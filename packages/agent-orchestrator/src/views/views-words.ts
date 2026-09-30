@@ -13,9 +13,9 @@ import { signedAndHeld, type AttemptClock, type TaskClock } from '../timeline/ti
 export type WordAttempt = AttemptClock & { ended: string | null; stated?: boolean; closeout?: unknown };
 
 /**
- * A task as the words read it off the engine's view: its word, its brief, how it settled, its attempts, the answers it was given, whether it
- * is held open or closed, and the closeout it was asked for. Written out here because a pure file imports no runtime, a type included, as
- * `AdmissionView` in `cap/cap.ts` is.
+ * A task as the words read it off the engine's view: its word, its brief, how it settled, its attempts, the answers it was given, whether
+ * it is held open or closed, and the closeout it was asked for. Written out here because a pure file imports no runtime, a type included,
+ * as `AdmissionView` in `cap/cap.ts` is.
  */
 export type WordView = TaskClock & {
   phase: string;
@@ -100,8 +100,8 @@ export const engineWord =
 
 /**
  * The engine's word for one task (`engineWord`) — but `succeeded` for a task held open that was closed after it signed, which the engine
- * calls `between attempts` until its next pass settles it: `phaseOfView` reads it as settled already, and the tick files what follows on it,
- * so `wf ls` and the board saying a session still going would disagree with the run for that pass. Exported for the api's `wordOf`.
+ * calls `between attempts` until its next pass settles it: `phaseOfView` reads it as settled already, and the tick files what follows on
+ * it, so `wf ls` and the board saying a session still going would disagree with the run for that pass. Exported for the api's `wordOf`.
  */
 export const wordOfView = (v: WordView | undefined): string =>
   !v?.state.brief ? 'unknown' : v.phase !== 'input-required' && signedAndHeld(v) ? 'succeeded' : v.phase;

@@ -26,12 +26,14 @@ import type { Assessment } from '../tick/assess.ts';
  * What the session of an ending that lands on its check is denied beyond its own `disallowedTools:`: the two commands that commit a staged
  * merge. The run commits it, on the check's word; a shipper that committed first would put the merge on the base branch unchecked, and the
  * pass after could only record it as committed before its check ran. A deny is a prefix, not a sandbox — `git merge` without `--no-commit`
- * still commits a clean merge, and `git -C . commit` is not `git commit` — so the brief says it too, and a commit made anyway is recorded as
- * such (`landingDue`'s `onHead`). The parser refuses a landing on codex, which takes no deny list.
+ * still commits a clean merge, and `git -C . commit` is not `git commit` — so the brief says it too, and a commit made anyway is recorded
+ * as such (`landingDue`'s `onHead`). The parser refuses a landing on codex, which takes no deny list.
  */
 export const LANDING_DENIED: readonly string[] = ['Bash(git commit:*)', 'Bash(git merge --continue:*)'];
 
-/** The deny list a step is filed with, each try and each round: its own, and `LANDING_DENIED` for an ending that lands on its check. Pure. */
+/**
+ * The deny list a step is filed with, each try and each round: its own, and `LANDING_DENIED` for an ending that lands on its check. Pure.
+ */
 export const filedDenies = (
   step: Pick<Workflow, 'name' | 'gate' | 'workspace' | 'check' | 'disallowedTools'>,
   run: Pick<Run, 'gates'>,
@@ -41,8 +43,8 @@ export const filedDenies = (
 /** The repository's own checkout as a pass reads it for an ending that lands on its check (`mergeState` in worktree.store.ts). */
 export type MergeState = {
   /**
-   * `ours`: a merge is in progress — MERGE_HEAD — and every commit it merges is the tip of one of this run's result branches; `other`: one is,
-   * and it merges something else, a person's or another run's; `none`: no merge is in progress.
+   * `ours`: a merge is in progress — MERGE_HEAD — and every commit it merges is the tip of one of this run's result branches; `other`: one
+   * is, and it merges something else, a person's or another run's; `none`: no merge is in progress.
    */
   merging: 'ours' | 'other' | 'none';
   /** Whether git holds a path unmerged. */
@@ -53,18 +55,21 @@ export type MergeState = {
   head?: string;
 };
 
-/** What a pass does about an ending's staged merge (`landingDue`): commit it with the step's message, abort it, or only write down how it stands. */
+/**
+ * What a pass does about an ending's staged merge (`landingDue`): commit it with the step's message, abort it, or only write down how it
+ * stands.
+ */
 export type Landing = { act: 'commit'; message: string } | { act: 'abort'; why: string } | { act: 'record'; landed: Landed };
 
 /**
  * What this pass does with the merge an ending that lands on its check staged in the repository's checkout (`landsOnCheck`), or undefined
- * when it does nothing. Pure: the tick acts, and writes what it did on the step's record (`landed`), once for each try. The checkout is read
- * through `merge` (`mergeState`: a handful of git calls in a person's own checkout), and only once a landing can be due: never while the
- * step's session or its check runs, and, for a step that ended any way but a signed hand-off, only where `staged` — MERGE_HEAD is there,
- * read off the file system with no git — says a merge is in progress to take back. So an ending that ended blocked with nothing staged
- * is recorded as landing nothing on the first pass that reads it settled (a task the engine does not know reads `running`, and waits),
- * with one `stat` of the checkout and no git, and the merges a person stages there after it — to resolve by hand what stopped it, or a
- * trial merge — are never the run's to abort. Level-triggered: a pass after a restart — the daemon's, or the machine's — reads the
+ * when it does nothing. Pure: the tick acts, and writes what it did on the step's record (`landed`), once for each try. The checkout is
+ * read through `merge` (`mergeState`: a handful of git calls in a person's own checkout), and only once a landing can be due: never while
+ * the step's session or its check runs, and, for a step that ended any way but a signed hand-off, only where `staged` — MERGE_HEAD is
+ * there, read off the file system with no git — says a merge is in progress to take back. So an ending that ended blocked with nothing
+ * staged is recorded as landing nothing on the first pass that reads it settled (a task the engine does not know reads `running`, and
+ * waits), with one `stat` of the checkout and no git, and the merges a person stages there after it — to resolve by hand what stopped it,
+ * or a trial merge — are never the run's to abort. Level-triggered: a pass after a restart — the daemon's, or the machine's — reads the
  * checkout and the engine as they are and does the same, so a merge staged by an ending is never left staged once nothing of it runs.
  *
  * Nothing while the step's session or its check is in flight, since each is working on that merge; nor on the pass that files its check,
@@ -73,8 +78,8 @@ export type Landing = { act: 'commit'; message: string } | { act: 'abort'; why: 
  * - **commit**: the step signed off done (`own` is `checking`), its check passed on the merge, the merge takes in every result branch and
  *   has no conflict, and the step's closeout gave a message. Only then does anything land on the base branch: the step was filed on a
  *   person's approval, and its check is the run's own, from the folder frozen on the record.
- * - **abort**, of a merge that is this run's: its check refused it or did not finish — a check that did not finish is no verdict, and no merge
- *   waits on one, since nothing would ever commit it; the step signed off anything but done, or ended with no closeout, failed or was
+ * - **abort**, of a merge that is this run's: its check refused it or did not finish — a check that did not finish is no verdict, and no
+ *   merge waits on one, since nothing would ever commit it; the step signed off anything but done, or ended with no closeout, failed or was
  *   stopped; the run was called off, or held before the check was filed; the merge has a conflict, or leaves a result branch out; or the
  *   step gave no message to commit it with.
  * - **record**, with no merge of the run's to act on: the step ended anything but done with nothing staged; it signed off done having
@@ -131,9 +136,9 @@ export function landingDue(
 }
 
 /**
- * Whether an ending that lands on its check still owes the checkout a landing, and holds it: filed, with nothing landed yet, and its session
- * or its check in flight, its check due, or its merge staged. What keeps another run's ending out of the checkout (`mainClaim`) and `wf rm`
- * from forgetting a run whose merge nothing would then commit or abort (`forgetRefusal`). Pure.
+ * Whether an ending that lands on its check still owes the checkout a landing, and holds it: filed, with nothing landed yet, and its
+ * session or its check in flight, its check due, or its merge staged. What keeps another run's ending out of the checkout (`mainClaim`) and
+ * `wf rm` from forgetting a run whose merge nothing would then commit or abort (`forgetRefusal`). Pure.
  */
 export const landingOpen = (
   step: Workflow,
@@ -150,8 +155,8 @@ export const landingOpen = (
 
 /**
  * What the run did with an ending's merge — `the run committed its merge onto main as 1a2b3c4`, or why it made no commit — as the tick's
- * note says it (the daemon's log), `wf ls` on the step's line (`listing`, clipped), and `wf decide` in its offer of a try of a merge the run
- * aborted (`retryLines`).
+ * note says it (the daemon's log), `wf ls` on the step's line (`listing`, clipped), and `wf decide` in its offer of a try of a merge the
+ * run aborted (`retryLines`).
  */
 export const landedWords = (run: Pick<Run, 'branch'>, landed: Landed): string =>
   'commit' in landed
@@ -276,9 +281,9 @@ export const toDecideWords = (run: Pick<Run, 'id' | 'branch'>, t: ToDecide): str
     : `${t.branches.join(', ')} ${t.branches.length > 1 ? 'are' : 'is'} ahead of ${run.branch}, and nothing has merged ${t.branches.length > 1 ? 'them' : 'it'} — wf decide ${run.id}`;
 
 /**
- * Why a run cannot be gated at these steps, in words that name the fix — or null. Pure, and asked at start before anything is written: a step
- * given twice, and a step the workflow does not have, naming the steps it has. `said` is how a refusal names what gave the gate: `--gate <step>`
- * by default, a card's `gate:` for a card's.
+ * Why a run cannot be gated at these steps, in words that name the fix — or null. Pure, and asked at start before anything is written: a
+ * step given twice, and a step the workflow does not have, naming the steps it has. `said` is how a refusal names what gave the gate:
+ * `--gate <step>` by default, a card's `gate:` for a card's.
  */
 export function gateRefusal(
   gates: readonly string[],

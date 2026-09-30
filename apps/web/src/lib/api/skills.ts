@@ -96,8 +96,9 @@ export type SkillDraft = {
 export type SkillUser = { from: 'yours' | 'repo'; name: string };
 
 /**
- * Mirrors `SkillDetail`: one skill on its page — its row, the version a write carries back, its draft (null where its SKILL.md does not read,
- * `body` its instructions all the same), the agents of either place that give this very folder, and the `cp -r` that moves it to the other place.
+ * Mirrors `SkillDetail`: one skill on its page — its row, the version a write carries back, its draft (null where its SKILL.md does not
+ * read, `body` its instructions all the same), the agents of either place that give this very folder, and the `cp -r` that moves it to the
+ * other place.
  */
 export type SkillDetail = {
   skill: SkillRow;
@@ -128,7 +129,10 @@ async function written(method: 'POST' | 'PUT', url: string, body: unknown): Prom
   );
 }
 
-/** A new skill of yours, written in your library: refused, in the package's words, for a name it has already or a draft the card reader refuses. */
+/**
+ * A new skill of yours, written in your library: refused, in the package's words, for a name it has already or a draft the card reader
+ * refuses.
+ */
 export const createSkill = (draft: SkillDraft): Promise<SkillSaved> => written('POST', '/api/skills/yours', { skill: draft });
 
 /** A skill of yours written again, whole, at the version it was read at: refused 409 when it has changed since. */

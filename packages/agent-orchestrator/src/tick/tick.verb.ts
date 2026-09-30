@@ -28,11 +28,17 @@ import type { PassCost } from '../meter/meter.ts';
 import { advanceRun, type Advanced } from './advance.verb.ts';
 import { costOf, ioOf, meteredEngine } from '../meter/meter.verb.ts';
 
-/** One pass: every run advanced, in the store's order, and what the pass did with the queue of inbox cards, when it did anything (`startQueued`). */
+/**
+ * One pass: every run advanced, in the store's order, and what the pass did with the queue of inbox cards, when it did anything
+ * (`startQueued`).
+ */
 export type Pass = {
   runs: Advanced[];
   queue?: QueueStarted;
-  /** Why the feed could not be written on this pass (`recordFeed`), when it could not: the pass itself went on, since nothing reads the feed to decide. */
+  /**
+   * Why the feed could not be written on this pass (`recordFeed`), when it could not: the pass itself went on, since nothing reads the feed
+   * to decide.
+   */
   feedError?: string;
   /**
    * What the pass cost, phase by phase (`PassCost`), as written to the store for `wf up --stats` and the api (`recordPassCost`) — its
@@ -41,7 +47,8 @@ export type Pass = {
   cost?: PassCost;
   /**
    * The moves the runtime's lifecycle had no edge for on this pass (`TickReport.refused`): each task stalls, asked again every pass, until
-   * what it sees changes or the machine gains the edge. Absent when there were none. `wf up` says each once while it lasts (`refusalLines`).
+   * what it sees changes or the machine gains the edge. Absent when there were none. `wf up` says each once while it lasts
+   * (`refusalLines`).
    */
   refused?: RefusedMove[];
   /**
@@ -54,10 +61,10 @@ export type Pass = {
 };
 
 /**
- * What a daemon says of a pass's refused moves, and what it has then said: a refusal it said on an earlier pass and that is still refused is
- * not said again, one that cleared is forgotten, so it is said again if it comes back. `said` holds the refusals of the last pass alone, by
- * task, state and event: a daemon that restarts says every refusal still standing once more, since what it printed before is on a terminal
- * that may be gone. Nothing is decided on it: this is only what has been printed, as `wf up`'s queue and feed failures are.
+ * What a daemon says of a pass's refused moves, and what it has then said: a refusal it said on an earlier pass and that is still refused
+ * is not said again, one that cleared is forgotten, so it is said again if it comes back. `said` holds the refusals of the last pass alone,
+ * by task, state and event: a daemon that restarts says every refusal still standing once more, since what it printed before is on a
+ * terminal that may be gone. Nothing is decided on it: this is only what has been printed, as `wf up`'s queue and feed failures are.
  */
 export function refusalLines(refused: readonly RefusedMove[], said: ReadonlySet<string>): { lines: string[]; said: Set<string> } {
   const now = new Set<string>();
@@ -73,22 +80,24 @@ export function refusalLines(refused: readonly RefusedMove[], said: ReadonlySet<
 /** What the runtime's own pass reported (`Engine`'s `tick`). */
 type TickReport = Awaited<ReturnType<Engine['tick']>>;
 
-/** What a pass is handed: where a queued card with no repository of its own is started, the memo it answers from, and whether it verifies. */
+/**
+ * What a pass is handed: where a queued card with no repository of its own is started, the memo it answers from, and whether it verifies.
+ */
 type PassOptions = { repo: string; memo: RestMemo; verify: boolean };
 
 /**
  * Every run, advanced once, after one engine tick — then, with a run slot free, the queue's next card started. This is the whole daemon: an
  * Effect program that requires the engine as a service (`EngineService`), whose plain face is `tick`.
  *
- * First, what the engine's tick saw waiting is admitted per pool under `WF_MAX_CONCURRENT` (`toAdmit`), off the views its pass built from its
- * one observation of each harness; the engine starts it on its next pass. So a task filed on this pass is admitted on the next and started on
- * the one after, and a slot freed is taken a pass after it is freed.
+ * First, what the engine's tick saw waiting is admitted per pool under `WF_MAX_CONCURRENT` (`toAdmit`), off the views its pass built from
+ * its one observation of each harness; the engine starts it on its next pass. So a task filed on this pass is admitted on the next and
+ * started on the one after, and a slot freed is taken a pass after it is freed.
  *
- * Every run that has started first, which the cap on runs in flight (`WF_MAX_RUNS`) never holds: what each has in flight once its pass is done
- * is what the cap counts. Then each run with nothing filed, oldest first (`admissionOrder`), judged against the runs in flight so far — and
- * counted, once it filed, for the next (`runAdmitted`). Then, while a slot is still free (`slotFree`) — always, with no cap — one queued card
- * is started, on `repo` when its card names none: one per pass, so the next pass counts its run before another is started. Nothing is carried
- * between passes: the next one counts again.
+ * Every run that has started first, which the cap on runs in flight (`WF_MAX_RUNS`) never holds: what each has in flight once its pass is
+ * done is what the cap counts. Then each run with nothing filed, oldest first (`admissionOrder`), judged against the runs in flight so far
+ * — and counted, once it filed, for the next (`runAdmitted`). Then, while a slot is still free (`slotFree`) — always, with no cap — one
+ * queued card is started, on `repo` when its card names none: one per pass, so the next pass counts its run before another is started.
+ * Nothing is carried between passes: the next one counts again.
  *
  * A run at rest — finished, every task settled, nothing due and nothing done — is answered from the memo of the passes before (`RestMemo`)
  * while none of its inputs changed, and costs no read of the engine and no git of its own: see `restMemo`.
@@ -203,8 +212,9 @@ const judged = (e: Engine, judging: Judging, run: Run, resting: RestingPass | un
   );
 
 /**
- * Each run with nothing filed judged, oldest first (`admissionOrder`), against the runs in flight so far under the cap `cap`: those the pass
- * judged in flight and those it left unjudged, and each waiting run once it filed or went unjudged. Answers the runs in flight at the end.
+ * Each run with nothing filed judged, oldest first (`admissionOrder`), against the runs in flight so far under the cap `cap`: those the
+ * pass judged in flight and those it left unjudged, and each waiting run once it filed or went unjudged. Answers the runs in flight at the
+ * end.
  */
 const waitingJudged = Effect.fn('waitingJudged')(function* (
   e: Engine,
@@ -279,7 +289,9 @@ const restMemo = (e: Engine): RestMemo => {
   return memo;
 };
 
-/** What a pass answers runs at rest by: the memo, read up to date with the feed, the store's stamps, and git's heads once per repository. */
+/**
+ * What a pass answers runs at rest by: the memo, read up to date with the feed, the store's stamps, and git's heads once per repository.
+ */
 type RestingPass = { memo: RestMemo; stamps: Map<string, string>; heads: (repo: string) => Record<string, string>; verify: boolean };
 
 /**
@@ -338,8 +350,8 @@ async function followedFeed(e: Engine, memo: RestMemo): Promise<boolean> {
 }
 
 /**
- * A run's full pass (`advanceRun`): what it advanced, what holds it out of rest, and what it rests on. Fails with `Unjudged` where a read of
- * one of its tasks' journals was refused (`unreadableJournal`), with a refusal where the pass refused, and dies of anything else.
+ * A run's full pass (`advanceRun`): what it advanced, what holds it out of rest, and what it rests on. Fails with `Unjudged` where a read
+ * of one of its tasks' journals was refused (`unreadableJournal`), with a refusal where the pass refused, and dies of anything else.
  */
 const fullPass = (e: Engine, run: Run, slot?: RunSlot) =>
   awaited(() =>
@@ -359,9 +371,9 @@ const fullPass = (e: Engine, run: Run, slot?: RunSlot) =>
  * Answered from memory, it costs no journal read, no observe and no git process of its own, and is counted (`rested`). With `verify`, it is
  * judged in full as well (`verified`), and a difference is died of: a change the memo missed is a bug in what it watches.
  *
- * `slot` is `advance`'s, handed on to every full pass. A run with nothing filed comes here too — one called off before it started rests like
- * any other — and its answer from memory does not hang on the slot: a run at rest has nothing ready (`atRest`), and only a run with a step
- * ready wants a slot (`slotNeed`), so the cap holds it on no pass and it counts on none.
+ * `slot` is `advance`'s, handed on to every full pass. A run with nothing filed comes here too — one called off before it started rests
+ * like any other — and its answer from memory does not hang on the slot: a run at rest has nothing ready (`atRest`), and only a run with a
+ * step ready wants a slot (`slotNeed`), so the cap holds it on no pass and it counts on none.
  */
 const advanceResting = Effect.fn('advanceResting')(function* (e: Engine, run: Run, resting: RestingPass | undefined, slot?: RunSlot) {
   if (!resting) return (yield* fullPass(e, run, slot)).advanced;
@@ -388,8 +400,8 @@ const advanceResting = Effect.fn('advanceResting')(function* (e: Engine, run: Ru
 });
 
 /**
- * A run the memo answered, judged in full as well (`fullPass`): nothing where the two agree, and a defect naming the run where the full pass
- * answers otherwise, finds it not at rest, or wrote its record (`record`, as the memo read it) otherwise.
+ * A run the memo answered, judged in full as well (`fullPass`): nothing where the two agree, and a defect naming the run where the full
+ * pass answers otherwise, finds it not at rest, or wrote its record (`record`, as the memo read it) otherwise.
  */
 const verified = Effect.fn('verified')(function* (
   e: Engine,

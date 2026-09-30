@@ -7,7 +7,10 @@ import { LOOP_REPLIES, type Workflow, WorkflowError } from '../step/step.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 import { contextText, sessionContext } from '../keys/index.ts';
 
-/** Whether a team works in folders the run makes, with no git repository (`workspace: folder`): every step says it, or none does (`validate`). */
+/**
+ * Whether a team works in folders the run makes, with no git repository (`workspace: folder`): every step says it, or none does
+ * (`validate`).
+ */
 export const isFolderTeam = (steps: readonly Pick<Workflow, 'workspace'>[]): boolean =>
   steps.length > 0 && steps.every((s) => s.workspace === 'folder');
 
@@ -137,15 +140,16 @@ const DEFAULT_MODE = 'auto';
  * prompt, the session is told so, and it carries on.
  *
  * A job waits on nobody, in any mode (agent-runtime's open issue 28, M1, Claude Code 2.1.280): `claude -p` in `auto`, `dontAsk`,
- * `default` and `acceptEdits` is denied each call it cannot make, carries on and exits on its own. So a step run as a job — every `claude` step without `background: true`,
- * every `claude-detached` one — is not judged on this, and neither is a codex step: `codex exec` has one shell, fenced by the sandbox its
- * `sandbox:` names, and asks nobody in any of them. So the modes that ask nobody are Claude Code's, and a harness's own: Codex has no
- * permission mode to judge (`permissionMode:` is refused there), and `background: true` is refused on any harness but claude. What is judged is the one way left to ask: a `background: true` step.
+ * `default` and `acceptEdits` is denied each call it cannot make, carries on and exits on its own. So a step run as a job — every `claude`
+ * step without `background: true`, every `claude-detached` one — is not judged on this, and neither is a codex step: `codex exec` has one
+ * shell, fenced by the sandbox its `sandbox:` names, and asks nobody in any of them. So the modes that ask nobody are Claude Code's, and a
+ * harness's own: Codex has no permission mode to judge (`permissionMode:` is refused there), and `background: true` is refused on any
+ * harness but claude. What is judged is the one way left to ask: a `background: true` step.
  *
  * A git run's steps work in a checkout a person has opened and trusted, with settings of its own; a folder run's do not, and there is
  * nobody to answer. So this is refused for folder teams only, at load, where every start — a brief, an inbox card, a queued card, the
- * api — passes. It costs the step what `dontAsk` denies, which is everything not allowed: that is what `allowedTools:` gives back, scoped to the
- * step's own folder (`Edit(**)`).
+ * api — passes. It costs the step what `dontAsk` denies, which is everything not allowed: that is what `allowedTools:` gives back, scoped
+ * to the step's own folder (`Edit(**)`).
  */
 function validateFolderMode(steps: readonly Workflow[]): void {
   if (!isFolderTeam(steps)) return;

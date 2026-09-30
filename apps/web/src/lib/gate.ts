@@ -13,15 +13,15 @@ type DetailStep = RunDetail['steps'][number];
 
 /**
  * A gate a person answers from the board: the step waiting at it; whether it ends the run in the repository's own checkout (`ends`), held
- * before it is filed so that the approval is what runs it; and the steps a send-back goes to (`back`) — the step itself for a gate that holds
- * after its step has run, the work an ending waits on for an ending, and none for an ending that waits on nothing.
+ * before it is filed so that the approval is what runs it; and the steps a send-back goes to (`back`) — the step itself for a gate that
+ * holds after its step has run, the work an ending waits on for an ending, and none for an ending that waits on nothing.
  */
 export type GateAsk = { step: string; ends: boolean; back: readonly string[]; onto: string | null };
 
 /**
- * The gate the Factory's card answers, off the list alone: the ending's gate the run's to-decide says, or the first step waiting at its gate
- * on you. Null on a run called off, on a run a person holds (`wf hold`, whose approval the package refuses), and where no gate waits. A
- * to-decide gate whose `back` names the step itself holds after the step ran (`sendBackTo` gives the step once it has a task); one whose
+ * The gate the Factory's card answers, off the list alone: the ending's gate the run's to-decide says, or the first step waiting at its
+ * gate on you. Null on a run called off, on a run a person holds (`wf hold`, whose approval the package refuses), and where no gate waits.
+ * A to-decide gate whose `back` names the step itself holds after the step ran (`sendBackTo` gives the step once it has a task); one whose
  * `back` does not is an ending, not filed until approved. A list from an api without `back` reads the step alone as where a send-back goes,
  * which the package would refuse for an ending, in its words.
  */
@@ -57,9 +57,10 @@ export function gateOfStep(
 export const backName = (back: readonly string[]): string => (back.length === 1 ? back[0] : 'the work');
 
 /**
- * The card's words for a gate, in its one row: what approving does, and where a send-back goes. `approve to run ship on main,
- * or send review back`; for a gate that holds after its step ran, `approve what plan handed on, or send it back`. Long names cut it short on
- * the card, which has it whole on hover beside the step's own prose; the inspector says it all, whole.
+ * The card's words for a gate, in its one row: what approving does, and where a send-back goes.
+ * `approve to run ship on main, or send review back`; for a gate that holds after its step ran,
+ * `approve what plan handed on, or send it back`. Long names cut it short on the card, which has it whole on hover beside the step's own
+ * prose; the inspector says it all, whole.
  */
 export function gateCardLine(gate: GateAsk): string {
   const approving = gate.ends ? `approve to run ${gate.step}${gate.onto ? ` on ${gate.onto}` : ''}` : `approve what ${gate.step} handed on`;
@@ -69,9 +70,9 @@ export function gateCardLine(gate: GateAsk): string {
 
 /**
  * The card's way to what a gate asks a person to approve, which a card has no room to show (it must fit its cell): the words, and where on
- * the run's page it goes. A step that has signed off opens its inspector (`step`), on its Output tab, where its closeout is: `Read the plan`
- * for the step the shipped folders call `plan`, `Read what it handed on` for any other. An ending has handed nothing on and has no closeout
- * of its own: its section (`hash`), where what it would act on is drawn beside its gate.
+ * the run's page it goes. A step that has signed off opens its inspector (`step`), on its Output tab, where its closeout is:
+ * `Read the plan` for the step the shipped folders call `plan`, `Read what it handed on` for any other. An ending has handed nothing on and
+ * has no closeout of its own: its section (`hash`), where what it would act on is drawn beside its gate.
  */
 export const readLink = (gate: Pick<GateAsk, 'step' | 'ends'>): { words: string; step: string } | { words: string; hash: string } =>
   gate.ends
@@ -195,7 +196,10 @@ export type Waits = { said: string; step: string | null };
 export const decideLine = (branches: readonly string[]): string =>
   `decide its result: ${branches.length === 1 ? 'a branch' : `${branches.length} branches`} ahead of the base that nothing merges`;
 
-/** A step's need, for the inspector, in full: what it asks, or what the harness waits for, where to answer it, and what its session said last. */
+/**
+ * A step's need, for the inspector, in full: what it asks, or what the harness waits for, where to answer it, and what its session said
+ * last.
+ */
 export const needWords = (need: Need): string =>
   need.kind === 'asks'
     ? `${need.step} asks: ${need.needs}`

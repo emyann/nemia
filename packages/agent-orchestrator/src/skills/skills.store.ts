@@ -2,8 +2,8 @@
  * What the board's skill picker and skill page write: a skill copied whole from another folder of skills (`copySkill`), and a skill made or
  * changed (`writeSkill`), each refused as `SkillWriteError`.
  *
- * Beneath the controllers, beside `record.store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports it. A run is
- * changed by none of it: it froze its folder, and its agents' skills, at `wf start`.
+ * Beneath the controllers, beside `record.store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports it. A run
+ * is changed by none of it: it froze its folder, and its agents' skills, at `wf start`.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -16,8 +16,8 @@ import { HOME } from '../record/record.store.ts';
 import { isWorkflowsHolder } from '../folder/write.store.ts';
 
 /**
- * A write of a skill refused, as the api answers it: a skill not there (`missing`), a name already taken (`exists`), a skill that changed since
- * it was read (`stale`), or anything else judged.
+ * A write of a skill refused, as the api answers it: a skill not there (`missing`), a name already taken (`exists`), a skill that changed
+ * since it was read (`stale`), or anything else judged.
  */
 export class SkillWriteError extends WorkflowError {
   readonly why: 'missing' | 'exists' | 'stale' | 'refused';
@@ -36,10 +36,11 @@ export type SkillCopied = { dir: string; name: string; written: string[] };
  * repository it runs on, never in the checkout Nemia ships from. A write of its own, done before and apart from any save of an agent.
  *
  * Judged whole before a byte is written, each refusal by name: `to` is a `skills/` beside the workflows the board lists — the store's, or a
- * repository's — unless `{ anywhere: true }`; the name is a skill's (`skillNameRefusal`); `from` has that skill, a folder holding a SKILL.md
- * whose card entry reads (`skillEntryOf`), so a copy is never a skill no agent could be given; nothing in it is a link, since a copy would
- * follow it and bring in whatever it points at; and `to` has no skill of that name, which a copy would write over. It is then copied into a
- * hidden folder beside where it goes and renamed into place, so a copy that fails part-way leaves no half a skill to be found.
+ * repository's — unless `{ anywhere: true }`; the name is a skill's (`skillNameRefusal`); `from` has that skill, a folder holding a
+ * SKILL.md whose card entry reads (`skillEntryOf`), so a copy is never a skill no agent could be given; nothing in it is a link, since a
+ * copy would follow it and bring in whatever it points at; and `to` has no skill of that name, which a copy would write over. It is then
+ * copied into a hidden folder beside where it goes and renamed into place, so a copy that fails part-way leaves no half a skill to be
+ * found.
  */
 export function copySkill(from: string, to: string, name: string, { anywhere = false }: { anywhere?: boolean } = {}): SkillCopied {
   const refuse = refuseSkill;
@@ -89,9 +90,9 @@ const refuseSkill = (why: string | undefined, kind?: SkillWriteError['why']): vo
 };
 
 /**
- * The refusals a copy and a write of a skill share, judged before either reads a byte of it: `at` is a `skills/` beside the workflows the board
- * lists — the store's, or a repository's — unless `anywhere`; `name` is a skill's (`skillNameRefusal`); and neither `at` nor the folder it is in
- * is a link, which a write would follow out of the store.
+ * The refusals a copy and a write of a skill share, judged before either reads a byte of it: `at` is a `skills/` beside the workflows the
+ * board lists — the store's, or a repository's — unless `anywhere`; `name` is a skill's (`skillNameRefusal`); and neither `at` nor the
+ * folder it is in is a link, which a write would follow out of the store.
  */
 function judgeSkillPlace(at: string, name: string, anywhere: boolean, verb: string, linkWhy: string): void {
   if (path.basename(at) !== SKILLS_FOLDER)
@@ -115,16 +116,17 @@ export type SkillChange = SkillDraft | { name: string; preload: boolean };
 export type SkillWritten = { dir: string; name: string; version: string; written: string[] };
 
 /**
- * A skill of the folder of skills `to` written: made, with `{ version: null }`, or changed, with the version it was read at. What the board's
- * skill page does — a person writes a skill of their own in the store's library, where an agent of the store finds it. A skill's version is
- * digested into the version of every agent that gives it (`agentVersion`), so a change of it is a change of every one of them.
+ * A skill of the folder of skills `to` written: made, with `{ version: null }`, or changed, with the version it was read at. What the
+ * board's skill page does — a person writes a skill of their own in the store's library, where an agent of the store finds it. A skill's
+ * version is digested into the version of every agent that gives it (`agentVersion`), so a change of it is a change of every one of them.
  *
  * Judged whole before a byte is written, each refusal by name: the place and the name as a copy judges them (`judgeSkillPlace`); a SKILL.md
  * that is not a file of the folder's own — a link — which the write would follow; for a skill made, a name already taken (`exists`), and a
- * change of its `preload:` alone, which has no skill to change; for one changed, a skill not there (`missing`) and one whose files moved since
- * the version was read (`stale`); and a skill the card reader would refuse (`renderSkill`, `withPreload`), in its words. A skill whose SKILL.md
- * does not read may be written — that is how it is mended — so only what is written must read. A skill made is written in a hidden folder
- * beside where it goes and renamed into place, and a change through a hidden file beside SKILL.md, so a write that fails leaves no half a skill.
+ * change of its `preload:` alone, which has no skill to change; for one changed, a skill not there (`missing`) and one whose files moved
+ * since the version was read (`stale`); and a skill the card reader would refuse (`renderSkill`, `withPreload`), in its words. A skill
+ * whose SKILL.md does not read may be written — that is how it is mended — so only what is written must read. A skill made is written in a
+ * hidden folder beside where it goes and renamed into place, and a change through a hidden file beside SKILL.md, so a write that fails
+ * leaves no half a skill.
  */
 export function writeSkill(
   to: string,

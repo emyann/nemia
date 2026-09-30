@@ -109,8 +109,8 @@ const board = () => {
 
 /**
  * One pass over the run, metered as `tick` meters it: the engine's calls it made, in order, each with the run's id cut to `R`, and the
- * meter's count of calls in the phases a pass asks the engine in: `journals`, a read, and `act`, which is also every pass's hand-off and its
- * asks consumed (`consumeAsks`), each step's workspace cut, and the record written (`rewriteRun`).
+ * meter's count of calls in the phases a pass asks the engine in: `journals`, a read, and `act`, which is also every pass's hand-off and
+ * its asks consumed (`consumeAsks`), each step's workspace cut, and the record written (`rewriteRun`).
  */
 const pass = async (b: ReturnType<typeof board>, id: string) => {
   b.calls.length = 0;

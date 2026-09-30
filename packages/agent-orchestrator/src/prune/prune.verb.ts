@@ -1,7 +1,8 @@
 /**
- * `wf prune`: remove a run's worktrees alone (`prune`), reading the run as `cancel` does and refusing by name before anything is touched; and
- * the words `wf rm` shares with it — a path as git names a worktree (`resolved`), what git said when it refused (`gitWords`), and whose
- * merge is in the checkout (`merging`). A controller, reaching the runtime through the client (`runtime-client.ts`); it never stops anything.
+ * `wf prune`: remove a run's worktrees alone (`prune`), reading the run as `cancel` does and refusing by name before anything is touched;
+ * and the words `wf rm` shares with it — a path as git names a worktree (`resolved`), what git said when it refused (`gitWords`), and whose
+ * merge is in the checkout (`merging`). A controller, reaching the runtime through the client (`runtime-client.ts`); it never stops
+ * anything.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -40,20 +41,20 @@ export const merging = (run: Run, steps: readonly Workflow[] | undefined): Merge
  * files were removed where they would list them, as the api's file route does (410).
  *
  * Read as `wf rm` reads a run (`forget`), and refused, before anything is touched, for every reason `pruneRefusal` names: a folder run, a
- * run not over, anything that holds `wf rm`, a finished run not merged unless `unmerged`, a hand-off owed, and a worktree that is locked, on
- * no branch with something a removal would leave on none, or holds a change no commit has — or whose status git cannot read. No other run
- * is asked: one waiting on this run reads its record, which stays. A run once pruned is not asked its merge again for its worktrees; for
- * its files it is. A record whose workflow folder is gone is judged without its steps, and `pruneRefusal` says so.
+ * run not over, anything that holds `wf rm`, a finished run not merged unless `unmerged`, a hand-off owed, and a worktree that is locked,
+ * on no branch with something a removal would leave on none, or holds a change no commit has — or whose status git cannot read. No other
+ * run is asked: one waiting on this run reads its record, which stays. A run once pruned is not asked its merge again for its worktrees;
+ * for its files it is. A record whose workflow folder is gone is judged without its steps, and `pruneRefusal` says so.
  *
  * The worktrees are the run's as git lists them: a directory already gone is git's to forget (`git worktree prune`), not a removal, and a
  * run with no worktree left answers `nothing`, and says why. A link as the files directory is removed as a link, and read as nothing to
  * give back.
  *
  * Without `yes`, nothing is touched: each worktree and what removing it frees on disk (`diskBytes`: a worktree's `node_modules` is main's
- * files hardlinked, which cost its directories alone while main still holds them, and the blocks of any main has since replaced). With it, the
- * run is marked pruned first (`pruneFile`), its files counted as gone when they are to go, so that a pass or the api reading it while its
- * worktrees go reads it pruned and files nothing (`advance`); then git removes each worktree — never `--force`, so a file that turned up
- * since it was read is git's refusal and not a loss — and `worktrees/<id>` once it is empty; then its files, under `artifacts`, removed
+ * files hardlinked, which cost its directories alone while main still holds them, and the blocks of any main has since replaced). With it,
+ * the run is marked pruned first (`pruneFile`), its files counted as gone when they are to go, so that a pass or the api reading it while
+ * its worktrees go reads it pruned and files nothing (`advance`); then git removes each worktree — never `--force`, so a file that turned
+ * up since it was read is git's refusal and not a loss — and `worktrees/<id>` once it is empty; then its files, under `artifacts`, removed
  * and never followed, what would not go said and counted out of what was freed; and the marker is written again with what was removed.
  * The marker's time moves only when a worktree goes. A prune that removed nothing takes the marker back: gone on a run never pruned before,
  * as it was on one that was. The tick never calls this.
@@ -219,9 +220,10 @@ export async function prune(
 }
 
 /**
- * What removing a directory frees on disk, in bytes, as `du` counts it: a link as a link, and a file hardlinked from `beside` not at all while
- * `beside` still holds it. `du` counts an inode once per invocation, at the first path it meets it under, so `beside` is named first and the
- * directory's own line is read. A `du` that could not read a path still totals the rest, which is read; zero when `du` says nothing. A run's files directory has no `beside`: what a run collects is copied, not linked.
+ * What removing a directory frees on disk, in bytes, as `du` counts it: a link as a link, and a file hardlinked from `beside` not at all
+ * while `beside` still holds it. `du` counts an inode once per invocation, at the first path it meets it under, so `beside` is named first
+ * and the directory's own line is read. A `du` that could not read a path still totals the rest, which is read; zero when `du` says
+ * nothing. A run's files directory has no `beside`: what a run collects is copied, not linked.
  */
 function diskBytes(dir: string, beside?: string): number {
   const own = (out: string) => {

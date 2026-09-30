@@ -31,7 +31,9 @@ const FOLDERS = shippedFolders();
 /** Every shipped agents folder there is: each agent in it is named by a step of a shipped folder. */
 const AGENT_FOLDERS = SHIPPED_HOLDERS.map((holder) => path.join(holder, 'agents')).filter((dir) => fs.existsSync(dir));
 
-/** Every folder of skills a step may load, whose `allowed-tools` a loaded skill grants the session: the repository's, shipped, the team's. */
+/**
+ * Every folder of skills a step may load, whose `allowed-tools` a loaded skill grants the session: the repository's, shipped, the team's.
+ */
 const SKILL_FOLDERS = [
   path.join(REPO, '.claude', 'skills'),
   ...SHIPPED_HOLDERS.map((holder) => path.join(holder, 'skills')),

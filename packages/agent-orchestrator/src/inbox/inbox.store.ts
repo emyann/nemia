@@ -3,8 +3,8 @@
  * (`dropFromInbox`), a path named as a card (`inboxNameAt`), and the queue's files — the tries the tick wrote down of a queued card's start
  * (`queueDir`, `queueTries`). The judgement is `inbox.ts`'s; this reads and writes.
  *
- * Beneath the controllers, beside `record.store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports what the package
- * exports of it. A card's start — `startFromInbox`, and `startQueued`, the tick's — starts a run, and
+ * Beneath the controllers, beside `record.store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports what the
+ * package exports of it. A card's start — `startFromInbox`, and `startQueued`, the tick's — starts a run, and
  * is `inbox.verb.ts`'s, through `start`.
  */
 import fs from 'node:fs';
@@ -37,7 +37,10 @@ import { HOME, isDirectory, listRuns, runId, runsDir } from '../record/record.st
  */
 export const inboxDir = (): string => path.join(HOME, 'inbox');
 
-/** The inbox's entries as the pure half takes a folder's: a folder by its name and a trailing `/`, a markdown file with its text. None when there is no inbox yet. */
+/**
+ * The inbox's entries as the pure half takes a folder's: a folder by its name and a trailing `/`, a markdown file with its text. None when
+ * there is no inbox yet.
+ */
 export function inboxFiles(): Array<{ file: string; text: string }> {
   let names: string[];
   try {
@@ -63,9 +66,9 @@ export const inboxCards = (): string[] =>
     .map((l) => l.name);
 
 /**
- * Where the tick writes down a queued card's start it tried and did not make (`QueueTry`): `$WF_ROOT/queue/<name>.json`, outside the inbox, which
- * is a person's. The tick is its one writer: it writes one when a start does not happen, and removes it once the card is not queued as it
- * was — started, taken back, dropped or edited.
+ * Where the tick writes down a queued card's start it tried and did not make (`QueueTry`): `$WF_ROOT/queue/<name>.json`, outside the inbox,
+ * which is a person's. The tick is its one writer: it writes one when a start does not happen, and removes it once the card is not queued
+ * as it was — started, taken back, dropped or edited.
  */
 export const queueDir = (): string => path.join(HOME, 'queue');
 
@@ -97,15 +100,15 @@ export function queueTries(): Map<string, QueueTry> {
 }
 
 /**
- * `wf inbox`: every card in the inbox, by name, with the runs a record says it was started as (`inboxListing`) — and every entry that does not
- * read as a card, with why. The run records are read for their `from`, so a card whose removal failed after its start is listed as started; and
- * the tick's tries, so a queued card whose start was refused, or failed, says why.
+ * `wf inbox`: every card in the inbox, by name, with the runs a record says it was started as (`inboxListing`) — and every entry that does
+ * not read as a card, with why. The run records are read for their `from`, so a card whose removal failed after its start is listed as
+ * started; and the tick's tries, so a queued card whose start was refused, or failed, says why.
  */
 export const readInbox = (): InboxListing[] => inboxListing(inboxFiles(), listRuns(), isDirectory, queueTries());
 
 /**
- * Why a card may not name a repository, or null: `repo:` is the repository a run started from the card works on, and a team whose every step
- * says `workspace: folder` works on none — the card would keep on disk a path no run of it will ever look at.
+ * Why a card may not name a repository, or null: `repo:` is the repository a run started from the card works on, and a team whose every
+ * step says `workspace: folder` works on none — the card would keep on disk a path no run of it will ever look at.
  *
  * Refused wherever a card's `workflow:` is written — `addToInbox` (`wf inbox add`, and the board's Inbox) and `queueInInbox`
  * (`wf inbox queue --workflow`, which writes that key over the card's own) — in the words `wf start --repo` is refused in: the same
@@ -134,8 +137,9 @@ function cardRepoRefusal(opts: { workflow?: string; repo?: string; dir?: string 
 /**
  * `wf inbox add`: an idea filed as a card (`ideaCard`), under the slug `runId` makes of its body's first line, suffix and all, so two ideas
  * alike are two cards, and a name already taken is drawn again, never written over. `text` is a note, or a file's text; `from` is what a
- * refusal calls it; `dir` is the folder a path in the text's own `workflow:` is read from — the file's — and it is written absolute (`ideaCard`). `workflow` and `repo` are written as the card's keys, over
- * the text's own: `repo` an absolute path to a directory, `workflow` a name or an absolute path (`workflowAt`), as a start would be given it.
+ * refusal calls it; `dir` is the folder a path in the text's own `workflow:` is read from — the file's — and it is written absolute
+ * (`ideaCard`). `workflow` and `repo` are written as the card's keys, over the text's own: `repo` an absolute path to a directory,
+ * `workflow` a name or an absolute path (`workflowAt`), as a start would be given it.
  */
 export function addToInbox(opts: { text: string; from?: string; dir?: string; workflow?: string; repo?: string }): {
   card: InboxCard;
@@ -158,7 +162,9 @@ export function addToInbox(opts: { text: string; from?: string; dir?: string; wo
   }
 }
 
-/** What `wf inbox queue` did: the card as it now reads, its file, and — once queued — its place in the queue's order and how many are in it. */
+/**
+ * What `wf inbox queue` did: the card as it now reads, its file, and — once queued — its place in the queue's order and how many are in it.
+ */
 export type InboxQueued = { card: InboxCard; file: string; place?: number; of?: number; was: 'queued' | 'taken back' | 'not queued' };
 
 /** A queue `queueRefusal` refused, by its kind: a card a run's record names, or one already queued, is a `Conflict`; the rest `Invalid`. */
@@ -166,18 +172,18 @@ const queueRefused = (why: string, card: InboxCard, startedAs: readonly string[]
   startedAs.length || card.queued !== undefined ? new Conflict({ message: why }) : new WorkflowError(why);
 
 /**
- * `wf inbox queue <name>`: the card marked to start on its own, `queued:` the time now, and `workflow:` written over its own when given; `off`
- * takes the mark back, whatever the card's `repo:` names: a card whose repository is gone leaves the queue as any card does. The card's file
- * is written whole, through a hidden file renamed over it, so a pass never reads half a card — and the file keeps the time it was last
- * written, as the rename would give it the time of the queue, and a card has no filing time of its own but its mtime: a board orders its
- * cards by it, and a card queued or taken back would jump to the top of the list. A queue is no edit of the idea. When that time cannot be
- * set back, the queue is written all the same.
+ * `wf inbox queue <name>`: the card marked to start on its own, `queued:` the time now, and `workflow:` written over its own when given;
+ * `off` takes the mark back, whatever the card's `repo:` names: a card whose repository is gone leaves the queue as any card does. The
+ * card's file is written whole, through a hidden file renamed over it, so a pass never reads half a card — and the file keeps the time it
+ * was last written, as the rename would give it the time of the queue, and a card has no filing time of its own but its mtime: a board
+ * orders its cards by it, and a card queued or taken back would jump to the top of the list. A queue is no edit of the idea. When that time
+ * cannot be set back, the queue is written all the same.
  *
  * Refused by name, exit 2, before anything is written: a name that is not a card's (`inboxNameRefusal`), a name with no card (`Missing`) —
  * naming the cards there are — a card that does not read, and what `queueRefusal` refuses: a card a run's record names and one already
- * queued (`Conflict`), and one with no workflow and none given. A `workflow` given, queued or taken back, is written over the card's own, and refused onto a folder team for a
- * card that names a repository (`cardRepoRefusal`); with none given, the card's `repo:` is not judged. `off` on a card not queued writes
- * nothing, and says so.
+ * queued (`Conflict`), and one with no workflow and none given. A `workflow` given, queued or taken back, is written over the card's own,
+ * and refused onto a folder team for a card that names a repository (`cardRepoRefusal`); with none given, the card's `repo:` is not judged.
+ * `off` on a card not queued writes nothing, and says so.
  */
 export function queueInInbox(name: string, how: { off?: boolean; workflow?: string } = {}): InboxQueued {
   const refused = inboxNameRefusal(name);
@@ -226,8 +232,8 @@ export function queueInInbox(name: string, how: { off?: boolean; workflow?: stri
 export type InboxDropped = { removed: true; file: string } | { removed: false; cards: string[] };
 
 /**
- * `wf inbox rm`: a card dropped without being started. Refused, exit 2, for a name that is not a card's (`inboxNameRefusal`). A name with no
- * card is normal — dropped already, or never filed — and says which cards there are.
+ * `wf inbox rm`: a card dropped without being started. Refused, exit 2, for a name that is not a card's (`inboxNameRefusal`). A name with
+ * no card is normal — dropped already, or never filed — and says which cards there are.
  */
 export function dropFromInbox(name: string): InboxDropped {
   const refused = inboxNameRefusal(name);
@@ -248,9 +254,9 @@ export function dropFromInbox(name: string): InboxDropped {
 }
 
 /**
- * The name of the inbox card `given` is a path to — any path under the inbox, `<inbox>/<name>.md` or `<inbox>/<name>`, links resolved on the
- * way to both (`inboxNameOf`) — or null for a path outside it, and for text: what makes `wf start <path>` go through `startFromInbox`. A card
- * not there is still a card's path, refused by name at start.
+ * The name of the inbox card `given` is a path to — any path under the inbox, `<inbox>/<name>.md` or `<inbox>/<name>`, links resolved on
+ * the way to both (`inboxNameOf`) — or null for a path outside it, and for text: what makes `wf start <path>` go through `startFromInbox`.
+ * A card not there is still a card's path, refused by name at start.
  */
 export function inboxNameAt(given: string): string | null {
   const real = (at: string): string => {

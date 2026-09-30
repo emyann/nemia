@@ -11,7 +11,10 @@ import { OUT, store } from '../world.ts';
 /** The workflow the `builder` page makes, and what its two steps' agents are told. */
 const BUILT = { name: 'built', plan: 'Write PLAN.md.', implement: 'Implement what PLAN.md says.' };
 
-/** The workflow of yours the `builder` page opens a step with an agent on: its step `build` names the agent `agent`, and is moved to `other`. */
+/**
+ * The workflow of yours the `builder` page opens a step with an agent on: its step `build` names the agent `agent`, and is moved to
+ * `other`.
+ */
 const CREWED = { name: 'crew', agent: 'coder', other: 'critic' };
 
 /** The schema the `builder` page pastes for an `output:`: strict, as the parser takes one. */

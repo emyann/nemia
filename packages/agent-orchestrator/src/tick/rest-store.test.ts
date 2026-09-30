@@ -3,11 +3,11 @@
  * input of a run takes it out of the memo (`advanceResting` in tick.verb.ts): its record, the files a person keeps beside it, its asks and
  * what is done with them, its tasks' journals, and its result branches. What makes a run at rest is pure, and lives in rest.test.ts.
  *
- * Walked through the runtime itself, `promiseEngine` over an in-memory journal and a harness the test signs by hand, as held.test.ts does. A
- * file of its own, since `tick` reads every run under `WF_ROOT`. Every pass that is not a measurement judges the runs the memo answered in
- * full as well (`verifyRest`), and throws where the two differ. `WF_ROOT` is read as the module loads, so it is set before the import; no
- * cap on runs in flight, and sessions enough that every task filed is admitted on the pass after, so a store of two hundred runs is built
- * in a few passes.
+ * Walked through the runtime itself, `promiseEngine` over an in-memory journal and a harness the test signs by hand, as held.test.ts does.
+ * A file of its own, since `tick` reads every run under `WF_ROOT`. Every pass that is not a measurement judges the runs the memo answered
+ * in full as well (`verifyRest`), and throws where the two differ. `WF_ROOT` is read as the module loads, so it is set before the import;
+ * no cap on runs in flight, and sessions enough that every task filed is admitted on the pass after, so a store of two hundred runs is
+ * built in a few passes.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -47,7 +47,9 @@ const aRepo = (): string => {
   return repo;
 };
 
-/** A workflow folder of the steps given, each `after` the one before it, on codex: a job that is not held open, so it settles as it signs. */
+/**
+ * A workflow folder of the steps given, each `after` the one before it, on codex: a job that is not held open, so it settles as it signs.
+ */
 const folder = (...steps: string[]) => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   steps.forEach((name, k) =>

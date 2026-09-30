@@ -12,7 +12,9 @@ export class Missing extends TaggedError('Missing')<{ readonly message: string }
   readonly exitCode = 2;
 }
 
-/** What is asked is well formed, and the state of a run or of the store forbids it: a step already approved, a store another process holds. */
+/**
+ * What is asked is well formed, and the state of a run or of the store forbids it: a step already approved, a store another process holds.
+ */
 export class Conflict extends TaggedError('Conflict')<{ readonly message: string }> {
   readonly exitCode = 2;
 }

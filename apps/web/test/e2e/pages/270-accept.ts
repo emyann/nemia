@@ -8,10 +8,10 @@ import { OUT, store } from '../world.ts';
 
 export default {
   /**
-   * `wf accept` as a button: the loop out of rounds, review on round 3 of 3 and asking again, accepted from its run's page with a reason. The
-   * api calls the package's `accept()`, which writes the acceptance as `wf accept` does and nothing else, and the page reads the run move: the
-   * loop is over on the person's word, and nobody is waited on. Taken back, so every page after this one, and this one in the other theme,
-   * reads the store as seeded.
+   * `wf accept` as a button: the loop out of rounds, review on round 3 of 3 and asking again, accepted from its run's page with a reason.
+   * The api calls the package's `accept()`, which writes the acceptance as `wf accept` does and nothing else, and the page reads the run
+   * move: the loop is over on the person's word, and nobody is waited on. Taken back, so every page after this one, and this one in the
+   * other theme, reads the store as seeded.
    */
   name: 'accept',
   route: `/runs/${LOOPING.id}`,

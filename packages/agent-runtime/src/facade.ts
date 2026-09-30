@@ -33,7 +33,10 @@ export { CLAUDE_CONTEXT_TOKENS, CLAUDE_EFFORTS, CLAUDE_PERMISSION_MODES } from '
 export { CODEX_EFFORTS, CODEX_SANDBOXES } from './harness/codex/codex.ts';
 export type { HarnessSpec } from './harness/detached/detached.ts';
 export type { Credentials, MissingCredential, RemoteAgent } from './a2a/index.ts';
-/** Why a remote agent's entry is not one the runtime can reach, or `undefined`: what `Engine.layer` refuses, for a caller that reads entries from a file of its own and words the refusal there. */
+/**
+ * Why a remote agent's entry is not one the runtime can reach, or `undefined`: what `Engine.layer` refuses, for a caller that reads entries
+ * from a file of its own and words the refusal there.
+ */
 export { remoteConfigRefusal } from './a2a/index.ts';
 export { denialText, nameFor } from './core/index.ts';
 /** The task's lifecycle as plain data — states, edges, first and final states — for a board to draw; never the machine or its move. */

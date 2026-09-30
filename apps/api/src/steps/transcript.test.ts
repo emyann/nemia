@@ -3,8 +3,8 @@
  *
  * At shipped defaults: the api's own engine over a store this file seeds, reading a transcript file where Claude Code keeps
  * one (CLAUDE_CONFIG_DIR). What the routes give is held to what the engine gives for the same task. The harness's fake `claude`
- * (test/harness.ts) is first on PATH, so the registry of the sessions on this machine is never asked: it lists what a test says is running, and notes
- * every call, so a test can count what the stream costs. The store and CLAUDE_CONFIG_DIR are the harness's
+ * (test/harness.ts) is first on PATH, so the registry of the sessions on this machine is never asked: it lists what a test says is running,
+ * and notes every call, so a test can count what the stream costs. The store and CLAUDE_CONFIG_DIR are the harness's
  * scratch ones (`root`, `config`).
  */
 import { config, observations, registry, root } from '../../test/harness.ts';

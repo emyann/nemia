@@ -14,10 +14,11 @@ export const THEMES = ['light', 'dark'] as const;
 export type Theme = (typeof THEMES)[number];
 
 /**
- * A page the e2e visits: its name, for the screenshots and the failure; where it is; and what it must have. `follows` for a page that follows a
- * live session over server-sent events: its stream never finishes, so the network never idles, and the page is visited once it has loaded and
- * photographed once its canvases have settled, without waiting on the network. Every other page is visited once it has loaded and its network
- * is idle (`idle`: the feed's stream, which the board may hold open, left out), and photographed once it is idle again.
+ * A page the e2e visits: its name, for the screenshots and the failure; where it is; and what it must have. `follows` for a page that
+ * follows a live session over server-sent events: its stream never finishes, so the network never idles, and the page is visited once it
+ * has loaded and photographed once its canvases have settled, without waiting on the network. Every other page is visited once it has
+ * loaded and its network is idle (`idle`: the feed's stream, which the board may hold open, left out), and photographed once it is idle
+ * again.
  */
 export type PageSpec = { name: string; route: string; expect: (page: Page) => Promise<void>; follows?: true };
 
@@ -32,7 +33,10 @@ export const storeGone = (store: string): string =>
   `the e2e's store ${store} is gone, removed from outside while the pages were visited: every run reads 404 since, so no page failed. Run the e2e again` +
   '\n  what removes it: a sweep of the temporary directory — `systemd-tmpfiles --remove --boot` empties /tmp, and a slow WSL boot runs it beside the checks';
 
-/** A page that failed in a theme: where, why, and its picture — the store gone, given `lost`, said first, and what the page then failed on after it. */
+/**
+ * A page that failed in a theme: where, why, and its picture — the store gone, given `lost`, said first, and what the page then failed on
+ * after it.
+ */
 class PageFailure extends Error {
   constructor(where: string, cause: unknown, screenshot: string, lost?: string) {
     const why =

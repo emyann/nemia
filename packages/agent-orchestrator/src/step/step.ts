@@ -115,20 +115,20 @@ export type Workflow = {
   /**
    * `denials: fail`: a try whose session the harness denied a call is not passed on. It signs off as ever, and the step reads `denied` —
    * nothing after it is filed, no check is run on work done without the tool, and it waits on a person — rather than going on with the
-   * `denied: …` note beside its word. `retries:` never spends a try on it: `allowedTools:` is frozen on the run at `wf start`, so a try the run
-   * filed on its own would be denied the same call again. A person tries it again with `wf retry` (a new session, told what it was denied,
-   * to do without it), or adds the rule the offer names to the folder's `allowedTools:` and starts a new run. Absent: denials are recorded and
-   * said, and decide nothing. Every denial counts, one the checkout's settings or the step's own `disallowedTools:` make on purpose included.
-   * Refused where no denial is ever read, rather than accepted and never met: on codex, which records none, and beside `background: true`,
-   * whose `claude --bg` session records none either (agent-runtime's open issue 28).
+   * `denied: …` note beside its word. `retries:` never spends a try on it: `allowedTools:` is frozen on the run at `wf start`, so a try the
+   * run filed on its own would be denied the same call again. A person tries it again with `wf retry` (a new session, told what it was
+   * denied, to do without it), or adds the rule the offer names to the folder's `allowedTools:` and starts a new run. Absent: denials are
+   * recorded and said, and decide nothing. Every denial counts, one the checkout's settings or the step's own `disallowedTools:` make on
+   * purpose included. Refused where no denial is ever read, rather than accepted and never met: on codex, which records none, and beside
+   * `background: true`, whose `claude --bg` session records none either (agent-runtime's open issue 28).
    */
   denials?: 'fail';
   /**
-   * `remote: true`: every session of the step is bridged to claude.ai — Claude Code's `--remote-control`, filed as `config.claude.remoteControl` — and
-   * listed in the web's agents view, where anyone signed in to the account can drive it from a browser or a phone: type into it, answer its
-   * prompts, stop it. A deliberate setting, never a default, for that reason. `remote: false` is what a step without the line is. Refused at
-   * `wf start` on a harness the engine has no such flag for, and on `claude` without `background: true`: only Claude Code's background
-   * sessions are bridged, and a job (`claude -p`) opens no bridge.
+   * `remote: true`: every session of the step is bridged to claude.ai — Claude Code's `--remote-control`, filed as
+   * `config.claude.remoteControl` — and listed in the web's agents view, where anyone signed in to the account can drive it from a browser
+   * or a phone: type into it, answer its prompts, stop it. A deliberate setting, never a default, for that reason. `remote: false` is what
+   * a step without the line is. Refused at `wf start` on a harness the engine has no such flag for, and on `claude` without
+   * `background: true`: only Claude Code's background sessions are bridged, and a job (`claude -p`) opens no bridge.
    */
   remote?: boolean;
   /**
@@ -146,9 +146,9 @@ export type Workflow = {
    * The most the step's tries may cost together, in dollars — `budget: 5`, `budget: 2.50`. Absent: no cap. The run reads what each
    * ended try cost off the engine, and once they have together cost it or more, files nothing more for the step on its own — no `retries:`
    * try, no round of a loop it is in — until a person raises it (`wf retry --budget`, `wf round --budget`). On `claude` and
-   * `claude-detached`, whose sessions are `claude -p` jobs, what is left of it is handed to the engine as `config.budgetUsd` too — a harness
-   * argument the runtime judges nothing of — and the harness ends a session once the tries together reach it (`budgetUsdFor`). Refused on codex, which has none, and beside `background: true`,
-   * whose `claude --bg` keeps none either.
+   * `claude-detached`, whose sessions are `claude -p` jobs, what is left of it is handed to the engine as `config.budgetUsd` too — a
+   * harness argument the runtime judges nothing of — and the harness ends a session once the tries together reach it (`budgetUsdFor`).
+   * Refused on codex, which has none, and beside `background: true`, whose `claude --bg` keeps none either.
    */
   budget?: number;
   /**
@@ -161,8 +161,9 @@ export type Workflow = {
   retries?: number;
   /**
    * `gate: true`: the step's closeout waits for a person before anything after it is filed. Verified first, where it has a `check:`, then
-   * held — `awaiting approval` — until `wf approve` is on disk for the try it is on. Not control flow: the run files nothing on a condition,
-   * it waits for a person's word, as it does at the run boundary. Absent: no gate, as `wf start --gate <step>` can still set one for a run.
+   * held — `awaiting approval` — until `wf approve` is on disk for the try it is on. Not control flow: the run files nothing on a
+   * condition, it waits for a person's word, as it does at the run boundary. Absent: no gate, as `wf start --gate <step>` can still set one
+   * for a run.
    */
   gate?: true;
   /**
@@ -214,9 +215,9 @@ export type StepAgent = {
   body: string;
   given: Partial<Record<StepKey, string>>;
   /**
-   * The agent's own instructions, its skills and its system prompt, as the step was resolved: what `wf start` renders for a Claude Code step,
-   * which is then told its instructions in its system prompt and its note alone in its brief (`rendersAgent`, `briefBody`). Absent on a
-   * record without them, whose step is told both in its brief.
+   * The agent's own instructions, its skills and its system prompt, as the step was resolved: what `wf start` renders for a Claude Code
+   * step, which is then told its instructions in its system prompt and its note alone in its brief (`rendersAgent`, `briefBody`). Absent on
+   * a record without them, whose step is told both in its brief.
    */
   instructions?: string;
   skills?: string[];
@@ -394,13 +395,13 @@ export const isObject = (v: unknown): v is Record<string, unknown> => Boolean(v)
 export const isReadme = (file: string): boolean => /^readme\.md$/i.test(file);
 
 /**
- * The folder of agents, beside the workflows that name them: `agents/`. A workflow may not have its name — `workflowsIn` never lists it, and
- * `loadWorkflows`, `workflowFolder` and `writeWorkflow` refuse it (`agentsFolderRefusal`).
+ * The folder of agents, beside the workflows that name them: `agents/`. A workflow may not have its name — `workflowsIn` never lists it,
+ * and `loadWorkflows`, `workflowFolder` and `writeWorkflow` refuse it (`agentsFolderRefusal`).
  */
 export const AGENTS_FOLDER = 'agents';
 
 /**
- * The folder of skills, beside the agents that give them: `skills/`, each skill a folder of its own holding a `SKILL.md`. No workflow has its
- * name either (`agentsFolderRefusal`).
+ * The folder of skills, beside the agents that give them: `skills/`, each skill a folder of its own holding a `SKILL.md`. No workflow has
+ * its name either (`agentsFolderRefusal`).
  */
 export const SKILLS_FOLDER = 'skills';

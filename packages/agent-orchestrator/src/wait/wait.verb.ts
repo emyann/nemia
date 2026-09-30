@@ -1,6 +1,6 @@
 /**
- * `wf hold`: hold a run until other runs ship (`hold`), and lift a hold by hand (`unhold`), each writing the person's own file, refused before
- * anything is written. A controller, reaching the runtime through the client (`runtime-client.ts`).
+ * `wf hold`: hold a run until other runs ship (`hold`), and lift a hold by hand (`unhold`), each writing the person's own file, refused
+ * before anything is written. A controller, reaching the runtime through the client (`runtime-client.ts`).
  */
 import fs from 'node:fs';
 import type { Engine } from '../runtime-client.ts';

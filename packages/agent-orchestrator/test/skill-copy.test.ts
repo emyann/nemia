@@ -3,7 +3,8 @@
  * can give it. And what a skill costs a turn (`skillTurnCost`), which the picker shows beside each.
  *
  * The copy is held byte for byte against its source, the tests' team's skills (`team.ts`), and each refusal is made to refuse at shipped
- * defaults, asserted on its message, its kind, and with the library as it was. `WF_ROOT` is set before the modules are imported, since they read it as they load.
+ * defaults, asserted on its message, its kind, and with the library as it was. `WF_ROOT` is set before the modules are imported, since they
+ * read it as they load.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

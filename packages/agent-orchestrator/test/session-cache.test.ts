@@ -1,9 +1,9 @@
 /**
  * A continued session keeps its prompt cache: every task the run files with `resumeFrom` carries what the task whose session it continues
- * was filed with — its closeout schema, byte for byte as JSON, its model, effort, tools, disallowed tools and permission mode. Each of those
- * is part of the cached prompt: the schema is Claude Code's `StructuredOutput` tool, a tool sits at the front, and a changed one rewrites the
- * whole conversation at twenty times the price of reading it: a continuation filed with another schema than the one it continues rewrites
- * hundreds of thousands of tokens.
+ * was filed with — its closeout schema, byte for byte as JSON, its model, effort, tools, disallowed tools and permission mode. Each of
+ * those is part of the cached prompt: the schema is Claude Code's `StructuredOutput` tool, a tool sits at the front, and a changed one
+ * rewrites the whole conversation at twenty times the price of reading it: a continuation filed with another schema than the one it
+ * continues rewrites hundreds of thousands of tokens.
  *
  * And its context window (`contextTokens`), which is not part of the cached prompt — a resume given another window, or none, reads the
  * whole prompt from the cache (agent-runtime open issue 26) — but which a resumed session keeps only when it is given it again: Claude
@@ -35,7 +35,9 @@ const { advance, readRun, retry, start, stepsOf } = await import('../src/runner.
 
 const LOOPED = ['dev'];
 
-/** What a task is filed with that the harness puts in the cached prompt, beside the conversation itself — and the window the session keeps. */
+/**
+ * What a task is filed with that the harness puts in the cached prompt, beside the conversation itself — and the window the session keeps.
+ */
 const CACHED = ['closeoutSchema', 'model', 'effort', 'tools', 'disallowedTools', 'permissionMode', 'contextTokens'] as const;
 
 type Filed = { id: string; resumeFrom?: string; closeoutSchema?: object; config?: Record<string, unknown> } & Record<string, unknown>;
@@ -120,7 +122,10 @@ const board = () => {
   return { e, tasks, settle };
 };
 
-/** A value a strict schema accepts: the first of each choice, one item in each array. What a step says matters to the walk only by its shape. */
+/**
+ * A value a strict schema accepts: the first of each choice, one item in each array. What a step says matters to the walk only by its
+ * shape.
+ */
 function valueOf(schema: Record<string, unknown>): unknown {
   if (Array.isArray(schema.anyOf)) return valueOf(schema.anyOf[0] as Record<string, unknown>);
   if (Array.isArray(schema.enum)) return schema.enum[0];

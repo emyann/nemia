@@ -5,9 +5,9 @@ import { COSTLY, DIAMOND, ENDING, FAKE, GATED, LOOPING, SHIPPED, UNMERGED } from
 import type { PageSpec } from '../visit.ts';
 
 /**
- * A place in the menu pressed with Enter, as from the keyboard: the page is not loaded again, and the history has one entry more, as after a
- * click. The browser clicks a link on Enter's keydown, and React Aria lets that click through: only the root's `RouterProvider` keeps it from
- * loading the whole page. Nothing else in the e2e presses a link from the keyboard.
+ * A place in the menu pressed with Enter, as from the keyboard: the page is not loaded again, and the history has one entry more, as after
+ * a click. The browser clicks a link on Enter's keydown, and React Aria lets that click through: only the root's `RouterProvider` keeps it
+ * from loading the whole page. Nothing else in the e2e presses a link from the keyboard.
  */
 async function enterOnPlace(page: Page, place: (typeof PLACES)[number], route: string): Promise<void> {
   const before = await page.evaluate(() => {

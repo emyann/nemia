@@ -3,11 +3,13 @@
  *
  * Every state machine in the repository prints its own Mermaid diagram, and its package's docs hold that text between two markers:
  *
- *     <!-- diagram:<name>:begin — generated, from the repository's root: node -e "import('./<path>.ts').then((m) => console.log(m.<fn>()))" -->
- *     ```mermaid
- *     …
- *     ```
- *     <!-- diagram:<name>:end -->
+ * ~~~
+ * <!-- diagram:<name>:begin — generated, from the repository's root: node -e "import('./<path>.ts').then((m) => console.log(m.<fn>()))" -->
+ * ```mermaid
+ * …
+ * ```
+ * <!-- diagram:<name>:end -->
+ * ~~~
  *
  * This test knows no machine. It reads every markdown file the repository holds, runs each marker's command from the root, and
  * refuses a block that is not what the command prints, a command that cannot print (a machine that does not exist), and a marker of

@@ -148,8 +148,8 @@ function YourAnswer({ answer }: { answer: string }) {
 }
 
 /**
- * How a try ended, said first — by its agent, or by the machine for it — then its statement drawn, when there is one. A statement that could
- * not be read is shown whole, as the engine recorded it: nothing hidden.
+ * How a try ended, said first — by its agent, or by the machine for it — then its statement drawn, when there is one. A statement that
+ * could not be read is shown whole, as the engine recorded it: nothing hidden.
  */
 function TryOutcome({ t, none }: { t: StepTry; none: string }) {
   const outcome = outcomeOf(t, none);

@@ -208,7 +208,9 @@ const FOLDER_MAX = 6;
 /** The folder of `src` a file sits in, or undefined for a file at the root. */
 const folderOf = (file: string): string | undefined => /^src\/([^/]+)\//.exec(file)?.[1];
 
-/** Where the tree breaks the layout: a stray file at the root, a folder too big, a folder with a face it needs not or without one it needs. */
+/**
+ * Where the tree breaks the layout: a stray file at the root, a folder too big, a folder with a face it needs not or without one it needs.
+ */
 function layoutBreaches(files: string[]): string[] {
   const out = files
     .filter((f) => folderOf(f) === undefined && !ROOT_FILES.includes(f))

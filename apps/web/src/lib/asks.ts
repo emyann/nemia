@@ -2,8 +2,9 @@
  * What a step needs from a person, as the board says it, and what the run's page offers to answer it with. Pure.
  *
  * The facts are the api's — a closeout's `needs`, a session the harness blocked and, on a run's detail, what it said last, what `wf ls`
- * asks of you for a step at its gate (`approve plan`), `waitingOnYou`, a try a person `asked` for — which are the package's and the engine's.
- * The words that join the first two to a step, `asks` and `blocked by the harness`, are the board's: the package has none for them.
+ * asks of you for a step at its gate (`approve plan`), `waitingOnYou`, a try a person `asked` for — which are the package's and the
+ * engine's. The words that join the first two to a step, `asks` and `blocked by the harness`, are the board's: the package has none for
+ * them.
  */
 import type { Question, RunDetail, RunSummary, RunToDecide } from './api';
 import { stepState } from './status.ts';
@@ -15,9 +16,9 @@ type NeedsStep = Pick<RunSummary['steps'][number], 'name' | 'needs' | 'blockedBy
 
 /**
  * What one step needs from a person: the question it signed off blocked with; that the harness blocked its session — with what that harness
- * says it waits for where it says anything (`waitingFor`, the package's words, on the list as on the detail), and what the session said last
- * where the api read it (a run's detail), null where it did not (the list) or the session said nothing; or, at its gate, its approval —
- * `said` in `wf ls`'s words, `approve plan`.
+ * says it waits for where it says anything (`waitingFor`, the package's words, on the list as on the detail), and what the session said
+ * last where the api read it (a run's detail), null where it did not (the list) or the session said nothing; or, at its gate, its approval
+ * — `said` in `wf ls`'s words, `approve plan`.
  */
 export type Need =
   | { step: string; kind: 'asks'; needs: string }
@@ -45,8 +46,8 @@ export function needOf(step: NeedsStep, waitingOnYou: boolean, runCancelled: boo
 /**
  * Each step's need, in the run's order: what the Factory's card and the run's banner say.
  *
- * Without the ending step whose gate the run's to-decide line already says, as `wf ls` leaves it out of `→ waiting on you` (cli/main.ts): that
- * line names the step and the command that approves it, and the same step is not asked for twice.
+ * Without the ending step whose gate the run's to-decide line already says, as `wf ls` leaves it out of `→ waiting on you` (cli/main.ts):
+ * that line names the step and the command that approves it, and the same step is not asked for twice.
  */
 export const needsOf = (
   run: Pick<RunSummary, 'cancelledAt' | 'waitingOnYou'> & { steps: readonly NeedsStep[]; toDecide?: RunToDecide | null },
@@ -96,9 +97,9 @@ export const needLine = (need: Need): string =>
   need.kind === 'approve' ? need.said : `${need.step} ${need.kind === 'asks' ? '' : 'is '}${needText(need)}`;
 
 /**
- * Whether a step's section offers its gate — Approve and Send back — beside what it handed on: it waits at its gate on you, as `wf ls` asks it
- * (`approve plan`), on a run nobody called off. Only words offer it: a step approved or sent back carries none, and neither does a detail from
- * an api that has no approve route, whose `approve` is not there at all (`withGraph` refuses such a detail first).
+ * Whether a step's section offers its gate — Approve and Send back — beside what it handed on: it waits at its gate on you, as `wf ls` asks
+ * it (`approve plan`), on a run nobody called off. Only words offer it: a step approved or sent back carries none, and neither does a
+ * detail from an api that has no approve route, whose `approve` is not there at all (`withGraph` refuses such a detail first).
  */
 export const gateOffered = (step: Pick<RunDetail['steps'][number], 'approve'>, runCancelled: boolean): boolean =>
   Boolean(step.approve) && !runCancelled;
@@ -114,7 +115,8 @@ export const stepAnchor = (step: string): string => `step-${step}`;
  *   try-again  its check refused it, or it ended without its closeout: another session, with something to say if you like — and
  *              where a check did not pass, the check run again; first, when it did not finish
  *   denied     its harness denied its try a call, and it says `denials: fail`: another session, a new one first, as `wf decide` offers it —
- *              the run's `allowedTools:` is frozen, so a try is denied the same call again. `calls` is the line naming them (`StepNeeds.denied`)
+ *              the run's `allowedTools:` is frozen, so a try is denied the same call again. `calls` is the line naming them
+ *              (`StepNeeds.denied`)
  *   raise      a try of it, or its loop's round, has to carry a raise of its cap (`StepRaise`): over its budget, ended at it, or a check
  *              that did not finish past it. With its try — `wf retry --budget`, a nudge or a new session, and for a step that signed off
  *              blocked the answer to its `needs` beside it (`--message`), or its check again, which needs no raise — or with its loop's
@@ -169,8 +171,8 @@ export function offersOf(run: Pick<RunDetail, 'cancelledAt' | 'waitingOnYou' | '
 }
 
 /**
- * The amount a raise's box starts at: the first whole dollar above what the package says the budget has to pass (`StepRaise.above`) — $5 for
- * a step whose tries cost $4.25, $4 for one ended at a $3 cap. A person changes it; the package refuses one not above, in its words.
+ * The amount a raise's box starts at: the first whole dollar above what the package says the budget has to pass (`StepRaise.above`) — $5
+ * for a step whose tries cost $4.25, $4 for one ended at a $3 cap. A person changes it; the package refuses one not above, in its words.
  */
 export const raiseTo = (above: number): number => Math.floor(above) + 1;
 

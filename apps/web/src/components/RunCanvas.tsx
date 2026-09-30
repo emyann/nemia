@@ -110,7 +110,7 @@ function Canvas({ run, selected, onSelect, computed }: Props & { computed: Reado
   });
 
   useEffect(() => {
-    // oxlint-disable-next-line react/set-state-in-effect -- React Flow's nodes are state a drag and its measurements write too: the folder's steps are merged into them after the commit
+    // oxlint-disable-next-line react/set-state-in-effect -- a drag writes the nodes too: the steps are merged into them after the commit
     setPlaced((current) => {
       const have = new Map(current.map((n) => [n.id, n]));
       const at = place(names, computed, readLayout(run.id));

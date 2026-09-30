@@ -206,9 +206,10 @@ export const waitingOf =
 
 /**
  * What a task's sessions were denied, off views already read: every call the harness refused on an attempt that ended, as a permission rule
- * names it (`denialText`: `Skill(look)`, `Bash(pytest)`), each text once, in the order first denied. Empty for a task nobody read, one whose
- * attempts denied nothing, and one whose harness cannot say — a `background: true` session records none (the runtime's `Attempt.denials`) —
- * so an empty list is not a claim that nothing was denied. Costs no observation of its own: the denials are on the engine's journal.
+ * names it (`denialText`: `Skill(look)`, `Bash(pytest)`), each text once, in the order first denied. Empty for a task nobody read, one
+ * whose attempts denied nothing, and one whose harness cannot say — a `background: true` session records none (the runtime's
+ * `Attempt.denials`) — so an empty list is not a claim that nothing was denied. Costs no observation of its own: the denials are on the
+ * engine's journal.
  *
  * Every attempt of the task, not only its last: an attempt the engine started again within one filing is the same try, and what the first
  * was denied is still what the step could not do. A try is a task of its own (`checkTaskId`, `sessionTasks`), so the current try's task
@@ -225,8 +226,9 @@ export const deniedOf =
   };
 
 /**
- * What each task's sessions cost, off views already read (`taskSpend`): what holds a step to its `budget:`, and what `wf ls` and `wf decide`
- * print beside it — and what they were denied (`deniedOf`), which stops a step that says `denials: fail`. Exported, log-free, for a consumer that words a step as `wf ls` does. A task with no view read has no spend known.
+ * What each task's sessions cost, off views already read (`taskSpend`): what holds a step to its `budget:`, and what `wf ls` and
+ * `wf decide` print beside it — and what they were denied (`deniedOf`), which stops a step that says `denials: fail`. Exported, log-free,
+ * for a consumer that words a step as `wf ls` does. A task with no view read has no spend known.
  */
 export const spendReader =
   (views: ReadonlyMap<string, TaskView>): SpendOf =>
@@ -263,8 +265,8 @@ export const sessionIn = (views: ReadonlyMap<string, TaskView>, taskId: string):
 
 /**
  * A step's word on a run left unjudged because a task it reads does not (`unjudgedWords`): `unreadable` when any task the step has filed —
- * its own, its check's, an earlier try's or its check's (`stepTasks`) — is among `unreadable`; else `pending` with no task of its own filed,
- * and the engine's word for that task (`wordOfView`). What `wf ls` prints beside such a step, and the board's chip.
+ * its own, its check's, an earlier try's or its check's (`stepTasks`) — is among `unreadable`; else `pending` with no task of its own
+ * filed, and the engine's word for that task (`wordOfView`). What `wf ls` prints beside such a step, and the board's chip.
  */
 export const unjudgedWord =
   (views: ReadonlyMap<string, TaskView>, unreadable: ReadonlyMap<string, string>) =>
@@ -395,9 +397,9 @@ export const closeoutReader =
  * Shipped is the run's own `wf decide`'s word, and nothing stricter or looser: `decision` says `shipped` — the run is not running, it was
  * not cancelled, and every result branch is on its base branch (`isShipped`), with work past its base or with every step succeeded. A child
  * starts when its parent's `wf decide` says shipped, and a child waits exactly while it does not. A result branch is cut at its run's base,
- * which is on the base branch, so a branch nobody has committed to is on it from the moment it is cut: a parent still running has not shipped
- * for that, nor one that ended failed, blocked or unsigned with nothing committed; one whose steps all signed off with nothing to commit has,
- * as its `wf decide` says. A run that worked on its base branch itself (`--no-worktree`) never has.
+ * which is on the base branch, so a branch nobody has committed to is on it from the moment it is cut: a parent still running has not
+ * shipped for that, nor one that ended failed, blocked or unsigned with nothing committed; one whose steps all signed off with nothing to
+ * commit has, as its `wf decide` says. A run that worked on its base branch itself (`--no-worktree`) never has.
  *
  * Git first, which costs no harness observe: a result branch not on the base branch has not shipped, whatever the run's steps say. The
  * engine's view of the parent's tasks is read only once every one is.

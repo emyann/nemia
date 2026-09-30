@@ -29,9 +29,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 /**
  * The frame of every page: the sidebar, a header naming the section, and the page, in a centred column unless a matched route's
- * `staticData` asks for `fullBleed`. The header is `h-12`, the height the Factory leaves above itself. It follows the workflow feed once for
- * the whole page: what moves on it is read again at once, and the polls slow while it is open. React Aria's `RouterProvider` sends every
- * React Aria link, pressed with Enter or clicked, through the router, so no link loads the whole page again.
+ * `staticData` asks for `fullBleed`. The header is `h-12`, the height the Factory leaves above itself. It follows the workflow feed once
+ * for the whole page: what moves on it is read again at once, and the polls slow while it is open. React Aria's `RouterProvider` sends
+ * every React Aria link, pressed with Enter or clicked, through the router, so no link loads the whole page again.
  */
 function Root() {
   const path = useRouterState({ select: (state) => state.location.pathname });
@@ -64,7 +64,9 @@ function Root() {
   );
 }
 
-/** A place in the menu: the sidebar's button, which is React Aria's link once it has an `href`, given the router's `to` and its preloading. */
+/**
+ * A place in the menu: the sidebar's button, which is React Aria's link once it has an `href`, given the router's `to` and its preloading.
+ */
 const NavLink = routeLink(SidebarMenuButton);
 
 /** The menu, with `path`'s place in it marked; on a narrow screen it is a sheet over the page, and a pick closes it. */

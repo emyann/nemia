@@ -167,8 +167,8 @@ export const lockfilePackages = (lock: unknown): Record<string, LockEntry> | nul
  * A package parts when main does not have it, when one side is a link and the other is not, when a link
  * leads elsewhere, or when the versions differ. So does one nested in a workspace's own `node_modules`,
  * which links to main's root tree cannot give. An optional package main does not have is not a
- * difference: it is a platform build this machine did not take. A package main has and the lockfile does not name is not looked for. A lockfile that did
- * not parse parts at `package-lock.json`.
+ * difference: it is a platform build this machine did not take. A package main has and the lockfile does not name is not looked for. A
+ * lockfile that did not parse parts at `package-lock.json`.
  *
  * `inPlace` is for a tree read where the lockfile is — the repository's checkout, against the merge staged in it
  * (`checkoutParts`): no link is made, so a nested package parts only as a top-level one does.
@@ -349,7 +349,10 @@ export type WorkspacePlan =
 /** The directory inside a folder step's own folder that holds what the run copied in for it: `given/inputs`, `given/from/<step>`. */
 export const GIVEN = 'given';
 
-/** One thing the run copied into a folder step's folder: the step whose folder it was, where it now sits (from the folder), and where it came from. */
+/**
+ * One thing the run copied into a folder step's folder: the step whose folder it was, where it now sits (from the folder), and where it
+ * came from.
+ */
 export type GivenFrom = { step: string; dir: string; source: string };
 
 /** What a folder step is given: the run's inputs, and a copy of each folder it waits on. Both by their path from the step's own folder. */
@@ -359,9 +362,9 @@ export type Given = { inputs: string | null; from: readonly GivenFrom[] };
  * What the run copies into a folder step's folder as it makes it, and the names its brief calls those copies by — one function, read by
  * both, so the brief never names a path the fence denies.
  *
- * A folder team's steps run in `dontAsk` (`validateFolderMode` in workflow/validate.ts): a call outside the step's own directory is denied with no
- * prompt, the session reads the refusal and carries on, and nothing says so to anyone. So the run's `inputs/`, and the folders of the
- * steps this one waits on but did not continue, are copied in: a read inside the session's own directory needs no permission of any
+ * A folder team's steps run in `dontAsk` (`validateFolderMode` in workflow/validate.ts): a call outside the step's own directory is denied
+ * with no prompt, the session reads the refusal and carries on, and nothing says so to anyone. So the run's `inputs/`, and the folders of
+ * the steps this one waits on but did not continue, are copied in: a read inside the session's own directory needs no permission of any
  * harness. `artifactsContract`'s folder branch goes the same way round.
  *
  * Keyed on the workspace plan, so what is copied is what the step DECLARED it waits on — a fork's parent, a fan-in's parents — and never

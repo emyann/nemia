@@ -2,8 +2,8 @@
  * The session page's prompt box, as rules: whether it may send to a step's session, and what was said to the step, with what the page has
  * just said. Pure, so the rules are held by tests without a browser (test/say.test.ts).
  *
- * The facts are the api's — the step's word, its task, the run's cancellation, and `said`, off the engine's journal — which are the package's
- * and the engine's. What the box says when it is closed is the board's: it points at where a person can act instead.
+ * The facts are the api's — the step's word, its task, the run's cancellation, and `said`, off the engine's journal — which are the
+ * package's and the engine's. What the box says when it is closed is the board's: it points at where a person can act instead.
  */
 import type { RunDetail, Said } from './api';
 import { stepState } from './status.ts';
@@ -16,8 +16,8 @@ export type Sayable = { open: true } | { open: false; why: string };
  * harness — a session waiting on a person is running, and the engine hands it the words. Closed, with the reason, for a run called off, a
  * step not filed, a task the engine has no record of, one filed and not started, and a session that has ended — signed off, checked, failed
  * or stopped — which is the run page's to answer or try again. A held run stays open: a hold stops what is filed next and the answers to a
- * gate, never a session at work, and `wf say` is not refused on it. What the page cannot see coming, the api refuses in the package's words or
- * the engine's, and the box shows that refusal as it is.
+ * gate, never a session at work, and `wf say` is not refused on it. What the page cannot see coming, the api refuses in the package's words
+ * or the engine's, and the box shows that refusal as it is.
  */
 export function sayable(
   run: Pick<RunDetail, 'cancelledAt'>,
@@ -47,7 +47,10 @@ export function sayable(
   };
 }
 
-/** What was said to a step as the api last read it, with what this page has said since that the read does not have yet: once each, in the order said. */
+/**
+ * What was said to a step as the api last read it, with what this page has said since that the read does not have yet: once each, in the
+ * order said.
+ */
 export function mergeSaid(read: readonly Said[], sent: readonly Said[]): Said[] {
   const key = (s: Said) => `${s.attempt}:${s.at}`;
   const known = new Set(read.map(key));
@@ -55,9 +58,9 @@ export function mergeSaid(read: readonly Said[], sent: readonly Said[]): Said[] 
 }
 
 /**
- * What the prompt box holds once the api has said `sent`: nothing, when it still holds those words; what was typed after them, when a person
- * went on typing while they were being said — the sent words leave, so Send again does not say them twice; and everything, when the box was
- * rewritten meanwhile, since that is not what was sent.
+ * What the prompt box holds once the api has said `sent`: nothing, when it still holds those words; what was typed after them, when a
+ * person went on typing while they were being said — the sent words leave, so Send again does not say them twice; and everything, when the
+ * box was rewritten meanwhile, since that is not what was sent.
  */
 export const textAfterSaid = (now: string, sent: string): string =>
   now === sent ? '' : now.startsWith(sent) ? now.slice(sent.length).trimStart() : now;

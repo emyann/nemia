@@ -22,8 +22,8 @@ export type InboxEntry = {
   body: string | null;
   filedAt: string | null;
   /**
-   * On a queued card only (`wf inbox queue`): when it was queued, and its place in the order the tick starts cards in, from 1 — null for a card a
-   * record says was started, which the tick never starts again.
+   * On a queued card only (`wf inbox queue`): when it was queued, and its place in the order the tick starts cards in, from 1 — null for a
+   * card a record says was started, which the tick never starts again.
    */
   queued?: { at: string; place: number | null };
   /**
@@ -34,8 +34,8 @@ export type InboxEntry = {
 };
 
 /**
- * The inbox. Not polled: it changes when a person files, drops or starts a card, here or at the command line. Read again on each visit, and on
- * a run's event on the workflow feed, which a queued card started is; the feed says nothing of cards.
+ * The inbox. Not polled: it changes when a person files, drops or starts a card, here or at the command line. Read again on each visit, and
+ * on a run's event on the workflow feed, which a queued card started is; the feed says nothing of cards.
  */
 export const inboxQuery = queryOptions({
   queryKey: ['inbox'],
@@ -56,9 +56,9 @@ export const cardQuery = (name: string) =>
   });
 
 /**
- * File an idea as a card, as `wf inbox add "<idea>" --workflow <name> --repo <path>` does. Resolves with the card's name; rejects with the api's
- * refusal in full — the package's words for an idea with nothing in it or a repository that is not an absolute path to a directory, or the
- * api's own about the request or a workflow it has none of.
+ * File an idea as a card, as `wf inbox add "<idea>" --workflow <name> --repo <path>` does. Resolves with the card's name; rejects with the
+ * api's refusal in full — the package's words for an idea with nothing in it or a repository that is not an absolute path to a directory,
+ * or the api's own about the request or a workflow it has none of.
  *
  * Sent as `application/json`, which the api requires of it, as of a start.
  */
@@ -81,10 +81,11 @@ export async function fileCard(card: {
 }
 
 /**
- * Drop a card without starting it, as `wf inbox rm <name>` does. Rejects with the api's refusal in full: the package's words for a card that is
- * not there, naming the cards that are, or for a name that is not a card's.
+ * Drop a card without starting it, as `wf inbox rm <name>` does. Rejects with the api's refusal in full: the package's words for a card
+ * that is not there, naming the cards that are, or for a name that is not a card's.
  *
- * Sent as `application/json`, with no body, which the api requires of it, as of every write: a request another site's page cannot make unasked.
+ * Sent as `application/json`, with no body, which the api requires of it, as of every write: a request another site's page cannot make
+ * unasked.
  */
 export async function dropCard(name: string): Promise<void> {
   const route = `/api/inbox/${encodeURIComponent(name)}`;
@@ -108,9 +109,10 @@ export type Queued = {
 };
 
 /**
- * Queue a card to start on its own, as `wf inbox queue <name>` does — or, `off`, take it off the queue, as `--off` does. The tick starts the next
- * card in the queue when a run slot frees, on the workflow the card names. Resolves with what was done; rejects with the api's refusal in full —
- * the package's words for a card that is not there, names no workflow, is queued already or was started — or the api's own about the request.
+ * Queue a card to start on its own, as `wf inbox queue <name>` does — or, `off`, take it off the queue, as `--off` does. The tick starts
+ * the next card in the queue when a run slot frees, on the workflow the card names. Resolves with what was done; rejects with the api's
+ * refusal in full — the package's words for a card that is not there, names no workflow, is queued already or was started — or the api's
+ * own about the request.
  *
  * Sent as `application/json`, with no body, which the api requires of it, as of every write.
  */

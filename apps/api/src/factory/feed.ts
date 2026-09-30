@@ -86,8 +86,8 @@ export const feedEvents = (from: number): Stream.Stream<SSEMessage, unknown> =>
  * event with `retrying: false`, said once, and ends the stream rather than fail every second; a reader opens it again with no cursor and
  * reads the feed it has now. Any other failure is of that read, not the feed: it is said once as `unreadable` with `retrying: true`, the
  * watch reads again on its next beat from the same cursor, and the first read that works clears it with `readable`, whether or not it
- * finds a line. The relay runs on the app's runtime, and the watch is held in the scope of `feedEvents`, which the request's abort interrupts: when the reader goes, or the feed does, it is
- * stopped on that one path, and no fs watcher and no timer is left behind.
+ * finds a line. The relay runs on the app's runtime, and the watch is held in the scope of `feedEvents`, which the request's abort
+ * interrupts: when the reader goes, or the feed does, it is stopped on that one path, and no fs watcher and no timer is left behind.
  */
 export const feed = new Hono<ApiEnv>().get('/api/feed/stream', (c) => {
   const from = feedCursorOf(c.req.header('Last-Event-ID') || c.req.query('after') || undefined);

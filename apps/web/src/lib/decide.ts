@@ -47,9 +47,10 @@ export const decisionStamp = (
  * touched, counted once; the lines of every file, each file counted once; and how many branches git could not read.
  *
  * Once per file, not once per branch: each branch is diffed against the run's base, and a follower in a worktree of its own starts from
- * its parent's branch, so a fan-out's result branches each carry the parent's changes, which a sum would count once per branch. A file on several branches counts the change with the most lines among them — the parent's plus a follower's own on top of
- * it. Two siblings that each changed one file apart count the larger alone: the card is a line for triage, and `wf decide`, which prints
- * each branch on its own, is where the whole of it is. A binary file adds no lines.
+ * its parent's branch, so a fan-out's result branches each carry the parent's changes, which a sum would count once per branch. A file on
+ * several branches counts the change with the most lines among them — the parent's plus a follower's own on top of it. Two siblings that
+ * each changed one file apart count the larger alone: the card is a line for triage, and `wf decide`, which prints each branch on its own,
+ * is where the whole of it is. A binary file adds no lines.
  */
 export function touchedSummary(touched: readonly Touched[]): string {
   const read = touched.flatMap((t) => ('error' in t.radius ? [] : [t.radius]));
@@ -108,9 +109,9 @@ export function changeOf(touched: Touched | undefined, file: string): { added: n
 }
 
 /**
- * The looping step an `accept` command of this run accepts — `wf accept <run> <step> --message "<why>"`, as the api reads it out of `wf decide`'s
- * offer (`ONCE_MORE` in apps/api/src/decide/decision.ts) — or null for any other command, or one of another run. The board presses that one
- * itself.
+ * The looping step an `accept` command of this run accepts — `wf accept <run> <step> --message "<why>"`, as the api reads it out of
+ * `wf decide`'s offer (`ONCE_MORE` in apps/api/src/decide/decision.ts) — or null for any other command, or one of another run. The board
+ * presses that one itself.
  */
 export function acceptStepOf(command: Pick<DecideCommand, 'label' | 'command'>, runId: string): string | null {
   if (command.label !== 'accept') return null;

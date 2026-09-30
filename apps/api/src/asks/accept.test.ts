@@ -1,7 +1,7 @@
 /**
- * POST /api/runs/:id/steps/:step/accept: a person's acceptance of a loop out of rounds, as it stands, from the board — through the package's
- * `accept()`, `wf accept`'s own, which writes the acceptance and nothing else, and refused in the package's words. The api judges none of it:
- * every refusal here is asserted equal to what `accept()` itself says.
+ * POST /api/runs/:id/steps/:step/accept: a person's acceptance of a loop out of rounds, as it stands, from the board — through the
+ * package's `accept()`, `wf accept`'s own, which writes the acceptance and nothing else, and refused in the package's words. The api judges
+ * none of it: every refusal here is asserted equal to what `accept()` itself says.
  *
  * At shipped defaults: the api's own engine over a store this file seeds, the harness's fake `claude` (test/harness.ts) first on PATH.
  */

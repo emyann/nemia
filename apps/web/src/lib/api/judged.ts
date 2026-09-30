@@ -20,7 +20,8 @@ export const RunStatusSchema = Schema.Literals(['running', 'succeeded', 'failed'
  * branches ahead of the base that nothing in the workflow merges.
  *
  * On `approve`, `back` are the steps a send-back goes to (`sendBackTo`): the step itself once it has a task, the work an ending waits on
- * before it is filed; and `onto` the base branch the run's result is on its way to: what the Factory's card answers the gate with, off the list.
+ * before it is filed; and `onto` the base branch the run's result is on its way to: what the Factory's card answers the gate with, off the
+ * list.
  *
  * `said` is the whole of what `wf ls` prints after `→ to decide:`, and `command` the command at the end of it. The board runs neither.
  */

@@ -1,6 +1,6 @@
 /**
- * The words the Factory says over its floor when nothing ticks the store (`DaemonLine`), from what the api judged of `daemon.json` (`Daemon`).
- * Pure: the time is handed in, the browser's own on the page, so an age moves between reads.
+ * The words the Factory says over its floor when nothing ticks the store (`DaemonLine`), from what the api judged of `daemon.json`
+ * (`Daemon`). Pure: the time is handed in, the browser's own on the page, so an age moves between reads.
  */
 import type { Daemon } from './api';
 import { agoWord } from './quota.ts';
@@ -8,7 +8,9 @@ import { agoWord } from './quota.ts';
 /** The command that starts a daemon, set apart on the page. */
 export const START = 'npx wf up';
 
-/** The line in three parts, `before` + `command` + `after`, so the page can set the command as code and a test can read the sentence whole. */
+/**
+ * The line in three parts, `before` + `command` + `after`, so the page can set the command as code and a test can read the sentence whole.
+ */
 export type DaemonWords = { before: string; command: typeof START; after: string };
 
 /** How long ago the daemon did something, as the line says it: never `just now`, which reads as a daemon that is fine. */

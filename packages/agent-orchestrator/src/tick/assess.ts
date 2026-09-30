@@ -50,7 +50,9 @@ export type Assessment = {
    * is awaiting approval.
    */
   stoppedOn?: 'awaiting approval' | 'blocked';
-  /** What a person has to decide about the run's result, when the run is at it and nobody has (`toDecide`). Absent while there is nothing. */
+  /**
+   * What a person has to decide about the run's result, when the run is at it and nobody has (`toDecide`). Absent while there is nothing.
+   */
   toDecide?: ToDecide;
   /**
    * The runs a person holds this one until (`Run.hold`), while the hold stands: the run is `running`, and nothing is due — no step, check,

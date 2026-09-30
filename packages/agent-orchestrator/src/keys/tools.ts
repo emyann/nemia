@@ -200,12 +200,14 @@ const dirOf = (cwd: string): string => cwd.replace(/\/+$/, '');
  *   - a path in the session's own directory is written from it (`Edit(notes.md)`), as a rule without a leading `/` is read: the next
  *     run's step works in a directory of its own, named by its own id, and an absolute path to this run's would never match it;
  *   - any other absolute path takes a second `/` (`Edit(//abs/notes.md)`): one `/` reads as a path from the settings' folder, not the
- *     root. A part of it that is this run's id is `*`, which matches the next run's: a path under `runs/<id>/artifacts` is offered with `*` for `<id>`;
+ *     root. A part of it that is this run's id is `*`, which matches the next run's: a path under `runs/<id>/artifacts` is offered with `*`
+ *     for `<id>`;
  *   - a command is `Bash(<its first word>:*)`, since its first word is all the runtime keeps of it (`Bash(pytest)`), and a rule without
  *     `:*` allows that bare word and no command that goes on past it;
  *   - any other call is as it was denied: `Skill(look)`, `SendMessage`.
  *
- * What a person adds to a folder's `allowedTools:` for a new run; nothing here widens the run that was denied, whose `allowedTools:` is frozen.
+ * What a person adds to a folder's `allowedTools:` for a new run; nothing here widens the run that was denied, whose `allowedTools:` is
+ * frozen.
  */
 export function allowRuleOf(denied: string, at: DeniedAt = {}): string {
   const { tool, what } = callOf(denied);
@@ -229,12 +231,12 @@ function pathRuleOf(path: string, { cwd, runId }: DeniedAt): string {
 }
 
 /**
- * The first of a step's `disallowedTools:` rules that may be what denied a call, or undefined. Pure. A deny beats every allow, so a call one
- * of them denied is denied again in a new run whatever its `allowedTools:` says, and is offered no allow rule (`deniedOffer`). *May*: the
- * runtime keeps a command's first word alone, so `Bash(npm)` denied may be `disallowedTools: Bash(npm run build)` at work, or `npm test` that
- * nothing allowed. A rule on the same tool — any file-editing tool for an `Edit` rule — matches a call when it names nothing, or names
- * that command's first word, or a path pattern the call's path is under (from the root for `//`, from the session's directory for any
- * other; `~` is nobody's here, and matches nothing), or exactly what the call names.
+ * The first of a step's `disallowedTools:` rules that may be what denied a call, or undefined. Pure. A deny beats every allow, so a call
+ * one of them denied is denied again in a new run whatever its `allowedTools:` says, and is offered no allow rule (`deniedOffer`). *May*:
+ * the runtime keeps a command's first word alone, so `Bash(npm)` denied may be `disallowedTools: Bash(npm run build)` at work, or
+ * `npm test` that nothing allowed. A rule on the same tool — any file-editing tool for an `Edit` rule — matches a call when it names
+ * nothing, or names that command's first word, or a path pattern the call's path is under (from the root for `//`, from the session's
+ * directory for any other; `~` is nobody's here, and matches nothing), or exactly what the call names.
  */
 export function disallowedBy(denied: string, disallowedTools: readonly string[], at: DeniedAt = {}): string | undefined {
   const call = callOf(denied);
@@ -253,8 +255,8 @@ export function disallowedBy(denied: string, disallowedTools: readonly string[],
 }
 
 /**
- * Whether a path is one a rule's path pattern names, or under one: `**` any depth, `*` and `?` within a part. A relative pattern with no `/`
- * in it names a file at any depth below the directory, as a gitignore line does. Pure.
+ * Whether a path is one a rule's path pattern names, or under one: `**` any depth, `*` and `?` within a part. A relative pattern with no
+ * `/` in it names a file at any depth below the directory, as a gitignore line does. Pure.
  */
 function pathUnder(pattern: string, path: string, cwd: string | undefined): boolean {
   const target = path.startsWith('/') ? path.replace(/^\/\//, '/') : cwd ? `${dirOf(cwd)}/${path.replace(/^\.\//, '')}` : undefined;

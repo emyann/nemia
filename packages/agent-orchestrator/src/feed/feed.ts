@@ -29,7 +29,9 @@ import type { Closeout } from '../closeout/closeout.ts';
 import { holdWord } from '../wait/wait.ts';
 import { SLOT_WAIT, slotWord } from '../cap/cap.ts';
 
-/** One line of the feed: when, which run, which step of it (none for the run's own line), the word the tick judged, and the note beside it. */
+/**
+ * One line of the feed: when, which run, which step of it (none for the run's own line), the word the tick judged, and the note beside it.
+ */
 export type FeedLine = { at: string; run: string; step?: string; word: string; note?: string };
 
 /** The word a run's line says once its record is gone from the store (`wf rm`): the fold forgets the run on reading it. */
@@ -157,15 +159,15 @@ export function feedWords(
 }
 
 /**
- * The longest `needs` the feed carries. A feed line is one line of `wf watch`, and a step's `needs` is the agent's, of any length: past this
- * it is clipped, and `wf decide` has it whole.
+ * The longest `needs` the feed carries. A feed line is one line of `wf watch`, and a step's `needs` is the agent's, of any length: past
+ * this it is clipped, and `wf decide` has it whole.
  */
 const NEEDS_CAP = 200;
 
 /**
- * What a step that signed off blocked needs, for its line in the feed: `needs: <its closeout's needs>`, one line (`oneLine`) — or nothing, for
- * a step that did not sign off blocked or said nothing it needs. Its word says `BLOCKED` already (`listing`); this is the question, so a
- * watcher does not have to run `wf decide` to read it. Pure.
+ * What a step that signed off blocked needs, for its line in the feed: `needs: <its closeout's needs>`, one line (`oneLine`) — or nothing,
+ * for a step that did not sign off blocked or said nothing it needs. Its word says `BLOCKED` already (`listing`); this is the question, so
+ * a watcher does not have to run `wf decide` to read it. Pure.
  */
 const needsNote = (c: Closeout | { error: string } | undefined): string => {
   const needs = c && !('error' in c) && c.outcome === 'blocked' && typeof c.needs === 'string' ? oneLine(c.needs, NEEDS_CAP) : '';

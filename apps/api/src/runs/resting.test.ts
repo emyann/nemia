@@ -1,9 +1,9 @@
 /**
  * The list's memo of runs at rest (`resting.ts`): `GET /api/runs` answers a finished run from memory while nothing it was judged on has
  * moved, so a poll reads the journals of the runs still moving and of none other — and answers afresh the moment anything it watches does:
- * the run's record, a file a person writes beside it, a line of its tasks on the engine's feed, a tip of a branch git was asked about, or the
- * record gone. Every api test runs with `WF_VERIFY_REST=1` (test/harness.ts), which judges each kept answer afresh too and fails the request
- * on a difference; the tests here turn it off where they measure what the memo saves, or ask whether it saw a change on its own.
+ * the run's record, a file a person writes beside it, a line of its tasks on the engine's feed, a tip of a branch git was asked about, or
+ * the record gone. Every api test runs with `WF_VERIFY_REST=1` (test/harness.ts), which judges each kept answer afresh too and fails the
+ * request on a difference; the tests here turn it off where they measure what the memo saves, or ask whether it saw a change on its own.
  *
  * At shipped defaults: the api's own engine over a store this file seeds, the harness's fake `claude` (test/harness.ts) first on PATH.
  */

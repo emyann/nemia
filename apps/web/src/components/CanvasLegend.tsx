@@ -8,9 +8,9 @@ import { Travelling } from './StateEdge';
  * `StateEdge` draws it — dashed and still, moving into a running step, solid, looping back — and the human gate. The moving
  * sample moves as a running edge does, and is as still as one where the person asked for reduced motion.
  *
- * `cards`, on the Factory: the edge between two cards too, from a run to one that waits on it (`afterEdges`) — started `--after` it, or held
- * until it ships (`wf hold`), which are both a wait on that run and drawn alike; the card itself says which. And the ring round a card whose
- * result nobody has decided, which stays on the floor, finished, until a person decides it.
+ * `cards`, on the Factory: the edge between two cards too, from a run to one that waits on it (`afterEdges`) — started `--after` it, or
+ * held until it ships (`wf hold`), which are both a wait on that run and drawn alike; the card itself says which. And the ring round a card
+ * whose result nobody has decided, which stays on the floor, finished, until a person decides it.
  */
 export function CanvasLegend({ className = '', cards = false }: { className?: string; cards?: boolean }) {
   return (
@@ -39,7 +39,9 @@ export function CanvasLegend({ className = '', cards = false }: { className?: st
   );
 }
 
-/** Two cards and the edge from the one into the other, dashed as it is while the second waits: solid once it has started, as any edge is. */
+/**
+ * Two cards and the edge from the one into the other, dashed as it is while the second waits: solid once it has started, as any edge is.
+ */
 function CardsSample() {
   const stroke = edgeStroke('to-come', false);
   const card = (x: number) => <rect x={x} y={1.75} width={8} height={8.5} rx={1.5} fill="none" stroke="currentColor" strokeWidth={1.5} />;

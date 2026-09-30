@@ -1,8 +1,8 @@
 /**
- * `wf decide` (`decideRun`): the pure call over one read of each task, with what a person needs to decide the run. It reads the repository's
- * own checkout as the pass that would file into it reads it (`checkoutHold`, in `ending.verb.ts`). A controller, reaching the runtime
- * through the client (`runtime-client.ts`): an Effect program that requires the engine as a service (`EngineService`), and `decide`, its
- * plain face in a Promise, over the engine it is handed.
+ * `wf decide` (`decideRun`): the pure call over one read of each task, with what a person needs to decide the run. It reads the
+ * repository's own checkout as the pass that would file into it reads it (`checkoutHold`, in `ending.verb.ts`). A controller, reaching the
+ * runtime through the client (`runtime-client.ts`): an Effect program that requires the engine as a service (`EngineService`), and
+ * `decide`, its plain face in a Promise, over the engine it is handed.
  */
 import { Effect } from 'effect';
 import { EngineService, awaited, nameFor, tried, type Engine, type TaskView, type Usage } from '../runtime-client.ts';
@@ -60,13 +60,19 @@ export type Decided = {
   retrying: Retry[];
   /** The rounds the next tick files: asked for with `again: true`, or with `wf round`. */
   rounding: Round[];
-  /** For each loop out of rounds, the `wf round` that goes once more (`roundLines`); for each step a person may try again, the `wf retry` (`retryLines`). */
+  /**
+   * For each loop out of rounds, the `wf round` that goes once more (`roundLines`); for each step a person may try again, the `wf retry`
+   * (`retryLines`).
+   */
   offers: string[];
   /** The OVER BUDGET line, saying why each step over its budget is held (`overBudgetLine`); undefined with none. */
   overBudgetLine?: string;
   /** What each filed step's current try consumed (`consumption`), off the views read for the rest. */
   used: Record<string, Usage | undefined>;
-  /** For each step with a try, its `cost` line (`costLine`): its current try's, its tries' together where there were more, and the cap in force. */
+  /**
+   * For each step with a try, its `cost` line (`costLine`): its current try's, its tries' together where there were more, and the cap in
+   * force.
+   */
   costs: Record<string, string>;
   /** The run's `cost` line, after its steps (`runCostLines`): every step's tries together. None before any attempt has ended. */
   runCost: string[];
@@ -77,29 +83,35 @@ export type Decided = {
   answers: Record<string, Answered>;
   /** For each step that signed off blocked and may be tried again, the `wf retry --message` that answers it (`answerLines`). */
   answering: Record<string, string>;
-  /** For each gated step with something to say, what its gate says (`gateLines`): approved, when and with what words, or awaiting approval and the commands. */
+  /**
+   * For each gated step with something to say, what its gate says (`gateLines`): approved, when and with what words, or awaiting approval
+   * and the commands.
+   */
   gates: Record<string, string>;
-  /** For each looping step whose loop a person ended as it stands (`acceptedLines`): when, and the words they gave — why its findings are open. */
+  /**
+   * For each looping step whose loop a person ended as it stands (`acceptedLines`): when, and the words they gave — why its findings are
+   * open.
+   */
   accepted: Record<string, string>;
   /**
    * For each step whose session the harness blocked and that says what it waits for, the sentence a person acts on (`harnessWaitLine`):
    * `waiting for a permission prompt — answer it in Claude Code: claude agents, session ae/<task>/1`. Off the views already read, so it
    * costs no observation; empty for a harness that says nothing, which is every harness but Claude Code's. The session named is the
-   * engine's name for the task's current attempt (`nameFor`), which `claude agents` lists it under. Read on this call and kept nowhere, so a
-   * step that stops waiting says nothing here on the next.
+   * engine's name for the task's current attempt (`nameFor`), which `claude agents` lists it under. Read on this call and kept nowhere, so
+   * a step that stops waiting says nothing here on the next.
    */
   waitingOn: Record<string, string>;
   /**
-   * For each step whose current try's sessions were denied a call, the line that names them (`deniedWords`): `denied: Skill(look),
-   * Bash(pytest)`. Off the engine's record of each ended attempt (`deniedOf`); empty for a step denied nothing, or whose harness cannot say.
-   * A denied call is a tool the session was not allowed, which a job carries on without.
+   * For each step whose current try's sessions were denied a call, the line that names them (`deniedWords`):
+   * `denied: Skill(look), Bash(pytest)`. Off the engine's record of each ended attempt (`deniedOf`); empty for a step denied nothing, or
+   * whose harness cannot say. A denied call is a tool the session was not allowed, which a job carries on without.
    */
   denied: Record<string, string>;
   /** The runs this run's roots wait on (`waitsOf`): while there are any, that is the whole of what there is to say. */
   waiting: Wait[];
   /**
-   * The runs a person holds this run until (`holdsOf`): while the hold stands, what is in flight is all there is to say, and nothing is offered.
-   * None on a run nobody holds.
+   * The runs a person holds this run until (`holdsOf`): while the hold stands, what is in flight is all there is to say, and nothing is
+   * offered. None on a run nobody holds.
    */
   holding: Wait[];
   /**
@@ -121,7 +133,10 @@ export type Decided = {
   held?: RunSlot;
   /** Where each result branch stands against the base branch, as git says it now (`branchStandings`): the fact under the run's result. */
   standings: BranchStanding[];
-  /** The run whose ending step has the repository's own checkout while this run's waits for it (`checkoutHold`); absent when nothing holds it. */
+  /**
+   * The run whose ending step has the repository's own checkout while this run's waits for it (`checkoutHold`); absent when nothing holds
+   * it.
+   */
   checkout?: CheckoutHold;
   /**
    * What is left for a person to decide about the result (`toDecide`): the ending step's gate, or a branch nobody has merged (`assess`, on

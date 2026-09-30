@@ -11,7 +11,9 @@ import type { TranscriptEvent } from '../src/lib/api.ts';
 class Stream implements StreamLike {
   readyState = 1;
   readonly #target = new EventTarget();
-  /** Typed as an EventSource types it: a listener takes a `MessageEvent`, though `open` and `error` reach it as plain events, there as here. */
+  /**
+   * Typed as an EventSource types it: a listener takes a `MessageEvent`, though `open` and `error` reach it as plain events, there as here.
+   */
   addEventListener(type: string, listener: (event: MessageEvent) => void): void {
     this.#target.addEventListener(type, listener as EventListener);
   }

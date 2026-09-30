@@ -57,9 +57,10 @@ export const specRows = (spec: StepSpec, filed: StepFiled | null = null): Array<
 const isRemote = (spec: StepSpec, filed: StepFiled | null): boolean => !!filed?.remote || !!spec.harness?.startsWith('a2a:');
 
 /**
- * A step on a remote A2A agent, as rows: the harness, the agent's address, and what the run itself keeps — `after`, `workspace`, the deadline.
- * No model, effort, context, fence, tools or resume: the agent runs as its own party configured it, and a `harness's own · default` row there
- * would say the run chose what nobody here chose. The address is the store's current word; where the store does not declare the agent, it says so.
+ * A step on a remote A2A agent, as rows: the harness, the agent's address, and what the run itself keeps — `after`, `workspace`, the
+ * deadline. No model, effort, context, fence, tools or resume: the agent runs as its own party configured it, and a
+ * `harness's own · default` row there would say the run chose what nobody here chose. The address is the store's current word; where the
+ * store does not declare the agent, it says so.
  */
 function remoteRows(spec: StepSpec, filed: StepFiled | null): Array<[string, ReactNode]> {
   const address = filed?.remote === undefined || filed.remote === null ? null : (filed.remote.address ?? 'no longer in a2a-agents.json');
@@ -99,7 +100,10 @@ function ranWith(
   );
 }
 
-/** The model, as `ranWith` reads it — and the model a person's `wf retry --model` asked this try for, marked `this try`, whatever the workflow says. */
+/**
+ * The model, as `ranWith` reads it — and the model a person's `wf retry --model` asked this try for, marked `this try`, whatever the
+ * workflow says.
+ */
 function modelRow(workflow: string | null, filed: StepFiled | null): ReactNode {
   if (!filed?.askedModel) return ranWith(workflow, filed, (f) => f.model);
   const says = workflow === null ? 'names no model' : `says ${workflow}`;
@@ -214,9 +218,9 @@ const WARN = 'text-amber-700 dark:text-amber-400';
 
 /**
  * What sessions read, by price: the counts — `read 21.4M · wrote 412k · peak 167k` — and, beneath, a resumed session that wrote its
- * context to the cache again. The peak is marked where it reached the step's `context:` cap or passed 200k with none, and so is the rebuild:
- * each is a session that paid for a context it need not have carried, or carried again. The words are the package's (`readWords`). Where no
- * peak was measured, the compactions (`compacted at its 200k cap`) stand in its place among the counts.
+ * context to the cache again. The peak is marked where it reached the step's `context:` cap or passed 200k with none, and so is the
+ * rebuild: each is a session that paid for a context it need not have carried, or carried again. The words are the package's (`readWords`).
+ * Where no peak was measured, the compactions (`compacted at its 200k cap`) stand in its place among the counts.
  */
 export function Read({ said, peak, rebuilt }: { said: string; peak: PeakMark; rebuilt: number }) {
   const parts = said.split(' · ');

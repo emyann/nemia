@@ -12,7 +12,9 @@ import { FALLBACK_MS, type FeedStatus, followFeed, keysOf, pace, polled, REOPEN_
 class Stream implements StreamLike {
   readyState = 0;
   readonly #target = new EventTarget();
-  /** Typed as an EventSource types it: a listener takes a `MessageEvent`, though `open` and `error` reach it as plain events, there as here. */
+  /**
+   * Typed as an EventSource types it: a listener takes a `MessageEvent`, though `open` and `error` reach it as plain events, there as here.
+   */
   addEventListener(type: string, listener: (event: MessageEvent) => void): void {
     this.#target.addEventListener(type, listener as EventListener);
   }

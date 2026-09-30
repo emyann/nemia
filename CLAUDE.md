@@ -83,8 +83,9 @@ holds what every change needs.
     (`packages/agent-orchestrator/test/comments.test.ts`, with its short list of other programs' words).
   - A block is off while its `excludeFiles` names its package. The card that cleans a package switches its guards on by deleting that
     one line, and edits nothing shared. The runtime's block also covers `lint/**`, the guards' own plugin; no other block lists it.
-  - A JSDoc on a parameter, a union member or a local is refused: say it as an `@param` line or in the declaration's JSDoc. `oxfmt`
-    rewraps no comment, so a line you join stays within its 140 columns; a `(` `)` it drops once a comment inside them goes is its own.
+  - A JSDoc on a parameter, a union member or a local is refused: say it as an `@param` line or in the declaration's JSDoc.
+    `comments.test.ts` refuses a comment line over 140 columns, since `oxfmt` rewraps none; a `(` `)` it drops once a comment inside
+    them goes is its own.
 - **A limit is met by cutting the function** (500 code lines a file, 80 a function, cyclomatic 20, cognitive 15), never by raising a
   ceiling in `.oxlintrc.json`. The commit that shrinks a baselined file lowers its ceiling there and its count in
   `packages/agent-orchestrator/test/limits.test.ts`, which refuses one left loose; a move renames both.

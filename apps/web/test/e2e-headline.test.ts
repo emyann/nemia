@@ -1,8 +1,8 @@
 /**
- * The e2e's last lines when a page fails (`headlineOf`, visit.ts): the failure in a few lines — which page, in which theme, what failed, and
- * the picture — said again after each server's output, on stdout too. A check shows the tail of what it printed and logs its stdout alone,
- * so a failure said once, first, on stderr reads as an exit 1 with nothing printed. No browser, so `npm test` runs it; `e2e/visit.test.ts`
- * runs a page that fails so through the runner, and reads the lines at the end of both streams.
+ * The e2e's last lines when a page fails (`headlineOf`, visit.ts): the failure in a few lines — which page, in which theme, what failed,
+ * and the picture — said again after each server's output, on stdout too. A check shows the tail of what it printed and logs its stdout
+ * alone, so a failure said once, first, on stderr reads as an exit 1 with nothing printed. No browser, so `npm test` runs it;
+ * `e2e/visit.test.ts` runs a page that fails so through the runner, and reads the lines at the end of both streams.
  */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';

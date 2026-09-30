@@ -1,10 +1,10 @@
 /**
- * Git and a git run's worktrees: the `git` helpers, the starting workspace, a step's worktree cut and merged, what `.worktreeinclude` copies
- * into it and the `node_modules` it is given (`workspace.ts` decides, this applies), and the hand-off commit of what a step left
+ * Git and a git run's worktrees: the `git` helpers, the starting workspace, a step's worktree cut and merged, what `.worktreeinclude`
+ * copies into it and the `node_modules` it is given (`workspace.ts` decides, this applies), and the hand-off commit of what a step left
  * uncommitted.
  *
- * Beneath the controllers, beside `record.store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports what the package
- * exports of it. What reads a branch once the run has one — its standing, its diff — is `branches.store.ts`'s, and a step's
+ * Beneath the controllers, beside `record.store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports what the
+ * package exports of it. What reads a branch once the run has one — its standing, its diff — is `branches.store.ts`'s, and a step's
  * artifacts `artifacts.store.ts`'s, both through the `git` helpers here, so this file imports `record.store.ts` alone of those beside it;
  * `wf rm`'s removal is `forget.verb.ts`'s.
  */
@@ -452,7 +452,10 @@ export function handOff(workspace: string, step: string, when = ''): { commit: s
   }
 }
 
-/** What a failed git command said, for a person: the last lines of its stderr — where git hands on a hook's output, stdout's too — or its exit status. */
+/**
+ * What a failed git command said, for a person: the last lines of its stderr — where git hands on a hook's output, stdout's too — or its
+ * exit status.
+ */
 function failedWords(err: unknown, lines = 4): string {
   const { stderr, status } = err as { stderr?: unknown; status?: number | null };
   const said = (Buffer.isBuffer(stderr) ? stderr.toString('utf8') : typeof stderr === 'string' ? stderr : '')
@@ -499,11 +502,12 @@ export const mergeInProgress = (repo: string): boolean => {
 };
 
 /**
- * The repository's own checkout as a pass reads it for an ending that lands on its check (`MergeState`, `landingDue`): whether a merge is in
- * progress, and whose — this run's when every commit its MERGE_HEAD names is the tip of one of `tips`, the run's result branches — whether a
- * path is unmerged, which result branches a commit now would leave out, and HEAD. Read quietly: a checkout git cannot read is merging nothing.
- * A handful of git calls, so a pass asks only once a landing can be due (`landingDue`'s `merge`). Unmerged paths are read with
- * `ls-files --unmerged`, off the index as it is, never `git diff`, which refreshes it and takes its lock in a checkout a person commits in.
+ * The repository's own checkout as a pass reads it for an ending that lands on its check (`MergeState`, `landingDue`): whether a merge is
+ * in progress, and whose — this run's when every commit its MERGE_HEAD names is the tip of one of `tips`, the run's result branches —
+ * whether a path is unmerged, which result branches a commit now would leave out, and HEAD. Read quietly: a checkout git cannot read is
+ * merging nothing. A handful of git calls, so a pass asks only once a landing can be due (`landingDue`'s `merge`). Unmerged paths are read
+ * with `ls-files --unmerged`, off the index as it is, never `git diff`, which refreshes it and takes its lock in a checkout a person
+ * commits in.
  */
 export function mergeState(repo: string, tips: Readonly<Record<string, string>>): MergeState {
   const file = mergeHeadFile(repo);

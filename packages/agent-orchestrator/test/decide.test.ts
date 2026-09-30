@@ -959,7 +959,10 @@ test("`wf decide`'s program says in its type what it needs and what it refuses: 
   assert.deepEqual([typeof typed, typeof infallible, typeof unprovided], ['object', 'object', 'function']);
 });
 
-/** `wf decide`'s whole screen for `id`, with the run id, its repository, its base commit and the store as `<id>`, `<repo>`, `<base>` and `<root>`. */
+/**
+ * `wf decide`'s whole screen for `id`, with the run id, its repository, its base commit and the store as `<id>`, `<repo>`, `<base>` and
+ * `<root>`.
+ */
 const whole = (t: TestContext, e: Engine, id: string, ...flags: string[]): Promise<string[]> => {
   const run = gitRun(readRun(id));
   return decideScreen(t, e, [id, ...flags], { '<id>': id, '<root>': ROOT, '<repo>': run.repo, '<base>': run.baseRef });

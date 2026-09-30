@@ -28,8 +28,8 @@ export type Place = {
 export const workRoot = (runs: string, id: string): string => path.join(runs, id, 'work');
 
 /**
- * Where `wf start --input` puts a run's files: `runs/<id>/inputs`, the one writer of that path, which record.store.ts's `inputsDir` reads. Here
- * because a folder step's folder is given a copy of it (`folderPlace.make`), and a path two files spell for themselves drifts apart.
+ * Where `wf start --input` puts a run's files: `runs/<id>/inputs`, the one writer of that path, which record.store.ts's `inputsDir` reads.
+ * Here because a folder step's folder is given a copy of it (`folderPlace.make`), and a path two files spell for themselves drifts apart.
  */
 export const inputsRoot = (runs: string, id: string): string => path.join(runs, id, 'inputs');
 

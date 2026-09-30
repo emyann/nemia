@@ -1,17 +1,18 @@
 /**
  * The skills an agent of yours can be given, as the board's skill picker lists them, and a skill Nemia ships copied into your library.
  *
- * An agent of yours finds a skill as a start finds it (`lookupRoots`): the store's `workflows/skills/` — your library — then the `.claude/skills/`
- * of the repository the board serves. The first that has a name wins, so a name in both is listed once, in your library. The skills Nemia
- * ships, `workflows/skills/` of the checkout the api runs from, are not among them: an agent of the store never finds one there, so a
- * shipped skill is copied into your library first (`copySkill`, a write of its own, before and apart from any save of the agent).
+ * An agent of yours finds a skill as a start finds it (`lookupRoots`): the store's `workflows/skills/` — your library — then the
+ * `.claude/skills/` of the repository the board serves. The first that has a name wins, so a name in both is listed once, in your library.
+ * The skills Nemia ships, `workflows/skills/` of the checkout the api runs from, are not among them: an agent of the store never finds one
+ * there, so a shipped skill is copied into your library first (`copySkill`, a write of its own, before and apart from any save of the
+ * agent).
  *
- * Each skill is listed with its card entry or the package's refusal of it (a SKILL.md with no description can be given to no agent), whether it
- * is loaded every turn (`preload: true`), what it costs a turn (`skillTurnCost`: about, at four characters a token), and the agents of yours
- * that give it.
+ * Each skill is listed with its card entry or the package's refusal of it (a SKILL.md with no description can be given to no agent),
+ * whether it is loaded every turn (`preload: true`), what it costs a turn (`skillTurnCost`: about, at four characters a token), and the
+ * agents of yours that give it.
  *
- * And one skill on a page of its own (`skillDetail`), and one of yours written on the board (`writeSkill`): made, changed at the version it was
- * read at, or its `preload:` alone switched. Every write is to your library; the api writes nothing into a checkout, so a skill of the
+ * And one skill on a page of its own (`skillDetail`), and one of yours written on the board (`writeSkill`): made, changed at the version it
+ * was read at, or its `preload:` alone switched. Every write is to your library; the api writes nothing into a checkout, so a skill of the
  * repository's is read there, and a page says the `cp -r` that moves a skill between the two.
  */
 import fs from 'node:fs';
@@ -103,8 +104,8 @@ export function sourceOf(dir: string, repo: string, home: string): SkillSource |
 }
 
 /**
- * One skill read now: its entry or why it has none, and its cost. A folder or SKILL.md that is a link is refused unread: what it points at is
- * outside the folder, and the copy refuses one too.
+ * One skill read now: its entry or why it has none, and its cost. A folder or SKILL.md that is a link is refused unread: what it points at
+ * is outside the folder, and the copy refuses one too.
  */
 export function skillRow(name: string, dir: string, from: SkillSource, usedBy: string[] = [], found: SkillRow['found'] = null): SkillRow {
   const file = path.join(dir, 'SKILL.md');
@@ -148,8 +149,8 @@ function skillFolders(dir: string): string[] {
 }
 
 /**
- * Every skill the picker lists, by place: yours, then the repository's — each name where an agent of yours finds it, so a name in both is in
- * yours alone — then what Nemia ships, each marked where an agent of yours already finds a skill of its name. A name both of one
+ * Every skill the picker lists, by place: yours, then the repository's — each name where an agent of yours finds it, so a name in both is
+ * in yours alone — then what Nemia ships, each marked where an agent of yours already finds a skill of its name. A name both of one
  * repository's places for skills have, which happens only when the store is in that repository and nothing says which is given, is listed
  * in yours with the package's refusal as its `error`.
  */
@@ -191,8 +192,8 @@ export type GivenSkill = {
 };
 
 /**
- * The skills an agent gives, one row each in its order, each found where a start finds it (`found`, the agent's `skillsFor`). A skill no place
- * has is a row with the refusal the card says; one found in a place the board does not list reads `from: null`.
+ * The skills an agent gives, one row each in its order, each found where a start finds it (`found`, the agent's `skillsFor`). A skill no
+ * place has is a row with the refusal the card says; one found in a place the board does not list reads `from: null`.
  */
 export function givenSkills(skills: readonly string[], found: ReturnType<typeof skillsFor>, repo: string, home: string): GivenSkill[] {
   return skills.map((name) => {
@@ -219,7 +220,9 @@ const DRAFT_SHAPE =
 const POST_SHAPE = `${COPY_SHAPE}, or \`{ "skill": ${DRAFT_SHAPE.slice(1, -1)} }\``;
 const PUT_SHAPE = `\`{ "version": "<as GET /api/skills/yours/<name> answers it>", "skill": ${DRAFT_SHAPE.slice(1, -1)} }\`, or \`{ "version": "…", "preload": true or false }\``;
 
-/** A skill's keys, in the order they are refused; each value is then judged by the package, which says what is wrong with it in its words. */
+/**
+ * A skill's keys, in the order they are refused; each value is then judged by the package, which says what is wrong with it in its words.
+ */
 const SKILL_KEYS = {
   name: Schema.String,
   title: Schema.optionalKey(Schema.NullOr(Schema.String)),
@@ -281,7 +284,9 @@ function postWords(route: string): Words {
   };
 }
 
-/** Why a PUT's body is not a change of the skill `name`: not an object, no version, not one of `skill` and `preload`, then the one it sent. */
+/**
+ * Why a PUT's body is not a change of the skill `name`: not an object, no version, not one of `skill` and `preload`, then the one it sent.
+ */
 function putWords(route: string, name: string): Words {
   return ({ path: [key, ...rest], input }: BodyIssue, body: unknown) => {
     if (key === undefined) return `${route} takes a JSON object: ${PUT_SHAPE}.`;
@@ -309,10 +314,11 @@ const skillGuard = (route: string, method: 'POST' | 'PUT'): Guarded => ({
 export type SkillUser = { from: AgentPlace; name: string };
 
 /**
- * One skill on its own page. `skill` is its row as the list has it; `version` what a write of it carries back (`skillVersion`); `draft` what
- * its form is filled from (`skillDraftOf`), or null where its SKILL.md does not read — `skill.error` says why, and `body` is its instructions
- * all the same, so a skill of yours can be mended; `users` the agents, of either place, that give this very folder, as their start would find
- * it; `copyHint` the command that takes it to the other place, since the api writes no checkout — null for what Nemia ships.
+ * One skill on its own page. `skill` is its row as the list has it; `version` what a write of it carries back (`skillVersion`); `draft`
+ * what its form is filled from (`skillDraftOf`), or null where its SKILL.md does not read — `skill.error` says why, and `body` is its
+ * instructions all the same, so a skill of yours can be mended; `users` the agents, of either place, that give this very folder, as their
+ * start would find it; `copyHint` the command that takes it to the other place, since the api writes no checkout — null for what Nemia
+ * ships.
  */
 export type SkillDetail = {
   skill: SkillRow;
@@ -327,8 +333,8 @@ export type SkillDetail = {
 export type SkillSaved = SkillDetail & { written: string[] };
 
 /**
- * Where the skill `name` of `from` is: your library's folder of it, the repository's — its `.claude/skills/` first, then `workflows/skills/`,
- * as a start of the repository's finds it — or what Nemia ships. Null when that place has none.
+ * Where the skill `name` of `from` is: your library's folder of it, the repository's — its `.claude/skills/` first, then
+ * `workflows/skills/`, as a start of the repository's finds it — or what Nemia ships. Null when that place has none.
  */
 export function skillDirOf(from: SkillSource, name: string, repo: string, home: string, shipped: string = SHIPPED_SKILLS): string | null {
   const places =
@@ -462,7 +468,8 @@ const repoRefusal = (route: string, name: string | null, repo: string, home: str
 
 /**
  * The skills' routes. Each write is guarded (guard.ts) and writes only your library: 403 for the repository's (`repoRefusal`), 400 for
- * any other place; a write the package refuses is answered as `written` and `writeRefused` say, and any other refusal by its kind (`app.onError`).
+ * any other place; a write the package refuses is answered as `written` and `writeRefused` say, and any other refusal by its kind
+ * (`app.onError`).
  *
  * - `GET /api/skills` — every skill by place (`listSkills`), read from disk on each request, so a skill a person has just written lists as
  *   it is now.

@@ -10,10 +10,10 @@ export type BuilderFlowEdge = Edge<BuilderEdgeData, 'builder'>;
 export const BACKWARD_DEPTH = 80;
 
 /**
- * An edge on the builder's canvas: drawn as a workflow's edges are before any run — dashed, and a loop's edge back beneath the row in violet —
- * with a button at its middle that takes the key it stands for away: `after:` on the step it points at, or `loop:` and its rounds on the step
- * it leaves. An `after` edge that points backwards, which only steps waiting on each other have, dips beneath the row too: drawn straight it
- * would cross both blocks, and its button would sit on the forward edge's.
+ * An edge on the builder's canvas: drawn as a workflow's edges are before any run — dashed, and a loop's edge back beneath the row in
+ * violet — with a button at its middle that takes the key it stands for away: `after:` on the step it points at, or `loop:` and its rounds
+ * on the step it leaves. An `after` edge that points backwards, which only steps waiting on each other have, dips beneath the row too:
+ * drawn straight it would cross both blocks, and its button would sit on the forward edge's.
  */
 export function BuilderEdge({
   sourceX,

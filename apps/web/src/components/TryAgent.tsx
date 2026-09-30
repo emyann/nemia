@@ -11,9 +11,9 @@ import { StatusChip } from './StatusChip';
 const code = (text: string) => <code className="font-mono text-xs break-all">{text}</code>;
 
 /**
- * An agent of yours tried on a short brief: the fence said in one line, the brief and the button, and the latest try of it — its state, what
- * it spent of its dollar, the files it wrote and a link to its run. The api starts one try of an agent at a time, as an ordinary folder run of
- * the store's hidden `tries/<agent>` team, and the button is held while one moves, with the reason beside it.
+ * An agent of yours tried on a short brief: the fence said in one line, the brief and the button, and the latest try of it — its state,
+ * what it spent of its dollar, the files it wrote and a link to its run. The api starts one try of an agent at a time, as an ordinary
+ * folder run of the store's hidden `tries/<agent>` team, and the button is held while one moves, with the reason beside it.
  */
 export function TryAgent({ agent }: { agent: AgentListing }) {
   if (agent.untried) return <Untried untried={agent.untried} />;
@@ -146,8 +146,8 @@ export function TryRun({ id }: { id: string }) {
 }
 
 /**
- * What an agent's page says in place of the Try panel when it cannot be tried: why, in the api's words (`untried`, which its try's route refuses
- * with), and the command that copies it to yours when that is the fix — into the store the api reads, which the api names.
+ * What an agent's page says in place of the Try panel when it cannot be tried: why, in the api's words (`untried`, which its try's route
+ * refuses with), and the command that copies it to yours when that is the fix — into the store the api reads, which the api names.
  */
 function Untried({ untried, yours = false }: { untried: NonNullable<AgentListing['untried']>; yours?: boolean }) {
   return (
@@ -169,7 +169,9 @@ function Untried({ untried, yours = false }: { untried: NonNullable<AgentListing
   );
 }
 
-/** What a repository agent's page says in place of the Try panel: only yours are tried, and the copy, from the api, that makes one of yours. */
+/**
+ * What a repository agent's page says in place of the Try panel: only yours are tried, and the copy, from the api, that makes one of yours.
+ */
 export function TryYours({ agent }: { agent: AgentListing }) {
   return (
     <Untried yours untried={agent.untried ?? { why: 'Only an agent of yours can be tried. Copy it to yours to try it.', copy: null }} />

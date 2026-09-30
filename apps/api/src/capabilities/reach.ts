@@ -39,8 +39,9 @@ const CLAUDE_CODE: ReadonlySet<string> = new Set(['claude', 'claude-detached']);
 const JOB_MEASURED: ReadonlySet<string | null> = new Set([null, 'auto', 'dontAsk', 'default', 'acceptEdits']);
 
 /**
- * Why what asks is denied without a prompt on a Claude Code step: `dontAsk`, which denies it in any session; or it runs as a job, which has no
- * one to ask — every `claude` step but a background session (`background: true`), and every `claude-detached` one. Null where it prompts.
+ * Why what asks is denied without a prompt on a Claude Code step: `dontAsk`, which denies it in any session; or it runs as a job, which has
+ * no one to ask — every `claude` step but a background session (`background: true`), and every `claude-detached` one. Null where it
+ * prompts.
  */
 export const askDenierOf = (harness: string, spec: Pick<WorkflowStepSpec, 'permissionMode' | 'background'>): 'dontAsk' | 'a job' | null => {
   if (spec.permissionMode === 'dontAsk') return 'dontAsk';
@@ -51,23 +52,27 @@ export const askDenierOf = (harness: string, spec: Pick<WorkflowStepSpec, 'permi
 /** Where a step's own deny rules are read from. */
 export const DISALLOW = 'disallowedTools:';
 
-/** A tool taken from a step by a deny rule: the tool, the rule and where it was read — and the family the set names it in, for one taken from `Cron*`. */
+/**
+ * A tool taken from a step by a deny rule: the tool, the rule and where it was read — and the family the set names it in, for one taken
+ * from `Cron*`.
+ */
 export type RemovedTool = { name: string; rule: string; source: string; of: string | null };
 
 /**
- * A server's tool as it reaches a step: the rule that denies it; the ask rule that makes it ask, when no deny does; and whether a rule allows it
- * with neither over it — which, in `dontAsk`, is whether it runs at all.
+ * A server's tool as it reaches a step: the rule that denies it; the ask rule that makes it ask, when no deny does; and whether a rule
+ * allows it with neither over it — which, in `dontAsk`, is whether it runs at all.
  */
 export type ReachedMcpTool = { name: string; denied: DeniedRule | null; asks: DeniedRule | null; allowed: boolean };
 
 /**
- * What the settings' allow rules give a step. `rules` are those that stand: none a deny takes back (`takenBack`, with the deny), none an ask rule
- * takes back (`asked`, with the ask rule: it asks, and where `askDenier` names why, is denied), and none of a tool the step does not have (`unused`) — known only
- * for a step whose `tools:` names its set. `bash` are the Bash rules that stand, each with its command as the rule writes it, the narrower deny
- * rules that still refuse some of what it allows (`except`) and the narrower ask rules that still make some of it ask (`asks`); none for a step
- * with no Bash, which `why` says. `dontAsk` is whether the step runs in it, where anything that asks and no rule allows is denied without a prompt.
- * `askDenier` is why what an ask rule makes ask is denied without a prompt instead — `dontAsk`, or `a job`, which asks nobody — and null where it
- * prompts: a background session in another mode, or a job in a mode not measured.
+ * What the settings' allow rules give a step. `rules` are those that stand: none a deny takes back (`takenBack`, with the deny), none an
+ * ask rule takes back (`asked`, with the ask rule: it asks, and where `askDenier` names why, is denied), and none of a tool the step does
+ * not have (`unused`) — known only for a step whose `tools:` names its set. `bash` are the Bash rules that stand, each with its command as
+ * the rule writes it, the narrower deny rules that still refuse some of what it allows (`except`) and the narrower ask rules that still
+ * make some of it ask (`asks`); none for a step with no Bash, which `why` says. `dontAsk` is whether the step runs in it, where anything
+ * that asks and no rule allows is denied without a prompt. `askDenier` is why what an ask rule makes ask is denied without a prompt instead
+ * — `dontAsk`, or `a job`, which asks nobody — and null where it prompts: a background session in another mode, or a job in a mode not
+ * measured.
  */
 export type AllowedFor = {
   rules: string[];
@@ -76,8 +81,8 @@ export type AllowedFor = {
   unused: string[];
   bash: Array<{ rule: string; command: string; except: string[]; asks: string[] }>;
   /**
-   * Every rule of `rules` that a narrower deny still refuses part of, or a narrower ask rule still makes part of ask — a Bash command, one tool of
-   * a server — with those denies and those ask rules.
+   * Every rule of `rules` that a narrower deny still refuses part of, or a narrower ask rule still makes part of ask — a Bash command, one
+   * tool of a server — with those denies and those ask rules.
    */
   exceptions: Array<{ rule: string; except: string[]; asks: string[] }>;
   dontAsk: boolean;
@@ -86,10 +91,10 @@ export type AllowedFor = {
 };
 
 /**
- * One of Claude Code's read-only commands as it reaches a step with Bash: whether it was measured running without a rule, or only documented so
- * (`READ_ONLY_COMMANDS`); the ask rule that makes all of it ask, when no deny refuses it — `Bash`, or a Bash rule covering `<command> *` — which
- * beats the harness's own leave as it beats an allow; and the rule that refuses all of it: a deny so covering it, or that ask rule on a step
- * that denies what asks (`askDenierOf`).
+ * One of Claude Code's read-only commands as it reaches a step with Bash: whether it was measured running without a rule, or only
+ * documented so (`READ_ONLY_COMMANDS`); the ask rule that makes all of it ask, when no deny refuses it — `Bash`, or a Bash rule covering
+ * `<command> *` — which beats the harness's own leave as it beats an allow; and the rule that refuses all of it: a deny so covering it, or
+ * that ask rule on a step that denies what asks (`askDenierOf`).
  */
 export type ReadOnlyCommand = { command: string; measured: boolean; denied: DeniedRule | null; asks: DeniedRule | null };
 
@@ -102,8 +107,8 @@ export type StepReach = {
   /** Whether it runs on Claude Code, whose set was measured. Every field below that says null says it is not. */
   claudeCode: boolean;
   /**
-   * The fence as its file declares it, null where it declares none. A step names no MCP server: `mcp:` is not a key a step has. `permissionMode`
-   * is Claude Code's, `sandbox` Codex's: a step has at most one of the two.
+   * The fence as its file declares it, null where it declares none. A step names no MCP server: `mcp:` is not a key a step has.
+   * `permissionMode` is Claude Code's, `sandbox` Codex's: a step has at most one of the two.
    */
   fence: {
     tools: string[] | null;
@@ -115,8 +120,8 @@ export type StepReach = {
     mcp: null;
   };
   /**
-   * The built-in tools it has: its `tools:` exactly (`declared`), or the harness's own set (`measured`), less what a deny rule removes. `inferred`
-   * are those of the measured set no measurement named (`MEASURED_TOOLS.inferred`); none for a step that declares its tools.
+   * The built-in tools it has: its `tools:` exactly (`declared`), or the harness's own set (`measured`), less what a deny rule removes.
+   * `inferred` are those of the measured set no measurement named (`MEASURED_TOOLS.inferred`); none for a step that declares its tools.
    */
   tools: { from: 'declared' | 'measured'; names: string[]; inferred: string[]; removed: RemovedTool[] } | null;
   /** The repository's skills it can load — every one, with the Skill tool; none without it, and why. */
@@ -125,16 +130,22 @@ export type StepReach = {
   mcp: Array<{ server: string; tools: ReachedMcpTool[] | null; why: string | null }> | null;
   /** Every deny rule that holds for it: the settings', then its own. None for a step whose harness reads no settings. */
   denied: DeniedRule[];
-  /** Every ask rule that holds for it: the settings' — a step has no key of its own for one. None for a step whose harness reads no settings. */
+  /**
+   * Every ask rule that holds for it: the settings' — a step has no key of its own for one. None for a step whose harness reads no
+   * settings.
+   */
   asked: DeniedRule[];
   allowed: AllowedFor;
-  /** Claude Code's read-only commands, the measured ones first: none for a step with no Bash, and null for a harness whose were not measured. */
+  /**
+   * Claude Code's read-only commands, the measured ones first: none for a step with no Bash, and null for a harness whose were not
+   * measured.
+   */
   readOnly: ReadOnlyCommand[] | null;
 };
 
 /**
- * What the Capabilities page reads: the repository's capabilities, the measured set a step without `tools:` has, the read-only commands Claude
- * Code runs without a rule, and what each step gets.
+ * What the Capabilities page reads: the repository's capabilities, the measured set a step without `tools:` has, the read-only commands
+ * Claude Code runs without a rule, and what each step gets.
  */
 export type CapabilitiesWithSteps = Capabilities & {
   measured: typeof MEASURED_TOOLS;
@@ -143,8 +154,8 @@ export type CapabilitiesWithSteps = Capabilities & {
 };
 
 /**
- * A permission rule as Claude Code reads one: the tool, and what its parentheses scope — null for a rule naming the tool whole, as `Bash` and
- * `Bash(*)` both do. Null for a rule that names no built-in tool so, an MCP server's (`mcp__<server>__<tool>`) among them.
+ * A permission rule as Claude Code reads one: the tool, and what its parentheses scope — null for a rule naming the tool whole, as `Bash`
+ * and `Bash(*)` both do. Null for a rule that names no built-in tool so, an MCP server's (`mcp__<server>__<tool>`) among them.
  */
 function ruleOf(rule: string): { tool: string; scope: string | null } | null {
   const m = /^([A-Za-z][A-Za-z0-9]*)(?:\(([\s\S]*)\))?$/.exec(rule);
@@ -159,7 +170,9 @@ const bashPattern = (scope: string): string => (scope.endsWith(':*') ? `${scope.
 const bareOf = (pattern: string): string | null =>
   pattern.endsWith(' *') && pattern.indexOf('*') === pattern.length - 1 ? pattern.slice(0, -2) : null;
 
-/** Whether a Bash pattern matches a command, as Claude Code matches one: `*` any text, spaces included; with no `*`, that command exactly. */
+/**
+ * Whether a Bash pattern matches a command, as Claude Code matches one: `*` any text, spaces included; with no `*`, that command exactly.
+ */
 function bashMatches(pattern: string, command: string): boolean {
   const glob = new RegExp(
     `^${pattern
@@ -171,10 +184,10 @@ function bashMatches(pattern: string, command: string): boolean {
 }
 
 /**
- * Whether the Bash rule scoped `outer` matches every command the rule scoped `inner` matches, each as its rule writes it (`git:*`, `git diff:*`,
- * `npm run build`). Read off `inner`'s text with each `*` of it taken as written: `outer`'s own characters are never a `*`, so where `outer`
- * matches that text, each `*` of `inner` falls inside a wildcard of `outer`, which matches whatever it stands for. And the bare command a
- * trailing ` *` of `inner` matches, `outer` must match too.
+ * Whether the Bash rule scoped `outer` matches every command the rule scoped `inner` matches, each as its rule writes it (`git:*`,
+ * `git diff:*`, `npm run build`). Read off `inner`'s text with each `*` of it taken as written: `outer`'s own characters are never a `*`,
+ * so where `outer` matches that text, each `*` of `inner` falls inside a wildcard of `outer`, which matches whatever it stands for. And the
+ * bare command a trailing ` *` of `inner` matches, `outer` must match too.
  */
 export function bashCovers(outer: string, inner: string): boolean {
   const [o, i] = [bashPattern(outer), bashPattern(inner)];
@@ -182,17 +195,21 @@ export function bashCovers(outer: string, inner: string): boolean {
   return bashMatches(o, i) && (bare === null || bashMatches(o, bare));
 }
 
-/** A rule naming an MCP server's tools: the server, and one tool — null for every tool of it, as `mcp__<server>` and `mcp__<server>__*` both are. */
+/**
+ * A rule naming an MCP server's tools: the server, and one tool — null for every tool of it, as `mcp__<server>` and `mcp__<server>__*` both
+ * are.
+ */
 function mcpRuleOf(rule: string): { server: string; tool: string | null } | null {
   const m = /^mcp__(.+?)(?:__(.+))?$/.exec(rule);
   return m ? { server: m[1], tool: m[2] === undefined || m[2] === '*' ? null : m[2] } : null;
 }
 
 /**
- * The deny rule that takes an allow rule back whole, or undefined — and, given the ask rules, the ask rule that does, since ask too comes before
- * allow. Deny comes before allow whatever either's specificity, so a deny takes back the allow when it matches every call the allow does: one of the same words; one naming the allow's tool whole; a Bash deny that covers the
- * allow's commands (`bashCovers`); a deny of the whole of an MCP server, over an allow of one of its tools or of all of them — a server's tool
- * read as `denyingRule` reads it for the tools row, so the row and the allow rules say the same.
+ * The deny rule that takes an allow rule back whole, or undefined — and, given the ask rules, the ask rule that does, since ask too comes
+ * before allow. Deny comes before allow whatever either's specificity, so a deny takes back the allow when it matches every call the allow
+ * does: one of the same words; one naming the allow's tool whole; a Bash deny that covers the allow's commands (`bashCovers`); a deny of
+ * the whole of an MCP server, over an allow of one of its tools or of all of them — a server's tool read as `denyingRule` reads it for the
+ * tools row, so the row and the allow rules say the same.
  */
 function takenBackBy(allow: string, denied: readonly DeniedRule[]): DeniedRule | undefined {
   const server = mcpRuleOf(allow);
@@ -211,8 +228,8 @@ function takenBackBy(allow: string, denied: readonly DeniedRule[]): DeniedRule |
 }
 
 /**
- * The deny rules narrower than an allow that stands, which still refuse some of what it allows — or, given the ask rules, those that still make
- * some of it ask: a Bash deny among a Bash allow's commands (`bashCovers`), and a deny of one tool of a server an allow names whole.
+ * The deny rules narrower than an allow that stands, which still refuse some of what it allows — or, given the ask rules, those that still
+ * make some of it ask: a Bash deny among a Bash allow's commands (`bashCovers`), and a deny of one tool of a server an allow names whole.
  */
 function narrowerDenies(allow: string, denied: readonly DeniedRule[]): string[] {
   const server = mcpRuleOf(allow);
@@ -411,8 +428,9 @@ function stepReach(
 }
 
 /**
- * Everything the Capabilities page reads, off the checkout at `repo`: what it offers (`capabilitiesOf`, its servers asked through `asker` with
- * `env`), and what each step of each workflow listed from it and from `home` gets. A workflows directory that cannot be listed is a warning, and no step is shown; the rest is served.
+ * Everything the Capabilities page reads, off the checkout at `repo`: what it offers (`capabilitiesOf`, its servers asked through `asker`
+ * with `env`), and what each step of each workflow listed from it and from `home` gets. A workflows directory that cannot be listed is a
+ * warning, and no step is shown; the rest is served.
  */
 export async function capabilitiesWithSteps(
   repo: string,

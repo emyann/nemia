@@ -1,7 +1,7 @@
 /**
- * GET /api/quota: the plan's usage asked of Claude Code with its `get_usage` control request — here of the harness's `claude`, which answers
- * as Claude Code 2.1.278 did when recorded (`fixtures/get-usage-*.json`) — kept for a while, one ask at a time, and each way it can fail said
- * in a sentence; and the pure judgement under it (`quotaOf`).
+ * GET /api/quota: the plan's usage asked of Claude Code with its `get_usage` control request — here of the harness's `claude`, which
+ * answers as Claude Code 2.1.278 did when recorded (`fixtures/get-usage-*.json`) — kept for a while, one ask at a time, and each way it can
+ * fail said in a sentence; and the pure judgement under it (`quotaOf`).
  */
 import { answer, askEnded, asks, calls, lastAskEnv, recorded, usageAnswer } from '../../test/harness.ts';
 import { test } from 'node:test';

@@ -7,6 +7,9 @@
  * `off`, or aimed at other files — fails here. The last part is what a lint rule cannot see across files: a name a comment quotes in
  * backticks is one the code has, in each file a block that is on covers.
  *
+ * Whether its block is on or off, no line that holds a comment, in any source file under packages/, apps/ and lint/, is wider than 140
+ * columns: oxfmt wraps code at that width and rewraps no comment.
+ *
  * The test reads files outside this package: after a change elsewhere, `npx turbo run test --force`.
  */
 import { test } from 'node:test';
@@ -394,6 +397,73 @@ function commentsOf(file: string, text: string): Found[] {
   visit(source);
   return [...found.values()].sort((a, b) => a.line - b.line);
 }
+
+/**
+ * The widest a line that holds any part of a comment may be, in code points: oxfmt's print width (`.oxfmtrc.json`), which rewraps no
+ * comment.
+ */
+const COMMENT_WIDTH = 140;
+
+/**
+ * Each line of `text` that holds any part of a comment and is wider than 140 columns, measured whole in code points, indentation and code
+ * before the comment included: `<file>:<line> is <n> columns`, each line once, in order.
+ */
+function wideCommentLines(file: string, text: string): string[] {
+  const lines = text.split('\n');
+  const held = new Set(commentsOf(file, text).flatMap(({ line, text: comment }) => comment.split('\n').map((_, i) => line + i)));
+  return [...held]
+    .sort((a, b) => a - b)
+    .flatMap((line) => {
+      const width = Array.from(lines[line - 1].replace(/\r$/, '')).length;
+      return width > COMMENT_WIDTH ? [`${file}:${line} is ${width} columns`] : [];
+    });
+}
+
+/** A line `width` code points wide: `head`, then as many `x` as it takes, then `tail`. */
+const widened = (head: string, tail: string, width: number): string => `${head}${'x'.repeat(width - head.length - tail.length)}${tail}`;
+
+test('REFUSED: a line over 140 columns that holds a comment is found, in a JSDoc, a //, after code and in JSX; a wide code line is not', () => {
+  const over = COMMENT_WIDTH + 1;
+  const fixture = [
+    widened('/** a one-line JSDoc ', ' */', over),
+    'export const a = 1;',
+    widened('/** a JSDoc at the width ', ' */', COMMENT_WIDTH),
+    'export const b = 1;',
+    '/**',
+    widened(' * the middle line of a JSDoc ', '', over),
+    ' */',
+    'export const c = 1;',
+    widened('// oxlint-disable-next-line no-debugger -- a directive ', '', over),
+    'debugger;',
+    widened('export const d = 1; // a comment after code ', '', over),
+    widened("export const e = 'a string with no comment ", "';", COMMENT_WIDTH + 10),
+    '/** A view: documented. */',
+    'export function View() {',
+    widened('  return <div>{/* a comment in JSX ', ' */}</div>;', over),
+    '}',
+    '',
+  ].join('\n');
+  const at = (needle: string) => `fixture.tsx:${lineOf(fixture, needle)} is ${over} columns`;
+  assert.deepEqual(wideCommentLines('fixture.tsx', fixture), [
+    at('a one-line JSDoc'),
+    at('the middle line of a JSDoc'),
+    at('a directive'),
+    at('a comment after code'),
+    at('a comment in JSX'),
+  ]);
+});
+
+test('no line that holds a comment, under packages/, apps/ and lint/, is over 140 columns', () => {
+  const files = sourceFiles();
+  const wide = files.flatMap((file) => wideCommentLines(file, fs.readFileSync(path.join(ROOT, file), 'utf8')));
+  assert.deepEqual(wide, [], `rewrap these comments within ${COMMENT_WIDTH} columns: oxfmt rewraps none`);
+  const folders = ['lint', ...workspacePackages().flatMap((pkg) => [`${pkg}/src`, `${pkg}/test`])];
+  assert.deepEqual(
+    folders.filter((folder) => !files.some((file) => file.startsWith(`${folder}/`))),
+    [],
+    'the scan read no source file in these folders',
+  );
+});
 
 /** A name a comment may quote: an identifier, a dotted path of them, with `()` after a call. */
 const NAME = /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*(?:\(\))?$/;

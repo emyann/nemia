@@ -62,12 +62,13 @@ const toldBy = (e: Engine, taskId: string, text: string): Effect.Effect<Said, Co
   );
 
 /**
- * Why an ask cannot be written where a file that is not one already stands, in words that name it — or null, when there is none: the file reads
- * as an ask, or it is gone, consumed by a pass since the verb looked. `read` is the file read as the tick reads it (`askIn`, `roundAskIn`).
+ * Why an ask cannot be written where a file that is not one already stands, in words that name it — or null, when there is none: the file
+ * reads as an ask, or it is gone, consumed by a pass since the verb looked. `read` is the file read as the tick reads it (`askIn`,
+ * `roundAskIn`).
  *
- * An ask is written under its try's name, exclusively, and never over a file there. One that does not read as an ask — `{}`, a hand edit, a torn
- * copy — is honoured by no pass, and `wf ls` shows nothing asked, so "already asked for, wait for it" would be a wait for ever. The way out is a
- * person's: delete the file, and ask again.
+ * An ask is written under its try's name, exclusively, and never over a file there. One that does not read as an ask — `{}`, a hand edit, a
+ * torn copy — is honoured by no pass, and `wf ls` shows nothing asked, so "already asked for, wait for it" would be a wait for ever. The
+ * way out is a person's: delete the file, and ask again.
  */
 export function strayAsk(file: string, read: RetryAsk | RoundAsk | string, what: string, again: string): string | null {
   if (typeof read !== 'string' || !lstatOf(file)) return null;

@@ -20,9 +20,9 @@ export const POPOVER =
  * A gate on the Factory's card: what approving does and where a send-back goes, in one row whatever the names (`gateCardLine`), since a
  * card taller than its cell reaches over the card beneath it (`CELL_HEIGHT`) — cut short where the names are long and whole on hover and in
  * the inspector; a link to what is being approved, a page away, since a card has no room for a plan; and the answer beside it — Approve
- * and Send back, each a popover over the card, through the same api as the run page's gate (`useApprove`, `useAsk`). The popover is the second press: nothing is sent by the button on the card. At an ending the approval's button
- * says what it runs (`Run ship now`), and a send-back needs words, as `wf retry --message` does. A refusal shows in the popover in the
- * api's words, the words kept in the box.
+ * and Send back, each a popover over the card, through the same api as the run page's gate (`useApprove`, `useAsk`). The popover is the
+ * second press: nothing is sent by the button on the card. At an ending the approval's button says what it runs (`Run ship now`), and a
+ * send-back needs words, as `wf retry --message` does. A refusal shows in the popover in the api's words, the words kept in the box.
  *
  * Clicks inside are the card's own: they neither toggle the card's steps nor drag it (`nodrag`), and the popovers, which React draws
  * outside the card, bubble through it as React does, so the stop is on the wrapper.

@@ -43,18 +43,24 @@ export function inputRefusal(inputs: readonly InputFile[]): string | null {
  * The line a step's brief carries under what was asked for when `wf start --input` gave the run files: where they are, and each by name.
  * Undefined for a run given none, or with no directory to name.
  *
- * `inFolder` for a step of a folder run, which is fenced to its own folder (`validateFolderMode` in workflow/validate.ts): the run's own `inputs/`
- * sits beside that folder, outside the fence, and named it the session would be denied the read with no prompt and no way to say so. The
- * run copies them in instead (`givenPlan`, `folderPlace.make`), and the line names the copy, by its path from the folder.
+ * `inFolder` for a step of a folder run, which is fenced to its own folder (`validateFolderMode` in workflow/validate.ts): the run's own
+ * `inputs/` sits beside that folder, outside the fence, and named it the session would be denied the read with no prompt and no way to say
+ * so. The run copies them in instead (`givenPlan`, `folderPlace.make`), and the line names the copy, by its path from the folder.
  */
 export const inputsLine = (dir: string | undefined, names: readonly string[] | undefined, inFolder = false): string | undefined =>
   dir && names?.length
     ? `Files given with it (\`wf start --input\`), ${inFolder ? `copied into \`${GIVEN}/inputs\` in this folder` : `in \`${dir}\``}: ${names.map((n) => `\`${n}\``).join(', ')}.`
     : undefined;
 
-/** What `wf decide` says under a run's line of where the run came from: the inbox card it was started from. Undefined for a run typed at `wf start`. */
+/**
+ * What `wf decide` says under a run's line of where the run came from: the inbox card it was started from. Undefined for a run typed at
+ * `wf start`.
+ */
 export const fromNote = (run: Pick<Run, 'from'>): string | undefined => (run.from ? `from inbox card ${run.from.inbox}` : undefined);
 
-/** What `wf decide` says under a run's line when `wf start --input` gave it files: each by name, and where they are. Undefined for a run given none. */
+/**
+ * What `wf decide` says under a run's line when `wf start --input` gave it files: each by name, and where they are. Undefined for a run
+ * given none.
+ */
 export const inputsNote = (dir: string, names: readonly string[] | undefined): string | undefined =>
   names?.length ? `inputs  ${names.join(', ')}  —  in ${dir}` : undefined;

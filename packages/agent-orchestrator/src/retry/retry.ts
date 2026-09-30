@@ -76,8 +76,8 @@ import { heldLater } from '../round/round.ts';
  *
  * And a gated step that signed off, while nothing after it is filed: `awaiting approval`, or approved and not yet handed on — which a step
  * nothing waits on never is: approved, it has handed on, since there is nothing left to file. A try of it is
- * a send-back from its gate (`sendsBack`) — `nudge` or `fresh`, with what to change, which `retryRefusal` holds it to — and the try after it
- * is on a try its approval does not name, so an approval given before the send-back is spent by it.
+ * a send-back from its gate (`sendsBack`) — `nudge` or `fresh`, with what to change, which `retryRefusal` holds it to — and the try after
+ * it is on a try its approval does not name, so an approval given before the send-back is spent by it.
  *
  * And the looping step an ending waits on, once that ending has been filed and stopped on the base branch (`endingStopped`): a try of it
  * sends the work back from there through the folder's loop — the step filed again with what the person and the ending said, free to ask for
@@ -152,7 +152,10 @@ export function retryable(
   };
 }
 
-/** Whether a person's ask carries what a try of its step needs past its budget (`Raise`): a `--budget` above it, on an ask that files a session. */
+/**
+ * Whether a person's ask carries what a try of its step needs past its budget (`Raise`): a `--budget` above it, on an ask that files a
+ * session.
+ */
 export const carries = (a: Pick<RetryAsk, 'mode' | 'budget'>, raise: Raise | undefined): boolean =>
   !raise || a.mode === 'recheck' || (a.budget !== undefined && a.budget > raise.above);
 
@@ -188,11 +191,13 @@ export const heard = (a: Pick<RetryAsk, 'message'>, sendsBack: true | undefined)
  * An ask names one try, by number, so it is honoured once: an ask for a try the record already holds is
  * spent (`spentAsks`) and files nothing, whichever pass reads it.
  *
- * A step over its budget, or ended at it, is never tried on the run's word — it is not `failed (check)`, so `retries:` files nothing — and a
- * person's ask for a session of it is due only with a `--budget` above what it has spent (`Raise`), which the try carries and the record keeps.
+ * A step over its budget, or ended at it, is never tried on the run's word — it is not `failed (check)`, so `retries:` files nothing — and
+ * a person's ask for a session of it is due only with a `--budget` above what it has spent (`Raise`), which the try carries and the record
+ * keeps.
  *
- * A step at its gate, or approved and not handed on (`sendsBack`), is tried only on an ask with words (`heard`): a wordless one, asked while
- * its harness blocked the session that then signed off, would send it back with nothing to change, before anyone read what it handed on.
+ * A step at its gate, or approved and not handed on (`sendsBack`), is tried only on an ask with words (`heard`): a wordless one, asked
+ * while its harness blocked the session that then signed off, would send it back with nothing to change, before anyone read what it handed
+ * on.
  *
  * An ending the work is sent back from is not also tried: its own ask, written by hand beside the send-back, names the try the send-back
  * takes, and is spent by it (`spentAsks`).
@@ -261,7 +266,9 @@ export function retriesDue(
   return due.filter((r) => !due.some((o) => o.back?.includes(r.step)));
 }
 
-/** The ways a person's try of a step whose task has not settled may be asked for: those `retryable` takes for a session its harness blocked. */
+/**
+ * The ways a person's try of a step whose task has not settled may be asked for: those `retryable` takes for a session its harness blocked.
+ */
 const STOPPED_FIRST: readonly RetryMode[] = ['nudge', 'fresh'];
 
 /**
@@ -399,16 +406,19 @@ export function retryLines(
   return lines;
 }
 
-/** The longest one rule `deniedOffer` prints: a rule clipped with `…` is not one a person can copy into `allowedTools:`, so a path goes whole but for a pathological one. */
+/**
+ * The longest one rule `deniedOffer` prints: a rule clipped with `…` is not one a person can copy into `allowedTools:`, so a path goes
+ * whole but for a pathological one.
+ */
 const RULE_CAP = 240;
 
 /**
- * Why a step that says `denials: fail` waits on you, and the way on that is not a try: the rules the folder's `allowedTools:` needs for a new run
- * (`allowRuleOf`), since this run's is frozen at `wf start` and nothing widens it — `Bash(pytest)` denied is `Bash(pytest:*)`, a file
- * written, by any tool, `Edit(…)`, and a path in the step's own directory written from it (`at`), since the next run's is another. A call
- * the step's own `disallowedTools:` may have denied (`disallowedBy`) is offered no rule: a deny beats every allow, so the rule would allow
- * nothing, and the offer says which of its rules is at work instead. Each rule one line (`oneLine`), since the harness's words are free
- * text; at most `DENIED_SHOWN`, then how many more, as `deniedWords` names the calls themselves. Pure.
+ * Why a step that says `denials: fail` waits on you, and the way on that is not a try: the rules the folder's `allowedTools:` needs for a
+ * new run (`allowRuleOf`), since this run's is frozen at `wf start` and nothing widens it — `Bash(pytest)` denied is `Bash(pytest:*)`, a
+ * file written, by any tool, `Edit(…)`, and a path in the step's own directory written from it (`at`), since the next run's is another. A
+ * call the step's own `disallowedTools:` may have denied (`disallowedBy`) is offered no rule: a deny beats every allow, so the rule would
+ * allow nothing, and the offer says which of its rules is at work instead. Each rule one line (`oneLine`), since the harness's words are
+ * free text; at most `DENIED_SHOWN`, then how many more, as `deniedWords` names the calls themselves. Pure.
  */
 export function deniedOffer(denied: readonly string[], step: Pick<Workflow, 'disallowedTools'> = {}, at: DeniedAt = {}): string {
   const calls = [...new Set(denied)];
@@ -461,9 +471,9 @@ export function overBudgetLine(steps: readonly Workflow[], run: Run, d: Decision
 
 /**
  * For each step that signed off blocked and may be tried again, the `wf retry` that answers its `needs`, as `wf decide` prints it under the
- * question. Pure. Not among `retryLines`' offers, whose shape the board reads. None for a blocked step whose session has not settled, which a
- * try would run beside, and none on a run that is not waiting on a person. None on a pruned run (`prunedRefusal`), whose question stays with
- * nothing to answer it, nor on a held one (`heldRefusal`), whose question is asked again once the hold lifts.
+ * question. Pure. Not among `retryLines`' offers, whose shape the board reads. None for a blocked step whose session has not settled, which
+ * a try would run beside, and none on a run that is not waiting on a person. None on a pruned run (`prunedRefusal`), whose question stays
+ * with nothing to answer it, nor on a held one (`heldRefusal`), whose question is asked again once the hold lifts.
  *
  * @param spendOf What each task's sessions cost (`taskSpend`): a blocked step over its budget is answered with `--budget` too.
  */

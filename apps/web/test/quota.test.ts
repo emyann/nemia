@@ -1,6 +1,6 @@
 /**
- * The quota's words over the Factory (src/lib/quota.ts): a reset in the person's own time zone, the age of a reading, and a window marked or
- * reset since. `npm run e2e` looks at the header itself.
+ * The quota's words over the Factory (src/lib/quota.ts): a reset in the person's own time zone, the age of a reading, and a window marked
+ * or reset since. `npm run e2e` looks at the header itself.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

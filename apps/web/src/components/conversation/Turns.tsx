@@ -74,8 +74,8 @@ export function TurnView({ turn, live, last, tail }: { turn: Turn; live: boolean
 
 /**
  * What a person said to the session, off the engine's journal: on the reader's side, as their words, marked as said to the session while it
- * ran, with when — and, once the session's transcript shows the words reaching it, that they are in its conversation. Drawn once: the session's
- * own line for them is taken out (`heardIn`). The words as given, not as markdown: they are on the record as typed.
+ * ran, with when — and, once the session's transcript shows the words reaching it, that they are in its conversation. Drawn once: the
+ * session's own line for them is taken out (`heardIn`). The words as given, not as markdown: they are on the record as typed.
  */
 function Told({ turn }: { turn: ToldTurn }) {
   return (

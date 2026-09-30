@@ -1,9 +1,9 @@
 /**
  * The feed (`feed.ts`) over the store's own file: `$WF_ROOT/feed.jsonl`, and this process's one fold of it, which the tick writes through.
  *
- * Beneath the controllers, beside `record.store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports it. `feed.ts` is the pure half — the
- * line, the fold, what a pass owes — and this is the file: read, appended to and followed, each helper taking the file as an argument, and
- * the exports over the store's own.
+ * Beneath the controllers, beside `record.store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports it.
+ * `feed.ts` is the pure half — the line, the fold, what a pass owes — and this is the file: read, appended to and followed, each helper
+ * taking the file as an argument, and the exports over the store's own.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -22,7 +22,8 @@ const feedMemo: FeedMemo = freshMemo();
 /**
  * Write what the pass judged of every run in the store, where it is not what the feed said of it last (`recordFeedFile`), and the lines
  * written. `now` is every run the pass judged: one the feed still names that is not in it is gone, and gets its `removed` — but for one of
- * `unjudged`, which the pass read and could not judge (`feedChanges`). `memo` is for a test, which starts one afresh to be a restarted daemon.
+ * `unjudged`, which the pass read and could not judge (`feedChanges`). `memo` is for a test, which starts one afresh to be a restarted
+ * daemon.
  */
 export const recordFeed = (
   now: ReadonlyMap<string, FeedWords>,
@@ -36,13 +37,19 @@ export const recordFeed = (
 /** A fold of nothing, for a test that plays a restarted daemon. */
 export const freshFeedMemo = freshMemo;
 
-/** The feed's lines after `after`, and the cursor to read on from (`readFeedFile`): a cursor inside a line, or past the end, is refused by name. */
+/**
+ * The feed's lines after `after`, and the cursor to read on from (`readFeedFile`): a cursor inside a line, or past the end, is refused by
+ * name.
+ */
 export const readFeed = (after = 0): { lines: FeedLine[]; cursor: number } => readFeedFile(feedFile(), after);
 
 /** Why `after` cannot be read from — or undefined when it can (`cursorRefusalAt`). */
 export const feedCursorRefusal = (after: number): string | undefined => cursorRefusalAt(feedFile(), after);
 
-/** Follow the feed from `from` until `stop()` (`watchFeedFile`), each line with the cursor just after it: refused before anything is watched when the cursor cannot be read from. */
+/**
+ * Follow the feed from `from` until `stop()` (`watchFeedFile`), each line with the cursor just after it: refused before anything is watched
+ * when the cursor cannot be read from.
+ */
 export const watchFeed = (opts: Parameters<typeof watchFeedFile>[1]): { stop(): void } => watchFeedFile(feedFile(), opts);
 
 const statOf = (file: string): fs.Stats | undefined => fs.statSync(file, { throwIfNoEntry: false });
@@ -179,10 +186,10 @@ function recordFeedFile(
 }
 
 /**
- * Whether the feed was cut under a reader at `cursor`, in words — or undefined, when the cursor is still one of this file's: it was deleted, a
- * file was put in its place (`ino`, the inode the cursor was read in), or it is shorter than the cursor or has no line boundary there
- * (`cursorRefusalAt`): truncated, and perhaps written again. A feed truncated and written past the cursor again, a line ending just there,
- * is not seen: nothing on disk tells it from the same feed grown.
+ * Whether the feed was cut under a reader at `cursor`, in words — or undefined, when the cursor is still one of this file's: it was
+ * deleted, a file was put in its place (`ino`, the inode the cursor was read in), or it is shorter than the cursor or has no line boundary
+ * there (`cursorRefusalAt`): truncated, and perhaps written again. A feed truncated and written past the cursor again, a line ending just
+ * there, is not seen: nothing on disk tells it from the same feed grown.
  */
 function feedCut(file: string, cursor: number, ino: number | undefined, stat: fs.Stats | undefined): string | undefined {
   if (cursor === 0) return undefined;
@@ -210,12 +217,12 @@ function feedCut(file: string, cursor: number, ino: number | undefined, stat: fs
  * not only when the next line is written.
  *
  * **A feed cut under the watch** — deleted, truncated, or replaced by another file — leaves the cursor pointing into a file that is not the
- * one it was handed out by (`feedCut`). Given `onCut`, the watch says so there once, in words, and reads on from the start of the feed there
- * is now. From the start and not from its end: a cut feed is one the tick has no fold of, so its next pass writes every run's words again
- * (`recordFeedFile`) — the lines a watcher that lost its place needs, and they would be skipped from the end, as would every transition
- * written between the cut and the watch noticing it. The cost is a line the watcher had before may be said again, which at least once
- * already allows. Without `onCut`, the cut is refused (exit 2) to `onError` on every beat, and the caller ends the watch — the api's stream
- * does, and a reader opens it again from the feed it has now.
+ * one it was handed out by (`feedCut`). Given `onCut`, the watch says so there once, in words, and reads on from the start of the feed
+ * there is now. From the start and not from its end: a cut feed is one the tick has no fold of, so its next pass writes every run's words
+ * again (`recordFeedFile`) — the lines a watcher that lost its place needs, and they would be skipped from the end, as would every
+ * transition written between the cut and the watch noticing it. The cost is a line the watcher had before may be said again, which at least
+ * once already allows. Without `onCut`, the cut is refused (exit 2) to `onError` on every beat, and the caller ends the watch — the api's
+ * stream does, and a reader opens it again from the feed it has now.
  *
  * A directory `fs.watch` cannot watch leaves the timer alone. The timer is not unref'd: a watch keeps its process alive, as `wf watch`
  * needs.

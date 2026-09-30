@@ -28,11 +28,16 @@ export type StepUsed = {
    * `large` past 200k on a step with none; null otherwise.
    */
   peak: 'cap' | 'large' | null;
-  /** How many resumed sessions wrote their context to the cache again instead of reading it (`rebuiltCache`); 0 where none did, or nobody could tell. */
+  /**
+   * How many resumed sessions wrote their context to the cache again instead of reading it (`rebuiltCache`); 0 where none did, or nobody
+   * could tell.
+   */
   rebuilt: number;
 };
 
-/** What a run's sessions read, as `StepUsed` has it: the words, where the peak stands, and how many resumed sessions rebuilt their cache. */
+/**
+ * What a run's sessions read, as `StepUsed` has it: the words, where the peak stands, and how many resumed sessions rebuilt their cache.
+ */
 export type RunRead = { said: string; peak: StepUsed['peak']; rebuilt: number };
 
 /**

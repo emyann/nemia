@@ -8,8 +8,8 @@
  *
  * `held` is a fact about the run too: a person holds it until other runs ship (`wf hold`), so a step not filed will not be until the hold
  * lifts, and a step at a human gate asks nothing of anyone while it stands — every verb that would answer it is refused. The words stay
- * `wf ls`'s (`awaiting approval`, `succeeded · BLOCKED`); only the colour and the meaning say the run is held. A step at work, asking through
- * its harness (`needs-human`), checking, or settled keeps its state: what is in flight runs on, and a verdict is a verdict.
+ * `wf ls`'s (`awaiting approval`, `succeeded · BLOCKED`); only the colour and the meaning say the run is held. A step at work, asking
+ * through its harness (`needs-human`), checking, or settled keeps its state: what is in flight runs on, and a verdict is a verdict.
  */
 export type StepState =
   | 'working'
@@ -56,14 +56,14 @@ const HELD_BY_A_HOLD: ReadonlySet<StepState> = new Set([
 
 /**
  * A step's state from its word alone, and whether the run was called off. `succeeded · BLOCKED` is `blocked`: the session ended cleanly,
- * and the step waits on a person. `over budget` comes with the amounts — `over budget $4.25 of $3`, or `over budget — implement $4.25 of $3`
- * on a looping step whose round would file one. The engine's `succeeded`, a session that ended, is at most its own word, `unverified`; so is
- * `input-required`, a task held open whose turn signed and waits for a person's word with nothing running, whose word beside it says which
- * (`input-required · BLOCKED`). `waiting on a-1x2y (cancelled), b-3z4w`, a root of a run started `--after` runs that have not shipped, and
- * `pending` are not filed, as `waiting` is. `waiting for a run slot (2 of 2 in flight)`, and the feed's `waiting for a run slot` without the
- * count, is a root of a run the cap on runs in flight holds: `waiting-for-slot`. Any other word — `running (working)`, `working (quiescent)`,
- * `starting`, `between attempts`, or one `wf ls` has that this does not know — is `working`: a step the board cannot name is shown as still
- * going, never as done or as needing you.
+ * and the step waits on a person. `over budget` comes with the amounts — `over budget $4.25 of $3`, or
+ * `over budget — implement $4.25 of $3` on a looping step whose round would file one. The engine's `succeeded`, a session that ended, is at
+ * most its own word, `unverified`; so is `input-required`, a task held open whose turn signed and waits for a person's word with nothing
+ * running, whose word beside it says which (`input-required · BLOCKED`). `waiting on a-1x2y (cancelled), b-3z4w`, a root of a run started
+ * `--after` runs that have not shipped, and `pending` are not filed, as `waiting` is. `waiting for a run slot (2 of 2 in flight)`, and the
+ * feed's `waiting for a run slot` without the count, is a root of a run the cap on runs in flight holds: `waiting-for-slot`. Any other word
+ * — `running (working)`, `working (quiescent)`, `starting`, `between attempts`, or one `wf ls` has that this does not know — is `working`:
+ * a step the board cannot name is shown as still going, never as done or as needing you.
  */
 function wordState(status: string, runCancelled: boolean): StepState {
   const [word = '', said] = status.split(' · ');

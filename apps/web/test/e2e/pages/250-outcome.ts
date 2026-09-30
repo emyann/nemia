@@ -227,7 +227,9 @@ function writeRun(root: string): string[] {
   return [record, dir, files, ...tasks];
 }
 
-/** The step's inspector, on its Output tab: what a click on its node opens, the click sent to the node where it is, whatever lies over it. */
+/**
+ * The step's inspector, on its Output tab: what a click on its node opens, the click sent to the node where it is, whatever lies over it.
+ */
 async function outputOf(page: Page, step: string) {
   await page.locator(`section[aria-label="The run's steps as a graph"] .react-flow__node[data-id="${step}"]`).dispatchEvent('click');
   const inspector = page.locator(`aside[aria-label="Step ${step}"]`);

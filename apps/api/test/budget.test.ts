@@ -1,7 +1,7 @@
 /**
- * What a step and a run cost, and a step held on its budget, as the board reads them: the engine's `costUsd`, `apiMs` and `toolMs` on `used`,
- * `cost` on a run and on each of its time's totals, `spent`, `budget` and `raise` on a step, the words `wf ls` and `wf decide` say of a step
- * past its cap — and a raise, asked for through POST …/retry and POST …/round with a `budget`, refused in the package's words.
+ * What a step and a run cost, and a step held on its budget, as the board reads them: the engine's `costUsd`, `apiMs` and `toolMs` on
+ * `used`, `cost` on a run and on each of its time's totals, `spent`, `budget` and `raise` on a step, the words `wf ls` and `wf decide` say
+ * of a step past its cap — and a raise, asked for through POST …/retry and POST …/round with a `budget`, refused in the package's words.
  *
  * At shipped defaults: the api's own engine over the harness's scratch store (`root`), which this file seeds, and the harness's fake
  * `claude` first on PATH (test/harness.ts).
@@ -28,7 +28,10 @@ const write = (file: string, text: string) => {
 const journal = (taskId: string, events: object[]) =>
   write(path.join(root, 'engine', 'tasks', `${taskId}.jsonl`), events.map((event) => `${JSON.stringify(event)}\n`).join(''));
 
-/** A step's task that ran once from `from` seconds, and signed off with `closeout` — its attempt with the usage the engine read of it, when it read one. */
+/**
+ * A step's task that ran once from `from` seconds, and signed off with `closeout` — its attempt with the usage the engine read of it, when
+ * it read one.
+ */
 const session = (taskId: string, harness: string, from: number, closeout: object, usage?: object) =>
   journal(taskId, [
     { kind: 'filed', at: at(from), brief: 'Do it.', cwd: '/code/app', maxAttempts: 1, harness },
@@ -85,9 +88,9 @@ const USAGE = {
 };
 
 /**
- * R: `implement` has `budget: 2`, and its two rounds cost $1.20 and $0.90. `review` loops back to it, on Codex, which prices nothing, and asked
- * for a third round — which would file implement again, past its cap. `tokens` has `budget: 3`, and its two tries cost $1.75 and $2.50, each
- * refused by its check.
+ * R: `implement` has `budget: 2`, and its two rounds cost $1.20 and $0.90. `review` loops back to it, on Codex, which prices nothing, and
+ * asked for a third round — which would file implement again, past its cap. `tokens` has `budget: 3`, and its two tries cost $1.75 and
+ * $2.50, each refused by its check.
  */
 const R = 'r-cost';
 const again = { type: 'object', properties: { again: { type: 'boolean' } }, required: ['again'], additionalProperties: false };
@@ -169,8 +172,8 @@ write(
 session('t-plan', 'codex', 0, done('Planned it.'), USAGE.review);
 
 /**
- * R2: past a budget on its own work. `palette` has `budget: 1`, and its one session cost $1.50 and signed off blocked with a question; `lint`
- * has `budget: 1`, and its one session cost $1.20 and was refused by its check. Each reads `over budget`, however it ended.
+ * R2: past a budget on its own work. `palette` has `budget: 1`, and its one session cost $1.50 and signed off blocked with a question;
+ * `lint` has `budget: 1`, and its one session cost $1.20 and was refused by its check. Each reads `over budget`, however it ended.
  */
 const R2 = 'r-cost-own';
 const PALETTE_NEEDS = 'Warm colours, or cool ones?';

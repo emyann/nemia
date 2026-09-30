@@ -1,11 +1,12 @@
 /**
- * The agent files: where `wf start` renders each step's agent for Claude Code (`agentFilesDir`), the render itself (`writeAgentFiles`), and a
- * skill read again once its rendered folder is gone (`skillsAgain`); and what the board's Agents page writes — an agent and the files beside
- * it (`writeAgent`, `removeAgent`, refused as `AgentWriteError`) — and the agents of the two places the board lists them from
+ * The agent files: where `wf start` renders each step's agent for Claude Code (`agentFilesDir`), the render itself (`writeAgentFiles`), and
+ * a skill read again once its rendered folder is gone (`skillsAgain`); and what the board's Agents page writes — an agent and the files
+ * beside it (`writeAgent`, `removeAgent`, refused as `AgentWriteError`) — and the agents of the two places the board lists them from
  * (`agentPlaces`, `listAgents`, `findAgent`). What a folder holds is `agents.ts`'s; this writes and reads it.
  *
  * Beneath the controllers, beside `record.store.ts`, whose run folder holds the agent files: it imports neither the engine nor a
- * controller, and no pure file imports it (`test/boundary.test.ts`). A run is changed by none of the writes: it froze its agents at `wf start`.
+ * controller, and no pure file imports it (`test/boundary.test.ts`). A run is changed by none of the writes: it froze its agents at
+ * `wf start`.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -49,9 +50,9 @@ export const renderedIn = (dir: string, step: Workflow): boolean =>
   isDirectory(dir) && (!namesPlugin(step) || isDirectory(path.join(dir, pluginOf(step.agent!.name))));
 
 /**
- * Render every step of `steps` whose agent is rendered (`rendersAgent`) into its folder (`agentFilesDir`): its prompt, its skills copied whole
- * from where the load found them (`skills`), and its style. Written once, at `wf start`, so an edit of an agent or a skill after it reaches no
- * run already started, as an edit of its workflow does not. A skill is copied through its links: the folder is the step's own.
+ * Render every step of `steps` whose agent is rendered (`rendersAgent`) into its folder (`agentFilesDir`): its prompt, its skills copied
+ * whole from where the load found them (`skills`), and its style. Written once, at `wf start`, so an edit of an agent or a skill after it
+ * reaches no run already started, as an edit of its workflow does not. A skill is copied through its links: the folder is the step's own.
  */
 export function writeAgentFiles(run: Pick<Run, 'id'>, steps: readonly Workflow[], skills: SkillsFound): void {
   for (const step of steps.filter(rendersAgent)) {
@@ -83,8 +84,9 @@ export function writeAgentFiles(run: Pick<Run, 'id'>, steps: readonly Workflow[]
 }
 
 /**
- * The skills of a step whose rendered folder is gone (`unrendered`), read again from where the load finds them now (`skills`): each SKILL.md's
- * body, or why it is not there. The copy `wf start` froze went with the folder, so this is the one read of a skill after a run started.
+ * The skills of a step whose rendered folder is gone (`unrendered`), read again from where the load finds them now (`skills`): each
+ * SKILL.md's body, or why it is not there. The copy `wf start` froze went with the folder, so this is the one read of a skill after a run
+ * started.
  */
 export function skillsAgain(step: Workflow, skills: SkillsFound): SkillAgain[] {
   return (step.agent?.skills ?? []).map((name) => {
@@ -117,7 +119,8 @@ export class AgentWriteError extends WorkflowError {
 export type AgentWritten = { dir: string; agent: Agent; version: string; written: string[]; removed: string[] };
 
 /**
- * A file written beside an agent, named by one of the agent's own keys: the result schema its `output:` names. Its file is a plain `.json` name in the folder — no folder of its own, and not another agent's file.
+ * A file written beside an agent, named by one of the agent's own keys: the result schema its `output:` names. Its file is a plain `.json`
+ * name in the folder — no folder of its own, and not another agent's file.
  */
 export type AgentSidecar = { file: string; text: string };
 
@@ -125,16 +128,17 @@ export type AgentSidecar = { file: string; text: string };
 export type AgentSchema = AgentSidecar;
 
 /**
- * The agent keys that name a file beside the agent, and what a refusal calls each. `card:` is not one: an agent's card is generated from its
- * skills, and the load refuses a `card:` line, naming the file it points at as nobody's (`cardRetired`).
+ * The agent keys that name a file beside the agent, and what a refusal calls each. `card:` is not one: an agent's card is generated from
+ * its skills, and the load refuses a `card:` line, naming the file it points at as nobody's (`cardRetired`).
  */
 const SIDECARS = [
   { key: 'output' as const, what: 'result schema', a: 'the result schema', suggest: (name: string) => `${name}.schema.json` },
 ];
 
 /**
- * Why no agent may be written to or removed from `dir`, or `undefined`: an agent is a file in `agents/` beside the workflows the board lists
- * — the store's (`<store>/workflows/agents`) or a repository's (`<repo>/workflows/agents`). Anywhere else only with `{ anywhere: true }`.
+ * Why no agent may be written to or removed from `dir`, or `undefined`: an agent is a file in `agents/` beside the workflows the board
+ * lists — the store's (`<store>/workflows/agents`) or a repository's (`<repo>/workflows/agents`). Anywhere else only with
+ * `{ anywhere: true }`.
  */
 function agentPlaceRefusal(dir: string, anywhere: boolean): string | undefined {
   if (path.basename(dir) !== AGENTS_FOLDER) {
@@ -170,22 +174,22 @@ const inUseByRepo = (name: string, users: readonly string[], repo: string, does:
   `${AGENTS_FOLDER}/${name}.md is named by ${users.length === 1 ? 'a step' : `${users.length} steps`} of the repository ${repo} — ${users.join(', ')} — which has no ${name} of its own, so its workflows are given this one, and ${does} would leave ${users.length === 1 ? 'it' : 'each'} naming an agent that is not there, which the workflow refuses to load. Give ${users.length === 1 ? 'that step' : 'those steps'} another agent or remove the \`agent:\` line, or copy this agent into ${path.join(repo, 'workflows', AGENTS_FOLDER)}/ (git shows it as a change to commit), first.`;
 
 /**
- * An agent written from a draft (`renderAgent`): what the board's Agents page saves, and the inverse of `loadAgents` for one agent. `dir` is
- * a folder of agents, `<workflows>/agents`, and a run is not changed by any of it: a run froze its folder, and the agents its steps name, at
- * `wf start`, so a write changes what a later `wf start` freezes and nothing else.
+ * An agent written from a draft (`renderAgent`): what the board's Agents page saves, and the inverse of `loadAgents` for one agent. `dir`
+ * is a folder of agents, `<workflows>/agents`, and a run is not changed by any of it: a run froze its folder, and the agents its steps
+ * name, at `wf start`, so a write changes what a later `wf start` freezes and nothing else.
  *
  * `version` is the agent's as it was read (`agentVersion`), or `null` for a new agent; `from` names the agent the draft was read from, when
  * it is renamed. Judged whole before a byte is written, each refusal by name: the place (`agentPlaceRefusal`), each name as a file's
  * (`agentNameRefusal`), a link where a file would be written or removed, a new agent whose name is taken, an agent not there or changed
  * since `version` was read, a rename onto another agent or of one steps still name — saying which — and then the file as it would be,
- * rendered and parsed as `loadAgents` parses one, so every key and value the parser refuses is refused here, in its words. A `card` option is
- * refused: the card is generated from the agent's skills, and a card file sent would be dropped unsaid. With `repo`, the version is read
+ * rendered and parsed as `loadAgents` parses one, so every key and value the parser refuses is refused here, in its words. A `card` option
+ * is refused: the card is generated from the agent's skills, and a card file sent would be dropped unsaid. With `repo`, the version is read
  * with the skills a start on `repo` finds (`agentSkillsFound`), as the board lists it; without, with those beside the folder.
  *
  * `schema` is the result schema the agent's `output:` names, written beside it with it: a `.json` file's name with no folder, the one that
  * key names, not a link, and not a file another agent names — that one is its agent's to change. Without one, the file that key names is
- * read from the folder as it is. A key whose line is taken off, or pointed at another file, leaves the file it named where it is, so a field
- * cleared by mistake costs no one the schema they wrote; removing the agent takes its files with it (`removeAgent`).
+ * read from the folder as it is. A key whose line is taken off, or pointed at another file, leaves the file it named where it is, so a
+ * field cleared by mistake costs no one the schema they wrote; removing the agent takes its files with it (`removeAgent`).
  *
  * Renamed by case where the filesystem does not tell case apart, the file it is renamed from is removed before the one it is renamed to
  * is written, as in `writeWorkflow`.
@@ -390,22 +394,24 @@ export function removeAgent(
 }
 
 /**
- * Where the skills of the agents in `dir` (`<workflows>/agents`) are found, as a start finds them for a workflow beside it (`skillsFor`): that
- * root first, then `repo`'s `.claude/`, then the store. What a card (`cardSkills`) and an agent's version are read with outside a start, so the
- * card names the skills a run would be given and its version moves with them.
+ * Where the skills of the agents in `dir` (`<workflows>/agents`) are found, as a start finds them for a workflow beside it (`skillsFor`):
+ * that root first, then `repo`'s `.claude/`, then the store. What a card (`cardSkills`) and an agent's version are read with outside a
+ * start, so the card names the skills a run would be given and its version moves with them.
  */
 export const agentSkillsFound = (dir: string, repo: string): SkillsFound =>
   skillsFor(path.join(path.dirname(path.resolve(dir)), '_'), { repo: path.resolve(repo), home: HOME });
 
 /**
- * The skills a write's or a removal's version is read with: found as `repo`'s start finds them, as the board's listing reads the version the
- * write carries back, or beside the folder alone with no `repo`. Read one way and checked another, an agent whose skill is in the
+ * The skills a write's or a removal's version is read with: found as `repo`'s start finds them, as the board's listing reads the version
+ * the write carries back, or beside the folder alone with no `repo`. Read one way and checked another, an agent whose skill is in the
  * repository's `.claude/skills/` would be refused as changed since it was read on every save.
  */
 const skillsAt = (at: string, repo: string | undefined): SkillsFound | undefined =>
   repo === undefined ? undefined : agentSkillsFound(at, repo);
 
-/** Where an agent may be, in order: the repository's `workflows/agents`, then your store's. The board's two places (`sourcesOf`, apps/api). */
+/**
+ * Where an agent may be, in order: the repository's `workflows/agents`, then your store's. The board's two places (`sourcesOf`, apps/api).
+ */
 export const agentPlaces = (repo: string): Array<{ from: AgentPlace; dir: string }> => [
   { from: 'repo', dir: path.join(path.resolve(repo), 'workflows', AGENTS_FOLDER) },
   { from: 'yours', dir: path.join(HOME, 'workflows', AGENTS_FOLDER) },

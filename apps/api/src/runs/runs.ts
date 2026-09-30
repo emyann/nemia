@@ -69,20 +69,24 @@ export type RunSummary = {
   createdAt: string;
   /**
    * When the run started (`runStartedAt`): its first task's filing, off the engine's feed — for a run started `--after` runs, or held for a
-   * run slot, well after `createdAt`. `createdAt` for a run started whose filings the feed does not have; null while nothing of it is filed.
+   * run slot, well after `createdAt`. `createdAt` for a run started whose filings the feed does not have; null while nothing of it is
+   * filed.
    */
   startedAt: string | null;
   cancelledAt: string | null;
   /**
-   * That `wf prune` removed the run's worktrees, and its files too once `--artifacts` did, in `wf prune`'s words — what it removed and what it
-   * kept — for the mark beside its status; null on a run never pruned.
+   * That `wf prune` removed the run's worktrees, and its files too once `--artifacts` did, in `wf prune`'s words — what it removed and what
+   * it kept — for the mark beside its status; null on a run never pruned.
    */
   pruned: { said: string } | null;
   /** The runs this one waits on (`wf start --after`), as the record froze them at start: none for a run started without. */
   after: string[];
   /** The runs its roots still wait on, in the package's words (`RunWaiting`); null once there are none, or the run has started. */
   waiting: RunWaiting | null;
-  /** The runs a person holds this one until (`wf hold <run> --until <run>`), as its hold file names them: none for a run nobody holds, or one called off. */
+  /**
+   * The runs a person holds this one until (`wf hold <run> --until <run>`), as its hold file names them: none for a run nobody holds, or
+   * one called off.
+   */
   heldUntil: string[];
   /**
    * The hold, in the package's words (`RunHolding`); null for a run nobody holds, and one called off. While it stands nothing of the run is
@@ -100,7 +104,10 @@ export type RunSummary = {
    * A held run the same: it moves as it would unheld while the hold may lift on its own (`RunHolding.onYou`), and files nothing until then.
    */
   moving: boolean;
-  /** What the run has cost so far, every step's tries together, as `wf ls` adds it up on the run's line (`runSpend`); null until a cost was measured. */
+  /**
+   * What the run has cost so far, every step's tries together, as `wf ls` adds it up on the run's line (`runSpend`); null until a cost was
+   * measured.
+   */
   cost: Spent | null;
   /**
    * `status` is what `wf ls` prints for the step — see `judge` for the one word it corrects. `note` is what `wf ls` prints
@@ -116,11 +123,13 @@ export type RunSummary = {
    */
   waitingOnYou: string[];
   /**
-   * `waitingOnYou` as `wf ls` names it after `→ waiting on you:` (`onYouWords`), one entry a step, in its order: the step's name — and for a
-   * step at its gate, what is asked of you, `approve plan`.
+   * `waitingOnYou` as `wf ls` names it after `→ waiting on you:` (`onYouWords`), one entry a step, in its order: the step's name — and for
+   * a step at its gate, what is asked of you, `approve plan`.
    */
   onYou: string[];
-  /** What a person has to decide about the run's result, when the run is at it and nobody has (`RunToDecide`); null while there is nothing. */
+  /**
+   * What a person has to decide about the run's result, when the run is at it and nobody has (`RunToDecide`); null while there is nothing.
+   */
   toDecide: RunToDecide | null;
   /**
    * Why the run is not judged, when a task it reads — its own, or one of a run it waits on — has a journal that does not read, in the
@@ -237,7 +246,9 @@ async function judgedOrNot(
   return 'judged' in one ? one.judged : { unjudged: unjudged(run, views, unreadable, one.unreadable, home) };
 }
 
-/** Runs judged now, as the list judges them and never from its memo: for a write that must know whether one still moves (a try, agents.ts). */
+/**
+ * Runs judged now, as the list judges them and never from its memo: for a write that must know whether one still moves (a try, agents.ts).
+ */
 export async function judgedNow(e: Engine['Service'], home: string, some: readonly Run[]): Promise<Array<Omit<RunSummary, 'startedAt'>>> {
   const { views, reader, unreadable } = await viewsFor(e, some);
   const git = branchReader();
@@ -391,15 +402,16 @@ async function listed({ e, env, home, memo }: Served): Promise<RunSummary[]> {
  * - `DELETE /api/runs/:id/hold` — a person's hold lifted, as `wf hold <run> --off` lifts it (`unhold`): its file removed, and the run goes
  *   on at the next tick, what its steps asked while it was held asked again. Guarded as a write (`liftGuard`). Refused in the package's
  *   words, by `app.onError`: a run nobody holds — a pruned one among them, since no verb holds one — and a hold put again as it was lifted
- *   are a 409 (`Conflict`), a run gone since the route read it a 404; any other failure is a 502. No feed line: the tick is the feed's one writer, and the board reads the run again itself.
+ *   are a 409 (`Conflict`), a run gone since the route read it a 404; any other failure is a 502. No feed line: the tick is the feed's one
+ *   writer, and the board reads the run again itself.
  * - `POST /api/runs/:id/prune` — a finished run pruned, as `wf prune <run> --yes` prunes it (`prune`), with `artifacts` its `--artifacts`
  *   and `unmerged` its `--unmerged` (`PRUNE_BODY`): its worktrees removed, and its files with `artifacts`; its record and every branch
  *   kept. Guarded as a write (`pruneGuard`). The page asks twice before it sends this, so there is no dry run here. The package decides
  *   everything and words it, and the api maps its answer to a status: refused (a folder run, a run not over, a finished run nobody merged
  *   without `unmerged`, a worktree holding what no commit has…) and nothing left to prune (one pruned already) are each a 409 in `wf
  *   prune`'s words alone, as `DELETE …` sends `forget`'s, the page saying `Not pruned` above them itself (`Refusal`); a thrown refusal of
- *   the package's goes to `app.onError`, which answers it by its kind, and any other failure is a 502. No feed line: the marker the prune writes moves the run's
- *   `restStamps`, and the board reads the run again itself.
+ *   the package's goes to `app.onError`, which answers it by its kind, and any other failure is a 502. No feed line: the marker the prune
+ *   writes moves the run's `restStamps`, and the board reads the run again itself.
  */
 
 export const runs = new Hono<ApiEnv>()

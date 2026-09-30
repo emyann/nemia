@@ -51,9 +51,9 @@ const START_MS = 30_000;
 const servers: Array<{ name: string; child: ChildProcess; output: () => string }> = [];
 
 /**
- * A Unix socket standing in for a session's inbox, as Claude Code's reads one: each connection's lines kept, as JSON where they parse, nothing
- * answered, and its end closed once the sender's is; each line is handed to `onLine` once kept. Unreferenced, so it keeps nothing alive; it goes
- * with the store.
+ * A Unix socket standing in for a session's inbox, as Claude Code's reads one: each connection's lines kept, as JSON where they parse,
+ * nothing answered, and its end closed once the sender's is; each line is handed to `onLine` once kept. Unreferenced, so it keeps nothing
+ * alive; it goes with the store.
  */
 function listen(socket: string, onLine: (line: unknown) => void = () => {}): Promise<void> {
   const server = net.createServer({ allowHalfOpen: true }, (connection) => {
@@ -211,7 +211,10 @@ async function main(): Promise<void> {
     CLAUDE_CONFIG_DIR: path.join(store, 'claude'),
     /** The quota asked of the e2e's claude on every read, so the quota page reads the answer it has just written. */
     HKB_QUOTA_KEEP_MS: '0',
-    /** Asked again at once after an answer the usage service gave nothing for, so the page that draws one reads the good answer it puts back. */
+    /**
+     * Asked again at once after an answer the usage service gave nothing for, so the page that draws one reads the good answer it puts
+     * back.
+     */
     HKB_QUOTA_BACKOFF_MS: '0',
     PATH: `${bin}${path.delimiter}${process.env.PATH ?? ''}`,
   });

@@ -52,7 +52,9 @@ export type Decision =
       kind: 'awaiting';
       outcome: 'succeeded' | 'failed' | 'blocked';
       branches: string[];
-      /** Steps whose task failed or was stopped — over their budget or not, as each list below names a step by how it ended on its own work. */
+      /**
+       * Steps whose task failed or was stopped — over their budget or not, as each list below names a step by how it ended on its own work.
+       */
       failed: string[];
       /** Steps that signed off blocked. */
       stuck: string[];
@@ -66,11 +68,16 @@ export type Decision =
       unverified: string[];
       /** Looping steps that asked for another round on the last one their `rounds:` allows. */
       exhausted: string[];
-      /** Steps whose tries cost their `budget:` or more where another session of them is the way on, and looping steps whose round waits on one (`stepStatus`). */
+      /**
+       * Steps whose tries cost their `budget:` or more where another session of them is the way on, and looping steps whose round waits on
+       * one (`stepStatus`).
+       */
       overBudget: string[];
       /** Steps whose harness ended their session at their `budget:`. */
       budgetExhausted: string[];
-      /** Steps that signed off having been denied a call, and say `denials: fail`: nothing after them is filed, and no check of them ran. */
+      /**
+       * Steps that signed off having been denied a call, and say `denials: fail`: nothing after them is filed, and no check of them ran.
+       */
       denied: string[];
       /** Gated steps that signed off and wait for a person's `wf approve` (`stepStatus`): nothing after them is filed. */
       awaitingApproval: string[];

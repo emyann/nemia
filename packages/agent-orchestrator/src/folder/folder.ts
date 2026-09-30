@@ -8,9 +8,9 @@ import { orderSteps, parseWorkflow, validate } from '../workflow/index.ts';
 import type { Agents, SkillsFound } from '../agents/agents.ts';
 
 /**
- * Why `name` cannot be a step's name, or `undefined` when it can. A step is its file, `<name>.md`, in its workflow's folder, and other steps
- * name it in `after:`, `input:`, `resume:` and `loop:`: so a name is one file's in that folder, not hidden, not the README's, and one a list
- * can hold. What `writeWorkflow` refuses a step with before it writes; a folder read from disk has its names from its files already.
+ * Why `name` cannot be a step's name, or `undefined` when it can. A step is its file, `<name>.md`, in its workflow's folder, and other
+ * steps name it in `after:`, `input:`, `resume:` and `loop:`: so a name is one file's in that folder, not hidden, not the README's, and one
+ * a list can hold. What `writeWorkflow` refuses a step with before it writes; a folder read from disk has its names from its files already.
  */
 export function stepNameRefusal(name: unknown): string | undefined {
   const fix = 'Name it as its file is named, without .md — implement, say.';
@@ -56,12 +56,12 @@ export const linkRefusal = (file: string, what: string): string =>
 export const stepFiles = (entries: readonly string[]): string[] => entries.filter((f) => f.endsWith('.md') && !isReadme(f)).sort();
 
 /**
- * A folder's steps from the text of their files, `[name, text]` a step, checked as a folder on disk is checked: each step parsed, in the order
- * of its file's name as a folder lists them, then the ways the steps do not form a workflow (`validate`), and in the order they run. Pure:
- * `read` answers for a file beside the steps, and `agents` are those `agent:` may name, as `parseWorkflow`'s are.
+ * A folder's steps from the text of their files, `[name, text]` a step, checked as a folder on disk is checked: each step parsed, in the
+ * order of its file's name as a folder lists them, then the ways the steps do not form a workflow (`validate`), and in the order they run.
+ * Pure: `read` answers for a file beside the steps, and `agents` are those `agent:` may name, as `parseWorkflow`'s are.
  *
- * What `loadWorkflows` reads a folder with, and what `writeWorkflow` checks one with before a byte of it is written: one reading, so a folder
- * written is refused for what a folder read would be, in the same words.
+ * What `loadWorkflows` reads a folder with, and what `writeWorkflow` checks one with before a byte of it is written: one reading, so a
+ * folder written is refused for what a folder read would be, in the same words.
  */
 export function parseFolder(
   files: ReadonlyArray<readonly [name: string, text: string]>,

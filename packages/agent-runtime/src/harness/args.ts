@@ -180,8 +180,8 @@ const RULE = /^[A-Za-z][^\s,()]*(?:\([^()]+\))?$/;
  *
  * The checks every adapter shares: a value no harness could use, refused before it is journalled, since a journalled task
  * is a promise the loop keeps trying to honour. Asked by every `Runner` (`Runner.layer`), so the Effect door and
- * the `file` of an engine `Engine.layer` builds give one sentence for each. A harness's own words — the modes and efforts it takes — are its
- * runner's (`harnessRefusalOf` in `facade/consumer.ts`).
+ * the `file` of an engine `Engine.layer` builds give one sentence for each. A harness's own words — the modes and efforts it takes — are
+ * its runner's (`harnessRefusalOf` in `facade/consumer.ts`).
  *
  * In order:
  *

@@ -45,7 +45,9 @@ const valueAt = (value: unknown, path: readonly PropertyKey[]): unknown =>
     value,
   );
 
-/** Why `route` answered `value` with what the board does not read, from the first issue of its failed decode: a sentence ending on the fix. */
+/**
+ * Why `route` answered `value` with what the board does not read, from the first issue of its failed decode: a sentence ending on the fix.
+ */
 function unreadWords(route: string, value: unknown, issue: SchemaIssue.Issue): string {
   const [first] = formatter(issue).issues;
   const path = (first?.path ?? []).map((p) => (typeof p === 'object' && p !== null && 'key' in p ? p.key : p));
@@ -57,7 +59,10 @@ function unreadWords(route: string, value: unknown, issue: SchemaIssue.Issue): s
   return `${route} answered what this board does not read: at ${pathWords(path)}, the value ${what}. The board and the api were built apart: rebuild the board (npm run build) and reload it.`;
 }
 
-/** The JSON of a 2xx answer to `path`; rejects with a `ReadRefusal` in the api's own words (its `error`) where it gave them, else naming the status. */
+/**
+ * The JSON of a 2xx answer to `path`; rejects with a `ReadRefusal` in the api's own words (its `error`) where it gave them, else naming the
+ * status.
+ */
 async function answer(path: string, init?: RequestInit): Promise<unknown> {
   const res = await fetch(path, init);
   if (!res.ok) {
@@ -82,7 +87,9 @@ export async function get<T>(path: string, schema: Schema.Decoder<T>, init?: Req
   throw new UnreadAnswer(route, unreadWords(route, value, decoded.failure.issue));
 }
 
-/** Reads `path` from the api as `get` does, and takes its JSON to be a `T` unread: the read of a file not decoded yet (`test/read.test.ts`). */
+/**
+ * Reads `path` from the api as `get` does, and takes its JSON to be a `T` unread: the read of a file not decoded yet (`test/read.test.ts`).
+ */
 export async function getUndecoded<T>(path: string, init?: RequestInit): Promise<T> {
   return (await answer(path, init)) as T;
 }

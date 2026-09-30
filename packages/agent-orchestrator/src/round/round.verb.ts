@@ -29,13 +29,14 @@ import { Conflict, Missing } from '../refusal/refusal.ts';
 export type RoundAsked = { run: Run; ask: RoundAsk; file: string };
 
 /**
- * Ask for one more round of a loop whose rounds are spent — `wf round` — by writing the ask, and nothing else. The next tick honours it once.
+ * Ask for one more round of a loop whose rounds are spent — `wf round` — by writing the ask, and nothing else. The next tick honours it
+ * once.
  *
  * Refused before anything is written, with what to do instead (`roundAsk`): a round still running, one the run files itself, a loop that
- * ended without asking again, a step of the loop that stopped, a cancelled run, a round already asked for. Like `wf retry`'s, the ask is the
- * person's own file, and the verb never writes the run's json, which the tick owns. `stepName` may be left out when the run has one loop.
- * `budget` raises the cap of each step of the loop over its budget, for a round held on it: the ask carries it, and the tick keeps it.
- * An ask written by someone else between the look and the write is refused as the look would have refused it, and a file at the ask's
+ * ended without asking again, a step of the loop that stopped, a cancelled run, a round already asked for. Like `wf retry`'s, the ask is
+ * the person's own file, and the verb never writes the run's json, which the tick owns. `stepName` may be left out when the run has one
+ * loop. `budget` raises the cap of each step of the loop over its budget, for a round held on it: the ask carries it, and the tick keeps
+ * it. An ask written by someone else between the look and the write is refused as the look would have refused it, and a file at the ask's
  * name that does not read as one is named (`strayAsk`). Fails with a refusal, the verb's or one a read threw; dies of anything else
  * (`tried`, `awaited`).
  */

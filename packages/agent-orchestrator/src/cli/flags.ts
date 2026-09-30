@@ -198,9 +198,9 @@ type FlagRules = {
 };
 
 /**
- * A verb's flags after its one positional argument — `wf start`'s and `wf plan`'s — each value flag also as `--flag=<value>`. Anything else is
- * refused before anything is read: a flag the verb does not take, a misspelt one, a value flag with no value or given twice, and a second
- * positional: dropped instead, a misspelt `--after` would start a run that waits on nothing, filed on the next pass.
+ * A verb's flags after its one positional argument — `wf start`'s and `wf plan`'s — each value flag also as `--flag=<value>`. Anything else
+ * is refused before anything is read: a flag the verb does not take, a misspelt one, a value flag with no value or given twice, and a
+ * second positional: dropped instead, a misspelt `--after` would start a run that waits on nothing, filed on the next pass.
  */
 export function readFlags(argv: string[], rules: FlagRules): { values: Record<string, string[]>; switches: string[] } {
   const values: Record<string, string[]> = {};

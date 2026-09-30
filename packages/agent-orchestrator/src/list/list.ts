@@ -51,7 +51,10 @@ export type Listing = {
    * Beside the status and never in it, so the words stay the vocabulary a reader of them keys on.
    */
   steps: Array<{ name: string; status: string; branch: string | null; note?: string; cost?: string }>;
-  /** Steps a person has to act on — blocked, unsigned, refused by their check, or awaiting approval, with no try due — on a run nobody has called off, pruned or held. */
+  /**
+   * Steps a person has to act on — blocked, unsigned, refused by their check, or awaiting approval, with no try due — on a run nobody has
+   * called off, pruned or held.
+   */
   waitingOnYou: string[];
   /**
    * The runs a person holds this run until (`Run.hold`, `holdsOf`): while the hold stands, nothing is asked of anyone, and `wf ls` says
@@ -61,11 +64,14 @@ export type Listing = {
   holding?: Wait[];
   /** The runs this run's roots wait on (`waitsOf`): none once it has started, or on a run nobody has called off. */
   waiting: Wait[];
-  /** The cap on runs in flight holding this run, and the count it is held at (`heldRuns`): absent unless it holds a run with nothing filed. */
+  /**
+   * The cap on runs in flight holding this run, and the count it is held at (`heldRuns`): absent unless it holds a run with nothing filed.
+   */
   slot?: RunSlot;
   /**
-   * What the run has cost so far, every step's ended tries together (`runSpend`): `$12.40`, and `≥$12.40` where an ended attempt has no cost
-   * on it. Absent until a cost was measured. Each step's own is `cost` on its line, beside its word — and in it, for a step at its budget.
+   * What the run has cost so far, every step's ended tries together (`runSpend`): `$12.40`, and `≥$12.40` where an ended attempt has no
+   * cost on it. Absent until a cost was measured. Each step's own is `cost` on its line, beside its word — and in it, for a step at its
+   * budget.
    */
   cost?: string;
   /**
@@ -352,7 +358,8 @@ export function waitingWords(waitingFor: string): string {
  *
  * **One writer for these words**, as `waitingWords` is for a wait: `wf ls`, `wf decide` and the board say the same fact. Each call is the
  * harness's own free text — a path, a command's first word — so each is made one line (`oneLine`) before it is joined: `wf ls` prints the
- * line in its note, `wf decide` under the step, and a newline in either breaks the screen. At most `DENIED_SHOWN` are named, then how many more.
+ * line in its note, `wf decide` under the step, and a newline in either breaks the screen. At most `DENIED_SHOWN` are named, then how many
+ * more.
  */
 export function deniedWords(denied: readonly string[]): string {
   if (!denied.length) return '';
@@ -395,8 +402,8 @@ const gateNote = (run: Pick<Run, 'id' | 'pruned' | 'hold'>, step: string, back: 
       : `approve it: wf approve ${run.id} ${step}${back.length ? ` — or send it back: ${back.map((name) => `wf retry ${run.id} ${name} --message "<objection>"`).join(' or ')}` : ''}`;
 
 /**
- * What `wf ls` names after `→ waiting on you:`, one entry per step a person has to act on (`waitingOnYou`): the step's name — and for a step
- * at its gate, what is asked of them, `approve plan`. Pure.
+ * What `wf ls` names after `→ waiting on you:`, one entry per step a person has to act on (`waitingOnYou`): the step's name — and for a
+ * step at its gate, what is asked of them, `approve plan`. Pure.
  */
 export const onYouWords = (l: Pick<Listing, 'steps' | 'waitingOnYou'>): string[] =>
   l.waitingOnYou.map((name) => (l.steps.find((s) => s.name === name)?.status === 'awaiting approval' ? `approve ${name}` : name));

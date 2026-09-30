@@ -9,9 +9,9 @@
  *     ---
  *     Cache the engine's views between passes.
  *
- * A card in a plan's format (plan.ts), with two differences. `workflow:` is optional: an idea often does not know what will run it, and that
- * is chosen at start. `repo:` is a key of its own, optional too: the absolute path of the repository the idea is about. And an inbox card
- * has no `after:`: what it waits on is said at start, when the runs it could wait on are known.
+ * A card in a plan's format (plan.ts), with two differences. `workflow:` is optional: an idea often does not know what will run it, and
+ * that is chosen at start. `repo:` is a key of its own, optional too: the absolute path of the repository the idea is about. And an inbox
+ * card has no `after:`: what it waits on is said at start, when the runs it could wait on are known.
  *
  * `queued:` marks a card to start on its own (`wf inbox queue`): the time it was queued, which orders the queue. The tick starts the oldest
  * such card when a run slot is free (`queueOrder`, `startQueued` in inbox.verb.ts).
@@ -22,7 +22,8 @@
  * **The keys are a closed list**, as a plan card's are: a key nothing reads is a constraint nobody enforces.
  *
  * Nothing about a run changes. A card started is a run like any other, whose record carries `from: { inbox: <name> }`, and the card is
- * removed; a card still there whose name a record carries is one whose removal failed, and `wf inbox` says it was started, composed on read.
+ * removed; a card still there whose name a record carries is one whose removal failed, and `wf inbox` says it was started, composed on
+ * read.
  *
  * Pure: handed a card's text, the folder's entries and the run records, and whether a path is a directory, never reading one
  * (inbox.store.ts and inbox.verb.ts read them).
@@ -37,7 +38,9 @@ export type InboxCard = {
   name: string;
   /** Its file's name, as a refusal names it. */
   file: string;
-  /** The workflow to start it on, as written — a name under the repository's `workflows/`, or a path to a workflow folder — when it says. */
+  /**
+   * The workflow to start it on, as written — a name under the repository's `workflows/`, or a path to a workflow folder — when it says.
+   */
   workflow?: string;
   /** The absolute path of the repository the idea is about, when it says. */
   repo?: string;
@@ -52,7 +55,10 @@ export type InboxCard = {
 /** Every key an inbox card may set, each optional. Anything else is refused by name — `after:` with where it is said instead. */
 export const INBOX_KEYS = ['workflow', 'repo', 'queued', 'gate'] as const;
 
-/** An ISO time as `new Date().toISOString()` writes it, to the second or the millisecond, in UTC: what `queued:` takes, so the order is stable. */
+/**
+ * An ISO time as `new Date().toISOString()` writes it, to the second or the millisecond, in UTC: what `queued:` takes, so the order is
+ * stable.
+ */
 const isInstant = (value: string): boolean =>
   /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(value) && !Number.isNaN(Date.parse(value));
 
@@ -123,8 +129,8 @@ export function parseInboxCard(file: string, text: string, isDirectory: (at: str
 
 /**
  * An inbox card's frontmatter as key → value: `workflow:` and `repo:`, each at most once, to something; any other key refused by name.
- * `filing` is true for a file `wf inbox add` is given, which is not a card yet: `after:`'s refusal then says to file it before the start that
- * gives the wait, since `file` is where the idea is now, and no card's path.
+ * `filing` is true for a file `wf inbox add` is given, which is not a card yet: `after:`'s refusal then says to file it before the start
+ * that gives the wait, since `file` is where the idea is now, and no card's path.
  */
 function inboxKeys(file: string, block: string, filing = false): Partial<Record<(typeof INBOX_KEYS)[number], string>> {
   return frontmatterKeys(file, block, INBOX_KEYS, (key) =>
@@ -137,8 +143,8 @@ function inboxKeys(file: string, block: string, filing = false): Partial<Record<
 }
 
 /**
- * A card's workflow as the card writes it: a path — one with a slash, or `.` or `..` — absolute against `dir`, where it was written from, so
- * it names the same folder from the inbox; a bare name as it is, a workflow the repository has, found at start. `dir` is absolute.
+ * A card's workflow as the card writes it: a path — one with a slash, or `.` or `..` — absolute against `dir`, where it was written from,
+ * so it names the same folder from the inbox; a bare name as it is, a workflow the repository has, found at start. `dir` is absolute.
  */
 export function workflowAt(given: string, dir: string): string {
   return /[\\/]/.test(given) || given === '.' || given === '..' ? path.resolve(dir, given) : given;
@@ -171,7 +177,10 @@ export function noCardLine(name: string, cards: readonly string[]): string {
   return `no card ${name} in the inbox.${bare} ${cards.length ? `Its cards are: ${[...cards].sort().join(', ')}.` : 'The inbox is empty.'}`;
 }
 
-/** A card as `wf inbox` lists it, or an entry of the folder that does not read as one — `error` says why — in which case `name` is its file's. */
+/**
+ * A card as `wf inbox` lists it, or an entry of the folder that does not read as one — `error` says why — in which case `name` is its
+ * file's.
+ */
 export type InboxListing = {
   name: string;
   file: string;
@@ -186,35 +195,37 @@ export type InboxListing = {
   /** Why the entry does not read as a card: its card's refusal, or not a `.md` file. Null for a card. */
   error: string | null;
   /**
-   * On a queued card only: when it was queued, and its place in the order the tick starts cards in (`queueOrder`), from 1 — null for a card a
-   * record says was started, which the tick never starts again.
+   * On a queued card only: when it was queued, and its place in the order the tick starts cards in (`queueOrder`), from 1 — null for a card
+   * a record says was started, which the tick never starts again.
    */
   queued?: { at: string; place: number | null };
   /**
-   * On a queued card only, whose start the tick tried and did not make, as the card stands (`QueueTry`): when, on which repository, why, and
-   * whether the package refused it or something else failed.
+   * On a queued card only, whose start the tick tried and did not make, as the card stands (`QueueTry`): when, on which repository, why,
+   * and whether the package refused it or something else failed.
    */
   tried?: { at: string; repo: string; why: string; refused: boolean };
 };
 
 /**
- * A queued card's start the tick tried and did not make, as it writes it down: when, the card's text as it was, the repository it was tried on —
- * the card's `repo:`, or the daemon's for a card that names none — why, and whether it was a refusal.
+ * A queued card's start the tick tried and did not make, as it writes it down: when, the card's text as it was, the repository it was tried
+ * on — the card's `repo:`, or the daemon's for a card that names none — why, and whether it was a refusal.
  *
- * `refused` is the package's own refusal, by name, exit 2 — the workflow gone, the repository gone, a card that does not read: it lasts. The tick
- * does not try that card again while its text is the same and it would be tried on the same repository (`nextQueued`) — an edit, a queue taken
- * back and given again, or a daemon in another repository for a card that names none, is a new try. Anything else — git failing while the
- * start reads the repository, a file that cannot be read — is a failure, not a verdict on the card: it is tried again on the next pass.
+ * `refused` is the package's own refusal, by name, exit 2 — the workflow gone, the repository gone, a card that does not read: it lasts.
+ * The tick does not try that card again while its text is the same and it would be tried on the same repository (`nextQueued`) — an edit, a
+ * queue taken back and given again, or a daemon in another repository for a card that names none, is a new try. Anything else — git failing
+ * while the start reads the repository, a file that cannot be read — is a failure, not a verdict on the card: it is tried again on the next
+ * pass.
  */
 export type QueueTry = { at: string; text: string; repo: string; why: string; refused: boolean };
 
 /**
  * The inbox as `wf inbox` lists it, by file name: every entry of the folder — a folder inside it by its name and a trailing `/` — each card
- * with the runs its name is on (`startedAs`), and each entry that is not a card listed with why, never hidden. A hidden file and a README are
- * not listed: the one is an editor's, the other says what the folder is for. A queued card says when, and its place in the order; and, when the
- * tick's last try of its start is of the card as it stands (`tries`, by name), that try. A queued card that reads but for a `repo:` naming no
- * directory keeps its place, with its workflow and repository as written, the repository keying its try: the start refuses it by name, as
- * it refuses a workflow gone, and it never leaves the queue with nothing said. An entry that does not read for another reason is not queued.
+ * with the runs its name is on (`startedAs`), and each entry that is not a card listed with why, never hidden. A hidden file and a README
+ * are not listed: the one is an editor's, the other says what the folder is for. A queued card says when, and its place in the order; and,
+ * when the tick's last try of its start is of the card as it stands (`tries`, by name), that try. A queued card that reads but for a
+ * `repo:` naming no directory keeps its place, with its workflow and repository as written, the repository keying its try: the start
+ * refuses it by name, as it refuses a workflow gone, and it never leaves the queue with nothing said. An entry that does not read for
+ * another reason is not queued.
  */
 export function inboxListing(
   files: readonly PlanFile[],
@@ -281,8 +292,8 @@ export function inboxListing(
 }
 
 /**
- * The queued cards in the order the tick starts them: by when each was queued, then by name — a card a record says was started left out, since
- * it is never started again. Pure. A card whose start was refused keeps its place, and the tick passes over it (`nextQueued`).
+ * The queued cards in the order the tick starts them: by when each was queued, then by name — a card a record says was started left out,
+ * since it is never started again. Pure. A card whose start was refused keeps its place, and the tick passes over it (`nextQueued`).
  */
 export const queueOrder = (listing: readonly InboxListing[]): InboxListing[] =>
   listing
@@ -290,9 +301,9 @@ export const queueOrder = (listing: readonly InboxListing[]): InboxListing[] =>
     .sort((a, b) => a.queued!.at.localeCompare(b.queued!.at) || a.name.localeCompare(b.name));
 
 /**
- * The card the tick starts next, when a run slot is free, on a daemon in `repo`: the first in the queue's order whose start was not refused as it
- * stands — its text the same, and tried on the repository it would be tried on now, its `repo:` or else `repo`. A card whose start failed for
- * any other reason keeps its place, and is tried again. Pure.
+ * The card the tick starts next, when a run slot is free, on a daemon in `repo`: the first in the queue's order whose start was not refused
+ * as it stands — its text the same, and tried on the repository it would be tried on now, its `repo:` or else `repo`. A card whose start
+ * failed for any other reason keeps its place, and is tried again. Pure.
  */
 export const nextQueued = (listing: readonly InboxListing[], repo: string): InboxListing | undefined =>
   queueOrder(listing).find((l) => !(l.tried?.refused && l.tried.repo === (l.repo ?? repo)));
@@ -319,8 +330,8 @@ export const ignoredRepoLine = (repo: string): string =>
   `the card's repo: ${repo} was not looked at — this workflow's steps work in folders, with no git repository`;
 
 /**
- * A pass's start of a queued card, as `wf up` and `wf tick` log it: `started <card> as <runId>`, or why it was not started, and what then. A
- * card whose `repo:` the run looked at none of says so in the same line (`ignoredRepoLine`). A failure is said once by the daemon that
+ * A pass's start of a queued card, as `wf up` and `wf tick` log it: `started <card> as <runId>`, or why it was not started, and what then.
+ * A card whose `repo:` the run looked at none of says so in the same line (`ignoredRepoLine`). A failure is said once by the daemon that
  * says it — `wf up` keeps the last one it printed, rather than reading `again`, which is a fact about the store and not about this
  * terminal.
  */
@@ -339,10 +350,10 @@ export function queueLine(q: QueueStarted): string {
 }
 
 /**
- * What `wf inbox` prints, a line per entry: the card's name, the first line of its body, its workflow and repository when it names them, and
- * the runs it was started as — or, for an entry that does not read as a card, why. A queued card says its place in the queue and, when the
- * tick's last try did not start it as it stands, why: refused, it waits for a person, not for a slot; failed otherwise, the tick tries it
- * again. A reason the entry's own error already says is not said twice.
+ * What `wf inbox` prints, a line per entry: the card's name, the first line of its body, its workflow and repository when it names them,
+ * and the runs it was started as — or, for an entry that does not read as a card, why. A queued card says its place in the queue and, when
+ * the tick's last try did not start it as it stands, why: refused, it waits for a person, not for a slot; failed otherwise, the tick tries
+ * it again. A reason the entry's own error already says is not said twice.
  */
 export function inboxLines(listing: readonly InboxListing[]): string[] {
   const width = Math.max(0, ...listing.map((l) => l.name.length));
@@ -364,14 +375,15 @@ export function inboxLines(listing: readonly InboxListing[]): string[] {
 }
 
 /**
- * The file `wf inbox add` writes for an idea, and its body — refused, naming `from`, as the card it writes would be refused (`parseInboxCard`).
+ * The file `wf inbox add` writes for an idea, and its body — refused, naming `from`, as the card it writes would be refused
+ * (`parseInboxCard`).
  *
- * `text` is the idea as given: a note, or a file's text. A file whose frontmatter is an inbox card's — every line a key of `INBOX_KEYS`, or an
- * `after:`, which is refused by name — gives its keys and its body; any other text, a frontmatter that never closes included, is the body
- * whole, as `wf start` takes a brief that is not a card. `workflow` and `repo`, when given, are written over the text's own. Refused too:
- * text with nothing in it, a `workflow` or `repo` given on more than one line, and a `queued:` in the text: a card is queued once it is in the
- * inbox, under its own name, and a time carried in from elsewhere would jump the queue. A body that opens with a `---` rule of its own is
- * given a frontmatter of one comment line, so the rule is not read as the card's frontmatter.
+ * `text` is the idea as given: a note, or a file's text. A file whose frontmatter is an inbox card's — every line a key of `INBOX_KEYS`, or
+ * an `after:`, which is refused by name — gives its keys and its body; any other text, a frontmatter that never closes included, is the
+ * body whole, as `wf start` takes a brief that is not a card. `workflow` and `repo`, when given, are written over the text's own. Refused
+ * too: text with nothing in it, a `workflow` or `repo` given on more than one line, and a `queued:` in the text: a card is queued once it
+ * is in the inbox, under its own name, and a time carried in from elsewhere would jump the queue. A body that opens with a `---` rule of
+ * its own is given a frontmatter of one comment line, so the rule is not read as the card's frontmatter.
  *
  * `dir` is the folder a `workflow:` of the text's own that is a path was written from — the file's, as a plan card's is its plan folder —
  * and such a path is written absolute against it (`workflowAt`). Left relative, the start would read it from the inbox, and
@@ -435,10 +447,10 @@ export function ideaCard(
 }
 
 /**
- * A card's text with `queued:` set to `at` — or taken off, for `null` — and `workflow:` written over its own when given: what `wf inbox queue`
- * writes. The frontmatter is written again in the keys' order, its comments dropped, as `wf inbox add` writes a card, and a body that opens
- * with a `---` rule of its own is kept from being read as the frontmatter, as `ideaCard` keeps it. Pure; the text it gives reads back as a
- * card (`parseInboxCard`), or is refused as one would be.
+ * A card's text with `queued:` set to `at` — or taken off, for `null` — and `workflow:` written over its own when given: what
+ * `wf inbox queue` writes. The frontmatter is written again in the keys' order, its comments dropped, as `wf inbox add` writes a card, and
+ * a body that opens with a `---` rule of its own is kept from being read as the frontmatter, as `ideaCard` keeps it. Pure; the text it
+ * gives reads back as a card (`parseInboxCard`), or is refused as one would be.
  */
 export function queuedText(card: InboxCard, at: string | null, isDirectory: (at: string) => boolean, workflow?: string): string {
   const keys = { workflow: workflow ?? card.workflow, repo: card.repo, queued: at ?? undefined, gate: card.gate };
@@ -450,9 +462,9 @@ export function queuedText(card: InboxCard, at: string | null, isDirectory: (at:
 }
 
 /**
- * Why `wf inbox queue` will not queue this card, in words that name the fix — or undefined, when it may. Pure. Refused: a card a run's record
- * names (`startedAs`), which is not started again (`startedRefusal`); a card already queued, with its place, and how to take it back; and a card
- * with no `workflow:` and none given — nothing would say what starts it, and `--workflow <w>` writes both.
+ * Why `wf inbox queue` will not queue this card, in words that name the fix — or undefined, when it may. Pure. Refused: a card a run's
+ * record names (`startedAs`), which is not started again (`startedRefusal`); a card already queued, with its place, and how to take it
+ * back; and a card with no `workflow:` and none given — nothing would say what starts it, and `--workflow <w>` writes both.
  */
 export function queueRefusal(
   card: InboxCard,
@@ -473,8 +485,8 @@ export function queueRefusal(
 
 /**
  * The name of the inbox card `at` names — a path under the inbox `dir`, as its path from there, less a trailing `.md`, so `<dir>/<name>` is
- * the card `wf inbox` lists as `<name>` — or null for a path outside it, and for the inbox itself: what makes `wf start <path>` start a card
- * out of the inbox. Both paths are taken as given; inbox.store.ts resolves links first.
+ * the card `wf inbox` lists as `<name>` — or null for a path outside it, and for the inbox itself: what makes `wf start <path>` start a
+ * card out of the inbox. Both paths are taken as given; inbox.store.ts resolves links first.
  *
  * Every path under the inbox goes to the start, never to a brief: whether the card is there, and whether the name is a card's — a folder
  * inside the inbox gives one with a slash — is `startFromInbox`'s to say, by name. Taken as a brief, a card's name typed without its `.md`
@@ -487,8 +499,8 @@ export function inboxNameOf(at: string, dir: string): string | null {
 }
 
 /**
- * Why a card cannot be started on no workflow: it names none, and none was given — with the workflows the repository has to name one of, and
- * how. `where` is what `wf start` is given for the card.
+ * Why a card cannot be started on no workflow: it names none, and none was given — with the workflows the repository has to name one of,
+ * and how. `where` is what `wf start` is given for the card.
  */
 export function noWorkflowRefusal(card: Pick<InboxCard, 'file'>, where: string, repo: string, workflows: readonly string[]): string {
   const dir = path.join(repo, 'workflows');
@@ -501,8 +513,8 @@ export function noWorkflowRefusal(card: Pick<InboxCard, 'file'>, where: string, 
 }
 
 /**
- * Why a card is not started again: a run's record names it (`from`), so it was started, and is still in the inbox because its removal failed.
- * Started again, the idea would run twice.
+ * Why a card is not started again: a run's record names it (`from`), so it was started, and is still in the inbox because its removal
+ * failed. Started again, the idea would run twice.
  */
 export function startedRefusal(card: Pick<InboxCard, 'name' | 'file'>, where: string, runs: readonly string[]): string {
   return `${card.file}: this card was started as ${runs.join(', ')} — ${runs.length === 1 ? "that run's record says" : 'their records say'} so — and is still in the inbox because its removal failed. Drop it with wf inbox rm ${card.name}; to run the idea again, park it again under a name of its own first: wf inbox add ${where}.`;

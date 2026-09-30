@@ -61,14 +61,14 @@ import { bare, type Engine, judgedSteps, type Views } from '../store.ts';
 export type RunStatus = Assessment['status'];
 
 /**
- * What a person has to decide about a run's result — the fifth reason a run waits on one, beside a step blocked, unsigned, over budget or at
- * a gate — as the package decides it (`toDecide`) and words it (`toDecideWords`):
+ * What a person has to decide about a run's result — the fifth reason a run waits on one, beside a step blocked, unsigned, over budget or
+ * at a gate — as the package decides it (`toDecide`) and words it (`toDecideWords`):
  *
  *   approve  the run is at its result and the gate on a last step has nobody's approval. `step` is that step, `filed` whether it has run,
  *            and `says` what it would do, the first line of the step's own note (`ownNote`) — null where it has none, and for a gated step
  *            that has signed off, whose closeout is what to read
- *   git      nothing waits at such a gate, every step finished, no step of the workflow merges, and `branches` are ahead of the base branch:
- *            merging or dropping them is a person's, by hand
+ *   git      nothing waits at such a gate, every step finished, no step of the workflow merges, and `branches` are ahead of the base
+ *            branch: merging or dropping them is a person's, by hand
  *
  * `said` is the whole of what `wf ls` prints after `→ to decide:`, and `command` the command at the end of it — `wf approve <run> <step>`,
  * or `wf decide <run>` for the branches, which the board runs no more than `wf ls` does.
@@ -126,12 +126,13 @@ export type RunWaiting = {
 /**
  * What a person's hold on a run says (`wf hold <run> --until <run>`, `Run.hold`), as `wf ls` and `wf decide` say it — never worded here.
  *
- * `at` is when the hold was put, as its file says it. `runs` are the package's `holdsOf`: each run the hold names that has not shipped, and,
- * for one that never will without a person, why — as `RunWaiting.runs` has them — or, in the moment every one has shipped and the next tick
- * has not yet lifted the hold, each of them `shipped`. `word` is what `wf ls` prints under the run (`holdWord`), and `advice` the line `wf
- * decide` prints under it (`holdAdvice`). `onYou` is whether the hold lifts only by a person's hand: it names no run, or a run it names never
- * ships on its own — the rule `wf ls` prints the advice by. A hold asks nothing of anyone while it may still lift: every verb a step's word
- * would take is refused while it stands (`heldRefusal`), so no step of a held run waits on you (`waitingOnYou`) and nothing is offered.
+ * `at` is when the hold was put, as its file says it. `runs` are the package's `holdsOf`: each run the hold names that has not shipped,
+ * and, for one that never will without a person, why — as `RunWaiting.runs` has them — or, in the moment every one has shipped and the next
+ * tick has not yet lifted the hold, each of them `shipped`. `word` is what `wf ls` prints under the run (`holdWord`), and `advice` the line
+ * `wf decide` prints under it (`holdAdvice`). `onYou` is whether the hold lifts only by a person's hand: it names no run, or a run it names
+ * never ships on its own — the rule `wf ls` prints the advice by. A hold asks nothing of anyone while it may still lift: every verb a
+ * step's word would take is refused while it stands (`heldRefusal`), so no step of a held run waits on you (`waitingOnYou`) and nothing is
+ * offered.
  */
 export type RunHolding = {
   at: string;
@@ -154,12 +155,12 @@ export type RunHolding = {
  * `waitingFor` is what that harness says the session waits for, where it says anything (`TaskView.waitingFor`, off the same
  * views — no observation of its own, unlike `lastLine`). Both halves are the package's words, never worded here: `words` is
  * the wait a card or a node says (`waiting for a permission prompt`), `advice` what a person does about it, naming the
- * session `claude agents` lists it under, or for a step on a remote A2A agent the `wf say` that answers its Task (`answerIn`). Said under the wait, never with it — one sentence between them, and
- * a surface with room for both. Null where the harness said nothing, and for a step nothing blocked — read afresh on every
- * request, so a session that stops waiting stops carrying it.
+ * session `claude agents` lists it under, or for a step on a remote A2A agent the `wf say` that answers its Task (`answerIn`). Said under
+ * the wait, never with it — one sentence between them, and a surface with room for both. Null where the harness said nothing, and for a
+ * step nothing blocked — read afresh on every request, so a session that stops waiting stops carrying it.
  *
- * `approve` is what `wf ls` asks of you for a step waiting at its gate, on a run nobody called off and with no send-back asked for: `approve
- * plan` (`onYouWords`). Null for any other step — one not gated, not signed off yet, approved, or sent back.
+ * `approve` is what `wf ls` asks of you for a step waiting at its gate, on a run nobody called off and with no send-back asked for:
+ * `approve plan` (`onYouWords`). Null for any other step — one not gated, not signed off yet, approved, or sent back.
  *
  * `denied` is what the harness denied the step's current try, off the engine's record of each ended attempt (`deniedOf`, the same views):
  * `calls`, each as a permission rule names it (`Skill(look)`, `Bash(pytest)`), once each in the order first denied, and `words`, the line
@@ -186,10 +187,11 @@ export async function waitsIn(run: Run, reader: Engine['Service'], git: BranchRe
 }
 
 /**
- * A run waited on that never ships without a person: what `wf ls` prints `→ waiting on you:` for, and `waitAdvice` says is yours to resolve.
+ * A run waited on that never ships without a person: what `wf ls` prints `→ waiting on you:` for, and `waitAdvice` says is yours to
+ * resolve.
  *
- * The package decides it (`neverShips` in its wait/wait.ts) and does not export it. Read here off `Wait`'s own contract — its id and, when it may
- * never ship without a person, why — so any reason it carries counts, not only `missing`, `cancelledAt` and `gone`.
+ * The package decides it (`neverShips` in its wait/wait.ts) and does not export it. Read here off `Wait`'s own contract — its id and, when
+ * it may never ship without a person, why — so any reason it carries counts, not only `missing`, `cancelledAt` and `gone`.
  */
 const neverShips = (w: Wait): boolean => Object.entries(w).some(([key, why]) => key !== 'run' && why !== undefined);
 
@@ -205,8 +207,8 @@ export function waitingOf(run: Run, waits: readonly Wait[]): RunWaiting | null {
 }
 
 /**
- * The runs a held run waits on to ship (`holdsOf`), each read once with the package's `parentOf` — as `wf ls` and `wf decide` read them — and
- * none, without a look, for a run nobody holds or one called off, of which the package says no hold (`listing`, `decide`).
+ * The runs a held run waits on to ship (`holdsOf`), each read once with the package's `parentOf` — as `wf ls` and `wf decide` read them —
+ * and none, without a look, for a run nobody holds or one called off, of which the package says no hold (`listing`, `decide`).
  */
 export async function holdsIn(run: Run, reader: Engine['Service'], git: BranchReader = branchReader()): Promise<Wait[]> {
   if (!run.hold || run.cancelledAt) return [];
@@ -217,8 +219,8 @@ export async function holdsIn(run: Run, reader: Engine['Service'], git: BranchRe
 
 /**
  * Whether a held run's hold lifts only by a person's hand: it names no run, or a run it names never ships on its own — no such run, a
- * cancelled one, a result branch gone. As `wf ls` and `wf decide` decide it (cli/main.ts). Not `neverShips` above, which reads any reason a `Wait`
- * carries as one it may never ship for: a hold's `shipped` is the opposite.
+ * cancelled one, a result branch gone. As `wf ls` and `wf decide` decide it (cli/main.ts). Not `neverShips` above, which reads any reason a
+ * `Wait` carries as one it may never ship for: a hold's `shipped` is the opposite.
  */
 const holdNeedsYou = (holds: readonly Wait[]): boolean =>
   !holds.length || holds.some((w) => Boolean(w.missing || w.cancelledAt || w.gone?.length));
@@ -251,14 +253,20 @@ export const wordOf =
   (taskId: string): string =>
     wordOfView(views.get(taskId));
 
-/** What the run established, over one read of its tasks: each step's word and note, who is waited on, where the run stands, and whether it still moves. */
+/**
+ * What the run established, over one read of its tasks: each step's word and note, who is waited on, where the run stands, and whether it
+ * still moves.
+ */
 type Judged = {
   words: ReadonlyMap<string, string>;
   notes: ReadonlyMap<string, string | null>;
   waitingOnYou: string[];
   /** `waitingOnYou` in `wf ls`'s words (`onYouWords`), in the page's order: `approve plan` for a step at its gate. */
   onYou: string[];
-  /** What a person has to decide about the result (`toDecide`), as `listing` reads it off the branch standings it was given; null while there is nothing. */
+  /**
+   * What a person has to decide about the result (`toDecide`), as `listing` reads it off the branch standings it was given; null while
+   * there is nothing.
+   */
   toDecide: RunToDecide | null;
   status: RunStatus;
   /**
@@ -400,8 +408,9 @@ export type Asked = { branches: string[]; failed: boolean };
  *
  * Given the runs a person holds it until, read once (`holdsIn`), none for a run nobody holds: what `wf ls` says of the hold, and `listing`
  * offers nothing on a held run,
- * so no step of it waits on you. A held run moves as it would unheld while the hold may still lift on its own — the tick lifts it once every
- * run it names has shipped, and files then what is due — as a run waiting on runs does, and not once it lifts only by a person's hand.
+ * so no step of it waits on you. A held run moves as it would unheld while the hold may still lift on its own — the tick lifts it once
+ * every run it names has shipped, and files then what is due — as a run waiting on runs does, and not once it lifts only by a person's
+ * hand.
  *
  * And given where the run's result branches stand, asked of git for the runs where the answer can decide anything (`standingsOf`), once
  * the run's status is known: `listing` reads what is left to decide off them, on the same inputs as `assess`, so the words and the

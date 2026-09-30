@@ -183,8 +183,8 @@ const ANSWER: Record<string, string> = {
 };
 
 /**
- * A loop's target's answers, `finding → answer · why`: the finding, then its answer and why beneath it — the finding and why as the markdown
- * they are, each maybe more than a line, and the answer a badge.
+ * A loop's target's answers, `finding → answer · why`: the finding, then its answer and why beneath it — the finding and why as the
+ * markdown they are, each maybe more than a line, and the answer a badge.
  */
 function Replies({ replies }: { replies: Array<Record<string, unknown>> }) {
   return (
@@ -230,7 +230,10 @@ function YesNo({ yes, description }: { yes: boolean; description: string | null 
   );
 }
 
-/** Strings a line each, each the markdown it may be; one that names an image among the try's files, that image, with no bullet beside its caption. */
+/**
+ * Strings a line each, each the markdown it may be; one that names an image among the try's files, that image, with no bullet beside its
+ * caption.
+ */
 function StringList({ items, artifacts }: { items: string[]; artifacts: readonly StepArtifact[] }) {
   if (!items.length) return <None />;
   return (

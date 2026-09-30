@@ -71,8 +71,9 @@ export type Decidable = {
   overBudget: string | null;
   commands: DecideCommand[];
   /**
-   * The run finished and nobody has decided it, as the package reads it — what `wf prune` refuses without `--unmerged`: the result branches,
-   * and `direct` for a run that worked on its base branch itself (its branch is the base branch). Null for a run still running with a step waiting on you.
+   * The run finished and nobody has decided it, as the package reads it — what `wf prune` refuses without `--unmerged`: the result
+   * branches, and `direct` for a run that worked on its base branch itself (its branch is the base branch). Null for a run still running
+   * with a step waiting on you.
    */
   awaiting: { branches: string[]; direct: boolean } | null;
 };

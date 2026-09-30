@@ -58,7 +58,9 @@ export const isGitRun = (run: Run): run is GitRun => placeOf(run) === 'git';
 
 type RunBase = {
   id: string;
-  /** Where the run's first step works: its repository's checkout, or a folder run's own folder. Later steps inherit, fork or merge from it. */
+  /**
+   * Where the run's first step works: its repository's checkout, or a folder run's own folder. Later steps inherit, fork or merge from it.
+   */
   workspace: string;
   /** What the person actually asked for. This travels to EVERY step; it is the spec. */
   brief: string;
@@ -78,28 +80,28 @@ type RunBase = {
    */
   after?: string[];
   /**
-   * The files `wf start --input` copied into the run's own `inputs/` directory (`inputsDir` in record.store.ts), by name, in the order given.
-   * Named on every step's brief that carries what was asked for (`inputsLine`), and under the run's line in `wf decide`. Absent on a run
-   * given none.
+   * The files `wf start --input` copied into the run's own `inputs/` directory (`inputsDir` in record.store.ts), by name, in the order
+   * given. Named on every step's brief that carries what was asked for (`inputsLine`), and under the run's line in `wf decide`. Absent on a
+   * run given none.
    */
   inputs?: string[];
   /**
-   * Where the run came from, when it was not typed at `wf start`: `{ inbox: <name> }` for a card started out of the inbox (`startFromInbox` in
-   * inbox.verb.ts), which removes the card once this record is written. `wf inbox` reads it to say a card still there was `started as` this
-   * run, and `wf decide` names the card under the run's line. Absent on a run started any other way.
+   * Where the run came from, when it was not typed at `wf start`: `{ inbox: <name> }` for a card started out of the inbox (`startFromInbox`
+   * in inbox.verb.ts), which removes the card once this record is written. `wf inbox` reads it to say a card still there was `started as`
+   * this run, and `wf decide` names the card under the run's line. Absent on a run started any other way.
    */
   from?: { inbox: string };
   /**
    * The steps this run is gated at beyond those its workflow gates (`gate: true`), frozen at start: `wf start --gate <step>`, and an inbox
-   * card's `gate:`. Each such step's closeout waits for a person — `wf approve` — before anything after it is filed (`hasGate`). Absent on a
-   * run given none.
+   * card's `gate:`. Each such step's closeout waits for a person — `wf approve` — before anything after it is filed (`hasGate`). Absent on
+   * a run given none.
    */
   gates?: string[];
   /**
-   * What people approved at a gate (`wf approve`), each in a file of its own beside the retry asks — `runs/<id>.asks/approve-<step>-<try>` —
-   * composed on read, as `cancelledAt` is (`readRun` in record.store.ts), and never written into the record: the tick owns the record, a person
-   * owns their word. An approval opens a gate for the try it names (`approvalOf`), and one for an earlier try is spent. Absent when there
-   * are none.
+   * What people approved at a gate (`wf approve`), each in a file of its own beside the retry asks — `runs/<id>.asks/approve-<step>-<try>`
+   * — composed on read, as `cancelledAt` is (`readRun` in record.store.ts), and never written into the record: the tick owns the record, a
+   * person owns their word. An approval opens a gate for the try it names (`approvalOf`), and one for an earlier try is spent. Absent when
+   * there are none.
    */
   approvals?: Approval[];
   /**
@@ -110,8 +112,8 @@ type RunBase = {
    */
   acceptances?: Acceptance[];
   /**
-   * When the cap on runs in flight (`WF_MAX_RUNS`) first held this run, with nothing of it filed: written once, by the pass that held it. What
-   * says the time before its first filing was a wait for a run slot (`timeline`). Absent on a run the cap never held.
+   * When the cap on runs in flight (`WF_MAX_RUNS`) first held this run, with nothing of it filed: written once, by the pass that held it.
+   * What says the time before its first filing was a wait for a run slot (`timeline`). Absent on a run the cap never held.
    */
   slotHeldAt?: string;
   /**
@@ -130,9 +132,9 @@ type RunBase = {
   cancelledAt?: string;
   /**
    * When `wf prune` removed the run's worktrees, and which, with what each held on disk — composed on read from a file of its own,
-   * `runs/<id>.pruned`, as `cancelledAt` is (`readRun` in record.store.ts), and never written into the record. A pruned run is read as it was,
-   * off its record, its branches and its files directory, and nothing more of it is filed: every verb that would work in a worktree refuses
-   * it (`prunedRefusal`), and so does every pass (`advance`). Absent on a run nobody pruned.
+   * `runs/<id>.pruned`, as `cancelledAt` is (`readRun` in record.store.ts), and never written into the record. A pruned run is read as it
+   * was, off its record, its branches and its files directory, and nothing more of it is filed: every verb that would work in a worktree
+   * refuses it (`prunedRefusal`), and so does every pass (`advance`). Absent on a run nobody pruned.
    */
   pruned?: Pruned;
   /**
@@ -177,8 +179,8 @@ export type PrunedFiles = { at: string; bytes: number };
 export type Approval = { step: string; try: number; at: string; message?: string };
 
 /**
- * A person's word at a loop out of rounds, as its file says it (`wf accept`): the looping step, the try it accepts, when, and what they said
- * — the words every step after the loop is handed under `## Accepted`, beside the findings the loop left open (`acceptedSection`).
+ * A person's word at a loop out of rounds, as its file says it (`wf accept`): the looping step, the try it accepts, when, and what they
+ * said — the words every step after the loop is handed under `## Accepted`, beside the findings the loop left open (`acceptedSection`).
  *
  * `message` is required, where an approval's is not: an approval says yes to work a step handed on, and an acceptance says yes to work a
  * reviewer has just said is not done. What makes that a decision rather than a shrug is the reason, and it is the one thing the shipper and
@@ -204,11 +206,13 @@ export type Acceptance = { step: string; try: number; at: string; message: strin
  *   over budget      its tries have together cost its `budget:` or more, so nothing is left to spend, and the way on is another session
  *                    of it — its last try ended without letting what waits on it run (a check that did not finish is not that: it
  *                    runs again for nothing), or its loop asks for a round that would file it again — or, on a looping step that asked
- *                    for one, a step of its loop is. Never a step of a loop whose round is due: `wf round --budget` raised the cap (`roundSpans`)
- *   budget exhausted its harness ended its session at the step's `budget:` (a `claude -p` job: the runtime's `limit: 'budget'` on the attempt)
- *   denied           it signed off, and its harness denied its try a call, on a step that says `denials: fail`: nothing after it is filed and
- *                    no check is run on work done without the tool; `retries:` never files a try of it, since the try would run under the
- *                    same frozen `allowedTools:` — a person does, `wf retry`
+ *                    for one, a step of its loop is. Never a step of a loop whose round is due: `wf round --budget` raised the cap
+ *                    (`roundSpans`)
+ *   budget exhausted its harness ended its session at the step's `budget:` (a `claude -p` job: the runtime's `limit: 'budget'` on the
+ *                    attempt)
+ *   denied           it signed off, and its harness denied its try a call, on a step that says `denials: fail`: nothing after it is
+ *                    filed and no check is run on work done without the tool; `retries:` never files a try of it, since the try would run
+ *                    under the same frozen `allowedTools:` — a person does, `wf retry`
  *   failed (check)   its check did not exit 0
  *   failed, stopped  the engine's own words for the step's task
  *
@@ -294,9 +298,15 @@ export type StepRecord = {
   branch?: string;
   check?: { taskId: string };
   tries?: EarlierTry[];
-  /** The task whose leftovers the run has committed (`handOffDue`): once for each try, so what a person leaves in the workspace after is theirs. */
+  /**
+   * The task whose leftovers the run has committed (`handOffDue`): once for each try, so what a person leaves in the workspace after is
+   * theirs.
+   */
   handedOff?: string;
-  /** What the run did with the merge an ending that lands on its check staged (`landingDue`): the commit it made, or why it made none. Once for each try. */
+  /**
+   * What the run did with the merge an ending that lands on its check staged (`landingDue`): the commit it made, or why it made none. Once
+   * for each try.
+   */
   landed?: Landed;
 };
 
@@ -327,8 +337,8 @@ export const andList = (items: readonly string[]): string =>
   items.length > 1 ? `${items.slice(0, -1).join(', ')} and ${items.at(-1)}` : (items[0] ?? '');
 
 /**
- * A pruned run in words, as `wf decide` says it under the run's line and where a decision would otherwise wait on a person's verb: when it was
- * pruned — or that its marker no longer says — and what was removed. Pure.
+ * A pruned run in words, as `wf decide` says it under the run's line and where a decision would otherwise wait on a person's verb: when it
+ * was pruned — or that its marker no longer says — and what was removed. Pure.
  */
 export const prunedWords = (pruned: Pruned): string => {
   const files = pruned.artifacts ? filesPrunedWords(pruned.artifacts) : '';
@@ -346,8 +356,8 @@ export const filesPrunedWords = (files: PrunedFiles): string =>
 
 /**
  * Free text from outside — a harness's word, a closeout's `needs` — made one line of at most `cap` characters: every run of whitespace, a
- * newline included, becomes one space, and what is over the cap is clipped with `…`. Pure. What `waitingWords` does to a harness's word, for
- * every screen that prints such text into a line of its own.
+ * newline included, becomes one space, and what is over the cap is clipped with `…`. Pure. What `waitingWords` does to a harness's word,
+ * for every screen that prints such text into a line of its own.
  */
 export function oneLine(text: string, cap: number): string {
   const line = text.trim().replace(/\s+/g, ' ');
@@ -360,7 +370,9 @@ export const DENIED_SHOWN = 5;
 /** The longest one denied call a line prints: a file tool's is its path, which can be long, and a command's first word is free text. */
 export const DENIED_CAP = 60;
 
-/** Text in a fence longer than any run of backticks inside it, so what it quotes cannot close the fence, nor open a section of the brief's. */
+/**
+ * Text in a fence longer than any run of backticks inside it, so what it quotes cannot close the fence, nor open a section of the brief's.
+ */
 export function fenced(text: string, info = ''): string[] {
   const fence = '`'.repeat(Math.max(3, ...(text.match(/`+/g) ?? []).map((ticks) => ticks.length + 1)));
   return [`${fence}${info}`, text, fence];
@@ -378,13 +390,17 @@ export const stepTasks = ({ taskId, check, tries }: StepRecord): string[] => [
   ...(tries ?? []).flatMap((t) => [t.taskId, ...(t.check ? [t.check.taskId] : [])]),
 ];
 
-/** Every task a run has filed (`stepTasks`), step by step: what a read of the whole run reads, and what a journal that does not read can cost it. */
+/**
+ * Every task a run has filed (`stepTasks`), step by step: what a read of the whole run reads, and what a journal that does not read can
+ * cost it.
+ */
 export const runTasks = (run: Pick<Run, 'steps'>): string[] => Object.values(run.steps).flatMap(stepTasks);
 
 /**
  * Why a run is not judged, whole, when a task it reads has a journal that does not read: `own`, the task of its own that does not
  * (`runTasks`), or undefined for a task of a run it waits on; `why`, the runtime's words; `by`, what does not judge it — `the board`,
- * `wf ls`, `wf decide`. One sentence wherever a run is left unjudged, as the tick leaves it: what reads, what does not, and what that costs.
+ * `wf ls`, `wf decide`. One sentence wherever a run is left unjudged, as the tick leaves it: what reads, what does not, and what that
+ * costs.
  */
 export function unjudgedWords(runId: string, own: string | undefined, why: string, by: string): string {
   const what = own ? `the journal of its task ${own} does not: ${why}` : `the journal of a task of a run it waits on does not: ${why}`;

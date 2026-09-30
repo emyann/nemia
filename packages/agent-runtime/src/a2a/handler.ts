@@ -300,8 +300,8 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
    * Every session the harness lists, by name, filtered by `contextId` — the harness's id for the conversation, so every
    * attempt that continued one — and `status`, with what each closed with only when `includeArtifacts` asks for it, as
    * A2A's default leaves it out. The first page observes once; the pages after it are served from that listing by its
-   * token, `<listing>:<offset>`, whatever other listings were made since. A token of a listing whose last page was served, or that was dropped, is refused rather than served a list
-   * that moved under it.
+   * token, `<listing>:<offset>`, whatever other listings were made since. A token of a listing whose last page was served, or that was
+   * dropped, is refused rather than served a list that moved under it.
    */
   async listTasks(params: ListTasksRequest, _context: ServerCallContext): Promise<ListTasksResponse> {
     if (params.statusTimestampAfter !== undefined) {
@@ -391,8 +391,8 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
   /**
    * A session's conversation, by its name or by its id. Answered once, never streamed, and nothing is kept. By id — the
    * Effect door's `Runner.transcript`, whose caller has the id already — the harness reads that session. By name, the
-   * session's id is found afresh on every read. An attempt that has ended — or whose task settled with it open — has its session's id on the
-   * record, and no registry is asked. Otherwise, and for a name no attempt is journalled under yet, since a session is
+   * session's id is found afresh on every read. An attempt that has ended — or whose task settled with it open — has its session's id on
+   * the record, and no registry is asked. Otherwise, and for a name no attempt is journalled under yet, since a session is
    * listed before its spawn is written, it is found by name when the harness can `find` one in flight, and observed when
    * it cannot or finds none. A registry that cannot be read this time is nothing observed, and a `find` that fails is
    * nothing found: a caller polls again, as it would a session not registered yet. The read itself answers in the

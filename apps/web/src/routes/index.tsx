@@ -25,7 +25,9 @@ export const Route = createFileRoute('/')({
   ),
 });
 
-/** Every run in flight, a card each, and the queued cards beside them. `runsQuery` reads the runs again on each event of the workflow feed. */
+/**
+ * Every run in flight, a card each, and the queued cards beside them. `runsQuery` reads the runs again on each event of the workflow feed.
+ */
 function Factory() {
   const { data: runs } = useSuspenseQuery(runsQuery);
   return <FactoryCanvas runs={runs} />;

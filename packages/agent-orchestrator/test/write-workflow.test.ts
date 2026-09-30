@@ -324,7 +324,10 @@ test('REFUSED, with the folder as it was: a step name that is not a file name, o
   assert.equal(fs.readFileSync(file, 'utf8'), 'not a folder\n');
 });
 
-/** Whether this filesystem tells `plan.md` from `Plan.md` apart. Where it does not, they are one file, and a step renamed by case is that file renamed. */
+/**
+ * Whether this filesystem tells `plan.md` from `Plan.md` apart. Where it does not, they are one file, and a step renamed by case is that
+ * file renamed.
+ */
 const caseSensitive = (() => {
   const probe = fs.mkdtempSync(path.join(ROOT, 'case-'));
   fs.writeFileSync(path.join(probe, 'a.md'), '');

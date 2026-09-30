@@ -1504,7 +1504,10 @@ const closeoutSaying = (summary: string, more: Partial<StepCloseout> = {}): Step
   ...more,
 });
 
-/** implement on its third try, as the api gives it: refused by its check on the first, tried again by `retries:`, then sent round by review's loop. */
+/**
+ * implement on its third try, as the api gives it: refused by its check on the first, tried again by `retries:`, then sent round by
+ * review's loop.
+ */
 const threeTries: StepTry[] = [
   {
     try: 1,
@@ -2132,7 +2135,9 @@ type Answer = import('../src/lib/asks.ts').Answer;
 const LOGIN =
   'Could not refresh your login because another Claude Code process is refreshing it (or exited mid-refresh) · Try again in a minute';
 
-/** What the harness says a blocked session waits for, as the api gives it: the words a card or a node says, and what a person does about it. */
+/**
+ * What the harness says a blocked session waits for, as the api gives it: the words a card or a node says, and what a person does about it.
+ */
 const WAIT = { words: 'waiting for a permission prompt', advice: 'answer it in Claude Code: claude agents, session ae/t-1/1' };
 
 /** The run of one step, `review`, in `status`, with what the api says it needs and who it says is waited on. */
@@ -2824,7 +2829,9 @@ const decidedAs = (standings: unknown[]) => ({
   commands: [],
 });
 
-/** A component rendered with the run's decision already read, as the Decide section on the same page has read it for this state of the run. */
+/**
+ * A component rendered with the run's decision already read, as the Decide section on the same page has read it for this state of the run.
+ */
 function withDecision(run: RunDetail, decision: unknown, element: ReturnType<typeof createElement>): string {
   const client = new QueryClient();
   client.setQueryData(['runs', run.id, 'decision', decisionStamp(run)], decision);
@@ -3701,7 +3708,10 @@ const allowedTo = (dontAsk: boolean, askDenier: StepReach['allowed']['askDenier'
   askDenier,
   why: null,
 });
-/** The read-only commands as the api gives them to a step: `denied` by a deny rule, and `asks` by an ask rule — which, `dontAsk`, the api gives as the rule that denies it too. */
+/**
+ * The read-only commands as the api gives them to a step: `denied` by a deny rule, and `asks` by an ask rule — which, `dontAsk`, the api
+ * gives as the rule that denies it too.
+ */
 const readOnlyReach = (
   denied: Record<string, string> = {},
   asks: Record<string, string> = {},
@@ -3887,7 +3897,10 @@ test("outside dontAsk the settings' allow rules are listed, and the read-only co
   assert.doesNotMatch(html, /denied without a prompt/, 'nothing is denied without a prompt outside dontAsk');
 });
 
-/** The builder's banner for a save that did not go through, as the api answered it: the head line, and whether it offers to read the folder again. */
+/**
+ * The builder's banner for a save that did not go through, as the api answered it: the head line, and whether it offers to read the folder
+ * again.
+ */
 async function refusedMarkup(
   message: string,
   steps: string[],
@@ -4293,7 +4306,7 @@ async function agentFormWith(listing: Record<string, unknown>, readOnly = false)
     onSave: () => {},
   });
   return renderToStaticMarkup(
-    // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props of a component that requires it, and a .ts file has no JSX.
+    // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
     createElement(RouterContextProvider, { router, children: createElement(QueryClientProvider, { client }, form) }),
   );
 }
@@ -4473,7 +4486,7 @@ async function routedWith(element: ReturnType<typeof createElement>, data: Array
   const client = new QueryClient();
   for (const [key, value] of data) client.setQueryData(key, value);
   return renderToStaticMarkup(
-    // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props of a component that requires it, and a .ts file has no JSX.
+    // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
     createElement(RouterContextProvider, { router, children: createElement(QueryClientProvider, { client }, element) }),
   );
 }

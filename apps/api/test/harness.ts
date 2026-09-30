@@ -22,7 +22,10 @@ import { scratch } from './scratch.ts';
 export const bin = scratch('nemia-api-harness-');
 /** What `claude agents` lists: a JSON array of sessions, as Claude Code's registry lists them. None until a test writes some. */
 export const registry = path.join(bin, 'registry.json');
-/** Every call the fake answered, a line each: its arguments. An ask for the quota adds a line of what it ran in, and one when it ended, each with its pid. */
+/**
+ * Every call the fake answered, a line each: its arguments. An ask for the quota adds a line of what it ran in, and one when it ended, each
+ * with its pid.
+ */
 export const calls = path.join(bin, 'calls');
 /**
  * What the fake prints to a `get_usage` request (`claude -p`, the api's `askUsage`): lines of stream-json, `@ID@` in them replaced by the
@@ -96,7 +99,11 @@ export const asks = (): number => callsOf('-p');
  */
 export const askEnded = (pid: number): boolean => fs.readFileSync(calls, 'utf8').split('\n').includes(`usage-ended pid=${pid}`);
 
-/** What the last ask ran in: `{ CLAUDECODE, CLAUDE_CODE_ENTRYPOINT, CLAUDE_CONFIG_DIR, CLAUDE_CODE_OAUTH_TOKEN, CLAUDE_CODE_USE_BEDROCK, cwd, pid }`, `unset` for a variable it did not have. */
+/**
+ * What the last ask ran in:
+ * `{ CLAUDECODE, CLAUDE_CODE_ENTRYPOINT, CLAUDE_CONFIG_DIR, CLAUDE_CODE_OAUTH_TOKEN, CLAUDE_CODE_USE_BEDROCK, cwd, pid }`, `unset` for a
+ * variable it did not have.
+ */
 export function lastAskEnv(): Record<string, string> {
   const line =
     fs

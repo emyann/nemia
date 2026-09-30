@@ -45,8 +45,8 @@ export function lookupRoots(workflowDir: string, places: Places = {}): string[] 
 }
 
 /**
- * Whether two of `roots` are one repository's two places — its `workflows/` and its `.claude/` — where a name in both is refused rather than
- * one of them chosen: a person reading either folder would take the one before them for the one that runs.
+ * Whether two of `roots` are one repository's two places — its `workflows/` and its `.claude/` — where a name in both is refused rather
+ * than one of them chosen: a person reading either folder would take the one before them for the one that runs.
  */
 const sameRepository = (a: string, b: string): boolean =>
   path.dirname(a) === path.dirname(b) && [path.basename(a), path.basename(b)].sort().join() === '.claude,workflows';
@@ -290,9 +290,9 @@ export function loadAgents(dir: string): Map<string, Agent | WorkflowError> {
 }
 
 /**
- * Every step, in every workflow in `workflowsDir`, that names the agent `name` (`agent:`), as `<workflow>/<step>`, sorted. Each step file is
- * read as the parser reads its `agent:` line, so a folder that does not load counts as much as one that does: a step that names the agent
- * is broken by its going, whether or not something else is broken beside it.
+ * Every step, in every workflow in `workflowsDir`, that names the agent `name` (`agent:`), as `<workflow>/<step>`, sorted. Each step file
+ * is read as the parser reads its `agent:` line, so a folder that does not load counts as much as one that does: a step that names the
+ * agent is broken by its going, whether or not something else is broken beside it.
  */
 export function agentUsers(workflowsDir: string, name: string): string[] {
   const users: string[] = [];
@@ -315,11 +315,12 @@ export function agentUsers(workflowsDir: string, name: string): string[] {
  * What an agent's files hold, as one word, or `null` for an agent that is not there: a digest of `<name>.md`, of the file it names beside
  * it — the schema its `output:` names — and of each skill its `skills:` gives, every file of the skill's
  * folder, each by name with what it holds, so a file that cannot be read counts as what it says. A write of the agent carries it, and is
- * refused when the agent's files hold another (`writeAgent`), rather than written over what changed since it was read. The api's `versionOf`
- * digests a folder's agents through this, so an edit of a skill moves the folder's version too — and so does its card, which is read off
- * those skills' SKILL.md files (`cardSkills`).
+ * refused when the agent's files hold another (`writeAgent`), rather than written over what changed since it was read. The api's
+ * `versionOf` digests a folder's agents through this, so an edit of a skill moves the folder's version too — and so does its card, which is
+ * read off those skills' SKILL.md files (`cardSkills`).
  *
- * `skills` are where the skills are found (`skillsFor`); without them, in the `skills/` beside `dir`. A skill found nowhere counts as missing.
+ * `skills` are where the skills are found (`skillsFor`); without them, in the `skills/` beside `dir`. A skill found nowhere counts as
+ * missing.
  */
 export function agentVersion(dir: string, name: string, skills?: SkillsFound): string | null {
   const at = path.join(dir, `${name}.md`);
@@ -341,8 +342,8 @@ export function agentVersion(dir: string, name: string, skills?: SkillsFound): s
 
 /**
  * The version of the skill whose folder is `dir`: a digest of every file in it, as `agentVersion` counts the folder of each skill an agent
- * gives — so a write that moves this moves the version of every agent that gives the skill. Null for a folder with no SKILL.md. A write of the
- * skill carries it, and is refused when the skill's folder holds another (`writeSkill`).
+ * gives — so a write that moves this moves the version of every agent that gives the skill. Null for a folder with no SKILL.md. A write of
+ * the skill carries it, and is refused when the skill's folder holds another (`writeSkill`).
  */
 export function skillVersion(dir: string): string | null {
   if (!fs.lstatSync(path.join(dir, 'SKILL.md'), { throwIfNoEntry: false })) return null;
@@ -352,7 +353,9 @@ export function skillVersion(dir: string): string | null {
     .slice(0, 16);
 }
 
-/** A file as a version counts it: a link as where it points, never what it points at, which is outside the folder and no write goes through. */
+/**
+ * A file as a version counts it: a link as where it points, never what it points at, which is outside the folder and no write goes through.
+ */
 function readForVersion(file: string): string | { unreadable: string } | { link: string } {
   if (fs.lstatSync(file, { throwIfNoEntry: false })?.isSymbolicLink()) return { link: fs.readlinkSync(file) };
   try {
@@ -377,7 +380,10 @@ function folderForVersion(dir: string): Array<[string, unknown]> {
   });
 }
 
-/** The skills an agent's text gives by name, as `parseAgent` reads its `skills:` line — none for a line that names a card file, which it refuses. */
+/**
+ * The skills an agent's text gives by name, as `parseAgent` reads its `skills:` line — none for a line that names a card file, which it
+ * refuses.
+ */
 export function skillNamesIn(text: string): string[] {
   const line = frontmatterKey(text, 'skills');
   if (line === undefined || isCardFile(line)) return [];
@@ -388,14 +394,14 @@ export function skillNamesIn(text: string): string[] {
 }
 
 /**
- * What an agent's card says it can do (`agentCard`): an entry for each skill its `skills:` gives, in that order, read off the skill's SKILL.md
- * (`skillEntryOf`) where `found` finds it — or, for an agent given none, one entry made from its own description (`ownSkill`). Never a list
- * written by hand, so the card cannot say what the skills do not.
+ * What an agent's card says it can do (`agentCard`): an entry for each skill its `skills:` gives, in that order, read off the skill's
+ * SKILL.md (`skillEntryOf`) where `found` finds it — or, for an agent given none, one entry made from its own description (`ownSkill`).
+ * Never a list written by hand, so the card cannot say what the skills do not.
  *
- * Refused, naming the fix: a skill found nowhere or that cannot be used, in `skillAt`'s words for the agent, and a SKILL.md whose frontmatter
- * the card cannot read. The card only describes — no run reads it — so nothing refuses a load or a run for it: it is refused where a card is
- * asked for (`wf agents card`, the api's card route) and said on the board's agent page. `found` is where a start finds skills (`skillsFor`,
- * with the places), or a card could name a skill the run would not be given.
+ * Refused, naming the fix: a skill found nowhere or that cannot be used, in `skillAt`'s words for the agent, and a SKILL.md whose
+ * frontmatter the card cannot read. The card only describes — no run reads it — so nothing refuses a load or a run for it: it is refused
+ * where a card is asked for (`wf agents card`, the api's card route) and said on the board's agent page. `found` is where a start finds
+ * skills (`skillsFor`, with the places), or a card could name a skill the run would not be given.
  */
 export function cardSkills(agent: Pick<Agent, 'name' | 'description' | 'skills'>, found: SkillsFound): AgentSkill[] {
   if (!agent.skills?.length) return [ownSkill(agent)];
@@ -436,8 +442,8 @@ export function preloads(skillDir: string): boolean {
 /**
  * What a workflow is for, in its author's words: the first paragraph of its folder's README, its lines joined into one.
  *
- * Null when the folder has no README, or the README has nothing else (`readmeDescription`, which reads its text). Never throws: a README that cannot be read
- * describes nothing, and the steps beside it are `loadWorkflows`' to judge.
+ * Null when the folder has no README, or the README has nothing else (`readmeDescription`, which reads its text). Never throws: a README
+ * that cannot be read describes nothing, and the steps beside it are `loadWorkflows`' to judge.
  */
 export function workflowDescription(dir: string): string | null {
   let text: string;

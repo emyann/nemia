@@ -6,7 +6,10 @@
 import type { MachineEdge } from './api/machines.ts';
 import type { LifecycleStep, StepPath } from './api/steps.ts';
 
-/** How often the path of a task still moving is read again while the panel is open: a move that changes no step's word says nothing on the feed. */
+/**
+ * How often the path of a task still moving is read again while the panel is open: a move that changes no step's word says nothing on the
+ * feed.
+ */
 export const PATH_POLL_MS = 2_000;
 
 /**

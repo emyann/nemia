@@ -500,9 +500,9 @@ test("unset, the api serves its own checkout: Playwright's server lists browser_
 });
 
 /**
- * A checkout with workflows: `dev`'s implement on Claude Code with no `tools:` and a `disallowedTools:`, its review fenced to four tools in `dontAsk`;
- * and `codexed`, one step on Codex, in its `read-only` sandbox. The settings enable the fixture server, deny one of its tools and a push, and allow three Bash commands and a
- * search. The fixture server lists `echo` and `wipe`.
+ * A checkout with workflows: `dev`'s implement on Claude Code with no `tools:` and a `disallowedTools:`, its review fenced to four tools in
+ * `dontAsk`; and `codexed`, one step on Codex, in its `read-only` sandbox. The settings enable the fixture server, deny one of its tools
+ * and a push, and allow three Bash commands and a search. The fixture server lists `echo` and `wipe`.
  */
 const stepsRepo = () =>
   repoWith({
@@ -551,7 +551,10 @@ const claudeStepsOf = async (repo: string): Promise<Record<string, Measured>> =>
 
 const SETTINGS = '.claude/settings.json';
 
-/** A Bash allow rule standing as the page gives it: its command, the narrower denies that still refuse some of it, and the ask rules that make some of it ask. */
+/**
+ * A Bash allow rule standing as the page gives it: its command, the narrower denies that still refuse some of it, and the ask rules that
+ * make some of it ask.
+ */
 const bashRule = (rule: string, except: string[] = [], asks: string[] = []) => ({
   rule,
   command: rule.slice('Bash('.length, -1),
@@ -559,7 +562,10 @@ const bashRule = (rule: string, except: string[] = [], asks: string[] = []) => (
   asks,
 });
 
-/** Nothing of the settings taken back or out of reach, and no reason for no Bash: what `allowed` has beside `rules` and `bash` on a plain step. */
+/**
+ * Nothing of the settings taken back or out of reach, and no reason for no Bash: what `allowed` has beside `rules` and `bash` on a plain
+ * step.
+ */
 const nothingElse = { takenBack: [], asked: [], unused: [], exceptions: [], why: null };
 
 test("a step with `tools:` gets exactly those — no skill without Skill, the tools of each server the checkout enables, and the settings' deny", async () => {
@@ -923,7 +929,9 @@ test('REFUSED: a deny of a whole MCP server takes back an allow of one of its to
   );
 });
 
-/** Every read-only command as a step with Bash and no deny or ask rule of them gets it: the measured ones first, then what the docs name. */
+/**
+ * Every read-only command as a step with Bash and no deny or ask rule of them gets it: the measured ones first, then what the docs name.
+ */
 const readOnlyAll = () => [
   ...READ_ONLY_COMMANDS.measured.map((command: string) => ({ command, measured: true, denied: null, asks: null })),
   ...READ_ONLY_COMMANDS.documented.map((command: string) => ({ command, measured: false, denied: null, asks: null })),
@@ -994,8 +1002,9 @@ test('the ask list is permissions.ask in .claude/settings.json, in its order —
 });
 
 /**
- * A checkout whose settings may ask: review in dontAsk with Bash, implement in no mode with Bash — a job, as every step is but one that says
- * `background: true` — and watch, a background session in no mode with Bash, the one of the three a call that asks is put to a person on.
+ * A checkout whose settings may ask: review in dontAsk with Bash, implement in no mode with Bash — a job, as every step is but one that
+ * says `background: true` — and watch, a background session in no mode with Bash, the one of the three a call that asks is put to a person
+ * on.
  */
 const askingRepo = (permissions: object) =>
   repoWith({

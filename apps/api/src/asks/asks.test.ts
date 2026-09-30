@@ -212,7 +212,9 @@ const nothingWritten = (why: string) => {
   assert.equal(fs.readFileSync(recordFile, 'utf8'), record, `the run's record untouched: ${why}`);
 };
 
-/** What the package's `retry()` refuses `how` for, word for word — given the harness's word, as `wf retry` gives it: what `wf retry` prints. */
+/**
+ * What the package's `retry()` refuses `how` for, word for word — given the harness's word, as `wf retry` gives it: what `wf retry` prints.
+ */
 const retryRefuses = async (step: string, how: RetryHow): Promise<string> => {
   try {
     await retry(engine(), R, step, how, { stopBlocked: true });

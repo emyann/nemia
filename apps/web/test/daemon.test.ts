@@ -1,6 +1,6 @@
 /**
- * The Factory's line when nothing ticks the store (src/lib/daemon.ts): nothing while a daemon ticks, and for every other standing, why and how
- * to start one. `npm run e2e` looks at the header itself.
+ * The Factory's line when nothing ticks the store (src/lib/daemon.ts): nothing while a daemon ticks, and for every other standing, why and
+ * how to start one. `npm run e2e` looks at the header itself.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

@@ -7,9 +7,9 @@
  * The order matters: the pages share one seeded store, and each takes back what it wrote before the next is visited. A new page's number
  * says where it goes, and the numbers go in tens to leave room.
  *
- * Beside the pages, `pages/NAMES` says which pages there are, a name a line, in no order that matters. The directory alone cannot tell a page
- * deleted by mistake from one never written, so the load refuses a page with no line and a line with no page. The file is merged by union
- * (`.gitattributes`): two runs that each add a page and its line merge.
+ * Beside the pages, `pages/NAMES` says which pages there are, a name a line, in no order that matters. The directory alone cannot tell a
+ * page deleted by mistake from one never written, so the load refuses a page with no line and a line with no page. The file is merged by
+ * union (`.gitattributes`): two runs that each add a page and its line merge.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -46,9 +46,9 @@ export function namesIn(dir = PAGES_DIR): Set<string> {
 
 /**
  * The page files in `dir`, in the order they are visited. Refuses anything else there but NAMES — a helper, a page without its number, a
- * folder or a link — since the runner would never visit it: a page that is not visited checks nothing, and says nothing about it. And refuses
- * when the pages and NAMES differ either way. `list` is how the directory is read, for a test to hand it one that lists its files in an order
- * of its own.
+ * folder or a link — since the runner would never visit it: a page that is not visited checks nothing, and says nothing about it. And
+ * refuses when the pages and NAMES differ either way. `list` is how the directory is read, for a test to hand it one that lists its files
+ * in an order of its own.
  */
 export function pageFiles(
   dir = PAGES_DIR,

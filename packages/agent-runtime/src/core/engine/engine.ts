@@ -38,7 +38,10 @@ export const Lifecycle = Context.Reference<Move>('engine/Lifecycle', { defaultVa
 /** How long a spawned session may go unregistered by the harness before we call it gone. */
 export const GRACE_MS = 30_000;
 
-/** A live session is one the engine is still waiting on: at work or waiting on a person. `completed`, `failed`, `rejected` and `canceled` are not. */
+/**
+ * A live session is one the engine is still waiting on: at work or waiting on a person. `completed`, `failed`, `rejected` and `canceled`
+ * are not.
+ */
 export const LIVE: ReadonlySet<SessionState> = new Set(['submitted', 'working', 'input-required', 'auth-required']);
 
 /** A move the lifecycle refused in a pass: which task, and the state and event it had no edge for (`Refusal`). */
@@ -54,7 +57,9 @@ export type TaskView = {
   phase: string;
   /** The session as its harness lists it — or, once the harness has let it go, its own id as recorded. */
   sessionId: string | null;
-  /** What the attempt in flight has consumed so far, when its runner can see inside it. Settled attempts carry theirs on `state.attempts`. */
+  /**
+   * What the attempt in flight has consumed so far, when its runner can see inside it. Settled attempts carry theirs on `state.attempts`.
+   */
   usage?: Usage;
   /**
    * What the harness says the session is waiting for, in its own words, for a task whose phase is `needs-human`
@@ -142,7 +147,7 @@ export const stepRefusalOf = (extra: readonly unknown[]): string | undefined =>
 export const settleRefusalOf = (maxSteps: unknown, extra: readonly unknown[]): string | undefined =>
   Number.isInteger(maxSteps) && (maxSteps as number) > 0 && extra.length === 0
     ? undefined
-    : // oxlint-disable-next-line typescript/no-base-to-string -- `String(maxSteps)` is reached only once an object and a function are ruled out, a narrowing tsc reads and this rule does not
+    : // oxlint-disable-next-line typescript/no-base-to-string -- `String` is reached only once an object and a function are ruled out
       `settleTask takes a task, an observation and a number of steps above nought, and was handed ${extra.length ? `${extra.length} more` : `a maxSteps of ${typeof maxSteps === 'object' || typeof maxSteps === 'function' ? JSON.stringify(maxSteps) : String(maxSteps)}`}: its third argument was the ceiling's slots, and the runtime has no ceiling since stage 4c part 2. ${ADMIT_INSTEAD}`;
 
 /** Nothing left unread: what `step` and `settleTask` decide on, handed an observation and no more. */

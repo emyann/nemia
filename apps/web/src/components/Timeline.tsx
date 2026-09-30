@@ -4,9 +4,9 @@ import { spentTitle } from '../lib/cost';
 
 /**
  * Where a run's time went, as `wf decide` prints it: a row for each try's session and each try's check of every step, in the order the run
- * keeps its steps — when it was filed, spawned and ended, how long it queued for a slot and ran, what its session used and what it cost — then
- * each round's total when its loop went round, named by its looping step where more than one loop did, and the run's, each with what its
- * sessions cost. The words are the api's, which are the
+ * keeps its steps — when it was filed, spawned and ended, how long it queued for a slot and ran, what its session used and what it cost —
+ * then each round's total when its loop went round, named by its looping step where more than one loop did, and the run's, each with what
+ * its sessions cost. The words are the api's, which are the
  * package's; the times are the engine's instants, shown in this browser's clock. Nothing is drawn for a run with nothing filed.
  */
 export function Timeline({ run }: { run: RunDetail }) {
@@ -143,7 +143,10 @@ function SpanRow({
   );
 }
 
-/** A total's row: the run's, or a round's — named by its loop's looping step when `named`, as when two loops went round — and what its sessions cost. */
+/**
+ * A total's row: the run's, or a round's — named by its loop's looping step when `named`, as when two loops went round — and what its
+ * sessions cost.
+ */
 function TotalRow({ total, named }: { total: TimelineTotal; named: boolean }) {
   const what = total.round === null ? "the run's tries" : `round ${total.round}'s sessions`;
   return (

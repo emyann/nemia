@@ -1,6 +1,6 @@
 /**
- * `fed`, the e2e's line on the workflow feed for a page that edits the store by hand: it writes what the package reads back, a step's line and
- * a run's, appended after what is there. No browser, so `npm test` runs it.
+ * `fed`, the e2e's line on the workflow feed for a page that edits the store by hand: it writes what the package reads back, a step's line
+ * and a run's, appended after what is there. No browser, so `npm test` runs it.
  */
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -19,8 +19,8 @@ after(() => setStore(undefined));
 /**
  * The feed as the package reads it back: `wf feed 0` over the store, its CLI. The web imports nothing of the package, and reaching into its
  * `src` is refused (`packages/agent-orchestrator/test/contract.test.ts`), so it is asked as a person asks it. Each line is printed as
- * `<time>  <run>  <step or —>  <word>`, and the last is `cursor: <bytes>`. Answers the words after each line's time, which is the line's own
- * and says nothing of what the package read, and the cursor.
+ * `<time>  <run>  <step or —>  <word>`, and the last is `cursor: <bytes>`. Answers the words after each line's time, which is the line's
+ * own and says nothing of what the package read, and the cursor.
  */
 function wfFeed(store: string): { said: string[]; cursor: number } {
   const out = execFileSync(process.execPath, [path.join(REPO, 'packages', 'agent-orchestrator', 'bin', 'wf.ts'), 'feed', '0'], {

@@ -73,8 +73,8 @@ export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Servic
  *   500 for a daemon.json that is there and cannot be read — a directory in its place, a permission: the package throws rather than call
  *   it free.
  * - `GET /api/quota` — the subscription's quota, as Claude Code answers its get_usage request, asked at most once a keep however many
- *   boards read (`QuotaAsker`, factory/quota.ts): what the Factory says over its floor. Every case is a 200 with a sentence, the harness's failures
- *   included.
+ *   boards read (`QuotaAsker`, factory/quota.ts): what the Factory says over its floor. Every case is a 200 with a sentence, the harness's
+ *   failures included.
  * - asks/asks.ts — a person's asks of a run: a try (with answers to its questions, asks/answers.ts), a round, words for a running
  *   session, an approval and an acceptance; five writes.
  * - steps/steps.ts — a step's own reads: its output, its files, and its conversation, once or followed.

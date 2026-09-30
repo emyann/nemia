@@ -525,14 +525,6 @@
       }
     },
     {
-      "files": ["packages/agent-orchestrator/src/forget/forget.verb.ts"],
-      "rules": {
-        "max-lines-per-function": ["error", { "max": 129, "skipBlankLines": true, "skipComments": true }],
-        "complexity": ["error", { "max": 38 }],
-        "sonarjs/cognitive-complexity": ["error", 44]
-      }
-    },
-    {
       "files": ["packages/agent-orchestrator/src/prune/prune.verb.ts"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 155, "skipBlankLines": true, "skipComments": true }],

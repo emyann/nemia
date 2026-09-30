@@ -25,6 +25,10 @@ import {
   type TaskView,
 } from 'agent-runtime';
 import type { GitRun, Run, TaskPhase } from '../src/run.ts';
+import type { Effect as EffectOf } from 'effect/Effect';
+import type { ForgetHow, Forgot } from '../src/forget/forget.ts';
+import type { Refusal } from '../src/refusal/refusal.ts';
+import type { EngineService } from '../src/runtime-client.ts';
 import type { RetryHow } from '../src/retry/retry-ask.ts';
 import { readCheckBrief, verdictWord } from '../src/check/check.ts';
 import { scratch } from './scratch.ts';
@@ -5646,6 +5650,115 @@ test('REFUSED at shipped defaults: a pass that read a `--no-worktree` run before
 
   assert.ok(!under('runs', run.id), 'no files directory without a record');
   assert.equal(gitIn(repo, 'status', '--porcelain'), '?? later.txt', "and nothing of a person's checkout committed under the step's name");
+});
+
+test("`wf rm`'s program, given the engine as a service, answers what its plain face answers: the face runs the program and adds nothing", async () => {
+  const { Effect } = await import('effect');
+  const { forgetRun } = await import('../src/forget/forget.verb.ts');
+  const { EngineService } = await import('../src/runtime-client.ts');
+  const b = board();
+  const run = start({ brief: 'forgotten through its program', repo: aRepo(), workflowDir: folder() });
+  await advance(b.e, readRun(run.id));
+  const program = (how: ForgetHow) => Effect.runPromise(forgetRun(run.id, how).pipe(Effect.provide(EngineService.layer(b.e))));
+
+  const refused = await program({});
+  assert.equal(refused.kind, 'refused', 'a step in flight: nothing is touched, so the face may be asked the same');
+  assert.deepStrictEqual(refused, await forget(b.e, run.id));
+
+  const wt = readRun(run.id).steps.implement.workspace!;
+  b.settle(`${run.id}-implement`, 'failed');
+  await advance(b.e, readRun(run.id));
+  const forgot = await program({ deleteBranches: true, forceUnmerged: true });
+  assert.deepEqual([forgot.kind, forgot.removed], ['forgotten', [wt]]);
+  assert.deepEqual(
+    forgot.branches.map((f) => [f.branch, f.deleted]),
+    [[`wf/${run.id}/implement`, true]],
+    'what it was asked, honoured',
+  );
+  assert.ok(!under('runs', `${run.id}.json`) && !under('worktrees', run.id));
+  assert.deepStrictEqual(await forget(b.e, run.id), await program({}), 'no record left: both say so the same');
+});
+
+/** An engine every verb of which fails the test, naming the verb: for a call that must ask the engine nothing. */
+const untouched = (e: Engine): Engine =>
+  Object.fromEntries(Object.keys(e).map((verb) => [verb, () => assert.fail(`the engine was asked \`${verb}\``)])) as unknown as Engine;
+
+test('REFUSED at shipped defaults: `wf rm` of an id that is not a name rejects with the `Invalid` itself, exit code 2, in its words, before the store or the engine is read', async () => {
+  const { Invalid } = await import('../src/refusal/refusal.ts');
+  const { idRefusal } = await import('../src/forget/forget.ts');
+  writeRun(aRun('climbed', {}));
+  fs.renameSync(path.join(ROOT, 'runs', 'climbed.json'), path.join(ROOT, 'climbed.json'));
+  const err = await forget(untouched(board().e), '../climbed').then(
+    () => assert.fail('wf rm of ../climbed resolved'),
+    (x: unknown) => x,
+  );
+  assert.ok(err instanceof Invalid, `an Invalid, not ${String(err)}`);
+  assert.equal(err.exitCode, 2);
+  assert.equal(err.message, idRefusal('../climbed'));
+  assert.ok(fs.existsSync(path.join(ROOT, 'climbed.json')), 'the record its path climbs to is not read, nor removed');
+  fs.rmSync(path.join(ROOT, 'climbed.json'));
+});
+
+test("`wf rm`'s refusal is its program's typed failure; anything else is a defect, which the face rejects with as it was thrown", async () => {
+  const { Effect } = await import('effect');
+  const { forgetRun } = await import('../src/forget/forget.verb.ts');
+  const { EngineService } = await import('../src/runtime-client.ts');
+  const b = board();
+  const recovered = (e: Engine, id: string) =>
+    Effect.runPromise(
+      forgetRun(id, {}).pipe(
+        Effect.catchTag('Invalid', (r) => Effect.succeed(r.message)),
+        Effect.provide(EngineService.layer(e)),
+      ),
+    );
+  assert.match(String(await recovered(b.e, '../x')), /^"\.\.\/x" is not a run's id/);
+  fs.writeFileSync(path.join(ROOT, 'runs', 'garbled.json'), '{ not json');
+  assert.match(String(await recovered(b.e, 'garbled')), /is not JSON/, "a refusal the store threw is the program's failure too");
+  assert.ok(under('runs', 'garbled.json'), 'and nothing removed');
+  fs.rmSync(path.join(ROOT, 'runs', 'garbled.json'));
+
+  const run = start({ brief: 'its journal will not read', repo: aRepo(), workflowDir: folder() });
+  await advance(b.e, readRun(run.id));
+  const boom = new Error('journal');
+  const broken = {
+    ...b.e,
+    view: async () => {
+      throw boom;
+    },
+  };
+  const died = await recovered(broken, run.id).then(
+    () => assert.fail('a defect recovered as a refusal'),
+    (x: unknown) => x,
+  );
+  assert.equal(died, boom, 'not a failure the program may catch by its tag: the error itself');
+  const uncaught = await Effect.runPromise(
+    forgetRun(run.id, {}).pipe(
+      Effect.catch(() => Effect.succeed('caught')),
+      Effect.provide(EngineService.layer(broken)),
+    ),
+  ).then(
+    () => assert.fail('a defect caught as a failure'),
+    (x: unknown) => x,
+  );
+  assert.equal(uncaught, boom, 'nor any failure at all: a defect, which no `Effect.catch` recovers');
+  const face = await forget(broken, run.id).then(
+    () => assert.fail('wf rm over a journal that does not read resolved'),
+    (x: unknown) => x,
+  );
+  assert.equal(face, boom);
+  assert.ok(under('runs', `${run.id}.json`), 'nothing removed');
+});
+
+test("`wf rm`'s program says in its type what it needs and what it refuses: the engine, and a refusal", async () => {
+  const { Effect } = await import('effect');
+  const { forgetRun } = await import('../src/forget/forget.verb.ts');
+  const typed: EffectOf<Forgot, Refusal, EngineService> = forgetRun('x', {});
+  // @ts-expect-error -- a refusal is its failure, so it is not an Effect that cannot fail
+  const infallible: EffectOf<Forgot, never, EngineService> = forgetRun('x', {});
+  const unprovided = () =>
+    // @ts-expect-error -- forgetRun requires EngineService, and runPromise takes no requirement
+    Effect.runPromise(forgetRun('x', {}));
+  assert.deepEqual([typeof typed, typeof infallible, typeof unprovided], ['object', 'object', 'function']);
 });
 
 /** `wf decide`'s whole screen for `run`, with its id, repository and base commit and the store as `<id>`, `<repo>`, `<base>` and `<root>`. */

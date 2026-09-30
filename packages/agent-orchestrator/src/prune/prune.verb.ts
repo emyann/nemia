@@ -15,7 +15,8 @@ import { filesPrunedWords, isGitRun, namesInOrder, type Pruned, type Run } from 
 import { approvedFirst, landsOnCheck } from '../status/status.ts';
 import { decision, type Decision } from '../decide/decide.ts';
 import { forgetRefusal, heldWorktree, idRefusal, parseWorktrees, runWorktrees, type AskName } from '../forget/forget.ts';
-import { HOME, askFile, lstatOf, pruneFile, readAsks, readRun, roundAskFile, runsDir, stepsOf } from '../record/record.store.ts';
+import { HOME, lstatOf, runsDir, stepsOf } from '../record/record.store.ts';
+import { runStore } from '../record/files.store.ts';
 import { gitSays, mergeInProgress, mergeState } from '../workspace/worktree.store.ts';
 import { resultTips, shippedOf, standingsOf } from '../branches/branches.store.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, spendReader, taskPhases } from '../views/views.verb.ts';
@@ -52,12 +53,12 @@ export const merging = (run: Run, steps: readonly Workflow[] | undefined): Merge
  *
  * Without `yes`, nothing is touched: each worktree and what removing it frees on disk (`diskBytes`: a worktree's `node_modules` is main's
  * files hardlinked, which cost its directories alone while main still holds them, and the blocks of any main has since replaced). With it,
- * the run is marked pruned first (`pruneFile`), its files counted as gone when they are to go, so that a pass or the api reading it while
- * its worktrees go reads it pruned and files nothing (`advance`); then git removes each worktree — never `--force`, so a file that turned
- * up since it was read is git's refusal and not a loss — and `worktrees/<id>` once it is empty; then its files, under `artifacts`, removed
- * and never followed, what would not go said and counted out of what was freed; and the marker is written again with what was removed.
- * The marker's time moves only when a worktree goes. A prune that removed nothing takes the marker back: gone on a run never pruned before,
- * as it was on one that was. The tick never calls this.
+ * the run is marked pruned first (`runStore.runs.prune`), its files counted as gone when they are to go, so that a pass or the api
+ * reading it while its worktrees go reads it pruned and files nothing (`advance`); then git removes each worktree — never `--force`, so
+ * a file that turned up since it was read is git's refusal and not a loss — and `worktrees/<id>` once it is empty; then its files, under
+ * `artifacts`, removed and never followed, what would not go said and counted out of what was freed; and the marker is written again with
+ * what was removed. The marker's time moves only when a worktree goes. A prune that removed nothing takes the marker back: gone on a
+ * run never pruned before, as it was on one that was. The tick never calls this.
  */
 export async function prune(
   e: Engine,
@@ -66,7 +67,7 @@ export async function prune(
 ): Promise<Pruning> {
   const refusedId = idRefusal(id, 'prune');
   if (refusedId) throw new Invalid({ message: refusedId });
-  const run = readRun(id);
+  const run = runStore.runs.read(id);
   const none = { worktrees: [], left: [] };
   const folder = pruneRefusal(run, { decided: undefined, held: null, owed: [], worktrees: [] });
   if (!isGitRun(run)) return { id, kind: 'refused', refusal: folder!, ...none };
@@ -105,7 +106,7 @@ export async function prune(
   }
 
   const { views, phaseOf } = await taskPhases(e, run);
-  const { asks, rounds } = readAsks(id);
+  const { asks, rounds } = runStore.asks.read(id);
   const reader = closeoutReader(views, run);
   const asked = closeoutAsked(views);
   const verdictOf = exitVerdicts(views, run);
@@ -121,7 +122,7 @@ export async function prune(
       run.steps[name] = { ...run.steps[name], taskId };
     }
     decided = decision(steps, run, phaseOf, shippedOf(run), reader, asked, verdictOf, asks, rounds, harnessBlocked(views), spendOf).kind;
-    const askAt = (a: AskName) => (a.kind === 'retry' ? askFile(id, a.step, a.n) : roundAskFile(id, a.step, a.n));
+    const askAt = (a: AskName) => runStore.asks.where(id, a);
     const standings = steps.some((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId) ? standingsOf(run) : [];
     held = forgetRefusal(
       steps,
@@ -176,7 +177,7 @@ export async function prune(
         ? { artifacts: filesBefore }
         : {}),
   });
-  fs.writeFileSync(pruneFile(id), JSON.stringify(marker([], kept?.bytes), null, 2));
+  runStore.runs.prune(id, marker([], kept?.bytes));
   const removed: Array<{ path: string; bytes: number }> = [];
   const left: Pruning['left'] = [];
   for (const w of worktrees) {
@@ -203,10 +204,9 @@ export async function prune(
   }
   const filesWent = freed !== undefined && (freed > 0 || !lstatOf(kept!.path));
   if (!removed.length && !filesWent) {
-    if (run.pruned) fs.writeFileSync(pruneFile(id), JSON.stringify(run.pruned, null, 2));
-    else fs.rmSync(pruneFile(id), { force: true });
+    runStore.runs.prune(id, run.pruned);
   } else {
-    fs.writeFileSync(pruneFile(id), JSON.stringify(marker(removed, filesWent ? freed : undefined), null, 2));
+    runStore.runs.prune(id, marker(removed, filesWent ? freed : undefined));
   }
   return {
     id,

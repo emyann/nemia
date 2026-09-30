@@ -8,9 +8,8 @@ import { Effect } from 'effect';
 import { EngineService, awaited, tried, type Engine } from '../runtime-client.ts';
 import { tryOf, type Run } from '../record/record.ts';
 import { sayRefusal, type Said } from './say.ts';
-import { type RoundAsk } from '../status/status.ts';
-import { type RetryAsk } from '../retry/index.ts';
-import { lstatOf, readRun, stepsOf } from '../record/record.store.ts';
+import { stepsOf } from '../record/record.store.ts';
+import { runStore } from '../record/files.store.ts';
 import { phaseOfView } from '../views/views-words.ts';
 import { Conflict } from '../refusal/refusal.ts';
 
@@ -32,7 +31,7 @@ export type Told = { run: Run; taskId: string; try: number; said: Said };
  */
 export const sayRun = Effect.fn('say')(function* (id: string, stepName: string, text: string) {
   const e = yield* EngineService;
-  const run = yield* tried(() => readRun(id));
+  const run = yield* tried(() => runStore.runs.read(id));
   const steps = yield* tried(() => stepsOf(run));
   const taskId = run.steps[stepName]?.taskId;
   const phase = taskId ? phaseOfView(yield* awaited(() => e.view(taskId))) : 'unknown';
@@ -63,14 +62,14 @@ const toldBy = (e: Engine, taskId: string, text: string): Effect.Effect<Said, Co
 
 /**
  * Why an ask cannot be written where a file that is not one already stands, in words that name it — or null, when there is none: the file
- * reads as an ask, or it is gone, consumed by a pass since the verb looked. `read` is the file read as the tick reads it (`askIn`,
- * `roundAskIn`).
+ * reads as an ask, or it is gone, consumed by a pass since the verb looked. `where` and `stray` are the store's answer to the write
+ * (`AskWritten`): the file, and why it is no ask, read as the tick reads it.
  *
  * An ask is written under its try's name, exclusively, and never over a file there. One that does not read as an ask — `{}`, a hand edit, a
  * torn copy — is honoured by no pass, and `wf ls` shows nothing asked, so "already asked for, wait for it" would be a wait for ever. The
  * way out is a person's: delete the file, and ask again.
  */
-export function strayAsk(file: string, read: RetryAsk | RoundAsk | string, what: string, again: string): string | null {
-  if (typeof read !== 'string' || !lstatOf(file)) return null;
-  return `${what} cannot be asked for: ${file} is already there, and it is not an ask — ${read}. No tick honours it, and wf ls shows nothing asked, so waiting would be for ever. Delete it (rm ${file}), then ask again: ${again}.`;
+export function strayAsk(where: string, stray: string | null, what: string, again: string): string | null {
+  if (stray === null) return null;
+  return `${what} cannot be asked for: ${where} is already there, and it is not an ask — ${stray}. No tick honours it, and wf ls shows nothing asked, so waiting would be for ever. Delete it (rm ${where}), then ask again: ${again}.`;
 }

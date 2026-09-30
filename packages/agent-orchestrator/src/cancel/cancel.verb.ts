@@ -8,7 +8,8 @@ import { Effect } from 'effect';
 import { EngineService, awaited, tried, type Engine } from '../runtime-client.ts';
 import { type Run } from '../record/record.ts';
 import { cancelPlan, type CancelPlan } from './cancel.ts';
-import { markCancelled, readAsks, readRun, stepsOf } from '../record/record.store.ts';
+import { stepsOf } from '../record/record.store.ts';
+import { runStore } from '../record/files.store.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, spendReader, taskPhases } from '../views/views.verb.ts';
 import { adoptChecks, adoptRounds, adoptTries, closeWaitingTasks } from '../tick/advance.verb.ts';
 
@@ -28,15 +29,15 @@ export type Cancelled = { run: Run; plan: CancelPlan };
  * refuses is the next pass's to make again.
  *
  * Never writes the run's json: a tick may be halfway through a pass over the same run. The cancellation goes in a file only this verb
- * writes (`markCancelled`), and `advance` enforces it on every pass, which also covers a step filed after the stop list was taken. Fails
- * with a refusal a read threw; dies of anything else, a stop the engine rejects included (`tried`, `awaited`).
+ * writes (`runStore.runs.cancel`), and `advance` enforces it on every pass, which also covers a step filed after the stop list was
+ * taken. Fails with a refusal a read threw; dies of anything else, a stop the engine rejects included (`tried`, `awaited`).
  */
 export const cancelRun = Effect.fn('cancel')(function* (id: string) {
   const e = yield* EngineService;
-  const run = yield* tried(() => readRun(id));
+  const run = yield* tried(() => runStore.runs.read(id));
   const steps = yield* tried(() => stepsOf(run));
   const { views, phaseOf } = yield* awaited(() => taskPhases(e, run));
-  const { asks, rounds } = yield* tried(() => readAsks(id));
+  const { asks, rounds } = yield* tried(() => runStore.asks.read(id));
   const verdictOf = exitVerdicts(views, run);
   const spendOf = spendReader(views);
   yield* awaited(() => adoptRounds(e, run, steps, views, phaseOf, closeoutReader(views, run), closeoutAsked(views), rounds, spendOf));
@@ -52,7 +53,7 @@ export const cancelRun = Effect.fn('cancel')(function* (id: string) {
   yield* awaited(() => closeWaitingTasks(e, run, views));
   if (plan.kind === 'already-cancelled') return { run, plan } satisfies Cancelled;
 
-  return { run: { ...run, cancelledAt: yield* tried(() => markCancelled(id)) }, plan } satisfies Cancelled;
+  return { run: { ...run, cancelledAt: yield* tried(() => runStore.runs.cancel(id)) }, plan } satisfies Cancelled;
 });
 
 /**

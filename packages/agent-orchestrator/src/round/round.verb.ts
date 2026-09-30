@@ -4,24 +4,13 @@
  * (`runtime-client.ts`): Effect programs that require the engine as a service (`roundRun` and `acceptRun`, over `EngineService`), and
  * `round` and `accept`, their plain faces in a Promise, over the engine they are handed.
  */
-import fs from 'node:fs';
 import { Effect } from 'effect';
 import { EngineService, awaited, tried, type Engine } from '../runtime-client.ts';
 import { type Acceptance, type Run } from '../record/record.ts';
 import { type RoundAsk } from '../status/status.ts';
 import { acceptAsk, roundAsk } from './round.ts';
-import {
-  acceptFile,
-  acceptanceIn,
-  lstatOf,
-  readAsks,
-  readRun,
-  roundAskFile,
-  roundAskIn,
-  runFile,
-  stepsOf,
-  writeAsk,
-} from '../record/record.store.ts';
+import { stepsOf } from '../record/record.store.ts';
+import { runStore } from '../record/files.store.ts';
 import { strayAsk } from '../say/say.verb.ts';
 import { closeoutAsked, closeoutReader, spendReader, taskPhases } from '../views/views.verb.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
@@ -42,13 +31,13 @@ export type RoundAsked = { run: Run; ask: RoundAsk; file: string };
  */
 export const roundRun = Effect.fn('round')(function* (id: string, stepName?: string, budget?: number) {
   const e = yield* EngineService;
-  const run = yield* tried(() => readRun(id));
+  const run = yield* tried(() => runStore.runs.read(id));
   const steps = yield* tried(() => stepsOf(run));
   const { views, phaseOf } = yield* awaited(() => taskPhases(e, run));
   const answer = (asks: readonly RoundAsk[]) =>
     roundAsk(steps, run, stepName, phaseOf, closeoutReader(views, run), closeoutAsked(views), asks, spendReader(views), budget);
 
-  const first = answer((yield* tried(() => readAsks(id))).rounds);
+  const first = answer((yield* tried(() => runStore.asks.read(id))).rounds);
   if ('refusal' in first) return yield* Effect.fail(new Conflict({ message: first.refusal }));
   const ask: RoundAsk = {
     step: first.step,
@@ -56,15 +45,14 @@ export const roundRun = Effect.fn('round')(function* (id: string, stepName?: str
     ...(first.budget !== undefined ? { budget: first.budget } : {}),
     at: new Date().toISOString(),
   };
-  const file = roundAskFile(id, ask.step, ask.round);
-  if (!(yield* tried(() => writeAsk(file, ask)))) {
-    const now = answer((yield* tried(() => readAsks(id))).rounds);
+  const written = yield* tried(() => runStore.asks.write(id, { kind: 'round', ask }));
+  const file = written.where;
+  if (!written.written) {
+    const now = answer((yield* tried(() => runStore.asks.read(id))).rounds);
     const why =
       'refusal' in now
         ? now.refusal
-        : yield* tried(() =>
-            strayAsk(file, roundAskIn(file, ask.step, ask.round), `round ${ask.round} of ${ask.step}'s loop`, `wf round ${id} ${ask.step}`),
-          );
+        : strayAsk(file, written.stray, `round ${ask.round} of ${ask.step}'s loop`, `wf round ${id} ${ask.step}`);
     return yield* Effect.fail(
       new Conflict({ message: why ?? `round ${ask.round} of ${ask.step}'s loop is already asked for. Wait for it: wf ls ${id}.` }),
     );
@@ -97,24 +85,28 @@ export type Accepted = { run: Run; acceptance: Acceptance; file: string };
  */
 export const acceptRun = Effect.fn('accept')(function* (id: string, stepName?: string, message?: string) {
   const e = yield* EngineService;
-  if (!(yield* tried(() => fs.existsSync(runFile(id)))))
+  if (!(yield* tried(() => runStore.runs.exists(id))))
     return yield* Effect.fail(
       new Missing({
         message: `no such run: ${id}. wf accept takes a run by its id, as wf ls lists it: wf accept <runId> [<step>] --message "<why>".`,
       }),
     );
-  const run = yield* tried(() => readRun(id));
+  const run = yield* tried(() => runStore.runs.read(id));
   const steps = yield* tried(() => stepsOf(run));
   const { views, phaseOf } = yield* awaited(() => taskPhases(e, run));
   const answer = (now: Run, rounds: readonly RoundAsk[]) =>
     acceptAsk(steps, now, stepName, message, phaseOf, closeoutReader(views, now), closeoutAsked(views), rounds, spendReader(views));
 
-  const first = answer(run, (yield* tried(() => readAsks(id))).rounds);
+  const first = answer(run, (yield* tried(() => runStore.asks.read(id))).rounds);
   if ('refusal' in first) return yield* Effect.fail(new Conflict({ message: first.refusal }));
   const acceptance: Acceptance = { step: first.step, try: first.try, at: new Date().toISOString(), message: message! };
-  const file = acceptFile(id, acceptance.step, acceptance.try);
-  if (!(yield* tried(() => writeAsk(file, acceptance)))) {
-    const why = yield* tried(() => acceptedAlready(file, acceptance, answer(readRun(id), readAsks(id).rounds), id));
+  const written = yield* tried(() => runStore.asks.write(id, { kind: 'accept', ask: acceptance }));
+  const file = written.where;
+  if (!written.written) {
+    const { stray } = written;
+    const why = yield* tried(() =>
+      acceptedAlready(file, stray, acceptance, answer(runStore.runs.read(id), runStore.asks.read(id).rounds), id),
+    );
     return yield* Effect.fail(new Conflict({ message: why }));
   }
   return { run, acceptance, file } satisfies Accepted;
@@ -129,12 +121,17 @@ export const accept = (e: Engine, id: string, stepName?: string, message?: strin
 
 /**
  * Why `acceptance` could not be written at `file` of the run `id`, read again: the refusal the look would now give (`now`), else the
- * file there that is not an acceptance, named with how to clear it, else the acceptance someone else wrote first.
+ * file there that is not an acceptance, named with why (`stray`) and how to clear it, else the acceptance someone else wrote first.
  */
-function acceptedAlready(file: string, acceptance: Acceptance, now: ReturnType<typeof acceptAsk>, id: string): string {
+function acceptedAlready(
+  file: string,
+  stray: string | null,
+  acceptance: Acceptance,
+  now: ReturnType<typeof acceptAsk>,
+  id: string,
+): string {
   if ('refusal' in now) return now.refusal;
-  const read = acceptanceIn(file, acceptance.step, acceptance.try);
-  return typeof read === 'string' && lstatOf(file)
-    ? `try ${acceptance.try} of ${acceptance.step} cannot be accepted: ${file} is already there, and it is not an acceptance — ${read}. It ends no loop, and no tick moves it, so waiting would be for ever. Delete it (rm ${file}), then accept again: wf accept ${id} ${acceptance.step} --message "<why>".`
+  return stray !== null
+    ? `try ${acceptance.try} of ${acceptance.step} cannot be accepted: ${file} is already there, and it is not an acceptance — ${stray}. It ends no loop, and no tick moves it, so waiting would be for ever. Delete it (rm ${file}), then accept again: wf accept ${id} ${acceptance.step} --message "<why>".`
     : `try ${acceptance.try} of ${acceptance.step} is already accepted. What waits on it is filed on the next tick: wf ls ${id}.`;
 }

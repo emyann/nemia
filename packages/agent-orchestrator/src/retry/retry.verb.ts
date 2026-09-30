@@ -7,7 +7,8 @@ import { Effect } from 'effect';
 import { EngineService, awaited, tried, type Engine } from '../runtime-client.ts';
 import { tryOf, type Run } from '../record/record.ts';
 import { retryable, retryRefusal, type RetryAsk, type RetryHow } from './index.ts';
-import { askFile, askIn, readAsks, readRun, stepsOf, writeAsk } from '../record/record.store.ts';
+import { stepsOf } from '../record/record.store.ts';
+import { runStore } from '../record/files.store.ts';
 import { strayAsk } from '../say/say.verb.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, spendReader, taskPhases } from '../views/views.verb.ts';
 import { Conflict } from '../refusal/refusal.ts';
@@ -40,7 +41,7 @@ export const retryRun = Effect.fn('retry')(function* (
   { stopBlocked = false }: { stopBlocked?: boolean } = {},
 ) {
   const e = yield* EngineService;
-  const run = yield* tried(() => readRun(id));
+  const run = yield* tried(() => runStore.runs.read(id));
   const steps = yield* tried(() => stepsOf(run));
   const { views, phaseOf } = yield* awaited(() => taskPhases(e, run));
   const blocked = stopBlocked ? harnessBlocked(views) : () => false;
@@ -60,7 +61,7 @@ export const retryRun = Effect.fn('retry')(function* (
       spendOf,
     );
 
-  const refused = refusal((yield* tried(() => readAsks(id))).asks);
+  const refused = refusal((yield* tried(() => runStore.asks.read(id))).asks);
   if (refused) return yield* Effect.fail(new Conflict({ message: refused }));
   const ask: RetryAsk = {
     step: stepName,
@@ -71,12 +72,14 @@ export const retryRun = Effect.fn('retry')(function* (
     ...(how.budget !== undefined ? { budget: how.budget } : {}),
     at: new Date().toISOString(),
   };
-  const file = askFile(id, stepName, ask.try);
-  if (!(yield* tried(() => writeAsk(file, ask)))) {
+  const written = yield* tried(() => runStore.asks.write(id, { kind: 'retry', ask }));
+  const file = written.where;
+  if (!written.written) {
+    const { stray } = written;
     const why = yield* tried(
       () =>
-        refusal(readAsks(id).asks) ??
-        strayAsk(file, askIn(file, stepName, ask.try), `try ${ask.try} of ${stepName}`, `wf retry ${id} ${stepName}`) ??
+        refusal(runStore.asks.read(id).asks) ??
+        strayAsk(file, stray, `try ${ask.try} of ${stepName}`, `wf retry ${id} ${stepName}`) ??
         `try ${ask.try} of ${stepName} is already asked for. Wait for it: wf ls ${id}.`,
     );
     return yield* Effect.fail(new Conflict({ message: why }));

@@ -420,11 +420,30 @@ export function unjudgedWords(runId: string, own: string | undefined, why: strin
 /** The asks waiting beside a run, tries and rounds, and a line for each file named as one that cannot be read as one. */
 export type AsksRead = { asks: RetryAsk[]; rounds: RoundAsk[]; notes: string[] };
 
+/** The kinds of ask a person writes: a try (`wf retry`), a round (`wf round`), an approval (`wf approve`), an acceptance (`wf accept`). */
+export type AskKind = 'retry' | 'round' | 'approve' | 'accept';
+
+/** Which ask: its kind, its step, and its number — the try it names, or the round a round ask asks for. */
+export type AskKey = { kind: AskKind; step: string; n: number };
+
+/** A person's ask, of its kind, as its verb writes it. */
+export type PersonAsk =
+  | { kind: 'retry'; ask: RetryAsk }
+  | { kind: 'round'; ask: RoundAsk }
+  | { kind: 'approve'; ask: Approval }
+  | { kind: 'accept'; ask: Acceptance };
+
+/**
+ * What writing a person's ask did, and `where` a person finds its file: written; or not, since a file already stood at its name — `stray`
+ * says why that file is not an ask of its kind, read as the tick reads it, and is null when it reads as one or is gone since.
+ */
+export type AskWritten = { written: true; where: string } | { written: false; where: string; stray: string | null };
+
 /**
  * The run store, as a plain value of synchronous methods: a run's record, and the files a person keeps beside it, by run id and never by
  * path. The tick writes the record; a person's verbs write their own files; no method lets one writer write the other's, but the tick's
  * one touch on a person's file, a hold lifted. Its implementation is `filesStore` (`files.store.ts`), bound as `runStore` there. What the
- * tick's pass reads and writes of the store, grouped as `runs`, `asks` and `holds`.
+ * tick's pass and a person's verbs read and write of the store, grouped as `runs`, `asks` and `holds`.
  */
 export type RunStore = {
   readonly runs: {
@@ -451,6 +470,16 @@ export type RunStore = {
     readonly exists: (id: string) => boolean;
     /** Whether a person called the run off: cancelled it, pruned it, or holds it. */
     readonly calledOff: (id: string) => boolean;
+    /** Write down that a person cancelled the run (`wf cancel`), and answer with the time that stands: the first cancellation is kept. */
+    readonly cancel: (id: string) => string;
+    /**
+     * Remove what the store keeps under the run's id, whether or not its record is there — the record, the cancellation, the prune marker,
+     * the hold, the asks and the run's own directory, in that order — and answer with each path removed, from `WF_ROOT`, a directory's with
+     * a trailing `/`. Writes nothing.
+     */
+    readonly forget: (id: string) => string[];
+    /** Write the prune marker a person's `wf prune` puts on the run, whole over the one there; `undefined` takes the marker away. */
+    readonly prune: (id: string, marker: Pruned | undefined) => void;
   };
   readonly asks: {
     /** The asks waiting beside the run. */
@@ -459,9 +488,23 @@ export type RunStore = {
     readonly answers: (id: string) => RetryAsk[];
     /** Set aside each ask, approval and acceptance the run's record already answers: consumed, never edited. */
     readonly consume: (run: Run, asks: readonly RetryAsk[], rounds: readonly RoundAsk[]) => void;
+    /**
+     * Write a person's ask, whole and exclusively, keyed by its kind, its step and its number: never over a file at its name, which is
+     * answered as `written: false`, with why that file is no ask of its kind (`AskWritten`).
+     */
+    readonly write: (id: string, ask: PersonAsk) => AskWritten;
+    /** Where a person finds the ask `key` of the run: the path a message names for them to read or remove. */
+    readonly where: (id: string, key: AskKey) => string;
   };
   readonly holds: {
     /** Lift the hold put at `at`, and only while it still stands: false when it is gone or a hold was put since. */
     readonly lift: (id: string, at: string) => boolean;
+    /**
+     * Hold the run until the runs `until` ship, with a person's `why` and who they are (`by`) when given: the hold written, or null when
+     * one already stands, which is kept.
+     */
+    readonly put: (id: string, until: readonly string[], said: Pick<Hold, 'why' | 'by'>) => Hold | null;
+    /** Whether a hold's file is there, read as a hold or not: one that does not read still holds the run. */
+    readonly stands: (id: string) => boolean;
   };
 };

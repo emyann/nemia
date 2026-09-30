@@ -2,14 +2,14 @@
  * `wf hold`: hold a run until other runs ship (`hold`), and lift a hold by hand (`unhold`), each writing the person's own file, refused
  * before anything is written. A controller, reaching the runtime through the client (`runtime-client.ts`).
  */
-import fs from 'node:fs';
 import os from 'node:os';
 import type { Engine } from '../runtime-client.ts';
 import { type Hold, type Run } from '../record/record.ts';
 import { holdRefusal } from './wait.ts';
 import { idRefusal } from '../forget/forget.ts';
 import { assess } from '../tick/assess.ts';
-import { holdFile, listRuns, readAsks, readRun, removeHold, runFile, stepsOf, writeHold } from '../record/record.store.ts';
+import { stepsOf } from '../record/record.store.ts';
+import { runStore } from '../record/files.store.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, parentOf, spendReader, taskPhases } from '../views/views.verb.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 
@@ -39,11 +39,11 @@ export async function hold(e: Engine, id: string, until: readonly string[], said
     const badUntil = idRefusal(named, 'hold', `wf hold ${id} --until`);
     if (badUntil) throw new Invalid({ message: `--until ${badUntil}` });
   }
-  if (!fs.existsSync(runFile(id)))
+  if (!runStore.runs.exists(id))
     throw new Missing({
       message: `no such run: ${id}. wf hold takes a run by its id, as wf ls lists it: wf hold <runId> --until <runId>.`,
     });
-  const run = readRun(id);
+  const run = runStore.runs.read(id);
   const read = new Map(await Promise.all([...new Set(until)].filter((u) => u !== id).map(async (u) => [u, await parentOf(e, u)] as const)));
   let finished: 'shipped' | 'succeeded' | undefined;
   if (until.length && !run.cancelledAt && !run.pruned && !run.hold) {
@@ -51,7 +51,7 @@ export async function hold(e: Engine, id: string, until: readonly string[], said
     else {
       const steps = stepsOf(run);
       const { views, phaseOf } = await taskPhases(e, run);
-      const { asks, rounds } = readAsks(id);
+      const { asks, rounds } = runStore.asks.read(id);
       const { status } = assess(
         steps,
         run,
@@ -67,12 +67,13 @@ export async function hold(e: Engine, id: string, until: readonly string[], said
       if (status === 'succeeded') finished = 'succeeded';
     }
   }
-  const refused = holdRefusal(run, until, (u) => read.get(u) ?? { shipped: false }, listRuns(), finished);
+  const refused = holdRefusal(run, until, (u) => read.get(u) ?? { shipped: false }, runStore.runs.list(), finished);
   if (refused) throw new Conflict({ message: refused });
-  const put = writeHold(id, until, { ...said, by: said.by ?? osUser() });
+  const put = runStore.holds.put(id, until, { ...said, by: said.by ?? osUser() });
   if (!put)
     throw new Conflict({
-      message: holdRefusal(readRun(id), until, (u) => read.get(u) ?? { shipped: false }, []) ?? `${id} is already held: wf ls ${id}.`,
+      message:
+        holdRefusal(runStore.runs.read(id), until, (u) => read.get(u) ?? { shipped: false }, []) ?? `${id} is already held: wf ls ${id}.`,
     });
   return { run: { ...run, hold: put }, hold: put };
 }
@@ -89,19 +90,19 @@ function osUser(): string | undefined {
 /**
  * Lift a person's hold by hand — `wf hold <run> --off`: the run goes on at the next tick, and what its steps asked while it was held is
  * asked again. Refused, exit 2: an id that is not a run's, a run not there, a run nobody holds, and a hold lifted and put again since it
- * was read, which is a person's newer word and stays (`removeHold` takes only the hold read, by its `at`).
+ * was read, which is a person's newer word and stays (`runStore.holds.lift` takes only the hold read, by its `at`).
  */
 export function unhold(id: string): Holding {
   const bad = idRefusal(id, 'hold');
   if (bad) throw new Invalid({ message: bad });
-  if (!fs.existsSync(runFile(id)))
+  if (!runStore.runs.exists(id))
     throw new Missing({ message: `no such run: ${id}. wf hold takes a run by its id, as wf ls lists it: wf hold <runId> --off.` });
-  const run = readRun(id);
+  const run = runStore.runs.read(id);
   if (!run.hold)
     throw new Conflict({
       message: `${id} is not held, so there is no hold to lift. To hold it until other runs ship: wf hold ${id} --until <runId>.`,
     });
-  if (!removeHold(id, run.hold.at) && fs.existsSync(holdFile(id)))
+  if (!runStore.holds.lift(id, run.hold.at) && runStore.holds.stands(id))
     throw new Conflict({
       message: `${id}'s hold changed as it was lifted: read it again (wf ls ${id}), then lift it: wf hold ${id} --off.`,
     });

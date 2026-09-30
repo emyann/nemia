@@ -548,9 +548,9 @@
     {
       "files": ["packages/agent-orchestrator/src/prune/prune.verb.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 155, "skipBlankLines": true, "skipComments": true }],
-        "complexity": ["error", { "max": 52 }],
-        "sonarjs/cognitive-complexity": ["error", 50]
+        "max-lines-per-function": ["error", { "max": 154, "skipBlankLines": true, "skipComments": true }],
+        "complexity": ["error", { "max": 51 }],
+        "sonarjs/cognitive-complexity": ["error", 47]
       }
     },
     {

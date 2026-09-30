@@ -102,6 +102,23 @@ export const workflowsQuery = queryOptions({
   queryFn: () => get('/api/workflows', Schema.mutable(Schema.Array(WorkflowListingSchema))),
 });
 
+/** Where a start runs and a listing is read, as the api resolves `?factory=` and `?repo=` (`placeFor`): a factory, and one of its repositories. */
+export type Place = { factory: string; repo: string };
+
+/** The query naming `place`: none for no place and for the default factory, whose answer is the same as naming none. */
+export const placeQuery = (place?: Place | null): string =>
+  !place || place.factory === 'default' ? '' : `?factory=${encodeURIComponent(place.factory)}&repo=${encodeURIComponent(place.repo)}`;
+
+/**
+ * The workflows a factory offers on one of its repositories, read with its hires: each says what they leave `unfilled`, and each step the
+ * agent `hired` into it. Keyed apart from `workflowsQuery`, which the builder drafts from: a builder never reads this one.
+ */
+export const factoryWorkflowsQuery = (place: Place) =>
+  queryOptions({
+    queryKey: ['factory-workflows', place.factory, place.repo],
+    queryFn: () => get(`/api/workflows${placeQuery(place)}`, Schema.mutable(Schema.Array(WorkflowListingSchema))),
+  });
+
 /**
  * Mirrors `WorkflowStepPage` in apps/api/src/workflows/workflows.ts: one step of a workflow — its body, its file as written, and every key
  * a step may set, in the package's order, with its value as the loader read it.
@@ -174,16 +191,22 @@ const StartedSchema = Schema.Struct({
  * leaves the inbox — `removed` says whether it did, and `why` why not. Refused in the package's words: a card not there, one started
  * already.
  *
+ * `place` starts it in a factory, on one of its repositories, as `wf start --factory` does (`placeQuery`): refused in the package's words
+ * for a workflow the factory has not attached, a step its hires leave unfilled, or a repository outside it.
+ *
  * Sent as `application/json`, which the api requires of a start: the one body a page on another site cannot send it unasked.
  */
-export const startRun = (start: {
-  workflow: string;
-  from: WorkflowListing['from'];
-  brief: string;
-  after?: readonly string[];
-  card?: string;
-}): Promise<Started> =>
-  send('POST', '/api/runs', StartedSchema, {
+export const startRun = (
+  start: {
+    workflow: string;
+    from: WorkflowListing['from'];
+    brief: string;
+    after?: readonly string[];
+    card?: string;
+  },
+  place?: Place | null,
+): Promise<Started> =>
+  send('POST', `/api/runs${placeQuery(place)}`, StartedSchema, {
     body: start,
     may: 'The run may have started: look on the Runs page before starting it again.',
   });

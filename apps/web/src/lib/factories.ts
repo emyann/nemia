@@ -65,6 +65,13 @@ export const factoryBlocks = (factories: readonly Factory[], runs: readonly Fact
   return [...factories.filter((f) => f.default && held), ...factories.filter((f) => !f.default)].map((f) => blockOf(f, runs));
 };
 
+/**
+ * The repository a card starts on in `factory`: the card's `repo:`, else the factory's one repository when it has only one, else null — a
+ * person picks it among the factory's.
+ */
+export const startRepo = (factory: Pick<Factory, 'repos'>, cardRepo: string | null): string | null =>
+  cardRepo ?? (factory.repos.length === 1 ? factory.repos[0] : null);
+
 /** How many factories the menu lists before it offers the rest. */
 export const MENU_SHOWN = 5;
 

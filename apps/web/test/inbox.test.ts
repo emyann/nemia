@@ -5,11 +5,12 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { dropCard, fileCard, queueCard, startRun, type InboxEntry, type WorkflowListing } from '../src/lib/api.ts';
+import { dropCard, fileCard, queueCard, startRun, type Factory, type InboxEntry, type WorkflowListing } from '../src/lib/api.ts';
 import {
   afterFor,
   capLine,
   cardLines,
+  cardPlace,
   hasPage,
   ignoredRepoNote,
   namedElsewhere,
@@ -502,5 +503,55 @@ test("a card is queued by its name in the path, POST, and taken off the queue wi
     (err: Error) =>
       err.message.startsWith('POST /api/inbox/bare/queue answered what this board does not read: at name, the value is missing.') &&
       /before asking again/.test(err.message),
+  );
+});
+
+test('a card in a factory starts there: in the /api/runs request, the factory and its repository go in the query and the body is as before', async (t) => {
+  const sent = sending(t, () => answered(201, { id: 'r', card: 'c', removed: true }, 'Created'));
+  const asked = { workflow: 'good', from: 'repo' as const, brief: 'Hire', card: 'c' };
+  await startRun(asked, { factory: 'hiring', repo: '/r/x' });
+  assert.equal(sent[0].url, '/api/runs?factory=hiring&repo=%2Fr%2Fx');
+  assert.deepEqual(JSON.parse(String(sent[0].init?.body)), asked);
+  await startRun(asked, { factory: 'default', repo: '/r/x' });
+  await startRun(asked);
+  assert.deepEqual(
+    sent.slice(1).map((s) => s.url),
+    ['/api/runs', '/api/runs'],
+    'the default factory, and no place, send no query',
+  );
+});
+
+/** A factory as the api lists it, on `repos`. */
+const factoryOn = (name: string, repos: string[], error: string | null = null): Factory => ({
+  name,
+  default: name === 'default',
+  repos,
+  workflows: name === 'default' ? null : ['good'],
+  hires: {},
+  error,
+});
+const FACTORIES = [factoryOn('default', ['/code/app']), factoryOn('solo', ['/r/a']), factoryOn('pair', ['/r/a', '/r/b'])];
+
+test("a card's place: none in the default factory; a factory's one repository filled in; the card's repo: among several, else none to pick", () => {
+  assert.equal(cardPlace(entry('a', null), FACTORIES), null);
+  assert.equal(cardPlace(entry('a', null, { factory: 'default' }), FACTORIES), null);
+  assert.deepEqual(cardPlace(entry('a', null, { factory: 'solo' }), FACTORIES), { factory: 'solo', repos: ['/r/a'], repo: '/r/a' });
+  assert.deepEqual(cardPlace(entry('a', null, { factory: 'pair', repo: '/r/b' }), FACTORIES), {
+    factory: 'pair',
+    repos: ['/r/a', '/r/b'],
+    repo: '/r/b',
+  });
+  assert.deepEqual(cardPlace(entry('a', null, { factory: 'pair' }), FACTORIES), { factory: 'pair', repos: ['/r/a', '/r/b'], repo: null });
+});
+
+test('REFUSED: no place for a card naming a factory the store does not list, or one whose file does not read — each says why', () => {
+  assert.deepEqual(cardPlace(entry('a', null, { factory: 'gone' }), FACTORIES), {
+    why: "The card names the factory gone, which the store does not have: file it with wf factory add gone --repo <path>, or change the card's factory: line.",
+  });
+  assert.deepEqual(
+    cardPlace(entry('a', null, { factory: 'bad' }), [...FACTORIES, factoryOn('bad', [], '/store/factories/bad.json is not JSON')]),
+    {
+      why: 'The card names the factory bad, whose file does not read: /store/factories/bad.json is not JSON',
+    },
   );
 });

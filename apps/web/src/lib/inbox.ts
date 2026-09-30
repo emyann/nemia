@@ -1,4 +1,5 @@
-import type { Ceilings, InboxEntry, WorkflowListing } from './api';
+import type { Ceilings, Factory, InboxEntry, WorkflowListing } from './api';
+import { startRepo } from './factories.ts';
 
 /**
  * The inbox as the page lists it: the newest card first, by when its file was written (`filedAt`) — a card carries no time of its own —
@@ -90,6 +91,26 @@ export function presetOf(
   const readable = workflows.filter((w) => w.error === null);
   if (/^(?:[\\/]|[A-Za-z]:[\\/])/.test(workflow)) return readable.find((w) => trimmed(w.dir) === trimmed(workflow)) ?? null;
   return readable.find((w) => w.from === 'repo' && w.name === workflow) ?? null;
+}
+
+/**
+ * Where a card in a factory starts: the factory, its repositories, and the one it starts on (`startRepo`) — null while a person has it to
+ * pick. Null for a card of the default factory, which starts as the api's repository has it. For a factory the store does not list, or
+ * whose file does not read, why the card cannot start in it.
+ */
+export type CardPlace = { factory: string; repos: string[]; repo: string | null } | { why: string };
+
+/** `entry`'s place among `factories`, as the api lists them (`CardPlace`). */
+export function cardPlace(entry: Pick<InboxEntry, 'factory' | 'repo'>, factories: readonly Factory[]): CardPlace | null {
+  if (entry.factory === null || entry.factory === 'default') return null;
+  const factory = factories.find((f) => f.name === entry.factory);
+  if (!factory) {
+    return {
+      why: `The card names the factory ${entry.factory}, which the store does not have: file it with wf factory add ${entry.factory} --repo <path>, or change the card's factory: line.`,
+    };
+  }
+  if (factory.error !== null) return { why: `The card names the factory ${factory.name}, whose file does not read: ${factory.error}` };
+  return { factory: factory.name, repos: factory.repos, repo: startRepo(factory, entry.repo) };
 }
 
 /**

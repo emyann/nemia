@@ -6,9 +6,9 @@
  * a controller that does, never the runtime: `views.verb.ts` (what the runtime's views of a run's tasks say), `start.verb.ts`,
  * `plan.verb.ts` and `inbox.verb.ts` (starting runs, plans and inbox cards), `tick.verb.ts` and `advance.verb.ts` (a pass — `tick`,
  * `advance` — and the filings it adopts), what a person asks of a run (`cancel.verb.ts`, `retry.verb.ts`, `gate.verb.ts`, `say.verb.ts`,
- * `wait.verb.ts`, `round.verb.ts`), `forget.verb.ts` and `prune.verb.ts` (`wf rm` and `wf prune`), and `list.verb.ts` and `decide.verb.ts`
- * (what a person reads of a run: `wf ls` and `wf decide`). They import one way — views and starting beneath the tick, the tick beneath the
- * rest — so no cycle forms among them (`test/boundary.test.ts`).
+ * `wait.verb.ts`, `round.verb.ts`), `forget.verb.ts` and `prune.verb.ts` (`wf rm` and `wf prune`), `list.verb.ts` and `decide.verb.ts`
+ * (what a person reads of a run: `wf ls` and `wf decide`), and `stats.verb.ts` (what the store's runs add up to: `wf stats`). They import
+ * one way — views and starting beneath the tick, the tick beneath the rest — so no cycle forms among them (`test/boundary.test.ts`).
  *
  * What of the I/O never names the engine sits beneath the controllers, and this file re-exports what it exported of them:
  * `record.store.ts` (a run's id, its files' names, a step's check stderr, artifacts and inputs), `files.store.ts` (the run store a run's
@@ -350,6 +350,9 @@ export type { Told } from './say/say.verb.ts';
 export { forget } from './forget/forget.verb.ts';
 export { prune } from './prune/prune.verb.ts';
 export { decide } from './decide/decide.verb.ts';
+export { stats } from './stats/stats.verb.ts';
+export { BY_KEYS, statsLine, statsLines, statsQueryOf } from './stats/index.ts';
+export type { ByKey, QueryKey, Stats, StatsQuery } from './stats/index.ts';
 export { list, unjudgedOf } from './list/list.verb.ts';
 export type { Answered, Decided } from './decide/decide.verb.ts';
 export type { Unjudged } from './list/list.verb.ts';

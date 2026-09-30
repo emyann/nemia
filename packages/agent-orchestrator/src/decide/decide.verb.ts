@@ -31,6 +31,7 @@ import {
   closeoutReader,
   consumption,
   deniedOf,
+  everyTryOf,
   harnessBlocked,
   parentsOf,
   saidIn,
@@ -161,19 +162,6 @@ const answersOf = Effect.fn('answersOf')(function* (e: Engine, run: Run, views: 
     answers[name] = { try: answer.try, message: answer.message!, ...(c && !('error' in c) && c.needs ? { needs: c.needs } : {}) };
   }
   return answers;
-});
-
-/** `views`, with the engine's view of every earlier try's task and check they do not hold (`e`, the call's `viewedOnce`). */
-const everyTryOf = Effect.fn('everyTryOf')(function* (e: Engine, run: Run, views: ReadonlyMap<string, TaskView>) {
-  const everyTry = new Map(views);
-  for (const record of Object.values(run.steps)) {
-    for (const t of record.tries ?? []) {
-      for (const taskId of [t.taskId, t.check?.taskId]) {
-        if (taskId && !everyTry.has(taskId)) everyTry.set(taskId, yield* awaited(() => e.view(taskId)));
-      }
-    }
-  }
-  return everyTry;
 });
 
 /** For each step, what a person said to its sessions, try by try, off `everyTry`; a task two tries share is read once. */

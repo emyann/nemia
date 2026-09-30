@@ -29,6 +29,7 @@ wf approve r-xyz plan --message "ship the second reading"   # it waits at its ga
 wf round r-xyz       # the review still asks for more after the last round it allows: once more
 wf accept r-xyz --message "the findings are follow-up work"   # or: enough, go on with what is there
 wf say r-xyz implement "Widen the scope to apps/api too."   # tell a running step something, on its record
+wf stats --by agent  # what the runs add up to: the last 14 days against the 14 before, a row per day and per step
 ```
 
 **Nemia ships no workflows, agents or skills.** A repository writes its own, one folder each under `<repo>/workflows/`, and a
@@ -109,6 +110,37 @@ EventSource that reconnects resumes after the last line it was sent.
 
 `wf` once had a `watch` verb that followed the engine, and gave it back: observing the engine is
 the engine's job. This one follows what only this package knows.
+
+## What the runs add up to: `wf stats`
+
+`wf stats` reads every run in the store, of every factory and repository, and adds up how the work
+flows: the runs finished and landed, the rounds a loop took to be accepted, the share of landed runs
+that landed on their first try, the cost and wall time of a landed run, and per step its tries, their
+time and cost, its checks' verdicts and its waits at a gate. It prints tiles — the last 14 days
+against the 14 before — a row per UTC day, and a row per step and agent.
+
+```bash
+wf stats                                   # every day since the first try ended, to today
+wf stats --from 2026-09-01 --to 2026-09-30 # those days, in UTC
+wf stats --by agent                        # a group per agent; also step, factory, workflow, repo
+wf stats --factory default --step review   # only those; --agent, --workflow and --repo narrow the same way
+wf stats --line                            # one line, for a recap
+wf stats --json                            # what GET /api/stats answers
+```
+
+- **A number nothing measured is absent** — `—` in words, null in JSON — never 0: a run with a session
+  not measured has no cost, and a workflow with no `loop:` step has no rounds.
+- **A try falls on the UTC day it ended, a run on the day it finished**: its ending step's landing
+  settled (committed, aborted or untouched), or, for an ending that commits in its own prose and so
+  never says how it landed, its current try done (its session succeeded and not blocked, its check
+  passed) and none in flight — its landing then unknown, `—`. With no ending step, every step's current
+  try done and none in flight. A run waiting on a person — a check refused or unfinished, a session
+  failed — has not finished, nor has a cancelled one.
+- **Rounds count only a loop that ended accepted**: its reviewer signed `again: false`, or a person
+  ran `wf accept`. A first-try landing is the `workspace: main` step landing on its first try.
+- **A check is passed, refused or unfinished**: refused only when it ran to its end and exited
+  non-zero, as `wf decide` reads it. A gate wait runs from the try's end to its approval.
+- **A run whose journal does not read is left out whole**, and named on the last line.
 
 ## Where this stops
 

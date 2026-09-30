@@ -170,6 +170,19 @@ export const taskPhases = (
   phaseOf: (taskId: string) => TaskPhase;
 }> => Effect.runPromise(taskPhasesRead(run, how).pipe(Effect.provide(EngineService.layer(e))));
 
+/** `views`, with the engine's view of every earlier try's task and check they do not hold (`e`, the call's `viewedOnce`). */
+export const everyTryOf = Effect.fn('everyTryOf')(function* (e: Engine, run: Run, views: ReadonlyMap<string, TaskView>) {
+  const everyTry = new Map(views);
+  for (const record of Object.values(run.steps)) {
+    for (const t of record.tries ?? []) {
+      for (const taskId of [t.taskId, t.check?.taskId]) {
+        if (taskId && !everyTry.has(taskId)) everyTry.set(taskId, yield* awaited(() => e.view(taskId)));
+      }
+    }
+  }
+  return everyTry;
+});
+
 /**
  * Whether a task was asked for a closeout: the schema the engine keeps on its record of the filing — and `unsigned` when its last
  * attempt ended without it (`unsignedEnd`), which the runtime reports and the orchestrator judges. What tells a step that ended

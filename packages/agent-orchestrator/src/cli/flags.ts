@@ -76,6 +76,13 @@ export const HELP = `wf — run a workflow of agent steps
                                one the cap on runs in flight holds waiting for a run slot (2 of 2 in
                                flight); what each step's tries and the run have cost, where measured;
                                last, whether a wf up ticks the store and when its last pass was
+  wf stats [--from <day>] [--to <day>] [--by agent|step|factory|workflow|repo] [--agent|--step|--factory|--workflow|--repo <v>] [--line|--json]
+                               what every run in the store adds up to, by UTC day: rounds to
+                               acceptance of each loop: step, landings of the workspace: main step
+                               and on which try, cost and time per landed run, and each step's
+                               tries, time, cost, checks and gate waits; first the last 14 days
+                               against the 14 before. A number nothing measured reads —, never 0.
+                               --line: one line, for a recap; --json: the whole answer
   wf feed [cursor]             what the tick judged, a line each time it changed: a run's status, a
                                step's word as wf ls says it, and what a person's word changed — then
                                cursor: <n>, to read on from with wf feed <n>; from the start with none

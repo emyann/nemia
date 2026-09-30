@@ -134,6 +134,7 @@ const listing = (name: string, from: 'repo' | 'yours', dir: string, error: strin
   folderTeam: false,
   version: '0',
   error,
+  unfilled: null,
 });
 
 const WORKFLOWS = [

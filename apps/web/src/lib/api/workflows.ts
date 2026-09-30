@@ -19,10 +19,14 @@ import {
 } from './library.ts';
 
 /**
- * Mirrors `ListedStep` in apps/api/src/workflows/workflows.ts: a step as a workflow's listing has it — and as the builder puts it back.
- * `spec` and `body` are the step resolved; `own` is what a step with an agent sets itself, null for a step with none.
+ * Mirrors `ListedStep` in apps/api/src/workflows/workflows.ts: a step as a workflow's listing has it. `spec` and `body` are the step
+ * resolved; `own` is what a step with an agent sets itself, null for a step with none; `hired` is the agent the factory the listing is in
+ * hires into it, which `spec.agent` then names too — null for a step it hires no one into, and in the default factory.
  */
-export type ListedStep = { name: string; spec: WorkflowStepSpec; body: string; own: StepOwn | null };
+export type ListedStep = { name: string; spec: WorkflowStepSpec; body: string; own: StepOwn | null; hired: string | null };
+
+/** A step as the builder puts it back: a listed step without `hired`, which no step file writes. */
+export type StepWritten = Omit<ListedStep, 'hired'>;
 
 /**
  * Mirrors `StepOwn` in apps/api/src/workflows/workflows.ts: the keys a step with an agent sets itself — the rest are its agent's — and its
@@ -42,6 +46,7 @@ const ListedStepSchema = Schema.Struct({
   spec: WorkflowStepSpecSchema,
   body: Schema.String,
   own: Schema.NullOr(StepOwnSchema),
+  hired: Schema.NullOr(Schema.String),
 }) satisfies Schema.Schema<ListedStep>;
 
 /**
@@ -66,6 +71,11 @@ export type WorkflowListing = {
   /** What the folder's files held when it was listed: a save carries it, and the api refuses one of a folder changed since (409). */
   version: string;
   error: string | null;
+  /**
+   * Why a run of it cannot start in the factory it is listed in, in the package's words: the steps its hires leave with no agent, and the
+   * hire that fills each. Null where every step has one, in the default factory, and for a folder that does not load.
+   */
+  unfilled: string | null;
 };
 
 /** Where a workflow is read from: the repository's `workflows/`, or yours. */
@@ -83,6 +93,7 @@ const WorkflowListingSchema = Schema.Struct({
   folderTeam: Schema.Boolean,
   version: Schema.String,
   error: Schema.NullOr(Schema.String),
+  unfilled: Schema.NullOr(Schema.String),
 }) satisfies Schema.Schema<WorkflowListing>;
 
 /** Every workflow there is. Not polled: it changes when a person edits a folder. Read again on each visit. */
@@ -233,7 +244,7 @@ const build = (method: 'PUT' | 'POST', route: string, body: unknown): Promise<Wo
  */
 export const saveWorkflow = (
   name: string,
-  save: { version: string; steps: readonly ListedStep[]; schemas: readonly SchemaFile[] },
+  save: { version: string; steps: readonly StepWritten[]; schemas: readonly SchemaFile[] },
 ): Promise<WorkflowSaved> =>
   build('PUT', `/api/workflows/yours/${encodeURIComponent(name)}`, {
     version: save.version,
@@ -244,5 +255,5 @@ export const saveWorkflow = (
 /**
  * Make a folder of yours with its first step. Rejects with a `BuildRefusal`, as a save does: a name taken, or a step the package refuses.
  */
-export const createWorkflow = (name: string, step: ListedStep): Promise<WorkflowSaved> =>
+export const createWorkflow = (name: string, step: StepWritten): Promise<WorkflowSaved> =>
   build('POST', '/api/workflows/yours', { name, step });

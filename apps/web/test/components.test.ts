@@ -3995,6 +3995,7 @@ async function startMarkup(folderTeam: boolean, repo?: string): Promise<string> 
     folderTeam,
     version: '0',
     error: null,
+    unfilled: null,
   };
   return renderToStaticMarkup(
     createElement(

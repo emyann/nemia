@@ -139,12 +139,15 @@ export const workflow = (extra: Partial<WorkflowListing> = {}): WorkflowListing 
   from: 'yours',
   dir: '/store/workflows/build',
   description: 'An intent to main.',
-  steps: [{ name: 'ship', spec: stepSpec(), body: 'Land it.', own: { keys: ['workspace', 'slot', 'gate'], body: 'Land it.' } }],
+  steps: [
+    { name: 'ship', spec: stepSpec(), body: 'Land it.', own: { keys: ['workspace', 'slot', 'gate'], body: 'Land it.' }, hired: null },
+  ],
   graph: { roots: ['ship'], edges: [{ from: 'review', to: 'ship', kind: 'after' }] },
   schemas: ['ship.schema.json'],
   folderTeam: false,
   version: 'v-3',
   error: null,
+  unfilled: null,
   ...extra,
 });
 

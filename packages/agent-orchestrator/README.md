@@ -1025,8 +1025,10 @@ nothing that waits on the step ever runs. A step with no `check:` has nothing ru
   person's own Linux work, but with nothing else busy there it still uses every CPU the VM has. `CHECK_NICENESS`.
 - **The gate is the exit code the engine recorded.** The `[wf check] exit N` line in the log is the
   number shown to a person; a command that prints one of its own changes that number and nothing else.
-- The command sees `WF_RUN`, `WF_STEP`, `WF_BASE_REF`, `WF_WORKSPACE`, `WF_STDERR`, and `WF_ARTIFACTS` — the
-  step's files directory, where a check that takes screenshots puts them (*A step's files*, below).
+- The command sees `WF_RUN`, `WF_STEP`, `WF_BASE_REF`, `WF_WORKSPACE`, `WF_STDERR`, `WF_ARTIFACTS` — the
+  step's files directory, where a check that takes screenshots puts them (*A step's files*, below) — and
+  `WF_CLOSEOUT`: the step's closeout as a JSON file, flat, its declared fields beside the four, the check's own data
+  to read (`checks/<task>.closeout.json`, beside its stderr).
 - The run commits what a step left **before** filing its check and never after, so what a suite leaves
   behind is not committed under the step's name.
 

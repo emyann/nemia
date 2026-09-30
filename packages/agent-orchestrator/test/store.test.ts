@@ -473,9 +473,10 @@ test("the run files a signed step's check itself: the frozen command, in its wor
         WF_WORKSPACE: run.repo,
         WF_STDERR: path.join(ROOT, 'checks', `${id}.stderr`),
         WF_ARTIFACTS: path.join(ROOT, 'runs', run.id, 'artifacts', 'implement'),
+        WF_CLOSEOUT: path.join(ROOT, 'checks', `${id}.closeout.json`),
       },
     },
-    "`WF_ARTIFACTS` is the step's own files directory, where a check that takes screenshots puts them",
+    "`WF_ARTIFACTS` is the step's own files directory, where a check that takes screenshots puts them; `WF_CLOSEOUT` the step's closeout",
   );
   assert.ok(fs.existsSync(path.join(ROOT, 'checks')), 'the stderr file has somewhere to go');
   assert.ok(fs.statSync(path.join(ROOT, 'runs', run.id, 'artifacts', 'implement')).isDirectory(), 'and so do its files');
@@ -485,6 +486,33 @@ test("the run files a signed step's check itself: the frozen command, in its wor
 
   settle(id, 'succeeded');
   assert.deepEqual((await advance(e, readRun(run.id))).filed, ['review'], 'exit 0, and the follower is filed');
+});
+
+test("a check is handed the step's closeout as a file, flat, a declared field at the top level beside the four", async () => {
+  const dir = folder('output: implement.schema.json\ncheck: node check.ts');
+  const MUTANTS = {
+    type: 'object',
+    properties: { mutants: { type: 'array', items: { type: 'string' } }, noMutants: { type: ['string', 'null'] } },
+    required: ['mutants', 'noMutants'],
+    additionalProperties: false,
+  };
+  fs.writeFileSync(path.join(dir, 'implement.schema.json'), JSON.stringify(MUTANTS));
+  const run = started(dir);
+  const { e, tasks, settle } = board();
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-implement`, 'succeeded', { ...SIGNED, mutants: [], noMutants: 'a doc only' });
+  await advance(e, readRun(run.id));
+
+  const id = `${run.id}-implement-check`;
+  const file = readCheckBrief(tasks.get(id)!.spec.brief).env.WF_CLOSEOUT;
+  assert.equal(file, path.join(ROOT, 'checks', `${id}.closeout.json`));
+  assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), {
+    outcome: 'done',
+    summary: 'did it',
+    artifacts: [],
+    mutants: [],
+    noMutants: 'a doc only',
+  });
 });
 
 test('a check that exits non-zero leaves the follower unfiled, pass after pass, and the run failed', async () => {

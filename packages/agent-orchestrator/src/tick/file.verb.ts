@@ -54,6 +54,7 @@ import {
   runFile,
   stepsOf,
 } from '../record/record.store.ts';
+import { writeCheckCloseout } from '../check/check.store.ts';
 import { checkoutParts, gitSays, workspaceFor } from '../workspace/worktree.store.ts';
 import { agentFilesDir, renderedIn, skillsAgain } from '../agents/agents.store.ts';
 import { closeoutOf, refusalOf, saidIn, sessionIn } from '../views/views.verb.ts';
@@ -527,6 +528,7 @@ async function fileCheck(f: Filing, name: string): Promise<void> {
     const files = artifactsDir(run, name);
     fs.mkdirSync(files, { recursive: true });
     const install = isGitRun(run) && landsOnCheck(step, run) ? (checkoutParts(workspace) ?? undefined) : undefined;
+    const closeout = f.reads.signedOff(name);
     if (install)
       f.notes.push(
         `${name}: the merge's package-lock.json asks for ${install}, which the checkout's node_modules does not have: its check runs npm install there first`,
@@ -543,6 +545,7 @@ async function fileCheck(f: Filing, name: string): Promise<void> {
           WF_WORKSPACE: workspace,
           WF_STDERR: checkStderr(taskId),
           WF_ARTIFACTS: files,
+          ...(closeout ? { WF_CLOSEOUT: writeCheckCloseout(taskId, closeout) } : {}),
         },
         install,
       ),

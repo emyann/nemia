@@ -2,7 +2,7 @@
 import { queryOptions } from '@tanstack/react-query';
 import { Schema } from 'effect';
 import { pace } from '../feed.ts';
-import { get } from './read.ts';
+import { get, send } from './read.ts';
 import { RunGraphSchema, type RunGraph } from './graph.ts';
 import {
   PlaceKindSchema,
@@ -140,29 +140,37 @@ export const runsQuery = queryOptions({
   refetchInterval: () => pace(5_000),
 });
 
+/** What a removal answers: the run removed. */
+const RemovedSchema = Schema.Struct({ id: Schema.String, removed: Schema.Literal(true) }) satisfies Schema.Schema<{
+  id: string;
+  removed: true;
+}>;
+
 /**
  * Remove a try's run, as `wf rm` removes it: its record, and the folders it worked in. The api removes only a try, and not one still in
  * flight; rejects with its refusal in full — the package's words, which say to cancel it first — or the api's own about the request.
  */
-export async function removeRun(id: string): Promise<{ id: string; removed: true }> {
-  const route = `/api/runs/${encodeURIComponent(id)}`;
-  const res = await fetch(route, { method: 'DELETE', headers: { 'content-type': 'application/json' }, body: '{}' });
-  const body = (await res.json().catch(() => undefined)) as { removed?: unknown; error?: unknown } | undefined;
-  if (res.ok && body?.removed === true) return { id, removed: true };
-  throw new Error(typeof body?.error === 'string' ? body.error : `DELETE ${route} answered ${res.status} ${res.statusText}`);
-}
+export const removeRun = (id: string): Promise<{ id: string; removed: true }> =>
+  send('DELETE', `/api/runs/${encodeURIComponent(id)}`, RemovedSchema, {
+    body: {},
+    may: 'The run may be removed: look on the Runs page before removing it again.',
+  });
+
+/** What a lift answers: the run whose hold is lifted. The hold that was is dropped: nothing reads it. */
+const LiftedSchema = Schema.Struct({ id: Schema.String, lifted: Schema.Literal(true) }) satisfies Schema.Schema<{
+  id: string;
+  lifted: true;
+}>;
 
 /**
  * Lift a person's hold on a run, as `wf hold <run> --off` lifts it: the hold's file removed, and the run goes on at the next tick. Rejects
  * with the api's refusal in full — the package's words for a run nobody holds — or its own about the request.
  */
-export async function liftHold(id: string): Promise<{ id: string; lifted: true }> {
-  const route = `/api/runs/${encodeURIComponent(id)}/hold`;
-  const res = await fetch(route, { method: 'DELETE', headers: { 'content-type': 'application/json' }, body: '{}' });
-  const body = (await res.json().catch(() => undefined)) as { lifted?: unknown; error?: unknown } | undefined;
-  if (res.ok && body?.lifted === true) return { id, lifted: true };
-  throw new Error(typeof body?.error === 'string' ? body.error : `DELETE ${route} answered ${res.status} ${res.statusText}`);
-}
+export const liftHold = (id: string): Promise<{ id: string; lifted: true }> =>
+  send('DELETE', `/api/runs/${encodeURIComponent(id)}/hold`, LiftedSchema, {
+    body: {},
+    may: `The hold may be lifted: look at the run (\`wf ls ${id}\`) before lifting it again.`,
+  });
 
 /**
  * What a prune gives back beyond the run's worktrees, as `wf prune` takes it: `--artifacts`, its files; `--unmerged`, a run nobody merged.
@@ -172,20 +180,22 @@ export type PruneHow = { artifacts: boolean; unmerged: boolean };
 /** What the api answers a prune with: `wf prune`'s lines, and how many places it could not remove (`left`), which those lines name. */
 export type Pruned = { id: string; pruned: true; lines: string[]; left: number };
 
+/** Decodes the api's answer to a prune: its lines, and each place it could not remove, by its path. */
+const PruneAnswerSchema = Schema.Struct({
+  pruned: Schema.Literal(true),
+  lines: StringsSchema,
+  left: Schema.Array(Schema.Struct({ path: Schema.String })),
+});
+
 /**
  * Prune a finished run, as `wf prune <run> --yes` does: its worktrees removed, and its files with `artifacts`; a run nobody merged only
  * with `unmerged`. No branch is deleted. Rejects with the api's refusal in full — the package's words for a run not over, one already
  * pruned, or one nobody merged — or its own about the request.
  */
 export async function pruneRun(id: string, how: PruneHow): Promise<Pruned> {
-  const route = `/api/runs/${encodeURIComponent(id)}/prune`;
-  const res = await fetch(route, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(how) });
-  const body = (await res.json().catch(() => undefined)) as
-    | { pruned?: unknown; lines?: unknown; left?: unknown; error?: unknown }
-    | undefined;
-  if (res.ok && body?.pruned === true) {
-    const lines = Array.isArray(body.lines) ? body.lines.filter((line): line is string => typeof line === 'string') : [];
-    return { id, pruned: true, lines, left: Array.isArray(body.left) ? body.left.length : 0 };
-  }
-  throw new Error(typeof body?.error === 'string' ? body.error : `POST ${route} answered ${res.status} ${res.statusText}`);
+  const answer = await send('POST', `/api/runs/${encodeURIComponent(id)}/prune`, PruneAnswerSchema, {
+    body: how,
+    may: `The run may be pruned: look at it (\`wf ls ${id}\`) before pruning it again.`,
+  });
+  return { id, pruned: true, lines: answer.lines, left: answer.left.length };
 }

@@ -1,7 +1,10 @@
-/** The workflows, a step's page, and a run started from one (apps/api/src/workflows/workflows.ts). */
+/**
+ * The workflows, a step's page, and a run started from one (apps/api/src/workflows/workflows.ts); and the builder's writes of a folder of
+ * yours (apps/api/src/workflows/builder.ts), which answer the folder as the list reads it.
+ */
 import { queryOptions } from '@tanstack/react-query';
-import { Schema } from 'effect';
-import { get } from './read.ts';
+import { Option, Schema } from 'effect';
+import { get, send, type SendHow } from './read.ts';
 import { RunGraphSchema, type RunGraph } from './graph.ts';
 import {
   AgentSkillSchema,
@@ -10,6 +13,7 @@ import {
   WorkflowStepSpecSchema,
   type AgentSkill,
   type KeyRow,
+  type SchemaFile,
   type StepKey,
   type WorkflowStepSpec,
 } from './library.ts';
@@ -142,10 +146,17 @@ export const repositoryQuery = queryOptions({
 /** What a start answers: the new run — and, for an inbox card, whether the card left the inbox, and why not when it did not. */
 export type Started = { id: string; removed?: boolean; why?: string };
 
+/** Decodes a `Started`: a `removed` or a `why` the api leaves out stays out. */
+const StartedSchema = Schema.Struct({
+  id: Schema.String,
+  removed: Schema.optionalKey(Schema.Boolean),
+  why: Schema.optionalKey(Schema.String),
+}) satisfies Schema.Schema<Started>;
+
 /**
  * Start a run of a workflow, as `wf start` does: the api writes the run's record and files nothing. Resolves with the new
  * run's id; rejects with the api's refusal in full — the loader's, `wf start`'s (`afterRefusal`'s, for a run it will not wait
- * on), or the api's own about the request; and an answer that succeeded without an id, saying the run may have started. `after` names the
+ * on), or the api's own about the request; and an answer the board does not read, saying the run may have started. `after` names the
  * runs it waits on, as `--after` does; left out when there are none.
  *
  * `card` starts an inbox card, as `wf start <inbox>/<card>.md --brief <brief>` does: the record carries where it came from, and the card
@@ -154,27 +165,84 @@ export type Started = { id: string; removed?: boolean; why?: string };
  *
  * Sent as `application/json`, which the api requires of a start: the one body a page on another site cannot send it unasked.
  */
-export async function startRun(start: {
+export const startRun = (start: {
   workflow: string;
   from: WorkflowListing['from'];
   brief: string;
   after?: readonly string[];
   card?: string;
-}): Promise<Started> {
-  const res = await fetch('/api/runs', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(start) });
-  const body = (await res.json().catch(() => undefined)) as { id?: unknown; removed?: unknown; why?: unknown; error?: unknown } | undefined;
-  if (res.ok && typeof body?.id === 'string') {
-    return {
-      id: body.id,
-      ...(typeof body.removed === 'boolean' ? { removed: body.removed } : {}),
-      ...(typeof body.why === 'string' ? { why: body.why } : {}),
-    };
+}): Promise<Started> =>
+  send('POST', '/api/runs', StartedSchema, {
+    body: start,
+    may: 'The run may have started: look on the Runs page before starting it again.',
+  });
+
+/** A list of strings, as a decoded answer holds it: mutable, as the plain types say. */
+const StringsSchema = Schema.mutable(Schema.Array(Schema.String));
+
+/** Mirrors `WorkflowSaved` in apps/api/src/workflows/builder.ts: a folder written, read back from disk, and its files by name. */
+export type WorkflowSaved = { workflow: WorkflowListing; written: string[]; kept: string[]; removed: string[] };
+
+/** Decodes a `WorkflowSaved`. */
+const WorkflowSavedSchema = Schema.Struct({
+  workflow: WorkflowListingSchema,
+  written: StringsSchema,
+  kept: StringsSchema,
+  removed: StringsSchema,
+}) satisfies Schema.Schema<WorkflowSaved>;
+
+/**
+ * A write of the builder's the api refused: its sentence, and the steps it names — one, several for a cycle, or none for a refusal of the
+ * folder or the request — which the board shows it by. `status` is the api's: 409 for a folder changed since the board read it. Null for a
+ * write refused before an answer said why.
+ */
+export class BuildRefusal extends Error {
+  readonly steps: string[];
+  readonly status: number | null;
+  constructor(message: string, steps: readonly string[], status: number | null = null) {
+    super(message);
+    this.steps = [...steps];
+    this.status = status;
   }
-  if (res.ok) {
-    throw new Error(
-      `POST /api/runs answered ${res.status} ${res.statusText} without the new run's id, so the api and this board disagree about what a start answers. ` +
-        'The run may have started: look on the Runs page before starting it again, and restart the api (`npm run dev`).',
-    );
-  }
-  throw new Error(typeof body?.error === 'string' ? body.error : `POST /api/runs answered ${res.status} ${res.statusText}`);
 }
+
+/** The steps a refusal of the builder's names: its `steps`, none where it names none. */
+const StepsNamed = Schema.Struct({ steps: StringsSchema });
+
+/** How a builder's write is refused: a `BuildRefusal` in the api's words, with the steps it names and its status. */
+const refused: SendHow['refused'] = (words, status, answer) =>
+  new BuildRefusal(
+    words,
+    Option.match(Schema.decodeUnknownOption(StepsNamed)(answer), { onNone: () => [], onSome: (s) => s.steps }),
+    status,
+  );
+
+/** A builder's write of a folder: resolved with the folder written, read back; rejected with a `BuildRefusal`, or an `UnreadAnswer`. */
+const build = (method: 'PUT' | 'POST', route: string, body: unknown): Promise<WorkflowSaved> =>
+  send(method, route, WorkflowSavedSchema, {
+    body,
+    may: 'The folder may be written: reload the Workflows page before writing it again.',
+    refused,
+  });
+
+/**
+ * Put a folder of yours back from its steps and the schemas pasted for them, as the builder saves it: the api judges the two together,
+ * calls the package's `writeWorkflow`, and answers the folder read back from disk. `version` is the one the folder was listed at. Rejects
+ * with a `BuildRefusal`: the package's sentence and the steps it names, a folder changed since it was read (409), or the api's own about
+ * the request; and with an `UnreadAnswer` for an answer the board does not read, saying the folder may be written.
+ */
+export const saveWorkflow = (
+  name: string,
+  save: { version: string; steps: readonly ListedStep[]; schemas: readonly SchemaFile[] },
+): Promise<WorkflowSaved> =>
+  build('PUT', `/api/workflows/yours/${encodeURIComponent(name)}`, {
+    version: save.version,
+    steps: save.steps,
+    ...(save.schemas.length ? { schemas: save.schemas } : {}),
+  });
+
+/**
+ * Make a folder of yours with its first step. Rejects with a `BuildRefusal`, as a save does: a name taken, or a step the package refuses.
+ */
+export const createWorkflow = (name: string, step: ListedStep): Promise<WorkflowSaved> =>
+  build('POST', '/api/workflows/yours', { name, step });

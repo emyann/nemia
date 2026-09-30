@@ -284,10 +284,10 @@ export function WorkflowBuilder({ workflow, onClose }: { workflow: WorkflowListi
  *
  * A 4xx is the api's judgement of the request — the package's refusal, a body it will not read, a folder changed since (409) — and it
  * writes nothing, so the banner says so. Anything else leaves what the folder holds unknown: a 500 is a write that broke off partway, and
- * an answer with no status of its own may have been carried out all the same — a fetch that never landed, or one the api answered without
- * what it wrote (`build` in lib/api/builder.ts), which is why the words for it are what the api did not say rather than that it said
- * nothing. None of them says nothing was written, and each offers to read the folder again, as a 409 does — the one way back to what is on
- * disk, since the draft is a folder read at a version the api no longer has.
+ * an answer with no status of its own may have been carried out all the same — a fetch that never landed, or one the api answered with
+ * what the board does not read (`build` in lib/api/workflows.ts), which is why the words for it are what the api did not say rather than
+ * that it said nothing. None of them says nothing was written, and each offers to read the folder again, as a 409 does — the one way back
+ * to what is on disk, since the draft is a folder read at a version the api no longer has.
  */
 export function SaveRefused({ refusal, rereading, onReread }: { refusal: BuildRefusal; rereading: boolean; onReread: () => void }) {
   const nothingWritten = refusal.status !== null && refusal.status < 500;

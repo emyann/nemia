@@ -100,6 +100,11 @@ The board is Vite, React, TanStack Router and Query, React Flow, and shadcn's co
   never exports (`export type *`): every key the board reads required, an unknown key dropped. `satisfies` misses a schema narrower than
   its type (a word left out, a `null` refused, a `?` key required) and a `Schema.Any`: read the schema against the type. A read that passes
   no schema — a GET by bare `fetch`, a `get` of `Schema.Unknown` — is refused by `unschemedReads` (`test/read.test.ts`).
+- A write sends with `send` (`lib/api/read.ts`) through a schema beside its answer's type, with `may` words saying what to look at before
+  sending it again; an answer that does not decode is an `UnreadAnswer`, never a refusal. `unschemedReads` refuses any `fetch` outside
+  read.ts: a fetch that is no api call gets an exemption of its own in that test, with its reason.
+- A value two files under `lib/api/` need sits in a sibling that imports no sibling (`test/api-files.test.ts`): the builder's saves decode
+  a `WorkflowListing`, so they sit in `workflows.ts` beside its schema.
 - A mirror narrower than the api's type drops the key on decode, and a write that sends the read back loses it (the builder's save, a
   step's `workspace` and `slot`): diff the mirror against the api's type, key by key, before writing its schema.
 - `Schema.Union` takes the first member that decodes and drops the keys it does not know: put a member that owns more keys before one it

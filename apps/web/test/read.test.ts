@@ -1,7 +1,8 @@
 /**
- * The board's reads decode the api's answers where they enter (`get`, src/lib/api/read.ts): an answer that does not decode is refused with
- * the route, the first wrong key, what was there and the fix; a key the board does not know is dropped; a refusal of the api's stays in its
- * words. No read in the board's source passes no schema (`unschemedReads`), and no schema leaves through the barrel.
+ * The board's reads and writes decode the api's answers where they enter (`get` and `send`, src/lib/api/read.ts): an answer that does not
+ * decode is refused with the route, the first wrong key, what was there and the fix; a key the board does not know is dropped; a refusal of
+ * the api's stays in its words. No read or write in the board's source passes no schema (`unschemedReads`), and no schema leaves through
+ * the barrel.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -171,8 +172,11 @@ test("a read the api refused still rejects in the api's words and status, not as
   assert.equal(err.message, 'no run x');
 });
 
-/** What `unschemedReads` found: a line per read that passes no schema, and how many reads through `get` pass one. */
-type ReadScan = { faults: string[]; schemed: number };
+/**
+ * What `unschemedReads` found: a line per read or write that passes no schema, how many reads through `get` pass one (`schemed`), and how
+ * many writes through `send` do (`sent`).
+ */
+type ReadScan = { faults: string[]; schemed: number; sent: number };
 
 /** Whether `module` names read.ts, as a file under src/ imports it: `./read.ts`, `./api/read`, `@/lib/api/read`. */
 const isReadModule = (module: string) => /(^|\/)read(\.ts)?$/.test(module);
@@ -200,25 +204,29 @@ const isWrite = (call: ts.CallExpression) => {
 const decodesNothing = (schema: ts.Expression | undefined) =>
   !schema || (ts.isPropertyAccessExpression(schema) && ['Unknown', 'Any'].includes(schema.name.text));
 
-/** The names `get` of read.ts is bound to in `source`: `get`, or what `import { get as … }` calls it. */
-function readNames(source: ts.SourceFile): Set<string> {
+/** The names `seam` of read.ts (`get` or `send`) is bound to in `source`: the seam's own, or what `import { get as … }` calls it. */
+function readNames(source: ts.SourceFile, seam: 'get' | 'send'): Set<string> {
   const names = new Set<string>();
   for (const s of source.statements) {
     if (!ts.isImportDeclaration(s) || !ts.isStringLiteral(s.moduleSpecifier) || !isReadModule(s.moduleSpecifier.text)) continue;
     const bindings = s.importClause?.namedBindings;
     if (!bindings || !ts.isNamedImports(bindings)) continue;
-    for (const e of bindings.elements) if ((e.propertyName ?? e.name).text === 'get') names.add(e.name.text);
+    for (const e of bindings.elements) if ((e.propertyName ?? e.name).text === seam) names.add(e.name.text);
   }
   return names;
 }
 
+const GET_FIX = 'decode the read through `get(path, schema)` (lib/api/read.ts), with a schema beside its type';
+const SEND_FIX = 'decode the answer through `send(method, path, schema, how)` (lib/api/read.ts), with a schema beside its type';
+
 /**
- * Every read in `texts` (a file's path under src/ to its text) that passes no schema: a GET by `fetch` outside read.ts, a `get` of read.ts
- * with no schema or one that decodes nothing, and any `getUndecoded`. Each fault names the file and the line, and says to decode through
- * `get(path, schema)`.
+ * Every read or write in `texts` (a file's path under src/ to its text) that passes no schema: any `fetch` outside read.ts, a GET or a
+ * write; a `get` of read.ts with no schema or one that decodes nothing, a `send` of read.ts the same by its third argument, and any
+ * `getUndecoded`. Each fault names the file and the line, and says to decode through `get(path, schema)` or `send(method, path, schema,
+ * how)`.
  */
 export function unschemedReads(texts: ReadonlyMap<string, string>): ReadScan {
-  const scan: ReadScan = { faults: [], schemed: 0 };
+  const scan: ReadScan = { faults: [], schemed: 0, sent: 0 };
   for (const [file, text] of texts) {
     const source = ts.createSourceFile(
       file,
@@ -227,19 +235,25 @@ export function unschemedReads(texts: ReadonlyMap<string, string>): ReadScan {
       true,
       file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
     );
-    const gets = readNames(source);
-    const fault = (node: ts.Node, what: string) =>
-      scan.faults.push(
-        `${file}:${source.getLineAndCharacterOfPosition(node.getStart()).line + 1}: ${what}: decode the read through \`get(path, schema)\` (lib/api/read.ts), with a schema beside its type`,
-      );
+    const gets = readNames(source, 'get');
+    const sends = readNames(source, 'send');
+    const fault = (node: ts.Node, what: string, fix: string) =>
+      scan.faults.push(`${file}:${source.getLineAndCharacterOfPosition(node.getStart()).line + 1}: ${what}: ${fix}`);
     const visit = (node: ts.Node): void => {
-      if (ts.isIdentifier(node) && node.text === 'getUndecoded') fault(node, 'getUndecoded reads an answer undecoded');
-      if (ts.isCallExpression(node) && isFetch(node) && file !== 'lib/api/read.ts' && !isWrite(node))
-        fault(node, 'a GET by fetch reads an answer undecoded');
+      if (ts.isIdentifier(node) && node.text === 'getUndecoded') fault(node, 'getUndecoded reads an answer undecoded', GET_FIX);
+      if (ts.isCallExpression(node) && isFetch(node) && file !== 'lib/api/read.ts') {
+        if (isWrite(node)) fault(node, 'a write by fetch reads its answer undecoded', SEND_FIX);
+        else fault(node, 'a GET by fetch reads an answer undecoded', GET_FIX);
+      }
       if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && gets.has(node.expression.text)) {
         if (decodesNothing(node.arguments[1]))
-          fault(node, 'a get that passes no schema, or one that decodes nothing, reads an answer undecoded');
+          fault(node, 'a get that passes no schema, or one that decodes nothing, reads an answer undecoded', GET_FIX);
         else scan.schemed += 1;
+      }
+      if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && sends.has(node.expression.text)) {
+        if (decodesNothing(node.arguments[2]))
+          fault(node, 'a send that passes no schema, or one that decodes nothing, reads its answer undecoded', SEND_FIX);
+        else scan.sent += 1;
       }
       ts.forEachChild(node, visit);
     };
@@ -282,20 +296,52 @@ test('REFUSED: a GET by fetch, bare or off globalThis, a get with no schema or o
     ],
   );
   assert.ok(
-    faults.every((f) => f.endsWith(': decode the read through `get(path, schema)` (lib/api/read.ts), with a schema beside its type')),
+    faults.every((f) => f.endsWith(`: ${GET_FIX}`)),
     faults.join('\n'),
   );
 });
 
-test('a write by fetch, a get with its schema, and the fetch inside read.ts are no unschemed read', () => {
+test('REFUSED: a write by fetch, bare, off globalThis or with its method in a variable, and a send with no schema or one decoding nothing', () => {
   const texts = new Map([
     ['lib/api/a.ts', 'export const a = (route: string, method: string, headers: Headers) => fetch(route, { method, headers });'],
     ['lib/api/b.ts', "export const b = (route: string) => fetch(route, { method: 'POST' });"],
-    ['lib/api/c.ts', "import { get } from './read.ts';\nexport const c = () => get('/api/x', XSchema);"],
-    ['lib/api/read.ts', 'export const answer = (path: string, init?: RequestInit) => fetch(path, init);'],
-    ['lib/api/d.ts', "import { get } from '@tanstack/whatever';\nexport const d = () => get('/api/x');"],
+    ['lib/c.ts', "export const c = (url: string) => globalThis.fetch(url, { method: 'DELETE' });"],
+    ['lib/api/d.ts', "import { send } from './read.ts';\nexport const d = () => send('POST', '/api/x');"],
+    [
+      'routes/e.tsx',
+      "import { send as write } from '@/lib/api/read';\nimport { Schema } from 'effect';\nexport const e = () => write('PUT', '/api/x', Schema.Unknown, how);",
+    ],
+    [
+      'lib/api/f.ts',
+      "import { send } from './read.ts';\nimport { Schema } from 'effect';\nexport const f = () => send('DELETE', '/api/x', Schema.Any, how);",
+    ],
   ]);
-  assert.deepEqual(unschemedReads(texts), { faults: [], schemed: 1 });
+  const { faults } = unschemedReads(texts);
+  assert.deepEqual(
+    faults.map((f) => f.slice(0, f.indexOf(': decode'))),
+    [
+      'lib/api/a.ts:1: a write by fetch reads its answer undecoded',
+      'lib/api/b.ts:1: a write by fetch reads its answer undecoded',
+      'lib/c.ts:1: a write by fetch reads its answer undecoded',
+      'lib/api/d.ts:2: a send that passes no schema, or one that decodes nothing, reads its answer undecoded',
+      'routes/e.tsx:3: a send that passes no schema, or one that decodes nothing, reads its answer undecoded',
+      'lib/api/f.ts:3: a send that passes no schema, or one that decodes nothing, reads its answer undecoded',
+    ],
+  );
+  assert.ok(
+    faults.every((f) => f.endsWith(`: ${SEND_FIX}`)),
+    faults.join('\n'),
+  );
+});
+
+test('a get and a send with their schema, and the fetch inside read.ts, are no unschemed read', () => {
+  const texts = new Map([
+    ['lib/api/c.ts', "import { get } from './read.ts';\nexport const c = () => get('/api/x', XSchema);"],
+    ['lib/api/e.ts', "import { send } from './read.ts';\nexport const e = () => send('POST', '/api/x', XSchema, { may: 'M.' });"],
+    ['lib/api/read.ts', "export const answer = (path: string, init?: RequestInit) => fetch(path, { ...init, method: 'POST' });"],
+    ['lib/api/d.ts', "import { get, send } from '@tanstack/whatever';\nexport const d = () => [get('/api/x'), send('POST', '/x')];"],
+  ]);
+  assert.deepEqual(unschemedReads(texts), { faults: [], schemed: 1, sent: 1 });
 });
 
 /** Every `.ts` and `.tsx` under `dir`, by its path from src/. */
@@ -307,21 +353,31 @@ const sources = (dir: string, under = ''): Array<[string, string]> =>
     return /\.tsx?$/.test(e.name) ? [[name, fs.readFileSync(at, 'utf8')]] : [];
   });
 
-test("every read the board's source makes passes a schema", () => {
+test("every read and write the board's source makes passes a schema", () => {
   const texts = new Map(sources(path.resolve(DIR, '..', '..')));
   assert.ok(texts.has('lib/api/runs.ts') && texts.has('lib/api/read.ts') && texts.has('routes/__root.tsx'), [...texts.keys()].join(', '));
-  const { faults, schemed } = unschemedReads(texts);
+  const { faults, schemed, sent } = unschemedReads(texts);
   assert.ok(schemed >= 15, `the walk counted ${schemed} reads through get with a schema`);
   assert.deepEqual(faults, []);
+  assert.ok(sent >= 16, `the walk counted ${sent} writes through send with a schema`);
 });
 
-test('read.ts hands out its read and its two refusals, and no other read', async () => {
-  assert.deepEqual(Object.keys(await import('../src/lib/api/read.ts')).sort(), ['ReadRefusal', 'UnreadAnswer', 'get']);
+test('read.ts hands out its read, its write and their three refusals, and nothing else', async () => {
+  assert.deepEqual(Object.keys(await import('../src/lib/api/read.ts')).sort(), [
+    'ReadRefusal',
+    'UnreadAnswer',
+    'WriteRefusal',
+    'get',
+    'send',
+  ]);
 });
 
 test('the barrel hands out no schema: the mirror stays types, queries and writes', () => {
   const names = Object.keys(api);
-  assert.ok(names.includes('runsQuery') && names.includes('UnreadAnswer') && names.includes('ReadRefusal'), names.join(', '));
+  assert.ok(
+    names.includes('runsQuery') && names.includes('UnreadAnswer') && names.includes('ReadRefusal') && names.includes('WriteRefusal'),
+    names.join(', '),
+  );
   assert.deepEqual(
     names.filter((n) => n.endsWith('Schema')),
     [],

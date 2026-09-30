@@ -1,7 +1,7 @@
 /** The agents, and the writes of one of yours (apps/api/src/agents/agents.ts). */
 import { queryOptions } from '@tanstack/react-query';
-import { Schema } from 'effect';
-import { get } from './read.ts';
+import { Option, Schema } from 'effect';
+import { get, send, type SendHow } from './read.ts';
 import { AgentSkillSchema, GivenSkillSchema, SchemaFileSchema, type AgentSkill, type GivenSkill, type SchemaFile } from './library.ts';
 
 /**
@@ -147,6 +147,16 @@ export type AgentDraft = {
 /** Mirrors `AgentSaved` in apps/api/src/agents/agents.ts: the agent as it now reads, and its files by name. */
 export type AgentSaved = { agent: AgentListing; written: string[]; removed: string[] };
 
+/** A list of strings, as a decoded answer holds it: mutable, as the plain types say. */
+const Strings = Schema.mutable(Schema.Array(Schema.String));
+
+/** Decodes an `AgentSaved`. */
+const AgentSavedSchema = Schema.Struct({
+  agent: AgentListingSchema,
+  written: Strings,
+  removed: Strings,
+}) satisfies Schema.Schema<AgentSaved>;
+
 /**
  * A write of an agent the api refused: the package's sentence, the nodes that still name the agent when that is why, and the api's status —
  * 404 for an agent gone, 409 for one changed since it was read, a name taken, or an agent still named. Null for no answer.
@@ -161,35 +171,55 @@ export class AgentRefusal extends Error {
   }
 }
 
-async function agentWrite<T>(method: 'POST' | 'PUT' | 'DELETE', route: string, body: unknown): Promise<T> {
-  const res = await fetch(route, { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
-  const answer = (await res.json().catch(() => undefined)) as Record<string, unknown> | undefined;
-  if (res.ok && answer) return answer as T;
-  const users = Array.isArray(answer?.users) ? answer.users.filter((s): s is string => typeof s === 'string') : [];
-  throw new AgentRefusal(
-    typeof answer?.error === 'string' ? answer.error : `${method} ${route} answered ${res.status} ${res.statusText}`,
-    users,
-    res.status,
+/** The nodes a refusal of an agent's write names: its `users`, none where it names none. */
+const UsersNamed = Schema.Struct({ users: Strings });
+
+/** How an agent's write is refused: an `AgentRefusal` in the api's words, with the nodes it names and its status. */
+const refused: SendHow['refused'] = (words, status, answer) =>
+  new AgentRefusal(
+    words,
+    Option.match(Schema.decodeUnknownOption(UsersNamed)(answer), { onNone: () => [], onSome: (u) => u.users }),
+    status,
   );
-}
+
+/** What an agent's write may have done, and what to look at before writing it again. */
+const WRITTEN = 'The agent may be written: read it again on its page before writing it again.';
+
+/**
+ * A write of an agent's, sent as `application/json` with `body`, its answer decoded with `schema`: rejected with an `AgentRefusal`, or an
+ * `UnreadAnswer` saying `may`.
+ */
+const agentWrite = <T>(
+  method: 'POST' | 'PUT' | 'DELETE',
+  route: string,
+  schema: Schema.Decoder<T>,
+  body: unknown,
+  may = WRITTEN,
+): Promise<T> => send(method, route, schema, { body, may, refused });
 
 /** Make an agent of yours. Rejects with an `AgentRefusal`: a name taken, or a key or value the package refuses. */
-export const createAgent = (draft: AgentDraft): Promise<AgentSaved> => agentWrite('POST', '/api/agents/yours', draft);
+export const createAgent = (draft: AgentDraft): Promise<AgentSaved> => agentWrite('POST', '/api/agents/yours', AgentSavedSchema, draft);
 
 /** Put an agent of yours back — renamed, when the draft names it otherwise — against the version it was read at. */
 export const saveAgent = (name: string, version: string, draft: AgentDraft): Promise<AgentSaved> =>
-  agentWrite('PUT', `/api/agents/yours/${encodeURIComponent(name)}`, { ...draft, version });
+  agentWrite('PUT', `/api/agents/yours/${encodeURIComponent(name)}`, AgentSavedSchema, { ...draft, version });
 
 /** Remove an agent of yours, against the version it was read at: refused while a node still names it, saying which. */
 export const removeAgent = (name: string, version: string): Promise<{ removed: string[] }> =>
-  agentWrite('DELETE', `/api/agents/yours/${encodeURIComponent(name)}`, { version });
+  agentWrite('DELETE', `/api/agents/yours/${encodeURIComponent(name)}`, Schema.Struct({ removed: Strings }), { version });
+
+/** What a try may have started, and where to look before trying the agent again. */
+const TRIED = 'The try may have started: look on the Runs page before trying the agent again.';
 
 /** Mirrors `AgentTried` in apps/api/src/agents/agents.ts: the run a try started, which its page follows. */
 export type AgentTried = { id: string };
+
+/** Decodes an `AgentTried`. */
+const AgentTriedSchema = Schema.Struct({ id: Schema.String }) satisfies Schema.Schema<AgentTried>;
 
 /**
  * Try an agent of yours on a short brief: a one-step folder run of it, fenced to its folder with a dollar to spend. Rejects with an
  * `AgentRefusal`: an empty brief, a try of it still running, an agent that does not read or gives a skill only the repository has.
  */
 export const tryAgent = (name: string, brief: string): Promise<AgentTried> =>
-  agentWrite('POST', `/api/agents/yours/${encodeURIComponent(name)}/try`, { brief });
+  agentWrite('POST', `/api/agents/yours/${encodeURIComponent(name)}/try`, AgentTriedSchema, { brief }, TRIED);

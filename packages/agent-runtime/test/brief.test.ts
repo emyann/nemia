@@ -215,7 +215,10 @@ test('`ae start` refuses a `trustFrom` that is not an absolute directory, and on
   assert.equal(relative.filed, false);
   const claude = aeStart('trustFrom: /repo');
   assert.equal(claude.status, 2);
-  assert.match(claude.stderr, /^file: `codex` gives Codex arguments of its own, and the `claude` harness is not Codex: its session would start without them\./);
+  assert.match(
+    claude.stderr,
+    /^file: `codex` gives Codex arguments of its own, and the `claude` harness is not Codex: its session would start without them\./,
+  );
   assert.equal(claude.filed, false);
 });
 

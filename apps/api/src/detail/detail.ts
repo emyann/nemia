@@ -489,7 +489,7 @@ function toldOf(run: Run, name: string, workflows: readonly Workflow[] | null, v
 
 /**
  * A step's gate (`StepGate`), or null for a step with none: whether it waits at it, in `wf ls`'s word, and the approval of the try it is
- * on. Off the record as `listRuns` composes it, with each approval its file holds (`approvalOf`): no read of its own.
+ * on. Off the record as `runStore` composes it, with each approval its file holds (`approvalOf`): no read of its own.
  */
 function gateOf(run: Run, step: Workflow, status: string): StepGate | null {
   if (!hasGate(step, run)) return null;
@@ -501,7 +501,7 @@ function gateOf(run: Run, step: Workflow, status: string): StepGate | null {
 }
 
 /**
- * A looping step's acceptance (`StepAcceptance`), off the record as `listRuns` composes it, as `gateOf` reads an approval: no read of its
+ * A looping step's acceptance (`StepAcceptance`), off the record as `runStore` composes it, as `gateOf` reads an approval: no read of its
  * own.
  */
 function acceptedOf(run: Run, step: string): StepAcceptance | null {

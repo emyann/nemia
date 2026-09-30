@@ -15,7 +15,7 @@ import type { RunDecision } from '../src/decide/decision.ts';
 import type { RunDetail } from '../src/detail/detail.ts';
 import type { RunSummary } from '../src/runs/runs.ts';
 import { app } from '../src/app.ts';
-import { askFile, budgetRefusal, decide, engine, list, readRun, retry, round, roundAskFile, usedLines } from 'agent-orchestrator';
+import { askFile, budgetRefusal, decide, engine, list, retry, round, roundAskFile, usedLines, runStore } from 'agent-orchestrator';
 
 type RetryHow = import('agent-orchestrator').RetryHow;
 
@@ -323,7 +323,7 @@ test("a measured try's cost is on the detail — the engine's costUsd, apiMs and
   );
   assert.equal(stepOf(run, 'implement').spent?.said, '$2.10');
 
-  const words = await list(engine(), readRun(R));
+  const words = await list(engine(), runStore.runs.read(R));
   assert.ok(run.cost);
   const { usd, ...total } = run.cost;
   assert.deepEqual(
@@ -355,11 +355,11 @@ test("a measured try's cost is on the detail — the engine's costUsd, apiMs and
     { usd: 5, said: '$5', of: null, over: false },
     'its cap is there, and what it cost of it is not known: no of',
   );
-  assert.equal((await list(engine(), readRun(FREE))).cost, undefined, '`wf ls` prints no cost for it either');
+  assert.equal((await list(engine(), runStore.runs.read(FREE))).cost, undefined, '`wf ls` prints no cost for it either');
 });
 
 test("a step over its budget, on the list and on the detail, in `wf ls`'s words — waiting on you, and moving nothing — with its cap, what it has cost of it, and the raise the package takes", async () => {
-  const words = await list(engine(), readRun(R));
+  const words = await list(engine(), runStore.runs.read(R));
   const listed = await summary();
   const statuses = ['over budget $2.10 of $2', 'over budget — implement $2.10 of $2', 'over budget $4.25 of $3'];
   assert.deepEqual(
@@ -603,7 +603,7 @@ test("a raise as the board sends it is the package's ask: a try's and a round's,
   assert.ok(!Number.isNaN(Date.parse(roundWhen)), roundWhen);
   assert.equal(fs.readFileSync(recordFile, 'utf8'), record, "the api wrote nothing of the run's record");
 
-  const words = await list(engine(), readRun(R));
+  const words = await list(engine(), runStore.runs.read(R));
   const run = await detail();
   assert.deepEqual(
     run.steps.map(({ name, note }) => ({ name, note })),
@@ -674,7 +674,7 @@ test('a step past its budget on its own work is raised as `wf decide` offers it:
     'a refused check past its budget, run again: no budget, since a recheck files no session to spend it',
   );
 
-  const words = await list(engine(), readRun(R2));
+  const words = await list(engine(), runStore.runs.read(R2));
   const after = await detail(R2);
   assert.deepEqual(
     after.steps.map(({ name, note }) => ({ name, note })),

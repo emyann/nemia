@@ -24,7 +24,7 @@ import type { Said } from 'agent-orchestrator';
 import type { RunDetail } from '../detail/detail.ts';
 import type { RunSummary } from '../runs/runs.ts';
 import { app } from '../app.ts';
-import { engine, list, readRun, say } from 'agent-orchestrator';
+import { engine, list, say, runStore } from 'agent-orchestrator';
 
 const tmp = (label: string) => scratch(`nemia-api-say-${label}-`);
 
@@ -278,7 +278,11 @@ test("words as the board sends them are the package's `say`: 202 with the engine
   assert.deepEqual([implement.said, implement.note], [[said], 'said to 1×']);
   for (const other of steps.filter((s) => s.name !== 'implement'))
     assert.deepEqual(other.said, [], `${other.name}: nobody told it anything`);
-  assert.equal((await list(engine(), readRun(R))).steps.find((s) => s.name === 'implement')!.note, 'said to 1×', "`wf ls`'s words");
+  assert.equal(
+    (await list(engine(), runStore.runs.read(R))).steps.find((s) => s.name === 'implement')!.note,
+    'said to 1×',
+    "`wf ls`'s words",
+  );
   const summary = ((await (await app.request('/api/runs')).json()) as RunSummary[]).find((r) => r.id === R)!;
   assert.equal(summary.steps.find((s) => s.name === 'implement')!.note, 'said to 1×', 'and on the list');
   assert.deepEqual(

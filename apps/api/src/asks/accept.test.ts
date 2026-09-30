@@ -14,7 +14,7 @@ import type { Acceptance } from 'agent-orchestrator';
 import type { RunDecision } from '../decide/decision.ts';
 import type { RunDetail } from '../detail/detail.ts';
 import { app } from '../app.ts';
-import { accept, acceptFile, engine, list, readRun, round } from 'agent-orchestrator';
+import { accept, acceptFile, engine, list, round, runStore } from 'agent-orchestrator';
 import { acceptWordsRefusal } from 'agent-orchestrator/run';
 
 const T0 = Date.parse('2026-09-22T09:00:00.000Z');
@@ -273,7 +273,7 @@ test("an acceptance as the board sends it is the package's: 202 with the step, t
   const run = (await (await app.request(`/api/runs/${R}`)).json()) as RunDetail;
   const review = run.steps.find((s) => s.name === 'review')!;
   assert.deepEqual(review.accepted, { try: 2, at: took.at, message: WHY });
-  const words = await list(engine(), readRun(R));
+  const words = await list(engine(), runStore.runs.read(R));
   const listed = words.steps.find((s) => s.name === 'review')!;
   assert.equal(review.status, listed.status, 'as `wf ls` has it until the tick files what waits');
   assert.notEqual(review.status, 'exhausted', "the loop over on the person's word");

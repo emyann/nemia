@@ -6,12 +6,12 @@ import {
   type BranchReader,
   branchReader,
   forget,
-  listRuns,
   prune,
   runStartedAt,
   unhold,
   unjudgedWord,
   verifiesRest,
+  runStore,
 } from 'agent-orchestrator';
 import { isRefusal } from 'agent-orchestrator/effect';
 import { isGitRun, type PlaceKind, placeOf, pruneLines, prunedKept, prunedWords, type Run } from 'agent-orchestrator/run';
@@ -336,7 +336,7 @@ async function atRest(run: Run, judged: Judged, reader: Engine['Service']): Prom
  */
 async function listed({ e, env, home, memo }: Served): Promise<RunSummary[]> {
   const read = await restingRead(e, memo.resting, verifiesRest(env));
-  const runs = listRuns();
+  const runs = runStore.runs.list();
   read.only(runs.map((run) => run.id));
   const filed = await filedTimes(e, memo.filings);
   const kept = new Map<string, Omit<RunSummary, 'startedAt'>>();
@@ -411,7 +411,7 @@ async function listed({ e, env, home, memo }: Served): Promise<RunSummary[]> {
  *   without `unmerged`, a worktree holding what no commit has…) and nothing left to prune (one pruned already) are each a 409 in `wf
  *   prune`'s words alone, as `DELETE …` sends `forget`'s, the page saying `Not pruned` above them itself (`Refusal`); a thrown refusal of
  *   the package's goes to `app.onError`, which answers it by its kind, and any other failure is a 502. No feed line: the marker the prune
- *   writes moves the run's `restStamps`, and the board reads the run again itself.
+ *   writes moves the run's stamp in `runStore`, and the board reads the run again itself.
  */
 
 export const runs = new Hono<ApiEnv>()

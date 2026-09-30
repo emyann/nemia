@@ -230,13 +230,13 @@ test("REFUSED at load in the engine's words: a `budget:` beside `background: tru
 test("a step that names no mode is filed in the mode the parser refuses `auto` for — the runtime's default — and a rendered step's flags reach Claude Code as the runtime spells them", async () => {
   const { DEFAULT_PERMISSION_MODE, parseAgent } = await import('../src/workflow.ts');
   const { renderedFlags } = await import('../src/agents/agents.ts');
-  const scribe = parseAgent('scribe', '---\nsystemPrompt: no-coding\n---\nYou write.\n');
+  const scribe = parseAgent('scribe', '---\nsystemPrompt: no-coding\nskills: write-a-note, mind-the-tone\n---\nYou write.\n');
   const step = parseWorkflow('write', '---\nagent: scribe\n---\nWrite.\n', undefined, new Map([['scribe', scribe]]));
   const claude = renderedFlags(step, '/runs/r/agents/write');
   assert.deepEqual(
     Object.keys(claude ?? {}).sort(),
     ['appendSystemPromptFile', 'pluginDir', 'settings'],
-    'what the tick files for an agent with instructions and systemPrompt: no-coding, every flag renderedFlags gives but systemPromptFile',
+    'what the tick files for an agent with instructions, skills and systemPrompt: no-coding, every flag renderedFlags gives but systemPromptFile',
   );
   const dir = scratch('wf-vocabulary-');
   fs.writeFileSync(
@@ -269,5 +269,8 @@ test("a step that names no mode is filed in the mode the parser refuses `auto` f
   assert.equal(args[args.indexOf('--permission-mode') + 1], DEFAULT_PERMISSION_MODE, "the parser's copy of the runtime's default");
   assert.equal(args[args.indexOf('--append-system-prompt-file') + 1], '/runs/r/agents/write/prompt.md');
   assert.equal(args[args.indexOf('--plugin-dir') + 1], '/runs/r/agents/write/nemia-scribe');
-  assert.equal(args[args.indexOf('--settings') + 1], '{"outputStyle":"nemia-scribe:no-coding"}');
+  assert.equal(
+    args[args.indexOf('--settings') + 1],
+    '{"outputStyle":"nemia-scribe:no-coding","skillOverrides":{"write-a-note":"off","mind-the-tone":"off"}}',
+  );
 });

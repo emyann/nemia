@@ -27,6 +27,7 @@ import {
   REFUSED,
   SKILLS_FOLDER,
   splitFrontmatter,
+  type StepAgent,
   type Workflow,
   type WorkflowError,
 } from '../step/step.ts';
@@ -507,7 +508,8 @@ export type RenderedSkill = { name: string; whole?: string };
 /**
  * The text of `prompt.md`: the agent's instructions, then each skill it is given by its namespaced name, the session to load it with the
  * Skill tool when the instructions say it is needed, then each skill told whole, under a heading of its name. Claude Code lists a plugin's
- * skills to the session by name and description all the same; naming them here says they are this agent's.
+ * skills to the session by name and description all the same; naming them here says they are this agent's. A bare skill of the same name
+ * is hidden from the session (`sessionSettings`), so the name it is told is the only one it sees.
  */
 export function renderedPrompt(step: Workflow, skills: readonly RenderedSkill[]): string {
   const agent = step.agent!;
@@ -552,9 +554,23 @@ export const pluginManifest = (agent: string): string =>
 export const namesPlugin = (step: Workflow): boolean => Boolean(step.agent?.skills?.length || step.agent?.systemPrompt === 'no-coding');
 
 /**
+ * The settings a rendered step's session is given (`--settings`), or `undefined` when it needs none: the style chosen (`no-coding`), and
+ * every skill the agent names turned `off` by `skillOverrides`. Claude Code applies no override to a plugin's skills, so the session keeps
+ * the frozen copy, `nemia-<agent>:<name>`, and loses any bare one of the same name — the repository's, a nested folder's or its own.
+ */
+function sessionSettings(agent: StepAgent): string | undefined {
+  const settings = {
+    ...(agent.systemPrompt === 'no-coding' && { outputStyle: `${pluginOf(agent.name)}:${NO_CODING_STYLE}` }),
+    ...(agent.skills?.length && { skillOverrides: Object.fromEntries(agent.skills.map((name) => [name, 'off'])) }),
+  };
+  return Object.keys(settings).length ? JSON.stringify(settings) : undefined;
+}
+
+/**
  * The flags a rendered step is filed with, as the runtime's `config.claude` takes them, `dir` its rendered folder: the prompt appended, or
- * in place of Claude Code's (`own`); the plugin, when there are skills or a style in it; and the style chosen (`no-coding`). Undefined for a
- * step not rendered (`rendersAgent`), which is filed with none.
+ * in place of Claude Code's (`own`); the plugin, when there are skills or a style in it; and its session's settings (`sessionSettings`):
+ * the style chosen (`no-coding`), and each named skill's bare copy hidden, so the session sees the plugin's alone. Undefined for a step not
+ * rendered (`rendersAgent`), which is filed with none.
  */
 export function renderedFlags(
   step: Workflow,
@@ -565,9 +581,10 @@ export function renderedFlags(
   const prompt = path.join(dir, PROMPT_FILE);
   const plugin = pluginOf(agent.name);
   const told = Boolean(agent.instructions || agent.skills?.length);
+  const settings = sessionSettings(agent);
   return {
     ...(told ? (agent.systemPrompt === 'own' ? { systemPromptFile: prompt } : { appendSystemPromptFile: prompt }) : {}),
     ...(namesPlugin(step) ? { pluginDir: [path.join(dir, plugin)] } : {}),
-    ...(agent.systemPrompt === 'no-coding' ? { settings: JSON.stringify({ outputStyle: `${plugin}:${NO_CODING_STYLE}` }) } : {}),
+    ...(settings !== undefined && { settings }),
   };
 }

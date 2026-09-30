@@ -4,7 +4,7 @@
  */
 import { queryOptions } from '@tanstack/react-query';
 import { Schema } from 'effect';
-import { get } from './read.ts';
+import { get, send, type SendHow } from './read.ts';
 import { AgentSkillSchema, SkillCostSchema, SkillSourceSchema, type AgentSkill, type SkillCost, type SkillSource } from './library.ts';
 
 /** A list of strings, as a decoded answer holds it: mutable, as the plain types say. */
@@ -53,6 +53,9 @@ const SkillPlaceSchema = Schema.Struct({
 /** Mirrors `SkillAdded`: the copied skill as it now reads in your library, and its files. */
 export type SkillAdded = { skill: SkillRow; written: string[] };
 
+/** Decodes a `SkillAdded`. */
+const SkillAddedSchema = Schema.Struct({ skill: SkillRowSchema, written: Strings }) satisfies Schema.Schema<SkillAdded>;
+
 /** Every skill the picker lists, by place, read from disk on each request. */
 export const skillsQuery = queryOptions({
   queryKey: ['skills'],
@@ -68,20 +71,15 @@ export class SkillRefusal extends Error {
   }
 }
 
+/** How a skill's write is refused: a `SkillRefusal` in the api's words, with its status. */
+const refused: SendHow['refused'] = (words, status) => new SkillRefusal(words, status);
+
+/** What a skill's write may have done, and what to look at before writing it again. */
+const WRITTEN = 'The skill may be written: read the skills again before writing it again.';
+
 /** Copy the skill Nemia ships under `name` into your library, a write of its own: an agent of yours can then be given it. */
-export async function copySkill(name: string): Promise<SkillAdded> {
-  const res = await fetch('/api/skills/yours', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ copy: name }),
-  });
-  const answer = (await res.json().catch(() => undefined)) as Record<string, unknown> | undefined;
-  if (res.ok && answer) return answer as SkillAdded;
-  throw new SkillRefusal(
-    typeof answer?.error === 'string' ? answer.error : `POST /api/skills/yours answered ${res.status} ${res.statusText}`,
-    res.status,
-  );
-}
+export const copySkill = (name: string): Promise<SkillAdded> =>
+  send('POST', '/api/skills/yours', SkillAddedSchema, { body: { copy: name }, may: WRITTEN, refused });
 
 /**
  * Mirrors `SkillDraft` in the package: a skill as it is written — its name (its folder), a human title, what it does, its card's tags and
@@ -141,6 +139,9 @@ const SkillDetailSchema = Schema.Struct({
 /** Mirrors `SkillSaved`: a skill written, as its page now reads it. */
 export type SkillSaved = SkillDetail & { written: string[] };
 
+/** Decodes a `SkillSaved`. */
+const SkillSavedSchema = Schema.Struct({ ...SkillDetailSchema.fields, written: Strings }) satisfies Schema.Schema<SkillSaved>;
+
 /** One skill, read from disk now: its page's read. Under `skillsQuery`'s key, so a write that reads the list again reads it again too. */
 export const skillQuery = (from: string, name: string) =>
   queryOptions({
@@ -148,15 +149,9 @@ export const skillQuery = (from: string, name: string) =>
     queryFn: () => get(`/api/skills/${encodeURIComponent(from)}/${encodeURIComponent(name)}`, SkillDetailSchema),
   });
 
-async function written(method: 'POST' | 'PUT', url: string, body: unknown): Promise<SkillSaved> {
-  const res = await fetch(url, { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
-  const answer = (await res.json().catch(() => undefined)) as Record<string, unknown> | undefined;
-  if (res.ok && answer) return answer as SkillSaved;
-  throw new SkillRefusal(
-    typeof answer?.error === 'string' ? answer.error : `${method} ${url} answered ${res.status} ${res.statusText}`,
-    res.status,
-  );
-}
+/** A skill written by `method` to `url`, sent as `application/json`: rejected with a `SkillRefusal`, or an `UnreadAnswer`. */
+const written = (method: 'POST' | 'PUT', url: string, body: unknown): Promise<SkillSaved> =>
+  send(method, url, SkillSavedSchema, { body, may: WRITTEN, refused });
 
 /**
  * A new skill of yours, written in your library: refused, in the package's words, for a name it has already or a draft the card reader

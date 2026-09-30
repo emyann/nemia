@@ -320,7 +320,8 @@ test("a card is filed as JSON, the one body the api takes, and resolves with its
   await assert.rejects(
     fileCard(card),
     (err: Error) =>
-      /^POST \/api\/inbox answered 201 +without the card's name/.test(err.message) && /before filing it again/.test(err.message),
+      err.message.startsWith('POST /api/inbox answered what this board does not read: at name, the value is missing.') &&
+      /before filing it again/.test(err.message),
   );
 });
 
@@ -497,6 +498,7 @@ test("a card is queued by its name in the path, POST, and taken off the queue wi
   await assert.rejects(
     queueCard('bare'),
     (err: Error) =>
-      /^POST \/api\/inbox\/bare\/queue answered 200 +without what it did/.test(err.message) && /before asking again/.test(err.message),
+      err.message.startsWith('POST /api/inbox/bare/queue answered what this board does not read: at name, the value is missing.') &&
+      /before asking again/.test(err.message),
   );
 });

@@ -1,7 +1,7 @@
 /** The inbox: its cards, and a card filed, dropped and queued (apps/api/src/inbox/inbox.ts). */
 import { queryOptions } from '@tanstack/react-query';
 import { Schema } from 'effect';
-import { get } from './read.ts';
+import { get, send } from './read.ts';
 import { KeyRowSchema, type KeyRow } from './library.ts';
 import type { WorkflowListing } from './workflows.ts';
 
@@ -89,23 +89,16 @@ export const cardQuery = (name: string) =>
  *
  * Sent as `application/json`, which the api requires of it, as of a start.
  */
-export async function fileCard(card: {
+export const fileCard = (card: {
   body: string;
   workflow?: string;
   from?: WorkflowListing['from'];
   repo?: string;
-}): Promise<{ name: string }> {
-  const res = await fetch('/api/inbox', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(card) });
-  const body = (await res.json().catch(() => undefined)) as { name?: unknown; error?: unknown } | undefined;
-  if (res.ok && typeof body?.name === 'string') return { name: body.name };
-  if (res.ok) {
-    throw new Error(
-      `POST /api/inbox answered ${res.status} ${res.statusText} without the card's name, so the api and this board disagree about what a filing answers. ` +
-        'The card may be filed: look in the inbox (`wf inbox`) before filing it again, and restart the api (`npm run dev`).',
-    );
-  }
-  throw new Error(typeof body?.error === 'string' ? body.error : `POST /api/inbox answered ${res.status} ${res.statusText}`);
-}
+}): Promise<{ name: string }> =>
+  send('POST', '/api/inbox', Schema.Struct({ name: Schema.String }), {
+    body: card,
+    may: 'The card may be filed: look in the inbox (`wf inbox`) before filing it again.',
+  });
 
 /**
  * Drop a card without starting it, as `wf inbox rm <name>` does. Rejects with the api's refusal in full: the package's words for a card
@@ -115,11 +108,9 @@ export async function fileCard(card: {
  * unasked.
  */
 export async function dropCard(name: string): Promise<void> {
-  const route = `/api/inbox/${encodeURIComponent(name)}`;
-  const res = await fetch(route, { method: 'DELETE', headers: { 'content-type': 'application/json' } });
-  if (res.ok) return;
-  const body = (await res.json().catch(() => undefined)) as { error?: unknown } | undefined;
-  throw new Error(typeof body?.error === 'string' ? body.error : `DELETE ${route} answered ${res.status} ${res.statusText}`);
+  await send('DELETE', `/api/inbox/${encodeURIComponent(name)}`, Schema.Struct({ removed: Schema.Literal(true) }), {
+    may: 'The card may be dropped: look in the inbox (`wf inbox`) before dropping it again.',
+  });
 }
 
 /**
@@ -135,6 +126,16 @@ export type Queued = {
   of: number | null;
 };
 
+/** Decodes a `Queued`. */
+const QueuedSchema = Schema.Struct({
+  name: Schema.String,
+  file: Schema.String,
+  was: Schema.Literals(['queued', 'taken back', 'not queued']),
+  queued: Schema.NullOr(Schema.String),
+  place: Schema.NullOr(Schema.Number),
+  of: Schema.NullOr(Schema.Number),
+}) satisfies Schema.Schema<Queued>;
+
 /**
  * Queue a card to start on its own, as `wf inbox queue <name>` does — or, `off`, take it off the queue, as `--off` does. The tick starts
  * the next card in the queue when a run slot frees, on the workflow the card names. Resolves with what was done; rejects with the api's
@@ -143,17 +144,7 @@ export type Queued = {
  *
  * Sent as `application/json`, with no body, which the api requires of it, as of every write.
  */
-export async function queueCard(name: string, { off = false }: { off?: boolean } = {}): Promise<Queued> {
-  const route = `/api/inbox/${encodeURIComponent(name)}/queue`;
-  const method = off ? 'DELETE' : 'POST';
-  const res = await fetch(route, { method, headers: { 'content-type': 'application/json' } });
-  const body = (await res.json().catch(() => undefined)) as (Partial<Queued> & { error?: unknown }) | undefined;
-  if (res.ok && typeof body?.was === 'string') return body as Queued;
-  if (res.ok) {
-    throw new Error(
-      `${method} ${route} answered ${res.status} ${res.statusText} without what it did, so the api and this board disagree about what a queue answers. ` +
-        'The card may be queued, or not: look in the inbox (`wf inbox`) before asking again, and restart the api (`npm run dev`).',
-    );
-  }
-  throw new Error(typeof body?.error === 'string' ? body.error : `${method} ${route} answered ${res.status} ${res.statusText}`);
-}
+export const queueCard = (name: string, { off = false }: { off?: boolean } = {}): Promise<Queued> =>
+  send(off ? 'DELETE' : 'POST', `/api/inbox/${encodeURIComponent(name)}/queue`, QueuedSchema, {
+    may: 'The card may be queued, or not: look in the inbox (`wf inbox`) before asking again.',
+  });

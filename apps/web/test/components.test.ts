@@ -3960,14 +3960,14 @@ test('REFUSED at shipped defaults: a save with no status — a fetch that never 
   assert.equal(lost.reread, true);
 
   const shapeless = await refusedMarkup(
-    'PUT /api/workflows/yours/mine answered 200 OK without what it wrote, so the api and this board disagree about what a write answers.',
+    'PUT /api/workflows/yours/mine answered what this board does not read: at workflow, the value is missing. The folder may be written: reload the Workflows page before writing it again.',
     [],
     null,
   );
   assert.equal(
     shapeless.head,
     said,
-    "the other refusal with no status of its own (`build` in lib/api/builder.ts): the head says what the api's answer did not say",
+    "the other refusal with no status of its own (`build` in lib/api/workflows.ts): the head says what the api's answer did not say",
   );
   assert.doesNotMatch(
     shapeless.head,

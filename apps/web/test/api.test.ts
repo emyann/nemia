@@ -28,8 +28,12 @@ test("saying something to a step posts the words as JSON and resolves with the e
   answer = () => new Response(JSON.stringify({ error: refusal }), { status: 409 });
   await assert.rejects(sayToStep('r-1', 'implement', 'Widen it.'), (err: Error) => err.message === refusal);
   answer = () => new Response('{}', { status: 202 });
-  await assert.rejects(sayToStep('r-1', 'implement', 'Widen it.'), (err: Error) =>
-    /^POST \/api\/runs\/r-1\/steps\/implement\/say answered 202 +without what it journalled/.test(err.message),
+  await assert.rejects(
+    sayToStep('r-1', 'implement', 'Widen it.'),
+    (err: Error) =>
+      err.message.startsWith(
+        'POST /api/runs/r-1/steps/implement/say answered what this board does not read: at at, the value is missing.',
+      ) && /before saying them again/.test(err.message),
   );
 });
 
@@ -125,7 +129,7 @@ test('an answer with nothing to say says what came back: the status line of an e
   await assert.rejects(
     startRun(asked),
     (err: Error) =>
-      err.message.startsWith("POST /api/runs answered 201 Created without the new run's id") &&
+      err.message.startsWith('POST /api/runs answered what this board does not read: at id, the value is missing.') &&
       /look on the Runs page before starting it again/.test(err.message),
   );
 });
@@ -247,8 +251,9 @@ test("REFUSED: an ask the api refuses rejects with the api's words, verbatim; an
   await assert.rejects(
     askTry('r-1', 'implement', { mode: 'nudge' }),
     (err: Error) =>
-      /^POST \/api\/runs\/r-1\/steps\/implement\/retry answered 202 .*without the try it asked for/.test(err.message) &&
-      /before asking again/.test(err.message),
+      err.message.startsWith(
+        'POST /api/runs/r-1/steps/implement/retry answered what this board does not read: at try, the value is missing.',
+      ) && /before asking again/.test(err.message),
   );
 
   globalThis.fetch = async () => new Response('<html>Bad Gateway</html>', { status: 502, statusText: 'Bad Gateway' });
@@ -284,8 +289,11 @@ test("a raise is posted as JSON beside the try's mode, or with the round's step,
   answer = () => answered(409, { error: words });
   await assert.rejects(askRound('r-1', { step: 'review', budget: 2 }), (err: Error) => err.message === words);
   answer = () => answered(202, {});
-  await assert.rejects(askRound('r-1', { budget: 3 }), (err: Error) =>
-    /^POST \/api\/runs\/r-1\/round answered 202 +without the round it asked for/.test(err.message),
+  await assert.rejects(
+    askRound('r-1', { budget: 3 }),
+    (err: Error) =>
+      err.message.startsWith('POST /api/runs/r-1/round answered what this board does not read: at step, the value is missing.') &&
+      /before asking again/.test(err.message),
   );
 
   assert.deepEqual(
@@ -321,8 +329,9 @@ test("an acceptance is posted as JSON to the looping step's route with the words
   await assert.rejects(
     acceptLoop('r-1', 'review', { message: 'Good enough.' }),
     (err: Error) =>
-      /^POST \/api\/runs\/r-1\/steps\/review\/accept answered 202 .*without the acceptance it wrote/.test(err.message) &&
-      /before accepting again/.test(err.message),
+      err.message.startsWith(
+        'POST /api/runs/r-1/steps/review/accept answered what this board does not read: at step, the value is missing.',
+      ) && /before accepting again/.test(err.message),
   );
 
   assert.deepEqual(

@@ -1684,6 +1684,22 @@ test('REFUSED silence: a check that did not finish says so, and one whose log ca
   );
 });
 
+test("a step after a checked step, tried afresh, is handed that check in its try's brief too", async () => {
+  const run = started(folder('check: npm test'));
+  const b = board();
+  b.logs.set(`${run.id}-implement-check`, mutantLog([KILLED_1]));
+  await advance(b.e, readRun(run.id));
+  b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
+  await advance(b.e, readRun(run.id));
+  b.settle(`${run.id}-implement-check`, 'succeeded', undefined, 0);
+  assert.deepEqual((await advance(b.e, readRun(run.id))).filed, ['review']);
+  b.settle(`${run.id}-review`, 'failed', undefined, 1, 'quiet');
+  await retry(b.e, run.id, 'review', { mode: 'fresh' });
+  assert.deepEqual((await advance(b.e, readRun(run.id))).tried, ['review']);
+  const said = dataUnder(b.tasks.get(`${run.id}-review-try2`)!.spec.brief, CHECK_SAID) as { reported: string[] };
+  assert.ok(said.reported.includes(`wf mutants: killed ${KILLED_1}`), said.reported.join('\n'));
+});
+
 test("a step after a step with no `check:` is handed no check's word", async () => {
   const run = started(folder());
   const { e, tasks, settle } = board();

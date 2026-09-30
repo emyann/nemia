@@ -1,6 +1,6 @@
 import path from 'node:path';
 import type { Locator } from 'playwright';
-import { openDebug, sidebar, themeOf } from '../board.ts';
+import { openDebug, photograph, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectInView, expectTexts, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { FAKE, SESSION } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -71,7 +71,7 @@ export default {
       );
     const body = sheet.locator('[data-wide-body]');
     await expectInView(lit, body, 'the lit state lies in the sheet’s view');
-    await sheet.screenshot({ path: path.join(OUT, `debug-wide-open-${await themeOf(page)}.png`) });
+    await photograph(sheet, path.join(OUT, `debug-wide-open-${await themeOf(page)}.png`));
 
     await sheet.getByRole('slider', { name: "The path's entry shown" }).press('End');
     const completed = wide.locator('[data-state="completed"][data-lit]');
@@ -80,7 +80,7 @@ export default {
     await expectTexts(sheet.locator('[data-shown]'), ['Entry 5 of 5, the newest'], 'the sheet says it shows the newest');
     await expectInView(completed, body, 'the sheet’s body follows the lit state down into view');
     await settled(page);
-    await sheet.screenshot({ path: path.join(OUT, `debug-wide-scrubbed-${await themeOf(page)}.png`) });
+    await photograph(sheet, path.join(OUT, `debug-wide-scrubbed-${await themeOf(page)}.png`));
 
     await sheet.getByRole('button', { name: 'Close' }).click();
     await expectCount(page.getByRole('dialog'), 0, 'the sheet closed');

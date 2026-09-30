@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
 import { expectTheme, idle, Refused, settled, track, watch } from './checks.ts';
+import { photograph } from './board.ts';
 
 export const THEMES = ['light', 'dark'] as const;
 export type Theme = (typeof THEMES)[number];
@@ -59,14 +60,14 @@ async function visit(context: BrowserContext, base: string, spec: PageSpec, them
     await spec.expect(page);
     if (!spec.follows) await idle(page);
     await settled(page);
-    await page.screenshot({ path: shot, fullPage: true });
+    await photograph(page, shot, { fullPage: true });
     const seen = problems();
     if (seen.length) throw new Refused(`no console error and no failed request — ${seen.length} seen:\n    ${seen.join('\n    ')}`);
     return shot;
   } catch (err) {
     fs.rmSync(shot, { force: true });
     const failed = path.join(out, `${spec.name}-${theme}-failed.png`);
-    await page.screenshot({ path: failed, fullPage: true }).catch(() => {});
+    await photograph(page, failed, { fullPage: true }).catch(() => {});
     throw new PageFailure(where(spec, theme), err, failed, store !== undefined && !fs.existsSync(store) ? storeGone(store) : undefined);
   } finally {
     await page.close();

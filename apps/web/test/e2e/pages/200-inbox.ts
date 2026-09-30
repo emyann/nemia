@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page, Response } from 'playwright';
-import { PLACES_SAID, sidebar, themeOf } from '../board.ts';
+import { photograph, PLACES_SAID, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { CARDS, DIAMOND_RUNS, QUEUE, QUEUED, queuedCardText, refusedWhy, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -231,7 +231,7 @@ export default {
         await idle(page);
         await unmoved('queued');
         await settled(page);
-        await page.screenshot({ path: path.join(OUT, `inbox-queued-${await themeOf(page)}.png`), fullPage: true });
+        await photograph(page, path.join(OUT, `inbox-queued-${await themeOf(page)}.png`), { fullPage: true });
         const [unqueued] = await Promise.all([
           page.waitForResponse(
             (r) => r.request().method() === 'DELETE' && new URL(r.url()).pathname === `/api/inbox/${planned.name}/queue`,
@@ -270,7 +270,7 @@ export default {
     );
     await expectVisible(startForm.getByRole('button', { name: 'Start' }), 'and a Start button');
     await settled(page);
-    await page.screenshot({ path: path.join(OUT, `inbox-start-${await themeOf(page)}.png`), fullPage: true });
+    await photograph(page, path.join(OUT, `inbox-start-${await themeOf(page)}.png`), { fullPage: true });
     await plannedItem.getByRole('button', { name: 'Close' }).click();
     await expectCount(startForm, 0, 'Close folds the start form away');
 
@@ -379,7 +379,7 @@ export default {
         if (new URL(kept.url()).pathname !== '/inbox') throw new Refused(`the page stays on the inbox — it went to ${kept.url()}`);
         if (!fs.existsSync(cardFile)) throw new Refused(`the card is still in the inbox — ${cardFile} is gone`);
         await settled(kept);
-        await kept.screenshot({ path: path.join(OUT, `inbox-kept-${await themeOf(kept)}.png`), fullPage: true });
+        await photograph(kept, path.join(OUT, `inbox-kept-${await themeOf(kept)}.png`), { fullPage: true });
         await idle(kept);
         const seen = problems();
         if (seen.length)
@@ -429,7 +429,7 @@ export default {
       await expectCount(item.getByRole('button', { name: 'Start' }), 0, 'and offers no Start: started again, the idea would run twice');
       await expectVisible(item.getByRole('button', { name: 'Remove' }), 'and offers Remove');
       await settled(already);
-      await already.screenshot({ path: path.join(OUT, `inbox-started-as-${await themeOf(already)}.png`), fullPage: true });
+      await photograph(already, path.join(OUT, `inbox-started-as-${await themeOf(already)}.png`), { fullPage: true });
       await idle(already);
       const seen = problems();
       if (seen.length)
@@ -467,7 +467,7 @@ export default {
       );
       await expectCount(item.locator(`form[aria-label="Start ${elsewhereName}"]`), 0, 'with no Start until one is picked');
       await settled(other);
-      await other.screenshot({ path: path.join(OUT, `inbox-elsewhere-${await themeOf(other)}.png`), fullPage: true });
+      await photograph(other, path.join(OUT, `inbox-elsewhere-${await themeOf(other)}.png`), { fullPage: true });
       await idle(other);
       const seen = problems();
       if (seen.length)
@@ -524,7 +524,7 @@ export default {
       const shown = await strays.locator('pre[data-source]').textContent();
       if (shown !== strayText) throw new Refused(`the stray file's Source is the file as written — it shows ${JSON.stringify(shown)}`);
       await settled(strays);
-      await strays.screenshot({ path: path.join(OUT, `inbox-strays-${await themeOf(strays)}.png`), fullPage: true });
+      await photograph(strays, path.join(OUT, `inbox-strays-${await themeOf(strays)}.png`), { fullPage: true });
       await idle(strays);
       const seen = problems();
       if (seen.length)
@@ -554,7 +554,7 @@ export default {
       );
       await expectVisible(empty.locator('form[aria-label="File a card"]'), 'and still has the box');
       await settled(empty);
-      await empty.screenshot({ path: path.join(OUT, `inbox-empty-${await themeOf(empty)}.png`), fullPage: true });
+      await photograph(empty, path.join(OUT, `inbox-empty-${await themeOf(empty)}.png`), { fullPage: true });
       await idle(empty);
       const seen = problems();
       if (seen.length)
@@ -637,7 +637,7 @@ export default {
       if (JSON.stringify(after) !== JSON.stringify(before))
         throw new Refused(`nothing is written on a refusal — ${runsDir} went from ${before.length} files to ${after.length}`);
       await settled(refused);
-      await refused.screenshot({ path: path.join(OUT, `inbox-refused-${await themeOf(refused)}.png`), fullPage: true });
+      await photograph(refused, path.join(OUT, `inbox-refused-${await themeOf(refused)}.png`), { fullPage: true });
       await idle(refused);
       onlyRefusal(refused, problems(), answered);
     } finally {
@@ -682,7 +682,7 @@ export default {
         );
       await expectVisible(gone.locator('[data-title]', { hasText: planned.title }), 'with the first line of the card it was about');
       await settled(unremoved);
-      await unremoved.screenshot({ path: path.join(OUT, `inbox-remove-refused-${await themeOf(unremoved)}.png`), fullPage: true });
+      await photograph(unremoved, path.join(OUT, `inbox-remove-refused-${await themeOf(unremoved)}.png`), { fullPage: true });
       await gone.getByRole('button', { name: 'Dismiss' }).click();
       await expectCount(gone, 0, 'Dismiss takes the refusal of a card that is gone away');
       await idle(unremoved);
@@ -756,7 +756,7 @@ export default {
       if (JSON.stringify(after) !== JSON.stringify(before))
         throw new Refused(`nothing is written on a refusal — ${runsDir} went from ${before.length} files to ${after.length}`);
       await settled(conflicted);
-      await conflicted.screenshot({ path: path.join(OUT, `inbox-conflict-${await themeOf(conflicted)}.png`), fullPage: true });
+      await photograph(conflicted, path.join(OUT, `inbox-conflict-${await themeOf(conflicted)}.png`), { fullPage: true });
       await idle(conflicted);
       onlyRefusal(conflicted, problems(), answered);
     } finally {
@@ -825,7 +825,7 @@ export default {
           `the refusal on the card is the package's sentence, verbatim — it shows ${JSON.stringify(shown)}, and the api said ${JSON.stringify(error)}`,
         );
       await settled(requeued);
-      await requeued.screenshot({ path: path.join(OUT, `inbox-queue-refused-${await themeOf(requeued)}.png`), fullPage: true });
+      await photograph(requeued, path.join(OUT, `inbox-queue-refused-${await themeOf(requeued)}.png`), { fullPage: true });
       await idle(requeued);
       onlyRefusal(requeued, problems(), answered);
     } finally {

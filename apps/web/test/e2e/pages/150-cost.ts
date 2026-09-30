@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { sidebar, themeOf } from '../board.ts';
+import { photograph, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectInside, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { COSTLY } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -237,7 +237,7 @@ export default {
       if (fs.existsSync(asks))
         throw new Refused(`nothing is written on a refusal — ${asks} holds ${fs.readdirSync(asks, { recursive: true }).join(', ')}`);
       await settled(refused);
-      await refused.screenshot({ path: path.join(OUT, `cost-refused-${await themeOf(refused)}.png`), fullPage: true });
+      await photograph(refused, path.join(OUT, `cost-refused-${await themeOf(refused)}.png`), { fullPage: true });
       await idle(refused);
       const expected = `request answered 409: POST ${answered.url()}`;
       const seen = problems();

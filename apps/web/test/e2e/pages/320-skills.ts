@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { themeOf } from '../board.ts';
+import { photograph, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { AGENTS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -87,7 +87,7 @@ export default {
       const offered = sheet.locator(`section[aria-label="Your library"] [data-offered-skill="${mine}"]`);
       await expectVisible(offered.locator('p', { hasText: /tokens/ }), `${mine} says what it costs a turn`);
       await settled(page);
-      await page.screenshot({ path: path.join(OUT, `skills-sheet-${await themeOf(page)}.png`) });
+      await photograph(page, path.join(OUT, `skills-sheet-${await themeOf(page)}.png`));
 
       await offered.getByRole('button', { name: `Add ${mine}` }).click();
       await expectVisible(offered, `${mine} is still listed`);
@@ -119,7 +119,7 @@ export default {
         "Doesn't write code is chosen, pressed by its label",
       );
       await settled(page);
-      await page.screenshot({ path: path.join(OUT, `skills-composed-${await themeOf(page)}.png`), fullPage: true });
+      await photograph(page, path.join(OUT, `skills-composed-${await themeOf(page)}.png`), { fullPage: true });
 
       const [saved] = await Promise.all([
         page.waitForResponse((r) => r.request().method() === 'PUT' && new URL(r.url()).pathname === `/api/agents/yours/${seeded.name}`, {

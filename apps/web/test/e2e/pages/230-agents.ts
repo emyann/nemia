@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { filesIn, sidebar, themeOf } from '../board.ts';
+import { filesIn, photograph, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { AGENTS, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -126,7 +126,7 @@ export default {
     if (shown !== onDisk) throw new Refused(`Source is the agent's file byte for byte — it shows ${JSON.stringify(shown)}`);
     await file.getByRole('button', { name: 'Source' }).click();
     await settled(page);
-    await page.screenshot({ path: path.join(OUT, `agents-repo-${await themeOf(page)}.png`), fullPage: true });
+    await photograph(page, path.join(OUT, `agents-repo-${await themeOf(page)}.png`), { fullPage: true });
 
     await page.locator(`[data-used-by] a[data-node="${good.name}/implement"]`).click();
     await page.waitForURL((url) => url.pathname === `/workflows/repo/${good.name}/implement`, { timeout: WAIT_MS });
@@ -205,7 +205,7 @@ export default {
       await expectCount(form.getByRole('textbox', { name: 'Its card' }), 0, 'no card is pasted');
       await form.getByRole('textbox', { name: 'Instructions' }).fill(made.body);
       await settled(page);
-      await page.screenshot({ path: path.join(OUT, `agents-new-${await themeOf(page)}.png`), fullPage: true });
+      await photograph(page, path.join(OUT, `agents-new-${await themeOf(page)}.png`), { fullPage: true });
       const [created] = await Promise.all([
         page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/agents/yours', {
           timeout: WAIT_MS,
@@ -251,7 +251,7 @@ export default {
         'once saved, the form is the agent as it now reads, and Save waits again',
       );
       await settled(page);
-      await page.screenshot({ path: path.join(OUT, `agents-edit-${await themeOf(page)}.png`), fullPage: true });
+      await photograph(page, path.join(OUT, `agents-edit-${await themeOf(page)}.png`), { fullPage: true });
 
       await page.getByRole('button', { name: 'Remove…' }).click();
       await expectTexts(
@@ -312,7 +312,7 @@ export default {
       if (JSON.stringify(filesIn(agentsDir)) !== JSON.stringify(before))
         throw new Refused(`nothing is removed on a refusal — ${agentsDir} changed`);
       await settled(refused);
-      await refused.screenshot({ path: path.join(OUT, `agents-refused-${await themeOf(refused)}.png`), fullPage: true });
+      await photograph(refused, path.join(OUT, `agents-refused-${await themeOf(refused)}.png`), { fullPage: true });
       await idle(refused);
       const expected = `request answered 409: DELETE ${answered.url()}`;
       const seen = problems();

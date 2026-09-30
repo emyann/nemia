@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { fed, themeOf } from '../board.ts';
+import { fed, photograph, themeOf } from '../board.ts';
 import { cardOf, expectClearOfEachOther, expectClearOfPanels, holdEdgeOf, photographCard } from '../canvas.ts';
 import { expectCount, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { GATED, HELD } from '../seed.ts';
@@ -58,7 +58,7 @@ export default {
       await expectClearOfPanels(page, 'with a run held');
       await settled(page);
       const theme = await themeOf(page);
-      await page.screenshot({ path: path.join(OUT, `hold-held-${theme}.png`), fullPage: true });
+      await photograph(page, path.join(OUT, `hold-held-${theme}.png`), { fullPage: true });
       await photographCard(page, card, path.join(OUT, `hold-card-${theme}.png`));
 
       await page.goto(new URL(`/runs/${id}`, page.url()).href, { waitUntil: 'load' });
@@ -76,7 +76,7 @@ export default {
       await expectCount(page.locator('section[aria-label="Decide"]'), 0, 'and the page no Decide section');
       await expectCount(page.getByText('waiting on you', { exact: true }), 0, 'and nothing on it says it waits on you');
       await settled(page);
-      await page.screenshot({ path: path.join(OUT, `hold-run-${theme}.png`), fullPage: true });
+      await photograph(page, path.join(OUT, `hold-run-${theme}.png`), { fullPage: true });
     } finally {
       fs.rmSync(hold, { force: true });
       fed(id, gated, 'awaiting approval');

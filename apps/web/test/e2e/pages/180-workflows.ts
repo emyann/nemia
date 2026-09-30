@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator } from 'playwright';
-import { cancelledAt, nextVisit, sidebar, themeOf } from '../board.ts';
+import { cancelledAt, nextVisit, photograph, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectInside, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { DIAMOND, DIAMOND_RUNS, FAKE, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -147,7 +147,7 @@ export default {
       if (JSON.stringify(after) !== JSON.stringify(before))
         throw new Refused(`nothing is written on a refusal — ${runsDir} went from ${before.length} files to ${after.length}`);
       await settled(refused);
-      await refused.screenshot({ path: path.join(OUT, `start-refused-${await themeOf(refused)}.png`), fullPage: true });
+      await photograph(refused, path.join(OUT, `start-refused-${await themeOf(refused)}.png`), { fullPage: true });
       await idle(refused);
       const expected = `request answered 422: POST ${answered.url()}`;
       const seen = problems();

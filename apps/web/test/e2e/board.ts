@@ -62,6 +62,14 @@ export const cancelledAt = (): string => fs.readFileSync(path.join(store!, 'runs
 export const themeOf = (page: Page): Promise<string> =>
   page.evaluate(() => (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
 
+/**
+ * Takes a picture of a page or of what a locator finds into `file`, with every CSS animation stilled for the shot and played again after
+ * it: an agent's face, which moves at all times, is drawn at rest with its eyes open, the same in every run. `fullPage` as Playwright's.
+ */
+export async function photograph(target: Page | Locator, file: string, options: { fullPage?: boolean } = {}): Promise<void> {
+  await target.screenshot({ ...options, path: file, animations: 'disabled' });
+}
+
 /** The places of the queued cards, as the board says them. */
 export const PLACES_SAID = ['1st', '2nd', '3rd', '4th'] as const;
 

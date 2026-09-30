@@ -1,6 +1,6 @@
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { themeOf } from '../board.ts';
+import { photograph, themeOf } from '../board.ts';
 import { cardOf, expectClearOfEachOther } from '../canvas.ts';
 import { expectInside, expectVisible, Refused, settled } from '../checks.ts';
 import { ENDING } from '../seed.ts';
@@ -63,7 +63,7 @@ export default {
         floorOf(page),
         `${when}: the run inspected shows its head in the floor once the inspector closes, clear of what is drawn over it`,
       );
-      await page.screenshot({ path: path.join(OUT, `factory-frame-${when}-${await themeOf(page)}.png`), fullPage: true });
+      await photograph(page, path.join(OUT, `factory-frame-${when}-${await themeOf(page)}.png`), { fullPage: true });
       await hide.click();
       await expectVisible(card.getByRole('button', { name: 'Show steps' }), `${when}: Hide steps closes the card`);
     };

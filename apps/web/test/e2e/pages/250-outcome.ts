@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { fed, sidebar, themeOf } from '../board.ts';
+import { fed, photograph, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectDrawn, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { png } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -236,16 +236,16 @@ async function outputOf(page: Page, step: string) {
 }
 
 /** The inspector as a person sees it, and then its whole length: what is below its fold is read by scrolling it, and read here too. */
-async function photograph(page: Page, inspector: ReturnType<Page['locator']>, name: string) {
+async function photographInspector(page: Page, inspector: ReturnType<Page['locator']>, name: string) {
   await settled(page);
   const theme = await themeOf(page);
-  await inspector.screenshot({ path: path.join(OUT, `outcome-${name}-${theme}.png`) });
+  await photograph(inspector, path.join(OUT, `outcome-${name}-${theme}.png`));
   await inspector.evaluate((aside) => {
     aside.style.height = 'auto';
     for (const child of Array.from(aside.querySelectorAll<HTMLElement>('*')))
       if (getComputedStyle(child).overflowY === 'auto') child.style.overflow = 'visible';
   });
-  await inspector.screenshot({ path: path.join(OUT, `outcome-${name}-whole-${theme}.png`) });
+  await photograph(inspector, path.join(OUT, `outcome-${name}-whole-${theme}.png`));
   await inspector.evaluate((aside) => {
     aside.style.height = '';
     for (const child of Array.from(aside.querySelectorAll<HTMLElement>('*'))) child.style.overflow = '';
@@ -290,7 +290,7 @@ export default {
         review.locator('section[data-field="again"]', { hasText: 'true when a finding is worth another round' }),
         "beside what it means, from review's schema",
       );
-      await photograph(page, review, 'review');
+      await photographInspector(page, review, 'review');
 
       const raw = review.getByRole('switch');
       await review.locator('label', { hasText: /^Raw$/ }).click();
@@ -300,7 +300,7 @@ export default {
         'Raw shows the statement as it came, its findings as JSON',
       );
       await expectCount(review.locator('table[data-kind="findings"]'), 0, 'in place of the drawing');
-      await photograph(page, review, 'review-raw');
+      await photographInspector(page, review, 'review-raw');
       await review.locator('label', { hasText: /^Raw$/ }).click();
       await expectCount(review.locator('pre[data-raw]'), 0, 'and pressed again, the drawing is back');
 
@@ -315,7 +315,7 @@ export default {
       );
       await expectCount(plan.locator('section[data-field="steps"][data-kind="list"] li'), 3, 'its steps a list');
       await expectCount(plan.locator('section[data-field="risks"][data-kind="list"] li'), 1, 'and its risks');
-      await photograph(page, plan, 'plan');
+      await photographInspector(page, plan, 'plan');
 
       const implement = await outputOf(page, 'implement');
       await expectDrawn(
@@ -330,12 +330,12 @@ export default {
         implement.locator(`section[data-field="replies"] li[data-answer="won't fix"] [data-slot="badge"]`, { hasText: "won't fix" }),
         "and won't fix",
       );
-      await photograph(page, implement, 'implement');
+      await photographInspector(page, implement, 'implement');
 
       const ask = await outputOf(page, 'ask');
       await expectVisible(ask.locator('[data-outcome="blocked"][data-by="agent"]'), 'ask opens on blocked, said by the agent');
       await expectVisible(ask.locator('[data-needs] strong', { hasText: 'The outcome' }), 'and what it needs, as the markdown it wrote');
-      await photograph(page, ask, 'ask');
+      await photographInspector(page, ask, 'ask');
 
       const quiet = await outputOf(page, 'quiet');
       await expectVisible(
@@ -343,7 +343,7 @@ export default {
         "quiet has no statement: the machine's reason, unsigned",
       );
       await expectVisible(quiet.locator('[data-reason]', { hasText: OUTCOME.reason }), 'said in a sentence');
-      await photograph(page, quiet, 'quiet');
+      await photographInspector(page, quiet, 'quiet');
 
       const odd = await outputOf(page, 'odd');
       await expectVisible(
@@ -354,7 +354,7 @@ export default {
         odd.locator('section[data-field="weights"][data-kind="json"] pre', { hasText: '"findings": 0.7' }),
         'and so is an object',
       );
-      await photograph(page, odd, 'odd');
+      await photographInspector(page, odd, 'odd');
 
       const garbled = await outputOf(page, 'garbled');
       await expectVisible(
@@ -366,7 +366,7 @@ export default {
         garbled.locator('section[aria-label="As it came"] pre[data-raw]', { hasText: OUTCOME.garbled }),
         'then the statement whole, as it came',
       );
-      await photograph(page, garbled, 'garbled');
+      await photographInspector(page, garbled, 'garbled');
     } finally {
       await page.goto(new URL('/runs', page.url()).href, { waitUntil: 'load' });
       await idle(page);

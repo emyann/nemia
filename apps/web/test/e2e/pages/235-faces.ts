@@ -1,6 +1,6 @@
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { sidebar, themeOf } from '../board.ts';
+import { photograph, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, WAIT_MS } from '../checks.ts';
 import { AGENTS, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -142,7 +142,7 @@ export default {
       await follows(page, `${card} svg[data-agent-face="${name}"]`, 112, person);
     }
     const theme = await themeOf(page);
-    await page.screenshot({ path: path.join(OUT, `faces-list-${theme}.png`), fullPage: true });
+    await photograph(page, path.join(OUT, `faces-list-${theme}.png`), { fullPage: true });
 
     await page.goto(new URL(`/agents/repo/${good.agent.name}`, page.url()).href, { waitUntil: 'load' });
     await idle(page);
@@ -152,6 +152,6 @@ export default {
       `the face at the head of ${good.agent.name}'s page is a drawing, named ${good.agent.person}`,
     );
     await follows(page, head, 96, `${good.agent.person}, at the head of its page,`);
-    await page.screenshot({ path: path.join(OUT, `faces-head-${theme}.png`), fullPage: true });
+    await photograph(page, path.join(OUT, `faces-head-${theme}.png`), { fullPage: true });
   },
 } satisfies PageSpec;

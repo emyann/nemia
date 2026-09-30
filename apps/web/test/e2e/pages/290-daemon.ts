@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { themeOf } from '../board.ts';
+import { photograph, themeOf } from '../board.ts';
 import { expectClearOfEachOther, expectClearOfPanels } from '../canvas.ts';
 import { expectCount, expectUncut, expectVisible, idle, Refused, settled } from '../checks.ts';
 import type { PageSpec } from '../visit.ts';
@@ -39,7 +39,7 @@ export default {
     const line = page.locator('[data-daemon]');
     const shoot = async (what: string) => {
       await settled(page);
-      await page.screenshot({ path: path.join(OUT, `daemon-${what}-${await themeOf(page)}.png`), fullPage: true });
+      await photograph(page, path.join(OUT, `daemon-${what}-${await themeOf(page)}.png`), { fullPage: true });
     };
 
     await expectVisible(

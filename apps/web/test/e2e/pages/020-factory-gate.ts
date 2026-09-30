@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page, Response } from 'playwright';
-import { fed, themeOf } from '../board.ts';
+import { fed, photograph, themeOf } from '../board.ts';
 import { cardOf, expectClearOfEachOther, showFinished } from '../canvas.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { ENDING } from '../seed.ts';
@@ -75,7 +75,7 @@ export default {
       if (kept !== ENDING.objection) throw new Refused('the words stay in the box after a refusal');
       await expectCount(cardOf(refused, id).locator('[data-taken]'), 0, 'and the card says nothing was taken');
       await settled(refused);
-      await refused.screenshot({ path: path.join(OUT, `factory-gate-refused-${await themeOf(refused)}.png`), fullPage: true });
+      await photograph(refused, path.join(OUT, `factory-gate-refused-${await themeOf(refused)}.png`), { fullPage: true });
       const expected = `request answered 409: POST ${answered.url()}`;
       const seen = problems();
       const others = seen.filter(
@@ -125,7 +125,7 @@ export default {
     await expectCount(inspector.locator('dt', { hasText: /^attempts$/ }), 0, 'rather than a table of dashes');
     await expectVisible(asked.getByRole('button', { name: 'Approve', exact: true }), "the inspector answers it too, the run page's gate");
     await settled(page);
-    await page.screenshot({ path: path.join(OUT, `factory-gate-inspector-${await themeOf(page)}.png`), fullPage: true });
+    await photograph(page, path.join(OUT, `factory-gate-inspector-${await themeOf(page)}.png`), { fullPage: true });
     await page.getByRole('button', { name: "Close the step's panel" }).click();
     await card.getByRole('button', { name: 'Hide steps' }).click();
 
@@ -135,7 +135,7 @@ export default {
       'the popover says what approving runs',
     );
     await settled(page);
-    await page.screenshot({ path: path.join(OUT, `factory-gate-confirm-${await themeOf(page)}.png`), fullPage: true });
+    await photograph(page, path.join(OUT, `factory-gate-confirm-${await themeOf(page)}.png`), { fullPage: true });
     const [response] = await Promise.all([page.waitForResponse(approved, { timeout: WAIT_MS }), runNow(page).click()]);
     if (response.status() !== 202)
       throw new Refused(`the api takes the approval — it answered ${response.status()}: ${await response.text()}`);
@@ -153,7 +153,7 @@ export default {
     );
     await expectCount(answerOf(page, 'Approve'), 0, 'and offers the gate no more');
     await settled(page);
-    await page.screenshot({ path: path.join(OUT, `factory-gate-approved-${await themeOf(page)}.png`), fullPage: true });
+    await photograph(page, path.join(OUT, `factory-gate-approved-${await themeOf(page)}.png`), { fullPage: true });
     fs.rmSync(asks, { recursive: true, force: true });
     fed(id, ending, 'awaiting approval');
     await expectVisible(answerOf(page, 'Approve'), 'with the approval taken back, the card offers the gate again');
@@ -178,7 +178,7 @@ export default {
       'the card says it is sent back, and what comes next',
     );
     await settled(page);
-    await page.screenshot({ path: path.join(OUT, `factory-gate-sent-back-${await themeOf(page)}.png`), fullPage: true });
+    await photograph(page, path.join(OUT, `factory-gate-sent-back-${await themeOf(page)}.png`), { fullPage: true });
     fs.rmSync(asks, { recursive: true, force: true });
     fed(id, ending, 'awaiting approval');
     await expectVisible(

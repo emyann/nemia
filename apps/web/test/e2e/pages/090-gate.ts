@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { expectRendered, fed, sidebar, themeOf } from '../board.ts';
+import { expectRendered, fed, photograph, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectLeftOf, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { GATED } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -119,7 +119,7 @@ export default {
       'and does not say the run is still moving: it waits on you',
     );
     await settled(page);
-    await page.screenshot({ path: path.join(OUT, `gate-awaiting-${await themeOf(page)}.png`), fullPage: true });
+    await photograph(page, path.join(OUT, `gate-awaiting-${await themeOf(page)}.png`), { fullPage: true });
     await files.locator('summary').click();
     await expectVisible(handedOn.getByText(GATED.output.files[0].path), 'opened, the fold draws the files');
     await handedOn.locator('details[data-fold="files"] summary').click();
@@ -137,7 +137,7 @@ export default {
       'and says the answer is under Details',
     );
     await settled(page);
-    await page.screenshot({ path: path.join(OUT, `gate-inspector-${await themeOf(page)}.png`), fullPage: true });
+    await photograph(page, path.join(OUT, `gate-inspector-${await themeOf(page)}.png`), { fullPage: true });
     await inspector.getByRole('button', { name: "Close the step's panel" }).click();
     await expectCount(inspector, 0, 'closed, so the rest of the page reads one gate');
 
@@ -180,7 +180,7 @@ export default {
       if (fs.existsSync(asks))
         throw new Refused(`nothing is written on a refusal — ${asks} holds ${fs.readdirSync(asks, { recursive: true }).join(', ')}`);
       await settled(refused);
-      await refused.screenshot({ path: path.join(OUT, `gate-refused-${await themeOf(refused)}.png`), fullPage: true });
+      await photograph(refused, path.join(OUT, `gate-refused-${await themeOf(refused)}.png`), { fullPage: true });
       const expected = `request answered 409: POST ${answered.url()}`;
       const seen = problems();
       const others = seen.filter(
@@ -231,7 +231,7 @@ export default {
     await expectCount(banner, 0, 'and the banner with it: nobody is waited on');
     await expectVisible(section.locator('dd', { hasText: /^approved, try 1$/ }), "the step's facts say its gate is approved");
     await settled(page);
-    await page.screenshot({ path: path.join(OUT, `gate-approved-${await themeOf(page)}.png`), fullPage: true });
+    await photograph(page, path.join(OUT, `gate-approved-${await themeOf(page)}.png`), { fullPage: true });
 
     fs.rmSync(asks, { recursive: true, force: true });
     fed(id, gated, 'awaiting approval');
@@ -252,7 +252,7 @@ export default {
     );
     await expectCount(gateOf(page), 0, 'and offers the gate no more: it is sent back');
     await settled(page);
-    await page.screenshot({ path: path.join(OUT, `gate-sent-back-${await themeOf(page)}.png`), fullPage: true });
+    await photograph(page, path.join(OUT, `gate-sent-back-${await themeOf(page)}.png`), { fullPage: true });
 
     fs.rmSync(asks, { recursive: true, force: true });
     fed(id, gated, 'awaiting approval');

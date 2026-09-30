@@ -333,9 +333,9 @@ test('the graph a board draws is the machine read as plain data, and a fresh cop
   graph.edges.pop();
   graph.states.pop();
   assert.deepEqual(lifecycleGraph().edges, edgesOf(), 'a caller that changes its copy changes no other');
-  const mine = lifecycleGraph();
-  mine.verbs[0].from.pop();
-  assert.deepEqual(lifecycleGraph().verbs, VERBS, 'nor the verbs, down to the states each is taken from');
+  const verbs: unknown = JSON.parse(JSON.stringify(VERBS));
+  lifecycleGraph().verbs[0].from.pop();
+  assert.deepEqual(lifecycleGraph().verbs, verbs, 'nor the verbs, down to the states each is taken from');
   assert.ok(
     lifecycleGraph().edges.some((e) => e.from === 'ending' && e.event === 'CLOSED' && e.guard === 'lastDone' && e.to === 'completed'),
     'a guarded edge keeps its guard',

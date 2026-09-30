@@ -14,18 +14,7 @@ import { runsQuery, type RunSummary } from '../src/lib/api/runs.ts';
 const DIR = path.resolve(import.meta.dirname, '../src/lib/api');
 
 /** The files under src/lib/api/ whose reads are not decoded yet. A file leaves the list when its reads are; none joins it. */
-const UNDECODED = [
-  'agents.ts',
-  'builder.ts',
-  'capabilities.ts',
-  'ceilings.ts',
-  'daemon.ts',
-  'inbox.ts',
-  'machines.ts',
-  'quota.ts',
-  'skills.ts',
-  'workflows.ts',
-] as const;
+const UNDECODED = ['capabilities.ts', 'ceilings.ts', 'daemon.ts', 'inbox.ts', 'quota.ts'] as const;
 
 /** Every read answering `body` as JSON, with `status`, for the length of the test. */
 function answering(t: { after: (fn: () => void) => void }, body: unknown, status = 200) {

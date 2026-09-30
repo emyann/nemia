@@ -81,14 +81,16 @@ export const HELP = `wf — run a workflow of agent steps
                                a worktree locked, on no branch, or with changes no commit has;
                                and a finished run not merged unless --unmerged, with --artifacts
                                as without: its files are what a person reads to decide it
-  wf hold <runId> --until <runId> [--until <runId> ...]
+  wf hold <runId> --until <runId> [--until <runId> ...] [--why "<words>"] [--by <name>]
                                file nothing more of a run until other runs ship, as --after would
                                have: what is in flight finishes, nothing new is filed, and nothing
                                is asked of you — wf ls and wf decide say held until <run> ships, and
                                what a step asks is asked once the hold lifts. The tick lifts it when
                                every run named has shipped. Refused of a run cancelled, pruned,
                                finished or already held, and of a run named that is unknown, the run
-                               itself, or one that already waits on it, through --after or a hold
+                               itself, or one that already waits on it, through --after or a hold.
+                               --why: the reason, shown beside held until <run> ships wherever it is
+                               said; --by: who puts the hold (default: your OS user)
   wf hold <runId> --off        lift the hold now: the next tick goes on as if it had never been put
   wf decide <runId> [--sensitive <globs>]
                                what the run produced, and the choice it leaves you (wf decide --help)

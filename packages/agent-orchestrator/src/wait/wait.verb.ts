@@ -3,6 +3,7 @@
  * before anything is written. A controller, reaching the runtime through the client (`runtime-client.ts`).
  */
 import fs from 'node:fs';
+import os from 'node:os';
 import type { Engine } from '../runtime-client.ts';
 import { type Hold, type Run } from '../record/record.ts';
 import { holdRefusal } from './wait.ts';
@@ -27,8 +28,11 @@ export type Holding = { run: Run; hold: Hold };
  * named: twice, the run itself, one not there, a folder run, another repository or base branch, `--no-worktree`, cancelled, a result branch
  * gone, already shipped — and one that already waits on this run, through `--after` or a hold. Writes `runs/<id>.hold`, exclusively: a hold
  * two people put at once is the first one's, and the second is refused as already held.
+ *
+ * @param said The person's words for why (`--why`), and who they are (`--by`): without a name, the user this process runs as, and none
+ *   when the system has no name for it.
  */
-export async function hold(e: Engine, id: string, until: readonly string[]): Promise<Holding> {
+export async function hold(e: Engine, id: string, until: readonly string[], said: Pick<Hold, 'why' | 'by'> = {}): Promise<Holding> {
   const bad = idRefusal(id, 'hold');
   if (bad) throw new Invalid({ message: bad });
   for (const named of until) {
@@ -65,12 +69,21 @@ export async function hold(e: Engine, id: string, until: readonly string[]): Pro
   }
   const refused = holdRefusal(run, until, (u) => read.get(u) ?? { shipped: false }, listRuns(), finished);
   if (refused) throw new Conflict({ message: refused });
-  const put = writeHold(id, until);
+  const put = writeHold(id, until, { ...said, by: said.by ?? osUser() });
   if (!put)
     throw new Conflict({
       message: holdRefusal(readRun(id), until, (u) => read.get(u) ?? { shipped: false }, []) ?? `${id} is already held: wf ls ${id}.`,
     });
   return { run: { ...run, hold: put }, hold: put };
+}
+
+/** Who this process runs as, by the name the system gives the user — or undefined, for a user it has no entry for. */
+function osUser(): string | undefined {
+  try {
+    return os.userInfo().username || undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /**

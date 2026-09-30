@@ -159,8 +159,17 @@ type RunBase = {
   createdAt: string;
 };
 
-/** A person's hold on a run, as its file says it: when it was put, and the runs it waits on to ship, in the order they were named. */
-export type Hold = { at: string; until: string[] };
+/**
+ * A person's hold on a run, as its file says it: when it was put, the runs it waits on to ship, in the order they were named, the
+ * person's words for why (`why`, absent when none were given) and who put it (`by`, absent on a file older code wrote), each one line.
+ */
+export type Hold = { at: string; until: string[]; why?: string; by?: string };
+
+/** The longest a hold's why is kept and shown (`wf hold --why`): what is over it is clipped with `…` (`oneLine`). */
+export const WHY_CAP = 200;
+
+/** The longest a hold's name for who put it is kept and shown (`wf hold --by`). */
+export const BY_CAP = 64;
 
 /**
  * What `wf prune` removed of a run, as its file says it: when, and each worktree with the bytes it held (`du`), which are what it freed —

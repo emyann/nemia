@@ -6,6 +6,7 @@
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import type { Engine } from 'agent-runtime';
@@ -18,6 +19,7 @@ process.env.WF_ROOT = ROOT;
 const {
   accept,
   advance,
+  BY_CAP,
   approve,
   decide,
   forget,
@@ -33,6 +35,7 @@ const {
   say,
   start,
   unhold,
+  WHY_CAP,
 } = await import('../src/runner.ts');
 const { main } = await import('../src/cli/main.ts');
 
@@ -43,6 +46,16 @@ const git = (cwd: string, ...args: string[]) =>
     stdio: ['ignore', 'pipe', 'pipe'],
   }).trim();
 const holdFileOf = (id: string) => path.join(ROOT, 'runs', `${id}.hold`);
+
+/**
+ * The hold on `id` made one that code older than `wf hold --by` wrote: its file without `by`, which every screen says as the plain
+ * `held until <run> ships`.
+ */
+const asOlder = (id: string): void => {
+  const { by, ...older } = JSON.parse(fs.readFileSync(holdFileOf(id), 'utf8')) as { by?: string };
+  assert.equal(by, os.userInfo().username, `a hold put with no --by is put by the OS user`);
+  fs.writeFileSync(holdFileOf(id), JSON.stringify(older, null, 2));
+};
 
 /** A repository with one commit. */
 const aRepo = (): string => {
@@ -370,8 +383,9 @@ test('a held run files nothing — the next step, nor on a hold written between 
   const { printed } = await typed(t, b.e, 'hold', run.id, '--until', target.id);
   assert.equal(
     printed,
-    `${run.id}  held until ${target.id} ships — nothing more of it is filed, and nothing is asked of you, until then; the next tick lifts the hold`,
+    `${run.id}  held until ${target.id} ships (by ${os.userInfo().username}) — nothing more of it is filed, and nothing is asked of you, until then; the next tick lifts the hold`,
   );
+  asOlder(run.id);
   await advance(b.e, readRun(run.id));
   const quiet = await advance(b.e, readRun(run.id));
   assert.ok(!b.filings.includes(`${run.id}-implement`), 'nothing filed while held');
@@ -480,6 +494,7 @@ test('REFUSED while held: an approval, a retry, a round and an acceptance — an
   await advance(b.e, readRun(atGate.id));
   assert.match((await typed(t, b.e, 'ls', atGate.id)).printed, /waiting on you: approve implement/, 'the gate is asked before');
   assert.equal((await typed(t, b.e, 'hold', atGate.id, '--until', target.id)).error, undefined);
+  asOlder(atGate.id);
   const held = `${atGate.id} is held until ${target.id} ships (wf hold, at `;
   await assert.rejects(
     approve(b.e, atGate.id, 'implement'),
@@ -604,6 +619,7 @@ test('REFUSED at shipped defaults: wf rm of a run another holds on names the hol
   const target = await aRunning(b, repo);
   const run = start({ brief: 'waits for the target', repo, workflowDir: oneStep() });
   await hold(b.e, run.id, [target.id]);
+  asOlder(run.id);
   assert.equal((await typed(t, b.e, 'cancel', target.id)).error, undefined);
   b.settle(`${target.id}-implement`, 'stopped');
   const refusedRm = await forget(b.e, target.id, {});
@@ -793,6 +809,7 @@ test('wf decide on a held run that also waits --after a run says both, and that 
   const target = await aRunning(b, repo);
   const child = start({ brief: 'after the parent', repo, workflowDir: oneStep(), after: [parent.id] });
   await hold(b.e, child.id, [target.id]);
+  asOlder(child.id);
   const screen = (await typed(t, b.e, 'decide', child.id)).printed;
   assert.match(screen, new RegExp(`\n  waiting on ${parent.id}`), screen);
   assert.match(
@@ -851,6 +868,7 @@ test('the whole screen of a run held by a person while its step runs, of one wai
 
   const going = await aRunning(b, repo);
   await hold(b.e, going.id, [target.id]);
+  asOlder(going.id);
   assert.deepEqual(await decideScreen(t, b.e, [going.id], { ...ids, '<id>': going.id }), [
     '<id>  still going',
     '',
@@ -867,6 +885,7 @@ test('the whole screen of a run held by a person while its step runs, of one wai
     '  nothing of <id> is filed until wf decide says <parent> has shipped onto main; nothing to decide yet',
   ]);
   await hold(b.e, child.id, [target.id]);
+  asOlder(child.id);
   assert.deepEqual(await decideScreen(t, b.e, [child.id], { ...ids, '<id>': child.id }), [
     '<id>  after the parent',
     '',
@@ -1008,4 +1027,192 @@ test('the whole screen of a loop a person accepted as it stands', async (t) => {
     '  ship it   git -C <repo> merge --no-ff wf/<id>/implement',
     '  drop it   git -C <repo> branch -D wf/<id>/implement',
   ]);
+});
+
+/** `text` as a pattern that matches it and nothing else inside a line. */
+const literal = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+test("holdWord says the person's why and who put the hold after `ships`, before any suffix; with neither it is the plain line", async () => {
+  const { heldLater } = await import('../src/round/round.ts');
+  const said = { why: 'merge conflicts', by: 'operator' };
+  assert.equal(holdWord([{ run: 'a-1' }], said), 'held until a-1 ships (why: merge conflicts; by operator)');
+  assert.equal(holdWord([{ run: 'a-1' }], { why: 'x' }), 'held until a-1 ships (why: x)');
+  assert.equal(holdWord([{ run: 'a-1' }], { by: 'operator' }), 'held until a-1 ships (by operator)', 'a hold with no why says who put it');
+  assert.equal(holdWord([{ run: 'a-1' }], {}), 'held until a-1 ships', 'a file older code wrote, with no by, is the plain line');
+  assert.equal(holdWord([{ run: 'a-1' }]), 'held until a-1 ships');
+  assert.equal(
+    holdWord([{ run: 'a-1', shipped: true }], said),
+    'held until a-1 ships (why: merge conflicts; by operator) — it has shipped, and the next tick lifts the hold',
+  );
+  assert.equal(holdWord([{ run: 'a-1' }, { run: 'b-2' }], said), 'held until a-1 and b-2 ship (why: merge conflicts; by operator)');
+  assert.equal(holdWord([], said), 'held, on a hold that names no run (why: merge conflicts; by operator)');
+  assert.equal(
+    heldLater({ at: 't', until: ['a-1'], why: 'w', by: 'b' }, 'its approval'),
+    'held until a-1 ships (why: w; by b); its approval is asked once the hold lifts',
+  );
+  assert.equal(heldLater({ at: 't', until: ['a-1'] }, 'its approval'), 'held until a-1 ships; its approval is asked once the hold lifts');
+});
+
+test("wf hold writes the person's why, one line, and who they are into the hold's file — by default the OS user — and says them back", async (t) => {
+  const b = board();
+  const repo = aRepo();
+  const target = await aRunning(b, repo);
+  const said = start({ brief: 'held with words', repo, workflowDir: oneStep() });
+  const { printed, error } = await typed(t, b.e, 'hold', said.id, '--until', target.id, '--why', '  two\n words ', '--by', 'operator');
+  assert.equal(error, undefined);
+  assert.deepEqual((({ why, by }) => ({ why, by }))(JSON.parse(fs.readFileSync(holdFileOf(said.id), 'utf8')) as Record<string, unknown>), {
+    why: 'two words',
+    by: 'operator',
+  });
+  assert.equal(
+    printed,
+    `${said.id}  held until ${target.id} ships (why: two words; by operator) — nothing more of it is filed, and nothing is asked of you, until then; the next tick lifts the hold`,
+  );
+  const plain = start({ brief: 'held with none', repo, workflowDir: oneStep() });
+  assert.equal((await typed(t, b.e, 'hold', plain.id, '--until=' + target.id, '--why=it waits')).error, undefined);
+  assert.equal(readRun(plain.id).hold?.why, 'it waits', '--why=<words> is --why <words>');
+  assert.equal((await typed(t, b.e, 'hold', plain.id, '--off')).error, undefined);
+  assert.equal((await typed(t, b.e, 'hold', plain.id, '--until', target.id)).error, undefined);
+  const file = JSON.parse(fs.readFileSync(holdFileOf(plain.id), 'utf8')) as Record<string, unknown>;
+  assert.deepEqual(Object.keys(file), ['at', 'until', 'by'], 'a hold put with no --why writes no why');
+  assert.equal(file.by, os.userInfo().username, 'nor --by: it is put by the OS user');
+
+  const nameless = start({ brief: 'held by a user the system cannot name', repo, workflowDir: oneStep() });
+  t.mock.method(os, 'userInfo', () => {
+    throw new Error('ENOENT: no such file or directory, uv_os_get_passwd');
+  });
+  assert.equal((await typed(t, b.e, 'hold', nameless.id, '--until', target.id, '--why', 'w')).error, undefined);
+  assert.deepEqual(Object.keys(JSON.parse(fs.readFileSync(holdFileOf(nameless.id), 'utf8')) as object), ['at', 'until', 'why']);
+});
+
+test("a hold's file written by hand is read as it is: a why or a by that is no words is left out, and a long why is one line within its cap", async () => {
+  const repo = aRepo();
+  const run = start({ brief: 'held by hand', repo, workflowDir: oneStep() });
+  for (const bad of [7, null, '', ' \n\t ', ['x'], { a: 1 }]) {
+    fs.writeFileSync(holdFileOf(run.id), JSON.stringify({ at: 't', until: ['a-1'], why: bad, by: bad }));
+    const read = readRun(run.id).hold!;
+    assert.ok(!('why' in read) && !('by' in read), `why and by of ${JSON.stringify(bad)} read as none: ${JSON.stringify(read)}`);
+    assert.equal(holdWord([{ run: 'a-1' }], read), 'held until a-1 ships');
+  }
+  const long = `${'many words\n'.repeat(30)}end`;
+  fs.writeFileSync(holdFileOf(run.id), JSON.stringify({ at: 't', until: ['a-1'], why: long, by: `  op\nerator ${'x'.repeat(100)}` }));
+  const read = readRun(run.id).hold!;
+  assert.ok(read.why!.length <= WHY_CAP && read.why!.endsWith('…') && !/\s\s|\n/.test(read.why!), read.why);
+  assert.ok(read.by!.length <= BY_CAP && read.by!.startsWith('op erator x') && read.by!.endsWith('…'), read.by);
+  fs.writeFileSync(holdFileOf(run.id), JSON.stringify({ at: 't', until: ['a-1'] }));
+  assert.deepEqual(readRun(run.id).hold, { at: 't', until: ['a-1'] }, 'a file with no why and no by, as older code wrote it');
+  fs.rmSync(holdFileOf(run.id));
+});
+
+test('REFUSED at shipped defaults: --why and --by with no value, given twice, with --off, blank, or over their caps — and no hold is written', async (t) => {
+  const b = board();
+  const repo = aRepo();
+  const target = await aRunning(b, repo);
+  const run = start({ brief: 'not held', repo, workflowDir: oneStep() });
+  const u = ['hold', run.id, '--until', target.id];
+  await refused(t, b.e, /^--why takes the words for why the run is held: wf hold <runId>/, ...u, '--why');
+  await refused(t, b.e, /^--why takes the words for why the run is held/, ...u, '--why', '--by', 'x');
+  await refused(t, b.e, /^--by takes who puts the hold, by a name: wf hold <runId>/, ...u, '--by');
+  await refused(t, b.e, /^wf hold takes --why once: a hold says one why/, ...u, '--why', 'a', '--why', 'b');
+  await refused(t, b.e, /^wf hold takes --by once: a hold says one by/, ...u, '--by', 'a', '--by=b');
+  await refused(t, b.e, /^wf hold --off lifts the hold whole, and takes no --why or --by/, 'hold', run.id, '--off', '--why', 'w');
+  await refused(t, b.e, /^wf hold --off lifts the hold whole, and takes no --why or --by/, 'hold', run.id, '--by', 'x', '--off');
+  await refused(t, b.e, /^--why takes the words for why the run is held, and was given only blanks: give it words/, ...u, '--why', ' \n ');
+  await refused(t, b.e, /^--by takes who puts the hold, by a name, and was given only blanks/, ...u, '--by=');
+  await refused(
+    t,
+    b.e,
+    new RegExp(`^--why takes at most ${WHY_CAP} characters, and was given ${WHY_CAP + 1}: say it shorter`),
+    ...u,
+    '--why',
+    'w'.repeat(WHY_CAP + 1),
+  );
+  await refused(
+    t,
+    b.e,
+    new RegExp(`^--by takes at most ${BY_CAP} characters, and was given ${BY_CAP + 1}: say it shorter`),
+    ...u,
+    '--by',
+    'b'.repeat(BY_CAP + 1),
+  );
+  assert.ok(!fs.existsSync(holdFileOf(run.id)), 'no refused hold is written');
+  assert.equal((await typed(t, b.e, ...u, '--why', 'w'.repeat(WHY_CAP), '--by', 'b'.repeat(BY_CAP))).error, undefined, 'at the caps, held');
+});
+
+test('REFUSED at shipped defaults: a hold on a run already held with words names the fix that puts them back, quoted for a shell', async (t) => {
+  const b = board();
+  const repo = aRepo();
+  const target = await aRunning(b, repo);
+  const run = start({ brief: 'held once', repo, workflowDir: oneStep() });
+  assert.equal((await typed(t, b.e, 'hold', run.id, '--until', target.id, '--why', "it's blocked", '--by', 'operator')).error, undefined);
+  await refused(
+    t,
+    b.e,
+    new RegExp(`${literal(`then wf hold ${run.id} --until ${target.id} --why 'it'\\''s blocked'.`)}$`),
+    'hold',
+    run.id,
+    '--until',
+    target.id,
+  );
+  const plain = start({ brief: 'held once, with no words', repo, workflowDir: oneStep() });
+  assert.equal((await typed(t, b.e, 'hold', plain.id, '--until', target.id)).error, undefined);
+  await refused(
+    t,
+    b.e,
+    new RegExp(`${literal(`then wf hold ${plain.id} --until ${target.id}.`)}$`),
+    'hold',
+    plain.id,
+    '--until',
+    target.id,
+  );
+});
+
+test("wf ls, wf decide and the feed say a hold's why and who put it beside held until, on the run's row and at the gate it holds back; a hold older code wrote says the plain line", async (t) => {
+  const b = board();
+  const repo = aRepo();
+  const target = await aRunning(b, repo);
+  const words = `held until ${target.id} ships (why: merge conflicts in five files; by operator)`;
+  const why = ['--why', 'merge conflicts in five files', '--by', 'operator'];
+
+  const atGate = start({ brief: 'at its gate', repo, workflowDir: gated() });
+  await advance(b.e, readRun(atGate.id));
+  b.settle(`${atGate.id}-implement`, 'succeeded', SIGNED);
+  await advance(b.e, readRun(atGate.id));
+  const olderGate = start({ brief: 'at its gate, held by older code', repo, workflowDir: gated() });
+  await advance(b.e, readRun(olderGate.id));
+  b.settle(`${olderGate.id}-implement`, 'succeeded', SIGNED);
+  await advance(b.e, readRun(olderGate.id));
+  assert.equal((await typed(t, b.e, 'hold', atGate.id, '--until', target.id, ...why)).error, undefined);
+  assert.equal((await typed(t, b.e, 'hold', olderGate.id, '--until', target.id)).error, undefined);
+  asOlder(olderGate.id);
+
+  const ls = (await typed(t, b.e, 'ls', atGate.id)).printed;
+  assert.match(ls, new RegExp(`→ ${literal(words)}  —  wf hold ${atGate.id} --off lifts it`), ls);
+  assert.match(ls, new RegExp(`${literal(words)}; its approval is asked once the hold lifts`), ls);
+  const olderLs = (await typed(t, b.e, 'ls', olderGate.id)).printed;
+  assert.match(olderLs, new RegExp(`→ held until ${target.id} ships  —  wf hold ${olderGate.id} --off lifts it`), olderLs);
+  assert.match(olderLs, new RegExp(`held until ${target.id} ships; its approval is asked once the hold lifts`), olderLs);
+
+  const screen = (await typed(t, b.e, 'decide', atGate.id)).printed;
+  assert.match(screen, new RegExp(`\n  ${literal(words)}\n`), screen);
+  assert.deepEqual((await decide(b.e, atGate.id)).gates, {
+    implement: `awaiting approval:  ${words}; its approval is asked once the hold lifts`,
+  });
+  assert.match((await typed(t, b.e, 'decide', olderGate.id)).printed, new RegExp(`\n  held until ${target.id} ships\n`));
+
+  const parent = await aRunning(b, repo);
+  const child = start({ brief: 'after the parent', repo, workflowDir: oneStep(), after: [parent.id] });
+  assert.equal((await typed(t, b.e, 'hold', child.id, '--until', target.id, ...why)).error, undefined);
+  assert.match(
+    (await typed(t, b.e, 'decide', child.id)).printed,
+    new RegExp(`\n  ${literal(words)} as well — wf hold ${child.id} --off lifts the hold, and not the wait above$`),
+  );
+
+  const quiet = start({ brief: 'held before it files', repo, workflowDir: oneStep() });
+  assert.equal((await typed(t, b.e, 'hold', quiet.id, '--until', target.id, ...why)).error, undefined);
+  assert.equal((await advance(b.e, readRun(quiet.id))).feed.run.note, words, "the feed's note says the words");
+  const olderQuiet = start({ brief: 'held before it files, by older code', repo, workflowDir: oneStep() });
+  assert.equal((await typed(t, b.e, 'hold', olderQuiet.id, '--until', target.id)).error, undefined);
+  asOlder(olderQuiet.id);
+  assert.equal((await advance(b.e, readRun(olderQuiet.id))).feed.run.note, `held until ${target.id} ships`);
 });

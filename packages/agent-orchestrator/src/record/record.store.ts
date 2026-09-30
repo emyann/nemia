@@ -9,7 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Result, Schema, SchemaIssue } from 'effect';
-import type { Acceptance, Approval, Hold, Pruned, Run } from './record.ts';
+import { BY_CAP, oneLine, WHY_CAP, type Acceptance, type Approval, type Hold, type Pruned, type Run } from './record.ts';
 import { spentAcceptances, spentApprovals, type RoundAsk } from '../status/status.ts';
 import { spentRoundAsks } from '../round/round.ts';
 import { spentAsks, type RetryAsk } from '../retry/index.ts';
@@ -159,12 +159,23 @@ const sayOnce = (line: string): void => {
 const isText = Schema.is(Schema.String);
 const isAmount = Schema.is(Schema.Finite);
 const isList = Schema.is(Schema.Array(Schema.Unknown));
+/** A person's free words off a file, one line within `cap`: none for a value that is not text, or only blanks. */
+const wordsOf = (value: unknown, cap: number): string | undefined => (isText(value) && value.trim() ? oneLine(value, cap) : undefined);
 const isPrunedWorktree = Schema.is(Schema.StructWithRest(Schema.Struct({ path: Schema.String, bytes: Schema.Finite }), Rest));
 
 /** A marker's text as JSON, or undefined where it is not: each field is then read as missing, as a marker that does not read is. */
 const jsonOr = (text: string): unknown => {
   try {
     return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+};
+
+/** A person's marker file, as JSON where it reads as JSON (`jsonOr`) — or undefined, when there is no such file to read. */
+const markerOf = (file: string): { json: unknown } | undefined => {
+  try {
+    return { json: jsonOr(readText(file)) };
   } catch {
     return undefined;
   }
@@ -203,14 +214,9 @@ export const pruneFile = (id: string) => path.join(runsDir(), `${id}.pruned`);
  * field that does not read is empty. Its files (`wf prune --artifacts`) are pruned when the marker names them, at the time it says or none.
  */
 function readPruned(id: string): Pruned | undefined {
-  let text: string;
-  try {
-    text = readText(pruneFile(id));
-  } catch {
-    return undefined;
-  }
-  const read = jsonOr(text);
-  const [at, worktrees, artifacts] = [fieldOf(read, 'at'), fieldOf(read, 'worktrees'), fieldOf(read, 'artifacts')];
+  const marker = markerOf(pruneFile(id));
+  if (!marker) return undefined;
+  const [at, worktrees, artifacts] = [fieldOf(marker.json, 'at'), fieldOf(marker.json, 'worktrees'), fieldOf(marker.json, 'artifacts')];
   const [artifactsAt, artifactsBytes] = [fieldOf(artifacts, 'at'), fieldOf(artifacts, 'bytes')];
   return {
     at: isText(at) ? at : '',
@@ -222,9 +228,9 @@ function readPruned(id: string): Pruned | undefined {
 }
 
 /**
- * That a person holds the run until other runs ship (`wf hold`): `{ at, until }`, a person's fact in a file of its own for the reason
- * `cancelFile` is. Written by `hold` alone, exclusively; removed by `wf hold --off`, by the tick once every run it names has shipped
- * (`removeHold`), and by `wf rm` with the run. Composed onto the run on read as `hold`.
+ * That a person holds the run until other runs ship (`wf hold`): `{ at, until, why?, by? }`, a person's fact in a file of its own for the
+ * reason `cancelFile` is. Written by `hold` alone, exclusively; removed by `wf hold --off`, by the tick once every run it names has shipped
+ * (`removeHold`), and by `wf rm` with the run. Composed onto the run on read as `hold`, its `why` and `by` each one line within its cap.
  */
 export const holdFile = (id: string) => path.join(runsDir(), `${id}.hold`);
 
@@ -233,24 +239,21 @@ export const holdFile = (id: string) => path.join(runsDir(), `${id}.hold`);
  * never lifts a hold that names nothing, so only `wf hold --off` lifts it, and the run files nothing while the file is there (`advance`).
  */
 function readHold(id: string): Hold | undefined {
-  let text: string;
-  try {
-    text = readText(holdFile(id));
-  } catch {
-    return undefined;
-  }
-  const read = jsonOr(text);
-  const [at, until] = [fieldOf(read, 'at'), fieldOf(read, 'until')];
-  return { at: isText(at) ? at : '', until: isList(until) ? until.filter(isText) : [] };
+  const marker = markerOf(holdFile(id));
+  if (!marker) return undefined;
+  const [at, until] = [fieldOf(marker.json, 'at'), fieldOf(marker.json, 'until')];
+  const [why, by] = [wordsOf(fieldOf(marker.json, 'why'), WHY_CAP), wordsOf(fieldOf(marker.json, 'by'), BY_CAP)];
+  return { at: isText(at) ? at : '', until: isList(until) ? until.filter(isText) : [], ...(why ? { why } : {}), ...(by ? { by } : {}) };
 }
 
 /**
- * Write down that this run is held until `until` ship, and answer with the hold written — or null, when a hold already stands. `wx`, so a
- * hold two people put at once is the first one's, whole, and a hold is never edited: changing what it names is `--off` and a new hold.
+ * Write down that this run is held until `until` ship, with the person's `why` and who they are (`by`) when given, and answer with the
+ * hold written — or null, when a hold already stands. `wx`, so a hold two people put at once is the first one's, whole, and a hold is
+ * never edited: changing what it names or says is `--off` and a new hold.
  */
-export const writeHold = (id: string, until: readonly string[]): Hold | null => {
+export const writeHold = (id: string, until: readonly string[], { why, by }: Pick<Hold, 'why' | 'by'> = {}): Hold | null => {
   fs.mkdirSync(runsDir(), { recursive: true });
-  const hold: Hold = { at: new Date().toISOString(), until: [...until] };
+  const hold: Hold = { at: new Date().toISOString(), until: [...until], ...(why ? { why } : {}), ...(by ? { by } : {}) };
   try {
     fs.writeFileSync(holdFile(id), JSON.stringify(hold, null, 2), { flag: 'wx' });
     return hold;

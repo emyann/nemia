@@ -146,7 +146,7 @@ export function feedWords(
     run: {
       word: `${stoppedOn ?? status}${run.pruned ? ' (pruned)' : ''}`,
       ...(run.hold && status !== 'cancelled'
-        ? { note: holdWord(l.holding ?? []) }
+        ? { note: holdWord(l.holding ?? [], run.hold) }
         : onYou.length
           ? { note: `waiting on you: ${onYou.join(', ')}` }
           : {}),

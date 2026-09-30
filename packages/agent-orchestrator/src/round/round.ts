@@ -448,11 +448,15 @@ export const heldNote = (step: Workflow, run: Run): string =>
 const noMoreRounds = (pruned: Pruned): string => `no round more, since the run was ${prunedWords(pruned)}`;
 
 /**
- * Where a verb would be offered on a held run, what is said instead: `held until a-1x2y ships; its approval is asked once the hold lifts`.
- * Every verb that would release work is refused while the hold stands (`heldRefusal`), and a note never offers a refused verb.
+ * Where a verb would be offered on a held run, what is said instead, with what the person who put the hold said of it: `held until a-1x2y
+ * ships (why: merge conflicts; by operator); its approval is asked once the hold lifts`. Every verb that would release work is refused
+ * while the hold stands (`heldRefusal`), and a note never offers a refused verb.
  */
 export const heldLater = (hold: Hold, what: string): string =>
-  `${holdWord(hold.until.map((run) => ({ run })))}; ${what} is asked once the hold lifts`;
+  `${holdWord(
+    hold.until.map((run) => ({ run })),
+    hold,
+  )}; ${what} is asked once the hold lifts`;
 
 /** The steps of a loop over their budget, in words: `implement has cost $4.20 of its $3 budget`. */
 const overWords = (over: ReadonlyArray<{ name: string; spent: Spend; cap: number }>): string =>

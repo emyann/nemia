@@ -19,6 +19,7 @@ export type { Answer, Asked, Question, QuestionOption } from './question/questio
 export { answerOf, messageRefusal, type EarlierTry } from './retry/index.ts';
 export { answerLines, deniedOffer, overBudgetLine, retriesDue, retryable, retryLines, retryRefusal, tryNote } from './retry/index.ts';
 export {
+  BY_CAP,
   checkTaskId,
   filesPrunedWords,
   firstLine,
@@ -34,6 +35,7 @@ export {
   stepTasks,
   stopsFollowers,
   unjudgedWords,
+  WHY_CAP,
 } from './record/record.ts';
 export type {
   Acceptance,

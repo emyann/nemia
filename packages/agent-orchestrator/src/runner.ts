@@ -66,7 +66,7 @@ export {
   sizeOf,
 } from './run.ts';
 export type { Pruned, PrunedFiles, PruneFacts, Pruning } from './run.ts';
-export { heldRefusal, holdAdvice, holdRefusal, holdsOf, holdWord } from './run.ts';
+export { BY_CAP, heldRefusal, holdAdvice, holdRefusal, holdsOf, holdWord, oneLine, WHY_CAP } from './run.ts';
 export type { Hold } from './run.ts';
 export {
   acceptAsk,

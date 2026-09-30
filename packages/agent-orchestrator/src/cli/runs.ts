@@ -15,6 +15,7 @@ import {
   findAgent,
   forget,
   forgetLine,
+  BY_CAP,
   hold,
   holdAdvice,
   holdWord,
@@ -34,6 +35,8 @@ import {
   unjudgedOf,
   viewedOnce,
   waitAdvice,
+  oneLine,
+  WHY_CAP,
   type AgentPlace,
   type ForgetHow,
   type Pruning,
@@ -89,27 +92,65 @@ export function pruneHow(argv: string[]): { ids: string[]; unmerged: boolean; ye
   return { ids, unmerged, yes, artifacts };
 }
 
+/** What `wf hold` takes beside the runs: the person's words for why (`--why`), and who puts the hold (`--by`). */
+type HoldSaid = { why?: string; by?: string };
+
+/** `--why` and `--by`: the flag, the key it fills, what it takes as its refusal says it, and the longest it may be. */
+const SAID_FLAGS = [
+  { flag: '--why', key: 'why', takes: 'the words for why the run is held', cap: WHY_CAP },
+  { flag: '--by', key: 'by', takes: 'who puts the hold, by a name', cap: BY_CAP },
+] as const;
+
 /**
- * `wf hold`'s arguments after the run: `--until <runId>`, once for each run to wait on, or `--off` alone. Refused before any run is read:
- * neither, both, a flag it does not take, and `--until` with no run. A run named twice is the verb's to refuse (`holdRefusal`), in its
- * words.
+ * `--why` or `--by`'s value, as one line: every run of whitespace, a newline included, one space. Refused: the flag given twice, with no
+ * value or another flag after it, blank, or longer than its cap.
  */
-export function holdHow(argv: string[]): { until: string[]; off: boolean } {
-  const shape = 'wf hold <runId> --until <runId> [--until <runId> ...], or wf hold <runId> --off';
+function saidValue(
+  said: HoldSaid,
+  { flag, key, takes, cap }: (typeof SAID_FLAGS)[number],
+  value: string | undefined,
+  shape: string,
+): string {
+  if (said[key] !== undefined) usage(`wf hold takes ${flag} once: a hold says one ${key}. ${shape}.`);
+  if (value === undefined || value.startsWith('--')) return usage(`${flag} takes ${takes}: ${shape}.`);
+  const line = oneLine(value, Number.POSITIVE_INFINITY);
+  if (!line) usage(`${flag} takes ${takes}, and was given only blanks: give it words, or leave ${flag} out.`);
+  if (line.length > cap) usage(`${flag} takes at most ${cap} characters, and was given ${line.length}: say it shorter.`);
+  return line;
+}
+
+/**
+ * `wf hold`'s arguments after the run: `--until <runId>`, once for each run to wait on, with `--why "<words>"` and `--by <name>` beside
+ * them, each at most once; or `--off` alone. Refused before any run is read: neither, both, a flag it does not take, `--until` with no
+ * run, and what `saidValue` refuses of `--why` and `--by`, and either with `--off`. A run named twice is the verb's to refuse
+ * (`holdRefusal`), in its words.
+ */
+export function holdHow(argv: string[]): { until: string[]; off: boolean } & HoldSaid {
+  const shape = 'wf hold <runId> --until <runId> [--until <runId> ...] [--why "<words>"] [--by <name>], or wf hold <runId> --off';
   const until: string[] = [];
+  const said: HoldSaid = {};
   let off = false;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
+    const saying = SAID_FLAGS.find(({ flag }) => arg === flag || arg.startsWith(`${flag}=`));
     if (arg === '--off') off = true;
+    else if (saying) said[saying.key] = saidValue(said, saying, arg === saying.flag ? argv[++i] : arg.slice(saying.flag.length + 1), shape);
     else if (arg === '--until' || arg.startsWith('--until=')) {
       const id = arg === '--until' ? argv[++i] : arg.slice('--until='.length);
       if (!id || id.startsWith('-')) usage(`--until takes the run to wait on, by id: ${shape}.`);
       until.push(id);
     } else usage(`wf hold does not take ${arg}. It takes the run, then the runs it waits on or --off: ${shape}.`);
   }
+  holdTogether({ until, off, ...said }, shape);
+  return { until, off, ...said };
+}
+
+/** Refused of `wf hold`'s flags together: `--until` and `--off` both, `--why` or `--by` with `--off`, and neither `--until` nor `--off`. */
+function holdTogether({ until, off, why, by }: { until: string[]; off: boolean } & HoldSaid, shape: string): void {
   if (off && until.length) usage(`wf hold takes --until or --off, not both: lift the hold first, then hold it again — ${shape}.`);
+  if (off && (why !== undefined || by !== undefined))
+    usage(`wf hold --off lifts the hold whole, and takes no --why or --by: those go with --until, on the hold put next — ${shape}.`);
   if (!off && !until.length) usage(`wf hold needs the runs to wait on, or --off to lift a hold: ${shape}.`);
-  return { until, off };
 }
 
 /** `wf agents`' flags: `--repo <r>` once, and for a card `--from repo|yours` once, when both places have an agent of that name. */
@@ -149,7 +190,7 @@ function printAsks(run: Run, { steps, waitingOnYou, waiting, holding, toDecide }
     const never = !holding.length || holding.some((w) => w.missing || w.cancelledAt || w.gone?.length);
     const lifting = holding.length > 0 && holding.every((w) => w.shipped);
     console.log(
-      `   → ${holdWord(holding)}${never ? `: ${holdAdvice(run, holding)}` : lifting ? '' : `  —  wf hold ${run.id} --off lifts it`}`,
+      `   → ${holdWord(holding, run.hold)}${never ? `: ${holdAdvice(run, holding)}` : lifting ? '' : `  —  wf hold ${run.id} --off lifts it`}`,
     );
   }
   const result = resultBranches(run);
@@ -350,14 +391,17 @@ export async function pruneVerb(rest: string[], e: Engine): Promise<void> {
 export async function holdVerb(rest: string[], e: Engine): Promise<void> {
   if (!rest[0] || rest[0].startsWith('-'))
     usage('wf hold takes the run first: wf hold <runId> --until <runId> [--until <runId> ...], or wf hold <runId> --off.');
-  const { until, off } = holdHow(rest.slice(1));
+  const { until, off, why, by } = holdHow(rest.slice(1));
   if (off) {
     const { run } = unhold(rest[0]);
     return console.log(`${run.id}  hold lifted — the next tick goes on, and what its steps ask is asked`);
   }
-  const { run } = await hold(e, rest[0], until);
+  const { run, hold: put } = await hold(e, rest[0], until, { why, by });
   return console.log(
-    `${run.id}  ${holdWord(until.map((u) => ({ run: u })))} — nothing more of it is filed, and nothing is asked of you, until then; the next tick lifts the hold`,
+    `${run.id}  ${holdWord(
+      until.map((u) => ({ run: u })),
+      put,
+    )} — nothing more of it is filed, and nothing is asked of you, until then; the next tick lifts the hold`,
   );
 }
 

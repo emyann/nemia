@@ -18,7 +18,7 @@ import {
   type RoundBriefing,
 } from './brief-sections.ts';
 import { landsOnCheck, owesReplies } from '../status/status.ts';
-import { checkContract, landingContract } from '../check/check.ts';
+import { checkContract, checkHandedSection, landingContract, type CheckHanded } from '../check/check.ts';
 import { artifactsContract } from '../artifacts/artifacts.ts';
 import { briefBody } from '../agents/agents.ts';
 import { inputsLine } from '../start/inputs.ts';
@@ -52,6 +52,11 @@ import { resultSteps, workChecks } from '../branches/branches.ts';
  * it was filed because a person decided the findings are not this run's work, and it is the only step that can tell anyone — see
  * `acceptedSection`.
  *
+ * A step filed after a step with a `check:` is handed what that check said (`## What <step>'s check said`): its exit, the last lines of
+ * each stream, and every line of its stdout that starts `wf <name>:`, whole. That is evidence, not process: the run executed the command,
+ * so what it printed is a fact about the work, as the diff is — a reviewer judges the mutants a check ran with it rather than being sent to
+ * a log its fence does not reach. See `checkHandedSection`.
+ *
  * Every brief ends on what finishing means: the command the step is judged by, when it has one, where its files go, and then the
  * closeout, last, because it says to give it last. A loop's target past its first round answers the findings it was handed. A folder
  * run's steps are told of folders and never of git (`placeOf`). A try or a round that continues the last session is told only what
@@ -77,6 +82,8 @@ import { resultSteps, workChecks } from '../branches/branches.ts';
  *   without it.
  * @param inputsDir The directory the run copied `wf start --input` files into (`inputsDir` in record.store.ts): named, with `run.inputs`,
  *   under what was asked for.
+ * @param checked For a step filed after checked steps: what each of their checks said on the try or round it follows
+ *   (`checkHandedSection`), read by file.verb.ts. Absent, and nothing is said of a check: the board's preview composes without it.
  */
 export function composeBrief(
   step: Workflow,
@@ -89,6 +96,7 @@ export function composeBrief(
   round?: RoundBriefing,
   parents?: readonly ParentCloseout[],
   inputsDir?: string,
+  checked?: readonly CheckHanded[],
 ): string {
   const inFolder = placeOf(run) === 'folder';
   const contracts = [
@@ -106,10 +114,7 @@ export function composeBrief(
       ? roundSection(step, round, steps, closeoutOf, inFolder)
       : '';
   if (retry?.resumed || round?.resumed) return again.slice(1) + contracts;
-  const given =
-    (step.input ?? []).map((from) => fromSection(from, steps, closeoutOf)).join('\n') +
-    (step.loop ? loopSection(step, run, steps, closeoutOf) : '') +
-    again;
+  const given = givenSections(step, run, steps, closeoutOf, checked) + again;
   const tree = depsLines(deps);
   const approved = approvedSection(step, run, steps);
   const accepted = acceptedSection(step, run, steps, closeoutOf);
@@ -217,6 +222,24 @@ export function composeBrief(
   if (given) parts.push(given);
   parts.push(contracts);
   return parts.join('\n');
+}
+
+/**
+ * What a step is handed of the steps before it, in every brief but a resumed try's or round's: what each step it reads declared
+ * (`## From <step>`), what each checked step it follows was told by its check (`## What <step>'s check said`), and its loop's findings.
+ */
+function givenSections(
+  step: Workflow,
+  run: Run,
+  steps: readonly Workflow[],
+  closeoutOf: (step: string) => Closeout | undefined,
+  checked: readonly CheckHanded[] = [],
+): string {
+  return (
+    (step.input ?? []).map((from) => fromSection(from, steps, closeoutOf)).join('\n') +
+    checked.map((c) => checkHandedSection(c)).join('') +
+    (step.loop ? loopSection(step, run, steps, closeoutOf) : '')
+  );
 }
 
 /**

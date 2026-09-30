@@ -1,8 +1,10 @@
 /**
- * `wf retry`: ask for another try of a step (`retry`), by writing the person's ask and nothing else, refused before anything is written. A
- * controller, reaching the runtime through the client (`runtime-client.ts`).
+ * `wf retry`: ask for another try of a step, by writing the person's ask and nothing else, refused before anything is written. A controller,
+ * reaching the runtime through the client (`runtime-client.ts`): an Effect program that requires the engine as a service (`retryRun`, over
+ * `EngineService`), and `retry`, its plain face in a Promise, over the engine it is handed.
  */
-import type { Engine } from '../runtime-client.ts';
+import { Effect } from 'effect';
+import { EngineService, awaited, tried, type Engine } from '../runtime-client.ts';
 import { tryOf, type Run } from '../record/record.ts';
 import { retryable, retryRefusal, type RetryAsk, type RetryHow } from './index.ts';
 import { askFile, askIn, readAsks, readRun, stepsOf, writeAsk } from '../record/record.store.ts';
@@ -25,18 +27,19 @@ export type Asked = { run: Run; ask: RetryAsk; file: string; stopFirst: boolean 
  *
  * `stopBlocked` takes a step whose session its harness blocked, with nothing signed (`retryable`): the ask is written as any other, and
  * the tick stops that session before it files the try. `wf retry` passes it, and so does the board's `POST …/retry`. Left out, such a
- * step is running and refused as one: a caller takes the harness's word on purpose, never by default.
+ * step is running and refused as one: a caller takes the harness's word on purpose, never by default. Fails with a refusal, the verb's or
+ * one a read threw; dies of anything else (`tried`, `awaited`).
  */
-export async function retry(
-  e: Engine,
+export const retryRun = Effect.fn('retry')(function* (
   id: string,
   stepName: string,
   how: RetryHow,
   { stopBlocked = false }: { stopBlocked?: boolean } = {},
-): Promise<Asked> {
-  const run = readRun(id);
-  const steps = stepsOf(run);
-  const { views, phaseOf } = await taskPhases(e, run);
+) {
+  const e = yield* EngineService;
+  const run = yield* tried(() => readRun(id));
+  const steps = yield* tried(() => stepsOf(run));
+  const { views, phaseOf } = yield* awaited(() => taskPhases(e, run));
   const blocked = stopBlocked ? harnessBlocked(views) : () => false;
   const spendOf = spendReader(views);
   const refusal = (asks: readonly RetryAsk[]) =>
@@ -54,8 +57,8 @@ export async function retry(
       spendOf,
     );
 
-  const refused = refusal(readAsks(id).asks);
-  if (refused) throw new Conflict({ message: refused });
+  const refused = refusal((yield* tried(() => readAsks(id))).asks);
+  if (refused) return yield* Effect.fail(new Conflict({ message: refused }));
   const ask: RetryAsk = {
     step: stepName,
     try: tryOf(run, stepName) + 1,
@@ -66,13 +69,14 @@ export async function retry(
     at: new Date().toISOString(),
   };
   const file = askFile(id, stepName, ask.try);
-  if (!writeAsk(file, ask)) {
-    throw new Conflict({
-      message:
+  if (!(yield* tried(() => writeAsk(file, ask)))) {
+    const why = yield* tried(
+      () =>
         refusal(readAsks(id).asks) ??
         strayAsk(file, askIn(file, stepName, ask.try), `try ${ask.try} of ${stepName}`, `wf retry ${id} ${stepName}`) ??
         `try ${ask.try} of ${stepName} is already asked for. Wait for it: wf ls ${id}.`,
-    });
+    );
+    return yield* Effect.fail(new Conflict({ message: why }));
   }
   const step = steps.find((s) => s.name === stepName)!;
   return {
@@ -80,5 +84,12 @@ export async function retry(
     ask,
     file,
     stopFirst: retryable(step, run, phaseOf, closeoutReader(views, run), closeoutAsked(views), steps, blocked, spendOf).blockedByHarness,
-  };
-}
+  } satisfies Asked;
+});
+
+/**
+ * `wf retry` (`retryRun`) in a Promise, over `e`: what the CLI, the api and the tests call. Rejects with the refusal the program failed
+ * with, or with whatever else it died of, as it was thrown.
+ */
+export const retry = (e: Engine, id: string, stepName: string, how: RetryHow, blocked: { stopBlocked?: boolean } = {}): Promise<Asked> =>
+  Effect.runPromise(retryRun(id, stepName, how, blocked).pipe(Effect.provide(EngineService.layer(e))));

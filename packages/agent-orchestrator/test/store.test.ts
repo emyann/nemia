@@ -30,6 +30,11 @@ import type { ForgetHow, Forgot } from '../src/forget/forget.ts';
 import type { Refusal } from '../src/refusal/refusal.ts';
 import type { EngineService } from '../src/runtime-client.ts';
 import type { RetryHow } from '../src/retry/retry-ask.ts';
+import type { Accepted, RoundAsked } from '../src/round/round.verb.ts';
+import type { Asked } from '../src/retry/retry.verb.ts';
+import type { Approved } from '../src/gate/gate.verb.ts';
+import type { Told } from '../src/say/say.verb.ts';
+import type { Cancelled } from '../src/cancel/cancel.verb.ts';
 import { readCheckBrief, verdictWord } from '../src/check/check.ts';
 import { scratch } from './scratch.ts';
 import { decideScreen } from './screens.ts';
@@ -5809,6 +5814,286 @@ test("`wf rm`'s program says in its type what it needs and what it refuses: the 
     // @ts-expect-error -- forgetRun requires EngineService, and runPromise takes no requirement
     Effect.runPromise(forgetRun('x', {}));
   assert.deepEqual([typeof typed, typeof infallible, typeof unprovided], ['object', 'object', 'function']);
+});
+
+/**
+ * The programs of what a person asks of a run, and a runner of one over `e` as its plain face runs it: given the engine as a service.
+ * Imported at the call, as `WF_ROOT` is read when the store loads.
+ */
+const verbPrograms = async () => {
+  const { Effect } = await import('effect');
+  const { EngineService } = await import('../src/runtime-client.ts');
+  const { acceptRun, roundRun } = await import('../src/round/round.verb.ts');
+  const { retryRun } = await import('../src/retry/retry.verb.ts');
+  const { approveRun } = await import('../src/gate/gate.verb.ts');
+  const { sayRun } = await import('../src/say/say.verb.ts');
+  const { cancelRun } = await import('../src/cancel/cancel.verb.ts');
+  const over = <A, E>(e: Engine, program: EffectOf<A, E, EngineService>): Promise<A> =>
+    Effect.runPromise(program.pipe(Effect.provide(EngineService.layer(e))));
+  return { Effect, EngineService, over, acceptRun, approveRun, cancelRun, retryRun, roundRun, sayRun };
+};
+
+/** What `p` rejects with, or a failed test when it resolves. */
+const rejection = (p: Promise<unknown>, what: string): Promise<unknown> =>
+  p.then(
+    () => assert.fail(`${what} resolved`),
+    (x: unknown) => x,
+  );
+
+test('the programs of `wf round`, `wf accept`, `wf retry`, `wf approve`, `wf say` and `wf cancel`, given the engine as a service, answer what their plain faces answer on the same store: each face runs its program and adds nothing', async (t) => {
+  const v = await verbPrograms();
+  const { cancelFile } = await import('../src/record/record.store.ts');
+  const at = Date.parse('2026-09-30T08:00:00.000Z');
+  const same = async <A extends object>(what: string, program: () => Promise<A>, face: () => Promise<A>) => {
+    t.mock.timers.enable({ apis: ['Date'], now: at });
+    try {
+      const ran = await program();
+      if ('file' in ran) fs.rmSync(String(ran.file));
+      assert.deepStrictEqual(ran, await face(), what);
+    } finally {
+      t.mock.timers.reset();
+    }
+  };
+
+  const run = started(loopedThenShip());
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  for (const n of [1, 2]) {
+    await toReview(b, run.id, n, true);
+    assert.deepEqual((await advance(b.e, readRun(run.id))).looped, ['review'], `round ${n + 1}`);
+  }
+  await toReview(b, run.id, 3, true);
+  await advance(b.e, readRun(run.id));
+  await same(
+    'wf round',
+    () => v.over(b.e, v.roundRun(run.id)),
+    () => round(b.e, run.id),
+  );
+  fs.rmSync(path.join(asksDir(run.id), 'round-review-4'));
+  await same(
+    'wf accept',
+    () => v.over(b.e, v.acceptRun(run.id, undefined, ENOUGH)),
+    () => accept(b.e, run.id, undefined, ENOUGH),
+  );
+  assert.deepEqual((await advance(b.e, readRun(run.id))).filed, ['ship']);
+  b.settle(`${run.id}-ship`, 'succeeded', SIGNED);
+  await advance(b.e, readRun(run.id));
+  await same(
+    'wf approve',
+    () => v.over(b.e, v.approveRun(run.id, 'ship', 'ship it')),
+    () => approve(b.e, run.id, 'ship', 'ship it'),
+  );
+
+  const failed = started(folder());
+  await advance(b.e, readRun(failed.id));
+  b.settle(`${failed.id}-implement`, 'failed');
+  await advance(b.e, readRun(failed.id));
+  await same(
+    'wf retry',
+    () => v.over(b.e, v.retryRun(failed.id, 'implement', { mode: 'fresh' })),
+    () => retry(b.e, failed.id, 'implement', { mode: 'fresh' }),
+  );
+
+  const running = started(folder());
+  await advance(b.e, readRun(running.id));
+  const taskId = `${running.id}-implement`;
+  b.settle(taskId, 'running');
+  const told = await v.over(b.e, v.sayRun(running.id, 'implement', 'Start with the parser.'));
+  const face = await say(b.e, running.id, 'implement', 'Start with the parser.');
+  assert.deepStrictEqual(
+    [told, face],
+    b.said.get(taskId)!.map((said) => ({ ...face, said })),
+    'wf say: each journalled once, in turn',
+  );
+
+  await same(
+    'wf cancel',
+    async () => {
+      const cancelled = await v.over(b.e, v.cancelRun(running.id));
+      fs.rmSync(cancelFile(running.id));
+      return cancelled;
+    },
+    () => cancel(b.e, running.id),
+  );
+  assert.deepEqual(b.stopped.slice(-2), [taskId, taskId], 'each asked the engine to stop the step');
+});
+
+test('REFUSED as a typed failure: a run not there is a `Missing`, and a state that forbids the verb a `Conflict`, which each program fails with in the words its plain face rejects with', async () => {
+  const v = await verbPrograms();
+  const recovered = <A>(e: Engine, program: EffectOf<A, Refusal, EngineService>, tag: 'Missing' | 'Conflict') =>
+    v.over(
+      e,
+      program.pipe(
+        v.Effect.map(() => 'answered'),
+        v.Effect.catchTag(tag, (r) => v.Effect.succeed(r.message)),
+      ),
+    );
+  const b = board();
+  assert.equal(
+    await recovered(b.e, v.approveRun('no-such-run', 'x'), 'Missing'),
+    'no such run: no-such-run. wf approve takes a run by its id, as wf ls lists it: wf approve <runId> <step>.',
+  );
+  assert.equal(
+    await recovered(b.e, v.acceptRun('no-such-run', undefined, ENOUGH), 'Missing'),
+    'no such run: no-such-run. wf accept takes a run by its id, as wf ls lists it: wf accept <runId> [<step>] --message "<why>".',
+  );
+
+  const run = started(looped());
+  await advance(b.e, readRun(run.id));
+  b.settle(`${run.id}-implement`, 'running');
+  const refusals: Array<[string, EffectOf<unknown, Refusal, EngineService>, Promise<unknown>]> = [
+    ['wf retry', v.retryRun(run.id, 'implement', { mode: 'fresh' }), retry(b.e, run.id, 'implement', { mode: 'fresh' })],
+    ['wf round', v.roundRun(run.id), round(b.e, run.id)],
+    ['wf approve', v.approveRun(run.id, 'implement', 'ok'), approve(b.e, run.id, 'implement', 'ok')],
+  ];
+  for (const [what, program, face] of refusals) {
+    const err = await rejection(face, what);
+    assert.ok(err instanceof Conflict, `${what}: a Conflict, not ${String(err)}`);
+    assert.equal(await recovered(b.e, program, 'Conflict'), err.message, what);
+  }
+  assert.ok(!fs.existsSync(asksDir(run.id)), 'nothing written');
+});
+
+test("REFUSED as a typed failure: a record the store refuses to read is each program's `Invalid`, in the store's words, not a defect", async () => {
+  const v = await verbPrograms();
+  const e = board().e;
+  fs.writeFileSync(path.join(ROOT, 'runs', 'garbled.json'), '{ not json');
+  const programs: Array<[string, EffectOf<unknown, Refusal, EngineService>]> = [
+    ['wf round', v.roundRun('garbled')],
+    ['wf accept', v.acceptRun('garbled', undefined, ENOUGH)],
+    ['wf retry', v.retryRun('garbled', 'implement', { mode: 'fresh' })],
+    ['wf approve', v.approveRun('garbled', 'implement')],
+    ['wf say', v.sayRun('garbled', 'implement', 'hello')],
+    ['wf cancel', v.cancelRun('garbled')],
+  ];
+  for (const [what, program] of programs) {
+    const said = await v.over(
+      e,
+      program.pipe(
+        v.Effect.map(() => 'answered'),
+        v.Effect.catchTag('Invalid', (r) => v.Effect.succeed(r.message)),
+      ),
+    );
+    assert.match(said, /is not JSON/, what);
+  }
+  assert.ok(!fs.existsSync(asksDir('garbled')) && !fs.existsSync(path.join(ROOT, 'runs', 'garbled.cancelled')), 'nothing written');
+  fs.rmSync(path.join(ROOT, 'runs', 'garbled.json'));
+});
+
+test('a journal that does not read is a defect of each program, which no `Effect.catch` recovers, and its plain face rejects with it as it was thrown; nothing written', async () => {
+  const v = await verbPrograms();
+  const b = board();
+  const run = started(folder());
+  await advance(b.e, readRun(run.id));
+  const boom = new Error('journal');
+  const broken = {
+    ...b.e,
+    view: async () => {
+      throw boom;
+    },
+  };
+  const verbs: Array<[string, EffectOf<unknown, Refusal, EngineService>, () => Promise<unknown>]> = [
+    ['wf round', v.roundRun(run.id), () => round(broken, run.id)],
+    ['wf accept', v.acceptRun(run.id, undefined, ENOUGH), () => accept(broken, run.id, undefined, ENOUGH)],
+    ['wf retry', v.retryRun(run.id, 'implement', { mode: 'fresh' }), () => retry(broken, run.id, 'implement', { mode: 'fresh' })],
+    ['wf approve', v.approveRun(run.id, 'implement', 'ok'), () => approve(broken, run.id, 'implement', 'ok')],
+    ['wf say', v.sayRun(run.id, 'implement', 'hello'), () => say(broken, run.id, 'implement', 'hello')],
+    ['wf cancel', v.cancelRun(run.id), () => cancel(broken, run.id)],
+  ];
+  for (const [what, program, face] of verbs) {
+    const uncaught = await rejection(v.over(broken, program.pipe(v.Effect.catch(() => v.Effect.succeed('caught')))), what);
+    assert.equal(uncaught, boom, `${what}: a defect, which no \`Effect.catch\` recovers`);
+    assert.equal(await rejection(face(), what), boom, `${what}: its face rejects with the error itself`);
+  }
+  assert.ok(!fs.existsSync(asksDir(run.id)) && !readRun(run.id).cancelledAt, 'nothing written');
+});
+
+test("REFUSED as a typed failure: `wf say`'s engine refusing, exit code 2, is its program's `Conflict` in the engine's words; words not delivered, with no exit code, are a defect its face rejects with as it was thrown", async () => {
+  const v = await verbPrograms();
+  const b = board();
+  const run = started(folder());
+  await advance(b.e, readRun(run.id));
+  const taskId = `${run.id}-implement`;
+  assert.equal(
+    await v.over(
+      b.e,
+      v.sayRun(run.id, 'implement', 'Start with the parser.').pipe(
+        v.Effect.map(() => 'answered'),
+        v.Effect.catchTag('Conflict', (r) => v.Effect.succeed(r.message)),
+      ),
+    ),
+    `say: \`${taskId}\` has not started an attempt yet, so there is no session to hear anything.`,
+  );
+
+  b.settle(taskId, 'running');
+  const lost = new Error(`say: ae/${taskId}/1 was not given the words (connect ECONNREFUSED). Nothing was journalled.`);
+  const deaf = {
+    ...b.e,
+    say: async () => {
+      throw lost;
+    },
+  };
+  const program = v.sayRun(run.id, 'implement', 'Widen the scope.').pipe(v.Effect.catch(() => v.Effect.succeed('caught')));
+  assert.equal(await rejection(v.over(deaf, program), 'wf say'), lost, 'a defect, which no `Effect.catch` recovers');
+  assert.equal(await rejection(say(deaf, run.id, 'implement', 'Widen the scope.'), 'wf say'), lost);
+  assert.deepEqual(b.said.get(taskId), undefined, 'nothing said');
+});
+
+test('`wf cancel` asks the engine to stop before it marks the run: a stop the engine rejects leaves the run uncancelled, and its plain face rejects with it', async () => {
+  const b = board();
+  const run = started(folder());
+  await advance(b.e, readRun(run.id));
+  const refused = new Error('stop: the engine is not listening');
+  const deaf = {
+    ...b.e,
+    stop: async () => {
+      throw refused;
+    },
+  };
+  assert.equal(await rejection(cancel(deaf, run.id), 'wf cancel'), refused);
+  assert.equal(readRun(run.id).cancelledAt, undefined, 'not marked: asking again does both');
+  assert.ok((await cancel(b.e, run.id)).run.cancelledAt, 'asked again, it stops and marks');
+});
+
+test('the programs of what a person asks of a run say in their types what they need and what they refuse: the engine, and a refusal', async () => {
+  const v = await verbPrograms();
+  const typed: Array<EffectOf<unknown, Refusal, EngineService>> = [
+    v.roundRun('x') satisfies EffectOf<RoundAsked, Refusal, EngineService>,
+    v.acceptRun('x') satisfies EffectOf<Accepted, Refusal, EngineService>,
+    v.retryRun('x', 'y', { mode: 'fresh' }) satisfies EffectOf<Asked, Refusal, EngineService>,
+    v.approveRun('x', 'y') satisfies EffectOf<Approved, Refusal, EngineService>,
+    v.sayRun('x', 'y', 'z') satisfies EffectOf<Told, Refusal, EngineService>,
+    v.cancelRun('x') satisfies EffectOf<Cancelled, Refusal, EngineService>,
+  ];
+  const infallible = [
+    // @ts-expect-error -- a refusal is its failure, so it is not an Effect that cannot fail
+    v.roundRun('x') satisfies EffectOf<RoundAsked, never, EngineService>,
+    // @ts-expect-error -- a refusal is its failure, so it is not an Effect that cannot fail
+    v.acceptRun('x') satisfies EffectOf<Accepted, never, EngineService>,
+    // @ts-expect-error -- a refusal is its failure, so it is not an Effect that cannot fail
+    v.retryRun('x', 'y', { mode: 'fresh' }) satisfies EffectOf<Asked, never, EngineService>,
+    // @ts-expect-error -- a refusal is its failure, so it is not an Effect that cannot fail
+    v.approveRun('x', 'y') satisfies EffectOf<Approved, never, EngineService>,
+    // @ts-expect-error -- a refusal is its failure, so it is not an Effect that cannot fail
+    v.sayRun('x', 'y', 'z') satisfies EffectOf<Told, never, EngineService>,
+    // @ts-expect-error -- a refusal is its failure, so it is not an Effect that cannot fail
+    v.cancelRun('x') satisfies EffectOf<Cancelled, never, EngineService>,
+  ];
+  const unprovided = () => [
+    // @ts-expect-error -- roundRun requires EngineService, and runPromise takes no requirement
+    v.Effect.runPromise(v.roundRun('x')),
+    // @ts-expect-error -- acceptRun requires EngineService, and runPromise takes no requirement
+    v.Effect.runPromise(v.acceptRun('x')),
+    // @ts-expect-error -- retryRun requires EngineService, and runPromise takes no requirement
+    v.Effect.runPromise(v.retryRun('x', 'y', { mode: 'fresh' })),
+    // @ts-expect-error -- approveRun requires EngineService, and runPromise takes no requirement
+    v.Effect.runPromise(v.approveRun('x', 'y')),
+    // @ts-expect-error -- sayRun requires EngineService, and runPromise takes no requirement
+    v.Effect.runPromise(v.sayRun('x', 'y', 'z')),
+    // @ts-expect-error -- cancelRun requires EngineService, and runPromise takes no requirement
+    v.Effect.runPromise(v.cancelRun('x')),
+  ];
+  assert.deepEqual([typed.length, infallible.length, typeof unprovided], [6, 6, 'function']);
 });
 
 /** `wf decide`'s whole screen for `run`, with its id, repository and base commit and the store as `<id>`, `<repo>`, `<base>` and `<root>`. */

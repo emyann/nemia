@@ -1,7 +1,9 @@
 /**
  * The board's mirror of the api is one file per concern under src/lib/api/, which src/lib/api.ts re-exports. None of them may reach the
- * re-exporting file or each other at run time: a type crosses between them by `import type`, which is erased, and the only values they
- * import are react-query's, the feed's pace and their one read (`get`, read.ts). So no runtime import cycle can form among them.
+ * re-exporting file at run time, and a sibling only one level deep: a file may import values from a sibling that imports values from no
+ * sibling (the schemas of judged.ts and graph.ts, which runs.ts decodes with), so no runtime import cycle can form among them. A type crosses
+ * by `import type`, which is erased; the other values they import are react-query's, effect's, the feed's pace and their reads (read.ts),
+ * and read.ts imports effect alone.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -11,7 +13,27 @@ import path from 'node:path';
 const DIR = path.resolve(import.meta.dirname, '../src/lib/api');
 
 /** What the files under src/lib/api/ may import values from. */
-const ALLOWED = new Set(['@tanstack/react-query', '../feed.ts', './read.ts']);
+const ALLOWED = new Set(['@tanstack/react-query', 'effect', '../feed.ts', './read.ts']);
+
+/** What read.ts, the reads every file imports, may import values from. */
+const READ_ALLOWED = new Set(['effect']);
+
+/** A specifier naming a sibling under src/lib/api/, other than read.ts. */
+const sibling = (s: string) => /^\.\/[^/]+\.ts$/.test(s) && s !== './read.ts';
+
+/**
+ * What the files under src/lib/api/ import that they may not, given each file's text: a line each, `<file> imports <specifier>`. A sibling
+ * may be imported only where it imports values from no sibling itself; read.ts imports only what `READ_ALLOWED` has.
+ */
+export function importFaults(texts: ReadonlyMap<string, string>): string[] {
+  const values = new Map([...texts].map(([f, text]) => [f, valueImports(text)]));
+  const leaf = (s: string) => !(values.get(s.slice(2)) ?? []).some(sibling);
+  return [...values].flatMap(([f, specs]) =>
+    specs
+      .filter((s) => (f === 'read.ts' ? !READ_ALLOWED.has(s) : !ALLOWED.has(s) && !(sibling(s) && texts.has(s.slice(2)) && leaf(s))))
+      .map((s) => `${f} imports ${s}`),
+  );
+}
 
 /** The specifiers `text` imports or re-exports values from: every `import`/`export … from` but `import type` and `export type`. */
 export function valueImports(text: string): string[] {
@@ -36,13 +58,25 @@ test('REFUSED: a value import of the re-exporting file or of a sibling is found;
   );
 });
 
-test('the files under src/lib/api/ import values from react-query, the feed and read.ts alone, and read.ts from nothing', () => {
+test('REFUSED: a value import of a sibling that imports a sibling, and of anything but effect in read.ts', () => {
+  const texts = new Map([
+    ['runs.ts', "import { RunGraphSchema } from './graph.ts';\nimport { Schema } from 'effect';"],
+    ['graph.ts', "import { EdgeSchema } from './edges.ts';\nimport type { Spent } from './judged.ts';"],
+    ['edges.ts', "import { Schema } from 'effect';"],
+    ['judged.ts', "import { runsQuery } from './runs.ts';"],
+    ['read.ts', "import { Schema } from 'effect';\nimport { pace } from '../feed.ts';"],
+  ]);
+  assert.deepEqual(importFaults(texts), ['runs.ts imports ./graph.ts', 'judged.ts imports ./runs.ts', 'read.ts imports ../feed.ts']);
+});
+
+test('the files under src/lib/api/ import values from react-query, effect, the feed, read.ts and a leaf sibling alone, and read.ts from effect', () => {
   const files = fs.readdirSync(DIR).filter((f) => f.endsWith('.ts'));
   assert.ok(files.length > 10 && files.includes('read.ts'), `the mirror's files: ${files.join(', ')}`);
-  const found = files.flatMap((f) => {
-    const text = fs.readFileSync(path.join(DIR, f), 'utf8');
-    const values = valueImports(text);
-    return (f === 'read.ts' ? values : values.filter((s) => !ALLOWED.has(s))).map((s) => `${f} imports ${s}`);
-  });
-  assert.deepEqual(found, [], "import a sibling's type with `import type`; a value two of them need goes in read.ts");
+  const texts = new Map(files.map((f) => [f, fs.readFileSync(path.join(DIR, f), 'utf8')]));
+  assert.ok(valueImports(texts.get('runs.ts') ?? '').includes('./judged.ts'), 'runs.ts decodes with the schemas of judged.ts');
+  assert.deepEqual(
+    importFaults(texts),
+    [],
+    "import a sibling's type with `import type`; a value two of them need goes in read.ts, or in a sibling that imports no sibling",
+  );
 });

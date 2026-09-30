@@ -3,7 +3,7 @@
  *
  * Claude Code keeps every `--bg` session in `claude agents` until something removes it, and one that has given its closeout
  * stays `working/idle` there for good. So once an attempt's end is on the record, the engine releases its session. What is
- * checked is what `createEngine()` really runs: the fake writes down every call, and keeps its rows the way `claude agents
+ * checked is what the Promise engine really runs: the fake writes down every call, and keeps its rows the way `claude agents
  * --all --json` prints them.
  *
  * Claude Code writes a session's cost into its transcript only as its process exits. A session that gave its closeout keeps
@@ -25,7 +25,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 /** Where Claude Code keeps transcripts: read when the runner is loaded, so set before the runner's import. */
 const config = tmp('config');
 process.env.CLAUDE_CONFIG_DIR = config;
-const { createEngine } = await import('../src/facade.ts');
+const { Engine, promiseEngine } = await import('../src/index.ts');
 
 type Row = { name: string; sessionId: string; state: string; status: string; startedAt: number };
 
@@ -158,7 +158,7 @@ const wrote = (row: Row, ago: number) => {
 test('a task that gave its closeout settles, and its session is stopped and removed in that pass — the next tick does not see it', async () => {
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
-    const engine = createEngine({ root: tmp('root') });
+    const engine = promiseEngine(Engine.layer({ root: tmp('root') }));
     const id = await engine.file({
       config: { background: true },
       brief: 'the prompt',
@@ -197,7 +197,7 @@ test("a session's cost, which Claude Code writes only as its process exits, is r
     const claude = fakeClaude();
     claude.costOnStop({ totalCostUSD: 0.25, totalAPIDuration: 4000, totalToolDuration: 300, hasUnknownModelCost: false });
     await onPath(claude.bin, async () => {
-      const engine = createEngine({ root: tmp('root') });
+      const engine = promiseEngine(Engine.layer({ root: tmp('root') }));
       const id = await engine.file({
         brief: 'the prompt',
         cwd: tmp('cwd'),
@@ -243,7 +243,7 @@ test('a session listed done whose process still runs is stopped before it goes �
   const claude = fakeClaude();
   claude.costOnStop({ totalCostUSD: 0.0143, totalAPIDuration: 1081, totalToolDuration: 0, hasUnknownModelCost: false });
   await onPath(claude.bin, async () => {
-    const engine = createEngine({ root: tmp('root') });
+    const engine = promiseEngine(Engine.layer({ root: tmp('root') }));
     const id = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd') });
     await engine.tick();
     const [row] = claude.rows();
@@ -268,7 +268,7 @@ test('a session listed done whose process still runs is stopped before it goes �
 test('a task that asked for a worktree has its session stopped and never removed — claude rm deletes the worktree, with the work in it', async () => {
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
-    const engine = createEngine({ root: tmp('root') });
+    const engine = promiseEngine(Engine.layer({ root: tmp('root') }));
     const id = await engine.file({
       brief: 'the prompt',
       cwd: tmp('cwd'),
@@ -295,7 +295,7 @@ test('a session ended by quiet is stopped before it goes — its end is on the r
   for (const worktree of [false, true]) {
     const claude = fakeClaude();
     await onPath(claude.bin, async () => {
-      const engine = createEngine({ root: tmp('root') });
+      const engine = promiseEngine(Engine.layer({ root: tmp('root') }));
       const id = await engine.file({
         brief: 'the prompt',
         cwd: tmp('cwd'),
@@ -331,7 +331,7 @@ test('a session ended by quiet is stopped before it goes — its end is on the r
 test('no session is released while its attempt runs; one a person stopped is released once its task settles, its id recorded for logs', async () => {
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
-    const engine = createEngine({ root: tmp('root') });
+    const engine = promiseEngine(Engine.layer({ root: tmp('root') }));
     const id = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd') });
     await engine.tick();
     const [row] = claude.rows();
@@ -367,7 +367,7 @@ test('no session is released while its attempt runs; one a person stopped is rel
 test('a session stopped at its deadline is released once its task settles, as one a person stopped is', async () => {
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
-    const engine = createEngine({ root: tmp('root') });
+    const engine = promiseEngine(Engine.layer({ root: tmp('root') }));
     const id = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd'), deadlineSeconds: 0.2 });
     await engine.tick();
     const [row] = claude.rows();
@@ -426,7 +426,7 @@ test("a task settled before its session's id was recorded keeps that session lis
     },
   };
   await onPath(claude.bin, async () => {
-    const engine = createEngine({ root: tmp('root'), journal });
+    const engine = promiseEngine(Engine.layer({ root: tmp('root'), journal }));
     for (let i = 0; i < 2; i++) await engine.tick();
     assert.deepEqual(claude.releases(), [['rm', recorded.split('-')[0]]], 'the session whose id is on the record, and only it');
     assert.deepEqual(
@@ -440,7 +440,7 @@ test("a task settled before its session's id was recorded keeps that session lis
 test('a release the harness refuses fails nothing else in the pass, and is asked again until it succeeds', async () => {
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
-    const engine = createEngine({ root: tmp('root') });
+    const engine = promiseEngine(Engine.layer({ root: tmp('root') }));
     const done = await engine.file({ config: { background: true }, brief: 'exits on its own', cwd: tmp('cwd') });
     await engine.tick();
     claude.setRows(claude.rows().map((r) => ({ ...r, state: 'done' })));

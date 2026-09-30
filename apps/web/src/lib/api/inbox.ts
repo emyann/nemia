@@ -1,6 +1,6 @@
 /** The inbox: its cards, and a card filed, dropped and queued (apps/api/src/inbox/inbox.ts). */
 import { queryOptions } from '@tanstack/react-query';
-import { get } from './read.ts';
+import { getUndecoded } from './read.ts';
 import type { KeyRow, WorkflowListing } from './workflows.ts';
 
 /**
@@ -39,7 +39,7 @@ export type InboxEntry = {
  */
 export const inboxQuery = queryOptions({
   queryKey: ['inbox'],
-  queryFn: () => get<InboxEntry[]>('/api/inbox'),
+  queryFn: () => getUndecoded<InboxEntry[]>('/api/inbox'),
 });
 
 /**
@@ -52,7 +52,7 @@ export type InboxCardPage = InboxEntry & { source: string; keys: KeyRow[] | null
 export const cardQuery = (name: string) =>
   queryOptions({
     queryKey: ['inbox', name],
-    queryFn: () => get<InboxCardPage>(`/api/inbox/${encodeURIComponent(name)}`),
+    queryFn: () => getUndecoded<InboxCardPage>(`/api/inbox/${encodeURIComponent(name)}`),
   });
 
 /**

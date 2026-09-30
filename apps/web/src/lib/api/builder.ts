@@ -1,6 +1,6 @@
 /** The builder's form and its writes of a folder of yours (apps/api/src/workflows/builder.ts). */
 import { queryOptions } from '@tanstack/react-query';
-import { get } from './read.ts';
+import { getUndecoded } from './read.ts';
 import type { ListedStep, WorkflowListing, WorkflowStepSpec } from './workflows.ts';
 
 /** Mirrors `KeyKind` in apps/api/src/workflows/builder.ts: how a key is set on a step's form. */
@@ -35,7 +35,7 @@ export type KeyForm = {
 /** What a step's form is drawn from. It changes with the package, so once a visit. */
 export const keyFormQuery = queryOptions({
   queryKey: ['step-keys'],
-  queryFn: () => get<KeyForm>('/api/workflows/keys'),
+  queryFn: () => getUndecoded<KeyForm>('/api/workflows/keys'),
   staleTime: Infinity,
 });
 

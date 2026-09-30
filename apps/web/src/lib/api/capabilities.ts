@@ -3,7 +3,7 @@
  * reach.ts).
  */
 import { queryOptions } from '@tanstack/react-query';
-import { get } from './read.ts';
+import { getUndecoded } from './read.ts';
 
 /** Mirrors `Described` in apps/api/src/capabilities/capabilities.ts: a skill or an agent, and the file it was read from. */
 export type Described = { name: string; description: string | null; source: string };
@@ -147,5 +147,5 @@ export type Capabilities = {
  */
 export const capabilitiesQuery = queryOptions({
   queryKey: ['capabilities'],
-  queryFn: () => get<Capabilities>('/api/capabilities'),
+  queryFn: () => getUndecoded<Capabilities>('/api/capabilities'),
 });

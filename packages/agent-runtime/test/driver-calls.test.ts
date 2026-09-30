@@ -19,7 +19,8 @@ import { rmSync } from 'node:fs';
 import { Effect } from 'effect';
 import { a2aOps } from '../src/a2a/client.ts';
 import { HarnessHandler } from '../src/a2a/handler.ts';
-import { createEngine, type PromiseRunner, type Sighting } from '../src/facade.ts';
+import type { PromiseRunner, Sighting } from '../src/facade.ts';
+import { Engine, promiseEngine } from '../src/index.ts';
 import { promiseOps } from '../src/facade/promise.ts';
 import { scratch } from './scratch.ts';
 
@@ -95,7 +96,7 @@ const spy = () => {
 const everyVerb = async (harnesses: Record<string, PromiseRunner>) => {
   const root = scratch('ae-driver-calls-');
   try {
-    const engine = createEngine({ root, harnesses });
+    const engine = promiseEngine(Engine.layer({ root, harnesses }));
     const id = await engine.file({ id: 't-calls', brief: 'b', cwd: '/repo', harness: 'fake' });
     await engine.tick();
     await engine.view(id);

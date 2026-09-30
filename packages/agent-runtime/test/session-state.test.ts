@@ -22,7 +22,8 @@ import { viewOfState } from '../src/core/engine/engine.ts';
 import { AUTH_WAIT, claudeStateOf } from '../src/harness/claude/bg.ts';
 import { detachedStateOf } from '../src/harness/detached/detached.ts';
 import { promiseOps } from '../src/facade/promise.ts';
-import { createEngine, type PromiseRunner } from '../src/facade.ts';
+import type { PromiseRunner } from '../src/facade.ts';
+import { Engine, promiseEngine } from '../src/index.ts';
 import { corpusOf, filed, spawned, starting, TASK, type Case } from './lifecycle-corpus.ts';
 import { scratch } from './scratch.ts';
 
@@ -279,7 +280,7 @@ test('an engine over a PromiseRunner that speaks the former words settles its ta
       return '';
     },
   };
-  const engine = createEngine({ root: scratch('ae-state-root-'), harnesses: { fake } });
+  const engine = promiseEngine(Engine.layer({ root: scratch('ae-state-root-'), harnesses: { fake } }));
   const cwd = scratch('ae-state-cwd-');
   const [done, stopped, blocked] = [
     await engine.file({ brief: 'a', cwd, harness: 'fake' }),
@@ -337,7 +338,7 @@ test("a journal written before the words changed folds and settles as it did: it
       return '';
     },
   };
-  const first = createEngine({ root, harnesses: { fake } });
+  const first = promiseEngine(Engine.layer({ root, harnesses: { fake } }));
   const ids = [
     await first.file({ brief: 'a', cwd, harness: 'fake' }),
     await first.file({ brief: 'b', cwd, harness: 'fake' }),
@@ -377,7 +378,7 @@ test("a journal written before the words changed folds and settles as it did: it
   );
   const before = ids.map((id) => fs.readFileSync(file(id), 'utf8'));
 
-  const engine = createEngine({ root, harnesses: { fake } });
+  const engine = promiseEngine(Engine.layer({ root, harnesses: { fake } }));
   await engine.tick();
   const views = await Promise.all(ids.map((id) => engine.view(id)));
   assert.deepEqual(

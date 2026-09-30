@@ -250,13 +250,15 @@ to own the process.
 
 ## Using it without Effect
 
-Effect is how this engine is written, not how it is used. The default entry point has **no Effect
-in any signature**:
+Effect is how this engine is written, not how it is used. The engine a consumer uses has **no Effect
+in any signature**: `promiseEngine` builds it from the Effect face's `Engine.layer`, once, and every verb is a Promise.
+The consumer calls two functions and writes no Effect:
 
 ```ts
-import { createEngine, codex } from 'agent-runtime'
+import { codex } from 'agent-runtime'
+import { Engine, promiseEngine } from 'agent-runtime/effect'
 
-const engine = createEngine({ harnesses: { claude: 'claude-bg', codex } })
+const engine = promiseEngine(Engine.layer({ harnesses: { claude: 'claude-bg', codex } }))
 
 const id = await engine.file({ brief, cwd, harness: 'codex' })
 await engine.tick()
@@ -266,14 +268,14 @@ const { entries, cursor } = await engine.feed(0)
 Bring your own store — plain async, no `Effect.tryPromise` anywhere:
 
 ```ts
-createEngine({
+promiseEngine(Engine.layer({
   journal: {
     append: async (taskId, event) => { await db.event.create({ data: { jobId: +taskId, payload: event } }) },
     read:   async (taskId) => (await db.event.findMany({ where: { jobId: +taskId } })).map(r => r.payload),
     list:   async () => (await db.job.findMany()).map(j => String(j.id)),
     feed:   async (after) => { /* WHERE id > after ORDER BY id */ },
   },
-})
+}))
 ```
 
 Bring your own harness — three ways, in order of how much you have to write:
@@ -285,8 +287,8 @@ Bring your own harness — three ways, in order of how much you have to write:
 | a `HarnessSpec` | any CLI that runs a prompt and exits — a command and an exit code |
 | a `PromiseRunner` | four async methods, and four optional ones, `find`, `release`, `transcript` and `say`, for anything else at all |
 
-**`src/cli/main.ts` imports `createEngine`, and types, and nothing else from the engine.** That is
-deliberate and it is the test: if the Promise API were not enough to write the CLI with, it would
+**`src/cli/main.ts` builds its engine with `promiseEngine(Engine.layer(…))`, and imports types and plain helpers, through the
+two faces alone.** That is deliberate and it is the test: if the Promise API were not enough to write the CLI with, it would
 not be enough for anyone. `grep "from 'effect'" src/cli/main.ts` returns nothing, and a test says so.
 
 The Effect API is still there under `agent-runtime/effect` — `Layer` composition, typed error
@@ -294,8 +296,8 @@ channels, the lot. Keep your `effect` version aligned with this package's if you
 tags are identity-based, and two copies in one tree do not see each other's services. A consumer
 who never imports Effect can never have that problem.
 
-The engine itself is a service there, `Engine`: `Engine.layer(options)` takes what `createEngine` takes, and each verb is an
-Effect whose refusal is a tagged error in the words the Promise door rejects with, without the verb in front. `createEngine` is
+The engine itself is a service there, `Engine`: `Engine.layer(options)` takes the engine's options, and each verb is an
+Effect whose refusal is a tagged error in the words the Promise door rejects with, without the verb in front. The Promise door is
 that layer with each verb run as a Promise (`promiseEngine`), so both doors are one engine; `test/doors.test.ts` calls every verb
 through both.
 
@@ -308,13 +310,13 @@ const id = await Effect.runPromise(
 )
 ```
 
-Its `file` refuses what `createEngine().file()` refuses of the task itself, in the same sentence — `refusalOf` in
+Its `file` refuses what the Promise engine's `file` refuses of the task itself, in the same sentence — `refusalOf` in
 `src/core/engine/filing.ts` for the task's own fields, and `argsRefusalOf` in `src/harness/args.ts` for the checks every harness shares
 of its `config`, which `file` asks and every `Runner` made by `Runner.layer` asks too, so a runner built with `Runner.of`
 alone is no way round them; `test/refusal.test.ts` holds both doors to both — and fails
 with `FileRefused`, a tagged error beside `JournalError`, with nothing journalled. It refuses no harness's words: it has no harnesses to
 ask, so an unknown harness or a permission mode the harness rejects is still journalled there (open issue 6). `Engine`'s
-`file` has them, and refuses them as `createEngine().file()` does.
+`file` has them, and refuses them as the Promise engine's `file` does.
 
 ## Several harnesses, one board
 
@@ -358,7 +360,7 @@ alone or with its store, ends its harness and exits at its next write, and never
 
 **Adding a harness is a value, not code** — `HarnessSpec` is a command, an optional regex, and
 optionally the words it refuses, a reader of what it prints, and where it keeps its conversation. It names
-no pool: `createEngine` refuses a harness with a `pool` key (exit 2), since the runtime counts none — a layer
+no pool: `Engine.layer` refuses a harness with a `pool` key (exit 2), since the runtime counts none — a layer
 above that shares a ceiling between harnesses keeps its own list (agent-orchestrator's `POOLS`):
 
 ```ts
@@ -376,7 +378,7 @@ which is the test of whether the seam was in the right place.
 
 ### Beneath the harnesses: an A2A seam
 
-Each harness is an [A2A](https://a2a-protocol.org) agent of its own, and `createEngine` reaches it through the
+Each harness is an [A2A](https://a2a-protocol.org) agent of its own, and the engine reaches it through the
 `@a2a-js/sdk` client, in this process, with no HTTP between them. A session is an A2A Task named for it, `ae/<task>/<n>`,
 whose `contextId` is the harness's own id for the conversation — the `nativeId` that `--resume` takes — or empty until
 something has seen it; a spawn is a user Message marked with the runtime's extension (`urn:agent-runtime:session:v1`), the
@@ -445,17 +447,17 @@ A harness can be an A2A agent another party runs, reached over HTTP by its addre
 where the other harnesses are, by name, and a task picks it by that name, as it picks `codex`:
 
 ```ts
-const engine = createEngine({
+const engine = promiseEngine(Engine.layer({
   harnesses: { reviewer: { url: 'https://agents.example/reviewer' } },
   credentials: (scheme, agentUrl, harness) => (scheme === 'token' ? process.env.REVIEWER_TOKEN : undefined),
   missingCredential: (scheme) => `set REVIEWER_TOKEN for \`${scheme}\``, // optional: the end of the refusal's words
-});
+}));
 await engine.file({ harness: 'reviewer', brief: 'Review this diff …', cwd: '/repo', closeoutSchema });
 ```
 
 The configuration is `{ url }` — the agent's base URL, whose card is read at `.well-known/agent-card.json` beneath its path
 (`https://agents.example/reviewer/.well-known/agent-card.json` above), or the URL itself when it names a `.json` file — or `{ card }`, the card as the JSON the agent would serve. Nothing else:
-`createEngine` refuses, with exit 2, another key, both or neither, an address that is not `http:` or `https:`, one that
+`Engine.layer` refuses, with exit 2, another key, both or neither, an address that is not `http:` or `https:`, one that
 carries a user name or password, and a card that does not decode (below). A task on a remote agent
 carries no `config`: the agent runs as its operator configured it, and `file` refuses every harness argument, naming it.
 Nothing of the task but its brief, the session it continues (`resumeFrom`, as the message's `contextId`) and its closeout
@@ -520,7 +522,7 @@ requirements, each naming schemes with their string scopes. Every other key is k
 A2A 1.0 does not define is kept and never sent: a requirement that names it is unmet, and the spawn is refused only when
 no requirement is met. A card that does not decode is refused in words that name its first wrong field by its path
 (`supportedInterfaces.0.url`) and what is there instead: served, the spawn ends `unstartable` with nothing sent, the card
-named by its origin and path; configured, `createEngine` refuses it with exit 2, and the orchestrator leaves the entry of
+named by its origin and path; configured, `Engine.layer` refuses it with exit 2, and the orchestrator leaves the entry of
 `a2a-agents.json` out.
 
 For an agent given by its URL, only an interface on that URL's origin is used: a card that names
@@ -897,7 +899,7 @@ moved to the orchestrator in part 1 and were retired here in part 2, each refuse
 ceiling taken and ignored would start every task at once and say nothing:
 
 - `priority` on a filing, at any value, `0` and `undefined` as an own key included, at both doors (exit 2);
-- `maxConcurrent` on `createEngine`, at any value, and a harness — a `HarnessSpec` or a `PromiseRunner` — that names a
+- `maxConcurrent` on `Engine.layer`, at any value, and a harness — a `HarnessSpec` or a `PromiseRunner` — that names a
   `pool` (exit 2, naming the harness);
 - any argument to `tick()`, at both doors, which took the ceiling and the pools (the Effect door fails `TickRefused`);
 - a third argument to `step`, and a `maxSteps` to `settleTask` that is not a whole number above nought, on the Effect door:
@@ -1672,7 +1674,7 @@ what a step leaves behind. The rule is what lets Codex do it itself.
 
 ## Which runner: CLI or Agent SDK
 
-**`createEngine` and `ae` always use the CLI runners.** No environment variable selects another.
+**`Engine.layer` and `ae` always use the CLI runners.** No environment variable selects another.
 `sdkRunner()` exists, but only as a `Layer` for the Effect API: you compose it yourself, and tick
 in the same long-lived process that spawned the sessions, because they die with it.
 
@@ -1793,7 +1795,7 @@ of pure code sits beside it.
 | `src/facade/consumer.ts` | what a consumer writes and is given — its store in Promises, its harnesses, its options, its task and its engine — the adapters over them, and what the door refuses of them |
 | `src/service/engine.ts` | the engine as an Effect service, `Engine`: `Engine.layer(options)` assembles each harness behind its A2A agent, the store and the memo, and its verbs are Effects that fail with tagged errors (`ListRefused`, `TranscriptRefused`, `SayRefused`, `SayUnsent`, and the core's) |
 | `src/service/index.ts` | the face of `service/`, as the doors take it |
-| `src/facade/engine.ts` | `promiseEngine`: an `Engine` layer built once and each verb run as a Promise, a refusal an `Error` whose `exitCode` is 2; and `createEngine`, the Promise face of `Engine.layer` |
+| `src/facade/engine.ts` | `promiseEngine`: an `Engine` layer built once and each verb run as a Promise, a refusal an `Error` whose `exitCode` is 2: the Promise engine a consumer builds as `promiseEngine(Engine.layer(options))` |
 | `src/facade/promise.ts` | a harness a consumer wrote in Promises (`PromiseRunner`), as the engine's verbs: an adapter like the others, reached through the A2A seam |
 | `src/cli/main.ts` | the verbs, and the brief: parse (closed keys), call, print |
 | `bin/ae.ts` | the `ae` entry point: a refusal prints its sentence and exits 2 |
@@ -1807,7 +1809,7 @@ of pure code sits beside it.
 | `test/detached.test.ts` | the worker, the lease, the composite, each spec's argv and refusals — `sh` as the harness |
 | `test/mcp.test.ts` | what each harness is given for MCP, at shipped defaults — fake `claude` and `codex` on `PATH` |
 | `test/io.test.ts` | what a pass costs as the runtime reports it: a tick's `ms` and each harness's observes, and `io()`'s bytes read and processes started |
-| `test/facade.test.ts` | the Promise API, and every refusal at `file()` at shipped defaults; `createEngine` refusing `maxConcurrent` and a harness's `pool`, and `tick()` refusing an argument |
+| `test/facade.test.ts` | the Promise API, and every refusal at `file()` at shipped defaults; the Promise engine refusing `maxConcurrent` and a harness's `pool`, and `tick()` refusing an argument |
 | `test/release.test.ts` | letting a finished Claude Code session go, and reading what it cost once stopped, at shipped defaults — a fake `claude` that keeps a registry and writes a `cost-state` as it stops a session |
 | `test/budget.test.ts` | a spend cap, at shipped defaults — fake `claude`s: a `claude -p` that stops at its cap ends its attempt `failed` with `limit: 'budget'` and settles its task as any failure, the note naming no budget; the flag reaches both Claude runners on every attempt |
 | `test/admit.test.ts` | queued and admitted: the wait, the word, the pass after it, the pre-4c reading, `admit`'s refusals at shipped defaults, and a count proving the word asks no harness |
@@ -1828,7 +1830,7 @@ of pure code sits beside it.
 | `src/a2a/map.test.ts` | a remote agent's Task in the runtime's words and a spawn in A2A's, pure: every state, where a statement is read, and none before completion |
 | `test/remote-agent.test.ts` | a remote agent end to end against the SDK's own server over HTTP (`test/remote-server.ts`), on each binding and in each order: every refusal at shipped defaults with nothing sent, a restart that never sends twice, the secret on no file, and what a pass costs |
 | `test/a2a-boundary.test.ts` | only `src/a2a/` imports the A2A SDK, its face left out, and neither entry exports an SDK name or value — each made to refuse planted source |
-| `test/journal-words.test.ts` | the journal's words for five runs through `createEngine`, pinned: the seam beneath the harnesses changes none of them |
+| `test/journal-words.test.ts` | the journal's words for five runs through `promiseEngine`, pinned: the seam beneath the harnesses changes none of them |
 | `test/readme.test.ts` | this file, held to the code |
 | `test/live.test.ts` | the `--tools` fence, the `--disallowedTools` deny (run from a checkout Claude Code trusts), `--strict-mcp-config`, what a released session still has, `say` into a working session, a session that ends its turn without its closing statement, a `claude -p` session stopped at its budget, a `--bg` session spending past one, its cost read once let go, and a session bridged by `remoteControl` beside one that is not, against real Claude Code — `AE_LIVE=1` only |
 | `docs/open-issues.md` | what is still wrong or half-verified |
@@ -1868,9 +1870,9 @@ watches for its `settled` event, and files the next one — it never reads a tas
 learns what `decide` is:
 
 ```ts
-import { createEngine } from 'agent-runtime'
+import { Engine, promiseEngine } from 'agent-runtime/effect'
 
-const engine = createEngine()
+const engine = promiseEngine(Engine.layer())
 const { entries, cursor } = await engine.feed(lastCursor)
 for (const { taskId, event } of entries) {
   if (event.kind === 'settled' && event.outcome === 'succeeded') {

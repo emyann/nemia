@@ -1,5 +1,5 @@
 /**
- * What the journal says, word for word, for six scripted runs through `createEngine` — and what the harness was asked.
+ * What the journal says, word for word, for six scripted runs through `promiseEngine` — and what the harness was asked.
  *
  * Whatever carries a spawn, an observe or a stop to a harness, the record a run leaves is the same, to the word. Times are
  * masked, since they are the clock's; everything else — ids, names, reasons, a harness's own words — is compared exactly,
@@ -18,7 +18,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fold } from '../src/core/domain.ts';
-import { createEngine, type Event, type PromiseJournal, type PromiseRunner, type Sighting, type SpawnRequest } from '../src/facade.ts';
+import type { Event, PromiseJournal, PromiseRunner, Sighting, SpawnRequest } from '../src/facade.ts';
+import { Engine, promiseEngine } from '../src/index.ts';
 
 /**
  * A store in memory, and a harness whose sessions a test moves by hand, behind the engine as a consumer builds it. Its
@@ -61,7 +62,7 @@ const board = (spawnFails?: Error) => {
       return '';
     },
   };
-  const engine = createEngine({ journal, harnesses: { fake } });
+  const engine = promiseEngine(Engine.layer({ journal, harnesses: { fake } }));
   const record = async (id: string) => (await journal.read(id)).map((e) => ({ ...e, at: '<at>' }));
   return { engine, sessions, asked, record };
 };

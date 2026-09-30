@@ -168,7 +168,7 @@ const cardRefusal = (harness: string, card: unknown): string | undefined => {
 };
 
 /**
- * Why a remote agent's configuration cannot be taken, or `undefined`. Asked by `createEngine`, so an address that could
+ * Why a remote agent's configuration cannot be taken, or `undefined`. Asked by `Engine.layer`, so an address that could
  * never be reached — or one that carries a secret in it, which the configuration is no place for — or a card that does not
  * decode is refused before any task is filed on it.
  */

@@ -3,9 +3,9 @@
  *
  * The harness-agnostic refusals live under the Effect `file` (`refusalOf` in `src/core/engine/filing.ts`), so a consumer of
  * `agent-runtime/effect` cannot journal `deadlineSeconds: NaN`, which would stop its task on the first pass, and
- * `createEngine().file()` throws the same sentence behind `file: `. The harness's own words stay at the facade
+ * the Promise engine's `file` throws the same sentence behind `file: `. The harness's own words stay at the facade
  * (`test/facade.test.ts`); the Effect door has no harnesses to ask. Codex's arguments (`config.codex`) on a harness that is not
- * Codex are refused at both of the engine's doors, the `Engine` service and `createEngine`, which have harnesses to ask.
+ * Codex are refused at both of the engine's doors, the `Engine` service and `promiseEngine`, which have harnesses to ask.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,7 +17,6 @@ import { file, type Filing } from '../src/core/engine/filing.ts';
 import {
   claudeDetached,
   codex,
-  createEngine,
   type EngineOptions,
   type Event,
   type HarnessArgs,
@@ -25,7 +24,7 @@ import {
   type PromiseRunner,
   type Sighting,
 } from '../src/facade.ts';
-import { Engine } from '../src/index.ts';
+import { Engine, promiseEngine } from '../src/index.ts';
 import { claudeBgRefuses, claudeCodeRefuses } from '../src/harness/claude/vocabulary.ts';
 import { scratch } from './scratch.ts';
 
@@ -58,7 +57,7 @@ const memoryStore = (): PromiseJournal => {
 /** The Promise door, at shipped defaults, over a store a test can read. */
 const promiseDoor = () => {
   const journal = memoryStore();
-  return { engine: createEngine({ journal }), listed: () => journal.list() };
+  return { engine: promiseEngine(Engine.layer({ journal })), listed: () => journal.list() };
 };
 
 const ok: Filing = { brief: 'b', cwd: '/r' };
@@ -218,7 +217,7 @@ test("REFUSED at shipped defaults: Codex's arguments on a harness that is not Co
     journal: memoryStore(),
     harnesses: { claude: 'claude', bg: 'claude-bg', codex, 'claude-detached': claudeDetached, remote: { url: 'https://a.example' }, mine },
   };
-  const promise = createEngine(options);
+  const promise = promiseEngine(Engine.layer(options));
   const viaEffect = (spec: Filing) =>
     Effect.runPromise(Effect.flip(Engine.use((e) => e.file(spec)).pipe(Effect.provide(Engine.layer(options)))));
   const config = { codex: { trustFrom: '/repo' } };
@@ -234,7 +233,7 @@ test("REFUSED at shipped defaults: Codex's arguments on a harness that is not Co
   }
   assert.ok(await promise.file({ ...ok, harness: 'codex', config }), 'Codex takes them');
   assert.ok(await promise.file({ ...ok, harness: 'mine', config }), "a PromiseRunner is the consumer's own, and asked nothing");
-  const lone = createEngine({ root: scratch('ae-codex-bag-'), journal: memoryStore(), harnesses: { claude: 'claude' } });
+  const lone = promiseEngine(Engine.layer({ root: scratch('ae-codex-bag-'), journal: memoryStore(), harnesses: { claude: 'claude' } }));
   await assert.rejects(
     lone.file({ ...ok, harness: 'claude', config }),
     (e: Error) =>

@@ -7,7 +7,7 @@
  * that feed and, for each settled task, the little a pass still does with it: let the harness go of its finished sessions
  * (`releaseFinished`), which reads the observation and so is asked on every pass.
  *
- * A cache of a pure function, never a source of truth: it lives as long as the engine that made it (`createEngine`), is
+ * A cache of a pure function, never a source of truth: it lives as long as the engine that made it (`Engine.layer`), is
  * never written down, and a fresh engine starts with none and folds everything. A pass without one — the Effect door's,
  * with layers of its own — folds every task.
  */

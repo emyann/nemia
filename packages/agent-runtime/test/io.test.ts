@@ -6,7 +6,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { createEngine, type HarnessSpec, type PromiseRunner, type PromiseSighting } from '../src/facade.ts';
+import type { HarnessSpec, PromiseRunner, PromiseSighting } from '../src/facade.ts';
+import { Engine, promiseEngine } from '../src/index.ts';
 import { scratch } from './scratch.ts';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -16,7 +17,7 @@ const quick: HarnessSpec = { name: 'quick', command: () => ({ cmd: 'true', args:
 
 const settledEngine = async () => {
   const root = scratch('ae-io-root-');
-  const engine = createEngine({ root, harnesses: { quick }, defaultHarness: 'quick' });
+  const engine = promiseEngine(Engine.layer({ root, harnesses: { quick }, defaultHarness: 'quick' }));
   const id = await engine.file({ brief: 'b', cwd: scratch('ae-io-cwd-') });
   const until = Date.now() + 20_000;
   while (!(await engine.view(id)).state.settled && Date.now() < until) {
@@ -54,7 +55,7 @@ test('a tick counts the observes that could not read their harness (`unread`), a
     stop: async () => {},
     logs: async () => '',
   };
-  const engine = createEngine({ root: scratch('ae-io-root-'), harnesses: { flaky }, defaultHarness: 'flaky' });
+  const engine = promiseEngine(Engine.layer({ root: scratch('ae-io-root-'), harnesses: { flaky }, defaultHarness: 'flaky' }));
   const id = await engine.file({ brief: 'b', cwd: scratch('ae-io-cwd-') });
   await engine.tick();
   const read = await engine.tick();
@@ -92,7 +93,7 @@ test("a tick counts only the observes made during it; io() counts every observe,
 
 test('io() counts the bytes of a journal a view reads, and the worker a pass starts', async () => {
   const root = scratch('ae-io-root-');
-  const engine = createEngine({ root, harnesses: { quick }, defaultHarness: 'quick' });
+  const engine = promiseEngine(Engine.layer({ root, harnesses: { quick }, defaultHarness: 'quick' }));
   const id = await engine.file({ brief: 'b', cwd: scratch('ae-io-cwd-') });
 
   const read0 = engine.io();
@@ -125,7 +126,7 @@ test("a view reads its journal once, settled or observed: it views the fold it c
     stop: async () => {},
     logs: async () => '',
   };
-  const engine = createEngine({ root: scratch('ae-io-root-'), harnesses: { inMemory }, defaultHarness: 'inMemory' });
+  const engine = promiseEngine(Engine.layer({ root: scratch('ae-io-root-'), harnesses: { inMemory }, defaultHarness: 'inMemory' }));
   const id = await engine.file({ brief: 'b', cwd: scratch('ae-io-cwd-') });
   await engine.tick();
   await engine.tick();

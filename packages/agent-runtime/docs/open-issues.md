@@ -80,7 +80,7 @@ cannot be told apart from what its parent spent. `claude-detached` records what 
 ### 6. The Effect door's `file` refuses no harness's words
 
 **Where.** `file` in `agent-runtime/src/core/engine/filing.ts` refuses what the task says of itself; the refusals in a harness's
-words live in `createEngine().file()` (`harnessRefusalOf` in `agent-runtime/src/facade/consumer.ts`), because that is where the
+words live in the `file` of an engine `Engine.layer` builds (`harnessRefusalOf` in `agent-runtime/src/facade/consumer.ts`), because that is where the
 configured harnesses, and so their words, are known.
 
 **What changed** (2026-09-22). The harness-agnostic half moved under the Effect `file`: `refusalOf` in `engine.ts`, the
@@ -117,14 +117,14 @@ wrong: `RunnerOps` already has optional verbs (`find`, `release`, `transcript`, 
 would not move the line its four required ones hold. What it costs is elsewhere: `file` would need `Runner` beside
 `Journal`, a change to every Effect consumer's `file`; `composite` would need to refuse an unknown harness where it
 falls back today; and the refusals that name another harness — *file the task on `claude-detached`*, the windowed and
-the bridged harnesses listed by name — need the whole map of harness configs, which only `createEngine` holds, where
+the bridged harnesses listed by name — need the whole map of harness configs, which only the engine's options hold, where
 the composite sees opaque ops. A value passed to `file` instead would be opt-in: it repeats what the consumer's runner
 layer already knows, and by default refuses nothing. Either is more than a small change, so it was left; nothing in the
-workspace files through the Effect door (agent-orchestrator and the api use `createEngine`).
+workspace files through the Effect door (agent-orchestrator and the api use the Promise engine).
 
 **What changed** (the engine as a service). The Effect door has the engine too: `Engine.layer(options)` holds the harness
-configs, and its `file` asks `refusalOf`, `argsRefusalOf` and `harnessRefusalOf` first, as `createEngine().file()` does, since
-that one is now its Promise face (`service/engine.ts`, `facade/engine.ts`). `test/doors.test.ts` refuses an unknown harness
+configs, and its `file` asks `refusalOf`, `argsRefusalOf` and `harnessRefusalOf` first, and the Promise engine is that
+layer with each verb run as a Promise (`promiseEngine`; `service/engine.ts`, `facade/engine.ts`). `test/doors.test.ts` refuses an unknown harness
 and a mode its harness rejects at both doors. What is left is the bare `file` building block, which still has only the
 runner to ask, and so the paragraph above still holds for a consumer that composes its own layers.
 
@@ -314,10 +314,10 @@ transcript, and the pass journals a `measured` entry (engine `9d075f7`). What th
 **What changed** (2026-09-16). `remoteControl: true` on a task gives every attempt's `claude --bg` spawn `--remote-control`
 (`claudeOps` in `agent-runtime/src/harness/claude/bg.ts`), so the session is listed in claude.ai's agents view — measured 2026-09-16 on
 2.1.273 (agent-orchestrator `docs/features.md` §2): a `--bg` session gets a `bridgeSessionId` only with the flag. The flag takes
-an optional name, so it goes before `--permission-mode` and never before the prompt. `createEngine().file()` refuses a value
+an optional name, so it goes before `--permission-mode` and never before the prompt. The Promise engine's `file` refuses a value
 that is not true or false, and `true` on any `HarnessSpec` — `codex`, `claude-detached`, agent-orchestrator's `check` — naming the
 harness and the `'claude-bg'` one to file on; a `PromiseRunner` is handed it and asked nothing. `test/completion.test.ts`:
-the flag's place in the argv, and at `createEngine()`'s own harnesses a fake `claude` given it on a first attempt and a
+the flag's place in the argv, and at `Engine.layer`'s own harnesses a fake `claude` given it on a first attempt and a
 retry, and never for a task without it; `test/engine.test.ts`: carried to every attempt, and not read by `decide`;
 `test/facade.test.ts`: every refusal, by name. Measured under the engine (Verified live, below).
 
@@ -465,9 +465,9 @@ and a held task's signed attempt `INPUT_REQUIRED` on `getTask`. What is still di
   the agent, holding nothing, lists again for the id it hands the driver and to refuse a session that has ended. Words are
   said by a person, rarely.
 - **The Effect door is direct unless it asks otherwise.** `Runner.layer`, `Runner.claude` and `Runner.test` hand the
-  engine the driver as they did; `a2aRunner(ops)`, which needs the program's `Journal`, is the same seam `createEngine`
+  engine the driver as they did; `a2aRunner(ops)`, which needs the program's `Journal`, is the same seam `Engine.layer`
   takes. Its `Runner.transcript` is keyed by session id, as it always was, and goes through the seam by that id
-  (`sessionTranscript` takes a name or an id, never both); `createEngine`'s facade asks by name (`transcriptOf`).
+  (`sessionTranscript` takes a name or an id, never both); the Promise engine asks by name (`transcriptOf`).
 - **`listTasks` lists what the harness sees, never the journal.** An attempt the harness has let go is answered by
   `getTask`, off the journal; it is in no listing. So `observe` through the seam is the map it was.
 - **A stop of a session no harness lists fails in words** (`` the `<harness>` harness lists no session `<id>`: there is

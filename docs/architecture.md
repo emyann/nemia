@@ -11,7 +11,7 @@ broken. This page says what the tests hold; the tests are the rules.
 | `packages/agent-runtime` | One agent session run to completion, durably, on one harness: the journal, the attempts, the harnesses' vocabulary. The `ae` command. | `agent-runtime` → `src/facade.ts`, the runtime in Promises. `agent-runtime/effect` → `src/index.ts`, the same in Effect. `decide` is exported by neither. |
 | `packages/agent-orchestrator` | A folder of markdown as a workflow, and a run of its steps: which task to file next, what a person must decide, what the run's record says. The `wf` command. | `agent-orchestrator` → `src/runner.ts`: the controllers, and everything that reads or writes the disk, re-exported by name. `agent-orchestrator/run` → `src/run.ts`: `assess` (`src/tick/assess.ts`), and the words a run is described in, re-exported by name. `agent-orchestrator/workflow` → `src/workflow.ts`: the format, pure. `agent-orchestrator/effect` → `src/effect.ts`: the refusals by kind, `Missing`, `Conflict` and `Invalid`, as `agent-runtime/effect` is the runtime's face in Effect. |
 | `apps/api` | The workflows behind HTTP, and the feed as a stream. | Its routes. |
-| `apps/web` | The board people look at. It talks to the api over HTTP and imports no package. | Its pages. |
+| `apps/web` | The board people look at. It talks to the api over HTTP, decodes each answer it reads with a schema of its own (`effect`), and imports none of our packages. | Its pages. |
 
 Dependencies point down the table and never up: the web app talks to the api, the api imports the orchestrator, and
 the orchestrator imports the runtime. A test of the api may import the runtime's entries too. Spawning a package's

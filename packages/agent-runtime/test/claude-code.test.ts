@@ -659,9 +659,10 @@ test('REFUSED at shipped defaults: a flag the runtime gives Claude Code itself, 
 });
 
 test("REFUSED at shipped defaults: Claude Code's flags on a harness that is not Claude Code — codex, and any spec that does not say it is — at the engine's door and codex's own", async () => {
-  const { createEngine, codex } = await import('../src/facade.ts');
+  const { codex } = await import('../src/facade.ts');
+  const { Engine, promiseEngine } = await import('../src/index.ts');
   const other = { name: 'other', command: () => ({ cmd: 'true', args: [] }) };
-  const e = createEngine({ root: tmp('root'), harnesses: { claude: 'claude', codex, other } });
+  const e = promiseEngine(Engine.layer({ root: tmp('root'), harnesses: { claude: 'claude', codex, other } }));
   const claude = { appendSystemPromptFile: '/a/prompt.md' };
   for (const harness of ['codex', 'other']) {
     await assert.rejects(e.file({ brief: 'b', cwd: '/r', harness, config: { claude } }), (err: Error & { exitCode?: number }) => {
@@ -703,8 +704,8 @@ test("a flag Claude Code does not have fails the attempt as the CLI fails it —
   const prev = process.env.PATH;
   process.env.PATH = `${dir}:${prev}`;
   try {
-    const { createEngine } = await import('../src/facade.ts');
-    const e = createEngine({ root: tmp('root'), harnesses: { claude: 'claude' } });
+    const { Engine, promiseEngine } = await import('../src/index.ts');
+    const e = promiseEngine(Engine.layer({ root: tmp('root'), harnesses: { claude: 'claude' } }));
     const id = await e.file({ brief: 'b', cwd: dir, config: { claude: { frobnicate: true } } });
     const until = Date.now() + 20_000;
     while (!(await e.view(id)).state.settled) {

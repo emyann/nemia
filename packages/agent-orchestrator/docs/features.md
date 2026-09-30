@@ -4646,7 +4646,7 @@ orchestrator's, and nothing beneath it to lift. The number §12 had is left behi
   are gone, and so are its ceiling tests and `pool.test.ts`, whose cases the orchestrator's `src/cap/cap.test.ts` and
   `test/pool.test.ts` hold. The orchestrator's own `admissionOrder`, the runs in flight under `WF_MAX_RUNS`, is another thing and stays.
 - **Each is refused by name, never dropped** (exit 2, each with a test that makes it refuse at shipped defaults, each shown to fail with
-  its refusal taken out): `priority` at any value, at both doors; `maxConcurrent` on `createEngine`; a harness that names a `pool`; any
+  its refusal taken out): `priority` at any value, at both doors; `maxConcurrent` on `Engine.layer`; a harness that names a `pool`; any
   argument to `tick()`, at both doors (the Effect door fails `TickRefused`); the ceiling's old `slots` handed to `step` or `settleTask`,
   which took them third (`StepRefused`: in `settleTask` they sat where `maxSteps` is now, and settled nothing; found in review); and `AE_MAX_CONCURRENT` in `ae`'s environment, empty too.
   Each names what to do instead: file `queued: true`, and `admit`.
@@ -4832,7 +4832,7 @@ once in its step): agent-runtime's open issue 33.
 - **The memo** (`agent-runtime/src/core/engine/memo.ts`). An engine keeps a cursor into its own feed and, for each settled task it has folded,
   what `releaseFinished` still reads (`Releasable`). Each pass reads the feed on from the cursor before anything else, forgets every
   task it names, and skips a task still kept: no read, no fold, no `settleTask`; its finished sessions are let go off the memo. A fresh
-  engine folds everything, and `createEngine` makes one memo per engine, so `wf up` keeps it for as long as it runs. It rests on
+  engine folds everything, and `Engine.layer` makes one memo per engine, so `wf up` keeps it for as long as it runs. It rests on
   `settledQuiet`, `decide`'s first line: a settled task decides nothing in every journal shape, whatever is appended after
   (`test/lifecycle.test.ts`). `TickReport.views` and `refused` never held a settled task, so admission reads what it read.
 - **What could append to a settled task**: `requestStop` (unconditional), a second `file` under its id, `say`, the pass's `measured`

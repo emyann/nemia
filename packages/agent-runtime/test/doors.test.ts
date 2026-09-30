@@ -1,6 +1,6 @@
 /**
- * The engine through both doors: the `Engine` service of `agent-runtime/effect` and `createEngine` of `agent-runtime`, which is that
- * service with each verb run as a Promise. Each has every verb the other has; each verb gives the same answer through either, over
+ * The engine through both doors: the `Engine` service of `agent-runtime/effect`, and the Promise engine `promiseEngine` makes of its
+ * layer, which is that service with each verb run as a Promise. Each has every verb the other has; each verb gives the same answer through either, over
  * one store; and each refusal is a tagged error at the Effect door and the same words behind the verb, exit code 2, at the Promise
  * door.
  */
@@ -8,7 +8,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import {
-  createEngine,
   type EngineOptions,
   type Event,
   type FeedEntry,
@@ -17,7 +16,7 @@ import {
   type Sighting,
   type TickReport,
 } from '../src/facade.ts';
-import { Engine, type EngineShape } from '../src/index.ts';
+import { Engine, promiseEngine, type EngineShape } from '../src/index.ts';
 import { scratch } from './scratch.ts';
 
 /** A store in memory, which both doors are handed. */
@@ -87,7 +86,7 @@ const doors = () => {
   const layer = Engine.layer(options);
   const effect = <A, E>(f: (e: EngineShape) => Effect.Effect<A, E>): Promise<A> =>
     Effect.runPromise(Engine.use(f).pipe(Effect.provide(layer)));
-  return { effect, promise: createEngine(options), sessions, heard, unreadable, options };
+  return { effect, promise: promiseEngine(Engine.layer(options)), sessions, heard, unreadable, options };
 };
 
 /** What a call rejected with; a call that resolved fails the test. */
@@ -101,7 +100,7 @@ const failure = (p: Promise<unknown>): Promise<Error & { _tag?: string; exitCode
 const verbDrift = (service: readonly string[], promise: readonly string[]): string[] => [
   ...service
     .filter((n) => !promise.includes(n))
-    .map((n) => `createEngine has no \`${n}\`: run the service's verb as a Promise in promiseEngine (src/facade/engine.ts)`),
+    .map((n) => `the Promise engine has no \`${n}\`: run the service's verb as a Promise in promiseEngine (src/facade/engine.ts)`),
   ...promise
     .filter((n) => !service.includes(n))
     .map((n) => `the Engine service has no \`${n}\`: add it to EngineShape and make (src/service/engine.ts)`),
@@ -109,7 +108,7 @@ const verbDrift = (service: readonly string[], promise: readonly string[]): stri
 
 test('REFUSED: a verb one door has and the other lacks', () => {
   assert.deepEqual(verbDrift(['file', 'tick', 'say'], ['file', 'tick', 'answer']), [
-    "createEngine has no `say`: run the service's verb as a Promise in promiseEngine (src/facade/engine.ts)",
+    "the Promise engine has no `say`: run the service's verb as a Promise in promiseEngine (src/facade/engine.ts)",
     'the Engine service has no `answer`: add it to EngineShape and make (src/service/engine.ts)',
   ]);
 });
@@ -289,13 +288,13 @@ test("say's failure that is not a refusal is SayUnsent at the Effect door, with 
   assert.equal(plain.cause.message, unsent.cause.message);
 });
 
-test('options an engine cannot be built from: EngineRefused from the layer, and a throw at the call from createEngine', async () => {
+test('options an engine cannot be built from: EngineRefused from the layer, and a throw at the call from promiseEngine', async () => {
   const options = { journal: memoryJournal(), maxConcurrent: 2 } as unknown as EngineOptions;
   const refused = await failure(Effect.runPromise(Engine.use((e) => Effect.succeed(e)).pipe(Effect.provide(Engine.layer(options)))));
   assert.equal(refused._tag, 'EngineRefused');
   assert.match(refused.message, /^`maxConcurrent` is retired/);
   assert.throws(
-    () => createEngine(options),
-    (e: Error & { exitCode?: number }) => e.exitCode === 2 && e.message === `createEngine: ${refused.message}`,
+    () => promiseEngine(Engine.layer(options)),
+    (e: Error & { exitCode?: number }) => e.exitCode === 2 && e.message === `promiseEngine: ${refused.message}`,
   );
 });

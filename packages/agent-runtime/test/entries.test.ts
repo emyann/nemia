@@ -16,7 +16,6 @@ const PINNED: Record<string, string[]> = {
     'TURN_ARGS',
     'claudeDetached',
     'codex',
-    'createEngine',
     'denialText',
     'lifecycleGraph',
     'nameFor',
@@ -87,8 +86,8 @@ const drift = (entry: string, exported: string[], pinned: string[]): string[] =>
 ];
 
 test('REFUSED: an entry that drops a name, or gains one', () => {
-  assert.deepEqual(drift('agent-runtime', ['codex', 'nameFor'], ['codex', 'createEngine']), [
-    'agent-runtime no longer exports createEngine: re-export it by name from the entry, as before the move',
+  assert.deepEqual(drift('agent-runtime', ['codex', 'nameFor'], ['codex', 'lifecycleGraph']), [
+    'agent-runtime no longer exports lifecycleGraph: re-export it by name from the entry, as before the move',
     'agent-runtime exports nameFor, which it did not: a new name on an entry is added here on purpose',
   ]);
 });

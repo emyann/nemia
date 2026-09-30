@@ -1,6 +1,6 @@
 /** The workflows, a step's page, and a run started from one (apps/api/src/workflows/workflows.ts). */
 import { queryOptions } from '@tanstack/react-query';
-import { get } from './read.ts';
+import { getUndecoded } from './read.ts';
 import type { AgentSkill } from './agents.ts';
 import type { RunGraph } from './graph.ts';
 
@@ -83,7 +83,7 @@ export type WorkflowListing = {
 /** Every workflow there is. Not polled: it changes when a person edits a folder. Read again on each visit. */
 export const workflowsQuery = queryOptions({
   queryKey: ['workflows'],
-  queryFn: () => get<WorkflowListing[]>('/api/workflows'),
+  queryFn: () => getUndecoded<WorkflowListing[]>('/api/workflows'),
 });
 
 /**
@@ -113,7 +113,9 @@ export const stepQuery = (from: string, workflow: string, step: string) =>
   queryOptions({
     queryKey: ['workflows', from, workflow, step],
     queryFn: () =>
-      get<WorkflowStepPage>(`/api/workflows/${encodeURIComponent(from)}/${encodeURIComponent(workflow)}/${encodeURIComponent(step)}`),
+      getUndecoded<WorkflowStepPage>(
+        `/api/workflows/${encodeURIComponent(from)}/${encodeURIComponent(workflow)}/${encodeURIComponent(step)}`,
+      ),
   });
 
 /** A workflow by name, as the Workflows page lists it: the last segment of its folder. */
@@ -126,7 +128,7 @@ export const workflowNameOf = (workflowDir: string): string =>
 /** The repository a start runs in, as the api resolved it: what the start form lists the runs of. Read once a visit. */
 export const repositoryQuery = queryOptions({
   queryKey: ['repository'],
-  queryFn: () => get<{ repo: string }>('/api/repository'),
+  queryFn: () => getUndecoded<{ repo: string }>('/api/repository'),
 });
 
 /** What a start answers: the new run — and, for an inbox card, whether the card left the inbox, and why not when it did not. */

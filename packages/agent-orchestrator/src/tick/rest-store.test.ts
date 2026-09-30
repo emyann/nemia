@@ -3,7 +3,7 @@
  * input of a run takes it out of the memo (`advanceResting` in tick.verb.ts): its record, the files a person keeps beside it, its asks and
  * what is done with them, its tasks' journals, and its result branches. What makes a run at rest is pure, and lives in rest.test.ts.
  *
- * Walked through the runtime itself, `createEngine` over an in-memory journal and a harness the test signs by hand, as held.test.ts does. A
+ * Walked through the runtime itself, `promiseEngine` over an in-memory journal and a harness the test signs by hand, as held.test.ts does. A
  * file of its own, since `tick` reads every run under `WF_ROOT`. Every pass that is not a measurement judges the runs the memo answered in
  * full as well (`verifyRest`), and throws where the two differ. `WF_ROOT` is read as the module loads, so it is set before the import; no
  * cap on runs in flight, and sessions enough that every task filed is admitted on the pass after, so a store of two hundred runs is built
@@ -14,7 +14,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { createEngine, type PromiseJournal, type PromiseRunner, type PromiseSighting } from 'agent-runtime';
+import type { PromiseJournal, PromiseRunner, PromiseSighting } from 'agent-runtime';
+import { Engine, promiseEngine } from 'agent-runtime/effect';
 import type { GitRun, Run } from '../run.ts';
 import type { PassCost } from '../meter/meter.ts';
 import { scratch } from '../../test/scratch.ts';
@@ -103,12 +104,14 @@ const engine = () => {
     },
   };
   const journal = memoryJournal();
-  const e = createEngine({
-    root: fs.mkdtempSync(path.join(ROOT, 'engine-')),
-    journal,
-    harnesses: { claude: runner, codex: runner, check: runner },
-    defaultHarness: 'claude',
-  });
+  const e = promiseEngine(
+    Engine.layer({
+      root: fs.mkdtempSync(path.join(ROOT, 'engine-')),
+      journal,
+      harnesses: { claude: runner, codex: runner, check: runner },
+      defaultHarness: 'claude',
+    }),
+  );
   const signAll = (keep: readonly Run[] = [], closeout: (name: string) => object | undefined = () => undefined) => {
     for (const [name, s] of sessions) {
       if (s.state !== 'working' || keep.some((r) => name.startsWith(`ae/${r.id}-`))) continue;

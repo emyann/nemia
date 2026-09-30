@@ -6,7 +6,7 @@
  * So what is checked is what a poller sees: every event dated by the harness's own record and
  * given a role; a tool result paired to its call; the closeout a call like any other; a second read
  * emitting only what was appended; and a cursor from a file that shrank, or was replaced, reading again
- * rather than nothing for ever. Then the same through `createEngine()` at shipped defaults, with a fake
+ * rather than nothing for ever. Then the same through the Promise engine at shipped defaults, with a fake
  * `claude` or `codex` on PATH: `logs` beside it, and each refusal made to refuse.
  *
  * Where Claude Code keeps transcripts is read when the runner is loaded, so `CLAUDE_CONFIG_DIR` is set before the
@@ -765,7 +765,7 @@ test("claude-detached reads the transcript `claude --bg` would, once its run has
   assert.equal(detachedOps({ name: 'sh', command: () => ({ cmd: 'sh', args: ['-c', 'true'] }) }, root).transcript, undefined);
 });
 
-const { createEngine } = await import('../src/facade.ts');
+const { Engine, promiseEngine } = await import('../src/index.ts');
 type PromiseRunner = import('../src/facade.ts').PromiseRunner;
 type Sighting = import('../src/facade.ts').Sighting;
 
@@ -841,7 +841,7 @@ const fakeCodex = (thread: string) => {
 test("at shipped defaults, a Claude background session's transcript is its session's, read through its own harness from the cursor given — and logs is as it was", async () => {
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
-    const engine = createEngine({ root: tmp('root') });
+    const engine = promiseEngine(Engine.layer({ root: tmp('root') }));
     const id = await engine.file({
       brief: 'Write the word to WORD.txt, then give your closeout.',
       cwd: tmp('cwd'),
@@ -895,7 +895,7 @@ test("at shipped defaults, a Codex task's transcript is read from its rollout, b
   const thread = randomUUID();
   writeRollout(thread, jsonl(rolloutLines(thread)));
   await onPath(fakeCodex(thread), async () => {
-    const engine = createEngine({ root: tmp('root') });
+    const engine = promiseEngine(Engine.layer({ root: tmp('root') }));
     const id = await engine.file({ brief: 'Review the change.', cwd: tmp('cwd'), harness: 'codex' });
     await engine.tick();
     let read = await engine.transcript(id);
@@ -921,7 +921,7 @@ test('refused, each naming what to do: a task the engine has no record of, a cur
 
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
-    const engine = createEngine({ root: tmp('root') });
+    const engine = promiseEngine(Engine.layer({ root: tmp('root') }));
     await assert.rejects(
       engine.transcript('t-nope'),
       refusal(/^transcript: `t-nope` is not a task on this board\. `ae ls`, or `list\(\)`, gives the ones it has\.$/),
@@ -953,14 +953,16 @@ test('refused, each naming what to do: a task the engine has no record of, a cur
       return 'what it printed';
     },
   };
-  const own = createEngine({ root: tmp('root'), harnesses: { plain }, defaultHarness: 'plain' });
+  const own = promiseEngine(Engine.layer({ root: tmp('root'), harnesses: { plain }, defaultHarness: 'plain' }));
   const ownId = await own.file({ brief: 'the prompt', cwd: '/repo' });
   await assert.rejects(
     own.transcript(ownId),
     refusal(/^transcript: the `plain` harness keeps no conversation this engine can read\. `logs` gives what its session printed\.$/),
     'a harness brought as a PromiseRunner with no `transcript`',
   );
-  const sh = createEngine({ root: tmp('root'), harnesses: { sh: { name: 'sh', command: () => ({ cmd: 'sh', args: ['-c', 'true'] }) } } });
+  const sh = promiseEngine(
+    Engine.layer({ root: tmp('root'), harnesses: { sh: { name: 'sh', command: () => ({ cmd: 'sh', args: ['-c', 'true'] }) } } }),
+  );
   await assert.rejects(
     sh.transcript(await sh.file({ brief: 'the prompt', cwd: '/repo' })),
     refusal(/^transcript: the `sh` harness keeps no conversation/),
@@ -989,7 +991,7 @@ test("a PromiseRunner's cursor is its own: passed through as it gave it, and nev
       return { events: [said(page)], cursor: `page-${page + 1}` };
     },
   };
-  const engine = createEngine({ root: tmp('root'), harnesses: { talking }, defaultHarness: 'talking' });
+  const engine = promiseEngine(Engine.layer({ root: tmp('root'), harnesses: { talking }, defaultHarness: 'talking' }));
   const id = await engine.file({ brief: 'the prompt', cwd: '/repo' });
 
   const nothing = await engine.transcript(id);
@@ -1018,7 +1020,7 @@ test("a PromiseRunner's cursor is its own: passed through as it gave it, and nev
 test("a registry that cannot be read: an ended attempt's transcript is read by the id on the record, with no registry asked; one in flight reads as nothing new, from the cursor given", async () => {
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
-    const engine = createEngine({ root: tmp('root') });
+    const engine = promiseEngine(Engine.layer({ root: tmp('root') }));
     const id = await engine.file({
       brief: 'Write the word to WORD.txt, then give your closeout.',
       cwd: tmp('cwd'),

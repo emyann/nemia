@@ -6,7 +6,7 @@
  * nudged retry is read from its own start, never handed its first try's statement and usage; and a read taken
  * while the registry lists a session final for one observation — by a `view`, which observes without stepping —
  * is read again once the transcript is newer than it. A transcript's mtime is put back, so that nothing but the
- * attempt keeps one attempt's read from the next. What is checked is what `createEngine()` writes on the
+ * attempt keeps one attempt's read from the next. What is checked is what the Promise engine writes on the
  * record. Where Claude Code keeps transcripts is read when the runner is loaded, so `CLAUDE_CONFIG_DIR` is set
  * before the import.
  */
@@ -21,7 +21,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const config = tmp('config');
 process.env.CLAUDE_CONFIG_DIR = config;
-const { createEngine } = await import('../src/facade.ts');
+const { Engine, promiseEngine } = await import('../src/index.ts');
 
 type Row = { name: string; sessionId: string; state: string; status: string; startedAt: number };
 
@@ -98,7 +98,7 @@ const call = (id: string, name: string, input: object = {}) => ({ type: 'tool_us
 test("a session resumed under the same id is read for its new attempt: its own closeout, not the last one's, and usage since its own start", async () => {
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
-    const engine = createEngine({ root: tmp('root') });
+    const engine = promiseEngine(Engine.layer({ root: tmp('root') }));
     const schema = { type: 'object' };
 
     const first = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: schema });
@@ -189,7 +189,7 @@ test("a session resumed under the same id is read for its new attempt: its own c
 test('a statement read as nothing from a final sighting is read again once the transcript has grown, and found', async () => {
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
-    const engine = createEngine({ root: tmp('root') });
+    const engine = promiseEngine(Engine.layer({ root: tmp('root') }));
     const id = await engine.file({
       config: { background: true },
       brief: 'the prompt',

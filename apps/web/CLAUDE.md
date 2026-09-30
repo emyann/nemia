@@ -96,6 +96,9 @@ The board is Vite, React, TanStack Router and Query, React Flow, and shadcn's co
 - A new step status is drawn as `working` until `stepState` (`lib/status.ts`) knows it: add the word there, with its meaning, class,
   `stepGraph`'s fill and `offersOf`, in the same change.
 - A page that must agree with a verb's refusal reads the package's decision (`Decidable.awaiting`), never the list's `toDecide`.
+- A read decodes with `get` (`lib/api/read.ts`) through a schema beside its plain type (`satisfies Schema.Schema<T>`), which the barrel
+  never exports (`export type *`): every key the board reads required, an unknown key dropped. `satisfies` misses a key made optional:
+  read the schema against the type. `getUndecoded` is a list that only shrinks (`test/read.test.ts`).
 
 ## Node tests of `src`
 

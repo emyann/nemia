@@ -40,7 +40,7 @@ import {
 } from '../src/harness/detached/detached.ts';
 import { claudeResultOutput, claudeStreamOutput } from '../src/harness/detached/output.ts';
 import { codex, trustedProjects } from '../src/harness/codex/codex.ts';
-import { createEngine } from '../src/facade.ts';
+import { Engine, promiseEngine } from '../src/index.ts';
 import { execFileSync } from 'node:child_process';
 import { composite } from '../src/harness/seam.ts';
 import { RunnerError, testOps } from '../src/harness/seam.ts';
@@ -1727,7 +1727,7 @@ test('claude-detached at shipped defaults: a task that asked for a closeout gets
   process.env.PATH = `${bin}:${prev}`;
   try {
     const cwd = root();
-    const engine = createEngine({ root: root() });
+    const engine = promiseEngine(Engine.layer({ root: root() }));
     const schema = { type: 'object', properties: { outcome: { type: 'string' } } };
     const id = await engine.file({ brief: 'the prompt', cwd, harness: 'claude-detached', closeoutSchema: schema });
     const until = Date.now() + 15_000;
@@ -1764,7 +1764,7 @@ test('claude-detached, filed through the engine with disallowedTools, spawns cla
   const prev = process.env.PATH;
   process.env.PATH = `${bin}:${prev}`;
   try {
-    const engine = createEngine({ root: root() });
+    const engine = promiseEngine(Engine.layer({ root: root() }));
     const rules = ['Bash(npm run build)', 'Bash(npm run e2e)'];
     const allow = ['Write(**)'];
     const id = await engine.file({
@@ -1848,7 +1848,7 @@ test('codex at shipped defaults: what the attempt consumed is read from its exec
   process.env.PATH = `${bin}:${prev.PATH}`;
   process.env.CODEX_HOME = root();
   try {
-    const engine = createEngine({ root: root() });
+    const engine = promiseEngine(Engine.layer({ root: root() }));
     const id = await engine.file({ brief: 'the prompt', cwd: root(), harness: 'codex' });
     const until = Date.now() + 15_000;
     while (!(await engine.view(id)).state.settled && Date.now() < until) {

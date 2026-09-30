@@ -231,7 +231,7 @@ workflow gives the same value, the rule `workspace: folder` follows today (`isFo
   repository record, **`placeSkill: { skill, version }`**, optional in `GitRecordSchema`. An older build reads a record carrying it
   through the schema's `Rest` and ignores it, and runs its own git code, which is what the record meant then.
 - **A repository record without `placeSkill`** was started before the freeze. It is answered by the package's shipped copy of the git
-  skill (`packages/agent-orchestrator/workflows/skills/git/`), run where it is installed, as today's git code in `src` is: it is the
+  skill (`packages/agent-orchestrator/place/git/`), run where it is installed, as today's git code in `src` is: it is the
   package's own code, never a checkout's. No reader writes to such a record or freezes anything for it, so `wf ls`, the api, and an
   `--after` check of a parent the tick never passes again all have a script to run.
 - `open` runs on the frozen copy. Its `Opened` fills `repo`, `baseRef` and `branch`, the fields a repository run has today.
@@ -317,9 +317,11 @@ What is lost overall:
   no `check:`); clean up by hand what `wf rm` left, with the commands `say` prints.
 - **A writing team** (`note`) says `place: folder`. None of its agents lists `git`, its briefs carry no git sentence (they come from a
   place it does not have), and no script runs for it.
-- **Where it lives.** The skill ships in `workflows/skills/git/` and in `packages/agent-orchestrator/workflows/skills/git/`, held byte for
-  byte like the ui agents. The package already ships `trial-merge-a-branch` and the shipper there. The package's copy is the one its
-  tests prove and the one a record without `placeSkill` runs.
+- **Where it lives.** One copy, in the package: `packages/agent-orchestrator/place/git/`, shipped as Nemia's own code and covered by its
+  `tsconfig` and lint as `src` is. No copy goes in this repository's `.claude/skills/` or `workflows/`, and no test holds two copies. The
+  package ships no workflow, agent or skill besides it (`trial-merge-a-branch` lives only in the tests' team, `test/fixtures/team/`). It
+  is the copy the package's tests prove and the one a record without `placeSkill` runs. `skillsFor` reads a team's skills and the
+  places', not the package's, so card C says how `wf start` finds it.
 
 ## The migration
 
@@ -332,7 +334,9 @@ gone, not moved.
 
 | card | after | what |
 |---|---|---|
-| A. The contract and the skill, unused | now | `src/place/place.ts` (types; pure; a new file joins `PURE`) and `src/place/place.store.ts` (run a verb, decode; joins `STORE`); `workflows/skills/git/` and the package's copy: SKILL.md, `place.json`, `scripts/*.ts`, with tests that run every verb against scratch repositories (`scratch(prefix)`), including a refusal and an unread answer per verb. The package's `tsconfig` and oxlint cover the package's copy; a test holds the two copies byte for byte. Nothing calls it yet. |
+| A1. The contract and the skill, unused | now | `src/place/place.ts` (all nine verbs' requests and answers, the outcomes, the deadlines, `PlaceDeclared`; pure) and `src/place/place.store.ts` (`runPlaceVerb`, `readPlaceJson`; store), re-exported by `runner.ts`; `packages/agent-orchestrator/place/git/`: SKILL.md, `place.json` declaring the verbs it has scripts for, `scripts/contract.ts`, `open.ts`, `handoff.ts`, `status.ts`, `land.ts`, with tests that run every script against scratch repositories (`scratch(prefix)`): an answer, a refusal and an unread answer per verb. The package's `tsconfig` and oxlint cover `place/`. Nothing calls it yet. |
+| A2. `make`, `inventory`, `remove`, unused | A1 | Their scripts and tests, and the verbs added to `place.json`. |
+| A3. `report` and `standing`, unused | A1 | Their scripts and tests, and the verbs added to `place.json`. |
 | B1. Codex trust, the runtime's half | now | The runtime takes `config.codex.trustFrom`, a directory, like `config.claude`: it extends the operator's trust in that directory to `cwd`, and never grants it (`codex.ts:187-204`). A task without it is prepared as today, through `repositoryOf`, so no codex step in a worktree loses the project's settings before B2. |
 | B2. Codex trust, the filing half | B1, 6 | The tick passes `trustFrom: run.repo` for a codex step of a repository run, and `repositoryOf` goes in the same card. An `ae` user of codex in a worktree then names the directory. |
 | C. `place:` and the freeze | 4a, 5 | The key, its `FrozenStepSchema` field, the same-value rule, the refusal with no `place:`, `workspace: folder` as a former spelling, `open` at `wf start`, the copy to `WF_ROOT/places/`; `placeSkill` on the repository record and as an optional field of `GitRecordSchema`, with a test that a record carrying it is read, and one that a record without it resolves to the package's copy; `place`, `placeOf`, `isGitRun`, the api's and the web's `PlaceKind` untouched; the shipped folders gain `place: git` or `place: folder`; the api's builder and the web's builder. The tick still calls today's git helpers. |
@@ -367,9 +371,10 @@ absorbs. The `say` templates are what make the words match.
 
 - **Processes.** A verb is a node process (tens of milliseconds) where today's call was an `execFileSync` of git or a `stat`. Per pass:
   one `standing` per repository and frozen copy (it replaces a `for-each-ref` per repository), one `handoff` per step whose hand-off is
-  due, one `status` per ending holding a checkout, and a few `report`s when something moved. Nothing measured this yet. Card A measures a
-  verb's cost on the owner's machine, and card J compares the pass's `place` phase with today's `git` phase in `tick-stats.json`. A
-  board request spawns nothing, where today the list, the decision page and the memo of runs at rest run git on each request
+  due, one `status` per ending holding a checkout, and a few `report`s when something moved. Measured by card A1 on the owner's machine
+  (12 cores, WSL), `runPlaceVerb` on a scratch repository, ten runs each, a floor: `open`, `status`, `handoff` and `land` take 50 to 60
+  ms at the median, against 1 ms for one `git rev-parse`; node's start is most of it. Card J compares the pass's `place` phase with
+  today's `git` phase in `tick-stats.json`. A board request spawns nothing, where today the list, the decision page and the memo of runs at rest run git on each request
   (`branchReader`, `headsOf`).
 - **Code.** The git code does not disappear; it moves into the skill's scripts. The package loses `worktree.ts`'s git half, most of
   `branches.ts`, the git calls of `forget.ts`, and the api's `merge.ts`. It gains `place/` and the decoders.

@@ -196,20 +196,24 @@ export function inboxQueueHow(argv: string[]): { workflow?: string; off: boolean
   return { ...(workflow !== undefined ? { workflow } : {}), off: switches.length > 0 };
 }
 
-/** `wf inbox add`'s flags, after the idea: `--workflow <name>` and `--repo <path>`, once each. */
-export function inboxAddHow(argv: string[]): { workflow?: string; repo?: string } {
+/** What one of `wf inbox add`'s flags names, once per card. */
+const ADD_NAMES: Record<string, string> = { '--workflow': 'workflow', '--repo': 'repository', '--factory': 'factory' };
+
+/** `wf inbox add`'s flags, after the idea: `--workflow <name>`, `--repo <path>` and `--factory <name>`, once each. */
+export function inboxAddHow(argv: string[]): { workflow?: string; repo?: string; factory?: string } {
   const { values } = readFlags(argv, {
     takes: {
       '--workflow': 'the workflow to start the card on, by name or as a path: wf inbox add "<idea>" --workflow <name>',
       '--repo': 'the repository the idea is about: wf inbox add "<idea>" --repo <path>',
+      '--factory': 'the factory that processes the card: wf inbox add "<idea>" --factory <name>',
     },
     unknown: (arg) =>
       arg.startsWith('-')
-        ? `wf inbox add does not take ${arg}. It takes the idea, then --workflow <name> and --repo <path>.`
+        ? `wf inbox add does not take ${arg}. It takes the idea, then --workflow <name>, --repo <path> and --factory <name>.`
         : `wf inbox add takes one idea, and ${arg} is a second. Quote an idea with spaces — wf inbox add "<idea>" — or give it as a file: wf inbox add ./idea.md.`,
-    twice: (flag) => `wf inbox add takes ${flag} once: a card names one ${flag === '--repo' ? 'repository' : 'workflow'}.`,
+    twice: (flag) => `wf inbox add takes ${flag} once: a card names one ${ADD_NAMES[flag]}.`,
   });
-  return { workflow: values['--workflow']?.[0], repo: values['--repo']?.[0] };
+  return { workflow: values['--workflow']?.[0], repo: values['--repo']?.[0], factory: values['--factory']?.[0] };
 }
 
 /** The factory a run was started in, and the repository a git run works on there, as `wf start` says it; none in the default factory. */
@@ -333,7 +337,7 @@ function inboxList(): void {
   if (!listing.length) return console.log(`the inbox is empty — park an idea with wf inbox add "<idea>"`);
   for (const line of inboxLines(listing)) console.log(line);
   console.log(
-    `\nstart one: wf start ${path.join(inboxDir(), '<name>.md')} [--workflows <w>] [--repo <r>] — queue one: wf inbox queue <name> — drop one: wf inbox rm <name>`,
+    `\nstart one: wf start ${path.join(inboxDir(), '<name>.md')} [--workflows <w>] [--repo <r>] [--factory <f>] — queue one: wf inbox queue <name> — drop one: wf inbox rm <name>`,
   );
 }
 
@@ -345,7 +349,7 @@ function inboxAdd(args: string[]): void {
   const idea = args[0];
   if (idea === undefined || idea.startsWith('--'))
     usage(
-      'wf inbox add takes the idea, first: wf inbox add "<idea>" [--workflow <name>] [--repo <path>], or a file: wf inbox add ./idea.md. Nothing was filed.',
+      'wf inbox add takes the idea, first: wf inbox add "<idea>" [--workflow <name>] [--repo <path>] [--factory <name>], or a file: wf inbox add ./idea.md. Nothing was filed.',
     );
   const how = inboxAddHow(args.slice(1));
   const at = fs.statSync(idea, { throwIfNoEntry: false });
@@ -359,9 +363,10 @@ function inboxAdd(args: string[]): void {
     ...(at ? { from: idea, dir: path.dirname(path.resolve(idea)) } : { dir: process.cwd() }),
     ...(workflow !== undefined ? { workflow } : {}),
     ...(how.repo !== undefined ? { repo: path.resolve(how.repo) } : {}),
+    ...(how.factory !== undefined ? { factory: how.factory } : {}),
   });
   console.log(
-    `${card.name}  ${card.body.split('\n')[0].slice(0, 56)}${card.workflow ? `  workflow: ${card.workflow}` : ''}${card.repo ? `  repo: ${card.repo}` : ''}`,
+    `${card.name}  ${card.body.split('\n')[0].slice(0, 56)}${card.workflow ? `  workflow: ${card.workflow}` : ''}${card.repo ? `  repo: ${card.repo}` : ''}${card.factory ? `  factory: ${card.factory}` : ''}`,
   );
   console.log(`filed: ${file} — start it with wf start ${file}${card.workflow ? '' : ' --workflows <w>'}`);
 }
@@ -381,7 +386,7 @@ function inboxQueue(args: string[]): void {
   if (queued.was === 'taken back')
     return console.log(`${name}  taken back: it no longer starts on its own — start it with wf start ${queued.file}`);
   console.log(
-    `${name}  queued at ${queued.card.queued}, ${queued.place} of ${queued.of}  workflow: ${queued.card.workflow}${queued.card.repo ? `  repo: ${queued.card.repo}` : ''}`,
+    `${name}  queued at ${queued.card.queued}, ${queued.place} of ${queued.of}  workflow: ${queued.card.workflow}${queued.card.repo ? `  repo: ${queued.card.repo}` : ''}${queued.card.factory ? `  factory: ${queued.card.factory}` : ''}`,
   );
   console.log(
     `the tick starts it on its own once its turn comes and a run slot is free${queued.card.repo ? '' : ', on the repository wf up runs in'} — take it back with wf inbox queue ${name} --off`,

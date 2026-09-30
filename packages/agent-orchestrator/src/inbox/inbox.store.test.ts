@@ -196,10 +196,35 @@ test('`wf inbox add` files a card under the slug of its first line and a suffix 
   );
   assert.deepEqual(lines.slice(-2), [
     '',
-    `start one: wf start ${path.join(INBOX, '<name>.md')} [--workflows <w>] [--repo <r>] — queue one: wf inbox queue <name> — drop one: wf inbox rm <name>`,
+    `start one: wf start ${path.join(INBOX, '<name>.md')} [--workflows <w>] [--repo <r>] [--factory <f>] — queue one: wf inbox queue <name> — drop one: wf inbox rm <name>`,
   ]);
   fs.rmSync(path.join(ROOT, 'runs', 'show-the-flag-on-the-settin-zz99.json'));
   fs.rmSync(path.join(ROOT, 'runs', 'an-unrelated-run-yy88.json'));
+});
+
+test("`wf inbox add --factory` files a card that names its factory, over the text's own, and says it — REFUSED by name: a name that is not a factory's, and the flag twice; nothing filed", async (t) => {
+  emptyInbox();
+  const { card, file } = addToInbox({ text: 'Build the page', factory: 'pipao' });
+  assert.equal(card.factory, 'pipao');
+  assert.equal(fs.readFileSync(file, 'utf8'), '---\nfactory: pipao\n---\nBuild the page\n');
+  const idea = path.join(fs.mkdtempSync(path.join(ROOT, 'given-')), 'idea.md');
+  fs.writeFileSync(idea, '---\nfactory: nemia\nworkflow: build\n---\nShip it\n');
+  const printed = await printedBy(t, 'inbox', 'add', idea, '--factory', 'pipao');
+  const [name] = printed[0].split('  ');
+  assert.equal(printed[0], `${name}  Ship it  workflow: build  factory: pipao`);
+  assert.equal(fs.readFileSync(path.join(INBOX, `${name}.md`), 'utf8'), '---\nworkflow: build\nfactory: pipao\n---\nShip it\n');
+  assert.equal(readInbox().find((l) => l.name === name)?.factory, 'pipao');
+
+  emptyInbox();
+  assert.throws(
+    () => addToInbox({ text: 'an idea', factory: 'Pipao' }),
+    refusedWith(/^the idea: `factory: Pipao` — `Pipao` is not a factory's name: .* — pipao, say\. /),
+  );
+  await assert.rejects(
+    main(['inbox', 'add', 'an idea', '--factory', 'pipao', '--factory', 'nemia'], NO_ENGINE),
+    refusedWith(/^wf inbox add takes --factory once: a card names one factory\.$/),
+  );
+  assert.deepEqual(inInbox(), [], 'nothing filed');
 });
 
 test('`wf inbox rm` drops a card without starting it — a name with no card is normal: it says so, and which cards there are, exit 0', async (t) => {
@@ -226,7 +251,7 @@ test('REFUSED by name at shipped defaults: `wf inbox add` with no idea, an empty
   await assert.rejects(
     add(),
     refusedWith(
-      /^wf inbox add takes the idea, first: wf inbox add "<idea>" \[--workflow <name>\] \[--repo <path>\], or a file: wf inbox add \.\/idea\.md\. Nothing was filed\.$/,
+      /^wf inbox add takes the idea, first: wf inbox add "<idea>" \[--workflow <name>\] \[--repo <path>\] \[--factory <name>\], or a file: wf inbox add \.\/idea\.md\. Nothing was filed\.$/,
     ),
   );
   await assert.rejects(add('--workflow', 'dev'), refusedWith(/^wf inbox add takes the idea, first:/));
@@ -273,7 +298,9 @@ test('REFUSED by name at shipped defaults: `wf inbox add` with no idea, an empty
   );
   await assert.rejects(
     add('an idea', '--workflows', 'dev'),
-    refusedWith(/^wf inbox add does not take --workflows\. It takes the idea, then --workflow <name> and --repo <path>\.$/),
+    refusedWith(
+      /^wf inbox add does not take --workflows\. It takes the idea, then --workflow <name>, --repo <path> and --factory <name>\.$/,
+    ),
   );
   await assert.rejects(add('an', 'idea'), refusedWith(/^wf inbox add takes one idea, and idea is a second\. Quote an idea with spaces/));
   assert.deepEqual(inInbox(), [], 'nothing filed');

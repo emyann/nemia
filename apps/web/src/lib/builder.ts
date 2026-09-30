@@ -37,6 +37,8 @@ export const UNSET: Readonly<WorkflowStepSpec> = {
   after: [],
   resume: null,
   input: [],
+  workspace: null,
+  slot: null,
   agent: null,
   permissionMode: null,
   sandbox: null,

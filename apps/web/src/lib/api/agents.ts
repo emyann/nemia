@@ -1,22 +1,8 @@
 /** The agents, and the writes of one of yours (apps/api/src/agents/agents.ts). */
 import { queryOptions } from '@tanstack/react-query';
-import { getUndecoded } from './read.ts';
-import type { SchemaFile } from './builder.ts';
-import type { GivenSkill } from './skills.ts';
-
-/**
- * Mirrors `AgentSkill` in the package: one thing an agent says it can do, in the A2A protocol's words — `id`, `name`, `description` and
- * `tags` are REQUIRED there and here, and the rest are written only where they say something the card does not already say.
- */
-export type AgentSkill = {
-  id: string;
-  name: string;
-  description: string;
-  tags: string[];
-  examples?: string[];
-  inputModes?: string[];
-  outputModes?: string[];
-};
+import { Schema } from 'effect';
+import { get } from './read.ts';
+import { AgentSkillSchema, GivenSkillSchema, SchemaFileSchema, type AgentSkill, type GivenSkill, type SchemaFile } from './library.ts';
 
 /**
  * The keys an agent sets on the steps that name it: every agent key but what describes the agent itself — its description, the skills its
@@ -35,8 +21,33 @@ export type AgentRoleKey =
   | 'remote'
   | 'output';
 
+/** Decodes an agent's role keys as its file writes them, each only where it sets it. */
+const RoleKeysSchema = Schema.Struct({
+  harness: Schema.optionalKey(Schema.String),
+  model: Schema.optionalKey(Schema.String),
+  effort: Schema.optionalKey(Schema.String),
+  context: Schema.optionalKey(Schema.String),
+  permissionMode: Schema.optionalKey(Schema.String),
+  sandbox: Schema.optionalKey(Schema.String),
+  tools: Schema.optionalKey(Schema.String),
+  disallowedTools: Schema.optionalKey(Schema.String),
+  allowedTools: Schema.optionalKey(Schema.String),
+  remote: Schema.optionalKey(Schema.String),
+  output: Schema.optionalKey(Schema.String),
+}) satisfies Schema.Schema<Partial<Record<AgentRoleKey, string>>>;
+
 /** Mirrors `AgentUser` in apps/api/src/agents/agents.ts: a node that names an agent, the step of a workflow in the agent's own place. */
 export type AgentUser = { from: 'repo' | 'yours'; workflow: string; step: string };
+
+/** Where an agent is read from: the repository's, or yours. */
+const AgentPlaceSchema = Schema.Literals(['repo', 'yours']);
+
+/** Decodes an `AgentUser`. */
+const AgentUserSchema = Schema.Struct({
+  from: AgentPlaceSchema,
+  workflow: Schema.String,
+  step: Schema.String,
+}) satisfies Schema.Schema<AgentUser>;
 
 /**
  * Mirrors `AgentListing` in apps/api/src/agents/agents.ts: one agent — its keys as its file writes them, its instructions, the result
@@ -77,15 +88,38 @@ export type AgentListing = {
   untried: { why: string; copy: string | null } | null;
 };
 
+/** Decodes an `AgentListing`: each key the board reads, of its type and words; a key it does not know is dropped. */
+const AgentListingSchema = Schema.Struct({
+  name: Schema.String,
+  from: AgentPlaceSchema,
+  dir: Schema.String,
+  file: Schema.String,
+  role: Schema.NullOr(Schema.String),
+  description: Schema.NullOr(Schema.String),
+  keys: RoleKeysSchema,
+  body: Schema.String,
+  schema: Schema.NullOr(SchemaFileSchema),
+  card: Schema.NullOr(Schema.mutable(Schema.Array(AgentSkillSchema))),
+  cardError: Schema.NullOr(Schema.String),
+  skills: Schema.NullOr(Schema.String),
+  systemPrompt: Schema.NullOr(Schema.String),
+  given: Schema.mutable(Schema.Array(GivenSkillSchema)),
+  source: Schema.String,
+  version: Schema.String,
+  usedBy: Schema.mutable(Schema.Array(AgentUserSchema)),
+  error: Schema.NullOr(Schema.String),
+  untried: Schema.NullOr(Schema.Struct({ why: Schema.String, copy: Schema.NullOr(Schema.String) })),
+}) satisfies Schema.Schema<AgentListing>;
+
 /** Every agent of the repository's and of yours, read from disk on each request. */
 export const agentsQuery = queryOptions({
   queryKey: ['agents'],
-  queryFn: () => getUndecoded<AgentListing[]>('/api/agents'),
+  queryFn: () => get('/api/agents', Schema.mutable(Schema.Array(AgentListingSchema))),
 });
 
 /** One agent, read from disk now: `agentQuery`'s read, for a page that must read it past the cache. */
 export const readAgent = (from: string, name: string): Promise<AgentListing> =>
-  getUndecoded<AgentListing>(`/api/agents/${encodeURIComponent(from)}/${encodeURIComponent(name)}`);
+  get(`/api/agents/${encodeURIComponent(from)}/${encodeURIComponent(name)}`, AgentListingSchema);
 
 /** One agent, for its page. */
 export const agentQuery = (from: string, name: string) =>

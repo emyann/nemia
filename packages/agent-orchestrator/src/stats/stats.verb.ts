@@ -1,6 +1,7 @@
 /**
  * `wf stats` (`statsRun`): the flow numbers of every run in the store (`statsOf`), off each run's record and the engine's view of every
- * task of every try, each viewed once, the calls each session was refused read off the same views (`deniedCallsOf`). A controller,
+ * task of every try, each viewed once, the calls each session was refused and the skills it loaded read off the same views
+ * (`deniedCallsOf`, `skillsLoadedOf`): no session's log nor transcript. A controller,
  * reaching the runtime through the client (`runtime-client.ts`): an Effect program that requires the engine as a service (`EngineService`),
  * and `stats`, its plain face in a Promise, over the engine it is handed. It writes nothing, and keeps nothing between calls.
  */
@@ -16,7 +17,7 @@ import { phaseOfView } from '../views/views-words.ts';
 import { renderedSkillVersions } from '../agents/agents.store.ts';
 import { dayOf, factsOf, keysOf, statsOf, type CheckVerdict, type Facts, type StatsQuery } from './stats.ts';
 import { frozenOf, type RunFrozen } from './marks.ts';
-import { deniedCallsOf } from './discipline.ts';
+import { deniedCallsOf, skillsLoadedOf } from './discipline.ts';
 
 /** How a check's task ended (`CheckVerdict`): passed, refused (it ran to its end and exited non-zero, `refusedCheck`), or unfinished. */
 function verdictOf(view: TaskView | undefined): CheckVerdict {
@@ -63,6 +64,7 @@ async function runFacts(e: Engine, run: Run, steps: Workflow[]): Promise<Pick<Fa
     verdictOf: (taskId) => verdictOf(everyTry.get(taskId)),
     closeoutOf: closeoutReader(views, run),
     deniedOf: (taskId) => deniedCallsOf(everyTry.get(taskId)).map(denialText),
+    skillsOf: (taskId) => skillsLoadedOf(everyTry.get(taskId)),
   });
 }
 

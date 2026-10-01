@@ -1,6 +1,7 @@
 /**
  * The stats in words (`Stats`, `stats.ts`): the tiles, a row per day, a row per change to what the runs froze, a row per step, a row per
- * call a step was refused, and the one line the morning recap quotes. A number with nothing measured under it reads `—`, never 0. Pure.
+ * call a step was refused, a row per skill a step loaded, and the one line the morning recap quotes. A number with nothing measured under
+ * it reads `—`, never 0. Pure.
  */
 import { dollars, durationWord } from '../status/status.ts';
 import type { Group, Headline, Stats, StepRow } from './stats.ts';
@@ -26,6 +27,7 @@ const wordsOf = (h: Headline): Record<string, string> => ({
   refused: String(h.refused),
   'gate wait': or(h.gateWaitMs, durationWord),
   denied: or(h.deniedPerTry, perTry),
+  skills: or(h.skillsPerTry, perTry),
 });
 
 /** Rows of cells in columns, each as wide as its widest cell, two spaces apart. */
@@ -75,11 +77,18 @@ const costWord = (s: StepRow): string =>
 const deniedWord = (s: StepRow): string =>
   s.deniedCalls === null ? NONE : s.deniedTries === s.tries ? String(s.deniedCalls) : `${s.deniedCalls} (${s.deniedTries} of ${s.tries})`;
 
-/** A row per step and agent: its tries, their run time and cost, its checks' verdicts, its mean gate wait, the calls it was refused. */
+/** The skills a step loaded in words: their count over its measured tries, and how many were, where not all. */
+const skillsWord = (s: StepRow): string =>
+  s.skillLoads === null ? NONE : s.skillTries === s.tries ? String(s.skillLoads) : `${s.skillLoads} (${s.skillTries} of ${s.tries})`;
+
+/**
+ * A row per step and agent: its tries, their run time and cost, its checks' verdicts, its mean gate wait, the calls it was refused, the
+ * skills it loaded.
+ */
 function stepLines(steps: readonly StepRow[]): string[] {
   if (!steps.length) return [];
   return table([
-    ['step', 'agent', 'tries', 'ran', 'cost', 'passed', 'refused', 'unfinished', 'gate wait', 'denied'],
+    ['step', 'agent', 'tries', 'ran', 'cost', 'passed', 'refused', 'unfinished', 'gate wait', 'denied', 'skills'],
     ...steps.map((s) => [
       s.step,
       s.agent ?? NONE,
@@ -91,6 +100,7 @@ function stepLines(steps: readonly StepRow[]): string[] {
       String(s.checks.unfinished),
       or(s.gateWaitMs, durationWord),
       deniedWord(s),
+      skillsWord(s),
     ]),
   ]);
 }
@@ -101,9 +111,15 @@ function denialLines(steps: readonly StepRow[]): string[] {
   return rows.length ? table([['step', 'agent', 'denied', 'calls'], ...rows]) : [];
 }
 
+/** A row per skill each step and agent loaded, with how many times; none where no step loaded a skill. */
+function skillLines(steps: readonly StepRow[]): string[] {
+  const rows = steps.flatMap((s) => s.skills.map((k) => [s.step, s.agent ?? NONE, k.skill, String(k.count)]));
+  return rows.length ? table([['step', 'agent', 'skill', 'loads'], ...rows]) : [];
+}
+
 /**
  * What `wf stats` prints: the tiles, a row per day — per group, with a key — then a row per change to what the runs froze, a row per step,
- * a row per call a step was refused, and the runs left out.
+ * a row per call a step was refused, a row per skill a step loaded, and the runs left out.
  */
 export function statsLines(s: Stats): string[] {
   const filtered = Object.entries(s.filters).map(([k, v]) => `${k} ${v}`);
@@ -117,6 +133,7 @@ export function statsLines(s: Stats): string[] {
     ...(s.all.marks.length ? ['', ...markLines(s.all.marks)] : []),
     ...(s.all.steps.length ? ['', ...stepLines(s.all.steps)] : []),
     ...(denialLines(s.all.steps).length ? ['', ...denialLines(s.all.steps)] : []),
+    ...(skillLines(s.all.steps).length ? ['', ...skillLines(s.all.steps)] : []),
     ...(s.unreadable.length ? ['', `left out, a journal of each not reading (wf ls says why): ${s.unreadable.join(', ')}`] : []),
   ];
 }
@@ -129,6 +146,6 @@ export function statsLine(s: Stats): string {
   return (
     `stats, last 14 days (the 14 before): ${was('runs')} runs finished, ${was('landed')} landed, ${was('first try')} on the first try, ` +
     `${was('rounds')} rounds, ${was('cost/landed')} and ${was('time/landed')} per landed run, ${was('tries')} tries, ` +
-    `${was('refused')} checks refused, ${was('gate wait')} at a gate, ${was('denied')} calls denied`
+    `${was('refused')} checks refused, ${was('gate wait')} at a gate, ${was('denied')} calls denied, ${was('skills')} skills loaded`
   );
 }

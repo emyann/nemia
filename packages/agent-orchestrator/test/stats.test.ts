@@ -1,8 +1,8 @@
 /**
  * `wf stats` over a store of seeded records and the runtime itself, `promiseEngine` over an in-memory journal: the numbers `--json`
  * answers, the one line `--line` prints, a check that refused told from one that did not finish (`refusedCheck`), the calls a session was
- * refused on a harness that records them, and the refusals of a key and a day it does not take. A run whose check did not finish has not
- * finished; a run whose journal does not read is left out whole, and named.
+ * refused on a harness that records them, the skills a session loaded where each of its ends says, and the refusals of a key and a day
+ * it does not take. A run whose check did not finish has not finished; a run whose journal does not read is left out whole, and named.
  *
  * `WF_ROOT` is set before the command line is imported, which reads it as the module loads.
  */
@@ -176,12 +176,12 @@ reviewRun('marks-4', '2026-09-27T08:00:00.000Z');
 
 type Denial = { tool: string; what?: string };
 
-/** A session task that ended on `day` at `hour`, an attempt per list of the calls it was denied, the last one succeeding. */
-function deniedSession(taskId: string, day: string, hour: number, attempts: Denial[][]) {
+/** A session task that ended on `day` at `hour`, an attempt per object its end says beside its closeout, the last one succeeding. */
+function endedSession(taskId: string, day: string, hour: number, attempts: object[]) {
   const when = at(hour, day);
   tasks.set(taskId, [
     { kind: 'filed', at: when, brief: 'Do it.', cwd: ROOT, maxAttempts: attempts.length, harness: 'claude' },
-    ...attempts.flatMap((denials, i) => [
+    ...attempts.flatMap((said, i) => [
       { kind: 'starting', at: when, attempt: i + 1 },
       { kind: 'spawned', at: when, attempt: i + 1 },
       {
@@ -192,12 +192,21 @@ function deniedSession(taskId: string, day: string, hour: number, attempts: Deni
         observed: i === attempts.length - 1 ? 'done' : 'failed',
         reason: 'harness',
         closeout: SIGNED,
-        ...(denials.length ? { denials } : {}),
+        ...said,
       },
     ]),
     { kind: 'settled', at: when, outcome: 'succeeded' },
   ]);
 }
+
+/** A session task that ended on `day` at `hour`, an attempt per list of the calls it was denied, the last one succeeding. */
+const deniedSession = (taskId: string, day: string, hour: number, attempts: Denial[][]) =>
+  endedSession(
+    taskId,
+    day,
+    hour,
+    attempts.map((denials) => (denials.length ? { denials } : {})),
+  );
 
 const DENIED_DAY = '2026-09-26';
 const UNMEASURED_DAY = '2026-09-25';
@@ -239,6 +248,37 @@ writeRun(
   { factory: 'denials', createdAt: `${BG_DAY}T00:00:00.000Z` },
 );
 
+const SKILLS_DAY = '2026-09-20';
+const NO_SKILL_DAY = '2026-09-21';
+const UNSAID_DAY = '2026-09-22';
+endedSession('skills-spec', SKILLS_DAY, 1, [{ skills: ['write-a-spec'] }, { skills: ['write-a-spec', 'look'] }]);
+endedSession('skills-spec-2', SKILLS_DAY, 2, [{ skills: ['look'] }, {}]);
+ran('skills-spec-2-check', 2, 3, { exitCode: null, day: SKILLS_DAY });
+ran('skills-spec-2-check-2', 3, 4, { exitCode: 0, day: SKILLS_DAY });
+endedSession('skills-quiet', NO_SKILL_DAY, 1, [{ skills: [] }]);
+endedSession('skills-old', UNSAID_DAY, 1, [{}]);
+writeRun(
+  'skills',
+  [
+    { name: 'spec', after: [], body: 'Write it.', check: 'true', agent: agent('seldon') },
+    { name: 'quiet', after: [], body: 'Do it.' },
+    { name: 'old', after: [], body: 'Do it.' },
+  ],
+  {
+    spec: {
+      taskId: 'skills-spec-2',
+      check: { taskId: 'skills-spec-2-check-2' },
+      tries: [
+        { taskId: 'skills-spec', then: 'retries' },
+        { taskId: 'skills-spec-2', then: 'retries', check: { taskId: 'skills-spec-2-check' } },
+      ],
+    },
+    quiet: { taskId: 'skills-quiet' },
+    old: { taskId: 'skills-old' },
+  },
+  { factory: 'skills', createdAt: `${SKILLS_DAY}T00:00:00.000Z` },
+);
+
 const printedBy = async (t: TestContext, argv: string[]) => {
   const out: string[] = [];
   const log = t.mock.method(console, 'log', (...a: unknown[]) => void out.push(a.map(String).join(' ')));
@@ -277,6 +317,7 @@ test('wf stats --by factory answers a group per factory, and --factory keeps one
       ['default', 3],
       ['denials', 7],
       ['other', 2],
+      ['skills', 5],
     ],
   );
   const only = JSON.parse(await printedBy(t, ['stats', '--json', '--factory', 'other'])) as Stats;
@@ -362,12 +403,43 @@ test('wf stats counts each call a session was refused, per measured try; a codex
     assert.deepEqual([row?.deniedCalls, row?.deniedTries, row?.denials], [null, 0, []], `${name} records no denial`);
   }
   const words = await printedBy(t, ['stats', '--factory', 'denials', '--from', BG_DAY, '--to', DENIED_DAY]);
-  assert.match(words, new RegExp(`^${BG_DAY}\\s.*\\s—$`, 'm'));
-  assert.match(words, new RegExp(`^${DENIED_DAY}\\s.*\\s2/try$`, 'm'));
-  assert.match(words, new RegExp(`^${UNMEASURED_DAY}\\s.*\\s—$`, 'm'));
-  assert.match(words, new RegExp(`^${QUIET_DAY}\\s.*\\s0/try$`, 'm'));
-  assert.match(words, /^write\s+ada\s+3\s.*\s4 \(2 of 3\)$/m, 'the step row says how many of its tries were measured');
+  assert.match(words, new RegExp(`^${BG_DAY}\\s.*\\s—\\s+—$`, 'm'), 'the last column is the skills loaded, unmeasured here');
+  assert.match(words, new RegExp(`^${DENIED_DAY}\\s.*\\s2/try\\s+—$`, 'm'));
+  assert.match(words, new RegExp(`^${UNMEASURED_DAY}\\s.*\\s—\\s+—$`, 'm'));
+  assert.match(words, new RegExp(`^${QUIET_DAY}\\s.*\\s0/try\\s+—$`, 'm'));
+  assert.match(words, /^write\s+ada\s+3\s.*\s4 \(2 of 3\)\s+—$/m, 'the step row says how many of its tries were measured');
   assert.match(words, /^write\s+ada\s+Write\(\/x\)\s+2$/m);
   const line = await printedBy(t, ['stats', '--line', '--factory', 'denials']);
-  assert.match(line, /, \S+ \(\S+\) calls denied$/);
+  assert.match(line, /, \S+ \(\S+\) calls denied, /);
+});
+
+test('wf stats counts each skill a session loaded, per try whose ends all say; a recheck, or one end unsaid, is unmeasured', async (t) => {
+  const range = ['--factory', 'skills', '--from', SKILLS_DAY, '--to', UNSAID_DAY];
+  const s = JSON.parse(await printedBy(t, ['stats', '--json', ...range])) as Stats;
+  assert.deepEqual(
+    Object.fromEntries(s.all.days.map((d) => [d.day, d.skillsPerTry])),
+    { [SKILLS_DAY]: 3, [NO_SKILL_DAY]: 0, [UNSAID_DAY]: null },
+    "three loads over spec's first try: its second has an end that does not say, and its recheck has no session of its own",
+  );
+  const row = (name: string) => s.all.steps.find((r) => r.step === name);
+  const spec = row('spec');
+  assert.deepEqual([spec?.tries, spec?.skillLoads, spec?.skillTries], [3, 3, 1]);
+  assert.deepEqual(spec?.skills, [
+    { skill: 'write-a-spec', count: 2 },
+    { skill: 'look', count: 1 },
+  ]);
+  assert.deepEqual([row('quiet')?.skillLoads, row('quiet')?.skillTries, row('quiet')?.skills], [0, 1, []], 'a measured empty list');
+  assert.deepEqual([row('old')?.skillLoads, row('old')?.skillTries, row('old')?.skills], [null, 0, []], 'an end that does not say');
+  const words = await printedBy(t, ['stats', ...range]);
+  assert.match(words, /^ {2}skills\s+\S+\s+\(\S+\)$/m, 'a tile');
+  assert.match(words, new RegExp(`^${SKILLS_DAY}\\s.*\\s3/try$`, 'm'));
+  assert.match(words, new RegExp(`^${NO_SKILL_DAY}\\s.*\\s0/try$`, 'm'));
+  assert.match(words, new RegExp(`^${UNSAID_DAY}\\s.*\\s—$`, 'm'));
+  assert.match(words, /^spec\s+seldon\s+3\s.*\s3 \(1 of 3\)$/m, 'the step row says how many of its tries were measured');
+  assert.match(words, /^old\s+—\s+1\s.*\s—$/m);
+  assert.match(words, /^step\s+agent\s+skill\s+loads$/m);
+  assert.match(words, /^spec\s+seldon\s+write-a-spec\s+2$/m);
+  assert.match(words, /^spec\s+seldon\s+look\s+1$/m);
+  const line = await printedBy(t, ['stats', '--line', '--factory', 'skills']);
+  assert.match(line, /, \S+ \(\S+\) calls denied, \S+ \(\S+\) skills loaded$/);
 });

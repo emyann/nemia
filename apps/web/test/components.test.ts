@@ -4951,8 +4951,13 @@ test('a step row says its step, its agent or —, its total as served, and each 
   assert.match(row('implement'), /data-total[^>]*>3 \(2 of 4\)</);
   assert.match(row('implement'), /data-item="look"[^>]*>look <span[^>]*>×2</);
   assert.match(row('implement'), /data-item="effect"[^>]*>effect <span[^>]*>×1</);
-  assert.match(row('design'), /<td[^>]*>—<\/td>/);
-  assert.match(row('design'), /data-total[^>]*>—</);
+  const cells = (step: string) => [...row(step).matchAll(/<td[^>]*>(.*?)<\/td>/g)].map((m) => m[1]).slice(0, 3);
+  assert.deepEqual(cells('implement'), ['implement', 'ada', '3 (2 of 4)']);
+  assert.deepEqual(
+    cells('design'),
+    ['design', '—', '—'],
+    'refused: a step with no agent says —, and its total — where nothing was measured',
+  );
   assert.doesNotMatch(markup, /truncate|text-ellipsis/, 'refused: a name is never cut');
   const none = renderToStaticMarkup(
     createElement(StatsByStep, { title: 'Calls refused', about: 'each call', kind: 'denials', total: 'calls', item: 'call', rows: [] }),

@@ -122,7 +122,7 @@ function cardsOf(closeout: Record<string, unknown>): Card[] {
 /** The first line of a card's body, past its frontmatter: what `wf inbox` lists as its title. */
 function firstLine(text: string): string {
   const body = text
-    .replace(/^﻿/, '')
+    .replace(/^\uFEFF/, '')
     .replace(/\r\n/g, '\n')
     .replace(/^---\n[\s\S]*?\n---(\n|$)/, '');
   return body.split('\n').find((line) => line.trim()) ?? '';

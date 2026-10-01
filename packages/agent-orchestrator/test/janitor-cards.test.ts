@@ -126,6 +126,36 @@ for (const key of ['factory', 'workflow', 'repo'])
     assert.deepEqual(inbox(root), {});
   });
 
+test('REFUSED: a card whose title is more than one line, or empty, files nothing, not even the card beside it', () => {
+  const { root, repo } = world();
+  const twoLines = run(root, [closeoutFile({ cards: [card('A ready card', repo), card('Allow agora\nthe typecheck it runs', repo)] })]);
+  assert.equal(twoLines.code, 1);
+  assert.match(twoLines.err, /card #2: its title is one line, what to correct, and this one is empty or more than one/);
+  const empty = run(root, [closeoutFile({ cards: [card('A ready card', repo), card('  ', repo)] })]);
+  assert.equal(empty.code, 1);
+  assert.match(empty.err, /card #2: its title is one line/);
+  assert.deepEqual(inbox(root), {});
+});
+
+test('REFUSED: a card of a kind that is not fence, body, skill or on-purpose files nothing, not even the card beside it', () => {
+  const { root, repo } = world();
+  const ran = run(root, [closeoutFile({ cards: [card('A ready card', repo), card('Deny agora the push', repo, { kind: 'deny' })] })]);
+  assert.equal(ran.code, 1);
+  assert.match(ran.err, /card #2: its kind is "deny", not one of fence, body, skill, on-purpose/);
+  assert.deepEqual(inbox(root), {});
+});
+
+test('REFUSED: an inbox card whose file starts with a byte order mark still reads its title, so it is not filed again', () => {
+  const { root, repo } = world();
+  fs.mkdirSync(path.join(root, 'inbox'));
+  const bom = String.fromCharCode(0xfeff);
+  fs.writeFileSync(path.join(root, 'inbox', 'keep-git-push-refu-b0m1.md'), `${bom}---\nrepo: ${repo}\n---\nKeep git push refused\n`);
+  const ran = run(root, [closeoutFile({ cards: [card('Keep git push refused', repo)] })]);
+  assert.equal(ran.code, 0, ran.err);
+  assert.match(ran.out, /already in the inbox: Keep git push refused/);
+  assert.deepEqual(Object.keys(inbox(root)), ['keep-git-push-refu-b0m1.md']);
+});
+
 test('REFUSED: a card whose repository is not an absolute path files nothing', () => {
   const { root, repo } = world();
   const ran = run(root, [closeoutFile({ cards: [card('A ready card', repo), card('A card on a relative path', 'packages')] })]);

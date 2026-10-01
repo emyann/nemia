@@ -36,6 +36,11 @@ export default {
     };
     try {
       await expectCount(page.locator('[data-quota="fresh"]'), 1, 'the header shows the quota Claude Code answered with');
+      await expectTexts(
+        line.locator('[data-quota-machine]'),
+        ['Quota on this machine:'],
+        "led by whose it is: the machine's, not the factory's whose floor shows it",
+      );
       const { rate_limits: limits } = (
         JSON.parse(written) as { response: { response: { rate_limits: Record<'five_hour' | 'seven_day', { resets_at: string }> } } }
       ).response.response;
@@ -74,21 +79,21 @@ export default {
       fs.writeFileSync(file, recordedUsage('no-plan'));
       await said(
         'no-plan',
-        /^No plan limits to show: the Claude Code the api runs is not signed in to a Claude subscription/,
+        /^Quota on this machine: No plan limits to show: the Claude Code the api runs is not signed in to a Claude subscription/,
         'Claude Code with no subscription says how to sign in',
       );
 
       fs.writeFileSync(file, recordedUsage('unsupported'));
       await said(
         'unknown',
-        /^Claude Code answered the usage request in a shape this board does not read: it refused the request \(Unsupported control request subtype/,
+        /^Quota on this machine: Claude Code answered the usage request in a shape this board does not read: it refused the request \(Unsupported control request subtype/,
         'a Claude Code without get_usage says what it answered',
       );
 
       fs.rmSync(file);
       await said(
         'failed',
-        /^Claude Code stopped before it answered the usage request \(exit 1: claude: not signed in, the e2e took its answer away\)\. Run claude -p/,
+        /^Quota on this machine: Claude Code stopped before it answered the usage request \(exit 1: claude: not signed in, the e2e took its answer away\)\. Run claude -p/,
         'a claude that ends before it answers says how it ended',
       );
     } finally {

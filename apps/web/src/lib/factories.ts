@@ -1,7 +1,8 @@
 /**
  * The machine split by factory, without React Flow: a block for each factory, with what it holds; the runs and the queued cards of one
- * factory; the factories the menu lists; and where a factory's floor starts a run. A run or a card belongs to the factory it names, and one
- * naming none to the default factory. Pure.
+ * factory; the factories the menu lists; where a factory's floor starts a run; and, for the pages that list the whole machine, the factory
+ * each run or card is tagged with, the factories their filter offers and what it keeps, and the factories a workflow is in. A run or a card
+ * belongs to the factory it names, and one naming none to the default factory. Pure.
  */
 import type { Factory, InboxEntry, RunSummary, WorkflowListing } from './api.ts';
 import { inFlight, repoName, waitsOnYou } from './factory.ts';
@@ -111,3 +112,45 @@ export const floorPlace = (factory: Factory): { factory: string; repos: string[]
 /** Why a workflow the factory lists cannot start: its folder's `error`, else the steps its hires leave `unfilled`; null when it can. */
 export const whyNotStarted = (workflow: Pick<WorkflowListing, 'error' | 'unfilled'>): string | null =>
   workflow.error ?? workflow.unfilled ?? null;
+
+/** The name the default factory goes by: in a filter, on a tag, and on a card that writes `factory: default`. */
+export const DEFAULT_NAME = 'default';
+
+/** The factory a run or a card is tagged with: the one it names, or `default` for one naming none. */
+export const factoryOf = (item: { factory: string | null }): string => item.factory ?? DEFAULT_NAME;
+
+/** Whether a run or a card is kept by the filter on the factory `filter` names (`factoryOf`): every one is when it names none. */
+export const keptBy =
+  (filter: string | undefined) =>
+  (item: { factory: string | null }): boolean =>
+    filter === undefined || factoryOf(item) === filter;
+
+/** The runs or cards of the factory `filter` names (`keptBy`), in their order; every one when `filter` names none. */
+export const shownIn = <T extends { factory: string | null }>(items: readonly T[], filter: string | undefined): T[] =>
+  items.filter(keptBy(filter));
+
+/** Each factory `items` are tagged with (`factoryOf`) and how many of them are, the default factory first, then by name. */
+export const factoryCounts = (items: readonly { factory: string | null }[]): { name: string; count: number }[] => {
+  const counts = new Map<string, number>();
+  for (const item of items) counts.set(factoryOf(item), (counts.get(factoryOf(item)) ?? 0) + 1);
+  const rank = (name: string) => (name === DEFAULT_NAME ? '' : name);
+  return [...counts].map(([name, count]) => ({ name, count })).sort((a, b) => rank(a.name).localeCompare(rank(b.name)));
+};
+
+/**
+ * The factories a listed workflow is in, by name, sorted: each named factory whose file reads and that attaches it by its folder's name,
+ * on a repository it is found on. One of yours is found on every repository; one of the repository's only on the api's, the default
+ * factory's. None while `factories` holds no default factory to say which repository that is.
+ */
+export const workflowFactories = (workflow: Pick<WorkflowListing, 'name' | 'from'>, factories: readonly Factory[]): string[] => {
+  const here = factories.find((f) => f.default)?.repos[0];
+  return factories
+    .filter((f) => !f.default && f.error === null && f.workflows !== null && f.workflows.includes(workflow.name))
+    .filter((f) => workflow.from === 'yours' || (here !== undefined && f.repos.includes(here)))
+    .map((f) => f.name)
+    .sort();
+};
+
+/** The factory a page's address filters by, `?factory=<name>`: none when it names none, or names it with nothing, or with no string. */
+export const factorySearch = (search: Record<string, unknown>): { factory?: string } =>
+  typeof search.factory === 'string' && search.factory ? { factory: search.factory } : {};

@@ -135,7 +135,7 @@ export default {
     await expectLeftOf(ghosts, floor, "the ghosts wait at the floor's left edge");
     await expectTexts(
       page.locator('[data-cap]'),
-      [`${IN_FLIGHT_BY_CAP} of ${QUEUE.cap} run slots taken · ${QUEUED.length} queued · ${PASS.line}`],
+      [`${IN_FLIGHT_BY_CAP} of ${QUEUE.cap} run slots taken on this machine · ${QUEUED.length} queued · ${PASS.line}`],
       `the header says the run slots taken of the cap the daemon last ran with (WF_MAX_RUNS=${QUEUE.cap}), and how many are queued — in slots, not beside the floor's 4 in flight as a second count of runs in flight — and what the daemon's last pass took`,
     );
     const pass = page.locator('[data-cap] [data-pass]');
@@ -569,7 +569,7 @@ export default {
     );
     await expectTexts(
       page.locator('[data-cap]'),
-      [`${IN_FLIGHT_BY_CAP} of ${QUEUE.cap} run slots taken · ${QUEUED.length} queued · ${PASS.line}`],
+      [`${IN_FLIGHT_BY_CAP} of ${QUEUE.cap} run slots taken on this machine · ${QUEUED.length} queued · ${PASS.line}`],
       'and the header still counts the queue',
     );
     await expectVisible(inspector.getByText(FAKE.title), 'the inspector names the run the step is in');

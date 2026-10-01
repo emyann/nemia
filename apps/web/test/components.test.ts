@@ -4761,6 +4761,21 @@ test("a character card holds one link to its agent's page, and its nodes' links 
   assert.doesNotMatch(html, /<a [^>]*>(?:(?!<\/a>)[\s\S])*<a /, 'no link inside a link');
 });
 
+test("REFUSED: a character card tags each factory its agent fills a step in, linked to its floor above the card's own link; none for none", async () => {
+  const html = await agentCard({ factories: ['nemia', 'pipao'] });
+  const tags = [...html.matchAll(/<a [^>]*data-factory-tag="([^"]+)"[^>]*>/g)];
+  assert.deepEqual(
+    tags.map(([, name]) => name),
+    ['nemia', 'pipao'],
+    html,
+  );
+  for (const [tag, name] of tags) assert.match(tag, new RegExp(`href="/factories/${name}"`), "each opens its factory's floor");
+  assert.match(html, /data-factory-tags[^>]*class="[^"]*relative z-10/, "above the name's link stretched over the card");
+  assert.doesNotMatch(html, /<a [^>]*>(?:(?!<\/a>)[\s\S])*<a /, 'no link inside a link');
+  assert.doesNotMatch(html, /title=/, 'no tooltip: the name link stretched over the card would take its hover');
+  for (const none of [await agentCard({ factories: [] }), await agentCard({})]) assert.doesNotMatch(none, /data-factory-tag/);
+});
+
 test('REFUSED: a character card draws no stats line for an agent that sets none, nor for one whose file does not read', async () => {
   const unset = await agentCard({ keys: { tools: 'Read' } });
   assert.match(unset, /data-agent-skill="grilling"/, 'the card is drawn');

@@ -29,7 +29,7 @@ export default {
       await expectVisible(
         line.filter({
           hasText:
-            /^Claude Code is signed in to a subscription \(max\), but Anthropic's usage service gave it nothing this time\. The service may be limiting how often it is asked/,
+            /^Quota on this machine: Claude Code is signed in to a subscription \(max\), but Anthropic's usage service gave it nothing this time\. The service may be limiting how often it is asked/,
         }),
         'the header says the usage service gave nothing, and that it may be limiting how often it is asked',
       );

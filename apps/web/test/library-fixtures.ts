@@ -1,12 +1,13 @@
 /**
- * The library's reads as the api answers them, every key the board reads: an agent (`agent`), the skills by place (`skillPlace`), one
- * skill's page (`skillDetail`), a workflow (`workflow`, its steps' keys from `stepSpec`), a step's page (`stepPage`), the builder's form
- * (`keyForm`) and a machine (`machine`). Each takes keys to put over its own.
+ * The library's reads as the api answers them, every key the board reads: an agent (`agent`), as the list reads it (`listedAgent`), the
+ * skills by place (`skillPlace`), one skill's page (`skillDetail`), a workflow (`workflow`, its steps' keys from `stepSpec`), a step's page
+ * (`stepPage`), the builder's form (`keyForm`) and a machine (`machine`). Each takes keys to put over its own.
  */
 import type {
   AgentListing,
   AgentSkill,
   KeyForm,
+  LibraryAgent,
   MachineGraph,
   SkillDetail,
   SkillPlace,
@@ -74,6 +75,9 @@ export const agent = (extra: Partial<AgentListing> = {}): AgentListing => ({
   untried: { why: 'a try runs Claude Code', copy: null },
   ...extra,
 });
+
+/** `agent` as the Agents page lists it, filling a step in the factory nemia; `factories` puts other names in its place. */
+export const listedAgent = (extra: Partial<AgentListing> = {}, factories = ['nemia']): LibraryAgent => ({ ...agent(extra), factories });
 
 /** The skills of one place. */
 export const skillPlace = (extra: Partial<SkillPlace> = {}): SkillPlace => ({

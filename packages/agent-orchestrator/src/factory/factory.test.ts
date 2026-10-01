@@ -107,7 +107,7 @@ test("a factory's fills for one workflow: its hires into that workflow's steps, 
   assert.deepEqual(fillsOf(hires, 'intake'), {});
 });
 
-test('REFUSED: every step no agent fills, naming the factory and the hire line for each; a step that names its agent or a remote one is filled', () => {
+test('REFUSED: every step no agent fills, naming the factory and hiring as the way, a hire line for each; a step that names its agent or a remote one is filled', () => {
   const steps = [
     { name: 'implement', harness: undefined, agent: undefined },
     { name: 'review', harness: undefined, agent: { name: 'reviewer', keys: [], body: '', given: {} } },
@@ -120,6 +120,13 @@ test('REFUSED: every step no agent fills, naming the factory and the hire line f
   assert.match(why, /wf factory hire pipao <agent> --step build\/implement/);
   assert.match(why, /wf factory hire pipao <agent> --step build\/ship/);
   assert.doesNotMatch(why, /build\/review|build\/ask/);
+  assert.ok(
+    why.endsWith(
+      '. Hire an agent into each — wf factory hire pipao <agent> --step build/implement; wf factory hire pipao <agent> --step build/ship. Nothing was started.',
+    ),
+    why,
+  );
+  assert.doesNotMatch(why, /default factory|plain session/);
   assert.equal(unfilledRefusal(steps.slice(1, 3), 'pipao', 'build'), undefined);
   assert.match(unfilledRefusal(steps.slice(0, 1), 'pipao', 'build')!, /^build: in the factory pipao, the step implement names no agent/);
 });

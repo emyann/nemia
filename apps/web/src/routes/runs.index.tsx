@@ -1,13 +1,16 @@
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
+import { FactoryFilter, FactoryTag } from '../components/FactoryTag';
 import { StatusChip } from '../components/StatusChip';
 import { StartedFrom } from '../components/TryTag';
 import { runsQuery, type RunSummary } from '../lib/api';
 import { spentTitle } from '../lib/cost';
 import { inFlight, inFlightFirst, onYouOf, runClock, titleOf, toDecideOf, waitsOnYou } from '../lib/factory';
+import { factoryOf, factorySearch, shownIn } from '../lib/factories';
 import { useNow } from '../lib/useNow';
 
 export const Route = createFileRoute('/runs/')({
+  validateSearch: factorySearch,
   loader: ({ context }) => context.queryClient.ensureQueryData(runsQuery),
   component: Runs,
   errorComponent: ({ error }) => (
@@ -24,9 +27,14 @@ export const Route = createFileRoute('/runs/')({
  * decide is a group of its own, as `wf ls` says it before who else a run waits on, and not a row among the finished that nothing marks as
  * waiting for a person; a run that is somehow both in flight and to decide is in flight, since what still moves is not yet a result to
  * decide. Every row reads how long its run has been at work against one clock for the page (`useNow`), not in the render.
+ *
+ * Every factory's runs are listed, each tagged with its own, and a filter over them keeps one factory's (`FactoryFilter`), kept in the
+ * address as `?factory=<name>` so it survives a reload, the list's poll and a link; a filter that keeps none says so and how to clear it.
  */
 function Runs() {
   const { data: runs } = useSuspenseQuery(runsQuery);
+  const { factory } = Route.useSearch();
+  const navigate = Route.useNavigate();
   const now = useNow(60_000);
 
   if (!runs.length) {
@@ -41,13 +49,27 @@ function Runs() {
     );
   }
 
-  const ordered = inFlightFirst(runs);
+  const ordered = inFlightFirst(shownIn(runs, factory));
   const flying = ordered.filter((run) => inFlight(run));
   const deciding = ordered.filter((run) => !inFlight(run) && toDecideOf(run) !== null);
   const finished = ordered.filter((run) => !inFlight(run) && toDecideOf(run) === null);
 
   return (
     <article className="space-y-8">
+      <FactoryFilter
+        items={runs}
+        factory={factory}
+        onChange={(picked) => void navigate({ search: picked === undefined ? {} : { factory: picked }, replace: true })}
+      />
+      {!ordered.length && (
+        <p data-filtered-out className="text-sm text-neutral-500">
+          No run of the factory <span className="font-mono">{factory}</span>.{' '}
+          <Link to="/runs" search={{}} replace className="underline underline-offset-2">
+            Show every factory&apos;s
+          </Link>
+          .
+        </p>
+      )}
       {flying.length > 0 && <RunGroup group="in-flight" title="In flight" about="something of each still moves" runs={flying} now={now} />}
       {deciding.length > 0 && (
         <RunGroup group="to-decide" title="To decide" about="each is at its result, and nobody has decided it" runs={deciding} now={now} />
@@ -88,7 +110,8 @@ function RunGroup({ group, title, about, runs, now }: { group: string; title: st
 }
 
 /**
- * One run's row. Its link carries the run's title and id; where it works, its repository or, for a folder run, which has none, `folders`;
+ * One run's row. Its link carries the run's title and id; the factory it is in, `default` for one naming none, as plain text since the
+ * row is a link; where it works, its repository or, for a folder run, which has none, `folders`;
  * whether it is cancelled; whether `wf prune` gave back its worktrees, and its files when asked, with what it removed and kept on hover;
  * what waits on you, as `wf ls` prints it: the steps, `approve plan` for one at its gate, or for a run waiting on a run that never ships,
  * what is yours to resolve; a person's hold (`wf hold`) in `wf ls`'s word, with how to lift it on hover, amber once only a person lifts it;
@@ -111,6 +134,7 @@ function RunRow({ run, now }: { run: RunSummary; now: number }) {
         <p className="truncate font-medium">{title}</p>
         <p className="mt-1 flex flex-wrap gap-x-3 text-xs text-neutral-500">
           <span className="font-mono">{run.id}</span>
+          <FactoryTag name={factoryOf(run)} />
           <span title={run.repo ?? 'Its steps work in folders the run made'}>{run.repo ?? 'folders'}</span>
           {run.cancelledAt && <span className="text-amber-600">cancelled</span>}
           {run.pruned && (

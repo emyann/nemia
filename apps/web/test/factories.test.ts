@@ -1,20 +1,26 @@
 /**
  * The factories as the board splits the machine by them (src/lib/factories.ts): a block a factory, the default one only while no factory
  * is filed and it holds runs; each run and queued card in the factory its record or card names, the default factory's naming none; the
- * menu's sub-items, the open one among them; and where a floor starts a run.
+ * menu's sub-items, the open one among them; where a floor starts a run; and, for the pages that list the whole machine, the factory each
+ * run or card is tagged with, the factories a filter offers and what it keeps, and the factories a workflow is in.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Factory, InboxEntry, RunSummary } from '../src/lib/api.ts';
 import {
   factoryBlocks,
+  factoryCounts,
+  factoryOf,
+  factorySearch,
   floorPlace,
   MENU_SHOWN,
   menuFactories,
   queuedIn,
   runsIn,
+  shownIn,
   startRepo,
   whyNotStarted,
+  workflowFactories,
   type FactoryRun,
 } from '../src/lib/factories.ts';
 import { placeQuery } from '../src/lib/api/workflows.ts';
@@ -182,4 +188,61 @@ test("a workflow that cannot start says why: its folder's error before the steps
   assert.equal(whyNotStarted({ error: 'no steps', unfilled: null }), 'no steps');
   assert.equal(whyNotStarted({ error: null, unfilled: 'hire dev/review' }), 'hire dev/review');
   assert.equal(whyNotStarted({ error: 'no steps', unfilled: 'hire dev/review' }), 'no steps');
+});
+
+/** A run or a card of each factory, in the order a page lists them: one of the default factory names none, one names it as `default`. */
+const tagged = [
+  { id: 'q-1', factory: 'quay' },
+  { id: 'd-1', factory: null },
+  { id: 'n-1', factory: 'nemia' },
+  { id: 'd-2', factory: 'default' },
+  { id: 'n-2', factory: 'nemia' },
+];
+
+test('a run or a card is tagged with the factory it names, and with default when it names none or names default', () => {
+  assert.equal(factoryOf({ factory: null }), 'default');
+  assert.equal(factoryOf({ factory: 'default' }), 'default');
+  assert.equal(factoryOf({ factory: 'nemia' }), 'nemia');
+});
+
+test("a filter keeps the runs or cards of its factory in their order — the default's naming none or naming default — and no filter keeps all", () => {
+  assert.deepEqual(ids(shownIn(tagged, undefined)), ['q-1', 'd-1', 'n-1', 'd-2', 'n-2']);
+  assert.deepEqual(ids(shownIn(tagged, 'nemia')), ['n-1', 'n-2']);
+  assert.deepEqual(ids(shownIn(tagged, 'default')), ['d-1', 'd-2']);
+  assert.deepEqual(ids(shownIn(tagged, 'gone')), []);
+});
+
+test('the filter offers each factory the runs or cards name, with how many, the default first and then by name, whatever their order', () => {
+  assert.deepEqual(factoryCounts([...tagged, { factory: 'amber' }]), [
+    { name: 'default', count: 2 },
+    { name: 'amber', count: 1 },
+    { name: 'nemia', count: 2 },
+    { name: 'quay', count: 1 },
+  ]);
+  assert.deepEqual(factoryCounts(tagged.filter((item) => item.factory !== null && item.factory !== 'default')), [
+    { name: 'nemia', count: 2 },
+    { name: 'quay', count: 1 },
+  ]);
+});
+
+test("REFUSED: a workflow is tagged only with the factories that attach it where it is found — the repository's on its repository, yours on any — never the default or a factory whose file does not read", () => {
+  const factories = [
+    factory('default', { default: true, repos: ['/r'], workflows: null, hires: {} }),
+    factory('b-other', { repos: ['/elsewhere'], workflows: ['dev'] }),
+    factory('a-here', { repos: ['/r'], workflows: ['dev'] }),
+    factory('c-broken', { repos: ['/r'], workflows: ['dev'], hires: {}, error: '/wf/factories/c-broken.json is not JSON' }),
+    factory('d-here', { repos: ['/r'], workflows: ['build'] }),
+  ];
+  assert.deepEqual(workflowFactories({ name: 'dev', from: 'repo' }, factories), ['a-here']);
+  assert.deepEqual(workflowFactories({ name: 'dev', from: 'yours' }, factories), ['a-here', 'b-other']);
+  assert.deepEqual(workflowFactories({ name: 'build', from: 'repo' }, factories), ['d-here']);
+  assert.deepEqual(workflowFactories({ name: 'intake', from: 'yours' }, factories), []);
+  assert.deepEqual(workflowFactories({ name: 'dev', from: 'repo' }, []), [], 'with no factories read, a workflow is in none');
+});
+
+test("a page's address filters by the factory it names, and by none when it names none, an empty one or not one string", () => {
+  assert.deepEqual(factorySearch({ factory: 'nemia' }), { factory: 'nemia' });
+  assert.deepEqual(factorySearch({ factory: 'default', step: 'x' }), { factory: 'default' });
+  for (const none of [{}, { factory: '' }, { factory: ['nemia'] }, { factory: 7 }])
+    assert.equal(Object.hasOwn(factorySearch(none), 'factory'), false);
 });

@@ -99,7 +99,7 @@ export function fillsOf(hires: Hires, workflow: string): Record<string, string> 
 
 /**
  * Why a run of `workflow` in the factory `factory` cannot start, or undefined: every step that is left with no agent — its file names none,
- * no hire fills it, and it runs on no remote agent — named, with the hire that fills each.
+ * no hire fills it, and it runs on no remote agent — named, with the hire that fills each: in a factory, hiring is the way to fill a step.
  */
 export function unfilledRefusal(
   steps: readonly Pick<Workflow, 'name' | 'agent' | 'harness'>[],
@@ -113,7 +113,7 @@ export function unfilledRefusal(
       ? `the step ${unfilled[0]} names no agent, and ${factory} hires none into it`
       : `${unfilled.length} steps name no agent, and ${factory} hires none into them: ${unfilled.join(', ')}`;
   const hires = unfilled.map((s) => `wf factory hire ${factory} <agent> --step ${workflow}/${s}`).join('; ');
-  return `${workflow}: in the factory ${factory}, ${which}. Hire an agent into ${unfilled.length === 1 ? 'it' : 'each'} — ${hires} — or start it in the default factory, where such a step runs as a plain session. Nothing was started.`;
+  return `${workflow}: in the factory ${factory}, ${which}. Hire an agent into ${unfilled.length === 1 ? 'it' : 'each'} — ${hires}. Nothing was started.`;
 }
 
 /**

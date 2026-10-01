@@ -39,8 +39,8 @@ export function StatsByStep({
           <tbody className="divide-y divide-neutral-200 font-mono dark:divide-neutral-800">
             {rows.map((row) => (
               <tr key={`${row.step} ${row.agent}`} data-by-step-row={row.step} className="align-top">
-                <td className="py-1 pr-4 wrap-anywhere">{row.step}</td>
-                <td className="py-1 pr-4 wrap-anywhere">{row.agent ?? NONE}</td>
+                <td className="py-1 pr-4 wrap-break-word">{row.step}</td>
+                <td className="py-1 pr-4 wrap-break-word">{row.agent ?? NONE}</td>
                 <td data-total className="py-1 pr-4 whitespace-nowrap tabular-nums">
                   {row.total}
                 </td>

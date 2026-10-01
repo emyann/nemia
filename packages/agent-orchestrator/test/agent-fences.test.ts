@@ -61,13 +61,16 @@ const shown = (call: Call): string => (call.command === undefined ? call.tool : 
 
 /**
  * Whether a permission rule reaches a call: a bare tool name is that tool, `mcp__<server>` or `mcp__<server>__*` every tool of the
- * server, `Bash(x)` the command `x` exactly, and `Bash(x:*)` or `Bash(x *)` the command `x` or `x` followed by a space and more.
- * Throws on a `*` anywhere else, which this matcher does not model.
+ * server, `Bash(x)` the command `x` exactly, and `Bash(x:*)` or `Bash(x *)` the command `x` or `x` followed by a space and more. Any
+ * other `Tool(x)` reaches some call of that tool, so it is read as reaching every one; Claude Code matches a write against `Edit` rules,
+ * so an `Edit` rule reaches `Write` too. Throws on a `*` anywhere else, which this matcher does not model.
  */
 function reaches(rule: string, call: Call): boolean {
   const bash = /^Bash\((.*)\)$/s.exec(rule)?.[1];
   if (bash === undefined) {
-    if (rule.includes('(')) return false;
+    const tool = rule.includes('(') ? rule.slice(0, rule.indexOf('(')) : undefined;
+    if (call.tool === 'Write' && (rule === 'Edit' || tool === 'Edit')) return true;
+    if (tool !== undefined) return tool === call.tool && call.command === undefined;
     const server = rule.startsWith('mcp__') ? rule.replace(/__\*$/, '') : undefined;
     if (server !== undefined && !server.includes('*') && server.split('__').length === 2)
       return rule === call.tool || call.tool.startsWith(`${server}__`);
@@ -170,6 +173,11 @@ test('the matcher reads the rule shapes the fences use, and throws on a wildcard
   assert.equal(reaches('mcp__playwright__*', unsafe), true);
   assert.equal(reaches('mcp__playwright__browser_navigate', unsafe), false);
   assert.equal(reaches('Bash(git push:*)', unsafe), false);
+  assert.equal(reaches('Edit(**)', { tool: 'Edit' }), true, 'an edit rule on any path reaches an edit');
+  assert.equal(reaches('Edit(src/**)', { tool: 'Write' }), true, 'a write is matched against Edit rules');
+  assert.equal(reaches('Edit', { tool: 'Write' }), true);
+  assert.equal(reaches('Read(**)', { tool: 'Edit' }), false);
+  assert.equal(reaches('Edit(**)', push), false);
   assert.throws(
     () => reaches('Bash(git * push)', push),
     (err: Error) => err.message.includes('not modelled'),
@@ -226,9 +234,10 @@ const shippedStepOf = (agent: string): Step => {
 const CHECKERS = [
   { agent: 'seldon', skill: 'write-a-spec', from: 'Run each check bare' },
   { agent: 'agora', skill: 'review-a-change', from: '**Run the suite yourself**' },
+  { agent: 'argus', skill: 'read-the-stats', from: '**Run each read bare**' },
 ];
 
-test('every check the skills of Seldon and Agora name is one their fence allows', () => {
+test('every check the skills of Seldon, Agora and Argus name is one their fence allows', () => {
   for (const { agent, skill, from } of CHECKERS) {
     const step = shippedStepOf(agent);
     assert.equal(step.permissionMode, 'dontAsk', `${agent} runs dontAsk`);
@@ -327,4 +336,67 @@ test("REFUSED: the team's implementer with its deny line cut back to the four it
   const implement = loadWorkflows(path.join(root, 'dev')).find((s) => s.name === 'implement')!;
   assert.equal(implement.agent?.name, 'implementer');
   assert.equal(unfenced(implement).length, FENCED.length, unfenced(implement).join('\n'));
+});
+
+/** What a janitor must never do, in the spellings a session types: start, file, queue or drop a card, approve or retry a step, edit. */
+const ACTS: Call[] = [
+  ...['wf start x', 'wf inbox add x', 'wf inbox queue x', 'wf inbox rm x', 'wf approve r s', 'wf retry r s'].flatMap((command) => [
+    { tool: 'Bash', command: `npx ${command}` } as const,
+    { tool: 'Bash', command } as const,
+  ]),
+  { tool: 'Edit' },
+  { tool: 'Write' },
+];
+
+/** What of `ACTS` a step could run: given dontAsk, each a rule of its own, of the settings or of a skill allows and none of its own denies. */
+function acting(step: Step): string[] {
+  if (step.permissionMode !== 'dontAsk' || step.background === true || step.workspace === 'main')
+    return [`${step.name}: not a dontAsk job, so every call no deny names runs`];
+  const allows = [...(step.allowedTools ?? []), ...(SETTINGS.permissions?.allow ?? []), ...SKILL_GRANTS];
+  return ACTS.filter(
+    (call) => allows.some((rule) => reaches(rule, call)) && !(step.disallowedTools ?? []).some((rule) => reaches(rule, call)),
+  ).map(shown);
+}
+
+/** The janitor's step read from a scratch copy of the shipped team, its agent's `allowedTools` line replaced by `allowed`. */
+function argusAllowed(allowed: string): Step {
+  const root = scratch('wf-fences-argus-');
+  fs.cpSync(SHIPPED_HOLDERS[0], root, { recursive: true });
+  const file = path.join(root, 'agents', 'argus.md');
+  const text = fs.readFileSync(file, 'utf8');
+  const loose = text.replace(/^allowedTools: .*$/m, `allowedTools: ${allowed}`);
+  assert.notEqual(loose, text, 'Argus has an allow line to replace');
+  fs.writeFileSync(file, loose);
+  return loadWorkflows(path.join(root, 'janitor'), { repo: REPO }).find((step) => step.agent?.name === 'argus')!;
+}
+
+test('Argus is refused every wf verb that acts and every edit: it runs dontAsk, and no allow reaches one', () => {
+  assert.deepEqual(acting(shippedStepOf('argus')), []);
+});
+
+test('REFUSED: Argus allowed every wf verb, the inbox whole or an edit, read from its file as a run reads it, could act', () => {
+  assert.deepEqual(acting(argusAllowed('Bash(npx wf:*)')), [
+    'Bash(npx wf start x)',
+    'Bash(npx wf inbox add x)',
+    'Bash(npx wf inbox queue x)',
+    'Bash(npx wf inbox rm x)',
+    'Bash(npx wf approve r s)',
+    'Bash(npx wf retry r s)',
+  ]);
+  assert.deepEqual(acting(argusAllowed('Bash(npx wf stats:*), Bash(npx wf inbox:*)')), [
+    'Bash(npx wf inbox add x)',
+    'Bash(npx wf inbox queue x)',
+    'Bash(npx wf inbox rm x)',
+  ]);
+  assert.deepEqual(acting(argusAllowed('Bash(wf:*), Edit(**)')), [
+    'Bash(wf start x)',
+    'Bash(wf inbox add x)',
+    'Bash(wf inbox queue x)',
+    'Bash(wf inbox rm x)',
+    'Bash(wf approve r s)',
+    'Bash(wf retry r s)',
+    'Edit',
+    'Write',
+  ]);
+  assert.deepEqual(acting({ ...shippedStepOf('argus'), permissionMode: 'auto' }), ['argus: not a dontAsk job, so every call no deny names runs']);
 });

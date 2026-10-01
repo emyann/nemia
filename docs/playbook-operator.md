@@ -140,6 +140,9 @@ rm "$S"/node_modules; git worktree remove "$S"
 - **Park, don't widen:** a reviewer's finding "not worth a round", an architect's out-of-scope item, a follow-up the person agreed to,
   all become inbox cards (`wf inbox add`) with enough context to start cold. Name the run they came from.
 - **A sweep that touches hundreds of files lands last,** alone, after merging main and rerunning its tool over what main brought.
+- **The janitor, on demand:** `wf start "Read the stats" --workflows janitor --factory nemia`, a period in the message when the default
+  (since its last run) is not the one wanted. Argus reads the stats and its step's check files one card per correction in the inbox,
+  never one already there; nothing it files is started. Triage them there: start one, or drop it with `wf inbox rm`.
 
 ## Consent
 

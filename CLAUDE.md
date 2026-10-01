@@ -125,6 +125,6 @@ holds what every change needs.
   made here). Vendored unchanged, pinned in `skills-lock.json` and credited in `THIRD_PARTY_NOTICES.md`: `shadcn` (its CLI runs from
   `apps/web`, where `components.json` is), and `grilling` and `grill-me` (Iris's interview).
 - `workflows/` — this repository's own team, `agents/`: Iris (product engineer), Seldon (software architect), Ada (software engineer),
-  Agora (code reviewer), Otto (release engineer); and two workflows: `intake` (an idea to an intent) and `build` (an intent to main,
-  started `--after` the intake run). Nemia ships none.
+  Agora (code reviewer), Otto (release engineer), Argus (janitor); and three workflows: `intake` (an idea to an intent), `build` (an
+  intent to main, started `--after` the intake run) and `janitor` (on demand: the stats to inbox cards, none started). Nemia ships none.
 - `.codex/rules/git-commit.rules` — lets a Codex step commit its own work in a worktree.

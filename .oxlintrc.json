@@ -789,7 +789,7 @@
     {
       "files": ["packages/agent-runtime/src/core/domain.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 97, "skipBlankLines": true, "skipComments": true }],
+        "max-lines-per-function": ["error", { "max": 85, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 42 }],
         "sonarjs/cognitive-complexity": ["error", 48]
       }
@@ -797,7 +797,7 @@
     {
       "files": ["packages/agent-runtime/src/core/engine/engine.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 89, "skipBlankLines": true, "skipComments": true }],
+        "max-lines-per-function": ["error", { "max": 85, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 34 }],
         "sonarjs/cognitive-complexity": ["error", 53]
       }
@@ -857,8 +857,7 @@
     {
       "files": ["packages/agent-runtime/src/harness/detached/output.ts"],
       "rules": {
-        "complexity": ["error", { "max": 21 }],
-        "sonarjs/cognitive-complexity": ["error", 28]
+        "sonarjs/cognitive-complexity": ["error", 19]
       }
     },
     {

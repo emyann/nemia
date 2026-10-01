@@ -166,6 +166,15 @@ export const step = Effect.fn('step')(function* (taskId: string, observed: Reado
   return yield* stepOn(taskId, observed, ALL_READ);
 });
 
+/** What the sighting `seen` an attempt ended on says of it, as its `ended` event carries it, each key written, undefined or not. */
+const endFacts = (seen: Sighting | undefined) => ({
+  usage: seen?.usage,
+  exitCode: seen?.exitCode,
+  denials: seen?.denials,
+  skills: seen?.skills,
+  limit: seen?.limit,
+});
+
 /**
  * A step, told which names the pass's observation could not read (`Now.unread`): the pass's own, which `step`'s door does not
  * take. Folds the task's journal, asks `decide` for one action, and carries it out. The actions, in the order an attempt
@@ -190,9 +199,9 @@ export const step = Effect.fn('step')(function* (taskId: string, observed: Reado
  *      returned — `spawned`, with its error — and the grace window `decide` keeps for a session the harness has not
  *      registered tells which it was: adopted if it shows up, `lost` if it never does.
  * 3. `stop` asks the runner to stop the session, and journals nothing: the next pass sees it stopped.
- * 4. `record-end` journals `ended`, with what the attempt consumed, how its process exited, what its harness denied it and
- *    the limit it says it stopped at, read off the same sighting the ending came from: facts for the record, of which
- *    `decide` sees none.
+ * 4. `record-end` journals `ended`, with what the attempt consumed, how its process exited, what its harness denied it, the
+ *    skills it loaded and the limit it says it stopped at, read off the same sighting the ending came from (`endFacts`):
+ *    facts for the record, of which `decide` sees none.
  * 5. `settle` journals `settled`, with, for an attempt left open, its session's id read off the sighting as an ending's facts
  *    are: an open attempt has no `ended` to carry it, and it is what `logs` reads once the harness has let the session go —
  *    a fact `decide` never reads. `decide` ends a stopped or timed-out attempt before it settles, so only a journal an older
@@ -257,7 +266,6 @@ const stepOn = Effect.fn('stepOn')(function* (taskId: string, observed: Readonly
     }
 
     case 'record-end': {
-      const seen = observed.get(nameFor(taskId, action.attempt));
       yield* journal.append(taskId, {
         kind: 'ended',
         at: at(),
@@ -268,10 +276,7 @@ const stepOn = Effect.fn('stepOn')(function* (taskId: string, observed: Readonly
         nativeId: action.nativeId,
         closeout: action.closeout,
         ...(action.stated !== undefined ? { stated: action.stated } : {}),
-        usage: seen?.usage,
-        exitCode: seen?.exitCode,
-        denials: seen?.denials,
-        limit: seen?.limit,
+        ...endFacts(observed.get(nameFor(taskId, action.attempt))),
       });
       break;
     }

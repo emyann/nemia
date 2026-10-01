@@ -489,6 +489,32 @@ test('a field of the wrong type fails the read, saying what is there and what th
   );
 });
 
+test('the skills an end names are read back as written, an empty list kept; a list of anything but names fails the read', async () => {
+  const end = (attempt: number, skills: unknown) => ({
+    kind: 'ended',
+    at: '2026-09-24T00:00:01Z',
+    attempt,
+    sessionId: 's',
+    observed: 'done',
+    reason: 'harness',
+    skills,
+  });
+  const dir = legacyStore({ 't-skills': [TODAY, end(1, []), end(2, ['look'])] });
+  const read = await run(
+    dir,
+    Effect.flatMap(Journal, (j) => j.read('t-skills')),
+  );
+  assert.deepEqual(
+    read.map((e) => (e.kind === 'ended' ? e.skills : undefined)),
+    [undefined, [], ['look']],
+  );
+  const error = await failureOf(
+    legacyStore({ 't-bad': [TODAY, end(1, 'look')] }),
+    Effect.flatMap(Journal, (j) => j.read('t-bad')),
+  );
+  assert.ok(error.message.includes('entry 2 is a `ended` event, and its `skills` is "look"'), error.message);
+});
+
 test('a harness argument of the wrong type is refused under config and beside it, where a journal from before config put it', async () => {
   for (const filed of [
     { ...TODAY, config: { tools: 'Read' } },

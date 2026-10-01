@@ -34,9 +34,10 @@ export const releasableOf = (state: State): Releasable => ({
 
 /**
  * One engine's memo. `cursor` is where the last pass read the feed to, unset until the first pass; `settled` is each
- * settled task folded since, by id. `listed` is those of them whose harness still listed a finished session on the last
- * pass that looked: a pass tells its runner to look for them again (`expectedOf`), so a release the harness refused is asked
- * again, and one that went through is seen gone and dropped. `verify` is the proof's switch: each skipped task is folded again
+ * settled task folded since, by id. `listed` is those of them a finished session of which could still move on the last pass
+ * that looked — its release refused, its harness listing it at work, or its harness unread: a pass tells its runner to look
+ * for them again (`expectedOf`), so a refused release is asked again, and a task whose sessions are let go of ended, or seen
+ * gone, is dropped. `verify` is the proof's switch: each skipped task is folded again
  * all the same, and a difference fails the pass (`TickMemoDiverged`) — on in the engine's tick tests, off in an engine.
  */
 export type TickMemoState = { cursor: Cursor | undefined; settled: Map<string, Releasable>; listed: Set<string>; readonly verify: boolean };

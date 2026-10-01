@@ -22,7 +22,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import type { Denial, Sighting, Usage, SessionState } from '../../core/index.ts';
-import { RunnerError, type RunnerOps, type SpawnRequest, type TranscriptEvent } from '../seam.ts';
+import { RunnerError, type Observation, type RunnerOps, type SpawnRequest, type TranscriptEvent } from '../seam.ts';
 import { writeMcpConfig } from '../mcp.ts';
 import { readTranscript } from '../transcript.ts';
 import { countSpawn, readText } from '../../core/engine/tally.ts';
@@ -112,9 +112,9 @@ export type HarnessSpec = {
   codexArgs?: true;
   /**
    * The harness prints a resumed session's cost and API time as totals that carry its parent's on, not as its own:
-   * `claude -p --resume` does. Set, the run file keeps the id it resumed, and `observe` takes the
-   * parent's printed totals off — the latest run started before it under that id, as its own output read them. Where
-   * there is no such run, or it printed no total, the attempt carries no cost rather than its parent's too.
+   * `claude -p --resume` does. Set, the run file keeps the id it resumed and, read once at its spawn, the parent's printed
+   * totals (`carried`) — the latest run started before it under that id, as its own output read them — which a look takes
+   * off. Where there is no such run, or it printed no total, the attempt carries no cost rather than its parent's too.
    */
   resumeCostCarried?: true;
 };
@@ -227,6 +227,12 @@ const RunFileSchema = Schema.StructWithRest(
     exitCode: Schema.optional(Schema.Finite),
     /** The harness's own id this run resumed, kept only for a spec whose printed totals carry the parent's. */
     resumeFrom: Schema.optional(Schema.String),
+    /**
+     * The totals its parent printed, read once at the spawn of a run that kept `resumeFrom`, and taken off its own: each
+     * absent when the parent printed none, `{}` when there was no parent. Absent from a run file spawned before it was
+     * written, whose parent is looked for among the run files instead.
+     */
+    carried: Schema.optional(Schema.Struct({ costUsd: Schema.optional(Schema.Finite), apiMs: Schema.optional(Schema.Finite) })),
     /** For a spec with `input`: what the worker writes on the harness's stdin (`RunInput`). Absent, the run takes no words. */
     input: Schema.optional(
       Schema.Struct({
@@ -249,6 +255,12 @@ const RunFileSchema = Schema.StructWithRest(
 );
 
 type RunFile = typeof RunFileSchema.Type;
+
+/** A run file read, by the name its run is under. */
+type Run = { name: string; run: RunFile };
+
+/** What a resumed run's parent printed as its totals, as `RunFileSchema` keeps it. */
+type Carried = NonNullable<RunFile['carried']>;
 
 const isRunFile = Schema.is(RunFileSchema);
 
@@ -305,22 +317,98 @@ const sightingOf = (
 });
 
 const runFileOf = (spec: HarnessSpec, root: string, name: string) => path.join(root, 'runs', spec.name, `${safe(name)}.json`);
+const inboxFileOf = (spec: HarnessSpec, root: string, name: string) => path.join(root, 'runs', spec.name, `${safe(name)}.inbox.jsonl`);
+
+/**
+ * The run under `name`, from its own run file alone: no other file is read. No file there, or a file whose name is
+ * another — `safe` folds two names into one path — is no run (`undefined`). A file that is there and cannot be read, or
+ * is in no shape a worker writes, is `unread`, in words saying why: it may be a worker's half-written file.
+ */
+const runAt = (spec: HarnessSpec, root: string, name: string): { run: RunFile } | { unread: string } | undefined => {
+  let text: string;
+  try {
+    text = readText(runFileOf(spec, root, name));
+  } catch (e) {
+    return (e as NodeJS.ErrnoException).code === 'ENOENT' ? undefined : { unread: e instanceof Error ? e.message : String(e) };
+  }
+  const run = runFileIn(text);
+  if (typeof run === 'string') return { unread: run };
+  return run.name === name ? { run } : undefined;
+};
 
 /**
  * A run found by its name, from its own run file alone: no other run is read, and no output. A detached run's handle
  * is its name, so that is the id found. A file whose name is not this one — `safe` folds two names into one path — is
- * not this run, and a file that cannot be read yet is not found, as `observe` skips it.
+ * not this run, and a file that cannot be read yet is not found.
  */
 export const detachedFind =
   (spec: HarnessSpec, root: string) =>
   (name: string): Effect.Effect<{ sessionId: string } | undefined> =>
     Effect.sync(() => {
-      try {
-        const run = runFileIn(readText(runFileOf(spec, root, name)));
-        return typeof run !== 'string' && run.name === name ? { sessionId: name } : undefined;
-      } catch {
-        return undefined;
-      }
+      const at = runAt(spec, root, name);
+      return at && 'run' in at ? { sessionId: name } : undefined;
+    });
+
+/** When a run file says its harness started: `NaN` for one that does not say, which is before and after nothing. */
+const startOf = (run: RunFile) => (run.startedAt ? new Date(run.startedAt).getTime() : NaN);
+
+/**
+ * The parent of a run that resumed `resumeFrom`, among `all`: the run under that id that started last `before` — a resume keeps its
+ * parent's id, so a later run under it is a child, never the parent — and never the run named `except`, the one being spawned.
+ */
+const parentOf = (all: readonly Run[], resumeFrom: string, before: number, except?: string): Run | undefined =>
+  all
+    .filter((o) => o.name !== except && o.run.nativeId === resumeFrom && startOf(o.run) < before)
+    .sort((a, b) => startOf(b.run) - startOf(a.run))[0];
+
+/** `usage` with the parent's `carried` totals taken off: a measure either lacks, or that would go below nothing, dropped. */
+const lessCarried = (usage: Usage, carried: Carried): Usage | undefined => {
+  const { costUsd, apiMs, ...own } = usage;
+  const less = (mine: number | undefined, theirs: number | undefined) =>
+    mine !== undefined && theirs !== undefined && mine >= theirs ? { value: mine - theirs } : undefined;
+  const cost = less(costUsd, carried.costUsd);
+  const api = less(apiMs, carried.apiMs);
+  const left: Usage = { ...own, ...(cost ? { costUsd: cost.value } : {}), ...(api ? { apiMs: api.value } : {}) };
+  return Object.keys(left).length ? left : undefined;
+};
+
+/**
+ * `say` for a spec with `input`: the words appended to the inbox of the run under the session's name, as the line its harness
+ * reads, for its worker to write on. Its own run file alone is read. Refused, with nothing appended, where no worker would
+ * write the words on (`detachedOps`).
+ */
+const sayTo =
+  (spec: HarnessSpec, root: string, input: NonNullable<HarnessSpec['input']>): NonNullable<RunnerOps['say']> =>
+  (session, text) =>
+    Effect.try({
+      try: () => {
+        const { name } = session;
+        let run: RunFile | string | undefined;
+        try {
+          run = runFileIn(fs.readFileSync(runFileOf(spec, root, name), 'utf8'));
+        } catch {}
+        if (typeof run === 'string')
+          throw new Error(
+            `\`${name}\` cannot be told anything: its run file, ${runFileOf(spec, root, name)}, is unreadable — ${run}. Its worker writes that file; if it is being written, say it again in a moment. Nothing was said.`,
+          );
+        if (!run || run.name !== name) throw new Error(`no session \`${name}\` is running to hear anything: there is no run of it.`);
+        if (!run.input)
+          throw new Error(
+            `\`${name}\` was started with no way in: its worker writes nothing on its input. Continue its session with a new task that carries the words (\`resumeFrom\`).`,
+          );
+        if (run.inputClosed)
+          throw new Error(
+            `\`${name}\` has given its result and reads no more words: its input is closed. Continue its session with a new task that carries the words (\`resumeFrom\`).`,
+          );
+        const state = leased(run, Date.now());
+        if (state !== 'working') throw new Error(`\`${name}\` is \`${state}\`, not running: it takes no more words.`);
+        const line = input.line(text);
+        if (/[\r\n]/.test(line))
+          throw new Error(`the words make a line with a line break in it, which the harness would read as two. Nothing was said.`);
+        fs.appendFileSync(inboxFileOf(spec, root, name), `${line}\n`);
+      },
+      catch: (cause) =>
+        new RunnerError({ verb: 'say', message: `${spec.name}: ${cause instanceof Error ? cause.message : String(cause)}` }),
     });
 
 /**
@@ -330,9 +418,11 @@ export const detachedFind =
  * and the closeout's schema, its MCP config, its inbox (`.inbox.jsonl`, so never read as a run file), and a stop asked of it
  * (`.stop`: a file of its own, so the run file keeps one writer, the worker, and not `.json`, so never a run file).
  *
- * Run files are read (`readAll`) by their name alone: a closeout, a schema or an MCP config is also JSON, and a payload
- * that carried a `name` would otherwise be read as a session. A half-written file, one in no shape a worker writes, or one
- * gone between the listing and the read, is skipped: the next pass reads it whole.
+ * A look told which sessions to read (`observeFor`) reads each one's own run file, output and closeout, and no other run's;
+ * `observe` lists them all (`readAll`), for the views and verbs that read every session. A run file is listed by its name
+ * alone: a closeout, a schema or an MCP config is also JSON, and a payload that carried a `name` would otherwise be read as a
+ * session. Listed, a half-written file, one in no shape a worker writes, or one gone between the listing and the read, is
+ * skipped: the next pass reads it whole. Asked for by name, one there that cannot be read is `unread`, never gone.
  *
  * What a run said, as a sighting carries it:
  *
@@ -345,10 +435,10 @@ export const detachedFind =
  *   a finished run's output is read once per change of it, by any process: what was read is kept beside it (`outputIn`).
  *   A refusal is kept by this process alone, as a read is.
  * - `usageOf`: what a run's output says it used, as the attempt's own. A resumed run of a spec whose totals carry the
- *   parent's (`resumeCostCarried`) has the parent's taken off: the parent is the run under the id it resumed that started
- *   last before it — a resume keeps its parent's id, so a later run under that id is a child, never the parent. No
- *   parent, a parent that printed no total, or a total that would go below nothing: that measure is dropped, never
- *   overcounted.
+ *   parent's (`resumeCostCarried`) has the parent's taken off, as its spawn wrote them on its run file (`carried`): the
+ *   parent is the run under the id it resumed that started last before it (`parentOf`). A run file spawned before
+ *   `carried` was written has its parent looked for among every run file, on that look alone. No parent, a parent that
+ *   printed no total, or a total that would go below nothing: that measure is dropped, never overcounted.
  *
  * - `spawn`, in order:
  *   1. Resolves the task's `cwd` from the process that launches, as `claude --bg`'s is: relative, the worker would start in
@@ -363,7 +453,8 @@ export const detachedFind =
  *      no more. The inbox is never written or cleared: it is the person's, and a run spawned again under the name starts
  *      past what was said to the one before it (`RunInput.from`).
  *   5. Writes the run file before the launch, with no pid: the run is intended, and a crash here leaves a file that says
- *      so. The worker overwrites it with its own pid the moment it starts.
+ *      so. The worker overwrites it with its own pid the moment it starts, keeping what the spawn wrote. A resumed run of a
+ *      spec with `resumeCostCarried` carries its parent's totals on it (`carried`), found among the run files once, here.
  *   6. Launches the worker detached, stdio ignored, unref'd: it outlives this process by design. Its `error` event is
  *      heard, so a launch that fails after `spawn` returns never takes the engine down with it; the run file it leaves
  *      says working with no pid, and the lease calls that dead.
@@ -377,6 +468,9 @@ export const detachedFind =
  *   the process's own, once it has one: the worker writes -1 when there is none — killed by a signal, or never started —
  *   and that is reported as no code, not as a code. A run whose output the spec refuses fails the whole look, in the
  *   spec's words, naming the run and its output file: every session of the harness is unread, never gone.
+ * - `observeFor`: the same sighting for each name expected that has a run file, and the name `unread` for one whose file is
+ *   there and unreadable. A refused output fails it as it fails `observe`.
+ * - `find`: the run under a name, off its own run file alone, as `detachedFind`; `stop` and `transcript` read by it.
  * - `stop`, in order, for a run that is working:
  *   1. Leaves the stop on disk (`.stop`). The run file exists before the worker has written its own pid, and a stop in
  *      that window has no process to signal; the worker reads the stop once its pid is published, before it starts the
@@ -393,8 +487,8 @@ export const detachedFind =
  *   id — the run's `nativeId`, which the worker reads off what the harness prints, so until it has printed one there is
  *   nothing to read. A name with no run file is taken for that id itself: the id an attempt's end was recorded with,
  *   which is what the engine asks by once the run file is gone.
- * - `say` (a spec with `input`): words for a running session, appended to its inbox as the line its harness reads, for
- *   its worker to write on. Its own run file alone is read, as `find` reads it. Appended is not read: the worker writes a
+ * - `say` (a spec with `input`, `sayTo`): words for a running session, appended to its inbox as the line its harness reads,
+ *   for its worker to write on. Its own run file alone is read, as `find` reads it. Appended is not read: the worker writes a
  *   line on within a second, and one appended in the second before the harness's closing line is never written on.
  *   Refused, with nothing appended, where no worker would write the words on: no run under the name, or a run file that
  *   cannot be read; a run its worker started with no input; a run whose harness has printed its closing line; one that is
@@ -407,13 +501,13 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
   const closeoutFile = (name: string) => path.join(dir, `${safe(name)}.closeout.json`);
   const schemaFile = (name: string) => path.join(dir, `${safe(name)}.schema.json`);
   const mcpFile = (name: string) => path.join(dir, `${safe(name)}.mcp.json`);
-  const inboxFile = (name: string) => path.join(dir, `${safe(name)}.inbox.jsonl`);
+  const inboxFile = (name: string) => inboxFileOf(spec, root, name);
   const stopFile = (name: string) => path.join(dir, `${safe(name)}.stop`);
   const saidFile = (name: string) => path.join(dir, `${safe(name)}.said`);
 
-  const readAll = (): Array<{ name: string; run: RunFile }> => {
+  const readAll = (): Run[] => {
     if (!fs.existsSync(dir)) return [];
-    const out: Array<{ name: string; run: RunFile }> = [];
+    const out: Run[] = [];
     for (const f of fs.readdirSync(dir)) {
       if (!f.endsWith('.json') || f.endsWith('.closeout.json') || f.endsWith('.schema.json') || f.endsWith('.mcp.json')) continue;
       try {
@@ -424,7 +518,10 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
     return out;
   };
 
-  const find = (sessionId: string) => readAll().find(({ name }) => name === sessionId);
+  const find = (name: string): Run | undefined => {
+    const at = runAt(spec, root, name);
+    return at && 'run' in at ? { name, run: at.run } : undefined;
+  };
 
   const statementOf = (name: string): Sighting['closeout'] => {
     const f = closeoutFile(name);
@@ -448,20 +545,26 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
     spec.readOutput &&
     outputIn(spec.readOutput, outputs, name, { log: logFile(name), kept: saidFile(name) }, detachedStateOf(run, Date.now()) !== 'working');
 
-  const usageOf = (all: Array<{ name: string; run: RunFile }>, run: RunFile, usage: Usage | undefined): Usage | undefined => {
-    if (!usage || !spec.resumeCostCarried || !run.resumeFrom) return usage;
-    const at = (r: RunFile) => (r.startedAt ? new Date(r.startedAt).getTime() : NaN);
-    const parent = all.filter((o) => o.run.nativeId === run.resumeFrom && at(o.run) < at(run)).sort((a, b) => at(b.run) - at(a.run))[0];
+  const carriedBy = (all: readonly Run[], resumeFrom: string, before: number, except?: string): Carried => {
+    const parent = parentOf(all, resumeFrom, before, except);
     const told = parent && outputOf(parent.name, parent.run);
-    const carried = told && 'read' in told ? told.read.usage : undefined;
-    const { costUsd, apiMs, ...own } = usage;
-    const less = (mine: number | undefined, theirs: number | undefined) =>
-      mine !== undefined && theirs !== undefined && mine >= theirs ? { value: mine - theirs } : undefined;
-    const cost = less(costUsd, carried?.costUsd);
-    const api = less(apiMs, carried?.apiMs);
-    const left: Usage = { ...own, ...(cost ? { costUsd: cost.value } : {}), ...(api ? { apiMs: api.value } : {}) };
-    return Object.keys(left).length ? left : undefined;
+    const { costUsd, apiMs } = (told && 'read' in told && told.read.usage) || {};
+    return { ...(costUsd !== undefined ? { costUsd } : {}), ...(apiMs !== undefined ? { apiMs } : {}) };
   };
+
+  const usageOf = (run: RunFile, usage: Usage | undefined, all: () => readonly Run[]): Usage | undefined =>
+    !usage || !spec.resumeCostCarried || !run.resumeFrom
+      ? usage
+      : lessCarried(usage, run.carried ?? carriedBy(all(), run.resumeFrom, startOf(run)));
+
+  const sightingAt = (name: string, run: RunFile, now: number, all: () => readonly Run[]): Sighting => {
+    const output = outputOf(name, run);
+    if (output && 'wrong' in output) throw new Error(`\`${name}\`'s output, ${logFile(name)}, cannot be read: ${output.wrong}`);
+    return sightingOf(name, run, now, statementOf(name), output, usageOf(run, output?.read.usage, all));
+  };
+
+  const observeError = (cause: unknown) =>
+    new RunnerError({ verb: 'observe', message: `${spec.name}: ${cause instanceof Error ? cause.message : String(cause)}` });
 
   const transcriptOf =
     (reader: NonNullable<HarnessSpec['transcript']>): NonNullable<RunnerOps['transcript']> =>
@@ -474,40 +577,6 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
         },
         catch: (cause) =>
           new RunnerError({ verb: 'transcript', message: `${spec.name}: ${cause instanceof Error ? cause.message : String(cause)}` }),
-      });
-
-  const sayTo =
-    (input: NonNullable<HarnessSpec['input']>): NonNullable<RunnerOps['say']> =>
-    (session, text) =>
-      Effect.try({
-        try: () => {
-          const { name } = session;
-          let run: RunFile | string | undefined;
-          try {
-            run = runFileIn(fs.readFileSync(runFile(name), 'utf8'));
-          } catch {}
-          if (typeof run === 'string')
-            throw new Error(
-              `\`${name}\` cannot be told anything: its run file, ${runFile(name)}, is unreadable — ${run}. Its worker writes that file; if it is being written, say it again in a moment. Nothing was said.`,
-            );
-          if (!run || run.name !== name) throw new Error(`no session \`${name}\` is running to hear anything: there is no run of it.`);
-          if (!run.input)
-            throw new Error(
-              `\`${name}\` was started with no way in: its worker writes nothing on its input. Continue its session with a new task that carries the words (\`resumeFrom\`).`,
-            );
-          if (run.inputClosed)
-            throw new Error(
-              `\`${name}\` has given its result and reads no more words: its input is closed. Continue its session with a new task that carries the words (\`resumeFrom\`).`,
-            );
-          const state = leased(run, Date.now());
-          if (state !== 'working') throw new Error(`\`${name}\` is \`${state}\`, not running: it takes no more words.`);
-          const line = input.line(text);
-          if (/[\r\n]/.test(line))
-            throw new Error(`the words make a line with a line break in it, which the harness would read as two. Nothing was said.`);
-          fs.appendFileSync(inboxFile(name), `${line}\n`);
-        },
-        catch: (cause) =>
-          new RunnerError({ verb: 'say', message: `${spec.name}: ${cause instanceof Error ? cause.message : String(cause)}` }),
       });
 
   return {
@@ -547,7 +616,9 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
             logFile: logFile(r.name),
             stopFile: stopFile(r.name),
             nativeIdPattern: spec.nativeIdPattern,
-            ...(spec.resumeCostCarried && r.resumeFrom ? { resumeFrom: r.resumeFrom } : {}),
+            ...(spec.resumeCostCarried && r.resumeFrom
+              ? { resumeFrom: r.resumeFrom, carried: carriedBy(readAll(), r.resumeFrom, Date.now(), r.name) }
+              : {}),
             ...(input ? { input } : {}),
           };
           fs.writeFileSync(runFile(r.name), JSON.stringify({ ...plan, state: 'working', pid: 0, heartbeatAt: new Date().toISOString() }));
@@ -568,17 +639,28 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
       try: () => {
         const now = Date.now();
         const all = readAll();
-        const m = new Map<string, Sighting>();
-        for (const { name, run } of all) {
-          const output = outputOf(name, run);
-          if (output && 'wrong' in output) throw new Error(`\`${name}\`'s output, ${logFile(name)}, cannot be read: ${output.wrong}`);
-          m.set(name, sightingOf(name, run, now, statementOf(name), output, usageOf(all, run, output?.read.usage)));
-        }
-        return m;
+        return new Map(all.map(({ name, run }) => [name, sightingAt(name, run, now, () => all)]));
       },
-      catch: (cause) =>
-        new RunnerError({ verb: 'observe', message: `${spec.name}: ${cause instanceof Error ? cause.message : String(cause)}` }),
+      catch: observeError,
     }),
+
+    observeFor: (expected) =>
+      Effect.try({
+        try: (): Observation => {
+          const now = Date.now();
+          let listing: Run[] | undefined;
+          const all = () => (listing ??= readAll());
+          const seen = new Map<string, Sighting>();
+          const unread = new Set<string>();
+          for (const { name } of expected) {
+            const at = runAt(spec, root, name);
+            if (at && 'unread' in at) unread.add(name);
+            else if (at) seen.set(name, sightingAt(name, at.run, now, all));
+          }
+          return { seen, unread };
+        },
+        catch: observeError,
+      }),
 
     stop: (sessionId) =>
       Effect.try({
@@ -606,6 +688,6 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
       }),
 
     ...(spec.transcript ? { transcript: transcriptOf(spec.transcript) } : {}),
-    ...(spec.input ? { say: sayTo(spec.input) } : {}),
+    ...(spec.input ? { say: sayTo(spec, root, spec.input) } : {}),
   };
 };

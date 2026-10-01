@@ -33,6 +33,8 @@ One session run to completion, durably, on one harness. `decide` (`src/core/doma
 - **`io().reads` counts every file the runtime reads**, not only journals.
 - **A test stamps the times the runtime compares from the journal's attempt start** (`begun` in `test/resume.test.ts`,
   `test/shell.test.ts`), never `new Date()` beside a fake's `Date.now()`: a clock stepping back drops a closeout or counts a former try.
+- **A detached look told names reads only their run files** (`observeFor`); `observe` lists every run, for views and verbs. A finished
+  session leaves the pass's look once released and not at work (`releaseFinished`): `detached.test.ts` and `engine.test.ts` count it.
 - **`engine.test.ts` reads `domain.ts` from `decide` on, and all of `lifecycle.ts`, comments included**: a JSDoc there writes no
   `.usage`, `.claude` or another key the test refuses. A case name in `test/lifecycle-corpus.ts` is a key of
   `test/fixtures/decide-corpus.json`: renaming one is re-recording the fixture.

@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { deniedCallsOf, deniesRecorded } from './discipline.ts';
+import { JOBS_SINCE, deniedCallsOf, deniesRecorded, ranAsJob } from './discipline.ts';
 
 const write = { tool: 'Write', what: '/x' };
 const push = { tool: 'Bash', what: 'git push' };
@@ -32,4 +32,15 @@ test('a step on codex, on a remote agent or in the background records no denial;
   assert.equal(deniesRecorded({}), true, 'no harness: is the default, claude');
   assert.equal(deniesRecorded({ harness: 'claude' }), true);
   assert.equal(deniesRecorded({ harness: 'claude-detached' }), true);
+});
+
+test('a session filed before steps ran as jobs records no denial, nor one whose filing and spawn are unknown', () => {
+  const before = new Date(Date.parse(JOBS_SINCE) - 1000).toISOString();
+  const after = new Date(Date.parse(JOBS_SINCE) + 1000).toISOString();
+  assert.equal(ranAsJob({ filedAt: before, spawnedAt: after }), false, 'filed before: a background session, whenever it spawned');
+  assert.equal(ranAsJob({ filedAt: JOBS_SINCE, spawnedAt: JOBS_SINCE }), true);
+  assert.equal(ranAsJob({ filedAt: after, spawnedAt: after }), true);
+  assert.equal(ranAsJob({ filedAt: null, spawnedAt: before }), false, 'with no filing known, its spawn says');
+  assert.equal(ranAsJob({ filedAt: null, spawnedAt: after }), true);
+  assert.equal(ranAsJob({ filedAt: null, spawnedAt: null }), false);
 });

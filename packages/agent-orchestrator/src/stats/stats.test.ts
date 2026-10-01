@@ -371,35 +371,50 @@ test('a day whose runs never recorded their landing has no landed count, printed
   assert.equal(statsOf(factsOfAll(aborted), {}, NOW).all.total.landed, 0, 'a run recorded as not landing is counted: 0, not —');
 });
 
+/** A day after `JOBS_SINCE`, when every `claude` step ran as a job that records its denials, and the moment the stats are read on it. */
+const JOBS_DAY = '2026-09-28';
+const JOBS_NOW = new Date(`${JOBS_DAY}T20:00:00.000Z`);
+
 test('refused calls are a mean per measured try, and absent — null, not 0 — where no try was measured', () => {
   const steps = [step('design', [], { by: 'seldon' }), step('implement', ['design'], { by: 'ada', harness: 'codex' })];
   const tries = {
     design: [
-      { end: at(1), denied: ['Write(/x)', 'Bash(git push)'] },
-      { end: at(2), denied: [] },
+      { end: at(1, JOBS_DAY), denied: ['Write(/x)', 'Bash(git push)'] },
+      { end: at(2, JOBS_DAY), denied: [] },
     ],
-    implement: [{ end: at(3), denied: ['Write(/x)'] }],
+    implement: [{ end: at(3, JOBS_DAY), denied: ['Write(/x)'] }],
   };
-  const s = statsOf(factsOfAll(readOf('denied', steps, tries)), {}, NOW);
+  const s = statsOf(factsOfAll(readOf('denied', steps, tries)), {}, JOBS_NOW);
   assert.equal(s.all.total.deniedPerTry, 1, 'three calls over two measured tries: the codex try is not one of them');
-  assert.equal(s.all.days.find((d) => d.day === DAY)?.deniedPerTry, 1);
-  const codex = statsOf(factsOfAll(readOf('codex', steps, { implement: tries.implement })), {}, NOW);
+  assert.equal(s.all.days.find((d) => d.day === JOBS_DAY)?.deniedPerTry, 1);
+  const codex = statsOf(factsOfAll(readOf('codex', steps, { implement: tries.implement })), {}, JOBS_NOW);
   assert.equal(codex.all.total.deniedPerTry, null, 'a codex step records no denial: nothing measured, not 0');
   assert.match(statsLine(codex), /— \(—\) calls denied/);
-  const none = statsOf(factsOfAll(readOf('none', steps, { design: [{ end: at(1) }] })), {}, NOW);
+  const none = statsOf(factsOfAll(readOf('none', steps, { design: [{ end: at(1, JOBS_DAY) }] })), {}, JOBS_NOW);
   assert.equal(none.all.total.deniedPerTry, 0, 'a claude try denied nothing is a measured 0');
   assert.match(statsLine(none), /0\/try \(—\) calls denied/);
+  none.all.tiles.last.deniedPerTry = 1 / 300;
+  assert.match(statsLine(none), / 0\.003\/try \(—\) calls denied/, 'a rate above 0 under 0.01 keeps a significant figure, never reading 0');
+});
+
+test('a claude try filed before steps ran as jobs is unmeasured: the tile before reads —, and the mean is not diluted with 0', () => {
+  const steps = [step('design', [], { by: 'seldon' })];
+  const r = readOf('bg', steps, { design: [{ end: at(1) }, { end: at(1, JOBS_DAY), denied: ['Write(/x)'] }] });
+  const [old, job] = factsOf(r).tries;
+  assert.deepEqual([old.denied, job.denied], [null, ['Write(/x)']]);
+  const { all } = statsOf(factsOfAll(r), {}, JOBS_NOW);
+  assert.deepEqual([all.tiles.before.deniedPerTry, all.tiles.last.deniedPerTry], [null, 1]);
 });
 
 test("a step's refused calls are counted by call, most first and then by call, over its measured tries", () => {
   const steps = [step('design', [], { by: 'seldon' })];
   const tries = {
     design: [
-      { end: at(1), denied: ['Write(/z)', 'Write(/a)', 'Bash(git push)'] },
-      { end: at(2), denied: ['Bash(git push)', 'Write(/z)', 'Write(/a)', 'Bash(git push)'] },
+      { end: at(1, JOBS_DAY), denied: ['Write(/z)', 'Write(/a)', 'Bash(git push)'] },
+      { end: at(2, JOBS_DAY), denied: ['Bash(git push)', 'Write(/z)', 'Write(/a)', 'Bash(git push)'] },
     ],
   };
-  const [row] = statsOf(factsOfAll(readOf('by-call', steps, tries)), {}, NOW).all.steps;
+  const [row] = statsOf(factsOfAll(readOf('by-call', steps, tries)), {}, JOBS_NOW).all.steps;
   assert.deepEqual([row.deniedCalls, row.deniedTries], [7, 2]);
   assert.deepEqual(row.denials, [
     { call: 'Bash(git push)', count: 3 },
@@ -407,6 +422,6 @@ test("a step's refused calls are counted by call, most first and then by call, o
     { call: 'Write(/z)', count: 2 },
   ]);
   const codex = [step('design', [], { by: 'seldon', harness: 'codex' })];
-  const [unmeasured] = statsOf(factsOfAll(readOf('codex', codex, tries)), {}, NOW).all.steps;
+  const [unmeasured] = statsOf(factsOfAll(readOf('codex', codex, tries)), {}, JOBS_NOW).all.steps;
   assert.deepEqual([unmeasured.deniedCalls, unmeasured.deniedTries, unmeasured.denials], [null, 0, []]);
 });

@@ -192,7 +192,11 @@ test('the served stats decode with every null kept, and the keys the page does n
   assert.equal(stats.all.days[0].deniedPerTry, null, 'a day no try was measured on keeps its calls refused unmeasured');
   assert.equal(stats.all.days[1].deniedPerTry, 0);
   const denied = HEADLINES.find((h) => h.key === 'deniedPerTry')!;
-  assert.deepEqual([denied.words(null), denied.words(0), denied.words(1 / 3)], [NONE, '0/try', '0.33/try']);
+  assert.deepEqual(
+    [denied.words(null), denied.words(0), denied.words(1 / 3), denied.words(1 / 300), denied.words(0.0099)],
+    [NONE, '0/try', '0.33/try', '0.003/try', '0.01/try'],
+    'a rate above 0 under 0.01 keeps a significant figure, never reading as a measured 0',
+  );
   assert.equal(stats.all.tiles.last.landed, null);
   assert.equal(stats.all.marks[0].repo, null);
   assert.equal(stats.all.marks[0].agents[0], null);

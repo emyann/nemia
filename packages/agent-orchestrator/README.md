@@ -148,7 +148,9 @@ wf stats --json                            # what GET /api/stats answers
   `claude-detached`). `denied` is their mean per measured try (`0.5/try`); a step's row sums them,
   says how many of its tries were measured where not all (`3 (2 of 4)`), and names each call with its
   count. A try on codex, on a remote agent or with `background: true` records none, and a recheck's try
-  ran no session: none is measured, so a day of only those reads `—`.
+  ran no session: none is measured, so a day of only those reads `—`. Nor is a session filed before
+  2026-09-23 19:04:31 UTC (`JOBS_SINCE`), when `claude` steps began to run as jobs: until then each ran
+  as `claude --bg`, which records no denial, and its journal does not say which it was.
 - **A run whose journal does not read is left out whole**, and named on the last line.
 - **A change is marked on the day a run froze it**: a step (its keys and its own note), an agent's
   instructions, skills and system prompt, or a skill as `wf start` rendered it, that differs from what

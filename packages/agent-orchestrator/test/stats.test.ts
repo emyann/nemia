@@ -199,9 +199,10 @@ function deniedSession(taskId: string, day: string, hour: number, attempts: Deni
   ]);
 }
 
-const DENIED_DAY = '2026-09-22';
-const UNMEASURED_DAY = '2026-09-21';
-const QUIET_DAY = '2026-09-20';
+const DENIED_DAY = '2026-09-26';
+const UNMEASURED_DAY = '2026-09-25';
+const QUIET_DAY = '2026-09-24';
+const BG_DAY = '2026-09-23';
 const writeX = { tool: 'Write', what: '/x' };
 const rm = { tool: 'Bash', what: 'rm' };
 deniedSession('denied-write', DENIED_DAY, 1, [[writeX], [writeX, { tool: 'Bash', what: 'git push' }]]);
@@ -211,6 +212,7 @@ ran('denied-write-2-check-2', 3, 4, { exitCode: 0, day: DENIED_DAY });
 deniedSession('denied-codex', UNMEASURED_DAY, 1, [[rm]]);
 deniedSession('denied-bg', UNMEASURED_DAY, 2, [[rm]]);
 deniedSession('denied-quiet', QUIET_DAY, 1, [[]]);
+deniedSession('denied-before-jobs', BG_DAY, 18, [[]]);
 writeRun(
   'denied',
   [
@@ -218,6 +220,7 @@ writeRun(
     { name: 'codex', after: [], body: 'Do it.', harness: 'codex' },
     { name: 'bg', after: [], body: 'Do it.', background: true },
     { name: 'quiet', after: [], body: 'Do it.' },
+    { name: 'before-jobs', after: [], body: 'Do it.' },
   ],
   {
     write: {
@@ -231,8 +234,9 @@ writeRun(
     codex: { taskId: 'denied-codex' },
     bg: { taskId: 'denied-bg' },
     quiet: { taskId: 'denied-quiet' },
+    'before-jobs': { taskId: 'denied-before-jobs' },
   },
-  { factory: 'denials', createdAt: `${QUIET_DAY}T00:00:00.000Z` },
+  { factory: 'denials', createdAt: `${BG_DAY}T00:00:00.000Z` },
 );
 
 const printedBy = async (t: TestContext, argv: string[]) => {
@@ -271,7 +275,7 @@ test('wf stats --by factory answers a group per factory, and --factory keeps one
     s.groups.map((g) => [g.key, g.total.tries]),
     [
       ['default', 3],
-      ['denials', 6],
+      ['denials', 7],
       ['other', 2],
     ],
   );
@@ -339,12 +343,12 @@ test('wf stats marks the day a run froze a rendered skill that differs from the 
 });
 
 test('wf stats counts each call a session was refused, per measured try; a codex, background or recheck try is unmeasured', async (t) => {
-  const s = JSON.parse(await printedBy(t, ['stats', '--json', '--factory', 'denials', '--from', QUIET_DAY, '--to', DENIED_DAY])) as Stats;
+  const s = JSON.parse(await printedBy(t, ['stats', '--json', '--factory', 'denials', '--from', BG_DAY, '--to', DENIED_DAY])) as Stats;
   const perDay = Object.fromEntries(s.all.days.map((d) => [d.day, d.deniedPerTry]));
   assert.deepEqual(
     perDay,
-    { [QUIET_DAY]: 0, [UNMEASURED_DAY]: null, [DENIED_DAY]: 2 },
-    'four calls over the two sessions of write, its recheck not counted again; codex and background are not measured, not 0',
+    { [BG_DAY]: null, [QUIET_DAY]: 0, [UNMEASURED_DAY]: null, [DENIED_DAY]: 2 },
+    'four calls over the two sessions of write, its recheck not counted again; codex, background and a pre-job session are unmeasured',
   );
   const write = s.all.steps.find((row) => row.step === 'write');
   assert.deepEqual([write?.tries, write?.deniedCalls, write?.deniedTries], [3, 4, 2]);
@@ -353,11 +357,12 @@ test('wf stats counts each call a session was refused, per measured try; a codex
     { call: 'Bash(git push)', count: 1 },
     { call: 'Bash(rm)', count: 1 },
   ]);
-  for (const name of ['codex', 'bg']) {
+  for (const name of ['codex', 'bg', 'before-jobs']) {
     const row = s.all.steps.find((r) => r.step === name);
     assert.deepEqual([row?.deniedCalls, row?.deniedTries, row?.denials], [null, 0, []], `${name} records no denial`);
   }
-  const words = await printedBy(t, ['stats', '--factory', 'denials', '--from', QUIET_DAY, '--to', DENIED_DAY]);
+  const words = await printedBy(t, ['stats', '--factory', 'denials', '--from', BG_DAY, '--to', DENIED_DAY]);
+  assert.match(words, new RegExp(`^${BG_DAY}\\s.*\\s—$`, 'm'));
   assert.match(words, new RegExp(`^${DENIED_DAY}\\s.*\\s2/try$`, 'm'));
   assert.match(words, new RegExp(`^${UNMEASURED_DAY}\\s.*\\s—$`, 'm'));
   assert.match(words, new RegExp(`^${QUIET_DAY}\\s.*\\s0/try$`, 'm'));

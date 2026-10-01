@@ -11,7 +11,8 @@ const NONE = '—';
 const or = <T>(v: T | null, word: (v: T) => string): string => (v === null ? NONE : word(v));
 const percent = (share: number): string => `${Math.round(share * 100)}%`;
 const oneDecimal = (n: number): string => (Math.round(n * 10) / 10).toString();
-const perTry = (n: number): string => `${Math.round(n * 100) / 100}/try`;
+/** A rate per try to two decimals, or to one significant figure under 0.01, so a rate above 0 never reads as 0. */
+const perTry = (n: number): string => `${n > 0 && n < 0.01 ? Number(n.toPrecision(1)) : Math.round(n * 100) / 100}/try`;
 
 /** A headline's numbers in words, by the name each is printed under. */
 const wordsOf = (h: Headline): Record<string, string> => ({

@@ -17,7 +17,7 @@ import { DEFAULT_FACTORY } from '../factory/factory.ts';
 import { askedAgain, landsOnCheck } from '../status/status.ts';
 import type { Timeline, TimelineTry } from '../timeline/timeline.ts';
 import { marksOf, type Mark, type RunFrozen } from './marks.ts';
-import { deniesRecorded } from './discipline.ts';
+import { deniesRecorded, ranAsJob } from './discipline.ts';
 
 /** What a breakdown or a filter goes by: the step's agent, the step, the run's factory, its workflow's folder and its repository. */
 export const BY_KEYS = ['agent', 'step', 'factory', 'workflow', 'repo'] as const;
@@ -41,8 +41,8 @@ export type RunKeys = { run: string; factory: string; workflow: string; repo: st
  * One try of one step that ended, on the UTC day it ended: its check's end, or its session's where it has no check. `agent` is the
  * step's agent, null where it names none. `ranMs` is its session's and its check's run times, `costUsd` what its session cost, `check` its
  * check's verdict, null with no check, and `gateWaitMs` the wait for a person's approval of this try: each null where not measured.
- * `denied` names each call its session was refused, one per call; null for a try that ran no session of its own (a recheck's) and on a
- * step whose harness records no denial (`deniesRecorded`).
+ * `denied` names each call its session was refused, one per call; null for a try that ran no session of its own (a recheck's), on a step
+ * whose harness records no denial (`deniesRecorded`), and for a session filed before steps ran as jobs (`ranAsJob`).
  */
 export type TryFact = RunKeys & {
   day: string;
@@ -148,7 +148,7 @@ function tryFactsOf(r: RunRead): TryFact[] {
           costUsd: t.used?.costUsd ?? null,
           check: t.check ? r.verdictOf(t.check.taskId) : null,
           gateWaitMs: gateWaitOf(r, step, t),
-          denied: t.session && deniesRecorded(step) ? r.deniedOf(t.session.taskId) : null,
+          denied: t.session && deniesRecorded(step) && ranAsJob(t.session) ? r.deniedOf(t.session.taskId) : null,
         },
       ];
     }),

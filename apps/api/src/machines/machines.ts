@@ -8,7 +8,10 @@ import { lifecycleGraph, type LifecycleGraph } from 'agent-orchestrator';
 /** A machine as the list names it: the name its routes take, what a person calls it, and the file its graph is read from. */
 export type MachineListing = { name: string; title: string; source: string };
 
-/** A machine's graph: its listing, its first state, every state, the final ones, and every edge (from, event, guard, to, action). */
+/**
+ * A machine's graph: its listing, its first state, every state, the final ones, every edge (from, event, guard, to, action), and every
+ * verb written from outside it (verb, entry, by, from, to, guard).
+ */
 export type MachineGraph = MachineListing & LifecycleGraph;
 
 /** Each machine by its name, with the function that reads its graph off its code on each request. */

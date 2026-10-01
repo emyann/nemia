@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
 import type { ByAction, StateBox } from '../lib/machine';
 
@@ -6,9 +7,10 @@ export type MachineFlowNode = Node<StateBox & { lit?: boolean }, 'state'>;
 
 /**
  * Edges listed by the action they take: each edge's event, with its guard, on a line of its own (`data-edge-line`), then the action
- * behind an arrow. What a state's box lists of the edges back to it, and what a route's label lists of its edges.
+ * behind an arrow, and under them any `children`, in the same frame. What a state's box lists of the edges back to it, and what a
+ * route's label lists of its edges, its verbs under them.
  */
-export function ByActionList({ list }: { list: readonly ByAction[] }) {
+export function ByActionList({ list, children }: { list: readonly ByAction[]; children?: ReactNode }) {
   return (
     <div className="px-2.5 py-1 font-mono text-[11px] leading-4 whitespace-nowrap">
       {list.map((group) => (
@@ -21,6 +23,7 @@ export function ByActionList({ list }: { list: readonly ByAction[] }) {
           <div className="text-neutral-500 dark:text-neutral-400">→ {group.action}</div>
         </div>
       ))}
+      {children}
     </div>
   );
 }

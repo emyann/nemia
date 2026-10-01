@@ -32,7 +32,13 @@ function flowOf(drawing: Drawing, lit: string | undefined, taken: readonly strin
       source: route.from,
       target: route.to,
       data: { ...route, taken: on },
-      markerEnd: { type: MarkerType.ArrowClosed, color, width: 18, height: 18, markerUnits: 'userSpaceOnUse' },
+      markerEnd: {
+        type: route.dashed ? MarkerType.Arrow : MarkerType.ArrowClosed,
+        color,
+        width: 18,
+        height: 18,
+        markerUnits: 'userSpaceOnUse',
+      },
       selectable: false,
       focusable: false,
     };
@@ -41,8 +47,9 @@ function flowOf(drawing: Drawing, lit: string | undefined, taken: readonly strin
 }
 
 /**
- * A state machine drawn from its graph (`drawMachine`): a box per state, an edge per pair of states an edge joins, every edge listed by
- * action on its route or, back to its own state, on the state's box.
+ * A state machine drawn from its graph (`drawMachine`): a box per state, a route per pair of states an edge or a person's verb joins,
+ * every edge listed by action on its route or, back to its own state, on the state's box, and every verb on each route it takes. A route
+ * only a verb takes is dashed, its arrowhead open; one an edge takes is solid, its arrowhead filled.
  *
  * Laid out, never arranged: nothing moves, joins or zooms, and the wheel scrolls the page past it. It is drawn at its own size, or
  * smaller to fit a narrower frame, or one lower than `maxHeight`, which is as tall as the drawing then is; its flow has an id of its own,

@@ -29,10 +29,32 @@ const MachineEdgeSchema = Schema.Struct({
 }) satisfies Schema.Schema<MachineEdge>;
 
 /**
- * Mirrors `MachineGraph` in apps/api/src/machines/machines.ts: a machine's listing, its first state, every state, the final ones, every
- * edge.
+ * Mirrors the runtime's `LifecycleVerb`: a verb a person writes from outside the machine, the entry it journals, who writes it, the
+ * states it is taken from, the state the next pass reads, and the guard its refusal asks first.
  */
-export type MachineGraph = MachineListing & { initial: string; states: string[]; final: string[]; edges: MachineEdge[] };
+export type MachineVerb = { verb: string; entry: string; by: string; from: string[]; to: string; guard: string };
+
+/** Decodes a `MachineVerb`. */
+const MachineVerbSchema = Schema.Struct({
+  verb: Schema.String,
+  entry: Schema.String,
+  by: Schema.String,
+  from: Schema.mutable(Schema.Array(Schema.String)),
+  to: Schema.String,
+  guard: Schema.String,
+}) satisfies Schema.Schema<MachineVerb>;
+
+/**
+ * Mirrors `MachineGraph` in apps/api/src/machines/machines.ts: a machine's listing, its first state, every state, the final ones, every
+ * edge, and every verb written from outside it, none for a machine that has no verb.
+ */
+export type MachineGraph = MachineListing & {
+  initial: string;
+  states: string[];
+  final: string[];
+  edges: MachineEdge[];
+  verbs: MachineVerb[];
+};
 
 /** Decodes a `MachineGraph`. */
 const MachineGraphSchema = Schema.Struct({
@@ -41,6 +63,7 @@ const MachineGraphSchema = Schema.Struct({
   states: Schema.mutable(Schema.Array(Schema.String)),
   final: Schema.mutable(Schema.Array(Schema.String)),
   edges: Schema.mutable(Schema.Array(MachineEdgeSchema)),
+  verbs: Schema.mutable(Schema.Array(MachineVerbSchema)),
 }) satisfies Schema.Schema<MachineGraph>;
 
 /** The machines there are, by name. Read again on each visit: a machine changes only with the code. */

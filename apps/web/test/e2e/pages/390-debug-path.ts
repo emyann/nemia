@@ -41,14 +41,7 @@ export default {
     await expectVisible(lifecycle, 'over the lifecycle’s graph');
     const entries = panel.getByRole('list', { name: 'The path' }).locator('li');
     await expectCount(entries, WORDS.length, 'one entry of the timeline for each entry of the path');
-    const read = await entries.evaluateAll((all) =>
-      all.map((li) =>
-        Array.from(li.querySelectorAll('button > span'))
-          .slice(0, 2)
-          .map((span) => span.textContent)
-          .join(' '),
-      ),
-    );
+    const read = await entries.evaluateAll((all) => all.map((li) => li.querySelector('[data-said]')?.textContent));
     if (read.join(' | ') !== WORDS.join(' | '))
       throw new Refused(`the timeline reads each state and the entry that put it there, in order — it reads ${read.join(', ')}`);
     const lit = lifecycle.locator('[data-state][data-lit]');

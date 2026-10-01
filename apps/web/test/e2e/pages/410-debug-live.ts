@@ -68,7 +68,8 @@ export default {
         LIVE_MS,
       );
       await expectVisible(lifecycle.locator('[data-state="canceled"][data-lit]'), 'stopped before it started: canceled lit', LIVE_MS);
-      await expectCount(lifecycle.locator('[data-route][data-taken]'), 1, 'one route taken: stopping to canceled, a pass’s');
+      await expectCount(lifecycle.locator('[data-route][data-taken]'), 2, 'two routes taken: the person’s stop, and a pass’s settling');
+      await expectVisible(lifecycle.locator('[data-route="submitted->stopping"][data-taken]'), 'submitted->stopping taken, by the stop');
       await expectVisible(lifecycle.locator('[data-route="stopping->canceled"][data-taken]'), 'stopping->canceled taken');
       const picker = panel.getByRole('radiogroup', { name: 'Which try' });
       await expectVisible(picker.getByRole('radio', { name: 'try 2 (current)', checked: true }), 'the current try is picked');

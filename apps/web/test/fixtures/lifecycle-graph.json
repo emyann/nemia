@@ -303,5 +303,41 @@
       "to": "failed",
       "action": "settle"
     }
+  ],
+  "verbs": [
+    {
+      "verb": "requestStop",
+      "entry": "stop-requested",
+      "by": "person",
+      "from": [
+        "submitted",
+        "starting",
+        "working",
+        "input-required",
+        "ending"
+      ],
+      "to": "stopping",
+      "guard": "stoppable"
+    },
+    {
+      "verb": "answer",
+      "entry": "input",
+      "by": "person",
+      "from": [
+        "input-required"
+      ],
+      "to": "submitted",
+      "guard": "awaitsWord"
+    },
+    {
+      "verb": "close",
+      "entry": "closed",
+      "by": "person",
+      "from": [
+        "input-required"
+      ],
+      "to": "ending",
+      "guard": "awaitsWord"
+    }
   ]
 }

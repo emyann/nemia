@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Sheet, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { machineQuery, stepPathQuery, type LifecycleStep, type MachineGraph, type RunDetail, type StepPath } from '@/lib/api';
-import { centredScroll, litAt, pathPoll, pathStamp, takenRoutes } from '@/lib/lifecyclePath';
+import { byPerson, centredScroll, litAt, pathPoll, pathStamp, takenRoutes } from '@/lib/lifecyclePath';
 import { clockWord } from '@/lib/quota';
 import { useNow } from '@/lib/useNow';
 import { MachineCanvas } from './MachineCanvas';
@@ -69,7 +69,7 @@ function PathOf({ run, step, machine }: { run: RunDetail; step: Step; machine: M
   const last = path.length - 1;
   const at = pinned === null ? last : Math.min(pinned, last);
   const lit = litAt(path, at);
-  const taken = takenRoutes(path, at, machine.edges);
+  const taken = takenRoutes(path, at, machine);
   const current = step.tries.find((t) => t.current)?.try ?? step.tries.length;
   const pick = (n: number) => {
     setTryNumber(n === current ? null : n);
@@ -107,7 +107,7 @@ function PathOf({ run, step, machine }: { run: RunDetail; step: Step; machine: M
           className={`grid gap-4 md:grid-cols-[minmax(0,1fr)_18rem] ${read.isPlaceholderData ? 'opacity-60' : ''}`}
         >
           <MachineCanvas machine={machine} id="debug-lifecycle" lit={lit} taken={taken} maxHeight={CANVAS_MAX_HEIGHT} />
-          <Timeline path={path} at={at} edges={machine.edges} onScrub={onScrub} />
+          <Timeline path={path} at={at} machine={machine} onScrub={onScrub} />
         </div>
       )}
     </div>
@@ -241,39 +241,48 @@ function Scrubber({ path, at, onScrub }: { path: readonly LifecycleStep[]; at: n
 
 /**
  * The path as a timeline: a slider over its entries and the list of them, each its state, the journal entry that put it there and when,
- * the one shown marked. A move no edge of the graph makes — a person's stop, answer or close — says so.
+ * the one shown marked. A move a person's verb made — a stop, an answer or a close — names the verb (`byPerson`), and a move neither
+ * a verb nor an edge of the graph makes says so.
  */
 function Timeline({
   path,
   at,
-  edges,
+  machine,
   onScrub,
 }: {
   path: readonly LifecycleStep[];
   at: number;
-  edges: MachineGraph['edges'];
+  machine: Pick<MachineGraph, 'edges' | 'verbs'>;
   onScrub: (i: number) => void;
 }) {
   const now = new Date(useNow(60_000));
-  const routes = new Set(edges.map((e) => `${e.from}->${e.to}`));
+  const routes = new Set(machine.edges.map((e) => `${e.from}->${e.to}`));
   if (path.length === 0) return <p className="text-sm text-muted-foreground">Its journal has nothing on it yet.</p>;
   return (
     <div className="space-y-2">
       <Scrubber path={path} at={at} onScrub={onScrub} />
       <ol aria-label="The path" className="space-y-0.5 font-mono text-[11px]">
         {path.map((s, i) => {
-          const moved = i > 0 && path[i - 1].state !== s.state;
-          const offGraph = moved && !routes.has(`${path[i - 1].state}->${s.state}`);
+          const verb = byPerson(path, i, machine.verbs);
+          const offGraph = !verb && i > 0 && path[i - 1].state !== s.state && !routes.has(`${path[i - 1].state}->${s.state}`);
           return (
             <li key={i} data-entry={i} data-state-at={s.state} aria-current={i === at ? 'step' : undefined}>
               <AriaButton
                 onPress={() => onScrub(i)}
                 className={`flex w-full items-baseline gap-2 rounded px-1.5 py-0.5 text-left outline-none hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-ring/50 dark:hover:bg-neutral-800 ${i === at ? 'bg-amber-100 dark:bg-amber-950' : ''} ${i > at ? 'text-neutral-400 dark:text-neutral-600' : ''}`}
               >
-                <span className="font-semibold">{s.state}</span>
-                <span className="text-muted-foreground">← {s.event}</span>
-                {offGraph && <span className="text-muted-foreground">(no edge)</span>}
-                <span className="ml-auto text-muted-foreground">{clockWord(new Date(s.at), now)}</span>
+                <span className="flex min-w-0 flex-1 flex-wrap gap-x-2 *:whitespace-nowrap">
+                  <span data-said>
+                    <span className="font-semibold">{s.state}</span> <span className="text-muted-foreground">← {s.event}</span>
+                  </span>
+                  {verb && (
+                    <span data-by-person={verb} className="text-violet-700 italic dark:text-violet-300">
+                      (by a person: {verb})
+                    </span>
+                  )}
+                  {offGraph && <span className="text-muted-foreground">(no edge)</span>}
+                </span>
+                <span className="shrink-0 text-muted-foreground">{clockWord(new Date(s.at), now)}</span>
               </AriaButton>
             </li>
           );

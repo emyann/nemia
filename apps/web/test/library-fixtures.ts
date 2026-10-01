@@ -185,7 +185,7 @@ export const keyForm = (extra: Partial<KeyForm> = {}): KeyForm => ({
   ...extra,
 });
 
-/** A machine's graph, one edge under a guard and one without. */
+/** A machine's graph, one edge under a guard and one without, and a verb a person writes from outside it. */
 export const machine = (extra: Partial<MachineGraph> = {}): MachineGraph => ({
   name: 'lifecycle',
   title: "A task's lifecycle",
@@ -197,5 +197,6 @@ export const machine = (extra: Partial<MachineGraph> = {}): MachineGraph => ({
     { from: 'queued', event: 'start', guard: 'hasSlot', to: 'running', action: 'spawn' },
     { from: 'running', event: 'exit', to: 'done', action: 'record' },
   ],
+  verbs: [{ verb: 'close', entry: 'closed', by: 'person', from: ['running'], to: 'done', guard: 'awaitsWord' }],
   ...extra,
 });

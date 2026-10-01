@@ -1,25 +1,31 @@
 /**
- * A state machine's drawing (`drawMachine`, src/lib/machine.ts): every edge in exactly one place, edges between the same two states drawn
- * as one, an edge back to its own state written on its box, and nothing laid over anything else.
+ * A state machine's drawing (`drawMachine`, src/lib/machine.ts): every edge and every verb in exactly one place, edges and verbs between
+ * the same two states drawn as one, an edge back to its own state written on its box, a route only a person's verb takes dashed, and
+ * nothing laid over anything else.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import type { MachineEdge } from '../src/lib/api/machines.ts';
+import type { MachineEdge, MachineVerb } from '../src/lib/api/machines.ts';
 import {
   byAction,
   drawMachine,
   END_INSET,
   eventOf,
   HEAD_HEIGHT,
+  labelSize,
   LINE_HEIGHT,
   PAD_Y,
   pathOf,
   stateSize,
+  verbOf,
   type Drawing,
 } from '../src/lib/machine.ts';
 
-/** A machine with what the drawing gathers: edges back to a state, two states joined by several edges, guards, a loop back, a root. */
+/**
+ * A machine with what the drawing gathers: edges back to a state, two states joined by several edges, guards, a loop back, a root, and
+ * a person's verb taken from two states: from `idle`, where no edge leads to `failed`, and from `busy`, where one does.
+ */
 const MACHINE = {
   initial: 'idle',
   states: ['idle', 'busy', 'held', 'done', 'failed'],
@@ -36,6 +42,9 @@ const MACHINE = {
     { from: 'held', event: 'ANSWERED', to: 'busy', action: 'resume' },
     { from: 'held', event: 'GIVEN_UP', to: 'failed', action: 'settle' },
   ] satisfies MachineEdge[],
+  verbs: [
+    { verb: 'cancel', entry: 'cancelled', by: 'person', from: ['idle', 'busy'], to: 'failed', guard: 'open' },
+  ] satisfies MachineVerb[],
 };
 
 /** The task's lifecycle as the api served it when its drawing was written: a machine the size of the real one, held as it was. */
@@ -63,23 +72,46 @@ const overlaps = (boxes: Box[]): string[] =>
       .map((b) => `${a.name} and ${b.name}`),
   );
 
-/** Where each edge is written: `from->to` for a route, `from` for a box, with its event and its action. */
+/** Where each edge and verb is written: `from->to` for a route, `from` for a box, with its event and its action, or the verb's line. */
 const written = (drawing: Drawing): string[] => [
   ...drawing.routes.flatMap((r) => r.edges.flatMap((g) => g.events.map((e) => `${r.from}->${r.to} ${e} / ${g.action}`))),
+  ...drawing.routes.flatMap((r) => r.verbs.map((v) => `${r.from}->${r.to} ${v}`)),
   ...drawing.states.flatMap((s) => s.stays.flatMap((g) => g.events.map((e) => `${s.id} ${e} / ${g.action}`))),
 ];
 
-test('every edge is written once, on its route or, back to its own state, on its box', () => {
+test('every edge is written once, on its route or, back to its own state, on its box; every verb once on each route it takes', () => {
   const drawing = drawMachine(MACHINE);
-  const expected = MACHINE.edges.map((e) => `${e.from === e.to ? e.from : `${e.from}->${e.to}`} ${eventOf(e)} / ${e.action}`);
+  const expected = [
+    ...MACHINE.edges.map((e) => `${e.from === e.to ? e.from : `${e.from}->${e.to}`} ${eventOf(e)} / ${e.action}`),
+    ...MACHINE.verbs.flatMap((v) => v.from.map((from) => `${from}->${v.to} ${verbOf(v)}`)),
+  ];
   assert.deepEqual(written(drawing).sort(), expected.sort());
+  assert.equal(verbOf(MACHINE.verbs[0]), 'cancel [open]', 'a verb is written with its guard');
+});
+
+test("a pair only a person's verb joins is one dashed route; a pair an edge joins too is one solid route listing both", () => {
+  const drawing = drawMachine(MACHINE);
+  const route = (id: string) => drawing.routes.find((r) => r.id === id) ?? assert.fail(`no route ${id}`);
+  assert.deepEqual(
+    { ...route('idle->failed'), path: '', label: null },
+    { id: 'idle->failed', from: 'idle', to: 'failed', edges: [], verbs: ['cancel [open]'], dashed: true, path: '', label: null },
+  );
+  assert.equal(route('busy->failed').dashed, false, 'an edge joins it: solid');
+  assert.deepEqual(route('busy->failed').edges, [{ action: 'settle', events: ['ENDED'] }]);
+  assert.deepEqual(route('busy->failed').verbs, ['cancel [open]']);
+  assert.equal(route('idle->busy').dashed, false);
+  assert.deepEqual(route('idle->busy').verbs, []);
+  assert.deepEqual(
+    drawing.routes.filter((r) => r.dashed).map((r) => r.id),
+    ['idle->failed'],
+  );
 });
 
 test('the edges between the same two states are one route, listed by action; an edge back to its state is no route', () => {
   const drawing = drawMachine(MACHINE);
   assert.deepEqual(
     drawing.routes.map((r) => r.id),
-    ['idle->busy', 'busy->done', 'busy->failed', 'busy->held', 'held->busy', 'held->failed'],
+    ['idle->busy', 'busy->done', 'busy->failed', 'busy->held', 'held->busy', 'held->failed', 'idle->failed'],
   );
   assert.deepEqual(drawing.routes.find((r) => r.id === 'busy->done')!.edges, [{ action: 'settle', events: ['ENDED [ok]', 'CLOSED [ok]'] }]);
   assert.deepEqual(drawing.states.find((s) => s.id === 'busy')!.stays, [
@@ -92,7 +124,7 @@ test('the edges between the same two states are one route, listed by action; an 
 test('nothing is laid over anything else: no two boxes meet, whether states or labels, and all lie inside the drawing', () => {
   const drawing = drawMachine(MACHINE);
   const boxes = boxesOf(drawing);
-  assert.equal(boxes.length, MACHINE.states.length + 6);
+  assert.equal(boxes.length, MACHINE.states.length + 7);
   assert.deepEqual(overlaps(boxes), []);
   for (const box of boxes) {
     assert.ok(box.x >= 0 && box.y >= 0 && box.x + box.width <= drawing.width && box.y + box.height <= drawing.height, box.name);
@@ -189,17 +221,27 @@ test('the first state and the final ones are marked, and only they', () => {
   );
 });
 
-test('a state an edge names that the graph does not list is drawn, so no edge is lost', () => {
+test('a state an edge or a verb names that the graph does not list is drawn, so no edge and no verb is lost', () => {
   const drawing = drawMachine({ ...MACHINE, states: ['idle'] });
   assert.deepEqual(drawing.states.map((s) => s.id).sort(), [...MACHINE.states].sort());
-  assert.equal(written(drawing).length, MACHINE.edges.length);
+  assert.equal(written(drawing).length, MACHINE.edges.length + 2);
+  const verbs = [{ ...MACHINE.verbs[0], from: ['idle'], to: 'gone' }];
+  const stopped = drawMachine({ ...MACHINE, verbs });
+  assert.ok(
+    stopped.states.some((s) => s.id === 'gone'),
+    'the state only a verb leads to',
+  );
+  assert.deepEqual(stopped.routes.find((r) => r.id === 'idle->gone')?.verbs, ['cancel [open]']);
 });
 
-test('a box and a label are sized for their lines: a line per event and one per action, as wide as the longest', () => {
+test('a box and a label are sized for their lines: a line per event, one per action and one per verb, as wide as the longest', () => {
   assert.equal(stateSize([]).height, HEAD_HEIGHT);
   assert.equal(stateSize(byAction(MACHINE.edges.slice(2, 4))).height, HEAD_HEIGHT + LINE_HEIGHT * 4 + PAD_Y, 'two events, two actions');
   const wide = stateSize([{ action: 'x', events: ['A_VERY_LONG_EVENT_NAME [with_a_guard]'] }]);
   assert.ok(wide.width > stateSize([]).width, 'a long event widens its box');
+  assert.equal(labelSize([], ['cancel [open]']).height, LINE_HEIGHT + PAD_Y, 'a verb alone is a line');
+  assert.equal(labelSize(byAction(MACHINE.edges.slice(6, 7)), ['cancel [open]']).height, LINE_HEIGHT * 3 + PAD_Y, 'an edge and a verb');
+  assert.ok(labelSize([], ['a_very_long_verb [with_a_guard]']).width > labelSize([], ['cancel [open]']).width, 'a long verb widens it');
 });
 
 test('a route is drawn along its legs, straight along each and curving upright from one to the next, down or back up', () => {

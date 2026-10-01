@@ -18,7 +18,7 @@ export function StatsTiles({ last, before }: { last: StatsTile; before: StatsTil
           ({last.from} → {last.to}), against the 14 before ({before.from} → {before.to})
         </span>
       </h2>
-      <ul className="grid grid-cols-3 gap-2 sm:grid-cols-5 xl:grid-cols-9">
+      <ul className="grid grid-cols-2 gap-2 sm:grid-cols-5 2xl:grid-cols-10">
         {HEADLINES.map((number) => {
           const trend = trendOf(last[number.key], before[number.key]);
           return (

@@ -6,7 +6,18 @@ import type { PageSpec } from '../visit.ts';
 import { OUT } from '../world.ts';
 
 /** The headline numbers the page draws, by the api's key, in its order. */
-const KEYS = ['rounds', 'firstTry', 'costPerLanded', 'timePerLanded', 'landed', 'runs', 'tries', 'refused', 'gateWaitMs'] as const;
+const KEYS = [
+  'rounds',
+  'firstTry',
+  'costPerLanded',
+  'timePerLanded',
+  'landed',
+  'runs',
+  'tries',
+  'refused',
+  'gateWaitMs',
+  'deniedPerTry',
+] as const;
 
 /** The part of `GET /api/stats`'s answer the page is held to. */
 type Served = {

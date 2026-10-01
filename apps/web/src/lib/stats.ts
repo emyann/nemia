@@ -31,6 +31,9 @@ export function durationWord(ms: number): string {
   return `${Math.floor(h / 24)}d${two(h % 24)}h`;
 }
 
+/** A rate per try to two decimals, or to one significant figure under 0.01, so a rate above 0 never reads as 0. */
+const perTry = (n: number): string => `${n > 0 && n < 0.01 ? Number(n.toPrecision(1)) : Math.round(n * 100) / 100}/try`;
+
 /** The headline numbers, in the order the page shows them: how well the runs went first, then how much went on. */
 export const HEADLINES: readonly HeadlineNumber[] = [
   { key: 'rounds', label: 'rounds', about: 'mean rounds to acceptance', words: or((n) => (Math.round(n * 10) / 10).toString()) },
@@ -47,6 +50,7 @@ export const HEADLINES: readonly HeadlineNumber[] = [
   { key: 'tries', label: 'tries', about: 'tries ended', words: or(String) },
   { key: 'refused', label: 'refused', about: 'checks that refused', words: or(String) },
   { key: 'gateWaitMs', label: 'gate wait', about: 'mean wait at a gate', words: or(durationWord) },
+  { key: 'deniedPerTry', label: 'denied', about: 'mean calls refused per try', words: or(perTry) },
 ];
 
 /** Every headline number of `h` in words, by key. */

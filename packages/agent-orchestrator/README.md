@@ -116,8 +116,9 @@ the engine's job. This one follows what only this package knows.
 `wf stats` reads every run in the store, of every factory and repository, and adds up how the work
 flows: the runs finished and landed, the rounds a loop took to be accepted, the share of landed runs
 that landed on their first try, the cost and wall time of a landed run, and per step its tries, their
-time and cost, its checks' verdicts and its waits at a gate. It prints tiles — the last 14 days
-against the 14 before — a row per UTC day, and a row per step and agent.
+time and cost, its checks' verdicts, its waits at a gate and the calls its harness refused it. It prints
+tiles — the last 14 days against the 14 before — a row per UTC day, a row per step and agent, and a
+row per call a step was refused.
 
 ```bash
 wf stats                                   # every day since the first try ended, to today
@@ -142,6 +143,14 @@ wf stats --json                            # what GET /api/stats answers
   ran `wf accept`. A first-try landing is the `workspace: main` step landing on its first try.
 - **A check is passed, refused or unfinished**: refused only when it ran to its end and exited
   non-zero, as `wf decide` reads it. A gate wait runs from the try's end to its approval.
+- **A refused call counts where the harness records it**: every call each ended attempt of a try's
+  own session was denied, one per call, on a step that runs `claude -p` (`claude` or
+  `claude-detached`). `denied` is their mean per measured try (`0.5/try`); a step's row sums them,
+  says how many of its tries were measured where not all (`3 (2 of 4)`), and names each call with its
+  count. A try on codex, on a remote agent or with `background: true` records none, and a recheck's try
+  ran no session: none is measured, so a day of only those reads `—`. Nor is a session filed before
+  2026-09-23 19:04:31 UTC (`JOBS_SINCE`), when `claude` steps began to run as jobs: until then each ran
+  as `claude --bg`, which records no denial, and its journal does not say which it was.
 - **A run whose journal does not read is left out whole**, and named on the last line.
 - **A change is marked on the day a run froze it**: a step (its keys and its own note), an agent's
   instructions, skills and system prompt, or a skill as `wf start` rendered it, that differs from what

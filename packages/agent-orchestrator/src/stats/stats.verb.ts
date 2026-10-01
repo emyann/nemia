@@ -1,11 +1,11 @@
 /**
  * `wf stats` (`statsRun`): the flow numbers of every run in the store (`statsOf`), off each run's record and the engine's view of every
- * task of every try, each viewed once. A controller, reaching the runtime through the client (`runtime-client.ts`): an Effect program that
- * requires the engine as a service (`EngineService`), and `stats`, its plain face in a Promise, over the engine it is handed. It writes
- * nothing, and keeps nothing between calls.
+ * task of every try, each viewed once, the calls each session was refused read off the same views (`deniedCallsOf`). A controller,
+ * reaching the runtime through the client (`runtime-client.ts`): an Effect program that requires the engine as a service (`EngineService`),
+ * and `stats`, its plain face in a Promise, over the engine it is handed. It writes nothing, and keeps nothing between calls.
  */
 import { Effect } from 'effect';
-import { EngineService, awaited, unreadableJournal, type Engine, type TaskView } from '../runtime-client.ts';
+import { EngineService, awaited, denialText, unreadableJournal, type Engine, type TaskView } from '../runtime-client.ts';
 import { refusedCheck, type Run } from '../record/record.ts';
 import type { Workflow } from '../step/step.ts';
 import { timeline } from '../timeline/timeline.ts';
@@ -16,6 +16,7 @@ import { phaseOfView } from '../views/views-words.ts';
 import { renderedSkillVersions } from '../agents/agents.store.ts';
 import { dayOf, factsOf, keysOf, statsOf, type CheckVerdict, type Facts, type StatsQuery } from './stats.ts';
 import { frozenOf, type RunFrozen } from './marks.ts';
+import { deniedCallsOf } from './discipline.ts';
 
 /** How a check's task ended (`CheckVerdict`): passed, refused (it ran to its end and exited non-zero, `refusedCheck`), or unfinished. */
 function verdictOf(view: TaskView | undefined): CheckVerdict {
@@ -61,6 +62,7 @@ async function runFacts(e: Engine, run: Run, steps: Workflow[]): Promise<Pick<Fa
     succeeded: (taskId) => phaseOfView(everyTry.get(taskId)) === 'succeeded',
     verdictOf: (taskId) => verdictOf(everyTry.get(taskId)),
     closeoutOf: closeoutReader(views, run),
+    deniedOf: (taskId) => deniedCallsOf(everyTry.get(taskId)).map(denialText),
   });
 }
 

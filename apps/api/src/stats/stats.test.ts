@@ -126,6 +126,14 @@ test('GET /api/stats counts every run in the store, of every factory and reposit
   assert.deepEqual(body, await flowNumbers(e, { from: '2026-09-28', to: '2026-09-28', by: 'factory' }));
 });
 
+test('GET /api/stats answers the calls refused per try as null, never 0, where every try ran on a harness that records none', async () => {
+  const { body } = await asked('?from=2026-09-28&to=2026-09-28');
+  assert.equal(body.all.total.tries, 2, 'two tries ended, each on codex');
+  assert.equal(body.all.total.deniedPerTry, null);
+  assert.equal(body.all.days[0].deniedPerTry, null);
+  assert.deepEqual([body.all.steps[0].deniedCalls, body.all.steps[0].deniedTries, body.all.steps[0].denials], [null, 0, []]);
+});
+
 test('GET /api/stats keeps one factory with ofFactory and one repository with ofRepo, compared as strings', async () => {
   const other = await asked('?ofFactory=other');
   assert.deepEqual([other.body.all.total.tries, other.body.filters], [1, { factory: 'other' }]);

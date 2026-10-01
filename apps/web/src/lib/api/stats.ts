@@ -5,7 +5,8 @@ import { get } from './read.ts';
 
 /**
  * Mirrors the package's `Headline`: the runs finished and those landed, the mean rounds to acceptance, the share landed on the first try,
- * the mean cost and wall time of a landed run, the tries, the checks refused and the mean gate wait. A number nothing measured is null.
+ * the mean cost and wall time of a landed run, the tries, the checks refused, the mean gate wait, and the mean calls refused per try over
+ * the tries whose harness records them (`deniedPerTry`). A number nothing measured is null.
  */
 export type StatsHeadline = {
   runs: number;
@@ -17,6 +18,7 @@ export type StatsHeadline = {
   tries: number;
   refused: number;
   gateWaitMs: number | null;
+  deniedPerTry: number | null;
 };
 
 /** The numbers of one UTC day of the period. */
@@ -66,6 +68,7 @@ const HeadlineFields = {
   tries: Schema.Number,
   refused: Schema.Number,
   gateWaitMs: known,
+  deniedPerTry: known,
 };
 
 /** Decodes a tile. */

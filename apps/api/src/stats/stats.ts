@@ -25,8 +25,11 @@ const QUERY_KEYS: Record<QueryKey, string> = {
  *   the store, whatever factory and repository the request is answered in, like `GET /api/runs`. `from` and `to` are UTC days
  *   (YYYY-MM-DD), `by` one of agent, step, factory, workflow or repo, and `agent`, `step`, `workflow`, `ofFactory` and `ofRepo` keep only
  *   the facts that have that value, compared as strings: `ofRepo` a repository's path as a run's record names it. A number nothing
- *   measured is null, never 0. Each group carries its `marks`: the days a run froze a step, an agent or a rendered skill that differs from
- *   the run of the same workflow folder before it. A query the package refuses (`statsQueryOf`) is a 422 naming the key and what it takes.
+ *   measured is null, never 0: `deniedPerTry`, the mean calls a try was refused, is null on a day whose tries all ran on a harness that
+ *   records no denial (codex, a remote agent, `background: true`) or were a recheck's, as is a step row's `deniedCalls`; its `denials`
+ *   name each call refused, with a count. Each group carries its `marks`: the days a run froze a step, an agent or a rendered skill that
+ *   differs from the run of the same workflow folder before it. A query the package refuses (`statsQueryOf`) is a 422 naming the key and
+ *   what it takes.
  */
 export const stats = new Hono<ApiEnv>().get('/api/stats', (c) =>
   served(c, async ({ e }) => {

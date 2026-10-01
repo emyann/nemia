@@ -512,9 +512,18 @@ test("a try keeps or breaks each rule its step's skills declare, by the calls it
     { skill: 'write-a-spec', rule: 'checks-bare', says: 'Run a check bare', kept: 1, broken: 0 },
   ]);
   const words = statsLines(statsOf(factsOfAll(r), {}, JOBS_NOW));
-  assert.ok(words.some((l) => /^step\s+agent\s+skill\s+rule\s+kept\s+broken$/.test(l)), words.join('\n'));
-  assert.ok(words.some((l) => /^design\s+seldon\s+write-a-spec\s+read-with-read\s+0\s+1$/.test(l)), words.join('\n'));
-  assert.ok(words.some((l) => /^design\s+seldon\s+write-a-spec\s+checks-bare\s+1\s+0$/.test(l)), words.join('\n'));
+  assert.ok(
+    words.some((l) => /^step\s+agent\s+skill\s+rule\s+kept\s+broken$/.test(l)),
+    words.join('\n'),
+  );
+  assert.ok(
+    words.some((l) => /^design\s+seldon\s+write-a-spec\s+read-with-read\s+0\s+1$/.test(l)),
+    words.join('\n'),
+  );
+  assert.ok(
+    words.some((l) => /^design\s+seldon\s+write-a-spec\s+checks-bare\s+1\s+0$/.test(l)),
+    words.join('\n'),
+  );
 });
 
 test('a try whose denials were not measured — a recheck, on codex, before steps ran as jobs — keeps and breaks no rule', () => {
@@ -538,7 +547,10 @@ test('a try whose denials were not measured — a recheck, on codex, before step
   assert.deepEqual(statsOf(factsOfAll(recheck), {}, JOBS_NOW).all.steps[0].rules, [
     { skill: 'write-a-spec', rule: 'read-with-read', says: 'Read a file with Read', kept: 0, broken: 1 },
   ]);
-  const codex = declaring(readOf('codex', [step('design', [], { by: 'seldon', harness: 'codex' })], { design: [{ end: at(1, JOBS_DAY) }] }), declared);
+  const codex = declaring(
+    readOf('codex', [step('design', [], { by: 'seldon', harness: 'codex' })], { design: [{ end: at(1, JOBS_DAY) }] }),
+    declared,
+  );
   const before = declaring(readOf('before', [step('design', [], { by: 'seldon' })], { design: [{ end: at(1) }] }), declared);
   for (const r of [codex, before]) {
     assert.equal(factsOf(r).tries[0].rules, null, r.run.id);

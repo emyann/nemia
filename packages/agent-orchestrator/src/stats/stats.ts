@@ -2,7 +2,7 @@
  * The flow numbers of a store's history, defined on each workflow's structure and never on a step's name: the rounds of each `loop:` step
  * to acceptance, the tries of the `workspace: main` step to a landing, what a landed run cost and how long it took, and every step's tries,
  * time, cost, check verdicts and gate waits, the calls its harness refused it, where the harness records them, the skills its sessions
- * loaded, where their ends say (`discipline.ts`), and each rule its skills declare, kept or broken by those calls (`rules.ts`).
+ * loaded, where their ends say, and each rule its skills declare, kept or broken by those calls (`discipline.ts`).
  *
  * Pure: `factsOf` turns one run's timeline and record into facts, `statsOf` buckets them by UTC day and by one breakdown key, filters them
  * and totals them, with the changes to what the runs froze (`marksOf`, `marks.ts`), and `statsQueryOf` reads what a person asked.
@@ -18,8 +18,7 @@ import { DEFAULT_FACTORY } from '../factory/factory.ts';
 import { askedAgain, landsOnCheck } from '../status/status.ts';
 import type { Timeline, TimelineTry } from '../timeline/timeline.ts';
 import { marksOf, type Mark, type RunFrozen } from './marks.ts';
-import { deniesRecorded, ranAsJob } from './discipline.ts';
-import { ruleRowsOf, rulesOfTry, type RuleFact, type RuleRow } from './rules.ts';
+import { deniesRecorded, ranAsJob, ruleRowsOf, rulesOfTry, type RuleFact, type RuleRow } from './discipline.ts';
 import type { SkillRule } from '../skills/skills.ts';
 
 /** What a breakdown or a filter goes by: the step's agent, the step, the run's factory, its workflow's folder and its repository. */

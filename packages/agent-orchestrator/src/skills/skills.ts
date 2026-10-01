@@ -7,8 +7,8 @@ import { frontmatterKey } from '../former/former.ts';
 import { skillNameRefusal } from '../agents/agents.ts';
 
 /**
- * A rule a skill declares in the `rules.json` beside its SKILL.md (`readSkillRules`): its `id`, what it `says`, and the calls that break it,
- * each written as a `disallowedTools:` rule (`Bash(cat:*)`) that a call the harness denied is matched against (`disallowedBy`).
+ * A rule a skill declares in the `rules.json` beside its SKILL.md (`readSkillRules`): its `id`, what it `says`, and the calls that break
+ * it, each written as a `disallowedTools:` rule (`Bash(cat:*)`) that a call the harness denied is matched against (`disallowedBy`).
  */
 export type SkillRule = { id: string; says: string; breaks: string[] };
 

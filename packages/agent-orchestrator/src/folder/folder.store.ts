@@ -137,7 +137,9 @@ function rulesFieldRefusal(error: Schema.SchemaError): string {
   const [first] = SchemaIssue.makeFormatterStandardSchemaV1()(error.issue).issues;
   const at = (first?.path ?? []).map((p) => (typeof p === 'object' && p !== null && 'key' in p ? p.key : p)).map(String);
   const field = at.length ? `\`${at.join('.')}\`` : 'shape';
-  return first?.message === 'Missing key' ? `its ${field} is missing` : `its ${field} is wrong (${first?.message ?? 'not a skill\'s rules'})`;
+  return first?.message === 'Missing key'
+    ? `its ${field} is missing`
+    : `its ${field} is wrong (${first?.message ?? "not a skill's rules"})`;
 }
 
 /**
@@ -166,7 +168,8 @@ export function readSkillRules(skillDir: string): SkillRule[] {
   const rules = decoded.success.rules.map((r) => ({ id: r.id, says: r.says, breaks: [...r.breaks] }));
   rules.forEach((r, i) => {
     const before = rules.findIndex((other) => other.id === r.id);
-    if (before !== i) throw new WorkflowError(`${file} names the rule \`${r.id}\` twice, at \`rules.${before}\` and \`rules.${i}\`. ${RULES_SHAPE}`);
+    if (before !== i)
+      throw new WorkflowError(`${file} names the rule \`${r.id}\` twice, at \`rules.${before}\` and \`rules.${i}\`. ${RULES_SHAPE}`);
   });
   return rules;
 }

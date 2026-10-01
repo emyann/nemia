@@ -2844,7 +2844,7 @@ test('REFUSED: a date, a card, a finding or a measured version in the words a pe
   }
 });
 
-test("REFUSED at load: a skill whose `rules.json` does not read — not JSON, a rule with no `breaks`, two rules under one id — naming the skill, the file and the field", () => {
+test('REFUSED at load: a skill whose `rules.json` does not read — not JSON, a rule with no `breaks`, two rules under one id — naming the skill, the file and the field', () => {
   const refusedWith = (rules: string): string => {
     const root = teamCopy('wf-rules-');
     fs.writeFileSync(path.join(root, 'skills', 'implement-a-change', 'rules.json'), rules);

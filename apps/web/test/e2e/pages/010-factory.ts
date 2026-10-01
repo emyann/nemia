@@ -229,6 +229,14 @@ export default {
     for (const run of [top, shipped, running])
       await expectCount(cardOf(page, run.id).locator('[data-waiting]'), 0, `${run.id} waits on no run`);
     await expectVisible(
+      cardOf(page, bottom.id).locator(
+        `[data-ghost-run] [data-waiting="on-runs"] a[data-waits-on="${running.id}"][href="/runs/${running.id}"]`,
+      ),
+      `the bottom's card is a ghost until it starts, and names ${running.id}, which it waits on, as a link to that run`,
+    );
+    for (const run of [top, shipped, running, orphan])
+      await expectCount(cardOf(page, run.id).locator('[data-ghost-run]'), 0, `${run.id}'s card is no ghost: it started, or waits on you`);
+    await expectVisible(
       cardOf(page, running.id).locator(`time[title*="${DIAMOND.words.running}"]`, { hasText: /^\d+m \d{2}s since it started$/ }),
       `${running.id}'s card counts its time at work from its first filing, and says on hover that it ${DIAMOND.words.running}`,
     );

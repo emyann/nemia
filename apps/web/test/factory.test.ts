@@ -700,7 +700,7 @@ test("a factory's floor draws its own run waiting on a run of another factory, a
     ['c'],
   );
   assert.equal(runEdges(floor).length, 0, 'p is on no card of this floor, so no edge leaves it');
-  assert.equal(waitsOnRuns(floor[0]!), true);
+  assert.equal(waitsOnRuns(floor[0]), true);
   assert.deepEqual(
     floorRuns(runs, false).map((one) => one.id),
     ['p', 'c'],

@@ -47,7 +47,7 @@ import { RunnerError, testOps } from '../src/harness/seam.ts';
 import type { SessionState } from '../src/core/session.ts';
 import type { Sighting } from '../src/core/domain.ts';
 import { runningIn, scratch } from './scratch.ts';
-import { resultLine, SESSION, stream } from './reader-streams.ts';
+import { resultLine, SESSION, SKILLS_STREAM, stream } from './reader-streams.ts';
 
 const root = () => scratch('ae-detached-');
 const sh = (script: string): HarnessSpec => ({ name: 'sh', command: () => ({ cmd: 'sh', args: ['-c', script] }) });
@@ -1539,6 +1539,7 @@ test("claude -p's stream says what it was denied as it happens, the input off th
       closeout: { payload: { outcome: 'done' } },
       usage: { costUsd: 0.02 },
       denials: [{ tool: 'Write', what: '/tmp/outside/x.txt' }, { tool: 'WebFetch' }],
+      skills: ['look'],
     },
     'a call allowed (uname, the skill) is not a denial, and each denied one is named once, not once per line that names it',
   );
@@ -1546,7 +1547,7 @@ test("claude -p's stream says what it was denied as it happens, the input off th
   const killed = log.split('\n').slice(0, -1).join('\n');
   assert.deepEqual(
     claudeStreamOutput(killed),
-    { denials: [{ tool: 'Write', what: '/tmp/outside/x.txt' }, { tool: 'WebFetch' }] },
+    { denials: [{ tool: 'Write', what: '/tmp/outside/x.txt' }, { tool: 'WebFetch' }], skills: ['look'] },
     'killed before its result, by a stop or a signal, the events are all it says: every denial is still read',
   );
   assert.equal('denials' in claudeResultOutput(killed), false, '--output-format json has no events: it says nothing until its result');
@@ -1554,10 +1555,10 @@ test("claude -p's stream says what it was denied as it happens, the input off th
 
 test('a denial event whose call is not in the stream is the tool alone — and takes what its result says of it', () => {
   const lone = [stream.init, stream.denied('toolu_b', 'Bash')].join('\n');
-  assert.deepEqual(claudeStreamOutput(lone), { denials: [{ tool: 'Bash' }] });
+  assert.deepEqual(claudeStreamOutput(lone), { denials: [{ tool: 'Bash' }], skills: [] });
   assert.deepEqual(
     claudeStreamOutput([lone, stream.denied('toolu_b', 'Bash'), 'not json "permission_denied"'].join('\n')),
-    { denials: [{ tool: 'Bash' }] },
+    { denials: [{ tool: 'Bash' }], skills: [] },
     'named twice, once; a line that is not an event is skipped',
   );
   const withResult = [
@@ -1582,9 +1583,33 @@ test('a denial event whose call is not in the stream is the tool alone — and t
     claudeStreamOutput(
       [stream.init, stream.calls(['toolu_q', 'Bash', { command: 'ls' }]), stream.toolResult('toolu_q'), resultLine({})].join('\n'),
     ),
-    {},
+    { skills: [] },
     'a stream that denied nothing says nothing of it',
   );
+});
+
+test("claude -p's stream says each skill its session loaded, once per call, by its name without the plugin's, beside what it was denied", () => {
+  const read = claudeStreamOutput(SKILLS_STREAM);
+  assert.deepEqual(read.skills, ['write-a-spec', 'look'], 'a call named again is one load; a load denied, or naming no skill, is none');
+  assert.deepEqual(read.denials, [{ tool: 'Skill', what: 'grill-me' }], 'the denied load is a denial');
+  assert.deepEqual(read.closeout?.payload, { outcome: 'done' });
+});
+
+test('a skill denied only in the result is no load', () => {
+  const log = [
+    stream.init,
+    stream.calls(['toolu_k1', 'Skill', { skill: 'look' }], ['toolu_k2', 'Skill', { skill: 'grill-me' }]),
+    resultLine({ permission_denials: [{ tool_name: 'Skill', tool_use_id: 'toolu_k2', tool_input: { skill: 'grill-me' } }] }),
+  ].join('\n');
+  assert.deepEqual(claudeStreamOutput(log).skills, ['look']);
+});
+
+test('a stream that started says the skills its session loaded even when it loaded none; one with no init line cannot say', () => {
+  const none = [stream.init, stream.calls(['toolu_q', 'Bash', { command: 'ls' }]), resultLine({})].join('\n');
+  assert.deepEqual(claudeStreamOutput(none), { skills: [] }, 'measured: none loaded');
+  const unstarted = SKILLS_STREAM.split('\n').slice(1).join('\n');
+  assert.equal('skills' in claudeStreamOutput(unstarted), false, 'no init line: no session known to have started, nothing measured');
+  assert.equal('skills' in claudeResultOutput(SKILLS_STREAM), false, '--output-format json has no events: it cannot say');
 });
 
 test("a spec that reads its harness's output reports the answer found there, stamped with when it was written — nothing in the workspace", async () => {

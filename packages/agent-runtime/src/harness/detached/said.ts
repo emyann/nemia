@@ -1,10 +1,10 @@
 /**
  * What a detached run's output said, read once per change of the output, across processes: `outputIn` reads the harness's
  * capture (`.log`) through the spec's `readOutput`, and once the run is over keeps what it read in a file beside it (`.said`),
- * keyed by the capture's size and mtime and the readers' `SAID_VERSION`. A process that finds the file with the key the
- * capture has now takes it and reads no capture; one that finds no file, a file that does not parse or decode, or another
- * key, reads the capture again. The file is never trusted over the capture, and never carried from one pass to the next:
- * its key is read on each.
+ * keyed by the capture's size and mtime and the readers' `SAID_VERSION`, or a version of `SAID_EXTENDED`. A process that finds
+ * the file with the key the capture has now takes it and reads no capture; one that finds no file, a file that does not parse
+ * or decode, or another key, reads the capture again. The file is never trusted over the capture, and never carried from one
+ * pass to the next: its key is read on each.
  *
  * One writer, the harness's own `observe` — the daemon's, the api's or a command's: each writes the same content for a key,
  * through a file of its own renamed into place, so a reader only finds a whole one. Neither name ends in `.json`, so
@@ -20,13 +20,21 @@ import type { HarnessOutput, HarnessSpec } from './detached.ts';
  * The shipped readers' version — `claudeResultOutput`, `claudeStreamOutput` and `codexOutput`: a kept output of another
  * version is read again from its capture. Goes up with every change to what a reader reads, as `SAID_DIGEST` does.
  */
-export const SAID_VERSION = 1;
+export const SAID_VERSION = 2;
+
+/**
+ * The former versions whose kept output the shipped readers would read the same but for the fields they have added since:
+ * taken as it is, with the capture's key, and its log not read again — the added fields absent, which is the truth of a
+ * capture read before they were. A version leaves this list the moment a reader changes what one of its fields says, or
+ * stops saying one: the digest pin catches a reader that reads otherwise, never a version wrongly left here.
+ */
+export const SAID_EXTENDED: readonly number[] = [1];
 
 /**
  * The digest of what the shipped readers read of the streams in `test/reader-streams.ts`: a reader that reads otherwise fails
  * `test/said.test.ts` until this is recorded again, beside a `SAID_VERSION` gone up with it.
  */
-export const SAID_DIGEST = '4a06037b65565fbe1d221521f6080c017b31d015dcf22ad171572d914f66e861';
+export const SAID_DIGEST = '09d5ca58f1661366556da9f2ac05f95470905c6bb2e5e3e650afdbc681f03709';
 
 /** What a capture is known by: its size and mtime, as `fs.statSync` gives them. */
 export type SaidKey = { size: number; mtimeMs: number };
@@ -47,10 +55,14 @@ const KeptSchema = Schema.Struct({
     usage: Schema.optional(UsageSchema),
     limit: Schema.optional(Schema.String),
     denials: Schema.optional(Schema.Array(Schema.Struct({ tool: Schema.String, what: Schema.optional(Schema.String) }))),
+    skills: Schema.optional(Schema.Array(Schema.String)),
   }),
 });
 
 const isKept = Schema.is(KeptSchema);
+
+/** Whether a kept output of `version` is taken: the shipped readers' own, or one of `SAID_EXTENDED`. */
+const isTaken = (version: number): boolean => version === SAID_VERSION || SAID_EXTENDED.includes(version);
 
 /** What `file` keeps of a capture known by `key` — or nothing, when it is not there, not whole, not decoded, or of another key. */
 export const keptSaid = (file: string, key: SaidKey): HarnessOutput | undefined => {
@@ -60,7 +72,7 @@ export const keptSaid = (file: string, key: SaidKey): HarnessOutput | undefined 
   } catch {
     return undefined;
   }
-  if (!isKept(parsed) || parsed.version !== SAID_VERSION || parsed.size !== key.size || parsed.mtimeMs !== key.mtimeMs) return undefined;
+  if (!isKept(parsed) || !isTaken(parsed.version) || parsed.size !== key.size || parsed.mtimeMs !== key.mtimeMs) return undefined;
   return parsed.read as HarnessOutput;
 };
 

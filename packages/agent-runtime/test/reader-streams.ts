@@ -117,6 +117,21 @@ const DENIED_STREAM = [
   }),
 ];
 
+/**
+ * A session that loaded skills: two loads, one of them named again on a later line, a load it was denied, and a call that
+ * names no skill, before its result.
+ */
+export const SKILLS_STREAM = [
+  stream.init,
+  stream.calls(['toolu_k1', 'Skill', { skill: 'nemia-seldon:write-a-spec' }], ['toolu_k2', 'Skill', { skill: 'look' }]),
+  stream.toolResult('toolu_k1'),
+  stream.calls(['toolu_k1', 'Skill', { skill: 'nemia-seldon:write-a-spec' }]),
+  stream.calls(['toolu_k3', 'Skill', { skill: 'grill-me' }]),
+  stream.denied('toolu_k3', 'Skill'),
+  stream.calls(['toolu_k4', 'Skill', {}], ['toolu_k5', 'Skill', { skill: ' ' }]),
+  resultLine({ structured_output: { outcome: 'done' } }),
+].join('\n');
+
 const LONE = [stream.init, stream.denied('toolu_b', 'Bash')].join('\n');
 
 const STREAMS = [
@@ -136,6 +151,8 @@ const STREAMS = [
     }),
   ].join('\n'),
   [stream.init, stream.calls(['toolu_q', 'Bash', { command: 'ls' }]), stream.toolResult('toolu_q'), resultLine({})].join('\n'),
+  SKILLS_STREAM,
+  SKILLS_STREAM.split('\n').slice(1).join('\n'),
 ];
 
 const CODEX = [

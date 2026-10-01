@@ -115,6 +115,11 @@ export type Sighting = {
    * `decide` does not read it; a person, and the upper layer, do.
    */
   denials?: Denial[];
+  /**
+   * Every skill the session loaded, one per call, by its name without its plugin's: `[]` when it loaded none. Absent when the
+   * harness cannot say. **Carried, never judged**: `decide` does not read it.
+   */
+  skills?: string[];
 };
 
 /**
@@ -247,8 +252,8 @@ export type EndReason = 'harness' | 'lost' | 'unsigned' | 'unstartable' | 'opera
  * - `spawned`: RESULT — the spawn call returned, and the session is the harness's problem now. `error` when the call
  *   failed without the harness vouching that nothing started: whether a session exists is then the grace window's to
  *   find out.
- * - `ended`: an attempt reached a terminal state, as observed — never as assumed. `usage`, `exitCode`, `denials` and
- *   `limit` come from the same sighting, when its runner measured them; `decide` reads none of them. `stated`, on an end
+ * - `ended`: an attempt reached a terminal state, as observed — never as assumed. `usage`, `exitCode`, `denials`, `skills`
+ *   and `limit` come from the same sighting, when its runner measured them; `decide` reads none of them. `stated`, on an end
  *   read off a sighting of a task that asked for a closing statement: whether one came. A fact, never a verdict — `decide`
  *   does not read it, and the layer above judges what a missing statement means. Absent from an end an older runtime
  *   wrote, and from an end with no sighting behind it (`lost`, `unstartable`, a cut).
@@ -327,6 +332,7 @@ export type Event =
       usage?: Usage;
       exitCode?: number;
       denials?: Denial[];
+      skills?: string[];
       limit?: string;
       error?: string;
     }
@@ -381,6 +387,8 @@ export type Attempt = {
   exitCode: number | null;
   /** The tool calls its harness denied, when it denied any and said so. Carried, never read. */
   denials?: Denial[];
+  /** The skills its session loaded, `[]` for none, when its harness said. Carried, never read. */
+  skills?: string[];
   /** The limit its configuration set that its harness says it ended the session at — `budget` — when it said one. Carried, never read. */
   limit?: string;
   /**
@@ -424,6 +432,22 @@ export type State = {
   stopRequested: boolean;
   settled: Outcome | null;
 };
+
+/** Ends the attempt `a` as the `ended` event `e` says: an empty list of skills kept, an empty one of denials not. */
+function endAttempt(a: Attempt, e: Extract<Event, { kind: 'ended' }>): void {
+  a.ended = e.observed;
+  a.endedAt = e.at;
+  a.reason = e.reason;
+  a.nativeId = e.nativeId ?? a.nativeId;
+  a.closeout = e.closeout;
+  if (e.stated !== undefined) a.stated = e.stated;
+  a.usage = e.usage ?? null;
+  a.exitCode = e.exitCode ?? null;
+  if (e.denials?.length) a.denials = e.denials;
+  if (e.skills) a.skills = e.skills;
+  if (e.limit) a.limit = e.limit;
+  a.error = e.error ?? a.error;
+}
 
 /** Observed state, folded. A `State` is never stored — it is always re-derived from the journal. */
 export function fold(taskId: string, events: readonly Event[]): State {
@@ -481,19 +505,7 @@ export function fold(taskId: string, events: readonly Event[]): State {
       }
       case 'ended': {
         const a = s.attempts.find((x) => x.n === e.attempt);
-        if (a) {
-          a.ended = e.observed;
-          a.endedAt = e.at;
-          a.reason = e.reason;
-          a.nativeId = e.nativeId ?? a.nativeId;
-          a.closeout = e.closeout;
-          if (e.stated !== undefined) a.stated = e.stated;
-          a.usage = e.usage ?? null;
-          a.exitCode = e.exitCode ?? null;
-          if (e.denials?.length) a.denials = e.denials;
-          if (e.limit) a.limit = e.limit;
-          a.error = e.error ?? a.error;
-        }
+        if (a) endAttempt(a, e);
         break;
       }
       case 'measured': {

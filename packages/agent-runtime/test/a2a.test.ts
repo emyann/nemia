@@ -100,6 +100,7 @@ const full: Sighting = {
   waitingFor: 'permission prompt',
   limit: 'budget',
   denials: [{ tool: 'Skill', what: 'look' }, { tool: 'WebFetch' }],
+  skills: ['write-a-spec', 'look'],
 };
 
 test('a sighting rides whole in its Task, and survives a transport that serialises', () => {
@@ -112,6 +113,12 @@ test('a sighting rides whole in its Task, and survives a transport that serialis
   assert.deepEqual(closeoutOf(overTheWire(t)), full.closeout!.payload);
   assert.deepEqual(overTheWire(t.metadata), t.metadata, 'nothing in a sighting changes shape as JSON');
   assert.deepEqual(sightingOf({ ...t, metadata: overTheWire(t.metadata) }), full);
+  const none: Sighting = { ...full, skills: [] };
+  assert.deepEqual(
+    sightingOf({ ...t, metadata: overTheWire(taskOfSighting('ae/t-1/3', none).metadata) }),
+    none,
+    'no skill loaded is said too',
+  );
   for (const state of SESSION_STATES) {
     const bare = taskOfSighting('ae/t-1/3', { sessionId: 's', state });
     assert.deepEqual(sightingOf(bare), { sessionId: 's', state });

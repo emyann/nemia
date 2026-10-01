@@ -19,8 +19,9 @@ import { layers, type Point } from './layout.ts';
  * Runs.
  *
  * A run started `--after` runs that have not shipped is in flight while each may still ship: it moves, since the tick files its roots
- * when they do. Not once one never will without a person (`waiting.onYou`) — no such run, a cancelled one, a branch gone — though
- * `assess`, which knows nothing of the gate, still calls it running: nothing of it moves until a person acts, and it waits on them.
+ * when they do, and its card is a ghost until it starts (`waitsOnRuns`). Not once one never will without a person (`waiting.onYou`) —
+ * no such run, a cancelled one, a branch gone — though `assess`, which knows nothing of the gate, still calls it running: nothing of it
+ * moves until a person acts, and it waits on them.
  *
  * So is a run a person holds until runs ship (`wf hold`), and on the same terms. `assess` calls a held run running whatever its steps say,
  * and the tick lifts the hold when those runs ship, though nothing of it is filed before then. Not once only a person lifts it
@@ -47,6 +48,14 @@ export const toDecideOf = (run: { toDecide?: RunToDecide | null }): RunToDecide 
  */
 export const waitsOnYou = (run: Pick<RunSummary, 'waitingOnYou' | 'cancelledAt'> & Held): boolean =>
   !run.cancelledAt && (run.waitingOnYou.length > 0 || Boolean(run.waiting?.onYou) || Boolean(run.holding?.onYou));
+
+/**
+ * Whether a run waits on runs, and on nothing else: started `--after` runs not shipped, each of which may still ship, with nothing of it
+ * filed yet (the api's `waiting`, null once a step is filed), and nobody to act (`waitsOnYou`). The floor draws such a run as a ghost, as
+ * the queue lane draws a card not started, until it starts. Not a cancelled run, which waits on nobody.
+ */
+export const waitsOnRuns = (run: Pick<RunSummary, 'waitingOnYou' | 'cancelledAt'> & Held): boolean =>
+  !run.cancelledAt && Boolean(run.waiting) && !waitsOnYou(run);
 
 /**
  * Who a run waits on, as `wf ls` names them after `→ waiting on you:` — `approve plan` for a step at its gate — off the api's `onYou`; and

@@ -761,6 +761,53 @@ export function seedDiamond(repo: string, root: string, now = Date.now()): void 
   record(orphan, 1.6, { taskId: null });
 }
 
+/**
+ * A run of FACTORIES' `hiring` started `--after` DIAMOND's `running`, a run of the default factory that may still ship: on its factory's
+ * floor, a ghost that names `running` and draws no card of it. Not seeded with the rest, so no count of the store's runs moves: the page
+ * that reads it writes it (`seedChained`) and takes it back.
+ */
+export const CHAINED = {
+  id: 'waits-in-a-factory-e2e16',
+  title: 'Waits in a factory',
+  factory: FACTORIES.hiring.name,
+  after: [DIAMOND.running.id],
+  /** What `wf ls` says of its root, and its card with it. */
+  word: DIAMOND.words.bottom,
+} as const;
+
+/**
+ * Write CHAINED's record into the store at `root`, as the diamond's are written (`seedDiamond`), on the checkout at `repo`, from its
+ * `main`: in its factory, nothing of it filed. Returns the record's path, for the page to take it back.
+ */
+export function seedChained(root: string, repo: string, now = Date.now()): string {
+  const base = execFileSync('git', ['rev-parse', 'main'], { cwd: repo, encoding: 'utf8' }).trim();
+  const workflowDir = path.join(root, 'workflow-diamond');
+  const file = path.join(root, 'runs', `${CHAINED.id}.json`);
+  write(
+    file,
+    JSON.stringify(
+      {
+        id: CHAINED.id,
+        repo,
+        workspace: repo,
+        baseRef: base,
+        branch: 'main',
+        isolate: true,
+        brief: `${CHAINED.title}\n\nA run seeded by npm run e2e, in the factory ${CHAINED.factory}: after ${CHAINED.after.join(' and ')}.`,
+        workflowDir,
+        workflow: [{ name: 'implement', after: [], body: 'Implement it.', harness: 'claude' }],
+        after: CHAINED.after,
+        factory: CHAINED.factory,
+        createdAt: new Date(now).toISOString(),
+        steps: { implement: { taskId: null } },
+      },
+      null,
+      2,
+    ),
+  );
+  return file;
+}
+
 /** Where in the store the sessions `claude agents --all --json` lists are kept, for the fake `claude` run.ts puts on the api's PATH. */
 export const REGISTRY = 'claude-agents.json';
 

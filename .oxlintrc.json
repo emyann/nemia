@@ -353,9 +353,9 @@
     {
       "files": ["apps/web/src/components/RunNode.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 176, "skipBlankLines": true, "skipComments": true }],
-        "complexity": ["error", { "max": 48 }],
-        "sonarjs/cognitive-complexity": ["error", 29]
+        "max-lines-per-function": ["error", { "max": 170, "skipBlankLines": true, "skipComments": true }],
+        "complexity": ["error", { "max": 45 }],
+        "sonarjs/cognitive-complexity": ["error", 24]
       }
     },
     {

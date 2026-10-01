@@ -27,10 +27,12 @@ import {
   toggleOpen,
   unfoldingNow,
   waitedMs,
+  waitsOnRuns,
   waitsOnYou,
   widenLayout,
   type Span,
 } from '../src/lib/factory.ts';
+import { runsIn } from '../src/lib/factories.ts';
 import { tilesOf } from '../src/lib/flow.ts';
 import type { Point } from '../src/lib/layout.ts';
 
@@ -647,6 +649,63 @@ test('a run waiting on runs that may still ship is in flight; one waiting on a r
     'a run with a step waiting on you waits on you',
   );
   assert.equal(waitsOnYou(run(['running (working)'], { moving: true })), false, 'a run nobody waits on does not');
+});
+
+test('a run waits on runs, a ghost on the floor, while what it waits on may still ship and nothing of it is filed', () => {
+  assert.equal(waitsOnRuns(run(['waiting'], { after: ['p'], waiting: waitingOn(false), moving: true })), true);
+  assert.equal(
+    waitsOnRuns(run(['waiting'], { after: ['p'], waiting: waitingOn(true) })),
+    false,
+    'a run waiting on a run that never ships waits on you',
+  );
+  assert.equal(
+    waitsOnRuns(
+      run(['waiting'], {
+        after: ['p'],
+        waiting: waitingOn(false),
+        holding: { at: cancelledAt, runs: [], word: 'held until a person lifts it', advice: 'wf hold r-1 --off', onYou: true },
+      }),
+    ),
+    false,
+    'a run held until only a person lifts it waits on you',
+  );
+  assert.equal(
+    waitsOnRuns(run(['waiting'], { after: ['p'], waiting: waitingOn(false), cancelledAt })),
+    false,
+    'a cancelled run waits on nobody',
+  );
+  assert.equal(
+    waitsOnRuns(run(['running (working)'], { after: ['p'], waiting: null, moving: true })),
+    false,
+    'a run that started is a card again',
+  );
+  assert.equal(waitsOnRuns(run(['running (working)'], { moving: true })), false, 'a run started without --after waits on nothing');
+});
+
+test("a factory's floor draws its own run waiting on a run of another factory, as a ghost and with no edge, and no card of that run", () => {
+  const runs = [
+    run(['running (working)'], { id: 'p', factory: null, moving: true, createdAt: '2026-09-14T00:00:00.000Z' }),
+    run(['waiting'], {
+      id: 'c',
+      factory: 'nemia',
+      after: ['p'],
+      waiting: waitingOn(false),
+      moving: true,
+      createdAt: '2026-09-14T00:01:00.000Z',
+    }),
+  ];
+  const floor = floorRuns(runsIn(runs, { name: 'nemia', default: false }), false);
+  assert.deepEqual(
+    floor.map((one) => one.id),
+    ['c'],
+  );
+  assert.equal(runEdges(floor).length, 0, 'p is on no card of this floor, so no edge leaves it');
+  assert.equal(waitsOnRuns(floor[0]), true);
+  assert.deepEqual(
+    floorRuns(runs, false).map((one) => one.id),
+    ['p', 'c'],
+    'without the factory, p would be on the floor',
+  );
 });
 
 const at = (minutes: number) => new Date(Date.UTC(2026, 8, 14, 0, minutes)).toISOString();

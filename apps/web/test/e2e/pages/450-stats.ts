@@ -3,9 +3,10 @@ import type { Page } from 'playwright';
 import { photograph, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectUncut, expectVisible, idle, Refused } from '../checks.ts';
 import type { PageSpec } from '../visit.ts';
+import { FAKE } from '../seed.ts';
 import { OUT } from '../world.ts';
 
-/** The headline numbers the page draws, by the api's key, in its order. */
+/** The headline numbers the page draws as tiles, by the api's key, in its order. */
 const KEYS = [
   'rounds',
   'firstTry',
@@ -19,12 +20,22 @@ const KEYS = [
   'deniedPerTry',
 ] as const;
 
+/** The headline numbers the page draws as charts: every tile's, and skills loaded per try, which has no tile. */
+const CHARTS = [...KEYS, 'skillsPerTry'] as const;
+
+/** A step row's served count and how many of its tries were measured, for each table the page draws a step row in. */
+const BY_STEP = {
+  skills: { count: 'skillLoads', measured: 'skillTries' },
+  denials: { count: 'deniedCalls', measured: 'deniedTries' },
+} as const;
+
 /** The part of `GET /api/stats`'s answer the page is held to. */
 type Served = {
   all: {
     days: Array<Record<string, unknown> & { day: string }>;
     tiles: { last: Record<string, unknown> };
     marks: Array<{ day: string }>;
+    steps: Array<Record<string, unknown> & { step: string; tries: number }>;
   };
 };
 
@@ -42,7 +53,7 @@ async function served(page: Page, query: string): Promise<Served> {
 /** Each chart has a column per served day, each holding the day's served value, null kept; and a rule on each day a mark was served. */
 async function expectCharts(page: Page, stats: Served, assertion: string): Promise<void> {
   const days = stats.all.days;
-  for (const key of KEYS) {
+  for (const key of CHARTS) {
     const chart = page.locator(`[data-chart="${key}"]`);
     await expectCount(
       chart.locator('[data-day]'),
@@ -66,6 +77,43 @@ async function expectCharts(page: Page, stats: Served, assertion: string): Promi
   }
 }
 
+/**
+ * Each step table has a row per served step, whose total is the served count — — where none of its tries was measured, and how many were
+ * where not all — each name read whole; `theme`'s session's skills are named with their counts.
+ */
+async function expectByStep(page: Page, stats: Served, assertion: string): Promise<void> {
+  for (const [kind, { count, measured }] of Object.entries(BY_STEP)) {
+    const table = page.locator(`[data-by-step="${kind}"]`);
+    await expectCount(table.locator('[data-by-step-row]'), stats.all.steps.length, `${assertion}: a ${kind} row for each served step`);
+    const drawn = await table
+      .locator('[data-by-step-row]')
+      .evaluateAll((rows) => rows.map((r) => [r.getAttribute('data-by-step-row'), r.querySelector('[data-total]')?.textContent ?? '']));
+    const wanted = stats.all.steps.map((s) => {
+      const n = s[count] as number | null;
+      const of = s[measured] as number;
+      return [s.step, n === null ? '—' : of === s.tries ? String(n) : `${n} (${of} of ${s.tries})`];
+    });
+    if (JSON.stringify(drawn) !== JSON.stringify(wanted))
+      throw new Refused(
+        `${assertion}: the ${kind} rows say what the api serves — drew ${JSON.stringify(drawn)}, served ${JSON.stringify(wanted)}`,
+      );
+    await expectUncut(table.locator('[data-by-step-row] td, [data-item]'), `${assertion}: every ${kind} cell and name read whole`);
+  }
+  const theme = page.locator(`[data-by-step="skills"] [data-by-step-row="${FAKE.refused}"]`);
+  await expectVisible(theme.locator('[data-item="look"]', { hasText: '×2' }), `${assertion}: ${FAKE.refused} loaded look twice`);
+  await expectVisible(theme.locator('[data-item="effect"]', { hasText: '×1' }), `${assertion}: ${FAKE.refused} loaded effect once`);
+}
+
+/** Where the two step tables sit: side by side, or the calls refused below the skills loaded. */
+async function byStepLayout(page: Page): Promise<'side by side' | 'stacked'> {
+  const skills = await page.locator('[data-by-step="skills"]').boundingBox();
+  const denials = await page.locator('[data-by-step="denials"]').boundingBox();
+  if (!skills || !denials) throw new Refused('the two step tables are drawn');
+  if (denials.y >= skills.y + skills.height) return 'stacked';
+  if (Math.abs(denials.y - skills.y) < 2 && denials.x >= skills.x + skills.width) return 'side by side';
+  throw new Refused(`the step tables neither sit side by side nor stack — ${JSON.stringify({ skills, denials })}`);
+}
+
 /** The page on a phone's screen, photographed whole: nothing wider than the screen, every tile read whole; then the window put back. */
 async function onPhone(page: Page): Promise<void> {
   const size = page.viewportSize();
@@ -75,6 +123,8 @@ async function onPhone(page: Page): Promise<void> {
     const wide = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     if (wide > 1) throw new Refused(`the page fits a phone's 390 pixels — it is ${wide} pixels wider`);
     await expectUncut(page.locator('[data-tile] [data-words]'), 'every tile says its name and its numbers whole on a phone');
+    await expectUncut(page.locator('[data-by-step-row] td, [data-item]'), 'every step table cell and name read whole on a phone');
+    if ((await byStepLayout(page)) !== 'stacked') throw new Refused('the step tables stack on a phone');
     await photograph(page, path.join(OUT, `stats-phone-${await themeOf(page)}.png`), { fullPage: true });
   } finally {
     if (size) await page.setViewportSize(size);
@@ -84,8 +134,9 @@ async function onPhone(page: Page): Promise<void> {
 export default {
   /**
    * The Stats page: the sidebar lights Stats; each tile holds what the api serves for the last 14 days, null kept; each chart a column per
-   * served day of the 28, with a rule on each day marked; All asks for every day and draws each; and a factory picked from its picker is
-   * asked for as `ofFactory`, never `factory`, and lit.
+   * served day of the 28, with a rule on each day marked, skills loaded drawn as a chart with no tile; a row per served step in the skills
+   * loaded and the calls refused, side by side from 1280 wide and stacked on a phone; All asks for every day and draws each; and a factory
+   * picked from its picker is asked for as `ofFactory`, never `factory`, and lit.
    */
   name: 'stats',
   route: '/stats',
@@ -107,6 +158,12 @@ export default {
     await expectUncut(page.locator('[data-tile] [data-words]'), 'every tile says its name and its numbers whole at 1280 wide');
     await expectCharts(page, month, 'over 28 days');
     await photograph(page.locator('section[aria-label="A day at a time"]'), path.join(OUT, `stats-charts-${await themeOf(page)}.png`));
+    await expectByStep(page, month, 'over 28 days');
+    if ((await byStepLayout(page)) !== 'side by side') throw new Refused('the step tables sit side by side at 1280 wide');
+    await photograph(
+      page.locator('[data-by-step="skills"]').locator('xpath=..'),
+      path.join(OUT, `stats-by-step-${await themeOf(page)}.png`),
+    );
 
     const every = page.waitForRequest((r) => new URL(r.url()).pathname === '/api/stats' && !new URL(r.url()).searchParams.has('from'));
     await page.locator('[data-period="all"]').click();

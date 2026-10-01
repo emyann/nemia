@@ -4821,6 +4821,7 @@ const { StatsChart } = await import('../src/components/StatsChart.tsx');
 const { StatsTiles } = await import('../src/components/StatsTiles.tsx');
 const { StatsMarks } = await import('../src/components/StatsMarks.tsx');
 const { StatsFilters } = await import('../src/components/StatsFilters.tsx');
+const { StatsByStep } = await import('../src/components/StatsByStep.tsx');
 const { HEADLINES, marksByDay } = await import('../src/lib/stats.ts');
 
 /** A day of the Stats page with nothing measured but what it is given. */
@@ -4836,6 +4837,7 @@ const statsDay = (day: string, given: Record<string, number | null> = {}) => ({
   refused: 0,
   gateWaitMs: null,
   deniedPerTry: null,
+  skillsPerTry: null,
   ...given,
 });
 
@@ -4893,11 +4895,12 @@ test('REFUSED: a tile keeps a number nothing measured apart from 0, and says the
   const window = (from: string, to: string, given: Record<string, number | null>) => ({ ...statsDay('x', given), from, to });
   const markup = renderToStaticMarkup(
     createElement(StatsTiles, {
-      last: window('2026-09-17', '2026-09-30', { runs: 3, landed: 0, firstTry: null }),
+      last: window('2026-09-17', '2026-09-30', { runs: 3, landed: 0, firstTry: null, skillsPerTry: 2 }),
       before: window('2026-09-03', '2026-09-16', { runs: 1, landed: null, firstTry: 0.5 }),
     }),
   );
-  assert.equal([...markup.matchAll(/data-tile="/g)].length, HEADLINES.length);
+  assert.equal([...markup.matchAll(/data-tile="/g)].length, 10, 'ten tiles');
+  assert.doesNotMatch(markup, /data-tile="skillsPerTry"/, 'refused: skills loaded is drawn as a chart only');
   const tile = (key: string) => markup.match(new RegExp(`<li data-tile="${key}".*?</li>`))?.[0] ?? '';
   assert.match(tile('runs'), /data-value="3"/);
   assert.match(tile('runs'), />3<\/span>.*↑.*before 1</);
@@ -4918,6 +4921,49 @@ test('the changes are said a row each, with a link to the run that froze each, o
   const none = await routedWith(createElement(StatsMarks, { marks: [] }));
   assert.doesNotMatch(none, /data-mark=/);
   assert.match(none, /Nothing a run froze changed in this period\./);
+});
+
+test('a step row says its step, its agent or —, its total as served, and each name with its count, none cut', () => {
+  const markup = renderToStaticMarkup(
+    createElement(StatsByStep, {
+      title: 'Skills loaded',
+      about: 'each skill',
+      kind: 'skills',
+      total: 'loads',
+      item: 'skill',
+      rows: [
+        {
+          step: 'implement',
+          agent: 'ada',
+          total: '3 (2 of 4)',
+          items: [
+            { name: 'look', count: 2 },
+            { name: 'effect', count: 1 },
+          ],
+        },
+        { step: 'design', agent: null, total: '—', items: [] },
+      ],
+    }),
+  );
+  assert.match(markup, /aria-label="Skills loaded" data-by-step="skills"/);
+  const row = (step: string) => markup.match(new RegExp(`<tr[^>]*data-by-step-row="${step}".*?</tr>`))?.[0] ?? '';
+  assert.match(row('implement'), />ada</);
+  assert.match(row('implement'), /data-total[^>]*>3 \(2 of 4\)</);
+  assert.match(row('implement'), /data-item="look"[^>]*>look <span[^>]*>×2</);
+  assert.match(row('implement'), /data-item="effect"[^>]*>effect <span[^>]*>×1</);
+  const cells = (step: string) => [...row(step).matchAll(/<td[^>]*>(.*?)<\/td>/g)].map((m) => m[1]).slice(0, 3);
+  assert.deepEqual(cells('implement'), ['implement', 'ada', '3 (2 of 4)']);
+  assert.deepEqual(
+    cells('design'),
+    ['design', '—', '—'],
+    'refused: a step with no agent says —, and its total — where nothing was measured',
+  );
+  assert.doesNotMatch(markup, /truncate|text-ellipsis/, 'refused: a name is never cut');
+  const none = renderToStaticMarkup(
+    createElement(StatsByStep, { title: 'Calls refused', about: 'each call', kind: 'denials', total: 'calls', item: 'call', rows: [] }),
+  );
+  assert.doesNotMatch(none, /data-by-step-row/);
+  assert.match(none, /No step ended a try in this period\./);
 });
 
 test('the filters link each period with the filters kept, the default period left out, and light the key a value is kept of', async () => {

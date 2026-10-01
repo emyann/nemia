@@ -1,13 +1,13 @@
 import type { StatsTile } from '../lib/api';
-import { HEADLINES, trendOf } from '../lib/stats';
+import { TILES, trendOf } from '../lib/stats';
 
 /** The trend's words, for a person who reads it aloud. */
 const TREND_WORDS = { '↑': 'up on', '↓': 'down on', '=': 'the same as' } as const;
 
 /**
- * A tile per headline number (`data-tile`, its served value for the last 14 days as JSON in `data-value`, null kept): its words for the
- * last 14 days, which way it went, and its words for the 14 days before, each window's first and last day on hover. Which way is better
- * is not said: for a cost down is, for the runs landed up is.
+ * A tile per headline number in `TILES` (`data-tile`, its served value for the last 14 days as JSON in `data-value`, null kept): its words
+ * for the last 14 days, which way it went, and its words for the 14 days before, each window's first and last day on hover. Which way is
+ * better is not said: for a cost down is, for the runs landed up is. A number drawn only as a chart has no tile.
  */
 export function StatsTiles({ last, before }: { last: StatsTile; before: StatsTile }) {
   return (
@@ -19,7 +19,7 @@ export function StatsTiles({ last, before }: { last: StatsTile; before: StatsTil
         </span>
       </h2>
       <ul className="grid grid-cols-2 gap-2 sm:grid-cols-5 2xl:grid-cols-10">
-        {HEADLINES.map((number) => {
+        {TILES.map((number) => {
           const trend = trendOf(last[number.key], before[number.key]);
           return (
             <li

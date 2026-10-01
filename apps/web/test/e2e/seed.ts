@@ -54,6 +54,8 @@ export const FAKE = {
     words: 'denied: Skill(look), Bash(npx playwright test)',
     node: 'denied 2 calls',
   },
+  /** The skills `theme`'s session loaded, as the engine recorded them on the attempt's end: `look` twice, `effect` once. */
+  skills: ['look', 'effect', 'look'],
   /** Who a person has to act for: the step that signed off blocked, and the one whose check refused. */
   waitingOnYou: ['implement', 'theme'],
   /** `tokens`' lane, which `theme` worked in too: the run's result branch, committed in its repository. */
@@ -1776,6 +1778,7 @@ export function seed(root: string, now = Date.now()): void {
     nativeId?: string,
     usage?: object,
     denials?: readonly object[],
+    skills?: readonly string[],
   ): void =>
     write(
       path.join(root, 'engine', 'tasks', `${task}.jsonl`),
@@ -1794,6 +1797,7 @@ export function seed(root: string, now = Date.now()): void {
           closeout,
           ...(usage ? { usage } : {}),
           ...(denials ? { denials } : {}),
+          ...(skills ? { skills } : {}),
         },
         { kind: 'settled', at: ago(ended), outcome: 'succeeded' },
       ]),
@@ -1827,6 +1831,7 @@ export function seed(root: string, now = Date.now()): void {
     undefined,
     undefined,
     FAKE.denied.denials,
+    FAKE.skills,
   );
 
   write(

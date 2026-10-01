@@ -1,7 +1,8 @@
 /**
  * The calls a try was refused, as the stats count them: which steps' tries are measured at all (`deniesRecorded`), which sessions ran as
- * jobs that record them (`ranAsJob`), and every call each ended attempt of a session was denied, one per call (`deniedCallsOf`). Pure:
- * `stats.verb.ts` hands the views here and words each call with the runtime's `denialText`.
+ * jobs that record them (`ranAsJob`), and every call each ended attempt of a session was denied, one per call (`deniedCallsOf`). And the
+ * skills a try loaded: every skill each ended attempt of a session loaded, one per load, where each ended attempt says (`skillsLoadedOf`).
+ * Pure: `stats.verb.ts` hands the views here and words each call with the runtime's `denialText`.
  */
 import { DEFAULT_HARNESS } from '../harness/harness.ts';
 import type { Workflow } from '../step/step.ts';
@@ -43,3 +44,17 @@ export type DeniedClock<D> = { state: { attempts: ReadonlyArray<{ ended: unknown
  */
 export const deniedCallsOf = <D>(view: DeniedClock<D> | undefined): D[] =>
   (view?.state.attempts ?? []).flatMap((a) => (a.ended === null || a.ended === undefined ? [] : [...(a.denials ?? [])]));
+
+/** What `skillsLoadedOf` reads of a task's view: its attempts, whether each ended, and the skills each loaded, where its end says. */
+export type SkillsClock = { state: { attempts: ReadonlyArray<{ ended: unknown; skills?: readonly string[] }> } };
+
+/**
+ * Every skill a task's sessions loaded: each skill of each attempt that ended, in the order of the attempts, one per load — a skill loaded
+ * twice is two; `[]` where every ended attempt loaded none. Null, not measured, for a task with no view, with no attempt ended, or with an
+ * ended attempt whose end does not say its skills (an older journal, a `lost` end, a harness that cannot say).
+ */
+export function skillsLoadedOf(view: SkillsClock | undefined): string[] | null {
+  const ends = (view?.state.attempts ?? []).filter((a) => a.ended !== null && a.ended !== undefined);
+  if (!ends.length || !ends.every((a) => a.skills !== undefined)) return null;
+  return ends.flatMap((a) => [...(a.skills ?? [])]);
+}

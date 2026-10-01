@@ -116,9 +116,9 @@ the engine's job. This one follows what only this package knows.
 `wf stats` reads every run in the store, of every factory and repository, and adds up how the work
 flows: the runs finished and landed, the rounds a loop took to be accepted, the share of landed runs
 that landed on their first try, the cost and wall time of a landed run, and per step its tries, their
-time and cost, its checks' verdicts, its waits at a gate and the calls its harness refused it. It prints
-tiles — the last 14 days against the 14 before — a row per UTC day, a row per step and agent, and a
-row per call a step was refused.
+time and cost, its checks' verdicts, its waits at a gate, the calls its harness refused it and the
+skills its sessions loaded. It prints tiles — the last 14 days against the 14 before — a row per UTC
+day, a row per step and agent, a row per call a step was refused, and a row per skill a step loaded.
 
 ```bash
 wf stats                                   # every day since the first try ended, to today
@@ -151,6 +151,14 @@ wf stats --json                            # what GET /api/stats answers
   ran no session: none is measured, so a day of only those reads `—`. Nor is a session filed before
   2026-09-23 19:04:31 UTC (`JOBS_SINCE`), when `claude` steps began to run as jobs: until then each ran
   as `claude --bg`, which records no denial, and its journal does not say which it was.
+- **A skill load counts where every end of the try's own session says what it loaded**: the runtime
+  writes `skills` on an attempt's end where its harness can say (a `claude` job), `[]` for none, one
+  entry per load. A try is measured when each ended attempt of its own session carries the key; one end
+  without it (an older journal, a `lost` end, codex, a remote agent, `background: true`), no ended
+  attempt, or no session of its own (a recheck) leaves the try unmeasured, never 0. `skills` is the mean
+  loads per measured try; a step's row sums them, says how many of its tries were measured where not
+  all (`3 (2 of 4)`), and names each skill with its count, most first, then by name. Only the task
+  journals the engine already reads are read: no session's log, transcript or capture.
 - **A run whose journal does not read is left out whole**, and named on the last line.
 - **A change is marked on the day a run froze it**: a step (its keys and its own note), an agent's
   instructions, skills and system prompt, or a skill as `wf start` rendered it, that differs from what

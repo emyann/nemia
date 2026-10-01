@@ -29,9 +29,18 @@ const TEAM = [
 
 /**
  * One try of a fixture: when it ended, what its session cost (1 unless given; null for unmeasured), its check's verdict if it has one,
- * why the try after it was filed, whether its session failed, and the calls its session was refused.
+ * why the try after it was filed, whether its session failed, the calls its session was refused, and the skills it loaded (unmeasured
+ * unless given).
  */
-type Try = { end: string; cost?: number | null; check?: CheckVerdict; then?: 'round' | 'retries'; failed?: true; denied?: string[] };
+type Try = {
+  end: string;
+  cost?: number | null;
+  check?: CheckVerdict;
+  then?: 'round' | 'retries';
+  failed?: true;
+  denied?: string[];
+  skills?: string[];
+};
 
 /** A session or a check that ran an hour, filed ten minutes before, and ended at `end`: succeeded, unless `failed`. */
 const ended = (end: string, cost: number | null, failed = false): TaskClock => ({
@@ -60,6 +69,7 @@ function readOf(id: string, steps: readonly Workflow[], tries: Record<string, Tr
   const filed = new Map<string, string>();
   const verdicts = new Map<string, CheckVerdict>();
   const denied = new Map<string, string[]>();
+  const skills = new Map<string, string[]>();
   const record: Run['steps'] = {};
   for (const [name, list] of Object.entries(tries)) {
     const ids = list.map((t, i) => {
@@ -68,6 +78,7 @@ function readOf(id: string, steps: readonly Workflow[], tries: Record<string, Tr
       views.set(taskId, ended(sessionEnd, t.cost === undefined ? 1 : t.cost, t.failed));
       filed.set(taskId, minus(sessionEnd, 70 * MIN));
       if (t.denied) denied.set(taskId, t.denied);
+      if (t.skills) skills.set(taskId, t.skills);
       if (t.check) {
         views.set(`${taskId}-check`, ended(t.end, null));
         filed.set(`${taskId}-check`, minus(t.end, 9 * MIN));
@@ -86,6 +97,7 @@ function readOf(id: string, steps: readonly Workflow[], tries: Record<string, Tr
     succeeded: (taskId: string) => views.get(taskId)?.phase === 'succeeded',
     verdictOf: (taskId: string) => verdicts.get(taskId) ?? null,
     deniedOf: (taskId: string) => denied.get(taskId) ?? [],
+    skillsOf: (taskId: string) => skills.get(taskId) ?? null,
     closeoutOf: (name: string) =>
       steps.find((s) => s.name === name)?.loop ? { outcome: 'done' as const, summary: '', artifacts: [], output: { again } } : undefined,
   };
@@ -424,4 +436,47 @@ test("a step's refused calls are counted by call, most first and then by call, o
   const codex = [step('design', [], { by: 'seldon', harness: 'codex' })];
   const [unmeasured] = statsOf(factsOfAll(readOf('codex', codex, tries)), {}, JOBS_NOW).all.steps;
   assert.deepEqual([unmeasured.deniedCalls, unmeasured.deniedTries, unmeasured.denials], [null, 0, []]);
+});
+
+test('skills loaded are a mean per measured try: a try whose ends do not say is left out, never 0, and a measured empty list is 0', () => {
+  const steps = [step('design', [], { by: 'seldon' })];
+  const tries = { design: [{ end: at(1), skills: ['look', 'effect'] }, { end: at(2), skills: [] }, { end: at(3) }] };
+  const r = readOf('skills', steps, tries);
+  assert.deepEqual(
+    factsOf(r).tries.map((t) => t.skills),
+    [['look', 'effect'], [], null],
+  );
+  const s = statsOf(factsOfAll(r), {}, NOW);
+  assert.equal(s.all.total.skillsPerTry, 1, 'two loads over two measured tries: the unmeasured try is not one of them');
+  assert.equal(s.all.days.find((d) => d.day === DAY)?.skillsPerTry, 1);
+  const unsaid = statsOf(factsOfAll(readOf('unsaid', steps, { design: [{ end: at(1) }] })), {}, NOW);
+  assert.equal(unsaid.all.total.skillsPerTry, null, 'nothing measured, not 0');
+  assert.match(statsLine(unsaid), /— \(—\) skills loaded$/);
+  const none = statsOf(factsOfAll(readOf('none', steps, { design: [{ end: at(1), skills: [] }] })), {}, NOW);
+  assert.equal(none.all.total.skillsPerTry, 0, 'a session that loaded none is a measured 0');
+  assert.match(statsLine(none), /0\/try \(—\) skills loaded$/);
+});
+
+test("a step's skills are counted by skill over its measured tries, most first and then by name, and how many tries were measured", () => {
+  const steps = [step('design', [], { by: 'seldon' })];
+  const tries = {
+    design: [{ end: at(1), skills: ['look', 'write-a-spec', 'effect'] }, { end: at(2), skills: ['write-a-spec'] }, { end: at(3) }],
+  };
+  const s = statsOf(factsOfAll(readOf('by-skill', steps, tries)), {}, NOW);
+  const [row] = s.all.steps;
+  assert.deepEqual([row.tries, row.skillLoads, row.skillTries], [3, 4, 2]);
+  assert.deepEqual(row.skills, [
+    { skill: 'write-a-spec', count: 2 },
+    { skill: 'effect', count: 1 },
+    { skill: 'look', count: 1 },
+  ]);
+  const words = statsLines(s);
+  assert.match(
+    words.find((l) => l.startsWith('design '))!,
+    /\s4 \(2 of 3\)$/,
+    'the step row says how many of its tries were measured',
+  );
+  assert.ok(words.some((l) => /^design\s+seldon\s+write-a-spec\s+2$/.test(l)));
+  const [unmeasured] = statsOf(factsOfAll(readOf('unsaid', steps, { design: [{ end: at(1) }] })), {}, NOW).all.steps;
+  assert.deepEqual([unmeasured.skillLoads, unmeasured.skillTries, unmeasured.skills], [null, 0, []]);
 });

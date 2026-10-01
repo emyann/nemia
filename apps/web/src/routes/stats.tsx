@@ -1,11 +1,12 @@
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
+import { StatsByStep } from '../components/StatsByStep';
 import { StatsChart } from '../components/StatsChart';
 import { StatsFilters } from '../components/StatsFilters';
 import { StatsMarks } from '../components/StatsMarks';
 import { StatsTiles } from '../components/StatsTiles';
 import { statsQuery } from '../lib/api';
-import { apiQueryOf, HEADLINES, marksByDay, searchOf } from '../lib/stats';
+import { apiQueryOf, byStepOf, HEADLINES, marksByDay, searchOf } from '../lib/stats';
 
 /**
  * The Stats page, at `/stats`: its search is the period and the filters (`searchOf`), and its loader asks the api for them as of the
@@ -32,8 +33,9 @@ export const Route = createFileRoute('/stats')({
 
 /**
  * How well the factory has worked, measured: the tiles for the last 14 days against the 14 before, then a daily chart per headline number
- * over the period chosen, with a rule on each day something a run froze changed, and those changes in words. Every number is the api's,
- * as `wf stats` counts it; one nothing measured reads — and draws nothing.
+ * over the period chosen, with a rule on each day something a run froze changed; the skills each step and agent loaded beside the calls
+ * refused it, side by side on a wide screen; and the changes in words. Every number is the api's, as `wf stats` counts it; one nothing
+ * measured reads — and draws nothing.
  */
 function StatsPage() {
   const search = Route.useSearch();
@@ -62,6 +64,24 @@ function StatsPage() {
           ))}
         </div>
       </section>
+      <div className="grid gap-6 xl:grid-cols-2">
+        <StatsByStep
+          title="Skills loaded"
+          about="each skill a step's sessions loaded, over the tries whose sessions said"
+          kind="skills"
+          rows={byStepOf(data.all.steps, 'skills')}
+          total="loads"
+          item="skill"
+        />
+        <StatsByStep
+          title="Calls refused"
+          about="each call a step's harness refused it, over the tries whose harness records them"
+          kind="denials"
+          rows={byStepOf(data.all.steps, 'denials')}
+          total="calls"
+          item="call"
+        />
+      </div>
       <StatsMarks marks={data.all.marks} />
       {data.unreadable.length > 0 && (
         <p data-unreadable className="text-xs text-amber-700 dark:text-amber-400">

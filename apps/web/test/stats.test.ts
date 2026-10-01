@@ -2,7 +2,20 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Schema } from 'effect';
 import { StatsSchema, type Stats, type StatsDay } from '../src/lib/api/stats.ts';
-import { apiQueryOf, HEADLINES, marksByDay, NONE, periodFrom, repoWord, searchOf, seriesOf, trendOf, wordsOf } from '../src/lib/stats.ts';
+import {
+  apiQueryOf,
+  byStepOf,
+  HEADLINES,
+  marksByDay,
+  NONE,
+  periodFrom,
+  repoWord,
+  searchOf,
+  seriesOf,
+  TILES,
+  trendOf,
+  wordsOf,
+} from '../src/lib/stats.ts';
 
 /** A day with nothing measured but what it is given. */
 const day = (d: string, given: Partial<StatsDay> = {}): StatsDay => ({
@@ -17,6 +30,7 @@ const day = (d: string, given: Partial<StatsDay> = {}): StatsDay => ({
   refused: 0,
   gateWaitMs: null,
   deniedPerTry: null,
+  skillsPerTry: null,
   ...given,
 });
 
@@ -84,6 +98,7 @@ test('each number is worded as wf stats words it', () => {
     refused: 0,
     gateWaitMs: 42_000,
     deniedPerTry: 0.4,
+    skillsPerTry: 2.5,
   });
   assert.deepEqual(words, {
     rounds: '2.5',
@@ -96,6 +111,7 @@ test('each number is worded as wf stats words it', () => {
     refused: '0',
     gateWaitMs: '42s',
     deniedPerTry: '0.4/try',
+    skillsPerTry: '2.5/try',
   });
   const labels = HEADLINES.map((h) => h.label);
   assert.deepEqual(labels, [
@@ -109,6 +125,7 @@ test('each number is worded as wf stats words it', () => {
     'refused',
     'gate wait',
     'denied',
+    'skills',
   ]);
   const cost = HEADLINES.find((h) => h.key === 'costPerLanded')!;
   assert.equal(cost.words(0.004), '$0.004', 'a cost under a cent keeps three figures, as dollars does');
@@ -160,8 +177,39 @@ const served = {
   filters: {},
   all: {
     total: day('total'),
-    days: [day('2026-09-29'), day('2026-09-30', { rounds: 0, firstTry: null, deniedPerTry: 0 })],
-    steps: [{ step: 'implement' }],
+    days: [day('2026-09-29'), day('2026-09-30', { rounds: 0, firstTry: null, deniedPerTry: 0, skillsPerTry: 1.5 })],
+    steps: [
+      {
+        step: 'implement',
+        agent: 'ada',
+        tries: 4,
+        ranMs: 60_000,
+        costUsd: null,
+        costTries: 0,
+        checks: { passed: 1, refused: 0, unfinished: 0 },
+        gateWaitMs: null,
+        deniedCalls: null,
+        deniedTries: 0,
+        denials: [],
+        skillLoads: 3,
+        skillTries: 2,
+        skills: [
+          { skill: 'look', count: 2 },
+          { skill: 'effect', count: 1 },
+        ],
+      },
+      {
+        step: 'design',
+        agent: null,
+        tries: 1,
+        deniedCalls: 2,
+        deniedTries: 1,
+        denials: [{ call: 'Bash(git push)', count: 2 }],
+        skillLoads: null,
+        skillTries: 0,
+        skills: [],
+      },
+    ],
     tiles: {
       last: { ...day('x', { runs: 2 }), from: '2026-09-17', to: '2026-09-30' },
       before: { ...day('x'), from: '2026-09-03', to: '2026-09-16' },
@@ -201,10 +249,63 @@ test('the served stats decode with every null kept, and the keys the page does n
   assert.equal(stats.all.marks[0].repo, null);
   assert.equal(stats.all.marks[0].agents[0], null);
   assert.equal('groups' in stats, false);
-  assert.equal('steps' in stats.all, false);
   assert.equal('total' in stats.all, false);
+  assert.equal(stats.all.days[0].skillsPerTry, null, 'a day no try was measured on keeps its skills loaded unmeasured');
+  assert.equal(stats.all.days[1].skillsPerTry, 1.5);
+  assert.deepEqual(
+    [stats.all.steps[0].skillLoads, stats.all.steps[0].deniedCalls, stats.all.steps[1].skillLoads, stats.all.steps[1].deniedCalls],
+    [3, null, null, 2],
+  );
+  assert.equal('ranMs' in stats.all.steps[0], false, 'the step row numbers the page does not read are dropped');
   assert.throws(
     () => Schema.decodeUnknownSync(StatsSchema)({ ...served, all: { ...served.all, marks: [{ ...served.all.marks[0], kind: 'file' }] } }),
     'refused: a mark of a kind the page does not know',
   );
+});
+
+test('REFUSED: a step row that leaves out its skills or its denials does not decode: the page reads both', () => {
+  for (const key of ['skills', 'denials', 'skillLoads', 'skillTries'] as const) {
+    const { [key]: _gone, ...row } = served.all.steps[0];
+    assert.throws(
+      () => Schema.decodeUnknownSync(StatsSchema)({ ...served, all: { ...served.all, steps: [row] } }),
+      `refused: a row with no ${key}`,
+    );
+  }
+});
+
+test('the tiles are every headline number but skills loaded, which is drawn as a chart only', () => {
+  assert.equal(TILES.length, 10, 'ten tiles, in whole rows of five and of ten');
+  assert.equal(HEADLINES.length, 11);
+  assert.equal(
+    TILES.some((t) => t.key === 'skillsPerTry'),
+    false,
+  );
+  assert.deepEqual(
+    TILES.map((t) => t.key),
+    HEADLINES.flatMap((h) => (h.key === 'skillsPerTry' ? [] : [h.key])),
+  );
+});
+
+test('REFUSED: a step row says — where none of its tries was measured, the count where all were, and how many were where not all', () => {
+  const stats: Stats = Schema.decodeUnknownSync(StatsSchema)(served);
+  assert.deepEqual(byStepOf(stats.all.steps, 'skills'), [
+    {
+      step: 'implement',
+      agent: 'ada',
+      total: '3 (2 of 4)',
+      items: [
+        { name: 'look', count: 2 },
+        { name: 'effect', count: 1 },
+      ],
+    },
+    { step: 'design', agent: null, total: NONE, items: [] },
+  ]);
+  assert.deepEqual(byStepOf(stats.all.steps, 'denials'), [
+    { step: 'implement', agent: 'ada', total: NONE, items: [] },
+    { step: 'design', agent: null, total: '2', items: [{ name: 'Bash(git push)', count: 2 }] },
+  ]);
+  const all = { ...stats.all.steps[0], skillTries: 4 };
+  assert.equal(byStepOf([all], 'skills')[0].total, '3', 'every try measured: the count alone');
+  const zero = { ...stats.all.steps[0], deniedCalls: 0, deniedTries: 4 };
+  assert.equal(byStepOf([zero], 'denials')[0].total, '0', 'a measured 0 is 0, never —');
 });

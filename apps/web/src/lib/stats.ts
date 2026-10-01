@@ -1,9 +1,9 @@
 /**
  * The Stats page's rules: the headline numbers it draws, each worded as `wf stats` words it (`stats-words.ts` in the orchestrator), the
- * page's search and the api's query it asks, the period counted in UTC days, and the days and marks turned into what a chart draws. A
- * number nothing measured is null here, and `—` in words, never 0. Pure.
+ * page's search and the api's query it asks, the period counted in UTC days, the days and marks turned into what a chart draws, and the
+ * steps into the rows of what each loaded or was refused. A number nothing measured is null here, and `—` in words, never 0. Pure.
  */
-import type { StatsDay, StatsHeadline, StatsMark } from './api.ts';
+import type { StatsDay, StatsHeadline, StatsMark, StatsStep } from './api.ts';
 
 /** What a number nothing measured reads. */
 export const NONE = '—';
@@ -11,8 +11,11 @@ export const NONE = '—';
 /** A headline number's key in the api's answer. */
 export type HeadlineKey = keyof StatsHeadline;
 
-/** A headline number: its key, its name as `wf stats` prints it, what it counts, and its value in words. */
-export type HeadlineNumber = { key: HeadlineKey; label: string; about: string; words: (value: number | null) => string };
+/**
+ * A headline number: its key, its name as `wf stats` prints it, what it counts, and its value in words; `tile: false` for one the page
+ * draws as a chart only, with no tile.
+ */
+export type HeadlineNumber = { key: HeadlineKey; label: string; about: string; words: (value: number | null) => string; tile?: false };
 
 const or = (word: (v: number) => string) => (v: number | null) => (v === null ? NONE : word(v));
 
@@ -51,7 +54,11 @@ export const HEADLINES: readonly HeadlineNumber[] = [
   { key: 'refused', label: 'refused', about: 'checks that refused', words: or(String) },
   { key: 'gateWaitMs', label: 'gate wait', about: 'mean wait at a gate', words: or(durationWord) },
   { key: 'deniedPerTry', label: 'denied', about: 'mean calls refused per try', words: or(perTry) },
+  { key: 'skillsPerTry', label: 'skills', about: 'mean skills loaded per try', words: or(perTry), tile: false },
 ];
+
+/** The headline numbers drawn as a tile, in the page's order: every one but those drawn as a chart only. */
+export const TILES: readonly HeadlineNumber[] = HEADLINES.filter((number) => number.tile !== false);
 
 /** Every headline number of `h` in words, by key. */
 export const wordsOf = (h: StatsHeadline): Record<HeadlineKey, string> =>
@@ -155,4 +162,22 @@ export function withPeriod(search: StatsSearch, period: PeriodId): StatsSearch {
 export function withFilter(search: StatsSearch, key: FilterKey, value: string | null): StatsSearch {
   const { [key]: _was, ...rest } = search;
   return value === null ? rest : { ...rest, [key]: value };
+}
+
+/** A step and agent's row of what it loaded or was refused: its total in words, and each name with its count, in the order served. */
+export type ByStepRow = { step: string; agent: string | null; total: string; items: Array<{ name: string; count: number }> };
+
+/**
+ * A row per step and agent of the skills its sessions loaded (`skills`) or the calls refused it (`denials`): the total over its measured
+ * tries, as `wf stats` words it — `—` where none was measured, the count where all were, else the count and how many were, `3 (2 of 4)`.
+ */
+export function byStepOf(steps: readonly StatsStep[], of: 'skills' | 'denials'): ByStepRow[] {
+  return steps.map((s) => {
+    const [count, measured, items] =
+      of === 'skills'
+        ? [s.skillLoads, s.skillTries, s.skills.map((k) => ({ name: k.skill, count: k.count }))]
+        : [s.deniedCalls, s.deniedTries, s.denials.map((d) => ({ name: d.call, count: d.count }))];
+    const total = count === null ? NONE : measured === s.tries ? String(count) : `${count} (${measured} of ${s.tries})`;
+    return { step: s.step, agent: s.agent, total, items };
+  });
 }

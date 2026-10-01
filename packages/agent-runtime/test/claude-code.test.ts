@@ -10,6 +10,7 @@ import { Effect } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
+import { ioCounts } from '../src/core/engine/tally.ts';
 
 const tmp = (label: string) => scratch(`ae-claude-code-${label}-`);
 
@@ -199,7 +200,9 @@ test('observeFor asks `claude agents` only when a session expected is not a job:
       JSON.stringify([{ name: 'ae/b/1', sessionId: BG_ID, state: 'working', status: 'busy', kind: 'background' }]),
     );
 
-    assert.equal((await Effect.runPromise(ops.observeFor!([]))).seen.size, 1, 'nothing expected: the jobs, off their run files');
+    const before = ioCounts().reads;
+    assert.equal((await Effect.runPromise(ops.observeFor!([]))).seen.size, 0, 'nothing expected: nothing listed');
+    assert.equal(ioCounts().reads - before, 0, 'and no run file read');
     const jobs = await Effect.runPromise(ops.observeFor!([{ name: 'ae/j/1', harness: 'claude' }]));
     assert.equal(jobs.seen.get('ae/j/1')?.sessionId, 'ae/j/1');
     assert.deepEqual(jobs.unread, new Set());
@@ -250,6 +253,60 @@ test("observeFor says which names it could not read: a background session's, and
       ]),
     );
     assert.deepEqual(read.unread, new Set(), 'read, and not listed: gone, as the registry answered and lists neither');
+  } finally {
+    f.restore();
+  }
+});
+
+test('a pass over many ended jobs reads the run file and output of the job it expects, and no other', async () => {
+  const f = fake();
+  try {
+    const root = tmp('root');
+    const runs = path.join(root, 'runs', 'claude');
+    fs.mkdirSync(runs, { recursive: true });
+    const at = new Date().toISOString();
+    for (let i = 0; i <= 200; i++) {
+      const file = path.join(runs, `ae_s${i}_1`);
+      fs.writeFileSync(
+        `${file}.json`,
+        JSON.stringify({
+          name: `ae/s${i}/1`,
+          state: 'done',
+          exitCode: 0,
+          pid: 999999,
+          logFile: `${file}.log`,
+          startedAt: at,
+          heartbeatAt: at,
+        }),
+      );
+      fs.writeFileSync(`${file}.log`, `${JSON.stringify({ type: 'result', subtype: 'success', is_error: false, total_cost_usd: 0.01 })}\n`);
+    }
+    const full = await Effect.runPromise(opsIn(root).observe);
+    const ops = opsIn(root);
+    const calls = f.read('agents-calls')?.length;
+    const before = ioCounts().reads;
+    const told = await Effect.runPromise(ops.observeFor!([{ name: 'ae/s7/1', harness: 'claude' }]));
+    const reads = ioCounts().reads - before;
+    assert.ok(reads <= 3, `read ${reads} files: its run file, what its output said and its closeout`);
+    assert.deepEqual([...told.seen.keys()], ['ae/s7/1']);
+    assert.deepEqual(told.seen.get('ae/s7/1'), full.get('ae/s7/1'));
+    assert.equal(f.read('agents-calls')?.length, calls, 'and no `claude agents`: the job answered');
+  } finally {
+    f.restore();
+  }
+});
+
+test('a job whose run file is there and half written is unread, never gone, when `claude agents` lists nothing', async () => {
+  const f = fake();
+  try {
+    const root = tmp('root');
+    const runs = path.join(root, 'runs', 'claude');
+    fs.mkdirSync(runs, { recursive: true });
+    fs.writeFileSync(path.join(runs, 'ae_j_3.json'), '{"name": "ae/j/3", "sta');
+    const told = await Effect.runPromise(opsIn(root).observeFor!([{ name: 'ae/j/3', harness: 'claude' }]));
+    assert.deepEqual([...told.seen.keys()], []);
+    assert.deepEqual(told.unread, new Set(['ae/j/3']));
+    assert.equal(f.read('agents-calls')?.length, 1, 'the registry was asked, and lists nothing');
   } finally {
     f.restore();
   }

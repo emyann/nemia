@@ -386,9 +386,7 @@ const releaseFinished = Effect.fn('releaseFinished')(function* (
       if (finished && unread.has(name)) listed = true;
       continue;
     }
-    const released = yield* runner
-      .release(session, state.config ?? {})
-      .pipe(Effect.catchTag('RunnerError', () => Effect.succeed(REFUSED)));
+    const released = yield* runner.release(session, state.config ?? {}).pipe(Effect.catchTag('RunnerError', () => Effect.succeed(REFUSED)));
     if (released === REFUSED || atWorkState(session.state)) listed = true;
     const measured = typeof released === 'object' ? released : session.usage;
     if (

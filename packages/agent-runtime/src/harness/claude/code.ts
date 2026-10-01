@@ -170,6 +170,8 @@ export const isClaudeJob = (sessionId: string) => nameParts(sessionId) !== undef
  *
  * - `observe` lists both modes; one mode's registry unreadable does not blind the engine to the other's sessions, as for
  *   the composite's harnesses: a read that failed lists nothing.
+ * - `observeFor` reads the jobs it is told of by name, each one's run file and output and no other job's, and the registry
+ *   only for a name no job answers.
  * - `find` reads the job's own run file first — one file, never the jobs' output, which a transcript in flight would
  *   re-read on every poll — and then Claude Code's registration.
  * - `release` lets a background session go; a job's run file is its record, as `logs` reads it, so a job has nothing to
@@ -202,26 +204,29 @@ export const claudeCodeOps = (options: ClaudeOptions = {}): RunnerOps => {
     ),
 
     /**
-     * The jobs, off their run files, and Claude Code's registry only when a session expected is not among them: it asks
-     * `claude agents` only for a session it expects that is no job, so a pass with only jobs in flight spawns none. Read
-     * off the world, never off a task's config: a task filed on this harness may run `--bg` without its config saying so,
-     * and a job whose run file is not there is looked for in the registry too — once its grace is past, the pass reads it
-     * lost either way. A job listing that cannot be read this time asks the registry, as `observe` would.
+     * The jobs expected, each off its own run file and no other, and Claude Code's registry only when a session expected is
+     * not among them: it asks `claude agents` only for a session it expects that is no job, so a pass with only jobs in
+     * flight spawns none. Read off the world, never off a task's config: a task filed on this harness may run `--bg` without
+     * its config saying so, and a job whose run file is not there is looked for in the registry too — once its grace is
+     * past, the pass reads it lost either way. A job read that failed, or left a name unread, asks the registry.
      *
-     * An expected name that neither listing has is `unread` when a read that could have listed it failed: the job listing, or
-     * the registry once asked. A job's name the registry was asked for and does not list, with the jobs read, is absent.
+     * An expected name that neither listing has is `unread` when a read that could have listed it failed: the job read, its
+     * run file there and unreadable, or the registry once asked. A job's name the registry was asked for and does not list,
+     * with its run file not there, is absent.
      */
     observeFor: (expected) =>
-      read(job).pipe(
+      job.observeFor!(expected).pipe(
+        Effect.map((o): Observation | undefined => o),
+        Effect.catchCause(() => Effect.succeed(undefined)),
         Effect.flatMap((jobs) =>
-          !jobs || expected.some((e) => !jobs.has(e.name))
+          !jobs || expected.some((e) => !jobs.seen.has(e.name))
             ? read(bg).pipe(Effect.map((sessions) => ({ jobs, sessions })))
             : Effect.succeed({ jobs, sessions: new Map<string, Sighting>() }),
         ),
         Effect.map(({ jobs, sessions }): Observation => {
-          const seen = new Map([...(jobs ?? []), ...(sessions ?? [])]);
-          const failed = !jobs || !sessions;
-          return { seen, unread: new Set(failed ? expected.map((e) => e.name).filter((name) => !seen.has(name)) : []) };
+          const seen = new Map([...(jobs?.seen ?? []), ...(sessions ?? [])]);
+          const unread = (name: string) => !seen.has(name) && (!jobs || !sessions || jobs.unread.has(name));
+          return { seen, unread: new Set(expected.map((e) => e.name).filter(unread)) };
         }),
       ),
 

@@ -391,7 +391,7 @@ test('what `codex exec` cannot take while it runs: its card says no words, and a
   const root = tmp('store');
   const ops = detachedOps(codex, root);
   const extension = cardOf('codex', ops).capabilities!.extensions.find((e) => e.uri === RUNTIME_EXTENSION)!;
-  assert.deepEqual(extension.params, { methods: ['sessionLogs', 'sessionTranscript'], say: false });
+  assert.deepEqual(extension.params, { methods: ['sessionLogs', 'sessionTranscript', 'observeSessions'], say: false });
 
   const cwd = workdir({ gate: 'go' });
   const client = agent(root);

@@ -43,11 +43,12 @@ import { codex, trustedProjects } from '../src/harness/codex/codex.ts';
 import { Engine, promiseEngine } from '../src/index.ts';
 import { execFileSync } from 'node:child_process';
 import { composite } from '../src/harness/seam.ts';
-import { RunnerError, testOps } from '../src/harness/seam.ts';
+import { RunnerError, testOps, type Observation } from '../src/harness/seam.ts';
 import type { SessionState } from '../src/core/session.ts';
 import type { Sighting } from '../src/core/domain.ts';
 import { runningIn, scratch } from './scratch.ts';
 import { resultLine, SESSION, SKILLS_STREAM, stream } from './reader-streams.ts';
+import { ioCounts } from '../src/core/engine/tally.ts';
 
 const root = () => scratch('ae-detached-');
 const sh = (script: string): HarnessSpec => ({ name: 'sh', command: () => ({ cmd: 'sh', args: ['-c', script] }) });
@@ -1895,6 +1896,12 @@ test("a resumed run of a spec whose totals carry the parent's reports its own co
   const seen = await Effect.runPromise(ops.observe);
   const near = (got: number | undefined, want: number) =>
     assert.ok(got !== undefined && Math.abs(got - want) < 1e-9, `${got} is not ${want}`);
+  const told = await Effect.runPromise(detachedOps(spec, dir).observeFor!([{ name: 'ae/r/3' }, { name: 'ae/r/2' }]));
+  assert.deepEqual(
+    [told.seen.get('ae/r/3')?.usage, told.seen.get('ae/r/2')?.usage],
+    [seen.get('ae/r/3')?.usage, seen.get('ae/r/2')?.usage],
+    "a run file spawned before its parent's totals were carried on it has them found among the run files, asked for by name too",
+  );
   assert.equal(seen.get('ae/r/1')?.usage?.costUsd, 0.0209649, 'a run that resumed nothing is its own total');
   near(seen.get('ae/r/2')?.usage?.costUsd, 0.0047732);
   near(seen.get('ae/r/3')?.usage?.costUsd, 0.002674);
@@ -1972,4 +1979,141 @@ test("the id a run resumed is kept on its run file only by a spec whose totals c
   };
   assert.equal((await read({ ...sh('true'), resumeCostCarried: true }, 'ae/w/1')).resumeFrom, SESSION);
   assert.equal('resumeFrom' in (await read({ ...sh('true'), name: 'other' }, 'ae/w/2')), false);
+});
+
+/** A run file in `dir`'s `sh` runs, as a worker leaves it once its harness has exited 0, with `log` as its output. */
+const doneRun = (dir: string, name: string, patch: object = {}, log = resultLine({ total_cost_usd: 0.01 })) => {
+  const runs = path.join(dir, 'runs', 'sh');
+  fs.mkdirSync(runs, { recursive: true });
+  const file = name.replace(/[^a-zA-Z0-9]+/g, '_');
+  const at = '2026-09-23T12:00:00Z';
+  fs.writeFileSync(
+    path.join(runs, `${file}.json`),
+    JSON.stringify({ name, state: 'done', exitCode: 0, pid: 999999, logFile: '/dev/null', startedAt: at, heartbeatAt: at, ...patch }),
+  );
+  fs.writeFileSync(path.join(runs, `${file}.log`), log);
+};
+
+/** How many files `f` reads through the runtime's readers. */
+const readsOf = async (f: () => Promise<unknown>) => {
+  const before = ioCounts().reads;
+  await f();
+  return ioCounts().reads - before;
+};
+
+test('a detached look reads the run file and output of each session it is asked about and no other', async () => {
+  const dir = root();
+  const spec: HarnessSpec = { ...sh('true'), readOutput: claudeResultOutput };
+  for (let i = 0; i < 200; i++) doneRun(dir, `ae/s${i}/1`, { nativeId: SESSION });
+  doneRun(dir, 'ae/asked/1', { nativeId: SESSION }, resultLine({ total_cost_usd: 0.25, duration_api_ms: 900 }));
+  const full = await Effect.runPromise(detachedOps(spec, dir).observe);
+  assert.equal(full.size, 201, 'listed in full, and what each output said kept beside it');
+
+  const ops = detachedOps(spec, dir);
+  let told: Observation | undefined;
+  const reads = await readsOf(async () => {
+    told = await Effect.runPromise(ops.observeFor!([{ name: 'ae/asked/1' }]));
+  });
+  assert.ok(reads <= 3, `read ${reads} files: its run file, what its output said and its closeout, and no other run's`);
+  assert.deepEqual([...told!.seen.keys()], ['ae/asked/1']);
+  assert.deepEqual(told!.unread, new Set());
+  assert.deepEqual(told!.seen.get('ae/asked/1'), full.get('ae/asked/1'), 'the sighting the full listing gives');
+});
+
+test("a name asked for with no run file is absent, one whose run file is there and unreadable is unread, and a name whose path holds another name's run is absent", async () => {
+  const dir = root();
+  const ops = detachedOps(sh('true'), dir);
+  doneRun(dir, 'ae/a/b/1');
+  const runs = path.join(dir, 'runs', 'sh');
+  fs.writeFileSync(path.join(runs, 'ae_h_1.json'), '{"name":');
+  fs.writeFileSync(
+    path.join(runs, 'ae_p_1.json'),
+    JSON.stringify({ name: 'ae/p/1', state: 'done', logFile: '/dev/null', heartbeatAt: new Date().toISOString() }),
+  );
+  const told = await Effect.runPromise(
+    ops.observeFor!([{ name: 'ae/none/1' }, { name: 'ae/h/1' }, { name: 'ae/p/1' }, { name: 'ae/a_b/1' }, { name: 'ae/a/b/1' }]),
+  );
+  assert.deepEqual([...told.seen.keys()], ['ae/a/b/1'], 'a run file is the run under its own name alone');
+  assert.deepEqual(told.unread, new Set(['ae/h/1', 'ae/p/1']), 'half written, or with no pid: neither there nor gone');
+});
+
+test('REFUSED: a run asked for whose output the spec refuses fails the look, naming the run and its output; through the composite, the names routed there are unread', async () => {
+  const dir = root();
+  const spec: HarnessSpec = {
+    ...sh('true'),
+    readOutput: () => {
+      throw new Error('no result line in it');
+    },
+  };
+  doneRun(dir, 'ae/w/1');
+  const ops = detachedOps(spec, dir);
+  const refused = await Effect.runPromise(Effect.flip(ops.observeFor!([{ name: 'ae/w/1' }])));
+  assert.equal(
+    refused.message,
+    `sh: \`ae/w/1\`'s output, ${path.join(dir, 'runs', 'sh', 'ae_w_1.log')}, cannot be read: no result line in it`,
+  );
+  const other = new Map<string, Sighting>([['ae/o/1', { sessionId: 'o', state: 'working' }]]);
+  const both = composite({ sh: ops, other: testOps({ sessions: other }) }, 'other');
+  const told = await Effect.runPromise(
+    both.observeFor!([
+      { name: 'ae/w/1', harness: 'sh' },
+      { name: 'ae/o/1', harness: 'other' },
+    ]),
+  );
+  assert.deepEqual(told.unread, new Set(['ae/w/1']));
+  assert.deepEqual([...told.seen.keys()], ['ae/o/1']);
+});
+
+test("a resumed run's spawn carries its parent's totals on its run file, and a look by name takes them off reading no parent", async () => {
+  const dir = root();
+  const OTHER = '11111111-2222-3333-4444-555555555555';
+  const t0 = Date.parse('2026-09-23T12:00:00Z');
+  const parent = (name: string, at: number, result: object, nativeId = SESSION) =>
+    doneRun(dir, name, { nativeId, startedAt: new Date(at).toISOString() }, resultLine(result));
+  parent('ae/r/1', t0, { total_cost_usd: 0.0209649, duration_api_ms: 6069 });
+  parent('ae/r/3', t0 + 2_000, { total_cost_usd: 0.0284121, duration_api_ms: 8132 });
+  parent('ae/r/2', t0 + 1_000, { total_cost_usd: 0.0257381, duration_api_ms: 7142 });
+  parent('ae/v/1', t0, { usage: { input_tokens: 1, output_tokens: 1 } }, OTHER);
+  const printing = (result: object): HarnessSpec => ({
+    ...sh(`echo '${resultLine(result)}'`),
+    readOutput: claudeResultOutput,
+    resumeCostCarried: true,
+  });
+  const runOn = (name: string) => JSON.parse(fs.readFileSync(path.join(dir, 'runs', 'sh', `${name.replace(/\//g, '_')}.json`), 'utf8'));
+  const spec = printing({ total_cost_usd: 0.031, duration_api_ms: 9000 });
+  await Effect.runPromise(detachedOps(spec, dir).spawn({ ...req('ae/r/4', dir), resumeFrom: SESSION }));
+  assert.deepEqual(runOn('ae/r/4').carried, { costUsd: 0.0284121, apiMs: 8132 }, 'the latest run before it under the id');
+  await settle(detachedOps(spec, dir), 'ae/r/4', 'completed');
+  assert.deepEqual(runOn('ae/r/4').carried, { costUsd: 0.0284121, apiMs: 8132 }, 'kept by its worker');
+
+  for (const n of [1, 2, 3]) fs.rmSync(path.join(dir, 'runs', 'sh', `ae_r_${n}.json`));
+  const ops = detachedOps(spec, dir);
+  let told: Observation | undefined;
+  const reads = await readsOf(async () => {
+    told = await Effect.runPromise(ops.observeFor!([{ name: 'ae/r/4' }]));
+  });
+  assert.ok(reads <= 3, `read ${reads} files, none of its parent's`);
+  const usage = told!.seen.get('ae/r/4')?.usage;
+  assert.ok(usage?.costUsd !== undefined && Math.abs(usage.costUsd - 0.0025879) < 1e-9, `cost ${usage?.costUsd}`);
+  assert.equal(usage?.apiMs, 868, 'its own API time, its parent gone from the folder');
+
+  await Effect.runPromise(detachedOps(spec, dir).spawn({ ...req('ae/u/1', dir), resumeFrom: '00000000-0000-4000-8000-000000000000' }));
+  assert.deepEqual(runOn('ae/u/1').carried, {}, 'no parent: nothing carried');
+  await Effect.runPromise(detachedOps(spec, dir).spawn({ ...req('ae/v/2', dir), resumeFrom: OTHER }));
+  assert.deepEqual(runOn('ae/v/2').carried, {}, 'a parent that printed no total: nothing carried');
+  await Effect.runPromise(
+    detachedOps({ ...spec, resumeCostCarried: undefined }, dir).spawn({ ...req('ae/n/1', dir), resumeFrom: SESSION }),
+  );
+  assert.equal('carried' in runOn('ae/n/1'), false, 'a spec whose harness prints its own totals carries none');
+  for (const name of ['ae/r/4', 'ae/u/1', 'ae/v/2', 'ae/n/1']) await settle(detachedOps(spec, dir), name, 'completed');
+});
+
+test('find and stop read the one run file of the session they are given, among many', async () => {
+  const dir = root();
+  const spec = sh('true');
+  for (let i = 0; i < 50; i++) doneRun(dir, `ae/s${i}/1`);
+  const ops = detachedOps(spec, dir);
+  assert.equal(await readsOf(() => Effect.runPromise(detachedFind(spec, dir)('ae/s7/1'))), 1, 'found off its run file');
+  assert.equal(await readsOf(() => Effect.runPromise(ops.stop('ae/s7/1'))), 1, 'a run over is not stopped, read off its run file');
+  assert.equal(await readsOf(() => Effect.runPromise(ops.stop('ae/none/1'))), 0, 'no run file: nothing read, nothing stopped');
 });

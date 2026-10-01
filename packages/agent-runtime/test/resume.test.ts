@@ -17,7 +17,6 @@ import path from 'node:path';
 import { scratch } from './scratch.ts';
 
 const tmp = (label: string) => scratch(`ae-resume-${label}-`);
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const config = tmp('config');
 process.env.CLAUDE_CONFIG_DIR = config;
@@ -78,13 +77,16 @@ const onPath = async <T>(bin: string, f: () => Promise<T>): Promise<T> => {
 };
 
 const transcript = (sessionId: string) => path.join(config, 'projects', 'fake-project', `${sessionId}.jsonl`);
-/** Entries appended to the session's transcript, each stamped now. */
-const append = (sessionId: string, ...entries: object[]) => {
+/** Entries appended to the session's transcript, each stamped `at`, in milliseconds since the epoch. */
+const append = (sessionId: string, at: number, ...entries: object[]) => {
   const file = transcript(sessionId);
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  const timestamp = new Date().toISOString();
+  const timestamp = new Date(at).toISOString();
   fs.appendFileSync(file, entries.map((e) => `${JSON.stringify({ sessionId, timestamp, ...e })}\n`).join(''));
 };
+/** When the journal says the task's first attempt began, in milliseconds since the epoch. */
+const begun = async (engine: ReturnType<typeof promiseEngine>, id: string) =>
+  Date.parse((await engine.view(id)).state.attempts[0]?.startedAt ?? '');
 /** Its mtime put back, as if last written `ago` milliseconds ago. */
 const age = (sessionId: string, ago: number) => {
   const at = new Date(Date.now() - ago);
@@ -104,9 +106,11 @@ test("a session resumed under the same id is read for its new attempt: its own c
     const first = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: schema });
     await engine.tick();
     const [row] = claude.rows();
-    await sleep(10);
+    const began = await begun(engine, first);
+    claude.set(row.name, { startedAt: began });
     append(
       row.sessionId,
+      began + 1,
       prompt('the prompt'),
       response('msg_1', call('tu_1', 'Read')),
       response('msg_2', call('tu_2', 'StructuredOutput', { outcome: 'done', by: 'first' })),
@@ -145,16 +149,17 @@ test("a session resumed under the same id is read for its new attempt: its own c
     assert.equal(resumed?.name, `ae/${retry}/1`, 'the retry continues that session');
     assert.equal(resumed?.sessionId, row.sessionId, 'the same id');
 
-    claude.set(resumed.name, { state: 'done' });
+    const again = Math.max(await begun(engine, retry), began + 1) + 1;
+    claude.set(resumed.name, { state: 'done', startedAt: again });
     assert.deepEqual(
       (await engine.view(retry)).usage,
       { turns: 0, toolCalls: 0, inputTokens: 0, uncachedTokens: 0, cacheWriteTokens: 0, cacheReadTokens: 0, outputTokens: 0 },
       "nothing since its own start — not the first try's count",
     );
 
-    await sleep(10);
     append(
       row.sessionId,
+      again + 1,
       prompt('give your closeout'),
       response('msg_3', { type: 'text', text: 'Giving it.' }),
       response('msg_4', call('tu_3', 'Bash')),
@@ -198,8 +203,9 @@ test('a statement read as nothing from a final sighting is read again once the t
     });
     await engine.tick();
     const [row] = claude.rows();
-    await sleep(10);
-    append(row.sessionId, prompt('the prompt'), response('msg_1', call('tu_1', 'Bash', { run_in_background: true })));
+    const began = await begun(engine, id);
+    claude.set(row.name, { startedAt: began });
+    append(row.sessionId, began + 1, prompt('the prompt'), response('msg_1', call('tu_1', 'Bash', { run_in_background: true })));
     age(row.sessionId, 30_000);
 
     claude.set(row.name, { state: 'done' });
@@ -219,11 +225,11 @@ test('a statement read as nothing from a final sighting is read again once the t
       },
       'listed final between two turns, for one observation, and seen only by a view: nothing said yet',
     );
-    append(row.sessionId, response('msg_2', { type: 'text', text: 'the background task finished' }));
+    append(row.sessionId, began + 2, response('msg_2', { type: 'text', text: 'the background task finished' }));
     age(row.sessionId, 30_000);
     assert.equal((await engine.view(id)).usage?.turns, 1, 'no newer than the read: kept');
 
-    append(row.sessionId, response('msg_3', call('tu_2', 'StructuredOutput', { outcome: 'done' })));
+    append(row.sessionId, began + 3, response('msg_3', call('tu_2', 'StructuredOutput', { outcome: 'done' })));
     await engine.tick();
 
     const v = await engine.view(id);

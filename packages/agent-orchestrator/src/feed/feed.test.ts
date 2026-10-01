@@ -11,12 +11,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync, spawn } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { Cause, Effect, Exit, Fiber } from 'effect';
 import type { Engine } from 'agent-runtime';
 import type { Run } from '../record/record.ts';
 import { listing } from '../list/list.ts';
 import { feedChanges, feedPhase, feedWords, foldFeed, type FeedLine } from './feed.ts';
+import { nodeChild } from '../../test/child.ts';
 import { scratch } from '../../test/scratch.ts';
 
 const ROOT = scratch('wf-feed-');
@@ -635,76 +636,61 @@ test('`wf watch` survives a feed cut under it: truncated, deleted or replaced, i
   const run = started('the cut');
   await tick(b.e);
   const cli = new URL('../cli/main.ts', import.meta.url).href;
-  const child = spawn(
-    process.execPath,
-    ['--input-type=module', '-e', `const { main } = await import(${JSON.stringify(cli)}); await main(['watch', '${size()}'], {});`],
-    {
-      env: { ...process.env, WF_ROOT: ROOT },
-      stdio: ['ignore', 'pipe', 'pipe'],
-    },
-  );
-  let out = '';
-  let err = '';
-  child.stdout.on('data', (d) => {
-    out += d;
+  const w = nodeChild(`const { main } = await import(${JSON.stringify(cli)}); await main(['watch', '${size()}'], {});`, {
+    ...process.env,
+    WF_ROOT: ROOT,
   });
-  child.stderr.on('data', (d) => {
-    err += d;
-  });
-  const printed = async (ok: () => boolean, what: string) => {
-    const bound = Date.now() + 10_000;
-    while (!ok()) {
-      if (Date.now() > bound) throw new Error(`${what} — stdout:\n${out}\nstderr:\n${err}`);
-      await new Promise((r) => setTimeout(r, 20));
-    }
-  };
-  const cuts = () => err.split('\n').filter((l) => l.includes('under this watch'));
+  const cuts = () =>
+    w
+      .err()
+      .split('\n')
+      .filter((l) => l.includes('under this watch'));
   try {
-    await printed(
-      () => out.includes('watching from'),
+    await w.until(
+      () => w.out().includes('watching from'),
       'a real `wf watch`, in a process killed at the end since it never returns, its engine never asked anything, starts',
     );
 
     fs.truncateSync(FEED, 0);
-    await printed(() => cuts().length === 1, 'truncated to nothing: the truncation is said once');
+    await w.until(() => cuts().length === 1, 'truncated to nothing: the truncation is said once');
     assert.match(cuts()[0], /^wf watch: the feed was truncated under this watch at cursor \d+, and is 0 bytes now .*from its start/);
     b.set(`${run.id}-plan`, 'succeeded', SIGNED);
     await tick(b.e);
     await tick(b.e);
-    await printed(
-      () => /\splan\s+awaiting approval/.test(out),
+    await w.until(
+      () => /\splan\s+awaiting approval/.test(w.out()),
       'the watch reads the feed the tick writes again from its start: the gate reached after the cut is delivered',
     );
 
-    const before = out.length;
+    const before = w.out().length;
     fs.rmSync(FEED);
-    await printed(() => cuts().length === 2, 'deleted: the same, the deletion is said');
+    await w.until(() => cuts().length === 2, 'deleted: the same, the deletion is said');
     assert.match(cuts()[1], /the feed was deleted under this watch/);
     await approve(b.e, run.id, 'plan');
     for (let i = 0; i < 2; i++) await tick(b.e);
-    await printed(() => /\splan\s+(?!awaiting)/.test(out.slice(before)), 'the approval after the deletion is delivered');
+    await w.until(() => /\splan\s+(?!awaiting)/.test(w.out().slice(before)), 'the approval after the deletion is delivered');
 
-    const at = out.length;
+    const at = w.out().length;
     const next = `${FEED}.next`;
     fs.writeFileSync(
       next,
       `${fs.readFileSync(FEED, 'utf8')}${JSON.stringify({ at: '2026-09-22T10:00:00.000Z', run: 'r-new', word: 'running' })}\n`,
     );
     fs.renameSync(next, FEED);
-    await printed(
-      () => out.slice(at).includes('r-new'),
+    await w.until(
+      () => w.out().slice(at).includes('r-new'),
       'replaced by another file of the same bytes and more: nothing about its size tells, its inode does, and the replacement is read',
     );
     assert.equal(cuts().length, 3);
     assert.match(cuts()[2], /the feed was replaced under this watch/);
 
-    const quiet = err;
+    const quiet = w.err();
     fs.appendFileSync(FEED, `${JSON.stringify({ at: '2026-09-22T10:00:01.000Z', run: 'r-last', word: 'running' })}\n`);
-    await printed(() => out.includes('r-last'), 'each cut said once: every beat after reads on, and the line after is delivered');
-    assert.equal(err, quiet, 'nothing more said, and no `past the end`, ever');
-    assert.doesNotMatch(err, /past the end|falls inside a line/);
+    await w.until(() => w.out().includes('r-last'), 'each cut said once: every beat after reads on, and the line after is delivered');
+    assert.equal(w.err(), quiet, 'nothing more said, and no `past the end`, ever');
+    assert.doesNotMatch(w.err(), /past the end|falls inside a line/);
   } finally {
-    child.kill();
+    w.child.kill();
   }
 });
 

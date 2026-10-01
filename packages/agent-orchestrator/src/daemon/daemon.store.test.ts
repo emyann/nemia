@@ -16,6 +16,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import type { Engine, RefusedMove, TickReport } from 'agent-runtime';
+import { nodeChild } from '../../test/child.ts';
 import { scratch } from '../../test/scratch.ts';
 
 const ROOT = scratch('wf-daemon-');
@@ -406,27 +407,19 @@ for (const [signal, code] of [
   test(`\`wf up\` stopped by ${signal} lets the store go on the way out, with the signal's exit code, ${code}`, async () => {
     clear();
     const cli = new URL('../cli/main.ts', import.meta.url).href;
-    const child = spawn(
-      process.execPath,
-      [
-        '--input-type=module',
-        '-e',
-        `const { main } = await import(${JSON.stringify(cli)}); await main(['up', '20'], { tick: async () => ({ tasks: 0, actions: [], running: {}, views: [] }), admit: async () => [] });`,
-      ],
-      {
-        env: { ...process.env, WF_ROOT: ROOT },
-        stdio: 'ignore',
-      },
+    const w = nodeChild(
+      `const { main } = await import(${JSON.stringify(cli)}); await main(['up', '20'], { tick: async () => ({ tasks: 0, actions: [], running: {}, views: [] }), admit: async () => [] });`,
+      { ...process.env, WF_ROOT: ROOT },
     );
-    const exited = new Promise<number | null>((resolve) => child.on('exit', (code) => resolve(code)));
+    const { child } = w;
     try {
-      const until = Date.now() + 20_000;
-      while (!(fs.existsSync(FILE) && read().pid === child.pid && read().passedAt)) {
-        assert.ok(Date.now() < until, 'the daemon wrote a pass within 20s');
-        await new Promise((r) => setTimeout(r, 25));
-      }
+      await w.until(() => fs.existsSync(FILE) && read().pid === child.pid && Boolean(read().passedAt), 'the daemon wrote a pass');
       child.kill(signal);
-      assert.equal(await exited, code, 'a real process, since a signal stops it; its engine a fake, so no harness is asked anything');
+      assert.equal(
+        (await w.closed).code,
+        code,
+        'a real process, since a signal stops it; its engine a fake, so no harness is asked anything',
+      );
       const file = read();
       assert.equal(file.pid, child.pid);
       assert.ok(file.stoppedAt, 'stoppedAt written as it stopped');

@@ -24,7 +24,6 @@ function wf(root: string, argv: string[], cwd = path.dirname(root)): { status: n
     cwd,
     env: { ...process.env, WF_ROOT: root, AE_ROOT: path.join(dir, 'engine'), PATH: `${BIN}${path.delimiter}${process.env.PATH}` },
     encoding: 'utf8',
-    timeout: 60_000,
   });
   return { status, stderr };
 }

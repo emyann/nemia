@@ -108,6 +108,8 @@ pure, store, controller or the client (`test/boundary.test.ts`), and its folders
 - **An ending's check installs what the staged merge's lockfile asks for, in the checkout**, first (`checkoutParts`, `checkScript`):
   compared in place, never with `lockfileParts(repo, repo)`, which parts on every package nested in a workspace. A failed install is
   ended by a signal: only the process's exit code is a verdict (`exitVerdicts`), not the log's trailer.
+- **A test that spawns a `wf` child waits on it with `nodeChild`** (`test/child.ts`): for what it says or writes, or its exit, which fails
+  the wait at once with its output — never under a deadline, which the CLI's import alone can pass on a loaded machine.
 - **`execFileSync` with no `stdio` copies the child's stderr onto yours**: pass `stdio: ['ignore', 'pipe', 'pipe']`.
 - **A `readdirSync` entry for a symlink is not `isFile()`, and every write follows it**: refuse a link by name where a folder's files are
   its own (`writeWorkflow`).

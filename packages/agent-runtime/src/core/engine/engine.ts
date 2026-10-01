@@ -336,6 +336,9 @@ const settleOn = Effect.fn('settleOn')(function* (
   return taken;
 });
 
+/** What a release the harness refused answers, in `releaseFinished`: told apart from every answer a release gives. */
+const REFUSED = Symbol('refused');
+
 /**
  * Let the harness go of the sessions a task has finished with: every attempt whose end is on the
  * record and whose session the harness still lists. I/O applied to what the journal already says,
@@ -346,14 +349,14 @@ const settleOn = Effect.fn('settleOn')(function* (
  * as an older runtime wrote it, keeps its session listed: released, `logs` would have nothing to read. The runner is
  * handed the task's harness arguments unopened: it reads there whether it cut a worktree it must keep.
  *
- * Level-triggered like the rest: asked on every pass that still observes such a session, so a crash
+ * Level-triggered like the rest: asked on every pass that observes such a session while it can still move, so a crash
  * between writing an end and releasing is repaired by the next pass. A release the harness refuses is
- * not the pass's failure; it is asked again.
+ * not the pass's failure; it is asked again on the next pass.
  *
  * What the attempt consumed is written down here as well, when it says more than the record does (`measured`):
  * Claude Code writes a session's cost only as its process exits, which is after its end was written, so the read a
  * release takes once it has stopped the session is the first to have it — or, for a session left listed, the
- * sighting's. Written once: a session left listed is seen on every pass, and the second read says nothing new. It says
+ * sighting's. Written once: a session still looked for is seen again on the next pass, and that read says nothing new. It says
  * more when one of its keys has a value the record lacks — by value, never by key: `{ costUsd: undefined }` measured
  * nothing, and a journal that writes JSON drops the key, so a key asked alone would be new on every pass.
  *
@@ -365,9 +368,6 @@ const settleOn = Effect.fn('settleOn')(function* (
  * and dropped from the memo's look on one failed read, a release the harness refused would never be asked again. A session
  * let go of and listed ended says nothing more on any pass, and is looked for no more.
  */
-/** What a release the harness refused answers, in `releaseFinished`: told apart from every answer a release gives. */
-const REFUSED = Symbol('refused');
-
 const releaseFinished = Effect.fn('releaseFinished')(function* (
   state: Releasable,
   observed: ReadonlyMap<string, Sighting>,

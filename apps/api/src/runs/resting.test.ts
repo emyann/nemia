@@ -17,7 +17,7 @@ import type { RunSummary } from './runs.ts';
 import { app, runtime } from '../app.ts';
 import { ReadMemo } from '../layer.ts';
 import { Engine, findRun } from '../store.ts';
-import { verifiesRest } from 'agent-orchestrator';
+import { approve, engine, verifiesRest } from 'agent-orchestrator';
 import { restingRead } from './resting.ts';
 
 /** The engine the app's requests read through: its reads are what a poll costs. */
@@ -297,6 +297,90 @@ test('two requests at once: the first reads the feed and judges the run succeede
   alone.keep(findRun('r-raced')!, judged, [], () => new Map());
   assert.ok(resting.runs.has('r-raced'), 'a request no other overtook keeps what it judged');
   resting.runs.delete('r-raced');
+});
+
+/** A line appended to a task's journal, then the same event on the engine's feed, as the runtime's every append writes the two. */
+const appended = (taskId: string, event: object) => {
+  write(journal(taskId), `${fs.existsSync(journal(taskId)) ? fs.readFileSync(journal(taskId), 'utf8') : ''}${JSON.stringify(event)}\n`);
+  fs.appendFileSync(path.join(root, 'engine', 'feed.jsonl'), `${JSON.stringify({ taskId, event })}\n`);
+};
+
+/** A run of `design → implement` whose design is gated, its record as the tick writes it: design's task given once filed. */
+function writeGated(id: string, filed: boolean) {
+  write(
+    path.join(root, 'runs', `${id}.json`),
+    JSON.stringify(
+      {
+        id,
+        repo,
+        baseRef: base,
+        workspace: repo,
+        branch: 'main',
+        isolate: true,
+        brief: 'Design it',
+        createdAt: at,
+        workflowDir: path.join(root, 'no-such-workflow'),
+        workflow: [
+          { name: 'design', after: [], body: 'Design it.', harness: 'codex', gate: true },
+          { name: 'implement', after: ['design'], body: 'Implement it.', harness: 'codex' },
+        ],
+        steps: {
+          design: filed ? { taskId: `${id}-design`, branch: `wf/${id}/design` } : { taskId: null },
+          implement: { taskId: null },
+        },
+      },
+      null,
+      2,
+    ),
+  );
+}
+
+test('a gated run read by the list at every event from being filed to being approved: the memo keeps it only at its gate, answers it as a fresh read does, and lets the approval go', async () => {
+  const id = 'r-gated';
+  const task = `${id}-design`;
+  const keptAt: string[] = [];
+  const read = async (event: string) => {
+    const answer = await listed(id);
+    if (resting.runs.has(id)) keptAt.push(event);
+    return answer!;
+  };
+
+  writeGated(id, false);
+  assert.equal((await read('filed')).moving, true, 'its design is due: the tick files it');
+  branchOff(`wf/${id}/design`);
+  appended(task, { kind: 'filed', at, brief: 'Design it.', cwd: repo, maxAttempts: 1, harness: 'codex' });
+  await read('task filed, record not yet');
+  writeGated(id, true);
+  await read('task on the record');
+  appended(task, { kind: 'starting', at, attempt: 1 });
+  await read('starting');
+  appended(task, { kind: 'spawned', at, attempt: 1 });
+  assert.equal((await read('spawned')).moving, true, 'its session runs');
+  appended(task, {
+    kind: 'ended',
+    at,
+    attempt: 1,
+    sessionId: `ae/${task}/1`,
+    observed: 'done',
+    reason: 'harness',
+    closeout: { outcome: 'done', summary: 'Designed it.', needs: null, artifacts: [] },
+  });
+  await read('ended');
+  appended(task, { kind: 'settled', at, outcome: 'succeeded' });
+  const gated = await read('settled');
+  await read('settled, from memory');
+  assert.deepEqual(keptAt, ['settled', 'settled, from memory'], 'kept once at rest at its gate, and at no event before');
+  assert.equal(gated.status, 'failed');
+  assert.equal(gated.moving, false);
+  assert.deepEqual(gated.waitingOnYou, ['design']);
+  assert.equal(gated.steps.find((s) => s.name === 'design')?.status, 'awaiting approval');
+
+  await approve(engine(), id, 'design');
+  const approved = await read('approved');
+  assert.ok(!resting.runs.has(id), 'the approval takes it out');
+  assert.equal(approved.moving, true, 'implement is due: the tick files it');
+  assert.deepEqual(approved.waitingOnYou, []);
+  assert.deepEqual(await unverified(() => listed(id)), approved, 'and the memo answers it as the fresh read did');
 });
 
 test('REFUSED at shipped defaults: a WF_VERIFY_REST that is neither 1 nor 0 is refused by name, exit 2, and fails the list, never read as off', async (t) => {

@@ -1,7 +1,7 @@
 import { useId, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { runGone, runQuery, runsQuery, tryAgent, type AgentListing } from '../lib/api';
-import { latestTryOf, TRY_FENCE, TRY_TERMS, tryHeld } from '../lib/agents';
+import { runGone, runQuery, runsQuery, tryAgent, type AgentListing, type RunSummary } from '../lib/api';
+import { latestTryOf, TRY_FENCE, TRY_TERMS, tryHeld, tryStatusWord } from '../lib/agents';
 import { costText } from '../lib/cost';
 import { AgentRefused, RouteLink } from './AgentParts';
 import { Artifacts } from './Artifacts';
@@ -85,13 +85,16 @@ function TryForm({ agent }: { agent: AgentListing }) {
         </div>
         {start.isError && <AgentRefused message={start.error.message} users={[]} from="yours" verb="Not started" />}
       </form>
-      {shown && <TryRun id={shown} />}
+      {shown && <TryRun id={shown} listed={runs?.find((run) => run.id === shown)} />}
     </section>
   );
 }
 
-/** One try, as its run reads: the state, what it spent of its budget, the files its folder holds, and its run's page. */
-export function TryRun({ id }: { id: string }) {
+/**
+ * One try, as its run reads: the state, what it spent of its budget, the files its folder holds, and its run's page. `listed` is its row on
+ * the list of runs, which says what stopped a failed try (`tryStatusWord`); undefined before the list has it.
+ */
+export function TryRun({ id, listed }: { id: string; listed?: RunSummary }) {
   const { data: run, error } = useQuery(runQuery(id));
   const link = (
     <RouteLink to="/runs/$runId" params={{ runId: id }} data-try-run={id} className="font-mono text-xs underline underline-offset-2">
@@ -118,7 +121,7 @@ export function TryRun({ id }: { id: string }) {
       <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-600 dark:text-neutral-400">
         <span>The latest try, {link}:</span>
         {step && <StatusChip status={step.status} runCancelled={run.cancelledAt !== null} runHeld={run.holding != null} />}
-        <span data-try-status>{run.status}</span>
+        <span data-try-status>{tryStatusWord(run.status, listed)}</span>
         {spent && (
           <span data-try-spent>
             spent <span className="font-mono">{spent}</span>

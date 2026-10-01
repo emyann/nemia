@@ -22,6 +22,12 @@ export type RunStatus = 'running' | 'succeeded' | 'failed' | 'cancelled';
 /** Decodes a `RunStatus`. */
 export const RunStatusSchema = Schema.Literals(['running', 'succeeded', 'failed', 'cancelled']) satisfies Schema.Schema<RunStatus>;
 
+/** Mirrors `RunStoppedOn` in apps/api/src/runs/judged.ts: what stopped a `failed` run in which no step broke, as `wf decide` says it. */
+export type RunStoppedOn = 'awaiting approval' | 'blocked';
+
+/** Decodes a `RunStoppedOn`. */
+export const RunStoppedOnSchema = Schema.Literals(['awaiting approval', 'blocked']) satisfies Schema.Schema<RunStoppedOn>;
+
 /**
  * Mirrors `RunToDecide` in apps/api/src/runs/judged.ts: what a person has to decide about a run's result, the fifth reason a run waits on
  * one — `approve`, the gate on its last step, with `step`, `filed` whether it has run, and `says`, what it would do, the first line of the

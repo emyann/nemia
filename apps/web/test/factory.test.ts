@@ -52,6 +52,7 @@ const run = (statuses: readonly string[], extra: Partial<RunSummary> = {}): RunS
   cancelledAt: null,
   pruned: null,
   status: 'running',
+  stoppedOn: null,
   moving: false,
   cost: null,
   steps: statuses.map((status, i) => ({
@@ -736,6 +737,7 @@ test('a run that waits on a person stays on the floor, whatever Show finished sa
     run(['unverified · done', 'awaiting approval', 'waiting'], {
       id: 'gated',
       status: 'failed',
+      stoppedOn: 'awaiting approval',
       moving: false,
       waitingOnYou: ['plan'],
       onYou: ['approve plan'],
@@ -745,6 +747,7 @@ test('a run that waits on a person stays on the floor, whatever Show finished sa
     run(['succeeded · BLOCKED', 'waiting'], {
       id: 'blocked',
       status: 'failed',
+      stoppedOn: 'blocked',
       moving: false,
       waitingOnYou: ['step-0'],
       onYou: ['step-0'],

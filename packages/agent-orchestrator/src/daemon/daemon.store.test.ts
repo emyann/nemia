@@ -54,6 +54,42 @@ const holdBy = (pid: number, over: Record<string, unknown> = {}): string => {
   return text;
 };
 
+/** A duration as `durationWord` prints it (3s, 16m11s, 1h05m, 2d03h) in milliseconds; NaN for a word that is not wholly such pairs. */
+const msOfWord = (word: string): number => {
+  if (!/^(?:\d+[dhms])+$/.test(word)) return NaN;
+  const unit = { d: 86_400_000, h: 3_600_000, m: 60_000, s: 1000 } as const;
+  return [...word.matchAll(/(\d+)([dhms])/g)].reduce((ms, [, n, u]) => ms + Number(n) * unit[u as keyof typeof unit], 0);
+};
+
+/** The milliseconds a duration printed of a fixture may say, in its words: from its age when written up to that age and the time since. */
+type Ages = { from: number; to: number };
+
+/**
+ * The window of a fixture stamped `age` ms before the clock read when it was written, at or after `written`, and measured by a clock read
+ * at or before `after`: a floor, and the time the pass took — never a bound fixed in advance.
+ */
+const windowOf = (age: number, written: number, after: number): Ages => ({ from: age, to: age + (after - written) });
+
+/** Whether `word`, a duration as `durationWord` prints it, lies in `window`; a word that does not read is not. */
+const within = (word: string, { from, to }: Ages): boolean => {
+  const ms = msOfWord(word);
+  return from <= ms && ms <= to;
+};
+
+/** The silence over which a holder at every 4000ms is stale, as `wf up` prints it. */
+const STALE = '15m00s';
+
+/**
+ * Whether `line` is `wf up`'s takeover of a stale holder `pid` at every 4000ms: that pid, a silence over the bound it names, and one the
+ * fixture's `window` allows.
+ */
+const saysStale = (line: string, pid: number, window: Ages): boolean => {
+  const silence = new RegExp(
+    `^ {3}took ${ROOT} over from pid ${pid}, alive but silent for (\\S+), over the ${STALE} that is stale at every 4000ms — `,
+  ).exec(line)?.[1];
+  return silence !== undefined && msOfWord(silence) > msOfWord(STALE) && within(silence, window);
+};
+
 const read = () =>
   JSON.parse(fs.readFileSync(FILE, 'utf8')) as {
     pid: number;
@@ -253,36 +289,36 @@ test('REFUSED at shipped defaults: a second `wf up`, and a `wf tick` by hand, wh
     assert.equal(e.passes, 0, 'neither ticked');
     assert.equal(fs.readFileSync(FILE, 'utf8'), text, 'nor wrote the file');
   }
+  const written = Date.now();
   holdBy(LIVE);
   const { printed } = await typed(t, ['ls'], engineOf());
+  const ages = windowOf(3000, written, Date.now());
   assert.equal(printed[0], 'no runs');
-  assert.match(
-    printed.at(-1)!,
-    new RegExp(`^wf up: ticking, pid ${LIVE}, every 4000ms — last pass \\d+s ago \\(`),
-    '`wf ls` says who ticks, last',
-  );
+  const ago = new RegExp(`^wf up: ticking, pid ${LIVE}, every 4000ms — last pass (\\S+) ago \\(`).exec(printed.at(-1)!)?.[1];
+  assert.ok(ago !== undefined && within(ago, ages), `\`wf ls\` says who ticks, last, and its pass 3s ago:\n${printed.at(-1)}`);
 });
 
 test('a holder stale, gone or stopped is taken over by `wf up` — and not refused to a `wf tick`, which writes nothing', async (t) => {
+  const matches = (pattern: RegExp) => (line: string) => pattern.test(line);
   const cases = [
     {
       name: 'stale',
       pid: LIVE,
       over: { passedAt: minutesAgo(16) },
-      took: new RegExp(
-        `^ {3}took ${ROOT} over from pid ${LIVE}, alive but silent for 16m0\\ds, over the 15m00s that is stale at every 4000ms`,
-      ),
+      took: (line: string, ages: Ages) => saysStale(line, LIVE, ages),
     },
-    { name: 'gone', pid: GONE, over: {}, took: new RegExp(`^ {3}took ${ROOT} over from pid ${GONE}, whose process is gone`) },
+    { name: 'gone', pid: GONE, over: {}, took: matches(new RegExp(`^ {3}took ${ROOT} over from pid ${GONE}, whose process is gone`)) },
     { name: 'stopped', pid: LIVE, over: { stoppedAt: minutesAgo(0.01) }, took: undefined },
     {
       name: 'unreadable',
       pid: LIVE,
       over: { pid: 'nobody' },
-      took: new RegExp(`^ {3}took ${ROOT} over from a daemon.json that did not read as a holder$`),
+      took: matches(new RegExp(`^ {3}took ${ROOT} over from a daemon.json that did not read as a holder$`)),
     },
   ];
+  let stale: { line: string; ages: Ages } | undefined;
   for (const c of cases) {
+    const written = Date.now();
     const text = holdBy(c.pid, c.over);
     const tick = engineOf(() => {});
     const byHand = await typed(t, ['tick'], tick);
@@ -301,10 +337,19 @@ test('a holder stale, gone or stopped is taken over by `wf up` — and not refus
     assert.equal(during!.pid, process.pid, c.name);
     assert.ok(Date.parse(during!.startedAt) >= before - 1, `${c.name}: a start of its own`);
     assert.equal(during!.stoppedAt, undefined, c.name);
+    const ages = windowOf(16 * 60_000, written, Date.now());
     const took = printed.filter((l) => l.includes(' took '));
-    if (c.took) assert.ok(took.length === 1 && c.took.test(took[0]), `${c.name}:\n${printed.join('\n')}`);
+    if (c.took) assert.ok(took.length === 1 && c.took(took[0], ages), `${c.name}:\n${printed.join('\n')}`);
     else assert.deepEqual(took, [], `${c.name}: a clean stop is nothing to report`);
+    if (c.name === 'stale') stale = { line: took[0], ages };
   }
+  const { line, ages } = stale!;
+  const saying = (silence: string) => line.replace(/silent for \S+,/, `silent for ${silence},`);
+  assert.ok(saysStale(line, LIVE, ages), `the stale line read as itself:\n${line}`);
+  assert.ok(!saysStale(line.replace(`pid ${LIVE},`, `pid ${GONE},`), LIVE, ages), 'refused: a line that names another pid');
+  assert.ok(!saysStale(saying('3s'), LIVE, { from: 0, to: Infinity }), 'refused: a live holder called stale, whatever the pass took');
+  assert.ok(!saysStale(saying('15m30s'), LIVE, ages), 'refused: a silence shorter than the fixture is old');
+  assert.ok(!saysStale(saying('2h00m'), LIVE, ages), 'refused: a silence longer than the fixture is old and the pass took');
 });
 
 test('a daemon whose store is taken over while it runs stops at its next pass, and writes nothing over the new holder', async (t) => {
@@ -341,11 +386,13 @@ test('`wf tick` on a store nobody holds never writes the file, and `wf ls` says 
   assert.equal(fs.existsSync(FILE), false, "the daemon is the file's one writer");
   const lastLine = async () => (await typed(t, ['ls'], engineOf())).printed.at(-1);
   assert.equal(await lastLine(), 'wf up: none has held this store — nothing ticks it; start one with wf up');
+  const written = Date.now();
   holdBy(LIVE, { passedAt: minutesAgo(20) });
-  assert.match(
-    (await lastLine())!,
-    new RegExp(`^wf up: stalled, pid ${LIVE}, every 4000ms — alive, but silent for 20m0\\ds: last pass 20m0\\ds ago \\(`),
-  );
+  const stalled = (await lastLine())!;
+  const ages = windowOf(20 * 60_000, written, Date.now());
+  const [, silence, ago] =
+    new RegExp(`^wf up: stalled, pid ${LIVE}, every 4000ms — alive, but silent for (\\S+): last pass (\\S+) ago \\(`).exec(stalled) ?? [];
+  assert.ok(silence !== undefined && within(silence, ages) && within(ago, ages), `silent, and last passed, 20m ago:\n${stalled}`);
   holdBy(GONE);
   assert.match((await lastLine())!, new RegExp(`^wf up: none ticking — pid ${GONE} is gone, its last pass `));
   clear();

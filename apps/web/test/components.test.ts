@@ -4639,6 +4639,7 @@ test('a lifecycle state lit is marked data-lit and filled amber; a route taken i
     states: ['a', 'b'],
     final: ['b'],
     edges: [{ from: 'a', event: 'GO', to: 'b', action: 'go' }],
+    verbs: [],
   });
   const node = (lit: boolean) =>
     renderToStaticMarkup(
@@ -4653,6 +4654,28 @@ test('a lifecycle state lit is marked data-lit and filled amber; a route taken i
     );
   assert.match(edge(true), /stroke:var\(--edge-taken\);stroke-width:3/);
   assert.match(edge(false), /stroke:var\(--edge-done\);stroke-width:1.5/);
+});
+
+test("a route only a person's verb takes is drawn dashed; one an edge takes too is drawn solid", async () => {
+  const { MachineEdge } = await import('../src/components/MachineEdge.tsx');
+  const { drawMachine } = await import('../src/lib/machine.ts');
+  const drawing = drawMachine({
+    initial: 'a',
+    states: ['a', 'b', 'c'],
+    final: ['c'],
+    edges: [
+      { from: 'a', event: 'GO', to: 'b', action: 'go' },
+      { from: 'b', event: 'END', to: 'c', action: 'end' },
+    ],
+    verbs: [{ verb: 'close', entry: 'closed', by: 'person', from: ['a', 'b'], to: 'c', guard: 'awaitsWord' }],
+  });
+  const edge = (id: string) => {
+    const route = drawing.routes.find((r) => r.id === id) ?? assert.fail(`no route ${id}`);
+    return renderToStaticMarkup(createElement(ReactFlowProvider, null, createElement(MachineEdge, { data: route } as never)));
+  };
+  assert.match(edge('a->c'), /stroke:var\(--edge-done\);stroke-width:1.5;stroke-dasharray:6 4/);
+  assert.doesNotMatch(edge('b->c'), /stroke-dasharray/, 'an edge takes it as well as the verb');
+  assert.doesNotMatch(edge('a->b'), /stroke-dasharray/);
 });
 
 test("an agent's face is drawn from its name, alive at all times: the same name the same face, another name another, named as a person is", async () => {

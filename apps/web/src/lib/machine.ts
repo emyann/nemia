@@ -5,12 +5,14 @@
  * Two kinds of edge are gathered before the layout, so no two are drawn over each other: an edge back to its own state is written on
  * that state's box (`stays`), and the edges between the same two states are one drawn edge (`Route`). Either way the edges are listed
  * by the action they take — the events, each with its guard, then the action — so every edge of the graph is one event line, in
- * exactly one place. Read top to bottom: the first state at the top, the final ones at the bottom.
+ * exactly one place. A verb a person writes from outside the machine joins the route of each state it is taken from to the state it
+ * leads to, a line of its own under the edges (`verbOf`); a route no edge takes, only a person's verb, is dashed. Read top to bottom: the
+ * first state at the top, the final ones at the bottom.
  *
  * Pure: sizes come from the number of lines and their length in the monospace the canvas writes them in, not from a measured page.
  */
 import { Graph, layout } from '@dagrejs/dagre';
-import type { MachineEdge, MachineGraph } from './api/machines.ts';
+import type { MachineEdge, MachineGraph, MachineVerb } from './api/machines.ts';
 
 export type Point = { x: number; y: number };
 
@@ -32,12 +34,17 @@ export type StateBox = {
 /** A stretch of a route drawn straight, at `x` from the `enter` y to the `leave` y, down or back up: where it crosses one rank. */
 export type Leg = { x: number; enter: number; leave: number };
 
-/** The edges from one state to another, drawn as one: its SVG path, its edges by action, and the box its label sits in, by its centre. */
+/**
+ * The edges and verbs from one state to another, drawn as one: its SVG path, its edges by action, its verbs (`verbOf`), whether it is
+ * dashed — no edge takes it, only a person's verb — and the box its label sits in, by its centre.
+ */
 export type Route = {
   id: string;
   from: string;
   to: string;
   edges: ByAction[];
+  verbs: string[];
+  dashed: boolean;
   path: string;
   label: Point & { width: number; height: number };
 };
@@ -60,6 +67,9 @@ export const MIN_WIDTH = 128;
 
 /** An edge's event, with its guard in brackets when it has one. */
 export const eventOf = (edge: MachineEdge): string => `${edge.event}${edge.guard ? ` [${edge.guard}]` : ''}`;
+
+/** A verb as its route lists it: the verb, with the guard its refusal asks first in brackets. */
+export const verbOf = (verb: Pick<MachineVerb, 'verb' | 'guard'>): string => `${verb.verb} [${verb.guard}]`;
 
 /** `edges` gathered by action, each action once in the order its first edge comes, its events in the table's order. */
 export function byAction(edges: readonly MachineEdge[]): ByAction[] {
@@ -85,11 +95,17 @@ export const stateSize = (stays: readonly ByAction[]): { width: number; height: 
   height: HEAD_HEIGHT + (stays.length ? LINE_HEIGHT * linesOf(stays) + PAD_Y : 0),
 });
 
-/** A route's label size: its edges' lines. */
-export const labelSize = (edges: readonly ByAction[]): { width: number; height: number } => ({
-  width: Math.ceil(widthOf(edges)),
-  height: LINE_HEIGHT * linesOf(edges) + PAD_Y,
+/** A route's label size: its edges' lines, and a line per verb (`verbOf`). */
+export const labelSize = (edges: readonly ByAction[], verbs: readonly string[] = []): { width: number; height: number } => ({
+  width: Math.ceil(Math.max(widthOf(edges), Math.max(0, ...verbs.map((v) => v.length)) * CHAR_WIDTH + PAD_X)),
+  height: LINE_HEIGHT * (linesOf(edges) + verbs.length) + PAD_Y,
 });
+
+/**
+ * How much more a route an edge takes weighs than one only a person's verb takes, when dagre orders each rank: the machine's own routes
+ * hold the layout, and the verbs' are laid round them.
+ */
+export const EDGE_WEIGHT = 2;
 
 /** How far a route's end stays from either side of its state's box. */
 export const END_INSET = 12;
@@ -123,35 +139,53 @@ function legsOf(points: readonly Point[], from: StateBox, to: StateBox, half: (y
   ];
 }
 
+/** What joins one state to another: the edges between them, and the verbs a person takes from the one to the other. */
+type Pair = { from: string; to: string; edges: MachineEdge[]; verbs: string[] };
+
+/**
+ * The pairs of states an edge or a verb joins, by `from->to`, each once: an edge back to its own state is no pair, and a verb joins one
+ * pair for each state it is taken from. Edges come first, in the table's order, then the pairs only verbs join.
+ */
+function pairsOf(edges: readonly MachineEdge[], verbs: readonly MachineVerb[]): Map<string, Pair> {
+  const pairs = new Map<string, Pair>();
+  const pairOf = (from: string, to: string) => {
+    const id = `${from}->${to}`;
+    const pair = pairs.get(id) ?? { from, to, edges: [], verbs: [] };
+    pairs.set(id, pair);
+    return pair;
+  };
+  for (const edge of edges) if (edge.from !== edge.to) pairOf(edge.from, edge.to).edges.push(edge);
+  for (const verb of verbs) for (const from of verb.from) pairOf(from, verb.to).verbs.push(verbOf(verb));
+  return pairs;
+}
+
 /**
  * The machine laid out top to bottom by dagre: each state a box sized for its lines, each route with its label where dagre makes room
- * for it and its line drawn down through the ranks it crosses (`legsOf`, `pathOf`). A state an edge names that the graph does not list
- * is drawn too, so no edge is lost.
+ * for it and its line drawn down through the ranks it crosses (`legsOf`, `pathOf`), the routes edges take weighing more (`EDGE_WEIGHT`).
+ * A state an edge or a verb names that the graph does not list is drawn too, so no edge and no verb is lost.
  */
-export function drawMachine(graph: Pick<MachineGraph, 'initial' | 'states' | 'final' | 'edges'>): Drawing {
-  const names = [...new Set([...graph.states, ...graph.edges.flatMap((e) => [e.from, e.to])])];
+export function drawMachine(graph: Pick<MachineGraph, 'initial' | 'states' | 'final' | 'edges' | 'verbs'>): Drawing {
+  const named = [...graph.edges.flatMap((e) => [e.from, e.to]), ...graph.verbs.flatMap((v) => [...v.from, v.to])];
+  const names = [...new Set([...graph.states, ...named])];
   const stays = new Map(names.map((name) => [name, byAction(graph.edges.filter((e) => e.from === name && e.to === name))]));
-  const pairs = new Map<string, MachineEdge[]>();
-  for (const edge of graph.edges) {
-    if (edge.from === edge.to) continue;
-    const id = `${edge.from}->${edge.to}`;
-    pairs.set(id, [...(pairs.get(id) ?? []), edge]);
-  }
+  const pairs = pairsOf(graph.edges, graph.verbs);
   const g = new Graph();
   g.setGraph({ rankdir: 'TB', ranker: 'longest-path', nodesep: 16, edgesep: 8, ranksep: 40, marginx: 8, marginy: 8 });
   g.setDefaultEdgeLabel(() => ({}));
   for (const name of names) g.setNode(name, stateSize(stays.get(name)!));
-  for (const [, edges] of pairs) g.setEdge(edges[0].from, edges[0].to, { ...labelSize(byAction(edges)), labelpos: 'c' });
+  for (const { from, to, edges, verbs } of pairs.values()) {
+    g.setEdge(from, to, { ...labelSize(byAction(edges), verbs), labelpos: 'c', weight: edges.length ? EDGE_WEIGHT : 1 });
+  }
   layout(g);
   const states = names.map((id) => {
     const { x, y, width, height } = g.node(id);
     const box = { x: x - width / 2, y: y - height / 2, width, height };
     return { id, ...box, initial: id === graph.initial, final: graph.final.includes(id), stays: stays.get(id)! };
   });
-  const laid = [...pairs].map(([id, edges]) => {
-    const { from, to } = edges[0];
+  const laid = [...pairs].map(([id, { from, to, edges, verbs }]) => {
     const { points = [], x = 0, y = 0, width = 0, height = 0 } = g.edge(from, to);
-    return { id, from, to, edges: byAction(edges), points: points as Point[], label: { x, y, width, height } };
+    const label = { x, y, width, height };
+    return { id, from, to, edges: byAction(edges), verbs, dashed: edges.length === 0, points: points as Point[], label };
   });
   const half = bandsOf([...states.map((s) => ({ y: s.y + s.height / 2, height: s.height })), ...laid.map((r) => r.label)]);
   const at = new Map(states.map((s) => [s.id, s]));

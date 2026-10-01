@@ -370,7 +370,8 @@ test('a gated run read by the list at every event from being filed to being appr
   const gated = await read('settled');
   await read('settled, from memory');
   assert.deepEqual(keptAt, ['settled', 'settled, from memory'], 'kept once at rest at its gate, and at no event before');
-  assert.equal(gated.status, 'failed');
+  assert.equal(gated.status, 'failed', "`assess`'s word for a run no follower of which can go on");
+  assert.equal(gated.stoppedOn, 'awaiting approval', 'and what stopped it, as `wf decide` says it');
   assert.equal(gated.moving, false);
   assert.deepEqual(gated.waitingOnYou, ['design']);
   assert.equal(gated.steps.find((s) => s.name === 'design')?.status, 'awaiting approval');
@@ -380,6 +381,7 @@ test('a gated run read by the list at every event from being filed to being appr
   assert.ok(!resting.runs.has(id), 'the approval takes it out');
   assert.equal(approved.moving, true, 'implement is due: the tick files it');
   assert.deepEqual(approved.waitingOnYou, []);
+  assert.deepEqual([approved.status, approved.stoppedOn], ['running', null]);
   assert.deepEqual(await unverified(() => listed(id)), approved, 'and the memo answers it as the fresh read did');
 });
 

@@ -25,6 +25,7 @@ import {
   needsOf,
   type RunHolding,
   type RunStatus,
+  type RunStoppedOn,
   type RunToDecide,
   type RunWaiting,
   type Spent,
@@ -96,6 +97,11 @@ export type RunSummary = {
    */
   holding: RunHolding | null;
   status: RunStatus;
+  /**
+   * What stopped a `failed` run in which no step broke, as `wf decide` and the feed say it: `awaiting approval` for a run at its gate,
+   * `blocked` for one whose step signed off blocked. Null for every other run, one whose step broke among them.
+   */
+  stoppedOn: RunStoppedOn | null;
   /**
    * Whether anything of the run still moves: a task the engine holds for it — a step's or a check's, filed
    * and not settled — or a step, a check, a try or a round a tick would still file. `status` does not say: `assess` reads a
@@ -169,6 +175,7 @@ async function summarize(run: Run, views: Views, reader: Engine['Service'], git:
     heldUntil: judged.holding ? run.hold!.until : [],
     holding: judged.holding,
     status: judged.status,
+    stoppedOn: judged.stoppedOn,
     moving: judged.moving,
     cost: judged.cost,
     steps: names.map((name) => ({
@@ -215,6 +222,7 @@ function unjudged(run: Run, views: Views, unreadable: Unreadable, said: string, 
     heldUntil: run.hold && !run.cancelledAt ? run.hold.until : [],
     holding: null,
     status: 'running',
+    stoppedOn: null,
     moving: true,
     cost: null,
     steps: names.map((name) => ({

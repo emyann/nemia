@@ -58,6 +58,8 @@ import { bare, type Engine, judgedSteps, type Views } from '../store.ts';
 
 /** Where a run stands, as `assess` decides it: `running` until every step is final one way or the other. */
 export type RunStatus = Assessment['status'];
+/** What stopped a `failed` run in which no step broke, as `assess` words it (`Assessment['stoppedOn']`). */
+export type RunStoppedOn = NonNullable<Assessment['stoppedOn']>;
 
 /**
  * What a person has to decide about a run's result — the fifth reason a run waits on one, beside a step blocked, unsigned, over budget or
@@ -269,6 +271,8 @@ type Judged = {
    */
   toDecide: RunToDecide | null;
   status: RunStatus;
+  /** What stopped a `failed` run in which no step broke, off the same `assess` as `status`: what `wf decide` says. Null otherwise. */
+  stoppedOn: RunStoppedOn | null;
   /**
    * The line `cancelPlan` draws for a finished run, which `status` does not: something in flight, or something a tick would still file — a
    * check, a try, a round due once a loop's looping step settled, or roots `assess` makes ready. Roots of a run waiting on runs are filed
@@ -436,7 +440,7 @@ export function judge(
   const phase = (taskId: string) => phaseOfView(views.get(taskId));
   const judgedOf = (on: Run) =>
     assess(steps, on, phase, closeoutReader(views, run), asked, verdicts, asks, rounds, harnessBlocked(views), spendOf);
-  const { status, ready, check, retry, round } = judgedOf(run);
+  const { status, stoppedOn, ready, check, retry, round } = judgedOf(run);
   const standings = readStandings(status, steps);
   const said = listing(
     shown,
@@ -467,6 +471,7 @@ export function judge(
     onYou: onYouWords({ steps: said.steps, waitingOnYou }),
     toDecide: toDecideOf(run, said.toDecide, steps),
     status,
+    stoppedOn: stoppedOn ?? null,
     moving:
       inFlight(run, phase).length > 0 ||
       (tickReads && ((due.ready.length > 0 && !waiting?.onYou) || due.check.length > 0 || due.retry.length > 0 || due.round.length > 0)),

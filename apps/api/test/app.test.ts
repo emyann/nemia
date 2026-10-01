@@ -198,6 +198,8 @@ test('runs are read from the workflow store and summarized, with what each step 
       heldUntil: [],
       holding: null,
       status: 'cancelled',
+      /** Called off: not a failed run, so nothing stopped it but a person. */
+      stoppedOn: null,
       moving: false,
       /** Nothing of it was measured: no cost, which is not $0. */
       cost: null,
@@ -1304,23 +1306,26 @@ test("the api's words, and who it says is waited on, are `list`'s — a refused 
   }
 });
 
-test("a run's status is where `assess` puts it — running, succeeded, failed or cancelled — on both endpoints", async () => {
-  const cases: Array<[id: string, status: string, why: string]> = [
-    ['r-5', 'running', 'a step filed and queued for a slot, its follower still to be filed'],
-    ['r-7', 'running', 'a step on its second attempt'],
-    ['r-21', 'succeeded', 'verified, then done on its own word'],
+test("a run's status is where `assess` puts it — running, succeeded, failed or cancelled — on both endpoints, and the list says what stopped a failed run in which no step broke", async () => {
+  const cases: Array<[id: string, status: string, stoppedOn: RunSummary['stoppedOn'], why: string]> = [
+    ['r-5', 'running', null, 'a step filed and queued for a slot, its follower still to be filed'],
+    ['r-7', 'running', null, 'a step on its second attempt'],
+    ['r-21', 'succeeded', null, 'verified, then done on its own word'],
     [
       'r-6',
       'running',
+      null,
       'no frozen workflow, so judged by its folder as the tick judges it: its step signed off blocked, and the folder gained a step the tick would file',
     ],
-    ['r-20', 'failed', 'a check refused, so what waits on that step waits for ever'],
-    ['r-8', 'failed', 'a step signed off blocked, so its follower will never be filed'],
-    ['r-2', 'cancelled', 'called off, whatever its steps say'],
-    ['r-3', 'cancelled', 'called off, and judged from its record, its folder gone'],
+    ['r-20', 'failed', null, 'a check refused, so what waits on that step waits for ever: a step broke'],
+    ['r-8', 'failed', 'blocked', 'a step signed off blocked, so its follower will never be filed'],
+    ['r-2', 'cancelled', null, 'called off, whatever its steps say'],
+    ['r-3', 'cancelled', null, 'called off, and judged from its record, its folder gone'],
   ];
-  for (const [id, status, why] of cases) {
-    assert.equal((await listed(id)).status, status, `${id} listed: ${why}`);
+  for (const [id, status, stoppedOn, why] of cases) {
+    const summary = await listed(id);
+    assert.equal(summary.status, status, `${id} listed: ${why}`);
+    assert.equal(summary.stoppedOn, stoppedOn, `${id} stopped on: ${why}`);
     assert.equal((await detailOf(id)).status, status, `${id} in full: ${why}`);
   }
 });

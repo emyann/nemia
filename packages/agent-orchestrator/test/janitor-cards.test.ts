@@ -81,7 +81,14 @@ test('each card is filed through wf inbox add, ready to start, with its numbers,
     assert.match(text, new RegExp(`^workflow: ${given.workflow}$`, 'm'));
     assert.match(text, new RegExp(`^factory: ${given.factory}$`, 'm'));
     assert.match(text, /^---\n[\s\S]*?\n---\n/);
-    assert.equal(text.replace(/^---\n[\s\S]*?\n---\n/, '').trim().split('\n')[0], given.title, 'its first line is its title');
+    assert.equal(
+      text
+        .replace(/^---\n[\s\S]*?\n---\n/, '')
+        .trim()
+        .split('\n')[0],
+      given.title,
+      'its first line is its title',
+    );
     assert.ok(text.includes(given.correction) && text.includes(`(${given.kind})`), 'the correction and its kind');
     assert.ok(text.includes(given.evidence) && text.includes('2026-09-15 to 2026-09-28') && text.includes('2026-09-01 to 2026-09-14'));
     assert.ok(text.includes('Filed by Argus in run read-the-stats-ab12'));
@@ -118,6 +125,26 @@ for (const key of ['factory', 'workflow', 'repo'])
     assert.match(ran.err, new RegExp(`"A card half said" names no ${key}`));
     assert.deepEqual(inbox(root), {});
   });
+
+test('REFUSED: a card whose repository is not an absolute path files nothing', () => {
+  const { root, repo } = world();
+  const ran = run(root, [closeoutFile({ cards: [card('A ready card', repo), card('A card on a relative path', 'packages')] })]);
+  assert.equal(ran.code, 1);
+  assert.match(ran.err, /"A card on a relative path": its repo "packages" is not an absolute path/);
+  assert.deepEqual(inbox(root), {});
+});
+
+test('REFUSED: a card wf inbox add refuses fails the check, naming it, and the cards before it stay filed for the next check', () => {
+  const { root, repo } = world();
+  const gone = path.join(repo, 'gone');
+  const ran = run(root, [closeoutFile({ cards: [card('A ready card', repo), card('A card on no repository', gone)] })]);
+  assert.equal(ran.code, 1);
+  assert.match(ran.err, /card #2, "A card on no repository": wf inbox add failed/);
+  assert.deepEqual(
+    Object.values(inbox(root)).map((text) => text.includes('A ready card')),
+    [true],
+  );
+});
 
 test('REFUSED: two cards with the same title, in other case and spacing, file nothing', () => {
   const { root, repo } = world();

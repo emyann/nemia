@@ -348,7 +348,10 @@ const ACTS: Call[] = [
   { tool: 'Write' },
 ];
 
-/** What of `ACTS` a step could run: given dontAsk, each a rule of its own, of the settings or of a skill allows and none of its own denies. */
+/**
+ * What of `ACTS` a step could run: in a dontAsk job, each that a rule of its own, of the settings or of a skill allows and none of its
+ * own denies; any other step runs every call no deny names.
+ */
 function acting(step: Step): string[] {
   if (step.permissionMode !== 'dontAsk' || step.background === true || step.workspace === 'main')
     return [`${step.name}: not a dontAsk job, so every call no deny names runs`];
@@ -398,5 +401,7 @@ test('REFUSED: Argus allowed every wf verb, the inbox whole or an edit, read fro
     'Edit',
     'Write',
   ]);
-  assert.deepEqual(acting({ ...shippedStepOf('argus'), permissionMode: 'auto' }), ['argus: not a dontAsk job, so every call no deny names runs']);
+  assert.deepEqual(acting({ ...shippedStepOf('argus'), permissionMode: 'auto' }), [
+    'argus: not a dontAsk job, so every call no deny names runs',
+  ]);
 });

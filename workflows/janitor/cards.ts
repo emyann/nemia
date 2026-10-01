@@ -8,8 +8,9 @@
  * queues and drops nothing, and never writes in the inbox itself.
  *
  * Prints a line per card, filed or already there, and exits 0. Exits 1, naming the fix on stderr and filing nothing, when no closeout
- * reached it, a card is not text where text is due or names no factory, workflow or repository, two cards share a title, or `against` is
- * not as long as `period` or does not end the day before it starts; and, having filed the cards before it, when `wf inbox add` fails.
+ * reached it, a card is not text where text is due, names no factory, workflow or repository or a relative one, two cards share a
+ * title, or `against` is not as long as `period` or does not end the day before it starts; and, having filed the cards before it, when
+ * `wf inbox add` fails.
  */
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -78,7 +79,10 @@ function checkPeriods(closeout: Record<string, unknown>): { period: Period; agai
   return { period, against };
 }
 
-/** Card `i` of the list, checked field by field; refuses a field that is not text, a title of more than one line, or no place. */
+/**
+ * Card `i` of the list, checked field by field; refuses a field that is not text, a title of more than one line, a kind not known, no
+ * factory, workflow or repository, and a repository that is not an absolute path.
+ */
 function cardOf(value: unknown, i: number): Card {
   const c = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>;
   const wrong = FIELDS.filter((k) => typeof c[k] !== 'string');
@@ -86,16 +90,25 @@ function cardOf(value: unknown, i: number): Card {
   const card = c as Card;
   if (!card.title.trim() || /[\r\n]/.test(card.title.trim()))
     throw new Refusal(`card #${i + 1}: its title is one line, what to correct, and this one is empty or more than one`);
-  if (!KINDS.includes(card.kind)) throw new Refusal(`card #${i + 1}: its kind is ${JSON.stringify(card.kind)}, not one of ${KINDS.join(', ')}`);
+  if (!KINDS.includes(card.kind))
+    throw new Refusal(`card #${i + 1}: its kind is ${JSON.stringify(card.kind)}, not one of ${KINDS.join(', ')}`);
   for (const key of ['factory', 'workflow', 'repo'] as const)
     if (!card[key].trim())
-      throw new Refusal(`card #${i + 1}, "${card.title.trim()}" names no ${key}, so it is not ready to start: give the ${key} it starts with`);
+      throw new Refusal(
+        `card #${i + 1}, "${card.title.trim()}" names no ${key}, so it is not ready to start: give the ${key} it starts with`,
+      );
+  if (!path.isAbsolute(card.repo.trim()))
+    throw new Refusal(
+      `card #${i + 1}, "${card.title.trim()}": its repo ${JSON.stringify(card.repo)} is not an absolute path; ` +
+        'name the repository from the root',
+    );
   return card;
 }
 
 /** The closeout's cards, checked whole; refuses a closeout with no list, and two cards with the same title. */
 function cardsOf(closeout: Record<string, unknown>): Card[] {
-  if (!Array.isArray(closeout.cards)) throw new Refusal('the closeout names no `cards` list: sign off with one, empty when nothing is to correct');
+  if (!Array.isArray(closeout.cards))
+    throw new Refusal('the closeout names no `cards` list: sign off with one, empty when nothing is to correct');
   const cards = closeout.cards.map(cardOf);
   const seen = new Set<string>();
   for (const card of cards) {
@@ -149,7 +162,8 @@ function file(card: Card, text: string, dir: string, i: number): void {
   });
   if (ran.status !== 0)
     throw new Refusal(
-      `card #${i + 1}, "${card.title.trim()}": wf inbox add failed (${ran.error?.message ?? `exit ${ran.status}`}): ${ran.stderr.trim()}; ` +
+      `card #${i + 1}, "${card.title.trim()}": wf inbox add failed (${ran.error?.message ?? `exit ${ran.status}`}): ` +
+        `${(ran.stderr ?? '').trim()}; ` +
         'the cards before it are filed, and the check run again files the rest',
     );
   console.log(`wf janitor: filed ${ran.stdout.split('\n')[0].trim()}`);

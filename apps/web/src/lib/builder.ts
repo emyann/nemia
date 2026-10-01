@@ -57,6 +57,7 @@ export const UNSET: Readonly<WorkflowStepSpec> = {
   retries: null,
   gate: null,
   output: null,
+  tally: [],
   loop: null,
   rounds: null,
 };
@@ -87,6 +88,7 @@ export const draftOf = (workflow: Pick<WorkflowListing, 'steps'>): DraftStep[] =
       input: [...spec.input],
       disallowedTools: [...spec.disallowedTools],
       allowedTools: [...spec.allowedTools],
+      tally: [...spec.tally],
       tools: spec.tools && [...spec.tools],
     },
     body,
@@ -166,7 +168,7 @@ export function addStep(steps: readonly DraftStep[], name: string, body: string)
   if (nameRefusal(steps, name)) return [...steps];
   return [
     ...steps,
-    { name, spec: { ...UNSET, after: [], input: [], disallowedTools: [], allowedTools: [] }, body, own: null, schema: null },
+    { name, spec: { ...UNSET, after: [], input: [], disallowedTools: [], allowedTools: [], tally: [] }, body, own: null, schema: null },
   ];
 }
 
@@ -332,6 +334,17 @@ export const listOf = (typed: string): string[] =>
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean);
+
+/** What an empty list field leaves its key at, said in its box: the harness's own tools, or none of what the list names. */
+const LIST_UNSET: Readonly<Partial<Record<keyof WorkflowStepSpec, string>>> = {
+  tools: "the harness's own set",
+  disallowedTools: 'nothing denied',
+  allowedTools: 'nothing allowed',
+  tally: 'nothing counted',
+};
+
+/** The words an empty list field of `key` shows (`LIST_UNSET`), `none` for a list key it does not name. */
+export const listUnsetWords = (key: keyof WorkflowStepSpec): string => LIST_UNSET[key] ?? 'none';
 
 /**
  * Tokens as a person types them — `200k`, `150000`, `1M` — or null for none, or for anything else: the package's `tokensOf`, which the page

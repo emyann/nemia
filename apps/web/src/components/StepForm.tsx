@@ -1,6 +1,18 @@
 import { useId, useState, type ReactNode } from 'react';
 import type { KeyField, KeyForm, WorkflowStepSpec } from '../lib/api';
-import { contextText, listOf, numberOf, removeStep, setBody, setKey, setSchema, takes, tokensOf, type DraftStep } from '../lib/builder';
+import {
+  contextText,
+  listOf,
+  listUnsetWords,
+  numberOf,
+  removeStep,
+  setBody,
+  setKey,
+  setSchema,
+  takes,
+  tokensOf,
+  type DraftStep,
+} from '../lib/builder';
 import { AgentLink } from './AgentParts';
 import { Markdown } from './Markdown';
 
@@ -224,7 +236,7 @@ function KeyInput({
           id={id}
           mono
           value={listed ? listed.join(', ') : ''}
-          placeholder={given ?? (key === 'tools' ? "the harness's own set" : 'nothing denied')}
+          placeholder={given ?? listUnsetWords(key)}
           canon={(typed) => listOf(typed).join(', ')}
           commit={(typed) => set(key, (key === 'tools' && !typed.trim() ? null : listOf(typed)) as never)}
         />

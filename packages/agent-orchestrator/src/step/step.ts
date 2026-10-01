@@ -184,6 +184,12 @@ export type Workflow = {
    */
   output?: StepOutput;
   /**
+   * What `wf stats` counts of this step's closeouts, per step and day: each a field its `output:` declares — an array counts its items,
+   * an integer or a number is its value — or `field.flag`, the items of an array `field` whose boolean `flag` is true. Each is checked
+   * against the `output:` schema when the step is read (`tallyOf`), and a run is counted by the tally it froze.
+   */
+  tally?: string[];
+  /**
    * The step to run again when this one's closeout says `again: true`: one this step waits on through `after`.
    *
    * A round files that step again — its last session continued, handed this step's declared output as data —
@@ -272,6 +278,7 @@ export const STEP_KEYS = [
   'retries',
   'gate',
   'output',
+  'tally',
   'loop',
   'rounds',
 ] as const;
@@ -325,6 +332,8 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
   retries: COUNTS.retries.counts,
   gate: "`true`: the step's closeout waits for a person — `wf approve` — before anything after it is filed, verified first where it has a check",
   output: 'a JSON Schema file beside the step: what its closeout declares, for a step that reads it with `input:`',
+  tally:
+    "what `wf stats` counts of the step's closeouts, per day: fields its `output:` declares — an array's items, a number's value — or `field.flag`, an array's items whose boolean flag is true",
   loop: "the step to run again when this one's closeout says `again: true`: one it waits on",
   rounds: COUNTS.rounds.counts,
 };

@@ -11,6 +11,7 @@ import {
   draftOf,
   listedWith,
   listOf,
+  listUnsetWords,
   nameRefusal,
   numberOf,
   orderOf,
@@ -190,6 +191,15 @@ test('the steps are placed left to right by after; steps that wait on each other
     ),
     ['review', 'plan', 'implement'],
   );
+});
+
+test("an empty list field says what its key leaves unset: the harness's tools, nothing denied, nothing allowed, nothing counted", () => {
+  assert.deepEqual((['tools', 'disallowedTools', 'allowedTools', 'tally'] as const).map(listUnsetWords), [
+    "the harness's own set",
+    'nothing denied',
+    'nothing allowed',
+    'nothing counted',
+  ]);
 });
 
 test('what is typed into a list or a number field, as the listing has it', () => {

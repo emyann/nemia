@@ -2,7 +2,8 @@
  * The flow numbers of a store's history, defined on each workflow's structure and never on a step's name: the rounds of each `loop:` step
  * to acceptance, the tries of the `workspace: main` step to a landing, what a landed run cost and how long it took, and every step's tries,
  * time, cost, check verdicts and gate waits, the calls its harness refused it, where the harness records them, the skills its sessions
- * loaded, where their ends say, and each rule its skills declare, kept or broken by those calls (`discipline.ts`).
+ * loaded, where their ends say, and each rule its skills declare, kept or broken by those calls (`discipline.ts`); and each count the
+ * step declares over its closeouts (`tally:`, `tally.ts`), per step and day.
  *
  * Pure: `factsOf` turns one run's timeline and record into facts, `statsOf` buckets them by UTC day and by one breakdown key, filters them
  * and totals them, with the changes to what the runs froze (`marksOf`, `marks.ts`), and `statsQueryOf` reads what a person asked.
@@ -20,6 +21,7 @@ import type { Timeline, TimelineTry } from '../timeline/timeline.ts';
 import { marksOf, type Mark, type RunFrozen } from './marks.ts';
 import { deniesRecorded, ranAsJob, ruleRowsOf, rulesOfTry, type RuleFact, type RuleRow } from './discipline.ts';
 import type { SkillRule } from '../skills/skills.ts';
+import { tallyIn, tallyRowsOf, type TallyFact, type TallyRow } from '../tally/tally.ts';
 
 /** What a breakdown or a filter goes by: the step's agent, the step, the run's factory, its workflow's folder and its repository. */
 export const BY_KEYS = ['agent', 'step', 'factory', 'workflow', 'repo'] as const;
@@ -47,7 +49,9 @@ export type RunKeys = { run: string; factory: string; workflow: string; repo: st
  * whose harness records no denial (`deniesRecorded`), and for a session filed before steps ran as jobs (`ranAsJob`). `skills` names each
  * skill its session loaded, one per load, `[]` for none; null for a try with no session of its own, and for a session an end of which does
  * not say what it loaded (`skillsLoadedOf`). `rules` holds each rule the step's frozen skills declare, kept or broken by `denied`
- * (`rulesOfTry`), `[]` with none declared; null where `denied` is.
+ * (`rulesOfTry`), `[]` with none declared; null where `denied` is. `tallies` holds each count the frozen step declares (`tally:`), valued
+ * off its session's own closeout (`tallyIn`): `[]` with none declared, and each value null for a try with no session of its own or whose
+ * closeout does not hold it.
  */
 export type TryFact = RunKeys & {
   day: string;
@@ -61,6 +65,7 @@ export type TryFact = RunKeys & {
   denied: string[] | null;
   skills: string[] | null;
   rules: RuleFact[] | null;
+  tallies: TallyFact[];
 };
 
 /**
@@ -87,7 +92,8 @@ export type Facts = { tries: TryFact[]; runs: RunFact[]; frozen: RunFrozen[] };
 /**
  * A run's timeline and record, and what `factsOf` reads beyond them: whether a task succeeded, each check's verdict, each step's
  * closeout, every call a session's task was refused, one per call, worded as a permission rule (`Bash(git push)`), and every skill it
- * loaded, one per load, null where an end of it does not say (`skillsLoadedOf`); and the rules each skill a step froze declares, by skill.
+ * loaded, one per load, null where an end of it does not say (`skillsLoadedOf`); the rules each skill a step froze declares, by skill;
+ * and the closeout a task's current turn made, undefined where it made none that reads.
  */
 export type RunRead = {
   run: Run;
@@ -99,6 +105,7 @@ export type RunRead = {
   deniedOf: (taskId: string) => string[];
   skillsOf: (taskId: string) => string[] | null;
   rulesOf: (step: Workflow) => ReadonlyMap<string, readonly SkillRule[]>;
+  closeoutOfTask: (taskId: string) => Closeout | undefined;
 };
 
 /** The UTC day of a time, `YYYY-MM-DD`. */
@@ -162,6 +169,10 @@ function tryFactsOf(r: RunRead): TryFact[] {
           denied,
           skills: t.session ? r.skillsOf(t.session.taskId) : null,
           rules: rulesOfTry(denied, r.rulesOf(step)),
+          tallies: (step.tally ?? []).map((tally) => ({
+            tally,
+            value: t.session ? tallyIn(tally, r.closeoutOfTask(t.session.taskId)?.output) : null,
+          })),
         },
       ];
     }),
@@ -300,10 +311,18 @@ export type StepRow = {
 export type Tiles = { last: Headline & { from: string; to: string }; before: Headline & { from: string; to: string } };
 
 /**
- * The numbers of a set of facts: over all its days, on each day of the range, per step, and the tiles; and the changes to what its runs
- * froze on the days of the range (`Mark`, `marks.ts`), sorted by day, run, kind and name.
+ * The numbers of a set of facts: over all its days, on each day of the range, per step, and the tiles; the changes to what its runs
+ * froze on the days of the range (`Mark`, `marks.ts`), sorted by day, run, kind and name; and a row per step and count it declares
+ * (`TallyRow`, `tally.ts`), over the range and on each of its days, its sum null where no try of it was measured.
  */
-export type Group = { total: Headline; days: Array<Headline & { day: string }>; steps: StepRow[]; tiles: Tiles; marks: Mark[] };
+export type Group = {
+  total: Headline;
+  days: Array<Headline & { day: string }>;
+  steps: StepRow[];
+  tiles: Tiles;
+  marks: Mark[];
+  tallies: TallyRow[];
+};
 
 /**
  * What `wf stats` and `GET /api/stats` answer: the days asked for, the filters and the key, the numbers of every fact kept (`all`), and,
@@ -414,6 +433,7 @@ function groupOf(f: Kept, from: string | null, to: string, today: string): Group
     steps: stepRowsOf(kept.tries),
     tiles: { last: tile(dayPlus(today, -13), today), before: tile(dayPlus(today, -27), dayPlus(today, -14)) },
     marks: kept.marks,
+    tallies: tallyRowsOf(kept.tries, from ? daysBetween(from, to) : []),
   };
 }
 

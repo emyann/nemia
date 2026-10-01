@@ -70,6 +70,7 @@ test('a step with every key the parser types, its agent and its output reads as 
         title: 'a key the parser keeps',
       },
     },
+    tally: ['verdict'],
     loop: 'implement',
     rounds: 3,
     agent: {
@@ -92,6 +93,8 @@ test('a step with every key the parser types, its agent and its output reads as 
     ['slot', 'all'],
     ['denials', 'warn'],
     ['after', 'implement'],
+    ['tally', 3],
+    ['tally', 'verdict'],
   ] as const) {
     assert.ok(Result.isFailure(decode({ ...(frozen(step) as object), [key]: value })), `${key}: ${value} is refused`);
   }

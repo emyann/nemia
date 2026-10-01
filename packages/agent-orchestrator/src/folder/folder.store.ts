@@ -590,6 +590,7 @@ const frozenStepFields = {
   retries: Schema.optionalKey(Schema.Finite),
   gate: Schema.optionalKey(Schema.Literal(true)),
   output: Schema.optionalKey(Schema.StructWithRest(Schema.Struct({ file: Schema.String, schema: OutputSchemaSchema }), Rest)),
+  tally: Schema.optionalKey(Strings),
   loop: Schema.optionalKey(Schema.String),
   rounds: Schema.optionalKey(Schema.Finite),
 } satisfies FrozenStepFields;

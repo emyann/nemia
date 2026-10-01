@@ -22,7 +22,8 @@ description: "Read a factory's stats since the janitor's last run, against the s
    nothing is never proposed a write. A skill's rule broken on many tries (a step row's `rules`) is a candidate card too — a fence, or a
    line in the skill — with its `kept` and `broken` as the evidence.
 5. **Read the rest for what moved**: a step whose tries, cost or refused checks rose against the period before, a loop that took more
-   rounds, a gate that waited longer. Propose a correction only where the numbers point at one; a number that moved with nothing to
+   rounds, a gate that waited longer, a count a workflow declares over its closeouts that rose (`all.tallies`: each step's `sum` over
+   its measured `tries`, null where none was measured). Propose a correction only where the numbers point at one; a number that moved with nothing to
    correct goes in the report, not on a card.
 6. **Read the inbox** (`npx wf inbox`, and the cards under `${WF_ROOT:-~/.agent-workflows}/inbox/` with Read): propose nothing a card
    there already says, under its title or another. The check files no card whose title one there already has.

@@ -1,11 +1,12 @@
 /**
  * The stats in words (`Stats`, `stats.ts`): the tiles, a row per day, a row per change to what the runs froze, a row per step, a row per
- * call a step was refused, a row per skill a step loaded, a row per rule a step's skills declare, and the one line the morning recap
- * quotes. A number with nothing measured under it reads `—`, never 0. Pure.
+ * call a step was refused, a row per skill a step loaded, a row per rule a step's skills declare, a row per day and count a step
+ * declares (`tally:`), and the one line the morning recap quotes. A number with nothing measured under it reads `—`, never 0. Pure.
  */
 import { dollars, durationWord } from '../status/status.ts';
 import type { Group, Headline, Stats, StepRow } from './stats.ts';
 import type { Mark } from './marks.ts';
+import type { TallyCell } from '../tally/tally.ts';
 
 const NONE = '—';
 
@@ -123,9 +124,29 @@ function ruleLines(steps: readonly StepRow[]): string[] {
   return rows.length ? table([['step', 'agent', 'skill', 'rule', 'kept', 'broken'], ...rows]) : [];
 }
 
+/** A tally's cell in words: its sum, to two decimals, `—` where no try was measured; and how many were. */
+const tallyCells = (c: TallyCell): string[] => [or(c.sum, (n) => String(Math.round(n * 100) / 100)), String(c.tries)];
+
+/**
+ * A row per day something happened on and count a step declares (`tally:`), then a row per count over the whole range (`all`); none
+ * where no step declares one.
+ */
+function tallyLines(g: Group): string[] {
+  if (!g.tallies.length) return [];
+  const days = g.days.filter((d) => d.tries || d.runs).map((d) => d.day);
+  return table([
+    ['day', 'step', 'tally', 'sum', 'tries'],
+    ...days.flatMap((day) =>
+      g.tallies.map((row) => [day, row.step, row.tally, ...tallyCells(row.days.find((d) => d.day === day) ?? { sum: null, tries: 0 })]),
+    ),
+    ...g.tallies.map((row) => ['all', row.step, row.tally, ...tallyCells(row.total)]),
+  ]);
+}
+
 /**
  * What `wf stats` prints: the tiles, a row per day — per group, with a key — then a row per change to what the runs froze, a row per step,
- * a row per call a step was refused, a row per skill a step loaded, a row per rule its skills declare, and the runs left out.
+ * a row per call a step was refused, a row per skill a step loaded, a row per rule its skills declare, a row per day and count a step
+ * declares, and the runs left out.
  */
 export function statsLines(s: Stats): string[] {
   const filtered = Object.entries(s.filters).map(([k, v]) => `${k} ${v}`);
@@ -141,6 +162,7 @@ export function statsLines(s: Stats): string[] {
     ...(denialLines(s.all.steps).length ? ['', ...denialLines(s.all.steps)] : []),
     ...(skillLines(s.all.steps).length ? ['', ...skillLines(s.all.steps)] : []),
     ...(ruleLines(s.all.steps).length ? ['', ...ruleLines(s.all.steps)] : []),
+    ...(s.all.tallies.length ? ['', ...tallyLines(s.all)] : []),
     ...(s.unreadable.length ? ['', `left out, a journal of each not reading (wf ls says why): ${s.unreadable.join(', ')}`] : []),
   ];
 }

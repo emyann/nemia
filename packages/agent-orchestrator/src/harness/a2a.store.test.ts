@@ -194,6 +194,7 @@ const LOCAL_ONLY: Record<string, string> = {
   denials: 'fail',
   budget: '5',
   output: 'schema.json',
+  tally: 'issues',
   resume: 'plan',
   check: 'npm test',
 };

@@ -124,6 +124,8 @@ export type WorkflowStepSpec = {
   gate: true | null;
   /** The schema file `output:` names. */
   output: string | null;
+  /** What `wf stats` counts of the step's closeouts (`tally:`): empty for none. */
+  tally: string[];
   loop: string | null;
   rounds: number | null;
 };
@@ -160,6 +162,7 @@ export const StepKeySchema = Schema.Literals([
   'retries',
   'gate',
   'output',
+  'tally',
   'loop',
   'rounds',
 ]) satisfies Schema.Schema<StepKey>;
@@ -190,6 +193,7 @@ export const WorkflowStepSpecSchema = Schema.Struct({
   retries: Schema.NullOr(Schema.Number),
   gate: Schema.NullOr(Schema.Literal(true)),
   output: Schema.NullOr(Schema.String),
+  tally: Strings,
   loop: Schema.NullOr(Schema.String),
   rounds: Schema.NullOr(Schema.Number),
 }) satisfies Schema.Schema<WorkflowStepSpec>;

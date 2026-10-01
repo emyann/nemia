@@ -91,6 +91,7 @@ const KINDS: Readonly<Record<StepKey, KeyKind>> = {
   retries: 'count',
   gate: 'flag',
   output: 'schema',
+  tally: 'list',
   loop: 'step',
   rounds: 'count',
 };
@@ -194,23 +195,15 @@ function harnessChoices(): readonly string[] {
   return [...HARNESSES, ...names.map((name) => `${REMOTE_PREFIX}${name}`)];
 }
 
+/** The words a key of a fixed list may be set to, the flags' among them; the harness and the agent are offered as the store has them. */
+const WORDS: Readonly<Partial<Record<StepKey, readonly string[]>>> = { ...FLAGS, workspace: WORKSPACES, slot: SLOTS, denials: DENIALS };
+
 export const keyForm = (home: string): KeyForm => ({
   keys: STEP_KEYS.map((key) => ({
     key,
     meaning: STEP_KEY_MEANINGS[key],
     kind: KINDS[key],
-    choices:
-      key === 'harness'
-        ? harnessChoices()
-        : key === 'workspace'
-          ? WORKSPACES
-          : key === 'slot'
-            ? SLOTS
-            : key === 'denials'
-              ? DENIALS
-              : key === 'agent'
-                ? agentsOfYours(home)
-                : (FLAGS[key] ?? null),
+    choices: key === 'harness' ? harnessChoices() : key === 'agent' ? agentsOfYours(home) : (WORDS[key] ?? null),
     byHarness: key === 'effort' ? EFFORTS : key === 'permissionMode' ? PERMISSION_MODES : key === 'sandbox' ? SANDBOXES : null,
   })),
   defaultHarness: DEFAULT_HARNESS,

@@ -432,3 +432,27 @@ test("REFUSED at shipped defaults, with the folder as it was: a step's file that
     'with no README given, the link is nothing the write touches',
   );
 });
+
+test('REFUSED at load and at write, in the same words: a `tally:` the closeout of the step cannot hold, naming its file, the schema and the field', () => {
+  const dir = devIn('tallied');
+  const review = path.join(dir, 'review.md');
+  const original = fs.readFileSync(review, 'utf8');
+  const steps = loadWorkflows(dir);
+  fs.writeFileSync(review, original.replace(/^budget: 20$/m, 'budget: 20\ntally: findings, nope'));
+  assert.match(fs.readFileSync(review, 'utf8'), /^tally: findings, nope$/m, 'the line is really in the file');
+  const said =
+    'review: `tally: findings, nope` in review.md: `output: review.schema.json` declares no field `nope`; it declares findings, again.';
+  assert.throws(
+    () => loadWorkflows(dir),
+    (e: unknown) => e instanceof WorkflowError && e.message.startsWith(said),
+  );
+  fs.writeFileSync(review, original);
+
+  const drafted = steps.map((s) => (s.name === 'review' ? { ...s, tally: ['findings', 'nope'] } : s));
+  assert.ok(refusal(dir, () => writeWorkflow(dir, drafted)).startsWith(said));
+
+  const kept = steps.map((s) => (s.name === 'review' ? { ...s, tally: ['findings'] } : s));
+  writeWorkflow(dir, kept);
+  assert.match(fs.readFileSync(review, 'utf8'), /^tally: findings$/m);
+  assert.deepEqual(loadWorkflows(dir).find((s) => s.name === 'review')?.tally, ['findings'], 'and a tally it can hold reads back');
+});

@@ -108,6 +108,51 @@ function reviewed(id: string, createdAt: string, text: string) {
 reviewed('m-1', '2026-09-26T09:00:00.000Z', 'Read the diff.');
 reviewed('m-2', '2026-09-27T09:00:00.000Z', 'Read the diff, then run the suite.');
 
+const TALLY_DAY = '2026-09-24';
+
+/** A run of a step that tallies its issues, in the factory `tallies`, its session signing `issues` on `TALLY_DAY`, or none. */
+function tallied(id: string, issues?: object[]) {
+  const day = (hour: number) => `${TALLY_DAY}T${String(hour).padStart(2, '0')}:00:00.000Z`;
+  write(
+    path.join(root, 'engine', 'tasks', `${id}-triage.jsonl`),
+    jsonl([
+      { kind: 'filed', at: day(10), brief: 'Sort them.', cwd: root, maxAttempts: 1, harness: 'codex' },
+      { kind: 'starting', at: day(10), attempt: 1 },
+      { kind: 'spawned', at: day(10), attempt: 1 },
+      {
+        kind: 'ended',
+        at: day(11),
+        attempt: 1,
+        sessionId: `ae/${id}-triage/1`,
+        observed: 'done',
+        reason: 'harness',
+        closeout: { outcome: 'done', summary: 'Sorted.', needs: null, artifacts: [], ...(issues ? { issues } : {}) },
+      },
+      { kind: 'settled', at: day(11), outcome: 'succeeded' },
+    ]),
+  );
+  write(
+    path.join(root, 'runs', `${id}.json`),
+    JSON.stringify({
+      id,
+      repo: '/repos/triage',
+      baseRef: 'abc',
+      workspace: '/repos/triage',
+      branch: 'main',
+      isolate: true,
+      brief: `The brief of ${id}`,
+      createdAt: day(9),
+      workflowDir: '/repos/triage/workflows/triage',
+      workflow: [{ name: 'triage', after: [], body: 'Sort them.', harness: 'codex', tally: ['issues', 'issues.open'] }],
+      steps: { triage: { taskId: `${id}-triage` } },
+      factory: 'tallies',
+    }),
+  );
+}
+
+tallied('t-signed', [{ open: true }, { open: false }, { open: true }]);
+tallied('t-unsigned');
+
 const asked = async (query: string) => {
   const res = await app.request(`/api/stats${query}`);
   return { status: res.status, body: (await res.json()) as Stats & { error?: string } };
@@ -121,8 +166,9 @@ test('GET /api/stats counts every run in the store, of every factory and reposit
     [
       ['default', 1, 1],
       ['other', 1, 2],
+      ['tallies', 0, undefined],
     ],
-    'a run of another factory, on a repository the api does not serve, is counted',
+    'a run of another factory, on a repository the api does not serve, is counted; one with no try that day is a group of none',
   );
   assert.deepEqual(body, await flowNumbers(e, { from: '2026-09-28', to: '2026-09-28', by: 'factory' }));
 });
@@ -172,4 +218,32 @@ test('GET /api/stats answers the change marks as the package does: a rendered sk
     [['2026-09-27', 'm-2', 'skill', 'review-a-change', 'm-1']],
   );
   assert.deepEqual(body, await flowNumbers(e, { workflow: 'review' }));
+});
+
+test('GET /api/stats answers each tally a step froze, per day and over the range, as null — never 0 — where no closeout measured it', async () => {
+  const { status, body } = await asked(`?ofFactory=tallies&from=2026-09-23&to=${TALLY_DAY}`);
+  assert.equal(status, 200, body.error);
+  assert.deepEqual(body.all.tallies, [
+    {
+      step: 'triage',
+      tally: 'issues',
+      total: { sum: 3, tries: 1 },
+      days: [
+        { day: '2026-09-23', sum: null, tries: 0 },
+        { day: TALLY_DAY, sum: 3, tries: 1 },
+      ],
+    },
+    {
+      step: 'triage',
+      tally: 'issues.open',
+      total: { sum: 2, tries: 1 },
+      days: [
+        { day: '2026-09-23', sum: null, tries: 0 },
+        { day: TALLY_DAY, sum: 2, tries: 1 },
+      ],
+    },
+  ]);
+  assert.equal(body.all.total.tries, 2, 'the run whose closeout signed no issues is a try, and measured no tally');
+  const none = await asked('?ofFactory=other');
+  assert.deepEqual(none.body.all.tallies, [], 'a step that declares no tally has no row');
 });

@@ -1049,6 +1049,7 @@ const unset: WorkflowStepSpec = {
   retries: null,
   gate: null,
   output: null,
+  tally: [],
   loop: null,
   rounds: null,
 };

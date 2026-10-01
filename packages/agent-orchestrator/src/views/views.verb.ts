@@ -445,17 +445,28 @@ function tailOf(file: string, bytes = 64_000): string {
  */
 export function closeoutOf(views: ReadonlyMap<string, TaskView>, run: Run, stepName: string): Closeout | { error: string } | undefined {
   const taskId = run.steps[stepName]?.taskId;
-  const state = taskId ? views.get(taskId)?.state : undefined;
+  return taskId ? closeoutSaid(views, taskId) : undefined;
+}
+
+/** The closing statement a task's current turn made (`currentTurn`), parsed; undefined where it made none. */
+function closeoutSaid(views: ReadonlyMap<string, TaskView>, taskId: string): Closeout | { error: string } | undefined {
+  const state = views.get(taskId)?.state;
   const said = state ? currentTurn(state).at(-1)?.closeout : undefined;
   return said === undefined ? undefined : parseCloseout(said);
+}
+
+/** A task's closing statement (`closeoutSaid`), well-formed only: what `wf stats` reads a try's tallies off. */
+export function taskCloseout(views: ReadonlyMap<string, TaskView>, taskId: string): Closeout | undefined {
+  const c = closeoutSaid(views, taskId);
+  return c && !('error' in c) ? c : undefined;
 }
 
 /** Only the well-formed ones, for the pure functions that just want the outcome. */
 export const closeoutReader =
   (views: ReadonlyMap<string, TaskView>, run: Run) =>
   (stepName: string): Closeout | undefined => {
-    const c = closeoutOf(views, run, stepName);
-    return c && !('error' in c) ? c : undefined;
+    const taskId = run.steps[stepName]?.taskId;
+    return taskId ? taskCloseout(views, taskId) : undefined;
   };
 
 /**

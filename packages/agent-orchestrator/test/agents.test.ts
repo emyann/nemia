@@ -93,6 +93,7 @@ test('REFUSED at shipped defaults: every wiring key in an agent file, by name, s
     'rounds',
     'budget',
     'deadlineSeconds',
+    'tally',
   ];
   assert.deepEqual(
     STEP_KEYS.filter((k) => !(AGENT_KEYS as readonly string[]).includes(k) && k !== ('agent' as string)).sort(),

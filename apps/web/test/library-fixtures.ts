@@ -132,6 +132,7 @@ export const stepSpec = (extra: Partial<WorkflowStepSpec> = {}): WorkflowStepSpe
   retries: 1,
   gate: true,
   output: 'ship.schema.json',
+  tally: [],
   loop: null,
   rounds: null,
   ...extra,

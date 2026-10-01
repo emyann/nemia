@@ -117,9 +117,10 @@ the engine's job. This one follows what only this package knows.
 flows: the runs finished and landed, the rounds a loop took to be accepted, the share of landed runs
 that landed on their first try, the cost and wall time of a landed run, and per step its tries, their
 time and cost, its checks' verdicts, its waits at a gate, the calls its harness refused it, the
-skills its sessions loaded, and each rule its skills declare, kept or broken. It prints tiles — the
-last 14 days against the 14 before — a row per UTC day, a row per step and agent, a row per call a
-step was refused, a row per skill a step loaded, and a row per rule a step's skills declare.
+skills its sessions loaded, each rule its skills declare, kept or broken, and each count its workflow
+declares over its closeouts (`tally:`). It prints tiles — the last 14 days against the 14 before — a
+row per UTC day, a row per step and agent, a row per call a step was refused, a row per skill a step
+loaded, a row per rule a step's skills declare, and a row per day, step and tally.
 
 ```bash
 wf stats                                   # every day since the first try ended, to today
@@ -173,6 +174,16 @@ wf stats --json                            # what GET /api/stats answers
   is gone counts none; editing it marks a skill change (below). A `rules.json` that does not read is
   refused at load and at `wf start`, naming the file and its first wrong field. A step's row lists
   each rule with its `kept` and `broken`, most broken first; a skill that declares none has no row.
+- **A tally is a field of a step's closeout, counted as the run froze it**: each entry of the step's
+  `tally:` ([below](#declared-output-output-and-input)) is valued on each try whose own session's closeout
+  reads — an array its items, an integer or a number its value, `field.flag` the items whose boolean flag
+  is `true` — and `sum` adds the values of the day's tries, `tries` saying how many were measured. A try
+  with no closeout of its own (a recheck, a session that signed none), or a field absent or of another
+  type at run time, measured nothing: on a day with no measured try the sum is `—`, never 0, while a
+  closeout that holds an empty list measured 0. Only what the run froze at `wf start` counts: a `tally:`
+  added to the folder later counts no run before it. In JSON, each group's `tallies` give a row per step
+  and tally, its `total` over the range and a cell per day of it; in words, a row per day a try ended or
+  a run finished, and an `all` row per tally.
 - **A run whose journal does not read is left out whole**, and named on the last line.
 - **A change is marked on the day a run froze it**: a step (its keys and its own note), an agent's
   instructions, skills and system prompt, or a skill as `wf start` rendered it, that differs from what
@@ -258,7 +269,7 @@ reads as it was written.
 
 A step's keys are a closed list — `after`, `resume`, `input`, `workspace`, `slot`, `agent`, `harness`, `model`, `effort`, `context`,
 `permissionMode`, `sandbox`, `tools`, `disallowedTools`, `allowedTools`, `background`, `remote`, `deadlineSeconds`, `budget`, `check`, `retries`,
-`gate`, `output`, `loop`, `rounds` — and a key the parser does not know is refused by name before anything is spent, as is a value
+`gate`, `output`, `tally`, `loop`, `rounds` — and a key the parser does not know is refused by name before anything is spent, as is a value
 it cannot use (`src/workflow/step-file.ts`). `guide` is refused with a reason of its own, and so is `maxAttempts`, retired on 2026-09-23 with
 the runtime's own: the runtime makes one attempt at a session, and trying again is the run's — `retries:` and `wf retry`
 ([below](#trying-again-retries-and-wf-retry)). A run frozen with the key still loads, lists and files, without it.
@@ -776,6 +787,14 @@ Review the change in this workspace as a second engineer would, and look at it a
   schemas. At load, the run refuses a schema whose objects are not strict or that uses `$ref`, a schema that names
   `outcome`, `summary`, `artifacts` or `needs`, a file that is not there, and a file outside the folder — absolute, or up
   and out with `..` — before it is read. Each refusal names the fix.
+- **`tally: <field>, <field>.<flag>`** names what `wf stats` counts of the step's closeouts: a field of
+  its `output:` schema that is an array (its items are counted), an integer or a number (its value is
+  summed), or an array's field and a boolean of its items (the items where it is `true`): `tally:
+  findings, mutants.proves`. Refused at load and at `wf start`, naming the step's file, the schema and
+  the entry: a `tally:` on a step with no `output:` (its own or its agent's) or on a remote agent, a
+  field the schema does not declare or declares as another type, a flag that is no boolean of the
+  items of an array, an entry with more than one dot or an empty part, and an entry given twice. It is
+  frozen with the step, and counted by what each run froze.
 - **`input: <step>`** hands this step the producer's declared fields, under `## From <step>` in its
   brief, as JSON labelled as data. It gets those fields only, never the producer's summary, needs or
   artifacts. The producer must be a step this one waits on — directly, through the steps between, or

@@ -286,8 +286,8 @@ export function tryHeld(brief: string, latest: { moving: boolean; id: string } |
 }
 
 /**
- * A try's state in words: what stopped it (`stoppedOn`, `awaiting approval` or `blocked`) off its row on the list, where the list judged its
- * run as `status`, the run's detail, does; else `status`. Takes the row undefined before the list has the try.
+ * A try's state in words: what stopped it (`stoppedOn`, `awaiting approval` or `blocked`) off its row on the list, where the list judged
+ * its run as `status`, the run's detail, does; else `status`. Takes the row undefined before the list has the try.
  */
 export function tryStatusWord(status: RunStatus, listed: Pick<RunSummary, 'status' | 'stoppedOn'> | undefined): string {
   return (listed?.status === status ? listed.stoppedOn : null) ?? status;

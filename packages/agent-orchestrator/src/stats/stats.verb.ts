@@ -1,10 +1,11 @@
 /**
  * `wf stats` (`statsRun`): the flow numbers of every run in the store (`statsOf`), off each run's record and the engine's view of every
  * task of every try, each viewed once, the calls each session was refused and the skills it loaded read off the same views
- * (`deniedCallsOf`, `skillsLoadedOf`), each try's counts read off its own task's closeout (`taskCloseout`), and the rules each step's skills
- * declare read off their frozen copies (`renderedSkillRules`): no session's log nor transcript, and no skill of the checkout. A controller,
- * reaching the runtime through the client (`runtime-client.ts`): an Effect program that requires the engine as a service (`EngineService`),
- * and `stats`, its plain face in a Promise, over the engine it is handed. It writes nothing, and keeps nothing between calls.
+ * (`deniedCallsOf`, `skillsLoadedOf`), each try's counts read off its own task's closeout (`taskCloseout`), and the rules each step's
+ * skills declare read off their frozen copies (`renderedSkillRules`): no session's log nor transcript, and no skill of the checkout. A
+ * controller, reaching the runtime through the client (`runtime-client.ts`): an Effect program that requires the engine as a service
+ * (`EngineService`), and `stats`, its plain face in a Promise, over the engine it is handed. It writes nothing, and keeps nothing between
+ * calls.
  */
 import { Effect } from 'effect';
 import { EngineService, awaited, denialText, unreadableJournal, type Engine, type TaskView } from '../runtime-client.ts';

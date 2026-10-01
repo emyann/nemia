@@ -222,10 +222,26 @@ deniedSession('denied-codex', UNMEASURED_DAY, 1, [[rm]]);
 deniedSession('denied-bg', UNMEASURED_DAY, 2, [[rm]]);
 deniedSession('denied-quiet', QUIET_DAY, 1, [[]]);
 deniedSession('denied-before-jobs', BG_DAY, 18, [[]]);
+const RULED = 'write-a-spec';
+const RULES = [
+  { id: 'no-write', says: 'Write nothing at the root', breaks: ['Edit(//x)'] },
+  { id: 'no-curl', says: 'Never fetch', breaks: ['Bash(curl:*)'] },
+  { id: 'no-rm', says: 'Never remove', breaks: ['Bash(rm:*)'] },
+];
+/** The skill `name` as `wf start` rendered it for the denied run's write step, its `rules.json` written as `rules` where given. */
+function renderedForWrite(name: string, rules?: string) {
+  const dir = path.join(ROOT, 'runs', 'denied', 'agents', 'write', 'nemia-ada', 'skills', name);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'SKILL.md'), `---\nname: ${name}\ndescription: A skill.\n---\nDo it.\n`);
+  if (rules !== undefined) fs.writeFileSync(path.join(dir, 'rules.json'), rules);
+}
+renderedForWrite(RULED, JSON.stringify({ rules: RULES }));
+renderedForWrite('look');
+renderedForWrite('unread', '{ "rules": [{ "id": "x" }] }');
 writeRun(
   'denied',
   [
-    { name: 'write', after: [], body: 'Write it.', agent: agent('ada') },
+    { name: 'write', after: [], body: 'Write it.', agent: { ...agent('ada'), skills: [RULED, 'look', 'unread'] } },
     { name: 'codex', after: [], body: 'Do it.', harness: 'codex' },
     { name: 'bg', after: [], body: 'Do it.', background: true },
     { name: 'quiet', after: [], body: 'Do it.' },
@@ -411,6 +427,26 @@ test('wf stats counts each call a session was refused, per measured try; a codex
   assert.match(words, /^write\s+ada\s+Write\(\/x\)\s+2$/m);
   const line = await printedBy(t, ['stats', '--line', '--factory', 'denials']);
   assert.match(line, /, \S+ \(\S+\) calls denied, /);
+});
+
+test("wf stats counts each rule a step's frozen skills declare, kept or broken per measured try; rules that do not read count none", async (t) => {
+  const range = ['--factory', 'denials', '--from', BG_DAY, '--to', DENIED_DAY];
+  const s = JSON.parse(await printedBy(t, ['stats', '--json', ...range])) as Stats;
+  const write = s.all.steps.find((row) => row.step === 'write');
+  assert.deepEqual(
+    write?.rules,
+    [
+      { skill: RULED, rule: 'no-rm', says: 'Never remove', kept: 1, broken: 1 },
+      { skill: RULED, rule: 'no-write', says: 'Write nothing at the root', kept: 1, broken: 1 },
+      { skill: RULED, rule: 'no-curl', says: 'Never fetch', kept: 2, broken: 0 },
+    ],
+    "write's two sessions, its recheck not counted again; look declares none, and unread's rules.json does not read",
+  );
+  assert.deepEqual(s.all.steps.find((row) => row.step === 'quiet')?.rules, [], 'a step given no skill');
+  const words = await printedBy(t, ['stats', ...range]);
+  assert.match(words, /^step\s+agent\s+skill\s+rule\s+kept\s+broken$/m);
+  assert.match(words, new RegExp(`^write\\s+ada\\s+${RULED}\\s+no-write\\s+1\\s+1$`, 'm'));
+  assert.match(words, new RegExp(`^write\\s+ada\\s+${RULED}\\s+no-curl\\s+2\\s+0$`, 'm'));
 });
 
 test('wf stats counts each skill a session loaded, per try whose ends all say; a recheck, or one end unsaid, is unmeasured', async (t) => {

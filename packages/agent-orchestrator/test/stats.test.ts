@@ -1,7 +1,7 @@
 /**
  * `wf stats` over a store of seeded records and the runtime itself, `promiseEngine` over an in-memory journal: the numbers `--json`
- * answers, the one line `--line` prints, a check that refused told from one that did not finish (`refusedCheck`), and the refusals of
- * a key and a day it does not take. A run whose check did not finish has not finished; a run whose journal does not read is left out
+ * answers, the one line `--line` prints, a check that refused told from one that did not finish (`refusedCheck`), the calls a session was
+ * refused on a harness that records them, and the refusals of a key and a day it does not take. A run whose check did not finish has not finished; a run whose journal does not read is left out
  * whole, and named.
  *
  * `WF_ROOT` is set before the command line is imported, which reads it as the module loads.
@@ -22,33 +22,38 @@ process.env.WF_ROOT = ROOT;
 const { main } = await import('../src/cli/main.ts');
 
 const DAY = '2026-09-28';
-const at = (hour: number): string => `${DAY}T${String(hour).padStart(2, '0')}:00:00.000Z`;
+const at = (hour: number, day = DAY): string => `${day}T${String(hour).padStart(2, '0')}:00:00.000Z`;
 const SIGNED = { outcome: 'done', summary: 'Did it.', needs: null, artifacts: [] };
 
 const tasks = new Map<string, unknown[]>();
 
 /**
- * A task filed at `from` that ran from `from` to `to`: a session signing `closeout` and measured at `costUsd`, or a check exiting
- * `exitCode`, or with `exitCode` null ended without one.
+ * A task filed at `from` that ran from `from` to `to`, on `day` or `DAY`: a session signing `closeout` and measured at `costUsd`, or a
+ * check exiting `exitCode`, or with `exitCode` null ended without one.
  */
-function ran(taskId: string, from: number, to: number, how: { costUsd?: number; closeout?: object; exitCode?: number | null } = {}) {
+function ran(
+  taskId: string,
+  from: number,
+  to: number,
+  how: { costUsd?: number; closeout?: object; exitCode?: number | null; day?: string } = {},
+) {
   const check = how.exitCode !== undefined;
   const passed = !check || how.exitCode === 0;
   tasks.set(taskId, [
-    { kind: 'filed', at: at(from), brief: 'Do it.', cwd: ROOT, maxAttempts: 1, harness: check ? 'check' : 'claude' },
-    { kind: 'starting', at: at(from), attempt: 1 },
-    { kind: 'spawned', at: at(from), attempt: 1 },
+    { kind: 'filed', at: at(from, how.day), brief: 'Do it.', cwd: ROOT, maxAttempts: 1, harness: check ? 'check' : 'claude' },
+    { kind: 'starting', at: at(from, how.day), attempt: 1 },
+    { kind: 'spawned', at: at(from, how.day), attempt: 1 },
     {
       kind: 'ended',
-      at: at(to),
+      at: at(to, how.day),
       attempt: 1,
       sessionId: `ae/${taskId}/1`,
       observed: passed ? 'done' : 'failed',
       reason: 'harness',
       ...(check ? (how.exitCode === null ? {} : { exitCode: how.exitCode }) : { closeout: how.closeout ?? SIGNED }),
     },
-    ...(how.costUsd === undefined ? [] : [{ kind: 'measured', at: at(to), attempt: 1, usage: { costUsd: how.costUsd } }]),
-    { kind: 'settled', at: at(to), outcome: passed ? 'succeeded' : 'failed' },
+    ...(how.costUsd === undefined ? [] : [{ kind: 'measured', at: at(to, how.day), attempt: 1, usage: { costUsd: how.costUsd } }]),
+    { kind: 'settled', at: at(to, how.day), outcome: passed ? 'succeeded' : 'failed' },
   ]);
 }
 
@@ -169,6 +174,67 @@ reviewRun('marks-2', '2026-09-25T23:59:00.000Z', 'Read the diff, then run the su
 reviewRun('marks-3', '2026-09-26T08:00:00.000Z', 'Read the diff, then run the suite.');
 reviewRun('marks-4', '2026-09-27T08:00:00.000Z');
 
+type Denial = { tool: string; what?: string };
+
+/** A session task that ended on `day` at `hour`, an attempt per list of the calls it was denied, the last one succeeding. */
+function deniedSession(taskId: string, day: string, hour: number, attempts: Denial[][]) {
+  const when = at(hour, day);
+  tasks.set(taskId, [
+    { kind: 'filed', at: when, brief: 'Do it.', cwd: ROOT, maxAttempts: attempts.length, harness: 'claude' },
+    ...attempts.flatMap((denials, i) => [
+      { kind: 'starting', at: when, attempt: i + 1 },
+      { kind: 'spawned', at: when, attempt: i + 1 },
+      {
+        kind: 'ended',
+        at: when,
+        attempt: i + 1,
+        sessionId: `ae/${taskId}/${i + 1}`,
+        observed: i === attempts.length - 1 ? 'done' : 'failed',
+        reason: 'harness',
+        closeout: SIGNED,
+        ...(denials.length ? { denials } : {}),
+      },
+    ]),
+    { kind: 'settled', at: when, outcome: 'succeeded' },
+  ]);
+}
+
+const DENIED_DAY = '2026-09-22';
+const UNMEASURED_DAY = '2026-09-21';
+const QUIET_DAY = '2026-09-20';
+const writeX = { tool: 'Write', what: '/x' };
+const rm = { tool: 'Bash', what: 'rm' };
+deniedSession('denied-write', DENIED_DAY, 1, [[writeX], [writeX, { tool: 'Bash', what: 'git push' }]]);
+deniedSession('denied-write-2', DENIED_DAY, 2, [[rm]]);
+ran('denied-write-2-check', 2, 3, { exitCode: null, day: DENIED_DAY });
+ran('denied-write-2-check-2', 3, 4, { exitCode: 0, day: DENIED_DAY });
+deniedSession('denied-codex', UNMEASURED_DAY, 1, [[rm]]);
+deniedSession('denied-bg', UNMEASURED_DAY, 2, [[rm]]);
+deniedSession('denied-quiet', QUIET_DAY, 1, [[]]);
+writeRun(
+  'denied',
+  [
+    { name: 'write', after: [], body: 'Write it.', agent: agent('ada') },
+    { name: 'codex', after: [], body: 'Do it.', harness: 'codex' },
+    { name: 'bg', after: [], body: 'Do it.', background: true },
+    { name: 'quiet', after: [], body: 'Do it.' },
+  ],
+  {
+    write: {
+      taskId: 'denied-write-2',
+      check: { taskId: 'denied-write-2-check-2' },
+      tries: [
+        { taskId: 'denied-write', then: 'retries' },
+        { taskId: 'denied-write-2', then: 'retries', check: { taskId: 'denied-write-2-check' } },
+      ],
+    },
+    codex: { taskId: 'denied-codex' },
+    bg: { taskId: 'denied-bg' },
+    quiet: { taskId: 'denied-quiet' },
+  },
+  { factory: 'denials', createdAt: `${QUIET_DAY}T00:00:00.000Z` },
+);
+
 const printedBy = async (t: TestContext, argv: string[]) => {
   const out: string[] = [];
   const log = t.mock.method(console, 'log', (...a: unknown[]) => void out.push(a.map(String).join(' ')));
@@ -205,6 +271,7 @@ test('wf stats --by factory answers a group per factory, and --factory keeps one
     s.groups.map((g) => [g.key, g.total.tries]),
     [
       ['default', 3],
+      ['denials', 6],
       ['other', 2],
     ],
   );
@@ -269,4 +336,33 @@ test('wf stats marks the day a run froze a rendered skill that differs from the 
   );
   const words = await printedBy(t, ['stats', '--workflow', 'review']);
   assert.match(words, new RegExp(`^2026-09-25\\s+skill ${SKILL}\\s+marks-2\\s+marks-1$`, 'm'));
+});
+
+test('wf stats counts each call a session was refused, per measured try; a codex, a background or a recheck try is not measured', async (t) => {
+  const s = JSON.parse(await printedBy(t, ['stats', '--json', '--factory', 'denials', '--from', QUIET_DAY, '--to', DENIED_DAY])) as Stats;
+  const perDay = Object.fromEntries(s.all.days.map((d) => [d.day, d.deniedPerTry]));
+  assert.deepEqual(
+    perDay,
+    { [QUIET_DAY]: 0, [UNMEASURED_DAY]: null, [DENIED_DAY]: 2 },
+    'four calls over the two sessions of write, its recheck not counted again; codex and background are not measured, not 0',
+  );
+  const write = s.all.steps.find((row) => row.step === 'write');
+  assert.deepEqual([write?.tries, write?.deniedCalls, write?.deniedTries], [3, 4, 2]);
+  assert.deepEqual(write?.denials, [
+    { call: 'Write(/x)', count: 2 },
+    { call: 'Bash(git push)', count: 1 },
+    { call: 'Bash(rm)', count: 1 },
+  ]);
+  for (const name of ['codex', 'bg']) {
+    const row = s.all.steps.find((r) => r.step === name);
+    assert.deepEqual([row?.deniedCalls, row?.deniedTries, row?.denials], [null, 0, []], `${name} records no denial`);
+  }
+  const words = await printedBy(t, ['stats', '--factory', 'denials', '--from', QUIET_DAY, '--to', DENIED_DAY]);
+  assert.match(words, new RegExp(`^${DENIED_DAY}\\s.*\\s2/try$`, 'm'));
+  assert.match(words, new RegExp(`^${UNMEASURED_DAY}\\s.*\\s—$`, 'm'));
+  assert.match(words, new RegExp(`^${QUIET_DAY}\\s.*\\s0/try$`, 'm'));
+  assert.match(words, /^write\s+ada\s+3\s.*\s4 \(2 of 3\)$/m, 'the step row says how many of its tries were measured');
+  assert.match(words, /^write\s+ada\s+Write\(\/x\)\s+2$/m);
+  const line = await printedBy(t, ['stats', '--line', '--factory', 'denials']);
+  assert.match(line, /, \S+ \(\S+\) calls denied$/);
 });

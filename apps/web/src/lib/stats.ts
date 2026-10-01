@@ -47,6 +47,7 @@ export const HEADLINES: readonly HeadlineNumber[] = [
   { key: 'tries', label: 'tries', about: 'tries ended', words: or(String) },
   { key: 'refused', label: 'refused', about: 'checks that refused', words: or(String) },
   { key: 'gateWaitMs', label: 'gate wait', about: 'mean wait at a gate', words: or(durationWord) },
+  { key: 'deniedPerTry', label: 'denied', about: 'mean calls refused per try', words: or((n) => `${Math.round(n * 100) / 100}/try`) },
 ];
 
 /** Every headline number of `h` in words, by key. */

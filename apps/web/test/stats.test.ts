@@ -16,6 +16,7 @@ const day = (d: string, given: Partial<StatsDay> = {}): StatsDay => ({
   tries: 0,
   refused: 0,
   gateWaitMs: null,
+  deniedPerTry: null,
   ...given,
 });
 
@@ -82,6 +83,7 @@ test('each number is worded as wf stats words it', () => {
     tries: 12,
     refused: 0,
     gateWaitMs: 42_000,
+    deniedPerTry: 0.4,
   });
   assert.deepEqual(words, {
     rounds: '2.5',
@@ -93,9 +95,21 @@ test('each number is worded as wf stats words it', () => {
     tries: '12',
     refused: '0',
     gateWaitMs: '42s',
+    deniedPerTry: '0.4/try',
   });
   const labels = HEADLINES.map((h) => h.label);
-  assert.deepEqual(labels, ['rounds', 'first try', 'cost/landed', 'time/landed', 'landed', 'runs', 'tries', 'refused', 'gate wait']);
+  assert.deepEqual(labels, [
+    'rounds',
+    'first try',
+    'cost/landed',
+    'time/landed',
+    'landed',
+    'runs',
+    'tries',
+    'refused',
+    'gate wait',
+    'denied',
+  ]);
   const cost = HEADLINES.find((h) => h.key === 'costPerLanded')!;
   assert.equal(cost.words(0.004), '$0.004', 'a cost under a cent keeps three figures, as dollars does');
   const time = HEADLINES.find((h) => h.key === 'timePerLanded')!;
@@ -146,7 +160,7 @@ const served = {
   filters: {},
   all: {
     total: day('total'),
-    days: [day('2026-09-29'), day('2026-09-30', { rounds: 0, firstTry: null })],
+    days: [day('2026-09-29'), day('2026-09-30', { rounds: 0, firstTry: null, deniedPerTry: 0 })],
     steps: [{ step: 'implement' }],
     tiles: {
       last: { ...day('x', { runs: 2 }), from: '2026-09-17', to: '2026-09-30' },
@@ -175,6 +189,10 @@ test('the served stats decode with every null kept, and the keys the page does n
   const stats: Stats = Schema.decodeUnknownSync(StatsSchema)(served);
   assert.equal(stats.all.days[1].firstTry, null);
   assert.equal(stats.all.days[1].rounds, 0);
+  assert.equal(stats.all.days[0].deniedPerTry, null, 'a day no try was measured on keeps its calls refused unmeasured');
+  assert.equal(stats.all.days[1].deniedPerTry, 0);
+  const denied = HEADLINES.find((h) => h.key === 'deniedPerTry')!;
+  assert.deepEqual([denied.words(null), denied.words(0), denied.words(1 / 3)], [NONE, '0/try', '0.33/try']);
   assert.equal(stats.all.tiles.last.landed, null);
   assert.equal(stats.all.marks[0].repo, null);
   assert.equal(stats.all.marks[0].agents[0], null);

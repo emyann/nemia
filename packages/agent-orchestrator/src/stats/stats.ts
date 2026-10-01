@@ -1,7 +1,7 @@
 /**
  * The flow numbers of a store's history, defined on each workflow's structure and never on a step's name: the rounds of each `loop:` step
  * to acceptance, the tries of the `workspace: main` step to a landing, what a landed run cost and how long it took, and every step's tries,
- * time, cost, check verdicts and gate waits.
+ * time, cost, check verdicts and gate waits, and the calls its harness refused it, where the harness records them (`discipline.ts`).
  *
  * Pure: `factsOf` turns one run's timeline and record into facts, `statsOf` buckets them by UTC day and by one breakdown key, filters them
  * and totals them, with the changes to what the runs froze (`marksOf`, `marks.ts`), and `statsQueryOf` reads what a person asked.
@@ -17,6 +17,7 @@ import { DEFAULT_FACTORY } from '../factory/factory.ts';
 import { askedAgain, landsOnCheck } from '../status/status.ts';
 import type { Timeline, TimelineTry } from '../timeline/timeline.ts';
 import { marksOf, type Mark, type RunFrozen } from './marks.ts';
+import { deniesRecorded } from './discipline.ts';
 
 /** What a breakdown or a filter goes by: the step's agent, the step, the run's factory, its workflow's folder and its repository. */
 export const BY_KEYS = ['agent', 'step', 'factory', 'workflow', 'repo'] as const;
@@ -40,6 +41,8 @@ export type RunKeys = { run: string; factory: string; workflow: string; repo: st
  * One try of one step that ended, on the UTC day it ended: its check's end, or its session's where it has no check. `agent` is the
  * step's agent, null where it names none. `ranMs` is its session's and its check's run times, `costUsd` what its session cost, `check` its
  * check's verdict, null with no check, and `gateWaitMs` the wait for a person's approval of this try: each null where not measured.
+ * `denied` names each call its session was refused, one per call; null for a try that ran no session of its own (a recheck's) and on a
+ * step whose harness records no denial (`deniesRecorded`).
  */
 export type TryFact = RunKeys & {
   day: string;
@@ -50,6 +53,7 @@ export type TryFact = RunKeys & {
   costUsd: number | null;
   check: CheckVerdict | null;
   gateWaitMs: number | null;
+  denied: string[] | null;
 };
 
 /**
@@ -74,8 +78,8 @@ export type RunFact = RunKeys & {
 export type Facts = { tries: TryFact[]; runs: RunFact[]; frozen: RunFrozen[] };
 
 /**
- * A run's timeline and record, and what `factsOf` reads beyond them: whether a task succeeded, each check's verdict, and each step's
- * closeout.
+ * A run's timeline and record, and what `factsOf` reads beyond them: whether a task succeeded, each check's verdict, each step's
+ * closeout, and every call a session's task was refused, one per call, worded as a permission rule (`Bash(git push)`).
  */
 export type RunRead = {
   run: Run;
@@ -84,6 +88,7 @@ export type RunRead = {
   succeeded: (taskId: string) => boolean;
   verdictOf: (checkTaskId: string) => CheckVerdict | null;
   closeoutOf: (step: string) => Closeout | undefined;
+  deniedOf: (taskId: string) => string[];
 };
 
 /** The UTC day of a time, `YYYY-MM-DD`. */
@@ -143,6 +148,7 @@ function tryFactsOf(r: RunRead): TryFact[] {
           costUsd: t.used?.costUsd ?? null,
           check: t.check ? r.verdictOf(t.check.taskId) : null,
           gateWaitMs: gateWaitOf(r, step, t),
+          denied: t.session && deniesRecorded(step) ? r.deniedOf(t.session.taskId) : null,
         },
       ];
     }),
@@ -235,7 +241,8 @@ export const factsOf = (r: RunRead): Pick<Facts, 'tries' | 'runs'> => ({ tries: 
  * whether it landed. `rounds` is the mean rounds
  * to acceptance, `firstTry` the share of landed runs that landed on their first try, `costPerLanded` and `timePerLanded` the mean cost and
  * wall time of a landed run, over those measured. `tries` counts the tries, `refused` the checks that refused, and `gateWaitMs` is the mean
- * wait at a gate. Each mean over nothing is null.
+ * wait at a gate. `deniedPerTry` is the mean count of calls refused per try, over the tries whose harness records them. Each mean over
+ * nothing is null.
  */
 export type Headline = {
   runs: number;
@@ -247,11 +254,13 @@ export type Headline = {
   tries: number;
   refused: number;
   gateWaitMs: number | null;
+  deniedPerTry: number | null;
 };
 
 /**
  * One step's totals, for one agent: its tries, their known run time, what the measured ones cost (`costTries` of them measured), their
- * checks' verdicts, and the mean gate wait.
+ * checks' verdicts, and the mean gate wait; and the calls refused it, `deniedCalls` over the `deniedTries` tries measured (null with none),
+ * each call with its count (`denials`), most first, then by call.
  */
 export type StepRow = {
   step: string;
@@ -262,6 +271,9 @@ export type StepRow = {
   costTries: number;
   checks: Record<CheckVerdict, number>;
   gateWaitMs: number | null;
+  deniedCalls: number | null;
+  deniedTries: number;
+  denials: Array<{ call: string; count: number }>;
 };
 
 /** The last 14 days to today, and the 14 before them, each by its first and last day. */
@@ -306,7 +318,17 @@ export function headlineOf(f: Pick<Facts, 'tries' | 'runs'>): Headline {
     tries: f.tries.length,
     refused: f.tries.filter((t) => t.check === 'refused').length,
     gateWaitMs: mean(f.tries.map((t) => t.gateWaitMs)),
+    deniedPerTry: mean(f.tries.map((t) => t.denied?.length ?? null)),
   };
+}
+
+/** Each call refused over a step's tries, with how many times: most first, then by call. */
+function callCounts(tries: readonly TryFact[]): StepRow['denials'] {
+  const counts = new Map<string, number>();
+  for (const call of tries.flatMap((t) => t.denied ?? [])) counts.set(call, (counts.get(call) ?? 0) + 1);
+  return [...counts]
+    .map(([call, count]) => ({ call, count }))
+    .sort((a, b) => b.count - a.count || (a.call < b.call ? -1 : a.call > b.call ? 1 : 0));
 }
 
 /** Each step's totals, per agent (`StepRow`), in the order of the tries: run by run, and a run's steps in its workflow's order. */
@@ -329,6 +351,9 @@ function stepRowsOf(tries: readonly TryFact[]): StepRow[] {
       unfinished: of.filter((t) => t.check === 'unfinished').length,
     },
     gateWaitMs: mean(of.map((t) => t.gateWaitMs)),
+    deniedCalls: knownSum(of.map((t) => t.denied?.length)),
+    deniedTries: of.filter((t) => t.denied !== null).length,
+    denials: callCounts(of),
   }));
 }
 

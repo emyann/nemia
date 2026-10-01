@@ -4826,6 +4826,7 @@ const statsDay = (day: string, given: Record<string, number | null> = {}) => ({
   tries: 0,
   refused: 0,
   gateWaitMs: null,
+  deniedPerTry: null,
   ...given,
 });
 

@@ -91,6 +91,9 @@ holds what every change needs.
   `packages/agent-orchestrator/test/limits.test.ts`, which refuses one left loose; a move renames both.
 - **A state machine is drawn by its code.** A new machine prints its own Mermaid diagram, held between `diagram:<name>` markers in its
   package's docs whose begin line names the command; never a drawing. `agent-orchestrator/test/diagrams.test.ts` refuses a drift.
+- **A state machine declares the verbs written from outside it**: each with the states it is taken from, the state the next pass reads
+  and its guard, which the verb's refusal asks first; its diagram draws them. The lifecycle's are `VERBS`, held to their refusals by
+  `agent-runtime/src/core/verbs.test.ts`; `LifecycleGraph.verbs` is required of every machine the board serves, `[]` when it has none.
 - The Kubernetes test for a new field on the runtime's task: does `batch/v1` have a field for it?
 
 ## Git

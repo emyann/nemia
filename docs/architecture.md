@@ -44,7 +44,7 @@ reach packages/agent-orchestrator through `agent-orchestrator`, `agent-orchestra
 `agent-orchestrator/workflow` and `agent-orchestrator/effect` alone. `./workflow` is the pure format, `./effect` the
 refusals by kind, and what reads a folder from disk is exported from `agent-orchestrator`. XState is a dependency
 of the runtime alone: `src/core/lifecycle.ts` is the one file of any workspace that imports it, and neither entry exports it,
-the machine, or the readings `decide` moves by. `agent-runtime` exports the lifecycle's graph as plain data (`lifecycleGraph`),
+the machine, or the readings `decide` moves by. `agent-runtime` exports the lifecycle's graph as plain data (`lifecycleGraph`: its states, edges and a person's verbs),
 which the board draws.
 
 Tests: `packages/agent-runtime/test/contract.test.ts`, `packages/agent-orchestrator/test/contract.test.ts` and

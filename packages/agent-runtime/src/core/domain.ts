@@ -23,7 +23,16 @@
  */
 
 import type { HarnessArgs } from '../harness/args.ts';
-import { transition, type LifecycleEvent, type LifecycleState, type Move, type Refusal } from './lifecycle.ts';
+import {
+  transition,
+  VERBS,
+  type LifecycleEvent,
+  type LifecycleState,
+  type Move,
+  type Refusal,
+  type VerbGuard,
+  type VerbName,
+} from './lifecycle.ts';
 import { endOf, isLive, NEEDS_HUMAN, RUNNING, waitsOnPerson, type Ended, type Outcome, type SessionState } from './session.ts';
 
 /** Ended by the session itself, not stopped under it: an end on record that no deadline overrules. */
@@ -545,6 +554,21 @@ export function waitsForInput(state: State): boolean {
   const last = state.attempts.at(-1);
   return state.holdOpen === true && !state.settled && !state.closed && last?.ended === 'done' && (last.turn ?? 0) === state.inputs.length;
 }
+
+/** A task a person may ask to stop (`requestStop`): not settled, and not asked to stop already. */
+export const stoppable = (state: State): boolean => !state.settled && !state.stopRequested;
+
+/** A task a person may answer or close: waiting on their word (`waitsForInput`), and not asked to stop, which outranks it. */
+export const awaitsWord = (state: State): boolean => waitsForInput(state) && !state.stopRequested;
+
+/** Each guard a verb of `VERBS` names, by that name: the predicate its refusal asks of the task's state. */
+export const VERB_GUARDS: Record<VerbGuard, (state: State) => boolean> = { stoppable, awaitsWord };
+
+/** Whether a person's verb is taken in this state: the guard `VERBS` names for it, asked of the state. */
+export const verbTakes = (verb: VerbName, state: State): boolean => {
+  const guard = VERBS.find((v) => v.verb === verb)?.guard;
+  return guard !== undefined && VERB_GUARDS[guard](state);
+};
 
 /**
  * Whether the task waits for the layer above's word to start its current turn: queued — or filed by an older runtime,

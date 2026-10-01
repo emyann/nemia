@@ -28,9 +28,10 @@
  * `input-required` is. A session blocked on a person is a self-edge of `working`, not a state: the journal cannot tell it
  * from working, only a sighting can, and a state is what the journal says.
  *
- * **A person's verbs are not edges.** `requestStop`, `answer` and `close` write an entry to the journal, and the next
- * pass reads the state that entry makes: `stopping`, a new turn's `submitted`, `ending`. The edges are what a pass does,
- * and a pass never writes a person's word, so `stopping` is entered by no edge (the reachability test counts it a root).
+ * **A person's verbs are not edges, and are declared beside them.** `requestStop`, `answer` and `close` write an entry to
+ * the journal, and the next pass reads the state that entry makes: `stopping`, a new turn's `submitted`, `ending`. The edges
+ * are what a pass does, and a pass never writes a person's word. `VERBS` says, for each, the states it is taken from, the
+ * state the next pass reads and the guard its refusal asks (`verbTakes` in `domain.ts`); the diagram draws them.
  *
  * **An event with no edge is refused, not guessed at.** `transition` answers `{ refused }`, `decide` turns it into
  * `nothing` with the refusal on it, the engine's pass reports it (`TickReport.refused`) and `wf up` logs it: a missing
@@ -45,7 +46,7 @@
 import { setup, transition as xTransition } from 'xstate';
 import { toDirectedGraph } from 'xstate/graph';
 import { endOf, phaseWordOf, type Ended, type Outcome } from './session.ts';
-import type { Action, EndReason, Sighting } from './domain.ts';
+import type { Action, EndReason, Event, Sighting } from './domain.ts';
 
 /** Where a task stands, read off its journal alone (`lifecycleOf` in `domain.ts`). */
 export const STATES = [
@@ -60,6 +61,39 @@ export const STATES = [
   'canceled',
 ] as const;
 export type LifecycleState = (typeof STATES)[number];
+
+/**
+ * A verb written to a task from outside the lifecycle, by a person: the entry it journals, the states it is taken from, the
+ * state the next pass reads once it is journalled, and the guard its refusal asks, by the name `VERB_GUARDS` keys it by.
+ */
+export type Verb = {
+  verb: string;
+  entry: Event['kind'];
+  by: 'person';
+  from: readonly LifecycleState[];
+  to: LifecycleState;
+  guard: string;
+};
+
+/**
+ * The verbs a person writes to a task. None is an edge: each journals its entry, and the next pass reads the state it makes.
+ * `stoppable`: not settled, not asked to stop already. `awaitsWord`: held open, its turn signed, waiting on a person.
+ */
+export const VERBS = [
+  {
+    verb: 'requestStop',
+    entry: 'stop-requested',
+    by: 'person',
+    from: ['submitted', 'starting', 'working', 'input-required', 'ending'],
+    to: 'stopping',
+    guard: 'stoppable',
+  },
+  { verb: 'answer', entry: 'input', by: 'person', from: ['input-required'], to: 'submitted', guard: 'awaitsWord' },
+  { verb: 'close', entry: 'closed', by: 'person', from: ['input-required'], to: 'ending', guard: 'awaitsWord' },
+] as const satisfies readonly Verb[];
+
+export type VerbName = (typeof VERBS)[number]['verb'];
+export type VerbGuard = (typeof VERBS)[number]['guard'];
 
 /** What a pass saw of one attempt's session, and what ending it now would lead to. */
 type Seen = {
@@ -470,17 +504,19 @@ export const FINAL: ReadonlySet<LifecycleState> = new Set(
 );
 
 /**
- * The machine as a Mermaid state diagram, one line per edge, generated from `edgesOf`: the README's diagram is this text,
+ * The machine as a Mermaid state diagram, one line per edge, generated from `edgesOf`, then one per verb and state it is taken
+ * from, labelled with its guard and who writes it and no action, since no pass takes it: the README's diagram is this text,
  * between its `diagram:lifecycle` markers, and the repository's diagram test fails when the two differ. Mermaid takes no `-`
  * in a state's id, so `input-required` is drawn under its own name, by an id without one.
  */
-export const diagram = (machine = MACHINE): string => {
+export const diagram = (machine = MACHINE, verbs: readonly Verb[] = VERBS): string => {
   const id = (s: string) => s.replace(/-/g, '_');
   return [
     'stateDiagram-v2',
     ...STATES.filter((s) => s !== id(s)).map((s) => `  state "${s}" as ${id(s)}`),
     `  [*] --> ${id(CONFIG.initial)}`,
     ...edgesOf(machine).map((e) => `  ${id(e.from)} --> ${id(e.to)}: ${e.event}${e.guard ? ` [${e.guard}]` : ''} / ${e.action}`),
+    ...verbs.flatMap((v) => v.from.map((from) => `  ${id(from)} --> ${id(v.to)}: ${v.verb} [${v.guard}] (by ${v.by})`)),
     ...[...FINAL].map((s) => `  ${id(s)} --> [*]`),
   ].join('\n');
 };
@@ -488,16 +524,29 @@ export const diagram = (machine = MACHINE): string => {
 /** One edge of the lifecycle, as `lifecycleGraph` hands it to a board: plain strings, never a piece of the machine. */
 export type LifecycleEdge = Edge;
 
-/** The lifecycle as plain data: its first state, every state in the table's order, the final ones, and every edge. */
-export type LifecycleGraph = { initial: LifecycleState; states: LifecycleState[]; final: LifecycleState[]; edges: LifecycleEdge[] };
+/** One verb a person writes to a task, as `lifecycleGraph` hands it to a board: plain strings. */
+export type LifecycleVerb = Omit<Verb, 'from'> & { from: LifecycleState[] };
 
 /**
- * The shipped lifecycle as data a board draws, read off the same graph as `diagram` (`statesOf`, `edgesOf`, `FINAL`). Each call
- * returns a fresh copy that survives a JSON round trip: it takes nothing, and hands out no machine and no move.
+ * The lifecycle as plain data: its first state, every state in the table's order, the final ones, every edge, and every verb
+ * written from outside it. A machine that has no verb says so with none.
+ */
+export type LifecycleGraph = {
+  initial: LifecycleState;
+  states: LifecycleState[];
+  final: LifecycleState[];
+  edges: LifecycleEdge[];
+  verbs: LifecycleVerb[];
+};
+
+/**
+ * The shipped lifecycle as data a board draws, read off the same graph as `diagram` (`statesOf`, `edgesOf`, `FINAL`, `VERBS`).
+ * Each call returns a fresh copy that survives a JSON round trip: it takes nothing, and hands out no machine and no move.
  */
 export const lifecycleGraph = (): LifecycleGraph => ({
   initial: CONFIG.initial,
   states: statesOf(),
   final: [...FINAL],
   edges: edgesOf(),
+  verbs: VERBS.map((v) => ({ ...v, from: [...v.from] })),
 });

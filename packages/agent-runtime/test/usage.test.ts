@@ -67,6 +67,26 @@ test("a resumed session's inherited conversation is not counted as its own", () 
   );
 });
 
+test('an attempt begins at its start to the millisecond: a response one millisecond before is not its own, one at it is', () => {
+  const since = Date.parse('2026-10-01T04:49:00.500Z');
+  const jsonl = [
+    response(new Date(since - 1).toISOString(), 'msg_before', [{ type: 'tool_use', id: 'tu_before', name: 'Read' }]),
+    response(new Date(since).toISOString(), 'msg_at', [{ type: 'tool_use', id: 'tu_at', name: 'Bash' }]),
+  ].join('\n');
+  assert.deepEqual(transcriptUsage(jsonl, since), {
+    turns: 1,
+    toolCalls: 1,
+    inputTokens: 1110,
+    uncachedTokens: 10,
+    cacheWriteTokens: 100,
+    cacheReadTokens: 1000,
+    outputTokens: 5,
+    peakContextTokens: 1110,
+    firstContextTokens: 1110,
+    firstCacheWriteTokens: 100,
+  });
+});
+
 test('tokens are absent, not 0, when a counted response did not carry them — and a transcript has no cost', () => {
   const jsonl = [response('2026-09-12T09:00:01Z', 'msg_1', [], null), response('2026-09-12T09:00:02Z', 'msg_2', [])].join('\n');
   const u = transcriptUsage(jsonl, 0);

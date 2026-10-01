@@ -3,7 +3,7 @@
  * graph were taken to reach it, when the path is read again, and the stamp that keys it by the step's state. Pure, with file imports
  * only, so a node test reads it as the page does.
  */
-import type { MachineEdge } from './api/machines.ts';
+import type { MachineGraph, MachineVerb } from './api/machines.ts';
 import type { LifecycleStep, StepPath } from './api/steps.ts';
 
 /**
@@ -35,17 +35,30 @@ export const litAt = (path: readonly LifecycleStep[], at: number): string | unde
 
 /**
  * The routes of the graph the path took up to step `at`, as the drawing names them (`from->to`): each move from one state to another
- * that an edge of `edges` joins. A step that keeps its state takes no route, and neither does a move no edge makes — a person's stop,
- * answer or close, which the timeline shows all the same.
+ * that an edge of the graph joins, or a verb a person takes from the one to the other — a stop, an answer or a close. A step that keeps
+ * its state takes no route, and neither does a move nothing joins, which the timeline shows all the same.
  */
-export function takenRoutes(path: readonly LifecycleStep[], at: number, edges: readonly MachineEdge[]): string[] {
-  const routes = new Set(edges.filter((e) => e.from !== e.to).map((e) => `${e.from}->${e.to}`));
+export function takenRoutes(path: readonly LifecycleStep[], at: number, graph: Pick<MachineGraph, 'edges' | 'verbs'>): string[] {
+  const routes = new Set([
+    ...graph.edges.filter((e) => e.from !== e.to).map((e) => `${e.from}->${e.to}`),
+    ...graph.verbs.flatMap((v) => v.from.map((from) => `${from}->${v.to}`)),
+  ]);
   const taken = new Set<string>();
   for (let i = 1; i <= Math.min(at, path.length - 1); i++) {
     const id = `${path[i - 1].state}->${path[i].state}`;
     if (routes.has(id)) taken.add(id);
   }
   return [...taken];
+}
+
+/**
+ * The verb a person wrote that moved the path at step `i`: the one that journals the step's entry and is taken from the state before to
+ * the state after. Undefined for the first step, a step that keeps its state, and a move no verb makes so.
+ */
+export function byPerson(path: readonly LifecycleStep[], i: number, verbs: readonly MachineVerb[]): string | undefined {
+  const [before, step] = [path[i - 1], path[i]];
+  if (!before || !step || before.state === step.state) return undefined;
+  return verbs.find((v) => v.entry === step.event && v.to === step.state && v.from.includes(before.state))?.verb;
 }
 
 /** A box on the page, as `getBoundingClientRect` gives one. */

@@ -4,8 +4,8 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { centredScroll, litAt, PATH_POLL_MS, pathPoll, pathStamp, takenRoutes } from '../src/lib/lifecyclePath.ts';
-import type { MachineEdge } from '../src/lib/api/machines.ts';
+import { byPerson, centredScroll, litAt, PATH_POLL_MS, pathPoll, pathStamp, takenRoutes } from '../src/lib/lifecyclePath.ts';
+import type { MachineEdge, MachineVerb } from '../src/lib/api/machines.ts';
 import type { LifecycleStep, StepPath } from '../src/lib/api/steps.ts';
 
 const FINAL = ['completed', 'failed', 'canceled'];
@@ -24,9 +24,32 @@ const EDGES: MachineEdge[] = [
   { from: 'submitted', event: 'TICK', to: 'submitted', action: 'wait' },
   { from: 'starting', event: 'SEEN', to: 'working', action: 'wait' },
   { from: 'working', event: 'ENDED', to: 'ending', action: 'settle' },
+  { from: 'working', event: 'ENDED', guard: 'holds', to: 'input-required', action: 'hold' },
   { from: 'ending', event: 'SETTLED', to: 'completed', action: 'none' },
   { from: 'stopping', event: 'SETTLED', to: 'canceled', action: 'none' },
 ];
+
+/** The lifecycle's verbs as the runtime declares them: what a person writes from outside it. */
+const VERBS: MachineVerb[] = [
+  {
+    verb: 'requestStop',
+    entry: 'stop-requested',
+    by: 'person',
+    from: ['submitted', 'starting', 'working', 'input-required', 'ending'],
+    to: 'stopping',
+    guard: 'stoppable',
+  },
+  { verb: 'answer', entry: 'input', by: 'person', from: ['input-required'], to: 'submitted', guard: 'awaitsWord' },
+  { verb: 'close', entry: 'closed', by: 'person', from: ['input-required'], to: 'ending', guard: 'awaitsWord' },
+];
+
+const GRAPH = { edges: EDGES, verbs: VERBS };
+
+/** A review task held open after its turn, then closed by a person: input-required to ending at its `closed` entry. */
+const closed = [...running, ...pathOf(['input-required', 'ended'], ['ending', 'closed'], ['completed', 'settled'])].map((s, i) => ({
+  ...s,
+  at: `c${i}`,
+}));
 
 test('the current try of a task still moving is read again every PATH_POLL_MS', () => {
   assert.equal(pathPoll(read(running), FINAL, true), PATH_POLL_MS);
@@ -61,20 +84,56 @@ test('the state lit follows the scrub, and stays on the newest past the end', ()
 });
 
 test('the routes taken are the moves between states an edge makes, up to the scrub, and never a stay', () => {
-  assert.deepEqual(takenRoutes(settled, 4, EDGES), ['submitted->starting', 'starting->working', 'working->ending', 'ending->completed']);
-  assert.deepEqual(takenRoutes(settled, 2, EDGES), ['submitted->starting', 'starting->working']);
-  assert.equal(takenRoutes(settled, 0, EDGES).length, 0, 'at the filing, nothing taken');
+  assert.deepEqual(takenRoutes(settled, 4, GRAPH), ['submitted->starting', 'starting->working', 'working->ending', 'ending->completed']);
+  assert.deepEqual(takenRoutes(settled, 2, GRAPH), ['submitted->starting', 'starting->working']);
+  assert.equal(takenRoutes(settled, 0, GRAPH).length, 0, 'at the filing, nothing taken');
   const admitted = pathOf(['submitted', 'filed'], ['submitted', 'admitted'], ['starting', 'starting']);
-  assert.deepEqual(takenRoutes(admitted, 2, EDGES), ['submitted->starting'], 'submitted to submitted is a stay, drawn on its box');
+  assert.deepEqual(takenRoutes(admitted, 2, GRAPH), ['submitted->starting'], 'submitted to submitted is a stay, drawn on its box');
 });
 
-test("a person's move, which no edge makes, is lit as a state and taken as no route", () => {
+test("a person's stop takes its verb's route, from the state it was taken in", () => {
   const stopped = [
     ...running,
     ...pathOf(['stopping', 'stop-requested'], ['stopping', 'ended'], ['canceled', 'settled']).map((s, i) => ({ ...s, at: `z${i}` })),
   ];
   assert.equal(litAt(stopped, 3), 'stopping');
-  assert.deepEqual(takenRoutes(stopped, 5, EDGES), ['submitted->starting', 'starting->working', 'stopping->canceled']);
+  assert.deepEqual(takenRoutes(stopped, 5, GRAPH), ['submitted->starting', 'starting->working', 'working->stopping', 'stopping->canceled']);
+});
+
+test("a person's close takes its verb's route at its entry, and not before", () => {
+  assert.equal(litAt(closed, 4), 'ending');
+  assert.ok(takenRoutes(closed, 4, GRAPH).includes('input-required->ending'), 'at the closed entry');
+  assert.ok(!takenRoutes(closed, 3, GRAPH).includes('input-required->ending'), 'at the entry before, held');
+  assert.deepEqual(takenRoutes(closed, 5, GRAPH), [
+    'submitted->starting',
+    'starting->working',
+    'working->input-required',
+    'input-required->ending',
+    'ending->completed',
+  ]);
+});
+
+test("REFUSED: a move neither an edge nor a verb makes takes no route, a person's close in a graph without its verb included", () => {
+  assert.ok(!takenRoutes(closed, 5, { edges: EDGES, verbs: [] }).includes('input-required->ending'));
+  const leapt = pathOf(['submitted', 'filed'], ['completed', 'settled']);
+  assert.equal(takenRoutes(leapt, 1, GRAPH).length, 0, 'submitted to completed: nothing joins them');
+});
+
+test("a person's move is named by the verb that journals its entry, from where it was taken to where it leads", () => {
+  assert.equal(byPerson(closed, 4, VERBS), 'close');
+  assert.equal(byPerson(closed, 3, VERBS), undefined, 'the turn ended: no person moved it');
+  assert.equal(byPerson(closed, 0, VERBS), undefined, 'the filing moves nothing');
+  const answered = pathOf(['input-required', 'ended'], ['submitted', 'input']);
+  assert.equal(byPerson(answered, 1, VERBS), 'answer');
+});
+
+test('REFUSED: a move is named by no verb whose entry is not the one that made it, or whose route is not the move', () => {
+  const misnamed = pathOf(['input-required', 'ended'], ['ending', 'input']);
+  assert.equal(byPerson(misnamed, 1, VERBS), undefined, 'the answer journals input, but leads to submitted, not ending');
+  const elsewhere = pathOf(['stopping', 'ended'], ['ending', 'closed']);
+  assert.equal(byPerson(elsewhere, 1, VERBS), undefined, 'a close is taken from input-required only');
+  const stayed = pathOf(['stopping', 'stop-requested'], ['stopping', 'stop-requested']);
+  assert.equal(byPerson(stayed, 1, VERBS), undefined, 'a stay is no move');
 });
 
 test('REFUSED: the graph full width scrolls only to a lit state drawn out of view, and then centres it', () => {

@@ -35,7 +35,11 @@ export default {
         POLLED_MS,
       );
       await expectCount(lifecycle.locator('[data-state][data-lit]'), 1, 'and it alone');
-      await expectVisible(panel.getByRole('list', { name: 'The path' }).getByText('(no edge)'), 'a person’s stop is a move no edge makes');
+      await expectVisible(
+        panel.getByRole('list', { name: 'The path' }).getByText('(by a person: requestStop)'),
+        'a person’s stop is named by its verb on the timeline',
+      );
+      await expectVisible(lifecycle.locator('[data-route="working->stopping"][data-taken]'), 'and its route, from working, is taken');
       await settled(page);
       await photograph(panel, path.join(OUT, `debug-polled-stopping-${await themeOf(page)}.png`));
     } finally {

@@ -1,8 +1,8 @@
 /**
  * `wf stats` over a store of seeded records and the runtime itself, `promiseEngine` over an in-memory journal: the numbers `--json`
  * answers, the one line `--line` prints, a check that refused told from one that did not finish (`refusedCheck`), the calls a session was
- * refused on a harness that records them, and the refusals of a key and a day it does not take. A run whose check did not finish has not finished; a run whose journal does not read is left out
- * whole, and named.
+ * refused on a harness that records them, and the refusals of a key and a day it does not take. A run whose check did not finish has not
+ * finished; a run whose journal does not read is left out whole, and named.
  *
  * `WF_ROOT` is set before the command line is imported, which reads it as the module loads.
  */
@@ -338,7 +338,7 @@ test('wf stats marks the day a run froze a rendered skill that differs from the 
   assert.match(words, new RegExp(`^2026-09-25\\s+skill ${SKILL}\\s+marks-2\\s+marks-1$`, 'm'));
 });
 
-test('wf stats counts each call a session was refused, per measured try; a codex, a background or a recheck try is not measured', async (t) => {
+test('wf stats counts each call a session was refused, per measured try; a codex, background or recheck try is unmeasured', async (t) => {
   const s = JSON.parse(await printedBy(t, ['stats', '--json', '--factory', 'denials', '--from', QUIET_DAY, '--to', DENIED_DAY])) as Stats;
   const perDay = Object.fromEntries(s.all.days.map((d) => [d.day, d.deniedPerTry]));
   assert.deepEqual(

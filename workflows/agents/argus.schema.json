@@ -1,0 +1,54 @@
+{
+  "type": "object",
+  "properties": {
+    "period": {
+      "type": "object",
+      "description": "The days the report reads: from the day the last janitor run ended, or the last 14 days when there was none, or the period the brief gives.",
+      "properties": {
+        "from": { "type": "string", "description": "The first day read, YYYY-MM-DD in UTC." },
+        "to": { "type": "string", "description": "The last day read, YYYY-MM-DD in UTC." }
+      },
+      "required": ["from", "to"],
+      "additionalProperties": false
+    },
+    "against": {
+      "type": "object",
+      "description": "The days it is compared with: as many as the period, ending the day before the period starts.",
+      "properties": {
+        "from": { "type": "string", "description": "The first day compared with, YYYY-MM-DD in UTC." },
+        "to": { "type": "string", "description": "The last day compared with, YYYY-MM-DD in UTC: the day before the period's first." }
+      },
+      "required": ["from", "to"],
+      "additionalProperties": false
+    },
+    "report": {
+      "type": "string",
+      "description": "The report, in markdown: what moved between the two periods, with the numbers wf stats gave, a number nothing measured said as not measured, and the corrections proposed."
+    },
+    "cards": {
+      "type": "array",
+      "description": "One inbox card per correction proposed, filed by the step's check; none already in the inbox under the same title. Empty when nothing is worth correcting.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string", "description": "What to correct, in one line: the card's first line, which a later run reads to file no repeat." },
+          "kind": {
+            "type": "string",
+            "enum": ["fence", "body", "skill", "on-purpose"],
+            "description": "The correction: fence, an allow or a deny by name; body, a line in an agent's body; skill, a line in a skill; on-purpose, the refusal is meant and stays."
+          },
+          "correction": { "type": "string", "description": "The correction itself, exactly: the rule to add, or the line and the file it goes in." },
+          "evidence": { "type": "string", "description": "The numbers behind it, as wf stats gave them for the period and the one before." },
+          "agent": { "type": "string", "description": "The agent the correction is about, by name; empty when it is about no one agent." },
+          "factory": { "type": "string", "description": "The factory the card is started in." },
+          "workflow": { "type": "string", "description": "The workflow the card is started on, by name." },
+          "repo": { "type": "string", "description": "The repository the card is about, as an absolute path." }
+        },
+        "required": ["title", "kind", "correction", "evidence", "agent", "factory", "workflow", "repo"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["period", "against", "report", "cards"],
+  "additionalProperties": false
+}

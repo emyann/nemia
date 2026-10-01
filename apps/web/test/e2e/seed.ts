@@ -763,8 +763,8 @@ export function seedDiamond(repo: string, root: string, now = Date.now()): void 
 
 /**
  * A run of FACTORIES' `hiring` started `--after` DIAMOND's `running`, a run of the default factory that may still ship: on its factory's
- * floor, a ghost that names `running` and draws no card of it. Not seeded with the rest, so no count of the store's runs moves: the page that
- * reads it writes it (`seedChained`) and takes it back.
+ * floor, a ghost that names `running` and draws no card of it. Not seeded with the rest, so no count of the store's runs moves: the page
+ * that reads it writes it (`seedChained`) and takes it back.
  */
 export const CHAINED = {
   id: 'waits-in-a-factory-e2e16',

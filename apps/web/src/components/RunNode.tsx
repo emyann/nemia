@@ -52,9 +52,9 @@ export type RunFlowNode = Node<RunNodeData, 'run'>;
  * - Beside its id, where its steps work: its repository, or folders the run made (`workspace: folder`); a try of an agent, a folder
  *   run of the store's own, is tagged with its agent instead, since its folder is on no page.
  * - On whom a run started `--after` waits, and a person's hold on it (`wf hold`), each in `wf ls`'s word, amber when only a person moves
- *   it, with what to do on hover (`WaitingLine`).
+ *   it, with what to do on hover (`WaitingLine`). A hold is said instead of a gate: while it stands, nothing of the run is asked of anyone.
  * - A run that waits on runs that may still ship, and on nothing else (`waitsOnRuns`), is a ghost until it starts: dimmed and dashed, as
- *   the queue lane draws a card not started, each run it waits on a link to that run. A hold is said instead of a gate: while it stands, nothing of the run is asked of anyone.
+ *   the queue lane draws a card not started, each run it waits on a link to that run.
  * - What a person has to know to act, besides the gate's own `approve <step>`: a step's question, or a session the harness blocked, two
  *   lines each, whole on hover, each a link to its step on the run's page.
  * - The gate, answered here (`CardGate`). Once answered, what the card said, through the state the answer was given in and the one it

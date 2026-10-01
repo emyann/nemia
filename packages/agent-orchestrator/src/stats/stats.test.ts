@@ -32,7 +32,8 @@ const TEAM = [
 /**
  * One try of a fixture: when it ended, what its session cost (1 unless given; null for unmeasured), its check's verdict if it has one,
  * why the try after it was filed, whether its session failed, the calls its session was refused, the skills it loaded (unmeasured
- * unless given), and whether it is a recheck, sharing the try before it's session.
+ * unless given), whether it is a recheck, sharing the try before it's session, and the fields its session's closeout declared, where it
+ * made one.
  */
 type Try = {
   end: string;
@@ -43,6 +44,7 @@ type Try = {
   denied?: string[];
   skills?: string[];
   recheck?: true;
+  closeout?: Record<string, unknown>;
 };
 
 /** A session or a check that ran an hour, filed ten minutes before, and ended at `end`: succeeded, unless `failed`. */
@@ -73,6 +75,7 @@ function readOf(id: string, steps: readonly Workflow[], tries: Record<string, Tr
   const verdicts = new Map<string, CheckVerdict>();
   const denied = new Map<string, string[]>();
   const skills = new Map<string, string[]>();
+  const closeouts = new Map<string, Record<string, unknown>>();
   const record: Run['steps'] = {};
   for (const [name, list] of Object.entries(tries)) {
     const ids: EarlierTry[] = [];
@@ -84,6 +87,7 @@ function readOf(id: string, steps: readonly Workflow[], tries: Record<string, Tr
       filed.set(taskId, minus(sessionEnd, 70 * MIN));
       if (t.denied) denied.set(taskId, t.denied);
       if (t.skills) skills.set(taskId, t.skills);
+      if (t.closeout) closeouts.set(taskId, t.closeout);
       if (t.check) {
         views.set(`${own}-check`, ended(t.end, null));
         filed.set(`${own}-check`, minus(t.end, 9 * MIN));
@@ -104,6 +108,10 @@ function readOf(id: string, steps: readonly Workflow[], tries: Record<string, Tr
     deniedOf: (taskId: string) => denied.get(taskId) ?? [],
     skillsOf: (taskId: string) => skills.get(taskId) ?? null,
     rulesOf: (_step: Workflow): ReadonlyMap<string, readonly SkillRule[]> => new Map(),
+    closeoutOfTask: (taskId: string) => {
+      const output = closeouts.get(taskId);
+      return output && { outcome: 'done' as const, summary: '', artifacts: [], output };
+    },
     closeoutOf: (name: string) =>
       steps.find((s) => s.name === name)?.loop ? { outcome: 'done' as const, summary: '', artifacts: [], output: { again } } : undefined,
   };
@@ -587,6 +595,113 @@ test("a rule's kept and broken add up to its step and agent's tries whose denial
     [
       ['read-with-read', 1, 2],
       ['checks-bare', 2, 1],
+    ],
+  );
+});
+
+const DAY_BEFORE = '2026-09-09';
+const TWO_BEFORE = '2026-09-08';
+
+/** A workflow of one step that tallies its issues and the open ones (`tally:`). */
+const TRIAGE = [step('triage', [], { by: 'sorter', tally: ['issues', 'issues.open'] })];
+
+test("a try's tallies are its own session's closeout's values, and null — never 0 — for a try with no closeout or no session of its own", () => {
+  const r = readOf('tallied', TRIAGE, {
+    triage: [
+      { end: at(1, TWO_BEFORE), closeout: { issues: [{ open: true }, { open: false }, {}] } },
+      { end: at(1, DAY_BEFORE), check: 'refused', closeout: { issues: [] } },
+      { end: at(2, DAY_BEFORE), check: 'passed', recheck: true },
+      { end: at(3, DAY_BEFORE) },
+    ],
+  });
+  assert.deepEqual(
+    factsOf(r).tries.map((t) => t.tallies),
+    [
+      [
+        { tally: 'issues', value: 3 },
+        { tally: 'issues.open', value: 1 },
+      ],
+      [
+        { tally: 'issues', value: 0 },
+        { tally: 'issues.open', value: 0 },
+      ],
+      [
+        { tally: 'issues', value: null },
+        { tally: 'issues.open', value: null },
+      ],
+      [
+        { tally: 'issues', value: null },
+        { tally: 'issues.open', value: null },
+      ],
+    ],
+    'a measured empty list is 0; a recheck shares its try before it, and a session that made no closeout measured nothing',
+  );
+  const plain = readOf('plain', [step('design', [], { by: 'seldon' })], { design: [{ end: at(1), closeout: { issues: [1] } }] });
+  assert.deepEqual(factsOf(plain).tries[0].tallies, [], 'a step that declares no tally gives none, whatever its closeout holds');
+  assert.deepEqual(statsOf(factsOfAll(plain), {}, NOW).all.tallies, []);
+});
+
+test("a step's tallies are summed per day of the range and over it, over measured tries only, and absent where none was measured", () => {
+  const r = readOf('per-day', TRIAGE, {
+    triage: [
+      { end: at(1, TWO_BEFORE), closeout: { issues: [{ open: true }, { open: true }] } },
+      { end: at(2, TWO_BEFORE), closeout: { issues: [{ open: false }] } },
+      { end: at(1, DAY_BEFORE) },
+    ],
+  });
+  const s = statsOf(factsOfAll(r), { from: TWO_BEFORE }, NOW);
+  assert.deepEqual(s.all.tallies, [
+    {
+      step: 'triage',
+      tally: 'issues',
+      total: { sum: 3, tries: 2 },
+      days: [
+        { day: TWO_BEFORE, sum: 3, tries: 2 },
+        { day: DAY_BEFORE, sum: null, tries: 0 },
+        { day: DAY, sum: null, tries: 0 },
+      ],
+    },
+    {
+      step: 'triage',
+      tally: 'issues.open',
+      total: { sum: 2, tries: 2 },
+      days: [
+        { day: TWO_BEFORE, sum: 2, tries: 2 },
+        { day: DAY_BEFORE, sum: null, tries: 0 },
+        { day: DAY, sum: null, tries: 0 },
+      ],
+    },
+  ]);
+  const words = statsLines(s);
+  assert.ok(words.includes('day         step    tally        sum  tries'), words.join('\n'));
+  assert.ok(words.some((l) => /^2026-09-08\s+triage\s+issues\s+3\s+2$/.test(l)));
+  assert.ok(
+    words.some((l) => /^2026-09-09\s+triage\s+issues\.open\s+—\s+0$/.test(l)),
+    'a day with a try and no closeout reads —',
+  );
+  assert.ok(!words.some((l) => l.startsWith(`${DAY}  triage`)), 'a day nothing happened on is left out of the words');
+  assert.ok(words.some((l) => /^all\s+triage\s+issues\s+3\s+2$/.test(l)));
+});
+
+test('a workflow with other names gets its own tally rows, keyed by its step and its field', () => {
+  const triaged = readOf('t', TRIAGE, { triage: [{ end: at(1), closeout: { issues: [{}] } }] });
+  const checkIn = [step('check-in', [], { tally: ['notes'] })];
+  const noted = readOf('c', checkIn, { 'check-in': [{ end: at(2), closeout: { notes: 4 } }] });
+  const s = statsOf(factsOfAll(triaged, noted), {}, NOW);
+  assert.deepEqual(
+    s.all.tallies.map((row) => [row.step, row.tally, row.total]),
+    [
+      ['triage', 'issues', { sum: 1, tries: 1 }],
+      ['triage', 'issues.open', { sum: 0, tries: 1 }],
+      ['check-in', 'notes', { sum: 4, tries: 1 }],
+    ],
+  );
+  const bySorter = statsOf(factsOfAll(triaged, noted), { by: 'agent' }, NOW);
+  assert.deepEqual(
+    bySorter.groups.map((g) => [g.key, g.tallies.map((row) => row.tally)]),
+    [
+      ['sorter', ['issues', 'issues.open']],
+      [null, ['notes']],
     ],
   );
 });

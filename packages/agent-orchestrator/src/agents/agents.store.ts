@@ -1,9 +1,9 @@
 /**
  * The agent files: where `wf start` renders each step's agent for Claude Code (`agentFilesDir`), the render itself (`writeAgentFiles`), the
- * version of each skill it rendered (`renderedSkillVersions`), and a skill read again once its rendered folder is gone (`skillsAgain`);
- * and what the board's Agents page writes — an agent and the files beside it (`writeAgent`, `removeAgent`, refused as `AgentWriteError`)
- * — and the agents of the two places the board lists them from (`agentPlaces`, `listAgents`, `findAgent`). What a folder holds is
- * `agents.ts`'s; this writes and reads it.
+ * version of each skill it rendered (`renderedSkillVersions`) and the rules each declares (`renderedSkillRules`), and a skill read again
+ * once its rendered folder is gone (`skillsAgain`); and what the board's Agents page writes — an agent and the files beside it
+ * (`writeAgent`, `removeAgent`, refused as `AgentWriteError`) — and the agents of the two places the board lists them from (`agentPlaces`,
+ * `listAgents`, `findAgent`). What a folder holds is `agents.ts`'s; this writes and reads it.
  *
  * Beneath the controllers, beside `record.store.ts`, whose run folder holds the agent files: it imports neither the engine nor a
  * controller, and no pure file imports it (`test/boundary.test.ts`). A run is changed by none of the writes: it froze its agents at
@@ -32,7 +32,8 @@ import {
 } from './agents.ts';
 import { frontmatterKey } from '../former/former.ts';
 import { linkRefusal } from '../folder/folder.ts';
-import { agentUsers, agentVersion, loadAgents, preloads, skillsFor, skillVersion } from '../folder/folder.store.ts';
+import { agentUsers, agentVersion, loadAgents, preloads, readSkillRules, skillsFor, skillVersion } from '../folder/folder.store.ts';
+import type { SkillRule } from '../skills/skills.ts';
 import { isWorkflowsHolder } from '../folder/write.store.ts';
 import { HOME, isDirectory, runsDir } from '../record/record.store.ts';
 
@@ -96,6 +97,27 @@ export function renderedSkillVersions(run: Pick<Run, 'id'>, step: Workflow): Map
     agent.skills.flatMap((name) => {
       const version = skillVersion(path.join(skills, name));
       return version === null ? [] : [[name, version] as const];
+    }),
+  );
+}
+
+/**
+ * The rules (`readSkillRules`) each skill `wf start` rendered for a step of `run` declares, by the skill's name, read off its copy in the
+ * step's folder (`agentFilesDir`): a skill whose copy is not there, that declares none, or whose `rules.json` does not read is left out.
+ */
+export function renderedSkillRules(run: Pick<Run, 'id'>, step: Workflow): Map<string, SkillRule[]> {
+  const agent = step.agent;
+  if (!agent?.skills) return new Map();
+  const skills = path.join(agentFilesDir(run, step.name), pluginOf(agent.name), 'skills');
+  return new Map(
+    agent.skills.flatMap((name) => {
+      try {
+        const rules = readSkillRules(path.join(skills, name));
+        return rules.length ? [[name, rules] as const] : [];
+      } catch (err) {
+        if (err instanceof WorkflowError) return [];
+        throw err;
+      }
     }),
   );
 }

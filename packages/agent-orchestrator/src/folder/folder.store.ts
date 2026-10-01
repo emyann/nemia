@@ -9,7 +9,7 @@
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Schema } from 'effect';
+import { Result, Schema, SchemaIssue } from 'effect';
 import {
   AGENTS_FOLDER,
   isReadme,
@@ -23,7 +23,7 @@ import {
 import { codexModeLine, formerKeyLine, formerKeysIn, frontmatterKey } from '../former/former.ts';
 import { agentsDir, agentsFolderRefusal, linkRefusal, parseFolder, readmeDescription, stepFiles, type Fills } from './folder.ts';
 import { isCardFile, ownSkill, parseAgent, SYSTEM_PROMPTS, type Agent, type Agents, type SkillsFound } from '../agents/agents.ts';
-import { skillEntryOf, type AgentSkill } from '../skills/skills.ts';
+import { skillEntryOf, type AgentSkill, type SkillRule } from '../skills/skills.ts';
 
 /**
  * Where else a workflow's agents and skills are looked for, beside its own folder: the repository it runs on, whose `.claude/agents/` and
@@ -99,7 +99,7 @@ export function skillsFor(workflowDir: string, places: Places = {}): SkillsFound
       if (!fs.statSync(path.join(at, 'SKILL.md'), { throwIfNoEntry: false })?.isFile()) continue;
       const first = found.get(name);
       if (!first) {
-        found.set(name, { at: root, dir: at });
+        found.set(name, { at: root, dir: rulesRefusal(at) ?? at });
         continue;
       }
       if (sameRepository(first.at, root)) {
@@ -113,6 +113,73 @@ export function skillsFor(workflowDir: string, places: Places = {}): SkillsFound
     }
   }
   return { at: new Map([...found].map(([name, { dir }]) => [name, dir])), looked: roots.map((root) => path.join(root, SKILLS_FOLDER)) };
+}
+
+/** The file beside a skill's SKILL.md that names its traceable rules (`readSkillRules`). */
+export const RULES_FILE = 'rules.json';
+
+const SkillRulesSchema = Schema.Struct({
+  rules: Schema.Array(
+    Schema.Struct({
+      id: Schema.String.check(Schema.isMinLength(1)),
+      says: Schema.String.check(Schema.isMinLength(1)),
+      breaks: Schema.Array(Schema.String.check(Schema.isMinLength(1))).check(Schema.isMinLength(1)),
+    }),
+  ).check(Schema.isMinLength(1)),
+});
+
+const RULES_SHAPE =
+  'Write it as { "rules": [{ "id", "says", "breaks" }] }: an id once each, what the rule says, and the calls that break it, each a ' +
+  '`disallowedTools:` rule such as `Bash(cat:*)` — or delete the file.';
+
+/** Why a skill's rules do not read: the first field the schema refuses, by its path. */
+function rulesFieldRefusal(error: Schema.SchemaError): string {
+  const [first] = SchemaIssue.makeFormatterStandardSchemaV1()(error.issue).issues;
+  const at = (first?.path ?? []).map((p) => (typeof p === 'object' && p !== null && 'key' in p ? p.key : p)).map(String);
+  const field = at.length ? `\`${at.join('.')}\`` : 'shape';
+  return first?.message === 'Missing key' ? `its ${field} is missing` : `its ${field} is wrong (${first?.message ?? 'not a skill\'s rules'})`;
+}
+
+/**
+ * The rules a skill declares in its `rules.json` (`RULES_FILE`) beside its SKILL.md, in the file's order; `[]` with no file. Refused with a
+ * `WorkflowError` naming the file, its first wrong field and the shape to write: a file that is not JSON, a field missing or empty — a rule
+ * with no `breaks` among them — and two rules under one `id`.
+ */
+export function readSkillRules(skillDir: string): SkillRule[] {
+  const file = path.join(skillDir, RULES_FILE);
+  let text: string;
+  try {
+    text = fs.readFileSync(file, 'utf8');
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return [];
+    throw new WorkflowError(`${file} cannot be read (${(err as Error).message}). ${RULES_SHAPE}`);
+  }
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch (err) {
+    throw new WorkflowError(`${file} is not JSON (${(err as Error).message}). ${RULES_SHAPE}`);
+  }
+  const decoded = Schema.decodeUnknownResult(SkillRulesSchema)(raw);
+  if (Result.isFailure(decoded))
+    throw new WorkflowError(`${file} does not read as a skill's rules: ${rulesFieldRefusal(decoded.failure)}. ${RULES_SHAPE}`);
+  const rules = decoded.success.rules.map((r) => ({ id: r.id, says: r.says, breaks: [...r.breaks] }));
+  rules.forEach((r, i) => {
+    const before = rules.findIndex((other) => other.id === r.id);
+    if (before !== i) throw new WorkflowError(`${file} names the rule \`${r.id}\` twice, at \`rules.${before}\` and \`rules.${i}\`. ${RULES_SHAPE}`);
+  });
+  return rules;
+}
+
+/** The refusal of a skill whose `rules.json` does not read (`readSkillRules`), or nothing for one whose does. */
+function rulesRefusal(skillDir: string): WorkflowError | undefined {
+  try {
+    readSkillRules(skillDir);
+    return undefined;
+  } catch (err) {
+    if (err instanceof WorkflowError) return err;
+    throw err;
+  }
 }
 
 /**

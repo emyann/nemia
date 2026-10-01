@@ -5,10 +5,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Run } from '../record/record.ts';
+import type { EarlierTry } from '../retry/index.ts';
 import type { Workflow } from '../step/step.ts';
 import { timeline, type TaskClock } from '../timeline/timeline.ts';
 import { factsOf, statsOf, statsQueryOf, type CheckVerdict, type Facts } from './stats.ts';
 import { statsLine, statsLines } from './stats-words.ts';
+import type { SkillRule } from '../skills/skills.ts';
 
 const MIN = 60_000;
 const minus = (at: string, ms: number): string => new Date(Date.parse(at) - ms).toISOString();
@@ -29,8 +31,8 @@ const TEAM = [
 
 /**
  * One try of a fixture: when it ended, what its session cost (1 unless given; null for unmeasured), its check's verdict if it has one,
- * why the try after it was filed, whether its session failed, the calls its session was refused, and the skills it loaded (unmeasured
- * unless given).
+ * why the try after it was filed, whether its session failed, the calls its session was refused, the skills it loaded (unmeasured
+ * unless given), and whether it is a recheck, sharing the try before it's session.
  */
 type Try = {
   end: string;
@@ -40,6 +42,7 @@ type Try = {
   failed?: true;
   denied?: string[];
   skills?: string[];
+  recheck?: true;
 };
 
 /** A session or a check that ran an hour, filed ten minutes before, and ended at `end`: succeeded, unless `failed`. */
@@ -72,19 +75,21 @@ function readOf(id: string, steps: readonly Workflow[], tries: Record<string, Tr
   const skills = new Map<string, string[]>();
   const record: Run['steps'] = {};
   for (const [name, list] of Object.entries(tries)) {
-    const ids = list.map((t, i) => {
-      const taskId = `${id}-${name}-${i + 1}`;
+    const ids: EarlierTry[] = [];
+    list.forEach((t, i) => {
+      const own = `${id}-${name}-${i + 1}`;
+      const taskId = t.recheck ? ids[i - 1].taskId : own;
       const sessionEnd = t.check ? minus(t.end, 10 * MIN) : t.end;
       views.set(taskId, ended(sessionEnd, t.cost === undefined ? 1 : t.cost, t.failed));
       filed.set(taskId, minus(sessionEnd, 70 * MIN));
       if (t.denied) denied.set(taskId, t.denied);
       if (t.skills) skills.set(taskId, t.skills);
       if (t.check) {
-        views.set(`${taskId}-check`, ended(t.end, null));
-        filed.set(`${taskId}-check`, minus(t.end, 9 * MIN));
-        verdicts.set(`${taskId}-check`, t.check);
+        views.set(`${own}-check`, ended(t.end, null));
+        filed.set(`${own}-check`, minus(t.end, 9 * MIN));
+        verdicts.set(`${own}-check`, t.check);
       }
-      return { taskId, then: t.then ?? 'retries', ...(t.check ? { check: { taskId: `${taskId}-check` } } : {}) };
+      ids.push({ taskId, then: t.then ?? 'retries', ...(t.check ? { check: { taskId: `${own}-check` } } : {}) });
     });
     const last = ids.at(-1)!;
     record[name] = { taskId: last.taskId, ...(last.check ? { check: last.check } : {}), tries: ids.slice(0, -1) };
@@ -98,6 +103,7 @@ function readOf(id: string, steps: readonly Workflow[], tries: Record<string, Tr
     verdictOf: (taskId: string) => verdicts.get(taskId) ?? null,
     deniedOf: (taskId: string) => denied.get(taskId) ?? [],
     skillsOf: (taskId: string) => skills.get(taskId) ?? null,
+    rulesOf: (_step: Workflow): ReadonlyMap<string, readonly SkillRule[]> => new Map(),
     closeoutOf: (name: string) =>
       steps.find((s) => s.name === name)?.loop ? { outcome: 'done' as const, summary: '', artifacts: [], output: { again } } : undefined,
   };
@@ -479,4 +485,96 @@ test("a step's skills are counted by skill over its measured tries, most first a
   assert.ok(words.some((l) => /^design\s+seldon\s+write-a-spec\s+2$/.test(l)));
   const [unmeasured] = statsOf(factsOfAll(readOf('unsaid', steps, { design: [{ end: at(1) }] })), {}, NOW).all.steps;
   assert.deepEqual([unmeasured.skillLoads, unmeasured.skillTries, unmeasured.skills], [null, 0, []]);
+});
+
+const readWithRead: SkillRule = { id: 'read-with-read', says: 'Read a file with Read', breaks: ['Bash(cat:*)', 'Bash(head:*)'] };
+const checksBare: SkillRule = { id: 'checks-bare', says: 'Run a check bare', breaks: ['Bash(cd:*)'] };
+
+/** `r`, its steps' frozen skills declaring `declared`, by step name and then by skill. */
+const declaring = <R extends ReturnType<typeof readOf>>(r: R, declared: Record<string, Record<string, SkillRule[]>>): R => ({
+  ...r,
+  rulesOf: (s: Workflow) => new Map(Object.entries(declared[s.name] ?? {})),
+});
+
+test("a try keeps or breaks each rule its step's skills declare, by the calls it was denied; a skill that declares none gives none", () => {
+  const steps = [step('design', [], { by: 'seldon' })];
+  const r = declaring(readOf('rules', steps, { design: [{ end: at(1, JOBS_DAY), denied: ['Bash(cat)', 'Write(/x)'] }] }), {
+    design: { 'write-a-spec': [readWithRead, checksBare], effect: [] },
+  });
+  const [fact] = factsOf(r).tries;
+  assert.deepEqual(fact.rules, [
+    { skill: 'write-a-spec', rule: 'read-with-read', says: 'Read a file with Read', broken: true, by: ['Bash(cat)'] },
+    { skill: 'write-a-spec', rule: 'checks-bare', says: 'Run a check bare', broken: false, by: [] },
+  ]);
+  const [row] = statsOf(factsOfAll(r), {}, JOBS_NOW).all.steps;
+  assert.deepEqual(row.rules, [
+    { skill: 'write-a-spec', rule: 'read-with-read', says: 'Read a file with Read', kept: 0, broken: 1 },
+    { skill: 'write-a-spec', rule: 'checks-bare', says: 'Run a check bare', kept: 1, broken: 0 },
+  ]);
+  const words = statsLines(statsOf(factsOfAll(r), {}, JOBS_NOW));
+  assert.ok(words.some((l) => /^step\s+agent\s+skill\s+rule\s+kept\s+broken$/.test(l)), words.join('\n'));
+  assert.ok(words.some((l) => /^design\s+seldon\s+write-a-spec\s+read-with-read\s+0\s+1$/.test(l)), words.join('\n'));
+  assert.ok(words.some((l) => /^design\s+seldon\s+write-a-spec\s+checks-bare\s+1\s+0$/.test(l)), words.join('\n'));
+});
+
+test('a try whose denials were not measured — a recheck, on codex, before steps ran as jobs — keeps and breaks no rule', () => {
+  const declared = { design: { 'write-a-spec': [readWithRead] } };
+  const recheck = declaring(
+    readOf('recheck', [step('design', [], { by: 'seldon' })], {
+      design: [
+        { end: at(1, JOBS_DAY), denied: ['Bash(cat)'], check: 'unfinished' },
+        { end: at(2, JOBS_DAY), recheck: true, check: 'passed' },
+      ],
+    }),
+    declared,
+  );
+  assert.deepEqual(
+    factsOf(recheck).tries.map((t) => [t.try, t.rules?.map((f) => f.broken) ?? null]),
+    [
+      [1, [true]],
+      [2, null],
+    ],
+  );
+  assert.deepEqual(statsOf(factsOfAll(recheck), {}, JOBS_NOW).all.steps[0].rules, [
+    { skill: 'write-a-spec', rule: 'read-with-read', says: 'Read a file with Read', kept: 0, broken: 1 },
+  ]);
+  const codex = declaring(readOf('codex', [step('design', [], { by: 'seldon', harness: 'codex' })], { design: [{ end: at(1, JOBS_DAY) }] }), declared);
+  const before = declaring(readOf('before', [step('design', [], { by: 'seldon' })], { design: [{ end: at(1) }] }), declared);
+  for (const r of [codex, before]) {
+    assert.equal(factsOf(r).tries[0].rules, null, r.run.id);
+    assert.deepEqual(statsOf(factsOfAll(r), {}, JOBS_NOW).all.steps[0].rules, [], `${r.run.id}: no row, never a row of zeros`);
+  }
+  const undeclared = readOf('undeclared', [step('design', [], { by: 'seldon' })], { design: [{ end: at(1, JOBS_DAY) }] });
+  assert.deepEqual(factsOf(undeclared).tries[0].rules, []);
+  assert.deepEqual(statsOf(factsOfAll(undeclared), {}, JOBS_NOW).all.steps[0].rules, []);
+  assert.ok(!statsLines(statsOf(factsOfAll(undeclared), {}, JOBS_NOW)).some((l) => /^step\s+agent\s+skill\s+rule/.test(l)));
+});
+
+test("a rule's kept and broken add up to its step and agent's tries whose denials were measured", () => {
+  const steps = [step('design', [], { by: 'seldon' }), step('implement', ['design'], { by: 'ada' })];
+  const tries = {
+    design: [
+      { end: at(1, JOBS_DAY), denied: ['Bash(cat)'] },
+      { end: at(2, JOBS_DAY), denied: [] },
+      { end: at(3) },
+      { end: at(4, JOBS_DAY), denied: ['Bash(head)', 'Bash(cd)'] },
+    ],
+    implement: [{ end: at(5, JOBS_DAY), denied: ['Bash(cd)'] }],
+  };
+  const r = declaring(readOf('identity', steps, tries), {
+    design: { 'write-a-spec': [readWithRead, checksBare] },
+    implement: { 'write-a-spec': [checksBare] },
+  });
+  const s = statsOf(factsOfAll(r), {}, JOBS_NOW);
+  for (const row of s.all.steps) {
+    assert.ok(row.rules.length > 0, row.step);
+    for (const rule of row.rules) assert.equal(rule.kept + rule.broken, row.deniedTries, `${row.step} ${rule.rule}`);
+  }
+  assert.deepEqual(
+    s.all.steps[0].rules.map((x) => [x.rule, x.kept, x.broken]),
+    [
+      ['read-with-read', 1, 2],
+      ['checks-bare', 2, 1],
+    ],
+  );
 });

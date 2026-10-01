@@ -1,7 +1,8 @@
 /**
  * `wf stats` (`statsRun`): the flow numbers of every run in the store (`statsOf`), off each run's record and the engine's view of every
  * task of every try, each viewed once, the calls each session was refused and the skills it loaded read off the same views
- * (`deniedCallsOf`, `skillsLoadedOf`): no session's log nor transcript. A controller,
+ * (`deniedCallsOf`, `skillsLoadedOf`), and the rules each step's skills declare read off their frozen copies (`renderedSkillRules`): no
+ * session's log nor transcript, and no skill of the checkout. A controller,
  * reaching the runtime through the client (`runtime-client.ts`): an Effect program that requires the engine as a service (`EngineService`),
  * and `stats`, its plain face in a Promise, over the engine it is handed. It writes nothing, and keeps nothing between calls.
  */
@@ -14,7 +15,7 @@ import { runStore } from '../record/files.store.ts';
 import { stepsOf } from '../record/record.store.ts';
 import { closeoutReader, everyTryOf, taskPhases, viewedOnce } from '../views/views.verb.ts';
 import { phaseOfView } from '../views/views-words.ts';
-import { renderedSkillVersions } from '../agents/agents.store.ts';
+import { renderedSkillRules, renderedSkillVersions } from '../agents/agents.store.ts';
 import { dayOf, factsOf, keysOf, statsOf, type CheckVerdict, type Facts, type StatsQuery } from './stats.ts';
 import { frozenOf, type RunFrozen } from './marks.ts';
 import { deniedCallsOf, skillsLoadedOf } from './discipline.ts';
@@ -65,6 +66,7 @@ async function runFacts(e: Engine, run: Run, steps: Workflow[]): Promise<Pick<Fa
     closeoutOf: closeoutReader(views, run),
     deniedOf: (taskId) => deniedCallsOf(everyTry.get(taskId)).map(denialText),
     skillsOf: (taskId) => skillsLoadedOf(everyTry.get(taskId)),
+    rulesOf: (step) => renderedSkillRules(run, step),
   });
 }
 

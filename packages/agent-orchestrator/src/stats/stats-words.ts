@@ -1,7 +1,7 @@
 /**
  * The stats in words (`Stats`, `stats.ts`): the tiles, a row per day, a row per change to what the runs froze, a row per step, a row per
- * call a step was refused, a row per skill a step loaded, and the one line the morning recap quotes. A number with nothing measured under
- * it reads `—`, never 0. Pure.
+ * call a step was refused, a row per skill a step loaded, a row per rule a step's skills declare, and the one line the morning recap
+ * quotes. A number with nothing measured under it reads `—`, never 0. Pure.
  */
 import { dollars, durationWord } from '../status/status.ts';
 import type { Group, Headline, Stats, StepRow } from './stats.ts';
@@ -117,9 +117,15 @@ function skillLines(steps: readonly StepRow[]): string[] {
   return rows.length ? table([['step', 'agent', 'skill', 'loads'], ...rows]) : [];
 }
 
+/** A row per rule each step and agent's skills declare, kept and broken over its measured tries; none where no step has one. */
+function ruleLines(steps: readonly StepRow[]): string[] {
+  const rows = steps.flatMap((s) => s.rules.map((r) => [s.step, s.agent ?? NONE, r.skill, r.rule, String(r.kept), String(r.broken)]));
+  return rows.length ? table([['step', 'agent', 'skill', 'rule', 'kept', 'broken'], ...rows]) : [];
+}
+
 /**
  * What `wf stats` prints: the tiles, a row per day — per group, with a key — then a row per change to what the runs froze, a row per step,
- * a row per call a step was refused, a row per skill a step loaded, and the runs left out.
+ * a row per call a step was refused, a row per skill a step loaded, a row per rule its skills declare, and the runs left out.
  */
 export function statsLines(s: Stats): string[] {
   const filtered = Object.entries(s.filters).map(([k, v]) => `${k} ${v}`);
@@ -134,6 +140,7 @@ export function statsLines(s: Stats): string[] {
     ...(s.all.steps.length ? ['', ...stepLines(s.all.steps)] : []),
     ...(denialLines(s.all.steps).length ? ['', ...denialLines(s.all.steps)] : []),
     ...(skillLines(s.all.steps).length ? ['', ...skillLines(s.all.steps)] : []),
+    ...(ruleLines(s.all.steps).length ? ['', ...ruleLines(s.all.steps)] : []),
     ...(s.unreadable.length ? ['', `left out, a journal of each not reading (wf ls says why): ${s.unreadable.join(', ')}`] : []),
   ];
 }

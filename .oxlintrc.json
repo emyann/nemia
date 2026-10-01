@@ -279,14 +279,13 @@
     {
       "files": ["apps/api/src/workflows/builder.ts"],
       "rules": {
-        "max-lines": ["error", { "max": 520, "skipBlankLines": true, "skipComments": true }],
-        "sonarjs/cognitive-complexity": ["error", 21]
+        "max-lines": ["error", { "max": 511, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
       "files": ["apps/api/src/workflows/workflows.ts"],
       "rules": {
-        "complexity": ["error", { "max": 28 }]
+        "complexity": ["error", { "max": 25 }]
       }
     },
     {

@@ -389,22 +389,28 @@ function schemasIn(dir: string): string[] {
   }
 }
 
+/** The keys of a step that are lists, each empty where the step leaves it unset. */
+const listsOf = (step: Workflow) => ({
+  input: step.input ?? [],
+  disallowedTools: step.disallowedTools ?? [],
+  allowedTools: step.allowedTools ?? [],
+  tally: step.tally ?? [],
+});
+
 export const specOf = (step: Workflow): WorkflowStepSpec => ({
+  ...listsOf(step),
   harness: step.harness ?? null,
   model: step.model ?? null,
   effort: step.effort ?? null,
   context: step.context ?? null,
   after: step.after,
   resume: step.resume ?? null,
-  input: step.input ?? [],
   workspace: step.workspace ?? null,
   slot: step.slot ?? null,
   agent: step.agent?.name ?? null,
   permissionMode: step.permissionMode ?? null,
   sandbox: step.sandbox ?? null,
   tools: step.tools ?? null,
-  disallowedTools: step.disallowedTools ?? [],
-  allowedTools: step.allowedTools ?? [],
   denials: step.denials ?? null,
   background: step.background ?? null,
   remote: step.remote ?? null,
@@ -414,7 +420,6 @@ export const specOf = (step: Workflow): WorkflowStepSpec => ({
   retries: step.retries ?? null,
   gate: step.gate ?? null,
   output: step.output?.file ?? null,
-  tally: step.tally ?? [],
   loop: step.loop ?? null,
   rounds: step.rounds ?? null,
 });

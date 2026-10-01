@@ -69,8 +69,13 @@ test('REFUSED: a start in a factory that has attached no workflow offers none, n
     () => start({ brief: 'build it', repo, workflowDir: build, isolate: false, factory: 'pipao' }),
     refusedWith(
       'Invalid',
-      /^build: the factory pipao does not offer this workflow — it offers none yet\. Attach it — wf factory attach pipao build — or start it in the default factory, which offers every workflow\. Nothing was started\.$/,
+      /^build: the factory pipao does not offer this workflow — it offers none yet\. Attach it: wf factory attach pipao build\. Nothing was started\.$/,
     ),
+  );
+  assert.throws(
+    () => start({ brief: 'build it', repo, workflowDir: build, isolate: false, factory: 'pipao' }),
+    (err: Error) => !/default factory/.test(err.message),
+    "only the factory's own fix, never the default factory",
   );
   assert.deepEqual(runsWritten(), before);
 });
@@ -82,7 +87,7 @@ test('REFUSED: a start of a workflow its factory has not attached, before its st
     () => start({ brief: 'build it', repo, workflowDir: build, isolate: false, factory: 'pipao' }),
     refusedWith(
       'Invalid',
-      /^build: the factory pipao does not offer this workflow — it offers: dev\. Attach it — wf factory attach pipao build — /,
+      /^build: the factory pipao does not offer this workflow — it offers: dev\. Attach it: wf factory attach pipao build\. Nothing was started\.$/,
     ),
     'the unattached refusal, not the unfilled one, though build has steps no one fills',
   );
@@ -250,7 +255,12 @@ test("REFUSED: a git run on a repository outside its factory, naming the factory
       err._tag === 'Invalid' &&
       err.exitCode === 2 &&
       err.message ===
-        `${other}: the factory pipao works on ${repo}, and this repository is not one of them. Name one of them — --repo ${repo} — or start it in the default factory. Nothing was started.`,
+        `${other}: the factory pipao works on ${repo}, and this repository is not one of them. Name one of them — --repo ${repo} — or file a factory on this one: wf factory add <name> --repo ${other}. Nothing was started.`,
+  );
+  assert.throws(
+    () => start({ brief: 'build it', repo: other, repoNamed: true, workflowDir: build, isolate: false, factory: 'pipao' }),
+    (err: Error) => !/default factory/.test(err.message),
+    "only the factory's own fix, never the default factory",
   );
   assert.deepEqual(runsWritten(), before);
 });
@@ -390,7 +400,7 @@ test("REFUSED: a card's factory: the store does not have, and one that does not 
     () => startFromInbox({ name: 'unattached', workflow: build, callerRepo: repo, isolate: false }),
     refusedWith(
       'Invalid',
-      /^build: the factory pipao does not offer this workflow — it offers: dev\. Attach it — wf factory attach pipao build — /,
+      /^build: the factory pipao does not offer this workflow — it offers: dev\. Attach it: wf factory attach pipao build\. Nothing was started\.$/,
     ),
   );
   assert.deepEqual(runsWritten(), before);

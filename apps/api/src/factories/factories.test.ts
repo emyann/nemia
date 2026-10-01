@@ -155,14 +155,15 @@ test("REFUSED at shipped defaults: a factory the store does not have is a 404, a
   assert.equal(said(bad.body), factoryNameRefusal('Bad'));
 });
 
-test("REFUSED at shipped defaults: a repository outside the factory named is a 422 naming the factory's and the ?repo= that asks for one — given, or the api's own when the factory has two", async () => {
+test("REFUSED at shipped defaults: a repository outside the factory named is a 422 naming the factory's, the ?repo= that asks for one and the add that files one on it — given, or the api's own when the factory has two", async () => {
   const sorted = [repoR, repoS].sort();
   const named = await get<unknown>(`/api/workflows?factory=pair&repo=${encodeURIComponent(own)}`);
   assert.equal(named.status, 422);
   assert.equal(
     said(named.body),
-    `${own}: the factory pair works on ${sorted.join(', ')}, and this repository is not one of them. Name one of them — ?factory=pair&repo=${sorted[0]} — or ask in the default factory.`,
+    `${own}: the factory pair works on ${sorted.join(', ')}, and this repository is not one of them. Name one of them — ?factory=pair&repo=${sorted[0]} — or file a factory on this one: wf factory add <name> --repo ${own}.`,
   );
+  assert.doesNotMatch(said(named.body), /default factory/, "only the factory's own fix");
   const fallen = await get<unknown>('/api/workflows?factory=pair');
   assert.equal(fallen.status, 422, 'two repositories: none is filled in, and the api own is not one of them');
   assert.ok(said(fallen.body).startsWith(`${own}: the factory pair works on`), said(fallen.body));
@@ -202,6 +203,7 @@ test("a step's page in a factory is read with its hires, and a workflow the fact
   const gamma = await get<unknown>('/api/workflows/repo/gamma/plan?factory=hired');
   assert.equal(gamma.status, 404);
   assert.equal(said(gamma.body), unattachedRefusal({ name: 'hired', workflows: ['alpha'] }, 'gamma'));
+  assert.doesNotMatch(said(gamma.body), /default factory/, "only the factory's own fix");
   const offered = await get<WorkflowStepPage>(`/api/workflows/repo/gamma/plan?repo=${encodeURIComponent(repoR)}`);
   assert.equal(offered.status, 200, 'the default factory offers it');
 });

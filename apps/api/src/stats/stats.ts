@@ -30,9 +30,12 @@ const QUERY_KEYS: Record<QueryKey, string> = {
  *   name each call refused, with a count. `skillsPerTry`, the mean skills a try's session loaded, is null on a day with no try whose
  *   session's ends all say what they loaded, as is a step row's `skillLoads`; its `skills` name each skill loaded, with a count. Its
  *   `rules` are each rule a skill the step is given declares in its `rules.json`, kept or broken over the tries whose refused calls were
- *   measured — broken when a refused call matches one of its `breaks` — empty with none declared or measured. Each
- *   group carries its `marks`: the days a run froze a step, an agent or a rendered skill that differs from the run of the same workflow
- *   folder before it. A query the package refuses (`statsQueryOf`) is a 422 naming the key and what it takes.
+ *   measured — broken when a refused call matches one of its `breaks` — empty with none declared or measured. A group's `tallies` are
+ *   a row per step and field the step's frozen `tally:` names, each a `sum` and the `tries` it was measured on, over the range
+ *   (`total`) and on each of its `days`: an array's items, a number's value, or the items whose boolean flag is true; `sum` is null,
+ *   never 0, on a day no closeout of the step measured it. Each group carries its `marks`: the days a run froze a step, an agent or a
+ *   rendered skill that differs from the run of the same workflow folder before it. A query the package refuses (`statsQueryOf`) is a
+ *   422 naming the key and what it takes.
  */
 export const stats = new Hono<ApiEnv>().get('/api/stats', (c) =>
   served(c, async ({ e }) => {

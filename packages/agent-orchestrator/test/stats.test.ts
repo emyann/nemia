@@ -295,6 +295,21 @@ writeRun(
   { factory: 'skills', createdAt: `${SKILLS_DAY}T00:00:00.000Z` },
 );
 
+const TALLY_DAY = '2026-09-18';
+const UNTALLIED_DAY = '2026-09-19';
+ran('tallied-triage', 1, 2, { day: TALLY_DAY, closeout: { ...SIGNED, issues: [{ open: true }, { open: false }] } });
+ran('untallied-triage', 1, 2, { day: UNTALLIED_DAY });
+for (const [id, day] of [
+  ['tallied', TALLY_DAY],
+  ['untallied', UNTALLIED_DAY],
+])
+  writeRun(
+    id,
+    [{ name: 'triage', after: [], body: 'Sort them.', tally: ['issues', 'issues.open'], agent: agent('sorter') }],
+    { triage: { taskId: `${id}-triage` } },
+    { factory: 'tallies', createdAt: `${day}T00:00:00.000Z` },
+  );
+
 const printedBy = async (t: TestContext, argv: string[]) => {
   const out: string[] = [];
   const log = t.mock.method(console, 'log', (...a: unknown[]) => void out.push(a.map(String).join(' ')));
@@ -334,6 +349,7 @@ test('wf stats --by factory answers a group per factory, and --factory keeps one
       ['denials', 7],
       ['other', 2],
       ['skills', 5],
+      ['tallies', 2],
     ],
   );
   const only = JSON.parse(await printedBy(t, ['stats', '--json', '--factory', 'other'])) as Stats;
@@ -478,4 +494,38 @@ test('wf stats counts each skill a session loaded, per try whose ends all say; a
   assert.match(words, /^spec\s+seldon\s+look\s+1$/m);
   const line = await printedBy(t, ['stats', '--line', '--factory', 'skills']);
   assert.match(line, /, \S+ \(\S+\) calls denied, \S+ \(\S+\) skills loaded$/);
+});
+
+test("wf stats totals each tally a step froze over its closeouts, per day and over the range; a day with no closeout's value is —, never 0", async (t) => {
+  const range = ['--factory', 'tallies', '--from', TALLY_DAY, '--to', UNTALLIED_DAY];
+  const s = JSON.parse(await printedBy(t, ['stats', '--json', ...range])) as Stats;
+  assert.deepEqual(
+    s.all.tallies.map((row) => [row.step, row.tally, row.total, row.days]),
+    [
+      [
+        'triage',
+        'issues',
+        { sum: 2, tries: 1 },
+        [
+          { day: TALLY_DAY, sum: 2, tries: 1 },
+          { day: UNTALLIED_DAY, sum: null, tries: 0 },
+        ],
+      ],
+      [
+        'triage',
+        'issues.open',
+        { sum: 1, tries: 1 },
+        [
+          { day: TALLY_DAY, sum: 1, tries: 1 },
+          { day: UNTALLIED_DAY, sum: null, tries: 0 },
+        ],
+      ],
+    ],
+    'the session that signed no issues measured none',
+  );
+  const words = await printedBy(t, ['stats', ...range]);
+  assert.match(words, /^day\s+step\s+tally\s+sum\s+tries$/m);
+  assert.match(words, new RegExp(`^${TALLY_DAY}\\s+triage\\s+issues\\.open\\s+1\\s+1$`, 'm'));
+  assert.match(words, new RegExp(`^${UNTALLIED_DAY}\\s+triage\\s+issues\\s+—\\s+0$`, 'm'));
+  assert.match(words, /^all\s+triage\s+issues\s+2\s+1$/m);
 });

@@ -335,6 +335,17 @@ export const listOf = (typed: string): string[] =>
     .map((s) => s.trim())
     .filter(Boolean);
 
+/** What an empty list field leaves its key at, said in its box: the harness's own tools, or none of what the list names. */
+const LIST_UNSET: Readonly<Partial<Record<keyof WorkflowStepSpec, string>>> = {
+  tools: "the harness's own set",
+  disallowedTools: 'nothing denied',
+  allowedTools: 'nothing allowed',
+  tally: 'nothing counted',
+};
+
+/** The words an empty list field of `key` shows (`LIST_UNSET`), `none` for a list key it does not name. */
+export const listUnsetWords = (key: keyof WorkflowStepSpec): string => LIST_UNSET[key] ?? 'none';
+
 /**
  * Tokens as a person types them — `200k`, `150000`, `1M` — or null for none, or for anything else: the package's `tokensOf`, which the page
  * cannot import. Whether the harness takes the number is the package's to say when the draft is saved.

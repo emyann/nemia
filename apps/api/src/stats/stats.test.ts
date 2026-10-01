@@ -26,8 +26,8 @@ const at = '2026-09-28T09:00:00.000Z';
 const ended = '2026-09-28T10:00:00.000Z';
 const jsonl = (lines: object[]) => lines.map((line) => `${JSON.stringify(line)}\n`).join('');
 
-/** A task that ran an hour, signed off and was measured at `costUsd`. */
-const signedOff = (taskId: string, costUsd: number) =>
+/** A task that ran an hour, signed off and was measured at `costUsd`, its end saying the skills its session loaded where given. */
+const signedOff = (taskId: string, costUsd: number, skills?: string[]) =>
   write(
     path.join(root, 'engine', 'tasks', `${taskId}.jsonl`),
     jsonl([
@@ -42,15 +42,16 @@ const signedOff = (taskId: string, costUsd: number) =>
         observed: 'done',
         reason: 'harness',
         closeout: { outcome: 'done', summary: 'Did it.', needs: null, artifacts: [] },
+        ...(skills ? { skills } : {}),
       },
       { kind: 'measured', at: ended, attempt: 1, usage: { costUsd } },
       { kind: 'settled', at: ended, outcome: 'succeeded' },
     ]),
   );
 
-/** A finished run of one step on `repo`, in `factory` when one is named. */
-function finished(id: string, repo: string, costUsd: number, factory?: string) {
-  signedOff(`${id}-implement`, costUsd);
+/** A finished run of one step on `repo`, in `factory` when one is named, its session's end saying the skills it loaded where given. */
+function finished(id: string, repo: string, costUsd: number, factory?: string, skills?: string[]) {
+  signedOff(`${id}-implement`, costUsd, skills);
   write(
     path.join(root, 'runs', `${id}.json`),
     JSON.stringify({
@@ -71,7 +72,7 @@ function finished(id: string, repo: string, costUsd: number, factory?: string) {
 }
 
 finished('r-home', '/repos/home', 1);
-finished('r-away', '/repos/away', 2, 'other');
+finished('r-away', '/repos/away', 2, 'other', ['look', 'look']);
 
 /** A run of the review workflow on `/repos/home`, created at `createdAt`, its skill rendered as `text`: nothing of it ran. */
 function reviewed(id: string, createdAt: string, text: string) {
@@ -132,6 +133,18 @@ test('GET /api/stats answers the calls refused per try as null, never 0, where e
   assert.equal(body.all.total.deniedPerTry, null);
   assert.equal(body.all.days[0].deniedPerTry, null);
   assert.deepEqual([body.all.steps[0].deniedCalls, body.all.steps[0].deniedTries, body.all.steps[0].denials], [null, 0, []]);
+});
+
+test('GET /api/stats answers the skills loaded per try as null, never 0, where no end says them, and counts each where one does', async () => {
+  const { body } = await asked('?from=2026-09-28&to=2026-09-28&ofFactory=default');
+  assert.equal(body.all.total.tries, 1);
+  assert.equal(body.all.total.skillsPerTry, null);
+  assert.equal(body.all.days[0].skillsPerTry, null);
+  assert.deepEqual([body.all.steps[0].skillLoads, body.all.steps[0].skillTries, body.all.steps[0].skills], [null, 0, []]);
+  const other = await asked('?from=2026-09-28&to=2026-09-28&ofFactory=other');
+  assert.equal(other.body.all.total.skillsPerTry, 2);
+  const { skillLoads, skillTries, skills } = other.body.all.steps[0];
+  assert.deepEqual({ skillLoads, skillTries, skills }, { skillLoads: 2, skillTries: 1, skills: [{ skill: 'look', count: 2 }] });
 });
 
 test('GET /api/stats keeps one factory with ofFactory and one repository with ofRepo, compared as strings', async () => {

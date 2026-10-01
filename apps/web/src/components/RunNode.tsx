@@ -5,12 +5,12 @@ import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
 import { ChevronRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import { decisionQuery, type RunDetail, type RunSummary } from '@/lib/api';
+import { decisionQuery, type RunDetail, type RunSummary, type RunWaiting } from '@/lib/api';
 import { TryTag } from './TryTag';
 import { needLine, needsOf, stepAnchor } from '@/lib/asks';
 import { spentTitle } from '@/lib/cost';
 import { decisionStamp, isDecidable, touchedSummary } from '@/lib/decide';
-import { clockCounts, repoName, runClock, titleOf, toDecideOf, waitsOnYou } from '@/lib/factory';
+import { clockCounts, repoName, runClock, titleOf, toDecideOf, waitsOnRuns, waitsOnYou } from '@/lib/factory';
 import { flowSteps, railOf, tilesOf } from '@/lib/flow';
 import { decideLine, gateOfSummary } from '@/lib/gate';
 import { useNow } from '@/lib/useNow';
@@ -52,7 +52,9 @@ export type RunFlowNode = Node<RunNodeData, 'run'>;
  * - Beside its id, where its steps work: its repository, or folders the run made (`workspace: folder`); a try of an agent, a folder
  *   run of the store's own, is tagged with its agent instead, since its folder is on no page.
  * - On whom a run started `--after` waits, and a person's hold on it (`wf hold`), each in `wf ls`'s word, amber when only a person moves
- *   it, with what to do on hover. A hold is said instead of a gate: while it stands, nothing of the run is asked of anyone.
+ *   it, with what to do on hover (`WaitingLine`).
+ * - A run that waits on runs that may still ship, and on nothing else (`waitsOnRuns`), is a ghost until it starts: dimmed and dashed, as
+ *   the queue lane draws a card not started, each run it waits on a link to that run. A hold is said instead of a gate: while it stands, nothing of the run is asked of anyone.
  * - What a person has to know to act, besides the gate's own `approve <step>`: a step's question, or a session the harness blocked, two
  *   lines each, whole on hover, each a link to its step on the run's page.
  * - The gate, answered here (`CardGate`). Once answered, what the card said, through the state the answer was given in and the one it
@@ -72,6 +74,7 @@ export function RunNode({ data: { run, finished, open, detail, trouble, selected
   const cancelled = run.cancelledAt !== null;
   const title = titleOf(run);
   const decide = toDecideOf(run);
+  const look = lookOf(run, finished);
   const gate = gateOfSummary(run);
   const needs = needsOf(run).filter((need) => !(need.kind === 'approve' && need.step === gate?.step));
   const stamp = run.steps.map((step) => `${step.name}:${step.status}`).join('|');
@@ -90,7 +93,8 @@ export function RunNode({ data: { run, finished, open, detail, trouble, selected
   return (
     <Card
       size="sm"
-      className={`w-fit flex-row items-start gap-0 shadow-sm transition-opacity ${decide ? 'ring-1 ring-emerald-500/60' : finished ? 'opacity-50 hover:opacity-80' : ''}`}
+      data-ghost-run={look.ghost || undefined}
+      className={`w-fit flex-row items-start gap-0 shadow-sm transition-opacity ${look.className}`}
     >
       <div className="flex w-88 shrink-0 flex-col gap-3">
         <div className="min-w-0 px-3">
@@ -133,15 +137,7 @@ export function RunNode({ data: { run, finished, open, detail, trouble, selected
               </span>
             )}
           </p>
-          {run.waiting && (
-            <p
-              data-waiting={run.waiting.onYou ? 'on-you' : 'on-runs'}
-              title={run.waiting.advice}
-              className={`mt-1 line-clamp-2 font-mono text-[11px] break-words ${run.waiting.onYou ? 'text-amber-800 dark:text-amber-300' : 'text-muted-foreground'}`}
-            >
-              {run.waiting.word}
-            </p>
-          )}
+          {run.waiting && <WaitingLine waiting={run.waiting} ghost={look.ghost} />}
           {run.holding && (
             <p
               data-holding={run.holding.onYou ? 'on-you' : 'on-runs'}
@@ -251,6 +247,54 @@ export function RunNode({ data: { run, finished, open, detail, trouble, selected
       <Handle type="target" position={Position.Left} isConnectable={false} className="opacity-0" />
       <Handle type="source" position={Position.Right} isConnectable={false} className="opacity-0" />
     </Card>
+  );
+}
+
+/** How a ghost's card is drawn: dashed and dimmed, as `QueueLane` draws a card not started, and clearer on hover. */
+const GHOST = 'border border-dashed border-neutral-400/70 opacity-60 shadow-none hover:opacity-90 dark:border-neutral-600';
+
+/**
+ * How a run's card is drawn: ringed while a person has its result to decide (`toDecideOf`), the one finished card that waits for a
+ * person; else a ghost while it waits on runs and nothing else (`waitsOnRuns`); else dimmed once `finished`.
+ */
+function lookOf(run: RunSummary, finished: boolean): { ghost: boolean; className: string } {
+  if (toDecideOf(run)) return { ghost: false, className: 'ring-1 ring-emerald-500/60' };
+  if (waitsOnRuns(run)) return { ghost: true, className: GHOST };
+  return { ghost: false, className: finished ? 'opacity-50 hover:opacity-80' : '' };
+}
+
+/**
+ * What a run started `--after` runs waits on, in `wf ls`'s word (`waiting.word`), with what `wf decide` says on hover. Amber when only a
+ * person moves it; on a ghost's card (`ghost`), each run it waits on a link to that run's page.
+ */
+function WaitingLine({ waiting, ghost }: { waiting: RunWaiting; ghost: boolean }) {
+  return (
+    <p
+      data-waiting={waiting.onYou ? 'on-you' : 'on-runs'}
+      title={waiting.advice}
+      className={`mt-1 line-clamp-2 font-mono text-[11px] break-words ${waiting.onYou ? 'text-amber-800 dark:text-amber-300' : 'text-muted-foreground'}`}
+    >
+      {ghost ? (
+        <>
+          waiting on{' '}
+          {waiting.runs.map(({ run }, i) => (
+            <span key={run}>
+              {i > 0 && ', '}
+              <RouteLink
+                to="/runs/$runId"
+                params={{ runId: run }}
+                data-waits-on={run}
+                className="nodrag text-foreground/80 hover:underline"
+              >
+                {run}
+              </RouteLink>
+            </span>
+          ))}
+        </>
+      ) : (
+        waiting.word
+      )}
+    </p>
   );
 }
 

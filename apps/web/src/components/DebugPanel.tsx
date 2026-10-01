@@ -271,15 +271,18 @@ function Timeline({
                 onPress={() => onScrub(i)}
                 className={`flex w-full items-baseline gap-2 rounded px-1.5 py-0.5 text-left outline-none hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-ring/50 dark:hover:bg-neutral-800 ${i === at ? 'bg-amber-100 dark:bg-amber-950' : ''} ${i > at ? 'text-neutral-400 dark:text-neutral-600' : ''}`}
               >
-                <span className="font-semibold">{s.state}</span>
-                <span className="text-muted-foreground">← {s.event}</span>
-                {verb && (
-                  <span data-by-person={verb} className="text-violet-700 italic dark:text-violet-300">
-                    (by a person: {verb})
+                <span className="flex min-w-0 flex-1 flex-wrap gap-x-2 *:whitespace-nowrap">
+                  <span data-said>
+                    <span className="font-semibold">{s.state}</span> <span className="text-muted-foreground">← {s.event}</span>
                   </span>
-                )}
-                {offGraph && <span className="text-muted-foreground">(no edge)</span>}
-                <span className="ml-auto text-muted-foreground">{clockWord(new Date(s.at), now)}</span>
+                  {verb && (
+                    <span data-by-person={verb} className="text-violet-700 italic dark:text-violet-300">
+                      (by a person: {verb})
+                    </span>
+                  )}
+                  {offGraph && <span className="text-muted-foreground">(no edge)</span>}
+                </span>
+                <span className="shrink-0 text-muted-foreground">{clockWord(new Date(s.at), now)}</span>
               </AriaButton>
             </li>
           );

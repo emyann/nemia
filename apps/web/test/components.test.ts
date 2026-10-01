@@ -4565,6 +4565,15 @@ test('REFUSED: a second try while one moves — the button is held, and the late
   assert.match(html, /data-try-files[\s\S]*note\.md/);
 });
 
+test('a try stopped where no step broke says what stopped it, as the list words it, not a bare failed', async () => {
+  const { TryAgent } = await import('../src/components/TryAgent.tsx');
+  const html = await routedWith(createElement(TryAgent, { agent: composing as never }), [
+    [['runs'], [tried('r-t', { status: 'failed', stoppedOn: 'blocked' })]],
+    [['runs', 'r-t'], tryDetail({ status: 'failed' })],
+  ]);
+  assert.match(html, /data-try-status[^>]*>blocked</);
+});
+
 test('a try not filed yet says so in place of its files', async () => {
   const { TryRun } = await import('../src/components/TryAgent.tsx');
   const unfiled = tryDetail();

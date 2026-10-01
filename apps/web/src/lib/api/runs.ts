@@ -8,6 +8,7 @@ import {
   PlaceKindSchema,
   RunHoldingSchema,
   RunStatusSchema,
+  RunStoppedOnSchema,
   RunToDecideSchema,
   RunWaitingSchema,
   SpentSchema,
@@ -16,6 +17,7 @@ import {
   type PlaceKind,
   type RunHolding,
   type RunStatus,
+  type RunStoppedOn,
   type RunToDecide,
   type RunWaiting,
   type Spent,
@@ -61,6 +63,11 @@ export type RunSummary = {
   /** The hold, in the package's words (`RunHolding`); null for a run nobody holds, and one called off. */
   holding: RunHolding | null;
   status: RunStatus;
+  /**
+   * What stopped a `failed` run in which no step broke, as `wf decide` says it: `awaiting approval` at its gate, `blocked` where a step
+   * signed off blocked. Null for every other run.
+   */
+  stoppedOn: RunStoppedOn | null;
   /**
    * Whether anything of the run still moves: a task the engine holds for it, or a step or check a tick would still file — the roots of a
    * run waiting on runs that may still ship among them, and not those of one waiting on a run that never ships without a person.
@@ -112,6 +119,7 @@ const RunSummarySchema = Schema.Struct({
   heldUntil: StringsSchema,
   holding: Schema.NullOr(RunHoldingSchema),
   status: RunStatusSchema,
+  stoppedOn: Schema.NullOr(RunStoppedOnSchema),
   moving: Schema.Boolean,
   cost: Schema.NullOr(SpentSchema),
   steps: Schema.mutable(

@@ -133,6 +133,7 @@ test('GET /api/runs answers every run while one task journal holds an entry no r
     [['implement', 'r-bad-implement', 'unreadable']],
   );
   assert.equal(bad.status, 'running', 'counted in flight, as the tick counts it');
+  assert.equal(bad.stoppedOn, null, 'not judged: nothing stopped it');
   assert.equal(bad.moving, true);
   assert.deepEqual(bad.waitingOnYou, []);
 

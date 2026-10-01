@@ -17,7 +17,7 @@ test('the list names each machine, its title and the file it is drawn from', asy
   ]);
 });
 
-test("the lifecycle's graph is the runtime's, whole: its states, its first and final states, and every edge with its guard", async () => {
+test("the lifecycle's graph is the runtime's, whole: its states, its first and final states, every edge with its guard, and its verbs", async () => {
   const res = await app.request('/api/machines/lifecycle');
   assert.equal(res.status, 200);
   const graph = (await res.json()) as MachineGraph;
@@ -31,6 +31,12 @@ test("the lifecycle's graph is the runtime's, whole: its states, its first and f
       (e) => e.from === 'ending' && e.event === 'CLOSED' && e.guard === 'lastDone' && e.to === 'completed' && e.action === 'settle',
     ),
     'a guarded edge keeps its guard and its action',
+  );
+  assert.deepEqual(graph.verbs, lifecycleGraph().verbs, 'every verb written from outside it, as the runtime declares it');
+  assert.deepEqual(
+    graph.verbs.find((v) => v.verb === 'close'),
+    { verb: 'close', entry: 'closed', by: 'person', from: ['input-required'], to: 'ending', guard: 'awaitsWord' },
+    "a person's close, from where it is taken to where it leads, under its guard",
   );
 });
 

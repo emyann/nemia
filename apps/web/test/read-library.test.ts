@@ -71,7 +71,7 @@ test('each read of the library decodes an answer the api gives, as it gave it', 
   assert.deepEqual(await readRepository(), { repo: '/work/repo' });
   answering(t, keyForm());
   assert.deepEqual(await readKeyForm(), keyForm());
-  answering(t, { machines: [without(machine(), 'initial', 'states', 'final', 'edges')] });
+  answering(t, { machines: [without(machine(), 'initial', 'states', 'final', 'edges', 'verbs')] });
   assert.deepEqual(await readMachines(), { machines: [{ name: 'lifecycle', title: machine().title, source: machine().source }] });
   answering(t, machine());
   assert.deepEqual(await readMachine(), machine());
@@ -177,13 +177,19 @@ test("REFUSED, the builder's form: a key no step has, and an agent's gate set fa
   await assert.rejects(readKeyForm(), unread('/api/workflows/keys', 'keys[0].kind', '"colour", where'));
 });
 
-test('REFUSED, the machines: a list that is no list, and an edge without its action', async (t) => {
+test('REFUSED, the machines: a list that is no list, an edge without its action, a verb without its guard, and no verbs', async (t) => {
   answering(t, { machines: 'lifecycle' });
   await assert.rejects(readMachines(), unread('/api/machines', 'machines', '"lifecycle", where the board reads array'));
 
   const [edge] = machine().edges;
   answering(t, machine({ edges: [without(edge, 'action')] }));
   await assert.rejects(readMachine(), unread('/api/machines/lifecycle', 'edges[0].action', 'is missing'));
+
+  const [verb] = machine().verbs;
+  answering(t, machine({ verbs: [without(verb, 'guard')] }));
+  await assert.rejects(readMachine(), unread('/api/machines/lifecycle', 'verbs[0].guard', 'is missing'));
+  answering(t, without(machine(), 'verbs'));
+  await assert.rejects(readMachine(), unread('/api/machines/lifecycle', 'verbs', 'is missing'));
 });
 
 test("an agent the api refused still rejects in the api's words and status, not as an answer unread", async (t) => {

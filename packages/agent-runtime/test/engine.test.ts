@@ -1095,13 +1095,20 @@ test('a pass with no memo — the Effect door, on layers of its own — folds ev
   assert.equal(j.readsOf('done'), before + 2, 'folded, and read again by its step');
 });
 
-test('a settled task still listed is let go on every pass off what the memo kept, and what it consumed is written once, through the feed, so a memo kept from before it would fail the pass in check mode', async () => {
+test('a settled task let go of is released off what the memo kept, looked for no more though its harness still lists it ended, and what it consumed is written once, through the feed, so a memo kept from before it would fail the pass in check mode', async () => {
   const j = countedJournal();
   const sessions = new Map<string, Sighting>();
   const released: string[] = [];
+  const told: string[][] = [];
+  const ops = testOps({ sessions });
   const runner = Runner.layer({
-    ...testOps({ sessions }),
-    /** Says what the session consumed only once it has let it go, and keeps it listed after. */
+    ...ops,
+    observeFor: (expected) =>
+      Effect.sync(() => {
+        told.push(expected.map((e) => e.name));
+        return { seen: new Map([...sessions].filter(([name]) => expected.some((e) => e.name === name))), unread: new Set<string>() };
+      }),
+    /** Says what the session consumed only once it has let it go, and keeps it listed after, as a detached run's file is. */
     release: (s) =>
       Effect.sync(() => {
         released.push(s.sessionId);
@@ -1116,7 +1123,53 @@ test('a settled task still listed is let go on every pass off what the memo kept
   for (let pass = 0; pass < 4; pass++) await run(tick());
   const events = await run(Effect.flatMap(Journal, (jr) => jr.read('done')));
   assert.equal(events.filter((e) => e.kind === 'measured').length, 1, 'measured once');
-  assert.equal(released.length, 4, 'let go on each of the four passes that listed it');
+  assert.equal(released.length, 2, 'let go on the pass that ended it, and on the next, which folds it again for its measure');
+  assert.equal(sessions.has(nameFor('done', 1)), true, 'though its harness still lists it');
+  assert.deepEqual(
+    told.slice(1).map((names) => names.includes(nameFor('done', 1))),
+    [true, true, false, false],
+    'looked for on the pass that ended it and the one that folded its measure, and no more',
+  );
+});
+
+test('a finished session its harness still lists at work is looked for and released on every pass until it has ended, and what it consumed then is written once', async () => {
+  const sessions = new Map<string, Sighting>();
+  const released: number[] = [];
+  const told: string[][] = [];
+  let pass = 0;
+  const ops = testOps({ sessions });
+  const runner = Runner.layer({
+    ...ops,
+    observeFor: (expected) =>
+      Effect.sync(() => {
+        told.push(expected.map((e) => e.name));
+        return { seen: new Map([...sessions].filter(([name]) => expected.some((e) => e.name === name))), unread: new Set<string>() };
+      }),
+    /** Lets nothing go, as a job's release does: its process runs on until it exits, and writes its cost then. */
+    release: () => Effect.sync(() => void released.push(pass)),
+  });
+  const layer = Layer.mergeAll(Journal.test(), runner, tickMemoLayer({ verify: true }));
+  const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.runPromise(e.pipe(Effect.provide(layer)));
+  const id = await run(file(spec));
+  await run(tick());
+  const name = nameFor(id, 1);
+  sessions.set(name, { ...sessions.get(name)!, state: 'working', busy: false, quietMs: 120_000 });
+  for (pass = 1; pass <= 3; pass++) await run(tick());
+  assert.equal((await run(view(id, new Map()))).state.settled, 'succeeded', 'ended quiet while its process still runs');
+  sessions.set(name, { ...sessions.get(name)!, state: 'completed', quietMs: undefined, usage: { costUsd: 0.25 } });
+  for (pass = 4; pass <= 6; pass++) await run(tick());
+  const events = await run(Effect.flatMap(Journal, (j) => j.read(id)));
+  assert.deepEqual(
+    events.filter((e) => e.kind === 'measured').map((e) => e.kind === 'measured' && e.usage),
+    [{ costUsd: 0.25 }],
+    'measured once it ended',
+  );
+  assert.deepEqual(released, [1, 2, 3, 4, 5], 'released on each pass it was at work, the pass it was seen ended, and the next');
+  assert.deepEqual(
+    told.slice(1).map((names) => names.includes(name)),
+    [true, true, true, true, true, false],
+    'looked for while at work, on the pass it was seen ended and the one that folded its measure, and no more',
+  );
 });
 
 test('a pass tells its runner the sessions it expects — every attempt of every task it folds, on its harness — and asks observe nothing when it can be told', async () => {
@@ -1152,7 +1205,7 @@ test('a pass tells its runner the sessions it expects — every attempt of every
   assert.equal(observes, 0, 'observe, told nothing, is never asked when the runner can be told');
 });
 
-test('a release the harness refuses is asked again on every pass while the harness lists the session, the task kept by the memo, and looked for no more once it is gone', async () => {
+test('a release the harness refuses is asked again on every pass while the harness lists the session, the task kept by the memo, and looked for no more once one goes through', async () => {
   const sessions = new Map<string, Sighting>();
   const told: string[][] = [];
   const asked: number[] = [];
@@ -1187,8 +1240,8 @@ test('a release the harness refuses is asked again on every pass while the harne
   assert.deepEqual(asked, [1, 2, 3, 4], 'asked on every pass that listed it, the passes the memo kept the task included');
   assert.deepEqual(
     told.slice(1).map((names) => names.includes(name)),
-    [true, true, true, true, true, false, false],
-    'looked for while listed, once more to see it gone, and then no more',
+    [true, true, true, true, false, false, false],
+    'looked for while its release was refused, and no more once one went through',
   );
 });
 

@@ -358,11 +358,16 @@ const settleOn = Effect.fn('settleOn')(function* (
  * nothing, and a journal that writes JSON drops the key, so a key asked alone would be new on every pass.
  *
  * It reads a task's settling, its config and each attempt's end, session and usage, and no more (`Releasable`): a settled
- * task a pass skips is released off what the pass's memo kept of it. Says whether it wrote a `measured`, and whether the
- * harness listed a finished session of the task — the memo keeps looking for one it did (`TickMemoState.listed`). A finished
- * session whose harness could not be read this pass (`unread`) counts as listed, released nothing: it may still be there, and
- * dropped from the memo's look on one failed read, a release the harness refused would never be asked again.
+ * task a pass skips is released off what the pass's memo kept of it. Says whether it wrote a `measured`, and whether a
+ * finished session of the task can still move — the memo keeps looking for one that can (`TickMemoState.listed`): one whose
+ * release the harness refused, so it is asked again; one its harness lists at work, whose process runs on and may yet say
+ * what it consumed; and one whose harness could not be read this pass (`unread`), released nothing: it may still be there,
+ * and dropped from the memo's look on one failed read, a release the harness refused would never be asked again. A session
+ * let go of and listed ended says nothing more on any pass, and is looked for no more.
  */
+/** What a release the harness refused answers, in `releaseFinished`: told apart from every answer a release gives. */
+const REFUSED = Symbol('refused');
+
 const releaseFinished = Effect.fn('releaseFinished')(function* (
   state: Releasable,
   observed: ReadonlyMap<string, Sighting>,
@@ -381,10 +386,10 @@ const releaseFinished = Effect.fn('releaseFinished')(function* (
       if (finished && unread.has(name)) listed = true;
       continue;
     }
-    listed = true;
     const released = yield* runner
       .release(session, state.config ?? {})
-      .pipe(Effect.catchTag('RunnerError', () => Effect.succeed(undefined)));
+      .pipe(Effect.catchTag('RunnerError', () => Effect.succeed(REFUSED)));
+    if (released === REFUSED || atWorkState(session.state)) listed = true;
     const measured = typeof released === 'object' ? released : session.usage;
     if (
       measured &&
@@ -424,12 +429,12 @@ const atWork = (state: State, observed: ReadonlyMap<string, Sighting>): boolean 
 
 /**
  * The sessions a pass expects its harnesses to list: every attempt of every task it folds, on the harness the task was filed on,
- * and of every settled task the memo keeps whose harness listed a finished session of it on the last pass that looked.
+ * and of every settled task the memo keeps a finished session of which could still move on the last pass that looked.
  * A pass folds every task not settled, so every session that can still move is on it; a settled task it folds is — on an
  * engine's first pass, every one — so a session whose release a crash cut short is let go after a restart. A kept task stays on
- * it while its harness lists it, so a release the harness refused is asked again on every pass, as `releaseFinished` promises,
- * and drops off on the first pass that sees it gone: an absence read as every absence is, off the pass's one observation — and
- * only an absence: a pass that could not read its harness keeps it (`unread`).
+ * it while its release is refused or its session listed at work, so a refused release is asked again on every pass, as
+ * `releaseFinished` promises, and drops off on the first pass that lets it go ended or sees it gone: an absence read as every
+ * absence is, off the pass's one observation — and only an absence: a pass that could not read its harness keeps it (`unread`).
  * Off the journal and the last observation, never off what a pass did: a session started before a restart is expected on the
  * first pass after it.
  */

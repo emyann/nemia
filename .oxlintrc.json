@@ -373,8 +373,8 @@
       "files": ["apps/web/src/components/StepForm.tsx"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 182, "skipBlankLines": true, "skipComments": true }],
-        "complexity": ["error", { "max": 51 }],
-        "sonarjs/cognitive-complexity": ["error", 40]
+        "complexity": ["error", { "max": 50 }],
+        "sonarjs/cognitive-complexity": ["error", 37]
       }
     },
     {

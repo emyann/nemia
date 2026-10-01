@@ -96,6 +96,7 @@ const spec = (fields: Partial<WorkflowStepSpec>): WorkflowStepSpec => ({
   retries: null,
   gate: null,
   output: null,
+  tally: [],
   loop: null,
   rounds: null,
   ...fields,

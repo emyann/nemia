@@ -473,6 +473,7 @@ test('every key a step has is read — none is accepted and then dropped', () =>
     retries: '1',
     gate: 'true',
     output: 'review.schema.json',
+    tally: 'findings',
     loop: 'implement',
     rounds: '2',
   };
@@ -512,6 +513,7 @@ test('every key a step has is read — none is accepted and then dropped', () =>
   assert.equal(w.retries, 1);
   assert.deepEqual(w.input, ['implement']);
   assert.deepEqual(w.output, { file: 'review.schema.json', schema: LOOPING });
+  assert.deepEqual(w.tally, ['findings']);
   assert.deepEqual([w.loop, w.rounds], ['implement', 2]);
   assert.equal(w.gate, true);
   assert.equal(w.remote, true);
@@ -560,7 +562,7 @@ test('REFUSED: a table of meanings with a key missing, one out of order, an extr
 
 test('a key a step does not have is refused by name, with the keys it does have', () => {
   const list =
-    "A step's keys are: after, resume, input, workspace, slot, agent, harness, model, effort, context, permissionMode, sandbox, tools, disallowedTools, allowedTools, denials, background, remote, deadlineSeconds, budget, check, retries, gate, output, loop, rounds.";
+    "A step's keys are: after, resume, input, workspace, slot, agent, harness, model, effort, context, permissionMode, sandbox, tools, disallowedTools, allowedTools, denials, background, remote, deadlineSeconds, budget, check, retries, gate, output, tally, loop, rounds.";
   assert.throws(
     () => fm('review', 'colour: red'),
     (e: unknown) => {
@@ -2461,6 +2463,7 @@ test('`renderStep` of a step that sets every key: one line a key, in `STEP_KEYS`
     retries: '0',
     gate: 'true',
     output: 'review.schema.json',
+    tally: 'findings',
     loop: 'implement',
     rounds: '2',
   };
@@ -2503,6 +2506,7 @@ test('`renderStep` of a step that sets every key: one line a key, in `STEP_KEYS`
       'retries: 0',
       'gate: true',
       'output: review.schema.json',
+      'tally: findings',
       'loop: implement',
       'rounds: 2',
       '---',

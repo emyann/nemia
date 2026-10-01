@@ -91,6 +91,7 @@ const KINDS: Readonly<Record<StepKey, KeyKind>> = {
   retries: 'count',
   gate: 'flag',
   output: 'schema',
+  tally: 'list',
   loop: 'step',
   rounds: 'count',
 };

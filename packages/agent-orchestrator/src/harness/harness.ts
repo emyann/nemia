@@ -51,6 +51,7 @@ const REMOTE_REFUSED: Partial<Record<StepKey, string>> = {
   budget: 'is a spend cap a harness of ours keeps, and a remote agent keeps none and reports no cost',
   output:
     "declares the fields of a closing statement the harness is asked for, and A2A has no closeout schema: a Task the agent completes is the step's sign-off, and a data part on its reply is what it says",
+  tally: "counts fields of the closeout `output:` declares, and a step on a remote agent declares no `output:`",
   loop: 'goes round again on the `again` its `output:` declares, and a step on a remote agent declares no `output:`',
   resume: "continues a session a harness of ours kept, and the run keeps none of a remote agent's: a new Task is sent",
   check:

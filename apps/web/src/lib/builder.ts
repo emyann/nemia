@@ -57,6 +57,7 @@ export const UNSET: Readonly<WorkflowStepSpec> = {
   retries: null,
   gate: null,
   output: null,
+  tally: [],
   loop: null,
   rounds: null,
 };
@@ -87,6 +88,7 @@ export const draftOf = (workflow: Pick<WorkflowListing, 'steps'>): DraftStep[] =
       input: [...spec.input],
       disallowedTools: [...spec.disallowedTools],
       allowedTools: [...spec.allowedTools],
+      tally: [...spec.tally],
       tools: spec.tools && [...spec.tools],
     },
     body,
@@ -166,7 +168,7 @@ export function addStep(steps: readonly DraftStep[], name: string, body: string)
   if (nameRefusal(steps, name)) return [...steps];
   return [
     ...steps,
-    { name, spec: { ...UNSET, after: [], input: [], disallowedTools: [], allowedTools: [] }, body, own: null, schema: null },
+    { name, spec: { ...UNSET, after: [], input: [], disallowedTools: [], allowedTools: [], tally: [] }, body, own: null, schema: null },
   ];
 }
 

@@ -119,6 +119,8 @@ export type WorkflowStepSpec = {
   gate: true | null;
   /** The schema file `output:` names, beside the step. */
   output: string | null;
+  /** What `wf stats` counts of the step's closeouts (`tally:`), each a field its `output:` declares or `field.flag`: empty for none. */
+  tally: string[];
   loop: string | null;
   rounds: number | null;
 };
@@ -412,6 +414,7 @@ export const specOf = (step: Workflow): WorkflowStepSpec => ({
   retries: step.retries ?? null,
   gate: step.gate ?? null,
   output: step.output?.file ?? null,
+  tally: step.tally ?? [],
   loop: step.loop ?? null,
   rounds: step.rounds ?? null,
 });

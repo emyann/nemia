@@ -48,6 +48,7 @@ import {
   type Spelled,
 } from '../former/former.ts';
 import type { Agent, Agents, SkillsFound } from '../agents/agents.ts';
+import { tallyOf } from '../tally/tally.ts';
 
 /**
  * One step, from its file's text.
@@ -237,6 +238,7 @@ export function stepFrom(
       .map((s) => s.trim())
       .filter(Boolean),
     output,
+    tally: tallyOf(name, meta.tally, output),
     loop: loopOf(name, meta.loop, output),
     rounds: roundsOf(name, meta.loop, meta.rounds),
   };
@@ -286,7 +288,7 @@ export type StepDraft = Omit<Workflow, 'output' | 'agent'> & { output?: Pick<Ste
  * The keys whose empty list says what no line says: nothing to wait on, to read, to deny. Not `tools:`, where none reads as every tool to
  * one person.
  */
-const EMPTY_IS_UNSET: readonly StepKey[] = ['after', 'input', 'disallowedTools', 'allowedTools'];
+const EMPTY_IS_UNSET: readonly StepKey[] = ['after', 'input', 'disallowedTools', 'allowedTools', 'tally'];
 
 /**
  * A step as its file: the frontmatter, with the keys the step sets in `STEP_KEYS`' order, each written as the parser reads it — a list as

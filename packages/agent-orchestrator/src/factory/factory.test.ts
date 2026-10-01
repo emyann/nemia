@@ -158,12 +158,14 @@ test('REFUSED: a start of a workflow its factory has not attached, saying what i
   assert.equal(unattachedRefusal({ name: 'pipao', workflows: ['intake', 'build'] }, 'build'), undefined);
   assert.equal(
     unattachedRefusal({ name: 'pipao', workflows: [] }, 'build'),
-    'build: the factory pipao does not offer this workflow — it offers none yet. Attach it — wf factory attach pipao build — or start it in the default factory, which offers every workflow. Nothing was started.',
+    'build: the factory pipao does not offer this workflow — it offers none yet. Attach it: wf factory attach pipao build. Nothing was started.',
   );
-  assert.match(
-    unattachedRefusal({ name: 'pipao', workflows: ['intake', 'dev'] }, 'build')!,
-    /^build: the factory pipao does not offer this workflow — it offers: dev, intake\. Attach it — wf factory attach pipao build — /,
+  assert.equal(
+    unattachedRefusal({ name: 'pipao', workflows: ['intake', 'dev'] }, 'build'),
+    'build: the factory pipao does not offer this workflow — it offers: dev, intake. Attach it: wf factory attach pipao build. Nothing was started.',
   );
+  for (const workflows of [[], ['intake', 'dev']])
+    assert.doesNotMatch(unattachedRefusal({ name: 'pipao', workflows }, 'build')!, /default factory/, "only the factory's own fix");
   assert.match(unattachedRefusal({ name: 'pipao', workflows: ['builder'] }, 'build')!, /it offers: builder\./);
 });
 
@@ -181,12 +183,13 @@ test("the repository of a run in a factory: the one named, else the factory's on
   assert.equal(factoryRepo(undefined, undefined, '/here'), '/here', 'the default factory has no list');
 });
 
-test('REFUSED: a repository outside the factory, naming its list, sorted, and the --repo that starts it in one', () => {
+test('REFUSED: a repository outside the factory, naming its list, sorted, the --repo that starts it in one, and the add that files one on it', () => {
   const pipao = { name: 'pipao', repos: ['/r/b', '/r/a/'] };
   assert.equal(outsideRefusal(pipao, '/r/a'), undefined, 'compared as path.resolve spells both');
   assert.equal(outsideRefusal(pipao, '/r/b/'), undefined);
   assert.equal(
     outsideRefusal(pipao, '/r/c'),
-    '/r/c: the factory pipao works on /r/a, /r/b, and this repository is not one of them. Name one of them — --repo /r/a — or start it in the default factory. Nothing was started.',
+    '/r/c: the factory pipao works on /r/a, /r/b, and this repository is not one of them. Name one of them — --repo /r/a — or file a factory on this one: wf factory add <name> --repo /r/c. Nothing was started.',
   );
+  assert.doesNotMatch(outsideRefusal(pipao, '/r/c')!, /default factory/, "only the factory's own fix");
 });

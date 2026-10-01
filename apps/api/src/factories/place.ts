@@ -31,13 +31,13 @@ const unknownRepo = (repo: string, known: readonly string[]): Invalid =>
   });
 
 /**
- * Why the factory `factory` does not serve `repo`, not one of its repositories: an `Invalid`, naming them and the `?repo=` that asks for
- * one.
+ * Why the factory `factory` does not serve `repo`, not one of its repositories: an `Invalid`, naming them, the `?repo=` that asks for
+ * one, and the `wf factory add` that files a factory on `repo`.
  */
 const outsideRepo = (factory: Factory, repo: string): Invalid => {
   const repos = factory.repos.map((r) => path.resolve(r)).sort();
   return new Invalid({
-    message: `${repo}: the factory ${factory.name} works on ${repos.join(', ')}, and this repository is not one of them. Name one of them — ?factory=${factory.name}&repo=${repos[0]} — or ask in the default factory.`,
+    message: `${repo}: the factory ${factory.name} works on ${repos.join(', ')}, and this repository is not one of them. Name one of them — ?factory=${factory.name}&repo=${repos[0]} — or file a factory on this one: wf factory add <name> --repo ${repo}.`,
   });
 };
 

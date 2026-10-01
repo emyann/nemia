@@ -2389,7 +2389,8 @@ be (the workflow's `agents/`, the repository's, the store's).
 - **An inbox card starts in its factory**: its `factory:`, or `--factory` over it, on the repository its `repo:` names, else the
   factory's one repository, else the one it is started in (`repoFor`) — for a queued card, the one `wf up` runs in.
 - **Refused before anything is written**, exit 2 (`Invalid`, `outsideRefusal`): a git run on a repository that is not one of
-  the factory's, naming them and the `--repo` that starts it in one. Paths are compared as `path.resolve` spells them, so a
+  the factory's, naming them, the `--repo` that starts it in one, and the `wf factory add` that files a factory on it, since
+  none adds a repository to a factory. Paths are compared as `path.resolve` spells them, so a
   symlink to a repository is not that repository. A team that says `workspace: folder` works on no repository: it records its
   factory and no `repo`, and is never refused for where it is typed.
 

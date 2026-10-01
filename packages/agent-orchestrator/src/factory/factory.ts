@@ -123,7 +123,7 @@ export function unfilledRefusal(
 export function unattachedRefusal(factory: Pick<Factory, 'name' | 'workflows'>, workflow: string): string | undefined {
   if (factory.workflows.includes(workflow)) return undefined;
   const offers = factory.workflows.length ? `it offers: ${[...factory.workflows].sort().join(', ')}` : 'it offers none yet';
-  return `${workflow}: the factory ${factory.name} does not offer this workflow — ${offers}. Attach it — wf factory attach ${factory.name} ${workflow} — or start it in the default factory, which offers every workflow. Nothing was started.`;
+  return `${workflow}: the factory ${factory.name} does not offer this workflow — ${offers}. Attach it: wf factory attach ${factory.name} ${workflow}. Nothing was started.`;
 }
 
 /**
@@ -139,13 +139,14 @@ export function factoryRepo(factory: Pick<Factory, 'repos'> | undefined, named: 
 
 /**
  * Why a git run on `repo` cannot start in `factory`, or undefined when `repo` is one of its repositories, each compared as `path.resolve`
- * spells it: the factory's list named, sorted, with the `--repo` that starts it in one.
+ * spells it: the factory's list named, sorted, with the `--repo` that starts it in one, or the `wf factory add` that files a factory on
+ * `repo`, since none adds a repository to a factory.
  */
 export function outsideRefusal(factory: Pick<Factory, 'name' | 'repos'>, repo: string): string | undefined {
   const repos = factory.repos.map((r) => path.resolve(r));
   if (repos.includes(path.resolve(repo))) return undefined;
   const sorted = [...repos].sort();
-  return `${repo}: the factory ${factory.name} works on ${sorted.join(', ')}, and this repository is not one of them. Name one of them — --repo ${sorted[0]} — or start it in the default factory. Nothing was started.`;
+  return `${repo}: the factory ${factory.name} works on ${sorted.join(', ')}, and this repository is not one of them. Name one of them — --repo ${sorted[0]} — or file a factory on this one: wf factory add <name> --repo ${path.resolve(repo)}. Nothing was started.`;
 }
 
 /** A factory's hires as `wf factory ls` lists them under its line, sorted by step: `build/implement ← ada`. */

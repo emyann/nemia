@@ -19,7 +19,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { loadWorkflows } from '../src/folder/folder.store.ts';
+import { loadWorkflows, readSkillRules, RULES_FILE } from '../src/folder/folder.store.ts';
+import type { SkillRule } from '../src/skills/skills.ts';
 import { scratch } from './scratch.ts';
 import { placesOf, shippedFolders, SHIPPED_HOLDERS, TEAM, TEAM_DEV, teamCopy } from './team.ts';
 
@@ -361,17 +362,23 @@ function acting(step: Step): string[] {
   ).map(shown);
 }
 
-/** The janitor's step read from a scratch copy of the shipped team, its agent's `allowedTools` line replaced by `allowed`. */
-function argusAllowed(allowed: string): Step {
-  const root = scratch('wf-fences-argus-');
+/**
+ * The step of the shipped `workflow` that `agent` runs, read from a scratch copy of the shipped team, its agent's `allowedTools` line
+ * replaced by `allowed`.
+ */
+function shippedAllowed(agent: string, workflow: string, allowed: string): Step {
+  const root = scratch(`wf-fences-${agent}-`);
   fs.cpSync(SHIPPED_HOLDERS[0], root, { recursive: true });
-  const file = path.join(root, 'agents', 'argus.md');
+  const file = path.join(root, 'agents', `${agent}.md`);
   const text = fs.readFileSync(file, 'utf8');
   const loose = text.replace(/^allowedTools: .*$/m, `allowedTools: ${allowed}`);
-  assert.notEqual(loose, text, 'Argus has an allow line to replace');
+  assert.notEqual(loose, text, `${agent} has an allow line to replace`);
   fs.writeFileSync(file, loose);
-  return loadWorkflows(path.join(root, 'janitor'), { repo: REPO }).find((step) => step.agent?.name === 'argus')!;
+  return loadWorkflows(path.join(root, workflow), { repo: REPO }).find((step) => step.agent?.name === agent)!;
 }
+
+/** The janitor's step, its agent's `allowedTools` line replaced by `allowed` (`shippedAllowed`). */
+const argusAllowed = (allowed: string): Step => shippedAllowed('argus', 'janitor', allowed);
 
 test('Argus is refused every wf verb that acts and every edit: it runs dontAsk, and no allow reaches one', () => {
   assert.deepEqual(acting(shippedStepOf('argus')), []);
@@ -404,4 +411,69 @@ test('REFUSED: Argus allowed every wf verb, the inbox whole or an edit, read fro
   assert.deepEqual(acting({ ...shippedStepOf('argus'), permissionMode: 'auto' }), [
     'argus: not a dontAsk job, so every call no deny names runs',
   ]);
+});
+
+/** Every shipped skill that declares rules (`RULES_FILE`), by its name, each rule read as a run reads it (`readSkillRules`). */
+const SHIPPED_RULES = SKILL_FOLDERS.filter((dir) => dir !== path.join(TEAM, 'skills')).flatMap((dir) =>
+  fs
+    .readdirSync(dir)
+    .filter((name) => fs.existsSync(path.join(dir, name, RULES_FILE)))
+    .map((name) => ({ skill: name, rules: readSkillRules(path.join(dir, name)) })),
+);
+
+/** The call a `breaks` pattern names, as the runtime records a denial of it: a command by its first word, any other tool by its name. */
+function brokenBy(pattern: string): Call {
+  const written = /^([^()]+)\((.*)\)$/s.exec(pattern);
+  if (!written) return { tool: pattern };
+  if (written[1] !== 'Bash') return { tool: written[1] };
+  return {
+    tool: 'Bash',
+    command: written[2]
+      .replace(/(?::\*| \*)$/, '')
+      .trim()
+      .split(/\s+/)[0],
+  };
+}
+
+/**
+ * Each pattern of `rules` that a dontAsk job's fence lets through, so no denial of it is ever recorded and the rule could never break:
+ * reached by an allow of the step's, of the settings' or of a skill's, and by no deny of its own. Each as `<step>: <rule> <pattern>`.
+ */
+function unbreakable(step: Step, rules: readonly SkillRule[]): string[] {
+  const allows = [...(step.allowedTools ?? []), ...(SETTINGS.permissions?.allow ?? []), ...SKILL_GRANTS];
+  const denies = [...(step.disallowedTools ?? []), ...(SETTINGS.permissions?.deny ?? [])];
+  return rules.flatMap((rule) =>
+    rule.breaks
+      .filter((pattern) => {
+        const call = brokenBy(pattern);
+        return allows.some((r) => reaches(r, call)) && !denies.some((r) => reaches(r, call));
+      })
+      .map((pattern) => `${step.name}: ${rule.id} ${pattern}`),
+  );
+}
+
+/** Whether a step is a dontAsk job, which runs only what an allow reaches: what a denial of its is recorded for. */
+const dontAskJob = (step: Step): boolean => step.permissionMode === 'dontAsk' && step.background !== true && step.workspace !== 'main';
+
+test("every shipped skill's rules.json reads, and every call that breaks one of its rules is refused to each dontAsk step given it", () => {
+  assert.ok(SHIPPED_RULES.length > 0, 'a skill ships its rules');
+  for (const { skill, rules } of SHIPPED_RULES) {
+    const steps = shipped()
+      .map(({ step }) => step)
+      .filter((step) => step.agent?.skills?.includes(skill) && dontAskJob(step));
+    assert.ok(steps.length > 0, `${skill} declares rules, and no shipped dontAsk step is given it to refuse a call that breaks one`);
+    for (const step of steps) assert.deepEqual(unbreakable(step, rules), [], `${skill}: a call that breaks a rule is allowed`);
+  }
+});
+
+test('REFUSED: a call that breaks a shipped rule, allowed to the step given the skill, is named — by its own allow or the settings', () => {
+  const [spec] = SHIPPED_RULES.filter(({ skill }) => skill === 'write-a-spec');
+  assert.ok(spec, 'write-a-spec declares its rules');
+  const seldon = shippedAllowed('seldon', 'build', 'Agent, Bash(npm run lint), Bash(cat:*)');
+  assert.deepEqual(unbreakable(seldon, spec.rules), ['design: read-with-read Bash(cat:*)']);
+  const cd = [{ id: 'checks-bare', says: 'never cd', breaks: ['Bash(cd:*)'] }];
+  assert.deepEqual(unbreakable(shippedStepOf('seldon'), cd), ['design: checks-bare Bash(cd:*)'], "the settings' allow reaches cd");
+  assert.deepEqual(unbreakable({ ...seldon, disallowedTools: ['Bash(cat:*)'] }, spec.rules), [], 'a deny of its own refuses it');
+  assert.deepEqual(brokenBy('Bash(git -C:*)'), { tool: 'Bash', command: 'git' }, "a denial keeps a command's first word");
+  assert.deepEqual(brokenBy('Read(//etc/**)'), { tool: 'Read' });
 });

@@ -19,7 +19,8 @@ description: "Read a factory's stats since the janitor's last run, against the s
    (`VAR=`), `git -C` and `cd`, a read sent to Bash instead of Read or Grep, a write a read-only role tried. For each group, propose one
    correction: an allow by name (`fence`), a line in the agent's body (`body`) or in its skill (`skill`) that sends the call to a tool its
    fence allows, or "refused on purpose" (`on-purpose`) when the fence is right and the agent should stop asking. A role that writes
-   nothing is never proposed a write.
+   nothing is never proposed a write. A skill's rule broken on many tries (a step row's `rules`) is a candidate card too — a fence, or a
+   line in the skill — with its `kept` and `broken` as the evidence.
 5. **Read the rest for what moved**: a step whose tries, cost or refused checks rose against the period before, a loop that took more
    rounds, a gate that waited longer. Propose a correction only where the numbers point at one; a number that moved with nothing to
    correct goes in the report, not on a card.

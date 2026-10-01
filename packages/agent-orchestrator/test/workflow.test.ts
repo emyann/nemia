@@ -2843,3 +2843,32 @@ test('REFUSED: a date, a card, a finding or a measured version in the words a pe
     assert.doesNotMatch(w, /\d{4}-\d{2}-\d{2}|\bcard \d|\(F\d+|\bmeasured\b|\d+\.\d+\.\d+|minutes/, w);
   }
 });
+
+test('REFUSED at load: a skill whose `rules.json` does not read — not JSON, a rule with no `breaks`, two rules under one id — naming the skill, the file and the field', () => {
+  const refusedWith = (rules: string): string => {
+    const root = teamCopy('wf-rules-');
+    fs.writeFileSync(path.join(root, 'skills', 'implement-a-change', 'rules.json'), rules);
+    try {
+      loadWorkflows(path.join(root, 'dev'));
+    } catch (e) {
+      assert.ok(e instanceof WorkflowError, String(e));
+      assert.equal(e.exitCode, 2);
+      return e.message;
+    }
+    return assert.fail('loaded, and should have been refused');
+  };
+  const rule = (id: string, breaks: string[]) => ({ id, says: 'Read a file with Read', breaks });
+
+  const notJson = refusedWith('{');
+  assert.match(notJson, /^implement: `agent: implementer` gives the skill `implement-a-change`, which cannot be used — /);
+  assert.match(notJson, /skills\/implement-a-change\/rules\.json is not JSON/);
+  const empty = refusedWith(JSON.stringify({ rules: [rule('a', [])] }));
+  assert.match(empty, /skills\/implement-a-change\/rules\.json does not read as a skill's rules: its `rules\.0\.breaks` /);
+  const twice = refusedWith(JSON.stringify({ rules: [rule('a', ['Bash(cat:*)']), rule('a', ['Bash(head:*)'])] }));
+  assert.match(twice, /skills\/implement-a-change\/rules\.json names the rule `a` twice, at `rules\.0` and `rules\.1`/);
+  for (const message of [notJson, empty, twice]) assert.match(message, /Write it as \{ "rules": \[\{ "id", "says", "breaks" \}\] \}/);
+
+  const root = teamCopy('wf-rules-');
+  fs.writeFileSync(path.join(root, 'skills', 'implement-a-change', 'rules.json'), JSON.stringify({ rules: [rule('a', ['Bash(cat:*)'])] }));
+  assert.equal(loadWorkflows(path.join(root, 'dev')).length, 3, 'a rules.json that reads is no refusal');
+});

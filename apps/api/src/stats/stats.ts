@@ -28,7 +28,9 @@ const QUERY_KEYS: Record<QueryKey, string> = {
  *   measured is null, never 0: `deniedPerTry`, the mean calls a try was refused, is null on a day whose tries all ran on a harness that
  *   records no denial (codex, a remote agent, `background: true`) or were a recheck's, as is a step row's `deniedCalls`; its `denials`
  *   name each call refused, with a count. `skillsPerTry`, the mean skills a try's session loaded, is null on a day with no try whose
- *   session's ends all say what they loaded, as is a step row's `skillLoads`; its `skills` name each skill loaded, with a count. Each
+ *   session's ends all say what they loaded, as is a step row's `skillLoads`; its `skills` name each skill loaded, with a count. Its
+ *   `rules` are each rule a skill the step is given declares in its `rules.json`, kept or broken over the tries whose refused calls were
+ *   measured — broken when a refused call matches one of its `breaks` — empty with none declared or measured. Each
  *   group carries its `marks`: the days a run froze a step, an agent or a rendered skill that differs from the run of the same workflow
  *   folder before it. A query the package refuses (`statsQueryOf`) is a 422 naming the key and what it takes.
  */

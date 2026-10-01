@@ -116,9 +116,10 @@ the engine's job. This one follows what only this package knows.
 `wf stats` reads every run in the store, of every factory and repository, and adds up how the work
 flows: the runs finished and landed, the rounds a loop took to be accepted, the share of landed runs
 that landed on their first try, the cost and wall time of a landed run, and per step its tries, their
-time and cost, its checks' verdicts, its waits at a gate, the calls its harness refused it and the
-skills its sessions loaded. It prints tiles — the last 14 days against the 14 before — a row per UTC
-day, a row per step and agent, a row per call a step was refused, and a row per skill a step loaded.
+time and cost, its checks' verdicts, its waits at a gate, the calls its harness refused it, the
+skills its sessions loaded, and each rule its skills declare, kept or broken. It prints tiles — the
+last 14 days against the 14 before — a row per UTC day, a row per step and agent, a row per call a
+step was refused, a row per skill a step loaded, and a row per rule a step's skills declare.
 
 ```bash
 wf stats                                   # every day since the first try ended, to today
@@ -159,6 +160,19 @@ wf stats --json                            # what GET /api/stats answers
   loads per measured try; a step's row sums them, says how many of its tries were measured where not
   all (`3 (2 of 4)`), and names each skill with its count, most first, then by name. Only the task
   journals the engine already reads are read: no session's log, transcript or capture.
+- **A skill's traceable rules are counted kept or broken**: a skill names them in a `rules.json` beside
+  its SKILL.md, `{ "rules": [{ "id", "says", "breaks" }] }`, each `breaks` a list of calls written as
+  `disallowedTools:` rules (`Bash(cat:*)`, a path pattern `//`-absolute or a bare name). On each try
+  whose refused calls are measured (above), each rule of each skill the step's agent gives is broken
+  when a call the try was denied matches one of its `breaks`, as a fence matches it — a command by
+  its first word, the only word the runtime keeps — and kept otherwise. So `kept` means "no refused
+  call matched", not "followed": a breach the fence allows leaves no record, and a role whose fence
+  refuses nothing (`permissionMode: auto`) keeps every rule by this count. A rule is counted on every
+  measured try of a step given the skill, whether or not the session loaded it. The file is read off
+  the copy `wf start` froze with the run's agent, never the checkout's, so a run whose rendered folder
+  is gone counts none; editing it marks a skill change (below). A `rules.json` that does not read is
+  refused at load and at `wf start`, naming the file and its first wrong field. A step's row lists
+  each rule with its `kept` and `broken`, most broken first; a skill that declares none has no row.
 - **A run whose journal does not read is left out whole**, and named on the last line.
 - **A change is marked on the day a run froze it**: a step (its keys and its own note), an agent's
   instructions, skills and system prompt, or a skill as `wf start` rendered it, that differs from what

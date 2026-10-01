@@ -1,0 +1,14 @@
+{
+  "rules": [
+    {
+      "id": "read-with-read",
+      "says": "Read a file with Read and search with Grep or Glob; never head, cat, grep, awk or sed in Bash",
+      "breaks": ["Bash(head:*)", "Bash(cat:*)", "Bash(grep:*)", "Bash(awk:*)", "Bash(sed:*)"]
+    },
+    {
+      "id": "checks-bare",
+      "says": "Run each check bare, one command per call: never wrapped in timeout, never git -C or a for loop",
+      "breaks": ["Bash(timeout:*)", "Bash(git:*)", "Bash(for:*)"]
+    }
+  ]
+}

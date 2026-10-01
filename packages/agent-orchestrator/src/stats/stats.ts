@@ -1,8 +1,8 @@
 /**
  * The flow numbers of a store's history, defined on each workflow's structure and never on a step's name: the rounds of each `loop:` step
  * to acceptance, the tries of the `workspace: main` step to a landing, what a landed run cost and how long it took, and every step's tries,
- * time, cost, check verdicts and gate waits, the calls its harness refused it, where the harness records them, and the skills its sessions
- * loaded, where their ends say (`discipline.ts`).
+ * time, cost, check verdicts and gate waits, the calls its harness refused it, where the harness records them, the skills its sessions
+ * loaded, where their ends say, and each rule its skills declare, kept or broken by those calls (`discipline.ts`).
  *
  * Pure: `factsOf` turns one run's timeline and record into facts, `statsOf` buckets them by UTC day and by one breakdown key, filters them
  * and totals them, with the changes to what the runs froze (`marksOf`, `marks.ts`), and `statsQueryOf` reads what a person asked.
@@ -18,7 +18,8 @@ import { DEFAULT_FACTORY } from '../factory/factory.ts';
 import { askedAgain, landsOnCheck } from '../status/status.ts';
 import type { Timeline, TimelineTry } from '../timeline/timeline.ts';
 import { marksOf, type Mark, type RunFrozen } from './marks.ts';
-import { deniesRecorded, ranAsJob } from './discipline.ts';
+import { deniesRecorded, ranAsJob, ruleRowsOf, rulesOfTry, type RuleFact, type RuleRow } from './discipline.ts';
+import type { SkillRule } from '../skills/skills.ts';
 
 /** What a breakdown or a filter goes by: the step's agent, the step, the run's factory, its workflow's folder and its repository. */
 export const BY_KEYS = ['agent', 'step', 'factory', 'workflow', 'repo'] as const;
@@ -45,7 +46,8 @@ export type RunKeys = { run: string; factory: string; workflow: string; repo: st
  * `denied` names each call its session was refused, one per call; null for a try that ran no session of its own (a recheck's), on a step
  * whose harness records no denial (`deniesRecorded`), and for a session filed before steps ran as jobs (`ranAsJob`). `skills` names each
  * skill its session loaded, one per load, `[]` for none; null for a try with no session of its own, and for a session an end of which does
- * not say what it loaded (`skillsLoadedOf`).
+ * not say what it loaded (`skillsLoadedOf`). `rules` holds each rule the step's frozen skills declare, kept or broken by `denied`
+ * (`rulesOfTry`), `[]` with none declared; null where `denied` is.
  */
 export type TryFact = RunKeys & {
   day: string;
@@ -58,6 +60,7 @@ export type TryFact = RunKeys & {
   gateWaitMs: number | null;
   denied: string[] | null;
   skills: string[] | null;
+  rules: RuleFact[] | null;
 };
 
 /**
@@ -84,7 +87,7 @@ export type Facts = { tries: TryFact[]; runs: RunFact[]; frozen: RunFrozen[] };
 /**
  * A run's timeline and record, and what `factsOf` reads beyond them: whether a task succeeded, each check's verdict, each step's
  * closeout, every call a session's task was refused, one per call, worded as a permission rule (`Bash(git push)`), and every skill it
- * loaded, one per load, null where an end of it does not say (`skillsLoadedOf`).
+ * loaded, one per load, null where an end of it does not say (`skillsLoadedOf`); and the rules each skill a step froze declares, by skill.
  */
 export type RunRead = {
   run: Run;
@@ -95,6 +98,7 @@ export type RunRead = {
   closeoutOf: (step: string) => Closeout | undefined;
   deniedOf: (taskId: string) => string[];
   skillsOf: (taskId: string) => string[] | null;
+  rulesOf: (step: Workflow) => ReadonlyMap<string, readonly SkillRule[]>;
 };
 
 /** The UTC day of a time, `YYYY-MM-DD`. */
@@ -143,6 +147,7 @@ function tryFactsOf(r: RunRead): TryFact[] {
     (r.timeline.steps[step.name] ?? []).flatMap((t): TryFact[] => {
       const end = endOf(t);
       if (!end) return [];
+      const denied = t.session && deniesRecorded(step) && ranAsJob(t.session) ? r.deniedOf(t.session.taskId) : null;
       return [
         {
           ...keys,
@@ -154,8 +159,9 @@ function tryFactsOf(r: RunRead): TryFact[] {
           costUsd: t.used?.costUsd ?? null,
           check: t.check ? r.verdictOf(t.check.taskId) : null,
           gateWaitMs: gateWaitOf(r, step, t),
-          denied: t.session && deniesRecorded(step) && ranAsJob(t.session) ? r.deniedOf(t.session.taskId) : null,
+          denied,
           skills: t.session ? r.skillsOf(t.session.taskId) : null,
+          rules: rulesOfTry(denied, r.rulesOf(step)),
         },
       ];
     }),
@@ -269,7 +275,8 @@ export type Headline = {
  * One step's totals, for one agent: its tries, their known run time, what the measured ones cost (`costTries` of them measured), their
  * checks' verdicts, and the mean gate wait; and the calls refused it, `deniedCalls` over the `deniedTries` tries measured (null with none),
  * each call with its count (`denials`), most first, then by call; and the skills its sessions loaded, `skillLoads` over the `skillTries`
- * tries measured (null with none), each skill with its count (`skills`), most first, then by name.
+ * tries measured (null with none), each skill with its count (`skills`), most first, then by name; and each rule its skills declare, kept
+ * or broken over the tries whose denials were measured (`rules`, `ruleRowsOf`), empty with none declared or measured.
  */
 export type StepRow = {
   step: string;
@@ -286,6 +293,7 @@ export type StepRow = {
   skillLoads: number | null;
   skillTries: number;
   skills: Array<{ skill: string; count: number }>;
+  rules: RuleRow[];
 };
 
 /** The last 14 days to today, and the 14 before them, each by its first and last day. */
@@ -370,6 +378,7 @@ function stepRowsOf(tries: readonly TryFact[]): StepRow[] {
     skillLoads: knownSum(of.map((t) => t.skills?.length)),
     skillTries: of.filter((t) => t.skills !== null).length,
     skills: countsOf(of.flatMap((t) => t.skills ?? [])).map(({ name, count }) => ({ skill: name, count })),
+    rules: ruleRowsOf(of),
   }));
 }
 

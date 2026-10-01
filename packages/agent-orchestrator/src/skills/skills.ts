@@ -1,10 +1,16 @@
 /**
  * A skill on an agent: the entry an agent's card lists for it (`skillEntryOf`), a SKILL.md written back from a draft (`renderSkill`,
- * `skillDraftOf`), and its `preload:` line switched alone (`withPreload`).
+ * `skillDraftOf`), its `preload:` line switched alone (`withPreload`), and a rule it declares (`SkillRule`).
  */
 import { FRONTMATTER, refuse, SKILLS_FOLDER, splitFrontmatter } from '../step/step.ts';
 import { frontmatterKey } from '../former/former.ts';
 import { skillNameRefusal } from '../agents/agents.ts';
+
+/**
+ * A rule a skill declares in the `rules.json` beside its SKILL.md (`readSkillRules`): its `id`, what it `says`, and the calls that break
+ * it, each written as a `disallowedTools:` rule (`Bash(cat:*)`) that a call the harness denied is matched against (`disallowedBy`).
+ */
+export type SkillRule = { id: string; says: string; breaks: string[] };
 
 /**
  * One thing an agent says it can do, in the A2A protocol's words: its `AgentSkill`, as `specification/a2a.proto` defines it (protocol 1.0)

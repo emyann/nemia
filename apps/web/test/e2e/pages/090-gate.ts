@@ -137,6 +137,7 @@ export default {
       'and says the answer is under Details',
     );
     await settled(page);
+    await expectLeftOf(node, inspector, `the run is too wide to fit beside the bar at 1280, so ${gated} alone is fitted clear of it`);
     await photograph(page, path.join(OUT, `gate-inspector-${await themeOf(page)}.png`), { fullPage: true });
     await inspector.getByRole('button', { name: 'Close', exact: true }).click();
     await expectCount(inspector, 0, 'closed, so the rest of the page reads one gate');

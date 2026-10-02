@@ -195,10 +195,32 @@ const BESIDE_GAP = 24;
  * whole canvas, when the bar covers none of it, when it leaves less than `BESIDE_MIN`, or when the nodes are wider at `LEAST_ZOOM` than the
  * part it leaves: a fit there would put nodes off the canvas.
  */
-export function besideBar(width: number, over: number, nodes: number): { left: '10%'; right: `${number}px`; y: '20%' } | null {
+export function besideBar(width: number, over: number, nodes: number): Beside | null {
   const right = over + BESIDE_GAP;
   if (over <= 0 || width - over < BESIDE_MIN || nodes * LEAST_ZOOM > width * 0.9 - right) return null;
   return { left: '10%', right: `${right}px`, y: '20%' };
+}
+
+/** The padding of a fit beside the floating bar (`besideBar`). */
+export type Beside = { left: '10%'; right: `${number}px`; y: '20%' };
+
+/**
+ * How a canvas `width` pixels wide, the bar `over` pixels over its right edge, is fitted as a step opens in the bar: the run's nodes,
+ * `run` wide at a zoom of 1, beside the bar where they fit there (`besideBar`); else, where the open step's node — `step`, its right edge
+ * `right` pixels from the canvas's left as drawn and its width at a zoom of 1 — lies under the bar, that node alone beside it. Null, to
+ * leave the view as it is: no step open, its node clear of the bar, or no room beside the bar even for it.
+ */
+export function besideOpen(
+  width: number,
+  over: number,
+  run: number,
+  step: { right: number; width: number } | null,
+): { padding: Beside; alone: boolean } | null {
+  const whole = besideBar(width, over, run);
+  if (whole) return { padding: whole, alone: false };
+  if (!step || step.right <= width - over) return null;
+  const alone = besideBar(width, over, step.width);
+  return alone && { padding: alone, alone: true };
 }
 
 /** Where each step goes: where a person left it, if they moved it, else where the layering puts it. */

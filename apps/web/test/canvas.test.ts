@@ -6,6 +6,7 @@ import {
   attemptLine,
   BESIDE_MIN,
   besideBar,
+  besideOpen,
   duration,
   edgeLine,
   edgesOf,
@@ -463,4 +464,13 @@ test('a canvas is fitted beside the bar only where the bar covers it, leaves roo
   const room = 900 * 0.9 - (456 + 24);
   assert.notEqual(besideBar(900, 456, room / LEAST_ZOOM), null, 'nodes as wide as the room at the least zoom fit');
   assert.equal(besideBar(900, 456, room / LEAST_ZOOM + 1), null, 'nodes any wider would run off the canvas: the fit takes it whole');
+});
+
+test('a step opened in the bar is fitted beside it alone only where the run is too wide to fit there and its node lies under it', () => {
+  const padding = { left: '10%', right: '519px', y: '20%' };
+  assert.deepEqual(besideOpen(862, 495, 400, { right: 380, width: 224 }), { padding, alone: false }, 'the run fits beside the bar');
+  assert.deepEqual(besideOpen(862, 495, 524, { right: 383, width: 224 }), { padding, alone: true }, 'too wide: the step under the bar');
+  assert.equal(besideOpen(862, 495, 524, { right: 862 - 495, width: 224 }), null, 'a node that ends where the bar begins is left');
+  assert.equal(besideOpen(862, 495, 524, null), null, 'no step is open');
+  assert.equal(besideOpen(862, 495, 524, { right: 383, width: 600 }), null, 'no room beside the bar even for the step');
 });

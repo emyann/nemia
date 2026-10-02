@@ -3190,6 +3190,22 @@ test('REFUSED: `wf retry` with an empty --message, or --message on --recheck —
   }
 });
 
+test('REFUSED: `wf accept` with no --message, or an empty one — exit 2, in whole sentences that name the run and the step; the CLI refuses before it reads a run', async () => {
+  const { main } = await import('../src/cli/main.ts');
+  for (const [flags, sentence] of [
+    [
+      [],
+      '--message says why the work is good enough with its findings open, and is what the steps after the loop are handed — the shipper, and whoever reads the merge, have nothing else. Say it: wf accept no-such-run review --message "<why>".',
+    ],
+    [
+      ['--message', ' '],
+      '--message is empty, and an acceptance\'s words are the whole reason the loop ended with findings open: empty, they tell the steps after it nothing. Say why the work is good enough as it stands — wf accept no-such-run review --message "<why>".',
+    ],
+  ] as const) {
+    await assert.rejects(main(['accept', 'no-such-run', 'review', ...flags]), refusedAs(sentence), flags.join(' '));
+  }
+});
+
 test('`wf retry --message` takes the next argument as the answer whatever it starts with — an answer about a flag names it — and `--message=<answer>` too', async (t) => {
   t.mock.method(console, 'log', () => {});
   const { main } = await import('../src/cli/main.ts');

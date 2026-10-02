@@ -90,6 +90,9 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
   into `ENGINE_PHASES` and `ENGINE_WRITES`; an admitted task starts on the runtime's next pass.
 - **A finished run is answered from memory while what it was judged on stands** (`restMemo`, `atRest`, `restStamps`): a new input of its
   pass goes into the stamps. Every test file that ticks a store sets `WF_VERIFY_REST=1`.
+- **A test of what the tick judges by the clock seeds `Date`** (`t.mock.timers`: `daemon.store.test.ts`, `fileInOrder` in
+  `test/pool.test.ts`), and stamps a fake closeout from the attempt's journalled start (`starts` in `test/held.test.ts`), never
+  `Date.now()` plus a margin: a stepped wall clock turns the daemon stale, two filings round, or a closeout dropped.
 - **A pass on a copy of the store acts on the real repositories** its records name: measure with a fixture store of scratch repositories,
   or a fake runtime whose tasks are all `pending`.
 - **Git refuses a whole `for-each-ref` for one base it cannot read**: `branchReader` lists again without it (pinned against `oneByOne`).

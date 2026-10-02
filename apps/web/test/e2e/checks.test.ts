@@ -107,8 +107,8 @@ async function pageWith(html: string, { theme = 'light', api = 200 }: { theme?: 
 }
 
 async function eventually(done: () => boolean, ms = 3_000): Promise<void> {
-  const until = Date.now() + ms;
-  while (!done() && Date.now() < until) await new Promise((resolve) => setTimeout(resolve, 50));
+  const until = performance.now() + ms;
+  while (!done() && performance.now() < until) await new Promise((resolve) => setTimeout(resolve, 50));
 }
 
 test('a console error, an uncaught exception, a failed request and a 500 are each a problem', async () => {
@@ -416,21 +416,38 @@ test('a name cut short by the room beside it is refused, naming it — and so is
 test("idle resolves with the feed's stream open, which never ends — and only once nothing else has been in flight for its half a second", async () => {
   const { page } = await servedPage('<p>ok</p>');
   await opened(page, FEED_STREAM);
-  const from = Date.now();
+  const from = performance.now();
   await idle(page, 3_000);
   assert.ok(
-    Date.now() - from >= QUIET_MS,
-    `quiet for ${QUIET_MS} ms counted from the call, not from the last request — it took ${Date.now() - from} ms`,
+    performance.now() - from >= QUIET_MS,
+    `quiet for ${QUIET_MS} ms counted from the call, not from the last request — it took ${performance.now() - from} ms`,
+  );
+});
+
+test('idle counts its quiet on a clock that does not step: the wall clock stepped a minute ahead once it waits still leaves it its half a second', async (t) => {
+  const { page } = await servedPage('<p>ok</p>');
+  await opened(page, FEED_STREAM);
+  const wall = Date.now.bind(Date);
+  const from = performance.now();
+  const waited = idle(page, 3_000);
+  t.mock.method(Date, 'now', () => wall() + 60_000);
+  await waited;
+  assert.ok(
+    performance.now() - from >= QUIET_MS,
+    `quiet for ${QUIET_MS} ms as a monotonic clock counts it, whatever the wall clock says — it took ${performance.now() - from} ms`,
   );
 });
 
 test("idle waits for any other request: one answered late, and a stream that is not the feed's, which it refuses at its timeout, naming it", async () => {
   const { page } = await servedPage('<p>ok</p>');
   await opened(page, FEED_STREAM);
-  const from = Date.now();
+  const from = performance.now();
   await page.evaluate(() => void fetch('/api/slow?ms=1200'));
   await idle(page, 5_000);
-  assert.ok(Date.now() - from >= 1_200 + QUIET_MS, `idle waited for the late answer, then for quiet — it took ${Date.now() - from} ms`);
+  assert.ok(
+    performance.now() - from >= 1_200 + QUIET_MS,
+    `idle waited for the late answer, then for quiet — it took ${performance.now() - from} ms`,
+  );
 
   await opened(page, '/api/runs/r-1/stream');
   await assert.rejects(
@@ -565,11 +582,14 @@ test('idle lets go of the requests a page left behind when it reloaded or naviga
   assert.ok(asked.length > 0, 'the old document asked for something between the navigation and its commit — or this proves nothing');
   await idle(page, 3_000);
 
-  const from = Date.now();
+  const from = performance.now();
   await page.evaluate(() => {
     void fetch('/api/slow?ms=1200');
     history.pushState({}, '', '/elsewhere');
   });
   await idle(page, 5_000);
-  assert.ok(Date.now() - from >= 1_200, `idle waited for the request asked for before the pushState — it took ${Date.now() - from} ms`);
+  assert.ok(
+    performance.now() - from >= 1_200,
+    `idle waited for the request asked for before the pushState — it took ${performance.now() - from} ms`,
+  );
 });

@@ -15,10 +15,11 @@ broken. This page says what the tests hold; the tests are the rules.
 
 Each layer reaches exactly the one below it, and nothing reaches up or skips one:
 
-- the web reaches the api over HTTP alone `(no test yet)`;
-- the api reaches the orchestrator's public entries alone (the entries: `packages/agent-orchestrator/test/contract.test.ts`; that its
-  source imports no runtime: `(no test yet)`). The api's source reaches only the orchestrator; its tests may import the runtime's
-  public entries to build fakes;
+- the web reaches the api over HTTP alone (`apps/web/test/structure.test.ts`, and the web's lint block);
+- the api reaches the orchestrator's public entries alone (the entries: `packages/agent-orchestrator/test/contract.test.ts` and the
+  api's lint block; that its source imports no runtime: the api's lint block, proven by
+  `packages/agent-orchestrator/test/imports.test.ts`). The api's source reaches only the orchestrator; its tests may import the
+  runtime's public entries to build fakes;
 - the orchestrator reaches the runtime through its one client, `src/runtime-client.ts` (`CLIENT` in
   `packages/agent-orchestrator/test/boundary.test.ts`).
 
@@ -46,12 +47,12 @@ inbox, factories, stats, agent definitions.
 **In the api today, below its layer**: `src/factory/quota.ts` spawning `claude`, `runsInOf` in `src/detail/detail.ts` reading a
 harness's argv for a mode, and `src/capabilities/reach.ts` re-implementing permission matching.
 
-**In the web today, against its rule**, until the api answers that text:
+**In the web today, against its rule**, until the api answers that text, each file counted against a baseline that only shrinks
+(`STORE_PATHS` and `COMMAND_TEXT` in `apps/web/test/structure.test.ts`):
 
 - store paths, in `src/routes/agents.tsx`, `src/routes/agents_.new.tsx`, `src/routes/agents_.skills.new.tsx`,
   `src/routes/agents_.$from.$agent.tsx`, `src/routes/workflows.tsx` and `src/components/NewWorkflow.tsx`;
-- the commands it spells itself: every file of `apps/web/src` that names a `wf` verb, found by `grep -rlE '\bwf [a-z]+' apps/web/src`
-  (a JSDoc's mention included).
+- the commands it spells itself: every file of `apps/web/src` that names a `wf` or `nemia` verb, a JSDoc's mention included.
 
 Nothing here moves until its own card; a change elsewhere does not move it on the side.
 
@@ -85,16 +86,23 @@ of the runtime alone: `src/core/lifecycle.ts` is the one file of any workspace t
 the machine, or the readings `decide` moves by. `agent-runtime` exports the lifecycle's graph as plain data (`lifecycleGraph`: its states, edges and a person's verbs),
 which the board draws.
 
-Tests: `packages/agent-runtime/test/contract.test.ts`, `packages/agent-orchestrator/test/contract.test.ts` and
-`packages/agent-runtime/test/xstate-boundary.test.ts`.
+Lint holds the layers' imports as they are typed: `.oxlintrc.json` sets `no-restricted-imports` in one block per layer, over its
+source. The web's imports no workspace package, no harness SDK and no path into `packages/`; the api's imports the orchestrator
+through its four entries alone, and no runtime or harness SDK; the orchestrator's imports no harness SDK; the runtime's imports no
+layer above it. A harness SDK (`@anthropic-ai/claude-agent-sdk`, `@a2a-js/sdk`) is the runtime's alone.
+
+Tests: `packages/agent-runtime/test/contract.test.ts`, `packages/agent-orchestrator/test/contract.test.ts`,
+`packages/agent-runtime/test/xstate-boundary.test.ts`, and `packages/agent-orchestrator/test/imports.test.ts`, which runs oxlint
+with the layers' blocks on planted files.
 
 **2. Inside the orchestrator, every file is of one of four kinds**, held by
 `packages/agent-orchestrator/test/boundary.test.ts`. A file in a feature folder (`src/<feature>/`) says its kind by its
 name: `x.store.ts` is a store, `x.verb.ts` a controller, any other name pure, and every file of `src/cli/` is the CLI's.
 A file at the top of `src/` is named in `PURE`, `STORE`, `CONTROLLER` or `CLIENT`.
 
-- **pure** imports no agent-runtime, no node:fs (nor fs/promises), no node:child_process, and no file of the other
-  kinds: radius, rendering, retry, run and workflow at the top, and the folders' own — agents, artifacts, branches, cap,
+- **pure** imports no agent-runtime, no node:fs (nor fs/promises), no node:child_process, no node:http, node:https,
+  node:net or node:os, reads neither `process.env` nor `fetch`, and imports no file of the other kinds: radius, rendering,
+  retry, run and workflow at the top, and the folders' own — agents, artifacts, branches, cap,
   check, closeout, daemon, ending, feed, folder, former, gate, harness, inbox, keys, meter, plan, prune, record, refusal,
   rest, say, skills, status, step, timeline, views, wait, workflow, workspace.
 - **store** is the I/O beneath the controllers. It imports no agent-runtime, never a controller and not the client:
@@ -115,6 +123,9 @@ A file at the top of `src/` is named in `PURE`, `STORE`, `CONTROLLER` or `CLIENT
   and cli/exit.ts. The client and
   the controllers import one another with no cycle.
 - **client** is `src/runtime-client.ts`, the subject of the third rule.
+
+A place skill's scripts (`place/<name>/scripts/`) are none of the four: node runs them as they are, so they import node's
+built-ins and the scripts beside them alone (`placeBreaks` in the same test).
 
 A file in src or bin that no kind names fails the suite. `packages/agent-orchestrator/test/layout.test.ts` holds the
 folders: at most six source files in one, no folder named `utils`, `helpers`, `common`, `shared` or `misc`, no two
@@ -148,5 +159,7 @@ files need each other's values, and no file or folder is named `utils`, `helpers
 `apps/api/test/layout.test.ts`.
 
 Each rule's test first refuses planted source that breaks it, so none can pass by reading nothing. The contract tests
-read every file git lists outside their package, so a change elsewhere alone is not in their package's turbo cache
-key: run `npx turbo run test --force` after one.
+read every file git lists outside their package; `turbo.json` makes the apps' `src` and `test`, and for the runtime the
+orchestrator's source and tests, inputs of their package's test (`packages/agent-orchestrator/test/turbo-inputs.test.ts`),
+so a breach there cannot replay a pass from turbo's cache. A change to any other file outside a package is not in its
+cache key: run `npx turbo run test --force` after one.

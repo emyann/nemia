@@ -6,11 +6,13 @@ whole judgement. `packages/agent-orchestrator` owns workflows and the runs of th
 CLI). `apps/api` puts the workflows behind HTTP; `apps/web`, the board, shows them to a person.
 
 Each layer reaches exactly the one below it, and nothing reaches up or skips one: the web reaches the api over HTTP alone
-`(no test yet)`; the api reaches the orchestrator's public entries alone (the entries: `packages/agent-orchestrator/test/contract.test.ts`;
-that its source imports no runtime: `(no test yet)`); the orchestrator reaches the runtime through its one client, `src/runtime-client.ts`
-(`CLIENT` in `packages/agent-orchestrator/test/boundary.test.ts`). Read `README.md` and each package's README for the model before
-changing behaviour. `wf` becomes `nemia` (the Nemia intent); `ae` stays the runtime's CLI. The stores `~/.agent-workflows` (`WF_ROOT`)
-and `~/.agent-engine` (`AE_ROOT`) keep their names on purpose: a new default would orphan every record there.
+(`apps/web/test/structure.test.ts`); the api reaches the orchestrator's public entries alone (the entries:
+`packages/agent-orchestrator/test/contract.test.ts`; that its source imports no runtime: its lint block, which
+`packages/agent-orchestrator/test/imports.test.ts` proves); the orchestrator reaches the runtime through its one client,
+`src/runtime-client.ts` (`CLIENT` in `packages/agent-orchestrator/test/boundary.test.ts`). Read `README.md` and each package's
+README for the model before changing behaviour. `wf` becomes `nemia` (the Nemia intent); `ae` stays the runtime's CLI. The stores
+`~/.agent-workflows` (`WF_ROOT`) and `~/.agent-engine` (`AE_ROOT`) keep their names on purpose: a new default would orphan every
+record there.
 
 Each package and app has a `CLAUDE.md` of its own with the traps of its code; Claude Code reads it when you work in that folder. This file
 holds what every change needs.

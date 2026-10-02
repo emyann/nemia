@@ -26,7 +26,7 @@ fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 process.env.WF_ROOT = ROOT;
 process.env.WF_MAX_CONCURRENT = '10000';
 delete process.env.WF_MAX_RUNS;
-const { approve, forget, isGitRun, prune, retry, start } = await import('../runner.ts');
+const { addToInbox, approve, forget, isGitRun, prune, queueInInbox, readInbox, retry, start } = await import('../runner.ts');
 const { listRuns, readRun } = await import('../record/record.store.ts');
 const { tick, freshRestMemo } = await import('./tick.verb.ts');
 const { acceptFile, approvalFile, asksDir, holdFile, markCancelled, pruneFile, restStamps, runFile, runsDir, writeAsk } =
@@ -592,4 +592,57 @@ test('REFUSED: wf prune does not wait on a hand-off from a worktree that is gone
     'prunable',
     `the worktree left is prunable, not refused as right's hand-off still owed: ${pruning.kind === 'refused' ? pruning.refusal : pruning.kind}`,
   );
+});
+
+/** A workflow folder whose `implement` is followed by `ship`, its ending: gated, and worked in the repository's own checkout. */
+const shipping = () => {
+  const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nharness: codex\n---\nimplement it\n');
+  fs.writeFileSync(path.join(dir, 'ship.md'), '---\nharness: codex\nafter: implement\nworkspace: main\ngate: true\n---\nship it\n');
+  return dir;
+};
+
+test("a pass lists the store once: an ending waiting on the checkout and a refused queued card read no record of a finished run", async () => {
+  const repo = aRepo();
+  const [first, second] = started(2, shipping(), repo, true);
+  for (const run of [first, second]) touched.add(run.id);
+  for (let k = 0; k < 8 && ![first, second].every((r) => MEMO.runs.has(r.id)); k++) {
+    await verified();
+    for (const run of [first, second]) {
+      const workspace = readRun(run.id).steps.implement?.workspace;
+      if (workspace) fs.writeFileSync(path.join(workspace, `${run.id}.ts`), 'export const done = true;\n');
+    }
+    h.signAll(inFlight);
+  }
+  assert.ok(MEMO.runs.has(first.id) && MEMO.runs.has(second.id), 'both runs at rest at the gate of their ending');
+  await approve(h.e, first.id, 'ship', 'Merge it.');
+  await verified();
+  assert.ok(readRun(first.id).steps.ship?.taskId, "the first run's ending filed in the checkout");
+  inFlight.push(first);
+  await approve(h.e, second.id, 'ship', 'Merge it too.');
+
+  const gone = folder('work');
+  const { card } = addToInbox({ text: 'an idea whose workflow is gone', workflow: gone, repo: REPO });
+  queueInInbox(card.name);
+  fs.rmSync(gone, { recursive: true });
+  const refused = await verified();
+  assert.ok(refused.queue && 'refused' in refused.queue, `the card's start refused (${JSON.stringify(refused.queue)})`);
+
+  await verified();
+  const pass = await tick(h.e, { repo: ROOT, memo: MEMO, verifyRest: false });
+  const cost = pass.cost!;
+  const listed = listRuns().length;
+  assert.ok(cost.rested >= 200, `the finished runs answered from memory (${cost.rested})`);
+  assert.equal(
+    cost.records,
+    listed - cost.rested,
+    `only the records of the runs in flight read (${cost.records} of ${listed}, ${cost.rested} at rest): the checkout's claims and the queue are read off the pass's own listing`,
+  );
+  const waiting = pass.runs.find((a) => a.run.id === second.id)!;
+  console.log('WAIT', JSON.stringify(waiting.feed));
+  assert.equal(readRun(second.id).steps.ship?.taskId ?? null, null, "the second run's ending is not filed");
+  assert.deepEqual(waiting.feed.run.checkout, { run: first.id, step: 'ship' }, "it waits on the first run's, in the checkout");
+  assert.equal(pass.queue, undefined, 'the refused card is not tried again');
+  const listing = readInbox().find((l) => l.name === card.name);
+  assert.ok(listing?.queued && listing.tried?.refused, 'the card still queued, with its refusal');
 });

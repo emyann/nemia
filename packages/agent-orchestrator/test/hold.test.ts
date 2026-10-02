@@ -16,6 +16,8 @@ import { decideScreen } from './screens.ts';
 
 const ROOT = scratch('wf-hold-');
 process.env.WF_ROOT = ROOT;
+delete process.env.WF_MAX_CONCURRENT;
+delete process.env.WF_MAX_RUNS;
 const {
   accept,
   advance,

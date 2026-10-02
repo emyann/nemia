@@ -90,6 +90,8 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
   into `ENGINE_PHASES` and `ENGINE_WRITES`; an admitted task starts on the runtime's next pass.
 - **A finished run is answered from memory while what it was judged on stands** (`restMemo`, `atRest`, `restStamps`): a new input of its
   pass goes into the stamps. Every test file that ticks a store sets `WF_VERIFY_REST=1`.
+- **The test script loads `test/ambient.ts`**, which sets `WF_MAX_RUNS` and `WF_MAX_CONCURRENT` to a value their readers refuse: a
+  test file that reads either sets or deletes it at its head, never the daemon's (`test/ambient.test.ts`).
 - **A pass on a copy of the store acts on the real repositories** its records name: measure with a fixture store of scratch repositories,
   or a fake runtime whose tasks are all `pending`.
 - **Git refuses a whole `for-each-ref` for one base it cannot read**: `branchReader` lists again without it (pinned against `oneByOne`).

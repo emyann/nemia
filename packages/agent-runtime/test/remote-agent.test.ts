@@ -867,7 +867,7 @@ const stepBack = (t: TestContext, ms: number): void => {
   globalThis.Date = class extends Real {
     constructor(...args: ConstructorParameters<DateConstructor> | []) {
       if (args.length === 0) super(Real.now() - ms);
-      else super(...(args as ConstructorParameters<DateConstructor>));
+      else super(...args);
     }
     static override now(): number {
       return Real.now() - ms;

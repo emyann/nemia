@@ -1631,10 +1631,9 @@ test("a spec that reads its harness's output reports the answer found there, sta
   const seen = await settle(ops, 'ae/t20/1', 'completed');
   assert.deepEqual(seen.closeout?.payload, { outcome: 'done' });
   const filesystemClockSlackMs = 1_000;
-  assert.ok(
-    seen.closeout.at >= before - filesystemClockSlackMs && seen.closeout.at <= Date.now() + filesystemClockSlackMs,
-    `stamped ${seen.closeout.at}, spawned ${before}`,
-  );
+  const at = seen.closeout.at;
+  assert.ok(at !== undefined, 'a detached session can carry another attempt’s statement, so its statement has a time');
+  assert.ok(at >= before - filesystemClockSlackMs && at <= Date.now() + filesystemClockSlackMs, `stamped ${at}, spawned ${before}`);
   assert.deepEqual(fs.readdirSync(workspace), []);
 });
 

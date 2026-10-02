@@ -12,20 +12,43 @@
 import { durationWord } from '../status/status.ts';
 
 /**
+ * A reading of the machine's monotonic clock, in whole milliseconds, under the id of the boot it was taken in: shared by every process of
+ * that boot. The runtime's own `Monotonic` (its `core/clock.ts`), copied for the daemon's lease: the pure judgement and the store that read
+ * `daemon.json` may not import the runtime's client, and the copy goes with the lease when it moves into the runtime.
+ */
+export type Monotonic = { boot: string; ms: number };
+
+/** A moment as the daemon stamps it: its wall-clock time `at`, in epoch milliseconds, and its monotonic reading when it had one. */
+export type Instant = { at: number; mono?: Monotonic };
+
+/**
+ * How many milliseconds passed from `from` to `to`: the monotonic difference when both carry a reading of the same boot, the wall-clock
+ * difference otherwise — a reading missing on either side, or the two from different boots. The runtime's `elapsedMs`, copied with
+ * `Monotonic`.
+ */
+export const elapsedMs = (from: Instant, to: Instant): number =>
+  from.mono && to.mono && from.mono.boot === to.mono.boot ? to.mono.ms - from.mono.ms : to.at - from.at;
+
+/**
  * What `wf up` writes into `daemon.json`: who it is, where and how often it ticks, and when its last pass completed — none yet is `null`.
+ * Each of its start, its last pass and its beat is stamped on the wall clock (`startedAt`, `passedAt`, `beatAt`) and, where the machine
+ * says its boot, on the monotonic clock beside it (`startedMono`, `passedMono`, `beatMono`), written together or the reading left out.
  */
 export type DaemonFile = {
   pid: number;
   startedAt: string;
+  startedMono?: Monotonic;
   cwd: string;
   /** Its pass interval, in milliseconds (`wf up [ms]`): how stale is stale is measured from it (`staleAfterMs`). */
   every: number;
   passedAt: string | null;
+  passedMono?: Monotonic;
   /**
    * The daemon's beat: written on a timer of its interval whatever the pass is doing, so a pass that runs long — installs in several
    * worktrees one after another — still shows its process at work. Absent before the first beat.
    */
   beatAt?: string;
+  beatMono?: Monotonic;
   /**
    * When its process started, in clock ticks since boot (`/proc/<pid>/stat`, field 22): with the pid, it names the process, so a pid reused
    * after the daemon died without a word — `kill -9`, the OOM killer — names another process and holds nothing. Absent where there is no
@@ -92,8 +115,10 @@ export type DaemonRead = { text: string; file: DaemonFile | undefined };
 /**
  * Where the store stands: nobody has held it (`none`); a file that does not read as a holder (`unreadable`); a holder that stopped and said
  * so (`stopped`); one whose process is gone (`gone`), its pid dead or now another process's; one alive that has been silent for longer than
- * `staleAfterMs` of its interval (`stalled`); or one ticking. `last` is when it last showed life — the latest of its start, its last pass
- * and its beat — `quiet` how long ago that was, and `identity` what the process table said of its pid.
+ * `staleAfterMs` of its interval (`stalled`); or one ticking. `quiet` is how long it has been silent: the least time since its start, its
+ * last pass and its beat, each measured with `elapsedMs`, so on the monotonic clock within a boot and a stepped wall clock never makes a
+ * live daemon stalled. `last` is the latest of those stamps on the wall clock, and is only said to a person, as are the ages
+ * `lastPassWords`, `daemonLine`, `holdRefusal` and `takeoverLine` print. `identity` is what the process table said of its pid.
  */
 export type Standing = {
   kind: 'stopped' | 'gone' | 'stalled' | 'ticking';
@@ -104,20 +129,29 @@ export type Standing = {
 };
 export type DaemonStanding = { kind: 'none' } | { kind: 'unreadable'; text: string } | Standing;
 
+/** The file's stamps of life, each its wall time with the monotonic reading written beside it: its start, its last pass and its beat. */
+const stampsOf = (file: DaemonFile): Instant[] =>
+  [
+    { at: file.startedAt, mono: file.startedMono },
+    { at: file.passedAt, mono: file.passedMono },
+    { at: file.beatAt, mono: file.beatMono },
+  ].flatMap(({ at, mono }) => (at ? [{ at: Date.parse(at), ...(mono ? { mono } : {}) }] : []));
+
 /**
- * Judge the file as read, `undefined` when there is no file, at `now`, with `identify` answering what the process table says of the file's
- * pid. A stop said is read before the process, so a reused pid does not hold a store its daemon gave up; a process gone or another before
- * staleness, so a crash frees the store at once.
+ * Judge the file as read, `undefined` when there is no file, at `now` (both clocks), with `identify` answering what the process table says
+ * of the file's pid. A stop said is read before the process, so a reused pid does not hold a store its daemon gave up; a process gone or
+ * another before staleness, so a crash frees the store at once.
  */
 export function daemonStanding(
   read: DaemonRead | undefined,
-  { now, identify }: { now: number; identify: (file: DaemonFile) => Identity },
+  { now, identify }: { now: Instant; identify: (file: DaemonFile) => Identity },
 ): DaemonStanding {
   if (read === undefined) return { kind: 'none' };
   const { text, file } = read;
   if (!file) return { kind: 'unreadable', text };
-  const last = Math.max(...[file.startedAt, file.passedAt, file.beatAt].filter((t): t is string => !!t).map(Date.parse));
-  const quiet = now - last;
+  const stamps = stampsOf(file);
+  const last = Math.max(...stamps.map((s) => s.at));
+  const quiet = Math.min(...stamps.map((s) => elapsedMs(s, now)));
   const identity = identify(file);
   const kind = file.stoppedAt
     ? 'stopped'

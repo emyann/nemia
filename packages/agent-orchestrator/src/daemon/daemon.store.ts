@@ -21,6 +21,8 @@ import {
   type DaemonRead,
   type DaemonStanding,
   type Identity,
+  type Instant,
+  type Monotonic,
 } from './daemon.ts';
 import { Conflict } from '../refusal/refusal.ts';
 
@@ -160,6 +162,9 @@ export const daemonFile = (): string => path.join(HOME, DAEMON_FILE);
 
 const When = Schema.String.check(Schema.makeFilter((at: string) => !Number.isNaN(Date.parse(at))));
 
+/** A monotonic reading as the daemon writes one beside a stamp (`Monotonic`): its boot's id, and whole milliseconds. */
+const MonotonicSchema = Schema.Struct({ boot: Schema.String.check(Schema.isNonEmpty()), ms: Schema.Finite });
+
 /**
  * `daemon.json` as `wf up` writes it (`DaemonFile`). A pid that is not a positive whole number is not read as one: `kill(0)` and `kill(-n)`
  * signal process groups, not a process. `passedAt` may be absent, and is read as `null`. A key it does not name is dropped: the file is
@@ -168,10 +173,13 @@ const When = Schema.String.check(Schema.makeFilter((at: string) => !Number.isNaN
 const DaemonFileSchema = Schema.Struct({
   pid: Schema.Int.check(Schema.isGreaterThan(0)),
   startedAt: When,
+  startedMono: Schema.optionalKey(MonotonicSchema),
   cwd: Schema.String,
   every: Schema.Finite.check(Schema.isGreaterThan(0)),
   passedAt: Schema.optional(Schema.NullOr(When)),
+  passedMono: Schema.optionalKey(MonotonicSchema),
   beatAt: Schema.optionalKey(When),
+  beatMono: Schema.optionalKey(MonotonicSchema),
   procStart: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
   stoppedAt: Schema.optionalKey(When),
 });
@@ -235,8 +243,52 @@ export function identify(file: DaemonFile): Identity {
   return start === file.procStart ? 'same' : 'other';
 }
 
+/** Where Linux keeps the id of the running boot, a fresh one at each. */
+const BOOT_ID_FILE = '/proc/sys/kernel/random/boot_id';
+
+let boot: string | null | undefined;
+
+/** The running boot's id, read once; `null` where the machine does not say, and no monotonic reading is taken. */
+const bootId = (): string | null => {
+  if (boot === undefined) {
+    try {
+      boot = fs.readFileSync(BOOT_ID_FILE, 'utf8').trim() || null;
+    } catch {
+      boot = null;
+    }
+  }
+  return boot;
+};
+
+/** The monotonic clock now, in whole milliseconds, under the boot's id; undefined where the boot id cannot be read. */
+export const monoNow = (): Monotonic | undefined => {
+  const id = bootId();
+  return id === null ? undefined : { boot: id, ms: Number(process.hrtime.bigint() / 1_000_000n) };
+};
+
+/** Now, on both clocks: the wall clock's `Date.now()`, and the monotonic reading where there is one. */
+export const instantNow = (): Instant => {
+  const mono = monoNow();
+  return { at: Date.now(), ...(mono ? { mono } : {}) };
+};
+
+/** The monotonic key written beside each wall stamp a running daemon writes. */
+const MONO_OF = { passedAt: 'passedMono', beatAt: 'beatMono' } as const;
+
+/**
+ * `file` with its wall stamp `stamp` set to `now`, and the monotonic reading beside it: written with it, or, where `now` has none, left out
+ * rather than an earlier one kept beside a later stamp.
+ */
+function stamped(file: DaemonFile, stamp: keyof typeof MONO_OF, now: Instant): DaemonFile {
+  const next = { ...file };
+  next[stamp] = new Date(now.at).toISOString();
+  if (now.mono) next[MONO_OF[stamp]] = now.mono;
+  else delete next[MONO_OF[stamp]];
+  return next;
+}
+
 /** Where the store stands now: who holds it, and whether it ticks (`daemonStanding` in daemon.ts, off the file and the process table). */
-export const daemonStanding = (now = Date.now()): DaemonStanding => standingOf(readDaemon(), { now, identify });
+export const daemonStanding = (now: Instant = instantNow()): DaemonStanding => standingOf(readDaemon(), { now, identify });
 
 /** The file written whole, through a hidden file renamed over it, so a reader never reads half of it. */
 function writeDaemon(file: DaemonFile): void {
@@ -254,12 +306,13 @@ export type TakenStore = { held: DaemonFile; replaced: DaemonStanding };
  * the loser judges again. A file already there is replaced by a rename; two takeovers of one stale file both rename, and the loser learns
  * it at its first pass (`stillHeld`).
  */
-export function takeStore({ every, cwd, now = Date.now() }: { every: number; cwd: string; now?: number }): TakenStore {
+export function takeStore({ every, cwd, now = instantNow() }: { every: number; cwd: string; now?: Instant }): TakenStore {
   fs.mkdirSync(HOME, { recursive: true });
   const procStart = procStartOf(process.pid);
   const held: DaemonFile = {
     pid: process.pid,
-    startedAt: new Date(now).toISOString(),
+    startedAt: new Date(now.at).toISOString(),
+    ...(now.mono ? { startedMono: now.mono } : {}),
     cwd,
     every,
     passedAt: null,
@@ -268,7 +321,7 @@ export function takeStore({ every, cwd, now = Date.now() }: { every: number; cwd
   for (let tries = 0; ; tries++) {
     const replaced = daemonStanding(now);
     const holder = holderAgainst(replaced, process.pid);
-    if (holder) throw new Conflict({ message: holdRefusal(holder, 'up', HOME, now) });
+    if (holder) throw new Conflict({ message: holdRefusal(holder, 'up', HOME, now.at) });
     if (replaced.kind !== 'none') {
       writeDaemon(held);
       return { held, replaced };
@@ -296,24 +349,24 @@ export function stillHeld(held: DaemonFile): DaemonFile | undefined {
 }
 
 /**
- * Write down a pass this daemon completed — only while the store is still its own: a file that names another holder is that holder's to
- * write. Answers the file as it now stands.
+ * Write down a pass this daemon completed, at `now` on both clocks — only while the store is still its own: a file that names another holder
+ * is that holder's to write. Answers the file as it now stands.
  */
-export function passed(held: DaemonFile, at = new Date().toISOString()): DaemonFile {
-  const now = { ...held, passedAt: at };
-  if (!stillHeld(held)) writeDaemon(now);
-  return now;
+export function passed(held: DaemonFile, now: Instant = instantNow()): DaemonFile {
+  const file = stamped(held, 'passedAt', now);
+  if (!stillHeld(held)) writeDaemon(file);
+  return file;
 }
 
 /**
- * The daemon's beat, on a timer of its interval: `beatAt` written into its own file, whatever the pass is doing — only while the file names
- * this daemon, as it took the store, and it has not let it go; a file gone or unreadable is the next pass's to write. Never thrown: it runs
- * on a timer, where a throw would end the process mid-pass.
+ * The daemon's beat, on a timer of its interval: `beatAt` and `beatMono`, at `now` on both clocks, written into its own file, whatever the
+ * pass is doing — only while the file names this daemon, as it took the store, and it has not let it go; a file gone or unreadable is the
+ * next pass's to write. Never thrown: it runs on a timer, where a throw would end the process mid-pass.
  */
-export function beat(held: DaemonFile, at = new Date().toISOString()): void {
+export function beat(held: DaemonFile, now: Instant = instantNow()): void {
   try {
     const file = readDaemon()?.file;
-    if (file?.pid === held.pid && file.startedAt === held.startedAt && !file.stoppedAt) writeDaemon({ ...file, beatAt: at });
+    if (file?.pid === held.pid && file.startedAt === held.startedAt && !file.stoppedAt) writeDaemon(stamped(file, 'beatAt', now));
   } catch {}
 }
 
@@ -330,7 +383,7 @@ export function releaseStore(held: DaemonFile, at = new Date().toISOString()): v
 }
 
 /** Why a pass by hand may not run now — a daemon ticks the store — or undefined when it may. A `wf tick` never writes the file. */
-export function storeRefusal(verb: 'tick', now = Date.now()): string | undefined {
+export function storeRefusal(verb: 'tick', now: Instant = instantNow()): string | undefined {
   const holder = holderAgainst(daemonStanding(now), process.pid);
-  return holder ? holdRefusal(holder, verb, HOME, now) : undefined;
+  return holder ? holdRefusal(holder, verb, HOME, now.at) : undefined;
 }

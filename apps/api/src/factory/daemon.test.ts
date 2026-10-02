@@ -88,6 +88,14 @@ test('a pass that runs long is still ticking: silence is measured from the beat,
   assert.equal(d.ticking, true);
 });
 
+test('a live wf up is judged on the monotonic clock: wall stamps a stepped clock left twenty minutes behind are still ticking', async () => {
+  const boot = fs.readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim();
+  const mono = { boot, ms: Number(process.hrtime.bigint() / 1_000_000n) };
+  put(written(20 * MIN, { startedMono: mono, passedMono: mono, beatMono: mono }));
+  const d = await get();
+  assert.equal(d.kind, 'ticking', d.line);
+});
+
 test('REFUSED: a live wf up silent past the stale mark is stalled, not ticking', async () => {
   const at = ago(20 * MIN);
   const file = written(20 * MIN, { passedAt: at, beatAt: at });

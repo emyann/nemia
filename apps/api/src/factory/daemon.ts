@@ -8,7 +8,8 @@ import { daemonLine, daemonStanding, type DaemonStanding, type Identity, staleAf
 /**
  * Where the store stands (`kind`, the package's `DaemonStanding`): `ticking` alone is a daemon moving the runs. Every time is ISO, and null
  * where the file says none: `startedAt` since when the daemon has held the store, `passedAt` its last pass completed, `lastHeardAt` the
- * latest of its start, its last pass and its beat — silence is measured from it, and `staleAfterMs` of it makes a live daemon `stalled`.
+ * latest of its start, its last pass and its beat on the wall clock, said to a person; the package measures the silence beside it on the
+ * monotonic clock, and `staleAfterMs` of silence makes a live daemon `stalled`.
  * `identity` is what the api's own process table said of the pid (the package's `Identity`). A file that does not read has no fields.
  */
 export type Daemon = {
@@ -63,7 +64,8 @@ export function daemonOf(standing: DaemonStanding, now: number): Daemon {
 }
 
 /**
- * Whether a daemon ticks the store now: the file read and the process table asked, as `wf ls` asks them. Throws what the package throws of
- * a file that is there and cannot be read — a store that cannot be read cannot be said to tick or not.
+ * Whether a daemon ticks the store now: the file read and the process table asked, as `wf ls` asks them, the package reading both clocks;
+ * `now` is the wall time its ages are worded at. Throws what the package throws of a file that is there and cannot be read — a store that
+ * cannot be read cannot be said to tick or not.
  */
-export const readDaemon = (now = Date.now()): Daemon => daemonOf(daemonStanding(now), now);
+export const readDaemon = (now = Date.now()): Daemon => daemonOf(daemonStanding(), now);

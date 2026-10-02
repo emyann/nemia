@@ -2092,7 +2092,7 @@ On 2026-09-16 four daemons ticked `~/.agent-workflows` at once; on 2026-09-22 st
 node child ticking, reparented to init, while a check on the wrapper's name counted none. And `tick.json` is written only when the caps
 change, so nothing said whether a daemon was ticking at all: a run `waiting` and a store nothing ticks read the same.
 
-- **`$WF_ROOT/daemon.json`**, written by `wf up` alone: `{ pid, startedAt, cwd, every, passedAt, beatAt?, procStart?, stoppedAt? }` — its node pid,
+- **`$WF_ROOT/daemon.json`**, written by `wf up` alone: `{ pid, startedAt, startedMono?, cwd, every, passedAt, passedMono?, beatAt?, beatMono?, procStart?, stoppedAt? }` — its node pid,
   its start, where and how often it ticks, its last completed pass (`null` before the first), its beat — written on a timer of its interval,
   while a pass awaits too — its process's start from `/proc/<pid>/stat`, so a pid reused after a `kill -9` reads `gone` rather than
   holding the store and being named as a pid to kill (round 3's finding; where it cannot be compared a live pid holds, said unconfirmed,

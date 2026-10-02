@@ -2628,12 +2628,15 @@ The tick keeps one writer per file, and two ticks are two writers. So `wf up` ta
 `$WF_ROOT/daemon.json`, which it alone writes:
 
 ```json
-{ "pid": 51234, "startedAt": "2026-09-22T10:00:00.000Z", "cwd": "/home/me/repo", "every": 4000, "passedAt": "2026-09-22T10:41:07.311Z", "beatAt": "2026-09-22T10:41:09.002Z", "procStart": 1627402 }
+{ "pid": 51234, "startedAt": "2026-09-22T10:00:00.000Z", "startedMono": { "boot": "446eb266-…", "ms": 9120004 }, "cwd": "/home/me/repo", "every": 4000, "passedAt": "2026-09-22T10:41:07.311Z", "passedMono": { "boot": "446eb266-…", "ms": 11587315 }, "beatAt": "2026-09-22T10:41:09.002Z", "beatMono": { "boot": "446eb266-…", "ms": 11589006 }, "procStart": 1627402 }
 ```
 
 `pid` is the node process that ticks, `every` its interval, `passedAt` when its last pass completed (`null` before the first), `beatAt`
 when its timer last wrote the file, and `procStart` when its process started (clock ticks since boot, `/proc/<pid>/stat`), which with the
-pid names the process: a pid reused after the daemon died without a word names another process, and holds nothing. It is written as the store is taken, after every pass, on a beat of its interval whatever the pass is
+pid names the process: a pid reused after the daemon died without a word names another process, and holds nothing. Beside each of its
+start, its pass and its beat, `startedMono`, `passedMono` and `beatMono` are the machine's monotonic clock at the same moment, in whole
+milliseconds under the boot's id (`/proc/sys/kernel/random/boot_id`), written with their stamp or left out where the machine does not say
+its boot (`instantNow` in `src/daemon/daemon.store.ts`). It is written as the store is taken, after every pass, on a beat of its interval whatever the pass is
 doing, and once more as the daemon stops on a signal or a failure, with `stoppedAt` — always through a hidden file renamed over it, so a
 reader never reads half of it. Where the store stands is judged purely (`daemonStanding` in `src/daemon/daemon.ts`): no file, a file that does
 not read, a holder that `stopped`, one whose process is `gone` (`kill(pid, 0)` fails, or the pid's start is not `procStart`), one alive that has been silent for a long while
@@ -2645,7 +2648,10 @@ before the store is taken: `wf up -5` would write an interval the file does not 
   leave the child ticking, reparented to init). Anything else is taken over, and `wf up` says from whom when it was not a clean stop:
   `took ~/.agent-workflows over from pid 51234, whose process is gone`.
 - **Stale is ten of the holder's own intervals of silence, never under fifteen minutes** (`staleAfterMs`), measured from the latest of its
-  start, its last pass and its beat. A pass has no bound — it files every ready step of every run, each perhaps behind an `npm ci` of up to
+  start, its last pass and its beat, each measured with `elapsedMs`: on the monotonic clock when the stamp and now carry readings of one boot,
+  so a wall clock stepped forward never makes a live daemon stalled, nor one stepped back a silent one live; on the wall clock across a boot,
+  or for a stamp with no reading. The ages a person reads — `last pass 3s ago`, `stopped 2m ago` — are on the wall clock, said and never
+  decided on. A pass has no bound — it files every ready step of every run, each perhaps behind an `npm ci` of up to
   ten minutes — so the pass alone cannot say the daemon is alive; the beat, on a timer, is written while the pass awaits. What silences it
   is the event loop held by synchronous work, or the process stopped (`^Z`); the floor leaves those room, and at the default 4000 ms it
   decides. A daemon taken over while it lives — stalled — reads the file at the start of its next pass, finds another pid in it, and stops
@@ -3017,7 +3023,7 @@ holding a concurrency slot forever.
 | `src/gate/gate.ts` | a gate from a person's side — pure: **`approvalRefusal`**, whether `wf approve` may approve a step at its gate, the words refused with an approval (`approvalWordsRefusal`), and whether a task held open waits for a person's word (`holdsOpen`) |
 | `src/branches/branches.ts` | a run's result branches — pure: the steps whose branch is its result (`resultSteps`), the checks its work was judged by (`workChecks`), the tips a pass records (`tipBranches`, `tipsSeen`), and what `wf decide` shows of a branch: the numstat grouped by blast radius (`radius`), the agent-facing, check-affecting and lesson lists, and the lesson line; `branches/branches.store.ts` reads git |
 | `src/say/say.ts` | words a person says to a running step (`wf say`) — pure: what the engine journalled (`Said`), what is refused before the engine is asked (`sayRefusal`), and how `wf ls` and `wf decide` show them (`saidLines`) |
-| `src/daemon/daemon.ts` | who ticks the store — pure: `daemon.json` read, judged against a clock and a liveness answer (`daemonStanding`: none, unreadable, stopped, gone, stalled, ticking), how stale is stale (`staleAfterMs`), and what a refusal, a takeover and `wf ls` say of it |
+| `src/daemon/daemon.ts` | who ticks the store — pure: `daemon.json` read, judged against both clocks and a liveness answer (`daemonStanding`: none, unreadable, stopped, gone, stalled, ticking), the silence measured with `elapsedMs` (the runtime's, copied for the daemon's lease), how stale is stale (`staleAfterMs`), and what a refusal, a takeover and `wf ls` say of it |
 | `src/timeline/timeline.ts` | where a run's time went — pure: each try's session and check on the clock, the totals per round and for the run, the wait for a run slot, and the lines `wf decide` prints of them |
 | `src/closeout/closeout.ts` | the closeout — pure: the schema a step is filed with (`closeoutSchemaOf`, a loop's target's `replies` included), reading the statement a session gave (`parseCloseout`), what of it a step declared and owes (`declaredOutput`), how `wf decide` prints that, and what every step is told about finishing |
 | `src/retry/retry-ask.ts` | trying again — pure: how a person asks for another try (`wf retry`'s modes, its ask, `messageRefusal`), the tries a step's record keeps and what they have spent (`retriesSpent`, `signoffsSpent`), a record once a try is filed (`nextTry`), the model a continued session keeps, and the words for a try due and an answered one; what reads a step's standing (`retryable`, `retriesDue`) is `retry/retry.ts`'s, and `retryRefusal` `retry/retry-refusal.ts`'s |
@@ -3029,7 +3035,7 @@ holding a concurrency slot forever.
 | `src/workspace/workspace.ts` | what a worktree is given — pure: the `node_modules` plan, `.worktreeinclude`, and the line a step is told; where a step works and what a folder step is given (`workspacePlan`, `givenPlan`), and which finished steps hand their work off on a pass (`handOffDue`) |
 | `src/record/record.store.ts` | the run store under `WF_ROOT`: a run's id (`runId`), its record read and written (`readRun`, `listRuns`), the files a person owns beside it — a cancellation, a pruning, each ask, approval and acceptance — and where a check's stderr, a step's artifacts and a run's inputs are kept |
 | `src/agents/agents.store.ts` | a run's agent files: where a step's agent is rendered under `runs/<id>/agents/<step>` (`agentFilesDir`), the render at `wf start` (`writeAgentFiles`), a skill read again once its rendered folder is gone (`skillsAgain`), and what the board's Agents page writes: an agent and its files (`writeAgent`, `removeAgent`, `AgentWriteError`), and the agents it lists (`agentPlaces`, `listAgents`, `findAgent`) |
-| `src/daemon/daemon.store.ts` | `tick.json` (the two ceilings, `ceilings` and `lastCeilings`), `tick-stats.json` (what the last pass cost, `recordPassCost` and `lastPassCost`) and `daemon.json` read, judged by `src/daemon/daemon.ts`, and written: the store taken, held, beaten and let go (`takeStore`, `beat`, `releaseStore`) |
+| `src/daemon/daemon.store.ts` | `tick.json` (the two ceilings, `ceilings` and `lastCeilings`), `tick-stats.json` (what the last pass cost, `recordPassCost` and `lastPassCost`) and `daemon.json` read, judged by `src/daemon/daemon.ts`, and written: the store taken, held, beaten and let go (`takeStore`, `beat`, `releaseStore`), each stamp with its monotonic reading (`instantNow`) |
 | `src/feed/feed.store.ts` | the feed's file: the store's `feed.jsonl` read, appended to and followed, a cursor refused where it falls inside a line or past the end, and this process's one fold of it (`recordFeed`, `readFeed`, `watchFeed`, `feedCursorRefusal`) |
 | `src/meter/tally.store.ts` | a pass counted as it runs: the time in each phase (`within`, `metered`), the run records read, and the bytes and processes counted by its thin wrappers (`readText`, `execCounted`); at the bottom of the store's tree, open only during a pass |
 | `src/record/places.store.ts` | where a folder run's steps work (`workspace: folder`): a step's directory under `runs/<id>/work`, made before it is filed with what its brief names copied in (`folderPlace.make`), and nothing to hand off but the files where the step left them; at the bottom of the store's tree beside `folder/folder.store.ts`, and reads no git |

@@ -9,6 +9,7 @@ import {
   MAX_EVERY_MS,
   STALE_FLOOR_MS,
   daemonLine,
+  elapsedMs,
   everyOf,
   daemonStanding as standingOf,
   holdRefusal,
@@ -17,6 +18,7 @@ import {
   takeoverLine,
   type DaemonFile,
   type Identity,
+  type Instant,
 } from './daemon.ts';
 import { parseDaemonFile } from './daemon.store.ts';
 
@@ -31,11 +33,11 @@ const holder = (over: Partial<DaemonFile> = {}): DaemonFile => ({
   ...over,
 });
 const text = (file: DaemonFile | Record<string, unknown>) => JSON.stringify(file);
-const as = (identity: Identity) => ({ now: NOW, identify: () => identity });
+const as = (identity: Identity, now: Instant = { at: NOW }) => ({ now, identify: () => identity });
 const live = as('same');
 const dead = as('gone');
 /** The pure judgement of the file's text as `daemon.store.ts` reads it: undefined for no file, else the text and what it holds. */
-const judged = (text: string | undefined, how: { now: number; identify: () => Identity }) =>
+const judged = (text: string | undefined, how: { now: Instant; identify: () => Identity }) =>
   standingOf(text === undefined ? undefined : { text, file: parseDaemonFile(text) }, how);
 const kindOf = (file: DaemonFile | Record<string, unknown>, how = live) => judged(text(file), how).kind;
 
@@ -88,6 +90,60 @@ test('each standing, from the file and the clock: none, unreadable, ticking, sta
   assert.equal(kindOf(holder({ passedAt: ago(16) }), as('unknown')), 'stalled');
 });
 
+test('elapsed time is monotonic within a boot, and wall-clock across one or without a reading on either side', () => {
+  const mono = (boot: string, ms: number) => ({ boot, ms });
+  assert.equal(
+    elapsedMs({ at: 0, mono: mono('a', 100) }, { at: 50_000, mono: mono('a', 1100) }),
+    1000,
+    'one boot: the monotonic difference',
+  );
+  assert.equal(elapsedMs({ at: 0, mono: mono('a', 100) }, { at: 50_000, mono: mono('b', 1100) }), 50_000, 'two boots: the wall clock');
+  assert.equal(elapsedMs({ at: 0 }, { at: 50_000, mono: mono('a', 1100) }), 50_000, 'no reading at the start: the wall clock');
+  assert.equal(elapsedMs({ at: 0, mono: mono('a', 100) }, { at: 50_000 }), 50_000, 'no reading now: the wall clock');
+});
+
+test('silence is measured on the monotonic clock within a boot: a stepped wall clock neither stalls a live daemon nor revives a silent one', () => {
+  const BOOT = 'boot-1';
+  const NOW_MS = 10 * 3_600_000;
+  const now = { at: NOW, mono: { boot: BOOT, ms: NOW_MS } };
+  const monoAgo = (minutes: number, boot = BOOT) => ({ boot, ms: NOW_MS - minutes * 60_000 });
+  const fresh = { startedMono: monoAgo(30), passedMono: monoAgo(1 / 60), beatMono: monoAgo(1 / 60) };
+  const forward = holder({ startedAt: ago(50), passedAt: ago(20), beatAt: ago(20), ...fresh });
+  const judgedForward = judged(text(forward), as('same', now));
+  assert.equal(judgedForward.kind, 'ticking', 'wall stamps twenty minutes old, monotonic ones a second: the wall clock stepped forward');
+  assert.equal(judgedForward.kind === 'ticking' && judgedForward.quiet, 1000);
+  assert.equal(
+    kindOf(
+      holder({ passedAt: ago(0.05), beatAt: ago(0.05), startedMono: monoAgo(46), passedMono: monoAgo(16), beatMono: monoAgo(16) }),
+      as('same', now),
+    ),
+    'stalled',
+    'wall stamps fresh, monotonic ones sixteen minutes old: the wall clock stepped back, and the silence is still stale',
+  );
+  assert.equal(
+    kindOf(
+      holder({ passedAt: ago(20), beatAt: ago(20), startedMono: monoAgo(30), passedMono: monoAgo(16), beatMono: monoAgo(1 / 60) }),
+      as('same', now),
+    ),
+    'ticking',
+    'the least silence over the stamps: a beat a second old keeps a holder whose last pass was sixteen minutes ago',
+  );
+  const otherBoot = { startedMono: monoAgo(30, 'boot-0'), passedMono: monoAgo(0.05, 'boot-0') };
+  assert.equal(
+    kindOf(holder({ passedAt: ago(20), ...otherBoot }), as('same', now)),
+    'stalled',
+    'a reading of another boot: the wall clock',
+  );
+  assert.equal(kindOf(holder({ passedAt: ago(20), passedMono: monoAgo(0.05) }), as('same', { at: NOW })), 'stalled', 'no reading now');
+  assert.equal(kindOf(holder({ passedAt: ago(14) }), as('same', now)), 'ticking', 'a file with no reading: the wall clock, as before');
+  assert.equal(kindOf(holder({ passedAt: ago(16) }), as('same', now)), 'stalled');
+  assert.equal(
+    judgedForward.kind === 'ticking' && judgedForward.last,
+    Date.parse(ago(20)),
+    '`last` stays the latest wall stamp, for display',
+  );
+});
+
 test('a file that does not read as a holder is unreadable, and holds nothing — a pid that would signal a process group included', () => {
   for (const bad of ['', '{', 'null', '[]', '"x"']) assert.equal(judged(bad, live).kind, 'unreadable', JSON.stringify(bad));
   const { pid: _pid, ...noPid } = holder();
@@ -105,6 +161,9 @@ test('a file that does not read as a holder is unreadable, and holds nothing —
     { ...holder(), every: -5 },
     { ...holder(), every: null },
     holder({ procStart: -1 }),
+    { ...holder(), beatAt: ago(0), beatMono: { boot: '', ms: 1 } },
+    { ...holder(), passedMono: { boot: 'b', ms: 'soon' } },
+    { ...holder(), startedMono: 7 },
     holder({ procStart: 1.5 }),
     { ...holder(), procStart: '12' },
   ]) {
@@ -113,6 +172,13 @@ test('a file that does not read as a holder is unreadable, and holds nothing —
   }
   assert.deepEqual(parseDaemonFile(text({ ...holder(), passedAt: undefined })), { ...holder(), passedAt: null });
   assert.deepEqual(parseDaemonFile(text(holder({ procStart: 1627402 }))), holder({ procStart: 1627402 }));
+  const monotonic = holder({
+    beatAt: ago(0),
+    startedMono: { boot: 'b', ms: 1 },
+    passedMono: { boot: 'b', ms: 2 },
+    beatMono: { boot: 'b', ms: 3 },
+  });
+  assert.deepEqual(parseDaemonFile(text(monotonic)), monotonic, 'each monotonic reading read back beside its stamp');
 });
 
 test('only a daemon ticking that is not the reader holds the store against it', () => {

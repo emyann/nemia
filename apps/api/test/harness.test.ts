@@ -3,7 +3,7 @@
  * `--import` before every test file, under `test/` or beside the code in `src/`, every test file imports it first too, and the `claude` the
  * api's engine runs is the harness's.
  */
-import { askEnded, bin, calls, observations, registry, scriptUnharnessed, unharnessed } from './harness.ts';
+import { askEnded, bin, calls, observations, registry, root, scriptUnharnessed, unharnessed } from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
 import { scratch } from './scratch.ts';
-import { runtime } from '../src/app.ts';
+import { app, runtime } from '../src/app.ts';
 import { Engine } from '../src/store.ts';
 import { engine } from 'agent-orchestrator';
 
@@ -139,6 +139,16 @@ test('--import installs the harness once in a test file that imports nothing of 
   assert.equal(harnesses.length, 1, `one harness on the test's PATH, none from the runner: ${harnesses.join(', ')}`);
   assert.equal(seen.claude, path.join(harnesses[0], 'claude'), "the test's `claude` is the harness's");
   assert.ok(path.basename(seen.wfRoot ?? '').startsWith('nemia-api-store-'), `the store is a scratch folder: ${seen.wfRoot}`);
+});
+
+test("REFUSED, whatever the daemon's: a test that leaves WF_MAX_RUNS to the harness is answered 422 by GET /api/ceilings, naming the variable to set", async () => {
+  fs.rmSync(path.join(root, 'tick.json'), { force: true });
+  const res = await app.request('/api/ceilings');
+  assert.equal(res.status, 422, await res.clone().text());
+  assert.equal(
+    ((await res.json()) as { error: string }).error,
+    'WF_MAX_RUNS=set-it-in-the-test is not a count. It is the most runs in flight at once, a whole number: WF_MAX_RUNS=2 — or 0, or unset, for no cap.',
+  );
 });
 
 test('no api test file loads a module with import(): the harness sets the store as it loads, so the api and the package are imported after it', () => {

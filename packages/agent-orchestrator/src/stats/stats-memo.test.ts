@@ -22,7 +22,10 @@ const { freshStatsMemo, stats } = await import('./stats.verb.ts');
 
 type Event = Parameters<PromiseJournal['append']>[1];
 
-/** The engine's store, in memory: every append reaches the feed. */
+/** Every task whose journal does not read: the engine rejects its view with the `JournalError` a store's failure becomes. */
+const spoiled = new Set<string>();
+
+/** The engine's store, in memory: every append reaches the feed; a task in `spoiled` does not read. */
 const memoryJournal = (): PromiseJournal => {
   const tasks = new Map<string, Event[]>();
   const feed: Awaited<ReturnType<PromiseJournal['feed']>>['entries'] = [];
@@ -32,6 +35,7 @@ const memoryJournal = (): PromiseJournal => {
       feed.push({ taskId, event });
     },
     async read(taskId) {
+      if (spoiled.has(taskId)) throw new Error(`the journal of ${taskId} does not read`);
       return [...(tasks.get(taskId) ?? [])];
     },
     async list() {
@@ -257,4 +261,46 @@ test("a call keeps nothing once another has read the engine's feed on past where
   const answer = await stats(e, {}, NOW, { memo, verify: true });
   assert.deepStrictEqual(answer, await stats(e, {}, NOW));
   viewed = [];
+});
+
+test('a run a journal of which does not read is never kept, and is counted again once it reads, with no line on the feed', async () => {
+  await aRun('s-spoiled', 5);
+  spoiled.add('s-spoiled-implement');
+  const memo = freshStatsMemo();
+  const first = await stats(e, {}, NOW, { memo, ...unverified });
+  assert.deepEqual(first.unreadable, ['s-spoiled']);
+  assert.equal(memo.runs.has('s-spoiled'), false, 'nothing kept of the run a journal of which does not read');
+  viewedRuns();
+  spoiled.delete('s-spoiled-implement');
+  const healed = await stats(e, {}, NOW, { memo, ...unverified });
+  assert.deepEqual(viewedRuns(), ['s-moving', 's-spoiled']);
+  assert.deepEqual(healed.unreadable, []);
+  assert.deepStrictEqual(healed, await stats(e, {}, NOW));
+  fs.rmSync(recordFile('s-spoiled'));
+  viewed = [];
+});
+
+test('an engine whose feed does not read answers nothing from memory, and keeps nothing', async () => {
+  const memo = freshStatsMemo();
+  await stats(e, {}, NOW, { memo, ...unverified });
+  viewedRuns();
+  const unfed = {
+    ...e,
+    feed: async () => {
+      throw new Error('the feed does not read');
+    },
+  };
+  await stats(unfed, {}, NOW, { memo, ...unverified });
+  assert.deepEqual(viewedRuns(), [...FINISHED, 's-moving']);
+  assert.equal(memo.runs.size, 0);
+});
+
+test('an engine with no feed answers nothing from memory, and keeps nothing', async () => {
+  const memo = freshStatsMemo();
+  await stats(e, {}, NOW, { memo, ...unverified });
+  viewedRuns();
+  const feedless = { ...e, feed: undefined } as never;
+  await stats(feedless, {}, NOW, { memo, ...unverified });
+  assert.deepEqual(viewedRuns(), [...FINISHED, 's-moving']);
+  assert.equal(memo.runs.size, 0);
 });

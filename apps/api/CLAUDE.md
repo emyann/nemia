@@ -16,6 +16,9 @@ below its layer is in `docs/architecture.md`, *Who owns what*.
   stand. A new input `summarize` reads for a finished run goes into one of those, or a poll answers it stale. `WF_VERIFY_REST=1` (set by
   the harness) judges every kept answer afresh; a test that counts reads turns that off for its request (`unverified`). Requests overlap
   and share the feed cursor: a request keeps nothing once another has read the feed past where it read to.
+- **`GET /api/stats` answers a finished run's facts from the app's memo** (`ReadMemo.stats`, the package's `StatsMemo`) while its
+  stamp and the feed for its tasks stand. A new input of a run's stats facts goes into one of those, or the stats answer stale. Verified
+  under `WF_VERIFY_REST=1`; a test that counts reads turns that off (`unverified` in `src/stats/stats.test.ts`).
 - **A run's tasks are every step's, every check's, and every earlier try's and its check's** (`runTasks` in the package's `record/record.ts`); `list(taskIds)`
   looks at no harness when nothing among them is in flight.
 - **A run whose task's journal does not read is answered off its record** (`judgedOrNot` in `runs/runs.ts`), never judged, and not kept:

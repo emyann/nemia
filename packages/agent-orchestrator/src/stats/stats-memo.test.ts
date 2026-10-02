@@ -172,7 +172,7 @@ test("a line on the engine's feed for a run's task takes the run out of the memo
   const memo = freshStatsMemo();
   await stats(e, {}, NOW, { memo, ...unverified });
   viewedRuns();
-  await journal.append('s-c-implement', { kind: 'measured', at: ended, attempt: 1, usage: { costUsd: 5 } } as Event);
+  await journal.append('s-c-implement', { kind: 'measured', at: ended, attempt: 1, usage: { costUsd: 5 } });
   const answer = await stats(e, {}, NOW, { memo, ...unverified });
   assert.deepEqual(viewedRuns(), ['s-c', 's-moving']);
   assert.deepStrictEqual(answer, await stats(e, {}, NOW));
@@ -248,7 +248,7 @@ test("a call keeps nothing once another has read the engine's feed on past where
   during = {
     when: 's-b-implement',
     then: async () => {
-      await journal.append('s-b-implement', { kind: 'measured', at: ended, attempt: 1, usage: { costUsd: 9 } } as Event);
+      await journal.append('s-b-implement', { kind: 'measured', at: ended, attempt: 1, usage: { costUsd: 9 } });
       await stats(e, {}, NOW, { memo, ...unverified });
     },
   };

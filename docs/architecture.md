@@ -72,7 +72,10 @@ it: a finished run judged at rest on a full pass is answered from its memo while
 its files in the store, its tasks on the runtime's feed, its result branches' tips (`src/rest/rest.ts`, `restMemo` in
 `src/tick/tick.verb.ts`). It is keyed by what it read, emptied by a feed that went back, and rebuilt by one full pass on a
 restart, so it never decides what a full pass would not; the tests that tick judge every answer from it in full as well
-(`WF_VERIFY_REST`).
+(`WF_VERIFY_REST`). The stats keep one more, on the same key, in the process that serves them: each finished run's facts,
+while its files in the store stamp the same and nothing of its tasks is on the feed (`StatsMemo` in
+`src/stats/stats.verb.ts`, both memos brought up to the feed by `src/rest/rest.verb.ts`). The api holds it for an app;
+`wf stats` keeps none, and the api's tests read every answer from it afresh as well.
 
 ## The rules
 

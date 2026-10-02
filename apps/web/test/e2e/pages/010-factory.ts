@@ -1,6 +1,6 @@
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { nextVisit, photograph, PLACES_SAID, sidebar, themeOf } from '../board.ts';
+import { nextVisit, photograph, PLACES_SAID, sidebar, stepBar, themeOf } from '../board.ts';
 import {
   cardOf,
   cardsOf,
@@ -81,6 +81,9 @@ async function expectDiamond(page: Page, when: string): Promise<void> {
  * floor.
  */
 const IN_FLIGHT_BY_CAP = 3;
+
+/** A window wide enough for an open card to be drawn whole on the floor beside the queue's lane and the bar, at the reveal's least zoom. */
+const WIDE = { width: 1920, height: 1080 };
 
 export default {
   /**
@@ -451,12 +454,8 @@ export default {
     await photograph(page, path.join(OUT, `factory-laid-out-${await themeOf(page)}.png`), { fullPage: true });
 
     const nodes = await page.locator('.react-flow__node').count();
-    await card.locator('time').click();
-    await expectCount(
-      tiles,
-      FAKE.steps.length,
-      `a click on the card away from its title's link opens it into a tile per step (${FAKE.steps.join(', ')})`,
-    );
+    await card.getByRole('button', { name: 'Show steps' }).click();
+    await expectCount(tiles, FAKE.steps.length, `the chevron opens the card into a tile per step (${FAKE.steps.join(', ')})`);
     await expectCount(page.locator('.react-flow__node'), nodes, 'on the card itself: no node is added to the floor for a step');
     await expectVisible(
       card.getByText(FAKE.touched, { exact: true }),
@@ -563,43 +562,51 @@ export default {
     await card.getByRole('button', { name: 'Show steps' }).click();
     await expectCount(tiles, FAKE.steps.length, 'the chevron opens the run again after a reset');
     await expectApart(beside, card, 'the card beside it moves aside again');
-    await settled(page);
-    await tile('review').click();
-    const inspector = page.locator('aside[aria-label="Step review"]');
-    await expectVisible(inspector, 'the step inspector opens on a press on review');
-    await expectCount(tiles, FAKE.steps.length, 'a press on a tile does not close its card');
-    await expectCount(card.locator('[data-tile][aria-pressed="true"]'), 1, 'and one tile reads pressed');
-    await expectCount(tile('review').and(page.locator('[aria-pressed="true"]')), 1, "review's, the step inspected");
-    await expectCount(
-      page.locator('aside[aria-label="Queued cards"]'),
-      0,
-      "the queue's lane is off while a step's inspector is open beside the floor",
-    );
-    await expectTexts(
-      page.locator('[data-cap]'),
-      [`${IN_FLIGHT_BY_CAP} of ${QUEUE.cap} run slots taken on this machine · ${QUEUED.length} queued · ${PASS.line}`],
-      'and the header still counts the queue',
-    );
-    await expectVisible(inspector.getByText(FAKE.title), 'the inspector names the run the step is in');
-    await settled(page);
-    await expectInside(card, floor, 'the floor narrowed for the open inspector brings the open card back onto it');
+    const was = page.viewportSize();
+    await page.setViewportSize(WIDE);
+    try {
+      await settled(page);
+      await tile('review').click();
+      const inspector = stepBar(page, FAKE.id, 'review');
+      await expectVisible(inspector, "review's bar opens on a press on review");
+      await expectCount(tiles, FAKE.steps.length, 'a press on a tile does not close its card');
+      await expectCount(card.locator('[data-tile][aria-pressed="true"]'), 1, 'and one tile reads pressed');
+      await expectCount(tile('review').and(page.locator('[aria-pressed="true"]')), 1, "review's, the step inspected");
+      await expectCount(ghosts, QUEUED.length, "the queue's lane stays beside the floor while the bar floats over its right");
+      await expectTexts(
+        page.locator('[data-cap]'),
+        [`${IN_FLIGHT_BY_CAP} of ${QUEUE.cap} run slots taken on this machine · ${QUEUED.length} queued · ${PASS.line}`],
+        'and the header still counts the queue',
+      );
+      await expectVisible(inspector.getByText(FAKE.title), 'the bar names the run the step is in');
+      await settled(page);
+      await expectInside(
+        card,
+        floor,
+        'in a window as wide as WIDE, the floor narrowed by the bar over it brings the open card back onto it',
+      );
+      await expectLeftOf(card, inspector, 'left of the bar');
 
-    await tile(FAKE.refused).click();
-    await page.locator(`aside[aria-label="Step ${FAKE.refused}"]`).getByRole('tab', { name: 'Details' }).click();
-    const check = page.locator(`aside[aria-label="Step ${FAKE.refused}"] section[aria-label="Check"]`);
-    await expectVisible(
-      check.getByText(FAKE.check, { exact: true }),
-      `the inspector of ${FAKE.refused} shows its check's command (${FAKE.check})`,
-    );
-    await expectVisible(check.getByText('exit 1', { exact: true }), `the inspector of ${FAKE.refused} shows what its check exited with`);
-    await expectVisible(check.getByText(FAKE.said), `the inspector of ${FAKE.refused} shows the last lines of its check's output`);
-    await settled(page);
-    await expectInside(card, floor, `the open card is on the floor beside ${FAKE.refused}'s inspector`);
-    await page.getByRole('button', { name: "Close the step's panel" }).click();
-    await expectCount(page.locator(`aside[aria-label="Step ${FAKE.refused}"]`), 0, "the step's panel closes");
-    await expectCount(ghosts, QUEUED.length, "and the queue's lane is back beside the floor");
+      await tile(FAKE.refused).click();
+      const refused = stepBar(page, FAKE.id, FAKE.refused);
+      await refused.getByRole('tab', { name: 'Details' }).click();
+      const check = refused.locator('section[aria-label="Check"]');
+      await expectVisible(
+        check.getByText(FAKE.check, { exact: true }),
+        `the inspector of ${FAKE.refused} shows its check's command (${FAKE.check})`,
+      );
+      await expectVisible(check.getByText('exit 1', { exact: true }), `the inspector of ${FAKE.refused} shows what its check exited with`);
+      await expectVisible(check.getByText(FAKE.said), `the inspector of ${FAKE.refused} shows the last lines of its check's output`);
+      await settled(page);
+      await expectInside(card, floor, `the open card is on the floor beside ${FAKE.refused}'s bar`);
+      await refused.getByRole('button', { name: 'Close', exact: true }).click();
+      await expectCount(refused, 0, "the step's bar closes");
+    } finally {
+      if (was) await page.setViewportSize(was);
+    }
+    await expectCount(ghosts, QUEUED.length, "and the queue's lane is still beside the floor");
 
-    await beside.locator('time').click();
+    await beside.getByRole('button', { name: 'Show steps' }).click();
     const besideOpen = beside.locator(`section[aria-label="The run's steps"]`);
     const moving = besideOpen.locator(`[data-arrow="step:${NEIGHBOUR.running.replace('->', '->step:')}"]`);
     await expectCount(
@@ -637,7 +644,7 @@ export default {
     await expectCount(looping.locator('[data-round]'), 0, "and says no round on the card at rest: the pill's hover does");
     await page.getByRole('button', { name: 'Fit view' }).click();
     await settled(page);
-    await looping.locator('time').click();
+    await looping.getByRole('button', { name: 'Show steps' }).click();
     const loopOpen = looping.locator(`section[aria-label="The run's steps"]`);
     await expectCount(loopOpen.locator('[data-tile]'), LOOPING.steps.length, `${LOOPING.id} opens on its steps`);
     await expectTexts(

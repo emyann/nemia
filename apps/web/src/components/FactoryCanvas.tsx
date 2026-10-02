@@ -205,10 +205,10 @@ const placing = (change: NodeChange<RunFlowNode>): change is NodePositionChange 
  *   an opening card covers it, and one coming back takes its saved cell. A card moved is saved in this browser (`keepLayout`), where a
  *   card off the floor keeps its place and a run the store no longer lists does not; nor is such a run kept open.
  * - On mount it forgets what this browser keeps for the Factory that nothing reads (`forgetFactoryLeftovers`).
- * - A card opened is brought into view once the floor is laid out for it, and the run the bar shows, or a step of, is brought into view
- *   as the bar shows it and kept in view whenever the floor's frame changes size, across or down (`useFrameSize`): panned to its middle, if any of it is off screen, and zoomed out only as far as
- *   it must be, to `REVEAL_MIN_ZOOM` at most (`revealView`); a card taller than the frame even then shows its head, below the panels
- *   at the frame's top. Its box is the cells it takes (`openSpan`, `boxOf`).
+ * - A card opened is brought into view once the floor is laid out for it, and the run the bar shows, or a step of, is brought into view as
+ *   the bar shows it and kept in view whenever the floor's frame changes size, across or down (`useFrameSize`): panned to its middle, if
+ *   any of it is off screen, and zoomed out only as far as it must be, to `REVEAL_MIN_ZOOM` at most (`revealView`); a card taller than the
+ *   frame even then shows its head, below the panels at the frame's top. Its box is the cells it takes (`openSpan`, `boxOf`).
  * - The floor is fitted once per ask, never before the cards asked for are on it: first on mount, unanimated, in place of React Flow's
  *   own fit so it keeps clear of the panels too (`fitClear`); then on Fit view, Reset layout, Show finished, and whenever the queue lane,
  *   the quota line or the daemon line comes, goes or changes its words, which may wrap the header; and when the frame changes size with
@@ -221,8 +221,9 @@ const placing = (change: NodeChange<RunFlowNode>): change is NodePositionChange 
  *   is counted finished too, and stays on the floor whatever Show finished says (`floorRuns`); a run at its ending's gate is in both.
  *   Beside the counts it draws the cap (`CapLine`), the daemon and the quota, and the Show finished switch, named by a label beside it.
  * - The floor fills the screen under the root's header, its frame narrowed by what the bar covers of it (`useBarOver`), so the card
- *   inspected and every panel over the floor stay clear of the bar. The queue lane sits at its left. The floor's hint shows only where the floor is wide enough beside its buttons, and the legend wraps short of the minimap when there is
- *   one; arrowheads take their edges' colour in both themes.
+ *   inspected and every panel over the floor stay clear of the bar. The queue lane sits at its left. The floor's buttons wrap to a narrow
+ *   floor, its hint shows only where the floor is wide enough beside them, and the legend wraps short of the minimap when there is one;
+ *   arrowheads take their edges' colour in both themes.
  * - A click on a card, or Enter on the card itself, shows the run in the bar or closes it; a click or Enter on a link or a button in it
  *   does only what that does (`useFloorPress`).
  */
@@ -497,10 +498,10 @@ function Floor({ runs, factory }: { runs: readonly RunSummary[]; factory: Factor
                 defaultMarkerColor={null}
                 minZoom={0.2}
               >
-                <Panel position="top-left" className="hidden text-[11px] text-muted-foreground @2xl:block">
+                <Panel position="top-left" className="hidden text-[11px] text-muted-foreground @4xl:block">
                   Click a run to inspect it · double-click to open its page · drag a card, and it moves alone · kept in this browser
                 </Panel>
-                <Panel position="top-right" className="flex gap-2">
+                <Panel position="top-right" className="flex flex-wrap justify-end gap-2">
                   <Button variant="outline" size="sm" onPress={resetLayout}>
                     Reset layout
                   </Button>

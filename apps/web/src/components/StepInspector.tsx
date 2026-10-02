@@ -23,8 +23,9 @@ const TABS = ['Details', 'Output', 'Activity'] as const;
 type Tab = (typeof TABS)[number];
 
 /**
- * The tab a step's tabs (`StepTabs`) open on for a step nobody has picked a tab for: Output once the step has a closeout — it signed off, at its gate,
- * blocked or done — since what it handed on is what there is to read, and at a gate what a person approves; Details before that.
+ * The tab a step's tabs (`StepTabs`) open on for a step nobody has picked a tab for: Output once the step has a closeout — it signed off,
+ * at its gate, blocked or done — since what it handed on is what there is to read, and at a gate what a person approves; Details before
+ * that.
  */
 export const openingTab = (step: Pick<Step, 'closeout'>): Tab => (step.closeout ? 'Output' : 'Details');
 

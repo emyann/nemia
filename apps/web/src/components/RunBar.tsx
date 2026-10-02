@@ -27,9 +27,9 @@ export function RunBar({ run: id }: { run: string }) {
 }
 
 /**
- * What the run bar holds for the run `id`, as `run` was last read and `error` its read's failure, if any: what is to decide and who it waits
- * on, as the run's page says them, each step they name a button that shows the step in the bar; its steps, each a button with its status
- * that shows it in the bar; and its brief.
+ * What the run bar holds for the run `id`, as `run` was last read and `error` its read's failure, if any: what is to decide and who it
+ * waits on, as the run's page says them, each step they name a button that shows the step in the bar; its steps, each a button with its
+ * status that shows it in the bar; and its brief.
  */
 export function RunBody({ id, run, error }: { id: string; run: RunDetail | undefined; error: unknown }) {
   const { show } = useBar();

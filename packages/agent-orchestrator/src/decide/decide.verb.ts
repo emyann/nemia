@@ -13,13 +13,13 @@ import type { SaidTo } from '../say/say.ts';
 import type { BranchStanding, Round, SpendOf } from '../status/status.ts';
 import type { Workflow } from '../step/step.ts';
 import { hasStarted, holdsOf, waitsOf, type Wait } from '../wait/wait.ts';
-import { roundLines, roundsDue } from '../round/round.ts';
+import { roundOffers, roundsDue } from '../round/round.ts';
 import { deniedWords, harnessWaitLine } from '../list/list.ts';
-import { costLine, decision, runCostLines, type Decision } from './decide.ts';
+import { choicesOf, costLine, decision, runCostLines, type DecideCommand, type Decision } from './decide.ts';
 import { assess } from '../tick/assess.ts';
 import { acceptedLines, gateLines } from '../brief/index.ts';
 import { parseCloseout, type Closeout } from '../closeout/closeout.ts';
-import { answerLines, answerOf, overBudgetLine, retriesDue, retryLines, type Retry, type RetryAsk } from '../retry/index.ts';
+import { answerLines, answerOf, overBudgetLine, retriesDue, retryOffers, type Retry, type RetryAsk } from '../retry/index.ts';
 import { timeline, type Timeline } from '../timeline/timeline.ts';
 import { runStore } from '../record/files.store.ts';
 import { stepsOf } from '../record/record.store.ts';
@@ -67,6 +67,11 @@ export type Decided = {
    * (`retryLines`).
    */
   offers: string[];
+  /**
+   * The commands a person may type on a run awaiting them (`choicesOf`), each a bare `wf` or `git -C` line with its label: what the board
+   * offers and `wf decide` prints. None on a run that awaits nobody.
+   */
+  commands: DecideCommand[];
   /** The OVER BUDGET line, saying why each step over its budget is held (`overBudgetLine`); undefined with none. */
   overBudgetLine?: string;
   /** What each filed step's current try consumed (`consumption`), off the views read for the rest. */
@@ -221,7 +226,8 @@ function deniedLinesOf(run: Run, views: ReadonlyMap<string, TaskView>): Record<s
 
 /**
  * What is left for a person to do — the pure call, with git asked the one question it owns. Each task is viewed once (`viewedOnce`), the
- * current tries and every try before them, and git asked of each branch once (`branchReader`), for the decision and the standings both.
+ * current tries and every try before them, and git asked of each branch once (`branchReader`), for the decision and the standings both
+ * — and not at all for a run still running or called off, whose standings are none: nothing of it is decided on them.
  *
  * A cancelled, pruned or held run has no try or round due. Each line that would offer a verb (`retryLines`, `roundLines`, `answerLines`,
  * `overBudgetLine`, `gateLines`) says itself that it offers none, so the api's decision, which calls the same functions, says the same.
@@ -246,7 +252,7 @@ export const decideRun = Effect.fn('decide')(function* (id: string) {
   const checkout = yield* awaited(() => checkoutHold(e, run, steps));
   const shipped = yield* tried(() => shippedOf(run, git));
   const d = decision(steps, run, phaseOf, shipped, reader, asked, verdictOf, asks, rounds, blocked, spendOf, checkout);
-  const standings = yield* tried(() => standingsOf(run, git));
+  const standings = d.kind === 'running' || d.kind === 'cancelled' ? [] : yield* tried(() => standingsOf(run, git));
   const { toDecide: decide } = assess(steps, run, phaseOf, reader, asked, verdictOf, asks, rounds, blocked, spendOf, standings);
   const answers = yield* answersOf(e, run, views, yield* tried(() => runStore.asks.answers(id)));
   const everyTry = yield* everyTryOf(e, run, views);
@@ -258,6 +264,7 @@ export const decideRun = Effect.fn('decide')(function* (id: string) {
   const denied = deniedLinesOf(run, views);
   const held = !hasStarted(run) && !run.cancelledAt ? (yield* awaited(() => runSlots(e))).get(id) : undefined;
   const over = Boolean(run.cancelledAt || run.pruned || run.hold);
+  const offers = [...roundOffers(steps, run, d, spendOf), ...retryOffers(steps, run, d, phaseOf, reader, asked, spendOf, verdictOf)];
   const parent = yield* awaited(() => parentsOf(e, run, git));
   const answer: Decided = {
     run,
@@ -266,7 +273,8 @@ export const decideRun = Effect.fn('decide')(function* (id: string) {
     checks,
     retrying: over ? [] : retriesDue(steps, run, phaseOf, reader, asked, verdictOf, asks, blocked, spendOf),
     rounding: over ? [] : roundsDue(steps, run, phaseOf, reader, asked, rounds, spendOf),
-    offers: [...roundLines(steps, run, d, spendOf), ...retryLines(steps, run, d, phaseOf, reader, asked, spendOf, verdictOf)],
+    offers: offers.map((o) => o.said),
+    commands: choicesOf(steps, run, d, offers),
     overBudgetLine: overBudgetLine(steps, run, d, spendOf),
     used,
     costs,

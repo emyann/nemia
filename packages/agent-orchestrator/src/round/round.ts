@@ -41,7 +41,7 @@ import { loopSpan } from '../workflow/index.ts';
 import type { EarlierTry } from '../retry/index.ts';
 import { heldRefusal, prunedRefusal } from '../prune/prune.ts';
 import { holdWord } from '../wait/wait.ts';
-import type { Decision } from '../decide/decide.ts';
+import type { Decision, Offer } from '../decide/decide.ts';
 
 /**
  * The rounds due now. Pure, and blind to cancellation on purpose, as `retriesDue` is: `assess` answers for a cancelled run, and `advance`
@@ -468,9 +468,9 @@ const overWords = (over: ReadonlyArray<{ name: string; spent: Spend; cap: number
  *
  * None on a pruned run (`prunedRefusal`), nor on a held one (`heldRefusal`). A loop over budget and not held for it, its own try stopped,
  * is `retryLines`' to offer. `wf accept` is offered only out of rounds: below the cap the run goes round itself, and on a round held for a
- * budget raising it is the way on (`acceptAsk`).
+ * budget raising it is the way on (`acceptAsk`). Each offer is its sentence and the bare command it ends on (`Offer`).
  */
-export function roundLines(steps: readonly Workflow[], run: Run, d: Decision, spendOf: SpendOf = () => undefined): string[] {
+export function roundOffers(steps: readonly Workflow[], run: Run, d: Decision, spendOf: SpendOf = () => undefined): Offer[] {
   if (d.kind !== 'awaiting' || run.pruned || run.hold) return [];
   return steps
     .filter((s) => s.loop && (d.exhausted.includes(s.name) || d.overBudget.includes(s.name)))
@@ -482,15 +482,28 @@ export function roundLines(steps: readonly Workflow[], run: Run, d: Decision, sp
       const raise = over.length ? `, and ${overWords(over)}` : '';
       const once = over.length ? `, its cap raised above ${dollars(Math.max(...over.map((o) => o.spent.usd)))}` : '';
       const why = exhausted ? `\`rounds: ${capOf(looping)}\` are spent${raise}` : overWords(over);
-      const again = `${name}: it asked for round ${roundOf(run, name) + 1}, and ${why}. Its findings are below. Once more${once} — ${looping.loop} continued, then a new ${name}:  wf round ${run.id} ${name}${over.length ? ' --budget <amount>' : ''}`;
+      const round = `wf round ${run.id} ${name}${over.length ? ' --budget <amount>' : ''}`;
+      const again: Offer = {
+        step: name,
+        command: round,
+        said: `${name}: it asked for round ${roundOf(run, name) + 1}, and ${why}. Its findings are below. Once more${once} — ${looping.loop} continued, then a new ${name}:  ${round}`,
+      };
       if (!exhausted) return [again];
       const after = steps.filter((s) => s.after.includes(name)).map((s) => s.name);
       const then = after.length
         ? `${andList(after)} ${after.length > 1 ? 'are' : 'is'} filed and handed them with your words`
         : 'the run ends with them on the record';
+      const accept = `wf accept ${run.id} ${name} --message "<why>"`;
       return [
         again,
-        `${name}: enough — go on with what is there; its findings stay on the record, and ${then}:  wf accept ${run.id} ${name} --message "<why>"`,
+        {
+          step: name,
+          command: accept,
+          said: `${name}: enough — go on with what is there; its findings stay on the record, and ${then}:  ${accept}`,
+        },
       ];
     });
 }
+
+/** What `wf decide` offers for each loop out of rounds, as its lines: each offer's sentence (`roundOffers`). Pure. */
+export const roundLines = (...args: Parameters<typeof roundOffers>): string[] => roundOffers(...args).map((o) => o.said);

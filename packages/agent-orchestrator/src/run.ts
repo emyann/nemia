@@ -17,7 +17,17 @@ export { answerRefusal, answerText, askedQuestions, questionsOf } from './questi
 export type { Answer, Asked, Question, QuestionOption } from './question/question.ts';
 /** Re-exported for apps/api, which reads them from the `agent-orchestrator/run` subpath. */
 export { answerOf, messageRefusal, type EarlierTry } from './retry/index.ts';
-export { answerLines, deniedOffer, overBudgetLine, retriesDue, retryable, retryLines, retryRefusal, tryNote } from './retry/index.ts';
+export {
+  answerLines,
+  deniedOffer,
+  overBudgetLine,
+  retriesDue,
+  retryable,
+  retryLines,
+  retryOffers,
+  retryRefusal,
+  tryNote,
+} from './retry/index.ts';
 export {
   BY_CAP,
   checkTaskId,
@@ -161,6 +171,7 @@ export {
   roundDueNote,
   roundFiled,
   roundLines,
+  roundOffers,
   roundsDue,
   spentRoundAsks,
 } from './round/round.ts';
@@ -179,8 +190,8 @@ export {
 export type { AskName, BranchFate, ForgetHow, Forgot, GitWorktree } from './forget/forget.ts';
 export { fromNote, inputRefusal, inputsLine, inputsNote } from './start/inputs.ts';
 export type { InputFile } from './start/inputs.ts';
-export { costLine, decision, runCostLines } from './decide/decide.ts';
-export type { Decision, Shipped } from './decide/decide.ts';
+export { choicesOf, costLine, decision, runCostLines } from './decide/decide.ts';
+export type { DecideCommand, Decision, Offer, Shipped } from './decide/decide.ts';
 export { answerIn, deniedWords, harnessWaitLine, listing, onYouWords, waitingWords } from './list/list.ts';
 export type { Listing } from './list/list.ts';
 export { feedPhase, feedWords } from './feed/feed.ts';

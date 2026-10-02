@@ -35,16 +35,24 @@ import { resultTips } from '../branches/branches.store.ts';
  * step filed earlier in this very pass is read as being in it. One waiting to be filed counts only if the pass would in fact file it: a
  * send-back of the work un-holds its gate, and an ending that will not be filed must not hold another run's for ever. The cap on runs in
  * flight is read once for every claim (`runSlots`): a run it holds files nothing, so its ending claims nothing (`mainClaim`).
+ *
+ * @param runs The runs whose claims are read: a pass's own listing, the very runs it advances, so a step it filed is read on the run it
+ *   filed it on; the store's, listed only past the run's own asks, when none is given.
  */
-export async function checkoutHold(e: Engine, run: Run, steps: readonly Workflow[]): Promise<CheckoutHold | undefined> {
+export async function checkoutHold(
+  e: Engine,
+  run: Run,
+  steps: readonly Workflow[],
+  runs?: readonly Run[],
+): Promise<CheckoutHold | undefined> {
   const ending = steps.find((s) => s.workspace === 'main');
   if (!ending || run.cancelledAt || endingAsked(run, ending, runStore.asks.read(run.id).asks) === undefined) return undefined;
-  const runs = runStore.runs.list();
-  const slots = await runSlots(e, runs);
+  const listed = runs ?? runStore.runs.list();
+  const slots = await runSlots(e, listed);
   const mine = await mainClaim(e, run, slots.get(run.id));
   if (!mine || mine.holds) return undefined;
   const claims: MainClaim[] = [mine];
-  for (const other of runs) {
+  for (const other of listed) {
     if (other.id === run.id || !isGitRun(other) || path.resolve(other.repo) !== mine.repo) continue;
     const claim = await mainClaim(e, other, slots.get(other.id));
     if (claim) claims.push(claim);

@@ -33,6 +33,8 @@ holds what every change needs.
   report, not a fix.
 - Turbo does not see `workflows/`: after touching a workflow folder, run `npx turbo run test --force --continue`. The same goes for a
   change only to a doc: some tests read docs.
+- A run's check leaves what its tests cost in `WF_ARTIFACTS`, a `test-costs-<package>-<stamp>.json` per package and try; `node
+  tools/test-costs/report.ts <dir>...` ranks them. A package's peak is its largest process, not the sum of the files running at once.
 
 ## How to test
 
@@ -166,4 +168,6 @@ What the `create-an-agent` skill, being generic, does not say here:
   the place skill `place/git` (`packages/agent-orchestrator/place/git`, run through `runPlaceVerb`), the skills the api lists as shipped
   (`SHIPPED_SKILLS`, the checkout's `workflows/skills/`, none today), and Nemia's own agent once the Nemia slices build it. A person's
   factories get no workflow or agent from the package.
+- `tools/test-costs/` — the repository's test-cost recorder, on every package's `test` script: a probe in each test file's process, a
+  reporter beside spec, and `report.ts`; held by `agent-orchestrator/test/test-costs.test.ts` and `suite.test.ts`.
 - `.codex/rules/git-commit.rules` — lets a Codex step commit its own work in a worktree.

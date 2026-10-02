@@ -1181,7 +1181,7 @@ test("`wf start` is told which codex files still name their sandbox as `permissi
   );
   const root = folder({
     'team/review.md': '---\nharness: codex\npermissionMode: read-only\n---\nReview.\n',
-    'team/check.md': '---\nafter: review\nagent: checker\npermissionMode: workspace-write\n---\nCheck.\n',
+    'team/check.md': '---\nafter: review\nagent: checker\npermissionMode: read-only\n---\nCheck.\n',
     'team/implement.md': '---\nafter: check\npermissionMode: dontAsk\n---\nImplement.\n',
     'agents/checker.md': '---\nharness: codex\npermissionMode: read-only\n---\nYou check.\n',
   });
@@ -1190,7 +1190,7 @@ test("`wf start` is told which codex files still name their sandbox as `permissi
   assert.deepEqual(
     formerKeyLines(dir),
     [
-      codexModeLine(path.join(dir, 'check.md'), 'workspace-write'),
+      codexModeLine(path.join(dir, 'check.md'), 'read-only'),
       codexModeLine(path.join(dir, 'review.md'), 'read-only'),
       codexModeLine(path.join(root, 'agents', 'checker.md'), 'read-only'),
     ],

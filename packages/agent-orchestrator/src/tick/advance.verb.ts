@@ -295,11 +295,15 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
  *
  * A run that waited on runs cuts its roots, and every worktree and diff after, from its base branch as it stands on the pass that files
  * them, with their work on it, and hands each root what they concluded (`parentCloseouts`); read on that pass, and never again.
+ *
+ * @param runs The pass's own listing of the store, which `run` is one of: the runs whose claims on the repository's checkout are read
+ *   (`checkoutHold`). Left out, the store is listed afresh where the run's ending asks for the checkout.
  */
 export async function advanceRun(
   e: Engine,
   run: Run,
   slot?: RunSlot,
+  runs?: readonly Run[],
 ): Promise<{ advanced: Advanced; blockers: string[]; rest?: { tipped: string[] } }> {
   const { reads, askNotes } = await readPass(e, run);
   const { steps, phaseOf, signedOff, asked, verdictOf, sessionBlocked, spendOf, asks, roundAsks } = reads;
@@ -307,7 +311,7 @@ export async function advanceRun(
   if (run.cancelledAt) await stopCancelled(e, run, reads);
   const handed = handOffAll(run, reads);
   const landing = landEnding(run, steps, phaseOf, signedOff, asked, spendOf, verdictOf);
-  const checkout = await checkoutHold(e, run, steps);
+  const checkout = await checkoutHold(e, run, steps, runs);
   const liftNotes = await liftHold(e, run);
   const assessed = assess(steps, run, phaseOf, signedOff, asked, verdictOf, asks, roundAsks, sessionBlocked, spendOf, [], checkout);
   const closer = closerOf(e, reads.views);

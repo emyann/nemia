@@ -6,7 +6,7 @@
  * (`StoreRoot`, store.ts).
  */
 import { Context, Effect, Layer, type ManagedRuntime } from 'effect';
-import type { Factory } from 'agent-orchestrator';
+import { freshStatsMemo, type Factory, type StatsMemo } from 'agent-orchestrator';
 import { McpAsker } from './capabilities/capabilities.ts';
 import type { LastSaid } from './detail/detail.ts';
 import { placeFor } from './factories/place.ts';
@@ -26,15 +26,22 @@ export class ApiConfig extends Context.Service<ApiConfig, { readonly env: NodeJS
 
 /**
  * What an app's reads keep between requests, each read through its engine: the list's memo of runs at rest (`resting`, runs/resting.ts),
- * the feed's filing times (`filings`, `filedTimes`), and where each blocked session's conversation was last read (`said`). One for an app,
+ * the stats' memo of each run's facts (`stats`, the package's `StatsMemo`), the feed's filing times (`filings`, `filedTimes`), and where
+ * each blocked session's conversation was last read (`said`). One for an app,
  * built with its runtime (`live`), so an app over another engine starts with none. A cache: nothing is decided by it.
  */
 export class ReadMemo extends Context.Service<
   ReadMemo,
-  { readonly resting: RestingMemo<Omit<RunSummary, 'startedAt'>>; readonly filings: Filings; readonly said: LastSaid }
+  {
+    readonly resting: RestingMemo<Omit<RunSummary, 'startedAt'>>;
+    readonly stats: StatsMemo;
+    readonly filings: Filings;
+    readonly said: LastSaid;
+  }
 >()('api/ReadMemo') {
   static readonly live: Layer.Layer<ReadMemo> = Layer.sync(ReadMemo)(() => ({
     resting: restingMemo(),
+    stats: freshStatsMemo(),
     filings: { filed: new Map(), cursor: 0 },
     said: new Map(),
   }));

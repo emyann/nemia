@@ -60,14 +60,15 @@ const folder = (keys: { plan?: string; implement?: string } = {}) => {
   return dir;
 };
 
-/** The engine's store, in memory, as its own tests keep one. */
-const memoryJournal = (): PromiseJournal => {
+/** The engine's store, in memory, as its own tests keep one, noting in `starts` when each attempt began, by its session's name. */
+const memoryJournal = (starts: Map<string, number>): PromiseJournal => {
   const tasks = new Map<string, Parameters<PromiseJournal['append']>[1][]>();
   const feed: Awaited<ReturnType<PromiseJournal['feed']>>['entries'] = [];
   return {
     async append(taskId, event) {
       tasks.set(taskId, [...(tasks.get(taskId) ?? []), event]);
       feed.push({ taskId, event });
+      if (event.kind === 'starting') starts.set(nameFor(taskId, event.attempt), Date.parse(event.at));
     },
     async read(taskId) {
       return [...(tasks.get(taskId) ?? [])];
@@ -86,15 +87,17 @@ const BLOCKED = { outcome: 'blocked', summary: 'two flags could be meant', artif
 
 /**
  * The runtime, with a harness the test signs by hand: every session it is asked to start works until `sign` ends attempt `n` of a task with
- * a closeout, and with what it cost, as `claude -p` prints it; each has its own native id (`native-<n>`), so a turn that continues one says
- * which. A session ends in a harness's own words (`done`, `stopped`), as a runner written in Promises may still report them: the runtime
- * reads them as A2A's. A name in `refusing` is a spawn the harness refuses, as it refuses a start that ran nothing: the attempt ends
- * `unstartable`. `pass` is what the daemon does: the engine's tick, then the run's.
+ * a closeout, stamped a millisecond after the journal says the attempt began, and with what it cost, as `claude -p` prints it; each has
+ * its own native id (`native-<n>`), so a turn that continues one says which. A session ends in a harness's own words (`done`,
+ * `stopped`), as a runner written in Promises may still report them: the runtime reads them as A2A's. A name in `refusing` is a spawn the
+ * harness refuses, as it refuses a start that ran nothing: the attempt ends `unstartable`. `pass` is what the daemon does: the engine's
+ * tick, then the run's.
  */
 const engine = () => {
   const sessions = new Map<string, PromiseSighting>();
   const spawned: SpawnRequest[] = [];
   const refusing = new Set<string>();
+  const starts = new Map<string, number>();
   const runner: PromiseRunner = {
     async spawn(r) {
       if (refusing.has(r.name)) throw Object.assign(new Error(`${r.name}: refused`), { refused: true });
@@ -114,7 +117,7 @@ const engine = () => {
   const e = promiseEngine(
     EngineService.layer({
       root: fs.mkdtempSync(path.join(ROOT, 'engine-')),
-      journal: memoryJournal(),
+      journal: memoryJournal(starts),
       harnesses: { claude: runner, codex: runner, check: runner },
       defaultHarness: 'claude',
     }),
@@ -126,7 +129,7 @@ const engine = () => {
       ...sessions.get(name)!,
       state: 'done',
       busy: false,
-      closeout: { payload: closeout, at: Date.now() + 60_000 },
+      closeout: { payload: closeout, at: starts.get(name)! + 1 },
       ...(usage ? { usage } : {}),
     });
   };

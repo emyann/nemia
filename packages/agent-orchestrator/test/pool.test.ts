@@ -12,7 +12,7 @@
  * An admitted task starts on the runtime's next pass, so a freed slot is taken one pass after it is admitted into: each case ticks
  * once to admit and once to start.
  */
-import { test } from 'node:test';
+import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -113,6 +113,22 @@ const file = (id: string, harness: string) =>
         : id,
   });
 
+/**
+ * Files `tasks` in their order, a millisecond apart on a seeded clock: admission takes the earlier filing first (`toAdmit`), and the
+ * runtime stamps a filing with the clock, which a step back between two filings would turn round.
+ */
+const fileInOrder = async (t: TestContext, tasks: ReadonlyArray<readonly [string, string]>) => {
+  t.mock.timers.enable({ apis: ['Date'], now: Date.now() });
+  try {
+    for (const [id, harness] of tasks) {
+      await file(id, harness);
+      t.mock.timers.tick(1);
+    }
+  } finally {
+    t.mock.timers.reset();
+  }
+};
+
 const attempts = async (id: string) => (await e.view(id)).state.attempts.length;
 
 /** Until every task is `phase` — a detached worker publishes a moment after the pass spawns it. */
@@ -137,24 +153,25 @@ const drain = async () => {
   }
 };
 
-test("REFUSED at shipped defaults: a claude-detached session counts against claude's ceiling, the third claude task waits, and codex keeps its own", async () => {
+test("REFUSED at shipped defaults: a claude-detached session counts against claude's ceiling, the third claude task waits, and codex keeps its own", async (t) => {
   try {
-    await file('a1', 'claude-detached');
-    await file('a2', 'claude');
+    await fileInOrder(t, [
+      ['a1', 'claude-detached'],
+      ['a2', 'claude'],
+    ]);
     await tick(e);
     assert.equal((await attempts('a1')) + (await attempts('a2')), 0, 'admitted on this pass, started on the next');
     assert.deepEqual([(await e.view('a1')).admission, (await e.view('a2')).admission], ['admitted', 'admitted']);
     await tick(e);
     await until(['a1', 'a2'], 'running (working)');
 
-    for (const [id, harness] of [
+    await fileInOrder(t, [
       ['b1', 'claude'],
       ['b2', 'claude-detached'],
       ['c1', 'codex'],
       ['c2', 'codex'],
       ['c3', 'codex'],
-    ])
-      await file(id, harness);
+    ]);
     await tick(e);
     await tick(e);
     assert.equal(await attempts('b1'), 0, 'a claude task waits: one claude and one claude-detached session fill the pool');
@@ -182,21 +199,22 @@ test("REFUSED at shipped defaults: a claude-detached session counts against clau
   }
 });
 
-test('REFUSED at shipped defaults: a check keeps its own pool beside a full Claude Code one, and a third check waits', async () => {
+test('REFUSED at shipped defaults: a check keeps its own pool beside a full Claude Code one, and a third check waits', async (t) => {
   try {
-    await file('p1', 'claude');
-    await file('p2', 'claude-detached');
+    await fileInOrder(t, [
+      ['p1', 'claude'],
+      ['p2', 'claude-detached'],
+    ]);
     await tick(e);
     await tick(e);
     await until(['p1', 'p2'], 'running (working)');
 
-    for (const [id, harness] of [
+    await fileInOrder(t, [
       ['q1', 'claude-detached'],
       ['d1', 'check'],
       ['d2', 'check'],
       ['d3', 'check'],
-    ])
-      await file(id, harness);
+    ]);
     await tick(e);
     await tick(e);
     assert.equal(await attempts('q1'), 0, 'the Claude Code pool is full');
@@ -207,9 +225,12 @@ test('REFUSED at shipped defaults: a check keeps its own pool beside a full Clau
   }
 });
 
-test("one pass — the runtime's tick, admission and admit — asks `claude agents` nothing, with claude jobs at work and waiting", async () => {
+test("one pass — the runtime's tick, admission and admit — asks `claude agents` nothing, with claude jobs at work and waiting", async (t) => {
   try {
-    for (const id of ['s1', 's2', 's3', 's4']) await file(id, 'claude');
+    await fileInOrder(
+      t,
+      ['s1', 's2', 's3', 's4'].map((id) => [id, 'claude'] as const),
+    );
     const admitting = fake.agentsCalls();
     const first = (await tick(e)).cost;
     assert.equal(

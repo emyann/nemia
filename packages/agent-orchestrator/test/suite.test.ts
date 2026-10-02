@@ -15,6 +15,10 @@
  *
  * Each package's `test` script bounds how many test files `node --test` runs at once, the same `--test-concurrency=<n>` in each:
  * unbounded, a suite runs about as many processes as the machine has cores in every package, and several suites at once swap.
+ *
+ * Each package's `test` script records what its tests cost when a run's check gives it `WF_ARTIFACTS` (`tools/test-costs/`): it loads
+ * the probe into every test file's process, keeps the spec reporter on stdout, where a check's log and its `wf <word>: ` lines are read,
+ * and adds the cost reporter on stderr.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -157,6 +161,49 @@ test("every package's test script bounds how many test files run at once, the sa
   );
   assert.ok(scripts.filter((s) => s.script).length >= 4, `read ${scripts.length} packages' test scripts, fewer than the workspace has`);
   assert.deepEqual(unbounded(scripts), []);
+});
+
+/** The flags a package's `test` script records its costs with, each one word, in the order a missing one is named. */
+const RECORDING = [
+  '--import=../../tools/test-costs/probe.ts',
+  '--test-reporter=spec --test-reporter-destination=stdout',
+  '--test-reporter=../../tools/test-costs/reporter.ts --test-reporter-destination=stderr',
+];
+
+/** What a package's `test` script lacks to record its tests' costs, each with the flags to add; none when it records them. */
+const unrecorded = (name: string, script: string): string[] =>
+  RECORDING.filter((flags) => !` ${script.trim().replace(/\s+/g, ' ')} `.includes(` ${flags} `)).map(
+    (flags) => `${name}'s test script (${script}) does not record what its tests cost: add ${flags} to it`,
+  );
+
+test('REFUSED: a test script without the probe, the spec reporter on stdout, or the cost reporter', () => {
+  const [probe, spec, costs] = RECORDING;
+  const whole = `node ${probe} --test ${spec} ${costs} 'test/*.test.ts'`;
+  assert.deepEqual(unrecorded('x', whole), []);
+  assert.deepEqual(unrecorded('x', whole.replace(`${probe} `, '')), [
+    `x's test script (${whole.replace(`${probe} `, '')}) does not record what its tests cost: add ${probe} to it`,
+  ]);
+  assert.deepEqual(
+    unrecorded('x', whole.replace(`${spec} `, '')).map((line) => line.split(': add ')[1]),
+    [`${spec} to it`],
+    'the cost reporter alone takes the spec lines off stdout',
+  );
+  assert.deepEqual(
+    unrecorded('x', whole.replace(`${costs} `, '')).map((line) => line.split(': add ')[1]),
+    [`${costs} to it`],
+  );
+  assert.equal(unrecorded('x', whole.replace('destination=stderr', 'destination=stdout')).length, 1, 'the cost reporter writes to stderr');
+});
+
+test("every package's test script records what its tests cost", () => {
+  const repo = path.join(import.meta.dirname, '..', '..', '..');
+  const packages = ['packages', 'apps'].flatMap((top) => fs.readdirSync(path.join(repo, top)).map((name) => path.join(repo, top, name)));
+  assert.ok(packages.length >= 4, `read ${packages.length} packages`);
+  const refused = packages.flatMap((dir) => {
+    const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')) as { name: string; scripts: Record<string, string> };
+    return unrecorded(pkg.name, pkg.scripts.test ?? '');
+  });
+  assert.deepEqual(refused, []);
 });
 
 /** Every file the tsconfigs named by a `typecheck` script (`tsc --noEmit`, `tsc --noEmit -p <dir or file>`, joined by `&&`) check. */

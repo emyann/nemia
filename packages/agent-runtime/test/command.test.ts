@@ -134,7 +134,7 @@ test('a run spawned again under its name starts with empty streams, and a cut in
   assert.equal(await Effect.runPromise(ops.output!('ae/never/1', 'stdout')), undefined, 'a run that never was has no stream');
 });
 
-test('the command harness refuses, at file(), a task without a command and one carrying an argument of an agent', async () => {
+test('the command harness refuses, at file(), a task without a command, one carrying an argument of an agent, a statement or a session to resume', async () => {
   const { engine, cwd } = board();
   const refused = async (config: object, words: RegExp) => {
     const e = await engine.file({ brief: 'b', cwd, harness: 'command', config }).then(
@@ -151,6 +151,10 @@ test('the command harness refuses, at file(), a task without a command and one c
     .file({ brief: 'b', cwd, harness: 'command', config: { command: ['true'] }, closeoutSchema: { type: 'object' } })
     .catch((err: Error) => err.message);
   assert.match(String(schema), /writes no closing statement/);
+  const resumed = await engine
+    .file({ brief: 'b', cwd, harness: 'command', config: { command: ['true'] }, resumeFrom: 'ae/x/1' })
+    .catch((err: Error) => err.message);
+  assert.match(String(resumed), /`resumeFrom: ae\/x\/1` continues a session, and a command keeps none/);
 });
 
 test('command, env and niceness are refused on a harness that does not run a command, naming the one that does', async () => {

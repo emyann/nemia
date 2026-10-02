@@ -7,7 +7,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit && tsc --noEmit -p test/e2e",
-    "test": "node --test test/*.test.ts",
+    "test": "node --test --test-concurrency=1 test/*.test.ts",
     "e2e": "node --test test/e2e/*.test.ts && node test/e2e/run.ts"
   },
   "dependencies": {

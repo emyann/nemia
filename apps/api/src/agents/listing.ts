@@ -9,6 +9,7 @@ import {
   FORMER_KEYS,
   formerSandbox,
   frontmatterKey,
+  harnessPromptNamed,
   isCardFile,
   splitFrontmatter,
   type RoleKey,
@@ -18,7 +19,7 @@ import type { AgentListing, AgentUser } from './agents.ts';
 import type { WorkflowSource } from '../workflows/workflows.ts';
 
 /**
- * The keys a step has too. The agent's own (`AGENT_OWN_KEYS`: its role, description, skills and system prompt) are no step's, so the form
+ * The keys a step has too. The agent's own (`AGENT_OWN_KEYS`: its role, description, skills and harness prompt) are no step's, so the form
  * shows them apart (`RoleKey`).
  */
 const ROLE_KEYS = AGENT_KEYS.filter((key): key is RoleKey => !(AGENT_OWN_KEYS as readonly string[]).includes(key));
@@ -54,7 +55,7 @@ export const empty = (
   cardError: null,
   skills: null,
   given: [],
-  systemPrompt: null,
+  harnessPrompt: null,
   source: '',
   version,
   usedBy,
@@ -64,7 +65,8 @@ export const empty = (
 
 /**
  * The listing of a file that does not read as an agent (`agent`, the package's refusal, or nothing where the load found none): `base` with
- * the lines `source` writes, a former key read as the key it became, its instructions as written, and the schema its `output:` names
+ * the lines `source` writes, a former key read as the key it became (a former `systemPrompt:` in the word it is now, `harnessPromptNamed`),
+ * its instructions as written, and the schema its `output:` names
  * (`sidecarOf`) — so the form shows what to fix, and the refusal says why.
  */
 export function unreadListing(
@@ -102,8 +104,14 @@ export function unreadListing(
     body,
     schema: sidecarOf(keys.output),
     skills: skillsLineOf(source),
-    systemPrompt: frontmatterKey(source, 'systemPrompt') ?? null,
+    harnessPrompt: harnessPromptOf(source),
     source,
     error: agent ? agent.message : `${AGENTS_FOLDER}/${base.name}.md does not read.`,
   };
+}
+
+/** A file's harness prompt as written, or its former `systemPrompt:` line in the word it is now; null for neither. */
+function harnessPromptOf(source: string): string | null {
+  const former = frontmatterKey(source, 'systemPrompt');
+  return frontmatterKey(source, 'harnessPrompt') ?? (former === undefined ? null : harnessPromptNamed(former));
 }

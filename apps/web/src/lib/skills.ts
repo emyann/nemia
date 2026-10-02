@@ -16,7 +16,7 @@ export const SOURCE_BADGES: Readonly<Record<SkillSource, string>> = {
 
 /**
  * What a turn carries of a skill, in words: named, its listing — its name and description, which the session reads to decide to load it —
- * and its body only in a turn that loads it; preloaded, the whole of it every turn, cached as the system prompt is.
+ * and its body only in a turn that loads it; preloaded, the whole of it every turn, cached as Claude Code's own prompt is.
  */
 export function costWords(cost: SkillCost): string {
   if (cost.preload) return `loaded every turn — about ${cost.perTurn.toLocaleString('en')} tokens (cached)`;
@@ -115,7 +115,7 @@ export function skillEdited(form: SkillForm, was: SkillForm): boolean {
 
 /**
  * What the page says of the switch beside what a turn carries now (`costWords`): what the other position would carry — on, the body too,
- * about four characters a token, loaded every turn and cached as the system prompt is; off, only its name and what it does.
+ * about four characters a token, loaded every turn and cached as Claude Code's own prompt is; off, only its name and what it does.
  */
 export function preloadWords(cost: SkillCost): string {
   if (cost.preload) return 'Off, a session is told only its name and what it does, and loads it when it needs it.';

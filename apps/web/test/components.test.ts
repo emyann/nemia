@@ -4210,7 +4210,7 @@ test("an agent's form shows its card read-only, generated from its skills: an en
     body: 'Write.\n',
     schema: null,
     skills: 'write-a-note, file-it',
-    systemPrompt: null,
+    harnessPrompt: null,
     given: [],
     source: '',
     version: 'v1',
@@ -4326,7 +4326,7 @@ const composing = {
   body: 'Write.\n',
   schema: null,
   skills: 'write-a-note, ask-first, gone',
-  systemPrompt: null,
+  harnessPrompt: null,
   source: '',
   version: 'v1',
   usedBy: [],
@@ -4392,24 +4392,35 @@ test('an agent whose tools leave out Skill is told so before a save is refused, 
   );
 });
 
-test('the system prompt is a choice of what the agent does, the default drawn chosen when unset, and Only my instructions kept behind For experts', async () => {
+test("Claude Code's prompt is a choice of what the agent does, keep drawn chosen when unset, and Only my instructions kept behind For experts", async () => {
   const unset = await agentFormWith({ ...composing, skills: null, given: [] });
   assert.match(
     unset,
-    /data-system-prompt="default"[^>]*data-selected="true"|data-selected="true"[^>]*data-system-prompt="default"/,
-    'unset reads as the default',
+    /data-harness-prompt="keep"[^>]*data-selected="true"|data-selected="true"[^>]*data-harness-prompt="keep"/,
+    'unset reads as keep',
+  );
+  assert.match(
+    unset,
+    /data-slot="label">Claude Code&#x27;s prompt<\/span>/,
+    "the choice is labelled Claude Code's prompt, never System prompt",
+  );
+  assert.doesNotMatch(unset, /System prompt/);
+  assert.match(
+    unset,
+    /harnessPrompt:<\/code> — how much of Claude Code&#x27;s own prompt its sessions keep, before the instructions\s+below\./,
+    'the help line names the key and what it shapes',
   );
   assert.match(unset, /Works on code or files/);
   assert.match(unset, /Doesn&#x27;t write code/);
   assert.match(unset, /For experts/);
   assert.doesNotMatch(unset, /Only my instructions/, 'the expert choice is not drawn while its fold is shut');
-  const own = await agentFormWith({ ...composing, systemPrompt: 'own' });
+  const replace = await agentFormWith({ ...composing, harnessPrompt: 'replace' });
   assert.match(
-    own,
-    /data-system-prompt="own"[^>]*data-selected="true"|data-selected="true"[^>]*data-system-prompt="own"/,
-    'an agent that says own opens the fold, chosen',
+    replace,
+    /data-harness-prompt="replace"[^>]*data-selected="true"|data-selected="true"[^>]*data-harness-prompt="replace"/,
+    'an agent that says replace opens the fold, chosen',
   );
-  assert.match(await agentFormWith({ ...composing, systemPrompt: 'terse' }), /systemPrompt: terse<\/code>, which is none of these/);
+  assert.match(await agentFormWith({ ...composing, harnessPrompt: 'terse' }), /harnessPrompt: terse<\/code>, which is none of these/);
 });
 
 test("the repository's agent lists the skills it gives read-only: no Remove, no Add, and no list read for it", async () => {
@@ -4761,7 +4772,7 @@ const character = {
     output: 'iris.schema.json',
   },
   skills: 'grilling',
-  systemPrompt: 'no-coding',
+  harnessPrompt: 'no-coding',
   card: [{ id: 'grilling', name: 'Grilling', description: 'Asks until the plan holds.', tags: ['interview'] }],
   usedBy: [{ from: 'repo', workflow: 'intake', step: 'ask' }],
 };

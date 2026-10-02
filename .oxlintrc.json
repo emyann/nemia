@@ -780,7 +780,7 @@
     {
       "files": ["packages/agent-orchestrator/src/agents/agents.ts"],
       "rules": {
-        "sonarjs/cognitive-complexity": ["error", 22]
+        "sonarjs/cognitive-complexity": ["error", 17]
       }
     },
     {

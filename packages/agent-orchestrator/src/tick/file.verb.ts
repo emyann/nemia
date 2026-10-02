@@ -66,17 +66,17 @@ export const localFields = <T extends object>(step: Workflow, fields: () => T): 
   isRemoteHarness(step.harness) ? {} : fields();
 
 /**
- * A step as the tick tells it and files it: with its agent's instructions in the system prompt and its skills in a plugin, where `wf start`
- * rendered them (`rendersAgent`, `renderedFlags`); a step it does not render — a codex step, a record that gives no agent — is filed with
- * no flags and told everything in its brief. Where the rendered folder is not there as its flags name it (`unrendered`, `renderedIn`) —
- * gone, or rendered under the plugin's former name — a flag naming a file that is not there would end the session at its start, so its
- * brief tells it its skills whole, read again from where a start of this run's folder finds them (`skillsAgain`). Bridged to claude.ai,
- * where anyone signed in can drive it, only when the step says `remote: true`, never by default: as Claude Code's own flag, first among its
- * others (`claude.remoteControl`). A codex step of a repository run is filed with its repository's real path as the directory Codex's trust
- * extends from (`codex.trustFrom`), so a `--repo` given through a symlink names what the operator's Codex config lists; a folder run has no
- * repository, and a step on another harness takes no Codex arguments, so either is filed with none, as is one whose repository is no longer
- * there to resolve (`realRepoOf`). Both are the harness's own arguments (`own`), which the first filing, a try and a round each spread into
- * its `config`.
+ * A step as the tick tells it and files it: with its agent's instructions in Claude Code's prompt and its skills in a plugin, where
+ * `wf start` rendered them (`rendersAgent`, `renderedFlags`); a step it does not render — a codex step, a record that gives no agent — is
+ * filed with no flags and told everything in its brief. Where the rendered folder is not there as its flags name it (`unrendered`,
+ * `renderedIn`) — gone, or rendered under the plugin's former name — a flag naming a file that is not there would end the session at its
+ * start, so its brief tells it its skills whole, read again from where a start of this run's folder finds them (`skillsAgain`). Bridged to
+ * claude.ai, where anyone signed in can drive it, only when the step says `remote: true`, never by default: as Claude Code's own flag,
+ * first among its others (`claude.remoteControl`). A codex step of a repository run is filed with its repository's real path as the
+ * directory Codex's trust extends from (`codex.trustFrom`), so a `--repo` given through a symlink names what the operator's Codex config
+ * lists; a folder run has no repository, and a step on another harness takes no Codex arguments, so either is filed with none, as is one
+ * whose repository is no longer there to resolve (`realRepoOf`). Both are the harness's own arguments (`own`), which the first filing, a
+ * try and a round each spread into its `config`.
  */
 export function toldOf(run: Run, step: Workflow): { step: Workflow; own: { claude?: ClaudeFlags; codex?: CodexArgs } } {
   const dir = agentFilesDir(run, step.name);

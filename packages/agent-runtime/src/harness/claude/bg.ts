@@ -26,7 +26,7 @@ import { RunnerError } from '../error.ts';
 import { registryOf, type RegistryRow } from './registry.ts';
 import { type ParentCall, parentFileOf, parentOf, recordParent, whoseCall } from './parent.ts';
 import { claudeQuota } from './quota.ts';
-import type { RunnerOps, SpawnRequest } from '../seam.ts';
+import type { ExpectedSession, RunnerOps, SpawnRequest } from '../seam.ts';
 
 /**
  * How long a `working` session must write nothing before this harness reports it quiet — stopped, rather than
@@ -124,9 +124,16 @@ export type ClaudeOptions = {
 
 /**
  * What `claude agents` last listed of each of our sessions, by session id, rebuilt by every `observe`: its state (`listed`), its
- * process (`pids`) and its start (`starts`).
+ * process (`pids`) and its start (`starts`); and, for a session the last `observeFor` was told began earlier — a long-lived
+ * attempt, across the processes Claude Code respawned it in — when to count its usage from (`countsFrom`), rebuilt by every
+ * `observeFor` and kept by an `observe` for each session it still lists.
  */
-type Registry = { listed: Map<string, SessionState>; pids: Map<string, number>; starts: Map<string, number> };
+type Registry = {
+  listed: Map<string, SessionState>;
+  pids: Map<string, number>;
+  starts: Map<string, number>;
+  countsFrom: Map<string, number>;
+};
 
 /**
  * What a finished attempt said and consumed, as read from its transcript — kept for THAT attempt,
@@ -147,8 +154,12 @@ type Registry = { listed: Map<string, SessionState>; pids: Map<string, number>; 
  */
 type Kept<T> = { read: { value: T } | { refused: unknown }; readAt: number };
 
-/** An attempt's key in what is kept (`Kept`): the row's name, its session, and the start `claude agents` gave it. */
-const attemptOf = (name: string, s: Sighting, startedAt: number | undefined) => JSON.stringify([name, s.sessionId, startedAt ?? null]);
+/**
+ * An attempt's key in what is kept (`Kept`): the row's name, its session, the start `claude agents` gave it, and when its usage is
+ * counted from where that is another time (`countsFrom`), so a read counted from one is never handed to a look counting from the other.
+ */
+const attemptOf = (name: string, s: Sighting, startedAt: number | undefined, countFrom = startedAt) =>
+  JSON.stringify([name, s.sessionId, startedAt ?? null, ...(countFrom !== startedAt ? [countFrom] : [])]);
 
 /**
  * A runner's kept reads (`Kept`), over its clock and its two readers: `statementOf` and `usageOf` read an attempt's closeout
@@ -212,11 +223,15 @@ type Reading = {
   kept: ReturnType<typeof keptReads>;
 };
 
-/** One sighting in one pass: its row's name and start, its attempt, its transcript's mtime asked once at most, and its quiet so far. */
+/**
+ * One sighting in one pass: its row's name and start, when its usage is counted from, its attempt, its transcript's mtime asked once
+ * at most, and its quiet so far.
+ */
 type Look = {
   name: string;
   sighting: Sighting;
   startedAt: number | undefined;
+  countFrom: number | undefined;
   attempt: string;
   writtenAt: () => Promise<number | undefined>;
   quietFor: () => Promise<number | undefined>;
@@ -311,7 +326,8 @@ const transcriptUsageSince = async (sessionId: string, since: number) => {
  *     on the record — quiet, or idle after its closeout — still runs on Claude Code, and `release` must stop it;
  *   - its process (`pids`), how `say` finds the session's registration and so its inbox; a session listed with no
  *     process — one that has exited — has none;
- *   - its start (`starts`), what `release` reads usage from.
+ *   - its start (`starts`), what `release` reads usage from — or, for a long-lived attempt `observeFor` was told the start of, that
+ *     start (`countsFrom`), so its spend is counted across every process Claude Code respawned it in.
  * - What a finished attempt said and consumed (`Kept`), which only saves reads.
  *
  * No start in the registry, no usage: without one, a resumed session's inherited conversation cannot be told from
@@ -329,10 +345,12 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
     transcriptTime: options.transcriptTime ?? sdkTranscriptTime,
     kept: keptReads(now, options.closeoutFrom ?? transcriptCloseout, usageFrom),
   };
-  const registry: Registry = { listed: new Map(), pids: new Map(), starts: new Map() };
+  const registry: Registry = { listed: new Map(), pids: new Map(), starts: new Map(), countsFrom: new Map() };
   return {
     spawn: spawnUnder(root, options.parentCallFrom ?? transcriptLastCall),
-    observe: observeInto(reading, registry),
+    observe: observeInto(reading, registry, undefined),
+    observeFor: (expected) =>
+      observeInto(reading, registry, countsFromOf(expected)).pipe(Effect.map((seen) => ({ seen, unread: new Set<string>() }))),
     find: findIn(sessionsDir),
     stop: stopSession,
     release: releaseFrom(registry, usageFrom),
@@ -446,45 +464,56 @@ const sessionFlags = (r: SpawnRequest): string[] => {
 };
 
 /**
- * Every session of ours that `claude agents --all --json` lists, by name, in two passes, `registry` rebuilt by the first.
+ * When each expected session's usage is counted from, by name: the start the journal gave a long-lived attempt (`since`), a number
+ * that is one. A name given none is not in it, and is counted from its own start.
+ */
+const countsFromOf = (expected: readonly ExpectedSession[]): Map<string, number> =>
+  new Map(expected.flatMap((e) => (typeof e.since === 'number' && Number.isFinite(e.since) ? [[e.name, e.since] as const] : [])));
+
+/**
+ * Every session of ours that `claude agents --all --json` lists, by name, in two passes, `registry` rebuilt by the first. Told when
+ * to count sessions' usage from (`observeFor`), by name, each of those is counted from then; told nothing (`observe`), each from its
+ * own start, as its row gives it, unless the last `observeFor` said otherwise of it.
  *
  * 1. The registry's rows (`listedIn`).
  * 2. This harness's own definition of finished, applied to what is still `working` (`reportOf`). What was kept for an
  *    attempt no longer listed goes with it, so a released session is not read again.
  */
-const observeInto = (x: Reading, registry: Registry): RunnerOps['observe'] =>
+const observeInto = (x: Reading, registry: Registry, countsFrom: ReadonlyMap<string, number> | undefined): RunnerOps['observe'] =>
   sh('claude', ['agents', '--all', '--json'], { verb: 'observe' }).pipe(
     Effect.flatMap((out) => {
       const read = registryOf(out);
       return 'wrong' in read
         ? Effect.fail(new RunnerError({ verb: 'observe', message: read.wrong }))
-        : Effect.succeed(listedIn(read.rows, registry));
+        : Effect.succeed(listedIn(read.rows, registry, countsFrom));
     }),
     Effect.flatMap((m) => {
-      x.kept.prune(new Set([...m].map(([name, { sighting, startedAt }]) => attemptOf(name, sighting, startedAt))));
-      return Effect.forEach([...m], ([name, { sighting, startedAt }]) => reportedOf(x, name, sighting, startedAt), {
+      x.kept.prune(new Set([...m].map(([name, l]) => attemptOf(name, l.sighting, l.startedAt, l.countFrom))));
+      return Effect.forEach([...m], ([name, l]) => reportedOf(x, name, l), {
         concurrency: 'unbounded',
       }).pipe(Effect.map((entries) => new Map(entries)));
     }),
   );
 
 /**
- * Our decoded rows (`registryOf`) as sessions by name, each with its start, and `registry` cleared and rebuilt from them in row
- * order: each session's state (`listed`), its process (`pids`) and its start (`starts`). Called only on a listing that decoded, so
- * a refused one leaves the registry as the last one read.
+ * Our decoded rows (`registryOf`) as sessions by name, each with its start and when its usage is counted from, and `registry`
+ * cleared and rebuilt from them in row order: each session's state (`listed`), its process (`pids`) and its start (`starts`).
+ * `countsFrom`, by name, when given (`observeFor`), rebuilds the registry's too; when not (`observe`), each session still listed
+ * keeps what the last one said. Called only on a listing that decoded, so a refused one leaves the registry as the last one read.
  */
-const listedIn = (rows: RegistryRow[], registry: Registry) => {
-  const m = new Map<string, { sighting: Sighting; startedAt?: number }>();
-  registry.listed.clear();
-  registry.pids.clear();
-  registry.starts.clear();
+const listedIn = (rows: RegistryRow[], registry: Registry, countsFrom: ReadonlyMap<string, number> | undefined) => {
+  const m = new Map<string, { sighting: Sighting; startedAt?: number; countFrom?: number }>();
+  const kept = countsFrom ? new Map<string, number>() : new Map(registry.countsFrom);
+  for (const map of [registry.listed, registry.pids, registry.starts, registry.countsFrom]) map.clear();
   for (const row of rows) {
     const ours = ourRow(row);
     const { sessionId, state } = ours.sighting;
+    const countFrom = countsFrom?.get(row.name) ?? kept.get(sessionId) ?? ours.startedAt;
     registry.listed.set(sessionId, state);
     if (ours.pid !== undefined) registry.pids.set(sessionId, ours.pid);
     if (ours.startedAt !== undefined) registry.starts.set(sessionId, ours.startedAt);
-    m.set(row.name, { sighting: ours.sighting, startedAt: ours.startedAt });
+    if (countFrom !== undefined && countFrom !== ours.startedAt) registry.countsFrom.set(sessionId, countFrom);
+    m.set(row.name, { sighting: ours.sighting, startedAt: ours.startedAt, countFrom });
   }
   return m;
 };
@@ -520,9 +549,9 @@ const ourRow = (row: RegistryRow): { sighting: Sighting; startedAt?: number; pid
  * (`lines.ts`): a statement or usage the transcript holds and the runtime cannot read is no absence, so the whole listing fails and
  * each background session is unread.
  */
-const reportedOf = (x: Reading, name: string, sighting: Sighting, startedAt: number | undefined) =>
+const reportedOf = (x: Reading, name: string, l: { sighting: Sighting; startedAt?: number; countFrom?: number }) =>
   Effect.tryPromise({
-    try: () => reportOf(x, name, sighting, startedAt),
+    try: () => reportOf(x, name, l.sighting, l.startedAt, l.countFrom),
     catch: (cause) =>
       new RunnerError({
         verb: 'observe',
@@ -539,8 +568,8 @@ const reportedOf = (x: Reading, name: string, sighting: Sighting, startedAt: num
  * own start, whichever is later — a session resumed over a transcript cold for an hour has been quiet only since it began —
  * and a session with no transcript is never quiet: the deadline is for sessions nobody reads.
  *
- * A busy session is `busyReportOf`'s. Any other session reports what it said (`toldOf`), and what it consumed since its own
- * start, as measured or not at all. A resumed session carries its parent's statements too: whose a statement is, is this runner's
+ * A busy session is `busyReportOf`'s. Any other session reports what it said (`toldOf`), and what it consumed since `countFrom` —
+ * its own start, or a long-lived attempt's as the journal gave it — as measured or not at all. A resumed session carries its parent's statements too: whose a statement is, is this runner's
  * call by its id where the spawn recorded the parent's last call, and the engine's by its time where it did not, since only the
  * journal knows when the attempt began. One still `working` and quiet for the floor reports `quietMs` too, statement or not,
  * because an inherited statement the runner could not tell is discarded upstream; what quiet means is `decide`'s.
@@ -550,17 +579,18 @@ const reportOf = async (
   name: string,
   sighting: Sighting,
   startedAt: number | undefined,
+  countFrom = startedAt,
 ): Promise<readonly [string, Sighting]> => {
-  const attempt = attemptOf(name, sighting, startedAt);
+  const attempt = attemptOf(name, sighting, startedAt, countFrom);
   let written: Promise<number | undefined> | undefined;
   const writtenAt = () => (written ??= x.transcriptTime(sighting.sessionId));
   const quietFor = async () => {
     const lastWrite = await writtenAt();
     return lastWrite === undefined ? undefined : x.now() - Math.max(lastWrite, startedAt ?? lastWrite);
   };
-  if (sighting.busy) return busyReportOf(x, { name, sighting, startedAt, attempt, writtenAt, quietFor });
+  if (sighting.busy) return busyReportOf(x, { name, sighting, startedAt, countFrom, attempt, writtenAt, quietFor });
   const told = toldOf(x, name, await x.kept.statementOf(attempt, sighting, writtenAt));
-  const used = await x.kept.usageOf(attempt, sighting, startedAt, writtenAt);
+  const used = await x.kept.usageOf(attempt, sighting, countFrom, writtenAt);
   const reported: Sighting = {
     ...sighting,
     ...(told ? { closeout: told } : {}),
@@ -599,7 +629,7 @@ const busyReportOf = async (x: Reading, l: Look): Promise<readonly [string, Sigh
   const said = await x.kept.statementOf(l.attempt, sighting, l.writtenAt, true);
   const told = said?.lastWord ? toldOf(x, name, said) : undefined;
   if (!told || (told.at !== undefined && told.at < startedAt)) return [name, sighting];
-  const used = await x.kept.usageOf(l.attempt, sighting, startedAt, l.writtenAt, true);
+  const used = await x.kept.usageOf(l.attempt, sighting, l.countFrom, l.writtenAt, true);
   return [name, { ...sighting, closeout: told, ...(used ? { usage: used } : {}), quietMs: quiet }];
 };
 
@@ -646,7 +676,7 @@ const stopSession: RunnerOps['stop'] = (sessionId) => sh('claude', ['stop', shor
  */
 const releaseFrom =
   (
-    { listed, pids, starts }: Registry,
+    { listed, pids, starts, countsFrom }: Registry,
     usageFrom: (sessionId: string, since: number) => Promise<Usage | undefined>,
   ): NonNullable<RunnerOps['release']> =>
   (session, task) =>
@@ -658,7 +688,7 @@ const releaseFrom =
           Effect.catchTag('RunnerError', () => Effect.succeed('')),
         );
       }
-      const since = starts.get(session.sessionId);
+      const since = countsFrom.get(session.sessionId) ?? starts.get(session.sessionId);
       const measured =
         alive && since !== undefined ? yield* Effect.promise(() => usageFrom(session.sessionId, since).catch(() => undefined)) : undefined;
       if (!task.worktree) yield* sh('claude', ['rm', short(session.sessionId)], { verb: 'release' });

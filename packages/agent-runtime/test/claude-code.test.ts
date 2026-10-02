@@ -1017,3 +1017,62 @@ test("through the engine, a resumed session that ended with only its parent's st
   assert.equal(attempt?.closeout, undefined);
   assert.equal(attempt?.stated, false);
 });
+
+/** A runner over `rows`, its usage read recording each session and start it is counted from, and the record of those asks. */
+const countingOps = (f: ReturnType<typeof fake>, rows: object[]) => {
+  fs.writeFileSync(path.join(f.dir, 'agents.json'), JSON.stringify(rows));
+  const asked: Array<[string, number]> = [];
+  const ops = claudeCodeOps({
+    ...opsOptions(tmp('root')),
+    usageFrom: async (sessionId: string, since: number) => {
+      asked.push([sessionId, since]);
+      return { turns: asked.length };
+    },
+  });
+  return { ops, asked };
+};
+
+test("a long-lived attempt's usage is counted from the start a pass is told of, by its look and by its release — though a view's look comes between", async () => {
+  const f = fake();
+  try {
+    const startedAt = Date.now() - 60_000;
+    const since = startedAt - 3_600_000;
+    const { ops, asked } = countingOps(f, [bgRow('ae/r/2', 'working', 'idle', startedAt)]);
+
+    const seen = await Effect.runPromise(ops.observeFor!([{ name: 'ae/r/2', harness: 'claude', since }]));
+    assert.deepEqual(asked, [[BG_ID, since]], 'counted from when the attempt began, across the processes it was respawned in');
+    assert.deepEqual(seen.seen.get('ae/r/2')?.usage, { turns: 1 });
+
+    await Effect.runPromise(ops.observe);
+    await Effect.runPromise(ops.release!({ sessionId: BG_ID, state: 'working' }, {}));
+    assert.deepEqual(asked.at(-1), [BG_ID, since], 'the release reads the spend from the start the pass was told');
+    assert.ok(
+      asked.every(([, from]) => from === since),
+      "a view's look between, told nothing, keeps it for a session still listed, and never counts from the row's start",
+    );
+  } finally {
+    f.restore();
+  }
+});
+
+test("a session expected with no start, or with one that is no number, is counted from its row's start — by its look and its release", async () => {
+  const f = fake();
+  try {
+    const startedAt = Date.now() - 60_000;
+    for (const since of [undefined, 'yesterday', Number.NaN]) {
+      const { ops, asked } = countingOps(f, [bgRow('ae/r/2', 'working', 'idle', startedAt)]);
+      await Effect.runPromise(ops.observeFor!([{ name: 'ae/r/2', harness: 'claude', since: since as never }]));
+      await Effect.runPromise(ops.release!({ sessionId: BG_ID, state: 'working' }, {}));
+      assert.deepEqual(
+        asked,
+        [
+          [BG_ID, startedAt],
+          [BG_ID, startedAt],
+        ],
+        `since ${String(since)}`,
+      );
+    }
+  } finally {
+    f.restore();
+  }
+});

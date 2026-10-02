@@ -35,13 +35,13 @@ import { fold } from '../src/core/domain.ts';
 import { parseBrief, taskLine } from '../src/cli/main.ts';
 import { scratch } from './scratch.ts';
 
-/** Sign the session `name` off: done, with a closeout given after its attempt started. */
-const signed = (sessions: Map<string, Sighting>, name: string, summary: string) =>
+/** Sign the session `name` off: done, with a closeout given a moment after its attempt started (`began`, as journalled). */
+const signed = (sessions: Map<string, Sighting>, name: string, summary: string, began: string) =>
   sessions.set(name, {
     ...sessions.get(name)!,
     state: 'completed',
     busy: false,
-    closeout: { payload: { outcome: 'done', summary }, at: Date.now() + 60_000 },
+    closeout: { payload: { outcome: 'done', summary }, at: Date.parse(began) + 1_000 },
   });
 
 test('the Effect door: signed, it waits with its session released; answered after a restart, it resumes; closed, it settles', async () => {
@@ -66,7 +66,7 @@ test('the Effect door: signed, it waits with its session released; answered afte
 
     const id = await run(file({ brief: 'draft the plan', cwd: '/repo', holdOpen: true, config: { model: 'opus', budgetUsd: 1 } }));
     await run(tick());
-    signed(sessions, `ae/${id}/1`, 'a first draft');
+    signed(sessions, `ae/${id}/1`, 'a first draft', (await run(view(id, new Map()))).state.attempts[0].startedAt);
     await run(tick());
     assert.equal(await phase(id), 'input-required');
     assert.deepEqual(released, ['fake-1'], 'the signed session is let go: nothing runs while it waits');
@@ -90,7 +90,7 @@ test('the Effect door: signed, it waits with its session released; answered afte
     assert.deepEqual(spawned[0].config, { model: 'opus', budgetUsd: 1 }, "the first turn under the filing's");
     assert.equal(await phase(id), 'running (working)');
 
-    signed(sessions, `ae/${id}/2`, 'a shorter draft');
+    signed(sessions, `ae/${id}/2`, 'a shorter draft', (await run(view(id, new Map()))).state.attempts[1].startedAt);
     await run(tick());
     assert.equal(await phase(id), 'input-required', 'signed again: it waits again');
     await run(close(id));
@@ -234,7 +234,7 @@ test('the facade: signed, it waits; answered, it resumes; a stop settles it stop
   const b = board();
   const id = await b.engine.file({ brief: 'draft', cwd: '/r', harness: 'fake', holdOpen: true });
   await b.engine.tick();
-  signed(b.sessions, `ae/${id}/1`, 'drafted');
+  signed(b.sessions, `ae/${id}/1`, 'drafted', (await b.engine.view(id)).state.attempts[0].startedAt);
   await b.engine.tick();
   const v = await b.engine.view(id);
   assert.equal(v.phase, 'input-required');
@@ -244,7 +244,7 @@ test('the facade: signed, it waits; answered, it resumes; a stop settles it stop
   assert.deepEqual((await b.engine.view(id)).state.inputs, [said]);
   await b.engine.tick();
   assert.equal((await b.engine.view(id)).phase, 'running (working)');
-  signed(b.sessions, `ae/${id}/2`, 'again');
+  signed(b.sessions, `ae/${id}/2`, 'again', (await b.engine.view(id)).state.attempts[1].startedAt);
   await b.engine.tick();
   assert.equal((await b.engine.view(id)).phase, 'input-required');
   await b.engine.stop(id);

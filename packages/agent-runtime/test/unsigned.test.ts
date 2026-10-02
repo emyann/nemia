@@ -88,11 +88,18 @@ const onPath = async <T>(bin: string, f: () => Promise<T>): Promise<T> => {
   }
 };
 
-/** Lines appended to the session's transcript, then its mtime put back `ago` milliseconds. Each line carries its own time. */
-const wrote = (sessionId: string, ago: number, ...entries: object[]) => {
+/** When the journal says the task's first attempt began, in milliseconds since the epoch. */
+const begun = async (engine: ReturnType<typeof promiseEngine>, id: string) =>
+  Date.parse((await engine.view(id)).state.attempts[0]?.startedAt ?? '');
+
+/**
+ * Lines appended to the session's transcript, then its mtime put back `ago` milliseconds. Each line carries its own time, a
+ * moment after `began` (`begun`) unless it says another: a statement counts only when made after its attempt began.
+ */
+const wrote = (sessionId: string, began: number, ago: number, ...entries: object[]) => {
   const file = path.join(config, 'projects', 'fake-project', `${sessionId}.jsonl`);
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  const timestamp = new Date().toISOString();
+  const timestamp = new Date(began + 1).toISOString();
   fs.appendFileSync(file, entries.map((e) => `${JSON.stringify({ sessionId, timestamp, ...e })}\n`).join(''));
   const at = new Date(Date.now() - ago);
   fs.utimesSync(file, at, at);
@@ -117,7 +124,7 @@ test("a task that asked for a closeout, whose session goes quiet without one, en
     await engine.tick();
     const [row] = claude.rows();
 
-    wrote(row.sessionId, 10 * MINUTES, prompt('the prompt'), says('msg_1', 'I have finished.'));
+    wrote(row.sessionId, await begun(engine, id), 10 * MINUTES, prompt('the prompt'), says('msg_1', 'I have finished.'));
     claude.set(row.name, { startedAt: Date.now() - 20 * MINUTES });
     await engine.tick();
 
@@ -144,7 +151,7 @@ test('a task that asked for no closeout ends on quiet as it always did: succeede
     const id = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd') });
     await engine.tick();
     const [row] = claude.rows();
-    wrote(row.sessionId, 10 * MINUTES, prompt('the prompt'), says('msg_1', 'Done.'));
+    wrote(row.sessionId, await begun(engine, id), 10 * MINUTES, prompt('the prompt'), says('msg_1', 'Done.'));
     claude.set(row.name, { startedAt: Date.now() - 20 * MINUTES });
 
     await engine.tick();
@@ -166,7 +173,7 @@ test('quiet after a statement of its own succeeds with it; quiet after only a st
     const said = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: SCHEMA });
     await engine.tick();
     const [row] = claude.rows();
-    wrote(row.sessionId, 10 * MINUTES, prompt('the prompt'), closes('msg_1', { outcome: 'done' }));
+    wrote(row.sessionId, await begun(engine, said), 10 * MINUTES, prompt('the prompt'), closes('msg_1', { outcome: 'done' }));
     claude.set(row.name, { startedAt: Date.now() - 20 * MINUTES });
     await engine.tick();
     const v = await engine.view(said);
@@ -177,9 +184,11 @@ test('quiet after a statement of its own succeeds with it; quiet after only a st
     const inherited = await engine.file({ config: { background: true }, brief: 'go on', cwd: tmp('cwd'), closeoutSchema: SCHEMA });
     await engine.tick();
     const other = claude.rows().find((r) => r.name === `ae/${inherited}/1`)!;
-    const anHourAgo = new Date(Date.now() - 60 * MINUTES).toISOString();
+    const began = await begun(engine, inherited);
+    const anHourAgo = new Date(began - 60 * MINUTES).toISOString();
     wrote(
       other.sessionId,
+      began,
       10 * MINUTES,
       { ...prompt('the parent prompt'), timestamp: anHourAgo },
       { ...closes('msg_0', { outcome: 'done', by: 'parent' }), timestamp: anHourAgo },
@@ -204,7 +213,7 @@ test("THE HARNESS'S `done` without a statement is said to have stated nothing to
     const nothing = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd') });
     await engine.tick();
     for (const row of claude.rows()) {
-      wrote(row.sessionId, 0, prompt('the prompt'), says('msg_1', 'I have finished.'));
+      wrote(row.sessionId, await begun(engine, row.name.split('/')[1]), 0, prompt('the prompt'), says('msg_1', 'I have finished.'));
       claude.set(row.name, { state: 'done' });
     }
     await engine.tick();

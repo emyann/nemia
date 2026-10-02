@@ -99,14 +99,19 @@ const onPath = async <T>(bin: string, f: () => Promise<T>): Promise<T> => {
   }
 };
 
+/** When the journal says the task's first attempt began, in milliseconds since the epoch. */
+const begun = async (engine: ReturnType<typeof promiseEngine>, id: string) =>
+  Date.parse((await engine.view(id)).state.attempts[0]?.startedAt ?? '');
+
 /**
- * The session's transcript, in which it called StructuredOutput just now: where the runner reads a statement. A statement
- * counts only when made after its attempt began, so a test waits a moment after the spawn before it writes one.
+ * The session's transcript, in which it called StructuredOutput: where the runner reads a statement. A statement counts only
+ * when made after its attempt began (`began`, off the journal), and a line is counted as used only after its session's own
+ * start (the row's `startedAt`): it is stamped a moment after the later of the two.
  */
-const said = (row: Row, payload: object) => {
+const said = (row: Row, began: number, payload: object) => {
   const dir = path.join(config, 'projects', 'fake-project');
   fs.mkdirSync(dir, { recursive: true });
-  const at = new Date().toISOString();
+  const at = new Date(Math.max(began, row.startedAt) + 1).toISOString();
   fs.writeFileSync(
     path.join(dir, `${row.sessionId}.jsonl`),
     [
@@ -135,8 +140,9 @@ const said = (row: Row, payload: object) => {
 const short = (row: Row) => row.sessionId.split('-')[0];
 
 /**
- * A transcript with no statement in it, last written `ago` milliseconds ago. Quiet is counted from the later of a session's
- * last write and its own start, so a test that wants it quiet dates its start back too.
+ * A transcript with no statement in it, last written `ago` milliseconds ago, its line stamped a moment after its session's own
+ * start (the row's `startedAt`), where its usage is counted from. Quiet is counted from the later of a session's last write and
+ * its own start, so a test that wants it quiet dates its start back too.
  */
 const wrote = (row: Row, ago: number) => {
   const dir = path.join(config, 'projects', 'fake-project');
@@ -147,7 +153,7 @@ const wrote = (row: Row, ago: number) => {
     uuid: 'u-1',
     parentUuid: null,
     sessionId: row.sessionId,
-    timestamp: new Date().toISOString(),
+    timestamp: new Date(row.startedAt + 1).toISOString(),
     message: { role: 'user', content: 'the prompt' },
   };
   fs.writeFileSync(file, `${JSON.stringify(entry)}\n`);
@@ -168,8 +174,7 @@ test('a task that gave its closeout settles, and its session is stopped and remo
     await engine.tick();
     const [row] = claude.rows();
     assert.equal(row?.name, `ae/${id}/1`, 'spawned');
-    await sleep(10);
-    said(row, { outcome: 'done' });
+    said(row, await begun(engine, id), { outcome: 'done' });
 
     await engine.tick();
     assert.equal((await engine.view(id)).state.settled, 'succeeded');
@@ -206,8 +211,7 @@ test("a session's cost, which Claude Code writes only as its process exits, is r
       });
       await engine.tick();
       const [row] = claude.rows();
-      await sleep(10);
-      said(row, { outcome: 'done' });
+      said(row, await begun(engine, id), { outcome: 'done' });
 
       for (let i = 0; i < 3; i++) await engine.tick();
       const at = `worktree: ${worktree}`;
@@ -277,8 +281,7 @@ test('a task that asked for a worktree has its session stopped and never removed
     });
     await engine.tick();
     const [row] = claude.rows();
-    await sleep(10);
-    said(row, { outcome: 'done' });
+    said(row, await begun(engine, id), { outcome: 'done' });
 
     for (let i = 0; i < 3; i++) await engine.tick();
     assert.equal((await engine.view(id)).state.settled, 'succeeded');

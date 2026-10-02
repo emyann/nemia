@@ -18,6 +18,8 @@ const ROOT = scratch('wf-supervisor-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
 process.env.WF_ROOT = ROOT;
+delete process.env.WF_MAX_CONCURRENT;
+delete process.env.WF_MAX_RUNS;
 const { advance, list, retry, runSlots, start } = await import('../src/runner.ts');
 const { readRun } = await import('../src/record/record.store.ts');
 

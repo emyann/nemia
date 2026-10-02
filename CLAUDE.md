@@ -32,6 +32,8 @@ holds what every change needs.
   report, not a fix.
 - Turbo does not see `workflows/`: after touching a workflow folder, run `npx turbo run test --force --continue`. The same goes for a
   change only to a doc: some tests read docs.
+- A run's check leaves what its tests cost in `WF_ARTIFACTS`, a `test-costs-<package>-<stamp>.json` per package and try; `node
+  tools/test-costs/report.ts <dir>...` ranks them. A package's peak is its largest process, not the sum of the files running at once.
 
 ## How to test
 
@@ -69,13 +71,18 @@ holds what every change needs.
   (`agent-runtime/test/contract.test.ts`). A knob on a workload is a field carried on the task and read by a runner, never a callback
   into `decide`, and no `if` in `engine.ts` belongs in `decide` `(no test yet)`. What sits in which layer today, and what is a
   candidate to move, is in `docs/architecture.md`, *Who owns what*.
-- **Three rules hold the layers, each a test** (`docs/architecture.md`):
+- **Four rules hold the layers, each a test** (`docs/architecture.md`):
   - *Between packages, only the public contract*: `agent-runtime` and `agent-runtime/effect`; `agent-orchestrator`,
     `agent-orchestrator/run`, `agent-orchestrator/workflow` and `agent-orchestrator/effect` — never a subpath outside `exports`, a
     relative path, `import.meta.resolve` or a path into `src/` (the two `contract.test.ts`).
   - *Inside the orchestrator, every file is pure, store, controller or the client* (`PURE`, `STORE`, `CONTROLLER`, `CLIENT` in
     `packages/agent-orchestrator/test/boundary.test.ts`); a new file joins one kind, or the suite fails.
   - *The runtime is reached through one client*, `src/runtime-client.ts` (`CLIENT` in the same test).
+  - *Each layer says its own words*: no harness word outside the runtime, no workflow word in it, no team name in a package's `src`
+    (`HARNESS_WORDS`, `WORKFLOW_WORDS`, `TEAM_NAMES` in `packages/agent-orchestrator/test/words.test.ts`, which only shrink).
+- **A spec here reads `docs/architecture.md` first.** A change's `where` names its layer (`agent-runtime`, `agent-orchestrator`,
+  `apps/api`, `apps/web`), and in the orchestrator its feature folder and kind (pure, store, controller, client), in the api its folder;
+  its `why`, and a placement finding's `rule`, cite the rule above or the *Who owns what* line, with the test that holds it.
 - **Level-triggered.** A tick reads the world, decides, acts, and carries nothing between passes. A guard that only fires on a
   transition is wrong after a restart `(no test yet)`.
 - **One writer per file.** The tick writes the run record; a person's facts (`.cancelled`, an ask) get their own files, composed on read
@@ -125,6 +132,19 @@ holds what every change needs.
   tree and commits on exit 0 or aborts the merge (`landingDue`).
 - If you are a workflow step, commit as you go: the run commits only what you leave uncommitted, in one commit under your step's name.
 
+## Agents in this repository
+
+What the `create-an-agent` skill, being generic, does not say here:
+
+- Read `packages/agent-orchestrator/README.md`, *An agent is a node's attachment*, for the format and the four layers.
+- A test that loads a shipped folder passes its place (`placesOf` in `packages/agent-orchestrator/test/team.ts`), or the repository's
+  `.claude/skills/` is not found.
+- A checking agent given `Bash` denies `Bash(npm run build)` and `Bash(npm run e2e)`, which `.claude/settings.json` allows other roles,
+  allows by exact name the checks it runs (`npm run lint`, `npx turbo run typecheck --force`), and joins `CHECKERS` with its skill in
+  `packages/agent-orchestrator/test/agent-fences.test.ts`, which holds every shipped step's fence.
+- An agent's questions are an output field `{ "x-shape": "questions" }`, expanded by `packages/agent-orchestrator/src/question/question.ts`.
+- Its checks are *Check your work*, forced for `workflows/`; a new agent is named in *Where things are*.
+
 ## When you miss
 
 - A trap that cost you time is a lesson: better as a test that refuses the mistake, else three lines at most in the `CLAUDE.md` of the
@@ -147,4 +167,6 @@ holds what every change needs.
   the place skill `place/git` (`packages/agent-orchestrator/place/git`, run through `runPlaceVerb`), the skills the api lists as shipped
   (`SHIPPED_SKILLS`, the checkout's `workflows/skills/`, none today), and Nemia's own agent once the Nemia slices build it. A person's
   factories get no workflow or agent from the package.
+- `tools/test-costs/` — the repository's test-cost recorder, on every package's `test` script: a probe in each test file's process, a
+  reporter beside spec, and `report.ts`; held by `agent-orchestrator/test/test-costs.test.ts` and `suite.test.ts`.
 - `.codex/rules/git-commit.rules` — lets a Codex step commit its own work in a worktree.

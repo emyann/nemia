@@ -1,8 +1,8 @@
 /**
  * The runtime client: the one file of the package that imports `agent-runtime`, a type included (`test/boundary.test.ts`), as a Go agent
  * SDK reaches its sandbox runtime through one file of its own. It creates the runtime — the harnesses and `engine()` — and names the
- * runtime's types the controllers use (`Engine`, `TaskView`, `Usage`, `Denial`, `RefusedMove`, `nameFor`, `denialText`, `refusedText` and
- * `lifecycleGraph`), which they import from here and never from the runtime.
+ * runtime's types the controllers use (`Engine`, `TaskView`, `Usage`, `Denial`, `RefusedMove`, `HarnessQuota`, `QuotaLimit`, `nameFor`,
+ * `denialText`, `refusedText` and `lifecycleGraph`), which they import from here and never from the runtime.
  *
  * It uses the runtime's `Engine` service (`agent-runtime/effect`) and provides it as a layer, changed in one verb: `file`, so that every
  * task the orchestrator files is `queued` and starts only once the tick admits it (`cap.ts`). The controllers take the engine in Promises,
@@ -31,7 +31,7 @@ import { HOME } from './record/record.store.ts';
 import { REMOTE_PREFIX, remoteNameOf } from './harness/harness.ts';
 import { Invalid, isRefusal, type Refusal } from './refusal/refusal.ts';
 
-export type { ClaudeFlags, CodexArgs, Denial, Engine, RefusedMove, TaskView, Usage } from 'agent-runtime';
+export type { ClaudeFlags, CodexArgs, Denial, Engine, HarnessQuota, QuotaLimit, RefusedMove, TaskView, Usage } from 'agent-runtime';
 /** The name the engine gives a task's session, which is the name `claude agents` lists it under (`harnessWaitLine`). */
 export { nameFor } from 'agent-runtime';
 /** The task's lifecycle as plain data, which the board draws: what the api serves at `/api/machines`. */

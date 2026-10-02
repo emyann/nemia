@@ -85,11 +85,19 @@ test('a pass that runs long is still ticking: silence is measured from the beat,
 });
 
 test('REFUSED: a live wf up silent past the stale mark is stalled, not ticking', async () => {
-  put(written(20 * MIN));
+  const at = ago(20 * MIN);
+  const file = written(20 * MIN, { passedAt: at, beatAt: at });
+  put(file);
   const d = await get();
   assert.equal(d.kind, 'stalled');
   assert.equal(d.ticking, false);
-  assert.match(d.line, /^wf up: stalled, pid \d+, every 4000ms — alive, but silent for 20m/);
+  const [, pid, silent, lastPass, passedAt] =
+    /^wf up: stalled, pid (\d+), every 4000ms — alive, but silent for (\d+m\d{2}s): last pass (\d+m\d{2}s) ago \(([^)]+)\); /.exec(
+      d.line,
+    ) ?? [];
+  assert.equal(Number(pid), process.pid, d.line);
+  assert.equal(silent, lastPass, 'beat and pass at the same instant, judged at the same now: the same silence');
+  assert.equal(passedAt, file.passedAt, "the file's last pass, as written");
 });
 
 test('REFUSED: a wf up that said it stopped is stopped, though its process lives', async () => {

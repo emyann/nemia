@@ -7,7 +7,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit && tsc --noEmit -p test/e2e",
-    "test": "node --test test/*.test.ts",
+    "test": "node --import=../../tools/test-costs/probe.ts --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=../../tools/test-costs/reporter.ts --test-reporter-destination=stderr test/*.test.ts",
     "e2e": "node --test test/e2e/*.test.ts && node test/e2e/run.ts"
   },
   "dependencies": {

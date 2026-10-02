@@ -59,6 +59,9 @@ const harnessArgs = {
   budgetUsd: Schema.optional(Schema.Finite),
   claude: Schema.optional(ClaudeFlagsSchema),
   codex: Schema.optional(Schema.StructWithRest(Schema.Struct({ trustFrom: Schema.optional(Schema.String) }), Rest)),
+  command: Schema.optional(Strings),
+  env: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+  niceness: Schema.optional(Schema.Finite),
 };
 
 /**

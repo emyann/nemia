@@ -27,7 +27,7 @@ const ctx = new ServerCallContext();
 
 /**
  * A harness a test moves by hand, what it was asked, and a journal in memory, behind one handler. It has every verb a
- * driver may have — `find`, `release`, `say`, `transcript`, `observeFor` — unless `bare`, which leaves it the four every
+ * driver may have — `find`, `release`, `quota`, `say`, `output`, `transcript`, `observeFor` — unless `bare`, which leaves it the four every
  * driver has; `noFind` takes `find` alone away. `acted` is what the harness was asked, reads left out.
  */
 const harness = (
@@ -93,6 +93,10 @@ const harness = (
               asked.push(['release', [session, task]]);
               return Effect.succeed(session.state === 'completed' ? { turns: 3, costUsd: 0.25 } : undefined);
             }),
+          quota: Effect.suspend(() => {
+            asked.push(['quota', undefined]);
+            return Effect.succeed({ kind: 'no-plan' as const });
+          }),
           say: (session: { name: string; sessionId: string }, text: string) =>
             Effect.suspend(() => {
               asked.push(['say', [session, text]]);
@@ -102,6 +106,11 @@ const harness = (
            * Told what is expected, it lists those alone: what a driver that reads less when told looks like. A name it was
            * told to leave unread (`unread`) it leaves unread, as a driver whose registry could not be read leaves one.
            */
+          output: (name: string, stream: 'stdout' | 'stderr', lastBytes?: number) =>
+            Effect.suspend(() => {
+              asked.push(['output', [name, stream, lastBytes]]);
+              return Effect.succeed(sessions.has(name) ? `${stream} of ${name}` : undefined);
+            }),
           observeFor: (expected: readonly ExpectedSession[]) =>
             Effect.suspend(() => {
               asked.push(['observeFor', expected]);
@@ -481,6 +490,30 @@ const REFUSALS: Array<[string, (h: H) => Promise<unknown>, (e: Error) => boolean
     refusedWith(RequestMalformedError, 'the request names no session: send the id its harness lists it under as `sessionId`.'),
   ],
   [
+    'the output of a session on a harness that keeps no stream whole',
+    (h) => h.handler.sessionOutput({ name: 'ae/t-1/1', stream: 'stdout' }, ctx),
+    refusedWith(
+      UnsupportedOperationError,
+      "the `fake` harness keeps no stream whole: its session's logs are what it printed (sessionLogs).",
+    ),
+    { bare: true },
+  ],
+  [
+    'the output of a name that is not a session name',
+    (h) => h.handler.sessionOutput({ name: 'ae/t-1/0', stream: 'stdout' }, ctx),
+    refusedWith(RequestMalformedError, '`ae/t-1/0` is not a session name: a session is named `ae/<task>/<n>`, n from 1.'),
+  ],
+  [
+    'the output of a stream that is neither stdout nor stderr',
+    (h) => h.handler.sessionOutput({ name: 'ae/t-1/1', stream: 'both' as never }, ctx),
+    refusedWith(RequestMalformedError, '`both` is not a stream: ask for `stdout` or `stderr`.'),
+  ],
+  [
+    'the output of no bytes',
+    (h) => h.handler.sessionOutput({ name: 'ae/t-1/1', stream: 'stdout', lastBytes: 0 }, ctx),
+    refusedWith(RequestMalformedError, '`lastBytes: 0` is not a count of bytes: give a whole number above 0, or none.'),
+  ],
+  [
     'a release on a harness with nothing to let go of',
     (h) => h.handler.releaseSession({ session: { sessionId: 's-1', state: 'completed' }, task: {} }, ctx),
     refusedWith(UnsupportedOperationError, 'the `fake` harness has nothing to let go of: its registry is the record.'),
@@ -558,6 +591,19 @@ for (const [what, ask, says, setup] of REFUSALS) {
     assert.deepEqual(h.acted(), []);
   });
 }
+
+test("a session's output is what its harness keeps of the stream asked, and null for a session it keeps none of", async () => {
+  const h = harness();
+  h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'completed' });
+  assert.deepEqual(await h.handler.sessionOutput({ name: 'ae/t-1/1', stream: 'stderr', lastBytes: 5 }, ctx), {
+    output: 'stderr of ae/t-1/1',
+  });
+  assert.deepEqual(await h.handler.sessionOutput({ name: 'ae/t-2/1', stream: 'stdout' }, ctx), { output: null });
+  assert.deepEqual(h.acted(), [
+    ['output', ['ae/t-1/1', 'stderr', 5]],
+    ['output', ['ae/t-2/1', 'stdout', undefined]],
+  ]);
+});
 
 test('listings overlap: each is paged from the listing its token names, whatever was listed since', async () => {
   const h = harness();
@@ -948,7 +994,18 @@ test("the harness's card: its name, no streaming, no notifications, text in and 
       [
         RUNTIME_EXTENSION,
         false,
-        { methods: ['findSession', 'sessionLogs', 'releaseSession', 'sessionTranscript', 'observeSessions'], say: true },
+        {
+          methods: [
+            'findSession',
+            'sessionLogs',
+            'sessionOutput',
+            'releaseSession',
+            'sessionTranscript',
+            'observeSessions',
+            'harnessQuota',
+          ],
+          say: true,
+        },
       ],
     ],
   );
@@ -961,6 +1018,18 @@ test('REFUSED on the card: a verb the driver lacks is not offered, and logs, whi
     card.capabilities!.extensions.map((e) => e.params),
     [{ methods: ['sessionLogs'], say: false }],
   );
+});
+
+test("harnessQuota answers the driver's quota; REFUSED on a driver without one, which is asked nothing", async () => {
+  const h = harness();
+  assert.deepEqual(await h.handler.harnessQuota({}, ctx), { kind: 'no-plan' });
+  assert.deepEqual(h.acted(), [['quota', undefined]]);
+  const bare = harness({ bare: true });
+  await assert.rejects(
+    bare.handler.harnessQuota({}, ctx),
+    refusedWith(UnsupportedOperationError, "the `fake` harness reports no quota: no subscription's use can be asked of it."),
+  );
+  assert.deepEqual(bare.asked, []);
 });
 
 test('observeSessions hands the driver what is expected, and answers what it listed as Tasks', async () => {

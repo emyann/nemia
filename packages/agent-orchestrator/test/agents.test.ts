@@ -64,11 +64,11 @@ test('an agent is its role keys as written, its description, and its body as its
 });
 
 /**
- * The agent's own keys: `role`, `description`, `skills` and `systemPrompt` describe the agent itself — the job it holds, who it is, what
+ * The agent's own keys: `role`, `description`, `skills` and `harnessPrompt` describe the agent itself — the job it holds, who it is, what
  * it is given (and so what it says it can do) and how its sessions are told — and a step has none: a step's work is the workflow's, not the
  * agent's. Every other agent key is a key a step may set for itself, and takes from its agent when it does not.
  */
-const AGENT_OWN = ['role', 'description', 'skills', 'systemPrompt'];
+const AGENT_OWN = ['role', 'description', 'skills', 'harnessPrompt'];
 
 test("the role keys are the keys a step has, but for wiring, the agent's own keys", () => {
   assert.deepEqual([...AGENT_OWN_KEYS], AGENT_OWN, 'the package names the same keys as its own');
@@ -242,7 +242,7 @@ test("a step that names an agent runs with the agent's role keys, its own keys w
       given: { harness: 'claude', effort: 'high', context: '200k', disallowedTools: 'SendMessage' },
       instructions: 'Implement what you are asked.',
     },
-    "the keys the step set, its note, what each key it did not set read as, and the agent's instructions, which a Claude Code step is told in its system prompt",
+    "the keys the step set, its note, what each key it did not set read as, and the agent's instructions, which a Claude Code step is told in Claude Code's prompt",
   );
 
   const bare = parseWorkflow('build', '---\nagent: implementer\n---\n', undefined, agents);

@@ -3,7 +3,7 @@
  * harness's `HarnessHandler`, in this process, with no HTTP between them.
  *
  * `spawn`, `observe`, `stop` and `say` go through the client, as A2A's own calls; `find`, `logs`, `release`, the
- * transcript and `observeFor`, which A2A has no call for, through the runtime extension's methods on the same transport.
+ * transcript, `observeFor` and `quota`, which A2A has no call for, through the runtime extension's methods on the same transport.
  * One reaches the driver directly: `refuses`, which is no call to a session but the harness judging a task before any is
  * filed. Nothing the engine reads changes: a harness's words come back as the same `RunnerError`, `refused` where the
  * harness vouched nothing started, and a driver's defect as the defect it is.
@@ -38,6 +38,7 @@ import {
   Runner,
   RunnerError,
   type ExpectedSession,
+  type HarnessQuota,
   type Observation,
   type RunnerOps,
   type SpawnRequest,
@@ -51,6 +52,7 @@ import {
   MOST_PER_PAGE,
   type RuntimeExtensionParams,
   type SessionMethods,
+  type OutputRequest,
   type TranscriptRequest,
 } from './handler.ts';
 import { followUpOf, messageOf, RUNTIME_EXTENSION, sightingOf, wordsOf } from './map.ts';
@@ -127,6 +129,10 @@ export class InProcessTransport implements Transport {
     return this.handler.sessionLogs(params, new ServerCallContext());
   }
 
+  sessionOutput(params: OutputRequest): Promise<{ output: string | null }> {
+    return this.handler.sessionOutput(params, new ServerCallContext());
+  }
+
   releaseSession(params: { session: Sighting; task: { worktree?: string | boolean } }): Promise<{ usage: Usage | null }> {
     return this.handler.releaseSession(params, new ServerCallContext());
   }
@@ -137,6 +143,10 @@ export class InProcessTransport implements Transport {
 
   observeSessions(params: { expected: readonly ExpectedSession[] }): Promise<{ tasks: Task[]; unread: string[] }> {
     return this.handler.observeSessions(params, new ServerCallContext());
+  }
+
+  harnessQuota(params: Record<string, never>): Promise<HarnessQuota> {
+    return this.handler.harnessQuota(params, new ServerCallContext());
   }
 }
 
@@ -172,6 +182,18 @@ const call = <A>(verb: string, f: () => Promise<A>): Effect.Effect<A, RunnerErro
     ),
   );
 
+/** `find` through the seam: the session running under a name, `undefined` when none does. */
+const findThrough =
+  (transport: InProcessTransport) =>
+  (name: string): Effect.Effect<{ sessionId: string } | undefined, RunnerError> =>
+    call('find', () => transport.findSession({ name })).pipe(Effect.map((found) => found ?? undefined));
+
+/** `output` through the seam: one stream of the session under a name, whole or its last bytes; `undefined` when none was kept. */
+const outputThrough =
+  (transport: InProcessTransport) =>
+  (name: string, stream: 'stdout' | 'stderr', lastBytes?: number): Effect.Effect<string | undefined, RunnerError> =>
+    call('output', () => transport.sessionOutput({ name, stream, lastBytes })).pipe(Effect.map((r) => r.output ?? undefined));
+
 /**
  * What the seam offers the engine: a harness's verbs, and beside them the transcript asked by the session's name
  * (`transcriptOf`) rather than by an id the caller would have had to find first; `null` when no session goes by the name
@@ -183,25 +205,12 @@ export type SeamOps = RunnerOps & {
 };
 
 /**
- * A harness's `RunnerOps`, its session verbs through the A2A client. `spawn` sends the request as a user message and
- * reads the answer: `WORKING` started, `REJECTED` refused, `SUBMITTED` a spawn whose session may yet exist. `observe`
- * lists every page, and a listed Task that carries no sighting fails the read. `stop` cancels the session by name, read off the last
- * listing (`observe`'s or `observeFor`'s), since the engine stops by session id: a session the listing left out is listed in full when a
- * stop asks for it, and one no listing has is not stopped blindly but refused in words. The engine stops only a session the pass has just
- * seen live, so it never asks for that. A session that ended between the listing and the stop has nothing to stop, as a driver's
- * stop of an ended session does nothing: the next pass reads how it ended. `say` is a follow-up message on the session's
- * Task. `find`, `logs`, `release`, `transcript`, `transcriptOf` and `observeFor` are the extension's methods; the names
- * `observeFor`'s driver could not look for cross as it said them, names and nothing more. By id, a transcript is always
- * read: the handler answers `null` only for a name it found no session under, so a `null` by id is a defect. A verb is
- * offered as the card says — the verbs the harness's driver lacks are left off it — so the engine reads the absences the
- * driver itself shows. `refuses` is the driver's own, handed on directly: it is no call to a session.
+ * A spawn through `harness`'s client: the request sent as a user message, and the answer read — `WORKING` started, `REJECTED` refused,
+ * any other a spawn whose session may yet exist, in the harness's words when it gave some.
  */
-export const a2aOps = (harness: string, ops: RunnerOps, events: (taskId: string) => Promise<readonly Event[]>): SeamOps => {
-  const { card, transport, client } = seamOf(harness, ops, events);
-  const offered = extensionOf(card);
-  let names = new Map<string, string>();
-
-  const spawn = (r: SpawnRequest): Effect.Effect<void, RunnerError> =>
+const spawnThrough =
+  (harness: string, client: Client) =>
+  (r: SpawnRequest): Effect.Effect<void, RunnerError> =>
     call('spawn', () =>
       client.sendMessage({
         tenant: '',
@@ -233,6 +242,27 @@ export const a2aOps = (harness: string, ops: RunnerOps, events: (taskId: string)
         );
       }),
     );
+
+/**
+ * A harness's `RunnerOps`, its session verbs through the A2A client. `spawn` sends the request as a user message and
+ * reads the answer: `WORKING` started, `REJECTED` refused, `SUBMITTED` a spawn whose session may yet exist. `observe`
+ * lists every page, and a listed Task that carries no sighting fails the read. `stop` cancels the session by name, read off the last
+ * listing (`observe`'s or `observeFor`'s), since the engine stops by session id: a session the listing left out is listed in full when a
+ * stop asks for it, and one no listing has is not stopped blindly but refused in words. The engine stops only a session the pass has just
+ * seen live, so it never asks for that. A session that ended between the listing and the stop has nothing to stop, as a driver's
+ * stop of an ended session does nothing: the next pass reads how it ended. `say` is a follow-up message on the session's
+ * Task. `find`, `logs`, `release`, `transcript`, `transcriptOf`, `observeFor` and `quota` are the extension's methods; the names
+ * `observeFor`'s driver could not look for cross as it said them, names and nothing more. By id, a transcript is always
+ * read: the handler answers `null` only for a name it found no session under, so a `null` by id is a defect. A verb is
+ * offered as the card says — the verbs the harness's driver lacks are left off it — so the engine reads the absences the
+ * driver itself shows. `refuses` is the driver's own, handed on directly: it is no call to a session.
+ */
+export const a2aOps = (harness: string, ops: RunnerOps, events: (taskId: string) => Promise<readonly Event[]>): SeamOps => {
+  const { card, transport, client } = seamOf(harness, ops, events);
+  const offered = extensionOf(card);
+  let names = new Map<string, string>();
+
+  const spawn = spawnThrough(harness, client);
 
   const sightingsOf = (verb: string, tasks: readonly Task[], seen: Map<string, Sighting>): Effect.Effect<void, RunnerError> => {
     for (const t of tasks) {
@@ -301,9 +331,6 @@ export const a2aOps = (harness: string, ops: RunnerOps, events: (taskId: string)
       );
     });
 
-  const find = (name: string): Effect.Effect<{ sessionId: string } | undefined, RunnerError> =>
-    call('find', () => transport.findSession({ name })).pipe(Effect.map((found) => found ?? undefined));
-
   const logs = (sessionId: string): Effect.Effect<string, RunnerError> =>
     call('logs', () => transport.sessionLogs({ sessionId })).pipe(Effect.map((r) => r.logs));
 
@@ -335,10 +362,12 @@ export const a2aOps = (harness: string, ops: RunnerOps, events: (taskId: string)
     observe,
     stop,
     logs,
-    ...(offered.methods.includes('findSession') ? { find } : {}),
+    ...(offered.methods.includes('findSession') ? { find: findThrough(transport) } : {}),
+    ...(offered.methods.includes('sessionOutput') ? { output: outputThrough(transport) } : {}),
     ...(offered.methods.includes('releaseSession') ? { release } : {}),
     ...(offered.methods.includes('sessionTranscript') ? { transcript, transcriptOf } : {}),
     ...(offered.methods.includes('observeSessions') ? { observeFor } : {}),
+    ...(offered.methods.includes('harnessQuota') ? { quota: call('quota', () => transport.harnessQuota({})) } : {}),
     ...(offered.say ? { say } : {}),
     ...(ops.refuses ? { refuses: ops.refuses } : {}),
   };

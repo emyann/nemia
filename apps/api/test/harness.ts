@@ -6,6 +6,8 @@
  * theirs. So the runner itself — the registry it observes, the transcripts it reads, the flags it spawns with — is what the api's tests
  * exercise, and not a stand-in for it. It sets `WF_VERIFY_REST=1`: every answer the list's memo of runs at rest gives (`resting.ts`) is
  * judged afresh too, and a difference fails the request. And the store is a scratch folder too (`root`, `WF_ROOT`), never this machine's.
+ * It sets the daemon's two ceilings, `WF_MAX_RUNS` and `WF_MAX_CONCURRENT`, to `set-it-in-the-test`, which the package refuses by name: a
+ * run's check inherits the daemon's environment, so a test that reads a ceiling sets or deletes it itself.
  *
  * Installed as this module loads. The api's test script loads it with `--import` before any test file, and `node --test` loads that in
  * each test file's process and not in its own; each test file imports it first as well, by its path from the file, so a file run by hand
@@ -23,16 +25,15 @@ export const bin = scratch('nemia-api-harness-');
 /** What `claude agents` lists: a JSON array of sessions, as Claude Code's registry lists them. None until a test writes some. */
 export const registry = path.join(bin, 'registry.json');
 /**
- * Every call the fake answered, a line each: its arguments. An ask for the quota adds a line of what it ran in, and one when it ended, each
- * with its pid.
+ * Every call the fake answered, a line each: its arguments. An ask for the quota adds a line when it ended, with its pid.
  */
 export const calls = path.join(bin, 'calls');
 /**
- * What the fake prints to a `get_usage` request (`claude -p`, the api's `askUsage`): lines of stream-json, `@ID@` in them replaced by the
- * request's own id. Claude Code 2.1.278's answer as recorded until a test writes another (`usageAnswer`).
+ * What the fake prints to a `get_usage` request (`claude -p`, as the engine's `quota` asks it): lines of stream-json, `@ID@` in them
+ * replaced by the request's own id. Claude Code 2.1.278's answer as recorded until a test writes another (`usageAnswer`).
  */
 export const answer = path.join(bin, 'usage-answer');
-/** How the fake takes a `get_usage` request: `answer` (the default), `silent` — it never answers — or `exit`, 3 before it reads it. */
+/** How the fake takes a `get_usage` request: `answer` (the default), or `exit`, 3 before it reads it. */
 const mode = path.join(bin, 'usage-mode');
 
 /** Claude Code 2.1.278's answers to `get_usage`, recorded by hand (`fixtures/get-usage-*.json`), their request id made `@ID@`. */
@@ -42,6 +43,8 @@ export const recorded = (name: 'plan' | 'no-plan' | 'unsupported' | 'unanswered'
     .replace('"request_id":"usage-1"', '"request_id":"@ID@"');
 
 process.env.WF_VERIFY_REST = '1';
+process.env.WF_MAX_RUNS = 'set-it-in-the-test';
+process.env.WF_MAX_CONCURRENT = 'set-it-in-the-test';
 
 fs.writeFileSync(registry, '[]');
 fs.writeFileSync(calls, '');
@@ -54,9 +57,7 @@ fs.writeFileSync(
     `echo "$*" >> '${calls}'`,
     `if [ "$1" = agents ]; then cat '${registry}'; fi`,
     'if [ "$1" = -p ]; then',
-    `  echo "usage-env CLAUDECODE=\${CLAUDECODE-unset} CLAUDE_CODE_ENTRYPOINT=\${CLAUDE_CODE_ENTRYPOINT-unset} CLAUDE_CONFIG_DIR=\${CLAUDE_CONFIG_DIR-unset} CLAUDE_CODE_OAUTH_TOKEN=\${CLAUDE_CODE_OAUTH_TOKEN-unset} CLAUDE_CODE_USE_BEDROCK=\${CLAUDE_CODE_USE_BEDROCK-unset} cwd=$(pwd -P) pid=$$" >> '${calls}'`,
     `  case "$(cat '${mode}')" in`,
-    '    silent) exec sleep 30 ;;',
     "    exit) echo 'claude: the harness was told to fail' >&2; exit 3 ;;",
     '  esac',
     '  read -r line',
@@ -99,28 +100,8 @@ export const asks = (): number => callsOf('-p');
  */
 export const askEnded = (pid: number): boolean => fs.readFileSync(calls, 'utf8').split('\n').includes(`usage-ended pid=${pid}`);
 
-/**
- * What the last ask ran in:
- * `{ CLAUDECODE, CLAUDE_CODE_ENTRYPOINT, CLAUDE_CONFIG_DIR, CLAUDE_CODE_OAUTH_TOKEN, CLAUDE_CODE_USE_BEDROCK, cwd, pid }`, `unset` for a
- * variable it did not have.
- */
-export function lastAskEnv(): Record<string, string> {
-  const line =
-    fs
-      .readFileSync(calls, 'utf8')
-      .split('\n')
-      .filter((l) => l.startsWith('usage-env '))
-      .pop() ?? '';
-  return Object.fromEntries(
-    line
-      .slice('usage-env '.length)
-      .split(' ')
-      .map((kv) => [kv.slice(0, kv.indexOf('=')), kv.slice(kv.indexOf('=') + 1)]),
-  );
-}
-
 /** What the fake prints to the next `get_usage` requests, and how it takes them. */
-export function usageAnswer(text: string, how: 'answer' | 'silent' | 'exit' = 'answer'): void {
+export function usageAnswer(text: string, how: 'answer' | 'exit' = 'answer'): void {
   fs.writeFileSync(answer, text);
   fs.writeFileSync(mode, how);
 }

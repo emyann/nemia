@@ -4,6 +4,21 @@
     "goal": { "type": "string", "description": "What the intent wants true once this is built, restated for the steps after you: they read the spec, not the intent." },
     "constraints": { "type": "array", "description": "What the work must respect, from the intent and from this repository's rules. Empty when none applies.", "items": { "type": "string" } },
     "approach": { "type": "string", "description": "The change in a paragraph: what it does, and why this way rather than another." },
+    "placement": {
+      "type": "array",
+      "description": "Where each concept the change adds or moves lives, by the boundaries the repository's own rules define, shown to the person who approves the spec. Empty only when the change adds or moves no concept.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "concept": { "type": "string", "description": "The concept: a rule, a type, a verb, a page, a file of its own." },
+          "where": { "type": "string", "description": "The module or boundary it lives in, in the terms the repository's own rules use." },
+          "rule": { "type": "string", "description": "The repository rule that puts it there: the file that states or holds it, and its words." },
+          "rejected": { "type": ["string", "null"], "description": "The neighbouring place it could have gone, and why not there; null when the rules leave no other." }
+        },
+        "required": ["concept", "where", "rule", "rejected"],
+        "additionalProperties": false
+      }
+    },
     "changes": {
       "type": "array",
       "description": "Every path the change touches, by path from the workspace root, each with one line on what changes in it.",
@@ -11,9 +26,11 @@
         "type": "object",
         "properties": {
           "path": { "type": "string", "description": "A file you have read, or one the change adds." },
+          "where": { "type": "string", "description": "The module or boundary the path lives in, in the terms the repository's own rules use." },
+          "why": { "type": "string", "description": "Why the change lives there and not in the neighbouring module or boundary, citing the rule that decides it." },
           "change": { "type": "string", "description": "One line on what changes in it." }
         },
-        "required": ["path", "change"],
+        "required": ["path", "where", "why", "change"],
         "additionalProperties": false
       }
     },
@@ -36,6 +53,6 @@
     },
     "open": { "x-shape": "questions", "description": "What is still undecided, each as a question with its options and your recommendation. Empty only when nothing is." }
   },
-  "required": ["goal", "constraints", "approach", "changes", "steps", "tests", "risks", "decisions", "open"],
+  "required": ["goal", "constraints", "approach", "placement", "changes", "steps", "tests", "risks", "decisions", "open"],
   "additionalProperties": false
 }

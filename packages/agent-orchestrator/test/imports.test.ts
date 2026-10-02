@@ -1,5 +1,5 @@
 /**
- * The layers' import rules, held by lint (`docs/architecture.md`, "The three rules"): the board imports no workspace package, no harness
+ * The layers' import rules, held by lint (`docs/architecture.md`, "The rules"): the board imports no workspace package, no harness
  * SDK and no path into `packages/`; the api imports the orchestrator through `agent-orchestrator`, `/run`, `/workflow` and `/effect`
  * alone, and never the runtime or a harness SDK; the orchestrator imports no harness SDK; the runtime imports no layer above it.
  *

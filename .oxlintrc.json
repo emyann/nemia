@@ -128,7 +128,8 @@
       }
     },
     // The comment guards (lint/comments.ts, CLAUDE.md "Code reads by itself"), one block per package, the same rules in each, none with
-    // an `excludeFiles`. The runtime's block also covers lint/**, the guards' own plugin.
+    // an `excludeFiles`. The runtime's block also covers the folders beside the packages: lint/**, the guards' own plugin, and tools/**,
+    // the repository's test tooling.
     // packages/agent-orchestrator/test/comments.test.ts reads these blocks.
     {
       "files": ["apps/api/**"],
@@ -170,7 +171,7 @@
       }
     },
     {
-      "files": ["packages/agent-runtime/**", "lint/**"],
+      "files": ["packages/agent-runtime/**", "lint/**", "tools/**"],
       "rules": {
         "comments/no-code-comments": "error",
         "comments/no-history-in-comments": "error",
@@ -333,13 +334,6 @@
       "rules": {
         "max-lines-per-function": ["error", { "max": 104, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 22 }]
-      }
-    },
-    {
-      "files": ["apps/api/src/factory/quota.ts"],
-      "rules": {
-        "complexity": ["error", { "max": 25 }],
-        "sonarjs/cognitive-complexity": ["error", 25]
       }
     },
     {
@@ -787,7 +781,7 @@
     {
       "files": ["packages/agent-orchestrator/src/agents/agents.ts"],
       "rules": {
-        "sonarjs/cognitive-complexity": ["error", 22]
+        "sonarjs/cognitive-complexity": ["error", 17]
       }
     },
     {
@@ -844,7 +838,7 @@
     {
       "files": ["packages/agent-runtime/src/a2a/client.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 135, "skipBlankLines": true, "skipComments": true }]
+        "max-lines-per-function": ["error", { "max": 104, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
@@ -864,9 +858,9 @@
     {
       "files": ["packages/agent-runtime/src/cli/main.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 129, "skipBlankLines": true, "skipComments": true }],
-        "complexity": ["error", { "max": 53 }],
-        "sonarjs/cognitive-complexity": ["error", 59]
+        "max-lines-per-function": ["error", { "max": 121, "skipBlankLines": true, "skipComments": true }],
+        "complexity": ["error", { "max": 49 }],
+        "sonarjs/cognitive-complexity": ["error", 53]
       }
     },
     {
@@ -906,7 +900,7 @@
     {
       "files": ["packages/agent-runtime/src/harness/args.ts"],
       "rules": {
-        "complexity": ["error", { "max": 31 }],
+        "complexity": ["error", { "max": 30 }],
         "sonarjs/cognitive-complexity": ["error", 27]
       }
     },
@@ -933,7 +927,7 @@
     {
       "files": ["packages/agent-runtime/src/harness/detached/detached.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 181, "skipBlankLines": true, "skipComments": true }]
+        "max-lines-per-function": ["error", { "max": 179, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
@@ -960,7 +954,7 @@
     {
       "files": ["packages/agent-runtime/src/service/engine.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 293, "skipBlankLines": true, "skipComments": true }],
+        "max-lines-per-function": ["error", { "max": 263, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 25 }],
         "sonarjs/cognitive-complexity": ["error", 21]
       }

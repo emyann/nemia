@@ -41,6 +41,11 @@ export type PromiseRunner = {
   stop(sessionId: string): Promise<void>;
   logs(sessionId: string): Promise<string>;
   /**
+   * Optional. One stream of the session under `name`, the name the engine chose: `stdout` or `stderr`, as your harness kept
+   * it whole, or its last `lastBytes` bytes; `undefined` when it kept none. Without it, `output` refuses this harness's tasks.
+   */
+  output?(name: string, stream: 'stdout' | 'stderr', lastBytes?: number): Promise<string | undefined>;
+  /**
    * Optional. Let go of a session whose attempt's end the engine has written down — stop it if it
    * runs, drop it from your registry. Called on every pass that still observes it, so make it
    * idempotent; a rejection is asked again on the next. Resolve with what the session consumed, read
@@ -103,6 +108,15 @@ export const promiseOps = (h: PromiseRunner): RunnerOps => ({
       () => h.logs(id),
       (m) => new RunnerError({ verb: 'logs', message: m }),
     ),
+  ...(h.output
+    ? {
+        output: (name: string, stream: 'stdout' | 'stderr', lastBytes?: number) =>
+          wrap(
+            () => h.output!(name, stream, lastBytes),
+            (m) => new RunnerError({ verb: 'output', message: m }),
+          ),
+      }
+    : {}),
   ...(h.release
     ? {
         release: (session: Sighting, task: { worktree?: string | boolean }) =>

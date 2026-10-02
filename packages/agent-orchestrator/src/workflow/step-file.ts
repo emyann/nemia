@@ -98,7 +98,7 @@ export function parseWorkflow(
     );
   const fromAgent = meta.output === undefined && agent.keys.output !== undefined;
   const step = stepFrom(name, { ...inherited, ...meta }, body, fromAgent ? agent.read : read, spelled);
-  const composed = composedRefusal(`${name}: \`agent: ${agent.name}\``, agent.skills, agent.systemPrompt, step);
+  const composed = composedRefusal(`${name}: \`agent: ${agent.name}\``, agent.skills, agent.harnessPrompt, step);
   if (composed !== undefined) refuse(composed);
   if (skills) for (const skill of agent.skills ?? []) skillAt(name, agent.name, skill, skills);
   const keys = STEP_KEYS.filter((key) => Object.hasOwn(meta, key));
@@ -117,7 +117,7 @@ export function parseWorkflow(
       given,
       ...(agent.body && { instructions: agent.body }),
       ...(agent.skills?.length && { skills: agent.skills }),
-      ...(agent.systemPrompt !== undefined && { systemPrompt: agent.systemPrompt }),
+      ...(agent.harnessPrompt !== undefined && { harnessPrompt: agent.harnessPrompt }),
     },
   };
 }

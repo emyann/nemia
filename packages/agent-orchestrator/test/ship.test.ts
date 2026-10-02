@@ -23,6 +23,8 @@ const ROOT = scratch('wf-ship-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
 process.env.WF_ROOT = ROOT;
+delete process.env.WF_MAX_CONCURRENT;
+delete process.env.WF_MAX_RUNS;
 const {
   accept,
   advance,

@@ -212,7 +212,7 @@ test("GET /api/workflows/keys is the form a step is drawn in: every key in the p
   );
   assert.equal(Object.hasOwn(withAgents.agents, 'broken'), false, 'an agent the load refuses gives no values');
   for (const file of ['picked.md', 'picked.schema.json', 'broken.md']) fs.rmSync(path.join(STORE, 'agents', file));
-  const agentOnly = ['role', 'description', 'skills', 'systemPrompt'];
+  const agentOnly = ['role', 'description', 'skills', 'harnessPrompt'];
   assert.deepEqual(
     form.roleKeys,
     ['harness', 'model', 'effort', 'context', 'permissionMode', 'sandbox', 'tools', 'disallowedTools', 'allowedTools', 'remote', 'output'],
@@ -221,13 +221,13 @@ test("GET /api/workflows/keys is the form a step is drawn in: every key in the p
   assert.deepEqual(
     form.roleKeys,
     AGENT_KEYS.filter((k) => !agentOnly.includes(k)),
-    'the role keys are the agent keys but role, description, skills and systemPrompt',
+    'the role keys are the agent keys but role, description, skills and harnessPrompt',
   );
   for (const own of agentOnly)
     assert.equal(
       form.roleKeys.includes(own as never),
       false,
-      `${own} says what the agent is, what it is given or what becomes of its system prompt, and is never on the step form or in a step file`,
+      `${own} says what the agent is, what it is given or what becomes of Claude Code's own prompt, and is never on the step form or in a step file`,
     );
 
   const refusedAs = (key: string, value: string): string | null => {

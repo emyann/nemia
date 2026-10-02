@@ -52,6 +52,11 @@ export { nameFor } from './runtime-client.ts';
  */
 export { lifecycleGraph, type LifecycleGraph } from './runtime-client.ts';
 /**
+ * What a harness says of its subscription's limits, as the engine's `quota` answers it: the limits, each with its use and its reset, or
+ * why there are none. Re-exported because the api cannot import agent-runtime, as `nameFor` is.
+ */
+export type { HarnessQuota, QuotaLimit } from './runtime-client.ts';
+/**
  * Why one task's journal does not read, when `err` is what a read of it rejected with; undefined for any other failure
  * (`unreadableJournal`).
  */
@@ -350,7 +355,8 @@ export type { Told } from './say/say.verb.ts';
 export { forget } from './forget/forget.verb.ts';
 export { prune } from './prune/prune.verb.ts';
 export { decide } from './decide/decide.verb.ts';
-export { stats } from './stats/stats.verb.ts';
+export { freshStatsMemo, stats } from './stats/stats.verb.ts';
+export type { StatsMemo, StatsOptions } from './stats/stats.verb.ts';
 export { BY_KEYS, statsLine, statsLines, statsQueryOf } from './stats/index.ts';
 export type { ByKey, QueryKey, Stats, StatsQuery } from './stats/index.ts';
 export { list, unjudgedOf } from './list/list.verb.ts';

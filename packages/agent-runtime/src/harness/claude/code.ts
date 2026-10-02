@@ -21,6 +21,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { nameParts, type Sighting } from '../../core/index.ts';
 import { claudeOps, type ClaudeOptions } from './bg.ts';
+import { claudeQuota } from './quota.ts';
 import type { Observation, RunnerOps, SpawnRequest } from '../seam.ts';
 import { detachedFind, detachedOps, type HarnessIO, type HarnessSpec } from '../detached/detached.ts';
 import { claudeTranscriptEvents, claudeTranscriptFile } from './transcript.ts';
@@ -180,6 +181,7 @@ export const isClaudeJob = (sessionId: string) => nameParts(sessionId) !== undef
  *   session's — the same transcript file either way, which the background reader finds by that id.
  * - `say` sends a job's words to its inbox, which its worker writes on to its stdin, and a background session's to Claude
  *   Code's inbox.
+ * - `quota` asks the `claude` on PATH for the plan's usage (`claudeQuota`), whichever mode the sessions run in.
  */
 export const claudeCodeOps = (options: ClaudeOptions = {}): RunnerOps => {
   const root = options.root ?? path.join(os.homedir(), '.agent-engine');
@@ -240,5 +242,7 @@ export const claudeCodeOps = (options: ClaudeOptions = {}): RunnerOps => {
     transcript: (sessionId, after) => of(sessionId).transcript!(sessionId, after),
 
     say: (session, text) => of(session.sessionId).say!(session, text),
+
+    quota: claudeQuota(),
   };
 };

@@ -9,6 +9,7 @@ below its layer is in `docs/architecture.md`, *Who owns what*.
 - **The test script loads `test/harness.ts` with `--import`, and every test file imports it first too**, by its path from the file
   (`../../test/harness.ts` beside the code): a fake `claude` first on PATH, so no test asks this machine's live registry, even one run by
   hand (`node --import ./test/harness.ts --test <file>` from `apps/api`). `harness.test.ts` refuses a script or a file without it.
+  It sets `WF_MAX_RUNS` and `WF_MAX_CONCURRENT` to a value the package refuses: a test that reads a ceiling sets or deletes it itself.
 - **A body read off a response is `unknown`**: name the api's own answer type (`(await res.json()) as RunDetail`).
 - **An encoded `..` never reaches a route in a test**: `app.request` resolves `%2E%2E` before the router sees it. Send `..%2F…` to reach
   a name refusal.
@@ -16,6 +17,9 @@ below its layer is in `docs/architecture.md`, *Who owns what*.
   stand. A new input `summarize` reads for a finished run goes into one of those, or a poll answers it stale. `WF_VERIFY_REST=1` (set by
   the harness) judges every kept answer afresh; a test that counts reads turns that off for its request (`unverified`). Requests overlap
   and share the feed cursor: a request keeps nothing once another has read the feed past where it read to.
+- **`GET /api/stats` answers a finished run's facts from the app's memo** (`ReadMemo.stats`, the package's `StatsMemo`) while its
+  stamp and the feed for its tasks stand. A new input of a run's stats facts goes into one of those, or the stats answer stale. Verified
+  under `WF_VERIFY_REST=1`; a test that counts reads turns that off (`unverified` in `src/stats/stats.test.ts`).
 - **A run's tasks are every step's, every check's, and every earlier try's and its check's** (`runTasks` in the package's `record/record.ts`); `list(taskIds)`
   looks at no harness when nothing among them is in flight.
 - **A run whose task's journal does not read is answered off its record** (`judgedOrNot` in `runs/runs.ts`), never judged, and not kept:
@@ -49,7 +53,7 @@ below its layer is in `docs/architecture.md`, *Who owns what*.
   every folder decodes its bodies there.
 - **A route's contract is an entry in the JSDoc of its exported router** (`asks` in `asks/asks.ts`): the comment guard refuses a JSDoc on
   `.post(`. In a test, what a statement means goes into the test's name, an assertion's message, or a JSDoc on a property.
-- **What a route holds is taken with `acquireRelease` and let go as its scope closes** (`feedEvents`, `usageAsk`, `serverAsk`): a release
+- **What a route holds is taken with `acquireRelease` and let go as its scope closes** (`feedEvents`, `serverAsk`): a release
   that ends a process waits for it, so a test reads its pid gone as the Effect returns. An ask requests share (`makeQuota` in
   `factory/quota.ts`, `makeMcpAsker` in `capabilities/capabilities.ts`) is never interrupted by one request's going.
 - **A handle count is waited for, never read once after a close** (`watchers` and `until` in `src/factory/feed.test.ts`): a stream's watch is
@@ -60,3 +64,5 @@ below its layer is in `docs/architecture.md`, *Who owns what*.
   off `Served`, never `?repo=` itself, and the api serves no repository but its own and those a factory names (`factories.test.ts`).
 - **An agent fills a step by the file a start would run it with** (`stepsFilled`, `agents/fills.ts`), never by its name alone: the same
   name in the repository and in yours are two agents. `usedBy` is the package's by-name, same-place list the delete refusal reads.
+- **Only `main.ts`, `app.ts` and `layer.ts` touch the machine or read `process.env` and `fetch`**: a new reach in any other file is
+  refused by `test/kinds.test.ts`. Reach it through the orchestrator; when a move lands, take the reach off its entry in `MOVES`.

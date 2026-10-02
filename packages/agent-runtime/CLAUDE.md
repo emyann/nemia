@@ -12,6 +12,8 @@ down is in `docs/architecture.md`, *Who owns what*.
   `harness/seam.ts` and `harness/args.ts`, and a harness `core/engine/tally.ts`, by their own path: through a face the value graph
   closes a loop, and `test/layout.test.ts` refuses a cycle of value imports. A file moved deeper that builds a path from its own
   place gains a `..` (`WORKER`).
+- **No workflow's word in `src` or `bin`** (a workflow, a step, a gate, a factory, a closeout, the orchestrator, `wf`, Nemia): the
+  orchestrator's `test/words.test.ts` refuses a new one, and holds today's per file (`WORKFLOW_WORDS`); lower a count when one goes.
 
 ## The pass
 
@@ -36,8 +38,9 @@ down is in `docs/architecture.md`, *Who owns what*.
 - **The engine can say a task waits before its harness has let the session go** (`closedOut`, and it waits for the session before ending
   on a statement on disk): a test asserts both sides, or waits for the Task.
 - **`io().reads` counts every file the runtime reads**, not only journals.
-- **A test stamps the times the runtime compares from the journal's attempt start** (`begun` in `test/resume.test.ts`,
-  `test/shell.test.ts`), never `new Date()` beside a fake's `Date.now()`: a clock stepping back drops a closeout or counts a former try.
+- **A test stamps the times the runtime compares from the journal's attempt start** (`begun` in `test/release.test.ts`), and meets a
+  deadline with a start journalled long ago (`startedLongAgo`), never a sleep: a stepped wall clock drops a closeout or misses the
+  deadline. A duration a test measures is read with `performance.now()`; a stamp taken from a file equals its mtime (`detached.test.ts`).
 - **A detached look told names reads only their run files** (`observeFor`); `observe` lists every run, for views and verbs. A finished
   session leaves the pass's look once released and not at work (`releaseFinished`): `detached.test.ts` and `engine.test.ts` count it.
 - **`engine.test.ts` reads `domain.ts` from `decide` on, and all of `lifecycle.ts`, comments included**: a JSDoc there writes no
@@ -76,6 +79,11 @@ down is in `docs/architecture.md`, *Who owns what*.
 - **A Claude Code transcript line of a kind the runtime reads is decoded by `LINES` (`harness/claude/lines.ts`), by the reader that
   reads it**: one that does not decode fails the `--bg` `observe` (every background session unread) or the `transcript` verb, never
   read as absent. A field the runtime starts reading is added to the schema; any other line passes undecoded.
+- **A stream a runner keeps whole is read through `output`, never off the run directory** (`streamIn`, `detached.ts`, which counts
+  the read); a harness that keeps its streams apart says `streams: true`. `config.env` is journalled with the task: no secret there.
+- **A test runs at whatever niceness and IO class its parent gave it, and a worker it starts inherits both**: read a niceness
+  relative to the test's own (`ownNiceness`, `test/command.test.ts`), and prove an argv the IO class would hide by calling the
+  harness's `command`.
 - **A stream-json line is parsed for its `type`, never matched at its start** (`closesOn` in `bin/ae-worker.ts`): a job reading
   `--input-format stream-json` exits only when its stdin ends.
 

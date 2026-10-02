@@ -27,8 +27,8 @@ to change.
 Definition of done — a closed list, and it is closed:
 
 - [x] run a workload on a harness: durably, observably, to completion
-- [x] any harness, chosen per task (`claude`, `codex`, `claude-detached`)
-- [x] attempts, stop, logs — as text, and as the conversation to follow (`transcript`)
+- [x] any harness, chosen per task (`claude`, `codex`, `claude-detached`, `command`)
+- [x] attempts, stop, logs — as text, each stream of a process whole (`output`), and as the conversation to follow (`transcript`)
 - [x] a person's words into a session while it runs, on the record (`say`)
 - [x] queued and admitted — a task waits for a word before it starts, and the layer above says when; the runtime keeps
       no ceiling, no pools and no order of its own (retired in thin runtime stage 4c part 2)
@@ -300,7 +300,7 @@ Bring your own harness — three ways, in order of how much you have to write:
 | `'claude'` | Claude Code as the engine runs it by default: a step as a job (`claude -p`), and a background session (`claude --bg`) when its task asks with `config.background: true` |
 | `'claude-bg'` | Claude Code's background sessions alone; it keeps the registry |
 | a `HarnessSpec` | any CLI that runs a prompt and exits — a command and an exit code |
-| a `PromiseRunner` | four async methods, and four optional ones, `find`, `release`, `transcript` and `say`, for anything else at all |
+| a `PromiseRunner` | four async methods, and five optional ones, `find`, `output`, `release`, `transcript` and `say`, for anything else at all |
 
 **`src/cli/main.ts` builds its engine with `promiseEngine(Engine.layer(…))`, and imports types and plain helpers, through the
 two faces alone.** That is deliberate and it is the test: if the Promise API were not enough to write the CLI with, it would
@@ -350,13 +350,14 @@ harness: codex        # claude (default) | codex | claude-detached
 Review the diff on this branch for race conditions.
 ```
 
-Three are wired:
+Four are wired:
 
 | harness | how it runs | who keeps the registry |
 |---|---|---|
 | `claude` | a job: `claude -p --input-format stream-json --output-format stream-json`, in a worker we detach; with `config.background: true`, `claude --bg --name` | a job: **us**, a run file; a background session: **the harness** — `claude agents --json`, free |
 | `codex` | `codex exec --json`, in a worker we detach | **us** — a directory of run files |
 | `claude-detached` | `claude -p --output-format json`, same worker | us (there to compare the two paths) |
+| `command` | the process a task's `config.command` names, same worker — no agent at all | us |
 
 **Why two mechanisms and not one.** Claude Code keeps a registry of background sessions and will
 answer questions about them from any process. Codex has no such thing: `codex exec` runs in the
@@ -391,6 +392,37 @@ Exit 0 is success, anything else is failure. That is all a generic harness has t
 enough. `decide` never learns that harnesses exist — adding all of this changed it by zero lines,
 which is the test of whether the seam was in the right place.
 
+### A process as a harness: `command`
+
+A check — `npm test`, a build — is a process, not an agent, and runs on the same worker as one (`commandHarness`,
+`src/harness/command/command.ts`). A task gives it three arguments of its `config`, the fields a Pod's container has:
+
+| key | what it is |
+|---|---|
+| `command` | the program and its arguments, a list of strings, the program first, no shell between: `["sh", "-c", "npm test"]` |
+| `env` | variables laid over the worker's own environment, names to strings: `{ "CI": "1" }`. Journalled with the task, so it carries no secret |
+| `niceness` | 0 to 19: above 0 the process runs under `nice -n`, and in the idle IO class (`ionice -c3`) where the machine runs that — asked once a process, as the command would run it |
+
+Each is refused at `file()` when it is not what it says, and on any harness but one whose spec says `commandArgs: true`, which
+would run its own session without it; the command harness refuses a task without `command`, one that carries an agent's
+argument (`model`, `permissionMode`, …), a `closeoutSchema` and a `resumeFrom`. The brief is not read: the command is the work.
+
+Its exit code is its verdict, on the attempt: 0 succeeded, anything else failed. A command a stop ended has none, whatever it
+exited with. Its stdout and its stderr each go whole to a file of their own beside the run's log (a spec that says
+`streams: true`), cleared when the name is spawned again, and are read by `output`, never off the run directory:
+
+```ts
+const id = await engine.file({ brief: 'test', cwd, harness: 'command', config: { command: ['npm', 'test'], niceness: 10 } });
+// … ticked to its end
+await engine.output(id, 'stdout');        // all of it
+await engine.output(id, 'stderr', 4096);  // its last 4096 bytes, starting on a whole character
+```
+
+`output` asks the task's latest attempt, observes nothing, and answers `undefined` before an attempt or for a run that kept
+no streams. It refuses (exit 2; `OutputRefused` at the Effect door) a stream that is neither, a `lastBytes` that is not a whole
+number above 0, a task the board does not have, and a harness that keeps no whole streams, whose `logs` is what it has. On
+the command line, `ae output <task> [stdout|stderr]`, which says on stderr when there is nothing kept to print.
+
 ### Beneath the harnesses: an A2A seam
 
 Each harness is an [A2A](https://a2a-protocol.org) agent of its own, and the engine reaches it through the
@@ -401,7 +433,7 @@ brief its one text part, the session it continues (`resumeFrom`) its `contextId`
 whole and unopened — its metadata; `observe` is a listing, `stop` a cancel, and `say` a plain follow-up message on the
 session's Task, in no context or the session's own. What A2A
 has no call for is the extension's methods: `findSession`, `sessionLogs`, `releaseSession`, `sessionTranscript` and `observeSessions` (an
-`observe` told the sessions the journal expects, below). The harness's card lists
+`observe` told the sessions the journal expects, below), and `harnessQuota`, the one that is no session's (`quota`, below). The harness's card lists
 the ones its driver answers, and whether its sessions take words, and a verb the card leaves off is offered to nobody.
 What a harness says comes back in
 the same words: a spawn it refused is `REJECTED` and ends the attempt `unstartable`, one that may have started is
@@ -490,8 +522,8 @@ is free to ignore the schema it was sent. An agent that answers the message with
 the whole session in its reply: it ends at once, its data part the statement, and its logs are its words. `say` reaches a
 Task that asks for input, as a follow-up on it, and is refused while the Task is at work, since A2A gives a running Task
 no words. What the in-process seam's extension answers — `findSession`, `sessionLogs`, `releaseSession`,
-`sessionTranscript` — is never asked of another party: `find` and `release` are the registry's, and there is no
-`transcript`.
+`sessionTranscript`, `harnessQuota` — is never asked of another party: `find` and `release` are the registry's, and there is no
+`transcript` and no `quota`.
 
 **The registry, and what a restart does.** The driver keeps one file per session, `<root>/remote/<session name>.json`,
 written whole and renamed. The intent — the name, the harness it went through, the message's id and when, and the process
@@ -1187,14 +1219,20 @@ log. `exit` can come first, and the pass that records the end would then miss an
 pipe — for good, since an end is written once. Two seconds at most: a child the harness leaves behind
 can hold a pipe open for as long as it likes.
 
-Runners report the statement **and when it was made**. The engine decides whether it belongs to this
-attempt, records it on the attempt (`state.attempts[n].closeout`), and never reads it. Two rules
-guard that decision, both learned from real runs:
+Runners report the statement **and when it was made**, unless it cannot be another attempt's. The
+engine decides whether it belongs to this attempt, records it on the attempt
+(`state.attempts[n].closeout`), and never reads it. Two rules guard that decision, both learned from
+real runs:
 
 - **Made before the attempt began, it was inherited, not said.** A resumed Claude Code session's
   transcript holds its parent's entire conversation under the child's own session id — 460 entries,
   measured — so the parent's `StructuredOutput` call arrives looking exactly like the child's. Only
   the time tells them apart, and only the journal knows when the attempt started.
+  A runner whose session cannot carry another attempt's statement gives no time, and the engine then
+  keeps the statement whatever the clock says. A remote A2A agent is one: its Task was made by this
+  attempt's message. A time stamped when the runner read it would fall before the attempt's start
+  once the wall clock stepped back, and the statement would be dropped from a completed task.
+  Leaving out the time skips this check, so a runner that can resume a session always gives one.
 - **From a busy session, it is not final.** A step once declared itself done, carried on, found it
   could not commit, and revised its verdict eleven seconds later.
 
@@ -1527,6 +1565,27 @@ end is idle here, not a wait), `deadlineSeconds` (only a stop ends it) and `clos
 attempt); and, at the engine's doors, a harness that ends its session with its turn — `claude` without
 `config.background: true`, Codex, `claude-detached`, a remote agent. A consumer's own runner is asked nothing.
 
+## A harness's quota: `quota`
+
+A subscription has limits of its own — Claude Code's plan, five hours and a week — that no session's spend says. `quota(harness?)`
+asks a harness for them, the default harness when none is named, and answers what it said (`HarnessQuota`): the plan's limits, each
+with its key, its use in percent and its reset (`windows`), or why there are none — no plan, a plan the usage service gave nothing for,
+an answer in a shape the runtime does not read, no harness binary, a timeout, a process that ended before it answered.
+
+```ts
+const q = await engine.quota('claude')
+if (q.kind === 'windows') for (const l of q.limits) console.log(l.key, l.usedPercentage, l.resetsAt)
+```
+
+Claude Code answers it, as `claude` and as `claude-bg`: the `claude` on PATH, sent its `get_usage` control request with no prompt
+(`claudeQuota`, `harness/claude/quota.ts`), so no model is called and no token spent. Each call is one ask, one process: `claudeQuota`
+lets it go before it returns, whatever ended it — an answer, the timeout, an interruption. Through the engine the ask runs behind the
+A2A seam, which an interruption does not cross: a caller that interrupts `quota()` gets control back at once, and the process ends by
+the ask's own timeout, within `QUOTA_TIMEOUT_MS` (15 s) and 2 s more. Nothing is journalled and nothing kept, so a caller that reads
+often keeps the answer itself. A
+harness with no quota — Codex, a remote agent, a `PromiseRunner` — is refused in words (`QuotaRefused`, exit code 2 at the Promise door),
+naming the harnesses that have one; so is a harness the engine does not have, and any argument but one name.
+
 ## Waiting for a person: `holdOpen`, `answer` and `close`
 
 A task filed with `holdOpen: true` does not settle when an attempt signs. It waits, with nothing running, until a
@@ -1825,16 +1884,18 @@ of pure code sits beside it.
 | `src/harness/index.ts` | the face of the seam, as the A2A seam and the doors take it; `core/` imports `seam.ts` and `args.ts` by their own path |
 | `src/harness/claude/bg.ts` | Claude Code's `--bg` runner (`claudeOps`), and `sh`, the one way it shells out |
 | `src/harness/claude/code.ts` | Claude Code as the engine runs it by default: a step as a job (`claude -p`), or a background session (`claude --bg`) when the task asks, each verb routed by the session id's shape; and `claude -p`'s argv and the `claude-detached` spec |
+| `src/harness/claude/quota.ts` | Claude Code's quota (`claudeQuota`): the `claude` on PATH asked `get_usage` with no prompt, and its answer read (`quotaOfResponse`) |
 | `src/harness/claude/registry.ts` | the rows `claude agents --all --json` prints, decoded: which are ours, and why a listing is refused |
 | `src/harness/claude/lines.ts` | the transcript lines the runtime reads (`LINES`), each decoded where it is read, and why a line is refused |
 | `src/harness/claude/inbox.ts` | words said into a running Claude Code session: its inbox, and its registration found by name |
 | `src/harness/claude/transcript.ts` | a Claude Code session's transcript: where it is, its closeout, its lines as events, and its usage and cost |
 | `src/harness/claude/vocabulary.ts` | Claude Code's modes, efforts and context windows, and what it refuses to be asked for |
 | `src/harness/claude/index.ts` | the face of `harness/claude/`, as the doors take it |
+| `src/harness/command/command.ts` | a process as a harness: the program a task's `config.command` names, its `env` and `niceness`, its streams kept whole, and what it refuses |
 | `src/harness/codex/codex.ts` | Codex through `codex exec`: its sandboxes and efforts, the trust it is extended, and its spec |
 | `src/harness/codex/stream.ts` | what a Codex session prints under `exec --json`: each event the runtime reads decoded by `CodexEventSchema`, a stream that does not decode refused, and its usage |
 | `src/harness/codex/transcript.ts` | a Codex thread's rollout: where it is, and its records as events |
-| `src/harness/detached/detached.ts` | a runner for any harness that runs a prompt and exits: `HarnessSpec`, the detached worker's run files, the lease, and the four verbs over them |
+| `src/harness/detached/detached.ts` | a runner for any harness that runs a prompt and exits: `HarnessSpec`, the detached worker's run files, the lease, the four verbs over them, and `output`, a stream kept whole |
 | `src/harness/detached/output.ts` | what a detached session's output says: `claude -p`'s result and stream, read for closeout, usage, cost, a spent budget and denials, and the stream for the skills loaded |
 | `src/harness/detached/said.ts` | what was read of a finished run's output, kept beside its log keyed by the log's size and mtime and the readers' version — or a former one they only added fields to (`SAID_EXTENDED`) — so each process reads a log once per change of it |
 | `src/a2a/map.ts` | the runtime's words in A2A's and back, pure: a session is a Task named for it, a spawn a user Message marked with the runtime's extension and `config` in its metadata, words said to a session a follow-up on its Task, a sighting or a journalled attempt a Task, its context the harness's id for the conversation and its closeout its one Artifact |
@@ -1846,6 +1907,8 @@ of pure code sits beside it.
 | `src/a2a/index.ts` | the face of `a2a/`, as the doors take it: it imports no name of the SDK's |
 | `src/facade/consumer.ts` | what a consumer writes and is given — its store in Promises, its harnesses, its options, its task and its engine — the adapters over them, and what the door refuses of them |
 | `src/service/engine.ts` | the engine as an Effect service, `Engine`: `Engine.layer(options)` assembles each harness behind its A2A agent, the store and the memo, and its verbs are Effects that fail with tagged errors (`ListRefused`, `TranscriptRefused`, `SayRefused`, `SayUnsent`, and the core's) |
+| `src/service/output.ts` | the engine's `output` verb, `outputVerbOf`, and `OutputRefused`: one stream of a task's latest attempt, kept whole by its harness |
+| `src/service/harnesses.ts` | `DEFAULT_HARNESSES`, the harnesses an engine runs when its options name none |
 | `src/service/index.ts` | the face of `service/`, as the doors take it |
 | `src/facade/engine.ts` | `promiseEngine`: an `Engine` layer built once and each verb run as a Promise, a refusal an `Error` whose `exitCode` is 2: the Promise engine a consumer builds as `promiseEngine(Engine.layer(options))` |
 | `src/facade/promise.ts` | a harness a consumer wrote in Promises (`PromiseRunner`), as the engine's verbs: an adapter like the others, reached through the A2A seam |
@@ -1858,6 +1921,7 @@ of pure code sits beside it.
 | `test/unsigned.test.ts` | a session gone quiet, or `done`, without the closing statement its task asked for: ended with `stated: false`, and continued by nothing; quiet with none asked for still succeeds with no such key — a fake `claude` that keeps a registry, at shipped defaults |
 | `test/shell.test.ts` | a session held busy by a background shell it left running: its own closeout as the last word in a cold transcript ends the attempt, an advancing one or no statement does not — a fake `claude` that keeps a registry, at shipped defaults |
 | `test/resume.test.ts` | a resumed session read as its new attempt's, and a final read taken again once its transcript grows — a fake `claude` that keeps a registry, at shipped defaults |
+| `test/command.test.ts` | the command harness against the real worker: a long stdout read back whole, stderr apart, the exit code, `env`, `niceness`, a stop, a lingering child, a respawn, and its refusals |
 | `test/detached.test.ts` | the worker, the lease, the composite, each spec's argv and refusals — `sh` as the harness |
 | `test/mcp.test.ts` | what each harness is given for MCP, at shipped defaults — fake `claude` and `codex` on `PATH` |
 | `test/io.test.ts` | what a pass costs as the runtime reports it: a tick's `ms` and each harness's observes, and `io()`'s bytes read and processes started |

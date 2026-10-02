@@ -28,6 +28,7 @@ export type {
 export type { PromiseRunner, PromiseSighting } from './facade/promise.ts';
 export { codex } from './harness/codex/codex.ts';
 export { claudeDetached } from './harness/claude/index.ts';
+export { commandHarness } from './harness/command/command.ts';
 /** The words each harness takes, as lists: what an upper layer that checks a task before filing it holds its own copy to. */
 export { CLAUDE_CONTEXT_TOKENS, CLAUDE_EFFORTS, CLAUDE_PERMISSION_MODES } from './harness/claude/index.ts';
 export { CODEX_EFFORTS, CODEX_SANDBOXES } from './harness/codex/codex.ts';
@@ -51,7 +52,7 @@ export type { Event, Sighting, EndReason, State, Attempt, Usage, Said, Denial, I
 export type { SessionState, Ended, Outcome } from './core/index.ts';
 export { HARNESS_ARGS, TURN_ARGS, type CodexArgs, type HarnessArgs } from './harness/index.ts';
 export type { ClaudeFlags } from './harness/claude/index.ts';
-export type { McpServer, SpawnRequest, Transcript, TranscriptCursor, TranscriptEvent } from './harness/index.ts';
+export type { HarnessQuota, McpServer, QuotaLimit, SpawnRequest, Transcript, TranscriptCursor, TranscriptEvent } from './harness/index.ts';
 export type { FeedEntry, FeedRefusal, Cursor } from './core/engine/index.ts';
 export type { IoCounts } from './core/engine/index.ts';
 export type { RefusedMove, TaskList, TaskView, UnreadableTask } from './core/engine/index.ts';

@@ -6,7 +6,7 @@
  * The bottom of the format: every other part of it imports this, and this imports none of them but a type.
  */
 import { Invalid } from '../refusal/refusal.ts';
-import type { SystemPrompt } from '../agents/agents.ts';
+import type { HarnessPrompt } from '../agents/agents.ts';
 
 export type Workflow = {
   /** The step's name — the file's, minus `.md`. What `after` refers to. */
@@ -221,13 +221,13 @@ export type StepAgent = {
   body: string;
   given: Partial<Record<StepKey, string>>;
   /**
-   * The agent's own instructions, its skills and its system prompt, as the step was resolved: what `wf start` renders for a Claude Code
-   * step, which is then told its instructions in its system prompt and its note alone in its brief (`rendersAgent`, `briefBody`). Absent on
-   * a record without them, whose step is told both in its brief.
+   * The agent's own instructions, its skills and what becomes of Claude Code's own prompt (`harnessPrompt:`), as the step was resolved:
+   * what `wf start` renders for a Claude Code step, which is then told its instructions in Claude Code's prompt and its note alone in its
+   * brief (`rendersAgent`, `briefBody`). Absent on a record without them, whose step is told both in its brief.
    */
   instructions?: string;
   skills?: string[];
-  systemPrompt?: SystemPrompt;
+  harnessPrompt?: HarnessPrompt;
 };
 
 /** The rounds a `loop:` runs when its step does not say. */

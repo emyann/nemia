@@ -578,41 +578,45 @@ test('REFUSED at shipped defaults: a card file sent by a page drawn before the c
   assert.equal(fs.existsSync(path.join(AGENTS, 'scribe.md')), false, 'nothing was written');
 });
 
-test('an agent is written and listed with the skills it is given and its system prompt, each as its line writes it', async () => {
+test("an agent is written and listed with the skills it is given and what becomes of Claude Code's prompt, each as its line writes it", async () => {
   const made = await send('POST', '/api/agents/yours', {
     ...scribe,
     keys: { ...scribe.keys, tools: 'Read, Write, Skill' },
     skills: ' review-a-change,implement-a-change ',
-    systemPrompt: 'no-coding',
+    harnessPrompt: 'no-coding',
   });
   const saved = (await made.json()) as AgentSaved;
   assert.equal(made.status, 201, JSON.stringify(saved));
   try {
     const text = fs.readFileSync(path.join(AGENTS, 'scribe.md'), 'utf8');
     assert.match(text, /^skills: review-a-change,implement-a-change$/m);
-    assert.match(text, /^systemPrompt: no-coding$/m);
+    assert.match(text, /^harnessPrompt: no-coding$/m);
     assert.equal(saved.agent.skills, 'review-a-change, implement-a-change', 'listed as the parser read it');
-    assert.equal(saved.agent.systemPrompt, 'no-coding');
+    assert.equal(saved.agent.harnessPrompt, 'no-coding');
     assert.deepEqual(
       saved.agent.card?.map((s) => s.id),
       ['review-a-change', 'implement-a-change'],
       'the card is the skills it gives',
     );
     assert.equal(Object.hasOwn(saved.agent.keys, 'skills'), false, 'not a role key: a step has no skills of its own');
-    assert.equal(Object.hasOwn(saved.agent.keys, 'systemPrompt'), false, 'not a role key: a step has no system prompt of its own');
+    assert.equal(Object.hasOwn(saved.agent.keys, 'harnessPrompt'), false, 'not a role key: a step has no harness prompt of its own');
   } finally {
     await send('DELETE', '/api/agents/yours/scribe', { version: saved.agent.version });
   }
 });
 
-test("REFUSED at shipped defaults: skills or a system prompt not written as text, ones the package will not read, and skills the agent's tools could not load", async () => {
+test("REFUSED at shipped defaults: skills or a harness prompt not written as text, ones the package will not read, and skills the agent's tools could not load", async () => {
   await refused(send('POST', '/api/agents/yours', { ...scribe, skills: ['a'] }), 400, /`skills` is the skills the agent is given, by name/);
   await refused(
-    send('POST', '/api/agents/yours', { ...scribe, systemPrompt: 1 }),
+    send('POST', '/api/agents/yours', { ...scribe, harnessPrompt: 1 }),
     400,
-    /`systemPrompt` is `"default"`, `"no-coding"` or `"own"`/,
+    /`harnessPrompt` is `"keep"`, `"no-coding"` or `"replace"`/,
   );
-  await refused(send('POST', '/api/agents/yours', { ...scribe, systemPrompt: 'terse' }), 422, /systemPrompt/);
+  await refused(
+    send('POST', '/api/agents/yours', { ...scribe, harnessPrompt: 'terse' }),
+    422,
+    /`harnessPrompt: terse` is not one of keep, no-coding, replace/,
+  );
   await refused(send('POST', '/api/agents/yours', { ...scribe, skills: 'Not A Name' }), 422, /Not A Name/);
   await refused(send('POST', '/api/agents/yours', { ...scribe, skills: 'write-a-note' }), 422, /no `Skill`/);
   await refused(
@@ -621,6 +625,34 @@ test("REFUSED at shipped defaults: skills or a system prompt not written as text
     /codex/,
   );
   assert.equal(fs.existsSync(path.join(AGENTS, 'scribe.md')), false, 'nothing was written');
+});
+
+test('REFUSED: a page from before the rename that still sends `systemPrompt`, a null among them, as stale; nothing is written', async () => {
+  for (const sent of ['no-coding', null]) {
+    await refused(
+      send('POST', '/api/agents/yours', { ...scribe, systemPrompt: sent }),
+      400,
+      /^POST \/api\/agents\/yours: `systemPrompt` is now `harnessPrompt`[^]*A page that sends it is stale: reload it, and save again/,
+    );
+  }
+  assert.equal(fs.existsSync(path.join(AGENTS, 'scribe.md')), false, 'nothing was written');
+});
+
+test('an agent still on the former `systemPrompt:` line is listed with its `harnessPrompt` in the word it is now, read or not', async () => {
+  fs.writeFileSync(path.join(AGENTS, 'prompted.md'), '---\ndescription: Says own.\nsystemPrompt: own\n---\nYou are the whole prompt.\n');
+  fs.writeFileSync(path.join(AGENTS, 'prompted-broken.md'), '---\nsystemPrompt: own\ncheck: npm test\n---\nDo it.\n');
+  try {
+    const agents = await listed();
+    const prompted = agents.find((a) => a.name === 'prompted')!;
+    assert.equal(prompted.error ?? null, null);
+    assert.equal(prompted.harnessPrompt, 'replace');
+    const broken = agents.find((a) => a.name === 'prompted-broken')!;
+    assert.match(broken.error ?? '', /`check` is wiring/);
+    assert.equal(broken.harnessPrompt, 'replace', 'its former line as the parser reads it, so the form shows what it means');
+  } finally {
+    fs.rmSync(path.join(AGENTS, 'prompted.md'), { force: true });
+    fs.rmSync(path.join(AGENTS, 'prompted-broken.md'), { force: true });
+  }
 });
 
 test('an agent is answered as an A2A Agent Card, with what it leaves out said beside it and never inside it', async () => {

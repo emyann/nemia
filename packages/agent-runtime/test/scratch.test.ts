@@ -2,7 +2,9 @@
  * Every temporary root a test makes comes from `scratch`, which takes it away with whatever runs in it (`scratch.ts`):
  * a call of `os.tmpdir` anywhere else under `test/`, or in a test beside the code under `src/`, is refused, and each
  * package's copy of the helper is this one. A test of where the code under test runs a process names the temp directory with
- * `machineTempDir()`, which the scan refuses only on a line that makes a root with `mkdtempSync`.
+ * `machineTempDir()`, which the scan refuses only on a line that makes a root with `mkdtempSync`. A Claude Code runner a test
+ * makes is given its `root`, which it writes to as it looks (`harness/claude/quiet.ts`): a call with none is refused, since
+ * the default is the person's own store.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -68,4 +70,47 @@ test("the helper is the runtime's, byte for byte", () => {
     fs.readFileSync(RUNTIME, 'utf8'),
     'copy packages/agent-runtime/test/scratch.ts over this one: a change to it is made there and copied to every package',
   );
+});
+
+/** The makers of a Claude Code runner, whose `root` defaults to the person's own store. */
+const RUNNERS = /\b(?:claudeOps|claudeCodeOps|Runner\.claude)\s*\(/g;
+
+/** Each call in `text` of a maker in `RUNNERS` whose arguments do not name `root`, by its line; a comment line is passed over. */
+const rootlessRunners = (text: string) =>
+  [...text.matchAll(RUNNERS)].flatMap((m) => {
+    const start = (m.index ?? 0) + m[0].length;
+    let depth = 1;
+    let end = start;
+    while (end < text.length && depth > 0) {
+      depth += text[end] === '(' ? 1 : text[end] === ')' ? -1 : 0;
+      end++;
+    }
+    const line = text.slice(0, m.index).split('\n').length;
+    const shown = text.split('\n')[line - 1].trim();
+    if (/^(?:\*|\/\/|\/\*)/.test(shown) || /\broot\b/.test(text.slice(start, end))) return [];
+    return [`${line}: ${shown}`];
+  });
+
+test('REFUSED: a Claude Code runner made with no root is found, whichever maker and however its arguments are laid out', () => {
+  const maker = 'claude' + 'Ops';
+  const codeMaker = 'claudeCode' + 'Ops';
+  const runnerMaker = 'Runner.' + 'claude';
+  assert.deepEqual(rootlessRunners(`const a = 1;\nconst ops = ${maker}({ now: () => t });\n`), [
+    `2: const ops = ${maker}({ now: () => t });`,
+  ]);
+  assert.equal(rootlessRunners(`${maker}().spawn(r)`).length, 1, 'no arguments at all');
+  assert.equal(rootlessRunners(`${codeMaker}({\n  now,\n})`).length, 1);
+  assert.equal(rootlessRunners(`${runnerMaker}()`).length, 1);
+  assert.deepEqual(rootlessRunners(`${maker}({\n  root,\n  now: () => f(t),\n})`), [], 'a root given on another line');
+  assert.deepEqual(rootlessRunners(`${maker}({ ...opsOptions(root), now })`), [], 'a root given through a helper');
+  assert.deepEqual(rootlessRunners(` * The argv \`${maker}().spawn\` hands over`), [], 'a comment is passed over');
+});
+
+test('no test makes a Claude Code runner over the default store', () => {
+  const files = [
+    ...fs.readdirSync(TEST, { recursive: true, encoding: 'utf8' }).filter((f) => /\.(ts|tsx)$/.test(f) && f !== 'scratch.test.ts'),
+    ...besideTheCode(),
+  ];
+  const refused = files.flatMap((f) => rootlessRunners(fs.readFileSync(path.join(TEST, f), 'utf8')).map((l) => `${f}:${l}`));
+  assert.deepEqual(refused, [], "give the runner a root from scratch(prefix): with none it writes into the person's own ~/.agent-engine");
 });

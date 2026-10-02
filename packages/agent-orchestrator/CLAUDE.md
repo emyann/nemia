@@ -13,6 +13,8 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
 - **A place skill's scripts (`place/git/scripts/`) are standalone**: node's built-ins and erasable TypeScript only (`placeBreaks` in
   `test/boundary.test.ts`), run by the package only through `runPlaceVerb` (`src/place/place.store.ts`); a verb declared in
   `place.json` has its script (`readPlaceJson`).
+- **A harness's word or a team name in `src` or `bin` is refused by `test/words.test.ts`**, which holds today's per file
+  (`HARNESS_WORDS`, `TEAM_NAMES`, each naming its card or move): lower a count in the commit that removes one, and add none.
 - **Git holds `index.lock` through a clean filter under `git add`, not through `git commit`'s pre-commit hook** (it writes the index
   first): a test that holds a lock past a verb's deadline holds it with a filter (`test/git-skill.test.ts`).
 
@@ -94,6 +96,9 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
 - **A finished run is answered from memory while what it was judged on stands** (`restMemo`, `atRest`, `restStamps`): a new input of its
   pass goes into the stamps. A run whose stamp holds is not read off disk (`keptOf`), so an input the stamp misses is missed for good;
   `WF_VERIFY_REST` dies on it. Every test file that ticks a store sets `WF_VERIFY_REST=1`.
+  pass goes into the stamps. Every test file that ticks a store sets `WF_VERIFY_REST=1`.
+- **The test script loads `test/ambient.ts`**, which sets `WF_MAX_RUNS` and `WF_MAX_CONCURRENT` to a value their readers refuse: a
+  test file that reads either sets or deletes it at its head, never the daemon's (`test/ambient.test.ts`).
 - **A pass on a copy of the store acts on the real repositories** its records name: measure with a fixture store of scratch repositories,
   or a fake runtime whose tasks are all `pending`.
 - **Git refuses a whole `for-each-ref` for one base it cannot read**: `branchReader` lists again without it (pinned against `oneByOne`).

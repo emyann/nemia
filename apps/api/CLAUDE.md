@@ -9,6 +9,7 @@ below its layer is in `docs/architecture.md`, *Who owns what*.
 - **The test script loads `test/harness.ts` with `--import`, and every test file imports it first too**, by its path from the file
   (`../../test/harness.ts` beside the code): a fake `claude` first on PATH, so no test asks this machine's live registry, even one run by
   hand (`node --import ./test/harness.ts --test <file>` from `apps/api`). `harness.test.ts` refuses a script or a file without it.
+  It sets `WF_MAX_RUNS` and `WF_MAX_CONCURRENT` to a value the package refuses: a test that reads a ceiling sets or deletes it itself.
 - **A body read off a response is `unknown`**: name the api's own answer type (`(await res.json()) as RunDetail`).
 - **An encoded `..` never reaches a route in a test**: `app.request` resolves `%2E%2E` before the router sees it. Send `..%2F…` to reach
   a name refusal.
@@ -60,3 +61,5 @@ below its layer is in `docs/architecture.md`, *Who owns what*.
   off `Served`, never `?repo=` itself, and the api serves no repository but its own and those a factory names (`factories.test.ts`).
 - **An agent fills a step by the file a start would run it with** (`stepsFilled`, `agents/fills.ts`), never by its name alone: the same
   name in the repository and in yours are two agents. `usedBy` is the package's by-name, same-place list the delete refusal reads.
+- **Only `main.ts`, `app.ts` and `layer.ts` touch the machine or read `process.env` and `fetch`**: a new reach in any other file is
+  refused by `test/kinds.test.ts`. Reach it through the orchestrator; when a move lands, take the reach off its entry in `MOVES`.

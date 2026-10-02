@@ -14,6 +14,7 @@ const ROOT = scratch('wf-remote-refused-');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
+delete process.env.WF_MAX_CONCURRENT;
 const BIN = scratch('wf-remote-refused-bin-');
 for (const name of ['claude', 'codex']) fs.writeFileSync(path.join(BIN, name), '#!/bin/sh\nexit 1\n', { mode: 0o755 });
 process.env.PATH = `${BIN}${path.delimiter}${process.env.PATH}`;

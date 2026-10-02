@@ -69,13 +69,15 @@ holds what every change needs.
   (`agent-runtime/test/contract.test.ts`). A knob on a workload is a field carried on the task and read by a runner, never a callback
   into `decide`, and no `if` in `engine.ts` belongs in `decide` `(no test yet)`. What sits in which layer today, and what is a
   candidate to move, is in `docs/architecture.md`, *Who owns what*.
-- **Three rules hold the layers, each a test** (`docs/architecture.md`):
+- **Four rules hold the layers, each a test** (`docs/architecture.md`):
   - *Between packages, only the public contract*: `agent-runtime` and `agent-runtime/effect`; `agent-orchestrator`,
     `agent-orchestrator/run`, `agent-orchestrator/workflow` and `agent-orchestrator/effect` — never a subpath outside `exports`, a
     relative path, `import.meta.resolve` or a path into `src/` (the two `contract.test.ts`).
   - *Inside the orchestrator, every file is pure, store, controller or the client* (`PURE`, `STORE`, `CONTROLLER`, `CLIENT` in
     `packages/agent-orchestrator/test/boundary.test.ts`); a new file joins one kind, or the suite fails.
   - *The runtime is reached through one client*, `src/runtime-client.ts` (`CLIENT` in the same test).
+  - *Each layer says its own words*: no harness word outside the runtime, no workflow word in it, no team name in a package's `src`
+    (`HARNESS_WORDS`, `WORKFLOW_WORDS`, `TEAM_NAMES` in `packages/agent-orchestrator/test/words.test.ts`, which only shrink).
 - **A spec here reads `docs/architecture.md` first.** A change's `where` names its layer (`agent-runtime`, `agent-orchestrator`,
   `apps/api`, `apps/web`), and in the orchestrator its feature folder and kind (pure, store, controller, client), in the api its folder;
   its `why`, and a placement finding's `rule`, cite the rule above or the *Who owns what* line, with the test that holds it.

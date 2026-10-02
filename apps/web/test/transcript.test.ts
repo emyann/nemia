@@ -247,10 +247,21 @@ test('the tail begins after the last thing said: a call in it may still be answe
   assert.equal(tailStart(foldTranscript([use('b', 'Bash'), use('c', 'StructuredOutput', {})])), 2, 'after the closeout, nothing waits');
 });
 
-test('a step has a conversation to read once a session of its current task has started, and none before it or before it is filed', () => {
+test('a step has a conversation to read once a session of its current task has started, on its turn or one before, and none before it or before it is filed', () => {
   const latest = { startedAt: at(), ended: null, endedAt: null, reason: null };
-  assert.equal(sessionToRead({ taskId: 'run-review', attempts: { count: 1, latest } }), 'run-review');
-  assert.equal(sessionToRead({ taskId: 'run-review', attempts: { count: 3, latest } }), 'run-review');
-  assert.equal(sessionToRead({ taskId: 'run-review', attempts: { count: 0, latest: null } }), null);
-  assert.equal(sessionToRead({ taskId: null, attempts: { count: 0, latest: null } }), null);
+  const none = { count: 0, latest: null };
+  assert.equal(sessionToRead({ taskId: 'run-review', attempts: { count: 1, latest }, tries: [] }), 'run-review');
+  assert.equal(sessionToRead({ taskId: 'run-review', attempts: { count: 3, latest }, tries: [] }), 'run-review');
+  assert.equal(sessionToRead({ taskId: 'run-review', attempts: none, tries: [{ taskId: 'run-review', attempts: none }] }), null);
+  assert.equal(sessionToRead({ taskId: null, attempts: none, tries: [] }), null);
+  const answered = [
+    { taskId: 'run-review', attempts: { count: 1, latest } },
+    { taskId: 'run-review', attempts: none },
+  ];
+  assert.equal(sessionToRead({ taskId: 'run-review', attempts: none, tries: answered }), 'run-review');
+  const fresh = [
+    { taskId: 'run-review-1', attempts: { count: 1, latest } },
+    { taskId: 'run-review-2', attempts: none },
+  ];
+  assert.equal(sessionToRead({ taskId: 'run-review-2', attempts: none, tries: fresh }), null);
 });

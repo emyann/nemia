@@ -34,7 +34,7 @@ export const USAGE_ARGS = [
 /**
  * What a Claude Code session hands its children, as 2.1.278 does (read off a session's own environment): a process started from one would
  * otherwise start the ask as that session's child. Named, not matched by prefix: the rest of `CLAUDE*` is how the asked claude signs in
- * and whom it asks (`CLAUDE_CONFIG_DIR`, `CLAUDE_CODE_OAUTH_TOKEN`, `CLAUDE_CODE_USE_BEDROCK`…), as it is for the engine's workers.
+ * and whom it asks (`CLAUDE_CONFIG_DIR`, `CLAUDE_CODE_OAUTH_TOKEN`…), as it is for the engine's workers.
  */
 const SESSION_KEYS = new Set([
   'AI_AGENT',

@@ -27,8 +27,8 @@ export const registry = path.join(bin, 'registry.json');
  */
 export const calls = path.join(bin, 'calls');
 /**
- * What the fake prints to a `get_usage` request (`claude -p`, as the engine's `quota` asks it): lines of stream-json, `@ID@` in them replaced by the
- * request's own id. Claude Code 2.1.278's answer as recorded until a test writes another (`usageAnswer`).
+ * What the fake prints to a `get_usage` request (`claude -p`, as the engine's `quota` asks it): lines of stream-json, `@ID@` in them
+ * replaced by the request's own id. Claude Code 2.1.278's answer as recorded until a test writes another (`usageAnswer`).
  */
 export const answer = path.join(bin, 'usage-answer');
 /** How the fake takes a `get_usage` request: `answer` (the default), or `exit`, 3 before it reads it. */

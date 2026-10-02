@@ -87,8 +87,8 @@ version, and the version above must be the pin. An upgrade re-measures the table
   buffer, each item handed on with an awaited `Queue.offer`, so the watch waits for a slow reader: `feedEvents` in
   `apps/api/src/factory/feed.ts`. Hono's `streamSSE` runs it with the app's `runtime.runPromiseExit(program, { signal })`, the signal
   aborted from `stream.onAbort`: `runPromiseExit`, since `streamSSE` prints a rejection. A child process is `acquireRelease` with its
-  release reading the `Exit`, under `Effect.timeoutOrElse`, which waits for the release: `usageAsk` in `apps/api/src/factory/quota.ts`,
-  `serverAsk` in `apps/api/src/capabilities/capabilities.ts`.
+  release reading the `Exit`, under `Effect.timeoutOrElse`, which waits for the release: `claudeQuota` in
+  `packages/agent-runtime/src/harness/claude/quota.ts`, `serverAsk` in `apps/api/src/capabilities/capabilities.ts`.
 
 ## The api's runtime
 

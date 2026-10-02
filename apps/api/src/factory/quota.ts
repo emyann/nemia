@@ -109,7 +109,10 @@ export function ageWord(ms: number): string {
   return min % 60 ? `${h} h ${min % 60} min` : `${h} h`;
 }
 
-/** The windows the board shows, of the plan's `limits`, at `now`: in the board's order, each with its label, a key it does not know left out. */
+/**
+ * The windows the board shows, of the plan's `limits`, at `now`: in the board's order, each with its label, a key it does not know left
+ * out.
+ */
 function windowsOf(limits: readonly QuotaLimit[], now: number): QuotaWindow[] {
   return ORDER.flatMap((key) => {
     const limit = limits.find((l) => l.key === key);

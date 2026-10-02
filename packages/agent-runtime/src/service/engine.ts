@@ -129,9 +129,9 @@ export const listRefusalOf = (args: readonly unknown[]): string | undefined => {
  * The engine's verbs, each an Effect with what refuses it on its error channel. Each does what the verb of the same name on
  * `agent-runtime`'s `Engine` does, where each is described, and fails with a tagged error where that one rejects with an `Error`
  * whose `exitCode` is 2: `FileRefused`, `TickRefused`, `AdmitRefused`, `ListRefused`, `TranscriptRefused`, `SayRefused`, `QuotaRefused`,
- * `StopRefused` for `stop`, and `InputRefused` for `answer` and `close`. `SayUnsent` is `say`'s failure that is not a refusal; a `JournalError` or a
- * `RunnerError` is the store's or the harness's. `watch`, `io` and `start` succeed at once: `watch` and `start` with a handle that stops
- * them.
+ * `StopRefused` for `stop`, and `InputRefused` for `answer` and `close`. `SayUnsent` is `say`'s failure that is not a refusal; a
+ * `JournalError` or a `RunnerError` is the store's or the harness's. `watch`, `io` and `start` succeed at once: `watch` and `start`
+ * with a handle that stops them.
  */
 export type EngineShape = {
   readonly file: (spec: TaskSpec) => Effect.Effect<string, FileRefused | JournalError>;

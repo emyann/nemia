@@ -43,7 +43,7 @@ inbox, factories, stats, agent definitions.
 - copies of harness vocabulary (`src/harness/harness.ts`, `src/keys/keys.ts`, `src/keys/tools.ts`, `src/workflow/validate.ts`), held
   equal to the runtime's by `test/vocabulary.test.ts`.
 
-**In the api today, below its layer**: `src/factory/quota.ts` spawning `claude`, `runsInOf` in `src/detail/detail.ts` reading a
+**In the api today, below its layer**: `runsInOf` in `src/detail/detail.ts` reading a
 harness's argv for a mode, and `src/capabilities/reach.ts` re-implementing permission matching.
 
 **In the web today, against its rule**, until the api answers that text:

@@ -435,7 +435,7 @@ test(
   async () => {
     const root = tmp('release-board');
     const engine = promiseEngine(EngineService.layer({ root }));
-    const cwd = tmp('release');
+    const cwd = trusted('release');
     const word = `ae${randomUUID().slice(0, 8)}`;
     const agents = () =>
       JSON.parse(execFileSync('claude', ['agents', '--all', '--json'], { encoding: 'utf8', timeout: 60_000 })) as Array<{
@@ -499,6 +499,7 @@ test(
           } catch {}
         }
       }
+      fs.rmSync(cwd, { recursive: true, force: true });
     }
   },
 );

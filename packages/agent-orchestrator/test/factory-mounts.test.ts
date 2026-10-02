@@ -15,6 +15,7 @@ import type { Engine } from 'agent-runtime';
 import { scratch } from './scratch.ts';
 import { teamCopy } from './team.ts';
 import { factoryMounts } from '../src/factory/factory.ts';
+import { mountsLine } from '../src/start/inputs.ts';
 
 const ROOT = scratch('wf-factory-mounts-');
 process.env.WF_ROOT = ROOT;
@@ -223,7 +224,7 @@ test("the frozen mounts are filed with a local step's first filing, a try and a 
   assert.deepEqual(b.filed.get(round)?.config?.mounts, frozen, 'a round');
 });
 
-test('a step on a remote agent is filed no mounts, and its brief names none', async () => {
+test("a step on a remote agent is filed no mounts, and its brief names none, a round's included", async () => {
   const { repos, loop } = fresh();
   fs.writeFileSync(path.join(ROOT, 'a2a-agents.json'), JSON.stringify({ peer: { url: 'https://peer.example' } }));
   const asked = path.join(path.dirname(loop), 'asked');
@@ -237,6 +238,9 @@ test('a step on a remote agent is filed no mounts, and its brief names none', as
   const filing = b.filed.get(`${run.id}-ask`)!;
   assert.equal(Object.hasOwn(filing, 'config'), false, 'a remote step files no local fields');
   assert.doesNotMatch(filing.brief, /mounted read-only/);
+  const mounts = readOnly(repos[1]);
+  assert.deepEqual(mountsLine({ harness: 'a2a:peer' }, { mounts }), [], 'nor a round of it, briefed as a local step is');
+  assert.match(mountsLine({ harness: 'claude' }, { mounts }).join('\n'), /mounted read-only/);
 });
 
 test("REFUSED: a start whose step's harness cannot hold the factory's mounts, in the runtime's words, before anything is written", () => {

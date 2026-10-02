@@ -1205,7 +1205,7 @@ How each harness is asked — `claude` and `codex` verified live:
 | harness | how | where the answer lands |
 |---|---|---|
 | Claude Code | `--json-schema`: the session gets a `StructuredOutput` tool and calls it to finish. Works under `--bg`, though documented only for `-p` (2.1.270). | the session's transcript |
-| `claude-detached` | `-p --json-schema --output-format json`: `claude -p` prints one `result` object, and the answer is its `structured_output` (one live `-p` call, 2.1.270; under the engine, a fake `claude` only) | the worker's capture of its output, stamped with when that was last written |
+| `claude-detached` | `-p --json-schema --output-format json`: `claude -p` prints one `result` object, and the answer is its `structured_output` (one live `-p` call, 2.1.270; under the engine, a fake `claude` only) | the worker's capture of its output, with no time: the spawn cleared it before the run began |
 | Codex | `exec --output-schema`, with `-o` at a file the runner chose outside the workspace (0.154.0, strict schema) | that file |
 
 A detached run's end is written only once the harness's pipes have closed and its output is in the
@@ -1226,7 +1226,12 @@ real runs:
   keeps the statement whatever the clock says. A remote A2A agent is one: its Task was made by this
   attempt's message. A time stamped when the runner read it would fall before the attempt's start
   once the wall clock stepped back, and the statement would be dropped from a completed task.
-  Leaving out the time skips this check, so a runner that can resume a session always gives one.
+  The detached runner is another, though it resumes a session: its spawn clears the attempt's
+  closeout file and output before it launches the run, and a resumed run's parent wrote its own
+  under its own name, so whatever it reads there its own process wrote. A file's mtime is no
+  better than a clock: stepped back about a second every thirty seconds under load, it fell before
+  a 1.4 s attempt's start, and the statement was dropped. Leaving out the time skips this check, so
+  Claude Code's `--bg` runner, whose resumed transcript holds its parent's calls, still gives one.
 - **From a busy session, it is not final.** A step once declared itself done, carried on, found it
   could not commit, and revised its verdict eleven seconds later.
 

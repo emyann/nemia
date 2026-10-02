@@ -309,22 +309,23 @@ const formatter = SchemaIssue.makeFormatterStandardSchemaV1();
 export type RunInput = { first: string; inbox: string; from: number; closesOn: { key: string; value: string } };
 
 /**
- * A run's sighting, field for field: its closeout the file its harness wrote (`statement`), else what its output says, stamped
- * with when that output was written; its exit code once it has one, never the worker's -1; and what its output says it used,
- * reached and was denied, and the skills it loaded: an empty list kept, since it says they were counted.
+ * A run's sighting, field for field: its closeout the file its harness wrote (`statement`), else what its output says, with no
+ * time: the spawn cleared both before it launched the run, so either was written by the run's own process, and the engine keeps
+ * it whatever the clock says; its exit code once it has one, never the worker's -1; and what its output says it used, reached
+ * and was denied, and the skills it loaded: an empty list kept, since it says they were counted.
  */
 const sightingOf = (
   name: string,
   run: RunFile,
   now: number,
   statement: Sighting['closeout'],
-  output: { read: HarnessOutput; at: number } | undefined,
+  output: { read: HarnessOutput } | undefined,
   usage: Usage | undefined,
 ): Sighting => ({
   sessionId: name,
   state: detachedStateOf(run, now),
   nativeId: run.nativeId,
-  closeout: statement ?? (output?.read.closeout && { payload: output.read.closeout.payload, at: output.at }),
+  closeout: statement ?? (output?.read.closeout && { payload: output.read.closeout.payload }),
   ...(typeof run.exitCode === 'number' && run.exitCode >= 0 ? { exitCode: run.exitCode } : {}),
   ...(usage ? { usage } : {}),
   ...(output?.read.limit ? { limit: output.read.limit } : {}),
@@ -491,13 +492,12 @@ const outputOps = (spec: HarnessSpec, dir: string): Pick<RunnerOps, 'output'> =>
  *
  * What a run said, as a sighting carries it:
  *
- * - `statementOf`: the harness's final answer, if it wrote one, with the moment the file was written. The file's clock is
- *   not this process's clock, but the distance that matters is minutes: it is written when the harness exits, long after
- *   the attempt was journalled. Text that does not parse is carried as text — what counts as a valid closeout is the
- *   reader's business, not the runner's.
- * - `outputOf`: what the spec reads in the harness's output, with when that output was last written — the time a statement
- *   found there is reported with, as a closeout file's is its own mtime. Read again only when the capture has changed, so
- *   a finished run's output is read once per change of it, by any process: what was read is kept beside it (`outputIn`).
+ * - `statementOf`: the harness's final answer, if it wrote one, with no time: `spawn` cleared the file before it launched the
+ *   run, so the run's own process wrote it, and a resumed run's parent wrote its own under its own name. Text that does not
+ *   parse is carried as text — what counts as a valid closeout is the reader's business, not the runner's.
+ * - `outputOf`: what the spec reads in the harness's output, whose statement has no time for the same reason: `spawn`
+ *   cleared the output first. Read again only when the capture has changed, so a finished run's output is read once per
+ *   change of it, by any process: what was read is kept beside it (`outputIn`).
  *   A refusal is kept by this process alone, as a read is.
  * - `usageOf`: what a run's output says it used, as the attempt's own. A resumed run of a spec whose totals carry the
  *   parent's (`resumeCostCarried`) has the parent's taken off, as its spawn wrote them on its run file (`carried`): the
@@ -588,12 +588,9 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
   const find = (name: string): Run | undefined => runNamed(spec, root, name);
 
   const statementOf = (name: string): Sighting['closeout'] => {
-    const f = closeoutFile(name);
     let text: string;
-    let at: number;
     try {
-      text = readText(f);
-      at = fs.statSync(f).mtimeMs;
+      text = readText(closeoutFile(name));
     } catch {
       return undefined;
     }
@@ -601,11 +598,11 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
     try {
       payload = JSON.parse(text);
     } catch {}
-    return { payload, at };
+    return { payload };
   };
 
   const outputs: SaidMemo = new Map();
-  const outputOf = (name: string, run: RunFile): { read: HarnessOutput; at: number } | { wrong: string } | undefined =>
+  const outputOf = (name: string, run: RunFile): { read: HarnessOutput } | { wrong: string } | undefined =>
     spec.readOutput &&
     outputIn(spec.readOutput, outputs, name, { log: logFile(name), kept: saidFile(name) }, detachedStateOf(run, Date.now()) !== 'working');
 

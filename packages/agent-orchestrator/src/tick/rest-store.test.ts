@@ -602,7 +602,7 @@ const shipping = () => {
   return dir;
 };
 
-test("a pass lists the store once: an ending waiting on the checkout and a refused queued card read no record of a finished run", async () => {
+test('a pass lists the store once: an ending waiting on the checkout and a refused queued card read no record of a finished run', async () => {
   const repo = aRepo();
   const [first, second] = started(2, shipping(), repo, true);
   for (const run of [first, second]) touched.add(run.id);
@@ -639,9 +639,12 @@ test("a pass lists the store once: an ending waiting on the checkout and a refus
     `only the records of the runs in flight read (${cost.records} of ${listed}, ${cost.rested} at rest): the checkout's claims and the queue are read off the pass's own listing`,
   );
   const waiting = pass.runs.find((a) => a.run.id === second.id)!;
-  console.log('WAIT', JSON.stringify(waiting.feed));
   assert.equal(readRun(second.id).steps.ship?.taskId ?? null, null, "the second run's ending is not filed");
-  assert.deepEqual(waiting.feed.run.checkout, { run: first.id, step: 'ship' }, "it waits on the first run's, in the checkout");
+  assert.equal(
+    waiting.feed.steps.find((step) => step.name === 'ship')?.word,
+    `waiting on the checkout (${first.id}'s ship has it)`,
+    "it waits on the first run's, in the checkout",
+  );
   assert.equal(pass.queue, undefined, 'the refused card is not tried again');
   const listing = readInbox().find((l) => l.name === card.name);
   assert.ok(listing?.queued && listing.tried?.refused, 'the card still queued, with its refusal');

@@ -4,10 +4,10 @@
  * and the board removes it. Every refusal is made to refuse, and leaves no run behind: a repository agent, an empty brief, a try while one
  * moves, a name a try's folder cannot take, a skill only the repository has, and the guard's.
  *
- * In the harness's scratch store (`root`). Your agents are `scribe`, with a result schema beside it; `borrower`, which gives a skill only
- * the repository's .claude/skills has; `agents` and `skills`, whose names a try's folder cannot take; and those a try's fence does not
- * reach: `coder` on codex, `faraway`, a remote A2A agent, and `bridged`, bridged to claude.ai. The repository's own agents are `critic` and
- * `grader`, the second with a result schema beside it.
+ * In the harness's scratch store (`root`). Your agents are `scribe`, with a result schema beside it; `careful`, whose mode asks first;
+ * `borrower`, which gives a skill only the repository's .claude/skills has; `agents` and `skills`, whose names a try's folder cannot take;
+ * and those a try's fence does not reach: `coder` on codex, `faraway`, a remote A2A agent, and `bridged`, bridged to claude.ai. The
+ * repository's own agents are `critic` and `grader`, the second with a result schema beside it.
  */
 import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
@@ -32,6 +32,10 @@ fs.writeFileSync(path.join(YOURS, 'scribe.md'), SCRIBE);
 fs.writeFileSync(
   path.join(YOURS, 'scribe.schema.json'),
   JSON.stringify({ type: 'object', additionalProperties: false, required: ['notes'], properties: { notes: { type: 'string' } } }),
+);
+fs.writeFileSync(
+  path.join(YOURS, 'careful.md'),
+  '---\ndescription: Use this to read carefully.\npermissionMode: dontAsk\nallowedTools: Read\n---\nRead it.\n',
 );
 fs.writeFileSync(
   path.join(YOURS, 'borrower.md'),
@@ -179,6 +183,18 @@ test('a try of an agent of yours writes its folder and starts a folder run of it
   assert.equal(summary.moving, true, 'a try nothing has filed yet moves: a tick files it');
   const detail = (await (await app.request(`/api/runs/${first}`)).json()) as RunDetail;
   assert.deepEqual(detail.try, { agent: 'scribe' });
+});
+
+test("an agent whose mode asks first is tried in its own fence, already narrower than the try's, which a step could only tighten", async () => {
+  const id = await idOf(await tryIt('careful', { brief: 'Read the notes.' }));
+  const lines = fs.readFileSync(path.join(TRIES, 'careful', 'try.md'), 'utf8').split('\n');
+  assert.ok(lines.includes('agent: careful') && lines.includes('budget: 1'), lines.join('\n'));
+  assert.ok(!lines.some((line) => /^(permissionMode|allowedTools):/.test(line)), `no fence of the try's own: ${lines.join('\n')}`);
+  const step = JSON.parse(fs.readFileSync(path.join(RUNS, `${id}.json`), 'utf8')).workflow[0];
+  assert.equal(step.permissionMode, 'dontAsk', "the agent's own mode");
+  assert.deepEqual(step.allowedTools, ['Read'], "and the agent's own allows");
+  ended(id);
+  assert.equal((await remove(id)).status, 200);
 });
 
 test('a run that is no try says so', async () => {

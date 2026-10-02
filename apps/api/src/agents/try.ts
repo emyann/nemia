@@ -1,15 +1,16 @@
 /**
  * An agent of yours tried on a short brief, from its page: a hidden one-step folder team of the store's own,
  * `tries/<agent>/try.md`, started as any folder run is — with no repository, in folders the run makes under `runs/<id>/`, and a budget of
- * a dollar. Its step names the agent and fences it: `dontAsk` with `Edit(**)`, whatever the agent's own mode says, so every read outside
- * its folder is denied and nothing it writes lands outside the run. A rehearsal, not the agent's own permissions.
+ * a dollar. Its step names the agent and fences it: `dontAsk` with `Edit(**)` over an agent whose mode writes unasked, so every read
+ * outside its folder is denied and nothing it writes lands outside the run; an agent whose mode asks is tried in its own fence, already as
+ * narrow, since a step may only tighten its agent's fence.
  *
  * The folder is not among the workflows the board lists (`tries/` is no place of them), and a run of it is a try by where it was started
  * from (`tryOf`), read off the record alone: nothing new is written on it.
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { AGENTS_FOLDER, isRemoteHarness, SKILLS_FOLDER } from 'agent-orchestrator/workflow';
+import { AGENTS_FOLDER, editsUnasked, isRemoteHarness, SKILLS_FOLDER } from 'agent-orchestrator/workflow';
 import type { Run } from 'agent-orchestrator/run';
 import { Invalid } from 'agent-orchestrator/effect';
 import { quoted } from './skills.ts';
@@ -29,16 +30,18 @@ export const TRY_BUDGET = 1;
 /** What the step's frontmatter records the agent's version under: a comment, which the parser skips. */
 const VERSION_LINE = '# version ';
 
-/** The try's step file: the agent, the fence and the cap, and the agent's version it was written at. */
-export const tryText = (name: string, version: string): string =>
+/**
+ * The try's step file: the agent, the cap, and the agent's version it was written at — and the try's fence where it narrows the agent's,
+ * whose permission mode is `mode` (`undefined` for none): over one that writes unasked (`editsUnasked`).
+ */
+export const tryText = (name: string, version: string, mode: string | undefined): string =>
   [
     '---',
     `${VERSION_LINE}${version}`,
     'workspace: folder',
     `agent: ${name}`,
     `budget: ${TRY_BUDGET}`,
-    'permissionMode: dontAsk',
-    'allowedTools: Edit(**)',
+    ...(editsUnasked(mode) ? ['permissionMode: dontAsk', 'allowedTools: Edit(**)'] : []),
     '---',
     'A rehearsal of the brief: work in this folder, and write what you make here.',
     '',
@@ -105,10 +108,11 @@ export function untriedOf(
 }
 
 /**
- * The agent's try folder, written when its step file does not read or was written at another version of the agent, and left as it is
- * otherwise. A folder or a step file that is a link is refused (`Invalid`): written through, it would change whatever it points at.
+ * The try folder of an agent whose permission mode is `mode` (`tryText`), written when its step file does not read or was written at
+ * another version of the agent, and left as it is otherwise. A folder or a step file that is a link is refused (`Invalid`): written
+ * through, it would change whatever it points at.
  */
-export function writeTryFolder(name: string, version: string, home: string): string {
+export function writeTryFolder(name: string, version: string, mode: string | undefined, home: string): string {
   const dir = tryDir(name, home);
   const file = path.join(dir, `${TRY_STEP}.md`);
   for (const at of [triesDir(home), dir, file]) {
@@ -118,7 +122,7 @@ export function writeTryFolder(name: string, version: string, home: string): str
       });
     }
   }
-  const text = tryText(name, version);
+  const text = tryText(name, version, mode);
   let was: string | undefined;
   try {
     was = fs.readFileSync(file, 'utf8');

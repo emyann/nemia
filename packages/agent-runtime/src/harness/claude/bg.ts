@@ -569,10 +569,11 @@ const reportedOf = (x: Reading, name: string, l: { sighting: Sighting; startedAt
  * and a session with no transcript is never quiet: the deadline is for sessions nobody reads.
  *
  * A busy session is `busyReportOf`'s. Any other session reports what it said (`toldOf`), and what it consumed since `countFrom` —
- * its own start, or a long-lived attempt's as the journal gave it — as measured or not at all. A resumed session carries its parent's statements too: whose a statement is, is this runner's
- * call by its id where the spawn recorded the parent's last call, and the engine's by its time where it did not, since only the
- * journal knows when the attempt began. One still `working` and quiet for the floor reports `quietMs` too, statement or not,
- * because an inherited statement the runner could not tell is discarded upstream; what quiet means is `decide`'s.
+ * its own start, or a long-lived attempt's as the journal gave it — as measured or not at all. A resumed session carries its
+ * parent's statements too: whose a statement is, is this runner's call by its id where the spawn recorded the parent's last
+ * call, and the engine's by its time where it did not, since only the journal knows when the attempt began. One still
+ * `working` and quiet for the floor reports `quietMs` too, statement or not, because an inherited statement the runner could
+ * not tell is discarded upstream; what quiet means is `decide`'s.
  */
 const reportOf = async (
   x: Reading,

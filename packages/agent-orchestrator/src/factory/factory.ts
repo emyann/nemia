@@ -151,6 +151,17 @@ export function outsideRefusal(factory: Pick<Factory, 'name' | 'repos'>, repo: s
 }
 
 /**
+ * Why a run in `factory` cannot start: the runtime refuses the step `where` (`<workflow>/<step>`) a folder of the factory, mounted for
+ * it (`factoryMounts`), in its words (`why`); then where the mount came from, and what a person can do, since no flag leaves one off.
+ */
+export const factoryMountRefusal = (factory: Pick<Factory, 'name'>, where: string, why: string): string =>
+  `${why}\nThat folder is the factory ${factory.name}'s: a run in it mounts every repository of the factory but its own, read-only, ` +
+  `for each local step, and none is left off by hand. Hire into ${where} an agent whose harness holds the mount ` +
+  `(wf factory hire ${factory.name} <agent> --step ${where}); move or rename the folder, then file the factory again on its new path ` +
+  `(wf factory rm ${factory.name}, then wf factory add ${factory.name} --repo <path> for each, and attach and hire again); ` +
+  `or start the run without --factory. Nothing was written.`;
+
+/**
  * The folders a run in `factory` mounts: its repositories, each as `path.resolve` spells it, sorted and once each, but `repo`, the one
  * the run works on; every one read-only. A folder run works on none of them, gives no `repo`, and mounts them all.
  */

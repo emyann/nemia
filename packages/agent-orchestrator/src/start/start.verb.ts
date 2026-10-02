@@ -32,6 +32,7 @@ import { parentRecord } from '../branches/branches.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import {
   DEFAULT_FACTORY,
+  factoryMountRefusal,
   factoryMounts,
   factoryRepo,
   fillsOf,
@@ -169,12 +170,20 @@ export function stepsToStart(
  * folder the run renders it to, and an ending's read the run's artifacts folder, neither there yet: the runtime judges which flags a
  * step has, never where they point.
  */
-export function configRefused(
+export const configRefused = (
   steps: readonly Workflow[],
   places: Places,
   gates: readonly string[],
   mounts: readonly Mount[] = [],
-): string | undefined {
+): string | undefined => refusedStep(steps, places, gates, mounts)?.why;
+
+/** `configRefused`'s refusal with the step it refuses. */
+function refusedStep(
+  steps: readonly Workflow[],
+  places: Places,
+  gates: readonly string[],
+  mounts: readonly Mount[],
+): { step: Workflow; why: string } | undefined {
   for (const step of steps.filter((s) => !isRemoteHarness(s.harness))) {
     const own = ownOf(step, renderedFlags(step, '.'), () => places.repo);
     const runArtifacts = path.dirname(artifactsDir({ id: 'run' }, step.name));
@@ -185,7 +194,7 @@ export function configRefused(
       { model: step.model, budgetUsd: budgetUsdFor(step, step.budget), runArtifacts, own },
     );
     const why = filedRefusal((c) => configRefusal(step.harness ?? DEFAULT_HARNESS, c), step.name, config, lineOf(step));
-    if (why) return why;
+    if (why) return { step, why };
   }
   return undefined;
 }
@@ -446,8 +455,11 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   if (refusedInputs) return yield* Effect.fail(new Invalid({ message: refusedInputs }));
   const id = runId(opts.brief);
   const mounts = mountsAt(factory, folder ? undefined : opts.repo);
-  const refusedMounts = mounts.length ? configRefused(steps, places, opts.gates ?? [], mounts) : undefined;
-  if (refusedMounts) return yield* Effect.fail(new Invalid({ message: refusedMounts }));
+  const refusedMounts = mounts.length ? refusedStep(steps, places, opts.gates ?? [], mounts) : undefined;
+  if (factory && refusedMounts) {
+    const where = `${path.basename(path.resolve(opts.workflowDir))}/${refusedMounts.step.name}`;
+    return yield* Effect.fail(new Invalid({ message: factoryMountRefusal(factory, where, refusedMounts.why) }));
+  }
   const told = toldOf(opts, steps, inputs, factory, mounts);
   const stepRecords = Object.fromEntries(steps.map((s) => [s.name, { taskId: null }]));
   const run = yield* folder ? folderRun(id, told, stepRecords) : gitRun(id, told, stepRecords, opts.repo, isolate);

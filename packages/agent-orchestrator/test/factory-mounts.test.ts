@@ -24,9 +24,9 @@ const { addFactory, advance, attachWorkflow, hireAgent, retry, start } = await i
 const { readRun } = await import('../src/record/record.store.ts');
 const { main } = await import('../src/cli/main.ts');
 
-/** A git repository with one commit on `main`. */
-function aRepo(): string {
-  const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
+/** A git repository with one commit on `main`, in a folder named from `prefix`. */
+function aRepo(prefix = 'repo-'): string {
+  const repo = fs.mkdtempSync(path.join(ROOT, prefix));
   const git = (...args: string[]) =>
     execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: ['ignore', 'pipe', 'pipe'] });
   git('init', '-q', '-b', 'main');
@@ -260,7 +260,9 @@ test("REFUSED: a start whose step's harness cannot hold the factory's mounts, in
       err._tag === 'Invalid' &&
       err.message.includes(
         `\`mounts\` gives the session ${repos[1]} read-only, and Codex's \`danger-full-access\` sandbox writes everywhere.`,
-      ),
+      ) &&
+      err.message.includes("That folder is the factory trio's") &&
+      err.message.includes('wf factory hire trio <agent> --step coded/code'),
   );
   assert.deepEqual(runs(), before, 'nothing written');
   addFactory({ name: 'solo', repos: [repos[0]] });
@@ -268,4 +270,35 @@ test("REFUSED: a start whose step's harness cannot hold the factory's mounts, in
   hireAgent({ factory: 'solo', agent: 'coder', step: 'coded/code' });
   const run = start({ brief: 'code it', repo: repos[0], workflowDir: coded, isolate: false, factory: 'solo' });
   assert.equal('mounts' in run, false, 'with nothing to mount, the same step starts');
+});
+
+test('REFUSED: a factory folder whose path a permission rule cannot name refuses a Claude Code step at start, naming the factory and what to do, before anything is written', () => {
+  const { loop } = fresh();
+  const own = aRepo();
+  const spaced = aRepo('First Last-');
+  addFactory({ name: 'spaced', repos: [own, spaced] });
+  attachWorkflow({ factory: 'spaced', workflow: 'loop' });
+  hireAgent({ factory: 'spaced', agent: 'implementer', step: 'loop/implement' });
+  hireAgent({ factory: 'spaced', agent: 'reviewer', step: 'loop/review' });
+  const runs = () => (fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')).sort() : []);
+  const before = runs();
+  let message = '';
+  try {
+    start({ brief: 'build it', repo: own, workflowDir: loop, isolate: false, factory: 'spaced' });
+  } catch (err) {
+    message = (err as Error).message;
+  }
+  assert.match(message, /^implement: /, "the step's line first");
+  assert.ok(message.includes(`\`mounts\` gives the session ${JSON.stringify(spaced)} read-only, and Claude Code holds a folder`), message);
+  assert.ok(
+    message.endsWith(
+      "\nThat folder is the factory spaced's: a run in it mounts every repository of the factory but its own, read-only, for each local " +
+        'step, and none is left off by hand. Hire into loop/implement an agent whose harness holds the mount (wf factory hire spaced ' +
+        '<agent> --step loop/implement); move or rename the folder, then file the factory again on its new path (wf factory rm spaced, ' +
+        'then wf factory add spaced --repo <path> for each, and attach and hire again); or start the run without --factory. Nothing ' +
+        'was written.',
+    ),
+    message,
+  );
+  assert.deepEqual(runs(), before, 'nothing written');
 });

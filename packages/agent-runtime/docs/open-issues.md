@@ -291,6 +291,11 @@ orchestrator can say a run is over its budget only after an attempt has ended, a
 one live bound is still the harness's own cap, on a `claude` job alone. A harness that streamed its spend would let the
 orchestrator stop the session itself, through `stop`, with nothing in the runtime changed.
 
+**Measured again on 2.1.288** (2026-10-02, by hand, the slice 1c probe): still no `cost-state` per turn, and nothing naming cost,
+usage or tokens in a `claude agents --json` row or `~/.claude/sessions/<pid>.json`. What a running session has used is in its
+transcript's responses alone, as tokens. So a long-lived attempt's counts are journalled as they grow (a `counted` entry, issue
+18), and its cost still only at its end: a cap on its cost is a cap on tokens, or waits for its end.
+
 ### 18. A `--bg` attempt's cost is read only once its session is let go
 
 Claude Code writes a `cost-state` pair as a session's process exits, and never per turn: every `--bg` transcript on this
@@ -304,7 +309,16 @@ transcript, and the pass journals a `measured` entry (engine `9d075f7`). What th
   task settled — is measured from the sighting the pass made. One removed before this change never is.
 - **No cost at all** for a session killed so hard it wrote no `cost-state`, and for a continuation whose count was carried on
   from a total its transcript does not show — a parent killed that way: absent, not a guess.
-- **An attempt in flight has no cost** in `view` or `ae ls`: nothing has been written yet.
+- **An attempt in flight has no cost** in `view` or `ae ls`: nothing has been written yet. A long-lived attempt's (`restartPolicy:
+  Always`) turns and tokens are journalled as they grow instead — a `counted` entry each time a pass reads more than the record
+  (`countedFacts`), the attempt's usage replaced whole — and its view shows those; a job's are read at its end, as before. A busy
+  session's sighting carries no usage, so its counts wait for it to go idle.
+- **A respawn's cost is not the attempt's** (the slice 1c probe, 2026-10-02, 2.1.288): a process killed with `kill -9` writes no
+  `cost-state`, and the process Claude Code respawns on the same session counts afresh, under its own `startTime`, its own turns
+  alone. A long-lived attempt is counted from the start its journal gives it (`ExpectedSession.since`), across every process, and a
+  `cost-state` whose count began more than `COST_START_SLACK_MS` after it gives no cost, API or tool time: its tokens are the
+  attempt's, its cost absent rather than too low. The same holds of a spawn slower than that slack, whose journal start precedes
+  Claude Code's count. A compacted attempt counted that way has no tokens either: they come from the `cost-state` alone.
 - **The resumed reading rests on one shape**: a continuation writes into the same transcript, after its parent's pair, under
   its parent's `startTime` (one session continued twice, 2026-09-15). Its cost is its total less its parent's. No resumed
   session has been measured end to end under the engine.

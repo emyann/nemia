@@ -1318,6 +1318,16 @@ attempt's. No cost is given, rather than a wrong one: while no line has been wri
 count was carried on from a total the transcript does not show; and, for `costUsd` alone, when Claude Code could not price
 a model the session used — `unpricedModel: true`, since a total too low reads as the whole.
 
+**A long-lived attempt's spend is journalled as it grows.** A session that runs for days writes no cost until a process of it
+exits, so each pass that reads more of a long-lived attempt in flight (`restartPolicy: 'Always'`) than its record holds
+journals a **`counted`** entry: its turns, tool calls and tokens, never a cost, which `fold` puts in place of the attempt's
+`usage` whole, since a compacted attempt's reading drops tokens the last one had. The same reading on later passes writes
+nothing; a reading with fewer turns than the record is no count of this attempt and writes nothing either; a job's spend is
+written at its end, as before. Its end keeps what was counted when it carries no usage, and its cost is measured as any
+attempt's is. The pass tells the runner when the attempt began (`ExpectedSession.since`), and `--bg` counts from then across
+every process Claude Code respawned it in; a `cost-state` begun more than a few seconds after that is a respawn's own count,
+too low for the attempt, so it gives no cost ([open issue 18](docs/open-issues.md)).
+
 **What a session read, by price.** Measured over 234 worker sessions on 2026-09-18: 96.9% of input tokens were read
 from the cache, 3.1% written to it, almost none uncached — a read priced $0.50 a million and a write $10, a
 twenty-fold spread that `inputTokens` adds into one number. So an attempt records its input in its three classes as its

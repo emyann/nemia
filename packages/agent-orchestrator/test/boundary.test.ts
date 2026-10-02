@@ -23,6 +23,9 @@
  * **The runtime is reached through one client**, `CLIENT`, `runtime-client.ts`: of the package's files, it alone imports agent-runtime,
  * a type included; every controller beneath the CLI imports it, or imports a controller that reaches it, and it imports no controller.
  *
+ * The api's `test/kinds.test.ts` holds its readers to the same globals with a copy of the scanners, `PROCESS_ENV` and `FETCH`, which this
+ * test holds to its own: the two packages share no test code.
+ *
  * Each rule is a pure function over a map of each file's imports, run first on planted sources it must refuse (`REFUSED`), so that none
  * passes by seeing nothing, and then on the package. A rule a session can re-break is a rule this suite refuses.
  */
@@ -427,6 +430,15 @@ test('the scanner sees the environment and fetch outside comment lines, and only
   assert.deepEqual(sourcesOf({ 'src/x/x.ts': "import fs from 'node:fs';\nconst x = process.env.X;" }), {
     'src/x/x.ts': ['node:fs', 'global:process.env'],
   });
+});
+
+test("the api's copy of the globals' scanners is this test's own, character for character", () => {
+  const copy = fs.readFileSync(path.join(PKG, '..', '..', 'apps', 'api', 'test', 'kinds.test.ts'), 'utf8');
+  for (const [name, pattern] of Object.entries({ PROCESS_ENV, FETCH }))
+    assert.ok(
+      copy.includes(`const ${name} = ${String(pattern)};`),
+      `apps/api/test/kinds.test.ts declares ${name} as ${String(pattern)}: copy it from here`,
+    );
 });
 
 test('every file in src and bin is of one kind, and every file a kind names is there', () => {

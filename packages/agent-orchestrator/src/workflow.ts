@@ -87,6 +87,8 @@ export {
   formerKeysIn,
   formerSandbox,
   frontmatterKey,
+  harnessPromptLine,
+  harnessPromptNamed,
   modeOf,
 } from './former/former.ts';
 export type { FrozenStep } from './former/former.ts';
@@ -120,6 +122,7 @@ export {
   agentNameRefusal,
   cardRetired,
   CLAUDE_CODE_IGNORED,
+  HARNESS_PROMPTS,
   isCardFile,
   ownSkill,
   parseAgent,
@@ -127,7 +130,6 @@ export {
   SKILL_NAME,
   skillNameRefusal,
   skillTurnCost,
-  SYSTEM_PROMPTS,
   tokensAbout,
 } from './agents/agents.ts';
 export type {
@@ -137,10 +139,10 @@ export type {
   AgentKey,
   AgentOwnKey,
   Agents,
+  HarnessPrompt,
   RoleKey,
   SkillCost,
   SkillsFound,
-  SystemPrompt,
 } from './agents/agents.ts';
 export { renderSkill, skillDraftOf, skillEntryOf, withPreload } from './skills/skills.ts';
 export type { AgentSkill, SkillDraft } from './skills/skills.ts';

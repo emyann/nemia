@@ -54,13 +54,26 @@ const board = (journal = Journal.test(), memo: { verify: boolean } | false = { v
 const spec = { brief: 'do the thing', cwd: '/repo' };
 
 /**
- * A deadline far from any boundary: 50ms, tested after 150ms have passed.
- *
- * `deadlineSeconds: 0` is a coin flip: `ranFor > 0` is decided by whether a millisecond happened to elapse inside the pass.
- * A test that sits exactly on a comparison is testing the scheduler.
+ * A deadline far from any boundary on either side: ten minutes, met by a task started now, which runs well inside it, and by one
+ * whose attempt the journal says began twice that long ago (`startedLongAgo`), well past it. No test waits for a deadline to
+ * pass: a wall clock stepped back during the wait would leave it unreached, and one stepped forward would end the fresh one.
  */
-const SHORT_DEADLINE = 0.05;
-const pastIt = () => new Promise((r) => setTimeout(r, 150));
+const DEADLINE_SECONDS = 600;
+
+/**
+ * Journals attempt 1 of `id` as begun and spawned twice its deadline ago, and puts its session on the board's harness, working.
+ */
+const startedLongAgo = async (b: ReturnType<typeof board>, id: string) => {
+  const at = new Date(Date.now() - 2 * DEADLINE_SECONDS * 1000).toISOString();
+  await b.run(
+    Effect.flatMap(Journal, (j) =>
+      Effect.all([j.append(id, { kind: 'starting', at, attempt: 1 }), j.append(id, { kind: 'spawned', at, attempt: 1 })], {
+        discard: true,
+      }),
+    ),
+  );
+  b.sessions.set(nameFor(id, 1), { sessionId: `old-${id}`, state: 'working', nativeId: `old-${id}` });
+};
 
 test('the happy path: filed → spawned → running → done → settled', async () => {
   const b = board();
@@ -289,33 +302,25 @@ test('a journal an older runtime wrote with `maxAttempts: 2, resume: always` set
 
 test('a task past its deadline is stopped and settles failed', async () => {
   const b = board();
-  const id = await b.run(file({ ...spec, deadlineSeconds: SHORT_DEADLINE }));
-  await b.run(tick());
-  assert.deepEqual(
-    [...b.sessions.values()].map((s) => s.state),
-    ['working'],
-    'inside the deadline, it runs',
-  );
-  await pastIt();
+  const fresh = await b.run(file({ ...spec, deadlineSeconds: DEADLINE_SECONDS }));
+  const id = await b.run(file({ ...spec, deadlineSeconds: DEADLINE_SECONDS }));
+  await startedLongAgo(b, id);
 
   await b.run(tick());
-  assert.deepEqual(
-    [...b.sessions.values()].map((s) => s.state),
-    ['canceled'],
-    'the harness was told',
-  );
+  assert.equal(b.sessions.get(nameFor(fresh, 1))?.state, 'working', 'inside the deadline, it runs');
+  assert.equal(b.sessions.get(nameFor(id, 1))?.state, 'canceled', 'past it, the harness was told');
 
   await b.run(tick());
   const state = fold(id, await b.run(Effect.flatMap(Journal, (j) => j.read(id))));
   assert.equal(state.settled, 'failed', 'the next pass: the session is not live, so the task settles — failed, not a clean stop');
+  assert.equal(b.sessions.get(nameFor(fresh, 1))?.state, 'working', 'and the one inside its deadline still runs');
 });
 
 test('a session that finished before the pass past its deadline read it settles on its end, in that one pass', async () => {
   const b = board();
-  const id = await b.run(file({ ...spec, deadlineSeconds: SHORT_DEADLINE }));
-  await b.run(tick());
+  const id = await b.run(file({ ...spec, deadlineSeconds: DEADLINE_SECONDS }));
+  await startedLongAgo(b, id);
   for (const [k, v] of b.sessions) b.sessions.set(k, { ...v, state: 'completed', exitCode: 0 });
-  await pastIt();
 
   const before = (await b.run(Effect.flatMap(Journal, (j) => j.read(id)))).length;
   await b.run(tick());
@@ -332,17 +337,20 @@ test('a session that finished before the pass past its deadline read it settles 
 
 test('a deadline ends a blocked session, which would otherwise wait on a person for ever', async () => {
   const b = board();
-  await b.run(file({ ...spec, id: 'stuck', deadlineSeconds: SHORT_DEADLINE, brief: 'stuck' }));
+  await b.run(file({ ...spec, id: 'waiting', deadlineSeconds: DEADLINE_SECONDS, brief: 'waiting' }));
+  await b.run(file({ ...spec, id: 'stuck', deadlineSeconds: DEADLINE_SECONDS, brief: 'stuck' }));
+  await startedLongAgo(b, 'stuck');
+  const blocked = (id: string) => b.sessions.set(nameFor(id, 1), { ...b.sessions.get(nameFor(id, 1))!, state: 'input-required' });
+  blocked('stuck');
   await b.run(tick());
-  b.sessions.set(nameFor('stuck', 1), { ...b.sessions.get(nameFor('stuck', 1))!, state: 'input-required' });
-  await b.run(tick());
-  assert.equal(await b.run(phaseOf('stuck')), 'needs-human', 'blocked, and before its deadline nothing ends it');
-  await pastIt();
+  blocked('waiting');
+  assert.equal(b.sessions.get(nameFor('stuck', 1))!.state, 'canceled', 'blocked past its deadline, the deadline stops it');
 
   await b.run(tick());
-  assert.equal(b.sessions.get(nameFor('stuck', 1))!.state, 'canceled', 'the deadline stops it');
+  assert.equal(await b.run(phaseOf('waiting')), 'needs-human', 'blocked, and before its deadline nothing ends it');
+  assert.equal(await b.run(phaseOf('stuck')), 'failed', 'and the stopped one settles');
   await b.run(tick());
-  assert.equal(await b.run(phaseOf('stuck')), 'failed', 'and it settles');
+  assert.equal(await b.run(phaseOf('waiting')), 'needs-human', 'while the one inside its deadline still waits');
 });
 
 /**
@@ -495,6 +503,21 @@ test('a statement made BEFORE the attempt began was inherited, not said', async 
   );
 });
 
+test('a statement with no time is the session’s own: it ends the attempt and is on the record', async () => {
+  const b = board();
+  const { id, name } = await running(b, { ...spec, closeoutSchema: SCHEMA });
+  b.sessions.set(name, { ...b.sessions.get(name)!, busy: false, closeout: { payload: { outcome: 'done', by: 'child' } } });
+  await b.run(tick());
+
+  const v = await b.run(view(id, new Map()));
+  assert.equal(v.state.settled, 'succeeded');
+  assert.deepEqual(
+    v.state.attempts.map((a) => [a.ended, a.closeout, a.stated]),
+    [['done', { outcome: 'done', by: 'child' }, true]],
+    'no time to judge it by, and none needed: a runner gives none only for a session that cannot carry another attempt’s statement',
+  );
+});
+
 test('a statement from a session that is still busy is not final', async () => {
   const b = board();
   const { id, name, startedAt } = await running(b, { ...spec, closeoutSchema: SCHEMA });
@@ -631,8 +654,9 @@ test("tools, disallowedTools, effort, mcp, contextTokens and Claude Code's own f
     }),
   );
   await b.run(tick());
+  const began = Date.parse((await b.run(view(id, new Map()))).state.attempts[0].startedAt);
   for (const [k, v] of b.sessions)
-    b.sessions.set(k, { ...v, state: 'completed', busy: false, closeout: { payload: { outcome: 'done' }, at: Date.now() + 60_000 } });
+    b.sessions.set(k, { ...v, state: 'completed', busy: false, closeout: { payload: { outcome: 'done' }, at: began + 1_000 } });
   await b.run(tick());
   await b.run(answer(id, 'again'));
   await b.run(tick());
@@ -901,18 +925,19 @@ test('...and when no session shows up, the grace window ends it lost, as for any
   const b = board();
   const id = await b.run(file(spec));
   await b.run(step(id, new Map()));
+  const spawnedAt = new Date().toISOString();
   await b.run(
     Effect.flatMap(Journal, (j) =>
       j.append(id, {
         kind: 'spawned',
-        at: new Date().toISOString(),
+        at: spawnedAt,
         attempt: 1,
         error: 'launcher: lost the acknowledgement',
       }),
     ),
   );
   const state = fold(id, await b.run(Effect.flatMap(Journal, (j) => j.read(id))));
-  const later = { at: new Date(Date.now() + GRACE_MS + 1_000), graceMs: GRACE_MS };
+  const later = { at: new Date(Date.parse(spawnedAt) + GRACE_MS + 1_000), graceMs: GRACE_MS };
   assert.deepEqual(decide(state, new Map(), later), {
     do: 'record-end',
     attempt: 1,
@@ -1329,7 +1354,7 @@ test('a pass that could not read the harness does not end an attempt `lost`, its
   );
   const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.runPromise(e.pipe(Effect.provide(layer)));
   const id = await run(file({ ...spec, harness: 'claude' }));
-  const long = new Date(Date.now() - 2 * GRACE_MS).toISOString();
+  const long = new Date(Date.now() - GRACE_MS - 10 * 60_000).toISOString();
   await run(
     Effect.flatMap(Journal, (j) =>
       Effect.all([j.append(id, { kind: 'starting', at: long, attempt: 1 }), j.append(id, { kind: 'spawned', at: long, attempt: 1 })], {
@@ -1408,7 +1433,7 @@ test('a task on a harness this engine does not have is never spawned on the fall
   const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.runPromise(e.pipe(Effect.provide(layer)));
   const ready = await run(file({ ...spec, harness: 'a2a:reviewer' }));
   const away = await run(file({ ...spec, harness: 'a2a:reviewer' }));
-  const long = new Date(Date.now() - 2 * GRACE_MS).toISOString();
+  const long = new Date(Date.now() - GRACE_MS - 10 * 60_000).toISOString();
   await run(
     Effect.flatMap(Journal, (j) =>
       Effect.all([j.append(away, { kind: 'starting', at: long, attempt: 1 }), j.append(away, { kind: 'spawned', at: long, attempt: 1 })], {

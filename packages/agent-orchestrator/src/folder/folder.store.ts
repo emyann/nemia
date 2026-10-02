@@ -20,9 +20,9 @@ import {
   type StepKey,
   type Workflow,
 } from '../step/step.ts';
-import { codexModeLine, formerKeyLine, formerKeysIn, frontmatterKey } from '../former/former.ts';
+import { codexModeLine, formerKeyLine, formerKeysIn, frontmatterKey, harnessPromptLine } from '../former/former.ts';
 import { agentsDir, agentsFolderRefusal, linkRefusal, parseFolder, readmeDescription, stepFiles, type Fills } from './folder.ts';
-import { isCardFile, ownSkill, parseAgent, SYSTEM_PROMPTS, type Agent, type Agents, type SkillsFound } from '../agents/agents.ts';
+import { HARNESS_PROMPTS, isCardFile, ownSkill, parseAgent, type Agent, type Agents, type SkillsFound } from '../agents/agents.ts';
 import { skillEntryOf, type AgentSkill, type SkillRule } from '../skills/skills.ts';
 
 /**
@@ -221,7 +221,8 @@ export function loadWorkflows(dir: string, places: Places = {}, fills?: Fills): 
  * is not there, and a file that cannot be read says nothing here: the load has said why.
  *
  * A file that runs on codex — by its own `harness:` line, or a step's by its agent's — and still names its sandbox as `permissionMode:` is
- * named too (`codexModeLine`): the parser reads the line as `sandbox:`.
+ * named too (`codexModeLine`): the parser reads the line as `sandbox:`. So is an agent that still says `systemPrompt:`
+ * (`harnessPromptLine`), which the parser reads as `harnessPrompt:`.
  */
 export function formerKeyLines(dir: string): string[] {
   const read = (at: string): string => {
@@ -255,7 +256,12 @@ export function formerKeyLines(dir: string): string[] {
     ...agents.flatMap((agent) => {
       const at = agentAt(agent);
       const text = read(at);
-      return [...formerKeysIn(text).map((former) => formerKeyLine(at, former)), ...codexMode(at, text, frontmatterKey(text, 'harness'))];
+      const prompt = frontmatterKey(text, 'systemPrompt');
+      return [
+        ...formerKeysIn(text).map((former) => formerKeyLine(at, former)),
+        ...codexMode(at, text, frontmatterKey(text, 'harness')),
+        ...(prompt === undefined ? [] : [harnessPromptLine(at, prompt)]),
+      ];
     }),
   ];
 }
@@ -497,8 +503,8 @@ export function cardSkills(agent: Pick<Agent, 'name' | 'description' | 'skills'>
 }
 
 /**
- * Whether a skill asks to be told whole, in the system prompt after the agent's instructions, rather than named for the session to load:
- * its SKILL.md's frontmatter says `preload: true`. Claude Code reads no such key (its own `preload` is inert on a plugin's skill), so
+ * Whether a skill asks to be told whole, in Claude Code's own prompt after the agent's instructions, rather than named for the session to
+ * load: its SKILL.md's frontmatter says `preload: true`. Claude Code reads no such key (its own `preload` is inert on a plugin's skill), so
  * the run does it when it renders the agent (`writeAgentFiles`). False for a SKILL.md that cannot be read.
  */
 export function preloads(skillDir: string): boolean {
@@ -545,7 +551,7 @@ const OutputSchemaSchema = Schema.StructWithRest(
 
 /**
  * The agent a step names, as the parser resolves it (`StepAgent`): each key it gives one a step has (`STEP_KEYS`) or had (`FORMER_KEYS`),
- * every other key kept.
+ * its harness prompt under its name now or its former one, in the words each had (`FORMER_OWN_KEYS`), every other key kept.
  */
 const StepAgentSchema = Schema.StructWithRest(
   Schema.Struct({
@@ -555,7 +561,8 @@ const StepAgentSchema = Schema.StructWithRest(
     given: Schema.Record(Schema.String, Schema.String),
     instructions: Schema.optionalKey(Schema.String),
     skills: Schema.optionalKey(Strings),
-    systemPrompt: Schema.optionalKey(Schema.Literals(SYSTEM_PROMPTS)),
+    harnessPrompt: Schema.optionalKey(Schema.Literals(HARNESS_PROMPTS)),
+    systemPrompt: Schema.optionalKey(Schema.Literals(['default', 'no-coding', 'own'])),
   }),
   Rest,
 );

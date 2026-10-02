@@ -309,10 +309,10 @@ const WAITS: ReadonlyMap<TaskState, string> = new Map([
  *
  * The closing statement is the data part of the last Artifact that has one, and only on a Task that `COMPLETED`: an
  * agent may publish an Artifact while it works, and a statement read then would end the attempt early (`closedOut`).
- * Its time is `now`, the moment it was read, since the agent's clock is not ours, and the Task was made by this attempt's
- * message, so nothing on it was said before the attempt began. None, and the end is recorded `stated: false`.
+ * It has no time: the Task was made by this attempt's message, so nothing on it was said before the attempt began,
+ * and the engine keeps it whatever the clock says. None, and the end is recorded `stated: false`.
  */
-export const sightingOfTask = (t: Task, now: number): Sighting => {
+export const sightingOfTask = (t: Task): Sighting => {
   const state = t.status?.state ?? TaskState.TASK_STATE_UNSPECIFIED;
   const named = nameOf(state) ?? 'working';
   const waiting = WAITS.get(state);
@@ -322,7 +322,7 @@ export const sightingOfTask = (t: Task, now: number): Sighting => {
     state: named,
     ...(t.contextId ? { nativeId: t.contextId } : {}),
     ...(waiting ? { waitingFor: waiting } : {}),
-    ...(payload !== undefined ? { closeout: { payload, at: now } } : {}),
+    ...(payload !== undefined ? { closeout: { payload } } : {}),
   };
 };
 

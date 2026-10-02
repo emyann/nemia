@@ -25,7 +25,10 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
   `StepKeySchema` (`apps/web/src/lib/api/library.ts`), which refuses a key it does not list.
 - **A key renamed in `STEP_KEYS` is still read under its old name**: `FORMER_KEYS` (`former/former.ts`), `formerStepFields` and the agent's
   `keys` in `FrozenStepSchema` (`folder/folder.store.ts`, held by `test/frozen-step.test.ts`), `asNamed` in `readRun`,
-  `formerOf` in `apps/api/src/agents/agents.ts`, `formerKeyWritten` in the renders, `formerKeyLines` at `wf start`.
+  `formerOf` in `apps/api/src/agents/listing.ts`, `formerKeyWritten` in the renders, `formerKeyLines` at `wf start`.
+- **An agent's own key renamed is read through `FORMER_OWN_KEYS`, and its words through `harnessPromptNamed`** (`former/former.ts`):
+  in `parseAgent`, `asNamed`, the api's `unreadListing` (`apps/api/src/agents/listing.ts`) and `formerKeyLines`; `FORMER_KEYS` is typed
+  to step keys and cannot hold one.
 - **A key added to `AGENT_KEYS` that is no role key is excluded in three places** (`ROLE_KEYS` in the api's `builder.ts` and `agents.ts`,
   the web's `lib/agents.ts`); a key naming a file beside the agent is digested by `agentVersion` and by the api's `versionOf`.
 - **A folder is read with its places** (`lookupRoots`): a reader outside `wf start` passes `Places` (`placesOf(repo)`), and a version is
@@ -91,7 +94,8 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
 - **Admission reads the views the runtime's pass hands back** (`toAdmit`, `e.admit`), never a read of its own. A new engine verb goes
   into `ENGINE_PHASES` and `ENGINE_WRITES`; an admitted task starts on the runtime's next pass.
 - **A finished run is answered from memory while what it was judged on stands** (`restMemo`, `atRest`, `restStamps`): a new input of its
-  pass goes into the stamps. Every test file that ticks a store sets `WF_VERIFY_REST=1`.
+  pass goes into the stamps. A run whose stamp holds is not read off disk (`keptOf`), so an input the stamp misses is missed for good;
+  `WF_VERIFY_REST` dies on it. Every test file that ticks a store sets `WF_VERIFY_REST=1`.
 - **A pass on a copy of the store acts on the real repositories** its records name: measure with a fixture store of scratch repositories,
   or a fake runtime whose tasks are all `pending`.
 - **Git refuses a whole `for-each-ref` for one base it cannot read**: `branchReader` lists again without it (pinned against `oneByOne`).

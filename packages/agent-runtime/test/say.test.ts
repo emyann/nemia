@@ -121,12 +121,19 @@ const work = tmp('work');
 /**
  * A session's inbox: a Unix socket that reads each connection's lines, answers nothing, and closes its end once the
  * sender has, as Claude Code's does. `neverCloses` reads the line and keeps its end open, as a process busy past the
- * post's deadline would; `neverReads` takes the connection and reads nothing.
+ * post's deadline would; `neverReads` takes the connection and reads nothing. `heard(n)` resolves with the lines once the
+ * inbox has read `n` of them, on the connection's end where it reads them.
  */
 const inbox = async (o: { neverCloses?: boolean; neverReads?: boolean } = {}) => {
   const at = path.join(tmp('sock'), 'in.sock');
   const lines: Array<{ type?: string; session_id?: string; message?: { role?: string; content?: string } }> = [];
   const open = new Set<net.Socket>();
+  const waiting: Array<{ n: number; resolve: (got: typeof lines) => void }> = [];
+  const heard = (n: number) =>
+    new Promise<typeof lines>((resolve) => {
+      if (lines.length >= n) resolve(lines);
+      else waiting.push({ n, resolve });
+    });
   const server = net.createServer({ allowHalfOpen: true, pauseOnConnect: o.neverReads === true }, (c) => {
     open.add(c);
     c.on('close', () => open.delete(c));
@@ -138,6 +145,10 @@ const inbox = async (o: { neverCloses?: boolean; neverReads?: boolean } = {}) =>
     });
     c.on('end', () => {
       for (const l of got.split('\n')) if (l.trim()) lines.push(JSON.parse(l));
+      for (const due of waiting.filter((w) => lines.length >= w.n)) {
+        waiting.splice(waiting.indexOf(due), 1);
+        due.resolve(lines);
+      }
       if (!o.neverCloses) c.end();
     });
   });
@@ -146,6 +157,7 @@ const inbox = async (o: { neverCloses?: boolean; neverReads?: boolean } = {}) =>
   return {
     path: at,
     lines,
+    heard,
     close: () =>
       new Promise<void>((resolve) => {
         for (const c of open) c.destroy();
@@ -214,7 +226,7 @@ test("at shipped defaults, say hands the words verbatim to the running session's
   const said = await engine.say(id, text);
 
   assert.deepEqual(
-    box.lines,
+    await box.heard(1),
     [{ type: 'user', session_id: row.sessionId, message: { role: 'user', content: text } }],
     'one line, the words as given, for this session',
   );
@@ -232,7 +244,7 @@ test("at shipped defaults, say hands the words verbatim to the running session's
     'said twice, journalled twice, in order: the record keeps what a person did, not what is new',
   );
   assert.equal(again.attempt, 1);
-  assert.equal(box.lines.length, 2);
+  assert.equal((await box.heard(2)).length, 2);
   await box.close();
 });
 
@@ -241,7 +253,7 @@ test('a session its harness lists blocked is running, and its inbox is handed th
   const { id, row, box } = await running(engine);
   fake.setRows(fake.rows().map((r) => (r.sessionId === row.sessionId ? { ...r, state: 'blocked', status: 'idle' } : r)));
   await engine.say(id, 'you may run the migration');
-  assert.equal(box.lines.length, 1);
+  assert.equal((await box.heard(1)).length, 1);
   assert.equal((await engine.view(id)).state.said.length, 1);
   await box.close();
 });
@@ -258,7 +270,7 @@ test('a task journalled on claude before a job was its default runs --bg with no
   assert.equal((await engine.view(id)).state.config?.background, undefined, 'the record names no mode');
 
   await engine.say(id, 'and the web app');
-  assert.equal(box.lines.length, 1, 'the words reached its inbox');
+  assert.equal((await box.heard(1)).length, 1, 'the words reached its inbox');
   assert.equal((await engine.view(id)).state.said.length, 1);
   await box.close();
 });
@@ -569,7 +581,7 @@ test('an inbox that reads the words and never closes its end — a process busy 
   register(row, { messagingSocketPath: box.path });
   const said = await engine.say(id, 'are you there');
   assert.deepEqual(
-    box.lines.map((l) => l.message?.content),
+    (await box.heard(1)).map((l) => l.message?.content),
     ['are you there'],
     'the inbox has the words',
   );
@@ -577,11 +589,30 @@ test('an inbox that reads the words and never closes its end — a process busy 
   await box.close();
 });
 
-test('the post resolves once the whole line is written, closed or not; it rejects when the line is still being written at the deadline, which an inbox drops', async () => {
-  const slow = await inbox({ neverCloses: true });
-  await claudeInboxPost(slow.path, claudeInboxLine('s', 'hello'), 200);
-  assert.equal(slow.lines.length, 1);
+test('the post resolves once the whole line is written: when the inbox closes its end, or at its deadline when it never does', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const box = await inbox();
+  await claudeInboxPost(box.path, claudeInboxLine('s', 'hi'), 200);
+  assert.deepEqual(
+    box.lines.map((l) => l.message?.content),
+    ['hi'],
+    'settled by the inbox closing its end, the deadline never passing',
+  );
+  await box.close();
 
+  const slow = await inbox({ neverCloses: true });
+  const post = claudeInboxPost(slow.path, claudeInboxLine('s', 'hello'), 200);
+  const heard = await slow.heard(1);
+  t.mock.timers.tick(200);
+  await post;
+  assert.deepEqual(
+    heard.map((l) => l.message?.content),
+    ['hello'],
+  );
+  await slow.close();
+});
+
+test('the post rejects when the line is still being written at the deadline, which an inbox drops, and when the inbox is not there', async () => {
   const deaf = await inbox({ neverReads: true });
   await assert.rejects(
     claudeInboxPost(deaf.path, claudeInboxLine('s', 'x'.repeat(4 * 1024 * 1024)), 200),
@@ -590,8 +621,7 @@ test('the post resolves once the whole line is written, closed or not; it reject
   );
 
   const gone = path.join(tmp('gone'), 'in.sock');
-  await assert.rejects(claudeInboxPost(gone, claudeInboxLine('s', 'hello'), 200), (e: NodeJS.ErrnoException) => e.code === 'ENOENT');
-  await slow.close();
+  await assert.rejects(claudeInboxPost(gone, claudeInboxLine('s', 'hello'), 60_000), (e: NodeJS.ErrnoException) => e.code === 'ENOENT');
   await deaf.close();
 });
 

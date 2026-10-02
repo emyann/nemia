@@ -6,7 +6,7 @@ import { AgentSkillSchema, GivenSkillSchema, SchemaFileSchema, type AgentSkill, 
 
 /**
  * The keys an agent sets on the steps that name it: every agent key but what describes the agent itself — its description, the skills its
- * sessions are given and its system prompt (`AGENT_OWN_KEYS`). Mirrors `RoleKey` in the package.
+ * sessions are given and its harness prompt (`AGENT_OWN_KEYS`). Mirrors `RoleKey` in the package.
  */
 export type AgentRoleKey =
   | 'harness'
@@ -53,7 +53,7 @@ const AgentUserSchema = Schema.Struct({
  * Mirrors `AgentListing` in apps/api/src/agents/agents.ts: one agent — its keys as its file writes them, its instructions, the result
  * schema its `output:` names, what it says it can do — its card's skills, generated from the skills it gives (one entry each, read off each
  * SKILL.md, or one made from its description when it gives none), null with `cardError` saying why where none can be made — the skills its
- * sessions are given and its system prompt as its lines write them (null for none), its file as written, the version a write carries, the
+ * sessions are given and its harness prompt as its lines write them (null for none), its file as written, the version a write carries, the
  * nodes that name it, and the parser's refusal of a file that does not read.
  */
 export type AgentListing = {
@@ -72,8 +72,8 @@ export type AgentListing = {
   cardError: string | null;
   /** The skills its sessions are given, as its `skills:` line writes them: `review-a-change, write-a-note`. */
   skills: string | null;
-  /** `default`, `no-coding` or `own`, as written; null for none, which is `default`. */
-  systemPrompt: string | null;
+  /** What becomes of Claude Code's own prompt: `keep`, `no-coding` or `replace`, as the api reads it; null for none, which is `keep`. */
+  harnessPrompt: string | null;
   /** The skills it gives, one row each in its order: where a start finds it and what it costs a turn, or why none is found. */
   given: GivenSkill[];
   source: string;
@@ -102,7 +102,7 @@ const AgentListingSchema = Schema.Struct({
   card: Schema.NullOr(Schema.mutable(Schema.Array(AgentSkillSchema))),
   cardError: Schema.NullOr(Schema.String),
   skills: Schema.NullOr(Schema.String),
-  systemPrompt: Schema.NullOr(Schema.String),
+  harnessPrompt: Schema.NullOr(Schema.String),
   given: Schema.mutable(Schema.Array(GivenSkillSchema)),
   source: Schema.String,
   version: Schema.String,
@@ -141,8 +141,8 @@ export const agentQuery = (from: string, name: string) =>
   });
 
 /**
- * An agent as a write sends it: its name, description, the skills it gives and its system prompt — each null for none — the role keys it
- * sets, one unset as null, its instructions, and a result schema pasted for it. `skills` and `systemPrompt` are the agent's own lines, as
+ * An agent as a write sends it: its name, description, the skills it gives and its harness prompt — each null for none — the role keys it
+ * sets, one unset as null, its instructions, and a result schema pasted for it. `skills` and `harnessPrompt` are the agent's own lines, as
  * `description` is. Its card is generated from its skills, and nothing sends it.
  */
 export type AgentDraft = {
@@ -150,7 +150,7 @@ export type AgentDraft = {
   role: string | null;
   description: string | null;
   skills: string | null;
-  systemPrompt: string | null;
+  harnessPrompt: string | null;
   keys: Partial<Record<AgentRoleKey, string | null>>;
   body: string;
   schema?: SchemaFile;

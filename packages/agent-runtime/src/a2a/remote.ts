@@ -556,7 +556,7 @@ export const remoteOps = (
           sessionId: m.messageId,
           state: 'completed',
           ...(m.contextId ? { nativeId: m.contextId } : {}),
-          ...(data?.content?.$case === 'data' ? { closeout: { payload: data.content.value, at: Date.now() } } : {}),
+          ...(data?.content?.$case === 'data' ? { closeout: { payload: data.content.value } } : {}),
         },
       });
       return;
@@ -646,7 +646,7 @@ export const remoteOps = (
       if (err instanceof TaskNotFoundError) return undefined;
       return e.seen ?? { sessionId: e.taskId, state: 'working', ...(e.contextId ? { nativeId: e.contextId } : {}) };
     }
-    const s = sightingOfTask(task, Date.now());
+    const s = sightingOfTask(task);
     if (TERMINAL.has(s.state)) write({ ...e, seen: s, ended: true });
     else if (s.state !== e.seen?.state || s.waitingFor !== e.seen?.waitingFor || s.nativeId !== e.seen?.nativeId) write({ ...e, seen: s });
     return s;

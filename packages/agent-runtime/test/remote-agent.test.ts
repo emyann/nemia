@@ -556,7 +556,7 @@ test('restart with the intent on disk and no Task: never sent twice — a spawn 
   );
   assert.equal((await e.view(id)).state.settled, null, 'no refusal: a session may exist');
   assert.equal(s.counts.sendMessage ?? 0, 0);
-  const back = new Date(Date.now() - 31_000).toISOString();
+  const back = new Date(Date.now() - 10 * 60_000).toISOString();
   writeJournal(
     root,
     id,
@@ -658,7 +658,7 @@ test('an agent unreachable for a pass is not a session lost: the task reads as l
       },
     }),
   );
-  const back = new Date(Date.now() - 31_000).toISOString();
+  const back = new Date(Date.now() - 10 * 60_000).toISOString();
   writeJournal(
     root,
     id,
@@ -861,6 +861,51 @@ test('a pass returns while the agent holds the send, and the next task in it is 
   assert.equal(held.counts.sendMessage, 1, 'sent once');
 });
 
+/** Step this process's wall clock back by `ms` until the test ends: `Date.now()` and an argless `new Date()` read earlier. */
+const stepBack = (t: TestContext, ms: number): void => {
+  const Real = Date;
+  globalThis.Date = class extends Real {
+    constructor(...args: ConstructorParameters<DateConstructor> | []) {
+      if (args.length === 0) super(Real.now() - ms);
+      else super(...args);
+    }
+    static override now(): number {
+      return Real.now() - ms;
+    }
+  } as DateConstructor;
+  t.after(() => {
+    globalThis.Date = Real;
+  });
+};
+
+test("a remote Task's statement is kept when the wall clock steps back after the attempt began", async (t) => {
+  const g = gate();
+  const s = await serve({ script: () => [{ until: g.shut, data: { ok: 'held' }, state: 'completed' }] });
+  const { e } = engineOn(s);
+  const id = await e.file(task());
+  await running(e, id);
+  stepBack(t, 60_000);
+  g.open();
+  const v = await settled(e, id);
+  assert.equal(v.state.settled, 'succeeded');
+  assert.deepEqual(v.state.attempts[0].closeout, { ok: 'held' }, 'what the agent sent is on the record');
+  assert.notEqual(v.state.attempts[0].stated, false);
+});
+
+test("a remote agent's Message reply keeps its data when the wall clock steps back after the attempt began", async (t) => {
+  const g = gate();
+  const s = await serve({ script: () => [{ reply: 'r', data: { ok: 'replied' }, until: g.shut }] });
+  const { e } = engineOn(s);
+  const id = await e.file(task());
+  await running(e, id);
+  stepBack(t, 60_000);
+  g.open();
+  const v = await settled(e, id);
+  assert.equal(v.state.settled, 'succeeded');
+  assert.deepEqual(v.state.attempts[0].closeout, { ok: 'replied' }, 'what the agent sent is on the record');
+  assert.notEqual(v.state.attempts[0].stated, false);
+});
+
 test('an intent whose sending process lives is left to it: read submitted in another engine, and not sent again', async () => {
   const s = await serve({ script: HELD });
   const root = scratch('ae-remote-');
@@ -918,7 +963,7 @@ test('an intent whose sending process died is in doubt: not listed, never sent a
     events.find((ev) => ev.kind === 'spawned')?.error ?? '',
     /its answer was never recorded, since the process sending it stopped first: whether the agent made a Task of it is not known, and it is not sent twice/,
   );
-  const back = new Date(Date.now() - 31_000).toISOString();
+  const back = new Date(Date.now() - 10 * 60_000).toISOString();
   writeJournal(
     root,
     id,

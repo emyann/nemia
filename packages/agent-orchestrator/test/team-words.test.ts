@@ -1,9 +1,9 @@
 /**
- * The team's mechanism for placing a change is generic: the spec's and the review's schemas, the bodies of the agents that write, build
- * and review a spec, and their skills say "the boundaries the repository's own rules define", and never name this repository's layers,
- * the kinds of its orchestrator's files, or the document that holds them. This repository's words for them live in its `CLAUDE.md`
- * files, which every agent reads. Each word is first refused in planted text, and each file is read for a name it must hold, so a file
- * moved or emptied cannot make the guard pass by reading nothing.
+ * The team's mechanism for placing a change is generic: the spec's and the review's schemas, the bodies of the agents that write, build and
+ * review a spec, and their skills say "the boundaries the repository's own rules define", and never name this repository's layers, the
+ * kinds of its orchestrator's files, or the document that holds them; nor does the skill an agent is written by (`create-an-agent`). This
+ * repository's words for them live in its `CLAUDE.md` files, which every agent reads. Each word is first refused in planted text, and each
+ * file is read for a name it must hold, so a file moved or emptied cannot make the guard pass by reading nothing.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -25,6 +25,7 @@ const MECHANISM: Array<{ file: string; holds: string; body: boolean }> = [
   { file: '.claude/skills/write-a-spec/SKILL.md', holds: '# Write a spec', body: true },
   { file: '.claude/skills/review-a-change/SKILL.md', holds: '# Review a change', body: true },
   { file: '.claude/skills/implement-a-change/SKILL.md', holds: '# Implement a change', body: true },
+  { file: '.claude/skills/create-an-agent/SKILL.md', holds: '# Create an agent in Nemia', body: true },
 ];
 
 /** The text of `file` the guard reads: an agent's or a skill's body after its frontmatter, a schema whole. */

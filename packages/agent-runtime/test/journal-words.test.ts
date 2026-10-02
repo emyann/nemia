@@ -106,11 +106,12 @@ test('a session that signs off: spawned, ended with its statement and usage, set
   const id = await b.engine.file(filing);
   await b.engine.tick();
   const name = 'ae/t-words/1';
+  const began = Date.parse((await b.engine.view(id)).state.attempts[0].startedAt);
   b.sessions.set(name, {
     ...b.sessions.get(name)!,
     state: 'completed',
     busy: false,
-    closeout: { payload: { outcome: 'done', summary: 'wrote them' }, at: Date.now() + 60_000 },
+    closeout: { payload: { outcome: 'done', summary: 'wrote them' }, at: began + 1_000 },
     usage: { turns: 3, outputTokens: 120, costUsd: 0.25 },
   });
   await b.engine.tick();
@@ -310,19 +311,21 @@ test('a task held open: it signs and waits, an answer is a turn that continues i
   const b = board();
   const id = await b.engine.file({ ...filing, holdOpen: true });
   await b.engine.tick();
-  const sign = (n: number, summary: string) =>
+  const sign = async (n: number, summary: string) => {
+    const began = Date.parse((await b.engine.view(id)).state.attempts[n - 1].startedAt);
     b.sessions.set(`ae/t-words/${n}`, {
       ...b.sessions.get(`ae/t-words/${n}`)!,
       state: 'completed',
       busy: false,
-      closeout: { payload: { outcome: 'done', summary }, at: Date.now() + 60_000 },
+      closeout: { payload: { outcome: 'done', summary }, at: began + 1_000 },
     });
-  sign(1, 'a first draft');
+  };
+  await sign(1, 'a first draft');
   await b.engine.tick();
   assert.equal((await b.engine.view(id)).phase, 'input-required');
   await b.engine.answer(id, 'shorter, please', { config: { budgetUsd: 0.5 } });
   await b.engine.tick();
-  sign(2, 'a shorter draft');
+  await sign(2, 'a shorter draft');
   await b.engine.tick();
   await b.engine.close(id);
   await b.engine.tick();

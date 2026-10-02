@@ -681,9 +681,10 @@ function consumeNow(run: Run, asks: readonly RetryAsk[], rounds: readonly RoundA
 /**
  * Every run in the store. A record `wf rm` removed after the directory was read is no run, and no reason to fail every other run's pass;
  * nor is a record that does not read as a run (`UnreadableRecord`), which is left out and said, once a process, on `said` — stderr unless
- * given — with its fix. `wf <verb> <that id>` refuses in the same words.
+ * given — with its fix. `wf <verb> <that id>` refuses in the same words. A run `kept` answers for an id is listed as given, its record
+ * neither read nor counted; an id it answers nothing for is read.
  */
-export const listRuns = (said: (line: string) => void = sayOnce): Run[] =>
+export const listRuns = (said: (line: string) => void = sayOnce, kept?: (id: string) => Run | undefined): Run[] =>
   within('records', () =>
     fs.existsSync(runsDir())
       ? fs
@@ -692,7 +693,7 @@ export const listRuns = (said: (line: string) => void = sayOnce): Run[] =>
           .flatMap((f) => {
             const id = path.basename(f, '.json');
             try {
-              return [readRun(id)];
+              return [kept?.(id) ?? readRun(id)];
             } catch (err) {
               if (err instanceof UnreadableRecord) said(`left out: ${err.message}`);
               else if (fs.existsSync(runFile(id))) throw err;
@@ -712,6 +713,7 @@ export const listRuns = (said: (line: string) => void = sayOnce): Run[] =>
  * made again moves its run's stamp. The run's own directory (`<id>/`: its files and inputs) is no input of a pass, and is left out.
  *
  * A stamp is taken before the pass reads the records: a file changed between the two is read as changed by the next pass, never missed.
+ * While a run's stamp holds, a pass does not read its record again: the memo hands its run to `listRuns`.
  */
 export const restStamps = (): Map<string, string> =>
   within('records', () => {

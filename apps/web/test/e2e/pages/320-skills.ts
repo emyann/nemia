@@ -8,13 +8,13 @@ import { OUT, store } from '../world.ts';
 
 export default {
   /**
-   * An agent of yours composes its skills from a list, and its system prompt from what it does. `scribe`, which gives none, first names a
-   * skill no place has, as one copied from elsewhere would before its folder came, so its row reads not found; the file is put back. Its
+   * An agent of yours composes its skills from a list, and Claude Code's prompt from what it does. `scribe`, which gives none, first names
+   * a skill no place has, as one copied from elsewhere would before its folder came, so its row reads not found; the file is put back. Its
    * description is edited and left unsaved. The sheet lists your library, this repository's and Nemia's in that order, the repository's
    * `scratch` refused with its reason and nothing to press, and Nemia's saying none: Nemia ships no skill. A skill of your library is added
    * from the sheet's first group, a change of the form alone: nothing is written until Save, and the edit is kept. Its tools, which leave
    * out Skill, are put right from the note that says so, and Doesn't write code is picked, with Only my instructions behind For experts.
-   * Saved, the file gives the skill and says systemPrompt: no-coding. The page takes the agent back, so each visit, in either theme, reads
+   * Saved, the file gives the skill and says harnessPrompt: no-coding. The page takes the agent back, so each visit, in either theme, reads
    * the store as seeded.
    */
   name: 'skills',
@@ -50,10 +50,10 @@ export default {
       const description = form.getByRole('textbox', { name: 'Description', exact: true });
       await description.fill(drafted);
 
-      const prompt = form.getByRole('radiogroup', { name: 'System prompt' });
+      const prompt = form.getByRole('radiogroup', { name: "Claude Code's prompt" });
       await expectVisible(
         prompt.getByRole('radio', { name: /^Works on code or files/, checked: true }),
-        'unset, the system prompt reads as the default: Works on code or files',
+        "unset, Claude Code's prompt reads as keep: Works on code or files",
       );
       await expectCount(
         prompt.getByRole('radio', { name: /^Only my instructions/ }),
@@ -113,7 +113,7 @@ export default {
         throw new Refused('one press adds Skill to its tools');
       await expectCount(note, 0, 'and the note goes');
 
-      await prompt.locator('[data-system-prompt="no-coding"]').click();
+      await prompt.locator('[data-harness-prompt="no-coding"]').click();
       await expectVisible(
         prompt.getByRole('radio', { name: /^Doesn't write code/, checked: true }),
         "Doesn't write code is chosen, pressed by its label",
@@ -129,7 +129,7 @@ export default {
       ]);
       if (saved.status() !== 200) throw new Refused(`the api saves the agent — it answered ${saved.status()}: ${await saved.text()}`);
       const written = fs.readFileSync(agentFile, 'utf8');
-      for (const line of [`skills: ${mine}`, 'systemPrompt: no-coding', 'tools: Read, Skill', `description: ${drafted}`]) {
+      for (const line of [`skills: ${mine}`, 'harnessPrompt: no-coding', 'tools: Read, Skill', `description: ${drafted}`]) {
         if (!written.split('\n').includes(line))
           throw new Refused(`agents/${seeded.name}.md says ${line} — it holds ${JSON.stringify(written)}`);
       }

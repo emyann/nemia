@@ -136,7 +136,7 @@ const withAgent = (id: string): Record<string, unknown> => {
       file: 'review.json',
       schema: { type: 'object', properties: { verdict: { type: 'string' } }, required: ['verdict'], additionalProperties: false },
     },
-    agent: { name: 'reviewer', keys: ['gate'], body: 'You review.', given: { gate: 'true' }, skills: ['look'], systemPrompt: 'default' },
+    agent: { name: 'reviewer', keys: ['gate'], body: 'You review.', given: { gate: 'true' }, skills: ['look'], harnessPrompt: 'keep' },
   };
   return record;
 };
@@ -208,6 +208,28 @@ test('`listRuns` leaves out a record that does not read, says so with its fix, a
     );
   }
   for (const bad of ['r-noid', 'r-after', 'r-noname', 'r-notask', 'r-place', 'r-half', 'r-list']) fs.rmSync(runFile(bad));
+});
+
+test('`listRuns` lists the run `kept` answers for an id as given, its record never read; an id it does not answer is read as before', () => {
+  put('r-kept', '{"id": "r-kept", "repo"');
+  put('r-read', aRecord('r-read'));
+  const stand = { ...readRun('r-read'), id: 'r-kept', brief: 'what the memo holds' };
+  const said: string[] = [];
+  const listed = listRuns(
+    (line) => said.push(line),
+    (id) => (id === 'r-kept' ? stand : undefined),
+  );
+  assert.equal(
+    listed.find((r) => r.id === 'r-kept'),
+    stand,
+    'the record that is not JSON is listed as kept answers it',
+  );
+  assert.ok(!said.some((l) => l.includes('r-kept')), `and nothing is said of it, since it was not read: ${said.join('\n')}`);
+  assert.equal(listed.find((r) => r.id === 'r-read')?.brief, 'add a flag', 'an id kept does not answer is read off disk');
+  const unkept: string[] = [];
+  assert.ok(!listRuns((line) => unkept.push(line)).some((r) => r.id === 'r-kept'), 'with no kept, the record is read, and left out');
+  assert.ok(unkept.some((l) => l.startsWith('left out: run r-kept: its record, ')));
+  for (const id of ['r-kept', 'r-read']) fs.rmSync(runFile(id));
 });
 
 test('a key the tick does not name survives a read and a rewrite, and so does a frozen step key it does not name', () => {

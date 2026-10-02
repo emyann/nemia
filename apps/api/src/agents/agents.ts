@@ -50,7 +50,7 @@ export type AgentUser = { from: WorkflowSource; workflow: string; step: string }
 
 /**
  * One agent as the board lists it: its file's keys as written, its instructions, the result schema its `output:` names as that file holds
- * it, the skills its `skills:` gives its sessions and its `systemPrompt:`, each as written, what its card says it can do, the file's text,
+ * it, the skills its `skills:` gives its sessions and its `harnessPrompt:`, each as written, what its card says it can do, the file's text,
  * its version (`agentVersion`, what a write carries), and the nodes that name it. `error` is the parser's refusal of a file that does not
  * read, whose keys are then its lines as written, so the form can show what to fix.
  */
@@ -83,8 +83,11 @@ export type AgentListing = {
    * has none, and what it costs a turn (skills.ts). Empty for none, and for a file that does not read.
    */
   given: GivenSkill[];
-  /** What becomes of Claude Code's system prompt, as written: `default`, `no-coding` or `own`; null for none, which is `default`. */
-  systemPrompt: string | null;
+  /**
+   * What becomes of Claude Code's own prompt: `keep`, `no-coding` or `replace`, a former `systemPrompt:` line in the word it is now; null
+   * for none, which is `keep`.
+   */
+  harnessPrompt: string | null;
   source: string;
   version: string;
   usedBy: AgentUser[];
@@ -180,7 +183,7 @@ function readAgent(from: WorkflowSource, dir: string, name: string, repo: string
     cardError,
     skills: agent.skills?.join(', ') ?? null,
     given: givenSkills(agent.skills ?? [], found, repo, home),
-    systemPrompt: agent.systemPrompt ?? null,
+    harnessPrompt: agent.harnessPrompt ?? null,
     source,
     version,
     usedBy,
@@ -202,7 +205,7 @@ export type AgentSaved = { agent: AgentListing; written: string[]; removed: stri
 export type AgentRefused = { error: string; users: string[] };
 
 const DRAFT =
-  '"role"?: "<the job it holds>", "description"?: "<use this when…>", "skills"?: "<skill>, <skill>", "systemPrompt"?: "default" | "no-coding" | "own", "keys": { "model": "opus", "effort": "high", "tools": "Read, Grep", … }, "body": "<its instructions>", "schema"?: { "file": "<name>.schema.json", "text": "<a JSON Schema>" }';
+  '"role"?: "<the job it holds>", "description"?: "<use this when…>", "skills"?: "<skill>, <skill>", "harnessPrompt"?: "keep" | "no-coding" | "replace", "keys": { "model": "opus", "effort": "high", "tools": "Read, Grep", … }, "body": "<its instructions>", "schema"?: { "file": "<name>.schema.json", "text": "<a JSON Schema>" }';
 const POST_SHAPE = `\`{ "name": "<agent>", ${DRAFT} }\`, a key unset as null or left out`;
 const PUT_SHAPE = `\`{ "version": "<as GET /api/agents lists it>", "name"?: "<its new name>", ${DRAFT} }\`, a key unset as null or left out`;
 const DELETE_SHAPE = '`{ "version": "<as GET /api/agents lists it>" }`';
@@ -226,7 +229,8 @@ const DRAFT_FIELDS = {
   role: Schema.optionalKey(Schema.NullOr(Schema.String)),
   description: Schema.optionalKey(Schema.NullOr(Schema.String)),
   skills: Schema.optionalKey(Schema.NullOr(Schema.String)),
-  systemPrompt: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  systemPrompt: Schema.optionalKey(Schema.Never),
+  harnessPrompt: Schema.optionalKey(Schema.NullOr(Schema.String)),
   keys: Schema.optionalKey(Schema.Record(Schema.String, Schema.NullOr(Schema.String))),
   body: Schema.optionalKey(Schema.String),
   schema: Schema.optionalKey(Schema.NullOr(Schema.Struct({ file: Schema.String, text: Schema.String }))),
@@ -255,7 +259,11 @@ function draftWords(route: string, shape: string): Words {
       return wrong(
         '`skills` is the skills the agent is given, by name, as its line writes them — `"review-a-change, write-a-note"` — or null',
       );
-    if (key === 'systemPrompt') return wrong('`systemPrompt` is `"default"`, `"no-coding"` or `"own"`, or null');
+    if (key === 'systemPrompt')
+      return wrong(
+        '`systemPrompt` is now `harnessPrompt`, what becomes of Claude Code\'s own prompt: `"keep"`, `"no-coding"` or `"replace"`, where it said `"default"`, `"no-coding"` or `"own"`. A page that sends it is stale: reload it, and save again',
+      );
+    if (key === 'harnessPrompt') return wrong('`harnessPrompt` is `"keep"`, `"no-coding"` or `"replace"`, or null');
     if (key === 'keys' && inner !== undefined)
       return wrong(`\`keys.${String(inner)}\` is written as a string, as its line in the file is — ${JSON.stringify(input)} is not one`);
     if (key === 'keys') return wrong('`keys` is an object of the role keys the agent sets');
@@ -317,7 +325,7 @@ function draftOf(body: Omit<typeof POST_BODY.Type, 'name'>, name: string): { dra
       role: line(body.role),
       description: line(body.description),
       skills: line(body.skills),
-      systemPrompt: line(body.systemPrompt),
+      harnessPrompt: line(body.harnessPrompt),
       keys: Object.fromEntries(Object.entries(body.keys ?? {}).map(([key, value]) => [key, line(value)])),
       body: body.body ?? '',
     },

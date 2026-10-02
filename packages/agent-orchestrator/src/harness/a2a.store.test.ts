@@ -230,7 +230,7 @@ test('each key that tells a harness of ours how to run is refused on a remote st
 const agentsOf = (files: Record<string, string>): Agents =>
   new Map(Object.entries(files).map(([name, text]) => [name, parseAgent(name, text)]));
 
-test("a key a remote step's agent gives is refused as the step's own is, and so are its skills and its system prompt", () => {
+test("a key a remote step's agent gives is refused as the step's own is, and so are its skills and its harness prompt", () => {
   const refused = loadRefusal(() =>
     parseWorkflow(
       'ask',
@@ -270,10 +270,10 @@ test("a key a remote step's agent gives is refused as the step's own is, and so 
       'ask',
       '---\nagent: critic\nharness: a2a:reviewer\n---\nx\n',
       undefined,
-      agentsOf({ critic: '---\nsystemPrompt: default\n---\nCriticise.\n' }),
+      agentsOf({ critic: '---\nharnessPrompt: keep\n---\nCriticise.\n' }),
     ),
   );
-  assert.match(prompted, /`systemPrompt: default` shapes Claude Code's system prompt, and `harness: a2a:reviewer` is a remote A2A agent/);
+  assert.match(prompted, /`harnessPrompt: keep` shapes Claude Code's own prompt, and `harness: a2a:reviewer` is a remote A2A agent/);
   const told = parseWorkflow(
     'ask',
     '---\nagent: critic\nharness: a2a:reviewer\n---\nThe plan.\n',

@@ -94,7 +94,8 @@ export type TaskView = {
  *    conversation under the child's own id, so the parent's statement arrives looking exactly like the child's: the session
  *    id cannot tell them apart, the moment it was made can, and only the journal knows when this attempt began, which is
  *    why the check is here and not in a runner. One made before is carried over, not said: it is dropped from the
- *    sighting, so it is never recorded as this attempt's either.
+ *    sighting, so it is never recorded as this attempt's either. One with no time is from a session that cannot carry
+ *    another attempt's statement, and is the session's own.
  * 2. The harness has not answered already (`LIVE`): an ended session's statement rides along to the record and nothing
  *    more. A session listed `blocked` is live, and to `decide` it is live for ever: a step can call StructuredOutput, end its
  *    turn and be seen `blocked`, idle, next, so a statement ends a blocked attempt exactly as it ends a working one, or that
@@ -114,7 +115,7 @@ const closedOut = (state: State, observed: ReadonlyMap<string, Sighting>): Reado
   const name = nameFor(state.taskId, last.n);
   const seen = observed.get(name);
   if (!seen?.closeout) return observed;
-  if (!(seen.closeout.at > Date.parse(last.startedAt))) {
+  if (seen.closeout.at !== undefined && !(seen.closeout.at > Date.parse(last.startedAt))) {
     const said: Sighting = { ...seen };
     delete said.closeout;
     return new Map(observed).set(name, said);

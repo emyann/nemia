@@ -1181,14 +1181,20 @@ log. `exit` can come first, and the pass that records the end would then miss an
 pipe — for good, since an end is written once. Two seconds at most: a child the harness leaves behind
 can hold a pipe open for as long as it likes.
 
-Runners report the statement **and when it was made**. The engine decides whether it belongs to this
-attempt, records it on the attempt (`state.attempts[n].closeout`), and never reads it. Two rules
-guard that decision, both learned from real runs:
+Runners report the statement **and when it was made**, unless it cannot be another attempt's. The
+engine decides whether it belongs to this attempt, records it on the attempt
+(`state.attempts[n].closeout`), and never reads it. Two rules guard that decision, both learned from
+real runs:
 
 - **Made before the attempt began, it was inherited, not said.** A resumed Claude Code session's
   transcript holds its parent's entire conversation under the child's own session id — 460 entries,
   measured — so the parent's `StructuredOutput` call arrives looking exactly like the child's. Only
   the time tells them apart, and only the journal knows when the attempt started.
+  A runner whose session cannot carry another attempt's statement gives no time, and the engine then
+  keeps the statement whatever the clock says. A remote A2A agent is one: its Task was made by this
+  attempt's message. A time stamped when the runner read it would fall before the attempt's start
+  once the wall clock stepped back, and the statement would be dropped from a completed task.
+  Leaving out the time skips this check, so a runner that can resume a session always gives one.
 - **From a busy session, it is not final.** A step once declared itself done, carried on, found it
   could not commit, and revised its verdict eleven seconds later.
 

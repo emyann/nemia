@@ -1,22 +1,22 @@
 /**
  * An agent: a markdown file in `agents/` beside the workflows, whose frontmatter a step names with `agent:` and inherits. Its keys
- * (`AGENT_KEYS`), read by `parseAgent` and written back by `renderAgent`, the skills it names and what they cost a turn, and the card it
- * is published with (`agentCard`). And the agent rendered for Claude Code: what `wf start` writes for a step whose agent has
- * instructions, skills or a system prompt of its own, and what the tick hands Claude Code to read it. Pure: the layout, the prompt's
- * text and the flags; `writeAgentFiles` in agents.store.ts writes it.
+ * (`AGENT_KEYS`), read by `parseAgent` and written back by `renderAgent`, the skills it names and what they cost a turn, and the card it is
+ * published with (`agentCard`). And the agent rendered for Claude Code: what `wf start` writes for a step whose agent has instructions,
+ * skills or a harness prompt other than `keep` (`harnessPrompt:`), and what the tick hands Claude Code to read it. Pure: the layout, the
+ * prompt's text and the flags; `writeAgentFiles` in agents.store.ts writes it.
  *
  * Under `runs/<id>/agents/<step>/`, frozen with the run as its workflow is:
  *
  * - `prompt.md`, the agent's instructions, then a line naming each skill it is given, then the whole text of each skill that asks to be
- *   told whole (`preload: true`): appended to Claude Code's own system prompt, which is kept (`--append-system-prompt-file`), or put in
- *   its place for `systemPrompt: own` (`--system-prompt-file`);
+ *   told whole (`preload: true`): appended to Claude Code's own prompt, which is kept (`--append-system-prompt-file`), or put in
+ *   its place for `harnessPrompt: replace` (`--system-prompt-file`);
  * - `nemia-<agent>/`, a plugin of the step's own (`--plugin-dir`): its `skills/<name>/`, each copied whole from where the load found it,
- *   so a session loads them as `nemia-<agent>:<name>`; and, for `systemPrompt: no-coding`, `output-styles/no-coding.md`, a style that says
+ *   so a session loads them as `nemia-<agent>:<name>`; and, for `harnessPrompt: no-coding`, `output-styles/no-coding.md`, a style that says
  *   `keep-coding-instructions: false`, chosen by its namespaced name, since a bare one is echoed and not applied.
  *
- * The step's brief is then its own note alone (`briefBody`): the instructions are in the system prompt. A codex step is handed them in its
- * brief, and so is a step that continues another's session (`resume:`), whose system prompt stays that session's, and a
- * step on a remote A2A agent, which keeps its operator's.
+ * The step's brief is then its own note alone (`briefBody`): the instructions are in Claude Code's prompt. A codex step is handed them in
+ * its brief, and so is a step that continues another's session (`resume:`), whose prompt stays that session's, and a step on a remote A2A
+ * agent, which keeps its operator's.
  */
 import path from 'node:path';
 import {
@@ -35,10 +35,13 @@ import { composedRefusal } from '../keys/index.ts';
 import {
   codexModeWritten,
   codexSandboxNamed,
+  FORMER_HARNESS_PROMPTS,
   FORMER_KEYS,
+  FORMER_OWN_KEYS,
   formerKeyWritten,
   formerSandbox,
   frontmatterKey,
+  harnessPromptNamed,
   readKeys,
 } from '../former/former.ts';
 import { stepFrom } from '../workflow/index.ts';
@@ -47,16 +50,16 @@ import { isRemoteHarness } from '../harness/harness.ts';
 
 /**
  * The keys an agent file sets: the job it holds (`role:`, as `Product engineer`; its own name is its file's); what it is for, in a line;
- * the skills it is given (`skills:`), which are also what its card says it can do and what becomes of Claude Code's own system prompt
- * (`systemPrompt:`); and who does the work and how. A step that names the agent (`agent:`) takes the last of those as its own defaults, and
- * a key it sets itself wins. Everything else a step sets is wiring — where the step sits in its workflow, what it reads, how it is judged
- * and for how long — and belongs on the step: an agent file that sets one is refused by name.
+ * the skills it is given (`skills:`), which are also what its card says it can do; what becomes of Claude Code's own prompt
+ * (`harnessPrompt:`); and who does the work and how. A step that names the agent (`agent:`) takes the last of those as its own defaults,
+ * and a key it sets itself wins. Everything else a step sets is wiring — where the step sits in its workflow, what it reads, how it is
+ * judged and for how long — and belongs on the step: an agent file that sets one is refused by name.
  */
 export const AGENT_KEYS = [
   'role',
   'description',
   'skills',
-  'systemPrompt',
+  'harnessPrompt',
   'harness',
   'model',
   'effort',
@@ -71,28 +74,34 @@ export const AGENT_KEYS = [
 ] as const;
 export type AgentKey = (typeof AGENT_KEYS)[number];
 /**
- * The agent keys that are the agent's own and no step's: the job it holds, what it is for, the skills it is given and its system prompt. A
+ * The agent keys that are the agent's own and no step's: the job it holds, what it is for, the skills it is given and its harness prompt. A
  * step has none of them, so none is in `STEP_KEYS`, and code outside the package that reads the role keys leaves them out
  * (`apps/api/src/workflows/builder.ts`'s `ROLE_KEYS` and `apps/api/src/agents/agents.ts`'s, off this list; `apps/web/src/lib/agents.ts` by
  * hand).
  */
-export const AGENT_OWN_KEYS = ['role', 'description', 'skills', 'systemPrompt'] as const;
+export const AGENT_OWN_KEYS = ['role', 'description', 'skills', 'harnessPrompt'] as const;
 export type AgentOwnKey = (typeof AGENT_OWN_KEYS)[number];
 /** The keys a step takes from its agent: every agent key but its own (`AGENT_OWN_KEYS`). */
 export type RoleKey = Exclude<AgentKey, AgentOwnKey>;
 const isAgentKey = (key: string): key is AgentKey => (AGENT_KEYS as readonly string[]).includes(key);
 const isOwnKey = (key: string): key is AgentOwnKey => (AGENT_OWN_KEYS as readonly string[]).includes(key);
 /** What each of an agent's own lines is called where a draft gives it: its field, not one of its keys. */
-const OWN_LINE: Record<AgentOwnKey, string> = { role: 'role', description: 'description', skills: 'skills', systemPrompt: 'system prompt' };
+const OWN_LINE: Record<AgentOwnKey, string> = {
+  role: 'role',
+  description: 'description',
+  skills: 'skills',
+  harnessPrompt: "Claude Code's prompt",
+};
 
 /**
- * What becomes of Claude Code's own system prompt for an agent's steps (`systemPrompt:`): `default` keeps it and appends the agent's
- * instructions after it (`--append-system-prompt-file`); `no-coding` keeps it less its coding instructions, through an output style
- * that says `keep-coding-instructions: false`, and appends them the same; `own` replaces it with them (`--system-prompt-file`).
- * Absent is `default`. Claude Code's alone: codex is handed its instructions in the brief.
+ * What becomes of Claude Code's own prompt — the harness's system prompt — for an agent's steps (`harnessPrompt:`): `keep` keeps it and
+ * appends the agent's instructions after it (`--append-system-prompt-file`); `no-coding` keeps it less its coding instructions, through
+ * an output style that says `keep-coding-instructions: false`, and appends them the same; `replace` puts the instructions in its place
+ * (`--system-prompt-file`). Absent is `keep`. Claude Code's alone: codex is handed its instructions in the brief. Its former line,
+ * `systemPrompt: default | no-coding | own`, is still read (`FORMER_OWN_KEYS`).
  */
-export const SYSTEM_PROMPTS = ['default', 'no-coding', 'own'] as const;
-export type SystemPrompt = (typeof SYSTEM_PROMPTS)[number];
+export const HARNESS_PROMPTS = ['keep', 'no-coding', 'replace'] as const;
+export type HarnessPrompt = (typeof HARNESS_PROMPTS)[number];
 
 /** A skill's name: the folder it is, in `skills/`, lowercase words joined by dashes, as Claude Code names one. */
 export const SKILL_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -109,8 +118,8 @@ export function skillNameRefusal(name: unknown): string | undefined {
 /**
  * What a skill costs an agent's sessions, in tokens, estimated at four characters a token (the page says "about"): `listed`, its name and
  * description, which Claude Code lists to every session of an agent that gives it; `body`, its SKILL.md's body, which a session reads when
- * it loads the skill — or, for a skill that says `preload: true`, which the run appends to the system prompt, so it is carried on every
- * turn (cached). `perTurn` is what every turn carries: the listing, and the body too when it is preloaded. Pure, and never refuses: a
+ * it loads the skill — or, for a skill that says `preload: true`, which the run appends to Claude Code's own prompt, so it is carried on
+ * every turn (cached). `perTurn` is what every turn carries: the listing, and the body too when it is preloaded. Pure, and never refuses: a
  * SKILL.md that does not read costs what its text would.
  */
 export type SkillCost = { preload: boolean; listed: number; body: number; perTurn: number };
@@ -152,8 +161,8 @@ export type Agent = {
   description?: string;
   /** The skills its steps are given, by name (`skills:`), each a folder in a `skills/` the load finds (`SkillsFound`). */
   skills?: string[];
-  /** What becomes of Claude Code's system prompt, as written (`SYSTEM_PROMPTS`); absent is `default`. */
-  systemPrompt?: SystemPrompt;
+  /** What becomes of Claude Code's own prompt (`HARNESS_PROMPTS`), a former line read as its word now; absent is `keep`. */
+  harnessPrompt?: HarnessPrompt;
   keys: Partial<Record<RoleKey, string>>;
   body: string;
   read: (file: string) => string | undefined;
@@ -188,7 +197,7 @@ const CLAUDE_CODE_REFUSED: Record<string, string> = {
  * one it may: Claude Code's own agent files say their name, and `parseAgent` holds it to the file's.
  */
 function agentKeyRefusal(file: string, key: string): string | undefined {
-  if (isAgentKey(key) || key === 'name' || CLAUDE_CODE_IGNORED.includes(key)) return undefined;
+  if (isAgentKey(key) || key === 'name' || Object.hasOwn(FORMER_OWN_KEYS, key) || CLAUDE_CODE_IGNORED.includes(key)) return undefined;
   if (key === 'card') return cardRetired(file, 'card');
   if (Object.hasOwn(CLAUDE_CODE_REFUSED, key)) {
     return `${file}: \`${key}\` is Claude Code's own subagent key, and a run does not carry it to its sessions — ${CLAUDE_CODE_REFUSED[key]}. Delete the line to use this agent in a run: a key the run does not read is a constraint nobody enforces.`;
@@ -207,19 +216,19 @@ function agentKeyRefusal(file: string, key: string): string | undefined {
 /**
  * One agent, from its file's text: `name` is the file's, minus `.md`. Each value is judged as a step's would be, in the file's name, so a
  * line no step could run with is refused where it is written — a step that sets a key of its own is judged again with it. The body may be
- * empty: an agent that only sets how its steps run. `color` (`CLAUDE_CODE_IGNORED`) is read and dropped, and a `skills:` line that names a
- * card file is refused (`cardRetired`).
+ * empty: an agent that only sets how its steps run. `color` (`CLAUDE_CODE_IGNORED`) is read and dropped, a `skills:` line that names a
+ * card file is refused (`cardRetired`), and the former `systemPrompt:` line is read as `harnessPrompt:` (`harnessPromptOf`).
  */
 export function parseAgent(name: string, text: string, read?: (file: string) => string | undefined): Agent {
   const file = `${AGENTS_FOLDER}/${name}.md`;
   const { block, body } = splitFrontmatter(file, text);
   const {
-    meta: { role, description, skills: listed, systemPrompt: prompt, name: said, color: _, ...written },
+    meta: { role, description, skills: listed, harnessPrompt: prompt, systemPrompt: former, name: said, color: _, ...written },
     spelled,
   } =
     block === null
-      ? { meta: {} as Partial<Record<AgentKey | 'name' | 'color', string>>, spelled: {} }
-      : readKeys<AgentKey | 'name' | 'color'>(file, block, (key) => agentKeyRefusal(file, key));
+      ? { meta: {} as Partial<Record<AgentKey | 'name' | 'color' | 'systemPrompt', string>>, spelled: {} }
+      : readKeys<AgentKey | 'name' | 'color' | 'systemPrompt'>(file, block, (key) => agentKeyRefusal(file, key));
   if (said !== undefined && said !== name) {
     refuse(
       `${file}: \`name: ${said}\` is not the file's name, and an agent is named by its file: a step names this one \`agent: ${name}\`. Write \`name: ${name}\`, or delete the line.`,
@@ -229,20 +238,20 @@ export function parseAgent(name: string, text: string, read?: (file: string) => 
   const keys = codexSandboxNamed(file, written as Partial<Record<RoleKey, string>>, written.harness);
   const step = stepFrom(file, keys, body, read, spelled);
   const skills = skillNamesOf(file, listed);
-  const systemPrompt = systemPromptOf(file, prompt);
-  if (systemPrompt === 'own' && !body.trim()) {
+  const harnessPrompt = harnessPromptOf(file, prompt, former);
+  if (harnessPrompt === 'replace' && !body.trim()) {
     refuse(
-      `${file}: \`systemPrompt: own\` puts the agent's instructions in place of Claude Code's system prompt, and this agent has none: its sessions would start with no system prompt at all. Write its instructions below the frontmatter, or delete the line.`,
+      `${file}: \`${prompt === undefined ? `systemPrompt: ${former}` : 'harnessPrompt: replace'}\` puts the agent's instructions in place of Claude Code's own prompt, and this agent has none: its sessions would start with no prompt at all. Write its instructions below the frontmatter, or delete the line.`,
     );
   }
-  const composed = composedRefusal(file, skills, systemPrompt, step);
+  const composed = composedRefusal(file, skills, harnessPrompt, step);
   if (composed !== undefined) refuse(composed);
   return {
     name,
     ...(role !== undefined && { role }),
     ...(description !== undefined && { description }),
     ...(skills !== undefined && { skills }),
-    ...(systemPrompt !== undefined && { systemPrompt }),
+    ...(harnessPrompt !== undefined && { harnessPrompt }),
     keys,
     body,
     read: read ?? (() => undefined),
@@ -281,12 +290,26 @@ function skillNamesOf(file: string, written: string | undefined): string[] | und
   return names;
 }
 
-/** `systemPrompt:` as one of `SYSTEM_PROMPTS`, refused otherwise. */
-function systemPromptOf(file: string, written: string | undefined): SystemPrompt | undefined {
-  if (written === undefined) return undefined;
-  if ((SYSTEM_PROMPTS as readonly string[]).includes(written)) return written as SystemPrompt;
+/**
+ * `harnessPrompt:` as one of `HARNESS_PROMPTS`, or the former `systemPrompt:` line (`FORMER_OWN_KEYS`) as the word it is now
+ * (`harnessPromptNamed`); refused otherwise, and when both lines are set. Under the new key only the new words are read: a file that says
+ * `harnessPrompt:` was written after the rename, and a former word there is a slip, refused naming the word it is now.
+ */
+function harnessPromptOf(file: string, written: string | undefined, former: string | undefined): HarnessPrompt | undefined {
+  if (written !== undefined && former !== undefined) {
+    refuse(
+      `${file}: \`harnessPrompt: ${written}\` and \`systemPrompt: ${former}\` are both set, and they are one key: \`systemPrompt:\` is the former name of \`harnessPrompt:\`. Keep the \`harnessPrompt:\` line and delete the other.`,
+    );
+  }
+  if (written === undefined && former === undefined) return undefined;
+  const word = written ?? harnessPromptNamed(former!);
+  if ((HARNESS_PROMPTS as readonly string[]).includes(word)) return word as HarnessPrompt;
+  const line = written === undefined ? `systemPrompt: ${former}` : `harnessPrompt: ${written}`;
+  const slip = Object.hasOwn(FORMER_HARNESS_PROMPTS, word)
+    ? ` \`${word}\` is the former word, under \`systemPrompt:\`, for \`${FORMER_HARNESS_PROMPTS[word]}\`: write \`harnessPrompt: ${FORMER_HARNESS_PROMPTS[word]}\`.`
+    : '';
   return refuse(
-    `${file}: \`systemPrompt: ${written}\` is not one of ${SYSTEM_PROMPTS.join(', ')}. \`default\` keeps Claude Code's system prompt and appends the agent's instructions after it; \`no-coding\` keeps it less its coding instructions; \`own\` replaces it with the agent's instructions. Without the line, it is \`default\`.`,
+    `${file}: \`${line}\` is not one of ${HARNESS_PROMPTS.join(', ')}.${slip} \`keep\` keeps Claude Code's own prompt and appends the agent's instructions after it; \`no-coding\` keeps it less its coding instructions; \`replace\` puts the agent's instructions in its place. Without the line, it is \`keep\`.`,
   );
 }
 
@@ -300,10 +323,27 @@ export type AgentDraft = {
   description?: string | null;
   /** The skills it is given, as written: `review-a-change, write-a-note`. */
   skills?: string | null;
-  systemPrompt?: string | null;
+  /** What becomes of Claude Code's own prompt, as written: `keep`, `no-coding` or `replace`. */
+  harnessPrompt?: string | null;
   keys: Partial<Record<RoleKey, string | null>>;
   body: string;
 };
+
+/**
+ * Refuses what a draft from a page older than the format sends, and nothing writes: the former `systemPrompt` (`FORMER_OWN_KEYS`), a
+ * `card`, or a `skills:` naming a card file (`cardRetired`).
+ */
+function refuseStale(file: string, draft: AgentDraft): void {
+  if ((draft as { systemPrompt?: unknown }).systemPrompt != null) refuse(formerKeyWritten(file, 'systemPrompt'));
+  const sent = (draft as { card?: unknown }).card;
+  if (sent != null)
+    refuse(
+      `${cardRetired(file, 'card', typeof sent === 'string' ? sent : JSON.stringify(sent))} A page that sends it is stale: reload it, and save again.`,
+    );
+  if (draft.skills != null && isCardFile(String(draft.skills))) {
+    refuse(`${cardRetired(file, 'skills', String(draft.skills))} A page that sends it is stale: reload it, and save again.`);
+  }
+}
 
 /**
  * An agent as its file: the frontmatter, its own lines first (`AGENT_OWN_KEYS`) and then each role key it sets, in `AGENT_KEYS`' order, as
@@ -325,25 +365,18 @@ export function renderAgent(draft: AgentDraft): string {
       refuse(`${file}: \`name\` is the agent's file, and it is written as the draft's name — not a key. Give it as the name.`);
     if (isOwnKey(key))
       refuse(`${file}: \`${key}\` is the agent's own line, not one of its role keys — give it as the ${OWN_LINE[key]}, once.`);
-    if (Object.hasOwn(FORMER_KEYS, key)) refuse(formerKeyWritten(file, key));
+    if (Object.hasOwn(FORMER_KEYS, key) || Object.hasOwn(FORMER_OWN_KEYS, key)) refuse(formerKeyWritten(file, key));
     const refused = agentKeyRefusal(file, key);
     if (refused !== undefined) refuse(refused);
   }
   if (keys.harness === 'codex' && keys.permissionMode != null && formerSandbox(keys.permissionMode) !== undefined)
     refuse(codexModeWritten(file, keys.permissionMode));
-  const sent = (draft as { card?: unknown }).card;
-  if (sent != null)
-    refuse(
-      `${cardRetired(file, 'card', typeof sent === 'string' ? sent : JSON.stringify(sent))} A page that sends it is stale: reload it, and save again.`,
-    );
-  if (draft.skills != null && isCardFile(String(draft.skills))) {
-    refuse(`${cardRetired(file, 'skills', String(draft.skills))} A page that sends it is stale: reload it, and save again.`);
-  }
+  refuseStale(file, draft);
   const own: Record<AgentOwnKey, string | null | undefined> = {
     role: draft.role,
     description: draft.description,
     skills: draft.skills,
-    systemPrompt: draft.systemPrompt,
+    harnessPrompt: draft.harnessPrompt,
   };
   const values: Array<[string, string | null | undefined]> = AGENT_KEYS.map((key) => [key, isOwnKey(key) ? own[key] : keys[key]]);
   const lines = values.flatMap(([key, value]) => {
@@ -457,7 +490,7 @@ export function agentNameRefusal(name: unknown): string | undefined {
 /** The prompt's file in a step's rendered folder. */
 export const PROMPT_FILE = 'prompt.md';
 
-/** The output style `systemPrompt: no-coding` chooses, in the step's plugin. */
+/** The output style `harnessPrompt: no-coding` chooses, in the step's plugin. */
 export const NO_CODING_STYLE = 'no-coding';
 
 /** The plugin an agent's skills are served from, and so their namespace: `nemia-<agent>`. */
@@ -465,15 +498,15 @@ export const pluginOf = (agent: string): string => `nemia-${agent}`;
 
 /**
  * Whether `wf start` renders the step's agent and the tick files the step with it: a step of Claude Code's — codex loads no plugin and
- * takes no system prompt — whose record gives its agent instructions, skills or a system prompt other than `default`
- * (`StepAgent.instructions`, `skills`, `systemPrompt`; a record without them renders nothing), and which starts a session of its own. A
- * step that continues another's session keeps that session's system prompt, so it is told its agent's instructions in its brief (and may
- * give no skills, nor a system prompt: `composedRefusal`).
+ * takes no prompt of ours — whose record gives its agent instructions, skills or a harness prompt other than `keep`
+ * (`StepAgent.instructions`, `skills`, `harnessPrompt`; a record without them renders nothing), and which starts a session of its own. A
+ * step that continues another's session keeps that session's prompt, so it is told its agent's instructions in its brief (and may
+ * give no skills, nor a harness prompt: `composedRefusal`).
  */
 export const rendersAgent = (step: Workflow): boolean => {
   const agent = step.agent;
   if (!agent || step.harness === 'codex' || isRemoteHarness(step.harness) || step.resume) return false;
-  return Boolean(agent.instructions || agent.skills?.length || (agent.systemPrompt ?? 'default') !== 'default');
+  return Boolean(agent.instructions || agent.skills?.length || (agent.harnessPrompt ?? 'keep') !== 'keep');
 };
 
 /** What a step's brief opens with: its own note alone when its agent is rendered, its agent's instructions and its note otherwise. */
@@ -494,7 +527,7 @@ export type SkillAgain = { name: string; text: string } | { name: string; missin
  */
 export const unrendered = (step: Workflow, skills: readonly SkillAgain[] = []): Workflow => {
   if (!step.agent) return step;
-  const { instructions: _i, skills: _s, systemPrompt: _p, ...agent } = step.agent;
+  const { instructions: _i, skills: _s, harnessPrompt: _p, ...agent } = step.agent;
   if (!skills.length) return { ...step, agent };
   return {
     ...step,
@@ -536,7 +569,7 @@ export function renderedPrompt(step: Workflow, skills: readonly RenderedSkill[])
   );
 }
 
-/** The output style `systemPrompt: no-coding` writes into the step's plugin: Claude Code's prompt less `# Doing tasks`. */
+/** The output style `harnessPrompt: no-coding` writes into the step's plugin: Claude Code's prompt less `# Doing tasks`. */
 export const noCodingStyle = (agent: string): string =>
   [
     '---',
@@ -558,7 +591,7 @@ export const pluginManifest = (agent: string): string =>
   ) + '\n';
 
 /** Whether a rendered step is filed with its plugin (`pluginOf`): when its agent has skills, or a style in it (`no-coding`). */
-export const namesPlugin = (step: Workflow): boolean => Boolean(step.agent?.skills?.length || step.agent?.systemPrompt === 'no-coding');
+export const namesPlugin = (step: Workflow): boolean => Boolean(step.agent?.skills?.length || step.agent?.harnessPrompt === 'no-coding');
 
 /**
  * The settings a rendered step's session is given (`--settings`), or `undefined` when it needs none: the style chosen (`no-coding`), and
@@ -567,7 +600,7 @@ export const namesPlugin = (step: Workflow): boolean => Boolean(step.agent?.skil
  */
 function sessionSettings(agent: StepAgent): string | undefined {
   const settings = {
-    ...(agent.systemPrompt === 'no-coding' && { outputStyle: `${pluginOf(agent.name)}:${NO_CODING_STYLE}` }),
+    ...(agent.harnessPrompt === 'no-coding' && { outputStyle: `${pluginOf(agent.name)}:${NO_CODING_STYLE}` }),
     ...(agent.skills?.length && { skillOverrides: Object.fromEntries(agent.skills.map((name) => [name, 'off'])) }),
   };
   return Object.keys(settings).length ? JSON.stringify(settings) : undefined;
@@ -575,9 +608,9 @@ function sessionSettings(agent: StepAgent): string | undefined {
 
 /**
  * The flags a rendered step is filed with, as the runtime's `config.claude` takes them, `dir` its rendered folder: the prompt appended, or
- * in place of Claude Code's (`own`); the plugin, when there are skills or a style in it; and its session's settings (`sessionSettings`):
- * the style chosen (`no-coding`), and each named skill's bare copy hidden, so the session sees the plugin's alone. Undefined for a step not
- * rendered (`rendersAgent`), which is filed with none.
+ * in place of Claude Code's (`replace`); the plugin, when there are skills or a style in it; and its session's settings
+ * (`sessionSettings`): the style chosen (`no-coding`), and each named skill's bare copy hidden, so the session sees the plugin's alone.
+ * Undefined for a step not rendered (`rendersAgent`), which is filed with none.
  */
 export function renderedFlags(
   step: Workflow,
@@ -590,7 +623,7 @@ export function renderedFlags(
   const told = Boolean(agent.instructions || agent.skills?.length);
   const settings = sessionSettings(agent);
   return {
-    ...(told ? (agent.systemPrompt === 'own' ? { systemPromptFile: prompt } : { appendSystemPromptFile: prompt }) : {}),
+    ...(told ? (agent.harnessPrompt === 'replace' ? { systemPromptFile: prompt } : { appendSystemPromptFile: prompt }) : {}),
     ...(namesPlugin(step) ? { pluginDir: [path.join(dir, plugin)] } : {}),
     ...(settings !== undefined && { settings }),
   };

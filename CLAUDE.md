@@ -130,6 +130,19 @@ holds what every change needs.
   tree and commits on exit 0 or aborts the merge (`landingDue`).
 - If you are a workflow step, commit as you go: the run commits only what you leave uncommitted, in one commit under your step's name.
 
+## Agents in this repository
+
+What the `create-an-agent` skill, being generic, does not say here:
+
+- Read `packages/agent-orchestrator/README.md`, *An agent is a node's attachment*, for the format and the four layers.
+- A test that loads a shipped folder passes its place (`placesOf` in `packages/agent-orchestrator/test/team.ts`), or the repository's
+  `.claude/skills/` is not found.
+- A checking agent given `Bash` denies `Bash(npm run build)` and `Bash(npm run e2e)`, which `.claude/settings.json` allows other roles,
+  allows by exact name the checks it runs (`npm run lint`, `npx turbo run typecheck --force`), and joins `CHECKERS` with its skill in
+  `packages/agent-orchestrator/test/agent-fences.test.ts`, which holds every shipped step's fence.
+- An agent's questions are an output field `{ "x-shape": "questions" }`, expanded by `packages/agent-orchestrator/src/question/question.ts`.
+- Its checks are *Check your work*, forced for `workflows/`; a new agent is named in *Where things are*.
+
 ## When you miss
 
 - A trap that cost you time is a lesson: better as a test that refuses the mistake, else three lines at most in the `CLAUDE.md` of the

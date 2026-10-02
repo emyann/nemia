@@ -459,8 +459,11 @@ export type RunStore = {
      * acceptances. Refused: an id with no record (`Missing`), and a record that does not read as a run (`UnreadableRecord`).
      */
     readonly read: (id: string) => Run;
-    /** Every run in the store; a record that does not read as a run is left out and said once on `said`, stderr unless given. */
-    readonly list: (said?: (line: string) => void) => Run[];
+    /**
+     * Every run in the store; a record that does not read as a run is left out and said once on `said`, stderr unless given. A run `kept`
+     * answers for an id is listed as given, its record not read.
+     */
+    readonly list: (said?: (line: string) => void, kept?: (id: string) => Run | undefined) => Run[];
     /** Make a new run's record: `wf start`'s, the one writer that makes one. */
     readonly create: (run: Run) => void;
     /**
@@ -470,7 +473,8 @@ export type RunStore = {
     readonly rewrite: (run: Run) => boolean;
     /**
      * Each run's stamp: a text that changes whenever anything a pass reads of the run changes — its record, a person's file, an ask — and
-     * that the memo of runs at rest compares. Taken before the pass reads the records, so a change between the two is never missed.
+     * that the memo of runs at rest compares. Taken before the pass reads the records, so a change between the two is never missed; a pass
+     * reads no record whose stamp holds.
      */
     readonly stamps: () => Map<string, string>;
     /** Whether the run's record is there. */

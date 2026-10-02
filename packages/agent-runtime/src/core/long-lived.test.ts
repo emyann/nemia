@@ -277,6 +277,67 @@ test("LONG-LIVED: the backoff is a kubelet's — 10 s, doubled for each end in a
   }
 });
 
+/** A moment `ms` into the boot `boot` on the monotonic clock. */
+const mono = (ms: number, boot = 'b-1') => ({ boot, ms });
+/** Now at `wallMs` on the wall clock and `monoMs` on the monotonic clock of `boot`. */
+const nowOn = (wallMs: number, monoMs: number, boot = 'b-1') => ({ ...now(wallMs), mono: mono(monoMs, boot) });
+/** Two attempts that ended on their own: the first ran `firstWall` on the wall clock and `firstMono` on the monotonic one. */
+const twoRuns = (firstWall: number, firstMono: number): Event[] => {
+  const ran = (n: number, wall: number, ms: number, wallEnd: number, msEnd: number): Event[] => [
+    { kind: 'starting', at: at(wall), attempt: n, mono: mono(ms) },
+    { kind: 'spawned', at: at(wall), attempt: n, mono: mono(ms) },
+    { kind: 'ended', at: at(wallEnd), attempt: n, sessionId: `s${n}`, observed: 'failed', reason: 'harness', mono: mono(msEnd) },
+  ];
+  return [
+    filed(true),
+    ...ran(1, 0, 0, firstWall, firstMono),
+    ...ran(2, firstWall + 1_000, firstMono + 1_000, firstWall + 6_000, firstMono + 6_000),
+  ];
+};
+
+test('LONG-LIVED: a gap runs on the monotonic clock within a boot — a wall clock stepped forward ends none early, nor one stepped back holds it past its bound — and on the wall clock across one', () => {
+  const opened = [...inFlight(true), { kind: 'process', at: at(3), attempt: 1, pid: 100 } as Event];
+  assert.deepEqual(
+    sightingFacts(fold(TASK, opened), seen(RESPAWNING).get(N1), at(GAP), mono(GAP)),
+    [{ kind: 'gap', at: at(GAP), attempt: 1, mono: mono(GAP) }],
+    'the gap is journalled on both clocks',
+  );
+  const state = fold(TASK, [...opened, { kind: 'gap', at: at(GAP), attempt: 1, mono: mono(GAP) }]);
+  const type = (n: ReturnType<typeof nowOn>) => observe(state, seen(RESPAWNING), n).type;
+  assert.equal(type(nowOn(GAP + HOUR, GAP + RESPAWN_GAP_MS - 1)), 'SESSION_RESPAWNING', 'the wall clock an hour on');
+  assert.equal(type(nowOn(GAP, GAP + RESPAWN_GAP_MS)), 'RESPAWN_OVERDUE', 'past its bound in this boot, the wall clock unmoved');
+  assert.equal(type(nowOn(GAP + RESPAWN_GAP_MS, 0, 'b-2')), 'RESPAWN_OVERDUE', 'another boot: the wall clock');
+  assert.equal(type(nowOn(GAP + RESPAWN_GAP_MS - 1, HOUR, 'b-2')), 'SESSION_RESPAWNING', 'another boot: the wall clock');
+});
+
+test('LONG-LIVED: the backoff runs on the monotonic clock within a boot — a wall clock stepped forward restarts nothing early, nor one stepped back holds a restart due — and on the wall clock across one', () => {
+  const state = fold(TASK, [
+    filed(true),
+    { kind: 'starting', at: at(1), attempt: 1, mono: mono(1) },
+    { kind: 'spawned', at: at(2), attempt: 1, mono: mono(2) },
+    { ...lostEnd, mono: mono(END) },
+  ]);
+  const due = RESTART_BACKOFF.initialMs;
+  assert.equal(decide(state, new Map(), nowOn(END + HOUR, END + due - 1)).do, 'nothing', 'the wall clock an hour on');
+  assert.equal(decide(state, new Map(), nowOn(END, END + due)).do, 'start', 'due in this boot, the wall clock unmoved');
+  assert.equal(decide(state, new Map(), nowOn(END + due, 0, 'b-2')).do, 'start', 'another boot: the wall clock');
+  assert.equal(decide(state, new Map(), nowOn(END + due - 1, HOUR, 'b-2')).do, 'nothing', 'another boot: the wall clock');
+});
+
+test("LONG-LIVED: the backoff's reset after a run of 10 min is measured on the monotonic clock of the run's boot, whatever the wall clock stepped while it ran", () => {
+  const { resetAfterMs, initialMs, factor } = RESTART_BACKOFF;
+  assert.equal(
+    backoffOf(fold(TASK, twoRuns(5_000, resetAfterMs)).attempts),
+    initialMs,
+    'a run of 10 min the wall clock read as 5 s resets',
+  );
+  assert.equal(
+    backoffOf(fold(TASK, twoRuns(resetAfterMs, 5_000)).attempts),
+    initialMs * factor,
+    'a run of 5 s the wall clock read as 10 min does not',
+  );
+});
+
 test('LONG-LIVED: what a sighting journals — the first gap once, a process at each new pid or the end of a gap — and nothing for a job, an ended attempt or a session not seen', () => {
   const held = (pid: number): Sighting => ({ sessionId: 's1', state: 'input-required', busy: false, held: true, pid });
   const gone: Sighting = { sessionId: 's1', ...RESPAWNING };

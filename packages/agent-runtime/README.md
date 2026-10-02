@@ -1587,7 +1587,8 @@ and not held is **respawning** (`respawning`, `SESSION_RESPAWNING`): the pass do
 and nobody is asked anything. The engine journals what the listing says before it decides (`sightingFacts`): a `gap` the
 first time the session is seen with no process, and a `process`, with its pid, once it is held again — or held in a process
 it had not been seen in. So Claude Code's own crash loop is on the record and in the view, and never acted on. A gap open
-`RESPAWN_GAP_MS` (two minutes) is a respawn that is not coming (`RESPAWN_OVERDUE`): the attempt ends `lost`.
+`RESPAWN_GAP_MS` (two minutes) is a respawn that is not coming (`RESPAWN_OVERDUE`): the attempt ends `lost`. The gap is
+journalled on both clocks, and its two minutes run on the monotonic clock within a boot, the wall clock across one (`elapsedMs`).
 
 **An end no stop asked for is restarted, after a back-off.** A long-lived session that ends, however it ends — done,
 failed, lost, or stopped at its harness (`claude stop`, claude.ai) — with no `stop` on the record is started again as a new
@@ -1596,7 +1597,8 @@ attempt, `ae/<task>/<n+1>`, resuming the latest session an attempt recorded and 
 (`PREVIOUS_LIVE`), and nothing starts while its harness cannot be read (`UNREAD`). The wait is a kubelet's
 (`RESTART_BACKOFF`, `backoffOf`): 10 s after one end, doubled for each end in a row, at most 300 s; an attempt that ran
 600 s counts them again. It is read off the journal's times and `now` alone (`BACKING_OFF`, then `RESTART_DUE`), so a
-restarted daemon waits the same. Only `ae stop` ends the task: it settles `stopped`, and nothing restarts it.
+restarted daemon waits the same; the wait and the 600 s run on the monotonic clock between moments journalled in one boot,
+so a stepped wall clock restarts nothing early and holds no restart that is due, and on the wall clock across a reboot. Only `ae stop` ends the task: it settles `stopped`, and nothing restarts it.
 
 **Refused, with exit code 2**, nothing journalled: a `restartPolicy` other than `'Always'`; beside it, `holdOpen` (a turn's
 end is idle here, not a wait), `deadlineSeconds` (only a stop ends it) and `closeoutSchema` (a statement would end its

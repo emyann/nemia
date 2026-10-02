@@ -105,6 +105,7 @@ const Filed = event('filed', {
   closeoutSchema: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
   queued: Schema.optional(Schema.Boolean),
   holdOpen: Schema.optional(Schema.Literal(true)),
+  restartPolicy: Schema.optional(Schema.Literal('Always')),
 });
 
 /**

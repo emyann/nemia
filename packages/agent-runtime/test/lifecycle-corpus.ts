@@ -77,6 +77,17 @@ export const JOURNALS: Record<string, Event[]> = {
   'stop asked, spawned': [filed(), starting(1), spawned(1), { kind: 'stop-requested', at: at(2 * S) }],
   'stop asked, ended': [filed(), starting(1), spawned(1), ended(1, 'stopped', 'operator'), { kind: 'stop-requested', at: at(2 * S) }],
   settled: [filed(), starting(1), spawned(1), signed(1), { kind: 'settled', at: at(3 * S), outcome: 'succeeded' }],
+  'long-lived, intent, no spawn': [filed({ restartPolicy: 'Always' }), starting(1)],
+  'long-lived, in flight': [filed({ restartPolicy: 'Always' }), starting(1), spawned(1)],
+  'long-lived, stop asked in flight': [filed({ restartPolicy: 'Always' }), starting(1), spawned(1), { kind: 'stop-requested', at: at(2 * S) }],
+  'long-lived, ended with no stop': [filed({ restartPolicy: 'Always' }), starting(1), spawned(1), signed(1)],
+  'long-lived, ended on a stop': [
+    filed({ restartPolicy: 'Always' }),
+    starting(1),
+    spawned(1),
+    { kind: 'stop-requested', at: at(2 * S) },
+    ended(1, 'stopped', 'operator'),
+  ],
 };
 
 /** When the pass reads it: in the grace window and before a deadline of 40 s, or past both. */

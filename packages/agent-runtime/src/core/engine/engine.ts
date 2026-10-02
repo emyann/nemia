@@ -10,6 +10,7 @@ import {
   decide,
   fold,
   nameFor,
+  idleOf,
   needsHuman,
   settledQuiet,
   spawnRefused,
@@ -664,14 +665,15 @@ export const everyView = Effect.fn('everyView')(function* () {
  * 1. its outcome, once settled;
  * 2. `input-required`: held open, signed and waiting for a person's answer or close — A2A's TASK_STATE_INPUT_REQUIRED —
  *    with nothing running;
- * 3. `needs-human` (`needsHuman`);
- * 4. `working (quiescent)`: listed `working` and not busy, so it believes it has work and is computing nothing. Said out
+ * 3. `idle`: a long-lived task's session open between turns (`idleOf`), which only a stop ends;
+ * 4. `needs-human` (`needsHuman`);
+ * 5. `working (quiescent)`: listed `working` and not busy, so it believes it has work and is computing nothing. Said out
  *    loud, because it is indistinguishable from progress in every other view, and it is what a stalled step looks like from
  *    outside;
- * 5. `running (…)` for any other live session, in the words every view prints (`phaseWordOf`): A2A's names stop at the
+ * 6. `running (…)` for any other live session, in the words every view prints (`phaseWordOf`): A2A's names stop at the
  *    runtime;
- * 6. `starting`: spawned but not yet in the harness's registry — the grace window, not a gap between attempts;
- * 7. `between attempts`, or `pending` before the first.
+ * 7. `starting`: spawned but not yet in the harness's registry — the grace window, not a gap between attempts;
+ * 8. `between attempts`, or `pending` before the first.
  *
  * Its `sessionId` is the sighting's, or else the id its last end was recorded with: a released session is in no
  * observation, and that id is what `logs` reads then. `waitingFor` is carried only where the phase is `needs-human`: the
@@ -687,17 +689,19 @@ export function viewOfState(state: State, observed: ReadonlyMap<string, Sighting
     ? state.settled
     : waitsForInput(state)
       ? 'input-required'
-      : needsHuman(state, observed)
-        ? 'needs-human'
-        : live === 'working' && sighting?.busy === false
-          ? 'working (quiescent)'
-          : live
-            ? `running (${live})`
-            : last?.ended === null
-              ? 'starting'
-              : last
-                ? 'between attempts'
-                : 'pending';
+      : live && idleOf(state, sighting)
+        ? 'idle'
+        : needsHuman(state, observed)
+          ? 'needs-human'
+          : live === 'working' && sighting?.busy === false
+            ? 'working (quiescent)'
+            : live
+              ? `running (${live})`
+              : last?.ended === null
+                ? 'starting'
+                : last
+                  ? 'between attempts'
+                  : 'pending';
   const waitingFor = phase === 'needs-human' ? sighting?.waitingFor : undefined;
   const admission = admissionOf(state);
   return {

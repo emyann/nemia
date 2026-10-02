@@ -458,7 +458,8 @@ const listedIn = (rows: RegistryRow[], registry: Registry) => {
  * whether its process is busy this instant, two answers and not a fallback chain. The state is put in A2A's names
  * (`claudeStateOf`) with `waitingFor`, which tells two waits apart; `waitingFor` is carried as the harness says it and judged by
  * nothing here (`Sighting.waitingFor`), trimmed, and a blank one is none. The session id is the native id — `--resume` takes
- * exactly it — and the row's `startedAt`, when this session started, is what its usage is counted from.
+ * exactly it — and the row's `startedAt`, when this session started, is what its usage is counted from. `held` is whether the
+ * row lists a pid: `done` and an idle `blocked` are a turn's end, and the process outlives it until `claude stop` takes it.
  */
 const ourRow = (row: RegistryRow): { sighting: Sighting; startedAt?: number; pid?: number } => {
   const waitingFor = row.waitingFor?.trim() || undefined;
@@ -467,6 +468,7 @@ const ourRow = (row: RegistryRow): { sighting: Sighting; startedAt?: number; pid
       sessionId: row.sessionId,
       state: claudeStateOf(row.state, waitingFor),
       busy: row.status === 'busy',
+      held: row.pid !== undefined && row.pid !== null,
       nativeId: row.sessionId,
       ...(waitingFor ? { waitingFor } : {}),
     },

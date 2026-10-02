@@ -12,7 +12,7 @@ import { scratch } from '../../test/scratch.ts';
 
 const ROOT = scratch('wf-main-');
 process.env.WF_ROOT = ROOT;
-const { advance, start } = await import('../runner.ts');
+const { advance, COMMANDS, start } = await import('../runner.ts');
 const { readRun } = await import('../record/record.store.ts');
 const { main, VERBS } = await import('./main.ts');
 const { HELP } = await import('./flags.ts');
@@ -111,7 +111,7 @@ const typed = async (t: TestContext, e: Engine, ...argv: string[]) => {
 
 test('the verbs the help names are the verbs main runs, and no other', () => {
   const named = [...HELP.matchAll(/^ {2}wf (\w+)/gm)].map((m) => m[1]);
-  assert.deepEqual([...new Set(named)].sort(), [...VERBS.keys()].sort());
+  assert.deepEqual([...new Set(named)].sort(), [...VERBS.keys(), ...COMMANDS.map((c) => c.name)].sort());
 });
 
 test('the help, once and alone, for no verb, a verb it does not know, and a name every object has', async (t) => {

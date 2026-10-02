@@ -50,6 +50,7 @@ test("every key a brief has reaches the spec — none is accepted and then dropp
     background: ['true', true],
     holdOpen: ['true', true],
     queued: ['true', true],
+    restartPolicy: ['Always', 'Always'],
     trustFrom: [dir, dir],
   };
   const codexKeys: readonly string[] = ['trustFrom'];
@@ -93,6 +94,19 @@ test('`queued:` is true or false, as written — the one way to hold a task back
     refuses(
       brief(`queued: ${bad}`),
       /is not true or false\. Write `queued: true` to have the task wait for `ae admit <id>` before it starts/,
+    );
+  }
+});
+
+test('`restartPolicy:` is `Always` as written, and anything else is refused in its whole sentence — not read as a job', () => {
+  assert.equal(parse(brief('restartPolicy: Always')).restartPolicy, 'Always');
+  assert.equal(Object.hasOwn(parse(brief('model: opus')), 'restartPolicy'), false, 'absent: the task runs to its end');
+  for (const bad of ['always', 'Never', 'OnFailure', 'true']) {
+    refuses(
+      brief(`restartPolicy: ${bad}`),
+      new RegExp(
+        `^brief: \`restartPolicy: ${bad}\` is not a restart policy\\. Write \`restartPolicy: Always\` to keep the session open until \`ae stop\`, or leave it out to run the task to its end\\.$`,
+      ),
     );
   }
 });
@@ -247,7 +261,7 @@ test("`ae` refuses to run with `AE_MAX_CONCURRENT` set, at any value, empty too:
   );
 });
 
-test('a parsed brief has the same own keys it always had: the six always, `holdOpen`, `queued` and `config` only when given', () => {
+test('a parsed brief has the same own keys it always had: the six always, `holdOpen`, `queued`, `restartPolicy` and `config` only when given', () => {
   assert.deepEqual(Object.keys(parse('just do it')), ['brief', 'cwd', 'harness', 'deadlineSeconds', 'resumeFrom', 'closeoutSchema']);
   const spec = parse(brief('holdOpen: true\nqueued: false\nmodel: opus\nworktree: true\ntools: Read'));
   assert.deepEqual(Object.keys(spec), [
@@ -263,6 +277,7 @@ test('a parsed brief has the same own keys it always had: the six always, `holdO
   ]);
   assert.deepEqual(Object.keys(spec.config ?? {}), ['model', 'worktree', 'tools']);
   assert.equal(Object.hasOwn(parse(brief('holdOpen: false')), 'holdOpen'), false, '`holdOpen: false` leaves the key out');
+  assert.deepEqual(Object.keys(parse(brief('restartPolicy: Always\nqueued: true'))).slice(-2), ['queued', 'restartPolicy']);
 });
 
 test('a `true or false` key refuses anything else in its own whole sentence', () => {
@@ -289,6 +304,7 @@ test('a brief wrong in every value is refused in one order: the prompt, then eac
     'background: yes',
     'queued: yes',
     'holdOpen: yes',
+    'restartPolicy: always',
     `cwd: ${path.join(dir, 'nope')}`,
     `closeoutSchema: ${path.join(dir, 'missing.json')}`,
     'tools: Read,,Grep',

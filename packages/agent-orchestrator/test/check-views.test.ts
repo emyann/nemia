@@ -1,5 +1,5 @@
 /**
- * What a pass costs in `check` observes, at shipped defaults: the client's `engine()` with the shipped `CHECK` harness, a pass through
+ * What a pass costs in `check` observes, at shipped defaults: the client's `engine()` with the shipped `check` harness, a pass through
  * `tick()`, and the views `taskPhases` makes of a run's tasks — every task of every run, each pass — counted on the runtime's meter, the
  * `observed, by harness` lines of `wf up --stats`.
  *
@@ -15,7 +15,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Run } from '../src/run.ts';
-import { checkBrief } from '../src/check/check.ts';
+import { checkArgv } from '../src/check/check.ts';
 import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-check-views-');
@@ -32,19 +32,20 @@ const gates = scratch('wf-check-views-gates-');
 const calls = () => e.io().observed.check?.calls ?? 0;
 
 /**
- * A check filed as the tick files one, through the client; `held` runs until its gate is opened, and every other exits 0 at once. It has
- * no stderr or stdout file, workspace or artifacts: an empty `WF_STDERR` and `WF_STDOUT` leave both streams in the log, as a check filed
- * by hand does.
+ * A check filed as the tick files one, through the client, its argv in `config`; `held` runs until its gate is opened, and every other
+ * exits 0 at once.
  */
 const file = (id: string, held = false) =>
   e.file({
     id,
     cwd: scratch('wf-check-views-cwd-'),
     harness: 'check',
-    brief: checkBrief(
-      held ? `n=0; while [ ! -e ${JSON.stringify(path.join(gates, id))} ] && [ $n -lt 400 ]; do sleep 0.05; n=$((n+1)); done` : 'true',
-      { WF_RUN: 'r', WF_STEP: id, WF_WORKSPACE: '', WF_STDERR: '', WF_STDOUT: '', WF_ARTIFACTS: '' },
-    ),
+    brief: id,
+    config: {
+      command: checkArgv(
+        held ? `n=0; while [ ! -e ${JSON.stringify(path.join(gates, id))} ] && [ $n -lt 400 ]; do sleep 0.05; n=$((n+1)); done` : 'true',
+      ),
+    },
   });
 
 const until = async (ids: string[], done: (phase: string) => boolean) => {

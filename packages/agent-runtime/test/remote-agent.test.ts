@@ -21,6 +21,7 @@ import { REQUEST_MS, SPAWN_WAIT_MS, remoteOps } from '../src/a2a/remote.ts';
 import { RUNTIME_EXTENSION } from '../src/a2a/map.ts';
 import { apiKey, bearer, mtls, remoteServer, type Binding, type RemoteServer, type ServerOptions } from './remote-server.ts';
 import { scratch } from './scratch.ts';
+import { stepClock } from './clock.ts';
 
 const servers: RemoteServer[] = [];
 afterEach(async () => {
@@ -861,30 +862,13 @@ test('a pass returns while the agent holds the send, and the next task in it is 
   assert.equal(held.counts.sendMessage, 1, 'sent once');
 });
 
-/** Step this process's wall clock back by `ms` until the test ends: `Date.now()` and an argless `new Date()` read earlier. */
-const stepBack = (t: TestContext, ms: number): void => {
-  const Real = Date;
-  globalThis.Date = class extends Real {
-    constructor(...args: ConstructorParameters<DateConstructor> | []) {
-      if (args.length === 0) super(Real.now() - ms);
-      else super(...args);
-    }
-    static override now(): number {
-      return Real.now() - ms;
-    }
-  } as DateConstructor;
-  t.after(() => {
-    globalThis.Date = Real;
-  });
-};
-
 test("a remote Task's statement is kept when the wall clock steps back after the attempt began", async (t) => {
   const g = gate();
   const s = await serve({ script: () => [{ until: g.shut, data: { ok: 'held' }, state: 'completed' }] });
   const { e } = engineOn(s);
   const id = await e.file(task());
   await running(e, id);
-  stepBack(t, 60_000);
+  stepClock(t, -60_000);
   g.open();
   const v = await settled(e, id);
   assert.equal(v.state.settled, 'succeeded');
@@ -898,7 +882,7 @@ test("a remote agent's Message reply keeps its data when the wall clock steps ba
   const { e } = engineOn(s);
   const id = await e.file(task());
   await running(e, id);
-  stepBack(t, 60_000);
+  stepClock(t, -60_000);
   g.open();
   const v = await settled(e, id);
   assert.equal(v.state.settled, 'succeeded');

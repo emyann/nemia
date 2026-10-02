@@ -7,8 +7,8 @@
  *
  * What it reads and writes lives beside it, each in its own file: the transcript reader (`harness/transcript.ts`), a
  * Claude session's transcript and usage (`harness/claude/transcript.ts`), Claude Code's vocabulary
- * (`harness/claude/vocabulary.ts`), its inbox (`harness/claude/inbox.ts`), its registry's rows (`harness/claude/registry.ts`), and MCP
- * (`harness/mcp.ts`).
+ * (`harness/claude/vocabulary.ts`), its inbox (`harness/claude/inbox.ts`), its registry's rows (`harness/claude/registry.ts`), a
+ * resumed session's parent's last call (`harness/claude/parent.ts`), and MCP (`harness/mcp.ts`).
  */
 import { Effect } from 'effect';
 import { execFile } from 'node:child_process';
@@ -24,6 +24,7 @@ import { readTranscript } from '../transcript.ts';
 import { countSpawn, readTextAsync } from '../../core/engine/tally.ts';
 import { RunnerError } from '../error.ts';
 import { registryOf, type RegistryRow } from './registry.ts';
+import { type ParentCall, parentFileOf, parentOf, recordParent, whoseCall } from './parent.ts';
 import { claudeQuota } from './quota.ts';
 import type { RunnerOps, SpawnRequest } from '../seam.ts';
 
@@ -87,12 +88,13 @@ export const claudeStateOf = (word: string, waitingFor?: string): SessionState =
 };
 
 /**
- * A session's closing statement as this runner reads it: what it said, when it said it, and whether its conversation
- * ends with the statement's own result (`lastWord`). The first two go to the engine, which decides whose statement it
- * is; the third never leaves the runner — it is how a session held by something that is not the work is told from one
- * still doing it.
+ * A session's closing statement as this runner reads it: what it said, when it said it, its call's id when it has one, and
+ * whether its conversation ends with the statement's own result (`lastWord`). The id tells whose statement it is, against the
+ * parent's last call recorded at spawn (`whoseCall`): an inherited one goes nowhere, the session's own goes to the engine with
+ * what it said alone, and one the id cannot tell goes with its time too, for the engine to judge. `lastWord` never leaves the
+ * runner — it is how a session held by something that is not the work is told from one still doing it.
  */
-type Statement = { payload: unknown; at: number; lastWord?: boolean };
+export type Statement = { payload: unknown; at: number; id?: string; lastWord?: boolean };
 
 export type ClaudeOptions = {
   quiescentAfterMs?: number;
@@ -103,7 +105,15 @@ export type ClaudeOptions = {
   closeoutFrom?: (sessionId: string) => Promise<Statement | undefined>;
   /** What the session consumed since `since`, its own start. Injectable for the same reason. */
   usageFrom?: (sessionId: string, since: number) => Promise<Usage | undefined>;
-  /** Where the runner writes what it hands the CLI by path — a task's MCP config. Default `~/.agent-engine`. */
+  /**
+   * The last StructuredOutput call the session `sessionId` made, asked of a resumed session's parent at spawn: `undefined` where it
+   * cannot tell. Injectable for the same reason.
+   */
+  parentCallFrom?: (sessionId: string) => Promise<ParentCall | undefined>;
+  /**
+   * Where the runner writes what it hands the CLI by path — a task's MCP config — and what it records at spawn — a resumed session's
+   * parent's last call. Default `~/.agent-engine`.
+   */
   root?: string;
   /**
    * Where Claude Code registers each running session, by pid: `find` finds a session there by its name, and `say` its inbox. Default
@@ -190,8 +200,12 @@ const keptReads = (
   };
 };
 
-/** What `observe` reads a sighting with: the quiescence floor, the clock, the transcript's mtime, and the kept reads. */
+/**
+ * What `observe` reads a sighting with: the quiescence floor, the clock, the transcript's mtime, the kept reads, and `root`, where
+ * each session's parent's last call is recorded.
+ */
 type Reading = {
+  root: string;
   quiescentAfterMs: number;
   now: () => number;
   transcriptTime: (sessionId: string) => Promise<number | undefined>;
@@ -238,6 +252,18 @@ const transcriptCloseout = async (sessionId: string) => {
 };
 
 /**
+ * The last StructuredOutput call a session made, read off its transcript (`lastStructuredOutput`): `null` for none, and `undefined`
+ * with no transcript, no read, or a call with no id. Throws the refusal of a transcript whose lines do not decode.
+ */
+const transcriptLastCall = async (sessionId: string): Promise<ParentCall | undefined> => {
+  const read = await transcriptText(sessionId);
+  if (!read) return undefined;
+  const said = lastStructuredOutput(read.text, read.file);
+  if (!said) return { lastCall: null };
+  return said.id === undefined ? undefined : { lastCall: said.id };
+};
+
+/**
  * What a session consumed since `since`, read off its transcript (`transcriptUsage`), or `undefined` with no transcript or no read.
  * Throws the refusal of a transcript whose lines do not decode.
  */
@@ -277,6 +303,8 @@ const transcriptUsageSince = async (sessionId: string, since: number) => {
  * ## What it keeps between passes
  *
  * - A task's MCP config, under `root`, outside the workspace: a file in a step's worktree travels down its branch.
+ * - A resumed session's parent's last StructuredOutput call, by the attempt's name under `root` (`parent.ts`), written at spawn and
+ *   read on every look: what tells the session's own statement from the one it inherited.
  * - What `claude agents` last listed of each of our sessions, by session id, rebuilt by every `observe`, which a pass
  *   always makes before it releases anything and `say` is always handed a session from:
  *   - its state (`listed`), which `release` stops on whatever the sighting it is handed says: a session whose end is
@@ -295,6 +323,7 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
   const sessionsDir = options.sessionsDir ?? path.join(process.env.CLAUDE_CONFIG_DIR ?? path.join(os.homedir(), '.claude'), 'sessions');
   const usageFrom = options.usageFrom ?? transcriptUsageSince;
   const reading: Reading = {
+    root,
     quiescentAfterMs: options.quiescentAfterMs ?? QUIESCENT_AFTER_MS,
     now,
     transcriptTime: options.transcriptTime ?? sdkTranscriptTime,
@@ -302,7 +331,7 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
   };
   const registry: Registry = { listed: new Map(), pids: new Map(), starts: new Map() };
   return {
-    spawn: spawnUnder(root),
+    spawn: spawnUnder(root, options.parentCallFrom ?? transcriptLastCall),
     observe: observeInto(reading, registry),
     find: findIn(sessionsDir),
     stop: stopSession,
@@ -315,14 +344,19 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
 };
 
 /**
- * `claude --bg` under `r.name`, in the task's `cwd`, with its MCP configs written under `root`. The MCP configs are found and
- * written before the CLI runs, so whatever throws there started nothing (`refused`). The flags are `claudeArgv`'s.
+ * `claude --bg` under `r.name`, in the task's `cwd`, with its MCP configs written under `root`, and its parent's last call recorded
+ * there (`recordParent`, asked of `parentCallFrom`). Both are written before the CLI runs, so whatever throws there started nothing
+ * (`refused`), and no look finds the session before its record. The flags are `claudeArgv`'s.
  */
 const spawnUnder =
-  (root: string): RunnerOps['spawn'] =>
+  (root: string, parentCallFrom: (sessionId: string) => Promise<ParentCall | undefined>): RunnerOps['spawn'] =>
   (r) =>
-    Effect.try({
-      try: () => claudeMcpArgs([checkoutMcpConfig(r.cwd), writeMcpConfig(mcpFileOf(root, r.name), r.config?.mcp)]),
+    Effect.tryPromise({
+      try: async () => {
+        const mcpArgs = claudeMcpArgs([checkoutMcpConfig(r.cwd), writeMcpConfig(mcpFileOf(root, r.name), r.config?.mcp)]);
+        await recordParent(parentFileOf(root, r.name), r.resumeFrom, parentCallFrom);
+        return mcpArgs;
+      },
       catch: (cause) =>
         new RunnerError({
           verb: 'spawn',
@@ -460,7 +494,9 @@ const listedIn = (rows: RegistryRow[], registry: Registry) => {
  * whether its process is busy this instant, two answers and not a fallback chain. The state is put in A2A's names
  * (`claudeStateOf`) with `waitingFor`, which tells two waits apart; `waitingFor` is carried as the harness says it and judged by
  * nothing here (`Sighting.waitingFor`), trimmed, and a blank one is none. The session id is the native id — `--resume` takes
- * exactly it — and the row's `startedAt`, when this session started, is what its usage is counted from.
+ * exactly it — and the row's `startedAt`, when this session started, is what its usage is counted from. `held` is whether the
+ * row lists a pid: `done` and an idle `blocked` are a turn's end, and the process outlives it until `claude stop` takes it. The
+ * pid is on the sighting too, which a long-lived task journals as it changes (`sightingFacts`).
  */
 const ourRow = (row: RegistryRow): { sighting: Sighting; startedAt?: number; pid?: number } => {
   const waitingFor = row.waitingFor?.trim() || undefined;
@@ -469,8 +505,10 @@ const ourRow = (row: RegistryRow): { sighting: Sighting; startedAt?: number; pid
       sessionId: row.sessionId,
       state: claudeStateOf(row.state, waitingFor),
       busy: row.status === 'busy',
+      held: row.pid !== undefined && row.pid !== null,
       nativeId: row.sessionId,
       ...(waitingFor ? { waitingFor } : {}),
+      ...(row.pid !== undefined && row.pid !== null ? { pid: row.pid } : {}),
     },
     startedAt: row.startedAt ?? undefined,
     pid: row.pid ?? undefined,
@@ -501,10 +539,11 @@ const reportedOf = (x: Reading, name: string, sighting: Sighting, startedAt: num
  * own start, whichever is later — a session resumed over a transcript cold for an hour has been quiet only since it began —
  * and a session with no transcript is never quiet: the deadline is for sessions nobody reads.
  *
- * A busy session is `busyReportOf`'s. Any other session reports what it said, with when, and what it consumed since its own
- * start, as measured or not at all. Whether a statement belongs to this attempt is the engine's call: a resumed session carries
- * its parent's statements too, and only the journal knows when the attempt began. One still `working` and quiet for the floor
- * reports `quietMs` too, statement or not, because an inherited statement is discarded upstream; what quiet means is `decide`'s.
+ * A busy session is `busyReportOf`'s. Any other session reports what it said (`toldOf`), and what it consumed since its own
+ * start, as measured or not at all. A resumed session carries its parent's statements too: whose a statement is, is this runner's
+ * call by its id where the spawn recorded the parent's last call, and the engine's by its time where it did not, since only the
+ * journal knows when the attempt began. One still `working` and quiet for the floor reports `quietMs` too, statement or not,
+ * because an inherited statement the runner could not tell is discarded upstream; what quiet means is `decide`'s.
  */
 const reportOf = async (
   x: Reading,
@@ -520,11 +559,11 @@ const reportOf = async (
     return lastWrite === undefined ? undefined : x.now() - Math.max(lastWrite, startedAt ?? lastWrite);
   };
   if (sighting.busy) return busyReportOf(x, { name, sighting, startedAt, attempt, writtenAt, quietFor });
-  const said = await x.kept.statementOf(attempt, sighting, writtenAt);
+  const told = toldOf(x, name, await x.kept.statementOf(attempt, sighting, writtenAt));
   const used = await x.kept.usageOf(attempt, sighting, startedAt, writtenAt);
   const reported: Sighting = {
     ...sighting,
-    ...(said ? { closeout: { payload: said.payload, at: said.at } } : {}),
+    ...(told ? { closeout: told } : {}),
     ...(used ? { usage: used } : {}),
   };
   if (reported.state !== 'working') return [name, reported];
@@ -533,21 +572,35 @@ const reportOf = async (
 };
 
 /**
+ * What `observe` reports of the statement `said` by the session under `name`, by whose it is (`whoseCall`, against the record its
+ * spawn left): nothing when it is its parent's, what it said alone when it is its own, and what it said with when when its id
+ * cannot tell, for the engine to judge by the attempt's start.
+ */
+const toldOf = (x: Reading, name: string, said: Statement | undefined): { payload: unknown; at?: number } | undefined => {
+  if (!said) return undefined;
+  const whose = whoseCall(said.id, parentOf(parentFileOf(x.root, name)));
+  if (whose === 'inherited') return undefined;
+  return whose === 'own' ? { payload: said.payload } : { payload: said.payload, at: said.at };
+};
+
+/**
  * A busy session reports nothing it said and nothing quiet: a long tool call writes nothing for minutes. Unless the last word in
- * its conversation is its own closeout, from its own start on, and nothing has followed it for the floor: then the work is over
- * and something else holds its process — a background shell it left running — and its closeout, its usage and its `quietMs` are
- * reported. Both halves are needed: a session in a long turn has said nothing since its last tool call, and one whose closeout is
- * its parent's has said nothing of its own. Both reads are kept (`Kept`) while the transcript stays as they found it, since this
- * branch is reached only over a transcript cold for the floor.
+ * its conversation is its own closeout, and nothing has followed it for the floor: then the work is over and something else holds
+ * its process — a background shell it left running — and its closeout, its usage and its `quietMs` are reported. Both halves are
+ * needed: a session in a long turn has said nothing since its last tool call, and one whose closeout is its parent's has said
+ * nothing of its own. Its own is the one `toldOf` tells by its id, whatever its time, and else one made from its own start on.
+ * Both reads are kept (`Kept`) while the transcript stays as they found it, since this branch is reached only over a transcript
+ * cold for the floor.
  */
 const busyReportOf = async (x: Reading, l: Look): Promise<readonly [string, Sighting]> => {
   const { name, sighting, startedAt } = l;
   const quiet = sighting.state === 'working' ? await l.quietFor() : undefined;
   if (quiet === undefined || quiet < x.quiescentAfterMs || startedAt === undefined) return [name, sighting];
   const said = await x.kept.statementOf(l.attempt, sighting, l.writtenAt, true);
-  if (!said?.lastWord || said.at < startedAt) return [name, sighting];
+  const told = said?.lastWord ? toldOf(x, name, said) : undefined;
+  if (!told || (told.at !== undefined && told.at < startedAt)) return [name, sighting];
   const used = await x.kept.usageOf(l.attempt, sighting, startedAt, l.writtenAt, true);
-  return [name, { ...sighting, closeout: { payload: said.payload, at: said.at }, ...(used ? { usage: used } : {}), quietMs: quiet }];
+  return [name, { ...sighting, closeout: told, ...(used ? { usage: used } : {}), quietMs: quiet }];
 };
 
 /**

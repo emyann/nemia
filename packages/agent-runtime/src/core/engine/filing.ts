@@ -24,6 +24,8 @@ export type Filing = {
   holdOpen?: true;
   /** Wait for `admit` before each turn starts, rather than start on the next pass. See the `filed` event. */
   queued?: boolean;
+  /** Long-lived: the session stays open while idle, and only a stop ends it. See the `filed` event. */
+  restartPolicy?: 'Always';
 };
 
 /** A task `file` would not journal, and why, in the sentence `refusalOf` gives. Nothing was written. */
@@ -69,7 +71,8 @@ export const PRIORITY_RETIRED = `\`priority\` is retired: the runtime starts a t
  * 3. a retired key (`RETIRED_KEYS`), then `priority`, each present at any value: asked of the spec as handed in, untyped,
  *    since a caller built from JSON or against an older `TaskSpec` still sends them;
  * 4. a `deadlineSeconds` that is not seconds above 0, an empty `resumeFrom`, a `holdOpen` that is not `true`, and a `queued`
- *    that is not a boolean.
+ *    that is not a boolean;
+ * 5. what a long-lived task cannot honour (`restartRefusalOf`).
  *
  * Checked by `file` itself, so neither door journals what the loop cannot use. A journalled task is a promise the loop
  * keeps trying to honour, so a value it cannot use is cheapest refused before it is written: `deadlineSeconds: NaN`
@@ -96,6 +99,25 @@ export const refusalOf = (spec: Filing): string | undefined => {
   if (spec.queued !== undefined && typeof spec.queued !== 'boolean') {
     return `\`queued: ${JSON.stringify(spec.queued)}\` is not a yes or a no. Give true to have the task wait for \`admit\` before it starts, or leave it out to start it on the next pass.`;
   }
+  return restartRefusalOf(spec);
+};
+
+/**
+ * Why a task's `restartPolicy` cannot be honoured, or `undefined`: a value other than `'Always'`, and `'Always'` beside what
+ * ends a session it keeps open until a stop — `holdOpen`, which settles a turn's end to wait for an answer; `deadlineSeconds`,
+ * which stops it at a time; and `closeoutSchema`, whose statement ends an attempt.
+ */
+const restartRefusalOf = (spec: Filing): string | undefined => {
+  if (spec.restartPolicy === undefined) return undefined;
+  if (spec.restartPolicy !== 'Always') {
+    return `\`restartPolicy: ${JSON.stringify(spec.restartPolicy)}\` is not a restart policy the runtime takes. Give \`'Always'\` to keep the session open until it is stopped, or leave it out to run the task to its end.`;
+  }
+  if (spec.holdOpen !== undefined)
+    return "`restartPolicy: 'Always'` keeps the session open between turns, and `holdOpen` settles a turn's end to wait for an answer. Leave `holdOpen` off, and `say` the session its next words.";
+  if (spec.deadlineSeconds !== undefined)
+    return "`restartPolicy: 'Always'` keeps the session open until it is stopped, and `deadlineSeconds` would stop it at a time. Leave `deadlineSeconds` off, and `stop` the task when it should end.";
+  if (spec.closeoutSchema !== undefined)
+    return "`restartPolicy: 'Always'` keeps the session open until it is stopped, and a closing statement (`closeoutSchema`) would end its attempt. Leave `closeoutSchema` off.";
   return undefined;
 };
 
@@ -129,6 +151,7 @@ export const file = Effect.fn('file')(function* (spec: Filing) {
     closeoutSchema: spec.closeoutSchema,
     holdOpen: spec.holdOpen,
     queued: spec.queued === true,
+    ...(spec.restartPolicy === 'Always' ? { restartPolicy: 'Always' as const } : {}),
   });
   return id;
 });

@@ -298,7 +298,7 @@ export const resultOnBase = (standings: readonly BranchStanding[]): boolean =>
  * own file asked, so it is held to that whatever the engine recorded of the filing.
  *
  * **The check's own phase is the verdict.** The detached worker maps the command's exit code to
- * `done` or `failed`; the `[wf check] exit N` line in its log is the number shown to a person, and
+ * `done` or `failed`; the exit code its attempt recorded is the number shown to a person, and
  * is never what a follower waits on.
  *
  * **`again` is the loop's word, and only a yes or a no is one.** A looping step whose `again` is anything

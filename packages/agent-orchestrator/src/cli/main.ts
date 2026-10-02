@@ -34,9 +34,11 @@ import {
   waitWord,
   watchFeed,
   type Interval,
+  COMMANDS,
+  parseArgv,
+  type Command,
 } from '../runner.ts';
 import { HELP, usage, type Engine, type Verb } from './flags.ts';
-import { acceptVerb, approveVerb, retryVerb, roundVerb, sayVerb } from './asks.ts';
 import { decideVerb } from './decide/decide.ts';
 import { statsVerb } from './stats/stats.ts';
 import { factoryVerb } from './factory/factory.ts';
@@ -315,22 +317,31 @@ export const VERBS: ReadonlyMap<string, Verb> = new Map<string, Verb>([
   ['hold', holdVerb],
   ['decide', decideVerb],
   ['stats', statsVerb],
-  ['retry', retryVerb],
-  ['approve', approveVerb],
-  ['round', roundVerb],
-  ['accept', acceptVerb],
-  ['say', sayVerb],
   ['show', showVerb],
   ['logs', logsVerb],
   ['agents', agentsVerb],
 ]);
 
 /**
- * Runs the verb `argv` names and prints what it did, or prints the help for no verb and for a verb it does not know. `e` is the engine the
- * verbs talk to: the board under `WF_ROOT`, unless a test hands it one of its own.
+ * A command of the table (`COMMANDS`), run from the command line: its arguments read against its spec — the help printed for too little —
+ * then refused by its `check`, handed to its handler, and the lines it prints of the answer printed.
+ */
+async function commanded(command: Command, rest: string[], e: Engine): Promise<void> {
+  const args = parseArgv(command.spec, rest);
+  if (args === undefined) return console.log(HELP);
+  const wrong = command.check?.(args);
+  if (wrong) usage(wrong);
+  for (const line of command.print(await command.handler(e, args), args)) console.log(line);
+}
+
+/**
+ * Runs the command or the verb `argv` names and prints what it did, or prints the help for none and for a name it does not know. `e` is the
+ * engine they talk to: the board under `WF_ROOT`, unless a test hands it one of its own.
  */
 export async function main(argv: string[], e: Engine = engine()): Promise<void> {
   const [verb, ...rest] = argv;
+  const command = COMMANDS.find((c) => c.name === verb && c.only?.side !== 'api');
+  if (command) return commanded(command, rest, e);
   const run = verb === undefined ? undefined : VERBS.get(verb);
   if (run === undefined) return console.log(HELP);
   return run(rest, e);

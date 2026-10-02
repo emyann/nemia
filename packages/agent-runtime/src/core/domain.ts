@@ -70,7 +70,10 @@ export type Sighting = {
    *
    * The time is not decoration. A resumed session can carry a statement its parent made, and the
    * engine keeps one only if it was made after this attempt began. A runner whose session cannot carry
-   * another attempt's statement gives no time, and the engine keeps the statement whatever the clock says.
+   * another attempt's statement gives no time, and the engine keeps the statement whatever the clock says:
+   * a remote agent's, and a detached run's, whose spawn cleared the last one's before it launched it. So
+   * does a runner that told the statement is its session's own: Claude Code's `--bg`, by the call's id,
+   * against the parent's last call it recorded at spawn.
    */
   closeout?: { payload: unknown; at?: number };
   /**
@@ -95,11 +98,12 @@ export type Sighting = {
    * `claude agents --json` prints it beside `state: 'blocked'`. Absent from a harness that says nothing, and from
    * a session that is not waiting on anybody.
    *
-   * **Carried, never judged.** The engine owns no vocabulary for it and no enum of it: it is a container's
-   * `state.waiting.reason`, a word a person reads, and Claude Code may add another in any release. `decide` does not
-   * read it, and nothing here turns it into a state — `state` already says a session waits on a person
-   * (`input-required`, or `auth-required` to sign in), and this says what it waits on. Level-triggered like every other field of a
-   * sighting: read afresh each pass, so a session that stops waiting simply stops carrying it.
+   * **Its words are carried, never judged.** The engine owns no vocabulary for it and no enum of it: it is a container's
+   * `state.waiting.reason`, a word a person reads, and Claude Code may add another in any release. `decide` never reads its
+   * words, and nothing here turns it into a state — `state` already says a session waits on a person (`input-required`, or
+   * `auth-required` to sign in), and this says what it waits on. Only whether it is there is read, and only for a
+   * long-lived task (`idleOf`): one waiting on a person for something it names is not idle. Level-triggered like every
+   * other field of a sighting: read afresh each pass, so a session that stops waiting simply stops carrying it.
    */
   waitingFor?: string;
   /**
@@ -121,6 +125,16 @@ export type Sighting = {
    * harness cannot say. **Carried, never judged**: `decide` does not read it.
    */
   skills?: string[];
+  /**
+   * Whether the harness still holds the session's process — Claude Code's registry lists a pid for it. A fact about the
+   * process, beside `state`, which is the turn's: a turn that ended (`completed`, or Claude Code's idle `blocked`) leaves a
+   * process that is still there. Absent from a harness that cannot say, which reads as not held. Read by `decide` only for a
+   * long-lived task (`restartPolicy`): held, its idle session is open (`idleOf`); listed live and not held, its harness is
+   * respawning it (`respawning`).
+   */
+  held?: boolean;
+  /** The id of the process the harness holds the session in, when it says. Journalled for a long-lived task as it changes. */
+  pid?: number;
 };
 
 /**
@@ -274,6 +288,10 @@ export type EndReason = 'harness' | 'lost' | 'unsigned' | 'unstartable' | 'opera
  * - `admitted`: the layer above's word that a queued task's current turn may start: the next pass starts it. Names no
  *   turn: it admits the turn current when it is written, and a later turn — a person's answer to a task held open — waits
  *   for one of its own. Written by `admit`, and only while the task waits for it.
+ * - `gap`: a long-lived attempt's session was first listed live with no process — its harness respawning it — at `at`.
+ *   Written once per gap, by the engine off a sighting (`sightingFacts`); `decide` reads when it opened (`gapSince`).
+ * - `process`: the same attempt's session was listed held in a process — `pid`, when its harness said — after a gap, or
+ *   in a process it had not been seen in. Closes the gap. Written by the engine off a sighting; reported, never acted on.
  * - `settled`: terminal. Nothing moves after this. `nativeId` is the session of an attempt it left open — stopped by a
  *   person, or past its deadline, with no `ended` to carry it — as the harness still listed it: what `logs` reads once
  *   that session has been let go. `decide` never reads it.
@@ -317,6 +335,11 @@ export type Event =
        * settles it. Absent on a task not held open, which settles on its first signed end.
        */
       holdOpen?: true;
+      /**
+       * Filed long-lived, a Pod's `restartPolicy: Always`: a session that stays open while idle, whose end of a turn, idle
+       * listing or silence is not its end, and that only a stop from outside ends. Absent on a job, which runs to its end.
+       */
+      restartPolicy?: 'Always';
     }
   | { kind: 'starting'; at: string; attempt: number; resumeFrom?: string; nudge?: string }
   | { kind: 'spawned'; at: string; attempt: number; error?: string }
@@ -338,6 +361,8 @@ export type Event =
       error?: string;
     }
   | { kind: 'measured'; at: string; attempt: number; usage: Usage }
+  | { kind: 'gap'; at: string; attempt: number }
+  | { kind: 'process'; at: string; attempt: number; pid?: number }
   | { kind: 'stop-requested'; at: string }
   | ({ kind: 'said' } & Said)
   | ({ kind: 'input' } & Input)
@@ -399,6 +424,10 @@ export type Attempt = {
   turn?: number;
   /** What a failed spawn call said: the refusal behind `unstartable`, or an error after which a session may still exist. */
   error?: string;
+  /** When its session was first listed with no process, while no process has been seen since: an open gap. See `gap`. */
+  gapSince?: string;
+  /** The processes its session was seen held in, in order, as journalled. Carried, never read but for the last. See `process`. */
+  processes?: number[];
 };
 
 export type State = {
@@ -422,6 +451,8 @@ export type State = {
   said: Said[];
   /** Filed to be held open: a signed end waits on a person. See the `filed` event. */
   holdOpen?: true;
+  /** Filed long-lived: only a stop from outside ends its session. See the `filed` event. */
+  restartPolicy?: 'Always';
   /** Filed to wait for the layer above's word: absent on a journal an older runtime wrote, which reads as queued. See the `filed` event. */
   queued?: boolean;
   /** The turn the last `admitted` entry admitted, which is the turn current when it was written. See the `admitted` event. */
@@ -450,6 +481,42 @@ function endAttempt(a: Attempt, e: Extract<Event, { kind: 'ended' }>): void {
   a.error = e.error ?? a.error;
 }
 
+/** An event about one attempt, `e`, written into that attempt's fold `a`. */
+function foldInto(a: Attempt, e: Extract<Event, { kind: 'spawned' | 'ended' | 'measured' | 'gap' | 'process' }>): void {
+  switch (e.kind) {
+    case 'spawned':
+      a.spawnedAt = e.at;
+      a.error = e.error;
+      return;
+    case 'ended':
+      return endAttempt(a, e);
+    case 'measured':
+      a.usage = { ...a.usage, ...e.usage };
+      return;
+    case 'gap':
+      a.gapSince ??= e.at;
+      return;
+    case 'process':
+      delete a.gapSince;
+      if (e.pid !== undefined) a.processes = [...(a.processes ?? []), e.pid];
+  }
+}
+
+/** The task as the `filed` event `e` states it, written into the fold `s`. */
+function fileInto(s: State, e: Extract<Event, { kind: 'filed' }>): void {
+  s.filedAt = e.at;
+  s.brief = e.brief;
+  s.cwd = e.cwd;
+  s.harness = e.harness;
+  s.deadlineSeconds = e.deadlineSeconds;
+  s.resumeFrom = e.resumeFrom;
+  s.config = e.config;
+  s.closeoutSchema = e.closeoutSchema;
+  if (e.holdOpen) s.holdOpen = true;
+  if (e.restartPolicy === 'Always') s.restartPolicy = 'Always';
+  if (e.queued !== undefined) s.queued = e.queued;
+}
+
 /** Observed state, folded. A `State` is never stored — it is always re-derived from the journal. */
 export function fold(taskId: string, events: readonly Event[]): State {
   const s: State = {
@@ -466,16 +533,7 @@ export function fold(taskId: string, events: readonly Event[]): State {
   for (const e of events) {
     switch (e.kind) {
       case 'filed':
-        s.filedAt = e.at;
-        s.brief = e.brief;
-        s.cwd = e.cwd;
-        s.harness = e.harness;
-        s.deadlineSeconds = e.deadlineSeconds;
-        s.resumeFrom = e.resumeFrom;
-        s.config = e.config;
-        s.closeoutSchema = e.closeoutSchema;
-        if (e.holdOpen) s.holdOpen = true;
-        if (e.queued !== undefined) s.queued = e.queued;
+        fileInto(s, e);
         break;
       case 'admitted':
         s.admitted = s.inputs.length;
@@ -496,22 +554,13 @@ export function fold(taskId: string, events: readonly Event[]): State {
           ...(s.inputs.length ? { turn: s.inputs.length } : {}),
         });
         break;
-      case 'spawned': {
+      case 'spawned':
+      case 'ended':
+      case 'measured':
+      case 'gap':
+      case 'process': {
         const a = s.attempts.find((x) => x.n === e.attempt);
-        if (a) {
-          a.spawnedAt = e.at;
-          a.error = e.error;
-        }
-        break;
-      }
-      case 'ended': {
-        const a = s.attempts.find((x) => x.n === e.attempt);
-        if (a) endAttempt(a, e);
-        break;
-      }
-      case 'measured': {
-        const a = s.attempts.find((x) => x.n === e.attempt);
-        if (a) a.usage = { ...a.usage, ...e.usage };
+        if (a) foldInto(a, e);
         break;
       }
       case 'stop-requested':
@@ -655,6 +704,21 @@ export type Now = {
 };
 
 /**
+ * How long a long-lived task's session may be listed with no process before the runtime ends its attempt `lost`: Claude Code
+ * respawns a process it lost within some ten seconds, and one listed so for two minutes is not coming back.
+ */
+export const RESPAWN_GAP_MS = 120_000;
+
+/**
+ * How long a long-lived task waits to restart a session that ended, a kubelet's back-off: `initialMs` after one end,
+ * `factor` times longer after each end in a row, never past `maxMs`; an attempt that ran `resetAfterMs` counts them again.
+ */
+export const RESTART_BACKOFF = { initialMs: 10_000, factor: 2, maxMs: 300_000, resetAfterMs: 600_000 } as const;
+
+/** What a restarted session is told instead of the brief, on the conversation it continues. */
+export const RESTART_WORDS = 'Your session was restarted after its process ended. Carry on where you left off.';
+
+/**
  * A settled task: nothing is observed of it and nothing is decided, on any pass. `decide`'s first question, ahead of the
  * lifecycle — a settled task's state is final and takes no event, so asking would refuse every settled task in the store
  * on every pass — and the one a pass may ask to skip a settled task before it reads anything else of it.
@@ -724,9 +788,12 @@ export function lifecycleOf(state: State): LifecycleState {
  *    person's stop outranks the deadline.
  * 2. Its sighting, read before the journal's own `spawnedAt`: a crash between the spawn call and its journal entry leaves
  *    a session running under a name that can still be found, so it is adopted rather than started a second time — the
- *    whole reason the name is ours. Waiting on a person, `SESSION_BLOCKED`. At work, `SESSION_QUIET` once quiet — its
- *    runner holds it has stopped, and that is its end; whether it gave the statement its task asked for is recorded beside
- *    it (`stated`) and judged by the layer above, for the engine reports and never nudges — else `SESSION_LIVE`.
+ *    whole reason the name is ours. A long-lived task's session its harness is respawning (`respawning`),
+ *    `SESSION_RESPAWNING` — or `RESPAWN_OVERDUE`, listed so `RESPAWN_GAP_MS` since the gap opened. Its idle session
+ *    (`idleOf`), `SESSION_IDLE`: its turn's end, its idle listing and its silence are not its end. Waiting on a person,
+ *    `SESSION_BLOCKED`. At work, `SESSION_QUIET` once quiet — its runner holds it has stopped, and that is its end; whether
+ *    it gave the statement its task asked for is recorded beside it (`stated`) and judged by the layer above, for the
+ *    engine reports and never nudges — else `SESSION_LIVE`.
  *    Canceled, `SESSION_STOPPED`; any other end, `SESSION_ENDED`.
  * 3. `UNREAD`, when its harness could not be read this pass: nothing is known of the session, and an absence read off a
  *    failed look is no absence, so it never counts toward `lost`. Read before `spawnedAt` for the reason above: an intent
@@ -744,14 +811,15 @@ export function lifecycleOf(state: State): LifecycleState {
  * 3. `AWAITING_INPUT`, for a task held open whose turn signed: it waits on a person for as long as they take — ahead of
  *    the deadline, which times work, not a person reading it.
  * 4. `DEADLINE_SPENT`, when it is overdue and its last attempt ended at the deadline.
- * 5. `ATTEMPT_ENDED`, judged on the current turn's attempts, which are all of them for a task not held open. One attempt
+ * 5. For a long-lived task whose attempt ended, no stop asked: its restart (`restartOf`).
+ * 6. `ATTEMPT_ENDED`, judged on the current turn's attempts, which are all of them for a task not held open. One attempt
  *    per start.
- * 6. `NO_SESSION_TO_CONTINUE`, for a later turn with no session to continue.
- * 7. `QUEUED`, while the turn waits for the layer above's word; it is started by the pass after the one that wrote it.
+ * 7. `NO_SESSION_TO_CONTINUE`, for a later turn with no session to continue.
+ * 8. `QUEUED`, while the turn waits for the layer above's word; it is started by the pass after the one that wrote it.
  *    Read after every terminal answer, so a queued task can still settle.
- * 8. `PREVIOUS_LIVE`, when the session the turn continues — for the first turn, what the task was filed against; for a
+ * 9. `PREVIOUS_LIVE`, when the session the turn continues — for the first turn, what the task was filed against; for a
  *    later one, the session that signed the turn before it — is still held by its harness: it is stopped first.
- * 9. `READY` otherwise: in a later turn, told the person's answer; else the brief.
+ * 10. `READY` otherwise: in a later turn, told the person's answer; else the brief.
  */
 export function observe(state: State, observed: ReadonlyMap<string, Sighting>, now: Now): LifecycleEvent {
   if (state.settled) return { type: 'SETTLED', outcome: state.settled };
@@ -762,39 +830,74 @@ export function observe(state: State, observed: ReadonlyMap<string, Sighting>, n
   const ranFor = turn.attempts.length > 0 ? now.at.getTime() - new Date(turn.attempts[0].startedAt).getTime() : 0;
   const overdue = state.deadlineSeconds !== undefined && turn.attempts.length > 0 && ranFor > state.deadlineSeconds * 1000;
 
-  if (last && last.ended === null) {
-    const endedOwn = sighting !== undefined && ENDED_OWN.has(sighting.state);
-    if (overdue && !state.stopRequested && !endedOwn)
-      return { type: 'DEADLINE_PASSED', attempt: last.n, sighting, live: sighting !== undefined && isLive(sighting.state) };
-    if (sighting) {
-      const ending = endOf(sighting.state);
-      const seen = {
-        attempt: last.n,
-        sighting,
-        asked: state.closeoutSchema !== undefined,
-        holds: state.holdOpen === true && !state.closed && ending === 'done' && (last.turn ?? 0) === state.inputs.length,
-      };
-      if (NEEDS_HUMAN.has(sighting.state)) return { type: 'SESSION_BLOCKED', ...seen };
-      if (RUNNING.has(sighting.state)) return { type: sighting.quietMs !== undefined ? 'SESSION_QUIET' : 'SESSION_LIVE', ...seen };
-      return { type: sighting.state === 'canceled' ? 'SESSION_STOPPED' : 'SESSION_ENDED', ...seen };
-    }
-    if (now.unread?.has(nameFor(state.taskId, last.n))) return { type: 'UNREAD', attempt: last.n, overdue };
-    if (!last.spawnedAt) return { type: 'UNSPAWNED', attempt: last.n, name: nameFor(state.taskId, last.n) };
-    return now.at.getTime() - new Date(last.spawnedAt).getTime() < now.graceMs
-      ? { type: 'UNSEEN_IN_GRACE', attempt: last.n }
-      : { type: 'LOST', attempt: last.n };
-  }
+  if (last && last.ended === null) return flightEvent(state, last, sighting, now, overdue);
 
   if (state.stopRequested) return { type: 'NOTHING_OPEN' };
   if (state.holdOpen && state.closed) return { type: 'CLOSED', ...(last ? { last: { n: last.n, ended: last.ended } } : {}) };
   if (waitsForInput(state)) return { type: 'AWAITING_INPUT' };
   if (overdue && last?.reason === 'deadline') return { type: 'DEADLINE_SPENT', seconds: Math.round(ranFor / 1000) };
   const ended = turn.attempts.at(-1);
+  if (ended && state.restartPolicy === 'Always') return restartOf(state, sighting, now);
   if (ended) return { type: 'ATTEMPT_ENDED', ended: ended.ended, reason: ended.reason, attempts: turn.attempts.length, turn: turn.n };
   if (turn.n > 0 && !turn.continues) return { type: 'NO_SESSION_TO_CONTINUE', turn: turn.n };
   if (awaitsAdmission(state)) return { type: 'QUEUED' };
   if (turn.continues && sighting && isLive(sighting.state)) return { type: 'PREVIOUS_LIVE', sessionId: sighting.sessionId };
   return { type: 'READY', attempt: state.attempts.length + 1, resumeFrom: turn.continues, ...(turn.words ? { nudge: turn.words } : {}) };
+}
+
+/** What `observe` reads off an attempt in flight, by its rules 2 to 4: its deadline, its sighting, or its absence. */
+function flightEvent(state: State, last: Attempt, sighting: Sighting | undefined, now: Now, overdue: boolean): LifecycleEvent {
+  const endedOwn = sighting !== undefined && ENDED_OWN.has(sighting.state);
+  if (overdue && !state.stopRequested && !endedOwn)
+    return { type: 'DEADLINE_PASSED', attempt: last.n, sighting, live: sighting !== undefined && isLive(sighting.state) };
+  if (sighting) return sessionEvent(state, last, sighting, now);
+  if (now.unread?.has(nameFor(state.taskId, last.n))) return { type: 'UNREAD', attempt: last.n, overdue };
+  if (!last.spawnedAt) return { type: 'UNSPAWNED', attempt: last.n, name: nameFor(state.taskId, last.n) };
+  return now.at.getTime() - new Date(last.spawnedAt).getTime() < now.graceMs
+    ? { type: 'UNSEEN_IN_GRACE', attempt: last.n }
+    : { type: 'LOST', attempt: last.n };
+}
+
+/**
+ * Whether a long-lived task's session is idle as `sighting` shows it, open between turns: its harness still holds its process
+ * (`held`), it computes nothing (`busy`), and its turn has ended — waiting on nobody it names (`input-required` with no
+ * `waitingFor`, Claude Code's idle `blocked`), `completed`, or at work and quiet. Never for a job, whose turn's end is its end,
+ * and never for a session that waits on a person for something it names, or to sign in.
+ */
+export const idleOf = (state: State, sighting: Sighting | undefined): boolean => {
+  if (state.restartPolicy !== 'Always' || sighting?.held !== true || sighting.busy === true) return false;
+  if (sighting.state === 'input-required') return sighting.waitingFor === undefined;
+  return sighting.state === 'completed' || (RUNNING.has(sighting.state) && sighting.quietMs !== undefined);
+};
+
+/**
+ * Whether a long-lived task's harness is respawning its session as `sighting` shows it: listed live, with no process
+ * (`held: false`) — Claude Code's row for a session whose process died, which it restarts on the same conversation. Never for
+ * a job, for a task asked to stop, or for a harness that cannot say whether it holds a process.
+ */
+export const respawning = (state: State, sighting: Sighting | undefined): boolean =>
+  state.restartPolicy === 'Always' && !state.stopRequested && sighting?.held === false && isLive(sighting.state);
+
+/**
+ * What the sighting of the attempt in flight, `last`, says of its session: the second of `observe`'s rules for an attempt in
+ * flight, with what ending it now would lead to.
+ */
+function sessionEvent(state: State, last: Attempt, sighting: Sighting, now: Now): LifecycleEvent {
+  const ending = endOf(sighting.state);
+  const seen = {
+    attempt: last.n,
+    sighting,
+    asked: state.closeoutSchema !== undefined,
+    holds: state.holdOpen === true && !state.closed && ending === 'done' && (last.turn ?? 0) === state.inputs.length,
+  };
+  if (respawning(state, sighting)) {
+    const gap = last.gapSince === undefined ? 0 : now.at.getTime() - Date.parse(last.gapSince);
+    return { type: gap < RESPAWN_GAP_MS ? 'SESSION_RESPAWNING' : 'RESPAWN_OVERDUE', ...seen };
+  }
+  if (idleOf(state, sighting)) return { type: 'SESSION_IDLE', ...seen };
+  if (NEEDS_HUMAN.has(sighting.state)) return { type: 'SESSION_BLOCKED', ...seen };
+  if (RUNNING.has(sighting.state)) return { type: sighting.quietMs !== undefined ? 'SESSION_QUIET' : 'SESSION_LIVE', ...seen };
+  return { type: sighting.state === 'canceled' ? 'SESSION_STOPPED' : 'SESSION_ENDED', ...seen };
 }
 
 /**
@@ -810,9 +913,59 @@ export function spawnRefused(state: State, attempt: number, error: string, move:
     : moved.action;
 }
 
-/** Is this task waiting on a person? The one thing a fleet operator must be told about. */
+/** Is this task waiting on a person? The one thing a fleet operator must be told about. A long-lived task's idle session is not. */
 export function needsHuman(state: State, observed: ReadonlyMap<string, Sighting>): boolean {
   const last = state.attempts.at(-1);
   if (!last || last.ended !== null) return false;
-  return waitsOnPerson(observed.get(nameFor(state.taskId, last.n))?.state);
+  const seen = observed.get(nameFor(state.taskId, last.n));
+  return waitsOnPerson(seen?.state) && !idleOf(state, seen) && !respawning(state, seen);
+}
+
+/**
+ * The restart of a long-lived task whose last attempt ended with no stop asked, `observe`'s fifth rule with nothing in flight:
+ * `UNREAD` while its harness could not read the old name, `PREVIOUS_LIVE` while it still holds the old session, `BACKING_OFF`
+ * within `backoffOf` the end, then `RESTART_DUE` — continuing the latest session an attempt recorded, told `RESTART_WORDS`;
+ * with none recorded, what the turn continues, told the brief.
+ */
+function restartOf(state: State, sighting: Sighting | undefined, now: Now): LifecycleEvent {
+  const last = state.attempts[state.attempts.length - 1];
+  if (now.unread?.has(nameFor(state.taskId, last.n))) return { type: 'UNREAD', attempt: last.n, overdue: false };
+  if (sighting && (sighting.held === true || isLive(sighting.state))) return { type: 'PREVIOUS_LIVE', sessionId: sighting.sessionId };
+  const backoffMs = backoffOf(state.attempts);
+  if (now.at.getTime() - endedMs(last) < backoffMs) return { type: 'BACKING_OFF', attempt: last.n, backoffMs };
+  const session = [...state.attempts].reverse().find((a) => a.nativeId !== null)?.nativeId ?? undefined;
+  const from = session ? { resumeFrom: session, nudge: RESTART_WORDS } : { resumeFrom: turnOf(state).continues };
+  return { type: 'RESTART_DUE', attempt: state.attempts.length + 1, ...from };
+}
+
+/** When an attempt ended, in ms; one not ended yet reads as its start. The one reading of an end's time `decide` makes. */
+const endedMs = (a: Attempt): number => Date.parse(a.endedAt ?? a.startedAt);
+
+/**
+ * How long a long-lived task waits after its last end before restarting (`RESTART_BACKOFF`): the initial wait, doubled for each
+ * attempt before it that ended in a row too soon to reset it, up to the cap. Pure arithmetic over the attempts' times.
+ */
+export function backoffOf(attempts: readonly Attempt[]): number {
+  const { initialMs, factor, maxMs, resetAfterMs } = RESTART_BACKOFF;
+  let ends = 0;
+  for (let i = attempts.length - 1; i >= 0 && attempts[i].ended !== null; i--) {
+    if (endedMs(attempts[i]) - Date.parse(attempts[i].startedAt) >= resetAfterMs) break;
+    ends++;
+  }
+  return Math.min(initialMs * factor ** Math.max(0, ends - 1), maxMs);
+}
+
+/**
+ * What the engine journals of a long-lived attempt in flight off its sighting, before it decides: a `gap` the first time its
+ * session is seen respawning, and a `process` once it is seen held again after one, or held in a process it had not been
+ * seen in. Nothing for a job, a settled task, an ended attempt or a session the pass did not see.
+ */
+export function sightingFacts(state: State, sighting: Sighting | undefined, at: string): Event[] {
+  const last = state.attempts.at(-1);
+  if (state.restartPolicy !== 'Always' || state.settled || !sighting || !last || last.ended !== null) return [];
+  if (respawning(state, sighting)) return last.gapSince === undefined ? [{ kind: 'gap', at, attempt: last.n }] : [];
+  if (sighting.held !== true) return [];
+  const moved = sighting.pid !== undefined && sighting.pid !== last.processes?.at(-1);
+  if (last.gapSince === undefined && !moved) return [];
+  return [{ kind: 'process', at, attempt: last.n, ...(sighting.pid !== undefined ? { pid: sighting.pid } : {}) }];
 }

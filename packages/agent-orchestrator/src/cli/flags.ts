@@ -1,10 +1,9 @@
 /**
  * The flag reader every verb's parser calls, and what the families share beneath the verbs: the help, a verb's shape, a usage refusal, a
- * person's yes, an amount.
+ * person's yes.
  */
 import readline from 'node:readline/promises';
-import { Invalid, type engine } from '../runner.ts';
-import { dollarsOf } from '../workflow.ts';
+import { COMMANDS, Invalid, helpOf, type engine } from '../runner.ts';
 
 /** The engine the verbs talk to: the board under `WF_ROOT`, unless a test hands one of its own. */
 export type Engine = ReturnType<typeof engine>;
@@ -122,38 +121,7 @@ export const HELP = `wf — run a workflow of agent steps
   wf hold <runId> --off        lift the hold now: the next tick goes on as if it had never been put
   wf decide <runId> [--sensitive <globs>]
                                what the run produced, and the choice it leaves you (wf decide --help)
-  wf retry <runId> <step> [--nudge | --fresh | --model <m> | --recheck] [--message "<answer>"] [--budget <amount>]
-                               try a step waiting on you again, once, on the next tick:
-                               --nudge (default) continues its session, told what happened;
-                               --fresh a new session on its branch; --model <m> the same, on m;
-                               --recheck runs its check again, and files no session;
-                               --message "<answer>" goes into the try's brief, as ## Your answer:
-                               for a step that signed off blocked, the answer to its needs — or
-                               what you have to say to any step you try again; not with --recheck.
-                               The next argument is the answer, whatever it starts with; an answer
-                               that is only one of these flags' names goes as --message=<answer>;
-                               --budget <amount>: for a step over budget or budget exhausted, its
-                               cap raised to that many dollars, above what its tries have cost
-  wf approve <runId> <step> [--message "<words>"]
-                               let a step waiting at its gate hand on: what waits on it is filed on
-                               the next tick, and every step after the gate is handed your words
-                               under ## Approved. To send it back instead, with what to change:
-                               wf retry <runId> <step> --message "<objection>"
-  wf round <runId> [<step>] [--budget <amount>]
-                               once more: a loop out of rounds goes round again, once, on the
-                               next tick — the step it loops to continued, then a new reviewer;
-                               --budget raises the cap of a step of the loop over its budget
-  wf accept <runId> [<step>] --message "<why>"
-                               enough: a loop out of rounds ends on your word, with its findings
-                               open. What waits on the looping step is filed on the next tick as
-                               if it had said again: false — a gated ending goes to its gate —
-                               and every step after the loop is handed your words and those
-                               findings under ## Accepted. The other answer to wf round
-  wf say <runId> <step> "<words>"
-                               tell a step's running session something, through its harness: the
-                               engine journals the words on the step's task, wf ls notes the step
-                               said to, and wf decide prints them under it. A try that continues
-                               the session is handed them again, as ## Said to your session
+${helpOf(COMMANDS)}
   wf show <runId>              the run, and what each step was told
   wf logs <runId> <step>       that step's session output
   wf agents [--repo .]         the agents a step may name, the repository's then yours: what each is
@@ -262,14 +230,4 @@ export async function confirmed(question: string): Promise<boolean> {
   } finally {
     rl.close();
   }
-}
-
-/** A `--budget`'s value as dollars (`dollarsOf`), or refused, saying what it takes: an amount above zero, in digits. */
-export function amountOf(text: string | undefined, takes: string, form: string): number {
-  const amount = text === undefined ? undefined : dollarsOf(text);
-  if (amount === undefined)
-    usage(
-      `--budget takes ${takes} — an amount above zero, in digits, like 5 or 2.50${text === undefined ? '' : `, and ${text} is not one`}: ${form}`,
-    );
-  return amount!;
 }

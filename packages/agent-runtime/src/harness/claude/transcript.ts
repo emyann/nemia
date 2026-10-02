@@ -62,13 +62,14 @@ const callOf = (line: Line<'assistant'>): { payload: unknown; at: number; id?: s
 };
 
 /**
- * The LAST StructuredOutput call in a transcript, when it was made, and whether the conversation ends
- * with its result — `lastWord`: the session gave its closeout and has said nothing since.
+ * The LAST StructuredOutput call in a transcript, when it was made, its `tool_use` id when the block has one, and whether the
+ * conversation ends with its result — `lastWord`: the session gave its closeout and has said nothing since.
  *
- * Read from the raw JSONL rather than through `getSessionMessages`, because the SDK's messages
- * carry no timestamp, and the timestamp is the only thing that tells this session's statement from
- * one it inherited: a resumed transcript holds its parent's whole conversation, parent's calls
- * included, under the child's own session id.
+ * Read from the raw JSONL rather than through `getSessionMessages`, because the SDK's messages carry no timestamp and no call id.
+ * A resumed transcript holds its parent's whole conversation, parent's calls included, under the child's own session id, each
+ * call under the id and the time the parent made it. The id tells the session's own statement from one it inherited, where the
+ * runner recorded the parent's last call when it spawned the session (`harness/claude/parent.ts`); the time tells them apart
+ * where it did not.
  *
  * `lastWord` is what tells a session held by something other than the work from one still doing it,
  * so it is read here, off the same file, rather than by a second pass over it. Only a line that names
@@ -79,14 +80,18 @@ const callOf = (line: Line<'assistant'>): { payload: unknown; at: number; id?: s
  * and none before it, so a resumed transcript's inherited calls are not read. Throws an `Error` naming the line, in `file` when it
  * is given, its field and the fix, when a line read here does not decode: never read as no statement.
  */
-export const lastStructuredOutput = (jsonl: string, file?: string): { payload: unknown; at: number; lastWord: boolean } | undefined => {
+export const lastStructuredOutput = (
+  jsonl: string,
+  file?: string,
+): { payload: unknown; at: number; lastWord: boolean; id?: string } | undefined => {
   const lines = jsonl.split('\n');
   for (let i = lines.length - 1; i >= 0; i--) {
     if (!lines[i].includes('StructuredOutput')) continue;
     const line = lineOf(lines[i], ['assistant'], lineAt(i, file));
     const found = line && callOf(line);
     if (found) {
-      return { payload: found.payload, at: found.at, lastWord: found.id !== undefined && endsWithResultOf(lines, found.id, file) };
+      const { payload, at, id } = found;
+      return { payload, at, lastWord: id !== undefined && endsWithResultOf(lines, id, file), ...(id !== undefined ? { id } : {}) };
     }
   }
   return undefined;

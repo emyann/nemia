@@ -110,14 +110,19 @@ type Seen = {
  * `domain.ts`). Each names a fact, never an action: the edge says what the fact means in the state it meets.
  *
  * - Nothing in flight, the turn not started: `READY`, `QUEUED`, `PREVIOUS_LIVE`, `NO_SESSION_TO_CONTINUE`.
- * - An attempt in flight, and what its harness says of the name: `SESSION_LIVE`, `SESSION_BLOCKED`, `SESSION_QUIET`,
- *   `SESSION_ENDED`, `SESSION_STOPPED`, `UNSPAWNED`, `UNSEEN_IN_GRACE`, `LOST`, `UNREAD` and `DEADLINE_PASSED`.
+ * - An attempt in flight, and what its harness says of the name: `SESSION_LIVE`, `SESSION_IDLE`, `SESSION_BLOCKED`,
+ *   `SESSION_QUIET`, `SESSION_ENDED`, `SESSION_STOPPED`, `UNSPAWNED`, `UNSEEN_IN_GRACE`, `LOST`, `UNREAD` and `DEADLINE_PASSED`.
+ *   `SESSION_IDLE` is a long-lived task's session open between turns (`idleOf` in `domain.ts`). `SESSION_RESPAWNING` is one
+ *   its harness lists with no process, which it restarts itself, and `RESPAWN_OVERDUE` one listed so for `RESPAWN_GAP_MS`.
  *   `UNREAD` is one in flight — spawned, or only intended — whose harness could not be read this pass (`Now.unread`):
  *   neither seen nor gone; `overdue` on it says it is past its deadline.
  * - `SPAWN_REFUSED`, the engine's own: the harness refused the spawn, and nothing started. Never observed, since only the
  *   spawn call knows.
  * - Nothing in flight, and the record says why: `NOTHING_OPEN`, `AWAITING_INPUT`, `CLOSED`, `DEADLINE_SPENT`,
  *   `ATTEMPT_ENDED`.
+ * - Nothing in flight in a long-lived task, whose ended session is restarted (`restartOf` in `domain.ts`): `UNREAD` while its
+ *   harness could not be read, `PREVIOUS_LIVE` while it still holds the old one, `BACKING_OFF` within the backoff, then
+ *   `RESTART_DUE`.
  * - `SETTLED`: a settled task. Every state it can be in is final, and takes no event; `decide` never asks (`settledQuiet`).
  */
 export type LifecycleEvent =
@@ -126,10 +131,13 @@ export type LifecycleEvent =
   | { type: 'PREVIOUS_LIVE'; sessionId: string }
   | { type: 'NO_SESSION_TO_CONTINUE'; turn: number }
   | ({ type: 'SESSION_LIVE' } & Seen)
+  | ({ type: 'SESSION_IDLE' } & Seen)
   | ({ type: 'SESSION_BLOCKED' } & Seen)
   | ({ type: 'SESSION_QUIET' } & Seen)
   | ({ type: 'SESSION_ENDED' } & Seen)
   | ({ type: 'SESSION_STOPPED' } & Seen)
+  | ({ type: 'SESSION_RESPAWNING' } & Seen)
+  | ({ type: 'RESPAWN_OVERDUE' } & Seen)
   | { type: 'UNSPAWNED'; attempt: number; name: string }
   | { type: 'UNSEEN_IN_GRACE'; attempt: number }
   | { type: 'LOST'; attempt: number }
@@ -141,6 +149,8 @@ export type LifecycleEvent =
   | { type: 'CLOSED'; last?: { n: number; ended: Ended | null } }
   | { type: 'DEADLINE_SPENT'; seconds: number }
   | { type: 'ATTEMPT_ENDED'; ended: Ended | null; reason: EndReason | null; attempts: number; turn: number }
+  | { type: 'BACKING_OFF'; attempt: number; backoffMs: number }
+  | { type: 'RESTART_DUE'; attempt: number; resumeFrom?: string; nudge?: string }
   | { type: 'SETTLED'; outcome: Outcome };
 
 export type EventType = LifecycleEvent['type'];
@@ -154,7 +164,7 @@ export type Moved = { to: LifecycleState; action: Action } | { refused: Refusal 
 export type Move = (from: LifecycleState, event: LifecycleEvent) => Moved;
 
 type Ev<T extends EventType> = Extract<LifecycleEvent, { type: T }>;
-type Sessioned = Ev<'SESSION_LIVE' | 'SESSION_BLOCKED' | 'SESSION_QUIET' | 'SESSION_ENDED' | 'SESSION_STOPPED'>;
+type Sessioned = Ev<'SESSION_LIVE' | 'SESSION_IDLE' | 'SESSION_BLOCKED' | 'SESSION_QUIET' | 'SESSION_ENDED' | 'SESSION_STOPPED'>;
 type Open = Ev<'UNSPAWNED' | 'UNSEEN_IN_GRACE' | 'LOST' | 'UNREAD'>;
 
 /**
@@ -166,8 +176,14 @@ const said = (event: LifecycleEvent): Action => {
   switch (event.type) {
     case 'SESSION_LIVE':
       return { do: 'nothing', why: `running (${phaseWordOf(event.sighting.state)})` };
+    case 'SESSION_IDLE':
+      return { do: 'nothing', why: 'idle — open until stopped' };
     case 'SESSION_BLOCKED':
       return { do: 'nothing', why: 'blocked — needs a person' };
+    case 'SESSION_RESPAWNING':
+      return { do: 'nothing', why: 'restarting — its harness respawns its process' };
+    case 'BACKING_OFF':
+      return { do: 'nothing', why: `restarting — backing off ${event.backoffMs / 1000}s after attempt ${event.attempt} ended` };
     case 'UNSEEN_IN_GRACE':
       return { do: 'nothing', why: 'spawned, waiting for the harness to register it' };
     case 'UNREAD':
@@ -258,6 +274,22 @@ const deadline = [
 /** An attempt in flight, as its harness sees the name — the same in `starting` and `working`. */
 const inFlight = {
   SESSION_LIVE: { actions: nothing },
+  /** A long-lived task's session, open between turns: only a stop from outside ends it. */
+  SESSION_IDLE: { actions: nothing },
+  /** A long-lived task's session its harness is respawning: its harness's restart, waited out and never repeated. */
+  SESSION_RESPAWNING: { actions: nothing },
+  /** A respawn that never came: the attempt is lost, and the runtime restarts it from `ending`. */
+  RESPAWN_OVERDUE: {
+    target: 'ending',
+    actions: act('record-end', (e: Ev<'RESPAWN_OVERDUE'>) => ({
+      do: 'record-end',
+      attempt: e.attempt,
+      sessionId: e.sighting.sessionId,
+      observed: 'failed',
+      reason: 'lost',
+      nativeId: e.sighting.nativeId,
+    })),
+  },
   SESSION_BLOCKED: { actions: nothing },
   SESSION_QUIET: harness,
   SESSION_ENDED: harness,
@@ -371,6 +403,7 @@ const CONFIG = {
     stopping: {
       on: {
         SESSION_LIVE: { actions: act('stop', (e: Sessioned) => ({ do: 'stop', sessionId: e.sighting.sessionId, why: 'operator' })) },
+        SESSION_IDLE: { actions: act('stop', (e: Sessioned) => ({ do: 'stop', sessionId: e.sighting.sessionId, why: 'operator' })) },
         SESSION_BLOCKED: { actions: act('stop', (e: Sessioned) => ({ do: 'stop', sessionId: e.sighting.sessionId, why: 'operator' })) },
         SESSION_QUIET: { actions: act('stop', (e: Sessioned) => ({ do: 'stop', sessionId: e.sighting.sessionId, why: 'operator' })) },
         SESSION_ENDED: { actions: act('record-end', harnessEnd) },
@@ -386,7 +419,10 @@ const CONFIG = {
         NOTHING_OPEN: { target: 'canceled', actions: settle('stopped', () => 'operator') },
       },
     },
-    /** Nothing runs, and the record says how the turn ended, or that a person closed it: it settles on that. */
+    /**
+     * Nothing runs, and the record says how the turn ended, or that a person closed it: it settles on that — or, for a
+     * long-lived task no stop was asked of, restarts it.
+     */
     ending: {
       on: {
         CLOSED: [
@@ -409,6 +445,24 @@ const CONFIG = {
           { guard: 'endedStopped', target: 'canceled', actions: settle('stopped', () => 'session stopped') },
           { target: 'failed', actions: settle('failed', attemptNote) },
         ],
+        /** A long-lived task's harness could not be read: its old session may still run, so nothing starts beside it. */
+        UNREAD: { actions: nothing },
+        /** A long-lived task's old session, still held: stopped before it is restarted, or two would share one conversation. */
+        PREVIOUS_LIVE: {
+          actions: act('stop', (e: Ev<'PREVIOUS_LIVE'>) => ({ do: 'stop', sessionId: e.sessionId, why: 'to restart it' })),
+        },
+        /** A long-lived task's session ended, no stop asked: it waits out the backoff (`backoffOf` in `domain.ts`). */
+        BACKING_OFF: { actions: nothing },
+        /** The backoff spent: the next attempt starts, continuing the latest session it had. */
+        RESTART_DUE: {
+          target: 'starting',
+          actions: act('start', (e: Ev<'RESTART_DUE'>) => ({
+            do: 'start',
+            attempt: e.attempt,
+            ...(e.resumeFrom ? { resumeFrom: e.resumeFrom } : {}),
+            ...(e.nudge ? { nudge: e.nudge } : {}),
+          })),
+        },
       },
     },
     completed: { type: 'final' },

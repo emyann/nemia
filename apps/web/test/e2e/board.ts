@@ -222,6 +222,44 @@ export function recordedUsage(name: 'no-plan' | 'unsupported' | 'unanswered'): s
   return fs.readFileSync(file, 'utf8').replace('"request_id":"usage-1"', '"request_id":"@ID@"');
 }
 
+/**
+ * How long the e2e's api lets a read of the quota wait for its ask (`HKB_QUOTA_WAIT_MS`), so that at its keep of 0 a slow ask answers the
+ * read rather than leave it `asking`: the ask in flight before it and the one the api queues behind it, each given up by the runtime's
+ * claude harness after 15 s (`QUOTA_TIMEOUT_MS`).
+ */
+export const QUOTA_ASKS_MS = 2 * 15_000;
+
+/**
+ * The longest a reload waits for the quota from an ask begun after a change, as a bound on a hang and never as when it comes: the api's
+ * wait for the asks (`QUOTA_ASKS_MS`), and the board's next read, 2 s after a read told `asking`.
+ */
+export const QUOTA_ANSWER_MS = QUOTA_ASKS_MS + 2_000;
+
+/**
+ * Reloads `page` and waits for the board's `GET /api/quota` answered from an ask begun at `since` or after — its `askedAt`, and not
+ * `asking` — then for the page to idle: the quota the api read after what the page changed at `since`, the time taken before the change.
+ * Refuses, naming that answer, when none came within `QUOTA_ANSWER_MS`.
+ */
+export async function reloadForQuota(page: Page, since: number): Promise<void> {
+  const answered = page.waitForResponse(
+    async (r) => {
+      if (r.request().method() !== 'GET' || new URL(r.url()).pathname !== '/api/quota' || !r.ok()) return false;
+      const { state, askedAt } = (await r.json()) as { state?: unknown; askedAt?: unknown };
+      return state !== 'asking' && typeof askedAt === 'string' && Date.parse(askedAt) >= since;
+    },
+    { timeout: QUOTA_ANSWER_MS },
+  );
+  await page.reload({ waitUntil: 'load' });
+  try {
+    await answered;
+  } catch {
+    throw new Refused(
+      `the board reads the quota from an ask begun after ${new Date(since).toISOString()} — no answer to GET /api/quota came from one in ${QUOTA_ANSWER_MS} ms`,
+    );
+  }
+  await idle(page);
+}
+
 /** A step's Debug panel on `page`, opened: its trigger pressed and the path of `taskId` drawn, with the lifecycle it is drawn on. */
 export async function openDebug(page: Page, taskId: string): Promise<{ panel: Locator; lifecycle: Locator }> {
   const panel = page.getByRole('region', { name: 'Debug' });

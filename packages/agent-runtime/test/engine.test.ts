@@ -25,7 +25,7 @@ import { Runner } from '../src/harness/seam.ts';
 import { admit, answer, file, requestStop } from '../src/core/engine/filing.ts';
 import { GRACE_MS, Lifecycle, LIVE, step, settleTask, tick, view } from '../src/core/engine/engine.ts';
 import { withoutEdge } from '../src/core/lifecycle.ts';
-import { decide, fold, nameFor, type Event, type Sighting } from '../src/core/domain.ts';
+import { decide, fold, nameFor, RESTART_WORDS, type Event, type Sighting } from '../src/core/domain.ts';
 import type { SessionState } from '../src/core/session.ts';
 import type { SpawnRequest } from '../src/harness/seam.ts';
 import { tickMemoLayer } from '../src/core/engine/memo.ts';
@@ -114,6 +114,140 @@ test('CRASH while the session runs: the restart adopts it and starts nothing', a
 
   assert.deepEqual([...b.sessions.keys()], running, 'no second session, five restarts later');
   assert.equal(await b.run(phaseOf(id)), 'running (working)');
+});
+
+/**
+ * A board whose harness says what it was asked to stop and release, run by a fresh daemon on each call of `daemon`: a new
+ * process on the same journal and harness. A release is recorded only, so a released session stays listed as it was.
+ */
+const recording = () => {
+  const journal = Journal.test();
+  const sessions = new Map<string, Sighting>();
+  const spawned: SpawnRequest[] = [];
+  const asked: string[] = [];
+  const daemon = () => {
+    const ops = testOps({ sessions, spawned });
+    const runner = Runner.layer({
+      ...ops,
+      stop: (id) =>
+        Effect.andThen(
+          Effect.sync(() => asked.push(`stop ${id}`)),
+          ops.stop(id),
+        ),
+      release: (s) => Effect.sync(() => void asked.push(`release ${s.sessionId}`)),
+    });
+    const layer = Layer.mergeAll(journal, runner, tickMemoLayer({ verify: true }));
+    return <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.runPromise(e.pipe(Effect.provide(layer)));
+  };
+  return { sessions, spawned, asked, daemon };
+};
+
+/** Appends `events` to `id`'s journal, each stamped `ago` ms before now. */
+const journalAgo = (id: string, ...events: Array<[number, Record<string, unknown>]>) =>
+  Effect.flatMap(Journal, (j) =>
+    Effect.forEach(events, ([ago, e]) => j.append(id, { ...e, at: new Date(Date.now() - ago).toISOString() } as Event), {
+      discard: true,
+    }),
+  );
+
+const kindsOf = (id: string) =>
+  Effect.map(
+    Effect.flatMap(Journal, (j) => j.read(id)),
+    (events) => events.map((e) => e.kind),
+  );
+
+test('RESTART: a long-lived session idle across a daemon restart is left open — no end recorded, no stop, no release, no second spawn — where a job its harness lists done is ended and released', async () => {
+  const { sessions, spawned, asked, daemon } = recording();
+  const first = daemon();
+  await first(file({ ...spec, id: 'open', restartPolicy: 'Always', config: { background: true } }));
+  await first(file({ ...spec, id: 'job' }));
+  await first(tick());
+  const open = nameFor('open', 1);
+  const job = nameFor('job', 1);
+  sessions.set(open, { ...sessions.get(open)!, state: 'input-required', busy: false, held: true });
+  sessions.set(job, { ...sessions.get(job)!, state: 'completed', busy: false, held: true });
+  await first(tick());
+
+  const restarted = daemon();
+  for (let pass = 0; pass < 3; pass++) await restarted(tick());
+  const kinds = async (id: string) => (await restarted(Effect.flatMap(Journal, (j) => j.read(id)))).map((e) => e.kind);
+  assert.deepEqual(await kinds('open'), ['filed', 'starting', 'spawned'], 'nothing but its start on the record');
+  assert.equal(await restarted(phaseOf('open')), 'idle');
+  assert.equal(spawned.length, 2, 'no second session');
+  const openId = sessions.get(open)!.sessionId;
+  assert.deepEqual(
+    asked.filter((a) => a.endsWith(` ${openId}`)),
+    [],
+    'neither stopped nor released',
+  );
+  assert.deepEqual((await kinds('job')).slice(0, 4), ['filed', 'starting', 'spawned', 'ended'], 'the job, sighted done, is ended');
+  assert.equal(await restarted(phaseOf('job')), 'succeeded');
+  assert.ok(asked.includes(`release ${sessions.get(job)!.sessionId}`), 'and its session released');
+});
+
+test('LONG-LIVED: a respawn its harness makes is journalled — the gap once however many passes see it, the new process that closes it — shown restarting, and never acted on', async () => {
+  const b = board();
+  const id = await b.run(file({ ...spec, restartPolicy: 'Always', config: { background: true } }));
+  await b.run(tick());
+  const name = nameFor(id, 1);
+  const listed = b.sessions.get(name)!;
+  b.sessions.set(name, { ...listed, state: 'input-required', busy: false, held: true, pid: 100 });
+  await b.run(tick());
+  b.sessions.set(name, { ...listed, state: 'input-required', busy: false, held: false });
+  for (let pass = 0; pass < 3; pass++) await b.run(tick());
+  assert.equal(await b.run(phaseOf(id)), 'restarting');
+  b.sessions.set(name, { ...listed, state: 'input-required', busy: false, held: true, pid: 200 });
+  const report = await b.run(tick());
+  assert.equal(report.views.find((v) => v.id === id)?.state.attempts[0].processes?.join(), '100,200', 'the pass reports what it wrote');
+  assert.deepEqual(await b.run(kindsOf(id)), ['filed', 'starting', 'spawned', 'process', 'gap', 'process']);
+  assert.equal(await b.run(phaseOf(id)), 'idle');
+  assert.equal(b.spawned.length, 1, 'nothing spawned beside it');
+});
+
+test('LONG-LIVED: a gap open past RESPAWN_GAP_MS on the record is ended lost by a fresh daemon, and its listed session released', async () => {
+  const r = recording();
+  const run = r.daemon();
+  const id = await run(file({ ...spec, restartPolicy: 'Always', config: { background: true } }));
+  await run(
+    journalAgo(
+      id,
+      [300_000, { kind: 'starting', attempt: 1 }],
+      [300_000, { kind: 'spawned', attempt: 1 }],
+      [300_000, { kind: 'process', attempt: 1, pid: 100 }],
+      [121_000, { kind: 'gap', attempt: 1 }],
+    ),
+  );
+  r.sessions.set(nameFor(id, 1), { sessionId: 'native-1', state: 'input-required', busy: false, held: false, nativeId: 'native-1' });
+  await r.daemon()(tick());
+  const events = await run(Effect.flatMap(Journal, (j) => j.read(id)));
+  const end = events.find((e) => e.kind === 'ended');
+  assert.deepEqual(end && [end.attempt, end.observed, end.reason, end.nativeId], [1, 'failed', 'lost', 'native-1']);
+  assert.ok(r.asked.includes('release native-1'), 'the old session let go in the pass that ended it');
+  assert.equal(r.spawned.length, 0, 'nothing restarted inside the backoff');
+});
+
+test('LONG-LIVED: a session ended with no stop asked is restarted once the backoff is spent — its old session stopped first, the new one resuming its conversation, told RESTART_WORDS', async () => {
+  const r = recording();
+  const run = r.daemon();
+  const id = await run(file({ ...spec, restartPolicy: 'Always', config: { background: true } }));
+  await run(
+    journalAgo(
+      id,
+      [300_000, { kind: 'starting', attempt: 1 }],
+      [300_000, { kind: 'spawned', attempt: 1 }],
+      [11_000, { kind: 'ended', attempt: 1, sessionId: 'native-1', observed: 'failed', reason: 'lost', nativeId: 'native-1' }],
+    ),
+  );
+  r.sessions.set(nameFor(id, 1), { sessionId: 'native-1', state: 'input-required', busy: false, held: false, nativeId: 'native-1' });
+  await r.daemon()(tick());
+  assert.deepEqual(r.asked.slice(0, 1), ['stop native-1'], 'still listed live: stopped before anything starts');
+  assert.equal(r.spawned.length, 0);
+  await r.daemon()(tick());
+  assert.deepEqual(
+    r.spawned.map((s) => [s.name, s.resumeFrom, s.brief]),
+    [[nameFor(id, 2), 'native-1', RESTART_WORDS]],
+  );
+  assert.deepEqual((await run(kindsOf(id))).slice(-2), ['starting', 'spawned']);
 });
 
 test('a failed attempt settles the task failed: one attempt per start, and no second session', async () => {
@@ -683,7 +817,7 @@ test("tools, disallowedTools, effort, mcp, contextTokens and Claude Code's own f
   assert.equal(plain.spawned[0].config?.claude, undefined, 'no Remote Control unless asked');
 });
 
-test('decide never reads tools, effort, MCP servers, a budget, a context window, Remote Control, a priority an old journal carries, a filing time, usage, a cost, an exit code, an end time or what a person said — carried on the record, never judged', () => {
+test("decide never reads tools, effort, MCP servers, a budget, a context window, Remote Control, a priority an old journal carries, a filing time, usage, a cost, an exit code, what a person said, or an end time but for a long-lived task's backoff — carried on the record, never judged", () => {
   const source = fs.readFileSync(new URL('../src/core/domain.ts', import.meta.url), 'utf8');
   const from = source.indexOf('export function decide(');
   assert.ok(from >= 0, 'found decide');
@@ -693,10 +827,14 @@ test('decide never reads tools, effort, MCP servers, a budget, a context window,
     'export function observe(',
     'export function spawnRefused(',
     'export function needsHuman(',
+    'export const idleOf =',
+    'export function backoffOf(',
   ])
     assert.ok(body.includes(name), `the slice holds ${name}`);
+  const endTime = /const endedMs = \([^)]*\)[^=]*=>\s*[^;]*\.endedAt[^;]*;/;
+  assert.match(body, endTime, 'the one reading of an end time, `endedMs`, the backoff reads');
   const machine = fs.readFileSync(new URL('../src/core/lifecycle.ts', import.meta.url), 'utf8');
-  for (const read of [body, machine])
+  for (const read of [body.replace(endTime, ''), machine])
     assert.doesNotMatch(
       read,
       /\.tools|\.disallowedTools|\.effort|\.mcp\b|\.usage|\.exitCode|\.endedAt|\.said|\.budgetUsd|\.contextTokens|\.costUsd|\.remoteControl|\.claude\b|\.priority|\.filedAt/,

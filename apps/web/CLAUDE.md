@@ -38,6 +38,8 @@ The board is Vite, React, TanStack Router and Query, React Flow, and shadcn's co
 - An expectation about a time of day decides as `clockWord` does (same calendar day or not), never a hard-coded form.
 - Wait with `idle(page)` (`checks.ts`), never `networkidle`: the feed stream never ends. A page that edits the store by hand where the
   board must see it says so on the feed, `fed(run, step?, word)` (`board.ts`); the board polls once a minute while it follows the feed.
+- A page that changes what the e2e's `claude` answers the quota with reloads with `reloadForQuota` (`board.ts`): it waits for the answer
+  of an ask begun after the change, never for a longer timeout.
 - A page that holds a read with `route` routes before its `goto`: the feed's replay reads the run again right after the load.
 - A page whose state changes at its end waits for what it reads again before its last assertion, or its picture is taken mid-read.
 - Name a page's own pictures `<name>-<what>-<theme>.png`; `<name>-<theme>.png` is the runner's and is overwritten.

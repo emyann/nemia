@@ -8,14 +8,52 @@ broken. This page says what the tests hold; the tests are the rules.
 
 | Layer | Owns | Public contract |
 |---|---|---|
-| `packages/agent-runtime` | One agent session run to completion, durably, on one harness: the journal, the attempts, the harnesses' vocabulary. The `ae` command. | `agent-runtime` → `src/facade.ts`, the runtime in Promises. `agent-runtime/effect` → `src/index.ts`, the same in Effect. `decide` is exported by neither. |
-| `packages/agent-orchestrator` | A folder of markdown as a workflow, and a run of its steps: which task to file next, what a person must decide, what the run's record says. The `wf` command. | `agent-orchestrator` → `src/runner.ts`: the controllers, and everything that reads or writes the disk, re-exported by name. `agent-orchestrator/run` → `src/run.ts`: `assess` (`src/tick/assess.ts`), and the words a run is described in, re-exported by name. `agent-orchestrator/workflow` → `src/workflow.ts`: the format, pure. `agent-orchestrator/effect` → `src/effect.ts`: the refusals by kind, `Missing`, `Conflict` and `Invalid`, as `agent-runtime/effect` is the runtime's face in Effect. |
+| `packages/agent-runtime` | Agent sessions on a harness, durably: a job that runs to its end, and (not built yet) a long-lived session that runs until stopped. How a session runs: its command, mounts, restart and spend, the journal, the attempts, the harnesses' vocabulary. The `ae` command. | `agent-runtime` → `src/facade.ts`, the runtime in Promises. `agent-runtime/effect` → `src/index.ts`, the same in Effect. `decide` is exported by neither. |
+| `packages/agent-orchestrator` | A folder of markdown as a workflow, and a run of its steps: which task to file next, what a person must decide, what the run's record says. The `wf` command, to become `nemia`. | `agent-orchestrator` → `src/runner.ts`: the controllers, and everything that reads or writes the disk, re-exported by name. `agent-orchestrator/run` → `src/run.ts`: `assess` (`src/tick/assess.ts`), and the words a run is described in, re-exported by name. `agent-orchestrator/workflow` → `src/workflow.ts`: the format, pure. `agent-orchestrator/effect` → `src/effect.ts`: the refusals by kind, `Missing`, `Conflict` and `Invalid`, as `agent-runtime/effect` is the runtime's face in Effect. |
 | `apps/api` | The workflows behind HTTP, and the feed as a stream. | Its routes. |
-| `apps/web` | The board people look at. It talks to the api over HTTP, decodes each answer it reads with a schema of its own (`effect`), and imports none of our packages. | Its pages. |
+| `apps/web` | The board people look at. It talks to the api over HTTP, decodes each answer it reads with a schema of its own (`effect`), imports none of our packages, names no store path, and builds no command of its own: a command it shows is text the api answered. | Its pages. |
 
-Dependencies point down the table and never up: the web app talks to the api, the api imports the orchestrator, and
-the orchestrator imports the runtime. A test of the api may import the runtime's entries too. Spawning a package's
-`bin/` — `wf feed` in the web app's e2e test, say — is using its CLI, not importing it.
+Each layer reaches exactly the one below it, and nothing reaches up or skips one:
+
+- the web reaches the api over HTTP alone `(no test yet)`;
+- the api reaches the orchestrator's public entries alone (the entries: `packages/agent-orchestrator/test/contract.test.ts`; that its
+  source imports no runtime: `(no test yet)`). The api's source reaches only the orchestrator; its tests may import the runtime's
+  public entries to build fakes;
+- the orchestrator reaches the runtime through its one client, `src/runtime-client.ts` (`CLIENT` in
+  `packages/agent-orchestrator/test/boundary.test.ts`).
+
+Spawning a package's `bin/` — `wf feed` in the web app's e2e test, say — is using its CLI, not importing it.
+
+## Who owns what
+
+The runtime owns how a session runs; the layers above own what it means. The Kubernetes test settles a new field on the runtime's
+task: if the Pod spec (`core/v1`) has one — a container's command, args, env, volumes, restart policy, resources, priority — it is the
+runtime's.
+
+**Above the runtime by design**: run slots, checkout holds, worktrees and landing, what a check means, budgets across tries, gates, the
+inbox, factories, stats, agent definitions.
+
+**In the orchestrator today, a candidate for the runtime**:
+
+- session admission and pools (`src/cap/cap.ts`, `WF_MAX_CONCURRENT`);
+- the daemon and its lease (`src/daemon/`, `upVerb` in `src/cli/main.ts`);
+- the injected check harness (`src/check/check.ts`);
+- rendering agents and skills for Claude Code (`src/agents/agents.ts`, `src/agents/agents.store.ts`, `toldOf` in
+  `src/tick/file.verb.ts`);
+- copies of harness vocabulary (`src/harness/harness.ts`, `src/keys/keys.ts`, `src/keys/tools.ts`, `src/workflow/validate.ts`), held
+  equal to the runtime's by `test/vocabulary.test.ts`.
+
+**In the api today, below its layer**: `src/factory/quota.ts` spawning `claude`, `runsInOf` in `src/detail/detail.ts` reading a
+harness's argv for a mode, and `src/capabilities/reach.ts` re-implementing permission matching.
+
+**In the web today, against its rule**, until the api answers that text:
+
+- store paths, in `src/routes/agents.tsx`, `src/routes/agents_.new.tsx`, `src/routes/agents_.skills.new.tsx`,
+  `src/routes/agents_.$from.$agent.tsx`, `src/routes/workflows.tsx` and `src/components/NewWorkflow.tsx`;
+- the commands it spells itself: every file of `apps/web/src` that names a `wf` verb, found by `grep -rlE '\bwf [a-z]+' apps/web/src`
+  (a JSDoc's mention included).
+
+Nothing here moves until its own card; a change elsewhere does not move it on the side.
 
 ## Pure core, effectful shell
 

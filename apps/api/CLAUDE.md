@@ -1,7 +1,10 @@
 # apps/api — the workflows behind HTTP
 
-Hono over the orchestrator's public contract (`agent-orchestrator`, `agent-orchestrator/run`, `agent-orchestrator/workflow`,
-`agent-orchestrator/effect`).
+The workflows behind HTTP, and the feed as a stream: Hono over the orchestrator's public contract (`agent-orchestrator`,
+`agent-orchestrator/run`, `agent-orchestrator/workflow`, `agent-orchestrator/effect`; the entries:
+`packages/agent-orchestrator/test/contract.test.ts`), and nothing below it: its source imports no runtime `(no test yet)`, while its
+tests may import the runtime's public entries to build fakes. A harness fact it needs comes from the orchestrator; what it holds today
+below its layer is in `docs/architecture.md`, *Who owns what*.
 
 - **The test script loads `test/harness.ts` with `--import`, and every test file imports it first too**, by its path from the file
   (`../../test/harness.ts` beside the code): a fake `claude` first on PATH, so no test asks this machine's live registry, even one run by
@@ -21,8 +24,6 @@ Hono over the orchestrator's public contract (`agent-orchestrator`, `agent-orche
 - **Read a `Wait` by the key you mean**: a hold's `Wait` carries `shipped`, which an `--after` wait never does (`holdNeedsYou`, not
   `neverShips`, in `runs/judged.ts`).
 - **A remote agent's address is shown as origin and path, never whole** (`remoteOf` in `detail/detail.ts`): a query string can carry a key.
-- **A new offer in `wf decide` is parsed here** (`ONCE_MORE` in `decide/decision.ts`), with its label in `DecideCommand` and the web's mirror, or
-  the board offers the whole sentence as a command. Test the bare command, not that the offer is listed.
 - **A list a page turns into a sentence carries everything the sentence is about** (`folderFiles` in `steps/artifacts.ts` lists what it cannot
   serve by path), and leaves out only what the run itself put there (`GIVEN`).
 - **The list's `toDecide` is not the package's decision**: `decision` answers `awaiting` where `toDecide` says nothing; a page that must

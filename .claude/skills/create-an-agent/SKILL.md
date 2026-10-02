@@ -6,9 +6,9 @@ description: "How to create an agent in Nemia — who it is (a name, a role, a d
 # Create an agent in Nemia
 
 An agent is a hire: a person with a job, standards (its skills) and equipment (its tools). A workflow's step is a position it fills; one
-agent can fill positions in several workflows. Nemia ships none: this repository's team is in `workflows/`, a person's in
-`~/.agent-workflows/workflows/`, and the board's Agents page writes the second. Read `packages/agent-orchestrator/README.md`, *An agent is
-a node's attachment*, for the whole format; this is the procedure, and what it cost to learn.
+agent can fill positions in several workflows. A person's factories get no agent from Nemia: this repository's team is in `workflows/`, a
+person's in `~/.agent-workflows/workflows/`, and the board's Agents page writes the second. Read `packages/agent-orchestrator/README.md`,
+*An agent is a node's attachment*, for the whole format; this is the procedure, and what it cost to learn.
 
 ## Who it is
 

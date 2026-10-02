@@ -1,7 +1,10 @@
 # packages/agent-orchestrator — `wf`
 
-Runs of steps from folders of markdown, a tick that files and admits them on the runtime, and the verbs a person uses. Its files are
-pure, store, controller or the client (`test/boundary.test.ts`), and its folders are held by `test/layout.test.ts`.
+Workflows as folders of markdown, runs of their steps, a tick that files and admits them on the runtime, and the verbs a person uses:
+run slots, worktrees and landing, what a check means, budgets across tries, gates, the inbox, factories, stats, agent definitions. It
+reaches the runtime through `src/runtime-client.ts` alone (`CLIENT` in `test/boundary.test.ts`). Its files are pure, store, controller
+or the client (`test/boundary.test.ts`), and its folders are held by `test/layout.test.ts`. What it holds today that is a candidate for
+the runtime is in `docs/architecture.md`, *Who owns what*.
 
 ## Folders
 
@@ -33,10 +36,11 @@ pure, store, controller or the client (`test/boundary.test.ts`), and its folders
 - **A step's `body` opens with its agent's instructions** ("You are …"): a screen that quotes the step reads its own words, `ownNote`
   (`ending/ending.ts`), as `toDecide` and `wf decide` do.
 - **The board's listing of a step is resolved; its file is not**: write a step's own keys (`ListedStep.own`). A key the parser converts
-  is written back in the form the file has (`contextText`). Code outside the package reads frontmatter as the parser does
-  (`splitFrontmatter`, trimmed; `frontmatterValue`).
-- **A test that needs a realistic folder reads the tests' team** (`test/fixtures/team`, `test/team.ts`), never a shipped one: Nemia
-  ships none, and a guard over what ships reads `shippedFolders()`.
+  is written back in the form the file has (`contextText`). Code outside the package reads a step's frontmatter by calling the
+  package's reader (`splitFrontmatter`, from `agent-orchestrator/workflow`), never a parser of its own `(no test yet)`;
+  `frontmatterValue` in `apps/api/src/workflows/workflows.ts` is one today.
+- **A test that needs a realistic folder reads the tests' team** (`test/fixtures/team`, `test/team.ts`), never a shipped one: a
+  person's factories get no workflow or agent from the package, and a guard over what ships reads `shippedFolders()`.
 - **The api reads `agent-orchestrator/run`, `agent-orchestrator/workflow` and `agent-orchestrator/effect`**, its tests with
   `await import`: the api's typecheck fails on a name a subpath no longer exports, so before moving a name out of `run.ts` or
   `workflow.ts`, re-export from `run.ts` what the api reads there.
@@ -50,9 +54,10 @@ pure, store, controller or the client (`test/boundary.test.ts`), and its folders
 
 ## Runs, phases and asks
 
-- **The runtime's phase is free text compared exactly** (`needs-human` in `harnessBlocked`, the api's `needsOf`, the web's `stepState`,
-  `listing`): put a new word beside it (`waitingOf`), never into it. A new runtime phase is read in `listing` (`settledOf`) and in
-  `phaseOfView`, and on the board.
+- **The runtime's words stop here**: the orchestrator translates a runtime phase into its own status (`harnessBlocked`, `waitingOf`,
+  `settledOf` in `listing`, `phaseOfView`), and the api and the board read only the orchestrator's words `(no test yet)`; today the
+  api's `needsOf` and the web's `stepState` still compare `needs-human`. A new runtime phase is translated in `listing` and
+  `phaseOfView`; put a new word beside a phase (`waitingOf`), never into it.
 - **A new step status is `working` on the board until `stepState` knows it**.
 - **A word from outside is made one line before it is measured into a column** (`waitingWords`).
 - **A person's fact that stops a run's asks is read by `assess`**, not only by the verbs and the tick; a line that offers a verb says that
@@ -91,7 +96,6 @@ pure, store, controller or the client (`test/boundary.test.ts`), and its folders
 - **What `engine()` reads, it reads without throwing** (`readRemote`): a bad file is left out and said on stderr.
 - **A task journal that does not read stops its own run, never the pass**: `pass` in `tick/tick.verb.ts` leaves the run unjudged, in
   flight and out of the feed's `removed` (`unreadableJournal`); `test/unreadable-journal.test.ts` walks it on the runtime itself.
-- **A step's fence is read through `modeOf`**: Claude Code's is `permissionMode`, Codex's `sandbox`.
 - **The ending's check is the run's**: the shipper stages the merge; the tick commits on the check's exit 0 or aborts (`landingDue`),
   level-triggered off `MERGE_HEAD`, reading conflicts with `ls-files --unmerged` (never `git diff`, which takes the index lock). A landed
   ending keeps no pictures of the merged tree but those its closeout names (`dropLandedPictures`).
@@ -114,16 +118,7 @@ pure, store, controller or the client (`test/boundary.test.ts`), and its folders
 - **A `readdirSync` entry for a symlink is not `isFile()`, and every write follows it**: refuse a link by name where a folder's files are
   its own (`writeWorkflow`).
 
-## Claude Code, as the steps meet it
+## Claude Code
 
-- **A job (`claude -p`) never waits on a prompt; a background session in a folder nobody opened blocks in any mode that can ask**:
-  `validateFolderMode` judges only `background: true`, which must run `dontAsk` or `bypassPermissions`.
-- **A job reads no user settings** (`--setting-sources project,local`): what a step needs goes on the step, its agent or the checkout's
-  `.claude/settings.json`.
-- **A write is matched against `Edit` rules only**: write `allowedTools: Edit(**)`, never `Write(path)` (`fileRuleRefusal`).
-- **A project's allow rules are dropped in a directory Claude Code has not trusted**: measure a rule in a trusted checkout.
-- **A session under `~/.claude/` cannot write there in any mode**: put a probe store elsewhere.
-- **A path a fenced step's brief names is inside its own folder** (`givenPlan`, `folderPlace.make`); a rule offered for the next run names
-  no path of this one (`allowRuleOf`, `disallowedBy`).
-- **A job's turn cannot end to wait for background work**: run long work in the foreground, or block on it
-  (`timeout 580 bash -c "while kill -0 <pid>; do sleep 5; done"`).
+- **Claude Code's facts as the steps meet it, a step's fence among them, are the runtime's**: `packages/agent-runtime/CLAUDE.md`,
+  *Claude Code, as a harness*.

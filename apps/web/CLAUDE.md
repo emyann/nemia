@@ -1,5 +1,9 @@
 # apps/web — the board
 
+The board owns what a person sees and clicks. It reaches the api over HTTP alone: it imports no package, names no store path, and builds
+no command of its own — a command it shows is text the api answered `(no test yet)`; the files that do today are a listed exception in
+`docs/architecture.md`, *Who owns what*, until the api answers that text.
+
 The board is Vite, React, TanStack Router and Query, React Flow, and shadcn's components on React Aria (`aria-nova`). Its node tests
 (`test/*.test.ts`) load `src/` as Node does; its e2e (`test/e2e/`) drives the built app in Chromium.
 

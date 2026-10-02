@@ -1,11 +1,16 @@
 # Nemia — contributor guide
 
-Two packages and two apps. `packages/agent-runtime` runs one agent session to completion, durably (the `ae` CLI; `src/core/domain.ts` is
-the whole judgement). `packages/agent-orchestrator` sequences runtime tasks into runs of steps — a folder of markdown is a workflow (the
-`wf` CLI). `apps/api` puts the workflows behind HTTP; `apps/web`, the board, talks to it. Dependencies point down that list, never up.
-Read `README.md` and each package's README for the model before changing behaviour. The `wf` and `ae` commands and the stores
-`~/.agent-workflows` (`WF_ROOT`) and `~/.agent-engine` (`AE_ROOT`) keep their older names on purpose: a new default would orphan every
-record there.
+Two packages and two apps, each a layer that owns one thing. `packages/agent-runtime` runs agent sessions on a harness, durably: a job
+that runs to its end, and a long-lived session that runs until stopped (not built yet); the `ae` CLI, and `src/core/domain.ts` is the
+whole judgement. `packages/agent-orchestrator` owns workflows and the runs of their steps — a folder of markdown is a workflow (the `wf`
+CLI). `apps/api` puts the workflows behind HTTP; `apps/web`, the board, shows them to a person.
+
+Each layer reaches exactly the one below it, and nothing reaches up or skips one: the web reaches the api over HTTP alone
+`(no test yet)`; the api reaches the orchestrator's public entries alone (the entries: `packages/agent-orchestrator/test/contract.test.ts`;
+that its source imports no runtime: `(no test yet)`); the orchestrator reaches the runtime through its one client, `src/runtime-client.ts`
+(`CLIENT` in `packages/agent-orchestrator/test/boundary.test.ts`). Read `README.md` and each package's README for the model before
+changing behaviour. `wf` becomes `nemia` (the Nemia intent); `ae` stays the runtime's CLI. The stores `~/.agent-workflows` (`WF_ROOT`)
+and `~/.agent-engine` (`AE_ROOT`) keep their names on purpose: a new default would orphan every record there.
 
 Each package and app has a `CLAUDE.md` of its own with the traps of its code; Claude Code reads it when you work in that folder. This file
 holds what every change needs.
@@ -56,33 +61,41 @@ holds what every change needs.
 
 ## Rules the code keeps
 
-- **The runtime is finished.** It runs one workload on one harness; anything that knows about a second workload is the upper layer.
-  `decide` (`agent-runtime/src/core/domain.ts`) is pure and stays a screen long; `agent-runtime` (`src/facade.ts`) and `agent-runtime/effect`
-  (`src/index.ts`) are the export lists, and neither exports `decide`. A knob on the workload is a field carried on the task and read by a
-  runner, never a callback into `decide`, and no `if` in `engine.ts` belongs in `decide`.
+- **The runtime owns how a session runs; the layers above own what it means.** `decide` (`agent-runtime/src/core/domain.ts`) is pure
+  (`agent-runtime/test/engine.test.ts` refuses a carried field read in it) and stays a screen long `(no test yet)`; `agent-runtime`
+  (`src/facade.ts`) and `agent-runtime/effect` (`src/index.ts`) are the export lists, and neither exports `decide`
+  (`agent-runtime/test/contract.test.ts`). A knob on a workload is a field carried on the task and read by a runner, never a callback
+  into `decide`, and no `if` in `engine.ts` belongs in `decide` `(no test yet)`. What sits in which layer today, and what is a
+  candidate to move, is in `docs/architecture.md`, *Who owns what*.
 - **Three rules hold the layers, each a test** (`docs/architecture.md`):
   - *Between packages, only the public contract*: `agent-runtime` and `agent-runtime/effect`; `agent-orchestrator`,
     `agent-orchestrator/run`, `agent-orchestrator/workflow` and `agent-orchestrator/effect` — never a subpath outside `exports`, a
     relative path, `import.meta.resolve` or a path into `src/` (the two `contract.test.ts`).
   - *Inside the orchestrator, every file is pure, store, controller or the client* (`PURE`, `STORE`, `CONTROLLER`, `CLIENT` in
     `packages/agent-orchestrator/test/boundary.test.ts`); a new file joins one kind, or the suite fails.
-  - *The runtime is reached through one client*, `src/runtime-client.ts`.
+  - *The runtime is reached through one client*, `src/runtime-client.ts` (`CLIENT` in the same test).
 - **Level-triggered.** A tick reads the world, decides, acts, and carries nothing between passes. A guard that only fires on a
-  transition is wrong after a restart.
-- **One writer per file.** The tick writes the run record; a person's facts (`.cancelled`, an ask) get their own files, composed on read.
+  transition is wrong after a restart `(no test yet)`.
+- **One writer per file.** The tick writes the run record; a person's facts (`.cancelled`, an ask) get their own files, composed on read
+  (`packages/agent-orchestrator/test/run-store.test.ts` holds the run record's).
 - **A check that did not finish is not a refusal.** Only a numeric exit is a verdict on the work (`refusedCheck`); `wf retry <run> <step>
-  --recheck` runs it again — never a hand edit of a journal or a record.
-- **No command from a checkout.** A `check:` comes from the workflow folder frozen on the run record at `wf start`.
-- **Prose is not a constraint.** If the packages need an agent to do something, the machinery refuses the alternative.
-- **Errors say what to do next.** Throw `Error` with `.exitCode = 2` and a message naming the fix.
+  --recheck` runs it again — never a hand edit of a journal or a record (`agent-orchestrator/test/run.test.ts`, *a check that did not
+  finish is no refusal*).
+- **No command from a checkout.** A `check:` comes from the workflow folder frozen on the run record at `wf start`
+  (`agent-orchestrator/test/store.test.ts`, *the frozen command*).
+- **Prose is not a constraint.** If the packages need an agent to do something, the machinery refuses the alternative
+  `(no test yet)`.
+- **Errors say what to do next.** Throw `Error` with `.exitCode = 2` and a message naming the fix; in the orchestrator, a refusal by
+  kind (`Missing`, `Conflict`, `Invalid`), and `agent-orchestrator/test/refusal.test.ts` refuses an `exitCode: 2` set by hand.
 - **Code reads by itself.** No `//` or `/* */` comment in code but a lint or TypeScript directive with its `-- reason`; a JSDoc sits on
   a file's head or a declaration and says what it is, takes, returns and refuses — never its history, a workaround, a run, a date or a
   card: history lives in git, CLAUDE.md and the tests. A comment is never evidence that a problem is settled: read the code and its test.
   - The guards: the oxlint plugin `lint/comments.ts`, oxlint's `no-warning-comments` and `no-inline-comments`, in one override block per
     package in `.oxlintrc.json`, and a test that a name a comment quotes in backticks is one the code has
     (`packages/agent-orchestrator/test/comments.test.ts`, with its short list of other programs' words).
-  - A block is off while its `excludeFiles` names its package. The card that cleans a package switches its guards on by deleting that
-    one line, and edits nothing shared. The runtime's block also covers `lint/**`, the guards' own plugin; no other block lists it.
+  - Every package's guards are on: no block has an `excludeFiles` `(no test yet)`. A new package gets a block of its own, and the
+    runtime's block also covers `lint/**`, the guards' own plugin; no other block lists it (`comments.test.ts`, *one guard block per
+    workspace package*).
   - A JSDoc on a parameter, a union member or a local is refused: say it as an `@param` line or in the declaration's JSDoc.
     `comments.test.ts` refuses a comment line over 140 columns, since `oxfmt` rewraps none; a `(` `)` it drops once a comment inside
     them goes is its own.
@@ -94,7 +107,9 @@ holds what every change needs.
 - **A state machine declares the verbs written from outside it**: each with the states it is taken from, the state the next pass reads
   and its guard, which the verb's refusal asks first; its diagram draws them. The lifecycle's are `VERBS`, held to their refusals by
   `agent-runtime/src/core/verbs.test.ts`; `LifecycleGraph.verbs` is required of every machine the board serves, `[]` when it has none.
-- The Kubernetes test for a new field on the runtime's task: does `batch/v1` have a field for it?
+- **The Kubernetes test for a new field on the runtime's task: does the Pod spec (`core/v1`) have one?** A container's command, args,
+  env, volumes, restart policy, resources and priority are the runtime's; what a workflow means — a step, a gate, a check's verdict, a
+  budget across tries — is not `(no test yet)`.
 
 ## Git
 
@@ -126,5 +141,8 @@ holds what every change needs.
   `apps/web`, where `components.json` is), and `grilling` and `grill-me` (Iris's interview).
 - `workflows/` — this repository's own team, `agents/`: Iris (product engineer), Seldon (software architect), Ada (software engineer),
   Agora (code reviewer), Otto (release engineer), Argus (janitor); and three workflows: `intake` (an idea to an intent), `build` (an
-  intent to main, started `--after` the intake run) and `janitor` (on demand: the stats to inbox cards, none started). Nemia ships none.
+  intent to main, started `--after` the intake run) and `janitor` (on demand: the stats to inbox cards, none started). What Nemia ships:
+  the place skill `place/git` (`packages/agent-orchestrator/place/git`, run through `runPlaceVerb`), the skills the api lists as shipped
+  (`SHIPPED_SKILLS`, the checkout's `workflows/skills/`, none today), and Nemia's own agent once the Nemia slices build it. A person's
+  factories get no workflow or agent from the package.
 - `.codex/rules/git-commit.rules` — lets a Codex step commit its own work in a worktree.

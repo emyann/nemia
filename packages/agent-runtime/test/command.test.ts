@@ -129,6 +129,10 @@ test('a run spawned again under its name starts with empty streams, and a cut in
   assert.equal(await Effect.runPromise(ops.output!(name, 'stdout', 2)), 'é');
   assert.equal(await Effect.runPromise(ops.output!(name, 'stderr')), 'old\n');
   await Effect.runPromise(ops.spawn({ name, brief: 'x', cwd, config: { command: ['true'] } }));
+  assert.ok(
+    [undefined, ''].includes(await Effect.runPromise(ops.output!(name, 'stderr'))),
+    'the run before is gone before its worker has started',
+  );
   await done();
   assert.deepEqual([await Effect.runPromise(ops.output!(name, 'stdout')), await Effect.runPromise(ops.output!(name, 'stderr'))], ['', '']);
   assert.equal(await Effect.runPromise(ops.output!('ae/never/1', 'stdout')), undefined, 'a run that never was has no stream');

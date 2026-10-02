@@ -18,6 +18,7 @@ import {
   QUOTA_KEEP_MS,
   QUOTA_LAST_MS,
   QUOTA_MARK_PERCENT,
+  QUOTA_WAIT_MS,
   quotaOf,
   makeQuota,
   QuotaAsker,
@@ -401,6 +402,113 @@ test('HKB_QUOTA_KEEP_MS sets the keep — 0 asks on every read — and a value t
     forgetQuota();
     assert.equal((await read({ env: { ...process.env, HKB_QUOTA_KEEP_MS: bad } })).keepMs, QUOTA_KEEP_MS, bad);
   }
+});
+
+/**
+ * Asks the test answers by hand, each in its turn: how many began, how many were out at once at most, the answer of each, and `begun(n)`,
+ * which waits until the `n`th has begun — a few turns of the loop after the one before it ends — and throws if it has not after a hundred.
+ */
+const handAsks = () => {
+  const answers: ((q: HarnessQuota) => void)[] = [];
+  const counts = { began: 0, out: 0, most: 0 };
+  const ask = () =>
+    new Promise<HarnessQuota>((resolve) => {
+      counts.began += 1;
+      counts.out += 1;
+      counts.most = Math.max(counts.most, counts.out);
+      answers.push((q) => {
+        counts.out -= 1;
+        resolve(q);
+      });
+    });
+  const begun = async (n: number) => {
+    for (let turn = 0; answers.length < n; turn += 1) {
+      if (turn === 100) throw new Error(`ask ${n} never began: ${answers.length} began`);
+      await new Promise((r) => setImmediate(r));
+    }
+  };
+  return { ask, answers, counts, begun };
+};
+
+test('REFUSED: at a keep of 0, a read that comes while an ask begun before it is in flight is answered by an ask begun after it, never two at once', async () => {
+  fresh();
+  const env = { ...process.env, HKB_QUOTA_KEEP_MS: '0', HKB_QUOTA_BACKOFF_MS: '0' };
+  let clock = NOW;
+  const now = () => clock;
+  const { ask, answers, counts, begun } = handAsks();
+  const a = readQuota({ ask, env, now, waitMs: 60_000 });
+  await begun(1);
+  clock += 1;
+  const b = readQuota({ ask, env, now, waitMs: 60_000 });
+  const c = readQuota({ ask, env, now, waitMs: 60_000 });
+  answers[0]({ kind: 'no-plan' });
+  assert.equal((await a).state, 'no-plan', 'the first read is answered by the ask it began');
+  await begun(2);
+  assert.equal(counts.most, 1, 'the second ask began only once the first came back');
+  answers[1]({ kind: 'unknown', what: 'it refused the request' });
+  assert.deepEqual(
+    [(await b).state, (await c).state],
+    ['unknown', 'unknown'],
+    'the reads that came while the first ask was out are answered by the one begun after them, and share it',
+  );
+  assert.equal(counts.began, 2, 'one ask for the read that came first, one for the two that came after');
+  assert.equal(counts.most, 1, 'never two asks at once');
+});
+
+test('REFUSED: an ask whose answer cannot be read fails the reads that share it, and the ask queued behind it still begins', async () => {
+  fresh();
+  const env = { ...process.env, HKB_QUOTA_KEEP_MS: '0', HKB_QUOTA_BACKOFF_MS: '0' };
+  let clock = NOW;
+  const now = () => clock;
+  const { ask, answers, begun } = handAsks();
+  const waits = () => process.getActiveResourcesInfo().filter((kind) => kind === 'Timeout').length;
+  const before = waits();
+  const a = readQuota({ ask, env, now, waitMs: 60_000 });
+  await begun(1);
+  clock += 1;
+  const b = readQuota({ ask, env, now, waitMs: 60_000 });
+  answers[0]({ kind: 'windows', limits: null, subscription: 'max' } as never);
+  await assert.rejects(a, 'the read that shared the ask whose answer does not read fails with it');
+  await begun(2);
+  answers[1](plan());
+  assert.equal((await b).state, 'fresh', 'the read queued behind it is answered by its own ask');
+  clock += 1;
+  const c = readQuota({ ask, env, now, waitMs: 60_000 });
+  await begun(3);
+  answers[2]({ kind: 'no-plan' });
+  assert.equal((await c).state, 'no-plan', 'and a read after both is answered');
+  assert.equal(waits(), before, 'no read leaves its wait behind, the failed one included');
+});
+
+test('HKB_QUOTA_WAIT_MS sets how long a read waits for its ask: at a keep of 0, a read outlasts an ask slower than the 2 s default', async (t) => {
+  fresh();
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const env = { ...process.env, HKB_QUOTA_KEEP_MS: '0', HKB_QUOTA_BACKOFF_MS: '0', HKB_QUOTA_WAIT_MS: '30000' };
+  const { ask, answers, begun } = handAsks();
+  const slow = readQuota({ ask, env });
+  await begun(1);
+  t.mock.timers.tick(QUOTA_WAIT_MS);
+  answers[0](plan());
+  assert.equal((await slow).state, 'fresh', 'the read is answered by its own ask, slower than the default wait');
+  const bad = readQuota({ ask, env: { ...env, HKB_QUOTA_WAIT_MS: 'soon' } });
+  await begun(2);
+  t.mock.timers.tick(QUOTA_WAIT_MS);
+  assert.equal((await bad).state, 'asking', 'a wait that is no length of time is the default');
+  answers[1](plan());
+});
+
+test('askedAt is when the ask began, not when it answered', async () => {
+  fresh();
+  let clock = NOW;
+  const now = () => clock;
+  const { ask, answers, begun } = handAsks();
+  const q = readQuota({ ask, now, waitMs: 60_000 });
+  await begun(1);
+  clock += 7_000;
+  answers[0](plan());
+  const answered = await q;
+  assert.equal(answered.askedAt, new Date(NOW).toISOString(), 'the time Claude Code was asked, before the world it read could change');
+  assert.equal(answered.ageMs, 7_000);
 });
 
 test('REFUSED: a read that waits past its wait says asking, then what the ask came to', async () => {

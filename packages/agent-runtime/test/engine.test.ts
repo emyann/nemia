@@ -631,8 +631,9 @@ test("tools, disallowedTools, effort, mcp, contextTokens and Claude Code's own f
     }),
   );
   await b.run(tick());
+  const began = Date.parse((await b.run(view(id, new Map()))).state.attempts[0].startedAt);
   for (const [k, v] of b.sessions)
-    b.sessions.set(k, { ...v, state: 'completed', busy: false, closeout: { payload: { outcome: 'done' }, at: Date.now() + 60_000 } });
+    b.sessions.set(k, { ...v, state: 'completed', busy: false, closeout: { payload: { outcome: 'done' }, at: began + 1_000 } });
   await b.run(tick());
   await b.run(answer(id, 'again'));
   await b.run(tick());
@@ -901,18 +902,19 @@ test('...and when no session shows up, the grace window ends it lost, as for any
   const b = board();
   const id = await b.run(file(spec));
   await b.run(step(id, new Map()));
+  const spawnedAt = new Date().toISOString();
   await b.run(
     Effect.flatMap(Journal, (j) =>
       j.append(id, {
         kind: 'spawned',
-        at: new Date().toISOString(),
+        at: spawnedAt,
         attempt: 1,
         error: 'launcher: lost the acknowledgement',
       }),
     ),
   );
   const state = fold(id, await b.run(Effect.flatMap(Journal, (j) => j.read(id))));
-  const later = { at: new Date(Date.now() + GRACE_MS + 1_000), graceMs: GRACE_MS };
+  const later = { at: new Date(Date.parse(spawnedAt) + GRACE_MS + 1_000), graceMs: GRACE_MS };
   assert.deepEqual(decide(state, new Map(), later), {
     do: 'record-end',
     attempt: 1,
@@ -1329,7 +1331,7 @@ test('a pass that could not read the harness does not end an attempt `lost`, its
   );
   const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.runPromise(e.pipe(Effect.provide(layer)));
   const id = await run(file({ ...spec, harness: 'claude' }));
-  const long = new Date(Date.now() - 2 * GRACE_MS).toISOString();
+  const long = new Date(Date.now() - GRACE_MS - 10 * 60_000).toISOString();
   await run(
     Effect.flatMap(Journal, (j) =>
       Effect.all([j.append(id, { kind: 'starting', at: long, attempt: 1 }), j.append(id, { kind: 'spawned', at: long, attempt: 1 })], {
@@ -1408,7 +1410,7 @@ test('a task on a harness this engine does not have is never spawned on the fall
   const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.runPromise(e.pipe(Effect.provide(layer)));
   const ready = await run(file({ ...spec, harness: 'a2a:reviewer' }));
   const away = await run(file({ ...spec, harness: 'a2a:reviewer' }));
-  const long = new Date(Date.now() - 2 * GRACE_MS).toISOString();
+  const long = new Date(Date.now() - GRACE_MS - 10 * 60_000).toISOString();
   await run(
     Effect.flatMap(Journal, (j) =>
       Effect.all([j.append(away, { kind: 'starting', at: long, attempt: 1 }), j.append(away, { kind: 'spawned', at: long, attempt: 1 })], {

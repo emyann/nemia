@@ -25,7 +25,7 @@ import { type Run } from '../record/record.ts';
 import { afterRefusal } from '../wait/wait.ts';
 import { inputRefusal, type InputFile } from './inputs.ts';
 import { runStore } from '../record/files.store.ts';
-import { HOME, inputsDir, runId, runsDir } from '../record/record.store.ts';
+import { HOME, artifactsDir, inputsDir, runId, runsDir } from '../record/record.store.ts';
 import { writeAgentFiles } from '../agents/agents.store.ts';
 import { makeWorkspace, readInclude } from '../workspace/worktree.store.ts';
 import { parentRecord } from '../branches/branches.store.ts';
@@ -165,12 +165,19 @@ export function stepsToStart(
  * The first step whose config, as its first filing would file it (`filedConfig`) in a run started at `gates`, the runtime refuses on its
  * harness (`configRefusal`), in the runtime's words after the step's line they come from (`filedRefusal`); undefined where every step's
  * is taken. A step on a remote agent is configured by its operator, and asked nothing. Its agent's flags name the folder the run renders
- * it to, which is not there yet: the runtime judges which flags a step has, never where they point.
+ * it to, and an ending's read the run's artifacts folder, neither there yet: the runtime judges which flags a step has, never where they
+ * point.
  */
 export function configRefused(steps: readonly Workflow[], places: Places, gates: readonly string[]): string | undefined {
   for (const step of steps.filter((s) => !isRemoteHarness(s.harness))) {
     const own = ownOf(step, renderedFlags(step, '.'), () => places.repo);
-    const config = filedConfig(step, steps, { gates: [...gates] }, { model: step.model, budgetUsd: budgetUsdFor(step, step.budget), own });
+    const runArtifacts = path.dirname(artifactsDir({ id: 'run' }, step.name));
+    const config = filedConfig(
+      step,
+      steps,
+      { gates: [...gates] },
+      { model: step.model, budgetUsd: budgetUsdFor(step, step.budget), runArtifacts, own },
+    );
     const why = filedRefusal((c) => configRefusal(step.harness ?? DEFAULT_HARNESS, c), step.name, config, lineOf(step));
     if (why) return why;
   }

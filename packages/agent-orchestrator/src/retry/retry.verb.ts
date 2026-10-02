@@ -3,6 +3,7 @@
  * controller, reaching the runtime through the client (`runtime-client.ts`): an Effect program that requires the engine as a service
  * (`retryRun`, over `EngineService`), and `retry`, its plain face in a Promise, over the engine it is handed.
  */
+import path from 'node:path';
 import { Effect } from 'effect';
 import { EngineService, awaited, configRefusal, tried, type Engine } from '../runtime-client.ts';
 import { tryOf, type Run } from '../record/record.ts';
@@ -13,7 +14,7 @@ import { budgetOf, budgetUsdFor, stepSpend, type SpendOf } from '../status/statu
 import { toldOf } from '../tick/file.verb.ts';
 import type { Workflow } from '../workflow.ts';
 import { retryable, retryRefusal, type RetryAsk, type RetryHow } from './index.ts';
-import { stepsOf } from '../record/record.store.ts';
+import { artifactsDir, stepsOf } from '../record/record.store.ts';
 import { runStore } from '../record/files.store.ts';
 import { strayAsk } from '../say/say.verb.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, spendReader, taskPhases } from '../views/views.verb.ts';
@@ -112,7 +113,8 @@ function tryRefused(run: Run, steps: readonly Workflow[], step: Workflow, how: R
   if (how.mode === 'recheck' || isRemoteHarness(step.harness)) return undefined;
   const record = run.steps[step.name];
   const budgetUsd = budgetUsdFor(step, how.budget ?? budgetOf(step, record), stepSpend(run, step.name, spendOf));
-  const config = filedConfig(step, steps, run, { model: tryModel(step, record, how), budgetUsd, own: toldOf(run, step).own });
+  const runArtifacts = path.dirname(artifactsDir(run, step.name));
+  const config = filedConfig(step, steps, run, { model: tryModel(step, record, how), budgetUsd, runArtifacts, own: toldOf(run, step).own });
   const flags = { ...(how.mode === 'fresh' && how.model !== undefined && { model: how.model }), budget: how.budget };
   return filedRefusal((c) => configRefusal(step.harness ?? DEFAULT_HARNESS, c), step.name, config, lineOf(step, flags));
 }

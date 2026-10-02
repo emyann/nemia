@@ -1837,7 +1837,7 @@ export function seed(root: string, now = Date.now()): void {
   write(
     path.join(root, 'engine', 'tasks', `${check}.jsonl`),
     lines([
-      { kind: 'filed', at: ago(10), brief: JSON.stringify({ check: FAKE.check, env: {} }), cwd: lane, maxAttempts: 1, harness: 'check' },
+      { kind: 'filed', at: ago(10), brief: FAKE.check, cwd: lane, maxAttempts: 1, harness: 'check' },
       { kind: 'starting', at: ago(10), attempt: 1 },
       { kind: 'spawned', at: ago(10), attempt: 1 },
       { kind: 'ended', at: ago(7), attempt: 1, sessionId: `ae/${check}/1`, observed: 'failed', reason: 'harness', exitCode: 1 },
@@ -1847,8 +1847,11 @@ export function seed(root: string, now = Date.now()): void {
   const session = `ae/${check}/1`;
   const base = path.join(root, 'engine', 'runs', 'check', session.replace(/[^a-zA-Z0-9]+/g, '_'));
   write(`${base}.json`, JSON.stringify({ name: session, state: 'done', pid: 0, heartbeatAt: ago(7), logFile: `${base}.log`, exitCode: 1 }));
-  write(`${base}.log`, `ok 6 - the Factory shows a run in flight\n${FAKE.said}\n# tests 7\n# fail 1\n\n[wf check] exit 1\n`);
-  write(path.join(root, 'checks', `${check}.stderr`), 'npm error Lifecycle script `e2e` failed with error:\nnpm error code 1\n');
+  const checkStdout = `ok 6 - the Factory shows a run in flight\n${FAKE.said}\n# tests 7\n# fail 1\n`;
+  const checkStderr = 'npm error Lifecycle script `e2e` failed with error:\nnpm error code 1\n';
+  write(`${base}.log`, `${checkStdout}${checkStderr}`);
+  write(`${base}.stdout`, checkStdout);
+  write(`${base}.stderr`, checkStderr);
 
   const besideDir = path.join(root, 'workflow-beside');
   write(path.join(besideDir, 'plan.md'), '---\nharness: claude\n---\nPlan it.\n');
@@ -2250,7 +2253,7 @@ export function seed(root: string, now = Date.now()): void {
     write(
       path.join(root, 'engine', 'tasks', `${task}.jsonl`),
       lines([
-        { kind: 'filed', at: ago(at[0]), brief: JSON.stringify({ check: 'npm test', env: {} }), cwd, maxAttempts: 1, harness: 'check' },
+        { kind: 'filed', at: ago(at[0]), brief: 'npm test', cwd, maxAttempts: 1, harness: 'check' },
         { kind: 'starting', at: ago(at[0]), attempt: 1 },
         { kind: 'spawned', at: ago(at[0]), attempt: 1 },
         { kind: 'ended', at: ago(at[1]), attempt: 1, sessionId: `ae/${task}/1`, observed: 'failed', reason: 'harness', exitCode: 1 },
@@ -2260,8 +2263,11 @@ export function seed(root: string, now = Date.now()): void {
     const name = `ae/${task}/1`;
     const base = path.join(root, 'engine', 'runs', 'check', name.replace(/[^a-zA-Z0-9]+/g, '_'));
     write(`${base}.json`, JSON.stringify({ name, state: 'done', pid: 0, heartbeatAt: ago(at[1]), logFile: `${base}.log`, exitCode: 1 }));
-    write(`${base}.log`, 'ok 1 - sky is a colour\nnot ok 2 - rose is a colour\n# tests 2\n# fail 1\n\n[wf check] exit 1\n');
-    write(path.join(root, 'checks', `${task}.stderr`), 'npm error Lifecycle script `test` failed with error:\nnpm error code 1\n');
+    const said = 'ok 1 - sky is a colour\nnot ok 2 - rose is a colour\n# tests 2\n# fail 1\n';
+    const stderr = 'npm error Lifecycle script `test` failed with error:\nnpm error code 1\n';
+    write(`${base}.log`, `${said}${stderr}`);
+    write(`${base}.stdout`, said);
+    write(`${base}.stderr`, stderr);
   };
   const done = (summary: string, more: object = {}) => ({ outcome: 'done', summary, needs: null, artifacts: [], ...more });
   const unpriced = {

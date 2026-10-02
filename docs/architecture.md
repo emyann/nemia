@@ -38,7 +38,6 @@ inbox, factories, stats, agent definitions.
 
 - session admission and pools (`src/cap/cap.ts`, `WF_MAX_CONCURRENT`);
 - the daemon and its lease (`src/daemon/`, `upVerb` in `src/cli/main.ts`);
-- the injected check harness (`src/check/check.ts`);
 - rendering agents and skills for Claude Code (`src/agents/agents.ts`, `src/agents/agents.store.ts`, `toldOf` in
   `src/tick/file.verb.ts`);
 - copies of harness vocabulary (`src/harness/harness.ts`, `src/keys/keys.ts`, `src/keys/tools.ts`, `src/workflow/validate.ts`), held

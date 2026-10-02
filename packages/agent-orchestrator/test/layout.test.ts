@@ -287,7 +287,6 @@ test("REFUSED on the source: a value import from the flag reader back to the ver
   files.set('src/cli/flags.ts', `${flags}\nimport { main } from './main.ts';`);
   assert.deepEqual(cycles(valueGraph(files)), [
     [
-      'src/cli/asks.ts',
       'src/cli/decide/decide.ts',
       'src/cli/factory/factory.ts',
       'src/cli/flags.ts',
@@ -341,10 +340,10 @@ test("REFUSED on the source: a seventh source file in the CLI's folder", () => {
   const files = sourceFiles();
   assert.deepEqual(
     files.filter((f) => f.startsWith('src/cli/') && !f.endsWith('.test.ts')),
-    ['asks', 'exit', 'flags', 'main', 'runs', 'start', 'decide/decide', 'factory/factory', 'stats/stats'].map((f) => `src/cli/${f}.ts`),
-    "the CLI's folder holds its six today, and decide/, factory/ and stats/ one each",
+    ['exit', 'flags', 'main', 'runs', 'start', 'decide/decide', 'factory/factory', 'stats/stats'].map((f) => `src/cli/${f}.ts`),
+    "the CLI's folder holds its five today, and decide/, factory/ and stats/ one each",
   );
-  assert.deepEqual(folderBreaks([...files, 'src/cli/extra.ts']), [
+  assert.deepEqual(folderBreaks([...files, 'src/cli/extra.ts', 'src/cli/more.ts']), [
     'src/cli/ holds 7 source files, past 6: a folder that needs more holds two features — split it along them',
   ]);
 });

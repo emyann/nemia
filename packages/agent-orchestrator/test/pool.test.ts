@@ -16,7 +16,7 @@ import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { checkBrief } from '../src/check/check.ts';
+import { checkArgv } from '../src/check/check.ts';
 import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-pool-');
@@ -92,25 +92,18 @@ const e = engine();
 const cwd = scratch('wf-pool-cwd-');
 
 /**
- * A task filed as the tick files one, through the client: its brief is its id, the gate that ends it. A check's brief has no stderr or
- * stdout file, workspace or artifacts: an empty `WF_STDERR` and `WF_STDOUT` leave both streams in the log, as a check filed by hand does.
+ * A task filed as the tick files one, through the client: its brief is its id, the gate that ends it. A check runs the gate loop, its
+ * argv in `config`, as `fileCheck` files one.
  */
 const file = (id: string, harness: string) =>
   e.file({
     id,
     cwd,
     harness,
-    brief:
-      harness === 'check'
-        ? checkBrief(`while [ ! -e ${JSON.stringify(path.join(fake.gates, id))} ]; do sleep 0.05; done`, {
-            WF_RUN: 'r',
-            WF_STEP: id,
-            WF_WORKSPACE: '',
-            WF_STDERR: '',
-            WF_STDOUT: '',
-            WF_ARTIFACTS: '',
-          })
-        : id,
+    brief: id,
+    ...(harness === 'check'
+      ? { config: { command: checkArgv(`while [ ! -e ${JSON.stringify(path.join(fake.gates, id))} ]; do sleep 0.05; done`) } }
+      : {}),
   });
 
 /**

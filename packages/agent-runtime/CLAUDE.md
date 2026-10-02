@@ -40,7 +40,8 @@ down is in `docs/architecture.md`, *Who owns what*.
 - **`io().reads` counts every file the runtime reads**, not only journals.
 - **A test stamps the times the runtime compares from the journal's attempt start** (`begun` in `test/release.test.ts`), and meets a
   deadline with a start journalled long ago (`startedLongAgo`), never a sleep: a stepped wall clock drops a closeout or misses the
-  deadline. A duration a test measures is read with `performance.now()`; a stamp taken from a file equals its mtime (`detached.test.ts`).
+  deadline. A duration a test measures is read with `performance.now()`. A runner that cannot be handed another attempt's statement
+  reports it with no time (the detached spawn clears the last one's), and its test steps the clock (`stepClock`, `test/clock.ts`).
 - **A detached look told names reads only their run files** (`observeFor`); `observe` lists every run, for views and verbs. A finished
   session leaves the pass's look once released and not at work (`releaseFinished`): `detached.test.ts` and `engine.test.ts` count it.
 - **`engine.test.ts` reads `domain.ts` from `decide` on, and all of `lifecycle.ts`, comments included**: a JSDoc there writes no
@@ -112,10 +113,13 @@ What Claude Code does as the steps meet it. Where the orchestrator's code holds 
 - **An idle `--remote-control` session lists `blocked`, `idle`, with a `pid` and no `waitingFor`; a `stopped` row lists no `pid`**:
   `held` is the `pid` (`ourRow`). `--bg` needs a trusted `cwd`, and words `say` sends reach the model framed as a peer's, not
   the person's.
+- **Claude Code respawns a `--bg` process that died, on the same session, ~10 s later; a `--resume` given flags forks a new
+  session.** Never resume a session it is respawning: a long-lived restart waits for the old one's end and release
+  (`restartOf`, `src/core/long-lived.test.ts`); its listing in the gap is `blocked` with no `pid` (`respawning`).
 - **A job (`claude -p`) never waits on a prompt; a background session in a folder nobody opened blocks in any mode that can ask**:
   in the orchestrator today, `validateFolderMode` judges only `background: true`, which must run `dontAsk` or `bypassPermissions`.
-- **A job reads no user settings** (`--setting-sources project,local`): what a step needs goes on the step, its agent or the checkout's
-  `.claude/settings.json`.
+- **A job reads neither user settings nor `settings.local.json`** (`--setting-sources project`): what a step needs goes on the step, its
+  agent or the checkout's `.claude/settings.json`.
 - **A write is matched against `Edit` rules only**: write `allowedTools: Edit(**)`, never `Write(path)` (in the orchestrator today:
   `fileRuleRefusal`).
 - **A project's allow rules are dropped in a directory Claude Code has not trusted**: measure a rule in a trusted checkout.

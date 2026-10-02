@@ -48,7 +48,8 @@ The instructions are one of four layers that shape an agent apart from its task,
 
 They reach the agent in that order — instructions, custom instructions, the step's policy, then the task — and where two conflict, the
 later wins. Fences only tighten: a step may narrow its agent's fence and never widen it — the loader refuses a step's `tools:`,
-`allowedTools:`, `disallowedTools:`, `permissionMode:` or `sandbox:` that would give the agent what its file does not. So the instructions
+`allowedTools:`, `disallowedTools:`, `permissionMode:` or `sandbox:` that would give the agent what its file does not, and a step's
+`background: true` over an agent in any mode but `bypassPermissions`. So the instructions
 say what holds for the role everywhere, and nothing about one workflow or one workspace.
 
 ## Its closeout
@@ -88,7 +89,8 @@ the step's place, as a start gives it: a test that loads a folder passes the pla
 - **A step only tightens it.** A step that needs a tool, an allow or a mode its agent's file does not give needs another agent; a
   step's `disallowedTools:` replaces its agent's, so it repeats the agent's denies and adds its own.
 - **A background session** (`background: true`) also reads the person's user and local settings, where "don't ask again" writes allows:
-  it denies those five itself, whatever its mode.
+  it denies those five itself, whatever its mode. A step may set it only over an agent in `bypassPermissions`, the one mode no allow rule
+  widens; over any other the loader refuses it.
 
 ## Talking with a person
 

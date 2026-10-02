@@ -19,6 +19,7 @@ import { Engine as RuntimeEngine, promiseEngine } from 'agent-runtime/effect';
 import {
   claudeDetached,
   codex,
+  commandHarness,
   remoteConfigRefusal,
   type Credentials,
   type Engine,
@@ -26,7 +27,6 @@ import {
   type RemoteAgent,
 } from 'agent-runtime';
 import { envNameOf, readRemoteAgents, remoteAgentsFile } from './harness/a2a.store.ts';
-import { CHECK } from './check/check.ts';
 import { HOME } from './record/record.store.ts';
 import { REMOTE_PREFIX, remoteNameOf } from './harness/harness.ts';
 import { Invalid, isRefusal, type Refusal } from './refusal/refusal.ts';
@@ -58,9 +58,9 @@ export const unreadableJournal = (err: unknown): string | undefined => {
 };
 
 /**
- * The engine, with one harness of the run's own beside the three it ships.
- *
- * `check` runs a step's `check:` command (`src/check/check.ts`). Passing `harnesses` REPLACES the engine's
+ * The engine's harnesses, the run's `check` among them: the runtime's command harness, under the name checks have always run under, so
+ * the runtime keeps their streams in `runs/check/` and a check filed before it reads the same. It runs a step's `check:` command as the
+ * task's `config` gives it (`checkArgv`, `src/check/check.ts`). Passing `harnesses` REPLACES the engine's
  * default map rather than adding to it, so the defaults are named again here — leaving them out would
  * quietly send every `claude` step to whichever harness came first.
  *
@@ -72,7 +72,7 @@ export const HARNESSES = {
   claude: 'claude',
   codex,
   'claude-detached': claudeDetached,
-  check: CHECK,
+  check: { ...commandHarness, name: 'check' },
 } as const;
 
 /**

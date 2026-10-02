@@ -24,7 +24,7 @@
  * - A process a test kills in its `finally` may be gone already, and a file it polls may be mid-write or not there yet: the
  *   kill or the read that fails is passed over.
  */
-import { test } from 'node:test';
+import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import fs from 'node:fs';
@@ -47,6 +47,7 @@ import { RunnerError, testOps, type Observation } from '../src/harness/seam.ts';
 import type { SessionState } from '../src/core/session.ts';
 import type { Sighting } from '../src/core/domain.ts';
 import { runningIn, scratch } from './scratch.ts';
+import { stepClock } from './clock.ts';
 import { resultLine, SESSION, SKILLS_STREAM, stream } from './reader-streams.ts';
 import { ioCounts } from '../src/core/engine/tally.ts';
 
@@ -983,7 +984,11 @@ test("a detached harness's final answer is its closing statement — and nothing
 
   const seen = await settle(ops, 'ae/t9/1', 'completed');
   assert.deepEqual(seen.closeout?.payload, { outcome: 'done' });
-  assert.equal(typeof seen.closeout?.at, 'number');
+  assert.equal(
+    seen.closeout && 'at' in seen.closeout,
+    false,
+    'no time: its own process wrote the file, after the spawn cleared the last one, whatever the clock says',
+  );
   assert.deepEqual(fs.readdirSync(workspace), [], 'the workspace is the one place it must not be');
 });
 
@@ -1613,7 +1618,7 @@ test('a stream that started says the skills its session loaded even when it load
   assert.equal('skills' in claudeResultOutput(SKILLS_STREAM), false, '--output-format json has no events: it cannot say');
 });
 
-test("a spec that reads its harness's output reports the answer found there, stamped with when it was written — nothing in the workspace", async () => {
+test("a spec that reads its harness's output reports the answer found there, with no time — nothing in the workspace", async () => {
   const dir = root();
   const workspace = scratch('ae-ws-');
   const prints: HarnessSpec = {
@@ -1629,10 +1634,11 @@ test("a spec that reads its harness's output reports the answer found there, sta
 
   const seen = await settle(ops, 'ae/t20/1', 'completed');
   assert.deepEqual(seen.closeout?.payload, { outcome: 'done' });
-  const at = seen.closeout.at;
-  assert.ok(at !== undefined, 'a detached session can carry another attempt’s statement, so its statement has a time');
-  const written = fs.statSync(path.join(dir, 'runs', 'sh', 'ae_t20_1.log')).mtimeMs;
-  assert.equal(at, written, 'stamped with the time its log was last written, the file the answer was read from');
+  assert.equal(
+    'at' in seen.closeout,
+    false,
+    'no time: its own process wrote the log, after the spawn cleared the last one, whatever the clock says',
+  );
   assert.deepEqual(fs.readdirSync(workspace), []);
 });
 
@@ -1738,6 +1744,68 @@ test('claude-detached at shipped defaults: a task that asked for a closeout gets
   } finally {
     process.env.PATH = prev;
   }
+});
+
+/** File a task on `spec` through an engine, tick it until it settles, and give back its state. */
+const settledOn = async (spec: HarnessSpec, task: { resumeFrom?: string } = {}) => {
+  const engine = promiseEngine(Engine.layer({ root: root(), harnesses: { sh: spec } }));
+  const id = await engine.file({ brief: 'x', cwd: root(), harness: 'sh', closeoutSchema: { type: 'object' }, ...task });
+  const until = Date.now() + 15_000;
+  while (!(await engine.view(id)).state.settled && Date.now() < until) {
+    await engine.tick();
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  return (await engine.view(id)).state;
+};
+
+/** This process's clock 10 s ahead of the files': the attempt is journalled after the moment its statement's file was written. */
+const AHEAD_MS = 10_000;
+
+test("a detached statement it printed is on the record when this process's clock runs ahead of its files'", async (t: TestContext) => {
+  stepClock(t, AHEAD_MS);
+  const prints: HarnessSpec = {
+    name: 'sh',
+    readOutput: claudeResultOutput,
+    command: () => ({ cmd: 'sh', args: ['-c', `printf '%s\\n' '${resultLine({ structured_output: { outcome: 'done' } })}'`] }),
+  };
+  const state = await settledOn(prints);
+  assert.equal(state.settled, 'succeeded');
+  assert.deepEqual(state.attempts[0]?.closeout, { outcome: 'done' }, 'the answer it printed, on the record');
+  assert.notEqual(state.attempts[0]?.stated, false);
+});
+
+test("a detached statement written to its closeout file is on the record when this process's clock runs ahead of its files'", async (t: TestContext) => {
+  stepClock(t, AHEAD_MS);
+  const answers: HarnessSpec = {
+    name: 'sh',
+    command: (_r, io) => ({ cmd: 'sh', args: ['-c', `printf '%s' '{"outcome":"done"}' > '${io?.closeoutFile}'`] }),
+  };
+  const state = await settledOn(answers);
+  assert.equal(state.settled, 'succeeded');
+  assert.deepEqual(state.attempts[0]?.closeout, { outcome: 'done' }, 'the answer it wrote, on the record');
+  assert.notEqual(state.attempts[0]?.stated, false);
+});
+
+test("a resumed detached run that says nothing is not handed its parent's statement, from its file or its output", async () => {
+  const line = (o: object) => `printf '%s\\n' '${resultLine(o)}'`;
+  const spec: HarnessSpec = {
+    name: 'sh',
+    readOutput: claudeResultOutput,
+    command: (r, io) => ({
+      cmd: 'sh',
+      args: [
+        '-c',
+        r.resumeFrom
+          ? line({ result: 'nothing to say' })
+          : `printf '%s' '{"outcome":"parent"}' > '${io?.closeoutFile}'; ${line({ structured_output: { outcome: 'parent' } })}`,
+      ],
+    }),
+  };
+  const parent = await settledOn(spec);
+  assert.deepEqual(parent.attempts[0]?.closeout, { outcome: 'parent' }, 'the parent stated');
+  const child = await settledOn(spec, { resumeFrom: SESSION });
+  assert.equal(child.attempts[0]?.closeout, undefined, "the parent's statement is not the child's");
+  assert.equal(child.attempts[0]?.stated, false, 'and the child is on the record as not having stated');
 });
 
 test('claude-detached, filed through the engine with disallowedTools, spawns claude with --disallowedTools and the rules', async () => {

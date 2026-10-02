@@ -118,10 +118,9 @@ const saidAt = (
 };
 
 /**
- * What the run `name`'s capture says, as `reader` reads it, with when the capture was last written — or why the reader
- * refused it, or nothing where there is no capture yet. Read again only when the capture has changed since `memo` read
- * it, and then from the file it is kept in when that has its key. A refusal is kept in `memo` alone: it fails `observe`,
- * and is read again by the next process.
+ * What the run `name`'s capture says, as `reader` reads it — or why the reader refused it, or nothing where there is no
+ * capture yet. Read again only when the capture has changed since `memo` read it, and then from the file it is kept in when
+ * that has its key. A refusal is kept in `memo` alone: it fails `observe`, and is read again by the next process.
  *
  * @param over the run is no longer working, so its capture no longer grows: only then is what was read kept on disk.
  */
@@ -131,7 +130,7 @@ export const outputIn = (
   name: string,
   files: { log: string; kept: string },
   over: boolean,
-): { read: HarnessOutput; at: number } | { wrong: string } | undefined => {
+): { read: HarnessOutput } | { wrong: string } | undefined => {
   let key: SaidKey;
   try {
     const { size, mtimeMs } = fs.statSync(files.log);
@@ -146,5 +145,5 @@ export const outputIn = (
     known = { ...key, said };
     memo.set(name, known);
   }
-  return 'wrong' in known.said ? known.said : { read: known.said.read, at: known.mtimeMs };
+  return 'wrong' in known.said ? known.said : { read: known.said.read };
 };

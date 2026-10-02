@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { ClaudeFlags, CodexArgs, Engine, TaskView } from '../runtime-client.ts';
-import { CHECK_DEADLINE_SECONDS, checkBrief, type CheckHanded, type Verdict } from '../check/check.ts';
+import { CHECK_DEADLINE_SECONDS, CHECK_NICENESS, checkArgv, type CheckEnv, type CheckHanded, type Verdict } from '../check/check.ts';
 import { isRemoteHarness, type Workflow } from '../workflow.ts';
 import { resultSteps } from '../branches/branches.ts';
 import { holdsOpen } from '../gate/gate.ts';
@@ -43,12 +43,12 @@ import { roundFiled } from '../round/round.ts';
 import { filedConfig, tryModel } from '../filed/filed.ts';
 import { closeoutSchemaOf, parseCloseout, type Closeout } from '../closeout/closeout.ts';
 import { modeWord, nextTry, sessionModel, type Retry, type RetryAsk } from '../retry/index.ts';
-import { artifactsDir, checkStderr, inputsDir, stepsOf } from '../record/record.store.ts';
+import { artifactsDir, inputsDir, stepsOf } from '../record/record.store.ts';
 import { runStore } from '../record/files.store.ts';
-import { checkStdout, writeCheckCloseout } from '../check/check.store.ts';
+import { checkCloseout, writeCheckCloseout } from '../check/check.store.ts';
 import { checkoutParts, gitSays, realRepoOf, workspaceFor } from '../workspace/worktree.store.ts';
 import { agentFilesDir, renderedIn, skillsAgain } from '../agents/agents.store.ts';
-import { checksHandedOf, closeoutOf, refusalOf, saidIn, sessionIn } from '../views/views.verb.ts';
+import { checksHandedOf, closeoutOf, refusalOf, reportedEngine, saidIn, sessionIn } from '../views/views.verb.ts';
 import { phaseOfView } from '../views/views-words.ts';
 import { placesOf } from '../folder/lookup.store.ts';
 import { skillsFor } from '../folder/folder.store.ts';
@@ -195,6 +195,9 @@ export const mayFileOf = (run: Run): (() => boolean) => {
   return () => !(calledOff ||= !runStore.runs.exists(run.id) || runStore.runs.calledOff(run.id));
 };
 
+/** The engine as the pass read it: a check's verdict is read off the view the pass judged it by (`reportedEngine`), never a second time. */
+const asRead = (f: Filing): Engine => reportedEngine(f.e, [...f.reads.views.values()]);
+
 /** The step of this name, which the pass's assessment named. */
 const stepNamed = (f: Filing, name: string): Workflow => f.reads.steps.find((s) => s.name === name)!;
 
@@ -292,9 +295,9 @@ async function sendTry(f: Filing, r: Retry, step: Workflow, taskId: string, answ
   fs.mkdirSync(files, { recursive: true });
   const remote = isRemoteHarness(step.harness);
   const resumeFrom = r.mode === 'nudge' && !remote ? sessionIn(reads.views, record.taskId!) : undefined;
-  const refusal = record.check && step.check ? await refusalOf(e, step.check, record.check.taskId) : undefined;
+  const refusal = record.check && step.check ? await refusalOf(asRead(f), step.check, record.check.taskId) : undefined;
   const closeouts = await askingReads(f, r, resumeFrom);
-  const checked = remote ? [] : await checksHandedOf(e, run, reads.steps, step);
+  const checked = remote ? [] : await checksHandedOf(asRead(f), run, reads.steps, step);
   const status = triedFrom(step, run, reads.phaseOf, reads.signedOff, reads.asked, reads.steps, reads.spendOf);
   const told = toldOf(run, step);
   const brief = remote
@@ -388,7 +391,12 @@ const trySpec = (
   cwd: record.workspace ?? f.run.workspace,
   harness: step.harness,
   ...localFields(step, () => ({
-    config: filedConfig(step, f.reads.steps, f.run, { model: tryModel(step, record, r), budgetUsd: t.budgetUsd, own: t.told.own }),
+    config: filedConfig(step, f.reads.steps, f.run, {
+      model: tryModel(step, record, r),
+      budgetUsd: t.budgetUsd,
+      runArtifacts: path.dirname(artifactsDir(f.run, step.name)),
+      own: t.told.own,
+    }),
     resumeFrom: t.resumeFrom,
     ...(holdsOpenOn(step) ? { holdOpen: true as const } : {}),
     closeoutSchema: closeoutSchemaOf(step, f.reads.steps),
@@ -465,6 +473,7 @@ function roundSpec(f: Filing, r: Round, looping: Workflow, target: Workflow, tas
     ...localFields(target, () => ({
       config: filedConfig(target, reads.steps, run, {
         model: sessionModel(target, record),
+        runArtifacts: path.dirname(artifactsDir(run, target.name)),
         budgetUsd: budgetUsdFor(
           target,
           r.budget !== undefined && r.raise?.includes(r.target) ? r.budget : budgetOf(target, record),
@@ -501,7 +510,7 @@ async function fileCheck(f: Filing, name: string): Promise<void> {
   const workspace = run.steps[name].workspace ?? run.workspace;
   const taskId = checkTaskId(run, name);
   if (!(await e.view(taskId)).state.brief) {
-    fs.mkdirSync(path.dirname(checkStderr(taskId)), { recursive: true });
+    fs.mkdirSync(path.dirname(checkCloseout(taskId)), { recursive: true });
     const files = artifactsDir(run, name);
     fs.mkdirSync(files, { recursive: true });
     const install = isGitRun(run) && landsOnCheck(step, run) ? (checkoutParts(workspace) ?? undefined) : undefined;
@@ -510,25 +519,21 @@ async function fileCheck(f: Filing, name: string): Promise<void> {
       f.notes.push(
         `${name}: the merge's package-lock.json asks for ${install}, which the checkout's node_modules does not have: its check runs npm install there first`,
       );
+    const env: CheckEnv = {
+      WF_RUN: run.id,
+      WF_STEP: name,
+      ...(isGitRun(run) && step.workspace !== 'main' ? { WF_BASE_REF: run.baseRef } : {}),
+      WF_WORKSPACE: workspace,
+      WF_ARTIFACTS: files,
+      ...(closeout ? { WF_CLOSEOUT: writeCheckCloseout(taskId, closeout) } : {}),
+    };
     await e.file({
       id: taskId,
       harness: 'check',
-      brief: checkBrief(
-        step.check!,
-        {
-          WF_RUN: run.id,
-          WF_STEP: name,
-          ...(isGitRun(run) && step.workspace !== 'main' ? { WF_BASE_REF: run.baseRef } : {}),
-          WF_WORKSPACE: workspace,
-          WF_STDERR: checkStderr(taskId),
-          WF_STDOUT: checkStdout(taskId),
-          WF_ARTIFACTS: files,
-          ...(closeout ? { WF_CLOSEOUT: writeCheckCloseout(taskId, closeout) } : {}),
-        },
-        install,
-      ),
+      brief: step.check!,
       cwd: workspace,
       deadlineSeconds: CHECK_DEADLINE_SECONDS,
+      config: { command: checkArgv(step.check!, install !== undefined), env, niceness: CHECK_NICENESS },
     });
   }
   run.steps[name] = { ...run.steps[name], check: { taskId } };
@@ -556,7 +561,7 @@ export async function fileReady(f: Filing, ready: readonly string[], starting: b
     if (!f.mayFile()) break;
     const files = artifactsDir(run, name);
     fs.mkdirSync(files, { recursive: true });
-    const checked = isRemoteHarness(step.harness) ? [] : await checksHandedOf(f.e, run, f.reads.steps, step);
+    const checked = isRemoteHarness(step.harness) ? [] : await checksHandedOf(asRead(f), run, f.reads.steps, step);
     const taskId = await e.file(readySpec(f, step, place, files, { parents, checked }));
     run.steps[name] = { ...run.steps[name], taskId, workspace: place.workspace, branch: place.branch };
     filed.push(name);
@@ -614,6 +619,7 @@ function readySpec(
     ...localFields(step, () => ({
       config: filedConfig(step, reads.steps, run, {
         model: step.model,
+        runArtifacts: path.dirname(artifactsDir(run, step.name)),
         budgetUsd: budgetUsdFor(step, budgetOf(step, run.steps[step.name]), stepSpend(run, step.name, reads.spendOf)),
         own: told.own,
       }),

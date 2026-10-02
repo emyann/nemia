@@ -168,6 +168,11 @@ const lostEnd: Event = {
 test('LONG-LIVED: an attempt ended lost is restarted after the backoff, its old job stopped first while listed, resumed and told RESTART_WORDS', () => {
   const state = fold(TASK, [...inGap(true), lostEnd]);
   assert.deepEqual(decide(state, seen(RESPAWNING), now(END + 1)), { do: 'stop', sessionId: 's1', why: 'to restart it' });
+  assert.deepEqual(
+    decide(state, seen({ state: 'completed', busy: false, held: true, nativeId: 'native-1' }), now(END + HOUR)),
+    { do: 'stop', sessionId: 's1', why: 'to restart it' },
+    'a session listed done whose process its harness still holds is stopped first too',
+  );
   assert.equal(observe(state, new Map(), now(END + RESTART_BACKOFF.initialMs - 1)).type, 'BACKING_OFF');
   assert.equal(decide(state, new Map(), now(END + RESTART_BACKOFF.initialMs - 1)).do, 'nothing');
   assert.equal(viewOfState(state, new Map()).phase, 'between attempts');

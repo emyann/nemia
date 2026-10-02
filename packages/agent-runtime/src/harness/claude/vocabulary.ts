@@ -71,8 +71,8 @@ export type ClaudeFlags = {
  * a task that gave one there would have it twice, or the session printing what no reader of it expects. Each is given its
  * own way — `model`, `permissionMode`, `tools`, `budgetUsd` and the rest are harness arguments of their own. The argv of
  * every Claude Code spawn is held to this list (`test/claude-code.test.ts`), so a flag the runtime starts giving is added.
- * `settingSources` is given to every job, which reads its checkout's settings and not the operator's (`claudePrintFlags`),
- * and not to a background session.
+ * `settingSources` is given to every job, which reads its checkout's shared settings and neither the operator's nor the
+ * checkout's local file (`claudePrintFlags`), and not to a background session.
  */
 export const CLAUDE_OWNED_FLAGS: readonly string[] = [
   'print',

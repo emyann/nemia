@@ -115,8 +115,8 @@ What Claude Code does as the steps meet it. Where the orchestrator's code holds 
   the person's.
 - **A job (`claude -p`) never waits on a prompt; a background session in a folder nobody opened blocks in any mode that can ask**:
   in the orchestrator today, `validateFolderMode` judges only `background: true`, which must run `dontAsk` or `bypassPermissions`.
-- **A job reads no user settings** (`--setting-sources project,local`): what a step needs goes on the step, its agent or the checkout's
-  `.claude/settings.json`.
+- **A job reads neither user settings nor `settings.local.json`** (`--setting-sources project`): what a step needs goes on the step, its
+  agent or the checkout's `.claude/settings.json`.
 - **A write is matched against `Edit` rules only**: write `allowedTools: Edit(**)`, never `Write(path)` (in the orchestrator today:
   `fileRuleRefusal`).
 - **A project's allow rules are dropped in a directory Claude Code has not trusted**: measure a rule in a trusted checkout.

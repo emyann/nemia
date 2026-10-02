@@ -20,6 +20,7 @@ import {
   lockfilePackages,
   lockfileParting,
   refusalLines,
+  workspaceModules,
   worktreeInclude,
   type DepEntry,
   type DepsListing,
@@ -83,8 +84,8 @@ export function lockfileParts(mainRoot: string, worktree: string): string | null
 
 /**
  * Where the `package-lock.json` in a repository's checkout — during an ending, the merge staged there — asks for a package its own
- * `node_modules` does not have on disk: the first package path they disagree on, or null. `lockfileParting` in place, so a package nested
- * in a workspace's `node_modules` is compared as it is installed, not taken for one a link cannot give.
+ * `node_modules` does not have on disk: the first package path they disagree on, or null. `lockfileParting`, so a package nested in a
+ * workspace's `node_modules` is compared as it is installed.
  *
  * Null for a checkout with no lockfile, and for one with no `node_modules`: nobody installed a tree there to bring up to date.
  */
@@ -97,7 +98,7 @@ export function checkoutParts(repo: string): string | null {
     return null;
   }
   const lock = parsedLock(text);
-  return lockfileParting(lock, installedAt(repo, lock), true);
+  return lockfileParting(lock, installedAt(repo, lock));
 }
 
 /** A lockfile's text, parsed; null where it does not parse, which `lockfileParting` reads as parting at `package-lock.json`. */
@@ -165,6 +166,38 @@ function listDeps(modules: string): DepsListing | null {
     entries.filter((e) => e.name.startsWith('@') && e.link === undefined).map((e) => [e.name, entriesOf(path.join(modules, e.name))]),
   );
   return { entries, scopes, bins: entriesOf(path.join(modules, '.bin')) };
+}
+
+/**
+ * Main's own `node_modules` of each workspace folder the worktree's lockfile installs into (`workspaceModules`), listed for `depsPlan`
+ * and keyed by the folder. A folder is left out where the worktree's is not a directory of its own — absent, or reached through a link,
+ * which would have the plan write where it leads — where the worktree's `node_modules` there is a link, and where main has none.
+ */
+function nestedListings(mainRoot: string, worktree: string): Record<string, DepsListing> {
+  let text: string;
+  try {
+    text = fs.readFileSync(path.join(worktree, 'package-lock.json'), 'utf8');
+  } catch {
+    return {};
+  }
+  const root = fs.realpathSync(worktree);
+  const listings: Record<string, DepsListing> = {};
+  for (const folder of workspaceModules(parsedLock(text))) {
+    const here = path.join(worktree, folder);
+    if (!isOwnDirectory(here, path.join(root, folder)) || lstatOf(path.join(here, 'node_modules'))?.isSymbolicLink()) continue;
+    const listing = listDeps(path.join(mainRoot, folder, 'node_modules'));
+    if (listing) listings[folder] = listing;
+  }
+  return listings;
+}
+
+/** Whether `p` is a directory whose real path is `real`: there, and reached through no link. */
+function isOwnDirectory(p: string, real: string): boolean {
+  try {
+    return fs.realpathSync(p) === real && fs.statSync(p).isDirectory();
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -241,7 +274,7 @@ export async function provisionDeps(mainRoot: string, worktree: string): Promise
   let made = 0;
   let why: string | undefined;
   try {
-    for (const action of depsPlan(mainRoot, worktree, listing)) {
+    for (const action of depsPlan(mainRoot, worktree, listing, nestedListings(mainRoot, worktree))) {
       const there = lstatOf(action.path);
       if (there) {
         if (action.kind === 'tree' && there.isSymbolicLink() && fs.readlinkSync(action.path) === action.from)

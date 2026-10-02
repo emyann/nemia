@@ -175,9 +175,10 @@ What it leaves:
 - **`npm ci` runs inside the tick.** It is awaited, so `wf up` files nothing else for that minute, and a
   slow registry makes every run wait. If that hurts, the fix is an install filed as an engine task, the
   way the check is.
-- **Only the root `node_modules`.** A workspace's nested `node_modules`, where npm puts a conflicting
-  version, is not provisioned. Here `apps/web/node_modules` holds only vite's caches. The day one holds
-  a package, the worktree resolves the root's version of it.
+- **A workspace's nested `node_modules` parted, until 2026-10-02.** Once `apps/web/node_modules` held a
+  package (`@rolldown/plugin-babel`, with the React Compiler), every cut ran `npm ci`: 139 times in
+  `wf-up.log` by 2026-10-01. Each workspace's own `node_modules` is now planned and hardlinked as the
+  root's is (`workspaceModules`, `depsPlan`), and a nested package parts only as a root one does.
 - **The cut is the only time the run provisions.** A step that changes the lockfile mid-session installs
   for itself. `npm install` in a linked worktree replaced the links it touched with directories and
   wrote nothing of main's (measured with a local tarball, not a registry, before packages were hardlinked).
@@ -262,15 +263,15 @@ added a dependency failed its ship there: `n54w` on 2026-09-26 (`@types/express`
 `node_modules` by hand and asked for the ship again. A round's check never met this, since `provisionDeps` gives each worktree its own
 tree.
 
-Now the tick, filing the ending's check, compares the staged lockfile with the checkout's own tree (`checkoutParts`, `lockfileParting`
-in place). Where they differ, the check's brief carries `install` and its script runs `npm install --no-save --no-audit --no-fund`
+Now the tick, filing the ending's check, compares the staged lockfile with the checkout's own tree (`checkoutParts`,
+`lockfileParting`). Where they differ, the check's brief carries `install` and its script runs `npm install --no-save --no-audit --no-fund`
 before the command. The README bullet *The ending's check runs with the packages the merge brings* is the account.
 
 - **In the orchestrator, not in the shipped `check:` lines.** A shell exit is always a number, so an install that failed there would
   be a refusal of the work. The comparison is TypeScript's already, over what is on disk. A line in five shipped `ship.md` copies is
   prose, and the run could not say on the check's record what it did.
-- **Compared in place.** `lockfileParts(repo, repo)`, the worktree's comparison, parts on every package nested in a workspace
-  (`apps/web/node_modules/@rolldown/plugin-babel` in this repository), so every ship would have installed.
+- **Compared as installed.** A package nested in a workspace (`apps/web/node_modules/@rolldown/plugin-babel` in this repository) is
+  read where the checkout has it, so a ship installs only what the merge changed.
 - **A failed install ends by a signal.** The run reads a check's verdict off the process's exit code, not the log's trailer
   (`exitVerdicts`), so the script kills itself: no exit code, a check that did not finish.
 

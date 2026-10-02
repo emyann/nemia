@@ -95,9 +95,9 @@ holds what every change needs.
   - The guards: the oxlint plugin `lint/comments.ts`, oxlint's `no-warning-comments` and `no-inline-comments`, in one override block per
     package in `.oxlintrc.json`, and a test that a name a comment quotes in backticks is one the code has
     (`packages/agent-orchestrator/test/comments.test.ts`, with its short list of other programs' words).
-  - Every package's guards are on: no block has an `excludeFiles` `(no test yet)`. A new package gets a block of its own, and the
-    runtime's block also covers `lint/**`, the guards' own plugin; no other block lists it (`comments.test.ts`, *one guard block per
-    workspace package*).
+  - Every package's guards are on: no block has an `excludeFiles` (`comments.test.ts`, *no guard block has an excludeFiles*). A new
+    package gets a block of its own, and the runtime's block also covers `lint/**`, the guards' own plugin; no other block lists it
+    (`comments.test.ts`, *one guard block per workspace package*).
   - A JSDoc on a parameter, a union member or a local is refused: say it as an `@param` line or in the declaration's JSDoc.
     `comments.test.ts` refuses a comment line over 140 columns, since `oxfmt` rewraps none; a `(` `)` it drops once a comment inside
     them goes is its own.

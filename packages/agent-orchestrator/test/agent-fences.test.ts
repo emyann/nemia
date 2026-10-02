@@ -3,9 +3,9 @@
  * checkout's `.claude/settings.json` refuses none of them: the settings bind a person's own session in this checkout too, and a person
  * may ask their session to push.
  *
- * Nemia ships no team today, so the guard reads whatever is shipped (`shippedFolders`, none) and holds the tests' team (`team.ts`) to the
- * same fence: each refusal below is made on the team, cut back, and on a watcher's step written here, so a team shipped again is held
- * by a guard proven to refuse.
+ * The guard reads every workflow folder `shippedFolders` finds under `SHIPPED_HOLDERS`: the repository's `workflows/`, this repository's
+ * own team, and the package's own, none on disk. It holds the tests' team (`team.ts`) to the same fence: each refusal below is made on
+ * the team, cut back, and on a watcher's step written here, so whatever is shipped is held by a guard proven to refuse.
  *
  * Each step is read at shipped defaults, as `wf start` freezes it (`loadWorkflows`). A step in `auto` — the engine's default — runs
  * whatever no deny names, so its own `disallowedTools` must name each call. A step in `dontAsk` runs only what an allow reaches, so
@@ -26,7 +26,7 @@ import { placesOf, shippedFolders, SHIPPED_HOLDERS, TEAM, TEAM_DEV, teamCopy } f
 
 const REPO = path.join(import.meta.dirname, '..', '..', '..');
 
-/** Every shipped workflow folder, read off the disk: none today. */
+/** Every shipped workflow folder, read off the disk: this repository's own team's, under its `workflows/`. */
 const FOLDERS = shippedFolders();
 
 /** Every shipped agents folder there is: each agent in it is named by a step of a shipped folder. */

@@ -25,6 +25,9 @@
  *   `bridgeSessionId`, a file the engine never reads; the control has none, read again as long after, so a bridge it gets a
  *   moment after it registers is seen too. Both have no tools, so a session anyone on the account can drive from claude.ai for
  *   the minute it lives can do nothing.
+ * - A long-lived session, `restartPolicy: 'Always'`: a `--bg` session under Remote Control that answers its brief stays open,
+ *   read `idle`, past 90 s of silence and across a second engine over the same store, and settles `stopped` on a stop alone;
+ *   its control, the same task filed as a job, settles `succeeded` on its turn's end. Both have no tools.
  * - Claude Code as a job (M1 to M12, docs/open-issues.md, *Claude Code as a job*): `claude` runs a step as a job (`claude -p`),
  *   and a `--bg` session only when asked; these keep what that rests on measurable on each Claude Code. `--allowedTools` takes
  *   every word after it, so M1 gives the prompt first, and runs its eight jobs at once, each in a folder of its own. A resume's
@@ -699,6 +702,73 @@ test(
         for (const verb of ['stop', 'rm']) {
           try {
             execFileSync('claude', [verb, s.split('-')[0]], { stdio: 'ignore', timeout: 30_000 });
+          } catch {}
+        }
+      }
+    }
+  },
+);
+
+test(
+  "a long-lived --bg session stays open while idle — past 90 s of silence, and across a second engine over its store — and ends on a stop alone; the same task filed as a job settles on its turn's end",
+  {
+    skip,
+    timeout: 12 * 60_000,
+  },
+  async (t) => {
+    const root = tmp('long-lived-board');
+    const engine = promiseEngine(EngineService.layer({ root }));
+    const common = {
+      brief: 'Reply with the single word ok, and nothing else.',
+      config: { model: 'haiku', tools: [] as string[], background: true, claude: { remoteControl: true as const } },
+    };
+    const ids = {
+      open: await engine.file({ ...common, cwd: tmp('long-lived'), restartPolicy: 'Always' }),
+      job: await engine.file({ ...common, cwd: tmp('long-lived-job') }),
+    };
+    const views: Record<string, TaskView> = {};
+    const pass = async (e: Engine) => {
+      await e.tick();
+      for (const [k, id] of Object.entries(ids)) views[k] = await e.view(id);
+    };
+    try {
+      const until = Date.now() + 5 * 60_000;
+      while (!(views.open?.phase === 'idle' && views.job?.state.settled) && Date.now() < until) {
+        await pass(engine);
+        await new Promise((r) => setTimeout(r, 5_000));
+      }
+      assert.equal(views.open?.phase, 'idle', `the long-lived session reads idle once its turn ends: ${views.open?.phase}`);
+      assert.equal(views.job?.state.settled, 'succeeded', `the job settles on its turn's end: ${views.job?.phase}`);
+
+      const restarted = promiseEngine(EngineService.layer({ root }));
+      const quiet = Date.now() + 100_000;
+      while (Date.now() < quiet) {
+        await pass(restarted);
+        assert.equal(views.open?.phase, 'idle', `still idle, ${Math.round((quiet - Date.now()) / 1000)} s before the end of the wait`);
+        await new Promise((r) => setTimeout(r, 10_000));
+      }
+      assert.deepEqual(
+        views.open?.state.attempts.map((a) => a.ended),
+        [null],
+        'one attempt, never ended: no pass recorded an end, and none started a second',
+      );
+
+      await restarted.stop(ids.open);
+      const stopping = Date.now() + 2 * 60_000;
+      while (!views.open?.state.settled && Date.now() < stopping) {
+        await pass(restarted);
+        await new Promise((r) => setTimeout(r, 5_000));
+      }
+      assert.equal(views.open?.state.settled, 'stopped', `a stop ends it: ${views.open?.phase}`);
+      t.diagnostic(
+        `the long-lived session's end: ${views.open?.state.attempts.at(-1)?.ended} (${views.open?.state.attempts.at(-1)?.reason})`,
+      );
+    } finally {
+      for (const v of Object.values(views)) {
+        if (!v.sessionId) continue;
+        for (const verb of ['stop', 'rm']) {
+          try {
+            execFileSync('claude', [verb, v.sessionId.split('-')[0]], { stdio: 'ignore', timeout: 30_000 });
           } catch {}
         }
       }

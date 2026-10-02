@@ -112,7 +112,11 @@ test('RESTART: a long-lived session idle across a daemon restart is left open â€
     const ops = testOps({ sessions, spawned });
     const runner = Runner.layer({
       ...ops,
-      stop: (id) => Effect.andThen(Effect.sync(() => asked.push(`stop ${id}`)), ops.stop(id)),
+      stop: (id) =>
+        Effect.andThen(
+          Effect.sync(() => asked.push(`stop ${id}`)),
+          ops.stop(id),
+        ),
       release: (s) => Effect.sync(() => void asked.push(`release ${s.sessionId}`)),
     });
     const layer = Layer.mergeAll(journal, runner, tickMemoLayer({ verify: true }));

@@ -59,7 +59,11 @@ test('LONG-LIVED: a session open between turns is idle, and left alone an hour o
 test('LONG-LIVED: idle only while its process is held and at rest — a wait on a person, a busy turn and a session gone are what they are for a job', () => {
   const state = fold(TASK, inFlight(true));
   const cases: [string, Omit<Sighting, 'sessionId'>, string][] = [
-    ['waiting on a permission prompt', { state: 'input-required', busy: false, held: true, waitingFor: 'permission prompt' }, 'SESSION_BLOCKED'],
+    [
+      'waiting on a permission prompt',
+      { state: 'input-required', busy: false, held: true, waitingFor: 'permission prompt' },
+      'SESSION_BLOCKED',
+    ],
     ['at work on a turn', { state: 'working', busy: true, held: true }, 'SESSION_LIVE'],
     ['quiet, but busy', { state: 'working', busy: true, held: true, quietMs: 90_000 }, 'SESSION_QUIET'],
     ['listed done with no process', { state: 'completed', busy: false, held: false }, 'SESSION_ENDED'],
@@ -77,8 +81,15 @@ test('LONG-LIVED: only a stop ends it — asked of an idle session, it stops it,
     assert.deepEqual(decide(fold(TASK, asked), seen(sighting), now(HOUR + 1)), { do: 'stop', sessionId: 's1', why: 'operator' }, name);
   const end = decide(fold(TASK, asked), seen({ state: 'canceled', held: false }), now(HOUR + 2));
   assert.equal(end.do === 'record-end' && `${end.observed} ${end.reason}`, 'stopped operator');
-  const ended = fold(TASK, [...asked, { kind: 'ended', at: at(HOUR + 3), attempt: 1, sessionId: 's1', observed: 'stopped', reason: 'operator' }]);
-  assert.deepEqual(decide(ended, seen({ state: 'canceled', held: false }), now(HOUR + 4)), { do: 'settle', outcome: 'stopped', note: 'operator' });
+  const ended = fold(TASK, [
+    ...asked,
+    { kind: 'ended', at: at(HOUR + 3), attempt: 1, sessionId: 's1', observed: 'stopped', reason: 'operator' },
+  ]);
+  assert.deepEqual(decide(ended, seen({ state: 'canceled', held: false }), now(HOUR + 4)), {
+    do: 'settle',
+    outcome: 'stopped',
+    note: 'operator',
+  });
 });
 
 test('LONG-LIVED: a session that ended with no stop asked settles failed and says so, however it ended — where a job settles on its end', () => {

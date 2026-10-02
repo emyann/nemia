@@ -79,7 +79,12 @@ export const JOURNALS: Record<string, Event[]> = {
   settled: [filed(), starting(1), spawned(1), signed(1), { kind: 'settled', at: at(3 * S), outcome: 'succeeded' }],
   'long-lived, intent, no spawn': [filed({ restartPolicy: 'Always' }), starting(1)],
   'long-lived, in flight': [filed({ restartPolicy: 'Always' }), starting(1), spawned(1)],
-  'long-lived, stop asked in flight': [filed({ restartPolicy: 'Always' }), starting(1), spawned(1), { kind: 'stop-requested', at: at(2 * S) }],
+  'long-lived, stop asked in flight': [
+    filed({ restartPolicy: 'Always' }),
+    starting(1),
+    spawned(1),
+    { kind: 'stop-requested', at: at(2 * S) },
+  ],
   'long-lived, ended with no stop': [filed({ restartPolicy: 'Always' }), starting(1), spawned(1), signed(1)],
   'long-lived, ended on a stop': [
     filed({ restartPolicy: 'Always' }),

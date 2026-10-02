@@ -209,12 +209,13 @@ test('the Effect door journals a filing that refuses nothing, with every checked
   assert.deepEqual(await effect.listed(), [id]);
 });
 
-test("the Effect door journals a long-lived filing with its restart policy, and a filing without one as a job", async () => {
+test('the Effect door journals a long-lived filing with its restart policy, and a filing without one as a job', async () => {
   const effect = effectDoor();
   const always = await effect.run(file({ ...ok, restartPolicy: 'Always', queued: true, config: { background: true } }));
   const job = await effect.run(file(ok));
   const filedOf = (id: string) => effect.run(Effect.flatMap(Journal, (j) => j.read(id))).then((es) => es[0]);
-  assert.equal((await filedOf(always)).kind === 'filed' && (await filedOf(always)).restartPolicy, 'Always');
+  const filed = await filedOf(always);
+  assert.equal(filed.kind === 'filed' && filed.restartPolicy, 'Always');
   assert.equal(Object.hasOwn(await filedOf(job), 'restartPolicy'), false, 'a job journals no restart policy');
 });
 
@@ -305,9 +306,15 @@ test("REFUSED at shipped defaults: a long-lived task on a harness that ends its 
       return true;
     });
   }
-  assert.ok(await promise.file({ ...ok, harness: 'claude', restartPolicy: 'Always', config: { background: true } }), 'claude --bg keeps it open');
+  assert.ok(
+    await promise.file({ ...ok, harness: 'claude', restartPolicy: 'Always', config: { background: true } }),
+    'claude --bg keeps it open',
+  );
   assert.ok(await promise.file({ ...ok, harness: 'bg', restartPolicy: 'Always' }), 'so does the claude-bg harness');
-  assert.ok(await promise.file({ ...ok, harness: 'mine', restartPolicy: 'Always' }), "a PromiseRunner is the consumer's own, and asked nothing");
+  assert.ok(
+    await promise.file({ ...ok, harness: 'mine', restartPolicy: 'Always' }),
+    "a PromiseRunner is the consumer's own, and asked nothing",
+  );
   const lone = promiseEngine(Engine.layer({ root: scratch('ae-long-lived-'), journal: memoryStore(), harnesses: { claude: 'claude' } }));
   await assert.rejects(
     lone.file({ ...ok, harness: 'claude', config: { background: false }, restartPolicy: 'Always' }),

@@ -461,7 +461,8 @@ const listedIn = (rows: RegistryRow[], registry: Registry) => {
  * (`claudeStateOf`) with `waitingFor`, which tells two waits apart; `waitingFor` is carried as the harness says it and judged by
  * nothing here (`Sighting.waitingFor`), trimmed, and a blank one is none. The session id is the native id — `--resume` takes
  * exactly it — and the row's `startedAt`, when this session started, is what its usage is counted from. `held` is whether the
- * row lists a pid: `done` and an idle `blocked` are a turn's end, and the process outlives it until `claude stop` takes it.
+ * row lists a pid: `done` and an idle `blocked` are a turn's end, and the process outlives it until `claude stop` takes it. The
+ * pid is on the sighting too, which a long-lived task journals as it changes (`sightingFacts`).
  */
 const ourRow = (row: RegistryRow): { sighting: Sighting; startedAt?: number; pid?: number } => {
   const waitingFor = row.waitingFor?.trim() || undefined;
@@ -473,6 +474,7 @@ const ourRow = (row: RegistryRow): { sighting: Sighting; startedAt?: number; pid
       held: row.pid !== undefined && row.pid !== null,
       nativeId: row.sessionId,
       ...(waitingFor ? { waitingFor } : {}),
+      ...(row.pid !== undefined && row.pid !== null ? { pid: row.pid } : {}),
     },
     startedAt: row.startedAt ?? undefined,
     pid: row.pid ?? undefined,

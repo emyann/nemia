@@ -4,7 +4,20 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { decide, fold, nameFor, needsHuman, observe, type Event, type Sighting } from './domain.ts';
+import {
+  backoffOf,
+  decide,
+  fold,
+  nameFor,
+  needsHuman,
+  observe,
+  RESPAWN_GAP_MS,
+  RESTART_BACKOFF,
+  RESTART_WORDS,
+  sightingFacts,
+  type Event,
+  type Sighting,
+} from './domain.ts';
 import { viewOfState } from './engine/engine.ts';
 
 const T0 = new Date('2026-01-01T00:00:00Z');
@@ -67,7 +80,7 @@ test('LONG-LIVED: idle only while its process is held and at rest — a wait on 
     ['at work on a turn', { state: 'working', busy: true, held: true }, 'SESSION_LIVE'],
     ['quiet, but busy', { state: 'working', busy: true, held: true, quietMs: 90_000 }, 'SESSION_QUIET'],
     ['listed done with no process', { state: 'completed', busy: false, held: false }, 'SESSION_ENDED'],
-    ['listed waiting with no process', { state: 'input-required', busy: false, held: false }, 'SESSION_BLOCKED'],
+    ['listed waiting with no process: a respawn', { state: 'input-required', busy: false, held: false }, 'SESSION_RESPAWNING'],
     ['listed done, held unknown', { state: 'completed', busy: false }, 'SESSION_ENDED'],
     ['stopped, no process', { state: 'canceled', busy: false, held: false }, 'SESSION_STOPPED'],
   ];
@@ -92,26 +105,218 @@ test('LONG-LIVED: only a stop ends it — asked of an idle session, it stops it,
   });
 });
 
-test('LONG-LIVED: a session that ended with no stop asked settles failed and says so, however it ended — where a job settles on its end', () => {
+test('LONG-LIVED: the filing is read back off the journal, and a journal with no `restartPolicy` folds to a job', () => {
+  assert.equal(fold(TASK, [filed(true)]).restartPolicy, 'Always');
+  assert.equal(fold(TASK, [filed(false)]).restartPolicy, undefined);
+});
+
+const GAP = 10_000;
+/** A session held under pid 100, then seen with no process from `GAP` on: a gap Claude Code's own respawn closes, or not. */
+const inGap = (longLived: boolean): Event[] => [
+  ...inFlight(longLived),
+  { kind: 'process', at: at(3), attempt: 1, pid: 100 },
+  { kind: 'gap', at: at(GAP), attempt: 1 },
+];
+/** Claude Code's listing of a session it is respawning: blocked, no pid. */
+const RESPAWNING: Omit<Sighting, 'sessionId'> = { state: 'input-required', busy: false, held: false, nativeId: 'native-1' };
+
+test('LONG-LIVED: a gap no respawn closes is waited out for 120 s, nobody asked, then its attempt is ended lost — where a job listed the same waits on a person', () => {
+  assert.equal(RESPAWN_GAP_MS, 120_000, 'the shipped bound');
+  const state = fold(TASK, inGap(true));
+  const before = now(GAP + RESPAWN_GAP_MS - 1);
+  assert.equal(observe(state, seen(RESPAWNING), before).type, 'SESSION_RESPAWNING');
+  assert.equal(decide(state, seen(RESPAWNING), before).do, 'nothing');
+  assert.equal(needsHuman(state, seen(RESPAWNING)), false, 'Claude Code is restarting it, nobody is asked');
+  assert.equal(viewOfState(state, seen(RESPAWNING)).phase, 'restarting');
+  assert.equal(observe(state, seen(RESPAWNING), now(GAP + RESPAWN_GAP_MS)).type, 'RESPAWN_OVERDUE');
+  assert.deepEqual(decide(state, seen(RESPAWNING), now(GAP + RESPAWN_GAP_MS)), {
+    do: 'record-end',
+    attempt: 1,
+    sessionId: 's1',
+    observed: 'failed',
+    reason: 'lost',
+    nativeId: 'native-1',
+  });
+
+  const job = fold(TASK, inGap(false));
+  assert.equal(observe(job, seen(RESPAWNING), now(GAP + HOUR)).type, 'SESSION_BLOCKED', 'a job is unchanged');
+  assert.equal(needsHuman(job, seen(RESPAWNING)), true);
+});
+
+test('LONG-LIVED: a gap a respawn closed is over — the session is open again an age later, its attempt never ended', () => {
+  const events: Event[] = [...inGap(true), { kind: 'process', at: at(GAP + 11_000), attempt: 1, pid: 200 }];
+  const state = fold(TASK, events);
+  assert.equal(state.attempts[0].gapSince, undefined, 'the respawn closes the gap');
+  assert.deepEqual(state.attempts[0].processes, [100, 200]);
+  const back = seen({ state: 'input-required', busy: false, held: true, pid: 200 });
+  assert.equal(observe(state, back, now(GAP + 300_000)).type, 'SESSION_IDLE');
+  assert.equal(decide(state, back, now(GAP + 300_000)).do, 'nothing');
+  assert.equal(viewOfState(state, back).phase, 'idle');
+});
+
+const END = 200_000;
+const lostEnd: Event = {
+  kind: 'ended',
+  at: at(END),
+  attempt: 1,
+  sessionId: 's1',
+  observed: 'failed',
+  reason: 'lost',
+  nativeId: 'native-1',
+};
+
+test('LONG-LIVED: an attempt ended lost is restarted after the backoff, its old job stopped first while listed, resumed and told RESTART_WORDS', () => {
+  const state = fold(TASK, [...inGap(true), lostEnd]);
+  assert.deepEqual(decide(state, seen(RESPAWNING), now(END + 1)), { do: 'stop', sessionId: 's1', why: 'to restart it' });
+  assert.equal(observe(state, new Map(), now(END + RESTART_BACKOFF.initialMs - 1)).type, 'BACKING_OFF');
+  assert.equal(decide(state, new Map(), now(END + RESTART_BACKOFF.initialMs - 1)).do, 'nothing');
+  assert.equal(viewOfState(state, new Map()).phase, 'between attempts');
+  assert.deepEqual(decide(state, new Map(), now(END + RESTART_BACKOFF.initialMs)), {
+    do: 'start',
+    attempt: 2,
+    resumeFrom: 'native-1',
+    nudge: RESTART_WORDS,
+  });
+  assert.equal(
+    decide(state, new Map(), { ...now(END + HOUR), unread: new Set([N1]) }).do,
+    'nothing',
+    'an old job its harness could not read may still run: no restart beside it',
+  );
+});
+
+test('LONG-LIVED: a harness-side stop, or any end no stop asked for, is restarted after the backoff — where a job settles on its end', () => {
   const ends: [string, Event][] = [
-    ['done', { kind: 'ended', at: at(9), attempt: 1, sessionId: 's1', observed: 'done', reason: 'harness', nativeId: 'n1' }],
-    ['stopped', { kind: 'ended', at: at(9), attempt: 1, sessionId: 's1', observed: 'stopped', reason: 'harness' }],
-    ['failed', { kind: 'ended', at: at(9), attempt: 1, sessionId: 's1', observed: 'failed', reason: 'harness' }],
-    ['lost', { kind: 'ended', at: at(9), attempt: 1, sessionId: 's1', observed: 'failed', reason: 'lost' }],
+    [
+      'stopped at its harness',
+      { kind: 'ended', at: at(END), attempt: 1, sessionId: 's1', observed: 'stopped', reason: 'harness', nativeId: 'n1' },
+    ],
+    ['done', { kind: 'ended', at: at(END), attempt: 1, sessionId: 's1', observed: 'done', reason: 'harness', nativeId: 'n1' }],
+    ['failed', { kind: 'ended', at: at(END), attempt: 1, sessionId: 's1', observed: 'failed', reason: 'harness', nativeId: 'n1' }],
   ];
-  const job: Record<string, string> = { done: 'succeeded', stopped: 'stopped', failed: 'failed', lost: 'failed' };
+  const job: Record<string, string> = { 'stopped at its harness': 'stopped', done: 'succeeded', failed: 'failed' };
   for (const [name, end] of ends) {
+    const state = fold(TASK, [...inFlight(true), end]);
+    assert.equal(decide(state, new Map(), now(END + 9_999)).do, 'nothing', name);
     assert.deepEqual(
-      decide(fold(TASK, [...inFlight(true), end]), new Map(), now(10)),
-      { do: 'settle', outcome: 'failed', note: 'the long-lived session ended without a stop' },
+      decide(state, new Map(), now(END + 10_000)),
+      { do: 'start', attempt: 2, resumeFrom: 'n1', nudge: RESTART_WORDS },
       name,
     );
-    const a = decide(fold(TASK, [...inFlight(false), end]), new Map(), now(10));
+    const a = decide(fold(TASK, [...inFlight(false), end]), new Map(), now(END + 10_000));
     assert.equal(a.do === 'settle' && a.outcome, job[name], `${name}, as a job`);
   }
 });
 
-test('LONG-LIVED: the filing is read back off the journal, and a journal with no `restartPolicy` folds to a job', () => {
-  assert.equal(fold(TASK, [filed(true)]).restartPolicy, 'Always');
-  assert.equal(fold(TASK, [filed(false)]).restartPolicy, undefined);
+test("LONG-LIVED: the runtime's own stop ends it, and nothing restarts it however long after", () => {
+  const stopped: Event[] = [
+    ...inFlight(true),
+    { kind: 'stop-requested', at: at(HOUR) },
+    { kind: 'ended', at: at(HOUR + 1), attempt: 1, sessionId: 's1', observed: 'stopped', reason: 'operator', nativeId: 'n1' },
+  ];
+  for (const later of [10_000, HOUR, 24 * HOUR])
+    assert.deepEqual(decide(fold(TASK, stopped), new Map(), now(HOUR + later)), { do: 'settle', outcome: 'stopped', note: 'operator' });
+  const gapThenStop: Event[] = [...inGap(true), { kind: 'stop-requested', at: at(GAP + 1) }];
+  assert.deepEqual(
+    decide(fold(TASK, gapThenStop), seen(RESPAWNING), now(GAP + HOUR)),
+    { do: 'stop', sessionId: 's1', why: 'operator' },
+    'a stop asked during a gap stops it, and is never read as a respawn',
+  );
+});
+
+test('LONG-LIVED: a cold restart — no session recorded on any attempt — is told the brief, continuing what the task was filed against', () => {
+  const cold: Event = { kind: 'ended', at: at(END), attempt: 1, sessionId: '(never seen)', observed: 'failed', reason: 'lost' };
+  assert.deepEqual(decide(fold(TASK, [...inFlight(true), cold]), new Map(), now(END + 10_000)), { do: 'start', attempt: 2 });
+  const against: Event[] = [{ ...filed(true), resumeFrom: 'native-0' } as Event, ...inFlight(true).slice(1), cold];
+  assert.deepEqual(decide(fold(TASK, against), new Map(), now(END + 10_000)), { do: 'start', attempt: 2, resumeFrom: 'native-0' });
+});
+
+/** `k` attempts in a row, each ended `ran` ms after it started, the last ending at `END`. */
+const endedRuns = (...ran: number[]): Event[] => {
+  const events: Event[] = [filed(true)];
+  let t = END - ran.reduce((sum, r) => sum + r + 1_000, 0);
+  ran.forEach((r, i) => {
+    t += 1_000;
+    events.push({ kind: 'starting', at: at(t), attempt: i + 1 }, { kind: 'spawned', at: at(t), attempt: i + 1 });
+    t += r;
+    events.push({
+      kind: 'ended',
+      at: at(t),
+      attempt: i + 1,
+      sessionId: `s${i + 1}`,
+      observed: 'failed',
+      reason: 'harness',
+      nativeId: `n${i + 1}`,
+    });
+  });
+  return events;
+};
+
+test("LONG-LIVED: the backoff is a kubelet's — 10 s, doubled for each end in a row, capped at 300 s, and counted again after a run of 10 min", () => {
+  assert.deepEqual(RESTART_BACKOFF, { initialMs: 10_000, factor: 2, maxMs: 300_000, resetAfterMs: 600_000 }, 'the shipped numbers');
+  const short = 5_000;
+  const cases: [string, number[], number][] = [
+    ['one end', [short], 10_000],
+    ['two in a row', [short, short], 20_000],
+    ['five in a row', Array(5).fill(short), 160_000],
+    ['six in a row, capped', Array(6).fill(short), 300_000],
+    ['nine in a row, capped', Array(9).fill(short), 300_000],
+    ['three, the last after 599 s: no reset', [short, short, 599_000], 40_000],
+    ['three, the last after 600 s: reset', [short, short, 600_000], 10_000],
+    ['a run of 600 s, then two short ones', [600_000, short, short], 20_000],
+  ];
+  for (const [name, ran, ms] of cases) {
+    const state = fold(TASK, endedRuns(...ran));
+    assert.equal(backoffOf(state.attempts), ms, name);
+    assert.equal(decide(state, new Map(), now(END + ms - 1)).do, 'nothing', `${name}: backing off`);
+    assert.equal(decide(state, new Map(), now(END + ms)).do, 'start', `${name}: due`);
+  }
+});
+
+test('LONG-LIVED: what a sighting journals — the first gap once, a process at each new pid or the end of a gap — and nothing for a job, an ended attempt or a session not seen', () => {
+  const held = (pid: number): Sighting => ({ sessionId: 's1', state: 'input-required', busy: false, held: true, pid });
+  const gone: Sighting = { sessionId: 's1', ...RESPAWNING };
+  const T = at(HOUR);
+  const open = fold(TASK, inFlight(true));
+  const holding = fold(TASK, [...inFlight(true), { kind: 'process', at: at(3), attempt: 1, pid: 100 }]);
+  const gapped = fold(TASK, inGap(true));
+  assert.deepEqual(sightingFacts(open, held(100), T), [{ kind: 'process', at: T, attempt: 1, pid: 100 }], 'its first process');
+  assert.deepEqual(sightingFacts(holding, held(100), T), [], 'the same pid, no gap: nothing new');
+  assert.deepEqual(sightingFacts(holding, held(200), T), [{ kind: 'process', at: T, attempt: 1, pid: 200 }], 'a new pid with no gap seen');
+  assert.deepEqual(sightingFacts(holding, gone, T), [{ kind: 'gap', at: T, attempt: 1 }], 'the first sighting of no process');
+  assert.deepEqual(sightingFacts(gapped, gone, T), [], 'a gap already open is not opened twice');
+  assert.deepEqual(
+    sightingFacts(gapped, held(100), T),
+    [{ kind: 'process', at: T, attempt: 1, pid: 100 }],
+    'a held process closes a gap, its pid the same',
+  );
+  assert.deepEqual(sightingFacts(holding, { ...gone, state: 'canceled' }, T), [], 'a stopped listing is an end, not a gap');
+  assert.deepEqual(sightingFacts(holding, { ...gone, held: undefined }, T), [], 'a harness that cannot say is no gap');
+  assert.deepEqual(sightingFacts(holding, undefined, T), [], 'a session not seen, or not read this pass');
+  assert.deepEqual(sightingFacts(fold(TASK, inFlight(false)), gone, T), [], 'a job');
+  assert.deepEqual(sightingFacts(fold(TASK, [...inGap(true), lostEnd]), held(300), T), [], 'an ended attempt');
+});
+
+test("LONG-LIVED: Claude Code's own crash loop is reported only — each death and respawn journalled, shown restarting, no end, no action, no backoff", () => {
+  let events: Event[] = [...inFlight(true), { kind: 'process', at: at(3), attempt: 1, pid: 100 }];
+  const pass = (ms: number, sighting: Sighting) => {
+    const facts = sightingFacts(fold(TASK, events), sighting, at(ms));
+    events = [...events, ...facts];
+    const state = fold(TASK, events);
+    const observed = new Map([[N1, sighting]]);
+    return { facts: facts.length, action: decide(state, observed, now(ms)).do, phase: viewOfState(state, observed).phase };
+  };
+  let written = 0;
+  for (let cycle = 0; cycle < 3; cycle++) {
+    const t = HOUR + cycle * 60_000;
+    const died = pass(t, { sessionId: 's1', ...RESPAWNING });
+    const still = pass(t + 5_000, { sessionId: 's1', ...RESPAWNING });
+    const back = pass(t + 11_000, { sessionId: 's1', state: 'input-required', busy: false, held: true, pid: 200 + cycle });
+    assert.deepEqual([died.action, still.action, back.action], ['nothing', 'nothing', 'nothing'], `cycle ${cycle}`);
+    assert.deepEqual([died.phase, still.phase, back.phase], ['restarting', 'restarting', 'idle'], `cycle ${cycle}`);
+    written += died.facts + still.facts + back.facts;
+  }
+  assert.equal(written, 6, 'a gap and a process for each respawn');
+  const state = fold(TASK, events);
+  assert.deepEqual([state.attempts.length, state.attempts[0].ended], [1, null], 'one attempt, never ended');
+  assert.equal(events.filter((e) => e.kind === 'ended').length, 0);
 });

@@ -65,6 +65,8 @@ import { TaskState } from '@a2a-js/sdk';
 import { clientOf } from '../src/a2a/client.ts';
 import { codex } from '../src/harness/codex/codex.ts';
 import { codexRolloutFile } from '../src/harness/codex/transcript.ts';
+import { parentFileOf } from '../src/harness/claude/parent.ts';
+import { claudeTranscriptFile } from '../src/harness/claude/transcript.ts';
 import { detachedOps } from '../src/harness/detached/detached.ts';
 import { scratch } from './scratch.ts';
 
@@ -431,7 +433,8 @@ test(
     timeout: 25 * 60_000,
   },
   async () => {
-    const engine = promiseEngine(EngineService.layer({ root: tmp('release-board') }));
+    const root = tmp('release-board');
+    const engine = promiseEngine(EngineService.layer({ root }));
     const cwd = tmp('release');
     const word = `ae${randomUUID().slice(0, 8)}`;
     const agents = () =>
@@ -476,6 +479,13 @@ test(
       if (second.sessionId) sessions.add(second.sessionId);
       assert.equal(second.state.settled, 'succeeded', `resumed settled: ${second.phase}`);
       assert.deepEqual(second.state.attempts.at(-1)?.closeout, { word }, 'the removed session was resumed, and remembered its word');
+      const parent = JSON.parse(fs.readFileSync(parentFileOf(root, nameFor(secondId, 1)), 'utf8')) as { lastCall: unknown };
+      assert.equal(typeof parent.lastCall, 'string', "its spawn recorded its parent's last StructuredOutput call");
+      const resumed = claudeTranscriptFile(second.state.attempts.at(-1)?.nativeId ?? '');
+      assert.ok(
+        resumed && fs.readFileSync(resumed, 'utf8').includes(`"id":"${String(parent.lastCall)}"`),
+        'and the resumed transcript carries that call under the same id: whose statement it is, is told by it',
+      );
       assert.equal(
         agents().some((r) => r.sessionId === second.sessionId),
         false,

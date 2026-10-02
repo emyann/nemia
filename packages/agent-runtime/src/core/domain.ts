@@ -71,7 +71,9 @@ export type Sighting = {
    * The time is not decoration. A resumed session can carry a statement its parent made, and the
    * engine keeps one only if it was made after this attempt began. A runner whose session cannot carry
    * another attempt's statement gives no time, and the engine keeps the statement whatever the clock says:
-   * a remote agent's, and a detached run's, whose spawn cleared the last one's before it launched it.
+   * a remote agent's, and a detached run's, whose spawn cleared the last one's before it launched it. So
+   * does a runner that told the statement is its session's own: Claude Code's `--bg`, by the call's id,
+   * against the parent's last call it recorded at spawn.
    */
   closeout?: { payload: unknown; at?: number };
   /**

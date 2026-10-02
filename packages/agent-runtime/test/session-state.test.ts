@@ -230,7 +230,7 @@ test("the detached worker's words on its run file: each is one name, a lease gon
     ['toString', fresh, 'failed'],
   ];
   for (const [state, heartbeatAt, name] of rows)
-    assert.equal(detachedStateOf({ state, heartbeatAt }, now), name, `${state} at ${heartbeatAt}`);
+    assert.equal(detachedStateOf({ state, heartbeatAt }, { at: now }), name, `${state} at ${heartbeatAt}`);
 });
 
 const reporting = (states: Record<string, string>): PromiseRunner => ({

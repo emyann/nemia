@@ -2,8 +2,9 @@
  * What the journal says, word for word, for six scripted runs through `promiseEngine` — and what the harness was asked.
  *
  * Whatever carries a spawn, an observe or a stop to a harness, the record a run leaves is the same, to the word. Times are
- * masked, since they are the clock's; everything else — ids, names, reasons, a harness's own words — is compared exactly,
- * never by pattern: a word changed on the way from a harness to the journal fails nothing else.
+ * masked, since they are the clock's — `at`, and the monotonic `mono` a start, a spawn and an end carry beside it; everything else —
+ * ids, names, reasons, a harness's own words — is compared exactly, never by pattern: a word changed on the way from a harness
+ * to the journal fails nothing else.
  *
  * The shape pinned: an `ended` carries, off the same sighting as `usage` and `exitCode`, `denials` (the tool calls a harness
  * denied the session), `skills` (the skills it loaded) and `limit` (the limit its harness says it stopped at), and, for a task
@@ -64,7 +65,8 @@ const board = (spawnFails?: Error) => {
     },
   };
   const engine = promiseEngine(Engine.layer({ journal, harnesses: { fake } }));
-  const record = async (id: string) => (await journal.read(id)).map((e) => ({ ...e, at: '<at>' }));
+  const record = async (id: string) =>
+    (await journal.read(id)).map((e) => ({ ...e, at: '<at>', ...('mono' in e ? { mono: '<mono>' } : {}) }));
   return { engine, sessions, asked, record };
 };
 
@@ -117,11 +119,12 @@ test('a session that signs off: spawned, ended with its statement and usage, set
   await b.engine.tick();
   assert.deepEqual(await b.record(id), [
     filed,
-    { kind: 'starting', at: '<at>', attempt: 1, resumeFrom: undefined, nudge: undefined },
-    { kind: 'spawned', at: '<at>', attempt: 1 },
+    { kind: 'starting', at: '<at>', mono: '<mono>', attempt: 1, resumeFrom: undefined, nudge: undefined },
+    { kind: 'spawned', at: '<at>', mono: '<mono>', attempt: 1 },
     {
       kind: 'ended',
       at: '<at>',
+      mono: '<mono>',
       attempt: 1,
       sessionId: 's-1',
       observed: 'done',
@@ -149,11 +152,12 @@ test("a session that ends with no statement where one was asked: ended as its ha
   await b.engine.tick();
   assert.deepEqual(await b.record(id), [
     filed,
-    { kind: 'starting', at: '<at>', attempt: 1, resumeFrom: undefined, nudge: undefined },
-    { kind: 'spawned', at: '<at>', attempt: 1 },
+    { kind: 'starting', at: '<at>', mono: '<mono>', attempt: 1, resumeFrom: undefined, nudge: undefined },
+    { kind: 'spawned', at: '<at>', mono: '<mono>', attempt: 1 },
     {
       kind: 'ended',
       at: '<at>',
+      mono: '<mono>',
       attempt: 1,
       sessionId: 's-1',
       observed: 'done',
@@ -184,10 +188,11 @@ test('a spawn the harness refused: the attempt ends unstartable in its words, an
   await b.engine.tick();
   assert.deepEqual(await b.record(id), [
     filed,
-    { kind: 'starting', at: '<at>', attempt: 1, resumeFrom: undefined, nudge: undefined },
+    { kind: 'starting', at: '<at>', mono: '<mono>', attempt: 1, resumeFrom: undefined, nudge: undefined },
     {
       kind: 'ended',
       at: '<at>',
+      mono: '<mono>',
       attempt: 1,
       sessionId: '(never started)',
       observed: 'failed',
@@ -206,8 +211,8 @@ test('a spawn that failed without saying nothing started: spawned, with its erro
   await b.engine.tick();
   assert.deepEqual(await b.record(id), [
     filed,
-    { kind: 'starting', at: '<at>', attempt: 1, resumeFrom: undefined, nudge: undefined },
-    { kind: 'spawned', at: '<at>', attempt: 1, error: 'fake: the launcher lost its acknowledgement' },
+    { kind: 'starting', at: '<at>', mono: '<mono>', attempt: 1, resumeFrom: undefined, nudge: undefined },
+    { kind: 'spawned', at: '<at>', mono: '<mono>', attempt: 1, error: 'fake: the launcher lost its acknowledgement' },
   ]);
   assert.equal((await b.engine.view(id)).phase, 'starting');
   assert.deepEqual(b.asked, [['spawn', spawnAsked]]);
@@ -223,12 +228,13 @@ test('a person stops it: the session is stopped, its attempt ended by the operat
   await b.engine.tick();
   assert.deepEqual(await b.record(id), [
     filed,
-    { kind: 'starting', at: '<at>', attempt: 1, resumeFrom: undefined, nudge: undefined },
-    { kind: 'spawned', at: '<at>', attempt: 1 },
+    { kind: 'starting', at: '<at>', mono: '<mono>', attempt: 1, resumeFrom: undefined, nudge: undefined },
+    { kind: 'spawned', at: '<at>', mono: '<mono>', attempt: 1 },
     { kind: 'stop-requested', at: '<at>' },
     {
       kind: 'ended',
       at: '<at>',
+      mono: '<mono>',
       attempt: 1,
       sessionId: 's-1',
       observed: 'stopped',
@@ -261,6 +267,7 @@ test('what the harness denied the session is written on its end, as it said it, 
   assert.deepEqual(ended, {
     kind: 'ended',
     at: '<at>',
+    mono: '<mono>',
     attempt: 1,
     sessionId: 's-1',
     observed: 'failed',
@@ -332,6 +339,7 @@ test('a task held open: it signs and waits, an answer is a turn that continues i
   const ended = (n: number, summary: string) => ({
     kind: 'ended',
     at: '<at>',
+    mono: '<mono>',
     attempt: n,
     sessionId: `s-${n}`,
     observed: 'done',
@@ -347,12 +355,12 @@ test('a task held open: it signs and waits, an answer is a turn that continues i
   });
   assert.deepEqual(await b.record(id), [
     { ...filed, holdOpen: true },
-    { kind: 'starting', at: '<at>', attempt: 1, resumeFrom: undefined, nudge: undefined },
-    { kind: 'spawned', at: '<at>', attempt: 1 },
+    { kind: 'starting', at: '<at>', mono: '<mono>', attempt: 1, resumeFrom: undefined, nudge: undefined },
+    { kind: 'spawned', at: '<at>', mono: '<mono>', attempt: 1 },
     ended(1, 'a first draft'),
     { kind: 'input', at: '<at>', text: 'shorter, please', config: { budgetUsd: 0.5 } },
-    { kind: 'starting', at: '<at>', attempt: 2, resumeFrom: 's-1', nudge: 'shorter, please' },
-    { kind: 'spawned', at: '<at>', attempt: 2 },
+    { kind: 'starting', at: '<at>', mono: '<mono>', attempt: 2, resumeFrom: 's-1', nudge: 'shorter, please' },
+    { kind: 'spawned', at: '<at>', mono: '<mono>', attempt: 2 },
     ended(2, 'a shorter draft'),
     { kind: 'closed', at: '<at>' },
     { kind: 'settled', at: '<at>', outcome: 'succeeded', note: 'closed' },

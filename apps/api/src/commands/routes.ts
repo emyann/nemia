@@ -125,7 +125,7 @@ const answerOf = (command: Command, data: Readonly<Record<string, unknown>>): Re
   command.apiKeys ? Object.fromEntries(command.apiKeys.map((key) => [key, data[key]])) : data;
 
 /** A routed command's handler: the guard where it writes, its arguments, its check (422), and its handler's data, or 502 in its words. */
-const route = (command: Command, status: 202) => (c: Context<ApiEnv>) =>
+const route = (command: Command) => (c: Context<ApiEnv>) =>
   served(c, async (s) => {
     const words = WORDS[command.name];
     const at: Named = { runId: c.req.param('runId') ?? '', step: c.req.param('step') ?? '' };
@@ -139,24 +139,27 @@ const route = (command: Command, status: 202) => (c: Context<ApiEnv>) =>
     const wrong = command.check?.(read.args);
     if (wrong) return c.json({ error: wrong }, 422);
     try {
-      return c.json(answerOf(command, await command.handler(s.e, read.args)), status);
+      return c.json(answerOf(command, await command.handler(s.e, read.args)), 202);
     } catch (err) {
       if (isRefusal(err)) throw err;
       return c.json({ error: words.failed(at, err instanceof Error ? err.message : String(err)) }, 502);
     }
   });
 
-/** The routes of every command of `table` that has one, each answered from its entry. */
+/**
+ * The routes of every command of `table` posted on the api, each answered from its entry; a read the api gets is served by the api's
+ * own route for it, which calls the entry's handler.
+ */
 export function routesOf(table: readonly Command[]): Hono<ApiEnv> {
   const router = new Hono<ApiEnv>();
-  for (const command of table) if (command.route) router.on(command.route.method, command.route.path, route(command, command.route.status));
+  for (const command of table) if (command.route?.method === 'POST') router.post(command.route.path, route(command));
   return router;
 }
 
-/** Where the table asks the api for words it does not have, a sentence each: a routed command with none in words.ts. */
+/** Where the table asks the api for words it does not have, a sentence each: a command posted on the api with none in words.ts. */
 export const wordBreaks = (table: readonly Pick<CommandSpec, 'name' | 'route'>[]): string[] =>
   table
-    .filter((c) => c.route && !Object.hasOwn(WORDS, c.name))
+    .filter((c) => c.route?.method === 'POST' && !Object.hasOwn(WORDS, c.name))
     .map((c) => `${c.name} is routed on the api, and words.ts has no words for it: give it its guard, its shape and its refusals there`);
 
 /**

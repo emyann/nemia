@@ -60,10 +60,15 @@ export type Spec = {
   readonly apart?: (flag: string) => string;
 };
 
+/** Where the api serves a command: a write posted and accepted, or a read got and answered. */
+export type Route =
+  | { readonly method: 'POST'; readonly path: string; readonly status: 202 }
+  | { readonly method: 'GET'; readonly path: string; readonly status: 200 };
+
 /**
  * A command, as data: its `name`, its `usage` after the name and its `help` lines, as `wf`'s help prints them; its `spec`; `check`, the
  * refusal of its arguments before anything is read, the same on both sides, or null; `writes`, a write the api guards; its `route` on the
- * api, or `only`, the side it is served on alone and why; and `apiTakes`, the keys of a body the api folds into its arguments, which the
+ * api — a write is posted and accepted (202), a read is got (200) — or `only`, the side it is served on alone and why; and `apiTakes`, the keys of a body the api folds into its arguments, which the
  * command line has no flag for.
  */
 export type CommandSpec = {
@@ -73,7 +78,7 @@ export type CommandSpec = {
   readonly spec: Spec;
   readonly check?: (args: Args) => string | null;
   readonly writes: boolean;
-  readonly route?: { readonly method: 'POST'; readonly path: string; readonly status: 202 };
+  readonly route?: Route;
   readonly only?: { readonly side: 'cli' | 'api'; readonly why: string };
   readonly apiTakes?: readonly string[];
 };
@@ -177,19 +182,26 @@ export const helpOf = (table: readonly Pick<CommandSpec, 'name' | 'usage' | 'hel
     .join('\n');
 
 /**
- * Where a table of commands breaks its rules, a sentence each: a name defined twice; an entry served nowhere — neither routed on the api
- * nor said to be served on one side alone (`only`) — so a gap between the CLI and the api is never left unsaid; and a name that is both a
- * command of the table and one of the CLI's own verbs (`verbs`), which the CLI would run twice over.
+ * Where a table of commands breaks its rules, a sentence each: a name defined twice; two entries routed on one method and path, of which
+ * the api would serve the first alone; an entry served nowhere — neither routed on the api nor said to be served on one side alone
+ * (`only`) — so a gap between the CLI and the api is never left unsaid; and a name that is both a command the CLI serves and one of the
+ * CLI's own verbs (`verbs`), which the CLI would run twice over — an entry served on the api alone shares a verb's name freely.
  */
 export function commandBreaks(table: readonly Pick<CommandSpec, 'name' | 'route' | 'only'>[], verbs: readonly string[]): string[] {
   const breaks: string[] = [];
   const seen = new Set<string>();
+  const routed = new Map<string, string>();
   for (const c of table) {
     if (seen.has(c.name)) breaks.push(`${c.name} is defined twice: a command is one entry of the table`);
     seen.add(c.name);
+    const at = c.route && `${c.route.method} ${c.route.path}`;
+    const first = at && routed.get(at);
+    if (first) breaks.push(`${c.name} is routed on ${at}, as ${first} is: give it a path of its own`);
+    else if (at) routed.set(at, c.name);
     if (!c.route && !c.only)
       breaks.push(`${c.name} has no route and no only: give it its route on the api, or say which side alone serves it, and why`);
-    if (verbs.includes(c.name)) breaks.push(`${c.name} is a command of the table and a verb of the CLI: take it out of VERBS`);
+    if (c.only?.side !== 'api' && verbs.includes(c.name))
+      breaks.push(`${c.name} is a command of the table and a verb of the CLI: take it out of VERBS`);
   }
   return breaks;
 }

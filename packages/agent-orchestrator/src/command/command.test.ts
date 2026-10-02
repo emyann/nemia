@@ -189,7 +189,7 @@ test('a table breaks its rules: a name twice, an entry served nowhere, a command
     commandBreaks(
       [
         { name: 'a', route },
-        { name: 'a', route },
+        { name: 'a', route: { ...route, path: '/api/y' } },
       ],
       [],
     ),
@@ -200,5 +200,39 @@ test('a table breaks its rules: a name twice, an entry served nowhere, a command
   ]);
   assert.deepEqual(commandBreaks([{ name: 'a', route }], ['a']), [
     'a is a command of the table and a verb of the CLI: take it out of VERBS',
+  ]);
+});
+
+test('a table breaks its rules: two entries routed on one method and path, of which the api serves the first alone', () => {
+  const route = { method: 'GET', path: '/api/x', status: 200 } as const;
+  const only = { side: 'api', why: 'w' } as const;
+  assert.deepEqual(
+    commandBreaks(
+      [
+        { name: 'a', route },
+        { name: 'b', route: { method: 'POST', path: '/api/x', status: 202 } },
+      ],
+      [],
+    ),
+    [],
+    'one path, another method',
+  );
+  assert.deepEqual(
+    commandBreaks(
+      [
+        { name: 'a', route, only },
+        { name: 'b', route, only },
+      ],
+      [],
+    ),
+    ['b is routed on GET /api/x, as a is: give it a path of its own'],
+  );
+});
+
+test('a table breaks its rules: a verb of the CLI is refused only against an entry the CLI serves', () => {
+  const route = { method: 'GET', path: '/api/x', status: 200 } as const;
+  assert.deepEqual(commandBreaks([{ name: 'decide', route, only: { side: 'api', why: 'w' } }], ['decide']), []);
+  assert.deepEqual(commandBreaks([{ name: 'decide', route, only: { side: 'cli', why: 'w' } }], ['decide']), [
+    'decide is a command of the table and a verb of the CLI: take it out of VERBS',
   ]);
 });

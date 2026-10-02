@@ -265,8 +265,8 @@ export type ReadQuota = (opts: {
 const rejected = (e: unknown): Asked => ({ kind: 'rejected', said: e instanceof Error ? e.message : String(e) });
 
 /**
- * An ask of the quota, as an asker holds it: when it began — when Claude Code was started, and read the world it answers about — null while
- * it waits behind the one in flight; whether it has come back; and what settles once it has.
+ * An ask of the quota, as an asker holds it: when it began — when the harness was started, and read the world it answers about — null
+ * while it waits behind the one in flight; whether it has come back; and what settles once it has.
  */
 type Flight = { began: number | null; done: boolean; settled: Promise<void> };
 

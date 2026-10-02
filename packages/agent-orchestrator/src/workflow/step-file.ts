@@ -49,6 +49,7 @@ import {
 } from '../former/former.ts';
 import type { Agent, Agents, SkillsFound } from '../agents/agents.ts';
 import { tallyOf } from '../tally/tally.ts';
+import { fenceRefusal } from './fence.ts';
 
 /**
  * One step, from its file's text.
@@ -58,8 +59,8 @@ import { tallyOf } from '../tally/tally.ts';
  *
  * `agents` are the agents `agent:` may name (`loadAgents`). A step that names one is resolved here, once: each role key the agent sets is
  * the step's unless the step sets it too — the fence under either name, `permissionMode:` or `sandbox:`, as one key, so a step with a fence
- * of its own is given neither of its agent's — and what the step is told is the agent's instructions, a blank line, then the step's own
- * note — the agent's alone when the step has none. The step's own lines are read against the harness it runs on, its agent's where it
+ * of its own is given neither of its agent's; a fence key the step sets may only narrow its agent's (`fenceRefusal`). What the step is
+ * told is the agent's instructions, a blank line, then the step's own note — the agent's alone when the step has none. The step's own lines are read against the harness it runs on, its agent's where it
  * names none, before the two are merged: a step's `permissionMode:` on codex is its own `sandbox:`. A schema the agent's `output:` names is
  * read beside the agent, and one the step names beside the step. Everything downstream of the parser sees the resolved step; `agent` on it
  * says what was the step's own.
@@ -98,6 +99,8 @@ export function parseWorkflow(
     );
   const fromAgent = meta.output === undefined && agent.keys.output !== undefined;
   const step = stepFrom(name, { ...inherited, ...meta }, body, fromAgent ? agent.read : read, spelled);
+  const loosened = fenceRefusal(name, agent, meta, step);
+  if (loosened !== undefined) refuse(loosened);
   const composed = composedRefusal(`${name}: \`agent: ${agent.name}\``, agent.skills, agent.harnessPrompt, step);
   if (composed !== undefined) refuse(composed);
   if (skills) for (const skill of agent.skills ?? []) skillAt(name, agent.name, skill, skills);

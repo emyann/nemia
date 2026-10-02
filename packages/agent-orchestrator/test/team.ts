@@ -1,7 +1,7 @@
 /**
  * The tests' own team (`fixtures/team/`): one workflow, `dev` — implement ⇄ review → ship — the three agents its steps name, and a skill
  * for each. Nemia ships no team, so a test of the machinery that needs a folder a person could have written reads this one; a guard over
- * what ships reads `shippedFolders()`, which finds none until a team is shipped again.
+ * what ships reads `shippedFolders()`, which finds this repository's own team in its `workflows/`.
  */
 import fs from 'node:fs';
 import path from 'node:path';

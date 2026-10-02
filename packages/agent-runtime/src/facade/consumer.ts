@@ -264,6 +264,14 @@ export type Engine = {
    */
   logs: (taskId: string) => Promise<string>;
   /**
+   * One stream of the task's latest attempt, `stdout` or `stderr`, as its harness kept it whole, or its last `lastBytes` bytes:
+   * read from that stream alone, never the log both are mixed in. `undefined` before an attempt, or when the harness kept none
+   * for it. Observes nothing. Refused — rejected with an `Error` whose `exitCode` is 2 — for a `stream` that is neither, a
+   * `lastBytes` that is not a positive whole number, a task this engine has no record of, and a harness that keeps no whole
+   * streams (any but a `HarnessSpec` with `streams`, or a `PromiseRunner` with `output`).
+   */
+  output: (taskId: string, stream: 'stdout' | 'stderr', lastBytes?: number) => Promise<string | undefined>;
+  /**
    * The conversation of the task's session — the one `logs` reads, asked of the task's own harness alone, since no other
    * registry can name it — as events from `after` on, and the `cursor` to ask again from. Pull-only: poll with the cursor
    * the last read returned; nothing is pushed. No session yet is no events, and the cursor asked with — or one from the
@@ -477,10 +485,12 @@ export const optionsRefusalOf = (options: EngineOptions): string | undefined => 
  *    system prompt would be read by nobody;
  * 6. a `codex` on any harness but a `HarnessSpec` with `codexArgs` (`codexArgsMisplaced`): its session would start without
  *    the trust it names;
- * 7. what the harness's own `refuses` refuses: Claude Code's lists, a spec's, or a remote agent's (`remoteRefuses`).
+ * 7. a `command`, an `env` or a `niceness` on any harness but a `HarnessSpec` with `commandArgs` (`commandArgsMisplaced`): its
+ *    session would run something else than the process they name;
+ * 8. what the harness's own `refuses` refuses: Claude Code's lists, a spec's, or a remote agent's (`remoteRefuses`).
  *
- * A `PromiseRunner` is the consumer's own: it is handed a `contextTokens`, a `claude.remoteControl`, a `claude` and a
- * `codex`, and asked nothing of its own.
+ * A `PromiseRunner` is the consumer's own: it is handed a `contextTokens`, a `claude.remoteControl`, a `claude`, a `codex`,
+ * a `command`, an `env` and a `niceness`, and asked nothing of its own.
  */
 export const harnessRefusalOf = (spec: TaskSpec & { harness: string }, harnesses: Record<string, HarnessConfig>): string | undefined => {
   if (!Object.hasOwn(harnesses, spec.harness)) {
@@ -524,7 +534,7 @@ export const harnessRefusalOf = (spec: TaskSpec & { harness: string }, harnesses
       .map((name) => `\`${name}\``);
     return `\`claude\` gives Claude Code flags of its own, and the \`${spec.harness}\` harness is not Claude Code: its session would start without them. ${takers.length ? `File the task on ${takers.join(' or ')}, or leave \`claude\` off.` : "Leave `claude` off: none of this engine's harnesses is Claude Code."}`;
   }
-  return codexArgsMisplaced(spec, harnesses) ?? ownRefuses(h, spec.harness)?.(spec);
+  return argsMisplaced(spec, harnesses) ?? ownRefuses(h, spec.harness)?.(spec);
 };
 
 /** What a harness refuses in its own words: Claude Code's lists, a spec's `refuses`, a remote agent's; a `PromiseRunner`, nothing. */
@@ -553,4 +563,24 @@ const codexArgsMisplaced = (spec: TaskSpec & { harness: string }, harnesses: Rec
     .filter((name) => isCodex(harnesses[name]))
     .map((name) => `\`${name}\``);
   return `\`codex\` gives Codex arguments of its own, and the \`${spec.harness}\` harness is not Codex: its session would start without them. ${takers.length ? `File the task on ${takers.join(' or ')}, or leave \`codex\` off.` : "Leave `codex` off: none of this engine's harnesses is Codex."}`;
+};
+
+/** Why a task's arguments of one kind of harness cannot go on its own (`codexArgsMisplaced`, `commandArgsMisplaced`), or `undefined`. */
+const argsMisplaced = (spec: TaskSpec & { harness: string }, harnesses: Record<string, HarnessConfig>): string | undefined =>
+  codexArgsMisplaced(spec, harnesses) ?? commandArgsMisplaced(spec, harnesses);
+
+/**
+ * Why a task's `command`, `env` or `niceness` cannot go on its harness — or `undefined`: they are the arguments of a harness
+ * that runs a process (`commandArgs`), and any other would run its own session without them. A `PromiseRunner` is not asked.
+ */
+const commandArgsMisplaced = (spec: TaskSpec & { harness: string }, harnesses: Record<string, HarnessConfig>): string | undefined => {
+  const runsCommands = (o: HarnessConfig) => isSpec(o) && o.commandArgs === true;
+  const h = harnesses[spec.harness];
+  const ownRunner = !(isClaude(h) || isSpec(h) || isRemote(h));
+  const key = (['command', 'env', 'niceness'] as const).find((k) => spec.config?.[k] !== undefined);
+  if (key === undefined || ownRunner || runsCommands(h)) return undefined;
+  const takers = Object.keys(harnesses)
+    .filter((name) => runsCommands(harnesses[name]))
+    .map((name) => `\`${name}\``);
+  return `\`${key}\` names a process to run, and the \`${spec.harness}\` harness runs a session of its own: it would start without it. ${takers.length ? `File the task on ${takers.join(' or ')}, or leave \`${key}\` off.` : `Leave \`${key}\` off: none of this engine's harnesses runs a command.`}`;
 };

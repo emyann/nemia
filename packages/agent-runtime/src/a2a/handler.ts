@@ -111,6 +111,7 @@ export const cardOf = (harness: string, ops: RunnerOps): AgentCard => ({
           methods: [
             ...(ops.find ? ['findSession' as const] : []),
             'sessionLogs' as const,
+            ...(ops.output ? ['sessionOutput' as const] : []),
             ...(ops.release ? ['releaseSession' as const] : []),
             ...(ops.transcript ? ['sessionTranscript' as const] : []),
             ...(ops.observeFor ? ['observeSessions' as const] : []),
@@ -139,11 +140,16 @@ export type TranscriptRequest =
   | { name: string; sessionId?: undefined; after?: TranscriptCursor }
   | { sessionId: string; name?: undefined; after?: TranscriptCursor };
 
+/** A stream of a session asked for by the session's name: `stdout` or `stderr`, whole or its last `lastBytes` bytes. */
+export type OutputRequest = { name: string; stream: 'stdout' | 'stderr'; lastBytes?: number };
+
 export interface SessionMethods {
   /** The session running under a name, found without listing every other; `null` when none does. */
   findSession(params: { name: string }, context: ServerCallContext): Promise<{ sessionId: string } | null>;
   /** What a session printed, read by the id its harness lists it under, or the one its end was recorded with. */
   sessionLogs(params: { sessionId: string }, context: ServerCallContext): Promise<{ logs: string }>;
+  /** One stream of the session under a name, as the harness kept it whole, or its last bytes; `null` when it kept none. */
+  sessionOutput(params: OutputRequest, context: ServerCallContext): Promise<{ output: string | null }>;
   /** Let go of a session whose end is on the record; what it consumed, when the harness reads that only as it exits. */
   releaseSession(
     params: { session: Sighting; task: { worktree?: string | boolean } },
@@ -372,6 +378,26 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
       throw new RequestMalformedError('the request names no session: send the id its harness lists it under as `sessionId`.');
     }
     return { logs: await this.run(this.ops.logs(params.sessionId)) };
+  }
+
+  async sessionOutput(params: OutputRequest, _context: ServerCallContext): Promise<{ output: string | null }> {
+    if (!this.ops.output) {
+      throw new UnsupportedOperationError(
+        `the \`${this.harness}\` harness keeps no stream whole: its session's logs are what it printed (sessionLogs).`,
+      );
+    }
+    if (typeof params.name !== 'string' || !nameParts(params.name)) {
+      throw new RequestMalformedError(`\`${params.name}\` is not a session name: a session is named \`ae/<task>/<n>\`, n from 1.`);
+    }
+    if (params.stream !== 'stdout' && params.stream !== 'stderr') {
+      throw new RequestMalformedError(`\`${String(params.stream)}\` is not a stream: ask for \`stdout\` or \`stderr\`.`);
+    }
+    if (params.lastBytes !== undefined && !(Number.isSafeInteger(params.lastBytes) && params.lastBytes > 0)) {
+      throw new RequestMalformedError(
+        `\`lastBytes: ${String(params.lastBytes)}\` is not a count of bytes: give a whole number above 0, or none.`,
+      );
+    }
+    return { output: (await this.run(this.ops.output(params.name, params.stream, params.lastBytes))) ?? null };
   }
 
   async releaseSession(

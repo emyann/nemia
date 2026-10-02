@@ -12,6 +12,7 @@ import {
   pathOf,
   phaseWordOf,
   waitsOnPerson,
+  type Event,
   type Input,
   type LifecycleStep,
   type Said,
@@ -62,6 +63,7 @@ import {
 } from '../core/engine/index.ts';
 import { claudeSayRefuses, isClaudeJob, claudeDetached } from '../harness/claude/index.ts';
 import { codex } from '../harness/codex/codex.ts';
+import { commandHarness } from '../harness/command/command.ts';
 import { a2aOps, type SeamOps } from '../a2a/index.ts';
 import {
   journalOf,
@@ -74,6 +76,7 @@ import {
   harnessRefusalOf,
   type EngineIo,
   type EngineOptions,
+  type HarnessConfig,
   type ObserveCount,
   type TaskSpec,
   type TickReport,
@@ -91,6 +94,11 @@ export class ListRefused extends Schema.TaggedError<ListRefused>()('ListRefused'
 
 /** A transcript this engine will not read, and why: a task it has no record of, a harness that keeps none, a cursor no read gave. */
 export class TranscriptRefused extends Schema.TaggedError<TranscriptRefused>()('TranscriptRefused', {
+  message: Schema.String,
+}) {}
+
+/** A stream `output` will not read, and why: a stream that is neither, a count of bytes that is none, a task or harness without one. */
+export class OutputRefused extends Schema.TaggedError<OutputRefused>()('OutputRefused', {
   message: Schema.String,
 }) {}
 
@@ -119,7 +127,8 @@ export const listRefusalOf = (args: readonly unknown[]): string | undefined => {
 /**
  * The engine's verbs, each an Effect with what refuses it on its error channel. Each does what the verb of the same name on
  * `agent-runtime`'s `Engine` does, where each is described, and fails with a tagged error where that one rejects with an `Error`
- * whose `exitCode` is 2: `FileRefused`, `TickRefused`, `AdmitRefused`, `ListRefused`, `TranscriptRefused`, `SayRefused`, `StopRefused`
+ * whose `exitCode` is 2: `FileRefused`, `TickRefused`, `AdmitRefused`, `ListRefused`, `TranscriptRefused`, `OutputRefused`, `SayRefused`,
+ * `StopRefused`
  * for `stop`, and `InputRefused` for `answer` and `close`. `SayUnsent` is `say`'s failure that is not a refusal; a `JournalError` or a
  * `RunnerError` is the store's or the harness's. `watch`, `io` and `start` succeed at once: `watch` and `start` with a handle that stops
  * them.
@@ -137,6 +146,11 @@ export type EngineShape = {
     taskId: string,
     after?: TranscriptCursor,
   ) => Effect.Effect<Transcript, TranscriptRefused | JournalError | RunnerError>;
+  readonly output: (
+    taskId: string,
+    stream: 'stdout' | 'stderr',
+    lastBytes?: number,
+  ) => Effect.Effect<string | undefined, OutputRefused | JournalError | RunnerError>;
   readonly say: (taskId: string, text: string) => Effect.Effect<Said, SayRefused | SayUnsent | JournalError>;
   readonly answer: (taskId: string, text: string, options?: { config?: HarnessArgs }) => Effect.Effect<Input, InputRefused | JournalError>;
   readonly close: (taskId: string) => Effect.Effect<void, InputRefused | JournalError>;
@@ -153,6 +167,45 @@ export type EngineShape = {
     onTick?: (r: TickReport) => void;
     onError?: (e: unknown) => void;
   }) => Effect.Effect<{ stop: () => void }>;
+};
+
+/**
+ * `output` over the engine's journal and runners: refuses, in this order, a `stream` that is not `stdout` or `stderr`, a
+ * `lastBytes` that is not a whole number above 0, a task the journal has no record of, and a harness without `output`. Then
+ * the stream of the task's latest attempt, by the name the engine chose for it, or `undefined` before an attempt. Observes nothing.
+ */
+const outputVerbOf = (
+  read: (taskId: string) => Effect.Effect<readonly Event[], JournalError>,
+  runners: Record<string, SeamOps>,
+  harnessOf: (state: State) => string,
+) =>
+  Effect.fn('Engine.output')(function* (taskId: string, stream: 'stdout' | 'stderr', lastBytes?: number) {
+    const refuse = (message: string) => Effect.fail(new OutputRefused({ message }));
+    if (stream !== 'stdout' && stream !== 'stderr')
+      return yield* refuse(`\`${String(stream)}\` is not a stream: ask for \`stdout\` or \`stderr\`.`);
+    if (lastBytes !== undefined && !(Number.isSafeInteger(lastBytes) && lastBytes > 0))
+      return yield* refuse(
+        `\`lastBytes: ${String(lastBytes)}\` is not a count of bytes: give a whole number above 0, or none for the whole stream.`,
+      );
+    const events = yield* read(taskId);
+    if (!events.length) return yield* refuse(`\`${taskId}\` is not a task on this board. \`ae ls\`, or \`list()\`, gives the ones it has.`);
+    const state = fold(taskId, events);
+    const harness = harnessOf(state);
+    const output = runners[harness].output;
+    if (!output)
+      return yield* refuse(
+        `the \`${harness}\` harness keeps no whole streams: it mixes them in one log. \`logs\` gives what its session printed.`,
+      );
+    const last = state.attempts.at(-1);
+    return last ? yield* output(nameFor(taskId, last.n), stream, lastBytes) : undefined;
+  });
+
+/** The harnesses of an engine given none: Claude Code, Codex, `claude -p` on the detached worker, and a process. */
+const DEFAULT_HARNESSES: Record<string, HarnessConfig> = {
+  claude: 'claude',
+  codex,
+  'claude-detached': claudeDetached,
+  command: commandHarness,
 };
 
 /** An observe count with nothing counted: a harness this engine has not observed yet. */
@@ -211,11 +264,7 @@ const make = (options: EngineOptions) =>
     const refused = optionsRefusalOf(options);
     if (refused) return yield* Effect.fail(new EngineRefused({ message: refused }));
     const root = options.root ?? path.join(os.homedir(), '.agent-engine');
-    const harnesses = options.harnesses ?? {
-      claude: 'claude',
-      codex,
-      'claude-detached': claudeDetached,
-    };
+    const harnesses = options.harnesses ?? DEFAULT_HARNESSES;
     const fallback = options.defaultHarness ?? Object.keys(harnesses)[0] ?? 'claude';
 
     const journalOps = options.journal ? undefined : Journal.filesOps(root);
@@ -513,6 +562,7 @@ const make = (options: EngineOptions) =>
           }),
         ),
       transcript: transcriptVerb,
+      output: outputVerbOf(read, runners, harnessOf),
       say: sayVerb,
       answer: answerVerb,
       close: (taskId) => go(close(taskId)),

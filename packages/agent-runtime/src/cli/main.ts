@@ -431,6 +431,9 @@ const HELP = `ae — an engine for agent sessions
   ae ls                        every task, desired vs observed
   ae show <id>                 the journal, line by line
   ae logs <id>                 the session's output
+  ae output <id> [stdout|stderr]
+                               one stream of its latest attempt, whole, as a harness that
+                               keeps them apart kept it (the command harness): stdout by default
   ae stop <id>                 ask it to stop
   ae say <id> "<text>"         tell its running session something, and journal it: a job on
                                its stdin until its result, a background session in its inbox
@@ -481,6 +484,24 @@ const HELP = `ae — an engine for agent sessions
  */
 export const AE_MAX_CONCURRENT_RETIRED =
   'ae: `AE_MAX_CONCURRENT` is retired: the runtime keeps no ceiling, and starts every task it is given. Unset it, file with `queued: true` and start each with `ae admit <id>` when it may run; in a workflow the orchestrator admits under `WF_MAX_CONCURRENT`.';
+
+/**
+ * The words and the `--budget <usd>` of `ae answer`, taken from the arguments after its id; refuses, with exit code 2, a budget
+ * that is not dollars above 0 in digits.
+ */
+const answerArgs = (rest: string[]): { words: string; budget: string | undefined } => {
+  const at = rest.indexOf('--budget');
+  const budget = at === -1 ? undefined : rest[at + 1];
+  if (at !== -1 && !(budget !== undefined && /^\d*\.?\d+$/.test(budget) && Number(budget) > 0)) {
+    throw Object.assign(
+      new Error(
+        `answer: \`--budget ${budget ?? ''}\` is not an amount of dollars. Write dollars above 0, digits only, like \`--budget 5\` or \`--budget 0.25\`, or leave it out for the task's own.`,
+      ),
+      { exitCode: 2 },
+    );
+  }
+  return { words: (at === -1 ? rest : [...rest.slice(0, at), ...rest.slice(at + 2)]).join(' '), budget };
+};
 
 /**
  * Runs the `ae` verb `argv` names on the board at `AE_ROOT`, or prints `HELP`; refuses first, with exit code 2, to run with
@@ -535,6 +556,13 @@ export async function main(argv: string[]): Promise<void> {
       if (!arg) return console.log(HELP);
       return console.log(await engine.logs(arg));
 
+    case 'output': {
+      if (!arg) return console.log(HELP);
+      const text = await engine.output(arg, (argv[2] ?? 'stdout') as 'stdout' | 'stderr');
+      if (text !== undefined) process.stdout.write(text);
+      return;
+    }
+
     case 'stop':
       if (!arg) return console.log(HELP);
       await engine.stop(arg);
@@ -548,18 +576,7 @@ export async function main(argv: string[]): Promise<void> {
 
     case 'answer': {
       if (!arg) return console.log(HELP);
-      const rest = argv.slice(2);
-      const at = rest.indexOf('--budget');
-      const budget = at === -1 ? undefined : rest[at + 1];
-      if (at !== -1 && !(budget !== undefined && /^\d*\.?\d+$/.test(budget) && Number(budget) > 0)) {
-        throw Object.assign(
-          new Error(
-            `answer: \`--budget ${budget ?? ''}\` is not an amount of dollars. Write dollars above 0, digits only, like \`--budget 5\` or \`--budget 0.25\`, or leave it out for the task's own.`,
-          ),
-          { exitCode: 2 },
-        );
-      }
-      const words = (at === -1 ? rest : [...rest.slice(0, at), ...rest.slice(at + 2)]).join(' ');
+      const { words, budget } = answerArgs(argv.slice(2));
       const input = await engine.answer(arg, words, budget !== undefined ? { config: { budgetUsd: Number(budget) } } : {});
       console.log(entryLine(arg, { kind: 'input', ...input }));
       return console.log(`run 'ae tick' (or 'ae up') to start its next turn`);

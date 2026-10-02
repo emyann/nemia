@@ -38,7 +38,7 @@
  *   that checks a task before filing it holds its own copy to.
  */
 
-export { Engine, EngineRefused, ListRefused, TranscriptRefused, SayRefused, SayUnsent } from './service/index.ts';
+export { Engine, EngineRefused, ListRefused, TranscriptRefused, OutputRefused, SayRefused, SayUnsent } from './service/index.ts';
 export type { EngineShape } from './service/index.ts';
 export { promiseEngine } from './facade/engine.ts';
 export type { EngineOptions, TaskSpec, TickReport, EngineIo, ObserveCount } from './facade/consumer.ts';
@@ -72,6 +72,7 @@ export { remoteOps } from './a2a/index.ts';
 export type { Credentials, RemoteAgent } from './a2a/index.ts';
 export { codex } from './harness/codex/codex.ts';
 export { claudeDetached } from './harness/claude/index.ts';
+export { commandHarness } from './harness/command/command.ts';
 export { composite } from './harness/index.ts';
 export { sdkRunner } from './harness/index.ts';
 export { a2aRunner } from './a2a/index.ts';

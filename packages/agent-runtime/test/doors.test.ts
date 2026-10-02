@@ -40,7 +40,10 @@ const memoryJournal = (): PromiseJournal => {
   };
 };
 
-/** A harness whose sessions are a map, that hears words and keeps a transcript of them; `observe` rejects while `unreadable` is set. */
+/**
+ * A harness whose sessions are a map, that hears words, keeps a transcript of them and each stream apart; `observe` rejects while
+ * `unreadable` is set.
+ */
 const fakeHarness = (sessions: Map<string, Sighting>, heard: string[], unreadable = { now: false }): PromiseRunner => ({
   async spawn(r) {
     sessions.set(r.name, { sessionId: `s-${r.name}`, state: 'working' });
@@ -54,6 +57,9 @@ const fakeHarness = (sessions: Map<string, Sighting>, heard: string[], unreadabl
   },
   async logs(id) {
     return `logs of ${id}`;
+  },
+  async output(name, stream, lastBytes) {
+    return `${stream} of ${name}${lastBytes === undefined ? '' : `, its last ${lastBytes} bytes`}`;
   },
   async transcript() {
     return {
@@ -128,6 +134,7 @@ test('each verb gives the same answer through either door, over one store', asyn
   assert.deepEqual(await effect((e) => e.list(['one', 'two'])), await promise.list(['one', 'two']));
   assert.deepEqual(await effect((e) => e.list()), await promise.list());
   assert.deepEqual(await effect((e) => e.feed(0)), await promise.feed(0));
+  assert.deepEqual([await effect((e) => e.output('one', 'stdout')), await promise.output('two', 'stdout')], [undefined, undefined]);
 
   assert.deepEqual(await effect((e) => e.admit(['one'])), ['one']);
   assert.deepEqual(await promise.admit(['two']), ['two']);
@@ -140,6 +147,13 @@ test('each verb gives the same answer through either door, over one store', asyn
     assert.equal(view.phase, 'running (working)', id);
     assert.deepEqual(await effect((e) => e.view(id)), view, id);
     assert.equal(await effect((e) => e.logs(id)), await promise.logs(id));
+    const observed = promise.io().observed;
+    assert.deepEqual(
+      [await effect((e) => e.output(id, 'stderr', 5)), await promise.output(id, 'stdout')],
+      [`stderr of ae/${id}/1, its last 5 bytes`, `stdout of ae/${id}/1`],
+      'asked of the latest attempt, by the name the engine chose',
+    );
+    assert.deepEqual(promise.io().observed, observed, 'output observes nothing');
     const path = await promise.path(id);
     assert.deepEqual(
       path.map((s) => `${s.state} <- ${s.event}`),
@@ -249,6 +263,27 @@ test('each refusal is a tagged error at the Effect door, and its words behind th
     ],
     ['close', 'InputRefused', () => effect((e) => e.close('one')), () => promise.close('one'), /`one`/],
     ['stop', 'StopRefused', () => effect((e) => e.stop('ghost')), () => promise.stop('ghost'), /^`ghost` is not a task on this board\./],
+    [
+      'output',
+      'OutputRefused',
+      () => effect((e) => e.output('ghost', 'stdout')),
+      () => promise.output('ghost', 'stdout'),
+      /^`ghost` is not a task on this board\./,
+    ],
+    [
+      'output',
+      'OutputRefused',
+      () => effect((e) => e.output('one', 'both' as never)),
+      () => promise.output('one', 'both' as never),
+      /^`both` is not a stream: ask for `stdout` or `stderr`\.$/,
+    ],
+    ...[0, -1, 1.5, Number.NaN, '5'].map((lastBytes): [string, string, () => Promise<unknown>, () => Promise<unknown>, RegExp] => [
+      'output',
+      'OutputRefused',
+      () => effect((e) => e.output('one', 'stdout', lastBytes as never)),
+      () => promise.output('one', 'stdout', lastBytes as never),
+      new RegExp(`^\`lastBytes: ${String(lastBytes).replace('.', '\\.')}\` is not a count of bytes`),
+    ]),
   ];
   for (const [verb, tag, viaService, viaPromise, words] of cases) {
     const tagged = await failure(viaService());
@@ -298,4 +333,17 @@ test('options an engine cannot be built from: EngineRefused from the layer, and 
     () => promiseEngine(Engine.layer(options)),
     (e: Error & { exitCode?: number }) => e.exitCode === 2 && e.message === `promiseEngine: ${refused.message}`,
   );
+});
+
+test('output refuses a task whose harness keeps no whole streams, at both doors, naming logs', async () => {
+  const { effect, promise } = doors();
+  await promise.file({ brief: 'one', cwd: '/r', id: 'one', harness: 'claude', queued: true });
+  const tagged = await failure(effect((e) => e.output('one', 'stdout')));
+  assert.equal(tagged._tag, 'OutputRefused');
+  assert.equal(
+    tagged.message,
+    'the `claude` harness keeps no whole streams: it mixes them in one log. `logs` gives what its session printed.',
+  );
+  const plain = await failure(promise.output('one', 'stdout'));
+  assert.deepEqual([plain.message, plain.exitCode], [`output: ${tagged.message}`, 2]);
 });

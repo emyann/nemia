@@ -27,8 +27,8 @@ to change.
 Definition of done — a closed list, and it is closed:
 
 - [x] run a workload on a harness: durably, observably, to completion
-- [x] any harness, chosen per task (`claude`, `codex`, `claude-detached`)
-- [x] attempts, stop, logs — as text, and as the conversation to follow (`transcript`)
+- [x] any harness, chosen per task (`claude`, `codex`, `claude-detached`, `command`)
+- [x] attempts, stop, logs — as text, each stream of a process whole (`output`), and as the conversation to follow (`transcript`)
 - [x] a person's words into a session while it runs, on the record (`say`)
 - [x] queued and admitted — a task waits for a word before it starts, and the layer above says when; the runtime keeps
       no ceiling, no pools and no order of its own (retired in thin runtime stage 4c part 2)
@@ -295,7 +295,7 @@ Bring your own harness — three ways, in order of how much you have to write:
 | `'claude'` | Claude Code as the engine runs it by default: a step as a job (`claude -p`), and a background session (`claude --bg`) when its task asks with `config.background: true` |
 | `'claude-bg'` | Claude Code's background sessions alone; it keeps the registry |
 | a `HarnessSpec` | any CLI that runs a prompt and exits — a command and an exit code |
-| a `PromiseRunner` | four async methods, and four optional ones, `find`, `release`, `transcript` and `say`, for anything else at all |
+| a `PromiseRunner` | four async methods, and five optional ones, `find`, `output`, `release`, `transcript` and `say`, for anything else at all |
 
 **`src/cli/main.ts` builds its engine with `promiseEngine(Engine.layer(…))`, and imports types and plain helpers, through the
 two faces alone.** That is deliberate and it is the test: if the Promise API were not enough to write the CLI with, it would
@@ -345,13 +345,14 @@ harness: codex        # claude (default) | codex | claude-detached
 Review the diff on this branch for race conditions.
 ```
 
-Three are wired:
+Four are wired:
 
 | harness | how it runs | who keeps the registry |
 |---|---|---|
 | `claude` | a job: `claude -p --input-format stream-json --output-format stream-json`, in a worker we detach; with `config.background: true`, `claude --bg --name` | a job: **us**, a run file; a background session: **the harness** — `claude agents --json`, free |
 | `codex` | `codex exec --json`, in a worker we detach | **us** — a directory of run files |
 | `claude-detached` | `claude -p --output-format json`, same worker | us (there to compare the two paths) |
+| `command` | the process a task's `config.command` names, same worker — no agent at all | us |
 
 **Why two mechanisms and not one.** Claude Code keeps a registry of background sessions and will
 answer questions about them from any process. Codex has no such thing: `codex exec` runs in the
@@ -385,6 +386,37 @@ export const codex: HarnessSpec = {
 Exit 0 is success, anything else is failure. That is all a generic harness has to say, and it is
 enough. `decide` never learns that harnesses exist — adding all of this changed it by zero lines,
 which is the test of whether the seam was in the right place.
+
+### A process as a harness: `command`
+
+A check — `npm test`, a build — is a process, not an agent, and runs on the same worker as one (`commandHarness`,
+`src/harness/command/command.ts`). A task gives it three arguments of its `config`, the fields a Pod's container has:
+
+| key | what it is |
+|---|---|
+| `command` | the program and its arguments, a list of strings, the program first, no shell between: `["sh", "-c", "npm test"]` |
+| `env` | variables laid over the worker's own environment, names to strings: `{ "CI": "1" }`. Journalled with the task, so it carries no secret |
+| `niceness` | 0 to 19: above 0 the process runs under `nice -n`, and in the idle IO class (`ionice -c3`) where the machine runs that — asked once a process, as the command would run it |
+
+Each is refused at `file()` when it is not what it says, and on any harness but one whose spec says `commandArgs: true`, which
+would run its own session without it; the command harness refuses a task without `command`, one that carries an agent's
+argument (`model`, `permissionMode`, …), a `closeoutSchema` and a `resumeFrom`. The brief is not read: the command is the work.
+
+Its exit code is its verdict, on the attempt: 0 succeeded, anything else failed. A command a stop ended has none, whatever it
+exited with. Its stdout and its stderr each go whole to a file of their own beside the run's log (a spec that says
+`streams: true`), cleared when the name is spawned again, and are read by `output`, never off the run directory:
+
+```ts
+const id = await engine.file({ brief: 'test', cwd, harness: 'command', config: { command: ['npm', 'test'], niceness: 10 } });
+// … ticked to its end
+await engine.output(id, 'stdout');        // all of it
+await engine.output(id, 'stderr', 4096);  // its last 4096 bytes, starting on a whole character
+```
+
+`output` asks the task's latest attempt, observes nothing, and answers `undefined` before an attempt or for a run that kept
+no streams. It refuses (exit 2; `OutputRefused` at the Effect door) a stream that is neither, a `lastBytes` that is not a whole
+number above 0, a task the board does not have, and a harness that keeps no whole streams, whose `logs` is what it has. On
+the command line, `ae output <task> [stdout|stderr]`.
 
 ### Beneath the harnesses: an A2A seam
 
@@ -1793,10 +1825,11 @@ of pure code sits beside it.
 | `src/harness/claude/transcript.ts` | a Claude Code session's transcript: where it is, its closeout, its lines as events, and its usage and cost |
 | `src/harness/claude/vocabulary.ts` | Claude Code's modes, efforts and context windows, and what it refuses to be asked for |
 | `src/harness/claude/index.ts` | the face of `harness/claude/`, as the doors take it |
+| `src/harness/command/command.ts` | a process as a harness: the program a task's `config.command` names, its `env` and `niceness`, its streams kept whole, and what it refuses |
 | `src/harness/codex/codex.ts` | Codex through `codex exec`: its sandboxes and efforts, the trust it is extended, and its spec |
 | `src/harness/codex/stream.ts` | what a Codex session prints under `exec --json`: each event the runtime reads decoded by `CodexEventSchema`, a stream that does not decode refused, and its usage |
 | `src/harness/codex/transcript.ts` | a Codex thread's rollout: where it is, and its records as events |
-| `src/harness/detached/detached.ts` | a runner for any harness that runs a prompt and exits: `HarnessSpec`, the detached worker's run files, the lease, and the four verbs over them |
+| `src/harness/detached/detached.ts` | a runner for any harness that runs a prompt and exits: `HarnessSpec`, the detached worker's run files, the lease, the four verbs over them, and `output`, a stream kept whole |
 | `src/harness/detached/output.ts` | what a detached session's output says: `claude -p`'s result and stream, read for closeout, usage, cost, a spent budget and denials, and the stream for the skills loaded |
 | `src/harness/detached/said.ts` | what was read of a finished run's output, kept beside its log keyed by the log's size and mtime and the readers' version — or a former one they only added fields to (`SAID_EXTENDED`) — so each process reads a log once per change of it |
 | `src/a2a/map.ts` | the runtime's words in A2A's and back, pure: a session is a Task named for it, a spawn a user Message marked with the runtime's extension and `config` in its metadata, words said to a session a follow-up on its Task, a sighting or a journalled attempt a Task, its context the harness's id for the conversation and its closeout its one Artifact |
@@ -1820,6 +1853,7 @@ of pure code sits beside it.
 | `test/unsigned.test.ts` | a session gone quiet, or `done`, without the closing statement its task asked for: ended with `stated: false`, and continued by nothing; quiet with none asked for still succeeds with no such key — a fake `claude` that keeps a registry, at shipped defaults |
 | `test/shell.test.ts` | a session held busy by a background shell it left running: its own closeout as the last word in a cold transcript ends the attempt, an advancing one or no statement does not — a fake `claude` that keeps a registry, at shipped defaults |
 | `test/resume.test.ts` | a resumed session read as its new attempt's, and a final read taken again once its transcript grows — a fake `claude` that keeps a registry, at shipped defaults |
+| `test/command.test.ts` | the command harness against the real worker: a long stdout read back whole, stderr apart, the exit code, `env`, `niceness`, a stop, a lingering child, a respawn, and its refusals |
 | `test/detached.test.ts` | the worker, the lease, the composite, each spec's argv and refusals — `sh` as the harness |
 | `test/mcp.test.ts` | what each harness is given for MCP, at shipped defaults — fake `claude` and `codex` on `PATH` |
 | `test/io.test.ts` | what a pass costs as the runtime reports it: a tick's `ms` and each harness's observes, and `io()`'s bytes read and processes started |

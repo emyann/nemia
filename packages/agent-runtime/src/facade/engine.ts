@@ -14,6 +14,7 @@ const REFUSALS = new Set([
   'StopRefused',
   'ListRefused',
   'TranscriptRefused',
+  'OutputRefused',
   'SayRefused',
   'EngineRefused',
 ]);
@@ -64,6 +65,7 @@ export function promiseEngine<E>(layer: Layer.Layer<EngineService, E>): Engine {
     stop: (taskId) => run('stop', service.stop(taskId)),
     logs: (taskId) => run('logs', service.logs(taskId)),
     transcript: (taskId, after) => run('transcript', service.transcript(taskId, after)),
+    output: (taskId, stream, lastBytes) => run('output', service.output(taskId, stream, lastBytes)),
     say: (taskId, text) => run('say', service.say(taskId, text)),
     answer: (taskId, text, options) => run('answer', service.answer(taskId, text, options)),
     close: (taskId) => run('close', service.close(taskId)),

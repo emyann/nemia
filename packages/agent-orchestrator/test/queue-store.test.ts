@@ -46,7 +46,7 @@ const refusedAs = (tag: string, pattern: RegExp) => (err: Error & { exitCode?: n
 /**
  * An engine board a test settles by hand, as the engine would: a task filed is `pending`, and one asked to stop before it settled is
  * settled `stopped` by the next engine tick. Its feed has every filing, at the time the test's clock says, and `later` moves that clock on,
- * in minutes.
+ * in minutes. `list` views the tasks it is handed that were filed.
  */
 const board = () => {
   const tasks = new Map<
@@ -112,6 +112,10 @@ const board = () => {
     },
     logs: async () => '(no output yet)',
     feed: async (after = 0) => ({ entries: feed.slice(after), cursor: feed.length }),
+    list: async (ids?: readonly string[]) => ({
+      views: await Promise.all((ids ?? [...tasks.keys()]).filter((id) => tasks.has(id)).map((id) => e.view(id))),
+      unreadable: [],
+    }),
   } as unknown as Engine;
   const settle = (id: string, phase: TaskPhase, closeout?: unknown) => Object.assign(tasks.get(id)!, { phase, closeout });
   const later = (minutes: number) => {

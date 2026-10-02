@@ -1,6 +1,6 @@
 /**
- * The cap on runs in flight as it holds between passes (`slotsOf`, `runSlots`): every run read as a pass reads it, for `wf ls`, `wf decide`,
- * the repository's checkout and the board's ceilings. A controller, reaching the runtime through the client (`runtime-client.ts`).
+ * The cap on runs in flight as it holds between passes (`slotsOf`, `runSlots`): every run read as a pass reads it, for `wf ls`, `wf
+ * decide`, the repository's checkout and the board's ceilings. A controller, reaching the runtime through the client (`runtime-client.ts`).
  */
 import { unreadableJournal, type Engine, type TaskView } from '../runtime-client.ts';
 import type { Workflow } from '../workflow.ts';

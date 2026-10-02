@@ -68,8 +68,8 @@ export type Route =
 /**
  * A command, as data: its `name`, its `usage` after the name and its `help` lines, as `wf`'s help prints them; its `spec`; `check`, the
  * refusal of its arguments before anything is read, the same on both sides, or null; `writes`, a write the api guards; its `route` on the
- * api — a write is posted and accepted (202), a read is got (200) — or `only`, the side it is served on alone and why; and `apiTakes`, the keys of a body the api folds into its arguments, which the
- * command line has no flag for.
+ * api — a write is posted and accepted (202), a read is got (200) — or `only`, the side it is served on alone and why; and `apiTakes`, the
+ * keys of a body the api folds into its arguments, which the command line has no flag for.
  */
 export type CommandSpec = {
   readonly name: string;

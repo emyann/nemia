@@ -404,9 +404,9 @@ async function listed({ e, env, home, memo }: Served): Promise<RunSummary[]> {
  *   `branchReader`). With `WF_VERIFY_REST` a kept answer is judged afresh too, and one that differs fails the request.
  * - `GET /api/runs/:id` — a run in full (`detail`): refused with a 404 when there is no such run, and with a 502 when a task it reads does
  *   not, in the words the list says it with (`RunSummary.unreadable`).
- * - `GET /api/runs/:runId/decision` — what `wf decide` shows a person (`decisionOf`), the route of its entry of the command table. Not on the page's poll, since it runs `git diff`.
- *   Refused as the run's page is: a 404 with no such run, and a 502 when a task it reads does not, in the words the list says it with
- *   (`RunSummary.unreadable`).
+ * - `GET /api/runs/:runId/decision` — what `wf decide` shows a person (`decisionOf`), the route of its entry of the command table. Not on
+ *   the page's poll, since it runs `git diff`. Refused as the run's page is: a 404 with no such run, and a 502 when a task it reads does
+ *   not, in the words the list says it with (`RunSummary.unreadable`).
  * - `DELETE /api/runs/:id` — a try's run removed, as `wf rm` removes it (`forget`): its record, and the folders it worked in with it.
  *   Guarded as a write (`removeGuard`). Only a try: any other run is a 409 naming `wf rm`, which says what it hands off and what it leaves,
  *   and a git run's worktrees and branches are a person's to read before they go. A try still working is a 409 in the package's words; a

@@ -82,7 +82,10 @@ export type Decidable = {
    * labelled, beside the sentence it ends where it has one. None on a run that awaits nobody.
    */
   commands: DecideCommand[];
-  /** The run whose ending step has the repository's own checkout while this run's waits for it (`checkoutHold`); absent when none holds it. */
+  /**
+   * The run whose ending step has the repository's own checkout while this run's waits for it (`checkoutHold`); absent when none holds
+   * it.
+   */
   checkout?: CheckoutHold;
   /**
    * The run finished and nobody has decided it, as the package reads it (`decision`'s `awaiting`) — the reading `wf prune` refuses without
@@ -94,12 +97,12 @@ export type Decidable = {
 };
 
 /**
- * A run's decision. `waiting` for a run whose roots wait on runs that have not shipped: `wf decide` says that, and offers
- * nothing else — and the hold beside it, `holding`, for one a person also holds, as `wf decide` says both. `holding` alone for a run a
- * person holds (`wf hold`): `wf decide` says the hold and what lifts it, and offers nothing, since every verb that would release work is
- * refused while it stands (`heldRefusal`). `running` while it runs and nobody is waited on — `wf decide`'s "nothing to decide yet", with no
- * git asked — and `held` beside it for a run the cap on runs in flight holds, with the count it is held at (`slotsOf`). `nothing`, in `wf decide`'s words, for a run called off or whose branches are already on its base. Else
- * what there is to decide.
+ * A run's decision. `waiting` for a run whose roots wait on runs that have not shipped: `wf decide` says that, and offers nothing else —
+ * and the hold beside it, `holding`, for one a person also holds, as `wf decide` says both. `holding` alone for a run a person holds with
+ * `wf hold`: `wf decide` says the hold and what lifts it, and offers nothing, since every verb that would release work is refused while it
+ * stands (`heldRefusal`). `running` while it runs and nobody is waited on — `wf decide`'s "nothing to decide yet", with no git asked — and
+ * `held` beside it for a run the cap on runs in flight holds, with the count it is held at (`slotsOf`). `nothing`, in `wf decide`'s words,
+ * for a run called off or whose branches are already on its base. Else what there is to decide.
  */
 export type RunDecision =
   | { waiting: RunWaiting; holding?: RunHolding }
@@ -180,8 +183,8 @@ const DECIDE = COMMANDS.find((c) => c.name === 'decide')!;
  *
  * Then the branches the CLI reads (`branchesToRead`) — the result branches, or every branch a step worked on when no terminal step has one,
  * never the base branch of a run that cut worktrees, whose work is not on it — each read with `touchedBy`, and with `sensitiveDiff` over
- * the default check-affecting list. A branch git cannot read is an `error` on its entry, never a failed request. A few `git` calls a branch,
- * so read once, never on a poll. For a run still running with a step waiting on you, the branches read are the result steps'
+ * the default check-affecting list. A branch git cannot read is an `error` on its entry, never a failed request. A few `git` calls a
+ * branch, so read once, never on a poll. For a run still running with a step waiting on you, the branches read are the result steps'
  * (`resultSteps`), as the decision reads them once it is not. A folder run has no repository to ask, so none of git is read for it.
  * `standings` are none for a run that worked on its base branch itself, whose standing would read `main is on main`.
  */
@@ -230,9 +233,9 @@ function nothingOf(run: Run, d: Decided['decision']): string | undefined {
 }
 
 /**
- * What each branch the CLI reads touched (`branchesToRead`, `touchedBy`), and where each result branch stands against the base (`Standing`):
- * the branches `awaiting` names, or the result steps' while the run still runs. None for a folder run, and no standings for a run that
- * worked on its base branch itself.
+ * What each branch the CLI reads touched (`branchesToRead`, `touchedBy`), and where each result branch stands against the base
+ * (`Standing`): the branches `awaiting` names, or the result steps' while the run still runs. None for a folder run, and no standings for a
+ * run that worked on its base branch itself.
  */
 function branchesOf(run: Run, steps: Parameters<typeof resultSteps>[0], awaiting: string[] | undefined) {
   const results = [

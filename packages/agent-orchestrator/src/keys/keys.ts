@@ -20,7 +20,7 @@ import {
 } from '../harness/harness.ts';
 import { looseAt } from '../closeout/closeout.ts';
 import { expandShapes, SHAPE_KEY } from '../question/question.ts';
-import type { SystemPrompt } from '../agents/agents.ts';
+import type { HarnessPrompt } from '../agents/agents.ts';
 
 export function harnessOf(step: string, harness: string | undefined): string | undefined {
   if (harness === undefined || HARNESSES.includes(harness)) return harness;
@@ -514,34 +514,34 @@ export const keepsAuto = (model: string | undefined): boolean =>
 export const DEFAULT_PERMISSION_MODE = 'auto';
 
 /**
- * Why an agent's skills or system prompt cannot reach the sessions of a step that runs as `step` does — its harness, tools and deny list —
- * or `undefined`. `named` says whose: the agent's file, or a step that names it. Asked of the agent as its file sets them (`parseAgent`),
- * and again of each step that names it once its own keys are merged (`parseWorkflow`), since a step's `tools:`, `disallowedTools:` or
- * `harness:` can take away what the agent's allowed. On a step that continues a session (`resume:`), skills and a system prompt other than
- * `default` are refused: a session continued keeps the system prompt it was started with, and the plugins with it.
+ * Why an agent's skills or harness prompt (`harnessPrompt:`) cannot reach the sessions of a step that runs as `step` does — its harness,
+ * tools and deny list — or `undefined`. `named` says whose: the agent's file, or a step that names it. Asked of the agent as its file sets
+ * them (`parseAgent`), and again of each step that names it once its own keys are merged (`parseWorkflow`), since a step's `tools:`,
+ * `disallowedTools:` or `harness:` can take away what the agent's allowed. On a step that continues a session (`resume:`), skills and a
+ * harness prompt other than `keep` are refused: a session continued keeps the prompt it was started with, and the plugins with it.
  */
 export function composedRefusal(
   named: string,
   skills: readonly string[] | undefined,
-  systemPrompt: SystemPrompt | undefined,
+  harnessPrompt: HarnessPrompt | undefined,
   step: Pick<Workflow, 'harness' | 'tools' | 'disallowedTools' | 'resume'>,
 ): string | undefined {
   const listed = skills?.length ? `\`skills: ${skills.join(', ')}\`` : undefined;
-  if (step.resume && (listed || (systemPrompt ?? 'default') !== 'default')) {
-    return `${named}: ${listed ?? `\`systemPrompt: ${systemPrompt}\``} shapes the system prompt of a session the step starts, and \`resume: ${step.resume}\` continues ${step.resume}'s, which keeps the system prompt it was started with: it would reach nothing. Name an agent without it, or delete \`resume:\`.`;
+  if (step.resume && (listed || (harnessPrompt ?? 'keep') !== 'keep')) {
+    return `${named}: ${listed ?? `\`harnessPrompt: ${harnessPrompt}\``} shapes the prompt of a session the step starts, and \`resume: ${step.resume}\` continues ${step.resume}'s, which keeps the prompt it was started with: it would reach nothing. Name an agent without it, or delete \`resume:\`.`;
   }
   if (isRemoteHarness(step.harness)) {
     if (listed)
       return `${named}: ${listed} gives Claude Code skills from a plugin directory of the step's own, and \`harness: ${step.harness}\` is a remote A2A agent, which has the skills its operator gave it — its card says which — and loads none of ours. Delete the line, or run the step on claude.`;
-    if (systemPrompt !== undefined)
-      return `${named}: \`systemPrompt: ${systemPrompt}\` shapes Claude Code's system prompt, and \`harness: ${step.harness}\` is a remote A2A agent, which keeps its own: the agent's instructions are sent in the brief. Delete the line, or run the step on claude.`;
+    if (harnessPrompt !== undefined)
+      return `${named}: \`harnessPrompt: ${harnessPrompt}\` shapes Claude Code's own prompt, and \`harness: ${step.harness}\` is a remote A2A agent, which keeps its own: the agent's instructions are sent in the brief. Delete the line, or run the step on claude.`;
     return undefined;
   }
   if (step.harness === 'codex') {
     if (listed)
       return `${named}: ${listed} gives Claude Code skills from a plugin directory of the step's own, and codex loads none: it is handed its instructions in the brief. Run it on claude, or delete the line.`;
-    if (systemPrompt !== undefined && systemPrompt !== 'default')
-      return `${named}: \`systemPrompt: ${systemPrompt}\` shapes Claude Code's system prompt, and codex is handed its instructions in the brief, beside its own. Run it on claude, or delete the line.`;
+    if (harnessPrompt !== undefined && harnessPrompt !== 'keep')
+      return `${named}: \`harnessPrompt: ${harnessPrompt}\` shapes Claude Code's own prompt, and codex is handed its instructions in the brief, beside its own. Run it on claude, or delete the line.`;
     return undefined;
   }
   if (!listed) return undefined;

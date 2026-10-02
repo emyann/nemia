@@ -77,7 +77,7 @@ export function writeAgentFiles(run: Pick<Run, 'id'>, steps: readonly Workflow[]
       fs.mkdirSync(path.join(plugin, '.claude-plugin'), { recursive: true });
       fs.writeFileSync(path.join(plugin, '.claude-plugin', 'plugin.json'), pluginManifest(agent.name));
     }
-    if (agent.systemPrompt === 'no-coding') {
+    if (agent.harnessPrompt === 'no-coding') {
       fs.mkdirSync(path.join(plugin, 'output-styles'), { recursive: true });
       fs.writeFileSync(path.join(plugin, 'output-styles', `${NO_CODING_STYLE}.md`), noCodingStyle(agent.name));
     }

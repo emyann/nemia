@@ -130,8 +130,8 @@ function entryValuesOf(
  * A skill as it is written: what `renderSkill` takes, and what `skillDraftOf` reads off a SKILL.md. `name` is its folder, and the
  * frontmatter's `name:`; `title` the human name its card entry is given (`title:`, which Claude Code ignores); `description` what it does,
  * one line, which Claude Code lists it by; `tags` and `examples` its card entry's, each a list of one-line items; `preload`, whether the
- * run appends it whole to the system prompt, so it is carried on every turn; and `body`, its instructions. A key unset is left out, or
- * `null`.
+ * run appends it whole to Claude Code's own prompt, so it is carried on every turn; and `body`, its instructions. A key unset is left out,
+ * or `null`.
  */
 export type SkillDraft = {
   name: string;

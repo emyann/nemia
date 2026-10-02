@@ -136,7 +136,7 @@ const withAgent = (id: string): Record<string, unknown> => {
       file: 'review.json',
       schema: { type: 'object', properties: { verdict: { type: 'string' } }, required: ['verdict'], additionalProperties: false },
     },
-    agent: { name: 'reviewer', keys: ['gate'], body: 'You review.', given: { gate: 'true' }, skills: ['look'], systemPrompt: 'default' },
+    agent: { name: 'reviewer', keys: ['gate'], body: 'You review.', given: { gate: 'true' }, skills: ['look'], harnessPrompt: 'keep' },
   };
   return record;
 };

@@ -47,7 +47,7 @@ registerHooks({
 const { createElement } = await import('react');
 const { renderToStaticMarkup } = await import('react-dom/server');
 const { StatusChip, StepNote } = await import('../src/components/StatusChip.tsx');
-const { StepInspector } = await import('../src/components/StepInspector.tsx');
+const { StepTabs } = await import('../src/components/StepInspector.tsx');
 const { StepNode } = await import('../src/components/StepNode.tsx');
 const { afterEdges, stepData, stepEdges } = await import('../src/components/stepGraph.ts');
 const { StepRail, StepTiles } = await import('../src/components/StepRail.tsx');
@@ -221,7 +221,7 @@ function runWith(note: string | null): RunDetail {
 
 test("the inspector's Details show a step's note under its chip", () => {
   const run = runWith(exhaustedNote);
-  const html = renderToStaticMarkup(createElement(StepInspector, { run, step: run.steps[0], onClose: () => {} }));
+  const html = renderToStaticMarkup(createElement(StepTabs, { run, step: run.steps[0] }));
   const chip = html.indexOf('data-state="exhausted"');
   const note = html.indexOf(`<p data-note="true"`);
   assert.ok(chip >= 0, 'the chip is in the Details');
@@ -229,10 +229,7 @@ test("the inspector's Details show a step's note under its chip", () => {
   assert.ok(html.slice(note).startsWith(`<p data-note="true"`) && html.includes(`>${exhaustedNote}</p>`), html);
 
   const bare = runWith(null);
-  assert.doesNotMatch(
-    renderToStaticMarkup(createElement(StepInspector, { run: bare, step: bare.steps[0], onClose: () => {} })),
-    /data-note/,
-  );
+  assert.doesNotMatch(renderToStaticMarkup(createElement(StepTabs, { run: bare, step: bare.steps[0] })), /data-note/);
 });
 
 /** The run of one step, `review`, with the word and note `wf ls` gives it, and who the api says is waited on. */
@@ -750,7 +747,7 @@ test("the inspector's Details show `loop` and `rounds` beside `after` on a loopi
     rounds: 3,
   };
   const looping = { ...run.steps[0], spec };
-  const html = renderToStaticMarkup(createElement(StepInspector, { run, step: looping, onClose: () => {} }));
+  const html = renderToStaticMarkup(createElement(StepTabs, { run, step: looping }));
   const labels = [...html.matchAll(/<dt[^>]*>([^<]+)<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/g)].map((m) => [m[1], m[2].replace(/<[^>]+>/g, '')]);
   const at = (label: string) => labels.findIndex(([l]) => l === label);
   assert.deepEqual(
@@ -765,7 +762,7 @@ test("the inspector's Details show `loop` and `rounds` beside `after` on a loopi
   );
 
   const plain = { ...looping, spec: { ...spec, loop: null, rounds: null } };
-  const without = renderToStaticMarkup(createElement(StepInspector, { run, step: plain, onClose: () => {} }));
+  const without = renderToStaticMarkup(createElement(StepTabs, { run, step: plain }));
   assert.doesNotMatch(without, />loop<\/dt>|>rounds<\/dt>/);
   assert.match(without, />after<\/dt>/);
 });
@@ -1418,11 +1415,9 @@ test('the Decide section copies its commands and runs none: a button per command
 test("the inspector's Details say what a step used and what it cost beside its attempts — `not measured`, never 0", () => {
   const run = runWith(null);
   const rows = (step: RunDetail['steps'][number]) =>
-    [
-      ...renderToStaticMarkup(createElement(StepInspector, { run, step, onClose: () => {} })).matchAll(
-        /<dt[^>]*>([^<]+)<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/g,
-      ),
-    ].map((m) => [m[1], m[2].replace(/<[^>]+>/g, '')]);
+    [...renderToStaticMarkup(createElement(StepTabs, { run, step })).matchAll(/<dt[^>]*>([^<]+)<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/g)].map(
+      (m) => [m[1], m[2].replace(/<[^>]+>/g, '')],
+    );
   const labels = rows(run.steps[0]);
   const at = (label: string) => labels.findIndex(([l]) => l === label);
   assert.deepEqual(
@@ -1456,7 +1451,7 @@ test("the inspector's Details say what a step used and what it cost beside its a
     [undefined, undefined, undefined, undefined],
     'a step not filed has run nothing: never a table of dashes',
   );
-  const html = renderToStaticMarkup(createElement(StepInspector, { run, step: unfiledStep, onClose: () => {} }));
+  const html = renderToStaticMarkup(createElement(StepTabs, { run, step: unfiledStep }));
   assert.match(html, /<p data-unfiled="true"[^>]*>not filed yet<\/p>/, 'said once');
   assert.match(
     html,
@@ -1464,10 +1459,9 @@ test("the inspector's Details say what a step used and what it cost beside its a
     'and what its spec says still below: none, on this fixture',
   );
   const gated = renderToStaticMarkup(
-    createElement(StepInspector, {
+    createElement(StepTabs, {
       run: { ...run, waitingOnYou: [] },
       step: { ...unfiledStep, approve: 'approve implement' },
-      onClose: () => {},
     }),
   );
   assert.match(
@@ -1565,7 +1559,7 @@ const threeTries: StepTry[] = [
 test("the inspector's Details list a step's rounds, a row a try: its round and how it was reached, its task, attempts and verdict, and a link that selects it", () => {
   const run = runWith('round 2 of 3');
   const step = { ...run.steps[0], name: 'implement', status: 'running (working)', attempts: threeTries[2].attempts, tries: threeTries };
-  const html = renderToStaticMarkup(createElement(StepInspector, { run, step, onClose: () => {} }));
+  const html = renderToStaticMarkup(createElement(StepTabs, { run, step }));
   const section = /<section aria-label="Rounds"[\s\S]*?<\/section>/.exec(html)?.[0];
   assert.ok(section, `a Rounds section: ${html}`);
   const rows = [...section.matchAll(/<li data-try="(\d+)"([^>]*)>([\s\S]*?)<\/li>/g)].map((m) => [
@@ -1600,7 +1594,7 @@ test("the inspector's Details list a step's rounds, a row a try: its round and h
     "the attempts above it are the current try's, and say which try that is",
   );
 
-  const once = renderToStaticMarkup(createElement(StepInspector, { run, step: run.steps[0], onClose: () => {} }));
+  const once = renderToStaticMarkup(createElement(StepTabs, { run, step: run.steps[0] }));
   assert.doesNotMatch(once, /aria-label="Rounds"|>try<\/dt>/, 'one try: no Rounds, and no `try` above the attempts');
   assert.match(once, />attempts<\/dt>/);
 });
@@ -2677,6 +2671,27 @@ test("the banner says who the run waits on as `wf ls` does — `approve review`,
   );
 });
 
+test("in the frame's bar, the banners name a step by a button that opens the step's bar, where a hash would point nowhere", () => {
+  const theme = { ...atGate().steps[0], name: 'theme', status: 'failed ✗ check (exit 1)', approve: null, gate: null };
+  const run = atGate({}, { waitingOnYou: ['review', 'theme'], onYou: ['approve review', 'theme'] });
+  const onStep = () => {};
+  const needs = renderToStaticMarkup(
+    createElement(
+      QueryClientProvider,
+      { client: new QueryClient() },
+      createElement(NeedsBanner, { run: { ...run, steps: [run.steps[0], theme] }, onStep }),
+    ),
+  );
+  assert.doesNotMatch(needs, /href="#step-/);
+  assert.match(
+    needs,
+    /<strong><button type="button" data-approve="review" class="underline underline-offset-2">approve review<\/button>, theme<\/strong>/,
+  );
+  const decide = withClient(createElement(ToDecideBanner, { run: endingRun(), onStep }));
+  assert.doesNotMatch(decide, /href="#step-/);
+  assert.match(decide, /<button type="button" data-approve="ship" class="underline underline-offset-2">/);
+});
+
 test('the gate: Approve with a box for the words, which may stay empty, and Send back — the answer box — with an objection it waits for, continuing the session or in a new one', () => {
   const html = withClient(createElement(Gates.Gate, { runId: 'r-1', step: 'plan' }));
   assert.match(html, /^<section aria-label="The gate of plan" data-gate="awaiting"/);
@@ -2975,9 +2990,7 @@ test("REFUSED: an ending's gate brief quotes the package's `toDecide.says` alone
   const led = endingRun();
   const ship = { ...led.steps[1], body: "You are Otto, a release engineer. You land a run's result.\n\nNever push." };
   const brief = (toDecide: RunDetail['toDecide']) =>
-    textsOf(
-      withClient(createElement(StepInspector, { run: { ...led, toDecide, steps: [led.steps[0], ship] }, step: ship, onClose: () => {} })),
-    ).join(' ');
+    textsOf(withClient(createElement(StepTabs, { run: { ...led, toDecide, steps: [led.steps[0], ship] }, step: ship }))).join(' ');
   for (const toDecide of [null, { ...toShip, step: 'implement' }]) {
     const said = brief(toDecide);
     assert.ok(said.includes('ship waits at its gate'), said);
@@ -3359,7 +3372,7 @@ test('REFUSED: a step past its budget is no gate where the api does not say it w
 
 test("the inspector's Details say what every try cost of its cap — `spent`, red once past it — and add nothing for a step on its one try with no cap", () => {
   const run = runWith(null);
-  const markup = (step: RunDetail['steps'][number]) => renderToStaticMarkup(createElement(StepInspector, { run, step, onClose: () => {} }));
+  const markup = (step: RunDetail['steps'][number]) => renderToStaticMarkup(createElement(StepTabs, { run, step }));
   const rows = (step: RunDetail['steps'][number]) =>
     Object.fromEntries(
       [...markup(step).matchAll(/<dt[^>]*>([^<]+)<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/g)].map((m) => [m[1], m[2].replace(/<[^>]+>/g, '')]),
@@ -4148,7 +4161,7 @@ function gatedRun(closeout: StepCloseout | null, status = 'awaiting approval'): 
 const tabSelected = (html: string): string | undefined => /aria-selected="true"[^>]*>([A-Za-z]+)</.exec(html)?.[1];
 
 test('the inspector opens on Output for a step that has a closeout — at its gate, blocked or done — and on Details for one that has none', () => {
-  const inspect = (run: RunDetail) => withClient(createElement(StepInspector, { run, step: run.steps[0], onClose: () => {} }));
+  const inspect = (run: RunDetail) => withClient(createElement(StepTabs, { run, step: run.steps[0] }));
   const atGate = inspect(gatedRun(planCloseout));
   assert.equal(tabSelected(atGate), 'Output');
   assert.match(atGate, /data-field="approach"/, 'the Output tab is drawn: the approach is there without a press');
@@ -4988,4 +5001,68 @@ test('the filters link each period with the filters kept, the default period lef
   assert.doesNotMatch(link('all'), /data-active/);
   assert.match(markup, /data-filter="factory"[^>]*data-kept=""/);
   assert.doesNotMatch(markup, /data-filter="agent"[^>]*data-kept/);
+});
+
+/** A run's card on the floor, inside the router its title links with, as the floor draws it: shown in the bar or not (`inspected`). */
+async function cardMarkup(run: RunDetail, inspected: boolean): Promise<string> {
+  const { RunNode } = await import('../src/components/RunNode.tsx');
+  const data = { run, finished: false, open: false, detail: null, trouble: null, inspected, selected: null, onToggle() {}, onStep() {} };
+  const props = { id: run.id, type: 'run' as const, data, dragging: false, zIndex: 0, isConnectable: false, positionAbsoluteX: 0 };
+  return routedWith(createElement(ReactFlowProvider, null, createElement(RunNode, { ...props, positionAbsoluteY: 0 } as never)));
+}
+
+test('the card the bar shows is ringed and marked as inspected, and a card it does not show is not', async () => {
+  const shown = await cardMarkup(atGate(), true);
+  assert.match(shown, /data-inspected="true"/);
+  assert.match(shown, /ring-2 ring-ring/);
+  const other = await cardMarkup(atGate(), false);
+  assert.doesNotMatch(other, /data-inspected/);
+  assert.doesNotMatch(other, /ring-2 ring-ring/);
+});
+
+/** A piece that reads the address (`useBar`), drawn as a loaded root route's page, with the queries it reads already answered. */
+async function pagedWith(element: ReturnType<typeof createElement>, data: Array<[readonly unknown[], unknown]> = []): Promise<string> {
+  const { createMemoryHistory, createRootRoute, createRouter, RouterProvider } = await import('@tanstack/react-router');
+  const router = createRouter({ routeTree: createRootRoute({ component: () => element }), history: createMemoryHistory() });
+  await router.load();
+  const client = new QueryClient();
+  for (const [key, value] of data) client.setQueryData(key, value);
+  return renderToStaticMarkup(createElement(QueryClientProvider, { client }, createElement(RouterProvider, { router })));
+}
+
+test("the run bar: the run's title and id, what it asks of a person, its steps each a button with its status, and its brief", async () => {
+  const { RunBar } = await import('../src/components/RunBar.tsx');
+  const { titleOf: runTitle } = await import('../src/lib/factory.ts');
+  const theme = { ...atGate().steps[0], name: 'theme', status: 'failed ✗ check (exit 1)', approve: null, gate: null };
+  const base = atGate({}, { waitingOnYou: ['review', 'theme'], onYou: ['approve review', 'theme'], brief: 'Make the **floor** clear.' });
+  const run = { ...base, steps: [base.steps[0], theme] };
+  const html = await pagedWith(createElement(RunBar, { run: run.id }), [[['runs', run.id], run]]);
+  assert.ok(html.includes(`>${runTitle(run)}</h2>`), html);
+  assert.ok(html.includes(`<span class="font-mono text-xs">${run.id}</span>`), html);
+  assert.match(html, /<section aria-label="Waiting on you"/);
+  assert.match(html, /<button type="button" data-approve="review"/, "a step the banner names opens that step's bar");
+  const steps = /<section aria-label="Steps"[\s\S]*?<\/section>/.exec(html)![0];
+  assert.deepEqual(
+    [...steps.matchAll(/<button type="button" data-step="([^"]+)"[\s\S]*?data-state="([^"]+)"/g)].map((m) => [m[1], m[2]]),
+    [
+      ['review', 'awaiting-approval'],
+      ['theme', 'failed-check'],
+    ],
+  );
+  assert.match(/<section aria-label="Brief"[\s\S]*?<\/section>/.exec(html)![0], /<strong>floor<\/strong>/);
+
+  const decide = await pagedWith(createElement(RunBar, { run: 'r-1' }), [[['runs', 'r-1'], endingRun()]]);
+  assert.match(decide, /<section aria-label="To decide"[^>]*>[\s\S]*?<button type="button" data-approve="ship"/);
+});
+
+test('the run bar says a run not read yet, a read that failed, and a run gone from the store, and draws nothing of it under them', async () => {
+  const { RunBody } = await import('../src/components/RunBar.tsx');
+  const { ReadRefusal } = await import('../src/lib/api/read.ts');
+  const run = atGate();
+  const body = (props: { run: RunDetail | undefined; error: unknown }) => pagedWith(createElement(RunBody, { id: run.id, ...props }));
+  assert.match(await body({ run: undefined, error: null }), />Reading the run…</);
+  assert.match(await body({ run: undefined, error: new Error('the api is down') }), /Could not read the run r-1: the api is down/);
+  const gone = await body({ run, error: new ReadRefusal('gone', 404) });
+  assert.match(gone, /data-run-gone="r-1"/);
+  assert.doesNotMatch(gone, /aria-label="Steps"/);
 });

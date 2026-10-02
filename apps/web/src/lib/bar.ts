@@ -112,3 +112,10 @@ export function escapeDoes(key: EscapeKey): 'ignore' | 'leave' | 'close' {
   if (key.defaultPrevented || key.isComposing) return 'ignore';
   return key.fieldText ? 'leave' : 'close';
 }
+
+/**
+ * How many pixels of a frame whose right edge is at `frameRight` the bar covers, its left edge at `barLeft` (null with no bar drawn): none
+ * on a `narrow` screen, where the bar is the whole width and a frame narrowed by it would have no room left, and never fewer than none.
+ */
+export const barOver = (frameRight: number, barLeft: number | null, narrow: boolean): number =>
+  barLeft === null || narrow ? 0 : Math.max(0, frameRight - barLeft);

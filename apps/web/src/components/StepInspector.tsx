@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import type { RunDetail, StepTry } from '../lib/api';
 import { duration, isLive } from '../lib/canvas';
@@ -22,68 +22,11 @@ type Step = RunDetail['steps'][number];
 const TABS = ['Details', 'Output', 'Activity'] as const;
 type Tab = (typeof TABS)[number];
 
-type Props = {
-  run: RunDetail;
-  step: Step;
-  onClose: () => void;
-  /** Which run the step is in, above its name: on the Factory, where the steps of several runs are drawn. */
-  runTitle?: string;
-  /** Classes over the panel's own, for where it sits beside the floor. */
-  className?: string;
-};
-
 /**
- * The tab the inspector opens on for a step nobody has picked a tab for: Output once the step has a closeout — it signed off, at its gate,
+ * The tab a step's tabs (`StepTabs`) open on for a step nobody has picked a tab for: Output once the step has a closeout — it signed off, at its gate,
  * blocked or done — since what it handed on is what there is to read, and at a gate what a person approves; Details before that.
  */
 export const openingTab = (step: Pick<Step, 'closeout'>): Tab => (step.closeout ? 'Output' : 'Details');
-
-/**
- * The step inspector beside the factory's floor, for the step tile that was pressed: its run's title, the step's name, a button and
- * Escape that close it (`onClose`), around the step's tabs (`StepTabs`), which it keeps mounted as another step is pressed.
- */
-export function StepInspector({ run, step, onClose, runTitle, className }: Props) {
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
-
-  return (
-    <aside
-      aria-label={`Step ${step.name}`}
-      className={cn(
-        'flex h-[30rem] min-h-0 flex-col rounded border border-neutral-200 bg-white text-sm md:w-80 md:shrink-0 dark:border-neutral-800 dark:bg-neutral-900',
-        className,
-      )}
-    >
-      <header className="flex items-center justify-between gap-2 border-b border-neutral-200 px-3 py-2 dark:border-neutral-800">
-        <div className="min-w-0">
-          <p className="font-mono text-[10px] uppercase tracking-wider text-neutral-500">step inspector</p>
-          {runTitle && (
-            <p className="truncate text-xs text-neutral-500" title={runTitle}>
-              {runTitle}
-            </p>
-          )}
-          <h2 className="truncate font-semibold" title={step.name}>
-            {step.name}
-          </h2>
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close the step's panel"
-          className="rounded px-1.5 text-lg leading-none text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
-        >
-          ×
-        </button>
-      </header>
-      <StepTabs run={run} step={step} className="min-h-0 flex-1" />
-    </aside>
-  );
-}
 
 /**
  * What is going on in one step, in three tabs. It opens on the step's `openingTab`, and a tab a person picks is kept while it stays

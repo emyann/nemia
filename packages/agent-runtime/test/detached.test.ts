@@ -458,12 +458,13 @@ test('THE LEASE refused on the monotonic clock: a beat 31s old in this boot is d
   assert.equal(await seen(), 'working', 'a beat of another boot is not compared: its heartbeatAt answers, and it is fresh');
 });
 
-test('the spawn and the worker each beat on the monotonic clock of this boot: the worker’s first write beats again', async () => {
+test('the spawn and the worker each beat on the monotonic clock of this boot, and every write of the worker beats again', async () => {
   const dir = root();
   const ops = detachedOps(sh('sleep 30'), dir);
   await Effect.runPromise(ops.spawn(req('ae/m3/1', dir)));
   const file = path.join(dir, 'runs', 'sh', 'ae_m3_1.json');
-  const read = () => JSON.parse(fs.readFileSync(file, 'utf8')) as { pid: number; beat?: { boot: string; ms: number } };
+  const read = () =>
+    JSON.parse(fs.readFileSync(file, 'utf8')) as { pid: number; heartbeatAt: string; beat?: { boot: string; ms: number } };
   const spawned = read();
   assert.equal(spawned.pid, 0, 'read as the spawn wrote it, before the worker');
   assert.equal(spawned.beat?.boot, monoNow()?.boot, 'the spawn beats in this boot');
@@ -478,6 +479,15 @@ test('the spawn and the worker each beat on the monotonic clock of this boot: th
   }
   assert.equal(worker.beat?.boot, monoNow()?.boot, 'the worker beats in this boot');
   assert.ok(worker.beat!.ms > spawned.beat!.ms, 'the worker writes a beat of its own, not the one the spawn left');
+  let later = worker;
+  while (later.heartbeatAt === worker.heartbeatAt && performance.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 100));
+    try {
+      later = read();
+    } catch {}
+  }
+  assert.notEqual(later.heartbeatAt, worker.heartbeatAt, 'the worker wrote its run file again');
+  assert.ok(later.beat!.ms > worker.beat!.ms, 'a later write beats again, not only the first');
   await Effect.runPromise(ops.stop('ae/m3/1'));
   await settle(ops, 'ae/m3/1', 'canceled');
 });

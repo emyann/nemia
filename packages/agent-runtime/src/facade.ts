@@ -39,6 +39,11 @@ export type { Credentials, MissingCredential, RemoteAgent } from './a2a/index.ts
  * from a file of its own and words the refusal there.
  */
 export { remoteConfigRefusal } from './a2a/index.ts';
+/**
+ * Why a task's configuration on one of the harnesses an engine runs by default is one `file()` refuses, in the runtime's words, or
+ * `undefined`: for a caller that checks a task before it files it, and words the refusal in its own keys.
+ */
+export { configRefusal } from './service/harnesses.ts';
 export { denialText, nameFor } from './core/index.ts';
 /**
  * The task's lifecycle as plain data — states, edges, first and final states, and the verbs written from outside it — for a board to

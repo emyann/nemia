@@ -17,6 +17,7 @@ const PINNED: Record<string, string[]> = {
     'claudeDetached',
     'codex',
     'commandHarness',
+    'configRefusal',
     'denialText',
     'lifecycleGraph',
     'nameFor',

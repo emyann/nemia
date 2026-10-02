@@ -40,6 +40,11 @@ export { lifecycleGraph, type LifecycleGraph } from 'agent-runtime';
 export { denialText } from 'agent-runtime';
 /** A move the runtime's lifecycle had no edge for, as a person reads it in `wf up`'s log (`refusalLines`). */
 export { refusedText } from 'agent-runtime';
+/**
+ * Why the runtime would refuse a task's configuration on one of its default harnesses, in its words, or undefined: what `wf start` and
+ * `wf retry` ask of a step's filed config before anything is written, and word in the step's keys (`filedRefusal`).
+ */
+export { configRefusal } from 'agent-runtime';
 
 /**
  * Why one task's journal does not read, in the runtime's words, when `err` is what a read of it rejected with — the runtime's

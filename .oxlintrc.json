@@ -182,6 +182,91 @@
         "no-inline-comments": ["error", { "ignorePattern": "^\\s*(oxlint|eslint)-(disable|enable)" }]
       }
     },
+    // The layers (docs/architecture.md): each reaches the one below it, and nothing reaches up or skips one. One block per layer, over its
+    // source alone, since a test may import the runtime's entries for a fake. Their globs never overlap, because a later block that sets
+    // `no-restricted-imports` on a file replaces an earlier one's options. packages/agent-orchestrator/test/imports.test.ts reads these blocks.
+    // The board reaches the api over HTTP alone: no workspace package, no harness SDK, no path into packages/.
+    {
+      "files": ["apps/web/src/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["agent-orchestrator", "agent-orchestrator/**", "agent-runtime", "agent-runtime/**"],
+                "message": "The board reaches the api over HTTP alone: ask the api for what this import gives"
+              },
+              {
+                "group": ["@anthropic-ai/claude-agent-sdk", "@anthropic-ai/claude-agent-sdk/**", "@a2a-js/sdk", "@a2a-js/sdk/**"],
+                "message": "Only agent-runtime reaches a harness: ask the api for what this import gives"
+              },
+              { "group": ["**/packages/**"], "message": "The board imports no package's file: ask the api for what this import gives" }
+            ]
+          }
+        ]
+      }
+    },
+    // The api reaches the orchestrator's public entries alone, and never the runtime or a harness.
+    {
+      "files": ["apps/api/src/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["agent-orchestrator/**", "!agent-orchestrator/run", "!agent-orchestrator/workflow", "!agent-orchestrator/effect"],
+                "message": "The api reaches agent-orchestrator through its entries alone: agent-orchestrator, /run, /workflow or /effect"
+              },
+              {
+                "group": ["agent-runtime", "agent-runtime/**"],
+                "message": "The api never reaches the runtime: call the orchestrator entry that does"
+              },
+              {
+                "group": ["@anthropic-ai/claude-agent-sdk", "@anthropic-ai/claude-agent-sdk/**", "@a2a-js/sdk", "@a2a-js/sdk/**"],
+                "message": "Only agent-runtime reaches a harness: call the orchestrator entry that does"
+              },
+              { "group": ["**/packages/**"], "message": "The api imports a package by its name and entries, never a path into it" }
+            ]
+          }
+        ]
+      }
+    },
+    // The orchestrator reaches the runtime through its client, and a harness never.
+    {
+      "files": ["packages/agent-orchestrator/src/**", "packages/agent-orchestrator/bin/**", "packages/agent-orchestrator/place/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@anthropic-ai/claude-agent-sdk", "@anthropic-ai/claude-agent-sdk/**", "@a2a-js/sdk", "@a2a-js/sdk/**"],
+                "message": "Only agent-runtime reaches a harness: reach it through src/runtime-client.ts"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    // The runtime is the bottom layer: it reaches no layer above it.
+    {
+      "files": ["packages/agent-runtime/src/**", "packages/agent-runtime/bin/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["agent-orchestrator", "agent-orchestrator/**", "**/agent-orchestrator/**"],
+                "message": "The runtime reaches no layer above it: carry the knob on the task, read by a runner"
+              }
+            ]
+          }
+        ]
+      }
+    },
     // The size and complexity limits are off where a file is not code a person shapes. A test file is a list of cases, and its length is
     // its coverage.
     {

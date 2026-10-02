@@ -14,6 +14,12 @@
  * any other `<name>.ts` pure, and every file under `src/cli/` is the CLI. A file at the root of `src` or in `bin` is named in a list
  * below. Tests beside the code (`*.test.ts`) are of no kind and are not read.
  *
+ * **A pure file reaches nothing outside the process**: no disk, no process, no network (`http`, `https`, `net`), nothing of the machine
+ * (`os`), bare or as `node:` (`IMPURE`), and it reads neither `process.env` nor `fetch` outside its comment lines (`globalsIn`).
+ *
+ * **A place skill's script stands alone** (`placeBreaks`): it imports node's built-ins and the scripts beside it in its own `scripts/`
+ * folder, and nothing else, since node runs it as it is.
+ *
  * **The runtime is reached through one client**, `CLIENT`, `runtime-client.ts`: of the package's files, it alone imports agent-runtime,
  * a type included; every controller beneath the CLI imports it, or imports a controller that reaches it, and it imports no controller.
  *
@@ -23,6 +29,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { builtinModules } from 'node:module';
 import path from 'node:path';
 
 const PKG = path.join(import.meta.dirname, '..');
@@ -101,7 +108,11 @@ const CLI_REACHES = ['src/runner.ts', 'src/workflow.ts'];
 /** The package's files `bin/wf.ts` may import: the CLI, and what it exits with, imported before the package loads. */
 const BIN_REACHES = ['src/cli/main.ts', 'src/cli/exit.ts'];
 
-const IMPURE = ['fs', 'node:fs', 'fs/promises', 'node:fs/promises', 'child_process', 'node:child_process'];
+/** The node modules a pure file never imports, bare or as `node:`: the disk, a process, the network and the machine. */
+const IMPURE = ['fs', 'fs/promises', 'child_process', 'http', 'https', 'net', 'os'].flatMap((m) => [m, `node:${m}`]);
+
+/** The globals a pure file never reads, named in its sources as a module is: the environment and the network. */
+const IMPURE_GLOBALS = ['global:process.env', 'global:fetch'];
 
 type Sources = Record<string, readonly string[]>;
 
@@ -114,12 +125,30 @@ function importsIn(text: string): string[] {
   return [...found].sort();
 }
 
+/** Source text with each comment line blanked: a line that opens with `//`, `/*` or `*`. */
+const withoutComments = (text: string): string =>
+  text
+    .split('\n')
+    .map((line) => (/^\s*(\/\/|\/\*|\*)/.test(line) ? '' : line))
+    .join('\n');
+
+/** The impure globals a piece of source reads outside its comment lines, each as `IMPURE_GLOBALS` names it. */
+function globalsIn(text: string): string[] {
+  const code = withoutComments(text);
+  const found: string[] = [];
+  if (/\bprocess\s*(?:\.\s*env\b|\[\s*['"`]env['"`]\s*\])/.test(code)) found.push('global:process.env');
+  if (/(?:^|[^.\w$])fetch\s*\(|\bglobalThis\s*\.\s*fetch\b/m.test(code)) found.push('global:fetch');
+  return found;
+}
+
 /** A relative module as the package path it names (`../runner.ts` in `src/cli/main.ts` is `src/runner.ts`); any other as written. */
 const resolved = (file: string, mod: string): string => (mod.startsWith('.') ? path.posix.join(path.posix.dirname(file), mod) : mod);
 
-/** Each source file's imports, resolved: `src/` and `bin/`, every `.ts`. */
+/** Each source file's imports, resolved, and the impure globals it reads: `src/` and `bin/`, every `.ts`. */
 function sourcesOf(texts: Record<string, string>): Sources {
-  return Object.fromEntries(Object.entries(texts).map(([file, text]) => [file, importsIn(text).map((m) => resolved(file, m))]));
+  return Object.fromEntries(
+    Object.entries(texts).map(([file, text]) => [file, [...importsIn(text).map((m) => resolved(file, m)), ...globalsIn(text)]]),
+  );
 }
 
 /** Every `.ts` under `src` and `bin`, in folders too, but the tests beside the code. */
@@ -163,7 +192,10 @@ function unsorted(sources: Sources): string[] {
   return out;
 }
 
-/** A pure file imports no runtime, no disk, no process, no Effect but `PURE_EFFECT`, and no store, controller or client file. */
+/**
+ * A pure file imports no runtime, no disk, no process, no network, nothing of the machine, no Effect but `PURE_EFFECT`, and no store,
+ * controller or client file, and reads neither the environment nor `fetch`.
+ */
 function impurities(sources: Sources): string[] {
   const of = kinds(sources);
   return of.PURE.flatMap((file) =>
@@ -173,6 +205,7 @@ function impurities(sources: Sources): string[] {
           isRuntime(m) ||
           (isEffect(m) && m !== PURE_EFFECT) ||
           IMPURE.includes(m) ||
+          IMPURE_GLOBALS.includes(m) ||
           of.STORE.includes(m) ||
           of.CONTROLLER.includes(m) ||
           m === CLIENT,
@@ -291,6 +324,33 @@ function cycles(sources: Sources): string[] {
   return [...found].sort();
 }
 
+/** Each script of a place skill (`place/<name>/scripts/`, in folders too) with its imports as written, unresolved. */
+const placeSources = (): Sources => {
+  const dir = path.join(PKG, 'place');
+  return Object.fromEntries(
+    fs
+      .readdirSync(dir, { recursive: true, encoding: 'utf8' })
+      .map((f) => `place/${f.split(path.sep).join('/')}`)
+      .filter((f) => /^place\/[^/]+\/scripts\/.+\.ts$/.test(f))
+      .map((f) => [f, importsIn(fs.readFileSync(path.join(PKG, f), 'utf8'))]),
+  );
+};
+
+/** A node built-in, bare or as `node:`. */
+const isBuiltin = (m: string): boolean => m.startsWith('node:') || builtinModules.includes(m);
+
+/**
+ * A place skill's script stands alone, run by node as it is: it imports node's built-ins and the scripts beside it in its own folder,
+ * never a package, the package's source or another skill's script.
+ */
+function placeBreaks(sources: Sources): string[] {
+  return Object.entries(sources).flatMap(([file, imports]) =>
+    imports
+      .filter((m) => !isBuiltin(m) && !/^\.\/[^/]+\.ts$/.test(m))
+      .map((m) => `${file} imports ${m}: a place script imports node's built-ins and the scripts beside it alone`),
+  );
+}
+
 /** The package's sources with `file`'s imports changed by `change`: a copy, so each plant breaks one thing. */
 const planted = (file: string, change: (imports: readonly string[]) => readonly string[]): Sources => {
   const sources = { ...packageSources() };
@@ -320,6 +380,33 @@ test('the scanner sees every way a file can name a module — or the rules below
     { 'bin/wf.ts': ['src/cli/main.ts'] },
     'a relative module is the package path it names',
   );
+});
+
+test('the scanner sees the environment and fetch outside comment lines, and only there', () => {
+  const text = [
+    "const home = process.env.HOME ?? '';",
+    'const answer = await fetch(',
+    "  'http://localhost',",
+    ');',
+    "const root = process['env'];",
+    'const f = globalThis.fetch;',
+    '// a comment that reads process.env.X and calls fetch( is not code',
+  ].join('\n');
+  assert.deepEqual(globalsIn(text), IMPURE_GLOBALS);
+  assert.deepEqual(globalsIn(text.split('\n').slice(0, 2).join('\n')), IMPURE_GLOBALS, 'each on a line of its own');
+  assert.deepEqual(
+    globalsIn('const r = await client.fetch(url);\nconst e = run.process.envelope;'),
+    [],
+    'a method named fetch is no global',
+  );
+  assert.deepEqual(
+    globalsIn(['/**', ' * Reads `process.env.WF_ROOT` and calls `fetch(url)`.', ' */', '// fetch(', '/* process.env */'].join('\n')),
+    [],
+    'a JSDoc or a comment line names them and reads nothing',
+  );
+  assert.deepEqual(sourcesOf({ 'src/x/x.ts': "import fs from 'node:fs';\nconst x = process.env.X;" }), {
+    'src/x/x.ts': ['node:fs', 'global:process.env'],
+  });
 });
 
 test('every file in src and bin is of one kind, and every file a kind names is there', () => {
@@ -420,6 +507,42 @@ test('REFUSED: a pure file that reads the disk, spawns, imports the runtime or E
   ]);
   assert.deepEqual(impurities(adding('src/views/views-words.ts', 'src/views/views.verb.ts')), [
     'src/views/views-words.ts is pure and imports src/views/views.verb.ts',
+  ]);
+});
+
+test('REFUSED: a pure file that reaches the network or the machine, reads the environment or calls fetch', () => {
+  for (const m of ['node:os', 'os', 'node:http', 'http', 'node:https', 'node:net', 'net'])
+    assert.deepEqual(impurities(adding('src/run.ts', m)), [`src/run.ts is pure and imports ${m}`]);
+  assert.deepEqual(impurities(adding('src/workflow.ts', 'global:process.env')), ['src/workflow.ts is pure and imports global:process.env']);
+  assert.deepEqual(impurities(adding('src/tick/assess.ts', 'global:fetch')), ['src/tick/assess.ts is pure and imports global:fetch']);
+  const read = sourcesOf({ 'src/x/x.ts': 'export const root = () => process.env.WF_ROOT;\nexport const get = (u: string) => fetch(u);' });
+  assert.deepEqual(impurities({ ...packageSources(), ...read }), [
+    'src/x/x.ts is pure and imports global:process.env',
+    'src/x/x.ts is pure and imports global:fetch',
+  ]);
+  const said = sourcesOf({ 'src/x/x.ts': '/** Reads no `process.env` and calls no `fetch(url)`. */\nexport const x = 1;' });
+  assert.deepEqual(impurities({ ...packageSources(), ...said }), [], 'a JSDoc that names them is let through');
+  assert.deepEqual(impurities(adding('src/wait/wait.verb.ts', 'global:process.env')), [], 'a controller reads the environment');
+});
+
+test('the scripts of a place skill import node built-ins and the scripts beside them alone', () => {
+  const sources = placeSources();
+  assert.ok('place/git/scripts/contract.ts' in sources, `the scan read ${Object.keys(sources).join(', ') || 'no script'}`);
+  assert.ok(sources['place/git/scripts/land.ts'].includes('./contract.ts'), 'and read their imports');
+  assert.deepEqual(placeBreaks(sources), []);
+});
+
+test('REFUSED: a place script that imports a package, the package source, another skill or a folder beneath it', () => {
+  const at = 'place/git/scripts/contract.ts';
+  const plant = (m: string): Sources => ({ ...placeSources(), [at]: [...placeSources()[at], m] });
+  for (const m of ['effect', 'agent-runtime', 'agent-orchestrator/run', '../../../src/run.ts', '../../other/scripts/x.ts', './sub/x.ts'])
+    assert.deepEqual(placeBreaks(plant(m)), [
+      `${at} imports ${m}: a place script imports node's built-ins and the scripts beside it alone`,
+    ]);
+  for (const m of ['node:fs', 'fs', 'path', 'node:child_process', './open.ts'])
+    assert.deepEqual(placeBreaks(plant(m)), [], `${m} is let through`);
+  assert.deepEqual(placeBreaks({ 'place/other/scripts/x.ts': ['../../git/scripts/contract.ts'] }), [
+    "place/other/scripts/x.ts imports ../../git/scripts/contract.ts: a place script imports node's built-ins and the scripts beside it alone",
   ]);
 });
 

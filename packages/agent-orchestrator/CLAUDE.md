@@ -10,8 +10,9 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
 
 - **A file in `src/<feature>/` says its kind by its name**: `x.store.ts`, `x.verb.ts`, else pure; only a top-level file is listed in
   `boundary.test.ts`. A test beside its file reaches the helpers one folder further up (`../../test/scratch.ts`).
-- **A place skill's scripts (`place/git/scripts/`) are standalone**: node's built-ins and erasable TypeScript only, run by the package
-  only through `runPlaceVerb` (`src/place/place.store.ts`); a verb declared in `place.json` has its script (`readPlaceJson`).
+- **A place skill's scripts (`place/git/scripts/`) are standalone**: node's built-ins and erasable TypeScript only (`placeBreaks` in
+  `test/boundary.test.ts`), run by the package only through `runPlaceVerb` (`src/place/place.store.ts`); a verb declared in
+  `place.json` has its script (`readPlaceJson`).
 - **Git holds `index.lock` through a clean filter under `git add`, not through `git commit`'s pre-commit hook** (it writes the index
   first): a test that holds a lock past a verb's deadline holds it with a filter (`test/git-skill.test.ts`).
 

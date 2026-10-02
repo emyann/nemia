@@ -75,15 +75,28 @@ test("the command runs in the task's folder, with its env laid over the worker's
   assert.equal(await engine.output(id, 'stdout'), `a b|${fs.realpathSync(cwd)}|path`);
 });
 
-test('a niceness lowers the priority the command runs at, and gives it the idle IO class where the machine has one', async () => {
+test("a niceness lowers the priority the command runs at from the worker's own, and gives it the idle IO class where the machine has one", async () => {
   const idle = spawnSync('nice', ['-n', '10', 'ionice', '-c3', 'true'], { stdio: 'ignore' }).status === 0;
   const { engine, id } = await ran(['sh', '-c', 'ps -o ni= -p $$; ionice -p $$ 2>/dev/null || echo none'], { niceness: 10 });
   const [ni, io] = (await engine.output(id, 'stdout'))!.trim().split('\n');
-  assert.equal(ni.trim(), '10');
+  assert.equal(ni.trim(), String(Math.min(19, ownNiceness() + 10)), 'ten below its own, as low as the kernel goes');
   if (idle) assert.equal(io, 'idle');
   else assert.notEqual(io, 'idle');
   const plain = await ran(['sh', '-c', 'ps -o ni= -p $$'], { niceness: 0 });
   assert.equal((await plain.engine.output(plain.id, 'stdout'))!.trim(), String(ownNiceness()), "niceness 0 is the worker's own");
+});
+
+test('a niceness puts `nice -n` before the command, and `ionice -c3` after it only where prepare found the idle class runs', () => {
+  const asked = (niceness: number) => ({ name: 'ae/n/1', brief: 'b', cwd: '/', config: { command: ['npm', 'test'], niceness } });
+  const idle = spawnSync('nice', ['-n', '10', 'ionice', '-c3', 'true'], { stdio: 'ignore' }).status === 0;
+  assert.deepEqual(commandHarness.prepare!(asked(10)), idle ? { idleIo: true } : {});
+  assert.deepEqual(commandHarness.prepare!(asked(0)), {}, "a command at the worker's own priority keeps its IO class");
+  assert.deepEqual(commandHarness.command(asked(10), { idleIo: true }), {
+    cmd: 'nice',
+    args: ['-n', '10', 'ionice', '-c3', 'npm', 'test'],
+  });
+  assert.deepEqual(commandHarness.command(asked(10), {}), { cmd: 'nice', args: ['-n', '10', 'npm', 'test'] });
+  assert.deepEqual(commandHarness.command(asked(0), { idleIo: true }), { cmd: 'npm', args: ['test'] });
 });
 
 /** This process's own niceness, which a worker it spawns inherits. */

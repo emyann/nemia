@@ -76,6 +76,8 @@ down is in `docs/architecture.md`, *Who owns what*.
   read as absent. A field the runtime starts reading is added to the schema; any other line passes undecoded.
 - **A stream a runner keeps whole is read through `output`, never off the run directory** (`streamIn`, `detached.ts`, which counts
   the read); a harness that keeps its streams apart says `streams: true`. `config.env` is journalled with the task: no secret there.
+- **A run's check runs niced and IO-idle, and its workers inherit both**: a test reads a niceness from its own (`ownNiceness`,
+  `test/command.test.ts`) and proves an argv the IO class would hide by calling the harness's `command`.
 - **A stream-json line is parsed for its `type`, never matched at its start** (`closesOn` in `bin/ae-worker.ts`): a job reading
   `--input-format stream-json` exits only when its stdin ends.
 

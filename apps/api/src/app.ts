@@ -4,7 +4,7 @@ import { HTTPException } from 'hono/http-exception';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { isRefusal, type Refusal } from 'agent-orchestrator/effect';
 import { agents, skills } from './agents/index.ts';
-import { asks } from './asks/index.ts';
+import { commands } from './commands/index.ts';
 import { capabilitiesWithSteps, McpAsker } from './capabilities/index.ts';
 import { factories } from './factories/index.ts';
 import { ceilingsOf, feed, QuotaAsker, readDaemon } from './factory/index.ts';
@@ -81,8 +81,8 @@ export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Servic
  * - `GET /api/quota` — the subscription's quota, as the engine's `quota` answers it for the `claude` harness (Claude Code's get_usage
  *   request), asked at most once a keep however many boards read (`QuotaAsker`, factory/quota.ts): what the Factory says over its floor.
  *   Every case is a 200 with a sentence, the harness's failures and the engine's refusals included.
- * - asks/asks.ts — a person's asks of a run: a try (with answers to its questions, asks/answers.ts), a round, words for a running
- *   session, an approval and an acceptance; five writes.
+ * - commands/routes.ts — a person's asks of a run, generated from the package's command table: a try (with answers to its questions,
+ *   commands/extend.ts and asks/answers.ts), a round, words for a running session, an approval and an acceptance; five writes.
  * - steps/steps.ts — a step's own reads: its output, its files, and its conversation, once or followed.
  * - factory/feed.ts — the workflow feed followed, as server-sent events.
  * - machines/machines.ts — the state machines the board draws, listed, and one machine's graph, read off its code.
@@ -114,7 +114,7 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     .get('/api/ceilings', (c) => served(c, async ({ e, env }) => c.json(await ceilingsOf(e, env))))
     .get('/api/daemon', (c) => c.json(readDaemon()))
     .get('/api/quota', (c) => served(c, async ({ e, env, quota }) => c.json(await quota({ env, ask: () => e.quota('claude') }))))
-    .route('/', asks)
+    .route('/', commands)
     .route('/', steps)
     .route('/', feed)
     .route('/', machines)

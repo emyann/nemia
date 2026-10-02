@@ -308,13 +308,57 @@ const sessionNeeds = (raise: Raise | undefined): string =>
     : '';
 
 /**
+ * The words of the offer to raise a step's cap past what it spent (`retryOffers`): its bare command, from `command`, what comes before it
+ * in the sentence, from the step's state (`word`) and whether a ship may run again (`shipAgain`), and what after, ending on `more`.
+ */
+const raiseWords = (command: string, word: string, raise: Raise, shipAgain: string, more: string): [string, string, string] => [
+  `${command} --budget <amount>`,
+  `${word}, ${spentWord(raise.spent)} of ${budgetWord(raise.cap)}.${shipAgain} Raise its cap above ${aboveWord(raise)} and continue its session`,
+  `  (--fresh, or --model <m>, for a new session${more})`,
+];
+
+/**
+ * The words of the offer to send a step's work back when the endings after it (`back`) stopped on the base branch (`retryOffers`): its
+ * bare command, from `command`, and what comes before it in the sentence.
+ */
+const backWords = (command: string, step: string, back: string): [string, string] => [
+  `${command} --message "<objection>"`,
+  `${back} stopped on the base branch. Send the work back, when it does not hold on the base branch — ${step} is filed again with your objection and what ${back} said, may ask for a round, and ${back} waits at its gate for a new approval`,
+];
+
+/**
+ * The words of the offer to an ending that lands on its check, whose merge the run aborted (`retryOffers`): its bare `command`, what comes
+ * before it in the sentence and what after. Merge and check again when its check did not finish (`unfinished`), with nothing staged for
+ * `--recheck` to judge; otherwise continue its session, told what happened (`happened`). Each with what a new session needs past a budget.
+ */
+const abortedWords = (
+  run: Run,
+  command: string,
+  unfinished: boolean,
+  raise: Raise | undefined,
+  happened: string,
+): [string, string, string] =>
+  unfinished
+    ? [
+        command,
+        `its check did not finish, so the run aborted the merge and nothing landed on ${run.branch}. Merge and check again`,
+        sessionNeeds(raise),
+      ]
+    : [
+        command,
+        `${happened} Continue its session, told what happened`,
+        `  (--fresh, or --model <m>, for a new session${sessionNeeds(raise)})`,
+      ];
+
+/**
  * What `wf decide` offers for each step a person may try again: the command, and what it does. Pure.
  *
  * A check that did not finish is said so, with `--recheck` first: the run spent no retry on it, and the work
  * may pass as it stands. For anything else, `wf retry` continues the step's session, told what happened.
  *
- * Each offer is its sentence and, beside it, the bare command it ends on (`Offer`), which the board offers (`choicesOf`): the sentence says
- * `<step>: …:  wf retry <run> <step>  (--fresh…`. The answer to a blocked step is `answerLines`', beside its question.
+ * Each offer is its sentence and, beside it, the bare command it ends on (`Offer`), which the board offers (`choicesOf`): the sentence is
+ * written around the command, `<step>: …:  wf retry <run> <step>  (--fresh…`, so the two cannot say different things. The answer to a
+ * blocked step is `answerLines`', beside its question.
  *
  * None on a pruned run (`prunedRefusal`), nor on a held one (`heldRefusal`), whose decision is `running` and says so. A step at its gate
  * is offered its approval and its send-back (`gateLines`), never a try with nothing to change. The looping step an ending that stopped
@@ -341,7 +385,8 @@ export function retryOffers(
   if (d.kind !== 'awaiting' || run.pruned || run.hold) return [];
   const lines: Offer[] = [];
   for (const step of steps) {
-    const offer = (bare: string, said: string) => lines.push({ step: step.name, command: bare, said });
+    const offer = (bare: string, before: string, after = '') =>
+      lines.push({ step: step.name, command: bare, said: `${step.name}: ${before}:  ${bare}${after}` });
     const { status, modes, sendsBack, back, raise } = retryable(
       step,
       run,
@@ -355,10 +400,7 @@ export function retryOffers(
     );
     const command = `wf retry ${run.id} ${step.name}`;
     if (back) {
-      offer(
-        `${command} --message "<objection>"`,
-        `${step.name}: ${back.join(', ')} stopped on the base branch. Send the work back, when it does not hold on the base branch — ${step.name} is filed again with your objection and what ${back.join(', ')} said, may ask for a round, and ${back.join(', ')} waits at its gate for a new approval:  ${command} --message "<objection>"`,
-      );
+      offer(...backWords(command, step.name, back.join(', ')));
       continue;
     }
     if (!modes.length || sendsBack) continue;
@@ -368,40 +410,41 @@ export function retryOffers(
     const spent = step.retries ? `; retries: ${step.retries}, ${retriesSpent(run.steps[step.name])} spent` : '';
     const record = run.steps[step.name];
     if (landsOnCheck(step, run) && record?.landed && 'aborted' in record.landed) {
-      const budget = raise ? ` --budget <amount>` : '';
-      const said = d.unfinishedCheck.includes(step.name)
-        ? `its check did not finish, so the run aborted the merge and nothing landed on ${run.branch}. Merge and check again:  ${command}${budget}${sessionNeeds(raise)}`
-        : `${status} — ${landedWords(run, record.landed)}.${shipAgain} Continue its session, told what happened:  ${command}${budget}  (--fresh, or --model <m>, for a new session${sessionNeeds(raise)})`;
-      offer(`${command}${budget}`, `${step.name}: ${said}`);
+      offer(
+        ...abortedWords(
+          run,
+          `${command}${raise ? ' --budget <amount>' : ''}`,
+          d.unfinishedCheck.includes(step.name),
+          raise,
+          `${status} — ${landedWords(run, record.landed)}.${shipAgain}`,
+        ),
+      );
       continue;
     }
     if (d.unfinishedCheck.includes(step.name)) {
       offer(
         `${command} --recheck`,
-        `${step.name}: its check did not finish, so no retry was spent on it. Run the check again, and nothing else:  ${command} --recheck${sessionNeeds(raise)}`,
+        'its check did not finish, so no retry was spent on it. Run the check again, and nothing else',
+        sessionNeeds(raise),
       );
     } else if (raise) {
       const recheck = modes.includes('recheck') ? '; --recheck runs its check again, and needs no --budget' : '';
       const own = ownStatus(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf);
       const word = status === 'over budget' ? `over budget (${own === 'failed (check)' ? 'check refused' : own})` : status;
-      offer(
-        `${command} --budget <amount>`,
-        `${step.name}: ${word}, ${spentWord(raise.spent)} of ${budgetWord(raise.cap)}.${shipAgain} Raise its cap above ${aboveWord(raise)} and continue its session:  ${command} --budget <amount>  (--fresh, or --model <m>, for a new session${spent}${recheck})`,
-      );
+      offer(...raiseWords(command, word, raise, shipAgain, `${spent}${recheck}`));
     } else if (status === 'denied') {
       offer(
         `${command} --fresh`,
-        `${step.name}: ${deniedOffer(spendOf(run.steps[step.name].taskId!)?.denied ?? [], { disallowedTools: filedDenies(step, run) }, { cwd: run.steps[step.name].workspace, runId: run.id })}${shipAgain} A new session, told to do without it:  ${command} --fresh  (or continue its session: ${command})`,
+        `${deniedOffer(spendOf(run.steps[step.name].taskId!)?.denied ?? [], { disallowedTools: filedDenies(step, run) }, { cwd: run.steps[step.name].workspace, runId: run.id })}${shipAgain} A new session, told to do without it`,
+        `  (or continue its session: ${command})`,
       );
     } else if (isRemoteHarness(step.harness)) {
-      offer(
-        command,
-        `${step.name}: ${status}. Send it again, as a new Task told what happened:  ${command}${spent ? `  (${spent.slice(2)})` : ''}`,
-      );
+      offer(command, `${status}. Send it again, as a new Task told what happened`, spent ? `  (${spent.slice(2)})` : '');
     } else {
       offer(
         command,
-        `${step.name}: ${status}.${shipAgain} Continue its session, told what happened:  ${command}  (--fresh, or --model <m>, for a new session${spent})`,
+        `${status}.${shipAgain} Continue its session, told what happened`,
+        `  (--fresh, or --model <m>, for a new session${spent})`,
       );
     }
   }

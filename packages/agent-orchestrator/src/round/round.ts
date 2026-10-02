@@ -468,7 +468,8 @@ const overWords = (over: ReadonlyArray<{ name: string; spent: Spend; cap: number
  *
  * None on a pruned run (`prunedRefusal`), nor on a held one (`heldRefusal`). A loop over budget and not held for it, its own try stopped,
  * is `retryLines`' to offer. `wf accept` is offered only out of rounds: below the cap the run goes round itself, and on a round held for a
- * budget raising it is the way on (`acceptAsk`). Each offer is its sentence and the bare command it ends on (`Offer`).
+ * budget raising it is the way on (`acceptAsk`). Each offer is its sentence and the bare command it ends on (`Offer`), the sentence written
+ * around the command.
  */
 export function roundOffers(steps: readonly Workflow[], run: Run, d: Decision, spendOf: SpendOf = () => undefined): Offer[] {
   if (d.kind !== 'awaiting' || run.pruned || run.hold) return [];
@@ -483,24 +484,22 @@ export function roundOffers(steps: readonly Workflow[], run: Run, d: Decision, s
       const once = over.length ? `, its cap raised above ${dollars(Math.max(...over.map((o) => o.spent.usd)))}` : '';
       const why = exhausted ? `\`rounds: ${capOf(looping)}\` are spent${raise}` : overWords(over);
       const round = `wf round ${run.id} ${name}${over.length ? ' --budget <amount>' : ''}`;
-      const again: Offer = {
-        step: name,
-        command: round,
-        said: `${name}: it asked for round ${roundOf(run, name) + 1}, and ${why}. Its findings are below. Once more${once} — ${looping.loop} continued, then a new ${name}:  ${round}`,
-      };
+      const offer = (command: string, before: string): Offer => ({ step: name, command, said: `${name}: ${before}:  ${command}` });
+      const again = offer(
+        round,
+        `it asked for round ${roundOf(run, name) + 1}, and ${why}. Its findings are below. Once more${once} — ${looping.loop} continued, then a new ${name}`,
+      );
       if (!exhausted) return [again];
       const after = steps.filter((s) => s.after.includes(name)).map((s) => s.name);
       const then = after.length
         ? `${andList(after)} ${after.length > 1 ? 'are' : 'is'} filed and handed them with your words`
         : 'the run ends with them on the record';
-      const accept = `wf accept ${run.id} ${name} --message "<why>"`;
       return [
         again,
-        {
-          step: name,
-          command: accept,
-          said: `${name}: enough — go on with what is there; its findings stay on the record, and ${then}:  ${accept}`,
-        },
+        offer(
+          `wf accept ${run.id} ${name} --message "<why>"`,
+          `enough — go on with what is there; its findings stay on the record, and ${then}`,
+        ),
       ];
     });
 }

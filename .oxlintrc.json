@@ -691,7 +691,7 @@
       "files": ["packages/agent-orchestrator/src/retry/retry.ts"],
       "rules": {
         "complexity": ["error", { "max": 46 }],
-        "sonarjs/cognitive-complexity": ["error", 38]
+        "sonarjs/cognitive-complexity": ["error", 35]
       }
     },
     {

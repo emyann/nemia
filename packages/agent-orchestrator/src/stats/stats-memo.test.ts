@@ -1,0 +1,260 @@
+/**
+ * The stats' memo of each run's facts (`StatsMemo`, stats.verb.ts): a call through it reads again only the runs whose inputs changed — its
+ * files in the store (their stamp), its tasks' journals (the engine's feed) — and never keeps a run in flight; it answers what a call
+ * without it answers.
+ *
+ * Walked through the runtime itself, `promiseEngine` over an in-memory journal whose feed every append reaches, as the runtime's own
+ * journal does, and the engine's `view` counted by task id. A file of its own, since `stats` reads every run under `WF_ROOT`, read as the
+ * store loads, so it is set before the import.
+ */
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import type { PromiseJournal, PromiseRunner } from 'agent-runtime';
+import { Engine, promiseEngine } from 'agent-runtime/effect';
+import { scratch } from '../../test/scratch.ts';
+
+const ROOT = scratch('wf-stats-memo-');
+fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
+process.env.WF_ROOT = ROOT;
+const { freshStatsMemo, stats } = await import('./stats.verb.ts');
+
+type Event = Parameters<PromiseJournal['append']>[1];
+
+/** The engine's store, in memory: every append reaches the feed. */
+const memoryJournal = (): PromiseJournal => {
+  const tasks = new Map<string, Event[]>();
+  const feed: Awaited<ReturnType<PromiseJournal['feed']>>['entries'] = [];
+  return {
+    async append(taskId, event) {
+      tasks.set(taskId, [...(tasks.get(taskId) ?? []), event]);
+      feed.push({ taskId, event });
+    },
+    async read(taskId) {
+      return [...(tasks.get(taskId) ?? [])];
+    },
+    async list() {
+      return [...tasks.keys()].sort();
+    },
+    async feed(after) {
+      return { entries: feed.slice(after), cursor: feed.length };
+    },
+  };
+};
+
+/** A harness no task here reaches: every task is journalled by hand. */
+const idle: PromiseRunner = {
+  async spawn() {},
+  async observe() {
+    return new Map();
+  },
+  async stop() {},
+  async logs() {
+    return '';
+  },
+};
+
+const journal = memoryJournal();
+const engine = promiseEngine(
+  Engine.layer({ root: path.join(ROOT, 'engine'), journal, harnesses: { codex: idle, check: idle }, defaultHarness: 'codex' }),
+);
+/** Every task id the engine was asked to view since the last `viewedRuns`. */
+let viewed: string[] = [];
+/** What the next view of the task `when` names does once it has read, before it answers: another call, as a request overlapping it. */
+let during: { when: string; then: () => Promise<unknown> } | undefined;
+const e = {
+  ...engine,
+  view: async (taskId: string) => {
+    viewed.push(taskId);
+    const view = await engine.view(taskId);
+    const hook = during?.when === taskId ? during : undefined;
+    if (hook) {
+      during = undefined;
+      await hook.then();
+    }
+    return view;
+  },
+};
+
+/** The runs whose tasks were viewed since the last call, by run id, sorted. */
+const viewedRuns = (): string[] => {
+  const runs = [...new Set(viewed.map((taskId) => taskId.slice(0, taskId.lastIndexOf('-'))))].sort();
+  viewed = [];
+  return runs;
+};
+
+const at = '2026-09-28T09:00:00.000Z';
+const ended = '2026-09-28T10:00:00.000Z';
+const NOW = new Date('2026-10-02T12:00:00.000Z');
+
+/** A task filed, and where `settled`, run for an hour, signed off, measured at `costUsd` and settled. */
+async function journalled(taskId: string, costUsd: number, settled: boolean): Promise<void> {
+  const events: object[] = [{ kind: 'filed', at, brief: 'Do it.', cwd: ROOT, maxAttempts: 1, harness: 'codex' }];
+  if (settled)
+    events.push(
+      { kind: 'starting', at, attempt: 1 },
+      { kind: 'spawned', at, attempt: 1 },
+      {
+        kind: 'ended',
+        at: ended,
+        attempt: 1,
+        sessionId: `ae/${taskId}/1`,
+        observed: 'done',
+        reason: 'harness',
+        closeout: { outcome: 'done', summary: 'Did it.', needs: null, artifacts: [] },
+      },
+      { kind: 'measured', at: ended, attempt: 1, usage: { costUsd } },
+      { kind: 'settled', at: ended, outcome: 'succeeded' },
+    );
+  for (const event of events) await journal.append(taskId, event as Event);
+}
+
+const recordFile = (id: string) => path.join(ROOT, 'runs', `${id}.json`);
+
+/**
+ * A run of one step, its workflow frozen on its record unless `unfrozen` names the folder it reads, its step's task journalled as
+ * `journalled` says.
+ */
+async function aRun(id: string, costUsd: number, settled = true, unfrozen?: string): Promise<void> {
+  await journalled(`${id}-implement`, costUsd, settled);
+  const workflow = [{ name: 'implement', after: [], body: 'Implement it.', harness: 'codex' }];
+  fs.writeFileSync(
+    recordFile(id),
+    JSON.stringify({
+      id,
+      repo: '/repos/home',
+      baseRef: 'abc',
+      workspace: '/repos/home',
+      branch: 'main',
+      isolate: true,
+      brief: `The brief of ${id}`,
+      createdAt: at,
+      workflowDir: unfrozen ?? '/repos/home/workflows/build',
+      ...(unfrozen ? {} : { workflow }),
+      steps: { implement: { taskId: `${id}-implement` } },
+    }),
+  );
+}
+
+await aRun('s-a', 1);
+await aRun('s-b', 2);
+await aRun('s-c', 3);
+await aRun('s-moving', 4, false);
+
+const FINISHED = ['s-a', 's-b', 's-c'];
+const unverified = { verify: false };
+
+test('a second call on a store whose runs are as they were views no task of a finished run, and answers what a call without the memo answers', async () => {
+  const memo = freshStatsMemo();
+  const first = await stats(e, {}, NOW, { memo, ...unverified });
+  assert.deepEqual(viewedRuns(), [...FINISHED, 's-moving'], 'the first call reads every run');
+  const second = await stats(e, {}, NOW, { memo, ...unverified });
+  assert.deepEqual(viewedRuns(), ['s-moving'], 'the second reads only the run in flight');
+  assert.deepStrictEqual(second, first);
+  assert.deepStrictEqual(second, await stats(e, {}, NOW));
+  viewed = [];
+});
+
+test('a run whose files in the store changed is read again, and no other', async () => {
+  const memo = freshStatsMemo();
+  await stats(e, {}, NOW, { memo, ...unverified });
+  viewedRuns();
+  fs.writeFileSync(path.join(ROOT, 'runs', 's-b.cancelled'), `${ended}\n`);
+  const answer = await stats(e, {}, NOW, { memo, ...unverified });
+  assert.deepEqual(viewedRuns(), ['s-b', 's-moving']);
+  assert.deepStrictEqual(answer, await stats(e, {}, NOW));
+  fs.rmSync(path.join(ROOT, 'runs', 's-b.cancelled'));
+  viewed = [];
+});
+
+test("a line on the engine's feed for a run's task takes the run out of the memo, and no other", async () => {
+  const memo = freshStatsMemo();
+  await stats(e, {}, NOW, { memo, ...unverified });
+  viewedRuns();
+  await journal.append('s-c-implement', { kind: 'measured', at: ended, attempt: 1, usage: { costUsd: 5 } } as Event);
+  const answer = await stats(e, {}, NOW, { memo, ...unverified });
+  assert.deepEqual(viewedRuns(), ['s-c', 's-moving']);
+  assert.deepStrictEqual(answer, await stats(e, {}, NOW));
+  viewed = [];
+});
+
+test('a run with a task in flight is never kept, and read on every call', async () => {
+  const memo = freshStatsMemo();
+  await stats(e, {}, NOW, { memo, ...unverified });
+  assert.equal(memo.runs.has('s-moving'), false, 'nothing kept of the run in flight');
+  assert.deepEqual(
+    FINISHED.filter((id) => memo.runs.has(id)),
+    FINISHED,
+    'every finished run kept',
+  );
+  viewedRuns();
+  await stats(e, {}, NOW, { memo, ...unverified });
+  assert.deepEqual(viewedRuns(), ['s-moving']);
+});
+
+test('a feed that went back empties the memo, and the next call reads every run', async () => {
+  const memo = freshStatsMemo();
+  await stats(e, {}, NOW, { memo, ...unverified });
+  viewedRuns();
+  memo.cursor = Number.MAX_SAFE_INTEGER - 1;
+  await stats(e, {}, NOW, { memo, ...unverified });
+  assert.deepEqual(viewedRuns(), [...FINISHED, 's-moving']);
+});
+
+test('verify reads every run the memo answers afresh, and refuses one that differs, naming it', async () => {
+  const memo = freshStatsMemo();
+  const fresh = await stats(e, {}, NOW, { memo, ...unverified });
+  const kept = memo.runs.get('s-a')?.read;
+  assert.ok(kept, 's-a is kept');
+  kept.facts.tries = [];
+  kept.facts.runs = [];
+  assert.notDeepStrictEqual(await stats(e, {}, NOW, { memo, ...unverified }), fresh, 'unverified, the stale answer is given');
+  await assert.rejects(
+    stats(e, {}, NOW, { memo, verify: true }),
+    (err: Error) => err.message.includes('the run s-a ') && err.message.includes('stamp'),
+  );
+  viewed = [];
+});
+
+test('a run gone from the store is gone from the memo and from the answer', async () => {
+  await aRun('s-gone', 7);
+  const memo = freshStatsMemo();
+  await stats(e, {}, NOW, { memo, ...unverified });
+  assert.equal(memo.runs.has('s-gone'), true);
+  fs.rmSync(recordFile('s-gone'));
+  const answer = await stats(e, {}, NOW, { memo, ...unverified });
+  assert.equal(memo.runs.has('s-gone'), false);
+  assert.deepStrictEqual(answer, await stats(e, {}, NOW));
+  assert.equal(answer.all.total.runs, FINISHED.length, 's-gone no longer counted');
+  viewed = [];
+});
+
+test('a run whose workflow is not frozen on its record is never kept: its steps are read off its folder, which no stamp covers', async () => {
+  const folder = path.join(ROOT, 'unfrozen');
+  fs.mkdirSync(folder, { recursive: true });
+  fs.writeFileSync(path.join(folder, 'implement.md'), '---\nharness: codex\n---\nImplement it.\n');
+  await aRun('s-unfrozen', 6, true, folder);
+  const memo = freshStatsMemo();
+  await stats(e, {}, NOW, { memo, ...unverified });
+  viewedRuns();
+  await stats(e, {}, NOW, { memo, ...unverified });
+  assert.deepEqual(viewedRuns(), ['s-moving', 's-unfrozen']);
+  fs.rmSync(recordFile('s-unfrozen'));
+});
+
+test("a call keeps nothing once another has read the engine's feed on past where it read to", async () => {
+  const memo = freshStatsMemo();
+  during = {
+    when: 's-b-implement',
+    then: async () => {
+      await journal.append('s-b-implement', { kind: 'measured', at: ended, attempt: 1, usage: { costUsd: 9 } } as Event);
+      await stats(e, {}, NOW, { memo, ...unverified });
+    },
+  };
+  await stats(e, {}, NOW, { memo, ...unverified });
+  assert.equal(during, undefined, 'the overlapping call ran');
+  const answer = await stats(e, {}, NOW, { memo, verify: true });
+  assert.deepStrictEqual(answer, await stats(e, {}, NOW));
+  viewed = [];
+});

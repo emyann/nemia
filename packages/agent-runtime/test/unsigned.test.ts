@@ -14,6 +14,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
+import { seenFor } from './sighting.ts';
 
 const tmp = (label: string) => scratch(`ae-unsigned-${label}-`);
 
@@ -119,12 +120,14 @@ const settledNote = async (engine: ReturnType<typeof promiseEngine>, id: string)
 test("a task that asked for a closeout, whose session goes quiet without one, ends saying so — `stated: false` — and the runtime continues nothing: the nudge is the layer above's", async () => {
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
-    const engine = promiseEngine(Engine.layer({ root: tmp('root') }));
+    const root = tmp('root');
+    const engine = promiseEngine(Engine.layer({ root }));
     const id = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: SCHEMA });
     await engine.tick();
     const [row] = claude.rows();
 
     wrote(row.sessionId, await begun(engine, id), 10 * MINUTES, prompt('the prompt'), says('msg_1', 'I have finished.'));
+    await seenFor(root, row.name, row.sessionId, 10 * MINUTES);
     claude.set(row.name, { startedAt: Date.now() - 20 * MINUTES });
     await engine.tick();
 
@@ -147,11 +150,13 @@ test("a task that asked for a closeout, whose session goes quiet without one, en
 test('a task that asked for no closeout ends on quiet as it always did: succeeded, and nothing continued', async () => {
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
-    const engine = promiseEngine(Engine.layer({ root: tmp('root') }));
+    const root = tmp('root');
+    const engine = promiseEngine(Engine.layer({ root }));
     const id = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd') });
     await engine.tick();
     const [row] = claude.rows();
     wrote(row.sessionId, await begun(engine, id), 10 * MINUTES, prompt('the prompt'), says('msg_1', 'Done.'));
+    await seenFor(root, row.name, row.sessionId, 10 * MINUTES);
     claude.set(row.name, { startedAt: Date.now() - 20 * MINUTES });
 
     await engine.tick();
@@ -168,12 +173,14 @@ test('a task that asked for no closeout ends on quiet as it always did: succeede
 test("quiet after a statement of its own succeeds with it; quiet after only its parent's statement, resumed, has stated nothing", async () => {
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
-    const engine = promiseEngine(Engine.layer({ root: tmp('root') }));
+    const root = tmp('root');
+    const engine = promiseEngine(Engine.layer({ root }));
 
     const said = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: SCHEMA });
     await engine.tick();
     const [row] = claude.rows();
     wrote(row.sessionId, await begun(engine, said), 10 * MINUTES, prompt('the prompt'), closes('msg_1', { outcome: 'done' }));
+    await seenFor(root, row.name, row.sessionId, 10 * MINUTES);
     claude.set(row.name, { startedAt: Date.now() - 20 * MINUTES });
     await engine.tick();
     const v = await engine.view(said);
@@ -192,6 +199,7 @@ test("quiet after a statement of its own succeeds with it; quiet after only its 
     const other = claude.rows().find((r) => r.name === `ae/${inherited}/1`)!;
     assert.equal(other.sessionId, row.sessionId, "resumed into its parent's transcript, which ends on the parent's statement");
     claude.set(other.name, { startedAt: Date.now() - 20 * MINUTES });
+    await seenFor(root, other.name, other.sessionId, 10 * MINUTES);
     await engine.tick();
     const w = await engine.view(inherited);
     assert.equal(w.state.attempts[0]?.stated, false, "a parent's statement is not this attempt's");

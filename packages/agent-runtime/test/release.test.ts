@@ -18,6 +18,7 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { Event, PromiseJournal } from '../src/facade.ts';
 import { scratch } from './scratch.ts';
+import { seenFor } from './sighting.ts';
 
 const tmp = (label: string) => scratch(`ae-release-${label}-`);
 
@@ -313,7 +314,8 @@ test('a session ended by quiet is stopped before it goes — its end is on the r
   for (const worktree of [false, true]) {
     const claude = fakeClaude();
     await onPath(claude.bin, async () => {
-      const engine = promiseEngine(Engine.layer({ root: tmp('root') }));
+      const root = tmp('root');
+      const engine = promiseEngine(Engine.layer({ root }));
       const id = await engine.file({
         brief: 'the prompt',
         cwd: tmp('cwd'),
@@ -322,6 +324,7 @@ test('a session ended by quiet is stopped before it goes — its end is on the r
       await engine.tick();
       const [row] = claude.rows();
       wrote(row, 10 * 60_000);
+      await seenFor(root, row.name, row.sessionId, 10 * 60_000);
       claude.setRows(claude.rows().map((r) => ({ ...r, startedAt: Date.now() - 20 * 60_000 })));
 
       for (let i = 0; i < 3; i++) await engine.tick();

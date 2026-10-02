@@ -1,18 +1,17 @@
 /**
- * GET /api/quota: the plan's usage asked of Claude Code with its `get_usage` control request — here of the harness's `claude`, which
- * answers as Claude Code 2.1.278 did when recorded (`fixtures/get-usage-*.json`) — kept for a while, one ask at a time, and each way it can
- * fail said in a sentence; and the pure judgement under it (`quotaOf`).
+ * GET /api/quota: the plan's usage as the engine's `quota` answers it — here through the harness's `claude`, which answers as Claude Code
+ * 2.1.278 did when recorded (`fixtures/get-usage-*.json`) — kept for a while, one ask at a time, and each way it can fail said in a
+ * sentence; the pure judgement under it (`quotaOf`); and that the read starts no process of its own.
  */
-import { answer, askEnded, asks, calls, lastAskEnv, recorded, usageAnswer } from '../../test/harness.ts';
+import { asks, recorded, usageAnswer } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Effect, Exit, Layer } from 'effect';
+import { Layer } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
-import { machineTempDir, scratch } from '../../test/scratch.ts';
+import type { HarnessQuota } from 'agent-orchestrator';
 import { appOf, liveOf } from '../app.ts';
 import {
-  askUsage,
   backoffOf,
   QUOTA_BACKOFF_CEILING_MS,
   QUOTA_BACKOFF_MS,
@@ -22,8 +21,6 @@ import {
   quotaOf,
   makeQuota,
   QuotaAsker,
-  usageAsk,
-  usageEnv,
 } from './quota.ts';
 
 type Quota = import('./quota.ts').Quota;
@@ -41,26 +38,30 @@ const forgetQuota = () => {
 };
 
 const NOW = Date.parse('2026-09-19T10:00:00.000Z');
-/** A success answer, as Claude Code's control_response carries it, with these `rate_limits`. */
-const success = (limits: unknown, available = true) => ({
-  subtype: 'success',
-  request_id: 'x',
-  response: { subscription_type: 'max', rate_limits_available: available, rate_limits: limits },
+/** The plan's limits as the engine answers them, in Claude Code's order: a key the board does not know among them. */
+const plan = (five = 38.4, week = 86): HarnessQuota => ({
+  kind: 'windows',
+  limits: [
+    { key: 'five_hour', usedPercentage: five, resetsAt: '2026-09-19T12:00:00.048Z' },
+    { key: 'seven_day', usedPercentage: week, resetsAt: '2026-09-22T10:00:00.000Z' },
+    { key: 'nimbus_quill', usedPercentage: 0, resetsAt: null },
+  ],
+  subscription: 'max',
 });
-const plan = (five = 38.4, week = 86) =>
-  success({
-    five_hour: { utilization: five, resets_at: '2026-09-19T12:00:00.048163+00:00' },
-    seven_day: { utilization: week, resets_at: '2026-09-22T10:00:00+00:00' },
-    seven_day_opus: null,
-    nimbus_quill: { utilization: 0, resets_at: null },
+const UNANSWERED: HarnessQuota = { kind: 'unanswered', subscription: 'max' };
+const heard = (asked: HarnessQuota, at = NOW): Held => ({ asked, at });
+
+/** What the fake ask answers next, and how many times it has been asked. */
+const fake = { next: plan(), asked: 0 };
+/** A read through the fake ask, with `opts` beside it. */
+const read = (opts: Omit<Parameters<ReadQuota>[0], 'ask'> = {}): Promise<Quota> =>
+  readQuota({
+    ...opts,
+    ask: async () => {
+      fake.asked += 1;
+      return fake.next;
+    },
   });
-const heard = (response: unknown, at = NOW): Held => ({ asked: { kind: 'answer', response }, at });
-/**
- * A recorded answer's control_response, as `askUsage` hands it on: `plan`; `no-plan`, signed in with no subscription; `unsupported`, as
- * 2.1.278 refuses a subtype it does not have, a Claude Code without get_usage; `unanswered`, when Anthropic's usage service gave it
- * nothing.
- */
-const fixture = (name: 'plan' | 'no-plan' | 'unsupported' | 'unanswered') => (JSON.parse(recorded(name)) as { response: unknown }).response;
 
 const get = async (): Promise<Quota> => {
   const res = await app.request('/api/quota');
@@ -68,9 +69,10 @@ const get = async (): Promise<Quota> => {
   return (await res.json()) as Quota;
 };
 
-/** Before each test that asks: nothing held, the harness answering as recorded. */
+/** Before each test that asks: nothing held, the fake ask and the harness answering the plan. */
 const fresh = () => {
   forgetQuota();
+  fake.next = plan();
   usageAnswer(recorded('plan'));
 };
 
@@ -87,18 +89,20 @@ test("an answer with the plan's windows: the five-hour and the week, in that ord
       { key: 'five_hour', label: '5-hour', usedPercentage: 38.4, resetsAt: '2026-09-19T12:00:00.048Z', reset: false, marked: false },
       { key: 'seven_day', label: 'week', usedPercentage: 86, resetsAt: '2026-09-22T10:00:00.000Z', reset: false, marked: true },
     ],
-    'a null window and a key the board does not know (nimbus_quill) are not shown',
+    'a key the board does not know (nimbus_quill) is not shown',
   );
   assert.equal(q.markAt, QUOTA_MARK_PERCENT);
   assert.equal(q.last, null);
   const reversed = quotaOf(
-    heard(
-      success({
-        seven_day_sonnet: { utilization: 3, resets_at: null },
-        seven_day: { utilization: 1, resets_at: null },
-        five_hour: { utilization: 2, resets_at: null },
-      }),
-    ),
+    heard({
+      kind: 'windows',
+      limits: [
+        { key: 'seven_day_sonnet', usedPercentage: 3, resetsAt: null },
+        { key: 'seven_day', usedPercentage: 1, resetsAt: null },
+        { key: 'five_hour', usedPercentage: 2, resetsAt: null },
+      ],
+      subscription: null,
+    }),
     null,
     NOW,
   );
@@ -106,19 +110,6 @@ test("an answer with the plan's windows: the five-hour and the week, in that ord
     reversed.windows.map((w) => w.label),
     ['5-hour', 'week', 'week, Sonnet'],
     "the order is the board's, not the answer's",
-  );
-});
-
-test("Claude Code 2.1.278's recorded answer reads as the plan it was: max, 3% of five hours and 50% of the week", () => {
-  const q = quotaOf(heard(fixture('plan')), null, NOW);
-  assert.equal(q.state, 'fresh');
-  assert.equal(q.subscription, 'max');
-  assert.deepEqual(
-    q.windows.map((w) => [w.key, w.usedPercentage, w.resetsAt]),
-    [
-      ['five_hour', 3, '2026-09-19T15:10:00.048Z'],
-      ['seven_day', 50, '2026-09-23T11:00:00.048Z'],
-    ],
   );
 });
 
@@ -130,8 +121,8 @@ test('a window whose reset has passed since the answer says so', () => {
   );
 });
 
-test('REFUSED: no plan — Claude Code signed in with no subscription, as recorded from a CLAUDE_CONFIG_DIR with no sign-in — shows no number', () => {
-  const q = quotaOf(heard(fixture('no-plan')), heard(plan(), NOW - 600e3), NOW + 60e3);
+test('REFUSED: no plan — Claude Code signed in with no subscription — shows no number', () => {
+  const q = quotaOf(heard({ kind: 'no-plan' }), heard(plan(), NOW - 600e3), NOW + 60e3);
   assert.equal(q.state, 'no-plan');
   assert.deepEqual(q.windows, []);
   assert.equal(
@@ -141,29 +132,31 @@ test('REFUSED: no plan — Claude Code signed in with no subscription, as record
   assert.equal(q.last?.askedAt, '2026-09-19T09:50:00.000Z', 'the last answer with windows is kept for the hover');
 });
 
-test('REFUSED: an answer in a shape this code does not read is unknown, and says what it found', () => {
-  const unknown = (response: unknown, what: RegExp) => {
-    const q = quotaOf(heard(response), null, NOW);
-    assert.equal(q.state, 'unknown', JSON.stringify(response));
+test('REFUSED: an answer in a shape this code does not read is unknown, and says what it found; so are limits none of which the board shows', () => {
+  const unknown = (asked: HarnessQuota, what: RegExp) => {
+    const q = quotaOf(heard(asked), null, NOW);
+    assert.equal(q.state, 'unknown', JSON.stringify(asked));
     assert.deepEqual(q.windows, []);
     assert.ok(q.said!.startsWith('Claude Code answered the usage request in a shape this board does not read: '), q.said!);
     assert.match(q.said!, what);
     assert.match(q.said!, /get_usage is experimental: see README\.md, The quota on the board\./);
   };
-  unknown(fixture('unsupported'), /it refused the request \(Unsupported control request subtype: get_usage_nope\)/);
-  unknown(null, /its response is not an object/);
-  unknown({ subtype: 'pending', response: {} }, /neither a success nor an error/);
-  unknown({ subtype: 'success', response: { rate_limits: {} } }, /it has no rate_limits_available/);
-  unknown(success([1]), /its rate_limits are not an object/);
   unknown(
-    success({ five_hour: { utilization: '3', resets_at: null }, seven_day: { utilization: null, resets_at: null } }),
+    { kind: 'unknown', what: 'it refused the request (Unsupported control request subtype: get_usage_nope)' },
+    /it refused the request \(Unsupported control request subtype: get_usage_nope\)/,
+  );
+  unknown(
+    { kind: 'windows', limits: [], subscription: 'max' },
     /none of its rate_limits \(five_hour, seven_day, seven_day_sonnet, seven_day_opus\) has a numeric utilization/,
   );
-  unknown(success({ nimbus_quill: { utilization: 0, resets_at: null } }), /has a numeric utilization/);
+  unknown(
+    { kind: 'windows', limits: [{ key: 'nimbus_quill', usedPercentage: 0, resetsAt: null }], subscription: 'max' },
+    /has a numeric utilization/,
+  );
 });
 
-test("Claude Code 2.1.278's answer when Anthropic's usage service gave it nothing — signed in to max, rate_limits null — is unanswered: not unknown, not no-plan", () => {
-  const q = quotaOf({ ...heard(fixture('unanswered')), keptMs: QUOTA_BACKOFF_MS }, heard(plan(), NOW - 25 * 60e3), NOW);
+test("an answer in which Anthropic's usage service gave Claude Code nothing — signed in to max — is unanswered: not unknown, not no-plan", () => {
+  const q = quotaOf({ ...heard(UNANSWERED), keptMs: QUOTA_BACKOFF_MS }, heard(plan(), NOW - 25 * 60e3), NOW);
   assert.equal(q.state, 'unanswered');
   assert.equal(q.subscription, 'max');
   assert.deepEqual(q.windows, [], 'no number as now');
@@ -177,15 +170,11 @@ test("Claude Code 2.1.278's answer when Anthropic's usage service gave it nothin
     q.last?.windows.map((w) => w.usedPercentage),
     [38.4, 86],
   );
-  assert.equal(quotaOf(heard(success(null)), null, NOW).state, 'unanswered', "only null is the service's silence");
-  assert.equal(
-    quotaOf(heard(success([1])), null, NOW).state,
-    'unknown',
-    'rate_limits that are there and not an object are still a shape not read',
+  assert.match(
+    quotaOf(heard({ kind: 'unanswered', subscription: null }), null, NOW).said!,
+    /^Claude Code is signed in to a subscription, but/,
   );
-  assert.equal(quotaOf(heard(success(undefined)), null, NOW).state, 'unknown', 'and missing ones too');
-  assert.equal(quotaOf(heard(success(null, false)), null, NOW).state, 'no-plan');
-  assert.match(quotaOf({ ...heard(success(null)), keptMs: 80 * 60e3 }, null, NOW).said!, /Asked again in 1 h 20 min\.$/);
+  assert.match(quotaOf({ ...heard(UNANSWERED), keptMs: 80 * 60e3 }, null, NOW).said!, /Asked again in 1 h 20 min\.$/);
 });
 
 test('the backoff: 20 min, doubled each time in a row, to a ceiling of 4 h — and a first wait of 0 is none', () => {
@@ -204,7 +193,7 @@ test('the backoff: 20 min, doubled each time in a row, to a ceiling of 4 h — a
 });
 
 test('REFUSED: the last good reading goes after six hours', () => {
-  const at = (ago: number) => quotaOf(heard(success(null)), heard(plan(), NOW - ago), NOW).last;
+  const at = (ago: number) => quotaOf(heard(UNANSWERED), heard(plan(), NOW - ago), NOW).last;
   assert.notEqual(at(QUOTA_LAST_MS), null);
   assert.equal(at(QUOTA_LAST_MS + 1), null);
 });
@@ -227,22 +216,23 @@ test('REFUSED: a failure after a good answer shows no number as now: the answer 
 test('each way an ask fails, said with what to do, and when it is asked again', () => {
   const at = (asked: Held['asked'], keep = QUOTA_KEEP_MS) => quotaOf({ asked, at: NOW }, null, NOW, keep).said;
   assert.equal(
-    at({ kind: 'no-claude' }),
+    at({ kind: 'missing' }),
     "The quota cannot be asked for: there is no claude on the api's PATH. Install Claude Code, or start the api from a shell where claude runs. Asked again in 10 min.",
   );
+  assert.equal(quotaOf({ asked: { kind: 'missing' }, at: NOW }, null, NOW).state, 'no-claude');
   assert.equal(
     at({ kind: 'failed', code: 3, signal: null, said: 'claude: not logged in' }),
     'Claude Code stopped before it answered the usage request (exit 3: claude: not logged in). Run claude -p in a shell where the api runs to see why. Asked again in 10 min.',
   );
   assert.match(at({ kind: 'failed', code: null, signal: 'SIGKILL', said: '' })!, /\(killed by SIGKILL\)\./);
   assert.match(at({ kind: 'failed', code: null, signal: null, said: 'spawn EACCES' })!, /\(it did not start: spawn EACCES\)\./);
-  assert.match(at({ kind: 'no-claude' }, 0)!, /Asked again on the next read\.$/);
+  assert.match(at({ kind: 'missing' }, 0)!, /Asked again on the next read\.$/);
   const asking = quotaOf(null, heard(plan()), NOW);
   assert.deepEqual([asking.state, asking.said, asking.askedAt, asking.windows], ['asking', 'Asking Claude Code for the quota…', null, []]);
   assert.equal(asking.last?.windows.length, 2);
 });
 
-test("the route asks the harness's claude, and answers with the plan it recorded", async () => {
+test("the route asks the engine's claude harness, and answers with the plan it recorded; a claude that fails is said so", async () => {
   fresh();
   const before = asks();
   const q = await get();
@@ -254,34 +244,61 @@ test("the route asks the harness's claude, and answers with the plan it recorded
       ['seven_day', 50],
     ],
   );
-  assert.equal(asks(), before + 1);
+  assert.equal(asks(), before + 1, 'the engine asked the harness once');
+  forgetQuota();
+  usageAnswer('', 'exit');
+  try {
+    assert.match(
+      (await get()).said!,
+      /^Claude Code stopped before it answered the usage request \(exit 3: claude: the harness was told to fail\)\./,
+    );
+  } finally {
+    usageAnswer(recorded('plan'));
+  }
+});
+
+test('REFUSED: an ask that rejects is held as failed, with its words, and asked again only past the keep', async () => {
+  fresh();
+  let clock = NOW;
+  const now = () => clock;
+  let rejected = 0;
+  const ask = async (): Promise<HarnessQuota> => {
+    rejected += 1;
+    throw Object.assign(new Error('quota: the `claude` harness reports no quota.'), { exitCode: 2 });
+  };
+  const q = await readQuota({ ask, now });
+  assert.equal(q.state, 'failed');
+  assert.match(q.said!, /\(it did not start: quota: the `claude` harness reports no quota\.\)\./);
+  clock += QUOTA_KEEP_MS - 1;
+  assert.equal((await readQuota({ ask, now })).state, 'failed');
+  assert.equal(rejected, 1, 'held for the keep, as any failure');
 });
 
 test('REFUSED: a second read inside the keep asks nothing; one past it asks again', async () => {
   fresh();
   let clock = Date.now();
   const now = () => clock;
-  const before = asks();
-  assert.equal((await readQuota({ now })).state, 'fresh');
+  const before = fake.asked;
+  assert.equal((await read({ now })).state, 'fresh');
   clock += QUOTA_KEEP_MS - 1;
-  const kept = await readQuota({ now });
+  const kept = await read({ now });
   assert.equal(kept.state, 'fresh');
   assert.equal(kept.ageMs, QUOTA_KEEP_MS - 1);
-  assert.equal(asks(), before + 1, 'held for the keep');
-  usageAnswer('', 'exit');
+  assert.equal(fake.asked, before + 1, 'held for the keep');
+  fake.next = { kind: 'failed', code: 3, signal: null, said: '' };
   clock += 1;
-  assert.equal((await readQuota({ now })).state, 'failed');
+  assert.equal((await read({ now })).state, 'failed');
   clock += 60_000;
-  assert.equal((await readQuota({ now })).state, 'failed');
-  assert.equal(asks(), before + 2, 'a failure is held as long');
+  assert.equal((await read({ now })).state, 'failed');
+  assert.equal(fake.asked, before + 2, 'a failure is held as long');
 });
 
 test('REFUSED: after an unanswered answer no read asks inside the wait, however many boards read; the waits grow, and a good reading begins them again', async () => {
   fresh();
   let clock = Date.now();
   const now = () => clock;
-  const before = asks();
-  const many = async () => (await Promise.all(Array.from({ length: 12 }, () => readQuota({ now })))).map((q) => q.state);
+  const before = fake.asked;
+  const many = async () => (await Promise.all(Array.from({ length: 12 }, () => read({ now })))).map((q) => q.state);
   const readsAt = async (offset: number, state: string, asked: number, why: string) => {
     const from = clock;
     clock = from + offset;
@@ -290,211 +307,123 @@ test('REFUSED: after an unanswered answer no read asks inside the wait, however 
       Array(12).fill(state),
       `${why}: read by twelve boards at once, ${offset} ms past the last ask, each says ${state}`,
     );
-    assert.equal(asks(), before + asked, `${why}: ${asked} asks so far`);
+    assert.equal(fake.asked, before + asked, `${why}: ${asked} asks so far`);
     clock = from;
   };
-  usageAnswer(recorded('unanswered'));
-  const first = await readQuota({ now });
+  fake.next = UNANSWERED;
+  const first = await read({ now });
   assert.equal(first.state, 'unanswered');
   assert.match(first.said!, /Asked again in 20 min\.$/);
-  assert.equal(asks(), before + 1);
+  assert.equal(fake.asked, before + 1);
   await readsAt(QUOTA_KEEP_MS, 'unanswered', 1, 'past the keep of a good reading, and still inside the wait: nothing asked');
   await readsAt(QUOTA_BACKOFF_MS - 1, 'unanswered', 1, 'a millisecond short of twenty minutes: nothing asked');
   clock += QUOTA_BACKOFF_MS;
-  const second = await readQuota({ now });
-  assert.equal(asks(), before + 2, 'the wait over: one ask');
+  const second = await read({ now });
+  assert.equal(fake.asked, before + 2, 'the wait over: one ask');
   assert.match(second.said!, /Asked again in 40 min\.$/);
   await readsAt(40 * 60e3 - 1, 'unanswered', 2, 'the second wait is forty minutes');
   clock += 40 * 60e3;
-  assert.match((await readQuota({ now })).said!, /Asked again in 1 h 20 min\.$/);
-  assert.equal(asks(), before + 3);
-  usageAnswer('', 'exit');
+  assert.match((await read({ now })).said!, /Asked again in 1 h 20 min\.$/);
+  assert.equal(fake.asked, before + 3);
+  fake.next = { kind: 'failed', code: 3, signal: null, said: '' };
   clock += 80 * 60e3;
-  assert.equal((await readQuota({ now })).state, 'failed');
-  usageAnswer(recorded('unanswered'));
+  assert.equal((await read({ now })).state, 'failed');
+  fake.next = UNANSWERED;
   clock += QUOTA_KEEP_MS;
   assert.match(
-    (await readQuota({ now })).said!,
+    (await read({ now })).said!,
     /Asked again in 2 h 40 min\.$/,
     'a failure in between is kept the keep, and neither ends the row nor adds to it',
   );
-  assert.equal(asks(), before + 5);
-  usageAnswer(recorded('plan'));
+  assert.equal(fake.asked, before + 5);
+  fake.next = plan();
   clock += 160 * 60e3;
-  const good = await readQuota({ now });
+  const good = await read({ now });
   assert.equal(good.state, 'fresh');
   assert.equal(
     good.againAt,
     new Date(clock + QUOTA_KEEP_MS).toISOString(),
     'the first good reading begins the waits again, and is kept the keep',
   );
-  assert.equal(asks(), before + 6);
+  assert.equal(fake.asked, before + 6);
   await readsAt(QUOTA_KEEP_MS - 1, 'fresh', 6, 'a good reading is kept ten minutes');
-  usageAnswer(recorded('unanswered'));
+  fake.next = UNANSWERED;
   clock += QUOTA_KEEP_MS;
-  const again = await readQuota({ now });
+  const again = await read({ now });
   assert.equal(again.state, 'unanswered');
   assert.match(again.said!, /Asked again in 20 min\.$/, 'the row begun again: twenty minutes, not five hours and twenty');
   assert.equal(again.last?.windows.length, 2, 'with the good reading beside it');
-  assert.equal(asks(), before + 7);
-  usageAnswer(recorded('plan'));
+  assert.equal(fake.asked, before + 7);
 });
 
 test('HKB_QUOTA_BACKOFF_MS sets the first wait — 0 asks on every read — and a value that is no length of time is the default', async () => {
   fresh();
-  usageAnswer(recorded('unanswered'));
-  const before = asks();
+  fake.next = UNANSWERED;
+  const before = fake.asked;
   const env = { ...process.env, HKB_QUOTA_BACKOFF_MS: '0' };
-  assert.equal((await readQuota({ env })).said?.endsWith('Asked again on the next read.'), true);
-  await readQuota({ env });
-  assert.equal(asks(), before + 2);
+  assert.equal((await read({ env })).said?.endsWith('Asked again on the next read.'), true);
+  await read({ env });
+  assert.equal(fake.asked, before + 2);
   for (const bad of ['-5', 'soon', '']) {
     forgetQuota();
-    assert.match((await readQuota({ env: { ...process.env, HKB_QUOTA_BACKOFF_MS: bad } })).said!, /Asked again in 20 min\.$/, bad);
+    assert.match((await read({ env: { ...process.env, HKB_QUOTA_BACKOFF_MS: bad } })).said!, /Asked again in 20 min\.$/, bad);
   }
-  usageAnswer(recorded('plan'));
 });
 
-test('REFUSED: reads that come while an ask is in flight join it: one claude for all of them', async () => {
+test('REFUSED: reads that come while an ask is in flight join it: one ask for all of them, the route among them', async () => {
   fresh();
-  const before = asks();
-  const all = await Promise.all([readQuota(), readQuota(), get(), readQuota()]);
+  const before = asks() + fake.asked;
+  const all = await Promise.all([read(), read(), get(), read()]);
   assert.deepEqual(
     all.map((q) => q.state),
     ['fresh', 'fresh', 'fresh', 'fresh'],
   );
-  assert.equal(asks(), before + 1);
+  assert.equal(asks() + fake.asked, before + 1);
 });
 
 test('HKB_QUOTA_KEEP_MS sets the keep — 0 asks on every read — and a value that is no length of time is the default', async () => {
   fresh();
-  const before = asks();
+  const before = fake.asked;
   const env = { ...process.env, HKB_QUOTA_KEEP_MS: '0' };
-  assert.equal((await readQuota({ env })).keepMs, 0);
-  await readQuota({ env });
-  assert.equal(asks(), before + 2);
+  assert.equal((await read({ env })).keepMs, 0);
+  await read({ env });
+  assert.equal(fake.asked, before + 2);
   for (const bad of ['-5', 'soon', '']) {
     forgetQuota();
-    assert.equal((await readQuota({ env: { ...process.env, HKB_QUOTA_KEEP_MS: bad } })).keepMs, QUOTA_KEEP_MS, bad);
+    assert.equal((await read({ env: { ...process.env, HKB_QUOTA_KEEP_MS: bad } })).keepMs, QUOTA_KEEP_MS, bad);
   }
 });
 
-test('REFUSED: an answer to another request — or a line that is not one — is not taken for this one', async () => {
+test('REFUSED: a read that waits past its wait says asking, then what the ask came to', async () => {
   fresh();
-  const theirs = `${JSON.stringify({ type: 'control_response', response: { subtype: 'error', request_id: 'not-yours', error: 'wrong one' } })}\n`;
-  usageAnswer(`not json\n{"type":"system","subtype":"init"}\n${theirs}${recorded('plan')}`);
-  const asked = await askUsage();
-  assert.equal(asked.kind, 'answer');
-  assert.equal((asked as { response: { subtype: string } }).response.subtype, 'success');
-});
-
-test('REFUSED: the ask runs without what a Claude Code session hands its children, but with how it signs in, in the temporary directory', async () => {
-  fresh();
-  const session = { CLAUDECODE: '1', CLAUDE_CODE_ENTRYPOINT: 'cli', CLAUDE_PID: '1', CLAUDE_CODE_SESSION_ID: 's', AI_AGENT: 'claude-code' };
-  const signIn = { CLAUDE_CODE_OAUTH_TOKEN: 'sk-ant-oat-test', CLAUDE_CODE_USE_BEDROCK: '1' };
-  const env = { ...process.env, ...session, ...signIn };
-  const kept = usageEnv(env);
-  for (const key of Object.keys(session)) assert.equal(kept[key], undefined, key);
-  for (const [key, value] of Object.entries(signIn)) assert.equal(kept[key], value, key);
-  await askUsage({ env });
-  const ran = lastAskEnv();
-  assert.equal(ran.CLAUDECODE, 'unset');
-  assert.equal(ran.CLAUDE_CODE_ENTRYPOINT, 'unset');
-  assert.equal(ran.CLAUDE_CONFIG_DIR, process.env.CLAUDE_CONFIG_DIR);
-  assert.equal(ran.CLAUDE_CODE_OAUTH_TOKEN, 'sk-ant-oat-test');
-  assert.equal(ran.CLAUDE_CODE_USE_BEDROCK, '1');
-  assert.equal(ran.cwd, fs.realpathSync(machineTempDir()), 'askUsage runs its claude in the temp directory');
-  const started = fs
-    .readFileSync(calls, 'utf8')
-    .split('\n')
-    .filter((l) => l.startsWith('-p '))
-    .pop();
-  assert.equal(
-    started,
-    '-p --input-format stream-json --output-format stream-json --verbose --no-session-persistence --strict-mcp-config --setting-sources ',
-    "started without the user's settings, their plugins, hooks and skills' sync, without MCP servers, and writing no session",
-  );
-});
-
-test('an answered ask closes its stdin, and the process ends of its own', async () => {
-  fresh();
-  assert.equal((await askUsage()).kind, 'answer');
-  const pid = Number(lastAskEnv().pid);
-  for (let i = 0; i < 50 && !askEnded(pid); i++) await new Promise((r) => setTimeout(r, 20));
-  assert.ok(
-    askEnded(pid),
-    `the ask's claude (pid ${pid}, the last written as it started, every ask before it having answered) ended of its own once its stdin was closed`,
-  );
-});
-
-test('REFUSED: no claude on PATH is no-claude', async () => {
-  fresh();
-  const env = { ...process.env, PATH: path.join(scratch('nemia-api-nowhere-'), 'no-such-dir') };
-  assert.deepEqual(await askUsage({ env }), { kind: 'no-claude' });
-  assert.equal((await readQuota({ env })).state, 'no-claude');
-});
-
-test('REFUSED: a claude that ends before it answers is failed, with its exit code and the last line it wrote on stderr', async () => {
-  fresh();
-  usageAnswer('', 'exit');
-  assert.deepEqual(await askUsage(), { kind: 'failed', code: 3, signal: null, said: 'claude: the harness was told to fail' });
-});
-
-test('REFUSED: a claude that never answers is ended at the timeout, and a read that waits past its wait says asking, then timeout', async () => {
-  fresh();
-  usageAnswer(fs.readFileSync(answer, 'utf8'), 'silent');
-  const q = await readQuota({ waitMs: 50, timeoutMs: 400 });
+  let answered = false;
+  const ask = () =>
+    new Promise<HarnessQuota>((r) =>
+      setTimeout(() => {
+        answered = true;
+        r({ kind: 'timeout', ms: 15_000 });
+      }, 300),
+    );
+  const q = await readQuota({ ask, waitMs: 50 });
   assert.equal(q.state, 'asking');
   assert.equal(q.said, 'Asking Claude Code for the quota…');
   let after = q;
-  for (const bound = Date.now() + 5_000; after.state === 'asking' && Date.now() < bound;)
-    after = await readQuota({ waitMs: 50, timeoutMs: 400 });
+  for (const bound = Date.now() + 5_000; after.state === 'asking' && Date.now() < bound;) after = await readQuota({ ask, waitMs: 50 });
+  assert.ok(answered);
   assert.equal(after.state, 'timeout');
-  assert.match(after.said!, /^Claude Code did not answer the usage request within 1 s:/);
-  assert.throws(
-    () => process.kill(Number(lastAskEnv().pid), 0),
-    (e: NodeJS.ErrnoException) => e.code === 'ESRCH',
-    'the silent claude is gone once the ask has its outcome',
-  );
-  usageAnswer(recorded('plan'));
+  assert.match(after.said!, /^Claude Code did not answer the usage request within 15 s:/);
 });
 
-test('REFUSED: an ask that times out has ended its claude by the time it resolves', async () => {
-  fresh();
-  usageAnswer(fs.readFileSync(answer, 'utf8'), 'silent');
-  try {
-    const earlier = lastAskEnv().pid;
-    assert.deepEqual(await askUsage({ timeoutMs: 1_000 }), { kind: 'timeout', ms: 1_000 });
-    const pid = Number(lastAskEnv().pid);
-    assert.notEqual(String(pid), earlier, 'the ask started its claude, which wrote its pid before it went silent');
-    assert.throws(
-      () => process.kill(pid, 0),
-      (e: NodeJS.ErrnoException) => e.code === 'ESRCH',
-      `the silent claude (pid ${pid}) was sent SIGTERM and waited for, not left to end after the answer`,
-    );
-  } finally {
-    usageAnswer(recorded('plan'));
-  }
-});
+/** Each way `text` could start a process of its own: node's child_process named, or a call of one of its functions. */
+const starts = (text: string): string[] =>
+  [...text.matchAll(/\bchild_process\b|\b(?:spawn|spawnSync|exec|execSync|execFile|execFileSync|fork)\s*\(/g)].map((m) => m[0]);
 
-test('REFUSED: an ask interrupted before it has an outcome ends its claude before the interruption returns', async () => {
-  fresh();
-  usageAnswer(fs.readFileSync(answer, 'utf8'), 'silent');
-  try {
-    const earlier = lastAskEnv().pid;
-    const stop = new AbortController();
-    const exit = Effect.runPromiseExit(usageAsk(), { signal: stop.signal });
-    for (const bound = Date.now() + 5_000; lastAskEnv().pid === earlier && Date.now() < bound;) await new Promise((r) => setTimeout(r, 20));
-    const pid = Number(lastAskEnv().pid);
-    assert.notEqual(String(pid), earlier, 'the ask started its claude');
-    stop.abort();
-    assert.ok(Exit.hasInterrupts(await exit), 'the ask was interrupted, not answered');
-    assert.throws(
-      () => process.kill(pid, 0),
-      (e: NodeJS.ErrnoException) => e.code === 'ESRCH',
-      `the silent claude (pid ${pid}) is gone`,
-    );
-  } finally {
-    usageAnswer(recorded('plan'));
-  }
+test('REFUSED: the quota read starts no process: the engine asks', () => {
+  assert.deepEqual(starts("import { spawn } from 'node:child_process';\nconst c = spawn ('claude', USAGE_ARGS);"), [
+    'child_process',
+    'spawn (',
+  ]);
+  const text = fs.readFileSync(path.join(import.meta.dirname, 'quota.ts'), 'utf8');
+  assert.match(text, /export function makeQuota\s*\(/, 'the file read is the quota asker');
+  assert.deepEqual(starts(text), [], 'factory/quota.ts asks the engine, and starts no claude itself');
 });

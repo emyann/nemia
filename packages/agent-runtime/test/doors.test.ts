@@ -249,6 +249,13 @@ test('each refusal is a tagged error at the Effect door, and its words behind th
     ],
     ['close', 'InputRefused', () => effect((e) => e.close('one')), () => promise.close('one'), /`one`/],
     ['stop', 'StopRefused', () => effect((e) => e.stop('ghost')), () => promise.stop('ghost'), /^`ghost` is not a task on this board\./],
+    [
+      'quota',
+      'QuotaRefused',
+      () => effect((e) => e.quota('fake')),
+      () => promise.quota('fake'),
+      /^the `fake` harness reports no quota\. Ask one that does: claude\.$/,
+    ],
   ];
   for (const [verb, tag, viaService, viaPromise, words] of cases) {
     const tagged = await failure(viaService());

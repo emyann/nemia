@@ -66,6 +66,7 @@ export const board = () => {
       transcript: unkept('transcript'),
       path: unkept('path'),
       say: unkept('say'),
+      quota: unkept('quota'),
       answer: unkept('answer'),
       close: unkept('close'),
       watch: unkept('watch'),

@@ -7,7 +7,8 @@
  * conversation as events, for a person to follow, and nothing the engine acts on. And a seventh, `say`:
  * a person's words handed to a session while it runs, which the engine journals and never acts on. And an
  * eighth, `find`: one session by its name, without observing every other, for a read that needs only which
- * session it is. Swap the layer and the same engine drives a different harness; `Runner.test()` drives
+ * session it is. And a ninth, `quota`: what the harness's subscription has left, asked of the harness and of no session. Swap the
+ * layer and the same engine drives a different harness; `Runner.test()` drives
  * nothing at all, which is how the engine's tests cost zero dollars.
  *
  * Several harnesses, one seam (`composite`). A task says which harness it wants; this dispatches `spawn` to that one and
@@ -81,6 +82,33 @@ export type TranscriptCursor = string;
 /** A read of a session's conversation: the events from the cursor asked with, and the cursor to ask again with. */
 export type Transcript = { events: TranscriptEvent[]; cursor: TranscriptCursor };
 
+/**
+ * One limit of a harness's subscription, as the harness reported it: `key` is the harness's own name for it (Claude Code's `five_hour`,
+ * `seven_day`, …), `usedPercentage` how much of it is used, and `resetsAt` when it begins again, ISO, or null when none was given.
+ */
+export type QuotaLimit = { key: string; usedPercentage: number; resetsAt: string | null };
+
+/**
+ * What a harness's quota came to, asked once (`RunnerOps.quota`):
+ *
+ *   windows     the plan's limits, each with a finite use (`QuotaLimit`), in the harness's order, and its subscription; none, when the
+ *               harness listed limits and none had a number
+ *   no-plan     the harness has no plan limits: it is not signed in to a subscription
+ *   unanswered  it is signed in to `subscription`, and the service it asks gave it nothing
+ *   unknown     it answered in a shape the runtime does not read: `what` it found
+ *   missing     the harness's program is not on PATH
+ *   timeout     no answer within `ms`
+ *   failed      the process ended, or could not start, before it answered: its exit code or signal, and its stderr's last line
+ */
+export type HarnessQuota =
+  | { kind: 'windows'; limits: QuotaLimit[]; subscription: string | null }
+  | { kind: 'no-plan' }
+  | { kind: 'unanswered'; subscription: string | null }
+  | { kind: 'unknown'; what: string }
+  | { kind: 'missing' }
+  | { kind: 'timeout'; ms: number }
+  | { kind: 'failed'; code: number | null; signal: string | null; said: string };
+
 /** A session the journal expects a harness to list: an attempt's name (`ae/<task>/<n>`), and the harness its task was filed on. */
 export type ExpectedSession = { name: string; harness?: string };
 
@@ -102,7 +130,8 @@ export type Observation = { seen: Map<string, Sighting>; unread: ReadonlySet<str
  * already says, and answering nothing the engine acts on. Nor does `transcript`: optional, and read
  * for a person, never by `decide`. Nor does `say`: optional, a person's words carried in, and nothing
  * the engine decides on. Nor does `find`: optional, a cheaper way to one session's id than `observe`, and never
- * its state. Nor does `observeFor`: optional, `observe` told what the journal already names, and answering the same.
+ * its state. Nor does `observeFor`: optional, `observe` told what the journal already names, and answering the same. Nor does
+ * `quota`: optional, and asked of the harness, never of a session.
  */
 export type RunnerOps = {
   readonly spawn: (r: SpawnRequest) => Effect.Effect<void, RunnerError>;
@@ -160,6 +189,12 @@ export type RunnerOps = {
    * journals that they were said, and `decide` never reads that.
    */
   readonly say?: (session: { name: string; sessionId: string }, text: string) => Effect.Effect<void, RunnerError>;
+  /**
+   * What the harness's subscription has left, asked of the harness once: one process, or one request, a call, and nothing kept between
+   * calls. Optional, for a harness that can tell (Claude Code: its `get_usage` control request). It touches no session and is journalled
+   * nowhere. Every way an ask can go is a `HarnessQuota`, so it fails only where the seam between it and its caller does.
+   */
+  readonly quota?: Effect.Effect<HarnessQuota, RunnerError>;
   /**
    * Why this runner would not take a task, as a sentence that says what to write instead — or `undefined`. Asked by `file`
    * before anything is journalled, so a task no harness could start is never a promise the loop keeps trying to honour.

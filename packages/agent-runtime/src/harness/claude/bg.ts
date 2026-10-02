@@ -24,6 +24,7 @@ import { readTranscript } from '../transcript.ts';
 import { countSpawn, readTextAsync } from '../../core/engine/tally.ts';
 import { RunnerError } from '../error.ts';
 import { registryOf, type RegistryRow } from './registry.ts';
+import { claudeQuota } from './quota.ts';
 import type { RunnerOps, SpawnRequest } from '../seam.ts';
 
 /**
@@ -309,6 +310,7 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
     logs: sessionLogs,
     transcript: sessionTranscript,
     say: sayThrough(sessionsDir, registry.pids),
+    quota: claudeQuota(),
   };
 };
 

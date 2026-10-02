@@ -169,7 +169,12 @@ test("the table's help is today's, word for word", () => {
 });
 
 test('the help prints no command the CLI does not serve', () => {
-  const entry = (name: string, only?: { side: 'cli' | 'api'; why: string }) => ({ name, usage: '<runId>', help: ['h'], ...(only ? { only } : {}) });
+  const entry = (name: string, only?: { side: 'cli' | 'api'; why: string }) => ({
+    name,
+    usage: '<runId>',
+    help: ['h'],
+    ...(only ? { only } : {}),
+  });
   assert.equal(
     helpOf([entry('a'), entry('b', { side: 'api', why: 'w' }), entry('c', { side: 'cli', why: 'w' })]),
     ['  wf a <runId>', `${' '.repeat(31)}h`, '  wf c <runId>', `${' '.repeat(31)}h`].join('\n'),

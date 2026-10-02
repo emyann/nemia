@@ -173,7 +173,8 @@ const HELP_INDENT = ' '.repeat(31);
 export const helpOf = (table: readonly Pick<CommandSpec, 'name' | 'usage' | 'help' | 'only'>[]): string =>
   table
     .filter((c) => c.only?.side !== 'api')
-    .flatMap((c) => [`  ${CLI} ${c.name} ${c.usage}`, ...c.help.map((line) => `${HELP_INDENT}${line}`)]).join('\n');
+    .flatMap((c) => [`  ${CLI} ${c.name} ${c.usage}`, ...c.help.map((line) => `${HELP_INDENT}${line}`)])
+    .join('\n');
 
 /**
  * Where a table of commands breaks its rules, a sentence each: a name defined twice; an entry served nowhere — neither routed on the api

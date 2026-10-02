@@ -3165,7 +3165,10 @@ test('REFUSED: `wf retry` with an empty --message, or --message on --recheck —
 
   const { main } = await import('../src/cli/main.ts');
   for (const [flags, pattern] of [
-    [['--message', ''], '--message is empty, and an empty answer tells the step nothing. Say what the step needs to hear — wf retry no-such-run implement --message "<answer>" — or leave --message out.'],
+    [
+      ['--message', ''],
+      '--message is empty, and an empty answer tells the step nothing. Say what the step needs to hear — wf retry no-such-run implement --message "<answer>" — or leave --message out.',
+    ],
     [
       ['--recheck', '--message', 'the second reading'],
       "--message carries your answer into the try's brief, and --recheck files no session to read it — it runs the check again, and nothing else. " +
@@ -3177,7 +3180,10 @@ test('REFUSED: `wf retry` with an empty --message, or --message on --recheck —
       /^--message takes what to tell the step, and --fresh is one of wf retry's own flags, so the answer was left out: .*give it as --message=--fresh\.$/,
     ],
     [['--nudge', '--message', '--model', 'opus'], /^--message takes what to tell the step, and --model is one of wf retry's own flags/],
-    [['--message=', '--fresh'], '--message is empty, and an empty answer tells the step nothing. Say what the step needs to hear — wf retry no-such-run implement --message "<answer>" — or leave --message out.'],
+    [
+      ['--message=', '--fresh'],
+      '--message is empty, and an empty answer tells the step nothing. Say what the step needs to hear — wf retry no-such-run implement --message "<answer>" — or leave --message out.',
+    ],
     [['--message=a', '--message', 'b'], /^wf retry takes --message once/],
   ] as const) {
     await assert.rejects(main(['retry', 'no-such-run', 'implement', ...flags]), refusedAs(pattern), flags.join(' '));

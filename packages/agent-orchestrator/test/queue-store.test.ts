@@ -589,7 +589,7 @@ test("`wf inbox queue` keeps the card file's time: a queue is no edit of the ide
 
   const fresh = addToInbox({ text: 'Filed now', workflow: 'dev', repo });
   assert.ok(
-    Date.now() - fs.statSync(fresh.file).mtime.getTime() < 60_000,
+    fs.statSync(fresh.file).mtime > filed,
     'wf inbox add writes a card at the time it is filed: it is the queue that keeps the time it found, not every write of the inbox',
   );
 });

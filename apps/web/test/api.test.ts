@@ -135,8 +135,8 @@ test('an answer with nothing to say says what came back: the status line of an e
 });
 /** Until `done` holds, or two seconds have passed. */
 async function until(done: () => boolean): Promise<void> {
-  const by = Date.now() + 2_000;
-  while (!done() && Date.now() < by) await new Promise((resolve) => setTimeout(resolve, 5));
+  const by = performance.now() + 2_000;
+  while (!done() && performance.now() < by) await new Promise((resolve) => setTimeout(resolve, 5));
 }
 
 test("a run's decision is asked for once while a live step's engine word moves, once more when it settles — and the last one stays shown meanwhile", async (t) => {

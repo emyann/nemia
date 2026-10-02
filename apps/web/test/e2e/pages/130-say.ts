@@ -60,7 +60,7 @@ export default {
         throw new Refused(`the api answers with the engine's entry, { at, attempt, text } — it answered ${JSON.stringify(entry)}`);
       }
       const inbox = JSON.stringify({ type: 'user', session_id: SAYING.sessionId, message: { role: 'user', content: SAYING.words } });
-      for (const until = Date.now() + WAIT_MS; heard.length === before && Date.now() < until;)
+      for (const until = performance.now() + WAIT_MS; heard.length === before && performance.now() < until;)
         await new Promise((resolve) => setTimeout(resolve, 50));
       if (heard.length !== before + 1 || JSON.stringify(heard.at(-1)) !== inbox) {
         throw new Refused(`the words reached the session's inbox once, as given — it heard ${JSON.stringify(heard.slice(before))}`);

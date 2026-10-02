@@ -88,7 +88,7 @@ export default {
     await talk.hover();
     await page.mouse.wheel(0, -100_000);
     const scrolled = () => talk.evaluate((element) => element.scrollTop);
-    for (const until = Date.now() + WAIT_MS; (await scrolled()) > 0 && Date.now() < until;)
+    for (const until = performance.now() + WAIT_MS; (await scrolled()) > 0 && performance.now() < until;)
       await new Promise((resolve) => setTimeout(resolve, 100));
     if ((await scrolled()) > 0)
       throw new Refused(

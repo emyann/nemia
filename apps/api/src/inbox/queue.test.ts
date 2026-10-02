@@ -78,12 +78,14 @@ const startedFrom = (id: string, card: string): string =>
 
 const cardText = (name: string): string => fs.readFileSync(path.join(inbox, `${name}.md`), 'utf8');
 
-test("GET /api/inbox carries a queued card's time and place, and the tick's last try of its start, as the package lists them", async () => {
+test("GET /api/inbox carries a queued card's time and place, and the tick's last try of its start, as the package lists them", async (t) => {
   clear();
+  t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-09-16T09:30:00.000Z') });
   const first = addToInbox({ text: 'Cache the views between passes', workflow: 'dev', repo }).card;
   const second = addToInbox({ text: 'Show what a step cost', workflow: 'gone' }).card;
   const parked = addToInbox({ text: 'Not queued' }).card;
   queueInInbox(first.name);
+  t.mock.timers.tick(1);
   queueInInbox(second.name);
   const tried = {
     at: '2026-09-16T10:00:00.000Z',
@@ -115,8 +117,9 @@ test("GET /api/inbox carries a queued card's time and place, and the tick's last
   assert.equal('queued' in byName.get(parked.name)!, false, 'a card not queued carries no `queued`');
 });
 
-test('POST /api/inbox/:name/queue queues a card as `wf inbox queue` does, with its place; DELETE takes it back as `--off` does, and says so of a card not queued, writing nothing', async () => {
+test('POST /api/inbox/:name/queue queues a card as `wf inbox queue` does, with its place; DELETE takes it back as `--off` does, and says so of a card not queued, writing nothing', async (t) => {
   clear();
+  t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-09-16T09:30:00.000Z') });
   const first = addToInbox({ text: 'Cache the views between passes', workflow: 'dev' }).card;
   const second = addToInbox({ text: 'Show what a step cost', workflow: 'dev', repo }).card;
 
@@ -138,6 +141,7 @@ test('POST /api/inbox/:name/queue queues a card as `wf inbox queue` does, with i
     'written as wf inbox queue writes it',
   );
 
+  t.mock.timers.tick(1);
   const behind = (await (await queue(second.name, JSON_TYPE, '{}')).json()) as InboxQueueAnswer;
   assert.deepEqual([behind.was, behind.place, behind.of], ['queued', 2, 2], 'a body of {} is no body');
   const byName = (a: readonly unknown[], b: readonly unknown[]) => String(a[0]).localeCompare(String(b[0]));

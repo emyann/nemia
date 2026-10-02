@@ -137,9 +137,9 @@ const PROCESS_ENV = /\bprocess\s*(?:\.\s*env\b|\[\s*['"`]env['"`]\s*\])|\{[^}]*\
 
 /**
  * The global `fetch` however a file reaches it: called, passed, aliased, destructured or typed off; never a method of another object
- * (`client.fetch`), a longer name (`prefetch`), a quoted word or an object's key (`{ fetch: x }`).
+ * (`client.fetch`), a longer name (`prefetch`, `sec-fetch-site`), a quoted word or an object's key (`{ fetch: x }`).
  */
-const FETCH = /(?:^|[^.\w$'"`])fetch\b(?!\s*:)|\bglobalThis\s*\.\s*fetch\b/m;
+const FETCH = /(?:^|[^.\w$'"`-])fetch(?![\w$-])(?!\s*:)|\bglobalThis\s*\.\s*fetch\b/m;
 
 /** The impure globals a piece of source reads outside its comment lines, each as `IMPURE_GLOBALS` names it. */
 function globalsIn(text: string): string[] {
@@ -415,6 +415,7 @@ test('the scanner sees the environment and fetch outside comment lines, and only
     'fetchAll(url);',
     'const o = { fetch: x };',
     "const name = 'fetch';",
+    "c.req.header('sec-fetch-site');",
     'const { envelope } = process;',
   ])
     assert.deepEqual(globalsIn(none), [], `${none} reads no global`);

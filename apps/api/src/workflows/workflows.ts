@@ -31,6 +31,7 @@ import {
   loadWorkflows,
   lookupRoots,
   skillsFor,
+  skillVersion,
   start,
   startFromInbox,
   unattachedRefusal,
@@ -49,6 +50,7 @@ import {
   STEP_KEY_MEANINGS,
   STEP_KEYS,
   type AgentSkill,
+  type SkillsFound,
   type StepKey,
   type Workflow,
 } from 'agent-orchestrator/workflow';
@@ -85,6 +87,8 @@ export type WorkflowStepSpec = {
   slot: 'none' | null;
   /** The agent attached to the step (`agent:`), in agents/ beside the folder: the rest of the keys are resolved with it. Null for none. */
   agent: string | null;
+  /** The skills the step adds to its agent's (`skills:`), as its own line names them: empty where it adds none. */
+  skills: string[];
   /** Claude Code's permission mode (`permissionMode:`): null on codex, whose fence is `sandbox`. */
   permissionMode: string | null;
   /**
@@ -317,7 +321,8 @@ const listedStep =
  * what it says, so it changes the word too. So does each agent a step names (`agent:`), as the package versions it (`agentVersion`): its
  * file, where the load finds it (`lookupRoots`), each file it names beside it — the schema of its `output:`, its `card:` — and each skill
  * folder its `skills:` gives: what the board shows a step with an agent is the agent's keys, words, declared fields and skills as much as
- * the step's, and an agent edited after the listing is a step the board does not show as it is.
+ * the step's, and an agent edited after the listing is a step the board does not show as it is. So does each skill a step's own `skills:`
+ * adds to its agent's, its folder where the load finds it (`skillVersion`).
  */
 export function versionOf(dir: string, places: Places): string {
   let names: string[];
@@ -339,7 +344,8 @@ export function versionOf(dir: string, places: Places): string {
   };
   const files = names.map((name) => [name, read(path.join(dir, name))] as const);
   const named = [...new Set(files.flatMap(([, text]) => (typeof text === 'string' ? frontmatterValue(text, 'agent') : [])))].sort();
-  const skills = named.length ? skillsFor(dir, places) : undefined;
+  const added = [...new Set(files.flatMap(([, text]) => (typeof text === 'string' ? addedSkillsIn(text) : [])))].sort();
+  const skills = named.length || added.length ? skillsFor(dir, places) : undefined;
   const agents = named.map((agent) => {
     const root = lookupRoots(dir, places).find((at) =>
       fs.lstatSync(path.join(at, AGENTS_FOLDER, `${agent}.md`), { throwIfNoEntry: false }),
@@ -350,7 +356,7 @@ export function versionOf(dir: string, places: Places): string {
     ];
   });
   return createHash('sha256')
-    .update(JSON.stringify([...files, ...agents]))
+    .update(JSON.stringify([...files, ...agents, ...added.map((skill) => addedSkillVersion(skill, skills!))]))
     .digest('hex')
     .slice(0, 16);
 }
@@ -360,7 +366,7 @@ export function versionOf(dir: string, places: Places): string {
  * `  agent: coder` and `agent : coder` name the agent they load with. None for a file with no such line, or whose frontmatter never
  * closes (the load refuses it). A name with a slash names no file of agents/.
  */
-function frontmatterValue(text: string, key: 'agent'): string[] {
+function frontmatterValue(text: string, key: 'agent' | 'skills'): string[] {
   let block: string | null;
   try {
     block = splitFrontmatter('', text).block;
@@ -375,6 +381,21 @@ function frontmatterValue(text: string, key: 'agent'): string[] {
     return value && !/[\\/]/.test(value) ? [value] : [];
   }
   return [];
+}
+
+/** The skills a step file's own `skills:` line adds to its agent's, by name. None for a file with no such line. */
+const addedSkillsIn = (text: string): string[] =>
+  frontmatterValue(text, 'skills').flatMap((line) =>
+    line
+      .split(',')
+      .map((skill) => skill.trim())
+      .filter(Boolean),
+  );
+
+/** A skill a step adds, as a folder's version counts it: its folder's version where `found` has it (`skillVersion`), else missing. */
+function addedSkillVersion(skill: string, found: SkillsFound): [string, string | null | { missing: string }] {
+  const at = found.at.get(skill);
+  return [`skills/${skill}`, typeof at === 'string' ? skillVersion(at) : { missing: skill }];
 }
 
 /**
@@ -395,6 +416,7 @@ function schemasIn(dir: string): string[] {
 /** The keys of a step that are lists, each empty where the step leaves it unset. */
 const listsOf = (step: Workflow) => ({
   input: step.input ?? [],
+  skills: step.skills ?? [],
   disallowedTools: step.disallowedTools ?? [],
   allowedTools: step.allowedTools ?? [],
   tally: step.tally ?? [],

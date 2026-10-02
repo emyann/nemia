@@ -132,6 +132,7 @@ const spec = (fields: Partial<WorkflowStepSpec> = {}): WorkflowStepSpec => ({
   workspace: null,
   slot: null,
   agent: null,
+  skills: [],
   permissionMode: null,
   sandbox: null,
   tools: null,
@@ -181,6 +182,7 @@ test("GET /api/workflows/keys is the form a step is drawn in: every key in the p
     ['choice', ['fail']],
     '`denials:` says one word or nothing, as `slot:` does: `fail`, which the parser reads and nothing else',
   );
+  assert.equal(kindOf.skills, 'list', "a step's `skills:` is a plain list of the skills it adds to its agent's");
   write(
     path.join(STORE, 'agents', 'picked.md'),
     '---\nmodel: opus\ncontext: 200k\ntools: Read, Grep\noutput: picked.schema.json\n---\nPick me.\n',
@@ -227,7 +229,7 @@ test("GET /api/workflows/keys is the form a step is drawn in: every key in the p
     assert.equal(
       form.roleKeys.includes(own as never),
       false,
-      `${own} says what the agent is, what it is given or what becomes of Claude Code's own prompt, and is never on the step form or in a step file`,
+      `${own} says what the agent is, what it is given or what becomes of Claude Code's own prompt, and is no role key: a step adds skills to its agent's with a key of its own`,
     );
 
   const refusedAs = (key: string, value: string): string | null => {
@@ -453,6 +455,34 @@ test("a folder whose agent's skill is in the repository's `.claude/skills/` is l
     fs.rmSync(path.join(repo, '.claude'), { recursive: true, force: true });
     fs.rmSync(dir, { recursive: true, force: true });
     fs.rmSync(path.join(STORE, 'agents', 'cacher.md'));
+  }
+});
+
+test("a skill only a step's own `skills:` adds moves the folder's version when its folder is edited, as the agent's own skills do; another skill does not", () => {
+  const dir = path.join(STORE, 'step-skilled');
+  const added = path.join(STORE, 'skills', 'mind-the-index', 'SKILL.md');
+  const other = path.join(STORE, 'skills', 'mind-nothing', 'SKILL.md');
+  write(added, '---\nname: mind-the-index\ndescription: Use this when a change touches the index.\n---\nRead the index first.\n');
+  write(other, '---\nname: mind-nothing\ndescription: Use this never.\n---\nNothing.\n');
+  write(path.join(STORE, 'agents', 'indexer.md'), '---\ntools: Read, Skill\n---\nYou mind the index.\n');
+  write(path.join(dir, 'build.md'), '---\nagent: indexer\nskills: mind-the-index\n---\n');
+  try {
+    assert.equal(
+      loadWorkflows(dir, { repo, home: root })
+        .find((s) => s.name === 'build')
+        ?.agent?.skills?.join(),
+      'mind-the-index',
+    );
+    const at = versionOf(dir);
+    fs.appendFileSync(other, 'And say so.\n');
+    assert.equal(versionOf(dir), at, "a skill no step adds and no agent gives is not the folder's");
+    fs.appendFileSync(added, 'And say so.\n');
+    assert.notEqual(versionOf(dir), at, 'an edit of the skill the step adds moves the version, or the board would save over it unread');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(path.dirname(added), { recursive: true, force: true });
+    fs.rmSync(path.dirname(other), { recursive: true, force: true });
+    fs.rmSync(path.join(STORE, 'agents', 'indexer.md'));
   }
 });
 

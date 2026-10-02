@@ -292,7 +292,10 @@ test("a check's stdout is shown without the trailer, and only its last lines", (
   assert.equal(lastLines('a\nb\n\n\n', 1), 'b');
 });
 
-/** Ticks `e` until `id` is in a phase `done` accepts, and answers its view; fails after `ms` on the monotonic clock, which a test may seed `Date` beside. */
+/**
+ * Ticks `e` until `id` is in a phase `done` accepts, and answers its view; fails after `ms` on the monotonic clock, which a test may
+ * seed `Date` beside.
+ */
 const reached = async (e: Engine, id: string, done: (v: Awaited<ReturnType<Engine['view']>>) => boolean, what: string, ms = 20_000) => {
   const deadline = performance.now() + ms;
   for (;;) {

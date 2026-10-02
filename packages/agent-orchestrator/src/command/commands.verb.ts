@@ -9,7 +9,7 @@ import { approvalWordsRefusal } from '../gate/gate.ts';
 import { approve } from '../gate/gate.verb.ts';
 import { runStore } from '../record/files.store.ts';
 import { stepsOf } from '../record/record.store.ts';
-import { messageRefusal, type RetryAsk, type RetryHow } from '../retry/index.ts';
+import { messageRefusal, type RetryHow } from '../retry/index.ts';
 import { retry } from '../retry/retry.verb.ts';
 import { acceptWordsRefusal } from '../round/round.ts';
 import { accept, round } from '../round/round.verb.ts';
@@ -20,11 +20,13 @@ import { commandLine, type Args, type CommandSpec } from './command.ts';
 
 /**
  * A command whole: its spec, `handler`, which calls one package verb with the arguments and answers data — never printed lines — and
- * `print`, the lines the CLI prints of that data. The api answers the data as JSON.
+ * `print`, the lines the CLI prints of that data. The api answers the data as JSON, or only its `apiKeys` where the CLI prints more of
+ * it than the api answers.
  */
-export type Command<D extends object = object> = CommandSpec & {
+export type Command<D extends object = Readonly<Record<string, unknown>>> = CommandSpec & {
   handler(e: Engine, args: Args): Promise<D>;
   print(data: D, args: Args): readonly string[];
+  readonly apiKeys?: readonly (keyof D & string)[];
 };
 
 /** The text under `key`, or undefined where none was given. */
@@ -69,7 +71,7 @@ const RUN_LOOP = [
 ] as const;
 
 /** `wf retry`: another try of a step asked for, the next tick files it once, and the file the ask is written to. */
-const RETRY: Command<{ try: number; file: string; stopFirst: boolean; ask: RetryAsk }> = {
+const RETRY: Command<{ try: number; file: string; stopFirst: boolean }> = {
   name: 'retry',
   usage: '<runId> <step> [--nudge | --fresh | --model <m> | --recheck] [--message "<answer>"] [--budget <amount>]',
   help: [
@@ -130,16 +132,17 @@ const RETRY: Command<{ try: number; file: string; stopFirst: boolean; ask: Retry
   async handler(e, args) {
     const { runId, step } = named(args);
     const { ask, file, stopFirst } = await retry(e, runId, step, howOf(args), { stopBlocked: true });
-    return { try: ask.try, file, stopFirst, ask };
+    return { try: ask.try, file, stopFirst };
   },
-  print({ ask, file, stopFirst }, args) {
+  print({ try: tryNo, file, stopFirst }, args) {
     const { runId, step } = named(args);
+    const ask = howOf(args);
     const how = `${ask.model ? `--model ${ask.model}` : `--${ask.mode}`}${ask.budget !== undefined ? `, --budget ${ask.budget}` : ''}`;
     const then = stopFirst
       ? 'its harness blocked its session: the next tick stops it, and files the try once it has stopped'
       : 'the next tick files it, once';
     return [
-      `${runId}  asked: try ${ask.try} of ${step} (${how})${ask.message !== undefined ? ', with your answer' : ''} — ${then}`,
+      `${runId}  asked: try ${tryNo} of ${step} (${how})${ask.message !== undefined ? ', with your answer' : ''} — ${then}`,
       `   ${file}`,
     ];
   },
@@ -176,6 +179,7 @@ const APPROVE: Command<{ try: number; at: string; message: string | null; file: 
   writes: true,
   refuses: ['Missing', 'Conflict', 'Invalid'],
   route: { method: 'POST', path: '/api/runs/:runId/steps/:step/approve', status: 202 },
+  apiKeys: ['try', 'at', 'message', 'file'],
   async handler(e, args) {
     const { runId, step } = named(args);
     const { approval, file } = await approve(e, runId, step, textOf(args, 'message'));
@@ -223,6 +227,7 @@ const ROUND: Command<{ step: string; round: number; file: string; budget?: numbe
   writes: true,
   refuses: ['Missing', 'Conflict', 'Invalid'],
   route: { method: 'POST', path: '/api/runs/:runId/round', status: 202 },
+  apiKeys: ['step', 'round', 'file'],
   async handler(e, args) {
     const { ask, file } = await round(e, named(args).runId, textOf(args, 'step'), amountIn(args, 'budget'));
     return { step: ask.step, round: ask.round, file, ...(ask.budget !== undefined ? { budget: ask.budget } : {}) };
@@ -264,6 +269,7 @@ const ACCEPT: Command<{ step: string; try: number; at: string; message: string; 
   writes: true,
   refuses: ['Missing', 'Conflict', 'Invalid'],
   route: { method: 'POST', path: '/api/runs/:runId/steps/:step/accept', status: 202 },
+  apiKeys: ['step', 'try', 'at', 'message', 'file'],
   async handler(e, args) {
     const { runId } = named(args);
     const { acceptance, file } = await accept(e, runId, textOf(args, 'step'), textOf(args, 'message'));
@@ -299,6 +305,7 @@ const SAY: Command<{ at: string; attempt: number; text: string; try: number; tas
   writes: true,
   refuses: ['Missing', 'Conflict'],
   route: { method: 'POST', path: '/api/runs/:runId/steps/:step/say', status: 202 },
+  apiKeys: ['at', 'attempt', 'text'],
   async handler(e, args) {
     const { runId, step } = named(args);
     const told = await say(e, runId, step, textOf(args, 'text') ?? '');

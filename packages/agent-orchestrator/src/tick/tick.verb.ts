@@ -145,6 +145,7 @@ export const tick = (e: Engine, options: { repo?: string; memo?: RestMemo; verif
  * report, settled or changed by this pass since, is read off the engine's record where it is settled. In this order:
  * - the memo is brought up to the engine's feed after the runtime's pass (`restingPass`), so what it appended on it — a settled task's
  *   `measured` — is read on this one, and what is appended after is read on the next; a run `wf rm` forgot leaves the memo (`forgotten`).
+ * - the runs are listed, each run the memo holds whose stamp has not moved answered with the memo's run, its record not read (`keptOf`).
  * - the ceilings the pass runs with are written (`recordCeilings`), for `wf ls` and `wf decide`, which judge the cap from a shell of their
  *   own.
  * - queued tasks are admitted off the views the runtime's pass reported (`admitted`).
@@ -161,7 +162,7 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }
   const resting = yield* restingPass(e, memo, verify);
   const ran = yield* tried(() => ceilings());
   yield* tried(() => within('act', () => recordCeilings(ran)));
-  const runs = yield* tried(() => runStore.runs.list());
+  const runs = yield* tried(() => runStore.runs.list(undefined, resting && keptOf(resting)));
   if (resting) forgotten(memo, runs);
   yield* admitted(e, report, runs, ran.sessions);
   const judging: Judging = { done: new Map(), unjudged: new Map() };
@@ -267,16 +268,17 @@ const passOf = (report: TickReport, runs: readonly Run[], judging: Judging, queu
 
 /**
  * What the tick remembers of the runs at rest (`atRest`), in memory and nowhere else: for each, what its last full pass answered, and the
- * inputs it answered on — its files in the store (`restStamps`), its record as read, and the result branches whose tips it would read. And
+ * inputs it answered on — its files in the store (`restStamps`), the run as read, and the result branches whose tips it would read. And
  * `cursor`, where on the engine's feed the memo has read to: every task of every run appends to it (the runtime's journal), so an event for
  * a task of a run the memo holds takes the run out of it (`evictedBy`). Undefined until the first pass reads the feed.
  *
- * A cache of a pure function, never a source of truth: nothing is written for it, a restarted daemon starts with an empty one and judges
- * every run afresh, and no verb, `wf ls` or the api reads it.
+ * A cache of a pure function, never a source of truth: nothing is written for it, a restarted daemon starts with an empty one and reads
+ * and judges every run afresh, and no verb, `wf ls` or the api reads it. While a run's stamp holds, the pass is handed the memo's run in
+ * place of its record (`keptOf`): an input of the run that the stamp does not cover is never read again.
  */
 export type RestMemo = {
   cursor?: number;
-  runs: Map<string, { stamp: string; record: string; tipped: string[]; advanced: Omit<Advanced, 'run'> }>;
+  runs: Map<string, { stamp: string; run: Run; tipped: string[]; advanced: Omit<Advanced, 'run'> }>;
 };
 
 /** A memo that holds nothing: what a daemon starts with, and what a test hands each pass to play a restart. */
@@ -294,6 +296,14 @@ const restMemo = (e: Engine): RestMemo => {
  * What a pass answers runs at rest by: the memo, read up to date with the feed, the store's stamps, and git's heads once per repository.
  */
 type RestingPass = { memo: RestMemo; stamps: Map<string, string>; heads: (repo: string) => Record<string, string>; verify: boolean };
+
+/** The memo's run for an id whose stamp is the one it was kept at, for the store to list in place of reading its record; else nothing. */
+const keptOf =
+  ({ memo, stamps }: RestingPass) =>
+  (id: string): Run | undefined => {
+    const kept = memo.runs.get(id);
+    return kept !== undefined && kept.stamp === stamps.get(id) ? kept.run : undefined;
+  };
 
 /**
  * The memo brought up to the engine's feed — every run a task of which appended since takes it out — and the store stamped, before the pass
@@ -365,9 +375,9 @@ const fullPass = (e: Engine, run: Run, slot?: RunSlot) =>
 
 /**
  * One run's pass, answered from the memo where the run was at rest on its last full pass and nothing it was judged by has changed:
- * its files in the store stamp the same, its record reads the same, nothing of its tasks is on the feed since (`restingPass`), and every
- * result branch it would read the tip of is where its record says (`tipsSeen`, off one `for-each-ref` a repository). Otherwise a full pass
- * (`advanceRun`), kept in the memo if the run is at rest after it.
+ * its files in the store stamp the same, the pass was handed the memo's own run for it (`keptOf`), nothing of its tasks is on the feed
+ * since (`restingPass`), and every result branch it would read the tip of is where its record says (`tipsSeen`, off one `for-each-ref` a
+ * repository). Otherwise a full pass (`advanceRun`), kept in the memo if the run is at rest after it and the pass left the run as it read.
  *
  * Answered from memory, it costs no journal read, no observe and no git process of its own, and is counted (`rested`). With `verify`, it is
  * judged in full as well (`verified`), and a difference is died of: a change the memo missed is a bug in what it watches.
@@ -380,43 +390,47 @@ const advanceResting = Effect.fn('advanceResting')(function* (e: Engine, run: Ru
   if (!resting) return (yield* fullPass(e, run, slot)).advanced;
   const { memo, stamps, heads, verify } = resting;
   const stamp = stamps.get(run.id);
-  const record = JSON.stringify(run);
   const kept = memo.runs.get(run.id);
-  const unchanged = kept !== undefined && stamp !== undefined && kept.stamp === stamp && kept.record === record;
+  const unchanged = kept !== undefined && stamp !== undefined && kept.stamp === stamp && kept.run === run;
   if (
     unchanged &&
     (yield* tried(() => !kept.tipped.length || !isGitRun(run) || tipsSeen(run, kept.tipped, heads(run.repo)) === undefined))
   ) {
     countRested();
-    if (verify) yield* verified(e, run, slot, kept.advanced, record);
+    if (verify) yield* verified(e, run, slot, kept.advanced);
     return { ...kept.advanced, run };
   }
   memo.runs.delete(run.id);
+  const record = JSON.stringify(run);
   const { advanced, rest } = yield* fullPass(e, run, slot);
-  if (rest && stamp !== undefined) {
+  if (rest && stamp !== undefined && JSON.stringify(run) === record) {
     const { run: _, ...answered } = advanced;
-    memo.runs.set(run.id, { stamp, record, tipped: rest.tipped, advanced: answered });
+    memo.runs.set(run.id, { stamp, run, tipped: rest.tipped, advanced: answered });
   }
   return advanced;
 });
 
 /**
- * A run the memo answered, judged in full as well (`fullPass`): nothing where the two agree, and a defect naming the run where the full
- * pass answers otherwise, finds it not at rest, or wrote its record (`record`, as the memo read it) otherwise.
+ * A run the memo answered, its record read afresh and judged in full as well (`fullPass`): nothing where the two agree, and a defect naming
+ * the run where its record reads otherwise than the memo's run, or where the full pass answers otherwise, finds it not at rest, or changed
+ * the run it read.
  */
-const verified = Effect.fn('verified')(function* (
-  e: Engine,
-  run: Run,
-  slot: RunSlot | undefined,
-  kept: Omit<Advanced, 'run'>,
-  record: string,
-) {
+const verified = Effect.fn('verified')(function* (e: Engine, run: Run, slot: RunSlot | undefined, kept: Omit<Advanced, 'run'>) {
+  const fresh = yield* tried(() => runStore.runs.read(run.id));
+  const record = JSON.stringify(fresh);
+  if (record !== JSON.stringify(run))
+    return yield* Effect.die(
+      new Error(
+        `the tick answered ${run.id} from its memo of runs at rest, and its record reads otherwise than the memo's run: ` +
+          `an input of the run changed that its stamp does not watch (restStamps), or the memo's run was changed in memory`,
+      ),
+    );
   const {
     advanced: { run: _, ...judged },
     blockers,
     rest,
-  } = yield* fullPass(e, run, slot);
-  if (rest && isDeepStrictEqual(judged, kept) && JSON.stringify(run) === record) return;
+  } = yield* fullPass(e, fresh, slot);
+  if (rest && isDeepStrictEqual(judged, kept) && JSON.stringify(fresh) === record) return;
   return yield* Effect.die(
     new Error(
       `the tick answered ${run.id} from its memo of runs at rest, and a full pass ${rest ? 'answers otherwise' : `finds it not at rest (${blockers.join(', ')})`}: ` +

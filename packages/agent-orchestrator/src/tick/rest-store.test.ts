@@ -191,6 +191,7 @@ test('a pass costs as many journal reads, observes and git processes on 200 fini
     [200, twoHundred],
   ] as const) {
     assert.equal(c.rested, at, `every finished run of ${at} answered from memory`);
+    assert.equal(c.records, none.records, `${at} finished runs: no record read more than the runs in flight make`);
     assert.equal(journals(c), journals(none), `${at} finished runs: no journal read more than the runs in flight make`);
     assert.equal(observes(c), observes(none), `${at} finished runs: no observe more`);
     assert.equal(
@@ -201,6 +202,17 @@ test('a pass costs as many journal reads, observes and git processes on 200 fini
     assert.equal(c.spawned, none.spawned + ISOLATED_REPOS.length, `${at} finished runs: no process more than those`);
   }
   assert.equal(none.rested, 0);
+});
+
+test('a second pass over the same store reads no record of a finished run, and a memo emptied, as a restarted daemon has it, reads them all', async () => {
+  await measured();
+  const second = await measured();
+  const listed = listRuns().length;
+  assert.equal(second.rested, 200, 'every finished run answered from memory');
+  assert.equal(second.records, listed - second.rested, `only the records of the runs in flight read (${second.records} of ${listed})`);
+  const fresh = await measured(freshRestMemo());
+  assert.ok(fresh.records >= listed, `every record read with nothing in memory (${fresh.records} of ${listed})`);
+  await measured();
 });
 
 test('the same store, the memo emptied before every pass as a restarted daemon has it: every finished run is read again, and git asked for each', async () => {
@@ -253,13 +265,21 @@ const aResting = (isolate = false): GitRun => {
 
 /**
  * `change` made to a run at rest takes that run, and no other, out of the memo for the pass that reads it — for `afresh` passes, where the
- * first writes the record — and then it rests again.
+ * first writes the record — and then it rests again. The first of them reads `read` records more than a steady pass: the run's own, unless
+ * no file of it moved and the memo's run is judged.
  */
-const evicts = async (what: string, change: (run: Run) => void | Promise<void>, run: Run = aResting(), afresh = 1) => {
+const evicts = async (what: string, change: (run: Run) => void | Promise<void>, run: Run = aResting(), afresh = 1, read = 1) => {
   const before = await rested();
+  const steadily = await measured();
   assert.ok(MEMO.runs.has(run.id), `${what}: the run is at rest before`);
   await change(run);
-  for (let k = 0; k < afresh; k++)
+  const first = await measured();
+  assert.deepEqual(
+    [first.rested, first.records],
+    [before - 1, steadily.records + read],
+    `${what}: the run is judged afresh, and every other run still answered from memory without a read of its record`,
+  );
+  for (let k = 1; k < afresh; k++)
     assert.equal(
       await rested(),
       before - 1,
@@ -291,6 +311,14 @@ test("a person's marker beside the record — cancelled, pruned — takes a run 
 test("a hold takes a run out of the memo for as long as it holds: what it waits on is another run's", async () => {
   const run = aResting();
   const before = await rested();
+  const steadily = await measured();
+  fs.writeFileSync(holdFile(run.id), `${JSON.stringify({ at: new Date().toISOString(), until: [] })}\n`);
+  const held = await measured();
+  assert.deepEqual(
+    [held.rested, held.records],
+    [before - 1, steadily.records + 1],
+    'held on no run, the held run is judged afresh and its record read again, and no other',
+  );
   fs.writeFileSync(holdFile(run.id), `${JSON.stringify({ at: new Date().toISOString(), until: [inFlight[0].id] })}\n`);
   assert.equal(await rested(), before - 1);
   assert.equal(await rested(), before - 1, 'held, it is judged afresh on every pass');
@@ -357,6 +385,7 @@ test('a result branch moved takes its run out and its tip is written; one delete
     },
     run,
     2,
+    0,
   );
   assert.equal(readRun(run.id).tips![branch], moved, 'the tip the pass saw is on the record');
 
@@ -429,10 +458,24 @@ test('REFUSED: a memo that answers otherwise than a full pass, its inputs unchan
   await rested();
 });
 
+test('REFUSED: a memo whose run reads otherwise than its record, its stamp unchanged, throws under verifyRest, naming the run', async () => {
+  const run = aResting();
+  await rested();
+  const kept = MEMO.runs.get(run.id)!;
+  const was = kept.run;
+  kept.run = { ...was, brief: 'not what the record says' };
+  await assert.rejects(
+    verified(),
+    (err: Error) => err.message.includes(run.id) && /its record reads otherwise than the memo's run/.test(err.message),
+  );
+  kept.run = was;
+  await rested();
+});
+
 test('REFUSED: a memo that holds a run a full pass finds not at rest throws under verifyRest, naming the clauses that hold it out', async () => {
   const { run: _, ...advanced } = await answered(inFlight[0].id);
   const run = readRun(inFlight[0].id);
-  MEMO.runs.set(run.id, { stamp: restStamps().get(run.id)!, record: JSON.stringify(run), tipped: [], advanced });
+  MEMO.runs.set(run.id, { stamp: restStamps().get(run.id)!, run, tipped: [], advanced });
   await assert.rejects(
     verified(),
     (err: Error) => err.message.includes(run.id) && /a full pass finds it not at rest \(status, settled, inFlight\)/.test(err.message),

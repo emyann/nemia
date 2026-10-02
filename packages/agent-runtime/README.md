@@ -1243,8 +1243,14 @@ real runs:
   closeout file and output before it launches the run, and a resumed run's parent wrote its own
   under its own name, so whatever it reads there its own process wrote. A file's mtime is no
   better than a clock: stepped back about a second every thirty seconds under load, it fell before
-  a 1.4 s attempt's start, and the statement was dropped. Leaving out the time skips this check, so
-  Claude Code's `--bg` runner, whose resumed transcript holds its parent's calls, still gives one.
+  a 1.4 s attempt's start, and the statement was dropped. Leaving out the time skips this check.
+  Claude Code's `--bg` runner, whose resumed transcript holds its parent's calls, tells them by the
+  call's id: a flagged `--bg --resume` starts a copy under a new session id that carries the parent's
+  `tool_use` ids verbatim, and gives each new call a new one (measured on 2.1.288). Its spawn records
+  the parent's last StructuredOutput call id (`harness/claude/parent.ts`) before `claude` runs; a
+  statement with that id is inherited and not reported, and another is the session's own and carries
+  no time. Only a session with no record — spawned before the record was kept, or whose parent's
+  transcript could not be read — or a call with no id still gives a time.
 - **From a busy session, it is not final.** A step once declared itself done, carried on, found it
   could not commit, and revised its verdict eleven seconds later.
 
@@ -1908,6 +1914,7 @@ of pure code sits beside it.
 | `src/harness/sdk.ts` | the same four verbs on the Agent SDK, with the tradeoff written down |
 | `src/harness/index.ts` | the face of the seam, as the A2A seam and the doors take it; `core/` imports `seam.ts` and `args.ts` by their own path |
 | `src/harness/claude/bg.ts` | Claude Code's `--bg` runner (`claudeOps`), and `sh`, the one way it shells out |
+| `src/harness/claude/parent.ts` | what a resumed `--bg` session's spawn records of its parent: the id of the parent's last StructuredOutput call, and whose a statement is by it |
 | `src/harness/claude/code.ts` | Claude Code as the engine runs it by default: a step as a job (`claude -p`), or a background session (`claude --bg`) when the task asks, each verb routed by the session id's shape; and `claude -p`'s argv and the `claude-detached` spec |
 | `src/harness/claude/quota.ts` | Claude Code's quota (`claudeQuota`): the `claude` on PATH asked `get_usage` with no prompt, and its answer read (`quotaOfResponse`) |
 | `src/harness/claude/registry.ts` | the rows `claude agents --all --json` prints, decoded: which are ours, and why a listing is refused |

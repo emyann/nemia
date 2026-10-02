@@ -379,7 +379,7 @@ test('the LAST StructuredOutput call is the statement, stamped with when it was 
       at: Date.parse('2026-09-12T09:30:00.000Z'),
       lastWord: false,
     },
-    "the last call, with its time: a resumed transcript holds the parent's calls too, and the tool's definition names it",
+    "the last call, with its time and no `id` where it has none: a resumed transcript holds the parent's calls, and the tool's definition names it",
   );
   assert.equal(
     lastStructuredOutput(entry({ type: 'user', message: { content: 'say StructuredOutput' } })),
@@ -406,7 +406,7 @@ const closingTurn = (timestamp: string, id: string, input: object) => [
 test('a statement is the LAST WORD when the conversation ends with its result — bookkeeping after it does not count, and anything said after it does', () => {
   const at = '2026-09-17T02:53:00.160Z';
   const closed = closingTurn(at, 'toolu_1', { outcome: 'done' }).join('\n');
-  assert.deepEqual(lastStructuredOutput(closed), { payload: { outcome: 'done' }, at: Date.parse(at), lastWord: true });
+  assert.deepEqual(lastStructuredOutput(closed), { payload: { outcome: 'done' }, at: Date.parse(at), lastWord: true, id: 'toolu_1' });
   assert.equal(lastStructuredOutput(`${closed}\n`)?.lastWord, true, 'a trailing newline is not a line');
 
   const woken = [closed, entry({ type: 'user', timestamp: '2026-09-17T04:03:15.727Z', message: { content: 'carry on' } })].join('\n');
@@ -471,6 +471,7 @@ test("a call before the statement is never read, so never decoded: a resumed tra
     payload: { outcome: 'done' },
     at: Date.parse(at),
     lastWord: true,
+    id: 'toolu_1',
   });
 });
 

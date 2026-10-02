@@ -297,7 +297,11 @@ test('LONG-LIVED: what a sighting journals — the first gap once, a process at 
   assert.deepEqual(sightingFacts(holding, { ...gone, state: 'canceled' }, T), [], 'a stopped listing is an end, not a gap');
   assert.deepEqual(sightingFacts(holding, { ...gone, held: undefined }, T), [], 'a harness that cannot say is no gap');
   assert.deepEqual(sightingFacts(holding, undefined, T), [], 'a session not seen, or not read this pass');
-  assert.deepEqual(sightingFacts(fold(TASK, inFlight(false)), gone, T), [], 'a job');
+  assert.deepEqual(sightingFacts(fold(TASK, inFlight(false)), held(100), T), [], 'a job held with a process');
+  assert.deepEqual(sightingFacts(fold(TASK, inFlight(false)), gone, T), [], 'a job listed with none');
+  const settled = fold(TASK, [...inFlight(true), { kind: 'settled', at: at(5), outcome: 'failed' }]);
+  assert.equal(settled.attempts.at(-1)?.ended, null, 'settled with its attempt left open');
+  assert.deepEqual(sightingFacts(settled, held(100), T), [], 'a settled task held with a process');
   assert.deepEqual(sightingFacts(fold(TASK, [...inGap(true), lostEnd]), held(300), T), [], 'an ended attempt');
 });
 

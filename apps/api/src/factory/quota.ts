@@ -64,7 +64,7 @@ export type QuotaWindow = { key: string; label: string; usedPercentage: number; 
  *              `backoffOf`, not the keep
  *   no-claude  there is no `claude` on the api's PATH
  *   timeout    Claude Code did not answer in time
- *   failed     Claude Code ended before it answered
+ *   failed     Claude Code ended before it answered, or the engine would not ask it (`rejected`), each said in its own words
  *   unknown    it answered in a shape this code does not read: an error for the request, or no window it can read
  *
  * `said` is the plain sentence for every case but `fresh`, with what to do. `askedAt` and `ageMs` are the held ask's, null while none is;
@@ -142,11 +142,14 @@ const unknownRead = (what: string): Read => ({
   said: `Claude Code answered the usage request in a shape this board does not read: ${what}. ${SEE}.`,
 });
 
+/** What the api holds of an ask: the engine's answer, or the words the engine rejected the ask with. */
+export type Asked = HarnessQuota | { kind: 'rejected'; said: string };
+
 /**
  * What the engine's answer says to the board, judged at `now` for the windows' resets: the plan's windows (`fresh`), or why there are none,
  * with what to do. Pure. A plan none of whose limits is a window the board shows is `unknown`.
  */
-export function readOf(asked: HarnessQuota, now: number): Read {
+export function readOf(asked: Asked, now: number): Read {
   const none = { subscription: null, windows: [] };
   switch (asked.kind) {
     case 'missing':
@@ -169,6 +172,12 @@ export function readOf(asked: HarnessQuota, now: number): Read {
         said: `Claude Code stopped before it answered the usage request (${how}${asked.said ? `: ${asked.said}` : ''}). Run claude -p in a shell where the api runs to see why.`,
       };
     }
+    case 'rejected':
+      return {
+        ...none,
+        state: 'failed',
+        said: `The api's engine would not ask Claude Code for the quota (${asked.said}): this is the engine refusing, not Claude Code failing, so running claude will not show why. Restart the api; if the board says it again, the engine the api runs has no claude harness that answers a quota: see README.md, The quota on the board.`,
+      };
     case 'no-plan':
       return {
         ...none,
@@ -196,7 +205,7 @@ export function readOf(asked: HarnessQuota, now: number): Read {
  * An ask's outcome, and when it came: the ms since the epoch. `keptMs` is how long it is kept when that is not the keep: an `unanswered`
  * outcome's wait (`backoffOf`).
  */
-export type Held = { asked: HarnessQuota; at: number; keptMs?: number };
+export type Held = { asked: Asked; at: number; keptMs?: number };
 
 /**
  * How long the `streak`th `unanswered` outcome in a row is kept: `firstMs`, doubled for each one before it in the row, never past
@@ -251,13 +260,8 @@ export type ReadQuota = (opts: {
   now?: () => number;
 }) => Promise<Quota>;
 
-/** An ask that rejected, as the board holds it: `failed`, with what it rejected with. */
-const rejected = (e: unknown): HarnessQuota => ({
-  kind: 'failed',
-  code: null,
-  signal: null,
-  said: e instanceof Error ? e.message : String(e),
-});
+/** An ask that rejected, as the board holds it: `rejected`, with what it rejected with. */
+const rejected = (e: unknown): Asked => ({ kind: 'rejected', said: e instanceof Error ? e.message : String(e) });
 
 /**
  * A quota asker with nothing held, as a fresh api has: what it holds is the last ask's outcome, the last with windows, how many

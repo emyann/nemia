@@ -1181,14 +1181,20 @@ log. `exit` can come first, and the pass that records the end would then miss an
 pipe — for good, since an end is written once. Two seconds at most: a child the harness leaves behind
 can hold a pipe open for as long as it likes.
 
-Runners report the statement **and when it was made**. The engine decides whether it belongs to this
-attempt, records it on the attempt (`state.attempts[n].closeout`), and never reads it. Two rules
-guard that decision, both learned from real runs:
+Runners report the statement **and when it was made**, unless it cannot be another attempt's. The
+engine decides whether it belongs to this attempt, records it on the attempt
+(`state.attempts[n].closeout`), and never reads it. Two rules guard that decision, both learned from
+real runs:
 
 - **Made before the attempt began, it was inherited, not said.** A resumed Claude Code session's
   transcript holds its parent's entire conversation under the child's own session id — 460 entries,
   measured — so the parent's `StructuredOutput` call arrives looking exactly like the child's. Only
   the time tells them apart, and only the journal knows when the attempt started.
+  A runner whose session cannot carry another attempt's statement gives no time, and the engine then
+  keeps the statement whatever the clock says. A remote A2A agent is one: its Task was made by this
+  attempt's message. A time stamped when the runner read it would fall before the attempt's start
+  once the wall clock stepped back, and the statement would be dropped from a completed task.
+  Leaving out the time skips this check, so a runner that can resume a session always gives one.
 - **From a busy session, it is not final.** A step once declared itself done, carried on, found it
   could not commit, and revised its verdict eleven seconds later.
 
@@ -1502,8 +1508,11 @@ if (q.kind === 'windows') for (const l of q.limits) console.log(l.key, l.usedPer
 ```
 
 Claude Code answers it, as `claude` and as `claude-bg`: the `claude` on PATH, sent its `get_usage` control request with no prompt
-(`claudeQuota`, `harness/claude/quota.ts`), so no model is called and no token spent. Each call is one ask, one process, let go before
-the call returns, whatever ended it; nothing is journalled and nothing kept, so a caller that reads often keeps the answer itself. A
+(`claudeQuota`, `harness/claude/quota.ts`), so no model is called and no token spent. Each call is one ask, one process: `claudeQuota`
+lets it go before it returns, whatever ended it — an answer, the timeout, an interruption. Through the engine the ask runs behind the
+A2A seam, which an interruption does not cross: a caller that interrupts `quota()` gets control back at once, and the process ends by
+the ask's own timeout, within `QUOTA_TIMEOUT_MS` (15 s) and 2 s more. Nothing is journalled and nothing kept, so a caller that reads
+often keeps the answer itself. A
 harness with no quota — Codex, a remote agent, a `PromiseRunner` — is refused in words (`QuotaRefused`, exit code 2 at the Promise door),
 naming the harnesses that have one; so is a harness the engine does not have, and any argument but one name.
 

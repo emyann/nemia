@@ -69,9 +69,10 @@ export type Sighting = {
    * can take a structured final answer, and only once one was given.
    *
    * The time is not decoration. A resumed session can carry a statement its parent made, and the
-   * engine keeps one only if it was made after this attempt began.
+   * engine keeps one only if it was made after this attempt began. A runner whose session cannot carry
+   * another attempt's statement gives no time, and the engine keeps the statement whatever the clock says.
    */
-  closeout?: { payload: unknown; at: number };
+  closeout?: { payload: unknown; at?: number };
   /**
    * How long the session has been quiet — nothing written — present once that is long enough that its runner holds it
    * has stopped rather than paused between steps it drives itself (Claude Code: ninety seconds).

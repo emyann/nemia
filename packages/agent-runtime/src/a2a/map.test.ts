@@ -48,26 +48,22 @@ test('each A2A state is passed through as its own name, an interrupted one says 
     [99 as TaskState, 'working', undefined],
   ];
   for (const [state, observed, waiting] of cases) {
-    const s = sightingOfTask(taskIn(state), 5);
+    const s = sightingOfTask(taskIn(state));
     assert.equal(s.state, observed, TaskState[state] ?? String(state));
     assert.equal(s.waitingFor, waiting, TaskState[state] ?? String(state));
     assert.equal(s.sessionId, 't-1');
     assert.equal(s.nativeId, 'c-1', 'the context is the conversation a later turn continues');
     assert.equal(s.closeout, undefined, 'no artifact, no statement');
   }
-  assert.equal(sightingOfTask({ ...taskIn(TaskState.TASK_STATE_WORKING), status: undefined }, 5).state, 'working');
-  assert.equal(sightingOfTask({ ...taskIn(TaskState.TASK_STATE_WORKING), contextId: '' }, 5).nativeId, undefined);
+  assert.equal(sightingOfTask({ ...taskIn(TaskState.TASK_STATE_WORKING), status: undefined }).state, 'working');
+  assert.equal(sightingOfTask({ ...taskIn(TaskState.TASK_STATE_WORKING), contextId: '' }).nativeId, undefined);
 });
 
-test('the closing statement is the data part of the last artifact that has one, read at the moment it was read', () => {
-  const done = (...artifacts: Artifact[]) => sightingOfTask(taskIn(TaskState.TASK_STATE_COMPLETED, artifacts), 1234).closeout;
-  assert.deepEqual(done(artifact(data({ n: 1 })), artifact(data({ n: 2 }))), { payload: { n: 2 }, at: 1234 }, 'in the last artifact');
-  assert.deepEqual(done(artifact(data({ n: 1 })), artifact(text('words, no data'))), { payload: { n: 1 }, at: 1234 }, 'in an earlier one');
-  assert.deepEqual(
-    done(artifact(data({ n: 1 }), text('and a line'), data({ n: 3 }))),
-    { payload: { n: 3 }, at: 1234 },
-    'the last data part of it',
-  );
+test("the closing statement is the data part of the last artifact that has one, with no time: the Task is this attempt's own", () => {
+  const done = (...artifacts: Artifact[]) => sightingOfTask(taskIn(TaskState.TASK_STATE_COMPLETED, artifacts)).closeout;
+  assert.deepEqual(done(artifact(data({ n: 1 })), artifact(data({ n: 2 }))), { payload: { n: 2 } }, 'in the last artifact');
+  assert.deepEqual(done(artifact(data({ n: 1 })), artifact(text('words, no data'))), { payload: { n: 1 } }, 'in an earlier one');
+  assert.deepEqual(done(artifact(data({ n: 1 }), text('and a line'), data({ n: 3 }))), { payload: { n: 3 } }, 'the last data part of it');
   assert.equal(done(artifact(text('only words'))), undefined, 'none: the end is recorded `stated: false`');
   assert.equal(done(), undefined);
 });
@@ -79,7 +75,7 @@ test('a statement published while the Task is not complete is not read: it would
     TaskState.TASK_STATE_FAILED,
     TaskState.TASK_STATE_CANCELED,
   ]) {
-    assert.equal(sightingOfTask(taskIn(state, [artifact(data({ early: true }))]), 1).closeout, undefined, TaskState[state]);
+    assert.equal(sightingOfTask(taskIn(state, [artifact(data({ early: true }))])).closeout, undefined, TaskState[state]);
   }
 });
 

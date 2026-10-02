@@ -57,7 +57,11 @@ function fitBeside(frame: HTMLElement | null) {
  * Fits the canvas in `frame` again, with `fitView`, clear of the bar (`fitBeside`): when the frame changes width, as when the window does,
  * and when a step of the run opens in the bar or the bar closes (`covered`). A canvas drawn uncovered keeps React Flow's own first fit.
  */
-function useRefit(frame: RefObject<HTMLDivElement | null>, covered: boolean, fitView: ReturnType<typeof useReactFlow<StepFlowNode>>['fitView']) {
+function useRefit(
+  frame: RefObject<HTMLDivElement | null>,
+  covered: boolean,
+  fitView: ReturnType<typeof useReactFlow<StepFlowNode>>['fitView'],
+) {
   useEffect(() => {
     const el = frame.current;
     if (!el) return;

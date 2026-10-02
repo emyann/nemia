@@ -149,6 +149,8 @@ stateDiagram-v2
   submitted --> failed: NO_SESSION_TO_CONTINUE / settle
   starting --> starting: SESSION_LIVE / nothing
   starting --> starting: SESSION_IDLE / nothing
+  starting --> starting: SESSION_RESPAWNING / nothing
+  starting --> ending: RESPAWN_OVERDUE / record-end
   starting --> starting: SESSION_BLOCKED / nothing
   starting --> input_required: SESSION_QUIET [holds] / record-end
   starting --> ending: SESSION_QUIET / record-end
@@ -162,6 +164,8 @@ stateDiagram-v2
   starting --> ending: SPAWN_REFUSED / record-end
   working --> working: SESSION_LIVE / nothing
   working --> working: SESSION_IDLE / nothing
+  working --> working: SESSION_RESPAWNING / nothing
+  working --> ending: RESPAWN_OVERDUE / record-end
   working --> working: SESSION_BLOCKED / nothing
   working --> input_required: SESSION_QUIET [holds] / record-end
   working --> ending: SESSION_QUIET / record-end
@@ -189,10 +193,13 @@ stateDiagram-v2
   ending --> completed: CLOSED [lastDone] / settle
   ending --> failed: CLOSED / settle
   ending --> failed: DEADLINE_SPENT / settle
-  ending --> failed: ATTEMPT_ENDED [longLived] / settle
   ending --> completed: ATTEMPT_ENDED [endedDone] / settle
   ending --> canceled: ATTEMPT_ENDED [endedStopped] / settle
   ending --> failed: ATTEMPT_ENDED / settle
+  ending --> ending: UNREAD / nothing
+  ending --> ending: PREVIOUS_LIVE / stop
+  ending --> ending: BACKING_OFF / nothing
+  ending --> starting: RESTART_DUE / start
   submitted --> stopping: requestStop [stoppable] (by person)
   starting --> stopping: requestStop [stoppable] (by person)
   working --> stopping: requestStop [stoppable] (by person)
@@ -208,8 +215,7 @@ stateDiagram-v2
 
 The guards: `holds`, a task held open whose attempt ends `done`, waits on a person; `live`, a session past its deadline
 still running is stopped rather than ended; `overdue`, a person's stop whose harness could not be read (`UNREAD`) ends
-the attempt once its deadline has passed, and waits for a read until then; `longLived`, a long-lived task whose session
-ended with no stop asked, which settles `failed` however it ended; `lastDone`, `endedDone` and `endedStopped`, the
+the attempt once its deadline has passed, and waits for a read until then; `lastDone`, `endedDone` and `endedStopped`, the
 end a task settles on. A person's verbs are no edges, since no pass takes them: `VERBS` declares each, drawn above with
 who writes it and no action — `requestStop` from any state not final and not `stopping` under `stoppable`, `answer` and
 `close` from `input-required` under `awaitsWord` — and each refusal asks its guard first (`verbTakes`, `VERB_GUARDS`), which
@@ -1554,11 +1560,24 @@ await engine.stop(id)       // the next passes stop it, record the end `operator
 **Idle is read off the sighting.** A sighting carries `held`, whether the harness still holds the session's process
 (Claude Code's `claude agents` lists a `pid`); an idle session is held, not busy, and either listed waiting on nobody (no
 `waitingFor`), listed done, or quiet. A wait on a person — a permission prompt, authentication — is still `needs-human`,
-a busy one is at work, and a session listed with no process is gone.
+a busy one is at work, and a session listed done or stopped with no process has ended.
 
-**An end no stop asked for is a failure.** A long-lived session that ends, however it ends — done, failed, stopped by
-something else, lost — with no `stop` on the record settles the task `failed`, note `the long-lived session ended without
-a stop`. Starting it again is not built yet.
+**A process its harness respawns is waited out.** Claude Code restarts a `--bg` session whose process died, on the same
+conversation, some ten seconds later; meanwhile it lists the session `blocked` with no `pid`. A long-lived session listed live
+and not held is **respawning** (`respawning`, `SESSION_RESPAWNING`): the pass does nothing, `view` says phase `restarting`,
+and nobody is asked anything. The engine journals what the listing says before it decides (`sightingFacts`): a `gap` the
+first time the session is seen with no process, and a `process`, with its pid, once it is held again — or held in a process
+it had not been seen in. So Claude Code's own crash loop is on the record and in the view, and never acted on. A gap open
+`RESPAWN_GAP_MS` (two minutes) is a respawn that is not coming (`RESPAWN_OVERDUE`): the attempt ends `lost`.
+
+**An end no stop asked for is restarted, after a back-off.** A long-lived session that ends, however it ends — done,
+failed, lost, or stopped at its harness (`claude stop`, claude.ai) — with no `stop` on the record is started again as a new
+attempt, `ae/<task>/<n+1>`, resuming the latest session an attempt recorded and told `RESTART_WORDS` instead of the brief
+(`restartOf`; with none recorded, it starts on the brief). Its old session, if its harness still holds it, is stopped first
+(`PREVIOUS_LIVE`), and nothing starts while its harness cannot be read (`UNREAD`). The wait is a kubelet's
+(`RESTART_BACKOFF`, `backoffOf`): 10 s after one end, doubled for each end in a row, at most 300 s; an attempt that ran
+600 s counts them again. It is read off the journal's times and `now` alone (`BACKING_OFF`, then `RESTART_DUE`), so a
+restarted daemon waits the same. Only `ae stop` ends the task: it settles `stopped`, and nothing restarts it.
 
 **Refused, with exit code 2**, nothing journalled: a `restartPolicy` other than `'Always'`; beside it, `holdOpen` (a turn's
 end is idle here, not a wait), `deadlineSeconds` (only a stop ends it) and `closeoutSchema` (a statement would end its

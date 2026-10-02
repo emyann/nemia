@@ -14,6 +14,7 @@ import { LANDING_DENIED } from '../src/ending/ending.ts';
 import { readPlaceJson, runPlaceVerb } from '../src/runner.ts';
 import type { PlaceOutcome, PlaceVerb } from '../src/runner.ts';
 import { running } from './running.ts';
+import { steppingClock } from './clock.ts';
 import { scratch } from './scratch.ts';
 
 /** The git place the package ships. */
@@ -319,6 +320,51 @@ test('a handoff held past its deadline by a clean filter leaves no index.lock, a
     missing: [],
     head: git(dir, 'rev-parse', 'HEAD'),
   });
+});
+
+/**
+ * A place skill of one verb, `handoff`, whose script starts `/bin/sh` on a script of its own in its process group — `trap` set as `on`
+ * says, then a marker touched and a long sleep waited on — and idles past any deadline. Its folder, the shell's script and the marker.
+ */
+function heldPlace(on: string): { skill: string; shell: string; marker: string } {
+  const skill = scratch('wf-place-held-');
+  const marker = path.join(skill, 'in-the-shell');
+  const shell = path.join(skill, 'held.sh');
+  fs.writeFileSync(shell, `${on}\ntouch '${marker}'\nsleep 60 &\nwait\n`);
+  fs.mkdirSync(path.join(skill, 'scripts'));
+  fs.writeFileSync(
+    path.join(skill, 'scripts', 'handoff.ts'),
+    `import { spawn } from 'node:child_process';\nspawn('/bin/sh', [${JSON.stringify(shell)}], { stdio: 'ignore' });\nsetInterval(() => {}, 1000);\n`,
+  );
+  return { skill, shell, marker };
+}
+
+test('a group still cleaning up on SIGTERM is given its grace on a stepped wall clock', (t) => {
+  const { skill, shell, marker } = heldPlace(`trap 'sleep 0.3; exit 0' TERM`);
+  t.after(() => {
+    for (const pid of running(shell)) process.kill(pid, 'SIGKILL');
+  });
+  steppingClock(t, 60_000);
+  const outcome = runPlaceVerb(skill, 'handoff', { workspace: skill, step: 'build', why: '' }, { env: ENV, deadlineMs: 3000 });
+  assert.ok(fs.existsSync(marker), 'the shell had set its trap at the deadline');
+  assert.equal(unreadOf(outcome), 'it gave no answer within 3 s, its deadline, and was stopped');
+  assert.deepEqual(running(shell), [], 'the shell ended on SIGTERM');
+});
+
+test('REFUSED: a group that ignores SIGTERM is killed once its grace is over, on a stepped wall clock', (t) => {
+  const { skill, shell, marker } = heldPlace(`trap '' TERM`);
+  t.after(() => {
+    for (const pid of running(shell)) process.kill(pid, 'SIGKILL');
+  });
+  steppingClock(t, 60_000);
+  const outcome = runPlaceVerb(skill, 'handoff', { workspace: skill, step: 'build', why: '' }, { env: ENV, deadlineMs: 3000 });
+  assert.ok(fs.existsSync(marker), 'the shell had set its trap at the deadline');
+  assert.equal(
+    unreadOf(outcome),
+    'it gave no answer within 3 s, its deadline, and was stopped, and a process it started outlived SIGTERM for 2 s and was killed, ' +
+      'so a lock it held may be left',
+  );
+  assert.deepEqual(running(shell), [], 'the shell is killed');
 });
 
 test('land aborts a merge that conflicts, and leaves the checkout at ours', () => {

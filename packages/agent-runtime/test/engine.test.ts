@@ -21,7 +21,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect, Layer } from 'effect';
 import { Journal, type FeedEntry, type JournalOps } from '../src/core/engine/journal.ts';
-import { Runner } from '../src/harness/seam.ts';
+import { Runner, type ExpectedSession } from '../src/harness/seam.ts';
 import { admit, answer, file, requestStop } from '../src/core/engine/filing.ts';
 import { GRACE_MS, Lifecycle, LIVE, step, settleTask, tick, view } from '../src/core/engine/engine.ts';
 import { withoutEdge } from '../src/core/lifecycle.ts';
@@ -202,6 +202,63 @@ test('LONG-LIVED: a respawn its harness makes is journalled — the gap once how
   assert.deepEqual(await b.run(kindsOf(id)), ['filed', 'starting', 'spawned', 'process', 'gap', 'process']);
   assert.equal(await b.run(phaseOf(id)), 'idle');
   assert.equal(b.spawned.length, 1, 'nothing spawned beside it');
+});
+
+test('LONG-LIVED: what a session consumed is journalled as it grows — once per reading however many passes see it — where a job with the same sightings is journalled none', async () => {
+  const b = board();
+  const open = await b.run(file({ ...spec, id: 'open', restartPolicy: 'Always', config: { background: true } }));
+  const job = await b.run(file({ ...spec, id: 'job' }));
+  await b.run(tick());
+  const sight = (usage: Sighting['usage'], state: SessionState = 'input-required') => {
+    for (const id of [open, job]) b.sessions.set(nameFor(id, 1), { sessionId: `s-${id}`, state, busy: false, held: true, usage });
+  };
+  sight({ turns: 1, outputTokens: 10 });
+  await b.run(tick());
+  sight({ turns: 1, outputTokens: 10 });
+  await b.run(tick());
+  sight({ turns: 2, outputTokens: 25, costUsd: 0.1 });
+  const report = await b.run(tick());
+  const events = await b.run(Effect.flatMap(Journal, (j) => j.read(open)));
+  assert.deepEqual(
+    events.flatMap((e) => (e.kind === 'counted' ? [e.usage] : [])),
+    [
+      { turns: 1, outputTokens: 10 },
+      { turns: 2, outputTokens: 25 },
+    ],
+    'two readings, two entries, and no cost among them',
+  );
+  assert.deepEqual(report.views.find((v) => v.id === open)?.usage, { turns: 2, outputTokens: 25 }, 'the pass reports what it wrote');
+  assert.equal((await b.run(kindsOf(job))).includes('counted'), false, 'a job writes its spend at its end');
+
+  sight({ turns: 3, outputTokens: 40 }, 'failed');
+  await b.run(tick());
+  const end = (await b.run(Effect.flatMap(Journal, (j) => j.read(open)))).find((e) => e.kind === 'ended');
+  assert.deepEqual(end?.kind === 'ended' && end.usage, { turns: 3, outputTokens: 40 }, "the end carries the sighting's reading at its end");
+});
+
+test("LONG-LIVED: a long-lived attempt is looked for with when the journal says it began, which its runner counts its spend from; a job's is not", async () => {
+  const journal = Journal.test();
+  const sessions = new Map<string, Sighting>();
+  const asked: ExpectedSession[][] = [];
+  const runner = Runner.layer({
+    ...testOps({ sessions }),
+    observeFor: (expected) =>
+      Effect.sync(() => {
+        asked.push([...expected]);
+        return { seen: new Map(sessions), unread: new Set<string>() };
+      }),
+  });
+  const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) =>
+    Effect.runPromise(e.pipe(Effect.provide(Layer.mergeAll(journal, runner, tickMemoLayer({ verify: true })))));
+  const open = await run(file({ ...spec, id: 'open', restartPolicy: 'Always', config: { background: true } }));
+  const job = await run(file({ ...spec, id: 'job' }));
+  await run(tick());
+  await run(tick());
+  const startedAt = async (id: string) => (await run(Effect.flatMap(Journal, (j) => j.read(id)))).find((e) => e.kind === 'starting')!.at;
+  assert.deepEqual(new Map(asked.at(-1)?.map((e) => [e.name, e])), new Map([
+    [nameFor(open, 1), { name: nameFor(open, 1), harness: undefined, since: Date.parse(await startedAt(open)) }],
+    [nameFor(job, 1), { name: nameFor(job, 1), harness: undefined }],
+  ]));
 });
 
 test('LONG-LIVED: a gap open past RESPAWN_GAP_MS on the record is ended lost by a fresh daemon, and its listed session released', async () => {

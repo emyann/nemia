@@ -4,8 +4,9 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fold, type Event, type Sighting, type Usage } from '../domain.ts';
+import { fold, nameFor, type Event, type Sighting, type Usage } from '../domain.ts';
 import { countedFacts } from './counted.ts';
+import { viewOfState } from './engine.ts';
 
 const T0 = Date.parse('2026-01-01T00:00:00Z');
 const at = (ms: number) => new Date(T0 + ms).toISOString();
@@ -87,4 +88,10 @@ test('FOLD: a job with nothing counted folds no usage before its end, and none a
   assert.equal(fold(TASK, inFlight(false)).attempts[0].usage, null);
   const lost: Event = { kind: 'ended', at: at(30), attempt: 1, sessionId: 's1', observed: 'failed', reason: 'lost' };
   assert.equal(fold(TASK, inFlight(false, lost)).attempts[0].usage, null);
+});
+
+test("VIEW: a long-lived task shows its attempt's journalled counts, though the view's own sighting counts less; a job shows its sighting's", () => {
+  const lower = new Map([[nameFor(TASK, 1), seen({ turns: 1 })]]);
+  assert.deepEqual(viewOfState(fold(TASK, inFlight(true, counted(TWO_TURNS))), lower).usage, TWO_TURNS);
+  assert.deepEqual(viewOfState(fold(TASK, inFlight(false)), lower).usage, { turns: 1 });
 });

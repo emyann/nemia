@@ -17,11 +17,11 @@ import { settledQuiet, type Attempt, type State } from '../domain.ts';
 import type { Cursor } from './journal.ts';
 
 /**
- * What of a settled task a pass still reads: what `releaseFinished` reads, and the harness its sessions are looked for on
- * (`expectedOf`), and nothing else — a brief is not kept.
+ * What of a settled task a pass still reads: what `releaseFinished` reads, and the harness its sessions are looked for on and
+ * when a long-lived one's attempts began (`expectedOf`), and nothing else — a brief is not kept.
  */
-export type Releasable = Pick<State, 'taskId' | 'settled' | 'config' | 'harness'> & {
-  attempts: Array<Pick<Attempt, 'n' | 'ended' | 'nativeId' | 'usage'>>;
+export type Releasable = Pick<State, 'taskId' | 'settled' | 'config' | 'harness' | 'restartPolicy'> & {
+  attempts: Array<Pick<Attempt, 'n' | 'startedAt' | 'ended' | 'nativeId' | 'usage'>>;
 };
 
 export const releasableOf = (state: State): Releasable => ({
@@ -29,7 +29,8 @@ export const releasableOf = (state: State): Releasable => ({
   settled: state.settled,
   config: state.config,
   harness: state.harness,
-  attempts: state.attempts.map(({ n, ended, nativeId, usage }) => ({ n, ended, nativeId, usage })),
+  ...(state.restartPolicy ? { restartPolicy: state.restartPolicy } : {}),
+  attempts: state.attempts.map(({ n, startedAt, ended, nativeId, usage }) => ({ n, startedAt, ended, nativeId, usage })),
 });
 
 /**

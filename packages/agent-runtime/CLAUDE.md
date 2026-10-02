@@ -40,7 +40,8 @@ down is in `docs/architecture.md`, *Who owns what*.
 - **`io().reads` counts every file the runtime reads**, not only journals.
 - **A test stamps the times the runtime compares from the journal's attempt start** (`begun` in `test/release.test.ts`), and meets a
   deadline with a start journalled long ago (`startedLongAgo`), never a sleep: a stepped wall clock drops a closeout or misses the
-  deadline. A duration a test measures is read with `performance.now()`; a stamp taken from a file equals its mtime (`detached.test.ts`).
+  deadline. A duration a test measures is read with `performance.now()`. A runner that cannot be handed another attempt's statement
+  reports it with no time (the detached spawn clears the last one's), and its test steps the clock (`stepClock`, `test/clock.ts`).
 - **A detached look told names reads only their run files** (`observeFor`); `observe` lists every run, for views and verbs. A finished
   session leaves the pass's look once released and not at work (`releaseFinished`): `detached.test.ts` and `engine.test.ts` count it.
 - **`engine.test.ts` reads `domain.ts` from `decide` on, and all of `lifecycle.ts`, comments included**: a JSDoc there writes no

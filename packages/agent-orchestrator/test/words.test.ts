@@ -224,7 +224,7 @@ const WORKFLOW_WORDS: Baseline = {
   'packages/agent-runtime/src/harness/claude/transcript.ts': { count: 2, ...MOVES.closeout },
   'packages/agent-runtime/src/harness/claude/vocabulary.ts': { count: 1, ...MOVES.reword },
   'packages/agent-runtime/src/harness/codex/codex.ts': { count: 3, ...MOVES.reword },
-  'packages/agent-runtime/src/harness/detached/detached.ts': { count: 22, ...MOVES.closeout },
+  'packages/agent-runtime/src/harness/detached/detached.ts': { count: 21, ...MOVES.closeout },
   'packages/agent-runtime/src/harness/detached/output.ts': { count: 2, ...MOVES.closeout },
   'packages/agent-runtime/src/harness/detached/said.ts': { count: 1, ...MOVES.closeout },
   'packages/agent-runtime/src/harness/mcp.ts': { count: 1, ...MOVES.reword },

@@ -28,15 +28,25 @@ const seen = (file: string, name: string, durationMs: number, more: Partial<Seen
 });
 
 /** A probe's fragment for a file of the fixture's folder. */
-const fragment = (file: string, maxRssKb: number, wallMs = 100): Fragment => ({
+const fragment = (file: string, maxRssKb: number, wallMs = 100, runner = 42): Fragment => ({
   file: path.join('/pkg', file),
+  runner,
   wallMs,
   maxRssKb,
   cpuMs: 10,
   probeMs: 1,
 });
 
-const RUNNER = { package: 'p', dir: '/pkg', node: 'v0', platform: 'linux', at: '2026-10-02T00:00:00.000Z', wallMs: 1000, overheadMs: 5 };
+const RUNNER = {
+  pid: 42,
+  package: 'p',
+  dir: '/pkg',
+  node: 'v0',
+  platform: 'linux',
+  at: '2026-10-02T00:00:00.000Z',
+  wallMs: 1000,
+  overheadMs: 5,
+};
 
 test('a record keeps the fragments of the files the runner reported, and the package peaks at its largest file', () => {
   const costs = foldCosts(
@@ -59,6 +69,12 @@ test('a record keeps the fragments of the files the runner reported, and the pac
     costs.tests.map((t) => t.file),
     ['a.test.ts', 'b.test.ts', 'c.test.ts'],
   );
+});
+
+test('a fragment another runner left, as a try killed before its reporter ended does, is not folded into this one', () => {
+  const costs = foldCosts([seen('a.test.ts', 'a', 1)], [fragment('a.test.ts', 100, 50), fragment('a.test.ts', 9000, 900, 7)], RUNNER);
+  assert.deepEqual(costs.files, [{ file: 'a.test.ts', wallMs: 50, peakRssKb: 100, cpuMs: 10 }]);
+  assert.equal(costs.overheadMs, 5 + 1, "only this runner's probes count in its overhead");
 });
 
 test("a file whose process left no fragment has no figures, and adds nothing to the package's peak", () => {
@@ -167,6 +183,23 @@ test("a check's node --test leaves one record of its tests and files, its exit c
   }
   assert.equal(typeof costs.overheadMs, 'number');
   assert.ok(!fs.existsSync(path.join(artifacts, '.test-costs')), 'the fragments are removed once folded');
+});
+
+test("a killed try's fragment left in the files directory is not read into the next try's record, and is removed", () => {
+  const artifacts = scratch('test-costs-');
+  const left = path.join(artifacts, '.test-costs', 'fixture');
+  fs.mkdirSync(left, { recursive: true });
+  const stale: Fragment = { file: path.join(FIXTURE, 'light.test.ts'), runner: 1, wallMs: 9e9, maxRssKb: 9e9, cpuMs: 9e9, probeMs: 9e9 };
+  fs.writeFileSync(path.join(left, '1.json'), JSON.stringify(stale));
+  const ran = runFixture(['light.test.ts'], artifacts);
+  assert.equal(ran.status, 0, ran.stderr);
+  const [name] = recordsIn(artifacts);
+  const costs = JSON.parse(fs.readFileSync(path.join(artifacts, name), 'utf8')) as TestCosts;
+  const light = costs.files.find((f) => f.file === 'light.test.ts');
+  assert.ok(light && light.peakRssKb !== null && light.peakRssKb < 9e9, `light.test.ts peaks at ${light?.peakRssKb} KB, its own process's`);
+  assert.ok(light.wallMs !== null && light.wallMs < 9e9);
+  assert.ok(costs.overheadMs < 9e9, "the dead try's probe is no overhead of this one");
+  assert.ok(!fs.existsSync(path.join(artifacts, '.test-costs')), "the dead try's fragment is removed with this one's");
 });
 
 test("the spec reporter's lines stay on stdout, as with no recording", () => {

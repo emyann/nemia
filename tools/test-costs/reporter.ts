@@ -1,9 +1,10 @@
 /**
  * The cost reporter, a `node --test` reporter beside the spec reporter in a package's `test` script. It reads each `test:pass` and
  * `test:fail` event (name, file, line, nesting, `details.duration_ms`, `details.type`), and when the run ends it folds them with the
- * fragments the probes left into the package's record, written to the check's files directory (`WF_ARTIFACTS`) under a name of its own
- * per try (`recordName`), and removes the fragments. It does nothing without `WF_ARTIFACTS`, reads the whole stream whatever goes wrong,
- * and never throws: what it cannot record it says in one line, to its destination (stderr), and the run's exit code is unchanged.
+ * fragments its own test files' probes left into the package's record, written to the check's files directory (`WF_ARTIFACTS`) under a
+ * name of its own per try (`recordName`), and removes every fragment of its package, a killed try's among them. It does nothing
+ * without `WF_ARTIFACTS`, reads the whole stream whatever goes wrong, and never throws: what it cannot record it says in one line, to
+ * its destination (stderr), and the run's exit code is unchanged.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -42,6 +43,7 @@ function record(artifacts: string, seen: Seen[], spentMs: number): string[] {
     const fragments = fragmentsDir(artifacts, pkg);
     const at = new Date();
     const costs = foldCosts(seen, readFragments(fragments), {
+      pid: process.pid,
       package: pkg,
       dir,
       node: process.version,

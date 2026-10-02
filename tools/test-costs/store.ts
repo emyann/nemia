@@ -22,7 +22,7 @@ const isFragment = (value: unknown): value is Fragment => {
   const f = value as Partial<Record<keyof Fragment, unknown>> | null;
   return (
     typeof f?.file === 'string' &&
-    [f.wallMs, f.maxRssKb, f.cpuMs, f.probeMs].every((figure) => typeof figure === 'number' && Number.isFinite(figure))
+    [f.runner, f.wallMs, f.maxRssKb, f.cpuMs, f.probeMs].every((figure) => typeof figure === 'number' && Number.isFinite(figure))
   );
 };
 

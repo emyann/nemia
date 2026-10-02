@@ -9,8 +9,11 @@ import path from 'node:path';
 /** One test or suite as the runner reported it: `file` absolute, `durationMs` from `details.duration_ms`. */
 export type Seen = { file: string; line: number | null; name: string; nesting: number; suite: boolean; ok: boolean; durationMs: number };
 
-/** What the probe leaves for one process that loaded it: the file it ran (absolute), and what that process cost. */
-export type Fragment = { file: string; wallMs: number; maxRssKb: number; cpuMs: number; probeMs: number };
+/**
+ * What the probe leaves for one process that loaded it: the file it ran (absolute), the pid of the process that started it (`runner`,
+ * the `node --test` runner for a test file), and what that process cost.
+ */
+export type Fragment = { file: string; runner: number; wallMs: number; maxRssKb: number; cpuMs: number; probeMs: number };
 
 /** A test file's cost, its path from the package's folder; each figure null when its process left no fragment. */
 export type FileCost = { file: string; wallMs: number | null; peakRssKb: number | null; cpuMs: number | null };
@@ -40,8 +43,17 @@ export type TestCosts = {
   tests: TestCost[];
 };
 
-/** The runner's own facts, read where it ends: its folder, its wall time, and what the reporter spent. */
-export type Runner = { package: string; dir: string; node: string; platform: string; at: string; wallMs: number; overheadMs: number };
+/** The runner's own facts, read where it ends: its pid, its folder, its wall time, and what the reporter spent. */
+export type Runner = {
+  pid: number;
+  package: string;
+  dir: string;
+  node: string;
+  platform: string;
+  at: string;
+  wallMs: number;
+  overheadMs: number;
+};
 
 /** The folder, under a check's files directory, where the probes of one package leave their fragments for its reporter. */
 export const fragmentsDir = (artifacts: string, pkg: string): string => path.join(artifacts, '.test-costs', safeName(pkg));
@@ -70,9 +82,13 @@ function fileCosts(seen: Seen[], fragments: Fragment[], dir: string): FileCost[]
   return [...files.values()];
 }
 
-/** A package's record: its tests as reported, its files with their processes' costs, and its peak the largest file's. */
+/**
+ * A package's record: its tests as reported, its files with their processes' costs, and its peak the largest file's. Only the fragments
+ * of this runner's own processes are folded: a fragment another runner left, such as a try killed before its reporter ended, is not.
+ */
 export function foldCosts(seen: Seen[], fragments: Fragment[], runner: Runner): TestCosts {
-  const files = fileCosts(seen, fragments, runner.dir);
+  const own = fragments.filter((fragment) => fragment.runner === runner.pid);
+  const files = fileCosts(seen, own, runner.dir);
   return {
     version: 1,
     package: runner.package,
@@ -81,7 +97,7 @@ export function foldCosts(seen: Seen[], fragments: Fragment[], runner: Runner): 
     at: runner.at,
     wallMs: runner.wallMs,
     peakRssKb: files.reduce<number | null>((peak, file) => larger(peak, file.peakRssKb), null),
-    overheadMs: runner.overheadMs + fragments.reduce((sum, fragment) => sum + fragment.probeMs, 0),
+    overheadMs: runner.overheadMs + own.reduce((sum, fragment) => sum + fragment.probeMs, 0),
     files,
     tests: seen.map((test) => ({ ...test, file: path.relative(runner.dir, test.file) })),
   };

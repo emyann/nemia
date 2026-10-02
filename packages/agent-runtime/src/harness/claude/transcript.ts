@@ -287,7 +287,7 @@ const COST_START_SLACK_MS = 5_000;
  * `since` is when the attempt began, `begunAt` when its first line was written; `tokens`: its tokens too, the same way — for an
  * attempt whose transcript cannot count them (`transcriptUsage`).
  */
-const costOf = ({ before, after, begunAt = NaN }: Pick<Attempt, 'before' | 'after' | 'begunAt'>, since: number, tokens = false): Usage => {
+const costOf = ({ before, after, begunAt }: Pick<Attempt, 'before' | 'after' | 'begunAt'>, since: number, tokens = false): Usage => {
   if (after?.startTime === undefined || !(after.startTime <= begunAt + COST_START_SLACK_MS)) return {};
   const carried = after.startTime < since - COST_START_SLACK_MS;
   const base = carried && before?.startTime === after.startTime ? before : undefined;
@@ -392,7 +392,8 @@ const responseOf = ({ message: { usage: u } }: Line<'assistant'>): Response =>
 
 /**
  * What `transcriptUsage` reads of an attempt: its responses by id and its tool calls by id, the `cost-state` lines before and after
- * it began, whether it has begun and when its first line was written, its compactions with the largest context one of them summarised, and the name it runs under.
+ * it began, whether it has begun and when its first line was written (`NaN` until one is), its compactions with the largest context
+ * one of them summarised, and the name it runs under.
  */
 type Attempt = {
   responses: Map<string, Response>;
@@ -400,7 +401,7 @@ type Attempt = {
   before?: CostState;
   after?: CostState;
   begun: boolean;
-  begunAt?: number;
+  begunAt: number;
   compactions: number;
   summarised: number;
   name?: string;
@@ -408,7 +409,7 @@ type Attempt = {
 
 /** What `transcriptUsage` reads of an attempt (`Attempt`), in one pass over its transcript, from its first line to its last. */
 const attemptIn = (jsonl: string, since: number, file?: string): Attempt => {
-  const attempt: Attempt = { responses: new Map(), toolCalls: new Set(), begun: false, compactions: 0, summarised: 0 };
+  const attempt: Attempt = { responses: new Map(), toolCalls: new Set(), begun: false, begunAt: NaN, compactions: 0, summarised: 0 };
   for (const [i, text] of jsonl.split('\n').entries()) if (!took(attempt, text, since, () => lineAt(i, file))) break;
   return attempt;
 };

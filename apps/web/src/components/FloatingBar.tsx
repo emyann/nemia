@@ -1,8 +1,8 @@
 /**
  * The frame's floating bar: a panel at the right of every page, below the header, over the page, so the page keeps its whole width. It is
  * as wide as this browser keeps it (`useBarWidth`), resized by dragging its left edge or with the arrow keys on it, and the whole width of
- * a narrow screen. Its Close button and Escape close it (`useBar`), and closing it gives the focus back to what held it before. Beside Close,
- * its Open button visits the page of what it shows, for everything that has one (`barOpens`).
+ * a narrow screen. Its Close button and Escape close it (`useBar`), and closing it gives the focus back to what held it before. Beside
+ * Close, its Open button visits the page of what it shows, for everything that has one (`barOpens`).
  */
 import { useEffect, useId, useLayoutEffect, useRef, type KeyboardEvent, type PointerEvent, type ReactNode, type RefObject } from 'react';
 import { XIcon } from 'lucide-react';

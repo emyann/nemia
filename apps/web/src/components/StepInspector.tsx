@@ -86,8 +86,8 @@ export function StepInspector({ run, step, onClose, runTitle, className }: Props
 }
 
 /**
- * What is going on in one step, in three tabs. It opens on the step's `openingTab`, and a tab a person picks is kept while it stays mounted,
- * whichever step it is handed next. A try a Rounds row selects is kept with its step, and another step shows its current try.
+ * What is going on in one step, in three tabs. It opens on the step's `openingTab`, and a tab a person picks is kept while it stays
+ * mounted, whichever step it is handed next. A try a Rounds row selects is kept with its step, and another step shows its current try.
  *
  * Opened on Output at a gate, it says first that the answer is on Details, so the plan read is not a dead end. The Activity tab is keyed by
  * run and step, so a conversation never stands in for another step's while that one is read. `className` places it in what holds it.

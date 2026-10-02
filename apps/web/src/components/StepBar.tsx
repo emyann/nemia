@@ -1,5 +1,6 @@
 /**
- * The frame's floating bar for one step of a run: the step's tabs (`StepTabs`), read from the run's record, which a read again keeps current.
+ * The frame's floating bar for one step of a run: the step's tabs (`StepTabs`), read from the run's record, which a read again keeps
+ * current.
  */
 import { useQuery } from '@tanstack/react-query';
 import { runGone, runQuery, type RunDetail } from '@/lib/api';

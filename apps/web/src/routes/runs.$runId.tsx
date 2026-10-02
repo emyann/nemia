@@ -24,8 +24,8 @@ import { duration } from '../lib/canvas';
 import { waitedMs } from '../lib/factory';
 
 /**
- * `step`, the address of a link made before the frame's bar inspected steps, opens that step in the bar: the page is loaded again in place of
- * that address, at `?bar=step:<run>/<step>`, so Back does not return to it.
+ * `step`, the old address of one step of the run, opens that step in the frame's bar: the page is loaded again in place of that address,
+ * at `?bar=step:<run>/<step>`, so Back does not return to it.
  */
 export const Route = createFileRoute('/runs/$runId')({
   validateSearch: (search: Record<string, unknown>): { step?: string } =>

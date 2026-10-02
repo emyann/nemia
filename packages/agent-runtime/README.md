@@ -34,8 +34,9 @@ Definition of done — a closed list, and it is closed:
       no ceiling, no pools and no order of its own (retired in thin runtime stage 4c part 2)
 - [x] the feed — a cursored stream of everything that happened
 - [x] resume — a task filed with `resumeFrom` continues that session; one attempt per start, and nothing tried again here
-- [x] deadline — wall clock of an attempt, or of a held-open turn's; also the only thing that ends a `blocked` session,
-      which waits on a person forever — and is not counted at work while it waits
+- [x] deadline — the time the machine was up since an attempt started, or a held-open turn's first one: on the monotonic
+      clock within a boot, which does not run while the machine sleeps, and on the wall clock across a reboot; also the only
+      thing that ends a `blocked` session, which waits on a person forever — and is not counted at work while it waits
 - [x] isolation — `--worktree`, declared per task, cut by the harness
 
 **The engine is finished.** The next thing to build is a consumer of it, not more of it. If a
@@ -371,6 +372,11 @@ has ever taken. It is the price of not having somebody else's registry to read, 
 price of running more than one harness. It is a handful of lines, because the engine already had a
 journal and a seam.
 
+The beat is written on two clocks: `heartbeatAt` on the wall clock, and `beat`, `{ boot, ms }`, on the monotonic clock every
+process of a boot shares. The lease is measured on `beat` when it was written in this boot, so a wall clock stepped forward
+(NTP, a VM's time sync) never reads a live worker dead; a beat of another boot, or none, is measured from `heartbeatAt`
+(`elapsedMs`, `src/core/clock.ts`).
+
 The other way round, the run file removed is a stop: `stop` finds the worker by it, so a worker whose run file is gone,
 alone or with its store, ends its harness and exits at its next write, and never writes the file again (open issue 32).
 
@@ -605,7 +611,7 @@ after a space starts a comment. The keys are a closed list:
 | `harness` | `claude` (default), `codex`, `claude-detached` |
 | `model` | the harness's model name |
 | `permissionMode` | the harness's own words — see below; default `auto` for Claude Code, `workspace-write` for Codex |
-| `deadlineSeconds` | wall clock of the attempt — of a turn, when held open — above 0; absent, no deadline |
+| `deadlineSeconds` | the time the machine was up since the attempt started — the turn's first, when held open — above 0, on the monotonic clock within a boot and the wall clock across a reboot; absent, no deadline |
 | `resumeFrom` | a session id to continue, instead of starting cold |
 | `worktree` | `true`, `false`, or a name — the harness cuts it |
 | `closeoutSchema` | a JSON Schema file — the workload ends by answering in that shape |
@@ -677,7 +683,8 @@ started — the OS would not create the process, a detached worker was never lau
 the harness's words, and `decide` settles or retries it like any failure. Any other failure may
 have left a session behind (a launcher can create one and lose its acknowledgement), so the call is
 recorded as spawned, with its error, and the grace window decides: the session is adopted if it
-appears, the attempt `lost` if it never does. Either way the tick goes on; it used to reject, and
+appears, the attempt `lost` if it never does. The grace window runs from the spawn on the monotonic clock within a boot,
+as the deadline does: a stepped wall clock ends neither early. Either way the tick goes on; it used to reject, and
 every task behind the failed one stalled on every pass.
 
 ## Narrowing a session: `tools`, `effort` and `mcp`
@@ -1873,11 +1880,13 @@ of pure code sits beside it.
 | `src/core/path.ts` | a task's path through the lifecycle, replayed off its journal (`pathOf`): the state after each entry, the entry's kind and its time, for the `path` verb — pure, a reader's, never a pass's |
 | `src/core/event-schema.ts` | every event a runtime has written, as an Effect Schema, former shapes included: `Journal.layer` checks what any store gives back against it before `upgrade`, and fails a task's read with a `JournalError` naming its file, the entry and the field (`entryWords`); a feed entry it refuses is skipped and said (`FeedRefusal`) |
 | `src/core/quote.ts` | how a sentence quotes what it did not write, pure: a value cut to 60 characters, another party's address, status text or words to 200, the cut marked `…` (`quote`), and a long list shown by its first three and how many more (`firstOf`) |
+| `src/core/clock.ts` | how a duration the runtime decides on is measured, pure (`elapsedMs`): on the monotonic clock when both moments were read in one boot, on the wall clock otherwise |
 | `src/core/index.ts` | the face of `core/`: what the other folders and the entries take of it; nothing of `core/engine/` |
 | `src/core/engine/engine.ts` | applies one decision, then the pass over every task |
 | `src/core/engine/filing.ts` | filing a task, admitting, stopping, answering and closing it, each with what it refuses (`refusalOf`): a fact journalled for the pass to act on |
 | `src/core/engine/journal.ts` | append-only JSONL per task, plus the board-wide feed; `upgrade`, which reads a line written before an event's shape changed in today's, whoever's store it is — nothing on disk is rewritten |
 | `src/core/engine/memo.ts` | the settled tasks an engine's passes may skip until the feed names them, and the cursor into the feed: a cache of `fold`, rebuilt by a fresh engine, never written down |
+| `src/core/engine/now.ts` | now on both clocks (`instantNow`): `Date.now()`, and `process.hrtime` under the boot's id read from `/proc/sys/kernel/random/boot_id`, with no monotonic reading where there is none |
 | `src/core/engine/tally.ts` | what the runtime's own reads and spawns have cost the process, as running totals (`Engine.io()`): a thin wrapper around its readers and `sh`, not a syscall tracer |
 | `src/core/engine/index.ts` | the face of `core/engine/`: the engine's verbs, journal, memo and tally, as the doors take them |
 | `src/harness/seam.ts` | the compute seam — `spawn`/`observe`/`stop`/`logs`, and the optional `find`, `release`, `transcript` and `say` — the `Runner` service, the free harness `testOps`, and `composite`: dispatch by harness, merge what they all see |

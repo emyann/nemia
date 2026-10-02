@@ -322,7 +322,7 @@ async function sendTry(f: Filing, r: Retry, step: Workflow, taskId: string, answ
         inputsDir(run),
         checked,
       );
-  const budgetUsd = budgetUsdFor(step, r.budget ?? budgetOf(step, record), stepSpend(run, r.step, reads.spendOf));
+  const budgetUsd = budgetUsdFor(r.budget ?? budgetOf(step, record), stepSpend(run, r.step, reads.spendOf));
   if (answers) return answerHeld(e, taskId, brief, budgetUsd);
   await e.file(trySpec(f, r, step, record, { taskId, brief, resumeFrom, budgetUsd, told }));
   return undefined;
@@ -475,7 +475,6 @@ function roundSpec(f: Filing, r: Round, looping: Workflow, target: Workflow, tas
         model: sessionModel(target, record),
         runArtifacts: path.dirname(artifactsDir(run, target.name)),
         budgetUsd: budgetUsdFor(
-          target,
           r.budget !== undefined && r.raise?.includes(r.target) ? r.budget : budgetOf(target, record),
           stepSpend(run, r.target, reads.spendOf),
         ),
@@ -620,7 +619,7 @@ function readySpec(
       config: filedConfig(step, reads.steps, run, {
         model: step.model,
         runArtifacts: path.dirname(artifactsDir(run, step.name)),
-        budgetUsd: budgetUsdFor(step, budgetOf(step, run.steps[step.name]), stepSpend(run, step.name, reads.spendOf)),
+        budgetUsd: budgetUsdFor(budgetOf(step, run.steps[step.name]), stepSpend(run, step.name, reads.spendOf)),
         own: told.own,
       }),
       resumeFrom: step.resume ? sessionOf(f, step.resume) : undefined,

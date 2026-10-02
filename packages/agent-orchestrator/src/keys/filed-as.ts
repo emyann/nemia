@@ -8,7 +8,17 @@ import type { Workflow } from '../step/step.ts';
 /** A step's keys a filed config is written from. */
 export type FiledStep = Pick<
   Workflow,
-  'model' | 'effort' | 'context' | 'permissionMode' | 'sandbox' | 'tools' | 'disallowedTools' | 'allowedTools' | 'background' | 'budget'
+  | 'model'
+  | 'effort'
+  | 'context'
+  | 'permissionMode'
+  | 'sandbox'
+  | 'tools'
+  | 'disallowedTools'
+  | 'allowedTools'
+  | 'background'
+  | 'budget'
+  | 'remote'
 >;
 
 /** What a retry asked for that its config is filed with instead of the step's own lines: `--model` on a fresh try, and `--budget`. */
@@ -28,6 +38,7 @@ export const FILED_AS: Readonly<Record<string, (step: FiledStep) => string | und
   allowedTools: (s) => s.allowedTools && `allowedTools: ${s.allowedTools.join(', ')}`,
   background: (s) => (s.background === undefined ? undefined : `background: ${s.background}`),
   budgetUsd: (s) => (s.budget === undefined ? undefined : `budget: ${s.budget}`),
+  claude: (s) => (s.remote ? 'remote: true' : undefined),
 };
 
 /** The flag a retry typed for a field it chose, before the step's own line: `--model <m>`, `--budget <amount>`. */

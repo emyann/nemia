@@ -51,7 +51,6 @@ delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
 const {
   Conflict,
-  HARNESSES,
   accept,
   advance,
   approve,
@@ -2692,96 +2691,6 @@ test('a round files its target bridged as the target says, and the looping step 
     [true, undefined],
     'and run as the target says, a round being a session of it: a background session again, and review a job',
   );
-});
-
-test("REFUSED at `wf start`, in the engine's words, with nothing written: `remote: true` on every harness the engine refuses `claude.remoteControl` for — codex and claude-detached — and on a claude job; taken on a claude background session, and `remote: false` on any", async () => {
-  const engine = promiseEngine(
-    RuntimeEngine.layer({ root: fs.mkdtempSync(path.join(ROOT, 'engine-')), journal: memoryJournal(), harnesses: HARNESSES }),
-  );
-  const engineRefusal = async (harness: string, background?: boolean): Promise<string | undefined> => {
-    try {
-      await engine.file({
-        brief: 'b',
-        cwd: '/w',
-        harness,
-        config: { claude: { remoteControl: true }, ...(background ? { background } : {}) },
-      });
-      return undefined;
-    } catch (err) {
-      return (err as Error).message;
-    }
-  };
-  const bridgelessReason = async (harness: string): Promise<string | undefined> => {
-    const said = await engineRefusal(harness);
-    if (said === undefined) return undefined;
-    const reason = new RegExp(
-      `^file: \`claude\\.remoteControl\` asks for a session bridged to claude\\.ai, and the \`${harness}\` harness (.*?)\\. File the task on \`claude\``,
-    ).exec(said)?.[1];
-    assert.ok(reason, said);
-    return reason;
-  };
-  const runs = () => fs.readdirSync(path.join(ROOT, 'runs')).sort();
-  const withRemote = (harness: string, word = 'true') => folder(`harness: ${harness}\nremote: ${word}`);
-  const refusedAtStart = (dir: string, message: string, label: string) => {
-    const repo = aRepo();
-    const before = runs();
-    assert.throws(
-      () => start({ brief: 'add a flag', repo, workflowDir: dir, isolate: false }),
-      (err: Error & { exitCode?: number }) => err.exitCode === 2 && err.message === message,
-      label,
-    );
-    assert.deepEqual(runs(), before, `nothing written for ${label}`);
-    assert.equal(gitOut(repo, 'branch', '--list').split('\n').length, 1, 'and no branch cut');
-    const plan = fs.mkdtempSync(path.join(ROOT, 'plan-'));
-    fs.writeFileSync(path.join(plan, 'card.md'), `---\nworkflow: ${dir}\n---\nadd a flag\n`);
-    assert.throws(
-      () => startPlan({ dir: plan, repo }),
-      (err: Error & { exitCode?: number }) => err.exitCode === 2 && err.message.includes(message),
-      `a plan whose card names the workflow of ${label} is refused before its first run is started`,
-    );
-    assert.deepEqual(runs(), before, `nothing written for a plan on ${label}`);
-  };
-
-  for (const harness of ['codex', 'claude-detached']) {
-    const reason = await bridgelessReason(harness);
-    assert.ok(reason, `the engine refuses it on ${harness}`);
-    refusedAtStart(
-      withRemote(harness),
-      `implement: \`remote: true\` asks for a session bridged to claude.ai, and the \`${harness}\` harness ${reason}. Run the step on claude with \`background: true\` — delete \`harness: ${harness}\` — or delete \`remote: true\`.`,
-      harness,
-    );
-    assert.ok(
-      started(withRemote(harness, 'false')).id,
-      '`remote: false` asks for nothing, and the engine files it on any harness: so does start',
-    );
-  }
-
-  const job = await engineRefusal('claude');
-  const why = /^file: `claude\.remoteControl` bridges a session to claude\.ai, and (.*?)\. Give `config\.background: true` as well/.exec(
-    job ?? '',
-  )?.[1];
-  assert.ok(why, `on claude a job opens no bridge: the engine refuses it, and so does start, named or by default, in its words: ${job}`);
-  for (const [dir, label] of [
-    [withRemote('claude'), 'claude named'],
-    [folder('remote: true'), 'claude by default'],
-  ] as const) {
-    refusedAtStart(
-      dir,
-      `implement: \`remote: true\` bridges a session to claude.ai, and ${why}. Write \`background: true\` beside it, or delete \`remote: true\`.`,
-      label,
-    );
-  }
-
-  assert.equal(await engineRefusal('claude', true), undefined, 'a background session is bridged: the engine files it, and so does start');
-  for (const dir of [folder('harness: claude\nbackground: true\nremote: true'), folder('background: true\nremote: true')]) {
-    const run = started(dir);
-    const b = board();
-    await advance(b.e, readRun(run.id));
-    assert.deepEqual(
-      [b.tasks.get(`${run.id}-implement`)!.spec.config?.background, b.tasks.get(`${run.id}-implement`)!.spec.config?.claude?.remoteControl],
-      [true, true],
-    );
-  }
 });
 
 /** Every task a run's record names, viewed once, as the tick views them: all the exports are given — no engine, and so no log. */

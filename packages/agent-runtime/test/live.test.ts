@@ -165,12 +165,12 @@ const DENY_CLOSEOUT = {
 };
 const WRITTEN = ['BUILT', 'E2E'];
 
-/**
- * A checkout as this repository's review has one: its settings allow both commands, and each writes a file into it.
- * Made inside this package, not under the machine's temp directory, whose directories Claude Code does not trust.
- */
+/** A folder inside this package, not under the machine's temp directory, whose directories Claude Code does not trust. */
+const trusted = (label: string) => fs.mkdtempSync(path.join(import.meta.dirname, '..', `.ae-live-${label}-`));
+
+/** A checkout as this repository's review has one, made `trusted`: its settings allow both commands, and each writes a file into it. */
 const allowingCheckout = (label: string) => {
-  const dir = fs.mkdtempSync(path.join(import.meta.dirname, '..', `.ae-live-${label}-`));
+  const dir = trusted(label);
   fs.writeFileSync(
     path.join(dir, 'package.json'),
     JSON.stringify({ name: 'probe', private: true, scripts: { build: 'touch BUILT', e2e: 'touch E2E' } }),
@@ -722,9 +722,10 @@ test(
       brief: 'Reply with the single word ok, and nothing else.',
       config: { model: 'haiku', tools: [] as string[], background: true, claude: { remoteControl: true as const } },
     };
+    const dirs = { open: trusted('long-lived'), job: trusted('long-lived-job') };
     const ids = {
-      open: await engine.file({ ...common, cwd: tmp('long-lived'), restartPolicy: 'Always' }),
-      job: await engine.file({ ...common, cwd: tmp('long-lived-job') }),
+      open: await engine.file({ ...common, cwd: dirs.open, restartPolicy: 'Always' }),
+      job: await engine.file({ ...common, cwd: dirs.job }),
     };
     const views: Record<string, TaskView> = {};
     const pass = async (e: Engine) => {
@@ -772,6 +773,7 @@ test(
           } catch {}
         }
       }
+      for (const dir of Object.values(dirs)) fs.rmSync(dir, { recursive: true, force: true });
     }
   },
 );

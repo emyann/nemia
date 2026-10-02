@@ -231,7 +231,8 @@ function deniedLinesOf(run: Run, views: ReadonlyMap<string, TaskView>): Record<s
  *
  * A cancelled, pruned or held run has no try or round due. Each line that would offer a verb (`retryLines`, `roundLines`, `answerLines`,
  * `overBudgetLine`, `gateLines`) says itself that it offers none, so the api's decision, which calls the same functions, says the same.
- * A run nothing of which is filed is read against the cap on runs in flight (`slotsOf`), whose `WF_MAX_RUNS` before any pass is `env`'s.
+ * The cap on runs in flight, whose `WF_MAX_RUNS` before any pass is `env`'s, is read for both facts it bears on: whether a run nothing of
+ * which is filed is held (`slotsOf`), and which run's ending holds the repository's checkout (`checkoutHold`).
  * Fails with a refusal a read threw (`Missing`, for a run that is not there); dies of anything else (`tried`, `awaited`).
  */
 export const decideRun = Effect.fn('decide')(function* (id: string, env: NodeJS.ProcessEnv = process.env) {
@@ -250,7 +251,7 @@ export const decideRun = Effect.fn('decide')(function* (id: string, env: NodeJS.
   const verdictOf = (name: string) => checks[name]?.verdict;
   const blocked = harnessBlocked(views);
   const spendOf = spendReader(views);
-  const checkout = yield* awaited(() => checkoutHold(e, run, steps));
+  const checkout = yield* awaited(() => checkoutHold(e, run, steps, undefined, env));
   const shipped = yield* tried(() => shippedOf(run, git));
   const d = decision(steps, run, phaseOf, shipped, reader, asked, verdictOf, asks, rounds, blocked, spendOf, checkout);
   const standings = d.kind === 'running' || d.kind === 'cancelled' ? [] : yield* tried(() => standingsOf(run, git));

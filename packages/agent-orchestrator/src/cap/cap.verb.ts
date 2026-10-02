@@ -91,10 +91,14 @@ export async function slotsOf(
 
 /**
  * The runs the cap on runs in flight holds now, each with the count it is held at (`slotsOf`'s `held`). None, and nothing read, with no
- * cap or no run that has nothing filed.
+ * cap or no run that has nothing filed. The cap before any pass has written one is `env`'s `WF_MAX_RUNS`, as `slotsOf` reads it.
  */
-export async function runSlots(e: Engine, runs: readonly Run[] = runStore.runs.list()): Promise<Map<string, RunSlot>> {
-  const cap = lastCeilings()?.runs ?? maxRuns();
+export async function runSlots(
+  e: Engine,
+  runs: readonly Run[] = runStore.runs.list(),
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<Map<string, RunSlot>> {
+  const cap = lastCeilings()?.runs ?? maxRuns(env);
   if (cap <= 0 || !runs.some((r) => !hasStarted(r) && !r.cancelledAt)) return new Map();
-  return (await slotsOf(e, runs)).held;
+  return (await slotsOf(e, runs, env)).held;
 }

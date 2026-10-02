@@ -802,3 +802,60 @@ test("a run `assess` calls running while a step waits on a person is decided on:
     ['once more', 'ship it', 'drop it'],
   );
 });
+
+test("a run whose approved ending waits for the repository's checkout, which another run's ending is in, answers `checkout` with that run — read by the app's own `WF_MAX_RUNS`, never the process's — and one nothing holds answers none", async () => {
+  const { repo: shared, base: from } = aRepo();
+  const landing = [
+    { name: 'implement', after: [], body: 'Implement it.', harness: 'codex' },
+    { name: 'notes', after: [], body: 'Write the notes.', harness: 'codex', gate: true },
+    { name: 'ship', after: ['implement'], body: 'Ship it.', harness: 'claude', workspace: 'main', gate: true },
+  ];
+  const approve = (id: string) => {
+    fs.mkdirSync(path.join(root, 'runs', `${id}.asks`), { recursive: true });
+    fs.writeFileSync(path.join(root, 'runs', `${id}.asks`, 'approve-ship-1'), JSON.stringify({ at, message: 'Merge it.' }));
+  };
+  settledTask('t-d14-implement', done);
+  settledTask('t-d14-notes', done);
+  writeRun({
+    id: 'r-d14',
+    repo: shared,
+    baseRef: from,
+    workflow: landing,
+    steps: {
+      implement: { taskId: 't-d14-implement', branch: 'wf/r-d14/implement' },
+      notes: { taskId: 't-d14-notes', branch: 'wf/r-d14/notes' },
+      ship: { taskId: null },
+    },
+  });
+  approve('r-d14');
+  assert.equal(process.env.WF_MAX_RUNS, 'set-it-in-the-test', "the process's own is not a count, which the package refuses by name");
+  const { app: own } = appOf(liveOf({ ...process.env, WF_MAX_RUNS: '1' }));
+  const answer = async () => {
+    const res = await own.request('/api/runs/r-d14/decision');
+    const body = (await res.json()) as Decidable;
+    assert.equal(res.status, 200, JSON.stringify(body));
+    assert.ok('commands' in body, JSON.stringify(body));
+    return body;
+  };
+  assert.ok(!('checkout' in (await answer())), 'no other run is in the checkout, so nothing holds it');
+
+  settledTask('t-d15-implement', done);
+  journal('t-d15-ship', [
+    { ...filed('t-d15-ship'), cwd: shared },
+    { kind: 'starting', at, attempt: 1 },
+    { kind: 'spawned', at, attempt: 1 },
+  ]);
+  writeRun({
+    id: 'r-d15',
+    repo: shared,
+    baseRef: from,
+    workflow: landing,
+    steps: {
+      implement: { taskId: 't-d15-implement', branch: 'wf/r-d15/implement' },
+      notes: { taskId: null },
+      ship: { taskId: 't-d15-ship', workspace: shared, branch: 'main' },
+    },
+  });
+  approve('r-d15');
+  assert.deepEqual((await answer()).checkout, { run: 'r-d15', step: 'ship' });
+});

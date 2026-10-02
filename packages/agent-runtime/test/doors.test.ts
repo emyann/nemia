@@ -284,6 +284,13 @@ test('each refusal is a tagged error at the Effect door, and its words behind th
       () => promise.output('one', 'stdout', lastBytes as never),
       new RegExp(`^\`lastBytes: ${String(lastBytes).replace('.', '\\.')}\` is not a count of bytes`),
     ]),
+    [
+      'quota',
+      'QuotaRefused',
+      () => effect((e) => e.quota('fake')),
+      () => promise.quota('fake'),
+      /^the `fake` harness reports no quota\. Ask one that does: claude\.$/,
+    ],
   ];
   for (const [verb, tag, viaService, viaPromise, words] of cases) {
     const tagged = await failure(viaService());

@@ -428,7 +428,7 @@ brief its one text part, the session it continues (`resumeFrom`) its `contextId`
 whole and unopened — its metadata; `observe` is a listing, `stop` a cancel, and `say` a plain follow-up message on the
 session's Task, in no context or the session's own. What A2A
 has no call for is the extension's methods: `findSession`, `sessionLogs`, `releaseSession`, `sessionTranscript` and `observeSessions` (an
-`observe` told the sessions the journal expects, below). The harness's card lists
+`observe` told the sessions the journal expects, below), and `harnessQuota`, the one that is no session's (`quota`, below). The harness's card lists
 the ones its driver answers, and whether its sessions take words, and a verb the card leaves off is offered to nobody.
 What a harness says comes back in
 the same words: a spawn it refused is `REJECTED` and ends the attempt `unstartable`, one that may have started is
@@ -517,8 +517,8 @@ is free to ignore the schema it was sent. An agent that answers the message with
 the whole session in its reply: it ends at once, its data part the statement, and its logs are its words. `say` reaches a
 Task that asks for input, as a follow-up on it, and is refused while the Task is at work, since A2A gives a running Task
 no words. What the in-process seam's extension answers — `findSession`, `sessionLogs`, `releaseSession`,
-`sessionTranscript` — is never asked of another party: `find` and `release` are the registry's, and there is no
-`transcript`.
+`sessionTranscript`, `harnessQuota` — is never asked of another party: `find` and `release` are the registry's, and there is no
+`transcript` and no `quota`.
 
 **The registry, and what a restart does.** The driver keeps one file per session, `<root>/remote/<session name>.json`,
 written whole and renamed. The intent — the name, the harness it went through, the message's id and when, and the process
@@ -1213,14 +1213,20 @@ log. `exit` can come first, and the pass that records the end would then miss an
 pipe — for good, since an end is written once. Two seconds at most: a child the harness leaves behind
 can hold a pipe open for as long as it likes.
 
-Runners report the statement **and when it was made**. The engine decides whether it belongs to this
-attempt, records it on the attempt (`state.attempts[n].closeout`), and never reads it. Two rules
-guard that decision, both learned from real runs:
+Runners report the statement **and when it was made**, unless it cannot be another attempt's. The
+engine decides whether it belongs to this attempt, records it on the attempt
+(`state.attempts[n].closeout`), and never reads it. Two rules guard that decision, both learned from
+real runs:
 
 - **Made before the attempt began, it was inherited, not said.** A resumed Claude Code session's
   transcript holds its parent's entire conversation under the child's own session id — 460 entries,
   measured — so the parent's `StructuredOutput` call arrives looking exactly like the child's. Only
   the time tells them apart, and only the journal knows when the attempt started.
+  A runner whose session cannot carry another attempt's statement gives no time, and the engine then
+  keeps the statement whatever the clock says. A remote A2A agent is one: its Task was made by this
+  attempt's message. A time stamped when the runner read it would fall before the attempt's start
+  once the wall clock stepped back, and the statement would be dropped from a completed task.
+  Leaving out the time skips this check, so a runner that can resume a session always gives one.
 - **From a busy session, it is not final.** A step once declared itself done, carried on, found it
   could not commit, and revised its verdict eleven seconds later.
 
@@ -1521,6 +1527,27 @@ the fix is to continue a session that has ended, the sentence says so: a new tas
 what `wf retry --message` does. A registry that cannot be read, or words the harness did not take, reject
 without an exit code: nothing was said, so ask again.
 
+## A harness's quota: `quota`
+
+A subscription has limits of its own — Claude Code's plan, five hours and a week — that no session's spend says. `quota(harness?)`
+asks a harness for them, the default harness when none is named, and answers what it said (`HarnessQuota`): the plan's limits, each
+with its key, its use in percent and its reset (`windows`), or why there are none — no plan, a plan the usage service gave nothing for,
+an answer in a shape the runtime does not read, no harness binary, a timeout, a process that ended before it answered.
+
+```ts
+const q = await engine.quota('claude')
+if (q.kind === 'windows') for (const l of q.limits) console.log(l.key, l.usedPercentage, l.resetsAt)
+```
+
+Claude Code answers it, as `claude` and as `claude-bg`: the `claude` on PATH, sent its `get_usage` control request with no prompt
+(`claudeQuota`, `harness/claude/quota.ts`), so no model is called and no token spent. Each call is one ask, one process: `claudeQuota`
+lets it go before it returns, whatever ended it — an answer, the timeout, an interruption. Through the engine the ask runs behind the
+A2A seam, which an interruption does not cross: a caller that interrupts `quota()` gets control back at once, and the process ends by
+the ask's own timeout, within `QUOTA_TIMEOUT_MS` (15 s) and 2 s more. Nothing is journalled and nothing kept, so a caller that reads
+often keeps the answer itself. A
+harness with no quota — Codex, a remote agent, a `PromiseRunner` — is refused in words (`QuotaRefused`, exit code 2 at the Promise door),
+naming the harnesses that have one; so is a harness the engine does not have, and any argument but one name.
+
 ## Waiting for a person: `holdOpen`, `answer` and `close`
 
 A task filed with `holdOpen: true` does not settle when an attempt signs. It waits, with nothing running, until a
@@ -1819,6 +1846,7 @@ of pure code sits beside it.
 | `src/harness/index.ts` | the face of the seam, as the A2A seam and the doors take it; `core/` imports `seam.ts` and `args.ts` by their own path |
 | `src/harness/claude/bg.ts` | Claude Code's `--bg` runner (`claudeOps`), and `sh`, the one way it shells out |
 | `src/harness/claude/code.ts` | Claude Code as the engine runs it by default: a step as a job (`claude -p`), or a background session (`claude --bg`) when the task asks, each verb routed by the session id's shape; and `claude -p`'s argv and the `claude-detached` spec |
+| `src/harness/claude/quota.ts` | Claude Code's quota (`claudeQuota`): the `claude` on PATH asked `get_usage` with no prompt, and its answer read (`quotaOfResponse`) |
 | `src/harness/claude/registry.ts` | the rows `claude agents --all --json` prints, decoded: which are ours, and why a listing is refused |
 | `src/harness/claude/lines.ts` | the transcript lines the runtime reads (`LINES`), each decoded where it is read, and why a line is refused |
 | `src/harness/claude/inbox.ts` | words said into a running Claude Code session: its inbox, and its registration found by name |
@@ -1841,6 +1869,8 @@ of pure code sits beside it.
 | `src/a2a/index.ts` | the face of `a2a/`, as the doors take it: it imports no name of the SDK's |
 | `src/facade/consumer.ts` | what a consumer writes and is given — its store in Promises, its harnesses, its options, its task and its engine — the adapters over them, and what the door refuses of them |
 | `src/service/engine.ts` | the engine as an Effect service, `Engine`: `Engine.layer(options)` assembles each harness behind its A2A agent, the store and the memo, and its verbs are Effects that fail with tagged errors (`ListRefused`, `TranscriptRefused`, `SayRefused`, `SayUnsent`, and the core's) |
+| `src/service/output.ts` | the engine's `output` verb, `outputVerbOf`, and `OutputRefused`: one stream of a task's latest attempt, kept whole by its harness |
+| `src/service/harnesses.ts` | `DEFAULT_HARNESSES`, the harnesses an engine runs when its options name none |
 | `src/service/index.ts` | the face of `service/`, as the doors take it |
 | `src/facade/engine.ts` | `promiseEngine`: an `Engine` layer built once and each verb run as a Promise, a refusal an `Error` whose `exitCode` is 2: the Promise engine a consumer builds as `promiseEngine(Engine.layer(options))` |
 | `src/facade/promise.ts` | a harness a consumer wrote in Promises (`PromiseRunner`), as the engine's verbs: an adapter like the others, reached through the A2A seam |

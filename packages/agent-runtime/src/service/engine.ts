@@ -12,7 +12,6 @@ import {
   pathOf,
   phaseWordOf,
   waitsOnPerson,
-  type Event,
   type Input,
   type LifecycleStep,
   type Said,
@@ -28,6 +27,7 @@ import {
   composite,
   type ExpectedSession,
   type HarnessArgs,
+  type HarnessQuota,
   type RunnerOps,
   type Transcript,
   type TranscriptCursor,
@@ -61,9 +61,9 @@ import {
   type TaskList,
   type TaskView,
 } from '../core/engine/index.ts';
-import { claudeSayRefuses, isClaudeJob, claudeDetached } from '../harness/claude/index.ts';
-import { codex } from '../harness/codex/codex.ts';
-import { commandHarness } from '../harness/command/command.ts';
+import { claudeSayRefuses, isClaudeJob } from '../harness/claude/index.ts';
+import { OutputRefused, outputVerbOf } from './output.ts';
+import { DEFAULT_HARNESSES } from './harnesses.ts';
 import { a2aOps, type SeamOps } from '../a2a/index.ts';
 import {
   journalOf,
@@ -76,7 +76,6 @@ import {
   harnessRefusalOf,
   type EngineIo,
   type EngineOptions,
-  type HarnessConfig,
   type ObserveCount,
   type TaskSpec,
   type TickReport,
@@ -97,11 +96,6 @@ export class TranscriptRefused extends Schema.TaggedError<TranscriptRefused>()('
   message: Schema.String,
 }) {}
 
-/** A stream `output` will not read, and why: a stream that is neither, a count of bytes that is none, a task or harness without one. */
-export class OutputRefused extends Schema.TaggedError<OutputRefused>()('OutputRefused', {
-  message: Schema.String,
-}) {}
-
 /** Words `say` will not hand to a session, and why, in words that say what to do instead. Nothing was sent or journalled. */
 export class SayRefused extends Schema.TaggedError<SayRefused>()('SayRefused', {
   message: Schema.String,
@@ -116,6 +110,14 @@ export class SayUnsent extends Schema.TaggedError<SayUnsent>()('SayUnsent', {
   cause: Schema.optional(Schema.Defect()),
 }) {}
 
+/**
+ * A quota this engine will not ask, and why: an argument that is no harness's name, a harness this engine does not have, or one that
+ * reports no quota. Nothing was asked.
+ */
+export class QuotaRefused extends Schema.TaggedError<QuotaRefused>()('QuotaRefused', {
+  message: Schema.String,
+}) {}
+
 /** Why `list` refuses what it was handed, or `undefined` for nothing or one list of task ids. */
 export const listRefusalOf = (args: readonly unknown[]): string | undefined => {
   const [taskIds] = args;
@@ -127,11 +129,10 @@ export const listRefusalOf = (args: readonly unknown[]): string | undefined => {
 /**
  * The engine's verbs, each an Effect with what refuses it on its error channel. Each does what the verb of the same name on
  * `agent-runtime`'s `Engine` does, where each is described, and fails with a tagged error where that one rejects with an `Error`
- * whose `exitCode` is 2: `FileRefused`, `TickRefused`, `AdmitRefused`, `ListRefused`, `TranscriptRefused`, `OutputRefused`, `SayRefused`,
- * `StopRefused`
- * for `stop`, and `InputRefused` for `answer` and `close`. `SayUnsent` is `say`'s failure that is not a refusal; a `JournalError` or a
- * `RunnerError` is the store's or the harness's. `watch`, `io` and `start` succeed at once: `watch` and `start` with a handle that stops
- * them.
+ * whose `exitCode` is 2: `FileRefused`, `TickRefused`, `AdmitRefused`, `ListRefused`, `TranscriptRefused`, `OutputRefused`,
+ * `SayRefused`, `QuotaRefused`, `StopRefused` for `stop`, and `InputRefused` for `answer` and `close`. `SayUnsent` is `say`'s
+ * failure that is not a refusal; a `JournalError` or a `RunnerError` is the store's or the harness's. `watch`, `io` and `start`
+ * succeed at once: `watch` and `start` with a handle that stops them.
  */
 export type EngineShape = {
   readonly file: (spec: TaskSpec) => Effect.Effect<string, FileRefused | JournalError>;
@@ -152,6 +153,7 @@ export type EngineShape = {
     lastBytes?: number,
   ) => Effect.Effect<string | undefined, OutputRefused | JournalError | RunnerError>;
   readonly say: (taskId: string, text: string) => Effect.Effect<Said, SayRefused | SayUnsent | JournalError>;
+  readonly quota: (harness?: string) => Effect.Effect<HarnessQuota, QuotaRefused | RunnerError>;
   readonly answer: (taskId: string, text: string, options?: { config?: HarnessArgs }) => Effect.Effect<Input, InputRefused | JournalError>;
   readonly close: (taskId: string) => Effect.Effect<void, InputRefused | JournalError>;
   readonly feed: (after?: Cursor) => Effect.Effect<{ entries: FeedEntry[]; cursor: Cursor; refused?: FeedRefusal[] }, JournalError>;
@@ -167,45 +169,6 @@ export type EngineShape = {
     onTick?: (r: TickReport) => void;
     onError?: (e: unknown) => void;
   }) => Effect.Effect<{ stop: () => void }>;
-};
-
-/**
- * `output` over the engine's journal and runners: refuses, in this order, a `stream` that is not `stdout` or `stderr`, a
- * `lastBytes` that is not a whole number above 0, a task the journal has no record of, and a harness without `output`. Then
- * the stream of the task's latest attempt, by the name the engine chose for it, or `undefined` before an attempt. Observes nothing.
- */
-const outputVerbOf = (
-  read: (taskId: string) => Effect.Effect<readonly Event[], JournalError>,
-  runners: Record<string, SeamOps>,
-  harnessOf: (state: State) => string,
-) =>
-  Effect.fn('Engine.output')(function* (taskId: string, stream: 'stdout' | 'stderr', lastBytes?: number) {
-    const refuse = (message: string) => Effect.fail(new OutputRefused({ message }));
-    if (stream !== 'stdout' && stream !== 'stderr')
-      return yield* refuse(`\`${String(stream)}\` is not a stream: ask for \`stdout\` or \`stderr\`.`);
-    if (lastBytes !== undefined && !(Number.isSafeInteger(lastBytes) && lastBytes > 0))
-      return yield* refuse(
-        `\`lastBytes: ${String(lastBytes)}\` is not a count of bytes: give a whole number above 0, or none for the whole stream.`,
-      );
-    const events = yield* read(taskId);
-    if (!events.length) return yield* refuse(`\`${taskId}\` is not a task on this board. \`ae ls\`, or \`list()\`, gives the ones it has.`);
-    const state = fold(taskId, events);
-    const harness = harnessOf(state);
-    const output = runners[harness].output;
-    if (!output)
-      return yield* refuse(
-        `the \`${harness}\` harness keeps no whole streams: it mixes them in one log. \`logs\` gives what its session printed.`,
-      );
-    const last = state.attempts.at(-1);
-    return last ? yield* output(nameFor(taskId, last.n), stream, lastBytes) : undefined;
-  });
-
-/** The harnesses of an engine given none: Claude Code, Codex, `claude -p` on the detached worker, and a process. */
-const DEFAULT_HARNESSES: Record<string, HarnessConfig> = {
-  claude: 'claude',
-  codex,
-  'claude-detached': claudeDetached,
-  command: commandHarness,
 };
 
 /** An observe count with nothing counted: a harness this engine has not observed yet. */
@@ -245,6 +208,71 @@ const startOf =
     });
 
 /**
+ * `quota` over `runners`, the engine's harnesses as the seam offers them: the quota of the harness named, or of `fallback`, the default
+ * harness, when none is, as its runner answers it (`RunnerOps.quota`). Refused with `QuotaRefused`, in this order: an argument that is not
+ * one harness's name; a harness this engine does not have, naming the ones it has; and one whose runner reports no quota, naming the
+ * ones that do. Each call is one ask, and nothing is journalled.
+ */
+const quotaVerbOf = (runners: Record<string, SeamOps>, fallback: string): EngineShape['quota'] =>
+  Effect.fn('Engine.quota')(function* (harness?: string) {
+    const refuse = (message: string) => Effect.fail(new QuotaRefused({ message }));
+    const args = [...arguments];
+    if (args.length > 1 || (harness !== undefined && typeof harness !== 'string')) {
+      return yield* refuse(
+        `takes one harness's name, or nothing for the default harness (\`${fallback}\`); it was handed ${args.map((a) => JSON.stringify(a)).join(', ')}.`,
+      );
+    }
+    const name = harness ?? fallback;
+    if (!Object.hasOwn(runners, name)) {
+      return yield* refuse(`\`${name}\` is not a harness this engine has. Its harnesses are: ${Object.keys(runners).join(', ')}.`);
+    }
+    const ask = runners[name].quota;
+    if (!ask) {
+      const some = Object.keys(runners).filter((h) => runners[h].quota);
+      return yield* refuse(
+        `the \`${name}\` harness reports no quota. ${some.length ? `Ask one that does: ${some.join(', ')}.` : 'None of the harnesses this engine has does.'}`,
+      );
+    }
+    return yield* ask;
+  });
+
+/**
+ * `ops` with its observes counted into `observed`, under `name`, on the way (`ObserveCount`): each call, its time, what it listed, the
+ * registries it asked (`spawned`), and whether it left anything unread, a failed look counting as unread.
+ */
+const countedInto =
+  (observed: Record<string, ObserveCount>) =>
+  <R extends RunnerOps>(name: string, ops: R): R => {
+    const count = <A>(look: Effect.Effect<A, RunnerError>, read: (a: A) => { listed: number; unread: boolean }) =>
+      Effect.suspend(() => {
+        const t0 = performance.now();
+        const spawned = ioCounts().spawned;
+        return Effect.onExit(look, (exit) =>
+          Effect.sync(() => {
+            const o = (observed[name] ??= { ...NONE });
+            o.calls++;
+            o.ms += performance.now() - t0;
+            o.spawned += ioCounts().spawned - spawned;
+            const r = Exit.isSuccess(exit) ? read(exit.value) : { listed: 0, unread: true };
+            o.listed += r.listed;
+            if (r.unread) o.unread++;
+          }),
+        );
+      });
+    const observeFor = ops.observeFor;
+    return {
+      ...ops,
+      observe: count(ops.observe, (m) => ({ listed: m.size, unread: false })),
+      ...(observeFor
+        ? {
+            observeFor: (expected: readonly ExpectedSession[]) =>
+              count(observeFor(expected), (o) => ({ listed: o.seen.size, unread: o.unread.size > 0 })),
+          }
+        : {}),
+    };
+  };
+
+/**
  * The engine over `options` that `Engine.layer` builds: the file-backed store under `root` (`~/.agent-engine` by default) or the
  * `journal` given, and the `harnesses` given — by default `claude`, `codex` and `claude-detached`. Built once, and shared by every verb:
  *
@@ -271,35 +299,7 @@ const make = (options: EngineOptions) =>
     const journal = options.journal ? journalOf(options.journal) : Journal.layer(journalOps!);
     const events = (taskId: string) => Effect.runPromise(Effect.flatMap(Journal, (j) => j.read(taskId)).pipe(Effect.provide(journal)));
     const observed: Record<string, ObserveCount> = {};
-    const counted = <R extends RunnerOps>(name: string, ops: R): R => {
-      const count = <A>(look: Effect.Effect<A, RunnerError>, read: (a: A) => { listed: number; unread: boolean }) =>
-        Effect.suspend(() => {
-          const t0 = performance.now();
-          const spawned = ioCounts().spawned;
-          return Effect.onExit(look, (exit) =>
-            Effect.sync(() => {
-              const o = (observed[name] ??= { ...NONE });
-              o.calls++;
-              o.ms += performance.now() - t0;
-              o.spawned += ioCounts().spawned - spawned;
-              const r = Exit.isSuccess(exit) ? read(exit.value) : { listed: 0, unread: true };
-              o.listed += r.listed;
-              if (r.unread) o.unread++;
-            }),
-          );
-        });
-      const observeFor = ops.observeFor;
-      return {
-        ...ops,
-        observe: count(ops.observe, (m) => ({ listed: m.size, unread: false })),
-        ...(observeFor
-          ? {
-              observeFor: (expected: readonly ExpectedSession[]) =>
-                count(observeFor(expected), (o) => ({ listed: o.seen.size, unread: o.unread.size > 0 })),
-            }
-          : {}),
-      };
-    };
+    const counted = countedInto(observed);
     const observedNow = (): Record<string, ObserveCount> =>
       Object.fromEntries(Object.entries(observed).map(([name, o]) => [name, { ...o }]));
     const runners = Object.fromEntries(
@@ -564,6 +564,7 @@ const make = (options: EngineOptions) =>
       transcript: transcriptVerb,
       output: outputVerbOf(read, runners, harnessOf),
       say: sayVerb,
+      quota: quotaVerbOf(runners, fallback),
       answer: answerVerb,
       close: (taskId) => go(close(taskId)),
       feed: feedVerb,

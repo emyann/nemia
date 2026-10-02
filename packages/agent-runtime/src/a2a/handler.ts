@@ -48,7 +48,14 @@ import {
 } from '@a2a-js/sdk/errors';
 import { randomUUID } from 'node:crypto';
 import { fold, waitsForInput, isLive, phaseWordOf, nameParts, type Event, type Sighting, type Usage } from '../core/index.ts';
-import { RunnerError, type ExpectedSession, type RunnerOps, type Transcript, type TranscriptCursor } from '../harness/index.ts';
+import {
+  RunnerError,
+  type ExpectedSession,
+  type HarnessQuota,
+  type RunnerOps,
+  type Transcript,
+  type TranscriptCursor,
+} from '../harness/index.ts';
 import {
   canceledTask,
   contextRefusal,
@@ -115,6 +122,7 @@ export const cardOf = (harness: string, ops: RunnerOps): AgentCard => ({
             ...(ops.release ? ['releaseSession' as const] : []),
             ...(ops.transcript ? ['sessionTranscript' as const] : []),
             ...(ops.observeFor ? ['observeSessions' as const] : []),
+            ...(ops.quota ? ['harnessQuota' as const] : []),
           ],
           say: ops.say !== undefined,
         } satisfies RuntimeExtensionParams,
@@ -171,6 +179,8 @@ export interface SessionMethods {
     params: { expected: readonly ExpectedSession[] },
     context: ServerCallContext,
   ): Promise<{ tasks: Task[]; unread: string[] }>;
+  /** What the harness's subscription has left, asked of the harness and of no session (`RunnerOps.quota`): one ask each call. */
+  harnessQuota(params: Record<string, never>, context: ServerCallContext): Promise<HarnessQuota>;
 }
 
 /** Every listed session, as one listing saw them: the pages of that listing are served from here. */
@@ -470,6 +480,13 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
     }
     const { seen, unread } = await this.run(this.ops.observeFor(params.expected));
     return { tasks: [...seen].map(([name, s]) => taskOfSighting(name, s)), unread: [...unread] };
+  }
+
+  async harnessQuota(_params: Record<string, never>, _context: ServerCallContext): Promise<HarnessQuota> {
+    if (!this.ops.quota) {
+      throw new UnsupportedOperationError(`the \`${this.harness}\` harness reports no quota: no subscription's use can be asked of it.`);
+    }
+    return this.run(this.ops.quota);
   }
 
   async createTaskPushNotificationConfig(

@@ -18,11 +18,15 @@ description: "Review a change in this repository as a second engineer would: aga
    Judge whether the list covers every rule the change adds, and whether each mutant breaks the rule rather than the file's syntax: a
    rule with no mutant, or a mutant that only stops the file loading, is a finding. Quote each `wf mutants:` line you judged in your
    closeout's `mutants`.
-5. **Look for what the author could not see**: a rule claimed with no test that makes it refuse; a test that passes for nothing; a
-   caller that rebuilds a returned type field by field and drops the new one; a layer crossed; a limit raised; a behaviour change the spec
-   did not ask for. When the change touches `apps/web`, read the pictures implement handed on, in both themes, with `look`; never build
+5. **Check where each change lives**, against the repository's own boundary rules — its `CLAUDE.md` files and any architecture
+   document they name — and against the spec's `placement` and each change's `where`. Code in a boundary those rules give to another
+   concern, an import across a boundary they hold, or a change built elsewhere than the spec placed it without a word, is a finding of
+   kind `placement` that cites the rule.
+6. **Look for what the author could not see**: a rule claimed with no test that makes it refuse; a test that passes for nothing; a
+   caller that rebuilds a returned type field by field and drops the new one; a limit raised; a behaviour change the spec did not ask
+   for. When the change touches `apps/web`, read the pictures implement handed on, in both themes, with `look`; never build
    or run the e2e.
-6. **Write each finding so the engineer can act on it alone**: the file, the line, the input or case, and the wrong result. No finding
-   invented to look thorough, none about taste.
-7. **Decide the round**: `again` true only when a finding is worth another round of work. From the second round, read the engineer's
+7. **Write each finding so the engineer can act on it alone**: the file, the line, the input or case, and the wrong result; its `kind`,
+   and the `rule` it cites, by the file that states or holds it and its words. No finding invented to look thorough, none about taste.
+8. **Decide the round**: `again` true only when a finding is worth another round of work. From the second round, read the engineer's
    replies first: a finding answered `won't fix` with a sound reason is closed.

@@ -4082,14 +4082,15 @@ What it leaves:
 
 ## Shipped: the subscription's quota on the board
 
-P0.7 of `docs/pivot-2026-09-18.md`, then its source changed: the quota comes from the harness. Apps only: nothing in `packages/`
-changed but this file.
+P0.7 of `docs/pivot-2026-09-18.md`, then its source changed: the quota comes from the harness. The ask then moved down to the
+runtime: the api reads the engine's `quota` for the `claude` harness through `engine()`, and starts no process; the keep and the
+backoff stay in the api.
 
-- **The ask** (`apps/api/src/factory/quota.ts`, `askUsage`). The api starts the `claude` on its PATH as `claude -p --input-format stream-json
+- **The ask** (`claudeQuota` in `packages/agent-runtime/src/harness/claude/quota.ts`, the engine's `quota`). The runtime starts the `claude` on its PATH as `claude -p --input-format stream-json
   --output-format stream-json --verbose --no-session-persistence --strict-mcp-config --setting-sources ''`, writes one
   `control_request` with subtype `get_usage`, reads stdout for the `control_response` whose `request_id` is its own, and closes stdin,
   which ends the process. No model turn, nothing spent. It runs from `os.tmpdir()`, with the variables a Claude Code session around
-  the api hands its children dropped by name (`SESSION_KEYS`) and its sign-in and provider kept, and is killed at 15 s (SIGTERM,
+  the engine hands its children dropped by name (`SESSION_KEYS`) and its sign-in and provider kept, and is killed at 15 s (SIGTERM,
   SIGKILL 2 s later).
 - **The keep** (`readQuota`). The api holds one answer in memory for `QUOTA_KEEP_MS`, 10 min (`HKB_QUOTA_KEEP_MS`; the e2e sets 0),
   with at most one ask in flight, which concurrent reads join. Nothing asks unless a board reads: the web polls every 60 s, every
@@ -4106,7 +4107,7 @@ changed but this file.
   `rate_limits: null`: signed in, and Anthropic's usage service gave Claude Code nothing — seen by the owner on 2026-09-19, hours
   after the quota began to come from `get_usage`, with `Usage fetch returned a fieldless or non-object body (in-band error)` in
   2.1.278's `--debug` log; said as possibly the service limiting how often it is asked, never as a fact), `no-claude` (the spawn's ENOENT), `timeout`,
-  `failed` (exit code or signal, and stderr's last line), `unknown` (an error answer, or a shape not read, named). A window is `marked`
+  `failed` (exit code or signal, and stderr's last line; or an ask the engine rejected, in its words), `unknown` (an error answer, or a shape not read, named). A window is `marked`
   at `QUOTA_MARK_PERCENT`, 80, and `reset` when its `resets_at` has passed since the answer. Only the known windows are shown —
   `five_hour`, `seven_day`, `seven_day_sonnet`, `seven_day_opus` — since the answer carries others under codenames, at 0% with no
   reset. A state other than `fresh` carries the last answer that had windows as `last`, while it is younger than `QUOTA_LAST_MS`,
@@ -4115,12 +4116,16 @@ changed but this file.
   a marked window is amber with a warning icon. Every other state shows its sentence, and under it the last good reading, dimmed,
   with `as of 11:20, 25 min ago`. Loaded in the route's loader, and the floor fitted again when the line comes or goes, or the last
   reading does.
-- **Tests.** `apps/api/src/factory/quota.test.ts` judges answers recorded from 2.1.278 (`test/fixtures/get-usage-*.json`: a plan, no plan,
+- **Tests.** `packages/agent-runtime/test/quota.test.ts` judges answers recorded from 2.1.278 (`test/fixtures/get-usage-*.json`: a plan, no plan,
   an unsupported subtype, and the usage service's silence — the last rebuilt from the owner's recording of 2026-09-19, whose fields
-  it has, with the no-plan recording's session block) and drives the ask through the harness's fake `claude`: the flags exactly, the
-  scrubbed env and cwd, the id match past decoy lines, stdin closed, one ask for concurrent reads, the keep and its override, the
-  backoff on a fake clock — twelve reads at once inside each wait ask nothing, the waits grow, a good reading begins them again — and
-  its override, no claude on PATH, an exit, and a silence killed at the timeout. No test starts the real claude. The e2e's fake answers
+  it has, with the no-plan recording's session block) and drives the ask through a fake `claude`: the flags exactly, the scrubbed env
+  and cwd, the id match past decoy lines, stdin closed; no claude on PATH (`missing`), an exit (`failed`, with its code and stderr's
+  last line), a silence killed at the timeout, an interruption that ends its claude; the verb at both doors and its refusals.
+  `apps/api/src/factory/quota.test.ts` holds the board's judgement of each state and its sentence; one ask for concurrent reads; the
+  keep and its override; the backoff on a fake clock — twelve reads at once inside each wait ask nothing, the waits grow, a good
+  reading begins them again — and its override; an ask the engine rejected, held as `failed` in its own words and asked again past
+  the keep; the route through the engine to the harness's fake `claude`; and that the read starts no process. No test starts the
+  real claude. The e2e's fake answers
   from the store: the quota page draws fresh, no-plan, unknown and failed, and the quota-unanswered page the new state with the last
   reading dimmed, in both themes.
 

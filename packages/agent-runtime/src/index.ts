@@ -38,7 +38,16 @@
  *   that checks a task before filing it holds its own copy to.
  */
 
-export { Engine, EngineRefused, ListRefused, TranscriptRefused, OutputRefused, SayRefused, SayUnsent } from './service/index.ts';
+export {
+  Engine,
+  EngineRefused,
+  ListRefused,
+  TranscriptRefused,
+  OutputRefused,
+  SayRefused,
+  SayUnsent,
+  QuotaRefused,
+} from './service/index.ts';
 export type { EngineShape } from './service/index.ts';
 export { promiseEngine } from './facade/engine.ts';
 export type { EngineOptions, TaskSpec, TickReport, EngineIo, ObserveCount } from './facade/consumer.ts';
@@ -55,8 +64,10 @@ export { Runner, RunnerError, testOps } from './harness/index.ts';
 export { claudeOps } from './harness/claude/index.ts';
 export type {
   ExpectedSession,
+  HarnessQuota,
   McpServer,
   Observation,
+  QuotaLimit,
   RunnerOps,
   SpawnRequest,
   Transcript,

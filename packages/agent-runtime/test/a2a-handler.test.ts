@@ -27,7 +27,7 @@ const ctx = new ServerCallContext();
 
 /**
  * A harness a test moves by hand, what it was asked, and a journal in memory, behind one handler. It has every verb a
- * driver may have — `find`, `release`, `say`, `output`, `transcript`, `observeFor` — unless `bare`, which leaves it the four every
+ * driver may have — `find`, `release`, `quota`, `say`, `output`, `transcript`, `observeFor` — unless `bare`, which leaves it the four every
  * driver has; `noFind` takes `find` alone away. `acted` is what the harness was asked, reads left out.
  */
 const harness = (
@@ -93,6 +93,10 @@ const harness = (
               asked.push(['release', [session, task]]);
               return Effect.succeed(session.state === 'completed' ? { turns: 3, costUsd: 0.25 } : undefined);
             }),
+          quota: Effect.suspend(() => {
+            asked.push(['quota', undefined]);
+            return Effect.succeed({ kind: 'no-plan' as const });
+          }),
           say: (session: { name: string; sessionId: string }, text: string) =>
             Effect.suspend(() => {
               asked.push(['say', [session, text]]);
@@ -977,7 +981,18 @@ test("the harness's card: its name, no streaming, no notifications, text in and 
       [
         RUNTIME_EXTENSION,
         false,
-        { methods: ['findSession', 'sessionLogs', 'sessionOutput', 'releaseSession', 'sessionTranscript', 'observeSessions'], say: true },
+        {
+          methods: [
+            'findSession',
+            'sessionLogs',
+            'sessionOutput',
+            'releaseSession',
+            'sessionTranscript',
+            'observeSessions',
+            'harnessQuota',
+          ],
+          say: true,
+        },
       ],
     ],
   );
@@ -990,6 +1005,18 @@ test('REFUSED on the card: a verb the driver lacks is not offered, and logs, whi
     card.capabilities!.extensions.map((e) => e.params),
     [{ methods: ['sessionLogs'], say: false }],
   );
+});
+
+test("harnessQuota answers the driver's quota; REFUSED on a driver without one, which is asked nothing", async () => {
+  const h = harness();
+  assert.deepEqual(await h.handler.harnessQuota({}, ctx), { kind: 'no-plan' });
+  assert.deepEqual(h.acted(), [['quota', undefined]]);
+  const bare = harness({ bare: true });
+  await assert.rejects(
+    bare.handler.harnessQuota({}, ctx),
+    refusedWith(UnsupportedOperationError, "the `fake` harness reports no quota: no subscription's use can be asked of it."),
+  );
+  assert.deepEqual(bare.asked, []);
 });
 
 test('observeSessions hands the driver what is expected, and answers what it listed as Tasks', async () => {

@@ -78,9 +78,9 @@ export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Servic
  *   table as wf ls reads them, and never written, the file being the daemon's. What the Factory says over its floor when nothing ticks.
  *   500 for a daemon.json that is there and cannot be read — a directory in its place, a permission: the package throws rather than call
  *   it free.
- * - `GET /api/quota` — the subscription's quota, as Claude Code answers its get_usage request, asked at most once a keep however many
- *   boards read (`QuotaAsker`, factory/quota.ts): what the Factory says over its floor. Every case is a 200 with a sentence, the harness's
- *   failures included.
+ * - `GET /api/quota` — the subscription's quota, as the engine's `quota` answers it for the `claude` harness (Claude Code's get_usage
+ *   request), asked at most once a keep however many boards read (`QuotaAsker`, factory/quota.ts): what the Factory says over its floor.
+ *   Every case is a 200 with a sentence, the harness's failures and the engine's refusals included.
  * - asks/asks.ts — a person's asks of a run: a try (with answers to its questions, asks/answers.ts), a round, words for a running
  *   session, an approval and an acceptance; five writes.
  * - steps/steps.ts — a step's own reads: its output, its files, and its conversation, once or followed.
@@ -113,7 +113,7 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     .route('/', stats)
     .get('/api/ceilings', (c) => served(c, async ({ e, env }) => c.json(await ceilingsOf(e, env))))
     .get('/api/daemon', (c) => c.json(readDaemon()))
-    .get('/api/quota', (c) => served(c, async ({ env, quota }) => c.json(await quota({ env }))))
+    .get('/api/quota', (c) => served(c, async ({ e, env, quota }) => c.json(await quota({ env, ask: () => e.quota('claude') }))))
     .route('/', asks)
     .route('/', steps)
     .route('/', feed)

@@ -4,7 +4,8 @@
  * and tally, over a range and on each of its days. The names are the workflow's: this knows only what a step declares.
  *
  * A tally is a field of the step's closeout: an array counts its items, an integer or a number is its value, and `field.flag` counts the
- * items of an array `field` whose boolean `flag` is `true`. A value with nothing measured under it is null, never 0. Pure.
+ * items of an array `field` whose boolean `flag` is `true`, and `field.key=value` the items of an array `field` whose string `key` is
+ * exactly `value`. A value with nothing measured under it is null, never 0. Pure.
  */
 import { isObject, refuse, type StepOutput } from '../step/step.ts';
 
@@ -23,29 +24,55 @@ const typesOf = (entry: unknown): string[] => {
   return (Array.isArray(type) ? type : [type]).filter((t): t is string => typeof t === 'string');
 };
 
+/** An entry's parts: its field, the key of the field's items it reads, and the value it counts them by; undefined in none of the forms. */
+function partsOf(entry: string): { field: string; key: string | undefined; value: string | undefined } | undefined {
+  const [fieldKey, value, ...more] = entry.split('=');
+  const [field, key, ...deeper] = fieldKey.split('.');
+  if (more.length || deeper.length || !field || key === '' || (value !== undefined && key === undefined)) return undefined;
+  return { field, key, value };
+}
+
+/** The properties the items of an array entry of a schema declare; none where it declares none. */
+const itemPropertiesOf = (entry: unknown): Record<string, unknown> => {
+  const items = isObject(entry) ? entry.items : undefined;
+  return isObject(items) && isObject(items.properties) ? items.properties : {};
+};
+
+/** Why `field.key=value` cannot be tallied against `output`, in words after the step's line, or undefined where it can. */
+function matchRefusal(entry: string, field: string, key: string, value: string, output: StepOutput): string | undefined {
+  const named = `\`output: ${output.file}\``;
+  if (value === '') return `\`${entry}\` names no value. Name the value of \`${key}\` whose items it counts: \`${field}.${key}=<value>\``;
+  const declared = itemPropertiesOf(output.schema.properties[field])[key];
+  if (!typesOf(output.schema.properties[field]).includes('array') || !typesOf(declared).includes('string'))
+    return `${named} declares no string \`${key}\` on the items of an array \`${field}\`, and \`${entry}\` counts the items whose \`${key}\` is \`${value}\`. Declare it — \`"${key}": { "type": "string" }\` under the items' \`properties\` — or delete the entry`;
+  const allowed = isObject(declared) && Array.isArray(declared.enum) ? declared.enum : undefined;
+  if (allowed === undefined || allowed.includes(value)) return undefined;
+  return `${named} declares the \`${key}\` of the items of \`${field}\` as one of ${allowed.join(', ')}, and \`${value}\` is none of them. Name one of them, or delete the entry`;
+}
+
 /** Why `entry` cannot be tallied against `output`, in words after the step's line, or undefined where it can. */
 function entryRefusal(entry: string, output: StepOutput): string | undefined {
-  const parts = entry.split('.');
-  const [field, flag] = parts;
+  const parts = partsOf(entry);
   const properties = output.schema.properties;
   const named = `\`output: ${output.file}\``;
-  if (parts.length > 2 || !field || flag === '')
-    return `\`${entry}\` is neither a field nor \`field.flag\`. Name a field of ${named}, or one array field and a boolean of its items: \`issues.open\``;
+  if (!parts)
+    return `\`${entry}\` is none of a field, \`field.flag\` and \`field.key=value\`. Name a field of ${named}, one array field and a boolean of its items: \`issues.open\`, or one array field, a string of its items and a value: \`issues.kind=bug\``;
+  const { field, key: flag, value } = parts;
   if (!Object.hasOwn(properties, field))
     return `${named} declares no field \`${field}\`; it declares ${Object.keys(properties).join(', ')}. Name one of them, or delete the entry`;
+  if (flag !== undefined && value !== undefined) return matchRefusal(entry, field, flag, value, output);
   const types = typesOf(properties[field]);
   if (flag === undefined) {
     if (types.some((t) => t === 'array' || t === 'integer' || t === 'number')) return undefined;
     return `${named} declares \`${field}\` as ${JSON.stringify(types.length ? types : properties[field])}, and a tally counts an array's items or takes an integer's or a number's value. Name such a field, or delete the entry`;
   }
-  const items = properties[field].items;
-  const flags = isObject(items) && isObject(items.properties) ? items.properties : {};
-  if (types.includes('array') && typesOf(flags[flag]).includes('boolean')) return undefined;
+  if (types.includes('array') && typesOf(itemPropertiesOf(properties[field])[flag]).includes('boolean')) return undefined;
   return `${named} declares no boolean \`${flag}\` on the items of an array \`${field}\`, and \`${entry}\` counts the items whose \`${flag}\` is true. Declare it — \`"${flag}": { "type": "boolean" }\` under the items' \`properties\` — or delete the entry`;
 }
 
 /**
- * `tally:` as written, a list like `after:`, read against the step's `output:` schema: each entry is a field of it or `field.flag`.
+ * `tally:` as written, a list like `after:`, read against the step's `output:` schema: each entry is a field of it, `field.flag` or
+ * `field.key=value`.
  * Undefined for no line. Refused, naming the step's file and the entry: a tally on a step with no `output:`, an entry the schema cannot
  * hold (`entryRefusal`), and an entry given twice.
  */
@@ -70,11 +97,18 @@ export function tallyOf(step: string, written: string | undefined, output: StepO
   return entries;
 }
 
-/** A closeout's value of a tally: an array's item count, a finite number, or the items whose flag is exactly `true`; null otherwise. */
+/**
+ * A closeout's value of a tally: an array's item count, a finite number, the items whose flag is exactly `true`, or the items whose key is
+ * exactly the value; null otherwise.
+ */
 export function tallyIn(tally: string, output: Record<string, unknown> | undefined): number | null {
-  const [field, flag] = tally.split('.');
+  const [fieldKey, match] = tally.split('=');
+  const [field, key] = fieldKey.split('.');
   const value = output?.[field];
-  if (flag !== undefined) return Array.isArray(value) ? value.filter((item) => isObject(item) && item[flag] === true).length : null;
+  if (key !== undefined) {
+    const counted = (item: Record<string, unknown>) => (match === undefined ? item[key] === true : item[key] === match);
+    return Array.isArray(value) ? value.filter((item) => isObject(item) && counted(item)).length : null;
+  }
   if (Array.isArray(value)) return value.length;
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }

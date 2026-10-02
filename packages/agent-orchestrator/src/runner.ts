@@ -52,6 +52,11 @@ export { nameFor } from './runtime-client.ts';
  */
 export { lifecycleGraph, type LifecycleGraph } from './runtime-client.ts';
 /**
+ * What a harness says of its subscription's limits, as the engine's `quota` answers it: the limits, each with its use and its reset, or
+ * why there are none. Re-exported because the api cannot import agent-runtime, as `nameFor` is.
+ */
+export type { HarnessQuota, QuotaLimit } from './runtime-client.ts';
+/**
  * Why one task's journal does not read, when `err` is what a read of it rejected with; undefined for any other failure
  * (`unreadableJournal`).
  */

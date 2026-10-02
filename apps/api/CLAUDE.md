@@ -49,7 +49,7 @@ below its layer is in `docs/architecture.md`, *Who owns what*.
   every folder decodes its bodies there.
 - **A route's contract is an entry in the JSDoc of its exported router** (`asks` in `asks/asks.ts`): the comment guard refuses a JSDoc on
   `.post(`. In a test, what a statement means goes into the test's name, an assertion's message, or a JSDoc on a property.
-- **What a route holds is taken with `acquireRelease` and let go as its scope closes** (`feedEvents`, `usageAsk`, `serverAsk`): a release
+- **What a route holds is taken with `acquireRelease` and let go as its scope closes** (`feedEvents`, `serverAsk`): a release
   that ends a process waits for it, so a test reads its pid gone as the Effect returns. An ask requests share (`makeQuota` in
   `factory/quota.ts`, `makeMcpAsker` in `capabilities/capabilities.ts`) is never interrupted by one request's going.
 - **A handle count is waited for, never read once after a close** (`watchers` and `until` in `src/factory/feed.test.ts`): a stream's watch is

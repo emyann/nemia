@@ -375,6 +375,7 @@ const driven = (o: { spawnFails?: unknown; stopFails?: string; observeFails?: st
           release: (session: Sighting, task: { worktree?: string | boolean }) =>
             answer('release', [session, task], session.state === 'completed' ? { turns: 2, costUsd: 0.5 } : undefined),
           say: (session: { name: string; sessionId: string }, text: string) => answer('say', [session, text], undefined),
+          quota: answer('quota', undefined, { kind: 'unanswered' as const, subscription: 'max' }),
           /** Told what is expected, the sessions it names alone. */
           observeFor: (expected: readonly ExpectedSession[]) =>
             answer('observeFor', expected, {
@@ -572,7 +573,7 @@ test('a stop of a session that ended since the listing does nothing, as a driver
 
 test('every verb goes through the seam, the transcript by name too; refuses alone reaches the driver directly', () => {
   const d = driven();
-  for (const verb of ['spawn', 'observe', 'stop', 'find', 'logs', 'release', 'say', 'transcript', 'observeFor'] as const) {
+  for (const verb of ['spawn', 'observe', 'stop', 'find', 'logs', 'release', 'say', 'transcript', 'observeFor', 'quota'] as const) {
     assert.ok(d.runner[verb], `${verb} is offered`);
     assert.notEqual(d.runner[verb], d.ops[verb], `${verb} is the seam's, not the driver's`);
   }
@@ -590,6 +591,12 @@ test('REFUSED: a verb the driver lacks is not offered through the seam, since th
   assert.deepEqual(Object.keys(d.runner).sort(), ['logs', 'observe', 'refuses', 'spawn', 'stop', 'transcript', 'transcriptOf']);
   const none = a2aOps('fake', { spawn: d.ops.spawn, observe: d.ops.observe, stop: d.ops.stop, logs: d.ops.logs }, async () => []);
   assert.deepEqual(Object.keys(none).sort(), ['logs', 'observe', 'spawn', 'stop']);
+});
+
+test("the quota through the seam is the driver's answer, verbatim, and the driver is asked once", async () => {
+  const d = driven();
+  assert.deepEqual(await Effect.runPromise(d.runner.quota!), { kind: 'unanswered', subscription: 'max' });
+  assert.deepEqual(d.acted(), [['quota', undefined]]);
 });
 
 test("observeFor through the seam is the driver's, told what the engine expects, and stop learns its sessions from it", async () => {

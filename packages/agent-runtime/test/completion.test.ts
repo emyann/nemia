@@ -556,7 +556,9 @@ test('a blocked, idle session reports what it said too — and stays blocked, fo
 test('a finished session is read once while its transcript is unchanged — again once it is written, and again for another attempt', async () => {
   let asked = 0;
   let written = 0;
+  let t = 1_000_000;
   const ops = claudeOps({
+    now: () => t,
     transcriptTime: async () => written,
     closeoutFrom: async () => {
       asked++;
@@ -568,7 +570,8 @@ test('a finished session is read once while its transcript is unchanged — agai
     await Effect.runPromise(ops.observe);
     await Effect.runPromise(ops.observe);
     assert.equal(asked, 1, 'its transcript is older than the read');
-    written = Date.now();
+    t += 1_000;
+    written = t;
     await Effect.runPromise(ops.observe);
     assert.equal(asked, 2, 'written since the read: read again');
   } finally {

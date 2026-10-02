@@ -42,8 +42,8 @@ or TanStack Start server.
 ## The quota on the board
 
 The Factory's header shows how much of the subscription's five-hour window and week is used, each with its
-reset in your own time zone, and how old the reading is. Nothing to install: `GET /api/quota` asks Claude Code
-itself, with its `get_usage` control request, and serves the answer. It asks the `claude` on the api's PATH, at
+reset in your own time zone, and how old the reading is. Nothing to install: `GET /api/quota` asks the runtime's `claude` harness for its
+`quota`, which asks Claude Code itself with its `get_usage` control request, and serves the answer. It asks the `claude` on the api's PATH, at
 most once every 10 minutes, one ask at a time, and only while a board asks (`HKB_QUOTA_KEEP_MS` sets the keep; `0`
 asks on every read). An ask is a short `claude -p` that makes no model turn and spends nothing:
 

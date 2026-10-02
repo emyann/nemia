@@ -5,5 +5,5 @@ agent: agora
 loop: implement
 rounds: 3
 budget: 8
-tally: findings, mutants.proves
+tally: findings, findings.kind=placement, mutants.proves
 ---

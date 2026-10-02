@@ -20,6 +20,7 @@ import {
 } from '../record/record.ts';
 import { approvalOf, approvedFirst, branchWord, hasGate, landsOnCheck, resultOnBase, type BranchStanding } from '../status/status.ts';
 import type { CheckoutHold } from '../cap/cap.ts';
+import { DEFAULT_HARNESS, PERMISSION_MODES } from '../harness/harness.ts';
 import type { Assessment } from '../tick/assess.ts';
 
 /**
@@ -39,6 +40,18 @@ export const filedDenies = (
   run: Pick<Run, 'gates'>,
 ): string[] | undefined =>
   landsOnCheck(step, run) ? [...new Set([...(step.disallowedTools ?? []), ...LANDING_DENIED])] : step.disallowedTools;
+
+/**
+ * The allow list a step is filed with, each try and each round: its own, and for a step in the repository's own checkout
+ * (`workspace: main`) on a harness fenced by a permission mode and its rules, a read of its own run's artifacts folder, `runArtifacts`
+ * (absolute), in the rule's `//` form. Such a step reads what the steps before it left there, and a checkout's local settings, where a
+ * person's "don't ask again" writes, reach no step's session; the rule grants a read of that one run's folder and no write. Any other
+ * step is filed with its own list. Pure.
+ */
+export const filedAllows = (step: Pick<Workflow, 'workspace' | 'harness' | 'allowedTools'>, runArtifacts: string): string[] | undefined =>
+  step.workspace === 'main' && PERMISSION_MODES[step.harness ?? DEFAULT_HARNESS]
+    ? [...new Set([...(step.allowedTools ?? []), `Read(/${runArtifacts}/**)`])]
+    : step.allowedTools;
 
 /** The repository's own checkout as a pass reads it for an ending that lands on its check (`mergeState` in worktree.store.ts). */
 export type MergeState = {

@@ -11,7 +11,7 @@ import type { ClaudeFlags, CodexArgs, Engine, TaskView } from '../runtime-client
 import { CHECK_DEADLINE_SECONDS, checkBrief, type CheckHanded, type Verdict } from '../check/check.ts';
 import { isRemoteHarness, modeOf, sessionContext, type Workflow } from '../workflow.ts';
 import { resultSteps } from '../branches/branches.ts';
-import { filedDenies } from '../ending/ending.ts';
+import { filedAllows, filedDenies } from '../ending/ending.ts';
 import { holdsOpen } from '../gate/gate.ts';
 import {
   checkTaskId,
@@ -387,7 +387,7 @@ const trySpec = (
       permissionMode: modeOf(step),
       tools: step.tools,
       disallowedTools: filedDenies(step, f.run),
-      allowedTools: step.allowedTools,
+      allowedTools: filedAllows(step, path.dirname(artifactsDir(f.run, step.name))),
       background: step.background,
       budgetUsd: t.budgetUsd,
       ...t.told.own,
@@ -473,7 +473,7 @@ function roundSpec(f: Filing, r: Round, looping: Workflow, target: Workflow, tas
         permissionMode: modeOf(target),
         tools: target.tools,
         disallowedTools: filedDenies(target, run),
-        allowedTools: target.allowedTools,
+        allowedTools: filedAllows(target, path.dirname(artifactsDir(run, target.name))),
         background: target.background,
         budgetUsd: budgetUsdFor(
           target,
@@ -633,7 +633,7 @@ function readySpec(
         permissionMode: modeOf(step),
         tools: step.tools,
         disallowedTools: filedDenies(step, run),
-        allowedTools: step.allowedTools,
+        allowedTools: filedAllows(step, path.dirname(artifactsDir(run, step.name))),
         background: step.background,
         budgetUsd: budgetUsdFor(step, budgetOf(step, run.steps[step.name]), stepSpend(run, step.name, reads.spendOf)),
         ...told.own,

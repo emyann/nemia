@@ -221,6 +221,7 @@ test("REFUSED on the source: a value import from the format's leaf back to a fol
     [
       'src/closeout/closeout.ts',
       'src/harness/harness.ts',
+      'src/keys/filed-as.ts',
       'src/keys/index.ts',
       'src/keys/keys.ts',
       'src/keys/tools.ts',

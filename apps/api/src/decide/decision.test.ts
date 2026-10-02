@@ -339,7 +339,7 @@ test("the run's total reads its peak against the cap of the step that reached it
   );
 });
 
-test('a run still running is `running` and nothing else, and not one `git` is run for it', async () => {
+test('a run still running is `running` and nothing else, and not one `git` is run for it — nor where its result branch stands', async () => {
   journal('t-d2-implement', [filed('t-d2-implement'), { kind: 'starting', at, attempt: 1 }, { kind: 'spawned', at, attempt: 1 }]);
   writeRun({ id: 'r-d2', repo, baseRef: base, steps: { implement: { taskId: 't-d2-implement', branch }, review: { taskId: null } } });
   const detail = await detailOf('r-d2');
@@ -366,6 +366,10 @@ test('a run still running is `running` and nothing else, and not one `git` is ru
   const before = gitCount();
   assert.deepEqual(await decisionOf('r-d2'), { status: 200, body: { running: true } });
   assert.equal(gitCount(), before, 'no git call for a running run, on a branch git can read: a route that asked would have had an answer');
+  journal('t-d8-implement', [filed('t-d8-implement'), { kind: 'starting', at, attempt: 1 }, { kind: 'spawned', at, attempt: 1 }]);
+  writeRun({ id: 'r-d8', repo, baseRef: base, workflow: [workflow[0]], steps: { implement: { taskId: 't-d8-implement', branch } } });
+  assert.deepEqual(await decisionOf('r-d8'), { status: 200, body: { running: true } });
+  assert.equal(gitCount(), before, 'nor for one whose running step is its result, on a branch git can read: where it stands is not asked');
 
   await decisionOf('r-d1');
   assert.ok(gitCount() > before, "the count counts: a decidable run's decision is read out of git, through the same PATH");

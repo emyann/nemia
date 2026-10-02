@@ -126,6 +126,14 @@ export type TaskSpec = {
    * phase stays `pending`. Absent, or `false`, starts it on the next pass. Refused unless true or false.
    */
   queued?: boolean;
+  /**
+   * Long-lived, a Pod's `restartPolicy: Always`: the session stays open while idle — the end of a turn, an idle listing and
+   * silence are not its end — and only `stop` ends it; a person can `say` it words, or attach to it, at any time. A session that
+   * ends with no stop asked settles the task `failed`. Taken only by a Claude Code background session (`'claude'` with
+   * `config.background: true`, or `'claude-bg'`) and a `PromiseRunner`; refused beside `holdOpen`, `deadlineSeconds` or
+   * `closeoutSchema`, and unless `'Always'`.
+   */
+  restartPolicy?: 'Always';
   /** Choose the id yourself, to keep it in step with a row in your own database. */
   id?: string;
 };
@@ -477,7 +485,8 @@ export const optionsRefusalOf = (options: EngineOptions): string | undefined => 
  *    system prompt would be read by nobody;
  * 6. a `codex` on any harness but a `HarnessSpec` with `codexArgs` (`codexArgsMisplaced`): its session would start without
  *    the trust it names;
- * 7. what the harness's own `refuses` refuses: Claude Code's lists, a spec's, or a remote agent's (`remoteRefuses`).
+ * 7. a long-lived task on a harness whose session ends with its turn (`longLivedMisplaced`);
+ * 8. what the harness's own `refuses` refuses: Claude Code's lists, a spec's, or a remote agent's (`remoteRefuses`).
  *
  * A `PromiseRunner` is the consumer's own: it is handed a `contextTokens`, a `claude.remoteControl`, a `claude` and a
  * `codex`, and asked nothing of its own.
@@ -524,7 +533,28 @@ export const harnessRefusalOf = (spec: TaskSpec & { harness: string }, harnesses
       .map((name) => `\`${name}\``);
     return `\`claude\` gives Claude Code flags of its own, and the \`${spec.harness}\` harness is not Claude Code: its session would start without them. ${takers.length ? `File the task on ${takers.join(' or ')}, or leave \`claude\` off.` : "Leave `claude` off: none of this engine's harnesses is Claude Code."}`;
   }
-  return codexArgsMisplaced(spec, harnesses) ?? ownRefuses(h, spec.harness)?.(spec);
+  return misplaced(spec, harnesses) ?? ownRefuses(h, spec.harness)?.(spec);
+};
+
+/** What a task asks of its harness that only another harness of this engine gives: Codex's arguments, then a long-lived session. */
+const misplaced = (spec: TaskSpec & { harness: string }, harnesses: Record<string, HarnessConfig>): string | undefined =>
+  codexArgsMisplaced(spec, harnesses) ?? longLivedMisplaced(spec, harnesses);
+
+/**
+ * Why a task's `restartPolicy: 'Always'` cannot go to its harness — or `undefined`: a harness whose session ends with its turn,
+ * so nothing would stay open — Claude Code's job (`'claude'` without `config.background: true`), a `HarnessSpec`, which runs a
+ * prompt and exits (Codex among them), and a remote agent. The refusal names the harnesses of this engine that keep one open. A
+ * `PromiseRunner` is the consumer's own, and asked nothing.
+ */
+const longLivedMisplaced = (spec: TaskSpec & { harness: string }, harnesses: Record<string, HarnessConfig>): string | undefined => {
+  const h = harnesses[spec.harness];
+  const ownRunner = !(isClaude(h) || isSpec(h) || isRemote(h));
+  if (spec.restartPolicy !== 'Always' || ownRunner || h === 'claude-bg' || (h === 'claude' && spec.config?.background === true))
+    return undefined;
+  const open = Object.keys(harnesses)
+    .filter((name) => harnesses[name] === 'claude' || harnesses[name] === 'claude-bg')
+    .map((name) => (harnesses[name] === 'claude' ? `\`${name}\` with \`config.background: true\`` : `\`${name}\``));
+  return `\`restartPolicy: 'Always'\` keeps a session open until it is stopped, and the \`${spec.harness}\` harness${h === 'claude' ? ' runs this task as a job, which' : ''} ends its session with its turn. ${open.length ? `File the task on ${open.join(' or ')}, or leave \`restartPolicy\` off.` : "Leave `restartPolicy` off: none of this engine's harnesses keeps a session open."}`;
 };
 
 /** What a harness refuses in its own words: Claude Code's lists, a spec's `refuses`, a remote agent's; a `PromiseRunner`, nothing. */

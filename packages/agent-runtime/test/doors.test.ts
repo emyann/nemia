@@ -164,6 +164,34 @@ test('each verb gives the same answer through either door, over one store', asyn
   assert.deepEqual(Object.keys(io).sort(), Object.keys(promise.io()).sort());
 });
 
+test('a long-lived task through either door: filed with its restart policy, idle and left open across passes, and ended by a stop alone', async () => {
+  const { effect, promise, sessions } = doors();
+  await effect((e) => e.file({ brief: 'one', cwd: '/r', id: 'one', restartPolicy: 'Always' }));
+  await promise.file({ brief: 'two', cwd: '/r', id: 'two', restartPolicy: 'Always' });
+  await promise.tick();
+  assert.equal(sessions.size, 2);
+  for (const [name, s] of sessions) sessions.set(name, { ...s, state: 'input-required', busy: false, held: true });
+  for (let pass = 0; pass < 3; pass++) {
+    await effect((e) => e.tick());
+    await promise.tick();
+  }
+  for (const id of ['one', 'two']) {
+    const view = await promise.view(id);
+    assert.deepEqual([view.phase, view.state.restartPolicy, view.state.settled], ['idle', 'Always', null], id);
+    assert.deepEqual(await effect((e) => e.view(id)), view, id);
+  }
+  assert.deepEqual(
+    [...sessions.values()].map((s) => s.state),
+    ['input-required', 'input-required'],
+    'no pass stopped an idle session',
+  );
+
+  await effect((e) => e.stop('one'));
+  await promise.stop('two');
+  for (let pass = 0; pass < 3; pass++) await promise.tick();
+  for (const id of ['one', 'two']) assert.equal((await effect((e) => e.view(id))).state.settled, 'stopped', id);
+});
+
 test('watch and start run through either door, and each stops', async () => {
   const { effect, promise } = doors();
   await promise.file({ brief: 'one', cwd: '/r', id: 'one' });

@@ -292,16 +292,19 @@ test("a check's stdout is shown without the trailer, and only its last lines", (
   assert.equal(lastLines('a\nb\n\n\n', 1), 'b');
 });
 
-const settled = async (e: Engine, id: string, ms = 20_000) => {
-  const deadline = Date.now() + ms;
+/** Ticks `e` until `id` is in a phase `done` accepts, and answers its view; fails after `ms` on the monotonic clock, which a test may seed `Date` beside. */
+const reached = async (e: Engine, id: string, done: (v: Awaited<ReturnType<Engine['view']>>) => boolean, what: string, ms = 20_000) => {
+  const deadline = performance.now() + ms;
   for (;;) {
     await e.tick();
     const v = await e.view(id);
-    if (v.state.settled) return v;
-    if (Date.now() > deadline) assert.fail(`${id} never settled; phase ${v.phase}`);
+    if (done(v)) return v;
+    if (performance.now() > deadline) assert.fail(`${id} never ${what}; phase ${v.phase}`);
     await new Promise((r) => setTimeout(r, 150));
   }
 };
+
+const settled = (e: Engine, id: string, ms?: number) => reached(e, id, (v) => Boolean(v.state.settled), 'settled', ms);
 
 const rig = () => {
   const root = fs.realpathSync(scratch('wf-check-'));
@@ -421,9 +424,12 @@ test('LIVE: the FIFO a check copies its stdout through is left nowhere, by a che
   assert.deepEqual(fs.readdirSync(tmp), [], "the worker inherits this process's TMPDIR when a tick starts it");
 });
 
-test('LIVE: a check that hangs is stopped at its deadline, fails, and reads unfinished', async () => {
+test('LIVE: a check that hangs is stopped at its deadline, fails, and reads unfinished', async (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: Date.now() });
   const { e, file } = rig();
   const hung = await file('hung', 'sleep 60', 1);
+  await reached(e, hung, (v) => v.phase === 'running (working)', 'came to work');
+  t.mock.timers.tick(5_000);
   const v = await settled(e, hung);
   assert.equal(v.state.settled, 'failed', 'a hung suite does not hold the run for ever');
   assert.equal(readVerdict(await e.logs(hung)), 'unfinished');

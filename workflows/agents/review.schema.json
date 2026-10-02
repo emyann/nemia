@@ -9,9 +9,15 @@
         "properties": {
           "file": { "type": "string", "description": "The file, by path from the workspace root." },
           "line": { "type": ["integer", "null"], "description": "The line it is about; null when it is about something absent, such as a test nobody wrote." },
+          "kind": {
+            "type": "string",
+            "enum": ["placement", "behaviour", "test", "limit", "scope", "other"],
+            "description": "What kind of finding: `placement`, code in a boundary the repository's own rules give to another concern, or built elsewhere than the spec placed it; `behaviour`, a wrong result; `test`, a rule unproven, or a test that passes for nothing; `limit`, a ceiling raised or a size broken; `scope`, done what the spec did not ask, or left out what it asked; `other`, none of these."
+          },
+          "rule": { "type": ["string", "null"], "description": "The repository rule the finding cites: the file that states or holds it, and its words. Null when it cites none; never null for a `placement` finding." },
           "what": { "type": "string", "description": "What goes wrong, concretely: the input or the case, and the wrong result." }
         },
-        "required": ["file", "line", "what"],
+        "required": ["file", "line", "kind", "rule", "what"],
         "additionalProperties": false
       }
     },

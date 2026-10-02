@@ -10,14 +10,19 @@ intent, so restate the intent's goal and constraints in it.
 
 1. **Read the intent**, under *From run* in your brief, then the code it touches. Facts are yours to find: read, search, run the suite, or
    dispatch a sub-agent for a wide search. Never ask the person for what you can look up.
-2. **Read the rules the change meets**: the root `CLAUDE.md` and the `CLAUDE.md` of each package it touches — the layers, one writer per
-   file, level-triggered ticks, the size limits (a limit is met by cutting, never by raising a ceiling), how to test.
+2. **Read the rules the change meets**: the repository's instruction files (`CLAUDE.md` at the root and in each folder the change
+   touches) and every architecture or design document they name — its boundaries and what each owns, its size limits (a limit is met
+   by cutting, never by raising a ceiling), how to test.
 3. **Choose the approach**, and say why this way rather than the obvious other. Challenge any mechanism the intent asserts: read the
    code that would carry it.
-4. **List every change by path**, the **steps in order**, and the **tests**: for each rule the change adds, the fixture that makes it
+4. **Place each change** by the boundaries the repository's own rules define, in their terms. Each change says `where` it lives and
+   `why` there and not in the neighbouring place, citing the rule. The `placement` table gives each concept the change adds or moves:
+   where it lives, the rule that puts it there, and the alternative rejected. A placement the rules do not settle is the person's:
+   ask it in a round.
+5. **List every change by path**, the **steps in order**, and the **tests**: for each rule the change adds, the fixture that makes it
    refuse, and the check that it fails without the rule.
-5. **Size it.** One spec is one run of work under its budget. When it is more, say so and propose how to cut it into intents.
-6. **Ask what is the person's.** A choice the intent leaves open, a trade-off only they can weigh: ask it in a round, numbered, each with
+6. **Size it.** One spec is one run of work under its budget. When it is more, say so and propose how to cut it into intents.
+7. **Ask what is the person's.** A choice the intent leaves open, a trade-off only they can weigh: ask it in a round, numbered, each with
    your recommended answer. Record each answer, and who gave it, in `decisions`.
 
 Read a file with Read and search with Grep or Glob; never `head`, `cat`, `grep`, `awk`, `sed` or a pipe in Bash: it runs only the checks

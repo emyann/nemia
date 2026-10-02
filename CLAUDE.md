@@ -76,6 +76,9 @@ holds what every change needs.
   - *Inside the orchestrator, every file is pure, store, controller or the client* (`PURE`, `STORE`, `CONTROLLER`, `CLIENT` in
     `packages/agent-orchestrator/test/boundary.test.ts`); a new file joins one kind, or the suite fails.
   - *The runtime is reached through one client*, `src/runtime-client.ts` (`CLIENT` in the same test).
+- **A spec here reads `docs/architecture.md` first.** A change's `where` names its layer (`agent-runtime`, `agent-orchestrator`,
+  `apps/api`, `apps/web`), and in the orchestrator its feature folder and kind (pure, store, controller, client), in the api its folder;
+  its `why`, and a placement finding's `rule`, cite the rule above or the *Who owns what* line, with the test that holds it.
 - **Level-triggered.** A tick reads the world, decides, acts, and carries nothing between passes. A guard that only fires on a
   transition is wrong after a restart `(no test yet)`.
 - **One writer per file.** The tick writes the run record; a person's facts (`.cancelled`, an ask) get their own files, composed on read

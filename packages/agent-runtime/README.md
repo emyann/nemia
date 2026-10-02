@@ -789,8 +789,9 @@ operator's args and env.
 
 ### Settings: the checkout's, never the operator's
 
-A job, whether it runs on `claude` or on `claude-detached`, is spawned with `--setting-sources project,local` (`claudePrintFlags`). It reads the
-`.claude/settings.json` and `.claude/settings.local.json` of its `cwd`, and nothing of the operator's `~/.claude/settings.json`: not their
+A job, whether it runs on `claude` or on `claude-detached`, is spawned with `--setting-sources project` (`claudePrintFlags`). It reads the
+`.claude/settings.json` of its `cwd`, and neither that folder's `.claude/settings.local.json`, where Claude Code's "don't ask again" writes a
+person's allow rules, so a job in a person's checkout is fenced as it would be in a worktree, nor the operator's `~/.claude/settings.json`: not their
 default mode, allow and deny rules, `additionalDirectories`, enabled plugins, `~/.claude/skills`, hooks, `statusLine`, `outputStyle`, `model`,
 `effortLevel`, `env`, `attribution` or `autoMode` profile. So a job does the same whoever runs the engine, and an agent's own skills do
 not share Claude Code's 8,000-character skill listing with a person's (the owner's decision of 2026-09-25). What the runtime gives on the
@@ -803,7 +804,7 @@ the checkout's settings or on the task, never in `~/.claude/settings.json`. For 
 `../../docs/spike-2026-09-25-agents-skills.md`, F24.
 
 `settingSources` is on `CLAUDE_OWNED_FLAGS`, so `config.claude` cannot give it again. A background session (`config.background`,
-`claude --bg`) is not given the flag and reads the operator's settings as before: a job is what was measured, and the supervisor, which
+`claude --bg`) is not given the flag and reads the operator's settings and the checkout's local file as before: a job is what was measured, and the supervisor, which
 runs as a background session, is a session a person may attach to. `test/claude-code.test.ts` holds both.
 
 ## What a session may spend: `budgetUsd`

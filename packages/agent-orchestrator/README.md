@@ -489,8 +489,11 @@ Claude Code's flags for it in the engine's `config.claude` (docs/spike-2026-09-2
   a former word under the new key.
 
 Rendered or not, a step's job reads its checkout's settings and never the operator's. The runtime spawns every job with `--setting-sources
-project,local` (the runtime's README, *Settings: the checkout's, never the operator's*). So what a step needs is said where the run
-carries it. A rule goes in the repository's `.claude/settings.json` or on the step (`allowedTools:`). A step's `model:` and `effort:` go on
+project` (the runtime's README, *Settings: the checkout's, never the operator's*). So what a step needs is said where the run
+carries it. A rule goes in the repository's `.claude/settings.json` or on the step (`allowedTools:`). A rule in a checkout's
+`.claude/settings.local.json`, where "don't ask again" writes, reaches no step's job, only a background session. A step in the checkout
+itself (`workspace: main`) is given one rule by the run: a read of its own run's artifacts folder, where the steps before it left their
+files, and of no other run's (`filedAllows`). A step's `model:` and `effort:` go on
 the step or its agent, or it gets Claude Code's default rather than whatever the person running `wf up` set. And a repository whose commits
 must carry no `Co-Authored-By` trailer says `attribution` in its settings, as this one does. The skills a step is listed are its plugin's and
 the repository's, and none from `~/.claude/skills` or the operator's plugins (F24).

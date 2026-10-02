@@ -609,7 +609,7 @@ test("Claude Code's own flags (`config.claude`) are handed over as written, afte
   );
 });
 
-test("a job reads its checkout's settings and never the operator's — `--setting-sources project,local` once, on both `claude -p` specs; a background session is not given it", async () => {
+test("a job reads its checkout's shared settings and neither the operator's nor a `settings.local.json` — `--setting-sources project` once, on both `claude -p` specs; a background session is not given it", async () => {
   const { claudeDetached } = await import('../src/harness/claude/code.ts');
   const sources = (args: string[]) => args.flatMap((a, i) => (a === '--setting-sources' ? [args[i + 1]] : []));
   const f = fake();
@@ -624,11 +624,11 @@ test("a job reads its checkout's settings and never the operator's — `--settin
   } finally {
     f.restore();
   }
-  assert.deepEqual(sources(job), ['project,local'], 'the argv the worker gave the job');
-  assert.deepEqual(sources(claudeDetached.command({ name: 'ae/t/1', brief: 'b', cwd: '/r' }).args), ['project,local'], 'claude-detached');
+  assert.deepEqual(sources(job), ['project'], 'the argv the worker gave the job');
+  assert.deepEqual(sources(claudeDetached.command({ name: 'ae/t/1', brief: 'b', cwd: '/r' }).args), ['project'], 'claude-detached');
   assert.deepEqual(
     sources(claudeJob.command({ name: 'ae/t/1', brief: 'b', cwd: '/r', config: { claude: { settings: '{}' } } }).args),
-    ['project,local'],
+    ['project'],
     "beside the caller's own `--settings`",
   );
   assert.deepEqual(sources(bg), [], 'a background session reads what it read before');

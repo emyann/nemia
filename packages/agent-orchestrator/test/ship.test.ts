@@ -680,6 +680,32 @@ test("an approved ending stages the merge and signs off its message; the run exe
   assert.equal(fs.readFileSync(path.join(shot.dir, 'e2e-pictures.txt'), 'utf8'), note, 'nor writes the note again');
 });
 
+test("REFUSED at shipped defaults: an ending in the checkout reads its run's artifacts through the rule the run files it with, and no `settings.local.json`; a step in a worktree is filed with no such rule", async () => {
+  const { repo, id, tasks } = await stagedAndSigned();
+  const notes = path.join(artifactsDir({ id }, 'implement'), 'notes.md');
+  fs.mkdirSync(path.dirname(notes), { recursive: true });
+  fs.writeFileSync(notes, 'what the implement step left for the ending\n');
+  const runArtifacts = path.join(ROOT, 'runs', id, 'artifacts');
+  const rule = `Read(/${runArtifacts}/**)`;
+  const allows = (task: string) => (tasks.get(task)!.spec.config as { allowedTools?: string[] }).allowedTools ?? [];
+
+  assert.ok(
+    allows(`${id}-ship`).includes(rule),
+    `the ending is given a read of its own run's artifacts: ${allows(`${id}-ship`).join(', ')}`,
+  );
+  assert.equal(rule.startsWith('Read(//'), true, "an absolute path, in the rule's `//` form");
+  assert.ok(path.relative(runArtifacts, notes).split(path.sep)[0] !== '..', 'and the file the implement step left lies under it');
+  assert.equal(
+    fs.existsSync(path.join(repo, '.claude', 'settings.local.json')),
+    false,
+    'with no local settings in the checkout to give it',
+  );
+  assert.ok(
+    !allows(`${id}-implement`).some((r) => r.startsWith('Read(')),
+    `a step in a worktree is filed with its own rules only: ${allows(`${id}-implement`).join(', ')}`,
+  );
+});
+
 /** `npm`, offline, in a directory: a workspace-only tree needs no registry, and a test never reaches one. */
 const npm = (cwd: string, ...args: string[]) =>
   execFileSync('npm', [...args, '--offline', '--no-audit', '--no-fund'], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
@@ -892,8 +918,12 @@ for (const [said, exitCode, words] of [
       'the try the refusal names is honoured: a new try of ship, which stages the merge again and is checked again',
     );
     assert.equal(readRun(id).steps.ship.landed, undefined, 'and the new try has landed nothing yet');
-    const again = tasks.get(readRun(id).steps.ship.taskId!)!.spec.config as { disallowedTools?: string[] };
+    const again = tasks.get(readRun(id).steps.ship.taskId!)!.spec.config as { disallowedTools?: string[]; allowedTools?: string[] };
     assert.ok(again.disallowedTools?.includes('Bash(git commit:*)'), 'and it may not commit the merge either');
+    assert.ok(
+      again.allowedTools?.includes(`Read(/${path.join(ROOT, 'runs', id, 'artifacts')}/**)`),
+      "and it reads its run's artifacts again",
+    );
   });
 }
 

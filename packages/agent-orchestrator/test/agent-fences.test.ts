@@ -10,8 +10,9 @@
  * Each step is read at shipped defaults, as `wf start` freezes it (`loadWorkflows`). A step in `auto` — the engine's default — runs
  * whatever no deny names, so its own `disallowedTools` must name each call. A step in `dontAsk` runs only what an allow reaches, so
  * no rule of its `allowedTools`, of the settings' allow or of a skill's `allowed-tools` may reach one. A step that reads settings the
- * repository does not ship — a background session reads the person's user settings, and a job in the checkout itself its
- * `settings.local.json` — may be allowed anything there, so it too must name each call itself. A step on codex is fenced by a
+ * repository does not ship — a background session reads the person's user settings, and a job in the checkout itself that checkout's
+ * working-tree `.claude/settings.json`, which a person may have edited — may be allowed anything there, so it too must name each call
+ * itself. A step on codex is fenced by a
  * read-only sandbox. The matcher is Claude Code's rule shapes this suite relies on, and throws on a wildcard it does not model, so an
  * allow it cannot read fails the test rather than passing it.
  */
@@ -323,7 +324,7 @@ test("REFUSED: a watcher's step without its own deny of the forced delete is ope
   assert.deepEqual(
     unfenced({ ...bare, background: undefined }),
     ['supervise: Bash(git branch -D wf/r-1/implement)', 'supervise: Bash(git branch --delete --force wf/r-1/implement)'],
-    "a job in the checkout itself reads the person's settings.local.json there",
+    "a job in the checkout itself reads that checkout's working-tree settings.json, which a person may have edited",
   );
 });
 

@@ -52,10 +52,11 @@ export const claudePrintArgs = (r: SpawnRequest, io: HarnessIO | undefined, outp
  * 2. The caller's own flags (`config.claude`): after the variadic lists, which any flag ends, and before the mode.
  * 3. `--permission-mode`, `auto` unless the task names one.
  * 4. The MCP configurations, strict on every spawn as for `claude --bg`: the checkout's `.mcp.json` and the task's own.
- * 5. `--setting-sources project,local`, one value: a job reads `.claude/settings.json` and `settings.local.json` of its
- *    cwd, and nothing of `~/.claude/` — the user's mode, allow rules, plugins, skills, hooks, model and effort — so it does
- *    the same on any machine, and an agent's own skills do not share the listing's budget with a person's. `--settings`,
- *    `--plugin-dir` and `--mcp-config` still reach it.
+ * 5. `--setting-sources project`, one value: a job reads its cwd's `.claude/settings.json`, and neither that cwd's
+ *    `settings.local.json`, where a person's "don't ask again" writes allow rules, nor anything of `~/.claude/` — the
+ *    user's mode, allow rules, plugins, skills, hooks, model and effort — so it does the same on any machine and in any
+ *    checkout, and an agent's own skills do not share the listing's budget with a person's. `--settings`, `--plugin-dir`
+ *    and `--mcp-config` still reach it.
  * 6. `--model` and `--effort`, where the task names them.
  * 7. `--autocompact`, the context window, as for `claude --bg`: `claude -p` compacts past it and still gives its
  *    `structured_output`.
@@ -74,7 +75,7 @@ export const claudePrintFlags = (r: SpawnRequest, io: HarnessIO | undefined): st
   r.config?.permissionMode ?? 'auto',
   ...claudeMcpArgs([io?.checkoutMcpConfig, io?.mcpConfigFile]),
   '--setting-sources',
-  'project,local',
+  'project',
   ...(r.config?.model ? ['--model', r.config?.model] : []),
   ...(r.config?.effort ? ['--effort', r.config?.effort] : []),
   ...(r.config?.contextTokens !== undefined ? ['--autocompact', String(r.config?.contextTokens)] : []),

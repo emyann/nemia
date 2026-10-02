@@ -1,7 +1,7 @@
 # Architecture
 
 Two packages and two apps, in layers. Each layer owns one thing and is reached through a
-short list of entries, its public contract. Three rules keep it that way, and each is a test that fails the suite when
+short list of entries, its public contract. Four rules keep it that way, and each is a test that fails the suite when
 broken. This page says what the tests hold; the tests are the rules.
 
 ## The layers

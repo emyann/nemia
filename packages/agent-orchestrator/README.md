@@ -3068,4 +3068,4 @@ file. A test sits beside the file it tests (`src/<feature>/x.test.ts`), and `tes
 files and those across folders. Outside the package, the apps reach it through `agent-orchestrator`,
 `agent-orchestrator/run`, `agent-orchestrator/workflow` and `agent-orchestrator/effect` alone (`test/contract.test.ts`), whose names
 `test/entries.test.ts` pins.
-`docs/architecture.md`, at the repository's root, states the three rules and the layers they hold.
+`docs/architecture.md`, at the repository's root, states the four rules and the layers they hold.

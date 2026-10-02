@@ -259,13 +259,12 @@ test("words the harness could not be given come back in the engine's words, 502 
 test("words as the board sends them are the package's `say`: 202 with the engine's entry — `at`, `attempt`, `text` — the words on the session's inbox as given, the entry on the task's journal, and on the step's detail and in its note, as `wf ls` words it; nothing else written", async () => {
   const records = Object.fromEntries(Object.entries(written()).filter(([file]) => !file.startsWith(tasksDir)));
   const words = 'Widen the scope to apps/api too.\n\nAnd keep `--flag` as it is.';
-  const sent = Date.now();
   const res = await sayTo('implement', { text: words });
   assert.equal(res.status, 202, await res.clone().text());
   const said = (await res.json()) as Said;
   assert.deepEqual(Object.keys(said).sort(), ['at', 'attempt', 'text']);
   assert.deepEqual([said.attempt, said.text], [1, words]);
-  assert.ok(Date.parse(said.at) >= sent - 1000, said.at);
+  assert.equal(new Date(said.at).toISOString(), said.at, 'the time the package recorded, an ISO time');
 
   assert.deepEqual(
     box.lines,
@@ -273,6 +272,11 @@ test("words as the board sends them are the package's `say`: 202 with the engine
     'the words on the inbox, as given',
   );
   assert.deepEqual((await engine().view('t-implement')).state.said, [said], "the engine's journal of the task");
+  assert.deepEqual(
+    JSON.parse(fs.readFileSync(journalFile('t-implement'), 'utf8').trim().split('\n').at(-1)!),
+    { kind: 'said', ...said },
+    "the last line of the task's journal: the entry the package's say recorded",
+  );
   const steps = await detailSteps();
   const implement = steps.find((s) => s.name === 'implement')!;
   assert.deepEqual([implement.said, implement.note], [[said], 'said to 1×']);

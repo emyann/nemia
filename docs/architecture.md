@@ -1,7 +1,7 @@
 # Architecture
 
 Two packages and two apps, in layers. Each layer owns one thing and is reached through a
-short list of entries, its public contract. Three rules keep it that way, and each is a test that fails the suite when
+short list of entries, its public contract. Four rules keep it that way, and each is a test that fails the suite when
 broken. This page says what the tests hold; the tests are the rules.
 
 ## The layers
@@ -45,7 +45,13 @@ inbox, factories, stats, agent definitions.
   equal to the runtime's by `test/vocabulary.test.ts`.
 
 **In the api today, below its layer**: `runsInOf` in `src/detail/detail.ts` reading a
-harness's argv for a mode, and `src/capabilities/reach.ts` re-implementing permission matching.
+harness's argv for a mode, and `src/capabilities/reach.ts` re-implementing permission matching. Its readers that touch the machine
+are counted against a baseline that only shrinks (`MOVES` in `apps/api/test/kinds.test.ts`), each entry naming the card that moves it,
+else the move and where it goes.
+
+**Words of another layer, in every layer today**: a harness's words outside the runtime, a workflow's inside it, and this repository's
+team in the packages, each file counted against a baseline that only shrinks (`HARNESS_WORDS`, `WORKFLOW_WORDS` and `TEAM_NAMES` in
+`packages/agent-orchestrator/test/words.test.ts`), each entry naming its card, else the move and where it goes.
 
 **In the web today, against its rule**, until the api answers that text, each file counted against a baseline that only shrinks
 (`STORE_PATHS` and `COMMAND_TEXT` in `apps/web/test/structure.test.ts`):
@@ -147,7 +153,11 @@ the one place the A2A SDK is imported; `service/` is the engine as an Effect ser
 neither the core nor a harness imports `a2a/`, `service/`, `facade/` or `cli/`; `cli/` reaches the runtime through `src/facade.ts` alone; and no two files import each other's values,
 directly or around a loop. A folder another folder reads has a face, `index.ts`.
 
-**The api's folders.** The api has no kinds: it is routes over readers, and its `src/` is a folder per page or verb a
+**The api's kinds and folders.** The api is routes over readers, and has two kinds of file, held by `apps/api/test/kinds.test.ts`:
+the entry files, `main.ts`, `app.ts` and `layer.ts`, which may read the environment and serve HTTP; and the readers, every other file,
+which import no node:fs (nor fs/promises), node:child_process, node:http, node:https, node:net or node:os, nor `@hono/node-server`,
+and read neither `process.env` nor `fetch`. A reader that does today is listed with what it reaches (`MOVES`), and the list only
+shrinks. Its `src/` is a folder per page or verb a
 person uses — `runs/`, `detail/`, `steps/`, `decide/`, `asks/`, `inbox/`, `factory/`, `capabilities/`, `workflows/`,
 `agents/`. The root holds `main.ts`, `app.ts`, `port.ts`, `guard.ts`, `store.ts`, `layer.ts` (the services a handler reads, and
 `served`, which runs it on the app's `ManagedRuntime`) and `body.ts` (the request-body reader every folder uses) and nothing else.
@@ -158,8 +168,15 @@ judgement and `runs/` an agent's try — since a cycle of values passes the type
 files need each other's values, and no file or folder is named `utils`, `helpers`, `common`, `shared` or `misc`. Test:
 `apps/api/test/layout.test.ts`.
 
+**4. Each layer says its own words**, held by `packages/agent-orchestrator/test/words.test.ts`. A harness's words — Claude Code's,
+Codex's and Anthropic's names, and the runtime's own permission modes and sandboxes but the plain English ones — stay in
+packages/agent-runtime: not in the orchestrator's `src` and `bin`, `apps/api/src` or `apps/web/src`. A workflow's words — a workflow,
+a step, a gate, a factory, a closeout, the orchestrator, `wf` and Nemia — stay out of the runtime's `src` and `bin`. This repository's
+team, the agents of `workflows/agents/`, stays out of every package's `src`. A word is matched whole and in any case, comments
+included. Each file that says one today is counted, and the count only shrinks.
+
 Each rule's test first refuses planted source that breaks it, so none can pass by reading nothing. The contract tests
-read every file git lists outside their package; `turbo.json` makes the apps' `src` and `test`, and for the runtime the
-orchestrator's source and tests, inputs of their package's test (`packages/agent-orchestrator/test/turbo-inputs.test.ts`),
+read every file git lists outside their package; `turbo.json` makes the apps' `src` and `test`, for the runtime the apps' root
+`.ts` files and the orchestrator's source and tests, and for the orchestrator `workflows/agents/`, inputs of their package's test (`packages/agent-orchestrator/test/turbo-inputs.test.ts`),
 so a breach there cannot replay a pass from turbo's cache. A change to any other file outside a package is not in its
 cache key: run `npx turbo run test --force` after one.

@@ -28,6 +28,7 @@ const INBOX = path.join(ROOT, 'inbox');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
+delete process.env.WF_MAX_CONCURRENT;
 const { addFactory, addToInbox, attachWorkflow, cancel, decide, readInbox, start, startFromInbox, tick } = await import('../src/runner.ts');
 const { listRuns, readRun } = await import('../src/record/record.store.ts');
 const { main } = await import('../src/cli/main.ts');

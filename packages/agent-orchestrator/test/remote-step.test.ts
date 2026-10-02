@@ -18,6 +18,7 @@ const ROOT = scratch('wf-remote-step-');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
+delete process.env.WF_MAX_CONCURRENT;
 const { engine, tick } = await import('../src/runner.ts');
 const { readRun } = await import('../src/record/record.store.ts');
 const { main } = await import('../src/cli/main.ts');

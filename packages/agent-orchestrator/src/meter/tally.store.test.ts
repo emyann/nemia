@@ -23,6 +23,7 @@ const STATS = path.join(ROOT, 'tick-stats.json');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
+delete process.env.WF_MAX_CONCURRENT;
 const { lastPassCost, start, tick } = await import('../runner.ts');
 const { listRuns, readRun } = await import('../record/record.store.ts');
 const { metered, meteredPass, metering, within } = await import('./tally.store.ts');

@@ -21,6 +21,8 @@ import { scratch } from './scratch.ts';
 const ROOT = scratch('wf-check-views-');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
+delete process.env.WF_MAX_CONCURRENT;
+delete process.env.WF_MAX_RUNS;
 const { engine, tick } = await import('../src/runner.ts');
 const { taskPhases } = await import('../src/views/views.verb.ts');
 

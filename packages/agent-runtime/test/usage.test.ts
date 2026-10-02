@@ -824,6 +824,28 @@ test('ae show and ae feed say an end gave no statement where its task asked for 
   );
 });
 
+test("ae feed prints a long-lived attempt's counts as they grow, with no cost, which its end records — and ae ls its turns so far", () => {
+  const counted: Event = {
+    kind: 'counted',
+    at: '2026-10-02T22:10:00Z',
+    attempt: 1,
+    usage: { turns: 4, toolCalls: 2, inputTokens: 20400, outputTokens: 1530 },
+  };
+  assert.equal(
+    entryLine('t-1', counted),
+    `22:10:00  ${'t-1'.padEnd(34)} ${'counted'.padEnd(10)}  attempt 1: 4 turns · 2 tool calls · 20.4k in · 1.5k out · cache not measured · peak not measured`,
+  );
+  const state = fold('t-1', [
+    { kind: 'filed', at: '2026-10-02T22:00:00Z', brief: 'keep watch', cwd: '/r', restartPolicy: 'Always' },
+    { kind: 'starting', at: '2026-10-02T22:00:01Z', attempt: 1 },
+    counted,
+  ]);
+  assert.match(
+    taskLine({ id: 't-1', state, phase: 'running (working)', sessionId: null }),
+    /\(working\) {3}cost not measured · 4t  keep watch$/,
+  );
+});
+
 test('ae show prints the budget and the context window a task was filed with, and nothing for either it was not', () => {
   const filed = (extra: object): Event => ({ kind: 'filed', at: '2026-09-19T09:00:00Z', brief: 'b', cwd: '/r', ...extra });
   assert.deepEqual(limitLines(fold('t-1', [filed({ config: { contextTokens: 200000, budgetUsd: 0.25 } })])), [

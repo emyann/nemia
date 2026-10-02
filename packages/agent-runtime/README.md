@@ -1894,6 +1894,7 @@ of pure code sits beside it.
 | `src/harness/sdk.ts` | the same four verbs on the Agent SDK, with the tradeoff written down |
 | `src/harness/index.ts` | the face of the seam, as the A2A seam and the doors take it; `core/` imports `seam.ts` and `args.ts` by their own path |
 | `src/harness/claude/bg.ts` | Claude Code's `--bg` runner (`claudeOps`), and `sh`, the one way it shells out |
+| `src/harness/claude/parent.ts` | what a resumed `--bg` session's spawn records of its parent: the id of the parent's last StructuredOutput call, and whose a statement is by it |
 | `src/harness/claude/code.ts` | Claude Code as the engine runs it by default: a step as a job (`claude -p`), or a background session (`claude --bg`) when the task asks, each verb routed by the session id's shape; and `claude -p`'s argv and the `claude-detached` spec |
 | `src/harness/claude/quota.ts` | Claude Code's quota (`claudeQuota`): the `claude` on PATH asked `get_usage` with no prompt, and its answer read (`quotaOfResponse`) |
 | `src/harness/claude/registry.ts` | the rows `claude agents --all --json` prints, decoded: which are ours, and why a listing is refused |

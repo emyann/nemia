@@ -165,7 +165,7 @@ test('a task that asked for no closeout ends on quiet as it always did: succeede
   });
 });
 
-test('quiet after a statement of its own succeeds with it; quiet after only a statement made before the attempt began has stated nothing', async () => {
+test("quiet after a statement of its own succeeds with it; quiet after only its parent's statement, resumed, has stated nothing", async () => {
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
     const engine = promiseEngine(Engine.layer({ root: tmp('root') }));
@@ -181,18 +181,16 @@ test('quiet after a statement of its own succeeds with it; quiet after only a st
     assert.deepEqual(v.state.attempts[0]?.closeout, { outcome: 'done' });
     assert.equal(v.state.attempts[0]?.stated, true);
 
-    const inherited = await engine.file({ config: { background: true }, brief: 'go on', cwd: tmp('cwd'), closeoutSchema: SCHEMA });
+    const inherited = await engine.file({
+      config: { background: true },
+      brief: 'go on',
+      cwd: tmp('cwd'),
+      closeoutSchema: SCHEMA,
+      resumeFrom: row.sessionId,
+    });
     await engine.tick();
     const other = claude.rows().find((r) => r.name === `ae/${inherited}/1`)!;
-    const began = await begun(engine, inherited);
-    const anHourAgo = new Date(began - 60 * MINUTES).toISOString();
-    wrote(
-      other.sessionId,
-      began,
-      10 * MINUTES,
-      { ...prompt('the parent prompt'), timestamp: anHourAgo },
-      { ...closes('msg_0', { outcome: 'done', by: 'parent' }), timestamp: anHourAgo },
-    );
+    assert.equal(other.sessionId, row.sessionId, "resumed into its parent's transcript, which ends on the parent's statement");
     claude.set(other.name, { startedAt: Date.now() - 20 * MINUTES });
     await engine.tick();
     const w = await engine.view(inherited);
@@ -200,7 +198,7 @@ test('quiet after a statement of its own succeeds with it; quiet after only a st
     assert.equal(
       w.state.attempts[0]?.closeout,
       undefined,
-      "and no closeout: its transcript holds only its parent's conversation, statement included, from an hour before it began",
+      "and no closeout: its transcript holds only its parent's conversation, statement included, under the call id its spawn recorded",
     );
   });
 });

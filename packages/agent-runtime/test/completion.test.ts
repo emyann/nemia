@@ -1011,7 +1011,7 @@ test("a registry row is ours only when named `ae/` with a `state` key: another's
   }
 });
 
-test('a row is held while it lists a process: an idle session open for its next words, a finished one still open, and a stopped one gone', async () => {
+test('a row is held while it lists a process, which it names: an idle session open for its next words, a finished one still open, and a stopped one gone', async () => {
   const restore = withFakeClaude(
     JSON.stringify([
       { name: 'ae/a/1', sessionId: 's-a', state: 'blocked', status: 'idle', pid: 42 },
@@ -1029,8 +1029,8 @@ test('a row is held while it lists a process: an idle session open for its next 
     assert.deepEqual(
       [...(await Effect.runPromise(ops.observe))],
       [
-        ['ae/a/1', { sessionId: 's-a', state: 'input-required', busy: false, held: true, nativeId: 's-a' }],
-        ['ae/b/1', { sessionId: 's-b', state: 'completed', busy: false, held: true, nativeId: 's-b' }],
+        ['ae/a/1', { sessionId: 's-a', state: 'input-required', busy: false, held: true, nativeId: 's-a', pid: 42 }],
+        ['ae/b/1', { sessionId: 's-b', state: 'completed', busy: false, held: true, nativeId: 's-b', pid: 43 }],
         ['ae/c/1', { sessionId: 's-c', state: 'canceled', busy: false, held: false, nativeId: 's-c' }],
       ],
     );

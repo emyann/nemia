@@ -63,10 +63,11 @@ const SIGHTINGS: Record<string, Omit<Sighting, 'sessionId'> | undefined> = {
   'input-required, idle, held': { state: 'input-required', busy: false, held: true },
   'completed, held': { state: 'completed', busy: false, held: true },
   'working, quiet, held': { state: 'working', quietMs: 90_000, nativeId: 'native-q', held: true },
+  'input-required, not held': { state: 'input-required', busy: false, held: false, nativeId: 'native-r' },
 };
 
-/** The corpus under every sighting a harness can give, and one more: a pass that could not read the harness. */
-const corpus = (): Case[] => corpusOf(SIGHTINGS, { unread: true });
+/** The corpus under every sighting a harness can give, and one more: a pass that could not read the harness; at a time more, late. */
+const corpus = (): Case[] => corpusOf(SIGHTINGS, { unread: true, late: true });
 
 /** What the engine journals for an action, and nothing for one that writes nothing (`step` in `engine.ts`). */
 const journalled = (action: Action, ms: number): Event[] => {

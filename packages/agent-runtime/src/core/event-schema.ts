@@ -145,6 +145,8 @@ export const StoredEventSchema = Schema.Union([
   event('spawned', { attempt: Schema.Finite, error: Schema.optional(Schema.String) }),
   Ended,
   event('measured', { attempt: Schema.Finite, usage: UsageSchema }),
+  event('gap', { attempt: Schema.Finite }),
+  event('process', { attempt: Schema.Finite, pid: Schema.optional(Schema.Finite) }),
   event('stop-requested', {}),
   event('said', { attempt: Schema.Finite, text: Schema.String }),
   Input,

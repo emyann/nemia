@@ -54,7 +54,7 @@ export const QUIESCENT_AFTER_MS = 90_000;
  * it. A read is kept only while the transcript's mtime is still the one asked before it (`Kept.mtime`),
  * and that one older than the read by more than this: one more read at the end of a session, and never
  * a line missed. A write changes the mtime whichever way the wall clock stepped, so it is read again; a
- * step forward costs at most one more read.
+ * clock moved forward costs at most one more read.
  */
 const MTIME_SLOP_MS = 1_000;
 

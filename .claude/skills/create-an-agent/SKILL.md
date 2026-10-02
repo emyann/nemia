@@ -47,9 +47,9 @@ The instructions are one of four layers that shape an agent apart from its task,
    for every agent at work in it. Nemia composes nothing of them.
 
 They reach the agent in that order — instructions, custom instructions, the step's policy, then the task — and where two conflict, the
-later wins. Fences only tighten: a step may deny its agent a tool, never grant one its agent denies (enforced once that refusal is built;
-today a step's key wins, as every key does). So the instructions say what holds for the role everywhere, and nothing about one
-workflow or one workspace.
+later wins. Fences only tighten: a step may narrow its agent's fence and never widen it — the loader refuses a step's `tools:`,
+`allowedTools:`, `disallowedTools:`, `permissionMode:` or `sandbox:` that would give the agent what its file does not. So the instructions
+say what holds for the role everywhere, and nothing about one workflow or one workspace.
 
 ## Its closeout
 
@@ -85,6 +85,8 @@ the step's place, as a start gives it: a test that loads a folder passes the pla
   read or search to Read, Grep or Glob, not Bash.
 - **A role that edits runs `auto`**, and denies by name what it must never do: `Bash(git push)`, `Bash(git push:*)`, `Bash(git branch
   -D:*)`, `Bash(git branch --delete --force:*)`, `mcp__playwright__browser_run_code_unsafe`.
+- **A step only tightens it.** A step that needs a tool, an allow or a mode its agent's file does not give needs another agent; a
+  step's `disallowedTools:` replaces its agent's, so it repeats the agent's denies and adds its own.
 - **A background session** (`background: true`) also reads the person's user and local settings, where "don't ask again" writes allows:
   it denies those five itself, whatever its mode.
 

@@ -195,6 +195,7 @@ const HARNESS_WORDS: Baseline = {
   'packages/agent-orchestrator/src/tick/file.verb.ts': { count: 17, ...MOVES.render },
   'packages/agent-orchestrator/src/views/views.verb.ts': { count: 2, ...MOVES.wait },
   'packages/agent-orchestrator/src/workflow.ts': { count: 1, card: 'a8gp' },
+  'packages/agent-orchestrator/src/workflow/fence.ts': { count: 8, card: 'a8gp' },
   'packages/agent-orchestrator/src/workflow/step-file.ts': { count: 14, card: 'a8gp' },
   'packages/agent-orchestrator/src/workflow/validate.ts': { count: 27, card: 'a8gp' },
   'packages/agent-orchestrator/src/workspace/workspace.ts': { count: 5, card: 'slice-2' },

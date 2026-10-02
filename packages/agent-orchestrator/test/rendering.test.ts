@@ -527,13 +527,13 @@ function storeTeam(name: string, steps: Record<string, string>): string {
   for (const [step, text] of Object.entries(steps)) fs.writeFileSync(path.join(dir, `${step}.md`), text);
   return dir;
 }
-const FOLDER = 'workspace: folder\npermissionMode: dontAsk\nallowedTools: Edit(**)\n';
+const FOLDER = 'workspace: folder\npermissionMode: dontAsk\n';
 const HERE = fs.mkdirSync(path.join(ROOT, 'here'), { recursive: true }) ?? path.join(ROOT, 'here');
 fs.mkdirSync(path.join(ROOT, 'workflows', 'agents'), { recursive: true });
 fs.mkdirSync(path.join(ROOT, 'workflows', 'skills', 'write-a-note'), { recursive: true });
 fs.writeFileSync(
   path.join(ROOT, 'workflows', 'agents', 'scribe.md'),
-  '---\nskills: write-a-note, mind-the-tone\nharnessPrompt: no-coding\ntools: Read, Edit, Skill\n---\nYou write notes.\n',
+  '---\nskills: write-a-note, mind-the-tone\nharnessPrompt: no-coding\ntools: Read, Edit, Skill\nallowedTools: Edit(**)\n---\nYou write notes.\n',
 );
 fs.writeFileSync(path.join(ROOT, 'workflows', 'agents', 'coder.md'), '---\nharness: codex\n---\nYou write code.\n');
 fs.writeFileSync(path.join(ROOT, 'workflows', 'skills', 'write-a-note', 'SKILL.md'), SKILL('write-a-note'));
@@ -618,7 +618,10 @@ test('a rendered step whose folder is gone is filed as before 2026-09-25 — the
 });
 
 test('a rendered step whose plugin is under another name, as a start before the rename wrote it, is filed as one whose folder is gone; one that names no plugin is filed with its prompt', async () => {
-  fs.writeFileSync(path.join(ROOT, 'workflows', 'agents', 'plain.md'), '---\ntools: Read\n---\nYou write plainly.\n');
+  fs.writeFileSync(
+    path.join(ROOT, 'workflows', 'agents', 'plain.md'),
+    '---\ntools: Read\nallowedTools: Edit(**)\n---\nYou write plainly.\n',
+  );
   const dir = storeTeam('renamed', {
     write: `---\nagent: scribe\n${FOLDER}---\nWrite about tides.\n`,
     plain: `---\nagent: plain\n${FOLDER}---\nWrite plainly.\n`,

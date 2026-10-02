@@ -2,8 +2,9 @@
  * What the journal says, word for word, for six scripted runs through `promiseEngine` — and what the harness was asked.
  *
  * Whatever carries a spawn, an observe or a stop to a harness, the record a run leaves is the same, to the word. Times are
- * masked, since they are the clock's — `at`, and the monotonic `mono` a start and a spawn carry beside it; everything else — ids, names, reasons, a harness's own words — is compared exactly,
- * never by pattern: a word changed on the way from a harness to the journal fails nothing else.
+ * masked, since they are the clock's — `at`, and the monotonic `mono` a start and a spawn carry beside it; everything else —
+ * ids, names, reasons, a harness's own words — is compared exactly, never by pattern: a word changed on the way from a harness
+ * to the journal fails nothing else.
  *
  * The shape pinned: an `ended` carries, off the same sighting as `usage` and `exitCode`, `denials` (the tool calls a harness
  * denied the session), `skills` (the skills it loaded) and `limit` (the limit its harness says it stopped at), and, for a task

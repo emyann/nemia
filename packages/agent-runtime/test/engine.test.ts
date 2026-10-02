@@ -536,6 +536,27 @@ test('a pass journals the start and the spawn on the monotonic clock of this boo
   assert.ok(spawned.mono!.ms >= starting.mono!.ms, 'and later on that clock');
 });
 
+test("LONG-LIVED: a pass journals a respawn's gap and the session's end on the monotonic clock of this boot, which the restart measures", async () => {
+  const b = board();
+  const id = await b.run(file({ ...spec, restartPolicy: 'Always', config: { background: true } }));
+  await b.run(tick());
+  const name = nameFor(id, 1);
+  const listed = b.sessions.get(name)!;
+  b.sessions.set(name, { ...listed, state: 'input-required', busy: false, held: true, pid: 100 });
+  await b.run(tick());
+  b.sessions.set(name, { ...listed, state: 'input-required', busy: false, held: false });
+  await b.run(tick());
+  b.sessions.set(name, { ...listed, state: 'completed', busy: false, held: false });
+  await b.run(tick());
+  const events = await b.run(Effect.flatMap(Journal, (j) => j.read(id)));
+  const gap = events.find((e) => e.kind === 'gap');
+  const ended = events.find((e) => e.kind === 'ended');
+  assert.ok(gap?.kind === 'gap' && ended?.kind === 'ended', 'a gap and an end journalled');
+  assert.equal(gap.mono?.boot, monoNow()?.boot, 'the gap is stamped in this boot');
+  assert.equal(ended.mono?.boot, monoNow()?.boot, 'the end is stamped in this boot');
+  assert.ok(ended.mono!.ms >= gap.mono!.ms, 'and later on that clock');
+});
+
 test('a session spawned and not yet listed by its harness is in its grace, however far the wall clock steps forward', async (t) => {
   const b = board();
   const id = await b.run(file(spec));

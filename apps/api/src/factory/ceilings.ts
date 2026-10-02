@@ -2,37 +2,19 @@
  * The cap on runs in flight, and the runs it counts and holds, and what the last pass cost: what the Factory says over its floor
  * (`GET /api/ceilings`, app.ts).
  */
-import {
-  closeoutAsked,
-  closeoutReader,
-  exitVerdicts,
-  harnessBlocked,
-  lastCeilings,
-  lastPassCost,
-  maxRuns,
-  parentOf,
-  type ParentRun,
-  type PassCost,
-  phaseOfView,
-  slotWord,
-  spendReader,
-  stepsOf,
-  runStore,
-} from 'agent-orchestrator';
-import { admissionOrder, assess, gated, heldRuns, type Run, slotNeed } from 'agent-orchestrator/run';
-import type { Workflow } from 'agent-orchestrator/workflow';
-import { type Engine, everyView, judgedUnlessUnreadable, seenBy } from '../store.ts';
+import { lastCeilings, lastPassCost, type PassCost, slotWord, slotsOf, runStore } from 'agent-orchestrator';
+import type { Engine } from '../store.ts';
 
 /**
  * The cap on runs in flight, as the board says it over the Factory: `2 of 4 run slots taken`, or `no cap`.
  *
  * `last` is what the daemon's last pass ran with (`lastCeilings`, `$WF_ROOT/tick.json`): sessions at work per pool (`WF_MAX_CONCURRENT`)
  * and runs in flight (`WF_MAX_RUNS`, 0 for no cap) — null before any pass has written them. `cap` is the cap a run is judged by, as `wf ls`
- * and `wf decide` judge it (`runSlots`): the last pass's, and before any, the api's own `WF_MAX_RUNS`; 0 for none.
+ * and `wf decide` judge it (`slotsOf`): the last pass's, and before any, the api's own `WF_MAX_RUNS`; 0 for none.
  *
  * `inFlight` names the runs that count against it, oldest first, as a pass counts them (`slotNeed`): a task of the run filed and not
  * settled, or a started run nobody called off with something due. Not the Factory's own count of runs in flight, which also has a run
- * waiting on runs, or held for a slot, whose roots the tick will file. Null with no cap, when nothing is read, as `runSlots` reads nothing.
+ * waiting on runs, or held for a slot, whose roots the tick will file. Null with no cap, when nothing is read.
  * `held` are the runs the cap holds, in the order a pass admits them, each with the count it is held at and `wf ls`'s words on its roots
  * (`heldRuns`, `slotWord`).
  *
@@ -47,60 +29,18 @@ export type Ceilings = {
   pass: PassCost | null;
 };
 
-/** A run a task of which does not read (`judgedUnlessUnreadable`), as a pass counts it: in flight, and asking the cap for nothing more. */
-const UNJUDGED = { inFlight: true, wants: false } as const;
-
 /**
- * The cap on runs in flight, and the runs it counts and holds (`Ceilings`), judged as `runSlots` judges them — every run read as a pass
- * reads it, a record whose workflow does not read left out — off one observation of the harnesses (`everyView`), which the package's
- * `runSlots` would make once per task. `runSlots` answers the held runs alone, and the count in flight is what the board says; so its
- * judgement is made here with the package's own pure parts (`slotNeed`, `heldRuns`), and the api's test holds `held` to what `runSlots`
- * answers on the same store. A run a task of which does not read, its own or a run's it waits on, is counted in flight unjudged, as the
- * tick counts it (`UNJUDGED`). Read through `e`; the cap, before any pass wrote one, is `WF_MAX_RUNS` of `env`, the app's environment
- * (`maxRuns`).
+ * The cap on runs in flight, and the runs it counts and holds (`Ceilings`), as the package judges them between passes (`slotsOf`) — every
+ * run read as a pass reads it, off one look at the harnesses — with what the last pass ran with and cost. Read through `e`; the cap, before
+ * any pass wrote one, is `WF_MAX_RUNS` of `env`, the app's environment.
  */
 export async function ceilingsOf(e: Engine['Service'], env: NodeJS.ProcessEnv): Promise<Ceilings> {
-  const last = lastCeilings() ?? null;
-  const pass = lastPassCost() ?? null;
-  const cap = last?.runs ?? maxRuns(env);
-  if (cap <= 0) return { last, cap: 0, inFlight: null, held: [], pass };
-  const runs = runStore.runs.list();
-  const { views, unreadable } = await everyView(e);
-  const reader = seenBy(e, views);
-  const phase = (taskId: string) => phaseOfView(views.get(taskId));
-  const needs: Array<Pick<Run, 'id' | 'createdAt'> & { inFlight: boolean; wants: boolean }> = [];
-  for (const run of runs) {
-    let steps: Workflow[];
-    try {
-      steps = stepsOf(run);
-    } catch {
-      continue;
-    }
-    const need = await judgedUnlessUnreadable(run, unreadable, async () => {
-      const { asks, rounds } = runStore.asks.read(run.id);
-      const a = assess(
-        steps,
-        run,
-        phase,
-        closeoutReader(views, run),
-        closeoutAsked(views),
-        exitVerdicts(views, run),
-        asks,
-        rounds,
-        harnessBlocked(views),
-        spendReader(views),
-      );
-      const parents = new Map<string, ParentRun>();
-      if (gated(run)) for (const id of new Set(run.after)) parents.set(id, await parentOf(reader, id));
-      return slotNeed(run, phase, a, (id) => parents.get(id)?.shipped ?? false, steps);
-    });
-    needs.push({ id: run.id, createdAt: run.createdAt, ...('judged' in need ? need.judged : UNJUDGED) });
-  }
+  const { cap, inFlight, held } = await slotsOf(e, runStore.runs.list(), env);
   return {
-    last,
+    last: lastCeilings() ?? null,
     cap,
-    inFlight: admissionOrder(needs.filter((n) => n.inFlight)).map((n) => n.id),
-    held: [...heldRuns(needs, cap)].map(([run, slot]) => ({ run, ...slot, word: slotWord(slot) })),
-    pass,
+    inFlight,
+    held: [...held].map(([run, slot]) => ({ run, ...slot, word: slotWord(slot) })),
+    pass: lastPassCost() ?? null,
   };
 }

@@ -34,9 +34,9 @@ down is in `docs/architecture.md`, *Who owns what*.
 - **The engine can say a task waits before its harness has let the session go** (`closedOut`, and it waits for the session before ending
   on a statement on disk): a test asserts both sides, or waits for the Task.
 - **`io().reads` counts every file the runtime reads**, not only journals.
-- **A test stamps the times the runtime compares from the journal's attempt start** (`begun` in `test/resume.test.ts`,
-  `test/release.test.ts`), never `new Date()` beside a fake's `Date.now()`: a clock stepping back drops a closeout or counts a former
-  try. A duration a test measures is read with `performance.now()`; a stamp taken from a file equals its mtime (`detached.test.ts`).
+- **A test stamps the times the runtime compares from the journal's attempt start** (`begun` in `test/release.test.ts`), and meets a
+  deadline with a start journalled long ago (`startedLongAgo`), never a sleep: a stepped wall clock drops a closeout or misses the
+  deadline. A duration a test measures is read with `performance.now()`; a stamp taken from a file equals its mtime (`detached.test.ts`).
 - **A detached look told names reads only their run files** (`observeFor`); `observe` lists every run, for views and verbs. A finished
   session leaves the pass's look once released and not at work (`releaseFinished`): `detached.test.ts` and `engine.test.ts` count it.
 - **`engine.test.ts` reads `domain.ts` from `decide` on, and all of `lifecycle.ts`, comments included**: a JSDoc there writes no

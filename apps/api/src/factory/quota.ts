@@ -40,7 +40,10 @@ export const QUOTA_BACKOFF_CEILING_MS = 4 * 60 * 60 * 1000;
  */
 export const QUOTA_LAST_MS = 6 * 60 * 60 * 1000;
 
-/** How long a request waits for an ask before it answers `asking`: the Factory's loader waits on a slow harness this long, no longer. */
+/**
+ * How long a request waits for an ask before it answers `asking`: the Factory's loader waits on a slow harness this long, no longer.
+ * `HKB_QUOTA_WAIT_MS` sets it: with a keep shorter than an ask lasts, a wait shorter than the ask leaves every read `asking`.
+ */
 export const QUOTA_WAIT_MS = 2_000;
 
 /** A window used this much or more, in percent, is marked. */
@@ -250,9 +253,9 @@ const msOf = (env: NodeJS.ProcessEnv, name: string, fallback: number): number =>
 };
 
 /**
- * A read of the quota: how the quota is asked (`ask`, the engine's `quota` in the api), and what the read is judged against: how long it
- * waits for an ask (`waitMs`), the environment its keeps are read from (`env`, `HKB_QUOTA_KEEP_MS` and `HKB_QUOTA_BACKOFF_MS` on each
- * read), and the time (`now`).
+ * A read of the quota: how the quota is asked (`ask`, the engine's `quota` in the api), and what the read is judged against: the
+ * environment its keeps and its wait are read from (`env`, `HKB_QUOTA_KEEP_MS`, `HKB_QUOTA_BACKOFF_MS` and `HKB_QUOTA_WAIT_MS` on each
+ * read), how long it waits for an ask (`waitMs`, else `HKB_QUOTA_WAIT_MS`), and the time (`now`).
  */
 export type ReadQuota = (opts: {
   ask: () => Promise<HarnessQuota>;
@@ -337,7 +340,7 @@ export function makeQuota(): ReadQuota {
     }
     return flight;
   };
-  return async ({ ask, waitMs = QUOTA_WAIT_MS, env = process.env, now = () => Date.now() }) => {
+  return async ({ ask, env = process.env, waitMs = msOf(env, 'HKB_QUOTA_WAIT_MS', QUOTA_WAIT_MS), now = () => Date.now() }) => {
     const keepMs = msOf(env, 'HKB_QUOTA_KEEP_MS', QUOTA_KEEP_MS);
     const backoffMs = msOf(env, 'HKB_QUOTA_BACKOFF_MS', QUOTA_BACKOFF_MS);
     if (held === null || now() - held.at >= (held.keptMs ?? keepMs)) {

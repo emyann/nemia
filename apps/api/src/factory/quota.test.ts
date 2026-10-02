@@ -18,6 +18,7 @@ import {
   QUOTA_KEEP_MS,
   QUOTA_LAST_MS,
   QUOTA_MARK_PERCENT,
+  QUOTA_WAIT_MS,
   quotaOf,
   makeQuota,
   QuotaAsker,
@@ -477,6 +478,23 @@ test('REFUSED: an ask whose answer cannot be read fails the reads that share it,
   answers[2]({ kind: 'no-plan' });
   assert.equal((await c).state, 'no-plan', 'and a read after both is answered');
   assert.equal(waits(), before, 'no read leaves its wait behind, the failed one included');
+});
+
+test('HKB_QUOTA_WAIT_MS sets how long a read waits for its ask: at a keep of 0, a read outlasts an ask slower than the 2 s default', async (t) => {
+  fresh();
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const env = { ...process.env, HKB_QUOTA_KEEP_MS: '0', HKB_QUOTA_BACKOFF_MS: '0', HKB_QUOTA_WAIT_MS: '30000' };
+  const { ask, answers, begun } = handAsks();
+  const slow = readQuota({ ask, env });
+  await begun(1);
+  t.mock.timers.tick(QUOTA_WAIT_MS);
+  answers[0](plan());
+  assert.equal((await slow).state, 'fresh', 'the read is answered by its own ask, slower than the default wait');
+  const bad = readQuota({ ask, env: { ...env, HKB_QUOTA_WAIT_MS: 'soon' } });
+  await begun(2);
+  t.mock.timers.tick(QUOTA_WAIT_MS);
+  assert.equal((await bad).state, 'asking', 'a wait that is no length of time is the default');
+  answers[1](plan());
 });
 
 test('askedAt is when the ask began, not when it answered', async () => {

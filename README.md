@@ -46,7 +46,9 @@ reset in your own time zone, and how old the reading is. Nothing to install: `GE
 `quota`, which asks Claude Code itself with its `get_usage` control request, and serves the answer. It asks the `claude` on the api's PATH, at
 most once every 10 minutes, one ask at a time, and only while a board asks (`HKB_QUOTA_KEEP_MS` sets the keep; `0`
 asks on every read). A read is never answered by an ask that began more than the keep before it (with `0`, only by one that began after
-it), and a reading's age counts from when its ask began. An ask is a short `claude -p` that makes no model turn and spends nothing:
+it), and a reading's age counts from when its ask began. A read waits 2 s for its ask before it says it is asking (`HKB_QUOTA_WAIT_MS`):
+with a keep shorter than an ask lasts, set a wait longer than one, or every read starts an ask it does not wait out.
+An ask is a short `claude -p` that makes no model turn and spends nothing:
 
 ```bash
 claude -p --input-format stream-json --output-format stream-json --verbose \

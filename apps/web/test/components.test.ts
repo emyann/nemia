@@ -4548,7 +4548,7 @@ test('an agent of yours is tried from its page: the fence said in one line, and 
   const texts = textsOf(html);
   assert.ok(
     texts.includes(
-      "A rehearsal fenced to its own folder, not the agent's own permissions: dontAsk, allowed Edit(**) in its folder — or the agent's own mode, where it asks first — $1 to spend.",
+      "A rehearsal fenced to its own folder, not the agent's own permissions: dontAsk, allowed Edit(**) in its folder and never more than the agent is, $1 to spend.",
     ),
     texts.join(' | '),
   );

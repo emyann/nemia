@@ -262,11 +262,11 @@ export async function settleSave({
   release();
 }
 
-/** What a try is, said on the agent's Try panel in one line: the fence is the try's, whatever the agent's own keys say. */
+/** What a try is, said on the agent's Try panel in one line: the fence is the try's, held to its folder inside the agent's own. */
 export const TRY_FENCE = "A rehearsal fenced to its own folder, not the agent's own permissions";
 
-/** How a try runs, beside the fence: the keys its step says, or the agent's own mode where that asks first. */
-export const TRY_TERMS = "dontAsk, allowed Edit(**) in its folder — or the agent's own mode, where it asks first — $1 to spend";
+/** How a try runs, beside the fence: the keys its step says, never wider than the agent's own. */
+export const TRY_TERMS = 'dontAsk, allowed Edit(**) in its folder and never more than the agent is, $1 to spend';
 
 /** The latest try of an agent among the runs, by when it was made; undefined when it has none. */
 export function latestTryOf<T extends { try: { agent: string } | null; createdAt: string }>(

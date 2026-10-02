@@ -1,16 +1,16 @@
 /**
  * An agent of yours tried on a short brief, from its page: a hidden one-step folder team of the store's own,
  * `tries/<agent>/try.md`, started as any folder run is — with no repository, in folders the run makes under `runs/<id>/`, and a budget of
- * a dollar. Its step names the agent and fences it: `dontAsk` with `Edit(**)` over an agent whose mode writes unasked, so every read
- * outside its folder is denied and nothing it writes lands outside the run; an agent whose mode asks is tried in its own fence, already as
- * narrow, since a step may only tighten its agent's fence.
+ * a dollar. Its step names the agent and fences it to its folder, never wider than the agent's own (`directoryFence`): `dontAsk`, or the
+ * agent's mode where narrower, allowed `Edit(**)` over an agent whose mode writes unasked and otherwise only the agent's own rules inside
+ * its folder — so every read outside its folder is denied and nothing it writes lands outside the run.
  *
  * The folder is not among the workflows the board lists (`tries/` is no place of them), and a run of it is a try by where it was started
  * from (`tryOf`), read off the record alone: nothing new is written on it.
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { AGENTS_FOLDER, editsUnasked, isRemoteHarness, SKILLS_FOLDER } from 'agent-orchestrator/workflow';
+import { AGENTS_FOLDER, directoryFence, isRemoteHarness, SKILLS_FOLDER } from 'agent-orchestrator/workflow';
 import type { Run } from 'agent-orchestrator/run';
 import { Invalid } from 'agent-orchestrator/effect';
 import { quoted } from './skills.ts';
@@ -30,18 +30,33 @@ export const TRY_BUDGET = 1;
 /** What the step's frontmatter records the agent's version under: a comment, which the parser skips. */
 const VERSION_LINE = '# version ';
 
+/** An agent's keys the try's fence is read from, as its file writes them. */
+type FencedKeys = { permissionMode?: string; allowedTools?: string };
+
+/** The fence a try writes: its permission mode and allow rules. */
+type TryFence = { permissionMode: string; allowedTools: string[] };
+
 /**
- * The try's step file: the agent, the cap, and the agent's version it was written at — and the try's fence where it narrows the agent's,
- * whose permission mode is `mode` (`undefined` for none): over one that writes unasked (`editsUnasked`).
+ * The fence a try of agent `name`, whose keys are `keys`, writes (`directoryFence`), or why it has none: the agent's mode asks first and
+ * every one of its allow rules reaches outside the try's folder, so a step that narrows it to the folder cannot be written.
  */
-export const tryText = (name: string, version: string, mode: string | undefined): string =>
+function tryFence(name: string, keys: FencedKeys): TryFence | string {
+  return (
+    directoryFence(keys.permissionMode, keys.allowedTools) ??
+    `${name} allows \`${keys.allowedTools}\` in a mode that asks first (\`${keys.permissionMode}\`), and a try runs in a folder of its own, fenced no wider than its agent: none of those rules is inside the folder, and a step cannot allow nothing, so the try would run with them all. To try it, allow it an edit inside its folder — \`Edit(**)\` — or give it a mode that edits unasked, \`acceptEdits\`.`
+  );
+}
+
+/** The try's step file: the agent, the cap, the agent's version it was written at, and the try's fence `fence` (`tryFence`). */
+export const tryText = (name: string, version: string, fence: TryFence): string =>
   [
     '---',
     `${VERSION_LINE}${version}`,
     'workspace: folder',
     `agent: ${name}`,
     `budget: ${TRY_BUDGET}`,
-    ...(editsUnasked(mode) ? ['permissionMode: dontAsk', 'allowedTools: Edit(**)'] : []),
+    `permissionMode: ${fence.permissionMode}`,
+    ...(fence.allowedTools.length ? [`allowedTools: ${fence.allowedTools.join(', ')}`] : []),
     '---',
     'A rehearsal of the brief: work in this folder, and write what you make here.',
     '',
@@ -72,7 +87,13 @@ const FENCED_HARNESSES: readonly string[] = ['claude', 'claude-detached'];
 export type Untried = { why: string; copy: string | null };
 
 export function untriedOf(
-  agent: { from: 'repo' | 'yours'; name: string; file: string; keys: { harness?: string; remote?: string }; schemaFile: string | null },
+  agent: {
+    from: 'repo' | 'yours';
+    name: string;
+    file: string;
+    keys: { harness?: string; remote?: string } & FencedKeys;
+    schemaFile: string | null;
+  },
   home: string,
 ): Untried | null {
   if (agent.from === 'repo') {
@@ -104,15 +125,16 @@ export function untriedOf(
       copy: null,
     };
   }
-  return null;
+  const fence = tryFence(agent.name, agent.keys);
+  return typeof fence === 'string' ? { why: fence, copy: null } : null;
 }
 
 /**
- * The try folder of an agent whose permission mode is `mode` (`tryText`), written when its step file does not read or was written at
- * another version of the agent, and left as it is otherwise. A folder or a step file that is a link is refused (`Invalid`): written
- * through, it would change whatever it points at.
+ * The try folder of an agent whose keys are `keys` (`tryText`), written when its step file does not read or was written at another
+ * version of the agent, and left as it is otherwise. A folder or a step file that is a link is refused (`Invalid`): written through, it
+ * would change whatever it points at; and so is an agent the try cannot fence (`tryFence`).
  */
-export function writeTryFolder(name: string, version: string, mode: string | undefined, home: string): string {
+export function writeTryFolder(name: string, version: string, keys: FencedKeys, home: string): string {
   const dir = tryDir(name, home);
   const file = path.join(dir, `${TRY_STEP}.md`);
   for (const at of [triesDir(home), dir, file]) {
@@ -122,7 +144,9 @@ export function writeTryFolder(name: string, version: string, mode: string | und
       });
     }
   }
-  const text = tryText(name, version, mode);
+  const fence = tryFence(name, keys);
+  if (typeof fence === 'string') throw new Invalid({ message: fence });
+  const text = tryText(name, version, fence);
   let was: string | undefined;
   try {
     was = fs.readFileSync(file, 'utf8');

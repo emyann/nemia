@@ -454,6 +454,28 @@ test('REFUSED: at a keep of 0, a read that comes while an ask begun before it is
   assert.equal(counts.most, 1, 'never two asks at once');
 });
 
+test('REFUSED: an ask whose answer cannot be read fails the reads that share it, and the ask queued behind it still begins', async () => {
+  fresh();
+  const env = { ...process.env, HKB_QUOTA_KEEP_MS: '0', HKB_QUOTA_BACKOFF_MS: '0' };
+  let clock = NOW;
+  const now = () => clock;
+  const { ask, answers, begun } = handAsks();
+  const a = readQuota({ ask, env, now, waitMs: 60_000 });
+  await begun(1);
+  clock += 1;
+  const b = readQuota({ ask, env, now, waitMs: 60_000 });
+  answers[0]({ kind: 'windows', limits: null, subscription: 'max' } as never);
+  await assert.rejects(a, 'the read that shared the ask whose answer does not read fails with it');
+  await begun(2);
+  answers[1](plan());
+  assert.equal((await b).state, 'fresh', 'the read queued behind it is answered by its own ask');
+  clock += 1;
+  const c = readQuota({ ask, env, now, waitMs: 60_000 });
+  await begun(3);
+  answers[2]({ kind: 'no-plan' });
+  assert.equal((await c).state, 'no-plan', 'and a read after both is answered');
+});
+
 test('askedAt is when the ask began, not when it answered', async () => {
   fresh();
   let clock = NOW;

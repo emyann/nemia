@@ -326,10 +326,11 @@ export function makeQuota(): ReadQuota {
     if (before === null) flight.settled = go(flight);
     else {
       queued = flight;
-      flight.settled = before.settled.then(() => {
+      const start = () => {
         queued = null;
         return go(flight);
-      });
+      };
+      flight.settled = before.settled.then(start, start);
     }
     return flight;
   };

@@ -40,8 +40,10 @@ inbox, factories, stats, agent definitions.
 - the daemon and its lease (`src/daemon/`, `upVerb` in `src/cli/main.ts`);
 - rendering agents and skills for Claude Code (`src/agents/agents.ts`, `src/agents/agents.store.ts`, `toldOf` in
   `src/tick/file.verb.ts`);
-- copies of harness vocabulary (`src/harness/harness.ts`, `src/keys/keys.ts`, `src/keys/tools.ts`, `src/workflow/validate.ts`), held
-  equal to the runtime's by `test/vocabulary.test.ts`.
+- the rules about a harness's knobs the runtime cannot refuse (`tools:` on codex, `skills:` and `harnessPrompt:` on codex or a remote
+  agent, `sandbox:` on Claude Code: `src/keys/`), and the fence's ranking of codex's sandboxes (`SANDBOX_RANK` in
+  `src/workflow/fence.ts`), held equal to the runtime's by `test/fence.test.ts`. The words each harness takes are the runtime's,
+  asked at `wf start` (`configRefused` in `src/start/start.verb.ts`).
 
 **In the api today, below its layer**: `runsInOf` in `src/detail/detail.ts` reading a
 harness's argv for a mode, and `src/capabilities/reach.ts` re-implementing permission matching. Its readers that touch the machine

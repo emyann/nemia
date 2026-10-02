@@ -132,12 +132,21 @@ const withoutComments = (text: string): string =>
     .map((line) => (/^\s*(\/\/|\/\*|\*)/.test(line) ? '' : line))
     .join('\n');
 
+/** `process.env` however a file reaches it: read off `process`, by `['env']`, or destructured from it (`const { env } = process`). */
+const PROCESS_ENV = /\bprocess\s*(?:\.\s*env\b|\[\s*['"`]env['"`]\s*\])|\{[^}]*\benv\b[^}]*\}\s*=\s*(?:globalThis\s*\.\s*)?process\b/;
+
+/**
+ * The global `fetch` however a file reaches it: called, passed, aliased, destructured or typed off; never a method of another object
+ * (`client.fetch`), a longer name (`prefetch`), a quoted word or an object's key (`{ fetch: x }`).
+ */
+const FETCH = /(?:^|[^.\w$'"`])fetch\b(?!\s*:)|\bglobalThis\s*\.\s*fetch\b/m;
+
 /** The impure globals a piece of source reads outside its comment lines, each as `IMPURE_GLOBALS` names it. */
 function globalsIn(text: string): string[] {
   const code = withoutComments(text);
   const found: string[] = [];
-  if (/\bprocess\s*(?:\.\s*env\b|\[\s*['"`]env['"`]\s*\])/.test(code)) found.push('global:process.env');
-  if (/(?:^|[^.\w$])fetch\s*\(|\bglobalThis\s*\.\s*fetch\b/m.test(code)) found.push('global:fetch');
+  if (PROCESS_ENV.test(code)) found.push('global:process.env');
+  if (FETCH.test(code)) found.push('global:fetch');
   return found;
 }
 
@@ -394,11 +403,21 @@ test('the scanner sees the environment and fetch outside comment lines, and only
   ].join('\n');
   assert.deepEqual(globalsIn(text), IMPURE_GLOBALS);
   assert.deepEqual(globalsIn(text.split('\n').slice(0, 2).join('\n')), IMPURE_GLOBALS, 'each on a line of its own');
-  assert.deepEqual(
-    globalsIn('const r = await client.fetch(url);\nconst e = run.process.envelope;'),
-    [],
-    'a method named fetch is no global',
-  );
+  for (const read of ['.then(fetch)', 'const f = fetch;', 'const { fetch } = globalThis;', 'export const t: typeof fetch = f;'])
+    assert.deepEqual(globalsIn(read), ['global:fetch'], `${read} reads the global fetch`);
+  for (const read of ['const { env } = process;', 'const { argv, env: e } = process;', 'const { env } = globalThis.process;'])
+    assert.deepEqual(globalsIn(read), ['global:process.env'], `${read} reads the environment`);
+  assert.deepEqual(globalsIn('const e = globalThis.process.env.X;'), ['global:process.env']);
+  for (const none of [
+    'const r = await client.fetch(url);',
+    'const e = run.process.envelope;',
+    'prefetch(url);',
+    'fetchAll(url);',
+    'const o = { fetch: x };',
+    "const name = 'fetch';",
+    'const { envelope } = process;',
+  ])
+    assert.deepEqual(globalsIn(none), [], `${none} reads no global`);
   assert.deepEqual(
     globalsIn(['/**', ' * Reads `process.env.WF_ROOT` and calls `fetch(url)`.', ' */', '// fetch(', '/* process.env */'].join('\n')),
     [],
@@ -519,6 +538,16 @@ test('REFUSED: a pure file that reaches the network or the machine, reads the en
   assert.deepEqual(impurities({ ...packageSources(), ...read }), [
     'src/x/x.ts is pure and imports global:process.env',
     'src/x/x.ts is pure and imports global:fetch',
+  ]);
+  const reached = sourcesOf({
+    'src/x/a.ts': 'export const go = (p: Promise<URL>) => p.then(fetch);',
+    'src/x/b.ts': 'const f = fetch;\nexport const g = f;',
+    'src/x/c.ts': 'const { env } = process;\nexport const home = env.HOME;',
+  });
+  assert.deepEqual(impurities({ ...packageSources(), ...reached }), [
+    'src/x/a.ts is pure and imports global:fetch',
+    'src/x/b.ts is pure and imports global:fetch',
+    'src/x/c.ts is pure and imports global:process.env',
   ]);
   const said = sourcesOf({ 'src/x/x.ts': '/** Reads no `process.env` and calls no `fetch(url)`. */\nexport const x = 1;' });
   assert.deepEqual(impurities({ ...packageSources(), ...said }), [], 'a JSDoc that names them is let through');

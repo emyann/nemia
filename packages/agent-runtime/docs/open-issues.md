@@ -316,9 +316,10 @@ transcript, and the pass journals a `measured` entry (engine `9d075f7`). What th
 - **A respawn's cost is not the attempt's** (the slice 1c probe, 2026-10-02, 2.1.288): a process killed with `kill -9` writes no
   `cost-state`, and the process Claude Code respawns on the same session counts afresh, under its own `startTime`, its own turns
   alone. A long-lived attempt is counted from the start its journal gives it (`ExpectedSession.since`), across every process, and a
-  `cost-state` whose count began more than `COST_START_SLACK_MS` after it gives no cost, API or tool time: its tokens are the
-  attempt's, its cost absent rather than too low. The same holds of a spawn slower than that slack, whose journal start precedes
-  Claude Code's count. A compacted attempt counted that way has no tokens either: they come from the `cost-state` alone.
+  `cost-state` whose count began more than `COST_START_SLACK_MS` after the attempt's first line gives no cost, API or tool time: its
+  tokens are the attempt's, its cost absent rather than too low. A process that started late — a slow spawn, a crash between the
+  journal's start and the spawn — keeps its cost, its count beginning a moment before its first line. A compacted attempt counted
+  that way has no tokens either: they come from the `cost-state` alone.
 - **The resumed reading rests on one shape**: a continuation writes into the same transcript, after its parent's pair, under
   its parent's `startTime` (one session continued twice, 2026-09-15). Its cost is its total less its parent's. No resumed
   session has been measured end to end under the engine.

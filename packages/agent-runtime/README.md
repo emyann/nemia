@@ -1325,8 +1325,8 @@ journals a **`counted`** entry: its turns, tool calls and tokens, never a cost, 
 nothing; a reading with fewer turns than the record is no count of this attempt and writes nothing either; a job's spend is
 written at its end, as before. Its end keeps what was counted when it carries no usage, and its cost is measured as any
 attempt's is. The pass tells the runner when the attempt began (`ExpectedSession.since`), and `--bg` counts from then across
-every process Claude Code respawned it in; a `cost-state` begun more than a few seconds after that is a respawn's own count,
-too low for the attempt, so it gives no cost ([open issue 18](docs/open-issues.md)).
+every process Claude Code respawned it in; a `cost-state` begun more than a few seconds after the attempt's first line is a
+respawn's own count, too low for the attempt, so it gives no cost ([open issue 18](docs/open-issues.md)).
 
 **What a session read, by price.** Measured over 234 worker sessions on 2026-09-18: 96.9% of input tokens were read
 from the cache, 3.1% written to it, almost none uncached — a read priced $0.50 a million and a write $10, a

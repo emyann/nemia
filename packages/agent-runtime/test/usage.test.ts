@@ -234,13 +234,31 @@ test("a long-lived attempt Claude Code respawned is counted across both processe
   assert.equal(respawn.costUsd, 0.0046575, 'and the cost-state is its count, begun as it registered');
 });
 
-test("a cost-state begun a moment after the attempt is the attempt's count, and one begun before is carried on from", () => {
+test("a cost-state begun a moment after the attempt's first line is the attempt's count, and one begun before it is carried on from", () => {
   const since = Date.parse('2026-10-02T22:03:00Z');
+  const first = Date.parse('2026-10-02T22:03:01Z');
   const jsonl = (startTime: number) =>
     [prompt('2026-10-02T22:03:01Z'), response('2026-10-02T22:03:02Z', 'msg_1', []), costState(0.25, 900, 10, startTime)].join('\n');
-  assert.equal(transcriptUsage(jsonl(since + 4_000), since).costUsd, 0.25, 'counted from just after it registered');
-  assert.equal(transcriptUsage(jsonl(since - 4_000), since).costUsd, 0.25, 'counted from just before');
-  assert.equal('costUsd' in transcriptUsage(jsonl(since + 6_000), since), false, 'counted from a later process');
+  assert.equal(transcriptUsage(jsonl(first + 4_000), since).costUsd, 0.25, 'counted from just after its first line');
+  assert.equal(transcriptUsage(jsonl(since - 4_000), since).costUsd, 0.25, 'counted from just before it registered');
+  assert.equal('costUsd' in transcriptUsage(jsonl(first + 6_000), since), false, 'counted from a later process');
+});
+
+test('an attempt whose process began writing long after it registered is counted from its first line, and a later count still is not', () => {
+  const since = Date.parse('2026-10-02T22:03:00Z');
+  const first = Date.parse('2026-10-02T22:13:00Z');
+  const jsonl = (startTime: number) =>
+    [prompt('2026-10-02T22:13:00Z'), response('2026-10-02T22:13:02Z', 'msg_1', []), costState(0.25, 900, 10, startTime)].join('\n');
+  assert.equal(
+    transcriptUsage(jsonl(first - 800), since).costUsd,
+    0.25,
+    'its process started ten minutes late, a moment before its first line',
+  );
+  assert.equal(
+    'costUsd' in transcriptUsage(jsonl(first + 25_000), since),
+    false,
+    'a respawn of it, later still, counts its own turns alone',
+  );
 });
 
 test('a count carried on from a total the transcript does not show is no cost', () => {

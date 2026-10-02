@@ -1,5 +1,5 @@
 /**
- * GET /api/runs/:id/decision: what `wf decide` shows a person, off a real repository — what a result branch touched, the
+ * GET /api/runs/:runId/decision: what `wf decide` shows a person, off a real repository — what a result branch touched, the
  * lesson line, the check-affecting diffs cut per file, what each step consumed, and the commands — and nothing of it, and
  * no `git` at all, for a run still running.
  */
@@ -371,6 +371,27 @@ test('a run still running is `running` and nothing else, and not one `git` is ru
   assert.ok(gitCount() > before, "the count counts: a decidable run's decision is read out of git, through the same PATH");
 });
 
+test('a run the cap on runs in flight holds is `running`, held at the count `GET /api/ceilings` holds it at, and not one `git` is run for it', async () => {
+  journal('t-d13-implement', [filed('t-d13-implement'), { kind: 'starting', at, attempt: 1 }, { kind: 'spawned', at, attempt: 1 }]);
+  writeRun({ id: 'r-d13', repo, baseRef: base, steps: { implement: { taskId: 't-d13-implement', branch }, review: { taskId: null } } });
+  writeRun({ id: 'r-d12', repo, baseRef: base, steps: {} });
+  process.env.WF_MAX_RUNS = '1';
+  try {
+    const before = gitCount();
+    const { status, body } = await decisionOf('r-d12');
+    assert.equal(gitCount(), before, 'no git call for a run nothing of which is filed');
+    const ceilings = (await (await app.request('/api/ceilings')).json()) as { inFlight: string[]; held: { run: string }[] };
+    assert.ok(ceilings.inFlight.includes('r-d13'), JSON.stringify(ceilings));
+    assert.ok(
+      ceilings.held.some((h) => h.run === 'r-d12'),
+      JSON.stringify(ceilings),
+    );
+    assert.deepEqual({ status, body }, { status: 200, body: { running: true, held: { inFlight: ceilings.inFlight.length, cap: 1 } } });
+  } finally {
+    process.env.WF_MAX_RUNS = 'set-it-in-the-test';
+  }
+});
+
 test('a loop out of rounds offers both answers as commands, each the bare `wf` line and not the sentence that carries it', async () => {
   const looping = [
     { name: 'implement', after: [], body: 'Implement it.', harness: 'codex' },
@@ -412,7 +433,12 @@ test('a loop out of rounds offers both answers as commands, each the bare `wf` l
       { label: 'accept', command: 'wf accept r-d9 review --message "<why>"' },
       { label: 'once more', command: 'wf retry r-d9 implement' },
     ],
-    'both offers are parsed to the command a person runs: an offer ONCE_MORE does not know is handed over whole, a paragraph under a button that says `once more`',
+    'both offers are the bare command a person runs (`choicesOf`), never a paragraph under a button that says `once more`',
+  );
+  assert.deepEqual(
+    body.commands.filter((c) => !/^(wf|git -C) \S+( \S+)*$/.test(c.command) || /\n|\.$/.test(c.command)).map((c) => c.command),
+    [],
+    'every command is one line a person runs, never a sentence',
   );
   const accept = body.commands.find((c) => c.label === 'accept');
   assert.ok(accept?.said, JSON.stringify(body.commands));

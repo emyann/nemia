@@ -636,7 +636,7 @@ What it leaves:
 - **The board's answer box.** `retry(e, id, step, { mode, model, message })` and the ask file are what it builds
   on: a box on a blocked step in the Decide section, posting to a route guarded as `POST /api/runs` is. The api
   reads no answers yet. Its `listing` and `tryNote` calls pass none, so the board's note never says `answered`,
-  and its once-more command, cut from the offer by `ONCE_MORE`, is `wf retry <run> <step>` without `--message`.
+  and its once-more command, the offer's bare command (`choicesOf`), is `wf retry <run> <step>` without `--message`.
 - **The steering channel.** A message reached a step that was over and waiting, not one still running. *Shipped
   since, below: `wf say`*, over the engine's `say`, which is the way to reach a live session `wf` did not have. The
   record is the engine's journal of the task rather than an ask file, and `wf decide` prints it.
@@ -1570,7 +1570,7 @@ What it leaves:
 
 - **The board.** `apps/api` passes `listing`, `assess` and `decision` no `spendOf`. So it reads a step over its budget by the status
   underneath, and shows a `retries:` try as due that the tick holds. The board shows no cost and no `over budget`, and `apps/web`'s
-  `stepState` knows neither word. `ONCE_MORE` cuts `wf retry <run> <step>` out of an over-budget offer without its `--budget`, and
+  `stepState` knows neither word. `choicesOf` offers `wf retry <run> <step> --budget <amount>` for an over-budget step, but
   the retry route's body carries no `budget`, so the board's Continue on such a step is refused. Each fix is `spendReader(views)`
   handed where `closeoutAsked(views)` already goes, plus a field. That is the next apps run. The api's tests pin `usedLines`' words
   (`$0.004`, and a used line with no times), so the format keeps three figures under a cent and says nothing of time nobody measured.
@@ -2223,7 +2223,7 @@ What was built:
   says in red that its branch becomes the only copy of its work and that no branch is ever deleted. For such a run the first two are shown
   unavailable, with why. The prune is asked twice, the second time in words that name what goes, the warning again (`pruneOffer`,
   `pruneQuestion` in `apps/web/src/lib/prune.ts`).
-- **Who decided it is the package's word.** The popover reads the run's decision before it offers anything, and `GET /api/runs/:id/decision`
+- **Who decided it is the package's word.** The popover reads the run's decision before it offers anything, and `GET /api/runs/:runId/decision`
   carries `awaiting` — `decision`'s own `awaiting`, the reading `pruneRefusal` refuses without `--unmerged` — with its result branches and
   whether it worked on its base branch itself. `apps/api/src/runs/prune.test.ts` holds the field to `wf prune`'s answer for a run merged, one
   nobody merged, one running, a failed run merged by hand and one that worked on main itself.
@@ -2325,7 +2325,7 @@ The second of the three cards. The api says a held run is held, not waiting on y
 - **Nothing waits on you**: `waitingOnYou`, `onYou` and `toDecide` are empty, as `listing` says, and no step is offered an approval or a
   raise (`costOf` reads the hold beside the cancel and the prune).
 - **The decision is `{ holding }`**, and `{ waiting, holding }` for a run started `--after` and held as well. It offers no command, since
-  `decide` offers nothing on a held run, so `ONCE_MORE` has nothing to parse, and `heldLater`'s words carry no `wf` verb.
+  `decide` offers nothing on a held run, so `choicesOf` has nothing to offer, and `heldLater`'s words carry no `wf` verb.
 - **The verbs the board sends** answer 409 in the package's own words (`heldRefusal`), since the api calls the package's verbs.
 
 Where it departs from the plan: **`moving` is true for a held run while its hold may lift on its own**, when the run would move
@@ -3425,7 +3425,7 @@ What the board does with it, an item a commit — §8's apps half, the run after
   does not come off its base and that is the answer that says there is nothing to decide: remembering it can only forget a decision, never
   invent one, and the answer that holds a person up is asked every poll. It is what the store's long tail costs: of the author's 69 runs
   with a result branch on 2026-09-17, 66 were already on main — the first read of the list 691 ms of `git`, every later one three branches.
-  Beside it, `GET /api/runs/:id/decision` carries `standings` — where each result branch stands and
+  Beside it, `GET /api/runs/:runId/decision` carries `standings` — where each result branch stands and
   git's own diff stat of it (`branchWord`, `diffStat`) — reads the result with `resultSteps` rather than `terminalSteps`, and offers
   `ship it` and `drop it` no more for a folder whose ending merges, as `wf decide` never has. A gate's two commands are built from the
   steps a send-back names (`sendBackTo`) and not read out of the package's gate line with a pattern: that line carries no send-back at all
@@ -3494,7 +3494,7 @@ What it leaves:
 - **An ending step's artifacts from its workspace are not collected**, since the run hands nothing off in that checkout: such a step writes
   into the directory its brief names, by absolute path, and one it names from the workspace reads `not collected` on `wf decide` — which is
   now what its brief tells it (round 4, above).
-- **The board offers `git merge` for a run whose ending merges.** `commandsOf` (`apps/api/src/decide/decision.ts`) prints the hand-driven `git merge
+- **The board offers `git merge` for a run whose ending merges.** The api's commands (`apps/api/src/decide/decision.ts`) printed the hand-driven `git merge
   --no-ff` and `git branch -D` for every finished run, where `wf decide` prints them only for a folder with no ending step (`merges`): a
   folder that says what shipping is does not also tell a person to type it. Found by the review, round 4, and left: it is the api's, and
   belongs with the board half above.
@@ -4462,7 +4462,7 @@ in `dontAsk` denied the command it was told to run signed off all the same. A st
   your session was denied`), or the same session continued. `--recheck` is refused: no check ran. A pruned run offers nothing.
 - **Refused at load:** any word but `fail`; the key on codex, which records no denials; and beside `background: true`, whose denials
   are not read (issue 28).
-- **The api and the board.** The step's status is `denied`; `ONCE_MORE` parses the `--fresh` offer, so the board's button copies the bare
+- **The api and the board.** The step's status is `denied`; `choicesOf` offers `--fresh` as the bare command, so the board's button copies the bare
   command. The board draws the step amber, as it does one that did not sign, and its Decide section offers a new session first. The
   builder's step form sets the key (`KINDS`, `specOf`, the board's mirror with `UNSET`).
 
@@ -4605,7 +4605,7 @@ whose check nobody but the shipper read. The run executes it now, as it executes
   git), and `wf ls` says nothing of a landing the run did not make. Left unwritten, the landing stayed owed for good: a person's
   `git merge --no-commit` of the run's branch to resolve the conflict by hand read as the run's, and the next pass aborted it — their
   resolution with it — while `wf rm` refused the run on it (review round 3).
-- **The api** offers `wf retry <run> ship` as `once more` (`ONCE_MORE` already read it); `apps/api/src/decide/decision.test.ts` asserts the bare
+- **The api** offers `wf retry <run> ship` as `once more` (`choicesOf`, the offer's bare command); `apps/api/src/decide/decision.test.ts` asserts the bare
   command for an ending whose check did not finish.
 - **Tests that refuse**, each proven against a mutant: a commit on any settled check, another merge touched, no abort on cancel, a
   blank message committed, the checkout released before the landing (`ship.test.ts`, `run.test.ts`, with real git for

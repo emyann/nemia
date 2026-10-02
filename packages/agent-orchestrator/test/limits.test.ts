@@ -52,7 +52,6 @@ const RECORD: Record<string, Partial<Record<Rule, number>>> = {
   'apps/api/src/agents/agents.ts': { 'sonarjs/cognitive-complexity': 1 },
   'apps/api/src/capabilities/capabilities.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 1 },
   'apps/api/src/capabilities/reach.ts': { 'max-lines-per-function': 1, complexity: 1, 'sonarjs/cognitive-complexity': 1 },
-  'apps/api/src/decide/decision.ts': { 'max-lines-per-function': 1, 'sonarjs/cognitive-complexity': 1 },
   'apps/api/src/detail/detail.ts': { 'max-lines-per-function': 1, complexity: 1 },
   'apps/api/src/runs/judged.ts': { complexity: 1 },
   'apps/api/src/runs/runs.ts': { 'sonarjs/cognitive-complexity': 1 },

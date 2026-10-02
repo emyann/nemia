@@ -404,7 +404,7 @@ async function listed({ e, env, home, memo }: Served): Promise<RunSummary[]> {
  *   `branchReader`). With `WF_VERIFY_REST` a kept answer is judged afresh too, and one that differs fails the request.
  * - `GET /api/runs/:id` — a run in full (`detail`): refused with a 404 when there is no such run, and with a 502 when a task it reads does
  *   not, in the words the list says it with (`RunSummary.unreadable`).
- * - `GET /api/runs/:id/decision` — what `wf decide` shows a person (`decisionOf`). Not on the page's poll, since it runs `git diff`.
+ * - `GET /api/runs/:runId/decision` — what `wf decide` shows a person (`decisionOf`), the route of its entry of the command table. Not on the page's poll, since it runs `git diff`.
  *   Refused as the run's page is: a 404 with no such run, and a 502 when a task it reads does not, in the words the list says it with
  *   (`RunSummary.unreadable`).
  * - `DELETE /api/runs/:id` — a try's run removed, as `wf rm` removes it (`forget`): its record, and the folders it worked in with it.
@@ -511,9 +511,9 @@ export const runs = new Hono<ApiEnv>()
       }
     }),
   )
-  .get('/api/runs/:id/decision', (c) =>
+  .get('/api/runs/:runId/decision', (c) =>
     served(c, async ({ e, home }) => {
-      const id = c.req.param('id');
+      const id = c.req.param('runId');
       const run = findRun(id);
       if (!run) return c.json({ error: noSuchRun(id) }, 404);
       const { unreadable } = await viewsFor(e, [run]);

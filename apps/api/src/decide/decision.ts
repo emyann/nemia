@@ -1,5 +1,5 @@
 /**
- * What `wf decide` shows a person about a run (`GET /api/runs/:id/decision`): its branches, the lesson line, the diffs and the commands.
+ * What `wf decide` shows a person about a run (`GET /api/runs/:runId/decision`): its branches, the lesson line, the diffs and the commands.
  */
 import {
   branchesToRead,
@@ -7,28 +7,22 @@ import {
   branchStandings,
   branchWord,
   CHECK_AFFECTING,
-  closeoutAsked,
-  closeoutReader,
-  consumption,
+  COMMANDS,
+  type Decided,
+  type DecideCommand,
   diffStat,
-  exitVerdicts,
-  harnessBlocked,
-  isShipped,
   lessonLine,
-  merges,
-  phaseOfView,
   resultSteps,
-  runCostLines,
-  sendBackTo,
   sensitiveDiff,
   touchedBy,
-  runStore,
 } from 'agent-orchestrator';
-import { type Decision, decision, type GitRun, isGitRun, overBudgetLine, retryLines, roundLines, type Run } from 'agent-orchestrator/run';
+import { type CheckoutHold, type GitRun, isGitRun, type Run, type RunSlot } from 'agent-orchestrator/run';
 import { holdingOf, holdsIn, judge, type RunHolding, type RunWaiting, waitingOf, waitsIn } from '../runs/judged.ts';
 import { mergesOnto, mergeWord, type MergeWord } from './merge.ts';
 import { type Engine, judgedSteps, stepNames, viewsOf, workflowsOf } from '../store.ts';
 import { type StepUsed, totalOf, usedOf } from '../detail/usage.ts';
+
+export type { DecideCommand };
 
 /** What a branch touched, as `wf decide` reads it (`touchedBy`): its radius, or why git could not say. */
 export type Touched = { branch: string; radius: ReturnType<typeof touchedBy> };
@@ -60,17 +54,6 @@ export type SensitiveDiff = { branch: string; files: DiffFile[]; error: string |
 export type Lesson = { said: string; state: 'written' | 'nothing' | 'unknown' };
 
 /**
- * A command `wf decide` prints, and runs none of: ship it, drop it, read it for a run worked on its base branch, each
- * once-more (`wf retry`, `wf round`) with the line it prints it in, and for a step waiting at its gate on you, the two its gate line
- * prints under the step — approve (`wf approve`) and send back (`wf retry --message`). `said` is null where the label is all it says.
- */
-export type DecideCommand = {
-  label: 'ship it' | 'drop it' | 'read it' | 'once more' | 'accept' | 'approve' | 'send back' | 'forget it';
-  command: string;
-  said: string | null;
-};
-
-/**
  * What `wf decide` shows a person about a run: what each branch it reads touched, the lesson line, the check-affecting
  * diffs in full, what each step consumed and the run's total, and the commands.
  */
@@ -94,7 +77,13 @@ export type Decidable = {
   cost: string | null;
   /** `wf decide`'s OVER BUDGET line, saying why each step held on its budget is held (`overBudgetLine`); null when none is. */
   overBudget: string | null;
+  /**
+   * The commands a person may type on a run awaiting them, as the package builds them (`choicesOf`): each a bare `wf` or `git -C` line,
+   * labelled, beside the sentence it ends where it has one. None on a run that awaits nobody.
+   */
   commands: DecideCommand[];
+  /** The run whose ending step has the repository's own checkout while this run's waits for it (`checkoutHold`); absent when none holds it. */
+  checkout?: CheckoutHold;
   /**
    * The run finished and nobody has decided it, as the package reads it (`decision`'s `awaiting`) — the reading `wf prune` refuses without
    * `--unmerged` (`pruneRefusal`): the result branches it waits on, and `direct` for a run that worked on its base branch itself, which has
@@ -109,13 +98,13 @@ export type Decidable = {
  * nothing else — and the hold beside it, `holding`, for one a person also holds, as `wf decide` says both. `holding` alone for a run a
  * person holds (`wf hold`): `wf decide` says the hold and what lifts it, and offers nothing, since every verb that would release work is
  * refused while it stands (`heldRefusal`). `running` while it runs and nobody is waited on — `wf decide`'s "nothing to decide yet", with no
- * git asked. `nothing`, in `wf decide`'s words, for a run called off or whose branches are already on its base. Else
+ * git asked — and `held` beside it for a run the cap on runs in flight holds, with the count it is held at (`slotsOf`). `nothing`, in `wf decide`'s words, for a run called off or whose branches are already on its base. Else
  * what there is to decide.
  */
 export type RunDecision =
   | { waiting: RunWaiting; holding?: RunHolding }
   | { holding: RunHolding }
-  | { running: true }
+  | { running: true; held?: RunSlot }
   | { nothing: string }
   | Decidable;
 
@@ -176,116 +165,25 @@ function lessonOf(touched: readonly Touched[]): Lesson {
   return { said, state: touched.some((t) => !('error' in t.radius) && t.radius.lessons.length) ? 'written' : 'nothing' };
 }
 
-/**
- * A once-more line's command: `wf retry <run> <step>`, `--recheck` when it says so, `--fresh` for a step `denials: fail` stopped (whose
- * offer is a new session, told to do without the call), or `wf round <run> <step>` — with `--budget <amount>` past a cap — after the colon
- * and two spaces. Or a send-back from an ending that stopped on the base branch, which needs its words:
- * `wf retry <run> <step> --message "<objection>"`. Or, at the cap, `wf accept <run> <step> --message "<why>"`, the other answer — which
- * the board also presses itself, through `POST /api/runs/:id/steps/:step/accept`, reading the step off this command (`acceptStepOf` in
- * apps/web/src/lib/decide.ts).
- *
- * A verb this does not know is not dropped: `commandsOf` falls back to the whole English sentence, which the board then offers as a
- * command to copy and run. So an offer worded in the package goes in here in the same change (CLAUDE.md).
- *
- * A held run (`wf hold`) has no offer for this to read: `decisionOf` answers it `holding` before any line is made. The package's own lines
- * say the hold where they would offer a verb — `held until a-1 ships; once more is asked once the hold lifts` (`heldLater` in
- * round/round.ts) — a sentence with no `wf` verb in it, which would reach a person as a command to run if one got here.
- */
-const ONCE_MORE = /:\s{2}(wf (?:retry|round|accept) \S+ \S+(?: --recheck| --fresh| --budget <amount>| --message "<(?:objection|why)>")?)/;
+/** The package's own `wf decide` of a run (`decideRun`), through its entry of the command table, served on the api alone. */
+const DECIDE = COMMANDS.find((c) => c.name === 'decide')!;
 
 /**
- * A step waiting at its gate on a person, and the steps a send-back of it names (`sendBackTo`): what `wf decide` prints under the step, as
- * the facts it prints them from rather than the sentence it prints. Empty `back` for an ending step that waits on nothing, which has no
- * work to object to, and several for one that waits on several — `wf decide` prints a line for each.
- */
-type AtGate = { step: string; back: string[] };
-
-/**
- * The commands `wf decide` prints on a run awaiting a person: once more for each step it offers, the approval and a send-back for each step
- * waiting at its gate on you (`gates`), then ship it and drop it for the branches, or read it for a run worked on its base branch — which
- * has nothing to merge, nor a branch to delete. A folder run has none of those: its work stays where it is until a person is done with it,
- * and forgetting it is the one command `wf decide` prints (cli/main.ts, `!git`), and nothing about git.
- *
- * The gate's commands are built from the steps a send-back names and not read out of the package's own gate line: that line has no
- * send-back at all for an ending step that waits on nothing, and joins the commands with ` or ` for one that waits on several, and a run
- * whose only remaining action is an approval must not be handed an empty list of commands because a sentence did not parse.
- *
- * `endingMerges` is whether a step of the workflow acts on the base branch itself (`workspace: main`): ship it and drop it are for the
- * folder that says nothing about what happens when the work is done, and a folder that says it in prose does not also tell a person to type
- * `git merge` — its ending step is what merges, and a run parked at that step's gate is one approval away from doing it. As `wf decide`
- * decides it (cli/main.ts, `!merges(steps)`).
- */
-function commandsOf(
-  run: Run,
-  d: Decision,
-  offers: readonly string[],
-  gates: readonly AtGate[] = [],
-  endingMerges = false,
-): DecideCommand[] {
-  if (d.kind !== 'awaiting') return [];
-  const once = [
-    ...offers.map((said): DecideCommand => {
-      const command = ONCE_MORE.exec(said)?.[1] ?? said;
-      const label = command.startsWith('wf accept ') ? 'accept' : command.endsWith('--message "<objection>"') ? 'send back' : 'once more';
-      return { label, command, said };
-    }),
-    ...gates.flatMap(({ step, back }): DecideCommand[] => {
-      const approve = `wf approve ${run.id} ${step}`;
-      return [
-        { label: 'approve', command: approve, said: `${step} waits at its gate — with words: ${approve} --message "<words>"` },
-        ...back.map((name): DecideCommand => ({
-          label: 'send back',
-          command: `wf retry ${run.id} ${name} --message "<objection>"`,
-          said: null,
-        })),
-      ];
-    }),
-  ];
-  if (!isGitRun(run))
-    return [...once, { label: 'forget it', command: `wf rm ${run.id}`, said: 'forgets the run with its folders and files' }];
-  if (d.direct) {
-    const said = `worked directly on ${run.branch}; nothing to merge; the base was ${run.baseRef}`;
-    return [...once, { label: 'read it', command: `git -C ${run.repo} diff ${run.baseRef}...${run.branch}`, said }];
-  }
-  const first = endingMerges ? undefined : d.branches[0];
-  return [
-    ...once,
-    ...(first
-      ? ([
-          { label: 'ship it', command: `git -C ${run.repo} merge --no-ff ${first}`, said: null },
-          { label: 'drop it', command: `git -C ${run.repo} branch -D ${d.branches.join(' ')}`, said: null },
-        ] satisfies DecideCommand[])
-      : []),
-  ];
-}
-
-/**
- * What `wf decide` shows a person about a run, read off one read of its tasks.
- *
- * A run still running with nobody waited on is `running`, and git is not asked a thing: the page asks while a run is
- * decidable, and the Factory's card only for a run waiting on you, but a request is a request. Otherwise judged as the
- * CLI judges it (`decision`): called off, or already shipped, is `nothing`. Then the branches the CLI reads
- * (`branchesToRead`) — the result branches, or every branch a step worked on when no terminal step has one, never the base branch of a
- * run that cut worktrees, whose work is not on it — each
- * read with `touchedBy`, and with `sensitiveDiff` over the default check-affecting list. A branch git cannot read is
- * an `error` on its entry, never a failed request. A few `git` calls a branch, so read once, never on a poll.
+ * What `wf decide` shows a person about a run, decided by the package (`DECIDE`, the table's entry whose handler is `decideRun`): its
+ * decision, commands (`choicesOf`), costs and checkout, read with the branches and diffs the api reads beside them.
  *
  * First, as `wf decide` asks it first: a run whose roots wait on runs that have not shipped is `waiting`, and nothing else is read. Then a
- * run a person holds is `holding`, and nothing else is read either: what is in flight is on its detail, and nothing is offered.
+ * run a person holds is `holding`, and nothing else is read either: what is in flight is on its detail, and nothing is offered. A run still
+ * running with nobody waited on (`judge`, the listing's word) is `running`, with the slot the cap holds it for, and git is not asked a
+ * thing: the page asks while a run is decidable, and the Factory's card only for a run waiting on you, but a request is a request. Called
+ * off, or already shipped, is `nothing`.
  *
- * The run is judged without the branch standings, which this answer does not carry: a run still running is answered `running` without
- * one `git` being run for it, and what there is to decide is on the run's own detail, off its own read. `decision` is given the harness's
- * word, as `wf decide` reads it — a person's try of a session the harness blocked is waited on too — and what each task's sessions cost
- * (`spendReader`): a step over its budget, or ended at it, is waited on, and offered its try or round with `--budget`.
- *
- * For a run still running with a step waiting on you, the branches read are the result steps' (`resultSteps`), as `decision` reads them
- * once it is not: the terminal steps, and for a terminal step that works in the repository's own checkout, the steps it waits on, whose
- * work it acts on. A folder run has no repository to ask, so none of git is read for it: what its steps made is in their artifacts.
- * `standings` are none for a run that worked on its base branch itself, whose standing would read `main is on main` and whose own line
- * says so instead. A pruned run is offered no once-more, whose verbs each refuse it (`prunedRefusal`): the package's lines say so
- * themselves, for `wf decide` and for this. A step waiting at its gate on you — not one a person has sent back already, which waits on
- * nobody — is offered with the steps its send-back names (`sendBackTo`), which is what `wf decide` prints under the step; the word is
- * `listing`'s, as `needsOf` reads it for the verb.
+ * Then the branches the CLI reads (`branchesToRead`) — the result branches, or every branch a step worked on when no terminal step has one,
+ * never the base branch of a run that cut worktrees, whose work is not on it — each read with `touchedBy`, and with `sensitiveDiff` over
+ * the default check-affecting list. A branch git cannot read is an `error` on its entry, never a failed request. A few `git` calls a branch,
+ * so read once, never on a poll. For a run still running with a step waiting on you, the branches read are the result steps'
+ * (`resultSteps`), as the decision reads them once it is not. A folder run has no repository to ask, so none of git is read for it.
+ * `standings` are none for a run that worked on its base branch itself, whose standing would read `main is on main`.
  */
 export async function decisionOf(run: Run, e: Engine['Service'], home: string): Promise<RunDecision> {
   const waits = await waitsIn(run, e);
@@ -295,35 +193,48 @@ export async function decisionOf(run: Run, e: Engine['Service'], home: string): 
   if (waiting) return { waiting, ...(holding ? { holding } : {}) };
   if (holding) return { holding };
   const folder = workflowsOf(run, home).steps;
-  const names = stepNames(run, folder);
-  const views = await viewsOf(run, e);
-  const judged = judge(run, names, folder, views, waits, holds);
+  const judged = judge(run, stepNames(run, folder), folder, await viewsOf(run, e), waits, holds);
   if (judged.status === 'cancelled') return { nothing: `cancelled at ${run.cancelledAt} — nothing to decide` };
-  if (judged.status === 'running' && !judged.waitingOnYou.length) return { running: true };
-
+  const decided = (await DECIDE.handler(e, { runId: run.id })) as Decided;
+  if (judged.status === 'running' && !judged.waitingOnYou.length) return { running: true, ...(decided.held ? { held: decided.held } : {}) };
+  const d = decided.decision;
+  const nothing = nothingOf(run, d);
+  if (nothing) return { nothing };
   const steps = judgedSteps(run, folder);
-  const phase = (taskId: string) => phaseOfView(views.get(taskId));
-  const reader = closeoutReader(views, run);
-  const asked = closeoutAsked(views);
-  const verdicts = exitVerdicts(views, run);
-  const { asks, rounds } = runStore.asks.read(run.id);
-  const { spendOf } = judged;
-  const d = decision(
-    steps,
-    run,
-    phase,
-    (branch) => isGitRun(run) && isShipped(run, branch),
-    reader,
-    asked,
-    verdicts,
-    asks,
-    rounds,
-    harnessBlocked(views),
-    spendOf,
-  );
-  if (d.kind === 'cancelled') return { nothing: `cancelled at ${d.at} — nothing to decide` };
-  if (d.kind === 'shipped') return { nothing: `shipped — ${d.branches.join(', ')} is already on ${run.branch}` };
+  const { touched, standings } = branchesOf(run, steps, d.kind === 'awaiting' ? d.branches : undefined);
+  const filed = Object.keys(run.steps).filter((name) => run.steps[name]?.taskId);
+  const git = isGitRun(run) ? run : undefined;
+  return {
+    standings,
+    touched,
+    lesson: lessonOf(touched),
+    sensitive: git ? touched.map((t) => sensitiveOf(git, t)) : [],
+    used: Object.fromEntries(filed.map((name) => [name, usedOf(decided.used[name], steps.find((s) => s.name === name)?.context)])),
+    total: totalOf(
+      steps,
+      filed.map((name) => [name, decided.used[name]] as const),
+    ),
+    cost: decided.runCost[0]?.replace(/^cost\s+/, '') ?? null,
+    overBudget: decided.overBudgetLine ?? null,
+    commands: decided.commands,
+    ...(decided.checkout ? { checkout: decided.checkout } : {}),
+    awaiting: d.kind === 'awaiting' ? { branches: d.branches, direct: d.direct } : null,
+  };
+}
 
+/** What `wf decide` says of a run with nothing to decide: called off, or its branches already on the base; undefined for any other. */
+function nothingOf(run: Run, d: Decided['decision']): string | undefined {
+  if (d.kind === 'cancelled') return `cancelled at ${d.at} — nothing to decide`;
+  if (d.kind === 'shipped') return `shipped — ${d.branches.join(', ')} is already on ${run.branch}`;
+  return undefined;
+}
+
+/**
+ * What each branch the CLI reads touched (`branchesToRead`, `touchedBy`), and where each result branch stands against the base (`Standing`):
+ * the branches `awaiting` names, or the result steps' while the run still runs. None for a folder run, and no standings for a run that
+ * worked on its base branch itself.
+ */
+function branchesOf(run: Run, steps: Parameters<typeof resultSteps>[0], awaiting: string[] | undefined) {
   const results = [
     ...new Set(
       resultSteps(steps)
@@ -331,44 +242,21 @@ export async function decisionOf(run: Run, e: Engine['Service'], home: string): 
         .filter((b): b is string => Boolean(b)),
     ),
   ];
-  const result = d.kind === 'awaiting' ? d.branches : results;
-  const git = isGitRun(run) ? run : undefined;
-  const touched: Touched[] = !git
-    ? []
-    : branchesToRead(
-        result,
-        Object.values(git.steps).map((s) => s.branch),
-        git.isolate ? git.branch : undefined,
-      ).map((branch) => ({ branch, radius: touchedBy(git, branch) }));
-  const standings: Standing[] = git?.isolate
-    ? branchStandings(git, results).map((s) => ({
+  if (!isGitRun(run)) return { touched: [], standings: [] };
+  const touched: Touched[] = branchesToRead(
+    awaiting ?? results,
+    Object.values(run.steps).map((s) => s.branch),
+    run.isolate ? run.branch : undefined,
+  ).map((branch) => ({ branch, radius: touchedBy(run, branch) }));
+  const standings: Standing[] = run.isolate
+    ? branchStandings(run, results).map((s) => ({
         ...s,
-        said: branchWord(git, s),
-        stat: diffStat(git, s.branch).trim() || null,
-        merge: mergeOf(git, s),
+        said: branchWord(run, s),
+        stat: diffStat(run, s.branch).trim() || null,
+        merge: mergeOf(run, s),
       }))
     : [];
-  const consumed = consumption(views, run);
-  const filed = Object.keys(run.steps).filter((name) => run.steps[name]?.taskId);
-  const offers = [...roundLines(steps, run, d, spendOf), ...retryLines(steps, run, d, phase, reader, asked, spendOf, verdicts)];
-  const gates: AtGate[] = steps
-    .filter((step) => judged.words.get(step.name) === 'awaiting approval' && judged.waitingOnYou.includes(step.name))
-    .map((step) => ({ step: step.name, back: sendBackTo(step, run) }));
-  return {
-    standings,
-    touched,
-    lesson: lessonOf(touched),
-    sensitive: git ? touched.map((t) => sensitiveOf(git, t)) : [],
-    used: Object.fromEntries(filed.map((name) => [name, usedOf(consumed[name], steps.find((s) => s.name === name)?.context)])),
-    total: totalOf(
-      steps,
-      filed.map((name) => [name, consumed[name]] as const),
-    ),
-    cost: runCostLines(run, spendOf)[0]?.replace(/^cost\s+/, '') ?? null,
-    overBudget: overBudgetLine(steps, run, d, spendOf) ?? null,
-    commands: commandsOf(run, d, offers, gates, merges(steps)),
-    awaiting: d.kind === 'awaiting' ? { branches: d.branches, direct: d.direct } : null,
-  };
+  return { touched, standings };
 }
 
 /** Whether a branch ahead of the base still merges onto it (`StandingMerge`); null for one that is not ahead, which nothing would merge. */

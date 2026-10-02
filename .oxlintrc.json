@@ -324,13 +324,6 @@
       }
     },
     {
-      "files": ["apps/api/src/decide/decision.ts"],
-      "rules": {
-        "max-lines-per-function": ["error", { "max": 81, "skipBlankLines": true, "skipComments": true }],
-        "sonarjs/cognitive-complexity": ["error", 17]
-      }
-    },
-    {
       "files": ["apps/api/src/detail/detail.ts"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 99, "skipBlankLines": true, "skipComments": true }],

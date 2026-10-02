@@ -1,55 +1,78 @@
 /**
- * A run's start from a factory's floor, in the root's header: a button that opens a sheet with the repository the run starts on — the
- * factory's one, or picked among its several — the workflows the factory offers there, each that cannot start saying why, and `StartRun`
- * in the factory for the one picked, as `wf start --factory` starts it.
+ * A run's start from a factory's floor: the root header's button that opens it in the frame's floating bar (`FloatingBar`), and what the
+ * bar then shows — the repository the run starts on, the factory's one or picked among its several, the workflows the factory offers
+ * there, each that cannot start saying why, and `StartRun` in the factory for the one picked, as `wf start --factory` starts it.
  */
 import { useId, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { factoriesQuery, factoryWorkflowsQuery, type Place, type WorkflowListing } from '@/lib/api';
 import { floorPlace, whyNotStarted } from '@/lib/factories';
 import { workflowKey } from '@/lib/inbox';
+import { useBar } from '@/lib/useBar';
 import { RepoPicker } from './FactoryCardStart';
+import { FloatingBar } from './FloatingBar';
 import { StartRun } from './StartRun';
 
 const code = (text: string) => <code className="font-mono text-xs">{text}</code>;
 const path = (text: string) => <code className="font-mono text-xs break-all">{text}</code>;
 
 /**
- * The header's 'Start a run' in the factory `name`, and its sheet. Nothing is drawn before the factories are read, for a name the api lists
- * no factory by, or for the default factory, whose floor starts no run (`floorPlace`).
+ * The header's 'Start a run' in the factory `name`, which opens the bar on its start, pressed while it is open on its start or not. Nothing
+ * is drawn before the factories are read, for a name the api lists no factory by, or for the default factory, whose floor starts no run
+ * (`floorPlace`).
  */
 export function FactoryStart({ name }: { name: string }) {
   const factories = useQuery(factoriesQuery);
+  const { open, show } = useBar();
   const factory = factories.data?.find((f) => f.name === name);
   const place = factory ? floorPlace(factory) : null;
   if (!place) return null;
   return (
-    <SheetTrigger>
-      <Button variant="outline" size="sm" aria-label="Start a run" className="ml-auto shrink-0">
-        <Play data-icon="inline-start" />
-        <span className="hidden sm:inline">Start a run</span>
-      </Button>
-      <Sheet className="data-[side=right]:sm:max-w-xl">
-        <SheetHeader className="border-b border-neutral-200 dark:border-neutral-800">
-          <SheetTitle>Start a run in {name}</SheetTitle>
-          <SheetDescription>
-            A run of one of the workflows the factory offers, with its hires, on one of its repositories; it shows on this floor.
-          </SheetDescription>
-        </SheetHeader>
-        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 pb-4">
-          {'why' in place ? (
-            <p data-unplaced className="text-sm text-amber-700 dark:text-amber-400">
-              {place.why}
-            </p>
-          ) : (
-            <OnRepo place={place} />
-          )}
-        </div>
-      </Sheet>
-    </SheetTrigger>
+    <Button
+      variant="outline"
+      size="sm"
+      aria-label="Start a run"
+      aria-expanded={open?.kind === 'start' && open.factory === name}
+      onPress={() => show({ kind: 'start', factory: name })}
+      className="ml-auto shrink-0"
+    >
+      <Play data-icon="inline-start" />
+      <span className="hidden sm:inline">Start a run</span>
+    </Button>
+  );
+}
+
+/**
+ * The bar on the start of a run in the factory `factory`, which the address can name whatever factories there are: once they are read, a
+ * factory the api lists by no such name, or the default one, starts no run from here and says so.
+ */
+export function StartBar({ factory: name }: { factory: string }) {
+  const factories = useQuery(factoriesQuery);
+  const factory = factories.data?.find((f) => f.name === name);
+  const place = factory ? floorPlace(factory) : null;
+  return (
+    <FloatingBar
+      title={<>Start a run in {name}</>}
+      description="A run of one of the workflows the factory offers, with its hires, on one of its repositories; it shows on its floor."
+    >
+      {factories.error ? (
+        <p className="text-sm text-red-700 dark:text-red-400">Could not read the factories: {factories.error.message}</p>
+      ) : !factories.data ? (
+        <p className="text-xs text-neutral-500">Reading the factories…</p>
+      ) : place === null ? (
+        <p data-unplaced className="text-sm text-amber-700 dark:text-amber-400">
+          {factory ? 'The default factory starts no run from here: start one from the Workflows page.' : `No factory is named ${name}.`}
+        </p>
+      ) : 'why' in place ? (
+        <p data-unplaced className="text-sm text-amber-700 dark:text-amber-400">
+          {place.why}
+        </p>
+      ) : (
+        <OnRepo place={place} />
+      )}
+    </FloatingBar>
   );
 }
 

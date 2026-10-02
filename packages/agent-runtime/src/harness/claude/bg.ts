@@ -8,7 +8,8 @@
  * What it reads and writes lives beside it, each in its own file: the transcript reader (`harness/transcript.ts`), a
  * Claude session's transcript and usage (`harness/claude/transcript.ts`), Claude Code's vocabulary
  * (`harness/claude/vocabulary.ts`), its inbox (`harness/claude/inbox.ts`), its registry's rows (`harness/claude/registry.ts`), a
- * resumed session's parent's last call (`harness/claude/parent.ts`), and MCP (`harness/mcp.ts`).
+ * resumed session's parent's last call (`harness/claude/parent.ts`), when a transcript was first seen at its mtime
+ * (`harness/claude/quiet.ts`), and MCP (`harness/mcp.ts`).
  */
 import { Effect } from 'effect';
 import { execFile } from 'node:child_process';
@@ -22,9 +23,12 @@ import { claudeFlagsOf, worktreeName } from './vocabulary.ts';
 import { checkoutMcpConfig, claudeMcpArgs, writeMcpConfig } from '../mcp.ts';
 import { readTranscript } from '../transcript.ts';
 import { countSpawn, readTextAsync } from '../../core/engine/tally.ts';
+import type { Monotonic } from '../../core/clock.ts';
+import { monoNow } from '../../core/engine/now.ts';
 import { RunnerError } from '../error.ts';
 import { registryOf, type RegistryRow } from './registry.ts';
 import { type ParentCall, parentFileOf, parentOf, recordParent, whoseCall } from './parent.ts';
+import { clearSighting, quietFileOf, sightingOf } from './quiet.ts';
 import { claudeQuota } from './quota.ts';
 import type { RunnerOps, SpawnRequest } from '../seam.ts';
 
@@ -33,6 +37,10 @@ import type { RunnerOps, SpawnRequest } from '../seam.ts';
  * paused (`Sighting.quietMs`). The floor under both quiet rules: on its own for a session the registry lists
  * idle, and beside its own closeout being the last word in the conversation for one the registry lists busy.
  * What quiet means for the attempt is `decide`'s.
+ *
+ * Counted on both clocks, and the shorter wins: the wall clock from the transcript's mtime, and the monotonic clock from
+ * when the runner first saw that mtime (`quiet.ts`), so a wall clock stepped forward cannot report a working session quiet,
+ * one stepped back only delays it, and a mtime first seen waits the floor from then.
  *
  * 90 seconds. Long enough that a pause between self-driven steps resumes first — the docs are
  * explicit that `working` also covers "between steps of work it drives on its own" — and short
@@ -101,6 +109,8 @@ export type Statement = { payload: unknown; at: number; id?: string; lastWord?: 
 export type ClaudeOptions = {
   quiescentAfterMs?: number;
   now?: () => number;
+  /** The monotonic clock, under its boot's id (`monoNow`), or `undefined` where the machine does not say its boot. */
+  mono?: () => Monotonic | undefined;
   /** When the session's transcript was last written. Injectable so tests need no harness. */
   transcriptTime?: (sessionId: string) => Promise<number | undefined>;
   /** The session's closing statement, as above. Injectable for the same reason. */
@@ -113,8 +123,9 @@ export type ClaudeOptions = {
    */
   parentCallFrom?: (sessionId: string) => Promise<ParentCall | undefined>;
   /**
-   * Where the runner writes what it hands the CLI by path — a task's MCP config — and what it records at spawn — a resumed session's
-   * parent's last call. Default `~/.agent-engine`.
+   * Where the runner writes what it hands the CLI by path — a task's MCP config — what it records at spawn — a resumed session's
+   * parent's last call — and what it records as it looks — when it first saw a working session's transcript as it stands
+   * (`quiet.ts`). Default `~/.agent-engine`.
    */
   root?: string;
   /**
@@ -206,13 +217,14 @@ const keptReads = (
 };
 
 /**
- * What `observe` reads a sighting with: the quiescence floor, the clock, the transcript's mtime, the kept reads, and `root`, where
- * each session's parent's last call is recorded.
+ * What `observe` reads a sighting with: the quiescence floor, the two clocks, the transcript's mtime, the kept reads, and `root`,
+ * where each session's parent's last call and its transcript's sighting are recorded.
  */
 type Reading = {
   root: string;
   quiescentAfterMs: number;
   now: () => number;
+  mono: () => Monotonic | undefined;
   transcriptTime: (sessionId: string) => Promise<number | undefined>;
   kept: ReturnType<typeof keptReads>;
 };
@@ -310,6 +322,8 @@ const transcriptUsageSince = async (sessionId: string, since: number) => {
  * - A task's MCP config, under `root`, outside the workspace: a file in a step's worktree travels down its branch.
  * - A resumed session's parent's last StructuredOutput call, by the attempt's name under `root` (`parent.ts`), written at spawn and
  *   read on every look: what tells the session's own statement from the one it inherited.
+ * - When a working session's transcript was first seen at its mtime, on the monotonic clock, by the attempt's name under `root`
+ *   (`quiet.ts`): cleared at spawn, rewritten by a look only when the mtime or the boot differs, read fresh on every look.
  * - What `claude agents` last listed of each of our sessions, by session id, rebuilt by every `observe`, which a pass
  *   always makes before it releases anything and `say` is always handed a session from:
  *   - its state (`listed`), which `release` stops on whatever the sighting it is handed says: a session whose end is
@@ -331,6 +345,7 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
     root,
     quiescentAfterMs: options.quiescentAfterMs ?? QUIESCENT_AFTER_MS,
     now,
+    mono: options.mono ?? monoNow,
     transcriptTime: options.transcriptTime ?? sdkTranscriptTime,
     kept: keptReads(now, options.closeoutFrom ?? transcriptCloseout, usageFrom),
   };
@@ -350,7 +365,8 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
 
 /**
  * `claude --bg` under `r.name`, in the task's `cwd`, with its MCP configs written under `root`, and its parent's last call recorded
- * there (`recordParent`, asked of `parentCallFrom`). Both are written before the CLI runs, so whatever throws there started nothing
+ * there (`recordParent`, asked of `parentCallFrom`), and a former attempt's sighting under the name cleared (`clearSighting`).
+ * All are written before the CLI runs, so whatever throws there started nothing
  * (`refused`), and no look finds the session before its record. The flags are `claudeArgv`'s.
  */
 const spawnUnder =
@@ -360,6 +376,7 @@ const spawnUnder =
       try: async () => {
         const mcpArgs = claudeMcpArgs([checkoutMcpConfig(r.cwd), writeMcpConfig(mcpFileOf(root, r.name), r.config?.mcp)]);
         await recordParent(parentFileOf(root, r.name), r.resumeFrom, parentCallFrom);
+        clearSighting(quietFileOf(root, r.name));
         return mcpArgs;
       },
       catch: (cause) =>
@@ -539,10 +556,11 @@ const reportedOf = (x: Reading, name: string, sighting: Sighting, startedAt: num
 
 /**
  * One listed session as `observe` reports it, by this harness's own definition of finished. The clock is the transcript's
- * mtime, asked once a pass at most and only when needed, never a time this process remembers: a driver that ticks once per
- * process and exits gets the answer a long-lived one does. Quiet is counted from the transcript's last write or the session's
- * own start, whichever is later — a session resumed over a transcript cold for an hour has been quiet only since it began —
- * and a session with no transcript is never quiet: the deadline is for sessions nobody reads.
+ * mtime, asked once a pass at most and only when needed, and the sighting of it on disk (`quiet.ts`), never a time this process
+ * remembers: a driver that ticks once per process and exits gets the answer a long-lived one does. Quiet is counted from the
+ * transcript's last write or the session's own start, whichever is later — a session resumed over a transcript cold for an hour
+ * has been quiet only since it began — and bounded by the monotonic time since that write was first seen (`QUIESCENT_AFTER_MS`);
+ * a session with no transcript is never quiet: the deadline is for sessions nobody reads.
  *
  * A busy session is `busyReportOf`'s. Any other session reports what it said (`toldOf`), and what it consumed since its own
  * start, as measured or not at all. A resumed session carries its parent's statements too: whose a statement is, is this runner's
@@ -561,7 +579,11 @@ const reportOf = async (
   const writtenAt = () => (written ??= x.transcriptTime(sighting.sessionId));
   const quietFor = async () => {
     const lastWrite = await writtenAt();
-    return lastWrite === undefined ? undefined : x.now() - Math.max(lastWrite, startedAt ?? lastWrite);
+    if (lastWrite === undefined) return undefined;
+    const aged = x.now() - Math.max(lastWrite, startedAt ?? lastWrite);
+    const mono = x.mono();
+    const sighted = sightingOf(quietFileOf(x.root, name), lastWrite, mono);
+    return sighted && mono ? Math.min(aged, mono.ms - sighted.ms) : aged;
   };
   if (sighting.busy) return busyReportOf(x, { name, sighting, startedAt, attempt, writtenAt, quietFor });
   const told = toldOf(x, name, await x.kept.statementOf(attempt, sighting, writtenAt));

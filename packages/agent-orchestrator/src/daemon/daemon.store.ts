@@ -349,8 +349,8 @@ export function stillHeld(held: DaemonFile): DaemonFile | undefined {
 }
 
 /**
- * Write down a pass this daemon completed, at `now` on both clocks — only while the store is still its own: a file that names another holder
- * is that holder's to write. Answers the file as it now stands.
+ * Write down a pass this daemon completed, at `now` on both clocks — only while the store is still its own: a file that names another
+ * holder is that holder's to write. Answers the file as it now stands.
  */
 export function passed(held: DaemonFile, now: Instant = instantNow()): DaemonFile {
   const file = stamped(held, 'passedAt', now);

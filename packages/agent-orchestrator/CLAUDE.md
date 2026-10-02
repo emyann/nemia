@@ -99,6 +99,9 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
   pass goes into the stamps. Every test file that ticks a store sets `WF_VERIFY_REST=1`.
 - **The test script loads `test/ambient.ts`**, which sets `WF_MAX_RUNS` and `WF_MAX_CONCURRENT` to a value their readers refuse: a
   test file that reads either sets or deletes it at its head, never the daemon's (`test/ambient.test.ts`).
+- **A test of what the tick judges by the clock seeds `Date`** (`t.mock.timers`: `daemon.store.test.ts`, `fileInOrder` in
+  `test/pool.test.ts`), and stamps a fake closeout from the attempt's journalled start (`starts` in `test/held.test.ts`), never
+  `Date.now()` plus a margin: a stepped wall clock turns the daemon stale, two filings round, or a closeout dropped.
 - **A pass on a copy of the store acts on the real repositories** its records name: measure with a fixture store of scratch repositories,
   or a fake runtime whose tasks are all `pending`.
 - **Git refuses a whole `for-each-ref` for one base it cannot read**: `branchReader` lists again without it (pinned against `oneByOne`).

@@ -49,6 +49,18 @@ const GONE = spawnSync(process.execPath, ['-e', '0']).pid;
 
 const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
 
+/**
+ * The instant a test that reads an age or a stamp seeds `Date` at, before it writes its fixture: the CLI reads the clock itself, so only
+ * a seeded clock makes every age `wf up`, `wf ls` and `wf tick` print the fixture's own, whatever the machine's clock does meanwhile.
+ */
+const NOW = Date.parse('2026-10-02T12:00:00.000Z');
+
+/** Seeds `Date` at `NOW` for the rest of the test; `t.mock` lets it go when the test ends. */
+const seeded = (t: TestContext) => t.mock.timers.enable({ apis: ['Date'], now: NOW });
+
+/** `ms` after `NOW`, as the daemon writes a stamp. */
+const at = (ms: number) => new Date(NOW + ms).toISOString();
+
 /** A holder's file, written as `wf up` writes one — its process's start with its pid — over what is there. */
 const holdBy = (pid: number, over: Record<string, unknown> = {}): string => {
   const text = `${JSON.stringify({ pid, startedAt: minutesAgo(30), cwd: '/elsewhere', every: 4000, passedAt: minutesAgo(0.05), procStart: procStartOf(pid), ...over }, null, 2)}\n`;
@@ -63,33 +75,18 @@ const msOfWord = (word: string): number => {
   return [...word.matchAll(/(\d+)([dhms])/g)].reduce((ms, [, n, u]) => ms + Number(n) * unit[u as keyof typeof unit], 0);
 };
 
-/** The milliseconds a duration printed of a fixture may say, in its words: from its age when written up to that age and the time since. */
-type Ages = { from: number; to: number };
-
-/**
- * The window of a fixture stamped `age` ms before the clock read when it was written, at or after `written`, and measured by a clock read
- * at or before `after`: a floor, and the time the pass took — never a bound fixed in advance.
- */
-const windowOf = (age: number, written: number, after: number): Ages => ({ from: age, to: age + (after - written) });
-
-/** Whether `word`, a duration as `durationWord` prints it, lies in `window`; a word that does not read is not. */
-const within = (word: string, { from, to }: Ages): boolean => {
-  const ms = msOfWord(word);
-  return from <= ms && ms <= to;
-};
-
 /** The silence over which a holder at every 4000ms is stale, as `wf up` prints it. */
 const STALE = '15m00s';
 
 /**
- * Whether `line` is `wf up`'s takeover of a stale holder `pid` at every 4000ms: that pid, a silence over the bound it names, and one the
- * fixture's `window` allows.
+ * Whether `line` is `wf up`'s takeover of a stale holder `pid` at every 4000ms: that pid, a silence over the bound it names, and the
+ * fixture's own, `silent`.
  */
-const saysStale = (line: string, pid: number, window: Ages): boolean => {
+const saysStale = (line: string, pid: number, silent: string): boolean => {
   const silence = new RegExp(
     `^ {3}took ${ROOT} over from pid ${pid}, alive but silent for (\\S+), over the ${STALE} that is stale at every 4000ms — `,
   ).exec(line)?.[1];
-  return silence !== undefined && msOfWord(silence) > msOfWord(STALE) && within(silence, window);
+  return silence === silent && msOfWord(silence) > msOfWord(STALE);
 };
 
 const read = () =>
@@ -159,6 +156,7 @@ const clear = () => fs.rmSync(FILE, { force: true });
 test('a pass that runs long is heard from: the beat is written while the pass awaits, and the store reads as ticking throughout', async (t) => {
   assert.equal(daemonFile(), FILE);
   clear();
+  seeded(t);
   const beats: string[] = [];
   const kinds = new Set<string>();
   const e = engineOf(() => {
@@ -166,16 +164,17 @@ test('a pass that runs long is heard from: the beat is written while the pass aw
   });
   e.tick = async () => {
     e.passes++;
-    const until = Date.now() + 10_000;
+    const until = performance.now() + 10_000;
     while (beats.length < 2) {
       assert.ok(
-        Date.now() < until,
+        performance.now() < until,
         "two beats within 10s of one pass that awaits them, as an npm ci does: counted, not timed; without the beat's timer none comes",
       );
       const f = read();
       assert.equal(f.passedAt, null, 'no pass completed: the beat is not a pass');
       if (f.beatAt && f.beatAt !== beats.at(-1)) beats.push(f.beatAt);
       kinds.add(daemonStanding().kind);
+      t.mock.timers.tick(1);
       await new Promise((r) => setTimeout(r, 5));
     }
     throw STOP;
@@ -234,12 +233,13 @@ test('REFUSED at shipped defaults: `wf up` with an interval daemon.json cannot h
 
 test('`wf up` takes the store: its pid, where and how often it ticks, then each pass completed — and lets it go as it stops', async (t) => {
   clear();
+  seeded(t);
   const seen: ReturnType<typeof read>[] = [];
   const e = engineOf((pass) => {
     seen.push(read());
     if (pass === 3) throw STOP;
+    t.mock.timers.tick(1000);
   });
-  const before = Date.now();
   const { printed, threw } = await typed(t, ['up', '10'], e);
   assert.equal(threw, STOP);
   assert.equal(e.passes, 3);
@@ -248,13 +248,18 @@ test('`wf up` takes the store: its pid, where and how often it ticks, then each 
     Array.from({ length: 3 }, () => [process.pid, process.cwd(), 10, procStartOf(process.pid)]),
   );
   assert.equal(typeof seen[0].procStart, 'number', 'its process named by its start, with /proc on this host');
-  assert.equal(seen[0].passedAt, null, 'no pass completed before the first');
-  assert.ok(Date.parse(seen[0].startedAt) >= before - 1);
-  assert.ok(Date.parse(seen[1].passedAt!) >= Date.parse(seen[0].startedAt), 'the first pass written down before the second');
-  assert.ok(Date.parse(seen[2].passedAt!) >= Date.parse(seen[1].passedAt!));
+  assert.deepEqual(
+    seen.map((f) => [f.startedAt, f.passedAt]),
+    [
+      [at(0), null],
+      [at(0), at(1000)],
+      [at(0), at(2000)],
+    ],
+    'started when it took the store, no pass completed before the first, and each pass written down as it completed, before the next',
+  );
   const stopped = read();
   assert.equal(stopped.passedAt, seen[2].passedAt, 'the pass that threw completed nothing');
-  assert.ok(stopped.stoppedAt && Date.parse(stopped.stoppedAt) >= Date.parse(stopped.passedAt!), 'let go as it stopped');
+  assert.equal(stopped.stoppedAt, at(2000), 'let go as it stopped');
   assert.ok(
     printed.includes(
       `   holds ${ROOT} as pid ${process.pid} — a second wf up, or a wf tick, on this store is refused while it ticks (daemon.json)`,
@@ -270,6 +275,7 @@ test('`wf up` takes the store: its pid, where and how often it ticks, then each 
 });
 
 test('REFUSED at shipped defaults: a second `wf up`, and a `wf tick` by hand, while a live daemon has passed recently — the store untouched', async (t) => {
+  seeded(t);
   for (const over of [{}, { passedAt: null, startedAt: minutesAgo(0.1) }, { passedAt: minutesAgo(14) }]) {
     const text = holdBy(LIVE, over);
     const e = engineOf();
@@ -291,23 +297,25 @@ test('REFUSED at shipped defaults: a second `wf up`, and a `wf tick` by hand, wh
     assert.equal(e.passes, 0, 'neither ticked');
     assert.equal(fs.readFileSync(FILE, 'utf8'), text, 'nor wrote the file');
   }
-  const written = Date.now();
   holdBy(LIVE);
   const { printed } = await typed(t, ['ls'], engineOf());
-  const ages = windowOf(3000, written, Date.now());
   assert.equal(printed[0], 'no runs');
-  const ago = new RegExp(`^wf up: ticking, pid ${LIVE}, every 4000ms — last pass (\\S+) ago \\(`).exec(printed.at(-1)!)?.[1];
-  assert.ok(ago !== undefined && within(ago, ages), `\`wf ls\` says who ticks, last, and its pass 3s ago:\n${printed.at(-1)}`);
+  assert.equal(
+    printed.at(-1),
+    `wf up: ticking, pid ${LIVE}, every 4000ms — last pass 3s ago (${at(-3000)})`,
+    '`wf ls` says who ticks, last, and its pass 3s ago',
+  );
 });
 
 test('a holder stale, gone or stopped is taken over by `wf up` — and not refused to a `wf tick`, which writes nothing', async (t) => {
+  seeded(t);
   const matches = (pattern: RegExp) => (line: string) => pattern.test(line);
   const cases = [
     {
       name: 'stale',
       pid: LIVE,
       over: { passedAt: minutesAgo(16) },
-      took: (line: string, ages: Ages) => saysStale(line, LIVE, ages),
+      took: (line: string) => saysStale(line, LIVE, '16m00s'),
     },
     { name: 'gone', pid: GONE, over: {}, took: matches(new RegExp(`^ {3}took ${ROOT} over from pid ${GONE}, whose process is gone`)) },
     { name: 'stopped', pid: LIVE, over: { stoppedAt: minutesAgo(0.01) }, took: undefined },
@@ -318,9 +326,8 @@ test('a holder stale, gone or stopped is taken over by `wf up` — and not refus
       took: matches(new RegExp(`^ {3}took ${ROOT} over from a daemon.json that did not read as a holder$`)),
     },
   ];
-  let stale: { line: string; ages: Ages } | undefined;
+  let stale: string | undefined;
   for (const c of cases) {
-    const written = Date.now();
     const text = holdBy(c.pid, c.over);
     const tick = engineOf(() => {});
     const byHand = await typed(t, ['tick'], tick);
@@ -333,25 +340,23 @@ test('a holder stale, gone or stopped is taken over by `wf up` — and not refus
       during = read();
       throw STOP;
     });
-    const before = Date.now();
     const { printed, threw } = await typed(t, ['up'], up);
     assert.equal(threw, STOP, c.name);
     assert.equal(during!.pid, process.pid, c.name);
-    assert.ok(Date.parse(during!.startedAt) >= before - 1, `${c.name}: a start of its own`);
+    assert.equal(during!.startedAt, at(0), `${c.name}: a start of its own`);
     assert.equal(during!.stoppedAt, undefined, c.name);
-    const ages = windowOf(16 * 60_000, written, Date.now());
     const took = printed.filter((l) => l.includes(' took '));
-    if (c.took) assert.ok(took.length === 1 && c.took(took[0], ages), `${c.name}:\n${printed.join('\n')}`);
+    if (c.took) assert.ok(took.length === 1 && c.took(took[0]), `${c.name}:\n${printed.join('\n')}`);
     else assert.deepEqual(took, [], `${c.name}: a clean stop is nothing to report`);
-    if (c.name === 'stale') stale = { line: took[0], ages };
+    if (c.name === 'stale') stale = took[0];
   }
-  const { line, ages } = stale!;
+  const line = stale!;
   const saying = (silence: string) => line.replace(/silent for \S+,/, `silent for ${silence},`);
-  assert.ok(saysStale(line, LIVE, ages), `the stale line read as itself:\n${line}`);
-  assert.ok(!saysStale(line.replace(`pid ${LIVE},`, `pid ${GONE},`), LIVE, ages), 'refused: a line that names another pid');
-  assert.ok(!saysStale(saying('3s'), LIVE, { from: 0, to: Infinity }), 'refused: a live holder called stale, whatever the pass took');
-  assert.ok(!saysStale(saying('15m30s'), LIVE, ages), 'refused: a silence shorter than the fixture is old');
-  assert.ok(!saysStale(saying('2h00m'), LIVE, ages), 'refused: a silence longer than the fixture is old and the pass took');
+  assert.ok(saysStale(line, LIVE, '16m00s'), `the stale line read as itself:\n${line}`);
+  assert.ok(!saysStale(line.replace(`pid ${LIVE},`, `pid ${GONE},`), LIVE, '16m00s'), 'refused: a line that names another pid');
+  assert.ok(!saysStale(saying('3s'), LIVE, '3s'), 'refused: a live holder called stale, whatever silence it is expected to say');
+  assert.ok(!saysStale(saying('15m30s'), LIVE, '16m00s'), 'refused: a silence shorter than the fixture is old');
+  assert.ok(!saysStale(saying('2h00m'), LIVE, '16m00s'), 'refused: a silence longer than the fixture is old');
 });
 
 test('a daemon whose store is taken over while it runs stops at its next pass, and writes nothing over the new holder', async (t) => {
@@ -375,6 +380,7 @@ test('a daemon whose store is taken over while it runs stops at its next pass, a
 
 test('`wf tick` on a store nobody holds never writes the file, and `wf ls` says which daemon ticks, last on every path', async (t) => {
   clear();
+  seeded(t);
   assert.equal(
     (
       await typed(
@@ -388,13 +394,14 @@ test('`wf tick` on a store nobody holds never writes the file, and `wf ls` says 
   assert.equal(fs.existsSync(FILE), false, "the daemon is the file's one writer");
   const lastLine = async () => (await typed(t, ['ls'], engineOf())).printed.at(-1);
   assert.equal(await lastLine(), 'wf up: none has held this store — nothing ticks it; start one with wf up');
-  const written = Date.now();
   holdBy(LIVE, { passedAt: minutesAgo(20) });
   const stalled = (await lastLine())!;
-  const ages = windowOf(20 * 60_000, written, Date.now());
-  const [, silence, ago] =
-    new RegExp(`^wf up: stalled, pid ${LIVE}, every 4000ms — alive, but silent for (\\S+): last pass (\\S+) ago \\(`).exec(stalled) ?? [];
-  assert.ok(silence !== undefined && within(silence, ages) && within(ago, ages), `silent, and last passed, 20m ago:\n${stalled}`);
+  assert.ok(
+    stalled.startsWith(
+      `wf up: stalled, pid ${LIVE}, every 4000ms — alive, but silent for 20m00s: last pass 20m00s ago (${at(-20 * 60_000)}); `,
+    ),
+    `silent, and last passed, 20m ago:\n${stalled}`,
+  );
   holdBy(GONE);
   assert.match((await lastLine())!, new RegExp(`^wf up: none ticking — pid ${GONE} is gone, its last pass `));
   clear();

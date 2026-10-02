@@ -14,7 +14,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import type { PromiseJournal, PromiseRunner, PromiseSighting } from 'agent-runtime';
+import { nameFor, type PromiseJournal, type PromiseRunner, type PromiseSighting } from 'agent-runtime';
 import { Engine, promiseEngine } from 'agent-runtime/effect';
 import type { GitRun, Run } from '../run.ts';
 import type { PassCost } from '../meter/meter.ts';
@@ -59,14 +59,18 @@ const folder = (...steps: string[]) => {
   return dir;
 };
 
-/** The engine's store, in memory, as its own tests keep one; `journal` is kept so a test can append to a task as the runtime would. */
-const memoryJournal = (): PromiseJournal => {
+/**
+ * The engine's store, in memory, as its own tests keep one, noting in `starts` when each attempt began, by its session's name; `journal` is
+ * kept so a test can append to a task as the runtime would.
+ */
+const memoryJournal = (starts: Map<string, number>): PromiseJournal => {
   const tasks = new Map<string, Parameters<PromiseJournal['append']>[1][]>();
   const feed: Awaited<ReturnType<PromiseJournal['feed']>>['entries'] = [];
   return {
     async append(taskId, event) {
       tasks.set(taskId, [...(tasks.get(taskId) ?? []), event]);
       feed.push({ taskId, event });
+      if (event.kind === 'starting') starts.set(nameFor(taskId, event.attempt), Date.parse(event.at));
     },
     async read(taskId) {
       return [...(tasks.get(taskId) ?? [])];
@@ -86,7 +90,8 @@ const BLOCKED = { outcome: 'blocked', summary: 'two flags could be meant', artif
 /**
  * The runtime, with a harness whose sessions work until `signAll` ends them. The harness reports its own words (`done`, `stopped`), as a
  * runner written in Promises may still report them: the runtime reads them as A2A's. `signAll` signs every session at work but those of
- * the runs `keep` names, which stay in flight, with `closeout`, or `SIGNED` where it names none.
+ * the runs `keep` names, which stay in flight, with `closeout`, or `SIGNED` where it names none, stamped a millisecond after the journal
+ * says its attempt began.
  */
 const engine = () => {
   const sessions = new Map<string, PromiseSighting>();
@@ -106,7 +111,8 @@ const engine = () => {
       return '';
     },
   };
-  const journal = memoryJournal();
+  const starts = new Map<string, number>();
+  const journal = memoryJournal(starts);
   const e = promiseEngine(
     Engine.layer({
       root: fs.mkdtempSync(path.join(ROOT, 'engine-')),
@@ -118,7 +124,7 @@ const engine = () => {
   const signAll = (keep: readonly Run[] = [], closeout: (name: string) => object | undefined = () => undefined) => {
     for (const [name, s] of sessions) {
       if (s.state !== 'working' || keep.some((r) => name.startsWith(`ae/${r.id}-`))) continue;
-      sessions.set(name, { ...s, state: 'done', busy: false, closeout: { payload: closeout(name) ?? SIGNED, at: Date.now() + 60_000 } });
+      sessions.set(name, { ...s, state: 'done', busy: false, closeout: { payload: closeout(name) ?? SIGNED, at: starts.get(name)! + 1 } });
     }
   };
   return { e, journal, signAll };

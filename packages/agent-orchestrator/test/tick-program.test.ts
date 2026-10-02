@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import type { Engine, PromiseJournal, PromiseRunner, PromiseSighting } from 'agent-runtime';
+import { nameFor, type Engine, type PromiseJournal, type PromiseRunner, type PromiseSighting } from 'agent-runtime';
 import { Engine as RuntimeEngine, promiseEngine } from 'agent-runtime/effect';
 import { Effect } from 'effect';
 import type { Effect as EffectOf } from 'effect/Effect';
@@ -49,9 +49,12 @@ const FOLDER = fs.mkdtempSync(path.join(ROOT, 'wf-'));
 fs.writeFileSync(path.join(FOLDER, 'work.md'), '---\nharness: codex\n---\nwork it\n');
 
 const tasks = new Map<string, Awaited<ReturnType<PromiseJournal['read']>>>();
+/** When the journal says each attempt began, in milliseconds, by its session's name: a closeout counts only when made after it. */
+const starts = new Map<string, number>();
 const journal: PromiseJournal = {
   async append(taskId, event) {
     tasks.set(taskId, [...(tasks.get(taskId) ?? []), event]);
+    if (event.kind === 'starting') starts.set(nameFor(taskId, event.attempt), Date.parse(event.at));
   },
   async read(taskId) {
     return [...(tasks.get(taskId) ?? [])];
@@ -92,7 +95,7 @@ const signAll = () => {
         ...s,
         state: 'done',
         busy: false,
-        closeout: { payload: { outcome: 'done', summary: 'did it', artifacts: [], needs: null }, at: Date.now() + 60_000 },
+        closeout: { payload: { outcome: 'done', summary: 'did it', artifacts: [], needs: null }, at: starts.get(name)! + 1 },
       });
 };
 

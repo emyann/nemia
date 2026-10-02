@@ -1018,12 +1018,16 @@ test("through the engine, a resumed session that ended with only its parent's st
   assert.equal(attempt?.stated, false);
 });
 
-/** A runner over `rows`, its usage read recording each session and start it is counted from, and the record of those asks. */
-const countingOps = (f: ReturnType<typeof fake>, rows: object[]) => {
+/**
+ * A runner over `rows`, its usage read recording each session and start it is counted from, and the record of those asks; its
+ * transcripts last written at `writtenAt`, now by default.
+ */
+const countingOps = (f: ReturnType<typeof fake>, rows: object[], writtenAt?: number) => {
   fs.writeFileSync(path.join(f.dir, 'agents.json'), JSON.stringify(rows));
   const asked: Array<[string, number]> = [];
   const ops = claudeCodeOps({
     ...opsOptions(tmp('root')),
+    ...(writtenAt !== undefined ? { transcriptTime: async () => writtenAt } : {}),
     usageFrom: async (sessionId: string, since: number) => {
       asked.push([sessionId, since]);
       return { turns: asked.length };
@@ -1072,6 +1076,23 @@ test("a session expected with no start, or with one that is no number, is counte
         `since ${String(since)}`,
       );
     }
+  } finally {
+    f.restore();
+  }
+});
+
+test("an ended session's usage kept from its row's start is not what a look told an earlier start is handed — it is read again from then", async () => {
+  const f = fake();
+  try {
+    const startedAt = Date.now() - 60_000;
+    const since = startedAt - 3_600_000;
+    const { ops, asked } = countingOps(f, [bgRow('ae/r/2', 'done', 'idle', startedAt)], startedAt);
+    await Effect.runPromise(ops.observe);
+    await Effect.runPromise(ops.observe);
+    assert.deepEqual(asked, [[BG_ID, startedAt]], 'an ended session whose transcript is unchanged is read once, and kept');
+    const seen = await Effect.runPromise(ops.observeFor!([{ name: 'ae/r/2', harness: 'claude', since }]));
+    assert.deepEqual(asked.at(-1), [BG_ID, since]);
+    assert.deepEqual(seen.seen.get('ae/r/2')?.usage, { turns: 2 }, 'the read counted from the start it was told');
   } finally {
     f.restore();
   }

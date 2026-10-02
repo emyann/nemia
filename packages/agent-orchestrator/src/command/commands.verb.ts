@@ -2,7 +2,7 @@
  * The orchestrator's commands, each defined once (`COMMANDS`): its spec (`command.ts`), the one package verb its handler calls, the data
  * it answers, and the lines the CLI prints of that data. The CLI parses, refuses, helps and prints from an entry, and the api serves the
  * same entry on its route; an entry served on one side alone says so (`only`). Today: a person's asks of a run — `wf retry`, `wf approve`,
- * `wf round`, `wf accept` and `wf say`.
+ * `wf round`, `wf accept` and `wf say` — and two reads the api alone serves: a run's decision (`decideRun`) and the run slots (`slotsOf`).
  */
 import type { Engine } from '../runtime-client.ts';
 import { approvalWordsRefusal } from '../gate/gate.ts';
@@ -16,6 +16,8 @@ import { accept, round } from '../round/round.verb.ts';
 import { saidLines } from '../say/say.ts';
 import { say } from '../say/say.verb.ts';
 import { budgetRefusal, budgetWord } from '../status/status.ts';
+import { decide, type Decided } from '../decide/decide.verb.ts';
+import { slotsOf, type Slots } from '../cap/cap.verb.ts';
 import { commandLine, type Args, type CommandSpec } from './command.ts';
 
 /**
@@ -319,5 +321,39 @@ const SAY: Command<{ at: string; attempt: number; text: string; try: number; tas
   },
 };
 
+const DECIDE: Command<Decided> = {
+  name: 'decide',
+  usage: '<runId>',
+  help: ['what is left for a person to do on a run, and the commands that do it'],
+  spec: {
+    positionals: [{ key: 'runId', takes: 'required', kind: 'name' }],
+    flags: [],
+    unknown: (arg) => `wf decide does not take ${arg}.`,
+  },
+  writes: false,
+  route: { method: 'GET', path: '/api/runs/:runId/decision', status: 200 },
+  only: {
+    side: 'api',
+    why: "wf decide is the CLI's own verb: it prints a run's whole screen — its steps, closeouts, checks and diffs — off this decision, which the api answers as data",
+  },
+  handler: (e, args) => decide(e, named(args).runId),
+  print: () => [],
+};
+
+const CEILINGS: Command<Slots> = {
+  name: 'ceilings',
+  usage: '',
+  help: ['the cap on runs in flight, the runs it counts and the runs it holds'],
+  spec: { positionals: [], flags: [], unknown: (arg) => `the ceilings take no ${arg}.` },
+  writes: false,
+  route: { method: 'GET', path: '/api/ceilings', status: 200 },
+  only: {
+    side: 'api',
+    why: 'the board says the run slots over its Factory; at the command line, wf ls and wf decide say a run held for one beside the run',
+  },
+  handler: (e) => slotsOf(e),
+  print: () => [],
+};
+
 /** Every command defined once, in the order `wf`'s help lists them. */
-export const COMMANDS: readonly Command[] = [RETRY, APPROVE, ROUND, ACCEPT, SAY];
+export const COMMANDS: readonly Command[] = [RETRY, APPROVE, ROUND, ACCEPT, SAY, DECIDE, CEILINGS];

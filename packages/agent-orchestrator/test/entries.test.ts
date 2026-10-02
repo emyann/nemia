@@ -252,6 +252,7 @@ const PINNED: Record<string, string[]> = {
     'skillVersion',
     'skillsFor',
     'slotWord',
+    'slotsOf',
     'spendReader',
     'spentWord',
     'staleAfterMs',

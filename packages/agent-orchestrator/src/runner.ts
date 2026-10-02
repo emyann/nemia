@@ -337,7 +337,7 @@ export type { PlanStarted } from './plan/plan.verb.ts';
 export { advance } from './tick/advance.verb.ts';
 export { refusalLines, tick } from './tick/tick.verb.ts';
 export { checkoutHold } from './ending/ending.verb.ts';
-export { runSlots } from './cap/cap.verb.ts';
+export { runSlots, type Slots, slotsOf } from './cap/cap.verb.ts';
 export type { Advanced } from './tick/advance.verb.ts';
 export type { Pass } from './tick/tick.verb.ts';
 export { accept, round } from './round/round.verb.ts';

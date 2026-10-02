@@ -42,7 +42,7 @@ import {
   type CheckReport,
 } from '../views/views.verb.ts';
 import { checkoutHold } from '../ending/ending.verb.ts';
-import { runSlots } from '../cap/cap.verb.ts';
+import { slotsOf } from '../cap/cap.verb.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 
 /** A step's current try that a person answered: the try, what they said, and what the try before it needed, when it said. */
@@ -134,7 +134,7 @@ export type Decided = {
    */
   timeline: Timeline;
   /**
-   * The cap on runs in flight holding this run, with nothing of it filed, and the count it is held at (`runSlots`); absent when it holds
+   * The cap on runs in flight holding this run, with nothing of it filed, and the count it is held at (`slotsOf`); absent when it holds
    * none. Asked only of a run not cancelled with nothing filed, which is all the cap holds, as the answer reads every run in the store.
    */
   held?: RunSlot;
@@ -262,7 +262,7 @@ export const decideRun = Effect.fn('decide')(function* (id: string) {
   const costs = costsOf(steps, run, used, spendOf);
   const waitingOn = waitingOnOf(id, run, views);
   const denied = deniedLinesOf(run, views);
-  const held = !hasStarted(run) && !run.cancelledAt ? (yield* awaited(() => runSlots(e))).get(id) : undefined;
+  const held = !hasStarted(run) && !run.cancelledAt ? (yield* awaited(() => slotsOf(e))).held.get(id) : undefined;
   const over = Boolean(run.cancelledAt || run.pruned || run.hold);
   const offers = [...roundOffers(steps, run, d, spendOf), ...retryOffers(steps, run, d, phaseOf, reader, asked, spendOf, verdictOf)];
   const parent = yield* awaited(() => parentsOf(e, run, git));

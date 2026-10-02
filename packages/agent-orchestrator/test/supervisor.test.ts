@@ -47,7 +47,7 @@ const FOLDER = folderOf({
 
 /**
  * An engine board a test settles by hand, as gate.test.ts's: what each task was filed with, every filing, and each task's own session
- * (`native-<id>`). A settled task carries the closeout it is given. `reads` is every `view` the caller asked for, in order: what a pass
+ * (`native-<id>`). A settled task carries the closeout it is given. `list` views the tasks it is handed that were filed, each a read; `reads` is every `view` the caller asked for, in order: what a pass
  * costs the engine.
  */
 const board = () => {
@@ -100,6 +100,10 @@ const board = () => {
     feed: async () => ({ entries: [], cursor: 0 }),
     tick: async () => ({ tasks: 0, actions: [], running: {}, views: [] }),
     admit: async () => [],
+    list: async (ids?: readonly string[]) => ({
+      views: await Promise.all((ids ?? [...tasks.keys()]).filter((id) => tasks.has(id)).map((id) => e.view(id))),
+      unreadable: [],
+    }),
   } as unknown as Engine;
   const settle = (id: string, phase: TaskPhase, closeout?: unknown, exitCode?: number, costUsd?: number) =>
     Object.assign(tasks.get(id)!, { phase, closeout, exitCode, costUsd });

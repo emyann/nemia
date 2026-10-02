@@ -1,7 +1,10 @@
 # packages/agent-runtime — `ae`
 
-One session run to completion, durably, on one harness. `decide` (`src/core/domain.ts`) is the whole judgement, pure; `src/facade.ts` and
-`src/index.ts` are the only doors.
+Agent sessions on one harness each, durably: a job that runs to its end, and a long-lived session that runs until stopped (not built
+yet). It owns how a session runs: the task's command, mounts, restart and spend, the journal, the attempts, the harnesses' vocabulary.
+`decide` (`src/core/domain.ts`) is the whole judgement, pure (`test/engine.test.ts`); `src/facade.ts` and `src/index.ts` are the only
+doors (`test/contract.test.ts`). The orchestrator reaches it through its one client; what is still above it and a candidate to come
+down is in `docs/architecture.md`, *Who owns what*.
 
 ## Layout
 
@@ -89,3 +92,22 @@ One session run to completion, durably, on one harness. `decide` (`src/core/doma
 - **A sentence quotes another party's content through `quote` (`core/quote.ts`)**, and an error in the runtime's own words is a class
   `wordsOf` leaves whole (`a2a/said.ts`); anything else is cut at 200. `test/remote-quotes.test.ts` holds a huge-value fixture per site.
 - **A paged read is served from the listing its token names** (`OPEN_LISTINGS`), never the latest.
+
+## Claude Code, as a harness
+
+What Claude Code does as the steps meet it. Where the orchestrator's code holds a fact today, it is named beside it.
+
+- **A step's fence is one word per harness**: Claude Code's `permissionMode`, Codex's `sandbox` (in the orchestrator today: `modeOf` in
+  `former/former.ts`, held by `agent-orchestrator/test/vocabulary.test.ts`).
+- **A job (`claude -p`) never waits on a prompt; a background session in a folder nobody opened blocks in any mode that can ask**:
+  in the orchestrator today, `validateFolderMode` judges only `background: true`, which must run `dontAsk` or `bypassPermissions`.
+- **A job reads no user settings** (`--setting-sources project,local`): what a step needs goes on the step, its agent or the checkout's
+  `.claude/settings.json`.
+- **A write is matched against `Edit` rules only**: write `allowedTools: Edit(**)`, never `Write(path)` (in the orchestrator today:
+  `fileRuleRefusal`).
+- **A project's allow rules are dropped in a directory Claude Code has not trusted**: measure a rule in a trusted checkout.
+- **A session under `~/.claude/` cannot write there in any mode**: put a probe store elsewhere.
+- **A path a fenced step's brief names is inside its own folder**; a rule offered for the next run names no path of this one (in the
+  orchestrator today: `givenPlan`, `folderPlace.make`, `allowRuleOf`, `disallowedBy`).
+- **A job's turn cannot end to wait for background work**: run long work in the foreground, or block on it
+  (`timeout 580 bash -c "while kill -0 <pid>; do sleep 5; done"`).

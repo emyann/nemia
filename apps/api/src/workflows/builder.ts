@@ -21,21 +21,18 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Schema } from 'effect';
 import { Hono } from 'hono';
-import { agentsFor, loadAgents, remoteAgents, skillsFor, writeWorkflow, type Places } from 'agent-orchestrator';
+import { agentsFor, HARNESS_CHOICES, loadAgents, remoteAgents, skillsFor, writeWorkflow, type Places } from 'agent-orchestrator';
 import {
   AGENT_KEYS,
   AGENT_OWN_KEYS,
   AGENTS_FOLDER,
   DENIALS,
-  EFFORTS,
   HARNESSES,
   parseFolder,
   parseWorkflow,
-  PERMISSION_MODES,
   REMOTE_PREFIX,
   REMOTE_REFUSED_KEYS,
   renderStep,
-  SANDBOXES,
   SLOTS,
   STEP_KEY_MEANINGS,
   STEP_KEYS,
@@ -205,7 +202,7 @@ export const keyForm = (home: string): KeyForm => ({
     meaning: STEP_KEY_MEANINGS[key],
     kind: KINDS[key],
     choices: key === 'harness' ? harnessChoices() : key === 'agent' ? agentsOfYours(home) : (WORDS[key] ?? null),
-    byHarness: key === 'effort' ? EFFORTS : key === 'permissionMode' ? PERMISSION_MODES : key === 'sandbox' ? SANDBOXES : null,
+    byHarness: key === 'effort' || key === 'permissionMode' || key === 'sandbox' ? HARNESS_CHOICES[key] : null,
   })),
   defaultHarness: DEFAULT_HARNESS,
   roleKeys: [...ROLE_KEYS],

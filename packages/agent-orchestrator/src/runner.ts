@@ -308,7 +308,7 @@ export {
   readFactory,
   removeFactory,
 } from './factory/factory.store.ts';
-export { HARNESSES, engine, remoteAgents } from './runtime-client.ts';
+export { HARNESS_CHOICES, HARNESSES, engine, remoteAgents } from './runtime-client.ts';
 export { A2A_AGENTS_FILE, envNameOf } from './harness/a2a.store.ts';
 export {
   closeoutAsked,

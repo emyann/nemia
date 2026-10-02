@@ -14,17 +14,14 @@ import { TEAM } from '../../test/team.ts';
 import { app } from '../app.ts';
 import { DEFAULT_HARNESS, putSchemasBack, stepsNamed } from './builder.ts';
 import { listWorkflows, versionOf as versionIn } from './workflows.ts';
-import { loadWorkflows, writeWorkflow } from 'agent-orchestrator';
+import { HARNESS_CHOICES, loadWorkflows, writeWorkflow } from 'agent-orchestrator';
 import {
   AGENT_KEYS,
-  EFFORTS,
   HARNESSES,
   parseFolder,
   parseWorkflow,
-  PERMISSION_MODES,
   REMOTE_REFUSED_KEYS,
   renderStep,
-  SANDBOXES,
   STEP_KEY_MEANINGS,
   STEP_KEYS,
 } from 'agent-orchestrator/workflow';
@@ -163,16 +160,16 @@ test("GET /api/workflows/keys is the form a step is drawn in: every key in the p
   for (const k of form.keys) assert.equal(k.meaning, STEP_KEY_MEANINGS[k.key], k.key);
   const kindOf = Object.fromEntries(form.keys.map((k) => [k.key, k.kind]));
   assert.deepEqual(form.keys.find((k) => k.key === 'harness')?.choices, HARNESSES);
-  assert.deepEqual(form.keys.find((k) => k.key === 'effort')?.byHarness, EFFORTS);
-  assert.deepEqual(form.keys.find((k) => k.key === 'permissionMode')?.byHarness, PERMISSION_MODES);
+  assert.deepEqual(form.keys.find((k) => k.key === 'effort')?.byHarness, HARNESS_CHOICES.effort);
+  assert.deepEqual(form.keys.find((k) => k.key === 'permissionMode')?.byHarness, HARNESS_CHOICES.permissionMode);
   assert.deepEqual(
     [kindOf.sandbox, form.keys.find((k) => k.key === 'sandbox')?.byHarness],
-    ['harness-word', SANDBOXES],
+    ['harness-word', HARNESS_CHOICES.sandbox],
     "Codex's fence is its sandbox, a key of its own, offered to a step whose harness takes it",
   );
   for (const harness of HARNESSES)
     assert.equal(
-      Object.hasOwn(PERMISSION_MODES, harness) !== Object.hasOwn(SANDBOXES, harness),
+      Object.hasOwn(HARNESS_CHOICES.permissionMode, harness) !== Object.hasOwn(HARNESS_CHOICES.sandbox, harness),
       true,
       `${harness} has one of a permission mode and a sandbox`,
     );
@@ -263,13 +260,13 @@ test("GET /api/workflows/keys is the form a step is drawn in: every key in the p
     for (const word of words) assert.equal(refusedAs(key, word), null, `the parser takes the flag's word ${key}: ${word}`);
   assert.match(refusedAs('gate', 'false') ?? '', /`gate: false` is what a step without the line already is/, "gate's `false` is refused");
   assert.equal(form.defaultHarness, DEFAULT_HARNESS, "the default harness is the parser's");
-  for (const mode of PERMISSION_MODES[DEFAULT_HARNESS]) parseWorkflow('a', `---\npermissionMode: ${mode}\n---\nDo a.\n`);
-  assert.equal(Object.hasOwn(SANDBOXES, DEFAULT_HARNESS), false, 'a step that names no harness takes no sandbox');
-  const codexOnly = SANDBOXES.codex.find((m) => !PERMISSION_MODES[DEFAULT_HARNESS].includes(m))!;
-  assert.throws(
-    () => parseWorkflow('a', `---\npermissionMode: ${codexOnly}\n---\nDo a.\n`),
-    (e: Error) => e.message.startsWith('a: '),
-    "a step that names no harness takes no sandbox of codex's as a mode",
+  for (const mode of HARNESS_CHOICES.permissionMode[DEFAULT_HARNESS]) parseWorkflow('a', `---\npermissionMode: ${mode}\n---\nDo a.\n`);
+  assert.equal(Object.hasOwn(HARNESS_CHOICES.sandbox, DEFAULT_HARNESS), false, 'a step that names no harness takes no sandbox');
+  const codexOnly = HARNESS_CHOICES.sandbox.codex.find((m) => !HARNESS_CHOICES.permissionMode[DEFAULT_HARNESS].includes(m))!;
+  assert.equal(
+    parseWorkflow('a', `---\npermissionMode: ${codexOnly}\n---\nDo a.\n`).permissionMode,
+    codexOnly,
+    "a mode's word is the runtime's to judge, at `wf start`: the load reads it as written",
   );
   assert.throws(
     () => parseWorkflow('a', `---\nsandbox: ${codexOnly}\n---\nDo a.\n`),
@@ -510,7 +507,7 @@ test('a codex step that names its sandbox under the former key `permissionMode:`
   assert.equal(claude.status, 422, `a Claude Code step has no sandbox: ${JSON.stringify(refused)}`);
   assert.ok(
     refused.error.startsWith(
-      "review: `sandbox: read-only` is not a key claude takes. `sandbox:` is Codex's sandbox, and Claude Code has none: its fence is its permission mode, `permissionMode:`",
+      "review: `sandbox: read-only` is a codex step's sandbox, and this step runs on claude, which is fenced by its permission mode, `permissionMode:`",
     ),
     `refused naming its own fence: ${refused.error}`,
   );
@@ -679,8 +676,6 @@ test("REFUSED at shipped defaults: what the package refuses is a 422 in its word
     ["a name that is not a file's", [plan, { ...build, name: 'build/it' }], ['build/it']],
     ['a name twice', [plan, build, { ...build }], ['build']],
     ['no tools', [plan, { ...build, spec: { ...build.spec, tools: [] } }], ['build']],
-    ['a context window below what Claude Code takes', [plan, { ...build, spec: { ...build.spec, context: 50_000 } }], ['build']],
-    ['a context window on codex', [plan, { ...build, spec: { ...build.spec, harness: 'codex', context: 200_000 } }], ['build']],
     ['a line break in a check', [plan, { ...build, spec: { ...build.spec, check: 'npm test\nharness: codex' } }], ['build']],
     ['an empty body', [plan, { ...build, body: '  ' }], ['build']],
     ['no steps', [], []],

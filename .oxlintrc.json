@@ -358,7 +358,7 @@
     {
       "files": ["apps/api/src/workflows/builder.ts"],
       "rules": {
-        "max-lines": ["error", { "max": 511, "skipBlankLines": true, "skipComments": true }]
+        "max-lines": ["error", { "max": 508, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {

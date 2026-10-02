@@ -8,9 +8,10 @@
  *   one link to main's whole tree would have a worktree's apps import main's packages, and a branch's
  *   change be tested against main's. `depsPlan` gives the worktree a `node_modules` of its own: a
  *   workspace package is a link to the worktree's own copy, and every other package is main's,
- *   hardlinked file by file into a directory of the worktree's. When the branch's lockfile asks for a
- *   tree main has not installed, main's would lie, and the runner runs `npm ci` instead
- *   (`lockfileParting`).
+ *   hardlinked file by file into a directory of the worktree's — and so is each workspace's own
+ *   `node_modules`, where npm nests a package one workspace needs a copy of (`workspaceModules`). When
+ *   the branch's lockfile asks for a tree main has not installed, main's would lie, and the runner runs
+ *   `npm ci` instead (`lockfileParting`).
  *
  *   Hardlinked, not linked, because a link out of the worktree is a path out of the step's working
  *   directory: Claude Code allows a read through a symlink only when the link and its target both
@@ -75,7 +76,8 @@ export const inside = (root: string, p: string): string | null => {
 };
 
 /**
- * The worktree's `node_modules`, as actions, from a listing of main's.
+ * The worktree's `node_modules`, as actions, from a listing of main's — and of each workspace's own, `nested`, keyed by the workspace's
+ * folder (`workspaceModules`), planned after the root's under the same rules at `<worktree>/<folder>/node_modules`.
  *
  * - **A workspace package** — an entry of main's that is a link into the main checkout itself, outside
  *   its `node_modules` (`packages/*`, `apps/*` here) — is linked to the same path in the worktree, the
@@ -92,10 +94,27 @@ export const inside = (root: string, p: string): string | null => {
  *   belongs to the tree it is in, and a tool writing it through a link would write main's. That is also
  *   how the runner tells a tree npm installed (it has `.package-lock.json`) from one this plan made.
  */
-export function depsPlan(mainRoot: string, worktree: string, main: DepsListing): DepsAction[] {
-  const mainModules = path.join(mainRoot, 'node_modules');
-  const modules = path.join(worktree, 'node_modules');
+export function depsPlan(
+  mainRoot: string,
+  worktree: string,
+  main: DepsListing,
+  nested: Readonly<Record<string, DepsListing>> = {},
+): DepsAction[] {
+  return [
+    ...modulesPlan(mainRoot, worktree, '', main),
+    ...Object.keys(nested)
+      .sort()
+      .flatMap((folder) => modulesPlan(mainRoot, worktree, folder, nested[folder])),
+  ];
+}
+
+/** One `node_modules` of `depsPlan`'s, the one in `folder` (`''` for the root's), from main's listing of it. */
+function modulesPlan(mainRoot: string, worktree: string, folder: string, main: DepsListing): DepsAction[] {
+  const rootModules = path.join(mainRoot, 'node_modules');
+  const mainModules = path.join(mainRoot, folder, 'node_modules');
+  const modules = path.join(worktree, folder, 'node_modules');
   const actions: DepsAction[] = [{ kind: 'dir', path: modules }];
+  const inModules = (p: string) => [rootModules, mainModules].some((m) => p === m || inside(m, p));
 
   const place = (name: string, entry: DepEntry) => {
     const at = path.join(modules, name);
@@ -107,7 +126,7 @@ export function depsPlan(mainRoot: string, worktree: string, main: DepsListing):
     const resolved = path.resolve(path.dirname(from), entry.link);
     const inRepo = inside(mainRoot, resolved);
     actions.push(
-      inRepo && resolved !== mainModules && !inside(mainModules, resolved)
+      inRepo && !inModules(resolved)
         ? { kind: 'link', path: at, target: path.relative(path.dirname(at), path.join(worktree, inRepo)) }
         : { kind: 'link', path: at, target: from },
     );
@@ -147,6 +166,25 @@ export type Installed = { link: true; resolved: string } | { link: false; versio
 /** Whether a lockfile key names an installed package — `node_modules/a`, `node_modules/a/node_modules/b`, `apps/web/node_modules/c`. */
 export const isModuleKey = (key: string): boolean => key.startsWith('node_modules/') || key.includes('/node_modules/');
 
+/**
+ * The folder whose `node_modules` a lockfile's package path installs into: `''` for the root's, a workspace's folder (`apps/web` of
+ * `apps/web/node_modules/a`), or null for a folder the plan never makes — absolute, climbing out with `..`, or inside a `node_modules`.
+ */
+const moduleFolder = (key: string): string | null => {
+  if (key.startsWith('node_modules/')) return '';
+  const folder = key.slice(0, key.indexOf('/node_modules/'));
+  return folder.split('/').every((s) => s && s !== '.' && s !== '..' && s !== 'node_modules') ? folder : null;
+};
+
+/** The workspace folders whose own `node_modules` a lockfile installs into, sorted: `['apps/web']`. None for what is not a lockfile. */
+export function workspaceModules(lock: unknown): string[] {
+  const folders = Object.keys(lockfilePackages(lock) ?? {})
+    .filter(isModuleKey)
+    .map(moduleFolder)
+    .filter((folder): folder is string => !!folder);
+  return [...new Set(folders)].sort();
+}
+
 /** A lockfile's `packages`, or null when it has none — which is to say, it is not a lockfile. */
 export const lockfilePackages = (lock: unknown): Record<string, LockEntry> | null => {
   const packages = (lock as { packages?: unknown } | null)?.packages;
@@ -165,29 +203,23 @@ export const lockfilePackages = (lock: unknown): Record<string, LockEntry> | nul
  * not install.
  *
  * A package parts when main does not have it, when one side is a link and the other is not, when a link
- * leads elsewhere, or when the versions differ. So does one nested in a workspace's own `node_modules`,
- * which links to main's root tree cannot give. An optional package main does not have is not a
+ * leads elsewhere, or when the versions differ, whether it is at the root or nested in a workspace's own
+ * `node_modules`, which `depsPlan` gives the worktree as it gives the root's. So does one in a folder the plan never makes
+ * (`workspaceModules`): outside the repository, though main has it. An optional package main does not have is not a
  * difference: it is a platform build this machine did not take. A package main has and the lockfile does not name is not looked for. A
  * lockfile that did not parse parts at `package-lock.json`.
- *
- * `inPlace` is for a tree read where the lockfile is — the repository's checkout, against the merge staged in it
- * (`checkoutParts`): no link is made, so a nested package parts only as a top-level one does.
  */
-export function lockfileParting(
-  wanted: unknown,
-  installed: Readonly<Record<string, Installed | null | undefined>>,
-  inPlace = false,
-): string | null {
+export function lockfileParting(wanted: unknown, installed: Readonly<Record<string, Installed | null | undefined>>): string | null {
   const want = lockfilePackages(wanted);
   if (!want) return 'package-lock.json';
   for (const [key, entry] of Object.entries(want)) {
     if (!isModuleKey(key)) continue;
+    if (moduleFolder(key) === null) return key;
     const there = installed[key];
     if (!there) {
       if (entry?.optional) continue;
       return key;
     }
-    if (!inPlace && !key.startsWith('node_modules/')) return key;
     if (entry?.link ? !there.link || there.resolved !== entry.resolved : there.link || there.version !== entry?.version) return key;
   }
   return null;

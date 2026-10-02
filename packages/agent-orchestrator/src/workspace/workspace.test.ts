@@ -15,7 +15,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { depsPlan, lockfileParting, worktreeInclude, type DepsListing } from './workspace.ts';
+import { depsPlan, lockfileParting, workspaceModules, worktreeInclude, type DepsListing } from './workspace.ts';
 import type { Run } from '../record/record.ts';
 import { composeBrief } from '../brief/index.ts';
 import type { Workflow } from '../step/step.ts';
@@ -167,30 +167,94 @@ test("what parts a worktree's lockfile from what main has on disk: a package mis
   );
   assert.equal(
     lockfileParting(lock({ ...base, 'apps/web/node_modules/third': third }), onDisk),
-    'apps/web/node_modules/third',
-    'nested in a workspace, links to the root tree cannot give it, though main has it',
-  );
-  assert.equal(
-    lockfileParting(lock({ ...base, 'apps/web/node_modules/third': third }), onDisk, true),
     null,
-    'in place, the checkout against the merge staged in it, nothing is linked: a package nested in a workspace is installed where it is named',
+    "nested in a workspace at the version main has: the worktree is given main's, hardlinked in its own apps/web/node_modules",
   );
   assert.equal(
-    lockfileParting(lock({ ...base, 'apps/web/node_modules/third': { ...third, version: '2.0.0' } }), onDisk, true),
+    lockfileParting(lock({ ...base, 'apps/web/node_modules/third': { ...third, version: '2.0.0' } }), onDisk),
     'apps/web/node_modules/third',
-    'in place, another version nested in a workspace still parts',
+    'another version nested in a workspace parts',
   );
   assert.equal(
-    lockfileParting(lock({ ...base, 'apps/api/node_modules/y': { version: '1.0.0' } }), onDisk, true),
+    lockfileParting(lock({ ...base, 'apps/api/node_modules/y': { version: '1.0.0' } }), onDisk),
     'apps/api/node_modules/y',
-    'and so does one it does not have',
+    'and so does one main does not have',
   );
+  assert.equal(
+    lockfileParting(lock({ ...base, 'apps/web/node_modules/w': { resolved: 'packages/w2', link: true } }), {
+      ...onDisk,
+      'apps/web/node_modules/w': { link: true, resolved: 'packages/w' },
+    }),
+    'apps/web/node_modules/w',
+    'and a nested link that leads elsewhere',
+  );
+  for (const key of ['../out/node_modules/third', '/abs/node_modules/third', 'apps/../../out/node_modules/third']) {
+    assert.equal(
+      lockfileParting(lock({ ...base, [key]: third }), { ...onDisk, [key]: { link: false, version: '1.0.0' } }),
+      key,
+      `${key} is no folder of the repository's: never made in a worktree, so it parts though main has it`,
+    );
+  }
   assert.equal(
     lockfileParting(lock({ ...base, 'packages/x': { version: '9.9.9' } }), onDisk),
     null,
     "a workspace package's own entry is the worktree's copy",
   );
   assert.equal(lockfileParting(null, onDisk), 'package-lock.json', 'a lockfile that did not parse');
+});
+
+test("the folders whose own node_modules a lockfile installs into: a workspace's, never the root's, one outside the repository or one inside a node_modules", () => {
+  const keys = [
+    'node_modules/a',
+    'node_modules/a/node_modules/b',
+    'apps/web/node_modules/@s/p',
+    'apps/web/node_modules/q',
+    'apps/api/node_modules/r/node_modules/s',
+    'packages/x',
+    '../out/node_modules/y',
+    '/abs/node_modules/z',
+    'apps/./web/node_modules/t',
+    'node_modules/c/node_modules/d',
+  ];
+  assert.deepEqual(workspaceModules({ packages: Object.fromEntries(keys.map((k) => [k, { version: '1.0.0' }])) }), [
+    'apps/api',
+    'apps/web',
+  ]);
+  assert.deepEqual(workspaceModules({ name: 'not a lockfile' }), []);
+  assert.deepEqual(workspaceModules(null), []);
+});
+
+test("the plan of a workspace's own node_modules: a directory of the worktree's, under the root's, made by the same rules", () => {
+  const empty: DepsListing = { entries: [], scopes: {}, bins: [] };
+  const nested: Record<string, DepsListing> = {
+    'apps/app': {
+      entries: [
+        { name: '.vite' },
+        { name: '@sc' },
+        { name: 'nest' },
+        { name: 'wsdep', link: '../../../packages/x' },
+        { name: 'rooted', link: '../../../node_modules/third' },
+        { name: 'away', link: '/elsewhere/away' },
+        { name: '.bin' },
+      ],
+      scopes: { '@sc': [{ name: 'p' }] },
+      bins: [{ name: 'nestbin', link: '../nest/cli.js' }],
+    },
+  };
+  const nm = '/wt/run/implement/apps/app/node_modules';
+  assert.deepEqual(depsPlan('/repo', '/wt/run/implement', empty, nested), [
+    { kind: 'dir', path: '/wt/run/implement/node_modules' },
+    { kind: 'dir', path: nm },
+    { kind: 'dir', path: `${nm}/@sc` },
+    { kind: 'tree', path: `${nm}/@sc/p`, from: '/repo/apps/app/node_modules/@sc/p' },
+    { kind: 'tree', path: `${nm}/nest`, from: '/repo/apps/app/node_modules/nest' },
+    { kind: 'link', path: `${nm}/wsdep`, target: '../../../packages/x' },
+    { kind: 'link', path: `${nm}/rooted`, target: '/repo/apps/app/node_modules/rooted' },
+    { kind: 'link', path: `${nm}/away`, target: '/repo/apps/app/node_modules/away' },
+    { kind: 'dir', path: `${nm}/.bin` },
+    { kind: 'link', path: `${nm}/.bin/nestbin`, target: '../nest/cli.js' },
+  ]);
+  assert.deepEqual(depsPlan('/repo', '/wt/run/implement', empty), [{ kind: 'dir', path: '/wt/run/implement/node_modules' }]);
 });
 
 test('the brief says a tree was installed, under Where to look and before the closeout — and nothing of a linked one', () => {
@@ -567,9 +631,73 @@ test("the checkout against the merge staged in it: a package nested in a workspa
   write(path.join(repo, 'apps/app/node_modules/third/package.json'), JSON.stringify({ name: 'third', version: '2.0.0' }));
 
   assert.equal(checkoutParts(repo), null, 'every package the lockfile names is installed where it names it');
-  assert.equal(lockfileParts(repo, repo), 'apps/app/node_modules/third', "a worktree's comparison would install on every ship");
+  assert.equal(lockfileParts(repo, repo), null, "a worktree's comparison agrees: the nested package is the lockfile's");
   write(path.join(repo, 'package-lock.json'), JSON.stringify(lock('3.0.0')));
   assert.equal(checkoutParts(repo), 'apps/app/node_modules/third', 'the merge asks for another version of it');
   fs.rmSync(path.join(repo, 'package-lock.json'));
   assert.equal(checkoutParts(repo), null, 'no lockfile: not an npm checkout');
+});
+
+/**
+ * `aCheckout`, with a package npm installed nested in the app's own `node_modules`, as it does when a workspace needs its own copy: named
+ * in both lockfiles, and on main's disk at `version` (absent when null) beside a cache of vite's.
+ */
+function aNestedCheckout(version: string | null): { main: string; wt: string } {
+  const { main, wt } = aCheckout();
+  for (const root of [main, wt]) {
+    const file = path.join(root, 'package-lock.json');
+    const lock = JSON.parse(fs.readFileSync(file, 'utf8'));
+    lock.packages['apps/app/node_modules/nested'] = { version: '1.0.0' };
+    fs.writeFileSync(file, JSON.stringify(lock, null, 2));
+  }
+  const nested = path.join(main, 'apps/app/node_modules');
+  if (version) {
+    write(path.join(nested, 'nested/package.json'), JSON.stringify({ name: 'nested', version }));
+    write(path.join(nested, 'nested/index.js'), "module.exports = 'main-nested';\n");
+  }
+  write(path.join(nested, '.vite/cache'), 'main\n');
+  return { main, wt };
+}
+
+test("a package nested in a workspace's node_modules at the version main has is hardlinked into the worktree's own, never installed", async () => {
+  const { main, wt } = aNestedCheckout('1.0.0');
+  const mains = snapshot(path.join(main, 'apps/app/node_modules'));
+  assert.deepEqual(await provisionDeps(main, wt), { tree: 'hardlinked', made: 12 });
+
+  const ours = path.join(wt, 'apps/app/node_modules');
+  assert.deepEqual(required(path.join(wt, 'apps/app'), 'nested'), {
+    real: fs.realpathSync(path.join(ours, 'nested/index.js')),
+    value: 'main-nested',
+  });
+  assert.equal(
+    fs.statSync(path.join(ours, 'nested/index.js')).ino,
+    fs.statSync(path.join(main, 'apps/app/node_modules/nested/index.js')).ino,
+  );
+  assert.ok(fs.lstatSync(ours).isDirectory(), "the app's node_modules is the worktree's own directory, not a link to main's");
+  assert.ok(!fs.existsSync(path.join(ours, '.vite')), "vite's cache is the tree's own, and left out");
+  assert.deepEqual(await provisionDeps(main, wt), { tree: 'hardlinked', made: 0 }, 'a second call adds nothing');
+  write(path.join(ours, '.vite/cache'), "the branch's build\n");
+  assert.deepEqual(snapshot(path.join(main, 'apps/app/node_modules')), mains, "main's nested tree was not written");
+});
+
+test('a package nested in a workspace parts when main has another version of it, or none', async () => {
+  const { lockfileParts } = await import('./worktree.store.ts');
+  for (const version of ['2.0.0', null]) {
+    const { main, wt } = aNestedCheckout(version);
+    assert.equal(lockfileParts(main, wt), 'apps/app/node_modules/nested', `main has ${version ?? 'none'}: provisionDeps runs npm ci`);
+  }
+});
+
+test('a workspace folder of the worktree that leads outside it, or whose node_modules does, is never made through', async () => {
+  const outside = fs.mkdtempSync(path.join(ROOT, 'outside-'));
+  const linkedApp = aNestedCheckout('1.0.0');
+  fs.rmSync(path.join(linkedApp.wt, 'apps/app'), { recursive: true });
+  link(outside, path.join(linkedApp.wt, 'apps/app'));
+  assert.deepEqual(await provisionDeps(linkedApp.main, linkedApp.wt), { tree: 'hardlinked', made: 10 });
+  assert.deepEqual(fs.readdirSync(outside), [], 'the branch made apps/app a link: nothing is made where it leads');
+
+  const linkedModules = aNestedCheckout('1.0.0');
+  link(outside, path.join(linkedModules.wt, 'apps/app/node_modules'));
+  assert.deepEqual(await provisionDeps(linkedModules.main, linkedModules.wt), { tree: 'hardlinked', made: 10 });
+  assert.deepEqual(fs.readdirSync(outside), [], "nor where the app's node_modules leads");
 });

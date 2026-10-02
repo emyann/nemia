@@ -489,6 +489,29 @@ test('a field of the wrong type fails the read, saying what is there and what th
   );
 });
 
+test('a counted entry is read back as written; one whose usage no runtime wrote fails the read as a measured one does', async () => {
+  const usage = { turns: 3, outputTokens: 40 };
+  const good = legacyStore({ 't-ok': [TODAY, { kind: 'counted', at: '2026-09-24T00:00:01Z', attempt: 1, usage }] });
+  const events = await run(
+    good,
+    Effect.flatMap(Journal, (j) => j.read('t-ok')),
+  );
+  assert.deepEqual(events.at(-1), { kind: 'counted', at: '2026-09-24T00:00:01Z', attempt: 1, usage });
+  const dir = legacyStore({
+    't-bad': [TODAY, { kind: 'counted', at: '2026-09-24T00:00:01Z', attempt: 1, usage: { turns: 'three' } }],
+  });
+  const error = await failureOf(
+    dir,
+    Effect.flatMap(Journal, (j) => j.read('t-bad')),
+  );
+  assert.ok(
+    error.message.startsWith(
+      `t-bad's journal (${path.join(dir, 'tasks', 't-bad.jsonl')}), entry 2 is a \`counted\` event, and its \`usage.turns\` is "three", where the runtime writes number.`,
+    ),
+    error.message,
+  );
+});
+
 test('the skills an end names are read back as written, an empty list kept; a list of anything but names fails the read', async () => {
   const end = (attempt: number, skills: unknown) => ({
     kind: 'ended',

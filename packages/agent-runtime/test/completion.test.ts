@@ -589,6 +589,58 @@ test('a finished session is read once while its transcript is unchanged — agai
   }
 });
 
+/** A runner over a finished session whose clock is `clock.t`, whose transcript was written `clock.written`, and which says `clock.said`. */
+const keptOver = (clock: { t: number; written: number; said: number }) => {
+  const reads = { n: 0 };
+  const ops = claudeOps({
+    now: () => clock.t,
+    transcriptTime: async () => clock.written,
+    closeoutFrom: async () => {
+      reads.n++;
+      return { payload: clock.said, at: 1 };
+    },
+  });
+  return { reads, said: async () => (await Effect.runPromise(ops.observe)).get('ae/t-1/1')?.closeout?.payload };
+};
+
+test('a transcript written after the wall clock stepped back is read again: a read is kept only while the mtime it was made over stands', async () => {
+  const T = 1_789_000_000_000;
+  const clock = { t: T, written: T - 10_000, said: 1 };
+  const { reads, said } = keptOver(clock);
+  const restore = withFakeClaude(row('done', 'idle'));
+  try {
+    assert.equal(await said(), 1);
+    assert.equal(await said(), 1);
+    assert.equal(reads.n, 1, 'unchanged since the read: kept');
+    clock.t = T - 60_000;
+    clock.written = T - 50_000;
+    clock.said = 2;
+    assert.equal(await said(), 2, 'written after the read, stamped before it on a clock stepped back: read again');
+    assert.equal(reads.n, 2);
+  } finally {
+    restore();
+  }
+});
+
+test('a forward step of the wall clock costs at most one more read, and an unchanged transcript is still read once', async () => {
+  const T = 1_789_000_000_000;
+  const clock = { t: T, written: T - 10_000, said: 1 };
+  const { reads, said } = keptOver(clock);
+  const restore = withFakeClaude(row('done', 'idle'));
+  try {
+    await said();
+    clock.t = T + 3_600_000;
+    await said();
+    await said();
+    assert.ok(reads.n <= 2, `${reads.n} reads over three passes`);
+    clock.written = T + 3_600_000;
+    clock.said = 2;
+    assert.equal(await said(), 2, 'written since: read again');
+  } finally {
+    restore();
+  }
+});
+
 test('Claude Code is handed the schema as --json-schema, and the prompt still comes last', async () => {
   const dir = scratch('fake-claude-');
   const argsFile = path.join(dir, 'args');

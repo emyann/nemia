@@ -42,9 +42,11 @@ export const QUIESCENT_AFTER_MS = 90_000;
 
 /**
  * How far a transcript's mtime may trail `Date.now()` for the same instant. The kernel may stamp a
- * file from a coarser clock, so a line written just after a read can carry a time just before it. A
- * read of a finished session is kept only while its transcript is older than the read by more than
- * this: one more read at the end of a session, and never a line missed.
+ * file from a coarser clock, so a line written just after a read can carry the mtime asked just before
+ * it. A read is kept only while the transcript's mtime is still the one asked before it (`Kept.mtime`),
+ * and that one older than the read by more than this: one more read at the end of a session, and never
+ * a line missed. A write changes the mtime whichever way the wall clock stepped, so it is read again; a
+ * step forward costs at most one more read.
  */
 const MTIME_SLOP_MS = 1_000;
 
@@ -130,8 +132,11 @@ type Registry = { listed: Map<string, SessionState>; pids: Map<string, number>; 
 
 /**
  * What a finished attempt said and consumed, as read from its transcript — kept for THAT attempt,
- * and only while the transcript has not been written since. A working session is read on every
- * idle pass instead, because that is when it may just have spoken. Losing this only re-reads.
+ * and only while the transcript has not been written since: while its mtime equals the one asked just
+ * before the read (`mtime`), which was older than the read (`readAt`) by `MTIME_SLOP_MS`. Equality,
+ * not order, so a write stamped before the read by a wall clock stepped back is read. A working session
+ * is read on every idle pass instead, because that is when it may just have spoken. Losing this only
+ * re-reads.
  *
  * `keep` says which reads are worth keeping, and the caller decides: an attempt whose session the registry
  * lists FINAL, and a busy session read over a transcript cold for the quiescence floor, which is reached
@@ -145,7 +150,7 @@ type Registry = { listed: Map<string, SessionState>; pids: Map<string, number>; 
  * `--resume` of the same id is another attempt, never handed what was read of the one before. An attempt
  * is the row's name, its session, and the start `claude agents` gave it.
  */
-type Kept<T> = { read: { value: T } | { refused: unknown }; readAt: number };
+type Kept<T> = { read: { value: T } | { refused: unknown }; readAt: number; mtime: number | undefined };
 
 /** An attempt's key in what is kept (`Kept`): the row's name, its session, and the start `claude agents` gave it. */
 const attemptOf = (name: string, s: Sighting, startedAt: number | undefined) => JSON.stringify([name, s.sessionId, startedAt ?? null]);
@@ -171,15 +176,15 @@ const keptReads = (
   ): Promise<T> => {
     if (!keep) return read();
     const pin = kept.get(attempt);
-    const written = pin ? await writtenAt() : undefined;
-    let got = pin && written !== undefined && written < pin.readAt - MTIME_SLOP_MS ? pin.read : undefined;
+    const written = await writtenAt();
+    let got = pin && written !== undefined && written === pin.mtime && pin.mtime < pin.readAt - MTIME_SLOP_MS ? pin.read : undefined;
     if (!got) {
       const readAt = now();
       got = await read().then(
         (value) => ({ value }),
         (refused: unknown) => ({ refused }),
       );
-      kept.set(attempt, { read: got, readAt });
+      kept.set(attempt, { read: got, readAt, mtime: written });
     }
     if ('refused' in got) throw got.refused;
     return got.value;

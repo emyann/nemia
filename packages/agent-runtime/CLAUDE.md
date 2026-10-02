@@ -12,6 +12,8 @@ down is in `docs/architecture.md`, *Who owns what*.
   `harness/seam.ts` and `harness/args.ts`, and a harness `core/engine/tally.ts`, by their own path: through a face the value graph
   closes a loop, and `test/layout.test.ts` refuses a cycle of value imports. A file moved deeper that builds a path from its own
   place gains a `..` (`WORKER`).
+- **No workflow's word in `src` or `bin`** (a workflow, a step, a gate, a factory, a closeout, the orchestrator, `wf`, Nemia): the
+  orchestrator's `test/words.test.ts` refuses a new one, and holds today's per file (`WORKFLOW_WORDS`); lower a count when one goes.
 
 ## The pass
 

@@ -915,6 +915,19 @@ test('a stop: a live session is stopped and CANCELED, one already stopped is CAN
   ]);
 });
 
+test('a stop of a session listed done whose process its harness still holds stops it and is CANCELED; one let go is refused', async () => {
+  const h = harness();
+  h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'completed', busy: false, held: true });
+  h.sessions.set('ae/t-2/1', { sessionId: 's-2', state: 'completed', busy: false, held: false });
+  const cancel = (id: string) => h.handler.cancelTask({ tenant: '', id, metadata: undefined }, ctx);
+  assert.equal((await cancel('ae/t-1/1')).status!.state, TaskState.TASK_STATE_CANCELED);
+  await assert.rejects(
+    cancel('ae/t-2/1'),
+    refusedWith(TaskNotCancelableError, 'session `ae/t-2/1` has ended (done): there is nothing to stop.'),
+  );
+  assert.deepEqual(h.acted(), [['stop', 's-1']]);
+});
+
 test("a stop the harness failed throws the harness's words, unchanged", async () => {
   const h = harness({ stopFails: 'fake stop s-1: no such session (exit 1)' });
   h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'working' });
@@ -1008,6 +1021,20 @@ test('words to a running session reach the harness with the id it lists, and the
     ['say', [{ name: 'ae/t-1/1', sessionId: 's-1' }, 'look at the tests again']],
     ['say', [{ name: 'ae/t-2/1', sessionId: 's-2' }, 'go on']],
   ]);
+});
+
+test('words to a session listed done whose process its harness still holds reach it, as an open session; one let go is refused', async () => {
+  const h = harness();
+  h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'completed', busy: false, held: true });
+  h.sessions.set('ae/t-2/1', { sessionId: 's-2', state: 'completed', busy: false, held: false });
+  const open = await h.handler.sendMessage(said('ae/t-1/1', 'next'), ctx);
+  assert.ok('status' in open);
+  assert.equal(open.status!.state, TaskState.TASK_STATE_COMPLETED, 'answered as the harness lists it');
+  await assert.rejects(
+    h.handler.sendMessage(said('ae/t-2/1', 'next', { contextId: '' }), ctx),
+    refusedWith(UnsupportedOperationError, 'session `ae/t-2/1` has ended (done): it takes no more words.'),
+  );
+  assert.deepEqual(h.acted(), [['say', [{ name: 'ae/t-1/1', sessionId: 's-1' }, 'next']]]);
 });
 
 test('words the harness could not deliver throw its words, unchanged', async () => {

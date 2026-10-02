@@ -165,7 +165,7 @@ test('each verb gives the same answer through either door, over one store', asyn
 });
 
 test('a long-lived task through either door: filed with its restart policy, idle and left open across passes, and ended by a stop alone', async () => {
-  const { effect, promise, sessions } = doors();
+  const { effect, promise, sessions, heard } = doors();
   await effect((e) => e.file({ brief: 'one', cwd: '/r', id: 'one', restartPolicy: 'Always' }));
   await promise.file({ brief: 'two', cwd: '/r', id: 'two', restartPolicy: 'Always' });
   await promise.tick();
@@ -187,6 +187,18 @@ test('a long-lived task through either door: filed with its restart policy, idle
   );
   assert.equal((await effect((e) => e.say('one', 'look again'))).text, 'look again', 'an idle session hears its next words');
   assert.equal((await promise.say('two', 'and again')).text, 'and again');
+  for (const [name, s] of sessions) sessions.set(name, { ...s, state: 'completed', busy: false, held: true });
+  await promise.tick();
+  assert.equal((await effect((e) => e.say('one', 'once more'))).text, 'once more', 'a session listed done, its process held, hears too');
+  assert.equal((await promise.say('two', 'and once more')).text, 'and once more');
+  assert.deepEqual(heard.slice(-2), ['once more', 'and once more']);
+  sessions.set('ae/one/1', { ...sessions.get('ae/one/1')!, held: false });
+  assert.match(
+    (await failure(effect((e) => e.say('one', 'gone')))).message,
+    /^`one`'s session is `done` on its harness, not running: the next pass writes its end\./,
+    'a session listed done with no process is gone, and refused as for a job',
+  );
+  sessions.set('ae/one/1', { ...sessions.get('ae/one/1')!, held: true });
 
   await effect((e) => e.stop('one'));
   await promise.stop('two');

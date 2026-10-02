@@ -1502,8 +1502,9 @@ A task is a job by default: its session runs to its end, and the task settles on
 stays open between turns, and only a `stop` ends it. The end of a turn, a session listed `blocked` and waiting on nobody, one
 listed `done` whose process is still held, and 90 s of silence are each **idle** (`idleOf`, `SESSION_IDLE`): the pass does
 nothing, `view` says phase `idle`, and nobody is asked anything. A restarted engine reads the same off the record and the
-listing, so the session outlives the process that ticks it. `say` gives an idle session listed waiting its next words;
-one listed `done`, its process still held, is refused them by its harness today.
+listing, so the session outlives the process that ticks it. `say` gives an idle session its next words, and `stop` stops
+it, however it is listed: the seam takes words and a stop for a session listed done whose process its harness still holds
+(`held`), and refuses them, as A2A does a terminal Task, once the process is gone.
 
 ```ts
 const id = await engine.file({ brief: 'Watch the queue.', cwd, restartPolicy: 'Always', config: { background: true } })

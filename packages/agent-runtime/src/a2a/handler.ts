@@ -226,7 +226,8 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
   /**
    * Words said to a running session: A2A's follow-up, a message on the session's Task. Taken while the session runs —
    * working, or waiting on a person (`INPUT_REQUIRED`) — as the harness's inbox takes them either way; a session that has
-   * ended takes no more, as A2A refuses a message to a Task in a terminal state. The harness is listed afresh for the
+   * ended takes no more, as A2A refuses a message to a Task in a terminal state, unless its harness says it still holds its
+   * process (`held`): a long-lived session listed done between turns keeps its inbox. The harness is listed afresh for the
    * session's id: the handler holds no listing of its own, and the message's context, when it sends one, must be that
    * session's. Answered with the session as that listing saw it.
    *
@@ -248,7 +249,7 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
       throw new TaskNotFoundError(`no session \`${m.taskId}\` for the \`${this.harness}\` harness to hear anything: it lists none.`);
     const elsewhere = contextRefusal(m.taskId, m.contextId, seen);
     if (elsewhere) throw new RequestMalformedError(elsewhere);
-    if (!isLive(seen.state)) {
+    if (!isLive(seen.state) && seen.held !== true) {
       throw new UnsupportedOperationError(`session \`${m.taskId}\` has ended (${phaseWordOf(seen.state)}): it takes no more words.`);
     }
     await this.run(this.ops.say({ name: m.taskId, sessionId: seen.sessionId }, followUpText(m)));
@@ -284,12 +285,13 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
 
   /**
    * A stop. A live session is stopped and answered `CANCELED`, as is one already stopped, as A2A answers a repeat cancel.
-   * One that finished on its own cannot be: `TaskNotCancelableError`. A stop the harness failed throws its words.
+   * One that finished on its own cannot be: `TaskNotCancelableError`, unless its harness still holds its process (`held`), as it
+   * holds a long-lived session listed done between turns, which is stopped. A stop the harness failed throws its words.
    */
   async cancelTask(params: CancelTaskRequest, _context: ServerCallContext): Promise<Task> {
     const seen = (await this.run(this.ops.observe)).get(params.id);
     if (!seen) throw new TaskNotFoundError(`no session \`${params.id}\` for the \`${this.harness}\` harness to stop: it lists none.`);
-    if (!isLive(seen.state) && seen.state !== 'canceled') {
+    if (!isLive(seen.state) && seen.state !== 'canceled' && seen.held !== true) {
       throw new TaskNotCancelableError(`session \`${params.id}\` has ended (${phaseWordOf(seen.state)}): there is nothing to stop.`);
     }
     if (seen.state !== 'canceled') await this.run(this.ops.stop(seen.sessionId));

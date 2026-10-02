@@ -15,6 +15,7 @@ const REFUSALS = new Set([
   'ListRefused',
   'TranscriptRefused',
   'SayRefused',
+  'QuotaRefused',
   'EngineRefused',
 ]);
 
@@ -65,6 +66,7 @@ export function promiseEngine<E>(layer: Layer.Layer<EngineService, E>): Engine {
     logs: (taskId) => run('logs', service.logs(taskId)),
     transcript: (taskId, after) => run('transcript', service.transcript(taskId, after)),
     say: (taskId, text) => run('say', service.say(taskId, text)),
+    quota: (...args: unknown[]) => run('quota', Reflect.apply(service.quota, service, args) as ReturnType<EngineShape['quota']>),
     answer: (taskId, text, options) => run('answer', service.answer(taskId, text, options)),
     close: (taskId) => run('close', service.close(taskId)),
     feed: (after) => run('feed', service.feed(after)),

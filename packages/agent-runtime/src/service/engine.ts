@@ -27,6 +27,7 @@ import {
   composite,
   type ExpectedSession,
   type HarnessArgs,
+  type HarnessQuota,
   type RunnerOps,
   type Transcript,
   type TranscriptCursor,
@@ -108,6 +109,14 @@ export class SayUnsent extends Schema.TaggedError<SayUnsent>()('SayUnsent', {
   cause: Schema.optional(Schema.Defect()),
 }) {}
 
+/**
+ * A quota this engine will not ask, and why: an argument that is no harness's name, a harness this engine does not have, or one that
+ * reports no quota. Nothing was asked.
+ */
+export class QuotaRefused extends Schema.TaggedError<QuotaRefused>()('QuotaRefused', {
+  message: Schema.String,
+}) {}
+
 /** Why `list` refuses what it was handed, or `undefined` for nothing or one list of task ids. */
 export const listRefusalOf = (args: readonly unknown[]): string | undefined => {
   const [taskIds] = args;
@@ -119,8 +128,8 @@ export const listRefusalOf = (args: readonly unknown[]): string | undefined => {
 /**
  * The engine's verbs, each an Effect with what refuses it on its error channel. Each does what the verb of the same name on
  * `agent-runtime`'s `Engine` does, where each is described, and fails with a tagged error where that one rejects with an `Error`
- * whose `exitCode` is 2: `FileRefused`, `TickRefused`, `AdmitRefused`, `ListRefused`, `TranscriptRefused`, `SayRefused`, `StopRefused`
- * for `stop`, and `InputRefused` for `answer` and `close`. `SayUnsent` is `say`'s failure that is not a refusal; a `JournalError` or a
+ * whose `exitCode` is 2: `FileRefused`, `TickRefused`, `AdmitRefused`, `ListRefused`, `TranscriptRefused`, `SayRefused`, `QuotaRefused`,
+ * `StopRefused` for `stop`, and `InputRefused` for `answer` and `close`. `SayUnsent` is `say`'s failure that is not a refusal; a `JournalError` or a
  * `RunnerError` is the store's or the harness's. `watch`, `io` and `start` succeed at once: `watch` and `start` with a handle that stops
  * them.
  */
@@ -138,6 +147,7 @@ export type EngineShape = {
     after?: TranscriptCursor,
   ) => Effect.Effect<Transcript, TranscriptRefused | JournalError | RunnerError>;
   readonly say: (taskId: string, text: string) => Effect.Effect<Said, SayRefused | SayUnsent | JournalError>;
+  readonly quota: (harness?: string) => Effect.Effect<HarnessQuota, QuotaRefused | RunnerError>;
   readonly answer: (taskId: string, text: string, options?: { config?: HarnessArgs }) => Effect.Effect<Input, InputRefused | JournalError>;
   readonly close: (taskId: string) => Effect.Effect<void, InputRefused | JournalError>;
   readonly feed: (after?: Cursor) => Effect.Effect<{ entries: FeedEntry[]; cursor: Cursor; refused?: FeedRefusal[] }, JournalError>;
@@ -192,6 +202,71 @@ const startOf =
     });
 
 /**
+ * `quota` over `runners`, the engine's harnesses as the seam offers them: the quota of the harness named, or of `fallback`, the default
+ * harness, when none is, as its runner answers it (`RunnerOps.quota`). Refused with `QuotaRefused`, in this order: an argument that is not
+ * one harness's name; a harness this engine does not have, naming the ones it has; and one whose runner reports no quota, naming the
+ * ones that do. Each call is one ask, and nothing is journalled.
+ */
+const quotaVerbOf = (runners: Record<string, SeamOps>, fallback: string): EngineShape['quota'] =>
+  Effect.fn('Engine.quota')(function* (harness?: string) {
+    const refuse = (message: string) => Effect.fail(new QuotaRefused({ message }));
+    const args = [...arguments];
+    if (args.length > 1 || (harness !== undefined && typeof harness !== 'string')) {
+      return yield* refuse(
+        `takes one harness's name, or nothing for the default harness (\`${fallback}\`); it was handed ${args.map((a) => JSON.stringify(a)).join(', ')}.`,
+      );
+    }
+    const name = harness ?? fallback;
+    if (!Object.hasOwn(runners, name)) {
+      return yield* refuse(`\`${name}\` is not a harness this engine has. Its harnesses are: ${Object.keys(runners).join(', ')}.`);
+    }
+    const ask = runners[name].quota;
+    if (!ask) {
+      const some = Object.keys(runners).filter((h) => runners[h].quota);
+      return yield* refuse(
+        `the \`${name}\` harness reports no quota. ${some.length ? `Ask one that does: ${some.join(', ')}.` : 'None of the harnesses this engine has does.'}`,
+      );
+    }
+    return yield* ask;
+  });
+
+/**
+ * `ops` with its observes counted into `observed`, under `name`, on the way (`ObserveCount`): each call, its time, what it listed, the
+ * registries it asked (`spawned`), and whether it left anything unread, a failed look counting as unread.
+ */
+const countedInto =
+  (observed: Record<string, ObserveCount>) =>
+  <R extends RunnerOps>(name: string, ops: R): R => {
+    const count = <A>(look: Effect.Effect<A, RunnerError>, read: (a: A) => { listed: number; unread: boolean }) =>
+      Effect.suspend(() => {
+        const t0 = performance.now();
+        const spawned = ioCounts().spawned;
+        return Effect.onExit(look, (exit) =>
+          Effect.sync(() => {
+            const o = (observed[name] ??= { ...NONE });
+            o.calls++;
+            o.ms += performance.now() - t0;
+            o.spawned += ioCounts().spawned - spawned;
+            const r = Exit.isSuccess(exit) ? read(exit.value) : { listed: 0, unread: true };
+            o.listed += r.listed;
+            if (r.unread) o.unread++;
+          }),
+        );
+      });
+    const observeFor = ops.observeFor;
+    return {
+      ...ops,
+      observe: count(ops.observe, (m) => ({ listed: m.size, unread: false })),
+      ...(observeFor
+        ? {
+            observeFor: (expected: readonly ExpectedSession[]) =>
+              count(observeFor(expected), (o) => ({ listed: o.seen.size, unread: o.unread.size > 0 })),
+          }
+        : {}),
+    };
+  };
+
+/**
  * The engine over `options` that `Engine.layer` builds: the file-backed store under `root` (`~/.agent-engine` by default) or the
  * `journal` given, and the `harnesses` given — by default `claude`, `codex` and `claude-detached`. Built once, and shared by every verb:
  *
@@ -222,35 +297,7 @@ const make = (options: EngineOptions) =>
     const journal = options.journal ? journalOf(options.journal) : Journal.layer(journalOps!);
     const events = (taskId: string) => Effect.runPromise(Effect.flatMap(Journal, (j) => j.read(taskId)).pipe(Effect.provide(journal)));
     const observed: Record<string, ObserveCount> = {};
-    const counted = <R extends RunnerOps>(name: string, ops: R): R => {
-      const count = <A>(look: Effect.Effect<A, RunnerError>, read: (a: A) => { listed: number; unread: boolean }) =>
-        Effect.suspend(() => {
-          const t0 = performance.now();
-          const spawned = ioCounts().spawned;
-          return Effect.onExit(look, (exit) =>
-            Effect.sync(() => {
-              const o = (observed[name] ??= { ...NONE });
-              o.calls++;
-              o.ms += performance.now() - t0;
-              o.spawned += ioCounts().spawned - spawned;
-              const r = Exit.isSuccess(exit) ? read(exit.value) : { listed: 0, unread: true };
-              o.listed += r.listed;
-              if (r.unread) o.unread++;
-            }),
-          );
-        });
-      const observeFor = ops.observeFor;
-      return {
-        ...ops,
-        observe: count(ops.observe, (m) => ({ listed: m.size, unread: false })),
-        ...(observeFor
-          ? {
-              observeFor: (expected: readonly ExpectedSession[]) =>
-                count(observeFor(expected), (o) => ({ listed: o.seen.size, unread: o.unread.size > 0 })),
-            }
-          : {}),
-      };
-    };
+    const counted = countedInto(observed);
     const observedNow = (): Record<string, ObserveCount> =>
       Object.fromEntries(Object.entries(observed).map(([name, o]) => [name, { ...o }]));
     const runners = Object.fromEntries(
@@ -514,6 +561,7 @@ const make = (options: EngineOptions) =>
         ),
       transcript: transcriptVerb,
       say: sayVerb,
+      quota: quotaVerbOf(runners, fallback),
       answer: answerVerb,
       close: (taskId) => go(close(taskId)),
       feed: feedVerb,

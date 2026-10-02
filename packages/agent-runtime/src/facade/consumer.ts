@@ -4,7 +4,7 @@
  * refuses of them.
  */
 import type { Event, Input, LifecycleStep, Said } from '../core/index.ts';
-import type { HarnessArgs, RunnerOps, Transcript, TranscriptCursor } from '../harness/index.ts';
+import type { HarnessArgs, HarnessQuota, RunnerOps, Transcript, TranscriptCursor } from '../harness/index.ts';
 import {
   Journal,
   JournalError,
@@ -314,6 +314,20 @@ export type Engine = {
    * result are taken and may never be read.
    */
   say: (taskId: string, text: string) => Promise<Said>;
+  /**
+   * What a harness's subscription has left (`HarnessQuota`), asked of `harness`, or of the default harness when none is named: the
+   * plan's limits, each with its use and its reset, or why there are none. Claude Code answers it, as `claude` and as `claude-bg`, by
+   * starting the `claude` on PATH with its `get_usage` request: no prompt, no model called. Every way the ask goes is an answer —
+   * no `claude` on PATH is `missing`, one that ends or does not answer in time is `failed` or `timeout` — never a rejection.
+   *
+   * Each call is one ask: nothing is kept, so a caller that reads often keeps the answer itself, since the usage endpoint behind
+   * Claude Code's answer is reported to refuse an account that asks in bursts. No session is touched, and nothing is journalled.
+   *
+   * Refused — rejected with an `Error` whose `exitCode` is 2 — in this order: an argument that is not one harness's name; a harness this
+   * engine does not have, naming the ones it has; and one that reports no quota (`codex`, a `HarnessSpec`, a remote A2A agent, a
+   * `PromiseRunner`), naming the ones that do.
+   */
+  quota: (harness?: string) => Promise<HarnessQuota>;
   /**
    * Answer a task held open (`holdOpen`) that waits for one — phase `input-required`. Journalled as an `input` entry — `at`,
    * `text`, and `config` if given — which is returned, and which `view` carries as `state.inputs`. The next tick starts

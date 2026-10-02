@@ -35,7 +35,8 @@
  *
  * A stop heard once the harness runs ends its process group, and kills what is left of it `STOP_GRACE_MS` later: the worker
  * exits only once the group is empty, since a child that ignored SIGTERM, left behind by a harness that did not, has
- * nothing to find it by after.
+ * nothing to find it by after. A harness a stop ended is written with no exit code, -1, whatever it exited with: how a process
+ * ends on SIGTERM is no answer of its own.
  *
  * The run file is the session. Removed — the file alone, or the store it is in — the session has been taken away, and
  * nobody is left who could stop its harness: `stop` finds a worker by its run file. So the worker takes a run file gone
@@ -43,7 +44,10 @@
  * the heartbeat, within five seconds, or sooner at a word or an id. Its parent going is not a stop: outliving the engine
  * is what it is for.
  *
- * argv: <runFile>  — JSON: { cmd, args, cwd, logFile, stopFile?, nativeIdPattern?, input?, inputAt? }
+ * The harness's environment is the worker's, with the plan's `env` over it. Its stdout and stderr both go to the log, in the order
+ * they arrive; with `streams`, each also goes whole to a file of its own, the one place a reader finds one apart from the other.
+ *
+ * argv: <runFile>  — JSON: { cmd, args, cwd, logFile, env?, streams?, stopFile?, nativeIdPattern?, input?, inputAt? }
  */
 import fs from 'node:fs';
 import { spawn } from 'node:child_process';
@@ -54,6 +58,8 @@ const plan = JSON.parse(fs.readFileSync(runFile, 'utf8')) as {
   args: string[];
   cwd: string;
   logFile: string;
+  env?: Record<string, string>;
+  streams?: { stdout: string; stderr: string };
   stopFile?: string;
   nativeIdPattern?: string;
   pid?: number;
@@ -185,7 +191,12 @@ const input = plan.input;
  * A harness that shells out, as Codex does, otherwise leaves orphans, and an orphaned build holds the worktree the next
  * attempt wants.
  */
-const child = spawn(plan.cmd, plan.args, { cwd: plan.cwd, stdio: [input ? 'pipe' : 'ignore', 'pipe', 'pipe'], detached: true });
+const child = spawn(plan.cmd, plan.args, {
+  cwd: plan.cwd,
+  env: { ...process.env, ...plan.env },
+  stdio: [input ? 'pipe' : 'ignore', 'pipe', 'pipe'],
+  detached: true,
+});
 spawned = true;
 /**
  * The run's log, which takes the harness's stdout and stderr. Its error — output that arrives after it is closed, from a child
@@ -193,6 +204,15 @@ spawned = true;
  */
 const log = fs.createWriteStream(plan.logFile, { flags: 'a' });
 log.on('error', () => {});
+/** Each stream's own file, for a plan with `streams`: written as the log is, and its error heard and dropped as the log's. */
+const whole = plan.streams && { stdout: fs.createWriteStream(plan.streams.stdout), stderr: fs.createWriteStream(plan.streams.stderr) };
+for (const file of Object.values(whole ?? {})) file.on('error', () => {});
+/** Ends the log and each stream's file, and calls `done` once every one of them is on disk. */
+const endFiles = (done: () => void) => {
+  const files = [log, ...Object.values(whole ?? {})];
+  let left = files.length;
+  for (const file of files) file.end(() => --left === 0 && done());
+};
 
 /** The harness's own id, found in its output when it prints one: needed only to resume its session; the run's name is the key. */
 const nativeId = plan.nativeIdPattern ? new RegExp(plan.nativeIdPattern) : null;
@@ -203,8 +223,13 @@ const scan = (chunk: Buffer) => {
     if (m?.[1]) write({ nativeId: m[1] });
   }
 };
+const keep = (file: fs.WriteStream | undefined) => (chunk: Buffer) => {
+  if (file && !file.writableEnded) file.write(chunk);
+};
 child.stdout!.on('data', scan);
 child.stderr!.on('data', scan);
+child.stdout!.on('data', keep(whole?.stdout));
+child.stderr!.on('data', keep(whole?.stderr));
 
 const beat = setInterval(() => write(), 5_000);
 beat.unref?.();
@@ -287,8 +312,8 @@ child.on('exit', (code) => {
   const drained = Promise.all([closed(child.stdout!), closed(child.stderr!)]);
   const bound = new Promise<void>((resolve) => setTimeout(resolve, DRAIN_MS).unref());
   void Promise.race([drained, bound]).then(() =>
-    log.end(() => {
-      write({ state: stopping ? 'stopped' : code === 0 ? 'done' : 'failed', exitCode: code ?? -1 });
+    endFiles(() => {
+      write({ state: stopping ? 'stopped' : code === 0 ? 'done' : 'failed', exitCode: stopping ? -1 : (code ?? -1) });
       setTimeout(() => void leave(0), 50);
     }),
   );
@@ -299,6 +324,6 @@ child.on('error', (e) => {
   clearInterval(inbox);
   write({ state: 'failed', exitCode: -1 });
   log.write(`\n[worker] spawn failed: ${String(e)}\n`);
-  log.end();
+  endFiles(() => {});
   setTimeout(() => process.exit(1), 50);
 });

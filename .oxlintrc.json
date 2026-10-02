@@ -837,7 +837,7 @@
     {
       "files": ["packages/agent-runtime/src/a2a/client.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 105, "skipBlankLines": true, "skipComments": true }]
+        "max-lines-per-function": ["error", { "max": 104, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
@@ -857,9 +857,9 @@
     {
       "files": ["packages/agent-runtime/src/cli/main.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 129, "skipBlankLines": true, "skipComments": true }],
-        "complexity": ["error", { "max": 53 }],
-        "sonarjs/cognitive-complexity": ["error", 59]
+        "max-lines-per-function": ["error", { "max": 121, "skipBlankLines": true, "skipComments": true }],
+        "complexity": ["error", { "max": 49 }],
+        "sonarjs/cognitive-complexity": ["error", 53]
       }
     },
     {
@@ -900,7 +900,7 @@
     {
       "files": ["packages/agent-runtime/src/harness/args.ts"],
       "rules": {
-        "complexity": ["error", { "max": 31 }],
+        "complexity": ["error", { "max": 30 }],
         "sonarjs/cognitive-complexity": ["error", 27]
       }
     },
@@ -927,7 +927,7 @@
     {
       "files": ["packages/agent-runtime/src/harness/detached/detached.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 181, "skipBlankLines": true, "skipComments": true }]
+        "max-lines-per-function": ["error", { "max": 179, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
@@ -954,7 +954,7 @@
     {
       "files": ["packages/agent-runtime/src/service/engine.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 274, "skipBlankLines": true, "skipComments": true }],
+        "max-lines-per-function": ["error", { "max": 271, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 27 }],
         "sonarjs/cognitive-complexity": ["error", 23]
       }

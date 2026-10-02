@@ -1,0 +1,95 @@
+/**
+ * The package's `test` script loads `test/ambient.ts` into every test file's process, so a test that reads `WF_MAX_RUNS` or
+ * `WF_MAX_CONCURRENT` without setting it is refused, whatever the shell or the daemon that runs the check has set. Proven on fixtures run
+ * by `node --test` with the script's own flags, from the package, with the daemon's ceilings in their environment: one that relies on
+ * a default fails naming the sentinel, and one that deletes the variable first passes.
+ */
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
+import { SENTINEL } from './ambient.ts';
+import { scratch } from './scratch.ts';
+
+const PACKAGE = path.join(import.meta.dirname, '..');
+const CONFIG = pathToFileURL(path.join(PACKAGE, 'src', 'config', 'config.store.ts')).href;
+const script = (JSON.parse(fs.readFileSync(path.join(PACKAGE, 'package.json'), 'utf8')) as { scripts: { test: string } }).scripts.test;
+
+/**
+ * Why `script` may run a test file with the ceilings this machine has, or null when it may not: it loads `./test/ambient.ts` with
+ * `--import` before `--test`.
+ */
+function scriptUnguarded(script: string): string | null {
+  const words = script.trim().split(/\s+/);
+  const at = words.findIndex((w, i) => w === '--import=./test/ambient.ts' || (w === '--import' && words[i + 1] === './test/ambient.ts'));
+  const run = words.indexOf('--test');
+  if (words[0] === 'node' && at > 0 && run > at) return null;
+  return `the test script (${script}) runs its test files with the ceilings of the shell that runs it. Make it \`node --import ./test/ambient.ts --test …\`.`;
+}
+
+/**
+ * A test file that reads `name` through `reader` and expects `expected`, deleting the variable first when `names` is true, run with
+ * the flags `script` gives `node` before `--test`, from the package, with the daemon's ceilings in its environment.
+ */
+function runFixture(reader: 'maxRuns' | 'maxConcurrent', name: string, expected: number, names: boolean) {
+  const dir = scratch('wf-ambient-');
+  const file = path.join(dir, 'fixture.test.mjs');
+  fs.writeFileSync(
+    file,
+    [
+      "import { test } from 'node:test';",
+      "import assert from 'node:assert/strict';",
+      `import { ${reader} } from '${CONFIG}';`,
+      names ? `delete process.env.${name};` : '',
+      `test('the default', () => assert.equal(${reader}(), ${expected}));`,
+      '',
+    ].join('\n'),
+  );
+  const words = script.trim().split(/\s+/);
+  const flags = words.slice(1, words.indexOf('--test'));
+  const env: Record<string, string | undefined> = { ...process.env, WF_MAX_RUNS: '6', WF_MAX_CONCURRENT: '50' };
+  for (const key of ['NODE_TEST_CONTEXT', 'NODE_OPTIONS']) delete env[key];
+  return spawnSync(process.execPath, [...flags, '--test', file], { cwd: PACKAGE, env, encoding: 'utf8', timeout: 60_000 });
+}
+
+test("the package's test script loads test/ambient.ts with --import before --test", () => {
+  assert.equal(scriptUnguarded(script), null);
+});
+
+test('REFUSED: a test script without the ambient hook, with another file, or with it after --test, is named, with the fix', () => {
+  for (const bad of [
+    "node --test 'test/*.test.ts' 'src/**/*.test.ts'",
+    "node --import ./test/scratch.ts --test 'test/*.test.ts'",
+    "node --test --import ./test/ambient.ts 'test/*.test.ts'",
+  ]) {
+    assert.equal(
+      scriptUnguarded(bad),
+      `the test script (${bad}) runs its test files with the ceilings of the shell that runs it. Make it \`node --import ./test/ambient.ts --test …\`.`,
+    );
+  }
+  assert.equal(scriptUnguarded("node --import=./test/ambient.ts --test 'test/*.test.ts'"), null);
+});
+
+test("REFUSED under the daemon's WF_MAX_RUNS=6: a test file that relies on WF_MAX_RUNS's default fails, naming the variable to set", () => {
+  const ran = runFixture('maxRuns', 'WF_MAX_RUNS', 0, false);
+  assert.equal(ran.status, 1, `${ran.stdout}\n${ran.stderr}`);
+  assert.ok(ran.stdout.includes(`WF_MAX_RUNS=${SENTINEL} is not a count.`), ran.stdout);
+});
+
+test("REFUSED under the daemon's WF_MAX_CONCURRENT=50: a test file that relies on WF_MAX_CONCURRENT's default fails, naming the variable", () => {
+  const ran = runFixture('maxConcurrent', 'WF_MAX_CONCURRENT', 2, false);
+  assert.equal(ran.status, 1, `${ran.stdout}\n${ran.stderr}`);
+  assert.ok(ran.stdout.includes(`WF_MAX_CONCURRENT=${SENTINEL} is not a count from 1.`), ran.stdout);
+});
+
+test("a test file that deletes the ceiling it reads gets its default, whatever the daemon's", () => {
+  for (const [reader, name, expected] of [
+    ['maxRuns', 'WF_MAX_RUNS', 0],
+    ['maxConcurrent', 'WF_MAX_CONCURRENT', 2],
+  ] as const) {
+    const ran = runFixture(reader, name, expected, true);
+    assert.equal(ran.status, 0, `${name}: ${ran.stdout}\n${ran.stderr}`);
+  }
+});

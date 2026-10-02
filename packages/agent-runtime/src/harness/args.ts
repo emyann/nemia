@@ -95,6 +95,25 @@ export type HarnessArgs = {
    * would start its session without them, and unless an object holding only `trustFrom`, an absolute path.
    */
   codex?: CodexArgs;
+  /**
+   * The process the session is, as a Pod's container gives its `command` and `args`: the program first, then each argument as it
+   * reaches it, no shell between — `['sh', '-c', 'npm test']`. Read by a `HarnessSpec` with `commandArgs` alone (`commandHarness`),
+   * which runs it in the task's `cwd`; refused on any other harness, which would start its session without it, and unless a list
+   * whose first entry names a program and whose every entry is a string with no NUL in it.
+   */
+  command?: string[];
+  /**
+   * What the command's environment holds on top of the worker's own, as a Pod's container gives its `env`: `{ "CI": "1" }`. Read
+   * by a `HarnessSpec` with `commandArgs` alone, and refused on any other harness. Journalled with the task, so it carries no
+   * secret. Refused unless an object whose keys are variable names and whose values are strings with no NUL in them.
+   */
+  env?: Record<string, string>;
+  /**
+   * How far the command's priority is lowered: `nice -n` with it, and the idle IO class where `ionice -c3` runs on the machine.
+   * Read by a `HarnessSpec` with `commandArgs` alone, and refused on any other harness. Absent or 0: the worker's own priority.
+   * Refused unless a whole number from 0 to 19.
+   */
+  niceness?: number;
 };
 
 /**
@@ -120,6 +139,9 @@ const KEYS: Record<keyof HarnessArgs, true> = {
   budgetUsd: true,
   claude: true,
   codex: true,
+  command: true,
+  env: true,
+  niceness: true,
 };
 export const HARNESS_ARGS = Object.keys(KEYS) as ReadonlyArray<keyof HarnessArgs>;
 
@@ -242,8 +264,12 @@ export const argsRefusalOf = (spec: { config?: HarnessArgs }): string | undefine
   if (config.budgetUsd !== undefined && !isDollars(config.budgetUsd)) {
     return `\`budgetUsd: ${shown(config.budgetUsd)}\` is not an amount of dollars. Give dollars above 0, like 5 or 0.25, or leave it out for no cap.`;
   }
-  return claudeFlagsRefusalOf(config.claude) ?? codexArgsRefusalOf(config.codex);
+  return ownArgsRefusalOf(config);
 };
+
+/** Why the arguments one kind of harness alone reads cannot reach it — Claude Code's flags, Codex's own, a command's — or `undefined`. */
+const ownArgsRefusalOf = (config: HarnessArgs): string | undefined =>
+  claudeFlagsRefusalOf(config.claude) ?? codexArgsRefusalOf(config.codex) ?? commandArgsRefusalOf(config);
 
 /** A flag's name in camelCase, two letters or more: a one-letter flag is Claude Code's short form, which has a long one. */
 const FLAG_KEY = /^[a-z][a-zA-Z0-9]+$/;
@@ -287,6 +313,40 @@ const codexArgsRefusalOf = (args: unknown): string | undefined => {
   const { trustFrom } = args as CodexArgs;
   if (trustFrom !== undefined && !(typeof trustFrom === 'string' && path.isAbsolute(trustFrom))) {
     return `\`codex.trustFrom: ${JSON.stringify(trustFrom)}\` is not an absolute directory. Name the directory you trust in your Codex config by its absolute path, like "/path/to/repo", or leave it out to extend no trust.`;
+  }
+  return undefined;
+};
+
+/** A variable's name as a shell and `env` take one: a letter or an underscore first, then letters, digits and underscores. */
+const ENV_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+/** A string a process can be handed: one with no NUL, which would end it early on its way to the program. */
+const isArg = (v: unknown): v is string => typeof v === 'string' && !v.includes(String.fromCharCode(0));
+
+/**
+ * Why a task's `command`, `env` or `niceness` cannot reach a process — or `undefined`: a `command` that is not a list whose first
+ * entry names a program, or holds an entry that is no string or has a NUL; an `env` that is not an object of variable names to
+ * strings with no NUL; a `niceness` that is not a whole number from 0 to 19.
+ */
+const commandArgsRefusalOf = ({ command, env, niceness }: HarnessArgs): string | undefined => {
+  if (command !== undefined && !(Array.isArray(command) && command.length > 0 && command[0] !== '' && command.every(isArg))) {
+    return `\`command: ${JSON.stringify(command)}\` is not a command. Give the program and its arguments as a list of strings, the program first, like ["sh", "-c", "npm test"].`;
+  }
+  if (env !== undefined) {
+    if (typeof env !== 'object' || env === null || Array.isArray(env)) {
+      return `\`env: ${JSON.stringify(env)}\` is not an environment. Give an object of variable names to strings, like { "CI": "1" }, or leave it out.`;
+    }
+    const name = Object.keys(env).find((key) => !ENV_NAME.test(key));
+    if (name !== undefined) {
+      return `\`env.${name}\` is not a variable's name. Name it with letters, digits and underscores, a letter or an underscore first, like CI or WF_RUN.`;
+    }
+    const value = Object.keys(env).find((key) => !isArg(env[key]));
+    if (value !== undefined) {
+      return `\`env.${value}: ${JSON.stringify(env[value])}\` is not a variable's value. Give a string with no NUL in it, like "1".`;
+    }
+  }
+  if (niceness !== undefined && !(Number.isSafeInteger(niceness) && niceness >= 0 && niceness <= 19)) {
+    return `\`niceness: ${shown(niceness)}\` is not a niceness. Give a whole number from 0 to 19, like 10, or leave it out for the worker's own priority.`;
   }
   return undefined;
 };

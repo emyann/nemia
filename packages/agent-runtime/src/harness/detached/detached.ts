@@ -13,8 +13,9 @@
  * and therefore the price of running more than one harness.
  *
  * What it buys: this file has no idea what a harness is. It needs a command, a working directory
- * and an exit code — so a new harness is a `HarnessSpec` value, not new code. The two shipped are
- * `codex` (`harness/codex/codex.ts`) and `claudeDetached` (`harness/claude/code.ts`).
+ * and an exit code — so a new harness is a `HarnessSpec` value, not new code. The three shipped are
+ * `codex` (`harness/codex/codex.ts`), `claudeDetached` (`harness/claude/code.ts`) and `commandHarness`
+ * (`harness/command/command.ts`).
  */
 import { Effect, Result, Schema, SchemaIssue } from 'effect';
 import fs from 'node:fs';
@@ -25,14 +26,17 @@ import type { Denial, Sighting, Usage, SessionState } from '../../core/index.ts'
 import { RunnerError, type Observation, type RunnerOps, type SpawnRequest, type TranscriptEvent } from '../seam.ts';
 import { writeMcpConfig } from '../mcp.ts';
 import { readTranscript } from '../transcript.ts';
-import { countSpawn, readText } from '../../core/engine/tally.ts';
+import { countRead, countSpawn, readText } from '../../core/engine/tally.ts';
 import { outputIn, type SaidMemo } from './said.ts';
 
 /** Everything this engine needs to know about a harness. Add one by writing one of these. */
 export type HarnessSpec = {
   name: string;
-  /** The command that runs a brief to completion. Exit 0 is success; anything else is failure. */
-  command: (r: SpawnRequest, io?: HarnessIO) => { cmd: string; args: string[] };
+  /**
+   * The command that runs a brief to completion. Exit 0 is success; anything else is failure. `env`, when given, is laid over
+   * the worker's own environment for this process alone.
+   */
+  command: (r: SpawnRequest, io?: HarnessIO) => { cmd: string; args: string[]; env?: Record<string, string> };
   /**
    * What this harness needs to know about the machine before it runs — read from disk, from git —
    * kept out of `command` so that stays a pure function of what it is given. Merged into the `io`
@@ -117,6 +121,16 @@ export type HarnessSpec = {
    * off. Where there is no such run, or it printed no total, the attempt carries no cost rather than its parent's too.
    */
   resumeCostCarried?: true;
+  /**
+   * The harness runs the process a task's `config.command` names, with its `config.env` and `config.niceness` (`commandHarness`).
+   * Absent: the harness has no such arguments, and `file()` refuses a task that carries them rather than run something else.
+   */
+  commandArgs?: true;
+  /**
+   * The worker keeps the harness's stdout and its stderr each whole, in a file of its own beside the log (`.stdout`, `.stderr`),
+   * and the runner reads them (`output`). Absent: the log alone, both streams in one, and the runner has no `output`.
+   */
+  streams?: true;
 };
 
 /**
@@ -137,6 +151,8 @@ export type HarnessIO = {
   mcpConfigFile?: string;
   /** The checkout's own `.mcp.json`, when there is one. Found by a spec's `prepare`, which reads the disk. */
   checkoutMcpConfig?: string;
+  /** `ionice -c3` runs on this machine, so a command can be put in the idle IO class. Found by a spec's `prepare`. */
+  idleIo?: true;
 };
 
 /** What a harness's output said, as its spec's `readOutput` found it. Each part absent when it does not say. */
@@ -411,6 +427,55 @@ const sayTo =
         new RunnerError({ verb: 'say', message: `${spec.name}: ${cause instanceof Error ? cause.message : String(cause)}` }),
     });
 
+/** One of a process's two output streams, by the name its file and `output` give it. */
+export type StreamName = 'stdout' | 'stderr';
+
+/**
+ * What `file` holds, or its last `lastBytes` bytes, as text; `undefined` when there is no such file. A cut that falls inside a
+ * character starts after it: the bytes that continue a character cut in two are left off.
+ */
+const streamIn = (file: string, lastBytes?: number): string | undefined => {
+  let fd: number;
+  try {
+    fd = fs.openSync(file, 'r');
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+    throw e;
+  }
+  try {
+    const size = fs.fstatSync(fd).size;
+    const from = lastBytes === undefined ? 0 : Math.max(0, size - lastBytes);
+    const buf = Buffer.alloc(size - from);
+    const n = fs.readSync(fd, buf, 0, buf.length, from);
+    countRead(n);
+    const whole = from === 0 ? 0 : buf.subarray(0, n).findIndex((byte) => (byte & 0xc0) !== 0x80);
+    return buf.subarray(whole === -1 ? n : whole, n).toString('utf8');
+  } finally {
+    fs.closeSync(fd);
+  }
+};
+
+/** The run `name` names under `spec`'s folder at `root`, or `undefined` when it has none or its file cannot be read. */
+const runNamed = (spec: HarnessSpec, root: string, name: string): Run | undefined => {
+  const at = runAt(spec, root, name);
+  return at && 'run' in at ? { name, run: at.run } : undefined;
+};
+
+/** The file a run's `stream` is kept whole in, beside its run file in `dir`. */
+const streamFileOf = (dir: string, name: string, stream: StreamName) => path.join(dir, `${safe(name)}.${stream}`);
+
+/** The runner's `output`, for a spec that keeps its streams (`streams`): each read from its own file in `dir` (`streamIn`). */
+const outputOps = (spec: HarnessSpec, dir: string): Pick<RunnerOps, 'output'> =>
+  spec.streams
+    ? {
+        output: (name, stream, lastBytes) =>
+          Effect.try({
+            try: () => streamIn(streamFileOf(dir, name, stream), lastBytes),
+            catch: (cause) => new RunnerError({ verb: 'output', message: `${spec.name}: ${String(cause)}` }),
+          }),
+      }
+    : {};
+
 /**
  * The runner of a detached harness: a worker per session (`bin/ae-worker.ts`), and the directory `runs/<spec's name>`
  * under `root` as its registry, read fresh every pass, the same shape as `claude agents`. Beside each run file: the
@@ -446,7 +511,7 @@ const sayTo =
  *      refuses one at both doors; this is for a journal written otherwise, or by hand, and a caller of the runner itself.
  *   2. Refuses a `cwd` that is not a directory, because `spawn` does not throw for it: the child emits the error later,
  *      and, unheard, that event kills the process that launched the worker — the engine.
- *   3. Clears the previous attempt's closeout, output, what was read of its output, and stop: a re-spawn of the same
+ *   3. Clears the previous attempt's closeout, output and its streams, what was read of its output, and stop: a re-spawn of the same
  *      attempt must not find the previous one's answer waiting for it, in its file or in the output a spec reads one from,
  *      nor a stop asked of it, which its worker would read as asked of this one and start nothing.
  *   4. Writes the closeout's schema, and writes or clears the MCP config: a re-spawn is given the servers its task names,
@@ -483,6 +548,8 @@ const sayTo =
  *   Whichever came first, one of the two sees the other — a worker that read no stop published its pid before the stop
  *   was written, so the second read finds it — and a stop that lands at any moment is heard, on the pass that sends it.
  * - `logs`: the last 8000 characters of the harness's output.
+ * - `output` (a spec with `streams`): one stream of the run under a name, whole or its last bytes, read from its own file
+ *   alone; `undefined` when there is none, a run spawned before the spec kept streams among them.
  * - `transcript` (a spec with `transcript`): the conversation, from the harness's own record, found by the harness's own
  *   id — the run's `nativeId`, which the worker reads off what the harness prints, so until it has printed one there is
  *   nothing to read. A name with no run file is taken for that id itself: the id an attempt's end was recorded with,
@@ -518,10 +585,7 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
     return out;
   };
 
-  const find = (name: string): Run | undefined => {
-    const at = runAt(spec, root, name);
-    return at && 'run' in at ? { name, run: at.run } : undefined;
-  };
+  const find = (name: string): Run | undefined => runNamed(spec, root, name);
 
   const statementOf = (name: string): Sighting['closeout'] => {
     const f = closeoutFile(name);
@@ -586,12 +650,10 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
           const r = { ...asked, cwd: path.resolve(asked.cwd) };
           if (!isDirectory(r.cwd)) throw new Error(`cwd ${r.cwd} is not a directory`);
           fs.mkdirSync(dir, { recursive: true });
-          try {
-            fs.rmSync(closeoutFile(r.name));
-          } catch {}
-          fs.rmSync(logFile(r.name), { force: true });
-          fs.rmSync(saidFile(r.name), { force: true });
-          fs.rmSync(stopFile(r.name), { force: true });
+          const streams = { stdout: streamFileOf(dir, r.name, 'stdout'), stderr: streamFileOf(dir, r.name, 'stderr') };
+          for (const f of [closeoutFile(r.name), logFile(r.name), saidFile(r.name), stopFile(r.name), ...Object.values(streams)]) {
+            fs.rmSync(f, { force: true });
+          }
           outputs.delete(r.name);
           let io: HarnessIO = {};
           if (r.closeoutSchema) {
@@ -601,7 +663,7 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
           const mcpConfigFile = writeMcpConfig(mcpFile(r.name), r.config?.mcp);
           if (mcpConfigFile) io = { ...io, mcpConfigFile };
           io = { ...io, ...spec.prepare?.(r) };
-          const { cmd, args } = spec.command(r, io);
+          const { cmd, args, env } = spec.command(r, io);
           const input: RunInput | undefined = spec.input && {
             first: spec.input.line(r.brief),
             inbox: inboxFile(r.name),
@@ -614,6 +676,8 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
             args,
             cwd: r.cwd,
             logFile: logFile(r.name),
+            ...(env ? { env } : {}),
+            ...(spec.streams ? { streams } : {}),
             stopFile: stopFile(r.name),
             nativeIdPattern: spec.nativeIdPattern,
             ...(spec.resumeCostCarried && r.resumeFrom
@@ -687,6 +751,7 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
         catch: (cause) => new RunnerError({ verb: 'logs', message: String(cause) }),
       }),
 
+    ...outputOps(spec, dir),
     ...(spec.transcript ? { transcript: transcriptOf(spec.transcript) } : {}),
     ...(spec.input ? { say: sayTo(spec, root, spec.input) } : {}),
   };

@@ -18,6 +18,8 @@ const INBOX = path.join(ROOT, 'inbox');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
 process.env.WF_ROOT = ROOT;
+delete process.env.WF_MAX_CONCURRENT;
+delete process.env.WF_MAX_RUNS;
 const { addToInbox, dropFromInbox, inboxDir, readInbox, start, startFromInbox } = await import('../runner.ts');
 const { readRun } = await import('../record/record.store.ts');
 const { runStore } = await import('../record/files.store.ts');

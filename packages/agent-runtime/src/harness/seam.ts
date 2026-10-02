@@ -161,6 +161,12 @@ export type RunnerOps = {
   readonly stop: (sessionId: string) => Effect.Effect<void, RunnerError>;
   readonly logs: (sessionId: string) => Effect.Effect<string, RunnerError>;
   /**
+   * One stream of the session under `name`, `stdout` or `stderr`, as the harness kept it whole — or its last `lastBytes` bytes —
+   * read from that stream alone; `undefined` when it kept none under the name. Optional: a harness that keeps no stream apart
+   * from the other has `logs`, and that is all.
+   */
+  readonly output?: (name: string, stream: 'stdout' | 'stderr', lastBytes?: number) => Effect.Effect<string | undefined, RunnerError>;
+  /**
    * Let go of a session whose attempt's end the engine has written down: stop it if it still runs,
    * and take it out of the harness's registry. Optional — a harness whose registry is the record
    * (a detached runner's run files, which `logs` reads) has nothing to let go of.

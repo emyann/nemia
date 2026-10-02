@@ -52,6 +52,7 @@ import {
   MOST_PER_PAGE,
   type RuntimeExtensionParams,
   type SessionMethods,
+  type OutputRequest,
   type TranscriptRequest,
 } from './handler.ts';
 import { followUpOf, messageOf, RUNTIME_EXTENSION, sightingOf, wordsOf } from './map.ts';
@@ -128,6 +129,10 @@ export class InProcessTransport implements Transport {
     return this.handler.sessionLogs(params, new ServerCallContext());
   }
 
+  sessionOutput(params: OutputRequest): Promise<{ output: string | null }> {
+    return this.handler.sessionOutput(params, new ServerCallContext());
+  }
+
   releaseSession(params: { session: Sighting; task: { worktree?: string | boolean } }): Promise<{ usage: Usage | null }> {
     return this.handler.releaseSession(params, new ServerCallContext());
   }
@@ -176,6 +181,18 @@ const call = <A>(verb: string, f: () => Promise<A>): Effect.Effect<A, RunnerErro
         : Effect.die(cause),
     ),
   );
+
+/** `find` through the seam: the session running under a name, `undefined` when none does. */
+const findThrough =
+  (transport: InProcessTransport) =>
+  (name: string): Effect.Effect<{ sessionId: string } | undefined, RunnerError> =>
+    call('find', () => transport.findSession({ name })).pipe(Effect.map((found) => found ?? undefined));
+
+/** `output` through the seam: one stream of the session under a name, whole or its last bytes; `undefined` when none was kept. */
+const outputThrough =
+  (transport: InProcessTransport) =>
+  (name: string, stream: 'stdout' | 'stderr', lastBytes?: number): Effect.Effect<string | undefined, RunnerError> =>
+    call('output', () => transport.sessionOutput({ name, stream, lastBytes })).pipe(Effect.map((r) => r.output ?? undefined));
 
 /**
  * What the seam offers the engine: a harness's verbs, and beside them the transcript asked by the session's name
@@ -314,9 +331,6 @@ export const a2aOps = (harness: string, ops: RunnerOps, events: (taskId: string)
       );
     });
 
-  const find = (name: string): Effect.Effect<{ sessionId: string } | undefined, RunnerError> =>
-    call('find', () => transport.findSession({ name })).pipe(Effect.map((found) => found ?? undefined));
-
   const logs = (sessionId: string): Effect.Effect<string, RunnerError> =>
     call('logs', () => transport.sessionLogs({ sessionId })).pipe(Effect.map((r) => r.logs));
 
@@ -348,7 +362,8 @@ export const a2aOps = (harness: string, ops: RunnerOps, events: (taskId: string)
     observe,
     stop,
     logs,
-    ...(offered.methods.includes('findSession') ? { find } : {}),
+    ...(offered.methods.includes('findSession') ? { find: findThrough(transport) } : {}),
+    ...(offered.methods.includes('sessionOutput') ? { output: outputThrough(transport) } : {}),
     ...(offered.methods.includes('releaseSession') ? { release } : {}),
     ...(offered.methods.includes('sessionTranscript') ? { transcript, transcriptOf } : {}),
     ...(offered.methods.includes('observeSessions') ? { observeFor } : {}),

@@ -23,6 +23,9 @@
  * **The runtime is reached through one client**, `CLIENT`, `runtime-client.ts`: of the package's files, it alone imports agent-runtime,
  * a type included; every controller beneath the CLI imports it, or imports a controller that reaches it, and it imports no controller.
  *
+ * The api's `test/kinds.test.ts` holds its readers to the same globals with a copy of the scanners, `PROCESS_ENV` and `FETCH`, which this
+ * test holds to its own: the two packages share no test code.
+ *
  * Each rule is a pure function over a map of each file's imports, run first on planted sources it must refuse (`REFUSED`), so that none
  * passes by seeing nothing, and then on the package. A rule a session can re-break is a rule this suite refuses.
  */
@@ -132,12 +135,21 @@ const withoutComments = (text: string): string =>
     .map((line) => (/^\s*(\/\/|\/\*|\*)/.test(line) ? '' : line))
     .join('\n');
 
+/** `process.env` however a file reaches it: read off `process`, by `['env']`, or destructured from it (`const { env } = process`). */
+const PROCESS_ENV = /\bprocess\s*(?:\.\s*env\b|\[\s*['"`]env['"`]\s*\])|\{[^}]*\benv\b[^}]*\}\s*=\s*(?:globalThis\s*\.\s*)?process\b/;
+
+/**
+ * The global `fetch` however a file reaches it: called, passed, aliased, destructured or typed off; never a method of another object
+ * (`client.fetch`), a longer name (`prefetch`, `sec-fetch-site`), a quoted word or an object's key (`{ fetch: x }`).
+ */
+const FETCH = /(?:^|[^.\w$'"`-])fetch(?![\w$-])(?!\s*:)|\bglobalThis\s*\.\s*fetch\b/m;
+
 /** The impure globals a piece of source reads outside its comment lines, each as `IMPURE_GLOBALS` names it. */
 function globalsIn(text: string): string[] {
   const code = withoutComments(text);
   const found: string[] = [];
-  if (/\bprocess\s*(?:\.\s*env\b|\[\s*['"`]env['"`]\s*\])/.test(code)) found.push('global:process.env');
-  if (/(?:^|[^.\w$])fetch\s*\(|\bglobalThis\s*\.\s*fetch\b/m.test(code)) found.push('global:fetch');
+  if (PROCESS_ENV.test(code)) found.push('global:process.env');
+  if (FETCH.test(code)) found.push('global:fetch');
   return found;
 }
 
@@ -394,11 +406,22 @@ test('the scanner sees the environment and fetch outside comment lines, and only
   ].join('\n');
   assert.deepEqual(globalsIn(text), IMPURE_GLOBALS);
   assert.deepEqual(globalsIn(text.split('\n').slice(0, 2).join('\n')), IMPURE_GLOBALS, 'each on a line of its own');
-  assert.deepEqual(
-    globalsIn('const r = await client.fetch(url);\nconst e = run.process.envelope;'),
-    [],
-    'a method named fetch is no global',
-  );
+  for (const read of ['.then(fetch)', 'const f = fetch;', 'const { fetch } = globalThis;', 'export const t: typeof fetch = f;'])
+    assert.deepEqual(globalsIn(read), ['global:fetch'], `${read} reads the global fetch`);
+  for (const read of ['const { env } = process;', 'const { argv, env: e } = process;', 'const { env } = globalThis.process;'])
+    assert.deepEqual(globalsIn(read), ['global:process.env'], `${read} reads the environment`);
+  assert.deepEqual(globalsIn('const e = globalThis.process.env.X;'), ['global:process.env']);
+  for (const none of [
+    'const r = await client.fetch(url);',
+    'const e = run.process.envelope;',
+    'prefetch(url);',
+    'fetchAll(url);',
+    'const o = { fetch: x };',
+    "const name = 'fetch';",
+    "c.req.header('sec-fetch-site');",
+    'const { envelope } = process;',
+  ])
+    assert.deepEqual(globalsIn(none), [], `${none} reads no global`);
   assert.deepEqual(
     globalsIn(['/**', ' * Reads `process.env.WF_ROOT` and calls `fetch(url)`.', ' */', '// fetch(', '/* process.env */'].join('\n')),
     [],
@@ -407,6 +430,15 @@ test('the scanner sees the environment and fetch outside comment lines, and only
   assert.deepEqual(sourcesOf({ 'src/x/x.ts': "import fs from 'node:fs';\nconst x = process.env.X;" }), {
     'src/x/x.ts': ['node:fs', 'global:process.env'],
   });
+});
+
+test("the api's copy of the globals' scanners is this test's own, character for character", () => {
+  const copy = fs.readFileSync(path.join(PKG, '..', '..', 'apps', 'api', 'test', 'kinds.test.ts'), 'utf8');
+  for (const [name, pattern] of Object.entries({ PROCESS_ENV, FETCH }))
+    assert.ok(
+      copy.includes(`const ${name} = ${String(pattern)};`),
+      `apps/api/test/kinds.test.ts declares ${name} as ${String(pattern)}: copy it from here`,
+    );
 });
 
 test('every file in src and bin is of one kind, and every file a kind names is there', () => {
@@ -519,6 +551,16 @@ test('REFUSED: a pure file that reaches the network or the machine, reads the en
   assert.deepEqual(impurities({ ...packageSources(), ...read }), [
     'src/x/x.ts is pure and imports global:process.env',
     'src/x/x.ts is pure and imports global:fetch',
+  ]);
+  const reached = sourcesOf({
+    'src/x/a.ts': 'export const go = (p: Promise<URL>) => p.then(fetch);',
+    'src/x/b.ts': 'const f = fetch;\nexport const g = f;',
+    'src/x/c.ts': 'const { env } = process;\nexport const home = env.HOME;',
+  });
+  assert.deepEqual(impurities({ ...packageSources(), ...reached }), [
+    'src/x/a.ts is pure and imports global:fetch',
+    'src/x/b.ts is pure and imports global:fetch',
+    'src/x/c.ts is pure and imports global:process.env',
   ]);
   const said = sourcesOf({ 'src/x/x.ts': '/** Reads no `process.env` and calls no `fetch(url)`. */\nexport const x = 1;' });
   assert.deepEqual(impurities({ ...packageSources(), ...said }), [], 'a JSDoc that names them is let through');

@@ -148,6 +148,7 @@ stateDiagram-v2
   submitted --> submitted: PREVIOUS_LIVE / stop
   submitted --> failed: NO_SESSION_TO_CONTINUE / settle
   starting --> starting: SESSION_LIVE / nothing
+  starting --> starting: SESSION_IDLE / nothing
   starting --> starting: SESSION_BLOCKED / nothing
   starting --> input_required: SESSION_QUIET [holds] / record-end
   starting --> ending: SESSION_QUIET / record-end
@@ -160,6 +161,7 @@ stateDiagram-v2
   starting --> starting: UNREAD / nothing
   starting --> ending: SPAWN_REFUSED / record-end
   working --> working: SESSION_LIVE / nothing
+  working --> working: SESSION_IDLE / nothing
   working --> working: SESSION_BLOCKED / nothing
   working --> input_required: SESSION_QUIET [holds] / record-end
   working --> ending: SESSION_QUIET / record-end
@@ -173,6 +175,7 @@ stateDiagram-v2
   working --> ending: LOST / record-end
   input_required --> input_required: AWAITING_INPUT / nothing
   stopping --> stopping: SESSION_LIVE / stop
+  stopping --> stopping: SESSION_IDLE / stop
   stopping --> stopping: SESSION_BLOCKED / stop
   stopping --> stopping: SESSION_QUIET / stop
   stopping --> stopping: SESSION_ENDED / record-end
@@ -186,6 +189,7 @@ stateDiagram-v2
   ending --> completed: CLOSED [lastDone] / settle
   ending --> failed: CLOSED / settle
   ending --> failed: DEADLINE_SPENT / settle
+  ending --> failed: ATTEMPT_ENDED [longLived] / settle
   ending --> completed: ATTEMPT_ENDED [endedDone] / settle
   ending --> canceled: ATTEMPT_ENDED [endedStopped] / settle
   ending --> failed: ATTEMPT_ENDED / settle
@@ -204,7 +208,8 @@ stateDiagram-v2
 
 The guards: `holds`, a task held open whose attempt ends `done`, waits on a person; `live`, a session past its deadline
 still running is stopped rather than ended; `overdue`, a person's stop whose harness could not be read (`UNREAD`) ends
-the attempt once its deadline has passed, and waits for a read until then; `lastDone`, `endedDone` and `endedStopped`, the
+the attempt once its deadline has passed, and waits for a read until then; `longLived`, a long-lived task whose session
+ended with no stop asked, which settles `failed` however it ended; `lastDone`, `endedDone` and `endedStopped`, the
 end a task settles on. A person's verbs are no edges, since no pass takes them: `VERBS` declares each, drawn above with
 who writes it and no action — `requestStop` from any state not final and not `stopping` under `stoppable`, `answer` and
 `close` from `input-required` under `awaitsWord` — and each refusal asks its guard first (`verbTakes`, `VERB_GUARDS`), which
@@ -579,6 +584,7 @@ after a space starts a comment. The keys are a closed list:
 | `background` | `true` or `false` — `claude` only: `true` runs the session as `claude --bg`, which a person can attach to and bridge to claude.ai, instead of as a job (`claude -p`); either can be told something with `ae say`; see below |
 | `holdOpen` | `true` or `false` — `true` has the task wait for `ae answer` or `ae close` when an attempt signs, rather than settle; see below |
 | `queued` | `true` or `false` — `true` has the task wait for `ae admit <id>` before it starts: the one way to hold a task back, since the runtime keeps no ceiling; see *Queued and admitted* |
+| `restartPolicy` | `Always` — with `background: true` only: the session stays open between turns, idle, until `ae stop`; see *A long-lived session* |
 | `trustFrom` | `codex` only: an absolute directory you trust in `~/.codex/config.toml`, whose trust extends to the `cwd` — name it to work in a worktree of a repository you trust; see *Letting a sandboxed Codex step commit* |
 
 A brief writes each key on a line of its own, and `ae start` files the harness's — `model`, `permissionMode`, `worktree`,
@@ -589,7 +595,7 @@ under `config.codex`, where `file()` takes them.
 refuses a key not in that list (`afer: implement` is `` `afer` is not a key a brief has ``, with
 the list), a key given twice, a line that is not `key: value`, an empty value, a count or a number
 of seconds that is not one (`deadlineSeconds: 5m` used to become `NaN`, be journalled as `null`,
-and stop its task on the first pass), a `budgetUsd` that is not dollars in digits (`$5` is refused), a `contextTokens` that is not tokens in digits (`200k` is refused, and written back as `200000`), a `background` or a `holdOpen` that is not `true` or `false`, `maxAttempts` or `resume` at any value (retired: one attempt per start, above), a `cwd` or schema file that
+and stop its task on the first pass), a `budgetUsd` that is not dollars in digits (`$5` is refused), a `contextTokens` that is not tokens in digits (`200k` is refused, and written back as `200000`), a `background` or a `holdOpen` that is not `true` or `false`, a `restartPolicy` that is not `Always`, `maxAttempts` or `resume` at any value (retired: one attempt per start, above), a `cwd` or schema file that
 is not there, and a brief with no prompt.
 
 **`file()` refuses the same values at the API**, so the CLI is not the only door that checks — the harness's under
@@ -1488,6 +1494,37 @@ harness does not list running — `working` or `blocked`, since a session waitin
 the fix is to continue a session that has ended, the sentence says so: a new task with `resumeFrom`, which is
 what `wf retry --message` does. A registry that cannot be read, or words the harness did not take, reject
 without an exit code: nothing was said, so ask again.
+
+## A long-lived session: `restartPolicy: 'Always'`
+
+A task is a job by default: its session runs to its end, and the task settles on it. A task filed with
+`restartPolicy: 'Always'` is long-lived — a Pod's `restartPolicy`, of which this is the one value taken today: its session
+stays open between turns, and only a `stop` ends it. The end of a turn, a session listed `blocked` and waiting on nobody, one
+listed `done` whose process is still held, and 90 s of silence are each **idle** (`idleOf`, `SESSION_IDLE`): the pass does
+nothing, `view` says phase `idle`, and nobody is asked anything. A restarted engine reads the same off the record and the
+listing, so the session outlives the process that ticks it. `say` gives an idle session listed waiting its next words;
+one listed `done`, its process still held, is refused them by its harness today.
+
+```ts
+const id = await engine.file({ brief: 'Watch the queue.', cwd, restartPolicy: 'Always', config: { background: true } })
+// … its turn ends: view(id).phase is 'idle', and the session is still there
+await engine.say(id, 'Look again.')
+await engine.stop(id)       // the next passes stop it, record the end `operator`, and settle it stopped
+```
+
+**Idle is read off the sighting.** A sighting carries `held`, whether the harness still holds the session's process
+(Claude Code's `claude agents` lists a `pid`); an idle session is held, not busy, and either listed waiting on nobody (no
+`waitingFor`), listed done, or quiet. A wait on a person — a permission prompt, authentication — is still `needs-human`,
+a busy one is at work, and a session listed with no process is gone.
+
+**An end no stop asked for is a failure.** A long-lived session that ends, however it ends — done, failed, stopped by
+something else, lost — with no `stop` on the record settles the task `failed`, note `the long-lived session ended without
+a stop`. Starting it again is not built yet.
+
+**Refused, with exit code 2**, nothing journalled: a `restartPolicy` other than `'Always'`; beside it, `holdOpen` (a turn's
+end is idle here, not a wait), `deadlineSeconds` (only a stop ends it) and `closeoutSchema` (a statement would end its
+attempt); and, at the engine's doors, a harness that ends its session with its turn — `claude` without
+`config.background: true`, Codex, `claude-detached`, a remote agent. A consumer's own runner is asked nothing.
 
 ## Waiting for a person: `holdOpen`, `answer` and `close`
 

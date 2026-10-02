@@ -185,6 +185,8 @@ test('a long-lived task through either door: filed with its restart policy, idle
     ['input-required', 'input-required'],
     'no pass stopped an idle session',
   );
+  assert.equal((await effect((e) => e.say('one', 'look again'))).text, 'look again', 'an idle session hears its next words');
+  assert.equal((await promise.say('two', 'and again')).text, 'and again');
 
   await effect((e) => e.stop('one'));
   await promise.stop('two');

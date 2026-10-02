@@ -51,17 +51,13 @@ export {
 } from './step/step.ts';
 export type { OutputSchema, StepAgent, StepKey, StepOutput, Workflow } from './step/step.ts';
 export {
-  CONTEXT_WINDOWS,
-  EFFORTS,
   HARNESSES,
   isRemoteHarness,
-  PERMISSION_MODES,
   REMOTE_NAME,
   REMOTE_PREFIX,
   REMOTE_REFUSED_KEYS,
   remoteNameOf,
   remoteRetryRefusal,
-  SANDBOXES,
 } from './harness/harness.ts';
 export {
   allowRuleOf,

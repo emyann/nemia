@@ -4,7 +4,7 @@
  */
 import type { Verdict } from '../check/check.ts';
 import type { Workflow } from '../step/step.ts';
-import { terminalSteps } from '../workflow/index.ts';
+import { sandboxed, terminalSteps } from '../workflow/index.ts';
 import type { RetryAsk } from '../retry/index.ts';
 import {
   andList,
@@ -20,7 +20,7 @@ import {
 } from '../record/record.ts';
 import { approvalOf, approvedFirst, branchWord, hasGate, landsOnCheck, resultOnBase, type BranchStanding } from '../status/status.ts';
 import type { CheckoutHold } from '../cap/cap.ts';
-import { DEFAULT_HARNESS, PERMISSION_MODES } from '../harness/harness.ts';
+import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
 import type { Assessment } from '../tick/assess.ts';
 
 /**
@@ -49,7 +49,7 @@ export const filedDenies = (
  * step is filed with its own list. Pure.
  */
 export const filedAllows = (step: Pick<Workflow, 'workspace' | 'harness' | 'allowedTools'>, runArtifacts: string): string[] | undefined =>
-  step.workspace === 'main' && PERMISSION_MODES[step.harness ?? DEFAULT_HARNESS]
+  step.workspace === 'main' && !sandboxed(step.harness ?? DEFAULT_HARNESS) && !isRemoteHarness(step.harness)
     ? [...new Set([...(step.allowedTools ?? []), `Read(/${runArtifacts}/**)`])]
     : step.allowedTools;
 

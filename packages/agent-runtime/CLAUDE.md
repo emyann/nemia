@@ -112,7 +112,7 @@ down is in `docs/architecture.md`, *Who owns what*.
 What Claude Code does as the steps meet it. Where the orchestrator's code holds a fact today, it is named beside it.
 
 - **A step's fence is one word per harness**: Claude Code's `permissionMode`, Codex's `sandbox` (in the orchestrator today: `modeOf` in
-  `former/former.ts`, held by `agent-orchestrator/test/vocabulary.test.ts`).
+  `former/former.ts`, filed through `agent-orchestrator/test/rendering.test.ts`).
 - **An idle `--remote-control` session lists `blocked`, `idle`, with a `pid` and no `waitingFor`; a `stopped` row lists no `pid`**:
   `held` is the `pid` (`ourRow`). `--bg` needs a trusted `cwd`, and words `say` sends reach the model framed as a peer's, not
   the person's.

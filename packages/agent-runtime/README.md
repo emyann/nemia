@@ -682,8 +682,8 @@ denied load left out. `[]` is a session that loaded none; the key is absent wher
 --output-format json`, Codex, a background session, and a job that ended before it was read.
 
 The lists are exported, from both entries: `CLAUDE_PERMISSION_MODES`, `CLAUDE_EFFORTS` and `CLAUDE_CONTEXT_TOKENS`,
-`CODEX_SANDBOXES` and `CODEX_EFFORTS`. agent-orchestrator refuses the same words when it loads a workflow, before
-anything is filed, and holds its copy to these (`packages/agent-orchestrator/test/vocabulary.test.ts`).
+`CODEX_SANDBOXES` and `CODEX_EFFORTS`. agent-orchestrator keeps no copy: `wf start` asks `configRefusal` of every
+step before a run is written, and its form offers these lists.
 
 **A spawn that fails** is answered by what the harness can vouch for. When nothing can have
 started — the OS would not create the process, a detached worker was never launched, or a

@@ -58,8 +58,6 @@ const PLAIN_NAMES: readonly string[] = [];
 const CARDS: Readonly<Record<string, string>> = {
   ycug: 'the-runtime-runs-a-check-as-ycug: a check runs on a runtime command harness',
   u42s: 'the-runtime-records-on-each-u42s: the facts on the attempt — its effective mode, the denials measured, the exit verdict, when filed',
-  a8gp: "the-runtime-exports-one-conf-a8gp: the runtime exports one refusal of a harness's settings; the orchestrator's copies go",
-  '1bem': 'nemia-platform-slice-1-the-r-1bem: the long-lived kind of session',
   'slice-2': 'Nemia platform slice 2 (amend-the-nemia-intent-one-n-y2vp): mounts, and every run in a factory',
   'slice-3': 'Nemia platform slice 3 (amend-the-nemia-intent-one-n-y2vp): one daemon per machine, session admission and pools',
   'slice-4':
@@ -79,6 +77,10 @@ const MOVES = {
     to: 'packages/agent-runtime, answered per harness through the orchestrator',
   },
   defaults: { move: 'the default harness and its settings', to: "packages/agent-runtime's own default harnesses" },
+  knobs: {
+    move: "a harness's knobs as a step writes them: the keys, the rules the runtime cannot refuse, the fence's ranking and the form's choices",
+    to: "packages/agent-runtime, the runtime describing each harness's knobs",
+  },
   wait: {
     move: 'the words for a session waiting on a person: the harness that holds it and the command that lists it',
     to: "packages/agent-runtime's view of the attempt, which names where it is answered",
@@ -91,7 +93,10 @@ const MOVES = {
     move: "the harness's own prompt an agent keeps, trims or replaces (`harnessPrompt`), and the harness folders its skills come from",
     to: "packages/agent-runtime, which names each harness's prompt and folders; the layers above say the harness's prompt",
   },
-  api: { move: "the api's harness words", to: 'packages/agent-orchestrator, answered in its own words once its copies go (a8gp)' },
+  api: {
+    move: "the api's harness words",
+    to: "packages/agent-orchestrator, answered in its own words from the runtime's lists, through its client",
+  },
   web: { move: "the board's harness words", to: "apps/api, answered in the orchestrator's words" },
   closeout: {
     move: "the attempt's closeout, a workflow's word for what a session said as it finished",
@@ -172,31 +177,31 @@ const HARNESS_WORDS: Baseline = {
   'packages/agent-orchestrator/src/closeout/closeout.ts': { count: 5, ...MOVES.render },
   'packages/agent-orchestrator/src/daemon/daemon.store.ts': { count: 1, card: 'slice-3' },
   'packages/agent-orchestrator/src/decide/decide.verb.ts': { count: 4, ...MOVES.wait },
-  'packages/agent-orchestrator/src/ending/ending.ts': { count: 1, card: 'a8gp' },
+  'packages/agent-orchestrator/src/ending/ending.ts': { count: 1, ...MOVES.knobs },
   'packages/agent-orchestrator/src/folder/folder.store.ts': { count: 12, ...MOVES.checkout },
-  'packages/agent-orchestrator/src/folder/write.store.ts': { count: 4, card: 'a8gp' },
-  'packages/agent-orchestrator/src/former/former.ts': { count: 35, card: 'a8gp' },
-  'packages/agent-orchestrator/src/harness/harness.ts': { count: 40, card: 'a8gp' },
-  'packages/agent-orchestrator/src/keys/keys.ts': { count: 86, card: 'a8gp' },
-  'packages/agent-orchestrator/src/keys/tools.ts': { count: 20, card: 'a8gp' },
+  'packages/agent-orchestrator/src/folder/write.store.ts': { count: 4, ...MOVES.knobs },
+  'packages/agent-orchestrator/src/former/former.ts': { count: 32, ...MOVES.knobs },
+  'packages/agent-orchestrator/src/harness/harness.ts': { count: 9, ...MOVES.defaults },
+  'packages/agent-orchestrator/src/keys/filed-as.ts': { count: 1, ...MOVES.knobs },
+  'packages/agent-orchestrator/src/keys/keys.ts': { count: 48, ...MOVES.knobs },
+  'packages/agent-orchestrator/src/keys/tools.ts': { count: 15, ...MOVES.knobs },
   'packages/agent-orchestrator/src/list/list.ts': { count: 9, ...MOVES.wait },
   'packages/agent-orchestrator/src/record/places.store.ts': { count: 1, card: 'slice-2' },
   'packages/agent-orchestrator/src/record/record.store.ts': { count: 2, ...MOVES.wait },
   'packages/agent-orchestrator/src/record/record.ts': { count: 1, card: 'u42s' },
-  'packages/agent-orchestrator/src/retry/retry-refusal.ts': { count: 3, card: 'a8gp' },
+  'packages/agent-orchestrator/src/retry/retry-refusal.ts': { count: 3, ...MOVES.knobs },
   'packages/agent-orchestrator/src/runner.ts': { count: 1, ...MOVES.wait },
-  'packages/agent-orchestrator/src/runtime-client.ts': { count: 12, ...MOVES.defaults },
+  'packages/agent-orchestrator/src/runtime-client.ts': { count: 18, ...MOVES.defaults },
   'packages/agent-orchestrator/src/skills/skills.ts': { count: 11, ...MOVES.render },
-  'packages/agent-orchestrator/src/start/start.verb.ts': { count: 17, card: '1bem' },
   'packages/agent-orchestrator/src/stats/discipline.ts': { count: 10, card: 'u42s' },
-  'packages/agent-orchestrator/src/status/status.ts': { count: 17, card: 'u42s' },
-  'packages/agent-orchestrator/src/step/step.ts': { count: 78, card: 'a8gp' },
+  'packages/agent-orchestrator/src/status/status.ts': { count: 11, card: 'u42s' },
+  'packages/agent-orchestrator/src/step/step.ts': { count: 78, ...MOVES.knobs },
   'packages/agent-orchestrator/src/tick/file.verb.ts': { count: 15, ...MOVES.render },
   'packages/agent-orchestrator/src/views/views.verb.ts': { count: 2, ...MOVES.wait },
-  'packages/agent-orchestrator/src/workflow.ts': { count: 1, card: 'a8gp' },
-  'packages/agent-orchestrator/src/workflow/fence.ts': { count: 7, card: 'a8gp' },
-  'packages/agent-orchestrator/src/workflow/step-file.ts': { count: 14, card: 'a8gp' },
-  'packages/agent-orchestrator/src/workflow/validate.ts': { count: 27, card: 'a8gp' },
+  'packages/agent-orchestrator/src/workflow.ts': { count: 1, ...MOVES.knobs },
+  'packages/agent-orchestrator/src/workflow/fence.ts': { count: 13, ...MOVES.knobs },
+  'packages/agent-orchestrator/src/workflow/step-file.ts': { count: 14, ...MOVES.knobs },
+  'packages/agent-orchestrator/src/workflow/validate.ts': { count: 27, ...MOVES.knobs },
   'packages/agent-orchestrator/src/workspace/workspace.ts': { count: 5, card: 'slice-2' },
   'packages/agent-orchestrator/src/workspace/worktree.store.ts': { count: 2, card: 'slice-2' },
 };
@@ -437,7 +442,7 @@ test('REFUSED: a count above or below the baseline, an entry gone or clean, one 
   const rule: Rule = { what: 'harness words', dirs: [], fix: 'say it here' };
   const exists = (file: string): boolean => file !== 'src/gone.ts';
   const breaks = (counts: Record<string, number>, entry: Entry): string[] => ratchetBreaks(rule, counts, { 'src/a.ts': entry }, exists);
-  const held: Entry = { count: 2, card: 'a8gp' };
+  const held: Entry = { count: 2, card: 'u42s' };
   assert.deepEqual(breaks({ 'src/a.ts': 2 }, held), [], 'the measure the baseline holds is let through');
   assert.deepEqual(breaks({ 'src/a.ts': 2 }, { count: 2, move: 'a move', to: 'a place' }), [], 'a move with where it goes');
   assert.deepEqual(breaks({ 'src/a.ts': 3 }, held), [

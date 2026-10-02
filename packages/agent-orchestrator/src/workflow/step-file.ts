@@ -39,15 +39,7 @@ import {
   wordOf,
   workspaceOf,
 } from '../keys/index.ts';
-import {
-  codexModeWritten,
-  codexSandboxNamed,
-  FORMER_KEYS,
-  formerKeyWritten,
-  formerSandbox,
-  readKeys,
-  type Spelled,
-} from '../former/former.ts';
+import { codexModeWritten, codexSandboxNamed, FORMER_KEYS, formerKeyWritten, readKeys, type Spelled } from '../former/former.ts';
 import type { Agent, Agents, SkillsFound } from '../agents/agents.ts';
 import { tallyOf } from '../tally/tally.ts';
 import { addedSkillsRefusal, fenceRefusal } from './fence.ts';
@@ -240,7 +232,7 @@ export function stepFrom(
   if (meta.resume && !after.includes(meta.resume)) after.push(meta.resume);
   const harness = harnessOf(name, meta.harness);
   if (harness !== undefined && isRemoteHarness(harness)) remoteRefusal(name, meta, harness);
-  const background = backgroundOf(name, meta.background, harness);
+  const background = backgroundOf(name, meta.background);
   const output = outputOf(name, meta.output, read);
   if (meta.model?.trim() === 'inherit') {
     refuse(
@@ -260,17 +252,17 @@ export function stepFrom(
     harness,
     model: meta.model,
     effort: wordOf(name, 'effort', meta.effort, harness),
-    context: contextOf(name, meta.context, harness),
+    context: contextOf(name, meta.context),
     permissionMode: wordOf(name, 'permissionMode', meta.permissionMode, harness),
     sandbox: wordOf(name, 'sandbox', meta.sandbox, harness),
     tools: toolsOf(name, meta.tools, harness),
-    disallowedTools: rulesOf(name, 'disallowedTools', meta.disallowedTools, harness, spelled.disallowedTools),
-    allowedTools: rulesOf(name, 'allowedTools', meta.allowedTools, harness, spelled.allowedTools),
+    disallowedTools: rulesOf(name, 'disallowedTools', meta.disallowedTools, spelled.disallowedTools),
+    allowedTools: rulesOf(name, 'allowedTools', meta.allowedTools, spelled.allowedTools),
     denials: denialsOf(name, meta.denials, harness, background),
     background,
     remote: remoteOf(name, meta.remote),
     deadlineSeconds: countOf(name, 'deadlineSeconds', meta.deadlineSeconds),
-    budget: budgetOf(name, meta.budget, harness, background),
+    budget: budgetOf(name, meta.budget),
     check: checkOf(name, meta.check),
     retries: countOf(name, 'retries', meta.retries),
     gate: gateOf(name, meta.gate),
@@ -361,8 +353,7 @@ export function renderStep(step: StepDraft): string {
   );
   if (unknown !== undefined)
     refuse(Object.hasOwn(FORMER_KEYS, unknown) ? formerKeyWritten(step.name, unknown) : unknownKey(step.name, unknown));
-  if (step.harness === 'codex' && step.permissionMode != null && formerSandbox(step.permissionMode) !== undefined)
-    refuse(codexModeWritten(step.name, step.permissionMode));
+  if (step.harness === 'codex' && step.permissionMode != null) refuse(codexModeWritten(step.name, step.permissionMode));
   const provenance = step.agent != null && typeof step.agent === 'object' ? step.agent : undefined;
   const lines = STEP_KEYS.flatMap((key) => {
     const value = writtenValue(step.name, key, key === 'agent' ? (provenance?.name ?? step.agent) : step[key]);

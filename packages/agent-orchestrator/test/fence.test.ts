@@ -8,8 +8,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseAgent, parseWorkflow, WorkflowError, type Agents, type Workflow } from '../src/workflow.ts';
-import { CLAUDE_MODES } from '../src/harness/harness.ts';
-import { directoryFence, MODE_RANK } from '../src/workflow/fence.ts';
+import { CLAUDE_PERMISSION_MODES, CODEX_SANDBOXES } from 'agent-runtime';
+import { Engine, promiseEngine } from 'agent-runtime/effect';
+import { directoryFence, MODE_RANK, SANDBOX_RANK } from '../src/workflow/fence.ts';
 import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-fence-');
@@ -237,7 +238,7 @@ test('REFUSED at shipped defaults: the same widening on an agent a factory hires
 
 test("REFUSED at shipped defaults: `background: true` over an agent in any mode but the widest, which the person's own allow rules would widen", () => {
   const widest = 'bypassPermissions';
-  const modes = CLAUDE_MODES.filter((mode) => mode !== widest);
+  const modes = CLAUDE_PERMISSION_MODES.filter((mode) => mode !== widest);
   const agents = agentsOf({
     ...Object.fromEntries(modes.map((mode) => [mode, `---\npermissionMode: ${mode}\nallowedTools: Bash(npm test)\n---\nWork.\n`])),
     open: '---\n---\nWork.\n',
@@ -314,5 +315,57 @@ test("REFUSED: a fence held to the directory where an agent's every allow reache
 });
 
 test('every Claude Code mode has a rank, so a mode added to the vocabulary is placed before any step can name it', () => {
-  assert.deepEqual(Object.keys(MODE_RANK).sort(), [...CLAUDE_MODES].sort());
+  assert.deepEqual(Object.keys(MODE_RANK).sort(), [...CLAUDE_PERMISSION_MODES].sort());
+});
+
+test("the fence's ranking of codex's sandboxes is the runtime's list, narrowest first", () => {
+  assert.deepEqual(SANDBOX_RANK, CODEX_SANDBOXES);
+});
+
+test("a step that names no mode is filed in the mode the parser refuses `auto` for — the runtime's default — and a rendered step's flags reach Claude Code as the runtime spells them", async () => {
+  const { DEFAULT_PERMISSION_MODE, parseAgent } = await import('../src/workflow.ts');
+  const { renderedFlags } = await import('../src/agents/agents.ts');
+  const scribe = parseAgent('scribe', '---\nharnessPrompt: no-coding\nskills: write-a-note, mind-the-tone\n---\nYou write.\n');
+  const step = parseWorkflow('write', '---\nagent: scribe\n---\nWrite.\n', undefined, new Map([['scribe', scribe]]));
+  const claude = renderedFlags(step, '/runs/r/agents/write');
+  assert.deepEqual(
+    Object.keys(claude ?? {}).sort(),
+    ['appendSystemPromptFile', 'pluginDir', 'settings'],
+    'what the tick files for an agent with instructions, skills and harnessPrompt: no-coding, every flag renderedFlags gives but systemPromptFile',
+  );
+  const dir = scratch('wf-fence-auto-');
+  fs.writeFileSync(
+    path.join(dir, 'claude'),
+    [
+      '#!/bin/sh',
+      'case "$1" in',
+      '  agents) echo "[]" ;;',
+      `  *) printf '%s\\n' "$@" > '${path.join(dir, 'args')}'; exit 1 ;;`,
+      'esac',
+      '',
+    ].join('\n'),
+    { mode: 0o755 },
+  );
+  const prev = process.env.PATH;
+  process.env.PATH = `${dir}:${prev}`;
+  try {
+    const e = promiseEngine(Engine.layer({ root: path.join(dir, 'root'), harnesses: { claude: 'claude' } }));
+    const id = await e.file({ brief: 'b', cwd: dir, harness: 'claude', config: { claude } });
+    const until = Date.now() + 20_000;
+    while (!(await e.view(id)).state.settled) {
+      assert.ok(Date.now() < until, 'settled');
+      await e.tick();
+      await new Promise((r) => setTimeout(r, 50));
+    }
+  } finally {
+    process.env.PATH = prev;
+  }
+  const args = fs.readFileSync(path.join(dir, 'args'), 'utf8').split('\n');
+  assert.equal(args[args.indexOf('--permission-mode') + 1], DEFAULT_PERMISSION_MODE, "the parser's copy of the runtime's default");
+  assert.equal(args[args.indexOf('--append-system-prompt-file') + 1], '/runs/r/agents/write/prompt.md');
+  assert.equal(args[args.indexOf('--plugin-dir') + 1], '/runs/r/agents/write/nemia-scribe');
+  assert.equal(
+    args[args.indexOf('--settings') + 1],
+    '{"outputStyle":"nemia-scribe:no-coding","skillOverrides":{"write-a-note":"off","mind-the-tone":"off"}}',
+  );
 });

@@ -225,37 +225,20 @@ export function loadWorkflows(dir: string, places: Places = {}, fills?: Fills): 
  * (`harnessPromptLine`), which the parser reads as `harnessPrompt:`.
  */
 export function formerKeyLines(dir: string): string[] {
-  const read = (at: string): string => {
-    try {
-      return fs.readFileSync(at, 'utf8');
-    } catch {
-      return '';
-    }
-  };
-  let files: string[];
-  try {
-    files = stepFiles(fs.readdirSync(dir));
-  } catch {
-    return [];
-  }
-  const steps = files.map((file) => [file, read(path.join(dir, file))] as const);
-  const agents = [...new Set(steps.flatMap(([, text]) => frontmatterKey(text, 'agent') ?? []))].sort();
-  const agentAt = (agent: string): string => path.join(agentsDir(dir), `${agent}.md`);
+  const steps = stepTexts(dir);
+  const agents = [...new Set(steps.flatMap(({ agent }) => agent ?? []))].sort();
   const codexMode = (at: string, text: string, harness: string | undefined): string[] => {
-    const word = frontmatterKey(text, 'permissionMode');
-    return harness === 'codex' && word !== undefined ? [codexModeLine(at, word)] : [];
+    const word = formerModeOf(text, harness);
+    return word === undefined ? [] : [codexModeLine(at, word)];
   };
   return [
-    ...steps.flatMap(([file, text]) => {
+    ...steps.flatMap(({ file, text, harness }) => {
       const at = path.join(dir, file);
-      const agent = frontmatterKey(text, 'agent');
-      const harness =
-        frontmatterKey(text, 'harness') ?? (agent === undefined ? undefined : frontmatterKey(read(agentAt(agent)), 'harness'));
       return [...formerKeysIn(text).map((former) => formerKeyLine(at, former)), ...codexMode(at, text, harness)];
     }),
     ...agents.flatMap((agent) => {
-      const at = agentAt(agent);
-      const text = read(at);
+      const at = agentAt(dir, agent);
+      const text = textAt(at);
       const prompt = frontmatterKey(text, 'systemPrompt');
       return [
         ...formerKeysIn(text).map((former) => formerKeyLine(at, former)),
@@ -264,6 +247,58 @@ export function formerKeyLines(dir: string): string[] {
       ];
     }),
   ];
+}
+
+/**
+ * The word each step of the workflow in `dir` writes its sandbox under as `permissionMode:`, by the step's name: its own line, else, for a
+ * step that writes no fence of its own, its agent's beside the folder. The parser reads the line as `sandbox:` (`codexSandboxNamed`), and
+ * `wf start` quotes a refusal of it as the file says it. None for a folder that is not there.
+ */
+export function formerModesWritten(dir: string): Record<string, string> {
+  return Object.fromEntries(
+    stepTexts(dir).flatMap(({ file, text, agent, harness }) => {
+      const fenced = frontmatterKey(text, 'permissionMode') !== undefined || frontmatterKey(text, 'sandbox') !== undefined;
+      const agentText = agent === undefined ? '' : textAt(agentAt(dir, agent));
+      const word = fenced ? formerModeOf(text, harness) : formerModeOf(agentText, frontmatterKey(agentText, 'harness'));
+      return word === undefined ? [] : [[path.basename(file, '.md'), word]];
+    }),
+  );
+}
+
+/** A file's text, or nothing for one that cannot be read: the load has said why. */
+const textAt = (at: string): string => {
+  try {
+    return fs.readFileSync(at, 'utf8');
+  } catch {
+    return '';
+  }
+};
+
+/** Where the agent `agent` a step of the workflow in `dir` names is written. */
+const agentAt = (dir: string, agent: string): string => path.join(agentsDir(dir), `${agent}.md`);
+
+/** The word a file on `harness` names its sandbox under as `permissionMode:`, the former name of `sandbox:` there; else undefined. */
+const formerModeOf = (text: string, harness: string | undefined): string | undefined =>
+  harness === 'codex' ? frontmatterKey(text, 'permissionMode') : undefined;
+
+/**
+ * Each step file of the workflow in `dir` with its text, the agent it names and the harness it runs on: its own `harness:`, else its
+ * agent's. None for a folder that is not there.
+ */
+function stepTexts(dir: string): { file: string; text: string; agent?: string; harness?: string }[] {
+  let files: string[];
+  try {
+    files = stepFiles(fs.readdirSync(dir));
+  } catch {
+    return [];
+  }
+  return files.map((file) => {
+    const text = textAt(path.join(dir, file));
+    const agent = frontmatterKey(text, 'agent');
+    const harness =
+      frontmatterKey(text, 'harness') ?? (agent === undefined ? undefined : frontmatterKey(textAt(agentAt(dir, agent)), 'harness'));
+    return { file, text, agent, harness };
+  });
 }
 
 /**

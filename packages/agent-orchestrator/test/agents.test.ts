@@ -135,8 +135,8 @@ test('REFUSED at shipped defaults: `agent:` inside an agent file, a key no agent
   );
   assert.ok(attempts.includes('`wf retry <run> <step>`'), attempts);
 
-  const effort = refusal(() => agent('reviewer', '---\neffort: loud\n---\nReview it.\n'));
-  assert.ok(effort.startsWith('agents/reviewer.md: `effort: loud` is not an effort claude has'), effort);
+  const context = refusal(() => agent('reviewer', '---\ncontext: loud\n---\nReview it.\n'));
+  assert.ok(context.startsWith('agents/reviewer.md: `context: loud` is not a number of tokens'), context);
 
   const tools = refusal(() => agent('reviewer', '---\nharness: codex\ntools: Read\n---\nReview it.\n'));
   assert.ok(tools.startsWith('agents/reviewer.md: `tools: Read` is a tool list, and codex has none'), tools);
@@ -444,24 +444,18 @@ test('a codex agent names its sandbox as `sandbox:`, and one that says `permissi
   );
 });
 
-test('REFUSED at shipped defaults: `permissionMode:` on an agent or a step that runs on codex by the other, naming `sandbox:` — and `sandbox:` inherited onto Claude Code', () => {
-  const namesSandbox = (said: string) =>
-    said.includes("`permissionMode:` is Claude Code's permission mode, and codex has none: its fence is its sandbox, `sandbox:`");
-  const codexAgent = refusal(() => agent('reviewer', '---\nharness: codex\npermissionMode: dontAsk\n---\nReview.\n'));
-  assert.ok(
-    codexAgent.startsWith('agents/reviewer.md: `permissionMode: dontAsk` is not a key codex takes.') && namesSandbox(codexAgent),
-    codexAgent,
-  );
+test("REFUSED at shipped defaults: `sandbox:` on an agent or a step that runs on Claude Code, and a Claude Code agent's mode on a step that runs on codex by its own line — an agent's codex `permissionMode:` is its sandbox, whatever the word, for the runtime to judge at `wf start`", () => {
+  const onClaude = "is a codex step's sandbox, and this step runs on claude";
+  assert.deepEqual(agent('reviewer', '---\nharness: codex\npermissionMode: dontAsk\n---\nReview.\n').keys, {
+    harness: 'codex',
+    sandbox: 'dontAsk',
+  });
   assert.ok(
     refusal(() => agent('reviewer', '---\nharness: codex\npermissionMode: read-only\nsandbox: read-only\n---\nReview.\n')).includes(
       'are both set, and on codex they are one key',
     ),
   );
-  assert.ok(
-    refusal(() => agent('writer', '---\nsandbox: read-only\n---\nWrite.\n')).includes(
-      "`sandbox:` is Codex's sandbox, and Claude Code has none",
-    ),
-  );
+  assert.ok(refusal(() => agent('writer', '---\nsandbox: read-only\n---\nWrite.\n')).includes(onClaude));
 
   const agents = agentsOf({
     implementer: '---\nharness: claude\npermissionMode: dontAsk\n---\nImplement.\n',
@@ -469,13 +463,11 @@ test('REFUSED at shipped defaults: `permissionMode:` on an agent or a step that 
   });
   const moved = refusal(() => parseWorkflow('build', '---\nagent: implementer\nharness: codex\neffort: high\n---\n', undefined, agents));
   assert.ok(
-    moved.startsWith('build: `permissionMode: dontAsk` is not a key codex takes.') && namesSandbox(moved),
-    `a Claude Code agent's mode, taken by a step that runs on codex by its own line, is no sandbox, and refused as one: ${moved}`,
+    moved.startsWith('build: `harness: codex` runs its agent implementer on codex, and agents/implementer.md fences it for claude'),
+    `a Claude Code agent's mode, taken by a step that runs on codex by its own line, cannot be compared with a sandbox: ${moved}`,
   );
   assert.ok(
-    refusal(() => parseWorkflow('review', '---\nagent: reviewer\nharness: claude\n---\n', undefined, agents)).includes(
-      "`sandbox:` is Codex's sandbox, and Claude Code has none",
-    ),
+    refusal(() => parseWorkflow('review', '---\nagent: reviewer\nharness: claude\n---\n', undefined, agents)).includes(onClaude),
     "a codex agent's sandbox, taken by a step that runs on Claude Code by its own line, is refused",
   );
   assert.ok(
@@ -522,7 +514,7 @@ test("REFUSED at shipped defaults: a step that runs a fenced agent on the other 
   assert.ok(
     refusal(() =>
       parseWorkflow('build', '---\nagent: implementer\nharness: codex\npermissionMode: plan\n---\n', undefined, agents),
-    ).startsWith('build: `permissionMode: plan` is not a key codex takes.'),
+    ).startsWith('build: `harness: codex` runs its agent implementer on codex'),
     'a fence written for the wrong harness is refused',
   );
 });
@@ -540,7 +532,7 @@ test('REFUSED at shipped defaults: writeWorkflow of a draft on codex by its agen
   );
   assert.ok(
     said.startsWith('review: `permissionMode: read-only` on a step that runs on codex is the former name of `sandbox:` there') &&
-      said.includes('Send `sandbox: read-only` instead'),
+      said.includes('Send the sandbox as `sandbox:` instead'),
     said,
   );
   const kept = refusal(() =>
@@ -549,8 +541,10 @@ test('REFUSED at shipped defaults: writeWorkflow of a draft on codex by its agen
     }),
   );
   assert.ok(
-    kept.startsWith('review: `permissionMode: dontAsk` is not a key codex takes.') && kept.includes('Write `sandbox:` instead'),
-    `a Claude Code mode kept by a step moved onto codex names no sandbox: the parser refuses it, naming sandbox:, and not as a former name: ${kept}`,
+    kept.startsWith('review: `permissionMode: dontAsk` on a step that runs on codex is the former name of `sandbox:` there') &&
+      kept.includes('a step moved onto codex from Claude Code keeps its permission mode — clear it, and set the sandbox.') &&
+      !kept.includes('`sandbox: dontAsk`'),
+    `a Claude Code mode kept by a step moved onto codex is refused as the sandbox a file would read it as: ${kept}`,
   );
   assert.equal(fs.readFileSync(path.join(folder, 'review.md'), 'utf8'), '---\nagent: reviewer\n---\n', 'nothing written');
   writeWorkflow(folder, [{ name: 'review', after: [], agent: 'reviewer', sandbox: 'read-only', body: '' }], undefined, {

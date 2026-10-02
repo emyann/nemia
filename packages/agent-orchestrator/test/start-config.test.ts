@@ -1,28 +1,60 @@
 /**
  * `wf start` asks the runtime of each local step's first filing's config (`configRefused`, which `stepsToStart` asks last, before any
- * run is written) and refuses one it refuses, in its words, after the step's line they come from. The load's own refusals still say
- * every one of these first for a step as its file writes it, so each case loads a folder the load takes and changes the step's value
- * after it, as a step the load never judged. `WF_ROOT` is set before the import, since the module reads it as it loads.
+ * run is written) and refuses one it refuses, in its words, after the step's line they come from. The load judges no harness's words,
+ * so a folder that names one its harness refuses loads, and is refused here: by `startRun` and `startPlan` with nothing written, and
+ * started once the refusal `startRun` reads (`StartRefusal`) is another. `WF_ROOT` is set before the import, since the module reads it as
+ * it loads.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { Effect } from 'effect';
 import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-start-config-');
 process.env.WF_ROOT = ROOT;
-const { configRefused, stepsToStart } = await import('../src/start/start.verb.ts');
+const { configRefused, startRun, StartRefusal, stepsToStart } = await import('../src/start/start.verb.ts');
+const { startPlan } = await import('../src/plan/plan.verb.ts');
+type ConfigRefused = import('../src/start/start.verb.ts').ConfigRefused;
 const { configRefusal } = await import('../src/runtime-client.ts');
 const { LANDING_DENIED } = await import('../src/ending/ending.ts');
 
-/** A folder of `implement` and its ending `ship`, which lands on its check once approved. */
-function folder(name: string): string {
+/** A folder of `implement`, with `own` among its keys, and its ending `ship`, which lands on its check once approved, with `ending`. */
+function folder(name: string, own = 'effort: high', ending = 'gate: true'): string {
   const dir = path.join(ROOT, 'workflows', name);
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, 'implement.md'), '---\neffort: high\n---\nBuild it.\n');
-  fs.writeFileSync(path.join(dir, 'ship.md'), `---\nafter: implement\nworkspace: main\ngate: true\ncheck: npm test\n---\nShip it.\n`);
+  fs.writeFileSync(path.join(dir, 'implement.md'), `---\n${own}\n---\nBuild it.\n`);
+  fs.writeFileSync(path.join(dir, 'ship.md'), `---\nafter: implement\nworkspace: main\n${ending}\ncheck: npm test\n---\nShip it.\n`);
   return dir;
+}
+
+/** A repository with one commit, so a run has a base to record. */
+function aRepo(): string {
+  const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
+  const git = (...args: string[]) =>
+    execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: 'ignore' });
+  git('init', '-q');
+  git('commit', '-q', '--allow-empty', '-m', 'base');
+  return repo;
+}
+
+const runsWritten = (): string[] =>
+  fs.existsSync(path.join(ROOT, 'runs'))
+    ? fs
+        .readdirSync(path.join(ROOT, 'runs'))
+        .filter((f) => f.endsWith('.json'))
+        .map((f) => f.slice(0, -5))
+        .sort()
+    : [];
+
+/** `startRun` of `workflowDir` in a repository of its own, run to its end: the run's id, or the refusal it failed with. */
+function started(workflowDir: string, opts: { gates?: string[]; refused?: ConfigRefused } = {}): string {
+  const program = startRun({ brief: 'add a flag', repo: aRepo(), workflowDir, gates: opts.gates });
+  const exit = Effect.runSyncExit(opts.refused ? program.pipe(Effect.provideService(StartRefusal, opts.refused)) : program);
+  if (exit._tag === 'Success') return exit.value.id;
+  throw Effect.runSync(Effect.flip(Effect.failCause(exit.cause)));
 }
 
 const places = { home: ROOT };
@@ -53,4 +85,113 @@ test('a step on a remote agent is asked nothing, and a folder whose every step i
   assert.equal(configRefused(steps, places, []), undefined);
   const remote = steps.map((s) => (s.name === 'implement' ? { ...s, harness: 'a2a:reviewer', effort: 'ultra' } : s));
   assert.equal(configRefused(remote, places, []), undefined);
+});
+
+const ULTRA = folder('ultra', 'effort: ultra');
+const ULTRA_REFUSED = `implement: \`effort: ultra\` (filed as \`effort\`): ${configRefusal('claude', { effort: 'ultra' })}`;
+
+test("REFUSED at `wf start`: a step whose line its harness refuses fails `startRun` as Invalid, naming the step and its line, in the runtime's words, and no run is written", () => {
+  const before = runsWritten();
+  assert.throws(
+    () => started(ULTRA),
+    (err: Error & { _tag?: string }) => err._tag === 'Invalid' && err.message === ULTRA_REFUSED,
+  );
+  assert.deepEqual(runsWritten(), before);
+});
+
+test('REFUSED at `wf plan`: a card whose workflow has a step its harness refuses fails `startPlan` behind the card, and no run is written', () => {
+  const plan = fs.mkdtempSync(path.join(ROOT, 'plan-'));
+  fs.writeFileSync(path.join(plan, 'card.md'), `---\nworkflow: ${ULTRA}\n---\nadd a flag\n`);
+  const before = runsWritten();
+  assert.throws(
+    () => startPlan({ dir: plan, repo: aRepo() }),
+    (err: Error & { _tag?: string }) => err._tag === 'Invalid' && err.message === `card.md: \`workflow: ${ULTRA}\` — ${ULTRA_REFUSED}`,
+  );
+  assert.deepEqual(runsWritten(), before);
+});
+
+test('the same folder starts when the refusal `startRun` reads takes every step: the refusal came from the gate, not from the load', () => {
+  const id = started(ULTRA, { refused: () => undefined });
+  assert.ok(runsWritten().includes(id));
+});
+
+test('the gates `startRun` is given are the gates its refusal is asked of the steps with', () => {
+  const asked: (readonly string[])[] = [];
+  started(folder('gates-asked'), {
+    gates: ['implement'],
+    refused: (_steps: unknown, _places: unknown, gates: readonly string[]) => void asked.push(gates),
+  });
+  assert.deepEqual(asked, [['implement']]);
+});
+
+test("REFUSED at `wf start`: `remote: true` where the runtime bridges no session — codex, claude-detached, a claude job — named by its line, in the runtime's words; taken on a claude background session, and `remote: false` on any", () => {
+  for (const [own, harness] of [
+    ['harness: codex\nremote: true', 'codex'],
+    ['harness: claude-detached\nremote: true', 'claude-detached'],
+    ['remote: true', 'claude'],
+    ['harness: claude\nremote: true', 'claude'],
+  ] as const) {
+    const before = runsWritten();
+    assert.throws(
+      () => started(folder(`remote-${harness}-${own.length}`, own)),
+      (err: Error) =>
+        err.message === `implement: \`remote: true\` (filed as \`claude\`): ${configRefusal(harness, { claude: { remoteControl: true } })}`,
+      own,
+    );
+    assert.deepEqual(runsWritten(), before, own);
+  }
+  assert.ok(started(folder('bridged', 'background: true\nremote: true')));
+  assert.ok(started(folder('unbridged', 'harness: codex\nremote: false')));
+});
+
+test("REFUSED at `wf start`, every word the load once judged by a copy of the runtime's lists, now by the runtime, after the step's line", () => {
+  const cases: [string, string, string, Record<string, unknown>][] = [
+    ['effort: ultra', 'claude', 'effort', { effort: 'ultra' }],
+    ['harness: codex\neffort: ultra', 'codex', 'effort', { effort: 'ultra' }],
+    ['permissionMode: read-only', 'claude', 'permissionMode', { permissionMode: 'read-only' }],
+    ['harness: claude-detached\npermissionMode: yolo', 'claude-detached', 'permissionMode', { permissionMode: 'yolo' }],
+    ['harness: codex\nsandbox: plan', 'codex', 'permissionMode', { permissionMode: 'plan' }],
+    ['context: 50k', 'claude', 'contextTokens', { contextTokens: 50_000 }],
+    ['harness: codex\ncontext: 200k', 'codex', 'contextTokens', { contextTokens: 200_000 }],
+    ['harness: codex\nbackground: true', 'codex', 'background', { background: true }],
+    ['harness: claude-detached\nbackground: true', 'claude-detached', 'background', { background: true }],
+    ['harness: codex\nbudget: 5', 'codex', 'budgetUsd', { budgetUsd: 5 }],
+    ['harness: codex\nallowedTools: Read', 'codex', 'allowedTools', { allowedTools: ['Read'] }],
+    ['harness: codex\ndisallowedTools: Bash(git push)', 'codex', 'disallowedTools', { disallowedTools: ['Bash(git push)'] }],
+  ];
+  for (const [own, harness, field, config] of cases) {
+    const line = own.split('\n').at(-1)!;
+    const before = runsWritten();
+    assert.throws(
+      () => started(folder(`words-${runsWritten().length}-${own.replace(/\W+/g, '-')}`, own)),
+      (err: Error & { _tag?: string }) =>
+        err._tag === 'Invalid' && err.message === `implement: \`${line}\` (filed as \`${field}\`): ${configRefusal(harness, config)}`,
+      own,
+    );
+    assert.deepEqual(runsWritten(), before, own);
+  }
+  const both = folder('budget-background', 'background: true\nbudget: 5');
+  assert.throws(
+    () => started(both),
+    (err: Error) => err.message === `implement: ${configRefusal('claude', { background: true, budgetUsd: 5 })}`,
+    'a cap beside a background session is refused of the two together, named by the step',
+  );
+});
+
+test("REFUSED at `wf start`: a codex sandbox written under its former name, `permissionMode:`, is quoted as the file writes it — the step's own line, or its agent's — never as the `sandbox:` it is read as", () => {
+  const refusedAs = `implement: \`permissionMode: dontAsk\` (filed as \`permissionMode\`): ${configRefusal('codex', { permissionMode: 'dontAsk' })}`;
+  const own = folder('former-mode', 'harness: codex\npermissionMode: dontAsk');
+  assert.throws(
+    () => started(own),
+    (err: Error) => err.message === refusedAs,
+  );
+  fs.mkdirSync(path.join(ROOT, 'workflows', 'agents'), { recursive: true });
+  fs.writeFileSync(path.join(ROOT, 'workflows', 'agents', 'moded.md'), '---\nharness: codex\npermissionMode: dontAsk\n---\nYou build.\n');
+  const before = runsWritten();
+  assert.throws(
+    () => started(folder('former-mode-agent', 'agent: moded')),
+    (err: Error) => err.message === refusedAs,
+    "the agent's line, for a step that writes no fence of its own",
+  );
+  assert.deepEqual(runsWritten(), before);
 });

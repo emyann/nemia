@@ -283,11 +283,10 @@ the new name.
 
 `sandbox:` is Codex's name for its fence (`-s`, `sandbox_mode`), and a codex step took it on 2026-09-23; until then a codex step
 wrote its sandbox as `permissionMode:`, which is Claude Code's name for Claude Code's fence. So each harness has one fence under its
-own name: `permissionMode:` on Claude Code, `sandbox:` on codex, and each is refused on the other harness with words naming the right
-key. A codex step or agent written before still loads — `permissionMode: read-only`, `workspace-write` or `danger-full-access` is read
-as that `sandbox:`, and `permissionMode: bypassPermissions`, the engine's alias, as `sandbox: danger-full-access` — and `wf start`
-prints a line naming each file to rewrite. Any other word there is refused, naming `sandbox:`, and so is the line written beside a
-`sandbox:`. A run frozen before keeps a codex step's sandbox under `permissionMode`, and files it all the same: the engine's task
+own name: `permissionMode:` on Claude Code, `sandbox:` on codex; `sandbox:` on Claude Code is refused at load with words naming
+`permissionMode:`. A codex step or agent written before still loads — its `permissionMode:` is read as that `sandbox:`, and
+`permissionMode: bypassPermissions`, the engine's alias, as `sandbox: danger-full-access` — and `wf start` prints a line naming each file
+to rewrite. Whether the word is a sandbox is the runtime's to say at `wf start`; the line written beside a `sandbox:` is refused at load. A run frozen before keeps a codex step's sandbox under `permissionMode`, and files it all the same: the engine's task
 still calls either fence `permissionMode`, and the tick hands the one the step has on (`modeOf`). A page of the board opened before the rename that sends `permissionMode` back
 on a codex step is refused, saying to reload; a save from the board writes `sandbox:`, and a save that changes nothing keeps the file.
 Codex's approval policy is untouched: `codex exec` asks nobody, and the engine passes no `-a`.
@@ -556,13 +555,14 @@ Claude Code is given exactly the list as `--tools`, where a tool not on it does 
 session — not `--allowedTools`, where an unapproved one is still there to try. The list names Claude
 Code's built-in tools; the servers of the checkout's `.mcp.json` are not on it. Refused at load: a line
 that names no tool; an entry with a space or a comma inside (`Read Grep Glob`, `[Read, Grep]`, or
-`Bash(git diff:*)`, a rule where a tool goes); and any `tools:` on codex. Codex has no tool list, only
+`Bash(git diff:*)`, a rule where a tool goes); and any `tools:` on codex, the orchestrator's own rule, since the runtime
+takes the list there and Codex ignores it. Codex has no tool list, only
 one shell in a sandbox, so its fence is `sandbox:`, and `read-only` writes nothing.
 
 `effort:` is one word the step's harness takes: `low`, `medium`, `high`, `xhigh` or `max` on Claude Code,
-and `none` and `minimal` besides on codex. Another word is refused by name with the list, as a permission
-mode is. Refusing it here matters more than usual: Claude Code itself only warns about an effort it does
-not know, and runs at its default.
+and `none` and `minimal` besides on codex. Another word is refused at `wf start`, in the runtime's words after the
+step's line, as a permission mode is. Refusing it there matters more than usual: Claude Code itself only warns about
+an effort it does not know, and runs at its default.
 
 Both go to the engine on every filing of the step: the first, each try and each round. Without them, the
 step has the harness's own tools at its own effort.
@@ -582,10 +582,8 @@ the window the session compacts its conversation, a summary in place of what it 
 runs on the model's whole window, and a long session reads everything it ever read again on every call. `renderStep`
 writes it back in one canonical form, not as it was written: thousands with `k` (`150000` is `150k`, `1M` is `1000k`),
 and digits for a number that is not a whole thousand. Refused at load: a value that is not a number of tokens (`200 k`,
-`1.5M`, `200,000`); one outside what the harness takes, 100k to 1000k on Claude Code — and a bare `200`, which Claude
-Code's own flag would read as thousands, is refused saying to write `200k`; and any `context:` on codex, whose `codex
-exec` has no such knob. The range is a copy of the engine's `CLAUDE_CONTEXT_TOKENS`, held to it by
-`test/vocabulary.test.ts`.
+`1.5M`, `200,000`). A window outside what the harness takes, and any `context:` on codex, whose `codex exec` has no
+such knob, are the runtime's to refuse, in its words, at `wf start`.
 
 It goes to the engine on every filing of the step, as `effort:` does, and **a session keeps one window**: a nudge, an
 answer, a `retries:` try and a round each continue the session on the window it was started with, and a step that
@@ -621,8 +619,8 @@ and `RemoteTrigger`, which no step needs.
 
 Refused at load: a line that names no rule; an entry with a comma inside it (`Bash(git push, git reset)`
 would reach the harness as two halves of a rule, so write two rules); an entry that is not one rule
-(`SendMessage CronCreate`, a quoted name, an unclosed parenthesis); and any `disallowedTools:` on codex, which has
-no tool list, so its fence is `permissionMode`. A Bash rule matches as Claude Code matches it:
+(`SendMessage CronCreate`, a quoted name, an unclosed parenthesis). Any `disallowedTools:` on codex, which has
+no tool list, so its fence is `sandbox:`, is the runtime's to refuse at `wf start`. A Bash rule matches as Claude Code matches it:
 `Bash(npm run build)` is that command, as the settings' allow of the same words is.
 
 **A deny closes a command, not an allow.** This repository's settings also allow `Bash(npx turbo run test:*)`
@@ -632,12 +630,12 @@ any task or any file (`node --test` takes a glob, so a rule on the file's path i
 reviewer from those is the allow narrowed in `.claude/settings.json`, which this package does not own; until
 then, only a sentence in the reviewer's brief.
 
-**The engine is the source of these words.** The permission modes and efforts `src/harness/harness.ts` refuses
-are copies of agent-runtime's `CLAUDE_PERMISSION_MODES`, `CLAUDE_EFFORTS`, `CODEX_SANDBOXES` and
-`CODEX_EFFORTS`, which it exports. They are copies because `harness/harness.ts` is pure and imports no runtime
-(`docs/architecture.md`), and the engine refuses a word only when the step is filed, after the run exists.
-`test/vocabulary.test.ts` imports the runtime's lists and fails the moment a copy differs. The first copies had drifted: the engine took `manual` and
-codex's `bypassPermissions`, and the parser refused both. To change a word, change the engine, then the copy.
+**The engine is the source of these words.** The load keeps no copy of the permission modes, sandboxes, efforts and
+windows each harness takes: `wf start` and `wf retry` ask the runtime's `configRefusal` of every step's filed
+config before anything is written, and say its words after the step's line (`configRefused`). The board's form offers
+the runtime's own lists (`HARNESS_CHOICES`, through the client). The load keeps only what the runtime cannot refuse:
+`tools:` on codex, `skills:` and `harnessPrompt:` on codex or a remote agent, and `sandbox:` on Claude Code, which
+would be filed as a mode.
 
 ### A job, or a session that stays: `background:`
 
@@ -659,9 +657,9 @@ keeps no spend cap, and its denials are not read (issue 17, issue 28). A supervi
 end, and is answered from a phone (*A supervisor*, below). Most steps are jobs; until thin runtime stage 2 part 2 (2026-09-23) every
 step ran `--bg`.
 
-Refused at load: any word but `true` or `false`, and `true` on `codex` or `claude-detached`, which have no such mode; a `budget:` beside
-`background: true`, in the engine's words, since a background session keeps no cap; and, on a folder team, a background step in a mode
-that can ask (below).
+Refused at load: any word but `true` or `false`; and, on a folder team, a background step in a mode that can ask (below). Refused at
+`wf start`, in the runtime's words: `true` on `codex` or `claude-detached`, which have no such mode, and a `budget:` beside
+`background: true`, since a background session keeps no cap.
 
 ### When a denied call stops a step: `denials:`
 
@@ -709,11 +707,10 @@ phone, and not only watch it. So it is a deliberate setting, never a default: a 
 bridged, and a step's check never is.
 
 Refused at load: any word but `true` or `false` — `remote: yes` is refused by name — an empty value, and the line twice. Refused at
-`wf start`, with nothing written, on a harness the engine refuses `claude.remoteControl` for, in the engine's words: `codex` and
-`claude-detached` run a prompt and exit, and only a Claude Code background session, `claude` with `background: true`, is bridged; and on
-a `claude` step without `background: true`, since a job opens no bridge. The words are a copy, since `start` cannot wait on the engine's
-door; `test/store.test.ts` asks the engine and fails the moment they differ. `wf ls` and `wf decide`
-say nothing of it yet.
+`wf start`, with nothing written, on a harness the runtime refuses `claude.remoteControl` for, in the runtime's words after the
+`remote: true` line (`configRefused`): `codex` and `claude-detached` run a prompt and exit, and only a Claude Code background session,
+`claude` with `background: true`, is bridged; and on a `claude` step without `background: true`, since a job opens no bridge. `wf ls`
+and `wf decide` say nothing of it yet.
 
 ### What a step may spend: `budget:`
 
@@ -728,7 +725,8 @@ Implement what was asked, in this repository.
 
 `budget:` is dollars, `budget: 5` or `budget: 2.50`: the most the step's tries may cost together, every try and every round of it.
 Refused at load, naming the fix: `0`, a negative, a word, an amount written with its unit (`$5`, with `budget: 5` to write instead) and
-an empty value; and any `budget:` on codex, in the engine's words — `codex exec` has no spend cap, and reports no cost to cap. It is
+an empty value. Any `budget:` on codex is refused at `wf start`, in the runtime's words — `codex exec` has no spend cap, and reports no
+cost to cap. It is
 frozen on the run with every other key.
 
 The cost is the engine's: what the harness priced each attempt at, read once the attempt has ended (agent-runtime's README, *What an
@@ -737,9 +735,9 @@ attempt consumed*). What the key does turns on what the harness can keep:
 | harness | while a try runs | once a try has ended |
 |---|---|---|
 | `claude`, a job | what is left of the cap in force — the cap less what the step's tries have cost — goes to the engine as `config.budgetUsd` on every filing — a harness argument the runtime judges nothing of — so `claude -p --max-budget-usd` ends the session once the tries together reach the cap, past it by up to the response that crosses it: the runtime settles the task as its harness ended it, carrying the cut as `limit: 'budget'` on the attempt, and the run reads the step as `budget exhausted` (`taskSpend`, `ownStatus`). | the run adds up what the step's tries cost, and past the cap files nothing more for the step on its own word |
-| `claude`, `background: true` | refused at load: a `--bg` session keeps no `--max-budget-usd`, and writes its cost only as its process exits (agent-runtime's open issues 17 and 18) | — |
+| `claude`, `background: true` | refused at `wf start`: a `--bg` session keeps no `--max-budget-usd`, and writes its cost only as its process exits (agent-runtime's open issues 17 and 18) | — |
 | `claude-detached` | as a job on `claude` | as on `claude` |
-| `codex` | refused at load | — |
+| `codex` | refused at `wf start` | — |
 
 A step reads **`over budget`** — `over budget $4.20 of $3` in `wf ls` — when its ended tries have together cost the cap in force or
 more, so nothing is left and any session would spend past it, and another session of it is the way on: its last try ended without letting
@@ -2985,7 +2983,7 @@ holding a concurrency slot forever.
 |---|---|
 | `src/workflow.ts` | the format — pure, the entry `agent-orchestrator/workflow`: each name it exports re-exported by name from the folders below, and nothing else |
 | `src/step/step.ts` | a step's shape — pure: what a step file is once read (`Workflow`), its closed list of keys (`STEP_KEYS`, `STEP_KEY_MEANINGS`), the fields every closeout carries (`CLOSEOUT_FIELDS`, `outputFields`), and what every reader of a markdown file shares (`WorkflowError`, `splitFrontmatter`) |
-| `src/harness/harness.ts` | the harnesses and the words each takes — pure: `HARNESSES`, `PERMISSION_MODES`, `SANDBOXES`, `EFFORTS`, `CONTEXT_WINDOWS`, and a step on a remote agent, how it is named (`remoteNameOf`) and the keys it may not set (`REMOTE_REFUSED_KEYS`) |
+| `src/harness/harness.ts` | the harnesses — pure: `HARNESSES`, `DEFAULT_HARNESS`, and a step on a remote agent, how it is named (`remoteNameOf`) and the keys it may not set (`REMOTE_REFUSED_KEYS`) |
 | `src/keys/keys.ts` | a step's keys read one each — pure: a value as written, the value the step carries, or the refusal that names the fix (`wordOf`, `contextOf`, `budgetOf`, `gateOf`, `workspaceOf`, `slotOf`, `outputOf`), and a model that cannot run `auto` (`keepsAuto`) |
 | `src/keys/tools.ts` | a step's tool rules — pure: its `tools` (`toolsOf`), its allow and deny rules, a write named as anything but `Edit` refused (`rulesOf`), and the rule offered for a call a fenced step was denied (`allowRuleOf`, `disallowedBy`) |
 | `src/former/former.ts` | a key under the name it had before — pure: `FORMER_KEYS`, and an agent's own `FORMER_OWN_KEYS` with its words (`harnessPromptNamed`), read in a file (`readKeys`) and on a frozen record (`asNamed`), written back in the form the file has (`formerKeyWritten`), and the fence a step asks for under either key (`modeOf`) |

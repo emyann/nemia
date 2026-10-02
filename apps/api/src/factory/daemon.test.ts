@@ -85,7 +85,8 @@ test('a pass that runs long is still ticking: silence is measured from the beat,
 });
 
 test('REFUSED: a live wf up silent past the stale mark is stalled, not ticking', async () => {
-  const file = written(20 * MIN);
+  const at = ago(20 * MIN);
+  const file = written(20 * MIN, { passedAt: at, beatAt: at });
   put(file);
   const d = await get();
   assert.equal(d.kind, 'stalled');

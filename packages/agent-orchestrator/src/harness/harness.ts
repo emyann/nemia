@@ -145,9 +145,9 @@ export const EFFORTS: Readonly<Record<string, readonly string[]>> = {
 };
 
 /**
- * The context windows each harness takes, in tokens, both ends included: `context:`. Copied from the engine — `CLAUDE_CONTEXT_TOKENS` in
- * agent-runtime's `src/runner-claude-vocabulary.ts`, which `claudeDetached` declares too — for the reason the words above are, and held to
- * it by `test/vocabulary.test.ts`. A harness not listed has no such knob: `codex exec` runs on its model's own window.
+ * The context windows each harness takes, in tokens, both ends included: `context:`. Copied from the engine — `CLAUDE_CONTEXT_TOKENS`,
+ * which agent-runtime exports and `claudeJob` and `claudeDetached` declare as their `contextTokens` — for the reason the words above are,
+ * and held to it by `test/vocabulary.test.ts`. A harness not listed has no such knob: `codex exec` runs on its model's own window.
  */
 const CLAUDE_CONTEXT = { least: 100_000, most: 1_000_000 };
 export const CONTEXT_WINDOWS: Readonly<Record<string, { least: number; most: number }>> = {

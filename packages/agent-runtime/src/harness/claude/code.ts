@@ -191,18 +191,18 @@ export const claudeCodeOps = (options: ClaudeOptions = {}): RunnerOps => {
   const bg = claudeOps({ ...options, root });
   const of = (sessionId: string) => (isClaudeJob(sessionId) ? job : bg);
 
-  const read = (ops: RunnerOps) =>
-    ops.observe.pipe(
+  const read = (look: RunnerOps['observe']) =>
+    look.pipe(
       Effect.map((m): Map<string, Sighting> | undefined => m),
       Effect.catchCause(() => Effect.succeed(undefined)),
     );
-  const seen = (ops: RunnerOps) => read(ops).pipe(Effect.map((m) => m ?? new Map<string, Sighting>()));
+  const seen = (look: RunnerOps['observe']) => read(look).pipe(Effect.map((m) => m ?? new Map<string, Sighting>()));
 
   return {
     spawn: (r) => (r.config?.background ? bg : job).spawn(r),
     refuses: claudeCodeRefuses,
 
-    observe: Effect.all([seen(job), seen(bg)], { concurrency: 'unbounded' }).pipe(
+    observe: Effect.all([seen(job.observe), seen(bg.observe)], { concurrency: 'unbounded' }).pipe(
       Effect.map(([jobs, sessions]) => new Map([...jobs, ...sessions])),
     ),
 
@@ -215,7 +215,8 @@ export const claudeCodeOps = (options: ClaudeOptions = {}): RunnerOps => {
      *
      * An expected name that neither listing has is `unread` when a read that could have listed it failed: the job read, its
      * run file there and unreadable, or the registry once asked. A job's name the registry was asked for and does not list,
-     * with its run file not there, is absent.
+     * with its run file not there, is absent. The registry is told what it is told (`observeFor`), so a long-lived attempt's
+     * usage is counted from when the journal says it began.
      */
     observeFor: (expected) =>
       job.observeFor!(expected).pipe(
@@ -223,7 +224,7 @@ export const claudeCodeOps = (options: ClaudeOptions = {}): RunnerOps => {
         Effect.catchCause(() => Effect.succeed(undefined)),
         Effect.flatMap((jobs) =>
           !jobs || expected.some((e) => !jobs.seen.has(e.name))
-            ? read(bg).pipe(Effect.map((sessions) => ({ jobs, sessions })))
+            ? read(bg.observeFor!(expected).pipe(Effect.map((o) => o.seen))).pipe(Effect.map((sessions) => ({ jobs, sessions })))
             : Effect.succeed({ jobs, sessions: new Map<string, Sighting>() }),
         ),
         Effect.map(({ jobs, sessions }): Observation => {

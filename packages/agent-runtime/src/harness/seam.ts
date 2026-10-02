@@ -109,8 +109,12 @@ export type HarnessQuota =
   | { kind: 'timeout'; ms: number }
   | { kind: 'failed'; code: number | null; signal: string | null; said: string };
 
-/** A session the journal expects a harness to list: an attempt's name (`ae/<task>/<n>`), and the harness its task was filed on. */
-export type ExpectedSession = { name: string; harness?: string };
+/**
+ * A session the journal expects a harness to list: an attempt's name (`ae/<task>/<n>`), the harness its task was filed on, and,
+ * for a long-lived task's attempt, when the journal says it began, in ms (`since`): what a runner that counts the session's usage
+ * counts it from, across every process its harness ran it in. Absent for a job, whose runner counts from its own start.
+ */
+export type ExpectedSession = { name: string; harness?: string; since?: number };
 
 /**
  * What a look told what to expect saw (`observeFor`): the sessions it listed, by name, and the names expected of it that it could

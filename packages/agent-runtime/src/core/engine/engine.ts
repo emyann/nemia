@@ -33,6 +33,7 @@ import { Runner, type ExpectedSession } from '../../harness/seam.ts';
 import { transition, type Move, type Refusal } from '../lifecycle.ts';
 import { divergence, releasableOf, TickMemo, TickMemoDiverged, type Releasable, type TickMemoState } from './memo.ts';
 import { ADMIT_INSTEAD } from './filing.ts';
+import { countedFacts } from './counted.ts';
 import { instantNow } from './now.ts';
 
 /**
@@ -339,14 +340,23 @@ const lastSighting = (state: State, observed: ReadonlyMap<string, Sighting>): Si
 };
 
 /**
- * A task's fold, with what its sighting says of a long-lived attempt's process journalled first (`sightingFacts`): the fold
- * `decide` reads, so the time a gap opened is on the record before the pass judges it.
+ * What a task's sighting says of a long-lived attempt in flight, for the record: its process (`sightingFacts`), and what it has
+ * consumed so far (`countedFacts`).
+ */
+const notedOf = (state: State, observed: ReadonlyMap<string, Sighting>, at: string, mono?: Monotonic): Event[] => {
+  const sighting = lastSighting(state, observed);
+  return [...sightingFacts(state, sighting, at, mono), ...countedFacts(state, sighting, at)];
+};
+
+/**
+ * A task's fold, with what its sighting says of a long-lived attempt journalled first (`notedOf`): the fold `decide` reads, so
+ * the time a gap opened is on the record before the pass judges it.
  */
 const notedFold = Effect.fn('notedFold')(function* (taskId: string, observed: ReadonlyMap<string, Sighting>) {
   const journal = yield* Journal;
   const state = fold(taskId, yield* journal.read(taskId));
   const now = stamped();
-  const facts = sightingFacts(state, lastSighting(state, observed), now.at, now.mono);
+  const facts = notedOf(state, observed, now.at, now.mono);
   for (const fact of facts) yield* journal.append(taskId, fact);
   return facts.length > 0 ? fold(taskId, yield* journal.read(taskId)) : state;
 });
@@ -487,13 +497,19 @@ const atWork = (state: State, observed: ReadonlyMap<string, Sighting>): boolean 
  * `releaseFinished` promises, and drops off on the first pass that lets it go ended or sees it gone: an absence read as every
  * absence is, off the pass's one observation — and only an absence: a pass that could not read its harness keeps it (`unread`).
  * Off the journal and the last observation, never off what a pass did: a session started before a restart is expected on the
- * first pass after it.
+ * first pass after it. A long-lived task's attempt is expected with when the journal says it began (`since`), which its runner
+ * counts its spend from across every process of it.
  */
 const expectedOf = (
-  states: Iterable<Pick<State, 'taskId' | 'harness'> & { attempts: ReadonlyArray<{ n: number }> }>,
+  states: Iterable<Pick<State, 'taskId' | 'harness' | 'restartPolicy'> & { attempts: ReadonlyArray<{ n: number; startedAt: string }> }>,
 ): ExpectedSession[] => {
   const expected: ExpectedSession[] = [];
-  for (const state of states) for (const a of state.attempts) expected.push({ name: nameFor(state.taskId, a.n), harness: state.harness });
+  for (const state of states) {
+    for (const a of state.attempts) {
+      const since = state.restartPolicy === 'Always' ? { since: Date.parse(a.startedAt) } : {};
+      expected.push({ name: nameFor(state.taskId, a.n), harness: state.harness, ...since });
+    }
+  }
   return expected;
 };
 
@@ -607,7 +623,7 @@ export const tick = Effect.fn('tick')(function* () {
     }
     const before = folded.get(id);
     if (!before) continue;
-    const noted = sightingFacts(before, lastSighting(before, observed), '');
+    const noted = notedOf(before, observed, '');
     const actions = yield* settleOn(id, observed, unread, 8);
     taken.push(...actions);
     for (const a of actions) if (a.do === 'nothing' && a.refused) stalled.push({ taskId: id, ...a.refused });
@@ -760,7 +776,7 @@ export function viewOfState(state: State, observed: ReadonlyMap<string, Sighting
     state,
     phase,
     sessionId: sighting?.sessionId ?? last?.nativeId ?? null,
-    usage: sighting?.usage,
+    usage: state.restartPolicy === 'Always' ? (last?.usage ?? undefined) : sighting?.usage,
     ...(waitingFor ? { waitingFor } : {}),
     ...(admission ? { admission } : {}),
   };

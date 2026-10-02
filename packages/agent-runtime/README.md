@@ -1325,6 +1325,16 @@ attempt's. No cost is given, rather than a wrong one: while no line has been wri
 count was carried on from a total the transcript does not show; and, for `costUsd` alone, when Claude Code could not price
 a model the session used — `unpricedModel: true`, since a total too low reads as the whole.
 
+**A long-lived attempt's spend is journalled as it grows.** A session that runs for days writes no cost until a process of it
+exits, so each pass that reads more of a long-lived attempt in flight (`restartPolicy: 'Always'`) than its record holds
+journals a **`counted`** entry: its turns, tool calls and tokens, never a cost, which `fold` puts in place of the attempt's
+`usage` whole, since a compacted attempt's reading drops tokens the last one had. The same reading on later passes writes
+nothing; a reading with fewer turns than the record is no count of this attempt and writes nothing either; a job's spend is
+written at its end, as before. Its end keeps what was counted when it carries no usage, and its cost is measured as any
+attempt's is. The pass tells the runner when the attempt began (`ExpectedSession.since`), and `--bg` counts from then across
+every process Claude Code respawned it in; a `cost-state` begun more than a few seconds after the attempt's first line is a
+respawn's own count, too low for the attempt, so it gives no cost ([open issue 18](docs/open-issues.md)).
+
 **What a session read, by price.** Measured over 234 worker sessions on 2026-09-18: 96.9% of input tokens were read
 from the cache, 3.1% written to it, almost none uncached — a read priced $0.50 a million and a write $10, a
 twenty-fold spread that `inputTokens` adds into one number. So an attempt records its input in its three classes as its
@@ -1911,6 +1921,7 @@ of pure code sits beside it.
 | `src/core/clock.ts` | how a duration the runtime decides on is measured, pure (`elapsedMs`): on the monotonic clock when both moments were read in one boot, on the wall clock otherwise |
 | `src/core/index.ts` | the face of `core/`: what the other folders and the entries take of it; nothing of `core/engine/` |
 | `src/core/engine/engine.ts` | applies one decision, then the pass over every task |
+| `src/core/engine/counted.ts` | what a long-lived attempt in flight has consumed so far, journalled as it grows (`counted`), off the pass's sighting |
 | `src/core/engine/filing.ts` | filing a task, admitting, stopping, answering and closing it, each with what it refuses (`refusalOf`): a fact journalled for the pass to act on |
 | `src/core/engine/journal.ts` | append-only JSONL per task, plus the board-wide feed; `upgrade`, which reads a line written before an event's shape changed in today's, whoever's store it is — nothing on disk is rewritten |
 | `src/core/engine/memo.ts` | the settled tasks an engine's passes may skip until the feed names them, and the cursor into the feed: a cache of `fold`, rebuilt by a fresh engine, never written down |
@@ -1972,6 +1983,7 @@ of pure code sits beside it.
 | `test/release.test.ts` | letting a finished Claude Code session go, and reading what it cost once stopped, at shipped defaults — a fake `claude` that keeps a registry and writes a `cost-state` as it stops a session |
 | `test/budget.test.ts` | a spend cap, at shipped defaults — fake `claude`s: a `claude -p` that stops at its cap ends its attempt `failed` with `limit: 'budget'` and settles its task as any failure, the note naming no budget; the flag reaches both Claude runners on every attempt |
 | `test/admit.test.ts` | queued and admitted: the wait, the word, the pass after it, the pre-4c reading, `admit`'s refusals at shipped defaults, and a count proving the word asks no harness |
+| `src/core/engine/counted.test.ts` | a long-lived attempt's counts journalled once a reading, none for a job, and how `fold` and the view read them |
 | `src/core/engine/journal.test.ts` | the store and the feed's cursor, and a journal written before the harness's arguments were one `config`, read in today's shape |
 | `test/harness-args.test.ts` | the checks every harness shares of a task's `config`, made to refuse in their own file and through a `Runner` |
 | `test/core-reads.test.ts` | `domain.ts` and `engine.ts` read no harness argument: the `config` they carry is handed on unopened |

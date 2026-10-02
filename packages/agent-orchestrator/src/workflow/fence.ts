@@ -9,9 +9,9 @@ import { DEFAULT_PERMISSION_MODE, rulesOf, toolsOf } from '../keys/index.ts';
 import type { Agent } from '../agents/agents.ts';
 
 /**
- * How wide each Claude Code permission mode is, for a job that nobody answers: `plan` changes nothing; `dontAsk`, `default` and `manual`
- * run what the rules allow and deny the rest, since a job denies whatever they would ask; `acceptEdits` writes in its directory unasked;
- * `auto` lets a classifier allow what it judges safe; `bypassPermissions` asks about nothing.
+ * How wide each permission mode is, for a job that nobody answers: `plan` changes nothing; `default`, `manual` and the mode a held session
+ * runs in (`HELD_MODE`) run what the rules allow and deny the rest, since a job denies whatever they would ask; the next writes in its
+ * directory unasked; `auto` lets a classifier allow what it judges safe; the widest asks about nothing.
  */
 export const MODE_RANK: Readonly<Record<string, number>> = {
   plan: 0,
@@ -24,18 +24,21 @@ export const MODE_RANK: Readonly<Record<string, number>> = {
 };
 
 /**
- * Whether a Claude Code session in permission mode `mode` — the runtime's default when `undefined` — writes in its directory unasked:
- * `acceptEdits` and every wider mode. Such a mode grants what an `allowedTools:` rule `Edit(…)` on a path inside the directory would.
+ * Whether a session in permission mode `mode` — the runtime's default when `undefined` — writes in its directory unasked: the narrowest
+ * mode that does and every wider one. Such a mode grants what an `allowedTools:` rule `Edit(…)` on a path inside the directory would.
  */
 export const editsUnasked = (mode: string | undefined): boolean =>
   (MODE_RANK[mode ?? DEFAULT_PERMISSION_MODE] ?? 0) >= MODE_RANK.acceptEdits;
+
+/** The mode a session held to its directory runs in, which runs what its rules allow and denies the rest. */
+const HELD_MODE = 'dontAsk';
 
 /** The allow rules a session held to its directory keeps, as the path patterns covering every path inside it (`pathCovers`). */
 const IN_DIRECTORY = ['Edit(**)', 'Read(**)'];
 
 /**
- * The fence that holds a Claude Code session of an agent to its directory, never wider than the agent's own (`fenceRefusal` lets it
- * through): `dontAsk`, or the agent's mode `mode` where that is narrower; and `Edit(**)` under a mode that edits unasked
+ * The fence that holds a session of an agent to its directory, never wider than the agent's own (`fenceRefusal` lets it through):
+ * `HELD_MODE`, or the agent's mode `mode` where that is narrower; and `Edit(**)` under a mode that edits unasked
  * (`editsUnasked`), else those of the agent's allow rules `allows`, as written, that a rule inside the directory covers. Undefined when
  * the agent has allow rules and none is inside its directory: a step's list replaces its agent's and cannot be empty, so the agent's own
  * would run.
@@ -45,7 +48,7 @@ export function directoryFence(
   allows: string | undefined,
 ): { permissionMode: string; allowedTools: string[] } | undefined {
   const own = mode ?? DEFAULT_PERMISSION_MODE;
-  const permissionMode = (MODE_RANK[own] ?? 0) < MODE_RANK.dontAsk ? own : 'dontAsk';
+  const permissionMode = (MODE_RANK[own] ?? 0) < MODE_RANK[HELD_MODE] ? own : HELD_MODE;
   if (editsUnasked(mode)) return { permissionMode, allowedTools: ['Edit(**)'] };
   const rules = (allows ?? '')
     .split(',')
@@ -55,10 +58,10 @@ export function directoryFence(
   return rules.length && !allowedTools.length ? undefined : { permissionMode, allowedTools };
 }
 
-/** The sandbox a codex session runs in when its step names none: the runtime's `sandboxOf` gives `workspace-write`. */
+/** The sandbox a sandboxed session runs in when its step names none, the runtime's (`sandboxOf`). */
 export const DEFAULT_SANDBOX = 'workspace-write';
 
-/** The keys of a step's fence, either harness's: a codex step's `permissionMode:` is read as its `sandbox:` before this sees it. */
+/** The keys of a step's fence, either harness's: a sandboxed step's `permissionMode:` is read as its `sandbox:` before this sees it. */
 const FENCE_KEYS = ['tools', 'allowedTools', 'disallowedTools', 'permissionMode', 'sandbox'] as const;
 
 /** One of a fence's keys. */
@@ -69,7 +72,7 @@ type Said = { step: string; line: string; agent: string; file: string };
 
 /**
  * Why step `step` would widen its agent's fence, or `undefined` when it does not: `own` are the keys the step writes itself, the
- * codex sandbox under its own name (`codexSandboxNamed`), and `resolved` the step they were read into, with the agent's. A key the step
+ * sandbox under its own name (`codexSandboxNamed`), and `resolved` the step they were read into, with the agent's. A key the step
  * does not write is its agent's and widens nothing. A remote step is left to `remoteRefusal`, which refuses every fence key there.
  * The refusal names the step, the key, what it would add, and the fix.
  */
@@ -97,7 +100,7 @@ export function fenceRefusal(step: string, agent: Agent, own: Partial<Record<Ste
 /** The harness an agent runs on by its own file. */
 const agentHarness = (agent: Agent): string => agent.keys.harness ?? DEFAULT_HARNESS;
 
-/** Whether a harness fences a session with a sandbox, as codex does, rather than a permission mode and rule lists. */
+/** Whether a harness fences a session with a sandbox rather than a permission mode and rule lists. */
 const sandboxed = (harness: string): boolean => Object.hasOwn(SANDBOXES, harness);
 
 /** The agent's `tools:` as a list, or `undefined` for none: every tool. */
@@ -115,9 +118,9 @@ const tighten = (said: Said, widen: string): string =>
   `— a step may only tighten its agent's fence. ${widen} in ${said.file} (every step of ${said.agent} gets it), or attach another agent.`;
 
 /**
- * Refused: a step that runs an agent whose file sets a fence key on a harness fenced the other way — a Claude Code agent on codex, or a
- * codex agent on Claude Code. A sandbox and a permission mode cannot be compared, so a move would let a step widen the fence by its
- * harness.
+ * Refused: a step that runs an agent whose file sets a fence key on a harness fenced the other way — an agent fenced by a mode on a
+ * harness fenced by a sandbox, or the other way round. A sandbox and a permission mode cannot be compared, so a move would let a step
+ * widen the fence by its harness.
  */
 function movedRefusal(step: string, agent: Agent, file: string, harness: string): string | undefined {
   const from = agentHarness(agent);
@@ -164,7 +167,7 @@ function modeRefusal(said: Said, mode: string, agents: string | undefined): stri
   return `${said.step}: \`${said.line}\` is wider than ${said.file}, which ${runs} ${tighten(said, `Name one as narrow or narrower — ${listed(narrower)} — or widen the mode`)}`;
 }
 
-/** Refused: a codex sandbox wider than the agent's, or than codex's default when its file names none (`DEFAULT_SANDBOX`). */
+/** Refused: a sandbox wider than the agent's, or than its harness's default when its file names none (`DEFAULT_SANDBOX`). */
 function sandboxRefusal(said: Said, sandbox: string, agents: string | undefined): string | undefined {
   const order = SANDBOXES.codex;
   const agentSandbox = agents ?? DEFAULT_SANDBOX;
@@ -172,13 +175,13 @@ function sandboxRefusal(said: Said, sandbox: string, agents: string | undefined)
   const narrower = order.slice(0, order.indexOf(agentSandbox) + 1);
   const runs =
     agents === undefined
-      ? `names no sandbox, so its agent runs in \`${agentSandbox}\`, codex's default`
+      ? `names no sandbox, so its agent runs in \`${agentSandbox}\`, its harness's default`
       : `runs its agent in \`${agentSandbox}\``;
   return `${said.step}: \`${said.line}\` is wider than ${said.file}, which ${runs} ${tighten(said, `Name one as narrow or narrower — ${listed(narrower)} — or widen the sandbox`)}`;
 }
 
 /**
- * Whether an agent in permission mode `mode` already does what allow rule `rule` grants: `bypassPermissions` everything, and a mode that
+ * Whether an agent in permission mode `mode` already does what allow rule `rule` grants: the widest mode everything, and a mode that
  * writes unasked (`editsUnasked`) an `Edit` of a path inside its directory, which a bare `**` covers (`pathCovers`).
  */
 function modeGrants(mode: string | undefined, rule: string): boolean {
@@ -217,7 +220,7 @@ const SHELL_JOINS = /[;&|`<>\n]|\$\(/;
 
 /**
  * Whether a command prefix `by` (`npm:*`) covers `command`, itself a command or a prefix: the same words, or more words after them. A
- * command joined to another (`npm test && git push`), substituting one or redirecting is never covered, as Claude Code's prefix rules
+ * command joined to another (`npm test && git push`), substituting one or redirecting is never covered, as the harness's prefix rules
  * permit none of them.
  */
 function commandCovers(by: string, command: string): boolean {

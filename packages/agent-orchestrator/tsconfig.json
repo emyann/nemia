@@ -10,5 +10,5 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["src", "bin", "test", "place"]
+  "include": ["src", "bin", "test", "place", "../../tools"]
 }

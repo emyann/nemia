@@ -1,7 +1,8 @@
 /**
  * Fences only tighten: a step that names an agent, or is hired one, may narrow the agent's fence and never widen it. `fenceRefusal` judges
  * the fence keys a step writes itself — `tools:`, `allowedTools:`, `disallowedTools:`, `permissionMode:` and `sandbox:` — against its
- * agent's, and a step that runs a fenced agent on the other harness, whose fence cannot be compared with the agent's.
+ * agent's, and a step that runs a fenced agent on the other harness, whose fence cannot be compared with the agent's. `addedSkillsRefusal`
+ * judges a skill a step adds to its agent's, which the agent's fence must let the session load.
  */
 import { AGENTS_FOLDER, type StepKey, type Workflow } from '../step/step.ts';
 import { DEFAULT_HARNESS, isRemoteHarness, SANDBOXES } from '../harness/harness.ts';
@@ -93,6 +94,35 @@ export function fenceRefusal(step: string, agent: Agent, own: Partial<Record<Ste
   for (const key of FENCE_KEYS) {
     const why = own[key] === undefined ? undefined : judge[key]({ step, line: `${key}: ${own[key]}`, agent: agent.name, file });
     if (why !== undefined) return why;
+  }
+  return undefined;
+}
+
+/**
+ * Why step `step` may not add the skills `added` to its agent's, its line written as `line`, or `undefined` when it may: the first one the
+ * agent does not give whose load the agent's own fence refuses — a `tools:` list with no `Skill`, or a deny covering `Skill(<skill>)`.
+ * Loading a skill is a call of `Skill`, so adding one past the agent's fence would widen it. A step on a sandboxed harness or a remote
+ * agent is left to `composedRefusal`, which refuses skills there. The refusal names the step, the skill, the agent's file and both fixes.
+ */
+export function addedSkillsRefusal(
+  step: string,
+  agent: Agent,
+  line: string,
+  added: readonly string[],
+  resolved: Workflow,
+): string | undefined {
+  const harness = resolved.harness ?? DEFAULT_HARNESS;
+  if (isRemoteHarness(harness) || sandboxed(harness)) return undefined;
+  const file = `${AGENTS_FOLDER}/${agent.name}.md`;
+  const tools = agentTools(agent, file);
+  const denies = agentRules(agent, file, 'disallowedTools');
+  const untooled = tools !== undefined && !tools.includes('Skill');
+  for (const skill of added.filter((name) => !agent.skills?.includes(name))) {
+    const deny = denies.find((rule) => covers(rule, `Skill(${skill})`));
+    if (!untooled && deny === undefined) continue;
+    const why = untooled ? `gives it \`tools: ${(tools ?? []).join(', ')}\`, with no \`Skill\`` : `denies it \`${deny}\``;
+    const fix = untooled ? `Give ${agent.name} \`Skill\` in its \`tools:\`` : `Take \`${deny}\` off its \`disallowedTools:\``;
+    return `${step}: \`skills: ${line}\` adds \`${skill}\` to ${agent.name}'s skills, and ${file} ${why}: a session loads a skill with the \`Skill\` tool, and a step never widens its agent's fence. ${fix} in ${file} (every step of ${agent.name} gets it), or take \`${skill}\` off this step's \`skills:\`.`;
   }
   return undefined;
 }

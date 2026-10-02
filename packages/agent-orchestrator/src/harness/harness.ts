@@ -45,6 +45,8 @@ const REMOTE_REFUSED: Partial<Record<StepKey, string>> = {
   permissionMode: FENCED_THERE,
   sandbox: FENCED_THERE,
   tools: FENCED_THERE,
+  skills:
+    "gives a session on this machine skills from a plugin directory of the step's own, and a remote agent has the skills its operator gave it, and loads none of ours",
   disallowedTools: FENCED_THERE,
   allowedTools: FENCED_THERE,
   denials: 'stops the step on a call its harness denied, and a remote agent reports none',

@@ -31,7 +31,7 @@ import {
   type Workflow,
   type WorkflowError,
 } from '../step/step.ts';
-import { composedRefusal } from '../keys/index.ts';
+import { composedRefusal, SKILL_NAME, skillNamesOf } from '../keys/index.ts';
 import {
   codexModeWritten,
   codexSandboxNamed,
@@ -103,9 +103,6 @@ const OWN_LINE: Record<AgentOwnKey, string> = {
  */
 export const HARNESS_PROMPTS = ['keep', 'no-coding', 'replace'] as const;
 export type HarnessPrompt = (typeof HARNESS_PROMPTS)[number];
-
-/** A skill's name: the folder it is, in `skills/`, lowercase words joined by dashes, as Claude Code names one. */
-export const SKILL_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 /**
  * Why `name` cannot be a skill's folder, or `undefined`: what a skill is copied or written under is refused as `skills:` refuses a name.
@@ -271,24 +268,6 @@ export function cardRetired(file: string, key: 'card' | 'skills', named?: string
   const line = named === undefined ? `\`${key}\`` : `\`${key}: ${named}\``;
   const it = named === undefined ? 'the file it names' : named;
   return `${file}: ${line} names a card file, which is retired: an agent's card is generated from its \`skills:\`, an entry for each skill made from its SKILL.md's frontmatter (its \`title:\` or \`name:\`, \`description:\`, \`tags:\` and \`examples:\`), and from the agent's own \`description:\` when it has none. Delete the line, and ${it} beside the agent; to say what the agent can do, give it skills.`;
-}
-
-/** `skills:` as the names it lists, refused unless each is a skill's name (`SKILL_NAME`), once. */
-function skillNamesOf(file: string, written: string | undefined): string[] | undefined {
-  if (written === undefined) return undefined;
-  const named = `${file}: \`skills: ${written}\``;
-  const shape =
-    "Each is a skill's name — its folder in skills/, lowercase words joined by dashes — comma-separated: `skills: review-a-change, write-a-note`.";
-  const names = written
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
-  if (!names.length) refuse(`${named} names no skill. ${shape}`);
-  const odd = names.find((n) => !SKILL_NAME.test(n));
-  if (odd) refuse(`${named} has \`${odd}\`, which is not a skill's name. ${shape}`);
-  const twice = names.find((n, i) => names.indexOf(n) !== i);
-  if (twice) refuse(`${named} names \`${twice}\` twice. Name it once.`);
-  return names;
 }
 
 /**

@@ -364,7 +364,8 @@ What an agent is told comes in four layers, each written by whoever owns it:
 2. **Custom instructions** — what a person adds to an agent they use without rewriting it. Coming, not built.
 3. **The step's policy** — the step's own words and keys: what this node of this process asks of whoever does its work — a role's
    policies, *in this team, also check …*, or a `ship` step telling its shipper why a build and an e2e matter on a merged tree. It is a
-   normal layer, the place a process says what it expects of a role. A step adding skills to its agent's is coming, not built.
+   normal layer, the place a process says what it expects of a role. A step's `skills:` adds skills to its agent's, and takes none away
+   (below).
 4. **Factory rules** — the files the harness reads from the factory's workspace itself (today `CLAUDE.md`, `AGENTS.md`): what holds
    there for every agent at work in it. Nemia composes nothing of them; the harness reads them as it would for a person.
 
@@ -500,6 +501,11 @@ is refused, naming both. A folder team, which has no repository, reads the `.cla
 `agentVersion` digests each skill it gives, every file of its folder, so an edit moves the agent's version and the board's save
 refuses a stale read.
 
+A step with an agent may write `skills:` too: skills this position asks of whoever fills it, added to its agent's. They are found
+where the agent's are, frozen with the step at `wf start`, and the session is given the agent's skills, then the step's, each once; a
+step never takes one of its agent's away, so naming a few of them changes nothing. `renderStep` writes the step's own line back as it
+wrote it, never its agent's, and the board's step form shows it as a plain list. The board's version digests each skill a step adds.
+
 A subagent Claude Code's `/agents` wizard wrote into `.claude/agents/` runs as it is: its `name`, `description`, `tools` and `model`
 are the run's keys, and its `color` is read and ignored (`CLAUDE_CODE_IGNORED`) — it colours a name in Claude Code and holds nothing
 back — and is not written back by the board's save. Claude Code's keys that change what a session may do or has, which a run does not
@@ -513,7 +519,10 @@ as before; skills or a harness prompt on a step that continues another's session
 an agent with no instructions; and a Claude Code step that runs in `auto` — written, or the runtime's default when it names no mode —
 on `haiku`, `claude-haiku-4-5` or `claude-sonnet-4-5`, where Claude Code drops `auto` to `default` and a job then denies every call
 `default` would ask about (F21). A `wf retry --model` onto one of those models, from the terminal or the board, is refused the same way
-(`retryRefusal`, through `autoDropped`), since the step's mode is frozen with the run.
+(`retryRefusal`, through `autoDropped`), since the step's mode is frozen with the run. A step's own `skills:` is refused, naming the
+step, the skill and the fix: on a step with no agent (a factory's hire is one); a skill it adds that its agent's fence keeps from
+loading — `tools:` without `Skill`, or a `disallowedTools:` rule covering `Skill` or `Skill(<skill>)` — since a step never widens its
+agent's fence (`addedSkillsRefusal`); and one no place has, naming each place looked in.
 
 A run whose rendered folder was removed by hand is filed as a step was before: the instructions in its brief, and no flag naming a
 file that is not there. With no plugin there is nothing to load, so the brief tells each of the agent's skills whole after the

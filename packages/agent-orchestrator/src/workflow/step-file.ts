@@ -33,6 +33,7 @@ import {
   outputOf,
   remoteOf,
   rulesOf,
+  skillNamesOf,
   slotOf,
   toolsOf,
   wordOf,
@@ -49,7 +50,7 @@ import {
 } from '../former/former.ts';
 import type { Agent, Agents, SkillsFound } from '../agents/agents.ts';
 import { tallyOf } from '../tally/tally.ts';
-import { fenceRefusal } from './fence.ts';
+import { addedSkillsRefusal, fenceRefusal } from './fence.ts';
 
 /**
  * One step, from its file's text.
@@ -87,7 +88,12 @@ export function parseWorkflow(
   const attached = attachedAgent(name, written, hired);
   if (attached === undefined) {
     if (!own) throw new WorkflowError(`${name}: the body is empty — a step with nothing to say is not a step`);
-    return stepFrom(name, codexSandboxNamed(name, meta, meta.harness), own, read, spelled);
+    const step = stepFrom(name, codexSandboxNamed(name, meta, meta.harness), own, read, spelled);
+    if (meta.skills !== undefined)
+      refuse(
+        `${name}: \`skills: ${meta.skills}\` adds skills to the step's agent, and this step has none. Name one — \`agent: <name>\` — whose skills these add to, or delete the line.`,
+      );
+    return step;
   }
   const agent = agentOf(name, attached, agents, hired);
   meta = codexSandboxNamed(name, meta, meta.harness ?? agent.keys.harness);
@@ -100,6 +106,7 @@ export function parseWorkflow(
   const fromAgent = meta.output === undefined && agent.keys.output !== undefined;
   const step = stepFrom(name, { ...inherited, ...meta }, body, fromAgent ? agent.read : read, spelled);
   agentStepRefusal(name, agent, meta, step, skills);
+  const sessionSkills = [...(agent.skills ?? []), ...(step.skills ?? []).filter((skill) => !agent.skills?.includes(skill))];
   const keys = STEP_KEYS.filter((key) => Object.hasOwn(meta, key));
   const given = Object.fromEntries(
     STEP_KEYS.flatMap((key) => {
@@ -115,7 +122,7 @@ export function parseWorkflow(
       body: own,
       given,
       ...(agent.body && { instructions: agent.body }),
-      ...(agent.skills?.length && { skills: agent.skills }),
+      ...(sessionSkills.length && { skills: sessionSkills }),
       ...(agent.harnessPrompt !== undefined && { harnessPrompt: agent.harnessPrompt }),
     },
   };
@@ -124,6 +131,8 @@ export function parseWorkflow(
 /**
  * Refuses step `name`, resolved as `step` from its own lines `own` and its agent `agent`: a fence key that would widen the agent's
  * (`fenceRefusal`), a composition the harness cannot take (`composedRefusal`), and, given the places' `skills`, a skill none of them has.
+ * Each is asked of the agent's skills, then of those the step adds (`skills:`), the step's own fence for them asked by
+ * `addedSkillsRefusal`: a skill the agent's fence cannot load.
  */
 function agentStepRefusal(
   name: string,
@@ -137,16 +146,30 @@ function agentStepRefusal(
   const composed = composedRefusal(`${name}: \`agent: ${agent.name}\``, agent.skills, agent.harnessPrompt, step);
   if (composed !== undefined) refuse(composed);
   if (skills) for (const skill of agent.skills ?? []) skillAt(name, agent.name, skill, skills);
+  if (own.skills === undefined || !step.skills) return;
+  const unloadable = addedSkillsRefusal(name, agent, own.skills, step.skills, step);
+  if (unloadable !== undefined) refuse(unloadable);
+  const added = composedRefusal(name, step.skills, undefined, step);
+  if (added !== undefined) refuse(added);
+  const line = `${name}: \`skills: ${own.skills}\``;
+  if (skills) for (const skill of step.skills) foundSkill(`${line} adds the skill \`${skill}\``, "this step's", skill, skills);
 }
 
 /** The folder of the skill `skill` that step `step`'s agent names, or why not: none of the places has it, or two of one repository do. */
 export function skillAt(step: string, agent: string, skill: string, skills: SkillsFound): string {
+  return foundSkill(`${step}: \`agent: ${agent}\` gives the skill \`${skill}\``, "the agent's", skill, skills);
+}
+
+/**
+ * The folder of the skill `skill`, or why not, after `named`, which says who gives it: none of the places has it — and the fix takes it off
+ * `whose` `skills:` line — or two of one repository do.
+ */
+function foundSkill(named: string, whose: string, skill: string, skills: SkillsFound): string {
   const found = skills.at.get(skill);
-  if (found instanceof WorkflowError)
-    refuse(`${step}: \`agent: ${agent}\` gives the skill \`${skill}\`, which cannot be used — ${found.message}`);
+  if (found instanceof WorkflowError) refuse(`${named}, which cannot be used — ${found.message}`);
   if (found !== undefined) return found;
   return refuse(
-    `${step}: \`agent: ${agent}\` gives the skill \`${skill}\`, and no skills folder has it — looked in ${skills.looked.join(', ')}. A skill is a folder holding a SKILL.md: write skills/${skill}/SKILL.md beside ${AGENTS_FOLDER}/, or take \`${skill}\` off the agent's \`skills:\`.`,
+    `${named}, and no skills folder has it — looked in ${skills.looked.join(', ')}. A skill is a folder holding a SKILL.md: write skills/${skill}/SKILL.md beside ${AGENTS_FOLDER}/, or take \`${skill}\` off ${whose} \`skills:\`.`,
   );
 }
 
@@ -233,6 +256,7 @@ export function stepFrom(
     workspace: workspaceOf(name, meta.workspace, meta.check, meta.resume, meta.gate, meta.retries, harness),
     slot: slotOf(name, meta.slot),
     body,
+    skills: skillNamesOf(name, meta.skills),
     harness,
     model: meta.model,
     effort: wordOf(name, 'effort', meta.effort, harness),
@@ -302,10 +326,10 @@ export function autoDropped(
 export type StepDraft = Omit<Workflow, 'output' | 'agent'> & { output?: Pick<StepOutput, 'file'>; agent?: string | StepAgent | null };
 
 /**
- * The keys whose empty list says what no line says: nothing to wait on, to read, to deny. Not `tools:`, where none reads as every tool to
- * one person.
+ * The keys whose empty list says what no line says: nothing to wait on, to read, to deny, to add. Not `tools:`, where none reads as every
+ * tool to one person.
  */
-const EMPTY_IS_UNSET: readonly StepKey[] = ['after', 'input', 'disallowedTools', 'allowedTools', 'tally'];
+const EMPTY_IS_UNSET: readonly StepKey[] = ['after', 'input', 'skills', 'disallowedTools', 'allowedTools', 'tally'];
 
 /**
  * A step as its file: the frontmatter, with the keys the step sets in `STEP_KEYS`' order, each written as the parser reads it — a list as

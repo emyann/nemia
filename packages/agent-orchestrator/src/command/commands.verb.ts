@@ -1,0 +1,321 @@
+/**
+ * The orchestrator's commands, each defined once (`COMMANDS`): its spec (`command.ts`), the one package verb its handler calls, the data
+ * it answers, and the lines the CLI prints of that data. The CLI parses, refuses, helps and prints from an entry, and the api serves the
+ * same entry on its route; an entry served on one side alone says so (`only`). Today: a person's asks of a run — `wf retry`, `wf approve`,
+ * `wf round`, `wf accept` and `wf say`.
+ */
+import type { Engine } from '../runtime-client.ts';
+import { approvalWordsRefusal } from '../gate/gate.ts';
+import { approve } from '../gate/gate.verb.ts';
+import { runStore } from '../record/files.store.ts';
+import { stepsOf } from '../record/record.store.ts';
+import { messageRefusal, type RetryAsk, type RetryHow } from '../retry/index.ts';
+import { retry } from '../retry/retry.verb.ts';
+import { acceptWordsRefusal } from '../round/round.ts';
+import { accept, round } from '../round/round.verb.ts';
+import { saidLines } from '../say/say.ts';
+import { say } from '../say/say.verb.ts';
+import { budgetRefusal, budgetWord } from '../status/status.ts';
+import { commandLine, type Args, type CommandSpec } from './command.ts';
+
+/**
+ * A command whole: its spec, `handler`, which calls one package verb with the arguments and answers data — never printed lines — and
+ * `print`, the lines the CLI prints of that data. The api answers the data as JSON.
+ */
+export type Command<D extends object = object> = CommandSpec & {
+  handler(e: Engine, args: Args): Promise<D>;
+  print(data: D, args: Args): readonly string[];
+};
+
+/** The text under `key`, or undefined where none was given. */
+const textOf = (args: Args, key: string): string | undefined => {
+  const value = args[key];
+  return typeof value === 'string' ? value : undefined;
+};
+
+/** The dollars under `key`, or undefined where none were given. */
+const amountIn = (args: Args, key: string): number | undefined => {
+  const value = args[key];
+  return typeof value === 'number' ? value : undefined;
+};
+
+/** The run's id and the step's name, as every route and command line names them. */
+const named = (args: Args): { runId: string; step: string } => ({ runId: textOf(args, 'runId') ?? '', step: textOf(args, 'step') ?? '' });
+
+/** `wf retry`'s how, off its arguments: its way, the model a fresh session runs on, the answer and the cap. */
+function howOf(args: Args): RetryHow {
+  const mode = textOf(args, 'mode');
+  const model = textOf(args, 'model');
+  const message = textOf(args, 'message');
+  const budget = amountIn(args, 'budget');
+  return {
+    mode: mode === 'fresh' || mode === 'recheck' ? mode : 'nudge',
+    ...(model !== undefined ? { model } : {}),
+    ...(message !== undefined ? { message } : {}),
+    ...(budget !== undefined ? { budget } : {}),
+  };
+}
+
+/** The run's id and the step's name, as `wf retry`, `wf approve` and `wf say` take them first. */
+const RUN_STEP = [
+  { key: 'runId', takes: 'required', kind: 'name' },
+  { key: 'step', takes: 'required', kind: 'name' },
+] as const;
+
+/** The run's id, and the step that closes the loop when the run has more than one, as `wf round` and `wf accept` take them. */
+const RUN_LOOP = [
+  { key: 'runId', takes: 'required', kind: 'name' },
+  { key: 'step', takes: 'optional', kind: 'name' },
+] as const;
+
+/** `wf retry`: another try of a step asked for, the next tick files it once, and the file the ask is written to. */
+const RETRY: Command<{ try: number; file: string; stopFirst: boolean; ask: RetryAsk }> = {
+  name: 'retry',
+  usage: '<runId> <step> [--nudge | --fresh | --model <m> | --recheck] [--message "<answer>"] [--budget <amount>]',
+  help: [
+    'try a step waiting on you again, once, on the next tick:',
+    '--nudge (default) continues its session, told what happened;',
+    '--fresh a new session on its branch; --model <m> the same, on m;',
+    '--recheck runs its check again, and files no session;',
+    '--message "<answer>" goes into the try\'s brief, as ## Your answer:',
+    'for a step that signed off blocked, the answer to its needs — or',
+    'what you have to say to any step you try again; not with --recheck.',
+    'The next argument is the answer, whatever it starts with; an answer',
+    "that is only one of these flags' names goes as --message=<answer>;",
+    '--budget <amount>: for a step over budget or budget exhausted, its',
+    'cap raised to that many dollars, above what its tries have cost',
+  ],
+  spec: {
+    positionals: RUN_STEP,
+    flags: [
+      { flag: '--nudge', kind: 'switch', sets: { mode: 'nudge' }, way: true },
+      { flag: '--fresh', kind: 'switch', sets: { mode: 'fresh' }, way: true },
+      { flag: '--recheck', kind: 'switch', sets: { mode: 'recheck' }, way: true },
+      {
+        flag: '--model',
+        kind: 'name',
+        key: 'model',
+        sets: { mode: 'fresh' },
+        way: true,
+        takes: '--model takes the model to run the new session on: wf retry <runId> <step> --model <m>',
+      },
+      {
+        flag: '--message',
+        kind: 'text',
+        key: 'message',
+        takes: '--message takes what to tell the step, quoted: wf retry <runId> <step> --message "<answer>"',
+        twice: 'wf retry takes --message once: put the whole answer in it, quoted — wf retry <runId> <step> --message "<answer>".',
+      },
+      {
+        flag: '--budget',
+        kind: 'amount',
+        key: 'budget',
+        takes: "the most the step's tries may cost together, in dollars, above what they have cost",
+        form: 'wf retry <runId> <step> --budget <amount>',
+        twice: 'wf retry takes --budget once: the cap to raise the step to, in dollars — wf retry <runId> <step> --budget <amount>.',
+      },
+    ],
+    defaults: { mode: 'nudge' },
+    unknown: (arg) =>
+      `wf retry does not take ${arg}. It takes one of --nudge, --fresh, --model <m>, --recheck, and --message "<answer>" and --budget <amount>.`,
+    oneWay: 'wf retry asks for one try, one way: pick one of --nudge, --fresh, --model <m>, --recheck.',
+    apart: (flag) =>
+      `--message takes what to tell the step, and ${flag} is one of wf retry's own flags, so the answer was left out: wf retry <runId> <step> --message "<answer>". If ${flag} is the whole answer, give it as --message=${flag}.`,
+  },
+  check: (args) => messageRefusal(howOf(args), commandLine(RETRY, args)) ?? budgetRefusal(howOf(args), commandLine(RETRY, args)),
+  writes: true,
+  refuses: ['Missing', 'Conflict', 'Invalid'],
+  route: { method: 'POST', path: '/api/runs/:runId/steps/:step/retry', status: 202 },
+  apiTakes: ['answers'],
+  async handler(e, args) {
+    const { runId, step } = named(args);
+    const { ask, file, stopFirst } = await retry(e, runId, step, howOf(args), { stopBlocked: true });
+    return { try: ask.try, file, stopFirst, ask };
+  },
+  print({ ask, file, stopFirst }, args) {
+    const { runId, step } = named(args);
+    const how = `${ask.model ? `--model ${ask.model}` : `--${ask.mode}`}${ask.budget !== undefined ? `, --budget ${ask.budget}` : ''}`;
+    const then = stopFirst
+      ? 'its harness blocked its session: the next tick stops it, and files the try once it has stopped'
+      : 'the next tick files it, once';
+    return [
+      `${runId}  asked: try ${ask.try} of ${step} (${how})${ask.message !== undefined ? ', with your answer' : ''} — ${then}`,
+      `   ${file}`,
+    ];
+  },
+};
+
+/** What the next tick files once a step is approved: the step itself, what waits on it, or nothing, so its run can be decided. */
+type Next = 'step' | 'waiting' | 'nothing';
+
+/** `wf approve`: a step's try approved at its gate, what the next tick files because of it, and the file the approval is written to. */
+const APPROVE: Command<{ try: number; at: string; message: string | null; file: string; next: Next }> = {
+  name: 'approve',
+  usage: '<runId> <step> [--message "<words>"]',
+  help: [
+    'let a step waiting at its gate hand on: what waits on it is filed on',
+    'the next tick, and every step after the gate is handed your words',
+    'under ## Approved. To send it back instead, with what to change:',
+    'wf retry <runId> <step> --message "<objection>"',
+  ],
+  spec: {
+    positionals: RUN_STEP,
+    flags: [
+      {
+        flag: '--message',
+        kind: 'text',
+        key: 'message',
+        takes: '--message takes the words that go with your approval, quoted: wf approve <runId> <step> --message "<words>".',
+        twice: 'wf approve takes --message once: put all your words in it, quoted — wf approve <runId> <step> --message "<words>".',
+      },
+    ],
+    unknown: (arg) =>
+      `wf approve does not take ${arg}. It takes the run, the step, and --message "<words>": wf approve <runId> <step> [--message "<words>"].`,
+  },
+  check: (args) => approvalWordsRefusal(textOf(args, 'message'), commandLine(APPROVE, args)),
+  writes: true,
+  refuses: ['Missing', 'Conflict', 'Invalid'],
+  route: { method: 'POST', path: '/api/runs/:runId/steps/:step/approve', status: 202 },
+  async handler(e, args) {
+    const { runId, step } = named(args);
+    const { approval, file } = await approve(e, runId, step, textOf(args, 'message'));
+    const after = runStore.runs.read(runId);
+    const next: Next = !after.steps[step]?.taskId ? 'step' : stepsOf(after).some((s) => s.after.includes(step)) ? 'waiting' : 'nothing';
+    return { try: approval.try, at: approval.at, message: approval.message ?? null, file, next };
+  },
+  print({ try: tryNo, message, file, next }, args) {
+    const { runId, step } = named(args);
+    const then =
+      next === 'step'
+        ? `the next tick files ${step}`
+        : next === 'waiting'
+          ? 'the next tick files what waits on it'
+          : 'nothing waits on it: its run can be decided';
+    return [`${runId}  approved: try ${tryNo} of ${step}${message !== null ? ', with your words' : ''} — ${then}`, `   ${file}`];
+  },
+};
+
+/** `wf round`: another round of a loop out of rounds asked for, its cap raised with `--budget`, and the file the ask is written to. */
+const ROUND: Command<{ step: string; round: number; file: string; budget?: number }> = {
+  name: 'round',
+  usage: '<runId> [<step>] [--budget <amount>]',
+  help: [
+    'once more: a loop out of rounds goes round again, once, on the',
+    'next tick — the step it loops to continued, then a new reviewer;',
+    '--budget raises the cap of a step of the loop over its budget',
+  ],
+  spec: {
+    positionals: RUN_LOOP,
+    flags: [
+      {
+        flag: '--budget',
+        kind: 'amount',
+        key: 'budget',
+        takes: 'the most a step of the loop may cost together, in dollars, above what it has cost',
+        form: 'wf round <runId> [<step>] --budget <amount>',
+        twice:
+          'wf round takes --budget once: the cap to raise the steps of the loop over their budget to, in dollars — wf round <runId> [<step>] --budget <amount>.',
+      },
+    ],
+    unknown: () =>
+      'wf round takes the run and, when the run has more than one loop, the step that closes the one to go round: wf round <runId> [<step>] — and --budget <amount>, to raise the cap of a step of the loop over its budget.',
+  },
+  writes: true,
+  refuses: ['Missing', 'Conflict', 'Invalid'],
+  route: { method: 'POST', path: '/api/runs/:runId/round', status: 202 },
+  async handler(e, args) {
+    const { ask, file } = await round(e, named(args).runId, textOf(args, 'step'), amountIn(args, 'budget'));
+    return { step: ask.step, round: ask.round, file, ...(ask.budget !== undefined ? { budget: ask.budget } : {}) };
+  },
+  print({ step, round: n, file, budget }, args) {
+    return [
+      `${named(args).runId}  asked: round ${n} of ${step}'s loop${budget !== undefined ? `, its cap raised to ${budgetWord(budget)}` : ''} — the next tick files it, once`,
+      `   ${file}`,
+    ];
+  },
+};
+
+/** `wf accept`: a loop out of rounds closed on its last try as it stands, its findings open, and the file the acceptance is written to. */
+const ACCEPT: Command<{ step: string; try: number; at: string; message: string; file: string; waited: boolean }> = {
+  name: 'accept',
+  usage: '<runId> [<step>] --message "<why>"',
+  help: [
+    'enough: a loop out of rounds ends on your word, with its findings',
+    'open. What waits on the looping step is filed on the next tick as',
+    'if it had said again: false — a gated ending goes to its gate —',
+    'and every step after the loop is handed your words and those',
+    'findings under ## Accepted. The other answer to wf round',
+  ],
+  spec: {
+    positionals: RUN_LOOP,
+    flags: [
+      {
+        flag: '--message',
+        kind: 'text',
+        key: 'message',
+        takes: '--message takes why the work is good enough with its findings open, quoted: wf accept <runId> [<step>] --message "<why>".',
+        twice: 'wf accept takes --message once: put all your words in it, quoted — wf accept <runId> [<step>] --message "<why>".',
+      },
+    ],
+    unknown: () =>
+      'wf accept takes the run and, when the run has more than one loop, the step that closes the one to end: wf accept <runId> [<step>] --message "<why>".',
+  },
+  check: (args) => acceptWordsRefusal(textOf(args, 'message'), commandLine(ACCEPT, args)),
+  writes: true,
+  refuses: ['Missing', 'Conflict', 'Invalid'],
+  route: { method: 'POST', path: '/api/runs/:runId/steps/:step/accept', status: 202 },
+  async handler(e, args) {
+    const { runId } = named(args);
+    const { acceptance, file } = await accept(e, runId, textOf(args, 'step'), textOf(args, 'message'));
+    const waited = stepsOf(runStore.runs.read(runId)).some((s) => s.after.includes(acceptance.step));
+    return { step: acceptance.step, try: acceptance.try, at: acceptance.at, message: acceptance.message, file, waited };
+  },
+  print({ step, try: tryNo, file, waited }, args) {
+    return [
+      `${named(args).runId}  accepted: try ${tryNo} of ${step} as it stands, its findings open — ${waited ? 'the next tick files what waits on it' : 'nothing waits on it: its run can be decided'}`,
+      `   ${file}`,
+    ];
+  },
+};
+
+/**
+ * `wf say`: words to a step's session, journalled on its task, and printed as `wf decide` prints them. It takes every word after the step
+ * as one message, so an unquoted sentence is one; empty words are the engine's to refuse.
+ */
+const SAY: Command<{ at: string; attempt: number; text: string; try: number; taskId: string }> = {
+  name: 'say',
+  usage: '<runId> <step> "<words>"',
+  help: [
+    "tell a step's running session something, through its harness: the",
+    "engine journals the words on the step's task, wf ls notes the step",
+    'said to, and wf decide prints them under it. A try that continues',
+    'the session is handed them again, as ## Said to your session',
+  ],
+  spec: {
+    positionals: [...RUN_STEP, { key: 'text', takes: 'rest', kind: 'text' }],
+    flags: [],
+    unknown: (arg) => `wf say does not take ${arg}.`,
+  },
+  writes: true,
+  refuses: ['Missing', 'Conflict'],
+  route: { method: 'POST', path: '/api/runs/:runId/steps/:step/say', status: 202 },
+  async handler(e, args) {
+    const { runId, step } = named(args);
+    const told = await say(e, runId, step, textOf(args, 'text') ?? '');
+    const { at, attempt, text } = told.said;
+    return { at, attempt, text, try: told.try, taskId: told.taskId };
+  },
+  print({ at, attempt, text, try: tryNo, taskId }, args) {
+    const { runId, step } = named(args);
+    return [
+      `${runId}  said to ${step}, try ${tryNo}${attempt > 1 ? `, attempt ${attempt}` : ''}, at ${at} — journalled on ${taskId}: wf decide ${runId} prints it under the step`,
+      ...saidLines([{ at, attempt, text, try: tryNo }])
+        .slice(1)
+        .flatMap((l) => l.split('\n'))
+        .map((line) => `   ${line}`),
+    ];
+  },
+};
+
+/** Every command defined once, in the order `wf`'s help lists them. */
+export const COMMANDS: readonly Command[] = [RETRY, APPROVE, ROUND, ACCEPT, SAY];

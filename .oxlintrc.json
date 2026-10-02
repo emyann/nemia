@@ -603,13 +603,6 @@
       }
     },
     {
-      "files": ["packages/agent-orchestrator/src/cli/asks.ts"],
-      "rules": {
-        "complexity": ["error", { "max": 25 }],
-        "sonarjs/cognitive-complexity": ["error", 33]
-      }
-    },
-    {
       "files": ["packages/agent-orchestrator/src/cli/flags.ts"],
       "rules": {
         "sonarjs/cognitive-complexity": ["error", 19]

@@ -2,13 +2,14 @@
  * The comment guards: a comment is a JSDoc contract, or a lint directive with its reason (CLAUDE.md, "Code reads by itself").
  *
  * `lint/comments.ts` is the oxlint plugin; `.oxlintrc.json` runs the guards in one override block per package, none with an
- * `"excludeFiles"`, and one block also covers `lint/**`, the plugin itself. These tests run the repository's oxlint on fixtures with
+ * `"excludeFiles"`, and one block also covers the folders beside the packages: `lint/**`, the plugin itself, and `tools/**`, the
+ * repository's test tooling. These tests run the repository's oxlint on fixtures with
  * the repository's own block, so a guard the block names that runs nothing — misspelled, set to `off`, or aimed at other files — fails
  * here. The last part is what a lint rule cannot see across files: a name a comment quotes in backticks is one the code has, in each
  * file a guard block covers.
  *
- * No line that holds a comment, in any source file under packages/, apps/ and lint/, is wider than 140 columns: oxfmt wraps code at that
- * width and rewraps no comment.
+ * No line that holds a comment, in any source file under packages/, apps/, lint/ and tools/, is wider than 140 columns: oxfmt wraps code
+ * at that width and rewraps no comment.
  *
  * The test reads files outside this package: after a change elsewhere, `npx turbo run test --force`.
  */
@@ -58,8 +59,8 @@ const workspacePackages = (): string[] =>
     .filter((dir) => fs.existsSync(path.join(ROOT, dir, 'package.json')))
     .sort();
 
-/** The glob of the folder beside the packages that one guard block, and one only, lists after its package: the plugin's own. */
-const LINT = 'lint/**';
+/** The globs of the folders beside the packages, which one guard block, and one only, lists after its package: the plugin, the tooling. */
+const BESIDE = ['lint/**', 'tools/**'];
 
 /** A jsPlugins specifier made absolute, as a config in another folder needs it: a path from the root, or a package the root installs. */
 const resolvePlugin = (specifier: string): string =>
@@ -312,15 +313,37 @@ test('REFUSED: no-inline-comments refuses a comment after code, and lets a direc
   assert.deepEqual(refusals('inline.ts'), { 'no-inline-comments': [lineOf(INLINE, 'refused: after code')] });
 });
 
-test('there is one guard block per workspace package, each covering its package, and one also the plugin', () => {
+/** Where the guard blocks do not cover the folders beside the packages in one block, after its package's glob, as the fix to make. */
+function besideUnguarded(blocks: Block[]): string[] {
+  const holding = blocks.filter((block) => BESIDE.some((glob) => block.files.includes(glob)));
+  if (holding.length !== 1)
+    return [`${BESIDE.join(' and ')} are in ${holding.length} guard blocks: list them all in one, after its package's glob`];
+  return blocks.flatMap((block) => {
+    const files = [`${packageOf(block)}/**`, ...(block === holding[0] ? BESIDE : [])];
+    return JSON.stringify(block.files) === JSON.stringify(files)
+      ? []
+      : [`${packageOf(block)}'s block lists ${block.files.join(', ')}: make it ${files.join(', ')}`];
+  });
+}
+
+test('there is one guard block per workspace package, each covering its package, and one also the folders beside them', () => {
   const blocks = guardBlocks(readConfig());
   assert.deepEqual(blocks.map(packageOf).sort(), workspacePackages(), 'a package has no guard block, or two, or a block names no package');
-  const withLint = blocks.filter((block) => block.files.includes(LINT));
-  assert.equal(withLint.length, 1, `${LINT} is in ${withLint.length} guard blocks: the plugin's comments are guarded by one block`);
-  for (const block of blocks) {
-    const glob = [`${packageOf(block)}/**`];
-    assert.deepEqual(block.files, block === withLint[0] ? [...glob, LINT] : glob);
-  }
+  assert.deepEqual(besideUnguarded(blocks), []);
+});
+
+test('REFUSED: the tooling beside the packages guarded by a second block, or left out of the one', () => {
+  const blocks = guardBlocks(readConfig());
+  const holder = blocks.find((block) => block.files.includes('tools/**'));
+  assert.ok(holder, 'one block lists tools/** today');
+  const second = blocks.map((block) =>
+    block === holder || block !== blocks.find((b) => b !== holder) ? block : { ...block, files: [...block.files, 'tools/**'] },
+  );
+  assert.equal(besideUnguarded(second).length, 1, 'tools/** in a second block');
+  const left = blocks.map((block) => (block === holder ? { ...block, files: block.files.filter((glob) => glob !== 'tools/**') } : block));
+  assert.deepEqual(besideUnguarded(left), [
+    `${packageOf(holder)}'s block lists ${packageOf(holder)}/**, lint/**: make it ${packageOf(holder)}/**, lint/**, tools/**`,
+  ]);
 });
 
 test('no guard block has an excludeFiles', () => {
@@ -334,9 +357,9 @@ test('REFUSED: a guard block with an excludeFiles is found', () => {
   assert.deepEqual(excludedBlocks(readConfig(text.replace(line, `${line} "excludeFiles": ["apps/api/**"],`))), ['apps/api']);
 });
 
-/** Every source file git lists under packages/, apps/ and lint/, tracked or not yet added, that is on disk, from the root. */
+/** Every source file git lists under packages/, apps/, lint/ and tools/, tracked or not yet added, that is on disk, from the root. */
 const sourceFiles = (): string[] =>
-  execFileSync('git', ['ls-files', '-co', '--exclude-standard', 'packages', 'apps', 'lint'], {
+  execFileSync('git', ['ls-files', '-co', '--exclude-standard', 'packages', 'apps', 'lint', 'tools'], {
     cwd: ROOT,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -425,11 +448,11 @@ test('REFUSED: a line over 140 columns that holds a comment is found, in a JSDoc
   ]);
 });
 
-test('no line that holds a comment, under packages/, apps/ and lint/, is over 140 columns', () => {
+test('no line that holds a comment, under packages/, apps/, lint/ and tools/, is over 140 columns', () => {
   const files = sourceFiles();
   const wide = files.flatMap((file) => wideCommentLines(file, fs.readFileSync(path.join(ROOT, file), 'utf8')));
   assert.deepEqual(wide, [], `rewrap these comments within ${COMMENT_WIDTH} columns: oxfmt rewraps none`);
-  const folders = ['lint', ...workspacePackages().flatMap((pkg) => [`${pkg}/src`, `${pkg}/test`])];
+  const folders = ['lint', 'tools', ...workspacePackages().flatMap((pkg) => [`${pkg}/src`, `${pkg}/test`])];
   assert.deepEqual(
     folders.filter((folder) => !files.some((file) => file.startsWith(`${folder}/`))),
     [],
@@ -465,8 +488,8 @@ function namesOf(source: ts.SourceFile, into: Set<string>): Set<string> {
 
 let known: Set<string> | undefined;
 /**
- * Every name the repository's code has, from each source file under packages/, apps/ and lint/ but this one, whose fixtures quote stale
- * names.
+ * Every name the repository's code has, from each source file under packages/, apps/, lint/ and tools/ but this one, whose fixtures
+ * quote stale names.
  */
 const knownNames = (): Set<string> =>
   (known ??= sourceFiles()

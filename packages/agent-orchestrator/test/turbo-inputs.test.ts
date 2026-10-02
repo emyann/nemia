@@ -22,6 +22,7 @@ const INPUTS: Record<string, readonly string[]> = {
     '$TURBO_DEFAULT$',
     '$TURBO_ROOT$/.oxlintrc.json',
     '$TURBO_ROOT$/lint/**',
+    '$TURBO_ROOT$/tools/**',
     ...APPS,
     '$TURBO_ROOT$/apps/*/*.ts',
     '$TURBO_ROOT$/apps/*/package.json',
@@ -68,6 +69,9 @@ test("REFUSED: a task that drops the apps' tests, its own files, or its whole in
   ]);
   assert.deepEqual(missingInputs(dropping('agent-orchestrator#test', '$TURBO_ROOT$/packages/agent-runtime/**')), [
     'agent-orchestrator#test does not list $TURBO_ROOT$/packages/agent-runtime/** among its inputs in turbo.json: add it, or turbo replays it from its cache',
+  ]);
+  assert.deepEqual(missingInputs(dropping('agent-orchestrator#test', '$TURBO_ROOT$/tools/**')), [
+    'agent-orchestrator#test does not list $TURBO_ROOT$/tools/** among its inputs in turbo.json: add it, or turbo replays it from its cache',
   ]);
   assert.deepEqual(missingInputs(dropping('agent-runtime#test', '$TURBO_DEFAULT$')), [
     'agent-runtime#test does not list $TURBO_DEFAULT$ among its inputs in turbo.json: add it, or turbo replays it from its cache',

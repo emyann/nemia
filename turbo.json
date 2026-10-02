@@ -17,6 +17,7 @@
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/.oxlintrc.json",
         "$TURBO_ROOT$/lint/**",
+        "$TURBO_ROOT$/tools/**",
         "$TURBO_ROOT$/apps/*/src/**",
         "$TURBO_ROOT$/apps/*/test/**",
         "$TURBO_ROOT$/apps/*/*.ts",

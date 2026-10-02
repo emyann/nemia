@@ -19,7 +19,7 @@ import {
 } from '@xyflow/react';
 import type { RunDetail } from '../lib/api';
 import { inspects } from '../lib/bar';
-import { besideOpen, drawnWhole, forgetLayout, LEAST_ZOOM, place, readLayout, saveLayout } from '../lib/canvas';
+import { besideOpen, drawnWhole, forgetLayout, LEAST_ZOOM, place, readLayout, saveLayout, secondClick } from '../lib/canvas';
 import { layout, stepsOf, type Point } from '../lib/layout';
 import { useContent } from '../lib/useContent';
 import { stepState } from '../lib/status';
@@ -164,22 +164,59 @@ const placing = (change: NodeChange<StepFlowNode>): change is NodePositionChange
   change.type === 'position' || change.type === 'dimensions';
 
 /**
+ * Opens the session of the step of the run `run` that a double click's first click showed, from its second click wherever it lands
+ * (`secondClick`): taken before anything under it takes it, and its double click kept from the pane. Returns what a node's first click
+ * calls with the step it shows.
+ */
+function useSecondClick(run: string) {
+  const navigate = useNavigate();
+  const pressed = useRef<string | null>(null);
+  useEffect(() => {
+    let opened = false;
+    const click = (event: globalThis.MouseEvent) => {
+      const step = secondClick(pressed.current, event.detail);
+      pressed.current = null;
+      opened = step !== null;
+      if (!step) return;
+      event.stopPropagation();
+      event.preventDefault();
+      void navigate({ to: '/runs/$runId/steps/$step', params: { runId: run, step } });
+    };
+    const dblclick = (event: globalThis.MouseEvent) => {
+      if (!opened) return;
+      opened = false;
+      event.stopPropagation();
+      event.preventDefault();
+    };
+    window.addEventListener('click', click, true);
+    window.addEventListener('dblclick', dblclick, true);
+    return () => {
+      window.removeEventListener('click', click, true);
+      window.removeEventListener('dblclick', dblclick, true);
+    };
+  }, [navigate, run]);
+  return (step: string) => {
+    pressed.current = step;
+  };
+}
+
+/**
  * What a press on the canvas of `run` does, through the frame's bar (`useBar`): the step it shows (`selected`), none when it shows
  * anything else; a click or Enter on a node shows that step, or closes the bar for the step it shows (`toggle`); a double click on a node
- * opens the step's session, its first click having shown the step and its second ignored; and a click on the pane closes a bar a canvas
- * opened (`inspects`), never the start of a run.
+ * opens the step's session, its first click having shown the step and its second taken wherever it lands (`useSecondClick`); and a click
+ * on the pane closes a bar a canvas opened (`inspects`), never the start of a run.
  */
 function usePress(run: RunDetail) {
   const { open, toggle, close } = useBar();
-  const navigate = useNavigate();
+  const pressed = useSecondClick(run.id);
   const inspect = (step: string) => toggle({ kind: 'step', run: run.id, step });
   return {
     selected: open?.kind === 'step' && open.run === run.id ? open.step : null,
     onNodeClick: (event: MouseEvent, node: { id: string }) => {
-      if (event.detail <= 1) inspect(node.id);
+      if (event.detail > 1) return;
+      inspect(node.id);
+      pressed(node.id);
     },
-    onNodeDoubleClick: (_: MouseEvent, node: { id: string }) =>
-      void navigate({ to: '/runs/$runId/steps/$step', params: { runId: run.id, step: node.id } }),
     onKeyDown: (event: KeyboardEvent) => {
       const target = event.target as HTMLElement;
       if (event.key === 'Enter' && target.classList.contains('react-flow__node') && target.dataset.id) inspect(target.dataset.id);

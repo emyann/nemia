@@ -24,6 +24,7 @@ import {
   parseLayout,
   parseOpen,
   place,
+  secondClick,
   readFactoryLayout,
   readFactoryOpen,
   readNarrowFactoryLayout,
@@ -485,4 +486,12 @@ test('nodes are drawn whole on a canvas only where none of their edges is past o
   assert.equal(drawnWhole(box, { x: 0, y: 1, zoom: 1 }, 500, 150), false, 'past its bottom edge');
   assert.equal(drawnWhole(box, { x: 0, y: 0, zoom: 1.01 }, 500, 150), false, 'drawn larger, past its right and bottom edges');
   assert.equal(drawnWhole(box, { x: -50, y: -25, zoom: 0.5 }, 250, 75), true, 'its offset and zoom both count');
+});
+
+test("a double click's second click opens the step its first click showed, wherever it lands, and no other click opens one", () => {
+  assert.equal(secondClick('review', 2), 'review');
+  assert.equal(secondClick('review', 1), null, 'a single click');
+  assert.equal(secondClick('review', 0), null, 'a click the keyboard made');
+  assert.equal(secondClick('review', 3), null, "a triple click's third");
+  assert.equal(secondClick(null, 2), null, 'its first click showed no step');
 });

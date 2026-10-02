@@ -238,6 +238,13 @@ export function drawnWhole(
   return left >= 0 && top >= 0 && left + bounds.width * view.zoom <= width && top + bounds.height * view.zoom <= height;
 }
 
+/**
+ * The step whose session a click opens: on the second click of a double click, `detail` being the browser's count of the clicks, the
+ * step `pressed` that its first click showed, wherever the second lands — on the bar the first opened, or on the pane a fit moved the
+ * node off. Null for any other click, and where the first click showed no step.
+ */
+export const secondClick = (pressed: string | null, detail: number): string | null => (detail === 2 ? pressed : null);
+
 /** Where each step goes: where a person left it, if they moved it, else where the layering puts it. */
 export function place(
   names: readonly string[],

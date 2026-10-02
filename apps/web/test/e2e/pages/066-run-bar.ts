@@ -121,28 +121,58 @@ async function pressed(page: Page): Promise<void> {
   await expectClosed(page, 'a click on the empty canvas closes the bar');
 }
 
-/** Enter on a focused node shows it, and Escape closes it. */
+/** Refuses unless the focus is on the node of the step `step`. */
+async function expectFocused(page: Page, step: string, assertion: string): Promise<void> {
+  const focused = await page.evaluate(() => {
+    const now = document.activeElement;
+    return now?.classList.contains('react-flow__node') ? now.getAttribute('data-id') : (now?.tagName.toLowerCase() ?? null);
+  });
+  if (focused !== step) throw new Refused(`${assertion} — the focus is on ${focused}`);
+}
+
+/**
+ * Enter on a focused node shows it, and Escape closes it and gives the focus back to the node; after a switch by Enter to another node,
+ * and the focus taken into the bar from there, Escape gives it back to the node switched from, not to the one that opened the bar.
+ */
 async function keys(page: Page): Promise<void> {
   await nodeOf(page, OTHER).focus();
   await page.keyboard.press('Enter');
   await expectShows(page, OTHER, `Enter on ${OTHER}'s node shows it in the bar`);
   await page.keyboard.press('Escape');
   await expectClosed(page, 'Escape closes the bar');
+  await expectFocused(page, OTHER, `and gives the focus back to ${OTHER}'s node`);
+
+  await nodeOf(page, FIRST).focus();
+  await page.keyboard.press('Enter');
+  await expectShows(page, FIRST, `Enter on ${FIRST}'s node shows it`);
+  await nodeOf(page, OTHER).focus();
+  await page.keyboard.press('Enter');
+  const other = await expectShows(page, OTHER, `Enter on ${OTHER}'s node switches the bar to it`);
+  await other.focus();
+  await page.keyboard.press('Escape');
+  await expectClosed(page, 'Escape closes the switched bar');
+  await expectFocused(page, OTHER, `and gives the focus back to ${OTHER}'s node, switched from, not to ${FIRST}'s, which opened the bar`);
 }
 
 /**
- * The bar's Open, and a double click on a node, each open the step's session. The node double clicked is the run's first, at the canvas's
- * left: the first click opens the bar, and a node under where it opens would take the second click on the bar.
+ * The bar's Open, and a double click on a node, each open the step's session. The node double clicked lies where the bar opens: the
+ * first click opens the bar over it, and the second, landing on the bar, still opens the step's session.
  */
 async function opens(page: Page): Promise<void> {
   const session = `${RUN}/steps/${OTHER}`;
   await nodeOf(page, OTHER).click();
   const bar = await expectShows(page, OTHER, `a click on ${OTHER} shows it`);
+  const where = await bar.boundingBox();
   await bar.getByRole('link', { name: 'Open', exact: true }).click();
   await expectAt(page, session, `the bar's Open opens ${OTHER}'s session`);
   await visit(page, RUN);
-  await nodeOf(page, FAKE.blocked).dblclick();
-  await expectAt(page, `${RUN}/steps/${FAKE.blocked}`, `a double click on ${FAKE.blocked}, left of where the bar opens, opens its session`);
+  const node = await nodeOf(page, OTHER).boundingBox();
+  if (!where || !node || node.x + node.width / 2 <= where.x)
+    throw new Refused(
+      `${OTHER}'s node lies where the bar opens — its middle is at ${node && node.x + node.width / 2}, the bar at ${where?.x}`,
+    );
+  await nodeOf(page, OTHER).dblclick();
+  await expectAt(page, session, `a double click on ${OTHER}, whose second click lands on the bar the first opened, opens its session`);
   await visit(page, RUN);
 }
 
@@ -166,7 +196,8 @@ export default {
   /**
    * A run's canvas and the floating bar: an old `?step=` link lands on the bar, the canvas the page's whole width; a click on a node shows
    * it, the same node again closes it, another switches it with the tab kept, and the nodes are fitted clear of the bar; the empty canvas
-   * closes it, but never the start of a run; Enter and Escape do as a click and Close; Open and a double click open the step's session.
+   * closes it, but never the start of a run; Enter and Escape do as a click and Close, and Escape gives the focus back to the node; Open
+   * and a double click open the step's session, its second click landing on the bar.
    */
   name: 'run-bar',
   route: RUN,

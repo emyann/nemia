@@ -49,15 +49,21 @@ function useEscape(bar: RefObject<HTMLElement | null>, close: () => void) {
 }
 
 /**
- * Gives `bar` the focus as it opens, and as it closes gives it back to what held it before, while that is still on the page and the focus
- * is still in the bar or on nothing: not when a link to another page or a press on the page took it.
+ * Gives `bar` the focus as it opens, and as it closes gives it back to what held it last before it came into the bar — what opened the
+ * bar, or what the focus left for the bar since, as a step switched to from its node — while that is still on the page and the focus is
+ * still in the bar or on nothing: not when a link to another page or a press on the page took it.
  */
 function useFocusReturn(bar: RefObject<HTMLElement | null>) {
   useLayoutEffect(() => {
-    const opener = document.activeElement;
+    let opener = document.activeElement;
     const self = bar.current;
+    const enter = (event: FocusEvent) => {
+      if (event.relatedTarget instanceof HTMLElement && !self?.contains(event.relatedTarget)) opener = event.relatedTarget;
+    };
+    self?.addEventListener('focusin', enter);
     self?.focus();
     return () => {
+      self?.removeEventListener('focusin', enter);
       const now = document.activeElement;
       const held = now === null || now === document.body || (self?.contains(now) ?? false);
       if (held && opener instanceof HTMLElement && opener.isConnected) opener.focus();

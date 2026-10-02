@@ -18,7 +18,7 @@ import {
 } from '@xyflow/react';
 import type { RunDetail } from '../lib/api';
 import { inspects } from '../lib/bar';
-import { forgetLayout, place, readLayout, saveLayout } from '../lib/canvas';
+import { besideBar, forgetLayout, LEAST_ZOOM, place, readLayout, saveLayout } from '../lib/canvas';
 import { layout, stepsOf, type Point } from '../lib/layout';
 import { useContent } from '../lib/useContent';
 import { stepState } from '../lib/status';
@@ -37,31 +37,28 @@ const edgeTypes = { state: StateEdge };
 
 const FIT = { padding: 0.2, maxZoom: 1.25 };
 
-/** The least width of canvas the bar must leave uncovered for a fit to keep the nodes clear of it, in pixels. */
-const BESIDE_MIN = 240;
+/** The canvas's view, as `useReactFlow` gives it: what a fit reads the nodes from and fits. */
+type Flow = ReturnType<typeof useReactFlow<StepFlowNode>>;
 
 /**
- * How the canvas in `frame` is fitted: as `FIT`, and, where the frame's floating bar is drawn over the canvas's right with at least
- * `BESIDE_MIN` pixels left beside it, every node in the part it leaves uncovered. Takes the canvas's frame, or null; measures the bar where
- * it is drawn, at each call.
+ * How the canvas in `frame` is fitted: as `FIT`, and, where the frame's floating bar is drawn over the canvas with room beside it for the
+ * nodes of `flow` (`besideBar`), every node in the part it leaves uncovered. Takes the canvas's frame, or null; measures the bar where it
+ * is drawn, at each call.
  */
-function fitBeside(frame: HTMLElement | null) {
+function fitBeside(frame: HTMLElement | null, flow: Flow) {
   const bar = document.querySelector('[data-floating-bar]');
   if (!frame || !bar) return FIT;
   const over = frame.getBoundingClientRect().right - bar.getBoundingClientRect().left;
-  if (over <= 0 || frame.clientWidth - over < BESIDE_MIN) return FIT;
-  return { ...FIT, padding: { left: '10%', right: `${over + 24}px`, y: '20%' } } as const;
+  const padding = besideBar(frame.clientWidth, over, flow.getNodesBounds(flow.getNodes()).width);
+  return padding ? { ...FIT, padding } : FIT;
 }
 
 /**
- * Fits the canvas in `frame` again, with `fitView`, clear of the bar (`fitBeside`): when the frame changes width, as when the window does,
- * and when a step of the run opens in the bar or the bar closes (`covered`). A canvas drawn uncovered keeps React Flow's own first fit.
+ * Fits the canvas in `frame` again, with the `fitView` of `flow`, clear of the bar (`fitBeside`): when the frame changes width, as when the
+ * window does, when a step of the run opens in the bar or the bar closes (`covered`), and once after each Reset layout's commit (`resets`,
+ * its count). A canvas drawn uncovered keeps React Flow's own first fit.
  */
-function useRefit(
-  frame: RefObject<HTMLDivElement | null>,
-  covered: boolean,
-  fitView: ReturnType<typeof useReactFlow<StepFlowNode>>['fitView'],
-) {
+function useRefit(frame: RefObject<HTMLDivElement | null>, { covered, resets }: { covered: boolean; resets: number }, flow: Flow) {
   useEffect(() => {
     const el = frame.current;
     if (!el) return;
@@ -69,18 +66,25 @@ function useRefit(
     const observer = new ResizeObserver(() => {
       if (el.clientWidth === width) return;
       width = el.clientWidth;
-      void fitView({ ...fitBeside(el), duration: 200 });
+      void flow.fitView({ ...fitBeside(el, flow), duration: 200 });
     });
     observer.observe(el);
     return () => observer.disconnect();
-  }, [frame, fitView]);
+  }, [frame, flow]);
 
   const was = useRef(false);
   useEffect(() => {
     if (was.current === covered) return;
     was.current = covered;
-    void fitView({ ...fitBeside(frame.current), duration: 300 });
-  }, [covered, frame, fitView]);
+    void flow.fitView({ ...fitBeside(frame.current, flow), duration: 300 });
+  }, [covered, frame, flow]);
+
+  const fitted = useRef(0);
+  useEffect(() => {
+    if (resets === fitted.current) return;
+    fitted.current = resets;
+    void flow.fitView({ ...fitBeside(frame.current, flow), duration: 300 });
+  }, [resets, frame, flow]);
 }
 
 const button =
@@ -177,7 +181,7 @@ function usePress(run: RunDetail) {
  *   in both themes.
  */
 function Canvas({ run, computed }: Props & { computed: ReadonlyMap<string, Point> }) {
-  const { fitView } = useReactFlow<StepFlowNode>();
+  const flow = useReactFlow<StepFlowNode>();
   const { selected, ...press } = usePress(run);
   const runCancelled = run.cancelledAt !== null;
   const names = useContent(run.steps.map((s) => s.name));
@@ -226,7 +230,7 @@ function Canvas({ run, computed }: Props & { computed: ReadonlyMap<string, Point
   }, [placed, run.id]);
 
   const running = run.steps.filter((s) => states.get(s.name) === 'working').map((s) => s.name);
-  const focusRunning = () => void fitView({ nodes: running.map((id) => ({ id })), padding: 0.5, maxZoom: 1.25, duration: 400 });
+  const focusRunning = () => void flow.fitView({ nodes: running.map((id) => ({ id })), padding: 0.5, maxZoom: 1.25, duration: 400 });
 
   const [resets, setResets] = useState(0);
   const resetLayout = () => {
@@ -235,13 +239,7 @@ function Canvas({ run, computed }: Props & { computed: ReadonlyMap<string, Point
     setResets((n) => n + 1);
   };
   const frame = useRef<HTMLDivElement>(null);
-  const fitted = useRef(0);
-  useEffect(() => {
-    if (resets === fitted.current) return;
-    fitted.current = resets;
-    void fitView({ ...fitBeside(frame.current), duration: 300 });
-  }, [resets, fitView]);
-  useRefit(frame, selected !== null, fitView);
+  useRefit(frame, { covered: selected !== null, resets }, flow);
 
   return (
     <div ref={frame} className="h-[30rem] overflow-hidden rounded border border-neutral-200 dark:border-neutral-800">
@@ -262,6 +260,7 @@ function Canvas({ run, computed }: Props & { computed: ReadonlyMap<string, Point
         defaultMarkerColor={null}
         fitView
         fitViewOptions={FIT}
+        minZoom={LEAST_ZOOM}
       >
         <Panel position="top-left" className="text-[11px] text-neutral-500">
           Drag to arrange · kept in this browser

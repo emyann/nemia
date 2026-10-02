@@ -4,6 +4,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {
   attemptLine,
+  BESIDE_MIN,
+  besideBar,
   duration,
   edgeLine,
   edgesOf,
@@ -13,6 +15,7 @@ import {
   forgetFactoryOpen,
   forgetFactoryLeftovers,
   forgetLayout,
+  LEAST_ZOOM,
   LOOP_DEPTH,
   loopLabel,
   loopPath,
@@ -450,4 +453,14 @@ test('a browser that refuses storage keeps no run open, and throws nothing — n
   assert.deepEqual(readFactoryOpen(), [], 'a sandboxed frame throws on reading `localStorage` itself, before any call');
   assert.doesNotThrow(() => saveFactoryOpen(['r-1']));
   assert.doesNotThrow(() => forgetFactoryOpen());
+});
+
+test('a canvas is fitted beside the bar only where the bar covers it, leaves room, and the nodes fit there at the least zoom', () => {
+  assert.deepEqual(besideBar(900, 456, 400), { left: '10%', right: '480px', y: '20%' });
+  assert.equal(besideBar(900, 0, 400), null, 'the bar covers none of the canvas');
+  assert.equal(besideBar(900, -20, 400), null, 'the bar is beside the canvas');
+  assert.equal(besideBar(900, 900 - BESIDE_MIN + 1, 10), null, 'it leaves less than the least width');
+  const room = 900 * 0.9 - (456 + 24);
+  assert.notEqual(besideBar(900, 456, room / LEAST_ZOOM), null, 'nodes as wide as the room at the least zoom fit');
+  assert.equal(besideBar(900, 456, room / LEAST_ZOOM + 1), null, 'nodes any wider would run off the canvas: the fit takes it whole');
 });

@@ -9,7 +9,8 @@ import { BAR_KEY, barMost, barOf, barValue, barWidth, nextBar, parseWidth, type 
 /**
  * What the bar shows (`open`, none while it is closed), and the verbs that change it on this page, keeping its path and every other key of
  * its search: `show` a thing, as a new entry in the history, so Back closes it; `close` it in place of the current entry, so Back does not
- * open it again; and `toggle`, which closes it for the thing it shows and shows anything else.
+ * open it again; and `toggle`, which closes it for the thing it shows and shows anything else. None of them scrolls the page, which the
+ * bar floats over.
  */
 export function useBar(): { open: Bar | undefined; show: (bar: Bar) => void; close: () => void; toggle: (bar: Bar) => void } {
   const open = barOf(useSearch({ strict: false }).bar);
@@ -20,6 +21,7 @@ export function useBar(): { open: Bar | undefined; show: (bar: Bar) => void; clo
         to: '.',
         search: (search: Record<string, unknown>) => ({ ...search, bar: bar ? barValue(bar) : undefined }),
         replace,
+        resetScroll: false,
       }),
     [navigate],
   );

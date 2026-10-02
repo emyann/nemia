@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { expectRendered, fed, photograph, sidebar, themeOf } from '../board.ts';
+import { expectRendered, fed, photograph, sidebar, themeOf, stepBar } from '../board.ts';
 import { expectCount, expectLeftOf, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { GATED } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -126,7 +126,7 @@ export default {
     await expectCount(handedOn.locator('details[data-fold="files"][open]'), 0, 'and shuts again');
 
     await node.click();
-    const inspector = page.locator(`aside[aria-label="Step ${gated}"]`);
+    const inspector = stepBar(page, id, gated);
     await expectVisible(
       inspector.getByRole('tab', { name: 'Output', selected: true }),
       `${gated}'s inspector opens on Output: it has signed off`,
@@ -138,7 +138,7 @@ export default {
     );
     await settled(page);
     await photograph(page, path.join(OUT, `gate-inspector-${await themeOf(page)}.png`), { fullPage: true });
-    await inspector.getByRole('button', { name: "Close the step's panel" }).click();
+    await inspector.getByRole('button', { name: 'Close', exact: true }).click();
     await expectCount(inspector, 0, 'closed, so the rest of the page reads one gate');
 
     const refused = await page.context().newPage();

@@ -180,6 +180,27 @@ export function loopPath(source: Point, target: Point, depth = LOOP_DEPTH): { pa
   };
 }
 
+/** The least zoom a run's canvas is drawn at, which a fit does not go below. */
+export const LEAST_ZOOM = 0.5;
+
+/** The least width of canvas the bar must leave uncovered for a fit to keep the nodes clear of it, in pixels. */
+export const BESIDE_MIN = 240;
+
+/** The room a fit beside the bar keeps between the nodes and the bar, in pixels. */
+const BESIDE_GAP = 24;
+
+/**
+ * The padding that fits a canvas `width` pixels wide in the part the floating bar leaves uncovered, the bar `over` pixels over its right
+ * edge, for nodes `nodes` wide at a zoom of 1: a tenth of the width on the left, the bar and a gap on the right. Null, for a fit over the
+ * whole canvas, when the bar covers none of it, when it leaves less than `BESIDE_MIN`, or when the nodes are wider at `LEAST_ZOOM` than the
+ * part it leaves: a fit there would put nodes off the canvas.
+ */
+export function besideBar(width: number, over: number, nodes: number): { left: '10%'; right: `${number}px`; y: '20%' } | null {
+  const right = over + BESIDE_GAP;
+  if (over <= 0 || width - over < BESIDE_MIN || nodes * LEAST_ZOOM > width * 0.9 - right) return null;
+  return { left: '10%', right: `${right}px`, y: '20%' };
+}
+
 /** Where each step goes: where a person left it, if they moved it, else where the layering puts it. */
 export function place(
   names: readonly string[],

@@ -463,8 +463,7 @@ test('the spawn and the worker each beat on the monotonic clock of this boot, an
   const ops = detachedOps(sh('sleep 30'), dir);
   await Effect.runPromise(ops.spawn(req('ae/m3/1', dir)));
   const file = path.join(dir, 'runs', 'sh', 'ae_m3_1.json');
-  const read = () =>
-    JSON.parse(fs.readFileSync(file, 'utf8')) as { pid: number; heartbeatAt: string; beat?: { boot: string; ms: number } };
+  const read = () => JSON.parse(fs.readFileSync(file, 'utf8')) as { pid: number; heartbeatAt: string; beat?: { boot: string; ms: number } };
   const spawned = read();
   assert.equal(spawned.pid, 0, 'read as the spawn wrote it, before the worker');
   assert.equal(spawned.beat?.boot, monoNow()?.boot, 'the spawn beats in this boot');

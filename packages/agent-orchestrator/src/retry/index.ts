@@ -12,5 +12,5 @@ export {
   turnsOf,
 } from './retry-ask.ts';
 export type { EarlierTry, Retry, RetryAsk, RetryHow, RetryMode } from './retry-ask.ts';
-export { answerLines, deniedOffer, heard, overBudgetLine, retriesDue, retryable, retryLines, tryNote } from './retry.ts';
+export { answerLines, deniedOffer, heard, overBudgetLine, retriesDue, retryable, retryLines, retryOffers, tryNote } from './retry.ts';
 export { retryRefusal } from './retry-refusal.ts';

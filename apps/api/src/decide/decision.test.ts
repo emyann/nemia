@@ -1,5 +1,5 @@
 /**
- * GET /api/runs/:id/decision: what `wf decide` shows a person, off a real repository — what a result branch touched, the
+ * GET /api/runs/:runId/decision: what `wf decide` shows a person, off a real repository — what a result branch touched, the
  * lesson line, the check-affecting diffs cut per file, what each step consumed, and the commands — and nothing of it, and
  * no `git` at all, for a run still running.
  */
@@ -10,7 +10,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
-import { app } from '../app.ts';
+import { app, appOf, liveOf } from '../app.ts';
 import { diffFiles, DIFF_LINES } from './decision.ts';
 
 const realGit = execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim();
@@ -339,7 +339,7 @@ test("the run's total reads its peak against the cap of the step that reached it
   );
 });
 
-test('a run still running is `running` and nothing else, and not one `git` is run for it', async () => {
+test('a run still running is `running` and nothing else, and not one `git` is run for it — nor where its result branch stands', async () => {
   journal('t-d2-implement', [filed('t-d2-implement'), { kind: 'starting', at, attempt: 1 }, { kind: 'spawned', at, attempt: 1 }]);
   writeRun({ id: 'r-d2', repo, baseRef: base, steps: { implement: { taskId: 't-d2-implement', branch }, review: { taskId: null } } });
   const detail = await detailOf('r-d2');
@@ -366,9 +366,35 @@ test('a run still running is `running` and nothing else, and not one `git` is ru
   const before = gitCount();
   assert.deepEqual(await decisionOf('r-d2'), { status: 200, body: { running: true } });
   assert.equal(gitCount(), before, 'no git call for a running run, on a branch git can read: a route that asked would have had an answer');
+  journal('t-d8-implement', [filed('t-d8-implement'), { kind: 'starting', at, attempt: 1 }, { kind: 'spawned', at, attempt: 1 }]);
+  writeRun({ id: 'r-d8', repo, baseRef: base, workflow: [workflow[0]], steps: { implement: { taskId: 't-d8-implement', branch } } });
+  assert.deepEqual(await decisionOf('r-d8'), { status: 200, body: { running: true } });
+  assert.equal(gitCount(), before, 'nor for one whose running step is its result, on a branch git can read: where it stands is not asked');
 
   await decisionOf('r-d1');
   assert.ok(gitCount() > before, "the count counts: a decidable run's decision is read out of git, through the same PATH");
+});
+
+test("a run the cap on runs in flight holds is `running`, held at the count `GET /api/ceilings` holds it at — both by the app's own `WF_MAX_RUNS`, never the process's — and not one `git` is run for it", async () => {
+  journal('t-d13-implement', [filed('t-d13-implement'), { kind: 'starting', at, attempt: 1 }, { kind: 'spawned', at, attempt: 1 }]);
+  writeRun({ id: 'r-d13', repo, baseRef: base, steps: { implement: { taskId: 't-d13-implement', branch }, review: { taskId: null } } });
+  writeRun({ id: 'r-d12', repo, baseRef: base, steps: {} });
+  assert.equal(process.env.WF_MAX_RUNS, 'set-it-in-the-test', "the process's own is not a count, which the package refuses by name");
+  const { app: own } = appOf(liveOf({ ...process.env, WF_MAX_RUNS: '1' }));
+  const before = gitCount();
+  const res = await own.request('/api/runs/r-d12/decision');
+  const body = (await res.json()) as RunDecision;
+  assert.equal(gitCount(), before, 'no git call for a run nothing of which is filed');
+  const ceilings = (await (await own.request('/api/ceilings')).json()) as { inFlight: string[]; held: { run: string }[] };
+  assert.ok(ceilings.inFlight.includes('r-d13'), JSON.stringify(ceilings));
+  assert.ok(
+    ceilings.held.some((h) => h.run === 'r-d12'),
+    JSON.stringify(ceilings),
+  );
+  assert.deepEqual(
+    { status: res.status, body },
+    { status: 200, body: { running: true, held: { inFlight: ceilings.inFlight.length, cap: 1 } } },
+  );
 });
 
 test('a loop out of rounds offers both answers as commands, each the bare `wf` line and not the sentence that carries it', async () => {
@@ -412,7 +438,12 @@ test('a loop out of rounds offers both answers as commands, each the bare `wf` l
       { label: 'accept', command: 'wf accept r-d9 review --message "<why>"' },
       { label: 'once more', command: 'wf retry r-d9 implement' },
     ],
-    'both offers are parsed to the command a person runs: an offer ONCE_MORE does not know is handed over whole, a paragraph under a button that says `once more`',
+    'both offers are the bare command a person runs (`choicesOf`), never a paragraph under a button that says `once more`',
+  );
+  assert.deepEqual(
+    body.commands.filter((c) => !/^(wf|git -C) \S+( \S+)*$/.test(c.command) || /\n|\.$/.test(c.command)).map((c) => c.command),
+    [],
+    'every command is one line a person runs, never a sentence',
   );
   const accept = body.commands.find((c) => c.label === 'accept');
   assert.ok(accept?.said, JSON.stringify(body.commands));
@@ -770,4 +801,61 @@ test("a run `assess` calls running while a step waits on a person is decided on:
     decided.commands.map((c: { label: string }) => c.label),
     ['once more', 'ship it', 'drop it'],
   );
+});
+
+test("a run whose approved ending waits for the repository's checkout, which another run's ending is in, answers `checkout` with that run — read by the app's own `WF_MAX_RUNS`, never the process's — and one nothing holds answers none", async () => {
+  const { repo: shared, base: from } = aRepo();
+  const landing = [
+    { name: 'implement', after: [], body: 'Implement it.', harness: 'codex' },
+    { name: 'notes', after: [], body: 'Write the notes.', harness: 'codex', gate: true },
+    { name: 'ship', after: ['implement'], body: 'Ship it.', harness: 'claude', workspace: 'main', gate: true },
+  ];
+  const approve = (id: string) => {
+    fs.mkdirSync(path.join(root, 'runs', `${id}.asks`), { recursive: true });
+    fs.writeFileSync(path.join(root, 'runs', `${id}.asks`, 'approve-ship-1'), JSON.stringify({ at, message: 'Merge it.' }));
+  };
+  settledTask('t-d14-implement', done);
+  settledTask('t-d14-notes', done);
+  writeRun({
+    id: 'r-d14',
+    repo: shared,
+    baseRef: from,
+    workflow: landing,
+    steps: {
+      implement: { taskId: 't-d14-implement', branch: 'wf/r-d14/implement' },
+      notes: { taskId: 't-d14-notes', branch: 'wf/r-d14/notes' },
+      ship: { taskId: null },
+    },
+  });
+  approve('r-d14');
+  assert.equal(process.env.WF_MAX_RUNS, 'set-it-in-the-test', "the process's own is not a count, which the package refuses by name");
+  const { app: own } = appOf(liveOf({ ...process.env, WF_MAX_RUNS: '1' }));
+  const answer = async () => {
+    const res = await own.request('/api/runs/r-d14/decision');
+    const body = (await res.json()) as Decidable;
+    assert.equal(res.status, 200, JSON.stringify(body));
+    assert.ok('commands' in body, JSON.stringify(body));
+    return body;
+  };
+  assert.ok(!('checkout' in (await answer())), 'no other run is in the checkout, so nothing holds it');
+
+  settledTask('t-d15-implement', done);
+  journal('t-d15-ship', [
+    { ...filed('t-d15-ship'), cwd: shared },
+    { kind: 'starting', at, attempt: 1 },
+    { kind: 'spawned', at, attempt: 1 },
+  ]);
+  writeRun({
+    id: 'r-d15',
+    repo: shared,
+    baseRef: from,
+    workflow: landing,
+    steps: {
+      implement: { taskId: 't-d15-implement', branch: 'wf/r-d15/implement' },
+      notes: { taskId: null },
+      ship: { taskId: 't-d15-ship', workspace: shared, branch: 'main' },
+    },
+  });
+  approve('r-d15');
+  assert.deepEqual((await answer()).checkout, { run: 'r-d15', step: 'ship' });
 });

@@ -2,7 +2,7 @@
  * The orchestrator's commands, each defined once (`COMMANDS`): its spec (`command.ts`), the one package verb its handler calls, the data
  * it answers, and the lines the CLI prints of that data. The CLI parses, refuses, helps and prints from an entry, and the api serves the
  * same entry on its route; an entry served on one side alone says so (`only`). Today: a person's asks of a run — `wf retry`, `wf approve`,
- * `wf round`, `wf accept` and `wf say`.
+ * `wf round`, `wf accept` and `wf say` — and two reads the api alone serves: a run's decision (`decideRun`) and the run slots (`slotsOf`).
  */
 import type { Engine } from '../runtime-client.ts';
 import { approvalWordsRefusal } from '../gate/gate.ts';
@@ -16,15 +16,18 @@ import { accept, round } from '../round/round.verb.ts';
 import { saidLines } from '../say/say.ts';
 import { say } from '../say/say.verb.ts';
 import { budgetRefusal, budgetWord } from '../status/status.ts';
+import { decide, type Decided } from '../decide/decide.verb.ts';
+import { slotsOf, type Slots } from '../cap/cap.verb.ts';
 import { commandLine, type Args, type CommandSpec } from './command.ts';
 
 /**
  * A command whole: its spec, `handler`, which calls one package verb with the arguments and answers data — never printed lines — and
  * `print`, the lines the CLI prints of that data. The api answers the data as JSON, or only its `apiKeys` where the CLI prints more of
- * it than the api answers.
+ * it than the api answers. A handler reads its settings (`WF_MAX_RUNS`) from `env`: the process's own at the command line, the app's on
+ * the api.
  */
 export type Command<D extends object = Readonly<Record<string, unknown>>> = CommandSpec & {
-  handler(e: Engine, args: Args): Promise<D>;
+  handler(e: Engine, args: Args, env?: NodeJS.ProcessEnv): Promise<D>;
   print(data: D, args: Args): readonly string[];
   readonly apiKeys?: readonly (keyof D & string)[];
 };
@@ -126,7 +129,6 @@ const RETRY: Command<{ try: number; file: string; stopFirst: boolean }> = {
   },
   check: (args) => messageRefusal(howOf(args), commandLine(RETRY, args)) ?? budgetRefusal(howOf(args), commandLine(RETRY, args)),
   writes: true,
-  refuses: ['Missing', 'Conflict', 'Invalid'],
   route: { method: 'POST', path: '/api/runs/:runId/steps/:step/retry', status: 202 },
   apiTakes: ['answers'],
   async handler(e, args) {
@@ -177,7 +179,6 @@ const APPROVE: Command<{ try: number; at: string; message: string | null; file: 
   },
   check: (args) => approvalWordsRefusal(textOf(args, 'message'), commandLine(APPROVE, args)),
   writes: true,
-  refuses: ['Missing', 'Conflict', 'Invalid'],
   route: { method: 'POST', path: '/api/runs/:runId/steps/:step/approve', status: 202 },
   apiKeys: ['try', 'at', 'message', 'file'],
   async handler(e, args) {
@@ -225,7 +226,6 @@ const ROUND: Command<{ step: string; round: number; file: string; budget?: numbe
       'wf round takes the run and, when the run has more than one loop, the step that closes the one to go round: wf round <runId> [<step>] — and --budget <amount>, to raise the cap of a step of the loop over its budget.',
   },
   writes: true,
-  refuses: ['Missing', 'Conflict', 'Invalid'],
   route: { method: 'POST', path: '/api/runs/:runId/round', status: 202 },
   apiKeys: ['step', 'round', 'file'],
   async handler(e, args) {
@@ -267,7 +267,6 @@ const ACCEPT: Command<{ step: string; try: number; at: string; message: string; 
   },
   check: (args) => acceptWordsRefusal(textOf(args, 'message'), commandLine(ACCEPT, args)),
   writes: true,
-  refuses: ['Missing', 'Conflict', 'Invalid'],
   route: { method: 'POST', path: '/api/runs/:runId/steps/:step/accept', status: 202 },
   apiKeys: ['step', 'try', 'at', 'message', 'file'],
   async handler(e, args) {
@@ -303,7 +302,6 @@ const SAY: Command<{ at: string; attempt: number; text: string; try: number; tas
     unknown: (arg) => `wf say does not take ${arg}.`,
   },
   writes: true,
-  refuses: ['Missing', 'Conflict'],
   route: { method: 'POST', path: '/api/runs/:runId/steps/:step/say', status: 202 },
   apiKeys: ['at', 'attempt', 'text'],
   async handler(e, args) {
@@ -324,5 +322,39 @@ const SAY: Command<{ at: string; attempt: number; text: string; try: number; tas
   },
 };
 
+const DECIDE: Command<Decided> = {
+  name: 'decide',
+  usage: '<runId>',
+  help: ['what is left for a person to do on a run, and the commands that do it'],
+  spec: {
+    positionals: [{ key: 'runId', takes: 'required', kind: 'name' }],
+    flags: [],
+    unknown: (arg) => `wf decide does not take ${arg}.`,
+  },
+  writes: false,
+  route: { method: 'GET', path: '/api/runs/:runId/decision', status: 200 },
+  only: {
+    side: 'api',
+    why: "wf decide is the CLI's own verb: it prints a run's whole screen — its steps, closeouts, checks and diffs — off this decision, which the api answers as data",
+  },
+  handler: (e, args, env) => decide(e, named(args).runId, env),
+  print: () => [],
+};
+
+const CEILINGS: Command<Slots> = {
+  name: 'ceilings',
+  usage: '',
+  help: ['the cap on runs in flight, the runs it counts and the runs it holds'],
+  spec: { positionals: [], flags: [], unknown: (arg) => `the ceilings take no ${arg}.` },
+  writes: false,
+  route: { method: 'GET', path: '/api/ceilings', status: 200 },
+  only: {
+    side: 'api',
+    why: 'the board says the run slots over its Factory; at the command line, wf ls and wf decide say a run held for one beside the run',
+  },
+  handler: (e, _args, env) => slotsOf(e, undefined, env),
+  print: () => [],
+};
+
 /** Every command defined once, in the order `wf`'s help lists them. */
-export const COMMANDS: readonly Command[] = [RETRY, APPROVE, ROUND, ACCEPT, SAY];
+export const COMMANDS: readonly Command[] = [RETRY, APPROVE, ROUND, ACCEPT, SAY, DECIDE, CEILINGS];

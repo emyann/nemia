@@ -20,8 +20,8 @@ holds what every change needs.
 ## Check your work
 
 - `npm test` — turbo runs `node --test test/*.test.ts` in every package, and `src/**/*.test.ts` where a package keeps tests beside its
-  code, in parallel, with `--continue`; each package runs one test file at a time (`--test-concurrency=1` in its `test` script, chosen
-  to keep a suite under about 2 GB; `suite.test.ts` holds them equal). Not bare `node --test` from the root, nor a higher bound by
+  code, in parallel, with `--continue`; each package runs two test files at a time (`--test-concurrency=2` in its `test` script,
+  chosen to keep a suite near 2 GB; `suite.test.ts` holds them equal). Not bare `node --test` from the root, nor a higher bound by
   hand. To measure, type `npx turbo run test --force --continue`: without `--force` turbo replays a cached pass. Read `Failed:`
   first: a file marked `✖` with no failing test inside it is a package turbo interrupted, not a failure of that file.
 - `npm run typecheck` — `tsc --noEmit` per package, over its `src` and its `test/` (the web's `test/e2e/` under its own tsconfig);

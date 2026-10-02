@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "node --watch src/main.ts",
     "start": "node src/main.ts",
-    "test": "node --import ./test/harness.ts --test --test-concurrency=1 'test/*.test.ts' 'src/**/*.test.ts'",
+    "test": "node --import ./test/harness.ts --test --test-concurrency=2 'test/*.test.ts' 'src/**/*.test.ts'",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

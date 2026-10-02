@@ -6,7 +6,7 @@
     "test": "test"
   },
   "scripts": {
-    "test": "node --test --test-concurrency=1 'test/*.test.ts' 'src/**/*.test.ts'",
+    "test": "node --test --test-concurrency=2 'test/*.test.ts' 'src/**/*.test.ts'",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [],

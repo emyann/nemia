@@ -208,7 +208,7 @@ test('the scan reads the board, and sees each way a file names a module', () => 
     "import 'node:fs';",
     "const m = await import('../../../api/src/app.ts');",
     "// from 'nowhere' in a comment is no import",
-    " * import('agent-runtime') in a JSDoc is none either",
+    " * import('node:os') in a JSDoc is none either",
   ].join('\n');
   assert.deepEqual(importsIn(text), [
     '../../../api/src/app.ts',

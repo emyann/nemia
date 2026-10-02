@@ -126,7 +126,6 @@ const RETRY: Command<{ try: number; file: string; stopFirst: boolean }> = {
   },
   check: (args) => messageRefusal(howOf(args), commandLine(RETRY, args)) ?? budgetRefusal(howOf(args), commandLine(RETRY, args)),
   writes: true,
-  refuses: ['Missing', 'Conflict', 'Invalid'],
   route: { method: 'POST', path: '/api/runs/:runId/steps/:step/retry', status: 202 },
   apiTakes: ['answers'],
   async handler(e, args) {
@@ -177,7 +176,6 @@ const APPROVE: Command<{ try: number; at: string; message: string | null; file: 
   },
   check: (args) => approvalWordsRefusal(textOf(args, 'message'), commandLine(APPROVE, args)),
   writes: true,
-  refuses: ['Missing', 'Conflict', 'Invalid'],
   route: { method: 'POST', path: '/api/runs/:runId/steps/:step/approve', status: 202 },
   apiKeys: ['try', 'at', 'message', 'file'],
   async handler(e, args) {
@@ -225,7 +223,6 @@ const ROUND: Command<{ step: string; round: number; file: string; budget?: numbe
       'wf round takes the run and, when the run has more than one loop, the step that closes the one to go round: wf round <runId> [<step>] — and --budget <amount>, to raise the cap of a step of the loop over its budget.',
   },
   writes: true,
-  refuses: ['Missing', 'Conflict', 'Invalid'],
   route: { method: 'POST', path: '/api/runs/:runId/round', status: 202 },
   apiKeys: ['step', 'round', 'file'],
   async handler(e, args) {
@@ -267,7 +264,6 @@ const ACCEPT: Command<{ step: string; try: number; at: string; message: string; 
   },
   check: (args) => acceptWordsRefusal(textOf(args, 'message'), commandLine(ACCEPT, args)),
   writes: true,
-  refuses: ['Missing', 'Conflict', 'Invalid'],
   route: { method: 'POST', path: '/api/runs/:runId/steps/:step/accept', status: 202 },
   apiKeys: ['step', 'try', 'at', 'message', 'file'],
   async handler(e, args) {
@@ -303,7 +299,6 @@ const SAY: Command<{ at: string; attempt: number; text: string; try: number; tas
     unknown: (arg) => `wf say does not take ${arg}.`,
   },
   writes: true,
-  refuses: ['Missing', 'Conflict'],
   route: { method: 'POST', path: '/api/runs/:runId/steps/:step/say', status: 202 },
   apiKeys: ['at', 'attempt', 'text'],
   async handler(e, args) {

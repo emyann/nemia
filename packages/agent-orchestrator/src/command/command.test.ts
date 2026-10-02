@@ -81,8 +81,9 @@ test('a value flag given twice is refused, in its own words or as an argument no
   assert.equal(refusalOf(['r-1', '--who', 'a', '--who', 'b']), 'UNKNOWN --who');
 });
 
-test('two ways are refused, and one way given twice is not', () => {
+test('two ways are refused, and one way given twice counts as two', () => {
   assert.equal(refusalOf(['r-1', '--fast', '--slow']), 'ONE WAY');
+  assert.equal(refusalOf(['r-1', '--slow', '--slow']), 'ONE WAY');
   assert.deepEqual(parseArgv(SPEC, ['r-1', '--slow']), { mode: 'slow', runId: 'r-1' });
 });
 
@@ -164,6 +165,14 @@ test("the table's help is today's, word for word", () => {
       '                               said to, and wf decide prints them under it. A try that continues',
       '                               the session is handed them again, as ## Said to your session',
     ].join('\n'),
+  );
+});
+
+test('the help prints no command the CLI does not serve', () => {
+  const entry = (name: string, only?: { side: 'cli' | 'api'; why: string }) => ({ name, usage: '<runId>', help: ['h'], ...(only ? { only } : {}) });
+  assert.equal(
+    helpOf([entry('a'), entry('b', { side: 'api', why: 'w' }), entry('c', { side: 'cli', why: 'w' })]),
+    ['  wf a <runId>', `${' '.repeat(31)}h`, '  wf c <runId>', `${' '.repeat(31)}h`].join('\n'),
   );
 });
 

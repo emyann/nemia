@@ -35,7 +35,7 @@ export type Flag = {
   readonly key?: string;
   /** What it sets beside its value: `--fresh` sets `mode: 'fresh'`. */
   readonly sets?: Readonly<Record<string, string>>;
-  /** One of the command's ways: at most one is given (`Spec.oneWay`), and a way is never refused as given twice. */
+  /** One of the command's ways: at most one is given (`Spec.oneWay`), and a way given twice counts as two, never as its `twice`. */
   readonly way?: boolean;
   /** What a value flag takes, as its refusal of none says it: for an amount, what the dollars are of. */
   readonly takes?: string;
@@ -60,14 +60,11 @@ export type Spec = {
   readonly apart?: (flag: string) => string;
 };
 
-/** One of the orchestrator's refusals by its kind (`refusal/refusal.ts`). */
-export type RefusalKind = 'Missing' | 'Conflict' | 'Invalid';
-
 /**
  * A command, as data: its `name`, its `usage` after the name and its `help` lines, as `wf`'s help prints them; its `spec`; `check`, the
- * refusal of its arguments before anything is read, the same on both sides, or null; `writes`, a write the api guards; `refuses`, the
- * kinds its verb refuses with; its `route` on the api, or `only`, the side it is served on alone and why; and `apiTakes`, the keys of a
- * body the api folds into its arguments, which the command line has no flag for.
+ * refusal of its arguments before anything is read, the same on both sides, or null; `writes`, a write the api guards; its `route` on the
+ * api, or `only`, the side it is served on alone and why; and `apiTakes`, the keys of a body the api folds into its arguments, which the
+ * command line has no flag for.
  */
 export type CommandSpec = {
   readonly name: string;
@@ -76,7 +73,6 @@ export type CommandSpec = {
   readonly spec: Spec;
   readonly check?: (args: Args) => string | null;
   readonly writes: boolean;
-  readonly refuses: readonly RefusalKind[];
   readonly route?: { readonly method: 'POST'; readonly path: string; readonly status: 202 };
   readonly only?: { readonly side: 'cli' | 'api'; readonly why: string };
   readonly apiTakes?: readonly string[];
@@ -173,9 +169,11 @@ export function commandLine(command: Pick<CommandSpec, 'name' | 'spec'>, args: A
 /** The column the help's lines under a command start at. */
 const HELP_INDENT = ' '.repeat(31);
 
-/** The commands' lines of `wf`'s help, in the table's order: each usage, then its help lines under it. */
-export const helpOf = (table: readonly Pick<CommandSpec, 'name' | 'usage' | 'help'>[]): string =>
-  table.flatMap((c) => [`  ${CLI} ${c.name} ${c.usage}`, ...c.help.map((line) => `${HELP_INDENT}${line}`)]).join('\n');
+/** The commands' lines of `wf`'s help, in the table's order: each usage, then its help lines under it; none the CLI does not serve. */
+export const helpOf = (table: readonly Pick<CommandSpec, 'name' | 'usage' | 'help' | 'only'>[]): string =>
+  table
+    .filter((c) => c.only?.side !== 'api')
+    .flatMap((c) => [`  ${CLI} ${c.name} ${c.usage}`, ...c.help.map((line) => `${HELP_INDENT}${line}`)]).join('\n');
 
 /**
  * Where a table of commands breaks its rules, a sentence each: a name defined twice; an entry served nowhere — neither routed on the api

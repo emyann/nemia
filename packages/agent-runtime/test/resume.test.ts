@@ -227,7 +227,11 @@ test('a statement read as nothing from a final sighting is read again once the t
     );
     append(row.sessionId, began + 2, response('msg_2', { type: 'text', text: 'the background task finished' }));
     age(row.sessionId, 30_000);
-    assert.equal((await engine.view(id)).usage?.turns, 1, 'no newer than the read: kept');
+    assert.equal(
+      (await engine.view(id)).usage?.turns,
+      2,
+      'written after the read, though stamped before it as a wall clock stepped back stamps it: its mtime changed, so read again',
+    );
 
     append(row.sessionId, began + 3, response('msg_3', call('tu_2', 'StructuredOutput', { outcome: 'done' })));
     await engine.tick();

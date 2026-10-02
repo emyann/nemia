@@ -46,8 +46,12 @@ inbox, factories, stats, agent definitions.
 **In the api today, below its layer**: `src/factory/quota.ts` spawning `claude`, `runsInOf` in `src/detail/detail.ts` reading a
 harness's argv for a mode, and `src/capabilities/reach.ts` re-implementing permission matching.
 
-**In the web today, against its rule**: store paths in `src/routes/agents.tsx`, `src/routes/workflows.tsx` and
-`src/components/NewWorkflow.tsx`, and the commands it spells itself until the api answers them.
+**In the web today, against its rule**, until the api answers that text:
+
+- store paths, in `src/routes/agents.tsx`, `src/routes/agents_.new.tsx`, `src/routes/agents_.skills.new.tsx`,
+  `src/routes/agents_.$from.$agent.tsx`, `src/routes/workflows.tsx` and `src/components/NewWorkflow.tsx`;
+- the commands it spells itself: every file of `apps/web/src` that names a `wf` verb, found by `grep -rlE '\bwf [a-z]+' apps/web/src`
+  (a JSDoc's mention included).
 
 Nothing here moves until its own card; a change elsewhere does not move it on the side.
 

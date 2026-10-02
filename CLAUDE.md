@@ -62,10 +62,11 @@ holds what every change needs.
 ## Rules the code keeps
 
 - **The runtime owns how a session runs; the layers above own what it means.** `decide` (`agent-runtime/src/core/domain.ts`) is pure
-  and stays a screen long (`agent-runtime/test/engine.test.ts` refuses a carried field read in it); `agent-runtime` (`src/facade.ts`)
-  and `agent-runtime/effect` (`src/index.ts`) are the export lists, and neither exports `decide` (`agent-runtime/test/contract.test.ts`).
-  A knob on a workload is a field carried on the task and read by a runner, never a callback into `decide`, and no `if` in `engine.ts`
-  belongs in `decide`. What sits in which layer today, and what is a candidate to move, is in `docs/architecture.md`, *Who owns what*.
+  (`agent-runtime/test/engine.test.ts` refuses a carried field read in it) and stays a screen long `(no test yet)`; `agent-runtime`
+  (`src/facade.ts`) and `agent-runtime/effect` (`src/index.ts`) are the export lists, and neither exports `decide`
+  (`agent-runtime/test/contract.test.ts`). A knob on a workload is a field carried on the task and read by a runner, never a callback
+  into `decide`, and no `if` in `engine.ts` belongs in `decide` `(no test yet)`. What sits in which layer today, and what is a
+  candidate to move, is in `docs/architecture.md`, *Who owns what*.
 - **Three rules hold the layers, each a test** (`docs/architecture.md`):
   - *Between packages, only the public contract*: `agent-runtime` and `agent-runtime/effect`; `agent-orchestrator`,
     `agent-orchestrator/run`, `agent-orchestrator/workflow` and `agent-orchestrator/effect` — never a subpath outside `exports`, a

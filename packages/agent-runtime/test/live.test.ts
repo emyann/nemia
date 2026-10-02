@@ -25,6 +25,10 @@
  *   `bridgeSessionId`, a file the engine never reads; the control has none, read again as long after, so a bridge it gets a
  *   moment after it registers is seen too. Both have no tools, so a session anyone on the account can drive from claude.ai for
  *   the minute it lives can do nothing.
+ * - A long-lived session, `restartPolicy: 'Always'`: a `--bg` session under Remote Control that answers its brief stays open,
+ *   read `idle`, past 90 s of silence and across a second engine over the same store; `say` starts a turn on that session,
+ *   which answers and reads `idle` again under the same attempt; and it settles `stopped` on a stop alone. Its control, the
+ *   same task filed as a job, settles `succeeded` on its turn's end. Both have no tools.
  * - Claude Code as a job (M1 to M12, docs/open-issues.md, *Claude Code as a job*): `claude` runs a step as a job (`claude -p`),
  *   and a `--bg` session only when asked; these keep what that rests on measurable on each Claude Code. `--allowedTools` takes
  *   every word after it, so M1 gives the prompt first, and runs its eight jobs at once, each in a folder of its own. A resume's
@@ -56,7 +60,7 @@ import { Engine as EngineService, promiseEngine } from '../src/index.ts';
 import { file } from '../src/core/engine/filing.ts';
 import { tick, view } from '../src/core/engine/engine.ts';
 import { Journal } from '../src/core/engine/journal.ts';
-import { Runner } from '../src/harness/seam.ts';
+import { Runner, type TranscriptEvent } from '../src/harness/seam.ts';
 import { TaskState } from '@a2a-js/sdk';
 import { clientOf } from '../src/a2a/client.ts';
 import { codex } from '../src/harness/codex/codex.ts';
@@ -162,12 +166,12 @@ const DENY_CLOSEOUT = {
 };
 const WRITTEN = ['BUILT', 'E2E'];
 
-/**
- * A checkout as this repository's review has one: its settings allow both commands, and each writes a file into it.
- * Made inside this package, not under the machine's temp directory, whose directories Claude Code does not trust.
- */
+/** A folder inside this package, not under the machine's temp directory, whose directories Claude Code does not trust. */
+const trusted = (label: string) => fs.mkdtempSync(path.join(import.meta.dirname, '..', `.ae-live-${label}-`));
+
+/** A checkout as this repository's review has one, made `trusted`: its settings allow both commands, and each writes a file into it. */
 const allowingCheckout = (label: string) => {
-  const dir = fs.mkdtempSync(path.join(import.meta.dirname, '..', `.ae-live-${label}-`));
+  const dir = trusted(label);
   fs.writeFileSync(
     path.join(dir, 'package.json'),
     JSON.stringify({ name: 'probe', private: true, scripts: { build: 'touch BUILT', e2e: 'touch E2E' } }),
@@ -702,6 +706,101 @@ test(
           } catch {}
         }
       }
+    }
+  },
+);
+
+test(
+  "a long-lived --bg session stays open while idle — past 90 s of silence, and across a second engine over its store — takes a turn on words said to it, and ends on a stop alone; the same task filed as a job settles on its turn's end",
+  {
+    skip,
+    timeout: 12 * 60_000,
+  },
+  async (t) => {
+    const root = tmp('long-lived-board');
+    const engine = promiseEngine(EngineService.layer({ root }));
+    const common = {
+      brief: 'Reply with the single word ok, and nothing else.',
+      config: { model: 'haiku', tools: [] as string[], background: true, claude: { remoteControl: true as const } },
+    };
+    const dirs = { open: trusted('long-lived'), job: trusted('long-lived-job') };
+    const ids = {
+      open: await engine.file({ ...common, cwd: dirs.open, restartPolicy: 'Always' }),
+      job: await engine.file({ ...common, cwd: dirs.job }),
+    };
+    const views: Record<string, TaskView> = {};
+    const pass = async (e: Engine) => {
+      await e.tick();
+      for (const [k, id] of Object.entries(ids)) views[k] = await e.view(id);
+    };
+    try {
+      const until = Date.now() + 5 * 60_000;
+      while (!(views.open?.phase === 'idle' && views.job?.state.settled) && Date.now() < until) {
+        await pass(engine);
+        await new Promise((r) => setTimeout(r, 5_000));
+      }
+      assert.equal(views.open?.phase, 'idle', `the long-lived session reads idle once its turn ends: ${views.open?.phase}`);
+      assert.equal(views.job?.state.settled, 'succeeded', `the job settles on its turn's end: ${views.job?.phase}`);
+
+      const restarted = promiseEngine(EngineService.layer({ root }));
+      const quiet = Date.now() + 100_000;
+      while (Date.now() < quiet) {
+        await pass(restarted);
+        assert.equal(views.open?.phase, 'idle', `still idle, ${Math.round((quiet - Date.now()) / 1000)} s before the end of the wait`);
+        await new Promise((r) => setTimeout(r, 10_000));
+      }
+      assert.deepEqual(
+        views.open?.state.attempts.map((a) => a.ended),
+        [null],
+        'one attempt, never ended: no pass recorded an end, and none started a second',
+      );
+
+      const sessionId = views.open?.sessionId;
+      const word = `again-${randomUUID().slice(0, 8)}`;
+      const words = `Reply with the single word ${word}, and nothing else.`;
+      await restarted.say(ids.open, words);
+      const told = (events: TranscriptEvent[]) => events.findIndex((e) => e.kind === 'system' && e.text?.split('\n').includes(words));
+      const answered = (events: TranscriptEvent[]) =>
+        told(events) >= 0 && events.slice(told(events)).some((e) => e.role === 'assistant' && e.kind === 'text' && e.text?.includes(word));
+      const turn = Date.now() + 3 * 60_000;
+      let events: TranscriptEvent[] = [];
+      while (!(answered(events) && views.open?.phase === 'idle') && Date.now() < turn) {
+        await new Promise((r) => setTimeout(r, 5_000));
+        await pass(restarted);
+        events = (await restarted.transcript(ids.open)).events;
+      }
+      assert.ok(
+        told(events) >= 0,
+        `the idle session's transcript carries the words: ${JSON.stringify(events.filter((e) => e.kind === 'system'))}`,
+      );
+      assert.ok(answered(events), 'and a turn they started answers them');
+      assert.equal(views.open?.phase, 'idle', `idle again once that turn ends: ${views.open?.phase}`);
+      assert.deepEqual(
+        [views.open?.sessionId, views.open?.state.attempts.map((a) => a.ended)],
+        [sessionId, [null]],
+        'the same session took the turn: no end recorded, no second attempt',
+      );
+
+      await restarted.stop(ids.open);
+      const stopping = Date.now() + 2 * 60_000;
+      while (!views.open?.state.settled && Date.now() < stopping) {
+        await pass(restarted);
+        await new Promise((r) => setTimeout(r, 5_000));
+      }
+      assert.equal(views.open?.state.settled, 'stopped', `a stop ends it: ${views.open?.phase}`);
+      t.diagnostic(
+        `the long-lived session's end: ${views.open?.state.attempts.at(-1)?.ended} (${views.open?.state.attempts.at(-1)?.reason})`,
+      );
+    } finally {
+      for (const v of Object.values(views)) {
+        if (!v.sessionId) continue;
+        for (const verb of ['stop', 'rm']) {
+          try {
+            execFileSync('claude', [verb, v.sessionId.split('-')[0]], { stdio: 'ignore', timeout: 30_000 });
+          } catch {}
+        }
+      }
+      for (const dir of Object.values(dirs)) fs.rmSync(dir, { recursive: true, force: true });
     }
   },
 );

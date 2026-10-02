@@ -60,6 +60,9 @@ const SIGHTINGS: Record<string, Omit<Sighting, 'sessionId'> | undefined> = {
   failed: { state: 'failed', exitCode: 1 },
   rejected: { state: 'rejected' },
   canceled: { state: 'canceled' },
+  'input-required, idle, held': { state: 'input-required', busy: false, held: true },
+  'completed, held': { state: 'completed', busy: false, held: true },
+  'working, quiet, held': { state: 'working', quietMs: 90_000, nativeId: 'native-q', held: true },
 };
 
 /** The corpus under every sighting a harness can give, and one more: a pass that could not read the harness. */

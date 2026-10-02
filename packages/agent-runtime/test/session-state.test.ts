@@ -49,6 +49,9 @@ const FORMER_SIGHTINGS: Record<string, FormerSighting | undefined> = {
   'done, no statement': { state: 'done' },
   failed: { state: 'failed', exitCode: 1 },
   stopped: { state: 'stopped' },
+  'blocked, idle, held': { state: 'blocked', busy: false, held: true },
+  'done, held': { state: 'done', busy: false, held: true },
+  'working, quiet, held': { state: 'working', quietMs: 90_000, nativeId: 'native-q', held: true },
 };
 
 const translated = (by: (s: FormerSighting) => SessionState | undefined) =>
@@ -69,7 +72,7 @@ test("the corpus as it stood before the words changed, translated, decides every
   for (const [way, by] of ways) {
     const cases = corpusOf(translated(by));
     assert.deepEqual(cases.map((c) => c.name).sort(), Object.keys(RECORDED).sort(), `${way}: every recorded case, and no other`);
-    assert.equal(cases.length, 1152, `${way}: every journal shape, deadline, sighting and time`);
+    assert.equal(cases.length, 1776, `${way}: every journal shape, deadline, sighting and time`);
     for (const c of cases) assert.deepEqual(asJson(read(c)), asJson(RECORDED[c.name]), `${way}: ${c.name}`);
   }
 });

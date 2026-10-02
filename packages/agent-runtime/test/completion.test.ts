@@ -1001,9 +1001,37 @@ test("a registry row is ours only when named `ae/` with a `state` key: another's
     assert.deepEqual(
       [...(await Effect.runPromise(ops.observe))],
       [
-        ['ae/e/1', { sessionId: 's-e', state: 'input-required', busy: false, nativeId: 's-e' }],
-        ['ae/f/1', { sessionId: 's-f', state: 'auth-required', busy: false, nativeId: 's-f', waitingFor: 'authentication' }],
-        ['ae/g/1', { sessionId: 's-g', state: 'working', busy: true, nativeId: 's-g' }],
+        ['ae/e/1', { sessionId: 's-e', state: 'input-required', busy: false, held: false, nativeId: 's-e' }],
+        ['ae/f/1', { sessionId: 's-f', state: 'auth-required', busy: false, held: false, nativeId: 's-f', waitingFor: 'authentication' }],
+        ['ae/g/1', { sessionId: 's-g', state: 'working', busy: true, held: false, nativeId: 's-g' }],
+      ],
+    );
+  } finally {
+    restore();
+  }
+});
+
+test('a row is held while it lists a process: an idle session open for its next words, a finished one still open, and a stopped one gone', async () => {
+  const restore = withFakeClaude(
+    JSON.stringify([
+      { name: 'ae/a/1', sessionId: 's-a', state: 'blocked', status: 'idle', pid: 42 },
+      { name: 'ae/b/1', sessionId: 's-b', state: 'done', status: 'idle', pid: 43 },
+      { name: 'ae/c/1', sessionId: 's-c', state: 'stopped', status: 'idle' },
+    ]),
+  );
+  try {
+    const ops = claudeOps({
+      now: () => 0,
+      transcriptTime: async () => undefined,
+      closeoutFrom: async () => undefined,
+      usageFrom: async () => undefined,
+    });
+    assert.deepEqual(
+      [...(await Effect.runPromise(ops.observe))],
+      [
+        ['ae/a/1', { sessionId: 's-a', state: 'input-required', busy: false, held: true, nativeId: 's-a' }],
+        ['ae/b/1', { sessionId: 's-b', state: 'completed', busy: false, held: true, nativeId: 's-b' }],
+        ['ae/c/1', { sessionId: 's-c', state: 'canceled', busy: false, held: false, nativeId: 's-c' }],
       ],
     );
   } finally {

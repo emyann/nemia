@@ -30,15 +30,13 @@ export function barOf(value: unknown): Bar | undefined {
 export const barValue = (bar: Bar): string => `${bar.kind}:${bar.factory}`;
 
 /** The root route's search: a `bar` that names a bar, and none of the keys a page's own route reads (`factory`, `step`, the filters). */
-export const barSearch = (search: Record<string, unknown>): { bar?: string } =>
-  barOf(search.bar) ? { bar: search.bar as string } : {};
+export const barSearch = (search: Record<string, unknown>): { bar?: string } => (barOf(search.bar) ? { bar: search.bar as string } : {});
 
 /** Whether `one` and `other` show the same thing: the same kind, for the same factory. */
 const sameBar = (one: Bar, other: Bar): boolean => one.kind === other.kind && one.factory === other.factory;
 
 /** What the bar shows once `pressed` is pressed while it shows `open`: nothing, for the same thing again, else what was pressed. */
-export const nextBar = (open: Bar | undefined, pressed: Bar): Bar | undefined =>
-  open && sameBar(open, pressed) ? undefined : pressed;
+export const nextBar = (open: Bar | undefined, pressed: Bar): Bar | undefined => (open && sameBar(open, pressed) ? undefined : pressed);
 
 /** The width `raw`, as this browser stored it, in pixels: `BAR_DEFAULT` for nothing stored and for anything not a positive number. */
 export function parseWidth(raw: string | null): number {

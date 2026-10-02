@@ -555,3 +555,27 @@ export function composedRefusal(
   }
   return undefined;
 }
+
+/** A skill's name: the folder it is, in `skills/`, lowercase words joined by dashes, as a harness names one. */
+export const SKILL_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+/**
+ * `skills:` as the names it lists, an agent's line or a step's, refused in `file`'s name unless each is a skill's name (`SKILL_NAME`),
+ * once.
+ */
+export function skillNamesOf(file: string, written: string | undefined): string[] | undefined {
+  if (written === undefined) return undefined;
+  const named = `${file}: \`skills: ${written}\``;
+  const shape =
+    "Each is a skill's name — its folder in skills/, lowercase words joined by dashes — comma-separated: `skills: review-a-change, write-a-note`.";
+  const names = written
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (!names.length) refuse(`${named} names no skill. ${shape}`);
+  const odd = names.find((n) => !SKILL_NAME.test(n));
+  if (odd) refuse(`${named} has \`${odd}\`, which is not a skill's name. ${shape}`);
+  const twice = names.find((n, i) => names.indexOf(n) !== i);
+  if (twice) refuse(`${named} names \`${twice}\` twice. Name it once.`);
+  return names;
+}

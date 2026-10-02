@@ -118,6 +118,7 @@ export const stepSpec = (extra: Partial<WorkflowStepSpec> = {}): WorkflowStepSpe
   workspace: 'main',
   slot: 'none',
   agent: 'otto',
+  skills: [],
   permissionMode: 'dontAsk',
   sandbox: null,
   tools: ['Read'],

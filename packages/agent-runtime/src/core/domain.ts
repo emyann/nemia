@@ -33,6 +33,7 @@ import {
   type VerbGuard,
   type VerbName,
 } from './lifecycle.ts';
+import { elapsedMs, type Monotonic } from './clock.ts';
 import { endOf, isLive, NEEDS_HUMAN, RUNNING, waitsOnPerson, type Ended, type Outcome, type SessionState } from './session.ts';
 
 /** Ended by the session itself, not stopped under it: an end on record that no deadline overrules. */
@@ -332,8 +333,8 @@ export type Event =
        */
       restartPolicy?: 'Always';
     }
-  | { kind: 'starting'; at: string; attempt: number; resumeFrom?: string; nudge?: string }
-  | { kind: 'spawned'; at: string; attempt: number; error?: string }
+  | { kind: 'starting'; at: string; attempt: number; resumeFrom?: string; nudge?: string; mono?: Monotonic }
+  | { kind: 'spawned'; at: string; attempt: number; error?: string; mono?: Monotonic }
   | {
       kind: 'ended';
       at: string;
@@ -373,8 +374,12 @@ export type Attempt = {
   /** When the intent was journalled. The deadline runs from the FIRST of these, not from filing:
    *  a task queued for admission has not started burning its time. */
   startedAt: string;
+  /** The same moment on the monotonic clock, when the engine that journalled it read one. */
+  startedMono?: Monotonic;
   /** Null until the spawn call returned: the window a crash can land in. */
   spawnedAt: string | null;
+  /** The spawn's moment on the monotonic clock, when the engine that journalled it read one. */
+  spawnedMono?: Monotonic;
   ended: Ended | null;
   /** The `at` of the `ended` entry: when the engine wrote the end down. Null while the attempt runs. */
   endedAt: string | null;
@@ -506,6 +511,7 @@ export function fold(taskId: string, events: readonly Event[]): State {
         s.attempts.push({
           n: e.attempt,
           startedAt: e.at,
+          ...(e.mono ? { startedMono: e.mono } : {}),
           spawnedAt: null,
           ended: null,
           endedAt: null,
@@ -522,6 +528,7 @@ export function fold(taskId: string, events: readonly Event[]): State {
         const a = s.attempts.find((x) => x.n === e.attempt);
         if (a) {
           a.spawnedAt = e.at;
+          if (e.mono) a.spawnedMono = e.mono;
           a.error = e.error;
         }
         break;
@@ -668,6 +675,11 @@ export type Action =
  */
 export type Now = {
   at: Date;
+  /**
+   * The same moment on the monotonic clock: a duration from a journalled moment stamped in the same boot is measured on it
+   * (`elapsedMs`), and on the wall clock `at` otherwise. Absent where the machine gives no monotonic reading.
+   */
+  mono?: Monotonic;
   graceMs: number;
   /**
    * The session names the pass's observation could not read (`Observation.unread`): its harness failed to list them, so a
@@ -736,7 +748,8 @@ export function lifecycleOf(state: State): LifecycleState {
  * first attempt's intent rather than from filing: a task queued for admission has not started burning its time, and a
  * deadline that expired in the queue would be a ceiling that quietly fails work instead of delaying it. It is also the
  * only thing that ends a blocked session: one waiting on a person is running, forever, as far as every other rule here is
- * concerned.
+ * concerned. The deadline and the grace window are measured by `elapsedMs`: on the monotonic clock from a start or a spawn
+ * journalled in the boot `now.mono` reads, so a stepped wall clock ends neither early, and on the wall clock otherwise.
  *
  * With an attempt in flight, the first rule that holds answers:
  *
@@ -782,7 +795,9 @@ export function observe(state: State, observed: ReadonlyMap<string, Sighting>, n
   const sighting = last ? observed.get(nameFor(state.taskId, last.n)) : undefined;
   const turn = turnOf(state);
 
-  const ranFor = turn.attempts.length > 0 ? now.at.getTime() - new Date(turn.attempts[0].startedAt).getTime() : 0;
+  const nowAt = { at: now.at.getTime(), mono: now.mono };
+  const ranFor =
+    turn.attempts.length > 0 ? elapsedMs({ at: Date.parse(turn.attempts[0].startedAt), mono: turn.attempts[0].startedMono }, nowAt) : 0;
   const overdue = state.deadlineSeconds !== undefined && turn.attempts.length > 0 && ranFor > state.deadlineSeconds * 1000;
 
   if (last && last.ended === null) {
@@ -792,7 +807,7 @@ export function observe(state: State, observed: ReadonlyMap<string, Sighting>, n
     if (sighting) return sessionEvent(state, last, sighting);
     if (now.unread?.has(nameFor(state.taskId, last.n))) return { type: 'UNREAD', attempt: last.n, overdue };
     if (!last.spawnedAt) return { type: 'UNSPAWNED', attempt: last.n, name: nameFor(state.taskId, last.n) };
-    return now.at.getTime() - new Date(last.spawnedAt).getTime() < now.graceMs
+    return elapsedMs({ at: Date.parse(last.spawnedAt), mono: last.spawnedMono }, nowAt) < now.graceMs
       ? { type: 'UNSEEN_IN_GRACE', attempt: last.n }
       : { type: 'LOST', attempt: last.n };
   }

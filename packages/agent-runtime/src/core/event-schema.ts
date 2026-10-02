@@ -131,6 +131,9 @@ const Ended = event('ended', {
   error: Schema.optional(Schema.String),
 });
 
+/** A moment on the monotonic clock, as the engine stamps an attempt's start and spawn (`Monotonic`, `core/clock.ts`). */
+const MonotonicSchema = Schema.Struct({ boot: Schema.String, ms: Schema.Finite });
+
 /** A person's answer: one an older runtime wrote may carry `budgetUsd` beside `config`, which `upgrade` moves under it. */
 const Input = event('input', {
   text: Schema.String,
@@ -141,8 +144,13 @@ const Input = event('input', {
 /** Every event a runtime has written, in the shape it was written in. */
 export const StoredEventSchema = Schema.Union([
   Filed,
-  event('starting', { attempt: Schema.Finite, resumeFrom: Schema.optional(Schema.String), nudge: Schema.optional(Schema.String) }),
-  event('spawned', { attempt: Schema.Finite, error: Schema.optional(Schema.String) }),
+  event('starting', {
+    attempt: Schema.Finite,
+    resumeFrom: Schema.optional(Schema.String),
+    nudge: Schema.optional(Schema.String),
+    mono: Schema.optional(MonotonicSchema),
+  }),
+  event('spawned', { attempt: Schema.Finite, error: Schema.optional(Schema.String), mono: Schema.optional(MonotonicSchema) }),
   Ended,
   event('measured', { attempt: Schema.Finite, usage: UsageSchema }),
   event('stop-requested', {}),

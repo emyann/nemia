@@ -30,6 +30,8 @@ import type { SessionState } from '../src/core/session.ts';
 import type { SpawnRequest } from '../src/harness/seam.ts';
 import { tickMemoLayer } from '../src/core/engine/memo.ts';
 import { composite } from '../src/harness/seam.ts';
+import { monoNow } from '../src/core/engine/now.ts';
+import { stepClock } from './clock.ts';
 
 /**
  * One board: a journal and a fake harness whose session states a test moves by hand — and the pass's memo of the settled
@@ -431,6 +433,30 @@ test('running counts the sessions at work on each harness as the pass left them:
   );
   assert.equal(await b.run(phaseOf('c-end')), 'succeeded');
   assert.equal(await b.run(phaseOf('x-queued')), 'pending', 'queued, and never counted');
+});
+
+test('a pass journals the start and the spawn on the monotonic clock of this boot, beside their wall-clock time', async () => {
+  const b = board();
+  const id = await b.run(file(spec));
+  await b.run(tick());
+  const events = await b.run(Effect.flatMap(Journal, (j) => j.read(id)));
+  const starting = events.find((e) => e.kind === 'starting');
+  const spawned = events.find((e) => e.kind === 'spawned');
+  assert.ok(starting?.kind === 'starting' && spawned?.kind === 'spawned', 'started and spawned');
+  assert.equal(starting.mono?.boot, monoNow()?.boot, 'the start is stamped in this boot');
+  assert.equal(spawned.mono?.boot, monoNow()?.boot, 'the spawn is stamped in this boot');
+  assert.ok(spawned.mono!.ms >= starting.mono!.ms, 'and later on that clock');
+});
+
+test('a session spawned and not yet listed by its harness is in its grace, however far the wall clock steps forward', async (t) => {
+  const b = board();
+  const id = await b.run(file(spec));
+  await b.run(tick());
+  b.sessions.delete(nameFor(id, 1));
+  stepClock(t, GRACE_MS + 30_000);
+  await b.run(tick());
+  const [attempt] = (await b.run(view(id, new Map()))).state.attempts;
+  assert.equal(attempt?.ended, null, 'not ended `lost`: on the monotonic clock its grace has barely begun');
 });
 
 test('a pass walks the board in the order the store lists it, and starts every task not queued — the filing time and an old priority choose nothing', async () => {

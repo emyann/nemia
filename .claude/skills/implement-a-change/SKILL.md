@@ -6,7 +6,7 @@ description: "Build a change from its spec in this repository: tests first where
 # Implement a change
 
 1. **Read the spec** (handed to you under *From design*) and the `CLAUDE.md` of each package it touches. If main moved since your branch
-   was cut, merge it in first.
+   was cut, merge it in first. Build each change where the spec places it (its `where`); one that cannot live there is a wrong spec.
 2. **Prove before you build** where the spec claims a rule: write the test that makes it refuse, see it fail, then make it pass.
 3. **Name your mutants** in the closeout: one per rule or guard the change adds, each a `file`, the text `from` it holds exactly once in
    your committed result, what it becomes `to` (valid code that breaks the rule, never a syntax error), the `test` file that must fail,

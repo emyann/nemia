@@ -4,6 +4,7 @@ import {
   BAR_DEFAULT,
   BAR_GAP,
   BAR_MIN,
+  barMost,
   barOf,
   barSearch,
   barValue,
@@ -54,6 +55,12 @@ test('the width stays between the least and the window less a strip of page, and
   assert.equal(barWidth(5000, 1280), 1280 - BAR_GAP);
   assert.equal(barWidth(600, 1280), 600);
   assert.equal(barWidth(600, BAR_MIN + BAR_GAP - 1), BAR_MIN + BAR_GAP - 1);
+});
+
+test('the widest the bar is drawn is the window less a strip of page, or the whole of a window too narrow for both', () => {
+  assert.equal(barMost(1280), 1280 - BAR_GAP);
+  assert.equal(barMost(BAR_MIN + BAR_GAP), BAR_MIN);
+  assert.equal(barMost(390), 390);
 });
 
 test('Escape closes the bar, unless something else took it, it ends a composition, or it leaves a field that holds text', () => {

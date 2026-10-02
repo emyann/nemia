@@ -4,7 +4,7 @@
  */
 import { useCallback, useState, useSyncExternalStore } from 'react';
 import { useNavigate, useSearch } from '@tanstack/react-router';
-import { BAR_KEY, barOf, barValue, barWidth, nextBar, parseWidth, type Bar } from './bar.ts';
+import { BAR_KEY, barMost, barOf, barValue, barWidth, nextBar, parseWidth, type Bar } from './bar.ts';
 
 /**
  * What the bar shows (`open`, none while it is closed), and the verbs that change it on this page, keeping its path and every other key of
@@ -58,10 +58,10 @@ function storeWidth(width: number): void {
 }
 
 /**
- * The bar's width, drawn in this window (`barWidth`) and drawn again each time the window changes size, and what sets it: a width given in
- * pixels, held to the window and kept by this browser for every page.
+ * The bar's width, drawn in this window (`barWidth`) and drawn again each time the window changes size; what sets it: a width given in
+ * pixels, held to the window and kept by this browser for every page; and the widest it is drawn in this window (`barMost`).
  */
-export function useBarWidth(): [number, (width: number) => void] {
+export function useBarWidth(): [number, (width: number) => void, number] {
   const [stored, setStored] = useState(storedWidth);
   const viewport = useSyncExternalStore(onResize, viewportWidth, () => 1280);
   const set = (width: number) => {
@@ -69,5 +69,5 @@ export function useBarWidth(): [number, (width: number) => void] {
     setStored(held);
     storeWidth(held);
   };
-  return [barWidth(stored, viewport), set];
+  return [barWidth(stored, viewport), set, barMost(viewport)];
 }

@@ -38,9 +38,12 @@ async function visit(page: Page, to: string): Promise<void> {
   await idle(page);
 }
 
+/** The header's Start a run, which opens the bar. */
+const opener = (page: Page) => page.locator('header').getByRole('button', { name: 'Start a run' });
+
 /** Presses the header's Start a run and waits for the bar it opens. */
 async function openFromHeader(page: Page): Promise<Locator> {
-  await page.locator('header').getByRole('button', { name: 'Start a run' }).click();
+  await opener(page).click();
   const bar = barOf(page);
   await expectVisible(bar, "the header's Start a run opens the floating bar");
   return bar;
@@ -52,6 +55,14 @@ async function expectClosed(page: Page, pathname: string, assertion: string): Pr
   const url = new URL(page.url());
   if (url.searchParams.has('bar') || url.pathname !== pathname)
     throw new Refused(`${assertion}: the address keeps ${pathname} and loses bar — it is ${url.pathname}${url.search}`);
+}
+
+/** Refuses unless the focus is back on the header's Start a run, which opened the bar. */
+async function expectFocusBack(page: Page, assertion: string): Promise<void> {
+  if (!(await opener(page).evaluate((el) => el === document.activeElement))) {
+    const now = await page.evaluate(() => document.activeElement?.outerHTML.slice(0, 120) ?? 'nothing');
+    throw new Refused(`${assertion}: the header's Start a run holds the focus — ${now} does`);
+  }
 }
 
 /** The bar floats: the page under it keeps its width, and it sits below the header. A picture of it open. */
@@ -85,13 +96,17 @@ async function inTheAddress(page: Page): Promise<void> {
   await expectClosed(page, '/inbox', 'a link to another page closes the bar');
 }
 
-/** Escape closes the bar, from inside it and from the page, in place of the history entry; so does its Close button. */
+/**
+ * Escape closes the bar, from inside it and from the page, in place of the history entry; so does its Close button; both give the focus
+ * back to the header's Start a run.
+ */
 async function closes(page: Page): Promise<void> {
   await visit(page, FLOOR);
   let bar = await openFromHeader(page);
   if (!(await bar.evaluate((el) => el.contains(document.activeElement)))) throw new Refused('the bar takes the focus as it opens');
   await page.keyboard.press('Escape');
   await expectClosed(page, FLOOR, 'Escape inside the bar closes it');
+  await expectFocusBack(page, 'Escape gives the focus back');
   await page.goBack({ waitUntil: 'load' });
   await expectClosed(page, FLOOR, 'and replaces its entry: Back after closing it does not open it again');
   await openFromHeader(page);
@@ -101,6 +116,26 @@ async function closes(page: Page): Promise<void> {
   bar = await openFromHeader(page);
   await bar.getByRole('button', { name: 'Close' }).click();
   await expectClosed(page, FLOOR, 'its Close button closes the bar');
+  await expectFocusBack(page, 'its Close button gives the focus back');
+}
+
+/** Escape in a field of the page that holds text leaves the field and keeps the focus out of the bar; a second Escape closes the bar. */
+async function pageField(page: Page): Promise<void> {
+  await visit(page, `/inbox?bar=${OPEN}`);
+  const bar = barOf(page);
+  await expectVisible(bar, 'the bar opens on the Inbox');
+  const idea = page.locator('form[aria-label="File a card"]').getByRole('textbox', { name: 'An idea' });
+  await idea.fill('a half-typed idea');
+  await page.keyboard.press('Escape');
+  await idle(page);
+  await expectVisible(bar, 'Escape in a field of the page that holds text leaves the bar open');
+  if (await idea.evaluate((el) => el === document.activeElement)) throw new Refused('and leaves the field');
+  if (await bar.evaluate((el) => el.contains(document.activeElement)))
+    throw new Refused('and keeps the focus out of the bar: it was in a field of the page');
+  if ((await idea.inputValue()) !== 'a half-typed idea') throw new Refused('and keeps what the field holds');
+  await page.keyboard.press('Escape');
+  await expectClosed(page, '/inbox', 'a second Escape closes the bar');
+  await idea.fill('');
 }
 
 /** The bar's width: dragged, moved with the keys, the same on another page and after a reload. */
@@ -108,6 +143,9 @@ async function resizes(page: Page): Promise<void> {
   await visit(page, FLOOR);
   const bar = await openFromHeader(page);
   const edge = bar.getByRole('separator', { name: 'Resize the bar' });
+  const most = Number(await edge.getAttribute('aria-valuemax'));
+  const room = await page.evaluate(() => window.innerWidth - 96);
+  if (most !== room) throw new Refused(`the edge says the widest the bar goes, the window less a strip of page, ${room} — it says ${most}`);
   const start = (await boxOf(bar, 'the bar')).width;
   const grip = await boxOf(edge, "the bar's edge");
   const x = grip.x + grip.width / 2;
@@ -163,9 +201,10 @@ export default {
   /**
    * The frame's floating bar, opened by the header's Start a run on a factory's floor: it floats over the page below the header, and the
    * page keeps its width. The address holds it, `?bar=start:<factory>`, the same on every page: a reload keeps it, Back closes it, and a
-   * link to another page closes it. Escape and its Close button close it, Escape in place of its history entry, and a menu that takes
-   * Escape keeps it. Its edge resizes it, by pointer and by the arrow keys, and this browser keeps one width for every page. On a phone it
-   * is the screen's whole width. The width kept and the window's size are taken back.
+   * link to another page closes it. Escape and its Close button close it, Escape in place of its history entry, and give the focus back
+   * to what opened it; a menu that takes Escape keeps it, and Escape in a field of the page that holds text leaves the field, not for the
+   * bar. Its edge resizes it, by pointer and by the arrow keys, up to the widest it says, and this browser keeps one width for every page.
+   * On a phone it is the screen's whole width. The width kept and the window's size are taken back.
    */
   name: 'floating-bar',
   route: FLOOR,
@@ -175,6 +214,7 @@ export default {
       await floats(page);
       await inTheAddress(page);
       await closes(page);
+      await pageField(page);
       await resizes(page);
       await onPhone(page);
     } finally {

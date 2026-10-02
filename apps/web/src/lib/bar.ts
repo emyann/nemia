@@ -54,6 +54,9 @@ export function barWidth(width: number, viewport: number): number {
   return Math.min(Math.max(width, BAR_MIN), most);
 }
 
+/** The widest `barWidth` draws the bar in a window `viewport` pixels wide, for its edge to say. */
+export const barMost = (viewport: number): number => barWidth(Number.POSITIVE_INFINITY, viewport);
+
 /** An Escape pressed while the bar is open: whether a menu or a modal took it, whether it ends a composition, the text of its field. */
 export type EscapeKey = { defaultPrevented: boolean; isComposing: boolean; fieldText: string | null };
 

@@ -68,6 +68,18 @@ const detachedSession = (harness: string, taskId: string, attempt: number, outpu
   if (typeof output === 'string') fs.writeFileSync(`${base}.log`, output);
   else fs.mkdirSync(`${base}.log`);
 };
+/**
+ * The streams the runtime keeps of attempt 1 of a check, each whole in its own file beside its run's (`streams`): a stream given as
+ * `{ unreadable: true }` is a folder, which no read of the file gets through.
+ */
+const checkStreams = (taskId: string, streams: Partial<Record<'stdout' | 'stderr', string | { unreadable: true }>>) => {
+  const dir = path.join(root, 'engine', 'runs', 'check');
+  const base = path.join(dir, `ae/${taskId}/1`.replace(/[^a-zA-Z0-9]+/g, '_'));
+  fs.mkdirSync(dir, { recursive: true });
+  for (const [stream, text] of Object.entries(streams))
+    if (typeof text === 'string') fs.writeFileSync(`${base}.${stream}`, text);
+    else fs.mkdirSync(`${base}.${stream}`);
+};
 const codexSession = (taskId: string, attempt: number, output: string | { unreadable: true }) =>
   detachedSession('codex', taskId, attempt, output);
 
@@ -1181,8 +1193,8 @@ const silentTask = (taskId: string) =>
     { kind: 'settled', at, outcome: 'succeeded' },
   ]);
 
-/** A test runner's stdout as the check's log keeps it: the command's output, then the exit code the run printed. */
-const refusedOutput = 'ok 1 - builds\nnot ok 2 - parses a trailing comma\n# fail 1\n\n[wf check] exit 1\n';
+/** A test runner's stdout, as a check's log and its stdout keep it. */
+const refusedOutput = 'ok 1 - builds\nnot ok 2 - parses a trailing comma\n# fail 1\n';
 
 /**
  * A run that froze its workflow, with a step for each thing `wf ls` says the run established: verified;
@@ -1209,9 +1221,8 @@ function seedChecks() {
   for (const step of ['build', 'test', 'e2e', 'lint', 'docs']) settledTask(`t-20-${step}`, done);
   checkTask('r-20-build-check', { settled: 'succeeded', exitCode: 0 });
   checkTask('r-20-test-check', { settled: 'failed', exitCode: 1 });
-  detachedSession('check', 'r-20-test-check', 1, refusedOutput, 1);
-  fs.mkdirSync(path.join(root, 'checks'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'checks', 'r-20-test-check.stderr'), 'npm error Test failed.\n');
+  detachedSession('check', 'r-20-test-check', 1, '', 1);
+  checkStreams('r-20-test-check', { stdout: refusedOutput, stderr: 'npm error Test failed.\n' });
   checkTask('r-20-e2e-check', { settled: 'stopped' });
   checkTask('r-20-lint-check', { running: true });
   silentTask('t-20-notes');
@@ -1639,7 +1650,7 @@ test("a step with a `check:` carries its command, and once its check refused, th
     verdict: 'exit 1',
     refused: {
       exit: 'exit 1',
-      stdout: { lines: ['ok 1 - builds', 'not ok 2 - parses a trailing comma', '# fail 1', '', '[wf check] exit 1'], truncated: false },
+      stdout: { lines: ['ok 1 - builds', 'not ok 2 - parses a trailing comma', '# fail 1'], truncated: false },
       stderr: { lines: ['npm error Test failed.'], truncated: false },
       unreadable: null,
     },
@@ -1693,6 +1704,34 @@ test('a refused check whose output cannot be read still answers, and says how to
   assert.ok(refused.unreadable);
   assert.match(refused.unreadable, /Could not read the output of its check \(task r-22-test-check\)/);
   assert.match(refused.unreadable, /`wf decide r-22`/);
+});
+
+test('a refused check whose stderr the engine cannot give still answers with its stdout, and says how to read it from the command line', async () => {
+  settledTask('t-71-test', done);
+  checkTask('r-71-test-check', { settled: 'failed', exitCode: 1 });
+  detachedSession('check', 'r-71-test-check', 1, '', 1);
+  checkStreams('r-71-test-check', { stdout: refusedOutput, stderr: { unreadable: true } });
+  writeRun({
+    ...r2,
+    id: 'r-71',
+    workflowDir: path.join(NOWHERE, 'no-such-workflow'),
+    workflow: [{ name: 'test', after: [], body: 'Test it.', check: 'npm test' }],
+    steps: { test: { taskId: 't-71-test', check: { taskId: 'r-71-test-check' } } },
+  });
+
+  const [test] = (await detailOf('r-71')).steps;
+  const refused = test.check?.refused;
+  assert.ok(refused);
+  assert.deepEqual(
+    { ...refused, unreadable: undefined },
+    {
+      exit: 'exit 1',
+      stdout: { lines: ['ok 1 - builds', 'not ok 2 - parses a trailing comma', '# fail 1'], truncated: false },
+      stderr: { lines: [], truncated: false },
+      unreadable: undefined,
+    },
+  );
+  assert.match(refused.unreadable ?? '', /^Could not read the output of its check \(task r-71-test-check\): .*EISDIR.*`wf decide r-71`/);
 });
 
 test('the list of runs observes the engine at most once, however many runs and steps are filed, and not at all with nothing in flight', async (t) => {
@@ -1769,8 +1808,7 @@ test('a step on its third try, in the second round of its loop, carries every tr
   };
   settledTask('r-50-implement', said.implement);
   checkTask('r-50-implement-check', { settled: 'failed', exitCode: 1 });
-  fs.mkdirSync(path.join(root, 'checks'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'checks', 'r-50-implement-check.stderr'), 'npm error Test failed.\n');
+  checkStreams('r-50-implement-check', { stdout: refusedOutput, stderr: 'npm error Test failed.\n' });
   settledTask('r-50-implement-try2', said.implement2);
   checkTask('r-50-implement-try2-check', { settled: 'succeeded', exitCode: 0 });
   settledTask('r-50-review', said.review);
@@ -1852,7 +1890,7 @@ test('a step on its third try, in the second round of its loop, carries every tr
         note: null,
         status: 'succeeded',
         attempts: once,
-        /** Its check refused: the verdict, and its stderr, which is a file. Its output is not read for a try that is over. */
+        /** Its check refused: the verdict, and the stderr the runtime kept. Its stdout is not read for a try that is over. */
         check: {
           command: 'npm test',
           taskId: 'r-50-implement-check',

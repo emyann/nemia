@@ -537,7 +537,7 @@ export const agents = new Hono<ApiEnv>()
             },
             409,
           );
-        const workflowDir = writeTryFolder(name, agent.version, home);
+        const workflowDir = writeTryFolder(name, agent.version, agent.keys, home);
         const run = start({ brief: brief.trim(), repo: '', workflowDir });
         return c.json({ id: run.id } satisfies AgentTried, 201);
       } catch (err) {

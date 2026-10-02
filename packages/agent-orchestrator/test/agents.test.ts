@@ -433,10 +433,10 @@ test('a codex agent names its sandbox as `sandbox:`, and one that says `permissi
   const review = parseWorkflow('review', '---\nagent: reviewer\n---\n', undefined, agents);
   assert.deepEqual([review.harness, review.sandbox, review.permissionMode], ['codex', 'read-only', undefined]);
   assert.deepEqual(review.agent?.given, { harness: 'codex', sandbox: 'read-only' });
-  const own = parseWorkflow('review', '---\nagent: reviewer\npermissionMode: workspace-write\n---\n', undefined, agents);
+  const own = parseWorkflow('review', '---\nagent: reviewer\npermissionMode: read-only\n---\n', undefined, agents);
   assert.deepEqual(
     [own.sandbox, own.permissionMode, own.agent?.keys],
-    ['workspace-write', undefined, ['sandbox']],
+    ['read-only', undefined, ['sandbox']],
     "a step on codex by its agent's line, whose own line names the sandbox the former way: read as its own sandbox:",
   );
 });
@@ -482,28 +482,35 @@ test('REFUSED at shipped defaults: `permissionMode:` on an agent or a step that 
   );
 });
 
-test("a step's own fence replaces its agent's under either name: a Claude Code agent run on codex with a sandbox of the step's own, and a codex agent run on Claude Code with a mode", () => {
+test("REFUSED at shipped defaults: a step that runs a fenced agent on the other harness, with a fence of its own under either name — an agent with no fence moves, and the step's fence is its own", () => {
   const agents = agentsOf({
     implementer: '---\nharness: claude\npermissionMode: dontAsk\n---\nImplement.\n',
     reviewer: '---\nharness: codex\nsandbox: read-only\n---\nReview.\n',
+    mover: '---\nharness: claude\n---\nMove.\n',
   });
   for (const line of ['permissionMode: read-only', 'sandbox: read-only']) {
-    const step = parseWorkflow('build', `---\nagent: implementer\nharness: codex\n${line}\n---\n`, undefined, agents);
+    assert.ok(
+      refusal(() => parseWorkflow('build', `---\nagent: implementer\nharness: codex\n${line}\n---\n`, undefined, agents)).startsWith(
+        'build: `harness: codex` runs its agent implementer on codex, and agents/implementer.md fences it for claude',
+      ),
+      `${line}: a sandbox cannot be compared with the agent's mode`,
+    );
+    const step = parseWorkflow('build', `---\nagent: mover\nharness: codex\n${line}\n---\n`, undefined, agents);
     assert.deepEqual(
       [step.harness, step.sandbox, step.permissionMode],
       ['codex', 'read-only', undefined],
       `${line}: the sandbox is read under its former name, permissionMode:, as under sandbox:`,
     );
     assert.deepEqual(step.agent?.keys, ['harness', 'sandbox'], line);
-    assert.deepEqual(step.agent?.given, {}, `${line}: the agent's mode is not given to the step`);
-    assert.equal(
-      renderStep(step),
-      '---\nagent: implementer\nharness: codex\nsandbox: read-only\n---\n\n',
-      `${line}: written back without the agent's mode`,
-    );
+    assert.deepEqual(step.agent?.given, {}, `${line}: the agent gives the step nothing`);
+    assert.equal(renderStep(step), '---\nagent: mover\nharness: codex\nsandbox: read-only\n---\n\n', `${line}: written back as its own`);
   }
-  const moved = parseWorkflow('review', '---\nagent: reviewer\nharness: claude\npermissionMode: plan\n---\n', undefined, agents);
-  assert.deepEqual([moved.harness, moved.permissionMode, moved.sandbox], ['claude', 'plan', undefined]);
+  assert.ok(
+    refusal(() =>
+      parseWorkflow('review', '---\nagent: reviewer\nharness: claude\npermissionMode: plan\n---\n', undefined, agents),
+    ).startsWith('review: `harness: claude` runs its agent reviewer on claude'),
+    "a codex agent's sandbox cannot be compared with the step's mode",
+  );
   assert.equal(
     parseWorkflow('build', '---\nagent: implementer\n---\n', undefined, agents).permissionMode,
     'dontAsk',
@@ -524,13 +531,13 @@ test('REFUSED at shipped defaults: writeWorkflow of a draft on codex by its agen
   });
   const folder = path.join(dir, 'dev');
   const said = refusal(() =>
-    writeWorkflow(folder, [{ name: 'review', after: [], agent: 'reviewer', permissionMode: 'workspace-write', body: '' }], undefined, {
+    writeWorkflow(folder, [{ name: 'review', after: [], agent: 'reviewer', permissionMode: 'read-only', body: '' }], undefined, {
       anywhere: true,
     }),
   );
   assert.ok(
-    said.startsWith('review: `permissionMode: workspace-write` on a step that runs on codex is the former name of `sandbox:` there') &&
-      said.includes('Send `sandbox: workspace-write` instead'),
+    said.startsWith('review: `permissionMode: read-only` on a step that runs on codex is the former name of `sandbox:` there') &&
+      said.includes('Send `sandbox: read-only` instead'),
     said,
   );
   const kept = refusal(() =>
@@ -543,12 +550,12 @@ test('REFUSED at shipped defaults: writeWorkflow of a draft on codex by its agen
     `a Claude Code mode kept by a step moved onto codex names no sandbox: the parser refuses it, naming sandbox:, and not as a former name: ${kept}`,
   );
   assert.equal(fs.readFileSync(path.join(folder, 'review.md'), 'utf8'), '---\nagent: reviewer\n---\n', 'nothing written');
-  writeWorkflow(folder, [{ name: 'review', after: [], agent: 'reviewer', sandbox: 'workspace-write', body: '' }], undefined, {
+  writeWorkflow(folder, [{ name: 'review', after: [], agent: 'reviewer', sandbox: 'read-only', body: '' }], undefined, {
     anywhere: true,
   });
   assert.equal(
     fs.readFileSync(path.join(folder, 'review.md'), 'utf8'),
-    '---\nagent: reviewer\nsandbox: workspace-write\n---\n\n',
+    '---\nagent: reviewer\nsandbox: read-only\n---\n\n',
     'sent under its own name, it is written',
   );
 });

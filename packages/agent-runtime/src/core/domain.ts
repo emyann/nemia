@@ -95,11 +95,12 @@ export type Sighting = {
    * `claude agents --json` prints it beside `state: 'blocked'`. Absent from a harness that says nothing, and from
    * a session that is not waiting on anybody.
    *
-   * **Carried, never judged.** The engine owns no vocabulary for it and no enum of it: it is a container's
-   * `state.waiting.reason`, a word a person reads, and Claude Code may add another in any release. `decide` does not
-   * read it, and nothing here turns it into a state — `state` already says a session waits on a person
-   * (`input-required`, or `auth-required` to sign in), and this says what it waits on. Level-triggered like every other field of a
-   * sighting: read afresh each pass, so a session that stops waiting simply stops carrying it.
+   * **Its words are carried, never judged.** The engine owns no vocabulary for it and no enum of it: it is a container's
+   * `state.waiting.reason`, a word a person reads, and Claude Code may add another in any release. `decide` never reads its
+   * words, and nothing here turns it into a state — `state` already says a session waits on a person (`input-required`, or
+   * `auth-required` to sign in), and this says what it waits on. Only whether it is there is read, and only for a
+   * long-lived task (`idleOf`): one waiting on a person for something it names is not idle. Level-triggered like every
+   * other field of a sighting: read afresh each pass, so a session that stops waiting simply stops carrying it.
    */
   waitingFor?: string;
   /**
@@ -121,6 +122,13 @@ export type Sighting = {
    * harness cannot say. **Carried, never judged**: `decide` does not read it.
    */
   skills?: string[];
+  /**
+   * Whether the harness still holds the session's process — Claude Code's registry lists a pid for it. A fact about the
+   * process, beside `state`, which is the turn's: a turn that ended (`completed`, or Claude Code's idle `blocked`) leaves a
+   * process that is still there. Absent from a harness that cannot say, which reads as not held. Read by `decide` only for a
+   * long-lived task (`restartPolicy`): held, its idle session is open (`idleOf`).
+   */
+  held?: boolean;
 };
 
 /**
@@ -317,6 +325,11 @@ export type Event =
        * settles it. Absent on a task not held open, which settles on its first signed end.
        */
       holdOpen?: true;
+      /**
+       * Filed long-lived, a Pod's `restartPolicy: Always`: a session that stays open while idle, whose end of a turn, idle
+       * listing or silence is not its end, and that only a stop from outside ends. Absent on a job, which runs to its end.
+       */
+      restartPolicy?: 'Always';
     }
   | { kind: 'starting'; at: string; attempt: number; resumeFrom?: string; nudge?: string }
   | { kind: 'spawned'; at: string; attempt: number; error?: string }
@@ -422,6 +435,8 @@ export type State = {
   said: Said[];
   /** Filed to be held open: a signed end waits on a person. See the `filed` event. */
   holdOpen?: true;
+  /** Filed long-lived: only a stop from outside ends its session. See the `filed` event. */
+  restartPolicy?: 'Always';
   /** Filed to wait for the layer above's word: absent on a journal an older runtime wrote, which reads as queued. See the `filed` event. */
   queued?: boolean;
   /** The turn the last `admitted` entry admitted, which is the turn current when it was written. See the `admitted` event. */
@@ -450,6 +465,21 @@ function endAttempt(a: Attempt, e: Extract<Event, { kind: 'ended' }>): void {
   a.error = e.error ?? a.error;
 }
 
+/** The task as the `filed` event `e` states it, written into the fold `s`. */
+function fileInto(s: State, e: Extract<Event, { kind: 'filed' }>): void {
+  s.filedAt = e.at;
+  s.brief = e.brief;
+  s.cwd = e.cwd;
+  s.harness = e.harness;
+  s.deadlineSeconds = e.deadlineSeconds;
+  s.resumeFrom = e.resumeFrom;
+  s.config = e.config;
+  s.closeoutSchema = e.closeoutSchema;
+  if (e.holdOpen) s.holdOpen = true;
+  if (e.restartPolicy === 'Always') s.restartPolicy = 'Always';
+  if (e.queued !== undefined) s.queued = e.queued;
+}
+
 /** Observed state, folded. A `State` is never stored — it is always re-derived from the journal. */
 export function fold(taskId: string, events: readonly Event[]): State {
   const s: State = {
@@ -466,16 +496,7 @@ export function fold(taskId: string, events: readonly Event[]): State {
   for (const e of events) {
     switch (e.kind) {
       case 'filed':
-        s.filedAt = e.at;
-        s.brief = e.brief;
-        s.cwd = e.cwd;
-        s.harness = e.harness;
-        s.deadlineSeconds = e.deadlineSeconds;
-        s.resumeFrom = e.resumeFrom;
-        s.config = e.config;
-        s.closeoutSchema = e.closeoutSchema;
-        if (e.holdOpen) s.holdOpen = true;
-        if (e.queued !== undefined) s.queued = e.queued;
+        fileInto(s, e);
         break;
       case 'admitted':
         s.admitted = s.inputs.length;
@@ -724,7 +745,8 @@ export function lifecycleOf(state: State): LifecycleState {
  *    person's stop outranks the deadline.
  * 2. Its sighting, read before the journal's own `spawnedAt`: a crash between the spawn call and its journal entry leaves
  *    a session running under a name that can still be found, so it is adopted rather than started a second time — the
- *    whole reason the name is ours. Waiting on a person, `SESSION_BLOCKED`. At work, `SESSION_QUIET` once quiet — its
+ *    whole reason the name is ours. A long-lived task's idle session (`idleOf`), `SESSION_IDLE`: its turn's end, its idle
+ *    listing and its silence are not its end. Waiting on a person, `SESSION_BLOCKED`. At work, `SESSION_QUIET` once quiet — its
  *    runner holds it has stopped, and that is its end; whether it gave the statement its task asked for is recorded beside
  *    it (`stated`) and judged by the layer above, for the engine reports and never nudges — else `SESSION_LIVE`.
  *    Canceled, `SESSION_STOPPED`; any other end, `SESSION_ENDED`.
@@ -745,7 +767,7 @@ export function lifecycleOf(state: State): LifecycleState {
  *    the deadline, which times work, not a person reading it.
  * 4. `DEADLINE_SPENT`, when it is overdue and its last attempt ended at the deadline.
  * 5. `ATTEMPT_ENDED`, judged on the current turn's attempts, which are all of them for a task not held open. One attempt
- *    per start.
+ *    per start. `longLived` on it: the task was filed to end only on a stop from outside, and none was asked.
  * 6. `NO_SESSION_TO_CONTINUE`, for a later turn with no session to continue.
  * 7. `QUEUED`, while the turn waits for the layer above's word; it is started by the pass after the one that wrote it.
  *    Read after every terminal answer, so a queued task can still settle.
@@ -766,18 +788,7 @@ export function observe(state: State, observed: ReadonlyMap<string, Sighting>, n
     const endedOwn = sighting !== undefined && ENDED_OWN.has(sighting.state);
     if (overdue && !state.stopRequested && !endedOwn)
       return { type: 'DEADLINE_PASSED', attempt: last.n, sighting, live: sighting !== undefined && isLive(sighting.state) };
-    if (sighting) {
-      const ending = endOf(sighting.state);
-      const seen = {
-        attempt: last.n,
-        sighting,
-        asked: state.closeoutSchema !== undefined,
-        holds: state.holdOpen === true && !state.closed && ending === 'done' && (last.turn ?? 0) === state.inputs.length,
-      };
-      if (NEEDS_HUMAN.has(sighting.state)) return { type: 'SESSION_BLOCKED', ...seen };
-      if (RUNNING.has(sighting.state)) return { type: sighting.quietMs !== undefined ? 'SESSION_QUIET' : 'SESSION_LIVE', ...seen };
-      return { type: sighting.state === 'canceled' ? 'SESSION_STOPPED' : 'SESSION_ENDED', ...seen };
-    }
+    if (sighting) return sessionEvent(state, last, sighting);
     if (now.unread?.has(nameFor(state.taskId, last.n))) return { type: 'UNREAD', attempt: last.n, overdue };
     if (!last.spawnedAt) return { type: 'UNSPAWNED', attempt: last.n, name: nameFor(state.taskId, last.n) };
     return now.at.getTime() - new Date(last.spawnedAt).getTime() < now.graceMs
@@ -790,11 +801,49 @@ export function observe(state: State, observed: ReadonlyMap<string, Sighting>, n
   if (waitsForInput(state)) return { type: 'AWAITING_INPUT' };
   if (overdue && last?.reason === 'deadline') return { type: 'DEADLINE_SPENT', seconds: Math.round(ranFor / 1000) };
   const ended = turn.attempts.at(-1);
-  if (ended) return { type: 'ATTEMPT_ENDED', ended: ended.ended, reason: ended.reason, attempts: turn.attempts.length, turn: turn.n };
+  if (ended)
+    return {
+      type: 'ATTEMPT_ENDED',
+      ended: ended.ended,
+      reason: ended.reason,
+      attempts: turn.attempts.length,
+      turn: turn.n,
+      longLived: state.restartPolicy === 'Always',
+    };
   if (turn.n > 0 && !turn.continues) return { type: 'NO_SESSION_TO_CONTINUE', turn: turn.n };
   if (awaitsAdmission(state)) return { type: 'QUEUED' };
   if (turn.continues && sighting && isLive(sighting.state)) return { type: 'PREVIOUS_LIVE', sessionId: sighting.sessionId };
   return { type: 'READY', attempt: state.attempts.length + 1, resumeFrom: turn.continues, ...(turn.words ? { nudge: turn.words } : {}) };
+}
+
+/**
+ * Whether a long-lived task's session is idle as `sighting` shows it, open between turns: its harness still holds its process
+ * (`held`), it computes nothing (`busy`), and its turn has ended — waiting on nobody it names (`input-required` with no
+ * `waitingFor`, Claude Code's idle `blocked`), `completed`, or at work and quiet. Never for a job, whose turn's end is its end,
+ * and never for a session that waits on a person for something it names, or to sign in.
+ */
+export const idleOf = (state: State, sighting: Sighting | undefined): boolean => {
+  if (state.restartPolicy !== 'Always' || sighting?.held !== true || sighting.busy === true) return false;
+  if (sighting.state === 'input-required') return sighting.waitingFor === undefined;
+  return sighting.state === 'completed' || (RUNNING.has(sighting.state) && sighting.quietMs !== undefined);
+};
+
+/**
+ * What the sighting of the attempt in flight, `last`, says of its session: the second of `observe`'s rules for an attempt in
+ * flight, with what ending it now would lead to.
+ */
+function sessionEvent(state: State, last: Attempt, sighting: Sighting): LifecycleEvent {
+  const ending = endOf(sighting.state);
+  const seen = {
+    attempt: last.n,
+    sighting,
+    asked: state.closeoutSchema !== undefined,
+    holds: state.holdOpen === true && !state.closed && ending === 'done' && (last.turn ?? 0) === state.inputs.length,
+  };
+  if (idleOf(state, sighting)) return { type: 'SESSION_IDLE', ...seen };
+  if (NEEDS_HUMAN.has(sighting.state)) return { type: 'SESSION_BLOCKED', ...seen };
+  if (RUNNING.has(sighting.state)) return { type: sighting.quietMs !== undefined ? 'SESSION_QUIET' : 'SESSION_LIVE', ...seen };
+  return { type: sighting.state === 'canceled' ? 'SESSION_STOPPED' : 'SESSION_ENDED', ...seen };
 }
 
 /**
@@ -810,9 +859,10 @@ export function spawnRefused(state: State, attempt: number, error: string, move:
     : moved.action;
 }
 
-/** Is this task waiting on a person? The one thing a fleet operator must be told about. */
+/** Is this task waiting on a person? The one thing a fleet operator must be told about. A long-lived task's idle session is not. */
 export function needsHuman(state: State, observed: ReadonlyMap<string, Sighting>): boolean {
   const last = state.attempts.at(-1);
   if (!last || last.ended !== null) return false;
-  return waitsOnPerson(observed.get(nameFor(state.taskId, last.n))?.state);
+  const seen = observed.get(nameFor(state.taskId, last.n));
+  return waitsOnPerson(seen?.state) && !idleOf(state, seen);
 }

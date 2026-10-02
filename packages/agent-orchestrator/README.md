@@ -348,29 +348,42 @@ there is refused listing the agents there are. A link in `agents/` is refused as
 workflow — the listings skip it, and a workflow named `agents` is refused by name.
 
 At `wf start` each node is resolved and frozen on the run, so a run never reads `agents/` again, from a worktree or
-anywhere: the agent's keys are the defaults, a key the step writes wins, and the refusals that depend on the harness
-read the merged keys and name the step. On codex, and on a step that continues another's session (`resume:`), the brief is the
-agent's instructions, a blank line, then the step's own words; on Claude Code the instructions go after Claude Code's own prompt
-(*An agent rendered for Claude Code*, below) and the brief is the step's own words alone. `renderStep` writes a resolved step back as
-its file was: `agent:`, the keys the step set itself, and its own note, never the agent's. `wf start` names each node's agent beside it —
-`implement (implementer) → review (reviewer) → ship (shipper)` — and a node with nothing attached by its name alone.
+anywhere: the agent's keys are the defaults, a key the step writes wins — a fence key only narrows the agent's (*Four layers*, below) —
+and the refusals that depend on the harness read the merged keys and name the step. On codex, and on a step that continues another's
+session (`resume:`), the brief is the agent's instructions, a blank line, then the step's own words; on Claude Code the instructions go
+after Claude Code's own prompt (*An agent rendered for Claude Code*, below) and the brief is the step's own words alone. `renderStep`
+writes a resolved step back as its file was: `agent:`, the keys the step set itself, and its own note, never the agent's. `wf start` names
+each node's agent beside it — `implement (implementer) → review (reviewer) → ship (shipper)` — and a node with nothing attached by its
+name alone.
 
 #### Four layers: what shapes an agent, apart from its task
 
 What an agent is told comes in four layers, each written by whoever owns it:
 
 1. **Instructions** — the agent's own body, written once in its file: who it is and how it works, whatever node it is attached to.
-2. **Custom instructions** — what a person adds to an agent they use without rewriting it. Coming in S4, not built.
+2. **Custom instructions** — what a person adds to an agent they use without rewriting it. Coming, not built.
 3. **The step's policy** — the step's own words and keys: what this node of this process asks of whoever does its work — a role's
    policies, *in this team, also check …*, or a `ship` step telling its shipper why a build and an e2e matter on a merged tree. It is a
-   normal layer, the place a process says what it expects of a role. A step adding skills to its agent's is coming in S3.
+   normal layer, the place a process says what it expects of a role. A step adding skills to its agent's is coming, not built.
 4. **Factory rules** — the files the harness reads from the factory's workspace itself (today `CLAUDE.md`, `AGENTS.md`): what holds
    there for every agent at work in it. Nemia composes nothing of them; the harness reads them as it would for a person.
 
 The words reach the agent in that order — instructions, then custom instructions, then the step's policy, then the task — and where
-two say different things, the later one wins: the step knows the process, and the task knows the case. The agent is told so from S4.
-Fences only tighten: a step may take a tool away from its agent, never give one its agent denies. That is enforced from S2; today a
-step's key still wins over its agent's, as every other key does.
+two say different things, the later one wins: the step knows the process, and the task knows the case. Telling the agent so is coming,
+not built.
+
+Fences only tighten: a step may narrow its agent's fence, never widen it, and the loader refuses one that would (`fenceRefusal`). A
+step's `tools:` may name only tools its agent's list has; its `allowedTools:` only what its agent's rules allow; its `disallowedTools:`,
+which replaces its agent's list, must keep each of its agent's denies. Its `permissionMode:` or `sandbox:` may be no wider than its
+agent's, or than its harness's default when the agent names none: from narrowest, `plan`; `dontAsk`, `default` and `manual`;
+`acceptEdits`; `auto`; `bypassPermissions` — and on codex `read-only`; `workspace-write`; `danger-full-access`. And it may not run a
+fenced agent on the other harness, whose fence cannot be compared. One rule covers another when it is the same rule, a bare tool, a
+command prefix (`Bash(npm:*)` covers `Bash(npm test)`, never a command joined to another, `Bash(npm test && git push)`) or a path
+ending in `**` (`Edit(**)` covers `Edit(notes/**)`); anything else counts as wider. An agent's mode grants what it does unasked: from
+`acceptEdits` up, an `Edit` inside its directory, and under `bypassPermissions` every rule. The board's try (`apps/api`) holds an
+agent to its folder this way (`directoryFence`): `dontAsk`, or the agent's mode where narrower, allowed `Edit(**)` over a mode that edits
+unasked and otherwise only the agent's rules inside the folder; an agent whose every rule reaches outside it is not tried, since a step
+cannot allow nothing. A step that needs a wider fence needs another agent.
 
 The tests' team (`test/fixtures/team/`) is written this way, and the
 board's builder edits the node — which agent, its own keys and its note — showing the agent's values as placeholders.

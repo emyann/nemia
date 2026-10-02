@@ -520,6 +520,7 @@ const PINNED: Record<string, string[]> = {
     'codexModeLine',
     'codexModeWritten',
     'contextText',
+    'directoryFence',
     'disallowedBy',
     'dollarsOf',
     'fansOut',

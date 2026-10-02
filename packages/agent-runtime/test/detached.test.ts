@@ -57,8 +57,8 @@ const sh = (script: string): HarnessSpec => ({ name: 'sh', command: () => ({ cmd
 const req = (name: string, cwd: string) => ({ name, brief: 'x', cwd });
 
 const settle = async (ops: ReturnType<typeof detachedOps>, name: string, want: SessionState, ms = 15_000) => {
-  const deadline = Date.now() + ms;
-  while (Date.now() < deadline) {
+  const deadline = performance.now() + ms;
+  while (performance.now() < deadline) {
     const seen = (await Effect.runPromise(ops.observe)).get(name);
     if (seen?.state === want) return seen;
     await new Promise((r) => setTimeout(r, 150));
@@ -106,8 +106,8 @@ test('stop reaches the detached worker, which kills the harness and says so', as
   await Effect.runPromise(ops.spawn(req('ae/t4/1', dir)));
   await settle(ops, 'ae/t4/1', 'working');
 
-  const deadline = Date.now() + 15_000;
-  while (Date.now() < deadline) {
+  const deadline = performance.now() + 15_000;
+  while (performance.now() < deadline) {
     await Effect.runPromise(ops.stop('ae/t4/1'));
     if ((await Effect.runPromise(ops.observe)).get('ae/t4/1')?.state === 'canceled') break;
     await new Promise((r) => setTimeout(r, 200));
@@ -1738,9 +1738,9 @@ test("a run is not called over before the harness's last output is in its log â€
   const ops = detachedOps(late, dir);
   await Effect.runPromise(ops.spawn({ name: 'ae/t21/1', brief: 'x', cwd: dir, closeoutSchema: {} }));
 
-  const until = Date.now() + 15_000;
+  const until = performance.now() + 15_000;
   let seen: Sighting | undefined;
-  while (Date.now() < until) {
+  while (performance.now() < until) {
     seen = (await Effect.runPromise(ops.observe)).get('ae/t21/1');
     if (seen && seen.state !== 'working') break;
     await new Promise((r) => setTimeout(r, 20));
@@ -1794,8 +1794,8 @@ test('claude-detached at shipped defaults: a task that asked for a closeout gets
     const engine = promiseEngine(Engine.layer({ root: root() }));
     const schema = { type: 'object', properties: { outcome: { type: 'string' } } };
     const id = await engine.file({ brief: 'the prompt', cwd, harness: 'claude-detached', closeoutSchema: schema });
-    const until = Date.now() + 15_000;
-    while (!(await engine.view(id)).state.settled && Date.now() < until) {
+    const until = performance.now() + 15_000;
+    while (!(await engine.view(id)).state.settled && performance.now() < until) {
       await engine.tick();
       await new Promise((r) => setTimeout(r, 100));
     }
@@ -1817,8 +1817,8 @@ test('claude-detached at shipped defaults: a task that asked for a closeout gets
 const settledOn = async (spec: HarnessSpec, task: { resumeFrom?: string } = {}) => {
   const engine = promiseEngine(Engine.layer({ root: root(), harnesses: { sh: spec } }));
   const id = await engine.file({ brief: 'x', cwd: root(), harness: 'sh', closeoutSchema: { type: 'object' }, ...task });
-  const until = Date.now() + 15_000;
-  while (!(await engine.view(id)).state.settled && Date.now() < until) {
+  const until = performance.now() + 15_000;
+  while (!(await engine.view(id)).state.settled && performance.now() < until) {
     await engine.tick();
     await new Promise((r) => setTimeout(r, 100));
   }
@@ -1899,8 +1899,8 @@ test('claude-detached, filed through the engine with disallowedTools, spawns cla
       harness: 'claude-detached',
       config: { tools: ['Read', 'Bash'], disallowedTools: rules, allowedTools: allow },
     });
-    const until = Date.now() + 15_000;
-    while (!(await engine.view(id)).state.settled && Date.now() < until) {
+    const until = performance.now() + 15_000;
+    while (!(await engine.view(id)).state.settled && performance.now() < until) {
       await engine.tick();
       await new Promise((r) => setTimeout(r, 100));
     }
@@ -1976,8 +1976,8 @@ test('codex at shipped defaults: what the attempt consumed is read from its exec
   try {
     const engine = promiseEngine(Engine.layer({ root: root() }));
     const id = await engine.file({ brief: 'the prompt', cwd: root(), harness: 'codex' });
-    const until = Date.now() + 15_000;
-    while (!(await engine.view(id)).state.settled && Date.now() < until) {
+    const until = performance.now() + 15_000;
+    while (!(await engine.view(id)).state.settled && performance.now() < until) {
       await engine.tick();
       await new Promise((r) => setTimeout(r, 100));
     }

@@ -4107,7 +4107,7 @@ backoff stay in the api.
   `rate_limits: null`: signed in, and Anthropic's usage service gave Claude Code nothing — seen by the owner on 2026-09-19, hours
   after the quota began to come from `get_usage`, with `Usage fetch returned a fieldless or non-object body (in-band error)` in
   2.1.278's `--debug` log; said as possibly the service limiting how often it is asked, never as a fact), `no-claude` (the spawn's ENOENT), `timeout`,
-  `failed` (exit code or signal, and stderr's last line), `unknown` (an error answer, or a shape not read, named). A window is `marked`
+  `failed` (exit code or signal, and stderr's last line; or an ask the engine rejected, in its words), `unknown` (an error answer, or a shape not read, named). A window is `marked`
   at `QUOTA_MARK_PERCENT`, 80, and `reset` when its `resets_at` has passed since the answer. Only the known windows are shown —
   `five_hour`, `seven_day`, `seven_day_sonnet`, `seven_day_opus` — since the answer carries others under codenames, at 0% with no
   reset. A state other than `fresh` carries the last answer that had windows as `last`, while it is younger than `QUOTA_LAST_MS`,
@@ -4119,10 +4119,13 @@ backoff stay in the api.
 - **Tests.** `packages/agent-runtime/test/quota.test.ts` judges answers recorded from 2.1.278 (`test/fixtures/get-usage-*.json`: a plan, no plan,
   an unsupported subtype, and the usage service's silence — the last rebuilt from the owner's recording of 2026-09-19, whose fields
   it has, with the no-plan recording's session block) and drives the ask through a fake `claude`: the flags exactly, the scrubbed env
-  and cwd, the id match past decoy lines, stdin closed, the verb at both doors and its refusals. `apps/api/src/factory/quota.test.ts`
-  holds one ask for concurrent reads, the keep and its override, the backoff on a fake clock — twelve reads at once inside each wait ask nothing, the waits grow, a good reading begins them again — and
-  its override, and the route through the engine to the harness's fake `claude`; the runtime's, no claude on PATH, an exit, and a
-  silence killed at the timeout. No test starts the real claude. The e2e's fake answers
+  and cwd, the id match past decoy lines, stdin closed; no claude on PATH (`missing`), an exit (`failed`, with its code and stderr's
+  last line), a silence killed at the timeout, an interruption that ends its claude; the verb at both doors and its refusals.
+  `apps/api/src/factory/quota.test.ts` holds the board's judgement of each state and its sentence; one ask for concurrent reads; the
+  keep and its override; the backoff on a fake clock — twelve reads at once inside each wait ask nothing, the waits grow, a good
+  reading begins them again — and its override; an ask the engine rejected, held as `failed` in its own words and asked again past
+  the keep; the route through the engine to the harness's fake `claude`; and that the read starts no process. No test starts the
+  real claude. The e2e's fake answers
   from the store: the quota page draws fresh, no-plan, unknown and failed, and the quota-unanswered page the new state with the last
   reading dimmed, in both themes.
 

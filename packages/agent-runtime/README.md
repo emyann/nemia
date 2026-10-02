@@ -1502,8 +1502,11 @@ if (q.kind === 'windows') for (const l of q.limits) console.log(l.key, l.usedPer
 ```
 
 Claude Code answers it, as `claude` and as `claude-bg`: the `claude` on PATH, sent its `get_usage` control request with no prompt
-(`claudeQuota`, `harness/claude/quota.ts`), so no model is called and no token spent. Each call is one ask, one process, let go before
-the call returns, whatever ended it; nothing is journalled and nothing kept, so a caller that reads often keeps the answer itself. A
+(`claudeQuota`, `harness/claude/quota.ts`), so no model is called and no token spent. Each call is one ask, one process: `claudeQuota`
+lets it go before it returns, whatever ended it — an answer, the timeout, an interruption. Through the engine the ask runs behind the
+A2A seam, which an interruption does not cross: a caller that interrupts `quota()` gets control back at once, and the process ends by
+the ask's own timeout, within `QUOTA_TIMEOUT_MS` (15 s) and 2 s more. Nothing is journalled and nothing kept, so a caller that reads
+often keeps the answer itself. A
 harness with no quota — Codex, a remote agent, a `PromiseRunner` — is refused in words (`QuotaRefused`, exit code 2 at the Promise door),
 naming the harnesses that have one; so is a harness the engine does not have, and any argument but one name.
 

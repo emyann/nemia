@@ -116,7 +116,7 @@ export type HarnessArgs = {
    */
   niceness?: number;
   /**
-   * The folders beyond its `cwd` the session may reach, as a Pod's container is given its `volumeMounts`: each an absolute path, and
+   * The folders beyond its `cwd` the session may reach, as a Pod's container is given its volume mounts: each an absolute path, and
    * whether the session may only read it (`Mount`). Each harness renders them its own way, and one that cannot hold a mount's mode
    * refuses the task before it is journalled (`HarnessSpec.mounts`): Claude Code gives each one `--add-dir` and denies an edit
    * under a read-only one; Codex reads the whole disk in its sandboxes that write only their workspace, so it holds a read-only

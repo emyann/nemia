@@ -1,5 +1,5 @@
 /**
- * A task's mounts: the folders beyond its `cwd` a session may reach, as a Pod's container is given its `volumeMounts`, and the
+ * A task's mounts: the folders beyond its `cwd` a session may reach, as a Pod's container is given its volume mounts, and the
  * check of their shape every harness shares. A local process sees the disk as it is, so a mount's source and its place in the
  * session are one path.
  */

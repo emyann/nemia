@@ -652,7 +652,8 @@ test('`wf watch` survives a feed cut under it: truncated, deleted or replaced, i
     );
 
     fs.truncateSync(FEED, 0);
-    await w.until(() => cuts().length === 1, 'truncated to nothing: the truncation is said once');
+    await w.until(() => cuts().length >= 1, 'truncated to nothing: the truncation is said');
+    assert.equal(cuts().length, 1, 'the truncation is said once');
     assert.match(cuts()[0], /^wf watch: the feed was truncated under this watch at cursor \d+, and is 0 bytes now .*from its start/);
     b.set(`${run.id}-plan`, 'succeeded', SIGNED);
     await tick(b.e);
@@ -664,7 +665,8 @@ test('`wf watch` survives a feed cut under it: truncated, deleted or replaced, i
 
     const before = w.out().length;
     fs.rmSync(FEED);
-    await w.until(() => cuts().length === 2, 'deleted: the same, the deletion is said');
+    await w.until(() => cuts().length >= 2, 'deleted: the same, the deletion is said');
+    assert.equal(cuts().length, 2, 'the deletion is said once');
     assert.match(cuts()[1], /the feed was deleted under this watch/);
     await approve(b.e, run.id, 'plan');
     for (let i = 0; i < 2; i++) await tick(b.e);
@@ -678,10 +680,10 @@ test('`wf watch` survives a feed cut under it: truncated, deleted or replaced, i
     );
     fs.renameSync(next, FEED);
     await w.until(
-      () => w.out().slice(at).includes('r-new'),
-      'replaced by another file of the same bytes and more: nothing about its size tells, its inode does, and the replacement is read',
+      () => cuts().length >= 3 && w.out().slice(at).includes('r-new'),
+      'replaced by another file of the same bytes and more: its inode tells, not its size; the replacement is said on stderr and read',
     );
-    assert.equal(cuts().length, 3);
+    assert.equal(cuts().length, 3, 'the replacement is said once');
     assert.match(cuts()[2], /the feed was replaced under this watch/);
 
     const quiet = w.err();

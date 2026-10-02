@@ -15,7 +15,7 @@ attachment*, for the whole format; this is the procedure, and what it cost to le
 - **Its name is its file's**, `agents/<name>.md`, a person's first name in lower case (`nora`), and a step names it by that
   (`agent: nora`). The board shows the name as a person's (`Nora`) beside a face drawn from it (Blobatar), the same wherever it shows.
 - **`role:`** is the job it holds, in a few words (`Product engineer`); **`description:`** says when to attach it, one line. Both are the
-  agent's own lines, with `skills:` and `harnessPrompt:`: a step that sets one is refused.
+  agent's own lines, with `harnessPrompt:`: a step that sets one is refused. A step's `skills:` adds to its agent's (*Its skills*).
 - A `name:` line must equal the file's name; `card:` is retired (the card is generated from its skills: `npx wf agents card <name>`).
 
 ## The file
@@ -42,7 +42,7 @@ The instructions are one of four layers that shape an agent apart from its task,
 1. **Instructions** — the agent's body: who it is, wherever it is hired.
 2. **Custom instructions** — what a person adds to an agent they use without rewriting it. Coming, not built.
 3. **The step's policy** — the step's own words and keys: what this position of this process asks of a role. A normal layer, not a
-   workaround: say there what one workflow expects, and keep it out of the instructions. A step adding skills is coming.
+   workaround: say there what one workflow expects, and keep it out of the instructions. A step may add skills, never take one away.
 4. **Factory rules** — the files the harness reads from the factory's workspace itself (today `CLAUDE.md`, `AGENTS.md`): what holds there
    for every agent at work in it. Nemia composes nothing of them.
 
@@ -66,7 +66,8 @@ say what holds for the role everywhere, and nothing about one workflow or one wo
 
 `skills: <a>, <b>` names folders holding a `SKILL.md`, looked for in `skills/` beside the agents folder, then in the repository's
 `.claude/skills/`, then the store's. `tools:` must allow `Skill`. The repository's `.claude/skills/` is found only when the repository is
-the step's place, as a start gives it: a test that loads a folder passes the place too.
+the step's place, as a start gives it: a test that loads a folder passes the place too. A step with an agent may add skills with its
+own `skills:`: the session gets the agent's, then the step's, each once. The agent's fence must already load them; a step never widens it.
 
 - **Write a skill** with skill-creator's method: a `description:` that says when to use it, a short body, detail in files beside it.
 - **Use someone else's** unchanged: in a scratch project, `DO_NOT_TRACK=1 npx skills add <owner>/<repo> --skill <name> --agent

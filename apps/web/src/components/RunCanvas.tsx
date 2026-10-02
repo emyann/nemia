@@ -5,6 +5,7 @@ import {
   Background,
   BackgroundVariant,
   Controls,
+  getViewportForBounds,
   MiniMap,
   Panel,
   Position,
@@ -18,7 +19,7 @@ import {
 } from '@xyflow/react';
 import type { RunDetail } from '../lib/api';
 import { inspects } from '../lib/bar';
-import { besideOpen, forgetLayout, LEAST_ZOOM, place, readLayout, saveLayout } from '../lib/canvas';
+import { besideOpen, drawnWhole, forgetLayout, LEAST_ZOOM, place, readLayout, saveLayout } from '../lib/canvas';
 import { layout, stepsOf, type Point } from '../lib/layout';
 import { useContent } from '../lib/useContent';
 import { stepState } from '../lib/status';
@@ -53,18 +54,26 @@ function stepOf(flow: Flow, id: string, left: number) {
 
 /**
  * How the canvas in `frame` is fitted, with the step `open` in the bar, or null: as `FIT`, where the frame's floating bar is not drawn;
- * clear of the bar where it is (`besideOpen`), the whole run or the open step's node alone, at no more than the zoom it is drawn at. Null,
- * to leave the view as it is. Takes the canvas's frame, or null; measures the bar where it is drawn, at each call.
+ * clear of the bar where it is (`besideOpen`), the whole run or the open step's node alone, at no more than the zoom it is drawn at and
+ * only where every node is still drawn whole on the canvas (`drawnWhole`). Null, to leave the view as it is. Takes the canvas's frame,
+ * or null; measures the bar where it is drawn, at each call.
  */
 function fitBeside(frame: HTMLElement | null, flow: Flow, open: string | null) {
   const bar = document.querySelector('[data-floating-bar]');
   if (!frame || !bar) return FIT;
   const box = frame.getBoundingClientRect();
-  const run = flow.getNodesBounds(flow.getNodes()).width;
-  const fit = besideOpen(frame.clientWidth, box.right - bar.getBoundingClientRect().left, run, open ? stepOf(flow, open, box.left) : null);
+  const run = flow.getNodesBounds(flow.getNodes());
+  const fit = besideOpen(
+    frame.clientWidth,
+    box.right - bar.getBoundingClientRect().left,
+    run.width,
+    open ? stepOf(flow, open, box.left) : null,
+  );
   if (!fit) return null;
   if (!fit.alone || !open) return { ...FIT, padding: fit.padding };
-  return { ...FIT, padding: fit.padding, nodes: [{ id: open }], maxZoom: flow.getZoom() };
+  const { clientWidth: width, clientHeight: height } = frame;
+  const view = getViewportForBounds(flow.getNodesBounds([open]), width, height, LEAST_ZOOM, flow.getZoom(), fit.padding);
+  return drawnWhole(run, view, width, height) ? { ...FIT, padding: fit.padding, nodes: [{ id: open }], maxZoom: flow.getZoom() } : null;
 }
 
 /**

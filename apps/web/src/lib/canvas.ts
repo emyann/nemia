@@ -223,6 +223,21 @@ export function besideOpen(
   return alone && { padding: alone, alone: true };
 }
 
+/**
+ * Whether the nodes in `bounds`, a box at a zoom of 1, are drawn whole on a canvas `width` by `height` pixels in the view `view`, its
+ * offset and zoom: no edge of theirs past an edge of the canvas.
+ */
+export function drawnWhole(
+  bounds: { x: number; y: number; width: number; height: number },
+  view: { x: number; y: number; zoom: number },
+  width: number,
+  height: number,
+): boolean {
+  const left = bounds.x * view.zoom + view.x;
+  const top = bounds.y * view.zoom + view.y;
+  return left >= 0 && top >= 0 && left + bounds.width * view.zoom <= width && top + bounds.height * view.zoom <= height;
+}
+
 /** Where each step goes: where a person left it, if they moved it, else where the layering puts it. */
 export function place(
   names: readonly string[],

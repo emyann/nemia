@@ -7,6 +7,7 @@ import {
   BESIDE_MIN,
   besideBar,
   besideOpen,
+  drawnWhole,
   duration,
   edgeLine,
   edgesOf,
@@ -473,4 +474,15 @@ test('a step opened in the bar is fitted beside it alone only where the run is t
   assert.equal(besideOpen(862, 495, 524, { right: 862 - 495, width: 224 }), null, 'a node that ends where the bar begins is left');
   assert.equal(besideOpen(862, 495, 524, null), null, 'no step is open');
   assert.equal(besideOpen(862, 495, 524, { right: 383, width: 600 }), null, 'no room beside the bar even for the step');
+});
+
+test('nodes are drawn whole on a canvas only where none of their edges is past one of its own', () => {
+  const box = { x: 100, y: 50, width: 400, height: 100 };
+  assert.equal(drawnWhole(box, { x: 0, y: 0, zoom: 1 }, 500, 150), true, 'they end on its right and bottom edges');
+  assert.equal(drawnWhole(box, { x: -101, y: 0, zoom: 1 }, 500, 150), false, 'past its left edge');
+  assert.equal(drawnWhole(box, { x: 0, y: -51, zoom: 1 }, 500, 150), false, 'past its top edge');
+  assert.equal(drawnWhole(box, { x: 1, y: 0, zoom: 1 }, 500, 150), false, 'past its right edge');
+  assert.equal(drawnWhole(box, { x: 0, y: 1, zoom: 1 }, 500, 150), false, 'past its bottom edge');
+  assert.equal(drawnWhole(box, { x: 0, y: 0, zoom: 1.01 }, 500, 150), false, 'drawn larger, past its right and bottom edges');
+  assert.equal(drawnWhole(box, { x: -50, y: -25, zoom: 0.5 }, 250, 75), true, 'its offset and zoom both count');
 });

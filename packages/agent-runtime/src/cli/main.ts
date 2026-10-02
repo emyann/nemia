@@ -48,6 +48,7 @@ export const BRIEF_KEYS = [
   'background',
   'holdOpen',
   'queued',
+  'restartPolicy',
   'trustFrom',
 ] as const satisfies readonly (keyof TaskSpec | keyof HarnessArgs | keyof CodexArgs)[];
 export type BriefKey = (typeof BRIEF_KEYS)[number];
@@ -156,6 +157,14 @@ const trueOrFalse = (key: 'background' | 'queued' | 'holdOpen', value: string | 
   return value === 'true';
 };
 
+/** A `restartPolicy` value as the policy it names, or `undefined` when there is none. Refuses any word but `Always`. */
+const restartOf = (value: string | undefined): 'Always' | undefined => {
+  if (value === undefined || value === 'Always') return value;
+  throw refuse(
+    `\`restartPolicy: ${value}\` is not a restart policy. Write \`restartPolicy: Always\` to keep the session open until \`ae stop\`, or leave it out to run the task to its end.`,
+  );
+};
+
 /** A `cwd` value as the directory it resolves to, or `undefined` when there is none. Refuses one that is not a directory. */
 const directoryOf = (cwd: string | undefined): string | undefined => {
   if (cwd === undefined) return undefined;
@@ -221,6 +230,7 @@ const worktreeOf = (worktree: string | undefined): true | string | undefined =>
  * - `contextTokens` is a whole number in digits; `200k` is refused with the arithmetic done. Whether the harness takes the
  *   number is `file()`'s to say.
  * - `queued`, `holdOpen` and `background` are `true` or `false`; `queued: true` holds the task until `ae admit` starts it.
+ * - `restartPolicy` is `Always` alone: the session stays open until `ae stop`, which `file()` takes on `claude --bg` alone.
  * - `closeoutSchema` is a path to a JSON Schema file, relative to where `ae` runs: frontmatter is one line per key, and a
  *   schema is not.
  * - `tools` is one line, comma-separated: `tools: Read, Grep, Glob`. Which names a harness has is its to say.
@@ -251,6 +261,7 @@ export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
     meta.get('holdOpen'),
     'to have the task wait for `ae answer` or `ae close` when an attempt signs, or leave it out to settle it then',
   );
+  const restartPolicy = restartOf(meta.get('restartPolicy'));
   const cwd = directoryOf(meta.get('cwd'));
   const closeoutSchema = schemaAt(meta.get('closeoutSchema'));
   const tools = toolsOf(meta.get('tools'));
@@ -278,6 +289,7 @@ export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
     closeoutSchema,
     ...(holdOpen === true ? { holdOpen: true as const } : {}),
     ...(queued !== undefined ? { queued } : {}),
+    ...(restartPolicy ? { restartPolicy } : {}),
     ...(Object.keys(config).length ? { config } : {}),
   };
 }
@@ -465,6 +477,8 @@ const HELP = `ae — an engine for agent sessions
     holdOpen         true — when a turn ends done, wait for ae answer or ae close
                      rather than settle: input-required, with nothing running
     queued           true — wait for ae admit <id> before it starts
+    restartPolicy    Always — background only: keep the session open between turns, idle
+                     until ae stop; ae say gives it its next words
     contextTokens    the session's context window, in tokens: it compacts past about it —
                      claude and claude-detached, 100000 to 1000000
     trustFrom        codex only: an absolute directory you trust in ~/.codex/config.toml,

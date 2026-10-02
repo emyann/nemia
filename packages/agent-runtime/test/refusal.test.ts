@@ -142,6 +142,24 @@ const REFUSALS: Array<
   [{ config: { codex: 'x' } }, /^`codex: "x"` is not a set of Codex's arguments\./],
   [{ config: { codex: { trust: '/r' } } }, /^`codex\.trust` is not one of Codex's arguments\. Its only one is `trustFrom`/],
   [{ config: { codex: { trustFrom: 'repo' } } }, /^`codex\.trustFrom: "repo"` is not an absolute directory\./],
+  [
+    { restartPolicy: 'Never' },
+    /^`restartPolicy: "Never"` is not a restart policy the runtime takes\. Give `'Always'` to keep the session open until it is stopped, or leave it out to run the task to its end\.$/,
+  ],
+  [{ restartPolicy: true }, /^`restartPolicy: true` is not a restart policy the runtime takes\./],
+  [{ restartPolicy: 'always' }, /^`restartPolicy: "always"` is not a restart policy the runtime takes\./],
+  [
+    { restartPolicy: 'Always', holdOpen: true },
+    /^`restartPolicy: 'Always'` keeps the session open between turns, and `holdOpen` settles a turn's end to wait for an answer\. Leave `holdOpen` off, and `say` the session its next words\.$/,
+  ],
+  [
+    { restartPolicy: 'Always', deadlineSeconds: 60 },
+    /^`restartPolicy: 'Always'` keeps the session open until it is stopped, and `deadlineSeconds` would stop it at a time\. Leave `deadlineSeconds` off, and `stop` the task when it should end\.$/,
+  ],
+  [
+    { restartPolicy: 'Always', closeoutSchema: { type: 'object' } },
+    /^`restartPolicy: 'Always'` keeps the session open until it is stopped, and a closing statement \(`closeoutSchema`\) would end its attempt\. Leave `closeoutSchema` off\.$/,
+  ],
 ];
 
 for (const [bad, says] of REFUSALS) {
@@ -189,6 +207,16 @@ test('the Effect door journals a filing that refuses nothing, with every checked
   };
   const id = await effect.run(file(full));
   assert.deepEqual(await effect.listed(), [id]);
+});
+
+test('the Effect door journals a long-lived filing with its restart policy, and a filing without one as a job', async () => {
+  const effect = effectDoor();
+  const always = await effect.run(file({ ...ok, restartPolicy: 'Always', queued: true, config: { background: true } }));
+  const job = await effect.run(file(ok));
+  const filedOf = (id: string) => effect.run(Effect.flatMap(Journal, (j) => j.read(id))).then((es) => es[0]);
+  const filed = await filedOf(always);
+  assert.equal(filed.kind === 'filed' && filed.restartPolicy, 'Always');
+  assert.equal(Object.hasOwn(await filedOf(job), 'restartPolicy'), false, 'a job journals no restart policy');
 });
 
 test("the Effect door journals a harness's own words it cannot check: it has no harness to ask", async () => {
@@ -239,6 +267,67 @@ test("REFUSED at shipped defaults: Codex's arguments on a harness that is not Co
     (e: Error) =>
       e.message ===
       "file: `codex` gives Codex arguments of its own, and the `claude` harness is not Codex: its session would start without them. Leave `codex` off: none of this engine's harnesses is Codex.",
+  );
+});
+
+test("REFUSED at shipped defaults: a long-lived task on a harness that ends its session with its turn, at both of the engine's doors, naming the harnesses that keep one open — and taken on those", async () => {
+  const mine: PromiseRunner = {
+    async spawn() {},
+    async observe() {
+      return new Map();
+    },
+    async stop() {},
+    async logs() {
+      return '';
+    },
+  };
+  const options: EngineOptions = {
+    root: scratch('ae-long-lived-'),
+    journal: memoryStore(),
+    harnesses: { claude: 'claude', bg: 'claude-bg', codex, 'claude-detached': claudeDetached, remote: { url: 'https://a.example' }, mine },
+  };
+  const promise = promiseEngine(Engine.layer(options));
+  const viaEffect = (spec: Filing) =>
+    Effect.runPromise(Effect.flip(Engine.use((e) => e.file(spec)).pipe(Effect.provide(Engine.layer(options)))));
+  const open = 'File the task on `claude` with `config.background: true` or `bg`, or leave `restartPolicy` off.';
+  const cases: Array<[string, string]> = [
+    ['claude', 'the `claude` harness runs this task as a job, which ends its session with its turn.'],
+    ['codex', 'the `codex` harness ends its session with its turn.'],
+    ['claude-detached', 'the `claude-detached` harness ends its session with its turn.'],
+    ['remote', 'the `remote` harness ends its session with its turn.'],
+  ];
+  for (const [harness, why] of cases) {
+    const says = `\`restartPolicy: 'Always'\` keeps a session open until it is stopped, and ${why} ${open}`;
+    const err = await viaEffect({ ...ok, harness, restartPolicy: 'Always' });
+    assert.equal(err.message, says, harness);
+    await assert.rejects(promise.file({ ...ok, harness, restartPolicy: 'Always' }), (e: Error & { exitCode?: number }) => {
+      assert.equal(e.exitCode, 2, e.message);
+      assert.equal(e.message, `file: ${says}`, harness);
+      return true;
+    });
+  }
+  assert.ok(
+    await promise.file({ ...ok, harness: 'claude', restartPolicy: 'Always', config: { background: true } }),
+    'claude --bg keeps it open',
+  );
+  assert.ok(await promise.file({ ...ok, harness: 'bg', restartPolicy: 'Always' }), 'so does the claude-bg harness');
+  assert.ok(
+    await promise.file({ ...ok, harness: 'mine', restartPolicy: 'Always' }),
+    "a PromiseRunner is the consumer's own, and asked nothing",
+  );
+  const lone = promiseEngine(Engine.layer({ root: scratch('ae-long-lived-'), journal: memoryStore(), harnesses: { claude: 'claude' } }));
+  await assert.rejects(
+    lone.file({ ...ok, harness: 'claude', config: { background: false }, restartPolicy: 'Always' }),
+    (e: Error) =>
+      e.message ===
+      "file: `restartPolicy: 'Always'` keeps a session open until it is stopped, and the `claude` harness runs this task as a job, which ends its session with its turn. File the task on `claude` with `config.background: true`, or leave `restartPolicy` off.",
+  );
+  const jobs = promiseEngine(Engine.layer({ root: scratch('ae-long-lived-'), journal: memoryStore(), harnesses: { codex } }));
+  await assert.rejects(
+    jobs.file({ ...ok, harness: 'codex', restartPolicy: 'Always' }),
+    (e: Error) =>
+      e.message ===
+      "file: `restartPolicy: 'Always'` keeps a session open until it is stopped, and the `codex` harness ends its session with its turn. Leave `restartPolicy` off: none of this engine's harnesses keeps a session open.",
   );
 });
 

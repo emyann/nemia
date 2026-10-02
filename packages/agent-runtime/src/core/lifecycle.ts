@@ -110,8 +110,9 @@ type Seen = {
  * `domain.ts`). Each names a fact, never an action: the edge says what the fact means in the state it meets.
  *
  * - Nothing in flight, the turn not started: `READY`, `QUEUED`, `PREVIOUS_LIVE`, `NO_SESSION_TO_CONTINUE`.
- * - An attempt in flight, and what its harness says of the name: `SESSION_LIVE`, `SESSION_BLOCKED`, `SESSION_QUIET`,
- *   `SESSION_ENDED`, `SESSION_STOPPED`, `UNSPAWNED`, `UNSEEN_IN_GRACE`, `LOST`, `UNREAD` and `DEADLINE_PASSED`.
+ * - An attempt in flight, and what its harness says of the name: `SESSION_LIVE`, `SESSION_IDLE`, `SESSION_BLOCKED`,
+ *   `SESSION_QUIET`, `SESSION_ENDED`, `SESSION_STOPPED`, `UNSPAWNED`, `UNSEEN_IN_GRACE`, `LOST`, `UNREAD` and `DEADLINE_PASSED`.
+ *   `SESSION_IDLE` is a long-lived task's session open between turns (`idleOf` in `domain.ts`).
  *   `UNREAD` is one in flight — spawned, or only intended — whose harness could not be read this pass (`Now.unread`):
  *   neither seen nor gone; `overdue` on it says it is past its deadline.
  * - `SPAWN_REFUSED`, the engine's own: the harness refused the spawn, and nothing started. Never observed, since only the
@@ -126,6 +127,7 @@ export type LifecycleEvent =
   | { type: 'PREVIOUS_LIVE'; sessionId: string }
   | { type: 'NO_SESSION_TO_CONTINUE'; turn: number }
   | ({ type: 'SESSION_LIVE' } & Seen)
+  | ({ type: 'SESSION_IDLE' } & Seen)
   | ({ type: 'SESSION_BLOCKED' } & Seen)
   | ({ type: 'SESSION_QUIET' } & Seen)
   | ({ type: 'SESSION_ENDED' } & Seen)
@@ -140,7 +142,7 @@ export type LifecycleEvent =
   | { type: 'AWAITING_INPUT' }
   | { type: 'CLOSED'; last?: { n: number; ended: Ended | null } }
   | { type: 'DEADLINE_SPENT'; seconds: number }
-  | { type: 'ATTEMPT_ENDED'; ended: Ended | null; reason: EndReason | null; attempts: number; turn: number }
+  | { type: 'ATTEMPT_ENDED'; ended: Ended | null; reason: EndReason | null; attempts: number; turn: number; longLived?: boolean }
   | { type: 'SETTLED'; outcome: Outcome };
 
 export type EventType = LifecycleEvent['type'];
@@ -154,7 +156,7 @@ export type Moved = { to: LifecycleState; action: Action } | { refused: Refusal 
 export type Move = (from: LifecycleState, event: LifecycleEvent) => Moved;
 
 type Ev<T extends EventType> = Extract<LifecycleEvent, { type: T }>;
-type Sessioned = Ev<'SESSION_LIVE' | 'SESSION_BLOCKED' | 'SESSION_QUIET' | 'SESSION_ENDED' | 'SESSION_STOPPED'>;
+type Sessioned = Ev<'SESSION_LIVE' | 'SESSION_IDLE' | 'SESSION_BLOCKED' | 'SESSION_QUIET' | 'SESSION_ENDED' | 'SESSION_STOPPED'>;
 type Open = Ev<'UNSPAWNED' | 'UNSEEN_IN_GRACE' | 'LOST' | 'UNREAD'>;
 
 /**
@@ -166,6 +168,8 @@ const said = (event: LifecycleEvent): Action => {
   switch (event.type) {
     case 'SESSION_LIVE':
       return { do: 'nothing', why: `running (${phaseWordOf(event.sighting.state)})` };
+    case 'SESSION_IDLE':
+      return { do: 'nothing', why: 'idle — open until stopped' };
     case 'SESSION_BLOCKED':
       return { do: 'nothing', why: 'blocked — needs a person' };
     case 'UNSEEN_IN_GRACE':
@@ -258,6 +262,8 @@ const deadline = [
 /** An attempt in flight, as its harness sees the name — the same in `starting` and `working`. */
 const inFlight = {
   SESSION_LIVE: { actions: nothing },
+  /** A long-lived task's session, open between turns: only a stop from outside ends it. */
+  SESSION_IDLE: { actions: nothing },
   SESSION_BLOCKED: { actions: nothing },
   SESSION_QUIET: harness,
   SESSION_ENDED: harness,
@@ -371,6 +377,7 @@ const CONFIG = {
     stopping: {
       on: {
         SESSION_LIVE: { actions: act('stop', (e: Sessioned) => ({ do: 'stop', sessionId: e.sighting.sessionId, why: 'operator' })) },
+        SESSION_IDLE: { actions: act('stop', (e: Sessioned) => ({ do: 'stop', sessionId: e.sighting.sessionId, why: 'operator' })) },
         SESSION_BLOCKED: { actions: act('stop', (e: Sessioned) => ({ do: 'stop', sessionId: e.sighting.sessionId, why: 'operator' })) },
         SESSION_QUIET: { actions: act('stop', (e: Sessioned) => ({ do: 'stop', sessionId: e.sighting.sessionId, why: 'operator' })) },
         SESSION_ENDED: { actions: act('record-end', harnessEnd) },
@@ -403,8 +410,12 @@ const CONFIG = {
           target: 'failed',
           actions: settle('failed', (e: Ev<'DEADLINE_SPENT'>) => `deadline exceeded after ${e.seconds}s`),
         },
-        /** One attempt per start: trying again — lost, unstartable or failed — is the layer above's, a new filing. */
+        /**
+         * One attempt per start: trying again — lost, unstartable or failed — is the layer above's, a new filing. A long-lived
+         * task's session ended with no stop asked, however it ended: it fails, since only a stop from outside ends one.
+         */
         ATTEMPT_ENDED: [
+          { guard: 'longLived', target: 'failed', actions: settle('failed', () => 'the long-lived session ended without a stop') },
           { guard: 'endedDone', target: 'completed', actions: settle('succeeded') },
           { guard: 'endedStopped', target: 'canceled', actions: settle('stopped', () => 'session stopped') },
           { target: 'failed', actions: settle('failed', attemptNote) },
@@ -422,6 +433,7 @@ const GUARDS = {
   live: ({ event }: { event: LifecycleEvent }) => event.type === 'DEADLINE_PASSED' && event.live,
   overdue: ({ event }: { event: LifecycleEvent }) => event.type === 'UNREAD' && event.overdue,
   lastDone: ({ event }: { event: LifecycleEvent }) => event.type === 'CLOSED' && event.last?.ended === 'done',
+  longLived: ({ event }: { event: LifecycleEvent }) => event.type === 'ATTEMPT_ENDED' && event.longLived === true,
   endedDone: ({ event }: { event: LifecycleEvent }) => event.type === 'ATTEMPT_ENDED' && event.ended === 'done',
   endedStopped: ({ event }: { event: LifecycleEvent }) => event.type === 'ATTEMPT_ENDED' && event.ended === 'stopped',
 };

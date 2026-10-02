@@ -7,11 +7,13 @@ import path from 'node:path';
 import os from 'node:os';
 import {
   fold,
+  idleOf,
   nameFor,
   isLive,
   pathOf,
   phaseWordOf,
   waitsOnPerson,
+  type Attempt,
   type Input,
   type LifecycleStep,
   type Said,
@@ -169,6 +171,23 @@ export type EngineShape = {
     onTick?: (r: TickReport) => void;
     onError?: (e: unknown) => void;
   }) => Effect.Effect<{ stop: () => void }>;
+};
+
+/**
+ * The attempt `say` hands words to, read off the journal: the last, still running. Refused, in words that say what to do,
+ * for a task settled, asked to stop, not started, or whose last attempt has ended. `resume` says how to go on instead.
+ */
+const openAttemptOf = (taskId: string, state: State, resume: string): { last: Attempt } | { refused: string } => {
+  const last = state.attempts.at(-1);
+  if (state.settled)
+    return { refused: `\`${taskId}\` has settled (${state.settled}): no session of it is running to hear anything. ${resume}` };
+  if (state.stopRequested) return { refused: `\`${taskId}\` has been asked to stop: its session is being stopped, not steered. ${resume}` };
+  if (!last)
+    return {
+      refused: `\`${taskId}\` has not started an attempt yet, so there is no session to hear anything. Ask again once \`ae ls\` shows it running.`,
+    };
+  if (last.ended !== null) return { refused: `\`${taskId}\` has no attempt running: attempt ${last.n} ended \`${last.ended}\`. ${resume}` };
+  return { last };
 };
 
 /** An observe count with nothing counted: a harness this engine has not observed yet. */
@@ -419,7 +438,6 @@ const make = (options: EngineOptions) =>
       const runner = runners[harness];
       const h = harnesses[harness];
       const deliver = runner.say;
-      const last = state.attempts.at(-1);
       if (!deliver) {
         return yield* refuse(
           (isSpec(h) ? h.noChannel : undefined) ?? `the \`${harness}\` harness has no channel into a running session. ${resume}`,
@@ -428,16 +446,9 @@ const make = (options: EngineOptions) =>
       const bgRefuses = () => claudeSayRefuses(state.config ?? {}, text);
       const cannot = h === 'claude-bg' || (h === 'claude' && state.config?.background) ? bgRefuses() : undefined;
       if (cannot) return yield* refuse(cannot);
-      if (state.settled)
-        return yield* refuse(`\`${taskId}\` has settled (${state.settled}): no session of it is running to hear anything. ${resume}`);
-      if (state.stopRequested)
-        return yield* refuse(`\`${taskId}\` has been asked to stop: its session is being stopped, not steered. ${resume}`);
-      if (!last)
-        return yield* refuse(
-          `\`${taskId}\` has not started an attempt yet, so there is no session to hear anything. Ask again once \`ae ls\` shows it running.`,
-        );
-      if (last.ended !== null)
-        return yield* refuse(`\`${taskId}\` has no attempt running: attempt ${last.n} ended \`${last.ended}\`. ${resume}`);
+      const open = openAttemptOf(taskId, state, resume);
+      if ('refused' in open) return yield* refuse(open.refused);
+      const { last } = open;
       const name = nameFor(taskId, last.n);
       const unsent = (message: (e: unknown) => string) =>
         Effect.catchCause((cause: Cause.Cause<unknown>) => {
@@ -466,7 +477,7 @@ const make = (options: EngineOptions) =>
         );
       const cannotBg = h === 'claude' && !isClaudeJob(sighting.sessionId) ? bgRefuses() : undefined;
       if (cannotBg) return yield* refuse(cannotBg);
-      if (!isLive(sighting.state)) {
+      if (!isLive(sighting.state) && !idleOf(state, sighting)) {
         return yield* refuse(
           `\`${taskId}\`'s session is \`${phaseWordOf(sighting.state)}\` on its harness, not running: the next pass writes its end. ${resume}`,
         );

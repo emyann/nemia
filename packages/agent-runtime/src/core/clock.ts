@@ -5,7 +5,7 @@
  */
 
 /**
- * A reading of the machine's monotonic clock (`CLOCK_MONOTONIC`, through `process.hrtime`), in whole milliseconds: shared by
+ * A reading of the machine's monotonic clock (the kernel's, through `process.hrtime`), in whole milliseconds: shared by
  * every process of the boot `boot` names, and started again at the next boot.
  */
 export type Monotonic = { boot: string; ms: number };

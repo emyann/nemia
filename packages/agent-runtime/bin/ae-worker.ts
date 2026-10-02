@@ -77,7 +77,7 @@ const boot = (() => {
 })();
 /**
  * The heartbeat on the monotonic clock, `{ boot, ms }` as the runtime's `instantNow` reads it, so that the lease is measured
- * across this process and the one that reads it whatever the wall clock steps; `undefined` with no boot id.
+ * across this process and the one that reads it whatever the wall clock is set to; `undefined` with no boot id.
  */
 const beatNow = () => (boot ? { boot, ms: Number(process.hrtime.bigint() / 1_000_000n) } : undefined);
 

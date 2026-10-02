@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
+import type { ReactNode } from 'react';
 import { useSuspenseQuery } from '@tanstack/react-query';
-import { createFileRoute, Link } from '@tanstack/react-router';
+import { createFileRoute, Link, redirect } from '@tanstack/react-router';
 import { Artifacts, bytesWord, ClosedNeeds } from '../components/Closeout';
 import { Decide } from '../components/Decide';
 import { Markdown } from '../components/Markdown';
@@ -10,7 +10,6 @@ import { ActsOn, Approved, endsTheRun, Gate, gateWord } from '../components/Gate
 import { RunCanvas } from '../components/RunCanvas';
 import { RunGone } from '../components/RunGone';
 import { StatusChip, StepNote } from '../components/StatusChip';
-import { StepInspector } from '../components/StepInspector';
 import { Timeline } from '../components/Timeline';
 import { StartedFrom } from '../components/TryTag';
 import { RemoveRun } from '../components/RemoveRun';
@@ -18,18 +17,24 @@ import { LiftHold } from '../components/LiftHold';
 import { PruneRun } from '../components/PruneRun';
 import { runGone, runQuery, type RunDetail } from '../lib/api';
 import { answersOf, gateOffered, stepAnchor } from '../lib/asks';
+import { barValue } from '../lib/bar';
 import { spentTitle } from '../lib/cost';
 import { decidableRun } from '../lib/decide';
 import { duration } from '../lib/canvas';
 import { waitedMs } from '../lib/factory';
 
 /**
- * `step` opens that step's inspector as the page loads: the Factory card's gate links here to what the step at it handed on, which the
- * inspector opens on (its Output tab, for a step that has signed off).
+ * `step`, the old address of one step of the run, opens that step in the frame's bar: the page is loaded again in place of that address,
+ * at `?bar=step:<run>/<step>`, so Back does not return to it.
  */
 export const Route = createFileRoute('/runs/$runId')({
   validateSearch: (search: Record<string, unknown>): { step?: string } =>
     typeof search.step === 'string' && search.step ? { step: search.step } : {},
+  beforeLoad: ({ search, params }) => {
+    if (!search.step) return;
+    const bar = barValue({ kind: 'step', run: params.runId, step: search.step });
+    throw redirect({ to: '/runs/$runId', params, search: { bar }, replace: true });
+  },
   loader: ({ context, params }) => context.queryClient.ensureQueryData(runQuery(params.runId)),
   component: RunPage,
   errorComponent: ({ error }) => (
@@ -42,39 +47,8 @@ export const Route = createFileRoute('/runs/$runId')({
 
 type Step = RunDetail['steps'][number];
 
-/** How long a page opened on a step keeps that step's inspector in view while what is above it is still being read. */
-const LANDING_MS = 3_000;
-
 /**
- * Brings the page to `target`, the section that holds the inspector, when it is opened on a `step` (`?step=`): the inspector sits under the
- * banners and Decide, below the first screen, where a person who pressed Read the plan would otherwise be reading the Decide section.
- * Decide grows once its decision is read, after the page has drawn, so the scroll is made again each time `target`'s parent, the article,
- * changes height — for `LANDING_MS`, and never once the person scrolls, presses a key or touches the page themselves (`TAKEN_BACK`).
- */
-function useLanding(target: RefObject<HTMLElement | null>, step: string | undefined) {
-  useEffect(() => {
-    const el = target.current;
-    if (!step || !el) return;
-    const bring = () => el.scrollIntoView({ block: 'start' });
-    bring();
-    const resized = new ResizeObserver(bring);
-    resized.observe(el.parentElement ?? document.body);
-    const done = () => {
-      resized.disconnect();
-      clearTimeout(timer);
-      for (const kind of TAKEN_BACK) window.removeEventListener(kind, done, true);
-    };
-    const timer = setTimeout(done, LANDING_MS);
-    for (const kind of TAKEN_BACK) window.addEventListener(kind, done, true);
-    return done;
-  }, [target, step]);
-}
-
-/** What a person does to move the page themselves, which ends a landing. */
-const TAKEN_BACK = ['wheel', 'touchstart', 'keydown', 'pointerdown'] as const;
-
-/**
- * The page of a run, keyed by run, so the step selected and where the nodes were dragged belong to the run they were on. A run removed
+ * The page of a run, keyed by run, so where the nodes were dragged belongs to the run they were on. A run removed
  * while the page is open is said to be gone: the query keeps its last read, which is not drawn as if the run were still there.
  */
 function RunPage() {
@@ -97,30 +71,17 @@ function RunPage() {
  * attempt has none on it), what the same sessions read, by price, where every one of them measured it, what it was started from, and, once
  * it is over, what it holds on disk to give back as `wf prune` does; then Decide, between the banners and the canvas, for a run with
  * something to decide and never while it runs: an answer to give, or a try a person has asked for, since a session the harness blocked is
- * continued from the banner and Decide draws it only once its try is asked; the graph, with the inspector of the step selected; the brief,
+ * continued from the banner and Decide draws it only once its try is asked; the graph, the whole width of the page, a step pressed on it
+ * inspected in the frame's bar; the brief,
  * with the inbox card it was started from under it, as `wf decide` puts it under the run's line; its facts; its timeline; and each step's
  * section.
  *
  * Its facts: a folder run has no repository, base or branch, and names where its work is instead, the one thing a person needs to find what
  * it made; when it started, its first step filed, and the wait before, which a run started `--after` runs spends doing nothing; and, only
  * once `wf prune` removed its worktrees, the prune: the run is then read as it ended, and nothing of it can be tried again.
- *
- * A link to another step of the run while its page is open opens that one, seen as the render that reads the new link runs. A step the
- * folder has lost since it was clicked is off the canvas, and its inspector goes with it.
  */
 function Run({ run }: { run: RunDetail }) {
   const runCancelled = run.cancelledAt !== null;
-  const { step: linked } = Route.useSearch();
-  const [selected, setSelected] = useState<string | null>(linked ?? null);
-  const [seen, setSeen] = useState(linked);
-  if (linked !== seen) {
-    setSeen(linked);
-    if (linked) setSelected(linked);
-  }
-  const steps = useRef<HTMLElement>(null);
-  useLanding(steps, linked);
-  const close = useCallback(() => setSelected(null), []);
-  const inspected = run.steps.find((s) => s.name === selected);
 
   return (
     <article className="space-y-6">
@@ -166,11 +127,8 @@ function Run({ run }: { run: RunDetail }) {
 
       {(decidableRun(run) || answersOf(run).length > 0) && <Decide run={run} />}
 
-      <section ref={steps} aria-label="The run's steps as a graph" className="flex scroll-mt-4 flex-col gap-4 md:flex-row">
-        <div className="min-w-0 flex-1">
-          <RunCanvas run={run} selected={inspected?.name ?? null} onSelect={setSelected} />
-        </div>
-        {inspected && <StepInspector run={run} step={inspected} onClose={close} />}
+      <section aria-label="The run's steps as a graph">
+        <RunCanvas run={run} />
       </section>
 
       <section className="space-y-4">

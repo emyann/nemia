@@ -1,4 +1,4 @@
-import { sidebar } from '../board.ts';
+import { sidebar, stepBar } from '../board.ts';
 import { expectBeneath, expectCount, expectInside, expectVisible, settled } from '../checks.ts';
 import { LOOPING } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -101,7 +101,7 @@ export default {
     );
     await expectCount(timeline.locator('tfoot tr[data-total]'), 4, "a total for each of the loop's three rounds, and the run's");
     await node(LOOPING.exhausted).click();
-    const inspector = page.locator(`aside[aria-label="Step ${LOOPING.exhausted}"]`);
+    const inspector = stepBar(page, LOOPING.id, LOOPING.exhausted);
     await expectVisible(
       inspector.getByRole('tab', { name: 'Output', selected: true }),
       `${LOOPING.exhausted}'s inspector opens on Output: it has signed off`,
@@ -113,14 +113,10 @@ export default {
       `the inspector's Details show ${LOOPING.exhausted}'s note under its chip`,
     );
     await settled(page);
-    await expectInside(
-      graph.locator('.react-flow__node'),
-      graph.locator('.react-flow'),
-      'every step is on the canvas beside the open inspector',
-    );
+    await expectInside(graph.locator('.react-flow__node'), graph.locator('.react-flow'), 'every step is on the canvas under the open bar');
 
     await node(LOOPING.target).click();
-    const target = page.locator(`aside[aria-label="Step ${LOOPING.target}"]`);
+    const target = stepBar(page, LOOPING.id, LOOPING.target);
     const rows = target.locator('section[aria-label="Rounds"] li[data-try]');
     await expectCount(
       rows,

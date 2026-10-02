@@ -49,7 +49,7 @@ export default {
       'with no daemon.json, the header says nothing ticks the store, and how to start what does',
     );
     try {
-      fs.writeFileSync(file, daemonFile(20 * MIN));
+      fs.writeFileSync(file, daemonFile(20 * MIN + 30_000));
       await reload(page);
       const stalled = page.locator('[data-daemon="stalled"]', {
         hasText: new RegExp(

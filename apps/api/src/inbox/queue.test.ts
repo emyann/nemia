@@ -78,12 +78,14 @@ const startedFrom = (id: string, card: string): string =>
 
 const cardText = (name: string): string => fs.readFileSync(path.join(inbox, `${name}.md`), 'utf8');
 
-test("GET /api/inbox carries a queued card's time and place, and the tick's last try of its start, as the package lists them", async () => {
+test("GET /api/inbox carries a queued card's time and place, and the tick's last try of its start, as the package lists them", async (t) => {
   clear();
+  t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-09-16T09:30:00.000Z') });
   const first = addToInbox({ text: 'Cache the views between passes', workflow: 'dev', repo }).card;
   const second = addToInbox({ text: 'Show what a step cost', workflow: 'gone' }).card;
   const parked = addToInbox({ text: 'Not queued' }).card;
   queueInInbox(first.name);
+  t.mock.timers.tick(1);
   queueInInbox(second.name);
   const tried = {
     at: '2026-09-16T10:00:00.000Z',
@@ -115,8 +117,9 @@ test("GET /api/inbox carries a queued card's time and place, and the tick's last
   assert.equal('queued' in byName.get(parked.name)!, false, 'a card not queued carries no `queued`');
 });
 
-test('POST /api/inbox/:name/queue queues a card as `wf inbox queue` does, with its place; DELETE takes it back as `--off` does, and says so of a card not queued, writing nothing', async () => {
+test('POST /api/inbox/:name/queue queues a card as `wf inbox queue` does, with its place; DELETE takes it back as `--off` does, and says so of a card not queued, writing nothing', async (t) => {
   clear();
+  t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-09-16T09:30:00.000Z') });
   const first = addToInbox({ text: 'Cache the views between passes', workflow: 'dev' }).card;
   const second = addToInbox({ text: 'Show what a step cost', workflow: 'dev', repo }).card;
 
@@ -138,6 +141,7 @@ test('POST /api/inbox/:name/queue queues a card as `wf inbox queue` does, with i
     'written as wf inbox queue writes it',
   );
 
+  t.mock.timers.tick(1);
   const behind = (await (await queue(second.name, JSON_TYPE, '{}')).json()) as InboxQueueAnswer;
   assert.deepEqual([behind.was, behind.place, behind.of], ['queued', 2, 2], 'a body of {} is no body');
   const byName = (a: readonly unknown[], b: readonly unknown[]) => String(a[0]).localeCompare(String(b[0]));
@@ -423,13 +427,17 @@ test('GET /api/ceilings with no pass written and no cap is `no cap`, and reads n
   assert.equal(observations(), before, 'no observation of the harness with no cap');
 });
 
-test("GET /api/ceilings says the cap the daemon's last pass ran with, the runs in flight against it oldest first, and the runs it holds as `runSlots` holds them — off one observation", async () => {
+test("GET /api/ceilings says the cap the daemon's last pass ran with, the runs in flight against it oldest first, and the runs it holds as `runSlots` holds them — off one list", async () => {
   clear();
   seedRuns();
   tickWrote({ sessions: 2, runs: 1 });
   let before = observations();
   const one = await ceilings();
-  assert.equal(observations() - before, 1, 'one `claude agents` for every run at once');
+  assert.equal(
+    observations() - before,
+    0,
+    'no `claude agents`: one list of the runs’ tasks, which asks a harness only of a background session among them, and there is none',
+  );
   assert.deepEqual(
     one,
     {
@@ -467,7 +475,7 @@ test("GET /api/ceilings says the cap the daemon's last pass ran with, the runs i
   writeRun('0-also-flying', 5, { taskId: 't-also' });
   before = observations();
   assert.deepEqual((await ceilings()).inFlight, ['a-flying', '0-also-flying'], 'two in flight, oldest first by createdAt, then id');
-  assert.equal(observations() - before, 1);
+  assert.equal(observations() - before, 0);
 });
 
 test("REFUSED at shipped defaults: GET /api/ceilings judges by the daemon's last pass and not the api's environment — a pass with no cap is `no cap` beside WF_MAX_RUNS=1 — and reads the api's own only before any pass, refusing one that is not a count by name", async (t) => {

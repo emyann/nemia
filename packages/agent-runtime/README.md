@@ -34,8 +34,9 @@ Definition of done — a closed list, and it is closed:
       no ceiling, no pools and no order of its own (retired in thin runtime stage 4c part 2)
 - [x] the feed — a cursored stream of everything that happened
 - [x] resume — a task filed with `resumeFrom` continues that session; one attempt per start, and nothing tried again here
-- [x] deadline — wall clock of an attempt, or of a held-open turn's; also the only thing that ends a `blocked` session,
-      which waits on a person forever — and is not counted at work while it waits
+- [x] deadline — the time the machine was up since an attempt started, or a held-open turn's first one: on the monotonic
+      clock within a boot, which does not run while the machine sleeps, and on the wall clock across a reboot; also the only
+      thing that ends a `blocked` session, which waits on a person forever — and is not counted at work while it waits
 - [x] isolation — `--worktree`, declared per task, cut by the harness
 
 **The engine is finished.** The next thing to build is a consumer of it, not more of it. If a
@@ -377,6 +378,11 @@ has ever taken. It is the price of not having somebody else's registry to read, 
 price of running more than one harness. It is a handful of lines, because the engine already had a
 journal and a seam.
 
+The beat is written on two clocks: `heartbeatAt` on the wall clock, and `beat`, `{ boot, ms }`, on the monotonic clock every
+process of a boot shares. The lease is measured on `beat` when it was written in this boot, so a wall clock stepped forward
+(NTP, a VM's time sync) never reads a live worker dead; a beat of another boot, or none, is measured from `heartbeatAt`
+(`elapsedMs`, `src/core/clock.ts`).
+
 The other way round, the run file removed is a stop: `stop` finds the worker by it, so a worker whose run file is gone,
 alone or with its store, ends its harness and exits at its next write, and never writes the file again (open issue 32).
 
@@ -533,7 +539,7 @@ no words. What the in-process seam's extension answers — `findSession`, `sessi
 
 **The registry, and what a restart does.** The driver keeps one file per session, `<root>/remote/<session name>.json`,
 written whole and renamed. The intent — the name, the harness it went through, the message's id and when, and the process
-sending it with the time it gives up (`sending: { pid, until }`) — is on disk before the message is sent, and the Task's
+sending it with the time it gives up (`sending: { pid, until, mono }`) — is on disk before the message is sent, and the Task's
 id and context are written as the answer comes back. So a spawn asked again for a name that has an entry never sends a
 second message: an entry with a Task adopts it, and the next pass reads it by GetTask; an entry still being sent by a
 process that lives is left to it; any other is a send whose answer never came back, so whether a Task exists is not
@@ -554,7 +560,9 @@ left to answer within `SEND_MS` (15 minutes), in this process: until it does, ev
 `submitted` (the view's `running (working)`) while the sending process lives, and the answer is written as before — its
 Task, or its reply ended. A refusal that comes after the spawn returned ends the session `rejected`, a `harness` end, its
 words on `logs`; a send that fails on the way, is not answered within `SEND_MS`, or whose process died is in doubt, never
-sent twice, and `lost` past the grace window. A `stop` of a session still being sent cuts the send in the process that makes
+sent twice, and `lost` past the grace window. The `SEND_MS` lease is measured on the monotonic clock from the send's own
+stamp (`mono`, `{ boot, ms }`) within its boot, and on the wall clock from `sentAt` for an entry with none or across a reboot
+(`sendHeld`, `a2a/sending.ts`), so a wall clock stepped forward does not put a live send in doubt; `until` stays on the wall clock. A `stop` of a session still being sent cuts the send in the process that makes
 it, and the task settles `stopped`; a Task the agent makes of a send let go of is cancelled when its answer comes. A
 one-shot process that exits at once after its pass (`process.exit`) cuts its sends with it: in doubt, never sent twice. What
 is left of open issue 34 is the crash: a process that dies while a send is under way leaves a Task nobody owns.
@@ -611,7 +619,7 @@ after a space starts a comment. The keys are a closed list:
 | `harness` | `claude` (default), `codex`, `claude-detached` |
 | `model` | the harness's model name |
 | `permissionMode` | the harness's own words — see below; default `auto` for Claude Code, `workspace-write` for Codex |
-| `deadlineSeconds` | wall clock of the attempt — of a turn, when held open — above 0; absent, no deadline |
+| `deadlineSeconds` | the time the machine was up since the attempt started — the turn's first, when held open — above 0, on the monotonic clock within a boot and the wall clock across a reboot; absent, no deadline |
 | `resumeFrom` | a session id to continue, instead of starting cold |
 | `worktree` | `true`, `false`, or a name — the harness cuts it |
 | `closeoutSchema` | a JSON Schema file — the workload ends by answering in that shape |
@@ -683,7 +691,8 @@ started — the OS would not create the process, a detached worker was never lau
 the harness's words, and `decide` settles or retries it like any failure. Any other failure may
 have left a session behind (a launcher can create one and lose its acknowledgement), so the call is
 recorded as spawned, with its error, and the grace window decides: the session is adopted if it
-appears, the attempt `lost` if it never does. Either way the tick goes on; it used to reject, and
+appears, the attempt `lost` if it never does. The grace window runs from the spawn on the monotonic clock within a boot,
+as the deadline does: a stepped wall clock ends neither early. Either way the tick goes on; it used to reject, and
 every task behind the failed one stalled on every pass.
 
 ## Narrowing a session: `tools`, `effort` and `mcp`
@@ -1064,6 +1073,14 @@ quiet  ⟸  state = working AND busy AND the last word in its conversation is it
 
 and reports quiet as a fact, `quietMs`, with the state left `working`. What quiet means is `decide`'s (below).
 
+**Quiet is counted on both clocks, and the shorter wins.** The transcript's mtime is stamped on the wall clock, so a wall clock
+stepped forward an hour would make every working session quiet at once. The runner records, per attempt under its root, when it
+first saw the transcript at its current mtime on the monotonic clock (`<root>/quiet/<name>.json`, `{ mtimeMs, boot, ms }`,
+`harness/claude/quiet.ts`), rewritten only when the mtime or the boot differs and cleared at spawn; quiet is the wall-clock age
+bounded by the monotonic time since that sighting. So a forward step cannot report a working session quiet, a backward step only
+delays it, a sighting survives a daemon's restart within its boot, and a mtime first seen — after a reboot, or by a fresh root —
+waits the floor from then. A machine with no boot id has the wall clock alone.
+
 **The second quiet rule is for a session held by something that is not the work.** A step signed off with
 `StructuredOutput`, every commit in, and left a `run_in_background` loop running; its registration read `status: shell`,
 the registry listed it busy, and seventy-seven minutes later nothing had read its closeout — no end, no check, no
@@ -1256,7 +1273,9 @@ real runs:
 
 Claude Code's runner reads the statement from the transcript on every idle pass while a session
 works. What it read from a finished one it keeps for that attempt only — the row's name, its session,
-and the start `claude agents` gave it — and only while the transcript has not been written since.
+and the start `claude agents` gave it — and only while the transcript has not been written since: its mtime, asked again, equals the one asked just
+before that read, and that one was older than the read by `MTIME_SLOP_MS` — an equality, so a write stamped after a wall clock
+stepped back is read again.
 Kept by session id, for good, a read went wrong twice on one step. A `view` saw the session listed
 final at least ten seconds before its — inferred from the pinned usage, not observed — `StructuredOutput`, and "nothing said" was kept. Then a nudged retry,
 which `--resume` runs under the same id, was handed that nothing and its first try's usage, to the
@@ -1317,6 +1336,16 @@ whose lines it follows, and lines after the session was continued under another 
 attempt's. No cost is given, rather than a wrong one: while no line has been written since the attempt began; when the
 count was carried on from a total the transcript does not show; and, for `costUsd` alone, when Claude Code could not price
 a model the session used — `unpricedModel: true`, since a total too low reads as the whole.
+
+**A long-lived attempt's spend is journalled as it grows.** A session that runs for days writes no cost until a process of it
+exits, so each pass that reads more of a long-lived attempt in flight (`restartPolicy: 'Always'`) than its record holds
+journals a **`counted`** entry: its turns, tool calls and tokens, never a cost, which `fold` puts in place of the attempt's
+`usage` whole, since a compacted attempt's reading drops tokens the last one had. The same reading on later passes writes
+nothing; a reading with fewer turns than the record is no count of this attempt and writes nothing either; a job's spend is
+written at its end, as before. Its end keeps what was counted when it carries no usage, and its cost is measured as any
+attempt's is. The pass tells the runner when the attempt began (`ExpectedSession.since`), and `--bg` counts from then across
+every process Claude Code respawned it in; a `cost-state` begun more than a few seconds after the attempt's first line is a
+respawn's own count, too low for the attempt, so it gives no cost ([open issue 18](docs/open-issues.md)).
 
 **What a session read, by price.** Measured over 234 worker sessions on 2026-09-18: 96.9% of input tokens were read
 from the cache, 3.1% written to it, almost none uncached — a read priced $0.50 a million and a write $10, a
@@ -1580,7 +1609,8 @@ and not held is **respawning** (`respawning`, `SESSION_RESPAWNING`): the pass do
 and nobody is asked anything. The engine journals what the listing says before it decides (`sightingFacts`): a `gap` the
 first time the session is seen with no process, and a `process`, with its pid, once it is held again — or held in a process
 it had not been seen in. So Claude Code's own crash loop is on the record and in the view, and never acted on. A gap open
-`RESPAWN_GAP_MS` (two minutes) is a respawn that is not coming (`RESPAWN_OVERDUE`): the attempt ends `lost`.
+`RESPAWN_GAP_MS` (two minutes) is a respawn that is not coming (`RESPAWN_OVERDUE`): the attempt ends `lost`. The gap is
+journalled on both clocks, and its two minutes run on the monotonic clock within a boot, the wall clock across one (`elapsedMs`).
 
 **An end no stop asked for is restarted, after a back-off.** A long-lived session that ends, however it ends — done,
 failed, lost, or stopped at its harness (`claude stop`, claude.ai) — with no `stop` on the record is started again as a new
@@ -1589,7 +1619,8 @@ attempt, `ae/<task>/<n+1>`, resuming the latest session an attempt recorded and 
 (`PREVIOUS_LIVE`), and nothing starts while its harness cannot be read (`UNREAD`). The wait is a kubelet's
 (`RESTART_BACKOFF`, `backoffOf`): 10 s after one end, doubled for each end in a row, at most 300 s; an attempt that ran
 600 s counts them again. It is read off the journal's times and `now` alone (`BACKING_OFF`, then `RESTART_DUE`), so a
-restarted daemon waits the same. Only `ae stop` ends the task: it settles `stopped`, and nothing restarts it.
+restarted daemon waits the same; the wait and the 600 s run on the monotonic clock between moments journalled in one boot,
+so a stepped wall clock restarts nothing early and holds no restart that is due, and on the wall clock across a reboot. Only `ae stop` ends the task: it settles `stopped`, and nothing restarts it.
 
 **Refused, with exit code 2**, nothing journalled: a `restartPolicy` other than `'Always'`; beside it, `holdOpen` (a turn's
 end is idle here, not a wait), `deadlineSeconds` (only a stop ends it) and `closeoutSchema` (a statement would end its
@@ -1899,11 +1930,14 @@ of pure code sits beside it.
 | `src/core/path.ts` | a task's path through the lifecycle, replayed off its journal (`pathOf`): the state after each entry, the entry's kind and its time, for the `path` verb — pure, a reader's, never a pass's |
 | `src/core/event-schema.ts` | every event a runtime has written, as an Effect Schema, former shapes included: `Journal.layer` checks what any store gives back against it before `upgrade`, and fails a task's read with a `JournalError` naming its file, the entry and the field (`entryWords`); a feed entry it refuses is skipped and said (`FeedRefusal`) |
 | `src/core/quote.ts` | how a sentence quotes what it did not write, pure: a value cut to 60 characters, another party's address, status text or words to 200, the cut marked `…` (`quote`), and a long list shown by its first three and how many more (`firstOf`) |
+| `src/core/clock.ts` | how a duration the runtime decides on is measured, pure (`elapsedMs`): on the monotonic clock when both moments were read in one boot, on the wall clock otherwise |
 | `src/core/index.ts` | the face of `core/`: what the other folders and the entries take of it; nothing of `core/engine/` |
 | `src/core/engine/engine.ts` | applies one decision, then the pass over every task |
+| `src/core/engine/counted.ts` | what a long-lived attempt in flight has consumed so far, journalled as it grows (`counted`), off the pass's sighting |
 | `src/core/engine/filing.ts` | filing a task, admitting, stopping, answering and closing it, each with what it refuses (`refusalOf`): a fact journalled for the pass to act on |
 | `src/core/engine/journal.ts` | append-only JSONL per task, plus the board-wide feed; `upgrade`, which reads a line written before an event's shape changed in today's, whoever's store it is — nothing on disk is rewritten |
 | `src/core/engine/memo.ts` | the settled tasks an engine's passes may skip until the feed names them, and the cursor into the feed: a cache of `fold`, rebuilt by a fresh engine, never written down |
+| `src/core/engine/now.ts` | now on both clocks (`instantNow`): `Date.now()`, and `process.hrtime` under the boot's id read from `/proc/sys/kernel/random/boot_id`, with no monotonic reading where there is none |
 | `src/core/engine/tally.ts` | what the runtime's own reads and spawns have cost the process, as running totals (`Engine.io()`): a thin wrapper around its readers and `sh`, not a syscall tracer |
 | `src/core/engine/index.ts` | the face of `core/engine/`: the engine's verbs, journal, memo and tally, as the doors take them |
 | `src/harness/seam.ts` | the compute seam — `spawn`/`observe`/`stop`/`logs`, and the optional `find`, `release`, `transcript` and `say` — the `Runner` service, the free harness `testOps`, and `composite`: dispatch by harness, merge what they all see |
@@ -1914,6 +1948,7 @@ of pure code sits beside it.
 | `src/harness/sdk.ts` | the same four verbs on the Agent SDK, with the tradeoff written down |
 | `src/harness/index.ts` | the face of the seam, as the A2A seam and the doors take it; `core/` imports `seam.ts` and `args.ts` by their own path |
 | `src/harness/claude/bg.ts` | Claude Code's `--bg` runner (`claudeOps`), and `sh`, the one way it shells out |
+| `src/harness/claude/quiet.ts` | when a working `--bg` session's transcript was first seen at its mtime, on the monotonic clock, per attempt under the root: written by a look only when the mtime or the boot differs, cleared at spawn, read fresh on every look |
 | `src/harness/claude/parent.ts` | what a resumed `--bg` session's spawn records of its parent: the id of the parent's last StructuredOutput call, and whose a statement is by it |
 | `src/harness/claude/code.ts` | Claude Code as the engine runs it by default: a step as a job (`claude -p`), or a background session (`claude --bg`) when the task asks, each verb routed by the session id's shape; and `claude -p`'s argv and the `claude-detached` spec |
 | `src/harness/claude/quota.ts` | Claude Code's quota (`claudeQuota`): the `claude` on PATH asked `get_usage` with no prompt, and its answer read (`quotaOfResponse`) |
@@ -1935,6 +1970,7 @@ of pure code sits beside it.
 | `src/a2a/client.ts` | the engine's side of that seam: an in-process `Transport` to the handler, and a harness's verbs as calls through the SDK's `Client` and the extension's methods, as its card offers them; `transcript` and `refuses` passed through |
 | `src/a2a/card.ts` | a remote agent's card as it enters, served or configured: `CardSchema` decodes what the runtime reads of it before the SDK's parser, a card that does not decode is refused naming its first wrong field, and a configuration is judged (`remoteConfigRefusal`) |
 | `src/a2a/remote.ts` | a remote A2A agent as a harness: its card read and the binding chosen, auth as the card declares it, the registry under `remote/` (the intent before the send, the Task on its answer, never a second send), and the verbs as SendMessage, GetTask and CancelTask |
+| `src/a2a/sending.ts` | a send under way: its lease (`sendHeld`), `SEND_MS` on the monotonic clock from its stamp within a boot and on the wall clock from `sentAt` otherwise, and whether the process making it lives |
 | `src/a2a/said.ts` | the remote harness's own words told from another party's: the errors it throws in its own words, the A2A errors that refuse a send, and any other error's words quoted to 200 characters (`wordsOf`) |
 | `src/a2a/index.ts` | the face of `a2a/`, as the doors take it: it imports no name of the SDK's |
 | `src/facade/consumer.ts` | what a consumer writes and is given — its store in Promises, its harnesses, its options, its task and its engine — the adapters over them, and what the door refuses of them |
@@ -1961,6 +1997,7 @@ of pure code sits beside it.
 | `test/release.test.ts` | letting a finished Claude Code session go, and reading what it cost once stopped, at shipped defaults — a fake `claude` that keeps a registry and writes a `cost-state` as it stops a session |
 | `test/budget.test.ts` | a spend cap, at shipped defaults — fake `claude`s: a `claude -p` that stops at its cap ends its attempt `failed` with `limit: 'budget'` and settles its task as any failure, the note naming no budget; the flag reaches both Claude runners on every attempt |
 | `test/admit.test.ts` | queued and admitted: the wait, the word, the pass after it, the pre-4c reading, `admit`'s refusals at shipped defaults, and a count proving the word asks no harness |
+| `src/core/engine/counted.test.ts` | a long-lived attempt's counts journalled once a reading, none for a job, and how `fold` and the view read them |
 | `src/core/engine/journal.test.ts` | the store and the feed's cursor, and a journal written before the harness's arguments were one `config`, read in today's shape |
 | `test/harness-args.test.ts` | the checks every harness shares of a task's `config`, made to refuse in their own file and through a `Runner` |
 | `test/core-reads.test.ts` | `domain.ts` and `engine.ts` read no harness argument: the `config` they carry is handed on unopened |

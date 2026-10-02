@@ -97,6 +97,8 @@ export type WorkflowStepSpec = {
   slot: 'none' | null;
   /** The agent attached to the step (`agent:`), in agents/ beside the folder: the rest of the keys are resolved with it. Null for none. */
   agent: string | null;
+  /** The skills the step adds to its agent's (`skills:`): empty where it adds none. */
+  skills: string[];
   /** Claude Code's permission mode (`permissionMode:`): null on codex, whose fence is `sandbox`. */
   permissionMode: string | null;
   /**
@@ -144,6 +146,7 @@ export const StepKeySchema = Schema.Literals([
   'workspace',
   'slot',
   'agent',
+  'skills',
   'harness',
   'model',
   'effort',
@@ -179,6 +182,7 @@ export const WorkflowStepSpecSchema = Schema.Struct({
   workspace: Schema.NullOr(Schema.Literals(['main', 'folder'])),
   slot: Schema.NullOr(Schema.Literal('none')),
   agent: Schema.NullOr(Schema.String),
+  skills: Strings,
   permissionMode: Schema.NullOr(Schema.String),
   sandbox: Schema.NullOr(Schema.String),
   tools: Schema.NullOr(Strings),

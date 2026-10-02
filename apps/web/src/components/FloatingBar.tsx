@@ -1,14 +1,18 @@
 /**
  * The frame's floating bar: a panel at the right of every page, below the header, over the page, so the page keeps its whole width. It is
  * as wide as this browser keeps it (`useBarWidth`), resized by dragging its left edge or with the arrow keys on it, and the whole width of
- * a narrow screen. Its Close button and Escape close it (`useBar`), and closing it gives the focus back to what held it before.
+ * a narrow screen. Its Close button and Escape close it (`useBar`), and closing it gives the focus back to what held it before. Beside
+ * Close, its Open button visits the page of what it shows, for everything that has one (`barOpens`).
  */
 import { useEffect, useId, useLayoutEffect, useRef, type KeyboardEvent, type PointerEvent, type ReactNode, type RefObject } from 'react';
 import { XIcon } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Button, LinkButton } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { BAR_MIN, BAR_STEP, escapeDoes } from '@/lib/bar';
+import { BAR_MIN, BAR_STEP, barOpens, barValue, escapeDoes } from '@/lib/bar';
 import { useBar, useBarWidth } from '@/lib/useBar';
+import { routeLink } from './routeLink';
+
+const RouterLinkButton = routeLink(LinkButton);
 
 /** The text of `target` when it is a field a person types in, else null. */
 function fieldTextOf(target: EventTarget | null): string | null {
@@ -45,15 +49,21 @@ function useEscape(bar: RefObject<HTMLElement | null>, close: () => void) {
 }
 
 /**
- * Gives `bar` the focus as it opens, and as it closes gives it back to what held it before, while that is still on the page and the focus
- * is still in the bar or on nothing: not when a link to another page or a press on the page took it.
+ * Gives `bar` the focus as it opens, and as it closes gives it back to what held it last before it came into the bar — what opened the
+ * bar, or what the focus left for the bar since, as a step switched to from its node — while that is still on the page and the focus is
+ * still in the bar or on nothing: not when a link to another page or a press on the page took it.
  */
 function useFocusReturn(bar: RefObject<HTMLElement | null>) {
   useLayoutEffect(() => {
-    const opener = document.activeElement;
+    let opener = document.activeElement;
     const self = bar.current;
+    const enter = (event: FocusEvent) => {
+      if (event.relatedTarget instanceof HTMLElement && !self?.contains(event.relatedTarget)) opener = event.relatedTarget;
+    };
+    self?.addEventListener('focusin', enter);
     self?.focus();
     return () => {
+      self?.removeEventListener('focusin', enter);
       const now = document.activeElement;
       const held = now === null || now === document.body || (self?.contains(now) ?? false);
       if (held && opener instanceof HTMLElement && opener.isConnected) opener.focus();
@@ -98,10 +108,12 @@ function ResizeEdge({ width, most, onWidth }: { width: number; most: number; onW
 
 /**
  * The bar, titled `title`, with `description` under its title and `children` in a body that scrolls: an `aside` named by its title, which
- * takes the focus as it opens, so Tab reaches what it holds next, and gives it back as it closes (`useFocusReturn`).
+ * takes the focus as it opens, so Tab reaches what it holds next, and gives it back as it closes (`useFocusReturn`). It carries the address
+ * of what it shows (`data-bar`), and an Open button wherever that has a page (`barOpens`), so no bar can leave it out.
  */
 export function FloatingBar({ title, description, children }: { title: ReactNode; description?: ReactNode; children: ReactNode }) {
-  const { close } = useBar();
+  const { open, close } = useBar();
+  const page = open ? barOpens(open) : null;
   const [width, setWidth, most] = useBarWidth();
   const narrow = useIsMobile();
   const bar = useRef<HTMLElement>(null);
@@ -115,6 +127,7 @@ export function FloatingBar({ title, description, children }: { title: ReactNode
       aria-labelledby={heading}
       tabIndex={-1}
       data-floating-bar
+      data-bar={open ? barValue(open) : undefined}
       style={narrow ? undefined : { width }}
       className={`fixed top-12 right-0 bottom-0 z-40 flex flex-col bg-popover text-sm text-popover-foreground shadow-lg outline-none ${narrow ? 'left-0' : 'border-l'}`}
     >
@@ -126,6 +139,11 @@ export function FloatingBar({ title, description, children }: { title: ReactNode
           </h2>
           {description && <div className="text-muted-foreground">{description}</div>}
         </div>
+        {page && (
+          <RouterLinkButton {...page} variant="outline" size="sm" className="-mt-0.5 shrink-0">
+            Open
+          </RouterLinkButton>
+        )}
         <Button variant="ghost" size="icon-sm" aria-label="Close" onPress={close} className="-mt-1 -mr-1 shrink-0">
           <XIcon />
         </Button>

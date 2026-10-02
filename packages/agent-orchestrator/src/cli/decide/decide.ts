@@ -26,7 +26,6 @@ import {
   inputsNote,
   isGitRun,
   lessonLine,
-  merges,
   missingArtifacts,
   namesInOrder,
   outputLines,
@@ -38,7 +37,6 @@ import {
   runStore,
   roundDueNote,
   saidLines,
-  sendBackTo,
   sensitiveDiff,
   signoffsSpent,
   slotWord,
@@ -54,7 +52,7 @@ import {
   waitAdvice,
   waitWord,
 } from '../../runner.ts';
-import type { CheckReport, Decided, GitRun } from '../../runner.ts';
+import type { CheckReport, DecideCommand, Decided, GitRun } from '../../runner.ts';
 import { HELP, usage, type Engine } from '../flags.ts';
 
 export const DECIDE_HELP = `wf decide <runId> [--sensitive <globs>]
@@ -152,7 +150,7 @@ export async function decideVerb(rest: string[], e: Engine): Promise<void> {
   printTotals(decided);
   if (git) printBranches(git, decision.branches);
   printStanding(decided, decision, git);
-  printChoice(decided, decision, steps, git);
+  printChoice(decided, steps);
 }
 
 /** The decision of a run waiting on a person: the one that has a deciding screen. */
@@ -432,27 +430,37 @@ function printStanding({ run, standings }: Decided, decision: Awaiting, git: Git
   }
 }
 
-/** What is left to decide: the gated step to approve or send back, `wf rm` for a folder run, or the git commands to ship or drop. */
-function printChoice({ run, toDecide }: Decided, decision: Awaiting, steps: Steps, git: GitRun | undefined): void {
-  if (toDecide?.kind === 'approve') return printApprove(run, toDecide, steps);
-  if (!git) return console.log(`\n  done with it   wf rm ${run.id}  — forgets the run with its folders and files`);
-  const first = decision.branches[0];
-  if (first && !merges(steps) && !decision.direct) {
-    console.log(`\n  ship it   git -C ${git.repo} merge --no-ff ${first}`);
-    console.log(`  drop it   git -C ${git.repo} branch -D ${decision.branches.join(' ')}`);
+/**
+ * What is left to decide, as the run's commands say it (`Decided.commands`): the gated step to approve or send back, `wf rm` for a folder
+ * run, or the git commands to ship or drop.
+ */
+function printChoice({ toDecide, commands }: Decided, steps: Steps): void {
+  if (toDecide?.kind === 'approve') return printApprove(toDecide, steps, commands);
+  const said = (label: DecideCommand['label']) => commands.find((c) => c.label === label);
+  const forget = said('forget it');
+  if (forget) return console.log(`\n  done with it   ${forget.command}  — ${forget.said}`);
+  const [ship, drop] = [said('ship it'), said('drop it')];
+  if (ship && drop) {
+    console.log(`\n  ship it   ${ship.command}`);
+    console.log(`  drop it   ${drop.command}`);
   }
 }
 
 /**
  * The step at its gate: that it signed off, or that it is the ending not yet run, with the first paragraph of its own note (`ownNote`)
- * where it has one; then approve and send back.
+ * where it has one; then its approval and the send-backs after it, as the run's commands say them.
  */
-function printApprove(run: Decided['run'], toDecide: Extract<Decided['toDecide'], { kind: 'approve' }>, steps: Steps): void {
+function printApprove(toDecide: Extract<Decided['toDecide'], { kind: 'approve' }>, steps: Steps, commands: readonly DecideCommand[]): void {
   const step = steps.find((s) => s.name === toDecide.step)!;
   const unrun = ` has not run: this workflow's ending, and your approval is what runs it${toDecide.says === null ? '' : ':'}`;
   console.log(`\n  to decide  ${step.name}${toDecide.filed ? ' has signed off and waits for your word:' : unrun}`);
   const [paragraph] = toDecide.says === null ? [] : ownNote(step).split(/\n[ \t]*\n/);
   for (const line of paragraph?.split('\n') ?? []) console.log(`    ${line}`);
-  console.log(`\n  approve it    wf approve ${run.id} ${step.name} [--message "<words>"]`);
-  for (const back of sendBackTo(step, run)) console.log(`  send it back  wf retry ${run.id} ${back} --message "<objection>"`);
+  const at = commands.findIndex((c) => c.label === 'approve' && c.command.endsWith(` ${step.name}`));
+  if (at < 0) return;
+  console.log(`\n  approve it    ${commands[at].command} [--message "<words>"]`);
+  for (const back of commands.slice(at + 1)) {
+    if (back.label !== 'send back' || back.said !== null) break;
+    console.log(`  send it back  ${back.command}`);
+  }
 }

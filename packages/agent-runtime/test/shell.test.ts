@@ -16,6 +16,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
+import { seenFor } from './sighting.ts';
 
 const tmp = (label: string) => scratch(`ae-shell-${label}-`);
 
@@ -117,7 +118,8 @@ const closingTurn = (id: string, payload: object) => [
 test('a session held busy by a background shell, its closeout the last word in its transcript, is read as quiet: its closeout is recorded, the task settles, and the session is let go', async () => {
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
-    const engine = promiseEngine(Engine.layer({ root: tmp('root') }));
+    const root = tmp('root');
+    const engine = promiseEngine(Engine.layer({ root }));
     const id = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: SCHEMA });
     await engine.tick();
     const [row] = claude.rows();
@@ -125,6 +127,7 @@ test('a session held busy by a background shell, its closeout the last word in i
     const began = await begun(engine, id);
 
     wrote(row.sessionId, began + 1, 10 * MINUTES, prompt('the prompt'), ...closingTurn('msg_1', { outcome: 'done' }));
+    await seenFor(root, row.name, row.sessionId, 10 * MINUTES);
     claude.set(row.name, { startedAt: began - 20 * MINUTES });
     await engine.tick();
 
@@ -163,13 +166,15 @@ test('a session held busy whose transcript is still advancing is left alone — 
 test('a session held busy that gave no closeout is left where it was: the existing rule takes it once the registry lists it idle', async () => {
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
-    const engine = promiseEngine(Engine.layer({ root: tmp('root') }));
+    const root = tmp('root');
+    const engine = promiseEngine(Engine.layer({ root }));
     const id = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: SCHEMA });
     await engine.tick();
     const [row] = claude.rows();
     const began = await begun(engine, id);
 
     wrote(row.sessionId, began + 1, 10 * MINUTES, prompt('the prompt'), says('msg_1', 'I have finished.'));
+    await seenFor(root, row.name, row.sessionId, 10 * MINUTES);
     claude.set(row.name, { startedAt: began - 20 * MINUTES });
     await engine.tick();
     assert.equal((await engine.view(id)).state.attempts[0]?.ended, null, 'a busy session with nothing said is not quiet');

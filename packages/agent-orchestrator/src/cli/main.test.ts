@@ -111,7 +111,8 @@ const typed = async (t: TestContext, e: Engine, ...argv: string[]) => {
 
 test('the verbs the help names are the verbs main runs, and no other', () => {
   const named = [...HELP.matchAll(/^ {2}wf (\w+)/gm)].map((m) => m[1]);
-  assert.deepEqual([...new Set(named)].sort(), [...VERBS.keys(), ...COMMANDS.map((c) => c.name)].sort());
+  const served = COMMANDS.filter((c) => c.only?.side !== 'api').map((c) => c.name);
+  assert.deepEqual([...new Set(named)].sort(), [...VERBS.keys(), ...served].sort());
 });
 
 test('the help, once and alone, for no verb, a verb it does not know, and a name every object has', async (t) => {

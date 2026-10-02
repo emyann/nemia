@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { fed, photograph, sidebar, themeOf } from '../board.ts';
+import { fed, photograph, sidebar, themeOf, stepBar } from '../board.ts';
 import { expectCount, expectDrawn, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { png } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -232,7 +232,7 @@ function writeRun(root: string): string[] {
  */
 async function outputOf(page: Page, step: string) {
   await page.locator(`section[aria-label="The run's steps as a graph"] .react-flow__node[data-id="${step}"]`).dispatchEvent('click');
-  const inspector = page.locator(`aside[aria-label="Step ${step}"]`);
+  const inspector = stepBar(page, OUTCOME.id, step);
   await inspector.getByRole('tab', { name: 'Output' }).click();
   return inspector;
 }
@@ -243,13 +243,15 @@ async function photographInspector(page: Page, inspector: ReturnType<Page['locat
   const theme = await themeOf(page);
   await photograph(inspector, path.join(OUT, `outcome-${name}-${theme}.png`));
   await inspector.evaluate((aside) => {
-    aside.style.height = 'auto';
+    aside.style.position = 'absolute';
+    aside.style.bottom = 'auto';
     for (const child of Array.from(aside.querySelectorAll<HTMLElement>('*')))
       if (getComputedStyle(child).overflowY === 'auto') child.style.overflow = 'visible';
   });
   await photograph(inspector, path.join(OUT, `outcome-${name}-whole-${theme}.png`));
   await inspector.evaluate((aside) => {
-    aside.style.height = '';
+    aside.style.position = '';
+    aside.style.bottom = '';
     for (const child of Array.from(aside.querySelectorAll<HTMLElement>('*'))) child.style.overflow = '';
   });
 }

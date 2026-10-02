@@ -10,8 +10,8 @@ import { runGone, runQuery, type RunDetail, type Said } from '@/lib/api';
 import { titleOf } from '@/lib/factory';
 import { mergeSaid, sayable } from '@/lib/say';
 import { isGate, stepState } from '@/lib/status';
-import { foldTranscript, heardIn, withSaid } from '@/lib/transcript';
-import { useStepTranscript } from '@/lib/useStepTranscript';
+import { foldTranscript, heardIn, sessionToRead, withSaid, type Turn } from '@/lib/transcript';
+import { useStepTranscript, type Following } from '@/lib/useStepTranscript';
 
 /**
  * The page of a step's session, at /runs/$runId/steps/$step: `$runId_` draws it on its own, not inside the run's page, which has no outlet
@@ -75,15 +75,13 @@ function SessionPage() {
  */
 function Session({ run, step }: { run: RunDetail; step: Step }) {
   const cancelled = run.cancelledAt !== null;
-  const following = useStepTranscript(run.id, step.name, step.taskId, isGate(stepState(step.status, cancelled, false), cancelled));
+  const following = useStepTranscript(run.id, step.name, sessionToRead(step), isGate(stepState(step.status, cancelled, false), cancelled));
   const [sent, setSent] = useState<{ taskId: string | null; said: Said[] }>({ taskId: step.taskId, said: [] });
   const said = useMemo(() => mergeSaid(step.said, sent.taskId === step.taskId ? sent.said : []), [step.said, step.taskId, sent]);
   const turns = useMemo(() => {
     const heard = heardIn(following.events, said);
     return withSaid(foldTranscript(heard.events), heard.said);
   }, [following.events, said]);
-  const quiet = (text: string) => <p className="p-6 text-sm text-muted-foreground">{text}</p>;
-
   return (
     <div className="flex h-[calc(100svh-3rem)] min-h-96 flex-col">
       <header aria-label="The step" className="shrink-0 space-y-1 border-b px-4 py-3">
@@ -103,18 +101,7 @@ function Session({ run, step }: { run: RunDetail; step: Step }) {
       </header>
       <DebugPanel run={run} step={step} />
       <div className="flex min-h-0 flex-1 flex-col">
-        {!step.taskId ? (
-          quiet('Not filed yet, so there is no session to show.')
-        ) : following.loading ? (
-          quiet('Reading the conversation…')
-        ) : turns.length ? (
-          <Conversation turns={turns} live={following.live} className="min-h-0 flex-1" />
-        ) : (
-          !following.error &&
-          quiet(
-            following.live ? 'Nothing said yet. The page follows the session as it goes.' : 'Its session said nothing the engine can read.',
-          )
-        )}
+        <SessionBody step={step} following={following} turns={turns} />
       </div>
       <PromptBox
         runId={run.id}
@@ -125,6 +112,24 @@ function Session({ run, step }: { run: RunDetail; step: Step }) {
         }
       />
     </div>
+  );
+}
+
+/** A quiet line in the session's place: why there is no conversation to draw, or that it is being read. */
+const quiet = (text: string) => <p className="p-6 text-sm text-muted-foreground">{text}</p>;
+
+/**
+ * The session's conversation, `turns` folded off what `following` read: or why there is none — the step not filed, no session of its
+ * task started (`sessionToRead`), its conversation still being read, or nothing in it the engine can read.
+ */
+function SessionBody({ step, following, turns }: { step: Step; following: Following; turns: Turn[] }) {
+  if (!step.taskId) return quiet('Not filed yet, so there is no session to show.');
+  if (!sessionToRead(step)) return quiet('No session of it has started yet, so there is no conversation to show.');
+  if (following.loading) return quiet('Reading the conversation…');
+  if (turns.length) return <Conversation turns={turns} live={following.live} className="min-h-0 flex-1" />;
+  if (following.error) return null;
+  return quiet(
+    following.live ? 'Nothing said yet. The page follows the session as it goes.' : 'Its session said nothing the engine can read.',
   );
 }
 

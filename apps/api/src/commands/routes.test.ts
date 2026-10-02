@@ -1,7 +1,7 @@
 /**
  * The routes generated from the package's command table: a command asked on its route writes what the same entry writes asked as `wf`
  * parses it, every route that writes is guarded, a key another command takes on the api alone is refused, and the table asks the api for
- * nothing it lacks — words for each routed command, and an extension for each key a command takes on the api alone.
+ * nothing it lacks — words for each routed command, and an extension for each key a command takes on the api alone — and serves each route.
  *
  * At shipped defaults: the api's own engine over the harness's scratch store (`root`), which this file seeds.
  */
@@ -195,6 +195,14 @@ test('REFUSED at shipped defaults: `answers` sent to an approval, which takes no
 test('the table asks the api for nothing it lacks: words for each routed command, an extension for each key taken on the api alone', () => {
   assert.deepEqual(wordBreaks(COMMANDS), []);
   assert.deepEqual(extensionBreaks(COMMANDS), []);
+});
+
+test('every command the table routes is served by the api on its method and path: the posts the table generates, and the reads the api answers', () => {
+  const served = new Set(app.routes.map((r) => `${r.method} ${r.path}`));
+  assert.deepEqual(
+    COMMANDS.filter((c) => c.route && !served.has(`${c.route.method} ${c.route.path}`)).map((c) => c.name),
+    [],
+  );
 });
 
 test('REFUSED: a routed command the api has no words for, and a key taken on the api alone that no extension folds', () => {

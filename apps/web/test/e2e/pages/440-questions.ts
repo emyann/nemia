@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { fed, photograph, sidebar, themeOf } from '../board.ts';
+import { fed, photograph, sidebar, themeOf, stepBar } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
@@ -190,7 +190,7 @@ export default {
       const theme = await themeOf(page);
 
       await page.locator(`section[aria-label="The run's steps as a graph"] .react-flow__node[data-id="design"]`).dispatchEvent('click');
-      const inspector = page.locator('aside[aria-label="Step design"]');
+      const inspector = stepBar(page, id, 'design');
       await inspector.getByRole('tab', { name: 'Output' }).click();
       const asked = inspector.locator('section[data-questions="open"]');
       await expectVisible(asked.locator(`li[data-question="${done.title}"]`), "design's question is drawn under its field, read-only");

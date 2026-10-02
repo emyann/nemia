@@ -309,15 +309,20 @@ const count = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ?
  * What an attempt consumed, for a person — and when its runner measured nothing, saying so. A zero
  * would read as "cost nothing"; the truth is "nobody counted".
  */
-export const usageLine = (u: Usage | null): string => {
-  if (!u) return 'usage not measured';
+export const usageLine = (u: Usage | null): string => (u ? `${countsLine(u)} · ${costLine(u)}${readLine(u)}` : 'usage not measured');
+
+/** What an attempt has consumed so far, for a person, with no cost: a long-lived attempt's is written only at its end. */
+const runningLine = (u: Usage): string => `${countsLine(u)}${readLine(u)}`;
+
+/** An attempt's turns, tool calls and tokens, for a person, each one its runner could not see named not measured. */
+const countsLine = (u: Usage): string => {
   const tokens =
     u.inputTokens !== undefined && u.outputTokens !== undefined
       ? ` · ${count(u.inputTokens)} in · ${count(u.outputTokens)} out`
       : ' · tokens not measured';
   const turns = u.turns !== undefined ? `${u.turns} turns` : 'turns not measured';
   const calls = u.toolCalls !== undefined ? `${u.toolCalls} tool calls` : 'tool calls not measured';
-  return `${turns} · ${calls}${tokens} · ${costLine(u)}${readLine(u)}`;
+  return `${turns} · ${calls}${tokens}`;
 };
 
 /**
@@ -387,7 +392,8 @@ export const attemptLine = (a: Attempt): string => {
 /**
  * One task, for `ae ls`: `queued` while it waits for `ae admit`, and its latest attempt's cost beside its turns
  * — `$3.01 · 12t`, or `cost not measured` — once it has an attempt. An attempt still running has none yet: Claude
- * Code writes a session's cost as its process exits. A task held open and answered says which turn it is on — `turn 1`.
+ * Code writes a session's cost as its process exits. A long-lived attempt's turns are those journalled as it grows, its
+ * cost the one recorded at its end. A task held open and answered says which turn it is on — `turn 1`.
  */
 export const taskLine = (v: TaskView) => {
   const turn = v.state.inputs.length;
@@ -405,6 +411,7 @@ const KINDS: Record<string, string> = {
   spawned: 'started',
   ended: 'ended',
   measured: 'measured',
+  counted: 'counted',
   settled: 'SETTLED',
   'stop-requested': 'stop asked',
   said: 'said',
@@ -413,25 +420,25 @@ const KINDS: Record<string, string> = {
   admitted: 'admitted',
 };
 
+/** What follows each kind of journal entry's word, for a person; nothing for a kind not named. */
+const EXTRAS: { [K in Event['kind']]?: (event: Extract<Event, { kind: K }>) => string } = {
+  settled: (e) => `  ${e.outcome}`,
+  measured: (e) => `  attempt ${e.attempt}: ${costLine(e.usage)}`,
+  counted: (e) => `  attempt ${e.attempt}: ${runningLine(e.usage)}`,
+  ended: (e) =>
+    `  ${e.observed}${e.limit ? ` (${e.limit})` : e.reason === 'harness' ? unstated(e.stated) : ` (${e.reason})`}${e.error ? `: ${e.error.split('\n')[0].slice(0, 160)}` : ''}`,
+  spawned: (e) => (e.error ? `  but the call failed: ${e.error.split('\n')[0].slice(0, 160)}` : ''),
+  said: (e) => `  to attempt ${e.attempt}: ${e.text.trim().split('\n')[0].slice(0, 160)}`,
+  input: (e) =>
+    `  ${e.text.trim().split('\n')[0].slice(0, 160)}${e.config?.budgetUsd !== undefined ? `  (budget $${e.config.budgetUsd})` : ''}`,
+};
+
 /**
  * One journal entry, for a person. Shared by `feed`, `show` and `watch` so the same event does not
  * read three different ways depending on which verb printed it.
  */
 export const entryLine = (taskId: string, event: Event) => {
-  const extra =
-    event.kind === 'settled'
-      ? `  ${event.outcome}`
-      : event.kind === 'measured'
-        ? `  attempt ${event.attempt}: ${costLine(event.usage)}`
-        : event.kind === 'ended'
-          ? `  ${event.observed}${event.limit ? ` (${event.limit})` : event.reason === 'harness' ? unstated(event.stated) : ` (${event.reason})`}${event.error ? `: ${event.error.split('\n')[0].slice(0, 160)}` : ''}`
-          : event.kind === 'spawned' && event.error
-            ? `  but the call failed: ${event.error.split('\n')[0].slice(0, 160)}`
-            : event.kind === 'said'
-              ? `  to attempt ${event.attempt}: ${event.text.trim().split('\n')[0].slice(0, 160)}`
-              : event.kind === 'input'
-                ? `  ${event.text.trim().split('\n')[0].slice(0, 160)}${event.config?.budgetUsd !== undefined ? `  (budget $${event.config.budgetUsd})` : ''}`
-                : '';
+  const extra = (EXTRAS[event.kind] as ((e: Event) => string) | undefined)?.(event) ?? '';
   return `${event.at.slice(11, 19)}  ${taskId.padEnd(34)} ${(KINDS[event.kind] ?? event.kind).padEnd(10)}${extra}`;
 };
 

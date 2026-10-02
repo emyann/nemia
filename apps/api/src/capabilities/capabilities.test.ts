@@ -252,7 +252,8 @@ test('REFUSED: a server asked, whose ask is interrupted before it answers, is st
     serverAsk(repo, { name: 'silent', command: process.execPath, args }, { command: process.execPath, args, env }, 60_000),
     { signal: stop.signal },
   );
-  for (const bound = Date.now() + 5_000; startsIn(starts).length === 0 && Date.now() < bound;) await new Promise((r) => setTimeout(r, 20));
+  for (const bound = performance.now() + 5_000; startsIn(starts).length === 0 && performance.now() < bound;)
+    await new Promise((r) => setTimeout(r, 20));
   const [pid] = startsIn(starts);
   assert.ok(pid, 'the server started');
   stop.abort();

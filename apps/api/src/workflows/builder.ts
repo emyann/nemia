@@ -70,6 +70,7 @@ const KINDS: Readonly<Record<StepKey, KeyKind>> = {
   workspace: 'choice',
   slot: 'choice',
   agent: 'choice',
+  skills: 'list',
   harness: 'choice',
   model: 'text',
   effort: 'harness-word',
@@ -93,15 +94,14 @@ const KINDS: Readonly<Record<StepKey, KeyKind>> = {
   rounds: 'count',
 };
 
+/** A flag that says either word. */
+const EITHER = ['true', 'false'] as const;
+
 /**
  * What a flag may be set to, as the parser reads it: `background:` and `remote:` say either, and `gate:` only `true`, since `false` is a
  * step without the line.
  */
-const FLAGS: Readonly<Partial<Record<StepKey, readonly string[]>>> = {
-  background: ['true', 'false'],
-  remote: ['true', 'false'],
-  gate: ['true'],
-};
+const FLAGS: Readonly<Partial<Record<StepKey, readonly string[]>>> = { background: EITHER, remote: EITHER, gate: ['true'] };
 
 /**
  * The harness a step runs on when it names none, whose words `effort` and `permissionMode` take then — and which takes no `sandbox`. The

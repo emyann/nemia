@@ -1,6 +1,9 @@
-/** What is left for a person to do about a run (`decision`), and the cost lines `wf decide` prints (`costLine`, `runCostLines`). Pure. */
+/**
+ * What is left for a person to do about a run (`decision`), the commands `wf decide` offers for it (`choicesOf`), and the cost lines it
+ * prints (`costLine`, `runCostLines`). Pure.
+ */
 import type { Workflow } from '../step/step.ts';
-import { refusedCheck, tryOf, type CloseoutAsked, type Run, type StepStatus, type TaskPhase } from '../record/record.ts';
+import { isGitRun, refusedCheck, tryOf, type CloseoutAsked, type Run, type StepStatus, type TaskPhase } from '../record/record.ts';
 import type { Closeout } from '../closeout/closeout.ts';
 import type { Verdict } from '../check/check.ts';
 import type { RetryAsk } from '../retry/index.ts';
@@ -19,11 +22,13 @@ import {
   budgetWord,
   dollars,
   readWords,
+  sendBackTo,
   type Consumed,
 } from '../status/status.ts';
 import type { CheckoutHold } from '../cap/cap.ts';
 import { assess } from '../tick/assess.ts';
 import { resultSteps } from '../branches/branches.ts';
+import { merges } from '../ending/ending.ts';
 
 /**
  * What is left for a person to do about this run.
@@ -275,5 +280,74 @@ export function runCostLines(run: Run, spendOf: SpendOf): string[] {
   if (!spent.measured) return ['cost  run not measured'];
   return [
     `cost  run ${dollars(spent.usd)}${spent.unmeasured ? ` measured · ${spent.unmeasured} attempt${spent.unmeasured > 1 ? 's' : ''} not measured` : ''}`,
+  ];
+}
+
+/**
+ * A verb `wf decide` offers a person for one step (`retryOffers`, `roundOffers`): the sentence it prints, and the bare command that
+ * sentence ends on — `wf retry <run> <step>`, with `--recheck`, `--fresh`, `--budget <amount>` or `--message "<objection>"`; `wf round
+ * <run> <step>`, with `--budget <amount>` past a cap; or `wf accept <run> <step> --message "<why>"`.
+ */
+export type Offer = { step: string; command: string; said: string };
+
+/**
+ * A command `wf decide` offers, and runs none of: ship it, drop it, read it for a run worked on its base branch, forget it for a folder
+ * run, each once-more (`wf retry`, `wf round`) and accept with the line it prints it in, and for a step waiting at its gate on you, the
+ * approval (`wf approve`) and a send-back (`wf retry --message`) for each step it names. `said` is null where the label is all it says.
+ */
+export type DecideCommand = {
+  label: 'ship it' | 'drop it' | 'read it' | 'once more' | 'accept' | 'approve' | 'send back' | 'forget it';
+  command: string;
+  said: string | null;
+};
+
+/** The label of an offer's command: an acceptance, a send-back with its objection, or once more. */
+const labelOf = (command: string): DecideCommand['label'] =>
+  command.startsWith('wf accept ') ? 'accept' : command.endsWith('--message "<objection>"') ? 'send back' : 'once more';
+
+/** For each step waiting at its gate on you (`awaitingApproval`), its approval and a send-back for each step it names (`sendBackTo`). */
+function gateChoices(steps: readonly Workflow[], run: Run, waiting: readonly string[]): DecideCommand[] {
+  return steps
+    .filter((s) => waiting.includes(s.name))
+    .flatMap((step): DecideCommand[] => {
+      const approve = `wf approve ${run.id} ${step.name}`;
+      return [
+        { label: 'approve', command: approve, said: `${step.name} waits at its gate — with words: ${approve} --message "<words>"` },
+        ...sendBackTo(step, run).map((name): DecideCommand => ({
+          label: 'send back',
+          command: `wf retry ${run.id} ${name} --message "<objection>"`,
+          said: null,
+        })),
+      ];
+    });
+}
+
+/**
+ * The commands `wf decide` offers on a run awaiting a person (`Decision`), none on any other: once more, accept or a send-back for each
+ * offer (`offers`, round's then retry's), the approval and its send-backs for each step waiting at its gate on you, then ship it and drop
+ * it for the branches, or read it for a run worked on its base branch, which has nothing to merge nor a branch to delete. A folder run has
+ * none of those: forgetting it (`wf rm`) is its one command, and nothing about git. A workflow whose step acts on the base branch itself
+ * (`merges`) is offered no ship it nor drop it: its ending step is what merges, one approval away.
+ *
+ * Every command is a bare `wf` or `git -C` line, never a sentence: an offer's is the one it was made with.
+ */
+export function choicesOf(steps: readonly Workflow[], run: Run, d: Decision, offers: readonly Offer[]): DecideCommand[] {
+  if (d.kind !== 'awaiting') return [];
+  const once = [
+    ...offers.map(({ command, said }): DecideCommand => ({ label: labelOf(command), command, said })),
+    ...gateChoices(steps, run, d.awaitingApproval),
+  ];
+  if (!isGitRun(run))
+    return [...once, { label: 'forget it', command: `wf rm ${run.id}`, said: 'forgets the run with its folders and files' }];
+  if (d.direct) {
+    const said = `worked directly on ${run.branch}; nothing to merge; the base was ${run.baseRef}`;
+    return [...once, { label: 'read it', command: `git -C ${run.repo} diff ${run.baseRef}...${run.branch}`, said }];
+  }
+  const first = merges(steps) ? undefined : d.branches[0];
+  if (!first) return once;
+  return [
+    ...once,
+    { label: 'ship it', command: `git -C ${run.repo} merge --no-ff ${first}`, said: null },
+    { label: 'drop it', command: `git -C ${run.repo} branch -D ${d.branches.join(' ')}`, said: null },
   ];
 }

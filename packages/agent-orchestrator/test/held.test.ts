@@ -392,11 +392,14 @@ test("an answer's turn that was LOST settles its task failed, and a `wf retry --
   await h.pass(h.run.id);
   assert.equal(h.spawned.at(-1)!.name, h.turn);
   h.sessions.delete(h.turn);
+  const read = process.hrtime.bigint.bind(process.hrtime);
   mock.timers.enable({ apis: ['Date'], now: Date.now() + 10 * 60_000 });
+  const later = mock.method(process.hrtime, 'bigint', () => read() + 10n * 60_000_000_000n);
   try {
     await h.pass(h.run.id);
   } finally {
     mock.timers.reset();
+    later.mock.restore();
   }
   const last = (await stateOf(h.e, h.plan)).state.attempts.at(-1)!;
   assert.deepEqual(

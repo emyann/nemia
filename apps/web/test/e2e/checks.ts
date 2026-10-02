@@ -34,16 +34,16 @@ const flights = new WeakMap<Page, Flights>();
  */
 export function track(page: Page): void {
   if (flights.has(page)) return;
-  const f: Flights = { open: new Set(), last: Date.now() };
+  const f: Flights = { open: new Set(), last: performance.now() };
   let uncommittedNavigation: Request | undefined;
   page.on('request', (request) => {
     if (request.isNavigationRequest() && request.frame() === page.mainFrame()) uncommittedNavigation = request;
     if (isFeedStream(request)) return;
     f.open.add(request);
-    f.last = Date.now();
+    f.last = performance.now();
   });
   const done = (request: Request) => {
-    if (f.open.delete(request)) f.last = Date.now();
+    if (f.open.delete(request)) f.last = performance.now();
   };
   page.on('requestfinished', done);
   page.on('requestfailed', done);
@@ -51,7 +51,7 @@ export function track(page: Page): void {
     if (frame !== page.mainFrame() || uncommittedNavigation === undefined) return;
     for (const request of f.open) if (request !== uncommittedNavigation) f.open.delete(request);
     uncommittedNavigation = undefined;
-    f.last = Date.now();
+    f.last = performance.now();
   });
   flights.set(page, f);
 }
@@ -68,10 +68,10 @@ export const QUIET_MS = 500;
 export async function idle(page: Page, timeout = 30_000): Promise<void> {
   track(page);
   const f = flights.get(page)!;
-  const from = Date.now();
+  const from = performance.now();
   const end = from + timeout;
-  while (f.open.size || Date.now() - Math.max(f.last, from) < QUIET_MS) {
-    if (Date.now() >= end) {
+  while (f.open.size || performance.now() - Math.max(f.last, from) < QUIET_MS) {
+    if (performance.now() >= end) {
       const open = [...f.open].map((r) => `${r.method()} ${r.url()}`);
       throw new Refused(
         `the network idles — ${open.length ? `still in flight after ${timeout} ms: ${open.join(', ')}` : `never quiet for ${QUIET_MS} ms in ${timeout} ms`}`,
@@ -135,12 +135,12 @@ export async function expectVisible(locator: Locator, assertion: string, timeout
  * `expectVisible` alone passes an image whose request failed.
  */
 export async function expectDrawn(image: Locator, assertion: string, timeout = WAIT_MS): Promise<void> {
-  const until = Date.now() + timeout;
+  const until = performance.now() + timeout;
   await expectVisible(image, assertion, timeout);
   const drawn = () =>
     image.first().evaluate((element) => element instanceof HTMLImageElement && element.complete && element.naturalWidth > 0);
   let ok = await drawn();
-  while (!ok && Date.now() < until) {
+  while (!ok && performance.now() < until) {
     await new Promise((resolve) => setTimeout(resolve, 100));
     ok = await drawn();
   }
@@ -149,9 +149,9 @@ export async function expectDrawn(image: Locator, assertion: string, timeout = W
 
 /** As many elements match as `count`, within `timeout`. */
 export async function expectCount(locator: Locator, count: number, assertion: string, timeout = WAIT_MS): Promise<void> {
-  const until = Date.now() + timeout;
+  const until = performance.now() + timeout;
   let found = await locator.count();
-  while (found !== count && Date.now() < until) {
+  while (found !== count && performance.now() < until) {
     await new Promise((resolve) => setTimeout(resolve, 100));
     found = await locator.count();
   }
@@ -198,9 +198,9 @@ export async function expectInside(elements: Locator, frame: Locator, assertion:
 export async function settled(page: Page, timeout = 3_000): Promise<void> {
   const transforms = () =>
     page.locator('.react-flow__viewport').evaluateAll((viewports) => viewports.map((v) => (v as HTMLElement).style.transform).join(' | '));
-  const until = Date.now() + timeout;
+  const until = performance.now() + timeout;
   let last = await transforms();
-  for (let still = 0; still < 3 && Date.now() < until;) {
+  for (let still = 0; still < 3 && performance.now() < until;) {
     await new Promise((resolve) => setTimeout(resolve, 100));
     const now = await transforms();
     still = now === last ? still + 1 : 0;
@@ -266,9 +266,9 @@ export async function expectApart(these: Locator, those: Locator, assertion: str
     );
     return over.length ? `${over.join(', ')} overlap` : null;
   };
-  const until = Date.now() + timeout;
+  const until = performance.now() + timeout;
   let found = await problem();
-  while (found && Date.now() < until) {
+  while (found && performance.now() < until) {
     await new Promise((resolve) => setTimeout(resolve, 100));
     found = await problem();
   }
@@ -303,9 +303,9 @@ export async function expectUncut(elements: Locator, assertion: string, timeout 
  * moved it.
  */
 async function until(problem: () => Promise<string | null>, assertion: string, timeout: number): Promise<void> {
-  const end = Date.now() + timeout;
+  const end = performance.now() + timeout;
   let found = await problem();
-  while (found && Date.now() < end) {
+  while (found && performance.now() < end) {
     await new Promise((resolve) => setTimeout(resolve, 100));
     found = await problem();
   }

@@ -58,6 +58,9 @@ export function fed(run: string, ...said: [string] | [string, string]): void {
 /** When the run DIAMOND calls off was cancelled, as `wf cancel` wrote it beside its record. */
 export const cancelledAt = (): string => fs.readFileSync(path.join(store!, 'runs', `${DIAMOND.cancelled.id}.cancelled`), 'utf8').trim();
 
+/** The frame's floating bar while it shows the step `step` of the run `run`, found by the address it carries (`data-bar`). */
+export const stepBar = (page: Page, run: string, step: string): Locator => page.locator(`aside[data-bar="step:${run}/${step}"]`);
+
 /** The theme a page is in, as its browser prefers it: what names a photograph taken beside the visit's own. */
 export const themeOf = (page: Page): Promise<string> =>
   page.evaluate(() => (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));

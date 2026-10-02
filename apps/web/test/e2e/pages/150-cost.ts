@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { photograph, sidebar, themeOf } from '../board.ts';
+import { photograph, sidebar, themeOf, stepBar } from '../board.ts';
 import { expectCount, expectInside, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { COSTLY } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -254,7 +254,7 @@ export default {
     }
 
     await node(over.step).click();
-    const inspector = page.locator(`aside[aria-label="Step ${over.step}"]`);
+    const inspector = stepBar(page, COSTLY.id, over.step);
     await inspector.getByRole('tab', { name: 'Details' }).click();
     await expectVisible(
       inspector.locator('[data-spent="over"]', { hasText: over.of }),

@@ -261,9 +261,10 @@ const costStateOf = (line: Line<'cost-state'>): CostState => ({
 });
 
 /**
- * How far before the session's start in the registry a `cost-state`'s `startTime` may be and still be the count this
- * session began. Claude Code starts counting a moment before or after it registers the session — well under a second
- * either way — and a count carried on from an earlier process of the session began minutes before.
+ * How far a `cost-state`'s `startTime` may be before the attempt's start, or after its first line, and still be the count this
+ * attempt began. Claude Code starts counting a moment before or after it registers the session, and before its first line —
+ * however late the process started — a count carried on from an earlier process of the session began minutes before, and a
+ * process Claude Code respawned a long-lived attempt in starts a count of its own, ten seconds or more after that first line.
  */
 const COST_START_SLACK_MS = 5_000;
 
@@ -278,13 +279,16 @@ const COST_START_SLACK_MS = 5_000;
  * session's total, so an attempt's cost is its own, as its tokens are, and as a resumed `claude -p` reports its own.
  *
  * Absent, never 0: while no line has been written since the attempt began (its process has not exited); when the count
- * was carried on from a total this transcript does not show; and, for `costUsd`, when the harness could not price a
+ * was carried on from a total this transcript does not show; when the count began after the attempt's first line — a process Claude
+ * Code respawned the attempt in counts its own turns alone, and its predecessor, killed, wrote none — so a cost too low is
+ * never read as the attempt's; and, for `costUsd`, when the harness could not price a
  * model the session used — a total too low reads as the whole cost, so none is given, and `unpricedModel` says why.
  *
- * `tokens`: its tokens too, the same way — for an attempt whose transcript cannot count them (`transcriptUsage`).
+ * `since` is when the attempt began, `begunAt` when its first line was written; `tokens`: its tokens too, the same way — for an
+ * attempt whose transcript cannot count them (`transcriptUsage`).
  */
-const costOf = (before: CostState | undefined, after: CostState | undefined, since: number, tokens = false): Usage => {
-  if (after?.startTime === undefined) return {};
+const costOf = ({ before, after, begunAt }: Pick<Attempt, 'before' | 'after' | 'begunAt'>, since: number, tokens = false): Usage => {
+  if (after?.startTime === undefined || !(after.startTime <= begunAt + COST_START_SLACK_MS)) return {};
   const carried = after.startTime < since - COST_START_SLACK_MS;
   const base = carried && before?.startTime === after.startTime ? before : undefined;
   if (carried && !base) return {};
@@ -318,7 +322,8 @@ const costOf = (before: CostState | undefined, after: CostState | undefined, sin
  * What a session consumed, read from its transcript: the responses made at or after `since`, and what Claude Code said
  * the attempt cost (`costOf`).
  *
- * `since` is the session's own start, from the harness's registry. A resumed transcript holds its
+ * `since` is the session's own start, from the harness's registry, or a long-lived attempt's, as its journal gives it: the
+ * responses of every process Claude Code respawned it in are its own. A resumed transcript holds its
  * parent's whole conversation under the child's id, with the parent's timestamps, so counted whole
  * a continuation would report its parent's work as its own. A response is written as one line per
  * content block, each repeating its `message.id` and `usage`, so responses are counted once, by id. Tokens are given only when every
@@ -348,7 +353,8 @@ const costOf = (before: CostState | undefined, after: CostState | undefined, sin
  * that does not decode throws an `Error` naming the line, in `file` when it is given, its field and the fix: never read as nothing.
  */
 export const transcriptUsage = (jsonl: string, since: number, file?: string): Usage => {
-  const { responses, toolCalls, before, after, compactions, summarised } = attemptIn(jsonl, since, file);
+  const attempt = attemptIn(jsonl, since, file);
+  const { responses, toolCalls, compactions, summarised } = attempt;
   const counted = [...responses.values()];
   const measured = counted.filter((c) => c !== null);
   const all = measured.length === counted.length;
@@ -371,7 +377,7 @@ export const transcriptUsage = (jsonl: string, since: number, file?: string): Us
     ...(all && peak > 0 ? { peakContextTokens: peak } : {}),
     ...(first ? { firstContextTokens: first.uncached + first.write + first.read, firstCacheWriteTokens: first.write } : {}),
     ...(compacted ? { compactions } : {}),
-    ...costOf(before, after, since, compacted),
+    ...costOf(attempt, since, compacted),
   };
 };
 
@@ -386,7 +392,8 @@ const responseOf = ({ message: { usage: u } }: Line<'assistant'>): Response =>
 
 /**
  * What `transcriptUsage` reads of an attempt: its responses by id and its tool calls by id, the `cost-state` lines before and after
- * it began, whether it has begun, its compactions with the largest context one of them summarised, and the name it runs under.
+ * it began, whether it has begun and when its first line was written (`NaN` until one is), its compactions with the largest context
+ * one of them summarised, and the name it runs under.
  */
 type Attempt = {
   responses: Map<string, Response>;
@@ -394,6 +401,7 @@ type Attempt = {
   before?: CostState;
   after?: CostState;
   begun: boolean;
+  begunAt: number;
   compactions: number;
   summarised: number;
   name?: string;
@@ -401,7 +409,7 @@ type Attempt = {
 
 /** What `transcriptUsage` reads of an attempt (`Attempt`), in one pass over its transcript, from its first line to its last. */
 const attemptIn = (jsonl: string, since: number, file?: string): Attempt => {
-  const attempt: Attempt = { responses: new Map(), toolCalls: new Set(), begun: false, compactions: 0, summarised: 0 };
+  const attempt: Attempt = { responses: new Map(), toolCalls: new Set(), begun: false, begunAt: NaN, compactions: 0, summarised: 0 };
   for (const [i, text] of jsonl.split('\n').entries()) if (!took(attempt, text, since, () => lineAt(i, file))) break;
   return attempt;
 };
@@ -423,7 +431,10 @@ const took = (a: Attempt, text: string, since: number, where: () => string): boo
     a.name = named;
     return true;
   }
-  if (!a.begun && text.includes('"timestamp"')) a.begun = (writtenAt(text, where()) ?? NaN) >= since;
+  if (!a.begun && text.includes('"timestamp"')) {
+    a.begunAt = writtenAt(text, where()) ?? NaN;
+    a.begun = a.begunAt >= since;
+  }
   if (a.begun) tookSaid(a, text, since, where);
   return true;
 };

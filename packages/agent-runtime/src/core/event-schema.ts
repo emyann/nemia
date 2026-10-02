@@ -111,6 +111,9 @@ const Filed = event('filed', {
   restartPolicy: Schema.optional(Schema.Literal('Always')),
 });
 
+/** A moment on the monotonic clock, as the engine stamps an attempt's start, spawn and end, and a gap (`Monotonic`, `core/clock.ts`). */
+const MonotonicSchema = Schema.Struct({ boot: Schema.String, ms: Schema.Finite });
+
 /**
  * An end as any runtime wrote one: `budget` is the reason an older runtime's journal gives a session its harness ended at a
  * spend cap, read as `harness` with `limit: 'budget'` (`upgrade`).
@@ -129,6 +132,7 @@ const Ended = event('ended', {
   skills: Schema.optional(Schema.mutable(Schema.Array(Schema.String))),
   limit: Schema.optional(Schema.String),
   error: Schema.optional(Schema.String),
+  mono: Schema.optional(MonotonicSchema),
 });
 
 /** A person's answer: one an older runtime wrote may carry `budgetUsd` beside `config`, which `upgrade` moves under it. */
@@ -141,11 +145,17 @@ const Input = event('input', {
 /** Every event a runtime has written, in the shape it was written in. */
 export const StoredEventSchema = Schema.Union([
   Filed,
-  event('starting', { attempt: Schema.Finite, resumeFrom: Schema.optional(Schema.String), nudge: Schema.optional(Schema.String) }),
-  event('spawned', { attempt: Schema.Finite, error: Schema.optional(Schema.String) }),
+  event('starting', {
+    attempt: Schema.Finite,
+    resumeFrom: Schema.optional(Schema.String),
+    nudge: Schema.optional(Schema.String),
+    mono: Schema.optional(MonotonicSchema),
+  }),
+  event('spawned', { attempt: Schema.Finite, error: Schema.optional(Schema.String), mono: Schema.optional(MonotonicSchema) }),
   Ended,
   event('measured', { attempt: Schema.Finite, usage: UsageSchema }),
-  event('gap', { attempt: Schema.Finite }),
+  event('counted', { attempt: Schema.Finite, usage: UsageSchema }),
+  event('gap', { attempt: Schema.Finite, mono: Schema.optional(MonotonicSchema) }),
   event('process', { attempt: Schema.Finite, pid: Schema.optional(Schema.Finite) }),
   event('stop-requested', {}),
   event('said', { attempt: Schema.Finite, text: Schema.String }),

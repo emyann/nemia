@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Response } from 'playwright';
-import { fed, photograph, themeOf } from '../board.ts';
+import { fed, photograph, themeOf, stepBar } from '../board.ts';
 import { cardOf, expectClearOfEachOther, expectClearOfPanels } from '../canvas.ts';
 import { expectCount, expectOnScreen, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { GATED } from '../seed.ts';
@@ -50,18 +50,17 @@ export default {
     await expectVisible(read, `the card's gate offers Read the plan, in its answer row`);
     await expectClearOfEachOther(page);
     await read.click();
-    await page.waitForURL((url) => url.pathname === `/runs/${id}` && url.searchParams.get('step') === gated, { timeout: WAIT_MS });
-    const inspector = page.locator(`aside[aria-label="Step ${gated}"]`);
+    await page.waitForURL((url) => url.pathname === `/runs/${id}` && url.searchParams.get('bar') === `step:${id}/${gated}`, {
+      timeout: WAIT_MS,
+    });
+    const inspector = stepBar(page, id, gated);
     await expectVisible(
       inspector.getByRole('tab', { name: 'Output', selected: true }),
-      `Read the plan lands on ${gated}'s inspector, open on Output`,
+      `Read the plan lands on ${gated}'s bar, open on Output`,
     );
     await expectVisible(inspector.locator('[data-field="approach"]', { hasText: GATED.output.approach }), "with the plan's approach in it");
     await settled(page);
-    await expectOnScreen(
-      inspector,
-      `the page is scrolled to ${gated}'s inspector, below the first screen under the banners and Decide, and stays there once Decide has read its decision`,
-    );
+    await expectOnScreen(inspector, `${gated}'s bar floats in view over the run's page, whatever is above the canvas`);
     await photograph(page, path.join(OUT, `factory-mid-gate-read-${await themeOf(page)}.png`));
     await page.goto(new URL('/factories/default', page.url()).href, { waitUntil: 'load' });
     await idle(page);

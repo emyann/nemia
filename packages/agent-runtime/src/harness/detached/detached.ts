@@ -27,6 +27,8 @@ import { RunnerError, type Observation, type RunnerOps, type SpawnRequest, type 
 import { writeMcpConfig } from '../mcp.ts';
 import { readTranscript } from '../transcript.ts';
 import { countRead, countSpawn, readText } from '../../core/engine/tally.ts';
+import { instantNow } from '../../core/engine/now.ts';
+import { elapsedMs, type Instant, type Monotonic } from '../../core/clock.ts';
 import { outputIn, type SaidMemo } from './said.ts';
 
 /** Everything this engine needs to know about a harness. Add one by writing one of these. */
@@ -169,7 +171,10 @@ export type HarnessOutput = {
   skills?: string[];
 };
 
-/** How long a run file may go unbeaten before `observe` calls it dead. The worker beats every 5s. */
+/**
+ * How long a run file may go unbeaten before `observe` calls it dead. The worker beats every 5s. Measured from its `beat` on the
+ * monotonic clock when it was written in this boot, else from its `heartbeatAt` on the wall clock (`elapsedMs`).
+ */
 export const STALE_MS = 30_000;
 
 /** The worker a detached run is spawned with, `bin/ae-worker.ts`, found from this file's own folder. */
@@ -207,15 +212,21 @@ type WorkerState = 'working' | 'done' | 'failed' | 'stopped';
  */
 const WORKER_STATES: Record<WorkerState, SessionState> = { working: 'working', done: 'completed', failed: 'failed', stopped: 'canceled' };
 
+/** What of a run file its lease reads: its state, and its last beat on both clocks. */
+type Beaten = { state: string; heartbeatAt: string; beat?: Monotonic };
+
 /** A `working` run whose heartbeat has stopped is not working: `failed`. In the worker's words. */
-const leased = (run: { state: string; heartbeatAt: string }, now: number): string =>
-  run.state === 'working' && now - new Date(run.heartbeatAt).getTime() > STALE_MS ? 'failed' : run.state;
+const leased = (run: Beaten, now: Instant): string =>
+  run.state === 'working' && elapsedMs({ at: Date.parse(run.heartbeatAt), mono: run.beat }, now) > STALE_MS ? 'failed' : run.state;
 
 /** A run file's state as a sighting says it. A word no worker writes is `failed`, as a lease gone is. */
-export const detachedStateOf = (run: { state: string; heartbeatAt: string }, now: number): SessionState => {
+export const detachedStateOf = (run: Beaten, now: Instant): SessionState => {
   const word = leased(run, now);
   return Object.hasOwn(WORKER_STATES, word) ? WORKER_STATES[word as WorkerState] : 'failed';
 };
+
+/** Whether a run is over as of now: anything but `working`, a lease gone included. */
+const overNow = (run: Beaten): boolean => detachedStateOf(run, instantNow()) !== 'working';
 
 /**
  * A run file as the worker (`bin/ae-worker.ts`) and the spawn write it: what the worker writes about one session, and the
@@ -237,6 +248,8 @@ const RunFileSchema = Schema.StructWithRest(
     state: Schema.String,
     pid: Schema.Finite,
     heartbeatAt: Schema.String,
+    /** The same beat on the monotonic clock, with its boot's id; absent where the writer could not read one. */
+    beat: Schema.optional(Schema.Struct({ boot: Schema.String, ms: Schema.Finite })),
     startedAt: Schema.optional(Schema.String),
     nativeId: Schema.optional(Schema.String),
     logFile: Schema.String,
@@ -301,6 +314,12 @@ const runFileIn = (text: string): RunFile | string => {
 
 const formatter = SchemaIssue.makeFormatterStandardSchemaV1();
 
+/** The run file the spawn writes before its worker starts: `plan`, working, with no pid yet, and its first beat on both clocks. */
+const firstRunFile = (plan: object): string => {
+  const now = instantNow();
+  return JSON.stringify({ ...plan, state: 'working', pid: 0, heartbeatAt: new Date(now.at).toISOString(), beat: now.mono });
+};
+
 /**
  * What the worker is given to write on a harness's stdin: the brief's line first; then each line of the inbox from `from`
  * on — the inbox's size when the run was spawned, so a run spawned again under a name finds no words said to the one
@@ -317,7 +336,7 @@ export type RunInput = { first: string; inbox: string; from: number; closesOn: {
 const sightingOf = (
   name: string,
   run: RunFile,
-  now: number,
+  now: Instant,
   statement: Sighting['closeout'],
   output: { read: HarnessOutput } | undefined,
   usage: Usage | undefined,
@@ -417,7 +436,7 @@ const sayTo =
           throw new Error(
             `\`${name}\` has given its result and reads no more words: its input is closed. Continue its session with a new task that carries the words (\`resumeFrom\`).`,
           );
-        const state = leased(run, Date.now());
+        const state = leased(run, instantNow());
         if (state !== 'working') throw new Error(`\`${name}\` is \`${state}\`, not running: it takes no more words.`);
         const line = input.line(text);
         if (/[\r\n]/.test(line))
@@ -603,8 +622,7 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
 
   const outputs: SaidMemo = new Map();
   const outputOf = (name: string, run: RunFile): { read: HarnessOutput } | { wrong: string } | undefined =>
-    spec.readOutput &&
-    outputIn(spec.readOutput, outputs, name, { log: logFile(name), kept: saidFile(name) }, detachedStateOf(run, Date.now()) !== 'working');
+    spec.readOutput && outputIn(spec.readOutput, outputs, name, { log: logFile(name), kept: saidFile(name) }, overNow(run));
 
   const carriedBy = (all: readonly Run[], resumeFrom: string, before: number, except?: string): Carried => {
     const parent = parentOf(all, resumeFrom, before, except);
@@ -618,7 +636,7 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
       ? usage
       : lessCarried(usage, run.carried ?? carriedBy(all(), run.resumeFrom, startOf(run)));
 
-  const sightingAt = (name: string, run: RunFile, now: number, all: () => readonly Run[]): Sighting => {
+  const sightingAt = (name: string, run: RunFile, now: Instant, all: () => readonly Run[]): Sighting => {
     const output = outputOf(name, run);
     if (output && 'wrong' in output) throw new Error(`\`${name}\`'s output, ${logFile(name)}, cannot be read: ${output.wrong}`);
     return sightingOf(name, run, now, statementOf(name), output, usageOf(run, output?.read.usage, all));
@@ -682,7 +700,7 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
               : {}),
             ...(input ? { input } : {}),
           };
-          fs.writeFileSync(runFile(r.name), JSON.stringify({ ...plan, state: 'working', pid: 0, heartbeatAt: new Date().toISOString() }));
+          fs.writeFileSync(runFile(r.name), firstRunFile(plan));
 
           const child = spawn(process.execPath, [WORKER, runFile(r.name)], {
             detached: true,
@@ -698,7 +716,7 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
 
     observe: Effect.try({
       try: () => {
-        const now = Date.now();
+        const now = instantNow();
         const all = readAll();
         return new Map(all.map(({ name, run }) => [name, sightingAt(name, run, now, () => all)]));
       },
@@ -708,7 +726,7 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
     observeFor: (expected) =>
       Effect.try({
         try: (): Observation => {
-          const now = Date.now();
+          const now = instantNow();
           let listing: Run[] | undefined;
           const all = () => (listing ??= readAll());
           const seen = new Map<string, Sighting>();

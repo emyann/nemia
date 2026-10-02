@@ -19,6 +19,8 @@ export {
   outputOf,
   remoteOf,
   sessionContext,
+  SKILL_NAME,
+  skillNamesOf,
   slotOf,
   SLOTS,
   tokensOf,

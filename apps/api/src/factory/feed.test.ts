@@ -59,11 +59,11 @@ async function readUntil(
   ms = 5_000,
 ): Promise<Block[]> {
   const decoder = new TextDecoder();
-  const bound = Date.now() + ms;
+  const bound = performance.now() + ms;
   for (;;) {
     const complete = text.value.slice(0, text.value.lastIndexOf('\n\n') + 2);
     if (until(blocks(complete))) return blocks(complete);
-    const left = bound - Date.now();
+    const left = bound - performance.now();
     if (left <= 0) throw new Error(`the stream sent ${blocks(complete).length} events in ${ms} ms: ${complete}`);
     let timer: NodeJS.Timeout | undefined;
     const { done, value } = await Promise.race([
@@ -91,9 +91,9 @@ const open = async (query = '', headers: Record<string, string> = {}) => {
 const watchers = () => process.getActiveResourcesInfo().filter((name) => name === 'FSEventWrap').length;
 /** Wait until `ok` holds, under a bound of seconds: for the condition, never a length of time. */
 async function until(ok: () => boolean, what: () => string, ms = 3_000): Promise<void> {
-  const bound = Date.now() + ms;
+  const bound = performance.now() + ms;
   while (!ok()) {
-    if (Date.now() > bound) throw new Error(what());
+    if (performance.now() > bound) throw new Error(what());
     await new Promise((r) => setTimeout(r, 20));
   }
 }

@@ -20,10 +20,12 @@ import {
   waitsForInput,
   type Action,
   type Event,
+  type Now,
   type Sighting,
   type State,
   type Usage,
 } from '../domain.ts';
+import type { Monotonic } from '../clock.ts';
 import { atWorkState, phaseWordOf, type SessionState } from '../session.ts';
 import { Journal } from './journal.ts';
 import { configForTurn } from '../../harness/args.ts';
@@ -31,6 +33,8 @@ import { Runner, type ExpectedSession } from '../../harness/seam.ts';
 import { transition, type Move, type Refusal } from '../lifecycle.ts';
 import { divergence, releasableOf, TickMemo, TickMemoDiverged, type Releasable, type TickMemoState } from './memo.ts';
 import { ADMIT_INSTEAD } from './filing.ts';
+import { countedFacts } from './counted.ts';
+import { instantNow } from './now.ts';
 
 /**
  * The lifecycle `step` moves a task by: the shipped one (`lifecycle.ts`) unless a test provides another, which is how a
@@ -40,6 +44,26 @@ export const Lifecycle = Context.Reference<Move>('engine/Lifecycle', { defaultVa
 
 /** How long a spawned session may go unregistered by the harness before we call it gone. */
 export const GRACE_MS = 30_000;
+
+/** The clock `decide` is handed for one task: now, on the wall clock and the monotonic one, with the grace and the unread names. */
+const nowFor = (unread: ReadonlySet<string>): Now => {
+  const now = instantNow();
+  return { at: new Date(now.at), ...(now.mono ? { mono: now.mono } : {}), graceMs: GRACE_MS, unread };
+};
+
+/** When an entry is journalled: its `at`, and the same moment on the monotonic clock where there is one (a start, spawn, end or gap). */
+const stamped = (): { at: string; mono?: Monotonic } => {
+  const now = instantNow();
+  return { at: new Date(now.at).toISOString(), ...(now.mono ? { mono: now.mono } : {}) };
+};
+
+/** The `spawned` entry of `attempt`, stamped now, with the error its spawn call returned when it returned one. */
+const spawnedEntry = (attempt: number, error: string | undefined): Event => ({
+  kind: 'spawned',
+  ...stamped(),
+  attempt,
+  ...(error !== undefined ? { error } : {}),
+});
 
 /**
  * A live session is one the engine is still waiting on: at work or waiting on a person. `completed`, `failed`, `rejected` and `canceled`
@@ -221,7 +245,7 @@ const stepOn = Effect.fn('stepOn')(function* (taskId: string, observed: Readonly
   const move = yield* Lifecycle;
 
   const state = yield* notedFold(taskId, observed);
-  const action = decide(state, closedOut(state, observed), { at: new Date(), graceMs: GRACE_MS, unread }, move);
+  const action = decide(state, closedOut(state, observed), nowFor(unread), move);
   const at = () => new Date().toISOString();
 
   switch (action.do) {
@@ -231,7 +255,7 @@ const stepOn = Effect.fn('stepOn')(function* (taskId: string, observed: Readonly
     case 'start':
       yield* journal.append(taskId, {
         kind: 'starting',
-        at: at(),
+        ...stamped(),
         attempt: action.attempt,
         resumeFrom: action.resumeFrom,
         nudge: action.nudge,
@@ -259,7 +283,7 @@ const stepOn = Effect.fn('stepOn')(function* (taskId: string, observed: Readonly
         if (end.do !== 'record-end') return end;
         yield* journal.append(taskId, {
           kind: 'ended',
-          at: at(),
+          ...stamped(),
           attempt: end.attempt,
           sessionId: end.sessionId,
           observed: end.observed,
@@ -267,7 +291,7 @@ const stepOn = Effect.fn('stepOn')(function* (taskId: string, observed: Readonly
           error: end.error,
         });
       } else {
-        yield* journal.append(taskId, { kind: 'spawned', at: at(), attempt: action.attempt, ...(failed ? { error: failed.message } : {}) });
+        yield* journal.append(taskId, spawnedEntry(action.attempt, failed?.message));
       }
       break;
     }
@@ -275,7 +299,7 @@ const stepOn = Effect.fn('stepOn')(function* (taskId: string, observed: Readonly
     case 'record-end': {
       yield* journal.append(taskId, {
         kind: 'ended',
-        at: at(),
+        ...stamped(),
         attempt: action.attempt,
         sessionId: action.sessionId,
         observed: action.observed,
@@ -316,13 +340,23 @@ const lastSighting = (state: State, observed: ReadonlyMap<string, Sighting>): Si
 };
 
 /**
- * A task's fold, with what its sighting says of a long-lived attempt's process journalled first (`sightingFacts`): the fold
- * `decide` reads, so the time a gap opened is on the record before the pass judges it.
+ * What a task's sighting says of a long-lived attempt in flight, for the record: its process (`sightingFacts`), and what it has
+ * consumed so far (`countedFacts`).
+ */
+const notedOf = (state: State, observed: ReadonlyMap<string, Sighting>, at: string, mono?: Monotonic): Event[] => {
+  const sighting = lastSighting(state, observed);
+  return [...sightingFacts(state, sighting, at, mono), ...countedFacts(state, sighting, at)];
+};
+
+/**
+ * A task's fold, with what its sighting says of a long-lived attempt journalled first (`notedOf`): the fold `decide` reads, so
+ * the time a gap opened is on the record before the pass judges it.
  */
 const notedFold = Effect.fn('notedFold')(function* (taskId: string, observed: ReadonlyMap<string, Sighting>) {
   const journal = yield* Journal;
   const state = fold(taskId, yield* journal.read(taskId));
-  const facts = sightingFacts(state, lastSighting(state, observed), new Date().toISOString());
+  const now = stamped();
+  const facts = notedOf(state, observed, now.at, now.mono);
   for (const fact of facts) yield* journal.append(taskId, fact);
   return facts.length > 0 ? fold(taskId, yield* journal.read(taskId)) : state;
 });
@@ -463,13 +497,19 @@ const atWork = (state: State, observed: ReadonlyMap<string, Sighting>): boolean 
  * `releaseFinished` promises, and drops off on the first pass that lets it go ended or sees it gone: an absence read as every
  * absence is, off the pass's one observation — and only an absence: a pass that could not read its harness keeps it (`unread`).
  * Off the journal and the last observation, never off what a pass did: a session started before a restart is expected on the
- * first pass after it.
+ * first pass after it. A long-lived task's attempt is expected with when the journal says it began (`since`), which its runner
+ * counts its spend from across every process of it.
  */
 const expectedOf = (
-  states: Iterable<Pick<State, 'taskId' | 'harness'> & { attempts: ReadonlyArray<{ n: number }> }>,
+  states: Iterable<Pick<State, 'taskId' | 'harness' | 'restartPolicy'> & { attempts: ReadonlyArray<{ n: number; startedAt: string }> }>,
 ): ExpectedSession[] => {
   const expected: ExpectedSession[] = [];
-  for (const state of states) for (const a of state.attempts) expected.push({ name: nameFor(state.taskId, a.n), harness: state.harness });
+  for (const state of states) {
+    for (const a of state.attempts) {
+      const since = state.restartPolicy === 'Always' ? { since: Date.parse(a.startedAt) } : {};
+      expected.push({ name: nameFor(state.taskId, a.n), harness: state.harness, ...since });
+    }
+  }
   return expected;
 };
 
@@ -497,7 +537,7 @@ const verifyKept = Effect.fn('verifyKept')(function* (
   unread: ReadonlySet<string>,
 ) {
   const fresh = fold(kept.taskId, yield* (yield* Journal).read(kept.taskId));
-  const decided = decide(fresh, closedOut(fresh, observed), { at: new Date(), graceMs: GRACE_MS, unread }, yield* Lifecycle);
+  const decided = decide(fresh, closedOut(fresh, observed), nowFor(unread), yield* Lifecycle);
   const why = divergence(kept, fresh, decided);
   if (why) return yield* Effect.fail(new TickMemoDiverged({ taskId: kept.taskId, message: `the pass skipped \`${kept.taskId}\`: ${why}` }));
 });
@@ -583,7 +623,7 @@ export const tick = Effect.fn('tick')(function* () {
     }
     const before = folded.get(id);
     if (!before) continue;
-    const noted = sightingFacts(before, lastSighting(before, observed), '');
+    const noted = notedOf(before, observed, '');
     const actions = yield* settleOn(id, observed, unread, 8);
     taken.push(...actions);
     for (const a of actions) if (a.do === 'nothing' && a.refused) stalled.push({ taskId: id, ...a.refused });
@@ -736,7 +776,7 @@ export function viewOfState(state: State, observed: ReadonlyMap<string, Sighting
     state,
     phase,
     sessionId: sighting?.sessionId ?? last?.nativeId ?? null,
-    usage: sighting?.usage,
+    usage: state.restartPolicy === 'Always' ? (last?.usage ?? undefined) : sighting?.usage,
     ...(waitingFor ? { waitingFor } : {}),
     ...(admission ? { admission } : {}),
   };

@@ -1,7 +1,7 @@
 /**
  * `to decide` on the board: what a person has to decide about a run's result, as the api carries it on the list and on a run's detail —
  * the ending step's gate with the command that approves it, or a result branch nobody merged — and the facts under the result on
- * `GET /api/runs/:id/decision`: where each branch stands, and how much it changed.
+ * `GET /api/runs/:runId/decision`: where each branch stands, and how much it changed.
  *
  * The words are the package's (`toDecide`, `toDecideWords`, `branchWord`, `diffStat`), and the branches are read off a real repository.
  * Every `git` the api runs is noted, so a test can say which runs one is asked about: the list is polled every five seconds.
@@ -301,7 +301,8 @@ test("an ending that waits on several steps offers a send-back to each, and one 
     workflow: [{ name: 'ship', after: [], body: SHIP_BODY, harness: 'claude', workspace: 'main', gate: true }],
     steps: { ship: { taskId: null } },
   });
-  const lone = await decidableOf(alone);
+  process.env.WF_MAX_RUNS = '0';
+  const lone = await decidableOf(alone).finally(() => (process.env.WF_MAX_RUNS = 'set-it-in-the-test'));
   assert.deepEqual(
     lone.commands.map((c) => [c.label, c.command]),
     [['approve', `wf approve ${alone} ship`]],

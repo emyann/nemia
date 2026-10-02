@@ -106,12 +106,11 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
   none. A check starts at low priority (`CHECK_NICENESS`); sessions do not.
 - **A check logs its stdout; a person is shown the tail of its stderr**, whole at `WF_STDERR`. Its stdout is also kept whole at
   `WF_STDOUT` (`checkStdout`), which is what `reported` reads: the engine's `logs` is a tail (`test/check-handed.test.ts`).
-- **A worktree gets a `node_modules` of its own**, the third-party packages hardlinked from main's; a lockfile that differs from main's
-  costs an `npm ci`. Commit the lockfile with a new dependency, and run `npm install` on main after merging one by hand. `du` counts a
+- **A worktree gets a `node_modules` of its own**, the third-party packages hardlinked from main's, and so does each workspace whose
+  own `node_modules` the lockfile installs into (`workspaceModules`, `depsPlan`); a lockfile that differs from main's costs an `npm ci`. Commit the lockfile with a new dependency, and run `npm install` on main after merging one by hand. `du` counts a
   hardlinked file once per invocation (`diskBytes`).
-- **An ending's check installs what the staged merge's lockfile asks for, in the checkout**, first (`checkoutParts`, `checkScript`):
-  compared in place, never with `lockfileParts(repo, repo)`, which parts on every package nested in a workspace. A failed install is
-  ended by a signal: only the process's exit code is a verdict (`exitVerdicts`), not the log's trailer.
+- **An ending's check installs what the staged merge's lockfile asks for, in the checkout**, first (`checkoutParts`, `checkScript`). A
+  failed install is ended by a signal: only the process's exit code is a verdict (`exitVerdicts`), not the log's trailer.
 - **A test that spawns a `wf` child waits on it with `nodeChild`** (`test/child.ts`): for what it says or writes, or its exit, which fails
   the wait at once with its output — never under a deadline, which the CLI's import alone can pass on a loaded machine.
 - **`execFileSync` with no `stdio` copies the child's stderr onto yours**: pass `stdio: ['ignore', 'pipe', 'pipe']`.

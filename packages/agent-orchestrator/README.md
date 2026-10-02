@@ -939,17 +939,19 @@ filed, it fills in the rest:
   store is on another filesystem and a hardlink fails, the packages are linked as before and the run's
   notes say so. `.bin` and each `@scope` are directories of the worktree's own, so installing into the
   worktree never writes main's tree; `.bin` holds npm's relative links, so a workspace package's bin
-  runs the worktree's file. npm's and tools' dot files (`.package-lock.json`,
-  `.vite-temp`) are left out. `src/workspace/workspace.ts` decides from names, and `provisionDeps` in `src/workspace/worktree.store.ts`
+  runs the worktree's file. A package npm nests in a workspace's own `node_modules`, because that
+  workspace needs its own copy (`apps/web/node_modules/@rolldown/plugin-babel` here), is hardlinked the
+  same way into a `node_modules` of that workspace's folder in the worktree. npm's and tools' dot files
+  (`.package-lock.json`, `.vite-temp`, `.vite`) are left out. `src/workspace/workspace.ts` decides from names, and `provisionDeps` in `src/workspace/worktree.store.ts`
   does the work.
 - **An install of its own, when the lockfile asks for more.** For each package the worktree's
   `package-lock.json` names, the run looks at what is on disk at that path in the main checkout's
   `node_modules`, because that is the tree the links point at. Main's own `package-lock.json` can be
   ahead of it: a lockfile merged in with no `npm install` since. npm's record of the tree,
   `node_modules/.package-lock.json`, can be too, because `npm install --package-lock-only` rewrites it.
-  The trees part when main lacks a package, has another version, or links it elsewhere, or when a package
-  sits in a workspace's own `node_modules`, which links cannot give — a parent step added a dependency,
-  or main moved on. Links would then be the wrong tree, so the run runs `npm ci --no-audit --no-fund` in
+  The trees part when main lacks a package, has another version, or links it elsewhere — at the root or
+  nested in a workspace's own `node_modules` — or when a package path climbs out of the repository: a
+  parent step added a dependency, or main moved on. Links would then be the wrong tree, so the run runs `npm ci --no-audit --no-fund` in
   the worktree instead. That takes about a minute, and the step's brief says so under *Where to look*,
   so the step knows why it started late; `wf up` prints it too. An optional package main does not have
   is not a difference: it is another machine's platform build. If `npm ci` fails, the step is told what
@@ -1742,8 +1744,8 @@ dropped. **Nothing in the packages knows what shipping means.**
 - **The ending's check runs with the packages the merge brings.** The checkout's `node_modules` was installed from the
   base's lockfile, so a branch that adds a dependency (`@types/js-yaml`, `@types/express`, both on a live ship) failed
   its check there through no fault of the work. When the tick files the check, it compares the staged
-  `package-lock.json` with what the checkout has on disk at each package path it names (`checkoutParts`, in place:
-  a package nested in a workspace is read where it is installed). Where they differ, the brief carries `install` —
+  `package-lock.json` with what the checkout has on disk at each package path it names (`checkoutParts`:
+  a package nested in a workspace is read where it is installed, as a worktree's is). Where they differ, the brief carries `install` —
   the first path that differs, the check's record of why — the tick's note says so, and the script runs
   `npm install --no-save --no-audit --no-fund` in the checkout before the command (`checkScript`, `INSTALL`): the text
   is the run's, never the checkout's. `npm install` rather than `npm ci`, which empties `node_modules` under a dev

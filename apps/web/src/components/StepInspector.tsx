@@ -28,7 +28,7 @@ type Props = {
   onClose: () => void;
   /** Which run the step is in, above its name: on the Factory, where the steps of several runs are drawn. */
   runTitle?: string;
-  /** Classes over the panel's own, for where it sits: beside the run's canvas by default. */
+  /** Classes over the panel's own, for where it sits beside the floor. */
   className?: string;
 };
 
@@ -39,27 +39,10 @@ type Props = {
 export const openingTab = (step: Pick<Step, 'closeout'>): Tab => (step.closeout ? 'Output' : 'Details');
 
 /**
- * What is going on in one step, beside the canvas, for the node that was clicked. It opens on the step's `openingTab`, and a tab a
- * person picks is kept while the panel stays open, whichever step they click next. A try a Rounds row selects is kept with its step: the
- * panel stays mounted as another step is clicked, and that one's current try is shown.
- *
- * Opened on Output at a gate, it says first that the answer is on Details, so the plan read is not a dead end. The Activity tab is keyed by
- * run and step, so a conversation never stands in for another step's while that one is read.
+ * The step inspector beside the factory's floor, for the step tile that was pressed: its run's title, the step's name, a button and
+ * Escape that close it (`onClose`), around the step's tabs (`StepTabs`), which it keeps mounted as another step is pressed.
  */
 export function StepInspector({ run, step, onClose, runTitle, className }: Props) {
-  const [picked, setTab] = useState<Tab | null>(null);
-  const tab = picked ?? openingTab(step);
-  const [chosen, setChosen] = useState<{ step: string; try: number } | null>(null);
-  const runCancelled = run.cancelledAt !== null;
-  const runHeld = run.holding != null;
-  const state = stepState(step.status, runCancelled, runHeld);
-  const current = step.tries.find((t) => t.current) ?? step.tries.at(-1)!;
-  const selected = (chosen?.step === step.name && step.tries.find((t) => t.try === chosen.try)) || current;
-  const select = (n: number) => {
-    setChosen({ step: step.name, try: n });
-    setTab('Output');
-  };
-
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
@@ -97,7 +80,33 @@ export function StepInspector({ run, step, onClose, runTitle, className }: Props
           ×
         </button>
       </header>
+      <StepTabs run={run} step={step} className="min-h-0 flex-1" />
+    </aside>
+  );
+}
 
+/**
+ * What is going on in one step, in three tabs. It opens on the step's `openingTab`, and a tab a person picks is kept while it stays mounted,
+ * whichever step it is handed next. A try a Rounds row selects is kept with its step, and another step shows its current try.
+ *
+ * Opened on Output at a gate, it says first that the answer is on Details, so the plan read is not a dead end. The Activity tab is keyed by
+ * run and step, so a conversation never stands in for another step's while that one is read. `className` places it in what holds it.
+ */
+export function StepTabs({ run, step, className }: { run: RunDetail; step: Step; className?: string }) {
+  const [picked, setTab] = useState<Tab | null>(null);
+  const tab = picked ?? openingTab(step);
+  const [chosen, setChosen] = useState<{ step: string; try: number } | null>(null);
+  const runCancelled = run.cancelledAt !== null;
+  const state = stepState(step.status, runCancelled, run.holding != null);
+  const current = step.tries.find((t) => t.current) ?? step.tries.at(-1)!;
+  const selected = (chosen?.step === step.name && step.tries.find((t) => t.try === chosen.try)) || current;
+  const select = (n: number) => {
+    setChosen({ step: step.name, try: n });
+    setTab('Output');
+  };
+
+  return (
+    <div className={cn('flex flex-col', className)}>
       <div role="tablist" className="flex gap-1 border-b border-neutral-200 px-2 dark:border-neutral-800">
         {TABS.map((t) => (
           <button
@@ -145,7 +154,7 @@ export function StepInspector({ run, step, onClose, runTitle, className }: Props
         )}
         {tab === 'Activity' && <Activity key={`${run.id}/${step.name}`} run={run} step={step} />}
       </div>
-    </aside>
+    </div>
   );
 }
 

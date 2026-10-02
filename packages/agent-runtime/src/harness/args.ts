@@ -12,6 +12,7 @@ import path from 'node:path';
 import type { McpServer } from './seam.ts';
 import type { ClaudeFlags } from './claude/vocabulary.ts';
 import { mcpRefuses } from './mcp.ts';
+import { mountsRefusalOf, type Mount } from './mounts.ts';
 
 export type HarnessArgs = {
   model?: string;
@@ -114,6 +115,14 @@ export type HarnessArgs = {
    * Refused unless a whole number from 0 to 19.
    */
   niceness?: number;
+  /**
+   * The folders beyond its `cwd` the session may reach, as a Pod's container is given its `volumeMounts`: each an absolute path, and
+   * whether the session may only read it (`Mount`). Each harness renders them its own way, and one that cannot hold a mount's mode
+   * refuses the task before it is journalled (`HarnessSpec.mounts`): Claude Code gives each one `--add-dir` and denies an edit
+   * under a read-only one; Codex reads the whole disk in its sandboxes that write only their workspace, so it holds a read-only
+   * mount and refuses a writable one. Refused unless a list of mounts with no path given twice (`mountsRefusalOf`).
+   */
+  mounts?: Mount[];
 };
 
 /**
@@ -142,6 +151,7 @@ const KEYS: Record<keyof HarnessArgs, true> = {
   command: true,
   env: true,
   niceness: true,
+  mounts: true,
 };
 export const HARNESS_ARGS = Object.keys(KEYS) as ReadonlyArray<keyof HarnessArgs>;
 
@@ -267,9 +277,12 @@ export const argsRefusalOf = (spec: { config?: HarnessArgs }): string | undefine
   return ownArgsRefusalOf(config);
 };
 
-/** Why the arguments one kind of harness alone reads cannot reach it — Claude Code's flags, Codex's own, a command's — or `undefined`. */
+/**
+ * Why the arguments one kind of harness alone reads cannot reach it — Claude Code's flags, Codex's own, a command's — or the
+ * mounts every harness renders its own way, or `undefined`.
+ */
 const ownArgsRefusalOf = (config: HarnessArgs): string | undefined =>
-  claudeFlagsRefusalOf(config.claude) ?? codexArgsRefusalOf(config.codex) ?? commandArgsRefusalOf(config);
+  claudeFlagsRefusalOf(config.claude) ?? codexArgsRefusalOf(config.codex) ?? commandArgsRefusalOf(config) ?? mountsRefusalOf(config.mounts);
 
 /** A flag's name in camelCase, two letters or more: a one-letter flag is Claude Code's short form, which has a long one. */
 const FLAG_KEY = /^[a-z][a-zA-Z0-9]+$/;

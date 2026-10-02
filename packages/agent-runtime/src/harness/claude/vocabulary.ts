@@ -104,6 +104,7 @@ export const CLAUDE_OWNED_FLAGS: readonly string[] = [
   'worktree',
   'maxBudgetUsd',
   'settingSources',
+  'addDir',
 ];
 
 /** A camelCase key as Claude Code's flag: `appendSystemPromptFile` is `--append-system-prompt-file`. */
@@ -120,12 +121,56 @@ export const claudeFlagsOf = (flags: ClaudeFlags | undefined): string[] =>
   });
 
 /**
+ * A task's mounts as Claude Code's arguments: `--add-dir` and every mount's path, or nothing for none. Variadic, so it is placed
+ * where a flag follows it, never the brief.
+ */
+export const claudeMountArgs = (config: SpawnRequest['config']): string[] =>
+  config?.mounts?.length ? ['--add-dir', ...config.mounts.map((m) => m.path)] : [];
+
+/**
+ * What a Claude Code session is denied: the task's `disallowedTools`, and an edit anywhere under each read-only mount,
+ * `Edit(//<path>/**)`. `--add-dir` grants writes as well as reads where the mode lets a session write, and a deny beats every
+ * allow and every mode: it holds the folder read-only under `dontAsk`, `acceptEdits`, `auto` and `bypassPermissions`, a Bash
+ * redirection into it included (measured on Claude Code 2.1.288).
+ */
+export const claudeDenies = (config: SpawnRequest['config']): string[] => [
+  ...(config?.disallowedTools ?? []),
+  ...(config?.mounts ?? []).filter((m) => m.readOnly).map((m) => `Edit(/${m.path}/**)`),
+];
+
+/** The `--disallowedTools` flag and its one argument, the session's denies joined by commas (`claudeDenies`), or nothing for none. */
+export const claudeDenyArgs = (config: SpawnRequest['config']): string[] => {
+  const denies = claudeDenies(config);
+  return denies.length ? ['--disallowedTools', denies.join(',')] : [];
+};
+
+/**
+ * A path a permission rule cannot name: a space or a comma would split the rule, a parenthesis end it, and a glob's own
+ * characters would widen it.
+ */
+const UNRULED = /[\s,()*?[\]{}]/;
+
+/**
+ * Why a task's read-only mount cannot be held by Claude Code — or `undefined`: its path has a character the permission rule
+ * that denies an edit there cannot carry (`UNRULED`), so the folder could not be denied.
+ */
+const claudeMountRefusal = (task: Omit<SpawnRequest, 'name'>): string | undefined => {
+  const mount = task.config?.mounts?.find((m) => m.readOnly && UNRULED.test(m.path));
+  return mount
+    ? `\`mounts\` gives the session ${JSON.stringify(mount.path)} read-only, and Claude Code holds a folder read-only by a permission rule, which cannot name a path with a space, a comma, a parenthesis or a glob's character. Mount a folder whose path has none of them, or leave the mount off.`
+    : undefined;
+};
+
+/**
  * Whether a task asks for its session bridged to claude.ai: Claude Code's `--remote-control`, given in its flags
  * (`config.claude.remoteControl`). Only a background session opens one.
  */
 export const bridgeAsked = (task: { config?: { claude?: ClaudeFlags } }): boolean => task.config?.claude?.remoteControl !== undefined;
 
-/** What Claude Code cannot be asked for, Codex's own arguments among it, as a sentence that says what to write instead. */
+/**
+ * What Claude Code cannot be asked for, Codex's own arguments and a read-only mount it cannot deny among it, as a sentence that
+ * says what to write instead.
+ */
 export const claudeRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefined => {
   const { permissionMode, effort } = task.config ?? {};
   const owned = Object.keys(task.config?.claude ?? {}).find((key) => CLAUDE_OWNED_FLAGS.includes(key));
@@ -141,7 +186,7 @@ export const claudeRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefi
   if (effort !== undefined && !CLAUDE_EFFORTS.includes(effort)) {
     return `\`effort: ${effort}\` is not an effort Claude Code has. Its efforts are: ${CLAUDE_EFFORTS.join(', ')}.`;
   }
-  return undefined;
+  return claudeMountRefusal(task);
 };
 
 /**

@@ -18,7 +18,7 @@ import { getSessionInfo, getSessionMessages } from '@anthropic-ai/claude-agent-s
 import type { SessionState, Sighting, Usage } from '../../core/index.ts';
 import { claudeInbox, claudeInboxLine, claudeInboxPost, claudeRegistered } from './inbox.ts';
 import { claudeTranscriptEvents, lastStructuredOutput, renderTranscript, transcriptFile, transcriptUsage } from './transcript.ts';
-import { claudeFlagsOf, worktreeName } from './vocabulary.ts';
+import { claudeDenyArgs, claudeFlagsOf, claudeMountArgs, worktreeName } from './vocabulary.ts';
 import { checkoutMcpConfig, claudeMcpArgs, writeMcpConfig } from '../mcp.ts';
 import { readTranscript } from '../transcript.ts';
 import { countSpawn, readTextAsync } from '../../core/engine/tally.ts';
@@ -398,10 +398,12 @@ const mcpFileOf = (root: string, name: string) => path.join(root, 'mcp', `${name
  * 2. `--disallowedTools`, the other half of the fence: a tool the session has, or a command it may run, that it must
  *    not use — `Bash(npm run build)`, which the checkout's settings allow for another step's sake. A deny beats every
  *    allow. Claude Code splits it on commas and spaces outside a rule's parentheses, so one argument holds them.
+ *    An edit under each read-only mount is denied here too (`claudeDenies`).
  * 3. `--allowedTools`, which is not the fence's opposite: a rule here lets a tool the session HAS be used without
  *    asking a person who is not there. In `dontAsk` a mode that never asks also never allows a write, not even in the
  *    session's own cwd, so a fenced session that must write its own work is given `Edit(**)`, a glob resolved against
- *    its `cwd`: unscoped (`Write`) it would write anywhere, scoped it is denied outside. A deny still beats it.
+ *    its `cwd`: unscoped (`Write`) it would write anywhere, scoped it is denied outside. A deny still beats it. Then
+ *    `--add-dir` and each mount's path (`claudeMountArgs`), variadic, ended by the flag after it.
  * 4. The caller's own flags (`claudeFlagsOf`), Remote Control among them only when the task asks (`remoteControl`):
  *    the session bridged to claude.ai and listed in its agents view, where it can be driven from a browser or a
  *    phone, not only seen. A `--bg` session gets a `bridgeSessionId` only with this flag.
@@ -442,11 +444,15 @@ const claudeArgv = (r: SpawnRequest, mcpArgs: string[]): string[] => [
   r.brief,
 ];
 
-/** The fence's flags, 1 to 3 of `claudeArgv`: `--tools` for any list, even an empty one, and each rule list only when it has a rule. */
+/**
+ * The fence's flags, 1 to 3 of `claudeArgv`: `--tools` for any list, even an empty one, and each rule list only when it has a rule;
+ * then the mounts (`claudeMountArgs`), each read-only one an edit denied in the deny list (`claudeDenies`).
+ */
 const fenceFlags = (c: SpawnRequest['config']): string[] => [
   ...(c?.tools ? ['--tools', c.tools.join(',')] : []),
-  ...(c?.disallowedTools?.length ? ['--disallowedTools', c.disallowedTools.join(',')] : []),
+  ...claudeDenyArgs(c),
   ...(c?.allowedTools?.length ? ['--allowedTools', c.allowedTools.join(',')] : []),
+  ...claudeMountArgs(c),
 ];
 
 /** The session's flags, 7 to 12 of `claudeArgv`, each only when the task sets it. */

@@ -53,10 +53,28 @@ const WRITES: readonly string[] = ['Bash', 'Write', 'Edit'];
  * A word that is not a sandbox never arrives through `file()`, which refuses it; a direct caller
  * gets the default.
  */
-const sandboxOf = (r: SpawnRequest): string => {
+const sandboxOf = (r: Pick<SpawnRequest, 'config'>): string => {
   if (r.config?.tools && !r.config?.tools.some((t) => WRITES.includes(t))) return 'read-only';
   const asked = r.config?.permissionMode === 'bypassPermissions' ? 'danger-full-access' : r.config?.permissionMode;
   return asked !== undefined && CODEX_SANDBOXES.includes(asked) ? asked : 'workspace-write';
+};
+
+/**
+ * Why Codex cannot hold a task's mounts — or `undefined`. Codex reads the whole disk in its `read-only` and `workspace-write`
+ * sandboxes, so a read-only mount is held as it is and given no flag. It refuses a writable mount, which only `--add-dir` would
+ * give and `exec resume` rejects after the id, and a read-only one in `danger-full-access`, which writes everywhere.
+ */
+const codexMountRefusal = (task: Omit<SpawnRequest, 'name'>): string | undefined => {
+  const mounts = task.config?.mounts ?? [];
+  const writable = mounts.find((m) => !m.readOnly);
+  if (writable) {
+    return `\`mounts\` gives the session ${writable.path} writable, and Codex can write only its workspace: \`--add-dir\`, which would widen it, is rejected when a session is resumed. Mount the folder read-only, or file the task on Claude Code.`;
+  }
+  const held = mounts.find((m) => m.readOnly);
+  if (held && sandboxOf(task) === 'danger-full-access') {
+    return `\`mounts\` gives the session ${held.path} read-only, and Codex's \`danger-full-access\` sandbox writes everywhere. Name the \`workspace-write\` or \`read-only\` sandbox as \`permissionMode\`, or leave the mount off.`;
+  }
+  return undefined;
 };
 
 /**
@@ -91,6 +109,8 @@ export const CODEX_EFFORTS: readonly string[] = ['none', 'minimal', 'low', 'medi
  *    `--add-dir` after the id ("unexpected argument").
  * 10. The brief.
  *
+ * A read-only mount (`config.mounts`) is given nothing: the sandbox reads the whole disk and writes only the workspace.
+ *
  * It refuses what Codex would drop without a word: a deny or an allow list, as Codex has no tool list, only a sandbox; a
  * spend cap, as `codex exec` has none and its stream counts tokens, not dollars — its config's budgets are token
  * budgets; Claude Code's flags, as `codex exec` is another CLI. It reads what a session consumed from the same JSONL
@@ -102,6 +122,7 @@ export const CODEX_EFFORTS: readonly string[] = ['none', 'minimal', 'low', 'medi
 export const codex: HarnessSpec = {
   name: 'codex',
   codexArgs: true,
+  mounts: { readOnly: true },
   command: (r, io) => ({
     cmd: 'codex',
     args: [
@@ -142,6 +163,8 @@ export const codex: HarnessSpec = {
     if (task.config?.claude !== undefined) {
       return `\`claude: ${JSON.stringify(task.config.claude)}\` gives Claude Code flags of its own, and \`codex exec\` is not Claude Code. Leave \`claude\` off a Codex task, and say what the session must know in its brief.`;
     }
+    const mounted = codexMountRefusal(task);
+    if (mounted) return mounted;
     const sse = Object.entries(mcp ?? {}).find(([, s]) => 'url' in s && s.type === 'sse');
     if (sse) {
       return `\`mcp.${sse[0]}\` is an SSE server, and Codex connects only to stdio and streamable HTTP servers. Give \`type: "http"\` if the server speaks it, or leave the server off a Codex task.`;

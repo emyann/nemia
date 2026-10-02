@@ -509,11 +509,13 @@ export const optionsRefusalOf = (options: EngineOptions): string | undefined => 
  *    the trust it names;
  * 7. a `command`, an `env` or a `niceness` on any harness but a `HarnessSpec` with `commandArgs` (`commandArgsMisplaced`): its
  *    session would run something else than the process they name;
+ * 7b. a mount in `mounts` on a harness that does not hold its mode (`mountsMisplaced`): a remote agent, a `HarnessSpec` whose
+ *    `mounts` leaves the mode out; its session would not reach the folder as asked;
  * 8. a long-lived task on a harness whose session ends with its turn (`longLivedMisplaced`);
  * 9. what the harness's own `refuses` refuses: Claude Code's lists, a spec's, or a remote agent's (`remoteRefuses`).
  *
  * A `PromiseRunner` is the consumer's own: it is handed a `contextTokens`, a `claude.remoteControl`, a `claude`, a `codex`,
- * a `command`, an `env` and a `niceness`, and asked nothing of its own.
+ * a `command`, an `env`, a `niceness` and `mounts`, and asked nothing of its own.
  */
 export const harnessRefusalOf = (spec: TaskSpec & { harness: string }, harnesses: Record<string, HarnessConfig>): string | undefined => {
   if (!Object.hasOwn(harnesses, spec.harness)) {
@@ -609,9 +611,34 @@ const codexArgsMisplaced = (spec: TaskSpec & { harness: string }, harnesses: Rec
   return `\`codex\` gives Codex arguments of its own, and the \`${spec.harness}\` harness is not Codex: its session would start without them. ${takers.length ? `File the task on ${takers.join(' or ')}, or leave \`codex\` off.` : "Leave `codex` off: none of this engine's harnesses is Codex."}`;
 };
 
-/** Why a task's arguments of one kind of harness cannot go on its own (`codexArgsMisplaced`, `commandArgsMisplaced`), or `undefined`. */
+/**
+ * Why a task's arguments of one kind of harness cannot go on its own (`codexArgsMisplaced`, `commandArgsMisplaced`), or a mount on
+ * one that cannot hold it (`mountsMisplaced`), or `undefined`.
+ */
 const argsMisplaced = (spec: TaskSpec & { harness: string }, harnesses: Record<string, HarnessConfig>): string | undefined =>
-  codexArgsMisplaced(spec, harnesses) ?? commandArgsMisplaced(spec, harnesses);
+  codexArgsMisplaced(spec, harnesses) ?? commandArgsMisplaced(spec, harnesses) ?? mountsMisplaced(spec, harnesses);
+
+/** Whether a harness holds a mount in a mode: Claude Code in both, a `HarnessSpec` in those it declares, a remote agent in none. */
+const holdsMount = (h: HarnessConfig, mode: 'readOnly' | 'writable'): boolean => isClaude(h) || (isSpec(h) && h.mounts?.[mode] === true);
+
+/**
+ * Why a task's `config.mounts` cannot go on its harness — or `undefined`: a mount whose mode the harness does not hold
+ * (`HarnessSpec.mounts`), so its session would not see the folder, or could write where it may only read. A remote agent has
+ * none of this machine's disk, and holds no mount. The refusal names the harnesses of this engine that hold the mode. A
+ * `PromiseRunner` is handed the mounts, and not asked.
+ */
+const mountsMisplaced = (spec: TaskSpec & { harness: string }, harnesses: Record<string, HarnessConfig>): string | undefined => {
+  const h = harnesses[spec.harness];
+  const ownRunner = !(isClaude(h) || isSpec(h) || isRemote(h));
+  const mount = ownRunner ? undefined : spec.config?.mounts?.find((m) => !holdsMount(h, m.readOnly ? 'readOnly' : 'writable'));
+  if (mount === undefined) return undefined;
+  const mode = mount.readOnly ? 'readOnly' : 'writable';
+  const words = mount.readOnly ? 'read-only' : 'writable';
+  const holders = Object.keys(harnesses)
+    .filter((name) => holdsMount(harnesses[name], mode))
+    .map((name) => `\`${name}\``);
+  return `\`mounts\` gives the session ${mount.path} ${words}, and the \`${spec.harness}\` harness cannot hold a ${words} mount: its session would not reach the folder as asked. ${holders.length ? `File the task on ${holders.join(' or ')}, or leave the mount off.` : `Leave the mount off: none of this engine's harnesses holds a ${words} mount.`}`;
+};
 
 /**
  * Why a task's `command`, `env` or `niceness` cannot go on its harness — or `undefined`: they are the arguments of a harness

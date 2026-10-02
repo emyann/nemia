@@ -221,9 +221,9 @@ const placing = (change: NodeChange<RunFlowNode>): change is NodePositionChange 
  *   is counted finished too, and stays on the floor whatever Show finished says (`floorRuns`); a run at its ending's gate is in both.
  *   Beside the counts it draws the cap (`CapLine`), the daemon and the quota, and the Show finished switch, named by a label beside it.
  * - The floor fills the screen under the root's header, its frame narrowed by what the bar covers of it (`useBarOver`), so the card
- *   inspected and every panel over the floor stay clear of the bar. The queue lane sits at its left. The floor's buttons wrap to a narrow
- *   floor, its hint shows only where the floor is wide enough beside them, and the legend wraps short of the minimap when there is one;
- *   arrowheads take their edges' colour in both themes.
+ *   inspected and every panel over the floor stay clear of the bar. The queue lane sits at its left, and gives its room to the floor
+ *   while the bar shows a run or a step. The floor's buttons wrap to a narrow floor, its hint shows only where the floor is wide enough
+ *   beside them, and the legend wraps short of the minimap when there is one; arrowheads take their edges' colour in both themes.
  * - A click on a card, or Enter on the card itself, shows the run in the bar or closes it; a click or Enter on a link or a button in it
  *   does only what that does (`useFloorPress`).
  */
@@ -477,7 +477,7 @@ function Floor({ runs, factory }: { runs: readonly RunSummary[]; factory: Factor
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-        {laned && <QueueLane cards={queued} />}
+        {laned && !inspecting && <QueueLane cards={queued} />}
         {shown.length ? (
           <div ref={whole} className="flex min-h-0 min-w-0 flex-1">
             <div ref={frame} className="@container min-h-0 min-w-0 flex-1" style={{ marginRight: over }}>

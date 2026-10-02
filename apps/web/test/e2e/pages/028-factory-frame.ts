@@ -97,8 +97,8 @@ export default {
     await page.getByRole('button', { name: 'Reset layout' }).click();
     await settled(page);
     await inspectThenClose('strip', async () => {
-      const lane = await page.locator('aside[aria-label="Queued cards"]').boundingBox();
-      await dragEdgeTo(page, (lane ? lane.x + lane.width : 0) + STRIP);
+      const floor = await floorOf(page).boundingBox();
+      await dragEdgeTo(page, (floor?.x ?? 0) + STRIP);
       const width = await widthOf(page);
       if (!width || width > 2 * STRIP) throw new Refused(`the bar leaves the floor a strip, ${STRIP} px or so — it leaves ${width}`);
     });

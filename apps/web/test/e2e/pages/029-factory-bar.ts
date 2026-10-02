@@ -12,8 +12,11 @@ const FLOOR = '/factories/default';
 /** The run the page inspects, and the step of it the page shows. */
 const [RUN, STEP] = [FAKE.id, 'review'];
 
-/** A window wide enough for an open card to be drawn whole on the floor beside the queue's lane and the bar, at the reveal's least zoom. */
+/** A window wide enough that the floor beside the queue's lane and the bar has room for its hint as well as its buttons, or nearly. */
 const WIDE = { width: 1920, height: 1080 };
+
+/** The queue's lane at the floor's left. */
+const laneOf = (page: Page) => page.locator('aside[aria-label="Queued cards"]');
 
 /** The floor's frame. */
 const floorOf = (page: Page) => page.locator('.react-flow').first();
@@ -86,6 +89,7 @@ async function clickPane(page: Page): Promise<void> {
 async function presses(page: Page): Promise<void> {
   await bodyOf(page).click();
   await expectRun(page, `a click on ${RUN}'s card shows the run in the bar`);
+  await expectCount(laneOf(page), 0, "the queue's lane gives its room to the floor while the bar shows a run");
   await settled(page);
   await expectLeftOf(cardOf(page, RUN), runBar(page), 'the card inspected is left of the bar');
   const panels = floorOf(page).locator('.react-flow__panel:visible');
@@ -99,6 +103,7 @@ async function presses(page: Page): Promise<void> {
   await bodyOf(page).click();
   await expectNoBar(page, `a click on ${RUN}'s card again closes the bar`);
   await expectCount(cardOf(page, RUN).locator('[data-inspected]'), 0, 'and its card is no longer ringed');
+  await expectVisible(laneOf(page), "and the queue's lane is back beside the floor");
 
   await cardOf(page, RUN).focus();
   await page.keyboard.press('Enter');
@@ -137,21 +142,10 @@ async function contents(page: Page): Promise<void> {
 }
 
 /**
- * In a window as wide as `WIDE`, with the card unfolded by its chevron, a tile shows its step in the bar, left of it, and is pressed;
+ * With the card unfolded by its chevron, a tile shows its step in the bar, the card whole on the floor left of it, and is pressed;
  * pressed again, it closes the bar.
  */
 async function tiles(page: Page): Promise<void> {
-  const was = page.viewportSize();
-  await page.setViewportSize(WIDE);
-  try {
-    await tilePressed(page);
-  } finally {
-    if (was) await page.setViewportSize(was);
-  }
-}
-
-/** The presses of `tiles`, in the window it sets. */
-async function tilePressed(page: Page): Promise<void> {
   await fit(page);
   const card = cardOf(page, RUN);
   await card.getByRole('button', { name: 'Show steps' }).click();
@@ -163,14 +157,9 @@ async function tilePressed(page: Page): Promise<void> {
   await expectVisible(stepBar(page, RUN, STEP), `a click on ${STEP}'s tile shows the step in the bar`);
   await expectVisible(card.locator(`[data-tile="${STEP}"][aria-pressed="true"]`), 'and its tile is pressed');
   await settled(page);
-  await expectLeftOf(tile, stepBar(page, RUN, STEP), 'the tile is left of the bar');
-  const hint = floorOf(page).locator('.react-flow__panel.top.left:visible');
-  if (await hint.count())
-    await expectLeftOf(
-      hint,
-      floorOf(page).locator('.react-flow__panel.top.right'),
-      "the floor's hint, where it is drawn, ends left of its buttons",
-    );
+  await expectCount(laneOf(page), 0, "the queue's lane gives its room to the floor while the bar shows a step");
+  await expectInside(card, floorOf(page), 'the open card is whole on the floor');
+  await expectLeftOf(card, stepBar(page, RUN, STEP), 'left of the bar');
   await photograph(page, path.join(OUT, `factory-bar-step-${await themeOf(page)}.png`));
   await tile.click();
   await expectNoBar(page, `a click on ${STEP}'s tile again closes the bar`);
@@ -200,6 +189,21 @@ async function others(page: Page): Promise<void> {
   await clickPane(page);
   await expectVisible(bar, 'a click on the empty floor leaves the start of a run open');
   if (barInUrl(page) !== start) throw new Refused(`and the address keeps bar=${start} — it is ${page.url()}`);
+  await expectVisible(laneOf(page), "the queue's lane stays beside the floor while the bar starts a run");
+  const was = page.viewportSize();
+  await page.setViewportSize(WIDE);
+  try {
+    await settled(page);
+    const hint = floorOf(page).locator('.react-flow__panel.top.left:visible');
+    if (await hint.count())
+      await expectLeftOf(
+        hint,
+        floorOf(page).locator('.react-flow__panel.top.right'),
+        "in a window as wide as WIDE, the floor's hint, where it is drawn, ends left of its buttons",
+      );
+  } finally {
+    if (was) await page.setViewportSize(was);
+  }
   await bar.getByRole('button', { name: 'Close', exact: true }).click();
   await expectNoBar(page, 'its Close closes it');
 
@@ -230,10 +234,11 @@ async function edge(page: Page): Promise<void> {
 export default {
   /**
    * The Factory's floor and the frame's bar: a click or Enter on a card shows its run in the bar, ringed, with the card and the floor's
-   * panels clear of the bar; again, or the empty floor, closes it. The run bar has the run's title and id, the gates its banners name and
-   * its steps as buttons that show each step, and its brief. A tile, the card unfolded by its chevron, shows its step and is pressed. Open
-   * and a double click open the run's page. The start of a run is not closed by the floor, and a ghost opens its card's page. A card
-   * dragged under where the bar opens is brought clear of it. The page lays the floor out again at its end.
+   * panels clear of the bar and the queue's lane off to give the floor its room; again, or the empty floor, closes it. The run bar has the
+   * run's title and id, the gates its banners name and its steps as buttons that show each step, and its brief. A tile, the card unfolded
+   * by its chevron, shows its step and is pressed, the open card whole beside the bar. Open and a double click open the run's page. The
+   * start of a run is not closed by the floor, keeps the lane, and leaves the floor's hint clear of its buttons; a ghost opens its card's
+   * page. A card dragged under where the bar opens is brought clear of it. The page lays the floor out again at its end.
    */
   name: 'factory-bar',
   route: FLOOR,

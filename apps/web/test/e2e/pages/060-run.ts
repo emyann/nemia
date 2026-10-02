@@ -1,4 +1,4 @@
-import { sidebar } from '../board.ts';
+import { sidebar, stepBar } from '../board.ts';
 import { expectCount, expectDrawn, expectInside, expectUncut, expectVisible, Refused, settled } from '../checks.ts';
 import { FAKE, SESSION } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -213,7 +213,7 @@ export default {
     );
     await expectCount(timeline.locator('tr[data-total^="round-"]'), 0, "one round: the run's total alone");
     await graph.locator(`.react-flow__node[data-id="${FAKE.unverified}"]`).click();
-    const inspected = page.locator(`aside[aria-label="Step ${FAKE.unverified}"]`);
+    const inspected = stepBar(page, FAKE.id, FAKE.unverified);
     await expectVisible(
       inspected.getByRole('tab', { name: 'Output', selected: true }),
       `${FAKE.unverified}'s inspector opens on Output: it has signed off`,
@@ -222,16 +222,16 @@ export default {
     await expectVisible(inspected.locator('dd', { hasText: FAKE.used }), `the inspector's Details say what ${FAKE.unverified} used`);
 
     await graph.locator('.react-flow__node[data-id="review"]').click();
-    await expectVisible(page.locator('aside[aria-label="Step review"]'), 'the step inspector opens on a click on review');
+    await expectVisible(stepBar(page, FAKE.id, 'review'), 'the step inspector opens on a click on review');
     await settled(page);
     await expectInside(
       graph.locator('.react-flow__node'),
       graph.locator('.react-flow'),
-      'every step is on the canvas beside the open inspector, once the canvas, narrowed for it, has fitted itself again',
+      'every step is on the canvas, the whole width of the page, under the bar that floats over it',
     );
 
     await graph.locator(`.react-flow__node[data-id="${SESSION.step}"]`).click();
-    const inspector = page.locator(`aside[aria-label="Step ${SESSION.step}"]`);
+    const inspector = stepBar(page, FAKE.id, SESSION.step);
     await inspector.getByRole('tab', { name: 'Activity' }).click();
     await expectVisible(
       inspector.locator('[data-turn="tools"]', { hasText: SESSION.folded }),
@@ -245,7 +245,7 @@ export default {
     await settled(page);
 
     await graph.locator(`.react-flow__node[data-id="${FAKE.unverified}"]`).click();
-    const output = page.locator(`aside[aria-label="Step ${FAKE.unverified}"]`);
+    const output = stepBar(page, FAKE.id, FAKE.unverified);
     await output.getByRole('tab', { name: 'Output' }).click();
     const palette = output.locator(`img[alt="${FAKE.artifacts.image}"]`);
     await expectDrawn(palette, `${FAKE.unverified}'s Output tab draws the image it named inline (${FAKE.artifacts.image})`);

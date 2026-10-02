@@ -6,7 +6,8 @@ import { mergeEvents } from './transcript';
 export type { Following } from './following.ts';
 
 /**
- * A step's conversation: read once, and followed while its task is live.
+ * A step's conversation: read once, and followed while its task is live. `taskId` is the session to read (`sessionToRead`): null for a
+ * step with none, which reads nothing.
  *
  * The read gives the events so far, a cursor, and whether the task is live. A step whose task is not is read that once. One
  * whose task is live is followed by an EventSource on the stream route, from that cursor: each `transcript` event is merged

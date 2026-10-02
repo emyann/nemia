@@ -180,6 +180,71 @@ export function loopPath(source: Point, target: Point, depth = LOOP_DEPTH): { pa
   };
 }
 
+/** The least zoom a run's canvas is drawn at, which a fit does not go below. */
+export const LEAST_ZOOM = 0.5;
+
+/** The least width of canvas the bar must leave uncovered for a fit to keep the nodes clear of it, in pixels. */
+export const BESIDE_MIN = 240;
+
+/** The room a fit beside the bar keeps between the nodes and the bar, in pixels. */
+const BESIDE_GAP = 24;
+
+/**
+ * The padding that fits a canvas `width` pixels wide in the part the floating bar leaves uncovered, the bar `over` pixels over its right
+ * edge, for nodes `nodes` wide at a zoom of 1: a tenth of the width on the left, the bar and a gap on the right. Null, for a fit over the
+ * whole canvas, when the bar covers none of it, when it leaves less than `BESIDE_MIN`, or when the nodes are wider at `LEAST_ZOOM` than the
+ * part it leaves: a fit there would put nodes off the canvas.
+ */
+export function besideBar(width: number, over: number, nodes: number): Beside | null {
+  const right = over + BESIDE_GAP;
+  if (over <= 0 || width - over < BESIDE_MIN || nodes * LEAST_ZOOM > width * 0.9 - right) return null;
+  return { left: '10%', right: `${right}px`, y: '20%' };
+}
+
+/** The padding of a fit beside the floating bar (`besideBar`). */
+export type Beside = { left: '10%'; right: `${number}px`; y: '20%' };
+
+/**
+ * How a canvas `width` pixels wide, the bar `over` pixels over its right edge, is fitted as a step opens in the bar: the run's nodes,
+ * `run` wide at a zoom of 1, beside the bar where they fit there (`besideBar`); else, where the open step's node — `step`, its right edge
+ * `right` pixels from the canvas's left as drawn and its width at a zoom of 1 — lies under the bar, that node alone beside it. Null, to
+ * leave the view as it is: no step open, its node clear of the bar, or no room beside the bar even for it.
+ */
+export function besideOpen(
+  width: number,
+  over: number,
+  run: number,
+  step: { right: number; width: number } | null,
+): { padding: Beside; alone: boolean } | null {
+  const whole = besideBar(width, over, run);
+  if (whole) return { padding: whole, alone: false };
+  if (!step || step.right <= width - over) return null;
+  const alone = besideBar(width, over, step.width);
+  return alone && { padding: alone, alone: true };
+}
+
+/**
+ * Whether the nodes in `bounds`, a box at a zoom of 1, are drawn whole on a canvas `width` by `height` pixels in the view `view`, its
+ * offset and zoom: no edge of theirs past an edge of the canvas.
+ */
+export function drawnWhole(
+  bounds: { x: number; y: number; width: number; height: number },
+  view: { x: number; y: number; zoom: number },
+  width: number,
+  height: number,
+): boolean {
+  const left = bounds.x * view.zoom + view.x;
+  const top = bounds.y * view.zoom + view.y;
+  return left >= 0 && top >= 0 && left + bounds.width * view.zoom <= width && top + bounds.height * view.zoom <= height;
+}
+
+/**
+ * The step whose session a click opens: on the second click of a double click, `detail` being the browser's count of the clicks, the
+ * step `pressed` that its first click showed, wherever the second lands — on the bar the first opened, or on the pane a fit moved the
+ * node off. Null for any other click, and where the first click showed no step.
+ */
+export const secondClick = (pressed: string | null, detail: number): string | null => (detail === 2 ? pressed : null);
+
 /** Where each step goes: where a person left it, if they moved it, else where the layering puts it. */
 export function place(
   names: readonly string[],

@@ -1,17 +1,25 @@
 /**
  * What the frame's floating bar shows, read from the address (`useBar`): nothing while it is closed, else the bar for the thing it names,
- * drawn afresh for each thing.
+ * drawn afresh for each thing, or for each run for its steps.
  */
 import { barValue } from '@/lib/bar';
 import { useBar } from '@/lib/useBar';
 import { StartBar } from './FactoryStart';
+import { StepBar } from './StepBar';
 
-/** The bar the address opens, keyed by what it shows, so a switch to another thing starts from nothing; none while it is closed. */
+/**
+ * The bar the address opens, keyed by what it shows, so a switch to another thing starts from nothing; none while it is closed, and none
+ * yet for a run. A step's is keyed by its run alone, so a switch to another step of the run keeps the tab a person picked.
+ */
 export function OpenBar() {
   const { open } = useBar();
   if (!open) return null;
   switch (open.kind) {
     case 'start':
       return <StartBar key={barValue(open)} factory={open.factory} />;
+    case 'step':
+      return <StepBar key={`step:${open.run}`} run={open.run} step={open.step} />;
+    case 'run':
+      return null;
   }
 }

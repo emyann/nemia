@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type RefObject } from 'react';
+import { useNavigate } from '@tanstack/react-router';
 import {
   applyNodeChanges,
   Background,
   BackgroundVariant,
   Controls,
+  getViewportForBounds,
   MiniMap,
   Panel,
   Position,
@@ -16,16 +18,18 @@ import {
   type NodePositionChange,
 } from '@xyflow/react';
 import type { RunDetail } from '../lib/api';
-import { forgetLayout, place, readLayout, saveLayout } from '../lib/canvas';
+import { inspects } from '../lib/bar';
+import { besideOpen, drawnWhole, forgetLayout, LEAST_ZOOM, place, readLayout, saveLayout, secondClick } from '../lib/canvas';
 import { layout, stepsOf, type Point } from '../lib/layout';
 import { useContent } from '../lib/useContent';
 import { stepState } from '../lib/status';
+import { useBar } from '../lib/useBar';
 import { CanvasLegend } from './CanvasLegend';
 import { StateEdge } from './StateEdge';
 import { stepData, stepEdges, stepMinimapFill } from './stepGraph';
 import { StepNode, type StepFlowNode } from './StepNode';
 
-type Props = { run: RunDetail; selected: string | null; onSelect: (step: string | null) => void };
+type Props = { run: RunDetail };
 
 /** The canvas's node types for React Flow, one object for the module's life. */
 const nodeTypes = { step: StepNode };
@@ -33,6 +37,79 @@ const nodeTypes = { step: StepNode };
 const edgeTypes = { state: StateEdge };
 
 const FIT = { padding: 0.2, maxZoom: 1.25 };
+
+/** The canvas's view, as `useReactFlow` gives it: what a fit reads the nodes from and fits. */
+type Flow = ReturnType<typeof useReactFlow<StepFlowNode>>;
+
+/**
+ * The node of the step `id` on the canvas of `flow`, as `besideOpen` reads it: its right edge as drawn, in pixels from `left`, the
+ * canvas's left edge on the screen, and its width at a zoom of 1. Null when the canvas has no such node.
+ */
+function stepOf(flow: Flow, id: string, left: number) {
+  const node = flow.getInternalNode(id);
+  if (!node) return null;
+  const width = node.measured.width ?? 0;
+  return { right: flow.flowToScreenPosition({ x: node.internals.positionAbsolute.x + width, y: 0 }).x - left, width };
+}
+
+/**
+ * How the canvas in `frame` is fitted, with the step `open` in the bar, or null: as `FIT`, where the frame's floating bar is not drawn;
+ * clear of the bar where it is (`besideOpen`), the whole run or the open step's node alone, at no more than the zoom it is drawn at and
+ * only where every node is still drawn whole on the canvas (`drawnWhole`). Null, to leave the view as it is. Takes the canvas's frame,
+ * or null; measures the bar where it is drawn, at each call.
+ */
+function fitBeside(frame: HTMLElement | null, flow: Flow, open: string | null) {
+  const bar = document.querySelector('[data-floating-bar]');
+  if (!frame || !bar) return FIT;
+  const box = frame.getBoundingClientRect();
+  const run = flow.getNodesBounds(flow.getNodes());
+  const fit = besideOpen(
+    frame.clientWidth,
+    box.right - bar.getBoundingClientRect().left,
+    run.width,
+    open ? stepOf(flow, open, box.left) : null,
+  );
+  if (!fit) return null;
+  if (!fit.alone || !open) return { ...FIT, padding: fit.padding };
+  const { clientWidth: width, clientHeight: height } = frame;
+  const view = getViewportForBounds(flow.getNodesBounds([open]), width, height, LEAST_ZOOM, flow.getZoom(), fit.padding);
+  return drawnWhole(run, view, width, height) ? { ...FIT, padding: fit.padding, nodes: [{ id: open }], maxZoom: flow.getZoom() } : null;
+}
+
+/**
+ * Fits the canvas in `frame` again, with the `fitView` of `flow`, clear of the bar (`fitBeside`): when the frame changes width, as when the
+ * window does, and once after each Reset layout's commit (`resets`, its count), the whole run; when the step open in the bar (`open`)
+ * changes, as the bar opens, switches or closes, the whole run or that step. A canvas drawn with no step open keeps React Flow's own fit.
+ */
+function useRefit(frame: RefObject<HTMLDivElement | null>, { open, resets }: { open: string | null; resets: number }, flow: Flow) {
+  useEffect(() => {
+    const el = frame.current;
+    if (!el) return;
+    let width = el.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (el.clientWidth === width) return;
+      width = el.clientWidth;
+      void flow.fitView({ ...(fitBeside(el, flow, null) ?? FIT), duration: 200 });
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [frame, flow]);
+
+  const was = useRef<string | null>(null);
+  useEffect(() => {
+    if (was.current === open) return;
+    was.current = open;
+    const fit = fitBeside(frame.current, flow, open);
+    if (fit) void flow.fitView({ ...fit, duration: 300 });
+  }, [open, frame, flow]);
+
+  const fitted = useRef(0);
+  useEffect(() => {
+    if (resets === fitted.current) return;
+    fitted.current = resets;
+    void flow.fitView({ ...(fitBeside(frame.current, flow, null) ?? FIT), duration: 300 });
+  }, [resets, frame, flow]);
+}
 
 const button =
   'rounded border border-neutral-300 bg-white px-2 py-1 text-xs text-neutral-700 shadow-sm hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:disabled:hover:bg-neutral-900';
@@ -82,9 +159,73 @@ const nodeAt = (name: string, position: Point): PlacedStep => ({
   data: {},
 });
 
-/** A drag moving a node, or React Flow measuring one: the only changes the canvas keeps; a selection is handed up to the page. */
+/** A drag moving a node, or React Flow measuring one: the only changes the canvas keeps; what is selected is the bar's. */
 const placing = (change: NodeChange<StepFlowNode>): change is NodePositionChange | NodeDimensionChange =>
   change.type === 'position' || change.type === 'dimensions';
+
+/**
+ * Opens the session of the step of the run `run` that a double click's first click showed, from its second click wherever it lands
+ * (`secondClick`): taken before anything under it takes it, and its double click kept from the pane. Returns what a node's first click
+ * calls with the step it shows.
+ */
+function useSecondClick(run: string) {
+  const navigate = useNavigate();
+  const pressed = useRef<string | null>(null);
+  useEffect(() => {
+    let opened = false;
+    const click = (event: globalThis.MouseEvent) => {
+      const step = secondClick(pressed.current, event.detail);
+      pressed.current = null;
+      opened = step !== null;
+      if (!step) return;
+      event.stopPropagation();
+      event.preventDefault();
+      void navigate({ to: '/runs/$runId/steps/$step', params: { runId: run, step } });
+    };
+    const dblclick = (event: globalThis.MouseEvent) => {
+      if (!opened) return;
+      opened = false;
+      event.stopPropagation();
+      event.preventDefault();
+    };
+    window.addEventListener('click', click, true);
+    window.addEventListener('dblclick', dblclick, true);
+    return () => {
+      window.removeEventListener('click', click, true);
+      window.removeEventListener('dblclick', dblclick, true);
+    };
+  }, [navigate, run]);
+  return (step: string) => {
+    pressed.current = step;
+  };
+}
+
+/**
+ * What a press on the canvas of `run` does, through the frame's bar (`useBar`): the step it shows (`selected`), none when it shows
+ * anything else; a click or Enter on a node shows that step, or closes the bar for the step it shows (`toggle`); a double click on a node
+ * opens the step's session, its first click having shown the step and its second taken wherever it lands (`useSecondClick`); and a click
+ * on the pane closes a bar a canvas opened (`inspects`), never the start of a run.
+ */
+function usePress(run: RunDetail) {
+  const { open, toggle, close } = useBar();
+  const pressed = useSecondClick(run.id);
+  const inspect = (step: string) => toggle({ kind: 'step', run: run.id, step });
+  return {
+    selected: open?.kind === 'step' && open.run === run.id ? open.step : null,
+    onNodeClick: (event: MouseEvent, node: { id: string }) => {
+      if (event.detail > 1) return;
+      inspect(node.id);
+      pressed(node.id);
+    },
+    onKeyDown: (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement;
+      if (event.key === 'Enter' && target.classList.contains('react-flow__node') && target.dataset.id) inspect(target.dataset.id);
+    },
+    onPaneClick: () => {
+      if (inspects(open)) close();
+    },
+  };
+}
 
 /**
  * The canvas of `RunCanvas`, given the layering it computed.
@@ -92,15 +233,17 @@ const placing = (change: NodeChange<StepFlowNode>): change is NodePositionChange
  * - A node's place and size change only through a drag, a move by the arrow keys or React Flow measuring it, a step the workflow folder
  *   gains or loses while the page is open (placed where it belongs, `place`), and Reset layout. What a node shows is read from the run
  *   on every render, so a refetch moves the chips and leaves the nodes where a person put them. A node moved is saved in this browser.
- * - A click or a key that selects a step hands it up (`onSelect`), and a click on the pane hands up none: the page owns the panel, so it
- *   owns which step is selected.
+ * - A press shows a step in the frame's bar, which floats over the page, and a double click opens its session (`usePress`); the step the
+ *   bar shows is drawn selected.
  * - Reset layout lays the nodes out again from `after`, forgets the saved arrangement, and fits the view once, after the commit that
- *   moved them. The view is fitted again when the canvas changes width, as when the step panel opens beside it.
+ *   moved them. The view is fitted again when the canvas changes width, as when the window does, and as a step opens in the bar, switches
+ *   or closes, each time clear of the bar over the canvas: the whole run, or the open step where the run is too wide (`useRefit`).
  * - The legend wraps short of the minimap, drawn smaller than React Flow's own so it covers no node; arrowheads take their edges' colour
  *   in both themes.
  */
-function Canvas({ run, selected, onSelect, computed }: Props & { computed: ReadonlyMap<string, Point> }) {
-  const { fitView } = useReactFlow<StepFlowNode>();
+function Canvas({ run, computed }: Props & { computed: ReadonlyMap<string, Point> }) {
+  const flow = useReactFlow<StepFlowNode>();
+  const { selected, ...press } = usePress(run);
   const runCancelled = run.cancelledAt !== null;
   const names = useContent(run.steps.map((s) => s.name));
 
@@ -136,16 +279,11 @@ function Canvas({ run, selected, onSelect, computed }: Props & { computed: Reado
   const edges = useMemo(() => stepEdges(run), [run]);
 
   const moved = useRef(false);
-  const onNodesChange = useCallback(
-    (changes: NodeChange<StepFlowNode>[]) => {
-      const picked = changes.find((c) => c.type === 'select' && c.selected);
-      if (picked?.type === 'select') onSelect(picked.id);
-      if (changes.some((c) => c.type === 'position' && !c.dragging)) moved.current = true;
-      const kept = changes.filter(placing);
-      setPlaced((current) => applyNodeChanges(kept, current));
-    },
-    [onSelect],
-  );
+  const onNodesChange = useCallback((changes: NodeChange<StepFlowNode>[]) => {
+    if (changes.some((c) => c.type === 'position' && !c.dragging)) moved.current = true;
+    const kept = changes.filter(placing);
+    setPlaced((current) => applyNodeChanges(kept, current));
+  }, []);
   useEffect(() => {
     if (!moved.current) return;
     moved.current = false;
@@ -153,7 +291,7 @@ function Canvas({ run, selected, onSelect, computed }: Props & { computed: Reado
   }, [placed, run.id]);
 
   const running = run.steps.filter((s) => states.get(s.name) === 'working').map((s) => s.name);
-  const focusRunning = () => void fitView({ nodes: running.map((id) => ({ id })), padding: 0.5, maxZoom: 1.25, duration: 400 });
+  const focusRunning = () => void flow.fitView({ nodes: running.map((id) => ({ id })), padding: 0.5, maxZoom: 1.25, duration: 400 });
 
   const [resets, setResets] = useState(0);
   const resetLayout = () => {
@@ -161,26 +299,8 @@ function Canvas({ run, selected, onSelect, computed }: Props & { computed: Reado
     setPlaced((current) => current.map((n) => ({ ...n, position: computed.get(n.id) ?? n.position })));
     setResets((n) => n + 1);
   };
-  const fitted = useRef(0);
-  useEffect(() => {
-    if (resets === fitted.current) return;
-    fitted.current = resets;
-    void fitView({ ...FIT, duration: 300 });
-  }, [resets, fitView]);
-
   const frame = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = frame.current;
-    if (!el) return;
-    let width = el.clientWidth;
-    const observer = new ResizeObserver(() => {
-      if (el.clientWidth === width) return;
-      width = el.clientWidth;
-      void fitView({ ...FIT, duration: 200 });
-    });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [fitView]);
+  useRefit(frame, { open: selected, resets }, flow);
 
   return (
     <div ref={frame} className="h-[30rem] overflow-hidden rounded border border-neutral-200 dark:border-neutral-800">
@@ -190,9 +310,9 @@ function Canvas({ run, selected, onSelect, computed }: Props & { computed: Reado
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
-        onPaneClick={() => onSelect(null)}
+        {...press}
         nodesConnectable={false}
-        selectNodesOnDrag={false}
+        elementsSelectable={false}
         edgesFocusable={false}
         deleteKeyCode={null}
         selectionKeyCode={null}
@@ -201,6 +321,7 @@ function Canvas({ run, selected, onSelect, computed }: Props & { computed: Reado
         defaultMarkerColor={null}
         fitView
         fitViewOptions={FIT}
+        minZoom={LEAST_ZOOM}
       >
         <Panel position="top-left" className="text-[11px] text-neutral-500">
           Drag to arrange · kept in this browser

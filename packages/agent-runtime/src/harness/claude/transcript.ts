@@ -261,9 +261,10 @@ const costStateOf = (line: Line<'cost-state'>): CostState => ({
 });
 
 /**
- * How far before the session's start in the registry a `cost-state`'s `startTime` may be and still be the count this
- * session began. Claude Code starts counting a moment before or after it registers the session — well under a second
- * either way — and a count carried on from an earlier process of the session began minutes before.
+ * How far from the attempt's start a `cost-state`'s `startTime` may be, before or after, and still be the count this attempt
+ * began. Claude Code starts counting a moment before or after it registers the session — well under a second either way —
+ * a count carried on from an earlier process of the session began minutes before, and a process Claude Code respawned a
+ * long-lived attempt in starts a count of its own, ten seconds or more after the attempt began.
  */
 const COST_START_SLACK_MS = 5_000;
 
@@ -278,13 +279,15 @@ const COST_START_SLACK_MS = 5_000;
  * session's total, so an attempt's cost is its own, as its tokens are, and as a resumed `claude -p` reports its own.
  *
  * Absent, never 0: while no line has been written since the attempt began (its process has not exited); when the count
- * was carried on from a total this transcript does not show; and, for `costUsd`, when the harness could not price a
+ * was carried on from a total this transcript does not show; when the count began after the attempt did — a process Claude
+ * Code respawned the attempt in counts its own turns alone, and its predecessor, killed, wrote none — so a cost too low is
+ * never read as the attempt's; and, for `costUsd`, when the harness could not price a
  * model the session used — a total too low reads as the whole cost, so none is given, and `unpricedModel` says why.
  *
  * `tokens`: its tokens too, the same way — for an attempt whose transcript cannot count them (`transcriptUsage`).
  */
 const costOf = (before: CostState | undefined, after: CostState | undefined, since: number, tokens = false): Usage => {
-  if (after?.startTime === undefined) return {};
+  if (after?.startTime === undefined || after.startTime > since + COST_START_SLACK_MS) return {};
   const carried = after.startTime < since - COST_START_SLACK_MS;
   const base = carried && before?.startTime === after.startTime ? before : undefined;
   if (carried && !base) return {};
@@ -318,7 +321,8 @@ const costOf = (before: CostState | undefined, after: CostState | undefined, sin
  * What a session consumed, read from its transcript: the responses made at or after `since`, and what Claude Code said
  * the attempt cost (`costOf`).
  *
- * `since` is the session's own start, from the harness's registry. A resumed transcript holds its
+ * `since` is the session's own start, from the harness's registry, or a long-lived attempt's, as its journal gives it: the
+ * responses of every process Claude Code respawned it in are its own. A resumed transcript holds its
  * parent's whole conversation under the child's id, with the parent's timestamps, so counted whole
  * a continuation would report its parent's work as its own. A response is written as one line per
  * content block, each repeating its `message.id` and `usage`, so responses are counted once, by id. Tokens are given only when every

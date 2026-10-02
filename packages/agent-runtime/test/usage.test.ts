@@ -209,6 +209,40 @@ test("a resumed session's cost is its own: the total it exited with, less the to
   assert.equal(transcriptUsage(jsonl, Date.parse('2026-09-15T02:47:53Z')).costUsd, 4.1704, 'the third');
 });
 
+test("a long-lived attempt Claude Code respawned is counted across both processes, and the respawn's own cost is not the attempt's", () => {
+  const since = 1790978606904;
+  const respawned = 1790978632072;
+  const at = (ms: number) => new Date(ms).toISOString();
+  const jsonl = [
+    prompt(at(since + 500)),
+    response(at(since + 2_000), 'msg_1', []),
+    response(at(since + 4_000), 'msg_2', []),
+    response(at(since + 6_000), 'msg_3', []),
+    response(at(respawned + 3_000), 'msg_4', []),
+    costState(0.0046575, 2100, 0, respawned),
+    costState(0.0046575, 2100, 0, respawned),
+  ].join('\n');
+
+  const attempt = transcriptUsage(jsonl, since);
+  assert.equal(attempt.turns, 4, "the killed process wrote no cost-state, and its turns are the attempt's all the same");
+  assert.equal(attempt.outputTokens, 20);
+  for (const key of ['costUsd', 'apiMs', 'toolMs'])
+    assert.equal(key in attempt, false, `${key}: the respawned process counted its own turns alone, too low for the attempt`);
+
+  const respawn = transcriptUsage(jsonl, Date.parse(at(respawned + 813)));
+  assert.equal(respawn.turns, 1, 'counted from the respawn, its own turn');
+  assert.equal(respawn.costUsd, 0.0046575, 'and the cost-state is its count, begun as it registered');
+});
+
+test("a cost-state begun a moment after the attempt is the attempt's count, and one begun before is carried on from", () => {
+  const since = Date.parse('2026-10-02T22:03:00Z');
+  const jsonl = (startTime: number) =>
+    [prompt('2026-10-02T22:03:01Z'), response('2026-10-02T22:03:02Z', 'msg_1', []), costState(0.25, 900, 10, startTime)].join('\n');
+  assert.equal(transcriptUsage(jsonl(since + 4_000), since).costUsd, 0.25, 'counted from just after it registered');
+  assert.equal(transcriptUsage(jsonl(since - 4_000), since).costUsd, 0.25, 'counted from just before');
+  assert.equal('costUsd' in transcriptUsage(jsonl(since + 6_000), since), false, 'counted from a later process');
+});
+
 test('a count carried on from a total the transcript does not show is no cost', () => {
   const since = Date.parse('2026-09-15T01:12:01Z');
   const jsonl = [prompt('2026-09-15T01:12:05Z'), costState(43.0383, 3335346, 341815, Date.parse('2026-09-15T00:04:43Z'))].join('\n');

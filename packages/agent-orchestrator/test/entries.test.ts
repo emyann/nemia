@@ -125,6 +125,7 @@ const PINNED: Record<string, string[]> = {
     'forgetLine',
     'formerKeyLines',
     'freshFeedMemo',
+    'freshStatsMemo',
     'fromNote',
     'gateRefusal',
     'gatesOf',

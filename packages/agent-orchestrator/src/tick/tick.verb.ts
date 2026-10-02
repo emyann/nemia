@@ -20,7 +20,7 @@ import { ceilings, recordCeilings, recordPassCost } from '../daemon/daemon.store
 import { verifiesRest } from '../config/config.store.ts';
 import { feedFile, recordFeed } from '../feed/feed.store.ts';
 import { headsOf } from '../branches/branches.store.ts';
-import { evictedBy } from '../rest/rest.ts';
+import { followedFeed } from '../rest/rest.verb.ts';
 import { reportedEngine } from '../views/views.verb.ts';
 import { startQueued } from '../inbox/inbox.verb.ts';
 import { momentumOf, toAdmit } from '../cap/cap.ts';
@@ -330,35 +330,6 @@ const restingPass = Effect.fn('restingPass')(function* (e: Engine, memo: RestMem
   };
   return resting;
 });
-
-/**
- * Whether the memo was brought up to the engine's feed (`restingPass`): false, the memo emptied and its place on the feed forgotten, for a
- * feed that cannot be read. Never rejects.
- */
-async function followedFeed(e: Engine, memo: RestMemo): Promise<boolean> {
-  try {
-    if (memo.cursor === undefined) {
-      memo.runs.clear();
-      const { cursor } = await e.feed(Number.MAX_SAFE_INTEGER);
-      memo.cursor = cursor >= Number.MAX_SAFE_INTEGER ? 0 : cursor;
-      return true;
-    }
-    const { entries, cursor } = await e.feed(memo.cursor);
-    if (cursor < memo.cursor) memo.runs.clear();
-    else
-      for (const id of evictedBy(
-        entries.map((f) => f.taskId),
-        new Set(memo.runs.keys()),
-      ))
-        memo.runs.delete(id);
-    memo.cursor = cursor;
-    return true;
-  } catch {
-    memo.runs.clear();
-    memo.cursor = undefined;
-    return false;
-  }
-}
 
 /**
  * A run's full pass (`advanceRun`): what it advanced, what holds it out of rest, and what it rests on. Fails with `Unjudged` where a read

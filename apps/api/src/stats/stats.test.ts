@@ -247,3 +247,27 @@ test('GET /api/stats answers each tally a step froze, per day and over the range
   const none = await asked('?ofFactory=other');
   assert.deepEqual(none.body.all.tallies, [], 'a step that declares no tally has no row');
 });
+
+/** With the memo's check off: what the memo alone answers, and reads. */
+async function unverified<T>(f: () => Promise<T>): Promise<T> {
+  process.env.WF_VERIFY_REST = '0';
+  try {
+    return await f();
+  } finally {
+    process.env.WF_VERIFY_REST = '1';
+  }
+}
+
+test("GET /api/stats reads no run's journal again while the store is as it was, and reads again only the run whose record changed", async () => {
+  const first = await asked('');
+  const reads = e.io().reads;
+  const again = await unverified(() => asked(''));
+  assert.equal(e.io().reads - reads, 0, "the app's memo answered every run");
+  assert.deepEqual(again, first);
+  const record = path.join(root, 'runs', 'r-home.json');
+  write(record, JSON.stringify({ ...JSON.parse(fs.readFileSync(record, 'utf8')), brief: 'The brief of r-home, said again' }));
+  const before = e.io().reads;
+  const after = await unverified(() => asked(''));
+  assert.equal(e.io().reads - before, 1, "r-home's one journal, and no other run's");
+  assert.deepEqual(after.body, await flowNumbers(e, {}));
+});

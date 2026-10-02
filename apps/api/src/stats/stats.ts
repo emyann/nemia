@@ -1,6 +1,6 @@
 /** The flow numbers of every run in the store, for the board: what `wf stats --json` prints. */
 import { Hono } from 'hono';
-import { stats as flowNumbers, statsQueryOf, type QueryKey, type Stats } from 'agent-orchestrator';
+import { stats as flowNumbers, statsQueryOf, verifiesRest, type QueryKey, type Stats } from 'agent-orchestrator';
 import { type ApiEnv, served } from '../layer.ts';
 
 export type { Stats };
@@ -35,12 +35,13 @@ const QUERY_KEYS: Record<QueryKey, string> = {
  *   (`total`) and on each of its `days`: an array's items, a number's value, or the items whose boolean flag is true; `sum` is null,
  *   never 0, on a day no closeout of the step measured it. Each group carries its `marks`: the days a run froze a step, an agent or a
  *   rendered skill that differs from the run of the same workflow folder before it. A query the package refuses (`statsQueryOf`) is a
- *   422 naming the key and what it takes.
+ *   422 naming the key and what it takes. A run is read again only when its files in the store or its tasks' journals changed: each
+ *   finished run's facts are answered from the app's memo (`ReadMemo`) while they stand, and read afresh too under `WF_VERIFY_REST=1`.
  */
 export const stats = new Hono<ApiEnv>().get('/api/stats', (c) =>
-  served(c, async ({ e }) => {
+  served(c, async ({ e, env, memo }) => {
     const given = Object.fromEntries(Object.entries(QUERY_KEYS).map(([key, name]) => [key, c.req.query(name)]));
     const query = statsQueryOf(given, (key) => `?${QUERY_KEYS[key]}=`);
-    return c.json(await flowNumbers(e, query));
+    return c.json(await flowNumbers(e, query, new Date(), { memo: memo.stats, verify: verifiesRest(env) }));
   }),
 );

@@ -10,7 +10,14 @@
  * one before the first call or after the last is drawn on its own. A lone call is drawn as itself. The closeout — the
  * `StructuredOutput` call — is never folded: it is named, on its own, and it ends a fold as words do.
  */
-import type { Said, TranscriptEvent } from './api';
+import type { RunDetail, Said, TranscriptEvent } from './api';
+
+/**
+ * The task whose conversation a step has to read: its current try's, once an attempt of it has started. Null for a step not filed, and
+ * for one filed whose session has not started — waiting for a slot, or a task the engine has no record of — which has none to read.
+ */
+export const sessionToRead = (step: Pick<RunDetail['steps'][number], 'taskId' | 'attempts'>): string | null =>
+  step.attempts.count > 0 ? step.taskId : null;
 
 /** The tool a Claude Code session gives its closeout with. Codex gives its closeout as its last words, which are said. */
 export const CLOSEOUT_TOOL = 'StructuredOutput';

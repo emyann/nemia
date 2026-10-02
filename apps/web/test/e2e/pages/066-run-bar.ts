@@ -1,5 +1,5 @@
 import path from 'node:path';
-import type { Locator, Page } from 'playwright';
+import type { Locator, Page, Request } from 'playwright';
 import { photograph, stepBar, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { FAKE, FOLDER } from '../seed.ts';
@@ -154,17 +154,52 @@ async function keys(page: Page): Promise<void> {
   await expectFocused(page, OTHER, `and gives the focus back to ${OTHER}'s node, switched from, not to ${FIRST}'s, which opened the bar`);
 }
 
+/** The api's reads of a step's conversation: once, and followed. */
+const TRANSCRIPT = /^\/api\/runs\/[^/]+\/steps\/[^/]+\/transcript(\/stream)?$/;
+
+/** What the session page says of a step none of whose sessions has started. */
+const NO_SESSION = 'No session of it has started yet, so there is no conversation to show.';
+
+/** Refuses unless the session page says it has no conversation, once its reads are done. */
+async function expectNoConversation(page: Page, assertion: string): Promise<void> {
+  await idle(page);
+  await expectVisible(page.getByText(NO_SESSION, { exact: true }), assertion);
+}
+
 /**
  * The bar's Open, and a double click on a node, each open the step's session. The node double clicked lies where the bar opens: the
- * first click opens the bar over it, and the second, landing on the bar, still opens the step's session.
+ * first click opens the bar over it, and the second, landing on the bar, still opens the step's session. The step has no session that
+ * started, so neither its Activity tab nor its session page asks for its conversation, and each says it has none.
  */
 async function opens(page: Page): Promise<void> {
+  const asked: string[] = [];
+  const ask = (request: Request) => {
+    if (TRANSCRIPT.test(new URL(request.url()).pathname)) asked.push(request.url());
+  };
+  page.on('request', ask);
+  try {
+    await opened(page);
+  } finally {
+    page.off('request', ask);
+  }
+  if (asked.length) throw new Refused(`a step with no session that started asks for no conversation — asked ${asked.join(', ')}`);
+}
+
+/** The opens of `opens`, while it watches for a read of a conversation. */
+async function opened(page: Page): Promise<void> {
   const session = `${RUN}/steps/${OTHER}`;
   await nodeOf(page, OTHER).click();
   const bar = await expectShows(page, OTHER, `a click on ${OTHER} shows it`);
   const where = await bar.boundingBox();
+  await bar.getByRole('tab', { name: 'Activity' }).click();
+  await expectVisible(
+    bar.getByText('No session of it has started, so there is no conversation yet.', { exact: true }),
+    `the Activity tab of ${OTHER}, none of whose sessions started, says it has no conversation yet`,
+  );
+  await idle(page);
   await bar.getByRole('link', { name: 'Open', exact: true }).click();
   await expectAt(page, session, `the bar's Open opens ${OTHER}'s session`);
+  await expectNoConversation(page, `${OTHER}'s session page, opened from the bar, says it has no conversation to show`);
   await visit(page, RUN);
   const node = await nodeOf(page, OTHER).boundingBox();
   if (!where || !node || node.x + node.width / 2 <= where.x)
@@ -173,6 +208,7 @@ async function opens(page: Page): Promise<void> {
     );
   await nodeOf(page, OTHER).dblclick();
   await expectAt(page, session, `a double click on ${OTHER}, whose second click lands on the bar the first opened, opens its session`);
+  await expectNoConversation(page, `${OTHER}'s session page, opened by a double click, says it has no conversation to show`);
   await visit(page, RUN);
 }
 
@@ -197,7 +233,7 @@ export default {
    * A run's canvas and the floating bar: an old `?step=` link lands on the bar, the canvas the page's whole width; a click on a node shows
    * it, the same node again closes it, another switches it with the tab kept, and the nodes are fitted clear of the bar; the empty canvas
    * closes it, but never the start of a run; Enter and Escape do as a click and Close, and Escape gives the focus back to the node; Open
-   * and a double click open the step's session, its second click landing on the bar.
+   * and a double click open the step's session, its second click landing on the bar, and a step with no session asks no conversation.
    */
   name: 'run-bar',
   route: RUN,

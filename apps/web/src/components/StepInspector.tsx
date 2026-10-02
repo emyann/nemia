@@ -4,7 +4,7 @@ import type { RunDetail, StepTry } from '../lib/api';
 import { duration, isLive } from '../lib/canvas';
 import { isGate, stepState, type StepState } from '../lib/status';
 import { gateOfStep } from '../lib/gate';
-import { foldTranscript } from '../lib/transcript';
+import { foldTranscript, sessionToRead } from '../lib/transcript';
 import { useStepTranscript } from '../lib/useStepTranscript';
 import { cn } from '../lib/utils';
 import { Rounds, TryCloseouts, tryLabel } from './Closeout';
@@ -271,11 +271,12 @@ const ACTIVITY_TURNS = 30;
  */
 function Activity({ run, step }: { run: RunDetail; step: Step }) {
   const cancelled = run.cancelledAt !== null;
-  const following = useStepTranscript(run.id, step.name, step.taskId, isGate(stepState(step.status, cancelled, false), cancelled));
+  const following = useStepTranscript(run.id, step.name, sessionToRead(step), isGate(stepState(step.status, cancelled, false), cancelled));
   const turns = useMemo(() => foldTranscript(following.events), [following.events]);
   const tail = turns.slice(-ACTIVITY_TURNS);
 
   if (!step.taskId) return <p className="text-neutral-500">Not filed yet, so there is no conversation.</p>;
+  if (!sessionToRead(step)) return <p className="text-neutral-500">No session of it has started, so there is no conversation yet.</p>;
 
   return (
     <>

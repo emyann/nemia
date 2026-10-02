@@ -377,9 +377,12 @@ step's `tools:` may name only tools its agent's list has; its `allowedTools:` on
 which replaces its agent's list, must keep each of its agent's denies. Its `permissionMode:` or `sandbox:` may be no wider than its
 agent's, or than its harness's default when the agent names none: from narrowest, `plan`; `dontAsk`, `default` and `manual`;
 `acceptEdits`; `auto`; `bypassPermissions` — and on codex `read-only`; `workspace-write`; `danger-full-access`. And it may not run a
-fenced agent on the other harness, whose fence cannot be compared. One rule covers another when it is the same rule, a bare tool, a
-command prefix (`Bash(npm:*)` covers `Bash(npm test)`, never a command joined to another, `Bash(npm test && git push)`) or a path
-ending in `**` (`Edit(**)` covers `Edit(notes/**)`); anything else counts as wider. An agent's mode grants what it does unasked: from
+fenced agent on the other harness, whose fence cannot be compared. Nor may it set `background: true` over an agent in any mode but
+`bypassPermissions`: a background session also reads the person's user settings and the checkout's `settings.local.json`, where each
+"don't ask again" writes an allow rule, and every other mode runs more of what such a rule allows. Delete the line, and the step runs as
+a job, or attach an agent in `bypassPermissions` that denies by name what it must never do. One rule covers another when it is the
+same rule, a bare tool, a command prefix (`Bash(npm:*)` covers `Bash(npm test)`, never a command joined to another, `Bash(npm test &&
+git push)`) or a path ending in `**` (`Edit(**)` covers `Edit(notes/**)`); anything else counts as wider. An agent's mode grants what it does unasked: from
 `acceptEdits` up, an `Edit` inside its directory, and under `bypassPermissions` every rule. The board's try (`apps/api`) holds an
 agent to its folder this way (`directoryFence`): `dontAsk`, or the agent's mode where narrower, allowed `Edit(**)` over a mode that edits
 unasked and otherwise only the agent's rules inside the folder; an agent whose every rule reaches outside it is not tried, since a step

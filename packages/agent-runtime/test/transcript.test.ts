@@ -205,8 +205,8 @@ test("the Claude runner reads a session's conversation from its transcript: date
   assert.deepEqual(events, CLAUDE_EVENTS);
   datedWithRoles(events);
   assert.ok(
-    events.every((e) => Date.parse(e.at) < Date.now() - 3_000_000),
-    "each at the transcript's own time, an hour ago, not the read's",
+    events.every((e) => Date.parse(e.at) >= T0 && Date.parse(e.at) <= T0 + 8_000),
+    "each at the transcript's own time, between its first line and its last, not the read's",
   );
   const calls = events.filter((e) => e.kind === 'tool_use');
   assert.deepEqual(

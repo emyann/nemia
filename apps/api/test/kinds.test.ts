@@ -1,5 +1,5 @@
 /**
- * The api's two kinds of file (`docs/architecture.md`, *The rules that hold the layers*). An entry file (`ENTRY`: the process, the
+ * The api's two kinds of file (`docs/architecture.md`, *The rules*). An entry file (`ENTRY`: the process, the
  * mount and the services) may read the environment and serve HTTP; every other file under `src` is a reader, which reaches the machine
  * only through the orchestrator: it imports no module of the disk, a process, the network or the machine, bare or as `node:`, nor the
  * node server (`IMPURE`), and reads neither `process.env` nor the global `fetch` outside its comment lines (`globalsIn`).
@@ -40,7 +40,6 @@ const FETCH = /(?:^|[^.\w$'"`-])fetch(?![\w$-])(?!\s*:)|\bglobalThis\s*\.\s*fetc
 
 /** The cards filed to move a reach out of an api reader, by the id an entry names. */
 const CARDS: Readonly<Record<string, string>> = {
-  hcjv: 'the-runtime-answers-a-harnes-hcjv: the quota probe moves into the runtime',
   'slice-4':
     'Nemia platform slice 4 (amend-the-nemia-intent-one-n-y2vp): the command table and the rename to nemia; the api rebuilds no verb',
 };
@@ -78,7 +77,11 @@ const MOVES: Readonly<Record<string, Entry>> = {
   },
   'src/decide/merge.ts': { reaches: ['node:child_process'], card: 'slice-4' },
   'src/detail/detail.ts': { reaches: ['node:fs'], ...RUN_STORE },
-  'src/factory/quota.ts': { reaches: ['global:process.env'], card: 'hcjv' },
+  'src/factory/quota.ts': {
+    reaches: ['global:process.env'],
+    move: "the quota asker's default environment, read off the process",
+    to: 'the environment `served` gives each handler (src/layer.ts), passed to the asker by its route',
+  },
   'src/inbox/inbox.ts': {
     reaches: ['node:fs'],
     move: "reading the inbox's files",
@@ -234,7 +237,7 @@ test('REFUSED: a reader that imports the disk or the node server, reads the envi
 
 test('REFUSED: a baselined reader reaching more, an entry listing a reach gone, an entry for an entry file or a file gone, and one unnamed', () => {
   const exists = (file: string): boolean => file !== 'src/gone.ts';
-  const held: Entry = { reaches: ['node:fs'], card: 'hcjv' };
+  const held: Entry = { reaches: ['node:fs'], card: 'slice-4' };
   const breaks = (reached: Record<string, string[]>, moves: Record<string, Entry>): string[] => kindBreaks(reached, moves, exists);
   assert.deepEqual(breaks({ 'src/a.ts': ['node:fs'] }, { 'src/a.ts': held }), [], 'the reaches the entry lists are let through');
   assert.deepEqual(breaks({ 'src/a.ts': ['node:fs', 'node:os'] }, { 'src/a.ts': held }), [

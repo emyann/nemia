@@ -378,9 +378,12 @@ step's `tools:` may name only tools its agent's list has; its `allowedTools:` on
 which replaces its agent's list, must keep each of its agent's denies. Its `permissionMode:` or `sandbox:` may be no wider than its
 agent's, or than its harness's default when the agent names none: from narrowest, `plan`; `dontAsk`, `default` and `manual`;
 `acceptEdits`; `auto`; `bypassPermissions` — and on codex `read-only`; `workspace-write`; `danger-full-access`. And it may not run a
-fenced agent on the other harness, whose fence cannot be compared. One rule covers another when it is the same rule, a bare tool, a
-command prefix (`Bash(npm:*)` covers `Bash(npm test)`, never a command joined to another, `Bash(npm test && git push)`) or a path
-ending in `**` (`Edit(**)` covers `Edit(notes/**)`); anything else counts as wider. An agent's mode grants what it does unasked: from
+fenced agent on the other harness, whose fence cannot be compared. Nor may it set `background: true` over an agent in any mode but
+`bypassPermissions`: a background session also reads the person's user settings and the checkout's `settings.local.json`, where each
+"don't ask again" writes an allow rule, and every other mode runs more of what such a rule allows. Delete the line, and the step runs as
+a job, or attach an agent in `bypassPermissions` that denies by name what it must never do. One rule covers another when it is the
+same rule, a bare tool, a command prefix (`Bash(npm:*)` covers `Bash(npm test)`, never a command joined to another, `Bash(npm test &&
+git push)`) or a path ending in `**` (`Edit(**)` covers `Edit(notes/**)`); anything else counts as wider. An agent's mode grants what it does unasked: from
 `acceptEdits` up, an `Edit` inside its directory, and under `bypassPermissions` every rule. The board's try (`apps/api`) holds an
 agent to its folder this way (`directoryFence`): `dontAsk`, or the agent's mode where narrower, allowed `Edit(**)` over a mode that edits
 unasked and otherwise only the agent's rules inside the folder; an agent whose every rule reaches outside it is not tried, since a step
@@ -487,8 +490,11 @@ Claude Code's flags for it in the engine's `config.claude` (docs/spike-2026-09-2
   a former word under the new key.
 
 Rendered or not, a step's job reads its checkout's settings and never the operator's. The runtime spawns every job with `--setting-sources
-project,local` (the runtime's README, *Settings: the checkout's, never the operator's*). So what a step needs is said where the run
-carries it. A rule goes in the repository's `.claude/settings.json` or on the step (`allowedTools:`). A step's `model:` and `effort:` go on
+project` (the runtime's README, *Settings: the checkout's, never the operator's*). So what a step needs is said where the run
+carries it. A rule goes in the repository's `.claude/settings.json` or on the step (`allowedTools:`). A rule in a checkout's
+`.claude/settings.local.json`, where "don't ask again" writes, reaches no step's job, only a background session. A step in the checkout
+itself (`workspace: main`) is given one rule by the run: a read of its own run's artifacts folder, where the steps before it left their
+files, and of no other run's (`filedAllows`). A step's `model:` and `effort:` go on
 the step or its agent, or it gets Claude Code's default rather than whatever the person running `wf up` set. And a repository whose commits
 must carry no `Co-Authored-By` trailer says `attribution` in its settings, as this one does. The skills a step is listed are its plugin's and
 the repository's, and none from `~/.claude/skills` or the operator's plugins (F24).
@@ -1152,8 +1158,9 @@ nothing that waits on the step ever runs. A step with no `check:` has nothing ru
   A check no longer passes or fails on what `main` holds.
 - **A step is told before it is judged.** Every brief with a check says the command must exit 0 in the
   workspace, that the run executes it afterwards, and not to weaken it.
-- **It is an engine task,** on a `check` harness the run hands the engine (`src/check/check.ts`): `sh -c` with
-  the command in a subshell, stderr to a file of its own, and the exit code printed last. So a check
+- **It is an engine task,** on the runtime's command harness, registered as `check` (`HARNESSES` in
+  `src/runtime-client.ts`): filed with `sh -c` and the line the run froze as its `config.command` (`checkArgv`), its
+  environment and its niceness beside it; the runtime keeps its stdout and its stderr each whole. So a check
   outlives a tick that dies, is stopped by `wf cancel`, ends at a twenty-minute deadline, runs once and is
   never resumed, and has a concurrency pool of its own. Its task id is `<run>-<step>-check`, recorded as
   `steps[name].check` — beside the step's own `taskId`, never in place of it. The engine is unchanged.
@@ -1164,23 +1171,23 @@ nothing that waits on the step ever runs. A step with no `check:` has nothing ru
   watches while it runs; the agent sessions, filed on other harnesses, stay at normal priority, and so does a suite a
   session runs itself. `nice` ranks processes inside one kernel: in WSL a check now yields to the sessions and to a
   person's own Linux work, but with nothing else busy there it still uses every CPU the VM has. `CHECK_NICENESS`.
-- **The gate is the exit code the engine recorded.** The `[wf check] exit N` line in the log is the
-  number shown to a person; a command that prints one of its own changes that number and nothing else.
+- **The gate is the exit code the engine recorded** on the check's attempt, which is also the number shown to a
+  person (`attemptVerdict`); an attempt cut short at its deadline or by an operator did not finish, whatever it
+  exited with. What a command prints changes neither.
 - The command sees `WF_RUN`, `WF_STEP`, `WF_BASE_REF`, `WF_WORKSPACE`, `WF_ARTIFACTS` — the
   step's files directory, where a check that takes screenshots puts them (*A step's files*, below) — and
   `WF_CLOSEOUT`: the step's closeout as a JSON file, flat, its declared fields beside the four, the check's own data
-  to read (`checks/<task>.closeout.json`, beside its stderr). `WF_STDERR` and `WF_STDOUT` are the run's, and unset
-  before the command runs: its stderr goes to `checks/<task>.stderr`, and its stdout to the log and, whole, to
-  `checks/<task>.stdout`, since the engine's log of a task keeps only its last 8,000 characters. The copy is no
-  verdict: the command's exit is the check's, and a copy that cannot be made leaves stdout to the log alone.
+  to read (`checks/<task>.closeout.json`). Its stdout and its stderr are the runtime's, each kept whole beside its
+  attempt and read through the engine's `output` (`ae output <task> stdout`), since the engine's log of a task keeps
+  only its last 8,000 characters.
 - The run commits what a step left **before** filing its check and never after, so what a suite leaves
   behind is not committed under the step's name.
 - **The step filed after a checked step is handed what the check said**, in its brief, under
   `## What <step>'s check said`: its verdict (exit N, did not finish, or why it cannot be read), the last lines
   of its stdout and its stderr, and every line of its stdout that starts `wf <name>:` — a lowercase name, a colon
-  and a space, at the start of the line — whole, from `checks/<task>.stdout` and not only the tail
-  (`reportedLines`, at most `REPORTED_LINES`). A check with no such file — filed before it was kept, or whose copy
-  could not be made — has those lines read from the end of the log alone, and the section says so, with
+  and a space, at the start of the line — whole, from the stdout the runtime kept and not only the tail
+  (`reportedLines`, at most `REPORTED_LINES`). A check whose stdout the runtime did not keep — filed before it kept
+  streams — has those lines read from the end of the log alone, and the section says so, with
   `"partial": true`: a line absent from it proves nothing. That is how a check marks what the next step must read: `workflows/build`'s mutants
   print `wf mutants: …`, and a reviewer whose fence reaches no log judges them from its brief. The step reads
   the check of the try or round it follows, read on the pass that files it.
@@ -1761,7 +1768,7 @@ dropped. **Nothing in the packages knows what shipping means.**
   (`shipper.schema.json`): a subject of what shipped, the run's own title, and a short body read off `git log` and
   `git diff --stat` — never git's `Merge branch '…'`. Its brief says so under *The run checks and lands your merge*
   (`landingContract`). The tick then files the step's check as it files any — the `check` harness in the checkout,
-  `CHECK_DEADLINE_SECONDS`, `nice`d, its log and `WF_STDERR` where a check's go, no `WF_BASE_REF`: mid-merge,
+  `CHECK_DEADLINE_SECONDS`, `nice`d, its streams kept as a check's are, no `WF_BASE_REF`: mid-merge,
   `HEAD...MERGE_HEAD` is what the merge brings — and, on the pass that reads the check settled (`landingDue`, pure;
   `landEnding` in `ending/ending.verb.ts` acts), commits the merge with the message on exit 0 (`git commit -F -`) or runs
   `git merge --abort` on anything else: a refusal, a check that did not finish, a message left blank, a merge that
@@ -1789,9 +1796,9 @@ dropped. **Nothing in the packages knows what shipping means.**
   base's lockfile, so a branch that adds a dependency (`@types/js-yaml`, `@types/express`, both on a live ship) failed
   its check there through no fault of the work. When the tick files the check, it compares the staged
   `package-lock.json` with what the checkout has on disk at each package path it names (`checkoutParts`:
-  a package nested in a workspace is read where it is installed, as a worktree's is). Where they differ, the brief carries `install` —
-  the first path that differs, the check's record of why — the tick's note says so, and the script runs
-  `npm install --no-save --no-audit --no-fund` in the checkout before the command (`checkScript`, `INSTALL`): the text
+  a package nested in a workspace is read where it is installed, as a worktree's is). Where they differ, the tick's note names
+  the first path that differs, and the check's command runs
+  `npm install --no-save --no-audit --no-fund` in the checkout before the line (`checkArgv`, `INSTALL`): the text
   is the run's, never the checkout's. `npm install` rather than `npm ci`, which empties `node_modules` under a dev
   server running from it; `--no-save`, so the manifests stay as the merge staged them. An unchanged lockfile runs no
   npm at all. An install that fails prints `[wf check] install failed, exit N` and ends the check by a signal, with no
@@ -2823,7 +2830,7 @@ What is under `WF_ROOT` (`~/.agent-workflows` by default), and what `wf rm` does
 | `runs/<id>/inputs/` | files given with `wf start --input` | `wf start` | removed |
 | `runs/<id>/work/<step>/given/` | a folder step's copy of the run's inputs and of the folders it waits on | the tick, as it makes the folder | removed with the run |
 | `runs/<id>/artifacts/<step>/` | a step's files | the step; the tick collects into it | removed |
-| `checks/<id>-<step>[-try<n>]-check.stderr` | a check's stderr | the check | removed |
+| `checks/<id>-<step>[-try<n>]-check.stderr`, `.stdout` | a check's streams, from before the runtime kept them | the check | removed |
 | `worktrees/<id>/<step>/` | a step's worktree, with its own `node_modules` | the tick (`git worktree add`) | committed, then removed through git |
 | `tick-stats.json` | what the last pass cost, phase by phase, the tick's to write (`src/meter/meter.ts`): what `wf up --stats`, the api and the Factory's header read |
 | `feed.jsonl` | what the tick judged of each run and step, a line each time it changed (`wf feed`, `wf watch`) | the tick | kept: the run's lines stay, and the next pass writes its one `removed` |
@@ -3018,7 +3025,7 @@ holding a concurrency slot forever.
 | `src/retry/retry.ts` | a person's try from the run's side — pure: what may be asked (`retryable`), the tries due now (`retriesDue`), and what `wf ls` and `wf decide` say of them (`tryNote`, `retryLines`, `answerLines`, `deniedOffer`, `overBudgetLine`) |
 | `src/cap/cap.ts` | which queued tasks a pass lets start, the only ceiling on sessions since the runtime retired its own — pure: the pool each harness counts against (`POOLS`, `poolOf`), what holds a slot (`holdsSlot`), each task's momentum off the run records (`momentumOf`), and the tasks to admit under the ceiling, per pool, in order (`toAdmit`); **`runAdmitted`**, whether the cap on runs in flight leaves a run a slot, and which runs it holds (`heldRuns`), one run's step in a repository's own checkout at a time (`heldCheckouts`), and what is still in flight when a run is called off (`inFlight`) |
 | `src/rest/rest.ts` | a finished run a pass may answer from memory — pure: what makes a run at rest (`atRest`), and which runs a task on the runtime's feed takes out of the tick's memo (`evictedBy`); the memo is `tick/tick.verb.ts`'s |
-| `src/check/check.ts` | the check — pure: the harness the run hands the engine, the verdict, the contract |
+| `src/check/check.ts` | the check — pure: the command the run files on the command harness, the verdict, the contract |
 | `src/workspace/workspace.ts` | what a worktree is given — pure: the `node_modules` plan, `.worktreeinclude`, and the line a step is told; where a step works and what a folder step is given (`workspacePlan`, `givenPlan`), and which finished steps hand their work off on a pass (`handOffDue`) |
 | `src/record/record.store.ts` | the run store under `WF_ROOT`: a run's id (`runId`), its record read and written (`readRun`, `listRuns`), the files a person owns beside it — a cancellation, a pruning, each ask, approval and acceptance — and where a check's stderr, a step's artifacts and a run's inputs are kept |
 | `src/agents/agents.store.ts` | a run's agent files: where a step's agent is rendered under `runs/<id>/agents/<step>` (`agentFilesDir`), the render at `wf start` (`writeAgentFiles`), a skill read again once its rendered folder is gone (`skillsAgain`), and what the board's Agents page writes: an agent and its files (`writeAgent`, `removeAgent`, `AgentWriteError`), and the agents it lists (`agentPlaces`, `listAgents`, `findAgent`) |

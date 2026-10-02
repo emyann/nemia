@@ -149,6 +149,8 @@ stateDiagram-v2
   submitted --> failed: NO_SESSION_TO_CONTINUE / settle
   starting --> starting: SESSION_LIVE / nothing
   starting --> starting: SESSION_IDLE / nothing
+  starting --> starting: SESSION_RESPAWNING / nothing
+  starting --> ending: RESPAWN_OVERDUE / record-end
   starting --> starting: SESSION_BLOCKED / nothing
   starting --> input_required: SESSION_QUIET [holds] / record-end
   starting --> ending: SESSION_QUIET / record-end
@@ -162,6 +164,8 @@ stateDiagram-v2
   starting --> ending: SPAWN_REFUSED / record-end
   working --> working: SESSION_LIVE / nothing
   working --> working: SESSION_IDLE / nothing
+  working --> working: SESSION_RESPAWNING / nothing
+  working --> ending: RESPAWN_OVERDUE / record-end
   working --> working: SESSION_BLOCKED / nothing
   working --> input_required: SESSION_QUIET [holds] / record-end
   working --> ending: SESSION_QUIET / record-end
@@ -189,10 +193,13 @@ stateDiagram-v2
   ending --> completed: CLOSED [lastDone] / settle
   ending --> failed: CLOSED / settle
   ending --> failed: DEADLINE_SPENT / settle
-  ending --> failed: ATTEMPT_ENDED [longLived] / settle
   ending --> completed: ATTEMPT_ENDED [endedDone] / settle
   ending --> canceled: ATTEMPT_ENDED [endedStopped] / settle
   ending --> failed: ATTEMPT_ENDED / settle
+  ending --> ending: UNREAD / nothing
+  ending --> ending: PREVIOUS_LIVE / stop
+  ending --> ending: BACKING_OFF / nothing
+  ending --> starting: RESTART_DUE / start
   submitted --> stopping: requestStop [stoppable] (by person)
   starting --> stopping: requestStop [stoppable] (by person)
   working --> stopping: requestStop [stoppable] (by person)
@@ -208,8 +215,7 @@ stateDiagram-v2
 
 The guards: `holds`, a task held open whose attempt ends `done`, waits on a person; `live`, a session past its deadline
 still running is stopped rather than ended; `overdue`, a person's stop whose harness could not be read (`UNREAD`) ends
-the attempt once its deadline has passed, and waits for a read until then; `longLived`, a long-lived task whose session
-ended with no stop asked, which settles `failed` however it ended; `lastDone`, `endedDone` and `endedStopped`, the
+the attempt once its deadline has passed, and waits for a read until then; `lastDone`, `endedDone` and `endedStopped`, the
 end a task settles on. A person's verbs are no edges, since no pass takes them: `VERBS` declares each, drawn above with
 who writes it and no action — `requestStop` from any state not final and not `stopping` under `stoppable`, `answer` and
 `close` from `input-required` under `awaitsWord` — and each refusal asks its guard first (`verbTakes`, `VERB_GUARDS`), which
@@ -783,8 +789,9 @@ operator's args and env.
 
 ### Settings: the checkout's, never the operator's
 
-A job, whether it runs on `claude` or on `claude-detached`, is spawned with `--setting-sources project,local` (`claudePrintFlags`). It reads the
-`.claude/settings.json` and `.claude/settings.local.json` of its `cwd`, and nothing of the operator's `~/.claude/settings.json`: not their
+A job, whether it runs on `claude` or on `claude-detached`, is spawned with `--setting-sources project` (`claudePrintFlags`). It reads the
+`.claude/settings.json` of its `cwd`, and neither that folder's `.claude/settings.local.json`, where Claude Code's "don't ask again" writes a
+person's allow rules, so a job in a person's checkout is fenced as it would be in a worktree, nor the operator's `~/.claude/settings.json`: not their
 default mode, allow and deny rules, `additionalDirectories`, enabled plugins, `~/.claude/skills`, hooks, `statusLine`, `outputStyle`, `model`,
 `effortLevel`, `env`, `attribution` or `autoMode` profile. So a job does the same whoever runs the engine, and an agent's own skills do
 not share Claude Code's 8,000-character skill listing with a person's (the owner's decision of 2026-09-25). What the runtime gives on the
@@ -797,7 +804,7 @@ the checkout's settings or on the task, never in `~/.claude/settings.json`. For 
 `../../docs/spike-2026-09-25-agents-skills.md`, F24.
 
 `settingSources` is on `CLAUDE_OWNED_FLAGS`, so `config.claude` cannot give it again. A background session (`config.background`,
-`claude --bg`) is not given the flag and reads the operator's settings as before: a job is what was measured, and the supervisor, which
+`claude --bg`) is not given the flag and reads the operator's settings and the checkout's local file as before: a job is what was measured, and the supervisor, which
 runs as a background session, is a session a person may attach to. `test/claude-code.test.ts` holds both.
 
 ## What a session may spend: `budgetUsd`
@@ -1211,7 +1218,7 @@ How each harness is asked — `claude` and `codex` verified live:
 | harness | how | where the answer lands |
 |---|---|---|
 | Claude Code | `--json-schema`: the session gets a `StructuredOutput` tool and calls it to finish. Works under `--bg`, though documented only for `-p` (2.1.270). | the session's transcript |
-| `claude-detached` | `-p --json-schema --output-format json`: `claude -p` prints one `result` object, and the answer is its `structured_output` (one live `-p` call, 2.1.270; under the engine, a fake `claude` only) | the worker's capture of its output, stamped with when that was last written |
+| `claude-detached` | `-p --json-schema --output-format json`: `claude -p` prints one `result` object, and the answer is its `structured_output` (one live `-p` call, 2.1.270; under the engine, a fake `claude` only) | the worker's capture of its output, with no time: the spawn cleared it before the run began |
 | Codex | `exec --output-schema`, with `-o` at a file the runner chose outside the workspace (0.154.0, strict schema) | that file |
 
 A detached run's end is written only once the harness's pipes have closed and its output is in the
@@ -1232,7 +1239,18 @@ real runs:
   keeps the statement whatever the clock says. A remote A2A agent is one: its Task was made by this
   attempt's message. A time stamped when the runner read it would fall before the attempt's start
   once the wall clock stepped back, and the statement would be dropped from a completed task.
-  Leaving out the time skips this check, so a runner that can resume a session always gives one.
+  The detached runner is another, though it resumes a session: its spawn clears the attempt's
+  closeout file and output before it launches the run, and a resumed run's parent wrote its own
+  under its own name, so whatever it reads there its own process wrote. A file's mtime is no
+  better than a clock: stepped back about a second every thirty seconds under load, it fell before
+  a 1.4 s attempt's start, and the statement was dropped. Leaving out the time skips this check.
+  Claude Code's `--bg` runner, whose resumed transcript holds its parent's calls, tells them by the
+  call's id: a flagged `--bg --resume` starts a copy under a new session id that carries the parent's
+  `tool_use` ids verbatim, and gives each new call a new one (measured on 2.1.288). Its spawn records
+  the parent's last StructuredOutput call id (`harness/claude/parent.ts`) before `claude` runs; a
+  statement with that id is inherited and not reported, and another is the session's own and carries
+  no time. Only a session with no record — spawned before the record was kept, or whose parent's
+  transcript could not be read — or a call with no id still gives a time.
 - **From a busy session, it is not final.** A step once declared itself done, carried on, found it
   could not commit, and revised its verdict eleven seconds later.
 
@@ -1554,11 +1572,24 @@ await engine.stop(id)       // the next passes stop it, record the end `operator
 **Idle is read off the sighting.** A sighting carries `held`, whether the harness still holds the session's process
 (Claude Code's `claude agents` lists a `pid`); an idle session is held, not busy, and either listed waiting on nobody (no
 `waitingFor`), listed done, or quiet. A wait on a person — a permission prompt, authentication — is still `needs-human`,
-a busy one is at work, and a session listed with no process is gone.
+a busy one is at work, and a session listed done or stopped with no process has ended.
 
-**An end no stop asked for is a failure.** A long-lived session that ends, however it ends — done, failed, stopped by
-something else, lost — with no `stop` on the record settles the task `failed`, note `the long-lived session ended without
-a stop`. Starting it again is not built yet.
+**A process its harness respawns is waited out.** Claude Code restarts a `--bg` session whose process died, on the same
+conversation, some ten seconds later; meanwhile it lists the session `blocked` with no `pid`. A long-lived session listed live
+and not held is **respawning** (`respawning`, `SESSION_RESPAWNING`): the pass does nothing, `view` says phase `restarting`,
+and nobody is asked anything. The engine journals what the listing says before it decides (`sightingFacts`): a `gap` the
+first time the session is seen with no process, and a `process`, with its pid, once it is held again — or held in a process
+it had not been seen in. So Claude Code's own crash loop is on the record and in the view, and never acted on. A gap open
+`RESPAWN_GAP_MS` (two minutes) is a respawn that is not coming (`RESPAWN_OVERDUE`): the attempt ends `lost`.
+
+**An end no stop asked for is restarted, after a back-off.** A long-lived session that ends, however it ends — done,
+failed, lost, or stopped at its harness (`claude stop`, claude.ai) — with no `stop` on the record is started again as a new
+attempt, `ae/<task>/<n+1>`, resuming the latest session an attempt recorded and told `RESTART_WORDS` instead of the brief
+(`restartOf`; with none recorded, it starts on the brief). Its old session, if its harness still holds it, is stopped first
+(`PREVIOUS_LIVE`), and nothing starts while its harness cannot be read (`UNREAD`). The wait is a kubelet's
+(`RESTART_BACKOFF`, `backoffOf`): 10 s after one end, doubled for each end in a row, at most 300 s; an attempt that ran
+600 s counts them again. It is read off the journal's times and `now` alone (`BACKING_OFF`, then `RESTART_DUE`), so a
+restarted daemon waits the same. Only `ae stop` ends the task: it settles `stopped`, and nothing restarts it.
 
 **Refused, with exit code 2**, nothing journalled: a `restartPolicy` other than `'Always'`; beside it, `holdOpen` (a turn's
 end is idle here, not a wait), `deadlineSeconds` (only a stop ends it) and `closeoutSchema` (a statement would end its
@@ -1883,6 +1914,7 @@ of pure code sits beside it.
 | `src/harness/sdk.ts` | the same four verbs on the Agent SDK, with the tradeoff written down |
 | `src/harness/index.ts` | the face of the seam, as the A2A seam and the doors take it; `core/` imports `seam.ts` and `args.ts` by their own path |
 | `src/harness/claude/bg.ts` | Claude Code's `--bg` runner (`claudeOps`), and `sh`, the one way it shells out |
+| `src/harness/claude/parent.ts` | what a resumed `--bg` session's spawn records of its parent: the id of the parent's last StructuredOutput call, and whose a statement is by it |
 | `src/harness/claude/code.ts` | Claude Code as the engine runs it by default: a step as a job (`claude -p`), or a background session (`claude --bg`) when the task asks, each verb routed by the session id's shape; and `claude -p`'s argv and the `claude-detached` spec |
 | `src/harness/claude/quota.ts` | Claude Code's quota (`claudeQuota`): the `claude` on PATH asked `get_usage` with no prompt, and its answer read (`quotaOfResponse`) |
 | `src/harness/claude/registry.ts` | the rows `claude agents --all --json` prints, decoded: which are ours, and why a listing is refused |

@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { photograph, recordedUsage, themeOf } from '../board.ts';
+import { photograph, recordedUsage, reloadForQuota, themeOf } from '../board.ts';
 import { expectClearOfEachOther } from '../canvas.ts';
-import { expectCount, expectVisible, idle, Refused, settled } from '../checks.ts';
+import { expectCount, expectVisible, Refused, settled } from '../checks.ts';
 import { QUOTA } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
@@ -21,10 +21,10 @@ export default {
     const file = path.join(store!, QUOTA.file);
     const written = fs.readFileSync(file, 'utf8');
     await expectCount(page.locator('[data-quota="fresh"]'), 1, 'the header shows a good reading first: the last one, to keep in sight');
+    let since = Date.now();
     try {
       fs.writeFileSync(file, recordedUsage('unanswered'));
-      await page.reload({ waitUntil: 'load' });
-      await idle(page);
+      await reloadForQuota(page, since);
       const line = page.locator('[data-quota="unanswered"]');
       await expectVisible(
         line.filter({
@@ -66,10 +66,10 @@ export default {
       await settled(page);
       await expectClearOfEachOther(page);
     } finally {
+      since = Date.now();
       fs.writeFileSync(file, written);
     }
-    await page.reload({ waitUntil: 'load' });
-    await idle(page);
+    await reloadForQuota(page, since);
     await expectCount(
       page.locator('[data-quota="fresh"]'),
       1,

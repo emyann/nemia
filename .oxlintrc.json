@@ -86,7 +86,8 @@
         "packages/agent-orchestrator/src/feed/feed.store.ts",
         "apps/api/src/body.ts",
         "apps/api/src/agents/agents.ts",
-        "apps/api/src/asks/asks.ts",
+        "apps/api/src/commands/routes.ts",
+        "apps/api/src/commands/extend.ts",
         "apps/api/src/workflows/builder.ts",
         "apps/api/src/inbox/inbox.ts",
         "apps/api/src/runs/runs.ts",
@@ -332,7 +333,7 @@
     {
       "files": ["apps/api/src/detail/detail.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 104, "skipBlankLines": true, "skipComments": true }],
+        "max-lines-per-function": ["error", { "max": 99, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 22 }]
       }
     },
@@ -604,13 +605,6 @@
       }
     },
     {
-      "files": ["packages/agent-orchestrator/src/cli/asks.ts"],
-      "rules": {
-        "complexity": ["error", { "max": 25 }],
-        "sonarjs/cognitive-complexity": ["error", 33]
-      }
-    },
-    {
       "files": ["packages/agent-orchestrator/src/cli/flags.ts"],
       "rules": {
         "sonarjs/cognitive-complexity": ["error", 19]
@@ -754,7 +748,7 @@
     {
       "files": ["packages/agent-orchestrator/src/record/record.store.ts"],
       "rules": {
-        "max-lines": ["error", { "max": 552, "skipBlankLines": true, "skipComments": true }],
+        "max-lines": ["error", { "max": 551, "skipBlankLines": true, "skipComments": true }],
         "sonarjs/cognitive-complexity": ["error", 16]
       }
     },
@@ -866,8 +860,8 @@
     {
       "files": ["packages/agent-runtime/src/core/domain.ts"],
       "rules": {
-        "complexity": ["error", { "max": 34 }],
-        "sonarjs/cognitive-complexity": ["error", 34]
+        "complexity": ["error", { "max": 26 }],
+        "sonarjs/cognitive-complexity": ["error", 23]
       }
     },
     {
@@ -927,7 +921,7 @@
     {
       "files": ["packages/agent-runtime/src/harness/detached/detached.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 179, "skipBlankLines": true, "skipComments": true }]
+        "max-lines-per-function": ["error", { "max": 176, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {

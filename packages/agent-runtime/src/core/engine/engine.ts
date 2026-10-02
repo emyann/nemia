@@ -12,7 +12,9 @@ import {
   nameFor,
   idleOf,
   needsHuman,
+  respawning,
   settledQuiet,
+  sightingFacts,
   spawnRefused,
   turnOf,
   waitsForInput,
@@ -92,11 +94,14 @@ export type TaskView = {
  * The open attempt's sighting is made `completed` only when each of these holds, asked in this order:
  *
  * 1. The statement was made after this attempt began. A RESUMED Claude Code session's transcript holds its parent's whole
- *    conversation under the child's own id, so the parent's statement arrives looking exactly like the child's: the session
- *    id cannot tell them apart, the moment it was made can, and only the journal knows when this attempt began, which is
- *    why the check is here and not in a runner. One made before is carried over, not said: it is dropped from the
- *    sighting, so it is never recorded as this attempt's either. One with no time is from a session that cannot carry
- *    another attempt's statement, and is the session's own.
+ *    conversation under the child's own id, so the parent's statement arrives looking like the child's: the session id
+ *    cannot tell them apart. The `--bg` runner tells them by the call's id, against the parent's last call it recorded at
+ *    spawn, reports the parent's none and the session's own with no time. Where a runner could not tell — no record, a
+ *    call with no id — the moment it was made can, and only the journal knows when this attempt began, which is why the
+ *    check is here and not in a runner. One made before is carried over, not said: it is dropped from the sighting, so it
+ *    is never recorded as this attempt's either. One with no time is the session's own: a `--bg` session's told by its
+ *    call's id, a remote agent's Task, made by this attempt's message, or a detached run, whose spawn cleared the last
+ *    one's statement before it launched the run.
  * 2. The harness has not answered already (`LIVE`): an ended session's statement rides along to the record and nothing
  *    more. A session listed `blocked` is live, and to `decide` it is live for ever: a step can call StructuredOutput, end its
  *    turn and be seen `blocked`, idle, next, so a statement ends a blocked attempt exactly as it ends a working one, or that
@@ -215,7 +220,7 @@ const stepOn = Effect.fn('stepOn')(function* (taskId: string, observed: Readonly
 
   const move = yield* Lifecycle;
 
-  const state = fold(taskId, yield* journal.read(taskId));
+  const state = yield* notedFold(taskId, observed);
   const action = decide(state, closedOut(state, observed), { at: new Date(), graceMs: GRACE_MS, unread }, move);
   const at = () => new Date().toISOString();
 
@@ -304,8 +309,30 @@ const stepOn = Effect.fn('stepOn')(function* (taskId: string, observed: Readonly
   return action;
 });
 
+/** The sighting of a task's last attempt in one observation, as the harness gave it. */
+const lastSighting = (state: State, observed: ReadonlyMap<string, Sighting>): Sighting | undefined => {
+  const last = state.attempts.at(-1);
+  return last ? observed.get(nameFor(state.taskId, last.n)) : undefined;
+};
+
+/**
+ * A task's fold, with what its sighting says of a long-lived attempt's process journalled first (`sightingFacts`): the fold
+ * `decide` reads, so the time a gap opened is on the record before the pass judges it.
+ */
+const notedFold = Effect.fn('notedFold')(function* (taskId: string, observed: ReadonlyMap<string, Sighting>) {
+  const journal = yield* Journal;
+  const state = fold(taskId, yield* journal.read(taskId));
+  const facts = sightingFacts(state, lastSighting(state, observed), new Date().toISOString());
+  for (const fact of facts) yield* journal.append(taskId, fact);
+  return facts.length > 0 ? fold(taskId, yield* journal.read(taskId)) : state;
+});
+
 /** The actions that change the task's own journal: `settleOn` steps again after one, and stops at any other. */
 const PROGRESSES = new Set(['start', 'spawn', 'record-end', 'settle']);
+
+/** Whether a pass wrote to a task's journal: the facts its sighting noted first, or an action that progresses. */
+const wroteAny = (noted: readonly Event[], actions: readonly Action[]): boolean =>
+  noted.length > 0 || actions.some((a) => PROGRESSES.has(a.do));
 
 /**
  * One task, stepped until nothing moves — against ONE observation — at most `maxSteps` times. Returns the actions taken.
@@ -556,10 +583,11 @@ export const tick = Effect.fn('tick')(function* () {
     }
     const before = folded.get(id);
     if (!before) continue;
+    const noted = sightingFacts(before, lastSighting(before, observed), '');
     const actions = yield* settleOn(id, observed, unread, 8);
     taken.push(...actions);
     for (const a of actions) if (a.do === 'nothing' && a.refused) stalled.push({ taskId: id, ...a.refused });
-    const stepped = actions.some((a) => PROGRESSES.has(a.do)) ? fold(id, yield* journal.read(id)) : before;
+    const stepped = wroteAny(noted, actions) ? fold(id, yield* journal.read(id)) : before;
     const released = yield* releaseFinished(stepped, observed, unread);
     const after = released.wrote ? fold(id, yield* journal.read(id)) : stepped;
     if (memo && settledQuiet(after)) {
@@ -657,6 +685,20 @@ export const everyView = Effect.fn('everyView')(function* () {
   return { views: read.map(({ taskId, events }) => viewOfState(fold(taskId, events), observed)), unreadable } satisfies TaskList;
 });
 
+/** The phase `viewOfState` gives a task, by its rules in order, off its record and the sighting of its last attempt. */
+function phaseOfView(state: State, observed: ReadonlyMap<string, Sighting>, sighting: Sighting | undefined): string {
+  const last = state.attempts.at(-1);
+  if (state.settled) return state.settled;
+  if (waitsForInput(state)) return 'input-required';
+  const live = last?.ended === null && sighting ? phaseWordOf(sighting.state) : undefined;
+  if (live && respawning(state, sighting)) return 'restarting';
+  if (live && idleOf(state, sighting)) return 'idle';
+  if (needsHuman(state, observed)) return 'needs-human';
+  if (live) return live === 'working' && sighting?.busy === false ? 'working (quiescent)' : `running (${live})`;
+  if (last?.ended === null) return 'starting';
+  return last ? 'between attempts' : 'pending';
+}
+
 /**
  * A task's view from its folded record and one observation. Pure: `view` reads the record for it, and `tick` hands in the
  * fold it made.
@@ -666,15 +708,16 @@ export const everyView = Effect.fn('everyView')(function* () {
  * 1. its outcome, once settled;
  * 2. `input-required`: held open, signed and waiting for a person's answer or close — A2A's TASK_STATE_INPUT_REQUIRED —
  *    with nothing running;
- * 3. `idle`: a long-lived task's session open between turns (`idleOf`), which only a stop ends;
- * 4. `needs-human` (`needsHuman`);
- * 5. `working (quiescent)`: listed `working` and not busy, so it believes it has work and is computing nothing. Said out
+ * 3. `restarting`: a long-lived task's session its harness is respawning (`respawning`);
+ * 4. `idle`: a long-lived task's session open between turns (`idleOf`), which only a stop ends;
+ * 5. `needs-human` (`needsHuman`);
+ * 6. `working (quiescent)`: listed `working` and not busy, so it believes it has work and is computing nothing. Said out
  *    loud, because it is indistinguishable from progress in every other view, and it is what a stalled step looks like from
  *    outside;
- * 6. `running (…)` for any other live session, in the words every view prints (`phaseWordOf`): A2A's names stop at the
+ * 7. `running (…)` for any other live session, in the words every view prints (`phaseWordOf`): A2A's names stop at the
  *    runtime;
- * 7. `starting`: spawned but not yet in the harness's registry — the grace window, not a gap between attempts;
- * 8. `between attempts`, or `pending` before the first.
+ * 8. `starting`: spawned but not yet in the harness's registry — the grace window, not a gap between attempts;
+ * 9. `between attempts` — a long-lived task backing off before its restart among them — or `pending` before the first.
  *
  * Its `sessionId` is the sighting's, or else the id its last end was recorded with: a released session is in no
  * observation, and that id is what `logs` reads then. `waitingFor` is carried only where the phase is `needs-human`: the
@@ -685,24 +728,7 @@ export function viewOfState(state: State, observed: ReadonlyMap<string, Sighting
   const taskId = state.taskId;
   const last = state.attempts.at(-1);
   const sighting = last ? observed.get(nameFor(taskId, last.n)) : undefined;
-  const live = last && last.ended === null && sighting ? phaseWordOf(sighting.state) : undefined;
-  const phase = state.settled
-    ? state.settled
-    : waitsForInput(state)
-      ? 'input-required'
-      : live && idleOf(state, sighting)
-        ? 'idle'
-        : needsHuman(state, observed)
-          ? 'needs-human'
-          : live === 'working' && sighting?.busy === false
-            ? 'working (quiescent)'
-            : live
-              ? `running (${live})`
-              : last?.ended === null
-                ? 'starting'
-                : last
-                  ? 'between attempts'
-                  : 'pending';
+  const phase = phaseOfView(state, observed, sighting);
   const waitingFor = phase === 'needs-human' ? sighting?.waitingFor : undefined;
   const admission = admissionOf(state);
   return {

@@ -142,8 +142,9 @@ export type Workflow = {
    * Without it a `claude` step runs as a job, `claude -p`: it runs its brief to its end and exits, waits on nobody in any permission
    * mode (a call it may not make is denied and recorded on its attempt), takes `wf say` on its stdin until its result, and keeps a spend
    * cap (`budget:`). So the line is for a session that must outlive a brief — the supervisor — and nothing else. Refused on a harness
-   * other than `claude`, which has no second way to run, and beside `budget:`, which a background session does not keep. A step's key,
-   * not an agent's: it is how a step's session is run, not who does the work.
+   * other than `claude`, which has no second way to run, beside `budget:`, which a background session does not keep, and over an agent
+   * in any mode but the widest (`fenceRefusal`), since a background session also reads the person's own settings and their allow rules.
+   * A step's key, not an agent's: it is how a step's session is run, not who does the work.
    */
   background?: boolean;
   deadlineSeconds?: number;
@@ -332,7 +333,7 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
   denials:
     '`fail`: a try the harness denied a call is not passed on — the step reads `denied`, stops what comes after it and waits on a person, and `retries:` never retries it; on `claude` and `claude-detached` jobs only',
   background:
-    '`true`: the step runs as a Claude Code background session (`claude --bg`), which outlives its brief and can be attached to and bridged, rather than as a job (`claude -p`) — on `claude` only, and with no `budget:`',
+    "`true`: the step runs as a Claude Code background session (`claude --bg`), which outlives its brief and can be attached to and bridged, rather than as a job (`claude -p`) — on `claude` only, with no `budget:`, and over an agent only when its file runs it in the widest mode, since a background session also reads the person's own settings",
   remote:
     '`true`: every session of the step is bridged to claude.ai, where anyone signed in to the account can drive it from a browser or a phone — on `claude` with `background: true` only',
   deadlineSeconds: COUNTS.deadlineSeconds.counts,

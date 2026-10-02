@@ -220,7 +220,7 @@ test("a Codex session's closing statement is its Task's one Artifact: JSON off `
   assert.equal(artifact.artifactId, 'closeout');
   assert.equal(artifact.parts[0].content!.$case, 'data');
   assert.deepEqual(closeoutOf(done), { outcome: 'done', summary: 'turn 1' });
-  assert.equal(typeof artifact.metadata?.at, 'number', "stamped with when Codex wrote it, the file's time");
+  assert.equal(artifact.metadata?.at, undefined, "no time: the spawn cleared Codex's `-o` file before the run, so it is the run's own");
 
   assert.deepEqual(
     (await list(client)).tasks.map((t) => [t.id, t.artifacts]),

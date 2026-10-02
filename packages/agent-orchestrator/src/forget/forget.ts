@@ -500,7 +500,7 @@ export function branchFates(
 
 /**
  * The check logs in `checks/` that are the run's: `<id>-<step>-check.stderr` and `<id>-<step>-try<n>-check.stderr`, and each `.stdout`
- * beside them, for each step the record names (`checkStderr` in record.store.ts, `checkStdout` in check.store.ts). Pure. With no record
+ * beside them, for each step the record names: the files checks wrote before the runtime kept their streams. Pure. With no record
  * to name the steps, any `<id>-…-check.stderr` or `.stdout` — but none that could be another stored run's: one whose id starts with this
  * one's, or whose id this one starts with — `r-xyz-implement` is no run, and `r-xyz-implement-check.stderr` is `r-xyz`'s.
  */

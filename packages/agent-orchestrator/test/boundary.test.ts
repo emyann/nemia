@@ -655,12 +655,11 @@ test('the CLI reaches the package only through runner.ts, workflow.ts and its ow
   const sources = packageSources();
   assert.deepEqual(cliBreaks(sources), []);
   assert.deepEqual(
-    [sources['src/cli/main.ts'], sources['src/cli/asks.ts'], sources['bin/wf.ts']].map((imports) =>
+    [sources['src/cli/main.ts'], sources['src/cli/flags.ts'], sources['bin/wf.ts']].map((imports) =>
       imports.filter((m) => m.startsWith('src/')).sort(),
     ),
     [
       [
-        'src/cli/asks.ts',
         'src/cli/decide/decide.ts',
         'src/cli/factory/factory.ts',
         'src/cli/flags.ts',
@@ -669,7 +668,7 @@ test('the CLI reaches the package only through runner.ts, workflow.ts and its ow
         'src/cli/stats/stats.ts',
         'src/runner.ts',
       ],
-      ['src/cli/flags.ts', 'src/runner.ts'],
+      ['src/runner.ts'],
       ['src/cli/exit.ts', 'src/cli/main.ts'],
     ],
     "a file of the CLI's folder reaches the root and its own folder, and bin/wf.ts the CLI's two doors: let through",
@@ -734,8 +733,8 @@ test('REFUSED: a type imported from the runtime by a controller, a store file, a
   assert.deepEqual(clientBreaks(adding('src/cli/main.ts', 'agent-runtime')), [
     'src/cli/main.ts imports agent-runtime, and only src/runtime-client.ts may',
   ]);
-  assert.deepEqual(clientBreaks(adding('src/cli/asks.ts', 'agent-runtime')), [
-    'src/cli/asks.ts imports agent-runtime, and only src/runtime-client.ts may',
+  assert.deepEqual(clientBreaks(adding('src/cli/flags.ts', 'agent-runtime')), [
+    'src/cli/flags.ts imports agent-runtime, and only src/runtime-client.ts may',
   ]);
   assert.deepEqual(clientBreaks(adding('bin/wf.ts', 'agent-runtime')), [
     'bin/wf.ts imports agent-runtime, and only src/runtime-client.ts may',

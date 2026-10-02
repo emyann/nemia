@@ -6,8 +6,9 @@
  * a controller that does, never the runtime: `views.verb.ts` (what the runtime's views of a run's tasks say), `start.verb.ts`,
  * `plan.verb.ts` and `inbox.verb.ts` (starting runs, plans and inbox cards), `tick.verb.ts` and `advance.verb.ts` (a pass — `tick`,
  * `advance` — and the filings it adopts), what a person asks of a run (`cancel.verb.ts`, `retry.verb.ts`, `gate.verb.ts`, `say.verb.ts`,
- * `wait.verb.ts`, `round.verb.ts`), `forget.verb.ts` and `prune.verb.ts` (`wf rm` and `wf prune`), `list.verb.ts` and `decide.verb.ts`
- * (what a person reads of a run: `wf ls` and `wf decide`), and `stats.verb.ts` (what the store's runs add up to: `wf stats`). They import
+ * `wait.verb.ts`, `round.verb.ts`), the table of the commands that call them, each defined once (`commands.verb.ts`), `forget.verb.ts`
+ * and `prune.verb.ts` (`wf rm` and `wf prune`), `list.verb.ts` and `decide.verb.ts` (what a person reads of a run: `wf ls` and
+ * `wf decide`), and `stats.verb.ts` (what the store's runs add up to: `wf stats`). They import
  * one way — views and starting beneath the tick, the tick beneath the rest — so no cycle forms among them (`test/boundary.test.ts`).
  *
  * What of the I/O never names the engine sits beneath the controllers, and this file re-exports what it exported of them:
@@ -219,7 +220,6 @@ export {
   approvalFile,
   artifactsDir,
   askFile,
-  checkStderr,
   inputsDir,
   readAcceptances,
   readApprovals,
@@ -346,6 +346,10 @@ export { cancel } from './cancel/cancel.verb.ts';
 export { hold, unhold } from './wait/wait.verb.ts';
 export { retry } from './retry/retry.verb.ts';
 export { say } from './say/say.verb.ts';
+export { COMMANDS } from './command/commands.verb.ts';
+export type { Command } from './command/commands.verb.ts';
+export { CLI, commandBreaks, commandLine, helpOf, parseArgv } from './command/command.ts';
+export type { Args, CommandSpec, Flag, Positional, Spec } from './command/command.ts';
 export type { Accepted, RoundAsked } from './round/round.verb.ts';
 export type { Approved } from './gate/gate.verb.ts';
 export type { Asked } from './retry/retry.verb.ts';

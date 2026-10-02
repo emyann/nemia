@@ -13,6 +13,9 @@
  * and passes, a harness's refusal handed a fence at a place it no longer reads passes as accepting it, and a test file
  * that declares one type twice goes unseen.
  *
+ * Each package's `test` script bounds how many test files `node --test` runs at once, the same `--test-concurrency=<n>` in each:
+ * unbounded, a suite runs about as many processes as the machine has cores in every package, and several suites at once swap.
+ *
  * Each package's `test` script records what its tests cost when a run's check gives it `WF_ARTIFACTS` (`tools/test-costs/`): it loads
  * the probe into every test file's process, keeps the spec reporter on stdout, where a check's log and its `wf <word>: ` lines are read,
  * and adds the cost reporter on stderr.
@@ -89,6 +92,75 @@ test("every package's test script runs the tests beside its code", () => {
     return unrunBeside(pkg.name, pkg.scripts.test ?? '', testsBeside(dir).length);
   });
   assert.deepEqual(refused, []);
+});
+
+/** The number of test files a `test` script lets `node --test` run at once (`--test-concurrency=<n>`, one word), or null for none. */
+const testBound = (script: string): number | null => {
+  const word = script.split(/\s+/).find((w) => /^--test-concurrency=[1-9]\d*$/.test(w));
+  return word ? Number(word.slice('--test-concurrency='.length)) : null;
+};
+
+/**
+ * Where packages' `test` scripts run their files unbounded: each script with no `--test-concurrency=<n ≥ 1>` word, and every package
+ * when their bounds differ. A package with no `test` script has nothing to bound.
+ */
+const unbounded = (scripts: { name: string; script: string }[]): string[] => {
+  const bounds = new Map(scripts.filter((s) => s.script).map((s) => [s.name, testBound(s.script)]));
+  const missing = scripts
+    .filter((s) => s.script && bounds.get(s.name) === null)
+    .map(
+      (s) =>
+        `${s.name}'s test script (${s.script}) runs as many test files at once as the machine has cores: ` +
+        'add --test-concurrency=<n> after --test, the n every other package uses',
+    );
+  const given = [...bounds].filter(([, n]) => n !== null);
+  const differ =
+    new Set(given.map(([, n]) => n)).size > 1
+      ? [
+          `the packages' test scripts bound their files differently (${given.map(([name, n]) => `${name} ${n}`).join(', ')}): give each the same n`,
+        ]
+      : [];
+  return [...missing, ...differ];
+};
+
+test('REFUSED: a package whose test script runs its files unbounded, or bounded apart from the others', () => {
+  assert.deepEqual(unbounded([{ name: 'x', script: "node --test 'test/*.test.ts'" }]), [
+    "x's test script (node --test 'test/*.test.ts') runs as many test files at once as the machine has cores: " +
+      'add --test-concurrency=<n> after --test, the n every other package uses',
+  ]);
+  assert.equal(unbounded([{ name: 'x', script: "node --test --test-concurrency=0 'test/*.test.ts'" }]).length, 1, 'a bound below one');
+  assert.equal(unbounded([{ name: 'x', script: "node --test --test-concurrency=x 'test/*.test.ts'" }]).length, 1, 'a bound no number');
+  assert.equal(unbounded([{ name: 'x', script: "node --test --test-concurrency 2 'test/*.test.ts'" }]).length, 1, 'a bound in two words');
+  assert.deepEqual(
+    unbounded([
+      { name: 'x', script: 'node --test --test-concurrency=2 test/*.test.ts' },
+      { name: 'y', script: 'node --test --test-concurrency=3 test/*.test.ts' },
+    ]),
+    ["the packages' test scripts bound their files differently (x 2, y 3): give each the same n"],
+  );
+  assert.deepEqual(
+    unbounded([
+      { name: 'x', script: 'node --test --test-concurrency=3 test/*.test.ts' },
+      { name: 'y', script: "node --import ./test/ambient.ts --test --test-concurrency=3 'test/*.test.ts'" },
+      { name: 'z', script: '' },
+    ]),
+    [],
+  );
+});
+
+test("every package's test script bounds how many test files run at once, the same bound in each", () => {
+  const repo = path.join(import.meta.dirname, '..', '..', '..');
+  const scripts = ['packages', 'apps'].flatMap((top) =>
+    fs.readdirSync(path.join(repo, top)).map((name) => {
+      const pkg = JSON.parse(fs.readFileSync(path.join(repo, top, name, 'package.json'), 'utf8')) as {
+        name: string;
+        scripts: Record<string, string>;
+      };
+      return { name: pkg.name, script: pkg.scripts.test ?? '' };
+    }),
+  );
+  assert.ok(scripts.filter((s) => s.script).length >= 4, `read ${scripts.length} packages' test scripts, fewer than the workspace has`);
+  assert.deepEqual(unbounded(scripts), []);
 });
 
 /** The flags a package's `test` script records its costs with, each one word, in the order a missing one is named. */

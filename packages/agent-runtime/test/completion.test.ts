@@ -379,7 +379,7 @@ test('the LAST StructuredOutput call is the statement, stamped with when it was 
       at: Date.parse('2026-09-12T09:30:00.000Z'),
       lastWord: false,
     },
-    "the last call, with its time: a resumed transcript holds the parent's calls too, and the tool's definition names it",
+    "the last call, with its time and no `id` where it has none: a resumed transcript holds the parent's calls, and the tool's definition names it",
   );
   assert.equal(
     lastStructuredOutput(entry({ type: 'user', message: { content: 'say StructuredOutput' } })),
@@ -406,7 +406,7 @@ const closingTurn = (timestamp: string, id: string, input: object) => [
 test('a statement is the LAST WORD when the conversation ends with its result — bookkeeping after it does not count, and anything said after it does', () => {
   const at = '2026-09-17T02:53:00.160Z';
   const closed = closingTurn(at, 'toolu_1', { outcome: 'done' }).join('\n');
-  assert.deepEqual(lastStructuredOutput(closed), { payload: { outcome: 'done' }, at: Date.parse(at), lastWord: true });
+  assert.deepEqual(lastStructuredOutput(closed), { payload: { outcome: 'done' }, at: Date.parse(at), lastWord: true, id: 'toolu_1' });
   assert.equal(lastStructuredOutput(`${closed}\n`)?.lastWord, true, 'a trailing newline is not a line');
 
   const woken = [closed, entry({ type: 'user', timestamp: '2026-09-17T04:03:15.727Z', message: { content: 'carry on' } })].join('\n');
@@ -471,6 +471,7 @@ test("a call before the statement is never read, so never decoded: a resumed tra
     payload: { outcome: 'done' },
     at: Date.parse(at),
     lastWord: true,
+    id: 'toolu_1',
   });
 });
 
@@ -1011,7 +1012,7 @@ test("a registry row is ours only when named `ae/` with a `state` key: another's
   }
 });
 
-test('a row is held while it lists a process: an idle session open for its next words, a finished one still open, and a stopped one gone', async () => {
+test('a row is held while it lists a process, which it names: an idle session open for its next words, a finished one still open, and a stopped one gone', async () => {
   const restore = withFakeClaude(
     JSON.stringify([
       { name: 'ae/a/1', sessionId: 's-a', state: 'blocked', status: 'idle', pid: 42 },
@@ -1029,8 +1030,8 @@ test('a row is held while it lists a process: an idle session open for its next 
     assert.deepEqual(
       [...(await Effect.runPromise(ops.observe))],
       [
-        ['ae/a/1', { sessionId: 's-a', state: 'input-required', busy: false, held: true, nativeId: 's-a' }],
-        ['ae/b/1', { sessionId: 's-b', state: 'completed', busy: false, held: true, nativeId: 's-b' }],
+        ['ae/a/1', { sessionId: 's-a', state: 'input-required', busy: false, held: true, nativeId: 's-a', pid: 42 }],
+        ['ae/b/1', { sessionId: 's-b', state: 'completed', busy: false, held: true, nativeId: 's-b', pid: 43 }],
         ['ae/c/1', { sessionId: 's-c', state: 'canceled', busy: false, held: false, nativeId: 's-c' }],
       ],
     );

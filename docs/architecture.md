@@ -43,7 +43,11 @@ inbox, factories, stats, agent definitions.
 - the rules about a harness's knobs the runtime cannot refuse (`tools:` on codex, `skills:` and `harnessPrompt:` on codex or a remote
   agent, `sandbox:` on Claude Code: `src/keys/`), and the fence's ranking of codex's sandboxes (`SANDBOX_RANK` in
   `src/workflow/fence.ts`), held equal to the runtime's by `test/fence.test.ts`. The words each harness takes are the runtime's,
-  asked at `wf start` (`configRefused` in `src/start/start.verb.ts`).
+  asked at `wf start` (`configRefused` in `src/start/start.verb.ts`);
+- what the orchestrator still knows of Claude Code's modes and models, candidates for the runtime: the fence's ranking of the modes and
+  the mode it holds a session to its directory in (`MODE_RANK`, `HELD_MODE` in `src/workflow/fence.ts`), the modes a folder team's
+  background step may run in unasked (`validateFolderMode` in `src/workflow/validate.ts`), and the models that take no `auto` mode
+  (`AUTO_UNSUPPORTED` in `src/keys/keys.ts`).
 
 **In the api today, below its layer**: `runsInOf` in `src/detail/detail.ts` reading a
 harness's argv for a mode, and `src/capabilities/reach.ts` re-implementing permission matching. Its readers that touch the machine

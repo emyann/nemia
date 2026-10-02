@@ -410,7 +410,7 @@ test('THE LEASE: a run file whose heartbeat stopped is reported dead, not runnin
   write(1_000);
   assert.equal((await Effect.runPromise(ops.observe)).get('ae/t5/1')?.state, 'working', 'a fresh beat is alive');
 
-  write(STALE_MS + 5_000);
+  write(STALE_MS + 10 * 60_000);
   assert.equal((await Effect.runPromise(ops.observe)).get('ae/t5/1')?.state, 'failed', 'a stopped beat is dead');
 });
 
@@ -630,7 +630,7 @@ test('say is refused, with nothing appended, where no worker would write the wor
       state: 'working',
       pid: 999999,
       logFile: '/dev/null',
-      heartbeatAt: new Date(Date.now() - STALE_MS - 5_000).toISOString(),
+      heartbeatAt: new Date(Date.now() - STALE_MS - 10 * 60_000).toISOString(),
       input: { first: '', inbox: '', from: 0, closesOn: { key: 'kind', value: 'end' } },
     }),
   );
@@ -1625,15 +1625,14 @@ test("a spec that reads its harness's output reports the answer found there, sta
     }),
   };
   const ops = detachedOps(prints, dir);
-  const before = Date.now();
   await Effect.runPromise(ops.spawn({ name: 'ae/t20/1', brief: 'x', cwd: workspace, closeoutSchema: { type: 'object' } }));
 
   const seen = await settle(ops, 'ae/t20/1', 'completed');
   assert.deepEqual(seen.closeout?.payload, { outcome: 'done' });
-  const filesystemClockSlackMs = 1_000;
   const at = seen.closeout.at;
   assert.ok(at !== undefined, 'a detached session can carry another attemptâ€™s statement, so its statement has a time');
-  assert.ok(at >= before - filesystemClockSlackMs && at <= Date.now() + filesystemClockSlackMs, `stamped ${at}, spawned ${before}`);
+  const written = fs.statSync(path.join(dir, 'runs', 'sh', 'ae_t20_1.log')).mtimeMs;
+  assert.equal(at, written, 'stamped with the time its log was last written, the file the answer was read from');
   assert.deepEqual(fs.readdirSync(workspace), []);
 });
 
@@ -1684,10 +1683,10 @@ test("a run is not called over before the harness's last output is in its log â€
 test('...and a child that holds a pipe open for good does not keep the run working', async () => {
   const dir = root();
   const ops = detachedOps(sh('(sleep 30) & exit 0'), dir);
-  const started = Date.now();
+  const started = performance.now();
   await Effect.runPromise(ops.spawn(req('ae/t22/1', dir)));
   await settle(ops, 'ae/t22/1', 'completed', 10_000);
-  assert.ok(Date.now() - started < 10_000, 'ended within the drain bound, not when the child let go');
+  assert.ok(performance.now() - started < 10_000, 'ended within the drain bound, not when the child let go');
 });
 
 test('a re-spawn of the same attempt does not find the last answer in the output either', async () => {

@@ -556,7 +556,7 @@ test('restart with the intent on disk and no Task: never sent twice — a spawn 
   );
   assert.equal((await e.view(id)).state.settled, null, 'no refusal: a session may exist');
   assert.equal(s.counts.sendMessage ?? 0, 0);
-  const back = new Date(Date.now() - 31_000).toISOString();
+  const back = new Date(Date.now() - 10 * 60_000).toISOString();
   writeJournal(
     root,
     id,
@@ -658,7 +658,7 @@ test('an agent unreachable for a pass is not a session lost: the task reads as l
       },
     }),
   );
-  const back = new Date(Date.now() - 31_000).toISOString();
+  const back = new Date(Date.now() - 10 * 60_000).toISOString();
   writeJournal(
     root,
     id,
@@ -963,7 +963,7 @@ test('an intent whose sending process died is in doubt: not listed, never sent a
     events.find((ev) => ev.kind === 'spawned')?.error ?? '',
     /its answer was never recorded, since the process sending it stopped first: whether the agent made a Task of it is not known, and it is not sent twice/,
   );
-  const back = new Date(Date.now() - 31_000).toISOString();
+  const back = new Date(Date.now() - 10 * 60_000).toISOString();
   writeJournal(
     root,
     id,

@@ -170,6 +170,7 @@ export default {
   name: 'floating-bar',
   route: FLOOR,
   expect: async (page) => {
+    const home = page.url();
     try {
       await floats(page);
       await inTheAddress(page);
@@ -177,6 +178,7 @@ export default {
       await resizes(page);
       await onPhone(page);
     } finally {
+      if (new URL(page.url()).origin !== new URL(home).origin) await page.goto(home, { waitUntil: 'load' });
       await page.evaluate((key) => localStorage.removeItem(key), WIDTH_KEY);
     }
   },

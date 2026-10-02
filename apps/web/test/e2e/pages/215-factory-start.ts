@@ -42,7 +42,8 @@ async function keptOnEscape(page: Page, bar: Locator, form: Locator): Promise<vo
   await brief.fill(BRIEF);
   await page.keyboard.press('Escape');
   await idle(page);
-  if (!new URL(page.url()).searchParams.has('bar')) throw new Refused(`Escape in a field that holds text leaves the bar open — ${page.url()}`);
+  if (!new URL(page.url()).searchParams.has('bar'))
+    throw new Refused(`Escape in a field that holds text leaves the bar open — ${page.url()}`);
   await expectVisible(bar, 'Escape in a field that holds text leaves the bar open');
   if ((await brief.inputValue()) !== BRIEF)
     throw new Refused(`and keeps the brief typed — it holds ${JSON.stringify(await brief.inputValue())}`);

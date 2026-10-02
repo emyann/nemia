@@ -273,13 +273,16 @@ type Flight = { began: number | null; done: boolean; settled: Promise<void> };
 /** Waits for `settled` at most `ms`. */
 const waitFor = async (settled: Promise<void>, ms: number): Promise<void> => {
   let wait: NodeJS.Timeout | undefined;
-  await Promise.race([
-    settled,
-    new Promise((r) => {
-      wait = setTimeout(r, ms);
-    }),
-  ]);
-  clearTimeout(wait);
+  try {
+    await Promise.race([
+      settled,
+      new Promise((r) => {
+        wait = setTimeout(r, ms);
+      }),
+    ]);
+  } finally {
+    clearTimeout(wait);
+  }
 };
 
 /**

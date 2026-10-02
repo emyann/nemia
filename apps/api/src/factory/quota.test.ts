@@ -460,6 +460,8 @@ test('REFUSED: an ask whose answer cannot be read fails the reads that share it,
   let clock = NOW;
   const now = () => clock;
   const { ask, answers, begun } = handAsks();
+  const waits = () => process.getActiveResourcesInfo().filter((kind) => kind === 'Timeout').length;
+  const before = waits();
   const a = readQuota({ ask, env, now, waitMs: 60_000 });
   await begun(1);
   clock += 1;
@@ -474,6 +476,7 @@ test('REFUSED: an ask whose answer cannot be read fails the reads that share it,
   await begun(3);
   answers[2]({ kind: 'no-plan' });
   assert.equal((await c).state, 'no-plan', 'and a read after both is answered');
+  assert.equal(waits(), before, 'no read leaves its wait behind, the failed one included');
 });
 
 test('askedAt is when the ask began, not when it answered', async () => {

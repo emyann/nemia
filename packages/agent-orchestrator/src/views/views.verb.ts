@@ -9,10 +9,9 @@
  * beside each, its plain face in a Promise over the engine it is handed, which rejects with either as it was thrown. What reads only
  * views already read is plain.
  */
-import fs from 'node:fs';
 import { Effect, Result } from 'effect';
 import { EngineService, awaited, denialText, tried, type Engine, type TaskView } from '../runtime-client.ts';
-import { lastLines, readVerdict, reportedLines, stdoutTail, type CheckHanded, type CheckRefusal, type Verdict } from '../check/check.ts';
+import { attemptVerdict, lastLines, reportedLines, type CheckHanded, type CheckRefusal, type Verdict } from '../check/check.ts';
 import type { Workflow } from '../step/step.ts';
 import { resultSteps } from '../branches/branches.ts';
 import { stepTasks, type CloseoutAsked, type Run, type StepRecord, type TaskPhase } from '../record/record.ts';
@@ -23,8 +22,7 @@ import { decision } from '../decide/decide.ts';
 import { parseCloseout, type Closeout } from '../closeout/closeout.ts';
 import { taskUsage } from '../timeline/timeline.ts';
 import { runStore } from '../record/files.store.ts';
-import { checkStderr, stepsOf } from '../record/record.store.ts';
-import { checkStdout } from '../check/check.store.ts';
+import { stepsOf } from '../record/record.store.ts';
 import { oneByOne, parentRecord, shippedOf, type BranchReader } from '../branches/branches.store.ts';
 import { continuesFrom } from '../retry/index.ts';
 import { phaseOfView, unsignedEnd, wordOfView } from './views-words.ts';
@@ -114,7 +112,7 @@ export function viewedOnce(e: Engine): Engine {
 }
 
 /** The engine's verbs that change no task. */
-const ENGINE_READS = new Set(['tick', 'list', 'logs', 'transcript', 'path', 'feed', 'watch', 'io', 'start']);
+const ENGINE_READS = new Set(['tick', 'list', 'logs', 'output', 'transcript', 'path', 'feed', 'watch', 'io', 'start']);
 
 /** The engine's verbs that change a task, each with the tasks it names: a filing names none the report could carry. */
 const ENGINE_WRITES: Readonly<Record<string, (args: unknown[]) => readonly unknown[]>> = {
@@ -254,22 +252,18 @@ export const spendReader =
   };
 
 /**
- * What each step's current check exited with, off the engine's record: the code its process gave, or
- * `unfinished` when it gave none — killed by a signal, stopped, or never started — and `undefined` for a step
- * with no check filed. What the tick tells a refusal from a check that did not finish by (`refusedCheck`),
- * without reading a log: a run waiting on a person costs no more each pass. The check prints the code it exits
- * with, so this and the log's `[wf check] exit N`, which `wf ls` reads, agree. A check the operator or its deadline cut short is
- * `unfinished`, whatever code its process died with.
+ * What each step's current check exited with, off the engine's record (`attemptVerdict`): the code its process gave, or `unfinished` when
+ * it gave none — killed by a signal, stopped, or never started — or when the operator or its deadline cut it short, whatever code its
+ * process died with; and `undefined` for a step with no check filed. What the tick tells a refusal from a check that did not finish by
+ * (`refusedCheck`), and what `wf ls` words, without reading a stream: a run waiting on a person costs no more each pass.
  *
- * Exported for a consumer that words a check as `wf ls` does, without a `logs` call per refused check.
+ * Exported for a consumer that words a check as `wf ls` does.
  */
 export const exitVerdicts =
   (views: ReadonlyMap<string, TaskView>, run: Run) =>
   (step: string): Verdict | undefined => {
     const taskId = run.steps[step]?.check?.taskId;
-    if (!taskId) return undefined;
-    const last = views.get(taskId)?.state.attempts.at(-1);
-    return typeof last?.exitCode === 'number' && last.reason !== 'deadline' && last.reason !== 'operator' ? last.exitCode : 'unfinished';
+    return taskId ? attemptVerdict(views.get(taskId)?.state.attempts.at(-1)) : undefined;
   };
 
 /**
@@ -311,7 +305,7 @@ export const saidIn = (view: TaskView | undefined): readonly Said[] => view?.sta
  * What a settled check said, for a person to read.
  *
  * `passed` is the engine's settled phase — the worker's reading of the exit code, and the only thing
- * the run gates on. The rest is evidence: the number from the log's last line, and the last lines of
+ * the run gates on. The rest is evidence: the exit code its attempt recorded (`attemptVerdict`), and the last lines of
  * each stream, kept apart because a loud stderr must not push a test runner's stdout verdict off the
  * screen.
  */
@@ -350,14 +344,13 @@ export const checkReports = (
   Effect.runPromise(checkReportsRead(run, steps, phaseOf, want).pipe(Effect.provide(EngineService.layer(e))));
 
 /**
- * What a check said, off its log and its stderr file: the verdict, and the last lines of each stream. Fails with a refusal the log's read
- * rejected with, or the stderr file's read threw; dies of anything else. A stderr file that is not there, or does not read, says nothing.
+ * What a check said, off the engine: the verdict of its latest attempt (`attemptVerdict`), and the last lines of each stream the runtime
+ * kept (`checkStreams`). Fails with a refusal a read rejected with; dies of anything else.
  */
 export const refusalRead = Effect.fn('refusalOf')(function* (command: string, taskId: string) {
   const e = yield* EngineService;
-  const log = yield* awaited(() => e.logs(taskId));
-  const stderr = yield* tried(() => lastLines(tailOf(checkStderr(taskId))));
-  return { command, verdict: readVerdict(log), stdout: stdoutTail(log), stderr } satisfies CheckRefusal;
+  const { verdict, stdout, stderr } = yield* awaited(() => checkStreams(e, taskId, TAIL_BYTES));
+  return { command, verdict, stdout: lastLines(stdout), stderr: lastLines(stderr) } satisfies CheckRefusal;
 });
 
 /**
@@ -368,26 +361,23 @@ export const refusalOf = (e: Engine, command: string, taskId: string): Promise<C
   Effect.runPromise(refusalRead(command, taskId).pipe(Effect.provide(EngineService.layer(e))));
 
 /**
- * What a checked step's check said, for the step filed after it (`checkHandedSection`): one read of its log for the verdict and the
- * stdout's tail, the lines it marked (`reportedLines`) from its whole stdout file (`checkStdout`), and the tail of its stderr file. With
- * no stdout file that reads, the marked lines come from the log, which keeps only the end, and are `partial`. A log whose read rejects,
- * with anything, is `unreadable`, with the rejection's message: the step is filed all the same, and told why. Dies of nothing a read of
- * the log throws.
+ * What a checked step's check said, for the step filed after it (`checkHandedSection`): the verdict, the tails of its streams, and the
+ * lines it marked (`reportedLines`) from its whole stdout (`checkStreams`). With no stdout kept — a check run before the runtime kept its
+ * streams — the marked lines come from the log, which keeps only the end, and are `partial`. A read that rejects, with anything, is
+ * `unreadable`, with the rejection's message: the step is filed all the same, and told why. Dies of nothing a read throws.
  */
 export const checkHandedRead = Effect.fn('checkHanded')(function* (step: string, command: string, taskId: string) {
   const e = yield* EngineService;
-  const read = yield* Effect.result(Effect.tryPromise({ try: () => e.logs(taskId), catch: (err) => err }));
+  const read = yield* Effect.result(Effect.tryPromise({ try: () => checkStreams(e, taskId), catch: (err) => err }));
   if (Result.isFailure(read))
     return {
       step,
       command,
-      unreadable: `the engine could not give the log of its task ${taskId}: ${read.failure instanceof Error ? read.failure.message : String(read.failure)}`,
+      unreadable: `the engine could not give what its task ${taskId} printed: ${read.failure instanceof Error ? read.failure.message : String(read.failure)}`,
     } satisfies CheckHanded;
-  const log = read.success;
-  const stderr = yield* tried(() => lastLines(tailOf(checkStderr(taskId))));
-  const whole = wholeOf(checkStdout(taskId));
-  const { lines, cut } = reportedLines(whole ?? log);
-  const said = { verdict: readVerdict(log), stdout: stdoutTail(log), stderr, reported: lines, cut, partial: whole === undefined };
+  const { verdict, stdout, stderr, kept } = read.success;
+  const { lines, cut } = reportedLines(stdout);
+  const said = { verdict, stdout: lastLines(stdout), stderr: lastLines(stderr), reported: lines, cut, partial: !kept };
   return { step, command, ...said } satisfies CheckHanded;
 });
 
@@ -409,30 +399,25 @@ export const checksHandedRead = Effect.fn('checksHanded')(function* (run: Run, s
 export const checksHandedOf = (e: Engine, run: Run, steps: readonly Workflow[], step: Workflow): Promise<CheckHanded[]> =>
   Effect.runPromise(checksHandedRead(run, steps, step).pipe(Effect.provide(EngineService.layer(e))));
 
-/** A whole file, or nothing where it is absent or does not read — a check filed without `WF_STDOUT` keeps none. */
-function wholeOf(file: string): string | undefined {
-  try {
-    return fs.readFileSync(file, 'utf8');
-  } catch {
-    return undefined;
-  }
-}
+/** How much of the end of a stream a check's tail is read from. */
+const TAIL_BYTES = 64_000;
 
-/** The end of a file that may be large, or absent — a check stopped before it started wrote none. */
-function tailOf(file: string, bytes = 64_000): string {
-  try {
-    const fd = fs.openSync(file, 'r');
-    try {
-      const size = fs.fstatSync(fd).size;
-      const buf = Buffer.alloc(Math.min(size, bytes));
-      fs.readSync(fd, buf, 0, buf.length, size - buf.length);
-      return buf.toString('utf8');
-    } finally {
-      fs.closeSync(fd);
-    }
-  } catch {
-    return '';
-  }
+/**
+ * A check's verdict and streams, off the engine: the verdict of its latest attempt (`attemptVerdict`), its stderr's last `TAIL_BYTES`,
+ * and its stdout — whole, or its last `stdoutBytes` — through `output`, which the runtime keeps whole for a check. Where it kept none
+ * (`kept` false: a check run before the runtime kept them), stderr is empty and stdout is the end of the log. Rejects with what a read
+ * rejected with.
+ */
+async function checkStreams(
+  e: Engine,
+  taskId: string,
+  stdoutBytes?: number,
+): Promise<{ verdict: Verdict; stdout: string; stderr: string; kept: boolean }> {
+  const view = await e.view(taskId);
+  const [stdout, stderr] = await Promise.all([e.output(taskId, 'stdout', stdoutBytes), e.output(taskId, 'stderr', TAIL_BYTES)]);
+  const verdict = attemptVerdict(view.state.attempts.at(-1));
+  if (stdout === undefined) return { verdict, stdout: await e.logs(taskId), stderr: stderr ?? '', kept: false };
+  return { verdict, stdout, stderr: stderr ?? '', kept: true };
 }
 
 /**

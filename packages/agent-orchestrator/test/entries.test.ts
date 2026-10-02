@@ -81,7 +81,6 @@ const PINNED: Record<string, string[]> = {
     'cardToStart',
     'ceilingLines',
     'ceilings',
-    'checkStderr',
     'checkoutHold',
     'checkoutLine',
     'checkoutWord',

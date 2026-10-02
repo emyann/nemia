@@ -74,7 +74,10 @@ const branchOff = (repo: string, branch: string, change: () => void) => {
  */
 const board = () => {
   type Filed = { id: string; closeoutSchema?: object; config?: { claude?: { remoteControl?: true | string } } };
-  const tasks = new Map<string, { spec: Filed; phase: TaskPhase; closeout?: unknown; usage?: object; reason?: string; filedAt: number }>();
+  const tasks = new Map<
+    string,
+    { spec: Filed; phase: TaskPhase; closeout?: unknown; usage?: object; reason?: string; exitCode?: number; filedAt: number }
+  >();
   const T0 = Date.parse('2026-09-13T00:00:00Z');
   const iso = (ms: number) => new Date(ms).toISOString();
   const logs = new Map<string, string>();
@@ -111,7 +114,7 @@ const board = () => {
                     nativeId: `native-${id}`,
                     closeout: t.closeout,
                     usage: t.usage ?? null,
-                    exitCode: null,
+                    exitCode: t.exitCode ?? null,
                   },
                 ],
         },
@@ -127,9 +130,10 @@ const board = () => {
     ),
     stop: async () => {},
     logs: async (id: string) => logs.get(id) ?? '(no output yet)',
+    output: async () => undefined,
   } as unknown as Engine;
-  const settle = (id: string, phase: TaskPhase, closeout?: unknown, usage?: object, reason?: string) =>
-    Object.assign(tasks.get(id)!, { phase, closeout, usage, reason });
+  const settle = (id: string, phase: TaskPhase, closeout?: unknown, usage?: object, reason?: string, exitCode?: number) =>
+    Object.assign(tasks.get(id)!, { phase, closeout, usage, reason, exitCode });
   const filed = (id: string): Filed | undefined => tasks.get(id)?.spec;
   return { e, settle, logs, viewed, carries, filed, fed };
 };
@@ -167,8 +171,8 @@ const awaiting = async (implementKeys = '') => {
   await advance(e, readRun(run.id));
   settle(`${run.id}-implement`, 'succeeded', SIGNED, USAGE);
   await advance(e, readRun(run.id));
-  settle(`${run.id}-implement-check`, 'succeeded');
-  logs.set(`${run.id}-implement-check`, '# pass 1\n\n[wf check] exit 0\n');
+  settle(`${run.id}-implement-check`, 'succeeded', undefined, undefined, undefined, 0);
+  logs.set(`${run.id}-implement-check`, '# pass 1\n');
   await advance(e, readRun(run.id));
   settle(`${run.id}-review`, 'succeeded', SIGNED);
 
@@ -490,8 +494,8 @@ test("a measured cost on both screens: `wf decide` prints each step's beside wha
   await advance(e, readRun(run.id));
   settle(`${run.id}-implement`, 'succeeded', SIGNED, { ...USAGE, costUsd: 3.012, apiMs: 486_000, toolMs: 2_400 });
   await advance(e, readRun(run.id));
-  settle(`${run.id}-implement-check`, 'succeeded');
-  logs.set(`${run.id}-implement-check`, '# pass 1\n\n[wf check] exit 0\n');
+  settle(`${run.id}-implement-check`, 'succeeded', undefined, undefined, undefined, 0);
+  logs.set(`${run.id}-implement-check`, '# pass 1\n');
   await advance(e, readRun(run.id));
   settle(`${run.id}-review`, 'succeeded', SIGNED, { costUsd: 0.5 });
 
@@ -1208,8 +1212,8 @@ test('the whole screen of a run the run nudged to sign off, unsigned again, and 
   await advance(other.e, readRun(measured.id));
   other.settle(`${measured.id}-implement`, 'succeeded', SIGNED, { ...USAGE, costUsd: 3.012, apiMs: 486_000, toolMs: 2_400 });
   await advance(other.e, readRun(measured.id));
-  other.settle(`${measured.id}-implement-check`, 'failed');
-  other.logs.set(`${measured.id}-implement-check`, '# pass 1\n\n[wf check] exit 1\n');
+  other.settle(`${measured.id}-implement-check`, 'failed', undefined, undefined, undefined, 1);
+  other.logs.set(`${measured.id}-implement-check`, '# pass 1\n');
   await advance(other.e, readRun(measured.id));
   assert.deepEqual(await whole(t, other.e, measured.id), [
     '<id>  add sub',

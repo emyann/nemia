@@ -30,6 +30,9 @@ const counting = () => {
     async path() {
       return [];
     },
+    async output() {
+      return 'ok 1\n';
+    },
     async answer() {},
     async stop() {},
     async tick() {
@@ -46,8 +49,9 @@ test('a task is viewed once for a command, however many times the command reads 
   await e.view('a');
   await e.list();
   await e.path('a');
+  await e.output('a', 'stderr');
   await e.view('a');
-  assert.deepEqual(Object.fromEntries(asked), { a: 1, b: 1 }, 'a list and a path read, and change nothing');
+  assert.deepEqual(Object.fromEntries(asked), { a: 1, b: 1 }, 'a list, a path and a stream read, and change nothing');
 });
 
 test('a verb that changes a task drops its view alone; a pass, and a verb the memo does not know, drop every view', async () => {

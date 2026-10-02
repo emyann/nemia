@@ -13,7 +13,7 @@ import type { Closeout } from '../closeout/closeout.ts';
 import { inside } from '../workspace/workspace.ts';
 import { artifactPlace, sizeOf, type ArtifactFile, type MissingArtifact } from './artifacts.ts';
 import { isGitRun, type Run } from '../record/record.ts';
-import { artifactsDir, checkStderr, lstatOf } from '../record/record.store.ts';
+import { artifactsDir, lstatOf } from '../record/record.store.ts';
 import { gitSays } from '../workspace/worktree.store.ts';
 
 /**
@@ -247,7 +247,7 @@ function landedPicturesNote(
     "A check that does not pass keeps every picture it took, the failed page's among them.",
     "The pictures of the branch that a reviewer read are the implement step's, in its own files directory, and are kept.",
     ...(said.checkTaskId
-      ? [`What the check printed, each page it passed: ae logs ${said.checkTaskId}; its stderr: ${checkStderr(said.checkTaskId)}`]
+      ? [`What the check printed, each page it passed: ae logs ${said.checkTaskId}; its stderr: ae output ${said.checkTaskId} stderr`]
       : []),
     '',
     'Removed:',

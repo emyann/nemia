@@ -788,16 +788,10 @@ const rewriteNow = ({ approvals: _, acceptances: __, pruned: ___, hold: ____, ..
 };
 
 /**
- * Where a check's stderr goes: beside the run records, outside every workspace — a file inside one
- * would be committed by the next hand-off and ride the branch.
- */
-export const checkStderr = (taskId: string): string => path.join(HOME, 'checks', `${taskId}.stderr`);
-
-/**
  * The directory the run makes for a step's files: screenshots, logs, reports — for the steps after it
  * and the person who decides.
  *
- * Beside the run's record, outside every workspace, for the reason a check's stderr is: a file written
+ * Beside the run's record, outside every workspace: a file written
  * into a worktree is committed by the next hand-off and rides the branch, and a gitignored one never
  * reaches the next step's worktree at all. `advance` makes it before it files the step, tells the step in
  * its brief (`artifactsContract`), and hands it to the step's check as `WF_ARTIFACTS`.

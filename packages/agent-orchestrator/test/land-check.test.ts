@@ -1,6 +1,6 @@
 /**
  * The build workflow's landing check (`workflows/build/land.md`) runs the tests and the typecheck forced, so a cached pass never lands a
- * broken main. The shipped check is run as the run runs it (`sh -c` of its `checkScript`), on a scratch turbo monorepo whose cache is
+ * broken main. The shipped check is run as the run runs it (the argv `checkArgv` gives it), on a scratch turbo monorepo whose cache is
  * warm from main, with a merge staged as the ending stages it: `MERGE_HEAD` set, no `WF_BASE_REF`. The merge changes only a doc, a file
  * turbo does not hash, and the doc breaks a test or a typecheck that reads it. The shipped check must refuse it; the same check with
  * `npm test && npm run typecheck` in place of the forced pair passes it, which proves the fixture really meets turbo's cache.
@@ -11,7 +11,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadWorkflows } from '../src/folder/folder.store.ts';
-import { checkScript } from '../src/check/check.ts';
+import { checkArgv } from '../src/check/check.ts';
 import { REPO, placesOf } from './team.ts';
 import { scratch } from './scratch.ts';
 
@@ -88,8 +88,11 @@ const files = (): Record<string, string> => {
   };
 };
 
-/** Run `script` with `sh -c` in `dir`, in an environment built here, never inherited: no turbo, npm or run variable from outside. */
-const sh = (dir: string, script: string): { status: number; out: string } => {
+/**
+ * Run `check` as a check runs, its argv `checkArgv`'s, in `dir`, in an environment built here, never inherited: no turbo, npm or run
+ * variable from outside.
+ */
+const sh = (dir: string, check: string): { status: number; out: string } => {
   const env = {
     PATH: process.env.PATH ?? '',
     HOME: path.join(dir, 'home'),
@@ -97,7 +100,8 @@ const sh = (dir: string, script: string): { status: number; out: string } => {
     TURBO_TELEMETRY_DISABLED: '1',
     TURBO_NO_UPDATE_NOTIFIER: '1',
   };
-  const r = spawnSync('sh', ['-c', script], { cwd: dir, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 120_000 });
+  const [cmd, ...args] = checkArgv(check);
+  const r = spawnSync(cmd, args, { cwd: dir, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 120_000 });
   assert.equal(typeof r.status, 'number', `the command finished, not ended by ${r.signal ?? r.error?.message}:\n${r.stdout}${r.stderr}`);
   return { status: r.status as number, out: `${r.stdout}${r.stderr}` };
 };
@@ -133,13 +137,13 @@ const landing = (doc: string): string => {
  */
 const refused = (dir: string): string => {
   const check = landCheck();
-  const control = sh(dir, checkScript(unforced(check)));
+  const control = sh(dir, unforced(check));
   assert.equal(
     control.status,
     0,
     `turbo replays main's pass after a change to a doc it does not hash; if it hashes the doc now, the fixture needs another file:\n${control.out}`,
   );
-  const shipped = sh(dir, checkScript(check));
+  const shipped = sh(dir, check);
   assert.notEqual(shipped.status, 0, `the landing check passed a merge that breaks main:\n${shipped.out}`);
   return shipped.out;
 };

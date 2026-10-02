@@ -12,9 +12,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
-import type { Engine } from 'agent-runtime';
+import type { Engine, TaskSpec } from 'agent-runtime';
 import type { GitRun, Run, TaskPhase } from '../src/run.ts';
-import { CHECK } from '../src/check/check.ts';
 import { scratch } from './scratch.ts';
 import { decideScreen } from './screens.ts';
 import { TEAM, TEAM_DEV } from './team.ts';
@@ -108,7 +107,7 @@ const folder = (): string => {
  * exit code where it is given: a check settled with none did not finish (`exitVerdicts`).
  */
 const board = () => {
-  type Filed = { id: string; brief: string; cwd?: string; closeoutSchema?: object } & Record<string, unknown>;
+  type Filed = { id: string; brief: string; cwd?: string; closeoutSchema?: object; config?: TaskSpec['config'] } & Record<string, unknown>;
   const tasks = new Map<string, { spec: Filed; phase: TaskPhase; closeout?: unknown; exitCode?: number }>();
   const filings: string[] = [];
   const e = {
@@ -138,9 +137,9 @@ const board = () => {
       return spec.id;
     },
     stop: async () => {},
-    /** A check's log ends in the trailer its script writes (`readVerdict`), where it exited: `wf ls` and `wf decide` read the code. */
-    logs: async (id: string) =>
-      typeof tasks.get(id)?.exitCode === 'number' ? `[wf check] exit ${tasks.get(id)!.exitCode}\n` : '(no output yet)',
+    /** A check's verdict is its attempt's exit code (`exitVerdicts`); its log and streams say nothing of it. */
+    logs: async () => '(no output yet)',
+    output: async (id: string) => (typeof tasks.get(id)?.exitCode === 'number' ? '' : undefined),
     feed: async () => ({ entries: [], cursor: 0 }),
   } as unknown as Engine;
   const settle = (id: string, phase: TaskPhase, closeout?: unknown, exitCode?: number) =>
@@ -593,17 +592,22 @@ test("an approved ending stages the merge and signs off its message; the run exe
   );
 
   assert.deepEqual(signed.checked, ['ship']);
-  const check = tasks.get(checkId)!.spec as unknown as { harness: string; cwd: string; deadlineSeconds: number; brief: string };
+  const check = tasks.get(checkId)!.spec;
   assert.deepEqual(
     [check.harness, check.cwd, check.deadlineSeconds],
     ['check', repo, 1200],
     "the check is filed as any step's is: on the check harness, in the checkout where the merge is, with its deadline",
   );
-  const { check: command, env } = JSON.parse(check.brief);
-  assert.equal(command, readRun(id).workflow!.find((s) => s.name === 'ship')!.check, 'the command frozen on the record');
+  const command = readRun(id).workflow!.find((s) => s.name === 'ship')!.check!;
+  assert.deepEqual(check.config?.command, ['sh', '-c', command], 'the command frozen on the record, with no install to run first');
+  const env = check.config?.env ?? {};
   assert.equal(env.WF_BASE_REF, undefined, 'no WF_BASE_REF: what it judges is the merge, which the command reads off MERGE_HEAD');
   assert.equal(env.WF_WORKSPACE, repo);
-  assert.equal(env.WF_STDERR, path.join(ROOT, 'checks', `${checkId}.stderr`));
+  assert.deepEqual(
+    Object.keys(env).filter((k) => !/^WF_[A-Z_]+$/.test(k) || k === 'WF_STDERR' || k === 'WF_STDOUT'),
+    [],
+    'only WF_ names, and none for streams the runtime keeps',
+  );
   assert.equal((await list(e, readRun(id))).steps.find((s) => s.name === 'ship')!.status, 'checking');
 
   for (const phase of ['pending', 'running'] as const) {
@@ -649,7 +653,7 @@ test("an approved ending stages the merge and signs off its message; the run exe
       `^ship's check passed on the merge, and the run committed it as ${head.slice(0, 12)}\\.\nSo the run removed the 252 pictures`,
     ),
   );
-  assert.ok(note.includes(`ae logs ${checkId}; its stderr: ${path.join(ROOT, 'checks', `${checkId}.stderr`)}`), note);
+  assert.ok(note.includes(`ae logs ${checkId}; its stderr: ae output ${checkId} stderr`), note);
   assert.ok(note.includes('  answer-light-failed.png  189.5 KB\n'), note);
   const after = bytesIn(shot.dir);
   assert.equal(shot.before, 252 * 194_000);
@@ -718,7 +722,7 @@ const requiringB = (): string => {
 
 /** The check the run filed, run as the engine's worker runs it, in the checkout, with `npm` offline and a `PATH` a test may put first. */
 const runCheck = (tasks: ReturnType<typeof board>['tasks'], checkId: string, repo: string, first?: string) => {
-  const { cmd, args } = CHECK.command({ brief: tasks.get(checkId)!.spec.brief });
+  const [cmd = '', ...args] = tasks.get(checkId)!.spec.config?.command ?? [];
   const PATH = first ? `${first}${path.delimiter}${process.env.PATH ?? ''}` : process.env.PATH;
   return spawnSync(cmd, args, { cwd: repo, encoding: 'utf8', env: { ...process.env, PATH, npm_config_offline: 'true' } });
 };
@@ -739,9 +743,10 @@ test("an ending's merge that brings a dependency: its check installs what the me
   const { id, e, tasks, settle, signed, checkId, base } = await stagedAndSigned({ repo, dir: requiringB(), work: addB });
   assert.throws(() => execFileSync('node', ['-e', "require('b')"], { cwd: repo, stdio: 'ignore' }), 'the checkout does not have b yet');
 
-  const { install, check } = JSON.parse(tasks.get(checkId)!.spec.brief);
-  assert.equal(check, `node -e "require('b')"`);
-  assert.equal(install, 'node_modules/b', "the check's record says why it installs");
+  const filed = tasks.get(checkId)!.spec;
+  assert.equal(filed.brief, `node -e "require('b')"`);
+  assert.deepEqual(filed.config?.command?.slice(0, 2), ['sh', '-c']);
+  assert.match(filed.config?.command?.[2] ?? '', /\nnode -e "require\('b'\)"$/, 'the install first, then the check on a line of its own');
   assert.ok(
     signed.notes.includes(
       "ship: the merge's package-lock.json asks for node_modules/b, which the checkout's node_modules does not have: its check runs npm install there first",
@@ -752,7 +757,6 @@ test("an ending's merge that brings a dependency: its check installs what the me
   const r = runCheck(tasks, checkId, repo);
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /^\[wf check\] the staged merge asks for packages this checkout has not installed: npm install --no-save/m);
-  assert.match(r.stdout, /\n\[wf check\] exit 0\n$/);
   assert.equal(fs.realpathSync(path.join(repo, 'node_modules', 'b')), fs.realpathSync(path.join(repo, 'packages', 'b')));
   git(repo, 'diff', '--quiet');
   assert.match(
@@ -773,7 +777,7 @@ test("an ending's merge whose lockfile is main's: its check installs nothing, an
   const repo = anNpmRepo();
   const before = modulesOf(repo);
   const { tasks, signed, checkId } = await stagedAndSigned({ repo, dir: requiringB() });
-  assert.equal(JSON.parse(tasks.get(checkId)!.spec.brief).install, undefined);
+  assert.deepEqual(tasks.get(checkId)!.spec.config?.command, ['sh', '-c', `node -e "require('b')"`], 'the check alone, no install');
   assert.equal(
     signed.notes.some((n) => n.includes('npm install')),
     false,

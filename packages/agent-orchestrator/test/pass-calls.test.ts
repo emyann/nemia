@@ -102,7 +102,11 @@ const board = () => {
     },
     logs: async (id: string) => {
       calls.push(`logs ${id}`);
-      return typeof tasks.get(id)?.exitCode === 'number' ? `[wf check] exit ${tasks.get(id)!.exitCode}\n` : '(no output yet)';
+      return '(no output yet)';
+    },
+    output: async (id: string, stream: string) => {
+      calls.push(`output ${id} ${stream}`);
+      return '';
     },
   } as unknown as Engine;
   const settle = (id: string, phase: TaskPhase, closeout?: unknown, exitCode?: number) =>
@@ -155,10 +159,10 @@ test("a signed step's check is looked for, then filed; once it passes, the ready
   assert.deepEqual(ready.advanced.filed, ['review']);
   assert.deepEqual(
     ready.calls,
-    ['view R-implement', 'view R-implement-check', 'logs R-implement-check', 'file R-review'],
-    "the check's log is read once, for what the step after it is told the check said",
+    ['view R-implement', 'view R-implement-check', 'output R-implement-check stdout', 'output R-implement-check stderr', 'file R-review'],
+    "the check's streams are read once each, for what the step after it is told the check said, its verdict off the view the pass read",
   );
-  assert.deepEqual(ready.counted, { journals: 3, act: 5 }, "the two views, and the check's log");
+  assert.deepEqual(ready.counted, { journals: 4, act: 5 }, "the two views, and the check's two streams");
 });
 
 test('a try its check refused is looked for, then filed, under its own id', async () => {
@@ -176,10 +180,11 @@ test('a try its check refused is looked for, then filed, under its own id', asyn
     'view R-implement-check',
     'view R-implement-try2',
     'view R-implement-try2',
-    'logs R-implement-check',
+    'output R-implement-check stdout',
+    'output R-implement-check stderr',
     'file R-implement-try2',
   ]);
-  assert.deepEqual(tried.counted, { journals: 5, act: 4 }, 'the check it refused read for its brief');
+  assert.deepEqual(tried.counted, { journals: 6, act: 4 }, 'the check it refused read for its brief');
 });
 
 test('a round the looping step asked for is looked for, then filed, under its target’s next try', async () => {
@@ -239,14 +244,15 @@ test('a try and a round due on one pass: the try is filed first, then the round,
       'view R-implement-try2',
       'view R-docs-try2',
       'view R-docs-try2',
-      'logs R-docs-check',
+      'output R-docs-check stdout',
+      'output R-docs-check stderr',
       'file R-docs-try2',
       'view R-implement-try2',
       'file R-implement-try2',
     ],
     "the pass's reads, then the try looked for and filed, then the round",
   );
-  assert.deepEqual(both.counted, { journals: 9, act: 5 });
+  assert.deepEqual(both.counted, { journals: 10, act: 5 });
 });
 
 test("a cancelled run's task in flight is stopped by the pass, and nothing more is filed", async () => {

@@ -219,7 +219,6 @@ export {
   approvalFile,
   artifactsDir,
   askFile,
-  checkStderr,
   inputsDir,
   readAcceptances,
   readApprovals,

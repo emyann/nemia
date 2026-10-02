@@ -90,8 +90,8 @@ const BLOCKED = { outcome: 'blocked', summary: 'two flags could be meant', artif
  * a closeout, stamped a millisecond after the journal says the attempt began, and with what it cost, as `claude -p` prints it; each has
  * its own native id (`native-<n>`), so a turn that continues one says which. A session ends in a harness's own words (`done`,
  * `stopped`), as a runner written in Promises may still report them: the runtime reads them as A2A's. A name in `refusing` is a spawn the
- * harness refuses, as it refuses a start that ran nothing: the attempt ends `unstartable`. `pass` is what the daemon does: the engine's
- * tick, then the run's.
+ * harness refuses, as it refuses a start that ran nothing: the attempt ends `unstartable`. A check's harness keeps streams, as the
+ * runtime's command harness does, and none was printed. `pass` is what the daemon does: the engine's tick, then the run's.
  */
 const engine = () => {
   const sessions = new Map<string, PromiseSighting>();
@@ -118,7 +118,7 @@ const engine = () => {
     EngineService.layer({
       root: fs.mkdtempSync(path.join(ROOT, 'engine-')),
       journal: memoryJournal(starts),
-      harnesses: { claude: runner, codex: runner, check: runner },
+      harnesses: { claude: runner, codex: runner, check: { ...runner, output: async () => undefined } },
       defaultHarness: 'claude',
     }),
   );

@@ -64,7 +64,7 @@ export const board = () => {
       admit: unkept('admit'),
       list: unkept('list'),
       transcript: unkept('transcript'),
-      output: unkept('output'),
+      output: () => Effect.succeed(undefined),
       path: unkept('path'),
       say: unkept('say'),
       quota: unkept('quota'),

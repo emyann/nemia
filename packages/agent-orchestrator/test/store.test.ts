@@ -31,7 +31,7 @@ import type { CheckReport } from '../src/views/views.verb.ts';
 import type { CheckRefusal } from '../src/check/check.ts';
 import type { ParentRun } from '../src/wait/wait.ts';
 import type { BranchReader } from '../src/branches/branches.store.ts';
-import { readCheckBrief, verdictWord } from '../src/check/check.ts';
+import { verdictWord } from '../src/check/check.ts';
 import { scratch } from './scratch.ts';
 import { TEAM_DEV } from './team.ts';
 import { decideScreen } from './screens.ts';
@@ -355,6 +355,7 @@ const board = () => {
   const filings: string[] = [];
   const stopped: string[] = [];
   const logs = new Map<string, string>();
+  const outputs = new Map<string, string>();
   const said = new Map<string, Array<{ at: string; attempt: number; text: string }>>();
   const deaf = new Set<string>();
   const waiting = new Map<string, string>();
@@ -414,6 +415,8 @@ const board = () => {
       stopped.push(id);
     },
     logs: async (id: string) => logs.get(id) ?? '(no output yet)',
+    /** A stream of a task's latest attempt the runtime kept, by `<id>.<stream>`: none where a test set none, as for a check run before. */
+    output: async (id: string, stream: string) => outputs.get(`${id}.${stream}`),
     /**
      * The engine's `say`, as far as a run can tell it: refused in its words, exit code 2, for empty words, a task it has no record of, one
      * settled and one not started; rejected with no exit code for a session not given the words; otherwise journalled on the task, and
@@ -435,7 +438,7 @@ const board = () => {
   } as unknown as Engine;
   const settle = (id: string, phase: TaskPhase, closeout?: unknown, exitCode?: number, reason?: string | string[], usage?: object) =>
     Object.assign(tasks.get(id)!, { phase, closeout, exitCode, reason, usage });
-  return { e, tasks, filings, stopped, settle, logs, said, deaf, waiting, denials, stated };
+  return { e, tasks, filings, stopped, settle, logs, outputs, said, deaf, waiting, denials, stated };
 };
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
@@ -499,24 +502,24 @@ test("the run files a signed step's check itself: the frozen command, in its wor
     { harness: 'check', cwd: run.repo, deadlineSeconds: 1200, closeoutSchema: undefined },
   );
   assert.equal('maxAttempts' in spec || 'resume' in spec, false, 'one attempt, as every task is: the runtime refuses a count or a policy');
+  assert.equal(spec.brief, 'npm test && npm run typecheck', 'the brief is the check line, for a person reading the task');
   assert.deepEqual(
-    readCheckBrief(spec.brief),
+    spec.config,
     {
-      command: 'npm test && npm run typecheck',
+      command: ['sh', '-c', 'npm test && npm run typecheck'],
       env: {
         WF_RUN: run.id,
         WF_STEP: 'implement',
         WF_BASE_REF: run.baseRef,
         WF_WORKSPACE: run.repo,
-        WF_STDERR: path.join(ROOT, 'checks', `${id}.stderr`),
-        WF_STDOUT: path.join(ROOT, 'checks', `${id}.stdout`),
         WF_ARTIFACTS: path.join(ROOT, 'runs', run.id, 'artifacts', 'implement'),
         WF_CLOSEOUT: path.join(ROOT, 'checks', `${id}.closeout.json`),
       },
+      niceness: 10,
     },
-    "`WF_ARTIFACTS` is the step's own files directory, where a check that takes screenshots puts them; `WF_CLOSEOUT` the step's closeout",
+    "filed as data on the runtime's command harness: `WF_ARTIFACTS` is the step's own files directory, where a check that takes screenshots puts them; `WF_CLOSEOUT` the step's closeout",
   );
-  assert.ok(fs.existsSync(path.join(ROOT, 'checks')), 'the stderr file has somewhere to go');
+  assert.ok(fs.existsSync(path.join(ROOT, 'checks')), 'the closeout file has somewhere to go');
   assert.ok(fs.statSync(path.join(ROOT, 'runs', run.id, 'artifacts', 'implement')).isDirectory(), 'and so do its files');
 
   await advance(e, readRun(run.id));
@@ -542,7 +545,7 @@ test("a check is handed the step's closeout as a file, flat, a declared field at
   await advance(e, readRun(run.id));
 
   const id = `${run.id}-implement-check`;
-  const file = readCheckBrief(tasks.get(id)!.spec.brief).env.WF_CLOSEOUT;
+  const file = tasks.get(id)!.spec.config?.env?.WF_CLOSEOUT ?? '';
   assert.equal(file, path.join(ROOT, 'checks', `${id}.closeout.json`));
   assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), {
     outcome: 'done',
@@ -589,9 +592,10 @@ test('a `check:` planted in the folder after `wf start` never reaches the check 
   await advance(e, readRun(run.id));
   settle(`${run.id}-implement`, 'succeeded', SIGNED);
   await advance(e, readRun(run.id));
-  assert.equal(
-    readCheckBrief(tasks.get(`${run.id}-implement-check`)!.spec.brief).command,
-    'npm test',
+  const spec = tasks.get(`${run.id}-implement-check`)!.spec;
+  assert.deepEqual(
+    [spec.config?.command, spec.brief],
+    [['sh', '-c', 'npm test'], 'npm test'],
     'the frozen command, not the one a step would like to be judged by',
   );
 });
@@ -672,16 +676,16 @@ test("a step named for another step's check is refused at `wf start`, before any
   );
 });
 
-test('`wf ls` and `wf decide` read a refused check from its log and its stderr file', async () => {
+test('`wf ls` and `wf decide` read a refused check from the streams the runtime kept of it', async () => {
   const run = started(folder('check: npm test'));
-  const { e, settle, logs } = board();
+  const { e, settle, outputs } = board();
   await advance(e, readRun(run.id));
   settle(`${run.id}-implement`, 'succeeded', SIGNED);
   await advance(e, readRun(run.id));
   const id = `${run.id}-implement-check`;
-  settle(id, 'failed');
-  logs.set(id, 'not ok 3 - parses a trailing comma\n# fail 1\n\n[wf check] exit 1\n');
-  fs.writeFileSync(path.join(ROOT, 'checks', `${id}.stderr`), 'npm error Test failed.\n');
+  settle(id, 'failed', undefined, 1);
+  outputs.set(`${id}.stdout`, 'not ok 3 - parses a trailing comma\n# fail 1\n');
+  outputs.set(`${id}.stderr`, 'npm error Test failed.\n');
 
   const l = await list(e, readRun(run.id));
   assert.deepEqual(
@@ -1242,10 +1246,10 @@ const refusal = async (p: Promise<unknown>): Promise<string> => {
 };
 
 test('`retries: 1` re-files a step its check refused, once, continuing its session and told what the check said — and past it, files nothing', async () => {
-  const { run, e, tasks, filings, settle, logs } = await throughCheck('check: npm test && npm run typecheck\nretries: 1', 'failed', 1);
+  const { run, e, tasks, filings, settle, outputs } = await throughCheck('check: npm test && npm run typecheck\nretries: 1', 'failed', 1);
   const check1 = `${run.id}-implement-check`;
-  logs.set(check1, 'ok 1 - builds\nnot ok 2 - parses a trailing comma\n# fail 1\n\n[wf check] exit 1\n');
-  fs.writeFileSync(path.join(ROOT, 'checks', `${check1}.stderr`), 'npm error Test failed.\n');
+  outputs.set(`${check1}.stdout`, 'ok 1 - builds\nnot ok 2 - parses a trailing comma\n# fail 1\n');
+  outputs.set(`${check1}.stderr`, 'npm error Test failed.\n');
 
   const pass = await advance(e, readRun(run.id));
   const try2 = `${run.id}-implement-try2`;
@@ -1629,28 +1633,25 @@ const mutantLog = (killed: readonly string[]): string =>
     ...Array.from({ length: 24 }, (_, i) => `web:build: chunk ${i} built`),
     'wf check: nothing under apps/web/ or apps/api/ was touched: no build, no e2e',
     '',
-    '[wf check] exit 0',
-    '',
   ].join('\n');
 /**
- * A check's output as the run keeps it: its whole stdout, without the trailer, at `checks/<id>.stdout`, and in the engine's log only the
- * end from the web build on, which holds no `wf mutants:` line, as the engine keeps the end of a long one.
+ * A check's output as the runtime keeps it: its whole stdout as the stream of its attempt, and in the engine's log only the end from the
+ * web build on, which holds no `wf mutants:` line, as the engine keeps the end of a long one.
  */
-const checkPrinted = (logs: Map<string, string>, id: string, text: string) => {
-  fs.mkdirSync(path.join(ROOT, 'checks'), { recursive: true });
-  fs.writeFileSync(path.join(ROOT, 'checks', `${id}.stdout`), text.replace(/\n\[wf check\] exit \d+\n$/, ''));
-  logs.set(id, text.slice(text.indexOf('web:build:')));
+const checkPrinted = (b: { logs: Map<string, string>; outputs: Map<string, string> }, id: string, text: string) => {
+  b.outputs.set(`${id}.stdout`, text);
+  b.logs.set(id, text.slice(text.indexOf('web:build:')));
 };
 const KILLED_1 = '#1 src/a.ts: "x" → "y", by test/a.test.ts (failed, 0.4 s)';
 const KILLED_2 = '#2 src/b.ts: "<" → "<=", by test/b.test.ts (failed, 0.3 s)';
 const CHECK_SAID = "## What implement's check said";
 
 test('the step after a checked step is handed what the check said: its exit, the tails, and every `wf <name>:` line of its whole stdout, in its brief', async () => {
-  const { run, e, tasks, logs } = await throughCheck('check: npm test', 'succeeded', 0);
+  const { run, e, tasks, logs, outputs } = await throughCheck('check: npm test', 'succeeded', 0);
   const check = `${run.id}-implement-check`;
-  checkPrinted(logs, check, mutantLog([KILLED_1, KILLED_2]));
+  checkPrinted({ logs, outputs }, check, mutantLog([KILLED_1, KILLED_2]));
   assert.doesNotMatch(logs.get(check)!, /wf mutants:/, "the engine's log holds none of them");
-  fs.writeFileSync(path.join(ROOT, 'checks', `${check}.stderr`), 'npm warn deprecated glob@7\n');
+  outputs.set(`${check}.stderr`, 'npm warn deprecated glob@7\n');
 
   assert.deepEqual((await advance(e, readRun(run.id))).filed, ['review']);
   const brief = tasks.get(`${run.id}-review`)!.spec.brief;
@@ -1680,8 +1681,8 @@ test('the step after a checked step is handed what the check said: its exit, the
 test("each round's review is handed that round's check, never the first try's", async () => {
   const run = started(looped());
   const b = board();
-  checkPrinted(b.logs, `${run.id}-implement-check`, mutantLog([KILLED_1]));
-  checkPrinted(b.logs, `${run.id}-implement-try2-check`, mutantLog(['#9 src/c.ts: "a" → "b", by test/c.test.ts (failed, 0.2 s)']));
+  checkPrinted(b, `${run.id}-implement-check`, mutantLog([KILLED_1]));
+  checkPrinted(b, `${run.id}-implement-try2-check`, mutantLog(['#9 src/c.ts: "a" → "b", by test/c.test.ts (failed, 0.2 s)']));
   await advance(b.e, readRun(run.id));
   await toReview(b, run.id, 1, true);
   assert.deepEqual((await advance(b.e, readRun(run.id))).looped, ['review']);
@@ -1698,13 +1699,13 @@ test("each round's review is handed that round's check, never the first try's", 
 });
 
 test('REFUSED silence: a check that did not finish says so, and one whose log cannot be read says why, in the brief of the step after it', async () => {
-  const cut = await throughCheck('check: npm test', 'succeeded', 0);
+  const cut = await throughCheck('check: npm test', 'succeeded');
   cut.logs.set(`${cut.run.id}-implement-check`, 'wf mutants: baseline: test/a.test.ts passes unmutated\nok 1 - builds\n');
   await advance(cut.e, readRun(cut.run.id));
   const unfinished = cut.tasks.get(`${cut.run.id}-review`)!.spec.brief;
   assert.match(
     unfinished,
-    /\n## What implement's check said\n\nIt did not finish: it was stopped, or killed before it printed an exit code\./,
+    /\n## What implement's check said\n\nIt did not finish: it was stopped, or killed before it exited with a code\./,
   );
   assert.doesNotMatch(unfinished, /It passed/);
   assert.deepEqual(
@@ -1735,7 +1736,7 @@ test('REFUSED silence: a check that did not finish says so, and one whose log ca
   assert.match(
     gone.tasks.get(`${gone.run.id}-review`)!.spec.brief,
     new RegExp(
-      `\\n## What implement's check said\\n\\nWhat it said cannot be given here — the engine could not give the log of its task ${check}: no journal for ${check}\\.`,
+      `\\n## What implement's check said\\n\\nWhat it said cannot be given here — the engine could not give what its task ${check} printed: no journal for ${check}\\.`,
     ),
   );
 });
@@ -1743,7 +1744,7 @@ test('REFUSED silence: a check that did not finish says so, and one whose log ca
 test("a step after a checked step, tried afresh, is handed that check in its try's brief too", async () => {
   const run = started(folder('check: npm test'));
   const b = board();
-  checkPrinted(b.logs, `${run.id}-implement-check`, mutantLog([KILLED_1]));
+  checkPrinted(b, `${run.id}-implement-check`, mutantLog([KILLED_1]));
   await advance(b.e, readRun(run.id));
   b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
   await advance(b.e, readRun(run.id));
@@ -2793,9 +2794,9 @@ const viewsOf = async (e: Engine, run: Run): Promise<Map<string, TaskView>> => {
   return views;
 };
 
-test('REFUSED as a verdict: `exitVerdicts` reads `unfinished` for a check whose attempt has no exit code — the word `wf ls` reads off the log — and no retry is spent on it', async () => {
+test('REFUSED as a verdict: `exitVerdicts` reads `unfinished` for a check whose attempt has no exit code — the word `wf ls` says — and no retry is spent on it', async () => {
   const refused = await throughCheck('check: npm test\nretries: 1', 'failed', 1);
-  refused.logs.set(`${refused.run.id}-implement-check`, 'not ok 1 - parses a trailing comma\n\n[wf check] exit 1\n');
+  refused.logs.set(`${refused.run.id}-implement-check`, 'not ok 1 - parses a trailing comma\n');
   const killed = await throughCheck('check: npm test\nretries: 1', 'failed');
   killed.logs.set(`${killed.run.id}-implement-check`, 'ok 1 - builds\n');
   const cut = await throughCheck('check: npm test\nretries: 1', 'failed', 143);
@@ -2814,13 +2815,13 @@ test('REFUSED as a verdict: `exitVerdicts` reads `unfinished` for a check whose 
     assert.equal(
       (await list(b.e, run)).steps[0].status,
       `failed ✗ check (${verdictWord(verdict)})`,
-      "`wf ls`'s word, which it read off the log",
+      "`wf ls`'s word, which it read off the attempt",
     );
   }
   assert.deepEqual(
     (await advance(killed.e, readRun(killed.run.id))).tried,
     [],
-    'a check killed at its deadline, settled `failed` with no exit code on its attempt and no trailer on its log, did not finish: no retry',
+    'a check killed at its deadline, settled `failed` with no exit code on its attempt, did not finish: no retry',
   );
   assert.deepEqual(
     (await advance(cut.e, readRun(cut.run.id))).tried,
@@ -4412,7 +4413,7 @@ test('a nudge that continues a session is handed what was said to it — `wf ret
   assert.doesNotMatch(fresh.brief, /Said to your session|Widen the scope/, 'a new session is handed none of the last one');
 
   const { run: checked, e, tasks, said, logs } = await throughCheck('check: npm test\nretries: 1', 'failed', 1);
-  logs.set(`${checked.id}-implement-check`, 'not ok 1 - parses a trailing comma\n\n[wf check] exit 1\n');
+  logs.set(`${checked.id}-implement-check`, 'not ok 1 - parses a trailing comma\n');
   said.set(`${checked.id}-implement`, [{ at: '2026-09-14T16:05:00.000Z', attempt: 1, text: 'Run the parser tests too.' }]);
   assert.deepEqual((await advance(e, readRun(checked.id))).tried, ['implement']);
   const retried = tasks.get(`${checked.id}-implement-try2`)!.spec.brief;
@@ -5070,7 +5071,7 @@ test('REFUSED past its budget at shipped defaults: a claude step whose ended tri
   const { run, e, tasks, filings, settle, logs } = await throughCheck('check: npm test\nretries: 2\nbudget: 3', 'failed', 1);
   const implement = `${run.id}-implement`;
   settle(implement, 'succeeded', SIGNED, undefined, undefined, { costUsd: 4.25 });
-  logs.set(`${implement}-check`, 'not ok 1 - parses\n\n[wf check] exit 1\n');
+  logs.set(`${implement}-check`, 'not ok 1 - parses\n');
   for (let i = 0; i < 2; i++) {
     const pass = await advance(e, readRun(run.id));
     assert.deepEqual(
@@ -5132,7 +5133,6 @@ test('REFUSED past its budget at shipped defaults: a claude step whose ended tri
   settle(try2, 'succeeded', SIGNED, undefined, undefined, { costUsd: 6 });
   assert.deepEqual((await advance(e, readRun(run.id))).checked, ['implement']);
   settle(`${try2}-check`, 'failed', undefined, 1);
-  logs.set(`${try2}-check`, '[wf check] exit 1\n');
   assert.deepEqual(
     (await advance(e, readRun(run.id))).tried,
     [],
@@ -5280,7 +5280,7 @@ test('REFUSED by the CLI before a run is read: `wf retry --budget` with no amoun
 });
 
 test("a claude-detached step's tries share its cap: `retries:` files the next try with what is left of it, not a cap of its own — and at the cap, nothing left, files none", async () => {
-  const { run, e, tasks, settle, logs } = await throughCheck(
+  const { run, e, tasks, settle } = await throughCheck(
     'harness: claude-detached\ncheck: npm test\nretries: 2\nbudget: 3',
     'failed',
     1,
@@ -5288,7 +5288,6 @@ test("a claude-detached step's tries share its cap: `retries:` files the next tr
   const implement = `${run.id}-implement`;
   assert.equal(tasks.get(implement)!.spec.config?.budgetUsd, 3, 'the first filing: nothing spent, the whole cap');
   settle(implement, 'succeeded', SIGNED, undefined, undefined, { costUsd: 2.9 });
-  logs.set(`${implement}-check`, '[wf check] exit 1\n');
   assert.deepEqual((await advance(e, readRun(run.id))).tried, ['implement'], '$2.90 of $3: `retries:` tries it');
   const try2 = `${implement}-try2`;
   assert.equal(tasks.get(try2)!.spec.config?.budgetUsd, 0.1, 'what is left of $3 after $2.90');
@@ -5296,7 +5295,6 @@ test("a claude-detached step's tries share its cap: `retries:` files the next tr
   settle(try2, 'succeeded', SIGNED, undefined, undefined, { costUsd: 0.1 });
   assert.deepEqual((await advance(e, readRun(run.id))).checked, ['implement']);
   settle(`${try2}-check`, 'failed', undefined, 1);
-  logs.set(`${try2}-check`, '[wf check] exit 1\n');
   const pass = await advance(e, readRun(run.id));
   assert.deepEqual(
     [pass.tried, pass.blocked],
@@ -6329,14 +6327,14 @@ const viewPrograms = async () => {
 
 test('the programs of the views, given the engine as a service, answer what their plain faces answer on the same store: each face runs its program and adds nothing', async () => {
   const v = await viewPrograms();
-  const { run, e, settle, logs } = await throughCheck('check: npm test\nretries: 1', 'failed', 1);
+  const { run, e, settle, outputs } = await throughCheck('check: npm test\nretries: 1', 'failed', 1);
   await advance(e, readRun(run.id));
   settle(`${run.id}-implement-try2`, 'succeeded', SIGNED);
   await advance(e, readRun(run.id));
   const check = `${run.id}-implement-try2-check`;
   settle(check, 'failed', undefined, 1);
-  logs.set(check, 'not ok 1 - parses a trailing comma\n# fail 1\n\n[wf check] exit 1\n');
-  fs.writeFileSync(path.join(ROOT, 'checks', `${check}.stderr`), 'npm error Test failed.\n');
+  outputs.set(`${check}.stdout`, 'not ok 1 - parses a trailing comma\n# fail 1\n');
+  outputs.set(`${check}.stderr`, 'npm error Test failed.\n');
   const record = readRun(run.id);
   const earlier = `${run.id}-implement`;
   assert.deepEqual(record.steps.implement.tries?.[0].taskId, earlier, 'an earlier try, whose task only every try reads');
@@ -6691,7 +6689,7 @@ test('the whole screen of a run whose every step passed its check', async (t) =>
   await advance(b.e, readRun(run.id));
   b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
   await advance(b.e, readRun(run.id));
-  b.logs.set(`${run.id}-implement-check`, '# pass 1\n\n[wf check] exit 0\n');
+  b.logs.set(`${run.id}-implement-check`, '# pass 1\n');
   b.settle(`${run.id}-implement-check`, 'succeeded', undefined, 0);
   await advance(b.e, readRun(run.id));
   assert.deepEqual(await whole(t, b.e, run), [

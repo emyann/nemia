@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type RefObject } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import {
   applyNodeChanges,
@@ -36,6 +36,48 @@ const nodeTypes = { step: StepNode };
 const edgeTypes = { state: StateEdge };
 
 const FIT = { padding: 0.2, maxZoom: 1.25 };
+
+/** The least width of canvas the bar must leave uncovered for a fit to keep the nodes clear of it, in pixels. */
+const BESIDE_MIN = 240;
+
+/**
+ * How the canvas in `frame` is fitted: as `FIT`, and, where the frame's floating bar is drawn over the canvas's right with at least
+ * `BESIDE_MIN` pixels left beside it, every node in the part it leaves uncovered. Takes the canvas's frame, or null; measures the bar where
+ * it is drawn, at each call.
+ */
+function fitBeside(frame: HTMLElement | null) {
+  const bar = document.querySelector('[data-floating-bar]');
+  if (!frame || !bar) return FIT;
+  const over = frame.getBoundingClientRect().right - bar.getBoundingClientRect().left;
+  if (over <= 0 || frame.clientWidth - over < BESIDE_MIN) return FIT;
+  return { ...FIT, padding: { left: '10%', right: `${over + 24}px`, y: '20%' } } as const;
+}
+
+/**
+ * Fits the canvas in `frame` again, with `fitView`, clear of the bar (`fitBeside`): when the frame changes width, as when the window does,
+ * and when a step of the run opens in the bar or the bar closes (`covered`). A canvas drawn uncovered keeps React Flow's own first fit.
+ */
+function useRefit(frame: RefObject<HTMLDivElement | null>, covered: boolean, fitView: ReturnType<typeof useReactFlow<StepFlowNode>>['fitView']) {
+  useEffect(() => {
+    const el = frame.current;
+    if (!el) return;
+    let width = el.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (el.clientWidth === width) return;
+      width = el.clientWidth;
+      void fitView({ ...fitBeside(el), duration: 200 });
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [frame, fitView]);
+
+  const was = useRef(false);
+  useEffect(() => {
+    if (was.current === covered) return;
+    was.current = covered;
+    void fitView({ ...fitBeside(frame.current), duration: 300 });
+  }, [covered, frame, fitView]);
+}
 
 const button =
   'rounded border border-neutral-300 bg-white px-2 py-1 text-xs text-neutral-700 shadow-sm hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:disabled:hover:bg-neutral-900';
@@ -125,7 +167,8 @@ function usePress(run: RunDetail) {
  * - A press shows a step in the frame's bar, which floats over the page, and a double click opens its session (`usePress`); the step the
  *   bar shows is drawn selected.
  * - Reset layout lays the nodes out again from `after`, forgets the saved arrangement, and fits the view once, after the commit that
- *   moved them. The view is fitted again when the canvas changes width, as when the window does.
+ *   moved them. The view is fitted again when the canvas changes width, as when the window does, and as a step opens in the bar or it
+ *   closes, each time clear of the bar where it covers the canvas (`useRefit`).
  * - The legend wraps short of the minimap, drawn smaller than React Flow's own so it covers no node; arrowheads take their edges' colour
  *   in both themes.
  */
@@ -187,26 +230,14 @@ function Canvas({ run, computed }: Props & { computed: ReadonlyMap<string, Point
     setPlaced((current) => current.map((n) => ({ ...n, position: computed.get(n.id) ?? n.position })));
     setResets((n) => n + 1);
   };
+  const frame = useRef<HTMLDivElement>(null);
   const fitted = useRef(0);
   useEffect(() => {
     if (resets === fitted.current) return;
     fitted.current = resets;
-    void fitView({ ...FIT, duration: 300 });
+    void fitView({ ...fitBeside(frame.current), duration: 300 });
   }, [resets, fitView]);
-
-  const frame = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = frame.current;
-    if (!el) return;
-    let width = el.clientWidth;
-    const observer = new ResizeObserver(() => {
-      if (el.clientWidth === width) return;
-      width = el.clientWidth;
-      void fitView({ ...FIT, duration: 200 });
-    });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [fitView]);
+  useRefit(frame, selected !== null, fitView);
 
   return (
     <div ref={frame} className="h-[30rem] overflow-hidden rounded border border-neutral-200 dark:border-neutral-800">

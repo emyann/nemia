@@ -23,6 +23,7 @@ const ROOT = scratch('wf-decide-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
 process.env.WF_ROOT = ROOT;
+delete process.env.WF_MAX_RUNS;
 const { AGENT_FACING, CHECK_AFFECTING, LESSON, advance, consumption, isGitRun, lessonLine, retry, sensitiveDiff, start, touchedBy } =
   await import('../src/runner.ts');
 const { readRun } = await import('../src/record/record.store.ts');

@@ -2666,8 +2666,12 @@ written to `$WF_ROOT/tick-stats.json`, over the last pass's. Nothing decides on 
   answered from the tick's memo while its inputs are as they were: its record, every file beside it in the store (the markers, the
   asks directory and its `done/`: `restStamps`, one `readdir` and a `stat` each), each of its tasks' journals (the runtime's feed, read
   once a pass, takes a run out of the memo when one of its tasks is on it) and its result branches' tips (one `git for-each-ref` a
-  repository). The breakdown says how many (`, 200 runs at rest answered from memory`); on a store of 200 finished runs and a few in
-  flight a pass reads 4 journals and starts 2 git processes, as it does with none (`test/rest-store.test.ts`). The memo lives in the
+  repository). Its record is not read again either while its stamp holds: the memo keeps the run as it read it and hands it to the
+  listing (`keptOf`), so a pass reads only the records of runs in flight or whose files moved. The breakdown says how many (`, 200 runs at
+  rest answered from memory`); on a store of 200 finished runs and a few in flight a pass reads 4 journals, the records of the runs in
+  flight and starts 2 git processes, as it does with none (`src/tick/rest-store.test.ts`). On a store of 390 finished runs and 3 in flight,
+  a pass's `records` went from 393 records, 16 to 24 ms and 255 KB read to 3 records, 2 ms and 1.8 KB, and the pass from 32 to 49 ms to
+  10 to 13 ms (a fixture store, measured 2026-10-02; the owner's records are larger, so it read about 130 MB a minute). The memo lives in the
   daemon's memory and nowhere else, and a restart rebuilds it with one full pass: it never decides what a full pass would not.
   The tests that tick set `WF_VERIFY_REST=1`, which judges every run answered from memory in full as well and throws where the two differ.
   It takes `1` or `0`, and unset or empty is off; anything else is refused by name, exit 2 (`verifiesRest`).

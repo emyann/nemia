@@ -65,21 +65,17 @@ const RULE = /^[A-Za-z][^\s,()]*(?:\([^()]+\))?$/;
 const RULE_LIST = {
   disallowedTools: {
     is: 'a deny list',
-    has: 'no tool list to deny from',
     example: DISALLOW_EXAMPLE,
     written: 'what the session may not have',
     may: 'may not run',
-    sandbox: '`sandbox: read-only` for a step that must not write',
     absent: "the step is denied nothing beyond the checkout's settings",
     two: 'Two commands are two rules: `Bash(git push), Bash(git reset)`.',
   },
   allowedTools: {
     is: 'an allow list',
-    has: 'no tool list to allow from',
     example: ALLOW_EXAMPLE,
     written: 'what the session may do without being asked',
     may: 'may do',
-    sandbox: '`sandbox: workspace-write` for a step that writes in its workspace and asks nobody',
     absent: 'the step may do only what its `permissionMode` allows by itself',
     two: 'Two tools are two rules: `Edit(**), Bash(npm test)`.',
   },
@@ -93,25 +89,19 @@ const RULE_LIST = {
  * Split on commas, as `tools:` is, so a comma inside a rule's parentheses would reach the harness as two pieces of it, and is
  * refused as `tools:` refuses one. Only the parentheses are looked in, not the quotes `tools:` looks in: a quote is legal inside a rule —
  * `Bash(git commit -m 'wip')`. A list written in brackets or quotes splits into entries that are not rules, and is refused for that.
- * Refused on codex, which has no tool list at all. A line under the key's former name (`spelled`) is quoted as written, and said to be
- * the key.
+ * Which harnesses take a rule list is the runtime's to say at `wf start` (`configRefused` in start.verb.ts). A line under the key's former
+ * name (`spelled`) is quoted as written, and said to be the key.
  */
 export function rulesOf(
   step: string,
   key: 'disallowedTools' | 'allowedTools',
   written: string | undefined,
-  harness: string | undefined,
   spelled?: string,
 ): string[] | undefined {
   if (written === undefined) return undefined;
   const w = RULE_LIST[key];
   const named = `${step}: \`${spelled ?? key}: ${written}\`${spelled !== undefined && spelled !== key ? ` (\`${spelled}:\` is \`${key}:\`'s former name)` : ''}`;
   const shape = `Each entry is one rule, a tool or a tool and what it ${w.may}, comma-separated: ${w.example}.`;
-  if (harness === 'codex') {
-    refuse(
-      `${named} is ${w.is}, and codex has ${w.has}: one shell, fenced by its sandbox. The sandbox is \`sandbox:\` — \`read-only\` reads and runs commands and writes nothing, \`workspace-write\` writes in the workspace. Delete the line, and name the sandbox: ${w.sandbox}.`,
-    );
-  }
   if (/\([^)]*,/.test(written)) {
     const pieces = written
       .split(',')

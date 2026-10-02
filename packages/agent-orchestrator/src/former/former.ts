@@ -5,7 +5,6 @@
  * key renamed and its words (`FORMER_OWN_KEYS`, `harnessPromptNamed`), and a step frozen on a run record under an old name (`asNamed`).
  */
 import { refuse, splitFrontmatter, type StepAgent, type StepKey, type Workflow } from '../step/step.ts';
-import { SANDBOXES } from '../harness/harness.ts';
 import { ALLOW_EXAMPLE, BUDGET_EXAMPLE, DISALLOW_EXAMPLE, TOOLS_EXAMPLE } from '../keys/index.ts';
 import type { AgentOwnKey, HarnessPrompt, RoleKey } from '../agents/agents.ts';
 
@@ -41,8 +40,7 @@ export const harnessPromptNamed = (word: string): string =>
  * A step's or an agent's lines with a codex `permissionMode:` read as the `sandbox:` it names — `bypassPermissions`, which the engine takes
  * for the widest sandbox, as `danger-full-access` — for a step or agent that runs on `harness`. So a folder, or an agent, that names a
  * codex sandbox under the former key still loads, and `wf start` names the line to rename (`codexModeLine`). Refused when `sandbox:` is
- * written beside it: on codex the two are one key. A word that is no sandbox is left where it is, for `wordOf` to refuse in words naming
- * `sandbox:`. Pure.
+ * written beside it: on codex the two are one key. Whether the word is a sandbox is the runtime's to say at `wf start`. Pure.
  */
 export function codexSandboxNamed<K extends string>(
   file: string,
@@ -56,24 +54,18 @@ export function codexSandboxNamed<K extends string>(
       `${file}: \`permissionMode: ${word}\` and \`sandbox: ${meta.sandbox}\` are both set, and on codex they are one key: \`permissionMode:\` is the former name of a codex step's sandbox, and \`sandbox:\` is Codex's own name for it. Keep the \`sandbox:\` line and delete the other.`,
     );
   }
-  const sandbox = sandboxNamed(word);
-  if (!SANDBOXES.codex.includes(sandbox)) return meta;
   const { permissionMode: _, ...rest } = meta;
-  return { ...rest, sandbox } as Partial<Record<K | 'permissionMode' | 'sandbox', string>>;
+  return { ...rest, sandbox: sandboxNamed(word) } as Partial<Record<K | 'permissionMode' | 'sandbox', string>>;
 }
 
 /** The sandbox a codex permission mode named: itself, or `danger-full-access` for `bypassPermissions`, the engine's alias for it. */
 const sandboxNamed = (word: string): string => (word === 'bypassPermissions' ? 'danger-full-access' : word);
 
 /**
- * The sandbox a codex file's former `permissionMode: <word>` is read as, or `undefined` for a word that names none, which the parser
- * refuses. For code outside the package that reads a file's lines the parser did not read — the api's picture of an agent
- * that does not load — so it reads the former line as the parser would. Pure.
+ * The sandbox a codex file's former `permissionMode: <word>` is read as. For code outside the package that reads a file's lines the
+ * parser did not read — the api's picture of an agent that does not load — so it reads the former line as the parser would. Pure.
  */
-export const formerSandbox = (word: string): string | undefined => {
-  const sandbox = sandboxNamed(word);
-  return SANDBOXES.codex.includes(sandbox) ? sandbox : undefined;
-};
+export const formerSandbox = (word: string): string => sandboxNamed(word);
 
 /**
  * The fence a step asks its harness for: the engine's task calls both `permissionMode`, Claude Code's permission mode and Codex's sandbox,
@@ -198,11 +190,10 @@ export const formerKeyWritten = (file: string, former: string): string =>
 const renamed = (former: string): string => FORMER_KEYS[former] ?? FORMER_OWN_KEYS[former];
 
 /**
- * Why a codex `permissionMode` that names a sandbox (`formerSandbox`) is not written, as `formerKeyWritten` says of a former name: read
+ * Why a codex `permissionMode` (`formerSandbox`) is not written, as `formerKeyWritten` says of a former name: read
  * from a file, it is `sandbox:` on the step (`codexSandboxNamed`), and nothing puts it in one — `renderStep`, `renderAgent`, and
  * `writeWorkflow` for a step whose harness is its agent's. What sends one is a stale form that still names a codex sandbox as
- * `permissionMode`, or a step moved onto codex that kept its Claude Code mode, `bypassPermissions`. Any other word is no sandbox, written
- * as given, and refused by the parser in words naming `sandbox:`.
+ * `permissionMode`, or a step moved onto codex that kept its Claude Code mode, which a file would read as its sandbox.
  */
 export const codexModeWritten = (file: string, word: string): string =>
   `${file}: \`permissionMode: ${word}\` on a step that runs on codex is the former name of \`sandbox:\` there, which a file may still say but nothing writes. Send \`sandbox: ${sandboxNamed(word)}\` instead: a page that sends the former name is stale — reload it, and save again; and a step moved onto codex from Claude Code keeps its permission mode — clear it, and set the sandbox.`;

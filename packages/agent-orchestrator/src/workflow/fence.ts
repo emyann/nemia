@@ -5,7 +5,7 @@
  * `background: true` over an agent an allow rule would widen: a background session also reads the person's own settings.
  */
 import { AGENTS_FOLDER, type StepKey, type Workflow } from '../step/step.ts';
-import { DEFAULT_HARNESS, isRemoteHarness, SANDBOXES } from '../harness/harness.ts';
+import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
 import { DEFAULT_PERMISSION_MODE, rulesOf, toolsOf } from '../keys/index.ts';
 import type { Agent } from '../agents/agents.ts';
 
@@ -62,6 +62,15 @@ export function directoryFence(
   return rules.length && !allowedTools.length ? undefined : { permissionMode, allowedTools };
 }
 
+/**
+ * How wide each of codex's sandboxes is, narrowest first: `read-only` writes nothing, `workspace-write` writes in the workspace,
+ * `danger-full-access` anywhere. The runtime's own list, in its order, which `test/fence.test.ts` holds this ranking to.
+ */
+export const SANDBOX_RANK: readonly string[] = ['read-only', 'workspace-write', 'danger-full-access'];
+
+/** Whether a harness fences a session with a sandbox (`SANDBOX_RANK`) rather than a permission mode and rule lists: codex alone. */
+export const sandboxed = (harness: string): boolean => harness === 'codex';
+
 /** The sandbox a sandboxed session runs in when its step names none, the runtime's (`sandboxOf`). */
 export const DEFAULT_SANDBOX = 'workspace-write';
 
@@ -78,8 +87,8 @@ type Said = { step: string; line: string; agent: string; file: string };
  * Why step `step` would widen its agent's fence, or `undefined` when it does not: `own` are the keys the step writes itself, the
  * sandbox under its own name (`codexSandboxNamed`), and `resolved` the step they were read into, with the agent's. A key the step
  * does not write is its agent's and widens nothing, and `background: true` widens it as an allow rule would (`backgroundRefusal`). A
- * remote step is left to `remoteRefusal`, which refuses every fence key there. The refusal names the step, the key, what it would add,
- * and the fix.
+ * remote step is left to `remoteRefusal` in harness.ts, which refuses every fence key there. The refusal names the step, the key, what it
+ * would add, and the fix.
  */
 export function fenceRefusal(step: string, agent: Agent, own: Partial<Record<StepKey, string>>, resolved: Workflow): string | undefined {
   const harness = resolved.harness ?? DEFAULT_HARNESS;
@@ -106,15 +115,12 @@ export function fenceRefusal(step: string, agent: Agent, own: Partial<Record<Ste
 /** The harness an agent runs on by its own file. */
 const agentHarness = (agent: Agent): string => agent.keys.harness ?? DEFAULT_HARNESS;
 
-/** Whether a harness fences a session with a sandbox rather than a permission mode and rule lists. */
-const sandboxed = (harness: string): boolean => Object.hasOwn(SANDBOXES, harness);
-
 /** The agent's `tools:` as a list, or `undefined` for none: every tool. */
 const agentTools = (agent: Agent, file: string): string[] | undefined => toolsOf(file, agent.keys.tools, agentHarness(agent));
 
 /** The agent's allow or deny rules, `[]` for none. */
 const agentRules = (agent: Agent, file: string, key: 'allowedTools' | 'disallowedTools'): string[] =>
-  rulesOf(file, key, agent.keys[key], agentHarness(agent)) ?? [];
+  rulesOf(file, key, agent.keys[key]) ?? [];
 
 /** A list of names or rules, each in backticks. */
 const listed = (names: readonly string[]): string => names.map((n) => `\`${n}\``).join(', ');
@@ -190,7 +196,7 @@ function backgroundRefusal(said: Said, agents: string | undefined): string | und
 
 /** Refused: a sandbox wider than the agent's, or than its harness's default when its file names none (`DEFAULT_SANDBOX`). */
 function sandboxRefusal(said: Said, sandbox: string, agents: string | undefined): string | undefined {
-  const order = SANDBOXES.codex;
+  const order = SANDBOX_RANK;
   const agentSandbox = agents ?? DEFAULT_SANDBOX;
   if (order.indexOf(sandbox) <= order.indexOf(agentSandbox)) return undefined;
   const narrower = order.slice(0, order.indexOf(agentSandbox) + 1);

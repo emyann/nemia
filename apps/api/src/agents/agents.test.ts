@@ -327,9 +327,9 @@ test("refusals carry the package's words: a key, a value, a name, a name taken, 
     /^agents\/scribe\.md: `agent` is a step's key/,
   );
   await refused(
-    send('POST', '/api/agents/yours', { ...scribe, keys: { effort: 'enormous' } }),
+    send('POST', '/api/agents/yours', { ...scribe, keys: { context: 'lots' } }),
     422,
-    /^agents\/scribe\.md: `effort: enormous`/,
+    /^agents\/scribe\.md: `context: lots` is not a number of tokens/,
   );
   await refused(send('POST', '/api/agents/yours', { ...scribe, name: 'x.md' }), 400, /^`x\.md` is not an agent's name/);
   await refused(send('POST', '/api/agents/yours', { ...scribe, keys: { model: 7 } }), 400, /`keys\.model` is written as a string/);

@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { isReadme, WorkflowError, type Workflow } from '../step/step.ts';
-import { codexModeWritten, formerSandbox } from '../former/former.ts';
+import { codexModeWritten } from '../former/former.ts';
 import { parseWorkflow, renderStep, type StepDraft } from '../workflow/index.ts';
 import { agentsFolderRefusal, linkRefusal, parseFolder, stepNameRefusal } from './folder.ts';
 import { agentsFor, skillsFor, type Places } from './folder.store.ts';
@@ -90,12 +90,7 @@ export function writeWorkflow(
   const where = places ?? placesAround(at);
   const agents = agentsFor(at, where);
   const parsed = parseFolder(texts, read, agents, skillsFor(at, where));
-  const onCodex = steps.find(
-    (step) =>
-      step.permissionMode != null &&
-      formerSandbox(step.permissionMode) !== undefined &&
-      parsed.find((s) => s.name === step.name)?.harness === 'codex',
-  );
+  const onCodex = steps.find((step) => step.permissionMode != null && parsed.find((s) => s.name === step.name)?.harness === 'codex');
   if (onCodex) refuse(codexModeWritten(onCodex.name, onCodex.permissionMode!));
 
   fs.mkdirSync(at, { recursive: true });

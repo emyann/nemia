@@ -9,7 +9,18 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
-import { AUTO_UNSUPPORTED, keepsAuto, parseAgent, renderAgent, WorkflowError, type Agent, type Workflow } from '../src/workflow.ts';
+import { codex, CODEX_SANDBOXES } from 'agent-runtime';
+import {
+  AUTO_UNSUPPORTED,
+  keepsAuto,
+  modeOf,
+  parseAgent,
+  parseWorkflow,
+  renderAgent,
+  WorkflowError,
+  type Agent,
+  type Workflow,
+} from '../src/workflow.ts';
 import { agentsFor, agentVersion, loadWorkflows, lookupRoots, skillsFor } from '../src/folder/folder.store.ts';
 import { briefBody, noCodingStyle, pluginOf, renderedFlags, renderedPrompt, rendersAgent, unrendered } from '../src/agents/agents.ts';
 import { scratch } from './scratch.ts';
@@ -672,4 +683,33 @@ test('REFUSED at shipped defaults: wf start of a team whose agent gives a skill 
     'started from a directory whose .claude/ has no mind-the-tone, and the store has write-a-note alone',
   );
   assert.deepEqual(fs.existsSync(runs) ? fs.readdirSync(runs).sort() : [], before);
+});
+
+test("a codex step's `sandbox:` reaches Codex as its `-s`, every sandbox, and the one it was written as before 2026-09-23 the same", () => {
+  const sandboxOf = (text: string) => {
+    const step = parseWorkflow('review', text);
+    const { args } = codex.command({
+      name: 'review',
+      brief: 'b',
+      cwd: scratch('wf-rendering-codex-'),
+      config: { permissionMode: modeOf(step) },
+    });
+    return args[args.indexOf('-s') + 1];
+  };
+  for (const sandbox of CODEX_SANDBOXES) {
+    assert.equal(sandboxOf(`---\nharness: codex\nsandbox: ${sandbox}\n---\nreview it\n`), sandbox);
+    assert.equal(sandboxOf(`---\nharness: codex\npermissionMode: ${sandbox}\n---\nreview it\n`), sandbox, `the former line, ${sandbox}`);
+  }
+  assert.equal(sandboxOf('---\nharness: codex\npermissionMode: bypassPermissions\n---\nreview it\n'), 'danger-full-access');
+  const { args } = codex.command({
+    name: 'review',
+    brief: 'b',
+    cwd: scratch('wf-rendering-codex-'),
+    config: { permissionMode: parseWorkflow('review', '---\nharness: codex\nsandbox: read-only\n---\nr\n').permissionMode },
+  });
+  assert.equal(
+    args[args.indexOf('-s') + 1],
+    'workspace-write',
+    "filed from permissionMode alone, without modeOf, the reviewer runs in Codex's default, which writes",
+  );
 });

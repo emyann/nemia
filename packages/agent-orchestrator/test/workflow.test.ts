@@ -19,7 +19,8 @@ import { loadWorkflows, workflowDescription, workflowFolder } from '../src/folde
 import { CLOSEOUT_FIELDS, DEFAULT_ROUNDS, loopSpan, outputFields, STEP_KEY_MEANINGS, STEP_KEYS, type StepKey } from '../src/workflow.ts';
 import { agentsDir, parseFolder, renderStep, sessionContext, stepNameRefusal, type StepDraft } from '../src/workflow.ts';
 import { loadAgents } from '../src/folder/folder.store.ts';
-import { allowRuleOf, disallowedBy, DENIALS, HARNESSES, PERMISSION_MODES, SANDBOXES } from '../src/workflow.ts';
+import { allowRuleOf, disallowedBy, DENIALS, HARNESSES } from '../src/workflow.ts';
+import { CLAUDE_PERMISSION_MODES, CODEX_SANDBOXES } from 'agent-runtime';
 import {
   asNamed,
   autoDropped,
@@ -655,7 +656,7 @@ test('`renderStep` writes a context window in one canonical form, whatever the f
   }
 });
 
-test('REFUSED: a context: that is not a number of tokens, one outside what the harness takes, and any on codex — by name, saying what to write', () => {
+test('REFUSED: a context: that is not a number of tokens, by name, saying what to write; a number of tokens loads, and the runtime judges the window at `wf start` (`start-config.test.ts`)', () => {
   for (const bad of ['lots', '200 k', '1.5M', '200,000', '0', '-1', '200kb', '0k']) {
     assert.throws(
       () => fm('implement', `context: ${bad}`),
@@ -667,32 +668,14 @@ test('REFUSED: a context: that is not a number of tokens, one outside what the h
       bad,
     );
   }
-  assert.throws(
-    () => fm('implement', 'context: 50k'),
-    refusedWith(
-      /^implement: `context: 50k` is 50000 tokens, and claude takes a window from 100k to 1000k tokens \(there is no `harness:` line, so the step runs on claude\)\. Give one in that range — `context: 200k`, or `context: 150000` — or delete the line for the model's whole window\.$/,
-    ),
-  );
-  assert.throws(
-    () => fm('implement', 'harness: claude-detached\ncontext: 2M'),
-    refusedWith(/`context: 2M` is 2000000 tokens, and claude-detached takes a window from 100k to 1000k tokens\. Give one/),
-  );
-  assert.throws(() => fm('implement', 'context: 99999'), refusedWith(/is 99999 tokens, and claude takes/));
-  assert.throws(() => fm('implement', 'context: 1000001'), refusedWith(/is 1000001 tokens, and claude takes/));
-  assert.throws(
-    () => fm('implement', 'context: 200'),
-    refusedWith(
-      /`context: 200` is 200 tokens, and claude takes a window from 100k to 1000k tokens .*For 200 thousand, write `context: 200k`\.$/,
-    ),
-    "Claude Code's own flag reads a bare 200 as thousands: the step does not guess, it says what to write",
-  );
-  assert.throws(
-    () => fm('review', 'harness: codex\ncontext: 200k'),
-    refusedWith(
-      /^review: `context: 200k` sets the session's context window, and codex has no such knob: `codex exec` runs on its model's own window, whatever the step says\. Delete the line, or run the step on claude or claude-detached\.$/,
-    ),
-  );
   assert.throws(() => parseWorkflow('implement', '---\ncontext:\n---\nDo it.\n'), refusedWith(/`context` has no value/));
+  for (const [line, tokens] of [
+    ['context: 50k', 50_000],
+    ['harness: claude-detached\ncontext: 2M', 2_000_000],
+    ['context: 200', 200],
+    ['harness: codex\ncontext: 200k', 200_000],
+  ] as const)
+    assert.equal(fm('implement', line).context, tokens, line);
 });
 
 test("REFUSED: a step that continues another's session with a context window of its own other than that session's — by name, saying what to do", () => {
@@ -876,18 +859,9 @@ test('REFUSED: a disallowedTools: entry that is not one rule — a comma inside 
   );
 });
 
-test('REFUSED: disallowedTools: on a codex step, naming the sandbox sandbox: sets instead', () => {
-  assert.throws(
-    () => fm('review', 'harness: codex\ndisallowedTools: Bash(npm run build)'),
-    refusedWith(
-      /^review: `disallowedTools: Bash\(npm run build\)` is a deny list, and codex has no tool list to deny from: one shell, fenced by its sandbox\. The sandbox is `sandbox:` — .*`sandbox: read-only` for a step that must not write\./,
-    ),
-  );
-  assert.throws(
-    () => fm('review', 'disallowedTools: SendMessage\nharness: codex\nsandbox: read-only'),
-    refusedWith(/codex has no tool list to deny from/),
-    'wherever the harness line is, and beside the sandbox too',
-  );
+test("a codex step's `disallowedTools:` loads as written: whether codex takes a deny list is the runtime's to judge, at `wf start` (`start-config.test.ts`)", () => {
+  assert.deepEqual(fm('review', 'harness: codex\ndisallowedTools: Bash(npm run build)').disallowedTools, ['Bash(npm run build)']);
+  assert.deepEqual(fm('review', 'disallowedTools: SendMessage\nharness: codex\nsandbox: read-only').disallowedTools, ['SendMessage']);
 });
 
 test('allowedTools: is the rules the harness is given to allow without asking, one rule per entry, trimmed — and absent, the step may do only what its permissionMode allows', () => {
@@ -975,18 +949,9 @@ test('REFUSED: a rule on a file-editing tool that is not Edit, in either list, w
   assert.deepEqual(fm('write', 'disallowedTools: Write').disallowedTools, ['Write'], 'the bare name denies the tool itself');
 });
 
-test('REFUSED: allowedTools: on a codex step, naming the sandbox sandbox: sets instead', () => {
-  assert.throws(
-    () => fm('write', 'harness: codex\nallowedTools: Edit(**)'),
-    refusedWith(
-      /^write: `allowedTools: Edit\(\*\*\)` is an allow list, and codex has no tool list to allow from: one shell, fenced by its sandbox\. The sandbox is `sandbox:` — .*`sandbox: workspace-write` for a step that writes in its workspace and asks nobody\./,
-    ),
-  );
-  assert.throws(
-    () => fm('write', 'allowedTools: Edit(**)\nharness: codex\nsandbox: workspace-write'),
-    refusedWith(/codex has no tool list to allow from/),
-    'wherever the harness line is, and beside the sandbox too',
-  );
+test("a codex step's `allowedTools:` loads as written: whether codex takes an allow list is the runtime's to judge, at `wf start` (`start-config.test.ts`)", () => {
+  assert.deepEqual(fm('write', 'harness: codex\nallowedTools: Edit(**)').allowedTools, ['Edit(**)']);
+  assert.deepEqual(fm('write', 'allowedTools: Edit(**)\nharness: codex\nsandbox: workspace-write').allowedTools, ['Edit(**)']);
 });
 
 test('`disallow:` and `allow:`, the names the lists had until 2026-09-23, are still read, as `disallowedTools:` and `allowedTools:`', () => {
@@ -1080,10 +1045,6 @@ test('REFUSED: a list under its former name, in the words of the line as written
   assert.throws(
     () => fm('write', 'disallow: NotebookEdit(notes/**)'),
     refusedWith(/^write: `disallow: NotebookEdit\(notes\/\*\*\)` \(`disallow:` is `disallowedTools:`'s former name\) has/),
-  );
-  assert.throws(
-    () => fm('write', 'harness: codex\nallow: Edit(**)'),
-    refusedWith(/^write: `allow: Edit\(\*\*\)` \(`allow:` is `allowedTools:`'s former name\) is an allow list, and codex has no tool list/),
   );
   assert.throws(
     () => fm('write', 'allow: Bash(npm test, npm run build)'),
@@ -1199,22 +1160,9 @@ test("`wf start` is told which codex files still name their sandbox as `permissi
   assert.deepEqual(formerKeyLines(folder({ 'review.md': '---\nharness: codex\nsandbox: read-only\n---\nReview.\n' })), []);
 });
 
-test("REFUSED: an effort the step's harness does not take, by name, with the efforts it does", () => {
-  assert.throws(
-    () => fm('implement', 'effort: extreme'),
-    refusedWith(
-      /^implement: `effort: extreme` is not an effort claude has \(there is no `harness:` line, so the step runs on claude\)\. On claude it is one of: low, medium, high, xhigh, max\. Without the line, the harness uses its own default\.$/,
-    ),
-  );
-  assert.throws(
-    () => fm('review', 'harness: codex\neffort: ultra'),
-    refusedWith(/On codex it is one of: none, minimal, low, medium, high, xhigh, max\./),
-  );
-  assert.throws(
-    () => fm('implement', 'effort: minimal'),
-    refusedWith(/not an effort claude has .*`minimal` is codex's word, and this step does not run on codex/),
-  );
-  assert.throws(() => fm('implement', 'effort: High'), refusedWith(/not an effort claude has/), 'words are exact');
+test("an effort loads as written: which efforts a step's harness takes is the runtime's to judge, at `wf start` (`start-config.test.ts`)", () => {
+  assert.equal(fm('implement', 'effort: extreme').effort, 'extreme');
+  assert.equal(fm('review', 'harness: codex\neffort: ultra').effort, 'ultra');
   assert.equal(fm('review', 'harness: codex\neffort: minimal').effort, 'minimal');
   assert.equal(fm('x', 'harness: claude-detached\neffort: max').effort, 'max');
 });
@@ -1285,83 +1233,51 @@ test("harness: banana is refused with the harnesses there are; harness: check is
   for (const h of ['claude', 'codex', 'claude-detached']) assert.equal(fm('x', `harness: ${h}`).harness, h);
 });
 
-test("permissionMode: yolo is refused with the modes of the step's own harness", () => {
-  assert.throws(
-    () => fm('implement', 'permissionMode: yolo'),
-    /implement: `permissionMode: yolo` is not a mode claude has \(there is no `harness:` line, so the step runs on claude\)\. On claude it is one of: acceptEdits, auto, bypassPermissions, default, dontAsk, manual, plan\./,
-  );
-  assert.throws(
-    () => fm('review', 'harness: codex\nsandbox: yolo'),
-    (e: Error) =>
-      e.message.startsWith(
-        'review: `sandbox: yolo` is not a sandbox codex has. On codex it is one of: read-only, workspace-write, danger-full-access.',
-      ),
-  );
-  assert.throws(
-    () => fm('implement', 'permissionMode: read-only'),
-    (e: Error) =>
-      /not a mode claude has .*`read-only` is a sandbox codex has, written `sandbox: read-only` on a step that runs on codex/.test(
-        e.message,
-      ),
-    'a sandbox written as a permission mode on Claude Code is told where it belongs, under the key it is written with there',
-  );
-
+test("a permission mode, and a codex step's sandbox, load as written: which words a step's harness takes is the runtime's to judge, at `wf start` (`start-config.test.ts`)", () => {
+  assert.equal(fm('implement', 'permissionMode: yolo').permissionMode, 'yolo');
+  assert.equal(fm('implement', 'permissionMode: read-only').permissionMode, 'read-only');
+  assert.equal(fm('review', 'harness: codex\nsandbox: yolo').sandbox, 'yolo');
   assert.equal(fm('review', 'harness: codex\nsandbox: read-only').sandbox, 'read-only');
   assert.equal(fm('x', 'harness: claude-detached\npermissionMode: bypassPermissions').permissionMode, 'bypassPermissions');
   assert.equal(fm('x', 'permissionMode: auto').permissionMode, 'auto');
   assert.equal(fm('x', 'permissionMode: manual').permissionMode, 'manual', "the engine's word, Claude Code's manual, is a mode");
 });
 
-test('REFUSED: `permissionMode:` on a codex step that names no sandbox, with words naming `sandbox:` — wherever the harness line is', () => {
-  const namesSandbox = (e: Error) =>
-    /`permissionMode:` is Claude Code's permission mode, and codex has none: its fence is its sandbox, `sandbox:` — read-only, workspace-write, danger-full-access\. Write `sandbox:` instead/.test(
-      e.message,
-    );
-  assert.throws(
-    () => fm('review', 'harness: codex\npermissionMode: yolo'),
-    (e: Error) => e.message.startsWith('review: `permissionMode: yolo` is not a key codex takes. ') && namesSandbox(e),
-  );
-  for (const mode of PERMISSION_MODES.claude.filter((m) => m !== 'bypassPermissions')) {
-    assert.throws(
-      () => fm('review', `permissionMode: ${mode}\nharness: codex`),
-      (e: Error) => e.message.startsWith(`review: \`permissionMode: ${mode}\` is not a key codex takes. `) && namesSandbox(e),
-      `${mode}: Claude Code's own modes are no sandbox either; bypassPermissions, codex's widest sandbox to the engine, is read apart`,
-    );
-  }
-});
-
-test('REFUSED: `sandbox:` on a Claude Code step, with words naming `permissionMode:` — the default harness included', () => {
-  for (const [harness, line, said] of [
-    ['claude', '', 'claude takes (there is no `harness:` line, so the step runs on claude)'],
-    ['claude', 'harness: claude\n', 'claude takes'],
-    ['claude-detached', 'harness: claude-detached\n', 'claude-detached takes'],
-  ] as const) {
-    for (const sandbox of SANDBOXES.codex) {
-      assert.throws(
-        () => fm('implement', `${line}sandbox: ${sandbox}`),
-        (e: Error) =>
-          e.message.startsWith(
-            `implement: \`sandbox: ${sandbox}\` is not a key ${said}. \`sandbox:\` is Codex's sandbox, and Claude Code has none: its fence is its permission mode, \`permissionMode:\` — ${[...PERMISSION_MODES[harness]].join(', ')}`,
-          ) && e.message.includes('Write `permissionMode:` instead, or run the step on codex.'),
-        `${harness} ${sandbox}`,
-      );
+test("a codex step's `permissionMode:` loads as its `sandbox:`, whatever the word, wherever the harness line is: the runtime judges the word at `wf start` (`start-config.test.ts`)", () => {
+  for (const mode of ['yolo', ...CLAUDE_PERMISSION_MODES.filter((m) => m !== 'bypassPermissions')]) {
+    for (const lines of [`harness: codex\npermissionMode: ${mode}`, `permissionMode: ${mode}\nharness: codex`]) {
+      const step = fm('review', lines);
+      assert.deepEqual([step.sandbox, step.permissionMode], [mode, undefined], lines);
     }
   }
 });
 
-test("REFUSED: `sandbox: bypassPermissions`, Claude Code's word, naming Codex's own `danger-full-access`", () => {
-  assert.throws(
-    () => fm('review', 'harness: codex\nsandbox: bypassPermissions'),
-    (e: Error) =>
-      e.message.startsWith(
-        "review: `sandbox: bypassPermissions` is Claude Code's word for its widest mode. Codex's own name for the sandbox that fences nothing is `danger-full-access`: write `sandbox: danger-full-access`.",
-      ),
-  );
+test("REFUSED: `sandbox:` on a Claude Code step, the orchestrator's own rule — the runtime would file it as a mode — with words naming `permissionMode:`, the default harness included", () => {
+  for (const [harness, line, where] of [
+    ['claude', '', ' (there is no `harness:` line, so the step runs on claude)'],
+    ['claude', 'harness: claude\n', ''],
+    ['claude-detached', 'harness: claude-detached\n', ''],
+  ] as const) {
+    for (const sandbox of CODEX_SANDBOXES) {
+      assert.throws(
+        () => fm('implement', `${line}sandbox: ${sandbox}`),
+        (e: Error) =>
+          e.message ===
+          `implement: \`sandbox: ${sandbox}\` is a codex step's sandbox, and this step runs on ${harness}${where}, which is fenced by its permission mode, \`permissionMode:\`, with \`tools:\`, \`disallowedTools:\` and \`allowedTools:\`: the line would be filed as a mode. Write \`permissionMode:\` instead, or run the step on codex.`,
+        `${harness} ${sandbox}`,
+      );
+    }
+  }
+  assert.equal(fm('review', 'harness: codex\nsandbox: read-only').sandbox, 'read-only', 'on codex, its own key');
+});
+
+test("`sandbox: bypassPermissions` on codex loads as written: the runtime takes it for Codex's widest sandbox, and judges it at `wf start`", () => {
+  assert.equal(fm('review', 'harness: codex\nsandbox: bypassPermissions').sandbox, 'bypassPermissions');
   assert.equal(fm('review', 'harness: codex\nsandbox: danger-full-access').sandbox, 'danger-full-access');
 });
 
 test('a codex step that names its sandbox as `permissionMode:`, as every one did until 2026-09-23, still loads — read as `sandbox:`', () => {
-  for (const sandbox of SANDBOXES.codex) {
+  for (const sandbox of CODEX_SANDBOXES) {
     const step = fm('review', `harness: codex\npermissionMode: ${sandbox}`);
     assert.equal(step.sandbox, sandbox);
     assert.equal(step.permissionMode, undefined, 'read as the one key, never as both');
@@ -1904,7 +1820,7 @@ test("REFUSED at load: a background step of a folder team in a permission mode t
       ...(mode ? { [harness === 'codex' ? 'sandbox' : 'permissionMode']: mode } : {}),
     }));
   for (const harness of HARNESSES) {
-    for (const mode of [...(PERMISSION_MODES[harness] ?? SANDBOXES[harness]), undefined]) {
+    for (const mode of [...(harness === 'codex' ? CODEX_SANDBOXES : CLAUDE_PERMISSION_MODES), undefined]) {
       assert.doesNotThrow(() => validate(on(harness, undefined, mode)), `${harness} ${mode ?? 'with no mode'}, a job`);
       if (harness !== 'codex')
         assert.doesNotThrow(() => validate(on(harness, false, mode)), `${harness} ${mode ?? 'with no mode'}, \`background: false\``);
@@ -1940,7 +1856,7 @@ test("REFUSED at load: a background step of a folder team in a permission mode t
   );
 });
 
-test("`background: true` runs a claude step as a background session, `background: false` and no line as a job; REFUSED at load: another word, no value, the line twice, any harness but claude, and a `budget:` beside it — in the engine's words", () => {
+test('`background: true` runs a claude step as a background session, `background: false` and no line as a job; REFUSED at load: another word, no value, the line twice; on another harness, or beside a `budget:`, it loads, and the runtime judges it at `wf start` (`start-config.test.ts`)', () => {
   assert.equal(fm('supervise', 'background: true').background, true);
   assert.equal(fm('supervise', 'harness: claude\nbackground: true').background, true);
   assert.equal(fm('supervise', 'background: false').background, false);
@@ -1954,26 +1870,10 @@ test("`background: true` runs a claude step as a background session, `background
   );
   assert.throws(() => fm('supervise', 'background: true\nbackground: true'), refusedWith(/background/));
   for (const harness of ['codex', 'claude-detached']) {
-    assert.throws(
-      () => fm('supervise', `harness: ${harness}\nbackground: true`),
-      refusedWith(
-        new RegExp(
-          `^supervise: \`background: true\` asks for a Claude Code background session \\(\`claude --bg\`\\), and the \`${harness}\` harness has no such mode: .*\\. Run the step on claude — delete \`harness: ${harness}\` — or delete \`background: true\`\\.$`,
-        ),
-      ),
-      harness,
-    );
-    assert.doesNotThrow(
-      () => fm('supervise', `harness: ${harness}\nbackground: false`),
-      `${harness}: \`background: false\` asks for nothing`,
-    );
+    assert.equal(fm('supervise', `harness: ${harness}\nbackground: true`).background, true, harness);
+    assert.equal(fm('supervise', `harness: ${harness}\nbackground: false`).background, false, harness);
   }
-  assert.throws(
-    () => fm('supervise', 'background: true\nbudget: 2'),
-    refusedWith(
-      /^supervise: `budget: 2` is a spend cap, and `background: true` runs the step as a background session: a `claude --bg` session does not keep one: .*\. Delete `background: true` to run the step as a job \(`claude -p`\), which ends its session at the cap, or delete the budget line\.$/,
-    ),
-  );
+  assert.equal(fm('supervise', 'background: true\nbudget: 2').budget, 2, 'a cap beside a background session');
 });
 
 test('`denials: fail` is read on a job of `claude` and `claude-detached`, and a step without the line has none; REFUSED at load: another word, no value, the line twice, on codex, and beside `background: true` — where no denial is ever read', () => {
@@ -2614,19 +2514,14 @@ test('REFUSED: `renderStep` and `renderAgent` of a codex draft that sends its sa
     /^permissionMode: dontAsk$/m,
     "and a claude draft's permissionMode is its own",
   );
-  const moved = renderStep({ name: 'review', body: 'Review it.', harness: 'codex', permissionMode: 'dontAsk' } as StepDraft);
   assert.throws(
-    () => parseWorkflow('review', moved),
-    (e: Error) =>
-      e.message.startsWith('review: `permissionMode: dontAsk` is not a key codex takes.') && e.message.includes('Write `sandbox:` instead'),
-    'a Claude Code mode kept by a step moved onto codex is written as given, for the parser to refuse naming sandbox:, ' +
-      'not told to reload a page, which would send it again',
+    () => renderStep({ name: 'review', body: 'Review it.', harness: 'codex', permissionMode: 'dontAsk' } as StepDraft),
+    said('review', 'dontAsk', 'dontAsk'),
+    'a Claude Code mode kept by a step moved onto codex is refused too: a file would read it as the sandbox, which the runtime judges at `wf start`',
   );
-  const agent = renderAgent({ name: 'reviewer', keys: { harness: 'codex', permissionMode: 'dontAsk' }, body: 'You review.' });
-  assert.match(agent, /^permissionMode: dontAsk$/m);
   assert.throws(
-    () => parseAgent('reviewer', agent),
-    (e: Error) => e.message.startsWith('agents/reviewer.md: `permissionMode: dontAsk` is not a key codex takes.'),
+    () => renderAgent({ name: 'reviewer', keys: { harness: 'codex', permissionMode: 'dontAsk' }, body: 'You review.' }),
+    said('agents/reviewer.md', 'dontAsk', 'dontAsk'),
   );
 });
 
@@ -2847,8 +2742,6 @@ test('REFUSED: a date, a card, a finding or a measured version in the words a pe
     autoDropped('claude', 'haiku', undefined)!,
     said(() => renderStep({ name: 'write', after: [], body: 'Write.', disallow: ['SendMessage'] } as unknown as StepDraft)),
     said(() => fm('review', 'harness: codex\npermissionMode: read-only\nsandbox: read-only')),
-    said(() => fm('review', 'harness: codex\nbudget: 5')),
-    said(() => fm('watch', 'background: true\nbudget: 5')),
     said(() => parseFolder([['write', '---\nworkspace: folder\nbackground: true\n---\nWrite.\n']])),
     said(() => parseAgent('builder', '---\nskills: write-a-note\ntools: Read, Write\n---\nx\n')),
     said(() =>

@@ -5280,11 +5280,7 @@ test('REFUSED by the CLI before a run is read: `wf retry --budget` with no amoun
 });
 
 test("a claude-detached step's tries share its cap: `retries:` files the next try with what is left of it, not a cap of its own — and at the cap, nothing left, files none", async () => {
-  const { run, e, tasks, settle } = await throughCheck(
-    'harness: claude-detached\ncheck: npm test\nretries: 2\nbudget: 3',
-    'failed',
-    1,
-  );
+  const { run, e, tasks, settle } = await throughCheck('harness: claude-detached\ncheck: npm test\nretries: 2\nbudget: 3', 'failed', 1);
   const implement = `${run.id}-implement`;
   assert.equal(tasks.get(implement)!.spec.config?.budgetUsd, 3, 'the first filing: nothing spent, the whole cap');
   settle(implement, 'succeeded', SIGNED, undefined, undefined, { costUsd: 2.9 });

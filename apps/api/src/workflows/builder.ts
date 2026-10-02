@@ -146,7 +146,8 @@ export type KeyForm = {
 
 /**
  * The keys a step may take from its agent: the agent's keys but its own (`AGENT_OWN_KEYS`) — its description, the skills it is given
- * and its system prompt, none of which a step has. A key added to `AGENT_KEYS` that is not a role key joins that list, or the cast fails.
+ * and what becomes of Claude Code's own prompt, none of which a step has. A key added to `AGENT_KEYS` that is not a role key joins that
+ * list, or the cast fails.
  */
 const ROLE_KEYS: readonly StepKey[] = AGENT_KEYS.filter(
   (key): key is Exclude<typeof key, (typeof AGENT_OWN_KEYS)[number]> => !(AGENT_OWN_KEYS as readonly string[]).includes(key),

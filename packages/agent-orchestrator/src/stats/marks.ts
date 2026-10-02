@@ -72,7 +72,7 @@ function merged(items: FrozenItem[], item: FrozenItem): FrozenItem[] {
 }
 
 /**
- * Each step's items (`FrozenItem`): the step, its agent's instructions, skills and system prompt where the record carries its
+ * Each step's items (`FrozenItem`): the step, its agent's instructions, skills and harness prompt where the record carries its
  * instructions, else the agent unknown, and each skill it gives, by the digest of its rendered copy in `skills` (step → skill → digest).
  */
 function itemsOf(step: Workflow, skills: ReadonlyMap<string, ReadonlyMap<string, string>>): FrozenItem[] {
@@ -80,7 +80,9 @@ function itemsOf(step: Workflow, skills: ReadonlyMap<string, ReadonlyMap<string,
   if (!agent) return [stepItem(step)];
   const of = { steps: [step.name], agents: [agent.name] };
   const said =
-    agent.instructions === undefined ? null : { instructions: agent.instructions, skills: agent.skills, systemPrompt: agent.systemPrompt };
+    agent.instructions === undefined
+      ? null
+      : { instructions: agent.instructions, skills: agent.skills, harnessPrompt: agent.harnessPrompt };
   return [
     stepItem(step),
     { kind: 'agent', name: agent.name, digest: said && digestOf(said), ...of },

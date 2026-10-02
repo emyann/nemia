@@ -57,7 +57,7 @@ export const agent = (extra: Partial<AgentListing> = {}): AgentListing => ({
   card: [skillEntry()],
   cardError: null,
   skills: 'review-a-change',
-  systemPrompt: null,
+  harnessPrompt: null,
   given: [
     {
       name: 'review-a-change',

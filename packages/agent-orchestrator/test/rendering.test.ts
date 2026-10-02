@@ -1,8 +1,8 @@
 /**
  * An agent rendered for Claude Code (`agents/agents.ts`): the skills it gives by name, found in the workflow's own root, the repository's
- * `.claude/` or the store, the repository's before the store's; what becomes of Claude Code's system prompt; what `wf start` writes under
- * `runs/<id>/agents/<step>/`; and the flags the tick files the step with. Each refusal at shipped defaults. The runs are folder teams, so
- * no git is asked; a folder team started from `HERE` reads that directory's `.claude/` as its repository's.
+ * `.claude/` or the store, the repository's before the store's; what becomes of Claude Code's own prompt (`harnessPrompt:`); what
+ * `wf start` writes under `runs/<id>/agents/<step>/`; and the flags the tick files the step with. Each refusal at shipped defaults. The
+ * runs are folder teams, so no git is asked; a folder team started from `HERE` reads that directory's `.claude/` as its repository's.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -78,26 +78,48 @@ const SKILL = (name: string, extra = '') =>
 const team = (agent: string, files: Record<string, string>, step = "---\nagent: builder\n---\nThe step's own note.\n"): string =>
   path.join(tree({ 'workflows/team/build.md': step, 'workflows/agents/builder.md': agent, ...files }), 'workflows', 'team');
 
-test('an agent gives skills by name and says what becomes of the system prompt, each its own line, read and written back', () => {
+test("an agent gives skills by name and says what becomes of Claude Code's prompt, each its own line, read and written back", () => {
   const a = parseAgent(
     'builder',
-    '---\nskills: review-a-change, write-a-note\nsystemPrompt: no-coding\ntools: Read, Skill\n---\nYou build.\n',
+    '---\nskills: review-a-change, write-a-note\nharnessPrompt: no-coding\ntools: Read, Skill\n---\nYou build.\n',
   );
   assert.deepEqual(a.skills, ['review-a-change', 'write-a-note']);
-  assert.equal(a.systemPrompt, 'no-coding');
+  assert.equal(a.harnessPrompt, 'no-coding');
   assert.equal('skills' in a.keys, false, 'no role key: a step does not inherit it as one of its own');
   const written = renderAgent({
     name: 'builder',
     skills: 'review-a-change, write-a-note',
-    systemPrompt: 'no-coding',
+    harnessPrompt: 'no-coding',
     keys: { tools: 'Read, Skill' },
     body: 'You build.\n',
   });
-  assert.equal(written, '---\nskills: review-a-change, write-a-note\nsystemPrompt: no-coding\ntools: Read, Skill\n---\nYou build.\n');
+  assert.equal(written, '---\nskills: review-a-change, write-a-note\nharnessPrompt: no-coding\ntools: Read, Skill\n---\nYou build.\n');
   assert.deepEqual(parseAgent('builder', written).skills, a.skills);
+  for (const word of ['keep', 'no-coding', 'replace']) {
+    const agent = parseAgent('builder', `---\nharnessPrompt: ${word}\n---\nYou build.\n`);
+    assert.equal(agent.harnessPrompt, word);
+    assert.equal(
+      renderAgent({ name: 'builder', harnessPrompt: agent.harnessPrompt, keys: {}, body: agent.body }),
+      `---\nharnessPrompt: ${word}\n---\nYou build.\n`,
+    );
+  }
 });
 
-test('REFUSED at shipped defaults: a skill name that is none, a name given twice, an empty list, and a system prompt that is not one of the three', () => {
+test('the former `systemPrompt:` line is still read, each of its words as the one it is now, and written back as `harnessPrompt:`', () => {
+  for (const [former, now] of [
+    ['default', 'keep'],
+    ['no-coding', 'no-coding'],
+    ['own', 'replace'],
+  ] as const) {
+    const agent = parseAgent('builder', `---\nsystemPrompt: ${former}\n---\nYou build.\n`);
+    assert.equal(agent.harnessPrompt, now, `systemPrompt: ${former}`);
+    assert.equal('systemPrompt' in agent, false, 'nothing reads the former field');
+    const written = renderAgent({ name: 'builder', harnessPrompt: agent.harnessPrompt, keys: {}, body: agent.body });
+    assert.equal(written, `---\nharnessPrompt: ${now}\n---\nYou build.\n`);
+  }
+});
+
+test('REFUSED at shipped defaults: a skill name that is none, a name given twice, an empty list, and a harness prompt that is not one of the three', () => {
   assert.match(
     refusal(() => parseAgent('builder', '---\nskills: Review A Change\n---\nx\n')),
     /^agents\/builder\.md: `skills: Review A Change` has `Review A Change`, which is not a skill's name/,
@@ -111,17 +133,54 @@ test('REFUSED at shipped defaults: a skill name that is none, a name given twice
     /names no skill/,
   );
   assert.match(
+    refusal(() => parseAgent('builder', '---\nharnessPrompt: terse\n---\nx\n')),
+    /^agents\/builder\.md: `harnessPrompt: terse` is not one of keep, no-coding, replace/,
+  );
+  assert.match(
     refusal(() => parseAgent('builder', '---\nsystemPrompt: terse\n---\nx\n')),
-    /^agents\/builder\.md: `systemPrompt: terse` is not one of default, no-coding, own/,
+    /^agents\/builder\.md: `systemPrompt: terse` is not one of keep, no-coding, replace/,
   );
 });
 
-test('REFUSED at shipped defaults: `systemPrompt: own` with no instructions, which would start a session with no system prompt at all', () => {
+test('REFUSED at shipped defaults: a former word under the new key, which a file written after the rename does not say', () => {
+  assert.match(
+    refusal(() => parseAgent('builder', '---\nharnessPrompt: own\n---\nx\n')),
+    /^agents\/builder\.md: `harnessPrompt: own` is not one of keep, no-coding, replace\. `own` is the former word, under `systemPrompt:`, for `replace`: write `harnessPrompt: replace`/,
+  );
+  assert.match(
+    refusal(() => parseAgent('builder', '---\nharnessPrompt: default\n---\nx\n')),
+    /write `harnessPrompt: keep`/,
+  );
+});
+
+test('REFUSED at shipped defaults: `systemPrompt:` and `harnessPrompt:` both set, which are one key', () => {
+  assert.match(
+    refusal(() => parseAgent('builder', '---\nsystemPrompt: own\nharnessPrompt: keep\n---\nx\n')),
+    /^agents\/builder\.md: `harnessPrompt: keep` and `systemPrompt: own` are both set, and they are one key/,
+  );
+});
+
+test('REFUSED: a draft that sends the former `systemPrompt`, among its keys or as its own line, which nothing writes', () => {
+  assert.match(
+    refusal(() => renderAgent({ name: 'builder', keys: { systemPrompt: 'own' } as never, body: 'x' })),
+    /^agents\/builder\.md: `systemPrompt` is `harnessPrompt`'s former name, which a file may still say but nothing writes/,
+  );
+  assert.match(
+    refusal(() => renderAgent({ name: 'builder', systemPrompt: 'own', keys: {}, body: 'x' } as never)),
+    /^agents\/builder\.md: `systemPrompt` is `harnessPrompt`'s former name/,
+  );
+});
+
+test('REFUSED at shipped defaults: `harnessPrompt: replace` with no instructions, which would start a session with no prompt at all', () => {
+  assert.match(
+    refusal(() => parseAgent('builder', '---\nharnessPrompt: replace\n---\n')),
+    /`harnessPrompt: replace` puts the agent's instructions in place of Claude Code's own prompt, and this agent has none/,
+  );
   assert.match(
     refusal(() => parseAgent('builder', '---\nsystemPrompt: own\n---\n')),
-    /`systemPrompt: own` puts the agent's instructions in place of Claude Code's system prompt, and this agent has none/,
+    /`systemPrompt: own` puts the agent's instructions in place of Claude Code's own prompt, and this agent has none/,
   );
-  assert.equal(parseAgent('builder', '---\nsystemPrompt: own\n---\nYou are the whole prompt.\n').systemPrompt, 'own');
+  assert.equal(parseAgent('builder', '---\nharnessPrompt: replace\n---\nYou are the whole prompt.\n').harnessPrompt, 'replace');
 });
 
 test('REFUSED at shipped defaults: skills an agent gives with no `Skill` in its tools, or with `Skill` denied (F11)', () => {
@@ -154,14 +213,14 @@ test("REFUSED at shipped defaults: a step's own `tools:` or deny list that takes
   assert.equal(loadWorkflows(team(agent, skills)).length, 1);
 });
 
-test('REFUSED at shipped defaults: a codex agent with skills or a system prompt, and a Claude Code agent with them run on codex by its step', () => {
+test('REFUSED at shipped defaults: a codex agent with skills or a harness prompt, and a Claude Code agent with them run on codex by its step', () => {
   assert.match(
     refusal(() => parseAgent('builder', '---\nharness: codex\nskills: write-a-note\n---\nx\n')),
     /`skills: write-a-note` gives Claude Code skills from a plugin directory of the step's own, and codex loads none/,
   );
   assert.match(
-    refusal(() => parseAgent('builder', '---\nharness: codex\nsystemPrompt: no-coding\n---\nx\n')),
-    /`systemPrompt: no-coding` shapes Claude Code's system prompt, and codex is handed its instructions in the brief/,
+    refusal(() => parseAgent('builder', '---\nharness: codex\nharnessPrompt: no-coding\n---\nx\n')),
+    /`harnessPrompt: no-coding` shapes Claude Code's own prompt, and codex is handed its instructions in the brief/,
   );
   const skills = { 'workflows/skills/write-a-note/SKILL.md': SKILL('write-a-note') };
   assert.match(
@@ -171,27 +230,32 @@ test('REFUSED at shipped defaults: a codex agent with skills or a system prompt,
     /^build: `agent: builder`: `skills: write-a-note` gives Claude Code skills .* codex loads none/,
   );
   assert.match(
-    refusal(() => loadWorkflows(team('---\nsystemPrompt: own\n---\nYou build.\n', {}, '---\nagent: builder\nharness: codex\n---\n'))),
-    /^build: `agent: builder`: `systemPrompt: own` shapes Claude Code's system prompt/,
+    refusal(() => loadWorkflows(team('---\nharnessPrompt: replace\n---\nYou build.\n', {}, '---\nagent: builder\nharness: codex\n---\n'))),
+    /^build: `agent: builder`: `harnessPrompt: replace` shapes Claude Code's own prompt/,
   );
-  const [codex] = loadWorkflows(team('---\nharness: codex\nsystemPrompt: default\n---\nYou build.\n', {}));
+  assert.match(
+    refusal(() => loadWorkflows(team('---\nsystemPrompt: own\n---\nYou build.\n', {}, '---\nagent: builder\nharness: codex\n---\n'))),
+    /^build: `agent: builder`: `harnessPrompt: replace` shapes Claude Code's own prompt/,
+    'the former line is judged as the word it is now',
+  );
+  const [codex] = loadWorkflows(team('---\nharness: codex\nharnessPrompt: keep\n---\nYou build.\n', {}));
   assert.equal(
     rendersAgent(codex),
     false,
-    'a codex agent that says only `default`, or nothing, is not rendered: its instructions are in the brief',
+    'a codex agent that says only `keep`, or nothing, is not rendered: its instructions are in the brief',
   );
   assert.match(briefBody(codex), /^You build\./);
 });
 
-test('REFUSED at shipped defaults: skills or a system prompt on a step that continues another session, which keeps its own (F13)', () => {
+test('REFUSED at shipped defaults: skills or a harness prompt on a step that continues another session, which keeps its own (F13)', () => {
   const dir = team(
-    '---\nsystemPrompt: no-coding\n---\nYou build.\n',
+    '---\nharnessPrompt: no-coding\n---\nYou build.\n',
     { 'workflows/team/plan.md': '---\n---\nPlan it.\n' },
     '---\nagent: builder\nafter: plan\nresume: plan\n---\n',
   );
   assert.match(
     refusal(() => loadWorkflows(dir)),
-    /^build: `agent: builder`: `systemPrompt: no-coding` shapes the system prompt of a session the step starts, and `resume: plan` continues plan's/,
+    /^build: `agent: builder`: `harnessPrompt: no-coding` shapes the prompt of a session the step starts, and `resume: plan` continues plan's/,
   );
   const told = loadWorkflows(
     team(
@@ -416,12 +480,20 @@ test("the flags: the prompt appended by default and for no-coding, in place of C
     pluginDir: [`${dir}/nemia-builder`],
     settings: JSON.stringify({ skillOverrides: { 'write-a-note': 'off' } }),
   });
-  assert.deepEqual(flags('---\nsystemPrompt: no-coding\nskills: write-a-note\n---\nYou build.\n', skill), {
+  assert.deepEqual(flags('---\nharnessPrompt: no-coding\nskills: write-a-note\n---\nYou build.\n', skill), {
     appendSystemPromptFile: `${dir}/prompt.md`,
     pluginDir: [`${dir}/nemia-builder`],
     settings: JSON.stringify({ outputStyle: 'nemia-builder:no-coding', skillOverrides: { 'write-a-note': 'off' } }),
   });
-  assert.deepEqual(flags('---\nsystemPrompt: own\n---\nYou build.\n'), { systemPromptFile: `${dir}/prompt.md` });
+  assert.deepEqual(flags('---\nharnessPrompt: replace\n---\nYou build.\n'), { systemPromptFile: `${dir}/prompt.md` });
+  assert.deepEqual(flags('---\nharnessPrompt: keep\n---\nYou build.\n'), { appendSystemPromptFile: `${dir}/prompt.md` });
+  assert.deepEqual(flags('---\nharnessPrompt: no-coding\n---\nYou build.\n'), {
+    appendSystemPromptFile: `${dir}/prompt.md`,
+    pluginDir: [`${dir}/nemia-builder`],
+    settings: JSON.stringify({ outputStyle: 'nemia-builder:no-coding' }),
+  });
+  assert.deepEqual(flags('---\nsystemPrompt: own\n---\nYou build.\n'), { systemPromptFile: `${dir}/prompt.md` }, 'own is replace');
+  assert.deepEqual(flags('---\nsystemPrompt: default\n---\nYou build.\n'), { appendSystemPromptFile: `${dir}/prompt.md` });
   assert.deepEqual(flags('---\nsystemPrompt: no-coding\n---\nYou build.\n'), {
     appendSystemPromptFile: `${dir}/prompt.md`,
     pluginDir: [`${dir}/nemia-builder`],
@@ -461,7 +533,7 @@ fs.mkdirSync(path.join(ROOT, 'workflows', 'agents'), { recursive: true });
 fs.mkdirSync(path.join(ROOT, 'workflows', 'skills', 'write-a-note'), { recursive: true });
 fs.writeFileSync(
   path.join(ROOT, 'workflows', 'agents', 'scribe.md'),
-  '---\nskills: write-a-note, mind-the-tone\nsystemPrompt: no-coding\ntools: Read, Edit, Skill\n---\nYou write notes.\n',
+  '---\nskills: write-a-note, mind-the-tone\nharnessPrompt: no-coding\ntools: Read, Edit, Skill\n---\nYou write notes.\n',
 );
 fs.writeFileSync(path.join(ROOT, 'workflows', 'agents', 'coder.md'), '---\nharness: codex\n---\nYou write code.\n');
 fs.writeFileSync(path.join(ROOT, 'workflows', 'skills', 'write-a-note', 'SKILL.md'), SKILL('write-a-note'));
@@ -511,7 +583,7 @@ test("wf start renders each Claude Code step's agent under runs/<id>/agents/<ste
     settings: JSON.stringify({ outputStyle: 'nemia-scribe:no-coding', skillOverrides: { 'write-a-note': 'off', 'mind-the-tone': 'off' } }),
   });
   assert.match(write.brief, /^Write about tides\.\n/, "the step's own note first");
-  assert.doesNotMatch(write.brief, /You write notes/, 'the instructions are in the system prompt, not the brief');
+  assert.doesNotMatch(write.brief, /You write notes/, "the instructions are in Claude Code's prompt, not the brief");
 });
 
 test('a codex step is filed as before: its instructions in its brief, and no Claude Code flags', async () => {

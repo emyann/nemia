@@ -29,15 +29,17 @@ import type { SpawnRequest } from '../harness/index.ts';
 export const RUNTIME_EXTENSION = 'urn:agent-runtime:session:v1';
 
 /**
- * The extension's methods, beside A2A's: a session found by name, a session's logs, a session let go of, a session's
- * conversation read from a cursor, and the sessions listed as `listTasks` lists them, told which the journal expects. Each keeps its own
- * key — a name, a session id, the sighting — since none of them is a Task's to answer: a transcript is a history read with a cursor, of a
- * session that may have ended, where A2A's `SubscribeToTask` is a live stream refused on a Task in a terminal state. One is no session's
- * at all: `harnessQuota`, what the harness's subscription has left, asked of the harness itself.
+ * The extension's methods, beside A2A's: a session found by name, a session's logs, one of its streams kept whole, a session
+ * let go of, a session's conversation read from a cursor, and the sessions listed as `listTasks` lists them, told which the
+ * journal expects. Each keeps its own key — a name, a session id, the sighting — since none of them is a Task's to answer: a
+ * transcript is a history read with a cursor, of a session that may have ended, where A2A's `SubscribeToTask` is a live stream
+ * refused on a Task in a terminal state. One is no session's at all: `harnessQuota`, what the harness's subscription has left,
+ * asked of the harness itself.
  */
 export const SESSION_METHODS = [
   'findSession',
   'sessionLogs',
+  'sessionOutput',
   'releaseSession',
   'sessionTranscript',
   'observeSessions',

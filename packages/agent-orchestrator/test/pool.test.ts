@@ -23,6 +23,7 @@ const ROOT = scratch('wf-pool-');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_CONCURRENT;
+delete process.env.WF_MAX_RUNS;
 const { engine, tick } = await import('../src/runner.ts');
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));

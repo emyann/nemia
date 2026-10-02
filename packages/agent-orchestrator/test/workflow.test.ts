@@ -29,6 +29,7 @@ import {
   FORMER_KEYS,
   formerKeyLine,
   formerKeysIn,
+  harnessPromptLine,
   parseAgent,
   renderAgent,
 } from '../src/workflow.ts';
@@ -1154,6 +1155,23 @@ test('`wf start` is told which files still write a former name: the steps, then 
   ]);
   assert.deepEqual(formerKeyLines(folder({ 'write.md': '---\nallowedTools: Edit(**)\n---\nWrite.\n' })), []);
   assert.deepEqual(formerKeyLines(path.join(dir, 'nope')), []);
+});
+
+test('`wf start` is told which agent a step names still says `systemPrompt:`, with the line it is read as, and nothing of one on `harnessPrompt:`', () => {
+  assert.equal(
+    harnessPromptLine('w/agents/builder.md', 'own'),
+    "w/agents/builder.md: `systemPrompt: own` is read as `harnessPrompt: replace`, what becomes of Claude Code's own prompt. The former line is still read; rename it, or save the file from the board, which writes `harnessPrompt:`.",
+  );
+  const root = folder({
+    'team/write.md': '---\nagent: writer\n---\n',
+    'team/review.md': '---\nafter: write\nagent: reviewer\n---\n',
+    'agents/writer.md': '---\nsystemPrompt: own\n---\nWrite.\n',
+    'agents/reviewer.md': '---\nharnessPrompt: no-coding\n---\nReview.\n',
+    'agents/unused.md': '---\nsystemPrompt: default\n---\nNobody names me.\n',
+  });
+  const dir = path.join(root, 'team');
+  assert.doesNotThrow(() => loadWorkflows(dir), 'the folder starts: the former line stops nothing');
+  assert.deepEqual(formerKeyLines(dir), [harnessPromptLine(path.join(root, 'agents', 'writer.md'), 'own')]);
 });
 
 test("`wf start` is told which codex files still name their sandbox as `permissionMode:` — a step's by its own line or its agent's, and the agent's", () => {
@@ -2819,9 +2837,10 @@ test('REFUSED: a date, a card, a finding or a measured version in the words a pe
     }
     return assert.fail('refused');
   };
-  const builder = new Map([['builder', parseAgent('builder', '---\nsystemPrompt: no-coding\n---\nYou build.\n')]]);
+  const builder = new Map([['builder', parseAgent('builder', '---\nharnessPrompt: no-coding\n---\nYou build.\n')]]);
   const words = [
     formerKeyLine('w/write.md', 'allow'),
+    harnessPromptLine('w/agents/builder.md', 'own'),
     codexModeLine('w/review.md', 'read-only'),
     codexModeWritten('w/review.md', 'read-only'),
     cardRetired('agents/builder.md', 'card'),

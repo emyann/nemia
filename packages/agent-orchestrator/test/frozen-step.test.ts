@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import { Result, Schema } from 'effect';
 import { FrozenStepSchema, loadWorkflows, type FrozenStepFields } from '../src/folder/folder.store.ts';
 import { asNamed, FORMER_KEYS, type Workflow } from '../src/workflow.ts';
+import { renderedFlags } from '../src/agents/agents.ts';
 import { placesOf, shippedFolders, TEAM_DEV } from './team.ts';
 
 /** Every folder shipped (`team.ts`), and the tests' team's `dev`. */
@@ -80,7 +81,7 @@ test('a step with every key the parser types, its agent and its output reads as 
       given: { gate: 'true' },
       instructions: 'Say what is wrong.',
       skills: ['look'],
-      systemPrompt: 'no-coding',
+      harnessPrompt: 'no-coding',
     },
   };
   const decoded = decode(frozen(step));
@@ -98,10 +99,35 @@ test('a step with every key the parser types, its agent and its output reads as 
   ] as const) {
     assert.ok(Result.isFailure(decode({ ...(frozen(step) as object), [key]: value })), `${key}: ${value} is refused`);
   }
-  assert.ok(
-    Result.isFailure(decode({ ...(frozen(step) as object), agent: { ...step.agent, systemPrompt: 'mine' } })),
-    'a system prompt outside SYSTEM_PROMPTS is refused',
-  );
+  for (const agent of [{ harnessPrompt: 'mine' }, { harnessPrompt: 'own' }, { systemPrompt: 'mine' }, { systemPrompt: 'replace' }]) {
+    const { harnessPrompt: _, ...rest } = step.agent!;
+    assert.ok(
+      Result.isFailure(decode({ ...(frozen(step) as object), agent: { ...rest, ...agent } })),
+      `${JSON.stringify(agent)} is refused: a harness prompt outside HARNESS_PROMPTS, or a former one outside its three words`,
+    );
+  }
+});
+
+test('a step frozen before the rename, its agent on `systemPrompt:`, is read as `harnessPrompt:` and filed with the flag it was filed with', () => {
+  for (const [former, now, flag] of [
+    ['own', 'replace', 'systemPromptFile'],
+    ['default', 'keep', 'appendSystemPromptFile'],
+    ['no-coding', 'no-coding', 'appendSystemPromptFile'],
+  ] as const) {
+    const record = {
+      name: 'build',
+      after: [],
+      body: 'You build.\n\nGo.',
+      agent: { name: 'builder', keys: [], body: 'Go.', given: {}, instructions: 'You build.', systemPrompt: former },
+    };
+    const decoded = decode(record);
+    assert.ok(Result.isSuccess(decoded), `systemPrompt: ${former}: ${Result.isFailure(decoded) ? String(decoded.failure) : ''}`);
+    const step = asNamed(decoded.success);
+    assert.equal(step.agent?.harnessPrompt, now, `systemPrompt: ${former} is read as ${now}`);
+    assert.equal('systemPrompt' in (step.agent ?? {}), false, 'no reader sees the former field');
+    const flags = renderedFlags(step, '/runs/r/agents/build');
+    assert.equal(flags?.[flag], '/runs/r/agents/build/prompt.md', `systemPrompt: ${former} is filed with ${flag}, as before the rename`);
+  }
 });
 
 test('every former name of a key (`FORMER_KEYS`) is checked as the key it is now, on a step and in its agent, and read under the new', () => {

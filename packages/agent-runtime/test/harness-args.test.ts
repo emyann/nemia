@@ -27,18 +27,21 @@ const refusedBy = (ops: RunnerOps, t: Asked) =>
     }).pipe(Effect.provide(Runner.layer(ops))),
   );
 
-test("HARNESS_ARGS is the thirteen arguments a harness takes — the spend cap, Claude Code's own flags and Codex's among them, and remoteControl not: it is one of those flags", () => {
+test("HARNESS_ARGS is the sixteen arguments a harness takes — the spend cap, Claude Code's own flags, Codex's and a command's among them, and remoteControl not: it is one of those flags", () => {
   assert.deepEqual([...HARNESS_ARGS].sort(), [
     'allowedTools',
     'background',
     'budgetUsd',
     'claude',
     'codex',
+    'command',
     'contextTokens',
     'disallowedTools',
     'effort',
+    'env',
     'mcp',
     'model',
+    'niceness',
     'permissionMode',
     'tools',
     'worktree',
@@ -60,7 +63,7 @@ test("remoteControl, one of Claude Code's own flags, is refused under config and
   assert.equal(argsRefusalOf({ ...task, config: { background: true, claude: { remoteControl: true } } }), undefined);
 });
 
-test('a harness argument filed beside config is refused, naming where it goes — each of the thirteen — and the same value under config is taken', () => {
+test('a harness argument filed beside config is refused, naming where it goes — each of the sixteen — and the same value under config is taken', () => {
   const value: Record<keyof HarnessArgs, unknown> = {
     model: 'opus',
     permissionMode: 'auto',
@@ -75,6 +78,9 @@ test('a harness argument filed beside config is refused, naming where it goes �
     budgetUsd: 5,
     claude: { appendSystemPromptFile: 'prompt.md' },
     codex: { trustFrom: '/repo' },
+    command: ['sh', '-c', 'npm test'],
+    env: { CI: '1' },
+    niceness: 10,
   };
   for (const key of HARNESS_ARGS) {
     const says = argsRefusalOf({ ...task, [key]: value[key] } as never);
@@ -296,4 +302,45 @@ test('file asks the shared checks itself, over any runner: the SDK runner, and o
       assert.deepEqual(listed, [], `${label}: nothing journalled`);
     }
   }
+});
+
+test('a command is a list of strings, the program first and no NUL in any: anything else is refused, and saying what one is', () => {
+  const nul = String.fromCharCode(0);
+  for (const bad of [[], [''], 'npm test', [1], ['sh', 7], ['sh', `-c${nul}`], null, { cmd: 'sh' }]) {
+    const says = argsRefusalOf({ ...task, config: { command: bad } } as never) ?? '';
+    assert.equal(
+      says,
+      `\`command: ${JSON.stringify(bad)}\` is not a command. Give the program and its arguments as a list of strings, the program first, like ["sh", "-c", "npm test"].`,
+      JSON.stringify(bad),
+    );
+  }
+  for (const good of [['true'], ['sh', '-c', 'npm test'], ['node', '']]) {
+    assert.equal(argsRefusalOf({ ...task, config: { command: good } }), undefined, JSON.stringify(good));
+  }
+});
+
+test('an env is an object of variable names to strings with no NUL: an array, a name a shell would not take, a value that is no string, each refused', () => {
+  const nul = String.fromCharCode(0);
+  for (const bad of [['CI'], 'CI=1', null, 7]) {
+    const says = argsRefusalOf({ ...task, config: { env: bad } } as never) ?? '';
+    assert.ok(says.startsWith(`\`env: ${JSON.stringify(bad)}\` is not an environment.`), says);
+  }
+  for (const name of ['1CI', 'A-B', 'A=B', '', 'A B']) {
+    const says = argsRefusalOf({ ...task, config: { env: { OK: '1', [name]: '1' } } }) ?? '';
+    assert.ok(says.startsWith(`\`env.${name}\` is not a variable's name.`), says);
+  }
+  for (const value of [1, null, true, `a${nul}b`]) {
+    const says = argsRefusalOf({ ...task, config: { env: { CI: value } } } as never) ?? '';
+    assert.ok(says.startsWith(`\`env.CI: ${JSON.stringify(value)}\` is not a variable's value.`), says);
+  }
+  assert.equal(argsRefusalOf({ ...task, config: { env: { CI: '1', _X9: '' } } }), undefined);
+  assert.equal(argsRefusalOf({ ...task, config: { env: {} } }), undefined, "an empty one is the worker's own");
+});
+
+test('a niceness is a whole number from 0 to 19: anything else is refused, and saying what one is', () => {
+  for (const bad of [-1, 20, 1.5, Number.NaN, Infinity, '10', null]) {
+    const says = argsRefusalOf({ ...task, config: { niceness: bad } } as never) ?? '';
+    assert.ok(says.startsWith('`niceness: ') && says.includes('` is not a niceness. Give a whole number from 0 to 19'), String(bad));
+  }
+  for (const good of [0, 1, 10, 19]) assert.equal(argsRefusalOf({ ...task, config: { niceness: good } }), undefined, String(good));
 });

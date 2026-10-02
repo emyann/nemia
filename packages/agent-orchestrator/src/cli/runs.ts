@@ -452,7 +452,7 @@ function printAgent({ from, dir, name, agent }: ReturnType<typeof listAgents>[nu
   }
   for (const skill of card) console.log(`   ${skill.id}  ${skill.name} — ${skill.description}`);
   if (agent.skills?.length) console.log(`   given the skills ${agent.skills.join(', ')}`);
-  if (agent.systemPrompt !== undefined && agent.systemPrompt !== 'default') console.log(`   system prompt: ${agent.systemPrompt}`);
+  if (agent.harnessPrompt !== undefined && agent.harnessPrompt !== 'keep') console.log(`   harness prompt: ${agent.harnessPrompt}`);
 }
 
 /** `wf agents`: the agents a step may name, the repository's then yours, and `wf agents card`. */

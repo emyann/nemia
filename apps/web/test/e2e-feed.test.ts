@@ -34,14 +34,16 @@ function wfFeed(store: string): { said: string[]; cursor: number } {
   return { said: lines.slice(0, -1).map((l) => l.replace(/^\S+ {2}/, '')), cursor: Number(last[1]) };
 }
 
-test('fed appends a line the package reads back, with a step and without', () => {
+test('fed appends a line the package reads back, with a step and without', (t) => {
   const file = path.join(dir, 'feed.jsonl');
   const before = { at: '2026-09-22T00:00:00.000Z', run: 'r-0', word: 'running' };
   fs.writeFileSync(file, `${JSON.stringify(before)}\n`);
   setStore(dir);
-  const from = Date.now();
+  const now = Date.parse('2026-10-02T21:30:00.123Z');
+  t.mock.timers.enable({ apis: ['Date'], now });
   fed('r-1', 'implement', 'blocked');
   fed('r-1', 'awaiting approval');
+  t.mock.timers.reset();
   const { said, cursor } = wfFeed(dir);
   assert.equal(cursor, fs.statSync(file).size, 'every line is whole');
   assert.deepEqual(said, ['r-0  —  running', 'r-1  implement  blocked', 'r-1  —  awaiting approval']);
@@ -51,7 +53,6 @@ test('fed appends a line the package reads back, with a step and without', () =>
     .split('\n')
     .map((l) => JSON.parse(l) as Line);
   assert.equal(lines[0].at, before.at, 'what was there is kept');
-  for (const { at } of lines.slice(1))
-    assert.ok(Date.parse(at) >= from - 1000 && at === new Date(Date.parse(at)).toISOString(), `written now, as an ISO time: ${at}`);
+  for (const { at } of lines.slice(1)) assert.equal(at, new Date(now).toISOString(), 'written now, as an ISO time');
   assert.ok(!('step' in lines[2]), "a run's line carries no step key at all");
 });

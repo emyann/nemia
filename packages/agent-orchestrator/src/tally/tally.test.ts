@@ -19,7 +19,15 @@ const schema = (properties: OutputSchema['properties']): StepOutput => ({
 const triage = schema({
   issues: {
     type: 'array',
-    items: { type: 'object', properties: { open: { type: 'boolean' }, title: { type: 'string' } } },
+    items: {
+      type: 'object',
+      properties: {
+        open: { type: 'boolean' },
+        title: { type: 'string' },
+        kind: { type: 'string', enum: ['bug', 'idea'] },
+        note: { type: ['string', 'null'] },
+      },
+    },
   },
   score: { type: 'number' },
   seen: { type: ['integer', 'null'] },
@@ -40,6 +48,34 @@ test('a tally of an array, a number, an integer or null, and an array of items w
   assert.deepEqual(tallyOf('triage', ' issues, issues.open ,score, seen', triage), ['issues', 'issues.open', 'score', 'seen']);
   assert.equal(tallyOf('triage', undefined, triage), undefined, 'no line, no tally');
   assert.deepEqual(tallyOf('triage', '', undefined), [], 'an empty line on a step with no output counts nothing');
+});
+
+test('a tally of the items of an array whose string has a value reads as written, a value of its enum or any value of a free string', () => {
+  assert.deepEqual(tallyOf('triage', 'issues, issues.kind=bug, issues.note=a.b', triage), ['issues', 'issues.kind=bug', 'issues.note=a.b']);
+});
+
+test('REFUSED: a value its enum does not hold, naming the step file, the schema file and the values it holds', () => {
+  const message = refusal('issues.kind=nope', triage);
+  assert.match(message, /^triage: `tally: issues.kind=nope` in triage\.md: /);
+  assert.ok(message.includes('`output: triage.schema.json` declares the `kind` of the items of `issues` as one of bug, idea'), message);
+});
+
+test('REFUSED: a key that is no string of the items of an array, naming the step file, the schema file, the field and the key', () => {
+  for (const written of ['issues.open=true', 'issues.closed=bug', 'score.kind=bug']) {
+    const message = refusal(written, triage);
+    const [field, key] = written.split('=')[0].split('.');
+    assert.match(message, /triage\.md/, written);
+    assert.ok(
+      message.includes(`\`output: triage.schema.json\` declares no string \`${key}\` on the items of an array \`${field}\``),
+      `${written}: ${message}`,
+    );
+  }
+});
+
+test('REFUSED: an entry that names a key and no value', () => {
+  const message = refusal('issues.kind=', triage);
+  assert.match(message, /triage\.md/);
+  assert.ok(message.includes('`issues.kind=` names no value'), message);
 });
 
 test('a tally on a step with no output is refused, naming the step file', () => {
@@ -70,10 +106,19 @@ test('a flag that is not a boolean of the items of an array is refused, naming t
   }
 });
 
-test('an entry with more than one dot, or an empty part, is refused', () => {
-  for (const written of ['issues.open.now', 'issues.', '.open']) {
+test('an entry with more than one dot or one equals sign, an empty part, or a value with no key is refused, naming the three forms', () => {
+  for (const written of [
+    'issues.open.now',
+    'issues.',
+    '.open',
+    'issues.kind=bug=x',
+    'issues.kind.x=bug',
+    'issues=bug',
+    '=bug',
+    'issues.=bug',
+  ]) {
     const message = refusal(written, triage);
-    assert.ok(message.includes(`\`${written}\` is neither a field nor \`field.flag\``), `${written}: ${message}`);
+    assert.ok(message.includes(`\`${written}\` is none of a field, \`field.flag\` and \`field.key=value\``), `${written}: ${message}`);
     assert.match(message, /triage\.md/);
   }
 });
@@ -82,6 +127,7 @@ test('an entry given twice is refused', () => {
   const message = refusal('issues, score, issues', triage);
   assert.match(message, /triage\.md/);
   assert.match(message, /names `issues` twice/);
+  assert.match(refusal('issues.kind=bug, issues.kind=bug', triage), /names `issues.kind=bug` twice/);
 });
 
 test('a closeout gives an array its item count, a number its value and a flag its true items; a zero measured is 0', () => {
@@ -94,11 +140,21 @@ test('a closeout gives an array its item count, a number its value and a flag it
   assert.equal(tallyIn('zero', output), 0);
 });
 
+test('a closeout gives `field.key=value` the items whose key is exactly the value; an empty array is 0', () => {
+  const output = { issues: [{ kind: 'bug' }, { kind: 'idea' }, { kind: 'Bug' }, {}, 'bug', { kind: 'bug ' }], empty: [] };
+  assert.equal(tallyIn('issues.kind=bug', output), 1);
+  assert.equal(tallyIn('issues.kind=idea', output), 1);
+  assert.equal(tallyIn('empty.kind=bug', output), 0);
+});
+
 test('a closeout without the field, with another type at run time, or none at all, measured nothing: null, never 0', () => {
   const output = { issues: 'three', score: null, nan: Number.NaN };
   assert.equal(tallyIn('missing', output), null);
   assert.equal(tallyIn('issues', output), null);
   assert.equal(tallyIn('issues.open', output), null);
+  assert.equal(tallyIn('issues.kind=bug', output), null);
+  assert.equal(tallyIn('missing.kind=bug', output), null);
+  assert.equal(tallyIn('issues.kind=bug', undefined), null);
   assert.equal(tallyIn('score', output), null);
   assert.equal(tallyIn('nan', output), null);
   assert.equal(tallyIn('issues', undefined), null);
@@ -140,7 +196,7 @@ test("a step's tries total per tally over the range and per day, null on a day n
 });
 
 /** The words of this repository's build workflow that the counting must never know. */
-const BUILD_WORDS = /\b(findings|mutants|proves)\b/;
+const BUILD_WORDS = /\b(findings|mutants|proves|placement)\b/;
 
 /** The source files, tests left out, that read and count tallies. */
 const countingSources = (): Array<[string, string]> =>
@@ -152,8 +208,8 @@ const countingSources = (): Array<[string, string]> =>
   );
 
 test("no source that counts tallies names a field of this repository's build workflow", () => {
-  const planted = 'const n = tallyIn("findings", output);';
-  assert.match(planted, BUILD_WORDS, 'the matcher refuses a planted name');
+  for (const planted of ['const n = tallyIn("findings", output);', "const kinds = ['placement'];"])
+    assert.match(planted, BUILD_WORDS, `the matcher refuses a planted name: ${planted}`);
   const sources = countingSources();
   assert.ok(sources.some(([file]) => file === 'tally/tally.ts') && sources.some(([file]) => file === 'stats/stats.ts'));
   for (const [file, text] of sources) assert.doesNotMatch(text, BUILD_WORDS, file);

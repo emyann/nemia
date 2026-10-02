@@ -504,6 +504,16 @@ const answerArgs = (rest: string[]): { words: string; budget: string | undefined
 };
 
 /**
+ * Prints the stream `stream` of task `id` whole, as `engine.output` answers it, or says on stderr that none is kept; the engine
+ * refuses a stream that is neither `stdout` nor `stderr`.
+ */
+const printOutput = async (engine: Engine, id: string, stream: string): Promise<void> => {
+  const text = await engine.output(id, stream as 'stdout' | 'stderr');
+  if (text === undefined) return console.error(`${id}: no ${stream} kept: no attempt has run yet, or its run kept no streams`);
+  process.stdout.write(text);
+};
+
+/**
  * Runs the `ae` verb `argv` names on the board at `AE_ROOT`, or prints `HELP`; refuses first, with exit code 2, to run with
  * `AE_MAX_CONCURRENT` set (`AE_MAX_CONCURRENT_RETIRED`).
  *
@@ -556,12 +566,9 @@ export async function main(argv: string[]): Promise<void> {
       if (!arg) return console.log(HELP);
       return console.log(await engine.logs(arg));
 
-    case 'output': {
+    case 'output':
       if (!arg) return console.log(HELP);
-      const text = await engine.output(arg, (argv[2] ?? 'stdout') as 'stdout' | 'stderr');
-      if (text !== undefined) process.stdout.write(text);
-      return;
-    }
+      return printOutput(engine, arg, argv[2] ?? 'stdout');
 
     case 'stop':
       if (!arg) return console.log(HELP);

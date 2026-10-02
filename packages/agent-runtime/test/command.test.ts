@@ -14,6 +14,7 @@ import { Effect } from 'effect';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Engine as EngineService, promiseEngine, type TaskView } from '../src/index.ts';
 import { commandHarness } from '../src/harness/command/command.ts';
 import { detachedOps } from '../src/harness/detached/detached.ts';
@@ -151,6 +152,35 @@ test('a run spawned again under its name starts with empty streams, and a cut in
   assert.equal(await Effect.runPromise(ops.output!('ae/never/1', 'stdout')), undefined, 'a run that never was has no stream');
 });
 
+test('`ae output` prints a stream whole, stdout unless told stderr, says on stderr when none is kept, and refuses another stream', async () => {
+  const { root, cwd, engine } = board();
+  const ae = (...args: string[]) => {
+    const r = spawnSync(process.execPath, [fileURLToPath(new URL('../bin/ae.ts', import.meta.url)), 'output', ...args], {
+      env: { ...process.env, AE_ROOT: root },
+      encoding: 'utf8',
+    });
+    return [r.status, r.stdout, r.stderr];
+  };
+  const id = await engine.file({ brief: 'b', cwd, harness: 'command', config: { command: ['sh', '-c', 'echo out; echo err >&2'] } });
+  assert.deepEqual(ae(id), [0, '', `${id}: no stdout kept: no attempt has run yet, or its run kept no streams\n`]);
+  await settled(engine, id);
+  assert.deepEqual(ae(id), [0, 'out\n', '']);
+  assert.deepEqual(ae(id, 'stderr'), [0, 'err\n', '']);
+  assert.deepEqual(ae(id, 'both'), [2, '', 'output: `both` is not a stream: ask for `stdout` or `stderr`.\n']);
+});
+
+test('a spawn of a run that names no command is refused before anything runs, saying the harness runs only the one a task gives', async () => {
+  const root = scratch('ae-command-');
+  const cwd = scratch('ae-command-cwd-');
+  const ops = detachedOps(commandHarness, root);
+  for (const config of [{}, { command: [] }]) {
+    const err = await Effect.runPromise(Effect.flip(ops.spawn({ name: 'ae/bare/1', brief: 'x', cwd, config })));
+    assert.equal(err.refused, true);
+    assert.equal(err.message, 'command: Error: `ae/bare/1` names no `config.command`: the command harness runs only the one a task gives.');
+    assert.equal((await Effect.runPromise(ops.observe)).get('ae/bare/1'), undefined, 'no worker was started');
+  }
+});
+
 test('the command harness refuses, at file(), a task without a command, one carrying an argument of an agent, a statement or a session to resume', async () => {
   const { engine, cwd } = board();
   const refused = async (config: object, words: RegExp) => {
@@ -174,18 +204,21 @@ test('the command harness refuses, at file(), a task without a command, one carr
   assert.match(String(resumed), /`resumeFrom: ae\/x\/1` continues a session, and a command keeps none/);
 });
 
-test('command, env and niceness are refused on a harness that does not run a command, naming the one that does', async () => {
+test('command, env and niceness are refused on Codex, Claude Code and a remote agent, harnesses that run no command, naming the one that does', async () => {
   const root = scratch('ae-command-');
-  const engine = promiseEngine(EngineService.layer({ root, harnesses: { codex, command: commandHarness } }));
-  for (const config of [{ command: ['true'] }, { env: { CI: '1' } }, { niceness: 5 }]) {
-    const key = Object.keys(config)[0];
-    const message = await engine.file({ brief: 'b', cwd: root, harness: 'codex', config }).then(
-      () => 'filed',
-      (err: Error) => err.message,
-    );
-    assert.equal(
-      message,
-      `file: \`${key}\` names a process to run, and the \`codex\` harness runs a session of its own: it would start without it. File the task on \`command\`, or leave \`${key}\` off.`,
-    );
+  const harnesses = { codex, claude: 'claude', remote: { url: 'https://agent.example' }, command: commandHarness } as const;
+  const engine = promiseEngine(EngineService.layer({ root, harnesses }));
+  for (const harness of ['codex', 'claude', 'remote']) {
+    for (const config of [{ command: ['true'] }, { env: { CI: '1' } }, { niceness: 5 }]) {
+      const key = Object.keys(config)[0];
+      const message = await engine.file({ brief: 'b', cwd: root, harness, config }).then(
+        () => 'filed',
+        (err: Error) => err.message,
+      );
+      assert.equal(
+        message,
+        `file: \`${key}\` names a process to run, and the \`${harness}\` harness runs a session of its own: it would start without it. File the task on \`command\`, or leave \`${key}\` off.`,
+      );
+    }
   }
 });

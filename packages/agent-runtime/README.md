@@ -416,7 +416,7 @@ await engine.output(id, 'stderr', 4096);  // its last 4096 bytes, starting on a 
 `output` asks the task's latest attempt, observes nothing, and answers `undefined` before an attempt or for a run that kept
 no streams. It refuses (exit 2; `OutputRefused` at the Effect door) a stream that is neither, a `lastBytes` that is not a whole
 number above 0, a task the board does not have, and a harness that keeps no whole streams, whose `logs` is what it has. On
-the command line, `ae output <task> [stdout|stderr]`.
+the command line, `ae output <task> [stdout|stderr]`, which says on stderr when there is nothing kept to print.
 
 ### Beneath the harnesses: an A2A seam
 

@@ -94,7 +94,7 @@ export {
 export type { FrozenStep } from './former/former.ts';
 export {
   autoDropped,
-  editsUnasked,
+  directoryFence,
   fansOut,
   isFolderTeam,
   loopSpan,

@@ -30,6 +30,31 @@ export const MODE_RANK: Readonly<Record<string, number>> = {
 export const editsUnasked = (mode: string | undefined): boolean =>
   (MODE_RANK[mode ?? DEFAULT_PERMISSION_MODE] ?? 0) >= MODE_RANK.acceptEdits;
 
+/** The allow rules a session held to its directory keeps, as the path patterns covering every path inside it (`pathCovers`). */
+const IN_DIRECTORY = ['Edit(**)', 'Read(**)'];
+
+/**
+ * The fence that holds a Claude Code session of an agent to its directory, never wider than the agent's own (`fenceRefusal` lets it
+ * through): `dontAsk`, or the agent's mode `mode` where that is narrower; and `Edit(**)` under a mode that edits unasked
+ * (`editsUnasked`), else those of the agent's allow rules `allows`, as written, that a rule inside the directory covers. Undefined when
+ * the agent has allow rules and none is inside its directory: a step's list replaces its agent's and cannot be empty, so the agent's own
+ * would run.
+ */
+export function directoryFence(
+  mode: string | undefined,
+  allows: string | undefined,
+): { permissionMode: string; allowedTools: string[] } | undefined {
+  const own = mode ?? DEFAULT_PERMISSION_MODE;
+  const permissionMode = (MODE_RANK[own] ?? 0) < MODE_RANK.dontAsk ? own : 'dontAsk';
+  if (editsUnasked(mode)) return { permissionMode, allowedTools: ['Edit(**)'] };
+  const rules = (allows ?? '')
+    .split(',')
+    .map((rule) => rule.trim())
+    .filter(Boolean);
+  const allowedTools = rules.filter((rule) => IN_DIRECTORY.some((by) => covers(by, rule)));
+  return rules.length && !allowedTools.length ? undefined : { permissionMode, allowedTools };
+}
+
 /** The sandbox a codex session runs in when its step names none: the runtime's `sandboxOf` gives `workspace-write`. */
 export const DEFAULT_SANDBOX = 'workspace-write';
 
@@ -187,9 +212,16 @@ export function covers(by: string, rule: string): boolean {
 /** The tools whose rules name a path, as gitignore does: `Read` and `Edit`, which every file-editing tool is matched against. */
 const PATH_RULE_TOOLS = ['Read', 'Edit'];
 
-/** Whether a command prefix `by` (`npm:*`) covers `command`, itself a command or a prefix: the same words, or more words after them. */
+/** What makes a command more than one, or sends its output elsewhere: an operator, a substitution, a redirection or a new line. */
+const SHELL_JOINS = /[;&|`<>\n]|\$\(/;
+
+/**
+ * Whether a command prefix `by` (`npm:*`) covers `command`, itself a command or a prefix: the same words, or more words after them. A
+ * command joined to another (`npm test && git push`), substituting one or redirecting is never covered, as Claude Code's prefix rules
+ * permit none of them.
+ */
 function commandCovers(by: string, command: string): boolean {
-  if (!by.endsWith(':*')) return false;
+  if (!by.endsWith(':*') || SHELL_JOINS.test(command)) return false;
   const prefix = by.slice(0, -2);
   const words = command.endsWith(':*') ? command.slice(0, -2) : command;
   return words === prefix || words.startsWith(`${prefix} `);

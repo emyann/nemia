@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseAgent, parseWorkflow, WorkflowError, type Agents, type Workflow } from '../src/workflow.ts';
 import { CLAUDE_MODES } from '../src/harness/harness.ts';
-import { MODE_RANK } from '../src/workflow/fence.ts';
+import { directoryFence, MODE_RANK } from '../src/workflow/fence.ts';
 import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-fence-');
@@ -65,6 +65,17 @@ test('REFUSED at shipped defaults: `allowedTools:` allowing what its agent does 
     refusal(() => stepOf(agents, 'agent: ada\nallowedTools: Bash(npmx)')).includes('`Bash(npmx)`'),
     'a prefix covers a command, never a longer word',
   );
+  for (const joined of [
+    'Bash(npm test && git push)',
+    'Bash(npm test; curl x)',
+    'Bash(npm test | sh)',
+    'Bash(npm test > /etc/x)',
+    'Bash(npm $(x))',
+  ])
+    assert.ok(
+      refusal(() => stepOf(agents, `agent: ada\nallowedTools: ${joined}`)).includes(`\`${joined}\``),
+      `a prefix covers one command, never ${joined}`,
+    );
   holds(
     refusal(() => stepOf(agents, 'agent: bare\nallowedTools: Agent')),
     'build',
@@ -221,6 +232,36 @@ test('REFUSED at shipped defaults: the same widening on an agent a factory hires
   );
   holds(written, 'build', 'tools: Read, Bash', '`Bash`', 'ada');
   assert.equal(fs.readFileSync(path.join(folder, 'build.md'), 'utf8'), '---\nagent: ada\n---\n', 'nothing written');
+});
+
+test("REFUSED: a fence held to the directory where an agent's every allow reaches outside it, and each one given loads over its agent", () => {
+  const cases: [string | undefined, string | undefined, ReturnType<typeof directoryFence>][] = [
+    [undefined, 'Bash', { permissionMode: 'dontAsk', allowedTools: ['Edit(**)'] }],
+    ['acceptEdits', undefined, { permissionMode: 'dontAsk', allowedTools: ['Edit(**)'] }],
+    ['dontAsk', undefined, { permissionMode: 'dontAsk', allowedTools: [] }],
+    [
+      'default',
+      'Edit(notes/**), Read(docs/**), Bash(npm test), Edit(/etc/**), Read(../x)',
+      {
+        permissionMode: 'dontAsk',
+        allowedTools: ['Edit(notes/**)', 'Read(docs/**)'],
+      },
+    ],
+    ['plan', 'Edit(**)', { permissionMode: 'plan', allowedTools: ['Edit(**)'] }],
+    ['dontAsk', 'Bash, Edit(/home/**)', undefined],
+    ['manual', 'Read', undefined],
+  ];
+  for (const [mode, allows, fence] of cases) {
+    assert.deepEqual(directoryFence(mode, allows), fence, `${mode} with ${allows}`);
+    if (fence === undefined) continue;
+    const agent = ['---', ...(mode ? [`permissionMode: ${mode}`] : []), ...(allows ? [`allowedTools: ${allows}`] : []), '---', 'Work.', ''];
+    const lines = [
+      `permissionMode: ${fence.permissionMode}`,
+      ...(fence.allowedTools.length ? [`allowedTools: ${fence.allowedTools.join(', ')}`] : []),
+    ];
+    const step = stepOf(agentsOf({ tried: agent.join('\n') }), ['agent: tried', ...lines].join('\n'));
+    assert.equal(step.permissionMode, fence.permissionMode);
+  }
 });
 
 test('every Claude Code mode has a rank, so a mode added to the vocabulary is placed before any step can name it', () => {

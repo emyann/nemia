@@ -231,9 +231,10 @@ function deniedLinesOf(run: Run, views: ReadonlyMap<string, TaskView>): Record<s
  *
  * A cancelled, pruned or held run has no try or round due. Each line that would offer a verb (`retryLines`, `roundLines`, `answerLines`,
  * `overBudgetLine`, `gateLines`) says itself that it offers none, so the api's decision, which calls the same functions, says the same.
+ * A run nothing of which is filed is read against the cap on runs in flight (`slotsOf`), whose `WF_MAX_RUNS` before any pass is `env`'s.
  * Fails with a refusal a read threw (`Missing`, for a run that is not there); dies of anything else (`tried`, `awaited`).
  */
-export const decideRun = Effect.fn('decide')(function* (id: string) {
+export const decideRun = Effect.fn('decide')(function* (id: string, env: NodeJS.ProcessEnv = process.env) {
   const e = viewedOnce(yield* EngineService);
   const git = yield* tried(() => branchReader());
   const run = yield* tried(() => runStore.runs.read(id));
@@ -262,7 +263,7 @@ export const decideRun = Effect.fn('decide')(function* (id: string) {
   const costs = costsOf(steps, run, used, spendOf);
   const waitingOn = waitingOnOf(id, run, views);
   const denied = deniedLinesOf(run, views);
-  const held = !hasStarted(run) && !run.cancelledAt ? (yield* awaited(() => slotsOf(e))).held.get(id) : undefined;
+  const held = !hasStarted(run) && !run.cancelledAt ? (yield* awaited(() => slotsOf(e, undefined, env))).held.get(id) : undefined;
   const over = Boolean(run.cancelledAt || run.pruned || run.hold);
   const offers = [...roundOffers(steps, run, d, spendOf), ...retryOffers(steps, run, d, phaseOf, reader, asked, spendOf, verdictOf)];
   const parent = yield* awaited(() => parentsOf(e, run, git));
@@ -301,5 +302,5 @@ export const decideRun = Effect.fn('decide')(function* (id: string) {
  * `wf decide` (`decideRun`) in a Promise, over `engine`: what the CLI and the tests call. Rejects with the refusal the program failed with,
  * or with whatever else it died of, as it was thrown.
  */
-export const decide = (engine: Engine, id: string): Promise<Decided> =>
-  Effect.runPromise(decideRun(id).pipe(Effect.provide(EngineService.layer(engine))));
+export const decide = (engine: Engine, id: string, env?: NodeJS.ProcessEnv): Promise<Decided> =>
+  Effect.runPromise(decideRun(id, env).pipe(Effect.provide(EngineService.layer(engine))));

@@ -139,7 +139,7 @@ const route = (command: Command) => (c: Context<ApiEnv>) =>
     const wrong = command.check?.(read.args);
     if (wrong) return c.json({ error: wrong }, 422);
     try {
-      return c.json(answerOf(command, await command.handler(s.e, read.args)), 202);
+      return c.json(answerOf(command, await command.handler(s.e, read.args, s.env)), 202);
     } catch (err) {
       if (isRefusal(err)) throw err;
       return c.json({ error: words.failed(at, err instanceof Error ? err.message : String(err)) }, 502);

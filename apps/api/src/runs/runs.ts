@@ -512,12 +512,12 @@ export const runs = new Hono<ApiEnv>()
     }),
   )
   .get('/api/runs/:runId/decision', (c) =>
-    served(c, async ({ e, home }) => {
+    served(c, async ({ e, home, env }) => {
       const id = c.req.param('runId');
       const run = findRun(id);
       if (!run) return c.json({ error: noSuchRun(id) }, 404);
       const { unreadable } = await viewsFor(e, [run]);
-      const read = await judgedUnlessUnreadable(run, unreadable, () => decisionOf(run, e, home));
+      const read = await judgedUnlessUnreadable(run, unreadable, () => decisionOf(run, e, home, env));
       if ('unreadable' in read) return c.json({ error: read.unreadable }, 502);
       return c.json(read.judged);
     }),

@@ -23,10 +23,11 @@ import { commandLine, type Args, type CommandSpec } from './command.ts';
 /**
  * A command whole: its spec, `handler`, which calls one package verb with the arguments and answers data — never printed lines — and
  * `print`, the lines the CLI prints of that data. The api answers the data as JSON, or only its `apiKeys` where the CLI prints more of
- * it than the api answers.
+ * it than the api answers. A handler reads its settings (`WF_MAX_RUNS`) from `env`: the process's own at the command line, the app's on
+ * the api.
  */
 export type Command<D extends object = Readonly<Record<string, unknown>>> = CommandSpec & {
-  handler(e: Engine, args: Args): Promise<D>;
+  handler(e: Engine, args: Args, env?: NodeJS.ProcessEnv): Promise<D>;
   print(data: D, args: Args): readonly string[];
   readonly apiKeys?: readonly (keyof D & string)[];
 };
@@ -336,7 +337,7 @@ const DECIDE: Command<Decided> = {
     side: 'api',
     why: "wf decide is the CLI's own verb: it prints a run's whole screen — its steps, closeouts, checks and diffs — off this decision, which the api answers as data",
   },
-  handler: (e, args) => decide(e, named(args).runId),
+  handler: (e, args, env) => decide(e, named(args).runId, env),
   print: () => [],
 };
 
@@ -351,7 +352,7 @@ const CEILINGS: Command<Slots> = {
     side: 'api',
     why: 'the board says the run slots over its Factory; at the command line, wf ls and wf decide say a run held for one beside the run',
   },
-  handler: (e) => slotsOf(e),
+  handler: (e, _args, env) => slotsOf(e, undefined, env),
   print: () => [],
 };
 

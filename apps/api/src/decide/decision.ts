@@ -177,9 +177,10 @@ const DECIDE = COMMANDS.find((c) => c.name === 'decide')!;
  *
  * First, as `wf decide` asks it first: a run whose roots wait on runs that have not shipped is `waiting`, and nothing else is read. Then a
  * run a person holds is `holding`, and nothing else is read either: what is in flight is on its detail, and nothing is offered. A run still
- * running with nobody waited on (`judge`, the listing's word) is `running`, with the slot the cap holds it for, and git is not asked a
- * thing: the page asks while a run is decidable, and the Factory's card only for a run waiting on you, but a request is a request. Called
- * off, or already shipped, is `nothing`.
+ * running with nobody waited on (`judge`, the listing's word) is `running`, with the slot the cap holds it for — its `WF_MAX_RUNS` before
+ * any pass is `env`'s, the app's environment, as `GET /api/ceilings` reads it — and git is not asked a thing: the page asks while a run is
+ * decidable, and the Factory's card only for a run waiting on you, but a request is a request. Called off, or already shipped, is
+ * `nothing`.
  *
  * Then the branches the CLI reads (`branchesToRead`) — the result branches, or every branch a step worked on when no terminal step has one,
  * never the base branch of a run that cut worktrees, whose work is not on it — each read with `touchedBy`, and with `sensitiveDiff` over
@@ -188,7 +189,7 @@ const DECIDE = COMMANDS.find((c) => c.name === 'decide')!;
  * (`resultSteps`), as the decision reads them once it is not. A folder run has no repository to ask, so none of git is read for it.
  * `standings` are none for a run that worked on its base branch itself, whose standing would read `main is on main`.
  */
-export async function decisionOf(run: Run, e: Engine['Service'], home: string): Promise<RunDecision> {
+export async function decisionOf(run: Run, e: Engine['Service'], home: string, env: NodeJS.ProcessEnv): Promise<RunDecision> {
   const waits = await waitsIn(run, e);
   const waiting = waitingOf(run, waits);
   const holds = await holdsIn(run, e);
@@ -198,7 +199,7 @@ export async function decisionOf(run: Run, e: Engine['Service'], home: string): 
   const folder = workflowsOf(run, home).steps;
   const judged = judge(run, stepNames(run, folder), folder, await viewsOf(run, e), waits, holds);
   if (judged.status === 'cancelled') return { nothing: `cancelled at ${run.cancelledAt} — nothing to decide` };
-  const decided = (await DECIDE.handler(e, { runId: run.id })) as Decided;
+  const decided = (await DECIDE.handler(e, { runId: run.id }, env)) as Decided;
   if (judged.status === 'running' && !judged.waitingOnYou.length) return { running: true, ...(decided.held ? { held: decided.held } : {}) };
   const d = decided.decision;
   const nothing = nothingOf(run, d);

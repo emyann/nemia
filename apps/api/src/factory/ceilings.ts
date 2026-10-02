@@ -2,7 +2,7 @@
  * The cap on runs in flight, and the runs it counts and holds, and what the last pass cost: what the Factory says over its floor
  * (`GET /api/ceilings`, app.ts).
  */
-import { lastCeilings, lastPassCost, type PassCost, slotWord, slotsOf, runStore } from 'agent-orchestrator';
+import { COMMANDS, lastCeilings, lastPassCost, type PassCost, type Slots, slotWord } from 'agent-orchestrator';
 import type { Engine } from '../store.ts';
 
 /**
@@ -29,13 +29,16 @@ export type Ceilings = {
   pass: PassCost | null;
 };
 
+/** The package's run slots (`slotsOf`), through its entry of the command table, served on the api alone. */
+const CEILINGS = COMMANDS.find((c) => c.name === 'ceilings')!;
+
 /**
- * The cap on runs in flight, and the runs it counts and holds (`Ceilings`), as the package judges them between passes (`slotsOf`) — every
- * run read as a pass reads it, off one look at the harnesses — with what the last pass ran with and cost. Read through `e`; the cap, before
- * any pass wrote one, is `WF_MAX_RUNS` of `env`, the app's environment.
+ * The cap on runs in flight, and the runs it counts and holds (`Ceilings`), as the package judges them between passes (`CEILINGS`, the
+ * table's entry whose handler is `slotsOf`) — every run read as a pass reads it, off one look at the harnesses — with what the last pass
+ * ran with and cost. Read through `e`; the cap, before any pass wrote one, is `WF_MAX_RUNS` of `env`, the app's environment.
  */
 export async function ceilingsOf(e: Engine['Service'], env: NodeJS.ProcessEnv): Promise<Ceilings> {
-  const { cap, inFlight, held } = await slotsOf(e, runStore.runs.list(), env);
+  const { cap, inFlight, held } = (await CEILINGS.handler(e, {}, env)) as Slots;
   return {
     last: lastCeilings() ?? null,
     cap,

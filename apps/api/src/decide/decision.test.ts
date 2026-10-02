@@ -10,7 +10,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
-import { app } from '../app.ts';
+import { app, appOf, liveOf } from '../app.ts';
 import { diffFiles, DIFF_LINES } from './decision.ts';
 
 const realGit = execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim();
@@ -371,25 +371,26 @@ test('a run still running is `running` and nothing else, and not one `git` is ru
   assert.ok(gitCount() > before, "the count counts: a decidable run's decision is read out of git, through the same PATH");
 });
 
-test('a run the cap on runs in flight holds is `running`, held at the count `GET /api/ceilings` holds it at, and not one `git` is run for it', async () => {
+test("a run the cap on runs in flight holds is `running`, held at the count `GET /api/ceilings` holds it at — both by the app's own `WF_MAX_RUNS`, never the process's — and not one `git` is run for it", async () => {
   journal('t-d13-implement', [filed('t-d13-implement'), { kind: 'starting', at, attempt: 1 }, { kind: 'spawned', at, attempt: 1 }]);
   writeRun({ id: 'r-d13', repo, baseRef: base, steps: { implement: { taskId: 't-d13-implement', branch }, review: { taskId: null } } });
   writeRun({ id: 'r-d12', repo, baseRef: base, steps: {} });
-  process.env.WF_MAX_RUNS = '1';
-  try {
-    const before = gitCount();
-    const { status, body } = await decisionOf('r-d12');
-    assert.equal(gitCount(), before, 'no git call for a run nothing of which is filed');
-    const ceilings = (await (await app.request('/api/ceilings')).json()) as { inFlight: string[]; held: { run: string }[] };
-    assert.ok(ceilings.inFlight.includes('r-d13'), JSON.stringify(ceilings));
-    assert.ok(
-      ceilings.held.some((h) => h.run === 'r-d12'),
-      JSON.stringify(ceilings),
-    );
-    assert.deepEqual({ status, body }, { status: 200, body: { running: true, held: { inFlight: ceilings.inFlight.length, cap: 1 } } });
-  } finally {
-    process.env.WF_MAX_RUNS = 'set-it-in-the-test';
-  }
+  assert.equal(process.env.WF_MAX_RUNS, 'set-it-in-the-test', "the process's own is not a count, which the package refuses by name");
+  const { app: own } = appOf(liveOf({ ...process.env, WF_MAX_RUNS: '1' }));
+  const before = gitCount();
+  const res = await own.request('/api/runs/r-d12/decision');
+  const body = (await res.json()) as RunDecision;
+  assert.equal(gitCount(), before, 'no git call for a run nothing of which is filed');
+  const ceilings = (await (await own.request('/api/ceilings')).json()) as { inFlight: string[]; held: { run: string }[] };
+  assert.ok(ceilings.inFlight.includes('r-d13'), JSON.stringify(ceilings));
+  assert.ok(
+    ceilings.held.some((h) => h.run === 'r-d12'),
+    JSON.stringify(ceilings),
+  );
+  assert.deepEqual(
+    { status: res.status, body },
+    { status: 200, body: { running: true, held: { inFlight: ceilings.inFlight.length, cap: 1 } } },
+  );
 });
 
 test('a loop out of rounds offers both answers as commands, each the bare `wf` line and not the sentence that carries it', async () => {

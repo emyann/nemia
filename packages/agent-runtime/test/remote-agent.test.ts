@@ -82,6 +82,13 @@ const journalOf = (root: string, id: string) =>
 const writeJournal = (root: string, id: string, events: object[]) =>
   fs.writeFileSync(path.join(root, 'tasks', `${id}.jsonl`), events.map((e) => `${JSON.stringify(e)}\n`).join(''));
 const entryFile = (root: string, name: string) => path.join(root, 'remote', `${encodeURIComponent(name)}.json`);
+/** The start and the spawn of a journal as if written `ms` earlier, on the wall clock and on the monotonic clock of their boot. */
+const agedBy = (events: object[], ms: number): object[] =>
+  events.map((ev) => {
+    const e = ev as { kind: string; at: string; mono?: { boot: string; ms: number } };
+    if (e.kind !== 'starting' && e.kind !== 'spawned') return ev;
+    return { ...e, at: new Date(Date.parse(e.at) - ms).toISOString(), ...(e.mono ? { mono: { ...e.mono, ms: e.mono.ms - ms } } : {}) };
+  });
 
 test('the test agent serves its card and answers a message on each binding it lists', async () => {
   const s = await serve({ script: () => [{ data: { ok: true }, state: 'completed' }] });
@@ -557,12 +564,7 @@ test('restart with the intent on disk and no Task: never sent twice — a spawn 
   );
   assert.equal((await e.view(id)).state.settled, null, 'no refusal: a session may exist');
   assert.equal(s.counts.sendMessage ?? 0, 0);
-  const back = new Date(Date.now() - 10 * 60_000).toISOString();
-  writeJournal(
-    root,
-    id,
-    events.map((ev) => (ev.kind === 'starting' || ev.kind === 'spawned' ? { ...ev, at: back } : ev)),
-  );
+  writeJournal(root, id, agedBy(events, 10 * 60_000));
   const again = promiseEngine(EngineService.layer({ root, harnesses: { remote: { url: s.url } } }));
   const done = await settled(again, id);
   assert.equal(done.state.attempts[0].reason, 'lost');
@@ -659,12 +661,7 @@ test('an agent unreachable for a pass is not a session lost: the task reads as l
       },
     }),
   );
-  const back = new Date(Date.now() - 10 * 60_000).toISOString();
-  writeJournal(
-    root,
-    id,
-    journalOf(root, id).map((ev) => (ev.kind === 'starting' || ev.kind === 'spawned' ? { ...ev, at: back } : ev)),
-  );
+  writeJournal(root, id, agedBy(journalOf(root, id), 10 * 60_000));
   for (let i = 0; i < 3; i++) await dead.tick();
   const v = await dead.view(id);
   assert.equal(v.phase, 'running (working)', 'past the grace window, and not lost');
@@ -947,12 +944,7 @@ test('an intent whose sending process died is in doubt: not listed, never sent a
     events.find((ev) => ev.kind === 'spawned')?.error ?? '',
     /its answer was never recorded, since the process sending it stopped first: whether the agent made a Task of it is not known, and it is not sent twice/,
   );
-  const back = new Date(Date.now() - 10 * 60_000).toISOString();
-  writeJournal(
-    root,
-    id,
-    events.map((ev) => (ev.kind === 'starting' || ev.kind === 'spawned' ? { ...ev, at: back } : ev)),
-  );
+  writeJournal(root, id, agedBy(events, 10 * 60_000));
   const done = await settled(promiseEngine(EngineService.layer({ root, harnesses: { remote: { url: s.url } } })), id);
   assert.equal(done.state.attempts[0].reason, 'lost', 'the grace window passed with nothing listed under the name');
   assert.equal(s.counts.sendMessage ?? 0, 0, 'never sent');

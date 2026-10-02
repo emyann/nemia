@@ -264,6 +264,45 @@ test("LONG-LIVED: a long-lived attempt is looked for with when the journal says 
   );
 });
 
+test('LONG-LIVED: a settled long-lived task the memo keeps, its session still listed, is looked for with when its attempt began — so its release counts from then', async () => {
+  const journal = Journal.test();
+  const sessions = new Map<string, Sighting>();
+  const asked: ExpectedSession[][] = [];
+  const runner = Runner.layer({
+    ...testOps({ sessions }),
+    observeFor: (expected) =>
+      Effect.sync(() => {
+        asked.push([...expected]);
+        return { seen: new Map(sessions), unread: new Set<string>() };
+      }),
+    release: () => Effect.fail(new RunnerError({ verb: 'release', message: 'claude rm: still running' })),
+  });
+  const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) =>
+    Effect.runPromise(e.pipe(Effect.provide(Layer.mergeAll(journal, runner))));
+  const memo = tickMemoLayer({ verify: true });
+  const pass = () => Effect.runPromise(tick().pipe(Effect.provide(Layer.mergeAll(journal, runner, memo))));
+  const open = await run(file({ ...spec, id: 'open', restartPolicy: 'Always', config: { background: true } }));
+  await pass();
+  await run(requestStop(open));
+  await pass();
+  await pass();
+  await pass();
+  const events = await run(Effect.flatMap(Journal, (j) => j.read(open)));
+  assert.ok(
+    events.some((e) => e.kind === 'settled'),
+    'settled, and its release refused: the memo keeps it as still listed',
+  );
+  const since = Date.parse(events.find((e) => e.kind === 'starting')!.at);
+  const before = asked.length;
+  await pass();
+  assert.equal(asked.length, before + 1);
+  assert.deepEqual(
+    asked.at(-1)?.find((e) => e.name === nameFor(open, 1)),
+    { name: nameFor(open, 1), harness: undefined, since },
+    "the memo's record keeps the policy and the start the look is told",
+  );
+});
+
 test('LONG-LIVED: a gap open past RESPAWN_GAP_MS on the record is ended lost by a fresh daemon, and its listed session released', async () => {
   const r = recording();
   const run = r.daemon();

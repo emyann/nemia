@@ -177,3 +177,21 @@ test("REFUSED at `wf start`, every word the load once judged by a copy of the ru
     'a cap beside a background session is refused of the two together, named by the step',
   );
 });
+
+test("REFUSED at `wf start`: a codex sandbox written under its former name, `permissionMode:`, is quoted as the file writes it — the step's own line, or its agent's — never as the `sandbox:` it is read as", () => {
+  const refusedAs = `implement: \`permissionMode: dontAsk\` (filed as \`permissionMode\`): ${configRefusal('codex', { permissionMode: 'dontAsk' })}`;
+  const own = folder('former-mode', 'harness: codex\npermissionMode: dontAsk');
+  assert.throws(
+    () => started(own),
+    (err: Error) => err.message === refusedAs,
+  );
+  fs.mkdirSync(path.join(ROOT, 'workflows', 'agents'), { recursive: true });
+  fs.writeFileSync(path.join(ROOT, 'workflows', 'agents', 'moded.md'), '---\nharness: codex\npermissionMode: dontAsk\n---\nYou build.\n');
+  const before = runsWritten();
+  assert.throws(
+    () => started(folder('former-mode-agent', 'agent: moded')),
+    (err: Error) => err.message === refusedAs,
+    "the agent's line, for a step that writes no fence of its own",
+  );
+  assert.deepEqual(runsWritten(), before);
+});

@@ -17,7 +17,7 @@ import { budgetUsdFor } from '../status/status.ts';
 import { renderedFlags } from '../agents/agents.ts';
 import { ownOf } from '../tick/file.verb.ts';
 import { fansOut, isFolderTeam } from '../workflow/index.ts';
-import { loadWorkflows, skillsFor, type Places } from '../folder/folder.store.ts';
+import { formerModesWritten, loadWorkflows, skillsFor, type Places } from '../folder/folder.store.ts';
 import { placesOf } from '../folder/lookup.store.ts';
 import { workRoot } from '../record/places.store.ts';
 import { gateRefusal } from '../ending/ending.ts';
@@ -122,7 +122,7 @@ export function stepsToStart(
   }
   const undeclared = undeclaredRefusal(steps);
   if (undeclared) throw new Invalid({ message: undeclared });
-  const refusedConfig = refused(steps, places, gates);
+  const refusedConfig = refused(steps, places, gates, formerModesWritten(workflowDir));
   if (refusedConfig) throw new Invalid({ message: refusedConfig });
   return steps;
 }
@@ -132,9 +132,14 @@ export function stepsToStart(
  * harness (`configRefusal`), in the runtime's words after the step's line they come from (`filedRefusal`); undefined where every step's
  * is taken. A step on a remote agent is configured by its operator, and asked nothing. Its agent's flags name the folder the run renders
  * it to, and an ending's read the run's artifacts folder, neither there yet: the runtime judges which flags a step has, never where they
- * point.
+ * point. A step whose sandbox its file writes as `permissionMode:` (`written`, by the step's name) is quoted by that line.
  */
-export function configRefused(steps: readonly Workflow[], places: Places, gates: readonly string[]): string | undefined {
+export function configRefused(
+  steps: readonly Workflow[],
+  places: Places,
+  gates: readonly string[],
+  written: Readonly<Record<string, string>> = {},
+): string | undefined {
   for (const step of steps.filter((s) => !isRemoteHarness(s.harness))) {
     const own = ownOf(step, renderedFlags(step, '.'), () => places.repo);
     const runArtifacts = path.dirname(artifactsDir({ id: 'run' }, step.name));
@@ -144,14 +149,22 @@ export function configRefused(steps: readonly Workflow[], places: Places, gates:
       { gates: [...gates] },
       { model: step.model, budgetUsd: budgetUsdFor(step.budget), runArtifacts, own },
     );
-    const why = filedRefusal((c) => configRefusal(step.harness ?? DEFAULT_HARNESS, c), step.name, config, lineOf(step));
+    const former = written[step.name];
+    const lines = (field: string) =>
+      field === 'permissionMode' && former !== undefined ? `permissionMode: ${former}` : lineOf(step)(field);
+    const why = filedRefusal((c) => configRefusal(step.harness ?? DEFAULT_HARNESS, c), step.name, config, lines);
     if (why) return why;
   }
   return undefined;
 }
 
 /** What `stepsToStart` asks last of a folder's steps: why the runtime refuses one's first filing, or undefined (`configRefused`). */
-export type ConfigRefused = (steps: readonly Workflow[], places: Places, gates: readonly string[]) => string | undefined;
+export type ConfigRefused = (
+  steps: readonly Workflow[],
+  places: Places,
+  gates: readonly string[],
+  written?: Readonly<Record<string, string>>,
+) => string | undefined;
 
 /** The refusal `startRun` asks of a folder's steps before a run is written: `configRefused`, unless a layer gives another. */
 export const StartRefusal = Context.Reference<ConfigRefused>('orchestrator/StartRefusal', { defaultValue: () => configRefused });

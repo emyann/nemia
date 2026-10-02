@@ -18,21 +18,45 @@ const REVIEWER = 'reviewer-e2e';
 const withHires = (text: string, hires: Record<string, string>): string =>
   JSON.stringify({ ...(JSON.parse(text) as object), hires }, null, 2);
 
-/** Open the header's start on a fresh load of the floor, and the sheet it opens. */
+/** Open the header's start on a fresh load of the floor, and the floating bar it opens. */
 async function openStart(page: Page): Promise<Locator> {
   await page.goto(page.url(), { waitUntil: 'load' });
   await idle(page);
   await page.locator('header').getByRole('button', { name: 'Start a run' }).click();
-  const sheet = page.getByRole('dialog', { name: `Start a run in ${FACTORIES.hiring.name}` });
-  await expectVisible(sheet, "the header's Start a run opens a sheet naming the factory");
-  return sheet;
+  const bar = page.getByRole('complementary', { name: `Start a run in ${FACTORIES.hiring.name}` });
+  await expectVisible(bar, "the header's Start a run opens the floating bar naming the factory");
+  return bar;
+}
+
+/** Picks `workflow` in the bar, and the start it offers. */
+async function pickWorkflow(bar: Locator, workflow: string): Promise<Locator> {
+  await bar.locator(`[data-workflow="repo:${workflow}"] label`).click();
+  const form = bar.locator(`form[aria-label="Start a run of ${workflow}"]`);
+  await expectVisible(form, `picked, ${workflow} offers its start`);
+  return form;
+}
+
+/** A half-typed brief is not lost to one Escape: the first leaves its field, the brief kept and the bar open; the second closes the bar. */
+async function keptOnEscape(page: Page, bar: Locator, form: Locator): Promise<void> {
+  const brief = form.getByRole('textbox');
+  await brief.fill(BRIEF);
+  await page.keyboard.press('Escape');
+  await idle(page);
+  if (!new URL(page.url()).searchParams.has('bar')) throw new Refused(`Escape in a field that holds text leaves the bar open — ${page.url()}`);
+  await expectVisible(bar, 'Escape in a field that holds text leaves the bar open');
+  if ((await brief.inputValue()) !== BRIEF)
+    throw new Refused(`and keeps the brief typed — it holds ${JSON.stringify(await brief.inputValue())}`);
+  if (await brief.evaluate((el) => el === document.activeElement)) throw new Refused('and leaves the field');
+  await page.keyboard.press('Escape');
+  await expectCount(bar, 0, 'a second Escape closes the bar');
 }
 
 export default {
   /**
-   * A run is started from a factory's floor: the header's Start a run opens a sheet on the factory's one repository, fixed, listing the
+   * A run is started from a factory's floor: the header's Start a run opens the floating bar on the factory's one repository, fixed, listing the
    * workflows it offers there with its hires. A workflow whose step the factory hires no one into says so in the package's words and
-   * cannot be picked. Once the factory hires into it, it is picked, and the start sends `?factory=` and `?repo=`: the record names both.
+   * cannot be picked. Once the factory hires into it, it is picked; Escape in its brief leaves the field and keeps the brief, and a second
+   * Escape closes the bar. Picked again, the start sends `?factory=` and `?repo=`: the record names both.
    * The hires, the agent hired and the run are taken back.
    */
   name: 'factory-start',
@@ -52,32 +76,33 @@ export default {
       fs.writeFileSync(factoryFile, withHires(factoryText, {}));
       const { problems } = watch(other);
       await other.goto(page.url(), { waitUntil: 'load' });
-      let sheet = await openStart(other);
-      await expectVisible(sheet.locator('[data-repo]', { hasText: `On ${checkout}` }), "on the factory's one repository, fixed");
-      const row = sheet.locator(`[data-workflow="repo:${workflow}"]`);
+      let bar = await openStart(other);
+      await expectVisible(bar.locator('[data-repo]', { hasText: `On ${checkout}` }), "on the factory's one repository, fixed");
+      const row = bar.locator(`[data-workflow="repo:${workflow}"]`);
       await expectVisible(
         row.locator('[data-why-not]', { hasText: `wf factory hire ${factory} <agent> --step ${workflow}/${UNFILLED}` }),
         `${workflow}'s ${UNFILLED} has no agent in ${factory}: its row says so, and the hire that fills it`,
       );
       if (!(await row.getByRole('radio').isDisabled())) throw new Refused(`${workflow} cannot be picked while it is unfilled`);
-      await expectCount(sheet.locator('form[aria-label^="Start a run of"]'), 0, 'with no Start: the api would refuse it');
+      await expectCount(bar.locator('form[aria-label^="Start a run of"]'), 0, 'with no Start: the api would refuse it');
       await settled(other);
       await photograph(other, path.join(OUT, `factory-start-unfilled-${theme}.png`));
-      await sheet.getByRole('button', { name: 'Close' }).click();
-      await expectCount(sheet, 0, 'Close closes the sheet');
+      await bar.getByRole('button', { name: 'Close' }).click();
+      await expectCount(bar, 0, 'Close closes the bar');
 
       fs.writeFileSync(reviewerFile, '---\ndescription: Use this when a change needs reviewing.\n---\nYou review the change.\n');
       fs.writeFileSync(factoryFile, withHires(factoryText, { [`${workflow}/${UNFILLED}`]: REVIEWER }));
-      sheet = await openStart(other);
+      bar = await openStart(other);
       await expectCount(
-        sheet.locator(`[data-workflow="repo:${workflow}"] [data-why-not]`),
+        bar.locator(`[data-workflow="repo:${workflow}"] [data-why-not]`),
         0,
         `hired into ${UNFILLED}, ${workflow} can start`,
       );
-      await sheet.locator(`[data-workflow="repo:${workflow}"] label`).click();
-      const form = sheet.locator(`form[aria-label="Start a run of ${workflow}"]`);
-      await expectVisible(form, `picked, ${workflow} offers its start`);
+      let form = await pickWorkflow(bar, workflow);
       await expectVisible(form.getByText(`in the factory ${factory}`, { exact: false }), `which says the run runs in ${factory}`);
+      await keptOnEscape(other, bar, form);
+      bar = await openStart(other);
+      form = await pickWorkflow(bar, workflow);
       await form.getByRole('textbox').fill(BRIEF);
       const [started] = await Promise.all([
         other.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/runs', { timeout: WAIT_MS }),
@@ -89,7 +114,7 @@ export default {
       if (started.status() !== 201)
         throw new Refused(`the api starts the run in ${factory} — it answered ${started.status()}: ${await started.text()}`);
       const { id } = (await started.json()) as { id: string };
-      await expectVisible(sheet.locator(`[data-started="${id}"]`), `the sheet says ${id} started, and links to it`);
+      await expectVisible(bar.locator(`[data-started="${id}"]`), `the bar says ${id} started, and links to it`);
       const record = JSON.parse(fs.readFileSync(path.join(runsDir, `${id}.json`), 'utf8')) as { factory?: string; repo?: string };
       if (record.factory !== factory || record.repo !== checkout)
         throw new Refused(

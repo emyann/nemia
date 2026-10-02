@@ -94,11 +94,12 @@ export type Sighting = {
    * `claude agents --json` prints it beside `state: 'blocked'`. Absent from a harness that says nothing, and from
    * a session that is not waiting on anybody.
    *
-   * **Carried, never judged.** The engine owns no vocabulary for it and no enum of it: it is a container's
-   * `state.waiting.reason`, a word a person reads, and Claude Code may add another in any release. `decide` does not
-   * read it, and nothing here turns it into a state — `state` already says a session waits on a person
-   * (`input-required`, or `auth-required` to sign in), and this says what it waits on. Level-triggered like every other field of a
-   * sighting: read afresh each pass, so a session that stops waiting simply stops carrying it.
+   * **Its words are carried, never judged.** The engine owns no vocabulary for it and no enum of it: it is a container's
+   * `state.waiting.reason`, a word a person reads, and Claude Code may add another in any release. `decide` never reads its
+   * words, and nothing here turns it into a state — `state` already says a session waits on a person (`input-required`, or
+   * `auth-required` to sign in), and this says what it waits on. Only whether it is there is read, and only for a
+   * long-lived task (`idleOf`): one waiting on a person for something it names is not idle. Level-triggered like every
+   * other field of a sighting: read afresh each pass, so a session that stops waiting simply stops carrying it.
    */
   waitingFor?: string;
   /**
@@ -681,18 +682,6 @@ export type Now = {
 export const settledQuiet = (state: State): boolean => state.settled !== null;
 
 /**
- * Whether a long-lived task's session is idle as `sighting` shows it, open between turns: its harness still holds its process
- * (`held`), it computes nothing (`busy`), and its turn has ended — waiting on nobody it names (`input-required` with no
- * `waitingFor`, Claude Code's idle `blocked`), `completed`, or at work and quiet. Never for a job, whose turn's end is its end,
- * and never for a session that waits on a person for something it names, or to sign in.
- */
-export const idleOf = (state: State, sighting: Sighting | undefined): boolean => {
-  if (state.restartPolicy !== 'Always' || sighting?.held !== true || sighting.busy === true) return false;
-  if (sighting.state === 'input-required') return sighting.waitingFor === undefined;
-  return sighting.state === 'completed' || (RUNNING.has(sighting.state) && sighting.quietMs !== undefined);
-};
-
-/**
  * One step toward the desired state. Pure, total, and safe to call as often as you like —
  * calling it twice in a row with the same inputs returns the same answer, which is the whole
  * definition of level-triggered.
@@ -825,6 +814,18 @@ export function observe(state: State, observed: ReadonlyMap<string, Sighting>, n
   if (turn.continues && sighting && isLive(sighting.state)) return { type: 'PREVIOUS_LIVE', sessionId: sighting.sessionId };
   return { type: 'READY', attempt: state.attempts.length + 1, resumeFrom: turn.continues, ...(turn.words ? { nudge: turn.words } : {}) };
 }
+
+/**
+ * Whether a long-lived task's session is idle as `sighting` shows it, open between turns: its harness still holds its process
+ * (`held`), it computes nothing (`busy`), and its turn has ended — waiting on nobody it names (`input-required` with no
+ * `waitingFor`, Claude Code's idle `blocked`), `completed`, or at work and quiet. Never for a job, whose turn's end is its end,
+ * and never for a session that waits on a person for something it names, or to sign in.
+ */
+export const idleOf = (state: State, sighting: Sighting | undefined): boolean => {
+  if (state.restartPolicy !== 'Always' || sighting?.held !== true || sighting.busy === true) return false;
+  if (sighting.state === 'input-required') return sighting.waitingFor === undefined;
+  return sighting.state === 'completed' || (RUNNING.has(sighting.state) && sighting.quietMs !== undefined);
+};
 
 /**
  * What the sighting of the attempt in flight, `last`, says of its session: the second of `observe`'s rules for an attempt in

@@ -715,6 +715,7 @@ test('decide never reads tools, effort, MCP servers, a budget, a context window,
     'export function observe(',
     'export function spawnRefused(',
     'export function needsHuman(',
+    'export const idleOf =',
   ])
     assert.ok(body.includes(name), `the slice holds ${name}`);
   const machine = fs.readFileSync(new URL('../src/core/lifecycle.ts', import.meta.url), 'utf8');

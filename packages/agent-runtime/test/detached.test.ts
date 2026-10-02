@@ -1629,8 +1629,10 @@ test("a spec that reads its harness's output reports the answer found there, sta
 
   const seen = await settle(ops, 'ae/t20/1', 'completed');
   assert.deepEqual(seen.closeout?.payload, { outcome: 'done' });
+  const at = seen.closeout.at;
+  assert.ok(at !== undefined, 'a detached session can carry another attempt’s statement, so its statement has a time');
   const written = fs.statSync(path.join(dir, 'runs', 'sh', 'ae_t20_1.log')).mtimeMs;
-  assert.equal(seen.closeout.at, written, 'stamped with the time its log was last written, the file the answer was read from');
+  assert.equal(at, written, 'stamped with the time its log was last written, the file the answer was read from');
   assert.deepEqual(fs.readdirSync(workspace), []);
 });
 

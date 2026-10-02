@@ -503,6 +503,21 @@ test('a statement made BEFORE the attempt began was inherited, not said', async 
   );
 });
 
+test('a statement with no time is the session’s own: it ends the attempt and is on the record', async () => {
+  const b = board();
+  const { id, name } = await running(b, { ...spec, closeoutSchema: SCHEMA });
+  b.sessions.set(name, { ...b.sessions.get(name)!, busy: false, closeout: { payload: { outcome: 'done', by: 'child' } } });
+  await b.run(tick());
+
+  const v = await b.run(view(id, new Map()));
+  assert.equal(v.state.settled, 'succeeded');
+  assert.deepEqual(
+    v.state.attempts.map((a) => [a.ended, a.closeout, a.stated]),
+    [['done', { outcome: 'done', by: 'child' }, true]],
+    'no time to judge it by, and none needed: a runner gives none only for a session that cannot carry another attempt’s statement',
+  );
+});
+
 test('a statement from a session that is still busy is not final', async () => {
   const b = board();
   const { id, name, startedAt } = await running(b, { ...spec, closeoutSchema: SCHEMA });

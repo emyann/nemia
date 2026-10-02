@@ -268,10 +268,19 @@ test('REFUSED: an ask that rejects is held as failed, with its words, and asked 
   };
   const q = await readQuota({ ask, now });
   assert.equal(q.state, 'failed');
-  assert.match(q.said!, /\(it did not start: quota: the `claude` harness reports no quota\.\)\./);
+  assert.equal(
+    q.said,
+    "The api's engine would not ask Claude Code for the quota (quota: the `claude` harness reports no quota.): this is the engine " +
+      'refusing, not Claude Code failing, so running claude will not show why. Restart the api; if the board says it again, the engine ' +
+      'the api runs has no claude harness that answers a quota: see README.md, The quota on the board. Asked again in 10 min.',
+  );
   clock += QUOTA_KEEP_MS - 1;
   assert.equal((await readQuota({ ask, now })).state, 'failed');
   assert.equal(rejected, 1, 'held for the keep, as any failure');
+  clock += 1;
+  const again = await readQuota({ ask, now });
+  assert.equal(again.state, 'failed');
+  assert.equal(rejected, 2, 'past the keep, a rejected ask is asked again');
 });
 
 test('REFUSED: a second read inside the keep asks nothing; one past it asks again', async () => {

@@ -57,8 +57,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { firstOf, formerStateOf, isSessionState, quote, type SessionState, type Sighting, WORDS_QUOTE } from '../core/index.ts';
 import { RunnerError, type RunnerOps, type SpawnRequest } from '../harness/index.ts';
+import type { Monotonic } from '../core/clock.ts';
+import { instantNow } from '../core/engine/now.ts';
 import { cardOfJson, SCHEME_KINDS } from './card.ts';
 import { logsOfTask, remoteFollowUpOf, remoteMessageOf, sightingOfTask } from './map.ts';
+import { alive, sendHeld } from './sending.ts';
 import { AuthRefused, Doubt, Late, late, messageOf, Redirected, Refusal, sendRefused, untaken, wordsOf } from './said.ts';
 
 /**
@@ -242,10 +245,11 @@ type Entry = {
   /** The agent answered with a Message, not a Task: the whole of the session, in its words. */
   reply?: string;
   /**
-   * The send is under way in the process `pid`, which gives it up at `until`: while that process lives and the time has not
-   * come, the entry is a Task `submitted`. Gone once the answer, or its failure, is written.
+   * The send is under way in the process `pid`, which gives it up at `until`, `mono` its start on the monotonic clock: while that
+   * process lives and the send holds its lease (`sendHeld`), the entry is a Task `submitted`. Gone once the answer, or its
+   * failure, is written.
    */
-  sending?: { pid: number; until: string };
+  sending?: { pid: number; until: string; mono?: Monotonic };
   /** The agent refused the message after the spawn had returned: its words, the session ended `rejected`. */
   refused?: string;
   /** The send failed on the way, or was not answered in time: its words, the Task in doubt. */
@@ -254,16 +258,6 @@ type Entry = {
 
 /** What a send came to: the agent's answer, its refusal, a failure on the way, or a stop that cut it. */
 type Answer = { task: Task } | { message: Message } | { refused: string } | { failed: unknown } | { canceled: true };
-
-/** Whether a process lives: one this user cannot signal lives too. */
-const alive = (pid: number): boolean => {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (e) {
-    return (e as NodeJS.ErrnoException).code === 'EPERM';
-  }
-};
 
 const TERMINAL: ReadonlySet<SessionState> = new Set(['completed', 'failed', 'canceled', 'rejected']);
 
@@ -337,8 +331,7 @@ export const remoteOps = (
   const inFlight = new Map<string, AbortController>();
   const sendingLive = (e: Entry): boolean =>
     e.sending !== undefined &&
-    e.taskId === undefined &&
-    Date.parse(e.sending.until) > Date.now() &&
+    sendHeld(e, instantNow(), sendMs) &&
     (inFlight.has(e.name) || (e.sending.pid !== process.pid && alive(e.sending.pid)));
   const dir = path.join(root, 'remote');
   const done = path.join(dir, 'done');
@@ -599,14 +592,14 @@ export const remoteOps = (
         const { card, agentUrl } = await client();
         const auth = authOf(card, agentUrl, harness, credentials, o.missingCredential);
         if ('refusal' in auth) throw new Refusal(auth.refusal);
-        const sentAt = new Date();
+        const { at, mono } = instantNow();
         const intent: Entry = {
           name: r.name,
           agent: harness,
           messageId: randomUUID(),
           ...(r.resumeFrom ? { contextId: r.resumeFrom } : {}),
-          sentAt: sentAt.toISOString(),
-          sending: { pid: process.pid, until: new Date(sentAt.getTime() + sendMs).toISOString() },
+          sentAt: new Date(at).toISOString(),
+          sending: { pid: process.pid, until: new Date(at + sendMs).toISOString(), ...(mono ? { mono } : {}) },
         };
         write(intent);
         const stop = new AbortController();

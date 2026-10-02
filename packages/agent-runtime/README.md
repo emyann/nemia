@@ -539,7 +539,7 @@ no words. What the in-process seam's extension answers — `findSession`, `sessi
 
 **The registry, and what a restart does.** The driver keeps one file per session, `<root>/remote/<session name>.json`,
 written whole and renamed. The intent — the name, the harness it went through, the message's id and when, and the process
-sending it with the time it gives up (`sending: { pid, until }`) — is on disk before the message is sent, and the Task's
+sending it with the time it gives up (`sending: { pid, until, mono }`) — is on disk before the message is sent, and the Task's
 id and context are written as the answer comes back. So a spawn asked again for a name that has an entry never sends a
 second message: an entry with a Task adopts it, and the next pass reads it by GetTask; an entry still being sent by a
 process that lives is left to it; any other is a send whose answer never came back, so whether a Task exists is not
@@ -560,7 +560,9 @@ left to answer within `SEND_MS` (15 minutes), in this process: until it does, ev
 `submitted` (the view's `running (working)`) while the sending process lives, and the answer is written as before — its
 Task, or its reply ended. A refusal that comes after the spawn returned ends the session `rejected`, a `harness` end, its
 words on `logs`; a send that fails on the way, is not answered within `SEND_MS`, or whose process died is in doubt, never
-sent twice, and `lost` past the grace window. A `stop` of a session still being sent cuts the send in the process that makes
+sent twice, and `lost` past the grace window. The `SEND_MS` lease is measured on the monotonic clock from the send's own
+stamp (`mono`, `{ boot, ms }`) within its boot, and on the wall clock from `sentAt` for an entry with none or across a reboot
+(`sendHeld`, `a2a/sending.ts`), so a wall clock stepped forward does not put a live send in doubt; `until` stays on the wall clock. A `stop` of a session still being sent cuts the send in the process that makes
 it, and the task settles `stopped`; a Task the agent makes of a send let go of is cancelled when its answer comes. A
 one-shot process that exits at once after its pass (`process.exit`) cuts its sends with it: in doubt, never sent twice. What
 is left of open issue 34 is the crash: a process that dies while a send is under way leaves a Task nobody owns.
@@ -1071,6 +1073,14 @@ quiet  ⟸  state = working AND busy AND the last word in its conversation is it
 
 and reports quiet as a fact, `quietMs`, with the state left `working`. What quiet means is `decide`'s (below).
 
+**Quiet is counted on both clocks, and the shorter wins.** The transcript's mtime is stamped on the wall clock, so a wall clock
+stepped forward an hour would make every working session quiet at once. The runner records, per attempt under its root, when it
+first saw the transcript at its current mtime on the monotonic clock (`<root>/quiet/<name>.json`, `{ mtimeMs, boot, ms }`,
+`harness/claude/quiet.ts`), rewritten only when the mtime or the boot differs and cleared at spawn; quiet is the wall-clock age
+bounded by the monotonic time since that sighting. So a forward step cannot report a working session quiet, a backward step only
+delays it, a sighting survives a daemon's restart within its boot, and a mtime first seen — after a reboot, or by a fresh root —
+waits the floor from then. A machine with no boot id has the wall clock alone.
+
 **The second quiet rule is for a session held by something that is not the work.** A step signed off with
 `StructuredOutput`, every commit in, and left a `run_in_background` loop running; its registration read `status: shell`,
 the registry listed it busy, and seventy-seven minutes later nothing had read its closeout — no end, no check, no
@@ -1263,7 +1273,9 @@ real runs:
 
 Claude Code's runner reads the statement from the transcript on every idle pass while a session
 works. What it read from a finished one it keeps for that attempt only — the row's name, its session,
-and the start `claude agents` gave it — and only while the transcript has not been written since.
+and the start `claude agents` gave it — and only while the transcript has not been written since: its mtime, asked again, equals the one asked just
+before that read, and that one was older than the read by `MTIME_SLOP_MS` — an equality, so a write stamped after a wall clock
+stepped back is read again.
 Kept by session id, for good, a read went wrong twice on one step. A `view` saw the session listed
 final at least ten seconds before its — inferred from the pinned usage, not observed — `StructuredOutput`, and "nothing said" was kept. Then a nudged retry,
 which `--resume` runs under the same id, was handed that nothing and its first try's usage, to the
@@ -1936,6 +1948,7 @@ of pure code sits beside it.
 | `src/harness/sdk.ts` | the same four verbs on the Agent SDK, with the tradeoff written down |
 | `src/harness/index.ts` | the face of the seam, as the A2A seam and the doors take it; `core/` imports `seam.ts` and `args.ts` by their own path |
 | `src/harness/claude/bg.ts` | Claude Code's `--bg` runner (`claudeOps`), and `sh`, the one way it shells out |
+| `src/harness/claude/quiet.ts` | when a working `--bg` session's transcript was first seen at its mtime, on the monotonic clock, per attempt under the root: written by a look only when the mtime or the boot differs, cleared at spawn, read fresh on every look |
 | `src/harness/claude/parent.ts` | what a resumed `--bg` session's spawn records of its parent: the id of the parent's last StructuredOutput call, and whose a statement is by it |
 | `src/harness/claude/code.ts` | Claude Code as the engine runs it by default: a step as a job (`claude -p`), or a background session (`claude --bg`) when the task asks, each verb routed by the session id's shape; and `claude -p`'s argv and the `claude-detached` spec |
 | `src/harness/claude/quota.ts` | Claude Code's quota (`claudeQuota`): the `claude` on PATH asked `get_usage` with no prompt, and its answer read (`quotaOfResponse`) |
@@ -1957,6 +1970,7 @@ of pure code sits beside it.
 | `src/a2a/client.ts` | the engine's side of that seam: an in-process `Transport` to the handler, and a harness's verbs as calls through the SDK's `Client` and the extension's methods, as its card offers them; `transcript` and `refuses` passed through |
 | `src/a2a/card.ts` | a remote agent's card as it enters, served or configured: `CardSchema` decodes what the runtime reads of it before the SDK's parser, a card that does not decode is refused naming its first wrong field, and a configuration is judged (`remoteConfigRefusal`) |
 | `src/a2a/remote.ts` | a remote A2A agent as a harness: its card read and the binding chosen, auth as the card declares it, the registry under `remote/` (the intent before the send, the Task on its answer, never a second send), and the verbs as SendMessage, GetTask and CancelTask |
+| `src/a2a/sending.ts` | a send under way: its lease (`sendHeld`), `SEND_MS` on the monotonic clock from its stamp within a boot and on the wall clock from `sentAt` otherwise, and whether the process making it lives |
 | `src/a2a/said.ts` | the remote harness's own words told from another party's: the errors it throws in its own words, the A2A errors that refuse a send, and any other error's words quoted to 200 characters (`wordsOf`) |
 | `src/a2a/index.ts` | the face of `a2a/`, as the doors take it: it imports no name of the SDK's |
 | `src/facade/consumer.ts` | what a consumer writes and is given — its store in Promises, its harnesses, its options, its task and its engine — the adapters over them, and what the door refuses of them |

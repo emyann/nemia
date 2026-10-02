@@ -115,7 +115,7 @@ const wrote = (sessionId: string, text: string) => {
 };
 
 const texts = (events: TranscriptEvent[]) => events.map((e) => e.text);
-const find = (name: string) => Effect.runPromise(claudeOps().find!(name));
+const find = (name: string) => Effect.runPromise(claudeOps({ root: tmp('root') }).find!(name));
 
 test("a session registered under its attempt's name is found by it: its conversation is read with no `claude agents`, and a settled task is viewed off its record", async () => {
   const claude = fakeClaude();
@@ -182,7 +182,7 @@ test('a name no running session registered is not found — nor an interactive s
   const session = { name: `ae/t-${randomUUID().slice(0, 8)}/1`, sessionId: randomUUID() };
   assert.equal(await find(session.name), undefined, 'nothing registered under it');
   assert.equal(
-    await Effect.runPromise(claudeOps({ sessionsDir: path.join(tmp('nowhere'), 'sessions') }).find!(session.name)),
+    await Effect.runPromise(claudeOps({ root: tmp('root'), sessionsDir: path.join(tmp('nowhere'), 'sessions') }).find!(session.name)),
     undefined,
     'no sessions directory at all',
   );

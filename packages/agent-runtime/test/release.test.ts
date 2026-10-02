@@ -20,7 +20,6 @@ import type { Event, PromiseJournal } from '../src/facade.ts';
 import { scratch } from './scratch.ts';
 
 const tmp = (label: string) => scratch(`ae-release-${label}-`);
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** Where Claude Code keeps transcripts: read when the runner is loaded, so set before the runner's import. */
 const config = tmp('config');
@@ -138,6 +137,22 @@ const said = (row: Row, began: number, payload: object) => {
 };
 
 const short = (row: Row) => row.sessionId.split('-')[0];
+
+/** A journal held in `tasks`, each task's entries in order, whose feed names nothing. */
+const inMemory = (tasks: Record<string, Event[]>): PromiseJournal => ({
+  async append(id, e) {
+    (tasks[id] ??= []).push(e);
+  },
+  async read(id) {
+    return [...(tasks[id] ?? [])];
+  },
+  async list() {
+    return Object.keys(tasks);
+  },
+  async feed() {
+    return { entries: [], cursor: 0 };
+  },
+});
 
 /**
  * A transcript with no statement in it, last written `ago` milliseconds ago, its line stamped a moment after its session's own
@@ -370,11 +385,15 @@ test('no session is released while its attempt runs; one a person stopped is rel
 test('a session stopped at its deadline is released once its task settles, as one a person stopped is', async () => {
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
-    const engine = promiseEngine(Engine.layer({ root: tmp('root') }));
-    const id = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd'), deadlineSeconds: 0.2 });
-    await engine.tick();
-    const [row] = claude.rows();
-    await sleep(300);
+    const tasks: Record<string, Event[]> = {};
+    const engine = promiseEngine(Engine.layer({ root: tmp('root'), journal: inMemory(tasks) }));
+    const deadlineSeconds = 600;
+    const id = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd'), deadlineSeconds });
+    const longAgo = Date.now() - 2 * deadlineSeconds * 1000;
+    const at = new Date(longAgo).toISOString();
+    tasks[id].push({ kind: 'starting', at, attempt: 1 }, { kind: 'spawned', at, attempt: 1 });
+    const row = { name: `ae/${id}/1`, sessionId: randomUUID(), state: 'working', status: 'idle', startedAt: longAgo };
+    claude.setRows([row]);
     for (let i = 0; i < 3; i++) await engine.tick();
     const v = await engine.view(id);
     assert.equal(v.state.settled, 'failed');
@@ -414,22 +433,8 @@ test("a task settled before its session's id was recorded keeps that session lis
     before: stopped({ kind: 'settled', at, outcome: 'stopped', note: 'operator' }),
     after: stopped({ kind: 'settled', at, outcome: 'stopped', note: 'operator', nativeId: recorded }),
   };
-  const journal: PromiseJournal = {
-    async append(id, e) {
-      (tasks[id] ??= []).push(e);
-    },
-    async read(id) {
-      return [...(tasks[id] ?? [])];
-    },
-    async list() {
-      return Object.keys(tasks);
-    },
-    async feed() {
-      return { entries: [], cursor: 0 };
-    },
-  };
   await onPath(claude.bin, async () => {
-    const engine = promiseEngine(Engine.layer({ root: tmp('root'), journal }));
+    const engine = promiseEngine(Engine.layer({ root: tmp('root'), journal: inMemory(tasks) }));
     for (let i = 0; i < 2; i++) await engine.tick();
     assert.deepEqual(claude.releases(), [['rm', recorded.split('-')[0]]], 'the session whose id is on the record, and only it');
     assert.deepEqual(

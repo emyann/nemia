@@ -54,11 +54,11 @@ async function keptOnEscape(page: Page, bar: Locator, form: Locator): Promise<vo
 
 export default {
   /**
-   * A run is started from a factory's floor: the header's Start a run opens the floating bar on the factory's one repository, fixed, listing the
-   * workflows it offers there with its hires. A workflow whose step the factory hires no one into says so in the package's words and
-   * cannot be picked. Once the factory hires into it, it is picked; Escape in its brief leaves the field and keeps the brief, and a second
-   * Escape closes the bar. Picked again, the start sends `?factory=` and `?repo=`: the record names both.
-   * The hires, the agent hired and the run are taken back.
+   * A run is started from a factory's floor: the header's Start a run opens the floating bar on the factory's one repository, fixed,
+   * listing the workflows it offers there with its hires. A workflow whose step the factory hires no one into says so in the package's
+   * words and cannot be picked. Once the factory hires into it, it is picked; Escape in its brief leaves the field and keeps the brief,
+   * and a second Escape closes the bar. Picked again, the start sends `?factory=` and `?repo=`: the record names both. The hires, the
+   * agent hired and the run are taken back.
    */
   name: 'factory-start',
   route: `/factories/${FACTORIES.hiring.name}`,

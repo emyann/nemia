@@ -41,10 +41,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 /**
  * The frame of every page: the sidebar, a header naming the section — and the factory, inside one (`FactoryCrumb`), with the start of a
  * run in it (`FactoryStart`) — and the page, in a centred column unless a matched route's `staticData` asks for `fullBleed`. The header is
- * `h-12`, the height the Factory leaves above itself. Over the page, below the header, the floating bar (`OpenBar`) shows what the address's
- * `?bar=` names, the same on every page, and a link to another page, which carries no `bar`, closes it. It follows the workflow feed once
- * for the whole page: what moves on it is read again at once, and the polls slow while it is open. React Aria's `RouterProvider` sends
- * every React Aria link, pressed with Enter or clicked, through the router, so no link loads the whole page again.
+ * `h-12`, the height the Factory leaves above itself. Over the page, below the header, the floating bar (`OpenBar`) shows what the
+ * address's `?bar=` names, the same on every page, and a link to another page, which carries no `bar`, closes it. It follows the workflow
+ * feed once for the whole page: what moves on it is read again at once, and the polls slow while it is open. React Aria's
+ * `RouterProvider` sends every React Aria link, pressed with Enter or clicked, through the router, so no link loads the whole page again.
  */
 function Root() {
   const path = useRouterState({ select: (state) => state.location.pathname });

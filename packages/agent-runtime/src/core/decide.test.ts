@@ -323,6 +323,34 @@ test('a spawned session the harness has not registered yet is given a grace wind
   });
 });
 
+/** A reading of the monotonic clock `ms` into boot `boot`, as the engine stamps one. */
+const mono = (ms: number, boot = 'b-1') => ({ boot, ms });
+
+/** A spawn journalled at `at(2)`, its intent at `at(1)`, each stamped on the monotonic clock of `boot` when given one. */
+const spawnedIn = (boot?: string): Event[] => [
+  filed(),
+  { kind: 'starting', at: at(1), attempt: 1, ...(boot ? { mono: mono(1, boot) } : {}) },
+  { kind: 'spawned', at: at(2), attempt: 1, ...(boot ? { mono: mono(2, boot) } : {}) },
+];
+
+test('the grace window runs on the monotonic clock within a boot: a wall clock stepped forward ends no grace early', () => {
+  const s = fold(TASK, spawnedIn('b-1'));
+  assert.equal(decide(s, seen(), { ...now(60_000), mono: mono(5_000) }).do, 'nothing', 'five seconds in, whatever the wall clock says');
+});
+
+test('the grace window refused on the monotonic clock: past it in this boot, the spawn is lost however little the wall clock moved', () => {
+  const s = fold(TASK, spawnedIn('b-1'));
+  const decided = decide(s, seen(), { ...now(2), mono: mono(31_002) });
+  assert.equal(decided.do === 'record-end' && decided.reason, 'lost');
+});
+
+test('the grace window of a spawn stamped on no monotonic clock, or in another boot, runs on the wall clock', () => {
+  for (const boot of [undefined, 'b-0']) {
+    const decided = decide(fold(TASK, spawnedIn(boot)), seen(), { ...now(60_000), mono: mono(5_000) });
+    assert.equal(decided.do === 'record-end' && decided.reason, 'lost', `spawned in ${boot ?? 'no boot'}`);
+  }
+});
+
 const ran = (outcome: Ended, first: Event = filed()): Event[] => [
   first,
   { kind: 'starting', at: at(1), attempt: 1 },
@@ -424,6 +452,35 @@ const started = (extra: Event[] = []): Event[] => [
   { kind: 'spawned', at: at(1_100), attempt: 1 },
   ...extra,
 ];
+
+/** An attempt started at `at(1_000)` and spawned at `at(1_100)`, both stamped on the monotonic clock of `boot`. */
+const startedIn = (boot: string): Event[] => [
+  { kind: 'starting', at: at(1_000), attempt: 1, mono: mono(1_000, boot) },
+  { kind: 'spawned', at: at(1_100), attempt: 1, mono: mono(1_100, boot) },
+];
+
+test('the deadline runs on the monotonic clock within a boot: a wall clock stepped forward stops nothing before it is due', () => {
+  const s = fold(TASK, [withDeadline(600), ...startedIn('b-1')]);
+  assert.equal(decide(s, seen([N1, 'working']), { ...now(20 * 60_000), mono: mono(5 * 60_000) }).do, 'nothing', 'five minutes in');
+});
+
+test('the deadline refused on the monotonic clock: past it in this boot, the session is stopped however little the wall clock moved', () => {
+  const s = fold(TASK, [withDeadline(600), ...startedIn('b-1')]);
+  assert.deepEqual(decide(s, seen([N1, 'working']), { ...now(1_000), mono: mono(12 * 60_000) }), {
+    do: 'stop',
+    sessionId: 's0',
+    why: 'deadline',
+  });
+});
+
+test('the deadline of an attempt started in another boot runs on the wall clock', () => {
+  const s = fold(TASK, [withDeadline(600), ...startedIn('b-0')]);
+  assert.deepEqual(decide(s, seen([N1, 'working']), { ...now(20 * 60_000), mono: mono(5 * 60_000) }), {
+    do: 'stop',
+    sessionId: 's0',
+    why: 'deadline',
+  });
+});
 
 test('a live session past its deadline is stopped', () => {
   const s = fold(TASK, [withDeadline(10), ...started()]);

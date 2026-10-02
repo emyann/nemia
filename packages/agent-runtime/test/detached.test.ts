@@ -50,14 +50,15 @@ import { runningIn, scratch } from './scratch.ts';
 import { stepClock } from './clock.ts';
 import { resultLine, SESSION, SKILLS_STREAM, stream } from './reader-streams.ts';
 import { ioCounts } from '../src/core/engine/tally.ts';
+import { monoNow } from '../src/core/engine/now.ts';
 
 const root = () => scratch('ae-detached-');
 const sh = (script: string): HarnessSpec => ({ name: 'sh', command: () => ({ cmd: 'sh', args: ['-c', script] }) });
 const req = (name: string, cwd: string) => ({ name, brief: 'x', cwd });
 
 const settle = async (ops: ReturnType<typeof detachedOps>, name: string, want: SessionState, ms = 15_000) => {
-  const deadline = Date.now() + ms;
-  while (Date.now() < deadline) {
+  const deadline = performance.now() + ms;
+  while (performance.now() < deadline) {
     const seen = (await Effect.runPromise(ops.observe)).get(name);
     if (seen?.state === want) return seen;
     await new Promise((r) => setTimeout(r, 150));
@@ -105,8 +106,8 @@ test('stop reaches the detached worker, which kills the harness and says so', as
   await Effect.runPromise(ops.spawn(req('ae/t4/1', dir)));
   await settle(ops, 'ae/t4/1', 'working');
 
-  const deadline = Date.now() + 15_000;
-  while (Date.now() < deadline) {
+  const deadline = performance.now() + 15_000;
+  while (performance.now() < deadline) {
     await Effect.runPromise(ops.stop('ae/t4/1'));
     if ((await Effect.runPromise(ops.observe)).get('ae/t4/1')?.state === 'canceled') break;
     await new Promise((r) => setTimeout(r, 200));
@@ -413,6 +414,81 @@ test('THE LEASE: a run file whose heartbeat stopped is reported dead, not runnin
 
   write(STALE_MS + 10 * 60_000);
   assert.equal((await Effect.runPromise(ops.observe)).get('ae/t5/1')?.state, 'failed', 'a stopped beat is dead');
+});
+
+test('THE LEASE runs on the monotonic clock: a live worker is working whatever the wall clock stepped', async (t) => {
+  const dir = root();
+  const ops = detachedOps(sh('sleep 30'), dir);
+  await Effect.runPromise(ops.spawn(req('ae/m1/1', dir)));
+  await settle(ops, 'ae/m1/1', 'working');
+  stepClock(t, STALE_MS + 30_000);
+  assert.equal((await Effect.runPromise(ops.observe)).get('ae/m1/1')?.state, 'working', 'a wall clock stepped forward ends no lease');
+  await Effect.runPromise(ops.stop('ae/m1/1'));
+  await settle(ops, 'ae/m1/1', 'canceled');
+});
+
+test('THE LEASE refused on the monotonic clock: a beat 31s old in this boot is dead under a fresh heartbeatAt; one of another boot is read off heartbeatAt', async () => {
+  const dir = root();
+  const ops = detachedOps(sh('true'), dir);
+  const runs = path.join(dir, 'runs', 'sh');
+  fs.mkdirSync(runs, { recursive: true });
+  const here = monoNow();
+  assert.ok(here, 'this machine says its boot id');
+  const write = (heartbeatAgoMs: number, beat: { boot: string; ms: number }) =>
+    fs.writeFileSync(
+      path.join(runs, 'ae_m2_1.json'),
+      JSON.stringify({
+        name: 'ae/m2/1',
+        state: 'working',
+        pid: 999999,
+        logFile: '/dev/null',
+        heartbeatAt: new Date(Date.now() - heartbeatAgoMs).toISOString(),
+        beat,
+      }),
+    );
+  const seen = async () => (await Effect.runPromise(ops.observe)).get('ae/m2/1')?.state;
+
+  write(0, { boot: here.boot, ms: monoNow()!.ms - STALE_MS - 1_000 });
+  assert.equal(await seen(), 'failed', 'a beat past the lease in this boot is dead, however fresh its heartbeatAt');
+  write(0, { boot: here.boot, ms: monoNow()!.ms });
+  assert.equal(await seen(), 'working', 'a fresh beat in this boot is alive');
+  write(STALE_MS + 10 * 60_000, { boot: `${here.boot}-another`, ms: monoNow()!.ms });
+  assert.equal(await seen(), 'failed', 'a beat of another boot is not compared: its heartbeatAt answers, and it is stale');
+  write(0, { boot: `${here.boot}-another`, ms: 0 });
+  assert.equal(await seen(), 'working', 'a beat of another boot is not compared: its heartbeatAt answers, and it is fresh');
+});
+
+test('the spawn and the worker each beat on the monotonic clock of this boot, and every write of the worker beats again', async () => {
+  const dir = root();
+  const ops = detachedOps(sh('sleep 30'), dir);
+  await Effect.runPromise(ops.spawn(req('ae/m3/1', dir)));
+  const file = path.join(dir, 'runs', 'sh', 'ae_m3_1.json');
+  const read = () => JSON.parse(fs.readFileSync(file, 'utf8')) as { pid: number; heartbeatAt: string; beat?: { boot: string; ms: number } };
+  const spawned = read();
+  assert.equal(spawned.pid, 0, 'read as the spawn wrote it, before the worker');
+  assert.equal(spawned.beat?.boot, monoNow()?.boot, 'the spawn beats in this boot');
+  await settle(ops, 'ae/m3/1', 'working');
+  let worker = read();
+  const deadline = performance.now() + 15_000;
+  while (worker.pid === 0 && performance.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 50));
+    try {
+      worker = read();
+    } catch {}
+  }
+  assert.equal(worker.beat?.boot, monoNow()?.boot, 'the worker beats in this boot');
+  assert.ok(worker.beat!.ms > spawned.beat!.ms, 'the worker writes a beat of its own, not the one the spawn left');
+  let later = worker;
+  while (later.heartbeatAt === worker.heartbeatAt && performance.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 100));
+    try {
+      later = read();
+    } catch {}
+  }
+  assert.notEqual(later.heartbeatAt, worker.heartbeatAt, 'the worker wrote its run file again');
+  assert.ok(later.beat!.ms > worker.beat!.ms, 'a later write beats again, not only the first');
+  await Effect.runPromise(ops.stop('ae/m3/1'));
+  await settle(ops, 'ae/m3/1', 'canceled');
 });
 
 test('logs come back from the worker capture', async () => {
@@ -1671,9 +1747,9 @@ test("a run is not called over before the harness's last output is in its log â€
   const ops = detachedOps(late, dir);
   await Effect.runPromise(ops.spawn({ name: 'ae/t21/1', brief: 'x', cwd: dir, closeoutSchema: {} }));
 
-  const until = Date.now() + 15_000;
+  const until = performance.now() + 15_000;
   let seen: Sighting | undefined;
-  while (Date.now() < until) {
+  while (performance.now() < until) {
     seen = (await Effect.runPromise(ops.observe)).get('ae/t21/1');
     if (seen && seen.state !== 'working') break;
     await new Promise((r) => setTimeout(r, 20));
@@ -1727,8 +1803,8 @@ test('claude-detached at shipped defaults: a task that asked for a closeout gets
     const engine = promiseEngine(Engine.layer({ root: root() }));
     const schema = { type: 'object', properties: { outcome: { type: 'string' } } };
     const id = await engine.file({ brief: 'the prompt', cwd, harness: 'claude-detached', closeoutSchema: schema });
-    const until = Date.now() + 15_000;
-    while (!(await engine.view(id)).state.settled && Date.now() < until) {
+    const until = performance.now() + 15_000;
+    while (!(await engine.view(id)).state.settled && performance.now() < until) {
       await engine.tick();
       await new Promise((r) => setTimeout(r, 100));
     }
@@ -1750,8 +1826,8 @@ test('claude-detached at shipped defaults: a task that asked for a closeout gets
 const settledOn = async (spec: HarnessSpec, task: { resumeFrom?: string } = {}) => {
   const engine = promiseEngine(Engine.layer({ root: root(), harnesses: { sh: spec } }));
   const id = await engine.file({ brief: 'x', cwd: root(), harness: 'sh', closeoutSchema: { type: 'object' }, ...task });
-  const until = Date.now() + 15_000;
-  while (!(await engine.view(id)).state.settled && Date.now() < until) {
+  const until = performance.now() + 15_000;
+  while (!(await engine.view(id)).state.settled && performance.now() < until) {
     await engine.tick();
     await new Promise((r) => setTimeout(r, 100));
   }
@@ -1832,8 +1908,8 @@ test('claude-detached, filed through the engine with disallowedTools, spawns cla
       harness: 'claude-detached',
       config: { tools: ['Read', 'Bash'], disallowedTools: rules, allowedTools: allow },
     });
-    const until = Date.now() + 15_000;
-    while (!(await engine.view(id)).state.settled && Date.now() < until) {
+    const until = performance.now() + 15_000;
+    while (!(await engine.view(id)).state.settled && performance.now() < until) {
       await engine.tick();
       await new Promise((r) => setTimeout(r, 100));
     }
@@ -1909,8 +1985,8 @@ test('codex at shipped defaults: what the attempt consumed is read from its exec
   try {
     const engine = promiseEngine(Engine.layer({ root: root() }));
     const id = await engine.file({ brief: 'the prompt', cwd: root(), harness: 'codex' });
-    const until = Date.now() + 15_000;
-    while (!(await engine.view(id)).state.settled && Date.now() < until) {
+    const until = performance.now() + 15_000;
+    while (!(await engine.view(id)).state.settled && performance.now() < until) {
       await engine.tick();
       await new Promise((r) => setTimeout(r, 100));
     }

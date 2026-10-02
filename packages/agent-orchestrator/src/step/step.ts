@@ -55,6 +55,11 @@ export type Workflow = {
   slot?: 'none';
   /** Everything below the frontmatter: what the agent is told. */
   body: string;
+  /**
+   * The skills the step adds to its agent's (`skills:`), as its own line names them: never the agent's, which the session is given first
+   * (`StepAgent.skills`). Only on a step with an agent.
+   */
+  skills?: string[];
   harness?: string;
   model?: string;
   /** How hard the harness should think, in its own words: one of `EFFORTS` for the harness the step runs on. */
@@ -222,9 +227,10 @@ export type StepAgent = {
   body: string;
   given: Partial<Record<StepKey, string>>;
   /**
-   * The agent's own instructions, its skills and what becomes of Claude Code's own prompt (`harnessPrompt:`), as the step was resolved:
-   * what `wf start` renders for a Claude Code step, which is then told its instructions in Claude Code's prompt and its note alone in its
-   * brief (`rendersAgent`, `briefBody`). Absent on a record without them, whose step is told both in its brief.
+   * The agent's own instructions, the session's skills and what becomes of Claude Code's own prompt (`harnessPrompt:`), as the step was
+   * resolved: what `wf start` renders for a Claude Code step, which is then told its instructions in Claude Code's prompt and its note
+   * alone in its brief (`rendersAgent`, `briefBody`). The skills are the agent's, then those the step adds (`Workflow.skills`), each once.
+   * Absent on a record without them, whose step is told both in its brief.
    */
   instructions?: string;
   skills?: string[];
@@ -261,6 +267,7 @@ export const STEP_KEYS = [
   'workspace',
   'slot',
   'agent',
+  'skills',
   'harness',
   'model',
   'effort',
@@ -307,6 +314,8 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
   slot: "`none`: the run takes no run slot (`WF_MAX_RUNS`) — a session that watches the other runs rather than doing a run's work, on a workflow of one step",
   agent:
     "what is attached to this node to do its work: an agent in agents/, whose role keys are this step's defaults and whose instructions come before this step's own note; the step's own keys win",
+  skills:
+    "skills the step adds to its agent's, each a folder in a `skills/` beside `agents/`: the session is given the agent's, then these, each once, and none is taken away — on a step with an agent, whose fence lets it load them with `Skill`",
   harness:
     "what runs the session: `claude` (the default), `codex` or `claude-detached` — or `a2a:<name>`, a remote A2A agent the store's `a2a-agents.json` declares, which takes none of the keys that tell a harness of ours how to run",
   model: "the model the harness runs the session on: the harness's own default when unset",

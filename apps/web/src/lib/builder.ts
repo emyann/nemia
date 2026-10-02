@@ -43,6 +43,7 @@ export const UNSET: Readonly<WorkflowStepSpec> = {
   workspace: null,
   slot: null,
   agent: null,
+  skills: [],
   permissionMode: null,
   sandbox: null,
   tools: null,
@@ -86,6 +87,7 @@ export const draftOf = (workflow: Pick<WorkflowListing, 'steps'>): DraftStep[] =
       ...spec,
       after: [...spec.after],
       input: [...spec.input],
+      skills: [...spec.skills],
       disallowedTools: [...spec.disallowedTools],
       allowedTools: [...spec.allowedTools],
       tally: [...spec.tally],
@@ -168,7 +170,13 @@ export function addStep(steps: readonly DraftStep[], name: string, body: string)
   if (nameRefusal(steps, name)) return [...steps];
   return [
     ...steps,
-    { name, spec: { ...UNSET, after: [], input: [], disallowedTools: [], allowedTools: [], tally: [] }, body, own: null, schema: null },
+    {
+      name,
+      spec: { ...UNSET, after: [], input: [], skills: [], disallowedTools: [], allowedTools: [], tally: [] },
+      body,
+      own: null,
+      schema: null,
+    },
   ];
 }
 
@@ -338,6 +346,7 @@ export const listOf = (typed: string): string[] =>
 /** What an empty list field leaves its key at, said in its box: the harness's own tools, or none of what the list names. */
 const LIST_UNSET: Readonly<Partial<Record<keyof WorkflowStepSpec, string>>> = {
   tools: "the harness's own set",
+  skills: 'no skills added',
   disallowedTools: 'nothing denied',
   allowedTools: 'nothing allowed',
   tally: 'nothing counted',

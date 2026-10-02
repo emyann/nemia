@@ -579,6 +579,7 @@ const frozenStepFields = {
   workspace: Schema.optionalKey(Schema.Literals(['main', 'folder'])),
   slot: Schema.optionalKey(Schema.Literal('none')),
   agent: Schema.optionalKey(StepAgentSchema),
+  skills: Schema.optionalKey(Strings),
   harness: Schema.optionalKey(Schema.String),
   model: Schema.optionalKey(Schema.String),
   effort: Schema.optionalKey(Schema.String),

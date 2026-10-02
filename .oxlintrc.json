@@ -358,7 +358,7 @@
     {
       "files": ["apps/api/src/workflows/builder.ts"],
       "rules": {
-        "max-lines": ["error", { "max": 511, "skipBlankLines": true, "skipComments": true }]
+        "max-lines": ["error", { "max": 509, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
@@ -921,7 +921,7 @@
     {
       "files": ["packages/agent-runtime/src/harness/detached/detached.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 176, "skipBlankLines": true, "skipComments": true }]
+        "max-lines-per-function": ["error", { "max": 175, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {

@@ -81,7 +81,11 @@ export type SkillPlace = { from: SkillSource; dir: string; skills: SkillRow[] };
 /** What a copy answers: the skill as it now reads in your library, and its files by their path in it. */
 export type SkillAdded = { skill: SkillRow; written: string[] };
 
-/** `workflows/skills/` of the checkout the api runs from: the skills Nemia ships. */
+/**
+ * `workflows/skills/` of the checkout the api runs from: the skills Nemia ships, none while the checkout has no such folder. This
+ * repository keeps its own team in `workflows/`, so a skill the team puts in `workflows/skills/` lists as shipped: `sourceOf` answers
+ * `shipped` before `repo`.
+ */
 export const SHIPPED_SKILLS = path.join(HOME_REPO, 'workflows', SKILLS_FOLDER);
 
 /** Your library: the store's `workflows/skills/`, where the board copies a skill. */

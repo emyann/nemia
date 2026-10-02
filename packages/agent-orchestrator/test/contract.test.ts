@@ -10,6 +10,9 @@
  * files alone: after a change elsewhere, `npx turbo run test --force`, or turbo replays a pass that read none of it. The scanner is a copy
  * of the one in packages/agent-runtime/test/contract.test.ts, not an import of it: a package's test reaches into no other package's
  * files, which is the rule it keeps.
+ *
+ * Every workspace package, this one included, declares in its package.json the workspace packages it imports: its source in
+ * `dependencies`, its tests in `dependencies` or `devDependencies`. That scan reads every file git lists under apps/ and packages/.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -208,4 +211,102 @@ test('./workflow is the pure format, and what reads a folder from disk is export
     ['agent-orchestrator does not export workflowFolder: what reads a folder from disk is exported from the root'],
     'REFUSED: a reader the root dropped',
   );
+});
+
+/** A workspace package as its package.json says: its folder from the root, its name, and the names it declares. */
+type Manifest = { dir: string; name: string; dependencies: Record<string, string>; devDependencies: Record<string, string> };
+
+/** Every workspace package: each folder under apps/ and packages/ with a package.json, read from it. */
+function manifests(): Manifest[] {
+  return ['apps', 'packages']
+    .flatMap((top) => fs.readdirSync(path.join(ROOT, top)).map((name) => `${top}/${name}`))
+    .filter((dir) => fs.existsSync(path.join(ROOT, dir, 'package.json')))
+    .sort()
+    .map((dir) => {
+      const json = JSON.parse(fs.readFileSync(path.join(ROOT, dir, 'package.json'), 'utf8')) as Partial<Manifest>;
+      return { dir, name: json.name ?? dir, dependencies: json.dependencies ?? {}, devDependencies: json.devDependencies ?? {} };
+    });
+}
+
+/** Whether a file is a test's: under a `test/` folder, or named `*.test.ts` or `*.test.tsx`. */
+const isTestFile = (file: string): boolean => file.split('/').includes('test') || /\.test\.tsx?$/.test(file);
+
+/**
+ * What in `file`, a file of the package `manifest` describes, imports a workspace package by a name in `names` that the package does not
+ * declare: in `dependencies`, or for a test's file in `devDependencies` too. A package's own name is never refused.
+ */
+function undeclared(file: string, text: string, manifest: Manifest, names: readonly string[]): string[] {
+  const test = isTestFile(file);
+  const declared = (name: string) => name in manifest.dependencies || (test && name in manifest.devDependencies);
+  const list = test ? 'devDependencies' : 'dependencies';
+  return specifiersIn(withoutComments(text)).flatMap((spec) => {
+    const name = names.find((n) => spec === n || spec.startsWith(`${n}/`));
+    if (name === undefined || name === manifest.name || declared(name)) return [];
+    return [`${file} imports ${spec}, but ${manifest.dir}/package.json does not declare ${name}: add it to its ${list}`];
+  });
+}
+
+/** Every source file git lists under each workspace package, tracked or not yet added, that is on disk, with its package. */
+function packageFiles(all: readonly Manifest[]): { file: string; manifest: Manifest }[] {
+  const listed = execFileSync('git', ['ls-files', '-co', '--exclude-standard', ...all.map((m) => m.dir)], {
+    cwd: ROOT,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  return listed
+    .split('\n')
+    .filter((f) => SOURCE.test(f) && fs.existsSync(path.join(ROOT, f)))
+    .flatMap((file) => all.filter((m) => file.startsWith(`${m.dir}/`)).map((manifest) => ({ file, manifest })));
+}
+
+test('the declared-imports scan reads every workspace package, and finds workspace imports — or it would pass by reading nothing', () => {
+  const all = manifests();
+  const names = all.map((m) => m.name);
+  const files = packageFiles(all);
+  for (const dir of ['apps/api', 'apps/web', 'packages/agent-orchestrator', 'packages/agent-runtime'])
+    assert.ok(
+      files.some(({ manifest }) => manifest.dir === dir),
+      `the scan reads ${dir}`,
+    );
+  const named = files.flatMap(({ file }) => specifiersIn(fs.readFileSync(path.join(ROOT, file), 'utf8')));
+  assert.ok(
+    named.some((spec) => names.some((n) => spec === n || spec.startsWith(`${n}/`))),
+    'and some of it imports a workspace package',
+  );
+});
+
+test('every workspace package declares the workspace packages it imports', () => {
+  const all = manifests();
+  const names = all.map((m) => m.name);
+  const found = packageFiles(all).flatMap(({ file, manifest }) =>
+    undeclared(file, fs.readFileSync(path.join(ROOT, file), 'utf8'), manifest, names),
+  );
+  assert.deepEqual(found, []);
+});
+
+test('REFUSED: a workspace import its package does not declare, and a source import declared only for the tests', () => {
+  const names = ['api', 'agent-runtime', 'agent-orchestrator'];
+  const bare: Manifest = { dir: 'apps/api', name: 'api', dependencies: {}, devDependencies: {} };
+  const dev: Manifest = { ...bare, devDependencies: { 'agent-runtime': '*' } };
+  assert.deepEqual(undeclared('apps/api/test/x.test.ts', "import { Engine } from 'agent-runtime/effect';", bare, names), [
+    'apps/api/test/x.test.ts imports agent-runtime/effect, but apps/api/package.json does not declare agent-runtime: add it to its devDependencies',
+  ]);
+  assert.deepEqual(undeclared('apps/api/test/x.test.ts', "import { Engine } from 'agent-runtime/effect';", dev, names), []);
+  assert.deepEqual(undeclared('apps/api/src/x.test.ts', "import { Engine } from 'agent-runtime/effect';", dev, names), []);
+  assert.deepEqual(
+    undeclared('apps/api/src/x.ts', "import { claudeJob } from 'agent-runtime';", dev, names),
+    ['apps/api/src/x.ts imports agent-runtime, but apps/api/package.json does not declare agent-runtime: add it to its dependencies'],
+    'REFUSED: source declared only as a dev dependency',
+  );
+  assert.deepEqual(undeclared('apps/api/src/x.ts', "const run = await import('agent-orchestrator/run');", bare, names), [
+    'apps/api/src/x.ts imports agent-orchestrator/run, but apps/api/package.json does not declare agent-orchestrator: add it to its dependencies',
+  ]);
+  const fine = [
+    "import { app } from 'api/app';",
+    "import { x } from './x.ts';",
+    "import { Hono } from 'hono';",
+    "import { y } from 'agent-runtimes';",
+    ' * `agent-runtime/effect` named in prose',
+  ].join('\n');
+  assert.deepEqual(undeclared('apps/api/src/x.ts', fine, bare, names), []);
 });

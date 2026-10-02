@@ -1,5 +1,6 @@
 import { useId, useState, type ReactNode } from 'react';
 import { Button as AriaButton, Dialog, DialogTrigger, Heading, Popover } from 'react-aria-components';
+import { barValue } from '../lib/bar';
 import { backName, gateCardLine, readLink, takenLine, type GateAsk } from '../lib/gate';
 import { cn } from '../lib/utils';
 import { RouteLink } from './AgentParts';
@@ -109,7 +110,7 @@ export function CardGate({
         <RouteLink
           to="/runs/$runId"
           params={{ runId }}
-          {...('step' in read ? { search: { step: read.step } } : { hash: read.hash })}
+          {...('step' in read ? { search: { bar: barValue({ kind: 'step', run: runId, step: read.step }) } } : { hash: read.hash })}
           data-read={gate.step}
           className="ml-auto min-w-0 truncate rounded-sm text-[11px] font-medium text-neutral-700 underline decoration-neutral-400 underline-offset-2 outline-none hover:decoration-neutral-700 focus-visible:ring-2 focus-visible:ring-ring/50 dark:text-neutral-300 dark:decoration-neutral-500 dark:hover:decoration-neutral-300"
         >

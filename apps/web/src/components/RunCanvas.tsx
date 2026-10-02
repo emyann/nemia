@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
+import { useNavigate } from '@tanstack/react-router';
 import {
   applyNodeChanges,
   Background,
@@ -16,16 +17,18 @@ import {
   type NodePositionChange,
 } from '@xyflow/react';
 import type { RunDetail } from '../lib/api';
+import { inspects } from '../lib/bar';
 import { forgetLayout, place, readLayout, saveLayout } from '../lib/canvas';
 import { layout, stepsOf, type Point } from '../lib/layout';
 import { useContent } from '../lib/useContent';
 import { stepState } from '../lib/status';
+import { useBar } from '../lib/useBar';
 import { CanvasLegend } from './CanvasLegend';
 import { StateEdge } from './StateEdge';
 import { stepData, stepEdges, stepMinimapFill } from './stepGraph';
 import { StepNode, type StepFlowNode } from './StepNode';
 
-type Props = { run: RunDetail; selected: string | null; onSelect: (step: string | null) => void };
+type Props = { run: RunDetail };
 
 /** The canvas's node types for React Flow, one object for the module's life. */
 const nodeTypes = { step: StepNode };
@@ -82,9 +85,36 @@ const nodeAt = (name: string, position: Point): PlacedStep => ({
   data: {},
 });
 
-/** A drag moving a node, or React Flow measuring one: the only changes the canvas keeps; a selection is handed up to the page. */
+/** A drag moving a node, or React Flow measuring one: the only changes the canvas keeps; what is selected is the bar's. */
 const placing = (change: NodeChange<StepFlowNode>): change is NodePositionChange | NodeDimensionChange =>
   change.type === 'position' || change.type === 'dimensions';
+
+/**
+ * What a press on the canvas of `run` does, through the frame's bar (`useBar`): the step it shows (`selected`), none when it shows
+ * anything else; a click or Enter on a node shows that step, or closes the bar for the step it shows (`toggle`); a double click on a node
+ * opens the step's session, its first click having shown the step and its second ignored; and a click on the pane closes a bar a canvas
+ * opened (`inspects`), never the start of a run.
+ */
+function usePress(run: RunDetail) {
+  const { open, toggle, close } = useBar();
+  const navigate = useNavigate();
+  const inspect = (step: string) => toggle({ kind: 'step', run: run.id, step });
+  return {
+    selected: open?.kind === 'step' && open.run === run.id ? open.step : null,
+    onNodeClick: (event: MouseEvent, node: { id: string }) => {
+      if (event.detail <= 1) inspect(node.id);
+    },
+    onNodeDoubleClick: (_: MouseEvent, node: { id: string }) =>
+      void navigate({ to: '/runs/$runId/steps/$step', params: { runId: run.id, step: node.id } }),
+    onKeyDown: (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement;
+      if (event.key === 'Enter' && target.classList.contains('react-flow__node') && target.dataset.id) inspect(target.dataset.id);
+    },
+    onPaneClick: () => {
+      if (inspects(open)) close();
+    },
+  };
+}
 
 /**
  * The canvas of `RunCanvas`, given the layering it computed.
@@ -92,15 +122,16 @@ const placing = (change: NodeChange<StepFlowNode>): change is NodePositionChange
  * - A node's place and size change only through a drag, a move by the arrow keys or React Flow measuring it, a step the workflow folder
  *   gains or loses while the page is open (placed where it belongs, `place`), and Reset layout. What a node shows is read from the run
  *   on every render, so a refetch moves the chips and leaves the nodes where a person put them. A node moved is saved in this browser.
- * - A click or a key that selects a step hands it up (`onSelect`), and a click on the pane hands up none: the page owns the panel, so it
- *   owns which step is selected.
+ * - A press shows a step in the frame's bar, which floats over the page, and a double click opens its session (`usePress`); the step the
+ *   bar shows is drawn selected.
  * - Reset layout lays the nodes out again from `after`, forgets the saved arrangement, and fits the view once, after the commit that
- *   moved them. The view is fitted again when the canvas changes width, as when the step panel opens beside it.
+ *   moved them. The view is fitted again when the canvas changes width, as when the window does.
  * - The legend wraps short of the minimap, drawn smaller than React Flow's own so it covers no node; arrowheads take their edges' colour
  *   in both themes.
  */
-function Canvas({ run, selected, onSelect, computed }: Props & { computed: ReadonlyMap<string, Point> }) {
+function Canvas({ run, computed }: Props & { computed: ReadonlyMap<string, Point> }) {
   const { fitView } = useReactFlow<StepFlowNode>();
+  const { selected, ...press } = usePress(run);
   const runCancelled = run.cancelledAt !== null;
   const names = useContent(run.steps.map((s) => s.name));
 
@@ -136,16 +167,11 @@ function Canvas({ run, selected, onSelect, computed }: Props & { computed: Reado
   const edges = useMemo(() => stepEdges(run), [run]);
 
   const moved = useRef(false);
-  const onNodesChange = useCallback(
-    (changes: NodeChange<StepFlowNode>[]) => {
-      const picked = changes.find((c) => c.type === 'select' && c.selected);
-      if (picked?.type === 'select') onSelect(picked.id);
-      if (changes.some((c) => c.type === 'position' && !c.dragging)) moved.current = true;
-      const kept = changes.filter(placing);
-      setPlaced((current) => applyNodeChanges(kept, current));
-    },
-    [onSelect],
-  );
+  const onNodesChange = useCallback((changes: NodeChange<StepFlowNode>[]) => {
+    if (changes.some((c) => c.type === 'position' && !c.dragging)) moved.current = true;
+    const kept = changes.filter(placing);
+    setPlaced((current) => applyNodeChanges(kept, current));
+  }, []);
   useEffect(() => {
     if (!moved.current) return;
     moved.current = false;
@@ -190,9 +216,9 @@ function Canvas({ run, selected, onSelect, computed }: Props & { computed: Reado
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
-        onPaneClick={() => onSelect(null)}
+        {...press}
         nodesConnectable={false}
-        selectNodesOnDrag={false}
+        elementsSelectable={false}
         edgesFocusable={false}
         deleteKeyCode={null}
         selectionKeyCode={null}

@@ -424,7 +424,7 @@
     {
       "files": ["apps/web/src/components/RunCanvas.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 122, "skipBlankLines": true, "skipComments": true }]
+        "max-lines-per-function": ["error", { "max": 118, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
@@ -458,7 +458,6 @@
     {
       "files": ["apps/web/src/components/StepInspector.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 98, "skipBlankLines": true, "skipComments": true }],
         "sonarjs/cognitive-complexity": ["error", 16]
       }
     },
@@ -572,7 +571,6 @@
     {
       "files": ["apps/web/src/routes/runs.$runId.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 86, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 24 }]
       }
     },

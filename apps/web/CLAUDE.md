@@ -95,7 +95,6 @@ The board is Vite, React, TanStack Router and Query, React Flow, and shadcn's co
 - A query keyed by the state it answers for is not invalidated by a write: a write invalidates the run's record alone (`exact: true`).
 - `refetchInterval` is read again only when the query changes: `useFeed` marks the polled queries stale when the stream opens and reads
   them when it goes down (`pace` in `lib/feed.ts`).
-- A scroll made as a run's page opens lands short: `useLanding` scrolls again on each change of height until the person moves the page.
 - An `EventSource` is closed on the `error` fired as the response ends, or after a grace (`follow`), never on the last event.
 - Send what the current choice takes, not what hidden state holds (`afterFor`).
 - A form keyed on an agent's version is thrown away with its draft when a write beside the agent moves the version (`keptAfterCopy`,

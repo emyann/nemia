@@ -9,9 +9,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { ClaudeFlags, CodexArgs, Engine, TaskView } from '../runtime-client.ts';
 import { CHECK_DEADLINE_SECONDS, checkBrief, type CheckHanded, type Verdict } from '../check/check.ts';
-import { isRemoteHarness, modeOf, sessionContext, type Workflow } from '../workflow.ts';
+import { isRemoteHarness, type Workflow } from '../workflow.ts';
 import { resultSteps } from '../branches/branches.ts';
-import { filedDenies } from '../ending/ending.ts';
 import { holdsOpen } from '../gate/gate.ts';
 import {
   checkTaskId,
@@ -41,6 +40,7 @@ import {
 } from '../status/status.ts';
 import { composeBrief, remoteBrief, type EndingStopped, type ParentCloseout, type ParentStep, type RetryBriefing } from '../brief/index.ts';
 import { roundFiled } from '../round/round.ts';
+import { filedConfig, tryModel } from '../filed/filed.ts';
 import { closeoutSchemaOf, parseCloseout, type Closeout } from '../closeout/closeout.ts';
 import { modeWord, nextTry, sessionModel, type Retry, type RetryAsk } from '../retry/index.ts';
 import { artifactsDir, checkStderr, inputsDir, stepsOf } from '../record/record.store.ts';
@@ -84,11 +84,20 @@ export function toldOf(run: Run, step: Workflow): { step: Workflow; own: { claud
     rendersAgent(step) && !renderedIn(dir, step)
       ? unrendered(step, step.agent?.skills?.length ? skillsAgain(step, skillsFor(run.workflowDir, placesOf(run.repo))) : [])
       : step;
-  const rendered = renderedFlags(told, dir);
-  const repo = step.harness === 'codex' ? realRepoOf(run) : undefined;
-  const codex = repo === undefined ? undefined : { trustFrom: repo };
-  return { step: told, own: { claude: told.remote ? { remoteControl: true, ...rendered } : rendered, ...(codex ? { codex } : {}) } };
+  return { step: told, own: ownOf(told, renderedFlags(told, dir), () => realRepoOf(run)) };
 }
+
+/**
+ * The harness's own arguments a step is filed with (`toldOf`), off the flags its agent rendered to and its repository's real path, which
+ * is asked only of a step whose harness takes it. Pure but for `repoOf`.
+ */
+export const ownOf = (step: Workflow, rendered: ClaudeFlags | undefined, repoOf: () => string | undefined) => {
+  const repo = step.harness === 'codex' ? repoOf() : undefined;
+  return {
+    claude: step.remote ? { remoteControl: true as const, ...rendered } : rendered,
+    ...(repo === undefined ? {} : { codex: { trustFrom: repo } }),
+  };
+};
 
 /**
  * What each run this one waited on concluded, for its roots' briefs (`## From run <id>` in `composeBrief`): the first line of its brief,
@@ -379,19 +388,7 @@ const trySpec = (
   cwd: record.workspace ?? f.run.workspace,
   harness: step.harness,
   ...localFields(step, () => ({
-    config: {
-      /** A fresh try runs on the model it asked for, or the step's; any other try on the model its session was started on. */
-      model: r.mode === 'fresh' ? (r.model ?? step.model) : sessionModel(step, record),
-      effort: step.effort,
-      contextTokens: sessionContext(step, f.reads.steps),
-      permissionMode: modeOf(step),
-      tools: step.tools,
-      disallowedTools: filedDenies(step, f.run),
-      allowedTools: step.allowedTools,
-      background: step.background,
-      budgetUsd: t.budgetUsd,
-      ...t.told.own,
-    },
+    config: filedConfig(step, f.reads.steps, f.run, { model: tryModel(step, record, r), budgetUsd: t.budgetUsd, own: t.told.own }),
     resumeFrom: t.resumeFrom,
     ...(holdsOpenOn(step) ? { holdOpen: true as const } : {}),
     closeoutSchema: closeoutSchemaOf(step, f.reads.steps),
@@ -466,22 +463,15 @@ function roundSpec(f: Filing, r: Round, looping: Workflow, target: Workflow, tas
     cwd: record.workspace ?? run.workspace,
     harness: target.harness,
     ...localFields(target, () => ({
-      config: {
+      config: filedConfig(target, reads.steps, run, {
         model: sessionModel(target, record),
-        effort: target.effort,
-        contextTokens: sessionContext(target, reads.steps),
-        permissionMode: modeOf(target),
-        tools: target.tools,
-        disallowedTools: filedDenies(target, run),
-        allowedTools: target.allowedTools,
-        background: target.background,
         budgetUsd: budgetUsdFor(
           target,
           r.budget !== undefined && r.raise?.includes(r.target) ? r.budget : budgetOf(target, record),
           stepSpend(run, r.target, reads.spendOf),
         ),
-        ...told.own,
-      },
+        own: told.own,
+      }),
       resumeFrom,
       ...(holdsOpenOn(target) ? { holdOpen: true as const } : {}),
       closeoutSchema: closeoutSchemaOf(target, reads.steps),
@@ -622,22 +612,11 @@ function readySpec(
     harness: step.harness,
     deadlineSeconds: step.deadlineSeconds,
     ...localFields(step, () => ({
-      /**
-       * The harness's arguments, which the engine carries to the runner unread (`HarnessArgs`), all from the workflow this run froze. The
-       * runtime judges no budget: `budgetUsd` is the harness's own cap, and whether the step went over is this package's (`ownStatus`).
-       */
-      config: {
+      config: filedConfig(step, reads.steps, run, {
         model: step.model,
-        effort: step.effort,
-        contextTokens: sessionContext(step, reads.steps),
-        permissionMode: modeOf(step),
-        tools: step.tools,
-        disallowedTools: filedDenies(step, run),
-        allowedTools: step.allowedTools,
-        background: step.background,
         budgetUsd: budgetUsdFor(step, budgetOf(step, run.steps[step.name]), stepSpend(run, step.name, reads.spendOf)),
-        ...told.own,
-      },
+        own: told.own,
+      }),
       resumeFrom: step.resume ? sessionOf(f, step.resume) : undefined,
       ...(holdsOpenOn(step) ? { holdOpen: true as const } : {}),
       /**

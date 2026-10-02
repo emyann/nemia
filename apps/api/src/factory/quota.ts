@@ -3,8 +3,9 @@
  * `claude` on the api's PATH, sent its `get_usage` control request (packages/agent-orchestrator/docs/features.md, *the quota on the
  * board*). This file starts no process.
  *
- * Nothing asks unless a board asks. A read (`makeQuota`) answers from the last ask while it is younger than `QUOTA_KEEP_MS`, starts one ask
- * otherwise — a request that comes while one is in flight joins it — and waits for it at most `QUOTA_WAIT_MS` before it says `asking`.
+ * Nothing asks unless a board asks. A read (`makeQuota`) answers from the last ask while it is younger than `QUOTA_KEEP_MS`, counted from
+ * when the ask began; otherwise from an ask begun within the keep of the read — the one in flight, or one started after it, one at a time —
+ * and waits for it at most `QUOTA_WAIT_MS` before it says `asking`.
  * An answer in which Anthropic's usage service gave Claude Code nothing (`unanswered`) is kept longer, and longer again each time in a row
  * (`backoffOf`), until a good reading. What it holds is in the asker's memory (`QuotaAsker`, one for an app) and nowhere else, judged
  * against the time of each request: a restart costs one ask.
@@ -202,8 +203,8 @@ export function readOf(asked: Asked, now: number): Read {
 }
 
 /**
- * An ask's outcome, and when it came: the ms since the epoch. `keptMs` is how long it is kept when that is not the keep: an `unanswered`
- * outcome's wait (`backoffOf`).
+ * An ask's outcome, and when its ask began: the ms since the epoch. `keptMs` is how long it is kept when that is not the keep: an
+ * `unanswered` outcome's wait (`backoffOf`).
  */
 export type Held = { asked: Asked; at: number; keptMs?: number };
 
@@ -264,47 +265,81 @@ export type ReadQuota = (opts: {
 const rejected = (e: unknown): Asked => ({ kind: 'rejected', said: e instanceof Error ? e.message : String(e) });
 
 /**
+ * An ask of the quota, as an asker holds it: when it began — when Claude Code was started, and read the world it answers about — null while
+ * it waits behind the one in flight; whether it has come back; and what settles once it has.
+ */
+type Flight = { began: number | null; done: boolean; settled: Promise<void> };
+
+/** Waits for `settled` at most `ms`. */
+const waitFor = async (settled: Promise<void>, ms: number): Promise<void> => {
+  let wait: NodeJS.Timeout | undefined;
+  await Promise.race([
+    settled,
+    new Promise((r) => {
+      wait = setTimeout(r, ms);
+    }),
+  ]);
+  clearTimeout(wait);
+};
+
+/**
  * A quota asker with nothing held, as a fresh api has: what it holds is the last ask's outcome, the last with windows, how many
- * `unanswered` outcomes in a row since it, and the ask in flight, in its own memory and nobody's file.
+ * `unanswered` outcomes in a row since it, the ask in flight and the one queued behind it, in its own memory and nobody's file.
  *
  * Its read says the quota as the request should: from what is held while it is younger than its keep — the keep, or an `unanswered`
- * outcome's wait; otherwise from an ask — the one in flight, or one started now — waited for at most `waitMs`, and `asking` past that. An
- * answer that came in the wait is this request's, however short the keep. A reading with windows begins the backoff again; each
- * `unanswered` one in a row lengthens it (`backoffOf`); another failure between two `unanswered` answers neither ends it nor adds to it.
+ * outcome's wait — counted from when its ask began; otherwise from an ask begun within the keep of the read (with a keep of 0, only one
+ * begun after it), waited for at most `waitMs`, and `asking` past that. That ask is the one in flight when it began within the keep,
+ * else the one queued behind it, else one started now, or queued behind the one in flight: one ask at a time, and the reads that come
+ * while it waits share it. A reading with windows begins the backoff again; each `unanswered` one in a row lengthens it (`backoffOf`);
+ * another failure between two `unanswered` answers neither ends it nor adds to it.
  */
 export function makeQuota(): ReadQuota {
   let held: Held | null = null;
   let good: Held | null = null;
   let unanswered = 0;
-  let inFlight: Promise<void> | null = null;
+  let running: Flight | null = null;
+  let queued: Flight | null = null;
+  const hold = (asked: Asked, at: number, backoffMs: number) => {
+    const read = readOf(asked, at).state;
+    if (read === 'fresh') unanswered = 0;
+    if (read === 'unanswered') unanswered += 1;
+    held = read === 'unanswered' ? { asked, at, keptMs: backoffOf(unanswered, backoffMs) } : { asked, at };
+    if (read === 'fresh') good = held;
+  };
+  const begin = (flight: Flight, ask: () => Promise<HarnessQuota>, now: () => number, backoffMs: number): Promise<void> => {
+    const began = now();
+    flight.began = began;
+    running = flight;
+    return ask()
+      .catch(rejected)
+      .then((asked) => hold(asked, began, backoffMs))
+      .finally(() => {
+        flight.done = true;
+        if (running === flight) running = null;
+      });
+  };
+  const flightFor = (started: number, keepMs: number, go: (flight: Flight) => Promise<void>): Flight => {
+    if (running !== null && started - running.began! < keepMs) return running;
+    if (queued !== null) return queued;
+    const flight: Flight = { began: null, done: false, settled: Promise.resolve() };
+    const before = running;
+    if (before === null) flight.settled = go(flight);
+    else {
+      queued = flight;
+      flight.settled = before.settled.then(() => {
+        queued = null;
+        return go(flight);
+      });
+    }
+    return flight;
+  };
   return async ({ ask, waitMs = QUOTA_WAIT_MS, env = process.env, now = () => Date.now() }) => {
     const keepMs = msOf(env, 'HKB_QUOTA_KEEP_MS', QUOTA_KEEP_MS);
     const backoffMs = msOf(env, 'HKB_QUOTA_BACKOFF_MS', QUOTA_BACKOFF_MS);
-    const current = () => held !== null && now() - held.at < (held.keptMs ?? keepMs);
-    if (!current()) {
-      const started = now();
-      inFlight ??= ask()
-        .catch(rejected)
-        .then((asked) => {
-          const at = Math.max(started, now());
-          const read = readOf(asked, at).state;
-          if (read === 'fresh') unanswered = 0;
-          if (read === 'unanswered') unanswered += 1;
-          held = read === 'unanswered' ? { asked, at, keptMs: backoffOf(unanswered, backoffMs) } : { asked, at };
-          if (read === 'fresh') good = held;
-        })
-        .finally(() => {
-          inFlight = null;
-        });
-      let wait: NodeJS.Timeout | undefined;
-      await Promise.race([
-        inFlight,
-        new Promise((r) => {
-          wait = setTimeout(r, waitMs);
-        }),
-      ]);
-      clearTimeout(wait);
-      if (inFlight !== null || held === null || held.at < started) return quotaOf(null, good, now(), keepMs);
+    if (held === null || now() - held.at >= (held.keptMs ?? keepMs)) {
+      const flight = flightFor(now(), keepMs, (f) => begin(f, ask, now, backoffMs));
+      await waitFor(flight.settled, waitMs);
+      if (!flight.done) return quotaOf(null, good, now(), keepMs);
     }
     return quotaOf(held, good, now(), keepMs);
   };

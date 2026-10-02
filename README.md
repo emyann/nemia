@@ -45,7 +45,8 @@ The Factory's header shows how much of the subscription's five-hour window and w
 reset in your own time zone, and how old the reading is. Nothing to install: `GET /api/quota` asks the runtime's `claude` harness for its
 `quota`, which asks Claude Code itself with its `get_usage` control request, and serves the answer. It asks the `claude` on the api's PATH, at
 most once every 10 minutes, one ask at a time, and only while a board asks (`HKB_QUOTA_KEEP_MS` sets the keep; `0`
-asks on every read). An ask is a short `claude -p` that makes no model turn and spends nothing:
+asks on every read). A read is never answered by an ask that began more than the keep before it (with `0`, only by one that began after
+it), and a reading's age counts from when its ask began. An ask is a short `claude -p` that makes no model turn and spends nothing:
 
 ```bash
 claude -p --input-format stream-json --output-format stream-json --verbose \

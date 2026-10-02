@@ -103,6 +103,48 @@ test('CRASH while the session runs: the restart adopts it and starts nothing', a
   assert.equal(await b.run(phaseOf(id)), 'running (working)');
 });
 
+test('RESTART: a long-lived session idle across a daemon restart is left open — no end recorded, no stop, no release, no second spawn — where a job its harness lists done is ended and released', async () => {
+  const journal = Journal.test();
+  const sessions = new Map<string, Sighting>();
+  const spawned: SpawnRequest[] = [];
+  const asked: string[] = [];
+  const daemon = () => {
+    const ops = testOps({ sessions, spawned });
+    const runner = Runner.layer({
+      ...ops,
+      stop: (id) => Effect.andThen(Effect.sync(() => asked.push(`stop ${id}`)), ops.stop(id)),
+      release: (s) => Effect.sync(() => void asked.push(`release ${s.sessionId}`)),
+    });
+    const layer = Layer.mergeAll(journal, runner, tickMemoLayer({ verify: true }));
+    return <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.runPromise(e.pipe(Effect.provide(layer)));
+  };
+  const first = daemon();
+  await first(file({ ...spec, id: 'open', restartPolicy: 'Always', config: { background: true } }));
+  await first(file({ ...spec, id: 'job' }));
+  await first(tick());
+  const open = nameFor('open', 1);
+  const job = nameFor('job', 1);
+  sessions.set(open, { ...sessions.get(open)!, state: 'input-required', busy: false, held: true });
+  sessions.set(job, { ...sessions.get(job)!, state: 'completed', busy: false, held: true });
+  await first(tick());
+
+  const restarted = daemon();
+  for (let pass = 0; pass < 3; pass++) await restarted(tick());
+  const kinds = async (id: string) => (await restarted(Effect.flatMap(Journal, (j) => j.read(id)))).map((e) => e.kind);
+  assert.deepEqual(await kinds('open'), ['filed', 'starting', 'spawned'], 'nothing but its start on the record');
+  assert.equal(await restarted(phaseOf('open')), 'idle');
+  assert.equal(spawned.length, 2, 'no second session');
+  const openId = sessions.get(open)!.sessionId;
+  assert.deepEqual(
+    asked.filter((a) => a.endsWith(` ${openId}`)),
+    [],
+    'neither stopped nor released',
+  );
+  assert.deepEqual((await kinds('job')).slice(0, 4), ['filed', 'starting', 'spawned', 'ended'], 'the job, sighted done, is ended');
+  assert.equal(await restarted(phaseOf('job')), 'succeeded');
+  assert.ok(asked.includes(`release ${sessions.get(job)!.sessionId}`), 'and its session released');
+});
+
 test('a failed attempt settles the task failed: one attempt per start, and no second session', async () => {
   const b = board();
   const id = await b.run(file(spec));

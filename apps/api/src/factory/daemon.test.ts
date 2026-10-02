@@ -19,18 +19,22 @@ type DaemonFile = import('agent-orchestrator').DaemonFile;
 /** A pid no process has: above any `pid_max` Linux allows (2^22). */
 const NO_PID = 2 ** 30;
 const MIN = 60_000;
-const ago = (ms: number) => new Date(Date.now() - ms).toISOString();
+const ago = (ms: number, now = Date.now()) => new Date(now - ms).toISOString();
 
-/** A file as `wf up` writes it: this test's own process, confirmed by its start, every 4 s, passed and beating `quiet` ago. */
+/**
+ * A file as `wf up` writes it: this test's own process, confirmed by its start, every 4 s, passed and beating `quiet` ago — each stamp off
+ * one reading of the clock, so a step between two readings cannot set the pass after the beat.
+ */
 const written = (quiet: number, over: Partial<DaemonFile> = {}): DaemonFile => {
   const procStart = procStartOf(process.pid);
+  const now = Date.now();
   return {
     pid: process.pid,
-    startedAt: ago(quiet + 40 * MIN),
+    startedAt: ago(quiet + 40 * MIN, now),
     cwd: '/work/repo',
     every: 4_000,
-    passedAt: ago(quiet),
-    beatAt: ago(quiet),
+    passedAt: ago(quiet, now),
+    beatAt: ago(quiet, now),
     ...(procStart !== undefined ? { procStart } : {}),
     ...over,
   };

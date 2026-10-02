@@ -370,17 +370,19 @@ test('HKB_QUOTA_BACKOFF_MS sets the first wait — 0 asks on every read — and 
   fake.next = UNANSWERED;
   const before = fake.asked;
   const env = { ...process.env, HKB_QUOTA_BACKOFF_MS: '0' };
-  assert.equal((await read({ env })).said?.endsWith('Asked again on the next read.'), true);
-  await read({ env });
-  assert.equal(fake.asked, before + 2);
+  const now = () => NOW;
+  assert.equal((await read({ env, now })).said?.endsWith('Asked again on the next read.'), true);
+  await read({ env, now });
+  assert.equal(fake.asked, before + 2, 'asked again at the same instant');
   for (const bad of ['-5', 'soon', '']) {
     forgetQuota();
-    assert.match((await read({ env: { ...process.env, HKB_QUOTA_BACKOFF_MS: bad } })).said!, /Asked again in 20 min\.$/, bad);
+    assert.match((await read({ env: { ...process.env, HKB_QUOTA_BACKOFF_MS: bad }, now })).said!, /Asked again in 20 min\.$/, bad);
   }
 });
 
-test('REFUSED: reads that come while an ask is in flight join it: one ask for all of them, the route among them', async () => {
+test('REFUSED: reads that come while an ask is in flight join it: one ask for all of them, the route among them', async (t) => {
   fresh();
+  t.mock.timers.enable({ apis: ['Date'], now: NOW });
   const before = asks() + fake.asked;
   const all = await Promise.all([read(), read(), get(), read()]);
   assert.deepEqual(
@@ -394,12 +396,13 @@ test('HKB_QUOTA_KEEP_MS sets the keep — 0 asks on every read — and a value t
   fresh();
   const before = fake.asked;
   const env = { ...process.env, HKB_QUOTA_KEEP_MS: '0' };
-  assert.equal((await read({ env })).keepMs, 0);
-  await read({ env });
-  assert.equal(fake.asked, before + 2);
+  const now = () => NOW;
+  assert.equal((await read({ env, now })).keepMs, 0);
+  await read({ env, now });
+  assert.equal(fake.asked, before + 2, 'asked again at the same instant');
   for (const bad of ['-5', 'soon', '']) {
     forgetQuota();
-    assert.equal((await read({ env: { ...process.env, HKB_QUOTA_KEEP_MS: bad } })).keepMs, QUOTA_KEEP_MS, bad);
+    assert.equal((await read({ env: { ...process.env, HKB_QUOTA_KEEP_MS: bad }, now })).keepMs, QUOTA_KEEP_MS, bad);
   }
 });
 
@@ -417,7 +420,8 @@ test('REFUSED: a read that waits past its wait says asking, then what the ask ca
   assert.equal(q.state, 'asking');
   assert.equal(q.said, 'Asking Claude Code for the quota…');
   let after = q;
-  for (const bound = Date.now() + 5_000; after.state === 'asking' && Date.now() < bound;) after = await readQuota({ ask, waitMs: 50 });
+  for (const bound = performance.now() + 5_000; after.state === 'asking' && performance.now() < bound;)
+    after = await readQuota({ ask, waitMs: 50 });
   assert.ok(answered);
   assert.equal(after.state, 'timeout');
   assert.match(after.said!, /^Claude Code did not answer the usage request within 15 s:/);

@@ -2,8 +2,8 @@ import type { AgentDraft, AgentListing, AgentRoleKey, KeyForm, RunStatus, RunSum
 import { remoteRefuses } from './builder.ts';
 
 /**
- * The role keys, in the package's order (`AGENT_KEYS` less `AGENT_OWN_KEYS`: role, description, skills, harnessPrompt): the order an agent's
- * file writes them.
+ * The role keys, in the package's order (`AGENT_KEYS` less `AGENT_OWN_KEYS`: role, description, skills, harnessPrompt): the order an
+ * agent's file writes them.
  */
 export const ROLE_KEYS: readonly AgentRoleKey[] = [
   'harness',

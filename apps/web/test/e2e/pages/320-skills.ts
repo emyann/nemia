@@ -8,8 +8,8 @@ import { OUT, store } from '../world.ts';
 
 export default {
   /**
-   * An agent of yours composes its skills from a list, and Claude Code's prompt from what it does. `scribe`, which gives none, first names a
-   * skill no place has, as one copied from elsewhere would before its folder came, so its row reads not found; the file is put back. Its
+   * An agent of yours composes its skills from a list, and Claude Code's prompt from what it does. `scribe`, which gives none, first names
+   * a skill no place has, as one copied from elsewhere would before its folder came, so its row reads not found; the file is put back. Its
    * description is edited and left unsaved. The sheet lists your library, this repository's and Nemia's in that order, the repository's
    * `scratch` refused with its reason and nothing to press, and Nemia's saying none: Nemia ships no skill. A skill of your library is added
    * from the sheet's first group, a change of the form alone: nothing is written until Save, and the edit is kept. Its tools, which leave

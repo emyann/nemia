@@ -186,7 +186,7 @@ wf stats --json                            # what GET /api/stats answers
   a run finished, and an `all` row per tally.
 - **A run whose journal does not read is left out whole**, and named on the last line.
 - **A change is marked on the day a run froze it**: a step (its keys and its own note), an agent's
-  instructions, skills and system prompt, or a skill as `wf start` rendered it, that differs from what
+  instructions, skills and harness prompt, or a skill as `wf start` rendered it, that differs from what
   the run of the same workflow folder created just before it froze for the same item. It falls on the
   UTC day the later run was created, names the run it is compared with, and respects the filters and
   the days. Where either run does not say — a record without its agent's instructions, a rendered
@@ -341,7 +341,7 @@ rounds: 3
 ```
 
 Its keys are a role's — `harness`, `model`, `effort`, `context`, `permissionMode`, `sandbox`, `tools`, `disallowedTools`, `allowedTools`, `remote`,
-`output` — and three of its own, `description:`, `skills:` and `systemPrompt:`. A wiring key in an agent file is refused by name, saying it belongs on the step, and so
+`output` — and three of its own, `description:`, `skills:` and `harnessPrompt:`. A wiring key in an agent file is refused by name, saying it belongs on the step, and so
 is `agent:` itself: an agent does not name another. Each value is read by the rules a step's is, and refused in the
 agent's own name (`agents/reviewer.md: …`). A broken agent refuses only the steps that name it; one named that is not
 there is refused listing the agents there are. A link in `agents/` is refused as a linked step is. `agents` is not a
@@ -350,11 +350,27 @@ workflow — the listings skip it, and a workflow named `agents` is refused by n
 At `wf start` each node is resolved and frozen on the run, so a run never reads `agents/` again, from a worktree or
 anywhere: the agent's keys are the defaults, a key the step writes wins, and the refusals that depend on the harness
 read the merged keys and name the step. On codex, and on a step that continues another's session (`resume:`), the brief is the
-agent's instructions, a blank line, then the step's own words; on Claude Code the instructions go into the session's system prompt
-(*An agent rendered for Claude Code*, below) and the brief is the step's own words alone. Those words are a team's note to its agent — *in this team, also check …* — an escape hatch, not the normal
-case: a `ship` step, say, telling its shipper why a build and an e2e matter on a merged tree. `renderStep` writes a resolved step back as its file was: `agent:`, the keys the step
-set itself, and its own note, never the agent's. `wf start` names each node's agent beside it —
+agent's instructions, a blank line, then the step's own words; on Claude Code the instructions go after Claude Code's own prompt
+(*An agent rendered for Claude Code*, below) and the brief is the step's own words alone. `renderStep` writes a resolved step back as
+its file was: `agent:`, the keys the step set itself, and its own note, never the agent's. `wf start` names each node's agent beside it —
 `implement (implementer) → review (reviewer) → ship (shipper)` — and a node with nothing attached by its name alone.
+
+#### Four layers: what shapes an agent, apart from its task
+
+What an agent is told comes in four layers, each written by whoever owns it:
+
+1. **Instructions** — the agent's own body, written once in its file: who it is and how it works, whatever node it is attached to.
+2. **Custom instructions** — what a person adds to an agent they use without rewriting it. Coming in S4, not built.
+3. **The step's policy** — the step's own words and keys: what this node of this process asks of whoever does its work — a role's
+   policies, *in this team, also check …*, or a `ship` step telling its shipper why a build and an e2e matter on a merged tree. It is a
+   normal layer, the place a process says what it expects of a role. A step adding skills to its agent's is coming in S3.
+4. **Factory rules** — the files the harness reads from the factory's workspace itself (today `CLAUDE.md`, `AGENTS.md`): what holds
+   there for every agent at work in it. Nemia composes nothing of them; the harness reads them as it would for a person.
+
+The words reach the agent in that order — instructions, then custom instructions, then the step's policy, then the task — and where
+two say different things, the later one wins: the step knows the process, and the task knows the case. The agent is told so from S4.
+Fences only tighten: a step may take a tool away from its agent, never give one its agent denies. That is enforced from S2; today a
+step's key still wins over its agent's, as every other key does.
 
 The tests' team (`test/fixtures/team/`) is written this way, and the
 board's builder edits the node — which agent, its own keys and its note — showing the agent's values as placeholders.
@@ -423,24 +439,24 @@ not a semantic version: it changes when the agent's file, its result schema or o
 `output:`, the result schema a step's closeout is held to, maps to no A2A field. A2A's nearest is a skill's
 `outputModes`, which names media types, not a schema; `output:` stays a key of its own.
 
-#### An agent rendered for Claude Code: `skills:` and `systemPrompt:`
+#### An agent rendered for Claude Code: `skills:` and `harnessPrompt:`
 
 ```md
 ---
 description: Writes a short note on what it is asked about.
 skills: write-a-note, mind-the-tone
-systemPrompt: no-coding
+harnessPrompt: no-coding
 tools: Read, Edit, Skill
 ---
 You write notes. Load `write-a-note` before you start.
 ```
 
-A Claude Code step whose agent has instructions, skills or a system prompt of its own is *rendered* at `wf start`, under
+A Claude Code step whose agent has instructions, skills or a `harnessPrompt:` other than `keep` is *rendered* at `wf start`, under
 `runs/<id>/agents/<step>/`, frozen with the run as its workflow is (`agents/agents.ts`, `writeAgentFiles` in `agents/agents.store.ts`), and filed with
 Claude Code's flags for it in the engine's `config.claude` (docs/spike-2026-09-25-agents-skills.md says what each was measured to do):
 
 - `prompt.md` — the instructions, then a line naming each skill by its namespaced name, then the whole text of each skill whose
-  SKILL.md says `preload: true`. `--append-system-prompt-file` appends it to Claude Code's own system prompt, which is kept (F1).
+  SKILL.md says `preload: true`. `--append-system-prompt-file` appends it to Claude Code's own prompt, which is kept (F1).
 - `nemia-<agent>/` — a plugin of the step's own (`--plugin-dir`, F4, F5): `skills/<name>/`, each copied whole from where the load found
   it, so a session loads them with the `Skill` tool as `nemia-<agent>:<name>`, and nothing of the machine's own plugins is touched.
   `--settings` turns each of those names `off` in `skillOverrides`, which Claude Code applies to no plugin's skill: a bare skill of the
@@ -448,10 +464,13 @@ Claude Code's flags for it in the engine's `config.claude` (docs/spike-2026-09-2
   sees the frozen copy once, and a call to the bare name is refused (*"Skill look is disabled for model invocation in skillOverrides
   settings"*, Claude Code 2.1.285). An agent's body or a skill's that says *load `look`* still reaches the copy: told so, a session
   calls `nemia-<agent>:look`, the one it is listed.
-- `systemPrompt:` — `default`, or no line, keeps Claude Code's prompt and appends the instructions after it; `no-coding` does too, less
-  Claude Code's coding instructions, through an output style in the plugin that says `keep-coding-instructions: false`, chosen by its
-  namespaced name in `--settings` (a bare name is echoed and not applied, F16, F17); `own` puts the instructions in place of Claude
-  Code's prompt (`--system-prompt-file`, F15).
+- `harnessPrompt:` — what becomes of the harness's own prompt, Claude Code's system prompt. `keep`, or no line, keeps it and appends
+  the instructions after it; `no-coding` does too, less Claude Code's coding instructions, through an output style in the plugin that
+  says `keep-coding-instructions: false`, chosen by its namespaced name in `--settings` (a bare name is echoed and not applied, F16,
+  F17); `replace` puts the instructions in its place (`--system-prompt-file`, F15). Its former line,
+  `systemPrompt: default | no-coding | own`, is still read — `default` as `keep`, `own` as `replace` — in an agent file and on a run
+  frozen before the rename, and `wf start` names each file still on it; nothing writes it. Both lines in one file are refused, and so is
+  a former word under the new key.
 
 Rendered or not, a step's job reads its checkout's settings and never the operator's. The runtime spawns every job with `--setting-sources
 project,local` (the runtime's README, *Settings: the checkout's, never the operator's*). So what a step needs is said where the run
@@ -476,9 +495,9 @@ carry to its sessions, are refused by name, each with what does that in a run (`
 
 Refused at load, each in the name of the agent or of the step that names it (`composedRefusal`, `autoRefusal`): a skill no place has,
 naming each place looked in; skills with no `Skill` in the step's `tools:` or with `Skill` in its `disallowedTools:`, since a skill a
-session cannot load is a name in its prompt (F11); skills or a system prompt on codex, which is handed the instructions in its brief
-as before; skills or a system prompt on a step that continues another's session, which keeps its own (F13); `systemPrompt: own` on an
-agent with no instructions; and a Claude Code step that runs in `auto` — written, or the runtime's default when it names no mode —
+session cannot load is a name in its prompt (F11); skills or a harness prompt on codex, which is handed the instructions in its brief
+as before; skills or a harness prompt on a step that continues another's session, which keeps its own (F13); `harnessPrompt: replace` on
+an agent with no instructions; and a Claude Code step that runs in `auto` — written, or the runtime's default when it names no mode —
 on `haiku`, `claude-haiku-4-5` or `claude-sonnet-4-5`, where Claude Code drops `auto` to `default` and a job then denies every call
 `default` would ask about (F21). A `wf retry --model` onto one of those models, from the terminal or the board, is refused the same way
 (`retryRefusal`, through `autoDropped`), since the step's mode is frozen with the run.
@@ -1902,7 +1921,7 @@ Read the note and say whether it is right.
 - **What such a step may not say.** The keys that tell a harness of ours how to run a session are refused at load, from the step and
   from the agent it names, each with why: `model`, `effort`, `context`, `background`, `remote`, `permissionMode`, `sandbox`, `tools`,
   `disallowedTools`, `allowedTools`, `denials`, `budget`, `output`, `loop`, `resume` and `check` — and `workspace: main`, an agent's
-  skills and system prompt, and being a loop's target. The agent runs as its operator configured it, under their fence, and nothing
+  skills and harness prompt, and being a loop's target. The agent runs as its operator configured it, under their fence, and nothing
   here would hold it. The board's form leaves those keys off such a step (`KeyForm.remote`).
 - **What it is sent.** The step is filed with no harness arguments, no closing statement's schema and no session to continue, and its
   brief names nothing of this machine: its note (with its agent's instructions), what was asked for, what the runs it waited on concluded, what the steps it reads
@@ -2936,7 +2955,7 @@ holding a concurrency slot forever.
 | `src/harness/harness.ts` | the harnesses and the words each takes — pure: `HARNESSES`, `PERMISSION_MODES`, `SANDBOXES`, `EFFORTS`, `CONTEXT_WINDOWS`, and a step on a remote agent, how it is named (`remoteNameOf`) and the keys it may not set (`REMOTE_REFUSED_KEYS`) |
 | `src/keys/keys.ts` | a step's keys read one each — pure: a value as written, the value the step carries, or the refusal that names the fix (`wordOf`, `contextOf`, `budgetOf`, `gateOf`, `workspaceOf`, `slotOf`, `outputOf`), and a model that cannot run `auto` (`keepsAuto`) |
 | `src/keys/tools.ts` | a step's tool rules — pure: its `tools` (`toolsOf`), its allow and deny rules, a write named as anything but `Edit` refused (`rulesOf`), and the rule offered for a call a fenced step was denied (`allowRuleOf`, `disallowedBy`) |
-| `src/former/former.ts` | a key under the name it had before — pure: `FORMER_KEYS`, read in a file (`readKeys`) and on a frozen record (`asNamed`), written back in the form the file has (`formerKeyWritten`), and the fence a step asks for under either key (`modeOf`) |
+| `src/former/former.ts` | a key under the name it had before — pure: `FORMER_KEYS`, and an agent's own `FORMER_OWN_KEYS` with its words (`harnessPromptNamed`), read in a file (`readKeys`) and on a frozen record (`asNamed`), written back in the form the file has (`formerKeyWritten`), and the fence a step asks for under either key (`modeOf`) |
 | `src/workflow/step-file.ts` | one step file — pure: read into a `Workflow` through each key's reader, an unknown key refused (`parseWorkflow`), and written back, the parser run backwards (`renderStep`) |
 | `src/workflow/validate.ts` | a folder's steps checked together — pure: a cycle, a dangling `after`, an `input:` on work that has not finished, a workspace, a mode or a loop the team cannot run (`validate`), and the graph the `after` edges draw (`orderSteps`, `upstreamOf`, `fansOut`, `terminalSteps`) |
 | `src/folder/folder.ts` | a folder of markdown from its text — pure: its step files (`stepFiles`), the names a step and the folders beside it may take, and every step read and checked together (`parseFolder`) |

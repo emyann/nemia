@@ -26,10 +26,24 @@ const inFlight = (longLived: boolean, ...more: Event[]): Event[] => [
   { kind: 'spawned', at: at(2), attempt: 1 },
   ...more,
 ];
-const seen = (usage?: Usage): Sighting => ({ sessionId: 's1', state: 'input-required', busy: false, held: true, ...(usage ? { usage } : {}) });
+const seen = (usage?: Usage): Sighting => ({
+  sessionId: 's1',
+  state: 'input-required',
+  busy: false,
+  held: true,
+  ...(usage ? { usage } : {}),
+});
 const counted = (usage: Usage, n = 1): Event => ({ kind: 'counted', at: at(10), attempt: n, usage });
 
-const TWO_TURNS: Usage = { turns: 2, toolCalls: 1, inputTokens: 300, uncachedTokens: 10, cacheWriteTokens: 90, cacheReadTokens: 200, outputTokens: 40 };
+const TWO_TURNS: Usage = {
+  turns: 2,
+  toolCalls: 1,
+  inputTokens: 300,
+  uncachedTokens: 10,
+  cacheWriteTokens: 90,
+  cacheReadTokens: 200,
+  outputTokens: 40,
+};
 
 test('COUNTED: a long-lived attempt in flight whose sighting reports more than the record is written one counted entry, its counts and never a cost', () => {
   const state = fold(TASK, inFlight(true, counted({ turns: 1, outputTokens: 20 })));

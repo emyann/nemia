@@ -255,10 +255,13 @@ test("LONG-LIVED: a long-lived attempt is looked for with when the journal says 
   await run(tick());
   await run(tick());
   const startedAt = async (id: string) => (await run(Effect.flatMap(Journal, (j) => j.read(id)))).find((e) => e.kind === 'starting')!.at;
-  assert.deepEqual(new Map(asked.at(-1)?.map((e) => [e.name, e])), new Map([
-    [nameFor(open, 1), { name: nameFor(open, 1), harness: undefined, since: Date.parse(await startedAt(open)) }],
-    [nameFor(job, 1), { name: nameFor(job, 1), harness: undefined }],
-  ]));
+  assert.deepEqual(
+    new Map(asked.at(-1)?.map((e) => [e.name, e])),
+    new Map([
+      [nameFor(open, 1), { name: nameFor(open, 1), harness: undefined, since: Date.parse(await startedAt(open)) }],
+      [nameFor(job, 1), { name: nameFor(job, 1), harness: undefined }],
+    ]),
+  );
 });
 
 test('LONG-LIVED: a gap open past RESPAWN_GAP_MS on the record is ended lost by a fresh daemon, and its listed session released', async () => {

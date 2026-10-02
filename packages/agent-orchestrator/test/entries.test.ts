@@ -522,6 +522,7 @@ const PINNED: Record<string, string[]> = {
     'contextText',
     'disallowedBy',
     'dollarsOf',
+    'editsUnasked',
     'fansOut',
     'formerKeyLine',
     'formerKeysIn',

@@ -91,6 +91,36 @@ test('REFUSED at shipped defaults: a path rule outside the one its agent allows,
     );
 });
 
+test('REFUSED at shipped defaults: an `Edit` allow over an agent whose mode asks first, which a mode that edits unasked already grants', () => {
+  const agents = agentsOf({
+    asks: '---\npermissionMode: dontAsk\n---\nWork.\n',
+    edits: '---\npermissionMode: acceptEdits\n---\nWork.\n',
+    open: '---\n---\nWork.\n',
+    bypass: '---\npermissionMode: bypassPermissions\n---\nWork.\n',
+  });
+  holds(
+    refusal(() => stepOf(agents, 'agent: asks\nallowedTools: Edit(**)')),
+    'build',
+    'allowedTools: Edit(**)',
+    '`Edit(**)`',
+    'asks',
+  );
+  for (const agent of ['edits', 'open'])
+    assert.deepEqual(
+      stepOf(agents, `agent: ${agent}\npermissionMode: dontAsk\nallowedTools: Edit(**)`).allowedTools,
+      ['Edit(**)'],
+      `${agent} edits in its directory unasked`,
+    );
+  holds(
+    refusal(() => stepOf(agents, 'agent: edits\nallowedTools: Edit(/etc/**)')),
+    'build',
+    'allowedTools: Edit(/etc/**)',
+    '`Edit(/etc/**)`',
+    'edits',
+  );
+  assert.deepEqual(stepOf(agents, 'agent: bypass\nallowedTools: Bash(git push)').allowedTools, ['Bash(git push)'], 'asks about nothing');
+});
+
 test("REFUSED at shipped defaults: `disallowedTools:` that leaves out one of its agent's denies", () => {
   const agents = agentsOf({ ada: '---\ndisallowedTools: Bash(git push), Bash(git push:*)\n---\nWork.\n' });
   const said = refusal(() => stepOf(agents, 'agent: ada\ndisallowedTools: Bash(git push)'));

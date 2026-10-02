@@ -23,6 +23,13 @@ export const MODE_RANK: Readonly<Record<string, number>> = {
   bypassPermissions: 4,
 };
 
+/**
+ * Whether a Claude Code session in permission mode `mode` — the runtime's default when `undefined` — writes in its directory unasked:
+ * `acceptEdits` and every wider mode. Such a mode grants what an `allowedTools:` rule `Edit(…)` on a path inside the directory would.
+ */
+export const editsUnasked = (mode: string | undefined): boolean =>
+  (MODE_RANK[mode ?? DEFAULT_PERMISSION_MODE] ?? 0) >= MODE_RANK.acceptEdits;
+
 /** The sandbox a codex session runs in when its step names none: the runtime's `sandboxOf` gives `workspace-write`. */
 export const DEFAULT_SANDBOX = 'workspace-write';
 
@@ -49,7 +56,8 @@ export function fenceRefusal(step: string, agent: Agent, own: Partial<Record<Ste
   if (moved !== undefined) return moved;
   const judge: Record<FenceKey, (said: Said) => string | undefined> = {
     tools: (said) => toolsRefusal(said, resolved.tools ?? [], agentTools(agent, file)),
-    allowedTools: (said) => allowsRefusal(said, resolved.allowedTools ?? [], agentRules(agent, file, 'allowedTools')),
+    allowedTools: (said) =>
+      allowsRefusal(said, resolved.allowedTools ?? [], agentRules(agent, file, 'allowedTools'), agent.keys.permissionMode),
     disallowedTools: (said) => deniesRefusal(said, resolved.disallowedTools ?? [], agentRules(agent, file, 'disallowedTools')),
     permissionMode: (said) => modeRefusal(said, resolved.permissionMode ?? '', agent.keys.permissionMode),
     sandbox: (said) => sandboxRefusal(said, resolved.sandbox ?? '', agent.keys.sandbox),
@@ -83,7 +91,8 @@ const tighten = (said: Said, widen: string): string =>
 
 /**
  * Refused: a step that runs an agent whose file sets a fence key on a harness fenced the other way — a Claude Code agent on codex, or a
- * codex agent on Claude Code. A sandbox and a permission mode cannot be compared, so a move would let a step widen the fence by its harness.
+ * codex agent on Claude Code. A sandbox and a permission mode cannot be compared, so a move would let a step widen the fence by its
+ * harness.
  */
 function movedRefusal(step: string, agent: Agent, file: string, harness: string): string | undefined {
   const from = agentHarness(agent);
@@ -100,14 +109,17 @@ function toolsRefusal(said: Said, tools: readonly string[], agents: readonly str
   return `${said.step}: \`${said.line}\` would give its agent ${said.agent} ${listed(added)}, which ${said.file} does not ${tighten(said, `Take ${added.length > 1 ? 'them' : 'it'} off the line, or add ${added.length > 1 ? 'them' : 'it'} to \`tools:\``)}`;
 }
 
-/** Refused: an `allowedTools:` rule none of the agent's allow rules covers (`covers`); an agent with none allows nothing. */
-function allowsRefusal(said: Said, rules: readonly string[], agents: readonly string[]): string | undefined {
-  const added = rules.filter((rule) => !agents.some((by) => covers(by, rule)));
+/**
+ * Refused: an `allowedTools:` rule that neither one of the agent's allow rules covers (`covers`) nor the agent's mode grants
+ * (`modeGrants`); an agent with no rules and a mode that asks allows nothing.
+ */
+function allowsRefusal(said: Said, rules: readonly string[], agents: readonly string[], mode: string | undefined): string | undefined {
+  const added = rules.filter((rule) => !modeGrants(mode, rule) && !agents.some((by) => covers(by, rule)));
   if (!added.length) return undefined;
   return `${said.step}: \`${said.line}\` would allow its agent ${said.agent} ${listed(added)}, which ${said.file} does not allow ${tighten(said, `Take ${added.length > 1 ? 'them' : 'it'} off the line, or allow ${added.length > 1 ? 'them' : 'it'} in \`allowedTools:\``)}`;
 }
 
-/** Refused: a `disallowedTools:` list that leaves out a deny of the agent's, which it would lift, since a step's list replaces its agent's. */
+/** Refused: a `disallowedTools:` list that leaves out a deny of the agent's, which it would lift: a step's list replaces its agent's. */
 function deniesRefusal(said: Said, rules: readonly string[], agents: readonly string[]): string | undefined {
   const lifted = agents.filter((deny) => !rules.some((by) => covers(by, deny)));
   if (!lifted.length) return undefined;
@@ -138,6 +150,16 @@ function sandboxRefusal(said: Said, sandbox: string, agents: string | undefined)
       ? `names no sandbox, so its agent runs in \`${agentSandbox}\`, codex's default`
       : `runs its agent in \`${agentSandbox}\``;
   return `${said.step}: \`${said.line}\` is wider than ${said.file}, which ${runs} ${tighten(said, `Name one as narrow or narrower — ${listed(narrower)} — or widen the sandbox`)}`;
+}
+
+/**
+ * Whether an agent in permission mode `mode` already does what allow rule `rule` grants: `bypassPermissions` everything, and a mode that
+ * writes unasked (`editsUnasked`) an `Edit` of a path inside its directory, which a bare `**` covers (`pathCovers`).
+ */
+function modeGrants(mode: string | undefined, rule: string): boolean {
+  if (mode === 'bypassPermissions') return true;
+  const { tool, inner } = ruleParts(rule);
+  return tool === 'Edit' && inner !== undefined && editsUnasked(mode) && pathCovers('**', inner);
 }
 
 /** A permission rule's tool and what it names in its parentheses, `undefined` for a bare tool. */

@@ -379,7 +379,9 @@ agent's, or than its harness's default when the agent names none: from narrowest
 `acceptEdits`; `auto`; `bypassPermissions` — and on codex `read-only`; `workspace-write`; `danger-full-access`. And it may not run a
 fenced agent on the other harness, whose fence cannot be compared. One rule covers another when it is the same rule, a bare tool, a
 command prefix (`Bash(npm:*)` covers `Bash(npm test)`) or a path ending in `**` (`Edit(**)` covers `Edit(notes/**)`); anything else
-counts as wider. A step that needs a wider fence needs another agent.
+counts as wider. An agent's mode grants what it does unasked: from `acceptEdits` up, an `Edit` inside its directory, and under
+`bypassPermissions` every rule — so the board's try (`apps/api`) fences an agent whose mode edits unasked with `dontAsk` and
+`Edit(**)`, and runs one whose mode asks first in its own fence. A step that needs a wider fence needs another agent.
 
 The tests' team (`test/fixtures/team/`) is written this way, and the
 board's builder edits the node — which agent, its own keys and its note — showing the agent's values as placeholders.

@@ -8,6 +8,7 @@ import path from 'node:path';
 import { AGENTS_FOLDER, SKILLS_FOLDER, type Workflow } from '../step/step.ts';
 import { stepNameRefusal } from '../folder/folder.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
+import type { Mount } from '../record/record.ts';
 
 /** The one default factory's name: listed by `wf factory ls`, refused to `wf factory add` and `wf factory rm`. */
 export const DEFAULT_FACTORY = 'default';
@@ -147,6 +148,18 @@ export function outsideRefusal(factory: Pick<Factory, 'name' | 'repos'>, repo: s
   if (repos.includes(path.resolve(repo))) return undefined;
   const sorted = [...repos].sort();
   return `${repo}: the factory ${factory.name} works on ${sorted.join(', ')}, and this repository is not one of them. Name one of them — --repo ${sorted[0]} — or file a factory on this one: wf factory add <name> --repo ${path.resolve(repo)}. Nothing was started.`;
+}
+
+/**
+ * The folders a run in `factory` mounts: its repositories, each as `path.resolve` spells it, sorted and once each, but `repo`, the one
+ * the run works on; every one read-only. A folder run works on none of them, gives no `repo`, and mounts them all.
+ */
+export function factoryMounts(factory: Pick<Factory, 'repos'>, repo: string | undefined): Mount[] {
+  const own = repo === undefined ? undefined : path.resolve(repo);
+  return [...new Set(factory.repos.map((r) => path.resolve(r)))]
+    .filter((r) => r !== own)
+    .sort()
+    .map((r) => ({ path: r, readOnly: true }));
 }
 
 /** A factory's hires as `wf factory ls` lists them under its line, sorted by step: `build/implement ← ada`. */

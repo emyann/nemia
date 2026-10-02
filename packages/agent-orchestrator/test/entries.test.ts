@@ -160,6 +160,7 @@ const PINNED: Record<string, string[]> = {
     'isShipped',
     'lastCeilings',
     'lastPassCost',
+    'leftOutMounts',
     'lessonLine',
     'lifecycleGraph',
     'list',

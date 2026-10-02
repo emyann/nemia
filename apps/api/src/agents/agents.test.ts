@@ -181,7 +181,7 @@ test('a codex agent that names its sandbox as `permissionMode:`, as before 2026-
         version: fenced.version,
       }),
       422,
-      /^agents\/fenced\.md: `permissionMode: bypassPermissions` on a step that runs on codex is the former name of `sandbox:` there, .* Send `sandbox: danger-full-access` instead: .* reload it, and save again; .* clear it, and set the sandbox\.$/,
+      /^agents\/fenced\.md: `permissionMode: bypassPermissions` on a step that runs on codex is the former name of `sandbox:` there, .* Send the sandbox as `sandbox:` instead: .* reload it, and save again; .* clear it, and set the sandbox\.$/,
     );
     const put = await send('PUT', '/api/agents/yours/fenced', {
       name: 'fenced',

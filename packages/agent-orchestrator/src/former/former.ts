@@ -193,10 +193,11 @@ const renamed = (former: string): string => FORMER_KEYS[former] ?? FORMER_OWN_KE
  * Why a codex `permissionMode` (`formerSandbox`) is not written, as `formerKeyWritten` says of a former name: read
  * from a file, it is `sandbox:` on the step (`codexSandboxNamed`), and nothing puts it in one — `renderStep`, `renderAgent`, and
  * `writeWorkflow` for a step whose harness is its agent's. What sends one is a stale form that still names a codex sandbox as
- * `permissionMode`, or a step moved onto codex that kept its Claude Code mode, which a file would read as its sandbox.
+ * `permissionMode`, or a step moved onto codex that kept its Claude Code mode, which a file would read as its sandbox. It names no word for
+ * the sandbox: which words are one is the runtime's to say at `wf start`.
  */
 export const codexModeWritten = (file: string, word: string): string =>
-  `${file}: \`permissionMode: ${word}\` on a step that runs on codex is the former name of \`sandbox:\` there, which a file may still say but nothing writes. Send \`sandbox: ${sandboxNamed(word)}\` instead: a page that sends the former name is stale — reload it, and save again; and a step moved onto codex from Claude Code keeps its permission mode — clear it, and set the sandbox.`;
+  `${file}: \`permissionMode: ${word}\` on a step that runs on codex is the former name of \`sandbox:\` there, which a file may still say but nothing writes. Send the sandbox as \`sandbox:\` instead: a page that sends the former name is stale — reload it, and save again; and a step moved onto codex from Claude Code keeps its permission mode — clear it, and set the sandbox.`;
 
 /** What `wf start` says of a file whose codex step or agent still names its sandbox as `permissionMode:`. The one writer of it. */
 export const codexModeLine = (file: string, word: string): string =>

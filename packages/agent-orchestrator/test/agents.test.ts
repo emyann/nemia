@@ -529,7 +529,7 @@ test('REFUSED at shipped defaults: writeWorkflow of a draft on codex by its agen
   );
   assert.ok(
     said.startsWith('review: `permissionMode: read-only` on a step that runs on codex is the former name of `sandbox:` there') &&
-      said.includes('Send `sandbox: read-only` instead'),
+      said.includes('Send the sandbox as `sandbox:` instead'),
     said,
   );
   const kept = refusal(() =>
@@ -539,7 +539,8 @@ test('REFUSED at shipped defaults: writeWorkflow of a draft on codex by its agen
   );
   assert.ok(
     kept.startsWith('review: `permissionMode: dontAsk` on a step that runs on codex is the former name of `sandbox:` there') &&
-      kept.includes('a step moved onto codex from Claude Code keeps its permission mode — clear it, and set the sandbox.'),
+      kept.includes('a step moved onto codex from Claude Code keeps its permission mode — clear it, and set the sandbox.') &&
+      !kept.includes('`sandbox: dontAsk`'),
     `a Claude Code mode kept by a step moved onto codex is refused as the sandbox a file would read it as: ${kept}`,
   );
   assert.equal(fs.readFileSync(path.join(folder, 'review.md'), 'utf8'), '---\nagent: reviewer\n---\n', 'nothing written');

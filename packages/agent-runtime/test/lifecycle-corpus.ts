@@ -22,6 +22,10 @@ export const ended = (
   nativeId?: string,
 ): Event => ({ kind: 'ended', at: at(2 * S), attempt: n, sessionId: `s${n}`, observed, reason, ...(nativeId ? { nativeId } : {}) });
 export const signed = (n: number) => ended(n, 'done', 'harness', `native-${n}`);
+/** A long-lived attempt's session first listed with no process, its harness respawning it. */
+export const gap = (n: number, ms = S): Event => ({ kind: 'gap', at: at(ms), attempt: n });
+/** A long-lived attempt's session listed held in process `pid`. */
+export const held = (n: number, pid: number, ms = S): Event => ({ kind: 'process', at: at(ms), attempt: n, pid });
 
 /** Journal shapes, by name: what a task's record can say. */
 export const JOURNALS: Record<string, Event[]> = {
@@ -93,10 +97,29 @@ export const JOURNALS: Record<string, Event[]> = {
     { kind: 'stop-requested', at: at(2 * S) },
     ended(1, 'stopped', 'operator'),
   ],
+  'long-lived, intent, no spawn, gap open': [filed({ restartPolicy: 'Always' }), starting(1), gap(1)],
+  'long-lived, gap open': [filed({ restartPolicy: 'Always' }), starting(1), spawned(1), held(1, 100), gap(1)],
+  'long-lived, gap closed by a respawn': [
+    filed({ restartPolicy: 'Always' }),
+    starting(1),
+    spawned(1),
+    held(1, 100),
+    gap(1),
+    held(1, 200, 2 * S),
+  ],
+  'long-lived, stopped at its harness': [
+    filed({ restartPolicy: 'Always' }),
+    starting(1),
+    spawned(1),
+    ended(1, 'stopped', 'harness', 'native-1'),
+  ],
+  'long-lived, lost cold': [filed({ restartPolicy: 'Always' }), starting(1), spawned(1), ended(1, 'failed', 'lost')],
 };
 
 /** When the pass reads it: in the grace window and before a deadline of 40 s, or past both. */
 export const TIMES = { 'in grace': 2 * S, 'past grace': 45 * S } as const;
+/** A time more, `late`: past a respawn's gap (`RESPAWN_GAP_MS`) opened at 1 s. Asked for by `lifecycle.test.ts` alone, as `unread` is. */
+const LATE = { late: 125 * S } as const;
 export const DEADLINES = { 'no deadline': undefined, 'deadline 40 s': 40 } as const;
 
 /** The corpus's name for a pass that could not read the last attempt's harness. */
@@ -112,13 +135,17 @@ export type Case = {
 /**
  * Every journal shape, under every deadline, sighting and time: `SIGHTINGS` keyed by the name a case takes. With `unread`, one
  * sighting more, `unread`: the last attempt's name on none, its harness not read this pass (`Now.unread`). Asked
- * for by `lifecycle.test.ts` alone, so the corpus `session-state.test.ts` holds to its recording stays the one recorded.
+ * for by `lifecycle.test.ts` alone, so the corpus `session-state.test.ts` holds to its recording stays the one recorded. With
+ * `late`, one time more (`LATE`), on the same terms.
  */
-export const corpusOf = (SIGHTINGS: Record<string, Omit<Sighting, 'sessionId'> | undefined>, options: { unread?: boolean } = {}): Case[] =>
+export const corpusOf = (
+  SIGHTINGS: Record<string, Omit<Sighting, 'sessionId'> | undefined>,
+  options: { unread?: boolean; late?: boolean } = {},
+): Case[] =>
   Object.entries(JOURNALS).flatMap(([j, base]) =>
     Object.entries(DEADLINES).flatMap(([d, deadlineSeconds]) =>
       [...Object.entries(SIGHTINGS), ...(options.unread ? [[UNREAD, undefined] as const] : [])].flatMap(([s, sighting]) =>
-        Object.entries(TIMES).map(([t, ms]) => {
+        Object.entries({ ...TIMES, ...(options.late ? LATE : {}) }).map(([t, ms]) => {
           const events = base.map((e) => (e.kind === 'filed' && deadlineSeconds !== undefined ? { ...e, deadlineSeconds } : e));
           const last = fold(TASK, events).attempts.at(-1);
           const observed = new Map(sighting && last ? [[nameFor(TASK, last.n), { sessionId: `seen-${last.n}`, ...sighting }]] : []);

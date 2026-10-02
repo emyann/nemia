@@ -16,6 +16,7 @@ const ENGINE_PHASES: Readonly<Record<string, Phase>> = {
   list: 'journals',
   feed: 'journals',
   logs: 'journals',
+  output: 'journals',
   transcript: 'journals',
   file: 'act',
   admit: 'act',

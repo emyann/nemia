@@ -42,6 +42,7 @@ import {
   seedQuota,
   seedWorkflows,
 } from './seed.ts';
+import { QUOTA_ASKS_MS } from './board.ts';
 import { loadPages } from './pages.ts';
 import { exitOn, launch, visitAll } from './visit.ts';
 import { API, apiEnv, heard, OUT, setApiEnv, setStore, store, WEB } from './world.ts';
@@ -218,6 +219,8 @@ async function main(): Promise<void> {
      * back.
      */
     HKB_QUOTA_BACKOFF_MS: '0',
+    /** Each read waits for its own ask, however slow: at a keep of 0 no other ask answers it. */
+    HKB_QUOTA_WAIT_MS: String(QUOTA_ASKS_MS),
     PATH: `${bin}${path.delimiter}${process.env.PATH ?? ''}`,
   });
   const apiPort = await startServer(

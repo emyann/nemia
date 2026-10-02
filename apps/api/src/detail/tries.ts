@@ -15,7 +15,7 @@ import {
 import { LOOP_REPLIES, outputFields, type Workflow } from 'agent-orchestrator/workflow';
 import { artifactOf, type StepArtifact } from '../steps/artifacts.ts';
 import { wordOf } from '../runs/judged.ts';
-import { checkIn, type StepCheck } from '../steps/logs.ts';
+import { checkIn, type CheckStderr, type StepCheck } from '../steps/logs.ts';
 import { bare, type TaskView, type Views } from '../store.ts';
 
 /** A loop's target's answer to one finding it was handed, as its closeout gave it. */
@@ -168,16 +168,16 @@ export const turnOfTry = (earlier: readonly EarlierTry[], i: number): number =>
   earlier.slice(0, i).filter((t) => t.taskId === earlier[i].taskId && t.then !== 'recheck').length;
 
 /**
- * A step's tries, earliest first: each one its record keeps behind the current (`StepRecord.tries`), then the current, whose
- * word, check, closeout and attempts the step already has. Off the views already read (`viewsOf`), with no observation of its
- * own: an earlier refused check's stderr is a file, and its output is not read. What a person said to each try is off the
- * answers the request read (the answers `runStore` keeps).
+ * A step's tries, earliest first: each one its record keeps behind the current (`StepRecord.tries`), then the current, whose word, check,
+ * closeout and attempts the step already has. Off the views already read (`viewsOf`), with no observation of its own: an earlier refused
+ * check's stderr is read before (`refusedStderr`), and its stdout is not read. What a person said to each try is off the answers the
+ * request read (the answers `runStore` keeps).
  *
- * An earlier try is read on the turn of its task it was: a held task a person answered keeps each try they answered under its one id,
- * and a recheck replaces only the check, on the same task and turn, so it is no turn (as `turnsOf` counts them). Its status is
- * `succeeded` for a turn a person answered, which signed and ended `done` for it, the task's own word being the turn it is on now. What a
- * person said to a try, and how it was reached as `wf ls` words it — `answered`, when a person answered it — are read off the step's
- * record as it stood on that try, the tries behind it: `answerOf` reads a step's current try.
+ * An earlier try is read on the turn of its task it was: a held task a person answered keeps each try they answered under its one id, and a
+ * recheck replaces only the check, on the same task and turn, so it is no turn (as `turnsOf` counts them). Its status is `succeeded` for a
+ * turn a person answered, which signed and ended `done` for it, the task's own word being the turn it is on now. What a person said to a
+ * try, and how it was reached as `wf ls` words it — `answered`, when a person answered it — are read off the step's record as it stood on
+ * that try, the tries behind it: `answerOf` reads a step's current try.
  */
 export function triesOf(
   run: Run,
@@ -186,6 +186,7 @@ export function triesOf(
   views: Views,
   current: Pick<StepTry, 'status' | 'check' | 'closeout' | 'unreadable' | 'attempts'>,
   answers: readonly RetryAsk[],
+  stderr: CheckStderr,
 ): StepTry[] {
   const step = steps.find((s) => s.name === name) ?? bare(name);
   const record = run.steps[name];
@@ -205,7 +206,7 @@ export function triesOf(
       note: noteOf(i + 1),
       status: turnAt(i) < (views.get(t.taskId)?.state.inputs?.length ?? 0) ? 'succeeded' : wordOf(views)(t.taskId),
       attempts: attemptsIn(t.taskId, views, turnAt(i)),
-      check: step.check ? checkIn(step.check, t.check?.taskId, views) : null,
+      check: step.check ? checkIn(step.check, t.check?.taskId, views, stderr) : null,
       closeout: closeoutIn(run, name, step, t.taskId, views, turnAt(i)),
       unreadable: unreadableIn(t.taskId, views, turnAt(i)),
       answer: answerAt(i + 1),

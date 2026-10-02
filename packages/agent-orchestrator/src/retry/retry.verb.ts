@@ -3,15 +3,22 @@
  * controller, reaching the runtime through the client (`runtime-client.ts`): an Effect program that requires the engine as a service
  * (`retryRun`, over `EngineService`), and `retry`, its plain face in a Promise, over the engine it is handed.
  */
+import path from 'node:path';
 import { Effect } from 'effect';
-import { EngineService, awaited, tried, type Engine } from '../runtime-client.ts';
+import { EngineService, awaited, configRefusal, tried, type Engine } from '../runtime-client.ts';
 import { tryOf, type Run } from '../record/record.ts';
+import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
+import { filedRefusal, lineOf } from '../keys/index.ts';
+import { filedConfig, tryModel } from '../filed/filed.ts';
+import { budgetOf, budgetUsdFor, stepSpend, type SpendOf } from '../status/status.ts';
+import { toldOf } from '../tick/file.verb.ts';
+import type { Workflow } from '../workflow.ts';
 import { retryable, retryRefusal, type RetryAsk, type RetryHow } from './index.ts';
-import { stepsOf } from '../record/record.store.ts';
+import { artifactsDir, stepsOf } from '../record/record.store.ts';
 import { runStore } from '../record/files.store.ts';
 import { strayAsk } from '../say/say.verb.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, spendReader, taskPhases } from '../views/views.verb.ts';
-import { Conflict } from '../refusal/refusal.ts';
+import { Conflict, Invalid } from '../refusal/refusal.ts';
 
 /**
  * A person's ask, written: the run, the ask and its file — and `stopFirst`, when the tick stops the step's blocked session before it files
@@ -23,8 +30,9 @@ export type Asked = { run: Run; ask: RetryAsk; file: string; stopFirst: boolean 
  * Ask for another try of a step — `wf retry` — by writing the ask, and nothing else. The next tick honours it once.
  *
  * Refused before anything is written, with what to do instead (`retryRefusal`): a message that is empty or rides on
- * `--recheck`, a step that is not waiting on a person, a cancelled run, an ask for that try already there. Like a
- * cancellation, the ask is the person's own file, and the verb never writes the run's json, which the tick owns. What
+ * `--recheck`, a step that is not waiting on a person, a cancelled run, an ask for that try already there; then a try whose config
+ * its harness refuses (`tryRefused`). Like a cancellation, the ask is the person's own file, and the verb never writes the run's json,
+ * which the tick owns. What
  * the person said goes in the ask, `message`, and nowhere else: the tick carries it into the try's brief. An ask written by someone else
  * between the look and the write is refused as the look would have refused it, and a file at the ask's name that no pass reads as one is
  * named (`strayAsk`).
@@ -63,6 +71,9 @@ export const retryRun = Effect.fn('retry')(function* (
 
   const refused = refusal((yield* tried(() => runStore.asks.read(id))).asks);
   if (refused) return yield* Effect.fail(new Conflict({ message: refused }));
+  const step = steps.find((s) => s.name === stepName)!;
+  const refusedConfig = yield* tried(() => tryRefused(run, steps, step, how, spendOf));
+  if (refusedConfig) return yield* Effect.fail(new Invalid({ message: refusedConfig }));
   const ask: RetryAsk = {
     step: stepName,
     try: tryOf(run, stepName) + 1,
@@ -84,7 +95,6 @@ export const retryRun = Effect.fn('retry')(function* (
     );
     return yield* Effect.fail(new Conflict({ message: why }));
   }
-  const step = steps.find((s) => s.name === stepName)!;
   return {
     run,
     ask,
@@ -92,6 +102,22 @@ export const retryRun = Effect.fn('retry')(function* (
     stopFirst: retryable(step, run, phaseOf, closeoutReader(views, run), closeoutAsked(views), steps, blocked, spendOf).blockedByHarness,
   } satisfies Asked;
 });
+
+/**
+ * The runtime's refusal of the config the try asked for would be filed with (`filedConfig`, as the tick files a try: on the model the
+ * try runs on and with its cap), said as the step's after the line it comes from: the flag the retry typed where it chose the field
+ * (`--model`, on a fresh try, and `--budget`), else the step's own (`filedRefusal`). A recheck files no session, and a step on a remote
+ * agent is configured by its operator: neither is asked.
+ */
+function tryRefused(run: Run, steps: readonly Workflow[], step: Workflow, how: RetryHow, spendOf: SpendOf): string | undefined {
+  if (how.mode === 'recheck' || isRemoteHarness(step.harness)) return undefined;
+  const record = run.steps[step.name];
+  const budgetUsd = budgetUsdFor(step, how.budget ?? budgetOf(step, record), stepSpend(run, step.name, spendOf));
+  const runArtifacts = path.dirname(artifactsDir(run, step.name));
+  const config = filedConfig(step, steps, run, { model: tryModel(step, record, how), budgetUsd, runArtifacts, own: toldOf(run, step).own });
+  const flags = { ...(how.mode === 'fresh' && how.model !== undefined && { model: how.model }), budget: how.budget };
+  return filedRefusal((c) => configRefusal(step.harness ?? DEFAULT_HARNESS, c), step.name, config, lineOf(step, flags));
+}
 
 /**
  * `wf retry` (`retryRun`) in a Promise, over `e`: what the CLI, the api and the tests call. Rejects with the refusal the program failed

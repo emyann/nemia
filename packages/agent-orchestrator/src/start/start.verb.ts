@@ -6,20 +6,26 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { HARNESSES, readRemote, tried } from '../runtime-client.ts';
+import { configRefusal, HARNESSES, readRemote, tried } from '../runtime-client.ts';
 import { remoteAgentsFile } from '../harness/a2a.store.ts';
 import { refusalLines } from '../workspace/workspace.ts';
 import { type Workflow } from '../step/step.ts';
-import { remoteNameOf } from '../harness/harness.ts';
+import { DEFAULT_HARNESS, isRemoteHarness, remoteNameOf } from '../harness/harness.ts';
+import { filedRefusal, lineOf } from '../keys/index.ts';
+import { filedConfig } from '../filed/filed.ts';
+import { budgetUsdFor } from '../status/status.ts';
+import { renderedFlags } from '../agents/agents.ts';
+import { ownOf } from '../tick/file.verb.ts';
 import { fansOut, isFolderTeam } from '../workflow/index.ts';
 import { loadWorkflows, skillsFor, type Places } from '../folder/folder.store.ts';
+import { placesOf } from '../folder/lookup.store.ts';
 import { workRoot } from '../record/places.store.ts';
 import { gateRefusal } from '../ending/ending.ts';
 import { type Run } from '../record/record.ts';
 import { afterRefusal } from '../wait/wait.ts';
 import { inputRefusal, type InputFile } from './inputs.ts';
 import { runStore } from '../record/files.store.ts';
-import { HOME, inputsDir, runId, runsDir } from '../record/record.store.ts';
+import { HOME, artifactsDir, inputsDir, runId, runsDir } from '../record/record.store.ts';
 import { writeAgentFiles } from '../agents/agents.store.ts';
 import { makeWorkspace, readInclude } from '../workspace/worktree.store.ts';
 import { parentRecord } from '../branches/branches.store.ts';
@@ -98,9 +104,16 @@ function stepsIn(workflowDir: string, places: Places, factory: Factory | undefin
  * - a step named for another step's check (`<step>-check`) or try (`<step>-try<n>`, `<step>-try<n>-check`): the run files those tasks
  *   under those names, and would read one task as the other;
  * - a `remote: true` the engine does not bridge (`remoteRefusal`), and a remote agent not declared (`undeclaredRefusal`): the engine
- *   refuses them only when the step is filed, with the run on the record.
+ *   refuses them only when the step is filed, with the run on the record;
+ * - a step whose first filing's config its harness refuses (`configRefused`), the run started at `gates` beside the workflow's own.
  */
-export function stepsToStart(workflowDir: string, isolate: boolean, places: Places, factory?: Factory): Workflow[] {
+export function stepsToStart(
+  workflowDir: string,
+  isolate: boolean,
+  places: Places,
+  factory?: Factory,
+  gates: readonly string[] = [],
+): Workflow[] {
   const steps = stepsIn(workflowDir, places, factory);
   if (!isolate && isFolderTeam(steps)) {
     throw new Invalid({
@@ -143,7 +156,32 @@ export function stepsToStart(workflowDir: string, isolate: boolean, places: Plac
   if (unbridged) throw new Invalid({ message: unbridged });
   const undeclared = undeclaredRefusal(steps);
   if (undeclared) throw new Invalid({ message: undeclared });
+  const refusedConfig = configRefused(steps, places, gates);
+  if (refusedConfig) throw new Invalid({ message: refusedConfig });
   return steps;
+}
+
+/**
+ * The first step whose config, as its first filing would file it (`filedConfig`) in a run started at `gates`, the runtime refuses on its
+ * harness (`configRefusal`), in the runtime's words after the step's line they come from (`filedRefusal`); undefined where every step's
+ * is taken. A step on a remote agent is configured by its operator, and asked nothing. Its agent's flags name the folder the run renders
+ * it to, and an ending's read the run's artifacts folder, neither there yet: the runtime judges which flags a step has, never where they
+ * point.
+ */
+export function configRefused(steps: readonly Workflow[], places: Places, gates: readonly string[]): string | undefined {
+  for (const step of steps.filter((s) => !isRemoteHarness(s.harness))) {
+    const own = ownOf(step, renderedFlags(step, '.'), () => places.repo);
+    const runArtifacts = path.dirname(artifactsDir({ id: 'run' }, step.name));
+    const config = filedConfig(
+      step,
+      steps,
+      { gates: [...gates] },
+      { model: step.model, budgetUsd: budgetUsdFor(step, step.budget), runArtifacts, own },
+    );
+    const why = filedRefusal((c) => configRefusal(step.harness ?? DEFAULT_HARNESS, c), step.name, config, lineOf(step));
+    if (why) return why;
+  }
+  return undefined;
 }
 
 /**
@@ -354,7 +392,7 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   const isolate = opts.isolate ?? true;
   const places = placesOf(opts.repo);
   const factory = yield* tried(() => factoryNamed(opts.factory));
-  const steps = yield* tried(() => stepsToStart(opts.workflowDir, isolate, places, factory));
+  const steps = yield* tried(() => stepsToStart(opts.workflowDir, isolate, places, factory, opts.gates));
   const folder = isFolderTeam(steps);
   if (folder && opts.repoNamed) return yield* Effect.fail(new Invalid({ message: repoNamedRefusal(opts.repo) }));
   const outside = factory && !folder ? outsideRefusal(factory, opts.repo) : undefined;
@@ -380,6 +418,3 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
  * died of, as it was thrown.
  */
 export const start = (opts: StartOptions): Run => Effect.runSync(startRun(opts));
-
-/** Where a run on `repo` looks for its steps' agents and skills beside its folder's own (`lookupRoots`): the repository, then the store. */
-export const placesOf = (repo: string | undefined): Places => ({ ...(repo ? { repo } : {}), home: HOME });

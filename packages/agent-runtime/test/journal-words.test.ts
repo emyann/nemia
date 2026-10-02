@@ -2,7 +2,7 @@
  * What the journal says, word for word, for six scripted runs through `promiseEngine` — and what the harness was asked.
  *
  * Whatever carries a spawn, an observe or a stop to a harness, the record a run leaves is the same, to the word. Times are
- * masked, since they are the clock's — `at`, and the monotonic `mono` a start and a spawn carry beside it; everything else —
+ * masked, since they are the clock's — `at`, and the monotonic `mono` a start, a spawn and an end carry beside it; everything else —
  * ids, names, reasons, a harness's own words — is compared exactly, never by pattern: a word changed on the way from a harness
  * to the journal fails nothing else.
  *
@@ -124,6 +124,7 @@ test('a session that signs off: spawned, ended with its statement and usage, set
     {
       kind: 'ended',
       at: '<at>',
+      mono: '<mono>',
       attempt: 1,
       sessionId: 's-1',
       observed: 'done',
@@ -156,6 +157,7 @@ test("a session that ends with no statement where one was asked: ended as its ha
     {
       kind: 'ended',
       at: '<at>',
+      mono: '<mono>',
       attempt: 1,
       sessionId: 's-1',
       observed: 'done',
@@ -190,6 +192,7 @@ test('a spawn the harness refused: the attempt ends unstartable in its words, an
     {
       kind: 'ended',
       at: '<at>',
+      mono: '<mono>',
       attempt: 1,
       sessionId: '(never started)',
       observed: 'failed',
@@ -231,6 +234,7 @@ test('a person stops it: the session is stopped, its attempt ended by the operat
     {
       kind: 'ended',
       at: '<at>',
+      mono: '<mono>',
       attempt: 1,
       sessionId: 's-1',
       observed: 'stopped',
@@ -263,6 +267,7 @@ test('what the harness denied the session is written on its end, as it said it, 
   assert.deepEqual(ended, {
     kind: 'ended',
     at: '<at>',
+    mono: '<mono>',
     attempt: 1,
     sessionId: 's-1',
     observed: 'failed',
@@ -334,6 +339,7 @@ test('a task held open: it signs and waits, an answer is a turn that continues i
   const ended = (n: number, summary: string) => ({
     kind: 'ended',
     at: '<at>',
+    mono: '<mono>',
     attempt: n,
     sessionId: `s-${n}`,
     observed: 'done',

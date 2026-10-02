@@ -61,7 +61,7 @@ import {
   type StepNeeds,
   waitsIn,
 } from '../runs/judged.ts';
-import { checksOf, type StepCheck } from '../steps/logs.ts';
+import { checksOf, refusedStderr, type StepCheck } from '../steps/logs.ts';
 import {
   bare,
   type Engine,
@@ -583,16 +583,27 @@ const specOf = (step: Workflow): StepSpec => ({
  */
 const shownWorkflow = (run: Run, folder: readonly Workflow[] | null): readonly Workflow[] | null => run.workflow ?? folder;
 
+/** What `wf prune` took of a run, as the page shows it: when, each worktree and what it held, and its artifacts; null for none. */
+const prunedOf = (run: Run): RunDetail['pruned'] =>
+  run.pruned
+    ? {
+        at: run.pruned.at,
+        worktrees: run.pruned.worktrees.map(({ path, bytes }) => ({ path, bytes })),
+        artifacts: run.pruned.artifacts ? { at: run.pruned.artifacts.at, bytes: run.pruned.artifacts.bytes } : null,
+      }
+    : null;
+
 /**
  * A run in full, judged off the views of its tasks; or, when a task it reads does not (`judgedUnlessUnreadable`), why it is not judged, in
  * the words the list says it with (`RunSummary.unreadable`), and nothing else: the page shows no step as the engine's missing record would.
  *
  * The run's tasks, every try's, are read over one look at the harnesses (`viewsFor`), as the list reads them, the record first — never a
- * `view`, an observation, for each task of each try, one after another, on a page polled every five seconds — and only the run's own.
- * One more observation for each refused check's output (`checksOf`) and each blocked session's last line (`lastLineOf`), which only a
- * run's own detail reads. What its tries consumed and cost, and its timeline, come off the same views and the feed's filing times
- * (`filedTimes`), with no observation of their own; the timeline's rounds are of the loops of the steps the run is judged by. Read through
- * the app's engine and root, what it read before kept in its `memo`.
+ * `view`, an observation, for each task of each try, one after another, on a page polled every five seconds — and only the run's own. A
+ * refused check's streams are read through the engine's `output`, which observes nothing (`refusedStderr`, `checksOf`), and one more
+ * observation is made for each blocked session's last line (`lastLineOf`), which only a run's own detail reads. What its tries consumed and
+ * cost, and its timeline, come off the same views and the feed's filing times (`filedTimes`), with no observation of their own; the
+ * timeline's rounds are of the loops of the steps the run is judged by. Read through the app's engine and root, what it read before kept in
+ * its `memo`.
  */
 export async function detail(run: Run, { e, home, memo }: Pick<Served, 'e' | 'home' | 'memo'>): Promise<RunDetail | { unjudged: string }> {
   const folder = workflowsOf(run, home);
@@ -607,7 +618,8 @@ export async function detail(run: Run, { e, home, memo }: Pick<Served, 'e' | 'ho
   if ('unreadable' in read) return { unjudged: read.unreadable };
   const judged = read.judged;
   const steps = judgedSteps(run, workflows);
-  const checks = await checksOf(e, run, steps, views);
+  const stderr = await refusedStderr(e, run, views);
+  const checks = await checksOf(e, run, steps, views, stderr);
   const source = shownWorkflow(run, workflows);
   const used = consumption(views, run);
   const filed = await filedTimes(e, memo.filings);
@@ -626,13 +638,7 @@ export async function detail(run: Run, { e, home, memo }: Pick<Served, 'e' | 'ho
     createdAt: run.createdAt,
     startedAt: runStartedAt(run, filed),
     cancelledAt: run.cancelledAt ?? null,
-    pruned: run.pruned
-      ? {
-          at: run.pruned.at,
-          worktrees: run.pruned.worktrees.map(({ path, bytes }) => ({ path, bytes })),
-          artifacts: run.pruned.artifacts ? { at: run.pruned.artifacts.at, bytes: run.pruned.artifacts.bytes } : null,
-        }
-      : null,
+    pruned: prunedOf(run),
     onDisk: onDiskOf(run, home),
     after: run.after ?? [],
     ...(run.from ? { from: run.from, fromNote: fromNote(run)! } : {}),
@@ -687,7 +693,7 @@ export async function detail(run: Run, { e, home, memo }: Pick<Served, 'e' | 'ho
           ...current,
           used: taskId ? usedOf(used[name], judgedContext) : null,
           ...costOf(run, name, steps, views, judged.spendOf),
-          tries: triesOf(run, name, steps, views, current, judged.answers),
+          tries: triesOf(run, name, steps, views, current, judged.answers, stderr),
           timeline: (clock.steps[name] ?? []).map((t) => ({ ...t, used: t.session ? usedOf(t.used, judgedContext) : null })),
         };
       }),

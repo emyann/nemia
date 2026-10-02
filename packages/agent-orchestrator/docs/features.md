@@ -322,9 +322,8 @@ What it leaves:
   so nothing does one.
 - **A try shares its step's files directory.** The last try's screenshots stay beside the new try's until they
   are overwritten, and `wf decide` lists them all.
-- **Two readings of one verdict.** The tick tells a refusal by the exit code the engine recorded, so no log is
-  read per pass. `wf ls` and `wf decide` read the log's `[wf check] exit N`. They agree while the check prints
-  the code it exits with. A record from before the engine kept exit codes reads as "did not finish" to the
+- **One reading of one verdict.** The tick, `wf ls` and `wf decide` tell a refusal by the exit code the engine
+  recorded on the check's attempt (`attemptVerdict`), so no log is read per pass. A record from before the engine kept exit codes reads as "did not finish" to the
   tick, so it offers `--recheck` rather than spending a retry. A caller that passes no verdict gets the same
   reading. F's review found the api passing none, and reading a check stopped at its deadline as a refusal
   with a try due.
@@ -4580,7 +4579,7 @@ whose check nobody but the shipper read. The run executes it now, as it executes
 - **The ending stages; the run lands.** The shipper merges `--no-ff --no-commit` and signs off `done` with the commit message as its
   closeout's `message` (`workflows/agents/shipper.schema.json`); its brief says so under *The run checks and lands your merge*
   (`landingContract` in `check.ts`). The tick files the check on the `check` harness in the checkout, with `CHECK_DEADLINE_SECONDS`, niced,
-  its log and `WF_STDERR` where a check's go and no `WF_BASE_REF`, and `assess` reads it as it reads any check. `landingDue` (pure,
+  its streams kept as a check's are and no `WF_BASE_REF`, and `assess` reads it as it reads any check. `landingDue` (pure,
   `ending/ending.ts`) says what the settled check calls for, and `landEnding` (`ending/ending.verb.ts`) applies it: `git commit -F -` with
   the message on exit 0, `git merge --abort` on anything else. The step reads `checking` until then, then `verified ✓`, or `failed ✗ check
   (…)` / `failed` with the merge aborted; its record keeps `landed: {commit}` or `{aborted: <why>}`, and `wf ls` words it on the step's line
@@ -4972,6 +4971,20 @@ open a pull request.
   own checkout (`workspace: main`), reads main's settings, which deny nothing: nothing refuses that one step a push, a forced delete
   or the unsafe tool but its brief. Start such a run again rather than approve its ship unwatched. A supervisor started before this
   landed keeps its old list, without the forced delete: stop it and start it again.
+
+## Shipped: a check runs on the runtime's command harness (2026-10-02)
+
+The run no longer hands the runtime a harness of its own for checks. `HARNESSES.check` is the runtime's `commandHarness` under the
+name checks have always run under, and `fileCheck` files `sh -c` and the line the run froze (`checkArgv`), with the check's
+environment and niceness, as the task's `config`. The runtime keeps each stream whole and serves it through `output`.
+
+- **The verdict is the attempt's exit code** (`attemptVerdict`), read the same way by the tick, `wf ls`, `wf decide` and the api; one
+  cut short at its deadline or by an operator did not finish. No trailer is printed or read.
+- **What a check said is read through `output`**: the brief of the step after it, `wf decide`'s screen and the run page, which
+  shows every try's stderr and the current try's stdout. A check filed before has no streams kept, and is read off its log, `partial`.
+- **Gone**: the check script, its trailer and the copy of stdout, `WF_STDERR` and `WF_STDOUT`, `checks/<task>.stdout` and
+  `.stderr` (`wf rm` still removes those an earlier run wrote), and the api's read of a file.
+- **The daemon is restarted after landing**: until it is, it files and reads checks with the code it loaded.
 
 ## 1. A run that grows steps from a plan
 

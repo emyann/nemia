@@ -5,7 +5,8 @@
 import { workflowFolder } from '../folder/folder.store.ts';
 import { type Card, type Planned } from './plan.ts';
 import { readPlan } from './plan.store.ts';
-import { placesOf, refuseInclude, start, stepsToStart } from '../start/start.verb.ts';
+import { refuseInclude, start, stepsToStart } from '../start/start.verb.ts';
+import { placesOf } from '../folder/lookup.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 
 /**

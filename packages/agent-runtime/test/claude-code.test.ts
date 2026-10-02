@@ -4,13 +4,17 @@
  * remembered. Against the real worker and a fake `claude` on PATH that records what it was given and prints what Claude
  * Code prints.
  */
-import { test } from 'node:test';
+import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
 import { ioCounts } from '../src/core/engine/tally.ts';
+import { parentFileOf, type ParentCall } from '../src/harness/claude/parent.ts';
+import type { Statement } from '../src/harness/claude/bg.ts';
+import type { SpawnRequest } from '../src/harness/seam.ts';
+import { stepClock } from './clock.ts';
 
 const tmp = (label: string) => scratch(`ae-claude-code-${label}-`);
 
@@ -18,6 +22,7 @@ const tmp = (label: string) => scratch(`ae-claude-code-${label}-`);
 const config = tmp('config');
 process.env.CLAUDE_CONFIG_DIR = config;
 const { claudeCodeOps, claudeJob } = await import('../src/harness/claude/code.ts');
+const { claudeOps, QUIESCENT_AFTER_MS } = await import('../src/harness/claude/bg.ts');
 const { claudeCodeRefuses, claudeRefuses } = await import('../src/harness/claude/vocabulary.ts');
 
 const JOB_ID = '5e551011-0000-4000-8000-00000000000a';
@@ -26,10 +31,11 @@ const BG_ID = '5e551011-0000-4000-8000-00000000000b';
 /**
  * A fake `claude`: `-p` records its arguments, prints its init line, and then reads its stdin a line at a time as Claude
  * Code does — recording each in `job-stdin`, and printing a result for each but a brief of `wait`, until its stdin ends.
- * The result names its `type` last, as Claude Code's does. `--bg` records its arguments; `agents` lists what
- * `agents.json` holds, a line in `agents-calls` each time; `stop` and `rm` are recorded in order.
+ * The result names its `type` last, as Claude Code's does. `--bg` records its arguments, and the file `sees` as it finds it in
+ * `bg-saw` (`absent` when there is none); `agents` lists what `agents.json` holds, a line in `agents-calls` each time; `stop` and
+ * `rm` are recorded in order.
  */
-const fake = () => {
+const fake = (sees?: string) => {
   const dir = tmp('bin');
   const echo = (line: object) => `      echo '${JSON.stringify(line)}'`;
   fs.writeFileSync(path.join(dir, 'agents.json'), '[]');
@@ -40,7 +46,7 @@ const fake = () => {
       'case "$1" in',
       `  agents) echo x >> '${dir}/agents-calls'; cat '${dir}/agents.json' ;;`,
       `  stop|rm) echo "$@" >> '${dir}/verbs' ;;`,
-      `  --bg) printf '%s\\n' "$@" > '${dir}/bg-args' ;;`,
+      `  --bg) ${sees ? `{ cat '${sees}' 2>/dev/null || echo absent; } > '${dir}/bg-saw'; ` : ''}printf '%s\\n' "$@" > '${dir}/bg-args' ;;`,
       `  -p) printf '%s\\n' "$@" > '${dir}/job-args.tmp'; mv '${dir}/job-args.tmp' '${dir}/job-args'`,
       echo({ type: 'system', subtype: 'init', session_id: JOB_ID }),
       `      while IFS= read -r line; do printf '%s\\n' "$line" >> '${dir}/job-stdin'`,
@@ -79,15 +85,17 @@ const fake = () => {
   };
 };
 
-/** The Claude Code runner over a store at `root`, a background session's clock and statement answered without a transcript. */
-const opsIn = (root: string) =>
-  claudeCodeOps({
-    root,
-    sessionsDir: tmp('sessions'),
-    transcriptTime: async () => Date.now(),
-    closeoutFrom: async () => undefined,
-    usageFrom: async () => undefined,
-  });
+/** The Claude Code runner's options over a store at `root`, a background session's clock and statement answered without a transcript. */
+const opsOptions = (root: string) => ({
+  root,
+  sessionsDir: tmp('sessions'),
+  transcriptTime: async () => Date.now(),
+  closeoutFrom: async () => undefined,
+  usageFrom: async () => undefined,
+});
+
+/** The Claude Code runner over a store at `root` (`opsOptions`). */
+const opsIn = (root: string) => claudeCodeOps(opsOptions(root));
 
 const until = async <T>(read: () => Promise<T | undefined>, what: string, ms = 15_000): Promise<T> => {
   const deadline = Date.now() + ms;
@@ -609,7 +617,7 @@ test("Claude Code's own flags (`config.claude`) are handed over as written, afte
   );
 });
 
-test("a job reads its checkout's settings and never the operator's — `--setting-sources project,local` once, on both `claude -p` specs; a background session is not given it", async () => {
+test("a job reads its checkout's shared settings and neither the operator's nor a `settings.local.json` — `--setting-sources project` once, on both `claude -p` specs; a background session is not given it", async () => {
   const { claudeDetached } = await import('../src/harness/claude/code.ts');
   const sources = (args: string[]) => args.flatMap((a, i) => (a === '--setting-sources' ? [args[i + 1]] : []));
   const f = fake();
@@ -624,11 +632,11 @@ test("a job reads its checkout's settings and never the operator's — `--settin
   } finally {
     f.restore();
   }
-  assert.deepEqual(sources(job), ['project,local'], 'the argv the worker gave the job');
-  assert.deepEqual(sources(claudeDetached.command({ name: 'ae/t/1', brief: 'b', cwd: '/r' }).args), ['project,local'], 'claude-detached');
+  assert.deepEqual(sources(job), ['project'], 'the argv the worker gave the job');
+  assert.deepEqual(sources(claudeDetached.command({ name: 'ae/t/1', brief: 'b', cwd: '/r' }).args), ['project'], 'claude-detached');
   assert.deepEqual(
     sources(claudeJob.command({ name: 'ae/t/1', brief: 'b', cwd: '/r', config: { claude: { settings: '{}' } } }).args),
-    ['project,local'],
+    ['project'],
     "beside the caller's own `--settings`",
   );
   assert.deepEqual(sources(bg), [], 'a background session reads what it read before');
@@ -777,4 +785,235 @@ test("a flag Claude Code does not have fails the attempt as the CLI fails it —
   } finally {
     process.env.PATH = prev;
   }
+});
+
+const PARENT_ID = '5e551011-0000-4000-8000-00000000000c';
+const PARENT_CALL = 'toolu_01Parent';
+const OWN_CALL = 'toolu_01Child';
+
+/** The Claude Code runner over a store at `root`, a resumed session's parent's last call answered by `parent` without a transcript. */
+const bgOps = (root: string, parent: (sessionId: string) => Promise<ParentCall | undefined> = async () => ({ lastCall: PARENT_CALL })) =>
+  claudeCodeOps({ ...opsOptions(root), parentCallFrom: parent });
+
+/** A background row of ours, as `claude agents --all --json` lists it. */
+const bgRow = (name: string, state: string, status: string, startedAt: number) => ({
+  name,
+  sessionId: BG_ID,
+  state,
+  status,
+  kind: 'background',
+  startedAt,
+});
+
+const recordAt = (root: string, name: string) => JSON.parse(fs.readFileSync(parentFileOf(root, name), 'utf8')) as unknown;
+
+test("a background spawn records its parent's last StructuredOutput call under `root` — null resumed from nothing — and none where it could not tell, clearing the last one's", async () => {
+  const f = fake();
+  try {
+    const root = tmp('root');
+    const bg = { cwd: f.dir, config: { background: true } };
+    await Effect.runPromise(bgOps(root).spawn({ name: 'ae/fresh/1', brief: 'go', ...bg }));
+    assert.deepEqual(recordAt(root, 'ae/fresh/1'), { lastCall: null }, 'a fresh session has no parent: any call it makes is its own');
+
+    await Effect.runPromise(bgOps(root).spawn({ name: 'ae/r/2', brief: 'go', resumeFrom: PARENT_ID, ...bg }));
+    assert.deepEqual(recordAt(root, 'ae/r/2'), { lastCall: PARENT_CALL });
+
+    const asked: string[] = [];
+    const cannot = [
+      async (id: string) => {
+        asked.push(id);
+        return undefined;
+      },
+      async (id: string): Promise<ParentCall | undefined> => {
+        asked.push(id);
+        throw new Error('line 2 of the transcript does not decode');
+      },
+    ];
+    for (const parent of cannot) {
+      await Effect.runPromise(bgOps(root).spawn({ name: 'ae/r/2', brief: 'go', resumeFrom: PARENT_ID, ...bg }));
+      assert.ok(fs.existsSync(parentFileOf(root, 'ae/r/2')), 'seeded by the spawn before');
+      await Effect.runPromise(bgOps(root, parent).spawn({ name: 'ae/r/2', brief: 'go', resumeFrom: PARENT_ID, ...bg }));
+      assert.equal(fs.existsSync(parentFileOf(root, 'ae/r/2')), false, "no record, and not another attempt's: the time judges");
+      assert.equal(f.read('bg-args')?.[0], '--bg', 'and the session is spawned all the same');
+    }
+    assert.deepEqual(asked, [PARENT_ID, PARENT_ID], 'asked of the session it resumes');
+  } finally {
+    f.restore();
+  }
+});
+
+test("the parent's last call is on disk before `claude --bg` runs, so no look can find the session without it", async () => {
+  const root = tmp('root');
+  const f = fake(parentFileOf(root, 'ae/r/2'));
+  try {
+    await Effect.runPromise(
+      bgOps(root).spawn({ name: 'ae/r/2', brief: 'go', cwd: f.dir, resumeFrom: PARENT_ID, config: { background: true } }),
+    );
+    assert.deepEqual(JSON.parse(f.read('bg-saw')!.join('\n')), { lastCall: PARENT_CALL });
+  } finally {
+    f.restore();
+  }
+});
+
+test('REFUSED: a background spawn whose record of its parent cannot be written starts nothing and says so', async () => {
+  const f = fake();
+  try {
+    const root = tmp('root');
+    fs.writeFileSync(path.join(root, 'parent'), 'a file where the folder goes');
+    const e = await Effect.runPromise(
+      Effect.flip(bgOps(root).spawn({ name: 'ae/r/2', brief: 'go', cwd: f.dir, resumeFrom: PARENT_ID, config: { background: true } })),
+    );
+    assert.equal(e.refused, true, 'nothing started, so the attempt is unstartable, not lost');
+    assert.ok(e.message.startsWith('claude --bg: '), e.message);
+    assert.equal(f.read('bg-args'), undefined, '`claude` never ran');
+  } finally {
+    f.restore();
+  }
+});
+
+/** What `observe` reports of the background session `name`, its row `row` and its record written as `record`, or none. */
+const seenWith = async (o: { record?: string; said: Statement; row: object; quiet?: boolean }) => {
+  const f = fake();
+  try {
+    const root = tmp('root');
+    if (o.record !== undefined) {
+      fs.mkdirSync(path.dirname(parentFileOf(root, 'ae/r/2')), { recursive: true });
+      fs.writeFileSync(parentFileOf(root, 'ae/r/2'), o.record);
+    }
+    fs.writeFileSync(path.join(f.dir, 'agents.json'), JSON.stringify([o.row]));
+    const ops = claudeCodeOps({
+      root,
+      sessionsDir: tmp('sessions'),
+      now: () => Date.now(),
+      transcriptTime: async () => Date.now() - 10 * QUIESCENT_AFTER_MS,
+      closeoutFrom: async () => o.said,
+      usageFrom: async () => undefined,
+    });
+    return (await Effect.runPromise(ops.observe)).get('ae/r/2');
+  } finally {
+    f.restore();
+  }
+};
+
+test("REFUSED by identity: an idle session's statement with its parent's last call id is its parent's, though made after it began", async () => {
+  const startedAt = Date.now() - 60_000;
+  const seen = await seenWith({
+    record: JSON.stringify({ lastCall: PARENT_CALL }),
+    said: { payload: { by: 'parent' }, at: startedAt + 1_000, id: PARENT_CALL, lastWord: true },
+    row: bgRow('ae/r/2', 'working', 'idle', startedAt),
+  });
+  assert.equal(seen?.state, 'working');
+  assert.equal(seen?.closeout, undefined, 'its time would keep it; its id says it was inherited');
+});
+
+test("kept by identity: an idle session's own statement is reported with no time, made before its start by the clock or not", async () => {
+  const startedAt = Date.now();
+  for (const lastCall of [PARENT_CALL, null]) {
+    const seen = await seenWith({
+      record: JSON.stringify({ lastCall }),
+      said: { payload: { by: 'child' }, at: startedAt - 60_000, id: OWN_CALL, lastWord: true },
+      row: bgRow('ae/r/2', 'working', 'idle', startedAt),
+    });
+    assert.deepEqual(seen?.closeout, { payload: { by: 'child' } }, `parent's last call ${lastCall}`);
+    assert.equal('at' in (seen?.closeout ?? {}), false, 'no time for the engine to drop it by');
+  }
+});
+
+test('a busy session quiet for the floor whose own statement is its last word reports it with no time, whatever its clock — its parent’s, nothing', async () => {
+  const startedAt = Date.now() - 20 * QUIESCENT_AFTER_MS;
+  const busy = bgRow('ae/r/2', 'working', 'busy', startedAt);
+  const own = await seenWith({
+    record: JSON.stringify({ lastCall: PARENT_CALL }),
+    said: { payload: { by: 'child' }, at: startedAt - 60_000, id: OWN_CALL, lastWord: true },
+    row: busy,
+  });
+  assert.deepEqual(own?.closeout, { payload: { by: 'child' } }, 'stamped before its start, and its own all the same');
+  assert.ok((own?.quietMs ?? 0) >= QUIESCENT_AFTER_MS, 'and quiet');
+
+  const inherited = await seenWith({
+    record: JSON.stringify({ lastCall: PARENT_CALL }),
+    said: { payload: { by: 'parent' }, at: startedAt + 1_000, id: PARENT_CALL, lastWord: true },
+    row: busy,
+  });
+  assert.equal(inherited?.closeout, undefined);
+  assert.equal(inherited?.quietMs, undefined, 'its last word is its parent’s: it has said nothing of its own');
+});
+
+test('with no record, or one that does not read, a statement keeps its time for the engine to judge — never a refusal', async () => {
+  const startedAt = Date.now();
+  const said = { payload: { by: 'someone' }, at: startedAt - 60_000, id: OWN_CALL, lastWord: true };
+  for (const record of [undefined, 'not json', JSON.stringify({ lastCall: 7 }), JSON.stringify([PARENT_CALL])]) {
+    const seen = await seenWith({ ...(record !== undefined ? { record } : {}), said, row: bgRow('ae/r/2', 'working', 'idle', startedAt) });
+    assert.deepEqual(seen?.closeout, { payload: { by: 'someone' }, at: startedAt - 60_000 }, `record ${record}`);
+  }
+  const noId = await seenWith({
+    record: JSON.stringify({ lastCall: PARENT_CALL }),
+    said: { payload: { by: 'someone' }, at: startedAt - 60_000, lastWord: true },
+    row: bgRow('ae/r/2', 'working', 'idle', startedAt),
+  });
+  assert.deepEqual(noId?.closeout, { payload: { by: 'someone' }, at: startedAt - 60_000 }, 'a call with no id cannot be told');
+});
+
+/**
+ * The first attempt of a task resumed from a background session, run on Claude Code's background runner through an engine until it
+ * settles: `claude --bg` registers a finished session, and `said` is what its transcript says, given the session's start.
+ */
+const settledResumed = async (said: (startedAt: number) => Statement) => {
+  const f = fake();
+  try {
+    const { Engine, promiseEngine } = await import('../src/index.ts');
+    const root = tmp('root');
+    let startedAt = 0;
+    const ops = claudeOps({
+      root,
+      transcriptTime: async () => Date.now(),
+      closeoutFrom: async () => said(startedAt),
+      parentCallFrom: async () => ({ lastCall: PARENT_CALL }),
+      usageFrom: async () => undefined,
+    });
+    const runner = {
+      spawn: (r: SpawnRequest) => Effect.runPromise(ops.spawn(r)),
+      observe: () => Effect.runPromise(ops.observe),
+      stop: (id: string) => Effect.runPromise(ops.stop(id)),
+      logs: async () => '',
+    };
+    const e = promiseEngine(Engine.layer({ root, harnesses: { bg: runner } }));
+    const id = await e.file({ brief: 'b', cwd: f.dir, harness: 'bg', resumeFrom: PARENT_ID, closeoutSchema: { type: 'object' } });
+    const until = Date.now() + 20_000;
+    while (!(await e.view(id)).state.settled) {
+      assert.ok(Date.now() < until, 'settled');
+      await e.tick();
+      const name = f.read('bg-args')?.[2];
+      if (name && !startedAt) {
+        startedAt = Date.now();
+        fs.writeFileSync(path.join(f.dir, 'agents.json'), JSON.stringify([bgRow(name, 'done', 'idle', startedAt)]));
+      }
+    }
+    return (await e.view(id)).state.attempts[0];
+  } finally {
+    f.restore();
+  }
+};
+
+test("through the engine, a resumed session's own statement is on the record when this process's clock runs ahead of its transcript's", async (t: TestContext) => {
+  stepClock(t, 60_000);
+  const attempt = await settledResumed((startedAt) => ({
+    payload: { by: 'child' },
+    at: startedAt - 60_000 + 1_000,
+    id: OWN_CALL,
+    lastWord: true,
+  }));
+  assert.deepEqual(attempt?.closeout, { by: 'child' });
+  assert.notEqual(attempt?.stated, false);
+});
+
+test("through the engine, a resumed session that ended with only its parent's statement said nothing of its own", async () => {
+  const attempt = await settledResumed((startedAt) => ({
+    payload: { by: 'parent' },
+    at: startedAt + 1_000,
+    id: PARENT_CALL,
+    lastWord: true,
+  }));
+  assert.equal(attempt?.closeout, undefined);
+  assert.equal(attempt?.stated, false);
 });

@@ -51,15 +51,15 @@ const session = (taskId: string, harness: string, from: number, closeout: object
   ]);
 
 /**
- * A check that ran to its end and exited 1: a refusal — on the engine's record, which the api reads, and in the log its harness's worker
- * leaves, which `wf ls` reads (`readVerdict`), so the two agree.
+ * A check that ran to its end and exited 1: a refusal — on the engine's record, which the api reads and `wf ls` reads (`exitVerdicts`),
+ * so the two agree.
  */
 const refusedCheck = (taskId: string, from: number) => {
   journal(taskId, [
     {
       kind: 'filed',
       at: at(from),
-      brief: JSON.stringify({ check: 'npm test', env: {} }),
+      brief: 'npm test',
       cwd: '/code/app',
       maxAttempts: 1,
       harness: 'check',
@@ -72,7 +72,7 @@ const refusedCheck = (taskId: string, from: number) => {
   const name = `ae/${taskId}/1`;
   const base = path.join(root, 'engine', 'runs', 'check', name.replace(/[^a-zA-Z0-9]+/g, '_'));
   write(`${base}.json`, JSON.stringify({ name, state: 'done', pid: 0, heartbeatAt: at(from + 10), logFile: `${base}.log`, exitCode: 1 }));
-  write(`${base}.log`, 'not ok 1 - tokens are colours\n# fail 1\n\n[wf check] exit 1\n');
+  write(`${base}.log`, 'not ok 1 - tokens are colours\n# fail 1\n');
 };
 
 const done = (summary: string, more: object = {}) => ({ outcome: 'done', summary, needs: null, artifacts: [], ...more });

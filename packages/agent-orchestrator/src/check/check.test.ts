@@ -1,37 +1,35 @@
 /**
- * The check: a shell line the run executes, and the number it exits with.
+ * The check: a shell line the run executes on the runtime's command harness, and the number it exits with.
  *
- * The pure half — the brief, the verdict, the contract — is tested as data. The harness is tested the
- * only way that proves it: handed to a real engine, run by the real detached worker, with `sh`.
+ * The pure half — the argv, the verdict, the contract — is tested as data. The harness is tested the only way that proves it: registered
+ * with a real engine, run by the real detached worker, with `sh`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import type { Engine } from 'agent-runtime';
+import { commandHarness } from 'agent-runtime';
 import { Engine as EngineService, promiseEngine } from 'agent-runtime/effect';
 import {
-  CHECK,
   CHECK_NICENESS,
   INSTALL,
-  checkBrief,
+  attemptVerdict,
+  checkArgv,
   checkContract,
-  checkScript,
   lastLines,
-  readCheckBrief,
-  readVerdict,
   refusalSection,
   REPORTED_LINES,
   reportedLines,
   checkHandedSection,
-  stdoutTail,
   type CheckEnv,
   type Verdict,
 } from './check.ts';
 import { refusedCheck } from '../record/record.ts';
 import { exitVerdicts } from '../views/views.verb.ts';
+import { HARNESSES } from '../runtime-client.ts';
 import { scratch } from '../../test/scratch.ts';
 
 const ENV: CheckEnv = {
@@ -39,135 +37,37 @@ const ENV: CheckEnv = {
   WF_STEP: 'implement',
   WF_BASE_REF: 'abc123',
   WF_WORKSPACE: '/wt',
-  WF_STDERR: '/tmp/x.stderr',
-  WF_STDOUT: '',
   WF_ARTIFACTS: '/wf/runs/r-1/artifacts/implement',
 };
 
-test('the verdict is the last trailer in the log — one the command printed earlier changes nothing', () => {
-  assert.equal(readVerdict('ok 1\n# pass 3\n\n[wf check] exit 0\n'), 0);
-  assert.equal(readVerdict('[wf check] exit 0\nnot ok 2\n\n[wf check] exit 1\n'), 1);
+test('a check runs as `sh -c` and the line the run froze, as it is', () => {
+  assert.deepEqual(checkArgv('npm test'), ['sh', '-c', 'npm test']);
+  assert.deepEqual(checkArgv('npm test', false), ['sh', '-c', 'npm test']);
 });
 
-test('a log with no trailer is unfinished, never a guessed number', () => {
-  assert.equal(readVerdict('running 40 tests…\n'), 'unfinished', 'the deadline or a stop killed the script before its last line');
-  assert.equal(readVerdict('(no output yet)'), 'unfinished');
-  assert.equal(readVerdict('echo "[wf check] exit 0" is not on a line of its own'), 'unfinished');
-});
-
-test('a check brief carries its command and environment exactly', () => {
-  const command = `npm test && node -e 'console.log("a \\"quoted\\" \`thing\`")'`;
-  assert.deepEqual(readCheckBrief(checkBrief(command, ENV)), { command, env: ENV });
-});
-
-test('a brief that is not a check brief runs as the bare command, and reading it never throws', () => {
-  assert.deepEqual(
-    readCheckBrief('npm test'),
-    { command: 'npm test', env: {} },
-    "a harness whose command throws rejects the engine's whole tick, every run with it",
-  );
-  assert.deepEqual(readCheckBrief('{"not": "a check"}'), { command: '{"not": "a check"}', env: {} });
-  assert.deepEqual(readCheckBrief('null'), { command: 'null', env: {} });
-});
-
-test('only WF_ names reach the environment — a name `env` would read as an option is refused', () => {
-  const brief = JSON.stringify({ check: 'true', env: { WF_RUN: 'r', '-i': 'x', PATH: '/evil', WF_STEP: 7 } });
-  assert.deepEqual(readCheckBrief(brief).env, { WF_RUN: 'r' });
-  const { cmd, args } = CHECK.command({ brief });
-  assert.equal(cmd, 'nice');
-  assert.deepEqual(args.slice(0, 6), ['-n', '10', 'env', 'WF_RUN=r', 'sh', '-c']);
-});
-
-test('a filed check starts under `nice -n 10`, and its shell puts itself in the idle IO class before the command', () => {
-  assert.equal(
-    CHECK_NICENESS,
-    10,
-    'several checks at once freeze a workstation; an agent session is filed on another harness, and never passes here',
-  );
-  const { cmd, args } = CHECK.command({ brief: checkBrief('npm test', ENV) });
-  assert.deepEqual([cmd, ...args.slice(0, 3)], ['nice', '-n', '10', 'env']);
-  const script = args.at(-1)!;
+test("an ending's check that owes an install runs it first, its text fixed, and then the command on a line of its own", () => {
+  const [sh, c, script] = checkArgv('npm test # the suite', true);
+  assert.deepEqual([sh, c], ['sh', '-c']);
   const lines = script.split('\n');
-  const ionice = lines.findIndex((l) => /ionice -c3 -p \$\$/.test(l));
-  assert.ok(ionice >= 0 && ionice < lines.indexOf('wf_check() {'), script);
-  assert.match(lines[ionice], /^if command -v ionice /, 'only where the machine has it');
+  assert.equal(lines[0], `echo '[wf check] the staged merge asks for packages this checkout has not installed: ${INSTALL}'`);
+  assert.ok(lines[1].startsWith(`${INSTALL} 2>&1 || {`), lines[1]);
+  assert.match(lines[1], /kill -s KILL \$\$; \}$/, 'an install that fails ends the process by a signal: no exit code, no verdict');
+  assert.equal(lines.at(-1), 'npm test # the suite', 'the command last, alone on its line');
+  assert.equal(lines.length, 3);
 });
 
-/** A PATH directory holding only the named programs, linked to where this machine keeps them. */
-const onlyPrograms = (names: string[]): string => {
-  const dir = scratch('wf-check-bin-');
-  for (const name of names) {
-    const at = execFileSync('sh', ['-c', `command -v ${name}`], { encoding: 'utf8' }).trim();
-    fs.symlinkSync(fs.realpathSync(at), path.join(dir, name));
-  }
-  return dir;
-};
-
-test("a check's own exit code comes back through `nice` — a failing command still fails", () => {
-  const run = (command: string) => {
-    const { cmd, args } = CHECK.command({
-      brief: checkBrief(command, { ...ENV, WF_STDERR: path.join(scratch('wf-check-exit-'), 'x.stderr') }),
-    });
-    return spawnSync(cmd, args, { encoding: 'utf8' });
-  };
-  const failed = run('exit 5');
-  assert.equal(
-    failed.status,
-    5,
-    `the worker gates on the process's exit status, and nice and env exec, handing it on untouched\n${failed.stderr}`,
-  );
-  assert.equal(readVerdict(failed.stdout), 5);
-  assert.equal(run('true').status, 0);
+test('the verdict is the exit code an attempt recorded; none, or one its deadline or an operator cut short, is unfinished', () => {
+  assert.equal(attemptVerdict({ exitCode: 3 }), 3);
+  assert.equal(attemptVerdict({ exitCode: 0, reason: null }), 0);
+  for (const attempt of [undefined, {}, { exitCode: null }, { exitCode: 1, reason: 'deadline' }, { exitCode: 1, reason: 'operator' }])
+    assert.equal(attemptVerdict(attempt), 'unfinished', JSON.stringify(attempt));
 });
 
-test('a machine without ionice still runs the check, to its own exit code', () => {
-  const bin = onlyPrograms(['nice', 'env', 'sh']);
-  const { cmd, args } = CHECK.command({
-    brief: checkBrief('command -v ionice || echo no-ionice; exit 7', {
-      ...ENV,
-      WF_STDERR: path.join(bin, 'x.stderr'),
-      WF_STDOUT: path.join(bin, 'x.stdout'),
-    }),
-  });
-  const r = spawnSync(path.join(bin, cmd), args, { encoding: 'utf8', env: { PATH: bin } });
-  assert.equal(r.status, 7, r.stderr);
-  assert.match(r.stdout, /^no-ionice$/m, 'the check really ran with no ionice on its PATH');
-  assert.match(r.stdout, /\[wf check\] exit 7\n$/);
-  assert.equal(fs.existsSync(path.join(bin, 'x.stdout')), false, 'nor mktemp, nor mkfifo: its stdout is left to the log alone');
-});
-
-/** The check's script run as the engine runs it, with its stdout kept at `WF_STDOUT` (`x.stdout` in a scratch folder by default). */
-const copied = (command: string, stdout = path.join(scratch('wf-check-stdout-'), 'x.stdout')) => {
-  const { cmd, args } = CHECK.command({
-    brief: checkBrief(command, { ...ENV, WF_STDERR: path.join(scratch('wf-check-stderr-'), 'x.stderr'), WF_STDOUT: stdout }),
-  });
-  return { stdout, r: spawnSync(cmd, args, { encoding: 'utf8' }) };
-};
-
-test("a check's stdout is kept whole at WF_STDOUT and still logged, its own exit code the script's, and the trailer last", () => {
-  const { stdout, r } = copied('echo a; echo b; exit 5');
-  assert.equal(r.status, 5, r.stderr);
-  assert.equal(readVerdict(r.stdout), 5);
-  assert.equal(fs.readFileSync(stdout, 'utf8'), 'a\nb\n', 'the whole stdout, in order, without the trailer');
-  assert.equal(r.stdout, 'a\nb\n\n[wf check] exit 5\n', 'logged as well, and the trailer after every line the copy wrote');
-  assert.equal(copied('true').r.status, 0);
-});
-
-test('a WF_STDOUT that cannot be opened is no verdict: the command runs to its own exit code, its stdout in the log', () => {
-  const { stdout, r } = copied('echo fine; exit 3', path.join(scratch('wf-check-stdout-'), 'gone', 'x.stdout'));
-  assert.equal(r.status, 3, r.stderr);
-  assert.equal(r.stdout, 'fine\n\n[wf check] exit 3\n');
-  assert.equal(fs.existsSync(stdout), false);
-});
-
-test("a brief carries the install an ending's check owes, and reads back only one that is a string", () => {
-  const brief = checkBrief('npm test', ENV, 'node_modules/b');
-  assert.deepEqual(readCheckBrief(brief), { command: 'npm test', env: ENV, install: 'node_modules/b' });
-  assert.equal(JSON.parse(checkBrief('npm test', ENV)).install, undefined, 'no install, no field');
-  for (const install of [7, '', null, ['node_modules/b']]) {
-    const read = readCheckBrief(JSON.stringify({ check: 'npm test', env: ENV, install }));
-    assert.deepEqual(read, { command: 'npm test', env: ENV }, `install ${JSON.stringify(install)} is dropped`);
-  }
+test("the run's `check` harness is the runtime's command harness under the name checks have always run under", () => {
+  assert.equal(HARNESSES.check.name, 'check', 'the name keeps runs/check/, where checks filed before read');
+  assert.equal(HARNESSES.check.command, commandHarness.command, 'the runtime builds the argv: the package defines no harness code');
+  assert.equal(HARNESSES.check.prepare, commandHarness.prepare);
+  assert.equal(HARNESSES.check.streams, true, 'the runtime keeps its stdout and stderr whole, read through output');
 });
 
 /**
@@ -185,52 +85,43 @@ const fakeNpm = (code: number): { bin: string; args: string; PATH: string } => {
   return { bin, args, PATH: `${bin}${path.delimiter}${process.env.PATH ?? ''}` };
 };
 
-/** `CHECK.command` for a brief, run to its end with `npm` faked, in a workspace of its own: what came back, and the workspace. */
-const checked = (npm: ReturnType<typeof fakeNpm>, install: string | undefined) => {
+/** `checkArgv` for a command, run to its end with `npm` faked, in a workspace of its own: what came back, and the workspace. */
+const checked = (npm: ReturnType<typeof fakeNpm>, install: boolean) => {
   const workspace = scratch('wf-check-install-');
-  const { cmd, args } = CHECK.command({
-    brief: checkBrief(
-      'echo command ran > ran.txt',
-      { ...ENV, WF_WORKSPACE: workspace, WF_STDERR: path.join(npm.bin, 'x.stderr') },
-      install,
-    ),
-  });
+  const [cmd, ...args] = checkArgv('echo command ran > ran.txt', install);
   return { r: spawnSync(cmd, args, { cwd: workspace, encoding: 'utf8', env: { ...process.env, PATH: npm.PATH } }), workspace };
 };
 
 test("a check that owes an install runs `npm install --no-save` first, in its workspace, and then its command, to the command's exit code", () => {
   const npm = fakeNpm(0);
-  const { r, workspace } = checked(npm, 'node_modules/b');
+  const { r, workspace } = checked(npm, true);
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.deepEqual(fs.readFileSync(npm.args, 'utf8').trim().split('\n'), ['install', '--no-save', '--no-audit', '--no-fund']);
   assert.equal(INSTALL, 'npm install --no-save --no-audit --no-fund');
   assert.ok(fs.existsSync(path.join(workspace, 'ran.txt')), 'the command ran after it');
   assert.match(r.stdout, /^\[wf check\] the staged merge asks for packages this checkout has not installed: npm install --no-save/m);
   assert.match(r.stdout, /^npm said this$/m, "the install's stderr is in the log");
-  assert.equal(readVerdict(r.stdout), 0);
 });
 
 test('REFUSED: an install that fails runs no command and prints no exit code — the process ends by a signal, so the check did not finish', () => {
   const npm = fakeNpm(3);
-  const { r, workspace } = checked(npm, 'node_modules/b');
+  const { r, workspace } = checked(npm, true);
   assert.deepEqual(
     [r.status, r.signal],
     [null, 'SIGKILL'],
-    `the worker records no exit code for a process a signal ended (ae-worker.ts), which the run reads as unfinished\n${r.stdout}${r.stderr}`,
+    `the worker records no exit code for a process a signal ended, which the run reads as unfinished\n${r.stdout}${r.stderr}`,
   );
   assert.equal(fs.existsSync(path.join(workspace, 'ran.txt')), false, 'the command never ran');
   assert.match(r.stdout, /^\[wf check\] install failed, exit 3: no verdict on the work$/m);
-  assert.equal(readVerdict(r.stdout), 'unfinished');
 });
 
 test('a check that owes no install never calls npm', () => {
   const npm = fakeNpm(0);
-  const { r, workspace } = checked(npm, undefined);
+  const { r, workspace } = checked(npm, false);
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.equal(fs.existsSync(npm.args), false, 'npm was not called');
   assert.ok(fs.existsSync(path.join(workspace, 'ran.txt')));
   assert.doesNotMatch(r.stdout, /npm install/);
-  assert.equal(checkScript('npm test'), checkScript('npm test', false));
 });
 
 test('a step is told the command before it is judged by it, and that it comes from the run', () => {
@@ -242,7 +133,6 @@ test('a step is told the command before it is judged by it, and that it comes fr
 });
 
 test('the engine the run builds keeps its three harnesses, and gains the check', async () => {
-  const { HARNESSES } = await import('../runner.ts');
   const engine = await import('agent-runtime');
   assert.deepEqual(
     Object.keys(HARNESSES),
@@ -256,7 +146,7 @@ test('the engine the run builds keeps its three harnesses, and gains the check',
   );
   assert.equal(HARNESSES.codex, engine.codex);
   assert.equal(HARNESSES['claude-detached'], engine.claudeDetached);
-  assert.equal(HARNESSES.check, CHECK);
+  assert.equal(HARNESSES.check.name, 'check');
 });
 
 test('what a check said reaches the step tried again as data: its command, exit and both tails exactly, fenced past any backticks, and not to weaken it', () => {
@@ -279,13 +169,13 @@ test('what a check said reaches the step tried again as data: its command, exit 
   assert.match(text, /It exited 1\./);
 
   const unfinished = refusalSection({ ...said, verdict: 'unfinished' });
-  assert.match(unfinished, /It did not finish: it was stopped, or killed before it printed an exit code/);
+  assert.match(unfinished, /It did not finish: it was stopped, or killed before it exited with a code/);
   assert.equal(JSON.parse(/```+json\n([\s\S]*?)\n```+/.exec(unfinished)![1]).exit, 'unfinished');
 });
 
-test("a check's stdout is shown without the trailer, and only its last lines", () => {
-  const log = `${Array.from({ length: 30 }, (_, i) => `line ${i + 1}`).join('\n')}\n\n[wf check] exit 1\n`;
-  const tail = stdoutTail(log);
+test('the last lines of some output, without the blank ones at its end', () => {
+  const out = `${Array.from({ length: 30 }, (_, i) => `line ${i + 1}`).join('\n')}\n\n`;
+  const tail = lastLines(out);
   assert.equal(tail.split('\n').length, 20);
   assert.match(tail, /^line 11\n/);
   assert.match(tail, /line 30$/);
@@ -313,27 +203,22 @@ const rig = () => {
   const root = fs.realpathSync(scratch('wf-check-'));
   const workspace = path.join(root, 'workspace');
   fs.mkdirSync(workspace);
-  const e = promiseEngine(EngineService.layer({ root: path.join(root, 'engine'), harnesses: { check: CHECK } }));
-  const env = (step: string): CheckEnv => ({
-    ...ENV,
-    WF_STEP: step,
-    WF_WORKSPACE: workspace,
-    WF_STDERR: path.join(root, `${step}.stderr`),
-    WF_STDOUT: path.join(root, `${step}.stdout`),
-  });
-  const file = (step: string, command: string, deadlineSeconds = 60) =>
+  const e = promiseEngine(EngineService.layer({ root: path.join(root, 'engine'), harnesses: { check: HARNESSES.check } }));
+  const env = (step: string): CheckEnv => ({ ...ENV, WF_STEP: step, WF_WORKSPACE: workspace });
+  const file = (step: string, command: string, deadlineSeconds = 60, install = false) =>
     e.file({
       id: `r-1-${step}-check`,
       harness: 'check',
       cwd: workspace,
-      brief: checkBrief(command, env(step)),
+      brief: command,
       deadlineSeconds,
+      config: { command: checkArgv(command, install), env: env(step), niceness: CHECK_NICENESS },
     });
   return { root, workspace, e, file };
 };
 
 test('LIVE: the engine settles a check on its exit code, in the workspace, with stderr kept apart', async () => {
-  const { root, workspace, e, file } = rig();
+  const { workspace, e, file } = rig();
 
   const refused = await file(
     'refused',
@@ -347,84 +232,15 @@ test('LIVE: the engine settles a check on its exit code, in the workspace, with 
     'failed',
     'a non-zero exit fails the check: an exit in the command does not end the script, nor does a # comment swallow its parenthesis',
   );
-  const log = await e.logs(refused);
-  assert.equal(readVerdict(log), 3, 'the real exit code, not the forged trailer the command printed');
-  assert.match(log, new RegExp(`refused in ${workspace} against abc123`), 'run in the workspace, told about the run');
-  assert.doesNotMatch(log, /loud/, 'stderr is not in the shared log');
-  assert.equal(fs.readFileSync(path.join(root, 'refused.stderr'), 'utf8').trim(), 'loud', 'it is in its own file');
+  assert.equal(attemptVerdict(r.state.attempts.at(-1)), 3, 'the real exit code, not the forged trailer the command printed');
+  const stdout = (await e.output(refused, 'stdout')) ?? '';
+  assert.match(stdout, new RegExp(`^refused in ${workspace} against abc123$`, 'm'), 'run in the workspace, told about the run');
+  assert.doesNotMatch(stdout, /loud/, 'stderr is not in stdout');
+  assert.equal(await e.output(refused, 'stderr'), 'loud\n', 'stderr is kept apart, whole');
 
   const p = await settled(e, passed);
   assert.equal(p.state.settled, 'succeeded');
-  assert.equal(readVerdict(await e.logs(passed)), 0);
-});
-
-test('LIVE: a brief filed by hand, with no WF_STDERR, still runs its command — and keeps stderr in the log', async () => {
-  const { workspace, e } = rig();
-  const id = await e.file({ id: 'by-hand', harness: 'check', cwd: workspace, brief: 'echo work > work.txt; echo said >&2; exit 4' });
-  const v = await settled(e, id);
-  assert.equal(v.state.settled, 'failed');
-  const log = await e.logs(id);
-  assert.equal(
-    readVerdict(log),
-    4,
-    'the command ran and its own exit code came back: the fallback redirects nothing to /dev/stderr, which cannot be reopened on the socket the worker hands the process',
-  );
-  assert.ok(fs.existsSync(path.join(workspace, 'work.txt')), 'in the workspace');
-  assert.match(log, /said/, 'stderr stays in the log when there is no file for it');
-});
-
-test('LIVE: a stderr file that cannot be opened fails the check with a number, not a silent shell', async () => {
-  const { root, e } = rig();
-  const id = await e.file({
-    id: 'nowhere',
-    harness: 'check',
-    cwd: root,
-    brief: checkBrief('echo fine', { ...ENV, WF_WORKSPACE: root, WF_STDERR: path.join(root, 'gone', 'x.stderr') }),
-  });
-  const v = await settled(e, id);
-  assert.equal(v.state.settled, 'failed', 'a check whose evidence has nowhere to go does not pass');
-  assert.notEqual(readVerdict(await e.logs(id)), 'unfinished', 'and the script still reached its last line');
-});
-
-test('LIVE: a child the command leaves behind holding its stdout does not hold the check: it settles on the exit code, not the deadline', async (t) => {
-  const { root, e, file } = rig();
-  const pid = path.join(root, 'left.pid');
-  t.after(() => {
-    try {
-      process.kill(Number(fs.readFileSync(pid, 'utf8')));
-    } catch {
-      return;
-    }
-  });
-  const id = await file('left', `sleep 30 & echo $! > ${JSON.stringify(pid)}; echo done`, 20);
-  const v = await settled(e, id, 30_000);
-  assert.equal(v.state.settled, 'succeeded', 'the copy is waited for a bounded time, never until the deadline');
-  assert.equal(readVerdict(await e.logs(id)), 0);
-  assert.equal(fs.readFileSync(path.join(root, 'left.stdout'), 'utf8'), 'done\n');
-});
-
-test('LIVE: the FIFO a check copies its stdout through is left nowhere, by a check that finishes or one stopped while its command runs', async (t) => {
-  const { root, e, file } = rig();
-  const tmp = scratch('wf-check-tmpdir-');
-  const TMPDIR = process.env.TMPDIR;
-  t.after(() => {
-    if (TMPDIR === undefined) delete process.env.TMPDIR;
-    else process.env.TMPDIR = TMPDIR;
-  });
-  process.env.TMPDIR = tmp;
-  const done = await file('done', 'echo done');
-  const hung = await file('hung', 'echo started; sleep 60', 120);
-  assert.equal((await settled(e, done)).state.settled, 'succeeded');
-  const copy = path.join(root, 'hung.stdout');
-  const deadline = Date.now() + 20_000;
-  while (!(fs.existsSync(copy) && fs.readFileSync(copy, 'utf8') === 'started\n')) {
-    assert.ok(Date.now() < deadline, `the command never printed through the copy; phase ${(await e.view(hung)).phase}`);
-    await e.tick();
-    await new Promise((r) => setTimeout(r, 50));
-  }
-  await e.stop(hung);
-  assert.equal((await settled(e, hung)).state.settled, 'stopped');
-  assert.deepEqual(fs.readdirSync(tmp), [], "the worker inherits this process's TMPDIR when a tick starts it");
+  assert.equal(attemptVerdict(p.state.attempts.at(-1)), 0);
 });
 
 test('LIVE: a check that hangs is stopped at its deadline, fails, and reads unfinished', async (t) => {
@@ -435,7 +251,7 @@ test('LIVE: a check that hangs is stopped at its deadline, fails, and reads unfi
   t.mock.timers.tick(5_000);
   const v = await settled(e, hung);
   assert.equal(v.state.settled, 'failed', 'a hung suite does not hold the run for ever');
-  assert.equal(readVerdict(await e.logs(hung)), 'unfinished');
+  assert.equal(attemptVerdict(v.state.attempts.at(-1)), 'unfinished');
 });
 
 test('LIVE: a check the engine runs is niced, and IO-idle where this machine lets it be', async () => {
@@ -443,7 +259,7 @@ test('LIVE: a check the engine runs is niced, and IO-idle where this machine let
   const id = await file('niced', 'echo "nice=$(nice)"; echo "io=$(ionice 2>/dev/null || echo none)"');
   const v = await settled(e, id);
   assert.equal(v.state.settled, 'succeeded');
-  const log = await e.logs(id);
+  const log = (await e.output(id, 'stdout')) ?? '';
   assert.match(
     log,
     new RegExp(`^nice=${Math.min(19, os.getPriority() + CHECK_NICENESS)}$`, 'm'),
@@ -463,27 +279,18 @@ test('LIVE: a failing check still fails through `nice`, with its own exit code',
   const id = await file('five', 'exit 5');
   const v = await settled(e, id);
   assert.equal(v.state.settled, 'failed');
-  assert.equal(readVerdict(await e.logs(id)), 5);
+  assert.equal(attemptVerdict(v.state.attempts.at(-1)), 5);
 });
 
 test("LIVE: an ending's check whose install fails settles failed with no exit code, which the run reads as a check that did not finish", async (t) => {
-  const { e, workspace } = rig();
+  const { e, file } = rig();
   const npm = fakeNpm(3);
   const PATH = process.env.PATH;
   t.after(() => {
     process.env.PATH = PATH;
   });
   process.env.PATH = npm.PATH;
-  const id = await e.file({
-    id: 'r-1-ship-check',
-    harness: 'check',
-    cwd: workspace,
-    brief: checkBrief(
-      'echo command ran',
-      { ...ENV, WF_STEP: 'ship', WF_WORKSPACE: workspace, WF_STDERR: path.join(workspace, 'x.stderr') },
-      'node_modules/b',
-    ),
-  });
+  const id = await file('ship', 'echo command ran', 60, true);
   const v = await settled(e, id);
   process.env.PATH = PATH;
   assert.equal(v.state.settled, 'failed');
@@ -491,7 +298,7 @@ test("LIVE: an ending's check whose install fails settles failed with no exit co
   const verdict = exitVerdicts(new Map([[id, v]]), { steps: { ship: { check: { taskId: id } } } } as never)('ship');
   assert.equal(verdict, 'unfinished');
   assert.equal(refusedCheck(v.state.settled, verdict), false, 'not a refusal of the work');
-  const log = await e.logs(id);
+  const log = (await e.output(id, 'stdout')) ?? '';
   assert.match(
     log,
     /\[wf check\] install failed, exit 3/,
@@ -500,28 +307,7 @@ test("LIVE: an ending's check whose install fails settles failed with no exit co
   assert.doesNotMatch(log, /command ran/);
 });
 
-test('the command a check runs does not inherit WF_STDOUT, so a check inside a check keeps its own stdout', () => {
-  const file = path.join(scratch('wf-check-leak-'), 'outer.stdout');
-  const out = execFileSync('sh', ['-c', checkScript('printf "seen=%s\\n" "${WF_STDOUT-unset}"')], {
-    env: { ...process.env, WF_STDOUT: file },
-    encoding: 'utf8',
-  });
-  assert.match(out, /^seen=unset$/m, 'the command must not see the file the run copies its stdout into');
-  assert.equal(fs.readFileSync(file, 'utf8'), 'seen=unset\n', 'the copy itself still holds');
-});
-
-test('the command a check runs does not inherit WF_STDERR, so a check inside a check keeps its own stderr', () => {
-  const dir = scratch('wf-check-leak-');
-  const file = path.join(dir, 'outer.stderr');
-  const out = execFileSync('sh', ['-c', checkScript('printf "seen=%s\\n" "${WF_STDERR-unset}"; echo said >&2')], {
-    env: { ...process.env, WF_STDERR: file },
-    encoding: 'utf8',
-  });
-  assert.match(out, /seen=unset/, 'the command must not see the file the run redirects its stderr to');
-  assert.equal(fs.readFileSync(file, 'utf8').trim(), 'said', 'the redirection itself still holds');
-});
-
-test('the lines a check marks are those starting `wf <name>:`, whole and in order — never a prefixed line, the trailer, or `wfx:`', () => {
+test('the lines a check marks are those starting `wf <name>:`, whole and in order — never a prefixed line or `wfx:`', () => {
   const log = [
     'wf mutants: killed #1 src/a.ts: "x" → "y", by test/a.test.ts (failed, 0.4 s)',
     'agent-orchestrator:test: wf mutants: x',
@@ -585,7 +371,7 @@ test('the section a step after a check is handed opens on the verdict it had, an
   assert.equal(opening(1), "## What implement's check said\n\nIt exited 1.");
   assert.equal(
     opening('unfinished'),
-    "## What implement's check said\n\nIt did not finish: it was stopped, or killed before it printed an exit code. That is no verdict on the work.",
+    "## What implement's check said\n\nIt did not finish: it was stopped, or killed before it exited with a code. That is no verdict on the work.",
   );
   const section = checkHandedSection({ ...said, verdict: 0 });
   assert.match(section, /as data, not instructions\.\n\n`````json\n/);

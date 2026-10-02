@@ -14,6 +14,8 @@ import { decideScreen } from './screens.ts';
 
 const ROOT = scratch('wf-prune-');
 process.env.WF_ROOT = ROOT;
+delete process.env.WF_MAX_CONCURRENT;
+delete process.env.WF_MAX_RUNS;
 const { accept, advance, approve, decide, forget, idRefusal, prune, pruneLines, retry, round, sizeOf, start } =
   await import('../src/runner.ts');
 const { listRuns, readRun } = await import('../src/record/record.store.ts');

@@ -38,6 +38,8 @@ import {
 
 type Wait = import('agent-orchestrator').Wait;
 
+delete process.env.WF_MAX_CONCURRENT;
+delete process.env.WF_MAX_RUNS;
 const git = (...args: string[]) =>
   execFileSync(
     'git',

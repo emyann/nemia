@@ -23,6 +23,7 @@ const ROOT = scratch('wf-daemon-');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
+delete process.env.WF_MAX_CONCURRENT;
 const { beat, daemonFile, daemonStanding, lastCeilings, procStartOf } = await import('../runner.ts');
 const { parsePassCost } = await import('./daemon.store.ts');
 const { PHASES, passCost } = await import('../meter/meter.ts');

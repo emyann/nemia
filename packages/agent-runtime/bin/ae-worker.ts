@@ -7,7 +7,7 @@
  * and outlives the engine that started it, so anything clever in here is a thing that breaks
  * while nobody is watching.
  *
- * Its whole contract is the run file: `{ state, pid, heartbeatAt, nativeId }`, rewritten as the
+ * Its whole contract is the run file: `{ state, pid, heartbeatAt, beat, nativeId }`, rewritten as the
  * session moves and on a timer. The heartbeat is what makes "the worker was killed" observable —
  * a stopped session and a stalled one are indistinguishable on disk without it. That is the cost
  * of owning a registry, and owning a registry is the cost of being harness-agnostic.
@@ -67,12 +67,27 @@ const plan = JSON.parse(fs.readFileSync(runFile, 'utf8')) as {
   inputAt?: number;
 };
 
+/** The running boot's id, read once from where Linux keeps it; `undefined` where the machine does not say. */
+const boot = (() => {
+  try {
+    return fs.readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim() || undefined;
+  } catch {
+    return undefined;
+  }
+})();
+/**
+ * The heartbeat on the monotonic clock, `{ boot, ms }` as the runtime's `instantNow` reads it, so that the lease is measured
+ * across this process and the one that reads it whatever the wall clock steps; `undefined` with no boot id.
+ */
+const beatNow = () => (boot ? { boot, ms: Number(process.hrtime.bigint() / 1_000_000n) } : undefined);
+
 let status = {
   ...plan,
   state: 'working' as string,
   pid: process.pid,
   startedAt: new Date().toISOString(),
   heartbeatAt: new Date().toISOString(),
+  beat: beatNow(),
   nativeId: undefined as string | undefined,
   exitCode: undefined as number | undefined,
   /** A harness started here has closed nothing yet, whatever the one before it did. */
@@ -95,7 +110,7 @@ let stoppedAt: number | undefined;
  */
 const write = (patch: Partial<typeof status> = {}) => {
   if (gone) return;
-  status = { ...status, ...patch, heartbeatAt: new Date().toISOString() };
+  status = { ...status, ...patch, heartbeatAt: new Date().toISOString(), beat: beatNow() };
   if (!fs.existsSync(runFile)) return vanished();
   try {
     fs.writeFileSync(`${runFile}.tmp`, JSON.stringify(status));

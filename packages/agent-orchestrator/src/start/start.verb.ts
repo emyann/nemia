@@ -13,6 +13,7 @@ import { type Workflow } from '../step/step.ts';
 import { remoteNameOf } from '../harness/harness.ts';
 import { fansOut, isFolderTeam } from '../workflow/index.ts';
 import { loadWorkflows, skillsFor, type Places } from '../folder/folder.store.ts';
+import { placesOf } from '../folder/lookup.store.ts';
 import { workRoot } from '../record/places.store.ts';
 import { gateRefusal } from '../ending/ending.ts';
 import { type Run } from '../record/record.ts';
@@ -380,6 +381,3 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
  * died of, as it was thrown.
  */
 export const start = (opts: StartOptions): Run => Effect.runSync(startRun(opts));
-
-/** Where a run on `repo` looks for its steps' agents and skills beside its folder's own (`lookupRoots`): the repository, then the store. */
-export const placesOf = (repo: string | undefined): Places => ({ ...(repo ? { repo } : {}), home: HOME });

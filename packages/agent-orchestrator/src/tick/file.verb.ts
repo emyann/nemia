@@ -50,7 +50,7 @@ import { checkoutParts, gitSays, realRepoOf, workspaceFor } from '../workspace/w
 import { agentFilesDir, renderedIn, skillsAgain } from '../agents/agents.store.ts';
 import { checksHandedOf, closeoutOf, refusalOf, saidIn, sessionIn } from '../views/views.verb.ts';
 import { phaseOfView } from '../views/views-words.ts';
-import { placesOf } from '../start/start.verb.ts';
+import { placesOf } from '../folder/lookup.store.ts';
 import { skillsFor } from '../folder/folder.store.ts';
 import { renderedFlags, rendersAgent, unrendered } from '../agents/agents.ts';
 import { within } from '../meter/tally.store.ts';

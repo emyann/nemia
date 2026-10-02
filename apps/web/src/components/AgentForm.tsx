@@ -18,11 +18,11 @@ import {
   hasKey,
   KEY_LABELS,
   meaningOf,
-  pickSystemPrompt,
+  pickHarnessPrompt,
   schemaFileFor,
   skillToolGap,
-  SYSTEM_PROMPT_CHOICES,
-  systemPromptShown,
+  HARNESS_PROMPT_CHOICES,
+  harnessPromptShown,
   toolsWithSkill,
   type AgentForm as Form,
 } from '../lib/agents';
@@ -176,16 +176,16 @@ export function AgentForm({
           />
         )}
         {!readOnly && <SkillToolNote form={form} setKey={setKey} />}
-        <SystemPrompt
-          value={form.systemPrompt}
-          onChange={(picked) => setForm((f) => ({ ...f, systemPrompt: pickSystemPrompt(picked, listing?.systemPrompt ?? '') }))}
+        <HarnessPrompt
+          value={form.harnessPrompt}
+          onChange={(picked) => setForm((f) => ({ ...f, harnessPrompt: pickHarnessPrompt(picked, listing?.harnessPrompt ?? '') }))}
           readOnly={readOnly}
         />
       </fieldset>
 
       <Field
         label="Instructions"
-        hint="What every node that names it is told, in markdown: on Claude Code, after its system prompt, and a node's own note is its brief; on codex, first in its brief, before the node's own note."
+        hint="What every node that names it is told, in markdown: on Claude Code, after Claude Code's own prompt, and a node's own note is its brief; on codex, first in its brief, before the node's own note."
         value={form.body}
         onChange={(body) => setForm((f) => ({ ...f, body }))}
         readOnly={readOnly}
@@ -430,16 +430,16 @@ export const DOT =
   'mt-0.5 size-3.5 shrink-0 rounded-full border border-neutral-400 group-data-selected:border-4 group-data-selected:border-neutral-900 dark:border-neutral-600 dark:group-data-selected:border-neutral-200';
 
 /**
- * `systemPrompt:`, as a choice of what the agent does: Claude Code's instructions whole, less their coding section, or none — which drops
- * its safety rules, and is kept behind For experts, open where the agent already says it. Unset, the default is drawn chosen and nothing is
- * written until a person picks another (`pickSystemPrompt`). A word the file has that is none of these is shown as written: the package
- * says what is wrong with it.
+ * `harnessPrompt:`, as a choice of what the agent does: Claude Code's own prompt whole, less its coding section, or none — which drops its
+ * safety rules, and is kept behind For experts, open where the agent already says it. Unset, `keep` is drawn chosen and nothing is written
+ * until a person picks another (`pickHarnessPrompt`). A word the file has that is none of these is shown as written: the package says what
+ * is wrong with it.
  */
-function SystemPrompt({ value, onChange, readOnly }: { value: string; onChange: (value: string) => void; readOnly: boolean }) {
-  const shown = systemPromptShown(value);
-  const known = SYSTEM_PROMPT_CHOICES.some((choice) => choice.value === shown);
-  const radio = (choice: (typeof SYSTEM_PROMPT_CHOICES)[number]) => (
-    <Radio key={choice.value} value={choice.value} className={RADIO} data-system-prompt={choice.value}>
+function HarnessPrompt({ value, onChange, readOnly }: { value: string; onChange: (value: string) => void; readOnly: boolean }) {
+  const shown = harnessPromptShown(value);
+  const known = HARNESS_PROMPT_CHOICES.some((choice) => choice.value === shown);
+  const radio = (choice: (typeof HARNESS_PROMPT_CHOICES)[number]) => (
+    <Radio key={choice.value} value={choice.value} className={RADIO} data-harness-prompt={choice.value}>
       <span aria-hidden className={DOT} />
       <span className="space-y-0.5">
         <span className="block text-xs font-medium">{choice.label}</span>
@@ -449,14 +449,14 @@ function SystemPrompt({ value, onChange, readOnly }: { value: string; onChange: 
   );
   return (
     <RadioGroup value={known ? shown : null} onChange={onChange} isDisabled={readOnly} className="space-y-2">
-      <Label className="text-xs">System prompt</Label>
-      <div className="grid gap-2 sm:grid-cols-2">{SYSTEM_PROMPT_CHOICES.filter((choice) => !choice.expert).map(radio)}</div>
+      <Label className="text-xs">Claude Code&apos;s prompt</Label>
+      <div className="grid gap-2 sm:grid-cols-2">{HARNESS_PROMPT_CHOICES.filter((choice) => !choice.expert).map(radio)}</div>
       {!known && (
         <p className="text-[11px] text-red-700 dark:text-red-400">
-          Its file says <code className="font-mono">systemPrompt: {value}</code>, which is none of these.
+          Its file says <code className="font-mono">harnessPrompt: {value}</code>, which is none of these.
         </p>
       )}
-      <Collapsible defaultExpanded={shown === 'own'}>
+      <Collapsible defaultExpanded={shown === 'replace'}>
         {({ isExpanded }) => (
           <>
             <CollapsibleTrigger className="rounded-sm text-[11px] text-neutral-500 outline-none hover:text-neutral-900 focus-visible:ring-2 focus-visible:ring-ring/50 dark:hover:text-neutral-100">
@@ -464,14 +464,15 @@ function SystemPrompt({ value, onChange, readOnly }: { value: string; onChange: 
             </CollapsibleTrigger>
             <CollapsibleContent>
               {isExpanded && (
-                <div className="grid gap-2 pt-2 sm:grid-cols-2">{SYSTEM_PROMPT_CHOICES.filter((choice) => choice.expert).map(radio)}</div>
+                <div className="grid gap-2 pt-2 sm:grid-cols-2">{HARNESS_PROMPT_CHOICES.filter((choice) => choice.expert).map(radio)}</div>
               )}
             </CollapsibleContent>
           </>
         )}
       </Collapsible>
       <Text slot="description" className="block text-[11px] leading-snug text-muted-foreground">
-        <code className="font-mono">systemPrompt:</code> — what Claude Code tells its sessions before the instructions below.
+        <code className="font-mono">harnessPrompt:</code> — how much of Claude Code&apos;s own prompt its sessions keep, before the
+        instructions below.
       </Text>
     </RadioGroup>
   );

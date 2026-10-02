@@ -2,7 +2,7 @@ import type { AgentDraft, AgentListing, AgentRoleKey, KeyForm, RunStatus, RunSum
 import { remoteRefuses } from './builder.ts';
 
 /**
- * The role keys, in the package's order (`AGENT_KEYS` less `AGENT_OWN_KEYS`: role, description, skills, systemPrompt): the order an agent's
+ * The role keys, in the package's order (`AGENT_KEYS` less `AGENT_OWN_KEYS`: role, description, skills, harnessPrompt): the order an agent's
  * file writes them.
  */
 export const ROLE_KEYS: readonly AgentRoleKey[] = [
@@ -37,7 +37,7 @@ export const KEY_LABELS: Readonly<Record<AgentRoleKey, string>> = {
 /**
  * An agent's form as it is being edited: each field as typed, `''` for a key unset. `schemaText` is the result schema's text, read from the
  * file its `output:` names, and `schemaWas` what that file held when read — a schema is sent with a save only when it changed. `skills` —
- * the skills its sessions are given, by name, which its card is generated from — and `systemPrompt` are its own lines as typed. None of
+ * the skills its sessions are given, by name, which its card is generated from — and `harnessPrompt` are its own lines as typed. None of
  * those is a role key.
  */
 export type AgentForm = {
@@ -49,7 +49,7 @@ export type AgentForm = {
   schemaText: string;
   schemaWas: { file: string; text: string } | null;
   skills: string;
-  systemPrompt: string;
+  harnessPrompt: string;
 };
 
 /** A form for a new agent, or for the agent `listing` as it reads. */
@@ -64,15 +64,15 @@ export function formOf(listing: AgentListing | null): AgentForm {
     schemaText: listing?.schema?.text ?? '',
     schemaWas: listing?.schema ?? null,
     skills: listing?.skills ?? '',
-    systemPrompt: listing?.systemPrompt ?? '',
+    harnessPrompt: listing?.harnessPrompt ?? '',
   };
 }
 
 /** The schema file a new result schema is written to when the form names none: beside the agent, after it. */
 export const schemaFileFor = (name: string): string => `${name.trim() || 'agent'}.schema.json`;
 
-/** The words `systemPrompt:` takes, as the package's `SYSTEM_PROMPTS` has them; `''` on the form is none, which is `default`. */
-export const SYSTEM_PROMPTS = ['default', 'no-coding', 'own'] as const;
+/** The words `harnessPrompt:` takes, as the package's `HARNESS_PROMPTS` has them; `''` on the form is none, which is `keep`. */
+export const HARNESS_PROMPTS = ['keep', 'no-coding', 'replace'] as const;
 
 /**
  * The draft a save sends: each field trimmed, an empty one unset (null). A schema pasted with no `output:` is named after the agent, and
@@ -89,7 +89,7 @@ export function draftOf(form: AgentForm): AgentDraft {
     role: form.role.trim() || null,
     description: form.description.trim() || null,
     skills: form.skills.trim() || null,
-    systemPrompt: form.systemPrompt.trim() || null,
+    harnessPrompt: form.harnessPrompt.trim() || null,
     keys,
     body: form.body,
     ...(changed ? { schema: { file: keys.output!, text: form.schemaText } } : {}),
@@ -168,18 +168,18 @@ export const toolsWithSkill = (tools: string): string => skillLine([...skillList
 export const deniedWithoutSkill = (denied: string): string => skillLine(skillList(denied).filter((tool) => tool !== 'Skill'));
 
 /**
- * What each `systemPrompt:` word does, as the form offers it: a plain choice, what it costs or drops, and whether it is kept behind For
+ * What each `harnessPrompt:` word does, as the form offers it: a plain choice, what it costs or drops, and whether it is kept behind For
  * experts. Claude Code's own prompt is about 6.5k tokens, cached across turns; `no-coding` drops its coding section, about 750 of them;
- * `own` drops the lot, safety rules included, leaving the agent's instructions alone.
+ * `replace` drops the lot, safety rules included, leaving the agent's instructions alone.
  */
-export const SYSTEM_PROMPT_CHOICES: ReadonlyArray<{
-  value: (typeof SYSTEM_PROMPTS)[number];
+export const HARNESS_PROMPT_CHOICES: ReadonlyArray<{
+  value: (typeof HARNESS_PROMPTS)[number];
   label: string;
   says: string;
   expert: boolean;
 }> = [
   {
-    value: 'default',
+    value: 'keep',
     label: 'Works on code or files',
     says: "Claude Code's full instructions, then yours: about 6.5k tokens, cached.",
     expert: false,
@@ -191,24 +191,24 @@ export const SYSTEM_PROMPT_CHOICES: ReadonlyArray<{
     expert: false,
   },
   {
-    value: 'own',
+    value: 'replace',
     label: 'Only my instructions',
     says: "Drops Claude Code's own, its safety rules with them — only when a person asks for it.",
     expert: true,
   },
 ];
 
-/** The word a form's system prompt is drawn as: unset is `default`, which is what a session runs with. */
-export const systemPromptShown = (value: string): string => value.trim() || 'default';
+/** The word a form's harness prompt is drawn as: unset is `keep`, which is what a session runs with. */
+export const harnessPromptShown = (value: string): string => value.trim() || 'keep';
 
 /**
- * The form's system prompt once `picked` is chosen, from `was`, what the file said as read. The default is written only where it was: an
- * agent whose file said nothing, or `default`, gets back what it said, and one moved to the default from another word is left unset, which
- * is the default — so picking a choice and then the default again is no edit.
+ * The form's harness prompt once `picked` is chosen, from `was`, what the file said as read. `keep` is written only where it was: an agent
+ * whose file said nothing, or `keep`, gets back what it said, and one moved to `keep` from another word is left unset, which is `keep` —
+ * so picking a choice and then `keep` again is no edit.
  */
-export function pickSystemPrompt(picked: string, was: string): string {
-  if (picked !== 'default') return picked;
-  return was.trim() === 'default' ? was : '';
+export function pickHarnessPrompt(picked: string, was: string): string {
+  if (picked !== 'keep') return picked;
+  return was.trim() === 'keep' ? was : '';
 }
 
 /** The form an agent's page kept across a copy of a skill: the key it is drawn under, and the version the copy moved the agent to. */

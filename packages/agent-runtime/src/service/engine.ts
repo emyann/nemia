@@ -61,8 +61,9 @@ import {
   type TaskList,
   type TaskView,
 } from '../core/engine/index.ts';
-import { claudeSayRefuses, isClaudeJob, claudeDetached } from '../harness/claude/index.ts';
-import { codex } from '../harness/codex/codex.ts';
+import { claudeSayRefuses, isClaudeJob } from '../harness/claude/index.ts';
+import { OutputRefused, outputVerbOf } from './output.ts';
+import { DEFAULT_HARNESSES } from './harnesses.ts';
 import { a2aOps, type SeamOps } from '../a2a/index.ts';
 import {
   journalOf,
@@ -128,10 +129,10 @@ export const listRefusalOf = (args: readonly unknown[]): string | undefined => {
 /**
  * The engine's verbs, each an Effect with what refuses it on its error channel. Each does what the verb of the same name on
  * `agent-runtime`'s `Engine` does, where each is described, and fails with a tagged error where that one rejects with an `Error`
- * whose `exitCode` is 2: `FileRefused`, `TickRefused`, `AdmitRefused`, `ListRefused`, `TranscriptRefused`, `SayRefused`, `QuotaRefused`,
- * `StopRefused` for `stop`, and `InputRefused` for `answer` and `close`. `SayUnsent` is `say`'s failure that is not a refusal; a
- * `JournalError` or a `RunnerError` is the store's or the harness's. `watch`, `io` and `start` succeed at once: `watch` and `start`
- * with a handle that stops them.
+ * whose `exitCode` is 2: `FileRefused`, `TickRefused`, `AdmitRefused`, `ListRefused`, `TranscriptRefused`, `OutputRefused`,
+ * `SayRefused`, `QuotaRefused`, `StopRefused` for `stop`, and `InputRefused` for `answer` and `close`. `SayUnsent` is `say`'s
+ * failure that is not a refusal; a `JournalError` or a `RunnerError` is the store's or the harness's. `watch`, `io` and `start`
+ * succeed at once: `watch` and `start` with a handle that stops them.
  */
 export type EngineShape = {
   readonly file: (spec: TaskSpec) => Effect.Effect<string, FileRefused | JournalError>;
@@ -146,6 +147,11 @@ export type EngineShape = {
     taskId: string,
     after?: TranscriptCursor,
   ) => Effect.Effect<Transcript, TranscriptRefused | JournalError | RunnerError>;
+  readonly output: (
+    taskId: string,
+    stream: 'stdout' | 'stderr',
+    lastBytes?: number,
+  ) => Effect.Effect<string | undefined, OutputRefused | JournalError | RunnerError>;
   readonly say: (taskId: string, text: string) => Effect.Effect<Said, SayRefused | SayUnsent | JournalError>;
   readonly quota: (harness?: string) => Effect.Effect<HarnessQuota, QuotaRefused | RunnerError>;
   readonly answer: (taskId: string, text: string, options?: { config?: HarnessArgs }) => Effect.Effect<Input, InputRefused | JournalError>;
@@ -286,11 +292,7 @@ const make = (options: EngineOptions) =>
     const refused = optionsRefusalOf(options);
     if (refused) return yield* Effect.fail(new EngineRefused({ message: refused }));
     const root = options.root ?? path.join(os.homedir(), '.agent-engine');
-    const harnesses = options.harnesses ?? {
-      claude: 'claude',
-      codex,
-      'claude-detached': claudeDetached,
-    };
+    const harnesses = options.harnesses ?? DEFAULT_HARNESSES;
     const fallback = options.defaultHarness ?? Object.keys(harnesses)[0] ?? 'claude';
 
     const journalOps = options.journal ? undefined : Journal.filesOps(root);
@@ -560,6 +562,7 @@ const make = (options: EngineOptions) =>
           }),
         ),
       transcript: transcriptVerb,
+      output: outputVerbOf(read, runners, harnessOf),
       say: sayVerb,
       quota: quotaVerbOf(runners, fallback),
       answer: answerVerb,

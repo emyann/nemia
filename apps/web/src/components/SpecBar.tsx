@@ -50,9 +50,9 @@ function Unread({ workflow, error, read }: { workflow: string; error: Error | nu
 }
 
 /**
- * What the bar holds for the step `step` of `listing`: what it runs on (`runsOn`), its keys as its node lists them (`specLines`), and the
- * steps it waits on — the source of each `after` edge into it, in the workflow's order — or that it waits on none; that the workflow has
- * no such step, or does not read, where it has none.
+ * What the bar holds for the step `step` of `listing`: what it runs on (`runsOn`); its keys as its node lists them (`specLines`), each
+ * written whole, the tools by name where the node counts them; and the steps it waits on, the source of each `after` edge into it in the
+ * workflow's order, or that it waits on none. Where it has no such step, or the workflow does not read, it says so.
  */
 export function SpecBody({ listing, step: name }: { listing: WorkflowListing; step: string }) {
   const step = listing.steps.find((s) => s.name === name);
@@ -81,12 +81,10 @@ export function SpecBody({ listing, step: name }: { listing: WorkflowListing; st
       <section aria-label="Keys" className="space-y-1">
         <h3 className="text-xs font-medium text-muted-foreground">Keys</h3>
         <dl className="space-y-1">
-          {specLines(step.spec).map(([label, value, title = value]) => (
+          {specLines(step.spec).map(([label, value, whole = value]) => (
             <div key={label} className="flex min-w-0 gap-2">
               <dt className="w-16 shrink-0 text-muted-foreground">{label}</dt>
-              <dd className="min-w-0 font-mono break-words" title={title}>
-                {value}
-              </dd>
+              <dd className="min-w-0 font-mono break-words">{whole}</dd>
             </div>
           ))}
         </dl>

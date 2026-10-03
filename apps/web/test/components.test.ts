@@ -5169,6 +5169,11 @@ test("the bar for a workflow's step says what it runs on, its keys as its node l
     specLines(listing.steps[2].spec).map(([label]) => label),
     `every key its node lists: ${review}`,
   );
+  const many = await specBodyMarkup(
+    workflow({ steps: [step('ship', { tools: ['Read', 'Grep', 'Glob', 'Bash'] })], graph: { roots: ['ship'], edges: [] } }),
+    'ship',
+  );
+  assert.match(many, /<dt[^>]*>tools<\/dt><dd[^>]*>Read, Grep, Glob, Bash<\/dd>/, `the tools by name, where the node counts them: ${many}`);
   assert.match(
     review,
     /<p[^>]*data-waits-on[^>]*><span[^>]*>plan, implement<\/span><\/p>/,

@@ -110,9 +110,16 @@ const typed = async (t: TestContext, e: Engine, ...argv: string[]) => {
 };
 
 test('the verbs the help names are the verbs main runs, and no other', () => {
-  const named = [...HELP.matchAll(/^ {2}wf (\w+)/gm)].map((m) => m[1]);
+  const lines = [...HELP.matchAll(/^ {2}wf (.+)$/gm)].map((m) => m[1]);
   const served = COMMANDS.filter((c) => c.only?.side !== 'api').map((c) => c.name);
-  assert.deepEqual([...new Set(named)].sort(), [...VERBS.keys(), ...served].sort());
+  const names = [...VERBS.keys(), ...served];
+  const first = (words: string) => words.split(' ')[0];
+  assert.deepEqual([...new Set(lines.map(first))].sort(), [...new Set(names.map(first))].sort());
+  assert.deepEqual(
+    names.filter((name) => !lines.some((line) => line === name || line.startsWith(`${name} `))),
+    [],
+    'each name of two words opens a line of the help',
+  );
 });
 
 test('the help, once and alone, for no verb, a verb it does not know, and a name every object has', async (t) => {

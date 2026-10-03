@@ -91,7 +91,7 @@ export const SHIPPED_SKILLS = path.join(HOME_REPO, 'workflows', SKILLS_FOLDER);
 /** Your library: the store's `workflows/skills/`, where the board copies a skill. */
 export const librarySkills = (home: string): string => path.join(home, 'workflows', SKILLS_FOLDER);
 
-/** Where an agent of yours finds its skills on `repo`: the same call a start makes for it, and `skillsOfPlace` in agents.ts. */
+/** Where an agent of yours finds its skills on `repo`: the same call a start makes for it, and `agentSkillsFound` in the package. */
 const skillsOfYours = (repo: string, home: string) => skillsFor(path.join(home, 'workflows', '_'), placesOf(repo, home));
 
 /** Which place a skill's folder is in, by the folder of skills it sits in; `null` for none of them. */

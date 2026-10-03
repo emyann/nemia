@@ -129,8 +129,7 @@ type Baseline = Readonly<Record<string, Entry>>;
 
 /** Each file outside the runtime that says a harness's word today, with its count and what removes them. */
 const HARNESS_WORDS: Baseline = {
-  'apps/api/src/agents/agents.ts': { count: 6, ...MOVES.prompt },
-  'apps/api/src/agents/listing.ts': { count: 1, ...MOVES.api },
+  'apps/api/src/agents/agents.ts': { count: 3, ...MOVES.prompt },
   'apps/api/src/agents/skills.ts': { count: 9, ...MOVES.checkout },
   'apps/api/src/agents/try.ts': { count: 15, ...MOVES.api },
   'apps/api/src/app.ts': { count: 3, ...MOVES.quota },
@@ -167,7 +166,7 @@ const HARNESS_WORDS: Baseline = {
   'apps/web/src/lib/skills.ts': { count: 2, ...MOVES.prompt },
   'apps/web/src/lib/transcript.ts': { count: 11, ...MOVES.web },
   'apps/web/src/routes/capabilities.tsx': { count: 19, ...MOVES.reach },
-  'packages/agent-orchestrator/src/agents/agents.store.ts': { count: 8, ...MOVES.render },
+  'packages/agent-orchestrator/src/agents/agents.store.ts': { count: 7, ...MOVES.render },
   'packages/agent-orchestrator/src/agents/agents.ts': { count: 35, ...MOVES.render },
   'packages/agent-orchestrator/src/artifacts/artifacts.store.ts': { count: 2, card: 'slice-2' },
   'packages/agent-orchestrator/src/artifacts/artifacts.ts': { count: 3, card: 'slice-2' },

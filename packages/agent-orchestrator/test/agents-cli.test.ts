@@ -267,3 +267,70 @@ test('REFUSED at shipped defaults: wf agents custom for no agent, with --file an
   assert.equal(fs.existsSync(path.join(CUSTOM, 'scribe.md')), false);
   assert.equal(fs.existsSync(path.join(CUSTOM, 'ghost.md')), false);
 });
+
+test('wf agents and wf agents card take --repo joined as they take it apart', async (t) => {
+  const repo = repoAt('joined');
+  anAgent(path.join(repo, 'workflows', 'agents'), 'scribe', 'Writes it down.');
+  assert.deepEqual(await printedBy(t, 'agents', `--repo=${repo}`), await printedBy(t, 'agents', '--repo', repo));
+  assert.deepEqual(
+    await printedBy(t, 'agents', 'card', 'scribe', `--repo=${repo}`),
+    await printedBy(t, 'agents', 'card', 'scribe', '--repo', repo),
+  );
+});
+
+test('wf agents given a word that is none of its flags prints the help, as it did before it was a command', async (t) => {
+  const help = (await printedBy(t)).out;
+  for (const argv of [
+    ['agents', 'nope'],
+    ['agents', '--nope'],
+    ['agents', 'card'],
+    ['agents', 'custom'],
+  ])
+    assert.deepEqual(await printedBy(t, ...argv), { out: help, err: '' }, `wf ${argv.join(' ')}`);
+});
+
+test('REFUSED at shipped defaults: wf agents with a flag left out, given twice, or one it does not take — in its own words', async (t) => {
+  const refused = async (message: string, ...argv: string[]) => {
+    await assert.rejects(
+      () => printedBy(t, ...argv),
+      (err: Error & { exitCode?: number }) => {
+        assert.equal(err.message, message);
+        assert.equal(err.exitCode, 2);
+        return true;
+      },
+    );
+  };
+  const repoTakes = '--repo takes the repository whose workflows/agents to read: wf agents --repo <r>';
+  const fromTakes = '--from takes which place the agent is in: wf agents card <name> --from repo|yours';
+  await refused(repoTakes, 'agents', '--repo');
+  await refused(repoTakes, 'agents', '--repo', '--from', 'repo');
+  await refused(repoTakes, 'agents', '--repo', '--elsewhere');
+  await refused(repoTakes, 'agents', '--repo=');
+  await refused(fromTakes, 'agents', 'card', 'scribe', '--from');
+  await refused(fromTakes, 'agents', 'card', 'scribe', '--from', '--repo', '.');
+  await refused('wf agents takes --repo once: an agent is read from one repository.', 'agents', '--repo', 'a', '--repo', 'b');
+  await refused(
+    'wf agents takes --from once: an agent is read from one place.',
+    'agents',
+    'card',
+    'x',
+    '--from',
+    'repo',
+    '--from',
+    'yours',
+  );
+  await refused(
+    'wf agents does not take --nope. It takes --repo <r>, and for a card --from repo|yours.',
+    'agents',
+    '--repo',
+    '.',
+    '--nope',
+  );
+  await refused(
+    'wf agents takes no argument but card <name> or custom <name>: wf agents, wf agents card extra, or wf agents custom extra.',
+    'agents',
+    'card',
+    'scribe',
+    'extra',
+  );
+});

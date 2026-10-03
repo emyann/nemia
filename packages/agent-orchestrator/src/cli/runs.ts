@@ -1,26 +1,20 @@
 /**
- * The verbs over runs and agents — `wf cancel`, `wf rm`, `wf prune`, `wf hold`, `wf show`, `wf logs` and `wf agents` — their
+ * The verbs over runs and agents — `wf cancel`, `wf rm`, `wf prune`, `wf hold`, `wf show`, `wf logs` and `wf agents custom` — their
  * flags, read off the command line, and what each prints.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import {
-  agentPlaces,
   agentsFor,
-  agentSkillsFound,
-  agentVersion,
   cancel,
-  cardSkills,
   clearCustomInstructions,
   customInstructionsFile,
-  findAgent,
   forget,
   forgetLine,
   BY_CAP,
   HOME,
   hold,
   holdWord,
-  listAgents,
   Missing,
   prune,
   pruneLines,
@@ -32,11 +26,9 @@ import {
   oneLine,
   WHY_CAP,
   writeCustomInstructions,
-  type AgentPlace,
   type ForgetHow,
   type Pruning,
 } from '../runner.ts';
-import { agentCard } from '../workflow.ts';
 import { HELP, usage, readFlags, confirmed, type Engine } from './flags.ts';
 
 /**
@@ -145,25 +137,6 @@ function holdTogether({ until, off, why, by }: { until: string[]; off: boolean }
   if (off && (why !== undefined || by !== undefined))
     usage(`wf hold --off lifts the hold whole, and takes no --why or --by: those go with --until, on the hold put next — ${shape}.`);
   if (!off && !until.length) usage(`wf hold needs the runs to wait on, or --off to lift a hold: ${shape}.`);
-}
-
-/** `wf agents`' flags: `--repo <r>` once, and for a card `--from repo|yours` once, when both places have an agent of that name. */
-export function agentsHow(argv: string[]): { repo?: string; from?: AgentPlace } {
-  const { values } = readFlags(argv, {
-    takes: {
-      '--repo': 'the repository whose workflows/agents to read: wf agents --repo <r>',
-      '--from': 'which place the agent is in: wf agents card <name> --from repo|yours',
-    },
-    unknown: (arg) =>
-      arg.startsWith('-')
-        ? `wf agents does not take ${arg}. It takes --repo <r>, and for a card --from repo|yours.`
-        : `wf agents takes no argument but card <name> or custom <name>: wf agents, wf agents card ${arg}, or wf agents custom ${arg}.`,
-    twice: (flag) => `wf agents takes ${flag} once: an agent is read from one ${flag === '--repo' ? 'repository' : 'place'}.`,
-  });
-  const from = values['--from']?.[0];
-  if (from !== undefined && from !== 'repo' && from !== 'yours')
-    usage(`wf agents --from takes repo or yours, not ${from}: repo is <repo>/workflows/agents, yours is your store's.`);
-  return { repo: values['--repo']?.[0], ...(from === 'repo' || from === 'yours' ? { from } : {}) };
 }
 
 /** `wf cancel`: what it has in flight asked to stop, and nothing more filed; a line in every case, a run already over included. */
@@ -345,20 +318,6 @@ export async function logsVerb(rest: string[], e: Engine): Promise<void> {
   return console.log(await e.logs(taskId));
 }
 
-/** `wf agents card`: the agent in the shape of an A2A Agent Card, alone on stdout so `| jq` reads it, and what it is not on stderr. */
-function agentsCard(args: string[]): void {
-  const [name, ...flags] = args;
-  if (!name || name.startsWith('--')) return console.log(HELP);
-  const how = agentsHow(flags);
-  const { from, dir, agent } = findAgent(name, how.repo ?? '.', how.from);
-  const found = agentSkillsFound(dir, how.repo ?? '.');
-  const version = agentVersion(dir, name, found)!;
-  console.log(JSON.stringify(agentCard(agent, version, cardSkills(agent, found)), null, 2));
-  console.error(
-    `${name} (${from}) — a card, not an address: nothing here serves this agent over A2A, so it declares no interfaces and no security schemes.`,
-  );
-}
-
 /** `wf agents custom`'s flags after the agent's name: the words to write (`--file <path>`, or `-` for stdin), `--clear`, and `--repo`. */
 function customHow(argv: string[]): { file?: string; clear: boolean; repo: string } {
   const { values, switches } = readFlags(argv, {
@@ -401,7 +360,7 @@ const agentNamesAround = (repo: string): string[] =>
  * from `--file`, removed with `--clear`. Refused, writing nothing: a name no place has, and what `writeCustomInstructions` refuses. A run
  * already started keeps the words it was started with.
  */
-function agentsCustom(args: string[]): void {
+export function agentsCustom(args: string[]): void {
   const [name, ...flags] = args;
   if (!name || name.startsWith('-')) return console.log(HELP);
   const how = customHow(flags);
@@ -428,43 +387,4 @@ function agentsCustom(args: string[]): void {
   if (words === undefined)
     return console.log(`${name} has no custom instructions. Set them with wf agents custom ${name} --file <path>, or --file - for stdin.`);
   console.log(`${file}\n\n${words}`);
-}
-
-/** One agent's lines on `wf agents`: what it is for, what it says it can do, and the skills it is given; or why it does not read. */
-function printAgent({ from, dir, name, agent }: ReturnType<typeof listAgents>[number], repo: string): void {
-  if (agent instanceof Error) {
-    console.log(`${name}  ${from}  does not read: ${agent.message.split('\n')[0]}`);
-    return;
-  }
-  console.log(`${name}  ${from}  ${agent.description ?? 'no description:'}`);
-  let card: Array<{ id: string; name: string; description: string }>;
-  try {
-    card = cardSkills(agent, agentSkillsFound(dir, repo));
-  } catch (err) {
-    console.log(`   says nothing it can do — ${(err as Error).message.split('\n')[0]}`);
-    card = [];
-  }
-  for (const skill of card) console.log(`   ${skill.id}  ${skill.name} — ${skill.description}`);
-  if (agent.skills?.length) console.log(`   given the skills ${agent.skills.join(', ')}`);
-  if (agent.harnessPrompt !== undefined && agent.harnessPrompt !== 'keep') console.log(`   harness prompt: ${agent.harnessPrompt}`);
-  const custom = customInstructionsFile(HOME, name);
-  if (fs.lstatSync(custom, { throwIfNoEntry: false })) console.log(`   custom instructions: ${custom}`);
-}
-
-/** `wf agents`: the agents a step may name, the repository's then yours, `wf agents card` and `wf agents custom`. */
-export function agentsVerb(rest: string[]): void {
-  const [sub, ...args] = rest;
-  if (sub === 'card') return agentsCard(args);
-  if (sub === 'custom') return agentsCustom(args);
-  if (sub !== undefined && sub !== '--repo' && sub !== '--from') return console.log(HELP);
-  const how = agentsHow(rest);
-  const agents = listAgents(how.repo ?? '.');
-  if (!agents.length)
-    return console.log(
-      `no agents — an agent is a file in <workflows>/agents: ${agentPlaces(path.resolve(how.repo ?? '.'))
-        .map((p) => p.dir)
-        .join(' or ')}`,
-    );
-  for (const one of agents) printAgent(one, how.repo ?? '.');
-  console.log(`\none in A2A's shape: wf agents card <name>`);
 }

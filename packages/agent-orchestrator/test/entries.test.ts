@@ -51,6 +51,7 @@ const PINNED: Record<string, string[]> = {
     'addToInbox',
     'advance',
     'agentPlaces',
+    'agentRead',
     'agentSkillsFound',
     'agentUsers',
     'agentVersion',

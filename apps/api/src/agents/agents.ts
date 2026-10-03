@@ -8,188 +8,68 @@
  *
  * The repository's agents are read-only here, as its workflows are: the api writes nothing into a checkout.
  */
-import fs from 'node:fs';
 import path from 'node:path';
 import { Schema } from 'effect';
 import { Hono } from 'hono';
 import {
   AgentWriteError,
-  agentUsers,
-  agentVersion,
-  cardSkills,
+  agentRead,
+  agentSkillsFound,
+  COMMANDS,
   loadAgents,
   removeAgent,
-  skillsFor,
   start,
   writeAgent,
+  type AgentReading,
+  type AgentsRead,
   type AgentSchema,
+  type CardRead,
   runStore,
 } from 'agent-orchestrator';
-import {
-  AGENTS_FOLDER,
-  agentCard,
-  agentNameRefusal,
-  type AgentCardShape,
-  type AgentDraft,
-  type AgentSkill,
-  type RoleKey,
-  type SkillsFound,
-} from 'agent-orchestrator/workflow';
+import { AGENTS_FOLDER, agentNameRefusal, type AgentCardShape, type AgentDraft } from 'agent-orchestrator/workflow';
 import { readBody, valueAt, type BodyIssue, type Words } from '../body.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from '../guard.ts';
 import { type ApiEnv, served } from '../layer.ts';
 import { judgedNow } from '../runs/runs.ts';
 import { copyCommand, givenSkills, librarySkills, type GivenSkill } from './skills.ts';
-import { empty, unreadListing } from './listing.ts';
 import { factoriesFilling, inFactory, stepsFilled } from './fills.ts';
 import { tryOf, untriedOf, writeTryFolder, type Untried } from './try.ts';
-import { placesOf, sourcesOf, type WorkflowSource } from '../workflows/workflows.ts';
+import { sourcesOf, type WorkflowSource } from '../workflows/workflows.ts';
 
-/** A node that names an agent: the step `step` of the workflow `workflow`, read from `from` — the agent's own place. */
-export type AgentUser = { from: WorkflowSource; workflow: string; step: string };
-
-/**
- * One agent as the board lists it: its file's keys as written, its instructions, the result schema its `output:` names as that file holds
- * it, the skills its `skills:` gives its sessions and its `harnessPrompt:`, each as written, what its card says it can do, the file's text,
- * its version (`agentVersion`, what a write carries), and the nodes that name it. `error` is the parser's refusal of a file that does not
- * read, whose keys are then its lines as written, so the form can show what to fix.
- */
-export type AgentListing = {
-  name: string;
-  from: WorkflowSource;
-  dir: string;
-  file: string;
-  /** The job it holds (`role:`), as its file writes it: `Product engineer`. Null when it says none. */
-  role: string | null;
-  description: string | null;
-  keys: Partial<Record<RoleKey, string>>;
-  body: string;
-  schema: AgentSchema | null;
-  /**
-   * What its card says it can do, generated (`cardSkills`): an A2A skill for each skill its `skills:` gives, read off the
-   * skill's SKILL.md, or one made from its description when it gives none. Nobody writes it: the board shows it, read-only. Null when there
-   * is none — a file that does not read (`error` says why), or a card the package refuses (`cardError`).
-   */
-  card: AgentSkill[] | null;
-  /**
-   * Why the agent has no card when it reads — no description, a skill no place has, a SKILL.md with no description — in the package's
-   * words.
-   */
-  cardError: string | null;
-  /** The skills its steps are given, as its `skills:` line writes them: `review-a-change, write-a-note`. */
-  skills: string | null;
-  /**
-   * Each skill its `skills:` gives, in its order: where a start finds it — your library, the repository, or none — its card entry or why it
-   * has none, and what it costs a turn (skills.ts). Empty for none, and for a file that does not read.
-   */
-  given: GivenSkill[];
-  /**
-   * What becomes of Claude Code's own prompt: `keep`, `no-coding` or `replace`, a former `systemPrompt:` line in the word it is now; null
-   * for none, which is `keep`.
-   */
-  harnessPrompt: string | null;
-  source: string;
-  version: string;
-  usedBy: AgentUser[];
-  error: string | null;
-  /**
-   * Why it cannot be tried from the board, and the command that copies it to yours when that is the fix, in the store the api reads
-   * (`untriedOf`, which the try's route refuses on); null when nothing does. The page draws it in place of the Try it button.
-   */
-  untried: Untried | null;
-};
+export type { AgentUser } from 'agent-orchestrator';
 
 /**
- * Where an agent of `dir` finds its skills, as a start on `repo` does (`lookupRoots`): the `skills/` beside its folder, then the
- * repository's `.claude/skills/`, then the store's. What its version digests and its card is read from.
+ * One agent as the board lists it: the package's reading of it (`AgentReading`, as `wf agents` reads it) but the file of a person's custom
+ * instructions, which the board does not show, and two facts of the board's own:
+ *
+ * - `given`: each skill its `skills:` gives, in its order — where a start finds it, your library, the repository, or none; its card entry
+ *   or why it has none; and what it costs a turn (skills.ts). Empty for none, and for a file that does not read.
+ * - `untried`: why it cannot be tried from the board, and the command that copies it to yours when that is the fix, in the store the api
+ *   reads (`untriedOf`, which the try's route refuses on); null when nothing does. The page draws it in place of the Try it button.
  */
-const skillsOfPlace = (dir: string, repo: string, home: string): SkillsFound =>
-  skillsFor(path.join(path.dirname(dir), '_'), placesOf(repo, home));
+export type AgentListing = Omit<AgentReading, 'custom'> & { given: GivenSkill[]; untried: Untried | null };
+
+/** The package's listing of the agents (`wf agents`), its handler `agentsRead`: the api answers it on `GET /api/agents`. */
+const AGENTS = COMMANDS.find((c) => c.name === 'agents')!;
+
+/** The package's card of one agent (`wf agents card`), its handler `agentCardRead`: on `GET /api/agents/:from/:name/card`. */
+const AGENT_CARD = COMMANDS.find((c) => c.name === 'agents card')!;
 
 /** Where the agents of each place are: `<workflows>/agents`, the repository's then yours. */
 const agentPlaces = (repo: string, home: string): Array<{ from: WorkflowSource; dir: string }> =>
   sourcesOf(repo, home).map(({ from, dir }) => ({ from, dir: path.join(dir, AGENTS_FOLDER) }));
 
-/** Every agent of each place, by name, each read now from disk. */
-export function listAgents(repo: string, home: string): AgentListing[] {
-  return agentPlaces(repo, home).flatMap(({ from, dir }) =>
-    [...loadAgents(dir).keys()].sort().map((name) => listedAgent(from, dir, name, repo, home)!),
-  );
+/** The package's reading of an agent as the board lists it: its custom instructions' file left out, what it is given, why it is untried. */
+function listingOf({ custom: _custom, ...read }: AgentReading, repo: string, home: string): AgentListing {
+  const given =
+    read.error === null && read.skills ? givenSkills(read.skills.split(', '), agentSkillsFound(read.dir, repo, home), repo, home) : [];
+  return { ...read, given, untried: untriedOf({ ...read, schemaFile: read.schema?.file ?? null }, home) };
 }
 
 /** One agent as the listing has it, its skills found as a start on `repo` finds them, or null when `dir` has no file of that name. */
 export function listedAgent(from: WorkflowSource, dir: string, name: string, repo: string, home: string): AgentListing | null {
-  const read = readAgent(from, dir, name, repo, home);
-  return read && { ...read, untried: untriedOf({ ...read, schemaFile: read.schema?.file ?? null }, home) };
-}
-
-/**
- * One agent of `dir` as the listing has it, before whether it can be tried, or null when `dir` has no file of that name. A file that is a
- * link is answered with the package's refusal only: read here it would be whatever it points at, outside the folder. A file that does not
- * read is answered with its lines as written, so what is wrong can be put right in the form: a key under a former name too, as the parser
- * reads it, which the form's save then writes under the name it has; and a codex agent's sandbox under the former key `permissionMode:` is
- * its `sandbox`, as the parser reads it (`formerSandbox`).
- */
-function readAgent(from: WorkflowSource, dir: string, name: string, repo: string, home: string): AgentListing | null {
-  const found = skillsOfPlace(dir, repo, home);
-  const version = agentVersion(dir, name, found);
-  if (version === null) return null;
-  const file = path.join(dir, `${name}.md`);
-  const usedBy = agentUsers(path.dirname(dir), name).map((user) => {
-    const [workflow, step] = user.split('/') as [string, string];
-    return { from, workflow, step };
-  });
-  const agent = loadAgents(dir).get(name);
-  const linked = (at: string) => Boolean(fs.lstatSync(at, { throwIfNoEntry: false })?.isSymbolicLink());
-  if (linked(file))
-    return {
-      ...empty(from, dir, file, name, version, usedBy),
-      error: agent instanceof Error ? agent.message : `${AGENTS_FOLDER}/${name}.md is a link.`,
-    };
-  let source: string;
-  try {
-    source = fs.readFileSync(file, 'utf8');
-  } catch (err) {
-    return { ...empty(from, dir, file, name, version, usedBy), error: (err as Error).message };
-  }
-  const sidecarOf = (named: string | undefined): AgentSchema | null => {
-    if (named === undefined || path.isAbsolute(named) || /[\\/]/.test(named) || linked(path.join(dir, named))) return null;
-    try {
-      return { file: named, text: fs.readFileSync(path.join(dir, named), 'utf8') };
-    } catch {
-      return null;
-    }
-  };
-  if (agent === undefined || agent instanceof Error)
-    return unreadListing(empty(from, dir, file, name, version, usedBy), source, agent, sidecarOf);
-  let card: AgentSkill[] | null = null;
-  let cardError: string | null = null;
-  try {
-    card = cardSkills(agent, found);
-  } catch (err) {
-    cardError = (err as Error).message;
-  }
-  return {
-    name,
-    from,
-    dir,
-    file,
-    role: agent.role ?? null,
-    description: agent.description ?? null,
-    keys: agent.keys,
-    body: agent.body,
-    schema: sidecarOf(agent.keys.output),
-    card,
-    cardError,
-    skills: agent.skills?.join(', ') ?? null,
-    given: givenSkills(agent.skills ?? [], found, repo, home),
-    harnessPrompt: agent.harnessPrompt ?? null,
-    source,
-    version,
-    usedBy,
-    error: null,
-    untried: null,
-  };
+  const read = agentRead(from, dir, name, { repo, home });
+  return read && listingOf(read, repo, home);
 }
 
 /**
@@ -371,12 +251,13 @@ const noAgentWords = (from: string, name: string, dir: string): string =>
  * - `GET /api/agents` — the agents of the factory the request names (`LibraryAgent`, fills.ts), read from disk on each request, so an agent
  *   a person has just edited lists as it is now. Each with the steps it fills in that factory (`fills`) and the factories it fills a step
  *   in (`factories`), a step credited to the agent file a start would run it with. In a factory, only the agents it hires into a step or
- *   its attached workflows' steps name; in the default factory, every agent (`listAgents`).
+ *   its attached workflows' steps name; in the default factory, every agent (`AGENTS`, the package's `wf agents`).
  * - `GET /api/agents/:from/:name` — one agent, for its page; 404 for a name the place has no file of.
- * - `GET /api/agents/:from/:name/card` — one agent in the shape of an A2A Agent Card (`AgentCardAnswer`). Not a valid card and it says so:
- *   A2A marks `supportedInterfaces` REQUIRED, an interface is a transport and a URL, and nothing here serves an agent over A2A — so
- *   `servedOverA2A` is false beside it, in the answer, rather than left for a reader to work out. Its skills are generated (`cardSkills`);
- *   an agent with no `description:`, or a skill that cannot be read, has no card, and the package's refusal says which (422).
+ * - `GET /api/agents/:from/:name/card` — one agent in the shape of an A2A Agent Card (`AgentCardAnswer`), as `wf agents card` prints it
+ *   (`AGENT_CARD`). Not a valid card and it says so: A2A marks `supportedInterfaces` REQUIRED, an interface is a transport and a URL, and
+ *   nothing here serves an agent over A2A — so `servedOverA2A` is false beside it, in the answer, rather than left for a reader to work
+ *   out. Its skills are generated (`cardSkills`); an agent with no `description:`, or a skill that cannot be read, has no card, and the
+ *   package's refusal says which (422).
  * - `POST /api/agents/:from` — a new agent of yours: `writeAgent` with no version, so a name already taken is refused. 201.
  * - `PUT /api/agents/:from/:name` — an agent of yours put back, and renamed when the body names it otherwise, against the `version` it was
  *   read at, so a save of an agent changed since is refused rather than written over what changed.
@@ -393,9 +274,11 @@ const noAgentWords = (from: string, name: string, dir: string): string =>
  */
 export const agents = new Hono<ApiEnv>()
   .get('/api/agents', (c) =>
-    served(c, ({ repo, home, factory }) =>
-      c.json(inFactory(listAgents(repo, home), stepsFilled(repo, home, factory), factoriesFilling(home), factory)),
-    ),
+    served(c, async ({ e, env, repo, home, factory }) => {
+      const { agents: read } = (await AGENTS.handler(e, { repo }, env, home)) as AgentsRead;
+      const listings = read.map((one) => listingOf(one, repo, home));
+      return c.json(inFactory(listings, stepsFilled(repo, home, factory), factoriesFilling(home), factory));
+    }),
   )
   .get('/api/agents/:from/:name', (c) =>
     served(c, async ({ repo, home }) => {
@@ -408,7 +291,7 @@ export const agents = new Hono<ApiEnv>()
     }),
   )
   .get('/api/agents/:from/:name/card', (c) =>
-    served(c, async ({ repo, home }) => {
+    served(c, async ({ e, env, repo, home }) => {
       const { from, name } = c.req.param();
       const route = `GET /api/agents/${from}/${name}/card`;
       const place = placeOf(from, name, route, repo, home);
@@ -416,8 +299,7 @@ export const agents = new Hono<ApiEnv>()
       const agent = loadAgents(place.dir).get(name);
       if (agent === undefined) return c.json({ error: noAgentWords(from, name, place.dir) }, 404);
       if (agent instanceof Error) return c.json({ error: agent.message }, 422);
-      const found = skillsOfPlace(place.dir, repo, home);
-      const card = agentCard(agent, agentVersion(place.dir, name, found)!, cardSkills(agent, found));
+      const { card } = (await AGENT_CARD.handler(e, { name, repo, from }, env, home)) as CardRead;
       return c.json({
         card,
         servedOverA2A: false,

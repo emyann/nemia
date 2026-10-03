@@ -5289,6 +5289,17 @@ const railLinks = (html: string) =>
     lit: /data-active="true"/.test(tag),
   }));
 
+/** The rail's places that are pushed to its foot: each item's link name, where the item takes the room above it (`mt-auto`). */
+const railFoot = (html: string) =>
+  (/<nav aria-label="Places"[^>]*>([\s\S]*)<\/nav>/.exec(html)?.[1] ?? '')
+    .split(/(?=<li\b)/)
+    .filter((item) => /^<li\b[^>]*\bmt-auto\b/.test(item))
+    .map((item) => /aria-label="([^"]*)"/.exec(item)?.[1]);
+
+test('Capabilities, and it alone, sits at the foot of the rail, the room above it left empty', async () => {
+  assert.deepEqual(railFoot(await railAt('/agents')), ['Capabilities']);
+});
+
 test("the rail is a nav of the four places, each a link named for a screen reader, and only the page's own is lit", async () => {
   assert.deepEqual(railLinks(await railAt('/machines')), [
     { href: '/', name: 'Home', lit: false },

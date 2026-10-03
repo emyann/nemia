@@ -44,6 +44,19 @@ async function pointAt(page: Page, target: Locator, what: string): Promise<void>
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 8 });
 }
 
+/** Capabilities sits at the rail's foot, its bottom near the rail's, far below Machines, the rail's room between them left empty. */
+async function capabilitiesAtFoot(page: Page): Promise<void> {
+  const rail = await boxOf(railOf(page), 'the rail');
+  const machines = await boxOf(railOf(page).getByRole('link', { name: 'Machines' }), "the rail's Machines");
+  const capabilities = await boxOf(railOf(page).getByRole('link', { name: 'Capabilities' }), "the rail's Capabilities");
+  const foot = rail.y + rail.height - (capabilities.y + capabilities.height);
+  const gap = capabilities.y - (machines.y + machines.height);
+  if (foot > 24 || gap < rail.height / 2)
+    throw new Refused(
+      `Capabilities sits at the rail's foot, far below Machines — it ends ${foot}px above the rail's bottom, ${gap}px below Machines, in a rail ${rail.height}px tall`,
+    );
+}
+
 /** Each place in the rail is named by a tooltip: on hover, and on focus from the keyboard. */
 async function named(page: Page): Promise<void> {
   const rail = railOf(page);
@@ -107,6 +120,7 @@ export default {
     const size = page.viewportSize();
     try {
       await headerOverRail(page);
+      await capabilitiesAtFoot(page);
       await expectVisible(railOf(page).locator('a[data-active="true"][aria-label="Agents"]'), 'the rail lights Agents on its page');
       await expectCount(railOf(page).locator('a[data-active="true"]'), 1, 'and no other place');
       await named(page);

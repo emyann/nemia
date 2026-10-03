@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { NAV, RAIL } from '../src/components/nav.ts';
+import { NAV, RAIL, sectionOf } from '../src/components/nav.ts';
 
 test('the menu starts with the Inbox, and the rest follow in their order', () => {
   assert.deepEqual(
@@ -60,4 +60,15 @@ test('the rail and the menu share no route but Home, the factories canvas, until
   const rail = new Set<string>(RAIL.map((item) => item.to));
   const shared = NAV.map((item) => item.to).filter((to) => rail.has(to));
   assert.deepEqual(shared, ['/']);
+});
+
+test("the header names a page by the menu's place first — Factories on the canvas and a factory's floor — then by the rail's, and a page neither has a place for goes unnamed", () => {
+  assert.equal(sectionOf('/'), 'Factories');
+  assert.equal(sectionOf('/factories/nemia'), 'Factories');
+  assert.equal(sectionOf('/runs/r-1'), 'Runs');
+  assert.equal(sectionOf('/agents'), 'Agents');
+  assert.equal(sectionOf('/agents/scribe'), 'Agents');
+  assert.equal(sectionOf('/machines'), 'Machines');
+  assert.equal(sectionOf('/capabilities'), 'Capabilities');
+  assert.equal(sectionOf('/machinesx'), undefined);
 });

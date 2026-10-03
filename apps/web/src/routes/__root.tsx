@@ -6,7 +6,7 @@ import { TanStackRouterDevtools } from '@tanstack/react-router-devtools';
 import { RouterProvider as AriaRouterProvider } from 'react-aria-components';
 import { FrameHeader } from '@/components/FrameHeader';
 import { FrameRail } from '@/components/FrameRail';
-import { NAV, RAIL } from '@/components/nav';
+import { NAV, sectionOf } from '@/components/nav';
 import { OpenBar } from '@/components/OpenBar';
 import { routeLink } from '@/components/routeLink';
 import {
@@ -47,7 +47,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 function Root() {
   const path = useRouterState({ select: (state) => state.location.pathname });
   const fullBleed = useMatches({ select: (matches) => matches.some((match) => match.staticData?.fullBleed) });
-  const section = [...NAV, ...RAIL].find((item) => item.active(path))?.label;
+  const section = sectionOf(path);
   const factory = useMatch({ from: '/factories/$factory', shouldThrow: false })?.params.factory;
   const router = useRouter();
   const feed = useFeed();

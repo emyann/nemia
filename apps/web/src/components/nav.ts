@@ -28,3 +28,9 @@ export const RAIL = [
   { to: '/machines', label: 'Machines', icon: Network, active: (path: string) => path === '/machines' },
   { to: '/capabilities', label: 'Capabilities', icon: Blocks, active: (path: string) => path === '/capabilities' },
 ] as const;
+
+/**
+ * The name the header gives the page at `path`: the menu's place that `path` lights, else the rail's, so the canvas is Factories rather
+ * than Home; none when neither has a place for it.
+ */
+export const sectionOf = (path: string) => [...NAV, ...RAIL].find((item) => item.active(path))?.label;

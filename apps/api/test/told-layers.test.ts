@@ -65,6 +65,7 @@ test('each layer is answered as the run froze it: an edit of the agent, its cust
 
 test('a record that froze no workflow answers no layers, and still what it was told', async () => {
   const id = 'layers-unfrozen';
+  fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
   fs.writeFileSync(
     path.join(root, 'runs', `${id}.json`),
     JSON.stringify({

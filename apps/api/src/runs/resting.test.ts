@@ -462,3 +462,23 @@ test('REFUSED: an answer kept wrong fails the request under WF_VERIFY_REST, and 
   resting.runs.delete('r-poisoned');
   assert.equal((await listed('r-poisoned'))?.brief, 'Decide it');
 });
+
+test("a held run's decision reads what holds it and none of its own tasks: a session in flight is not viewed to say `holding`", async () => {
+  running('r-held-implement');
+  writeRun('r-held', 'Held while it runs');
+  write(path.join(root, 'runs', 'r-held.hold'), JSON.stringify({ at, until: ['r-nowhere'] }));
+  try {
+    const reads = e.io().reads;
+    const res = await app.request('/api/runs/r-held/decision');
+    assert.equal(res.status, 200, await res.clone().text());
+    const decided = (await res.json()) as { holding?: unknown };
+    assert.ok(decided.holding, JSON.stringify(decided));
+    assert.equal(
+      e.io().reads - reads,
+      1,
+      "the route's check that the run's journal reads (`viewsFor`), and no view more: the hold is answered off the runs it is held until",
+    );
+  } finally {
+    for (const file of ['r-held.json', 'r-held.hold']) fs.rmSync(path.join(root, 'runs', file));
+  }
+});

@@ -47,6 +47,7 @@ import { checkoutHold } from '../ending/ending.verb.ts';
  * @param slot The cap on runs in flight holding this run (`runSlots`), said where `waiting` would be; left out, none.
  * @param checkout Whether to read the run whose `workspace: main` step holds the repository's own checkout (`checkoutHold`); off, none.
  * @param git The call's branch reader (`branchReader`): one listing of a repository's branches for every run of it.
+ * @param parent The runs it waits on and is held until, as `parentsOf` read them; left out, read here.
  */
 export type ReadingHow = {
   views?: ReadonlyMap<string, TaskView>;
@@ -56,6 +57,7 @@ export type ReadingHow = {
   slot?: RunSlot;
   checkout?: boolean;
   git?: BranchReader;
+  parent?: (id: string) => ParentRun;
 };
 
 /**
@@ -96,7 +98,7 @@ export async function runReading(e: Engine, run: Run, how: ReadingHow = {}): Pro
   const assessed = assessOf(run);
   const standings = how.standings ? how.standings(assessed.status, steps) : standingsOf(run, git);
   const checkout = how.checkout ? await checkoutHold(e, run, steps) : undefined;
-  const parent: (id: string) => ParentRun = await parentsOf(e, run, git);
+  const parent = how.parent ?? (await parentsOf(e, run, git));
   const listed = listing(
     how.shown ?? steps,
     run,

@@ -184,6 +184,7 @@ const PINNED: Record<string, string[]> = {
     'owedFields',
     'ownNote',
     'parentOf',
+    'parentsOf',
     'parentRecord',
     'parseArgv',
     'parseDaemonFile',

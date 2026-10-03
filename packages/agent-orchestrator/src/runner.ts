@@ -319,6 +319,7 @@ export {
   exitVerdicts,
   harnessBlocked,
   parentOf,
+  parentsOf,
   readFilings,
   saidCount,
   spendReader,

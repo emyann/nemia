@@ -10,11 +10,11 @@ import {
   branchStandings,
   closeoutOf,
   deniedOf,
-  deniedWords,
   holdAdvice,
   holdWord,
   merges,
   nameFor,
+  type ParentRun,
   resultSteps,
   type Retry,
   type RetryAsk,
@@ -26,7 +26,6 @@ import {
   toDecideWords,
   type Wait,
   waitAdvice,
-  waitingWords,
   waitWord,
   wordOfView,
 } from 'agent-orchestrator';
@@ -218,6 +217,8 @@ export const wordOf =
 type Judged = {
   words: ReadonlyMap<string, string>;
   notes: ReadonlyMap<string, string | null>;
+  /** What the reading says beside each step's word: what its harness waits for (`waits`) and what its try was denied (`denied`). */
+  beside: ReadonlyMap<string, { waits?: string; denied?: string }>;
   waitingOnYou: string[];
   /** `waitingOnYou` in `wf ls`'s words (`onYouWords`), in the page's order: `approve plan` for a step at its gate. */
   onYou: string[];
@@ -339,12 +340,14 @@ export type Asked = { branches: string[]; failed: boolean };
 /**
  * What `judge` reads with: the request's reader (`seenBy`), which answers the run's tasks and those of the runs it waits on off the views
  * already read; the request's branch reader (`branchReader`), one listing of a repository's branches for every run of it, a fresh one
- * left out; and where the run's result branches stand once its status is known (`standingsOf`), no branch read left out.
+ * left out; where the run's result branches stand once its status is known (`standingsOf`), no branch read left out; and the runs it
+ * waits on and is held until as the caller read them (`parentsOf`), read afresh left out.
  */
 export type JudgeHow = {
   reader: Engine['Service'];
   git?: BranchReader;
   standings?: (status: RunStatus, steps: readonly Workflow[]) => readonly BranchStanding[];
+  parent?: (id: string) => ParentRun;
 };
 
 /**
@@ -372,11 +375,11 @@ export async function judge(
   names: readonly string[],
   folder: readonly Workflow[] | null,
   views: Views,
-  { reader, git, standings = () => [] }: JudgeHow,
+  { reader, git, standings = () => [], parent }: JudgeHow,
 ): Promise<Judged> {
   const steps = judgedSteps(run, folder);
   const shown = [...steps, ...names.filter((name) => !steps.some((s) => s.name === name)).map(bare)];
-  const read = await runReading(reader, run, { views, steps, shown, standings, ...(git ? { git } : {}) });
+  const read = await runReading(reader, run, { views, steps, shown, standings, ...(git ? { git } : {}), ...(parent ? { parent } : {}) });
   const { status, stoppedOn, ready, check, retry, round } = read.assessed;
   const waiting = waitingOf(run, read.waiting);
   const holding = holdingOf(run, read.holding ?? []);
@@ -387,6 +390,7 @@ export async function judge(
   return {
     words: new Map(read.steps.map((s) => [s.name, s.status])),
     notes: new Map(read.steps.map((s) => [s.name, s.note ?? null])),
+    beside: new Map(read.steps.map(({ name, waits, denied }) => [name, { waits, denied }])),
     waitingOnYou,
     onYou: onYouWords({ steps: read.steps, waitingOnYou }),
     toDecide: toDecideOf(run, read.toDecide, steps),
@@ -407,24 +411,25 @@ export async function judge(
 /**
  * What a person has to know to act on a step (`StepNeeds`), off the views the request already read, with no observation of its own: its
  * current try's closeout, the engine's word for its task, and what the run established of it (`judge`) — for a step at its gate that waits
- * on you, what `wf ls` asks of you, in its words (`onYouWords`). A wait is read only for a step the harness blocked, nothing else having
- * one for a person to answer: the harness's own word for it, and the name `claude agents` lists that session under (`nameFor`).
+ * on you, what `wf ls` asks of you, in its words (`onYouWords`). A wait is said only for a step the harness blocked, nothing else having
+ * one for a person to answer: the words the reading put beside its status (`waits`), and the name `claude agents` lists that session under
+ * (`nameFor`). What its try was denied is the reading's words too (`denied`), with each call off the views (`deniedOf`).
  */
-export function needsOf(run: Run, name: string, views: Views, judged: Pick<Judged, 'words' | 'waitingOnYou'>): StepNeeds {
+export function needsOf(run: Run, name: string, views: Views, judged: Pick<Judged, 'words' | 'waitingOnYou' | 'beside'>): StepNeeds {
   const view = run.steps[name]?.taskId ? views.get(run.steps[name].taskId) : undefined;
   const said = view ? closeoutOf(views, run, name) : undefined;
   const status = judged.words.get(name)!;
   const atGate = status === 'awaiting approval' && judged.waitingOnYou.includes(name);
   const blockedByHarness = view?.phase === 'needs-human' && said === undefined;
-  const word = blockedByHarness ? view?.waitingFor : undefined;
+  const { waits, denied } = judged.beside.get(name) ?? {};
+  const words = blockedByHarness ? waits : undefined;
   const attempt = view?.state.attempts.at(-1)?.n;
-  const calls = view ? deniedOf(views)(run.steps[name].taskId!) : [];
   return {
     needs: said && !('error' in said) && said.outcome === 'blocked' ? said.needs || null : null,
     blockedByHarness,
-    waitingFor: word
+    waitingFor: words
       ? {
-          words: waitingWords(word),
+          words,
           advice: answerIn(
             attempt === undefined ? null : nameFor(run.steps[name].taskId!, attempt),
             isRemoteHarness(view?.state.harness) ? { run: run.id, step: name } : undefined,
@@ -432,6 +437,6 @@ export function needsOf(run: Run, name: string, views: Views, judged: Pick<Judge
         }
       : null,
     approve: atGate ? onYouWords({ steps: [{ name, status, branch: null }], waitingOnYou: [name] })[0] : null,
-    denied: calls.length ? { words: deniedWords(calls), calls } : null,
+    denied: denied && view ? { words: denied, calls: deniedOf(views)(run.steps[name].taskId!) } : null,
   };
 }

@@ -322,6 +322,11 @@ test("what a blocked session's harness waits for is read afresh on every request
     "the pass's own word, whatever the last pass carried",
   );
   assert.doesNotMatch(JSON.stringify(await heldStep()), /permission prompt/, 'nothing of the old word is left');
+  assert.equal(
+    (await heldStep()).status,
+    'needs-human',
+    "GET /api/runs says the engine's bare word, which the board's chip and needsOf compare exactly: the wait is beside it, never in it",
+  );
 
   setWait(undefined);
   const silent = await heldStep();

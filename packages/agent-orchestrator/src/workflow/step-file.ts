@@ -53,7 +53,8 @@ import { addedSkillsRefusal, fenceRefusal } from './fence.ts';
  * `agents` are the agents `agent:` may name (`loadAgents`). A step that names one is resolved here, once: each role key the agent sets is
  * the step's unless the step sets it too — the fence under either name, `permissionMode:` or `sandbox:`, as one key, so a step with a fence
  * of its own is given neither of its agent's; a fence key the step sets may only narrow its agent's (`fenceRefusal`). What the step is
- * told is the agent's instructions, a blank line, then the step's own note — the agent's alone when the step has none. The step's own
+ * told is the agent's instructions, then a person's custom instructions for it (`Agent.customInstructions`), then the step's own note,
+ * each after a blank line — the agent's alone when the step has none. Custom instructions are words and set no key. The step's own
  * lines are read against the harness it runs on, its agent's where it names none, before the two are merged: a step's `permissionMode:`
  * on codex is its own `sandbox:`. A schema the agent's `output:` names is read beside the agent, and one the step names beside the step.
  * Everything downstream of the parser sees the resolved step; `agent` on it says what was the step's own.
@@ -90,7 +91,7 @@ export function parseWorkflow(
   const agent = agentOf(name, attached, agents, hired);
   meta = codexSandboxNamed(name, meta, meta.harness ?? agent.keys.harness);
   const inherited = fenceOf(meta) === undefined ? agent.keys : withoutFence(agent.keys);
-  const body = [agent.body, own].filter(Boolean).join('\n\n');
+  const body = [agent.body, agent.customInstructions, own].filter(Boolean).join('\n\n');
   if (!body)
     throw new WorkflowError(
       `${name}: the body is empty, and so is ${AGENTS_FOLDER}/${agent.name}.md's — a step with nothing to say is not a step. Write what the agent is told in its file, or this step's own note below its frontmatter.`,
@@ -114,6 +115,7 @@ export function parseWorkflow(
       body: own,
       given,
       ...(agent.body && { instructions: agent.body }),
+      ...(agent.customInstructions && { customInstructions: agent.customInstructions }),
       ...(sessionSkills.length && { skills: sessionSkills }),
       ...(agent.harnessPrompt !== undefined && { harnessPrompt: agent.harnessPrompt }),
     },

@@ -263,6 +263,28 @@ const mountsAt = (factory: Factory | undefined, repo: string | undefined): Mount
   factory ? factoryMounts(factory, repo).filter((m) => isDirectory(m.path)) : [];
 
 /**
+ * Why `steps`, started from `opts` in `factory` on `own` (none for a folder run), cannot be given `mounts`: a `writable:` name no folder
+ * answers (`writableRefusal`), or a step whose harness cannot hold its mounts — said for a writable one (`writableMountRefusal`), else
+ * for the read-only ones (`factoryMountRefusal`). Nothing when every step can.
+ */
+function mountRefusal(
+  opts: StartOptions,
+  steps: Workflow[],
+  places: Places,
+  factory: Factory | undefined,
+  own: string | undefined,
+  mounts: readonly Mount[],
+): string | undefined {
+  const workflow = path.basename(path.resolve(opts.workflowDir));
+  const unwritable = writableRefusal(steps, workflow, factory, own, mounts);
+  if (unwritable || !factory || !mounts.length) return unwritable;
+  const refused = refusedStep(steps, places, opts.gates ?? [], formerModesWritten(opts.workflowDir), mounts);
+  if (!refused) return undefined;
+  const writes = stepMounts(refused.step, mounts)?.some((m) => !m.readOnly);
+  return (writes ? writableMountRefusal : factoryMountRefusal)(factory, `${workflow}/${refused.step.name}`, refused.why);
+}
+
+/**
  * The factory's folders `startRun` left out of `run`'s mounts, as `wf start` says them: each of its repositories but the run's own that
  * is no directory now, as none was at start. None for a run in the default factory, or in one whose file no longer reads.
  */
@@ -442,18 +464,8 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   if (refusedInputs) return yield* Effect.fail(new Invalid({ message: refusedInputs }));
   const id = runId(opts.brief);
   const mounts = mountsAt(factory, folder ? undefined : opts.repo);
-  const workflow = path.basename(path.resolve(opts.workflowDir));
-  const unwritable = writableRefusal(steps, workflow, factory, folder ? undefined : opts.repo, mounts);
-  if (unwritable) return yield* Effect.fail(new Invalid({ message: unwritable }));
-  const refusedMounts = mounts.length
-    ? refusedStep(steps, places, opts.gates ?? [], formerModesWritten(opts.workflowDir), mounts)
-    : undefined;
-  if (factory && refusedMounts) {
-    const where = `${workflow}/${refusedMounts.step.name}`;
-    const writes = stepMounts(refusedMounts.step, mounts)?.some((m) => !m.readOnly);
-    const refusal = writes ? writableMountRefusal : factoryMountRefusal;
-    return yield* Effect.fail(new Invalid({ message: refusal(factory, where, refusedMounts.why) }));
-  }
+  const unmounted = mountRefusal(opts, steps, places, factory, folder ? undefined : opts.repo, mounts);
+  if (unmounted) return yield* Effect.fail(new Invalid({ message: unmounted }));
   const told = toldOf(opts, steps, inputs, factory, mounts);
   const stepRecords = Object.fromEntries(steps.map((s) => [s.name, { taskId: null }]));
   const run = yield* folder ? folderRun(id, told, stepRecords) : gitRun(id, told, stepRecords, opts.repo, isolate);

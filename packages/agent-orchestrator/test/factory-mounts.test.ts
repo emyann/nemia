@@ -321,7 +321,7 @@ function refusal(opts: Parameters<typeof start>[0]): string {
   }
   assert.equal(failed?._tag, 'Invalid', String(failed?.message));
   assert.deepEqual(runFiles(), before, 'nothing written');
-  return failed!.message;
+  return failed.message;
 }
 
 test("a step's `writable:` folder is filed writable for that step alone, on its first filing, a try and a round, and said on its brief and by wf start", async () => {

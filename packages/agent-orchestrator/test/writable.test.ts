@@ -72,7 +72,7 @@ test("REFUSED at load: `writable:` on a step whose agent's fence writes nothing,
   fs.writeFileSync(path.join(team, 'agents', 'planner.md'), '---\npermissionMode: plan\n---\nPlan it.\n');
   const agents = loadAgents(agentsDir(path.join(team, 'dev')));
   assert.throws(
-    () => parseWorkflow('plan', '---\nagent: planner\nwritable: web\n---\n', undefined, agents as never),
+    () => parseWorkflow('plan', '---\nagent: planner\nwritable: web\n---\n', undefined, agents),
     (err: Error) =>
       err.message ===
       "plan: `writable: web` lets the step write those folders, and its fence, with agents/planner.md's, runs in `plan`, which writes nothing: `writable:` widens where a step's writes reach, never what it may do. Delete the line, or run the step on a fence that writes — an agent whose file allows `Edit(**)`, say.",

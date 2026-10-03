@@ -2348,8 +2348,8 @@ run 'wf tick' (or 'wf up') to start it
   own, and `wf inbox queue` writes it ([below](#cards-that-start-themselves-wf-inbox-queue)). A fourth, `gate: <step>`, names
   the step of its workflow whose closeout waits for a person in the run it starts, one step, refused as a list or as a step's
   `true` ([*A gate*](#a-gate-a-handoff-that-waits-for-a-person--gate---gate-and-wf-approve)). A fifth, `factory: <name>`, names
-  the factory the card is started in ([below](#factories-a-named-grouping-in-the-store--wf-factory)); a card that names none is
-  the default factory's, read as it is.
+  the factory the card is started in ([below](#factories-a-named-grouping-in-the-store--wf-factory)); a card that names none
+  starts only with `--factory` ([*Every run in a factory*](#every-run-in-a-factory)).
 - **`repo:` is what makes one inbox serve several repositories.** A card that names its repository starts on it from
   wherever `wf start` is typed, and a board that one day serves more than one repository can group its inbox by it. A card
   without one is about the repository its start names: `--repo`, else `.`.
@@ -2399,8 +2399,9 @@ run 'wf tick' (or 'wf up') to start it
 ## Factories: a named grouping in the store — `wf factory`
 
 A factory names the repositories a body of work is on, the workflows it offers, and the agents it hires into their steps, as a
-file of its own in the store. A run started in a factory names it on its record; inbox cards name none yet, and a run or card that names
-none is in the one default factory.
+file of its own in the store. A run started in a factory names it on its record, and every run is started in one
+([*Every run in a factory*](#every-run-in-a-factory)); a record or a card written before, that names none, is in the one default
+factory, which holds that history.
 
 ```
 $ wf factory add pipao --repo ~/code/pipao
@@ -2476,8 +2477,8 @@ be (the workflow's `agents/`, the repository's, the store's).
   (`unfilledRefusal`); a hire into a step whose file names its own agent, which fills it in every factory, naming both and the
   `wf factory fire` that takes the hire back; a hired agent that is not there, in the factory's words; a factory the store
   does not have (`Missing`), or whose file does not read.
-- **In the default factory** — no `--factory`, or `--factory default` — nothing is read, and a step that names no agent runs
-  as a plain session, as it always has. The default factory is never written, so it hires no one: `hire` and `fire` refuse it.
+- **In the default factory** — a run recorded before every run had a factory, and an agent's try — nothing is read, and a step that
+  names no agent runs as a plain session, as it always has. The default factory is never written, so it hires no one: `hire` and `fire` refuse it.
 
 ### A run names its factory and its repository
 
@@ -2494,6 +2495,34 @@ be (the workflow's `agents/`, the repository's, the store's).
   none adds a repository to a factory. Paths are compared as `path.resolve` spells them, so a
   symlink to a repository is not that repository. A team that says `workspace: folder` works on no repository: it records its
   factory and no `repo`, and is never refused for where it is typed.
+
+### Every run in a factory
+
+Every start names its factory, or is started in the one whose repository it is on. The entries hold it: `wf start`, `wf start <card>`,
+`wf plan`, the queue's start (`startQueued`) and `POST /api/runs`; `start()` itself takes what it is given.
+
+```
+$ cd ~/code/pipao/src
+$ wf start "add a flag" --workflows build
+… factory: pipao, on /home/me/code/pipao
+```
+
+- **A workflow's start that names no factory runs in the one whose repository holds its folder** (`startFactory`,
+  `factoriesHolding`): `--repo`, else the directory `wf start` or `wf plan` is typed in; on the api, `?repo=`, else its own. A
+  repository holds itself and every folder under it, never a sibling that shares its prefix, and the run is on that repository's root.
+- **Refused, `Invalid`, before anything is written**: a folder no factory holds, naming the factories there are, the `--factory`
+  (`?factory=` on the api) that names one, and the `wf factory add` and `attach` that file one on it (`noFactoryRefusal`); a folder
+  two factories hold, nested repositories among them, naming each and the flag that picks it (`ambiguousFactoryRefusal`); and a start
+  that names `default`, which holds history and starts nothing (`defaultStartRefusal`). On the api, `?factory=default` is no factory
+  named, as the board never sends it, and is resolved.
+- **A card is started only in the factory named for it**: its `factory:`, or `--factory` (`?factory=`) over it — never one found
+  from its folder or its `repo:`, which two factories can hold. A card that names none is refused, naming the line that names one
+  (`unfactoredCardRefusal`); a queued one is refused wherever the daemon runs, not tried again while it reads the same, and `wf inbox`
+  names no repository to run `wf up` in for it.
+- **An agent's try is the one start in the default factory**: it is made before any factory hires the agent, on no repository.
+- **`WF_DEFAULT_FACTORY_STARTS=1` is the tests' switch**, off as shipped: with it, a start no factory holds, and a card that names
+  none, go to the default factory, as the package's and the api's tests start runs in scratch folders. A start that names `default`
+  and a folder two factories hold are refused all the same.
 
 ## How much runs at once: `WF_MAX_CONCURRENT` and `WF_MAX_RUNS`
 

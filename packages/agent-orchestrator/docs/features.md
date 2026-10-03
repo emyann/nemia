@@ -5008,8 +5008,20 @@ under `danger-full-access`, and a writable one is refused on Codex outright. The
   skills, which share the listing's budget that `--setting-sources project` keeps to the agent's own. **Open, for the owner**: accept
   it, or file a follow-up that mounts a folder without its skills (a runtime flag, measured on Claude Code first).
 
-Next: 2b, every run in a factory (`wf start` inside a factory's folder picks it; elsewhere it names one), and 2c, a workflow that marks
-a mount writable on purpose.
+## Shipped: every run in a factory (slice 2b)
+
+Every run is started in a factory, held at the entries and never inside `start()`: `wf start`, `wf start <card>`, `wf plan`, the
+queue's start and `POST /api/runs`. The README's *Every run in a factory* has the rules.
+
+- **A workflow's start that names no factory runs in the one whose repository holds its folder** (`startFactory`,
+  `factoriesHolding`), on that repository's root: `--repo` or where it is typed, on the api `?repo=` or its own repository.
+- **Refused, `Invalid`, with nothing written**: a folder no factory holds (`noFactoryRefusal`), one two factories hold, nested
+  repositories among them (`ambiguousFactoryRefusal`), and a start that names `default` (`defaultStartRefusal`).
+- **A card names its factory**, by `factory:` or `--factory`/`?factory=`, never inferred (`unfactoredCardRefusal`); in the queue the
+  refusal lasts while the card reads the same.
+- **The try stays in the default factory**, the one exception. `WF_DEFAULT_FACTORY_STARTS=1`, the tests' switch, is off as shipped.
+
+Next: 2c, a workflow that marks a mount writable on purpose.
 
 ## 1. A run that grows steps from a plan
 

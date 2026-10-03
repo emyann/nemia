@@ -1,7 +1,7 @@
 /**
  * The runtime's layout, held by path (`docs/architecture.md`): the core knows of the harnesses only their seam, a harness knows
  * nothing of A2A, of the engine service or of the doors, and the CLI reaches the runtime through its two faces alone. No two files
- * need each other's values, no source file imports a test, a face re-exports by name, and only the two entries sit flat in `src/`.
+ * need each other's values, no source file imports a test, a face re-exports by name, and only the entries sit flat in `src/`.
  *
  * Each rule is made to refuse a planted import first: a rule that reads nothing passes too.
  */
@@ -57,6 +57,8 @@ const sourceFiles = (): string[] =>
 const read = (file: string) => fs.readFileSync(path.join(PKG, file), 'utf8');
 
 const DOORS = ['src/facade.ts', 'src/index.ts'];
+/** The runtime's entries: its two doors, and the pure door to its vocabulary (`agent-runtime/vocabulary`). */
+const ENTRIES = [...DOORS, 'src/vocabulary.ts'];
 const under = (file: string, dir: string) => file.startsWith(`src/${dir}/`);
 /** What the core may import of the harnesses: the seam, the arguments a task carries, and their face. */
 const SEAM = ['src/harness/seam.ts', 'src/harness/args.ts', 'src/harness/index.ts'];
@@ -74,7 +76,7 @@ function pathBreaches(file: string, imports: Import[]): string[] {
   for (const { spec } of imports) {
     const target = resolved(file, spec);
     if (target === undefined || !target.startsWith('src/')) continue;
-    const above = DOORS.includes(target) || ['a2a', 'service', 'facade', 'cli'].some((dir) => under(target, dir));
+    const above = ENTRIES.includes(target) || ['a2a', 'service', 'facade', 'cli'].some((dir) => under(target, dir));
     if (under(file, 'core') && under(target, 'harness') && !SEAM.includes(target)) {
       out.push(`${file} imports ${target}: ${WHY.core}`);
     } else if ((under(file, 'core') || under(file, 'harness')) && above) {
@@ -188,19 +190,22 @@ test('REFUSED: the core reaching a driver, A2A, the engine service or a door; a 
   for (const [file, line] of allowed) assert.deepEqual(pathBreaches(file, importsIn(line)), [], `not refused: ${file}: ${line}`);
 });
 
-/** The files that sit flat in `src/` and are not one of the two entries, each worded with what to do instead. */
+/** The files that sit flat in `src/` and are not one of the entries, each worded with what to do instead. */
 const flatBreaches = (files: readonly string[]): string[] =>
   files
-    .filter((f) => !f.slice('src/'.length).includes('/') && !DOORS.includes(f))
-    .map((f) => `${f} sits flat in src/: only the entries ${DOORS.join(' and ')} do — put it in its feature's folder`);
+    .filter((f) => !f.slice('src/'.length).includes('/') && !ENTRIES.includes(f))
+    .map((f) => `${f} sits flat in src/: only the entries ${ENTRIES.join(', ')} do — put it in its feature's folder`);
 
 test('REFUSED: a source file flat in src/ that is not an entry', () => {
-  assert.deepEqual(flatBreaches(['src/facade.ts', 'src/index.ts', 'src/runner.ts', 'src/core/domain.ts', 'src/harness/claude/bg.ts']), [
-    "src/runner.ts sits flat in src/: only the entries src/facade.ts and src/index.ts do — put it in its feature's folder",
-  ]);
+  assert.deepEqual(
+    flatBreaches(['src/facade.ts', 'src/index.ts', 'src/vocabulary.ts', 'src/runner.ts', 'src/core/domain.ts', 'src/harness/claude/bg.ts']),
+    [
+      "src/runner.ts sits flat in src/: only the entries src/facade.ts, src/index.ts, src/vocabulary.ts do — put it in its feature's folder",
+    ],
+  );
 });
 
-test('only the two entries sit flat in src/', () => {
+test('only the entries sit flat in src/', () => {
   const files = sourceFiles();
   assert.ok(files.includes('src/facade.ts') && files.includes('src/core/domain.ts'), 'the scan reads the source and its folders');
   assert.deepEqual(flatBreaches(files), []);

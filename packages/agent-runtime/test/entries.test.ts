@@ -83,6 +83,15 @@ const PINNED: Record<string, string[]> = {
     'view',
     'viewOfState',
   ],
+  'agent-runtime/vocabulary': [
+    'CLAUDE_AUTO_DROPPED',
+    'CLAUDE_CONTEXT_TOKENS',
+    'CLAUDE_EFFORTS',
+    'CLAUDE_PERMISSION_MODES',
+    'CODEX_EFFORTS',
+    'CODEX_SANDBOXES',
+    'fenceReach',
+  ],
 };
 
 /** Where `exported` differs from `pinned`: each name dropped or added, worded with what to do. */
@@ -114,4 +123,13 @@ test('a name both entries export is the same value in each', async () => {
   const shared = Object.keys(promises).filter((n) => Object.hasOwn(effect, n));
   assert.ok(shared.includes('codex') && shared.includes('HARNESS_ARGS'), 'the entries share names');
   for (const name of shared) assert.equal(promises[name], effect[name], name);
+});
+
+test('every name the vocabulary door exports is the same value on the other two', async () => {
+  const promises = { ...(await import('agent-runtime')) } as Record<string, unknown>;
+  const effect = { ...(await import('agent-runtime/effect')) } as Record<string, unknown>;
+  for (const [name, value] of Object.entries(await import('agent-runtime/vocabulary'))) {
+    assert.equal(promises[name], value, `agent-runtime: ${name}`);
+    assert.equal(effect[name], value, `agent-runtime/effect: ${name}`);
+  }
 });

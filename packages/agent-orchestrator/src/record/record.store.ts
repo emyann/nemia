@@ -73,6 +73,7 @@ const runBase = {
   from: Schema.optional(Schema.StructWithRest(Schema.Struct({ inbox: Schema.String }), Rest)),
   gates: Schema.optional(Strings),
   factory: Schema.optional(Schema.String),
+  mounts: Schema.optional(Schema.mutable(Schema.Array(Schema.Struct({ path: Schema.String, readOnly: Schema.Boolean })))),
   slotHeldAt: Schema.optional(Schema.String),
   tips: Schema.optional(Schema.Record(Schema.String, Schema.String)),
   cancelledAt: Schema.optional(Schema.String),
@@ -104,9 +105,7 @@ const FolderRecordSchema = Schema.StructWithRest(
   Rest,
 );
 
-const RunRecordSchema = Schema.Union([GitRecordSchema, FolderRecordSchema]);
-
-const isRunRecord = Schema.is(RunRecordSchema);
+const isRunRecord = Schema.is(Schema.Union([GitRecordSchema, FolderRecordSchema]));
 
 const fieldOf = (value: unknown, key: PropertyKey): unknown =>
   typeof value === 'object' && value !== null ? Reflect.get(value, key) : undefined;

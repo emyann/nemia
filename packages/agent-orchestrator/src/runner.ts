@@ -15,13 +15,12 @@
  * `record.store.ts` (a run's id, its files' names, a step's check stderr, artifacts and inputs), `files.store.ts` (the run store a run's
  * record, a person's files beside it and the inbox's are read and written through, `runStore`, and the inbox's folder, `inboxDir`),
  * `daemon.store.ts` (`tick.json` and who ticks the store), `feed.store.ts` (the feed's file), `worktree.store.ts` (git, a step's worktree,
- * its `node_modules`, the hand-off commit), `branches.store.ts` (what git says of a run's result branches), `artifacts.store.ts` (the
- * files a step hands over), `folder.store.ts` and `write.store.ts` (a workflow folder read and written), `agents.store.ts` and
- * `skills.store.ts` (an agent and a skill written), `place.store.ts` (a place skill's verbs run and heard), `plan.store.ts` (a plan
- * folder read), `inbox.store.ts` (the inbox's cards filed, queued and dropped), `factory.store.ts` (the factories, `factoriesDir`) and
- * `config.store.ts` (the `WF_` environment). They import
- * neither the runtime nor a controller, and load as a tree:
- * the bottom, beneath `record.store.ts`, beneath `worktree.store.ts` and `write.store.ts`, beneath the rest, so no cycle can form
+ * its `node_modules`, the hand-off commit), `branches.store.ts` (what git says of a run's result branches), `artifacts.store.ts` (the files
+ * a step hands over), `folder.store.ts` and `write.store.ts` (a workflow folder read and written), `agents.store.ts`, `custom.store.ts` and
+ * `skills.store.ts` (an agent, a person's custom instructions for one, and a skill written), `place.store.ts` (a place skill's verbs run
+ * and heard), `plan.store.ts` (a plan folder read), `inbox.store.ts` (the inbox's cards filed, queued and dropped), `factory.store.ts` (the
+ * factories, `factoriesDir`) and `config.store.ts` (the `WF_` environment). They import neither the runtime nor a controller, and load as a
+ * tree: the bottom, beneath `record.store.ts`, beneath `worktree.store.ts` and `write.store.ts`, beneath the rest, so no cycle can form
  * (`test/boundary.test.ts`).
  */
 export { verdictWord } from './check/check.ts';
@@ -158,11 +157,13 @@ export {
   agentUsers,
   agentVersion,
   cardSkills,
+  customInstructionsFile,
   preloads,
   formerKeyLines,
   loadAgents,
   loadWorkflows,
   lookupRoots,
+  readCustomInstructions,
   skillsFor,
   skillVersion,
   workflowDescription,
@@ -170,6 +171,7 @@ export {
   workflowsIn,
 } from './folder/folder.store.ts';
 export type { Places } from './folder/folder.store.ts';
+export { clearCustomInstructions, writeCustomInstructions } from './agents/custom.store.ts';
 export { cardToStart, planLines, planStopped } from './plan/plan.ts';
 export type { Card, Planned } from './plan/plan.ts';
 export {
@@ -308,7 +310,7 @@ export {
   readFactory,
   removeFactory,
 } from './factory/factory.store.ts';
-export { HARNESSES, engine, remoteAgents } from './runtime-client.ts';
+export { HARNESS_CHOICES, HARNESSES, engine, remoteAgents } from './runtime-client.ts';
 export { A2A_AGENTS_FILE, envNameOf } from './harness/a2a.store.ts';
 export {
   closeoutAsked,
@@ -330,7 +332,7 @@ export {
 export { endWords, phaseOfView, wordOfView } from './views/views-words.ts';
 export type { CheckReport } from './views/views.verb.ts';
 export { readPlan } from './plan/plan.store.ts';
-export { repoFor, start } from './start/start.verb.ts';
+export { leftOutMounts, repoFor, start } from './start/start.verb.ts';
 export { startFromInbox, startQueued } from './inbox/inbox.verb.ts';
 export { startPlan } from './plan/plan.verb.ts';
 export type { InboxStart, InboxStarted } from './inbox/inbox.verb.ts';

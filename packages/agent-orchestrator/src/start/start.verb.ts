@@ -6,7 +6,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { configRefusal, HARNESSES, readRemote, tried } from '../runtime-client.ts';
+import { configRefusal, readRemote, tried } from '../runtime-client.ts';
 import { remoteAgentsFile } from '../harness/a2a.store.ts';
 import { refusalLines } from '../workspace/workspace.ts';
 import { type Workflow } from '../step/step.ts';
@@ -17,11 +17,11 @@ import { budgetUsdFor } from '../status/status.ts';
 import { renderedFlags } from '../agents/agents.ts';
 import { ownOf } from '../tick/file.verb.ts';
 import { fansOut, isFolderTeam } from '../workflow/index.ts';
-import { loadWorkflows, skillsFor, type Places } from '../folder/folder.store.ts';
+import { formerModesWritten, loadWorkflows, skillsFor, type Places } from '../folder/folder.store.ts';
 import { placesOf } from '../folder/lookup.store.ts';
 import { workRoot } from '../record/places.store.ts';
 import { gateRefusal } from '../ending/ending.ts';
-import { type Run } from '../record/record.ts';
+import { isGitRun, type Mount, type Run } from '../record/record.ts';
 import { afterRefusal } from '../wait/wait.ts';
 import { inputRefusal, type InputFile } from './inputs.ts';
 import { runStore } from '../record/files.store.ts';
@@ -32,6 +32,8 @@ import { parentRecord } from '../branches/branches.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import {
   DEFAULT_FACTORY,
+  factoryMountRefusal,
+  factoryMounts,
   factoryRepo,
   fillsOf,
   outsideRefusal,
@@ -40,40 +42,7 @@ import {
   type Factory,
 } from '../factory/factory.ts';
 import { readFactory } from '../factory/factory.store.ts';
-import { Effect } from 'effect';
-
-/**
- * Why the engine refuses `claude.remoteControl` on a harness that runs a prompt and exits, in its words (agent-runtime's `file()`), which
- * `test/store.test.ts` holds this copy to by asking the engine. A copy, since `start` is synchronous and the engine's door is not, and the
- * engine refuses only at filing, on the run's first pass, after the run is written.
- */
-const NOT_BRIDGED =
-  'has no such flag: it runs a prompt and exits, and only a Claude Code background session (`claude --bg --remote-control`) is bridged';
-
-/**
- * Why the engine refuses `claude.remoteControl` on a Claude Code job, in its words (agent-runtime's `claudeCodeRefuses`), which
- * `test/store.test.ts` holds this copy to by asking the engine: a `claude` step without `background: true` runs `claude -p`.
- */
-const JOB_NOT_BRIDGED = 'only a background session (`claude --bg`) can be bridged: a job runs `claude -p`, which opens no bridge';
-
-/**
- * The first step that says `remote: true` where the engine refuses `claude.remoteControl` — every one of `HARNESSES` but Claude Code's, as
- * the engine's own door judges (`NOT_BRIDGED`), and on Claude Code every step but a background session (`JOB_NOT_BRIDGED`) — refused by
- * name in the engine's words, or undefined. A step without a `harness:` runs on `claude`, the engine's first.
- */
-function remoteRefusal(steps: readonly Workflow[]): string | undefined {
-  const bridged = Object.entries(HARNESSES)
-    .filter(([, h]) => h === 'claude')
-    .map(([name]) => name);
-  const step = steps.find((s) => s.remote && !bridged.includes(s.harness ?? 'claude'));
-  if (step) {
-    return `${step.name}: \`remote: true\` asks for a session bridged to claude.ai, and the \`${step.harness}\` harness ${NOT_BRIDGED}. Run the step on ${bridged.join(' or ')} with \`background: true\` — delete \`harness: ${step.harness}\` — or delete \`remote: true\`.`;
-  }
-  const job = steps.find((s) => s.remote && !s.background);
-  if (job)
-    return `${job.name}: \`remote: true\` bridges a session to claude.ai, and ${JOB_NOT_BRIDGED}. Write \`background: true\` beside it, or delete \`remote: true\`.`;
-  return undefined;
-}
+import { Context, Effect } from 'effect';
 
 /**
  * A workflow folder's steps, as a run in `factory` runs them: each step its hires fill (`fillsOf`, by the folder's name) resolved against
@@ -103,9 +72,9 @@ function stepsIn(workflowDir: string, places: Places, factory: Factory | undefin
  *   does not have into the branch it stands on;
  * - a step named for another step's check (`<step>-check`) or try (`<step>-try<n>`, `<step>-try<n>-check`): the run files those tasks
  *   under those names, and would read one task as the other;
- * - a `remote: true` the engine does not bridge (`remoteRefusal`), and a remote agent not declared (`undeclaredRefusal`): the engine
- *   refuses them only when the step is filed, with the run on the record;
- * - a step whose first filing's config its harness refuses (`configRefused`), the run started at `gates` beside the workflow's own.
+ * - a remote agent not declared (`undeclaredRefusal`): the engine refuses it only when the step is filed, with the run on the record;
+ * - a step whose first filing's config its harness refuses (`refused`, `configRefused` unless a caller gives another), the run started at
+ *   `gates` beside the workflow's own: a word, a window, a cap or a bridge (`remote: true`) its harness does not take.
  */
 export function stepsToStart(
   workflowDir: string,
@@ -113,6 +82,7 @@ export function stepsToStart(
   places: Places,
   factory?: Factory,
   gates: readonly string[] = [],
+  refused: ConfigRefused = configRefused,
 ): Workflow[] {
   const steps = stepsIn(workflowDir, places, factory);
   if (!isolate && isFolderTeam(steps)) {
@@ -152,11 +122,9 @@ export function stepsToStart(
       message: `${s.name}: a step may not be named for another step's try. The run files ${of} tried again as ${of}-try2, its check as ${of}-try2-check, and on. Rename ${s.name}.md.`,
     });
   }
-  const unbridged = remoteRefusal(steps);
-  if (unbridged) throw new Invalid({ message: unbridged });
   const undeclared = undeclaredRefusal(steps);
   if (undeclared) throw new Invalid({ message: undeclared });
-  const refusedConfig = configRefused(steps, places, gates);
+  const refusedConfig = refused(steps, places, gates, formerModesWritten(workflowDir));
   if (refusedConfig) throw new Invalid({ message: refusedConfig });
   return steps;
 }
@@ -166,23 +134,51 @@ export function stepsToStart(
  * harness (`configRefusal`), in the runtime's words after the step's line they come from (`filedRefusal`); undefined where every step's
  * is taken. A step on a remote agent is configured by its operator, and asked nothing. Its agent's flags name the folder the run renders
  * it to, and an ending's read the run's artifacts folder, neither there yet: the runtime judges which flags a step has, never where they
- * point.
+ * point. A step whose sandbox its file writes as `permissionMode:` (`written`, by the step's name) is quoted by that line.
  */
-export function configRefused(steps: readonly Workflow[], places: Places, gates: readonly string[]): string | undefined {
+export const configRefused = (
+  steps: readonly Workflow[],
+  places: Places,
+  gates: readonly string[],
+  written: Readonly<Record<string, string>> = {},
+): string | undefined => refusedStep(steps, places, gates, written, [])?.why;
+
+/** `configRefused`'s refusal with the step it refuses, in a run that mounts `mounts` (`factoryMounts`). */
+function refusedStep(
+  steps: readonly Workflow[],
+  places: Places,
+  gates: readonly string[],
+  written: Readonly<Record<string, string>>,
+  mounts: readonly Mount[],
+): { step: Workflow; why: string } | undefined {
   for (const step of steps.filter((s) => !isRemoteHarness(s.harness))) {
     const own = ownOf(step, renderedFlags(step, '.'), () => places.repo);
     const runArtifacts = path.dirname(artifactsDir({ id: 'run' }, step.name));
     const config = filedConfig(
       step,
       steps,
-      { gates: [...gates] },
-      { model: step.model, budgetUsd: budgetUsdFor(step, step.budget), runArtifacts, own },
+      { gates: [...gates], ...(mounts.length ? { mounts: [...mounts] } : {}) },
+      { model: step.model, budgetUsd: budgetUsdFor(step.budget), runArtifacts, own },
     );
-    const why = filedRefusal((c) => configRefusal(step.harness ?? DEFAULT_HARNESS, c), step.name, config, lineOf(step));
-    if (why) return why;
+    const former = written[step.name];
+    const lines = (field: string) =>
+      field === 'permissionMode' && former !== undefined ? `permissionMode: ${former}` : lineOf(step)(field);
+    const why = filedRefusal((c) => configRefusal(step.harness ?? DEFAULT_HARNESS, c), step.name, config, lines);
+    if (why) return { step, why };
   }
   return undefined;
 }
+
+/** What `stepsToStart` asks last of a folder's steps: why the runtime refuses one's first filing, or undefined (`configRefused`). */
+export type ConfigRefused = (
+  steps: readonly Workflow[],
+  places: Places,
+  gates: readonly string[],
+  written?: Readonly<Record<string, string>>,
+) => string | undefined;
+
+/** The refusal `startRun` asks of a folder's steps before a run is written: `configRefused`, unless a layer gives another. */
+export const StartRefusal = Context.Reference<ConfigRefused>('orchestrator/StartRefusal', { defaultValue: () => configRefused });
 
 /**
  * The first step whose `harness: a2a:<name>` names an agent the store's `a2a-agents.json` does not give the engine, refused with the fix,
@@ -237,7 +233,7 @@ export type StartOptions = {
 };
 
 /** What a run is told at `wf start` and frozen on its record, whatever its place: the brief, the steps, and each option given. */
-type Told = Pick<Run, 'brief' | 'workflowDir' | 'workflow' | 'after' | 'inputs' | 'from' | 'gates' | 'factory'>;
+type Told = Pick<Run, 'brief' | 'workflowDir' | 'workflow' | 'after' | 'inputs' | 'from' | 'gates' | 'factory' | 'mounts'>;
 
 /** Why a folder team refuses `--repo`: its run works in folders it makes, and would never look at the repository named. */
 const repoNamedRefusal = (repo: string): string =>
@@ -253,11 +249,39 @@ function inputsOf(given: readonly string[]): InputFile[] {
   });
 }
 
+/** Whether `at` is a directory now. */
+const isDirectory = (at: string): boolean => fs.statSync(at, { throwIfNoEntry: false })?.isDirectory() === true;
+
 /**
- * What `opts` tells the run, with `steps` as the workflow it freezes, `inputs` by name, and `factory` the one it is started in; an option
- * not given is left out, and so is the default factory.
+ * The folders a run in `factory` on `repo` mounts (`factoryMounts`), each a directory now; none in the default factory. A folder run gives
+ * no `repo`.
  */
-function toldOf(opts: StartOptions, steps: Workflow[], inputs: readonly InputFile[], factory: Factory | undefined): Told {
+const mountsAt = (factory: Factory | undefined, repo: string | undefined): Mount[] =>
+  factory ? factoryMounts(factory, repo).filter((m) => isDirectory(m.path)) : [];
+
+/**
+ * The factory's folders `startRun` left out of `run`'s mounts, as `wf start` says them: each of its repositories but the run's own that
+ * is no directory now, as none was at start. None for a run in the default factory, or in one whose file no longer reads.
+ */
+export function leftOutMounts(run: Run): string[] {
+  if (!run.factory) return [];
+  let factory: Factory;
+  try {
+    factory = readFactory(run.factory);
+  } catch {
+    return [];
+  }
+  const mounted = new Set((run.mounts ?? []).map((m) => m.path));
+  return factoryMounts(factory, isGitRun(run) ? run.repo : undefined)
+    .map((m) => m.path)
+    .filter((at) => !mounted.has(at) && !isDirectory(at));
+}
+
+/**
+ * What `opts` tells the run, with `steps` as the workflow it freezes, `inputs` by name, `factory` the one it is started in, and `mounts`
+ * the folders it gives each local step; an option not given is left out, and so are the default factory and no mounts.
+ */
+function toldOf(opts: StartOptions, steps: Workflow[], inputs: readonly InputFile[], factory: Factory | undefined, mounts: Mount[]): Told {
   const after = opts.after ?? [];
   const gates = opts.gates ?? [];
   return {
@@ -269,6 +293,7 @@ function toldOf(opts: StartOptions, steps: Workflow[], inputs: readonly InputFil
     ...(opts.from ? { from: { inbox: opts.from.inbox } } : {}),
     ...(gates.length ? { gates: [...gates] } : {}),
     ...(factory ? { factory: factory.name } : {}),
+    ...(mounts.length ? { mounts } : {}),
   };
 }
 
@@ -385,6 +410,12 @@ export const repoFor = (name: string | undefined, named: string | undefined, fal
  * `repo` is not one of its repositories (`outsideRefusal`); a folder team works on none. Its name is frozen on the record. Left out, or the
  * default factory, nothing is read, and the record has no `factory`: a record that names none is the default factory's.
  *
+ * In a factory, the run mounts its folders (`factoryMounts`): every repository of the factory but the one a git run works on, each
+ * read-only, and all of them for a folder run, which works on none. A folder that is no directory at start is left out, and `wf start`
+ * says it (`leftOutMounts`); a step whose harness cannot hold them is refused before anything is written (`configRefused`). The list
+ * is frozen on the record as `mounts`, filed with every local step and named on its brief, so a later change to the factory changes
+ * no run started. Left out when none is mounted, and in the default factory.
+ *
  * Fails with the refusal it met, every one before anything is written (`stepsToStart`, `refuseInclude` and those above); dies of anything
  * else, the copy's and the render's `Error` included (`tried`).
  */
@@ -392,7 +423,8 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   const isolate = opts.isolate ?? true;
   const places = placesOf(opts.repo);
   const factory = yield* tried(() => factoryNamed(opts.factory));
-  const steps = yield* tried(() => stepsToStart(opts.workflowDir, isolate, places, factory, opts.gates));
+  const refused = yield* StartRefusal;
+  const steps = yield* tried(() => stepsToStart(opts.workflowDir, isolate, places, factory, opts.gates, refused));
   const folder = isFolderTeam(steps);
   if (folder && opts.repoNamed) return yield* Effect.fail(new Invalid({ message: repoNamedRefusal(opts.repo) }));
   const outside = factory && !folder ? outsideRefusal(factory, opts.repo) : undefined;
@@ -404,7 +436,15 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   const refusedInputs = inputRefusal(inputs);
   if (refusedInputs) return yield* Effect.fail(new Invalid({ message: refusedInputs }));
   const id = runId(opts.brief);
-  const told = toldOf(opts, steps, inputs, factory);
+  const mounts = mountsAt(factory, folder ? undefined : opts.repo);
+  const refusedMounts = mounts.length
+    ? refusedStep(steps, places, opts.gates ?? [], formerModesWritten(opts.workflowDir), mounts)
+    : undefined;
+  if (factory && refusedMounts) {
+    const where = `${path.basename(path.resolve(opts.workflowDir))}/${refusedMounts.step.name}`;
+    return yield* Effect.fail(new Invalid({ message: factoryMountRefusal(factory, where, refusedMounts.why) }));
+  }
+  const told = toldOf(opts, steps, inputs, factory, mounts);
   const stepRecords = Object.fromEntries(steps.map((s) => [s.name, { taskId: null }]));
   const run = yield* folder ? folderRun(id, told, stepRecords) : gitRun(id, told, stepRecords, opts.repo, isolate);
   yield* tried(() => copyInputs(run, inputs));

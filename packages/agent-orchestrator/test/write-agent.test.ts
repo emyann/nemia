@@ -221,8 +221,8 @@ test('a new agent over one that is there, and an edit of one that is not, are re
 test("a write refuses what the parser refuses, in the parser's words", () => {
   fresh();
   refused(
-    () => writeAgent(AGENTS, { ...scribe, keys: { effort: 'enormous' } }, { version: null }),
-    /^agents\/scribe\.md: `effort: enormous`/,
+    () => writeAgent(AGENTS, { ...scribe, keys: { context: 'lots' } }, { version: null }),
+    /^agents\/scribe\.md: `context: lots` is not a number of tokens/,
   );
   refused(
     () => writeAgent(AGENTS, { ...scribe, keys: { output: 'nothing.schema.json' } }, { version: null }),

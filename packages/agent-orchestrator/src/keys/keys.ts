@@ -1,23 +1,12 @@
 /**
  * The readers of a step's keys, one each: a value as written in the frontmatter in, the value the step carries out, or a
  * `WorkflowError` that names the fix (`harnessOf`, `wordOf`, `contextOf`, `budgetOf`, `workspaceOf`, `denialsOf`, `slotOf`,
- * `outputOf`, …); and what a step and an agent are both judged by: a model that cannot run `auto` (`keepsAuto`), and skills or a system
- * prompt a step's sessions cannot reach (`composedRefusal`). The tool rules are `tools.ts`'s.
+ * `outputOf`, …); and what a step and an agent are both judged by: skills or a system prompt a step's sessions cannot reach
+ * (`composedRefusal`). The tool rules are `tools.ts`'s.
  */
 import path from 'node:path';
 import { CLOSEOUT_FIELDS, COUNTS, isObject, type OutputSchema, refuse, type StepOutput, type Workflow } from '../step/step.ts';
-import {
-  CLAUDE_MODES,
-  CONTEXT_WINDOWS,
-  DEFAULT_HARNESS,
-  EFFORTS,
-  HARNESSES,
-  isRemoteHarness,
-  PERMISSION_MODES,
-  REMOTE_NAME,
-  remoteNameOf,
-  SANDBOXES,
-} from '../harness/harness.ts';
+import { DEFAULT_HARNESS, HARNESSES, isRemoteHarness, REMOTE_NAME, remoteNameOf } from '../harness/harness.ts';
 import { looseAt } from '../closeout/closeout.ts';
 import { expandShapes, SHAPE_KEY } from '../question/question.ts';
 import type { HarnessPrompt } from '../agents/agents.ts';
@@ -41,64 +30,32 @@ export function harnessOf(step: string, harness: string | undefined): string | u
   );
 }
 
-const VOCABULARY = {
-  permissionMode: { lists: PERMISSION_MODES, noun: 'a mode' },
-  sandbox: { lists: SANDBOXES, noun: 'a sandbox' },
-  effort: { lists: EFFORTS, noun: 'an effort' },
-} as const;
-
-/** The two fences, each one harness's: what a step on the other harness is told to write instead. */
-const FENCE_ELSEWHERE = {
-  permissionMode: (word: string) =>
-    `\`permissionMode:\` is Claude Code's permission mode, and codex has none: its fence is its sandbox, \`sandbox:\` — ${SANDBOXES.codex.join(', ')}. ${word === 'bypassPermissions' ? 'Write `sandbox: danger-full-access` instead, the sandbox that fences nothing' : 'Write `sandbox:` instead, naming one of them: `sandbox: read-only` for a step that must not write'}`,
-  sandbox: () =>
-    `\`sandbox:\` is Codex's sandbox, and Claude Code has none: its fence is its permission mode, \`permissionMode:\` — ${CLAUDE_MODES.join(', ')} — with \`tools:\`, \`disallowedTools:\` and \`allowedTools:\`. Write \`permissionMode:\` instead, or run the step on codex`,
-} as const;
-
 /**
- * A permission mode, a sandbox or an effort is the harness's vocabulary, so it is checked against the harness the step runs on. A harness
- * with no list for the key has no such knob: a sandbox on Claude Code, a permission mode on Codex, each refused in words naming the other
- * key. A word of the other fence — a sandbox written as a mode, or the other way round — is named as such in the refusal.
+ * A permission mode, a sandbox or an effort as written: the harness's own word, which the runtime judges against the harness the step runs
+ * on when `wf start` asks it (`configRefused` in start.verb.ts). Refused here: `sandbox:` on a step that does not run on codex, since a
+ * step files its sandbox as its harness's permission mode, and a sandbox read as a mode is a fence nobody asked for.
  */
 export function wordOf(
   step: string,
-  key: keyof typeof VOCABULARY,
+  key: 'permissionMode' | 'sandbox' | 'effort',
   word: string | undefined,
   harness: string | undefined,
 ): string | undefined {
-  const { lists, noun } = VOCABULARY[key];
   const on = harness ?? DEFAULT_HARNESS;
-  const words = lists[on];
-  if (word === undefined || words?.includes(word)) return word;
-  const where = harness ? '' : ` (there is no \`harness:\` line, so the step runs on ${on})`;
-  if (!words)
-    return refuse(
-      `${step}: \`${key}: ${word}\` is not a key ${on} takes${where}. ${FENCE_ELSEWHERE[key as keyof typeof FENCE_ELSEWHERE](word)}.`,
-    );
-  if (key === 'sandbox' && word === 'bypassPermissions') {
-    return refuse(
-      `${step}: \`sandbox: bypassPermissions\` is Claude Code's word for its widest mode. Codex's own name for the sandbox that fences nothing is \`danger-full-access\`: write \`sandbox: danger-full-access\`. On ${on} it is one of: ${words.join(', ')}.`,
+  if (key === 'sandbox' && word !== undefined && on !== 'codex') {
+    const where = harness ? '' : ` (there is no \`harness:\` line, so the step runs on ${on})`;
+    refuse(
+      `${step}: \`sandbox: ${word}\` is a codex step's sandbox, and this step runs on ${on}${where}, which is fenced by its permission mode, \`permissionMode:\`, with \`tools:\`, \`disallowedTools:\` and \`allowedTools:\`: the line would be filed as a mode. Write \`permissionMode:\` instead, or run the step on codex.`,
     );
   }
-  const owner = HARNESSES.find((h) => lists[h]?.includes(word));
-  const other = key === 'permissionMode' ? 'sandbox' : key === 'sandbox' ? 'permissionMode' : undefined;
-  const across = other && HARNESSES.find((h) => VOCABULARY[other].lists[h]?.includes(word));
-  return refuse(
-    `${step}: \`${key}: ${word}\` is not ${noun} ${on} has${where}.` +
-      ` On ${on} it is one of: ${words.join(', ')}.` +
-      (owner ? ` \`${word}\` is ${owner}'s word, and this step does not run on ${owner}.` : '') +
-      (across
-        ? ` \`${word}\` is ${VOCABULARY[other].noun} ${across} has, written \`${other}: ${word}\` on a step that runs on ${across}.`
-        : '') +
-      ' Without the line, the harness uses its own default.',
-  );
+  return word;
 }
 
 /**
  * `remote:` as written: `true` or `false`, or refused. Anything else — `yes`, `on` — is a word the run would have to interpret, and reading
  * it either way is wrong: as true it lets a session be driven from a phone nobody meant to reach it, as false it drops a setting without a
- * word. Which harnesses bridge a session is the engine's to say, so `remote: true` on another is refused at `wf start` (`remoteRefusal` in
- * start.verb.ts).
+ * word. Which harnesses bridge a session is the runtime's to say, so `remote: true` where it bridges none is refused at `wf start`
+ * (`configRefused` in start.verb.ts).
  */
 export function remoteOf(step: string, remote: string | undefined): boolean | undefined {
   if (remote === undefined) return undefined;
@@ -110,20 +67,14 @@ export function remoteOf(step: string, remote: string | undefined): boolean | un
 }
 
 /**
- * `background:` as written: `true` or `false`, or refused, for `remote:`'s reasons — and `true` refused on a harness other than `claude`,
- * as the engine refuses `config.background` there (agent-runtime's `file()`), here so a folder is refused at `wf start` and not on its
- * first pass. `codex exec` and `claude-detached`'s `claude -p` each run one way.
+ * `background:` as written: `true` or `false`, or refused, for `remote:`'s reasons. Which harnesses run a background session is the
+ * runtime's to say, so `true` on another is refused at `wf start` (`configRefused` in start.verb.ts).
  */
-export function backgroundOf(step: string, background: string | undefined, harness: string | undefined): boolean | undefined {
+export function backgroundOf(step: string, background: string | undefined): boolean | undefined {
   if (background === undefined) return undefined;
   if (background !== 'true' && background !== 'false') {
     refuse(
       `${step}: \`background: ${background}\` is not \`true\` or \`false\`. \`background: true\` runs every session of the step as a Claude Code background session (\`claude --bg\`); \`background: false\`, or no line, runs it as a job (\`claude -p\`). Write one of the two, or delete the line.`,
-    );
-  }
-  if (background === 'true' && (harness ?? DEFAULT_HARNESS) !== 'claude') {
-    refuse(
-      `${step}: \`background: true\` asks for a Claude Code background session (\`claude --bg\`), and the \`${harness}\` harness has no such mode: ${harness === 'codex' ? '`codex exec` runs a prompt and exits' : '`claude-detached` runs `claude -p` and nothing else'}. Run the step on claude — delete \`harness: ${harness}\` — or delete \`background: true\`.`,
     );
   }
   return background === 'true';
@@ -168,37 +119,16 @@ export const contextText = (tokens: number): string =>
   Number.isSafeInteger(tokens) && tokens > 0 && tokens % 1_000 === 0 ? `${tokens / 1_000}k` : String(tokens);
 
 /**
- * `context:` as tokens, refused unless a number of them (`tokensOf`) in the range the step's harness takes (`CONTEXT_WINDOWS`), and on a
- * harness with no such knob. A bare `200` is what Claude Code's own flag reads as thousands, and a person may mean that: the refusal says
- * so, rather than read it either way.
+ * `context:` as tokens, refused unless a number of them (`tokensOf`). The windows a harness takes, and whether it has the knob, are the
+ * runtime's to say at `wf start` (`configRefused` in start.verb.ts).
  */
-export function contextOf(step: string, context: string | undefined, harness: string | undefined): number | undefined {
+export function contextOf(step: string, context: string | undefined): number | undefined {
   if (context === undefined) return undefined;
-  const named = `${step}: \`context: ${context}\``;
-  const on = harness ?? DEFAULT_HARNESS;
-  const range = CONTEXT_WINDOWS[on];
-  if (!range) {
-    const windowed = HARNESSES.filter((h) => CONTEXT_WINDOWS[h]);
-    return refuse(
-      `${named} sets the session's context window, and ${on} has no such knob: \`codex exec\` runs on its model's own window, whatever the step says. Delete the line, or run the step on ${windowed.join(' or ')}.`,
-    );
-  }
   const tokens = tokensOf(context);
-  if (tokens === undefined) {
-    return refuse(
-      `${named} is not a number of tokens. \`context\` is the session's context window, in tokens: digits, or thousands with \`k\` — for example ${CONTEXT_EXAMPLE}.`,
-    );
-  }
-  if (tokens < range.least || tokens > range.most) {
-    const thousands = tokens * 1_000 >= range.least && tokens * 1_000 <= range.most && /^\d+$/.test(context.trim());
-    return refuse(
-      `${named} is ${tokens} tokens, and ${on} takes a window from ${contextText(range.least)} to ${contextText(range.most)} tokens${harness ? '' : ` (there is no \`harness:\` line, so the step runs on ${on})`}.` +
-        (thousands
-          ? ` For ${tokens} thousand, write \`context: ${tokens}k\`.`
-          : ` Give one in that range — ${CONTEXT_EXAMPLE} — or delete the line for the model's whole window.`),
-    );
-  }
-  return tokens;
+  if (tokens !== undefined) return tokens;
+  return refuse(
+    `${step}: \`context: ${context}\` is not a number of tokens. \`context\` is the session's context window, in tokens: digits, or thousands with \`k\` — for example ${CONTEXT_EXAMPLE}.`,
+  );
 }
 
 /**
@@ -234,47 +164,18 @@ export function dollarsOf(written: string): number | undefined {
 }
 
 /**
- * The reason `codex exec` keeps no budget, in the engine's words (agent-runtime's `codex.refuses`), which `test/vocabulary.test.ts`
- * holds this copy to: a cap there is one nothing reads.
+ * `budget:` as dollars, refused unless an amount above zero (`dollarsOf`). Which harnesses keep a cap, and beside what, is the runtime's to
+ * say at `wf start` (`configRefused` in start.verb.ts). `$5` and `5 USD` are what the author meant, so the refusal writes the amount back
+ * without its unit, as `deadlineSeconds: 5m`'s does the arithmetic.
  */
-const CODEX_KEEPS_NO_CAP = 'is a spend cap in dollars, and `codex exec` has none: it takes no such flag, and reports no cost to cap';
-
-/**
- * Why a `claude --bg` session keeps no budget, in the engine's words (agent-runtime's `claudeCodeRefuses`), which `test/vocabulary.test.ts`
- * holds this copy to.
- */
-const BACKGROUND_KEEPS_NO_CAP =
-  'a `claude --bg` session does not keep one: Claude Code takes `--max-budget-usd` only with `--print`, and a background session spends past a cap it is given';
-
-/**
- * `budget:` as dollars, refused unless an amount above zero (`dollarsOf`), on codex, and beside `background: true`, as the engine refuses a
- * `budgetUsd` there — here, so a folder is refused at `wf start` and not on its first pass. `$5` and `5 USD` are what the author meant, so
- * the refusal writes the amount back without its unit, as `deadlineSeconds: 5m`'s does the arithmetic.
- */
-export function budgetOf(
-  step: string,
-  budget: string | undefined,
-  harness: string | undefined,
-  background: boolean | undefined,
-): number | undefined {
+export function budgetOf(step: string, budget: string | undefined): number | undefined {
   if (budget === undefined) return undefined;
-  const named = `${step}: \`budget: ${budget}\``;
-  if (harness === 'codex') {
-    refuse(
-      `${named} ${CODEX_KEEPS_NO_CAP}. Delete the line, or run the step on claude or claude-detached, whose \`claude -p\` ends a session once the step's tries together have cost the budget.`,
-    );
-  }
-  if (background) {
-    refuse(
-      `${named} is a spend cap, and \`background: true\` runs the step as a background session: ${BACKGROUND_KEEPS_NO_CAP}. Delete \`background: true\` to run the step as a job (\`claude -p\`), which ends its session at the cap, or delete the budget line.`,
-    );
-  }
   const amount = dollarsOf(budget);
   if (amount !== undefined) return amount;
   const bare = budget.replace(/^\$\s*/, '').replace(/\s*(?:usd|dollars?)$/i, '');
   const unit = dollarsOf(bare) !== undefined;
   return refuse(
-    `${named} is not an amount. \`budget\` is the most the step's tries may cost together, in dollars: a number above zero, in digits${unit ? ` with no unit — \`budget: ${bare}\`` : ` — for example ${BUDGET_EXAMPLE}`}.`,
+    `${step}: \`budget: ${budget}\` is not an amount. \`budget\` is the most the step's tries may cost together, in dollars: a number above zero, in digits${unit ? ` with no unit — \`budget: ${bare}\`` : ` — for example ${BUDGET_EXAMPLE}`}.`,
   );
 }
 
@@ -498,20 +399,6 @@ export function outputOf(
   }
   return { file, schema: schema as OutputSchema };
 }
-
-/**
- * The models Claude Code runs in `default` when asked for `auto` (Claude Code 2.1.282): the
- * session starts in `auto`, says `default` from its first turn, and a job denies every call `default` would ask about. Each name as written
- * on a step, or with a date after it (`claude-haiku-4-5-20251001`). A model not listed is let through: the list is what is known to fail.
- */
-export const AUTO_UNSUPPORTED: readonly string[] = ['haiku', 'claude-haiku-4-5', 'claude-sonnet-4-5'];
-
-/** Whether Claude Code keeps `auto` on `model`: false for one known to drop it (`AUTO_UNSUPPORTED`), true for its default and any other. */
-export const keepsAuto = (model: string | undefined): boolean =>
-  model === undefined || !AUTO_UNSUPPORTED.some((m) => model === m || model.startsWith(`${m}-`));
-
-/** The permission mode a Claude Code step is filed with when it names none: the runtime's own (`--permission-mode auto`). */
-export const DEFAULT_PERMISSION_MODE = 'auto';
 
 /**
  * Why an agent's skills or harness prompt (`harnessPrompt:`) cannot reach the sessions of a step that runs as `step` does — its harness,

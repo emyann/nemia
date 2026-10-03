@@ -129,6 +129,12 @@ export type HarnessSpec = {
    */
   commandArgs?: true;
   /**
+   * The modes of a task's `config.mounts` this harness holds, and `command` renders: `readOnly`, a folder the session can read and
+   * not write; `writable`, one it can write too. Absent, or a mode left out: `file()` refuses a task with such a mount rather than
+   * start a session that would not see the folder, or could write where it was told it may only read.
+   */
+  mounts?: { readOnly?: true; writable?: true };
+  /**
    * The worker keeps the harness's stdout and its stderr each whole, in a file of its own beside the log (`.stdout`, `.stderr`),
    * and the runner reads them (`output`). Absent: the log alone, both streams in one, and the runner has no `output`.
    */

@@ -25,7 +25,16 @@ import { claudeQuota } from './quota.ts';
 import type { Observation, RunnerOps, SpawnRequest } from '../seam.ts';
 import { detachedFind, detachedOps, type HarnessIO, type HarnessSpec } from '../detached/detached.ts';
 import { claudeTranscriptEvents, claudeTranscriptFile } from './transcript.ts';
-import { CLAUDE_CONTEXT_TOKENS, claudeCodeRefuses, claudeFlagsOf, claudePrintRefuses, worktreeName } from './vocabulary.ts';
+import {
+  CLAUDE_CONTEXT_TOKENS,
+  CLAUDE_DEFAULT_MODE,
+  claudeCodeRefuses,
+  claudeDenyArgs,
+  claudeFlagsOf,
+  claudeMountArgs,
+  claudePrintRefuses,
+  worktreeName,
+} from './vocabulary.ts';
 import { claudeResultOutput, claudeStreamOutput } from '../detached/output.ts';
 import { checkoutMcpConfig, claudeMcpArgs } from '../mcp.ts';
 
@@ -49,30 +58,33 @@ export const claudePrintArgs = (r: SpawnRequest, io: HarnessIO | undefined, outp
  *    be used without asking a person who is not there. In `dontAsk` a mode that never asks also never allows a write, even
  *    in the session's own cwd, so a fenced session that must write its own work is given `Edit(**)`, a glob resolved
  *    against its `cwd`: unscoped (`Write`) it would write anywhere, scoped it is denied outside. A deny still beats it.
- * 2. The caller's own flags (`config.claude`): after the variadic lists, which any flag ends, and before the mode.
- * 3. `--permission-mode`, `auto` unless the task names one.
- * 4. The MCP configurations, strict on every spawn as for `claude --bg`: the checkout's `.mcp.json` and the task's own.
- * 5. `--setting-sources project`, one value: a job reads its cwd's `.claude/settings.json`, and neither that cwd's
+ *    The deny list also holds each read-only mount: an edit under it is denied (`claudeDenies`).
+ * 2. `--add-dir` and each mount's path (`claudeMountArgs`): variadic, and ended by the flag after it.
+ * 3. The caller's own flags (`config.claude`): after the variadic lists, which any flag ends, and before the mode.
+ * 4. `--permission-mode`, `auto` unless the task names one.
+ * 5. The MCP configurations, strict on every spawn as for `claude --bg`: the checkout's `.mcp.json` and the task's own.
+ * 6. `--setting-sources project`, one value: a job reads its cwd's `.claude/settings.json`, and neither that cwd's
  *    `settings.local.json`, where a person's "don't ask again" writes allow rules, nor anything of `~/.claude/` — the
  *    user's mode, allow rules, plugins, skills, hooks, model and effort — so it does the same on any machine and in any
  *    checkout, and an agent's own skills do not share the listing's budget with a person's. `--settings`, `--plugin-dir`
  *    and `--mcp-config` still reach it.
- * 6. `--model` and `--effort`, where the task names them.
- * 7. `--autocompact`, the context window, as for `claude --bg`: `claude -p` compacts past it and still gives its
+ * 7. `--model` and `--effort`, where the task names them.
+ * 8. `--autocompact`, the context window, as for `claude --bg`: `claude -p` compacts past it and still gives its
  *    `structured_output`.
- * 8. `--json-schema`, the closing statement's shape, as for `claude --bg`: the answer comes back as the result's
+ * 9. `--json-schema`, the closing statement's shape, as for `claude --bg`: the answer comes back as the result's
  *    `structured_output`.
- * 9. `--resume` and `--worktree`, where the task continues a session or asks for a worktree.
- * 10. `--max-budget-usd`, the spend cap: `claude -p` ends the session once a response takes it past, and says so in its
+ * 10. `--resume` and `--worktree`, where the task continues a session or asks for a worktree.
+ * 11. `--max-budget-usd`, the spend cap: `claude -p` ends the session once a response takes it past, and says so in its
  *     result.
  */
 export const claudePrintFlags = (r: SpawnRequest, io: HarnessIO | undefined): string[] => [
   ...(r.config?.tools ? ['--tools', r.config?.tools.join(',')] : []),
-  ...(r.config?.disallowedTools?.length ? ['--disallowedTools', r.config?.disallowedTools.join(',')] : []),
+  ...claudeDenyArgs(r.config),
   ...(r.config?.allowedTools?.length ? ['--allowedTools', r.config?.allowedTools.join(',')] : []),
+  ...claudeMountArgs(r.config),
   ...claudeFlagsOf(r.config?.claude),
   '--permission-mode',
-  r.config?.permissionMode ?? 'auto',
+  r.config?.permissionMode ?? CLAUDE_DEFAULT_MODE,
   ...claudeMcpArgs([io?.checkoutMcpConfig, io?.mcpConfigFile]),
   '--setting-sources',
   'project',
@@ -114,6 +126,7 @@ export const claudeDetached: HarnessSpec = {
   refuses: claudePrintRefuses,
   contextTokens: CLAUDE_CONTEXT_TOKENS,
   claudeFlags: true,
+  mounts: { readOnly: true, writable: true },
 };
 
 /**
@@ -160,6 +173,7 @@ export const claudeJob: HarnessSpec = {
   refuses: claudePrintRefuses,
   contextTokens: CLAUDE_CONTEXT_TOKENS,
   claudeFlags: true,
+  mounts: { readOnly: true, writable: true },
   resumeCostCarried: true,
 };
 

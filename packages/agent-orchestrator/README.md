@@ -283,11 +283,10 @@ the new name.
 
 `sandbox:` is Codex's name for its fence (`-s`, `sandbox_mode`), and a codex step took it on 2026-09-23; until then a codex step
 wrote its sandbox as `permissionMode:`, which is Claude Code's name for Claude Code's fence. So each harness has one fence under its
-own name: `permissionMode:` on Claude Code, `sandbox:` on codex, and each is refused on the other harness with words naming the right
-key. A codex step or agent written before still loads — `permissionMode: read-only`, `workspace-write` or `danger-full-access` is read
-as that `sandbox:`, and `permissionMode: bypassPermissions`, the engine's alias, as `sandbox: danger-full-access` — and `wf start`
-prints a line naming each file to rewrite. Any other word there is refused, naming `sandbox:`, and so is the line written beside a
-`sandbox:`. A run frozen before keeps a codex step's sandbox under `permissionMode`, and files it all the same: the engine's task
+own name: `permissionMode:` on Claude Code, `sandbox:` on codex; `sandbox:` on Claude Code is refused at load with words naming
+`permissionMode:`. A codex step or agent written before still loads — its `permissionMode:` is read as that `sandbox:`, and
+`permissionMode: bypassPermissions`, the engine's alias, as `sandbox: danger-full-access` — and `wf start` prints a line naming each file
+to rewrite. Whether the word is a sandbox is the runtime's to say at `wf start`; the line written beside a `sandbox:` is refused at load. A run frozen before keeps a codex step's sandbox under `permissionMode`, and files it all the same: the engine's task
 still calls either fence `permissionMode`, and the tick hands the one the step has on (`modeOf`). A page of the board opened before the rename that sends `permissionMode` back
 on a codex step is refused, saying to reload; a save from the board writes `sandbox:`, and a save that changes nothing keeps the file.
 Codex's approval policy is untouched: `codex exec` asks nobody, and the engine passes no `-a`.
@@ -350,8 +349,9 @@ workflow — the listings skip it, and a workflow named `agents` is refused by n
 At `wf start` each node is resolved and frozen on the run, so a run never reads `agents/` again, from a worktree or
 anywhere: the agent's keys are the defaults, a key the step writes wins — a fence key only narrows the agent's (*Four layers*, below) —
 and the refusals that depend on the harness read the merged keys and name the step. On codex, and on a step that continues another's
-session (`resume:`), the brief is the agent's instructions, a blank line, then the step's own words; on Claude Code the instructions go
-after Claude Code's own prompt (*An agent rendered for Claude Code*, below) and the brief is the step's own words alone. `renderStep`
+session (`resume:`), the brief is the agent's instructions, then your custom instructions for it (*Four layers*, below), then the step's
+own words, each after a blank line; on Claude Code the instructions and the custom instructions go after Claude Code's own prompt (*An
+agent rendered for Claude Code*, below) and the brief is the step's own words alone. `renderStep`
 writes a resolved step back as its file was: `agent:`, the keys the step set itself, and its own note, never the agent's. `wf start` names
 each node's agent beside it — `implement (implementer) → review (reviewer) → ship (shipper)` — and a node with nothing attached by its
 name alone.
@@ -361,7 +361,15 @@ name alone.
 What an agent is told comes in four layers, each written by whoever owns it:
 
 1. **Instructions** — the agent's own body, written once in its file: who it is and how it works, whatever node it is attached to.
-2. **Custom instructions** — what a person adds to an agent they use without rewriting it. Coming, not built.
+2. **Custom instructions** — what a person adds to an agent they use without rewriting it, any agent, the repository's or their own. They
+   are kept in the person's store, one file per agent name, `$WF_ROOT/custom-instructions/<agent>.md`
+   (`~/.agent-workflows/custom-instructions/<agent>.md` by default), never in the agent's folder, which may be the repository's; the
+   same words reach whichever agent of that name a run finds. `wf agents custom <name> --file <path>` writes them (`--file -` reads
+   stdin), `wf agents custom <name>` prints them, and `--clear` removes them; it refuses a name no place has, blank words, and a
+   frontmatter block. They only add words: they set no key, so they never widen the agent's fence, give it a tool, or change its model,
+   mode or skills — a frontmatter block written by hand, or a link, stops a start of every step naming the agent, naming the file.
+   `wf start` reads them once and freezes them with the step (`StepAgent.customInstructions`): a run started before an edit or a
+   `--clear` keeps the words it froze, and only runs started after it get the new ones.
 3. **The step's policy** — the step's own words and keys: what this node of this process asks of whoever does its work — a role's
    policies, *in this team, also check …*, or a `ship` step telling its shipper why a build and an e2e matter on a merged tree. It is a
    normal layer, the place a process says what it expects of a role. A step's `skills:` adds skills to its agent's, and takes none away
@@ -434,7 +442,8 @@ says it can do can be corrected without touching a run in flight. `agentVersion`
 card moves with the version, and the board refuses a save against a stale read. The Claude Code skill is the machinery: the folder a
 session loads through the `Skill` tool. The card entry is the sentence about it.
 
-`wf agents` lists both places, each agent by its description with its skills under it. `wf agents card <name>` prints one
+`wf agents` lists both places, each agent by its description with its skills under it, and the file of your custom instructions for it
+when you have some (*Four layers*, above; `wf agents custom <name>` prints, writes or clears them). `wf agents card <name>` prints one
 in the shape of an A2A Agent Card, JSON on stdout and nothing else:
 
 ```
@@ -468,11 +477,11 @@ tools: Read, Edit, Skill
 You write notes. Load `write-a-note` before you start.
 ```
 
-A Claude Code step whose agent has instructions, skills or a `harnessPrompt:` other than `keep` is *rendered* at `wf start`, under
+A Claude Code step whose agent has instructions, custom instructions, skills or a `harnessPrompt:` other than `keep` is *rendered* at `wf start`, under
 `runs/<id>/agents/<step>/`, frozen with the run as its workflow is (`agents/agents.ts`, `writeAgentFiles` in `agents/agents.store.ts`), and filed with
 Claude Code's flags for it in the engine's `config.claude` (docs/spike-2026-09-25-agents-skills.md says what each was measured to do):
 
-- `prompt.md` — the instructions, then a line naming each skill by its namespaced name, then the whole text of each skill whose
+- `prompt.md` — the instructions, then your custom instructions for the agent, then a line naming each skill by its namespaced name, then the whole text of each skill whose
   SKILL.md says `preload: true`. `--append-system-prompt-file` appends it to Claude Code's own prompt, which is kept (F1).
 - `nemia-<agent>/` — a plugin of the step's own (`--plugin-dir`, F4, F5): `skills/<name>/`, each copied whole from where the load found
   it, so a session loads them with the `Skill` tool as `nemia-<agent>:<name>`, and nothing of the machine's own plugins is touched.
@@ -523,8 +532,8 @@ naming each place looked in; skills with no `Skill` in the step's `tools:` or wi
 session cannot load is a name in its prompt (F11); skills or a harness prompt on codex, which is handed the instructions in its brief
 as before; skills or a harness prompt on a step that continues another's session, which keeps its own (F13); `harnessPrompt: replace` on
 an agent with no instructions; and a Claude Code step that runs in `auto` — written, or the runtime's default when it names no mode —
-on `haiku`, `claude-haiku-4-5` or `claude-sonnet-4-5`, where Claude Code drops `auto` to `default` and a job then denies every call
-`default` would ask about (F21). A `wf retry --model` onto one of those models, from the terminal or the board, is refused the same way
+on a model the runtime says Claude Code drops `auto` on (`fenceReach`'s `dropped`, from `agent-runtime/vocabulary`: `haiku`,
+`claude-haiku-4-5` or `claude-sonnet-4-5`), where it runs in `default` and a job then denies every call `default` would ask about (F21). A `wf retry --model` onto one of those models, from the terminal or the board, is refused the same way
 (`retryRefusal`, through `autoDropped`), since the step's mode is frozen with the run. A step's own `skills:` is refused, naming the
 step, the skill and the fix: on a step with no agent (a factory's hire is one); a skill it adds that its agent's fence keeps from
 loading — `tools:` without `Skill`, or a `disallowedTools:` rule covering `Skill` or `Skill(<skill>)` — since a step never widens its
@@ -556,13 +565,14 @@ Claude Code is given exactly the list as `--tools`, where a tool not on it does 
 session — not `--allowedTools`, where an unapproved one is still there to try. The list names Claude
 Code's built-in tools; the servers of the checkout's `.mcp.json` are not on it. Refused at load: a line
 that names no tool; an entry with a space or a comma inside (`Read Grep Glob`, `[Read, Grep]`, or
-`Bash(git diff:*)`, a rule where a tool goes); and any `tools:` on codex. Codex has no tool list, only
+`Bash(git diff:*)`, a rule where a tool goes); and any `tools:` on codex, the orchestrator's own rule, since the runtime
+takes the list there and Codex ignores it. Codex has no tool list, only
 one shell in a sandbox, so its fence is `sandbox:`, and `read-only` writes nothing.
 
 `effort:` is one word the step's harness takes: `low`, `medium`, `high`, `xhigh` or `max` on Claude Code,
-and `none` and `minimal` besides on codex. Another word is refused by name with the list, as a permission
-mode is. Refusing it here matters more than usual: Claude Code itself only warns about an effort it does
-not know, and runs at its default.
+and `none` and `minimal` besides on codex. Another word is refused at `wf start`, in the runtime's words after the
+step's line, as a permission mode is. Refusing it there matters more than usual: Claude Code itself only warns about
+an effort it does not know, and runs at its default.
 
 Both go to the engine on every filing of the step: the first, each try and each round. Without them, the
 step has the harness's own tools at its own effort.
@@ -582,10 +592,8 @@ the window the session compacts its conversation, a summary in place of what it 
 runs on the model's whole window, and a long session reads everything it ever read again on every call. `renderStep`
 writes it back in one canonical form, not as it was written: thousands with `k` (`150000` is `150k`, `1M` is `1000k`),
 and digits for a number that is not a whole thousand. Refused at load: a value that is not a number of tokens (`200 k`,
-`1.5M`, `200,000`); one outside what the harness takes, 100k to 1000k on Claude Code — and a bare `200`, which Claude
-Code's own flag would read as thousands, is refused saying to write `200k`; and any `context:` on codex, whose `codex
-exec` has no such knob. The range is a copy of the engine's `CLAUDE_CONTEXT_TOKENS`, held to it by
-`test/vocabulary.test.ts`.
+`1.5M`, `200,000`). A window outside what the harness takes, and any `context:` on codex, whose `codex exec` has no
+such knob, are the runtime's to refuse, in its words, at `wf start`.
 
 It goes to the engine on every filing of the step, as `effort:` does, and **a session keeps one window**: a nudge, an
 answer, a `retries:` try and a round each continue the session on the window it was started with, and a step that
@@ -621,8 +629,8 @@ and `RemoteTrigger`, which no step needs.
 
 Refused at load: a line that names no rule; an entry with a comma inside it (`Bash(git push, git reset)`
 would reach the harness as two halves of a rule, so write two rules); an entry that is not one rule
-(`SendMessage CronCreate`, a quoted name, an unclosed parenthesis); and any `disallowedTools:` on codex, which has
-no tool list, so its fence is `permissionMode`. A Bash rule matches as Claude Code matches it:
+(`SendMessage CronCreate`, a quoted name, an unclosed parenthesis). Any `disallowedTools:` on codex, which has
+no tool list, so its fence is `sandbox:`, is the runtime's to refuse at `wf start`. A Bash rule matches as Claude Code matches it:
 `Bash(npm run build)` is that command, as the settings' allow of the same words is.
 
 **A deny closes a command, not an allow.** This repository's settings also allow `Bash(npx turbo run test:*)`
@@ -632,12 +640,12 @@ any task or any file (`node --test` takes a glob, so a rule on the file's path i
 reviewer from those is the allow narrowed in `.claude/settings.json`, which this package does not own; until
 then, only a sentence in the reviewer's brief.
 
-**The engine is the source of these words.** The permission modes and efforts `src/harness/harness.ts` refuses
-are copies of agent-runtime's `CLAUDE_PERMISSION_MODES`, `CLAUDE_EFFORTS`, `CODEX_SANDBOXES` and
-`CODEX_EFFORTS`, which it exports. They are copies because `harness/harness.ts` is pure and imports no runtime
-(`docs/architecture.md`), and the engine refuses a word only when the step is filed, after the run exists.
-`test/vocabulary.test.ts` imports the runtime's lists and fails the moment a copy differs. The first copies had drifted: the engine took `manual` and
-codex's `bypassPermissions`, and the parser refused both. To change a word, change the engine, then the copy.
+**The engine is the source of these words.** The load keeps no copy of the permission modes, sandboxes, efforts and
+windows each harness takes: `wf start` and `wf retry` ask the runtime's `configRefusal` of every step's filed
+config before anything is written, and say its words after the step's line (`configRefused`). The board's form offers
+the runtime's own lists (`HARNESS_CHOICES`, through the client). The load keeps only what the runtime cannot refuse:
+`tools:` on codex, `skills:` and `harnessPrompt:` on codex or a remote agent, and `sandbox:` on Claude Code, which
+would be filed as a mode.
 
 ### A job, or a session that stays: `background:`
 
@@ -659,9 +667,9 @@ keeps no spend cap, and its denials are not read (issue 17, issue 28). A supervi
 end, and is answered from a phone (*A supervisor*, below). Most steps are jobs; until thin runtime stage 2 part 2 (2026-09-23) every
 step ran `--bg`.
 
-Refused at load: any word but `true` or `false`, and `true` on `codex` or `claude-detached`, which have no such mode; a `budget:` beside
-`background: true`, in the engine's words, since a background session keeps no cap; and, on a folder team, a background step in a mode
-that can ask (below).
+Refused at load: any word but `true` or `false`; and, on a folder team, a background step in a mode that can ask (below). Refused at
+`wf start`, in the runtime's words: `true` on `codex` or `claude-detached`, which have no such mode, and a `budget:` beside
+`background: true`, since a background session keeps no cap.
 
 ### When a denied call stops a step: `denials:`
 
@@ -709,11 +717,10 @@ phone, and not only watch it. So it is a deliberate setting, never a default: a 
 bridged, and a step's check never is.
 
 Refused at load: any word but `true` or `false` — `remote: yes` is refused by name — an empty value, and the line twice. Refused at
-`wf start`, with nothing written, on a harness the engine refuses `claude.remoteControl` for, in the engine's words: `codex` and
-`claude-detached` run a prompt and exit, and only a Claude Code background session, `claude` with `background: true`, is bridged; and on
-a `claude` step without `background: true`, since a job opens no bridge. The words are a copy, since `start` cannot wait on the engine's
-door; `test/store.test.ts` asks the engine and fails the moment they differ. `wf ls` and `wf decide`
-say nothing of it yet.
+`wf start`, with nothing written, on a harness the runtime refuses `claude.remoteControl` for, in the runtime's words after the
+`remote: true` line (`configRefused`): `codex` and `claude-detached` run a prompt and exit, and only a Claude Code background session,
+`claude` with `background: true`, is bridged; and on a `claude` step without `background: true`, since a job opens no bridge. `wf ls`
+and `wf decide` say nothing of it yet.
 
 ### What a step may spend: `budget:`
 
@@ -728,7 +735,8 @@ Implement what was asked, in this repository.
 
 `budget:` is dollars, `budget: 5` or `budget: 2.50`: the most the step's tries may cost together, every try and every round of it.
 Refused at load, naming the fix: `0`, a negative, a word, an amount written with its unit (`$5`, with `budget: 5` to write instead) and
-an empty value; and any `budget:` on codex, in the engine's words — `codex exec` has no spend cap, and reports no cost to cap. It is
+an empty value. Any `budget:` on codex is refused at `wf start`, in the runtime's words — `codex exec` has no spend cap, and reports no
+cost to cap. It is
 frozen on the run with every other key.
 
 The cost is the engine's: what the harness priced each attempt at, read once the attempt has ended (agent-runtime's README, *What an
@@ -737,9 +745,9 @@ attempt consumed*). What the key does turns on what the harness can keep:
 | harness | while a try runs | once a try has ended |
 |---|---|---|
 | `claude`, a job | what is left of the cap in force — the cap less what the step's tries have cost — goes to the engine as `config.budgetUsd` on every filing — a harness argument the runtime judges nothing of — so `claude -p --max-budget-usd` ends the session once the tries together reach the cap, past it by up to the response that crosses it: the runtime settles the task as its harness ended it, carrying the cut as `limit: 'budget'` on the attempt, and the run reads the step as `budget exhausted` (`taskSpend`, `ownStatus`). | the run adds up what the step's tries cost, and past the cap files nothing more for the step on its own word |
-| `claude`, `background: true` | refused at load: a `--bg` session keeps no `--max-budget-usd`, and writes its cost only as its process exits (agent-runtime's open issues 17 and 18) | — |
+| `claude`, `background: true` | refused at `wf start`: a `--bg` session keeps no `--max-budget-usd`, and writes its cost only as its process exits (agent-runtime's open issues 17 and 18) | — |
 | `claude-detached` | as a job on `claude` | as on `claude` |
-| `codex` | refused at load | — |
+| `codex` | refused at `wf start` | — |
 
 A step reads **`over budget`** — `over budget $4.20 of $3` in `wf ls` — when its ended tries have together cost the cap in force or
 more, so nothing is left and any session would spend past it, and another session of it is the way on: its last try ended without letting
@@ -2628,12 +2636,15 @@ The tick keeps one writer per file, and two ticks are two writers. So `wf up` ta
 `$WF_ROOT/daemon.json`, which it alone writes:
 
 ```json
-{ "pid": 51234, "startedAt": "2026-09-22T10:00:00.000Z", "cwd": "/home/me/repo", "every": 4000, "passedAt": "2026-09-22T10:41:07.311Z", "beatAt": "2026-09-22T10:41:09.002Z", "procStart": 1627402 }
+{ "pid": 51234, "startedAt": "2026-09-22T10:00:00.000Z", "startedMono": { "boot": "446eb266-…", "ms": 9120004 }, "cwd": "/home/me/repo", "every": 4000, "passedAt": "2026-09-22T10:41:07.311Z", "passedMono": { "boot": "446eb266-…", "ms": 11587315 }, "beatAt": "2026-09-22T10:41:09.002Z", "beatMono": { "boot": "446eb266-…", "ms": 11589006 }, "procStart": 1627402 }
 ```
 
 `pid` is the node process that ticks, `every` its interval, `passedAt` when its last pass completed (`null` before the first), `beatAt`
 when its timer last wrote the file, and `procStart` when its process started (clock ticks since boot, `/proc/<pid>/stat`), which with the
-pid names the process: a pid reused after the daemon died without a word names another process, and holds nothing. It is written as the store is taken, after every pass, on a beat of its interval whatever the pass is
+pid names the process: a pid reused after the daemon died without a word names another process, and holds nothing. Beside each of its
+start, its pass and its beat, `startedMono`, `passedMono` and `beatMono` are the machine's monotonic clock at the same moment, in whole
+milliseconds under the boot's id (`/proc/sys/kernel/random/boot_id`), written with their stamp or left out where the machine does not say
+its boot (`instantNow` in `src/daemon/daemon.store.ts`). It is written as the store is taken, after every pass, on a beat of its interval whatever the pass is
 doing, and once more as the daemon stops on a signal or a failure, with `stoppedAt` — always through a hidden file renamed over it, so a
 reader never reads half of it. Where the store stands is judged purely (`daemonStanding` in `src/daemon/daemon.ts`): no file, a file that does
 not read, a holder that `stopped`, one whose process is `gone` (`kill(pid, 0)` fails, or the pid's start is not `procStart`), one alive that has been silent for a long while
@@ -2645,7 +2656,10 @@ before the store is taken: `wf up -5` would write an interval the file does not 
   leave the child ticking, reparented to init). Anything else is taken over, and `wf up` says from whom when it was not a clean stop:
   `took ~/.agent-workflows over from pid 51234, whose process is gone`.
 - **Stale is ten of the holder's own intervals of silence, never under fifteen minutes** (`staleAfterMs`), measured from the latest of its
-  start, its last pass and its beat. A pass has no bound — it files every ready step of every run, each perhaps behind an `npm ci` of up to
+  start, its last pass and its beat, each measured with `elapsedMs`: on the monotonic clock when the stamp and now carry readings of one boot,
+  so a wall clock stepped forward never makes a live daemon stalled, nor one stepped back a silent one live; on the wall clock across a boot,
+  or for a stamp with no reading. The ages a person reads — `last pass 3s ago`, `stopped 2m ago` — are on the wall clock, said and never
+  decided on. A pass has no bound — it files every ready step of every run, each perhaps behind an `npm ci` of up to
   ten minutes — so the pass alone cannot say the daemon is alive; the beat, on a timer, is written while the pass awaits. What silences it
   is the event loop held by synchronous work, or the process stopped (`^Z`); the floor leaves those room, and at the default 4000 ms it
   decides. A daemon taken over while it lives — stalled — reads the file at the start of its next pass, finds another pid in it, and stops
@@ -2985,8 +2999,8 @@ holding a concurrency slot forever.
 |---|---|
 | `src/workflow.ts` | the format — pure, the entry `agent-orchestrator/workflow`: each name it exports re-exported by name from the folders below, and nothing else |
 | `src/step/step.ts` | a step's shape — pure: what a step file is once read (`Workflow`), its closed list of keys (`STEP_KEYS`, `STEP_KEY_MEANINGS`), the fields every closeout carries (`CLOSEOUT_FIELDS`, `outputFields`), and what every reader of a markdown file shares (`WorkflowError`, `splitFrontmatter`) |
-| `src/harness/harness.ts` | the harnesses and the words each takes — pure: `HARNESSES`, `PERMISSION_MODES`, `SANDBOXES`, `EFFORTS`, `CONTEXT_WINDOWS`, and a step on a remote agent, how it is named (`remoteNameOf`) and the keys it may not set (`REMOTE_REFUSED_KEYS`) |
-| `src/keys/keys.ts` | a step's keys read one each — pure: a value as written, the value the step carries, or the refusal that names the fix (`wordOf`, `contextOf`, `budgetOf`, `gateOf`, `workspaceOf`, `slotOf`, `outputOf`), and a model that cannot run `auto` (`keepsAuto`) |
+| `src/harness/harness.ts` | the harnesses — pure: `HARNESSES`, `DEFAULT_HARNESS`, and a step on a remote agent, how it is named (`remoteNameOf`) and the keys it may not set (`REMOTE_REFUSED_KEYS`) |
+| `src/keys/keys.ts` | a step's keys read one each — pure: a value as written, the value the step carries, or the refusal that names the fix (`wordOf`, `contextOf`, `budgetOf`, `gateOf`, `workspaceOf`, `slotOf`, `outputOf`), and skills or a system prompt a step's sessions cannot reach (`composedRefusal`) |
 | `src/keys/tools.ts` | a step's tool rules — pure: its `tools` (`toolsOf`), its allow and deny rules, a write named as anything but `Edit` refused (`rulesOf`), and the rule offered for a call a fenced step was denied (`allowRuleOf`, `disallowedBy`) |
 | `src/former/former.ts` | a key under the name it had before — pure: `FORMER_KEYS`, and an agent's own `FORMER_OWN_KEYS` with its words (`harnessPromptNamed`), read in a file (`readKeys`) and on a frozen record (`asNamed`), written back in the form the file has (`formerKeyWritten`), and the fence a step asks for under either key (`modeOf`) |
 | `src/workflow/step-file.ts` | one step file — pure: read into a `Workflow` through each key's reader, an unknown key refused (`parseWorkflow`), and written back, the parser run backwards (`renderStep`) |
@@ -3017,7 +3031,7 @@ holding a concurrency slot forever.
 | `src/gate/gate.ts` | a gate from a person's side — pure: **`approvalRefusal`**, whether `wf approve` may approve a step at its gate, the words refused with an approval (`approvalWordsRefusal`), and whether a task held open waits for a person's word (`holdsOpen`) |
 | `src/branches/branches.ts` | a run's result branches — pure: the steps whose branch is its result (`resultSteps`), the checks its work was judged by (`workChecks`), the tips a pass records (`tipBranches`, `tipsSeen`), and what `wf decide` shows of a branch: the numstat grouped by blast radius (`radius`), the agent-facing, check-affecting and lesson lists, and the lesson line; `branches/branches.store.ts` reads git |
 | `src/say/say.ts` | words a person says to a running step (`wf say`) — pure: what the engine journalled (`Said`), what is refused before the engine is asked (`sayRefusal`), and how `wf ls` and `wf decide` show them (`saidLines`) |
-| `src/daemon/daemon.ts` | who ticks the store — pure: `daemon.json` read, judged against a clock and a liveness answer (`daemonStanding`: none, unreadable, stopped, gone, stalled, ticking), how stale is stale (`staleAfterMs`), and what a refusal, a takeover and `wf ls` say of it |
+| `src/daemon/daemon.ts` | who ticks the store — pure: `daemon.json` read, judged against both clocks and a liveness answer (`daemonStanding`: none, unreadable, stopped, gone, stalled, ticking), the silence measured with `elapsedMs` (the runtime's, copied for the daemon's lease), how stale is stale (`staleAfterMs`), and what a refusal, a takeover and `wf ls` say of it |
 | `src/timeline/timeline.ts` | where a run's time went — pure: each try's session and check on the clock, the totals per round and for the run, the wait for a run slot, and the lines `wf decide` prints of them |
 | `src/closeout/closeout.ts` | the closeout — pure: the schema a step is filed with (`closeoutSchemaOf`, a loop's target's `replies` included), reading the statement a session gave (`parseCloseout`), what of it a step declared and owes (`declaredOutput`), how `wf decide` prints that, and what every step is told about finishing |
 | `src/retry/retry-ask.ts` | trying again — pure: how a person asks for another try (`wf retry`'s modes, its ask, `messageRefusal`), the tries a step's record keeps and what they have spent (`retriesSpent`, `signoffsSpent`), a record once a try is filed (`nextTry`), the model a continued session keeps, and the words for a try due and an answered one; what reads a step's standing (`retryable`, `retriesDue`) is `retry/retry.ts`'s, and `retryRefusal` `retry/retry-refusal.ts`'s |
@@ -3029,7 +3043,7 @@ holding a concurrency slot forever.
 | `src/workspace/workspace.ts` | what a worktree is given — pure: the `node_modules` plan, `.worktreeinclude`, and the line a step is told; where a step works and what a folder step is given (`workspacePlan`, `givenPlan`), and which finished steps hand their work off on a pass (`handOffDue`) |
 | `src/record/record.store.ts` | the run store under `WF_ROOT`: a run's id (`runId`), its record read and written (`readRun`, `listRuns`), the files a person owns beside it — a cancellation, a pruning, each ask, approval and acceptance — and where a check's stderr, a step's artifacts and a run's inputs are kept |
 | `src/agents/agents.store.ts` | a run's agent files: where a step's agent is rendered under `runs/<id>/agents/<step>` (`agentFilesDir`), the render at `wf start` (`writeAgentFiles`), a skill read again once its rendered folder is gone (`skillsAgain`), and what the board's Agents page writes: an agent and its files (`writeAgent`, `removeAgent`, `AgentWriteError`), and the agents it lists (`agentPlaces`, `listAgents`, `findAgent`) |
-| `src/daemon/daemon.store.ts` | `tick.json` (the two ceilings, `ceilings` and `lastCeilings`), `tick-stats.json` (what the last pass cost, `recordPassCost` and `lastPassCost`) and `daemon.json` read, judged by `src/daemon/daemon.ts`, and written: the store taken, held, beaten and let go (`takeStore`, `beat`, `releaseStore`) |
+| `src/daemon/daemon.store.ts` | `tick.json` (the two ceilings, `ceilings` and `lastCeilings`), `tick-stats.json` (what the last pass cost, `recordPassCost` and `lastPassCost`) and `daemon.json` read, judged by `src/daemon/daemon.ts`, and written: the store taken, held, beaten and let go (`takeStore`, `beat`, `releaseStore`), each stamp with its monotonic reading (`instantNow`) |
 | `src/feed/feed.store.ts` | the feed's file: the store's `feed.jsonl` read, appended to and followed, a cursor refused where it falls inside a line or past the end, and this process's one fold of it (`recordFeed`, `readFeed`, `watchFeed`, `feedCursorRefusal`) |
 | `src/meter/tally.store.ts` | a pass counted as it runs: the time in each phase (`within`, `metered`), the run records read, and the bytes and processes counted by its thin wrappers (`readText`, `execCounted`); at the bottom of the store's tree, open only during a pass |
 | `src/record/places.store.ts` | where a folder run's steps work (`workspace: folder`): a step's directory under `runs/<id>/work`, made before it is filed with what its brief names copied in (`folderPlace.make`), and nothing to hand off but the files where the step left them; at the bottom of the store's tree beside `folder/folder.store.ts`, and reads no git |

@@ -23,6 +23,7 @@ const config = tmp('config');
 process.env.CLAUDE_CONFIG_DIR = config;
 const { claudeCodeOps, claudeJob } = await import('../src/harness/claude/code.ts');
 const { claudeOps, QUIESCENT_AFTER_MS } = await import('../src/harness/claude/bg.ts');
+const { quietFileOf, sightingOf } = await import('../src/harness/claude/quiet.ts');
 const { claudeCodeRefuses, claudeRefuses } = await import('../src/harness/claude/vocabulary.ts');
 
 const JOB_ID = '5e551011-0000-4000-8000-00000000000a';
@@ -567,6 +568,7 @@ const EVERYTHING = {
   worktree: 'w',
   budgetUsd: 1,
   mcp: { m: { command: 'x' } },
+  mounts: [{ path: '/srv/notes', readOnly: true }],
 };
 
 test("Claude Code's own flags (`config.claude`) are handed over as written, after the variadic lists and directly before the mode — on a job, on claude -p's other spec and on a background session", async () => {
@@ -614,6 +616,97 @@ test("Claude Code's own flags (`config.claude`) are handed over as written, afte
     claudeJob.command({ name: 'ae/t/1', brief: 'b', cwd: '/r', config: { claude: {} } }).args,
     claudeJob.command({ name: 'ae/t/1', brief: 'b', cwd: '/r' }).args,
     'none given, none handed over: the argv is what it is without them',
+  );
+});
+
+/** A task's mounts, one read-only and one writable, and the argv each Claude Code spawn gives them. */
+const MOUNTED = {
+  disallowedTools: ['SendMessage'],
+  mounts: [
+    { path: '/srv/notes', readOnly: true },
+    { path: '/srv/scratch', readOnly: false },
+  ],
+};
+
+/** The argv of a job, of `claude-detached` and of a background session, for one `config`. */
+const spawnArgvs = async (config: SpawnRequest['config']): Promise<(readonly [string, string[]])[]> => {
+  const { claudeDetached } = await import('../src/harness/claude/code.ts');
+  const f = fake();
+  try {
+    await Effect.runPromise(
+      opsIn(tmp('root')).spawn({ name: 'ae/b/1', brief: 'the brief', cwd: f.dir, config: { ...config, background: true } }),
+    );
+    return [
+      ['a job', claudeJob.command({ name: 'ae/t/1', brief: 'the brief', cwd: '/r', config }).args],
+      ['claude-detached', claudeDetached.command({ name: 'ae/t/1', brief: 'the brief', cwd: '/r', config }).args],
+      ['a background session', f.read('bg-args')!],
+    ];
+  } finally {
+    f.restore();
+  }
+};
+
+test('a mount is `--add-dir` and its path, ended by a flag, and a read-only one is an edit denied under it, in the one deny list — on a job, on claude-detached and on a background session', async () => {
+  for (const [what, args] of await spawnArgvs(MOUNTED)) {
+    const at = args.indexOf('--add-dir');
+    assert.deepEqual(args.slice(at, at + 3), ['--add-dir', '/srv/notes', '/srv/scratch'], what);
+    assert.ok(args[at + 3].startsWith('--'), `${what}: a flag ends the variadic list, never the brief`);
+    assert.equal(args.filter((a) => a === '--disallowedTools').length, 1, `${what}: one deny list`);
+    assert.equal(
+      args[args.indexOf('--disallowedTools') + 1],
+      'SendMessage,Edit(//srv/notes/**)',
+      `${what}: the writable mount is not denied`,
+    );
+  }
+  const denied = (await spawnArgvs({ mounts: [{ path: '/srv/notes', readOnly: true }] })).map(
+    ([, args]) => args[args.indexOf('--disallowedTools') + 1],
+  );
+  assert.deepEqual(
+    denied,
+    ['Edit(//srv/notes/**)', 'Edit(//srv/notes/**)', 'Edit(//srv/notes/**)'],
+    'a read-only mount alone is a deny list of its own',
+  );
+});
+
+test('a task with no mounts is given the argv it was given before mounts existed, on a job, on claude-detached and on a background session', async () => {
+  const config = {
+    tools: ['Read'],
+    disallowedTools: ['SendMessage'],
+    allowedTools: ['Edit(**)'],
+    permissionMode: 'dontAsk',
+    model: 'opus',
+  };
+  const argvs = Object.fromEntries(
+    (await spawnArgvs(config)).map(([what, args]) => [what, args.filter((a) => !a.includes('ae-claude-code-'))]),
+  );
+  assert.deepEqual(argvs, PINNED_ARGV);
+});
+
+test('REFUSED at shipped defaults: a read-only mount whose path a permission rule cannot name, on a job, on a background session and on claude-detached', async () => {
+  const { Engine, promiseEngine } = await import('../src/index.ts');
+  const e = promiseEngine(Engine.layer({ root: tmp('root') }));
+  for (const at of ['/srv/my notes', '/srv/a,b', '/srv/(x)', '/srv/*']) {
+    for (const [harness, background] of [
+      ['claude', false],
+      ['claude', true],
+      ['claude-detached', false],
+    ] as const) {
+      const config = { background: background || undefined, mounts: [{ path: at, readOnly: true }] };
+      const says = await e.file({ brief: 'b', cwd: tmp('cwd'), harness, config }).then(
+        () => 'filed',
+        (err: Error) => err.message,
+      );
+      assert.equal(
+        says,
+        `file: \`mounts\` gives the session ${JSON.stringify(at)} read-only, and Claude Code holds a folder read-only by a permission rule, which cannot name a path with a space, a comma, a parenthesis or a glob's character. Mount a folder whose path has none of them, or leave the mount off.`,
+        `${harness}${background ? ' --bg' : ''}: ${at}`,
+      );
+    }
+  }
+  assert.equal(
+    claudeRefuses({ brief: 'b', cwd: '/r', config: { mounts: [{ path: '/srv/my notes', readOnly: false }] } }),
+    undefined,
+    'a writable mount names no rule',
   );
 });
 
@@ -871,7 +964,10 @@ test('REFUSED: a background spawn whose record of its parent cannot be written s
   }
 });
 
-/** What `observe` reports of the background session `name`, its row `row` and its record written as `record`, or none. */
+/**
+ * What `observe` reports of the background session `name`, its row `row` and its record written as `record`, or none: its
+ * transcript last written ten floors ago, and seen so by the runner since.
+ */
 const seenWith = async (o: { record?: string; said: Statement; row: object; quiet?: boolean }) => {
   const f = fake();
   try {
@@ -881,11 +977,14 @@ const seenWith = async (o: { record?: string; said: Statement; row: object; quie
       fs.writeFileSync(parentFileOf(root, 'ae/r/2'), o.record);
     }
     fs.writeFileSync(path.join(f.dir, 'agents.json'), JSON.stringify([o.row]));
+    const written = Date.now() - 10 * QUIESCENT_AFTER_MS;
+    sightingOf(quietFileOf(root, 'ae/r/2'), written, { boot: 'boot-1', ms: written });
     const ops = claudeCodeOps({
       root,
       sessionsDir: tmp('sessions'),
       now: () => Date.now(),
-      transcriptTime: async () => Date.now() - 10 * QUIESCENT_AFTER_MS,
+      mono: () => ({ boot: 'boot-1', ms: Date.now() }),
+      transcriptTime: async () => written,
       closeoutFrom: async () => o.said,
       usageFrom: async () => undefined,
     });
@@ -1097,3 +1196,69 @@ test("an ended session's usage kept from its row's start is not what a look told
     f.restore();
   }
 });
+
+/** The argv each Claude Code spawn gives a task with no mounts, held as written so a change to it is seen. */
+const PINNED_ARGV: Record<string, string[]> = {
+  'a background session': [
+    '--bg',
+    '--name',
+    'ae/b/1',
+    '--tools',
+    'Read',
+    '--disallowedTools',
+    'SendMessage',
+    '--allowedTools',
+    'Edit(**)',
+    '--permission-mode',
+    'dontAsk',
+    '--strict-mcp-config',
+    '--no-chrome',
+    '--model',
+    'opus',
+    'the brief',
+  ],
+  'a job': [
+    '-p',
+    '--input-format',
+    'stream-json',
+    '--output-format',
+    'stream-json',
+    '--verbose',
+    '--permission-prompts',
+    'none',
+    '--tools',
+    'Read',
+    '--disallowedTools',
+    'SendMessage',
+    '--allowedTools',
+    'Edit(**)',
+    '--permission-mode',
+    'dontAsk',
+    '--strict-mcp-config',
+    '--no-chrome',
+    '--setting-sources',
+    'project',
+    '--model',
+    'opus',
+  ],
+  'claude-detached': [
+    '-p',
+    'the brief',
+    '--output-format',
+    'json',
+    '--tools',
+    'Read',
+    '--disallowedTools',
+    'SendMessage',
+    '--allowedTools',
+    'Edit(**)',
+    '--permission-mode',
+    'dontAsk',
+    '--strict-mcp-config',
+    '--no-chrome',
+    '--setting-sources',
+    'project',
+    '--model',
+    'opus',
+  ],
+};

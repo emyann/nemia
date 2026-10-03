@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type RefObject } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import {
   applyNodeChanges,
@@ -18,12 +18,12 @@ import {
   type NodePositionChange,
 } from '@xyflow/react';
 import type { RunDetail } from '../lib/api';
-import { inspects } from '../lib/bar';
-import { besideOpen, drawnWhole, forgetLayout, LEAST_ZOOM, place, readLayout, saveLayout, secondClick } from '../lib/canvas';
+import { besideOpen, drawnWhole, forgetLayout, LEAST_ZOOM, place, readLayout, saveLayout } from '../lib/canvas';
 import { layout, stepsOf, type Point } from '../lib/layout';
 import { useContent } from '../lib/useContent';
 import { stepState } from '../lib/status';
-import { useBar } from '../lib/useBar';
+import { useBarOver } from '../lib/useBarOver';
+import { useCanvasPress } from '../lib/useCanvasPress';
 import { CanvasLegend } from './CanvasLegend';
 import { StateEdge } from './StateEdge';
 import { stepData, stepEdges, stepMinimapFill } from './stepGraph';
@@ -159,72 +159,50 @@ const nodeAt = (name: string, position: Point): PlacedStep => ({
   data: {},
 });
 
+/** The room React Flow keeps round a panel over the canvas (`.react-flow__panel`), in pixels: kept from the bar's edge too. */
+const PANEL_MARGIN = 15;
+
 /** A drag moving a node, or React Flow measuring one: the only changes the canvas keeps; what is selected is the bar's. */
 const placing = (change: NodeChange<StepFlowNode>): change is NodePositionChange | NodeDimensionChange =>
   change.type === 'position' || change.type === 'dimensions';
 
 /**
- * Opens the session of the step of the run `run` that a double click's first click showed, from its second click wherever it lands
- * (`secondClick`): taken before anything under it takes it, and its double click kept from the pane. Returns what a node's first click
- * calls with the step it shows.
+ * What a press on the canvas of `run` does (`useCanvasPress`): a node shows its step in the frame's bar, or closes it, and a double click
+ * opens the step's session. With the step the bar shows (`selected`), none when it shows anything else.
  */
-function useSecondClick(run: string) {
+function usePress(run: RunDetail) {
   const navigate = useNavigate();
-  const pressed = useRef<string | null>(null);
-  useEffect(() => {
-    let opened = false;
-    const click = (event: globalThis.MouseEvent) => {
-      const step = secondClick(pressed.current, event.detail);
-      pressed.current = null;
-      opened = step !== null;
-      if (!step) return;
-      event.stopPropagation();
-      event.preventDefault();
-      void navigate({ to: '/runs/$runId/steps/$step', params: { runId: run, step } });
-    };
-    const dblclick = (event: globalThis.MouseEvent) => {
-      if (!opened) return;
-      opened = false;
-      event.stopPropagation();
-      event.preventDefault();
-    };
-    window.addEventListener('click', click, true);
-    window.addEventListener('dblclick', dblclick, true);
-    return () => {
-      window.removeEventListener('click', click, true);
-      window.removeEventListener('dblclick', dblclick, true);
-    };
-  }, [navigate, run]);
-  return (step: string) => {
-    pressed.current = step;
-  };
+  const { shown, ...press } = useCanvasPress(
+    (step) => ({ kind: 'step', run: run.id, step }),
+    (step) => void navigate({ to: '/runs/$runId/steps/$step', params: { runId: run.id, step } }),
+  );
+  return { selected: shown?.kind === 'step' && shown.run === run.id ? shown.step : null, ...press };
 }
 
 /**
- * What a press on the canvas of `run` does, through the frame's bar (`useBar`): the step it shows (`selected`), none when it shows
- * anything else; a click or Enter on a node shows that step, or closes the bar for the step it shows (`toggle`); a double click on a node
- * opens the step's session, its first click having shown the step and its second taken wherever it lands (`useSecondClick`); and a click
- * on the pane closes a bar a canvas opened (`inspects`), never the start of a run.
+ * The canvas's buttons, at its top right and clear of the frame's bar over the canvas in `frame` (`useBarOver`): Reset layout
+ * (`onReset`), and Focus running step, which fits the view to the steps `running`, and is off while none is.
  */
-function usePress(run: RunDetail) {
-  const { open, toggle, close } = useBar();
-  const pressed = useSecondClick(run.id);
-  const inspect = (step: string) => toggle({ kind: 'step', run: run.id, step });
-  return {
-    selected: open?.kind === 'step' && open.run === run.id ? open.step : null,
-    onNodeClick: (event: MouseEvent, node: { id: string }) => {
-      if (event.detail > 1) return;
-      inspect(node.id);
-      pressed(node.id);
-    },
-    onKeyDown: (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement;
-      if (event.key === 'Enter' && target.classList.contains('react-flow__node') && target.dataset.id) inspect(target.dataset.id);
-    },
-    onPaneClick: () => {
-      if (inspects(open)) close();
-    },
-  };
+function Buttons({ frame, running, onReset }: { frame: RefObject<HTMLElement | null>; running: string[]; onReset: () => void }) {
+  const flow = useReactFlow<StepFlowNode>();
+  const over = useBarOver(frame);
+  const focusRunning = () => void flow.fitView({ nodes: running.map((id) => ({ id })), padding: 0.5, maxZoom: 1.25, duration: 400 });
+  return (
+    <Panel position="top-right" className="flex gap-2" style={{ marginRight: PANEL_MARGIN + over }}>
+      <button type="button" className={button} onClick={onReset}>
+        Reset layout
+      </button>
+      <button
+        type="button"
+        className={button}
+        onClick={focusRunning}
+        disabled={!running.length}
+        title={running.length ? undefined : 'No step is running'}
+      >
+        Focus running step
+      </button>
+    </Panel>
+  );
 }
 
 /**
@@ -291,7 +269,6 @@ function Canvas({ run, computed }: Props & { computed: ReadonlyMap<string, Point
   }, [placed, run.id]);
 
   const running = run.steps.filter((s) => states.get(s.name) === 'working').map((s) => s.name);
-  const focusRunning = () => void flow.fitView({ nodes: running.map((id) => ({ id })), padding: 0.5, maxZoom: 1.25, duration: 400 });
 
   const [resets, setResets] = useState(0);
   const resetLayout = () => {
@@ -326,20 +303,7 @@ function Canvas({ run, computed }: Props & { computed: ReadonlyMap<string, Point
         <Panel position="top-left" className="text-[11px] text-neutral-500">
           Drag to arrange · kept in this browser
         </Panel>
-        <Panel position="top-right" className="flex gap-2">
-          <button type="button" className={button} onClick={resetLayout}>
-            Reset layout
-          </button>
-          <button
-            type="button"
-            className={button}
-            onClick={focusRunning}
-            disabled={!running.length}
-            title={running.length ? undefined : 'No step is running'}
-          >
-            Focus running step
-          </button>
-        </Panel>
+        <Buttons frame={frame} running={running} onReset={resetLayout} />
         <Background variant={BackgroundVariant.Dots} gap={16} />
         <Controls showInteractive={false} />
         <CanvasLegend className="mr-40 ml-14" />

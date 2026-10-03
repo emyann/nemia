@@ -6,6 +6,7 @@ export { claudeCodeOps, claudeDetached, isClaudeJob } from './code.ts';
 export { claudeSayRefuses } from './inbox.ts';
 export { claudeQuota, quotaOfResponse, QUOTA_TIMEOUT_MS, USAGE_ARGS, usageEnv } from './quota.ts';
 export {
+  CLAUDE_AUTO_DROPPED,
   CLAUDE_CONTEXT_TOKENS,
   CLAUDE_EFFORTS,
   CLAUDE_PERMISSION_MODES,

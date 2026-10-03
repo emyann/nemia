@@ -2,8 +2,9 @@
 
 Agent sessions on one harness each, durably: a job that runs to its end, and a long-lived session that runs until stopped (not built
 yet). It owns how a session runs: the task's command, mounts, restart and spend, the journal, the attempts, the harnesses' vocabulary.
-`decide` (`src/core/domain.ts`) is the whole judgement, pure (`test/engine.test.ts`); `src/facade.ts` and `src/index.ts` are the only
-doors (`test/contract.test.ts`). The orchestrator reaches it through its one client; what is still above it and a candidate to come
+`decide` (`src/core/domain.ts`) is the whole judgement, pure (`test/engine.test.ts`); `src/facade.ts`, `src/index.ts` and
+`src/vocabulary.ts` are the only doors (`test/contract.test.ts`); the last, the harnesses' words and `fenceReach`, loads no Effect and
+no I/O (`test/vocabulary-door.test.ts`). The orchestrator reaches it through its one client; what is still above it and a candidate to come
 down is in `docs/architecture.md`, *Who owns what*.
 
 ## Layout
@@ -112,7 +113,7 @@ down is in `docs/architecture.md`, *Who owns what*.
 What Claude Code does as the steps meet it. Where the orchestrator's code holds a fact today, it is named beside it.
 
 - **A step's fence is one word per harness**: Claude Code's `permissionMode`, Codex's `sandbox` (in the orchestrator today: `modeOf` in
-  `former/former.ts`, held by `agent-orchestrator/test/vocabulary.test.ts`).
+  `former/former.ts`, filed through `agent-orchestrator/test/rendering.test.ts`).
 - **An idle `--remote-control` session lists `blocked`, `idle`, with a `pid` and no `waitingFor`; a `stopped` row lists no `pid`**:
   `held` is the `pid` (`ourRow`). `--bg` needs a trusted `cwd`, and words `say` sends reach the model framed as a peer's, not
   the person's.
@@ -120,11 +121,14 @@ What Claude Code does as the steps meet it. Where the orchestrator's code holds 
   session.** Never resume a session it is respawning: a long-lived restart waits for the old one's end and release
   (`restartOf`, `src/core/long-lived.test.ts`); its listing in the gap is `blocked` with no `pid` (`respawning`).
 - **A job (`claude -p`) never waits on a prompt; a background session in a folder nobody opened blocks in any mode that can ask**:
-  in the orchestrator today, `validateFolderMode` judges only `background: true`, which must run `dontAsk` or `bypassPermissions`.
+  the modes that ask nobody are this package's answer (`unasking` in `fenceReach`, `src/harness/reach.ts`), and the orchestrator's
+  `validateFolderMode` refuses a `background: true` step of a folder team in any other.
 - **A job reads neither user settings nor `settings.local.json`** (`--setting-sources project`): what a step needs goes on the step, its
   agent or the checkout's `.claude/settings.json`.
 - **A write is matched against `Edit` rules only**: write `allowedTools: Edit(**)`, never `Write(path)` (in the orchestrator today:
   `fileRuleRefusal`).
+- **`--add-dir` grants writes where the mode writes, and lists the folder's `.claude/skills`** (not its `CLAUDE.md`); an `Edit(//<path>/**)`
+  deny holds it read-only in `dontAsk`, `acceptEdits`, `auto` and `bypassPermissions`, a Bash `>` included (`claudeDenies`).
 - **A project's allow rules are dropped in a directory Claude Code has not trusted**: measure a rule in a trusted checkout.
 - **A session under `~/.claude/` cannot write there in any mode**: put a probe store elsewhere.
 - **A path a fenced step's brief names is inside its own folder**; a rule offered for the next run names no path of this one (in the

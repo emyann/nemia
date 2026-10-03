@@ -62,22 +62,23 @@ export type Workflow = {
   skills?: string[];
   harness?: string;
   model?: string;
-  /** How hard the harness should think, in its own words: one of `EFFORTS` for the harness the step runs on. */
+  /** How hard the harness should think, in its own words, which the runtime judges for the harness the step runs on at `wf start`. */
   effort?: string;
   /**
    * The context window the step's sessions are given, in tokens — written `context: 200k` or `context: 150000`, read once into the
    * number. Past about it Claude Code compacts the conversation and carries on (`--autocompact`, the engine's `contextTokens`); absent,
-   * a session runs on the model's whole window. Refused outside the range the harness takes (`CONTEXT_WINDOWS`), and on a harness with
-   * no such knob: codex. A step that continues another's session (`resume:`) keeps that session's window (`sessionContext`).
+   * a session runs on the model's whole window. The runtime refuses at `wf start` a window outside the range the harness takes, and one
+   * on a harness with no such knob: codex. A step that continues another's session (`resume:`) keeps that session's window
+   * (`sessionContext`).
    */
   context?: number;
   /**
-   * Claude Code's permission mode, `--permission-mode`: one of `PERMISSION_MODES` for the harness the step runs on. Refused on codex, whose
-   * fence is its sandbox (`sandbox`), in words naming `sandbox:`.
+   * Claude Code's permission mode, `--permission-mode`, which the runtime judges for the harness the step runs on at `wf start`. On codex,
+   * whose fence is its sandbox, the line is the former name of `sandbox:`.
    */
   permissionMode?: string;
   /**
-   * Codex's sandbox, `codex exec -s`: one of `SANDBOXES` for the harness the step runs on — `read-only`, `workspace-write`,
+   * Codex's sandbox, `codex exec -s`, which the runtime judges at `wf start` — `read-only`, `workspace-write`,
    * `danger-full-access`. Absent: Codex's `workspace-write`. Refused on claude and claude-detached, whose fence is `permissionMode`.
    *
    * On codex the key's former name, `permissionMode:`, is still read in a folder or an agent: a sandbox's word is read as `sandbox:`
@@ -208,9 +209,9 @@ export type Workflow = {
   rounds?: number;
   /**
    * The agent attached to the step (`agent:`), and what the step said itself: the keys its own file set — never `agent` — and its own note.
-   * The step's keys and body above are already resolved: the agent's role keys where the step sets none, and its instructions before the
-   * note. What the rest of the run reads is those; this says where each came from, which is what the step's file is written back from
-   * (`renderStep`). Absent on a step that names no agent.
+   * The step's keys and body above are already resolved: the agent's role keys where the step sets none, and its instructions, then a
+   * person's custom instructions for it, before the note. What the rest of the run reads is those; this says where each came from, which is
+   * what the step's file is written back from (`renderStep`). Absent on a step that names no agent.
    */
   agent?: StepAgent;
 };
@@ -233,6 +234,11 @@ export type StepAgent = {
    * Absent on a record without them, whose step is told both in its brief.
    */
   instructions?: string;
+  /**
+   * The person's custom instructions for the agent (`custom-instructions/<agent>.md` in their store), as the step was resolved and frozen
+   * at `wf start`: told after the agent's instructions and before the step's own note, so a later edit reaches no run already started.
+   */
+  customInstructions?: string;
   skills?: string[];
   harnessPrompt?: HarnessPrompt;
 };

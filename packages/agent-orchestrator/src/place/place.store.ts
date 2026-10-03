@@ -181,11 +181,14 @@ function signalGroup(pgid: number, signal: NodeJS.Signals | 0): boolean {
   }
 }
 
-/** Whether the process group `pgid` leads has no process left within `STOP_GRACE_MS`, asked every `STOP_POLL_MS`. */
+/**
+ * Whether the process group `pgid` leads has no process left within `STOP_GRACE_MS`, asked every `STOP_POLL_MS`. The grace is measured on
+ * this process's monotonic clock (`performance.now()`), so a wall clock stepped forward never ends it early.
+ */
 function emptied(pgid: number): boolean {
   const pause = new Int32Array(new SharedArrayBuffer(4));
-  const until = Date.now() + STOP_GRACE_MS;
-  while (Date.now() < until) {
+  const until = performance.now() + STOP_GRACE_MS;
+  while (performance.now() < until) {
     if (!signalGroup(pgid, 0)) return true;
     Atomics.wait(pause, 0, 0, STOP_POLL_MS);
   }

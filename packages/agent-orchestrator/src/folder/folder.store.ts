@@ -22,7 +22,17 @@ import {
 } from '../step/step.ts';
 import { codexModeLine, formerKeyLine, formerKeysIn, frontmatterKey, harnessPromptLine } from '../former/former.ts';
 import { agentsDir, agentsFolderRefusal, linkRefusal, parseFolder, readmeDescription, stepFiles, type Fills } from './folder.ts';
-import { HARNESS_PROMPTS, isCardFile, ownSkill, parseAgent, type Agent, type Agents, type SkillsFound } from '../agents/agents.ts';
+import {
+  CUSTOM_INSTRUCTIONS_FOLDER,
+  customInstructionsRefusal,
+  HARNESS_PROMPTS,
+  isCardFile,
+  ownSkill,
+  parseAgent,
+  type Agent,
+  type Agents,
+  type SkillsFound,
+} from '../agents/agents.ts';
 import { skillEntryOf, type AgentSkill, type SkillRule } from '../skills/skills.ts';
 
 /**
@@ -51,9 +61,46 @@ export function lookupRoots(workflowDir: string, places: Places = {}): string[] 
 const sameRepository = (a: string, b: string): boolean =>
   path.dirname(a) === path.dirname(b) && [path.basename(a), path.basename(b)].sort().join() === '.claude,workflows';
 
+/** The file of a person's custom instructions for the agent `name`, in the store `home`: `<home>/custom-instructions/<name>.md`. */
+export const customInstructionsFile = (home: string, name: string): string =>
+  path.join(path.resolve(home), CUSTOM_INSTRUCTIONS_FOLDER, `${name}.md`);
+
+/**
+ * A person's custom instructions for the agent `name`, read from the store `home` (`customInstructionsFile`): the words, or `undefined`
+ * when there are none or the file is blank. Refused as a `WorkflowError` naming the file and the fix: a link, whose words would change
+ * with what it points at, and a frontmatter block (`customInstructionsRefusal`).
+ */
+export function readCustomInstructions(home: string, name: string): string | undefined {
+  const file = customInstructionsFile(home, name);
+  const stat = fs.lstatSync(file, { throwIfNoEntry: false });
+  if (!stat) return undefined;
+  if (stat.isSymbolicLink())
+    throw new WorkflowError(
+      linkRefusal(file, `custom instructions are a person's own words: read through a link, they would change with what it points at.`),
+    );
+  if (!stat.isFile()) throw new WorkflowError(`${file} is not a file: custom instructions are one file per agent. Remove it.`);
+  const text = fs.readFileSync(file, 'utf8');
+  const refused = customInstructionsRefusal(file, text);
+  if (refused !== undefined) throw new WorkflowError(`${refused} Or remove them: wf agents custom ${name} --clear.`);
+  return text.trim() || undefined;
+}
+
+/** `agent` with the person's custom instructions for it from the store `home`, or the refusal of them (`readCustomInstructions`). */
+function withCustom(agent: Agent | WorkflowError, name: string, home: string | undefined): Agent | WorkflowError {
+  if (home === undefined || agent instanceof Error) return agent;
+  try {
+    const customInstructions = readCustomInstructions(home, name);
+    return customInstructions === undefined ? agent : { ...agent, customInstructions };
+  } catch (err) {
+    if (!(err instanceof WorkflowError)) throw err;
+    return err;
+  }
+}
+
 /**
  * Every agent a workflow's steps may name (`lookupRoots`), each read or the refusal of it, as `loadAgents` reads one folder: the first root
- * that has a name wins, and a name one repository has in both `workflows/agents/` and `.claude/agents/` is refused, naming both.
+ * that has a name wins, and a name one repository has in both `workflows/agents/` and `.claude/agents/` is refused, naming both. Each is
+ * given the person's custom instructions for its name from the store (`places.home`, `readCustomInstructions`), whichever place it is in.
  */
 export function agentsFor(workflowDir: string, places: Places = {}): Agents {
   const found = new Map<string, { at: string; agent: Agent | WorkflowError }>();
@@ -75,7 +122,7 @@ export function agentsFor(workflowDir: string, places: Places = {}): Agents {
       }
     }
   }
-  return new Map([...found].map(([name, { agent }]) => [name, agent]));
+  return new Map([...found].map(([name, { agent }]) => [name, withCustom(agent, name, places.home)]));
 }
 
 /**
@@ -225,37 +272,20 @@ export function loadWorkflows(dir: string, places: Places = {}, fills?: Fills): 
  * (`harnessPromptLine`), which the parser reads as `harnessPrompt:`.
  */
 export function formerKeyLines(dir: string): string[] {
-  const read = (at: string): string => {
-    try {
-      return fs.readFileSync(at, 'utf8');
-    } catch {
-      return '';
-    }
-  };
-  let files: string[];
-  try {
-    files = stepFiles(fs.readdirSync(dir));
-  } catch {
-    return [];
-  }
-  const steps = files.map((file) => [file, read(path.join(dir, file))] as const);
-  const agents = [...new Set(steps.flatMap(([, text]) => frontmatterKey(text, 'agent') ?? []))].sort();
-  const agentAt = (agent: string): string => path.join(agentsDir(dir), `${agent}.md`);
+  const steps = stepTexts(dir);
+  const agents = [...new Set(steps.flatMap(({ agent }) => agent ?? []))].sort();
   const codexMode = (at: string, text: string, harness: string | undefined): string[] => {
-    const word = frontmatterKey(text, 'permissionMode');
-    return harness === 'codex' && word !== undefined ? [codexModeLine(at, word)] : [];
+    const word = formerModeOf(text, harness);
+    return word === undefined ? [] : [codexModeLine(at, word)];
   };
   return [
-    ...steps.flatMap(([file, text]) => {
+    ...steps.flatMap(({ file, text, harness }) => {
       const at = path.join(dir, file);
-      const agent = frontmatterKey(text, 'agent');
-      const harness =
-        frontmatterKey(text, 'harness') ?? (agent === undefined ? undefined : frontmatterKey(read(agentAt(agent)), 'harness'));
       return [...formerKeysIn(text).map((former) => formerKeyLine(at, former)), ...codexMode(at, text, harness)];
     }),
     ...agents.flatMap((agent) => {
-      const at = agentAt(agent);
-      const text = read(at);
+      const at = agentAt(dir, agent);
+      const text = textAt(at);
       const prompt = frontmatterKey(text, 'systemPrompt');
       return [
         ...formerKeysIn(text).map((former) => formerKeyLine(at, former)),
@@ -264,6 +294,58 @@ export function formerKeyLines(dir: string): string[] {
       ];
     }),
   ];
+}
+
+/**
+ * The word each step of the workflow in `dir` writes its sandbox under as `permissionMode:`, by the step's name: its own line, else, for a
+ * step that writes no fence of its own, its agent's beside the folder. The parser reads the line as `sandbox:` (`codexSandboxNamed`), and
+ * `wf start` quotes a refusal of it as the file says it. None for a folder that is not there.
+ */
+export function formerModesWritten(dir: string): Record<string, string> {
+  return Object.fromEntries(
+    stepTexts(dir).flatMap(({ file, text, agent, harness }) => {
+      const fenced = frontmatterKey(text, 'permissionMode') !== undefined || frontmatterKey(text, 'sandbox') !== undefined;
+      const agentText = agent === undefined ? '' : textAt(agentAt(dir, agent));
+      const word = fenced ? formerModeOf(text, harness) : formerModeOf(agentText, frontmatterKey(agentText, 'harness'));
+      return word === undefined ? [] : [[path.basename(file, '.md'), word]];
+    }),
+  );
+}
+
+/** A file's text, or nothing for one that cannot be read: the load has said why. */
+const textAt = (at: string): string => {
+  try {
+    return fs.readFileSync(at, 'utf8');
+  } catch {
+    return '';
+  }
+};
+
+/** Where the agent `agent` a step of the workflow in `dir` names is written. */
+const agentAt = (dir: string, agent: string): string => path.join(agentsDir(dir), `${agent}.md`);
+
+/** The word a file on `harness` names its sandbox under as `permissionMode:`, the former name of `sandbox:` there; else undefined. */
+const formerModeOf = (text: string, harness: string | undefined): string | undefined =>
+  harness === 'codex' ? frontmatterKey(text, 'permissionMode') : undefined;
+
+/**
+ * Each step file of the workflow in `dir` with its text, the agent it names and the harness it runs on: its own `harness:`, else its
+ * agent's. None for a folder that is not there.
+ */
+function stepTexts(dir: string): { file: string; text: string; agent?: string; harness?: string }[] {
+  let files: string[];
+  try {
+    files = stepFiles(fs.readdirSync(dir));
+  } catch {
+    return [];
+  }
+  return files.map((file) => {
+    const text = textAt(path.join(dir, file));
+    const agent = frontmatterKey(text, 'agent');
+    const harness =
+      frontmatterKey(text, 'harness') ?? (agent === undefined ? undefined : frontmatterKey(textAt(agentAt(dir, agent)), 'harness'));
+    return { file, text, agent, harness };
+  });
 }
 
 /**
@@ -560,6 +642,7 @@ const StepAgentSchema = Schema.StructWithRest(
     body: Schema.String,
     given: Schema.Record(Schema.String, Schema.String),
     instructions: Schema.optionalKey(Schema.String),
+    customInstructions: Schema.optionalKey(Schema.String),
     skills: Schema.optionalKey(Strings),
     harnessPrompt: Schema.optionalKey(Schema.Literals(HARNESS_PROMPTS)),
     systemPrompt: Schema.optionalKey(Schema.Literals(['default', 'no-coding', 'own'])),

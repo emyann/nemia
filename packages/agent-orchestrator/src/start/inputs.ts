@@ -1,9 +1,12 @@
 /**
  * The files `wf start --input` gives a run: why they are refused (`inputRefusal`), and how a step's brief and `wf decide` name them
- * (`inputsLine`, `inputsNote`); and where a run came from (`fromNote`). Pure.
+ * (`inputsLine`, `inputsNote`); what a step's brief says of the folders its run mounts (`mountsLine`); and where a run came from
+ * (`fromNote`). Pure.
  */
 import path from 'node:path';
 import { GIVEN } from '../workspace/workspace.ts';
+import { isRemoteHarness } from '../harness/harness.ts';
+import type { Workflow } from '../step/step.ts';
 import type { Run } from '../record/record.ts';
 
 /**
@@ -51,6 +54,18 @@ export const inputsLine = (dir: string | undefined, names: readonly string[] | u
   dir && names?.length
     ? `Files given with it (\`wf start --input\`), ${inFolder ? `copied into \`${GIVEN}/inputs\` in this folder` : `in \`${dir}\``}: ${names.map((n) => `\`${n}\``).join(', ')}.`
     : undefined;
+
+/**
+ * What a step's brief says of the folders its run mounts, under what was asked for: each by its absolute path, to read and never write;
+ * a blank line before it. Nothing for a run that mounts none, and for a step on a remote agent, which is filed none.
+ */
+export const mountsLine = (step: Pick<Workflow, 'harness'>, run: Pick<Run, 'mounts'>): string[] =>
+  run.mounts?.length && !isRemoteHarness(step.harness)
+    ? [
+        '',
+        `Folders of this factory you may read, and must not write: ${run.mounts.map((m) => `\`${m.path}\``).join(', ')}. Each is mounted read-only; your own work stays in your workspace.`,
+      ]
+    : [];
 
 /**
  * What `wf decide` says under a run's line of where the run came from: the inbox card it was started from. Undefined for a run typed at

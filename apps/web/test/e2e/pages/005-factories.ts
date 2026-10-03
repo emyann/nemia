@@ -19,10 +19,10 @@ export default {
   /**
    * The Factories at `/`: every factory a block on a canvas, and a file that does not read a block that says why; the default factory is
    * none, in the canvas or the menu, once a factory is filed, though it holds runs. The menu's Factories lists the first five under it and
-   * a button for the rest; a factory past them, opened by its address, is lit in the menu as a sixth. A block pressed opens its factory's
-   * floor, at `/factories/<name>`, with only its runs on it — FOLDER's, in `hiring`, once finished runs are shown — and a start in its
-   * header. A name no factory has says so, answered with no 4xx, and leads back. The default factory's floor still answers its address,
-   * with no start in its header.
+   * a button for the rest; a factory past them, opened by its address, is lit in the menu as a sixth. A block double-clicked opens its
+   * factory's floor, at `/factories/<name>`, with only its runs on it — FOLDER's, in `hiring`, once finished runs are shown — and a start
+   * in its header. A name no factory has says so, answered with no 4xx, and leads back. The default factory's floor still answers its
+   * address, with no start in its header.
    */
   name: 'factories',
   route: '/',
@@ -33,14 +33,14 @@ export default {
       menu.locator('a[data-sidebar="menu-button"][data-active="true"]', { hasText: 'Factories' }),
       'the menu lights the Factories at /',
     );
-    const blocks = page.locator('.react-flow__node a[data-factory]');
+    const blocks = page.locator('.react-flow__node [data-factory]');
     await expectCount(blocks, LISTED.length, 'a block for each factory filed');
     await expectTexts(
-      page.locator('.react-flow__node a[data-factory] > span:first-child'),
+      page.locator('.react-flow__node [data-factory] > span:first-child'),
       LISTED,
       'the blocks in the order the api lists them, by name',
     );
-    const block = (name: string) => page.locator(`.react-flow__node a[data-factory="${name}"]`);
+    const block = (name: string) => page.locator(`.react-flow__node [data-factory="${name}"]`);
     await expectCount(block('default'), 0, 'and none for the default factory, which holds runs, once a factory is filed');
     const hiring = block(FACTORIES.hiring.name);
     await expectVisible(hiring.locator('[data-runs]', { hasText: /^0 in flight · 1 run$/ }), `${FACTORIES.hiring.name} holds FOLDER's run`);
@@ -76,7 +76,7 @@ export default {
     await expectTexts(subItems(page), LISTED, 'pressed, the menu lists every factory');
     await expectCount(more, 0, 'and the button is gone');
 
-    await hiring.click();
+    await hiring.dblclick();
     await page.waitForURL((url) => url.pathname === `/factories/${FACTORIES.hiring.name}`, { timeout: WAIT_MS });
     await idle(page);
     await expectVisible(

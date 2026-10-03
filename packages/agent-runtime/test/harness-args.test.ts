@@ -27,7 +27,7 @@ const refusedBy = (ops: RunnerOps, t: Asked) =>
     }).pipe(Effect.provide(Runner.layer(ops))),
   );
 
-test("HARNESS_ARGS is the sixteen arguments a harness takes — the spend cap, Claude Code's own flags, Codex's and a command's among them, and remoteControl not: it is one of those flags", () => {
+test("HARNESS_ARGS is the seventeen arguments a harness takes — the spend cap, the mounts, Claude Code's own flags, Codex's and a command's among them, and remoteControl not: it is one of those flags", () => {
   assert.deepEqual([...HARNESS_ARGS].sort(), [
     'allowedTools',
     'background',
@@ -41,6 +41,7 @@ test("HARNESS_ARGS is the sixteen arguments a harness takes — the spend cap, C
     'env',
     'mcp',
     'model',
+    'mounts',
     'niceness',
     'permissionMode',
     'tools',
@@ -63,7 +64,7 @@ test("remoteControl, one of Claude Code's own flags, is refused under config and
   assert.equal(argsRefusalOf({ ...task, config: { background: true, claude: { remoteControl: true } } }), undefined);
 });
 
-test('a harness argument filed beside config is refused, naming where it goes — each of the sixteen — and the same value under config is taken', () => {
+test('a harness argument filed beside config is refused, naming where it goes — each of the seventeen — and the same value under config is taken', () => {
   const value: Record<keyof HarnessArgs, unknown> = {
     model: 'opus',
     permissionMode: 'auto',
@@ -81,6 +82,7 @@ test('a harness argument filed beside config is refused, naming where it goes �
     command: ['sh', '-c', 'npm test'],
     env: { CI: '1' },
     niceness: 10,
+    mounts: [{ path: '/repo', readOnly: true }],
   };
   for (const key of HARNESS_ARGS) {
     const says = argsRefusalOf({ ...task, [key]: value[key] } as never);

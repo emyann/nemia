@@ -8,8 +8,9 @@ CLI). `apps/api` puts the workflows behind HTTP; `apps/web`, the board, shows th
 Each layer reaches exactly the one below it, and nothing reaches up or skips one: the web reaches the api over HTTP alone
 (`apps/web/test/structure.test.ts`); the api reaches the orchestrator's public entries alone (the entries:
 `packages/agent-orchestrator/test/contract.test.ts`; that its source imports no runtime: its lint block, which
-`packages/agent-orchestrator/test/imports.test.ts` proves); the orchestrator reaches the runtime through its one client,
-`src/runtime-client.ts` (`CLIENT` in `packages/agent-orchestrator/test/boundary.test.ts`). Read `README.md` and each package's
+`packages/agent-orchestrator/test/imports.test.ts` proves); the orchestrator reaches the runtime's behaviour through its one client,
+`src/runtime-client.ts` (`CLIENT` in `packages/agent-orchestrator/test/boundary.test.ts`), and its vocabulary through its pure door,
+`agent-runtime/vocabulary`, from any file. Read `README.md` and each package's
 README for the model before changing behaviour. `wf` becomes `nemia` (the Nemia intent); `ae` stays the runtime's CLI. The stores
 `~/.agent-workflows` (`WF_ROOT`) and `~/.agent-engine` (`AE_ROOT`) keep their names on purpose: a new default would orphan every
 record there.
@@ -73,12 +74,14 @@ holds what every change needs.
   into `decide`, and no `if` in `engine.ts` belongs in `decide` `(no test yet)`. What sits in which layer today, and what is a
   candidate to move, is in `docs/architecture.md`, *Who owns what*.
 - **Four rules hold the layers, each a test** (`docs/architecture.md`):
-  - *Between packages, only the public contract*: `agent-runtime` and `agent-runtime/effect`; `agent-orchestrator`,
+  - *Between packages, only the public contract*: `agent-runtime`, `agent-runtime/effect` and `agent-runtime/vocabulary`; `agent-orchestrator`,
     `agent-orchestrator/run`, `agent-orchestrator/workflow` and `agent-orchestrator/effect` — never a subpath outside `exports`, a
     relative path, `import.meta.resolve` or a path into `src/` (the two `contract.test.ts`).
   - *Inside the orchestrator, every file is pure, store, controller or the client* (`PURE`, `STORE`, `CONTROLLER`, `CLIENT` in
     `packages/agent-orchestrator/test/boundary.test.ts`); a new file joins one kind, or the suite fails.
-  - *The runtime is reached through one client*, `src/runtime-client.ts` (`CLIENT` in the same test).
+  - *The runtime is reached through one client*, `src/runtime-client.ts` (`CLIENT` in the same test): its behaviour through the client,
+    its vocabulary through its pure door, `agent-runtime/vocabulary`, which any file may import (`VOCABULARY` in the same test;
+    `packages/agent-runtime/test/vocabulary-door.test.ts` holds it pure).
   - *Each layer says its own words*: no harness word outside the runtime, no workflow word in it, no team name in a package's `src`
     (`HARNESS_WORDS`, `WORKFLOW_WORDS`, `TEAM_NAMES` in `packages/agent-orchestrator/test/words.test.ts`, which only shrink).
 - **A spec here reads `docs/architecture.md` first.** A change's `where` names its layer (`agent-runtime`, `agent-orchestrator`,

@@ -1,16 +1,33 @@
-import { Fragment } from 'react';
+import { Fragment, type ReactNode } from 'react';
 import type { RunDetail } from '../lib/api';
 import { needsOf, needText, offersOf, stepAnchor } from '../lib/asks';
 import { onYouOf, toDecideOf } from '../lib/factory';
 import { Continue } from './Decide';
 
 /**
+ * A banner's link to the step `step`, saying `children`: a button calling `onStep` with the step where one is given, as in the frame's bar,
+ * where a hash would point nowhere; else a hash to the step's section on the run's page.
+ */
+function StepLink({ step, onStep, children }: { step: string; onStep: ((step: string) => void) | undefined; children: ReactNode }) {
+  const className = 'underline underline-offset-2';
+  return onStep ? (
+    <button type="button" data-approve={step} className={className} onClick={() => onStep(step)}>
+      {children}
+    </button>
+  ) : (
+    <a href={`#${stepAnchor(step)}`} data-approve={step} className={className}>
+      {children}
+    </a>
+  );
+}
+
+/**
  * What a person has to decide about the run's result, above the banner and the page, as `wf ls` prints `→ to decide:` above
  * `→ waiting on you`: the ending step's gate, in the folder's own words, with the command that approves it — linked to that step's
- * section, where Approve and Send back are, by a hash the browser scrolls to and no navigation — or the result branch nobody has merged.
- * Nothing while there is nothing to decide.
+ * section, where Approve and Send back are, by a hash the browser scrolls to and no navigation, or given `onStep` a button calling it with
+ * the step (`StepLink`) — or the result branch nobody has merged. Nothing while there is nothing to decide.
  */
-export function ToDecideBanner({ run }: { run: RunDetail }) {
+export function ToDecideBanner({ run, onStep }: { run: RunDetail; onStep?: (step: string) => void }) {
   const decide = toDecideOf(run);
   if (!decide) return null;
   return (
@@ -21,9 +38,9 @@ export function ToDecideBanner({ run }: { run: RunDetail }) {
     >
       <strong>To decide:</strong>{' '}
       {decide.kind === 'approve' ? (
-        <a href={`#${stepAnchor(decide.step)}`} data-approve={decide.step} className="underline underline-offset-2">
+        <StepLink step={decide.step} onStep={onStep}>
           {decide.said}
-        </a>
+        </StepLink>
       ) : (
         decide.said
       )}
@@ -40,14 +57,15 @@ export function ToDecideBanner({ run }: { run: RunDetail }) {
  * Who it waits on is said as `wf ls` says it after `→ waiting on you:` (`onYou`): a step's name, and for a step at its gate,
  * `approve plan`, linked to the step's section, where Approve and Send back are. Without the ending step whose gate the to-decide banner
  * says (`onYouOf`), which is above this one and names it: `wf ls` does not ask for the same step twice. A run whose whole `waiting on you`
- * was that step has no banner here at all. A link to a step's section is a hash the browser scrolls to, and no navigation. A step at its
- * gate is said in the line alone: its approval is no question to list under it.
+ * was that step has no banner here at all. A link to a step's section is a hash the browser scrolls to, and no navigation, or given
+ * `onStep` a button calling it with the step (`StepLink`). A step at its gate is said in the line alone: its approval is no question to
+ * list under it.
  *
  * A question is answered from the Decide section; a session the harness blocked, here. Under such a session, what a person does about the
  * wait, in the package's words (`answerIn`): the harness answers it, and this board does not — Continue only asks the tick for another try.
  * Once that try is asked, the next tick stops the session, so that advice goes, and the step's note says what was asked instead.
  */
-export function NeedsBanner({ run }: { run: RunDetail }) {
+export function NeedsBanner({ run, onStep }: { run: RunDetail; onStep?: (step: string) => void }) {
   const needs = needsOf(run).filter((need) => need.kind !== 'approve');
   const said = onYouOf(run);
   const asks = run.waitingOnYou.map((step, i) => ({ step, said: run.onYou[i] ?? step })).filter((one) => said.includes(one.said));
@@ -68,9 +86,9 @@ export function NeedsBanner({ run }: { run: RunDetail }) {
                 {said === step ? (
                   said
                 ) : (
-                  <a href={`#${stepAnchor(step)}`} data-approve={step} className="underline underline-offset-2">
+                  <StepLink step={step} onStep={onStep}>
                     {said}
-                  </a>
+                  </StepLink>
                 )}
               </Fragment>
             ))}

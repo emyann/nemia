@@ -6,54 +6,51 @@
  * `addedSkillsRefusal` judges a skill a step adds to its agent's, which the agent's fence must let the session load.
  */
 import { AGENTS_FOLDER, type StepKey, type Workflow } from '../step/step.ts';
-import { DEFAULT_HARNESS, isRemoteHarness, SANDBOXES } from '../harness/harness.ts';
-import { DEFAULT_PERMISSION_MODE, rulesOf, toolsOf } from '../keys/index.ts';
+import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
+import { rulesOf, toolsOf } from '../keys/index.ts';
 import type { Agent } from '../agents/agents.ts';
+import { fenceReach, type FenceReach } from 'agent-runtime/vocabulary';
 
 /**
- * How wide each permission mode is, for a job that nobody answers: `plan` changes nothing; `default`, `manual` and the mode a held session
- * runs in (`HELD_MODE`) run what the rules allow and deny the rest, since a job denies whatever they would ask; the next writes in its
- * directory unasked; `auto` lets a classifier allow what it judges safe; the widest asks about nothing.
+ * What harness `harness`'s fence words reach, the runtime's answer (`fenceReach`): the default harness's for one fenced by neither a mode
+ * nor a sandbox, as every permission mode was judged before a step named its harness.
  */
-export const MODE_RANK: Readonly<Record<string, number>> = {
-  plan: 0,
-  dontAsk: 1,
-  default: 1,
-  manual: 1,
-  acceptEdits: 2,
-  auto: 3,
-  bypassPermissions: 4,
-};
+const reachOf = (harness: string = DEFAULT_HARNESS): FenceReach => fenceReach(harness) ?? fenceReach(DEFAULT_HARNESS)!;
 
-/** The widest permission mode in `MODE_RANK`, which asks about nothing and so is widened by no allow rule. */
-const WIDEST_MODE = Object.keys(MODE_RANK).reduce((wide, mode) => (MODE_RANK[mode] > MODE_RANK[wide] ? mode : wide));
+/** How wide fence word `word` is on `reach`: 0 for a word the harness does not take, which `wf start` refuses (`configRefused`). */
+const rankOf = (reach: FenceReach, word: string): number => reach.rank[word] ?? 0;
+
+/** The widest of a harness's fence words, the first of the top rank: on Claude Code the mode that asks about nothing. */
+const widestOf = (reach: FenceReach): string =>
+  Object.keys(reach.rank).reduce((wide, word) => (reach.rank[word] > reach.rank[wide] ? word : wide));
 
 /**
  * Whether a session in permission mode `mode` — the runtime's default when `undefined` — writes in its directory unasked: the narrowest
  * mode that does and every wider one. Such a mode grants what an `allowedTools:` rule `Edit(…)` on a path inside the directory would.
  */
-export const editsUnasked = (mode: string | undefined): boolean =>
-  (MODE_RANK[mode ?? DEFAULT_PERMISSION_MODE] ?? 0) >= MODE_RANK.acceptEdits;
-
-/** The mode a session held to its directory runs in, which runs what its rules allow and denies the rest. */
-const HELD_MODE = 'dontAsk';
+export const editsUnasked = (mode: string | undefined): boolean => {
+  const modes = reachOf();
+  return rankOf(modes, mode ?? modes.given) >= modes.writes;
+};
 
 /** The allow rules a session held to its directory keeps, as the path patterns covering every path inside it (`pathCovers`). */
 const IN_DIRECTORY = ['Edit(**)', 'Read(**)'];
 
 /**
  * The fence that holds a session of an agent to its directory, never wider than the agent's own (`fenceRefusal` lets it through):
- * `HELD_MODE`, or the agent's mode `mode` where that is narrower; and `Edit(**)` under a mode that edits unasked
- * (`editsUnasked`), else those of the agent's allow rules `allows`, as written, that a rule inside the directory covers. Undefined when
- * the agent has allow rules and none is inside its directory: a step's list replaces its agent's and cannot be empty, so the agent's own
- * would run.
+ * the mode the runtime holds a session to its directory in, or the agent's mode `mode` where that is narrower; and `Edit(**)` under a
+ * mode that edits unasked (`editsUnasked`), else those of the agent's allow rules `allows`, as written, that a rule inside the directory
+ * covers. Undefined when the agent has allow rules and none is inside its directory: a step's list replaces its agent's and cannot be
+ * empty, so the agent's own would run.
  */
 export function directoryFence(
   mode: string | undefined,
   allows: string | undefined,
 ): { permissionMode: string; allowedTools: string[] } | undefined {
-  const own = mode ?? DEFAULT_PERMISSION_MODE;
-  const permissionMode = (MODE_RANK[own] ?? 0) < MODE_RANK[HELD_MODE] ? own : HELD_MODE;
+  const modes = reachOf();
+  const own = mode ?? modes.given;
+  const held = modes.held ?? own;
+  const permissionMode = rankOf(modes, own) < rankOf(modes, held) ? own : held;
   if (editsUnasked(mode)) return { permissionMode, allowedTools: ['Edit(**)'] };
   const rules = (allows ?? '')
     .split(',')
@@ -63,8 +60,8 @@ export function directoryFence(
   return rules.length && !allowedTools.length ? undefined : { permissionMode, allowedTools };
 }
 
-/** The sandbox a sandboxed session runs in when its step names none, the runtime's (`sandboxOf`). */
-export const DEFAULT_SANDBOX = 'workspace-write';
+/** Whether a harness fences a session with a sandbox rather than a permission mode and rule lists, as the runtime answers. */
+export const sandboxed = (harness: string): boolean => fenceReach(harness)?.by === 'sandbox';
 
 /** The keys of a step's fence, either harness's: a sandboxed step's `permissionMode:` is read as its `sandbox:` before this sees it. */
 const FENCE_KEYS = ['tools', 'allowedTools', 'disallowedTools', 'permissionMode', 'sandbox'] as const;
@@ -75,12 +72,18 @@ type FenceKey = (typeof FENCE_KEYS)[number];
 /** The words of a refusal that names one key: the step's line and its agent's file. */
 type Said = { step: string; line: string; agent: string; file: string };
 
+/** The fence words of `reach` as narrow as `own` or narrower, or `undefined` when `asked` is no wider than `own`. */
+function narrowerThan(reach: FenceReach, asked: string, own: string): string[] | undefined {
+  if (rankOf(reach, asked) <= rankOf(reach, own)) return undefined;
+  return Object.keys(reach.rank).filter((word) => rankOf(reach, word) <= rankOf(reach, own));
+}
+
 /**
  * Why step `step` would widen its agent's fence, or `undefined` when it does not: `own` are the keys the step writes itself, the
  * sandbox under its own name (`codexSandboxNamed`), and `resolved` the step they were read into, with the agent's. A key the step
  * does not write is its agent's and widens nothing, and `background: true` widens it as an allow rule would (`backgroundRefusal`). A
- * remote step is left to `remoteRefusal`, which refuses every fence key there. The refusal names the step, the key, what it would add,
- * and the fix.
+ * remote step is left to `remoteRefusal` in harness.ts, which refuses every fence key there. The refusal names the step, the key, what it
+ * would add, and the fix.
  */
 export function fenceRefusal(step: string, agent: Agent, own: Partial<Record<StepKey, string>>, resolved: Workflow): string | undefined {
   const harness = resolved.harness ?? DEFAULT_HARNESS;
@@ -93,15 +96,15 @@ export function fenceRefusal(step: string, agent: Agent, own: Partial<Record<Ste
     allowedTools: (said) =>
       allowsRefusal(said, resolved.allowedTools ?? [], agentRules(agent, file, 'allowedTools'), agent.keys.permissionMode),
     disallowedTools: (said) => deniesRefusal(said, resolved.disallowedTools ?? [], agentRules(agent, file, 'disallowedTools')),
-    permissionMode: (said) => modeRefusal(said, resolved.permissionMode ?? '', agent.keys.permissionMode),
-    sandbox: (said) => sandboxRefusal(said, resolved.sandbox ?? '', agent.keys.sandbox),
+    permissionMode: (said) => modeRefusal(said, reachOf(harness), resolved.permissionMode ?? '', agent.keys.permissionMode),
+    sandbox: (said) => sandboxRefusal(said, reachOf(harness), resolved.sandbox ?? '', agent.keys.sandbox),
   };
   for (const key of FENCE_KEYS) {
     const why = own[key] === undefined ? undefined : judge[key]({ step, line: `${key}: ${own[key]}`, agent: agent.name, file });
     if (why !== undefined) return why;
   }
   if (resolved.background !== true) return undefined;
-  return backgroundRefusal({ step, line: 'background: true', agent: agent.name, file }, agent.keys.permissionMode);
+  return backgroundRefusal({ step, line: 'background: true', agent: agent.name, file }, reachOf(harness), agent.keys.permissionMode);
 }
 
 /**
@@ -136,15 +139,12 @@ export function addedSkillsRefusal(
 /** The harness an agent runs on by its own file. */
 const agentHarness = (agent: Agent): string => agent.keys.harness ?? DEFAULT_HARNESS;
 
-/** Whether a harness fences a session with a sandbox rather than a permission mode and rule lists. */
-const sandboxed = (harness: string): boolean => Object.hasOwn(SANDBOXES, harness);
-
 /** The agent's `tools:` as a list, or `undefined` for none: every tool. */
 const agentTools = (agent: Agent, file: string): string[] | undefined => toolsOf(file, agent.keys.tools, agentHarness(agent));
 
 /** The agent's allow or deny rules, `[]` for none. */
 const agentRules = (agent: Agent, file: string, key: 'allowedTools' | 'disallowedTools'): string[] =>
-  rulesOf(file, key, agent.keys[key], agentHarness(agent)) ?? [];
+  rulesOf(file, key, agent.keys[key]) ?? [];
 
 /** A list of names or rules, each in backticks. */
 const listed = (names: readonly string[]): string => names.map((n) => `\`${n}\``).join(', ');
@@ -191,11 +191,11 @@ function deniesRefusal(said: Said, rules: readonly string[], agents: readonly st
   return `${said.step}: \`${said.line}\` would lift ${listed(lifted)}, which ${said.file} denies its agent ${said.agent}: a step's \`disallowedTools:\` replaces its agent's, and a step may only tighten its agent's fence. Keep the agent's denies on the line and add yours — \`disallowedTools: ${whole}\` — or attach another agent.`;
 }
 
-/** Refused: a permission mode wider than the agent's, or than the runtime's default when its file names none (`MODE_RANK`). */
-function modeRefusal(said: Said, mode: string, agents: string | undefined): string | undefined {
-  const agentMode = agents ?? DEFAULT_PERMISSION_MODE;
-  if ((MODE_RANK[mode] ?? 0) <= (MODE_RANK[agentMode] ?? 0)) return undefined;
-  const narrower = Object.keys(MODE_RANK).filter((m) => MODE_RANK[m] <= MODE_RANK[agentMode]);
+/** Refused: a permission mode wider than the agent's, or than the runtime's default when its file names none, as `modes` ranks them. */
+function modeRefusal(said: Said, modes: FenceReach, mode: string, agents: string | undefined): string | undefined {
+  const agentMode = agents ?? modes.given;
+  const narrower = narrowerThan(modes, mode, agentMode);
+  if (narrower === undefined) return undefined;
   const runs =
     agents === undefined
       ? `names no mode, so its agent runs in \`${agentMode}\`, the runtime's default`
@@ -204,26 +204,26 @@ function modeRefusal(said: Said, mode: string, agents: string | undefined): stri
 }
 
 /**
- * Refused: `background: true` over an agent in any mode but the widest (`WIDEST_MODE`), or over one whose file names no mode. A
+ * Refused: `background: true` over an agent in any mode but the widest of `modes` (`widestOf`), or over one whose file names no mode. A
  * background session also reads the person's own user and local settings, where each "don't ask again" writes an allow rule, and every
  * other mode runs more of what such a rule allows; `agents` is the agent's mode, never the step's, since the rule widens the agent's.
  */
-function backgroundRefusal(said: Said, agents: string | undefined): string | undefined {
-  const agentMode = agents ?? DEFAULT_PERMISSION_MODE;
-  if (MODE_RANK[agentMode] === MODE_RANK[WIDEST_MODE]) return undefined;
+function backgroundRefusal(said: Said, modes: FenceReach, agents: string | undefined): string | undefined {
+  const agentMode = agents ?? modes.given;
+  const widest = widestOf(modes);
+  if (modes.rank[agentMode] === modes.rank[widest]) return undefined;
   const runs =
     agents === undefined
       ? `names no mode, so its agent runs in \`${agentMode}\`, the runtime's default`
       : `runs its agent in \`${agentMode}\``;
-  return `${said.step}: \`${said.line}\` runs the step's sessions as background sessions, which also read the person's own user and local settings, where each "don't ask again" writes an allow rule; ${said.file} ${runs}, which runs what such a rule allows — a step may only tighten its agent's fence. Delete the line and the step runs as a job, which reads only the checkout's settings, or attach an agent whose file runs it in \`${WIDEST_MODE}\`, which no allow rule widens, and which denies by name what it must never do.`;
+  return `${said.step}: \`${said.line}\` runs the step's sessions as background sessions, which also read the person's own user and local settings, where each "don't ask again" writes an allow rule; ${said.file} ${runs}, which runs what such a rule allows — a step may only tighten its agent's fence. Delete the line and the step runs as a job, which reads only the checkout's settings, or attach an agent whose file runs it in \`${widest}\`, which no allow rule widens, and which denies by name what it must never do.`;
 }
 
-/** Refused: a sandbox wider than the agent's, or than its harness's default when its file names none (`DEFAULT_SANDBOX`). */
-function sandboxRefusal(said: Said, sandbox: string, agents: string | undefined): string | undefined {
-  const order = SANDBOXES.codex;
-  const agentSandbox = agents ?? DEFAULT_SANDBOX;
-  if (order.indexOf(sandbox) <= order.indexOf(agentSandbox)) return undefined;
-  const narrower = order.slice(0, order.indexOf(agentSandbox) + 1);
+/** Refused: a sandbox wider than the agent's, or than its harness's default when its file names none, as `sandboxes` ranks them. */
+function sandboxRefusal(said: Said, sandboxes: FenceReach, sandbox: string, agents: string | undefined): string | undefined {
+  const agentSandbox = agents ?? sandboxes.given;
+  const narrower = narrowerThan(sandboxes, sandbox, agentSandbox);
+  if (narrower === undefined) return undefined;
   const runs =
     agents === undefined
       ? `names no sandbox, so its agent runs in \`${agentSandbox}\`, its harness's default`
@@ -236,7 +236,7 @@ function sandboxRefusal(said: Said, sandbox: string, agents: string | undefined)
  * writes unasked (`editsUnasked`) an `Edit` of a path inside its directory, which a bare `**` covers (`pathCovers`).
  */
 function modeGrants(mode: string | undefined, rule: string): boolean {
-  if (mode === WIDEST_MODE) return true;
+  if (mode === widestOf(reachOf())) return true;
   const { tool, inner } = ruleParts(rule);
   return tool === 'Edit' && inner !== undefined && editsUnasked(mode) && pathCovers('**', inner);
 }

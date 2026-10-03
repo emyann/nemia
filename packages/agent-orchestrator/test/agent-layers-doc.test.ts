@@ -67,3 +67,26 @@ test("the README's *An agent is a node's attachment* names the four layers in or
 test("create-an-agent's *The four layers* names them in order, as no escape hatch", () => {
   assert.equal(layersRefusal(SKILL()), undefined);
 });
+
+/** Why a passage's second layer is wrong — it says custom instructions are coming, or names no command that sets them — or undefined. */
+function customLayerRefusal(passage: string): string | undefined {
+  const layer = /2\.\s*\*\*Custom\s+instructions\*\*([^]*?)3\.\s*\*\*The\s+step's/.exec(passage)?.[1];
+  if (layer === undefined) return 'it has no second layer, custom instructions, before the step’s policy';
+  if (/coming,\s*not\s+built/i.test(layer)) return 'it says custom instructions are coming, not built';
+  if (!/wf\s+agents\s+custom\s+<name>/.test(layer)) return 'it names no command that sets them, `wf agents custom <name>`';
+  return undefined;
+}
+
+test('REFUSED: a second layer that says custom instructions are coming, or names no command that sets them', () => {
+  const layer = (words: string) =>
+    `1. **Instructions** — its body.\n2. **Custom instructions** — ${words}\n3. **The step's policy** — its own.`;
+  assert.equal(customLayerRefusal(layer('kept in your store, set by `wf agents\ncustom <name>`.')), undefined);
+  assert.match(customLayerRefusal(layer('what a person adds. Coming,\nnot built.')) ?? '', /coming, not built/);
+  assert.match(customLayerRefusal(layer('what a person adds.')) ?? '', /names no command/);
+  assert.match(customLayerRefusal('1. **Instructions** — its body.') ?? '', /no second layer/);
+});
+
+test('the README and create-an-agent each say custom instructions are built, and the command that sets them', () => {
+  assert.equal(customLayerRefusal(README()), undefined, 'README');
+  assert.equal(customLayerRefusal(SKILL()), undefined, 'create-an-agent');
+});

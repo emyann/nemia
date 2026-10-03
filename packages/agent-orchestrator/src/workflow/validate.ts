@@ -4,7 +4,8 @@
  * read the graph the `after` edges draw.
  */
 import { LOOP_REPLIES, type Workflow, WorkflowError } from '../step/step.ts';
-import { isRemoteHarness } from '../harness/harness.ts';
+import { fenceReach, type FenceReach } from 'agent-runtime/vocabulary';
+import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
 import { contextText, sessionContext } from '../keys/index.ts';
 
 /**
@@ -124,12 +125,13 @@ function validateFolder(steps: readonly Workflow[]): void {
 }
 
 /**
- * The permission modes in which a Claude Code background session (`claude --bg`) never stops to ask a person: `dontAsk`, which denies what
- * it is not given and lets the session read the refusal and carry on, and `bypassPermissions`, which allows everything. Every other mode
- * asks, `auto` — the engine's default, and what a step that names no mode runs in — among them.
+ * The modes a step's background session is judged by: its harness's reach (`fenceReach`), or the default harness's on one that ranks no
+ * modes, since only Claude Code runs a background session and `background: true` elsewhere is refused at `wf start`.
  */
-const BACKGROUND_UNASKING = ['dontAsk', 'bypassPermissions'] as const;
-const DEFAULT_MODE = 'auto';
+const backgroundReach = (harness: string = DEFAULT_HARNESS): FenceReach => {
+  const reach = fenceReach(harness);
+  return reach?.by === 'mode' ? reach : fenceReach(DEFAULT_HARNESS)!;
+};
 
 /**
  * The way a step of a folder team cannot be run: as a background session in a permission mode that can stop and ask.
@@ -142,9 +144,9 @@ const DEFAULT_MODE = 'auto';
  * A job waits on nobody, in any mode (agent-runtime's open issue 28, M1, Claude Code 2.1.280): `claude -p` in `auto`, `dontAsk`,
  * `default` and `acceptEdits` is denied each call it cannot make, carries on and exits on its own. So a step run as a job — every `claude`
  * step without `background: true`, every `claude-detached` one — is not judged on this, and neither is a codex step: `codex exec` has one
- * shell, fenced by the sandbox its `sandbox:` names, and asks nobody in any of them. So the modes that ask nobody are Claude Code's, and a
- * harness's own: Codex has no permission mode to judge (`permissionMode:` is refused there), and `background: true` is refused on any
- * harness but claude. What is judged is the one way left to ask: a `background: true` step.
+ * shell, fenced by the sandbox its `sandbox:` names, and asks nobody in any of them. So the modes that ask nobody are Claude Code's, and
+ * the runtime's to say (`backgroundReach`): Codex has no permission mode to judge (`permissionMode:` is refused there), and `background:
+ * true` is refused on any harness but claude. What is judged is the one way left to ask: a `background: true` step.
  *
  * A git run's steps work in a checkout a person has opened and trusted, with settings of its own; a folder run's do not, and there is
  * nobody to answer. So this is refused for folder teams only, at load, where every start — a brief, an inbox card, a queued card, the
@@ -153,15 +155,19 @@ const DEFAULT_MODE = 'auto';
  */
 function validateFolderMode(steps: readonly Workflow[]): void {
   if (!isFolderTeam(steps)) return;
-  const asking = steps.find((s) => s.background && !(BACKGROUND_UNASKING as readonly string[]).includes(s.permissionMode ?? DEFAULT_MODE));
+  const asking = steps.find((s) => {
+    const { given, unasking } = backgroundReach(s.harness);
+    return s.background && !unasking.includes(s.permissionMode ?? given);
+  });
   if (!asking) return;
+  const { given, unasking } = backgroundReach(asking.harness);
   const mode = asking.permissionMode
     ? `\`permissionMode: ${asking.permissionMode}\` can stop and ask a person to approve something`
-    : `it sets no \`permissionMode:\`, so it runs on the engine's default, \`${DEFAULT_MODE}\`, which can stop and ask a person to approve something`;
+    : `it sets no \`permissionMode:\`, so it runs on the engine's default, \`${given}\`, which can stop and ask a person to approve something`;
   throw new WorkflowError(
     `${asking.name}: \`workspace: folder\` works in a folder nobody has opened, \`background: true\` runs the step as a background session, and ${mode}` +
       ' — a read or a write outside the folder can, and an unattended background session then waits for ever on a prompt nobody answers.' +
-      ` Delete \`background: true\`, and the step runs as a job, which asks nobody in any mode; or write \`permissionMode: ${BACKGROUND_UNASKING[0]}\`, which denies such a call with no prompt and lets the session carry on.` +
+      ` Delete \`background: true\`, and the step runs as a job, which asks nobody in any mode; or write \`permissionMode: ${unasking[0]}\`, which denies such a call with no prompt and lets the session carry on.` +
       " A step in `dontAsk` that must write its own work needs `allowedTools: Edit(**)` beside it: `dontAsk` asks nobody, so it allows nothing, not even a write in the step's own folder, and `Edit(…)` is the rule every file-editing tool is matched against.",
   );
 }

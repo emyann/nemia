@@ -2092,7 +2092,7 @@ On 2026-09-16 four daemons ticked `~/.agent-workflows` at once; on 2026-09-22 st
 node child ticking, reparented to init, while a check on the wrapper's name counted none. And `tick.json` is written only when the caps
 change, so nothing said whether a daemon was ticking at all: a run `waiting` and a store nothing ticks read the same.
 
-- **`$WF_ROOT/daemon.json`**, written by `wf up` alone: `{ pid, startedAt, cwd, every, passedAt, beatAt?, procStart?, stoppedAt? }` — its node pid,
+- **`$WF_ROOT/daemon.json`**, written by `wf up` alone: `{ pid, startedAt, startedMono?, cwd, every, passedAt, passedMono?, beatAt?, beatMono?, procStart?, stoppedAt? }` — its node pid,
   its start, where and how often it ticks, its last completed pass (`null` before the first), its beat — written on a timer of its interval,
   while a pass awaits too — its process's start from `/proc/<pid>/stat`, so a pid reused after a `kill -9` reads `gone` rather than
   holding the store and being named as a pid to kill (round 3's finding; where it cannot be compared a live pid holds, said unconfirmed,
@@ -4985,6 +4985,31 @@ environment and niceness, as the task's `config`. The runtime keeps each stream 
 - **Gone**: the check script, its trailer and the copy of stdout, `WF_STDERR` and `WF_STDOUT`, `checks/<task>.stdout` and
   `.stderr` (`wf rm` still removes those an earlier run wrote), and the api's read of a file.
 - **The daemon is restarted after landing**: until it is, it files and reads checks with the code it loaded.
+
+## Shipped: mounts — a run reads its factory's other repositories (slice 2a)
+
+A runtime task now takes `config.mounts`, a list of `{ path, readOnly }`, as a Pod's container takes its `volumeMounts`: the runtime
+refuses a list that is not one, and a mount on a harness that cannot hold its mode, and each harness renders what it holds. Claude Code
+gets `--add-dir <path>`, and for a read-only mount `Edit(//<path>/**)` in its one deny list, measured to hold in every permission mode
+(`add-dir-measure.md` in the run's artifacts); Codex reads the disk already, so a read-only mount renders nothing there and is refused
+under `danger-full-access`, and a writable one is refused on Codex outright. The runtime's README, *Mounts*, has the rules.
+
+- **A run in a factory mounts the factory's other repositories, read-only** (`factoryMounts`): every repository of the factory but the
+  one a git run works on, and all of them for a folder run. `wf start` freezes the list on the record (`Run.mounts`), leaves out a
+  folder that is no directory and says so (`leftOutMounts`), and refuses a step whose harness cannot hold it before anything is written,
+  naming the factory the folder is mounted from and what a person can do (`factoryMountRefusal`). Every local step is filed with it (`filedConfig`), on its first filing, a try and a round, and its brief names
+  each folder (`mountsLine`); a step on a remote agent is filed none. A later change to the factory changes no run started.
+- **No factory, nothing changes**: a run in the default factory, or in a factory of one repository, has no `mounts` on its record, and
+  each step's argv is what it was.
+- **This is the reach *A copy, not a reach* left out**, for a factory's own repositories only: a mount is the folder as it stands, where
+  a copy is a snapshot at every filing. What a folder step is given (`given/`) stays a copy.
+- **A mount lists the folder's `.claude/skills` in the session** (Claude Code's `--add-dir`); its `CLAUDE.md` is not read. No flag turns
+  the one off without the other, so each local step of a run in a factory of several repositories sees, and may invoke, the others'
+  skills, which share the listing's budget that `--setting-sources project` keeps to the agent's own. **Open, for the owner**: accept
+  it, or file a follow-up that mounts a folder without its skills (a runtime flag, measured on Claude Code first).
+
+Next: 2b, every run in a factory (`wf start` inside a factory's folder picks it; elsewhere it names one), and 2c, a workflow that marks
+a mount writable on purpose.
 
 ## 1. A run that grows steps from a plan
 

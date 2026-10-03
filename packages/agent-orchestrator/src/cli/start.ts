@@ -18,6 +18,7 @@ import {
   inboxNameAt,
   inputsDir,
   isGitRun,
+  leftOutMounts,
   noCardLine,
   planLines,
   planStopped,
@@ -224,14 +225,29 @@ const factoryLine = (run: ReturnType<typeof start>): string[] =>
   run.factory ? [`factory: ${run.factory}${isGitRun(run) ? `, on ${run.repo}` : ''}`] : [];
 
 /**
- * What `wf start` prints of a run it started: its steps, where it came from when said, its factory, where it works, and what it waits on
- * and ends at.
+ * The folders of its factory a run mounts, read-only, as `wf start` says them, and those left out because they were no directory; none
+ * in the default factory.
+ */
+const mountLines = (run: ReturnType<typeof start>): string[] => {
+  const missing = leftOutMounts(run);
+  return [
+    ...(run.mounts?.length ? [`mounts: ${run.mounts.map((m) => m.path).join(', ')} — read-only, for every local step`] : []),
+    ...(missing.length
+      ? [`not mounted: ${missing.join(', ')} — of the factory's repositories, and no directory now; start again once it is there`]
+      : []),
+  ];
+};
+
+/**
+ * What `wf start` prints of a run it started: its steps, where it came from when said, its factory, the folders it mounts, where it works,
+ * and what it waits on and ends at.
  */
 function printStarted(run: ReturnType<typeof start>, from?: string): void {
   const steps = stepsOf(run);
   console.log(`${run.id}  ${steps.length} step(s): ${steps.map((s) => (s.agent ? `${s.name} (${s.agent.name})` : s.name)).join(' → ')}`);
   if (from) console.log(from);
   for (const line of factoryLine(run)) console.log(line);
+  for (const line of mountLines(run)) console.log(line);
   console.log(`workspace: ${run.workspace}${isGitRun(run) ? '' : ' — a folder per step, made as each is filed, with no git repository'}`);
   if (run.inputs?.length) console.log(`inputs: ${run.inputs.join(', ')} — copied into ${inputsDir(run)}`);
   if (run.after?.length)

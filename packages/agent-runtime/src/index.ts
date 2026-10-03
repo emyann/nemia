@@ -75,7 +75,7 @@ export type {
   TranscriptEvent,
 } from './harness/index.ts';
 export { HARNESS_ARGS, TURN_ARGS, argsRefusalOf } from './harness/index.ts';
-export type { CodexArgs, HarnessArgs } from './harness/index.ts';
+export type { CodexArgs, HarnessArgs, Mount } from './harness/index.ts';
 export type { ClaudeFlags } from './harness/claude/index.ts';
 export { detachedOps, STALE_MS } from './harness/detached/detached.ts';
 export type { HarnessSpec } from './harness/detached/detached.ts';
@@ -92,5 +92,6 @@ export type { Event, State, Attempt, Sighting, EndReason, Usage, Said, Denial, I
 export type { SessionState, Ended, Outcome } from './core/index.ts';
 export type { LifecycleStep, LifecycleState } from './core/index.ts';
 export { denialText, fold, nameFor } from './core/index.ts';
-export { CLAUDE_CONTEXT_TOKENS, CLAUDE_EFFORTS, CLAUDE_PERMISSION_MODES } from './harness/claude/index.ts';
-export { CODEX_EFFORTS, CODEX_SANDBOXES } from './harness/codex/codex.ts';
+export { CLAUDE_AUTO_DROPPED, CLAUDE_CONTEXT_TOKENS, CLAUDE_EFFORTS, CLAUDE_PERMISSION_MODES } from './harness/claude/index.ts';
+export { fenceReach, type FenceReach } from './harness/reach.ts';
+export { CODEX_EFFORTS, CODEX_SANDBOXES } from './harness/codex/vocabulary.ts';

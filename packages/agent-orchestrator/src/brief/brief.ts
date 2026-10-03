@@ -21,7 +21,7 @@ import { landsOnCheck, owesReplies } from '../status/status.ts';
 import { checkContract, checkHandedSection, landingContract, type CheckHanded } from '../check/check.ts';
 import { artifactsContract } from '../artifacts/artifacts.ts';
 import { briefBody } from '../agents/agents.ts';
-import { inputsLine } from '../start/inputs.ts';
+import { inputsLine, mountsLine } from '../start/inputs.ts';
 import { resultSteps, workChecks } from '../branches/branches.ts';
 
 /**
@@ -62,7 +62,7 @@ import { resultSteps, workChecks } from '../branches/branches.ts';
  * run's steps are told of folders and never of git (`placeOf`). A try or a round that continues the last session is told only what
  * became of it and the contracts; a step that continues another (`resume`) is told what it reads and a tree the run installed, never the
  * spec again. How the run provisioned the tree is said only when it did more than link it (`depsLines`). What was asked for carries the
- * files given with it (`inputsLine`), one line and only when there are any.
+ * files given with it (`inputsLine`), one line and only when there are any, and the folders the run mounts (`mountsLine`), likewise.
  *
  * A fan-in works on a branch with every step it waits on merged in, unless it works in the repository's checkout or in a folder, where
  * nothing is merged. A folder step is told which earlier steps worked in its own folder, read off the folders the record names, not the
@@ -130,7 +130,7 @@ export function composeBrief(
     : steps.filter((s) => s.name !== step.name && run.steps[s.name]?.taskId).map((s) => s.name);
 
   const inputs = inputsLine(inputsDir, run.inputs, inFolder);
-  const request = [run.brief, ...(inputs ? ['', inputs] : [])];
+  const request = [run.brief, ...(inputs ? ['', inputs] : []), ...mountsLine(step, run)];
   const opening = briefBody(step) ? [briefBody(step), ''] : [];
   const parts = [...opening, '## What was asked for', '', ...request, ...handed];
 

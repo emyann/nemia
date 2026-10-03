@@ -1,7 +1,7 @@
 import path from 'node:path';
 import type { Locator, Page, Request } from 'playwright';
 import { photograph, stepBar, themeOf } from '../board.ts';
-import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
+import { expectCount, expectLeftOf, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { FAKE, FOLDER } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT } from '../world.ts';
@@ -113,6 +113,11 @@ async function pressed(page: Page): Promise<void> {
     if (box && box.x + box.width > bar.x) under.push(String(await node.getAttribute('data-id')));
   }
   if (under.length) throw new Refused(`every node is fitted clear of the bar — ${under.join(', ')} lies under it`);
+  await expectLeftOf(
+    graphOf(page).getByRole('button', { name: 'Reset layout' }),
+    other,
+    "the canvas's buttons are drawn left of the bar, not under it",
+  );
   await photograph(page, path.join(OUT, `run-bar-step-${await themeOf(page)}.png`));
 
   await graphOf(page)

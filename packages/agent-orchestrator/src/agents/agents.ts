@@ -7,9 +7,9 @@
  *
  * Under `runs/<id>/agents/<step>/`, frozen with the run as its workflow is:
  *
- * - `prompt.md`, the agent's instructions, then a line naming each skill it is given, then the whole text of each skill that asks to be
- *   told whole (`preload: true`): appended to Claude Code's own prompt, which is kept (`--append-system-prompt-file`), or put in
- *   its place for `harnessPrompt: replace` (`--system-prompt-file`);
+ * - `prompt.md`, the agent's instructions, then the person's custom instructions for it (`customInstructions`), then a line naming each
+ *   skill it is given, then the whole text of each skill that asks to be told whole (`preload: true`): appended to Claude Code's own
+ *   prompt, which is kept (`--append-system-prompt-file`), or put in its place for `harnessPrompt: replace` (`--system-prompt-file`);
  * - `nemia-<agent>/`, a plugin of the step's own (`--plugin-dir`): its `skills/<name>/`, each copied whole from where the load found it,
  *   so a session loads them as `nemia-<agent>:<name>`; and, for `harnessPrompt: no-coding`, `output-styles/no-coding.md`, a style that says
  *   `keep-coding-instructions: false`, chosen by its namespaced name, since a bare one is echoed and not applied.
@@ -39,7 +39,6 @@ import {
   FORMER_KEYS,
   FORMER_OWN_KEYS,
   formerKeyWritten,
-  formerSandbox,
   frontmatterKey,
   harnessPromptNamed,
   readKeys,
@@ -164,8 +163,25 @@ export type Agent = {
   harnessPrompt?: HarnessPrompt;
   keys: Partial<Record<RoleKey, string>>;
   body: string;
+  /**
+   * What a person adds to the agent without rewriting it: the words of `custom-instructions/<name>.md` in their store, read by the load
+   * (`agentsFor`), never from the agent's own file. Words only: they set no key.
+   */
+  customInstructions?: string;
   read: (file: string) => string | undefined;
 };
+
+/** The folder of a person's store (`WF_ROOT`) that holds their custom instructions, one `<agent>.md` per agent name. */
+export const CUSTOM_INSTRUCTIONS_FOLDER = 'custom-instructions';
+
+/**
+ * Why `text`, the custom instructions of `file`, cannot be taken, or `undefined` when it can: a frontmatter block, since custom
+ * instructions only add words and never set a key — a fence, a tool, a model, a mode or a skill is the agent's file's or a step's.
+ */
+export function customInstructionsRefusal(file: string, text: string): string | undefined {
+  if (!/^\uFEFF?---[ \t]*(\r?\n|$)/.test(text)) return undefined;
+  return `${file} opens with a frontmatter block, a first line of \`---\`. Custom instructions only add words: they set no key, and so never widen an agent's fence, give it a tool, or change its model, mode or skills. Put a key in the agent's own file or on a step, and start the words with a word.`;
+}
 
 /** The agents a folder of workflows has, by name: each read, or why it cannot be — thrown only at a step that names it. */
 export type Agents = ReadonlyMap<string, Agent | WorkflowError>;
@@ -350,8 +366,7 @@ export function renderAgent(draft: AgentDraft): string {
     const refused = agentKeyRefusal(file, key);
     if (refused !== undefined) refuse(refused);
   }
-  if (keys.harness === 'codex' && keys.permissionMode != null && formerSandbox(keys.permissionMode) !== undefined)
-    refuse(codexModeWritten(file, keys.permissionMode));
+  if (keys.harness === 'codex' && keys.permissionMode != null) refuse(codexModeWritten(file, keys.permissionMode));
   refuseStale(file, draft);
   const own: Record<AgentOwnKey, string | null | undefined> = {
     role: draft.role,
@@ -479,15 +494,15 @@ export const pluginOf = (agent: string): string => `nemia-${agent}`;
 
 /**
  * Whether `wf start` renders the step's agent and the tick files the step with it: a step of Claude Code's — codex loads no plugin and
- * takes no prompt of ours — whose record gives its agent instructions, skills or a harness prompt other than `keep`
- * (`StepAgent.instructions`, `skills`, `harnessPrompt`; a record without them renders nothing), and which starts a session of its own. A
- * step that continues another's session keeps that session's prompt, so it is told its agent's instructions in its brief (and may
- * give no skills, nor a harness prompt: `composedRefusal`).
+ * takes no prompt of ours — whose record gives its agent instructions, custom instructions, skills or a harness prompt other than `keep`
+ * (`StepAgent.instructions`, `customInstructions`, `skills`, `harnessPrompt`; a record without them renders nothing), and which starts a
+ * session of its own. A step that continues another's session keeps that session's prompt, so it is told its agent's instructions in its
+ * brief (and may give no skills, nor a harness prompt: `composedRefusal`).
  */
 export const rendersAgent = (step: Workflow): boolean => {
   const agent = step.agent;
   if (!agent || step.harness === 'codex' || isRemoteHarness(step.harness) || step.resume) return false;
-  return Boolean(agent.instructions || agent.skills?.length || (agent.harnessPrompt ?? 'keep') !== 'keep');
+  return Boolean(agent.instructions || agent.customInstructions || agent.skills?.length || (agent.harnessPrompt ?? 'keep') !== 'keep');
 };
 
 /** What a step's brief opens with: its own note alone when its agent is rendered, its agent's instructions and its note otherwise. */
@@ -508,7 +523,7 @@ export type SkillAgain = { name: string; text: string } | { name: string; missin
  */
 export const unrendered = (step: Workflow, skills: readonly SkillAgain[] = []): Workflow => {
   if (!step.agent) return step;
-  const { instructions: _i, skills: _s, harnessPrompt: _p, ...agent } = step.agent;
+  const { instructions: _i, customInstructions: _c, skills: _s, harnessPrompt: _p, ...agent } = step.agent;
   if (!skills.length) return { ...step, agent };
   return {
     ...step,
@@ -527,10 +542,11 @@ export const unrendered = (step: Workflow, skills: readonly SkillAgain[] = []): 
 export type RenderedSkill = { name: string; whole?: string };
 
 /**
- * The text of `prompt.md`: the agent's instructions, then each skill it is given by its namespaced name, the session to load it with the
- * Skill tool when the instructions say it is needed, then each skill told whole, under a heading of its name. Claude Code lists a plugin's
- * skills to the session by name and description all the same; naming them here says they are this agent's. A bare skill of the same name
- * is hidden from the session (`sessionSettings`), so the name it is told is the only one it sees.
+ * The text of `prompt.md`: the agent's instructions, then the person's custom instructions for it, then each skill it is given by its
+ * namespaced name, the session to load it with the Skill tool when the instructions say it is needed, then each skill told whole, under a
+ * heading of its name. Claude Code lists a plugin's skills to the session by name and description all the same; naming them here says they
+ * are this agent's. A bare skill of the same name is hidden from the session (`sessionSettings`), so the name it is told is the only one it
+ * sees.
  */
 export function renderedPrompt(step: Workflow, skills: readonly RenderedSkill[]): string {
   const agent = step.agent!;
@@ -540,6 +556,7 @@ export function renderedPrompt(step: Workflow, skills: readonly RenderedSkill[])
   return (
     [
       ...(agent.instructions ? [agent.instructions.trimEnd()] : []),
+      ...(agent.customInstructions ? [agent.customInstructions.trimEnd()] : []),
       ...(named.length
         ? [
             `Your skills, each loaded with the Skill tool by its name when you need it: ${named.map((s) => `\`${plugin}:${s.name}\``).join(', ')}.`,
@@ -601,7 +618,7 @@ export function renderedFlags(
   const agent = step.agent!;
   const prompt = path.join(dir, PROMPT_FILE);
   const plugin = pluginOf(agent.name);
-  const told = Boolean(agent.instructions || agent.skills?.length);
+  const told = Boolean(agent.instructions || agent.customInstructions || agent.skills?.length);
   const settings = sessionSettings(agent);
   return {
     ...(told ? (agent.harnessPrompt === 'replace' ? { systemPromptFile: prompt } : { appendSystemPromptFile: prompt }) : {}),

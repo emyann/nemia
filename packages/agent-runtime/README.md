@@ -43,7 +43,7 @@ Definition of done — a closed list, and it is closed:
 change seems to belong in here, check it against the boundary above first: it almost certainly
 knows about a second workload. A knob on the workload is a field carried on the task and read by a runner, never a callback
 into `decide`. The harness's own — `model`, `permissionMode`, `tools`, `allowedTools`, `disallowedTools`, `effort`, `mcp`,
-`contextTokens`, `worktree`, `background`, `budgetUsd`, Claude Code's own flags under `claude`, and Codex's own under `codex` — are one object, the task's `config` (`HarnessArgs`, `src/harness/args.ts`):
+`contextTokens`, `worktree`, `background`, `budgetUsd`, `mounts`, Claude Code's own flags under `claude`, and Codex's own under `codex` — are one object, the task's `config` (`HarnessArgs`, `src/harness/args.ts`):
 the adapter's configuration, which `domain.ts` and `engine.ts` hand to the runner without opening, and
 `test/core-reads.test.ts` refuses either the day it reads one — or names a budget at all. `queued` is the task's own, read by
 `decide`: whether its turn waits for `admit`.
@@ -55,6 +55,29 @@ another harness translates it (`worktree`, which Codex turns into a worktree of 
 declares it or a layer above judges it (`contextTokens`), or it chooses the runtime's own process (`background`). A key moved
 into the bag is read at its old place off a journal (`upgrade` in `src/core/engine/journal.ts`) and refused there at both doors, naming
 the new place (`FORMER_ARGS`): `remoteControl` moved on 2026-09-25.
+
+### Mounts
+
+A task reaches folders beyond its `cwd` through `config.mounts`, as a Pod's container is given its `volumeMounts`: each an absolute
+path and whether the session may only read it — `[{ "path": "/srv/notes", "readOnly": true }]` (`Mount`, `src/harness/mounts.ts`).
+A local process sees the disk as it is, so a mount's source and its place are one path. `readOnly` is required: a mount left
+unmarked is refused, never silently writable. `file()` refuses at both doors a value that is not a list, an entry that is not
+`path` and `readOnly` alone, a path that is not absolute and resolved or holds a NUL, and a path given twice (`mountsRefusalOf`).
+
+Each harness renders them its own way, and one that cannot hold a mount's mode refuses the task before it is journalled, naming
+the harnesses that do (`HarnessSpec.mounts`, `mountsMisplaced` in `src/facade/consumer.ts`):
+
+- **Claude Code** (a job, `claude-detached`, `claude --bg`) holds both modes. Each mount is `--add-dir <path>`, and a read-only one
+  is also `Edit(//<path>/**)` in the one `--disallowedTools` list (`claudeMountArgs`, `claudeDenies`). `--add-dir` grants writes
+  as well as reads where the mode lets a session write; the deny holds the folder read-only in `dontAsk`, `acceptEdits`, `auto`
+  and `bypassPermissions`, a Bash redirection into it included. A read-only path a permission rule cannot name — a space, a
+  comma, a parenthesis, a glob's character — is refused. `--add-dir` also lists the folder's own `.claude/skills` in the
+  session; its `CLAUDE.md` is not read.
+- **Codex** holds a read-only mount and is given nothing for it: its `read-only` and `workspace-write` sandboxes read the whole
+  disk and write only the workspace. It refuses a read-only mount in `danger-full-access`, which writes everywhere, and a writable
+  one, which only `--add-dir` would give and `exec resume` rejects.
+- **The command harness and a remote agent** hold none: a command reads the disk it runs on as it is, and a remote agent has none
+  of this machine's disk. A `PromiseRunner` is handed them.
 
 ### One attempt per start
 
@@ -539,7 +562,7 @@ no words. What the in-process seam's extension answers — `findSession`, `sessi
 
 **The registry, and what a restart does.** The driver keeps one file per session, `<root>/remote/<session name>.json`,
 written whole and renamed. The intent — the name, the harness it went through, the message's id and when, and the process
-sending it with the time it gives up (`sending: { pid, until }`) — is on disk before the message is sent, and the Task's
+sending it with the time it gives up (`sending: { pid, until, mono }`) — is on disk before the message is sent, and the Task's
 id and context are written as the answer comes back. So a spawn asked again for a name that has an entry never sends a
 second message: an entry with a Task adopts it, and the next pass reads it by GetTask; an entry still being sent by a
 process that lives is left to it; any other is a send whose answer never came back, so whether a Task exists is not
@@ -560,7 +583,9 @@ left to answer within `SEND_MS` (15 minutes), in this process: until it does, ev
 `submitted` (the view's `running (working)`) while the sending process lives, and the answer is written as before — its
 Task, or its reply ended. A refusal that comes after the spawn returned ends the session `rejected`, a `harness` end, its
 words on `logs`; a send that fails on the way, is not answered within `SEND_MS`, or whose process died is in doubt, never
-sent twice, and `lost` past the grace window. A `stop` of a session still being sent cuts the send in the process that makes
+sent twice, and `lost` past the grace window. The `SEND_MS` lease is measured on the monotonic clock from the send's own
+stamp (`mono`, `{ boot, ms }`) within its boot, and on the wall clock from `sentAt` for an entry with none or across a reboot
+(`sendHeld`, `a2a/sending.ts`), so a wall clock stepped forward does not put a live send in doubt; `until` stays on the wall clock. A `stop` of a session still being sent cuts the send in the process that makes
 it, and the task settles `stopped`; a Task the agent makes of a send let go of is cancelled when its answer comes. A
 one-shot process that exits at once after its pass (`process.exit`) cuts its sends with it: in doubt, never sent twice. What
 is left of open issue 34 is the crash: a process that dies while a send is under way leaves a Task nobody owns.
@@ -679,9 +704,19 @@ one per call — a subagent's included — by its name without its plugin's (`wr
 denied load left out. `[]` is a session that loaded none; the key is absent where the harness cannot say: `claude -p
 --output-format json`, Codex, a background session, and a job that ended before it was read.
 
-The lists are exported, from both entries: `CLAUDE_PERMISSION_MODES`, `CLAUDE_EFFORTS` and `CLAUDE_CONTEXT_TOKENS`,
-`CODEX_SANDBOXES` and `CODEX_EFFORTS`. agent-orchestrator refuses the same words when it loads a workflow, before
-anything is filed, and holds its copy to these (`packages/agent-orchestrator/test/vocabulary.test.ts`).
+The lists are exported, from both entries and from the pure door `agent-runtime/vocabulary` (no Effect, no I/O):
+`CLAUDE_PERMISSION_MODES`, `CLAUDE_EFFORTS` and `CLAUDE_CONTEXT_TOKENS`, `CODEX_SANDBOXES` and `CODEX_EFFORTS`, with
+`CLAUDE_AUTO_DROPPED`, the models Claude Code drops `auto` on. agent-orchestrator keeps no copy: `wf start` asks `configRefusal` of every
+step before a run is written, and its form offers these lists.
+
+What a fence word reaches is answered beside them: `fenceReach(harness, model?)` gives, for Claude Code (`claude`,
+`claude-detached`) and Codex, whether a mode or a sandbox fences the session (`by`), how wide each word is (`rank`: plan 0;
+dontAsk, default and manual 1; acceptEdits 2; auto 3; bypassPermissions 4 — read-only 0, workspace-write 1, danger-full-access 2),
+the word a task naming none runs in (`given`: `auto`, `workspace-write`), the lowest rank that writes unasked (`writes`), the mode
+a session held to its directory runs in (`held`: `dontAsk`), the modes a background session runs in without stopping to ask a
+person (`unasking`: `dontAsk`, `bypassPermissions`; none on Codex), and the words dropped on `model` (`dropped`: `auto` on a model of
+`CLAUDE_AUTO_DROPPED`). It is `undefined` for any other harness. The runtime refuses none of these itself: `{ model: 'haiku' }` is
+filed in `auto` and runs in `default`, as the measure above says.
 
 **A spawn that fails** is answered by what the harness can vouch for. When nothing can have
 started — the OS would not create the process, a detached worker was never launched, or a
@@ -1071,6 +1106,14 @@ quiet  ⟸  state = working AND busy AND the last word in its conversation is it
 
 and reports quiet as a fact, `quietMs`, with the state left `working`. What quiet means is `decide`'s (below).
 
+**Quiet is counted on both clocks, and the shorter wins.** The transcript's mtime is stamped on the wall clock, so a wall clock
+stepped forward an hour would make every working session quiet at once. The runner records, per attempt under its root, when it
+first saw the transcript at its current mtime on the monotonic clock (`<root>/quiet/<name>.json`, `{ mtimeMs, boot, ms }`,
+`harness/claude/quiet.ts`), rewritten only when the mtime or the boot differs and cleared at spawn; quiet is the wall-clock age
+bounded by the monotonic time since that sighting. So a forward step cannot report a working session quiet, a backward step only
+delays it, a sighting survives a daemon's restart within its boot, and a mtime first seen — after a reboot, or by a fresh root —
+waits the floor from then. A machine with no boot id has the wall clock alone.
+
 **The second quiet rule is for a session held by something that is not the work.** A step signed off with
 `StructuredOutput`, every commit in, and left a `run_in_background` loop running; its registration read `status: shell`,
 the registry listed it busy, and seventy-seven minutes later nothing had read its closeout — no end, no check, no
@@ -1263,7 +1306,9 @@ real runs:
 
 Claude Code's runner reads the statement from the transcript on every idle pass while a session
 works. What it read from a finished one it keeps for that attempt only — the row's name, its session,
-and the start `claude agents` gave it — and only while the transcript has not been written since.
+and the start `claude agents` gave it — and only while the transcript has not been written since: its mtime, asked again, equals the one asked just
+before that read, and that one was older than the read by `MTIME_SLOP_MS` — an equality, so a write stamped after a wall clock
+stepped back is read again.
 Kept by session id, for good, a read went wrong twice on one step. A `view` saw the session listed
 final at least ten seconds before its — inferred from the pinned usage, not observed — `StructuredOutput`, and "nothing said" was kept. Then a nudged retry,
 which `--resume` runs under the same id, was handed that nothing and its first try's usage, to the
@@ -1910,6 +1955,7 @@ of pure code sits beside it.
 
 | file | what |
 |---|---|
+| `src/vocabulary.ts` | the vocabulary door's export list, pure: what `agent-runtime/vocabulary` gives |
 | `src/facade.ts` | the Promise API's export list, by name: what `agent-runtime` gives |
 | `src/index.ts` | the Effect API's export list — the boundary; `decide` is not on it |
 | `src/core/session.ts` | a session's state in A2A's names, the end each records and the word a person reads (`endOf`, `phaseWordOf`): read by both `domain.ts` and `lifecycle.ts`, so neither imports the other's values |
@@ -1931,11 +1977,14 @@ of pure code sits beside it.
 | `src/harness/seam.ts` | the compute seam — `spawn`/`observe`/`stop`/`logs`, and the optional `find`, `release`, `transcript` and `say` — the `Runner` service, the free harness `testOps`, and `composite`: dispatch by harness, merge what they all see |
 | `src/harness/error.ts` | `RunnerError`, beneath the seam and Claude Code's `--bg` runner: `Runner.claude` needs `claudeOps` as a value, and `claudeOps` builds `RunnerError`, so neither file imports the other for it |
 | `src/harness/args.ts` | a task's harness arguments, `HarnessArgs`: the adapter's configuration, carried as one `config`, and the checks every harness shares of it (`argsRefusalOf`), asked through every `Runner` |
+| `src/harness/reach.ts` | what a harness's fence words reach, `fenceReach`: each word's rank, the one a task naming none runs in, the held and unasking modes, and the modes Claude Code drops on a model |
+| `src/harness/mounts.ts` | a task's mounts, `Mount`: the folders beyond its `cwd` a session may reach, each read-only or writable, and the check of their shape every harness shares (`mountsRefusalOf`) |
 | `src/harness/mcp.ts` | a task's MCP servers: what is refused, the configs written, and Claude Code's flags for them; for Codex, the server names its config already has and a task's servers as its `mcp_servers` table |
 | `src/harness/transcript.ts` | the one transcript reader behind every harness's `transcript`, and its cursor |
 | `src/harness/sdk.ts` | the same four verbs on the Agent SDK, with the tradeoff written down |
 | `src/harness/index.ts` | the face of the seam, as the A2A seam and the doors take it; `core/` imports `seam.ts` and `args.ts` by their own path |
 | `src/harness/claude/bg.ts` | Claude Code's `--bg` runner (`claudeOps`), and `sh`, the one way it shells out |
+| `src/harness/claude/quiet.ts` | when a working `--bg` session's transcript was first seen at its mtime, on the monotonic clock, per attempt under the root: written by a look only when the mtime or the boot differs, cleared at spawn, read fresh on every look |
 | `src/harness/claude/parent.ts` | what a resumed `--bg` session's spawn records of its parent: the id of the parent's last StructuredOutput call, and whose a statement is by it |
 | `src/harness/claude/code.ts` | Claude Code as the engine runs it by default: a step as a job (`claude -p`), or a background session (`claude --bg`) when the task asks, each verb routed by the session id's shape; and `claude -p`'s argv and the `claude-detached` spec |
 | `src/harness/claude/quota.ts` | Claude Code's quota (`claudeQuota`): the `claude` on PATH asked `get_usage` with no prompt, and its answer read (`quotaOfResponse`) |
@@ -1943,10 +1992,11 @@ of pure code sits beside it.
 | `src/harness/claude/lines.ts` | the transcript lines the runtime reads (`LINES`), each decoded where it is read, and why a line is refused |
 | `src/harness/claude/inbox.ts` | words said into a running Claude Code session: its inbox, and its registration found by name |
 | `src/harness/claude/transcript.ts` | a Claude Code session's transcript: where it is, its closeout, its lines as events, and its usage and cost |
-| `src/harness/claude/vocabulary.ts` | Claude Code's modes, efforts and context windows, and what it refuses to be asked for |
+| `src/harness/claude/vocabulary.ts` | Claude Code's modes, their ranks, efforts and context windows, the models it drops `auto` on, and what it refuses to be asked for |
 | `src/harness/claude/index.ts` | the face of `harness/claude/`, as the doors take it |
 | `src/harness/command/command.ts` | a process as a harness: the program a task's `config.command` names, its `env` and `niceness`, its streams kept whole, and what it refuses |
-| `src/harness/codex/codex.ts` | Codex through `codex exec`: its sandboxes and efforts, the trust it is extended, and its spec |
+| `src/harness/codex/codex.ts` | Codex through `codex exec`: the trust it is extended, and its spec |
+| `src/harness/codex/vocabulary.ts` | Codex's sandboxes, narrowest first, its efforts and its default sandbox, with no I/O |
 | `src/harness/codex/stream.ts` | what a Codex session prints under `exec --json`: each event the runtime reads decoded by `CodexEventSchema`, a stream that does not decode refused, and its usage |
 | `src/harness/codex/transcript.ts` | a Codex thread's rollout: where it is, and its records as events |
 | `src/harness/detached/detached.ts` | a runner for any harness that runs a prompt and exits: `HarnessSpec`, the detached worker's run files, the lease, the four verbs over them, and `output`, a stream kept whole |
@@ -1957,6 +2007,7 @@ of pure code sits beside it.
 | `src/a2a/client.ts` | the engine's side of that seam: an in-process `Transport` to the handler, and a harness's verbs as calls through the SDK's `Client` and the extension's methods, as its card offers them; `transcript` and `refuses` passed through |
 | `src/a2a/card.ts` | a remote agent's card as it enters, served or configured: `CardSchema` decodes what the runtime reads of it before the SDK's parser, a card that does not decode is refused naming its first wrong field, and a configuration is judged (`remoteConfigRefusal`) |
 | `src/a2a/remote.ts` | a remote A2A agent as a harness: its card read and the binding chosen, auth as the card declares it, the registry under `remote/` (the intent before the send, the Task on its answer, never a second send), and the verbs as SendMessage, GetTask and CancelTask |
+| `src/a2a/sending.ts` | a send under way: its lease (`sendHeld`), `SEND_MS` on the monotonic clock from its stamp within a boot and on the wall clock from `sentAt` otherwise, and whether the process making it lives |
 | `src/a2a/said.ts` | the remote harness's own words told from another party's: the errors it throws in its own words, the A2A errors that refuse a send, and any other error's words quoted to 200 characters (`wordsOf`) |
 | `src/a2a/index.ts` | the face of `a2a/`, as the doors take it: it imports no name of the SDK's |
 | `src/facade/consumer.ts` | what a consumer writes and is given — its store in Promises, its harnesses, its options, its task and its engine — the adapters over them, and what the door refuses of them |

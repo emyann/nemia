@@ -793,81 +793,84 @@ test('`heldRuns`: every run in flight counted, then each that wants a slot admit
 test('`wf ls` on a run the cap holds: its roots say `waiting for a run slot (2 of 2 in flight)` where `waiting` would be, what waits on a root still says `waiting` — and a run that started, was called off or waits on a run is not said to wait for a slot', () => {
   const slot = { inFlight: 2, cap: 2 };
   const fresh = run({ implement: null, review: null });
-  const held = listing(
-    STEPS,
-    fresh,
-    shown({}),
-    () => undefined,
-    asked,
-    () => undefined,
-    [],
-    [],
-    [],
-    [],
-    () => 0,
-    () => undefined,
+  const held = listing({
+    steps: STEPS,
+    run: fresh,
+    phaseOf: shown({}),
+    closeoutOf: () => undefined,
+    askedCloseout: asked,
+    verdictOf: () => undefined,
+    asks: [],
+    roundAsks: [],
+    answers: [],
+    waits: [],
+    saidTo: () => 0,
+    spendOf: () => undefined,
     slot,
-  );
+  });
   assert.deepEqual(
     [held.steps.map((s) => s.status), held.slot, held.waitingOnYou],
     [['waiting for a run slot (2 of 2 in flight)', 'waiting'], slot, []],
   );
-  assert.equal(Object.hasOwn(listing(STEPS, fresh, shown({}), () => undefined, asked).steps[0], 'slot'), false);
   assert.equal(
     Object.hasOwn(
-      listing(STEPS, fresh, shown({}), () => undefined, asked),
+      listing({ steps: STEPS, run: fresh, phaseOf: shown({}), closeoutOf: () => undefined, askedCloseout: asked }).steps[0],
       'slot',
     ),
     false,
+  );
+  assert.equal(
+    Object.hasOwn(listing({ steps: STEPS, run: fresh, phaseOf: shown({}), closeoutOf: () => undefined, askedCloseout: asked }), 'slot'),
+    false,
     'no slot, no key',
   );
-  const started = listing(
-    STEPS,
-    run({ implement: 't1', review: null }),
-    shown({ t1: 'running' }),
-    () => undefined,
-    asked,
-    () => undefined,
-    [],
-    [],
-    [],
-    [],
-    () => 0,
-    () => undefined,
+  const started = listing({
+    steps: STEPS,
+    run: run({ implement: 't1', review: null }),
+    phaseOf: shown({ t1: 'running' }),
+    closeoutOf: () => undefined,
+    askedCloseout: asked,
+    verdictOf: () => undefined,
+    asks: [],
+    roundAsks: [],
+    answers: [],
+    waits: [],
+    saidTo: () => 0,
+    spendOf: () => undefined,
     slot,
-  );
+  });
   assert.deepEqual([started.steps[0].status, started.slot], ['running', undefined]);
-  const cancelled = listing(
-    STEPS,
-    run({ implement: null, review: null }, CANCELLED),
-    shown({}),
-    () => undefined,
-    asked,
-    () => undefined,
-    [],
-    [],
-    [],
-    [],
-    () => 0,
-    () => undefined,
+  const cancelled = listing({
+    steps: STEPS,
+    run: run({ implement: null, review: null }, CANCELLED),
+    phaseOf: shown({}),
+    closeoutOf: () => undefined,
+    askedCloseout: asked,
+    verdictOf: () => undefined,
+    asks: [],
+    roundAsks: [],
+    answers: [],
+    waits: [],
+    saidTo: () => 0,
+    spendOf: () => undefined,
     slot,
-  );
+  });
   assert.deepEqual([cancelled.steps[0].status, cancelled.slot], ['waiting', undefined]);
-  const waits = listing(
-    STEPS,
-    run({ implement: null, review: null }, { after: ['a-1x2y'] }),
-    shown({}),
-    () => undefined,
-    asked,
-    () => undefined,
-    [],
-    [],
-    [],
-    [{ run: 'a-1x2y' }],
-    () => 0,
-    () => undefined,
+  const waits = listing({
+    steps: STEPS,
+    run: run({ implement: null, review: null }, { after: ['a-1x2y'] }),
+    phaseOf: shown({}),
+    closeoutOf: () => undefined,
+    askedCloseout: asked,
+    verdictOf: () => undefined,
+    asks: [],
+    roundAsks: [],
+    answers: [],
+    waits: [{ run: 'a-1x2y' }],
+    saidTo: () => 0,
+    spendOf: () => undefined,
     slot,
-  );
+  });
   assert.deepEqual([waits.steps[0].status, waits.slot], ['waiting on a-1x2y', undefined]);
 });
 
@@ -1171,13 +1174,23 @@ const statuses = (l: ReturnType<typeof listing>) => l.steps.map((s) => s.status)
 const SETTLED = shown({ t1: 'succeeded', t2: 'succeeded' });
 
 test('a step that signed off says how, next to the phase', () => {
-  const l = listing(STEPS, finished(), SETTLED, signedOff({ implement: said('done'), review: said('done') }));
+  const l = listing({
+    steps: STEPS,
+    run: finished(),
+    phaseOf: SETTLED,
+    closeoutOf: signedOff({ implement: said('done'), review: said('done') }),
+  });
   assert.deepEqual(statuses(l), ['unverified · done', 'unverified · done']);
   assert.deepEqual(l.waitingOnYou, []);
 });
 
 test('BLOCKED stands out — its session succeeded, and it is the step waiting on you', () => {
-  const l = listing(STEPS, finished(), SETTLED, signedOff({ implement: said('done'), review: said('blocked') }));
+  const l = listing({
+    steps: STEPS,
+    run: finished(),
+    phaseOf: SETTLED,
+    closeoutOf: signedOff({ implement: said('done'), review: said('blocked') }),
+  });
   assert.deepEqual(
     statuses(l),
     ['unverified · done', 'succeeded · BLOCKED'],
@@ -1187,7 +1200,12 @@ test('BLOCKED stands out — its session succeeded, and it is the step waiting o
 });
 
 test('a step with no closeout is credited with nothing — still running, never filed, or from before closeouts', () => {
-  const live = listing(STEPS, run({ implement: 't1', review: null }), shown({ t1: 'running (working)' }), signedOff({}));
+  const live = listing({
+    steps: STEPS,
+    run: run({ implement: 't1', review: null }),
+    phaseOf: shown({ t1: 'running (working)' }),
+    closeoutOf: signedOff({}),
+  });
   assert.deepEqual(
     live.steps,
     [
@@ -1197,7 +1215,7 @@ test('a step with no closeout is credited with nothing — still running, never 
     'still running, and never filed',
   );
 
-  const old = listing(STEPS, finished(), shown({ t1: 'succeeded', t2: 'failed' }), signedOff({}));
+  const old = listing({ steps: STEPS, run: finished(), phaseOf: shown({ t1: 'succeeded', t2: 'failed' }), closeoutOf: signedOff({}) });
   assert.deepEqual(
     old.steps,
     [
@@ -1210,7 +1228,12 @@ test('a step with no closeout is credited with nothing — still running, never 
 });
 
 test('one line per step — the summary and what it needs are for `wf decide`', () => {
-  const l = listing(STEPS, finished(), SETTLED, signedOff({ implement: said('done'), review: said('blocked') }));
+  const l = listing({
+    steps: STEPS,
+    run: finished(),
+    phaseOf: SETTLED,
+    closeoutOf: signedOff({ implement: said('done'), review: said('blocked') }),
+  });
   for (const status of statuses(l)) {
     assert.doesNotMatch(status, /\n/);
     assert.doesNotMatch(status, /parser|flag name/);
@@ -1218,28 +1241,38 @@ test('one line per step — the summary and what it needs are for `wf decide`', 
 });
 
 test('a closeout nobody can read is said so, and is not taken for either answer', () => {
-  const l = listing(STEPS, finished(), SETTLED, signedOff({ implement: { error: 'not an object' } }));
+  const l = listing({ steps: STEPS, run: finished(), phaseOf: SETTLED, closeoutOf: signedOff({ implement: { error: 'not an object' } }) });
   assert.deepEqual(statuses(l), ['unverified · closeout unreadable', 'unverified']);
   assert.deepEqual(l.waitingOnYou, []);
 });
 
 test('a cancelled run is waiting on nobody, though its step still says it signed off blocked', () => {
-  const l = listing(STEPS, finished(CANCELLED), shown({ t1: 'succeeded', t2: 'stopped' }), signedOff({ implement: said('blocked') }));
+  const l = listing({
+    steps: STEPS,
+    run: finished(CANCELLED),
+    phaseOf: shown({ t1: 'succeeded', t2: 'stopped' }),
+    closeoutOf: signedOff({ implement: said('blocked') }),
+  });
   assert.deepEqual(statuses(l), ['succeeded · BLOCKED', 'stopped']);
   assert.deepEqual(l.waitingOnYou, [], '`wf decide` has nothing to decide for it');
 });
 
 test("a task held open that waits for a word — the engine's `input-required` — is read as it signed: blocked waits on you, a gated one is at its gate, and the word is still the engine's", () => {
   const waiting = shown({ t1: 'input-required', t2: 'input-required' });
-  const blocked = listing(STEPS, finished(), waiting, signedOff({ implement: said('done'), review: said('blocked') }));
+  const blocked = listing({
+    steps: STEPS,
+    run: finished(),
+    phaseOf: waiting,
+    closeoutOf: signedOff({ implement: said('done'), review: said('blocked') }),
+  });
   assert.deepEqual(statuses(blocked), ['unverified · done', 'input-required · BLOCKED']);
   assert.deepEqual(blocked.waitingOnYou, ['review']);
-  const gated = listing(
-    [step('implement'), { ...step('review', ['implement']), gate: true }],
-    finished(),
-    waiting,
-    signedOff({ implement: said('done'), review: said('done') }),
-  );
+  const gated = listing({
+    steps: [step('implement'), { ...step('review', ['implement']), gate: true }],
+    run: finished(),
+    phaseOf: waiting,
+    closeoutOf: signedOff({ implement: said('done'), review: said('done') }),
+  });
   assert.deepEqual(statuses(gated), ['unverified · done', 'awaiting approval']);
   assert.deepEqual(gated.waitingOnYou, ['review']);
 });
@@ -1351,12 +1384,18 @@ test('UNSIGNED, though the engine settles it `failed`: a session that went quiet
     });
   const quietly = decision(STEPS, r, failed, nothingShipped, none, quiet);
   assert.deepEqual(quietly.kind === 'awaiting' && [quietly.outcome, quietly.unsigned, quietly.failed], ['blocked', ['implement'], []]);
-  assert.deepEqual(listing(STEPS, r, shown({ t1: 'failed' }), none, quiet).waitingOnYou, ['implement']);
+  assert.deepEqual(
+    listing({ steps: STEPS, run: r, phaseOf: shown({ t1: 'failed' }), closeoutOf: none, askedCloseout: quiet }).waitingOnYou,
+    ['implement'],
+  );
   assert.match(brief(quiet), /The last try ended without the closeout the run asked for/);
 
   const broke = decision(STEPS, r, failed, nothingShipped, none, asked);
   assert.deepEqual(broke.kind === 'awaiting' && [broke.outcome, broke.unsigned, broke.failed], ['failed', [], ['implement']]);
-  assert.deepEqual(listing(STEPS, r, shown({ t1: 'failed' }), none, asked).waitingOnYou, []);
+  assert.deepEqual(
+    listing({ steps: STEPS, run: r, phaseOf: shown({ t1: 'failed' }), closeoutOf: none, askedCloseout: asked }).waitingOnYou,
+    [],
+  );
   assert.match(brief(asked), /session ended `failed` before it signed off/);
 });
 
@@ -1403,12 +1442,18 @@ test("UNSIGNED is the LAST attempt's word: a task journalled before stage 4a par
   assert.equal(stepStatus(STEPS[0], r, failed, none, lostLast), 'failed');
   const broke = decision(STEPS, r, failed, nothingShipped, none, lostLast);
   assert.deepEqual(broke.kind === 'awaiting' && [broke.outcome, broke.unsigned, broke.failed], ['failed', [], ['implement']]);
-  assert.deepEqual(listing(STEPS, r, shown({ t1: 'failed' }), none, lostLast).waitingOnYou, []);
+  assert.deepEqual(
+    listing({ steps: STEPS, run: r, phaseOf: shown({ t1: 'failed' }), closeoutOf: none, askedCloseout: lostLast }).waitingOnYou,
+    [],
+  );
 
   const quietLast = closeoutAsked(viewed('lost', 'unsigned'));
   assert.equal(quietLast('t1'), 'unsigned');
   assert.equal(stepStatus(STEPS[0], r, failed, none, quietLast), 'unsigned');
-  assert.deepEqual(listing(STEPS, r, shown({ t1: 'failed' }), none, quietLast).waitingOnYou, ['implement']);
+  assert.deepEqual(
+    listing({ steps: STEPS, run: r, phaseOf: shown({ t1: 'failed' }), closeoutOf: none, askedCloseout: quietLast }).waitingOnYou,
+    ['implement'],
+  );
   assert.equal(closeoutAsked(viewed('unsigned', 'unsigned'))('t1'), 'unsigned', 'quiet twice is quiet');
 });
 
@@ -1452,7 +1497,11 @@ test("UNSIGNED off what the runtime reports since stage 4a: a last attempt its h
   const quiet = viewed('succeeded', [unstated]);
   assert.equal(closeoutAsked(quiet)('t1'), 'unsigned');
   assert.equal(stepStatus(STEPS[0], r, phases({ t1: 'succeeded' }), none, closeoutAsked(quiet)), 'unsigned');
-  assert.deepEqual(listing(STEPS, r, shown({ t1: 'succeeded' }), none, closeoutAsked(quiet)).waitingOnYou, ['implement']);
+  assert.deepEqual(
+    listing({ steps: STEPS, run: r, phaseOf: shown({ t1: 'succeeded' }), closeoutOf: none, askedCloseout: closeoutAsked(quiet) })
+      .waitingOnYou,
+    ['implement'],
+  );
   assert.equal(
     closeoutAsked(viewed('succeeded', [{ ended: 'failed', reason: 'lost' }, unstated]))('t1'),
     'unsigned',
@@ -1691,16 +1740,27 @@ test('`wf ls` says what the run established, not only what the engine settled', 
     t4: 'succeeded',
     t5: 'succeeded',
   });
-  const l = listing(five, r, words, signedOff({ a: said('done'), b: said('done'), c: said('done'), d: said('done') }), asked, (name) =>
-    name === 'c' ? 1 : undefined,
-  );
+  const l = listing({
+    steps: five,
+    run: r,
+    phaseOf: words,
+    closeoutOf: signedOff({ a: said('done'), b: said('done'), c: said('done'), d: said('done') }),
+    askedCloseout: asked,
+    verdictOf: (name) => (name === 'c' ? 1 : undefined),
+  });
 
   assert.deepEqual(statuses(l), ['verified ✓', 'checking', 'failed ✗ check (exit 1)', 'unverified · done', 'unsigned']);
   assert.deepEqual(l.waitingOnYou, ['c', 'e'], 'the check that refused and the step that never signed');
 });
 
 test('a check stopped before it printed its exit code reads unfinished, never a number', () => {
-  const l = listing(CHECKED, withCheck('c1'), shown({ t1: 'succeeded', c1: 'failed' }), signedOff({ implement: said('done') }), asked);
+  const l = listing({
+    steps: CHECKED,
+    run: withCheck('c1'),
+    phaseOf: shown({ t1: 'succeeded', c1: 'failed' }),
+    closeoutOf: signedOff({ implement: said('done') }),
+    askedCloseout: asked,
+  });
   assert.deepEqual(statuses(l), ['failed ✗ check (unfinished)', 'waiting']);
 });
 
@@ -1749,7 +1809,14 @@ test("a check that refused, with `retries:` left, is due another try — a nudge
   assert.deepEqual(a.retry, [{ step: 'implement', try: 2, mode: 'nudge', by: 'retries' }]);
   assert.deepEqual([a.ready, a.blocked, a.status], [[], [], 'running'], 'what waits on it waits; nothing is final yet');
 
-  const l = listing(RETRIED, onTry(), shown({ t1: 'succeeded', c1: 'failed' }), signedOff({ implement: said('done') }), asked, () => 1);
+  const l = listing({
+    steps: RETRIED,
+    run: onTry(),
+    phaseOf: shown({ t1: 'succeeded', c1: 'failed' }),
+    closeoutOf: signedOff({ implement: said('done') }),
+    askedCloseout: asked,
+    verdictOf: () => 1,
+  });
   assert.deepEqual(l.steps[0], {
     name: 'implement',
     status: 'failed ✗ check (exit 1)',
@@ -1773,8 +1840,14 @@ test('REFUSED past `retries:`: no try is due, and the step waits on you as it di
   const a = assess(RETRIED, onTry(SPENT), p, signedDone, asked, () => 1);
   assert.deepEqual([a.retry, a.blocked, a.status], [[], ['review'], 'failed']);
   assert.deepEqual(
-    listing(RETRIED, onTry(SPENT), shown({ t1: 'succeeded', c1: 'failed' }), signedOff({ implement: said('done') }), asked, () => 1)
-      .waitingOnYou,
+    listing({
+      steps: RETRIED,
+      run: onTry(SPENT),
+      phaseOf: shown({ t1: 'succeeded', c1: 'failed' }),
+      closeoutOf: signedOff({ implement: said('done') }),
+      askedCloseout: asked,
+      verdictOf: () => 1,
+    }).waitingOnYou,
     ['implement'],
   );
   assert.deepEqual(assess(CHECKED, withCheck('c1'), p, signedDone, asked, () => 1).retry, [], 'nor at all, with no `retries:`');
@@ -1804,8 +1877,14 @@ test('a check that did not finish is no refusal: `retries:` spends nothing on it
     const a = assess(RETRIED, onTry(), p, signedDone, asked, () => verdict);
     assert.deepEqual([a.retry, a.blocked, a.status], [[], ['review'], 'failed'], why);
     assert.deepEqual(
-      listing(RETRIED, onTry(), shown({ t1: 'succeeded', c1: phase }), signedOff({ implement: said('done') }), asked, () => verdict)
-        .waitingOnYou,
+      listing({
+        steps: RETRIED,
+        run: onTry(),
+        phaseOf: shown({ t1: 'succeeded', c1: phase }),
+        closeoutOf: signedOff({ implement: said('done') }),
+        askedCloseout: asked,
+        verdictOf: () => verdict,
+      }).waitingOnYou,
       ['implement'],
       why,
     );
@@ -1850,15 +1929,15 @@ test("a person's ask is due for the step's next try only, once: an ask for a try
   assert.deepEqual(assess(RETRIED, onTry(), p, signedDone, asked, () => undefined, [askFor(2, 'recheck')]).retry, [
     { step: 'implement', try: 2, mode: 'recheck', by: 'ask' },
   ]);
-  const l = listing(
-    RETRIED,
-    onTry(),
-    shown({ t1: 'succeeded', c1: 'stopped' }),
-    signedOff({ implement: said('done') }),
-    asked,
-    () => 'unfinished',
-    [askFor(2, 'fresh', 'opus')],
-  );
+  const l = listing({
+    steps: RETRIED,
+    run: onTry(),
+    phaseOf: shown({ t1: 'succeeded', c1: 'stopped' }),
+    closeoutOf: signedOff({ implement: said('done') }),
+    askedCloseout: asked,
+    verdictOf: () => 'unfinished',
+    asks: [askFor(2, 'fresh', 'opus')],
+  });
   assert.deepEqual([l.steps[0].note, l.waitingOnYou], ['try 2 asked (--model opus) — the next tick files it', []]);
 
   const honoured = onTry([{ taskId: 't1', check: { taskId: 'c1' }, then: 'recheck' }], 'c2');
@@ -1926,14 +2005,20 @@ test("the current try decides the step: try 2 verified files what waits on it, a
     assess(RETRIED, r, phases({ t0: 'succeeded', c0: 'failed', t1: 'succeeded', c1: 'succeeded' }), signedDone, asked, () => 0).ready,
     ['review'],
   );
-  const l = listing(RETRIED, r, shown({ t1: 'succeeded', c1: 'succeeded' }), signedOff({ implement: said('done') }), asked);
+  const l = listing({
+    steps: RETRIED,
+    run: r,
+    phaseOf: shown({ t1: 'succeeded', c1: 'succeeded' }),
+    closeoutOf: signedOff({ implement: said('done') }),
+    askedCloseout: asked,
+  });
   assert.deepEqual(l.steps[0], { name: 'implement', status: 'verified ✓', branch: null, note: 'try 2, by retries: 2' });
   assert.equal(
     tryNote(RETRIED[0], { taskId: 't', tries: [{ taskId: 'a', then: 'fresh', model: 'opus' }] }),
     'try 2, fresh on opus, on your word',
   );
   assert.deepEqual(
-    listing(STEPS, finished(), SETTLED, signedOff({})).steps.map((s) => 'note' in s),
+    listing({ steps: STEPS, run: finished(), phaseOf: SETTLED, closeoutOf: signedOff({}) }).steps.map((s) => 'note' in s),
     [false, false],
     'a first try has no note at all',
   );
@@ -2061,7 +2146,15 @@ test("REFUSED before, now accepted: a step whose session its harness blocked, wi
     { kind: 'running', waiting: ['implement'] },
     'live and due, named once',
   );
-  const l = listing(STEPS, r, shown({ t1: 'needs-human' }), signedOff({}), asked, () => undefined, [askFor(2)]);
+  const l = listing({
+    steps: STEPS,
+    run: r,
+    phaseOf: shown({ t1: 'needs-human' }),
+    closeoutOf: signedOff({}),
+    askedCloseout: asked,
+    verdictOf: () => undefined,
+    asks: [askFor(2)],
+  });
   assert.deepEqual(
     [l.steps[0], l.waitingOnYou],
     [
@@ -2075,7 +2168,15 @@ test("REFUSED before, now accepted: a step whose session its harness blocked, wi
     ],
   );
   assert.equal(
-    listing(STEPS, r, shown({ t1: 'running (working)' }), signedOff({}), asked, () => undefined, [askFor(2)]).steps[0].note,
+    listing({
+      steps: STEPS,
+      run: r,
+      phaseOf: shown({ t1: 'running (working)' }),
+      closeoutOf: signedOff({}),
+      askedCloseout: asked,
+      verdictOf: () => undefined,
+      asks: [askFor(2)],
+    }).steps[0].note,
     'try 2 asked (--nudge) — stopping its session, then the tick files it',
     'a session working again: stopped first, and said so',
   );
@@ -2086,7 +2187,15 @@ test("REFUSED before, now accepted: a step whose session its harness blocked, wi
     "once the session has settled, the same ask is due as any stopped step's, and filed",
   );
   assert.equal(
-    listing(STEPS, r, shown({ t1: 'stopped' }), signedOff({}), asked, () => undefined, [askFor(2)]).steps[0].note,
+    listing({
+      steps: STEPS,
+      run: r,
+      phaseOf: shown({ t1: 'stopped' }),
+      closeoutOf: signedOff({}),
+      askedCloseout: asked,
+      verdictOf: () => undefined,
+      asks: [askFor(2)],
+    }).steps[0].note,
     'try 2 asked (--nudge) — the next tick files it',
   );
 });
@@ -2218,24 +2327,22 @@ test("`wf ls` says what a blocked step's harness waits for, beside the engine's 
   const r = run({ implement: 't1', review: null });
   const waiting = (id: string) => (id === 't1' ? 'permission prompt' : undefined);
   const lsWith = (phase: string, waitingOf: (id: string) => string | undefined) =>
-    listing(
-      STEPS,
-      r,
-      shown({ t1: phase }),
-      signedOff({}),
-      asked,
-      () => undefined,
-      [],
-      [],
-      [],
-      [],
-      () => 0,
-      () => undefined,
-      undefined,
-      [],
-      undefined,
+    listing({
+      steps: STEPS,
+      run: r,
+      phaseOf: shown({ t1: phase }),
+      closeoutOf: signedOff({}),
+      askedCloseout: asked,
+      verdictOf: () => undefined,
+      asks: [],
+      roundAsks: [],
+      answers: [],
+      waits: [],
+      saidTo: () => 0,
+      spendOf: () => undefined,
+      standings: [],
       waitingOf,
-    ).steps[0];
+    }).steps[0];
 
   const blocked = lsWith('needs-human', waiting);
   assert.deepEqual([blocked.status, blocked.waits], ['needs-human', 'waiting for a permission prompt'], 'the status is the bare word');
@@ -2253,7 +2360,7 @@ test("`wf ls` says what a blocked step's harness waits for, beside the engine's 
     'a harness that says nothing reads as it did before',
   );
   assert.equal(
-    listing(STEPS, r, shown({ t1: 'needs-human' }), signedOff({})).steps[0].status,
+    listing({ steps: STEPS, run: r, phaseOf: shown({ t1: 'needs-human' }), closeoutOf: signedOff({}) }).steps[0].status,
     'needs-human',
     'and so does a caller that asks nothing',
   );
@@ -2268,24 +2375,22 @@ test("`wf ls` says what a blocked step's harness waits for, beside the engine's 
 test("the word beside the phase disturbs nothing judged on it: the blocked step's try is still due, and still stops the session first", () => {
   const r = run({ implement: 't1', review: null });
   const waiting = (id: string) => (id === 't1' ? 'permission prompt' : undefined);
-  const l = listing(
-    STEPS,
-    r,
-    shown({ t1: 'needs-human' }),
-    signedOff({}),
-    asked,
-    () => undefined,
-    [askFor(2)],
-    [],
-    [],
-    [],
-    () => 0,
-    () => undefined,
-    undefined,
-    [],
-    undefined,
-    waiting,
-  );
+  const l = listing({
+    steps: STEPS,
+    run: r,
+    phaseOf: shown({ t1: 'needs-human' }),
+    closeoutOf: signedOff({}),
+    askedCloseout: asked,
+    verdictOf: () => undefined,
+    asks: [askFor(2)],
+    roundAsks: [],
+    answers: [],
+    waits: [],
+    saidTo: () => 0,
+    spendOf: () => undefined,
+    standings: [],
+    waitingOf: waiting,
+  });
   assert.deepEqual(
     l.steps[0],
     {
@@ -2319,25 +2424,23 @@ test("`wf ls` says what a step's current try was denied after its note, never in
   const r = run({ implement: 't1', review: 't2' });
   const denied = (id: string) => (id === 't1' ? ['Skill(look)', 'Bash(pytest)'] : []);
   const ls = (deniedOf?: (id: string) => readonly string[]) =>
-    listing(
-      STEPS,
-      r,
-      shown({ t1: 'succeeded', t2: 'running (working)' }),
-      signedOff({ implement: said('done') }),
-      asked,
-      () => undefined,
-      [],
-      [],
-      [],
-      [],
-      () => 0,
-      () => undefined,
-      undefined,
-      [],
-      undefined,
-      () => undefined,
+    listing({
+      steps: STEPS,
+      run: r,
+      phaseOf: shown({ t1: 'succeeded', t2: 'running (working)' }),
+      closeoutOf: signedOff({ implement: said('done') }),
+      askedCloseout: asked,
+      verdictOf: () => undefined,
+      asks: [],
+      roundAsks: [],
+      answers: [],
+      waits: [],
+      saidTo: () => 0,
+      spendOf: () => undefined,
+      standings: [],
+      waitingOf: () => undefined,
       deniedOf,
-    ).steps;
+    }).steps;
   const [implement, review] = ls(denied);
   assert.deepEqual(
     implement,
@@ -2352,25 +2455,23 @@ test("`wf ls` says what a step's current try was denied after its note, never in
     'a caller that asks nothing reads as one told of none',
   );
   assert.deepEqual([ls()[0].note, ls()[0].denied], [undefined, undefined]);
-  const tried = listing(
-    RETRIED,
-    onTry([{ taskId: 't0', then: 'nudge' }], null),
-    shown({ t1: 'running (working)' }),
-    signedOff({}),
-    asked,
-    () => undefined,
-    [],
-    [],
-    [],
-    [],
-    () => 0,
-    () => undefined,
-    undefined,
-    [],
-    undefined,
-    () => undefined,
-    (id) => (id === 't1' ? ['Bash(npm)'] : ['Skill(look)']),
-  ).steps[0];
+  const tried = listing({
+    steps: RETRIED,
+    run: onTry([{ taskId: 't0', then: 'nudge' }], null),
+    phaseOf: shown({ t1: 'running (working)' }),
+    closeoutOf: signedOff({}),
+    askedCloseout: asked,
+    verdictOf: () => undefined,
+    asks: [],
+    roundAsks: [],
+    answers: [],
+    waits: [],
+    saidTo: () => 0,
+    spendOf: () => undefined,
+    standings: [],
+    waitingOf: () => undefined,
+    deniedOf: (id) => (id === 't1' ? ['Bash(npm)'] : ['Skill(look)']),
+  }).steps[0];
   assert.equal(tried.denied, 'denied: Bash(npm)');
   assert.match(
     shownNote(tried) ?? '',
@@ -2431,15 +2532,15 @@ test("a person's answer rides on the ask to the try it files: due with it, and s
     [{ step: 'implement', try: 2, mode: 'nudge', by: 'ask' }],
     'no message, no key',
   );
-  const l = listing(
-    RETRIED,
-    onTry(),
-    shown({ t1: 'succeeded', c1: 'stopped' }),
-    signedOff({ implement: said('done') }),
-    asked,
-    () => 'unfinished',
-    [answered],
-  );
+  const l = listing({
+    steps: RETRIED,
+    run: onTry(),
+    phaseOf: shown({ t1: 'succeeded', c1: 'stopped' }),
+    closeoutOf: signedOff({ implement: said('done') }),
+    askedCloseout: asked,
+    verdictOf: () => 'unfinished',
+    asks: [answered],
+  });
   assert.equal(l.steps[0].note, 'try 2 asked (--nudge, with your answer) — the next tick files it');
 });
 
@@ -2548,17 +2649,17 @@ test('a try a person answered says so on `wf ls` — read off the ask, never the
   const answer: RetryAsk = { ...askFor(2), message: 'the second reading' };
   assert.equal(answerOf(nudged, 'implement', [askFor(3), answer]), answer);
   const listed = (answers: RetryAsk[] = []) =>
-    listing(
-      RETRIED,
-      nudged,
-      shown({ t1: 'succeeded', c1: 'running' }),
-      signedOff({ implement: said('done') }),
-      asked,
-      () => undefined,
-      [],
-      [],
+    listing({
+      steps: RETRIED,
+      run: nudged,
+      phaseOf: shown({ t1: 'succeeded', c1: 'running' }),
+      closeoutOf: signedOff({ implement: said('done') }),
+      askedCloseout: asked,
+      verdictOf: () => undefined,
+      asks: [],
+      roundAsks: [],
       answers,
-    ).steps[0].note;
+    }).steps[0].note;
   assert.equal(listed([answer]), 'try 2, nudged on your word, answered');
   assert.equal(listed(), 'try 2, nudged on your word', 'no ask read, nothing said');
 
@@ -3054,7 +3155,7 @@ test('`again: true` with rounds left is a round due — implement goes again —
   assert.deepEqual(a.round, [{ step: 'review', target: 'implement', round: 2, by: 'again' }]);
   assert.deepEqual([a.ready, a.blocked, a.retry, a.status], [[], [], [], 'running'], 'ship is not filed on a review that asked for more');
 
-  const l = listing(LOOP, inRound(1), ALL_SUCCEEDED, saidIn(1, true), asked);
+  const l = listing({ steps: LOOP, run: inRound(1), phaseOf: ALL_SUCCEEDED, closeoutOf: saidIn(1, true), askedCloseout: asked });
   assert.deepEqual(l.steps[1], {
     name: 'review',
     status: 'unverified · done',
@@ -3094,7 +3195,7 @@ test('REFUSED at the cap: `again: true` on round 3 of 3 files nothing and reads 
   assert.deepEqual([a.round, a.ready, a.blocked, a.status], [[], [], ['ship'], 'failed'], 'nothing filed, and ship never will be');
   assert.deepEqual(cancelPlan(LOOP, r, ALL_SUCCEEDED, said, asked), { kind: 'finished', status: 'failed' });
 
-  const l = listing(LOOP, r, ALL_SUCCEEDED, said, asked);
+  const l = listing({ steps: LOOP, run: r, phaseOf: ALL_SUCCEEDED, closeoutOf: said, askedCloseout: asked });
   assert.deepEqual(
     l.steps.map((s) => [s.status, s.note]),
     [
@@ -3134,7 +3235,16 @@ test("a person's `wf round` takes an exhausted loop once more, once: an ask for 
   assert.deepEqual(assess(LOOP, inRound(3), ALL_SUCCEEDED, said, asked, none, [], [roundAskFor(4)]).round, [
     { step: 'review', target: 'implement', round: 4, by: 'ask' },
   ]);
-  const l = listing(LOOP, inRound(3), ALL_SUCCEEDED, said, asked, none, [], [roundAskFor(4)]);
+  const l = listing({
+    steps: LOOP,
+    run: inRound(3),
+    phaseOf: ALL_SUCCEEDED,
+    closeoutOf: said,
+    askedCloseout: asked,
+    verdictOf: none,
+    asks: [],
+    roundAsks: [roundAskFor(4)],
+  });
   assert.deepEqual([l.steps[1].note, l.waitingOnYou], ['round 4 asked (wf round) — the next tick files implement', []]);
   assert.deepEqual(
     assess(LOOP, inRound(3), ALL_SUCCEEDED, said, asked, none, [], [roundAskFor(5)]).round,
@@ -3152,7 +3262,9 @@ test("a person's `wf round` takes an exhausted loop once more, once: an ask for 
     'honoured: round 4 is on the record, so the ask is spent and files nothing more',
   );
   assert.deepEqual(
-    listing(LOOP, inRound(4), ALL_SUCCEEDED, saidIn(4, false), asked).steps.map((s) => s.note),
+    listing({ steps: LOOP, run: inRound(4), phaseOf: ALL_SUCCEEDED, closeoutOf: saidIn(4, false), askedCloseout: asked }).steps.map(
+      (s) => s.note,
+    ),
     ['round 4, past rounds: 3, on your word', 'round 4, past rounds: 3, on your word', undefined],
   );
 });
@@ -3182,7 +3294,7 @@ test("a person's `wf accept` ends a loop out of rounds on their word: what waits
   );
   assert.deepEqual(roundsDue(LOOP, r, ALL_SUCCEEDED, said, asked), [], 'and no round is due on the way past');
 
-  const l = listing(LOOP, r, ALL_SUCCEEDED, said, asked);
+  const l = listing({ steps: LOOP, run: r, phaseOf: ALL_SUCCEEDED, closeoutOf: said, askedCloseout: asked });
   assert.deepEqual(
     l.steps.map((s) => [s.status, s.note]),
     [
@@ -3397,7 +3509,13 @@ test("a round moves every step of the loop behind it: the target continued under
     ['test'],
   );
   assert.deepEqual(
-    listing(chain, next, shown({ 'r-1-implement-try2': 'running (working)' }), replied, asked).steps.map((s) => s.note),
+    listing({
+      steps: chain,
+      run: next,
+      phaseOf: shown({ 'r-1-implement-try2': 'running (working)' }),
+      closeoutOf: replied,
+      askedCloseout: asked,
+    }).steps.map((s) => s.note),
     ['round 2 of 3', 'round 2 of 3', 'round 2 of 3'],
   );
 });
@@ -3937,62 +4055,51 @@ test('`wf ls` puts `waiting on <run>` on each root of a waiting run, where `wait
   const fan = [step('a'), step('b'), step('c', ['a', 'b'])];
   const child = run({ a: null, b: null, c: null }, { after: ['p-1'] });
   const waits = [{ run: 'p-1', cancelledAt: '2026-09-14T10:00:00Z' }];
-  const said = listing(
-    fan,
-    child,
-    () => 'unknown',
-    () => undefined,
-    undefined,
-    undefined,
-    [],
-    [],
-    [],
+  const said = listing({
+    steps: fan,
+    run: child,
+    phaseOf: () => 'unknown',
+    closeoutOf: () => undefined,
+    asks: [],
+    roundAsks: [],
+    answers: [],
     waits,
-  );
+  });
   assert.deepEqual(
     said.steps.map((s) => s.status),
     ['waiting on p-1 (cancelled)', 'waiting on p-1 (cancelled)', 'waiting'],
   );
   assert.deepEqual(said.waiting, waits);
   assert.deepEqual(
-    listing(
-      fan,
-      child,
-      () => 'unknown',
-      () => undefined,
-    ).steps.map((s) => s.status),
+    listing({ steps: fan, run: child, phaseOf: () => 'unknown', closeoutOf: () => undefined }).steps.map((s) => s.status),
     ['waiting', 'waiting', 'waiting'],
     'without waits, the words are what they are without --after',
   );
-  const off = listing(
-    fan,
-    { ...child, cancelledAt: '2026-09-14T11:00:00Z' },
-    () => 'unknown',
-    () => undefined,
-    undefined,
-    undefined,
-    [],
-    [],
-    [],
+  const off = listing({
+    steps: fan,
+    run: { ...child, cancelledAt: '2026-09-14T11:00:00Z' },
+    phaseOf: () => 'unknown',
+    closeoutOf: () => undefined,
+    asks: [],
+    roundAsks: [],
+    answers: [],
     waits,
-  );
+  });
   assert.deepEqual(
     [off.steps.map((s) => s.status), off.waiting],
     [['waiting', 'waiting', 'waiting'], []],
     'a run called off says nothing of runs it waited on, whatever it is handed',
   );
-  const going = listing(
-    fan,
-    run({ a: 't1', b: null, c: null }, { after: ['p-1'] }),
-    () => 'running',
-    () => undefined,
-    undefined,
-    undefined,
-    [],
-    [],
-    [],
+  const going = listing({
+    steps: fan,
+    run: run({ a: 't1', b: null, c: null }, { after: ['p-1'] }),
+    phaseOf: () => 'running',
+    closeoutOf: () => undefined,
+    asks: [],
+    roundAsks: [],
+    answers: [],
     waits,
-  );
+  });
   assert.deepEqual(
     [going.steps.map((s) => s.status), going.waiting],
     [['running', 'waiting', 'waiting'], []],
@@ -4231,19 +4338,19 @@ test('`saidLines`: each thing said to a step, in order, with its time and try �
 test("`wf ls` notes a step whose current try's session a person told something — `said to 2×` — after the try it is on, and nothing for a step nobody told", () => {
   const word = (m: Record<string, string>) => (id: string) => m[id] ?? 'unknown';
   const rows = (r: Run, words: Record<string, string>, told: Record<string, number>) =>
-    listing(
-      STEPS,
-      r,
-      word(words),
-      () => undefined,
-      () => false,
-      () => undefined,
-      [],
-      [],
-      [],
-      [],
-      (name) => told[name] ?? 0,
-    ).steps;
+    listing({
+      steps: STEPS,
+      run: r,
+      phaseOf: word(words),
+      closeoutOf: () => undefined,
+      askedCloseout: () => false,
+      verdictOf: () => undefined,
+      asks: [],
+      roundAsks: [],
+      answers: [],
+      waits: [],
+      saidTo: (name) => told[name] ?? 0,
+    }).steps;
   const live = run({ implement: 't1', review: null });
   assert.deepEqual(rows(live, { t1: 'running (working)' }, { implement: 2 })[0], {
     name: 'implement',
@@ -4482,7 +4589,15 @@ test("REFUSED before, now honoured: an ask written while the harness blocked a s
     'live and due, named once',
   );
 
-  const l = listing(STEPS, r, shown({ t1: 'running (working)' }), signedOff({}), asked, () => undefined, [askFor(2)]);
+  const l = listing({
+    steps: STEPS,
+    run: r,
+    phaseOf: shown({ t1: 'running (working)' }),
+    closeoutOf: signedOff({}),
+    askedCloseout: asked,
+    verdictOf: () => undefined,
+    asks: [askFor(2)],
+  });
   assert.deepEqual(
     [l.steps[0], l.waitingOnYou],
     [
@@ -4497,7 +4612,15 @@ test("REFUSED before, now honoured: an ask written while the harness blocked a s
     'wf ls says so, in words of its own beside a session that works',
   );
   assert.equal(
-    listing(STEPS, r, shown({ t1: 'needs-human' }), signedOff({}), asked, () => undefined, [askFor(2)]).steps[0].note,
+    listing({
+      steps: STEPS,
+      run: r,
+      phaseOf: shown({ t1: 'needs-human' }),
+      closeoutOf: signedOff({}),
+      askedCloseout: asked,
+      verdictOf: () => undefined,
+      asks: [askFor(2)],
+    }).steps[0].note,
     'try 2 asked (--nudge) — stopping its blocked session, then the tick files it',
     'and in the harness-blocked words beside needs-human',
   );
@@ -4508,7 +4631,15 @@ test("REFUSED before, now honoured: an ask written while the harness blocked a s
     'a task the engine has no record of is stopped for no ask',
   );
   assert.equal(
-    listing(STEPS, r, shown({}), signedOff({}), asked, () => undefined, [askFor(2)]).steps[0].note,
+    listing({
+      steps: STEPS,
+      run: r,
+      phaseOf: shown({}),
+      closeoutOf: signedOff({}),
+      askedCloseout: asked,
+      verdictOf: () => undefined,
+      asks: [askFor(2)],
+    }).steps[0].note,
     undefined,
     'and wf ls says nothing of one',
   );
@@ -5197,20 +5328,20 @@ test("REFUSED past its budget, at shipped defaults: a claude step whose ended tr
     'no tick would file anything',
   );
 
-  const l = listing(
-    BUDGETED,
-    r,
-    shown(REFUSED_TWICE),
-    signedOff({ implement: said('done') }),
-    asked,
-    () => 1,
-    [],
-    [],
-    [],
-    [],
-    () => 0,
-    spent,
-  );
+  const l = listing({
+    steps: BUDGETED,
+    run: r,
+    phaseOf: shown(REFUSED_TWICE),
+    closeoutOf: signedOff({ implement: said('done') }),
+    askedCloseout: asked,
+    verdictOf: () => 1,
+    asks: [],
+    roundAsks: [],
+    answers: [],
+    waits: [],
+    saidTo: () => 0,
+    spendOf: spent,
+  });
   assert.deepEqual(
     [l.steps[0].status, l.steps[0].note, l.waitingOnYou],
     ['over budget $4.25 of $3', 'try 2, by retries: 2', ['implement']],
@@ -5288,20 +5419,20 @@ test("REFUSED past its budget, at shipped defaults: a claude step whose ended tr
       why,
     );
     assert.equal(
-      listing(
-        BUDGETED,
-        r,
-        shown(REFUSED_TWICE),
-        signedOff({ implement: said('done') }),
-        asked,
-        () => 1,
-        [],
-        [],
-        [],
-        [],
-        () => 0,
-        under,
-      ).steps[0].status,
+      listing({
+        steps: BUDGETED,
+        run: r,
+        phaseOf: shown(REFUSED_TWICE),
+        closeoutOf: signedOff({ implement: said('done') }),
+        askedCloseout: asked,
+        verdictOf: () => 1,
+        asks: [],
+        roundAsks: [],
+        answers: [],
+        waits: [],
+        saidTo: () => 0,
+        spendOf: under,
+      }).steps[0].status,
       'failed ✗ check (exit 1)',
       why,
     );
@@ -5465,20 +5596,20 @@ test("a step its harness ended at its budget reads budget exhausted, with the am
     ended,
   );
   assert.deepEqual([a.retry, a.blocked, a.status], [[], ['review'], 'failed']);
-  const l = listing(
-    DETACHED,
-    r,
-    shown({ t1: 'failed' }),
-    signedOff({}),
-    asked,
-    () => undefined,
-    [],
-    [],
-    [],
-    [],
-    () => 0,
-    ended,
-  );
+  const l = listing({
+    steps: DETACHED,
+    run: r,
+    phaseOf: shown({ t1: 'failed' }),
+    closeoutOf: signedOff({}),
+    askedCloseout: asked,
+    verdictOf: () => undefined,
+    asks: [],
+    roundAsks: [],
+    answers: [],
+    waits: [],
+    saidTo: () => 0,
+    spendOf: ended,
+  });
   assert.deepEqual([l.steps[0].status, l.waitingOnYou], ['budget exhausted $3.02 of $3', ['implement']]);
   const d = decision(
     DETACHED,
@@ -5543,20 +5674,20 @@ test("a step its harness ended at its budget reads budget exhausted, with the am
   );
   assert.equal(refusal({ mode: 'fresh', budget: 5 }, unmeasured), null);
   assert.equal(
-    listing(
-      DETACHED,
-      r,
-      shown({ t1: 'failed' }),
-      signedOff({}),
-      asked,
-      () => undefined,
-      [],
-      [],
-      [],
-      [],
-      () => 0,
-      unmeasured,
-    ).steps[0].status,
+    listing({
+      steps: DETACHED,
+      run: r,
+      phaseOf: shown({ t1: 'failed' }),
+      closeoutOf: signedOff({}),
+      askedCloseout: asked,
+      verdictOf: () => undefined,
+      asks: [],
+      roundAsks: [],
+      answers: [],
+      waits: [],
+      saidTo: () => 0,
+      spendOf: unmeasured,
+    }).steps[0].status,
     'budget exhausted at $3',
   );
 });
@@ -5640,25 +5771,23 @@ test('a step that says `denials: fail` and signed off denied a call reads denied
     denied,
   );
   assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.denied, d.failed, d.unsigned], ['blocked', ['implement'], [], []]);
-  const l = listing(
-    DENYING,
-    r,
-    shown({ t1: 'succeeded' }),
-    signedOff({ implement: signedDone() }),
-    asked,
-    () => undefined,
-    [],
-    [],
-    [],
-    [],
-    () => 0,
-    denied,
-    undefined,
-    [],
-    undefined,
-    () => undefined,
-    (id) => denied(id)?.denied ?? [],
-  );
+  const l = listing({
+    steps: DENYING,
+    run: r,
+    phaseOf: shown({ t1: 'succeeded' }),
+    closeoutOf: signedOff({ implement: signedDone() }),
+    askedCloseout: asked,
+    verdictOf: () => undefined,
+    asks: [],
+    roundAsks: [],
+    answers: [],
+    waits: [],
+    saidTo: () => 0,
+    spendOf: denied,
+    standings: [],
+    waitingOf: () => undefined,
+    deniedOf: (id) => denied(id)?.denied ?? [],
+  });
   assert.deepEqual(
     [l.steps[0].status, l.steps[0].denied, shownNote(l.steps[0]), l.waitingOnYou],
     ['denied', 'denied: Write(/tmp/w/notes.md), Bash(pytest)', 'denied: Write(/tmp/w/notes.md), Bash(pytest)', ['implement']],
@@ -5883,7 +6012,7 @@ test('REFUSED once pruned: a loop out of rounds, or held on a budget, is offered
 
   const r = inRound(3, { pruned });
   const said = saidIn(3, true);
-  const l = listing(LOOP, r, ALL_SUCCEEDED, said, asked);
+  const l = listing({ steps: LOOP, run: r, phaseOf: ALL_SUCCEEDED, closeoutOf: said, askedCloseout: asked });
   assert.deepEqual(
     [l.steps[1].status, l.steps[1].note, l.waitingOnYou],
     ['rounds exhausted', `round 3 of 3, and it asked again — no round more, ${since}`, []],
@@ -5901,20 +6030,20 @@ test('REFUSED once pruned: a loop out of rounds, or held on a budget, is offered
   const held = inRound(1, { pruned });
   const heldSaid = saidIn(1, true);
   const spent = spends({ i1: 4.25, r1: 0.5 });
-  const hl = listing(
-    BUDGETED_LOOP,
-    held,
-    ALL_SUCCEEDED,
-    heldSaid,
-    asked,
-    () => 0,
-    [],
-    [],
-    [],
-    [],
-    () => 0,
-    spent,
-  );
+  const hl = listing({
+    steps: BUDGETED_LOOP,
+    run: held,
+    phaseOf: ALL_SUCCEEDED,
+    closeoutOf: heldSaid,
+    askedCloseout: asked,
+    verdictOf: () => 0,
+    asks: [],
+    roundAsks: [],
+    answers: [],
+    waits: [],
+    saidTo: () => 0,
+    spendOf: spent,
+  });
   assert.deepEqual([hl.steps[1].note, hl.waitingOnYou], [`round 1 of 3, and it asked again, past a budget — no round more, ${since}`, []]);
   assert.doesNotMatch(JSON.stringify(hl), offered);
   const hd = decision(
@@ -5969,20 +6098,20 @@ test('REFUSED past a budget in a loop: `again: true` files no round while a step
     'no round, and ship is not filed on a review that asked for more',
   );
 
-  const l = listing(
-    BUDGETED_LOOP,
-    r,
-    ALL_SUCCEEDED,
-    said,
-    asked,
-    () => 0,
-    [],
-    [],
-    [],
-    [],
-    () => 0,
-    spent,
-  );
+  const l = listing({
+    steps: BUDGETED_LOOP,
+    run: r,
+    phaseOf: ALL_SUCCEEDED,
+    closeoutOf: said,
+    askedCloseout: asked,
+    verdictOf: () => 0,
+    asks: [],
+    roundAsks: [],
+    answers: [],
+    waits: [],
+    saidTo: () => 0,
+    spendOf: spent,
+  });
   assert.deepEqual(
     l.steps.map((s) => [s.status, s.note]),
     [
@@ -6133,20 +6262,20 @@ test('a round asked past a budget holds no step of its loop on the pass before i
       () => false,
       spent,
     );
-    const l = listing(
-      BUDGETED_LOOP,
-      r,
-      ALL_SUCCEEDED,
-      said,
-      asked,
-      () => 0,
-      [],
-      rounds,
-      [],
-      [],
-      () => 0,
-      spent,
-    );
+    const l = listing({
+      steps: BUDGETED_LOOP,
+      run: r,
+      phaseOf: ALL_SUCCEEDED,
+      closeoutOf: said,
+      askedCloseout: asked,
+      verdictOf: () => 0,
+      asks: [],
+      roundAsks: rounds,
+      answers: [],
+      waits: [],
+      saidTo: () => 0,
+      spendOf: spent,
+    });
     const d = decision(
       BUDGETED_LOOP,
       r,
@@ -6254,20 +6383,20 @@ test('at the cap and past a budget: the loop reads rounds exhausted, and its onc
     'review: enough — go on with what is there; its findings stay on the record, and ship is filed and handed them with your words:  wf accept r-1 review --message "<why>"',
   ]);
   assert.equal(
-    listing(
-      BUDGETED_LOOP,
-      r,
-      ALL_SUCCEEDED,
-      said,
-      asked,
-      () => 0,
-      [],
-      [],
-      [],
-      [],
-      () => 0,
-      spent,
-    ).steps[1].note,
+    listing({
+      steps: BUDGETED_LOOP,
+      run: r,
+      phaseOf: ALL_SUCCEEDED,
+      closeoutOf: said,
+      askedCloseout: asked,
+      verdictOf: () => 0,
+      asks: [],
+      roundAsks: [],
+      answers: [],
+      waits: [],
+      saidTo: () => 0,
+      spendOf: spent,
+    }).steps[1].note,
     'round 3 of 3, and it asked again — once more: wf round r-1 review --budget <amount>',
   );
   assert.match(
@@ -6320,20 +6449,20 @@ test("an accepted loop is over nobody's budget: no step of it is held, since no 
     ['verified', 'unverified', 'waiting'],
     'accepted, a loop nobody will file again is over no budget; without the acceptance it reads exhausted, held past $3',
   );
-  const l = listing(
-    BUDGETED_LOOP,
-    r,
-    ALL_SUCCEEDED,
-    said,
-    asked,
-    () => 0,
-    [],
-    [],
-    [],
-    [],
-    () => 0,
-    spent,
-  );
+  const l = listing({
+    steps: BUDGETED_LOOP,
+    run: r,
+    phaseOf: ALL_SUCCEEDED,
+    closeoutOf: said,
+    askedCloseout: asked,
+    verdictOf: () => 0,
+    asks: [],
+    roundAsks: [],
+    answers: [],
+    waits: [],
+    saidTo: () => 0,
+    spendOf: spent,
+  });
   assert.deepEqual([l.steps.map((s) => s.status), l.waitingOnYou], [['verified ✓', 'unverified · done', 'waiting'], []]);
   assert.deepEqual(
     assess(
@@ -6391,20 +6520,20 @@ test('a step that signed off blocked past its budget reads blocked while its ses
 test("`wf ls`' words: each step's tries' cost beside its word once one was measured — `≥` where an ended attempt has none — and the run's; a step at its budget says it in its word, and nothing beside it", () => {
   const p = shown(REFUSED_TWICE);
   const done = signedOff({ implement: said('done') });
-  const l = listing(
-    BUDGETED,
-    refusedTwice(),
-    p,
-    done,
-    asked,
-    () => 1,
-    [],
-    [],
-    [],
-    [],
-    () => 0,
-    spends({ t0: 1, t1: 1.25 }),
-  );
+  const l = listing({
+    steps: BUDGETED,
+    run: refusedTwice(),
+    phaseOf: p,
+    closeoutOf: done,
+    askedCloseout: asked,
+    verdictOf: () => 1,
+    asks: [],
+    roundAsks: [],
+    answers: [],
+    waits: [],
+    saidTo: () => 0,
+    spendOf: spends({ t0: 1, t1: 1.25 }),
+  });
   assert.deepEqual(
     [l.steps[0], l.steps[1], l.cost],
     [
@@ -6419,54 +6548,54 @@ test("`wf ls`' words: each step's tries' cost beside its word once one was measu
       : id === 't1'
         ? { usd: 0, measured: 0, unmeasured: 1, budgetEnded: false }
         : undefined;
-  const part = listing(
-    BUDGETED,
-    refusedTwice(),
-    p,
-    done,
-    asked,
-    () => 1,
-    [],
-    [],
-    [],
-    [],
-    () => 0,
-    partly,
-  );
+  const part = listing({
+    steps: BUDGETED,
+    run: refusedTwice(),
+    phaseOf: p,
+    closeoutOf: done,
+    askedCloseout: asked,
+    verdictOf: () => 1,
+    asks: [],
+    roundAsks: [],
+    answers: [],
+    waits: [],
+    saidTo: () => 0,
+    spendOf: partly,
+  });
   assert.deepEqual([part.steps[0].cost, part.cost], ['≥$1.00', '≥$1.00'], 'a part never reads as the whole');
-  const over = listing(
-    BUDGETED,
-    refusedTwice(),
-    p,
-    done,
-    asked,
-    () => 1,
-    [],
-    [],
-    [],
-    [],
-    () => 0,
-    spends({ t0: 1.75, t1: 2.5 }),
-  );
+  const over = listing({
+    steps: BUDGETED,
+    run: refusedTwice(),
+    phaseOf: p,
+    closeoutOf: done,
+    askedCloseout: asked,
+    verdictOf: () => 1,
+    asks: [],
+    roundAsks: [],
+    answers: [],
+    waits: [],
+    saidTo: () => 0,
+    spendOf: spends({ t0: 1.75, t1: 2.5 }),
+  });
   assert.deepEqual(
     [over.steps[0], over.cost],
     [{ name: 'implement', status: 'over budget $4.25 of $3', branch: null, note: 'try 2, by retries: 2' }, '$4.25'],
   );
   for (const none of [() => undefined, spends({}, [])] as SpendOf[]) {
-    const bare = listing(
-      BUDGETED,
-      refusedTwice(),
-      p,
-      done,
-      asked,
-      () => 1,
-      [],
-      [],
-      [],
-      [],
-      () => 0,
-      none,
-    );
+    const bare = listing({
+      steps: BUDGETED,
+      run: refusedTwice(),
+      phaseOf: p,
+      closeoutOf: done,
+      askedCloseout: asked,
+      verdictOf: () => 1,
+      asks: [],
+      roundAsks: [],
+      answers: [],
+      waits: [],
+      saidTo: () => 0,
+      spendOf: none,
+    });
     assert.deepEqual(
       ['cost' in bare, bare.steps.map((s) => 'cost' in s)],
       [false, [false, false]],
@@ -6609,7 +6738,20 @@ test('REFUSED as a verdict past a budget: a step whose check did not finish read
       ],
       why,
     );
-    const l = listing(BUDGETED, r, shown(m), signedOff({ implement: said('done') }), asked, v, [], [], [], [], () => 0, spent);
+    const l = listing({
+      steps: BUDGETED,
+      run: r,
+      phaseOf: shown(m),
+      closeoutOf: signedOff({ implement: said('done') }),
+      askedCloseout: asked,
+      verdictOf: v,
+      asks: [],
+      roundAsks: [],
+      answers: [],
+      waits: [],
+      saidTo: () => 0,
+      spendOf: spent,
+    });
     assert.deepEqual([l.steps[0].status, l.steps[0].cost, l.waitingOnYou], ['failed ✗ check (unfinished)', '$4.25', ['implement']], why);
 
     const refusal = (how: RetryHow) => retryRefusal(BUDGETED, r, 'implement', how, p, signedDone, asked, v, [], () => false, spent);
@@ -7312,7 +7454,7 @@ test("a gated looping step is held when it hands on (`again: false`), and not wh
 
 test('`wf ls` at a gate: the step reads `awaiting approval`, with the two commands a person has beside it, and is waiting on you — named `approve plan`; approved, it reads its own word again and waits on nobody', () => {
   const shownAs = (p: Record<string, TaskPhase>) => (id: string) => p[id] ?? 'unknown';
-  const l = listing(PLANNED, atPlan(), shownAs({ t1: 'succeeded' }), signedDone, asked);
+  const l = listing({ steps: PLANNED, run: atPlan(), phaseOf: shownAs({ t1: 'succeeded' }), closeoutOf: signedDone, askedCloseout: asked });
   assert.deepEqual(l.steps[0], {
     name: 'plan',
     status: 'awaiting approval',
@@ -7326,9 +7468,21 @@ test('`wf ls` at a gate: the step reads `awaiting approval`, with the two comman
     'any other step by its name',
   );
 
-  const approved = listing(PLANNED, atPlan({ approvals: [approval('plan', 1)] }), shownAs({ t1: 'succeeded' }), signedDone, asked);
+  const approved = listing({
+    steps: PLANNED,
+    run: atPlan({ approvals: [approval('plan', 1)] }),
+    phaseOf: shownAs({ t1: 'succeeded' }),
+    closeoutOf: signedDone,
+    askedCloseout: asked,
+  });
   assert.deepEqual([approved.steps[0].status, approved.steps[0].note, approved.waitingOnYou], ['unverified · done', undefined, []]);
-  const cancelled = listing(PLANNED, atPlan(CANCELLED), shownAs({ t1: 'succeeded' }), signedDone, asked);
+  const cancelled = listing({
+    steps: PLANNED,
+    run: atPlan(CANCELLED),
+    phaseOf: shownAs({ t1: 'succeeded' }),
+    closeoutOf: signedDone,
+    askedCloseout: asked,
+  });
   assert.deepEqual(cancelled.waitingOnYou, [], 'a run called off waits on nobody');
 });
 
@@ -7747,15 +7901,15 @@ test("REFUSED at a gate, pass after pass: a wordless ask for the next try — as
     [['plan', 'store it first']],
     'with words, it is a send-back, and due',
   );
-  const l = listing(
-    PLANNED,
-    atPlan(),
-    (id) => (id === 't1' ? 'succeeded' : 'unknown'),
-    signedDone,
-    asked,
-    () => undefined,
-    [wordless],
-  );
+  const l = listing({
+    steps: PLANNED,
+    run: atPlan(),
+    phaseOf: (id) => (id === 't1' ? 'succeeded' : 'unknown'),
+    closeoutOf: signedDone,
+    askedCloseout: asked,
+    verdictOf: () => undefined,
+    asks: [wordless],
+  });
   assert.deepEqual([l.steps[0].status, l.waitingOnYou], ['awaiting approval', ['plan']]);
   assert.match(l.steps[0].note ?? '', /^approve it: wf approve r-1 plan/, 'no try said to be due');
 
@@ -7983,7 +8137,13 @@ test('REFUSED: a try of the ending step itself, which has not run — it names t
 
 test("`wf ls` at an ending step's gate: the step reads `awaiting approval` unfiled, with the approval and the send-back to the work beside it, and the run's line says what is to be decided", () => {
   const shownAs = (p: Record<string, TaskPhase>) => (id: string) => p[id] ?? 'unknown';
-  const l = listing(ENDS, atEnd(), shownAs({ t1: 'succeeded', t2: 'succeeded' }), signedDone, asked);
+  const l = listing({
+    steps: ENDS,
+    run: atEnd(),
+    phaseOf: shownAs({ t1: 'succeeded', t2: 'succeeded' }),
+    closeoutOf: signedDone,
+    askedCloseout: asked,
+  });
   assert.deepEqual(l.steps[2], {
     name: 'ship',
     status: 'awaiting approval',
@@ -8005,7 +8165,13 @@ test("`wf ls` at an ending step's gate: the step reads `awaiting approval` unfil
     steps: { ship: { taskId: 't3', workspace: '/repo', branch: 'main' } },
     approvals: [approval('ship', 1, 'merge it')],
   });
-  const after = listing(ENDS, ran, shownAs({ t1: 'succeeded', t2: 'succeeded', t3: 'succeeded' }), signedDone, asked);
+  const after = listing({
+    steps: ENDS,
+    run: ran,
+    phaseOf: shownAs({ t1: 'succeeded', t2: 'succeeded', t3: 'succeeded' }),
+    closeoutOf: signedDone,
+    askedCloseout: asked,
+  });
   assert.deepEqual(
     [after.steps[2].status, after.waitingOnYou, after.toDecide],
     ['unverified · done', [], undefined],
@@ -8080,22 +8246,21 @@ test("an ending's gate whose result git already has is nothing to decide: `to de
     ON,
   );
   assert.deepEqual([onBase.ready, onBase.toDecide], [[], undefined], 'nothing filed, and nothing to decide');
-  const l = listing(
-    ENDS,
-    atEnd(),
-    DONE,
-    signedDone,
-    asked,
-    () => undefined,
-    [],
-    [],
-    [],
-    [],
-    () => 0,
-    () => undefined,
-    undefined,
-    ON,
-  );
+  const l = listing({
+    steps: ENDS,
+    run: atEnd(),
+    phaseOf: DONE,
+    closeoutOf: signedDone,
+    askedCloseout: asked,
+    verdictOf: () => undefined,
+    asks: [],
+    roundAsks: [],
+    answers: [],
+    waits: [],
+    saidTo: () => 0,
+    spendOf: () => undefined,
+    standings: ON,
+  });
   assert.deepEqual([l.toDecide, l.waitingOnYou], [undefined, []]);
   assert.equal(
     l.steps[2].note,
@@ -8182,22 +8347,21 @@ test("an ending's gate whose result git already has is nothing to decide: `to de
       said,
     );
     assert.deepEqual(
-      listing(
-        ENDS,
-        atEnd(),
-        DONE,
-        signedDone,
-        asked,
-        () => undefined,
-        [],
-        [],
-        [],
-        [],
-        () => 0,
-        () => undefined,
-        undefined,
+      listing({
+        steps: ENDS,
+        run: atEnd(),
+        phaseOf: DONE,
+        closeoutOf: signedDone,
+        askedCloseout: asked,
+        verdictOf: () => undefined,
+        asks: [],
+        roundAsks: [],
+        answers: [],
+        waits: [],
+        saidTo: () => 0,
+        spendOf: () => undefined,
         standings,
-      ).waitingOnYou,
+      }).waitingOnYou,
       ['ship'],
       said,
     );
@@ -8499,13 +8663,13 @@ test('REFUSED once pruned: a step at its gate is offered no approval and no send
     undefined,
     'its approval is refused, so it is not what is left to decide',
   );
-  const l = listing(
-    ENDS,
-    r,
-    (id) => (({ t1: 'succeeded', t2: 'succeeded' }) as Record<string, TaskPhase>)[id] ?? 'unknown',
-    signedDone,
-    asked,
-  );
+  const l = listing({
+    steps: ENDS,
+    run: r,
+    phaseOf: (id) => (({ t1: 'succeeded', t2: 'succeeded' }) as Record<string, TaskPhase>)[id] ?? 'unknown',
+    closeoutOf: signedDone,
+    askedCloseout: asked,
+  });
   assert.deepEqual(
     [l.steps[2].note, l.waitingOnYou, l.toDecide],
     [
@@ -8546,7 +8710,13 @@ test('a run called off holds no ending gate: nothing files it, so its ending rea
   const off = atEnd({ cancelledAt: '2026-09-17T10:00:00.000Z' });
   assert.equal(stepStatus(SHIP, off, DONE, signedDone, asked, ENDS), 'waiting');
   const shownAs = (p: Record<string, TaskPhase>) => (id: string) => p[id] ?? 'unknown';
-  const l = listing(ENDS, off, shownAs({ t1: 'succeeded', t2: 'succeeded' }), signedDone, asked);
+  const l = listing({
+    steps: ENDS,
+    run: off,
+    phaseOf: shownAs({ t1: 'succeeded', t2: 'succeeded' }),
+    closeoutOf: signedDone,
+    askedCloseout: asked,
+  });
   assert.deepEqual([l.steps[2].status, l.waitingOnYou, l.toDecide], ['waiting', [], undefined]);
 });
 
@@ -8598,7 +8768,13 @@ test("REFUSED while the work goes round again: an ending's gate does not hold on
     String(approvalRefusal(looping, r, 'ship', undefined, DONE, said(true), asked)),
     /^ship is not at its gate yet: it ends the run in the repository's own checkout, and its gate holds once review has handed on/,
   );
-  const l = listing(looping, r, (id: string) => (id === 't1' || id === 't2' ? 'succeeded' : 'unknown'), said(true), asked);
+  const l = listing({
+    steps: looping,
+    run: r,
+    phaseOf: (id: string) => (id === 't1' || id === 't2' ? 'succeeded' : 'unknown'),
+    closeoutOf: said(true),
+    askedCloseout: asked,
+  });
   assert.deepEqual([l.steps[2].status, l.waitingOnYou, l.toDecide], ['waiting', [], undefined]);
 
   const handed = assess(
@@ -8665,15 +8841,15 @@ test('REFUSED while a send-back is being filed: an ending held at its gate reads
   );
   assert.deepEqual([a.retry.map((r) => `${r.step} try ${r.try}`), a.status, a.toDecide], [['review try 2'], 'running', undefined]);
   assert.deepEqual(unheld(ENDS, atEnd(), a.retry, a.round), new Set(['ship']));
-  const l = listing(
-    ENDS,
-    atEnd(),
-    (id: string) => (id === 't1' || id === 't2' ? 'succeeded' : 'unknown'),
-    signedDone,
-    asked,
-    () => undefined,
-    [ask],
-  );
+  const l = listing({
+    steps: ENDS,
+    run: atEnd(),
+    phaseOf: (id: string) => (id === 't1' || id === 't2' ? 'succeeded' : 'unknown'),
+    closeoutOf: signedDone,
+    askedCloseout: asked,
+    verdictOf: () => undefined,
+    asks: [ask],
+  });
   assert.deepEqual([l.steps[2].status, l.waitingOnYou, l.toDecide], ['waiting', [], undefined]);
 
   const d = decision(
@@ -8850,7 +9026,11 @@ test("UNSIGNED, the run nudges it ITSELF once a round before it waits on you: th
   );
   const a = assess(STEPS, r, failed, none, unsignedEnd);
   assert.deepEqual([a.retry.map((x) => x.by), a.status], [['signoff'], 'running'], 'the run is moving, and waiting on nobody');
-  assert.deepEqual(listing(STEPS, r, shown({ t1: 'failed' }), none, unsignedEnd).waitingOnYou, [], 'nor does wf ls put it on you');
+  assert.deepEqual(
+    listing({ steps: STEPS, run: r, phaseOf: shown({ t1: 'failed' }), closeoutOf: none, askedCloseout: unsignedEnd }).waitingOnYou,
+    [],
+    'nor does wf ls put it on you',
+  );
   assert.equal(dueNote(STEPS[0], r, due(r)[0]), 'try 2 due — a nudge to sign off, once a round: its session ended without its closeout');
   assert.equal(
     retryRefusal(STEPS, r, 'implement', { mode: 'nudge' }, failed, none, unsignedEnd),
@@ -8869,12 +9049,12 @@ test("UNSIGNED, the run nudges it ITSELF once a round before it waits on you: th
   const again = phases({ t2: 'failed' });
   assert.deepEqual(retriesDue(STEPS, nudged, again, none, unsignedEnd), [], 'never twice in a round');
   assert.deepEqual(
-    listing(STEPS, nudged, shown({ t2: 'failed' }), none, unsignedEnd).waitingOnYou,
+    listing({ steps: STEPS, run: nudged, phaseOf: shown({ t2: 'failed' }), closeoutOf: none, askedCloseout: unsignedEnd }).waitingOnYou,
     ['implement'],
     'the nudge ended unsigned too: the step is yours',
   );
   assert.equal(
-    listing(STEPS, nudged, shown({ t2: 'failed' }), none, unsignedEnd).steps[0].note,
+    listing({ steps: STEPS, run: nudged, phaseOf: shown({ t2: 'failed' }), closeoutOf: none, askedCloseout: unsignedEnd }).steps[0].note,
     'try 2, nudged to sign off by the run',
     'and the run says a nudge was tried',
   );

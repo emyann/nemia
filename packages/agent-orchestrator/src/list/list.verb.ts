@@ -99,26 +99,26 @@ export async function runReading(e: Engine, run: Run, how: ReadingHow = {}): Pro
   const standings = how.standings ? how.standings(assessed.status, steps) : standingsOf(run, git);
   const checkout = how.checkout ? await checkoutHold(e, run, steps) : undefined;
   const parent = how.parent ?? (await parentsOf(e, run, git));
-  const listed = listing(
-    how.shown ?? steps,
+  const listed = listing({
+    steps: how.shown ?? steps,
     run,
-    engineWord(views),
-    (name) => closeoutOf(views, run, name),
-    asked,
+    phaseOf: engineWord(views),
+    closeoutOf: (name) => closeoutOf(views, run, name),
+    askedCloseout: asked,
     verdictOf,
     asks,
-    rounds,
+    roundAsks: rounds,
     answers,
-    waitsOf(run, parent),
-    saidCount(views, run),
+    waits: waitsOf(run, parent),
+    saidTo: saidCount(views, run),
     spendOf,
-    how.slot,
+    slot: how.slot,
     standings,
     checkout,
-    waitingOf(views),
-    deniedOf(views),
-    holdsOf(run, parent),
-  );
+    waitingOf: waitingOf(views),
+    deniedOf: deniedOf(views),
+    holds: holdsOf(run, parent),
+  });
   return { ...listed, assessed, assessOf, phaseOf, answers, spendOf, spend: runSpend(run, spendOf) };
 }
 

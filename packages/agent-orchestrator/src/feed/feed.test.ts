@@ -908,7 +908,7 @@ test("feedPhase folds the engine's live words into running, and keeps every word
 });
 
 test('feedWords says the run with its prune, what waits on a person as a note, and a slot wait without its count', () => {
-  const steps = [{ name: 'plan', after: [], brief: 'plan it' }] as unknown as Parameters<typeof listing>[0];
+  const steps = [{ name: 'plan', after: [], brief: 'plan it' }] as unknown as Parameters<typeof listing>[0]['steps'];
   const run = {
     id: 'r-1',
     brief: 'b',
@@ -918,42 +918,34 @@ test('feedWords says the run with its prune, what waits on a person as a note, a
     branch: 'wf/r-1',
     base: 'main',
   } as unknown as Run;
-  const held = listing(
+  const held = listing({
     steps,
     run,
-    () => 'unknown',
-    () => undefined,
-    undefined,
-    undefined,
-    [],
-    [],
-    [],
-    [],
-    undefined,
-    undefined,
-    { inFlight: 2, cap: 2 },
-  );
+    phaseOf: () => 'unknown',
+    closeoutOf: () => undefined,
+    asks: [],
+    roundAsks: [],
+    answers: [],
+    waits: [],
+    slot: { inFlight: 2, cap: 2 },
+  });
   const a = feedWords(held, run, { status: 'running' });
   assert.deepEqual(a.run, { word: 'running' });
   assert.deepEqual(
     a.steps.map((s) => s.word),
     ['waiting for a run slot'],
   );
-  const other = listing(
+  const other = listing({
     steps,
     run,
-    () => 'unknown',
-    () => undefined,
-    undefined,
-    undefined,
-    [],
-    [],
-    [],
-    [],
-    undefined,
-    undefined,
-    { inFlight: 3, cap: 3 },
-  );
+    phaseOf: () => 'unknown',
+    closeoutOf: () => undefined,
+    asks: [],
+    roundAsks: [],
+    answers: [],
+    waits: [],
+    slot: { inFlight: 3, cap: 3 },
+  });
   assert.deepEqual(feedWords(other, run, { status: 'running' }), a, 'the count in flight moving is not a change');
   assert.deepEqual(feedWords(held, { pruned: { at: '', worktrees: [] } }, { status: 'succeeded' }).run, { word: 'succeeded (pruned)' });
   assert.deepEqual(

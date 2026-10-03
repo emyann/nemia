@@ -1,7 +1,8 @@
 /**
- * The Agents page in a factory (fills.ts): the agents a factory has — those it hires into a step and those its attached workflows' steps
- * name — each with the steps it fills, and in the default factory every agent, tagged with the factories it fills a step in. A step is
- * credited to the agent file a start would run it with, found as the loader finds it (`lookupRoots`), never to every agent of that name.
+ * The Agents page in a factory (the package's `stepsFilled` and `inFactory`, answered by agents.ts): the agents a factory has — those it
+ * hires into a step and those its attached workflows' steps name — each with the steps it fills, and in the default factory every agent,
+ * tagged with the factories it fills a step in. A step is credited to the agent file a start would run it with, found as the loader finds
+ * it (`lookupRoots`), never to every agent of that name.
  *
  * The api's own repository (`HKB_REPO`) is `repoR`. Its `alpha` has `implement`, naming no agent, and `review`, naming `iris`; `gamma/plan`
  * names `cleo`; `delta/ship` names none; `broken/named` names `bo` beside `broken/bad`, a step the loader refuses, and `broken/stray`,
@@ -21,7 +22,7 @@ import { scratch } from '../../test/scratch.ts';
 import { app } from '../app.ts';
 import { addFactory, attachWorkflow, hireAgent } from 'agent-orchestrator';
 
-type LibraryAgent = import('./fills.ts').LibraryAgent;
+type LibraryAgent = import('./agents.ts').LibraryAgent;
 type WorkflowListing = import('../workflows/workflows.ts').WorkflowListing;
 
 const write = (file: string, text: string): void => {

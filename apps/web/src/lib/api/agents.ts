@@ -112,7 +112,7 @@ const AgentListingSchema = Schema.Struct({
 }) satisfies Schema.Schema<AgentListing>;
 
 /**
- * Mirrors `LibraryAgent` in apps/api/src/agents/fills.ts, as the Agents page reads it: an agent's listing, and the names of the factories
+ * Mirrors `LibraryAgent` in apps/api/src/agents/agents.ts, as the Agents page reads it: an agent's listing, and the names of the factories
  * it fills a step in, sorted; the default factory is never one of them.
  */
 export type LibraryAgent = AgentListing & { factories: string[] };

@@ -62,7 +62,6 @@ const RUN_STORE: Move = {
 
 /** Each reader that reaches the machine today, with what it reaches and what moves it. */
 const MOVES: Readonly<Record<string, Entry>> = {
-  'src/agents/fills.ts': { reaches: ['node:fs'], ...AGENTS_STORE },
   'src/agents/try.ts': {
     reaches: ['node:fs'],
     move: "writing a try's folder for an agent",

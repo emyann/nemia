@@ -20,7 +20,8 @@ import {
 import { landsOnCheck, owesReplies } from '../status/status.ts';
 import { checkContract, checkHandedSection, landingContract, type CheckHanded } from '../check/check.ts';
 import { artifactsContract } from '../artifacts/artifacts.ts';
-import { briefBody } from '../agents/agents.ts';
+import { briefBody, rendersAgent, skillLayers } from '../agents/agents.ts';
+import { ownNote } from '../ending/ending.ts';
 import { inputsLine, mountsLine } from '../start/inputs.ts';
 import { resultSteps, workChecks } from '../branches/branches.ts';
 
@@ -376,4 +377,51 @@ function fromRunSection(parent: ParentCloseout, remote = false): string {
     }
   }
   return lines.join('\n');
+}
+
+/**
+ * What a step was told, by layer: its agent and the agent's instructions, the person's custom instructions for it and the agent's own
+ * skills; the step's policy, its own note and the skills its line adds (`skillLayers`); and the task, what its brief told it after them.
+ * Null where the step has none. `via` says where the first two went: the session's prompt (`prompt`), or the head of its brief (`brief`).
+ */
+export type ToldLayers = {
+  agent: string | null;
+  instructions: string | null;
+  custom: string | null;
+  agentSkills: string[];
+  policy: string;
+  addedSkills: string[];
+  task: string | null;
+  via: 'prompt' | 'brief';
+};
+
+/**
+ * What the frozen `step` was told, by layer (`ToldLayers`), its task cut from `brief`, the brief it was filed with or would be: after its
+ * own note where its agent is rendered (`rendersAgent`), after its instructions, custom instructions and note where they head the brief —
+ * a step on another harness or on `resume:`, or one filed with its rendered folder gone. A brief that opens with neither, then a blank
+ * line — a resumed try's, or one of a record frozen without its instructions — is the task whole, never cut at a guess; a null brief is
+ * no task.
+ */
+export function toldLayers(step: Workflow, brief: string | null): ToldLayers {
+  const agent = step.agent;
+  const policy = ownNote(step);
+  const instructions = agent?.instructions ?? null;
+  const custom = agent?.customInstructions ?? null;
+  const skills = skillLayers(step);
+  const layered = [instructions, custom, policy].filter(Boolean).join('\n\n');
+  const openings: Array<{ via: ToldLayers['via']; opening: string }> = [
+    ...(rendersAgent(step) ? [{ via: 'prompt' as const, opening: policy }] : []),
+    { via: 'brief', opening: layered },
+  ];
+  const opened = brief === null ? undefined : openings.find(({ opening }) => opening && brief.startsWith(`${opening}\n\n`));
+  return {
+    agent: agent?.name ?? null,
+    instructions,
+    custom,
+    agentSkills: skills.agent,
+    policy,
+    addedSkills: skills.added,
+    task: brief === null || !opened ? brief : brief.slice(opened.opening.length + 2),
+    via: opened?.via ?? (rendersAgent(step) ? 'prompt' : 'brief'),
+  };
 }

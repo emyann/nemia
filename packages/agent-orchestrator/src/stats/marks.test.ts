@@ -16,22 +16,26 @@ const BUILD = '/a/workflows/build';
 const SKILL = 'review-a-change';
 
 /** A review step filled by agora, resolved as the parser resolves it: the agent's instructions before the step's own note. */
-function review(more: { instructions?: string | null; note?: string; model?: string; skills?: string[] } = {}): Workflow {
+function review(more: { instructions?: string | null; note?: string; model?: string; skills?: string[]; added?: string[] } = {}): Workflow {
   const instructions = more.instructions === undefined ? 'You are Agora.' : more.instructions;
   const note = more.note ?? 'Review it.';
+  const own = more.skills ?? [SKILL];
+  const added = more.added?.filter((skill) => !own.includes(skill));
   const agent: StepAgent = {
     name: 'agora',
-    keys: [],
+    keys: more.added ? ['skills'] : [],
     body: note,
     given: {},
     ...(instructions === null ? {} : { instructions }),
-    skills: more.skills ?? [SKILL],
+    skills: [...own, ...(added ?? [])],
+    ...(added && { addedSkills: added }),
   };
   return {
     name: 'review',
     after: [],
     body: instructions === null ? note : `${instructions}\n\n${note}`,
     ...(more.model ? { model: more.model } : {}),
+    ...(more.added ? { skills: more.added } : {}),
     agent,
   };
 }
@@ -126,6 +130,19 @@ test("a step is marked for its own note and keys, its agent for its instructions
   ]);
   assert.deepEqual(said([frozen('r1', at(10), [review({ model: 'a' })]), frozen('r2', at(11), [review({ model: 'b' })])]), [
     'r2 step review since r1',
+  ]);
+});
+
+test("a skill the step's own line adds is the step's: it marks the step, never its agent, whose own skills still mark it", () => {
+  const at = (day: number) => `2026-09-${day}T08:00:00.000Z`;
+  const runs = [frozen('r1', at(10), [review()]), frozen('r2', at(11), [review({ added: [SKILL, 'extra'] })])];
+  assert.deepEqual(said(runs), ['r2 step review since r1']);
+  const extra = runs[1].items.find((i) => i.kind === 'skill' && i.name === 'extra');
+  assert.deepEqual(extra && { steps: extra.steps, agents: extra.agents }, { steps: ['review'], agents: [] });
+  const own = runs[1].items.find((i) => i.kind === 'skill' && i.name === SKILL);
+  assert.deepEqual(own?.agents, ['agora'], "a skill the step names that its agent has is the agent's");
+  assert.deepEqual(said([frozen('r1', at(10), [review()]), frozen('r2', at(11), [review({ skills: [SKILL, 'extra'] })])]), [
+    'r2 agent agora since r1',
   ]);
 });
 

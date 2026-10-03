@@ -51,6 +51,13 @@ test("the session is given the agent's skills, then the step's, each once; the s
   assert.equal(stepOf(AGENTS, 'agent: bare').agent?.skills, undefined, 'none from either, none at all');
 });
 
+test("the skills a step's line adds beyond its agent's are frozen apart, in its order; a step with no line freezes none", () => {
+  assert.deepEqual(stepOf(AGENTS, 'agent: ada\nskills: beta, gamma').agent?.addedSkills, ['gamma']);
+  assert.deepEqual(stepOf(AGENTS, 'agent: ada\nskills: beta, alpha').agent?.addedSkills, [], 'a line naming only the agent’s adds none');
+  assert.deepEqual(stepOf(AGENTS, 'agent: bare\nskills: gamma, delta').agent?.addedSkills, ['gamma', 'delta']);
+  assert.equal(stepOf(AGENTS, 'agent: ada').agent?.addedSkills, undefined, 'no line, no key');
+});
+
 test('a step never takes a skill from its agent: naming a few of them still gives the session all', () => {
   const step = stepOf(AGENTS, 'agent: ada\nskills: alpha');
   assert.deepEqual(step.agent?.skills, ['alpha', 'beta']);
@@ -192,6 +199,7 @@ test("`wf start` freezes the step's own line and the session's list, renders the
   const frozen = (readRun(run.id).workflow ?? []).find((s) => s.name === 'implement')!;
   assert.deepEqual(frozen.skills, ['review-a-change']);
   assert.deepEqual(frozen.agent?.skills, ['implement-a-change', 'review-a-change']);
+  assert.deepEqual(frozen.agent?.addedSkills, ['review-a-change']);
   const at = agentFilesDir(run, 'implement');
   const plugin = fs.readdirSync(at).find((entry) => fs.statSync(path.join(at, entry)).isDirectory())!;
   assert.ok(fs.existsSync(path.join(at, plugin, 'skills', 'review-a-change', 'SKILL.md')), `${at}/${plugin}`);
@@ -208,4 +216,6 @@ test('a frozen step with its own `skills:` reads back by the schema, and so does
   }
   const wrong = decode({ ...JSON.parse(JSON.stringify(step)), skills: 'beta' });
   assert.ok(Result.isFailure(wrong), 'a line that is not a list is refused');
+  const added = decode({ ...JSON.parse(JSON.stringify(step)), agent: { ...step.agent, addedSkills: 'gamma' } });
+  assert.ok(Result.isFailure(added), 'added skills that are not a list are refused');
 });

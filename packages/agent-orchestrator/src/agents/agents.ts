@@ -509,6 +509,17 @@ export const rendersAgent = (step: Workflow): boolean => {
 export const briefBody = (step: Workflow): string => (rendersAgent(step) ? step.agent!.body : step.body);
 
 /**
+ * The skills of a step's session by layer, from its frozen record: its agent's own, and those its `skills:` line added (`addedSkills`),
+ * each in the session's order. A record frozen before the added skills were kept apart counts every skill the step's line names as the
+ * step's, one its agent names too among them. A step with no agent has neither.
+ */
+export function skillLayers(step: Workflow): { agent: string[]; added: string[] } {
+  if (!step.agent) return { agent: [], added: [] };
+  const added = step.agent.addedSkills ?? step.skills ?? [];
+  return { agent: (step.agent.skills ?? []).filter((skill) => !added.includes(skill)), added };
+}
+
+/**
  * A skill as a step whose rendered folder is gone is told it: its SKILL.md's body, read again where the load finds it, or why it cannot be.
  */
 export type SkillAgain = { name: string; text: string } | { name: string; missing: string };

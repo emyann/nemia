@@ -5,7 +5,8 @@ import { Artifacts, bytesWord, ClosedNeeds } from '../components/Closeout';
 import { Decide } from '../components/Decide';
 import { Markdown } from '../components/Markdown';
 import { NeedsBanner, ToDecideBanner } from '../components/Needs';
-import { Check, code, Facts, pathRow, Read, readRows, specRows, spentRows, Told, when } from '../components/Facts';
+import { Check, code, Facts, pathRow, Read, readRows, specRows, spentRows, when } from '../components/Facts';
+import { Told } from '../components/Told';
 import { ActsOn, Approved, endsTheRun, Gate, gateWord } from '../components/Gate';
 import { RunCanvas } from '../components/RunCanvas';
 import { RunGone } from '../components/RunGone';
@@ -269,7 +270,7 @@ function StepSection({ run, step, runCancelled }: { run: RunDetail; step: Step; 
 
       {step.body && <Markdown className="text-sm">{step.body}</Markdown>}
 
-      {step.told && <Told told={step.told} filed={step.taskId !== null} />}
+      <Told told={step.told} layers={step.layers} filed={step.taskId !== null} />
 
       <Facts
         rows={[

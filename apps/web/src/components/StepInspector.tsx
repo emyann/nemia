@@ -8,7 +8,8 @@ import { foldTranscript, sessionToRead } from '../lib/transcript';
 import { useStepTranscript } from '../lib/useStepTranscript';
 import { cn } from '../lib/utils';
 import { Rounds, TryCloseouts, tryLabel } from './Closeout';
-import { Check, code, Facts, readRows, specRows, spentRows, Told, when } from './Facts';
+import { Check, code, Facts, readRows, specRows, spentRows, when } from './Facts';
+import { Told } from './Told';
 import { Asked } from './GateBrief';
 
 /**
@@ -175,7 +176,7 @@ function Details({ run, step, state, runCancelled, current, selected, onSelect }
           from before runs froze one, its folder.
         </p>
       )}
-      {step.told && <Told told={step.told} filed={step.taskId !== null} />}
+      <Told told={step.told} layers={step.layers} filed={step.taskId !== null} />
     </>
   );
 }

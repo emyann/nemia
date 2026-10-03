@@ -9,6 +9,7 @@
 import { createHash } from 'node:crypto';
 import type { Workflow } from '../step/step.ts';
 import { ownNote } from '../ending/ending.ts';
+import { skillLayers } from '../agents/agents.ts';
 import type { RunKeys } from './stats.ts';
 
 /** What a mark is about: a frozen step, an agent's instructions, or a rendered skill. */
@@ -72,21 +73,30 @@ function merged(items: FrozenItem[], item: FrozenItem): FrozenItem[] {
 }
 
 /**
- * Each step's items (`FrozenItem`): the step, its agent's instructions, skills and harness prompt where the record carries its
- * instructions, else the agent unknown, and each skill it gives, by the digest of its rendered copy in `skills` (step → skill → digest).
+ * Each step's items (`FrozenItem`): the step, its agent's instructions, own skills (`skillLayers`) and harness prompt where the record
+ * carries its instructions, else the agent unknown, and each skill it gives, by the digest of its rendered copy in `skills` (step → skill →
+ * digest): its agent's with the agent, those the step's line adds with the step alone.
  */
 function itemsOf(step: Workflow, skills: ReadonlyMap<string, ReadonlyMap<string, string>>): FrozenItem[] {
   const agent = step.agent;
   if (!agent) return [stepItem(step)];
-  const of = { steps: [step.name], agents: [agent.name] };
+  const layers = skillLayers(step);
   const said =
     agent.instructions === undefined
       ? null
-      : { instructions: agent.instructions, skills: agent.skills, harnessPrompt: agent.harnessPrompt };
+      : { instructions: agent.instructions, skills: layers.agent.length ? layers.agent : undefined, harnessPrompt: agent.harnessPrompt };
+  const skill = (name: string, agents: string[]): FrozenItem => ({
+    kind: 'skill',
+    name,
+    digest: skills.get(step.name)?.get(name) ?? null,
+    steps: [step.name],
+    agents,
+  });
   return [
     stepItem(step),
-    { kind: 'agent', name: agent.name, digest: said && digestOf(said), ...of },
-    ...(agent.skills ?? []).map((name): FrozenItem => ({ kind: 'skill', name, digest: skills.get(step.name)?.get(name) ?? null, ...of })),
+    { kind: 'agent', name: agent.name, digest: said && digestOf(said), steps: [step.name], agents: [agent.name] },
+    ...layers.agent.map((name) => skill(name, [agent.name])),
+    ...layers.added.map((name) => skill(name, [])),
   ];
 }
 

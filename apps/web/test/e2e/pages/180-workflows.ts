@@ -3,9 +3,12 @@ import path from 'node:path';
 import type { Locator } from 'playwright';
 import { cancelledAt, nextVisit, photograph, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectInside, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
-import { DIAMOND, DIAMOND_RUNS, FAKE, WORKFLOWS } from '../seed.ts';
+import { DIAMOND, DIAMOND_RUNS, FACTORIES, FAKE, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
+
+/** The agent the page writes into the checkout's `workflows/agents/` for FACTORIES' `hiring` to hire into `dev`'s `review`. */
+const REVIEWER = 'reviewer-e2e';
 
 export default {
   /**
@@ -13,7 +16,8 @@ export default {
    * refusal. The start form enables Start once there is a brief, and offers to wait on every run on its repository, each by where it
    * stands: a run waiting on a run called off has filed nothing, and never will without you, so it is not finished. Start is not pressed
    * here, as a run started would be on every page visited after this one; in a page of its own, whose one refusal is the point, a start
-   * that waits on a run called off is refused in `afterRefusal`'s words beside the form, and nothing is written. Each step's page opens
+   * that waits on a run called off is refused in `afterRefusal`'s words beside the form, and nothing is written: naming no factory, it
+   * is made in FACTORIES' `hiring`, the one that holds the checkout, hiring for it the agents that let `dev` start, taken back after. Each step's page opens
    * from a link under the graph, in the order a run runs them, and from its block on the graph.
    */
   name: 'workflows',
@@ -116,8 +120,16 @@ export default {
 
     const runsDir = path.join(store!, 'runs');
     const before = fs.readdirSync(runsDir).sort();
+    const factoryFile = path.join(store!, 'factories', `${FACTORIES.hiring.name}.json`);
+    const factoryText = fs.readFileSync(factoryFile, 'utf8');
+    const reviewerFile = path.join(store!, 'checkout', 'workflows', 'agents', `${REVIEWER}.md`);
     const refused = await page.context().newPage();
     try {
+      fs.writeFileSync(reviewerFile, '---\ndescription: Use this when a change needs reviewing.\n---\nYou review the change.\n');
+      fs.writeFileSync(
+        factoryFile,
+        JSON.stringify({ ...(JSON.parse(factoryText) as object), hires: { [`${good.name}/review`]: REVIEWER } }, null, 2),
+      );
       const { problems } = watch(refused);
       await refused.goto(page.url(), { waitUntil: 'load' });
       await idle(refused);
@@ -160,6 +172,8 @@ export default {
         );
     } finally {
       await refused.close();
+      fs.rmSync(reviewerFile, { force: true });
+      fs.writeFileSync(factoryFile, factoryText);
     }
 
     const bad = card(broken.name);

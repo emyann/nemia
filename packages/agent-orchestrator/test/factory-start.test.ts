@@ -407,16 +407,33 @@ test("REFUSED: a card's factory: the store does not have, and one that does not 
   assert.ok(fs.existsSync(nosuch) && fs.existsSync(unattached), 'both cards are left in the inbox');
 });
 
-test('a card of the default factory — no factory:, or factory: default — records no factory, and runs on the repository it is started in', () => {
+test('with WF_DEFAULT_FACTORY_STARTS=1, a card that names no factory records none, and runs on the repository it is started in', () => {
   const { build } = fresh();
   const other = aRepo();
-  for (const [name, text] of [
-    ['no-key', 'Build it.\n'],
-    ['by-name', '---\nfactory: default\n---\nBuild it.\n'],
-  ]) {
-    aCard(name, text);
-    const { run } = startFromInbox({ name, workflow: build, callerRepo: other, isolate: false });
-    assert.equal('factory' in readRun(run.id), false, name);
-    assert.equal(readRun(run.id).repo, other, name);
-  }
+  aCard('no-key', 'Build it.\n');
+  const { run } = startFromInbox({ name: 'no-key', workflow: build, callerRepo: other, isolate: false });
+  assert.equal('factory' in readRun(run.id), false);
+  assert.equal(readRun(run.id).repo, other);
+});
+
+test('REFUSED: a card that says factory: default, or is started with --factory default, even with WF_DEFAULT_FACTORY_STARTS=1; the card stays', () => {
+  const { build } = fresh();
+  const other = aRepo();
+  const before = runsWritten();
+  const card = aCard('by-name', '---\nfactory: default\n---\nBuild it.\n');
+  assert.throws(
+    () => startFromInbox({ name: 'by-name', workflow: build, callerRepo: other, isolate: false }),
+    refusedWith('Invalid', /^`default` is the default factory: .* Name a factory — `factory: <name>` in .*by-name\.md, one of pipao\./),
+  );
+  aCard('plain', 'Build it.\n');
+  assert.throws(
+    () =>
+      startFromInbox({ name: 'plain', workflow: build, callerRepo: other, isolate: false, factory: 'default', fix: '--factory <name>' }),
+    refusedWith(
+      'Invalid',
+      /^`default` is the default factory: .* Name a factory — --factory <name>, one of pipao\. Nothing was started\.$/,
+    ),
+  );
+  assert.deepEqual(runsWritten(), before);
+  assert.ok(fs.existsSync(card), 'the card is left in the inbox');
 });

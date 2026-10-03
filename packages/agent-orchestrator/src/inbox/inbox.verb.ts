@@ -15,6 +15,7 @@ import {
   noWorkflowRefusal,
   parseInboxCard,
   startedRefusal,
+  unfactoredCardRefusal,
   type InboxCard,
   type InboxListing,
   type QueueStarted,
@@ -27,9 +28,9 @@ import { inboxDir, runStore } from '../record/files.store.ts';
 import { inboxCards } from './inbox.store.ts';
 import { repoFor, start } from '../start/start.verb.ts';
 import { placesOf } from '../folder/lookup.store.ts';
-import { readFactories } from '../factory/factory.store.ts';
-import type { Factory } from '../factory/factory.ts';
-import { Conflict, Missing } from '../refusal/refusal.ts';
+import { defaultStartsAllowed, factoryNames, readFactories } from '../factory/factory.store.ts';
+import { DEFAULT_FACTORY, defaultStartRefusal, type Factory } from '../factory/factory.ts';
+import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 
 /** How to start an inbox card (`startFromInbox`): the card, and what its start says over it or beside it. */
 export type InboxStart = {
@@ -51,6 +52,11 @@ export type InboxStart = {
   callerRepo: string;
   /** The factory it is started in, over the card's `factory:` (`wf start <card> --factory`). */
   factory?: string;
+  /**
+   * How the start names a factory, in its own words with `<name>` in them — `--factory <name>`, `?factory=<name>` — said in the refusal
+   * of a card that names none. None for the queue's start, which has no such words.
+   */
+  fix?: string;
   /** The runs it waits on (`wf start --after`): an inbox card has no `after:`, so it is said here, at start. */
   after?: readonly string[];
   isolate?: boolean;
@@ -86,20 +92,36 @@ function cardWorkflow(opts: Pick<InboxStart, 'workflow' | 'from'>, card: InboxCa
 }
 
 /**
+ * The factory a card in `file` is started in: `opts.factory`, else the card's own `factory:` (`named`). Refused, `Invalid`: neither, unless
+ * `defaultStartsAllowed` (`unfactoredCardRefusal`), and the default factory (`defaultStartRefusal`), which no run is started in.
+ */
+function cardFactory(opts: Pick<InboxStart, 'factory' | 'fix'>, named: string | undefined, file: string): string | undefined {
+  const factory = opts.factory ?? named;
+  if (factory === undefined && !defaultStartsAllowed())
+    throw new Invalid({ message: unfactoredCardRefusal(file, factoryNames(), opts.fix) });
+  if (factory === DEFAULT_FACTORY) {
+    const fix = opts.factory === undefined ? `\`factory: <name>\` in ${file}` : (opts.fix ?? '<name>');
+    throw new Invalid({ message: defaultStartRefusal(fix, factoryNames()) });
+  }
+  return factory;
+}
+
+/**
  * `wf start <inbox>/<name>.md`, and the board's start of a card: a card out of the inbox started with `start()`, `from: { inbox: <name> }`
  * on its record, then removed from the inbox.
  *
  * The brief is `brief`, or else the card's body. The workflow is `workflow`, else the card's `workflow:` — found from the inbox folder as
  * `wf plan` finds a card's from its plan folder: a name under the repository's `workflows/`, or a path — else refused, naming the
- * repository's workflows. The factory is `factory`, else the card's `factory:`, else none: the default. The repository is `repo`, else the
+ * repository's workflows. The factory is `factory`, else the card's `factory:`. The repository is `repo`, else the
  * card's `repo:`, else the factory's one repository, else `callerRepo` (`repoFor`), chosen before the workflow is found in it; `start()`
  * judges the factory. The run is gated at the card's `gate:` and at `gates`, the card's first; a step both name is gated once.
  *
  * The record is written first, so a removal that fails leaves a card `wf inbox` lists as started — never a run with no trace of its card.
  * It says so in `why`, and the card is not started again (`startedRefusal`) until a person drops it. Refused by name before anything is
  * written, exit 2: a name that is not a card's (`inboxNameRefusal`), a card not there (`Missing`) — naming the cards there are — a card
- * that does not read, a card already started (`Conflict`), no workflow, a workflow that does not load behind the card, a `gate:` naming no
- * step of it, in the card's words, and a `brief` with nothing in it; and whatever `start()` refuses — an `--after`, an `--input`, a
+ * that does not read, a card already started (`Conflict`), no factory from either — `Invalid`, naming the line to write and `fix`
+ * (`unfactoredCardRefusal`), unless `defaultStartsAllowed` — or the default factory named (`defaultStartRefusal`), no workflow, a
+ * workflow that does not load behind the card, a `gate:` naming no step of it, in the card's words, and a `brief` with nothing in it; and whatever `start()` refuses — an `--after`, an `--input`, a
  * `--gate`, a factory not there, one that does not offer the workflow or does not work on the repository — as it refuses it.
  */
 export function startFromInbox(opts: InboxStart): InboxStarted {
@@ -119,7 +141,7 @@ export function startFromInbox(opts: InboxStart): InboxStarted {
     .map((r) => r.id);
   if (started.length) throw new Conflict({ message: startedRefusal(card, file, started) });
 
-  const factory = opts.factory ?? card.factory;
+  const factory = cardFactory(opts, card.factory, file);
   const repo = repoFor(factory, opts.repo ?? card.repo, opts.callerRepo);
   const workflowDir = cardWorkflow(opts, card, file, repo);
   if (opts.brief !== undefined && !opts.brief.trim()) {
@@ -177,7 +199,8 @@ function dropStaleTries(names: Iterable<string>, listing: readonly InboxListing[
  * remembered on, so its base is its base branch as it is now, and its brief is frozen now. Undefined with no card to start. A card
  * whose `repo:` the run looks at none of — a folder team's — carries it on `ignoredRepo`, as `wf start` says it: a tick's line
  * (`queueLine`) is the only place a daemon's start is read. The result names the repository (`on`) only when neither the card nor its
- * factory names one, and the start turns on where the daemon runs.
+ * factory names one, and the start turns on where the daemon runs — never for a card that names no factory, which is refused wherever the
+ * daemon runs (`unfactoredCardRefusal`, with no start's words), and lasts until the card names one.
  *
  * A start that does not happen is written down (`QueueTry`), and the card left as it is. A refusal — exit 2, the package's own, by name:
  * the workflow gone, the repository gone — lasts: no pass after it tries the card while it reads the same and would be tried on the same
@@ -197,7 +220,7 @@ export function startQueued(repo: string, runs: readonly Run[] = runStore.runs.l
   const next = nextQueued(listing, repo, factories);
   if (!next) return undefined;
   const { repo: on, fromDaemon } = queueRepo(next, repo, factories);
-  const where = fromDaemon ? { on } : {};
+  const where = fromDaemon && (next.factory !== null || defaultStartsAllowed()) ? { on } : {};
   try {
     const started = startFromInbox({ name: next.name, callerRepo: repo });
     const ignored = started.ignoredRepo !== undefined ? { ignoredRepo: started.ignoredRepo } : {};

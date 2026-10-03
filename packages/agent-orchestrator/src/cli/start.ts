@@ -26,6 +26,7 @@ import {
   readInbox,
   repoFor,
   start,
+  startFactory,
   startFromInbox,
   startPlan,
   stepsOf,
@@ -34,12 +35,14 @@ import {
 } from '../runner.ts';
 import { HELP, usage, readFlags } from './flags.ts';
 
-export const PLAN_HELP = `wf plan <folder> [--repo .]
+export const PLAN_HELP = `wf plan <folder> [--repo .] [--factory <name>]
 
 Start a plan: one run per card in the folder, parents first, each waiting on the runs of the cards it names.
 That is the record wf start --after writes, so the tick files a card's run once its parents have shipped, and
 every card is a decision at its own wf decide. Nothing else is written: the runs and their after are the plan.
-It prints a line per card: the card, its run, its workflow, and what it waits on.
+It prints a line per card: the card, its run, its workflow, and what it waits on. Every run is started in
+--factory, else the factory whose repository holds --repo, else the folder wf plan is typed in, when one
+factory alone does, on that repository; none, or two, is refused before any run is started, naming the fix.
 
 A card is one markdown file, <card>.md, and README.md beside the cards says what the plan is for:
 
@@ -70,7 +73,7 @@ is said at start:
     repo: /home/me/code/app    # the repository it is about, as an absolute path
     queued: 2026-09-16T10:00:00.000Z   # when it was queued to start on its own: wf inbox queue writes it
     gate: plan                 # the step whose closeout waits for wf approve in the run it starts
-    factory: pipao             # the factory it is started in (wf factory --help); the default when unset
+    factory: pipao             # the factory it is started in (wf factory --help); required to start
     ---
     Cache the engine's views between passes.
 
@@ -92,7 +95,8 @@ is said at start:
 Refused by name: a key a card does not have, a key set to nothing, a repo: that is not an absolute path to a
 directory, a queued: that is not a time or is on a card with no workflow:, a gate: naming more than one step or
 saying true, a factory: that is not a factory's name — and, at start, a gate: naming no step of the workflow, a
-factory: the store does not have or that does not offer the workflow — an add with no idea, and a name that would
+card that names no factory and is started with no --factory, never one taken from its folder or its repo:, a
+factory: the store does not have, default, or one that does not offer the workflow — an add with no idea, and a name that would
 leave the folder; and a queue of a name with no card, of a card with no workflow and no --workflow, of one
 already queued, and of one a run was started from.`;
 
@@ -117,7 +121,8 @@ const START_TAKES = {
     'the step whose closeout waits for a person before anything after it is filed: wf start <brief> --gate <step> [--gate <step> ...]',
   '--brief':
     'what the run is asked to do in place of an inbox card\'s body, as text or a file: wf start <inbox>/<name>.md --brief "<brief>"',
-  '--factory': "the factory the run is started in, whose hires fill the workflow's steps: wf start <brief> --factory <name>",
+  '--factory':
+    "the factory the run is started in, whose hires fill the workflow's steps; without it, the one whose repository holds the folder: wf start <brief> --factory <name>",
 } as const;
 
 /** Why a value flag of `wf start` is taken once, as its refusal says it, where it is not the workflow. */
@@ -156,12 +161,15 @@ export function startHow(argv: string[]): StartHow {
 }
 
 /**
- * `wf plan`'s one flag, after the folder: `--repo <r>`. `wf start`'s others are refused by name, each with why the folder says it instead;
- * and anything else, as `wf start` refuses it.
+ * `wf plan`'s flags, after the folder: `--repo <r>` and `--factory <name>`, once each. `wf start`'s others are refused by name, each with
+ * why the folder says it instead; and anything else, as `wf start` refuses it.
  */
-export function planHow(argv: string[]): { repo?: string } {
+export function planHow(argv: string[]): { repo?: string; factory?: string } {
   const { values } = readFlags(argv, {
-    takes: { '--repo': 'the repository the plan works on: wf plan <folder> --repo <r>' },
+    takes: {
+      '--repo': 'the repository the plan works on: wf plan <folder> --repo <r>',
+      '--factory': "the factory every card's run is started in: wf plan <folder> --factory <name>",
+    },
     refuses: {
       '--after':
         'wf plan does not take --after: each card says what it waits on, in its after:, and the folder is the whole plan. To wait on a run already started, start the card by hand: wf start <card.md> --workflows <dir> --after <runId>.',
@@ -176,11 +184,26 @@ export function planHow(argv: string[]): { repo?: string } {
     },
     unknown: (arg) =>
       arg.startsWith('-')
-        ? `wf plan does not take ${arg}. It takes the plan folder, then --repo <r>.`
+        ? `wf plan does not take ${arg}. It takes the plan folder, then --repo <r> and --factory <name>.`
         : `wf plan takes one folder, and ${arg} is a second. A plan is every card in one folder: wf plan <folder> --repo <r>.`,
-    twice: () => 'wf plan takes --repo once: a plan works on one repository.',
+    twice: (flag) =>
+      flag === '--factory'
+        ? 'wf plan takes --factory once: a plan is started in one factory.'
+        : 'wf plan takes --repo once: a plan works on one repository.',
   });
-  return { repo: values['--repo']?.[0] };
+  return { repo: values['--repo']?.[0], ...(values['--factory'] ? { factory: values['--factory'][0] } : {}) };
+}
+
+/**
+ * Where a start of a workflow typed here is made (`startFactory`): the factory `--factory` names, else the one whose repository holds
+ * `--repo`, else the directory it is typed in; and its repository — the one that holds the folder, when the factory was found from it,
+ * else `--repo`, else the factory's one repository, else here (`repoFor`). Refused as `startFactory` and `repoFor` refuse.
+ */
+function placeOfStart(how: { repo?: string; factory?: string }): { factory?: string; repo: string } {
+  const named = how.repo === undefined ? undefined : path.resolve(how.repo);
+  const found = startFactory(how.factory, named ?? path.resolve('.'), '--factory <name>');
+  const factory = found.factory?.name;
+  return { ...(factory !== undefined ? { factory } : {}), repo: found.repo ?? repoFor(factory, named, path.resolve('.')) };
 }
 
 /** `wf inbox queue`'s flags, after the card's name: `--workflow <w>` once, and `--off` — not both. */
@@ -288,6 +311,7 @@ function startInboxCard(inboxName: string, how: StartHow): void {
     inputs: how.inputs,
     gates: how.gates,
     ...(how.factory !== undefined ? { factory: how.factory } : {}),
+    fix: '--factory <name>',
   });
   printStarted(
     started.run,
@@ -314,7 +338,7 @@ export function startVerb(rest: string[]): void {
     );
   const text = fs.existsSync(arg) ? fs.readFileSync(arg, 'utf8') : undefined;
   const card = text === undefined ? null : cardToStart(arg, text, how.after);
-  const repo = repoFor(how.factory, how.repo === undefined ? undefined : path.resolve(how.repo), path.resolve('.'));
+  const { factory, repo } = placeOfStart(how);
   const run = start({
     brief: card ? card.body : (text?.trim() ?? arg),
     repo,
@@ -327,18 +351,22 @@ export function startVerb(rest: string[]): void {
     after: how.after,
     inputs: how.inputs,
     gates: how.gates,
-    ...(how.factory !== undefined ? { factory: how.factory } : {}),
+    ...(factory !== undefined ? { factory } : {}),
   });
   printStarted(run);
 }
 
-/** `wf plan`: a run per card of a plan folder, a line each; a card that did not start stops the rest, and fails with what it was told. */
+/**
+ * `wf plan`: a run per card of a plan folder, a line each, in the factory and on the repository a `wf start` typed here would be
+ * (`placeOfStart`); a card that did not start stops the rest, and fails with what it was told.
+ */
 export function planVerb(rest: string[]): void {
   if (rest.includes('--help')) return console.log(PLAN_HELP);
   const folder = rest[0];
   if (!folder || folder.startsWith('--')) return console.log(HELP);
-  const plan = { dir: path.resolve(folder), repo: path.resolve(planHow(rest.slice(1)).repo ?? '.') };
-  const { started, stopped, folderOf } = startPlan(plan);
+  const { factory, repo } = placeOfStart(planHow(rest.slice(1)));
+  const plan = { dir: path.resolve(folder), repo: path.resolve(repo) };
+  const { started, stopped, folderOf } = startPlan({ ...plan, ...(factory !== undefined ? { factory } : {}) });
   for (const line of planLines(started)) console.log(line);
   if (stopped) {
     const told = planStopped({ card: stopped.card, why: stopped.error.message, rest: stopped.rest }, started, { ...plan, folderOf });

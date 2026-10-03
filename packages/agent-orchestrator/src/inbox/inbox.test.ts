@@ -21,6 +21,7 @@ import {
   queueRefusal,
   queueRepo,
   startedRefusal,
+  unfactoredCardRefusal,
   workflowAt,
   type InboxListing,
 } from './inbox.ts';
@@ -251,7 +252,7 @@ test("`factory:` names the factory that processes a card, carried by the card, i
   assert.throws(
     () => read('---\nfactory: Pipao\n---\nx\n'),
     refusedWith(
-      /^cache-the-views-k2q9\.md: `factory: Pipao` — `Pipao` is not a factory's name: .* — pipao, say\. Correct it to a factory wf factory ls lists, or delete the line, and the card is the default factory's\.$/,
+      /^cache-the-views-k2q9\.md: `factory: Pipao` — `Pipao` is not a factory's name: .* — pipao, say\. Correct it to a factory wf factory ls lists\.$/,
     ),
   );
   assert.throws(
@@ -842,4 +843,14 @@ test('a queued card whose `repo:` names no directory any more keeps its place in
     `gone-a1b2    ${why}  queued 1 of 2 — not started at 2026-09-16T10:00:00.000Z Edit the card, or take it back and queue it again, and the tick tries it again`,
     'wf inbox says so beside why it does not read, without saying that twice',
   );
+});
+
+test("REFUSED: a card that names no factory, naming its file, the line to write with the factories, the start's fix only when it has one, and how a new card names one", () => {
+  assert.equal(
+    unfactoredCardRefusal('/s/inbox/a.md', ['pipao', 'abc'], '--factory <name>'),
+    '/s/inbox/a.md: this card names no factory, and a card is started only in the factory named for it, never one taken from its folder or its repo:, which can be two factories\'. Write `factory: <name>` in its frontmatter — one of abc, pipao, or name it at start: --factory <name>; a new card names it as it is filed: wf inbox add "<idea>" --factory <name>. Nothing was started.',
+  );
+  const queued = unfactoredCardRefusal('/s/inbox/a.md', []);
+  assert.match(queued, /— once one is filed: wf factory add <name> --repo <root>; a new card/);
+  assert.equal(queued.includes('at start'), false, 'the queue has no start words of its own');
 });

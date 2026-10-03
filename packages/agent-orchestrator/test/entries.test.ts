@@ -259,6 +259,7 @@ const PINNED: Record<string, string[]> = {
     'spentWord',
     'staleAfterMs',
     'start',
+    'startFactory',
     'startFromInbox',
     'startPlan',
     'startQueued',

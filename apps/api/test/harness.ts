@@ -7,7 +7,9 @@
  * exercise, and not a stand-in for it. It sets `WF_VERIFY_REST=1`: every answer the list's memo of runs at rest gives (`resting.ts`) is
  * judged afresh too, and a difference fails the request. And the store is a scratch folder too (`root`, `WF_ROOT`), never this machine's.
  * It sets the daemon's two ceilings, `WF_MAX_RUNS` and `WF_MAX_CONCURRENT`, to `set-it-in-the-test`, which the package refuses by name: a
- * run's check inherits the daemon's environment, so a test that reads a ceiling sets or deletes it itself.
+ * run's check inherits the daemon's environment, so a test that reads a ceiling sets or deletes it itself. It sets
+ * `WF_DEFAULT_FACTORY_STARTS=1`, so a start made in a scratch repository no factory holds, or of a card that names no factory, goes to the
+ * default factory: a test of the refusal those starts meet as shipped deletes it first.
  *
  * Installed as this module loads. The api's test script loads it with `--import` before any test file, and `node --test` loads that in
  * each test file's process and not in its own; each test file imports it first as well, by its path from the file, so a file run by hand
@@ -45,6 +47,7 @@ export const recorded = (name: 'plan' | 'no-plan' | 'unsupported' | 'unanswered'
 process.env.WF_VERIFY_REST = '1';
 process.env.WF_MAX_RUNS = 'set-it-in-the-test';
 process.env.WF_MAX_CONCURRENT = 'set-it-in-the-test';
+process.env.WF_DEFAULT_FACTORY_STARTS = '1';
 
 fs.writeFileSync(registry, '[]');
 fs.writeFileSync(calls, '');

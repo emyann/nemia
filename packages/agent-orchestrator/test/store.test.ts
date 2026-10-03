@@ -4041,7 +4041,7 @@ test('REFUSED by name: `wf plan` with --after, --workflows or --no-worktree — 
   await assert.rejects(typed('--no-worktree', '--repo', repo), refusedWith(/^wf plan does not take --no-worktree:/));
   await assert.rejects(
     typed('--repos', repo),
-    refusedWith(/^wf plan does not take --repos\. It takes the plan folder, then --repo <r>\.$/),
+    refusedWith(/^wf plan does not take --repos\. It takes the plan folder, then --repo <r> and --factory <name>\.$/),
   );
   await assert.rejects(typed('--repo', repo, '--repo', repo), refusedWith(/^wf plan takes --repo once: a plan works on one repository\.$/));
   await assert.rejects(typed('--repo'), refusedWith(/^--repo takes the repository the plan works on: wf plan <folder> --repo <r>$/));

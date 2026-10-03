@@ -323,6 +323,7 @@ export {
   exitVerdicts,
   harnessBlocked,
   parentOf,
+  parentsOf,
   readFilings,
   saidCount,
   spendReader,
@@ -367,7 +368,8 @@ export { freshStatsMemo, stats } from './stats/stats.verb.ts';
 export type { StatsMemo, StatsOptions } from './stats/stats.verb.ts';
 export { BY_KEYS, statsLine, statsLines, statsQueryOf } from './stats/index.ts';
 export type { ByKey, QueryKey, Stats, StatsQuery } from './stats/index.ts';
-export { list, unjudgedOf } from './list/list.verb.ts';
+export { list, runReading, unjudgedOf } from './list/list.verb.ts';
+export type { ReadingHow, RunReading } from './list/list.verb.ts';
 export type { Answered, Decided } from './decide/decide.verb.ts';
 export type { DecideCommand } from './decide/decide.ts';
-export type { Unjudged } from './list/list.verb.ts';
+export type { RunsListed, Unjudged } from './list/list.ts';

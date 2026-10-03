@@ -2,9 +2,9 @@
  * What `wf ls` shows of a run and each of its steps (`listing`), and the words it and the board say of a wait: a harness's (`waitingWords`,
  * `harnessWaitLine`), a denial's (`deniedWords`), a person's (`onYouWords`). Pure.
  */
-import { gated, hasStarted, waitWord, type Wait } from '../wait/wait.ts';
+import { gated, hasStarted, holdAdvice, holdWord, waitAdvice, waitWord, type Wait } from '../wait/wait.ts';
 import { slotWord, type CheckoutHold, type RunSlot } from '../cap/cap.ts';
-import { checkoutWord, LANDED_CAP, landedWords, onBaseNote, type ToDecide } from '../ending/ending.ts';
+import { checkoutWord, LANDED_CAP, landedWords, onBaseNote, toDecideWords, type ToDecide } from '../ending/ending.ts';
 import type { Workflow } from '../step/step.ts';
 import {
   DENIED_CAP,
@@ -43,14 +43,17 @@ import { acceptedNote, exhaustedNote, heldLater, heldNote, roundDueNote, roundsD
 import { saidWord } from '../say/say.ts';
 import { assess } from '../tick/assess.ts';
 import { neverApproved } from '../prune/prune.ts';
+import { daemonLine, type DaemonStanding } from '../daemon/daemon.ts';
 
 export type Listing = {
   /**
    * One line per step: its name, what to say about it, and the branch it is on — and, only for a step tried
    * again or about to be, `note`: the try it is on and how it got there (`tryNote`), or the try due (`dueNote`).
-   * Beside the status and never in it, so the words stay the vocabulary a reader of them keys on.
+   * Beside the status and never in it, so the words stay the vocabulary a reader of them keys on: so are `waits`, what the harness says a
+   * `needs-human` session waits for (`waitingWords`), and `denied`, what its current try was denied (`deniedWords`), which `wf ls` prints
+   * in the line (`shownStatus`, `shownNote`) and the board does not.
    */
-  steps: Array<{ name: string; status: string; branch: string | null; note?: string; cost?: string }>;
+  steps: Array<{ name: string; status: string; branch: string | null; note?: string; cost?: string; waits?: string; denied?: string }>;
   /**
    * Steps a person has to act on — blocked, unsigned, refused by their check, or awaiting approval, with no try due — on a run nobody has
    * called off, pruned or held.
@@ -80,6 +83,76 @@ export type Listing = {
    */
   toDecide?: ToDecide;
 };
+
+/** A run left unjudged (`unjudgedOf` in list.verb.ts): why, in one sentence, and each step's word with the branch it works on. */
+export type Unjudged = { said: string; steps: Array<{ name: string; status: string; branch?: string }> };
+
+/**
+ * `wf ls`'s answer (`runsListed` in list.verb.ts): each run with its record, judged or left unjudged, and its result branches
+ * (`resultBranches`); and whether a wf up ticks the store.
+ */
+export type RunsListed = { runs: Array<{ run: Run; listed: Listing | Unjudged; result: string[] }>; daemon: DaemonStanding };
+
+/** What `listing` reads a run's steps off: the run, the engine's words for its tasks, and what people and git said of it. */
+export interface ListingInput {
+  /** The run's steps, as the frozen folder names them, in its order. */
+  readonly steps: readonly Workflow[];
+  /** The run whose steps are listed. */
+  readonly run: Run;
+  /** The engine's own word for a task's phase — `running (working)`, `needs-human` — shown as-is. */
+  readonly phaseOf: (taskId: string) => string;
+  /** Each step's closeout, or the error that kept it from being read. */
+  readonly closeoutOf: (step: string) => Closeout | { error: string } | undefined;
+  /** Whether a task was asked its closeout, and what it was asked. */
+  readonly askedCloseout?: (taskId: string) => CloseoutAsked;
+  /** What a refused check exited with, as its log tells it. */
+  readonly verdictOf?: (step: string) => Verdict | undefined;
+  /** What people asked for with `wf retry`, and the run has not consumed yet. */
+  readonly asks?: readonly RetryAsk[];
+  /** What people asked for with `wf round`, and the run has not consumed yet. */
+  readonly roundAsks?: readonly RoundAsk[];
+  /** Every ask that carried a message, waiting or consumed (`readAnswers`): what says a step's try was answered (`answerOf`). */
+  readonly answers?: readonly RetryAsk[];
+  /** The runs this run waits on that have not shipped (`waitsOf`): what its roots say where `waiting` would be. */
+  readonly waits?: readonly Wait[];
+  /**
+   * How many times a person said something to each step's current try while it ran (`wf say`), off the engine's `said` on its
+   * task.
+   */
+  readonly saidTo?: (step: string) => number;
+  /** What each task's sessions cost (`taskSpend`): a step over its budget, or ended at it, with the amounts. */
+  readonly spendOf?: SpendOf;
+  /** The cap on runs in flight holding this run (`heldRuns`), if it does: what its roots say where `waiting` would be. */
+  readonly slot?: RunSlot;
+  /**
+   * Where each result branch stands against the base branch, as git says it on this pass (`branchStandings` in
+   * branches.store.ts): what says a finished run is one nobody has decided.
+   */
+  readonly standings?: readonly BranchStanding[];
+  /**
+   * The run whose `workspace: main` step is in the repository's own checkout while this run's waits for it (`checkoutHold` in
+   * ending.verb.ts): what this run's ending says where `waiting` would be.
+   */
+  readonly checkout?: CheckoutHold;
+  /**
+   * What the harness says a blocked session waits for, in its own words (`TaskView.waitingFor`): the row's `waits` beside
+   * the engine's `needs-human`. **Beside the word, never in it.** `phaseOf` is compared for `needs-human` exactly, here and by everything
+   * that reads a step's status — `harnessBlocked` in views.verb.ts, the api's `needsOf`, `stepState` on the board — so the status stays the
+   * engine's bare word, and only what `wf ls` prints gains the harness's (`shownStatus`).
+   */
+  readonly waitingOf?: (taskId: string) => string | undefined;
+  /**
+   * What each task's sessions were denied, as permission rules name them (`deniedOf` in views.verb.ts): the row's `denied`,
+   * `denied: Skill(look), Bash(pytest)` (`deniedWords`), for the step's current try, and neither in its status nor its note; `wf ls`
+   * prints it last in the note (`shownNote`), and the api carries the list as a field of its own (`StepNeeds.denied`).
+   */
+  readonly deniedOf?: (taskId: string) => readonly string[];
+  /**
+   * The runs a held run waits on to ship, as `holdsOf` reads them: said where `waiting on you` would be (`holdWord`). Left out,
+   * the runs the hold names, each taken as one that may still ship.
+   */
+  readonly holds?: readonly Wait[];
+}
 
 /**
  * What `wf ls` shows for each step of a run. Pure, like `decision`, and tested the same way.
@@ -117,53 +190,27 @@ export type Listing = {
  * are free text in a padded column; at its gate, the approval and the send-back; what the run did with an
  * ending's merge (`landed`), unless it found nothing staged; how many times it was spoken to; and what it
  * was denied. Its cost goes beside its word once measured, unless the word already shows it.
- *
- * @param phaseOf The engine's own word for a task's phase — `running (working)`, `needs-human` — shown as-is.
- * @param verdictOf What a refused check exited with, as its log tells it.
- * @param asks What people asked for with `wf retry`, and the run has not consumed yet.
- * @param roundAsks What people asked for with `wf round`, and the run has not consumed yet.
- * @param answers Every ask that carried a message, waiting or consumed (`readAnswers`): what says a step's try was answered (`answerOf`).
- * @param waits The runs this run waits on that have not shipped (`waitsOf`): what its roots say where `waiting` would be.
- * @param saidTo How many times a person said something to each step's current try while it ran (`wf say`), off the engine's `said` on its
- *   task.
- * @param spendOf What each task's sessions cost (`taskSpend`): a step over its budget, or ended at it, with the amounts.
- * @param slot The cap on runs in flight holding this run (`heldRuns`), if it does: what its roots say where `waiting` would be.
- * @param standings Where each result branch stands against the base branch, as git says it on this pass (`branchStandings` in
- *   branches.store.ts): what says a finished run is one nobody has decided.
- * @param checkout The run whose `workspace: main` step is in the repository's own checkout while this run's waits for it (`checkoutHold` in
- *   ending.verb.ts): what this run's ending says where `waiting` would be.
- * @param waitingOf What the harness says a blocked session waits for, in its own words (`TaskView.waitingFor`): said beside the engine's
- *   `needs-human` on the step's line, and nowhere else. **Beside the word, never in it.** `phaseOf` is compared for `needs-human` exactly,
- *   here and by everything that reads a step's status — `harnessBlocked` in views.verb.ts, the api's `needsOf`, `stepState` on the board —
- *   so the phase a decision is made on stays the engine's bare word, and only what `wf ls` prints gains the harness's. `list` in
- *   list.verb.ts passes this; the api does not, and its step's `status` reaches the board's chip unchanged.
- * @param deniedOf What each task's sessions were denied, as permission rules name them (`deniedOf` in views.verb.ts): said as
- *   `denied: Skill(look), Bash(pytest)` (`deniedWords`) in the note after the step's line, for the step's current try, and nowhere in its
- *   status — which stays the word every reader compares exactly. `list` in list.verb.ts passes this; the api does not, and carries the list
- *   as a field of its own (`StepNeeds.denied`).
- * @param holds The runs a held run waits on to ship, as `holdsOf` reads them: said where `waiting on you` would be (`holdWord`). Left out,
- *   the runs the hold names, each taken as one that may still ship.
  */
-export function listing(
-  steps: readonly Workflow[],
-  run: Run,
-  phaseOf: (taskId: string) => string,
-  closeoutOf: (step: string) => Closeout | { error: string } | undefined,
-  askedCloseout: (taskId: string) => CloseoutAsked = () => false,
-  verdictOf: (step: string) => Verdict | undefined = () => undefined,
-  asks: readonly RetryAsk[] = [],
-  roundAsks: readonly RoundAsk[] = [],
-  answers: readonly RetryAsk[] = [],
-  waits: readonly Wait[] = [],
-  saidTo: (step: string) => number = () => 0,
-  spendOf: SpendOf = () => undefined,
-  slot?: RunSlot,
-  standings: readonly BranchStanding[] = [],
-  checkout?: CheckoutHold,
-  waitingOf: (taskId: string) => string | undefined = () => undefined,
-  deniedOf: (taskId: string) => readonly string[] = () => [],
-  holds?: readonly Wait[],
-): Listing {
+export function listing({
+  steps,
+  run,
+  phaseOf,
+  closeoutOf,
+  askedCloseout = () => false,
+  verdictOf = () => undefined,
+  asks = [],
+  roundAsks = [],
+  answers = [],
+  waits = [],
+  saidTo = () => 0,
+  spendOf = () => undefined,
+  slot,
+  standings = [],
+  checkout,
+  waitingOf = () => undefined,
+  deniedOf = () => [],
+  holds,
+}: ListingInput): Listing {
   const waiting = gated(run) ? [...waits] : [];
   const held = slot && !waiting.length && !hasStarted(run) && !run.cancelledAt ? slot : undefined;
   const settledOf = (taskId: string): TaskPhase => {
@@ -226,10 +273,8 @@ export function listing(
     const taskId = run.steps[step.name]?.taskId;
     const landed = run.steps[step.name]?.landed;
     const landing = landed && !('untouched' in landed) ? oneLine(landedWords(run, landed), LANDED_CAP) : '';
-    const note = [tried, gate, landing, saidWord(saidTo(step.name)), taskId ? deniedWords(deniedOf(taskId)) : '']
-      .filter(Boolean)
-      .join(' · ');
-    return { ...row, ...(note ? { note } : {}), ...cost };
+    const note = [tried, gate, landing, saidWord(saidTo(step.name))].filter(Boolean).join(' · ');
+    return { ...row, ...(note ? { note } : {}), ...deniedRow(taskId ? deniedOf(taskId) : []), ...cost };
   });
 
   function lineOf(step: Workflow): Listing['steps'][number] {
@@ -281,7 +326,7 @@ export function listing(
     const said = !c ? '' : 'error' in c ? ' · closeout unreadable' : ` · ${c.outcome === 'blocked' ? 'BLOCKED' : 'done'}`;
     const word = status === 'unsigned' || status === 'unverified' || !taskId ? status : phaseOf(taskId);
     const waitsFor = taskId && word === 'needs-human' ? waitingOf(taskId) : undefined;
-    return { name, status: `${word}${waitsFor ? `: ${waitingWords(waitsFor)}` : ''}${said}`, branch };
+    return { name, status: `${word}${said}`, branch, ...(waitsFor ? { waits: waitingWords(waitsFor) } : {}) };
   }
 
   function budgetStatus(step: Workflow, status: StepStatus): string {
@@ -389,6 +434,17 @@ export const answerIn = (session: string | null, remote?: { run: string; step: s
 export const harnessWaitLine = (waitingFor: string, session: string | null, remote?: { run: string; step: string }): string =>
   `${waitingWords(waitingFor)} — ${answerIn(session, remote)}`;
 
+/** A row's `denied`, what a step's current try was denied (`deniedWords`); none for a step denied nothing. */
+const deniedRow = (denied: readonly string[]): { denied?: string } => (denied.length ? { denied: deniedWords(denied) } : {});
+
+/** A step's word as `wf ls` prints it: the bare `needs-human` the row's status keeps, then what the harness says it waits for (`waits`). */
+export const shownStatus = (s: Pick<Listing['steps'][number], 'status' | 'waits'>): string =>
+  s.waits ? s.status.replace(/^needs-human/, (word) => `${word}: ${s.waits}`) : s.status;
+
+/** A step's note as `wf ls` prints it: the row's note, then what its current try was denied (`denied`), last. */
+export const shownNote = (s: Pick<Listing['steps'][number], 'note' | 'denied'>): string | undefined =>
+  [s.note, s.denied].filter(Boolean).join(' · ') || undefined;
+
 /**
  * A step at its gate, beside its line on `wf ls`: the two things a person can say, as the commands that say them. The send-back goes to
  * the step itself once it has run, and to the work it would act on at an ending step's gate, which holds before it is filed (`sendBackTo`).
@@ -407,3 +463,56 @@ const gateNote = (run: Pick<Run, 'id' | 'pruned' | 'hold'>, step: string, back: 
  */
 export const onYouWords = (l: Pick<Listing, 'steps' | 'waitingOnYou'>): string[] =>
   l.waitingOnYou.map((name) => (l.steps.find((s) => s.name === name)?.status === 'awaiting approval' ? `approve ${name}` : name));
+
+/** What `wf ls` says a run asks beneath its steps: its ending's gate once, what waits on a person, a hold, and its result. */
+function asksLines(run: Run, { steps, waitingOnYou, waiting, holding, toDecide }: Listing, result: readonly string[]): string[] {
+  const lines: string[] = [];
+  if (toDecide) lines.push(`   → to decide: ${toDecideWords(run, toDecide)}`);
+  const onYou = onYouWords({ steps, waitingOnYou }).filter(
+    (said) => !(toDecide?.kind === 'approve' && said === `approve ${toDecide.step}`),
+  );
+  if (onYou.length) lines.push(`   → waiting on you: ${onYou.join(', ')}  —  wf decide ${run.id}`);
+  if (waiting.some((w) => w.missing || w.cancelledAt || w.gone?.length)) lines.push(`   → waiting on you: ${waitAdvice(run, waiting)}`);
+  if (holding) {
+    const never = !holding.length || holding.some((w) => w.missing || w.cancelledAt || w.gone?.length);
+    const lifting = holding.length > 0 && holding.every((w) => w.shipped);
+    lines.push(
+      `   → ${holdWord(holding, run.hold)}${never ? `: ${holdAdvice(run, holding)}` : lifting ? '' : `  —  wf hold ${run.id} --off lifts it`}`,
+    );
+  }
+  if (result.length) lines.push(`   → result: ${result.join(', ')}  —  wf decide ${run.id}`);
+  return lines;
+}
+
+/**
+ * A run's lines on `wf ls`: its brief and what it cost, a step a line — its word with what the harness says it waits for (`shownStatus`),
+ * its cost, its branch, and its note with what it was denied (`shownNote`) — and what it asks; unjudged, its steps and why.
+ */
+function runLines({ run, listed, result }: RunsListed['runs'][number]): string[] {
+  const calledOff = `${run.cancelledAt ? '  (cancelled)' : ''}${run.pruned ? '  (pruned)' : ''}`;
+  if ('said' in listed) {
+    const width = Math.max(20, ...listed.steps.map((s) => s.status.length));
+    return [
+      `${run.id}  ${run.brief.split('\n')[0].slice(0, 56)}${calledOff}`,
+      ...listed.steps.map((s) => `   ${s.name.padEnd(14)} ${s.status.padEnd(width)} ${s.branch ?? ''}`),
+      `   → unreadable: ${listed.said}`,
+    ];
+  }
+  const { steps, cost } = listed;
+  const said = steps.map((s) => `${shownStatus(s)}${s.cost ? `  ${s.cost}` : ''}`);
+  const width = Math.max(20, ...said.map((w) => w.length));
+  return [
+    `${run.id}  ${run.brief.split('\n')[0].slice(0, 56)}${calledOff}${cost ? `  ${cost}` : ''}`,
+    ...steps.map((s, i) => {
+      const note = shownNote(s);
+      return `   ${s.name.padEnd(14)} ${said[i].padEnd(width)} ${s.branch ?? ''}${note ? `  · ${note}` : ''}`;
+    }),
+    ...asksLines(run, listed, result),
+  ];
+}
+
+/** Every line `wf ls` prints of its answer at `now`: `no runs` for none, each run's lines, and whether a wf up ticks the store. */
+export const lsLines = ({ runs, daemon }: RunsListed, now: number): string[] => [
+  ...(runs.length ? runs.flatMap(runLines) : ['no runs']),
+  daemonLine(daemon, now),
+];

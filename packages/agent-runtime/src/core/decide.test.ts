@@ -585,11 +585,17 @@ const endedWith = (observed: Ended, reason: 'harness' | 'lost' | 'unstartable', 
   },
 ];
 
+/** The note a task settles failed with after one attempt ended for `reason`: a refused spawn says its words and the fix. */
+const noteOf = (reason: 'lost' | 'unstartable' | 'harness') =>
+  reason === 'unstartable'
+    ? '1 attempt(s), none succeeded: the last could not start: refused; fix what it names and file the task again'
+    : '1 attempt(s), none succeeded';
+
 test("an attempt that ended LOST, UNSTARTABLE or on its harness's failure settles the task failed: trying again is the layer above's", () => {
   for (const reason of ['lost', 'unstartable', 'harness'] as const) {
     assert.deepEqual(
       decide(fold(TASK, endedWith('failed', reason)), seen(), now(9)),
-      { do: 'settle', outcome: 'failed', note: '1 attempt(s), none succeeded' },
+      { do: 'settle', outcome: 'failed', note: noteOf(reason) },
       reason,
     );
   }
@@ -599,7 +605,7 @@ test('a journal an older runtime wrote, filed with attempts to spare and `resume
   for (const reason of ['lost', 'unstartable', 'harness'] as const) {
     const s = fold(TASK, endedWith('failed', reason, legacyFiled()));
     assert.equal('maxAttempts' in s || 'resume' in s, false, `${reason}: the retired keys are folded unread`);
-    assert.deepEqual(decide(s, seen(), now(9)), { do: 'settle', outcome: 'failed', note: '1 attempt(s), none succeeded' }, reason);
+    assert.deepEqual(decide(s, seen(), now(9)), { do: 'settle', outcome: 'failed', note: noteOf(reason) }, reason);
   }
   assert.deepEqual(
     fold(TASK, [legacyFiled()]),
@@ -651,7 +657,7 @@ test('a continuation whose spawn was REFUSED settles failed, and its attempt kee
   };
   for (const first of [undefined, legacyFiled({ resumeFrom: 'sess-1' })]) {
     const s = fold(TASK, continuation([refused], first));
-    assert.deepEqual(decide(s, seen(), now(9)), { do: 'settle', outcome: 'failed', note: '1 attempt(s), none succeeded' });
+    assert.deepEqual(decide(s, seen(), now(9)), { do: 'settle', outcome: 'failed', note: noteOf('unstartable') });
     assert.deepEqual(
       s.attempts.map((a) => [a.resumeFrom, a.nativeId, a.reason]),
       [['sess-1', null, 'unstartable']],
@@ -1011,7 +1017,11 @@ test("HELD OPEN: a turn is one attempt — one that fails, is lost or cannot sta
       error: 'refused',
     },
   ]);
-  assert.deepEqual(decide(unstartable, seen(), now(70_000)), settled, 'unstartable');
+  assert.deepEqual(
+    decide(unstartable, seen(), now(70_000)),
+    { ...settled, note: `${settled.note}: the last could not start: refused; fix what it names and file the task again` },
+    'unstartable, in its words and the fix',
+  );
   const legacy = fold(TASK, [
     ...held({ maxAttempts: 3, resume: 'always' } as object),
     answer(60_000),

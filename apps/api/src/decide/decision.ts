@@ -12,12 +12,13 @@ import {
   type DecideCommand,
   diffStat,
   lessonLine,
+  parentsOf,
   resultSteps,
   sensitiveDiff,
   touchedBy,
 } from 'agent-orchestrator';
-import { type CheckoutHold, type GitRun, isGitRun, type Run, type RunSlot } from 'agent-orchestrator/run';
-import { holdingOf, holdsIn, judge, type RunHolding, type RunWaiting, waitingOf, waitsIn } from '../runs/judged.ts';
+import { type CheckoutHold, type GitRun, holdsOf, isGitRun, type Run, type RunSlot, waitsOf } from 'agent-orchestrator/run';
+import { holdingOf, judge, type RunHolding, type RunWaiting, waitingOf } from '../runs/judged.ts';
 import { mergesOnto, mergeWord, type MergeWord } from './merge.ts';
 import { type Engine, judgedSteps, stepNames, viewsOf, workflowsOf } from '../store.ts';
 import { type StepUsed, totalOf, usedOf } from '../detail/usage.ts';
@@ -175,8 +176,9 @@ const DECIDE = COMMANDS.find((c) => c.name === 'decide')!;
  * What `wf decide` shows a person about a run, decided by the package (`DECIDE`, the table's entry whose handler is `decideRun`): its
  * decision, commands (`choicesOf`), costs and checkout, read with the branches and diffs the api reads beside them.
  *
- * First, as `wf decide` asks it first: a run whose roots wait on runs that have not shipped is `waiting`, and nothing else is read. Then a
- * run a person holds is `holding`, and nothing else is read either: what is in flight is on its detail, and nothing is offered. A run still
+ * First, as `wf decide` asks it first, off the runs it waits on and is held until, each read once (`parentsOf`): a run whose roots wait
+ * on runs that have not shipped is `waiting`, and none of its tasks is read. Then a run a person holds is `holding`, and none is read
+ * either: what is in flight is on its detail, and nothing is offered. Else the run is judged (`judge`) over those runs. A run still
  * running with nobody waited on (`judge`, the listing's word) is `running`, with the slot the cap holds it for — its `WF_MAX_RUNS` before
  * any pass is `env`'s, the app's environment, as `GET /api/ceilings` reads it — and git is not asked a thing: the page asks while a run is
  * decidable, and the Factory's card only for a run waiting on you, but a request is a request. Called off, or already shipped, is
@@ -190,14 +192,13 @@ const DECIDE = COMMANDS.find((c) => c.name === 'decide')!;
  * `standings` are none for a run that worked on its base branch itself, whose standing would read `main is on main`.
  */
 export async function decisionOf(run: Run, e: Engine['Service'], home: string, env: NodeJS.ProcessEnv): Promise<RunDecision> {
-  const waits = await waitsIn(run, e);
-  const waiting = waitingOf(run, waits);
-  const holds = await holdsIn(run, e);
-  const holding = holdingOf(run, holds);
+  const parent = await parentsOf(e, run);
+  const waiting = waitingOf(run, waitsOf(run, parent));
+  const holding = holdingOf(run, holdsOf(run, parent));
   if (waiting) return { waiting, ...(holding ? { holding } : {}) };
   if (holding) return { holding };
   const folder = workflowsOf(run, home).steps;
-  const judged = judge(run, stepNames(run, folder), folder, await viewsOf(run, e), waits, holds);
+  const judged = await judge(run, stepNames(run, folder), folder, await viewsOf(run, e), { reader: e, parent });
   if (judged.status === 'cancelled') return { nothing: `cancelled at ${run.cancelledAt} — nothing to decide` };
   const decided = (await DECIDE.handler(e, { runId: run.id }, env)) as Decided;
   if (judged.status === 'running' && !judged.waitingOnYou.length) return { running: true, ...(decided.held ? { held: decided.held } : {}) };

@@ -8,9 +8,22 @@ export class RunnerError extends Schema.TaggedError<RunnerError>()('RunnerError'
   verb: Schema.String,
   message: Schema.String,
   /**
-   * The harness vouches that nothing started: no session can exist under the name. Set by a spawn,
-   * and only when that is certain — the OS would not create the process, or a detached worker was
-   * never launched. Absent, a failed spawn may still have left a session running.
+   * The harness vouches that nothing started, and that waiting will not change that: no session can exist under the name.
+   * Set by a spawn, and only when that is certain — the OS would not create the process for a reason that stays (no binary,
+   * no cwd, a file it cannot write: `refusedOsError`), or a detached worker was never launched. Absent, a failed spawn may
+   * still have left a session running, or failed for a short-lived reason, and the grace window judges it.
    */
   refused: Schema.optionalKey(Schema.Boolean),
 }) {}
+
+/** The OS errors a spawn may fail with for a short-lived reason — no process slot, no descriptor, no memory — that waiting can clear. */
+export const TRANSIENT_ERRNOS: readonly string[] = ['EAGAIN', 'EMFILE', 'ENFILE', 'ENOMEM'];
+
+/**
+ * Whether `cause`, an error a spawn failed with before anything started, refuses it: true unless its `code` is one of
+ * `TRANSIENT_ERRNOS`, which a later try may not meet.
+ */
+export const refusedOsError = (cause: unknown): boolean => {
+  const code = (cause as NodeJS.ErrnoException | undefined)?.code;
+  return typeof code !== 'string' || !TRANSIENT_ERRNOS.includes(code);
+};

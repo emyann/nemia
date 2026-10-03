@@ -125,7 +125,11 @@ test('a remote step whose Task waits on its caller is answered with wf say, and 
     },
   });
   const run = oneStep('r-asks', 'a2a:reviewer', 't-asks');
-  const judged = { words: new Map([['ask', 'needs-human']]), waitingOnYou: [] as string[] };
+  const judged = {
+    words: new Map([['ask', 'needs-human']]),
+    waitingOnYou: [] as string[],
+    beside: new Map([['ask', { waits: 'waiting for an input' }]]),
+  };
   assert.deepEqual(needsOf(run, 'ask', new Map([['t-asks', view('a2a:reviewer')]]), judged).waitingFor, {
     words: 'waiting for an input',
     advice: 'read its question with wf logs r-asks ask, and answer it with wf say r-asks ask "<your answer>"',

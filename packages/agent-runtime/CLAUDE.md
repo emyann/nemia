@@ -121,7 +121,8 @@ What Claude Code does as the steps meet it. Where the orchestrator's code holds 
   session.** Never resume a session it is respawning: a long-lived restart waits for the old one's end and release
   (`restartOf`, `src/core/long-lived.test.ts`); its listing in the gap is `blocked` with no `pid` (`respawning`).
 - **A job (`claude -p`) never waits on a prompt; a background session in a folder nobody opened blocks in any mode that can ask**:
-  in the orchestrator today, `validateFolderMode` judges only `background: true`, which must run `dontAsk` or `bypassPermissions`.
+  the modes that ask nobody are this package's answer (`unasking` in `fenceReach`, `src/harness/reach.ts`), and the orchestrator's
+  `validateFolderMode` refuses a `background: true` step of a folder team in any other.
 - **A job reads neither user settings nor `settings.local.json`** (`--setting-sources project`): what a step needs goes on the step, its
   agent or the checkout's `.claude/settings.json`.
 - **A write is matched against `Edit` rules only**: write `allowedTools: Edit(**)`, never `Write(path)` (in the orchestrator today:

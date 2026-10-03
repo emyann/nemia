@@ -201,7 +201,7 @@ const HARNESS_WORDS: Baseline = {
   'packages/agent-orchestrator/src/workflow.ts': { count: 1, ...MOVES.knobs },
   'packages/agent-orchestrator/src/workflow/fence.ts': { count: 1, ...MOVES.knobs },
   'packages/agent-orchestrator/src/workflow/step-file.ts': { count: 14, ...MOVES.knobs },
-  'packages/agent-orchestrator/src/workflow/validate.ts': { count: 27, ...MOVES.knobs },
+  'packages/agent-orchestrator/src/workflow/validate.ts': { count: 22, ...MOVES.knobs },
   'packages/agent-orchestrator/src/workspace/workspace.ts': { count: 5, card: 'slice-2' },
   'packages/agent-orchestrator/src/workspace/worktree.store.ts': { count: 2, card: 'slice-2' },
 };

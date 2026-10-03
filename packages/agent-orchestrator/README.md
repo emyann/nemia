@@ -2513,8 +2513,9 @@ $ wf start "add a flag" --workflows build
 - **Refused, `Invalid`, before anything is written**: a folder no factory holds, naming the factories there are, the `--factory`
   (`?factory=` on the api) that names one, and the `wf factory add` and `attach` that file one on it (`noFactoryRefusal`); a folder
   two factories hold, nested repositories among them, naming each and the flag that picks it (`ambiguousFactoryRefusal`); and a start
-  that names `default`, which holds history and starts nothing (`defaultStartRefusal`). On the api, `?factory=default` is no factory
-  named, as the board never sends it, and is resolved.
+  that names `default` — `--factory default`, `factory: default`, or `?factory=default` on the api's start, of a workflow or a card —
+  which holds history and starts nothing (`defaultStartRefusal`), even with the test switch on. A read with `?factory=default` is the
+  default factory's.
 - **A card is started only in the factory named for it**: its `factory:`, or `--factory` (`?factory=`) over it — never one found
   from its folder or its `repo:`, which two factories can hold. A card that names none is refused, naming the line that names one
   (`unfactoredCardRefusal`); a queued one is refused wherever the daemon runs, not tried again while it reads the same, and `wf inbox`

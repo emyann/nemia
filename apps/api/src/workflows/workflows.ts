@@ -26,6 +26,7 @@ import {
   agentsFor,
   agentVersion,
   cardSkills,
+  DEFAULT_FACTORY,
   fillsOf,
   inboxNameRefusal,
   loadWorkflows,
@@ -659,9 +660,10 @@ function cardStarted(asked: Extract<Asked, { card: string }>, repo: string, fact
  *   the run is started in it (`start()`'s `factory`), which refuses a workflow it has not attached, a step its hires leave unfilled and a
  *   repository outside it, each an `Invalid`; a card is started in it too, the request's factory over the card's `factory:`, as
  *   `wf start <card> --factory` starts it, and refused as `start()` refuses, the card left in the inbox. Every run is started in a
- *   factory: a start that names none (no `?factory=`, or `default`) runs in the one factory whose repository holds the api's repository,
- *   or `?repo=`, on that repository (`startFactory`, as `wf start` finds it), and is refused, `Invalid`, where none or two do; a card
- *   that names none either way is refused, `Invalid` (`unfactoredCardRefusal`), never started in a factory found from its repository.
+ *   factory: a start that names none runs in the one factory whose repository holds the api's repository, or `?repo=`, on that
+ *   repository (`startFactory`, as `wf start` finds it), and is refused, `Invalid`, where none or two do; a card that names none either
+ *   way is refused, `Invalid` (`unfactoredCardRefusal`), never started in a factory found from its repository; and `?factory=default`,
+ *   of a workflow or a card, is refused, `Invalid` (`defaultStartRefusal`): the default factory holds history, and no start names it.
  */
 export const workflows = new Hono<ApiEnv>()
   .get('/api/workflows', (c) => served(c, ({ repo, home, factory }) => c.json(listWorkflows(repo, home, factory))))
@@ -711,12 +713,13 @@ export const workflows = new Hono<ApiEnv>()
       if ('status' in read) return c.json({ error: read.error }, read.status);
       const asked = startOf(read.body, repo, home);
       if ('status' in asked) return c.json({ error: asked.error }, asked.status);
+      const named = c.req.query('factory') === DEFAULT_FACTORY ? DEFAULT_FACTORY : factory?.name;
       if (asked.card !== undefined) {
-        const started = cardStarted(asked, repo, factory?.name);
+        const started = cardStarted(asked, repo, named);
         c.header('Location', `/api/runs/${encodeURIComponent(started.id)}`);
         return c.json(started, 201);
       }
-      const found = factory ? { factory, repo } : startFactory(undefined, repo, '?factory=<name>');
+      const found = factory ? { factory, repo } : startFactory(named, repo, '?factory=<name>');
       const { id } = start({
         brief: asked.brief,
         repo: found.repo ?? repo,

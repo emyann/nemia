@@ -275,7 +275,8 @@ function asShipped(t: { after: (fn: () => void) => void }): string {
   attachWorkflow({ factory: 'trio', workflow: 'delta' });
   t.after(() => {
     removeFactory('trio');
-    if (was !== undefined) process.env.WF_DEFAULT_FACTORY_STARTS = was;
+    if (was === undefined) delete process.env.WF_DEFAULT_FACTORY_STARTS;
+    else process.env.WF_DEFAULT_FACTORY_STARTS = was;
   });
   return repoT;
 }
@@ -288,7 +289,7 @@ test('as shipped, POST /api/runs with no ?factory= starts the run in the one fac
   assert.deepEqual([run.factory, run.repo], ['trio', repoT]);
 });
 
-test('REFUSED as shipped: POST /api/runs with no ?factory= on a repository three factories hold, or one none holds, or ?factory=default, is a 422 naming ?factory=, and nothing is written', async (t) => {
+test('REFUSED as shipped: POST /api/runs with no ?factory= on a repository three factories hold, or one none holds, is a 422 naming ?factory=, and nothing is written', async (t) => {
   asShipped(t);
   const before = runFiles();
   const shared = await post(`/api/runs?repo=${encodeURIComponent(repoR)}`, { workflow: 'alpha', brief: 'Add a cache' });
@@ -297,15 +298,37 @@ test('REFUSED as shipped: POST /api/runs with no ?factory= on a repository three
     said(await shared.json()),
     /^\S+: 3 factories work on this folder — hired on \S+, pair on \S+, solo on \S+ — .* Name the one: \?factory=hired, or \?factory=pair, or \?factory=solo\. Nothing was started\.$/,
   );
-  for (const url of ['/api/runs', '/api/runs?factory=default']) {
-    const loose = await post(url, { workflow: 'beta', brief: 'Add a cache' });
-    assert.equal(loose.status, 422, url);
+  const loose = await post('/api/runs', { workflow: 'beta', brief: 'Add a cache' });
+  assert.equal(loose.status, 422);
+  assert.match(
+    said(await loose.json()),
+    new RegExp(`^${own}: no factory works on this folder, .* Name the factory — \\?factory=<name>, one of `),
+  );
+  assert.deepEqual(runFiles(), before, 'nothing written');
+});
+
+test('REFUSED: POST /api/runs?factory=default, of a workflow or a card, is a 422 naming ?factory=<name>, even with WF_DEFAULT_FACTORY_STARTS=1, though one factory alone holds the repository; nothing is written and the card stays', async (t) => {
+  const repoT = asShipped(t);
+  process.env.WF_DEFAULT_FACTORY_STARTS = '1';
+  const { card } = addToInbox({ text: 'Cache the trios', factory: 'trio' });
+  const before = runFiles();
+  const url = `/api/runs?factory=default&repo=${encodeURIComponent(repoT)}`;
+  for (const body of [
+    { workflow: 'delta', brief: 'Add a cache' },
+    { workflow: 'delta', card: card.name },
+  ]) {
+    const res = await post(url, body);
+    assert.equal(res.status, 422, JSON.stringify(body));
     assert.match(
-      said(await loose.json()),
-      new RegExp(`^${own}: no factory works on this folder, .* Name the factory — \\?factory=<name>, one of `),
-      url,
+      said(await res.json()),
+      /^`default` is the default factory: .* Name a factory — \?factory=<name>, one of .*\. Nothing was started\.$/,
+      JSON.stringify(body),
     );
   }
+  assert.ok(
+    readInbox().some((c) => c.name === card.name),
+    'the card is still there',
+  );
   assert.deepEqual(runFiles(), before, 'nothing written');
 });
 

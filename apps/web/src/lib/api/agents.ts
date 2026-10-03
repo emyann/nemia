@@ -235,3 +235,51 @@ const AgentTriedSchema = Schema.Struct({ id: Schema.String }) satisfies Schema.S
  */
 export const tryAgent = (name: string, brief: string): Promise<AgentTried> =>
   agentWrite('POST', `/api/agents/yours/${encodeURIComponent(name)}/try`, AgentTriedSchema, { brief }, TRIED);
+
+/**
+ * Mirrors `CustomInstructionsAnswer` in apps/api/src/custom/custom.ts: a person's custom instructions for the agent `name`, the file in your
+ * store they are kept in, the words (null for none), and the package's refusal of a file there that does not read (null when it reads).
+ */
+export type CustomInstructions = { name: string; file: string; words: string | null; error: string | null };
+
+/** Decodes a `CustomInstructions`. */
+const CustomInstructionsSchema = Schema.Struct({
+  name: Schema.String,
+  file: Schema.String,
+  words: Schema.NullOr(Schema.String),
+  error: Schema.NullOr(Schema.String),
+}) satisfies Schema.Schema<CustomInstructions>;
+
+/** Mirrors `CustomInstructionsCleared` in apps/api/src/custom/custom.ts: the file a clear looked at, and whether it removed words. */
+export type CustomInstructionsCleared = { name: string; file: string; removed: boolean };
+
+/** Decodes a `CustomInstructionsCleared`. */
+const CustomInstructionsClearedSchema = Schema.Struct({
+  name: Schema.String,
+  file: Schema.String,
+  removed: Schema.Boolean,
+}) satisfies Schema.Schema<CustomInstructionsCleared>;
+
+/** The route of an agent's custom instructions, by its name. */
+const customRoute = (name: string): string => `/api/custom-instructions/${encodeURIComponent(name)}`;
+
+/** A person's custom instructions for the agent `name`, read from the store on each request. */
+export const customInstructionsQuery = (name: string) =>
+  queryOptions({
+    queryKey: ['custom-instructions', name],
+    queryFn: () => get(customRoute(name), CustomInstructionsSchema),
+  });
+
+/** What a write of custom instructions may have done, and what to look at before writing them again. */
+const CUSTOM_WRITTEN = "The words may be written: read the agent's page again before saving again.";
+
+/**
+ * Write `words` as the custom instructions for the agent `name`: the words as they now read. Rejects with a `WriteRefusal` in the
+ * package's words: a name no place has (404), blank words or a frontmatter block (422).
+ */
+export const writeCustomInstructions = (name: string, words: string): Promise<CustomInstructions> =>
+  send('PUT', customRoute(name), CustomInstructionsSchema, { body: { words }, may: CUSTOM_WRITTEN });
+
+/** Remove the custom instructions for the agent `name`: whether there were any. Rejects with a `WriteRefusal` for a name no place has. */
+export const clearCustomInstructions = (name: string): Promise<CustomInstructionsCleared> =>
+  send('DELETE', customRoute(name), CustomInstructionsClearedSchema, { body: {}, may: CUSTOM_WRITTEN });

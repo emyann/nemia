@@ -20,7 +20,6 @@ import { decisionOf } from '../decide/index.ts';
 import { detail } from '../detail/index.ts';
 import {
   type Asked,
-  holdsIn,
   judge,
   needsOf,
   type RunHolding,
@@ -31,7 +30,6 @@ import {
   type Spent,
   standingsOf,
   type StepNeeds,
-  waitsIn,
 } from './judged.ts';
 import { type RunGraph, runGraph } from './graph.ts';
 import { restingRead } from './resting.ts';
@@ -155,9 +153,11 @@ async function summarize(run: Run, views: Views, reader: Engine['Service'], git:
   const folder = workflowsOf(run, home).steps;
   const names = stepNames(run, folder);
   const asked: Asked = { branches: [], failed: false };
-  const judged = judge(run, names, folder, views, await waitsIn(run, reader, git), await holdsIn(run, reader, git), (status, steps) =>
-    standingsOf(run, steps, status, git, asked),
-  );
+  const judged = await judge(run, names, folder, views, {
+    reader,
+    git,
+    standings: (status, steps) => standingsOf(run, steps, status, git, asked),
+  });
   const summary = {
     id: run.id,
     repo: run.repo ?? null,

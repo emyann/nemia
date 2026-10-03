@@ -48,7 +48,6 @@ import { loopSpan, remoteNameOf, type Workflow } from 'agent-orchestrator/workfl
 import { folderFiles, type StepArtifact } from '../steps/artifacts.ts';
 import { type RunGraph, runGraph } from '../runs/graph.ts';
 import {
-  holdsIn,
   judge,
   needsOf,
   type RunHolding,
@@ -59,7 +58,6 @@ import {
   spentOf,
   standingsOf,
   type StepNeeds,
-  waitsIn,
 } from '../runs/judged.ts';
 import { checksOf, refusedStderr, type StepCheck } from '../steps/logs.ts';
 import {
@@ -611,9 +609,7 @@ export async function detail(run: Run, { e, home, memo }: Pick<Served, 'e' | 'ho
   const names = stepNames(run, workflows);
   const { views, reader: seen, unreadable } = await viewsFor(e, [run]);
   const read = await judgedUnlessUnreadable(run, unreadable, async () =>
-    judge(run, names, workflows, views, await waitsIn(run, seen), await holdsIn(run, seen), (status, steps) =>
-      standingsOf(run, steps, status),
-    ),
+    judge(run, names, workflows, views, { reader: seen, standings: (status, steps) => standingsOf(run, steps, status) }),
   );
   if ('unreadable' in read) return { unjudged: read.unreadable };
   const judged = read.judged;

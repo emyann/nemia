@@ -36,6 +36,9 @@ function refusalOf(argv: readonly string[], spec: Spec = SPEC): string | undefin
   }
 }
 
+/** A handler, as `commandBreaks` asks only whether an entry has one. */
+const handler = (): undefined => undefined;
+
 const RETRY = COMMANDS.find((c) => c.name === 'retry')!;
 const SAY = COMMANDS.find((c) => c.name === 'say')!;
 
@@ -90,6 +93,36 @@ test('two ways are refused, and one way given twice counts as two', () => {
 test("a text flag's value given apart that is one of the command's flags is refused; joined, it is the value", () => {
   assert.equal(refusalOf(['r-1', '--note', '--slow']), 'APART --slow');
   assert.deepEqual(parseArgv(SPEC, ['r-1', '--note=--slow']), { mode: 'fast', runId: 'r-1', note: '--slow' });
+});
+
+const HOLDING: Spec = {
+  positionals: [{ key: 'runId', takes: 'required', kind: 'name' }],
+  flags: [
+    { flag: '--until', kind: 'text', key: 'until', takes: 'UNTIL TAKES', many: true },
+    { flag: '--off', kind: 'switch', key: 'off' },
+  ],
+  unknown: (arg) => `UNKNOWN ${arg}`,
+  missing: 'MISSING',
+};
+
+test('a flag given once for each value collects them in order, never refused as given twice', () => {
+  assert.deepEqual(parseArgv(HOLDING, ['r-1', '--until', 'a', '--until=b']), { runId: 'r-1', until: ['a', 'b'] });
+  assert.deepEqual(parseArgv(HOLDING, ['r-1', '--until', 'a']), { runId: 'r-1', until: ['a'] });
+  assert.equal(refusalOf(['r-1', '--until'], HOLDING), 'UNTIL TAKES');
+});
+
+test('a switch with a key sets it to true, given once or more', () => {
+  assert.deepEqual(parseArgv(HOLDING, ['r-1', '--off']), { runId: 'r-1', off: true });
+  assert.deepEqual(parseArgv(HOLDING, ['r-1', '--off', '--off']), { runId: 'r-1', off: true });
+  assert.equal(refusalOf(['r-1', '--off=yes'], HOLDING), 'UNKNOWN --off=yes');
+});
+
+test('a spec that says its refusal of a required argument left out says it where the CLI would print its help', () => {
+  assert.equal(refusalOf([], HOLDING), 'MISSING');
+  assert.equal(refusalOf([''], HOLDING), 'MISSING');
+  assert.equal(refusalOf(['--off'], HOLDING), 'MISSING');
+  assert.equal(refusalOf(['-x'], HOLDING), 'MISSING');
+  assert.equal(parseArgv(SPEC, ['-x'])?.runId, '-x');
 });
 
 test("retry's command line keeps today's refusals", () => {
@@ -197,22 +230,22 @@ test('the help prints no command the CLI does not serve', () => {
 
 test('a table breaks its rules: a name twice, an entry served nowhere, a command that is also a verb of the CLI', () => {
   const route = { method: 'POST', path: '/api/x', status: 202 } as const;
-  assert.deepEqual(commandBreaks([{ name: 'a', route }], ['b']), []);
-  assert.deepEqual(commandBreaks([{ name: 'a', only: { side: 'cli', why: 'w' } }], []), []);
+  assert.deepEqual(commandBreaks([{ name: 'a', route, handler }], ['b']), []);
+  assert.deepEqual(commandBreaks([{ name: 'a', only: { side: 'cli', why: 'w' }, handler }], []), []);
   assert.deepEqual(
     commandBreaks(
       [
-        { name: 'a', route },
-        { name: 'a', route: { ...route, path: '/api/y' } },
+        { name: 'a', route, handler },
+        { name: 'a', route: { ...route, path: '/api/y' }, handler },
       ],
       [],
     ),
     ['a is defined twice: a command is one entry of the table'],
   );
-  assert.deepEqual(commandBreaks([{ name: 'a' }], []), [
+  assert.deepEqual(commandBreaks([{ name: 'a', handler }], []), [
     'a has no route and no only: give it its route on the api, or say which side alone serves it, and why',
   ]);
-  assert.deepEqual(commandBreaks([{ name: 'a', route }], ['a']), [
+  assert.deepEqual(commandBreaks([{ name: 'a', route, handler }], ['a']), [
     'a is a command of the table and a verb of the CLI: take it out of VERBS',
   ]);
 });
@@ -223,8 +256,8 @@ test('a table breaks its rules: two entries routed on one method and path, of wh
   assert.deepEqual(
     commandBreaks(
       [
-        { name: 'a', route },
-        { name: 'b', route: { method: 'POST', path: '/api/x', status: 202 } },
+        { name: 'a', route, handler },
+        { name: 'b', route: { method: 'POST', path: '/api/x', status: 202 }, handler },
       ],
       [],
     ),
@@ -234,8 +267,8 @@ test('a table breaks its rules: two entries routed on one method and path, of wh
   assert.deepEqual(
     commandBreaks(
       [
-        { name: 'a', route, only },
-        { name: 'b', route, only },
+        { name: 'a', route, only, handler },
+        { name: 'b', route, only, handler },
       ],
       [],
     ),
@@ -245,8 +278,39 @@ test('a table breaks its rules: two entries routed on one method and path, of wh
 
 test('a table breaks its rules: a verb of the CLI is refused only against an entry the CLI serves', () => {
   const route = { method: 'GET', path: '/api/x', status: 200 } as const;
-  assert.deepEqual(commandBreaks([{ name: 'decide', route, only: { side: 'api', why: 'w' } }], ['decide']), []);
-  assert.deepEqual(commandBreaks([{ name: 'decide', route, only: { side: 'cli', why: 'w' } }], ['decide']), [
+  assert.deepEqual(commandBreaks([{ name: 'decide', route, only: { side: 'api', why: 'w' }, handler }], ['decide']), []);
+  assert.deepEqual(commandBreaks([{ name: 'decide', route, only: { side: 'cli', why: 'w' }, handler }], ['decide']), [
     'decide is a command of the table and a verb of the CLI: take it out of VERBS',
+  ]);
+});
+
+test('a table breaks its rules: an entry the api serves with no handler, and one the CLI serves alone with no handler nor runner', () => {
+  const route = { method: 'POST', path: '/api/x', status: 202 } as const;
+  const only = { side: 'cli', why: 'w' } as const;
+  assert.deepEqual(commandBreaks([{ name: 'a', only }], [], ['a']), []);
+  assert.deepEqual(commandBreaks([{ name: 'a', route }], [], ['a']), [
+    'a has no handler and is served on the api: give it a handler, or serve it on the CLI alone and run it there',
+  ]);
+  assert.deepEqual(commandBreaks([{ name: 'a', only }], []), [
+    "a has no handler and no runner: give it a handler, or a runner in the CLI's RUNS",
+  ]);
+});
+
+test('a table breaks its rules: a runner of the CLI that runs no entry the CLI serves', () => {
+  const route = { method: 'GET', path: '/api/x', status: 200 } as const;
+  assert.deepEqual(commandBreaks([{ name: 'a', route, only: { side: 'api', why: 'w' }, handler }], [], ['a', 'b']), [
+    'a has a runner and no entry the CLI serves: give it its entry in the table, or take it out of RUNS',
+    'b has a runner and no entry the CLI serves: give it its entry in the table, or take it out of RUNS',
+  ]);
+});
+
+test('a table breaks its rules: a key a route sets that no flag of its spec fills', () => {
+  const route = { method: 'DELETE', path: '/api/x', status: 200, sets: { off: true, mode: 'fast' } } as const;
+  assert.deepEqual(commandBreaks([{ name: 'a', route, spec: { ...HOLDING, flags: [...HOLDING.flags, ...SPEC.flags] }, handler }], []), []);
+  assert.deepEqual(commandBreaks([{ name: 'a', route, spec: SPEC, handler }], []), [
+    "a's route sets off, which no flag of its spec fills: name a key the command reads",
+  ]);
+  assert.deepEqual(commandBreaks([{ name: 'a', route, spec: HOLDING, handler }], []), [
+    "a's route sets mode, which no flag of its spec fills: name a key the command reads",
   ]);
 });

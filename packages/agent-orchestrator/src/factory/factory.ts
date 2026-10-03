@@ -263,7 +263,13 @@ const writableSaid = (workflow: string, step: Pick<Workflow, 'name' | 'writable'
  * factory's repositories (`repos`, resolved) have it as their directory's name, or the one that does is no directory at start — it is
  * not among `mounts`. The run's own repository (`own`) is the step's workspace already, and taken.
  */
-function writableNameRefusal(said: string, name: string, repos: readonly string[], own: string | undefined, mounts: readonly Mount[]): string | undefined {
+function writableNameRefusal(
+  said: string,
+  name: string,
+  repos: readonly string[],
+  own: string | undefined,
+  mounts: readonly Mount[],
+): string | undefined {
   const named = repos.filter((r) => path.basename(r) === name);
   if (!named.length) {
     const names = [...new Set(repos.map((r) => path.basename(r)))].sort().join(', ');

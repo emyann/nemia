@@ -47,10 +47,6 @@ const CARDS: Readonly<Record<string, string>> = {
 type Move = { move: string; to: string };
 type Entry = { reaches: readonly string[]; card: string } | ({ reaches: readonly string[] } & Move);
 
-const AGENTS_STORE: Move = {
-  move: "reading an agent's and a skill's files",
-  to: "packages/agent-orchestrator's agents and skills stores, read through its entry",
-};
 const FOLDER_STORE: Move = {
   move: "reading and writing a workflow's folder",
   to: "packages/agent-orchestrator's folder store, read and written through its entry",
@@ -62,11 +58,6 @@ const RUN_STORE: Move = {
 
 /** Each reader that reaches the machine today, with what it reaches and what moves it. */
 const MOVES: Readonly<Record<string, Entry>> = {
-  'src/agents/try.ts': {
-    reaches: ['node:fs'],
-    move: "writing a try's folder for an agent",
-    to: "packages/agent-orchestrator's agents store, as a verb of its entry",
-  },
   'src/capabilities/capabilities.ts': {
     reaches: ['global:process.env', 'node:fs'],
     move: "reading a harness's settings and servers off the machine",

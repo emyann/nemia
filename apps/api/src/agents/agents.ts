@@ -37,7 +37,7 @@ import { refusedBeforeReading, type Guarded, type Refusal } from '../guard.ts';
 import { type ApiEnv, served } from '../layer.ts';
 import { judgedNow } from '../runs/runs.ts';
 import { copyCommand, givenSkills, librarySkills, type GivenSkill } from './skills.ts';
-import { tryOf, untriedOf, writeTryFolder, type Untried } from './try.ts';
+import { tryFolder, tryOf, untriedOf, type Untried } from './try.ts';
 import { sourcesOf, type WorkflowSource } from '../workflows/workflows.ts';
 
 export type { AgentUser } from 'agent-orchestrator';
@@ -272,7 +272,7 @@ const noAgentWords = (from: string, name: string, dir: string): string =>
  * - `PUT /api/agents/:from/:name` — an agent of yours put back, and renamed when the body names it otherwise, against the `version` it was
  *   read at, so a save of an agent changed since is refused rather than written over what changed.
  * - `POST /api/agents/:from/:name/try` — an agent of yours tried on a short brief: its try's folder written, or written again when the
- *   agent's version has moved (`writeTryFolder`), and a run of it started with no repository, as any folder team's is — a tick files it.
+ *   agent's version has moved (`tryFolder`), and a run of it started with no repository, as any folder team's is — a tick files it.
  *   The try is the one start made in the default factory: an agent is tried before any factory hires it, and on no factory's repository.
  *   201 with the run (`AgentTried`). Refuses the repository's agents, which a start with no repository does not find, with 403 and the
  *   command that copies one, its schema beside it, into the store this api reads (read off its file when it has one); an empty brief (422);
@@ -436,7 +436,7 @@ export const agents = new Hono<ApiEnv>()
             },
             409,
           );
-        const workflowDir = writeTryFolder(name, agent.version, agent.keys, home);
+        const workflowDir = tryFolder(name, agent.version, agent.keys, home);
         const run = start({ brief: brief.trim(), repo: '', workflowDir });
         return c.json({ id: run.id } satisfies AgentTried, 201);
       } catch (err) {

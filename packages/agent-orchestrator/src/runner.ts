@@ -17,12 +17,13 @@
  * record, a person's files beside it and the inbox's are read and written through, `runStore`, and the inbox's folder, `inboxDir`),
  * `daemon.store.ts` (`tick.json` and who ticks the store), `feed.store.ts` (the feed's file), `worktree.store.ts` (git, a step's worktree,
  * its `node_modules`, the hand-off commit), `branches.store.ts` (what git says of a run's result branches), `artifacts.store.ts` (the files
- * a step hands over), `folder.store.ts` and `write.store.ts` (a workflow folder read and written), `agents.store.ts`, `roster.store.ts`,
- * `custom.store.ts` and `skills.store.ts` (an agent, the agents of both places read, a person's custom instructions for one, and a skill
- * written), `place.store.ts` (a place skill's verbs run and heard), `plan.store.ts` (a plan folder read), `inbox.store.ts` (the inbox's
- * cards filed, queued and dropped), `factory.store.ts` (the factories, `factoriesDir`) and `config.store.ts` (the `WF_` environment). They
- * import neither the runtime nor a controller, and load as a tree: the bottom, beneath `record.store.ts`, beneath `worktree.store.ts` and
- * `write.store.ts`, beneath the rest, so no cycle can form (`test/boundary.test.ts`).
+ * a step hands over), `folder.store.ts` and `write.store.ts` (a workflow folder read and written), `lookup.store.ts` (the workflow folders
+ * a place holds), `agents.store.ts`, `roster.store.ts`, `fills.store.ts`, `try.store.ts`, `custom.store.ts` and `skills.store.ts` (an
+ * agent, the agents of both places read, the steps each fills, an agent's try folder written, a person's custom instructions for one, and
+ * a skill read and written), `place.store.ts` (a place skill's verbs run and heard), `plan.store.ts` (a plan folder read),
+ * `inbox.store.ts` (the inbox's cards filed, queued and dropped), `factory.store.ts` (the factories, `factoriesDir`) and `config.store.ts`
+ * (the `WF_` environment). They import neither the runtime nor a controller, and load as a tree: the bottom, beneath `record.store.ts`,
+ * beneath `worktree.store.ts` and `write.store.ts`, beneath the rest, so no cycle can form (`test/boundary.test.ts`).
  */
 export { verdictWord } from './check/check.ts';
 export { Conflict, Invalid, Missing } from './refusal/refusal.ts';
@@ -309,6 +310,7 @@ export type { AgentSchema, AgentSidecar, AgentWritten } from './agents/agents.st
 export { agentPlaces, agentRead, agentSkillsFound, findAgent, listAgents, type Readings } from './roster/roster.store.ts';
 export { agentFileOf, factoriesFilling, stepsFilled } from './roster/fills.store.ts';
 export { inFactory } from './roster/roster.ts';
+export { TRY_STEP, triesDir, tryDir, writeTryFolder } from './roster/try.store.ts';
 export type { AgentFill, AgentPlace, AgentReading, AgentsRead, AgentUser, CardRead, FilledStep } from './roster/roster.ts';
 export type { GivenRead, SkillChange, SkillCopied, SkillRead, SkillWritten } from './skills/skills.store.ts';
 export type { WorkflowWritten } from './folder/write.store.ts';

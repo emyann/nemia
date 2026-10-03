@@ -5272,3 +5272,38 @@ test("the bar for a workflow's step says what it runs on, its keys as its node l
   assert.match(missing, /dev has no step named ship\./, missing);
   assert.doesNotMatch(missing, /data-runs-on/, missing);
 });
+
+/** The rail at `path`, inside the sidebar it sits in and a router: each of its places is a route link. */
+async function railAt(path: string): Promise<string> {
+  const { FrameRail } = await import('../src/components/FrameRail.tsx');
+  const { SidebarProvider } = await import('../src/components/ui/sidebar.tsx');
+  // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
+  return routedWith(createElement(SidebarProvider, { children: createElement(FrameRail, { path }) }));
+}
+
+/** The rail's links, in their order: each one's `href`, its name and whether it is lit. */
+const railLinks = (html: string) =>
+  [...(/<nav aria-label="Places"[^>]*>([\s\S]*)<\/nav>/.exec(html)?.[1] ?? '').matchAll(/<a\b[^>]*>/g)].map(([tag]) => ({
+    href: /href="([^"]*)"/.exec(tag)?.[1],
+    name: /aria-label="([^"]*)"/.exec(tag)?.[1],
+    lit: /data-active="true"/.test(tag),
+  }));
+
+test("the rail is a nav of the four places, each a link named for a screen reader, and only the page's own is lit", async () => {
+  assert.deepEqual(railLinks(await railAt('/machines')), [
+    { href: '/', name: 'Home', lit: false },
+    { href: '/agents', name: 'Agents', lit: false },
+    { href: '/machines', name: 'Machines', lit: true },
+    { href: '/capabilities', name: 'Capabilities', lit: false },
+  ]);
+  assert.deepEqual(
+    railLinks(await railAt('/machinesx')).filter((link) => link.lit),
+    [],
+    "refused: a path that only begins with a place's name lights nothing",
+  );
+  assert.deepEqual(
+    railLinks(await railAt('/factories/nemia')).map((link) => link.lit),
+    [true, false, false, false],
+    "a factory's floor lights Home",
+  );
+});

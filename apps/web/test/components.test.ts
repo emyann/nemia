@@ -4695,6 +4695,88 @@ test('a lifecycle state lit is marked data-lit and filled amber; a route taken i
   assert.match(edge(false), /stroke:var\(--edge-done\);stroke-width:1.5/);
 });
 
+test("a machine's state the bar shows is marked data-inspected and ringed; one it does not show is not, but on keyboard focus", async () => {
+  const { MachineNode } = await import('../src/components/MachineNode.tsx');
+  const { drawMachine } = await import('../src/lib/machine.ts');
+  const [box] = drawMachine({ initial: 'a', states: ['a'], final: [], edges: [], verbs: [] }).states;
+  const node = (data: object) =>
+    renderToStaticMarkup(createElement(ReactFlowProvider, null, createElement(MachineNode, { data: { ...box, ...data } } as never)));
+  const shown = node({ pressable: true, inspected: true });
+  assert.match(shown, /data-state="a"[^>]*data-inspected="true"[^>]*class="[^"]*(?<!:)ring-4 ring-ring/, shown);
+  const pressable = node({ pressable: true, inspected: false });
+  assert.doesNotMatch(pressable, /data-inspected|(?<!:)ring-4 ring-ring/, pressable);
+  assert.match(pressable, /in-focus-visible:ring-2/, `ringed on keyboard focus: ${pressable}`);
+  assert.doesNotMatch(node({}), /data-inspected|ring-2|cursor-pointer/, 'a state no press reaches takes no mark of the bar');
+});
+
+test("a machine's states take a press, the focus and a name only when the canvas is given a press, as the Debug panel's never is", async () => {
+  const { flowOf } = await import('../src/components/MachineCanvas.tsx');
+  const { drawMachine } = await import('../src/lib/machine.ts');
+  const drawing = drawMachine({ initial: 'a', states: ['a', 'b'], final: ['b'], edges: [], verbs: [] });
+  const inert = flowOf(drawing, undefined, [], false, null).nodes;
+  for (const node of inert) {
+    assert.equal(node.style?.pointerEvents, undefined, `${node.id} takes no pointer events, so a click on it lands on the pane`);
+    assert.equal(node.ariaLabel, undefined, `${node.id} is named for no press`);
+    assert.equal(node.data.pressable, false);
+  }
+  const pressed = flowOf(drawing, undefined, [], true, 'b').nodes;
+  assert.deepEqual(
+    pressed.map((n) => [n.id, n.style?.pointerEvents, n.ariaLabel, n.data.inspected]),
+    [
+      ['a', 'all', 'State a', false],
+      ['b', 'all', 'State b', true],
+    ],
+  );
+});
+
+/** The bar's body for the state `state` of `graph`, as the bar for a machine's state draws it. */
+async function stateBodyMarkup(graph: import('../src/lib/api.ts').MachineGraph, state: string): Promise<string> {
+  const { StateBody } = await import('../src/components/StateBar.tsx');
+  return renderToStaticMarkup(createElement(StateBody, { graph, state }));
+}
+
+test("the bar for a machine's state says its kind, the edges that keep it there, and each route out with its edges and verbs", async () => {
+  const graph = {
+    name: 'm',
+    title: 'A machine',
+    source: 'm.ts',
+    initial: 'a',
+    states: ['a', 'b', 'c'],
+    final: ['c'],
+    edges: [
+      { from: 'a', event: 'TICK', to: 'a', action: 'nothing' },
+      { from: 'a', event: 'GO', guard: 'ready', to: 'b', action: 'go' },
+      { from: 'b', event: 'END', to: 'c', action: 'end' },
+    ],
+    verbs: [{ verb: 'close', entry: 'closed', by: 'person', from: ['a', 'b'], to: 'c', guard: 'awaitsWord' }],
+  } as never as import('../src/lib/api.ts').MachineGraph;
+  const a = await stateBodyMarkup(graph, 'a');
+  assert.match(a, /data-state-kind="initial state"/, a);
+  assert.match(a, /<div data-edge-line="true"[^>]*>TICK<\/div>/, `the edge back to it: ${a}`);
+  const outs = [...a.matchAll(/data-route-out="([^"]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(outs, ['b', 'c'], `a route out per state it leads to, in the drawing's order: ${a}`);
+  assert.match(a, /data-route-out="b".*?GO \[ready\].*?→ go/s, `the route to b lists its edge by action: ${a}`);
+  assert.match(a, /data-route-out="c".*?data-route-verb="close \[awaitsWord\]"/s, `the route to c lists the verb with its guard: ${a}`);
+  assert.doesNotMatch(a, /data-routes-none|data-stays-none/, a);
+
+  const b = await stateBodyMarkup(graph, 'b');
+  assert.deepEqual(
+    [...b.matchAll(/data-route-out="([^"]+)"/g)].map((m) => m[1]),
+    ['c'],
+    `one route out, its edge and the verb along it on the one route: ${b}`,
+  );
+  assert.match(b, /data-route-out="c".*?END.*?→ end.*?data-route-verb="close \[awaitsWord\]"/s, b);
+
+  const c = await stateBodyMarkup(graph, 'c');
+  assert.match(c, /data-state-kind="final state"/, c);
+  assert.match(c, /<p data-routes-none="true">none: it ends here<\/p>/, `a final state with nothing out says so: ${c}`);
+  assert.match(c, /<p data-stays-none="true">no edge keeps it here<\/p>/, c);
+
+  const gone = await stateBodyMarkup(graph, 'gone');
+  assert.match(gone, /A machine has no state named gone\./, gone);
+  assert.doesNotMatch(gone, /data-state-kind/, gone);
+});
+
 test("a route only a person's verb takes is drawn dashed; one an edge takes too is drawn solid", async () => {
   const { MachineEdge } = await import('../src/components/MachineEdge.tsx');
   const { drawMachine } = await import('../src/lib/machine.ts');

@@ -159,15 +159,45 @@ function pairsOf(edges: readonly MachineEdge[], verbs: readonly MachineVerb[]): 
   return pairs;
 }
 
+/** Every state of `graph`: those it lists, then any an edge or a verb names that it does not, each once. */
+function namesOf(graph: Pick<MachineGraph, 'states' | 'edges' | 'verbs'>): string[] {
+  const named = [...graph.edges.flatMap((e) => [e.from, e.to]), ...graph.verbs.flatMap((v) => [...v.from, v.to])];
+  return [...new Set([...graph.states, ...named])];
+}
+
+/** The edges back to `state` itself, by action: what its box lists. */
+const staysOf = (edges: readonly MachineEdge[], state: string): ByAction[] =>
+  byAction(edges.filter((e) => e.from === state && e.to === state));
+
+/** A route out of a state as the frame's bar lists it: the state it leads to, its edges by action, and its verbs (`verbOf`). */
+export type RouteOut = { to: string; edges: ByAction[]; verbs: string[] };
+
+/** What one state of a machine is: whether the machine starts or can end there, the edges back to it, and each route out of it. */
+export type StateFacts = { initial: boolean; final: boolean; stays: ByAction[]; routes: RouteOut[] };
+
+/**
+ * What `state` of `graph` is, read as `drawMachine` reads it, so the frame's bar lists what the drawing draws: its kind, its stays and
+ * each route out of it, in the drawing's order. None for a state neither the graph nor any of its edges or verbs names.
+ */
+export function stateFacts(
+  graph: Pick<MachineGraph, 'initial' | 'states' | 'final' | 'edges' | 'verbs'>,
+  state: string,
+): StateFacts | undefined {
+  if (!namesOf(graph).includes(state)) return undefined;
+  const routes = [...pairsOf(graph.edges, graph.verbs).values()]
+    .filter((pair) => pair.from === state)
+    .map(({ to, edges, verbs }) => ({ to, edges: byAction(edges), verbs }));
+  return { initial: state === graph.initial, final: graph.final.includes(state), stays: staysOf(graph.edges, state), routes };
+}
+
 /**
  * The machine laid out top to bottom by dagre: each state a box sized for its lines, each route with its label where dagre makes room
  * for it and its line drawn down through the ranks it crosses (`legsOf`, `pathOf`), the routes edges take weighing more (`EDGE_WEIGHT`).
  * A state an edge or a verb names that the graph does not list is drawn too, so no edge and no verb is lost.
  */
 export function drawMachine(graph: Pick<MachineGraph, 'initial' | 'states' | 'final' | 'edges' | 'verbs'>): Drawing {
-  const named = [...graph.edges.flatMap((e) => [e.from, e.to]), ...graph.verbs.flatMap((v) => [...v.from, v.to])];
-  const names = [...new Set([...graph.states, ...named])];
-  const stays = new Map(names.map((name) => [name, byAction(graph.edges.filter((e) => e.from === name && e.to === name))]));
+  const names = namesOf(graph);
+  const stays = new Map(names.map((name) => [name, staysOf(graph.edges, name)]));
   const pairs = pairsOf(graph.edges, graph.verbs);
   const g = new Graph();
   g.setGraph({ rankdir: 'TB', ranker: 'longest-path', nodesep: 16, edgesep: 8, ranksep: 40, marginx: 8, marginy: 8 });

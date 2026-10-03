@@ -1,7 +1,11 @@
+import { useRef } from 'react';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { MachineCanvas } from '../components/MachineCanvas';
 import { machineQuery, machinesQuery, type MachineListing } from '../lib/api';
+import { machineState } from '../lib/bar';
+import { useBarOver } from '../lib/useBarOver';
+import { useCanvasPress } from '../lib/useCanvasPress';
 
 export const Route = createFileRoute('/machines')({
   loader: async ({ context }) => {
@@ -30,6 +34,7 @@ function MachinesPage() {
           lists the events that take it, each with its guard in brackets, and under them <span className="font-mono text-xs">→</span> the
           action they take. What a box lists under its name are the events it stays in its state on.
         </p>
+        <p>A click on a state shows it in the bar: its kind, what keeps it there, and each route out of it.</p>
       </div>
       {data.machines.map((machine) => (
         <Machine key={machine.name} listing={machine} />
@@ -38,9 +43,17 @@ function MachinesPage() {
   );
 }
 
-/** One machine: its title, the file it is drawn from, and its drawing. */
+/**
+ * One machine: its title, the file it is drawn from, and its drawing. A click, a tap or Enter on a state shows it in the frame's bar,
+ * ringed; the same state again or the empty canvas closes it, and another switches it. A state has no page, so a double click does only
+ * what its first click did (`useCanvasPress`). The drawing is narrowed by what the bar covers of it (`useBarOver`), so the state shown
+ * stays clear of the bar.
+ */
 function Machine({ listing }: { listing: MachineListing }) {
   const { data } = useSuspenseQuery(machineQuery(listing.name));
+  const { shown, ...press } = useCanvasPress((state) => ({ kind: 'state', machine: listing.name, state }));
+  const whole = useRef<HTMLDivElement>(null);
+  const over = useBarOver(whole);
   return (
     <section aria-label={listing.title} className="space-y-3">
       <h2 className="text-sm font-medium">
@@ -59,7 +72,11 @@ function Machine({ listing }: { listing: MachineListing }) {
         ))}
         .
       </p>
-      <MachineCanvas machine={data} />
+      <div ref={whole}>
+        <div style={{ marginRight: over }}>
+          <MachineCanvas machine={data} press={press} inspected={machineState(shown, listing.name)} />
+        </div>
+      </div>
     </section>
   );
 }

@@ -19,6 +19,7 @@ import {
   type Sighting,
 } from './domain.ts';
 import { viewOfState } from './engine/engine.ts';
+import { TRANSIENT_ERRNOS } from '../harness/error.ts';
 
 const T0 = new Date('2026-01-01T00:00:00Z');
 const at = (ms: number) => new Date(T0.getTime() + ms).toISOString();
@@ -209,6 +210,76 @@ test('LONG-LIVED: a harness-side stop, or any end no stop asked for, is restarte
     );
     const a = decide(fold(TASK, [...inFlight(false), end]), new Map(), now(END + 10_000));
     assert.equal(a.do === 'settle' && a.outcome, job[name], `${name}, as a job`);
+  }
+});
+
+const REFUSAL = "claude --bg: error: option '--permission-mode <mode>' argument 'yolo' is invalid.";
+/** Attempt `n`'s spawn its harness refused at `END`: nothing started, in the harness's words. */
+const refusedEnd = (n: number): Event => ({
+  kind: 'ended',
+  at: at(END),
+  attempt: n,
+  sessionId: '(never started)',
+  observed: 'failed',
+  reason: 'unstartable',
+  error: REFUSAL,
+});
+
+test("LONG-LIVED: a spawn its harness refused is not restarted — the task settles failed in the refusal's words and the fix, where a death is restarted after the backoff", () => {
+  const death: Event = { kind: 'ended', at: at(END - 50_000), attempt: 1, sessionId: 's1', observed: 'failed', reason: 'harness', nativeId: 'n1' };
+  const refusals: [string, Event[], string][] = [
+    ['on its first attempt', [...inFlight(true).slice(0, 2), refusedEnd(1)], '1 attempt(s)'],
+    [
+      "on a restart's attempt after a death",
+      [...inFlight(true), death, { kind: 'starting', at: at(END - 40_000), attempt: 2 }, refusedEnd(2)],
+      '2 attempt(s)',
+    ],
+  ];
+  for (const [name, events, count] of refusals) {
+    const state = fold(TASK, events);
+    for (const later of [1, 10_000, HOUR]) {
+      assert.equal(observe(state, new Map(), now(END + later)).type, 'ATTEMPT_ENDED', `${name}, ${later} ms on`);
+      assert.deepEqual(
+        decide(state, new Map(), now(END + later)),
+        {
+          do: 'settle',
+          outcome: 'failed',
+          note: `${count}, none succeeded: the last could not start: ${REFUSAL}; fix what it names and file the task again`,
+        },
+        `${name}, ${later} ms on`,
+      );
+    }
+  }
+
+  const died = fold(TASK, [...inFlight(true), { ...death, at: at(END) }]);
+  assert.equal(observe(died, new Map(), now(END + 9_999)).type, 'BACKING_OFF', 'the control: a death waits out the backoff');
+  assert.deepEqual(decide(died, new Map(), now(END + 10_000)), { do: 'start', attempt: 2, resumeFrom: 'n1', nudge: RESTART_WORDS });
+});
+
+/** A spawn that failed on the short-lived OS error `code`, recorded as spawned with its words, and nothing seen since. */
+const spawnedWith = (code: string): Event[] => [
+  { kind: 'starting', at: at(1), attempt: 1 },
+  { kind: 'spawned', at: at(2), attempt: 1, error: `claude --bg: spawn claude ${code}` },
+];
+const neverSeen: Event = { kind: 'ended', at: at(END), attempt: 1, sessionId: '(never seen)', observed: 'failed', reason: 'lost' };
+
+test('LONG-LIVED: a spawn that failed on a short-lived OS error is restarted after the backoff — where a job settles lost, its spawn words not in its note', () => {
+  for (const code of TRANSIENT_ERRNOS) {
+    const inGrace = fold(TASK, [filed(true), ...spawnedWith(code)]);
+    assert.equal(observe(inGrace, new Map(), now(29_999)).type, 'UNSEEN_IN_GRACE', code);
+    assert.deepEqual(
+      decide(inGrace, new Map(), now(END)),
+      { do: 'record-end', attempt: 1, sessionId: '(never seen)', observed: 'failed', reason: 'lost' },
+      code,
+    );
+    const lost = fold(TASK, [filed(true), ...spawnedWith(code), neverSeen]);
+    assert.equal(observe(lost, new Map(), now(END + 9_999)).type, 'BACKING_OFF', code);
+    assert.deepEqual(decide(lost, new Map(), now(END + 10_000)), { do: 'start', attempt: 2 }, code);
+    assert.deepEqual(
+      decide(fold(TASK, [filed(false), ...spawnedWith(code), neverSeen]), new Map(), now(END + 10_000)),
+      { do: 'settle', outcome: 'failed', note: '1 attempt(s), none succeeded' },
+      `${code}, as a job`,
+    );
   }
 });
 

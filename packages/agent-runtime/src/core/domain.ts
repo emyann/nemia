@@ -845,9 +845,10 @@ export function lifecycleOf(state: State): LifecycleState {
  * 3. `AWAITING_INPUT`, for a task held open whose turn signed: it waits on a person for as long as they take — ahead of
  *    the deadline, which times work, not a person reading it.
  * 4. `DEADLINE_SPENT`, when it is overdue and its last attempt ended at the deadline.
- * 5. For a long-lived task whose attempt ended, no stop asked: its restart (`restartOf`).
+ * 5. For a long-lived task whose attempt ended, no stop asked: its restart (`restartOf`) — unless its harness refused the
+ *    spawn (`unstartable`), which waiting would not change, and it settles on that end, as a job does.
  * 6. `ATTEMPT_ENDED`, judged on the current turn's attempts, which are all of them for a task not held open. One attempt
- *    per start.
+ *    per start. For an `unstartable` end, the harness's words (`error`).
  * 7. `NO_SESSION_TO_CONTINUE`, for a later turn with no session to continue.
  * 8. `QUEUED`, while the turn waits for the layer above's word; it is started by the pass after the one that wrote it.
  *    Read after every terminal answer, so a queued task can still settle.
@@ -871,12 +872,21 @@ export function observe(state: State, observed: ReadonlyMap<string, Sighting>, n
   if (waitsForInput(state)) return { type: 'AWAITING_INPUT' };
   if (overdue && last?.reason === 'deadline') return { type: 'DEADLINE_SPENT', seconds: Math.round(ranFor / 1000) };
   const ended = turn.attempts.at(-1);
-  if (ended && state.restartPolicy === 'Always') return restartOf(state, sighting, now);
-  if (ended) return { type: 'ATTEMPT_ENDED', ended: ended.ended, reason: ended.reason, attempts: turn.attempts.length, turn: turn.n };
+  if (ended && state.restartPolicy === 'Always' && ended.reason !== 'unstartable') return restartOf(state, sighting, now);
+  if (ended) return attemptEnded(ended, turn.attempts.length, turn.n);
   if (turn.n > 0 && !turn.continues) return { type: 'NO_SESSION_TO_CONTINUE', turn: turn.n };
   if (awaitsAdmission(state)) return { type: 'QUEUED' };
   if (turn.continues && sighting && isLive(sighting.state)) return { type: 'PREVIOUS_LIVE', sessionId: sighting.sessionId };
   return { type: 'READY', attempt: state.attempts.length + 1, resumeFrom: turn.continues, ...(turn.words ? { nudge: turn.words } : {}) };
+}
+
+/**
+ * `ATTEMPT_ENDED` for `ended`, the last of `attempts` in turn `turn`: with the harness's words (`error`) only when it
+ * refused the spawn, since a spawn error on an attempt that ended otherwise is not why it ended.
+ */
+function attemptEnded(ended: Attempt, attempts: number, turn: number): LifecycleEvent {
+  const refusal = ended.reason === 'unstartable' && ended.error !== undefined ? { error: ended.error } : {};
+  return { type: 'ATTEMPT_ENDED', ended: ended.ended, reason: ended.reason, attempts, turn, ...refusal };
 }
 
 /** What `observe` reads off an attempt in flight, by its rules 2 to 4: its deadline, its sighting, or its absence. */
@@ -956,7 +966,8 @@ export function needsHuman(state: State, observed: ReadonlyMap<string, Sighting>
 }
 
 /**
- * The restart of a long-lived task whose last attempt ended with no stop asked, `observe`'s fifth rule with nothing in flight:
+ * The restart of a long-lived task whose last attempt ended with no stop asked, and not refused at its spawn (that settles),
+ * `observe`'s fifth rule with nothing in flight:
  * `UNREAD` while its harness could not read the old name, `PREVIOUS_LIVE` while it still holds the old session, `BACKING_OFF`
  * within `backoffOf` the end, then `RESTART_DUE` — continuing the latest session an attempt recorded, told `RESTART_WORDS`;
  * with none recorded, what the turn continues, told the brief.

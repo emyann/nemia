@@ -2093,8 +2093,8 @@ own session in the checkout may be asked to push, and it could not hold `git mer
 and merging is its whole job. It denies a forced `git branch -D` and `browser_run_code_unsafe` by name as well, though it runs
 `dontAsk`: a `--bg` session reads the person's own user and local settings, where an allow may reach them. What the supervisor's bookkeeping needs — `git add <path>`, `git commit <path>`,
 `git status`, `git log`, `git diff` — is not denied. A deny is a prefix, not a sandbox (`git -C <dir> merge`
-is not `git merge`): it stops a command that should not have been typed. `agent-fences.test.ts` holds the push, the forced delete and the
-unsafe browser tool on any step a repository ships, and on a watcher step it writes itself; the other git denies are
+is not `git merge`): it stops a command that should not have been typed. `agent-fences.test.ts` holds the push, the forced delete, a kill by name
+(`pkill`, `killall`, in any part of a compound command) and the unsafe browser tool on any step a repository ships, and on a watcher step it writes itself; the other git denies are
 the folder author's to keep.
 
 **How to start it**, once, and leave it running:

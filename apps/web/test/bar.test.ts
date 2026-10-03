@@ -15,6 +15,7 @@ import {
   inspects,
   nextBar,
   parseWidth,
+  machineState,
   specStep,
   type Bar,
 } from '../src/lib/bar.ts';
@@ -26,6 +27,7 @@ const REVIEW: Bar = { kind: 'step', run: 'abc', step: 'review' };
 const SHIP: Bar = { kind: 'step', run: 'abc', step: 'ship' };
 const FACTORY: Bar = { kind: 'factory', factory: 'hiring' };
 const SPEC: Bar = { kind: 'spec', from: 'repo', workflow: 'dev', step: 'review' };
+const STATE: Bar = { kind: 'state', machine: 'lifecycle', state: 'input-required' };
 
 test('the address opens a bar only for a known kind with a name: anything else opens none', () => {
   for (const value of [undefined, '', 'start', 'start:', 'nope:x', ':hiring', 42, ['start:hiring'], null])
@@ -66,6 +68,13 @@ test("a workflow's step's address names where the workflow is read from, the wor
     assert.equal(barOf(value), undefined, `${value} opens no bar`);
 });
 
+test("a machine's state's address names the machine up to the first slash and the state after it, and none without either", () => {
+  assert.deepEqual(barOf('state:lifecycle/input-required'), STATE);
+  assert.deepEqual(barOf('state:m/a/b:c'), { kind: 'state', machine: 'm', state: 'a/b:c' }, 'a state keeps its own');
+  for (const value of ['state:lifecycle', 'state:/x', 'state:lifecycle/', 'state:'])
+    assert.equal(barOf(value), undefined, `${value} opens no bar`);
+});
+
 test('a bar written to the address reads back as the same bar', () => {
   for (const value of [
     'start:hiring',
@@ -79,6 +88,8 @@ test('a bar written to the address reads back as the same bar', () => {
     'step:abc/x:y',
     'spec:repo/dev/review',
     'spec:yours/w/a/b:c',
+    'state:lifecycle/input-required',
+    'state:m/a/b:c',
   ])
     assert.equal(barValue(barOf(value)!), value);
   assert.deepEqual(barOf(barValue(OTHER)), OTHER);
@@ -135,6 +146,27 @@ test("a workflow's canvas and its Build read the step the bar shows of that work
   assert.equal(specStep(undefined, 'repo', 'dev'), null, 'no bar');
 });
 
+test("pressing the machine's state the bar shows closes it, and another state, the same state of another machine or another kind switches it", () => {
+  assert.equal(nextBar(STATE, { ...STATE }), undefined);
+  const working: Bar = { ...STATE, state: 'working' };
+  assert.deepEqual(nextBar(STATE, working), working, 'another state of the same machine');
+  const elsewhere: Bar = { ...STATE, machine: 'other' };
+  assert.deepEqual(nextBar(STATE, elsewhere), elsewhere, 'the same state of another machine');
+  assert.deepEqual(nextBar(STATE, SPEC), SPEC, "a workflow's step");
+});
+
+test("a machine's canvas reads the state the bar shows of that machine alone: not another's, nor another kind", () => {
+  assert.equal(machineState(STATE, 'lifecycle'), 'input-required');
+  assert.equal(machineState(STATE, 'other'), null, 'another machine');
+  assert.equal(machineState({ kind: 'step', run: 'lifecycle', step: 'input-required' }, 'lifecycle'), null, "a run's step");
+  assert.equal(machineState(SPEC, 'lifecycle'), null, "a workflow's step");
+  assert.equal(machineState(undefined, 'lifecycle'), null, 'no bar');
+});
+
+test('Open visits nothing for a state of a machine, which has no page', () => {
+  assert.equal(barOpens(STATE), null);
+});
+
 test("Open visits a workflow's step's page for a workflow's step", () => {
   assert.deepEqual(barOpens(SPEC), {
     to: '/workflows/$from/$workflow/$step',
@@ -157,6 +189,7 @@ test('a press on the empty canvas closes only what a canvas inspects: never the 
   assert.equal(inspects(REVIEW), true);
   assert.equal(inspects(FACTORY), true);
   assert.equal(inspects(SPEC), true);
+  assert.equal(inspects(STATE), true);
   assert.equal(inspects(HIRING), false);
   assert.equal(inspects(undefined), false);
 });

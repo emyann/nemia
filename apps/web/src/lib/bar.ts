@@ -4,15 +4,16 @@
  */
 
 /**
- * What the bar shows: the start of a run in a factory, a factory, a run, a step of a run, or a step of a workflow (`spec`), read from the
- * repository's workflows or yours (`from`).
+ * What the bar shows: the start of a run in a factory, a factory, a run, a step of a run, a step of a workflow (`spec`), read from the
+ * repository's workflows or yours (`from`), or a state of one of the code's state machines.
  */
 export type Bar =
   | { kind: 'start'; factory: string }
   | { kind: 'factory'; factory: string }
   | { kind: 'run'; run: string }
   | { kind: 'step'; run: string; step: string }
-  | { kind: 'spec'; from: 'repo' | 'yours'; workflow: string; step: string };
+  | { kind: 'spec'; from: 'repo' | 'yours'; workflow: string; step: string }
+  | { kind: 'state'; machine: string; state: string };
 
 /** The key this browser keeps the bar's one width under, for every page. */
 export const BAR_KEY = 'nemia:bar-width';
@@ -44,6 +45,14 @@ function specOf(name: string): Bar | undefined {
   return workflow && step && name.startsWith(`${from}/${workflow}/`) ? { kind: 'spec', from, workflow, step } : undefined;
 }
 
+/** The state of a machine `name` names, `<machine>/<state>`, split at its first `/`; none without a machine or a state. */
+function machineStateOf(name: string): Bar | undefined {
+  const slash = name.indexOf('/');
+  const machine = name.slice(0, slash);
+  const state = name.slice(slash + 1);
+  return slash > 0 && state ? { kind: 'state', machine, state } : undefined;
+}
+
 /** Each kind of bar the address names, by its word, read from the non-empty name after its `:`; none for a name the kind refuses. */
 const PARSERS: Record<string, (name: string) => Bar | undefined> = {
   start: (name) => ({ kind: 'start', factory: name }),
@@ -51,14 +60,15 @@ const PARSERS: Record<string, (name: string) => Bar | undefined> = {
   run: (name) => (name.includes('/') ? undefined : { kind: 'run', run: name }),
   step: stepOf,
   spec: specOf,
+  state: machineStateOf,
 };
 
 /**
- * The bar `value` names in the address — `start:<factory>`, `factory:<factory>`, `run:<run>`, `step:<run>/<step>` or
- * `spec:<from>/<workflow>/<step>` — or none for anything else: another kind, an empty name, a run with a `/` in its id, a `from` other
- * than `repo` or `yours`, not a string. A factory keeps its whole name. A run id is a file name in the store, and a workflow's name its
- * folder's, so a step's address splits at its first `/`, a workflow's step's at its first two, and the step keeps any `/` or `:` of its
- * own.
+ * The bar `value` names in the address — `start:<factory>`, `factory:<factory>`, `run:<run>`, `step:<run>/<step>`,
+ * `spec:<from>/<workflow>/<step>` or `state:<machine>/<state>` — or none for anything else: another kind, an empty name, a run with a `/`
+ * in its id, a `from` other than `repo` or `yours`, not a string. A factory keeps its whole name. A run id is a file name in the store, a
+ * workflow's name its folder's, and a machine's name a word, so a step's and a state's address split at its first `/`, a workflow's
+ * step's at its first two, and the step or the state keeps any `/` or `:` of its own.
  */
 export function barOf(value: unknown): Bar | undefined {
   if (typeof value !== 'string') return undefined;
@@ -81,13 +91,15 @@ export function barValue(bar: Bar): string {
       return `step:${bar.run}/${bar.step}`;
     case 'spec':
       return `spec:${bar.from}/${bar.workflow}/${bar.step}`;
+    case 'state':
+      return `state:${bar.machine}/${bar.state}`;
   }
 }
 
 /** The root route's search: a `bar` that names a bar, and none of the keys a page's own route reads (`factory`, `step`, the filters). */
 export const barSearch = (search: Record<string, unknown>): { bar?: string } => (barOf(search.bar) ? { bar: search.bar as string } : {});
 
-/** Whether `one` and `other` show the same thing: the same address, so the same kind for the same factory, run or step. */
+/** Whether `one` and `other` show the same thing: the same address, so the same kind for the same factory, run, step or state. */
 const sameBar = (one: Bar, other: Bar): boolean => barValue(one) === barValue(other);
 
 /** What the bar shows once `pressed` is pressed while it shows `open`: nothing, for the same thing again, else what was pressed. */
@@ -95,7 +107,7 @@ export const nextBar = (open: Bar | undefined, pressed: Bar): Bar | undefined =>
 
 /**
  * The page Open visits from the bar: a factory's floor, a run's page, a step's session, a workflow's step's page, or none for what is no
- * page, the start of a run.
+ * page, the start of a run and a state of a machine.
  */
 export type BarPage =
   | { to: '/factories/$factory'; params: { factory: string } }
@@ -105,7 +117,7 @@ export type BarPage =
 
 /**
  * The page the bar's Open visits for `bar`: a factory's floor for a factory, a run's page for a run, the step's session for a step, the
- * step's page for a workflow's step, and none for the start of a run.
+ * step's page for a workflow's step, and none for the start of a run or a state of a machine, which has no page of its own.
  */
 export function barOpens(bar: Bar): BarPage | null {
   switch (bar.kind) {
@@ -118,6 +130,7 @@ export function barOpens(bar: Bar): BarPage | null {
     case 'spec':
       return { to: '/workflows/$from/$workflow/$step', params: { from: bar.from, workflow: bar.workflow, step: bar.step } };
     case 'start':
+    case 'state':
       return null;
   }
 }
@@ -125,6 +138,10 @@ export function barOpens(bar: Bar): BarPage | null {
 /** The step of the workflow `workflow` read from `from` that `open` shows, or null for a bar that shows none of its steps. */
 export const specStep = (open: Bar | undefined, from: string, workflow: string): string | null =>
   open?.kind === 'spec' && open.from === from && open.workflow === workflow ? open.step : null;
+
+/** The state of the machine `machine` that `open` shows, or null for a bar that shows none of its states. */
+export const machineState = (open: Bar | undefined, machine: string): string | null =>
+  open?.kind === 'state' && open.machine === machine ? open.state : null;
 
 /**
  * Whether `open` is something a canvas inspects — everything the bar shows but the start of a run — which a press on the empty canvas

@@ -30,7 +30,6 @@ import {
   addSpend,
   approvalOf,
   budgetOf,
-  composeBrief,
   gatesOf,
   hasGate,
   isGitRun,
@@ -43,6 +42,7 @@ import {
   type Run,
   type StepRecord,
   type StepStatus,
+  type ToldLayers,
 } from 'agent-orchestrator/run';
 import { loopSpan, remoteNameOf, type Workflow } from 'agent-orchestrator/workflow';
 import { folderFiles, type StepArtifact } from '../steps/artifacts.ts';
@@ -86,6 +86,7 @@ import {
   unreadableIn,
 } from './tries.ts';
 import { tryOf } from '../agents/try.ts';
+import { toldOf } from './told.ts';
 import type { Served } from '../layer.ts';
 import { readOf, type RunRead, type StepUsed, totalOf, usedOf } from './usage.ts';
 
@@ -292,6 +293,12 @@ export type RunDetail = {
     body: string | null;
     /** For a filed step, the brief the engine was filed with; for one not yet filed, what it would be given now. */
     told: string | null;
+    /**
+     * What it was told, by layer (`toldLayers`): its agent's instructions, the person's custom instructions, the step's policy and the
+     * task, each from the step the run froze at `wf start`, the task cut from `told`. Null for a record that froze no workflow, never read
+     * from the folder.
+     */
+    layers: ToldLayers | null;
     taskId: string | null;
     workspace: string | null;
     /**
@@ -469,22 +476,6 @@ function roundSpend(clock: Timeline, steps: readonly Workflow[], total: Timeline
       (clock.steps[name] ?? []).flatMap((t) => (t.round === total.round && t.session ? [spendOf(t.session.taskId)] : [])),
     ),
   );
-}
-
-/**
- * What a step was told.
- *
- * For a filed step, the brief the engine holds: it is what the step was given. Recomposing it now
- * would not be — `composeBrief` points a step with no `after` at every step filed so far, so a
- * finished first step would read as told to look at work done after it, and an edited folder would
- * rewrite it. For a step not yet filed, what `composeBrief` would give it now, from `workflows` — the
- * workflow the run froze, as the tick composes it. For a filed task the engine has no record of, nobody can say.
- */
-function toldOf(run: Run, name: string, workflows: readonly Workflow[] | null, views: Views): string | null {
-  const taskId = run.steps[name]?.taskId;
-  if (taskId) return views.get(taskId)?.state.brief || null;
-  const step = workflows?.find((s) => s.name === name);
-  return step && workflows ? composeBrief(step, run, workflows) : null;
 }
 
 /**
@@ -678,7 +669,7 @@ export async function detail(run: Run, { e, home, memo }: Pick<Served, 'e' | 'ho
           spec: step ? specOf(step) : null,
           filed: filedOf(run.steps[name], views),
           body: step?.body ?? null,
-          told: toldOf(run, name, source, views),
+          ...toldOf(run, name, source, views),
           taskId,
           workspace: run.steps[name]?.workspace ?? null,
           ...filesOf(run, name),

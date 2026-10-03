@@ -5066,3 +5066,51 @@ test('the run bar says a run not read yet, a read that failed, and a run gone fr
   assert.match(gone, /data-run-gone="r-1"/);
   assert.doesNotMatch(gone, /aria-label="Steps"/);
 });
+
+const { FactoryBlockNode } = await import('../src/components/FactoryBlock.tsx');
+
+/** A factory's block on the Factories canvas, rendered to markup, `inspected` or not. */
+function factoryBlockMarkup(inspected: boolean): string {
+  const block = {
+    name: 'hiring',
+    default: false,
+    repos: ['checkout'],
+    runs: 1,
+    inFlight: 0,
+    waitsOnYou: 0,
+    workflows: 1,
+    hires: 1,
+    error: null,
+    inspected,
+  };
+  const props = {
+    id: block.name,
+    type: 'factory' as const,
+    data: block,
+    selected: false,
+    dragging: false,
+    zIndex: 0,
+    isConnectable: false,
+    positionAbsoluteX: 0,
+    positionAbsoluteY: 0,
+    selectable: false,
+    deletable: false,
+    draggable: false,
+  };
+  return renderToStaticMarkup(createElement(ReactFlowProvider, null, createElement(FactoryBlockNode, props)));
+}
+
+test("a factory's block is no link, so a press inspects it, and is marked as inspected only while the bar shows it", () => {
+  const shown = factoryBlockMarkup(true);
+  const hidden = factoryBlockMarkup(false);
+  for (const html of [shown, hidden]) {
+    assert.doesNotMatch(html, /<a[\s>]/, `the block holds no link: ${html}`);
+    assert.doesNotMatch(html, /href=/, `and no address: ${html}`);
+    assert.match(html, /data-factory="hiring"/);
+    assert.match(html, /0 in flight · 1 run/);
+    assert.match(html, /1 workflow · 1 hire/);
+  }
+  assert.match(shown, /data-inspected/, 'the block the bar shows is marked');
+  assert.match(shown, /ring-2 ring-ring/, 'and ringed');
+  assert.doesNotMatch(hidden, /data-inspected/, 'a block the bar does not show is not marked');
+});

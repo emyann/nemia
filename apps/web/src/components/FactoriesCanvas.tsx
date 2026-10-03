@@ -1,7 +1,12 @@
-import { useMemo } from 'react';
-import { Background, BackgroundVariant, Controls, ReactFlow } from '@xyflow/react';
+import { useEffect, useEffectEvent, useMemo, useRef, type RefObject } from 'react';
+import { Background, BackgroundVariant, Controls, ReactFlow, ReactFlowProvider, useReactFlow, useStoreApi } from '@xyflow/react';
+import { useNavigate } from '@tanstack/react-router';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import type { Bar } from '@/lib/bar';
 import type { FactoryBlock } from '@/lib/factories';
+import { revealView, sizeOf } from '@/lib/frame';
+import { useBarOver } from '@/lib/useBarOver';
+import { useCanvasPress } from '@/lib/useCanvasPress';
 import { useContent } from '@/lib/useContent';
 import { BLOCK_SIZE, FactoryBlockNode, type FactoryFlowNode } from './FactoryBlock';
 
@@ -12,16 +17,25 @@ const nodeTypes = { factory: FactoryBlockNode };
 const COLUMNS = 3;
 const GAP = 48;
 
+/** How the canvas is fitted to its frame: every block in view, never larger than life. */
+const FIT = { maxZoom: 1, padding: 0.15 } as const;
+
+/** How far out bringing the block inspected into view zooms, at most: past it, a block is too small to read. */
+const REVEAL_MIN_ZOOM = 0.4;
+
 /**
- * The blocks as React Flow's nodes, laid out on a grid in their order, `COLUMNS` a row: none dragged, none selected. React Flow takes the
- * pointer off a node that is neither, so each is given it back: a block is a link.
+ * The blocks as React Flow's nodes, laid out on a grid in their order, `COLUMNS` a row, the one named `inspected` marked so: none dragged,
+ * none selected, each named for a screen reader. React Flow takes the pointer off a node that is neither, so each is given it back: a block
+ * is pressed.
  */
-const nodesOf = (blocks: readonly FactoryBlock[]): FactoryFlowNode[] =>
+const nodesOf = (blocks: readonly FactoryBlock[], inspected: string | null): FactoryFlowNode[] =>
   blocks.map((block, i) => ({
     id: block.name,
     type: 'factory',
     position: { x: (i % COLUMNS) * (BLOCK_SIZE.width + GAP), y: Math.floor(i / COLUMNS) * (BLOCK_SIZE.height + GAP) },
-    data: block,
+    data: { ...block, inspected: block.name === inspected },
+    ariaLabel: `Factory ${block.name}`,
+    className: 'outline-none',
     width: BLOCK_SIZE.width,
     height: BLOCK_SIZE.height,
     draggable: false,
@@ -29,38 +43,98 @@ const nodesOf = (blocks: readonly FactoryBlock[]): FactoryFlowNode[] =>
     style: { pointerEvents: 'all' },
   }));
 
+/** The bar a factory's block shows: the factory's. */
+const factoryBar = (factory: string): Bar => ({ kind: 'factory', factory });
+
 /**
  * The Factories: every factory a block on a canvas (`FactoryBlockNode`), laid out on a grid in the order `factoryBlocks` gives, and fitted
- * to the frame, never larger than life. The canvas pans and zooms; a block does not move, and a click on one goes into it. With no block,
- * it says how to make a factory.
+ * to the frame, never larger than life. The canvas pans and zooms, and a block does not move. A click, a tap or Enter on a block shows its
+ * factory in the frame's bar, ringed; the same block again or the empty canvas closes it, and another switches it. A double click on a
+ * block, or the bar's Open, goes to its floor (`useCanvasPress`). With no block, it says how to make a factory.
  */
 export function FactoriesCanvas({ blocks }: { blocks: readonly FactoryBlock[] }) {
-  const content = useContent(blocks);
-  const nodes = useMemo(() => nodesOf(content), [content]);
-  if (!nodes.length) return <NoFactory />;
+  if (!blocks.length) return <NoFactory />;
   return (
-    <div className="h-[calc(100svh-3rem)] min-h-96" aria-label="The factories">
-      <ReactFlow
-        id="factories"
-        nodes={nodes}
-        nodeTypes={nodeTypes}
-        fitView
-        fitViewOptions={{ maxZoom: 1, padding: 0.15 }}
-        minZoom={0.2}
-        nodesDraggable={false}
-        nodesConnectable={false}
-        nodesFocusable={false}
-        elementsSelectable={false}
-        deleteKeyCode={null}
-        selectionKeyCode={null}
-        multiSelectionKeyCode={null}
-        colorMode="system"
-      >
-        <Background variant={BackgroundVariant.Dots} gap={16} />
-        <Controls showInteractive={false} />
-      </ReactFlow>
+    <ReactFlowProvider>
+      <Floor blocks={blocks} />
+    </ReactFlowProvider>
+  );
+}
+
+/**
+ * The canvas of `blocks`, its frame narrowed by what the bar covers of it (`useBarOver`), so the block inspected and the canvas's controls
+ * stay clear of the bar, the block brought into view as the bar shows it (`useKeepClear`).
+ */
+function Floor({ blocks }: { blocks: readonly FactoryBlock[] }) {
+  const navigate = useNavigate();
+  const { shown, ...press } = useCanvasPress(factoryBar, (factory) => void navigate({ to: '/factories/$factory', params: { factory } }));
+  const inspected = shown?.kind === 'factory' ? shown.factory : null;
+  const content = useContent(blocks);
+  const nodes = useMemo(() => nodesOf(content, inspected), [content, inspected]);
+  const whole = useRef<HTMLDivElement>(null);
+  const frame = useRef<HTMLDivElement>(null);
+  const over = useBarOver(whole);
+  useKeepClear(frame, inspected);
+  return (
+    <div ref={whole} className="flex h-[calc(100svh-3rem)] min-h-96" aria-label="The factories">
+      <div ref={frame} className="min-h-0 min-w-0 flex-1" style={{ marginRight: over }}>
+        <ReactFlow
+          id="factories"
+          nodes={nodes}
+          nodeTypes={nodeTypes}
+          {...press}
+          fitView
+          fitViewOptions={FIT}
+          minZoom={0.2}
+          nodesDraggable={false}
+          nodesConnectable={false}
+          elementsSelectable={false}
+          deleteKeyCode={null}
+          selectionKeyCode={null}
+          multiSelectionKeyCode={null}
+          colorMode="system"
+        >
+          <Background variant={BackgroundVariant.Dots} gap={16} />
+          <Controls showInteractive={false} />
+        </ReactFlow>
+      </div>
     </div>
   );
+}
+
+/**
+ * Keeps the canvas in `frame` readable beside the bar: brings the block `inspected` into view (`revealView`), at the zoom it has or zoomed
+ * out no further than `REVEAL_MIN_ZOOM`, as the bar shows it and as the frame changes width with it inspected; with none inspected, fits
+ * every block again (`FIT`) as the frame changes width, as when the bar closes or the window is resized.
+ */
+function useKeepClear(frame: RefObject<HTMLDivElement | null>, inspected: string | null) {
+  const { fitView, getNode, setViewport } = useReactFlow();
+  const store = useStoreApi();
+  const reveal = useEffectEvent((id: string) => {
+    const at = getNode(id)?.position;
+    if (!at || !frame.current) return;
+    const to = revealView({ ...at, ...BLOCK_SIZE }, store.getState().transform, sizeOf(frame.current), REVEAL_MIN_ZOOM);
+    if (to) void setViewport(to, { duration: 300 });
+  });
+  const resized = useEffectEvent(() => {
+    if (inspected) reveal(inspected);
+    else void fitView({ ...FIT, duration: 300 });
+  });
+  useEffect(() => {
+    if (inspected) reveal(inspected);
+  }, [inspected]);
+  useEffect(() => {
+    const el = frame.current;
+    if (!el) return;
+    let width = el.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (el.clientWidth === width) return;
+      width = el.clientWidth;
+      resized();
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [frame]);
 }
 
 /** No factory, and no run in the default one: say how to make one. */

@@ -538,7 +538,7 @@ function useFloorPress() {
   const { toggle } = useBar();
   const onStep = useCallback((run: string, step: string) => toggle({ kind: 'step', run, step }), [toggle]);
   return {
-    inspecting: shown && shown.kind !== 'start' ? shown.run : null,
+    inspecting: shown?.kind === 'run' || shown?.kind === 'step' ? shown.run : null,
     inspected: shown?.kind === 'run' ? shown.run : null,
     step: shown?.kind === 'step' ? shown : null,
     onStep,

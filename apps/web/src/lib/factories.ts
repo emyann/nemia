@@ -41,8 +41,8 @@ export const runsIn = <T extends { factory: string | null }>(runs: readonly T[],
 /** The cards in `factory`, in their order: the queue of its floor keeps these alone. */
 export const queuedIn = (cards: readonly InboxEntry[], factory: FactoryPlace): InboxEntry[] => cards.filter((card) => isIn(card, factory));
 
-/** `factory` as its block shows it, holding `runs`. */
-const blockOf = (factory: Factory, runs: readonly FactoryRun[]): FactoryBlock => {
+/** `factory` as its block and its bar show it, holding those of `runs` that are in it. */
+export const blockOf = (factory: Factory, runs: readonly FactoryRun[]): FactoryBlock => {
   const mine = runsIn(runs, factory);
   return {
     name: factory.name,
@@ -56,6 +56,23 @@ const blockOf = (factory: Factory, runs: readonly FactoryRun[]): FactoryBlock =>
     error: factory.error,
   };
 };
+
+/** `n` of `one`, in words: `1 run`, `3 runs`. */
+const count = (n: number, one: string) => `${n} ${one}${n === 1 ? '' : 's'}`;
+
+/** What a block offers, in words: the default factory every workflow and no hire; another its workflows and its hires. */
+export const offerOf = (block: FactoryBlock): string =>
+  block.workflows === null
+    ? 'every workflow · no hires'
+    : `${count(block.workflows, 'workflow')} · ${block.hires === 0 ? 'no hires' : count(block.hires, 'hire')}`;
+
+/** What a block's runs are doing, in words: how many are in flight and wait on you, how many it holds, or that it holds none. */
+export const runsOf = (block: FactoryBlock): string =>
+  block.runs === 0
+    ? 'No runs yet'
+    : [`${block.inFlight} in flight`, block.waitsOnYou > 0 && `${block.waitsOnYou} waiting on you`, count(block.runs, 'run')]
+        .filter(Boolean)
+        .join(' · ');
 
 /**
  * The blocks of the machine, one a factory, in the order the api lists them, one whose file does not read among them. The default factory

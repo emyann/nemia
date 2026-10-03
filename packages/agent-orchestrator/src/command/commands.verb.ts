@@ -7,7 +7,6 @@
  * (`wf agents card`, `agentCardRead`), and a run's course (`wf cancel`, `wf hold`: `runs.verb.ts`). The whole table (`TABLE`) adds the
  * commands the CLI serves alone and runs itself, with no handler: `wf tick`, `wf up` and `wf watch` (`RAN`).
  */
-import type { Engine } from '../runtime-client.ts';
 import { approvalWordsRefusal } from '../gate/gate.ts';
 import { approve } from '../gate/gate.verb.ts';
 import { runStore } from '../record/files.store.ts';
@@ -26,20 +25,8 @@ import { lsLines, type RunsListed } from '../list/list.ts';
 import { agentCardRead, agentsRead } from '../roster/roster.store.ts';
 import { agentsLines, cardNote, type AgentsRead, type CardRead } from '../roster/roster.ts';
 import { commandLine, type Args, type CommandSpec, type Flag } from './command.ts';
-import { CANCEL, HOLD, RAN, type Ran } from './runs.verb.ts';
-
-/**
- * A command whole: its spec, `handler`, which calls one package verb with the arguments and answers data — never printed lines — and
- * `print`, the lines the CLI prints of that data. The api answers the data as JSON, or only its `apiKeys` where the CLI prints more of
- * it than the api answers. A handler reads its settings (`WF_MAX_RUNS`) from `env`, and a person's own files from the store `home`: the
- * process's own at the command line, the app's on the api. `note` is what the CLI says of the data on stderr, beside what it prints.
- */
-export type Command<D extends object = Readonly<Record<string, unknown>>> = CommandSpec & {
-  handler(e: Engine, args: Args, env?: NodeJS.ProcessEnv, home?: string): Promise<D>;
-  print(data: D, args: Args): readonly string[];
-  note?(data: D, args: Args): readonly string[];
-  readonly apiKeys?: readonly (keyof D & string)[];
-};
+import type { Command, Ran } from './entry.verb.ts';
+import { CANCEL, HOLD, RAN } from './runs.verb.ts';
 
 /** The text under `key`, or undefined where none was given. */
 const textOf = (args: Args, key: string): string | undefined => {

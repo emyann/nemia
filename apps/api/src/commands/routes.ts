@@ -153,8 +153,8 @@ const route =
     });
 
 /**
- * The routes of every command of `table` the api posts or deletes on, each answered from its entry; a read the api gets is served by the api's
- * own route for it, which calls the entry's handler.
+ * The routes of every command of `table` the api posts or deletes on, each answered from its entry; a read the api gets is served by the
+ * api's own route for it, which calls the entry's handler.
  */
 export function routesOf(table: readonly Command[]): Hono<ApiEnv> {
   const router = new Hono<ApiEnv>();

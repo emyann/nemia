@@ -10,11 +10,8 @@ import { cursorTakes } from '../feed/feed.ts';
 import { BY_CAP, oneLine, WHY_CAP, type Hold } from '../record/record.ts';
 import { holdWord } from '../wait/wait.ts';
 import { hold, unhold } from '../wait/wait.verb.ts';
-import type { Args, CommandSpec } from './command.ts';
-import type { Command } from './commands.verb.ts';
-
-/** A command the CLI serves alone and runs itself, by its runner (`RUNS` in `cli/main.ts`): its spec, and no handler. */
-export type Ran = CommandSpec & { readonly only: { readonly side: 'cli'; readonly why: string }; readonly handler?: undefined };
+import type { Args } from './command.ts';
+import type { Command, Ran } from './entry.verb.ts';
 
 /** The text under `key`, or undefined where none was given. */
 const textOf = (args: Args, key: string): string | undefined => {

@@ -33,6 +33,7 @@ import {
   skillsFor,
   skillVersion,
   start,
+  startFactory,
   startFromInbox,
   unattachedRefusal,
   unfilledRefusal,
@@ -601,14 +602,15 @@ function agentSkillsOf(step: Workflow, dir: string, places: Places): AgentSkill[
 
 /**
  * The inbox card `asked` names, started by the package's `startFromInbox` with `repo` as the caller's and in the factory `factory` when
- * one is named, over the card's `factory:`, and what `POST /api/runs` answers:
- * the run's id and the card's name, whether the card was removed and why not, and the card's `repo:` the run did not look at.
+ * one is named, over the card's `factory:` — one that names none either way is refused, its fix `?factory=<name>` — and what
+ * `POST /api/runs` answers: the run's id and the card's name, whether the card was removed and why not, and the card's `repo:` the run did not look at.
  */
 function cardStarted(asked: Extract<Asked, { card: string }>, repo: string, factory: string | undefined) {
   const started = startFromInbox({
     name: asked.card,
     callerRepo: repo,
     ...(factory !== undefined ? { factory } : {}),
+    fix: '?factory=<name>',
     workflow: asked.dir,
     ...(asked.brief !== undefined ? { brief: asked.brief } : {}),
     ...(asked.after ? { after: asked.after } : {}),
@@ -655,7 +657,10 @@ function cardStarted(asked: Extract<Asked, { card: string }>, repo: string, fact
  *   says it (`ignoredRepoLine`): a client that starts a card is told the same fact wherever it started from. In a factory (`?factory=`),
  *   the run is started in it (`start()`'s `factory`), which refuses a workflow it has not attached, a step its hires leave unfilled and a
  *   repository outside it, each an `Invalid`; a card is started in it too, the request's factory over the card's `factory:`, as
- *   `wf start <card> --factory` starts it, and refused as `start()` refuses, the card left in the inbox.
+ *   `wf start <card> --factory` starts it, and refused as `start()` refuses, the card left in the inbox. Every run is started in a
+ *   factory: a start that names none (no `?factory=`, or `default`) runs in the one factory whose repository holds the api's repository,
+ *   or `?repo=`, on that repository (`startFactory`, as `wf start` finds it), and is refused, `Invalid`, where none or two do; a card
+ *   that names none either way is refused, `Invalid` (`unfactoredCardRefusal`), never started in a factory found from its repository.
  */
 export const workflows = new Hono<ApiEnv>()
   .get('/api/workflows', (c) => served(c, ({ repo, home, factory }) => c.json(listWorkflows(repo, home, factory))))
@@ -710,12 +715,13 @@ export const workflows = new Hono<ApiEnv>()
         c.header('Location', `/api/runs/${encodeURIComponent(started.id)}`);
         return c.json(started, 201);
       }
+      const found = factory ? { factory, repo } : startFactory(undefined, repo, '?factory=<name>');
       const { id } = start({
         brief: asked.brief,
-        repo,
+        repo: found.repo ?? repo,
         workflowDir: asked.dir,
         ...(asked.after ? { after: asked.after } : {}),
-        ...(factory ? { factory: factory.name } : {}),
+        ...(found.factory ? { factory: found.factory.name } : {}),
       });
       c.header('Location', `/api/runs/${encodeURIComponent(id)}`);
       return c.json({ id }, 201);

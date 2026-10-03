@@ -196,6 +196,18 @@ test('a try of an agent of yours writes its folder and starts a folder run of it
   assert.deepEqual(detail.try, { agent: 'scribe' });
 });
 
+test('a try is the one start made in the default factory: as shipped, with WF_DEFAULT_FACTORY_STARTS unset, it starts and records no factory', async (t) => {
+  const was = process.env.WF_DEFAULT_FACTORY_STARTS;
+  delete process.env.WF_DEFAULT_FACTORY_STARTS;
+  t.after(() => {
+    if (was !== undefined) process.env.WF_DEFAULT_FACTORY_STARTS = was;
+  });
+  fs.writeFileSync(path.join(YOURS, 'shipped.md'), '---\nmodel: sonnet\n---\nSay what you see.\n');
+  const id = await idOf(await tryIt('shipped', { brief: 'Say what is in the folder.' }));
+  const run = JSON.parse(fs.readFileSync(path.join(RUNS, `${id}.json`), 'utf8'));
+  assert.deepEqual([run.factory, run.repo, run.place], [undefined, undefined, { kind: 'folder' }]);
+});
+
 test("REFUSED: a try never runs with its agent's rules outside its folder — an agent whose mode asks first keeps only those inside it", async () => {
   for (const [name, mode, rules] of [
     ['careful', 'dontAsk', ['Edit(notes/**)']],

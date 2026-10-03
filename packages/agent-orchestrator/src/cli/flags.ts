@@ -132,6 +132,12 @@ ${helpOf(COMMANDS)}
                                nothing else — every field the protocol marks REQUIRED but
                                supportedInterfaces, which is left out because nothing here serves an
                                agent over A2A. The card describes; it is not an address
+  wf agents custom <name> [--file <path>|-] [--clear] [--repo .]
+                               your custom instructions for that agent: words you add to it without
+                               rewriting it, kept in <store>/custom-instructions/<name>.md and told
+                               after its instructions. Bare, prints them; --file writes them (- for
+                               stdin); --clear removes them. Words only: a frontmatter block is
+                               refused. A run keeps the words it was started with
 
 A workflow is a folder of markdown files. One file is one step:
 

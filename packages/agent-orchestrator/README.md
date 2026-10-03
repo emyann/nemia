@@ -381,6 +381,11 @@ The words reach the agent in that order — instructions, then custom instructio
 two say different things, the later one wins: the step knows the process, and the task knows the case. Telling the agent so is coming,
 not built.
 
+The run page shows a step's layers apart, as the run froze them at `wf start` (`toldLayers`), never as the files read now: the agent's
+instructions and its own skills, your custom instructions, the step's policy and the skills its `skills:` line adds, and the task, its
+brief after them. A skill the step adds is the step's layer, not its agent's: `wf start` freezes which they are (`StepAgent.addedSkills`),
+so one both name stays the agent's, and the stats mark an added skill's change on the step, never on its agent.
+
 Fences only tighten: a step may narrow its agent's fence, never widen it, and the loader refuses one that would (`fenceRefusal`). A
 step's `tools:` may name only tools its agent's list has; its `allowedTools:` only what its agent's rules allow; its `disallowedTools:`,
 which replaces its agent's list, must keep each of its agent's denies. Its `permissionMode:` or `sandbox:` may be no wider than its

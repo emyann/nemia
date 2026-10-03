@@ -196,5 +196,15 @@ export { answerIn, deniedWords, harnessWaitLine, listing, onYouWords, waitingWor
 export type { Listing } from './list/list.ts';
 export { feedPhase, feedWords } from './feed/feed.ts';
 export type { FeedSaid, FeedWords } from './feed/feed.ts';
-export { acceptedLines, composeBrief, gateLines, loopSection, remoteBrief, retrySection, roundSection, SIGNOFF } from './brief/index.ts';
-export type { EndingStopped, ParentCloseout, ParentStep, RetryBriefing, RoundBriefing } from './brief/index.ts';
+export {
+  acceptedLines,
+  composeBrief,
+  gateLines,
+  loopSection,
+  remoteBrief,
+  retrySection,
+  roundSection,
+  SIGNOFF,
+  toldLayers,
+} from './brief/index.ts';
+export type { EndingStopped, ParentCloseout, ParentStep, RetryBriefing, RoundBriefing, ToldLayers } from './brief/index.ts';

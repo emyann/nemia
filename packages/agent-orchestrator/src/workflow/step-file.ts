@@ -99,7 +99,8 @@ export function parseWorkflow(
   const fromAgent = meta.output === undefined && agent.keys.output !== undefined;
   const step = stepFrom(name, { ...inherited, ...meta }, body, fromAgent ? agent.read : read, spelled);
   agentStepRefusal(name, agent, meta, step, skills);
-  const sessionSkills = [...(agent.skills ?? []), ...(step.skills ?? []).filter((skill) => !agent.skills?.includes(skill))];
+  const added = step.skills?.filter((skill) => !agent.skills?.includes(skill));
+  const sessionSkills = [...(agent.skills ?? []), ...(added ?? [])];
   const keys = STEP_KEYS.filter((key) => Object.hasOwn(meta, key));
   const given = Object.fromEntries(
     STEP_KEYS.flatMap((key) => {
@@ -117,6 +118,7 @@ export function parseWorkflow(
       ...(agent.body && { instructions: agent.body }),
       ...(agent.customInstructions && { customInstructions: agent.customInstructions }),
       ...(sessionSkills.length && { skills: sessionSkills }),
+      ...(added && { addedSkills: added }),
       ...(agent.harnessPrompt !== undefined && { harnessPrompt: agent.harnessPrompt }),
     },
   };

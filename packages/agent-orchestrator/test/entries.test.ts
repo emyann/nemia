@@ -485,6 +485,7 @@ const PINNED: Record<string, string[]> = {
     'tipsSeen',
     'toDecide',
     'toDecideWords',
+    'toldLayers',
     'triedFrom',
     'tryNote',
     'unheld',

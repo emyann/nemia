@@ -92,7 +92,7 @@ test("GET answers none for an agent without custom instructions; PUT writes your
   assert.deepEqual(held(), {});
 });
 
-test('REFUSED at shipped defaults: a name no place has (404), blank words and a frontmatter block (422), each in the words the package says, writing nothing', async () => {
+test('REFUSED at shipped defaults: a name no place has (404, read, written or cleared), blank words and a frontmatter block (422), each in the words the package says, writing nothing', async () => {
   const ghost = await refused(() => send('PUT', '/api/custom-instructions/ghost', { words: 'Boo.' }), 404);
   assert.equal(
     ghost,
@@ -100,6 +100,7 @@ test('REFUSED at shipped defaults: a name no place has (404), blank words and a 
   );
   assert.ok(ghost.includes('The agents there: archivist, scribe.'), ghost);
   assert.equal(await refused(() => send('DELETE', '/api/custom-instructions/ghost', {}), 404), ghost);
+  assert.equal(await refused(() => app.request('/api/custom-instructions/ghost'), 404), ghost);
 
   const blank = await refused(() => send('PUT', '/api/custom-instructions/scribe', { words: ' \n\n' }), 422);
   assert.equal(

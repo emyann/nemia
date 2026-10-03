@@ -1,13 +1,13 @@
 /**
  * A person's custom instructions, written: one file per agent name in their store (`customInstructionsFile`), what they add to an agent
  * they use without rewriting it. Read by the load (`readCustomInstructions`), which a run does once, at `wf start`: a write or a clear
- * reaches only the runs started after it. The one writer of the folder, for a person's command and the board alike: a name no place has is
- * refused here, so both refuse it in the same words.
+ * reaches only the runs started after it. The one writer of the folder, and its reader for a person's command and the board alike: a name
+ * no place has is refused here, read, written or cleared, so both refuse it in the same words.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { customInstructionsRefusal } from './agents.ts';
-import { agentsFor, customInstructionsFile } from '../folder/folder.store.ts';
+import { agentsFor, customInstructionsFile, readCustomInstructions } from '../folder/folder.store.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 
 /**
@@ -21,6 +21,15 @@ function refuseNoAgent(home: string, name: string, repo: string): void {
   throw new Missing({
     message: `no agent named ${name} where a run on ${at} looks for one, nor in yours (${path.join(home, 'workflows', 'agents')}). ${names.length ? `The agents there: ${names.join(', ')}.` : 'There are none.'} Name one of them, or the repository it is in.`,
   });
+}
+
+/**
+ * The custom instructions for the agent `name` in the store `home`, as `readCustomInstructions` reads them, for a person's command and the
+ * board alike. Refused, reading nothing: a name a run on `repo` could not name (`Missing`).
+ */
+export function customInstructionsFor(home: string, name: string, repo: string): string | undefined {
+  refuseNoAgent(home, name, repo);
+  return readCustomInstructions(home, name);
 }
 
 /**

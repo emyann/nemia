@@ -1,13 +1,13 @@
 /**
  * A person's custom instructions for an agent on the board: read, written and cleared through the package's own functions
- * (`readCustomInstructions`, `writeCustomInstructions`, `clearCustomInstructions`), the ones `wf agents custom` calls, so the board and the
+ * (`customInstructionsFor`, `writeCustomInstructions`, `clearCustomInstructions`), the ones `wf agents custom` calls, so the board and the
  * command refuse the same things in the same words. They belong to an agent's name, not to a place: one file per name in your store, told
  * to whichever agent of that name a run finds. A run reads them once, at its start, so a write or a clear reaches only the runs started
  * after it.
  */
 import { Schema } from 'effect';
 import { Hono } from 'hono';
-import { clearCustomInstructions, customInstructionsFile, readCustomInstructions, writeCustomInstructions } from 'agent-orchestrator';
+import { clearCustomInstructions, customInstructionsFile, customInstructionsFor, writeCustomInstructions } from 'agent-orchestrator';
 import { agentNameRefusal, WorkflowError } from 'agent-orchestrator/workflow';
 import { readBody, valueAt } from '../body.ts';
 import { refusedBeforeReading, type Guarded } from '../guard.ts';
@@ -40,11 +40,14 @@ const customGuard = (route: string, shape: string): Guarded => ({
   shape,
 });
 
-/** The custom instructions for `name` in the store `home`, as the board reads them; a file the package refuses is answered in `error`. */
-function customOf(home: string, name: string): CustomInstructionsAnswer {
+/**
+ * The custom instructions for `name` in the store `home`, as the board reads them; a file the package refuses is answered in `error`.
+ * Refused, as the package refuses it: a name a run on `repo` could not name (`Missing`).
+ */
+function customOf(home: string, name: string, repo: string): CustomInstructionsAnswer {
   const file = customInstructionsFile(home, name);
   try {
-    return { name, file, words: readCustomInstructions(home, name) ?? null, error: null };
+    return { name, file, words: customInstructionsFor(home, name, repo) ?? null, error: null };
   } catch (err) {
     if (!(err instanceof WorkflowError)) throw err;
     return { name, file, words: null, error: err.message };
@@ -64,11 +67,11 @@ function customOf(home: string, name: string): CustomInstructionsAnswer {
  */
 export const customInstructions = new Hono<ApiEnv>()
   .get('/api/custom-instructions/:name', (c) =>
-    served(c, async ({ home }) => {
+    served(c, async ({ repo, home }) => {
       const { name } = c.req.param();
       const wrong = agentNameRefusal(name);
       if (wrong !== undefined) return c.json({ error: `GET /api/custom-instructions/${name}: ${wrong}` }, 400);
-      return c.json(customOf(home, name));
+      return c.json(customOf(home, name, repo));
     }),
   )
   .put('/api/custom-instructions/:name', (c) =>
@@ -93,7 +96,7 @@ export const customInstructions = new Hono<ApiEnv>()
       );
       if ('status' in read) return c.json({ error: read.error }, read.status);
       writeCustomInstructions(home, name, read.body.words, repo);
-      return c.json(customOf(home, name));
+      return c.json(customOf(home, name, repo));
     }),
   )
   .delete('/api/custom-instructions/:name', (c) =>

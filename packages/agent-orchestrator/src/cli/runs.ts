@@ -12,6 +12,7 @@ import {
   cardSkills,
   clearCustomInstructions,
   customInstructionsFile,
+  customInstructionsFor,
   findAgent,
   forget,
   forgetLine,
@@ -23,7 +24,6 @@ import {
   prune,
   pruneLines,
   pruningBytes,
-  readCustomInstructions,
   runStore,
   sizeOf,
   unhold,
@@ -410,7 +410,7 @@ function agentsCustom(args: string[]): void {
       `${name}: custom instructions written to ${file}, told after its instructions in every run started from now — ${kept}`,
     );
   }
-  const words = readCustomInstructions(HOME, name);
+  const words = customInstructionsFor(HOME, name, how.repo);
   if (words === undefined)
     return console.log(`${name} has no custom instructions. Set them with wf agents custom ${name} --file <path>, or --file - for stdin.`);
   console.log(`${file}\n\n${words}`);

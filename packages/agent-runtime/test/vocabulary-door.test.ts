@@ -1,6 +1,6 @@
 /**
  * The vocabulary door, `src/vocabulary.ts`, is pure: the files its value imports reach, the door's own among them, are the harnesses'
- * vocabulary files and `harness/reach.ts` alone, and none imports Effect or a module of node's. A caller that only judges words loads
+ * vocabulary files, `harness/choices.ts` and `harness/reach.ts` alone, and none imports Effect or a module of node's. A caller that only judges words loads
  * it without loading a runner. Type-only imports are erased and let through.
  */
 import { test } from 'node:test';
@@ -10,8 +10,14 @@ import path from 'node:path';
 
 const PKG = path.join(import.meta.dirname, '..');
 
-/** The files the door may load: itself, the harnesses' vocabularies, and the reach that reads them. */
-const DOOR_FILES = ['src/vocabulary.ts', 'src/harness/reach.ts', 'src/harness/claude/vocabulary.ts', 'src/harness/codex/vocabulary.ts'];
+/** The files the door may load: itself, the harnesses' vocabularies, and the choices and the reach that read them. */
+const DOOR_FILES = [
+  'src/vocabulary.ts',
+  'src/harness/choices.ts',
+  'src/harness/reach.ts',
+  'src/harness/claude/vocabulary.ts',
+  'src/harness/codex/vocabulary.ts',
+];
 
 /** Every module `text` imports for a value: a type-only import, or braces of `type` names only, is erased and left out. */
 function valueImports(text: string): string[] {
@@ -43,7 +49,7 @@ function doorBreaches(read: (file: string) => string): string[] {
     if (seen.has(file)) continue;
     seen.add(file);
     if (!DOOR_FILES.includes(file)) {
-      out.push(`the vocabulary door loads ${file}: keep it to the vocabulary files and reach.ts, or the door loads a runner`);
+      out.push(`the vocabulary door loads ${file}: keep it to the vocabulary files, choices.ts and reach.ts, or the door loads a runner`);
       continue;
     }
     for (const spec of valueImports(read(file))) {
@@ -65,7 +71,10 @@ test('REFUSED: a door file that imports a module of node, Effect, or a runner', 
     'src/harness/reach.ts imports effect: the vocabulary door has no Effect and no I/O, so its files import nothing but each other',
   ]);
   assert.deepEqual(doorBreaches(planting('src/harness/reach.ts', "import { codex } from './codex/codex.ts';")), [
-    'the vocabulary door loads src/harness/codex/codex.ts: keep it to the vocabulary files and reach.ts, or the door loads a runner',
+    'the vocabulary door loads src/harness/codex/codex.ts: keep it to the vocabulary files, choices.ts and reach.ts, or the door loads a runner',
+  ]);
+  assert.deepEqual(doorBreaches(planting('src/harness/choices.ts', "import { codex } from './codex/codex.ts';")), [
+    'the vocabulary door loads src/harness/codex/codex.ts: keep it to the vocabulary files, choices.ts and reach.ts, or the door loads a runner',
   ]);
   assert.deepEqual(
     doorBreaches(planting('src/harness/reach.ts', "import type { HarnessSpec } from './detached/detached.ts';")),
@@ -74,6 +83,6 @@ test('REFUSED: a door file that imports a module of node, Effect, or a runner', 
   );
 });
 
-test('the vocabulary door loads the vocabulary files and reach.ts alone, with no Effect and no I/O', () => {
+test('the vocabulary door loads the vocabulary files, choices.ts and reach.ts alone, with no Effect and no I/O', () => {
   assert.deepEqual(doorBreaches(onDisk), []);
 });

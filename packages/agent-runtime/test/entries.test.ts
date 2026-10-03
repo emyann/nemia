@@ -14,6 +14,7 @@ const PINNED: Record<string, string[]> = {
     'CODEX_EFFORTS',
     'CODEX_SANDBOXES',
     'HARNESS_ARGS',
+    'HARNESS_CHOICES',
     'TURN_ARGS',
     'claudeDetached',
     'codex',
@@ -40,6 +41,7 @@ const PINNED: Record<string, string[]> = {
     'FileRefused',
     'GRACE_MS',
     'HARNESS_ARGS',
+    'HARNESS_CHOICES',
     'InputRefused',
     'Journal',
     'JournalError',
@@ -90,6 +92,7 @@ const PINNED: Record<string, string[]> = {
     'CLAUDE_PERMISSION_MODES',
     'CODEX_EFFORTS',
     'CODEX_SANDBOXES',
+    'HARNESS_CHOICES',
     'fenceReach',
   ],
 };

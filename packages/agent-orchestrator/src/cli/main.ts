@@ -42,7 +42,7 @@ import { HELP, usage, type Engine, type Verb } from './flags.ts';
 import { decideVerb } from './decide/decide.ts';
 import { statsVerb } from './stats/stats.ts';
 import { factoryVerb } from './factory/factory.ts';
-import { agentsVerb, cancelVerb, holdVerb, logsVerb, lsVerb, pruneVerb, rmVerb, showVerb } from './runs.ts';
+import { agentsVerb, cancelVerb, holdVerb, logsVerb, pruneVerb, rmVerb, showVerb } from './runs.ts';
 import { inboxVerb, planVerb, startVerb } from './start.ts';
 
 /**
@@ -310,7 +310,6 @@ export const VERBS: ReadonlyMap<string, Verb> = new Map<string, Verb>([
   ['up', upVerb],
   ['feed', feedVerb],
   ['watch', watchVerb],
-  ['ls', lsVerb],
   ['cancel', cancelVerb],
   ['rm', rmVerb],
   ['prune', pruneVerb],

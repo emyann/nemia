@@ -164,6 +164,11 @@ test("the table's help is today's, word for word", () => {
       "                               engine journals the words on the step's task, wf ls notes the step",
       '                               said to, and wf decide prints them under it. A try that continues',
       '                               the session is handed them again, as ## Said to your session',
+      '  wf ls [<runId>]',
+      '                               runs and their steps — a run waiting on another says waiting on <run>,',
+      '                               one the cap on runs in flight holds waiting for a run slot (2 of 2 in',
+      "                               flight); what each step's tries and the run have cost, where measured;",
+      '                               last, whether a wf up ticks the store and when its last pass was',
     ].join('\n'),
   );
 });

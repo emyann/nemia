@@ -4,7 +4,17 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { holdsOpen, holdsOpenOn, landingDue, landingOpen, landsOnCheck, landedWords, type MergeState } from '../src/run.ts';
+import {
+  holdsOpen,
+  holdsOpenOn,
+  landingDue,
+  landingOpen,
+  landsOnCheck,
+  landedWords,
+  shownNote,
+  shownStatus,
+  type MergeState,
+} from '../src/run.ts';
 import {
   answerIn,
   admissionOrder,
@@ -2204,7 +2214,7 @@ test('`answerIn` and `harnessWaitLine`: where a person answers it, alone and aft
   );
 });
 
-test("`wf ls` says what a blocked step's harness waits for, beside the engine's word and not in it", () => {
+test("`wf ls` says what a blocked step's harness waits for, beside the engine's word and not in it: the status keeps the bare word", () => {
   const r = run({ implement: 't1', review: null });
   const waiting = (id: string) => (id === 't1' ? 'permission prompt' : undefined);
   const lsWith = (phase: string, waitingOf: (id: string) => string | undefined) =>
@@ -2225,19 +2235,21 @@ test("`wf ls` says what a blocked step's harness waits for, beside the engine's 
       [],
       undefined,
       waitingOf,
-    ).steps[0].status;
+    ).steps[0];
 
-  assert.equal(lsWith('needs-human', waiting), 'needs-human: waiting for a permission prompt');
-  const broken = lsWith('needs-human', () => 'permission prompt\nfor Bash(rm -rf /)');
+  const blocked = lsWith('needs-human', waiting);
+  assert.deepEqual([blocked.status, blocked.waits], ['needs-human', 'waiting for a permission prompt'], 'the status is the bare word');
+  assert.equal(shownStatus(blocked), 'needs-human: waiting for a permission prompt', 'and `wf ls` prints the wait beside it');
+  const broken = shownStatus(lsWith('needs-human', () => 'permission prompt\nfor Bash(rm -rf /)'));
   assert.equal(
     broken,
     'needs-human: waiting for a permission prompt for Bash(rm -rf /)',
     'one row per step, padded to the widest status with the branch after it: a newline the harness sent would misalign every row',
   );
   assert.doesNotMatch(broken, /\s\s|[\n\r\t]/, 'nothing in the status that a padded column cannot hold');
-  assert.equal(
+  assert.deepEqual(
     lsWith('needs-human', () => undefined),
-    'needs-human',
+    { name: 'implement', status: 'needs-human', branch: null },
     'a harness that says nothing reads as it did before',
   );
   assert.equal(
@@ -2245,12 +2257,12 @@ test("`wf ls` says what a blocked step's harness waits for, beside the engine's 
     'needs-human',
     'and so does a caller that asks nothing',
   );
-  assert.equal(
+  assert.deepEqual(
     lsWith('running (working)', waiting),
-    'running (working)',
+    { name: 'implement', status: 'running (working)', branch: null },
     'a phase that is not needs-human takes no word, whatever the caller answers',
   );
-  assert.equal(lsWith('succeeded', waiting), 'unsigned', 'nor a task that settled');
+  assert.deepEqual(lsWith('succeeded', waiting), { name: 'implement', status: 'unsigned', branch: null }, 'nor a task that settled');
 });
 
 test("the word beside the phase disturbs nothing judged on it: the blocked step's try is still due, and still stops the session first", () => {
@@ -2278,11 +2290,12 @@ test("the word beside the phase disturbs nothing judged on it: the blocked step'
     l.steps[0],
     {
       name: 'implement',
-      status: 'needs-human: waiting for a permission prompt',
+      status: 'needs-human',
       branch: null,
       note: 'try 2 asked (--nudge) — stopping its blocked session, then the tick files it',
+      waits: 'waiting for a permission prompt',
     },
-    '`needs-human` is still compared exactly: the note says the harness blocked it, though the status says more',
+    '`needs-human` is still compared exactly: the note says the harness blocked it, and the wait is beside the status',
   );
 });
 
@@ -2302,7 +2315,7 @@ test('`deniedWords`: each denied call as a rule names it, one line each, the res
   assert.equal(deniedWords(['A', 'B', 'C', 'D', 'E']), 'denied: A, B, C, D, E');
 });
 
-test("`wf ls` says what a step's current try was denied in its note, never in its status", () => {
+test("`wf ls` says what a step's current try was denied after its note, never in its status nor the note it keeps", () => {
   const r = run({ implement: 't1', review: 't2' });
   const denied = (id: string) => (id === 't1' ? ['Skill(look)', 'Bash(pytest)'] : []);
   const ls = (deniedOf?: (id: string) => readonly string[]) =>
@@ -2328,16 +2341,17 @@ test("`wf ls` says what a step's current try was denied in its note, never in it
   const [implement, review] = ls(denied);
   assert.deepEqual(
     implement,
-    { name: 'implement', status: 'unverified · done', branch: null, note: 'denied: Skill(look), Bash(pytest)' },
+    { name: 'implement', status: 'unverified · done', branch: null, denied: 'denied: Skill(look), Bash(pytest)' },
     'the status every reader compares is the one it was without the denials',
   );
-  assert.equal(review.note, undefined, 'a step denied nothing says nothing');
+  assert.equal(shownNote(implement), 'denied: Skill(look), Bash(pytest)', '`wf ls` prints them in the note');
+  assert.deepEqual([review.note, review.denied], [undefined, undefined], 'a step denied nothing says nothing');
   assert.deepEqual(
     ls(),
     ls(() => []),
     'a caller that asks nothing reads as one told of none',
   );
-  assert.equal(ls()[0].note, undefined);
+  assert.deepEqual([ls()[0].note, ls()[0].denied], [undefined, undefined]);
   const tried = listing(
     RETRIED,
     onTry([{ taskId: 't0', then: 'nudge' }], null),
@@ -2357,8 +2371,9 @@ test("`wf ls` says what a step's current try was denied in its note, never in it
     () => undefined,
     (id) => (id === 't1' ? ['Bash(npm)'] : ['Skill(look)']),
   ).steps[0];
+  assert.equal(tried.denied, 'denied: Bash(npm)');
   assert.match(
-    tried.note ?? '',
+    shownNote(tried) ?? '',
     /^try 2.* · denied: Bash\(npm\)$/,
     "the current try's task, not the try before it, after whatever else its note says",
   );
@@ -5645,8 +5660,8 @@ test('a step that says `denials: fail` and signed off denied a call reads denied
     (id) => denied(id)?.denied ?? [],
   );
   assert.deepEqual(
-    [l.steps[0].status, l.steps[0].note, l.waitingOnYou],
-    ['denied', 'denied: Write(/tmp/w/notes.md), Bash(pytest)', ['implement']],
+    [l.steps[0].status, l.steps[0].denied, shownNote(l.steps[0]), l.waitingOnYou],
+    ['denied', 'denied: Write(/tmp/w/notes.md), Bash(pytest)', 'denied: Write(/tmp/w/notes.md), Bash(pytest)', ['implement']],
   );
 
   assert.deepEqual(

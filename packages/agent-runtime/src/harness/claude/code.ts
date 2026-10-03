@@ -27,6 +27,7 @@ import { detachedFind, detachedOps, type HarnessIO, type HarnessSpec } from '../
 import { claudeTranscriptEvents, claudeTranscriptFile } from './transcript.ts';
 import {
   CLAUDE_CONTEXT_TOKENS,
+  CLAUDE_DEFAULT_MODE,
   claudeCodeRefuses,
   claudeDenyArgs,
   claudeFlagsOf,
@@ -83,7 +84,7 @@ export const claudePrintFlags = (r: SpawnRequest, io: HarnessIO | undefined): st
   ...claudeMountArgs(r.config),
   ...claudeFlagsOf(r.config?.claude),
   '--permission-mode',
-  r.config?.permissionMode ?? 'auto',
+  r.config?.permissionMode ?? CLAUDE_DEFAULT_MODE,
   ...claudeMcpArgs([io?.checkoutMcpConfig, io?.mcpConfigFile]),
   '--setting-sources',
   'project',

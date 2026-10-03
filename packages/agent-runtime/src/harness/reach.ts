@@ -1,0 +1,66 @@
+/**
+ * What a harness's fence words reach: how wide each permission mode or sandbox is, which one a task naming none runs in, which one a
+ * session held to its directory runs in, which ones a background session runs in without stopping to ask a person, and which ones
+ * Claude Code drops on a model. Pure, reading the harnesses' vocabularies alone, so a caller that only judges words asks without loading
+ * a runner.
+ */
+import {
+  CLAUDE_AUTO_DROPPED,
+  CLAUDE_DEFAULT_MODE,
+  CLAUDE_HELD_MODE,
+  CLAUDE_MODE_RANK,
+  CLAUDE_UNASKING_MODES,
+} from './claude/vocabulary.ts';
+import { CODEX_DEFAULT_SANDBOX, CODEX_SANDBOXES } from './codex/vocabulary.ts';
+
+/**
+ * A harness's fence, as the words that set it: `by` is what fences a session, a permission mode or a sandbox; `rank` how wide each word
+ * is, wider higher and equal as wide; `given` the word a task naming none runs in; `writes` the lowest rank that writes in the session's
+ * directory unasked; `held` the word a session held to its directory runs in, where the harness has one; `unasking` the words a
+ * background session runs in without stopping to ask a person, `held` first; `dropped` the words the harness runs as another on the
+ * model asked about.
+ */
+export type FenceReach = {
+  by: 'mode' | 'sandbox';
+  rank: Readonly<Record<string, number>>;
+  given: string;
+  writes: number;
+  held?: string;
+  unasking: readonly string[];
+  dropped: readonly string[];
+};
+
+/** Whether Claude Code drops `auto` on `model`: one of `CLAUDE_AUTO_DROPPED`, as named or with a `-` suffix. */
+const dropsAuto = (model: string | undefined): boolean =>
+  model !== undefined && CLAUDE_AUTO_DROPPED.some((m) => model === m || model.startsWith(`${m}-`));
+
+/** Claude Code's fence on `model`, run as a job or a background session alike. */
+const claudeReach = (model: string | undefined): FenceReach => ({
+  by: 'mode',
+  rank: CLAUDE_MODE_RANK,
+  given: CLAUDE_DEFAULT_MODE,
+  writes: CLAUDE_MODE_RANK.acceptEdits,
+  held: CLAUDE_HELD_MODE,
+  unasking: CLAUDE_UNASKING_MODES,
+  dropped: dropsAuto(model) ? ['auto'] : [],
+});
+
+/** Codex's fence: its sandboxes, narrowest first, none of which it drops or stops to ask in. */
+const codexReach = (): FenceReach => ({
+  by: 'sandbox',
+  rank: Object.fromEntries(CODEX_SANDBOXES.map((sandbox, i) => [sandbox, i])),
+  given: CODEX_DEFAULT_SANDBOX,
+  writes: CODEX_SANDBOXES.indexOf('workspace-write'),
+  unasking: [],
+  dropped: [],
+});
+
+/**
+ * What harness `harness`'s fence words reach on `model` (`FenceReach`), or `undefined` for a harness fenced by neither a mode nor a
+ * sandbox: a command, an A2A agent, or a name the runtime does not know.
+ */
+export const fenceReach = (harness: string, model?: string): FenceReach | undefined => {
+  if (harness === 'claude' || harness === 'claude-detached') return claudeReach(model);
+  if (harness === 'codex') return codexReach();
+  return undefined;
+};

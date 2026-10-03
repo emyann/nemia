@@ -19,7 +19,7 @@ import { getSessionInfo, getSessionMessages } from '@anthropic-ai/claude-agent-s
 import type { SessionState, Sighting, Usage } from '../../core/index.ts';
 import { claudeInbox, claudeInboxLine, claudeInboxPost, claudeRegistered } from './inbox.ts';
 import { claudeTranscriptEvents, lastStructuredOutput, renderTranscript, transcriptFile, transcriptUsage } from './transcript.ts';
-import { claudeDenyArgs, claudeFlagsOf, claudeMountArgs, worktreeName } from './vocabulary.ts';
+import { CLAUDE_DEFAULT_MODE, claudeDenyArgs, claudeFlagsOf, claudeMountArgs, worktreeName } from './vocabulary.ts';
 import { checkoutMcpConfig, claudeMcpArgs, writeMcpConfig } from '../mcp.ts';
 import { readTranscript } from '../transcript.ts';
 import { countSpawn, readTextAsync } from '../../core/engine/tally.ts';
@@ -453,14 +453,14 @@ const mcpFileOf = (root: string, name: string) => path.join(root, 'mcp', `${name
  *    harness (`claudeBgRefuses`); a task that reaches the runner with one anyway is not given less than it asked for.
  * 13. The brief, last.
  */
-const claudeArgv = (r: SpawnRequest, mcpArgs: string[]): string[] => [
+export const claudeArgv = (r: SpawnRequest, mcpArgs: string[]): string[] => [
   '--bg',
   '--name',
   r.name,
   ...fenceFlags(r.config),
   ...claudeFlagsOf(r.config?.claude),
   '--permission-mode',
-  r.config?.permissionMode ?? 'auto',
+  r.config?.permissionMode ?? CLAUDE_DEFAULT_MODE,
   ...mcpArgs,
   ...sessionFlags(r),
   r.brief,

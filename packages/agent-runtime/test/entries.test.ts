@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 
 const PINNED: Record<string, string[]> = {
   'agent-runtime': [
+    'CLAUDE_AUTO_DROPPED',
     'CLAUDE_CONTEXT_TOKENS',
     'CLAUDE_EFFORTS',
     'CLAUDE_PERMISSION_MODES',
@@ -19,6 +20,7 @@ const PINNED: Record<string, string[]> = {
     'commandHarness',
     'configRefusal',
     'denialText',
+    'fenceReach',
     'lifecycleGraph',
     'nameFor',
     'refusedText',
@@ -27,6 +29,7 @@ const PINNED: Record<string, string[]> = {
   ],
   'agent-runtime/effect': [
     'AdmitRefused',
+    'CLAUDE_AUTO_DROPPED',
     'CLAUDE_CONTEXT_TOKENS',
     'CLAUDE_EFFORTS',
     'CLAUDE_PERMISSION_MODES',
@@ -65,6 +68,7 @@ const PINNED: Record<string, string[]> = {
     'composite',
     'denialText',
     'detachedOps',
+    'fenceReach',
     'file',
     'fold',
     'nameFor',

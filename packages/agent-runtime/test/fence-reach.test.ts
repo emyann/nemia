@@ -1,0 +1,80 @@
+/**
+ * What a harness's fence words reach (`fenceReach`): each rank held to the harness's own words, the word a task naming none runs in held
+ * to the argv the runner gives it, and the models Claude Code drops `auto` on matched as named or with a suffix.
+ */
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { fenceReach } from '../src/harness/reach.ts';
+import { CLAUDE_PERMISSION_MODES } from '../src/harness/claude/vocabulary.ts';
+import { CODEX_SANDBOXES } from '../src/harness/codex/vocabulary.ts';
+import { claudeJob } from '../src/harness/claude/code.ts';
+import { claudeArgv } from '../src/harness/claude/bg.ts';
+import { codex } from '../src/harness/codex/codex.ts';
+
+const CLAUDES = ['claude', 'claude-detached'];
+
+/** The word after `flag` in `args`. */
+const after = (args: readonly string[], flag: string): string | undefined => args[args.indexOf(flag) + 1];
+
+test('every permission mode Claude Code takes has a rank, and no other word does, on either of its harnesses', () => {
+  for (const harness of CLAUDES) {
+    assert.deepEqual(Object.keys(fenceReach(harness)!.rank).sort(), [...CLAUDE_PERMISSION_MODES].sort(), harness);
+  }
+});
+
+test("codex's sandboxes rise in rank in the order Codex lists them, narrowest first", () => {
+  const { rank, by } = fenceReach('codex')!;
+  assert.equal(by, 'sandbox');
+  assert.deepEqual(Object.keys(rank), [...CODEX_SANDBOXES]);
+  assert.deepEqual(
+    CODEX_SANDBOXES.map((s) => rank[s]),
+    CODEX_SANDBOXES.map((_, i) => i),
+  );
+});
+
+test('the word a task naming none runs in is what the runner gives it: a job and a background session of Claude Code, and Codex', () => {
+  const task = { name: 'ae/t/1', brief: 'b', cwd: '/r' };
+  for (const harness of CLAUDES) {
+    assert.equal(fenceReach(harness)!.by, 'mode');
+    assert.equal(after(claudeJob.command(task).args, '--permission-mode'), fenceReach(harness)!.given, `${harness}, a job`);
+    assert.equal(after(claudeArgv(task, []), '--permission-mode'), fenceReach(harness)!.given, `${harness}, a background session`);
+  }
+  assert.equal(after(codex.command(task).args, '-s'), fenceReach('codex')!.given);
+});
+
+test("Claude Code's held mode leads the modes that ask nobody, each one of its words; acceptEdits is the first that writes; bypassPermissions alone is widest", () => {
+  const { rank, held, unasking, writes } = fenceReach('claude')!;
+  assert.equal(held, 'dontAsk');
+  assert.equal(unasking[0], held);
+  assert.deepEqual(unasking, ['dontAsk', 'bypassPermissions']);
+  for (const mode of unasking) assert.ok(CLAUDE_PERMISSION_MODES.includes(mode), mode);
+  assert.equal(writes, rank.acceptEdits);
+  assert.ok(rank.dontAsk < writes && rank.default < writes, 'the held mode and the default ask before writing');
+  const top = Math.max(...Object.values(rank));
+  assert.deepEqual(
+    Object.keys(rank).filter((m) => rank[m] === top),
+    ['bypassPermissions'],
+  );
+  assert.ok(rank.auto > rank.acceptEdits && rank.plan < rank.dontAsk);
+});
+
+test('codex holds no session to a mode and asks nobody in the background; workspace-write is the first sandbox that writes', () => {
+  const { rank, held, unasking, writes } = fenceReach('codex')!;
+  assert.equal(held, undefined);
+  assert.deepEqual(unasking, []);
+  assert.equal(writes, rank['workspace-write']);
+});
+
+test('Claude Code drops auto on a listed model, named or with a suffix, and on no other; codex drops nothing', () => {
+  for (const model of ['haiku', 'claude-haiku-4-5', 'claude-haiku-4-5-20251001', 'claude-sonnet-4-5']) {
+    for (const harness of CLAUDES) assert.deepEqual(fenceReach(harness, model)!.dropped, ['auto'], `${harness} ${model}`);
+  }
+  for (const model of ['opus', 'sonnet', 'claude-haiku-4-50', 'xhaiku', undefined]) {
+    assert.deepEqual(fenceReach('claude', model)!.dropped, [], String(model));
+  }
+  assert.deepEqual(fenceReach('codex', 'haiku')!.dropped, []);
+});
+
+test('a harness fenced by neither a mode nor a sandbox has no reach', () => {
+  for (const harness of ['command', 'a2a:x', 'nope', '']) assert.equal(fenceReach(harness), undefined, harness);
+});

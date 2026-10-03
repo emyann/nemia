@@ -194,6 +194,13 @@ function dropStaleTries(names: Iterable<string>, listing: readonly InboxListing[
 }
 
 /**
+ * The repository a queued card's line names (`on`), when it was tried on the daemon's (`fromDaemon`): none for a card that names no
+ * factory, refused wherever a daemon runs, unless `WF_DEFAULT_FACTORY_STARTS=1` starts it there.
+ */
+const daemonsRepo = (card: Pick<InboxListing, 'factory'>, on: string, fromDaemon: boolean): { on?: string } =>
+  fromDaemon && (card.factory !== null || defaultStartsAllowed()) ? { on } : {};
+
+/**
  * The queue's next card started (`nextQueued`), one try: through `startFromInbox`, with the card's `workflow:` and `factory:`, on the
  * repository `queueRepo` names — its `repo:`, else its factory's one repository, else `repo`, the daemon's — the same one its refusal is
  * remembered on, so its base is its base branch as it is now, and its brief is frozen now. Undefined with no card to start. A card
@@ -220,7 +227,7 @@ export function startQueued(repo: string, runs: readonly Run[] = runStore.runs.l
   const next = nextQueued(listing, repo, factories);
   if (!next) return undefined;
   const { repo: on, fromDaemon } = queueRepo(next, repo, factories);
-  const where = fromDaemon && (next.factory !== null || defaultStartsAllowed()) ? { on } : {};
+  const where = daemonsRepo(next, on, fromDaemon);
   try {
     const started = startFromInbox({ name: next.name, callerRepo: repo });
     const ignored = started.ignoredRepo !== undefined ? { ignoredRepo: started.ignoredRepo } : {};

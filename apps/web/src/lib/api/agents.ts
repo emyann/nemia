@@ -237,8 +237,9 @@ export const tryAgent = (name: string, brief: string): Promise<AgentTried> =>
   agentWrite('POST', `/api/agents/yours/${encodeURIComponent(name)}/try`, AgentTriedSchema, { brief }, TRIED);
 
 /**
- * Mirrors `CustomInstructionsAnswer` in apps/api/src/custom/custom.ts: a person's custom instructions for the agent `name`, the file in your
- * store they are kept in, the words (null for none), and the package's refusal of a file there that does not read (null when it reads).
+ * Mirrors `CustomInstructionsAnswer` in apps/api/src/custom/custom.ts: a person's custom instructions for the agent `name`, the file in
+ * your store they are kept in, the words (null for none), and the package's refusal of a file there that does not read (null when it
+ * reads).
  */
 export type CustomInstructions = { name: string; file: string; words: string | null; error: string | null };
 

@@ -6,6 +6,9 @@
  * And the factory on the run: its name frozen on the record, a factory with one repository giving the run its repository, and a git run on
  * a repository outside the factory refused, naming its list; a folder team works on none, and a run in the default factory records none.
  *
+ * And every run in a factory, as shipped (`asShipped` deletes `WF_DEFAULT_FACTORY_STARTS`, which `test/ambient.ts` sets): a start that names
+ * none runs in the one factory whose repository holds its folder, and is refused where none or two do; a card names its own, never found.
+ *
  * `WF_ROOT` is set before the runner is imported, since it is read as the module loads.
  */
 import { test } from 'node:test';
@@ -436,4 +439,205 @@ test('REFUSED: a card that says factory: default, or is started with --factory d
   );
   assert.deepEqual(runsWritten(), before);
   assert.ok(fs.existsSync(card), 'the card is left in the inbox');
+});
+
+/** `text` as a pattern that matches it alone. */
+const escaped = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** The switch off, as shipped, for the test `t`: put back as it was once it ends. */
+function asShipped(t: { after: (fn: () => void) => void }): void {
+  const was = process.env.WF_DEFAULT_FACTORY_STARTS;
+  delete process.env.WF_DEFAULT_FACTORY_STARTS;
+  t.after(() => {
+    if (was === undefined) delete process.env.WF_DEFAULT_FACTORY_STARTS;
+    else process.env.WF_DEFAULT_FACTORY_STARTS = was;
+  });
+}
+
+/** A factory `name` filed on `repos`, with `build` attached and every step of it hired. */
+function filed(name: string, ...repos: string[]): void {
+  addFactory({ name, repos });
+  attachWorkflow({ factory: name, workflow: 'build' });
+  hired(name);
+}
+
+/** The worktrees git lists for `repo`, its own checkout among them. */
+const worktrees = (repo: string): string =>
+  execFileSync('git', ['worktree', 'list', '--porcelain'], { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+
+test('REFUSED as shipped: wf start with no --factory in a folder two factories hold, naming each and the fix, with nothing written; --factory picks one', async (t) => {
+  asShipped(t);
+  const { build } = fresh();
+  const shared = aRepo();
+  filed('a', shared);
+  filed('b', shared);
+  const before = runsWritten();
+  const trees = worktrees(shared);
+  await assert.rejects(
+    typedFrom(shared, ['start', 'build it', '--workflows', build]),
+    refusedWith(
+      'Invalid',
+      new RegExp(
+        `^${escaped(shared)}: 2 factories work on this folder — a on ${escaped(shared)}, b on ${escaped(shared)} — .* Name the one: --factory a, or --factory b\\. Nothing was started\\.$`,
+      ),
+    ),
+  );
+  assert.deepEqual(runsWritten(), before, 'no run written');
+  assert.equal(worktrees(shared), trees, 'no worktree made');
+  const run = readRun(startedId(await typedFrom(shared, ['start', 'build it', '--workflows', build, '--factory', 'b', '--no-worktree'])));
+  assert.equal(run.factory, 'b');
+});
+
+test('REFUSED as shipped: nested repositories of two factories are two holders, with no deepest chosen', async (t) => {
+  asShipped(t);
+  const { build } = fresh();
+  const outer = aRepo();
+  const inner = path.join(outer, 'inner');
+  fs.mkdirSync(inner);
+  execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: inner, stdio: ['ignore', 'pipe', 'pipe'] });
+  filed('outer', outer);
+  filed('inner', inner);
+  const before = runsWritten();
+  await assert.rejects(
+    typedFrom(inner, ['start', 'build it', '--workflows', build, '--no-worktree']),
+    refusedWith(
+      'Invalid',
+      /2 factories work on this folder — inner on .*, outer on .* Name the one: --factory inner, or --factory outer\./,
+    ),
+  );
+  assert.deepEqual(runsWritten(), before);
+});
+
+test('REFUSED as shipped: wf start with no --factory in a repository no factory holds, naming --factory and wf factory add, with nothing written', async (t) => {
+  asShipped(t);
+  const { build } = fresh();
+  const loose = aRepo();
+  const before = runsWritten();
+  await assert.rejects(
+    typedFrom(loose, ['start', 'build it', '--workflows', build, '--no-worktree']),
+    refusedWith(
+      'Invalid',
+      new RegExp(
+        `^${escaped(loose)}: no factory works on this folder, .* Name the factory — --factory <name>, one of pipao — or file one on this repository .*: wf factory add <name> --repo <root>,`,
+      ),
+    ),
+  );
+  assert.deepEqual(runsWritten(), before);
+});
+
+test("as shipped, wf start with no --factory typed in a subfolder of a repository one factory alone holds runs in it, on that repository's root", async (t) => {
+  asShipped(t);
+  const { repo, build } = fresh();
+  hired();
+  const sub = path.join(repo, 'src', 'deep');
+  fs.mkdirSync(sub, { recursive: true });
+  const run = readRun(startedId(await typedFrom(sub, ['start', 'build it', '--workflows', build, '--no-worktree'])));
+  assert.equal(run.factory, 'pipao');
+  assert.equal(run.repo, repo);
+  const named = readRun(startedId(await typedFrom(ROOT, ['start', 'again', '--workflows', build, '--repo', sub, '--no-worktree'])));
+  assert.equal(named.factory, 'pipao', '--repo is the folder the factory is found from');
+  assert.equal(named.repo, repo);
+});
+
+test('REFUSED: wf start --factory default, as shipped and with WF_DEFAULT_FACTORY_STARTS=1, with nothing written', async (t) => {
+  const { repo, build } = fresh();
+  const before = runsWritten();
+  const refusal = /^`default` is the default factory: .* Name a factory — --factory <name>, one of pipao\. Nothing was started\.$/;
+  await assert.rejects(
+    typedFrom(repo, ['start', 'x', '--workflows', build, '--factory', 'default', '--no-worktree']),
+    refusedWith('Invalid', refusal),
+  );
+  asShipped(t);
+  await assert.rejects(
+    typedFrom(repo, ['start', 'x', '--workflows', build, '--factory', 'default', '--no-worktree']),
+    refusedWith('Invalid', refusal),
+  );
+  assert.deepEqual(runsWritten(), before);
+});
+
+test('with WF_DEFAULT_FACTORY_STARTS=1, wf start no factory holds goes to the default factory; a folder two hold is refused all the same', async () => {
+  const { build } = fresh();
+  const loose = aRepo();
+  const run = readRun(startedId(await typedFrom(loose, ['start', 'build it', '--workflows', build, '--no-worktree'])));
+  assert.equal('factory' in run, false);
+  assert.equal(run.repo, loose);
+  const shared = aRepo();
+  filed('a', shared);
+  filed('b', shared);
+  await assert.rejects(
+    typedFrom(shared, ['start', 'x', '--workflows', build, '--no-worktree']),
+    refusedWith('Invalid', /2 factories work on this folder/),
+  );
+});
+
+/** A plan folder of two cards on `build`, `b` after `a`. */
+function aPlanOf(build: string): string {
+  const dir = fs.mkdtempSync(path.join(ROOT, 'plan-'));
+  fs.writeFileSync(path.join(dir, 'a.md'), `---\nworkflow: ${build}\n---\nThe first.\n`);
+  fs.writeFileSync(path.join(dir, 'b.md'), `---\nworkflow: ${build}\nafter: a\n---\nThe second.\n`);
+  return dir;
+}
+
+/** The runs `wf plan` started: the records written since `before`. */
+const plannedRuns = (before: readonly string[]) =>
+  runsWritten()
+    .filter((f) => f.endsWith('.json') && !before.includes(f))
+    .map((f) => readRun(f.slice(0, -'.json'.length)));
+
+test('REFUSED as shipped: wf plan with no --factory where no factory, or two, holds the folder, before its first card is started', async (t) => {
+  asShipped(t);
+  const { build } = fresh();
+  const plan = aPlanOf(build);
+  const loose = aRepo();
+  const before = runsWritten();
+  await assert.rejects(typedFrom(loose, ['plan', plan]), refusedWith('Invalid', /no factory works on this folder, .*--factory <name>/));
+  const shared = aRepo();
+  filed('a', shared);
+  filed('b', shared);
+  await assert.rejects(
+    typedFrom(ROOT, ['plan', plan, '--repo', shared]),
+    refusedWith('Invalid', /Name the one: --factory a, or --factory b\./),
+  );
+  assert.deepEqual(runsWritten(), before);
+});
+
+test('as shipped, wf plan runs every card in the factory one alone holds the folder of, or in --factory', async (t) => {
+  asShipped(t);
+  const { repo, build } = fresh();
+  hired();
+  const before = runsWritten();
+  await typedFrom(repo, ['plan', aPlanOf(build)]);
+  const found = plannedRuns(before);
+  assert.equal(found.length, 2);
+  for (const run of found) assert.deepEqual([run.factory, run.repo], ['pipao', repo]);
+  const second = aRepo();
+  filed('duo', second);
+  const between = runsWritten();
+  await typedFrom(ROOT, ['plan', aPlanOf(build), '--factory', 'duo']);
+  const named = plannedRuns(between);
+  assert.equal(named.length, 2);
+  for (const run of named) assert.deepEqual([run.factory, run.repo], ['duo', second]);
+});
+
+test("REFUSED as shipped: wf start <card> naming no factory, though one alone holds where it is typed and its repo:; --factory or the card's factory: starts it", async (t) => {
+  asShipped(t);
+  const { repo, build } = fresh();
+  hired();
+  const before = runsWritten();
+  const card = aCard('loose', `---\nrepo: ${repo}\n---\nBuild it.\n`);
+  await assert.rejects(
+    typedFrom(repo, ['start', card, '--workflows', build, '--no-worktree']),
+    refusedWith(
+      'Invalid',
+      new RegExp(
+        `^${escaped(card)}: this card names no factory, .* Write \`factory: <name>\` in its frontmatter — one of pipao, or name it at start: --factory <name>; .* Nothing was started\\.$`,
+      ),
+    ),
+  );
+  assert.deepEqual(runsWritten(), before);
+  assert.ok(fs.existsSync(card), 'the card stays in the inbox');
+  const flagged = readRun(startedId(await typedFrom(repo, ['start', card, '--workflows', build, '--factory', 'pipao', '--no-worktree'])));
+  assert.equal(flagged.factory, 'pipao');
+  const own = aCard('own', `---\nfactory: pipao\n---\nBuild it.\n`);
+  assert.equal(readRun(startedId(await typedFrom(ROOT, ['start', own, '--workflows', build, '--no-worktree']))).factory, 'pipao');
 });

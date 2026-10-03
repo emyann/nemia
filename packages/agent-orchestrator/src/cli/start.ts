@@ -27,6 +27,7 @@ import {
   repoFor,
   start,
   startFactory,
+  defaultStartsAllowed,
   startFromInbox,
   startPlan,
   stepsOf,
@@ -379,7 +380,7 @@ export function planVerb(rest: string[]): void {
 function inboxList(): void {
   const listing = readInbox();
   if (!listing.length) return console.log(`the inbox is empty — park an idea with wf inbox add "<idea>"`);
-  for (const line of inboxLines(listing)) console.log(line);
+  for (const line of inboxLines(listing, defaultStartsAllowed())) console.log(line);
   console.log(
     `\nstart one: wf start ${path.join(inboxDir(), '<name>.md')} [--workflows <w>] [--repo <r>] [--factory <f>] — queue one: wf inbox queue <name> — drop one: wf inbox rm <name>`,
   );

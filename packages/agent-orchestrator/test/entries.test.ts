@@ -97,6 +97,7 @@ const PINNED: Record<string, string[]> = {
     'daemonLine',
     'daemonStanding',
     'decide',
+    'defaultStartsAllowed',
     'deniedOf',
     'deniedWords',
     'detachWorkflow',

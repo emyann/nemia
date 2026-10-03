@@ -722,7 +722,7 @@ test("`inboxListing` gives each queued card its place in the order — by when i
   );
   assert.equal(nextQueued(inboxListing(files.slice(5), [], isDirectory), app), undefined, 'nothing queued');
 
-  assert.deepEqual(inboxLines(listing), [
+  assert.deepEqual(inboxLines(listing, true), [
     `a-tied     Tied, and first by name  workflow: dev  queued 2 of 4 — failed at 2026-09-16T10:07:00.000Z on ${app}: ${noGit} — not a refusal: the tick tries it again on every pass, where it keeps its place`,
     'b-late     Late  workflow: dev  queued 4 of 4',
     'c-tied     Tied  workflow: dev  queued 3 of 4',
@@ -730,6 +730,11 @@ test("`inboxListing` gives each queued card its place in the order — by when i
     'e-started  Started by hand  workflow: dev  started as started-by-hand-ab12',
     'f-parked   Parked  workflow: dev',
   ]);
+  assert.equal(
+    inboxLines(listing).find((line) => line.startsWith('d-first')),
+    `d-first    First, and refused  workflow: nope  queued 1 of 4 — not started at 2026-09-16T10:06:00.000Z: d-first.md: \`workflow: nope\` — no workflow folder. Edit the card, or take it back and queue it again, and the tick tries it again`,
+    'as shipped, a card that names no factory is told of no repository to run a daemon in',
+  );
   const named = inboxListing(
     [{ file: 'g-named.md', text: `---\nworkflow: nope\nrepo: ${app}\nqueued: 2026-09-16T09:00:00.000Z\n---\nNamed\n` }],
     [],

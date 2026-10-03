@@ -300,6 +300,7 @@ export type { InboxDropped, InboxQueued } from './inbox/inbox.store.ts';
 export {
   addFactory,
   attachWorkflow,
+  defaultStartsAllowed,
   detachWorkflow,
   factoriesDir,
   fireAgent,

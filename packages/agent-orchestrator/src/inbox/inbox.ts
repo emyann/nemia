@@ -399,16 +399,17 @@ export function queueLine(q: QueueStarted): string {
  * What `wf inbox` prints, a line per entry: the card's name, the first line of its body, its workflow and repository when it names them,
  * and the runs it was started as — or, for an entry that does not read as a card, why. A queued card says its place in the queue and, when
  * the tick's last try did not start it as it stands, why: refused, it waits for a person, not for a slot; failed otherwise, the tick tries
- * it again. A reason the entry's own error already says is not said twice.
+ * it again. A reason the entry's own error already says is not said twice. A card that names no factory is refused wherever a daemon runs,
+ * and its try names no repository to run one in, unless `unfactoredStarts` (`WF_DEFAULT_FACTORY_STARTS=1`, the tests' switch) starts it.
  */
-export function inboxLines(listing: readonly InboxListing[]): string[] {
+export function inboxLines(listing: readonly InboxListing[], unfactoredStarts = false): string[] {
   const width = Math.max(0, ...listing.map((l) => l.name.length));
   const inLine = listing.filter((l) => l.queued?.place).length;
   return listing.map((l) => {
     const started = l.startedAs.length ? `  started as ${l.startedAs.join(', ')}` : '';
     const queued = l.queued?.place ? `  queued ${l.queued.place} of ${inLine}` : '';
     const t = l.tried;
-    const on = t && l.error === null && !l.repo ? ` on ${t.repo}` : '';
+    const on = t && l.error === null && !l.repo && (l.factory !== null || unfactoredStarts) ? ` on ${t.repo}` : '';
     const why = t && t.why !== l.error ? `: ${t.why}` : '';
     const tried = !t
       ? ''

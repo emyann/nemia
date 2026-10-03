@@ -20,13 +20,14 @@
  *                 the task settles on that end, and on nothing observed.
  *
  * A2A's `rejected` is not a state: a spawn its harness refused is one attempt's end (`unstartable`), and the task settles
- * `failed` from `ending` as on any failed end. A sighting may say `rejected` — a remote agent that refused the work once it
- * had it — and that is the harness ending the attempt, `SESSION_ENDED`, recorded `failed` as any failure the harness
- * reports. A sighting's `submitted` — a remote Task accepted and not yet started — is `SESSION_LIVE`, as `working` is:
- * every edge of it (wait, stop for a person or the deadline, stop before continuing) is right for it, and a new event
- * would copy them. `auth-required` is not a task's state either: a sighting says it, and it is `SESSION_BLOCKED`, as
- * `input-required` is. A session blocked on a person is a self-edge of `working`, not a state: the journal cannot tell it
- * from working, only a sighting can, and a state is what the journal says.
+ * `failed` from `ending` as on any failed end — a long-lived task too, which waiting would not start. A sighting may say
+ * `rejected` — a remote agent that refused the work once it had it — and that is the harness ending the attempt,
+ * `SESSION_ENDED`, recorded `failed` as any failure the harness reports. A sighting's `submitted` — a remote Task
+ * accepted and not yet started — is `SESSION_LIVE`, as `working` is: every edge of it (wait, stop for a person or the
+ * deadline, stop before continuing) is right for it, and a new event would copy them. `auth-required` is not a task's
+ * state either: a sighting says it, and it is `SESSION_BLOCKED`, as `input-required` is. A session blocked on a person is
+ * a self-edge of `working`, not a state: the journal cannot tell it from working, only a sighting can, and a state is what
+ * the journal says.
  *
  * **A person's verbs are not edges, and are declared beside them.** `requestStop`, `answer` and `close` write an entry to
  * the journal, and the next pass reads the state that entry makes: `stopping`, a new turn's `submitted`, `ending`. The edges
@@ -148,7 +149,7 @@ export type LifecycleEvent =
   | { type: 'AWAITING_INPUT' }
   | { type: 'CLOSED'; last?: { n: number; ended: Ended | null } }
   | { type: 'DEADLINE_SPENT'; seconds: number }
-  | { type: 'ATTEMPT_ENDED'; ended: Ended | null; reason: EndReason | null; attempts: number; turn: number }
+  | { type: 'ATTEMPT_ENDED'; ended: Ended | null; reason: EndReason | null; attempts: number; turn: number; error?: string }
   | { type: 'BACKING_OFF'; attempt: number; backoffMs: number }
   | { type: 'RESTART_DUE'; attempt: number; resumeFrom?: string; nudge?: string }
   | { type: 'SETTLED'; outcome: Outcome };
@@ -240,11 +241,14 @@ const cutEnd = (reason: 'operator' | 'deadline', attempt: number, sighting?: Sig
 /**
  * The note a turn with no successful attempt settles `failed` with: how many attempts it had — a journal an older runtime
  * wrote may hold several of one turn, and the note counts them all — and, for an end that runtime's engine judged
- * `unsigned`, that the last ended without the closing statement it was asked for.
+ * `unsigned`, that the last ended without the closing statement it was asked for; for a spawn its harness refused, whose
+ * words are on the event (`error`), that the last could not start, in those words, and the fix.
  */
 const attemptNote = (e: Ev<'ATTEMPT_ENDED'>) => {
   const none = `${e.attempts} attempt(s)${e.turn ? ` of turn ${e.turn}` : ''}, none succeeded`;
-  return e.reason === 'unsigned' ? `${none}: the last ended without the closing statement it was asked for` : none;
+  if (e.reason === 'unsigned') return `${none}: the last ended without the closing statement it was asked for`;
+  if (e.error !== undefined) return `${none}: the last could not start: ${e.error}; fix what it names and file the task again`;
+  return none;
 };
 
 /**
@@ -421,7 +425,7 @@ const CONFIG = {
     },
     /**
      * Nothing runs, and the record says how the turn ended, or that a person closed it: it settles on that — or, for a
-     * long-lived task no stop was asked of, restarts it.
+     * long-lived task no stop was asked of, restarts it, unless its harness refused the spawn, which it settles on.
      */
     ending: {
       on: {

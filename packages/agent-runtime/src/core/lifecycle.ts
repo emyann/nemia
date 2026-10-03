@@ -246,8 +246,7 @@ const cutEnd = (reason: 'operator' | 'deadline', attempt: number, sighting?: Sig
 const attemptNote = (e: Ev<'ATTEMPT_ENDED'>) => {
   const none = `${e.attempts} attempt(s)${e.turn ? ` of turn ${e.turn}` : ''}, none succeeded`;
   if (e.reason === 'unsigned') return `${none}: the last ended without the closing statement it was asked for`;
-  if (e.error !== undefined)
-    return `${none}: the last could not start: ${e.error}; fix what it names and file the task again`;
+  if (e.error !== undefined) return `${none}: the last could not start: ${e.error}; fix what it names and file the task again`;
   return none;
 };
 

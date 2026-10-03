@@ -872,13 +872,19 @@ export function observe(state: State, observed: ReadonlyMap<string, Sighting>, n
   if (waitsForInput(state)) return { type: 'AWAITING_INPUT' };
   if (overdue && last?.reason === 'deadline') return { type: 'DEADLINE_SPENT', seconds: Math.round(ranFor / 1000) };
   const ended = turn.attempts.at(-1);
-  if (ended && state.restartPolicy === 'Always' && ended.reason !== 'unstartable') return restartOf(state, sighting, now);
+  if (ended && restarts(state, ended)) return restartOf(state, sighting, now);
   if (ended) return attemptEnded(ended, turn.attempts.length, turn.n);
   if (turn.n > 0 && !turn.continues) return { type: 'NO_SESSION_TO_CONTINUE', turn: turn.n };
   if (awaitsAdmission(state)) return { type: 'QUEUED' };
   if (turn.continues && sighting && isLive(sighting.state)) return { type: 'PREVIOUS_LIVE', sessionId: sighting.sessionId };
   return { type: 'READY', attempt: state.attempts.length + 1, resumeFrom: turn.continues, ...(turn.words ? { nudge: turn.words } : {}) };
 }
+
+/**
+ * Whether `ended`, the last attempt of a task with nothing in flight and no stop asked, is restarted: for a long-lived task,
+ * unless its harness refused the spawn (`unstartable`), which waiting would not change.
+ */
+const restarts = (state: State, ended: Attempt): boolean => state.restartPolicy === 'Always' && ended.reason !== 'unstartable';
 
 /**
  * `ATTEMPT_ENDED` for `ended`, the last of `attempts` in turn `turn`: with the harness's words (`error`) only when it

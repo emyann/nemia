@@ -709,9 +709,13 @@ The lists are exported, from both entries: `CLAUDE_PERMISSION_MODES`, `CLAUDE_EF
 step before a run is written, and its form offers these lists.
 
 **A spawn that fails** is answered by what the harness can vouch for. When nothing can have
-started — the OS would not create the process, a detached worker was never launched, or a
-`PromiseRunner` rejects with `refused: true` — the attempt ends `failed`, reason `unstartable`, in
-the harness's words, and `decide` settles or retries it like any failure. Any other failure may
+started, and waiting would not change that — the OS would not create the process for a reason that stays (no binary,
+no working folder, a file the runner cannot write), a detached worker was never launched, or a `PromiseRunner` rejects
+with `refused: true` — the attempt ends `failed`, reason `unstartable`, in the harness's words, and the task settles
+`failed` with them: `N attempt(s), none succeeded: the last could not start: <words>; fix what it names and file the
+task again`. A long-lived task settles so too, and is not restarted. The OS refusing a process for a short-lived reason
+(`TRANSIENT_ERRNOS`: `EAGAIN`, `EMFILE`, `ENFILE`, `ENOMEM`, `refusedOsError`) is no refusal: the `--bg` runner leaves it
+to the grace window, as below, so its attempt ends `lost` and a long-lived task is restarted. Any other failure may
 have left a session behind (a launcher can create one and lose its acknowledgement), so the call is
 recorded as spawned, with its error, and the grace window decides: the session is adopted if it
 appears, the attempt `lost` if it never does. The grace window runs from the spawn on the monotonic clock within a boot,
@@ -1644,6 +1648,8 @@ attempt, `ae/<task>/<n+1>`, resuming the latest session an attempt recorded and 
 600 s counts them again. It is read off the journal's times and `now` alone (`BACKING_OFF`, then `RESTART_DUE`), so a
 restarted daemon waits the same; the wait and the 600 s run on the monotonic clock between moments journalled in one boot,
 so a stepped wall clock restarts nothing early and holds no restart that is due, and on the wall clock across a reboot. Only `ae stop` ends the task: it settles `stopped`, and nothing restarts it.
+A spawn its harness refused is no end of a session but its absence, which waiting would not change: the task settles
+`failed` in the refusal's words and the fix (*A spawn that fails*), on its first attempt as on a restart's.
 
 **Refused, with exit code 2**, nothing journalled: a `restartPolicy` other than `'Always'`; beside it, `holdOpen` (a turn's
 end is idle here, not a wait), `deadlineSeconds` (only a stop ends it) and `closeoutSchema` (a statement would end its

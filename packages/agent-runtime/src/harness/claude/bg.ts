@@ -784,7 +784,7 @@ const sayThrough =
 const short = (sessionId: string) => sessionId.split('-')[0];
 
 /** Whether `err`, what `execFile` failed with, is the OS refusing to create the process for a reason that stays. */
-const refusedSpawn = (err: NodeJS.ErrnoException) => err.syscall?.startsWith('spawn') === true && refusedOsError(err);
+const refusedSpawn = (err: Error) => (err as NodeJS.ErrnoException).syscall?.startsWith('spawn') === true && refusedOsError(err);
 
 /**
  * `cmd` run with `args`, answering its stdout, or a `RunnerError` for `verb` with its stderr. Refused (`refused`) only

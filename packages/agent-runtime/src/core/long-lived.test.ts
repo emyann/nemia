@@ -226,7 +226,15 @@ const refusedEnd = (n: number): Event => ({
 });
 
 test("LONG-LIVED: a spawn its harness refused is not restarted — the task settles failed in the refusal's words and the fix, where a death is restarted after the backoff", () => {
-  const death: Event = { kind: 'ended', at: at(END - 50_000), attempt: 1, sessionId: 's1', observed: 'failed', reason: 'harness', nativeId: 'n1' };
+  const death: Event = {
+    kind: 'ended',
+    at: at(END - 50_000),
+    attempt: 1,
+    sessionId: 's1',
+    observed: 'failed',
+    reason: 'harness',
+    nativeId: 'n1',
+  };
   const refusals: [string, Event[], string][] = [
     ['on its first attempt', [...inFlight(true).slice(0, 2), refusedEnd(1)], '1 attempt(s)'],
     [

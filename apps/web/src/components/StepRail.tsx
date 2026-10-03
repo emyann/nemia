@@ -112,7 +112,8 @@ const stepTitle = (step: SummaryStep | undefined, name: string, cancelled: boole
 /**
  * A run's steps on its card opened, to the right of what the card says at rest: every step a tile on the run's layering (`tilesOf`), with
  * its status, its latest attempt and what its tries cost — once the run's detail is read — and what it waits on a person for. A press on a
- * tile opens its inspector beside the floor (`onStep`). The attempts' times move every second while one counts, and every 30 s otherwise.
+ * tile shows its step in the frame's bar (`onStep`), and the tile pressed is the step the bar shows (`selected`). The attempts' times move
+ * every second while one counts, and every 30 s otherwise.
  */
 export function StepTiles({
   run,

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page, Response } from 'playwright';
-import { fed, photograph, themeOf } from '../board.ts';
+import { fed, photograph, stepBar, themeOf } from '../board.ts';
 import { cardOf, expectClearOfEachOther, showFinished } from '../canvas.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { ENDING } from '../seed.ts';
@@ -91,7 +91,7 @@ export default {
     }
     await expectVisible(answerOf(page, 'Approve'), 'the gate is on the card again once the approval is taken back');
 
-    await card.locator('time').click();
+    await card.getByRole('button', { name: 'Show steps' }).click();
     const node = card.locator(`[data-tile="${ending}"]`);
     await expectVisible(node, `the card opens into its steps, ${ending} among them`);
     await expectVisible(
@@ -99,7 +99,7 @@ export default {
       `${ending}'s tile says approving runs it`,
     );
     await node.click();
-    const inspector = page.locator(`aside[aria-label="Step ${ending}"]`);
+    const inspector = stepBar(page, id, ending);
     const asked = inspector.locator(`section[aria-label="What ${ending} asks of you"]`);
     await expectVisible(asked, `the inspector of ${ending} opens on what it asks of you`);
     await expectVisible(
@@ -126,7 +126,7 @@ export default {
     await expectVisible(asked.getByRole('button', { name: 'Approve', exact: true }), "the inspector answers it too, the run page's gate");
     await settled(page);
     await photograph(page, path.join(OUT, `factory-gate-inspector-${await themeOf(page)}.png`), { fullPage: true });
-    await page.getByRole('button', { name: "Close the step's panel" }).click();
+    await inspector.getByRole('button', { name: 'Close', exact: true }).click();
     await card.getByRole('button', { name: 'Hide steps' }).click();
 
     await answerOf(page, 'Approve').click();

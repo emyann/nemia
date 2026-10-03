@@ -7,6 +7,7 @@ import {
   barMost,
   barOf,
   barOpens,
+  barOver,
   barSearch,
   barValue,
   barWidth,
@@ -109,4 +110,11 @@ test('Escape closes the bar, unless something else took it, it ends a compositio
   assert.equal(escapeDoes({ ...key, fieldText: 'a brief' }), 'leave');
   assert.equal(escapeDoes({ ...key, defaultPrevented: true }), 'ignore', 'a menu or a modal closed on it');
   assert.equal(escapeDoes({ ...key, isComposing: true, fieldText: 'a' }), 'ignore');
+});
+
+test('the bar covers the part of a frame right of its left edge, and none with no bar, past the frame, or on a narrow screen', () => {
+  assert.equal(barOver(1280, null, false), 0);
+  assert.equal(barOver(1280, 704, true), 0);
+  assert.equal(barOver(900, 1000, false), 0);
+  assert.equal(barOver(1280, 1280 - BAR_DEFAULT, false), BAR_DEFAULT);
 });

@@ -22,8 +22,8 @@ import { StepRail, StepTiles } from './StepRail';
 /**
  * `finished` is a run not in flight: on the floor only when finished runs are asked for, and dimmed.
  * `open` is a run whose card is opened on its steps: `detail` its record once read, which gives each tile its attempt and cost, and
- * `trouble` why it could not be read. `selected` is the step whose inspector is open. `onToggle` opens or closes the card, and
- * `onStep` inspects a step of it.
+ * `trouble` why it could not be read. `inspected` is a run the frame's bar shows, and `selected` the step of it the bar shows.
+ * `onToggle` opens or closes the card, and `onStep` shows a step of it in the bar.
  */
 export type RunNodeData = {
   run: RunSummary;
@@ -31,6 +31,7 @@ export type RunNodeData = {
   open: boolean;
   detail: RunDetail | null;
   trouble: string | null;
+  inspected: boolean;
   selected: string | null;
   onToggle: (runId: string) => void;
   onStep: (runId: string, step: string) => void;
@@ -41,9 +42,10 @@ export type RunFlowNode = Node<RunNodeData, 'run'>;
  * One run on the Factory floor: what was asked, where, what each step is doing — a small flowchart of them (`StepRail`) — and for
  * how long.
  *
- * The chevron, or a click anywhere on the card, opens it: the card grows to the right with every step a tile (`StepTiles`), and a
- * tile opens its step's inspector. The title opens the run's page, and is not preloaded on hover: only an open run reads its detail.
- * `w-88` is `CARD_WIDTH`, narrower than the grid's cell, which leaves the gap between cards.
+ * The chevron opens it: the card grows to the right with every step a tile (`StepTiles`), and a tile shows its step in the frame's bar.
+ * A click on the card shows the run there, and the card is ringed while it does (`lookOf`). The title opens the run's page, and is not
+ * preloaded on hover: only an open run reads its detail. `w-88` is `CARD_WIDTH`, narrower than the grid's cell, which leaves the gap
+ * between cards.
  *
  * - Its clock (`runClock`) says how long it has been at work from its first filing, or how long it has waited before that; it moves
  *   every second while it counts (`clockCounts`), and every 30 s otherwise.
@@ -69,12 +71,12 @@ export type RunFlowNode = Node<RunNodeData, 'run'>;
  * - A handle on its left where the edge from a run it waits on comes in, and one on its right where the edge into each card that
  *   waits on it leaves.
  */
-export function RunNode({ data: { run, finished, open, detail, trouble, selected, onToggle, onStep } }: NodeProps<RunFlowNode>) {
+export function RunNode({ data: { run, finished, open, detail, trouble, inspected, selected, onToggle, onStep } }: NodeProps<RunFlowNode>) {
   const now = useNow(clockCounts(run, finished) ? 1_000 : 30_000);
   const cancelled = run.cancelledAt !== null;
   const title = titleOf(run);
   const decide = toDecideOf(run);
-  const look = lookOf(run, finished);
+  const look = lookOf(run, finished, inspected);
   const gate = gateOfSummary(run);
   const needs = needsOf(run).filter((need) => !(need.kind === 'approve' && need.step === gate?.step));
   const stamp = run.steps.map((step) => `${step.name}:${step.status}`).join('|');
@@ -91,11 +93,7 @@ export function RunNode({ data: { run, finished, open, detail, trouble, selected
   );
 
   return (
-    <Card
-      size="sm"
-      data-ghost-run={look.ghost || undefined}
-      className={`w-fit flex-row items-start gap-0 shadow-sm transition-opacity ${look.className}`}
-    >
+    <Card size="sm" {...look.marks} className={`w-fit flex-row items-start gap-0 shadow-sm transition-opacity ${look.className}`}>
       <div className="flex w-88 shrink-0 flex-col gap-3">
         <div className="min-w-0 px-3">
           <div className="flex items-center gap-1">
@@ -253,14 +251,22 @@ export function RunNode({ data: { run, finished, open, detail, trouble, selected
 /** How a ghost's card is drawn: dashed and dimmed, as `QueueLane` draws a card not started, and clearer on hover. */
 const GHOST = 'border border-dashed border-neutral-400/70 opacity-60 shadow-none hover:opacity-90 dark:border-neutral-600';
 
+/** How a run's card is drawn: whether it is a ghost, its classes, and the marks a check reads it by, a ghost's and the one inspected. */
+type Look = { ghost: boolean; className: string; marks: { 'data-ghost-run'?: true; 'data-inspected'?: true } };
+
 /**
- * How a run's card is drawn: ringed while a person has its result to decide (`toDecideOf`), the one finished card that waits for a
- * person; else a ghost while it waits on runs and nothing else (`waitsOnRuns`); else dimmed once `finished`.
+ * How a run's card is drawn: ringed in the focus colour, and marked, while the frame's bar shows it (`inspected`), and drawn whole, so a
+ * finished card or a ghost is read as clearly as the bar beside it; else ringed while a person has its result to decide (`toDecideOf`),
+ * the one finished card that waits for a person; else a ghost while it waits on runs and nothing else (`waitsOnRuns`); else dimmed once
+ * `finished`.
  */
-function lookOf(run: RunSummary, finished: boolean): { ghost: boolean; className: string } {
-  if (toDecideOf(run)) return { ghost: false, className: 'ring-1 ring-emerald-500/60' };
-  if (waitsOnRuns(run)) return { ghost: true, className: GHOST };
-  return { ghost: false, className: finished ? 'opacity-50 hover:opacity-80' : '' };
+function lookOf(run: RunSummary, finished: boolean, inspected: boolean): Look {
+  const ghost = waitsOnRuns(run);
+  const marks = { ...(ghost && { 'data-ghost-run': true as const }), ...(inspected && { 'data-inspected': true as const }) };
+  if (inspected) return { ghost, className: 'ring-2 ring-ring', marks };
+  if (toDecideOf(run)) return { ghost: false, className: 'ring-1 ring-emerald-500/60', marks: {} };
+  if (ghost) return { ghost, className: GHOST, marks };
+  return { ghost, className: finished ? 'opacity-50 hover:opacity-80' : '', marks };
 }
 
 /**

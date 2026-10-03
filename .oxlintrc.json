@@ -384,8 +384,7 @@
     {
       "files": ["apps/web/src/components/FactoryCanvas.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 297, "skipBlankLines": true, "skipComments": true }],
-        "complexity": ["error", { "max": 27 }]
+        "max-lines-per-function": ["error", { "max": 274, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
@@ -418,14 +417,14 @@
     {
       "files": ["apps/web/src/components/RunCanvas.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 102, "skipBlankLines": true, "skipComments": true }]
+        "max-lines-per-function": ["error", { "max": 88, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
       "files": ["apps/web/src/components/RunNode.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 170, "skipBlankLines": true, "skipComments": true }],
-        "complexity": ["error", { "max": 45 }],
+        "max-lines-per-function": ["error", { "max": 166, "skipBlankLines": true, "skipComments": true }],
+        "complexity": ["error", { "max": 44 }],
         "sonarjs/cognitive-complexity": ["error", 24]
       }
     },

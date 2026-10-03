@@ -17,6 +17,7 @@ import {
   type NodeDimensionChange,
   type NodePositionChange,
 } from '@xyflow/react';
+import { useNavigate } from '@tanstack/react-router';
 import { routeLink } from '@/components/routeLink';
 import { Button, LinkButton } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -57,6 +58,10 @@ import { anyInView, boxesOf, revealView, sized, sizeOf, type Box, type Size, typ
 import { queuedIn, type FactoryPlace } from '@/lib/factories';
 import { capLine, queueOf } from '@/lib/inbox';
 import { passLine, passTitle } from '@/lib/pass';
+import type { Bar } from '@/lib/bar';
+import { useBar } from '@/lib/useBar';
+import { useBarOver } from '@/lib/useBarOver';
+import { useCanvasPress } from '@/lib/useCanvasPress';
 import { useContent } from '@/lib/useContent';
 import { useFrameSize } from '@/lib/useFrameSize';
 import { useNow } from '@/lib/useNow';
@@ -65,7 +70,6 @@ import { CanvasLegend } from './CanvasLegend';
 import { QueueLane } from './QueueLane';
 import { RunNode, type RunFlowNode } from './RunNode';
 import { StateEdge } from './StateEdge';
-import { StepInspector } from './StepInspector';
 import { afterEdges } from './stepGraph';
 
 /**
@@ -148,12 +152,13 @@ const minimapFill = (node: RunFlowNode) =>
  * of children.
  *
  * Laid out on a grid, oldest first, the first time a run is seen in this browser — so a run that starts takes the next free cell and
- * moves no card already down — and after that wherever a person dragged it, until "Reset layout". A click on a card, or Enter on one,
- * opens it: the card grows to the right over as many cells as its steps' tiles need (`openSpan`), and the cards in them move aside
- * (`placeRuns`) — when it opens, by a click or brought back onto the floor open, and then only (`unfoldingNow`). Otherwise each card
- * moves alone, as in a factory modeller: a drop moves nothing else — a card dropped over another stays over it, since that is where the
- * person put it. The edges between cards stretch to follow; they pull nothing. A press on a step's tile opens its inspector beside the
- * floor. Which runs are open is kept in this browser with the layout.
+ * moves no card already down — and after that wherever a person dragged it, until "Reset layout". A card's chevron opens it: the card
+ * grows to the right over as many cells as its steps' tiles need (`openSpan`), and the cards in them move aside (`placeRuns`) — when it
+ * opens, by its chevron or brought back onto the floor open, and then only (`unfoldingNow`). Otherwise each card moves alone, as in a
+ * factory modeller: a drop moves nothing else — a card dropped over another stays over it, since that is where the person put it. The
+ * edges between cards stretch to follow; they pull nothing. A click on a card shows the run in the frame's bar, a double click opens its
+ * page, and a press on a step's tile shows that step in the bar (`useFloorPress`). Which runs are open is kept in this browser with the
+ * layout.
  *
  * The inbox's queued cards of `factory` (`queuedIn`) wait at the floor's left edge, as ghosts, in the order the tick starts them
  * (`QueueLane`), and the header says the run slots taken of the cap the daemon runs with (`CapLine`), and the subscription's quota as the
@@ -194,16 +199,16 @@ const placing = (change: NodeChange<RunFlowNode>): change is NodePositionChange 
  *
  * - A refetch that moves a status moves no card: what lays the cards out is kept by its content (`useContent`).
  * - Only a run open on the floor reads its detail, again on each of its events on the feed (`runQuery`): each tile's attempt and cost,
- *   and what the inspector shows. A closed card reads the list, and so does an open card's flowchart.
+ *   which the bar reads for itself. A closed card reads the list, and so does an open card's flowchart.
  * - The cards' positions change only through a drag or React Flow measuring a card, a run joining or leaving the floor, a card opening
  *   or closing, and Reset layout. The open cards claim their cells first, the one opened last first; a card on the floor stays put unless
  *   an opening card covers it, and one coming back takes its saved cell. A card moved is saved in this browser (`keepLayout`), where a
  *   card off the floor keeps its place and a run the store no longer lists does not; nor is such a run kept open.
  * - On mount it forgets what this browser keeps for the Factory that nothing reads (`forgetFactoryLeftovers`).
- * - A card opened is brought into view once the floor is laid out for it, and the run inspected is kept in view whenever the floor's
- *   frame changes size, across or down (`useFrameSize`): panned to its middle, if any of it is off screen, and zoomed out only as far as
- *   it must be, to `REVEAL_MIN_ZOOM` at most (`revealView`); a card taller than the frame even then shows its head, below the panels
- *   at the frame's top. Its box is the cells it takes (`openSpan`, `boxOf`).
+ * - A card opened is brought into view once the floor is laid out for it, and the run the bar shows, or a step of, is brought into view as
+ *   the bar shows it and kept in view whenever the floor's frame changes size, across or down (`useFrameSize`): panned to its middle, if
+ *   any of it is off screen, and zoomed out only as far as it must be, to `REVEAL_MIN_ZOOM` at most (`revealView`); a card taller than the
+ *   frame even then shows its head, below the panels at the frame's top. Its box is the cells it takes (`openSpan`, `boxOf`).
  * - The floor is fitted once per ask, never before the cards asked for are on it: first on mount, unanimated, in place of React Flow's
  *   own fit so it keeps clear of the panels too (`fitClear`); then on Fit view, Reset layout, Show finished, and whenever the queue lane,
  *   the quota line or the daemon line comes, goes or changes its words, which may wrap the header; and when the frame changes size with
@@ -215,12 +220,12 @@ const placing = (change: NodeChange<RunFlowNode>): change is NodePositionChange 
  * - The header counts runs in flight, finished, to decide as `wf ls` says them, and waiting on you. A run waiting on you, or to decide,
  *   is counted finished too, and stays on the floor whatever Show finished says (`floorRuns`); a run at its ending's gate is in both.
  *   Beside the counts it draws the cap (`CapLine`), the daemon and the quota, and the Show finished switch, named by a label beside it.
- * - The floor fills the screen under the root's header. The queue lane sits at its left, off while a step's inspector is open. The
- *   floor's hint shows only where the floor is wide enough beside its buttons, and the legend wraps short of the minimap when there is
- *   one; arrowheads take their edges' colour in both themes.
- * - A click on a card, or Enter on the card itself, opens or closes it; a click or Enter on a link or a button in it does only what
- *   that does. A press on a step's tile opens its inspector, which closes on a click on the floor, and when the run's read no longer
- *   has that step.
+ * - The floor fills the screen under the root's header, its frame narrowed by what the bar covers of it (`useBarOver`), so the card
+ *   inspected and every panel over the floor stay clear of the bar. The queue lane sits at its left, and gives its room to the floor
+ *   while the bar shows a run or a step. The floor's buttons wrap to a narrow floor, its hint shows only where the floor is wide enough
+ *   beside them, and the legend wraps short of the minimap when there is one; arrowheads take their edges' colour in both themes.
+ * - A click on a card, or Enter on the card itself, shows the run in the bar or closes it; a click or Enter on a link or a button in it
+ *   does only what that does (`useFloorPress`).
  */
 function Floor({ runs, factory }: { runs: readonly RunSummary[]; factory: FactoryPlace }) {
   const { fitView, setViewport } = useReactFlow<RunFlowNode>();
@@ -236,7 +241,7 @@ function Floor({ runs, factory }: { runs: readonly RunSummary[]; factory: Factor
 
   const [open, setOpen] = useState<string[]>(readFactoryOpen);
   const openSet = useMemo(() => new Set(open), [open]);
-  const [selected, setSelected] = useState<{ runId: string; step: string } | null>(null);
+  const { inspecting, inspected, step: barStep, onStep, ...press } = useFloorPress();
 
   const opened = useMemo(() => open.filter((id) => ids.includes(id)), [open, ids]);
   const reads = useQueries({ queries: opened.map((id) => runQuery(id)), combine: readsOf });
@@ -304,9 +309,11 @@ function Floor({ runs, factory }: { runs: readonly RunSummary[]; factory: Factor
   useEffect(() => forgetFactoryLeftovers(), []);
 
   const frame = useRef<HTMLDivElement>(null);
-  const latest = useRef({ open, placed, spans, inspecting: selected?.runId ?? null });
+  const whole = useRef<HTMLDivElement>(null);
+  const over = useBarOver(whole);
+  const latest = useRef({ open, placed, spans, inspecting });
   useLayoutEffect(() => {
-    latest.current = { open, placed, spans, inspecting: selected?.runId ?? null };
+    latest.current = { open, placed, spans, inspecting };
   });
 
   const onNodesChange = useCallback((changes: NodeChange<RunFlowNode>[]) => {
@@ -319,11 +326,8 @@ function Floor({ runs, factory }: { runs: readonly RunSummary[]; factory: Factor
   const toggle = useCallback((runId: string) => {
     if (!latest.current.open.includes(runId)) drawn.current.delete(runId);
     setOpen((current) => toggleOpen(current, runId));
-    setSelected((current) => (current?.runId === runId ? null : current));
     revealing.current = runId;
   }, []);
-
-  const inspect = useCallback((runId: string, step: string) => setSelected({ runId, step }), []);
 
   const nodes = useMemo(() => {
     const byId = new Map(shown.map((run) => [run.id, run]));
@@ -335,21 +339,22 @@ function Floor({ runs, factory }: { runs: readonly RunSummary[]; factory: Factor
       return [
         {
           ...card,
-          ariaLabel: `${isOpen ? 'Hide' : 'Show'} the steps of run: ${titleOf(run)}`,
+          ariaLabel: `Inspect run: ${titleOf(run)}`,
           data: {
             run,
             finished: !flying.has(run.id),
             open: isOpen,
             detail: read?.detail ?? null,
             trouble: read?.trouble ?? null,
-            selected: selected?.runId === run.id ? selected.step : null,
+            inspected: inspected === run.id,
+            selected: barStep?.run === run.id ? barStep.step : null,
             onToggle: toggle,
-            onStep: inspect,
+            onStep,
           },
         },
       ];
     });
-  }, [placed, shown, flying, openSet, details, selected, toggle, inspect]);
+  }, [placed, shown, flying, openSet, details, inspected, barStep, toggle, onStep]);
 
   const edges = useMemo((): Edge[] => afterEdges(shown), [shown]);
 
@@ -399,20 +404,18 @@ function Floor({ runs, factory }: { runs: readonly RunSummary[]; factory: Factor
     void fitView({ ...fitClear(frame.current), duration: first ? 0 : 300 });
   }, [fits, placed, ids, fitView, size]);
 
-  const close = useCallback(() => setSelected(null), []);
+  useEffect(() => {
+    if (inspecting && was.current) reveal(inspecting);
+  }, [inspecting, reveal]);
 
   const resetLayout = () => {
     forgetFactoryLayout();
     setOpen([]);
-    setSelected(null);
     const at = placeRuns(ids, new Map(), null, new Map(), after);
     setPlaced((current) => current.map((node) => ({ ...node, position: at.get(node.id) ?? node.position })));
     setFits((n) => n + 1);
   };
-  const collapseAll = () => {
-    setOpen([]);
-    setSelected(null);
-  };
+  const collapseAll = () => setOpen([]);
   const finishedSwitch = useId();
   const toggleFinished = (on: boolean) => {
     setShowFinished(on);
@@ -451,9 +454,6 @@ function Floor({ runs, factory }: { runs: readonly RunSummary[]; factory: Factor
     return sum + columns * rows;
   }, 0);
 
-  const inspectedRun = selected ? (details.get(selected.runId)?.detail ?? null) : null;
-  const inspected = inspectedRun?.steps.find((step) => step.name === selected?.step);
-
   return (
     <div className="flex h-[calc(100svh-3rem)] min-h-96 flex-col">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b px-4 py-2">
@@ -477,28 +477,17 @@ function Floor({ runs, factory }: { runs: readonly RunSummary[]; factory: Factor
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-        {laned && !(inspectedRun && inspected) && <QueueLane cards={queued} />}
+        {laned && !inspecting && <QueueLane cards={queued} />}
         {shown.length ? (
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col md:flex-row">
-            <div ref={frame} className="@container min-h-0 min-w-0 flex-1">
+          <div ref={whole} className="flex min-h-0 min-w-0 flex-1">
+            <div ref={frame} className="@container min-h-0 min-w-0 flex-1" style={{ marginRight: over }}>
               <ReactFlow
                 nodes={nodes}
                 edges={edges}
                 nodeTypes={nodeTypes}
                 edgeTypes={edgeTypes}
                 onNodesChange={onNodesChange}
-                onNodeClick={(event, node) => {
-                  if ((event.target as Element).closest('a, button')) return;
-                  toggle(node.id);
-                }}
-                onPaneClick={close}
-                onKeyDown={(event) => {
-                  if (event.key !== 'Enter') return;
-                  const target = event.target as HTMLElement;
-                  if (!target.classList.contains('react-flow__node')) return;
-                  const node = nodes.find((candidate) => candidate.id === target.dataset.id);
-                  if (node) toggle(node.id);
-                }}
+                {...press}
                 nodesConnectable={false}
                 elementsSelectable={false}
                 edgesFocusable={false}
@@ -509,10 +498,10 @@ function Floor({ runs, factory }: { runs: readonly RunSummary[]; factory: Factor
                 defaultMarkerColor={null}
                 minZoom={0.2}
               >
-                <Panel position="top-left" className="hidden text-[11px] text-muted-foreground @2xl:block">
-                  Click a run to open its steps · drag a card, and it moves alone · kept in this browser
+                <Panel position="top-left" className="hidden text-[11px] text-muted-foreground @4xl:block">
+                  Click a run to inspect it · double-click to open its page · drag a card, and it moves alone · kept in this browser
                 </Panel>
-                <Panel position="top-right" className="flex gap-2">
+                <Panel position="top-right" className="flex flex-wrap justify-end gap-2">
                   <Button variant="outline" size="sm" onPress={resetLayout}>
                     Reset layout
                   </Button>
@@ -529,15 +518,6 @@ function Floor({ runs, factory }: { runs: readonly RunSummary[]; factory: Factor
                 {cells > HANDFUL && <MiniMap<RunFlowNode> pannable zoomable style={{ width: 128, height: 88 }} nodeColor={minimapFill} />}
               </ReactFlow>
             </div>
-            {inspectedRun && inspected && (
-              <StepInspector
-                run={inspectedRun}
-                step={inspected}
-                runTitle={titleOf(inspectedRun)}
-                onClose={close}
-                className="h-80 shrink-0 rounded-none border-0 border-t md:h-auto md:border-t-0 md:border-l"
-              />
-            )}
           </div>
         ) : (
           <Empty anyRuns={runs.length > 0} queued={queued.length} />
@@ -546,6 +526,28 @@ function Floor({ runs, factory }: { runs: readonly RunSummary[]; factory: Factor
     </div>
   );
 }
+
+/**
+ * What a press on the floor does (`useCanvasPress`): a card shows its run in the frame's bar, or closes it, and a double click opens the
+ * run's page; a step's tile shows that step, or closes it (`onStep`). With the run whose card or step the bar shows (`inspecting`), the run
+ * it shows (`inspected`) and the step (`step`), each none while it shows anything else.
+ */
+function useFloorPress() {
+  const navigate = useNavigate();
+  const { shown, ...press } = useCanvasPress(runBar, (runId) => void navigate({ to: '/runs/$runId', params: { runId } }));
+  const { toggle } = useBar();
+  const onStep = useCallback((run: string, step: string) => toggle({ kind: 'step', run, step }), [toggle]);
+  return {
+    inspecting: shown && shown.kind !== 'start' ? shown.run : null,
+    inspected: shown?.kind === 'run' ? shown.run : null,
+    step: shown?.kind === 'step' ? shown : null,
+    onStep,
+    ...press,
+  };
+}
+
+/** The bar a run's card shows: the run's. */
+const runBar = (run: string): Bar => ({ kind: 'run', run });
 
 /**
  * The cap on runs in flight, as the daemon's last pass ran with it (`capLine`): `2 of 4 run slots taken · 3 queued`, or `no cap`. Its count

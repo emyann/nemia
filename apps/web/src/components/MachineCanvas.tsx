@@ -20,7 +20,7 @@ export type MachinePress = Omit<ReturnType<typeof useCanvasPress>, 'shown'>;
  * The drawing's states and routes as React Flow's nodes and edges, `lit`, `inspected` and `taken` marked on them; each state given back
  * its pointer events, a name and no outline of the browser's when it can be `pressed`.
  */
-function flowOf(drawing: Drawing, lit: string | undefined, taken: readonly string[], pressed: boolean, inspected: string | null) {
+export function flowOf(drawing: Drawing, lit: string | undefined, taken: readonly string[], pressed: boolean, inspected: string | null) {
   const nodes: MachineFlowNode[] = drawing.states.map((box) => ({
     id: box.id,
     type: 'state',

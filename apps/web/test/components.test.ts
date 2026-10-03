@@ -4702,11 +4702,31 @@ test("a machine's state the bar shows is marked data-inspected and ringed; one i
   const node = (data: object) =>
     renderToStaticMarkup(createElement(ReactFlowProvider, null, createElement(MachineNode, { data: { ...box, ...data } } as never)));
   const shown = node({ pressable: true, inspected: true });
-  assert.match(shown, /data-state="a"[^>]*data-inspected="true"[^>]*class="[^"]*(?<!:)ring-2 ring-ring/, shown);
+  assert.match(shown, /data-state="a"[^>]*data-inspected="true"[^>]*class="[^"]*(?<!:)ring-4 ring-ring/, shown);
   const pressable = node({ pressable: true, inspected: false });
-  assert.doesNotMatch(pressable, /data-inspected|(?<!:)ring-2 ring-ring/, pressable);
+  assert.doesNotMatch(pressable, /data-inspected|(?<!:)ring-4 ring-ring/, pressable);
   assert.match(pressable, /in-focus-visible:ring-2/, `ringed on keyboard focus: ${pressable}`);
   assert.doesNotMatch(node({}), /data-inspected|ring-2|cursor-pointer/, 'a state no press reaches takes no mark of the bar');
+});
+
+test("a machine's states take a press, the focus and a name only when the canvas is given a press, as the Debug panel's never is", async () => {
+  const { flowOf } = await import('../src/components/MachineCanvas.tsx');
+  const { drawMachine } = await import('../src/lib/machine.ts');
+  const drawing = drawMachine({ initial: 'a', states: ['a', 'b'], final: ['b'], edges: [], verbs: [] });
+  const inert = flowOf(drawing, undefined, [], false, null).nodes;
+  for (const node of inert) {
+    assert.equal(node.style?.pointerEvents, undefined, `${node.id} takes no pointer events, so a click on it lands on the pane`);
+    assert.equal(node.ariaLabel, undefined, `${node.id} is named for no press`);
+    assert.equal(node.data.pressable, false);
+  }
+  const pressed = flowOf(drawing, undefined, [], true, 'b').nodes;
+  assert.deepEqual(
+    pressed.map((n) => [n.id, n.style?.pointerEvents, n.ariaLabel, n.data.inspected]),
+    [
+      ['a', 'all', 'State a', false],
+      ['b', 'all', 'State b', true],
+    ],
+  );
 });
 
 /** The bar's body for the state `state` of `graph`, as the bar for a machine's state draws it. */

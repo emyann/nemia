@@ -35,11 +35,14 @@ export function ByActionList({ list, children }: { list: readonly ByAction[]; ch
 export const kindOf = ({ initial, final }: Pick<StateBox, 'initial' | 'final'>): string =>
   initial ? 'initial state' : final ? 'final state' : 'state';
 
-/** The fill and ring of a box: amber while lit, ringed while the bar shows it, ringed on keyboard focus while it can be pressed. */
+/**
+ * The fill and ring of a box: amber while lit; ringed while the bar shows it, as thick as a lit one, since the drawing shrinks beside the
+ * bar; ringed on keyboard focus while it can be pressed.
+ */
 function markOf({ lit, inspected, pressable }: MachineFlowNode['data']): string {
   if (lit) return 'bg-amber-50 ring-4 ring-amber-400 dark:bg-amber-950 dark:ring-amber-400';
   const fill = 'bg-white dark:bg-neutral-900';
-  if (inspected) return `${fill} cursor-pointer ring-2 ring-ring`;
+  if (inspected) return `${fill} cursor-pointer ring-4 ring-ring`;
   return pressable ? `${fill} cursor-pointer in-focus-visible:ring-2 in-focus-visible:ring-ring` : fill;
 }
 

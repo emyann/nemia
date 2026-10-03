@@ -133,3 +133,6 @@ What Claude Code does as the steps meet it. Where the orchestrator's code holds 
   orchestrator today: `givenPlan`, `folderPlace.make`, `allowRuleOf`, `disallowedBy`).
 - **A job's turn cannot end to wait for background work**: run long work in the foreground, or block on it
   (`timeout 580 bash -c "while kill -0 <pid>; do sleep 5; done"`).
+- **A Bash deny reaches each part of `&&`, `||`, `;`, `|`, `&`, a `$(…)`, and a part behind `timeout`, `nohup` or `VAR=`** (2.1.288),
+  but not `bash -c '…'` or `/usr/bin/pkill`; `partsOf` (`agent-orchestrator/test/agent-fences.test.ts`) models the parts. `Bash(pkill:*)`
+  leaves `kill $(pgrep …)`, `pgrep … | xargs kill` and `kill -1` open, a known gap.

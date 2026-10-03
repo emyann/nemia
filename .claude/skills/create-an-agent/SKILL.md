@@ -88,11 +88,11 @@ own `skills:`: the session gets the agent's, then the step's, each once. The age
   skill spells each bare, one per call (one wrapped, piped, redirected, or behind `cd`, `git -C`, `VAR=` or `for` is refused), and sends a
   read or search to Read, Grep or Glob, not Bash.
 - **A role that edits runs `auto`**, and denies by name what it must never do: `Bash(git push)`, `Bash(git push:*)`, `Bash(git branch
-  -D:*)`, `Bash(git branch --delete --force:*)`, `mcp__playwright__browser_run_code_unsafe`.
+  -D:*)`, `Bash(git branch --delete --force:*)`, `Bash(pkill:*)`, `Bash(killall:*)`, `mcp__playwright__browser_run_code_unsafe`.
 - **A step only tightens it.** A step that needs a tool, an allow or a mode its agent's file does not give needs another agent; a
   step's `disallowedTools:` replaces its agent's, so it repeats the agent's denies and adds its own.
 - **A background session** (`background: true`) also reads the person's user and local settings, where "don't ask again" writes allows:
-  it denies those five itself, whatever its mode. A step may set it only over an agent in `bypassPermissions`, the one mode no allow rule
+  it denies those seven itself, whatever its mode. A step may set it only over an agent in `bypassPermissions`, the one mode no allow rule
   widens; over any other the loader refuses it.
 
 ## Talking with a person

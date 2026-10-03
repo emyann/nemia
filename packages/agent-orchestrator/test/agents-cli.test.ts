@@ -246,7 +246,9 @@ test('REFUSED at shipped defaults: wf agents custom for no agent, with --file an
   };
   const ghost = await customRefused(t, 'ghost', '--file', text('ghost.md', 'Boo.\n'), '--repo', repo);
   assert.ok(
-    ghost.startsWith('no agent named ghost where a run on ') && ghost.includes('The agents there: scribe.') && ghost.includes('--repo <r>'),
+    ghost.startsWith(`no agent named ghost where a run on ${repo} looks for one`) &&
+      ghost.includes('The agents there: scribe.') &&
+      ghost.includes('the repository it is in'),
     ghost,
   );
   assert.match(

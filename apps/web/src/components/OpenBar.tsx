@@ -4,6 +4,7 @@
  */
 import { barValue } from '@/lib/bar';
 import { useBar } from '@/lib/useBar';
+import { FactoryBar } from './FactoryBar';
 import { StartBar } from './FactoryStart';
 import { RunBar } from './RunBar';
 import { StepBar } from './StepBar';
@@ -18,6 +19,8 @@ export function OpenBar() {
   switch (open.kind) {
     case 'start':
       return <StartBar key={barValue(open)} factory={open.factory} />;
+    case 'factory':
+      return <FactoryBar key={barValue(open)} factory={open.factory} />;
     case 'step':
       return <StepBar key={`step:${open.run}`} run={open.run} step={open.step} />;
     case 'run':

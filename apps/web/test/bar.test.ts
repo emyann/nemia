@@ -23,6 +23,7 @@ const OTHER: Bar = { kind: 'start', factory: 'other' };
 const RUN: Bar = { kind: 'run', run: 'abc' };
 const REVIEW: Bar = { kind: 'step', run: 'abc', step: 'review' };
 const SHIP: Bar = { kind: 'step', run: 'abc', step: 'ship' };
+const FACTORY: Bar = { kind: 'factory', factory: 'hiring' };
 
 test('the address opens a bar only for a known kind with a name: anything else opens none', () => {
   for (const value of [undefined, '', 'start', 'start:', 'nope:x', ':hiring', 42, ['start:hiring'], null])
@@ -40,8 +41,25 @@ test("a run's address names the run, and a step's names its run up to the first 
     assert.equal(barOf(value), undefined, `${value} opens no bar`);
 });
 
+test("a factory's address names the factory whole, a slash or a colon in its name kept, and none without a name", () => {
+  assert.deepEqual(barOf('factory:hiring'), FACTORY);
+  assert.deepEqual(barOf('factory:a/b'), { kind: 'factory', factory: 'a/b' });
+  assert.deepEqual(barOf('factory:a:b'), { kind: 'factory', factory: 'a:b' });
+  assert.equal(barOf('factory:'), undefined, 'factory: opens no bar');
+});
+
 test('a bar written to the address reads back as the same bar', () => {
-  for (const value of ['start:hiring', 'start:a:b', 'run:abc', 'step:abc/review', 'step:abc/a/b', 'step:abc/x:y'])
+  for (const value of [
+    'start:hiring',
+    'start:a:b',
+    'factory:hiring',
+    'factory:a/b',
+    'factory:a:b',
+    'run:abc',
+    'step:abc/review',
+    'step:abc/a/b',
+    'step:abc/x:y',
+  ])
     assert.equal(barValue(barOf(value)!), value);
   assert.deepEqual(barOf(barValue(OTHER)), OTHER);
 });
@@ -70,6 +88,17 @@ test('pressing the step the bar shows closes it, and another step, the run or an
   assert.deepEqual(nextBar({ kind: 'start', factory: 'abc' }, RUN), RUN, 'another kind of the same name');
 });
 
+test('pressing the factory the bar shows closes it, and another factory or the start of a run in it switches it', () => {
+  assert.equal(nextBar(FACTORY, { ...FACTORY }), undefined);
+  assert.deepEqual(nextBar(FACTORY, { kind: 'factory', factory: 'other' }), { kind: 'factory', factory: 'other' });
+  assert.deepEqual(nextBar(FACTORY, HIRING), HIRING, 'the start of a run in the same factory is another bar');
+  assert.deepEqual(nextBar(HIRING, FACTORY), FACTORY);
+});
+
+test("Open visits a factory's floor for a factory", () => {
+  assert.deepEqual(barOpens(FACTORY), { to: '/factories/$factory', params: { factory: 'hiring' } });
+});
+
 test("Open visits a run's page for a run, the step's session for a step, and nothing for the start of a run", () => {
   assert.deepEqual(barOpens(RUN), { to: '/runs/$runId', params: { runId: 'abc' } });
   assert.deepEqual(barOpens(REVIEW), { to: '/runs/$runId/steps/$step', params: { runId: 'abc', step: 'review' } });
@@ -79,6 +108,7 @@ test("Open visits a run's page for a run, the step's session for a step, and not
 test('a press on the empty canvas closes only what a canvas inspects: never the start of a run, whose brief it would lose', () => {
   assert.equal(inspects(RUN), true);
   assert.equal(inspects(REVIEW), true);
+  assert.equal(inspects(FACTORY), true);
   assert.equal(inspects(HIRING), false);
   assert.equal(inspects(undefined), false);
 });

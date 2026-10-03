@@ -484,33 +484,27 @@ test('REFUSED: at a keep of 0, three reads that come while an ask is in flight s
   );
 });
 
-test('REFUSED: at a keep of 0, a read after the wall clock stepped back behind the start of the held ask asks again', async () => {
+test('REFUSED: at a keep of 0, a read after the wall clock stepped back behind the start of the held ask asks again', async (t) => {
   fresh();
+  t.mock.timers.enable({ apis: ['Date'], now: NOW });
   const env = { ...process.env, HKB_QUOTA_KEEP_MS: '0', HKB_QUOTA_BACKOFF_MS: '0' };
-  const clock = { wall: NOW, mono: 0 };
-  const now = () => clock.wall;
-  const mono = () => clock.mono;
-  assert.equal((await read({ env, now, mono })).state, 'fresh');
+  assert.equal((await read({ env })).state, 'fresh');
   const before = fake.asked;
   fake.next = UNANSWERED;
-  clock.wall = NOW - 1_500;
-  clock.mono = 10;
-  assert.equal((await read({ env, now, mono })).state, 'unanswered', 'the read is answered by an ask begun after it');
+  t.mock.timers.setTime(NOW - 1_500);
+  assert.equal((await read({ env })).state, 'unanswered', 'the read is answered by an ask begun after it');
   assert.equal(fake.asked, before + 1, 'asked again, however far back the wall clock went');
 });
 
-test('REFUSED: at a keep of 0, a read that comes while an ask is in flight, with the wall clock stepped back behind its start, queues behind it and does not join it', async () => {
+test('REFUSED: at a keep of 0, a read that comes while an ask is in flight, with the wall clock stepped back behind its start, queues behind it and does not join it', async (t) => {
   fresh();
+  t.mock.timers.enable({ apis: ['Date'], now: NOW });
   const env = { ...process.env, HKB_QUOTA_KEEP_MS: '0', HKB_QUOTA_BACKOFF_MS: '0' };
-  const clock = { wall: NOW, mono: 0 };
-  const now = () => clock.wall;
-  const mono = () => clock.mono;
   const { ask, answers, counts, begun } = handAsks();
-  const a = readQuota({ ask, env, now, mono, waitMs: 60_000 });
+  const a = readQuota({ ask, env, waitMs: 60_000 });
   await begun(1);
-  clock.wall = NOW - 1_500;
-  clock.mono = 10;
-  const b = readQuota({ ask, env, now, mono, waitMs: 60_000 });
+  t.mock.timers.setTime(NOW - 1_500);
+  const b = readQuota({ ask, env, waitMs: 60_000 });
   answers[0](plan());
   assert.equal((await a).state, 'fresh');
   await begun(2);

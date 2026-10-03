@@ -49,6 +49,12 @@ const GONE = spawnSync(process.execPath, ['-e', '0']).pid;
 
 const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
 
+/** This boot's id, read here apart from the store's own reader. */
+const BOOT = fs.readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim();
+
+/** The kernel's monotonic clock `m` minutes ago, under this boot's id, as the daemon stamps a reading beside a wall stamp. */
+const monoAgo = (m: number) => ({ boot: BOOT, ms: Number(process.hrtime.bigint() / 1_000_000n) - m * 60_000 });
+
 /**
  * The instant a test that reads an age or a stamp seeds `Date` at, before it writes its fixture: the CLI reads the clock itself, so only
  * a seeded clock makes every age `wf up`, `wf ls` and `wf tick` print the fixture's own, whatever the machine's clock does meanwhile.
@@ -99,6 +105,9 @@ const read = () =>
     beatAt?: string;
     procStart?: number;
     stoppedAt?: string;
+    startedMono?: { boot: string; ms: number };
+    passedMono?: { boot: string; ms: number };
+    beatMono?: { boot: string; ms: number };
   };
 
 const STOP = Object.assign(new Error('the test stops the daemon'), { exitCode: 9 });
@@ -191,8 +200,15 @@ test("the beat writes only its own daemon's file: not over another holder, not a
   clear();
   const self = { pid: process.pid, startedAt: minutesAgo(1), cwd: '/here', every: 4000, passedAt: minutesAgo(0.5) };
   fs.writeFileSync(FILE, JSON.stringify(self));
-  beat(self, '2026-09-22T12:00:00.000Z');
-  assert.deepEqual(read(), { ...self, beatAt: '2026-09-22T12:00:00.000Z' }, 'its own file beats, its last pass kept');
+  const mono = monoAgo(0);
+  beat(self, { at: Date.parse('2026-09-22T12:00:00.000Z'), mono });
+  assert.deepEqual(read(), { ...self, beatAt: '2026-09-22T12:00:00.000Z', beatMono: mono }, 'its own file beats, its last pass kept');
+  beat(self, { at: Date.parse('2026-09-22T12:00:04.000Z') });
+  assert.deepEqual(
+    read(),
+    { ...self, beatAt: '2026-09-22T12:00:04.000Z' },
+    'a beat with no monotonic reading leaves none of an earlier beat beside its own stamp',
+  );
   for (const [name, over] of [
     ['another holder', { pid: LIVE }],
     ['stopped', { stoppedAt: minutesAgo(0.1) }],
@@ -248,6 +264,16 @@ test('`wf up` takes the store: its pid, where and how often it ticks, then each 
     Array.from({ length: 3 }, () => [process.pid, process.cwd(), 10, procStartOf(process.pid)]),
   );
   assert.equal(typeof seen[0].procStart, 'number', 'its process named by its start, with /proc on this host');
+  assert.deepEqual(
+    seen.map((f) => [f.startedMono?.boot, f.passedMono?.boot]),
+    [
+      [BOOT, undefined],
+      [BOOT, BOOT],
+      [BOOT, BOOT],
+    ],
+    'each stamp written with its monotonic reading, of this boot',
+  );
+  assert.ok(seen[2].passedMono!.ms >= seen[1].passedMono!.ms && seen[1].passedMono!.ms >= seen[0].startedMono!.ms);
   assert.deepEqual(
     seen.map((f) => [f.startedAt, f.passedAt]),
     [
@@ -305,6 +331,35 @@ test('REFUSED at shipped defaults: a second `wf up`, and a `wf tick` by hand, wh
     `wf up: ticking, pid ${LIVE}, every 4000ms — last pass 3s ago (${at(-3000)})`,
     '`wf ls` says who ticks, last, and its pass 3s ago',
   );
+});
+
+test('REFUSED at shipped defaults: a live daemon is not read stalled when the wall clock steps forward past its window', async (t) => {
+  const text = holdBy(LIVE, { startedMono: monoAgo(30), passedMono: monoAgo(0.05), beatMono: monoAgo(0.05) });
+  t.mock.timers.enable({ apis: ['Date'], now: Date.now() + 20 * 60_000 });
+  const e = engineOf();
+  await assert.rejects(main(['up'], e), refusedWith(new RegExp(`^wf up: ${ROOT} is held by the wf up of pid ${LIVE}, `)));
+  await assert.rejects(main(['tick'], e), refusedWith(new RegExp(`^wf tick: ${ROOT} is held by the wf up of pid ${LIVE}, `)));
+  assert.equal(e.passes, 0, 'neither ticked');
+  assert.equal(fs.readFileSync(FILE, 'utf8'), text, 'nor wrote the file');
+  const { printed } = await typed(t, ['ls'], engineOf());
+  assert.match(printed.at(-1)!, new RegExp(`^wf up: ticking, pid ${LIVE}, every 4000ms — `));
+  clear();
+});
+
+test('a daemon silent past its window on the monotonic clock is taken over, though the wall clock reads it fresh', async (t) => {
+  seeded(t);
+  holdBy(LIVE, { startedMono: monoAgo(46), passedMono: monoAgo(16) });
+  let during: ReturnType<typeof read> | undefined;
+  const up = engineOf(() => {
+    during = read();
+    throw STOP;
+  });
+  const { printed, threw } = await typed(t, ['up'], up);
+  assert.equal(threw, STOP);
+  assert.equal(during!.pid, process.pid, 'the store taken');
+  const took = printed.filter((l) => l.includes(' took '));
+  assert.ok(took.length === 1 && saysStale(took[0], LIVE, '16m00s'), printed.join('\n'));
+  clear();
 });
 
 test('a holder stale, gone or stopped is taken over by `wf up` — and not refused to a `wf tick`, which writes nothing', async (t) => {

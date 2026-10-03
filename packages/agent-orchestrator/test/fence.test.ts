@@ -8,9 +8,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseAgent, parseWorkflow, WorkflowError, type Agents, type Workflow } from '../src/workflow.ts';
-import { CLAUDE_PERMISSION_MODES, CODEX_SANDBOXES } from 'agent-runtime';
+import { CLAUDE_PERMISSION_MODES, fenceReach } from 'agent-runtime/vocabulary';
 import { Engine, promiseEngine } from 'agent-runtime/effect';
-import { directoryFence, MODE_RANK, SANDBOX_RANK } from '../src/workflow/fence.ts';
+import { directoryFence } from '../src/workflow/fence.ts';
 import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-fence-');
@@ -314,16 +314,8 @@ test("REFUSED: a fence held to the directory where an agent's every allow reache
   }
 });
 
-test('every Claude Code mode has a rank, so a mode added to the vocabulary is placed before any step can name it', () => {
-  assert.deepEqual(Object.keys(MODE_RANK).sort(), [...CLAUDE_PERMISSION_MODES].sort());
-});
-
-test("the fence's ranking of codex's sandboxes is the runtime's list, narrowest first", () => {
-  assert.deepEqual(SANDBOX_RANK, CODEX_SANDBOXES);
-});
-
 test("a step that names no mode is filed in the mode the parser refuses `auto` for — the runtime's default — and a rendered step's flags reach Claude Code as the runtime spells them", async () => {
-  const { DEFAULT_PERMISSION_MODE, parseAgent } = await import('../src/workflow.ts');
+  const { parseAgent } = await import('../src/workflow.ts');
   const { renderedFlags } = await import('../src/agents/agents.ts');
   const scribe = parseAgent('scribe', '---\nharnessPrompt: no-coding\nskills: write-a-note, mind-the-tone\n---\nYou write.\n');
   const step = parseWorkflow('write', '---\nagent: scribe\n---\nWrite.\n', undefined, new Map([['scribe', scribe]]));
@@ -361,7 +353,7 @@ test("a step that names no mode is filed in the mode the parser refuses `auto` f
     process.env.PATH = prev;
   }
   const args = fs.readFileSync(path.join(dir, 'args'), 'utf8').split('\n');
-  assert.equal(args[args.indexOf('--permission-mode') + 1], DEFAULT_PERMISSION_MODE, "the parser's copy of the runtime's default");
+  assert.equal(args[args.indexOf('--permission-mode') + 1], fenceReach('claude')!.given, "the runtime's answer, which the parser reads");
   assert.equal(args[args.indexOf('--append-system-prompt-file') + 1], '/runs/r/agents/write/prompt.md');
   assert.equal(args[args.indexOf('--plugin-dir') + 1], '/runs/r/agents/write/nemia-scribe');
   assert.equal(

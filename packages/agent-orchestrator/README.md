@@ -532,8 +532,8 @@ naming each place looked in; skills with no `Skill` in the step's `tools:` or wi
 session cannot load is a name in its prompt (F11); skills or a harness prompt on codex, which is handed the instructions in its brief
 as before; skills or a harness prompt on a step that continues another's session, which keeps its own (F13); `harnessPrompt: replace` on
 an agent with no instructions; and a Claude Code step that runs in `auto` — written, or the runtime's default when it names no mode —
-on `haiku`, `claude-haiku-4-5` or `claude-sonnet-4-5`, where Claude Code drops `auto` to `default` and a job then denies every call
-`default` would ask about (F21). A `wf retry --model` onto one of those models, from the terminal or the board, is refused the same way
+on a model the runtime says Claude Code drops `auto` on (`fenceReach`'s `dropped`, from `agent-runtime/vocabulary`: `haiku`,
+`claude-haiku-4-5` or `claude-sonnet-4-5`), where it runs in `default` and a job then denies every call `default` would ask about (F21). A `wf retry --model` onto one of those models, from the terminal or the board, is refused the same way
 (`retryRefusal`, through `autoDropped`), since the step's mode is frozen with the run. A step's own `skills:` is refused, naming the
 step, the skill and the fix: on a step with no agent (a factory's hire is one); a skill it adds that its agent's fence keeps from
 loading — `tools:` without `Skill`, or a `disallowedTools:` rule covering `Skill` or `Skill(<skill>)` — since a step never widens its
@@ -3000,7 +3000,7 @@ holding a concurrency slot forever.
 | `src/workflow.ts` | the format — pure, the entry `agent-orchestrator/workflow`: each name it exports re-exported by name from the folders below, and nothing else |
 | `src/step/step.ts` | a step's shape — pure: what a step file is once read (`Workflow`), its closed list of keys (`STEP_KEYS`, `STEP_KEY_MEANINGS`), the fields every closeout carries (`CLOSEOUT_FIELDS`, `outputFields`), and what every reader of a markdown file shares (`WorkflowError`, `splitFrontmatter`) |
 | `src/harness/harness.ts` | the harnesses — pure: `HARNESSES`, `DEFAULT_HARNESS`, and a step on a remote agent, how it is named (`remoteNameOf`) and the keys it may not set (`REMOTE_REFUSED_KEYS`) |
-| `src/keys/keys.ts` | a step's keys read one each — pure: a value as written, the value the step carries, or the refusal that names the fix (`wordOf`, `contextOf`, `budgetOf`, `gateOf`, `workspaceOf`, `slotOf`, `outputOf`), and a model that cannot run `auto` (`keepsAuto`) |
+| `src/keys/keys.ts` | a step's keys read one each — pure: a value as written, the value the step carries, or the refusal that names the fix (`wordOf`, `contextOf`, `budgetOf`, `gateOf`, `workspaceOf`, `slotOf`, `outputOf`), and skills or a system prompt a step's sessions cannot reach (`composedRefusal`) |
 | `src/keys/tools.ts` | a step's tool rules — pure: its `tools` (`toolsOf`), its allow and deny rules, a write named as anything but `Edit` refused (`rulesOf`), and the rule offered for a call a fenced step was denied (`allowRuleOf`, `disallowedBy`) |
 | `src/former/former.ts` | a key under the name it had before — pure: `FORMER_KEYS`, and an agent's own `FORMER_OWN_KEYS` with its words (`harnessPromptNamed`), read in a file (`readKeys`) and on a frozen record (`asNamed`), written back in the form the file has (`formerKeyWritten`), and the fence a step asks for under either key (`modeOf`) |
 | `src/workflow/step-file.ts` | one step file — pure: read into a `Workflow` through each key's reader, an unknown key refused (`parseWorkflow`), and written back, the parser run backwards (`renderStep`) |

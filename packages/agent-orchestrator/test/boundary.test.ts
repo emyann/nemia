@@ -22,6 +22,7 @@
  *
  * **The runtime is reached through one client**, `CLIENT`, `runtime-client.ts`: of the package's files, it alone imports agent-runtime,
  * a type included; every controller beneath the CLI imports it, or imports a controller that reaches it, and it imports no controller.
+ * The runtime's vocabulary, `agent-runtime/vocabulary` (`VOCABULARY`), pure, is the one entry any file imports, a pure one included.
  *
  * The api's `test/kinds.test.ts` holds its readers to the same globals with a copy of the scanners, `PROCESS_ENV` and `FETCH`, which this
  * test holds to its own: the two packages share no test code.
@@ -177,7 +178,11 @@ const packageSources = (): Sources =>
     ),
   );
 
-const isRuntime = (m: string): boolean => m === 'agent-runtime' || m.startsWith('agent-runtime/');
+/** The runtime's pure door to its vocabulary, which any file may import: by that exact name, and no subpath of it. */
+const VOCABULARY = 'agent-runtime/vocabulary';
+
+/** The runtime by any entry but its vocabulary (`VOCABULARY`): what the client alone imports. */
+const isRuntime = (m: string): boolean => m !== VOCABULARY && (m === 'agent-runtime' || m.startsWith('agent-runtime/'));
 
 /**
  * Effect, by any subpath. A pure file takes what a store file decoded, and the api loads `agent-orchestrator/run` and
@@ -518,6 +523,15 @@ test('REFUSED: a pure file that reads the disk, spawns, imports the runtime or E
     'src/check/check.ts is pure and imports node:child_process',
   ]);
   assert.deepEqual(impurities(adding('src/run.ts', 'agent-runtime/effect')), ['src/run.ts is pure and imports agent-runtime/effect']);
+  assert.deepEqual(impurities(adding('src/run.ts', 'agent-runtime')), ['src/run.ts is pure and imports agent-runtime']);
+  assert.deepEqual(impurities(adding('src/run.ts', 'agent-runtime/vocabulary/x')), [
+    'src/run.ts is pure and imports agent-runtime/vocabulary/x',
+  ]);
+  assert.deepEqual(
+    impurities(adding('src/workflow/fence.ts', 'agent-runtime/vocabulary')),
+    [],
+    'the vocabulary, and it alone, is let through',
+  );
   assert.ok('src/agents/agents.ts' in packageSources());
   assert.deepEqual(impurities(adding('src/agents/agents.ts', 'src/agents/agents.store.ts')), [
     'src/agents/agents.ts is pure and imports src/agents/agents.store.ts',
@@ -739,6 +753,10 @@ test('REFUSED: a type imported from the runtime by a controller, a store file, a
   assert.deepEqual(clientBreaks(adding('bin/wf.ts', 'agent-runtime')), [
     'bin/wf.ts imports agent-runtime, and only src/runtime-client.ts may',
   ]);
+  assert.deepEqual(clientBreaks(adding('src/agents/agents.store.ts', 'agent-runtime/vocabulary/x')), [
+    'src/agents/agents.store.ts imports agent-runtime, and only src/runtime-client.ts may',
+  ]);
+  assert.deepEqual(clientBreaks(adding('src/tick/tick.verb.ts', 'agent-runtime/vocabulary')), [], "the vocabulary is any file's");
   assert.deepEqual(clientBreaks(planted(CLIENT, (imports) => imports.filter((m) => !isRuntime(m)))), [
     'src/runtime-client.ts imports no agent-runtime: CLIENT names the wrong file',
   ]);

@@ -49,6 +49,7 @@ const LAYERS: { name: string; at: string[]; refused: string[]; allowed: string[]
     refused: [
       'agent-runtime',
       'agent-runtime/effect',
+      'agent-runtime/vocabulary',
       ...SDKS,
       'agent-orchestrator/src/run.ts',
       'agent-orchestrator/runx',
@@ -70,7 +71,7 @@ const LAYERS: { name: string; at: string[]; refused: string[]; allowed: string[]
     name: 'orchestrator',
     at: ['packages/agent-orchestrator/src', 'packages/agent-orchestrator/bin', 'packages/agent-orchestrator/place/git/scripts'],
     refused: SDKS,
-    allowed: ['agent-runtime', 'agent-runtime/effect', 'effect', 'node:fs', './runner.ts'],
+    allowed: ['agent-runtime', 'agent-runtime/effect', 'agent-runtime/vocabulary', 'effect', 'node:fs', './runner.ts'],
   },
   {
     name: 'runtime',

@@ -104,10 +104,13 @@ function modulesLoaded(entry: string, more: readonly string[] = []): string[] {
   return JSON.parse(out) as string[];
 }
 
-/** The modules each entry the api loads is pinned to: its own files and `effect/Data`'s, measured on the pinned `effect`. */
+/**
+ * The modules each entry the api loads is pinned to: its own files, the runtime's vocabulary door's and `effect/Data`'s, measured on the
+ * pinned `effect`.
+ */
 const PINNED_MODULES: Record<string, { all: number; effect: number }> = {
-  'agent-orchestrator/run': { all: 59, effect: 14 },
-  'agent-orchestrator/workflow': { all: 34, effect: 14 },
+  'agent-orchestrator/run': { all: 63, effect: 14 },
+  'agent-orchestrator/workflow': { all: 38, effect: 14 },
   'agent-orchestrator/effect': { all: 16, effect: 14 },
 };
 

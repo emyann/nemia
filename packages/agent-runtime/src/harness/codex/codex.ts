@@ -7,6 +7,7 @@ import path from 'node:path';
 import type { SpawnRequest } from '../seam.ts';
 import type { HarnessSpec } from '../detached/detached.ts';
 import { codexOutput } from './stream.ts';
+import { CODEX_DEFAULT_SANDBOX, CODEX_EFFORTS, CODEX_SANDBOXES } from './vocabulary.ts';
 import { codexRolloutEvents, codexRolloutFile } from './transcript.ts';
 import { codexMcpServerNames, codexMcpServers } from '../mcp.ts';
 
@@ -35,12 +36,6 @@ export const trustedProjects = (toml: string): Set<string> => {
   return trusted;
 };
 
-/**
- * Codex's sandboxes, which a task names as its `permissionMode`. `bypassPermissions`, Claude's
- * word, is also taken, as the widest: `danger-full-access`.
- */
-export const CODEX_SANDBOXES: readonly string[] = ['read-only', 'workspace-write', 'danger-full-access'];
-
 /** The tools that change files. Codex has no tool list — one shell, three sandboxes — so these decide. */
 const WRITES: readonly string[] = ['Bash', 'Write', 'Edit'];
 
@@ -56,7 +51,7 @@ const WRITES: readonly string[] = ['Bash', 'Write', 'Edit'];
 const sandboxOf = (r: Pick<SpawnRequest, 'config'>): string => {
   if (r.config?.tools && !r.config?.tools.some((t) => WRITES.includes(t))) return 'read-only';
   const asked = r.config?.permissionMode === 'bypassPermissions' ? 'danger-full-access' : r.config?.permissionMode;
-  return asked !== undefined && CODEX_SANDBOXES.includes(asked) ? asked : 'workspace-write';
+  return asked !== undefined && CODEX_SANDBOXES.includes(asked) ? asked : CODEX_DEFAULT_SANDBOX;
 };
 
 /**
@@ -76,13 +71,6 @@ const codexMountRefusal = (task: Omit<SpawnRequest, 'name'>): string | undefined
   }
   return undefined;
 };
-
-/**
- * The reasoning efforts the Codex API names for its default model. Codex checks
- * none itself: a bad one is sent, refused by the API, and the session exits 1 — so `file()` refuses
- * it first.
- */
-export const CODEX_EFFORTS: readonly string[] = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
 
 /**
  * Codex, through `codex exec`. Its argv, in order:

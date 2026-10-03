@@ -1,6 +1,5 @@
 /** The face of `keys/`: the readers of a step's keys and its tool rules, re-exported by name. */
 export {
-  AUTO_UNSUPPORTED,
   backgroundOf,
   BUDGET_EXAMPLE,
   budgetOf,
@@ -9,13 +8,11 @@ export {
   contextOf,
   contextText,
   countOf,
-  DEFAULT_PERMISSION_MODE,
   DENIALS,
   denialsOf,
   dollarsOf,
   gateOf,
   harnessOf,
-  keepsAuto,
   outputOf,
   remoteOf,
   sessionContext,

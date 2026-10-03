@@ -2,8 +2,9 @@
 
 Agent sessions on one harness each, durably: a job that runs to its end, and a long-lived session that runs until stopped (not built
 yet). It owns how a session runs: the task's command, mounts, restart and spend, the journal, the attempts, the harnesses' vocabulary.
-`decide` (`src/core/domain.ts`) is the whole judgement, pure (`test/engine.test.ts`); `src/facade.ts` and `src/index.ts` are the only
-doors (`test/contract.test.ts`). The orchestrator reaches it through its one client; what is still above it and a candidate to come
+`decide` (`src/core/domain.ts`) is the whole judgement, pure (`test/engine.test.ts`); `src/facade.ts`, `src/index.ts` and
+`src/vocabulary.ts` are the only doors (`test/contract.test.ts`); the last, the harnesses' words and `fenceReach`, loads no Effect and
+no I/O (`test/vocabulary-door.test.ts`). The orchestrator reaches it through its one client; what is still above it and a candidate to come
 down is in `docs/architecture.md`, *Who owns what*.
 
 ## Layout
@@ -120,7 +121,8 @@ What Claude Code does as the steps meet it. Where the orchestrator's code holds 
   session.** Never resume a session it is respawning: a long-lived restart waits for the old one's end and release
   (`restartOf`, `src/core/long-lived.test.ts`); its listing in the gap is `blocked` with no `pid` (`respawning`).
 - **A job (`claude -p`) never waits on a prompt; a background session in a folder nobody opened blocks in any mode that can ask**:
-  in the orchestrator today, `validateFolderMode` judges only `background: true`, which must run `dontAsk` or `bypassPermissions`.
+  the modes that ask nobody are this package's answer (`unasking` in `fenceReach`, `src/harness/reach.ts`), and the orchestrator's
+  `validateFolderMode` refuses a `background: true` step of a folder team in any other.
 - **A job reads neither user settings nor `settings.local.json`** (`--setting-sources project`): what a step needs goes on the step, its
   agent or the checkout's `.claude/settings.json`.
 - **A write is matched against `Edit` rules only**: write `allowedTools: Edit(**)`, never `Write(path)` (in the orchestrator today:

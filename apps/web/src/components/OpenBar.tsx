@@ -7,6 +7,7 @@ import { useBar } from '@/lib/useBar';
 import { FactoryBar } from './FactoryBar';
 import { StartBar } from './FactoryStart';
 import { RunBar } from './RunBar';
+import { SpecBar } from './SpecBar';
 import { StepBar } from './StepBar';
 
 /**
@@ -25,5 +26,7 @@ export function OpenBar() {
       return <StepBar key={`step:${open.run}`} run={open.run} step={open.step} />;
     case 'run':
       return <RunBar key={barValue(open)} run={open.run} />;
+    case 'spec':
+      return <SpecBar key={barValue(open)} from={open.from} workflow={open.workflow} step={open.step} />;
   }
 }

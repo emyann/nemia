@@ -9,6 +9,7 @@ import { WorkflowBuilder } from '../components/WorkflowBuilder';
 import { WorkflowCanvas } from '../components/WorkflowCanvas';
 import { factoriesQuery, workflowsQuery, type WorkflowListing } from '../lib/api';
 import { workflowFactories } from '../lib/factories';
+import { useBar } from '../lib/useBar';
 
 export const Route = createFileRoute('/workflows')({
   loader: ({ context }) =>
@@ -64,11 +65,12 @@ function WorkflowsPage() {
  * A workflow's card: what it is, the factories it is in (`workflowFactories`), each linked to its floor — nothing while they are unread or
  * for one in none — drawn, its steps' pages and a start — or, for one of yours, its builder in their place
  * (`WorkflowBuilder`). `building` opens it in the builder, as a workflow just made is. The repository's show none, and say why: the api
- * writes nothing into a checkout.
+ * writes nothing into a checkout. The canvas inspects a step in the frame's bar and the builder edits one, never both on one card: Build
+ * swaps the one for the other, and closes the bar where it shows a step of this workflow (`useBuilding`).
  */
 function WorkflowCard({ workflow, building: opened = false }: { workflow: WorkflowListing; building?: boolean }) {
   const { name, from, dir, description, steps, error } = workflow;
-  const [building, setBuilding] = useState(opened && from === 'yours' && !error);
+  const [building, build, stopBuilding] = useBuilding(workflow, opened);
   const { data: factories } = useQuery(factoriesQuery);
   const card = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -103,7 +105,7 @@ function WorkflowCard({ workflow, building: opened = false }: { workflow: Workfl
           {from === 'yours' && !error && !building && (
             <button
               type="button"
-              onClick={() => setBuilding(true)}
+              onClick={build}
               className="ml-auto rounded border border-neutral-300 px-2 py-0.5 text-xs font-medium hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-900"
             >
               Build
@@ -138,7 +140,7 @@ function WorkflowCard({ workflow, building: opened = false }: { workflow: Workfl
           <p className="font-mono text-xs whitespace-pre-wrap break-words text-red-800 dark:text-red-300">{error}</p>
         </div>
       ) : building ? (
-        <WorkflowBuilder workflow={workflow} onClose={() => setBuilding(false)} />
+        <WorkflowBuilder workflow={workflow} onClose={stopBuilding} />
       ) : (
         <>
           <WorkflowCanvas workflow={workflow} />
@@ -151,7 +153,23 @@ function WorkflowCard({ workflow, building: opened = false }: { workflow: Workfl
 }
 
 /**
- * Each step's page — what it is told, and its keys explained — in the order a run runs them: as a block on the graph opens it, by keyboard.
+ * Whether `workflow`'s card has its builder open — from the start where `opened` asks it of one of yours that reads — what Build does, and
+ * what closes the builder. Build closes the frame's bar where it shows a step of `workflow`, which the builder is about to draft and whose
+ * form the bar would cover, then opens the builder; a bar showing anything else stays.
+ */
+function useBuilding(workflow: WorkflowListing, opened: boolean): [building: boolean, build: () => void, stop: () => void] {
+  const [building, setBuilding] = useState(opened && workflow.from === 'yours' && !workflow.error);
+  const { open, close } = useBar();
+  const build = () => {
+    if (open?.kind === 'spec' && open.from === workflow.from && open.workflow === workflow.name) close();
+    setBuilding(true);
+  };
+  return [building, build, () => setBuilding(false)];
+}
+
+/**
+ * Each step's page — what it is told, and its keys explained — in the order a run runs them: as a double click on a block on the graph
+ * opens it, by keyboard.
  */
 function StepLinks({ workflow }: { workflow: WorkflowListing }) {
   return (

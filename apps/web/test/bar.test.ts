@@ -53,7 +53,15 @@ test("a workflow's step's address names where the workflow is read from, the wor
   assert.deepEqual(barOf('spec:repo/dev/review'), SPEC);
   assert.deepEqual(barOf('spec:yours/mine/plan'), { kind: 'spec', from: 'yours', workflow: 'mine', step: 'plan' });
   assert.deepEqual(barOf('spec:yours/w/a/b:c'), { kind: 'spec', from: 'yours', workflow: 'w', step: 'a/b:c' }, 'a step keeps its own');
-  for (const value of ['spec:other/dev/review', 'spec:repo/dev', 'spec:repo//review', 'spec:repo/dev/', 'spec:/dev/review', 'spec:repo', 'spec:'])
+  for (const value of [
+    'spec:other/dev/review',
+    'spec:repo/dev',
+    'spec:repo//review',
+    'spec:repo/dev/',
+    'spec:/dev/review',
+    'spec:repo',
+    'spec:',
+  ])
     assert.equal(barOf(value), undefined, `${value} opens no bar`);
 });
 

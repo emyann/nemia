@@ -40,7 +40,9 @@ sentence. A resumed session keeps the body it started with: an edit reaches the 
 The instructions are one of four layers that shape an agent apart from its task, each written by whoever owns it:
 
 1. **Instructions** — the agent's body: who it is, wherever it is hired.
-2. **Custom instructions** — what a person adds to an agent they use without rewriting it. Coming, not built.
+2. **Custom instructions** — what a person adds to an agent they use without rewriting it, kept in their store, one file per agent name
+   (`wf agents custom <name>`), never in the agent's folder. Words only: they set no key, so they never widen the fence or give a tool.
+   A run freezes them when it starts, so an edit reaches only the runs after it.
 3. **The step's policy** — the step's own words and keys: what this position of this process asks of a role. A normal layer, not a
    workaround: say there what one workflow expects, and keep it out of the instructions. A step may add skills, never take one away.
 4. **Factory rules** — the files the harness reads from the factory's workspace itself (today `CLAUDE.md`, `AGENTS.md`): what holds there

@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from 'react';
+import { useState } from 'react';
 import { useQuery, type QueryClient } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { createRootRouteWithContext, Outlet, useMatch, useMatches, useRouter, useRouterState } from '@tanstack/react-router';
@@ -38,10 +38,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 /**
  * The frame of every page: a header across the top (`FrameHeader`) naming the section — and the factory, inside one, with the start of a
  * run in it — and below it the sidebar, the rail of places beside its list, then the page, in a centred column unless a matched route's
- * `staticData` asks for `fullBleed`. The header is `h-12`, the height the Factory leaves above itself, and the sidebar starts under it. Over
- * the page, below the header, the floating bar (`OpenBar`) shows what the address's `?bar=` names, the same on every page, and a link to
- * another page, which carries no `bar`, closes it. It follows the workflow feed once for the whole page: what moves on it is read again at
- * once, and the polls slow while it is open. React Aria's `RouterProvider` sends every React Aria link, pressed with Enter or clicked,
+ * `staticData` asks for `fullBleed`. The header is `h-12`, the height the Factory leaves above itself, and the sidebar starts under it.
+ * Over the page, below the header, the floating bar (`OpenBar`) shows what the address's `?bar=` names, the same on every page, and a link
+ * to another page, which carries no `bar`, closes it. It follows the workflow feed once for the whole page: what moves on it is read again
+ * at once, and the polls slow while it is open. React Aria's `RouterProvider` sends every React Aria link, pressed with Enter or clicked,
  * through the router, so no link loads the whole page again.
  */
 function Root() {
@@ -54,7 +54,7 @@ function Root() {
 
   return (
     <AriaRouterProvider navigate={(href) => void router.navigate({ href })}>
-      <SidebarProvider className="flex-col" style={{ '--sidebar-width': SIDEBAR_WIDTH } as CSSProperties}>
+      <SidebarProvider className="flex-col">
         <FrameHeader section={section} factory={factory} feed={feed} />
         <div className="flex flex-1">
           <AppSidebar path={path} factory={factory} />
@@ -76,18 +76,16 @@ function Root() {
   );
 }
 
-/** The sidebar's width open: the rail's 3rem and the list's 16rem. Folded, it is the rail's alone (`--sidebar-width-icon`). */
-const SIDEBAR_WIDTH = '19rem';
-
 /**
  * A place in the menu: the sidebar's button, which is React Aria's link once it has an `href`, given the router's `to` and its preloading.
  */
 const NavLink = routeLink(SidebarMenuButton);
 
 /**
- * The sidebar, under the header: the rail (`FrameRail`), and beside it the list, with `path`'s place in each marked, and `factory`, the one
- * whose floor is open, listed among the factories. Folded, it is the rail alone, and the list is not drawn, so none of its links takes the
- * focus while hidden. On a narrow screen it is a sheet over the page holding both, and a pick closes it.
+ * The sidebar, under the header, the provider's width open: the rail (`FrameRail`), and beside it the list in the width left, with `path`'s
+ * place in each marked, and `factory`, the one whose floor is open, listed among the factories. Folded, it is the rail alone, and the list
+ * is not drawn, so none of its links takes the focus while hidden. On a narrow screen it is a sheet over the page holding both, and a pick
+ * closes it.
  */
 function AppSidebar({ path, factory }: { path: string; factory?: string }) {
   const { isMobile, state, setOpenMobile } = useSidebar();

@@ -6,11 +6,25 @@ import { expectCount, expectTexts, expectVisible, idle, Refused, WAIT_MS, watch 
 import { DIAMOND } from './seed.ts';
 import { API, store } from './world.ts';
 
-/** The menu's places, in its order: the Inbox first. */
-export const PLACES = ['Inbox', 'Factories', 'Runs', 'Stats', 'Workflows', 'Agents', 'Capabilities', 'Machines'];
+/** The sidebar list's places, in its order: the Inbox first. */
+export const PLACES = ['Inbox', 'Factories', 'Runs', 'Stats', 'Workflows'];
 
-/** On every page: the menu, with each of its places, in its order. */
+/** The rail's places, in its order: Home first, Capabilities at its foot. */
+export const RAIL_PLACES = ['Home', 'Agents', 'Machines', 'Capabilities'];
+
+/** The rail of places at the frame's left, under the header. */
+export const railOf = (page: Page): Locator => page.locator('nav[aria-label="Places"]');
+
+/** On every page: the header with the logo and the bell, the rail with its places in their order, and the list with each of its own. */
 export async function sidebar(page: Page): Promise<void> {
+  const header = page.locator('header[data-feed]');
+  await expectVisible(header.getByRole('link', { name: 'Nemia' }), 'the header has the logo, a link to Home');
+  await expectVisible(header.getByRole('button', { name: 'Notifications' }), 'the header has the bell');
+  const rail = railOf(page);
+  for (const place of RAIL_PLACES) await expectVisible(rail.getByRole('link', { name: place }), `the rail has ${place}`);
+  const named = await rail.getByRole('link').evaluateAll((links) => links.map((link) => link.getAttribute('aria-label')));
+  if (named.join() !== RAIL_PLACES.join())
+    throw new Refused(`the rail lists its places in order, ${RAIL_PLACES.join(', ')} — it lists ${named.join(', ')}`);
   const menu = page.locator('[data-sidebar="sidebar"]');
   for (const place of PLACES) await expectVisible(menu.getByRole('link', { name: place }), `the sidebar has ${place}`);
   await expectTexts(

@@ -1,6 +1,6 @@
 import path from 'node:path';
 import type { Locator } from 'playwright';
-import { photograph, sidebar, themeOf } from '../board.ts';
+import { photograph, railOf, sidebar, themeOf } from '../board.ts';
 import { expectApart, expectCount, expectInside, expectTexts, expectUncut, expectVisible, Refused } from '../checks.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT } from '../world.ts';
@@ -105,10 +105,7 @@ export default {
   route: '/machines',
   expect: async (page) => {
     await sidebar(page);
-    await expectVisible(
-      page.locator('[data-sidebar="sidebar"] a[data-active="true"]', { hasText: 'Machines' }),
-      'the sidebar lights Machines on its page',
-    );
+    await expectVisible(railOf(page).locator('a[data-active="true"][aria-label="Machines"]'), 'the rail lights Machines on its page');
     const served = (await (await page.request.get(new URL('/api/machines/lifecycle', page.url()).href)).json()) as Served;
     const section = page.locator('section[aria-label="A task\'s lifecycle"]');
     await expectVisible(

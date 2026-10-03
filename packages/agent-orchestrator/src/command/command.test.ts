@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { commandBreaks, commandLine, helpOf, parseArgv, type Spec } from './command.ts';
-import { COMMANDS } from './commands.verb.ts';
+import { COMMANDS, TABLE } from './commands.verb.ts';
 
 const SPEC: Spec = {
   positionals: [
@@ -41,6 +41,19 @@ const handler = (): undefined => undefined;
 
 const RETRY = COMMANDS.find((c) => c.name === 'retry')!;
 const SAY = COMMANDS.find((c) => c.name === 'say')!;
+const entry = (name: string) => TABLE.find((c) => c.name === name)!;
+
+/** What `command` refuses of `argv` before anything is read, its parser's words or its check's; null where it takes it. */
+function refusedBy(command: (typeof TABLE)[number], argv: readonly string[]): string | null {
+  try {
+    const args = parseArgv(command.spec, argv);
+    assert.ok(args, `wf ${command.name} ${argv.join(' ')} is given too little`);
+    return command.check?.(args) ?? null;
+  } catch (err) {
+    assert.equal((err as { exitCode?: number }).exitCode, 2);
+    return (err as Error).message;
+  }
+}
 
 test('a command line is read into its arguments, the defaults under what it gives', () => {
   assert.deepEqual(parseArgv(SPEC, ['r-1']), { mode: 'fast', runId: 'r-1' });
@@ -163,7 +176,7 @@ test('the command line a refusal shows names what was given and the usage of wha
 
 test("the table's help is today's, word for word", () => {
   assert.equal(
-    helpOf(COMMANDS),
+    helpOf(TABLE),
     [
       '  wf retry <runId> <step> [--nudge | --fresh | --model <m> | --recheck] [--message "<answer>"] [--budget <amount>]',
       '                               try a step waiting on you again, once, on the next tick:',
@@ -211,6 +224,36 @@ test("the table's help is today's, word for word", () => {
       '                               nothing else — every field the protocol marks REQUIRED but',
       '                               supportedInterfaces, which is left out because nothing here serves an',
       '                               agent over A2A. The card describes; it is not an address',
+      '  wf cancel <runId>',
+      '                               stop what it has in flight; file nothing more',
+      '  wf hold <runId> --until <runId> [--until <runId> ...] [--why "<words>"] [--by <name>]',
+      '                               file nothing more of a run until other runs ship, as --after would',
+      '                               have: what is in flight finishes, nothing new is filed, and nothing',
+      '                               is asked of you — wf ls and wf decide say held until <run> ships, and',
+      '                               what a step asks is asked once the hold lifts. The tick lifts it when',
+      '                               every run named has shipped. Refused of a run cancelled, pruned,',
+      '                               finished or already held, and of a run named that is unknown, the run',
+      '                               itself, or one that already waits on it, through --after or a hold.',
+      '                               --why: the reason, shown beside held until <run> ships wherever it is',
+      '                               said; --by: who puts the hold (default: your OS user).',
+      '                               wf hold <runId> --off: lift the hold now, and the next tick goes on as',
+      '                               if it had never been put',
+      '  wf tick [--stats]',
+      '                               one pass: tick the engine, file what became ready — refused while a',
+      '                               wf up ticks the store, since it runs the same pass (daemon.json);',
+      '                               --stats says after it what the pass cost, phase by phase',
+      '  wf up [ms]',
+      '                               the same, on a timer (4000 unless given; whole ms, 1 to 2147483647),',
+      '                               holding the store: a second wf up is refused while this one ticks,',
+      '                               and takes the store over once its process is gone or it has been',
+      '                               silent for 10 intervals, at least 15 minutes; it writes',
+      '                               WF_ROOT/daemon.json — pid, start, last pass, and a beat each interval;',
+      '                               once a minute, a line of what its passes cost (tick-stats.json).',
+      '                               wf up --stats: what the last pass cost, phase by phase — read, not',
+      '                               run, so it fits while a wf up holds the store; where none does,',
+      '                               wf tick --stats',
+      '  wf watch [cursor]',
+      "                               wf feed's lines, followed as the tick writes them, until ^C",
     ].join('\n'),
   );
 });
@@ -313,4 +356,68 @@ test('a table breaks its rules: a key a route sets that no flag of its spec fill
   assert.deepEqual(commandBreaks([{ name: 'a', route, spec: HOLDING, handler }], []), [
     "a's route sets mode, which no flag of its spec fills: name a key the command reads",
   ]);
+});
+
+/** `wf hold`'s two forms, as each of its refusals ends on them. */
+const HOLD_SHAPE = 'wf hold <runId> --until <runId> [--until <runId> ...] [--why "<words>"] [--by <name>], or wf hold <runId> --off';
+
+test("REFUSED at shipped defaults: wf hold's arguments, before any run is read, in today's words whole", () => {
+  const hold = entry('hold');
+  const first = 'wf hold takes the run first: wf hold <runId> --until <runId> [--until <runId> ...], or wf hold <runId> --off.';
+  for (const argv of [[], ['--until', 'a'], ['-x', '--off']]) assert.equal(refusedBy(hold, argv), first, argv.join(' '));
+  const until = `--until takes the run to wait on, by id: ${HOLD_SHAPE}.`;
+  for (const argv of [['--until'], ['--until', '--off'], ['--until', '-a'], ['--until=']])
+    assert.equal(refusedBy(hold, ['r-x', ...argv]), until, argv.join(' '));
+  assert.equal(refusedBy(hold, ['r-x']), `wf hold needs the runs to wait on, or --off to lift a hold: ${HOLD_SHAPE}.`);
+  assert.equal(
+    refusedBy(hold, ['r-x', '--until', 'a', '--off']),
+    `wf hold takes --until or --off, not both: lift the hold first, then hold it again — ${HOLD_SHAPE}.`,
+  );
+  assert.equal(
+    refusedBy(hold, ['r-x', '--off', '--why', 'w']),
+    `wf hold --off lifts the hold whole, and takes no --why or --by: those go with --until, on the hold put next — ${HOLD_SHAPE}.`,
+  );
+  assert.equal(
+    refusedBy(hold, ['r-x', '--after', 'a']),
+    `wf hold does not take --after. It takes the run, then the runs it waits on or --off: ${HOLD_SHAPE}.`,
+  );
+  assert.equal(refusedBy(hold, ['r-x', '--until', 'a', '--why', '--x']), `--why takes the words for why the run is held: ${HOLD_SHAPE}.`);
+  assert.equal(
+    refusedBy(hold, ['r-x', '--until', 'a', '--by', ' ']),
+    '--by takes who puts the hold, by a name, and was given only blanks: give it words, or leave --by out.',
+  );
+  assert.equal(
+    refusedBy(hold, ['r-x', '--until', 'a', '--by', 'a', '--by', 'b']),
+    `wf hold takes --by once: a hold says one by. ${HOLD_SHAPE}.`,
+  );
+  assert.equal(refusedBy(hold, ['r-x', '--until', 'a', '--until', 'b', '--why', 'w']), null);
+  assert.equal(refusedBy(hold, ['r-x', '--off', '--off']), null);
+});
+
+test("REFUSED at shipped defaults: wf tick's, wf up's and wf watch's arguments, in today's words whole", () => {
+  assert.equal(
+    refusedBy(entry('tick'), ['--bogus']),
+    'wf tick takes no --bogus: wf tick runs one pass, and wf tick --stats says after it what the pass cost.',
+  );
+  assert.equal(refusedBy(entry('tick'), ['--stats']), null);
+  const up = entry('up');
+  for (const argv of [
+    ['--stats', '20'],
+    ['20', '--stats'],
+  ])
+    assert.equal(
+      refusedBy(up, argv),
+      'wf up --stats reads what the last pass cost and ticks nothing, so it takes no 20: wf up --stats alone, or wf up 20 to tick.',
+    );
+  assert.match(
+    refusedBy(up, ['soon']) ?? '',
+    /^wf up takes its pass interval in whole milliseconds, from 1 to \d+, and "soon" is not one: /,
+  );
+  assert.match(refusedBy(up, ['--x']) ?? '', /^wf up takes its pass interval in whole milliseconds, from 1 to \d+, and "--x" is not one: /);
+  assert.equal(refusedBy(up, ['10', '20']), 'wf up takes one pass interval at most, and was given 20 too: wf up [ms].');
+  assert.equal(refusedBy(up, ['10']), null);
+  const cursor =
+    'wf watch takes one cursor at most, a whole number of bytes — 0, or the number a `cursor:` line printed: wf watch [cursor]';
+  for (const argv of [['x'], ['1', '2'], ['--from']]) assert.equal(refusedBy(entry('watch'), argv), cursor, argv.join(' '));
+  assert.equal(refusedBy(entry('watch'), ['12']), null);
 });

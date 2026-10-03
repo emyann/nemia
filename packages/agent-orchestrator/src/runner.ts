@@ -201,7 +201,7 @@ export {
   unfilledRefusal,
 } from './factory/factory.ts';
 export type { Factory, FactoryListing, Hires } from './factory/factory.ts';
-export { feedLineWords, REMOVED } from './feed/feed.ts';
+export { cursorTakes, feedLineWords, REMOVED } from './feed/feed.ts';
 export type { FeedLine } from './feed/feed.ts';
 export type { FeedSaid, FeedWords } from './run.ts';
 export {
@@ -355,8 +355,9 @@ export { cancel } from './cancel/cancel.verb.ts';
 export { hold, unhold } from './wait/wait.verb.ts';
 export { retry } from './retry/retry.verb.ts';
 export { say } from './say/say.verb.ts';
-export { COMMANDS } from './command/commands.verb.ts';
+export { COMMANDS, TABLE } from './command/commands.verb.ts';
 export type { Command } from './command/commands.verb.ts';
+export type { Ran } from './command/runs.verb.ts';
 export { CLI, commandBreaks, commandLine, helpOf, parseArgv } from './command/command.ts';
 export type { Args, CommandSpec, Flag, Positional, Spec } from './command/command.ts';
 export type { Accepted, RoundAsked } from './round/round.verb.ts';

@@ -3,8 +3,9 @@
  * it answers, and the lines the CLI prints of that data. The CLI parses, refuses, helps and prints from an entry, and the api serves the
  * same entry on its route; an entry served on one side alone says so (`only`). Today: a person's asks of a run — `wf retry`, `wf approve`,
  * `wf round`, `wf accept` and `wf say` — the runs and their steps (`wf ls`, `runsListed`), two reads the api alone serves: a run's
- * decision (`decideRun`) and the run slots (`slotsOf`), and the agents of both places (`wf agents`, `agentsRead`) and one agent's card
- * (`wf agents card`, `agentCardRead`).
+ * decision (`decideRun`) and the run slots (`slotsOf`), the agents of both places (`wf agents`, `agentsRead`) and one agent's card
+ * (`wf agents card`, `agentCardRead`), and a run's course (`wf cancel`, `wf hold`: `runs.verb.ts`). The whole table (`TABLE`) adds the
+ * commands the CLI serves alone and runs itself, with no handler: `wf tick`, `wf up` and `wf watch` (`RAN`).
  */
 import type { Engine } from '../runtime-client.ts';
 import { approvalWordsRefusal } from '../gate/gate.ts';
@@ -25,6 +26,7 @@ import { lsLines, type RunsListed } from '../list/list.ts';
 import { agentCardRead, agentsRead } from '../roster/roster.store.ts';
 import { agentsLines, cardNote, type AgentsRead, type CardRead } from '../roster/roster.ts';
 import { commandLine, type Args, type CommandSpec, type Flag } from './command.ts';
+import { CANCEL, HOLD, RAN, type Ran } from './runs.verb.ts';
 
 /**
  * A command whole: its spec, `handler`, which calls one package verb with the arguments and answers data — never printed lines — and
@@ -387,7 +389,6 @@ const CEILINGS: Command<Slots> = {
   print: () => [],
 };
 
-/** Every command defined once, in the order `wf`'s help lists them. */
 /** The refusal of a value left out of each of `wf agents`' two flags, saying what it takes. */
 const AGENTS_TAKES = {
   '--repo': '--repo takes the repository whose workflows/agents to read: wf agents --repo <r>',
@@ -468,4 +469,8 @@ const AGENT_CARD: Command<CardRead> = {
   note: (data, args) => cardNote(data, textOf(args, 'name') ?? ''),
 };
 
-export const COMMANDS: readonly Command[] = [RETRY, APPROVE, ROUND, ACCEPT, SAY, LS, DECIDE, CEILINGS, AGENTS, AGENT_CARD];
+/** Every command with a handler defined once, in the order `wf`'s help lists them: what the api may serve. */
+export const COMMANDS: readonly Command[] = [RETRY, APPROVE, ROUND, ACCEPT, SAY, LS, DECIDE, CEILINGS, AGENTS, AGENT_CARD, CANCEL, HOLD];
+
+/** The whole table: every command with a handler, then those the CLI runs itself (`RAN`), in the order `wf`'s help lists them. */
+export const TABLE: readonly (Command | Ran)[] = [...COMMANDS, ...RAN];

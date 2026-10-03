@@ -12,7 +12,7 @@ import { scratch } from '../../test/scratch.ts';
 
 const ROOT = scratch('wf-main-');
 process.env.WF_ROOT = ROOT;
-const { advance, COMMANDS, start } = await import('../runner.ts');
+const { advance, TABLE, start } = await import('../runner.ts');
 const { readRun } = await import('../record/record.store.ts');
 const { main, VERBS } = await import('./main.ts');
 const { HELP } = await import('./flags.ts');
@@ -111,7 +111,7 @@ const typed = async (t: TestContext, e: Engine, ...argv: string[]) => {
 
 test('the verbs the help names are the verbs main runs, and no other', () => {
   const lines = [...HELP.matchAll(/^ {2}wf (.+)$/gm)].map((m) => m[1]);
-  const served = COMMANDS.filter((c) => c.only?.side !== 'api').map((c) => c.name);
+  const served = TABLE.filter((c) => c.only?.side !== 'api').map((c) => c.name);
   const names = [...VERBS.keys(), ...served];
   const first = (words: string) => words.split(' ')[0];
   assert.deepEqual([...new Set(lines.map(first))].sort(), [...new Set(names.map(first))].sort());
@@ -187,6 +187,18 @@ test('wf cancel of a run with nothing filed yet says so, a line more', async (t)
     out: [`${run.id}  cancelled`, `   nothing was in flight — no further steps will be filed`],
     err: [],
   });
+});
+
+test("REFUSED at shipped defaults: wf cancel given a word after the run's id, and nothing is cancelled", async (t) => {
+  const b = board();
+  const run = start({ brief: 'not cancelled', repo: aRepo(), workflowDir: oneStep() });
+  for (const extra of ['extra', '--now'])
+    await assert.rejects(typed(t, b.e, 'cancel', run.id, extra), (err: Error & { exitCode?: number }) => {
+      assert.equal(err.message, `wf cancel takes one run's id: not ${extra}.`);
+      assert.equal(err.exitCode, 2);
+      return true;
+    });
+  assert.equal(readRun(run.id).cancelledAt, undefined, 'nothing cancelled');
 });
 
 test('wf show prints the record as JSON, the brief and each step body cut short', async (t) => {

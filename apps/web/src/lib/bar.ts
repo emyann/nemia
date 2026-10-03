@@ -3,12 +3,16 @@
  * what a press beside it does, how wide it is drawn, and what Escape does. Pure, for `useBar`, the bar (`FloatingBar`) and its node test.
  */
 
-/** What the bar shows: the start of a run in a factory, a factory, a run, or a step of a run. */
+/**
+ * What the bar shows: the start of a run in a factory, a factory, a run, a step of a run, or a step of a workflow (`spec`), read from the
+ * repository's workflows or yours (`from`).
+ */
 export type Bar =
   | { kind: 'start'; factory: string }
   | { kind: 'factory'; factory: string }
   | { kind: 'run'; run: string }
-  | { kind: 'step'; run: string; step: string };
+  | { kind: 'step'; run: string; step: string }
+  | { kind: 'spec'; from: 'repo' | 'yours'; workflow: string; step: string };
 
 /** The key this browser keeps the bar's one width under, for every page. */
 export const BAR_KEY = 'nemia:bar-width';
@@ -29,18 +33,31 @@ function stepOf(name: string): Bar | undefined {
   return slash > 0 && step ? { kind: 'step', run, step } : undefined;
 }
 
+/**
+ * The step of a workflow `name` names, `<from>/<workflow>/<step>`, split at its first two `/`; none for a `from` other than `repo` or
+ * `yours`, or without a workflow or a step.
+ */
+function specOf(name: string): Bar | undefined {
+  const [from, workflow] = name.split('/', 2);
+  const step = name.slice(`${from}/${workflow}/`.length);
+  if (from !== 'repo' && from !== 'yours') return undefined;
+  return workflow && step && name.startsWith(`${from}/${workflow}/`) ? { kind: 'spec', from, workflow, step } : undefined;
+}
+
 /** Each kind of bar the address names, by its word, read from the non-empty name after its `:`; none for a name the kind refuses. */
 const PARSERS: Record<string, (name: string) => Bar | undefined> = {
   start: (name) => ({ kind: 'start', factory: name }),
   factory: (name) => ({ kind: 'factory', factory: name }),
   run: (name) => (name.includes('/') ? undefined : { kind: 'run', run: name }),
   step: stepOf,
+  spec: specOf,
 };
 
 /**
- * The bar `value` names in the address — `start:<factory>`, `factory:<factory>`, `run:<run>` or `step:<run>/<step>` — or none for anything
- * else: another kind, an empty name, a run with a `/` in its id, not a string. A factory keeps its whole name. A run id is a file name in
- * the store, so a step's address splits at its first `/`, and the step keeps any `/` or `:` of its own.
+ * The bar `value` names in the address — `start:<factory>`, `factory:<factory>`, `run:<run>`, `step:<run>/<step>` or
+ * `spec:<from>/<workflow>/<step>` — or none for anything else: another kind, an empty name, a run with a `/` in its id, a `from` other than
+ * `repo` or `yours`, not a string. A factory keeps its whole name. A run id is a file name in the store, and a workflow's name its folder's,
+ * so a step's address splits at its first `/`, a workflow's step's at its first two, and the step keeps any `/` or `:` of its own.
  */
 export function barOf(value: unknown): Bar | undefined {
   if (typeof value !== 'string') return undefined;
@@ -61,6 +78,8 @@ export function barValue(bar: Bar): string {
       return `run:${bar.run}`;
     case 'step':
       return `step:${bar.run}/${bar.step}`;
+    case 'spec':
+      return `spec:${bar.from}/${bar.workflow}/${bar.step}`;
   }
 }
 
@@ -74,16 +93,18 @@ const sameBar = (one: Bar, other: Bar): boolean => barValue(one) === barValue(ot
 export const nextBar = (open: Bar | undefined, pressed: Bar): Bar | undefined => (open && sameBar(open, pressed) ? undefined : pressed);
 
 /**
- * The page Open visits from the bar: a factory's floor, a run's page, a step's session, or none for what is no page, the start of a run.
+ * The page Open visits from the bar: a factory's floor, a run's page, a step's session, a workflow's step's page, or none for what is no
+ * page, the start of a run.
  */
 export type BarPage =
   | { to: '/factories/$factory'; params: { factory: string } }
   | { to: '/runs/$runId'; params: { runId: string } }
-  | { to: '/runs/$runId/steps/$step'; params: { runId: string; step: string } };
+  | { to: '/runs/$runId/steps/$step'; params: { runId: string; step: string } }
+  | { to: '/workflows/$from/$workflow/$step'; params: { from: string; workflow: string; step: string } };
 
 /**
- * The page the bar's Open visits for `bar`: a factory's floor for a factory, a run's page for a run, the step's session for a step, and
- * none for the start of a run.
+ * The page the bar's Open visits for `bar`: a factory's floor for a factory, a run's page for a run, the step's session for a step, the
+ * step's page for a workflow's step, and none for the start of a run.
  */
 export function barOpens(bar: Bar): BarPage | null {
   switch (bar.kind) {
@@ -93,6 +114,8 @@ export function barOpens(bar: Bar): BarPage | null {
       return { to: '/runs/$runId', params: { runId: bar.run } };
     case 'step':
       return { to: '/runs/$runId/steps/$step', params: { runId: bar.run, step: bar.step } };
+    case 'spec':
+      return { to: '/workflows/$from/$workflow/$step', params: { from: bar.from, workflow: bar.workflow, step: bar.step } };
     case 'start':
       return null;
   }

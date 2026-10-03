@@ -24,6 +24,7 @@ const RUN: Bar = { kind: 'run', run: 'abc' };
 const REVIEW: Bar = { kind: 'step', run: 'abc', step: 'review' };
 const SHIP: Bar = { kind: 'step', run: 'abc', step: 'ship' };
 const FACTORY: Bar = { kind: 'factory', factory: 'hiring' };
+const SPEC: Bar = { kind: 'spec', from: 'repo', workflow: 'dev', step: 'review' };
 
 test('the address opens a bar only for a known kind with a name: anything else opens none', () => {
   for (const value of [undefined, '', 'start', 'start:', 'nope:x', ':hiring', 42, ['start:hiring'], null])
@@ -48,6 +49,14 @@ test("a factory's address names the factory whole, a slash or a colon in its nam
   assert.equal(barOf('factory:'), undefined, 'factory: opens no bar');
 });
 
+test("a workflow's step's address names where the workflow is read from, the workflow up to the next slash and the step after it", () => {
+  assert.deepEqual(barOf('spec:repo/dev/review'), SPEC);
+  assert.deepEqual(barOf('spec:yours/mine/plan'), { kind: 'spec', from: 'yours', workflow: 'mine', step: 'plan' });
+  assert.deepEqual(barOf('spec:yours/w/a/b:c'), { kind: 'spec', from: 'yours', workflow: 'w', step: 'a/b:c' }, 'a step keeps its own');
+  for (const value of ['spec:other/dev/review', 'spec:repo/dev', 'spec:repo//review', 'spec:repo/dev/', 'spec:/dev/review', 'spec:repo', 'spec:'])
+    assert.equal(barOf(value), undefined, `${value} opens no bar`);
+});
+
 test('a bar written to the address reads back as the same bar', () => {
   for (const value of [
     'start:hiring',
@@ -59,6 +68,8 @@ test('a bar written to the address reads back as the same bar', () => {
     'step:abc/review',
     'step:abc/a/b',
     'step:abc/x:y',
+    'spec:repo/dev/review',
+    'spec:yours/w/a/b:c',
   ])
     assert.equal(barValue(barOf(value)!), value);
   assert.deepEqual(barOf(barValue(OTHER)), OTHER);
@@ -95,6 +106,25 @@ test('pressing the factory the bar shows closes it, and another factory or the s
   assert.deepEqual(nextBar(HIRING, FACTORY), FACTORY);
 });
 
+test("pressing the workflow's step the bar shows closes it, and another step, the same step of another workflow or a run's step switches it", () => {
+  assert.equal(nextBar(SPEC, { ...SPEC }), undefined);
+  const implement: Bar = { ...SPEC, step: 'implement' };
+  assert.deepEqual(nextBar(SPEC, implement), implement, 'another step of the same workflow');
+  const elsewhere: Bar = { ...SPEC, workflow: 'other' };
+  assert.deepEqual(nextBar(SPEC, elsewhere), elsewhere, 'the same step of another workflow');
+  const mine: Bar = { ...SPEC, from: 'yours' };
+  assert.deepEqual(nextBar(SPEC, mine), mine, 'the same workflow and step, read from yours');
+  const ran: Bar = { kind: 'step', run: 'dev', step: 'review' };
+  assert.deepEqual(nextBar(SPEC, ran), ran, "a run's step of the same name");
+});
+
+test("Open visits a workflow's step's page for a workflow's step", () => {
+  assert.deepEqual(barOpens(SPEC), {
+    to: '/workflows/$from/$workflow/$step',
+    params: { from: 'repo', workflow: 'dev', step: 'review' },
+  });
+});
+
 test("Open visits a factory's floor for a factory", () => {
   assert.deepEqual(barOpens(FACTORY), { to: '/factories/$factory', params: { factory: 'hiring' } });
 });
@@ -109,6 +139,7 @@ test('a press on the empty canvas closes only what a canvas inspects: never the 
   assert.equal(inspects(RUN), true);
   assert.equal(inspects(REVIEW), true);
   assert.equal(inspects(FACTORY), true);
+  assert.equal(inspects(SPEC), true);
   assert.equal(inspects(HIRING), false);
   assert.equal(inspects(undefined), false);
 });

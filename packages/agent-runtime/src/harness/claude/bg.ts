@@ -25,7 +25,7 @@ import { readTranscript } from '../transcript.ts';
 import { countSpawn, readTextAsync } from '../../core/engine/tally.ts';
 import type { Monotonic } from '../../core/clock.ts';
 import { monoNow } from '../../core/engine/now.ts';
-import { RunnerError } from '../error.ts';
+import { RunnerError, refusedOsError } from '../error.ts';
 import { registryOf, type RegistryRow } from './registry.ts';
 import { type ParentCall, parentFileOf, parentOf, recordParent, whoseCall } from './parent.ts';
 import { clearSighting, quietFileOf, sightingOf } from './quiet.ts';
@@ -384,8 +384,9 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
 /**
  * `claude --bg` under `r.name`, in the task's `cwd`, with its MCP configs written under `root`, and its parent's last call recorded
  * there (`recordParent`, asked of `parentCallFrom`), and a former attempt's sighting under the name cleared (`clearSighting`).
- * All are written before the CLI runs, so whatever throws there started nothing
- * (`refused`), and no look finds the session before its record. The flags are `claudeArgv`'s.
+ * All are written before the CLI runs, so whatever throws there started nothing, and no look finds the session before its
+ * record: refused (`refused`) unless it failed for a short-lived reason (`refusedOsError`), which the grace window judges.
+ * The flags are `claudeArgv`'s.
  */
 const spawnUnder =
   (root: string, parentCallFrom: (sessionId: string) => Promise<ParentCall | undefined>): RunnerOps['spawn'] =>
@@ -401,7 +402,7 @@ const spawnUnder =
         new RunnerError({
           verb: 'spawn',
           message: `claude --bg: ${cause instanceof Error ? cause.message : String(cause)}`,
-          refused: true,
+          ...(refusedOsError(cause) ? { refused: true } : {}),
         }),
     }).pipe(
       Effect.flatMap((mcpArgs) => sh('claude', claudeArgv(r, mcpArgs), { cwd: r.cwd, verb: 'spawn' })),
@@ -782,11 +783,15 @@ const sayThrough =
 /** A session's short id, as `claude stop` and `claude rm` take it: the uuid's first block. */
 const short = (sessionId: string) => sessionId.split('-')[0];
 
+/** Whether `err`, what `execFile` failed with, is the OS refusing to create the process for a reason that stays. */
+const refusedSpawn = (err: NodeJS.ErrnoException) => err.syscall?.startsWith('spawn') === true && refusedOsError(err);
+
 /**
  * `cmd` run with `args`, answering its stdout, or a `RunnerError` for `verb` with its stderr. Refused (`refused`) only
- * when the OS never created the process — no binary, no cwd — so nothing ran and nothing started: any other failure ran
- * the command, and whether it registered a session first is not something its exit code says. Interrupted, it kills
- * the child.
+ * when the OS never created the process for a reason that stays — no binary, no cwd (`refusedOsError`) — so nothing ran,
+ * nothing started and nothing will by waiting: one it could not create for a short-lived reason is left to the grace window,
+ * and any other failure ran the command, and whether it registered a session first is not something its exit code says.
+ * Interrupted, it kills the child.
  */
 const sh = (cmd: string, args: string[], o: { cwd?: string; verb: string }) =>
   Effect.callback<string, RunnerError>((resume) => {
@@ -798,7 +803,7 @@ const sh = (cmd: string, args: string[], o: { cwd?: string; verb: string }) =>
               new RunnerError({
                 verb: o.verb,
                 message: `${cmd} ${args[0]}: ${stderr || err.message}`.trim(),
-                ...((err as NodeJS.ErrnoException).syscall?.startsWith('spawn') ? { refused: true } : {}),
+                ...(refusedSpawn(err) ? { refused: true } : {}),
               }),
             )
           : Effect.succeed(stdout),

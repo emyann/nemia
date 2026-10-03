@@ -15,6 +15,7 @@ import { parentFileOf, type ParentCall } from '../src/harness/claude/parent.ts';
 import type { Statement } from '../src/harness/claude/bg.ts';
 import type { SpawnRequest } from '../src/harness/seam.ts';
 import { stepClock } from './clock.ts';
+import { refusedOsError, TRANSIENT_ERRNOS } from '../src/harness/error.ts';
 
 const tmp = (label: string) => scratch(`ae-claude-code-${label}-`);
 
@@ -962,6 +963,14 @@ test('REFUSED: a background spawn whose record of its parent cannot be written s
   } finally {
     f.restore();
   }
+});
+
+test('a spawn the OS could not make for a short-lived reason is no refusal: EAGAIN, EMFILE, ENFILE, ENOMEM are left to the grace window, while ENOENT, EACCES and ENOTDIR refuse', () => {
+  const failed = (code: string) => Object.assign(new Error(`spawn claude ${code}`), { code, syscall: 'spawn claude', errno: -1 });
+  assert.deepEqual([...TRANSIENT_ERRNOS], ['EAGAIN', 'EMFILE', 'ENFILE', 'ENOMEM'], 'the shipped set');
+  for (const code of TRANSIENT_ERRNOS) assert.equal(refusedOsError(failed(code)), false, code);
+  for (const code of ['ENOENT', 'EACCES', 'ENOTDIR']) assert.equal(refusedOsError(failed(code)), true, code);
+  assert.equal(refusedOsError(new Error('no code at all')), true, 'an error with no code is no short-lived one');
 });
 
 /**

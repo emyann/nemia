@@ -2,7 +2,8 @@
  * The orchestrator's commands, each defined once (`COMMANDS`): its spec (`command.ts`), the one package verb its handler calls, the data
  * it answers, and the lines the CLI prints of that data. The CLI parses, refuses, helps and prints from an entry, and the api serves the
  * same entry on its route; an entry served on one side alone says so (`only`). Today: a person's asks of a run — `wf retry`, `wf approve`,
- * `wf round`, `wf accept` and `wf say` — and two reads the api alone serves: a run's decision (`decideRun`) and the run slots (`slotsOf`).
+ * `wf round`, `wf accept` and `wf say` — the runs and their steps (`wf ls`, `runsListed`), and two reads the api alone serves: a run's
+ * decision (`decideRun`) and the run slots (`slotsOf`).
  */
 import type { Engine } from '../runtime-client.ts';
 import { approvalWordsRefusal } from '../gate/gate.ts';
@@ -18,6 +19,8 @@ import { say } from '../say/say.verb.ts';
 import { budgetRefusal, budgetWord } from '../status/status.ts';
 import { decide, type Decided } from '../decide/decide.verb.ts';
 import { slotsOf, type Slots } from '../cap/cap.verb.ts';
+import { runsListed } from '../list/list.verb.ts';
+import { lsLines, type RunsListed } from '../list/list.ts';
 import { commandLine, type Args, type CommandSpec } from './command.ts';
 
 /**
@@ -322,6 +325,30 @@ const SAY: Command<{ at: string; attempt: number; text: string; try: number; tas
   },
 };
 
+/**
+ * `wf ls`: every run, or the one named, and its steps, as the package reads each (`runsListed`). The api serves the runs on this route off
+ * the same reading of each (`runReading`), as the board's summaries.
+ */
+const LS: Command<RunsListed> = {
+  name: 'ls',
+  usage: '[<runId>]',
+  help: [
+    'runs and their steps — a run waiting on another says waiting on <run>,',
+    'one the cap on runs in flight holds waiting for a run slot (2 of 2 in',
+    "flight); what each step's tries and the run have cost, where measured;",
+    'last, whether a wf up ticks the store and when its last pass was',
+  ],
+  spec: {
+    positionals: [{ key: 'runId', takes: 'optional', kind: 'name' }],
+    flags: [],
+    unknown: (arg) => `wf ls takes one run's id, or none: not ${arg}.`,
+  },
+  writes: false,
+  route: { method: 'GET', path: '/api/runs', status: 200 },
+  handler: (e, args) => runsListed(e, textOf(args, 'runId')),
+  print: (listed) => lsLines(listed, Date.now()),
+};
+
 const DECIDE: Command<Decided> = {
   name: 'decide',
   usage: '<runId>',
@@ -357,4 +384,4 @@ const CEILINGS: Command<Slots> = {
 };
 
 /** Every command defined once, in the order `wf`'s help lists them. */
-export const COMMANDS: readonly Command[] = [RETRY, APPROVE, ROUND, ACCEPT, SAY, DECIDE, CEILINGS];
+export const COMMANDS: readonly Command[] = [RETRY, APPROVE, ROUND, ACCEPT, SAY, LS, DECIDE, CEILINGS];

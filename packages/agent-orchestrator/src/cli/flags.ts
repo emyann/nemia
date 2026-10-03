@@ -71,10 +71,6 @@ export const HELP = `wf — run a workflow of agent steps
                                once a minute, a line of what its passes cost (tick-stats.json)
   wf up --stats                what the last pass cost, phase by phase — read, not run, so it fits
                                while a wf up holds the store; where none does, wf tick --stats
-  wf ls [runId]                runs and their steps — a run waiting on another says waiting on <run>,
-                               one the cap on runs in flight holds waiting for a run slot (2 of 2 in
-                               flight); what each step's tries and the run have cost, where measured;
-                               last, whether a wf up ticks the store and when its last pass was
   wf stats [--from <day>] [--to <day>] [--by agent|step|factory|workflow|repo] [--agent|--step|--factory|--workflow|--repo <v>] [--line|--json]
                                what every run in the store adds up to, by UTC day: rounds to
                                acceptance of each loop: step, landings of the workspace: main step

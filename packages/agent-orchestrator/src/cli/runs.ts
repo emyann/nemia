@@ -1,5 +1,5 @@
 /**
- * The verbs over runs and agents — `wf ls`, `wf cancel`, `wf rm`, `wf prune`, `wf hold`, `wf show`, `wf logs` and `wf agents` — their
+ * The verbs over runs and agents — `wf cancel`, `wf rm`, `wf prune`, `wf hold`, `wf show`, `wf logs` and `wf agents` — their
  * flags, read off the command line, and what each prints.
  */
 import fs from 'node:fs';
@@ -9,45 +9,32 @@ import {
   agentsFor,
   agentSkillsFound,
   agentVersion,
-  branchReader,
   cancel,
   cardSkills,
   clearCustomInstructions,
   customInstructionsFile,
-  daemonLine,
-  daemonStanding,
   findAgent,
   forget,
   forgetLine,
   BY_CAP,
   HOME,
   hold,
-  holdAdvice,
   holdWord,
-  list,
   listAgents,
   Missing,
-  onYouWords,
   prune,
   pruneLines,
   pruningBytes,
   readCustomInstructions,
   runStore,
-  resultBranches,
-  runSlots,
   sizeOf,
-  toDecideWords,
   unhold,
-  unjudgedOf,
-  viewedOnce,
-  waitAdvice,
   oneLine,
   WHY_CAP,
   writeCustomInstructions,
   type AgentPlace,
   type ForgetHow,
   type Pruning,
-  type Unjudged,
 } from '../runner.ts';
 import { agentCard } from '../workflow.ts';
 import { HELP, usage, readFlags, confirmed, type Engine } from './flags.ts';
@@ -177,78 +164,6 @@ export function agentsHow(argv: string[]): { repo?: string; from?: AgentPlace } 
   if (from !== undefined && from !== 'repo' && from !== 'yours')
     usage(`wf agents --from takes repo or yours, not ${from}: repo is <repo>/workflows/agents, yours is your store's.`);
   return { repo: values['--repo']?.[0], ...(from === 'repo' || from === 'yours' ? { from } : {}) };
-}
-
-/** A run's record, as `wf ls` reads it. */
-type Run = ReturnType<typeof runStore.runs.read>;
-
-/** A run as `wf ls` lists it: judged, or, where a task journal of it does not read, its steps and why (`unjudgedOf`). */
-type Listed = Awaited<ReturnType<typeof list>> | Unjudged;
-
-/** What `wf ls` says a run asks beneath its steps: its ending's gate once, what waits on a person, a hold, and its result. */
-function printAsks(run: Run, { steps, waitingOnYou, waiting, holding, toDecide }: Exclude<Listed, Unjudged>): void {
-  if (toDecide) console.log(`   → to decide: ${toDecideWords(run, toDecide)}`);
-  const onYou = onYouWords({ steps, waitingOnYou }).filter(
-    (said) => !(toDecide?.kind === 'approve' && said === `approve ${toDecide.step}`),
-  );
-  if (onYou.length) console.log(`   → waiting on you: ${onYou.join(', ')}  —  wf decide ${run.id}`);
-  if (waiting.some((w) => w.missing || w.cancelledAt || w.gone?.length)) console.log(`   → waiting on you: ${waitAdvice(run, waiting)}`);
-  if (holding) {
-    const never = !holding.length || holding.some((w) => w.missing || w.cancelledAt || w.gone?.length);
-    const lifting = holding.length > 0 && holding.every((w) => w.shipped);
-    console.log(
-      `   → ${holdWord(holding, run.hold)}${never ? `: ${holdAdvice(run, holding)}` : lifting ? '' : `  —  wf hold ${run.id} --off lifts it`}`,
-    );
-  }
-  const result = resultBranches(run);
-  if (result.length) console.log(`   → result: ${result.join(', ')}  —  wf decide ${run.id}`);
-}
-
-/** A run's lines on `wf ls`: its brief and what it cost, a step a line, and what it asks; unjudged, its steps and why. */
-function printListed(run: Run, listed: Listed): void {
-  const calledOff = `${run.cancelledAt ? '  (cancelled)' : ''}${run.pruned ? '  (pruned)' : ''}`;
-  if ('said' in listed) {
-    console.log(`${run.id}  ${run.brief.split('\n')[0].slice(0, 56)}${calledOff}`);
-    const width = Math.max(20, ...listed.steps.map((s) => s.status.length));
-    for (const s of listed.steps) console.log(`   ${s.name.padEnd(14)} ${s.status.padEnd(width)} ${s.branch ?? ''}`);
-    console.log(`   → unreadable: ${listed.said}`);
-    return;
-  }
-  const { steps, cost } = listed;
-  console.log(`${run.id}  ${run.brief.split('\n')[0].slice(0, 56)}${calledOff}${cost ? `  ${cost}` : ''}`);
-  const said = steps.map((s) => `${s.status}${s.cost ? `  ${s.cost}` : ''}`);
-  const width = Math.max(20, ...said.map((w) => w.length));
-  for (const [i, s] of steps.entries()) {
-    console.log(`   ${s.name.padEnd(14)} ${said[i].padEnd(width)} ${s.branch ?? ''}${s.note ? `  · ${s.note}` : ''}`);
-  }
-  printAsks(run, listed);
-}
-
-/**
- * `wf ls`: every run, or the one named, and last whether a wf up ticks the store. The cap on runs in flight is judged over the whole store
- * even for one run; a listing views each task once and asks git of each repository's branches once (`viewedOnce`, `branchReader`). A run
- * a task journal of which does not read is listed with its steps and `→ unreadable:` in the runtime's words (`unjudgedOf`).
- */
-export async function lsVerb(rest: string[], e: Engine): Promise<void> {
-  const runs = rest[0] ? [runStore.runs.read(rest[0])] : runStore.runs.list();
-  const ticking = () => console.log(daemonLine(daemonStanding(), Date.now()));
-  if (!runs.length) {
-    console.log('no runs');
-    return ticking();
-  }
-  const viewed = viewedOnce(e);
-  const git = branchReader();
-  git.prime(runs);
-  const held = await runSlots(viewed, rest[0] ? runStore.runs.list() : runs);
-  for (const run of runs) {
-    const listed = await list(viewed, run, held.get(run.id), git).catch(async (err: unknown) => {
-      const unjudged = await unjudgedOf(viewed, run, err, 'wf ls');
-      if (!unjudged) throw err;
-      return unjudged;
-    });
-    printListed(run, listed);
-  }
-  return ticking();
 }
 
 /** `wf cancel`: what it has in flight asked to stop, and nothing more filed; a line in every case, a run already over included. */

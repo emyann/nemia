@@ -112,7 +112,7 @@ function aFinishedRun(id: string, brief = 'Decide it') {
   signedOff(`${id}-implement`);
   writeRun(id, brief);
 }
-function writeRun(id: string, brief: string) {
+function writeRun(id: string, brief: string, check?: string) {
   write(
     path.join(root, 'runs', `${id}.json`),
     JSON.stringify(
@@ -126,13 +126,34 @@ function writeRun(id: string, brief: string) {
         brief,
         createdAt: at,
         workflowDir: path.join(root, 'no-such-workflow'),
-        workflow: PLAIN,
-        steps: { implement: { taskId: `${id}-implement`, branch: `wf/${id}/implement` } },
+        workflow: check ? [{ ...PLAIN[0], check }] : PLAIN,
+        steps: {
+          implement: {
+            taskId: `${id}-implement`,
+            branch: `wf/${id}/implement`,
+            ...(check ? { check: { taskId: `${id}-implement-check` } } : {}),
+          },
+        },
       },
       null,
       2,
     ),
   );
+}
+
+/** A run of one step that signed off and whose check, `npm test`, exited 1: refused, at rest until a person retries it. */
+function aRefusedRun(id: string) {
+  aFinishedRun(id);
+  write(
+    journal(`${id}-implement-check`),
+    jsonl([
+      { ...started()[0], brief: 'npm test', harness: 'check' },
+      ...started().slice(1),
+      { kind: 'ended', at, attempt: 1, sessionId: `ae/${id}-implement-check/1`, observed: 'failed', reason: 'harness', exitCode: 1 },
+      { kind: 'settled', at, outcome: 'failed' },
+    ]),
+  );
+  writeRun(id, 'Refuse it', 'npm test');
 }
 
 const list = async () => {
@@ -383,6 +404,34 @@ test('a gated run read by the list at every event from being filed to being appr
   assert.deepEqual(approved.waitingOnYou, []);
   assert.deepEqual([approved.status, approved.stoppedOn], ['running', null]);
   assert.deepEqual(await unverified(() => listed(id)), approved, 'and the memo answers it as the fresh read did');
+});
+
+test("a poll's reads: a run at rest, a moving one and one whose check refused it cost the journals of the moving one alone, and judged afresh their own journals and no more", async () => {
+  await list();
+  const cost = async () => {
+    const reads = e.io().reads;
+    await unverified(list);
+    return e.io().reads - reads;
+  };
+  const before = await cost();
+  aFinishedRun('r-count-rest');
+  running('r-count-moving-implement');
+  branchOff('wf/r-count-moving/implement');
+  writeRun('r-count-moving', 'Still counting');
+  aRefusedRun('r-count-refused');
+  const fresh = await cost();
+  assert.equal(fresh - before, 4, "judged afresh: each new run's journals once, the refused check's included, and no output of it");
+  assert.equal((await cost()) - before, 1, "then from memory: the moving run's one journal");
+  assert.ok(resting.runs.has('r-count-refused'), 'a refused run is at rest');
+});
+
+test("a refused check's verdict on a poll is its exit, off the journal: neither its output nor its logs are read", async (t) => {
+  aRefusedRun('r-verdict');
+  const output = t.mock.method(e, 'output');
+  const logs = t.mock.method(e, 'logs');
+  const run = await unverified(() => listed('r-verdict'));
+  assert.equal(run?.steps.find((s) => s.name === 'implement')?.status, 'failed ✗ check (exit 1)');
+  assert.deepEqual([output.mock.callCount(), logs.mock.callCount()], [0, 0]);
 });
 
 test('REFUSED at shipped defaults: a WF_VERIFY_REST that is neither 1 nor 0 is refused by name, exit 2, and fails the list, never read as off', async (t) => {

@@ -15,17 +15,21 @@
  * was read at, or its `preload:` alone switched. Every write is to your library; the api writes nothing into a checkout, so a skill of the
  * repository's is read there, and a page says the `cp -r` that moves a skill between the two.
  */
-import fs from 'node:fs';
 import path from 'node:path';
 import { Schema } from 'effect';
 import { Hono } from 'hono';
 import {
   agentSkillsFound,
   copySkill,
+  givenSkills as givenRead,
   listAgents,
   loadAgents,
   SkillWriteError,
+  skillDirIn,
+  skillFolders,
+  skillRead,
   skillsFor,
+  skillText,
   skillVersion,
   writeSkill,
   type AgentPlace,
@@ -37,9 +41,7 @@ import {
   AGENTS_FOLDER,
   SKILLS_FOLDER,
   skillDraftOf,
-  skillEntryOf,
   skillNameRefusal,
-  skillTurnCost,
   splitFrontmatter,
   WorkflowError,
   type AgentSkill,
@@ -107,31 +109,10 @@ export function sourceOf(dir: string, repo: string, home: string): SkillSource |
   return null;
 }
 
-/**
- * One skill read now: its entry or why it has none, and its cost. A folder or SKILL.md that is a link is refused unread: what it points at
- * is outside the folder, and the copy refuses one too.
- */
+/** One skill read now, as the picker lists it: the package's reading of its folder (`skillRead`), where it is, and who gives it. */
 export function skillRow(name: string, dir: string, from: SkillSource, usedBy: string[] = [], found: SkillRow['found'] = null): SkillRow {
-  const file = path.join(dir, 'SKILL.md');
-  const row: SkillRow = { name, from, dir, entry: null, error: null, preload: false, cost: null, usedBy, found };
-  const linked = [dir, file].find((at) => fs.lstatSync(at, { throwIfNoEntry: false })?.isSymbolicLink());
-  if (linked)
-    return {
-      ...row,
-      error: `${path.relative(path.dirname(dir), linked)} is a link, and what it points at is outside the folder of skills: make it a folder of its own.`,
-    };
-  let text: string;
-  try {
-    text = fs.readFileSync(file, 'utf8');
-  } catch (err) {
-    return { ...row, error: `${file} cannot be read (${err instanceof Error ? err.message : String(err)}).` };
-  }
-  const cost = skillTurnCost(name, text);
-  try {
-    return { ...row, entry: skillEntryOf(file, name, text), preload: cost.preload, cost };
-  } catch (err) {
-    return { ...row, error: err instanceof Error ? err.message : String(err), preload: cost.preload, cost };
-  }
+  const { entry, error, preload, cost } = skillRead(name, dir);
+  return { name, from, dir, entry, error, preload, cost, usedBy, found };
 }
 
 /** The agents of yours, by name, each with the skills its `skills:` gives: the ones that read. */
@@ -139,17 +120,6 @@ function yourAgentsSkills(home: string): Array<[string, string[]]> {
   return [...loadAgents(path.join(home, 'workflows', AGENTS_FOLDER))].flatMap(([name, agent]) =>
     agent instanceof Error ? [] : [[name, agent.skills ?? []] as [string, string[]]],
   );
-}
-
-/** The skill folders of `dir` by name, each a folder holding a SKILL.md, as `skillsFor` reads one. */
-function skillFolders(dir: string): string[] {
-  let names: string[];
-  try {
-    names = fs.readdirSync(dir).sort();
-  } catch {
-    return [];
-  }
-  return names.filter((name) => fs.statSync(path.join(dir, name, 'SKILL.md'), { throwIfNoEntry: false })?.isFile());
 }
 
 /**
@@ -200,22 +170,14 @@ export type GivenSkill = {
  * place has is a row with the refusal the card says; one found in a place the board does not list reads `from: null`.
  */
 export function givenSkills(skills: readonly string[], found: ReturnType<typeof skillsFor>, repo: string, home: string): GivenSkill[] {
-  return skills.map((name) => {
-    const at = found.at.get(name);
-    if (at instanceof WorkflowError) return { name, from: null, entry: null, error: at.message, preload: false, cost: null };
-    if (at === undefined)
-      return {
-        name,
-        from: null,
-        entry: null,
-        error: `No skills folder has \`${name}\` — looked in ${found.looked.join(', ')}.`,
-        preload: false,
-        cost: null,
-      };
-    const from = sourceOf(at, repo, home);
-    const { entry, error, preload, cost } = skillRow(name, at, from ?? 'repo');
-    return { name, from, entry, error, preload, cost };
-  });
+  return givenRead(skills, found).map(({ name, dir, entry, error, preload, cost }) => ({
+    name,
+    from: dir === null ? null : sourceOf(dir, repo, home),
+    entry,
+    error,
+    preload,
+    cost,
+  }));
 }
 
 const COPY_SHAPE = '`{ "copy": "<the name of a skill Nemia ships>" }`';
@@ -347,10 +309,7 @@ export function skillDirOf(from: SkillSource, name: string, repo: string, home: 
       : from === 'shipped'
         ? [shipped]
         : [path.join(path.resolve(repo), '.claude', SKILLS_FOLDER), path.join(path.resolve(repo), 'workflows', SKILLS_FOLDER)];
-  const dir = places
-    .map((place) => path.join(place, name))
-    .find((at) => fs.lstatSync(path.join(at, 'SKILL.md'), { throwIfNoEntry: false }));
-  return dir ?? null;
+  return skillDirIn(places, name);
 }
 
 /** The agents of both places that give the skill whose folder is `dir`, each as its own start finds the skill it names. */
@@ -395,10 +354,7 @@ export function skillDetail(
     users.filter((user) => user.from === 'yours').map((user) => user.name),
   );
   const file = path.join(dir, 'SKILL.md');
-  let text = '';
-  try {
-    text = fs.readFileSync(file, 'utf8');
-  } catch {}
+  const text = skillText(dir);
   let draft: SkillDraft | null = null;
   try {
     draft = skillDraftOf(file, name, text);

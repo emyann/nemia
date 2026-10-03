@@ -271,7 +271,16 @@ export {
 } from './branches/branches.store.ts';
 export { evictedBy } from './rest/rest.ts';
 export { AgentWriteError, removeAgent, writeAgent } from './agents/agents.store.ts';
-export { copySkill, SkillWriteError, writeSkill } from './skills/skills.store.ts';
+export {
+  copySkill,
+  givenSkills,
+  skillDirIn,
+  skillFolders,
+  skillRead,
+  skillText,
+  SkillWriteError,
+  writeSkill,
+} from './skills/skills.store.ts';
 export { readPlaceJson, runPlaceVerb } from './place/place.store.ts';
 export type {
   BranchStood,
@@ -299,7 +308,7 @@ export { foldersIn } from './folder/lookup.store.ts';
 export type { AgentSchema, AgentSidecar, AgentWritten } from './agents/agents.store.ts';
 export { agentPlaces, agentRead, agentSkillsFound, findAgent, listAgents, type Readings } from './roster/roster.store.ts';
 export type { AgentPlace, AgentReading, AgentsRead, AgentUser, CardRead } from './roster/roster.ts';
-export type { SkillChange, SkillCopied, SkillWritten } from './skills/skills.store.ts';
+export type { GivenRead, SkillChange, SkillCopied, SkillRead, SkillWritten } from './skills/skills.store.ts';
 export type { WorkflowWritten } from './folder/write.store.ts';
 export { addToInbox, dropFromInbox, inboxNameAt, queueInInbox, readInbox } from './inbox/inbox.store.ts';
 export type { InboxDropped, InboxQueued } from './inbox/inbox.store.ts';

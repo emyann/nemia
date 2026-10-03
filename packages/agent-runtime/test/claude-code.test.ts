@@ -8,6 +8,8 @@ import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import fs from 'node:fs';
+import childProcess from 'node:child_process';
+import { syncBuiltinESMExports } from 'node:module';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
 import { ioCounts } from '../src/core/engine/tally.ts';
@@ -971,6 +973,69 @@ test('a spawn the OS could not make for a short-lived reason is no refusal: EAGA
   for (const code of TRANSIENT_ERRNOS) assert.equal(refusedOsError(failed(code)), false, code);
   for (const code of ['ENOENT', 'EACCES', 'ENOTDIR']) assert.equal(refusedOsError(failed(code)), true, code);
   assert.equal(refusedOsError(new Error('no code at all')), true, 'an error with no code is no short-lived one');
+});
+
+/** An error as Node gives one for the OS errno `code`, met in `syscall` on `target`. */
+const osError = (code: string, syscall: string, target: string) =>
+  Object.assign(new Error(`${syscall} ${target} ${code}`), { code, syscall, path: target, errno: -1 });
+
+/** What a background spawn of `ae/r/2` fails with, through the runner over a store at `root`, or `undefined` when it starts. */
+const bgSpawnError = async (root: string, cwd: string) =>
+  Effect.runPromise(
+    bgOps(root)
+      .spawn({ name: 'ae/r/2', brief: 'go', cwd, resumeFrom: PARENT_ID, config: { background: true } })
+      .pipe(
+        Effect.as(undefined),
+        Effect.catchTag('RunnerError', (e) => Effect.succeed(e)),
+      ),
+  );
+
+test('a background launch the OS could not make for a short-lived reason is left to the grace window, through the runner: EAGAIN is no refusal, ENOENT is', async (t) => {
+  const f = fake();
+  const real = childProcess.execFile;
+  let code = 'EAGAIN';
+  t.mock.method(
+    childProcess,
+    'execFile',
+    (cmd: string, args: string[], o: object, done: (err: Error | null, out: string, err2: string) => void) => {
+      if (args[0] !== '--bg') return (real as (...a: unknown[]) => unknown)(cmd, args, o, done);
+      queueMicrotask(() => done(osError(code, `spawn ${cmd}`, cmd), '', ''));
+      return { kill: () => true };
+    },
+  );
+  syncBuiltinESMExports();
+  try {
+    const transient = await bgSpawnError(tmp('root'), f.dir);
+    assert.ok(transient, 'the launch failed');
+    assert.equal(transient.refused, undefined, 'a launch the OS could not make for want of a process slot is no refusal');
+    code = 'ENOENT';
+    assert.equal((await bgSpawnError(tmp('root'), f.dir))?.refused, true, 'one with no binary is');
+  } finally {
+    t.mock.restoreAll();
+    syncBuiltinESMExports();
+    f.restore();
+  }
+});
+
+test('a write before the background launch that failed for a short-lived reason is left to the grace window, through the runner: EMFILE is no refusal, ENOTDIR is', async (t) => {
+  const f = fake();
+  const real = fs.renameSync;
+  let code = 'EMFILE';
+  t.mock.method(fs, 'renameSync', (from: fs.PathLike, to: fs.PathLike) => {
+    if (path.basename(path.dirname(String(to))) === 'parent') throw osError(code, 'rename', String(to));
+    return real(from, to);
+  });
+  try {
+    const transient = await bgSpawnError(tmp('root'), f.dir);
+    assert.ok(transient?.message.startsWith('claude --bg: '), transient?.message);
+    assert.equal(transient?.refused, undefined, 'out of descriptors for a moment is no refusal');
+    assert.equal(f.read('bg-args'), undefined, '`claude` never ran');
+    code = 'ENOTDIR';
+    assert.equal((await bgSpawnError(tmp('root'), f.dir))?.refused, true, 'a folder that is a file is');
+  } finally {
+    t.mock.restoreAll();
+    f.restore();
+  }
 });
 
 /**

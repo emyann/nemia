@@ -1639,20 +1639,23 @@ it had not been seen in. So Claude Code's own crash loop is on the record and in
 `RESPAWN_GAP_MS` (two minutes) is a respawn that is not coming (`RESPAWN_OVERDUE`): the attempt ends `lost`. The gap is
 journalled on both clocks, and its two minutes run on the monotonic clock within a boot, the wall clock across one (`elapsedMs`).
 
-**An end no stop asked for is restarted, after a back-off.** A long-lived session that ends, however it ends — done,
-failed, lost, or stopped at its harness (`claude stop`, claude.ai) — with no `stop` on the record is started again as a new
+**An end no stop asked for is restarted, after a back-off.** A long-lived session that ends — done, failed, lost, or
+stopped at its harness (`claude stop`, claude.ai) — with no `stop` on the record is started again as a new
 attempt, `ae/<task>/<n+1>`, resuming the latest session an attempt recorded and told `RESTART_WORDS` instead of the brief
 (`restartOf`; with none recorded, it starts on the brief). Its old session, if its harness still holds it, is stopped first
 (`PREVIOUS_LIVE`), and nothing starts while its harness cannot be read (`UNREAD`). The wait is a kubelet's
 (`RESTART_BACKOFF`, `backoffOf`): 10 s after one end, doubled for each end in a row, at most 300 s; an attempt that ran
 600 s counts them again. It is read off the journal's times and `now` alone (`BACKING_OFF`, then `RESTART_DUE`), so a
 restarted daemon waits the same; the wait and the 600 s run on the monotonic clock between moments journalled in one boot,
-so a stepped wall clock restarts nothing early and holds no restart that is due, and on the wall clock across a reboot. Only `ae stop` ends the task: it settles `stopped`, and nothing restarts it.
-A spawn its harness refused is no end of a session but its absence, which waiting would not change: the task settles
-`failed` in the refusal's words and the fix (*A spawn that fails*), on its first attempt as on a restart's.
+so a stepped wall clock restarts nothing early and holds no restart that is due, and on the wall clock across a reboot.
+
+**Two things end the task.** `ae stop`: it settles `stopped`, and nothing restarts it. And a spawn its harness refused,
+which is no end of a session but its absence, and which waiting would not change: the attempt ends `unstartable` and the
+task settles `failed` in the refusal's words and the fix (*A spawn that fails*), on its first attempt as on a restart's.
+A launch the OS could not make for a short-lived reason is no refusal: its attempt ends `lost` and is restarted.
 
 **Refused, with exit code 2**, nothing journalled: a `restartPolicy` other than `'Always'`; beside it, `holdOpen` (a turn's
-end is idle here, not a wait), `deadlineSeconds` (only a stop ends it) and `closeoutSchema` (a statement would end its
+end is idle here, not a wait), `deadlineSeconds` (only a stop ends a session that runs) and `closeoutSchema` (a statement would end its
 attempt); and, at the engine's doors, a harness that ends its session with its turn — `claude` without
 `config.background: true`, Codex, `claude-detached`, a remote agent. A consumer's own runner is asked nothing.
 

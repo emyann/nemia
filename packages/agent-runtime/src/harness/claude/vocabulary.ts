@@ -180,20 +180,39 @@ export const claudeDenyArgs = (config: SpawnRequest['config']): string[] => {
 };
 
 /**
+ * What a Claude Code session may do without asking: the task's `allowedTools`, and an edit anywhere under each writable mount,
+ * `Edit(//<path>/**)`. `dontAsk` refuses a write under an added folder that no allow names, `Edit(**)` included, since it resolves
+ * against the session's cwd; the allow lets the Edit tool and a Bash redirection write there. `auto` writes there without it
+ * (measured on Claude Code 2.1.288).
+ */
+export const claudeAllows = (config: SpawnRequest['config']): string[] => [
+  ...(config?.allowedTools ?? []),
+  ...(config?.mounts ?? []).filter((m) => !m.readOnly).map((m) => `Edit(/${m.path}/**)`),
+];
+
+/** The `--allowedTools` flag and its one argument, the session's allows joined by commas (`claudeAllows`), or nothing for none. */
+export const claudeAllowArgs = (config: SpawnRequest['config']): string[] => {
+  const allows = claudeAllows(config);
+  return allows.length ? ['--allowedTools', allows.join(',')] : [];
+};
+
+/**
  * A path a permission rule cannot name: a space or a comma would split the rule, a parenthesis end it, and a glob's own
  * characters would widen it.
  */
 const UNRULED = /[\s,()*?[\]{}]/;
 
 /**
- * Why a task's read-only mount cannot be held by Claude Code — or `undefined`: its path has a character the permission rule
- * that denies an edit there cannot carry (`UNRULED`), so the folder could not be denied.
+ * Why a task's mount cannot be held by Claude Code — or `undefined`: its path has a character the permission rule that denies an
+ * edit there (`claudeDenies`), or allows one (`claudeAllows`), cannot carry (`UNRULED`).
  */
 const claudeMountRefusal = (task: Omit<SpawnRequest, 'name'>): string | undefined => {
-  const mount = task.config?.mounts?.find((m) => m.readOnly && UNRULED.test(m.path));
-  return mount
-    ? `\`mounts\` gives the session ${JSON.stringify(mount.path)} read-only, and Claude Code holds a folder read-only by a permission rule, which cannot name a path with a space, a comma, a parenthesis or a glob's character. Mount a folder whose path has none of them, or leave the mount off.`
-    : undefined;
+  const mount = task.config?.mounts?.find((m) => UNRULED.test(m.path));
+  if (!mount) return undefined;
+  const how = mount.readOnly
+    ? 'read-only, and Claude Code holds a folder read-only'
+    : 'writable, and Claude Code lets a session write a folder beside its own';
+  return `\`mounts\` gives the session ${JSON.stringify(mount.path)} ${how} by a permission rule, which cannot name a path with a space, a comma, a parenthesis or a glob's character. Mount a folder whose path has none of them, or leave the mount off.`;
 };
 
 /**
@@ -203,7 +222,7 @@ const claudeMountRefusal = (task: Omit<SpawnRequest, 'name'>): string | undefine
 export const bridgeAsked = (task: { config?: { claude?: ClaudeFlags } }): boolean => task.config?.claude?.remoteControl !== undefined;
 
 /**
- * What Claude Code cannot be asked for, Codex's own arguments and a read-only mount it cannot deny among it, as a sentence that
+ * What Claude Code cannot be asked for, Codex's own arguments and a mount whose rule it cannot write among it, as a sentence that
  * says what to write instead.
  */
 export const claudeRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefined => {

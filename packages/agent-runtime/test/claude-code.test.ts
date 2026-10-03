@@ -649,7 +649,23 @@ const spawnArgvs = async (config: SpawnRequest['config']): Promise<(readonly [st
   }
 };
 
-test('a mount is `--add-dir` and its path, ended by a flag, and a read-only one is an edit denied under it, in the one deny list — on a job, on claude-detached and on a background session', async () => {
+test('a mount is `--add-dir` and its path, ended by a flag, a read-only one an edit denied under it, in the one deny list, and a writable one an edit allowed under it, in the one allow list — on a job, on claude-detached and on a background session', async () => {
+  for (const [what, args] of await spawnArgvs({ ...MOUNTED, allowedTools: ['Edit(**)'] })) {
+    assert.equal(args.filter((a) => a === '--allowedTools').length, 1, `${what}: one allow list`);
+    assert.equal(
+      args[args.indexOf('--allowedTools') + 1],
+      'Edit(**),Edit(//srv/scratch/**)',
+      `${what}: the writable mount is allowed, and the read-only one is not`,
+    );
+  }
+  const allowed = (await spawnArgvs({ mounts: [{ path: '/srv/scratch', readOnly: false }] })).map(
+    ([, args]) => args[args.indexOf('--allowedTools') + 1],
+  );
+  assert.deepEqual(
+    allowed,
+    ['Edit(//srv/scratch/**)', 'Edit(//srv/scratch/**)', 'Edit(//srv/scratch/**)'],
+    'a writable mount alone is an allow list of its own: `dontAsk` refuses a write under an added folder that no allow names',
+  );
   for (const [what, args] of await spawnArgvs(MOUNTED)) {
     const at = args.indexOf('--add-dir');
     assert.deepEqual(args.slice(at, at + 3), ['--add-dir', '/srv/notes', '/srv/scratch'], what);
@@ -685,7 +701,7 @@ test('a task with no mounts is given the argv it was given before mounts existed
   assert.deepEqual(argvs, PINNED_ARGV);
 });
 
-test('REFUSED at shipped defaults: a read-only mount whose path a permission rule cannot name, on a job, on a background session and on claude-detached', async () => {
+test('REFUSED at shipped defaults: a mount whose path a permission rule cannot name, read-only or writable, on a job, on a background session and on claude-detached', async () => {
   const { Engine, promiseEngine } = await import('../src/index.ts');
   const e = promiseEngine(Engine.layer({ root: tmp('root') }));
   for (const at of ['/srv/my notes', '/srv/a,b', '/srv/(x)', '/srv/*']) {
@@ -706,11 +722,13 @@ test('REFUSED at shipped defaults: a read-only mount whose path a permission rul
       );
     }
   }
-  assert.equal(
-    claudeRefuses({ brief: 'b', cwd: '/r', config: { mounts: [{ path: '/srv/my notes', readOnly: false }] } }),
-    undefined,
-    'a writable mount names no rule',
-  );
+  for (const at of ['/srv/my notes', '/srv/a,b', '/srv/(x)', '/srv/*']) {
+    assert.equal(
+      claudeRefuses({ brief: 'b', cwd: '/r', config: { mounts: [{ path: at, readOnly: false }] } }),
+      `\`mounts\` gives the session ${JSON.stringify(at)} writable, and Claude Code lets a session write a folder beside its own by a permission rule, which cannot name a path with a space, a comma, a parenthesis or a glob's character. Mount a folder whose path has none of them, or leave the mount off.`,
+      at,
+    );
+  }
 });
 
 test("a job reads its checkout's shared settings and neither the operator's nor a `settings.local.json` — `--setting-sources project` once, on both `claude -p` specs; a background session is not given it", async () => {

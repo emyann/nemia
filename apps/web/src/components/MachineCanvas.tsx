@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Background, BackgroundVariant, MarkerType, ReactFlow } from '@xyflow/react';
 import type { MachineGraph } from '../lib/api';
 import { drawMachine, type Drawing } from '../lib/machine';
+import type { useCanvasPress } from '../lib/useCanvasPress';
 import { MachineEdge, type MachineFlowEdge } from './MachineEdge';
 import { MachineNode, type MachineFlowNode } from './MachineNode';
 
@@ -12,14 +13,21 @@ const edgeTypes = { route: MachineEdge };
 /** No route taken: one array for the module's life. */
 const NONE: readonly string[] = [];
 
-/** The drawing's states and routes as React Flow's nodes and edges, `lit` and `taken` marked on them. */
-function flowOf(drawing: Drawing, lit: string | undefined, taken: readonly string[]) {
+/** What a press on a machine's states does, as `useCanvasPress` gives it: React Flow's handlers. */
+export type MachinePress = Omit<ReturnType<typeof useCanvasPress>, 'shown'>;
+
+/**
+ * The drawing's states and routes as React Flow's nodes and edges, `lit`, `inspected` and `taken` marked on them; each state given back
+ * its pointer events, a name and no outline of the browser's when it can be `pressed`.
+ */
+export function flowOf(drawing: Drawing, lit: string | undefined, taken: readonly string[], pressed: boolean, inspected: string | null) {
   const nodes: MachineFlowNode[] = drawing.states.map((box) => ({
     id: box.id,
     type: 'state',
     position: { x: box.x, y: box.y },
-    data: { ...box, lit: box.id === lit },
-    style: { width: box.width, height: box.height },
+    data: { ...box, lit: box.id === lit, pressable: pressed, inspected: box.id === inspected },
+    style: { width: box.width, height: box.height, ...(pressed && { pointerEvents: 'all' as const }) },
+    ...(pressed && { ariaLabel: `State ${box.id}`, className: 'outline-none' }),
     draggable: false,
     selectable: false,
   }));
@@ -56,6 +64,9 @@ function flowOf(drawing: Drawing, lit: string | undefined, taken: readonly strin
  * `id` or else the machine's, which scopes its arrowheads' ids on a page that draws several.
  *
  * `lit` names the state a task's path stands in, and `taken` the routes it took there (`from->to`): drawn over the graph, lit in amber.
+ *
+ * Given `press`, a click, a tap or Enter on a state does what it says (`useCanvasPress`), and `inspected` names the state the frame's bar
+ * shows, ringed; with none, as in the Debug panel, nothing on it takes a press or the focus.
  */
 export function MachineCanvas({
   machine,
@@ -63,16 +74,21 @@ export function MachineCanvas({
   lit,
   taken = NONE,
   maxHeight = Infinity,
+  press,
+  inspected = null,
 }: {
   machine: MachineGraph;
   id?: string;
   lit?: string;
   taken?: readonly string[];
   maxHeight?: number;
+  press?: MachinePress;
+  inspected?: string | null;
 }) {
   const [frameWidth, setFrameWidth] = useState(0);
   const drawing = useMemo(() => drawMachine(machine), [machine]);
-  const drawn = useMemo(() => flowOf(drawing, lit, taken), [drawing, lit, taken]);
+  const pressed = press !== undefined;
+  const drawn = useMemo(() => flowOf(drawing, lit, taken, pressed, inspected), [drawing, lit, taken, pressed, inspected]);
   const zoom = frameWidth ? Math.min(1, frameWidth / drawn.width, maxHeight / drawn.height) : 1;
 
   return (
@@ -95,13 +111,14 @@ export function MachineCanvas({
           edges={drawn.edges}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
+          {...press}
           viewport={{ x: Math.max(0, (frameWidth - drawn.width * zoom) / 2), y: 0, zoom }}
           minZoom={0.1}
           nodesDraggable={false}
           nodesConnectable={false}
           elementsSelectable={false}
           edgesFocusable={false}
-          nodesFocusable={false}
+          nodesFocusable={pressed}
           panOnDrag={false}
           panOnScroll={false}
           zoomOnScroll={false}

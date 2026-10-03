@@ -8,6 +8,7 @@ import { FactoryBar } from './FactoryBar';
 import { StartBar } from './FactoryStart';
 import { RunBar } from './RunBar';
 import { SpecBar } from './SpecBar';
+import { StateBar } from './StateBar';
 import { StepBar } from './StepBar';
 
 /**
@@ -28,5 +29,7 @@ export function OpenBar() {
       return <RunBar key={barValue(open)} run={open.run} />;
     case 'spec':
       return <SpecBar key={barValue(open)} from={open.from} workflow={open.workflow} step={open.step} />;
+    case 'state':
+      return <StateBar key={barValue(open)} machine={open.machine} state={open.state} />;
   }
 }

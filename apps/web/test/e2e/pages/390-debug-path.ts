@@ -16,7 +16,8 @@ export default {
    * A settled step's Debug panel: closed as the page opens, with nothing of the lifecycle drawn; opened, its task's path, each state its
    * journal says with the entry that put it there, drawn over the lifecycle's graph — the state it stands in lit and the routes it took
    * to get there drawn over the graph's. A person scrubs back, by an entry of the timeline or the slider's keys, and the lit state and
-   * the routes taken move back with them. Reads the store as seeded and writes nothing.
+   * the routes taken move back with them. Its lifecycle is a drawing: a click on a state inspects nothing. Reads the store as seeded and
+   * writes nothing.
    */
   name: 'debug-path',
   route: `/runs/${FAKE.id}/steps/${SESSION.step}`,
@@ -71,5 +72,12 @@ export default {
     await expectTexts(panel.locator('[data-shown]'), [`Entry 2 of ${WORDS.length}`], 'the timeline says which entry it shows');
     await settled(page);
     await photograph(panel, path.join(OUT, `debug-path-scrubbed-${await themeOf(page)}.png`));
+
+    const before = new URL(page.url()).searchParams.get('bar');
+    await lifecycle.locator('[data-state="working"]').click({ force: true });
+    await expectCount(lifecycle.locator('[data-inspected]'), 0, "a click on a state of the panel's lifecycle inspects nothing");
+    await expectCount(page.locator('aside[data-bar^="state:"]'), 0, 'and shows no state in the bar');
+    const after = new URL(page.url()).searchParams.get('bar');
+    if (after !== before) throw new Refused(`and leaves the address's bar as it was, ${before} — it is ${after}`);
   },
 } satisfies PageSpec;

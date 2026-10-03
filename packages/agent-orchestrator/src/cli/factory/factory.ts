@@ -45,8 +45,10 @@ factory, naming the repositories its work is on, the workflows it offers and the
 
 wf start --factory <name> starts a run in a factory, of a workflow attached to it: each step its hires fill runs
 as its agent, and the start is refused while a step names no agent and is hired none, or names its own agent
-and is hired one too. Started in the default factory — no --factory — every workflow is offered, and a step that
-names no agent runs as a plain session.
+and is hired one too. Every run is started in a factory: with no --factory, in the one whose repository holds
+--repo or the directory wf start is typed in, and refused where none or two do; a card names its own, by its
+factory: line or --factory. The default factory holds the history of runs and cards that named none, and an
+agent's try; no start names it.
 
 Refused by name, and nothing written: a name that is not a slug, the name default, an add with no --repo or
 with a --repo that is not a directory, an add of a name already filed, an rm, attach, detach, hire or fire of a

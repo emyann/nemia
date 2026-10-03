@@ -382,6 +382,7 @@ const noAgentWords = (from: string, name: string, dir: string): string =>
  *   read at, so a save of an agent changed since is refused rather than written over what changed.
  * - `POST /api/agents/:from/:name/try` — an agent of yours tried on a short brief: its try's folder written, or written again when the
  *   agent's version has moved (`writeTryFolder`), and a run of it started with no repository, as any folder team's is — a tick files it.
+ *   The try is the one start made in the default factory: an agent is tried before any factory hires it, and on no factory's repository.
  *   201 with the run (`AgentTried`). Refuses the repository's agents, which a start with no repository does not find, with 403 and the
  *   command that copies one, its schema beside it, into the store this api reads (read off its file when it has one); an empty brief (422);
  *   an agent that does not read, or whose name, harness or `remote:` the loader would refuse on the try's own step (422, before anything is

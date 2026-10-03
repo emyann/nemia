@@ -261,6 +261,91 @@ test("the request's factory comes before the card's `factory:`: a card of hired 
   assert.deepEqual(runFiles(), before, 'nothing written');
 });
 
+/**
+ * The switch off, as shipped, for the test `t`, and the factory `trio` filed on a repository of its own whose workflow `delta` names its
+ * agent in its step: removed, with the switch put back, once the test ends.
+ */
+function asShipped(t: { after: (fn: () => void) => void }): string {
+  const was = process.env.WF_DEFAULT_FACTORY_STARTS;
+  delete process.env.WF_DEFAULT_FACTORY_STARTS;
+  const repoT = gitRepo('nemia-api-factory-t-');
+  write(path.join(repoT, 'workflows', 'delta', 'implement.md'), '---\nharness: claude\nagent: ada\n---\nImplement it.\n');
+  write(path.join(repoT, 'workflows', 'agents', 'ada.md'), '---\nharness: claude\n---\nYou implement what you are asked.\n');
+  addFactory({ name: 'trio', repos: [repoT] });
+  attachWorkflow({ factory: 'trio', workflow: 'delta' });
+  t.after(() => {
+    removeFactory('trio');
+    if (was === undefined) delete process.env.WF_DEFAULT_FACTORY_STARTS;
+    else process.env.WF_DEFAULT_FACTORY_STARTS = was;
+  });
+  return repoT;
+}
+
+test('as shipped, POST /api/runs with no ?factory= starts the run in the one factory whose repository holds ?repo=, on it', async (t) => {
+  const repoT = asShipped(t);
+  const res = await post(`/api/runs?repo=${encodeURIComponent(repoT)}`, { workflow: 'delta', brief: 'Add a cache' });
+  assert.equal(res.status, 201, await res.clone().text());
+  const run = runStore.runs.read(((await res.json()) as { id: string }).id);
+  assert.deepEqual([run.factory, run.repo], ['trio', repoT]);
+});
+
+test('REFUSED as shipped: POST /api/runs with no ?factory= on a repository three factories hold, or one none holds, is a 422 naming ?factory=, and nothing is written', async (t) => {
+  asShipped(t);
+  const before = runFiles();
+  const shared = await post(`/api/runs?repo=${encodeURIComponent(repoR)}`, { workflow: 'alpha', brief: 'Add a cache' });
+  assert.equal(shared.status, 422);
+  assert.match(
+    said(await shared.json()),
+    /^\S+: 3 factories work on this folder — hired on \S+, pair on \S+, solo on \S+ — .* Name the one: \?factory=hired, or \?factory=pair, or \?factory=solo\. Nothing was started\.$/,
+  );
+  const loose = await post('/api/runs', { workflow: 'beta', brief: 'Add a cache' });
+  assert.equal(loose.status, 422);
+  assert.match(
+    said(await loose.json()),
+    new RegExp(`^${own}: no factory works on this folder, .* Name the factory — \\?factory=<name>, one of `),
+  );
+  assert.deepEqual(runFiles(), before, 'nothing written');
+});
+
+test('REFUSED: POST /api/runs?factory=default, of a workflow or a card, is a 422 naming ?factory=<name>, even with WF_DEFAULT_FACTORY_STARTS=1, though one factory alone holds the repository; nothing is written and the card stays', async (t) => {
+  const repoT = asShipped(t);
+  process.env.WF_DEFAULT_FACTORY_STARTS = '1';
+  const { card } = addToInbox({ text: 'Cache the trios', factory: 'trio' });
+  const before = runFiles();
+  const url = `/api/runs?factory=default&repo=${encodeURIComponent(repoT)}`;
+  for (const body of [
+    { workflow: 'delta', brief: 'Add a cache' },
+    { workflow: 'delta', card: card.name },
+  ]) {
+    const res = await post(url, body);
+    assert.equal(res.status, 422, JSON.stringify(body));
+    assert.match(
+      said(await res.json()),
+      /^`default` is the default factory: .* Name a factory — \?factory=<name>, one of .*\. Nothing was started\.$/,
+      JSON.stringify(body),
+    );
+  }
+  assert.ok(
+    readInbox().some((c) => c.name === card.name),
+    'the card is still there',
+  );
+  assert.deepEqual(runFiles(), before, 'nothing written');
+});
+
+test('REFUSED as shipped: a card that names no factory is a 422 naming ?factory=, though one factory alone holds the repository it is started on; the card stays', async (t) => {
+  const repoT = asShipped(t);
+  const { card } = addToInbox({ text: 'Cache the trios' });
+  const before = runFiles();
+  const res = await post(`/api/runs?repo=${encodeURIComponent(repoT)}`, { workflow: 'delta', card: card.name });
+  assert.equal(res.status, 422);
+  assert.match(said(await res.json()), /: this card names no factory, .*, or name it at start: \?factory=<name>; /);
+  assert.ok(
+    readInbox().some((c) => c.name === card.name),
+    'the card is still there',
+  );
+  assert.deepEqual(runFiles(), before, 'nothing written');
+});
+
 test('GET /api/repository answers the repository a request is answered on: the api own, or the factory one', async () => {
   assert.deepEqual((await get<{ repo: string }>('/api/repository')).body, { repo: own });
   assert.deepEqual((await get<{ repo: string }>('/api/repository?factory=solo')).body, { repo: repoR });

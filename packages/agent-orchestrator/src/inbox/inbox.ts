@@ -19,8 +19,9 @@
  * `gate:` names a step of the card's workflow whose closeout waits for a person — `wf approve` — before anything after it is filed, for the
  * run the card starts and no other: a plan read before anyone implements it. Whether the workflow has that step is the start's to say.
  *
- * `factory:` names the factory that processes the card: its run is started in it, on its repository when it has one. A card that names
- * none is the default factory's. Whether the factory is there, offers the workflow and works on the repository is the start's to say.
+ * `factory:` names the factory that processes the card: its run is started in it, on its repository when it has one. A card is started
+ * only in a factory named for it, here or at start, never one inferred from its folder or its `repo:` (`unfactoredCardRefusal`). Whether
+ * the factory is there, offers the workflow and works on the repository is the start's to say.
  *
  * **The keys are a closed list**, as a plan card's are: a key nothing reads is a constraint nobody enforces.
  *
@@ -80,7 +81,7 @@ export const INBOX_KEY_MEANINGS: Readonly<Record<InboxKey, string>> = {
     'the time `wf inbox queue` marked the card to start on its own: the tick starts it when a run slot frees, oldest first; unset, a person starts it',
   gate: 'a step of its workflow whose closeout waits for a person — `wf approve` — before anything after it is filed, in the run it starts: none when unset',
   factory:
-    'the factory that processes the card: its run is started in it, on its repository when it has only one; the default factory when unset',
+    'the factory that processes the card: its run is started in it, on its repository when it has only one; required to start, unless the start names one',
 };
 
 function refuse(why: string): never {
@@ -135,10 +136,18 @@ export function parseInboxCard(file: string, text: string, isDirectory: (at: str
 /** Refuses a card's `factory:` that is not a factory's name (`factoryNameRefusal`), naming the file and the fix. */
 function refuseFactoryKey(file: string, factory: string): void {
   const refused = factoryNameRefusal(factory);
-  if (refused)
-    refuse(
-      `${file}: \`factory: ${factory}\` — ${refused} Correct it to a factory wf factory ls lists, or delete the line, and the card is the default factory's.`,
-    );
+  if (refused) refuse(`${file}: \`factory: ${factory}\` — ${refused} Correct it to a factory wf factory ls lists.`);
+}
+
+/**
+ * Why the card in `file` cannot start: neither it nor its start names a factory, and a card is started only in the factory named for it —
+ * never one inferred from a folder, which can be two factories'. Names the line to write, with the store's factories (`names`), the
+ * start's own words for naming one (`fix`, `--factory <name>` say) when it has any, and how a new card names one as it is filed.
+ */
+export function unfactoredCardRefusal(file: string, names: readonly string[], fix?: string): string {
+  const which = names.length ? `one of ${[...names].sort().join(', ')}` : 'once one is filed: wf factory add <name> --repo <root>';
+  const atStart = fix === undefined ? '' : `, or name it at start: ${fix}`;
+  return `${file}: this card names no factory, and a card is started only in the factory named for it, never one taken from its folder or its repo:, which can be two factories'. Write \`factory: <name>\` in its frontmatter — ${which}${atStart}; a new card names it as it is filed: wf inbox add "<idea>" --factory <name>. Nothing was started.`;
 }
 
 /**
@@ -390,16 +399,17 @@ export function queueLine(q: QueueStarted): string {
  * What `wf inbox` prints, a line per entry: the card's name, the first line of its body, its workflow and repository when it names them,
  * and the runs it was started as — or, for an entry that does not read as a card, why. A queued card says its place in the queue and, when
  * the tick's last try did not start it as it stands, why: refused, it waits for a person, not for a slot; failed otherwise, the tick tries
- * it again. A reason the entry's own error already says is not said twice.
+ * it again. A reason the entry's own error already says is not said twice. A card that names no factory is refused wherever a daemon runs,
+ * and its try names no repository to run one in, unless `unfactoredStarts` (`WF_DEFAULT_FACTORY_STARTS=1`, the tests' switch) starts it.
  */
-export function inboxLines(listing: readonly InboxListing[]): string[] {
+export function inboxLines(listing: readonly InboxListing[], unfactoredStarts = false): string[] {
   const width = Math.max(0, ...listing.map((l) => l.name.length));
   const inLine = listing.filter((l) => l.queued?.place).length;
   return listing.map((l) => {
     const started = l.startedAs.length ? `  started as ${l.startedAs.join(', ')}` : '';
     const queued = l.queued?.place ? `  queued ${l.queued.place} of ${inLine}` : '';
     const t = l.tried;
-    const on = t && l.error === null && !l.repo ? ` on ${t.repo}` : '';
+    const on = t && l.error === null && !l.repo && (l.factory !== null || unfactoredStarts) ? ` on ${t.repo}` : '';
     const why = t && t.why !== l.error ? `: ${t.why}` : '';
     const tried = !t
       ? ''

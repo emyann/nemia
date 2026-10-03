@@ -1101,6 +1101,47 @@ test("REFUSED at shipped defaults, on its factory's repository: a queued card of
   assert.deepEqual([(await tick(b.e, { repo: daemons })).queue, listRuns()], [undefined, []], 'passed over on the same repository');
 });
 
+test("REFUSED as shipped: a queued card that names no factory is refused from a daemon in a repository one factory alone holds, said with no start's flag and no repository to run wf up in, and not tried again; with its factory: written, it starts in it", async (t) => {
+  const was = process.env.WF_DEFAULT_FACTORY_STARTS;
+  delete process.env.WF_DEFAULT_FACTORY_STARTS;
+  t.after(() => {
+    if (was !== undefined) process.env.WF_DEFAULT_FACTORY_STARTS = was;
+  });
+  emptyStore(undefined);
+  const b = board();
+  const solo = aSoloFactory(['dev']);
+  const file = aCard('loose-card', { workflow: 'dev' }, 'Build it, somewhere.');
+  await printedBy(t, b.e, 'inbox', 'queue', 'loose-card');
+  const refused = await tick(b.e, { repo: solo });
+  assert.ok(refused.queue && 'refused' in refused.queue, JSON.stringify(refused.queue));
+  assert.equal(refused.queue.on, undefined, 'refused wherever the daemon runs');
+  assert.match(
+    refused.queue.refused,
+    /^\S+\/inbox\/loose-card\.md: this card names no factory, .* — one of solo; a new card names it as it is filed: /,
+  );
+  assert.doesNotMatch(refused.queue.refused, /--factory <name>;|at start/, 'a daemon has no flag to give');
+  assert.doesNotMatch(queueLine(refused.queue), / not started on |run wf up in the repository/);
+  assert.deepEqual([(await tick(b.e, { repo: solo })).queue, listRuns()], [undefined, []], 'the refusal lasts');
+  const [line] = await printedBy(t, b.e, 'inbox');
+  assert.match(line, /^loose-card .* — not started at \S+: \S+\/inbox\/loose-card\.md: this card names no factory, /);
+  assert.doesNotMatch(line, /run wf up in the repository/);
+
+  fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('---\nworkflow: dev', '---\nworkflow: dev\nfactory: solo'));
+  const pass = await tick(b.e, { repo: aRepoWith('dev') });
+  const [run] = fromCard('loose-card');
+  assert.deepEqual([pass.queue, run?.factory, run?.repo], [{ card: 'loose-card', run: run?.id, removed: true }, 'solo', solo]);
+
+  aCard('default-card', { workflow: 'dev', factory: 'default' }, 'Build it in the history.');
+  await printedBy(t, b.e, 'inbox', 'queue', 'default-card');
+  const history = await tick(b.e, { repo: solo });
+  assert.ok(history.queue && 'refused' in history.queue, JSON.stringify(history.queue));
+  assert.match(
+    history.queue.refused,
+    /^`default` is the default factory: .* Name a factory — `factory: <name>` in \S+\/inbox\/default-card\.md, one of solo\. /,
+  );
+  assert.deepEqual(fromCard('default-card'), []);
+});
+
 test('a record that does not read as a run stops no other run: the pass files the rest, and says once, on stderr, which record it left out and why', async (t) => {
   emptyStore(undefined);
   const b = board();

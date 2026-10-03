@@ -303,6 +303,7 @@ export type { InboxDropped, InboxQueued } from './inbox/inbox.store.ts';
 export {
   addFactory,
   attachWorkflow,
+  defaultStartsAllowed,
   detachWorkflow,
   factoriesDir,
   fireAgent,
@@ -310,6 +311,7 @@ export {
   readFactories,
   readFactory,
   removeFactory,
+  startFactory,
 } from './factory/factory.store.ts';
 export { HARNESSES, engine, remoteAgents } from './runtime-client.ts';
 export { HARNESS_CHOICES } from 'agent-runtime/vocabulary';

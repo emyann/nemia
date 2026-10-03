@@ -120,14 +120,6 @@ export const HELP = `wf — run a workflow of agent steps
 ${helpOf(COMMANDS)}
   wf show <runId>              the run, and what each step was told
   wf logs <runId> <step>       that step's session output
-  wf agents [--repo .]         the agents a step may name, the repository's then yours: what each is
-                               for, what it says it can do (an entry for each skill, read off its
-                               SKILL.md), and the skills it is given (its skills:)
-  wf agents card <name> [--repo .] [--from repo|yours]
-                               that agent in the shape of an A2A Agent Card, JSON on stdout and
-                               nothing else — every field the protocol marks REQUIRED but
-                               supportedInterfaces, which is left out because nothing here serves an
-                               agent over A2A. The card describes; it is not an address
   wf agents custom <name> [--file <path>|-] [--clear] [--repo .]
                                your custom instructions for that agent: words you add to it without
                                rewriting it, kept in <store>/custom-instructions/<name>.md and told

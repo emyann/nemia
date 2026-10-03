@@ -42,7 +42,7 @@ import { HELP, usage, type Engine, type Verb } from './flags.ts';
 import { decideVerb } from './decide/decide.ts';
 import { statsVerb } from './stats/stats.ts';
 import { factoryVerb } from './factory/factory.ts';
-import { agentsVerb, cancelVerb, holdVerb, logsVerb, pruneVerb, rmVerb, showVerb } from './runs.ts';
+import { agentsCustom, cancelVerb, holdVerb, logsVerb, pruneVerb, rmVerb, showVerb } from './runs.ts';
 import { inboxVerb, planVerb, startVerb } from './start.ts';
 
 /**
@@ -318,7 +318,7 @@ export const VERBS: ReadonlyMap<string, Verb> = new Map<string, Verb>([
   ['stats', statsVerb],
   ['show', showVerb],
   ['logs', logsVerb],
-  ['agents', agentsVerb],
+  ['agents custom', agentsCustom],
 ]);
 
 /**
@@ -330,7 +330,27 @@ async function commanded(command: Command, rest: string[], e: Engine): Promise<v
   if (args === undefined) return console.log(HELP);
   const wrong = command.check?.(args);
   if (wrong) usage(wrong);
-  for (const line of command.print(await command.handler(e, args), args)) console.log(line);
+  const data = await command.handler(e, args);
+  for (const line of command.print(data, args)) console.log(line);
+  for (const line of command.note?.(data, args) ?? []) console.error(line);
+}
+
+/** The names `wf` takes, its commands' and its verbs', a name of two words among them: `agents card`. */
+const NAMES = [...COMMANDS.filter((c) => c.only?.side !== 'api').map((c) => c.name), ...VERBS.keys()];
+
+/**
+ * The name `argv` opens with, the longest of `NAMES` whose words it starts with, and the arguments after it — or none. A name that heads
+ * others (`agents`, before `agents card`) given a word that is none of its flags is given too little, and gets the help.
+ */
+function namedIn(argv: readonly string[]): { name: string; rest: string[] } | undefined {
+  const opens = (name: string) => name.split(' ').every((word, i) => argv[i] === word);
+  const name = NAMES.filter(opens).sort((a, b) => b.length - a.length)[0];
+  if (name === undefined) return undefined;
+  const rest = argv.slice(name.split(' ').length);
+  const heads = NAMES.some((other) => other.startsWith(`${name} `));
+  const flags = COMMANDS.find((c) => c.name === name)?.spec.flags.map((f) => f.flag) ?? [];
+  if (heads && rest[0] !== undefined && !flags.includes(rest[0].split('=')[0])) return undefined;
+  return { name, rest };
 }
 
 /**
@@ -338,10 +358,9 @@ async function commanded(command: Command, rest: string[], e: Engine): Promise<v
  * engine they talk to: the board under `WF_ROOT`, unless a test hands it one of its own.
  */
 export async function main(argv: string[], e: Engine = engine()): Promise<void> {
-  const [verb, ...rest] = argv;
-  const command = COMMANDS.find((c) => c.name === verb && c.only?.side !== 'api');
-  if (command) return commanded(command, rest, e);
-  const run = verb === undefined ? undefined : VERBS.get(verb);
-  if (run === undefined) return console.log(HELP);
-  return run(rest, e);
+  const named = namedIn(argv);
+  if (named === undefined) return console.log(HELP);
+  const command = COMMANDS.find((c) => c.name === named.name && c.only?.side !== 'api');
+  if (command) return commanded(command, named.rest, e);
+  return VERBS.get(named.name)!(named.rest, e);
 }

@@ -159,6 +159,7 @@ test('REFUSED at shipped defaults: custom instructions with a frontmatter block,
   const repo = aRepo();
   const outside = path.join(ROOT, 'elsewhere.md');
   fs.writeFileSync(outside, 'Words from elsewhere.\n');
+  const runsIn = (): number => (fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')).length : 0);
   const refusals: Array<[string, () => void, RegExp]> = [
     ['a frontmatter block', () => customFor('implementer', '---\ntools: Bash\n---\nUse Bash.\n'), /opens with a frontmatter block/],
     [
@@ -173,7 +174,7 @@ test('REFUSED at shipped defaults: custom instructions with a frontmatter block,
   try {
     for (const [what, plant, said] of refusals) {
       plant();
-      const before = fs.readdirSync(path.join(ROOT, 'runs'), { withFileTypes: true }).length;
+      const before = runsIn();
       assert.throws(
         () => start({ brief: what, repo, workflowDir: path.join(team, 'dev') }),
         (err: Error & { exitCode?: number }) => {
@@ -183,7 +184,7 @@ test('REFUSED at shipped defaults: custom instructions with a frontmatter block,
           return true;
         },
       );
-      assert.equal(fs.readdirSync(path.join(ROOT, 'runs'), { withFileTypes: true }).length, before, `${what}: nothing started`);
+      assert.equal(runsIn(), before, `${what}: nothing started`);
       const other = start({ brief: `${what}, another agent`, repo, workflowDir: solo });
       assert.equal((readRun(other.id).workflow ?? [])[0]?.agent?.name, 'reviewer', what);
       fs.rmSync(CUSTOM, { recursive: true, force: true });

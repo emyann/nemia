@@ -11,6 +11,12 @@ import type { EarlierTry, RetryAsk } from '../retry/index.ts';
 import type { RoundAsk } from '../status/status.ts';
 import type { QueueTry } from '../inbox/inbox.ts';
 
+/**
+ * A folder a step may reach beyond its workspace, as the runtime takes it (`config.mounts`): an absolute path, and whether the step may
+ * only read it.
+ */
+export type Mount = { path: string; readOnly: boolean };
+
 /** What the engine says about one step's task. `unknown` is a task we filed and cannot find. */
 export type TaskPhase = 'pending' | 'running' | 'succeeded' | 'failed' | 'stopped' | 'unknown';
 
@@ -104,6 +110,12 @@ type RunBase = {
    * of its repositories. Absent on a run in the default factory, which is every record written before a run named its factory.
    */
   factory?: string;
+  /**
+   * The folders beyond its workspace each local step may read, frozen at start from the factory (`factoryMounts`): its repositories but
+   * the run's own, each read-only, left out when it was no directory at start. Filed with every local step (`filedConfig`), named on its
+   * brief (`mountsLine`), so a later change to the factory changes no run started. Absent: none.
+   */
+  mounts?: Mount[];
   /**
    * What people approved at a gate (`wf approve`), each in a file of its own beside the retry asks — `runs/<id>.asks/approve-<step>-<try>`
    * — composed on read, as `cancelledAt` is (`readRun` in record.store.ts), and never written into the record: the tick owns the record, a

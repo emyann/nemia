@@ -21,7 +21,7 @@ import { formerModesWritten, loadWorkflows, skillsFor, type Places } from '../fo
 import { placesOf } from '../folder/lookup.store.ts';
 import { workRoot } from '../record/places.store.ts';
 import { gateRefusal } from '../ending/ending.ts';
-import { type Run } from '../record/record.ts';
+import { isGitRun, type Mount, type Run } from '../record/record.ts';
 import { afterRefusal } from '../wait/wait.ts';
 import { inputRefusal, type InputFile } from './inputs.ts';
 import { runStore } from '../record/files.store.ts';
@@ -32,6 +32,8 @@ import { parentRecord } from '../branches/branches.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import {
   DEFAULT_FACTORY,
+  factoryMountRefusal,
+  factoryMounts,
   factoryRepo,
   fillsOf,
   outsideRefusal,
@@ -134,26 +136,35 @@ export function stepsToStart(
  * it to, and an ending's read the run's artifacts folder, neither there yet: the runtime judges which flags a step has, never where they
  * point. A step whose sandbox its file writes as `permissionMode:` (`written`, by the step's name) is quoted by that line.
  */
-export function configRefused(
+export const configRefused = (
   steps: readonly Workflow[],
   places: Places,
   gates: readonly string[],
   written: Readonly<Record<string, string>> = {},
-): string | undefined {
+): string | undefined => refusedStep(steps, places, gates, written, [])?.why;
+
+/** `configRefused`'s refusal with the step it refuses, in a run that mounts `mounts` (`factoryMounts`). */
+function refusedStep(
+  steps: readonly Workflow[],
+  places: Places,
+  gates: readonly string[],
+  written: Readonly<Record<string, string>>,
+  mounts: readonly Mount[],
+): { step: Workflow; why: string } | undefined {
   for (const step of steps.filter((s) => !isRemoteHarness(s.harness))) {
     const own = ownOf(step, renderedFlags(step, '.'), () => places.repo);
     const runArtifacts = path.dirname(artifactsDir({ id: 'run' }, step.name));
     const config = filedConfig(
       step,
       steps,
-      { gates: [...gates] },
+      { gates: [...gates], ...(mounts.length ? { mounts: [...mounts] } : {}) },
       { model: step.model, budgetUsd: budgetUsdFor(step.budget), runArtifacts, own },
     );
     const former = written[step.name];
     const lines = (field: string) =>
       field === 'permissionMode' && former !== undefined ? `permissionMode: ${former}` : lineOf(step)(field);
     const why = filedRefusal((c) => configRefusal(step.harness ?? DEFAULT_HARNESS, c), step.name, config, lines);
-    if (why) return why;
+    if (why) return { step, why };
   }
   return undefined;
 }
@@ -222,7 +233,7 @@ export type StartOptions = {
 };
 
 /** What a run is told at `wf start` and frozen on its record, whatever its place: the brief, the steps, and each option given. */
-type Told = Pick<Run, 'brief' | 'workflowDir' | 'workflow' | 'after' | 'inputs' | 'from' | 'gates' | 'factory'>;
+type Told = Pick<Run, 'brief' | 'workflowDir' | 'workflow' | 'after' | 'inputs' | 'from' | 'gates' | 'factory' | 'mounts'>;
 
 /** Why a folder team refuses `--repo`: its run works in folders it makes, and would never look at the repository named. */
 const repoNamedRefusal = (repo: string): string =>
@@ -238,11 +249,39 @@ function inputsOf(given: readonly string[]): InputFile[] {
   });
 }
 
+/** Whether `at` is a directory now. */
+const isDirectory = (at: string): boolean => fs.statSync(at, { throwIfNoEntry: false })?.isDirectory() === true;
+
 /**
- * What `opts` tells the run, with `steps` as the workflow it freezes, `inputs` by name, and `factory` the one it is started in; an option
- * not given is left out, and so is the default factory.
+ * The folders a run in `factory` on `repo` mounts (`factoryMounts`), each a directory now; none in the default factory. A folder run gives
+ * no `repo`.
  */
-function toldOf(opts: StartOptions, steps: Workflow[], inputs: readonly InputFile[], factory: Factory | undefined): Told {
+const mountsAt = (factory: Factory | undefined, repo: string | undefined): Mount[] =>
+  factory ? factoryMounts(factory, repo).filter((m) => isDirectory(m.path)) : [];
+
+/**
+ * The factory's folders `startRun` left out of `run`'s mounts, as `wf start` says them: each of its repositories but the run's own that
+ * is no directory now, as none was at start. None for a run in the default factory, or in one whose file no longer reads.
+ */
+export function leftOutMounts(run: Run): string[] {
+  if (!run.factory) return [];
+  let factory: Factory;
+  try {
+    factory = readFactory(run.factory);
+  } catch {
+    return [];
+  }
+  const mounted = new Set((run.mounts ?? []).map((m) => m.path));
+  return factoryMounts(factory, isGitRun(run) ? run.repo : undefined)
+    .map((m) => m.path)
+    .filter((at) => !mounted.has(at) && !isDirectory(at));
+}
+
+/**
+ * What `opts` tells the run, with `steps` as the workflow it freezes, `inputs` by name, `factory` the one it is started in, and `mounts`
+ * the folders it gives each local step; an option not given is left out, and so are the default factory and no mounts.
+ */
+function toldOf(opts: StartOptions, steps: Workflow[], inputs: readonly InputFile[], factory: Factory | undefined, mounts: Mount[]): Told {
   const after = opts.after ?? [];
   const gates = opts.gates ?? [];
   return {
@@ -254,6 +293,7 @@ function toldOf(opts: StartOptions, steps: Workflow[], inputs: readonly InputFil
     ...(opts.from ? { from: { inbox: opts.from.inbox } } : {}),
     ...(gates.length ? { gates: [...gates] } : {}),
     ...(factory ? { factory: factory.name } : {}),
+    ...(mounts.length ? { mounts } : {}),
   };
 }
 
@@ -370,6 +410,12 @@ export const repoFor = (name: string | undefined, named: string | undefined, fal
  * `repo` is not one of its repositories (`outsideRefusal`); a folder team works on none. Its name is frozen on the record. Left out, or the
  * default factory, nothing is read, and the record has no `factory`: a record that names none is the default factory's.
  *
+ * In a factory, the run mounts its folders (`factoryMounts`): every repository of the factory but the one a git run works on, each
+ * read-only, and all of them for a folder run, which works on none. A folder that is no directory at start is left out, and `wf start`
+ * says it (`leftOutMounts`); a step whose harness cannot hold them is refused before anything is written (`configRefused`). The list
+ * is frozen on the record as `mounts`, filed with every local step and named on its brief, so a later change to the factory changes
+ * no run started. Left out when none is mounted, and in the default factory.
+ *
  * Fails with the refusal it met, every one before anything is written (`stepsToStart`, `refuseInclude` and those above); dies of anything
  * else, the copy's and the render's `Error` included (`tried`).
  */
@@ -390,7 +436,15 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   const refusedInputs = inputRefusal(inputs);
   if (refusedInputs) return yield* Effect.fail(new Invalid({ message: refusedInputs }));
   const id = runId(opts.brief);
-  const told = toldOf(opts, steps, inputs, factory);
+  const mounts = mountsAt(factory, folder ? undefined : opts.repo);
+  const refusedMounts = mounts.length
+    ? refusedStep(steps, places, opts.gates ?? [], formerModesWritten(opts.workflowDir), mounts)
+    : undefined;
+  if (factory && refusedMounts) {
+    const where = `${path.basename(path.resolve(opts.workflowDir))}/${refusedMounts.step.name}`;
+    return yield* Effect.fail(new Invalid({ message: factoryMountRefusal(factory, where, refusedMounts.why) }));
+  }
+  const told = toldOf(opts, steps, inputs, factory, mounts);
   const stepRecords = Object.fromEntries(steps.map((s) => [s.name, { taskId: null }]));
   const run = yield* folder ? folderRun(id, told, stepRecords) : gitRun(id, told, stepRecords, opts.repo, isolate);
   yield* tried(() => copyInputs(run, inputs));

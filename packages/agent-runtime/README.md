@@ -43,7 +43,7 @@ Definition of done — a closed list, and it is closed:
 change seems to belong in here, check it against the boundary above first: it almost certainly
 knows about a second workload. A knob on the workload is a field carried on the task and read by a runner, never a callback
 into `decide`. The harness's own — `model`, `permissionMode`, `tools`, `allowedTools`, `disallowedTools`, `effort`, `mcp`,
-`contextTokens`, `worktree`, `background`, `budgetUsd`, Claude Code's own flags under `claude`, and Codex's own under `codex` — are one object, the task's `config` (`HarnessArgs`, `src/harness/args.ts`):
+`contextTokens`, `worktree`, `background`, `budgetUsd`, `mounts`, Claude Code's own flags under `claude`, and Codex's own under `codex` — are one object, the task's `config` (`HarnessArgs`, `src/harness/args.ts`):
 the adapter's configuration, which `domain.ts` and `engine.ts` hand to the runner without opening, and
 `test/core-reads.test.ts` refuses either the day it reads one — or names a budget at all. `queued` is the task's own, read by
 `decide`: whether its turn waits for `admit`.
@@ -55,6 +55,29 @@ another harness translates it (`worktree`, which Codex turns into a worktree of 
 declares it or a layer above judges it (`contextTokens`), or it chooses the runtime's own process (`background`). A key moved
 into the bag is read at its old place off a journal (`upgrade` in `src/core/engine/journal.ts`) and refused there at both doors, naming
 the new place (`FORMER_ARGS`): `remoteControl` moved on 2026-09-25.
+
+### Mounts
+
+A task reaches folders beyond its `cwd` through `config.mounts`, as a Pod's container is given its `volumeMounts`: each an absolute
+path and whether the session may only read it — `[{ "path": "/srv/notes", "readOnly": true }]` (`Mount`, `src/harness/mounts.ts`).
+A local process sees the disk as it is, so a mount's source and its place are one path. `readOnly` is required: a mount left
+unmarked is refused, never silently writable. `file()` refuses at both doors a value that is not a list, an entry that is not
+`path` and `readOnly` alone, a path that is not absolute and resolved or holds a NUL, and a path given twice (`mountsRefusalOf`).
+
+Each harness renders them its own way, and one that cannot hold a mount's mode refuses the task before it is journalled, naming
+the harnesses that do (`HarnessSpec.mounts`, `mountsMisplaced` in `src/facade/consumer.ts`):
+
+- **Claude Code** (a job, `claude-detached`, `claude --bg`) holds both modes. Each mount is `--add-dir <path>`, and a read-only one
+  is also `Edit(//<path>/**)` in the one `--disallowedTools` list (`claudeMountArgs`, `claudeDenies`). `--add-dir` grants writes
+  as well as reads where the mode lets a session write; the deny holds the folder read-only in `dontAsk`, `acceptEdits`, `auto`
+  and `bypassPermissions`, a Bash redirection into it included. A read-only path a permission rule cannot name — a space, a
+  comma, a parenthesis, a glob's character — is refused. `--add-dir` also lists the folder's own `.claude/skills` in the
+  session; its `CLAUDE.md` is not read.
+- **Codex** holds a read-only mount and is given nothing for it: its `read-only` and `workspace-write` sandboxes read the whole
+  disk and write only the workspace. It refuses a read-only mount in `danger-full-access`, which writes everywhere, and a writable
+  one, which only `--add-dir` would give and `exec resume` rejects.
+- **The command harness and a remote agent** hold none: a command reads the disk it runs on as it is, and a remote agent has none
+  of this machine's disk. A `PromiseRunner` is handed them.
 
 ### One attempt per start
 
@@ -1943,6 +1966,7 @@ of pure code sits beside it.
 | `src/harness/seam.ts` | the compute seam — `spawn`/`observe`/`stop`/`logs`, and the optional `find`, `release`, `transcript` and `say` — the `Runner` service, the free harness `testOps`, and `composite`: dispatch by harness, merge what they all see |
 | `src/harness/error.ts` | `RunnerError`, beneath the seam and Claude Code's `--bg` runner: `Runner.claude` needs `claudeOps` as a value, and `claudeOps` builds `RunnerError`, so neither file imports the other for it |
 | `src/harness/args.ts` | a task's harness arguments, `HarnessArgs`: the adapter's configuration, carried as one `config`, and the checks every harness shares of it (`argsRefusalOf`), asked through every `Runner` |
+| `src/harness/mounts.ts` | a task's mounts, `Mount`: the folders beyond its `cwd` a session may reach, each read-only or writable, and the check of their shape every harness shares (`mountsRefusalOf`) |
 | `src/harness/mcp.ts` | a task's MCP servers: what is refused, the configs written, and Claude Code's flags for them; for Codex, the server names its config already has and a task's servers as its `mcp_servers` table |
 | `src/harness/transcript.ts` | the one transcript reader behind every harness's `transcript`, and its cursor |
 | `src/harness/sdk.ts` | the same four verbs on the Agent SDK, with the tradeoff written down |

@@ -1002,12 +1002,16 @@ test('two texts with footnotes on one page name theirs apart — no id twice, ea
 type WorkflowStepSpec = import('../src/lib/api.ts').WorkflowStepSpec;
 
 /** A step of a workflow no run has started, as the Workflows page draws it: in the step node's spec mode — on the builder, with `build`. */
-async function specMarkup(spec: WorkflowStepSpec, build?: { unsaved: boolean; refused: boolean; selected: boolean }): Promise<string> {
+async function specMarkup(
+  spec: WorkflowStepSpec,
+  build?: { unsaved: boolean; refused: boolean; selected: boolean },
+  inspected?: boolean,
+): Promise<string> {
   const { SpecNode } = await import('../src/components/StepNode.tsx');
   const props = {
     id: 'review',
     type: 'spec' as const,
-    data: { name: 'review', index: 1, spec, ...(build ? { build } : {}) },
+    data: { name: 'review', index: 1, spec, ...(build ? { build } : {}), ...(inspected === undefined ? {} : { inspected }) },
     selected: false,
     dragging: false,
     zIndex: 0,
@@ -5113,4 +5117,71 @@ test("a factory's block is no link, so a press inspects it, and is marked as ins
   assert.match(shown, /data-inspected/, 'the block the bar shows is marked');
   assert.match(shown, /ring-2 ring-ring/, 'and ringed');
   assert.doesNotMatch(hidden, /data-inspected/, 'a block the bar does not show is not marked');
+});
+
+test("a workflow's step is marked as inspected only while the bar shows it, and never in the builder", async () => {
+  const spec = { ...unset, harness: 'claude', model: 'opus' };
+  const shown = await specMarkup(spec, undefined, true);
+  assert.match(shown, /data-inspected="true"/, `the step the bar shows is marked: ${shown}`);
+  assert.match(shown, /ring-2 ring-ring/, 'and ringed');
+  for (const hidden of [await specMarkup(spec), await specMarkup(spec, undefined, false)]) {
+    assert.doesNotMatch(hidden, /data-inspected/, `a step the bar does not show is not marked: ${hidden}`);
+    assert.doesNotMatch(hidden, /(?<!:)ring-2 ring-ring/, 'nor ringed, but on keyboard focus');
+  }
+  const building = await specMarkup(spec, { unsaved: false, refused: false, selected: false }, true);
+  assert.doesNotMatch(building, /data-inspected/, `the builder's node never takes the bar's mark: ${building}`);
+});
+
+/** The bar's body for the step `step` of `listing`, as the bar for a workflow's step draws it. */
+async function specBodyMarkup(listing: import('../src/lib/api.ts').WorkflowListing, step: string): Promise<string> {
+  const { SpecBody } = await import('../src/components/SpecBar.tsx');
+  return renderToStaticMarkup(createElement(SpecBody, { listing, step }));
+}
+
+test("the bar for a workflow's step says what it runs on, its keys as its node lists them, and the steps it waits on in the workflow's order", async () => {
+  const { workflow, stepSpec } = await import('./library-fixtures.ts');
+  const { specLines } = await import('../src/components/StepNode.tsx');
+  const step = (name: string, extra: Partial<WorkflowStepSpec> = {}) => ({
+    name,
+    spec: stepSpec({ ...extra }),
+    body: '',
+    own: { keys: [], body: '' },
+    hired: null,
+  });
+  const listing = workflow({
+    name: 'dev',
+    steps: [step('plan'), step('implement'), step('review', { agent: 'reviewer', harness: 'claude', model: 'opus' })],
+    graph: {
+      roots: ['plan'],
+      edges: [
+        { from: 'implement', to: 'review', kind: 'after' },
+        { from: 'plan', to: 'review', kind: 'after' },
+        { from: 'review', to: 'implement', kind: 'loop', rounds: 3 },
+        { from: 'plan', to: 'implement', kind: 'after' },
+      ],
+    },
+  });
+  const review = await specBodyMarkup(listing, 'review');
+  assert.match(review, /<p[^>]*data-runs-on[^>]*>reviewer · claude · opus<\/p>/, review);
+  const labels = [...review.matchAll(/<dt[^>]*>([^<]+)<\/dt>/g)].map((m) => m[1]);
+  assert.deepEqual(
+    labels,
+    specLines(listing.steps[2].spec).map(([label]) => label),
+    `every key its node lists: ${review}`,
+  );
+  assert.match(
+    review,
+    /<p[^>]*data-waits-on[^>]*><span[^>]*>plan, implement<\/span><\/p>/,
+    `the sources of its after edges, in the workflow's order, and not the loop's: ${review}`,
+  );
+
+  const plan = await specBodyMarkup(listing, 'plan');
+  assert.match(plan, /<p[^>]*data-waits-on[^>]*>nothing: it starts first<\/p>/, `a first step waits on nothing: ${plan}`);
+
+  const implement = await specBodyMarkup(listing, 'implement');
+  assert.match(implement, /<p[^>]*data-waits-on[^>]*><span[^>]*>plan<\/span><\/p>/, `the edge back a loop makes is no wait: ${implement}`);
+
+  const missing = await specBodyMarkup(listing, 'ship');
+  assert.match(missing, /dev has no step named ship\./, missing);
+  assert.doesNotMatch(missing, /data-runs-on/, missing);
 });

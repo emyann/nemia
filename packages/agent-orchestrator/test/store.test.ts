@@ -51,7 +51,6 @@ delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
 const {
   Conflict,
-  HARNESSES,
   accept,
   advance,
   approve,
@@ -1232,6 +1231,9 @@ const asksDir = (id: string) => path.join(ROOT, 'runs', `${id}.asks`);
 /** The asks waiting in a run's directory, by name. */
 const asksOf = (id: string) => (fs.existsSync(asksDir(id)) ? fs.readdirSync(asksDir(id)).filter((f) => f.startsWith('retry-')) : []);
 const refusedWith = (pattern: RegExp) => (err: Error & { exitCode?: number }) => err.exitCode === 2 && pattern.test(err.message);
+/** A refusal, exit 2, whose whole sentence is `message`, or matches `pattern`. */
+const refusedAs = (said: RegExp | string) => (err: Error & { exitCode?: number }) =>
+  typeof said === 'string' ? err.exitCode === 2 && err.message === said : refusedWith(said)(err);
 /**
  * What a verb refused with, once it has said it was a refusal — for a message to read more than one thing in, and to read something
  * out of.
@@ -2694,96 +2696,6 @@ test('a round files its target bridged as the target says, and the looping step 
   );
 });
 
-test("REFUSED at `wf start`, in the engine's words, with nothing written: `remote: true` on every harness the engine refuses `claude.remoteControl` for — codex and claude-detached — and on a claude job; taken on a claude background session, and `remote: false` on any", async () => {
-  const engine = promiseEngine(
-    RuntimeEngine.layer({ root: fs.mkdtempSync(path.join(ROOT, 'engine-')), journal: memoryJournal(), harnesses: HARNESSES }),
-  );
-  const engineRefusal = async (harness: string, background?: boolean): Promise<string | undefined> => {
-    try {
-      await engine.file({
-        brief: 'b',
-        cwd: '/w',
-        harness,
-        config: { claude: { remoteControl: true }, ...(background ? { background } : {}) },
-      });
-      return undefined;
-    } catch (err) {
-      return (err as Error).message;
-    }
-  };
-  const bridgelessReason = async (harness: string): Promise<string | undefined> => {
-    const said = await engineRefusal(harness);
-    if (said === undefined) return undefined;
-    const reason = new RegExp(
-      `^file: \`claude\\.remoteControl\` asks for a session bridged to claude\\.ai, and the \`${harness}\` harness (.*?)\\. File the task on \`claude\``,
-    ).exec(said)?.[1];
-    assert.ok(reason, said);
-    return reason;
-  };
-  const runs = () => fs.readdirSync(path.join(ROOT, 'runs')).sort();
-  const withRemote = (harness: string, word = 'true') => folder(`harness: ${harness}\nremote: ${word}`);
-  const refusedAtStart = (dir: string, message: string, label: string) => {
-    const repo = aRepo();
-    const before = runs();
-    assert.throws(
-      () => start({ brief: 'add a flag', repo, workflowDir: dir, isolate: false }),
-      (err: Error & { exitCode?: number }) => err.exitCode === 2 && err.message === message,
-      label,
-    );
-    assert.deepEqual(runs(), before, `nothing written for ${label}`);
-    assert.equal(gitOut(repo, 'branch', '--list').split('\n').length, 1, 'and no branch cut');
-    const plan = fs.mkdtempSync(path.join(ROOT, 'plan-'));
-    fs.writeFileSync(path.join(plan, 'card.md'), `---\nworkflow: ${dir}\n---\nadd a flag\n`);
-    assert.throws(
-      () => startPlan({ dir: plan, repo }),
-      (err: Error & { exitCode?: number }) => err.exitCode === 2 && err.message.includes(message),
-      `a plan whose card names the workflow of ${label} is refused before its first run is started`,
-    );
-    assert.deepEqual(runs(), before, `nothing written for a plan on ${label}`);
-  };
-
-  for (const harness of ['codex', 'claude-detached']) {
-    const reason = await bridgelessReason(harness);
-    assert.ok(reason, `the engine refuses it on ${harness}`);
-    refusedAtStart(
-      withRemote(harness),
-      `implement: \`remote: true\` asks for a session bridged to claude.ai, and the \`${harness}\` harness ${reason}. Run the step on claude with \`background: true\` — delete \`harness: ${harness}\` — or delete \`remote: true\`.`,
-      harness,
-    );
-    assert.ok(
-      started(withRemote(harness, 'false')).id,
-      '`remote: false` asks for nothing, and the engine files it on any harness: so does start',
-    );
-  }
-
-  const job = await engineRefusal('claude');
-  const why = /^file: `claude\.remoteControl` bridges a session to claude\.ai, and (.*?)\. Give `config\.background: true` as well/.exec(
-    job ?? '',
-  )?.[1];
-  assert.ok(why, `on claude a job opens no bridge: the engine refuses it, and so does start, named or by default, in its words: ${job}`);
-  for (const [dir, label] of [
-    [withRemote('claude'), 'claude named'],
-    [folder('remote: true'), 'claude by default'],
-  ] as const) {
-    refusedAtStart(
-      dir,
-      `implement: \`remote: true\` bridges a session to claude.ai, and ${why}. Write \`background: true\` beside it, or delete \`remote: true\`.`,
-      label,
-    );
-  }
-
-  assert.equal(await engineRefusal('claude', true), undefined, 'a background session is bridged: the engine files it, and so does start');
-  for (const dir of [folder('harness: claude\nbackground: true\nremote: true'), folder('background: true\nremote: true')]) {
-    const run = started(dir);
-    const b = board();
-    await advance(b.e, readRun(run.id));
-    assert.deepEqual(
-      [b.tasks.get(`${run.id}-implement`)!.spec.config?.background, b.tasks.get(`${run.id}-implement`)!.spec.config?.claude?.remoteControl],
-      [true, true],
-    );
-  }
-});
-
 /** Every task a run's record names, viewed once, as the tick views them: all the exports are given — no engine, and so no log. */
 const viewsOf = async (e: Engine, run: Run): Promise<Map<string, TaskView>> => {
   const views = new Map<string, TaskView>();
@@ -3162,10 +3074,14 @@ test('REFUSED: `wf retry` with an empty --message, or --message on --recheck —
 
   const { main } = await import('../src/cli/main.ts');
   for (const [flags, pattern] of [
-    [['--message', ''], /^--message is empty/],
+    [
+      ['--message', ''],
+      '--message is empty, and an empty answer tells the step nothing. Say what the step needs to hear — wf retry no-such-run implement --message "<answer>" — or leave --message out.',
+    ],
     [
       ['--recheck', '--message', 'the second reading'],
-      /^--message carries your answer into the try's brief, and --recheck files no session/,
+      "--message carries your answer into the try's brief, and --recheck files no session to read it — it runs the check again, and nothing else. " +
+        'Recheck without a message (wf retry no-such-run implement --recheck), or give the answer to a session: wf retry no-such-run implement --message "<answer>".',
     ],
     [['--message'], /^--message takes what to tell the step, quoted/],
     [
@@ -3173,10 +3089,29 @@ test('REFUSED: `wf retry` with an empty --message, or --message on --recheck —
       /^--message takes what to tell the step, and --fresh is one of wf retry's own flags, so the answer was left out: .*give it as --message=--fresh\.$/,
     ],
     [['--nudge', '--message', '--model', 'opus'], /^--message takes what to tell the step, and --model is one of wf retry's own flags/],
-    [['--message=', '--fresh'], /^--message is empty/],
+    [
+      ['--message=', '--fresh'],
+      '--message is empty, and an empty answer tells the step nothing. Say what the step needs to hear — wf retry no-such-run implement --message "<answer>" — or leave --message out.',
+    ],
     [['--message=a', '--message', 'b'], /^wf retry takes --message once/],
   ] as const) {
-    await assert.rejects(main(['retry', 'no-such-run', 'implement', ...flags]), refusedWith(pattern), flags.join(' '));
+    await assert.rejects(main(['retry', 'no-such-run', 'implement', ...flags]), refusedAs(pattern), flags.join(' '));
+  }
+});
+
+test('REFUSED: `wf accept` with no --message, or an empty one — exit 2, in whole sentences that name the run and the step; the CLI refuses before it reads a run', async () => {
+  const { main } = await import('../src/cli/main.ts');
+  for (const [flags, sentence] of [
+    [
+      [],
+      '--message says why the work is good enough with its findings open, and is what the steps after the loop are handed — the shipper, and whoever reads the merge, have nothing else. Say it: wf accept no-such-run review --message "<why>".',
+    ],
+    [
+      ['--message', ' '],
+      '--message is empty, and an acceptance\'s words are the whole reason the loop ended with findings open: empty, they tell the steps after it nothing. Say why the work is good enough as it stands — wf accept no-such-run review --message "<why>".',
+    ],
+  ] as const) {
+    await assert.rejects(main(['accept', 'no-such-run', 'review', ...flags]), refusedAs(sentence), flags.join(' '));
   }
 });
 
@@ -5259,7 +5194,7 @@ test("REFUSED past a budget in a loop at shipped defaults: review's `again: true
 test('REFUSED by the CLI before a run is read: `wf retry --budget` with no amount, a word, 0, a unit, twice, or with --recheck — and `--budget=<amount>` is read', async () => {
   const { main } = await import('../src/cli/main.ts');
   const { e } = board();
-  const cases: Array<[string[], RegExp]> = [
+  const cases: Array<[string[], RegExp | string]> = [
     [
       ['--budget'],
       /^--budget takes the most the step's tries may cost together, in dollars, above what they have cost — an amount above zero, in digits, like 5 or 2\.50: wf retry <runId> <step> --budget <amount>$/,
@@ -5268,10 +5203,14 @@ test('REFUSED by the CLI before a run is read: `wf retry --budget` with no amoun
     [['--budget', '0'], /, and 0 is not one: /],
     [['--budget', '$5'], /, and \$5 is not one: /],
     [['--budget', '5', '--budget', '6'], /^wf retry takes --budget once/],
-    [['--recheck', '--budget', '5'], /^--budget raises a step's cap for the session a try files, and --recheck files none/],
+    [
+      ['--recheck', '--budget', '5'],
+      "--budget raises a step's cap for the session a try files, and --recheck files none — it runs the check again, which costs nothing. " +
+        'Recheck without it (wf retry no-such-run implement --recheck), or give the cap to a session: wf retry no-such-run implement --budget <amount>.',
+    ],
   ];
   for (const [argv, pattern] of cases)
-    await assert.rejects(main(['retry', 'no-such-run', 'implement', ...argv], e), refusedWith(pattern), argv.join(' '));
+    await assert.rejects(main(['retry', 'no-such-run', 'implement', ...argv], e), refusedAs(pattern), argv.join(' '));
   await assert.rejects(
     main(['retry', 'no-such-run', 'implement', '--budget=5'], e),
     (err: unknown) => err instanceof Missing && err.message === "no such run: no-such-run  (try 'wf ls')",

@@ -427,13 +427,17 @@ test('GET /api/ceilings with no pass written and no cap is `no cap`, and reads n
   assert.equal(observations(), before, 'no observation of the harness with no cap');
 });
 
-test("GET /api/ceilings says the cap the daemon's last pass ran with, the runs in flight against it oldest first, and the runs it holds as `runSlots` holds them — off one observation", async () => {
+test("GET /api/ceilings says the cap the daemon's last pass ran with, the runs in flight against it oldest first, and the runs it holds as `runSlots` holds them — off one list", async () => {
   clear();
   seedRuns();
   tickWrote({ sessions: 2, runs: 1 });
   let before = observations();
   const one = await ceilings();
-  assert.equal(observations() - before, 1, 'one `claude agents` for every run at once');
+  assert.equal(
+    observations() - before,
+    0,
+    'no `claude agents`: one list of the runs’ tasks, which asks a harness only of a background session among them, and there is none',
+  );
   assert.deepEqual(
     one,
     {
@@ -471,7 +475,7 @@ test("GET /api/ceilings says the cap the daemon's last pass ran with, the runs i
   writeRun('0-also-flying', 5, { taskId: 't-also' });
   before = observations();
   assert.deepEqual((await ceilings()).inFlight, ['a-flying', '0-also-flying'], 'two in flight, oldest first by createdAt, then id');
-  assert.equal(observations() - before, 1);
+  assert.equal(observations() - before, 0);
 });
 
 test("REFUSED at shipped defaults: GET /api/ceilings judges by the daemon's last pass and not the api's environment — a pass with no cap is `no cap` beside WF_MAX_RUNS=1 — and reads the api's own only before any pass, refusing one that is not a count by name", async (t) => {

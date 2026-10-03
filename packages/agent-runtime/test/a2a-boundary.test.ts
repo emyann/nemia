@@ -30,6 +30,9 @@ function specifiersIn(text: string): string[] {
   return [...found].sort();
 }
 
+/** The seam's files that speak no protocol: a send's lease, read off the registry's own entry. */
+const SDK_FREE = ['src/a2a/sending.ts'];
+
 /** The seam's files, by their path in the package. */
 const inSeam = (file: string) => /^src\/a2a\/[a-z0-9-]+\.ts$/.test(file) && file !== 'src/a2a/index.ts';
 
@@ -62,11 +65,18 @@ test('the scan reads the seam and the rest of the package — or it would pass b
     'src/a2a/map.ts',
     'src/a2a/remote.ts',
     'src/a2a/said.ts',
+    'src/a2a/sending.ts',
   ]);
   assert.ok(files.includes('src/facade.ts') && files.includes('src/core/engine/engine.ts') && files.includes('bin/ae.ts'));
+  const sdkOf = (f: string) => specifiersIn(fs.readFileSync(path.join(PKG, f), 'utf8')).some((s) => s.startsWith(SDK));
   assert.ok(
-    files.filter(inSeam).every((f) => specifiersIn(fs.readFileSync(path.join(PKG, f), 'utf8')).some((s) => s.startsWith(SDK))),
-    'and every seam file imports the SDK, so the pattern matches an import of it',
+    files.filter((f) => inSeam(f) && !SDK_FREE.includes(f)).every(sdkOf),
+    'and every other seam file imports the SDK, so the pattern matches an import of it',
+  );
+  assert.deepEqual(
+    files.filter(inSeam).filter((f) => !sdkOf(f)),
+    SDK_FREE,
+    'the seam files that need no SDK, and only they',
   );
 });
 

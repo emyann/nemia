@@ -104,7 +104,8 @@ const folder = (): string => {
 
 /**
  * An engine board a test settles by hand, as gate.test.ts's: what each task was filed with, and every filing. `settle` takes a check's
- * exit code where it is given: a check settled with none did not finish (`exitVerdicts`).
+ * exit code where it is given: a check settled with none did not finish (`exitVerdicts`). `list` views the tasks it is handed that were
+ * filed.
  */
 const board = () => {
   type Filed = { id: string; brief: string; cwd?: string; closeoutSchema?: object; config?: TaskSpec['config'] } & Record<string, unknown>;
@@ -141,6 +142,10 @@ const board = () => {
     logs: async () => '(no output yet)',
     output: async (id: string) => (typeof tasks.get(id)?.exitCode === 'number' ? '' : undefined),
     feed: async () => ({ entries: [], cursor: 0 }),
+    list: async (ids?: readonly string[]) => ({
+      views: await Promise.all((ids ?? [...tasks.keys()]).filter((id) => tasks.has(id)).map((id) => e.view(id))),
+      unreadable: [],
+    }),
   } as unknown as Engine;
   const settle = (id: string, phase: TaskPhase, closeout?: unknown, exitCode?: number) =>
     Object.assign(tasks.get(id)!, { phase, closeout, exitCode });

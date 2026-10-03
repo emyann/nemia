@@ -8,7 +8,8 @@
  * What it reads and writes lives beside it, each in its own file: the transcript reader (`harness/transcript.ts`), a
  * Claude session's transcript and usage (`harness/claude/transcript.ts`), Claude Code's vocabulary
  * (`harness/claude/vocabulary.ts`), its inbox (`harness/claude/inbox.ts`), its registry's rows (`harness/claude/registry.ts`), a
- * resumed session's parent's last call (`harness/claude/parent.ts`), and MCP (`harness/mcp.ts`).
+ * resumed session's parent's last call (`harness/claude/parent.ts`), when a transcript was first seen at its mtime
+ * (`harness/claude/quiet.ts`), and MCP (`harness/mcp.ts`).
  */
 import { Effect } from 'effect';
 import { execFile } from 'node:child_process';
@@ -22,9 +23,12 @@ import { claudeDenyArgs, claudeFlagsOf, claudeMountArgs, worktreeName } from './
 import { checkoutMcpConfig, claudeMcpArgs, writeMcpConfig } from '../mcp.ts';
 import { readTranscript } from '../transcript.ts';
 import { countSpawn, readTextAsync } from '../../core/engine/tally.ts';
+import type { Monotonic } from '../../core/clock.ts';
+import { monoNow } from '../../core/engine/now.ts';
 import { RunnerError } from '../error.ts';
 import { registryOf, type RegistryRow } from './registry.ts';
 import { type ParentCall, parentFileOf, parentOf, recordParent, whoseCall } from './parent.ts';
+import { clearSighting, quietFileOf, sightingOf } from './quiet.ts';
 import { claudeQuota } from './quota.ts';
 import type { ExpectedSession, RunnerOps, SpawnRequest } from '../seam.ts';
 
@@ -34,6 +38,10 @@ import type { ExpectedSession, RunnerOps, SpawnRequest } from '../seam.ts';
  * idle, and beside its own closeout being the last word in the conversation for one the registry lists busy.
  * What quiet means for the attempt is `decide`'s.
  *
+ * Counted on both clocks, and the shorter wins: the wall clock from the transcript's mtime, and the monotonic clock from
+ * when the runner first saw that mtime (`quiet.ts`), so a wall clock stepped forward cannot report a working session quiet,
+ * one stepped back only delays it, and a mtime first seen waits the floor from then.
+ *
  * 90 seconds. Long enough that a pause between self-driven steps resumes first — the docs are
  * explicit that `working` also covers "between steps of work it drives on its own" — and short
  * enough that a fleet is not waiting on a session that has already written its last word.
@@ -42,9 +50,11 @@ export const QUIESCENT_AFTER_MS = 90_000;
 
 /**
  * How far a transcript's mtime may trail `Date.now()` for the same instant. The kernel may stamp a
- * file from a coarser clock, so a line written just after a read can carry a time just before it. A
- * read of a finished session is kept only while its transcript is older than the read by more than
- * this: one more read at the end of a session, and never a line missed.
+ * file from a coarser clock, so a line written just after a read can carry the mtime asked just before
+ * it. A read is kept only while the transcript's mtime is still the one asked before it (`Kept.mtime`),
+ * and that one older than the read by more than this: one more read at the end of a session, and never
+ * a line missed. A write changes the mtime whichever way the wall clock stepped, so it is read again; a
+ * clock moved forward costs at most one more read.
  */
 const MTIME_SLOP_MS = 1_000;
 
@@ -99,6 +109,8 @@ export type Statement = { payload: unknown; at: number; id?: string; lastWord?: 
 export type ClaudeOptions = {
   quiescentAfterMs?: number;
   now?: () => number;
+  /** The monotonic clock, under its boot's id (`monoNow`), or `undefined` where the machine does not say its boot. */
+  mono?: () => Monotonic | undefined;
   /** When the session's transcript was last written. Injectable so tests need no harness. */
   transcriptTime?: (sessionId: string) => Promise<number | undefined>;
   /** The session's closing statement, as above. Injectable for the same reason. */
@@ -111,8 +123,9 @@ export type ClaudeOptions = {
    */
   parentCallFrom?: (sessionId: string) => Promise<ParentCall | undefined>;
   /**
-   * Where the runner writes what it hands the CLI by path — a task's MCP config — and what it records at spawn — a resumed session's
-   * parent's last call. Default `~/.agent-engine`.
+   * Where the runner writes what it hands the CLI by path — a task's MCP config — what it records at spawn — a resumed session's
+   * parent's last call — and what it records as it looks — when it first saw a working session's transcript as it stands
+   * (`quiet.ts`). Default `~/.agent-engine`.
    */
   root?: string;
   /**
@@ -137,8 +150,11 @@ type Registry = {
 
 /**
  * What a finished attempt said and consumed, as read from its transcript — kept for THAT attempt,
- * and only while the transcript has not been written since. A working session is read on every
- * idle pass instead, because that is when it may just have spoken. Losing this only re-reads.
+ * and only while the transcript has not been written since: while its mtime equals the one asked just
+ * before the read (`mtime`), which was older than the read (`readAt`) by `MTIME_SLOP_MS`. Equality,
+ * not order, so a write stamped before the read by a wall clock stepped back is read. A working session
+ * is read on every idle pass instead, because that is when it may just have spoken. Losing this only
+ * re-reads.
  *
  * `keep` says which reads are worth keeping, and the caller decides: an attempt whose session the registry
  * lists FINAL, and a busy session read over a transcript cold for the quiescence floor, which is reached
@@ -152,7 +168,7 @@ type Registry = {
  * `--resume` of the same id is another attempt, never handed what was read of the one before. An attempt
  * is the row's name, its session, and the start `claude agents` gave it.
  */
-type Kept<T> = { read: { value: T } | { refused: unknown }; readAt: number };
+type Kept<T> = { read: { value: T } | { refused: unknown }; readAt: number; mtime: number | undefined };
 
 /**
  * An attempt's key in what is kept (`Kept`): the row's name, its session, the start `claude agents` gave it, and when its usage is
@@ -182,15 +198,15 @@ const keptReads = (
   ): Promise<T> => {
     if (!keep) return read();
     const pin = kept.get(attempt);
-    const written = pin ? await writtenAt() : undefined;
-    let got = pin && written !== undefined && written < pin.readAt - MTIME_SLOP_MS ? pin.read : undefined;
+    const written = await writtenAt();
+    let got = pin && written !== undefined && written === pin.mtime && pin.mtime < pin.readAt - MTIME_SLOP_MS ? pin.read : undefined;
     if (!got) {
       const readAt = now();
       got = await read().then(
         (value) => ({ value }),
         (refused: unknown) => ({ refused }),
       );
-      kept.set(attempt, { read: got, readAt });
+      kept.set(attempt, { read: got, readAt, mtime: written });
     }
     if ('refused' in got) throw got.refused;
     return got.value;
@@ -212,13 +228,14 @@ const keptReads = (
 };
 
 /**
- * What `observe` reads a sighting with: the quiescence floor, the clock, the transcript's mtime, the kept reads, and `root`, where
- * each session's parent's last call is recorded.
+ * What `observe` reads a sighting with: the quiescence floor, the two clocks, the transcript's mtime, the kept reads, and `root`,
+ * where each session's parent's last call and its transcript's sighting are recorded.
  */
 type Reading = {
   root: string;
   quiescentAfterMs: number;
   now: () => number;
+  mono: () => Monotonic | undefined;
   transcriptTime: (sessionId: string) => Promise<number | undefined>;
   kept: ReturnType<typeof keptReads>;
 };
@@ -320,6 +337,8 @@ const transcriptUsageSince = async (sessionId: string, since: number) => {
  * - A task's MCP config, under `root`, outside the workspace: a file in a step's worktree travels down its branch.
  * - A resumed session's parent's last StructuredOutput call, by the attempt's name under `root` (`parent.ts`), written at spawn and
  *   read on every look: what tells the session's own statement from the one it inherited.
+ * - When a working session's transcript was first seen at its mtime, on the monotonic clock, by the attempt's name under `root`
+ *   (`quiet.ts`): cleared at spawn, rewritten by a look only when the mtime or the boot differs, read fresh on every look.
  * - What `claude agents` last listed of each of our sessions, by session id, rebuilt by every `observe`, which a pass
  *   always makes before it releases anything and `say` is always handed a session from:
  *   - its state (`listed`), which `release` stops on whatever the sighting it is handed says: a session whose end is
@@ -342,6 +361,7 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
     root,
     quiescentAfterMs: options.quiescentAfterMs ?? QUIESCENT_AFTER_MS,
     now,
+    mono: options.mono ?? monoNow,
     transcriptTime: options.transcriptTime ?? sdkTranscriptTime,
     kept: keptReads(now, options.closeoutFrom ?? transcriptCloseout, usageFrom),
   };
@@ -363,7 +383,8 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
 
 /**
  * `claude --bg` under `r.name`, in the task's `cwd`, with its MCP configs written under `root`, and its parent's last call recorded
- * there (`recordParent`, asked of `parentCallFrom`). Both are written before the CLI runs, so whatever throws there started nothing
+ * there (`recordParent`, asked of `parentCallFrom`), and a former attempt's sighting under the name cleared (`clearSighting`).
+ * All are written before the CLI runs, so whatever throws there started nothing
  * (`refused`), and no look finds the session before its record. The flags are `claudeArgv`'s.
  */
 const spawnUnder =
@@ -373,6 +394,7 @@ const spawnUnder =
       try: async () => {
         const mcpArgs = claudeMcpArgs([checkoutMcpConfig(r.cwd), writeMcpConfig(mcpFileOf(root, r.name), r.config?.mcp)]);
         await recordParent(parentFileOf(root, r.name), r.resumeFrom, parentCallFrom);
+        clearSighting(quietFileOf(root, r.name));
         return mcpArgs;
       },
       catch: (cause) =>
@@ -569,10 +591,11 @@ const reportedOf = (x: Reading, name: string, l: { sighting: Sighting; startedAt
 
 /**
  * One listed session as `observe` reports it, by this harness's own definition of finished. The clock is the transcript's
- * mtime, asked once a pass at most and only when needed, never a time this process remembers: a driver that ticks once per
- * process and exits gets the answer a long-lived one does. Quiet is counted from the transcript's last write or the session's
- * own start, whichever is later — a session resumed over a transcript cold for an hour has been quiet only since it began —
- * and a session with no transcript is never quiet: the deadline is for sessions nobody reads.
+ * mtime, asked once a pass at most and only when needed, and the sighting of it on disk (`quiet.ts`), never a time this process
+ * remembers: a driver that ticks once per process and exits gets the answer a long-lived one does. Quiet is counted from the
+ * transcript's last write or the session's own start, whichever is later — a session resumed over a transcript cold for an hour
+ * has been quiet only since it began — and bounded by the monotonic time since that write was first seen (`QUIESCENT_AFTER_MS`);
+ * a session with no transcript is never quiet: the deadline is for sessions nobody reads.
  *
  * A busy session is `busyReportOf`'s. Any other session reports what it said (`toldOf`), and what it consumed since `countFrom` —
  * its own start, or a long-lived attempt's as the journal gave it — as measured or not at all. A resumed session carries its
@@ -593,7 +616,11 @@ const reportOf = async (
   const writtenAt = () => (written ??= x.transcriptTime(sighting.sessionId));
   const quietFor = async () => {
     const lastWrite = await writtenAt();
-    return lastWrite === undefined ? undefined : x.now() - Math.max(lastWrite, startedAt ?? lastWrite);
+    if (lastWrite === undefined) return undefined;
+    const aged = x.now() - Math.max(lastWrite, startedAt ?? lastWrite);
+    const mono = x.mono();
+    const sighted = sightingOf(quietFileOf(x.root, name), lastWrite, mono);
+    return sighted && mono ? Math.min(aged, mono.ms - sighted.ms) : aged;
   };
   if (sighting.busy) return busyReportOf(x, { name, sighting, startedAt, countFrom, attempt, writtenAt, quietFor });
   const told = toldOf(x, name, await x.kept.statementOf(attempt, sighting, writtenAt));

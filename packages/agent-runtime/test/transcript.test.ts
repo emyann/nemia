@@ -195,7 +195,7 @@ const datedWithRoles = (events: TranscriptEvent[]) => {
   }
 };
 
-const claudeRead = (sessionId: string, after?: string) => Effect.runPromise(claudeOps().transcript!(sessionId, after));
+const claudeRead = (sessionId: string, after?: string) => Effect.runPromise(claudeOps({ root: tmp('root') }).transcript!(sessionId, after));
 
 test("the Claude runner reads a session's conversation from its transcript: dated by it, each result paired to its call, the closeout a call like any other", async () => {
   const sessionId = randomUUID();
@@ -1065,7 +1065,9 @@ test("REFUSED: a finished background session whose statement's line does not dec
   const rows = JSON.stringify([{ name: 'ae/t/1', sessionId, state: 'done', status: 'idle', kind: 'background' }]);
   fs.writeFileSync(path.join(bin, 'claude'), `#!/bin/sh\ncat <<'JSON'\n${rows}\nJSON\n`, { mode: 0o755 });
 
-  const e = await onPath(bin, () => Effect.runPromise(Effect.flip(claudeOps({ transcriptTime: async () => 0 }).observe)));
+  const e = await onPath(bin, () =>
+    Effect.runPromise(Effect.flip(claudeOps({ root: tmp('root'), transcriptTime: async () => 0 }).observe)),
+  );
   assert.ok(e instanceof RunnerError, String(e));
   assert.equal(e.verb, 'observe');
   assert.ok(e.message.includes("`ae/t/1`'s transcript cannot be read"), e.message);

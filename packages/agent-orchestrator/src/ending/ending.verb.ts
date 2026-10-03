@@ -38,17 +38,19 @@ import { resultTips } from '../branches/branches.store.ts';
  *
  * @param runs The runs whose claims are read: a pass's own listing, the very runs it advances, so a step it filed is read on the run it
  *   filed it on; the store's, listed only past the run's own asks, when none is given.
+ * @param env Where the cap on runs in flight is read before any pass has written one (`runSlots`): the process's, or the api's own.
  */
 export async function checkoutHold(
   e: Engine,
   run: Run,
   steps: readonly Workflow[],
   runs?: readonly Run[],
+  env: NodeJS.ProcessEnv = process.env,
 ): Promise<CheckoutHold | undefined> {
   const ending = steps.find((s) => s.workspace === 'main');
   if (!ending || run.cancelledAt || endingAsked(run, ending, runStore.asks.read(run.id).asks) === undefined) return undefined;
   const listed = runs ?? runStore.runs.list();
-  const slots = await runSlots(e, listed);
+  const slots = await runSlots(e, listed, env);
   const mine = await mainClaim(e, run, slots.get(run.id));
   if (!mine || mine.holds) return undefined;
   const claims: MainClaim[] = [mine];

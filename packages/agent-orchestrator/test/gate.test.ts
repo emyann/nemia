@@ -414,7 +414,15 @@ test('REFUSED at shipped defaults: `wf approve` on a step not gated, one not sig
     refusedWith(/^wf approve does not take --mesage\. It takes the run, the step, and --message "<words>"/),
   );
   await assert.rejects(typed('--message'), refusedWith(/^--message takes the words that go with your approval, quoted/));
-  await assert.rejects(typed('--message='), refusedWith(/^--message is empty/));
+  await assert.rejects(typed('--message='), (err: Error & { exitCode?: number }) => {
+    assert.equal(err.exitCode, 2);
+    assert.equal(
+      err.message,
+      "--message is empty, and an approval's words are handed to every step after the gate: empty, they tell them nothing. " +
+        'Say what you approve, or on what terms — wf approve no-such-run-zz9z plan --message "<words>" — or leave --message out.',
+    );
+    return true;
+  });
   await assert.rejects(typed('--message', 'a', '--message', 'b'), refusedWith(/^wf approve takes --message once/));
   await assert.rejects(typed('yes'), refusedWith(/^wf approve does not take yes\./));
 });

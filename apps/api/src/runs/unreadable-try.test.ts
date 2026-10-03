@@ -1,7 +1,8 @@
 /**
  * A journal that does not read is a check's, or an earlier try's, and not the step's own session's: the list marks the step whose check or
- * try it is `unreadable`, not the word its session's view would give; and the decision `wf decide` shows (`GET /api/runs/:id/decision`) is
- * refused as the run's page is, a 502 in the list's words — for a run waiting on such a run too — while a run whose tasks read is answered.
+ * try it is `unreadable`, not the word its session's view would give; and the decision `wf decide` shows (`GET /api/runs/:runId/decision`)
+ * is refused as the run's page is, a 502 in the list's words — for a run waiting on such a run too — while a run whose tasks read is
+ * answered.
  *
  * At shipped defaults: the api's own engine over a store this file seeds, the harness's fake `claude` (test/harness.ts) first on PATH.
  */

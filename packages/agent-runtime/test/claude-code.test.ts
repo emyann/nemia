@@ -23,6 +23,7 @@ const config = tmp('config');
 process.env.CLAUDE_CONFIG_DIR = config;
 const { claudeCodeOps, claudeJob } = await import('../src/harness/claude/code.ts');
 const { claudeOps, QUIESCENT_AFTER_MS } = await import('../src/harness/claude/bg.ts');
+const { quietFileOf, sightingOf } = await import('../src/harness/claude/quiet.ts');
 const { claudeCodeRefuses, claudeRefuses } = await import('../src/harness/claude/vocabulary.ts');
 
 const JOB_ID = '5e551011-0000-4000-8000-00000000000a';
@@ -963,7 +964,10 @@ test('REFUSED: a background spawn whose record of its parent cannot be written s
   }
 });
 
-/** What `observe` reports of the background session `name`, its row `row` and its record written as `record`, or none. */
+/**
+ * What `observe` reports of the background session `name`, its row `row` and its record written as `record`, or none: its
+ * transcript last written ten floors ago, and seen so by the runner since.
+ */
 const seenWith = async (o: { record?: string; said: Statement; row: object; quiet?: boolean }) => {
   const f = fake();
   try {
@@ -973,11 +977,14 @@ const seenWith = async (o: { record?: string; said: Statement; row: object; quie
       fs.writeFileSync(parentFileOf(root, 'ae/r/2'), o.record);
     }
     fs.writeFileSync(path.join(f.dir, 'agents.json'), JSON.stringify([o.row]));
+    const written = Date.now() - 10 * QUIESCENT_AFTER_MS;
+    sightingOf(quietFileOf(root, 'ae/r/2'), written, { boot: 'boot-1', ms: written });
     const ops = claudeCodeOps({
       root,
       sessionsDir: tmp('sessions'),
       now: () => Date.now(),
-      transcriptTime: async () => Date.now() - 10 * QUIESCENT_AFTER_MS,
+      mono: () => ({ boot: 'boot-1', ms: Date.now() }),
+      transcriptTime: async () => written,
       closeoutFrom: async () => o.said,
       usageFrom: async () => undefined,
     });

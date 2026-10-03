@@ -14,7 +14,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
-import { claudeOps, QUIESCENT_AFTER_MS } from '../src/harness/claude/bg.ts';
+import { claudeOps, type ClaudeOptions, QUIESCENT_AFTER_MS } from '../src/harness/claude/bg.ts';
+import { quietFileOf, sightingOf } from '../src/harness/claude/quiet.ts';
 import { lastStructuredOutput } from '../src/harness/claude/transcript.ts';
 import { Engine, promiseEngine } from '../src/index.ts';
 import { RunnerError } from '../src/harness/error.ts';
@@ -24,6 +25,22 @@ import type { Event } from '../src/core/domain.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
+
+/** The boot the runners these tests make read their monotonic clock under. */
+const BOOT = 'boot-1';
+
+/**
+ * Claude Code's `--bg` runner over a scratch root, whose monotonic clock, when the test gives it a wall clock (`now`) and no
+ * monotonic one (`mono`), reads the same as the wall clock: a machine whose two clocks agree.
+ */
+const bgOps = (o: ClaudeOptions = {}) => {
+  const now = o.now;
+  return claudeOps({ ...(now ? { mono: () => ({ boot: BOOT, ms: now() }) } : {}), ...o, root: o.root ?? scratch('ae-bg-') });
+};
+
+/** A runner under `root` that first saw the transcript of the session under `name` at `mtimeMs` when the monotonic clock read `ms`. */
+const seenSince = (root: string, name: string, mtimeMs: number, ms: number) =>
+  sightingOf(quietFileOf(root, name), mtimeMs, { boot: BOOT, ms });
 
 const withFakeClaude = (json: string) => {
   const dir = scratch('fake-claude-');
@@ -70,7 +87,7 @@ test("the registry's words, read through `claude agents`: each is A2A's name onc
     ),
   );
   try {
-    const seen = await Effect.runPromise(claudeOps({ now: () => 0, transcriptTime: async () => 1 }).observe);
+    const seen = await Effect.runPromise(bgOps({ now: () => 0, transcriptTime: async () => 1 }).observe);
     assert.deepEqual(
       rows.map((_, i) => seen.get(`ae/t-${i}/1`)?.state),
       rows.map(([, , name]) => name),
@@ -84,7 +101,7 @@ test("the registry's words, read through `claude agents`: each is A2A's name onc
 test('state=done is taken at its word, immediately', async () => {
   const restore = withFakeClaude(row('done', 'idle'));
   try {
-    const seen = await Effect.runPromise(claudeOps({ now: () => 0, transcriptTime: async () => 1 }).observe);
+    const seen = await Effect.runPromise(bgOps({ now: () => 0, transcriptTime: async () => 1 }).observe);
     assert.equal(seen.get('ae/t-1/1')?.state, 'completed');
   } finally {
     restore();
@@ -95,7 +112,7 @@ test('working + busy is running, however long it lasts', async () => {
   const restore = withFakeClaude(row('working', 'busy'));
   try {
     let t = 0;
-    const ops = claudeOps({ now: () => t, transcriptTime: async () => 1 });
+    const ops = bgOps({ now: () => t, transcriptTime: async () => 1 });
     assert.equal((await Effect.runPromise(ops.observe)).get('ae/t-1/1')?.quietMs, undefined);
     t += 10 * QUIESCENT_AFTER_MS;
     const seen = (await Effect.runPromise(ops.observe)).get('ae/t-1/1');
@@ -110,7 +127,7 @@ test("working + idle is reported quiet only after the window, not before — and
   const restore = withFakeClaude(row('working', 'idle'));
   try {
     let t = 0;
-    const ops = claudeOps({ now: () => t, transcriptTime: async () => 0 });
+    const ops = bgOps({ now: () => t, transcriptTime: async () => 0 });
 
     assert.equal((await Effect.runPromise(ops.observe)).get('ae/t-1/1')?.quietMs, undefined, 'it just spoke');
     t = QUIESCENT_AFTER_MS - 1;
@@ -133,7 +150,7 @@ test('a transcript that moves PUSHES THE DEADLINE OUT — it was between steps, 
   try {
     let t = 0;
     let written = 0;
-    const ops = claudeOps({ now: () => t, transcriptTime: async () => written });
+    const ops = bgOps({ now: () => t, transcriptTime: async () => written });
 
     t = QUIESCENT_AFTER_MS - 1_000;
     written = t;
@@ -156,7 +173,7 @@ test('a transcript that moves PUSHES THE DEADLINE OUT — it was between steps, 
 test('a cold transcript is NOT silence while the session is busy', async () => {
   const restore = withFakeClaude(row('working', 'busy'));
   try {
-    const ops = claudeOps({ now: () => 100 * QUIESCENT_AFTER_MS, transcriptTime: async () => 0 });
+    const ops = bgOps({ now: () => 100 * QUIESCENT_AFTER_MS, transcriptTime: async () => 0 });
     assert.equal(
       (await Effect.runPromise(ops.observe)).get('ae/t-1/1')?.quietMs,
       undefined,
@@ -172,15 +189,19 @@ const busyRow = JSON.stringify([
   { name: 'ae/t-1/1', sessionId: 's-1', state: 'working', status: 'busy', kind: 'background', startedAt: STARTED },
 ]);
 /**
- * A busy session observed `after` its start, whose transcript was last written `written` and holds `said`. A session that signed
- * off with StructuredOutput and left a background shell running is listed busy for as long as the shell runs; its own closeout as
- * the last word in the conversation, and a transcript cold for the window, tell it from a session in a long turn.
+ * A busy session observed `after` its start, whose transcript was last written `written`, seen so by the runner since it was, and
+ * holds `said`. A session that signed off with StructuredOutput and left a background shell running is listed busy for as long as
+ * the shell runs; its own closeout as the last word in the conversation, and a transcript cold for the window, tell it from a
+ * session in a long turn.
  */
 const heldSession = async (after: number, written: number, said: { payload: unknown; at: number; lastWord?: boolean } | undefined) => {
   const restore = withFakeClaude(busyRow);
   let asked = 0;
+  const root = scratch('ae-bg-');
+  seenSince(root, 'ae/t-1/1', written, written);
   try {
-    const ops = claudeOps({
+    const ops = bgOps({
+      root,
       now: () => STARTED + after,
       transcriptTime: async () => written,
       closeoutFrom: async () => {
@@ -248,8 +269,8 @@ test('a busy session over a cold transcript is read ONCE, and again only once th
   try {
     let asked = 0;
     let written = STARTED;
-    let t = STARTED + QUIESCENT_AFTER_MS;
-    const ops = claudeOps({
+    let t = STARTED;
+    const ops = bgOps({
       now: () => t,
       transcriptTime: async () => written,
       closeoutFrom: async () => {
@@ -258,11 +279,15 @@ test('a busy session over a cold transcript is read ONCE, and again only once th
       },
     });
     await Effect.runPromise(ops.observe);
+    t += QUIESCENT_AFTER_MS;
+    await Effect.runPromise(ops.observe);
     await Effect.runPromise(ops.observe);
     await Effect.runPromise(ops.observe);
     assert.equal(asked, 1, 'three passes over a transcript nothing has written: one read');
 
     written = t;
+    await Effect.runPromise(ops.observe);
+    assert.equal(asked, 1, 'written just now: working, and not read');
     t += QUIESCENT_AFTER_MS;
     await Effect.runPromise(ops.observe);
     assert.equal(asked, 2, 'written since the read: read again');
@@ -274,7 +299,7 @@ test('a busy session over a cold transcript is read ONCE, and again only once th
 test('a busy session the registry gives no start is left alone: its conversation could not be told from the one it continues', async () => {
   const restore = withFakeClaude(row('working', 'busy'));
   try {
-    const ops = claudeOps({
+    const ops = bgOps({
       now: () => 10 * QUIESCENT_AFTER_MS,
       transcriptTime: async () => 0,
       closeoutFrom: async () => ({ payload: { outcome: 'done' }, at: 1, lastWord: true }),
@@ -288,13 +313,15 @@ test('a busy session the registry gives no start is left alone: its conversation
 test('the verdict does not depend on WHO is asking, or for how long', async () => {
   const restore = withFakeClaude(row('working', 'idle'));
   try {
-    const at = (t: number) => claudeOps({ now: () => t, transcriptTime: async () => 0 });
+    const root = scratch('ae-bg-');
+    const at = (t: number) => bgOps({ root, now: () => t, transcriptTime: async () => 0 });
+    await Effect.runPromise(at(0).observe);
     const first = await Effect.runPromise(at(QUIESCENT_AFTER_MS).observe);
     const second = await Effect.runPromise(at(QUIESCENT_AFTER_MS).observe);
     assert.equal(
       first.get('ae/t-1/1')?.quietMs,
       QUIESCENT_AFTER_MS,
-      'two runners are what two processes that each tick once are: neither keeps the clock between passes',
+      'runners are what processes that each tick once are: none keeps the clock between passes, and the sighting is on disk',
     );
     assert.equal(second.get('ae/t-1/1')?.quietMs, QUIESCENT_AFTER_MS, 'a runner that has never seen this session agrees');
   } finally {
@@ -302,10 +329,116 @@ test('the verdict does not depend on WHO is asking, or for how long', async () =
   }
 });
 
+/** A working, idle session whose runner reads the wall clock at `clock.wall` and the monotonic clock at `clock.mono`, over `root`. */
+const quietUnder = (
+  clock: { wall: number; mono: number },
+  root = scratch('ae-bg-'),
+  mono = (): { boot: string; ms: number } | undefined => ({ boot: BOOT, ms: clock.mono }),
+) => {
+  const ops = bgOps({ root, now: () => clock.wall, mono, transcriptTime: async () => 0 });
+  return async () => (await Effect.runPromise(ops.observe)).get('ae/t-1/1')?.quietMs;
+};
+
+test('a wall clock stepped forward does not make a working session quiet: the monotonic clock since the transcript was seen bounds it', async () => {
+  const restore = withFakeClaude(row('working', 'idle'));
+  try {
+    const clock = { wall: 0, mono: 0 };
+    const quiet = quietUnder(clock);
+    assert.equal(await quiet(), undefined, 'seen as written');
+    clock.wall = 10 * QUIESCENT_AFTER_MS;
+    clock.mono = 1_000;
+    assert.equal(await quiet(), undefined, 'ten floors on the wall clock, one second on the monotonic one: still working');
+    clock.mono = QUIESCENT_AFTER_MS - 1;
+    assert.equal(await quiet(), undefined, 'one millisecond short');
+    clock.mono = QUIESCENT_AFTER_MS;
+    assert.equal(await quiet(), QUIESCENT_AFTER_MS, 'quiet for the floor, as the clock that only goes forward tells it');
+  } finally {
+    restore();
+  }
+});
+
+test('a wall clock stepped back delays quiet, and never ends it early', async () => {
+  const restore = withFakeClaude(row('working', 'idle'));
+  try {
+    const clock = { wall: 0, mono: 0 };
+    const quiet = quietUnder(clock);
+    await quiet();
+    clock.wall = QUIESCENT_AFTER_MS - 60_000;
+    clock.mono = QUIESCENT_AFTER_MS;
+    assert.equal(await quiet(), undefined, 'the floor on the monotonic clock, a minute short of it on the wall clock stepped back');
+    clock.wall = QUIESCENT_AFTER_MS;
+    clock.mono = QUIESCENT_AFTER_MS + 60_000;
+    assert.equal(await quiet(), QUIESCENT_AFTER_MS, 'quiet once the wall clock reaches the floor too');
+  } finally {
+    restore();
+  }
+});
+
+test('a first sighting waits the floor: no record, one of another boot, of another mtime, or one that does not decode', async () => {
+  const restore = withFakeClaude(row('working', 'idle'));
+  const records: Array<[string, string | undefined]> = [
+    ['none', undefined],
+    ['another boot', JSON.stringify({ mtimeMs: 0, boot: 'boot-0', ms: 0 })],
+    ['another mtime', JSON.stringify({ mtimeMs: 5, boot: BOOT, ms: 0 })],
+    ['no decode', JSON.stringify({ mtimeMs: 0, boot: BOOT, ms: 'zero' })],
+    ['no JSON', '{half'],
+  ];
+  try {
+    for (const [what, record] of records) {
+      const root = scratch('ae-bg-');
+      const file = quietFileOf(root, 'ae/t-1/1');
+      if (record !== undefined) {
+        fs.mkdirSync(path.dirname(file), { recursive: true });
+        fs.writeFileSync(file, record);
+      }
+      const clock = { wall: 10 * QUIESCENT_AFTER_MS, mono: 10 * QUIESCENT_AFTER_MS };
+      const quiet = quietUnder(clock, root);
+      assert.equal(await quiet(), undefined, `${what}: a transcript cold for ten floors, first seen now`);
+      assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), { mtimeMs: 0, boot: BOOT, ms: 10 * QUIESCENT_AFTER_MS }, what);
+      clock.wall += QUIESCENT_AFTER_MS - 1;
+      clock.mono += QUIESCENT_AFTER_MS - 1;
+      assert.equal(await quiet(), undefined, `${what}: one millisecond short of the floor since`);
+      clock.wall += 1;
+      clock.mono += 1;
+      assert.equal(await quiet(), QUIESCENT_AFTER_MS, `${what}: the floor since it was first seen`);
+    }
+  } finally {
+    restore();
+  }
+});
+
+test('a machine that does not say its boot has the wall clock alone, and records no sighting', async () => {
+  const restore = withFakeClaude(row('working', 'idle'));
+  try {
+    const root = scratch('ae-bg-');
+    const quiet = quietUnder({ wall: 10 * QUIESCENT_AFTER_MS, mono: 0 }, root, () => undefined);
+    assert.equal(await quiet(), 10 * QUIESCENT_AFTER_MS);
+    assert.equal(fs.existsSync(quietFileOf(root, 'ae/t-1/1')), false);
+  } finally {
+    restore();
+  }
+});
+
+test('a spawn under a name clears the sighting a former attempt under it left', async () => {
+  const dir = scratch('ae-claude-');
+  fs.writeFileSync(path.join(dir, 'claude'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+  const prev = process.env.PATH;
+  process.env.PATH = `${dir}:${prev}`;
+  try {
+    const root = scratch('ae-bg-');
+    seenSince(root, 'ae/t/1', 0, 0);
+    assert.equal(fs.existsSync(quietFileOf(root, 'ae/t/1')), true);
+    await Effect.runPromise(bgOps({ root }).spawn({ name: 'ae/t/1', brief: 'the prompt', cwd: dir }));
+    assert.equal(fs.existsSync(quietFileOf(root, 'ae/t/1')), false);
+  } finally {
+    process.env.PATH = prev;
+  }
+});
+
 test('no transcript, no verdict — we do not settle on one idle sample', async () => {
   const restore = withFakeClaude(row('working', 'idle'));
   try {
-    const ops = claudeOps({ now: () => 100 * QUIESCENT_AFTER_MS, transcriptTime: async () => undefined });
+    const ops = bgOps({ now: () => 100 * QUIESCENT_AFTER_MS, transcriptTime: async () => undefined });
     assert.equal((await Effect.runPromise(ops.observe)).get('ae/t-1/1')?.quietMs, undefined, 'the deadline handles this one');
   } finally {
     restore();
@@ -316,7 +449,7 @@ test('blocked is never quiescent — a session waiting on a person is not finish
   const restore = withFakeClaude(row('blocked', 'idle'));
   try {
     let t = 0;
-    const ops = claudeOps({ now: () => t, transcriptTime: async () => 500 });
+    const ops = bgOps({ now: () => t, transcriptTime: async () => 500 });
     await Effect.runPromise(ops.observe);
     t += 10 * QUIESCENT_AFTER_MS;
     const seen = (await Effect.runPromise(ops.observe)).get('ae/t-1/1');
@@ -334,7 +467,10 @@ test('quiet is counted from the later of its last write and its own start: a ses
   );
   try {
     let t = started + 1_000;
-    const ops = claudeOps({
+    const root = scratch('ae-bg-');
+    seenSince(root, 'ae/t-1/2', 0, 0);
+    const ops = bgOps({
+      root,
       now: () => t,
       transcriptTime: async () => 0,
       closeoutFrom: async () => undefined,
@@ -485,7 +621,7 @@ test('an idle session reports what it said; a busy one is not even asked', async
 
   let restore = withFakeClaude(row('working', 'busy'));
   try {
-    const seen = await Effect.runPromise(claudeOps({ now: () => 0, transcriptTime: async () => 0, closeoutFrom }).observe);
+    const seen = await Effect.runPromise(bgOps({ now: () => 0, transcriptTime: async () => 0, closeoutFrom }).observe);
     assert.equal(seen.get('ae/t-1/1')?.closeout, undefined);
     assert.equal(asked, 0, 'mid-turn, nothing it has said is final');
   } finally {
@@ -494,7 +630,7 @@ test('an idle session reports what it said; a busy one is not even asked', async
 
   restore = withFakeClaude(row('working', 'idle'));
   try {
-    const seen = await Effect.runPromise(claudeOps({ now: () => 0, transcriptTime: async () => 0, closeoutFrom }).observe);
+    const seen = await Effect.runPromise(bgOps({ now: () => 0, transcriptTime: async () => 0, closeoutFrom }).observe);
     assert.deepEqual(seen.get('ae/t-1/1')?.closeout, said);
     assert.equal(seen.get('ae/t-1/1')?.state, 'working', 'reported, not acted on — whose it is, the engine decides');
   } finally {
@@ -508,7 +644,7 @@ test('REFUSED: a transcript whose statement does not decode fails `observe` as a
     let asked = 0;
     let written = 0;
     let t = 10 * QUIESCENT_AFTER_MS;
-    const ops = claudeOps({
+    const ops = bgOps({
       now: () => t,
       transcriptTime: async () => written,
       closeoutFrom: async () => {
@@ -540,9 +676,7 @@ test('a blocked, idle session reports what it said too — and stays blocked, fo
   const said = { payload: { outcome: 'done' }, at: 5 };
   const restore = withFakeClaude(row('blocked', 'idle'));
   try {
-    const seen = await Effect.runPromise(
-      claudeOps({ now: () => 0, transcriptTime: async () => 0, closeoutFrom: async () => said }).observe,
-    );
+    const seen = await Effect.runPromise(bgOps({ now: () => 0, transcriptTime: async () => 0, closeoutFrom: async () => said }).observe);
     assert.deepEqual(
       seen.get('ae/t-1/1')?.closeout,
       said,
@@ -558,7 +692,7 @@ test('a finished session is read once while its transcript is unchanged — agai
   let asked = 0;
   let written = 0;
   let t = 1_000_000;
-  const ops = claudeOps({
+  const ops = bgOps({
     now: () => t,
     transcriptTime: async () => written,
     closeoutFrom: async () => {
@@ -589,6 +723,58 @@ test('a finished session is read once while its transcript is unchanged — agai
   }
 });
 
+/** A runner over a finished session whose clock is `clock.t`, whose transcript was written `clock.written`, and which says `clock.said`. */
+const keptOver = (clock: { t: number; written: number; said: number }) => {
+  const reads = { n: 0 };
+  const ops = bgOps({
+    now: () => clock.t,
+    transcriptTime: async () => clock.written,
+    closeoutFrom: async () => {
+      reads.n++;
+      return { payload: clock.said, at: 1 };
+    },
+  });
+  return { reads, said: async () => (await Effect.runPromise(ops.observe)).get('ae/t-1/1')?.closeout?.payload };
+};
+
+test('a transcript written after the wall clock stepped back is read again: a read is kept only while the mtime it was made over stands', async () => {
+  const T = 1_789_000_000_000;
+  const clock = { t: T, written: T - 10_000, said: 1 };
+  const { reads, said } = keptOver(clock);
+  const restore = withFakeClaude(row('done', 'idle'));
+  try {
+    assert.equal(await said(), 1);
+    assert.equal(await said(), 1);
+    assert.equal(reads.n, 1, 'unchanged since the read: kept');
+    clock.t = T - 60_000;
+    clock.written = T - 50_000;
+    clock.said = 2;
+    assert.equal(await said(), 2, 'written after the read, stamped before it on a clock stepped back: read again');
+    assert.equal(reads.n, 2);
+  } finally {
+    restore();
+  }
+});
+
+test('a forward step of the wall clock costs at most one more read, and an unchanged transcript is still read once', async () => {
+  const T = 1_789_000_000_000;
+  const clock = { t: T, written: T - 10_000, said: 1 };
+  const { reads, said } = keptOver(clock);
+  const restore = withFakeClaude(row('done', 'idle'));
+  try {
+    await said();
+    clock.t = T + 3_600_000;
+    await said();
+    await said();
+    assert.ok(reads.n <= 2, `${reads.n} reads over three passes`);
+    clock.written = T + 3_600_000;
+    clock.said = 2;
+    assert.equal(await said(), 2, 'written since: read again');
+  } finally {
+    restore();
+  }
+});
+
 test('Claude Code is handed the schema as --json-schema, and the prompt still comes last', async () => {
   const dir = scratch('fake-claude-');
   const argsFile = path.join(dir, 'args');
@@ -597,7 +783,7 @@ test('Claude Code is handed the schema as --json-schema, and the prompt still co
   process.env.PATH = `${dir}:${prev}`;
   try {
     const schema = { type: 'object', properties: { outcome: { type: 'string' } } };
-    await Effect.runPromise(claudeOps().spawn({ name: 'ae/t/1', brief: 'the prompt', cwd: dir, closeoutSchema: schema }));
+    await Effect.runPromise(bgOps().spawn({ name: 'ae/t/1', brief: 'the prompt', cwd: dir, closeoutSchema: schema }));
     const args = fs.readFileSync(argsFile, 'utf8').trim().split('\n');
     const i = args.indexOf('--json-schema');
     assert.notEqual(i, -1);
@@ -610,7 +796,7 @@ test('Claude Code is handed the schema as --json-schema, and the prompt still co
 
 import type { SpawnRequest } from '../src/harness/seam.ts';
 
-/** The argv `claudeOps().spawn` hands to `claude`, recorded by a fake one on PATH. */
+/** The argv `bgOps().spawn` hands to `claude`, recorded by a fake one on PATH. */
 const argvOf = async (r: Partial<SpawnRequest>) => {
   const dir = scratch('fake-claude-');
   const argsFile = path.join(dir, 'args');
@@ -618,7 +804,7 @@ const argvOf = async (r: Partial<SpawnRequest>) => {
   const prev = process.env.PATH;
   process.env.PATH = `${dir}:${prev}`;
   try {
-    await Effect.runPromise(claudeOps().spawn({ name: 'ae/t/1', brief: 'the prompt', cwd: dir, ...r }));
+    await Effect.runPromise(bgOps().spawn({ name: 'ae/t/1', brief: 'the prompt', cwd: dir, ...r }));
     return fs.readFileSync(argsFile, 'utf8').replace(/\n$/, '').split('\n');
   } finally {
     process.env.PATH = prev;
@@ -814,7 +1000,7 @@ test("usage is measured from the session's own start, as the registry records it
   const restore = withFakeClaude(rowStarted('done', 'idle', 1_789_000_000_000));
   try {
     let since: number | undefined;
-    const ops = claudeOps({
+    const ops = bgOps({
       transcriptTime: async () => 0,
       closeoutFrom: async () => undefined,
       usageFrom: async (_id, from) => {
@@ -834,7 +1020,7 @@ test('no start in the registry, no usage — an inherited conversation could not
   const restore = withFakeClaude(rowStarted('done', 'idle'));
   try {
     let asked = 0;
-    const ops = claudeOps({
+    const ops = bgOps({
       transcriptTime: async () => 0,
       closeoutFrom: async () => undefined,
       usageFrom: async () => {
@@ -853,7 +1039,7 @@ test('a busy session is not read for usage — nothing it has consumed is final'
   const restore = withFakeClaude(rowStarted('working', 'busy', 1));
   try {
     let asked = 0;
-    const ops = claudeOps({
+    const ops = bgOps({
       transcriptTime: async () => 0,
       usageFrom: async () => {
         asked++;
@@ -870,7 +1056,7 @@ test('a busy session is not read for usage — nothing it has consumed is final'
 test('claude that could not even be launched says nothing started; one that ran and failed does not', async () => {
   const caught = (cwd: string) =>
     Effect.runPromise(
-      claudeOps()
+      bgOps()
         .spawn({ name: 'ae/t/1', brief: 'b', cwd })
         .pipe(
           Effect.as(undefined),
@@ -904,7 +1090,7 @@ test('with every option set, Claude Code is given each flag in its one order, th
   try {
     const schema = { type: 'object' };
     await Effect.runPromise(
-      claudeOps({ root }).spawn({
+      bgOps({ root }).spawn({
         name: 'ae/t/1',
         brief: 'the prompt',
         cwd: dir,
@@ -993,7 +1179,7 @@ test("a registry row is ours only when named `ae/` with a `state` key: another's
     ]),
   );
   try {
-    const ops = claudeOps({
+    const ops = bgOps({
       now: () => 0,
       transcriptTime: async () => undefined,
       closeoutFrom: async () => undefined,
@@ -1021,7 +1207,7 @@ test('a row is held while it lists a process, which it names: an idle session op
     ]),
   );
   try {
-    const ops = claudeOps({
+    const ops = bgOps({
       now: () => 0,
       transcriptTime: async () => undefined,
       closeoutFrom: async () => undefined,
@@ -1046,7 +1232,7 @@ test('every row a real `claude agents --all --json` printed decodes as ours, and
   );
   const restore = withFakeClaude(JSON.stringify(listing));
   try {
-    const ops = claudeOps({ now: () => 0, transcriptTime: async () => undefined, closeoutFrom: async () => undefined });
+    const ops = bgOps({ now: () => 0, transcriptTime: async () => undefined, closeoutFrom: async () => undefined });
     const seen = await Effect.runPromise(ops.observe);
     assert.deepEqual(
       [...seen.keys()],
@@ -1064,7 +1250,7 @@ test('every row a real `claude agents --all --json` printed decodes as ours, and
 const refusalOf = async (out: string) => {
   const restore = withFakeClaude(out);
   try {
-    const ops = claudeOps({ now: () => 0, transcriptTime: async () => undefined, closeoutFrom: async () => undefined });
+    const ops = bgOps({ now: () => 0, transcriptTime: async () => undefined, closeoutFrom: async () => undefined });
     return await Effect.runPromise(
       ops.observe.pipe(
         Effect.as(undefined),
@@ -1126,7 +1312,7 @@ test("a row's process and start are kept when it lists them, and none is when it
   const restore = withFakeClaude(JSON.stringify(rows));
   try {
     const since: number[] = [];
-    const ops = claudeOps({
+    const ops = bgOps({
       sessionsDir: scratch('ae-sessions-'),
       transcriptTime: async () => 0,
       closeoutFrom: async () => undefined,

@@ -39,7 +39,6 @@ import {
   FORMER_KEYS,
   FORMER_OWN_KEYS,
   formerKeyWritten,
-  formerSandbox,
   frontmatterKey,
   harnessPromptNamed,
   readKeys,
@@ -350,8 +349,7 @@ export function renderAgent(draft: AgentDraft): string {
     const refused = agentKeyRefusal(file, key);
     if (refused !== undefined) refuse(refused);
   }
-  if (keys.harness === 'codex' && keys.permissionMode != null && formerSandbox(keys.permissionMode) !== undefined)
-    refuse(codexModeWritten(file, keys.permissionMode));
+  if (keys.harness === 'codex' && keys.permissionMode != null) refuse(codexModeWritten(file, keys.permissionMode));
   refuseStale(file, draft);
   const own: Record<AgentOwnKey, string | null | undefined> = {
     role: draft.role,

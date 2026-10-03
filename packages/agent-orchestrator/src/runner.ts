@@ -308,7 +308,7 @@ export {
   readFactory,
   removeFactory,
 } from './factory/factory.store.ts';
-export { HARNESSES, engine, remoteAgents } from './runtime-client.ts';
+export { HARNESS_CHOICES, HARNESSES, engine, remoteAgents } from './runtime-client.ts';
 export { A2A_AGENTS_FILE, envNameOf } from './harness/a2a.store.ts';
 export {
   closeoutAsked,
@@ -337,7 +337,7 @@ export type { PlanStarted } from './plan/plan.verb.ts';
 export { advance } from './tick/advance.verb.ts';
 export { refusalLines, tick } from './tick/tick.verb.ts';
 export { checkoutHold } from './ending/ending.verb.ts';
-export { runSlots } from './cap/cap.verb.ts';
+export { runSlots, type Slots, slotsOf } from './cap/cap.verb.ts';
 export type { Advanced } from './tick/advance.verb.ts';
 export type { Pass } from './tick/tick.verb.ts';
 export { accept, round } from './round/round.verb.ts';
@@ -365,4 +365,5 @@ export { BY_KEYS, statsLine, statsLines, statsQueryOf } from './stats/index.ts';
 export type { ByKey, QueryKey, Stats, StatsQuery } from './stats/index.ts';
 export { list, unjudgedOf } from './list/list.verb.ts';
 export type { Answered, Decided } from './decide/decide.verb.ts';
+export type { DecideCommand } from './decide/decide.ts';
 export type { Unjudged } from './list/list.verb.ts';

@@ -55,9 +55,10 @@ const PARSERS: Record<string, (name: string) => Bar | undefined> = {
 
 /**
  * The bar `value` names in the address — `start:<factory>`, `factory:<factory>`, `run:<run>`, `step:<run>/<step>` or
- * `spec:<from>/<workflow>/<step>` — or none for anything else: another kind, an empty name, a run with a `/` in its id, a `from` other than
- * `repo` or `yours`, not a string. A factory keeps its whole name. A run id is a file name in the store, and a workflow's name its folder's,
- * so a step's address splits at its first `/`, a workflow's step's at its first two, and the step keeps any `/` or `:` of its own.
+ * `spec:<from>/<workflow>/<step>` — or none for anything else: another kind, an empty name, a run with a `/` in its id, a `from` other
+ * than `repo` or `yours`, not a string. A factory keeps its whole name. A run id is a file name in the store, and a workflow's name its
+ * folder's, so a step's address splits at its first `/`, a workflow's step's at its first two, and the step keeps any `/` or `:` of its
+ * own.
  */
 export function barOf(value: unknown): Bar | undefined {
   if (typeof value !== 'string') return undefined;

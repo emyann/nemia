@@ -38,7 +38,10 @@ async function expectNoBar(page: Page, assertion: string): Promise<void> {
   if (barInUrl(page) !== null) throw new Refused(`${assertion}: the address names no bar — it is ${page.url()}`);
 }
 
-/** Refuses unless the bar shows the step `step` of `name` read from `from`, the address names it, and its node alone on the page is marked. */
+/**
+ * Refuses unless the bar shows the step `step` of `name` read from `from`, the address names it, and its node alone on the page is
+ * marked.
+ */
 async function expectSpec(page: Page, from: string, name: string, step: string, assertion: string): Promise<Locator> {
   const bar = specBar(page, from, name, step);
   const value = `spec:${from}/${name}/${step}`;

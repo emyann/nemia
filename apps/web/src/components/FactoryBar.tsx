@@ -42,14 +42,20 @@ export function FactoryBar({ factory: name }: { factory: string }) {
   );
 }
 
-/** What the bar holds for a factory not shown yet: why a read failed, `error`; that no factory is named `name` once `read`; else that it reads. */
+/**
+ * What the bar holds for a factory not shown yet: why a read failed, `error`; that no factory is named `name` once `read`; else that it
+ * reads.
+ */
 function Unread({ name, error, read }: { name: string; error: Error | null; read: boolean }) {
   if (error) return <p className="text-sm text-red-700 dark:text-red-400">Could not read the factories and their runs: {error.message}</p>;
   if (read) return <p className="text-sm text-amber-700 dark:text-amber-400">No factory is named {name}.</p>;
   return <p className="text-xs text-neutral-500">Reading the factories…</p>;
 }
 
-/** What the bar holds for `block`: why its file does not read, whole; else what its runs are doing and what it offers, as its block says them. */
+/**
+ * What the bar holds for `block`: why its file does not read, whole; else what its runs are doing and what it offers, as its block says
+ * them.
+ */
 function FactoryBody({ block }: { block: FactoryBlock }) {
   if (block.error)
     return (

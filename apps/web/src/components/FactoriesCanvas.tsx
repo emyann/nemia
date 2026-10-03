@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, type RefObject } from 'react';
-import { Background, BackgroundVariant, Controls, ReactFlow, ReactFlowProvider, useReactFlow } from '@xyflow/react';
+import { useEffect, useEffectEvent, useMemo, useRef, type RefObject } from 'react';
+import { Background, BackgroundVariant, Controls, ReactFlow, ReactFlowProvider, useReactFlow, useStoreApi } from '@xyflow/react';
 import { useNavigate } from '@tanstack/react-router';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import type { Bar } from '@/lib/bar';
 import type { FactoryBlock } from '@/lib/factories';
+import { revealView, sizeOf } from '@/lib/frame';
 import { useBarOver } from '@/lib/useBarOver';
 import { useCanvasPress } from '@/lib/useCanvasPress';
 import { useContent } from '@/lib/useContent';
@@ -18,6 +19,9 @@ const GAP = 48;
 
 /** How the canvas is fitted to its frame: every block in view, never larger than life. */
 const FIT = { maxZoom: 1, padding: 0.15 } as const;
+
+/** How far out bringing the block inspected into view zooms, at most: past it, a block is too small to read. */
+const REVEAL_MIN_ZOOM = 0.4;
 
 /**
  * The blocks as React Flow's nodes, laid out on a grid in their order, `COLUMNS` a row, the one named `inspected` marked so: none dragged,
@@ -59,7 +63,7 @@ export function FactoriesCanvas({ blocks }: { blocks: readonly FactoryBlock[] })
 
 /**
  * The canvas of `blocks`, its frame narrowed by what the bar covers of it (`useBarOver`), so the block inspected and the canvas's controls
- * stay clear of the bar, and fitted again as that width changes (`useRefit`).
+ * stay clear of the bar, the block brought into view as the bar shows it (`useKeepClear`).
  */
 function Floor({ blocks }: { blocks: readonly FactoryBlock[] }) {
   const navigate = useNavigate();
@@ -70,7 +74,7 @@ function Floor({ blocks }: { blocks: readonly FactoryBlock[] }) {
   const whole = useRef<HTMLDivElement>(null);
   const frame = useRef<HTMLDivElement>(null);
   const over = useBarOver(whole);
-  useRefit(frame);
+  useKeepClear(frame, inspected);
   return (
     <div ref={whole} className="flex h-[calc(100svh-3rem)] min-h-96" aria-label="The factories">
       <div ref={frame} className="min-h-0 min-w-0 flex-1" style={{ marginRight: over }}>
@@ -98,9 +102,27 @@ function Floor({ blocks }: { blocks: readonly FactoryBlock[] }) {
   );
 }
 
-/** Fits the canvas in `frame` again (`FIT`) whenever the frame changes width: as the bar opens, switches or closes, and as the window does. */
-function useRefit(frame: RefObject<HTMLDivElement | null>) {
-  const { fitView } = useReactFlow();
+/**
+ * Keeps the canvas in `frame` readable beside the bar: brings the block `inspected` into view (`revealView`), at the zoom it has or zoomed
+ * out no further than `REVEAL_MIN_ZOOM`, as the bar shows it and as the frame changes width with it inspected; with none inspected, fits
+ * every block again (`FIT`) as the frame changes width, as when the bar closes or the window is resized.
+ */
+function useKeepClear(frame: RefObject<HTMLDivElement | null>, inspected: string | null) {
+  const { fitView, getNode, setViewport } = useReactFlow();
+  const store = useStoreApi();
+  const reveal = useEffectEvent((id: string) => {
+    const at = getNode(id)?.position;
+    if (!at || !frame.current) return;
+    const to = revealView({ ...at, ...BLOCK_SIZE }, store.getState().transform, sizeOf(frame.current), REVEAL_MIN_ZOOM);
+    if (to) void setViewport(to, { duration: 300 });
+  });
+  const resized = useEffectEvent(() => {
+    if (inspected) reveal(inspected);
+    else void fitView({ ...FIT, duration: 300 });
+  });
+  useEffect(() => {
+    if (inspected) reveal(inspected);
+  }, [inspected]);
   useEffect(() => {
     const el = frame.current;
     if (!el) return;
@@ -108,11 +130,11 @@ function useRefit(frame: RefObject<HTMLDivElement | null>) {
     const observer = new ResizeObserver(() => {
       if (el.clientWidth === width) return;
       width = el.clientWidth;
-      void fitView({ ...FIT, duration: 300 });
+      resized();
     });
     observer.observe(el);
     return () => observer.disconnect();
-  }, [frame, fitView]);
+  }, [frame]);
 }
 
 /** No factory, and no run in the default one: say how to make one. */

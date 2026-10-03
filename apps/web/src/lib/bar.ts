@@ -73,7 +73,9 @@ const sameBar = (one: Bar, other: Bar): boolean => barValue(one) === barValue(ot
 /** What the bar shows once `pressed` is pressed while it shows `open`: nothing, for the same thing again, else what was pressed. */
 export const nextBar = (open: Bar | undefined, pressed: Bar): Bar | undefined => (open && sameBar(open, pressed) ? undefined : pressed);
 
-/** The page Open visits from the bar: a factory's floor, a run's page, a step's session, or none for what is no page, the start of a run. */
+/**
+ * The page Open visits from the bar: a factory's floor, a run's page, a step's session, or none for what is no page, the start of a run.
+ */
 export type BarPage =
   | { to: '/factories/$factory'; params: { factory: string } }
   | { to: '/runs/$runId'; params: { runId: string } }

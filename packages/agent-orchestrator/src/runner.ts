@@ -295,6 +295,7 @@ export type {
   Unread,
 } from './place/place.ts';
 export { writeWorkflow } from './folder/write.store.ts';
+export { foldersIn } from './folder/lookup.store.ts';
 export type { AgentSchema, AgentSidecar, AgentWritten } from './agents/agents.store.ts';
 export { agentPlaces, agentRead, agentSkillsFound, findAgent, listAgents, type Readings } from './roster/roster.store.ts';
 export type { AgentPlace, AgentReading, AgentsRead, AgentUser, CardRead } from './roster/roster.ts';

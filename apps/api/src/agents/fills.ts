@@ -7,10 +7,10 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { fillsOf, lookupRoots, readFactories, type Factory, type Places } from 'agent-orchestrator';
+import { fillsOf, foldersIn, lookupRoots, readFactories, type Factory, type Places } from 'agent-orchestrator';
 import { AGENTS_FOLDER, frontmatterKey, stepFiles } from 'agent-orchestrator/workflow';
 import type { AgentListing } from './agents.ts';
-import { foldersIn, placesOf, sourcesOf, type WorkflowSource } from '../workflows/workflows.ts';
+import { placesOf, sourcesOf, type WorkflowSource } from '../workflows/workflows.ts';
 
 /** A step an agent fills: the step `step` of the workflow `workflow`, read from `from`, and whether a factory hired it there. */
 export type AgentFill = { from: WorkflowSource; workflow: string; step: string; hired: boolean };

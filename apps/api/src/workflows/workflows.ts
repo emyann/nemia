@@ -28,6 +28,7 @@ import {
   cardSkills,
   DEFAULT_FACTORY,
   fillsOf,
+  foldersIn,
   inboxNameRefusal,
   loadWorkflows,
   lookupRoots,
@@ -47,7 +48,6 @@ import {
   AGENTS_FOLDER,
   contextText,
   isFolderTeam,
-  SKILLS_FOLDER,
   splitFrontmatter,
   STEP_KEY_MEANINGS,
   STEP_KEYS,
@@ -450,36 +450,6 @@ export const specOf = (step: Workflow): WorkflowStepSpec => ({
   loop: step.loop ?? null,
   rounds: step.rounds ?? null,
 });
-
-/**
- * The folders directly in `dir`, sorted, a link to one included. None when `dir` is not there. A hidden folder is not a
- * workflow — `.git`, where a person keeps their workflows in git, or an editor's `.vscode` — so it is not listed, and no start
- * can name it; nor is `agents/`, whose files are the agents the workflows beside it name, nor `skills/`, the skills those agents give.
- */
-export function foldersIn(dir: string): string[] {
-  let names: string[];
-  try {
-    names = fs.readdirSync(dir);
-  } catch (err) {
-    if (['ENOENT', 'ENOTDIR'].includes((err as NodeJS.ErrnoException).code ?? '')) return [];
-    throw new Error(
-      `${dir} could not be listed (${err instanceof Error ? err.message : String(err)}), so no workflow in it is shown. Check its permissions.`,
-      {
-        cause: err,
-      },
-    );
-  }
-  return names
-    .filter((name) => {
-      if (name.startsWith('.') || name === AGENTS_FOLDER || name === SKILLS_FOLDER) return false;
-      try {
-        return fs.statSync(path.join(dir, name)).isDirectory();
-      } catch {
-        return false;
-      }
-    })
-    .sort();
-}
 
 const SHAPE =
   '`{ "workflow": "<name>", "brief": "<what to do>" }`, with `"from": "repo"` or `"yours"` when both have a workflow of that name, `"after": ["<runId>", …]` for the runs it waits on, and `"card": "<name>"` for an inbox card it starts';

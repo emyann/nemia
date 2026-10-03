@@ -131,6 +131,7 @@ const PINNED: Record<string, string[]> = {
     'firstLine',
     'forget',
     'forgetLine',
+    'foldersIn',
     'formerKeyLines',
     'freshFeedMemo',
     'freshStatsMemo',

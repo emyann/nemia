@@ -1,7 +1,7 @@
 /**
  * The vocabulary door, `src/vocabulary.ts`, is pure: the files its value imports reach, the door's own among them, are the harnesses'
- * vocabulary files, `harness/choices.ts` and `harness/reach.ts` alone, and none imports Effect or a module of node's. A caller that only judges words loads
- * it without loading a runner. Type-only imports are erased and let through.
+ * vocabulary files, `harness/choices.ts` and `harness/reach.ts` alone, and none imports Effect or a module of node's. A caller that only
+ * judges words loads it without loading a runner. Type-only imports are erased and let through.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

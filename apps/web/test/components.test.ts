@@ -4759,6 +4759,14 @@ test("the bar for a machine's state says its kind, the edges that keep it there,
   assert.match(a, /data-route-out="c".*?data-route-verb="close \[awaitsWord\]"/s, `the route to c lists the verb with its guard: ${a}`);
   assert.doesNotMatch(a, /data-routes-none|data-stays-none/, a);
 
+  const b = await stateBodyMarkup(graph, 'b');
+  assert.deepEqual(
+    [...b.matchAll(/data-route-out="([^"]+)"/g)].map((m) => m[1]),
+    ['c'],
+    `one route out, its edge and the verb along it on the one route: ${b}`,
+  );
+  assert.match(b, /data-route-out="c".*?END.*?→ end.*?data-route-verb="close \[awaitsWord\]"/s, b);
+
   const c = await stateBodyMarkup(graph, 'c');
   assert.match(c, /data-state-kind="final state"/, c);
   assert.match(c, /<p data-routes-none="true">none: it ends here<\/p>/, `a final state with nothing out says so: ${c}`);

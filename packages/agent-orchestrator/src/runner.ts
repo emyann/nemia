@@ -2,14 +2,15 @@
  * The package's root: what `agent-orchestrator` exports, each name re-exported by name from the file that holds it, and nothing else here.
  *
  * The runtime is reached through one client, `runtime-client.ts`, the only file that imports `agent-runtime`: it creates the runtime
- * (`engine()`, `HARNESSES`) and names its types. The controllers are a verb each, in its feature's folder, and each imports the client, or
- * a controller that does, never the runtime: `views.verb.ts` (what the runtime's views of a run's tasks say), `start.verb.ts`,
- * `plan.verb.ts` and `inbox.verb.ts` (starting runs, plans and inbox cards), `tick.verb.ts` and `advance.verb.ts` (a pass — `tick`,
- * `advance` — and the filings it adopts), what a person asks of a run (`cancel.verb.ts`, `retry.verb.ts`, `gate.verb.ts`, `say.verb.ts`,
- * `wait.verb.ts`, `round.verb.ts`), the table of the commands that call them, each defined once (`commands.verb.ts`), `forget.verb.ts`
- * and `prune.verb.ts` (`wf rm` and `wf prune`), `list.verb.ts` and `decide.verb.ts` (what a person reads of a run: `wf ls` and
- * `wf decide`), and `stats.verb.ts` (what the store's runs add up to: `wf stats`). They import
- * one way — views and starting beneath the tick, the tick beneath the rest — so no cycle forms among them (`test/boundary.test.ts`).
+ * (`engine()`, `HARNESSES`) and names its types. Its words come through its pure door, `agent-runtime/vocabulary`, which any file imports:
+ * `HARNESS_CHOICES`, the words each harness takes per key, is re-exported from there. The controllers are a verb each, in its feature's
+ * folder, and each imports the client, or a controller that does, never the runtime: `views.verb.ts` (what the runtime's views of a run's
+ * tasks say), `start.verb.ts`, `plan.verb.ts` and `inbox.verb.ts` (starting runs, plans and inbox cards), `tick.verb.ts` and
+ * `advance.verb.ts` (a pass — `tick`, `advance` — and the filings it adopts), what a person asks of a run (`cancel.verb.ts`,
+ * `retry.verb.ts`, `gate.verb.ts`, `say.verb.ts`, `wait.verb.ts`, `round.verb.ts`), the table of the commands that call them, each defined
+ * once (`commands.verb.ts`), `forget.verb.ts` and `prune.verb.ts` (`wf rm` and `wf prune`), `list.verb.ts` and `decide.verb.ts` (what a
+ * person reads of a run: `wf ls` and `wf decide`), and `stats.verb.ts` (what the store's runs add up to: `wf stats`). They import one way —
+ * views and starting beneath the tick, the tick beneath the rest — so no cycle forms among them (`test/boundary.test.ts`).
  *
  * What of the I/O never names the engine sits beneath the controllers, and this file re-exports what it exported of them:
  * `record.store.ts` (a run's id, its files' names, a step's check stderr, artifacts and inputs), `files.store.ts` (the run store a run's
@@ -310,7 +311,8 @@ export {
   readFactory,
   removeFactory,
 } from './factory/factory.store.ts';
-export { HARNESS_CHOICES, HARNESSES, engine, remoteAgents } from './runtime-client.ts';
+export { HARNESSES, engine, remoteAgents } from './runtime-client.ts';
+export { HARNESS_CHOICES } from 'agent-runtime/vocabulary';
 export { A2A_AGENTS_FILE, envNameOf } from './harness/a2a.store.ts';
 export {
   closeoutAsked,

@@ -50,12 +50,12 @@ import { folderOf, foldersIn, listed, placesOf, specOf, versionOf, type Workflow
 /**
  * How a key is set on a step's form, which is what its value is in JSON: `steps`, a list of the workflow's steps (`after`, `input`);
  * `step`, one of them (`resume`, `loop`); `choice`, one of `choices` (`harness`); `harness-word`, one of the words the step's harness takes
- * (`byHarness`: `effort`, `permissionMode`, `sandbox` — a harness absent from `byHarness` takes no such key: codex no `permissionMode`,
- * Claude Code no `sandbox`); `text`, one line (`model`, `check`); `list`, names (`tools`, `disallowedTools`); `count`, a whole number;
- * `dollars`, an amount; `tokens`, a number of tokens, which the form writes as a person does (`context`, `200k`); `flag`, `true` or `false`
- * as `choices` has them (`background`, `remote`, `gate`); `schema`, a file beside the step (`output`). `workspace` is a `choice` of its
- * words, `main` and `folder`, `slot` of one word, `none`, and `denials` of one, `fail`, since a step either says it or says nothing.
- * `agent` is a `choice` of the agents in yours' `agents/`, the only folder the builder writes the steps of.
+ * (`byHarness`: `effort`, `permissionMode`, `sandbox` — a harness absent from `byHarness` takes no such key); `text`, one line (`model`,
+ * `check`); `list`, names (`tools`, `disallowedTools`); `count`, a whole number; `dollars`, an amount; `tokens`, a number of tokens, which
+ * the form writes as a person does (`context`, `200k`); `flag`, `true` or `false` as `choices` has them (`background`, `remote`, `gate`);
+ * `schema`, a file beside the step (`output`). `workspace` is a `choice` of its words, `main` and `folder`, `slot` of one word, `none`, and
+ * `denials` of one, `fail`, since a step either says it or says nothing. `agent` is a `choice` of the agents in yours' `agents/`, the only
+ * folder the builder writes the steps of.
  */
 export type KeyKind = 'steps' | 'step' | 'choice' | 'harness-word' | 'text' | 'list' | 'count' | 'dollars' | 'tokens' | 'flag' | 'schema';
 

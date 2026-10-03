@@ -17,12 +17,8 @@ import path from 'node:path';
 import { Context, Effect, Layer } from 'effect';
 import { Engine as RuntimeEngine, promiseEngine } from 'agent-runtime/effect';
 import {
-  CLAUDE_EFFORTS,
-  CLAUDE_PERMISSION_MODES,
   claudeDetached,
   codex,
-  CODEX_EFFORTS,
-  CODEX_SANDBOXES,
   commandHarness,
   remoteConfigRefusal,
   type Credentials,
@@ -49,17 +45,6 @@ export { refusedText } from 'agent-runtime';
  * `wf retry` ask of a step's filed config before anything is written, and word in the step's keys (`filedRefusal`).
  */
 export { configRefusal } from 'agent-runtime';
-
-/**
- * The words each harness a step runs on takes for a key of the runtime's vocabulary — `effort`, `permissionMode`, `sandbox` — keyed by
- * the key, then by the harness: the runtime's own lists, which it judges a step's line by at `wf start` (`configRefusal`). A harness with
- * no list for a key has no such knob. What the api's builder offers on each step's form.
- */
-export const HARNESS_CHOICES: Readonly<Record<'effort' | 'permissionMode' | 'sandbox', Readonly<Record<string, readonly string[]>>>> = {
-  effort: { claude: CLAUDE_EFFORTS, codex: CODEX_EFFORTS, 'claude-detached': CLAUDE_EFFORTS },
-  permissionMode: { claude: CLAUDE_PERMISSION_MODES, 'claude-detached': CLAUDE_PERMISSION_MODES },
-  sandbox: { codex: CODEX_SANDBOXES },
-};
 
 /**
  * Why one task's journal does not read, in the runtime's words, when `err` is what a read of it rejected with — the runtime's

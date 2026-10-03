@@ -648,8 +648,8 @@ then, only a sentence in the reviewer's brief.
 **The engine is the source of these words.** The load keeps no copy of the permission modes, sandboxes, efforts and
 windows each harness takes: `wf start` and `wf retry` ask the runtime's `configRefusal` of every step's filed
 config before anything is written, and say its words after the step's line (`configRefused`). The board's form offers
-the runtime's own lists (`HARNESS_CHOICES`, through the client). The load keeps only what the runtime cannot refuse:
-`tools:` on codex, `skills:` and `harnessPrompt:` on codex or a remote agent, and `sandbox:` on Claude Code, which
+the runtime's own lists (`HARNESS_CHOICES`, through the runtime's vocabulary door, `agent-runtime/vocabulary`). The load
+keeps only what the runtime cannot refuse: `tools:` on codex, `skills:` and `harnessPrompt:` on codex or a remote agent, and `sandbox:` on Claude Code, which
 would be filed as a mode.
 
 ### A job, or a session that stays: `background:`

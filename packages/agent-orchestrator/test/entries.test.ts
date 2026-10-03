@@ -605,3 +605,9 @@ test('each entry exports exactly its pinned names', async () => {
     assert.deepEqual(drift(entry, Object.keys(await import(entry)), pinned), [], entry);
   }
 });
+
+test("HARNESS_CHOICES, which the api offers on a step's form, is the runtime's own table from its vocabulary door, not a copy", async () => {
+  const { HARNESS_CHOICES } = await import('agent-orchestrator');
+  const vocabulary = await import('agent-runtime/vocabulary');
+  assert.equal(HARNESS_CHOICES, vocabulary.HARNESS_CHOICES);
+});

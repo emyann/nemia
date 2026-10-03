@@ -46,7 +46,8 @@ inbox, factories, stats, agent definitions.
   in `src/start/start.verb.ts`), and what they reach — how two fence words compare, the mode a session is held to its directory in,
   the modes a background session runs in unasked, the models that drop `auto` — is the runtime's answer, read at load through its
   pure door (`fenceReach` from `agent-runtime/vocabulary`, in `src/workflow/fence.ts`, `src/workflow/validate.ts` and
-  `src/workflow/step-file.ts`); the refusals' words stay the orchestrator's;
+  `src/workflow/step-file.ts`); the refusals' words stay the orchestrator's. The board's form offers the runtime's own words per key
+  and harness, `HARNESS_CHOICES` from the same door, which the root entry re-exports for the api;
 
 **In the api today, below its layer**: `runsInOf` in `src/detail/detail.ts` reading a
 harness's argv for a mode, and `src/capabilities/reach.ts` re-implementing permission matching. Its readers that touch the machine
@@ -150,7 +151,7 @@ agent-runtime, a type included (`CLIENT` in test/boundary.test.ts). It creates t
 runtime's `Engine` service from `agent-runtime/effect`, provided as a layer, each verb run as a Promise for the controllers
 (`engineOf`, which a test hands a layer of its own). It passes the runtime's surface through rather than wrapping it. Every controller beneath the CLI reaches it, itself or
 through a controller it imports, and it imports no controller. The runtime's behaviour comes through the client; its vocabulary through
-its pure door, `agent-runtime/vocabulary` (`src/vocabulary.ts`: the words each harness takes and `fenceReach`, with no Effect and no
+its pure door, `agent-runtime/vocabulary` (`src/vocabulary.ts`: the words each harness takes, per key (`HARNESS_CHOICES`), and `fenceReach`, with no Effect and no
 I/O, held by `packages/agent-runtime/test/vocabulary-door.test.ts`), which any file of the orchestrator imports, a pure one included
 (`VOCABULARY` in test/boundary.test.ts).
 

@@ -426,7 +426,8 @@ const mcpFileOf = (root: string, name: string) => path.join(root, 'mcp', `${name
  *    asking a person who is not there. In `dontAsk` a mode that never asks also never allows a write, not even in the
  *    session's own cwd, so a fenced session that must write its own work is given `Edit(**)`, a glob resolved against
  *    its `cwd`: unscoped (`Write`) it would write anywhere, scoped it is denied outside. A deny still beats it. An edit
- *    under each writable mount is allowed here too (`claudeAllows`). Then `--add-dir` and each mount's path (`claudeMountArgs`), variadic, ended by the flag after it.
+ *    under each writable mount is allowed here too (`claudeAllows`). Then `--add-dir` and each mount's path
+ *    (`claudeMountArgs`), variadic, ended by the flag after it.
  * 4. The caller's own flags (`claudeFlagsOf`), Remote Control among them only when the task asks (`remoteControl`):
  *    the session bridged to claude.ai and listed in its agents view, where it can be driven from a browser or a
  *    phone, not only seen. A `--bg` session gets a `bridgeSessionId` only with this flag.

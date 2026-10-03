@@ -44,7 +44,7 @@ export type Workflow = {
    * `writable: [web]`: the folders of the run's factory this step may write, each by its directory's name. A run in a factory mounts its
    * other repositories read-only for every local step; this step alone is given the ones it names writable, and one that is the run's
    * own repository is its workspace already, and mounts nothing. It widens where the step's writes reach, never what it may do: refused
-   * at load over a fence that writes nothing (`writableFenceRefusal`) and on a remote agent, and at `wf start` when a name is no folder
+   * at load over a fence that writes nothing (`refuseUnwritable`) and on a remote agent, and at `wf start` when a name is no folder
    * of the factory, or two share it (`writableRefusal`), and on a harness that cannot hold a writable mount.
    */
   writable?: string[];

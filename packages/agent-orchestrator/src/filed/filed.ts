@@ -9,9 +9,9 @@ import { stepMounts } from '../factory/factory.ts';
  * The harness's arguments a step is filed with, which the engine carries to the runner unread (`HarnessArgs`), all from the workflow
  * the run froze: its model and cap as the filing chooses them (`t`), its context window off the session it continues
  * (`sessionContext`), its deny list with an ending's (`filedDenies`), its allow list with an ending's read of the run's artifacts folder
- * (`runArtifacts`, `filedAllows`), the folders the run mounts (`mounts`, frozen at start), writable where the step's `writable:` names one (`stepMounts`), and the harness's own arguments (`own`)
- * last. The runtime judges no budget: `budgetUsd` is the harness's own cap, and whether the step went over is this package's
- * (`ownStatus`). Pure.
+ * (`runArtifacts`, `filedAllows`), the folders the run mounts (`mounts`, frozen at start), writable where the step's `writable:` names
+ * one (`stepMounts`), and the harness's own arguments (`own`) last. The runtime judges no budget: `budgetUsd` is the harness's own cap,
+ * and whether the step went over is this package's (`ownStatus`). Pure.
  */
 export const filedConfig = <Own extends object>(
   step: Workflow,

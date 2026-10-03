@@ -42,7 +42,7 @@ import {
 import { codexModeWritten, codexSandboxNamed, FORMER_KEYS, formerKeyWritten, readKeys, type Spelled } from '../former/former.ts';
 import type { Agent, Agents, SkillsFound } from '../agents/agents.ts';
 import { tallyOf } from '../tally/tally.ts';
-import { addedSkillsRefusal, fenceRefusal, writableFenceRefusal } from './fence.ts';
+import { addedSkillsRefusal, fenceRefusal, refuseUnwritable } from './fence.ts';
 
 /**
  * One step, from its file's text.
@@ -86,8 +86,7 @@ export function parseWorkflow(
       refuse(
         `${name}: \`skills: ${meta.skills}\` adds skills to the step's agent, and this step has none. Name one — \`agent: <name>\` — whose skills these add to, or delete the line.`,
       );
-    const unwritten = writableFenceRefusal(step, undefined);
-    if (unwritten) refuse(unwritten);
+    refuseUnwritable(step, undefined);
     return step;
   }
   const agent = agentOf(name, attached, agents, hired);
@@ -101,8 +100,7 @@ export function parseWorkflow(
   const fromAgent = meta.output === undefined && agent.keys.output !== undefined;
   const step = stepFrom(name, { ...inherited, ...meta }, body, fromAgent ? agent.read : read, spelled);
   agentStepRefusal(name, agent, meta, step, skills);
-  const unwritten = writableFenceRefusal(step, agent.name);
-  if (unwritten) refuse(unwritten);
+  refuseUnwritable(step, agent.name);
   const added = step.skills?.filter((skill) => !agent.skills?.includes(skill));
   const sessionSkills = [...(agent.skills ?? []), ...(added ?? [])];
   const keys = STEP_KEYS.filter((key) => Object.hasOwn(meta, key));

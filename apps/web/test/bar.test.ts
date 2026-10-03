@@ -15,6 +15,7 @@ import {
   inspects,
   nextBar,
   parseWidth,
+  specStep,
   type Bar,
 } from '../src/lib/bar.ts';
 
@@ -124,6 +125,14 @@ test("pressing the workflow's step the bar shows closes it, and another step, th
   assert.deepEqual(nextBar(SPEC, mine), mine, 'the same workflow and step, read from yours');
   const ran: Bar = { kind: 'step', run: 'dev', step: 'review' };
   assert.deepEqual(nextBar(SPEC, ran), ran, "a run's step of the same name");
+});
+
+test("a workflow's canvas and its Build read the step the bar shows of that workflow alone: not another's, nor yours of the same name", () => {
+  assert.equal(specStep(SPEC, 'repo', 'dev'), 'review');
+  assert.equal(specStep(SPEC, 'yours', 'dev'), null, 'yours, of the same name');
+  assert.equal(specStep(SPEC, 'repo', 'other'), null, 'another workflow');
+  assert.equal(specStep({ kind: 'step', run: 'dev', step: 'review' }, 'repo', 'dev'), null, "a run's step");
+  assert.equal(specStep(undefined, 'repo', 'dev'), null, 'no bar');
 });
 
 test("Open visits a workflow's step's page for a workflow's step", () => {

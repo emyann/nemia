@@ -121,6 +121,10 @@ export function barOpens(bar: Bar): BarPage | null {
   }
 }
 
+/** The step of the workflow `workflow` read from `from` that `open` shows, or null for a bar that shows none of its steps. */
+export const specStep = (open: Bar | undefined, from: string, workflow: string): string | null =>
+  open?.kind === 'spec' && open.from === from && open.workflow === workflow ? open.step : null;
+
 /**
  * Whether `open` is something a canvas inspects — everything the bar shows but the start of a run — which a press on the empty canvas
  * closes; never the start of a run, whose half-typed brief a press beside it would lose, and nothing for a bar already closed.

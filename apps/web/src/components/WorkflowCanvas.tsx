@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, type RefObject } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { Background, BackgroundVariant, type Edge, Position, ReactFlow, ReactFlowProvider, useReactFlow } from '@xyflow/react';
 import type { RunDetail, WorkflowListing } from '../lib/api';
+import { specStep } from '../lib/bar';
 import { extentOf, layout, stepsOf } from '../lib/layout';
 import { useBarOver } from '../lib/useBarOver';
 import { useCanvasPress } from '../lib/useCanvasPress';
@@ -197,7 +198,7 @@ function Graph({ workflow, drawn }: { workflow: WorkflowListing; drawn: Drawn })
     (step) => ({ kind: 'spec', from, workflow: name, step }),
     (step) => void navigate({ to: '/workflows/$from/$workflow/$step', params: { from, workflow: name, step } }),
   );
-  const inspected = shown?.kind === 'spec' && shown.from === from && shown.workflow === name ? shown.step : null;
+  const inspected = specStep(shown, from, name);
   const nodes = useMemo(
     () => drawn.nodes.map((node) => ({ ...node, data: { ...node.data, inspected: node.id === inspected } })),
     [drawn, inspected],

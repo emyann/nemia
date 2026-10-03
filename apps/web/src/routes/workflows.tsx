@@ -9,6 +9,7 @@ import { WorkflowBuilder } from '../components/WorkflowBuilder';
 import { WorkflowCanvas } from '../components/WorkflowCanvas';
 import { factoriesQuery, workflowsQuery, type WorkflowListing } from '../lib/api';
 import { workflowFactories } from '../lib/factories';
+import { specStep } from '../lib/bar';
 import { useBar } from '../lib/useBar';
 
 export const Route = createFileRoute('/workflows')({
@@ -161,7 +162,7 @@ function useBuilding(workflow: WorkflowListing, opened: boolean): [building: boo
   const [building, setBuilding] = useState(opened && workflow.from === 'yours' && !workflow.error);
   const { open, close } = useBar();
   const build = () => {
-    if (open?.kind === 'spec' && open.from === workflow.from && open.workflow === workflow.name) close();
+    if (specStep(open, workflow.from, workflow.name) !== null) close();
     setBuilding(true);
   };
   return [building, build, () => setBuilding(false)];

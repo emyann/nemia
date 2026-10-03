@@ -26,15 +26,7 @@ export function StepBar({ run: id, step: name }: { run: string; step: string }) 
 /** What the step bar holds for the step `name` of the run `id`, as `run` was last read and `error` its read's failure, if any. */
 function StepBody({ id, name, run, error }: { id: string; name: string; run: RunDetail | undefined; error: unknown }) {
   if (run && runGone(error)) return <RunGone run={run} />;
-  if (!run) {
-    return error ? (
-      <p className="text-sm text-red-700 dark:text-red-400">
-        Could not read the run {id}: {error instanceof Error ? error.message : 'the api gave no reason'}
-      </p>
-    ) : (
-      <p className="text-xs text-neutral-500">Reading the run…</p>
-    );
-  }
+  if (!run) return <Unread id={id} error={error} />;
   const step = run.steps.find((s) => s.name === name);
   if (!step) {
     return (
@@ -44,4 +36,15 @@ function StepBody({ id, name, run, error }: { id: string; name: string; run: Run
     );
   }
   return <StepTabs run={run} step={step} className="h-full" />;
+}
+
+/** A bar's body for the run `id` not read yet: that it is read, or, with `error`, why the read failed. */
+export function Unread({ id, error }: { id: string; error: unknown }) {
+  return error ? (
+    <p className="text-sm text-red-700 dark:text-red-400">
+      Could not read the run {id}: {error instanceof Error ? error.message : 'the api gave no reason'}
+    </p>
+  ) : (
+    <p className="text-xs text-neutral-500">Reading the run…</p>
+  );
 }

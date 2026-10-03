@@ -19,7 +19,9 @@ description: "Build a change from its spec in this repository: tests first where
    `npm run build` and `npm run e2e`, then read the pictures it writes with the `look` skill. Green is the floor, not the bar.
    You run as a job, and a turn you end is your last: run each long command in the foreground, under the 10-minute limit of one call,
    or start it in the background and wait on it with a blocking call (`timeout 580 bash -c "while kill -0 <pid>; do sleep 5; done"`).
-   Never sign off while a check you started is still running.
+   Never sign off while a check you started is still running. Stop only what you started: bound it with `timeout`, or keep the pid of
+   what you start in the background (`$!`) and `kill <pid>`. Never `pkill` or `killall`: other runs share this machine, and your fence
+   refuses them.
 6. **Never make it pass by weakening it**: a test loosened, a ceiling raised in `.oxlintrc.json`, a check skipped. Cut the function; lower
    the ceiling of a file you shrank.
 7. **Answer the review**, from the second round: for each finding, fix it, or say in `replies` why not (`won't fix`, and the reason). A

@@ -209,9 +209,9 @@ export type Workflow = {
   rounds?: number;
   /**
    * The agent attached to the step (`agent:`), and what the step said itself: the keys its own file set — never `agent` — and its own note.
-   * The step's keys and body above are already resolved: the agent's role keys where the step sets none, and its instructions before the
-   * note. What the rest of the run reads is those; this says where each came from, which is what the step's file is written back from
-   * (`renderStep`). Absent on a step that names no agent.
+   * The step's keys and body above are already resolved: the agent's role keys where the step sets none, and its instructions, then a
+   * person's custom instructions for it, before the note. What the rest of the run reads is those; this says where each came from, which is
+   * what the step's file is written back from (`renderStep`). Absent on a step that names no agent.
    */
   agent?: StepAgent;
 };
@@ -234,6 +234,11 @@ export type StepAgent = {
    * Absent on a record without them, whose step is told both in its brief.
    */
   instructions?: string;
+  /**
+   * The person's custom instructions for the agent (`custom-instructions/<agent>.md` in their store), as the step was resolved and frozen
+   * at `wf start`: told after the agent's instructions and before the step's own note, so a later edit reaches no run already started.
+   */
+  customInstructions?: string;
   skills?: string[];
   harnessPrompt?: HarnessPrompt;
 };

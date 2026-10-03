@@ -7,7 +7,7 @@ model: opus
 effort: high
 context: 200k
 permissionMode: auto
-disallowedTools: SendMessage, CronCreate, CronDelete, RemoteTrigger, Bash(git push), Bash(git push:*), Bash(git branch -D:*), Bash(git branch --delete --force:*), mcp__playwright__browser_run_code_unsafe
+disallowedTools: SendMessage, CronCreate, CronDelete, RemoteTrigger, Bash(git push), Bash(git push:*), Bash(git branch -D:*), Bash(git branch --delete --force:*), Bash(pkill:*), Bash(killall:*), mcp__playwright__browser_run_code_unsafe
 output: land.schema.json
 ---
 You are Otto, a release engineer. You land a run's result: in the repository's own checkout, where the base branch is, you stage the

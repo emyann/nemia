@@ -164,7 +164,7 @@ export default {
         );
       }
       await photograph(page, path.join(OUT, `factory-gate-long-names-card-${await themeOf(page)}.png`), { fullPage: true });
-      await card.locator('time').click();
+      await card.getByRole('button', { name: 'Show steps' }).click();
       await expectCount(card.locator('[data-tile]'), LONG_NAMES.steps.length, 'the card opens into a tile per step');
       for (const name of LONG_NAMES.steps) {
         await expectCount(

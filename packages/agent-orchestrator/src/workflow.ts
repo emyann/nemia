@@ -61,13 +61,10 @@ export {
 } from './harness/harness.ts';
 export {
   allowRuleOf,
-  AUTO_UNSUPPORTED,
   contextText,
-  DEFAULT_PERMISSION_MODE,
   DENIALS,
   disallowedBy,
   dollarsOf,
-  keepsAuto,
   sessionContext,
   SKILL_NAME,
   SLOTS,

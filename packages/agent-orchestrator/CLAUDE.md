@@ -2,7 +2,8 @@
 
 Workflows as folders of markdown, runs of their steps, a tick that files and admits them on the runtime, and the verbs a person uses:
 run slots, worktrees and landing, what a check means, budgets across tries, gates, the inbox, factories, stats, agent definitions. It
-reaches the runtime through `src/runtime-client.ts` alone (`CLIENT` in `test/boundary.test.ts`). Its files are pure, store, controller
+reaches the runtime through `src/runtime-client.ts` alone (`CLIENT` in `test/boundary.test.ts`), and its vocabulary through
+`agent-runtime/vocabulary`, from any file (`VOCABULARY`). Its files are pure, store, controller
 or the client (`test/boundary.test.ts`), and its folders are held by `test/layout.test.ts`. What it holds today that is a candidate for
 the runtime is in `docs/architecture.md`, *Who owns what*.
 

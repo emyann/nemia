@@ -9,6 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import type { Engine } from 'agent-runtime';
 import { scratch } from './scratch.ts';
 
@@ -159,4 +160,110 @@ test('REFUSED at shipped defaults: a card for an agent whose skill says no descr
       return true;
     },
   );
+});
+
+const CUSTOM = path.join(ROOT, 'custom-instructions');
+
+/** What `wf agents custom` refused, run in-process: its message, with its exit code checked. */
+const customRefused = async (t: Mock, ...argv: string[]): Promise<string> => {
+  let said = '';
+  await assert.rejects(
+    () => printedBy(t, 'agents', 'custom', ...argv),
+    (err: Error & { exitCode?: number }) => {
+      assert.equal(err.exitCode, 2, err.message);
+      said = err.message;
+      return true;
+    },
+  );
+  return said;
+};
+
+test('wf agents custom writes your words for an agent into your store, prints them bare, lists them, and removes them with --clear', async (t) => {
+  const repo = repoAt('custom');
+  anAgent(path.join(repo, 'workflows', 'agents'), 'scribe', 'Writes it down.');
+  const words = path.join(repo, 'words.md');
+  fs.writeFileSync(words, 'Write it down in French.\n');
+  const file = path.join(CUSTOM, 'scribe.md');
+
+  assert.match((await printedBy(t, 'agents', 'custom', 'scribe', '--repo', repo)).out, /^scribe has no custom instructions\. Set them/);
+  const written = (await printedBy(t, 'agents', 'custom', 'scribe', '--file', words, '--repo', repo)).out;
+  assert.ok(written.includes(file) && written.includes('a run already started keeps the words it was started with'), written);
+  assert.equal(fs.readFileSync(file, 'utf8'), 'Write it down in French.\n');
+  assert.equal((await printedBy(t, 'agents', 'custom', 'scribe', '--repo', repo)).out, `${file}\n\nWrite it down in French.`);
+  assert.ok((await printedBy(t, 'agents', '--repo', repo)).out.includes(`   custom instructions: ${file}`));
+
+  assert.match((await printedBy(t, 'agents', 'custom', 'scribe', '--clear', '--repo', repo)).out, /^scribe: custom instructions removed/);
+  assert.equal(fs.existsSync(file), false);
+  assert.match(
+    (await printedBy(t, 'agents', 'custom', 'scribe', '--clear', '--repo', repo)).out,
+    /^scribe has no custom instructions to remove$/,
+  );
+  assert.equal((await printedBy(t, 'agents', '--repo', repo)).out.includes('custom instructions:'), false);
+});
+
+test('wf agents custom replaces a link at the file with the words, and never writes through it', async (t) => {
+  const repo = repoAt('custom-link');
+  anAgent(path.join(repo, 'workflows', 'agents'), 'scribe', 'Writes it down.');
+  const outside = path.join(repo, 'outside.md');
+  fs.writeFileSync(outside, 'Not yours to change.\n');
+  const words = path.join(repo, 'words.md');
+  fs.writeFileSync(words, 'Write it down in French.\n');
+  const file = path.join(CUSTOM, 'scribe.md');
+  fs.mkdirSync(CUSTOM, { recursive: true });
+  fs.symlinkSync(outside, file);
+  try {
+    await printedBy(t, 'agents', 'custom', 'scribe', '--file', words, '--repo', repo);
+    assert.equal(fs.readFileSync(outside, 'utf8'), 'Not yours to change.\n');
+    assert.equal(fs.lstatSync(file).isSymbolicLink(), false);
+    assert.equal(fs.readFileSync(file, 'utf8'), 'Write it down in French.\n');
+  } finally {
+    fs.rmSync(file, { force: true });
+  }
+});
+
+test("wf agents custom takes an agent of the repository's .claude/agents, and reads the words from stdin with --file -", () => {
+  const repo = repoAt('claude');
+  fs.mkdirSync(path.join(repo, '.claude', 'agents'), { recursive: true });
+  fs.writeFileSync(path.join(repo, '.claude', 'agents', 'helper.md'), '---\ndescription: Helps.\n---\nHelp.\n');
+  const wf = path.join(import.meta.dirname, '..', 'bin', 'wf.ts');
+  const ran = spawnSync(process.execPath, [wf, 'agents', 'custom', 'helper', '--file', '-', '--repo', repo], {
+    input: 'Help in French.\n',
+    env: { ...process.env, WF_ROOT: ROOT },
+    encoding: 'utf8',
+  });
+  assert.equal(ran.status, 0, `${ran.stdout}\n${ran.stderr}`);
+  assert.equal(fs.readFileSync(path.join(CUSTOM, 'helper.md'), 'utf8'), 'Help in French.\n');
+  fs.rmSync(path.join(CUSTOM, 'helper.md'));
+});
+
+test('REFUSED at shipped defaults: wf agents custom for no agent, with --file and --clear, from no file, blank, or with a frontmatter block — writing nothing', async (t) => {
+  const repo = repoAt('custom-refused');
+  anAgent(path.join(repo, 'workflows', 'agents'), 'scribe', 'Writes it down.');
+  const text = (name: string, words: string): string => {
+    const at = path.join(repo, name);
+    fs.writeFileSync(at, words);
+    return at;
+  };
+  const ghost = await customRefused(t, 'ghost', '--file', text('ghost.md', 'Boo.\n'), '--repo', repo);
+  assert.ok(
+    ghost.startsWith('no agent named ghost where a run on ') && ghost.includes('The agents there: scribe.') && ghost.includes('--repo <r>'),
+    ghost,
+  );
+  assert.match(
+    await customRefused(t, 'scribe', '--file', text('both.md', 'Both.\n'), '--clear', '--repo', repo),
+    /^wf agents custom takes --file or --clear, not both/,
+  );
+  assert.match(
+    await customRefused(t, 'scribe', '--file', path.join(repo, 'nowhere.md'), '--repo', repo),
+    /^wf agents custom cannot read .*nowhere\.md/,
+  );
+  assert.match(
+    await customRefused(t, 'scribe', '--file', text('blank.md', ' \n\n'), '--repo', repo),
+    /^the custom instructions for scribe are blank/,
+  );
+  const keyed = await customRefused(t, 'scribe', '--file', text('keyed.md', '---\ntools: Bash\n---\nUse Bash.\n'), '--repo', repo);
+  assert.ok(keyed.includes('opens with a frontmatter block') && keyed.includes('Custom instructions only add words'), keyed);
+  assert.ok(keyed.includes("Put a key in the agent's own file or on a step"), keyed);
+  assert.equal(fs.existsSync(path.join(CUSTOM, 'scribe.md')), false);
+  assert.equal(fs.existsSync(path.join(CUSTOM, 'ghost.md')), false);
 });

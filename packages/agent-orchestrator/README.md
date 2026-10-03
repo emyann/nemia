@@ -349,8 +349,9 @@ workflow — the listings skip it, and a workflow named `agents` is refused by n
 At `wf start` each node is resolved and frozen on the run, so a run never reads `agents/` again, from a worktree or
 anywhere: the agent's keys are the defaults, a key the step writes wins — a fence key only narrows the agent's (*Four layers*, below) —
 and the refusals that depend on the harness read the merged keys and name the step. On codex, and on a step that continues another's
-session (`resume:`), the brief is the agent's instructions, a blank line, then the step's own words; on Claude Code the instructions go
-after Claude Code's own prompt (*An agent rendered for Claude Code*, below) and the brief is the step's own words alone. `renderStep`
+session (`resume:`), the brief is the agent's instructions, then your custom instructions for it (*Four layers*, below), then the step's
+own words, each after a blank line; on Claude Code the instructions and the custom instructions go after Claude Code's own prompt (*An
+agent rendered for Claude Code*, below) and the brief is the step's own words alone. `renderStep`
 writes a resolved step back as its file was: `agent:`, the keys the step set itself, and its own note, never the agent's. `wf start` names
 each node's agent beside it — `implement (implementer) → review (reviewer) → ship (shipper)` — and a node with nothing attached by its
 name alone.
@@ -360,7 +361,15 @@ name alone.
 What an agent is told comes in four layers, each written by whoever owns it:
 
 1. **Instructions** — the agent's own body, written once in its file: who it is and how it works, whatever node it is attached to.
-2. **Custom instructions** — what a person adds to an agent they use without rewriting it. Coming, not built.
+2. **Custom instructions** — what a person adds to an agent they use without rewriting it, any agent, the repository's or their own. They
+   are kept in the person's store, one file per agent name, `$WF_ROOT/custom-instructions/<agent>.md`
+   (`~/.agent-workflows/custom-instructions/<agent>.md` by default), never in the agent's folder, which may be the repository's; the
+   same words reach whichever agent of that name a run finds. `wf agents custom <name> --file <path>` writes them (`--file -` reads
+   stdin), `wf agents custom <name>` prints them, and `--clear` removes them; it refuses a name no place has, blank words, and a
+   frontmatter block. They only add words: they set no key, so they never widen the agent's fence, give it a tool, or change its model,
+   mode or skills — a frontmatter block written by hand, or a link, stops a start of every step naming the agent, naming the file.
+   `wf start` reads them once and freezes them with the step (`StepAgent.customInstructions`): a run started before an edit or a
+   `--clear` keeps the words it froze, and only runs started after it get the new ones.
 3. **The step's policy** — the step's own words and keys: what this node of this process asks of whoever does its work — a role's
    policies, *in this team, also check …*, or a `ship` step telling its shipper why a build and an e2e matter on a merged tree. It is a
    normal layer, the place a process says what it expects of a role. A step's `skills:` adds skills to its agent's, and takes none away
@@ -433,7 +442,8 @@ says it can do can be corrected without touching a run in flight. `agentVersion`
 card moves with the version, and the board refuses a save against a stale read. The Claude Code skill is the machinery: the folder a
 session loads through the `Skill` tool. The card entry is the sentence about it.
 
-`wf agents` lists both places, each agent by its description with its skills under it. `wf agents card <name>` prints one
+`wf agents` lists both places, each agent by its description with its skills under it, and the file of your custom instructions for it
+when you have some (*Four layers*, above; `wf agents custom <name>` prints, writes or clears them). `wf agents card <name>` prints one
 in the shape of an A2A Agent Card, JSON on stdout and nothing else:
 
 ```
@@ -467,11 +477,11 @@ tools: Read, Edit, Skill
 You write notes. Load `write-a-note` before you start.
 ```
 
-A Claude Code step whose agent has instructions, skills or a `harnessPrompt:` other than `keep` is *rendered* at `wf start`, under
+A Claude Code step whose agent has instructions, custom instructions, skills or a `harnessPrompt:` other than `keep` is *rendered* at `wf start`, under
 `runs/<id>/agents/<step>/`, frozen with the run as its workflow is (`agents/agents.ts`, `writeAgentFiles` in `agents/agents.store.ts`), and filed with
 Claude Code's flags for it in the engine's `config.claude` (docs/spike-2026-09-25-agents-skills.md says what each was measured to do):
 
-- `prompt.md` — the instructions, then a line naming each skill by its namespaced name, then the whole text of each skill whose
+- `prompt.md` — the instructions, then your custom instructions for the agent, then a line naming each skill by its namespaced name, then the whole text of each skill whose
   SKILL.md says `preload: true`. `--append-system-prompt-file` appends it to Claude Code's own prompt, which is kept (F1).
 - `nemia-<agent>/` — a plugin of the step's own (`--plugin-dir`, F4, F5): `skills/<name>/`, each copied whole from where the load found
   it, so a session loads them with the `Skill` tool as `nemia-<agent>:<name>`, and nothing of the machine's own plugins is touched.
@@ -522,8 +532,8 @@ naming each place looked in; skills with no `Skill` in the step's `tools:` or wi
 session cannot load is a name in its prompt (F11); skills or a harness prompt on codex, which is handed the instructions in its brief
 as before; skills or a harness prompt on a step that continues another's session, which keeps its own (F13); `harnessPrompt: replace` on
 an agent with no instructions; and a Claude Code step that runs in `auto` — written, or the runtime's default when it names no mode —
-on `haiku`, `claude-haiku-4-5` or `claude-sonnet-4-5`, where Claude Code drops `auto` to `default` and a job then denies every call
-`default` would ask about (F21). A `wf retry --model` onto one of those models, from the terminal or the board, is refused the same way
+on a model the runtime says Claude Code drops `auto` on (`fenceReach`'s `dropped`, from `agent-runtime/vocabulary`: `haiku`,
+`claude-haiku-4-5` or `claude-sonnet-4-5`), where it runs in `default` and a job then denies every call `default` would ask about (F21). A `wf retry --model` onto one of those models, from the terminal or the board, is refused the same way
 (`retryRefusal`, through `autoDropped`), since the step's mode is frozen with the run. A step's own `skills:` is refused, naming the
 step, the skill and the fix: on a step with no agent (a factory's hire is one); a skill it adds that its agent's fence keeps from
 loading — `tools:` without `Skill`, or a `disallowedTools:` rule covering `Skill` or `Skill(<skill>)` — since a step never widens its
@@ -2083,8 +2093,8 @@ own session in the checkout may be asked to push, and it could not hold `git mer
 and merging is its whole job. It denies a forced `git branch -D` and `browser_run_code_unsafe` by name as well, though it runs
 `dontAsk`: a `--bg` session reads the person's own user and local settings, where an allow may reach them. What the supervisor's bookkeeping needs — `git add <path>`, `git commit <path>`,
 `git status`, `git log`, `git diff` — is not denied. A deny is a prefix, not a sandbox (`git -C <dir> merge`
-is not `git merge`): it stops a command that should not have been typed. `agent-fences.test.ts` holds the push, the forced delete and the
-unsafe browser tool on any step a repository ships, and on a watcher step it writes itself; the other git denies are
+is not `git merge`): it stops a command that should not have been typed. `agent-fences.test.ts` holds the push, the forced delete, a kill by name
+(`pkill`, `killall`, in any part of a compound command) and the unsafe browser tool on any step a repository ships, and on a watcher step it writes itself; the other git denies are
 the folder author's to keep.
 
 **How to start it**, once, and leave it running:
@@ -3020,7 +3030,7 @@ holding a concurrency slot forever.
 | `src/workflow.ts` | the format — pure, the entry `agent-orchestrator/workflow`: each name it exports re-exported by name from the folders below, and nothing else |
 | `src/step/step.ts` | a step's shape — pure: what a step file is once read (`Workflow`), its closed list of keys (`STEP_KEYS`, `STEP_KEY_MEANINGS`), the fields every closeout carries (`CLOSEOUT_FIELDS`, `outputFields`), and what every reader of a markdown file shares (`WorkflowError`, `splitFrontmatter`) |
 | `src/harness/harness.ts` | the harnesses — pure: `HARNESSES`, `DEFAULT_HARNESS`, and a step on a remote agent, how it is named (`remoteNameOf`) and the keys it may not set (`REMOTE_REFUSED_KEYS`) |
-| `src/keys/keys.ts` | a step's keys read one each — pure: a value as written, the value the step carries, or the refusal that names the fix (`wordOf`, `contextOf`, `budgetOf`, `gateOf`, `workspaceOf`, `slotOf`, `outputOf`), and a model that cannot run `auto` (`keepsAuto`) |
+| `src/keys/keys.ts` | a step's keys read one each — pure: a value as written, the value the step carries, or the refusal that names the fix (`wordOf`, `contextOf`, `budgetOf`, `gateOf`, `workspaceOf`, `slotOf`, `outputOf`), and skills or a system prompt a step's sessions cannot reach (`composedRefusal`) |
 | `src/keys/tools.ts` | a step's tool rules — pure: its `tools` (`toolsOf`), its allow and deny rules, a write named as anything but `Edit` refused (`rulesOf`), and the rule offered for a call a fenced step was denied (`allowRuleOf`, `disallowedBy`) |
 | `src/former/former.ts` | a key under the name it had before — pure: `FORMER_KEYS`, and an agent's own `FORMER_OWN_KEYS` with its words (`harnessPromptNamed`), read in a file (`readKeys`) and on a frozen record (`asNamed`), written back in the form the file has (`formerKeyWritten`), and the fence a step asks for under either key (`modeOf`) |
 | `src/workflow/step-file.ts` | one step file — pure: read into a `Workflow` through each key's reader, an unknown key refused (`parseWorkflow`), and written back, the parser run backwards (`renderStep`) |

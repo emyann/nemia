@@ -22,7 +22,17 @@ import {
 } from '../step/step.ts';
 import { codexModeLine, formerKeyLine, formerKeysIn, frontmatterKey, harnessPromptLine } from '../former/former.ts';
 import { agentsDir, agentsFolderRefusal, linkRefusal, parseFolder, readmeDescription, stepFiles, type Fills } from './folder.ts';
-import { HARNESS_PROMPTS, isCardFile, ownSkill, parseAgent, type Agent, type Agents, type SkillsFound } from '../agents/agents.ts';
+import {
+  CUSTOM_INSTRUCTIONS_FOLDER,
+  customInstructionsRefusal,
+  HARNESS_PROMPTS,
+  isCardFile,
+  ownSkill,
+  parseAgent,
+  type Agent,
+  type Agents,
+  type SkillsFound,
+} from '../agents/agents.ts';
 import { skillEntryOf, type AgentSkill, type SkillRule } from '../skills/skills.ts';
 
 /**
@@ -51,9 +61,46 @@ export function lookupRoots(workflowDir: string, places: Places = {}): string[] 
 const sameRepository = (a: string, b: string): boolean =>
   path.dirname(a) === path.dirname(b) && [path.basename(a), path.basename(b)].sort().join() === '.claude,workflows';
 
+/** The file of a person's custom instructions for the agent `name`, in the store `home`: `<home>/custom-instructions/<name>.md`. */
+export const customInstructionsFile = (home: string, name: string): string =>
+  path.join(path.resolve(home), CUSTOM_INSTRUCTIONS_FOLDER, `${name}.md`);
+
+/**
+ * A person's custom instructions for the agent `name`, read from the store `home` (`customInstructionsFile`): the words, or `undefined`
+ * when there are none or the file is blank. Refused as a `WorkflowError` naming the file and the fix: a link, whose words would change
+ * with what it points at, and a frontmatter block (`customInstructionsRefusal`).
+ */
+export function readCustomInstructions(home: string, name: string): string | undefined {
+  const file = customInstructionsFile(home, name);
+  const stat = fs.lstatSync(file, { throwIfNoEntry: false });
+  if (!stat) return undefined;
+  if (stat.isSymbolicLink())
+    throw new WorkflowError(
+      linkRefusal(file, `custom instructions are a person's own words: read through a link, they would change with what it points at.`),
+    );
+  if (!stat.isFile()) throw new WorkflowError(`${file} is not a file: custom instructions are one file per agent. Remove it.`);
+  const text = fs.readFileSync(file, 'utf8');
+  const refused = customInstructionsRefusal(file, text);
+  if (refused !== undefined) throw new WorkflowError(`${refused} Or remove them: wf agents custom ${name} --clear.`);
+  return text.trim() || undefined;
+}
+
+/** `agent` with the person's custom instructions for it from the store `home`, or the refusal of them (`readCustomInstructions`). */
+function withCustom(agent: Agent | WorkflowError, name: string, home: string | undefined): Agent | WorkflowError {
+  if (home === undefined || agent instanceof Error) return agent;
+  try {
+    const customInstructions = readCustomInstructions(home, name);
+    return customInstructions === undefined ? agent : { ...agent, customInstructions };
+  } catch (err) {
+    if (!(err instanceof WorkflowError)) throw err;
+    return err;
+  }
+}
+
 /**
  * Every agent a workflow's steps may name (`lookupRoots`), each read or the refusal of it, as `loadAgents` reads one folder: the first root
- * that has a name wins, and a name one repository has in both `workflows/agents/` and `.claude/agents/` is refused, naming both.
+ * that has a name wins, and a name one repository has in both `workflows/agents/` and `.claude/agents/` is refused, naming both. Each is
+ * given the person's custom instructions for its name from the store (`places.home`, `readCustomInstructions`), whichever place it is in.
  */
 export function agentsFor(workflowDir: string, places: Places = {}): Agents {
   const found = new Map<string, { at: string; agent: Agent | WorkflowError }>();
@@ -75,7 +122,7 @@ export function agentsFor(workflowDir: string, places: Places = {}): Agents {
       }
     }
   }
-  return new Map([...found].map(([name, { agent }]) => [name, agent]));
+  return new Map([...found].map(([name, { agent }]) => [name, withCustom(agent, name, places.home)]));
 }
 
 /**
@@ -595,6 +642,7 @@ const StepAgentSchema = Schema.StructWithRest(
     body: Schema.String,
     given: Schema.Record(Schema.String, Schema.String),
     instructions: Schema.optionalKey(Schema.String),
+    customInstructions: Schema.optionalKey(Schema.String),
     skills: Schema.optionalKey(Strings),
     harnessPrompt: Schema.optionalKey(Schema.Literals(HARNESS_PROMPTS)),
     systemPrompt: Schema.optionalKey(Schema.Literals(['default', 'no-coding', 'own'])),

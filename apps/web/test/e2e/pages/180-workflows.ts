@@ -18,7 +18,7 @@ export default {
    * here, as a run started would be on every page visited after this one; in a page of its own, whose one refusal is the point, a start
    * that waits on a run called off is refused in `afterRefusal`'s words beside the form, and nothing is written: naming no factory, it
    * is made in FACTORIES' `hiring`, the one that holds the checkout, hiring for it the agents that let `dev` start, taken back after.
-   * Each step's page opens from a link under the graph, in the order a run runs them, and from its block on the graph.
+   * Each step's page opens from a link under the graph, in the order a run runs them, and from a double click on its block on the graph.
    */
   name: 'workflows',
   route: '/workflows',
@@ -203,9 +203,9 @@ export default {
       await idle(again);
       const block = again.locator(`section[aria-label="Workflow ${good.name}"] .react-flow__node[data-id="implement"]`);
       await expectVisible(block, 'back on the Workflows page, the graph');
-      await block.click();
+      await block.dblclick();
       await again.waitForURL(`**/workflows/repo/${good.name}/implement`, { timeout: WAIT_MS });
-      await expectVisible(again.locator('h1', { hasText: /^implement$/ }), "a block on the graph opens its step's page");
+      await expectVisible(again.locator('h1', { hasText: /^implement$/ }), "a double click on a block on the graph opens its step's page");
     });
   },
 } satisfies PageSpec;

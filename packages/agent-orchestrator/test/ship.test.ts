@@ -60,7 +60,8 @@ fs.cpSync(path.join(TEAM, 'agents'), path.join(ROOT, 'agents'), { recursive: tru
 fs.cpSync(path.join(TEAM, 'skills'), path.join(ROOT, 'skills'), { recursive: true });
 
 /**
- * What the shipper's own `disallowedTools:` denies: what no step needs, and a push, a forced branch delete and the browser's unsafe tool.
+ * What the shipper's own `disallowedTools:` denies: what no step needs, and a push, a forced branch delete, a kill by name and the
+ * browser's unsafe tool.
  */
 const SHIPPER_DENIED = [
   'SendMessage',
@@ -71,6 +72,8 @@ const SHIPPER_DENIED = [
   'Bash(git push:*)',
   'Bash(git branch -D:*)',
   'Bash(git branch --delete --force:*)',
+  'Bash(pkill:*)',
+  'Bash(killall:*)',
   'mcp__playwright__browser_run_code_unsafe',
 ];
 const git = (cwd: string, ...args: string[]) =>

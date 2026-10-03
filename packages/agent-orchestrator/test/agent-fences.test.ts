@@ -1,7 +1,7 @@
 /**
- * Every shipped step is refused `git push`, a forced branch delete and Playwright's `browser_run_code_unsafe` by its own fence, and the
- * checkout's `.claude/settings.json` refuses none of them: the settings bind a person's own session in this checkout too, and a person
- * may ask their session to push.
+ * Every shipped step is refused `git push`, a forced branch delete, a kill by name (`pkill`, `killall`) and Playwright's
+ * `browser_run_code_unsafe` by its own fence, and the checkout's `.claude/settings.json` refuses none of them: the settings bind a
+ * person's own session in this checkout too, and a person may ask their session to push.
  *
  * The guard reads every workflow folder `shippedFolders` finds under `SHIPPED_HOLDERS`: the repository's `workflows/`, this repository's
  * own team, and the package's own, none on disk. It holds the tests' team (`team.ts`) to the same fence: each refusal below is made on
@@ -14,7 +14,8 @@
  * working-tree `.claude/settings.json`, which a person may have edited — may be allowed anything there, so it too must name each call
  * itself. A step on codex is fenced by a
  * read-only sandbox. The matcher is Claude Code's rule shapes this suite relies on, and throws on a wildcard it does not model, so an
- * allow it cannot read fails the test rather than passing it.
+ * allow it cannot read fails the test rather than passing it. A command is matched part by part, as Claude Code matches it (`partsOf`):
+ * a deny of any part refuses the whole, and a dontAsk step runs it only when an allow reaches every part.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -55,6 +56,11 @@ const FENCED: Call[] = [
   { tool: 'Bash', command: 'git push --force origin wf/r-1/implement' },
   { tool: 'Bash', command: 'git branch -D wf/r-1/implement' },
   { tool: 'Bash', command: 'git branch --delete --force wf/r-1/implement' },
+  { tool: 'Bash', command: 'pkill -f "turbo run test"' },
+  { tool: 'Bash', command: 'killall node' },
+  { tool: 'Bash', command: 'cd packages/agent-orchestrator && pkill -f "turbo run test"' },
+  { tool: 'Bash', command: 'timeout 5 pkill -f turbo' },
+  { tool: 'Bash', command: 'true; killall node' },
   { tool: 'mcp__playwright__browser_run_code_unsafe' },
 ];
 
@@ -85,6 +91,43 @@ function reaches(rule: string, call: Call): boolean {
   if (exact.includes('*')) throw new Error(`${rule}: a wildcard inside a Bash rule is not modelled; say how it reads, here`);
   return prefix === undefined ? call.command === bash : call.command === prefix || call.command.startsWith(`${prefix} `);
 }
+
+/** A wrapper Claude Code strips before it matches a part: a leading assignment, `timeout` with its duration, `nohup`. */
+const WRAPPER = /^(?:[A-Za-z_]\w*=\S*|timeout \d+(?:\.\d+)?[smhd]?|nohup)\s+/;
+
+/** A part with every leading wrapper stripped (`WRAPPER`). */
+function unwrapped(part: string): string {
+  let rest = part.trim();
+  let wrapper = WRAPPER.exec(rest);
+  while (wrapper) {
+    rest = rest.slice(wrapper[0].length).trimStart();
+    wrapper = WRAPPER.exec(rest);
+  }
+  return rest;
+}
+
+/**
+ * The parts of a shell command Claude Code matches a rule against, each `unwrapped`: split on `&&`, `||`, `;`, `|&`, `|`, `&` and a
+ * newline outside quotes. Throws on a substitution, a redirection, an escape, an unclosed quote or a separator inside quotes, which
+ * this matcher does not model.
+ */
+function partsOf(command: string): string[] {
+  if (/\$\(|[`<>\\]/.test(command))
+    throw new Error(`${command}: a substitution, redirection or escape is not modelled; say how it reads, here`);
+  const tokens = [...command.matchAll(/'[^']*'|"[^"]*"|&&|\|\||\|&|[;|&\n]|[^'"&|;\n]+/g)].map((token) => token[0]);
+  const quoted = tokens.filter((token) => /^['"]/.test(token));
+  if (tokens.join('') !== command || quoted.some((token) => /[;&|\n]/.test(token)))
+    throw new Error(`${command}: an unclosed quote or a separator inside quotes is not modelled; say how it reads, here`);
+  const parts = [''];
+  for (const token of tokens)
+    if (/^(?:&&|\|\||\|&|[;|&\n])$/.test(token)) parts.push('');
+    else parts[parts.length - 1] += token;
+  return parts.map(unwrapped).filter(Boolean);
+}
+
+/** A call as the parts Claude Code matches: each part of a shell command (`partsOf`), or the tool call itself. */
+const partsOfCall = (call: Call): Call[] =>
+  call.command === undefined ? [call] : partsOf(call.command).map((command) => ({ tool: 'Bash', command }) as const);
 
 /** A SKILL.md's `allowed-tools`, split on commas: what a session that loads the skill may run without asking. */
 function allowedToolsOf(file: string): string[] {
@@ -118,8 +161,8 @@ function unfenced(step: Step, settings: Settings = SETTINGS): string[] {
   const unshipped = step.background === true || step.workspace === 'main';
   const dontAsk = step.permissionMode === 'dontAsk' && !unshipped;
   return FENCED.filter((call) => {
-    if (denies.some((rule) => reaches(rule, call))) return false;
-    return !dontAsk || allows.some((rule) => reaches(rule, call));
+    if (partsOfCall(call).some((part) => denies.some((rule) => reaches(rule, part)))) return false;
+    return !dontAsk || partsOfCall(call).every((part) => allows.some((rule) => reaches(rule, part)));
   }).map((call) => `${step.name}: ${shown(call)}`);
 }
 
@@ -190,6 +233,29 @@ test('the matcher reads the rule shapes the fences use, and throws on a wildcard
   );
 });
 
+test('the matcher splits a command into the parts Claude Code matches, strips the wrappers it strips, and throws on a form it does not model', () => {
+  assert.deepEqual(partsOf('cd packages/agent-orchestrator && pkill -f "turbo run test"'), [
+    'cd packages/agent-orchestrator',
+    'pkill -f "turbo run test"',
+  ]);
+  assert.deepEqual(partsOf('a || b; c | d |& e & f\ng'), ['a', 'b', 'c', 'd', 'e', 'f', 'g']);
+  assert.deepEqual(partsOf('timeout 5 pkill -f turbo'), ['pkill -f turbo']);
+  assert.deepEqual(partsOf('FOO=1 nohup timeout 2.5s killall node'), ['killall node']);
+  assert.deepEqual(partsOf('true &'), ['true'], 'a command sent to the background is its own part');
+  assert.deepEqual(partsOf("bash -c 'pkill -f x'"), ["bash -c 'pkill -f x'"], 'a shell started by a command is one part');
+  assert.deepEqual(partsOf('timeoutx pkill'), ['timeoutx pkill'], 'a wrapper is a whole word');
+  for (const command of ['kill $(pgrep -f turbo)', 'kill `pgrep -f turbo`', "bash -c 'a; pkill x'", 'npm test 2>&1', 'echo "a'])
+    assert.throws(
+      () => partsOf(command),
+      (err: Error) => err.message.includes('not modelled'),
+      command,
+    );
+  const compound = { tool: 'Bash', command: 'cd packages/agent-orchestrator && pkill -f "turbo run test"' } as const;
+  assert.equal(reaches('Bash(pkill:*)', compound), false, 'a rule matched against the whole command misses the part');
+  assert.ok(partsOfCall(compound).some((part) => reaches('Bash(pkill:*)', part)));
+  assert.deepEqual(partsOfCall({ tool: 'Edit' }), [{ tool: 'Edit' }]);
+});
+
 test('every shipped agent is named by a shipped step, so the fence below reads each one', () => {
   const named = new Set(shipped().flatMap(({ step }) => (step.agent ? [step.agent.name] : [])));
   for (const dir of AGENT_FOLDERS)
@@ -197,7 +263,7 @@ test('every shipped agent is named by a shipped step, so the fence below reads e
       assert.ok(named.has(path.basename(file, '.md')), `${path.join(dir, file)} is named by no shipped step`);
 });
 
-test('every shipped step is refused git push, a forced branch delete and browser_run_code_unsafe: by its own deny in auto, by no allow in dontAsk, by a read-only sandbox on codex', () => {
+test('every shipped step is refused git push, a forced branch delete, a kill by name and browser_run_code_unsafe: by its own deny in auto, by no allow in dontAsk, by a read-only sandbox on codex', () => {
   const open = shipped().flatMap(({ dir, step }) => unfenced(step).map((what) => `${path.relative(REPO, dir)}/${what}`));
   assert.deepEqual(open, []);
   assert.ok(
@@ -302,7 +368,8 @@ test("REFUSED: a watcher's step without its own deny of the forced delete is ope
     folderOf({
       supervise:
         'workspace: main\nslot: none\nharness: claude\nbackground: true\npermissionMode: dontAsk\n' +
-        'disallowedTools: Bash(git push:*), Bash(git branch -D:*), Bash(git branch --delete --force:*), mcp__playwright__browser_run_code_unsafe',
+        'disallowedTools: Bash(git push:*), Bash(git branch -D:*), Bash(git branch --delete --force:*), Bash(pkill:*), Bash(killall:*), ' +
+        'mcp__playwright__browser_run_code_unsafe',
     }),
   ).find((s) => s.name === 'supervise')!;
   assert.deepEqual(unfenced(supervise), [], 'fenced by its own list');
@@ -340,6 +407,45 @@ test("REFUSED: the team's implementer with its deny line cut back to the four it
   assert.equal(unfenced(implement).length, FENCED.length, unfenced(implement).join('\n'));
 });
 
+/** Every call of `FENCED` that runs `pkill` or `killall` in some part, as `unfenced` names it for `step`. */
+const killsByName = (step: string): string[] =>
+  FENCED.filter((call) => partsOfCall(call).some((part) => /^(?:pkill|killall)\b/.test(part.command ?? ''))).map(
+    (call) => `${step}: ${shown(call)}`,
+  );
+
+test("REFUSED: Ada without its deny of pkill and killall, read from its file as a run reads it, is open on each kill by name, the compound's too", () => {
+  const ada = shippedStepOf('ada');
+  const line = ada.disallowedTools!.filter((rule) => rule !== 'Bash(pkill:*)' && rule !== 'Bash(killall:*)');
+  assert.equal(line.length, ada.disallowedTools!.length - 2, 'Ada denies both by name');
+  const bare = shippedWith('ada', 'build', 'disallowedTools', line.join(', '));
+  assert.equal(bare.permissionMode, 'auto');
+  assert.deepEqual(unfenced(bare), killsByName(bare.name));
+  assert.ok(
+    unfenced(bare).includes(`${bare.name}: Bash(cd packages/agent-orchestrator && pkill -f "turbo run test")`),
+    'the form that killed a landing check',
+  );
+});
+
+test('REFUSED: a dontAsk step an allow of pkill reaches is open on each kill by pkill whose every part some allow reaches', () => {
+  const reviewer = stepOf('reviewer');
+  assert.equal(reviewer.permissionMode, 'dontAsk');
+  assert.deepEqual(unfenced({ ...reviewer, allowedTools: [...(reviewer.allowedTools ?? []), 'Bash(pkill:*)'] }), [
+    'review: Bash(pkill -f "turbo run test")',
+    'review: Bash(cd packages/agent-orchestrator && pkill -f "turbo run test")',
+    'review: Bash(timeout 5 pkill -f turbo)',
+  ]);
+  assert.deepEqual(
+    unfenced({ ...reviewer, allowedTools: [...(reviewer.allowedTools ?? []), 'Bash(killall:*)'] }),
+    ['review: Bash(killall node)'],
+    'no allow reaches `true`, so the compound stays fenced',
+  );
+  assert.ok(
+    (SETTINGS.permissions?.allow ?? []).includes('Bash(cd:*)'),
+    'the settings allow cd, and still the compound is fenced: its pkill part is reached by no allow',
+  );
+  assert.deepEqual(unfenced(reviewer), []);
+});
+
 /** What a janitor must never do, in the spellings a session types: start, file, queue or drop a card, approve or retry a step, edit. */
 const ACTS: Call[] = [
   ...['wf start x', 'wf inbox add x', 'wf inbox queue x', 'wf inbox rm x', 'wf approve r s', 'wf retry r s'].flatMap((command) => [
@@ -364,19 +470,22 @@ function acting(step: Step): string[] {
 }
 
 /**
- * The step of the shipped `workflow` that `agent` runs, read from a scratch copy of the shipped team, its agent's `allowedTools` line
- * replaced by `allowed`.
+ * The step of the shipped `workflow` that `agent` runs, read from a scratch copy of the shipped team, its agent's `key` line replaced
+ * by `line`.
  */
-function shippedAllowed(agent: string, workflow: string, allowed: string): Step {
+function shippedWith(agent: string, workflow: string, key: 'allowedTools' | 'disallowedTools', line: string): Step {
   const root = scratch(`wf-fences-${agent}-`);
   fs.cpSync(SHIPPED_HOLDERS[0], root, { recursive: true });
   const file = path.join(root, 'agents', `${agent}.md`);
   const text = fs.readFileSync(file, 'utf8');
-  const loose = text.replace(/^allowedTools: .*$/m, `allowedTools: ${allowed}`);
-  assert.notEqual(loose, text, `${agent} has an allow line to replace`);
-  fs.writeFileSync(file, loose);
+  const changed = text.replace(new RegExp(`^${key}: .*$`, 'm'), `${key}: ${line}`);
+  assert.notEqual(changed, text, `${agent} has a ${key} line to replace`);
+  fs.writeFileSync(file, changed);
   return loadWorkflows(path.join(root, workflow), { repo: REPO }).find((step) => step.agent?.name === agent)!;
 }
+
+/** The step of the shipped `workflow` that `agent` runs, its agent's `allowedTools` line replaced by `allowed` (`shippedWith`). */
+const shippedAllowed = (agent: string, workflow: string, allowed: string): Step => shippedWith(agent, workflow, 'allowedTools', allowed);
 
 /** The janitor's step, its agent's `allowedTools` line replaced by `allowed` (`shippedAllowed`). */
 const argusAllowed = (allowed: string): Step => shippedAllowed('argus', 'janitor', allowed);

@@ -1,8 +1,8 @@
 /**
  * The readers of a step's keys, one each: a value as written in the frontmatter in, the value the step carries out, or a
  * `WorkflowError` that names the fix (`harnessOf`, `wordOf`, `contextOf`, `budgetOf`, `workspaceOf`, `denialsOf`, `slotOf`,
- * `outputOf`, …); and what a step and an agent are both judged by: a model that cannot run `auto` (`keepsAuto`), and skills or a system
- * prompt a step's sessions cannot reach (`composedRefusal`). The tool rules are `tools.ts`'s.
+ * `outputOf`, …); and what a step and an agent are both judged by: skills or a system prompt a step's sessions cannot reach
+ * (`composedRefusal`). The tool rules are `tools.ts`'s.
  */
 import path from 'node:path';
 import { CLOSEOUT_FIELDS, COUNTS, isObject, type OutputSchema, refuse, type StepOutput, type Workflow } from '../step/step.ts';
@@ -399,20 +399,6 @@ export function outputOf(
   }
   return { file, schema: schema as OutputSchema };
 }
-
-/**
- * The models Claude Code runs in `default` when asked for `auto` (Claude Code 2.1.282): the
- * session starts in `auto`, says `default` from its first turn, and a job denies every call `default` would ask about. Each name as written
- * on a step, or with a date after it (`claude-haiku-4-5-20251001`). A model not listed is let through: the list is what is known to fail.
- */
-export const AUTO_UNSUPPORTED: readonly string[] = ['haiku', 'claude-haiku-4-5', 'claude-sonnet-4-5'];
-
-/** Whether Claude Code keeps `auto` on `model`: false for one known to drop it (`AUTO_UNSUPPORTED`), true for its default and any other. */
-export const keepsAuto = (model: string | undefined): boolean =>
-  model === undefined || !AUTO_UNSUPPORTED.some((m) => model === m || model.startsWith(`${m}-`));
-
-/** The permission mode a Claude Code step is filed with when it names none: the runtime's own (`--permission-mode auto`). */
-export const DEFAULT_PERMISSION_MODE = 'auto';
 
 /**
  * Why an agent's skills or harness prompt (`harnessPrompt:`) cannot reach the sessions of a step that runs as `step` does — its harness,

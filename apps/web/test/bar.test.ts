@@ -7,6 +7,7 @@ import {
   barMost,
   barOf,
   barOpens,
+  barOver,
   barSearch,
   barValue,
   barWidth,
@@ -14,6 +15,8 @@ import {
   inspects,
   nextBar,
   parseWidth,
+  machineState,
+  specStep,
   type Bar,
 } from '../src/lib/bar.ts';
 
@@ -22,6 +25,9 @@ const OTHER: Bar = { kind: 'start', factory: 'other' };
 const RUN: Bar = { kind: 'run', run: 'abc' };
 const REVIEW: Bar = { kind: 'step', run: 'abc', step: 'review' };
 const SHIP: Bar = { kind: 'step', run: 'abc', step: 'ship' };
+const FACTORY: Bar = { kind: 'factory', factory: 'hiring' };
+const SPEC: Bar = { kind: 'spec', from: 'repo', workflow: 'dev', step: 'review' };
+const STATE: Bar = { kind: 'state', machine: 'lifecycle', state: 'input-required' };
 
 test('the address opens a bar only for a known kind with a name: anything else opens none', () => {
   for (const value of [undefined, '', 'start', 'start:', 'nope:x', ':hiring', 42, ['start:hiring'], null])
@@ -39,8 +45,52 @@ test("a run's address names the run, and a step's names its run up to the first 
     assert.equal(barOf(value), undefined, `${value} opens no bar`);
 });
 
+test("a factory's address names the factory whole, a slash or a colon in its name kept, and none without a name", () => {
+  assert.deepEqual(barOf('factory:hiring'), FACTORY);
+  assert.deepEqual(barOf('factory:a/b'), { kind: 'factory', factory: 'a/b' });
+  assert.deepEqual(barOf('factory:a:b'), { kind: 'factory', factory: 'a:b' });
+  assert.equal(barOf('factory:'), undefined, 'factory: opens no bar');
+});
+
+test("a workflow's step's address names where the workflow is read from, the workflow up to the next slash and the step after it", () => {
+  assert.deepEqual(barOf('spec:repo/dev/review'), SPEC);
+  assert.deepEqual(barOf('spec:yours/mine/plan'), { kind: 'spec', from: 'yours', workflow: 'mine', step: 'plan' });
+  assert.deepEqual(barOf('spec:yours/w/a/b:c'), { kind: 'spec', from: 'yours', workflow: 'w', step: 'a/b:c' }, 'a step keeps its own');
+  for (const value of [
+    'spec:other/dev/review',
+    'spec:repo/dev',
+    'spec:repo//review',
+    'spec:repo/dev/',
+    'spec:/dev/review',
+    'spec:repo',
+    'spec:',
+  ])
+    assert.equal(barOf(value), undefined, `${value} opens no bar`);
+});
+
+test("a machine's state's address names the machine up to the first slash and the state after it, and none without either", () => {
+  assert.deepEqual(barOf('state:lifecycle/input-required'), STATE);
+  assert.deepEqual(barOf('state:m/a/b:c'), { kind: 'state', machine: 'm', state: 'a/b:c' }, 'a state keeps its own');
+  for (const value of ['state:lifecycle', 'state:/x', 'state:lifecycle/', 'state:'])
+    assert.equal(barOf(value), undefined, `${value} opens no bar`);
+});
+
 test('a bar written to the address reads back as the same bar', () => {
-  for (const value of ['start:hiring', 'start:a:b', 'run:abc', 'step:abc/review', 'step:abc/a/b', 'step:abc/x:y'])
+  for (const value of [
+    'start:hiring',
+    'start:a:b',
+    'factory:hiring',
+    'factory:a/b',
+    'factory:a:b',
+    'run:abc',
+    'step:abc/review',
+    'step:abc/a/b',
+    'step:abc/x:y',
+    'spec:repo/dev/review',
+    'spec:yours/w/a/b:c',
+    'state:lifecycle/input-required',
+    'state:m/a/b:c',
+  ])
     assert.equal(barValue(barOf(value)!), value);
   assert.deepEqual(barOf(barValue(OTHER)), OTHER);
 });
@@ -69,6 +119,65 @@ test('pressing the step the bar shows closes it, and another step, the run or an
   assert.deepEqual(nextBar({ kind: 'start', factory: 'abc' }, RUN), RUN, 'another kind of the same name');
 });
 
+test('pressing the factory the bar shows closes it, and another factory or the start of a run in it switches it', () => {
+  assert.equal(nextBar(FACTORY, { ...FACTORY }), undefined);
+  assert.deepEqual(nextBar(FACTORY, { kind: 'factory', factory: 'other' }), { kind: 'factory', factory: 'other' });
+  assert.deepEqual(nextBar(FACTORY, HIRING), HIRING, 'the start of a run in the same factory is another bar');
+  assert.deepEqual(nextBar(HIRING, FACTORY), FACTORY);
+});
+
+test("pressing the workflow's step the bar shows closes it, and another step, the same step of another workflow or a run's step switches it", () => {
+  assert.equal(nextBar(SPEC, { ...SPEC }), undefined);
+  const implement: Bar = { ...SPEC, step: 'implement' };
+  assert.deepEqual(nextBar(SPEC, implement), implement, 'another step of the same workflow');
+  const elsewhere: Bar = { ...SPEC, workflow: 'other' };
+  assert.deepEqual(nextBar(SPEC, elsewhere), elsewhere, 'the same step of another workflow');
+  const mine: Bar = { ...SPEC, from: 'yours' };
+  assert.deepEqual(nextBar(SPEC, mine), mine, 'the same workflow and step, read from yours');
+  const ran: Bar = { kind: 'step', run: 'dev', step: 'review' };
+  assert.deepEqual(nextBar(SPEC, ran), ran, "a run's step of the same name");
+});
+
+test("a workflow's canvas and its Build read the step the bar shows of that workflow alone: not another's, nor yours of the same name", () => {
+  assert.equal(specStep(SPEC, 'repo', 'dev'), 'review');
+  assert.equal(specStep(SPEC, 'yours', 'dev'), null, 'yours, of the same name');
+  assert.equal(specStep(SPEC, 'repo', 'other'), null, 'another workflow');
+  assert.equal(specStep({ kind: 'step', run: 'dev', step: 'review' }, 'repo', 'dev'), null, "a run's step");
+  assert.equal(specStep(undefined, 'repo', 'dev'), null, 'no bar');
+});
+
+test("pressing the machine's state the bar shows closes it, and another state, the same state of another machine or another kind switches it", () => {
+  assert.equal(nextBar(STATE, { ...STATE }), undefined);
+  const working: Bar = { ...STATE, state: 'working' };
+  assert.deepEqual(nextBar(STATE, working), working, 'another state of the same machine');
+  const elsewhere: Bar = { ...STATE, machine: 'other' };
+  assert.deepEqual(nextBar(STATE, elsewhere), elsewhere, 'the same state of another machine');
+  assert.deepEqual(nextBar(STATE, SPEC), SPEC, "a workflow's step");
+});
+
+test("a machine's canvas reads the state the bar shows of that machine alone: not another's, nor another kind", () => {
+  assert.equal(machineState(STATE, 'lifecycle'), 'input-required');
+  assert.equal(machineState(STATE, 'other'), null, 'another machine');
+  assert.equal(machineState({ kind: 'step', run: 'lifecycle', step: 'input-required' }, 'lifecycle'), null, "a run's step");
+  assert.equal(machineState(SPEC, 'lifecycle'), null, "a workflow's step");
+  assert.equal(machineState(undefined, 'lifecycle'), null, 'no bar');
+});
+
+test('Open visits nothing for a state of a machine, which has no page', () => {
+  assert.equal(barOpens(STATE), null);
+});
+
+test("Open visits a workflow's step's page for a workflow's step", () => {
+  assert.deepEqual(barOpens(SPEC), {
+    to: '/workflows/$from/$workflow/$step',
+    params: { from: 'repo', workflow: 'dev', step: 'review' },
+  });
+});
+
+test("Open visits a factory's floor for a factory", () => {
+  assert.deepEqual(barOpens(FACTORY), { to: '/factories/$factory', params: { factory: 'hiring' } });
+});
+
 test("Open visits a run's page for a run, the step's session for a step, and nothing for the start of a run", () => {
   assert.deepEqual(barOpens(RUN), { to: '/runs/$runId', params: { runId: 'abc' } });
   assert.deepEqual(barOpens(REVIEW), { to: '/runs/$runId/steps/$step', params: { runId: 'abc', step: 'review' } });
@@ -78,6 +187,9 @@ test("Open visits a run's page for a run, the step's session for a step, and not
 test('a press on the empty canvas closes only what a canvas inspects: never the start of a run, whose brief it would lose', () => {
   assert.equal(inspects(RUN), true);
   assert.equal(inspects(REVIEW), true);
+  assert.equal(inspects(FACTORY), true);
+  assert.equal(inspects(SPEC), true);
+  assert.equal(inspects(STATE), true);
   assert.equal(inspects(HIRING), false);
   assert.equal(inspects(undefined), false);
 });
@@ -109,4 +221,11 @@ test('Escape closes the bar, unless something else took it, it ends a compositio
   assert.equal(escapeDoes({ ...key, fieldText: 'a brief' }), 'leave');
   assert.equal(escapeDoes({ ...key, defaultPrevented: true }), 'ignore', 'a menu or a modal closed on it');
   assert.equal(escapeDoes({ ...key, isComposing: true, fieldText: 'a' }), 'ignore');
+});
+
+test('the bar covers the part of a frame right of its left edge, and none with no bar, past the frame, or on a narrow screen', () => {
+  assert.equal(barOver(1280, null, false), 0);
+  assert.equal(barOver(1280, 704, true), 0);
+  assert.equal(barOver(900, 1000, false), 0);
+  assert.equal(barOver(1280, 1280 - BAR_DEFAULT, false), BAR_DEFAULT);
 });

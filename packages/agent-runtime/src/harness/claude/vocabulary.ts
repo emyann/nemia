@@ -24,6 +24,41 @@ export const CLAUDE_PERMISSION_MODES: readonly string[] = [
 ];
 
 /**
+ * How wide each of Claude Code's permission modes is, for a session nobody answers, wider higher and equal as wide: `plan` changes
+ * nothing; `default`, `manual` and `dontAsk` run what the rules allow and deny the rest, since a job denies whatever they would ask;
+ * `acceptEdits` writes in its directory unasked; `auto` lets a classifier allow what it judges safe; `bypassPermissions` asks about
+ * nothing. Every word of `CLAUDE_PERMISSION_MODES` has one (`test/fence-reach.test.ts`).
+ */
+export const CLAUDE_MODE_RANK: Readonly<Record<string, number>> = {
+  plan: 0,
+  dontAsk: 1,
+  default: 1,
+  manual: 1,
+  acceptEdits: 2,
+  auto: 3,
+  bypassPermissions: 4,
+};
+
+/** The permission mode a Claude Code session runs in when its task names none: `--permission-mode` is always given. */
+export const CLAUDE_DEFAULT_MODE = 'auto';
+
+/** The permission mode a session held to its directory runs in: what its rules allow, and nothing it would ask about. */
+export const CLAUDE_HELD_MODE = 'dontAsk';
+
+/**
+ * The permission modes a background session runs in without stopping to ask a person, the held mode first: every other mode can
+ * stop on a prompt, which a background session leaves waiting for someone to answer it.
+ */
+export const CLAUDE_UNASKING_MODES: readonly string[] = [CLAUDE_HELD_MODE, 'bypassPermissions'];
+
+/**
+ * The models on which Claude Code drops `auto`: the session starts in `auto` and says `default` from its first turn. Each matches the
+ * name as given or with a `-` suffix after it (`claude-haiku-4-5-20251001`). Measured on Claude Code 2.1.282; a model not listed is let
+ * through, since the list is what is known to fail. The runtime refuses none of them: it answers the fact (`fenceReach`).
+ */
+export const CLAUDE_AUTO_DROPPED: readonly string[] = ['haiku', 'claude-haiku-4-5', 'claude-sonnet-4-5'];
+
+/**
  * The efforts Claude Code takes. Refused here rather than left to the CLI, because the CLI does not
  * refuse one: it prints a warning for an unknown `--effort` and runs at its default effort — a knob
  * that silently does nothing.

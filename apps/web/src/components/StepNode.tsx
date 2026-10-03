@@ -164,19 +164,20 @@ const stepLabel = (index: number): string => `step ${String(index + 1).padStart(
  * Who does a step and what on, as its node says it: its agent first where it has one, then the harness and the model, or that it takes the
  * default.
  */
-const runsOn = (spec: { agent?: string | null; harness: string | null; model: string | null }): string =>
+export const runsOn = (spec: { agent?: string | null; harness: string | null; model: string | null }): string =>
   `${spec.agent ? `${spec.agent} · ` : ''}${spec.harness ?? 'default harness'} · ${spec.model ?? 'default model'}`;
 
 /**
  * A step of a workflow no run has started: `index` is its place in the workflow's order, `spec` what its frontmatter sets. `build` while
  * the builder has it (`WorkflowBuilder`): whether it has changes not saved, whether the last save was refused for it, and whether it is the
- * one its form shows.
+ * one its form shows. `inspected` while the frame's bar shows it, on the workflow's canvas (`WorkflowCanvas`); never in the builder.
  */
 export type SpecNodeData = {
   name: string;
   index: number;
   spec: WorkflowStepSpec;
   build?: { unsaved: boolean; refused: boolean; selected: boolean };
+  inspected?: boolean;
 };
 export type SpecFlowNode = Node<SpecNodeData, 'spec'>;
 
@@ -214,10 +215,11 @@ export function specLines(spec: WorkflowStepSpec): Array<[label: string, value: 
  * The step node in its spec mode, for a workflow before any run of it: the frame, the head and the handles a run's step has, in
  * the order `StepNode` has them, so an edge meets a step here where it meets it on a run; and where a run's step has its status and
  * its attempt, what the step is set to do (`specLines`), each value wrapped to three lines, since a check is a command a person reads
- * whole, then whole on hover. No status and no attempt: nothing has happened to it. While the builder has it, it is a `BuildingNode`.
+ * whole, then whole on hover. No status and no attempt: nothing has happened to it. Ringed and marked `data-inspected` while the frame's
+ * bar shows it, ringed on keyboard focus too. While the builder has it, it is a `BuildingNode`, which takes no mark of the bar's.
  */
 export function SpecNode({
-  data: { name, index, spec, build },
+  data: { name, index, spec, build, inspected },
   sourcePosition = Position.Right,
   targetPosition = Position.Left,
 }: NodeProps<SpecFlowNode>) {
@@ -238,7 +240,8 @@ export function SpecNode({
   return (
     <div
       data-spec
-      className="w-56 overflow-hidden rounded-md border border-neutral-300 bg-white text-neutral-900 shadow-sm dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100"
+      data-inspected={inspected || undefined}
+      className={`w-56 cursor-pointer overflow-hidden rounded-md border border-neutral-300 bg-white text-neutral-900 shadow-sm dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 ${inspected ? 'ring-2 ring-ring' : 'hover:border-neutral-400 in-focus-visible:ring-2 in-focus-visible:ring-ring dark:hover:border-neutral-500'}`}
     >
       <Handle type="target" position={targetPosition} isConnectable={false} className="opacity-0" />
 

@@ -4,6 +4,9 @@
  * agent's, a step that runs a fenced agent on the other harness, whose fence cannot be compared with the agent's, and a step's
  * `background: true` over an agent an allow rule would widen: a background session also reads the person's own settings.
  * `addedSkillsRefusal` judges a skill a step adds to its agent's, which the agent's fence must let the session load.
+ *
+ * `writable:` is the one key that reaches past the fence's directory, and it widens where a step's writes reach, never what it may do:
+ * `writableFenceRefusal` refuses it over a fence that writes nothing.
  */
 import { AGENTS_FOLDER, type StepKey, type Workflow } from '../step/step.ts';
 import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
@@ -290,4 +293,27 @@ function pathCovers(by: string, path: string): boolean {
   if (under === undefined || (under !== '' && !under.endsWith('/'))) return false;
   if (path.split('/').includes('..')) return false;
   return under === '' ? !/^[/~]/.test(path) : path.startsWith(under);
+}
+
+/** The tools that write a file: the Edit tool's family, and Bash, whose redirection writes where an edit rule lets it. */
+const WRITING_TOOLS = ['Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'Bash'];
+
+/**
+ * Refused: `writable:` on a step whose fence, as resolved with its agent's (`agent`, by name), writes nothing — the narrowest word of its
+ * harness, `plan` or `read-only`, or a `tools:` list with no tool that writes a file (`WRITING_TOOLS`). The key widens where a step's
+ * writes reach, and gives no write to a step that has none.
+ */
+export function writableFenceRefusal(step: Workflow, agent: string | undefined): string | undefined {
+  if (!step.writable) return undefined;
+  const reach = reachOf(step.harness);
+  const word = step.sandbox ?? step.permissionMode ?? reach.given;
+  const writesNothing = Object.hasOwn(reach.rank, word) && rankOf(reach, word) === 0;
+  const why = writesNothing
+    ? `runs in \`${word}\`, which writes nothing`
+    : step.tools && !step.tools.some((tool) => WRITING_TOOLS.includes(tool))
+      ? `has ${step.tools.length ? `only the tools ${listed(step.tools)}` : 'no tool'}, and none writes a file`
+      : undefined;
+  if (!why) return undefined;
+  const whose = agent === undefined ? 'its fence' : `its fence, with ${AGENTS_FOLDER}/${agent}.md's`;
+  return `${step.name}: \`writable: ${step.writable.join(', ')}\` lets the step write those folders, and ${whose}, ${why}: \`writable:\` widens where a step's writes reach, never what it may do. Delete the line, or run the step on a fence that writes — an agent whose file allows \`Edit(**)\`, say.`;
 }

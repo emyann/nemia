@@ -33,6 +33,7 @@ import {
   stepsOf,
   workflowAt,
   workflowFolder,
+  writersOf,
 } from '../runner.ts';
 import { HELP, usage, readFlags } from './flags.ts';
 
@@ -254,8 +255,14 @@ const factoryLine = (run: ReturnType<typeof start>): string[] =>
  */
 const mountLines = (run: ReturnType<typeof start>): string[] => {
   const missing = leftOutMounts(run);
+  const written = writersOf(stepsOf(run), run.mounts);
   return [
-    ...(run.mounts?.length ? [`mounts: ${run.mounts.map((m) => m.path).join(', ')} — read-only, for every local step`] : []),
+    ...(run.mounts?.length
+      ? [
+          `mounts: ${run.mounts.map((m) => m.path).join(', ')} — read-only, for every local step${written.length ? ' but where written below' : ''}`,
+        ]
+      : []),
+    ...written.map((w) => `writable: ${w.path} — for ${w.steps.join(', ')} alone`),
     ...(missing.length
       ? [`not mounted: ${missing.join(', ')} — of the factory's repositories, and no directory now; start again once it is there`]
       : []),

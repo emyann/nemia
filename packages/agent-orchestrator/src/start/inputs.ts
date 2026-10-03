@@ -7,7 +7,8 @@ import path from 'node:path';
 import { GIVEN } from '../workspace/workspace.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 import type { Workflow } from '../step/step.ts';
-import type { Run } from '../record/record.ts';
+import type { Mount, Run } from '../record/record.ts';
+import { stepMounts } from '../factory/factory.ts';
 
 /**
  * A file `wf start --input` was given, as start.verb.ts found it: the path as typed, where it resolves, and what is there. What
@@ -55,17 +56,33 @@ export const inputsLine = (dir: string | undefined, names: readonly string[] | u
     ? `Files given with it (\`wf start --input\`), ${inFolder ? `copied into \`${GIVEN}/inputs\` in this folder` : `in \`${dir}\``}: ${names.map((n) => `\`${n}\``).join(', ')}.`
     : undefined;
 
+/** Folders by their absolute paths, each in backticks. */
+const pathsOf = (mounts: readonly Mount[]): string => mounts.map((m) => `\`${m.path}\``).join(', ');
+
 /**
- * What a step's brief says of the folders its run mounts, under what was asked for: each by its absolute path, to read and never write;
- * a blank line before it. Nothing for a run that mounts none, and for a step on a remote agent, which is filed none.
+ * What a step's brief says of the folders its run mounts, under what was asked for: each by its absolute path, those its `writable:` names
+ * to write (`stepMounts`), the others to read and never write; a blank line before them. Nothing for a run that mounts none, and for a
+ * step on a remote agent, which is filed none.
  */
-export const mountsLine = (step: Pick<Workflow, 'harness'>, run: Pick<Run, 'mounts'>): string[] =>
-  run.mounts?.length && !isRemoteHarness(step.harness)
-    ? [
-        '',
-        `Folders of this factory you may read, and must not write: ${run.mounts.map((m) => `\`${m.path}\``).join(', ')}. Each is mounted read-only; your own work stays in your workspace.`,
-      ]
-    : [];
+export const mountsLine = (step: Pick<Workflow, 'harness' | 'writable'>, run: Pick<Run, 'mounts'>): string[] => {
+  const mounts = isRemoteHarness(step.harness) ? undefined : stepMounts(step, run.mounts);
+  if (!mounts?.length) return [];
+  const writes = mounts.filter((m) => !m.readOnly);
+  const reads = mounts.filter((m) => m.readOnly);
+  return [
+    '',
+    ...(writes.length
+      ? [
+          `Folders of this factory you may write, as this step's \`writable:\` names them: ${pathsOf(writes)}. Each is mounted writable for this step alone; every other step of the run only reads it.`,
+        ]
+      : []),
+    ...(reads.length
+      ? [
+          `Folders of this factory you may read, and must not write: ${pathsOf(reads)}. Each is mounted read-only; your own work stays in your workspace.`,
+        ]
+      : []),
+  ];
+};
 
 /**
  * What `wf decide` says under a run's line of where the run came from: the inbox card it was started from. Undefined for a run typed at

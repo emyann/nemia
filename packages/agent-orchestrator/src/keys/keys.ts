@@ -466,3 +466,24 @@ export function skillNamesOf(file: string, written: string | undefined): string[
   if (twice) refuse(`${named} names \`${twice}\` twice. Name it once.`);
   return names;
 }
+
+/**
+ * `writable:` as the folder names it lists, refused in `file`'s name unless each is a directory's name — not empty, not hidden, with no
+ * slash — once. Which folder of the factory each names is the start's to judge (`writableRefusal`).
+ */
+export function writableNamesOf(file: string, written: string | undefined): string[] | undefined {
+  if (written === undefined) return undefined;
+  const named = `${file}: \`writable: ${written}\``;
+  const shape =
+    "Each is one of the factory's folders by its directory's name, never a path, comma-separated: `writable: web, docs`; wf factory ls lists the folders.";
+  const names = written
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (!names.length) refuse(`${named} names no folder. ${shape}`);
+  const odd = names.find((n) => n.startsWith('.') || /[\\/]/.test(n));
+  if (odd) refuse(`${named} has \`${odd}\`, which is not a directory's name. ${shape}`);
+  const twice = names.find((n, i) => names.indexOf(n) !== i);
+  if (twice) refuse(`${named} names \`${twice}\` twice. Name it once.`);
+  return names;
+}

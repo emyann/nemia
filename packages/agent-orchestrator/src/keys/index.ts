@@ -18,6 +18,7 @@ export {
   sessionContext,
   SKILL_NAME,
   skillNamesOf,
+  writableNamesOf,
   slotOf,
   SLOTS,
   tokensOf,

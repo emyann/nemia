@@ -34,6 +34,9 @@ import {
   DEFAULT_FACTORY,
   factoryMountRefusal,
   factoryMounts,
+  stepMounts,
+  writableMountRefusal,
+  writableRefusal,
   factoryRepo,
   fillsOf,
   outsideRefusal,
@@ -412,7 +415,9 @@ export const repoFor = (name: string | undefined, named: string | undefined, fal
  *
  * In a factory, the run mounts its folders (`factoryMounts`): every repository of the factory but the one a git run works on, each
  * read-only, and all of them for a folder run, which works on none. A folder that is no directory at start is left out, and `wf start`
- * says it (`leftOutMounts`); a step whose harness cannot hold them is refused before anything is written (`configRefused`). The list
+ * says it (`leftOutMounts`); a step whose harness cannot hold them is refused before anything is written (`configRefused`). A step's
+ * `writable:` names the folders it alone is filed writable (`stepMounts`), each refused unless one folder of the factory has the name and
+ * is mounted or the run's own (`writableRefusal`), and on a harness that holds no writable mount (`writableMountRefusal`). The list
  * is frozen on the record as `mounts`, filed with every local step and named on its brief, so a later change to the factory changes
  * no run started. Left out when none is mounted, and in the default factory.
  *
@@ -437,12 +442,17 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   if (refusedInputs) return yield* Effect.fail(new Invalid({ message: refusedInputs }));
   const id = runId(opts.brief);
   const mounts = mountsAt(factory, folder ? undefined : opts.repo);
+  const workflow = path.basename(path.resolve(opts.workflowDir));
+  const unwritable = writableRefusal(steps, workflow, factory, folder ? undefined : opts.repo, mounts);
+  if (unwritable) return yield* Effect.fail(new Invalid({ message: unwritable }));
   const refusedMounts = mounts.length
     ? refusedStep(steps, places, opts.gates ?? [], formerModesWritten(opts.workflowDir), mounts)
     : undefined;
   if (factory && refusedMounts) {
-    const where = `${path.basename(path.resolve(opts.workflowDir))}/${refusedMounts.step.name}`;
-    return yield* Effect.fail(new Invalid({ message: factoryMountRefusal(factory, where, refusedMounts.why) }));
+    const where = `${workflow}/${refusedMounts.step.name}`;
+    const writes = stepMounts(refusedMounts.step, mounts)?.some((m) => !m.readOnly);
+    const refusal = writes ? writableMountRefusal : factoryMountRefusal;
+    return yield* Effect.fail(new Invalid({ message: refusal(factory, where, refusedMounts.why) }));
   }
   const told = toldOf(opts, steps, inputs, factory, mounts);
   const stepRecords = Object.fromEntries(steps.map((s) => [s.name, { taskId: null }]));

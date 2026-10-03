@@ -20,13 +20,14 @@
  *                 the task settles on that end, and on nothing observed.
  *
  * A2A's `rejected` is not a state: a spawn its harness refused is one attempt's end (`unstartable`), and the task settles
- * `failed` from `ending` as on any failed end — a long-lived task too, which waiting would not start. A sighting may say `rejected` — a remote agent that refused the work once it
- * had it — and that is the harness ending the attempt, `SESSION_ENDED`, recorded `failed` as any failure the harness
- * reports. A sighting's `submitted` — a remote Task accepted and not yet started — is `SESSION_LIVE`, as `working` is:
- * every edge of it (wait, stop for a person or the deadline, stop before continuing) is right for it, and a new event
- * would copy them. `auth-required` is not a task's state either: a sighting says it, and it is `SESSION_BLOCKED`, as
- * `input-required` is. A session blocked on a person is a self-edge of `working`, not a state: the journal cannot tell it
- * from working, only a sighting can, and a state is what the journal says.
+ * `failed` from `ending` as on any failed end — a long-lived task too, which waiting would not start. A sighting may say
+ * `rejected` — a remote agent that refused the work once it had it — and that is the harness ending the attempt,
+ * `SESSION_ENDED`, recorded `failed` as any failure the harness reports. A sighting's `submitted` — a remote Task
+ * accepted and not yet started — is `SESSION_LIVE`, as `working` is: every edge of it (wait, stop for a person or the
+ * deadline, stop before continuing) is right for it, and a new event would copy them. `auth-required` is not a task's
+ * state either: a sighting says it, and it is `SESSION_BLOCKED`, as `input-required` is. A session blocked on a person is
+ * a self-edge of `working`, not a state: the journal cannot tell it from working, only a sighting can, and a state is what
+ * the journal says.
  *
  * **A person's verbs are not edges, and are declared beside them.** `requestStop`, `answer` and `close` write an entry to
  * the journal, and the next pass reads the state that entry makes: `stopping`, a new turn's `submitted`, `ending`. The edges

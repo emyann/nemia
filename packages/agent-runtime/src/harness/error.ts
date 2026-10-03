@@ -16,7 +16,7 @@ export class RunnerError extends Schema.TaggedError<RunnerError>()('RunnerError'
   refused: Schema.optionalKey(Schema.Boolean),
 }) {}
 
-/** The OS errors a spawn may fail with for a short-lived reason — no process slot, no file descriptor, no memory — that waiting can clear. */
+/** The OS errors a spawn may fail with for a short-lived reason — no process slot, no descriptor, no memory — that waiting can clear. */
 export const TRANSIENT_ERRNOS: readonly string[] = ['EAGAIN', 'EMFILE', 'ENFILE', 'ENOMEM'];
 
 /**

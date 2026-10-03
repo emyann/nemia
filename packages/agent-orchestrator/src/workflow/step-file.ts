@@ -16,7 +16,8 @@ import {
   type Workflow,
   WorkflowError,
 } from '../step/step.ts';
-import { isRemoteHarness, remoteRefusal } from '../harness/harness.ts';
+import { fenceReach } from 'agent-runtime/vocabulary';
+import { DEFAULT_HARNESS, isRemoteHarness, remoteRefusal } from '../harness/harness.ts';
 import {
   backgroundOf,
   budgetOf,
@@ -25,11 +26,9 @@ import {
   contextOf,
   contextText,
   countOf,
-  DEFAULT_PERMISSION_MODE,
   denialsOf,
   gateOf,
   harnessOf,
-  keepsAuto,
   outputOf,
   remoteOf,
   rulesOf,
@@ -292,7 +291,8 @@ function autoRefusal(step: string, harness: string | undefined, model: string | 
 /**
  * Why a Claude Code session filed in `permissionMode` — the mode a step names, or `undefined` for none — would not run in it on `model`, as
  * the words after what names the model: `names no \`permissionMode:\`, …, and Claude Code drops \`auto\` …`. `undefined` when it would:
- * on codex, which has sandboxes and not modes; on a model that keeps `auto` (`keepsAuto`); or in any mode but `auto`. Such a session says
+ * on a harness whose fence reach drops no word on that model (`fenceReach`): codex, which has sandboxes and not modes, a model that keeps
+ * `auto`, or any mode but `auto`. Such a session says
  * `default` from its first turn, and a job denies every call `default` would ask about, which no line of the step says. The one wording
  * for the load's refusal (`autoRefusal`) and a retry's on another model (`retryRefusal`). Pure.
  */
@@ -301,13 +301,14 @@ export function autoDropped(
   model: string | undefined,
   permissionMode: string | undefined,
 ): string | undefined {
-  if (harness === 'codex' || isRemoteHarness(harness) || keepsAuto(model)) return undefined;
-  if ((permissionMode ?? DEFAULT_PERMISSION_MODE) !== 'auto') return undefined;
+  const reach = fenceReach(harness ?? DEFAULT_HARNESS, model);
+  const mode = permissionMode ?? reach?.given;
+  if (!reach || mode === undefined || !reach.dropped.includes(mode)) return undefined;
   const asked =
     permissionMode === undefined
-      ? `names no \`permissionMode:\`, so it is filed in \`${DEFAULT_PERMISSION_MODE}\`, the runtime's default`
-      : 'says `permissionMode: auto`';
-  return `${asked}, and Claude Code drops \`auto\` on that model: the session runs in \`default\`, and a job denies every call \`default\` would ask about`;
+      ? `names no \`permissionMode:\`, so it is filed in \`${mode}\`, the runtime's default`
+      : `says \`permissionMode: ${mode}\``;
+  return `${asked}, and Claude Code drops \`${mode}\` on that model: the session runs in \`default\`, and a job denies every call \`default\` would ask about`;
 }
 
 /**

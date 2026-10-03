@@ -10,17 +10,8 @@ import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { codex, CODEX_SANDBOXES } from 'agent-runtime';
-import {
-  AUTO_UNSUPPORTED,
-  keepsAuto,
-  modeOf,
-  parseAgent,
-  parseWorkflow,
-  renderAgent,
-  WorkflowError,
-  type Agent,
-  type Workflow,
-} from '../src/workflow.ts';
+import { CLAUDE_AUTO_DROPPED } from 'agent-runtime/vocabulary';
+import { autoDropped, modeOf, parseAgent, parseWorkflow, renderAgent, WorkflowError, type Agent, type Workflow } from '../src/workflow.ts';
 import { agentsFor, agentVersion, loadWorkflows, lookupRoots, skillsFor } from '../src/folder/folder.store.ts';
 import { briefBody, noCodingStyle, pluginOf, renderedFlags, renderedPrompt, rendersAgent, unrendered } from '../src/agents/agents.ts';
 import { scratch } from './scratch.ts';
@@ -297,12 +288,12 @@ test("REFUSED at shipped defaults: `auto` on a model Claude Code drops it on (F2
   assert.equal(loadWorkflows(team('---\nharness: codex\nmodel: haiku\n---\nx\n', {})).length, 1, 'kept: a codex step');
   assert.equal(loadWorkflows(team('---\n---\nx\n', {})).length, 1, 'kept: no model at all');
   assert.deepEqual(
-    [...AUTO_UNSUPPORTED],
+    [...CLAUDE_AUTO_DROPPED],
     ['haiku', 'claude-haiku-4-5', 'claude-sonnet-4-5'],
     'F21 measured these three; a new one is measured first',
   );
-  assert.equal(keepsAuto('claude-sonnet-4-5-20250929'), false);
-  assert.equal(keepsAuto('claude-sonnet-5'), true, 'a name that only begins like one measured is not it');
+  assert.ok(autoDropped('claude', 'claude-sonnet-4-5-20250929', undefined));
+  assert.equal(autoDropped('claude', 'claude-sonnet-5', undefined), undefined, 'a name that only begins like one measured is not it');
 });
 
 test('REFUSED at shipped defaults: a skill no place has, naming each place looked in, in order', () => {

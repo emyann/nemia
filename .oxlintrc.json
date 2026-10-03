@@ -476,12 +476,6 @@
       }
     },
     {
-      "files": ["apps/web/src/components/WorkflowCanvas.tsx"],
-      "rules": {
-        "max-lines-per-function": ["error", { "max": 98, "skipBlankLines": true, "skipComments": true }]
-      }
-    },
-    {
       "files": ["apps/web/src/components/conversation/PromptBox.tsx"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 96, "skipBlankLines": true, "skipComments": true }]
@@ -564,7 +558,7 @@
     {
       "files": ["apps/web/src/routes/runs.$runId.tsx"],
       "rules": {
-        "complexity": ["error", { "max": 24 }]
+        "complexity": ["error", { "max": 23 }]
       }
     },
     {

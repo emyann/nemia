@@ -174,6 +174,35 @@ const StepSpecSchema = Schema.Struct({
 }) satisfies Schema.Schema<StepSpec>;
 
 /**
+ * Mirrors `ToldLayers` (agent-orchestrator/run), the api's `layers`: what a step was told, by layer, from what its run froze — its
+ * agent, the agent's instructions and own skills, the person's custom instructions for it, the step's own note and the skills its line
+ * adds, and the task, its brief after them. `via` says where the agent's words and the person's went: the session's system prompt
+ * (`prompt`), or the head of its brief (`brief`).
+ */
+export type StepLayers = {
+  agent: string | null;
+  instructions: string | null;
+  custom: string | null;
+  agentSkills: string[];
+  policy: string;
+  addedSkills: string[];
+  task: string | null;
+  via: 'prompt' | 'brief';
+};
+
+/** Decodes a `StepLayers`. */
+const StepLayersSchema = Schema.Struct({
+  agent: Schema.NullOr(Schema.String),
+  instructions: Schema.NullOr(Schema.String),
+  custom: Schema.NullOr(Schema.String),
+  agentSkills: Schema.mutable(Schema.Array(Schema.String)),
+  policy: Schema.String,
+  addedSkills: Schema.mutable(Schema.Array(Schema.String)),
+  task: Schema.NullOr(Schema.String),
+  via: Schema.Literals(['prompt', 'brief']),
+}) satisfies Schema.Schema<StepLayers>;
+
+/**
  * Mirrors `StepFiled` in apps/api/src/detail/detail.ts: what the engine filed a step's current try with. Each field is null where the
  * task was filed without it — no deadline, which is no limit, and the harness's own model, effort and tools. `askedModel` is
  * the model a person's `wf retry --model` asked this try for; `runsIn` the permission mode the session runs in, as its harness
@@ -276,6 +305,8 @@ export type RunDetail = {
     filed: StepFiled | null;
     body: string | null;
     told: string | null;
+    /** What it was told, by layer, from what the run froze; null for a run that froze no workflow, whose `told` is all there is. */
+    layers: StepLayers | null;
     taskId: string | null;
     workspace: string | null;
     /**
@@ -426,6 +457,7 @@ const DetailStepSchema = Schema.Struct({
   filed: Schema.NullOr(StepFiledSchema),
   body: Schema.NullOr(Schema.String),
   told: Schema.NullOr(Schema.String),
+  layers: Schema.NullOr(StepLayersSchema),
   taskId: Schema.NullOr(Schema.String),
   workspace: Schema.NullOr(Schema.String),
   files: Schema.mutable(Schema.Array(StepArtifactSchema)),

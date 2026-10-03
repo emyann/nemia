@@ -1,7 +1,7 @@
 /**
  * What a step was told, folded away: it is long, and it does not change while you look at the step. Where its run froze its layers,
- * each is drawn apart, as frozen at `wf start` — the agent's instructions with its own skills, the person's custom instructions, the
- * step's policy with the skills its line adds, and the task; a run that froze none shows its brief whole.
+ * each is drawn apart, as the run froze it when it started — the agent's instructions with its own skills, the person's custom
+ * instructions, the step's policy with the skills its line adds, and the task; a run that froze none shows its brief whole.
  */
 import type { ReactNode } from 'react';
 import { Badge } from '@/components/ui/badge';

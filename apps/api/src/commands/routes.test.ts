@@ -227,6 +227,9 @@ test('REFUSED: a routed command the api has no words for, and a key taken on the
   assert.deepEqual(wordBreaks([{ name: 'sing', route }]), [
     'sing is routed on the api, and words.ts has no words for it: give it its guard, its shape and its refusals there',
   ]);
+  assert.deepEqual(wordBreaks([{ name: 'hush', route: { method: 'DELETE', path: '/api/runs/:runId/song', status: 200 } }]), [
+    'hush is routed on the api, and words.ts has no words for it: give it its guard, its shape and its refusals there',
+  ]);
   assert.deepEqual(wordBreaks([{ name: 'sing' }]), [], 'a command served on the command line alone needs no words');
   assert.deepEqual(extensionBreaks([{ name: 'approve', apiTakes: ['answers'] }]), [
     'approve takes `answers` on the api, and extend.ts folds none: give approve an extension that takes it, or drop it',

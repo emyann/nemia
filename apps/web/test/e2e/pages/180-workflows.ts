@@ -17,8 +17,8 @@ export default {
    * stands: a run waiting on a run called off has filed nothing, and never will without you, so it is not finished. Start is not pressed
    * here, as a run started would be on every page visited after this one; in a page of its own, whose one refusal is the point, a start
    * that waits on a run called off is refused in `afterRefusal`'s words beside the form, and nothing is written: naming no factory, it
-   * is made in FACTORIES' `hiring`, the one that holds the checkout, hiring for it the agents that let `dev` start, taken back after. Each step's page opens
-   * from a link under the graph, in the order a run runs them, and from its block on the graph.
+   * is made in FACTORIES' `hiring`, the one that holds the checkout, hiring for it the agents that let `dev` start, taken back after.
+   * Each step's page opens from a link under the graph, in the order a run runs them, and from its block on the graph.
    */
   name: 'workflows',
   route: '/workflows',

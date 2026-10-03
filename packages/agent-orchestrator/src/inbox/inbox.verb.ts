@@ -121,8 +121,9 @@ function cardFactory(opts: Pick<InboxStart, 'factory' | 'fix'>, named: string | 
  * written, exit 2: a name that is not a card's (`inboxNameRefusal`), a card not there (`Missing`) — naming the cards there are — a card
  * that does not read, a card already started (`Conflict`), no factory from either — `Invalid`, naming the line to write and `fix`
  * (`unfactoredCardRefusal`), unless `defaultStartsAllowed` — or the default factory named (`defaultStartRefusal`), no workflow, a
- * workflow that does not load behind the card, a `gate:` naming no step of it, in the card's words, and a `brief` with nothing in it; and whatever `start()` refuses — an `--after`, an `--input`, a
- * `--gate`, a factory not there, one that does not offer the workflow or does not work on the repository — as it refuses it.
+ * workflow that does not load behind the card, a `gate:` naming no step of it, in the card's words, and a `brief` with nothing in it. And
+ * refused as `start()` refuses it: an `--after`, an `--input` or a `--gate` it refuses, a factory not there, or one that does not offer
+ * the workflow or does not work on the repository.
  */
 export function startFromInbox(opts: InboxStart): InboxStarted {
   const refused = inboxNameRefusal(opts.name);

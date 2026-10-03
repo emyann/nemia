@@ -6,8 +6,9 @@
  * And the factory on the run: its name frozen on the record, a factory with one repository giving the run its repository, and a git run on
  * a repository outside the factory refused, naming its list; a folder team works on none, and a run in the default factory records none.
  *
- * And every run in a factory, as shipped (`asShipped` deletes `WF_DEFAULT_FACTORY_STARTS`, which `test/ambient.ts` sets): a start that names
- * none runs in the one factory whose repository holds its folder, and is refused where none or two do; a card names its own, never found.
+ * And every run in a factory, as shipped (`asShipped` deletes `WF_DEFAULT_FACTORY_STARTS`, which `test/ambient.ts` sets): a start that
+ * names none runs in the one factory whose repository holds its folder, and is refused where none or two do; a card names its own, never
+ * one found.
  *
  * `WF_ROOT` is set before the runner is imported, since it is read as the module loads.
  */

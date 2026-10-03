@@ -603,7 +603,8 @@ function agentSkillsOf(step: Workflow, dir: string, places: Places): AgentSkill[
 /**
  * The inbox card `asked` names, started by the package's `startFromInbox` with `repo` as the caller's and in the factory `factory` when
  * one is named, over the card's `factory:` — one that names none either way is refused, its fix `?factory=<name>` — and what
- * `POST /api/runs` answers: the run's id and the card's name, whether the card was removed and why not, and the card's `repo:` the run did not look at.
+ * `POST /api/runs` answers: the run's id and the card's name, whether the card was removed and why not, and the card's `repo:` the run
+ * did not look at.
  */
 function cardStarted(asked: Extract<Asked, { card: string }>, repo: string, factory: string | undefined) {
   const started = startFromInbox({

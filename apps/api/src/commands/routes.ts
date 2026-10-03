@@ -98,13 +98,14 @@ function split(command: CommandSpec, body: Readonly<Record<string, unknown>>) {
 /**
  * The arguments a request carries, made whole by the command's extension, or why it carries none: the run and the step its path names
  * (404), its JSON body (400), a key another command takes on the api alone (422), the body's schema (400), a step its body names (404),
- * and the extension's own refusals.
+ * and the extension's own refusals. A delete reads no body: its arguments are what its path names and what its route fixes (`sets`).
  */
 async function argsOf(c: Context<ApiEnv>, command: CommandSpec, at: Named, s: Served): Promise<{ args: Args } | Refusal> {
   const words = WORDS[command.name];
   const bound = at.step ? at : { runId: at.runId };
   const named = located(at, at.step || undefined, s.home);
   if ('status' in named) return named;
+  if (command.route?.method === 'DELETE') return { args: { ...command.route.sets, ...bound } };
   const json = await jsonOf(c, command.name, words);
   if ('status' in json) return json;
   const foreign = foreignKey(command, COMMANDS, json.value, words.shape);
@@ -124,42 +125,48 @@ async function argsOf(c: Context<ApiEnv>, command: CommandSpec, at: Named, s: Se
 const answerOf = (command: Command, data: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> =>
   command.apiKeys ? Object.fromEntries(command.apiKeys.map((key) => [key, data[key]])) : data;
 
-/** A routed command's handler: the guard where it writes, its arguments, its check (422), and its handler's data, or 502 in its words. */
-const route = (command: Command) => (c: Context<ApiEnv>) =>
-  served(c, async (s) => {
-    const words = WORDS[command.name];
-    const at: Named = { runId: c.req.param('runId') ?? '', step: c.req.param('step') ?? '' };
-    if (command.writes) {
-      const guard = words.guard(at);
-      const refused = refusedBeforeReading(guard, c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
-      if (refused) return c.json({ error: refused.error }, refused.status);
-    }
-    const read = await argsOf(c, command, at, s);
-    if ('status' in read) return c.json({ error: read.error }, read.status);
-    const wrong = command.check?.(read.args);
-    if (wrong) return c.json({ error: wrong }, 422);
-    try {
-      return c.json(answerOf(command, await command.handler(s.e, read.args, s.env)), 202);
-    } catch (err) {
-      if (isRefusal(err)) throw err;
-      return c.json({ error: words.failed(at, err instanceof Error ? err.message : String(err)) }, 502);
-    }
-  });
+/**
+ * A routed command's handler: the guard where it writes, its arguments, its check (422), and its handler's data at its route's status, or
+ * 502 in its words.
+ */
+const route =
+  (command: Command, { status }: NonNullable<Command['route']>) =>
+  (c: Context<ApiEnv>) =>
+    served(c, async (s) => {
+      const words = WORDS[command.name];
+      const at: Named = { runId: c.req.param('runId') ?? '', step: c.req.param('step') ?? '' };
+      if (command.writes) {
+        const guard = words.guard(at);
+        const refused = refusedBeforeReading(guard, c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
+        if (refused) return c.json({ error: refused.error }, refused.status);
+      }
+      const read = await argsOf(c, command, at, s);
+      if ('status' in read) return c.json({ error: read.error }, read.status);
+      const wrong = command.check?.(read.args);
+      if (wrong) return c.json({ error: wrong }, 422);
+      try {
+        return c.json(answerOf(command, await command.handler(s.e, read.args, s.env)), status);
+      } catch (err) {
+        if (isRefusal(err)) throw err;
+        return c.json({ error: words.failed(at, err instanceof Error ? err.message : String(err)) }, 502);
+      }
+    });
 
 /**
- * The routes of every command of `table` posted on the api, each answered from its entry; a read the api gets is served by the api's
+ * The routes of every command of `table` the api posts or deletes on, each answered from its entry; a read the api gets is served by the api's
  * own route for it, which calls the entry's handler.
  */
 export function routesOf(table: readonly Command[]): Hono<ApiEnv> {
   const router = new Hono<ApiEnv>();
-  for (const command of table) if (command.route?.method === 'POST') router.post(command.route.path, route(command));
+  for (const command of table)
+    if (command.route && command.route.method !== 'GET') router.on(command.route.method, command.route.path, route(command, command.route));
   return router;
 }
 
-/** Where the table asks the api for words it does not have, a sentence each: a command posted on the api with none in words.ts. */
+/** Where the table asks the api for words it does not have, a sentence each: a command posted or deleted on with none in words.ts. */
 export const wordBreaks = (table: readonly Pick<CommandSpec, 'name' | 'route'>[]): string[] =>
   table
-    .filter((c) => c.route?.method === 'POST' && !Object.hasOwn(WORDS, c.name))
+    .filter((c) => c.route !== undefined && c.route.method !== 'GET' && !Object.hasOwn(WORDS, c.name))
     .map((c) => `${c.name} is routed on the api, and words.ts has no words for it: give it its guard, its shape and its refusals there`);
 
 /**
@@ -199,5 +206,10 @@ export const wordBreaks = (table: readonly Pick<CommandSpec, 'name' | 'route'>[]
  *   Refuses words that are missing or empty (`acceptWordsRefusal`) with 422 before the run is read, and a loop that may not be accepted
  *   (`acceptAsk`) with 409 after — a step with no `loop:`, a round the run files itself or one already asked for, a loop that ended
  *   `again: false`, a try already accepted, a run called off.
+ * - `DELETE /api/runs/:id/hold` — a person's hold lifted, as `wf hold <run> --off` lifts it (`unhold`), the one form of `wf hold` the api
+ *   serves: its route sets `off`, and it reads no body. Its file removed, the run goes on at the next tick, what its steps asked while it
+ *   was held asked again. Refused in the package's words, by `app.onError`: a run nobody holds — a pruned one among them, since no verb
+ *   holds one — and a hold put again as it was lifted are a 409 (`Conflict`), a run gone since the route read it a 404; any other failure
+ *   is a 502. Its 200 is `{ id, lifted: true, hold }`. No feed line: the tick is the feed's one writer, and the board reads the run again.
  */
 export const commands = routesOf(COMMANDS);

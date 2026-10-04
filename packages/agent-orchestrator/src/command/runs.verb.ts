@@ -291,7 +291,8 @@ const TICK: Ran = {
   usage: '[--stats]',
   help: [
     'one pass: tick the engine, file what became ready — refused while a',
-    'wf up ticks the store, since it runs the same pass (daemon.json);',
+    'daemon (the api, or a wf up) ticks the store, since it runs the same',
+    'pass (daemon.json);',
     '--stats says after it what the pass cost, phase by phase',
   ],
   spec: {
@@ -300,7 +301,7 @@ const TICK: Ran = {
     unknown: (arg) => `wf tick takes no ${arg}: wf tick runs one pass, and wf tick --stats says after it what the pass cost.`,
   },
   writes: true,
-  only: { side: 'cli', why: 'a pass is run where the store is, by a person or by wf up; the api runs none' },
+  only: { side: 'cli', why: 'a pass is run where the store is, by a person or by a daemon; the api serves none on a route' },
 };
 
 /** Refused of `wf up`'s arguments: an interval beside `--stats`, which ticks nothing, or one `everyOf` refuses. */
@@ -318,14 +319,17 @@ const UP: Ran = {
   name: 'up',
   usage: '[ms]',
   help: [
-    'the same, on a timer (4000 unless given; whole ms, 1 to 2147483647),',
-    'holding the store: a second wf up is refused while this one ticks,',
-    'and takes the store over once its process is gone or it has been',
-    'silent for 10 intervals, at least 15 minutes; it writes',
-    'WF_ROOT/daemon.json — pid, start, last pass, and a beat each interval;',
+    'the headless daemon, where no board is served: the same pass on a',
+    'timer (4000 unless given; whole ms, 1 to 2147483647), holding the',
+    "store. The api's process (npm start in apps/api) is the daemon where",
+    'one is: one store takes one, and each is refused while the other',
+    "ticks. It takes the store over once its holder's process is gone or",
+    'it has been silent for 10 intervals, at least 15 minutes; it writes',
+    'WF_ROOT/daemon.json — who holds it, pid, start, last pass, and a beat',
+    'each interval;',
     'once a minute, a line of what its passes cost (tick-stats.json).',
     'wf up --stats: what the last pass cost, phase by phase — read, not',
-    'run, so it fits while a wf up holds the store; where none does,',
+    'run, so it fits while a daemon holds the store; where none does,',
     'wf tick --stats',
   ],
   spec: {

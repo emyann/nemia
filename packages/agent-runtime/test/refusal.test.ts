@@ -68,7 +68,7 @@ const ok: Filing = { brief: 'b', cwd: '/r' };
  *
  * - `maxAttempts` and `resume` are retired, at any value their defaults had: the runtime makes one attempt per start, and
  *   trying again is the caller's.
- * - `priority` is retired at any value: the runtime chooses no order, and the layer above admits.
+ * - `priority` is a whole number in int32, a Pod's priority: anything else is refused.
  * - `remoteControl` is Claude Code's own flag: refused as a harness argument or beside `config`, whatever it says, with a
  *   sentence naming where it goes.
  * - A harness argument goes under `config`, and nothing else goes there: one filed beside it (`model`, `permissionMode`,
@@ -108,13 +108,13 @@ const REFUSALS: Array<
   [{ config: { budgetUsd: Infinity } }, /^`budgetUsd: Infinity` is not an amount of dollars\./],
   [{ config: { budgetUsd: '5' } }, /^`budgetUsd: "5"` is not an amount of dollars\./],
   [
-    { priority: 0 },
-    /^`priority` is retired: the runtime starts a task on its next pass once it is admitted, so it chooses no order\. File tasks `queued: true` and `admit` each when it may start \(`ae admit <id>`\)/,
+    { priority: 1.5 },
+    /^`priority: 1\.5` is not a priority\. Give a whole number from -2147483648 to 2147483647, higher first, or leave it out for 0\.$/,
   ],
-  [{ priority: 1 }, /^`priority` is retired:/],
-  [{ priority: -1 }, /^`priority` is retired:/],
-  [{ priority: Number.NaN }, /^`priority` is retired:/],
-  [{ priority: 'high' }, /^`priority` is retired:/],
+  [{ priority: 2 ** 31 }, /^`priority: 2147483648` is not a priority\./],
+  [{ priority: Number.NaN }, /^`priority: NaN` is not a priority\./],
+  [{ priority: '1' }, /^`priority: "1"` is not a priority\./],
+  [{ priority: null }, /^`priority: null` is not a priority\./],
   [
     { config: { remoteControl: true } },
     /^`remoteControl` is Claude Code's own flag, not a harness argument: file it with Claude Code's flags, as `config: \{ claude: \{ remoteControl: true \} \}`, or leave it out\.$/,

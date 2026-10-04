@@ -133,7 +133,7 @@ export const list = (e: Engine, run: Run, slot?: RunSlot, git: BranchReader = br
   runReading(e, run, { slot, git, checkout: true });
 
 /**
- * `wf ls`'s answer: every run, or the one named, each as `list` reads it, and whether a wf up ticks the store (`daemonStanding`). The cap
+ * `wf ls`'s answer: every run, or the one named, each as `list` reads it, and which daemon ticks the store (`daemonStanding`). The cap
  * on runs in flight is judged over the whole store even for one run; each task is viewed once and each repository's branches listed once
  * (`viewedOnce`, `branchReader`). A run a task journal of which does not read is answered unjudged (`unjudgedOf`); any other failure
  * rejects. Refuses a run named that is not in the store, as `runStore.runs.read` does.

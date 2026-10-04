@@ -571,12 +571,6 @@
       }
     },
     {
-      "files": ["packages/agent-orchestrator/src/cap/cap.ts"],
-      "rules": {
-        "sonarjs/cognitive-complexity": ["error", 16]
-      }
-    },
-    {
       "files": ["packages/agent-orchestrator/src/cli/flags.ts"],
       "rules": {
         "sonarjs/cognitive-complexity": ["error", 19]

@@ -589,12 +589,10 @@ test('a deadline ends a blocked session, which would otherwise wait on a person 
 });
 
 /**
- * File `id` as of `at`: the entry `file` writes, with the time chosen by the test — or the one an older runtime wrote, with
- * the `priority` its pass admitted by under its ceiling.
+ * File `id` as of `at`: the entry `file` writes, with the time chosen by the test — or the one an older runtime wrote, with a
+ * `priority` JSON wrote `null` for.
  *
- * The pass keeps no ceiling, no pools and no order: which task starts, and when, is the layer above's (`queued` and `admit`;
- * the orchestrator's `toAdmit`). The ceiling, its pools, what a slot is held by and which task a free one goes to are
- * `agent-orchestrator/src/cap/cap.test.ts`'s and `pool.test.ts`'s.
+ * Which queued task a pass admits under the engine's ceiling, in which pool and in which order, is `test/admission.test.ts`'s.
  */
 const fileAt = (b: ReturnType<typeof board>, id: string, at: string, fields: Record<string, unknown> = {}) =>
   b.run(Effect.flatMap(Journal, (j) => j.append(id, { kind: 'filed', at, brief: id, cwd: '/repo', queued: false, ...fields })));
@@ -667,11 +665,11 @@ test('a session spawned and not yet listed by its harness is in its grace, howev
   assert.equal(attempt?.ended, null, 'not ended `lost`: on the monotonic clock its grace has barely begun');
 });
 
-test('a pass walks the board in the order the store lists it, and starts every task not queued — the filing time and an old priority choose nothing', async () => {
+test('a pass walks the board in the order the store lists it, and starts every task not queued — the filing time and a priority choose nothing', async () => {
   const b = board();
   await fileAt(b, 'a', '2026-09-16T10:00:02.000Z');
   await fileAt(b, 'b', '2026-09-16T10:00:00.000Z', { priority: 5 });
-  await fileAt(b, 'c', '2026-09-16T09:00:00.000Z', { priority: Number.NaN });
+  await fileAt(b, 'c', '2026-09-16T09:00:00.000Z', { priority: null });
   const report = await b.run(tick());
   assert.deepEqual(
     b.spawned.map((r) => r.name),
@@ -679,7 +677,8 @@ test('a pass walks the board in the order the store lists it, and starts every t
     'the listing order, and all three',
   );
   assert.deepEqual(report.running, { default: 3 });
-  assert.equal('priority' in (await b.run(view('b', new Map()))).state, false, 'the old key is folded unread: history, not state');
+  assert.equal((await b.run(view('b', new Map()))).state.priority, 5, 'a priority is carried on the record');
+  assert.equal('priority' in (await b.run(view('c', new Map()))).state, false, 'and one JSON wrote `null` for is left out: 0');
   assert.equal('priority' in b.spawned[1], false, 'and no harness is told it');
 });
 
@@ -692,7 +691,7 @@ test('the pass refuses any argument — an old ceiling, pools, anything, from a 
     assert.equal(refused._tag, 'TickRefused');
     assert.match(
       refused.message,
-      /^the pass takes no arguments, and was handed \d: it has no ceiling and no pools since stage 4c part 2\. File tasks `queued: true` and `admit` each/,
+      /^the pass takes no arguments, and was handed \d: a ceiling and its pools are the engine's own, never a pass's\. A ceiling is the engine's: give `Engine\.layer` a `maxConcurrent`/,
     );
   }
   assert.equal(b.sessions.size, 0, 'nothing started by a refused pass');

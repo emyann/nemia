@@ -45,8 +45,8 @@ function WorkflowsPage() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <p className="min-w-0 flex-1 text-sm text-neutral-500">
           A workflow is a folder of steps: this repository's under {where}, and yours under {yours}. Starting a run writes its record as{' '}
-          <code className="font-mono text-xs">wf start</code> does, and files nothing: <code className="font-mono text-xs">wf up</code>{' '}
-          files its steps. Yours are built here too.
+          <code className="font-mono text-xs">wf start</code> does, and files nothing: the daemon — this api, or{' '}
+          <code className="font-mono text-xs">wf up</code> — files its steps. Yours are built here too.
         </p>
         <NewWorkflow onCreated={setMade} />
       </div>

@@ -145,6 +145,12 @@ const decodeFeed = (raw: readonly unknown[], after: Cursor, located: StoreOps['l
 const argsOf = (config: Record<string, unknown>): HarnessArgs =>
   Schema.is(HarnessArgsSchema)(config) ? config : Schema.decodeUnknownSync(HarnessArgsSchema)(config);
 
+/** A stored `filed` event with its `priority` kept only when it is a whole number. */
+const weighed = (event: Extract<StoredEvent, { kind: 'filed' }>) => {
+  const { priority, ...unweighed } = event;
+  return Number.isInteger(priority) ? { ...unweighed, priority: priority! } : unweighed;
+};
+
 /**
  * An event in the shape the runtime reads, whatever shape it was written in. Nothing on disk is rewritten: the journal is
  * append-only, and a line is what was said when it was said, so a change to an event's shape is made where it is read.
@@ -162,6 +168,8 @@ const argsOf = (config: Record<string, unknown>): HarnessArgs =>
  *   claude.ai), under `config` or at a `filed` event's top level: moved into `config.claude` — `true` as the flag, where a
  *   flag already in `claude` is kept, and `false`, which asked for nothing, dropped. So a task filed bridged is bridged
  *   again on its next attempt.
+ * - A `filed` event's `priority` that is not a whole number — `null`, as JSON writes a `NaN` an older runtime took: left out,
+ *   so the task waits at 0.
  */
 export const upgrade = (event: StoredEvent): Event => {
   if (event.kind === 'input') {
@@ -174,13 +182,14 @@ export const upgrade = (event: StoredEvent): Event => {
     return { ...event, reason: 'harness', limit: 'budget' };
   }
   if (event.kind !== 'filed') return event;
-  const legacy: Record<string, unknown> = event;
+  const filed = weighed(event);
+  const legacy: Record<string, unknown> = filed;
   const moved = [...HARNESS_ARGS, ...Object.keys(FORMER_ARGS)].filter((key) => Object.hasOwn(legacy, key));
-  const given: Record<string, unknown> = event.config ?? {};
+  const given: Record<string, unknown> = filed.config ?? {};
   const former = Object.keys(FORMER_ARGS).filter((key) => Object.hasOwn(given, key));
-  if (!moved.length && !former.length) return event;
+  if (!moved.length && !former.length) return filed;
   const lifted: Record<string, unknown> = {};
-  const { config: _, ...rest } = event;
+  const { config: _, ...rest } = filed;
   const left: Record<string, unknown> = rest;
   for (const key of moved) {
     if (legacy[key] !== undefined) lifted[key] = legacy[key];
@@ -192,7 +201,7 @@ export const upgrade = (event: StoredEvent): Event => {
     if (config[key] === true) flags[FORMER_ARGS[key]] = true;
     delete config[key];
   }
-  if (Object.keys(flags).length) config.claude = { ...flags, ...event.config?.claude };
+  if (Object.keys(flags).length) config.claude = { ...flags, ...filed.config?.claude };
   return { ...rest, ...(Object.keys(config).length ? { config: argsOf(config) } : {}) };
 };
 

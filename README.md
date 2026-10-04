@@ -23,11 +23,16 @@ processes and reads your home directory, so it lives behind the API.
 
 ```bash
 npm install
-npm run dev         # api on :8787, web on :5173 (it proxies /api)
+npm run dev         # for working on the board: an api on :8788 that ticks nothing (--no-tick), web on :5173 (it proxies /api)
 npm test
 npm run typecheck
 npx wf              # the workspace CLIs are linked at the root
 ```
+
+`npm start` in `apps/api` is the store's daemon and the board's api at once: it holds `~/.agent-workflows/daemon.json`, ticks the runs
+and answers `/api` on :8787. The board itself is the web's server: `npm run build` then `npm run preview` in `apps/web`, which proxies
+`/api` to :8787. `npx wf up` is the same daemon on a machine that serves no board. One store takes one daemon: each refuses the other
+while it ticks, naming its pid.
 
 ## No build step, except the web app
 
@@ -112,4 +117,4 @@ git log -- packages/agent-runtime packages/agent-engine # renamed on 2026-09-23
 ```
 
 After pulling the rename, run `npm install` at the root (the workspace links are renamed) and restart a
-running `wf up`: a daemon started before it spawns its sessions from a worker path that is gone.
+running daemon: a daemon started before it spawns its sessions from a worker path that is gone.

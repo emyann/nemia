@@ -1,6 +1,6 @@
 # Operating the factory with its owner: a playbook
 
-How the operator session has run Nemia's factory (`wf up` and this repository's team) alongside its owner, written down on 2026-09-30
+How the operator session has run Nemia's factory (its daemon and this repository's team) alongside its owner, written down on 2026-09-30
 so that a supervisor agent can be built from it. It is a record of practice, not a design: where a rule here is only prose, the last
 section names the machinery that should hold it instead.
 
@@ -31,14 +31,14 @@ words the agent can act on. It files, chains and restarts. It does not decide wh
 
    ```sh
    cur=$(npx wf feed | awk '/^cursor:/{print $2}' | tail -1)
-   ( dprev=""; while true; do n=$(pgrep -fc '^node [^ ]*/node_modules/\.bin/wf up$' || true)
-     d="DAEMON: $n wf up processes"; [ "$n" != 1 ] && [ "$d" != "$dprev" ] && echo "$d"; dprev=$d; sleep 20; done ) &
+   ( dprev=""; while true; do d=$(npx wf ls | tail -1)
+     case "$d" in *': ticking,'*) ;; *) [ "$d" != "$dprev" ] && echo "DAEMON: $d";; esac; dprev=$d; sleep 20; done ) &
    npx wf watch "$cur" | awk '/^[[:space:]]*$/ || /watching from/ || / (running|pending|waiting)( on [a-z0-9-]+)?( |$)/ {next} {print; fflush()}'
    ```
 
    Filter with `awk` and `fflush()`, never `grep`: `grep` held each gate line in its buffer.
 2. **React** to each event. A step done or verified is routine: one line, no action. A gate (`awaiting approval`), a round
-   (`input-required · BLOCKED`), a failed check, a landing, or a daemon count other than 1 needs action.
+   (`input-required · BLOCKED`), a failed check, a landing, or a daemon line that is not `ticking` needs action.
 3. **After an expiry,** list what moved while the watch was down (`npx wf ls | grep -E 'awaiting approval|checking|input-required|running \('`)
    before re-arming.
 
@@ -111,18 +111,29 @@ rm "$S"/node_modules; git worktree remove "$S"
 
 ## After a landing
 
-- **Restart the daemon** when the landing changed `packages/agent-runtime/src` or `packages/agent-orchestrator/src` (not for a doc, a
-  skill, a test or the web alone), only when no landing holds the checkout:
+- **The daemon is the api**, started without `--no-tick`: it holds the store (`~/.agent-workflows/daemon.json`, `by: "api"`, its `url`),
+  ticks it, and answers the board's `/api` on 8787; the board is the web's `vite preview` (`npm run preview` in apps/web, after
+  `npm run build`), which proxies `/api` there. Start the api detached, so no harness's time limit ends it, from the main checkout:
+
+  ```sh
+  cd apps/api && env -u CLAUDECODE -u CLAUDE_CODE_SESSION_ID … WF_MAX_CONCURRENT=50 setsid nohup node src/main.ts >> ~/.agent-workflows/api.log 2>&1 &
+  ```
+
+  Find it by its lease, never by a pattern: `npx wf ls`'s last line names the holder, its pid and its url, and `daemon.json` holds the
+  same. A second api or a `wf up` on the store is refused while it ticks, naming it. `npm run dev` serves an api on 8788 that
+  ticks nothing (`--no-tick`), behind the vite dev server on 5173, for working on the board; `wf up` is the daemon on a machine with no board.
+- **Restart the daemon** when the landing changed `packages/agent-runtime/src`, `packages/agent-orchestrator/src` or `apps/api/src` (not
+  for a doc, a skill, a test or the web alone), at a gap: only when no landing holds the checkout. Stop it by the pid its lease names, and
+  wait for the lease to say it stopped before starting the next:
 
   ```sh
   n=$(npx wf ls | grep -cE ' land +(checking|running)')
-  [ "$n" = 0 ] && { pkill -f '^npm exec wf u[p]$'; pkill -f '^node [^ ]*/node_modules/\.bin/wf u[p]$'; }
-  env -u CLAUDECODE -u CLAUDE_CODE_SESSION_ID … WF_MAX_CONCURRENT=50 npx wf up >> ~/.agent-workflows/wf-up.log 2>&1   # in the background
-  pgrep -fa '^node [^ ]*/node_modules/\.bin/wf up$'   # exactly one
+  [ "$n" = 0 ] && kill "$(node -p 'require(process.env.HOME + "/.agent-workflows/daemon.json").pid')"
+  until node -e 'process.exit(require(process.env.HOME + "/.agent-workflows/daemon.json").stoppedAt ? 0 : 1)'; do sleep 1; done
   ```
 
-  Several landings queued together share one restart after the last. The old daemon's `exit 143` is the stop, not a failure. Never
-  stop the daemon with the harness's task-stop, and never `pkill -f` a pattern present in your own command line (the `[p]` trick).
+  then start it as above. Several landings queued together share one restart after the last. The old daemon's `exit 143` is the stop,
+  not a failure. Never stop the daemon with the harness's task-stop, and never by a name pattern: another run's process can match it.
 - **A failed landing check:** nothing landed and the merge was aborted (check `git status` and `.git/MERGE_HEAD` in the checkout). Read
   the check's stderr and the failing test; name the cause; bring the send-back to the person.
 - **Never touch the main checkout** (npm, git, a file) while a landing is checking in it. Gate every command on

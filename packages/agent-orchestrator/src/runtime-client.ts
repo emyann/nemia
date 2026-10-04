@@ -5,13 +5,13 @@
  * `denialText`, `refusedText` and `lifecycleGraph`), which they import from here and never from the runtime.
  *
  * It uses the runtime's `Engine` service (`agent-runtime/effect`) and provides it as a layer, changed in one verb: `file`, so that every
- * task the orchestrator files is `queued` and starts only once the tick admits it (`cap.ts`). The controllers take the engine in Promises,
- * each verb of that service run as one (`promiseEngine`): what they do with the runtime — file a task, view one, tick, admit, stop one,
- * read its logs, say something to it, read the feed — are the methods of the runtime's Promise `Engine`, which every controller takes as it
- * is and every test hands one of (`engineOf` over a layer of its own). A wrapper would be a second surface to keep in step with the first,
- * and a place for behaviour to grow; this file holds none but that one. A controller written as an Effect program requires that same
- * Promise engine as a service (`EngineService`), which its plain face provides from the engine it is handed, and lifts each read with
- * `tried` or `awaited`: a refusal is the program's failure, anything else a defect it dies of.
+ * task the orchestrator files is `queued` and starts only once the runtime admits it under the ceiling `engine()` gives it. The controllers
+ * take the engine in Promises, each verb of that service run as one (`promiseEngine`): what they do with the runtime — file a task, view
+ * one, tick, admit, stop one, read its logs, say something to it, read the feed — are the methods of the runtime's Promise `Engine`, which
+ * every controller takes as it is and every test hands one of (`engineOf` over a layer of its own). A wrapper would be a second surface to
+ * keep in step with the first, and a place for behaviour to grow; this file holds none but that one. A controller written as an Effect
+ * program requires that same Promise engine as a service (`EngineService`), which its plain face provides from the engine it is handed, and
+ * lifts each read with `tried` or `awaited`: a refusal is the program's failure, anything else a defect it dies of.
  */
 import path from 'node:path';
 import { Context, Effect, Layer } from 'effect';
@@ -28,6 +28,7 @@ import {
 } from 'agent-runtime';
 import { envNameOf, readRemoteAgents, remoteAgentsFile } from './harness/a2a.store.ts';
 import { HOME } from './record/record.store.ts';
+import { maxConcurrent } from './config/config.store.ts';
 import { REMOTE_PREFIX, remoteNameOf } from './harness/harness.ts';
 import { Invalid, isRefusal, type Refusal } from './refusal/refusal.ts';
 
@@ -62,23 +63,26 @@ export const unreadableJournal = (err: unknown): string | undefined => {
  * the runtime keeps their streams in `runs/check/` and a check filed before it reads the same. It runs a step's `check:` command as the
  * task's `config` gives it (`checkArgv`, `src/check/check.ts`). Passing `harnesses` REPLACES the engine's
  * default map rather than adding to it, so the defaults are named again here — leaving them out would
- * quietly send every `claude` step to whichever harness came first.
+ * quietly send every step to whichever harness came first.
  *
- * A `claude` step runs on the engine's `claude`: a job (`claude -p`), which ends on its own, asks nobody in any mode, and keeps a spend
- * cap; a step that says `background: true` is filed with `config.background` and runs as a background session (`claude --bg`), which
- * a person can talk to and bridge to claude.ai.
+ * A step runs on the engine's harness of its name as a job, which ends on its own, asks nobody in any mode, and keeps a spend cap; a
+ * step that says `background: true` is filed with `config.background` and runs as a background session, which a person can talk to.
+ *
+ * The detached harness and the job it stands beside are one subscription, so it counts in the job's pool (`pool`), under one ceiling;
+ * every other harness, `check` among them, is a pool of its own.
  */
 export const HARNESSES = {
   claude: 'claude',
   codex,
-  'claude-detached': claudeDetached,
+  'claude-detached': { ...claudeDetached, pool: 'claude' },
   check: { ...commandHarness, name: 'check' },
 } as const;
 
 /**
- * The engine the controllers use. How many sessions run at once is the orchestrator's to say (`toAdmit`, under `ceilings().sessions`, which
- * reads `WF_MAX_CONCURRENT`): every filing goes out `queued`, so the runtime starts nothing the tick has not admitted. The runtime keeps no
- * ceiling of its own, and refuses a `maxConcurrent` handed to it.
+ * The engine the controllers use. Every filing goes out `queued`, and the runtime admits it per pool under the ceiling handed to it here,
+ * `maxConcurrent` from `WF_MAX_CONCURRENT` (`maxConcurrent` in `config.store.ts`), the filed `priority` first. A value the variable
+ * refuses gives the engine no ceiling, so nothing is admitted: the tick refuses its pass on the same read (`ceilings`), so the daemon
+ * says why, and every other command works on.
  *
  * Its `a2a:<name>` harnesses are what the store's `a2a-agents.json` declares and the runtime takes (`readRemote`). A file refused as it
  * stands gives none, and an entry refused gives no harness of its name: each is said on stderr and left out, so every other command —
@@ -90,9 +94,8 @@ export const engine = (): Engine => {
   const read = readRemote();
   const remote = Object.fromEntries([...read.agents].map(([name, agent]) => [`${REMOTE_PREFIX}${name}`, agent]));
   for (const why of refusalsOf(read)) console.error(`wf: ${why} ${LEFT_OUT}`);
-  return engineOf(
-    RuntimeEngine.layer({ root: path.join(HOME, 'engine'), harnesses: { ...HARNESSES, ...remote }, credentials, missingCredential }),
-  );
+  const harnesses = { ...HARNESSES, ...remote };
+  return engineOf(RuntimeEngine.layer({ root: path.join(HOME, 'engine'), harnesses, credentials, missingCredential, ...ceilingOf() }));
 };
 
 /**
@@ -135,6 +138,16 @@ export const tried = <A>(read: () => A): Effect.Effect<A, Refusal> =>
  */
 export const awaited = <A>(read: () => Promise<A>): Effect.Effect<A, Refusal> =>
   Effect.tryPromise({ try: read, catch: (err) => err }).pipe(Effect.catch(orRefusal));
+
+/** The engine's ceiling, `WF_MAX_CONCURRENT`'s sessions per pool, or none when the variable is refused (`maxConcurrent`). */
+const ceilingOf = (): { maxConcurrent?: number } => {
+  try {
+    return { maxConcurrent: maxConcurrent() };
+  } catch (err) {
+    if (isRefusal(err)) return {};
+    throw err;
+  }
+};
 
 /** What `engine()` says after each refusal of the file or of an entry: that it was left out, and what that means. */
 const LEFT_OUT =
@@ -193,5 +206,5 @@ export const credentials: Credentials = (scheme, _agentUrl, harness) => {
 /** What a spawn refused for a secret not given says to do: set the variable, where the run's processes read it. */
 export const missingCredential: MissingCredential = (scheme, _agentUrl, harness) => {
   const name = remoteNameOf(harness) ?? harness;
-  return `set ${envNameOf(name, scheme)} to the secret for the scheme \`${scheme}\` ${name}'s card declares, in the environment of \`wf up\` (and of the api, which reads a run through the same engine), and restart it; then \`wf retry\` the step. The secret is read from there on every request, and never written to disk.`;
+  return `set ${envNameOf(name, scheme)} to the secret for the scheme \`${scheme}\` ${name}'s card declares, in the environment of the daemon — the api, or \`wf up\` — and of every api that reads a run through the same engine, and restart it; then \`wf retry\` the step. The secret is read from there on every request, and never written to disk.`;
 };

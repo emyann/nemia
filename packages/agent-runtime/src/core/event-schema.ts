@@ -3,7 +3,7 @@
  * (`Journal.layer`), before `upgrade` rewrites a former shape in today's.
  *
  * Each event keeps the keys it does not name (`Schema.StructWithRest`): a journal is never rewritten, and a key written by
- * another version of the runtime — `maxAttempts`, `resume` and `priority` on an old filing, a harness argument beside
+ * another version of the runtime — `maxAttempts` and `resume` on an old filing, a harness argument beside
  * `config` — is `upgrade`'s to move or the fold's to leave unread. The rest's `unknown` is also what holds each struct to
  * the hand-written `Event` in `domain.ts`: a field of `Event` a struct forgot is read as `unknown`, which no field's type
  * takes, so `tsc` refuses the assignment in `journal.ts`.
@@ -108,6 +108,7 @@ const Filed = event('filed', {
   config: Schema.optional(HarnessArgsSchema),
   closeoutSchema: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
   queued: Schema.optional(Schema.Boolean),
+  priority: Schema.optional(Schema.NullOr(Schema.Finite)),
   holdOpen: Schema.optional(Schema.Literal(true)),
   restartPolicy: Schema.optional(Schema.Literal('Always')),
 });

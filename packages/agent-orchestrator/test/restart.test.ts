@@ -1,22 +1,23 @@
 /**
  * A daemon restarted onto a store an engine that knew no admission left: filings with no `queued` key, which that engine admitted
  * itself under its own ceiling, beside two Claude Code sessions at work. The new engine reads a filing with no key as queued, so nothing
- * starts that the orchestrator has not admitted, and the orchestrator admits in the order the old engine did — momentum, filing time, id —
- * per pool, under `WF_MAX_CONCURRENT`, counting the sessions already at work.
+ * starts that it has not admitted, and it admits in the order the old engine did — the filed `priority`, filing time, id — per pool,
+ * under the `WF_MAX_CONCURRENT` that `engine()` read when it was built, counting the sessions already at work.
  *
  * An admitted task starts on the engine's next pass: a store's first pass admits, and its second starts, one pass (about 4 s) later than
  * when the old engine admitted and started in one. At the shipped ceiling of 2 the two at work fill claude's pool, and the restarted
- * daemon admits no claude task until one ends (the first case); the ceiling then raised to 5 shows the order past the two (the second).
+ * daemon admits no claude task until one ends (the first case); a daemon restarted again with the ceiling raised to 5, a fresh engine
+ * that never saw a filing, shows the order past the two off the journals alone (the second).
  *
  * And the other way: a store the new engine wrote, read by the engine it replaced, which knows neither the `queued` key nor the `admitted`
  * event. That engine's `fold` has no default case, so an event of a kind it does not know is passed over; the journal replayed with both
  * stripped folds to the same state, bar the two facts it never had.
  *
  * The store the old engine left holds two Claude Code sessions at work, which it started, and claude tasks waiting: tries carrying
- * momentum, each filed with the old `priority: 1`, two of them filed in one millisecond, the later id first on disk; a run's first step
+ * momentum, each filed with `priority: 1`, two of them filed in one millisecond, the later id first on disk; a run's first step
  * and an id no run names, which carry none whenever they were filed; and six codex tasks, in a pool of their own.
  *
- * `WF_ROOT` is set before the runner is imported, which reads it as the module loads; `WF_MAX_CONCURRENT` is read on every pass. Every
+ * `WF_ROOT` is set before the runner is imported, which reads it as the module loads; `WF_MAX_CONCURRENT` is read by `engine()`. Every
  * run a pass answers from its memo of runs at rest is judged in full as well, and a difference throws (`WF_VERIFY_REST`).
  */
 import { test } from 'node:test';
@@ -32,6 +33,7 @@ const ROOT = scratch('wf-restart-');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
+delete process.env.WF_MAX_CONCURRENT;
 const { engine, start, tick } = await import('../src/runner.ts');
 const { readRun } = await import('../src/record/record.store.ts');
 const { rewriteRun } = await import('../src/record/record.store.ts');
@@ -148,7 +150,7 @@ const failed = (id: string, s: number) =>
     { kind: 'settled', at: at(s + 4), outcome: 'failed' },
   ]);
 
-const e = engine();
+let e = engine();
 const admission = async (id: string) => (await e.view(id)).admission;
 const attempts = async (id: string) => (await e.view(id)).state.attempts.length;
 const CLAUDE = ['try-b', 'try-a', 'try-c', 'orphan', 'root-new', 'root-old'];
@@ -177,7 +179,6 @@ runNaming({ taskId: 'root-old' });
 CODEX.forEach((id, i) => pending(id, 40 + i, { harness: 'codex' }));
 
 test("REFUSED at shipped defaults: the two sessions at work fill claude's pool, so the restarted daemon admits no claude task and starts none; codex takes its own two", async () => {
-  delete process.env.WF_MAX_CONCURRENT;
   await tick(e);
   for (const id of [...CLAUDE, ...CODEX]) assert.equal(await attempts(id), 0, `${id} started on the pass that admitted it`);
   assert.deepEqual(
@@ -193,8 +194,9 @@ test("REFUSED at shipped defaults: the two sessions at work fill claude's pool, 
   assert.deepEqual(await Promise.all(CODEX.map(attempts)), [1, 1, 0, 0, 0, 0], 'the pass after admitting starts');
 });
 
-test('under a raised ceiling, the daemon admits in the old order — momentum, filing, id — a pass before it starts, and one more per session ended', async () => {
+test('restarted under a raised ceiling, a fresh engine admits in the old order — priority, filing, id — a pass before it starts, and one more per session ended', async () => {
   process.env.WF_MAX_CONCURRENT = '5';
+  e = engine();
   await tick(e);
   for (const id of CLAUDE) assert.equal(await attempts(id), 0, `${id} started on the pass that admitted it`);
   assert.deepEqual(

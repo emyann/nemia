@@ -15,7 +15,7 @@ wf inbox add "Cache the views between passes" --repo ~/code/myapp   # park an id
 wf inbox                                               # the cards parked, name and first line each
 wf start ~/.agent-workflows/inbox/cache-the-views-between-pass-k2q9.md --workflows dev   # start one: it leaves the inbox
 wf inbox rm cache-the-views-between-pass-k2q9          # or drop one unstarted
-wf up
+wf up                # the daemon on a machine with no board; npm start in apps/api is the daemon that serves one
 wf ls
 wf watch             # what the tick judges, a line each time it changes: a gate reached, a run done
 wf cancel r-xyz      # changed your mind: stop the step in flight, file nothing more
@@ -2135,7 +2135,7 @@ cancelled, listed and answered as any other.
 counted per harness pool, and the supervisor is on `claude` — the pool every Claude step of the runs it watches
 shares. A session that is watching is a session at work, so at the default a supervisor leaves one slot for
 the work it watches, freeing its own only between signing off and being answered. Raise the ceiling before
-starting one: `WF_MAX_CONCURRENT=3 wf up`.
+starting one: `WF_MAX_CONCURRENT=3` in the environment of the store's daemon, the api or `wf up`.
 
 ## A run that waits on a run: `wf start --after`
 
@@ -2567,7 +2567,7 @@ factory, and a step whose harness holds no writable mount, Codex's, in the runti
 
 ## How much runs at once: `WF_MAX_CONCURRENT` and `WF_MAX_RUNS`
 
-Two ceilings, both read from the environment `wf up` runs in, through Effect's `Config` (`src/config/config.store.ts`), and both said in
+Two ceilings, both read from the environment the store's daemon runs in — the api's process or `wf up` — through Effect's `Config` (`src/config/config.store.ts`), and both said in
 words when it starts:
 
 ```text
@@ -2690,10 +2690,14 @@ lasts and again if it clears and comes back (`refusalLines`), rather than every 
 `wf tick` prints every refusal of its one pass. Nothing is observed for it that the pass did not already observe, and a settled
 task is never refused, however many passes read it.
 
-## One `wf up` per store: `daemon.json`
+## One daemon per store: `daemon.json`
 
-The tick keeps one writer per file, and two ticks are two writers. So `wf up` takes the store for itself, through a file of its own,
-`$WF_ROOT/daemon.json`, which it alone writes:
+The tick keeps one writer per file, and two ticks are two writers. So the store's daemon takes the store for itself, through a file of its
+own, `$WF_ROOT/daemon.json`, which it alone writes. The daemon is the api's process (`npm start` in `apps/api`), which answers the board's
+`/api` as it ticks (the board itself is the web's server, which proxies to it), or `wf up` on a machine that serves none: both run `up` (`src/daemon/up.verb.ts`), which takes the store before anything else,
+and the file names which one holds it (`by`, `"api"` or `"wf up"`, read as `wf up` when absent) and where an api serves (`url`, written
+once it listens). An api started with `--no-tick` answers on 8788, behind the vite dev server, and takes nothing: it ticks no store, so a run filed on it
+moves on the daemon's next pass.
 
 ```json
 { "pid": 51234, "startedAt": "2026-09-22T10:00:00.000Z", "startedMono": { "boot": "446eb266-…", "ms": 9120004 }, "cwd": "/home/me/repo", "every": 4000, "passedAt": "2026-09-22T10:41:07.311Z", "passedMono": { "boot": "446eb266-…", "ms": 11587315 }, "beatAt": "2026-09-22T10:41:09.002Z", "beatMono": { "boot": "446eb266-…", "ms": 11589006 }, "procStart": 1627402 }
@@ -2711,9 +2715,10 @@ not read, a holder that `stopped`, one whose process is `gone` (`kill(pid, 0)` f
 (`stalled`), or one `ticking`. The interval is a whole number of milliseconds from 1 to 2147483647 and anything else is refused, exit 2,
 before the store is taken: `wf up -5` would write an interval the file does not read back, and a holder that does not read holds nothing.
 
-- **A second `wf up` is refused by name, exit 2, while the store is ticked** — naming the pid, where and since when it ticks, its last pass,
+- **A second daemon is refused by name, exit 2, while the store is ticked**, both ways round — an api while a `wf up` ticks, a `wf up`
+  while an api does, and either while one of its own kind does — — naming the pid, where and since when it ticks, its last pass,
   and how to stop it: `kill <pid>`, that pid, which is the node process and not an `npm exec` wrapper around it (killing the wrapper can
-  leave the child ticking, reparented to init). Anything else is taken over, and `wf up` says from whom when it was not a clean stop:
+  leave the child ticking, reparented to init). Anything else is taken over, and the daemon says from whom when it was not a clean stop:
   `took ~/.agent-workflows over from pid 51234, whose process is gone`.
 - **Stale is ten of the holder's own intervals of silence, never under fifteen minutes** (`staleAfterMs`), measured from the latest of its
   start, its last pass and its beat, each measured with `elapsedMs`: on the monotonic clock when the stamp and now carry readings of one boot,
@@ -2730,7 +2735,7 @@ before the store is taken: `wf up -5` would write an interval the file does not 
 - **Two starts on an empty store cannot both win**: the file is claimed with a link, which fails when it appeared in between, and the
   loser judges again. Two takeovers of one stale file both rename; the loser finds out at its first pass.
 - **`wf ls` ends on a line saying whether a daemon ticks and when it last passed**: `wf up: ticking, pid 51234, every 4000ms — last pass
-  3s ago (…)`, or `stalled`, `none ticking — pid 51234 is gone`, `stopped`, and `none has held this store` — so a run `waiting` is told
+  3s ago (…)` or `api: ticking, pid 51234 at http://127.0.0.1:8787, …`, or `stalled`, `none ticking — pid 51234 is gone`, `stopped`, and `none has held this store` — so a run `waiting` is told
   apart from a store nothing ticks.
 - **Liveness is this host's.** A store on a shared disk ticked from another machine reads as gone here. A pid reused after a daemon was
   killed with `-9` is another process's, told by its start, and the store is taken over at once. Where the start cannot be compared — no

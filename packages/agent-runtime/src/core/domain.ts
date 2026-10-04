@@ -259,8 +259,7 @@ export type EndReason = 'harness' | 'lost' | 'unsigned' | 'unstartable' | 'opera
  *
  * - `filed`: the desired state, stated once. A `filed` an older runtime wrote may also carry keys folded unread:
  *   `maxAttempts` and `resume`, how many attempts a turn had and which session a later one continued — the runtime makes
- *   one attempt per start, and trying again is the layer above's; and `priority`, which waiting task a free slot went to
- *   first — the runtime keeps no slots, and the layer above chooses what starts and `admit`s it. It may carry the spend
+ *   one attempt per start, and trying again is the layer above's. It may carry the spend
  *   cap beside `config`, read as one of the harness's arguments, under it (`upgrade` in `journal.ts`).
  * - `starting`: INTENT — the engine is about to spawn `nameFor(taskId, attempt)`. `nudge` is what a continued session is
  *   told instead of the brief — a later turn's answer; in a journal an older runtime wrote, also why a session that
@@ -334,6 +333,11 @@ export type Event =
        * admission rather than started all at once. A Job's `suspend: true`.
        */
       queued?: boolean;
+      /**
+       * Which waiting task a free slot of its pool goes to first, higher first: a Pod's priority. Carried for the pass's
+       * admission (`core/admission.ts`), never read by `decide`. Absent reads as 0.
+       */
+      priority?: number;
       /**
        * Held open: an attempt that ends signed leaves the task waiting on a person — `input-required`, no process
        * running — rather than settled. Their answer (`input`) is a new turn, an attempt continuing the session; a `closed`
@@ -449,6 +453,8 @@ export type State = {
   taskId: string;
   /** The `at` of its `filed` entry. `decide` never reads it: which waiting task a pass admits first is the pass's order. */
   filedAt?: string;
+  /** Which waiting task a free slot goes to first, as filed. See the `filed` event. `decide` never reads it. */
+  priority?: number;
   brief: string;
   cwd: string;
   /** Which harness runs it. `decide` never reads this — only the runner dispatches on it. */
@@ -540,6 +546,7 @@ function fileInto(s: State, e: Extract<Event, { kind: 'filed' }>): void {
   if (e.holdOpen) s.holdOpen = true;
   if (e.restartPolicy === 'Always') s.restartPolicy = 'Always';
   if (e.queued !== undefined) s.queued = e.queued;
+  if (e.priority !== undefined) s.priority = e.priority;
 }
 
 /** Observed state, folded. A `State` is never stored — it is always re-derived from the journal. */

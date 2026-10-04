@@ -102,6 +102,8 @@ const read = () =>
     cwd: string;
     every: number;
     passedAt: string | null;
+    by?: string;
+    url?: string;
     beatAt?: string;
     procStart?: number;
     stoppedAt?: string;
@@ -288,7 +290,7 @@ test('`wf up` takes the store: its pid, where and how often it ticks, then each 
   assert.equal(stopped.stoppedAt, at(2000), 'let go as it stopped');
   assert.ok(
     printed.includes(
-      `   holds ${ROOT} as pid ${process.pid} — a second wf up, or a wf tick, on this store is refused while it ticks (daemon.json)`,
+      `   holds ${ROOT} as pid ${process.pid} — a second daemon, the api or a wf up, or a wf tick, on this store is refused while it ticks (daemon.json)`,
     ),
     printed.join('\n'),
   );
@@ -309,7 +311,7 @@ test('REFUSED at shipped defaults: a second `wf up`, and a `wf tick` by hand, wh
       main(['up'], e),
       refusedWith(
         new RegExp(`^wf up: ${ROOT} is held by the wf up of pid ${LIVE}, started \\S+ in /elsewhere, every 4000ms — `),
-        new RegExp(`stop it with kill ${LIVE} — that pid is the node process that ticks, not an npm exec wrapper`),
+        new RegExp(`stop it with kill ${LIVE} — that pid is the node process that ticks, not an npm wrapper`),
       ),
       JSON.stringify(over),
     );
@@ -448,7 +450,10 @@ test('`wf tick` on a store nobody holds never writes the file, and `wf ls` says 
   );
   assert.equal(fs.existsSync(FILE), false, "the daemon is the file's one writer");
   const lastLine = async () => (await typed(t, ['ls'], engineOf())).printed.at(-1);
-  assert.equal(await lastLine(), 'wf up: none has held this store — nothing ticks it; start one with wf up');
+  assert.equal(
+    await lastLine(),
+    'daemon: none has held this store — nothing ticks it; start one with npm start in apps/api, or wf up where no board is served',
+  );
   holdBy(LIVE, { passedAt: minutesAgo(20) });
   const stalled = (await lastLine())!;
   assert.ok(
@@ -574,7 +579,7 @@ test("`wf up --stats` reads the last pass's cost beside a daemon that holds the 
   const none = await typed(t, ['up', '--stats'], engineOf());
   assert.equal(none.threw, undefined);
   assert.deepEqual(none.printed, [
-    `no pass has written what it cost to ${path.join(ROOT, 'tick-stats.json')} yet — no wf up holds this store: run wf tick --stats, or start wf up`,
+    `no pass has written what it cost to ${path.join(ROOT, 'tick-stats.json')} yet — no daemon holds this store: run wf tick --stats, or start one (npm start in apps/api, or wf up)`,
   ]);
 
   const byHand = await typed(
@@ -598,11 +603,11 @@ test("`wf up --stats` reads the last pass's cost beside a daemon that holds the 
   assert.equal(e.passes, 0, 'no pass');
   assert.equal(fs.readFileSync(FILE, 'utf8'), text, 'nor the store taken');
   assert.equal(held.printed[0], byHand.printed[at], 'the pass the hand tick wrote');
-  assert.equal(held.printed.at(-1), 'written by the wf up that holds this store, after its last pass');
+  assert.equal(held.printed.at(-1), 'written by the daemon that holds this store, after its last pass');
   clear();
   assert.match(
     (await typed(t, ['up', '--stats'], engineOf())).printed.at(-1)!,
-    /^no wf up holds this store now, so this was the last pass anyone ran: wf tick --stats runs one/,
+    /^no daemon holds this store now, so this was the last pass anyone ran: wf tick --stats runs one/,
   );
 });
 
@@ -761,4 +766,88 @@ test('the ceilings of the last pass read back as written, and REFUSED — read a
   } finally {
     fs.rmSync(file, { force: true });
   }
+});
+
+test('`up` as the api takes the store as the api, writes where it serves once it listens, and lets it go as its scope closes', async () => {
+  clear();
+  const { up, holdUrl } = await import('./up.verb.ts');
+  const { Effect } = await import('effect');
+  const seen: ReturnType<typeof read>[] = [];
+  const e = engineOf((n) => {
+    seen.push(read());
+    if (n === 2) throw STOP;
+  });
+  const listening = Effect.sync(() => {
+    assert.equal(read().url, undefined, 'no url before it listens');
+    assert.equal(holdUrl('http://127.0.0.1:8787'), true);
+  });
+  const threw = await Effect.runPromise(
+    Effect.scoped(up(e, { every: 10, repo: ROOT, holder: 'api', onTaken: () => listening })).pipe(Effect.flip),
+  );
+  assert.equal(threw, STOP);
+  assert.deepEqual(
+    seen.map((f) => [f.by, f.url]),
+    [
+      ['api', 'http://127.0.0.1:8787'],
+      ['api', 'http://127.0.0.1:8787'],
+    ],
+    'the holder and its url kept by every pass written down',
+  );
+  const stopped = read();
+  assert.ok(stopped.stoppedAt, 'let go as its scope closed');
+  assert.equal(holdUrl('http://127.0.0.1:9999'), false, 'a lease let go takes no url');
+  assert.equal(read().url, 'http://127.0.0.1:8787');
+  clear();
+});
+
+test('REFUSED at shipped defaults, both ways round: an api holding the store refuses a `wf up` and a `wf tick`, and a `wf up` holding it refuses an api', async (t) => {
+  seeded(t);
+  const { up } = await import('./up.verb.ts');
+  const { Effect } = await import('effect');
+  const text = holdBy(LIVE, { by: 'api', url: 'http://127.0.0.1:8787' });
+  const e = engineOf();
+  await assert.rejects(
+    main(['up'], e),
+    refusedWith(
+      new RegExp(`^wf up: ${ROOT} is held by the api of pid ${LIVE} at http://127\\.0\\.0\\.1:8787, started `),
+      new RegExp(`stop it with kill ${LIVE} — `),
+    ),
+  );
+  await assert.rejects(main(['tick'], e), refusedWith(new RegExp(`^wf tick: ${ROOT} is held by the api of pid ${LIVE} at `)));
+  const { printed } = await typed(t, ['ls'], engineOf());
+  assert.equal(printed.at(-1), `api: ticking, pid ${LIVE} at http://127.0.0.1:8787, every 4000ms — last pass 3s ago (${at(-3000)})`);
+  holdBy(LIVE);
+  const api = await Effect.runPromise(Effect.scoped(up(e, { every: 10, repo: ROOT, holder: 'api' })).pipe(Effect.flip));
+  assert.ok(
+    refusedWith(
+      new RegExp(`^api: ${ROOT} is held by the wf up of pid ${LIVE}, started `),
+      new RegExp(`serve a board beside it with --no-tick, or start this api again once it has stopped: stop it with kill ${LIVE} — `),
+    )(api as Error),
+    String(api),
+  );
+  assert.equal(e.passes, 0, 'none ticked');
+  assert.notEqual(fs.readFileSync(FILE, 'utf8'), text);
+  assert.equal(read().by, undefined, 'nor wrote the file: a record that names no holder is a wf up');
+  clear();
+});
+
+test('an api whose store is taken over while it runs stops at its next pass, naming the new holder', async () => {
+  clear();
+  const { up } = await import('./up.verb.ts');
+  const { Effect } = await import('effect');
+  let theirs = '';
+  const e = engineOf((n) => {
+    if (n === 1) theirs = holdBy(LIVE);
+    if (n > 1) throw STOP;
+  });
+  const threw = await Effect.runPromise(Effect.scoped(up(e, { every: 10, repo: ROOT, holder: 'api' })).pipe(Effect.flip));
+  assert.match(
+    (threw as Error).message,
+    new RegExp(
+      `^api: ${ROOT} was taken over by the wf up of pid ${LIVE}, started \\S+ in /elsewhere — this one stops rather than be a second writer\\.$`,
+    ),
+  );
+  assert.equal(e.passes, 1);
+  assert.equal(fs.readFileSync(FILE, 'utf8'), theirs);
+  clear();
 });

@@ -3,12 +3,13 @@
  * options, the task it files and the engine it gets — each adapted to the engine's services here, and what the door
  * refuses of them.
  */
+import { Layer } from 'effect';
 import type { Event, Input, LifecycleStep, Said } from '../core/index.ts';
 import type { HarnessArgs, HarnessQuota, RunnerOps, Transcript, TranscriptCursor } from '../harness/index.ts';
 import {
+  Admission,
   Journal,
   JournalError,
-  ADMIT_INSTEAD,
   type Cursor,
   type FeedEntry,
   type FeedRefusal,
@@ -51,17 +52,22 @@ export type PromiseJournal = {
  *                   what we sent it; its secrets come from `credentials`
  *   a `PromiseRunner` anything else at all
  *
- * None is counted under a ceiling: the runtime starts what it is given, and a layer above that pools its harnesses under
- * one rate limit files them `queued` and `admit`s them. A harness brought as an object that names a `pool` is refused
- * (`Engine.layer`).
+ * Each counts its sessions under the engine's ceiling (`maxConcurrent`) in a pool of its own, named as the harness is; one brought as
+ * an object may name a `pool` instead (`Pooled`), so two harnesses under one rate limit share one ceiling.
  */
-export type HarnessConfig = 'claude' | 'claude-bg' | HarnessSpec | RemoteAgent | PromiseRunner;
+export type HarnessConfig = 'claude' | 'claude-bg' | (HarnessSpec & Pooled) | (RemoteAgent & Pooled) | (PromiseRunner & Pooled);
+
+/** The pool a harness brought as an object counts its sessions in, when not its own: a name of one or more characters. */
+export type Pooled = { pool?: string };
 
 /**
- * What `Engine.layer` builds an engine from. It takes no `maxConcurrent`: given, at any value, it is refused, since the runtime keeps
- * no ceiling and starts every task it is given; how many run at once is the layer above's, which files `queued` and `admit`s.
+ * What `Engine.layer` builds an engine from. `maxConcurrent` is the engine's ceiling: how many sessions of each pool may be at work at
+ * once, a whole number from 1. With it, a pass admits the tasks filed `queued` while their pool has room, the highest `priority` first,
+ * then the earliest filed; without it, a queued task waits for `admit`. A task filed unqueued starts on the next pass, ceiling or not.
  */
 export type EngineOptions = {
+  /** The sessions at work at once in each pool: a whole number from 1. Absent: no ceiling, and nothing is admitted but by `admit`. */
+  maxConcurrent?: number;
   /** Where the file-backed store lives. Ignored when you bring your own `journal`. */
   root?: string;
   journal?: PromiseJournal;
@@ -83,10 +89,7 @@ export type EngineOptions = {
   missingCredential?: MissingCredential;
 };
 
-/**
- * A task to file (`Engine.file`). It takes no `priority`: a task that carries one, at any value, is refused, since the runtime keeps
- * no slots to give first; which task starts first is the layer above's, when it `admit`s.
- */
+/** A task to file (`Engine.file`). */
 export type TaskSpec = {
   brief: string;
   cwd: string;
@@ -136,6 +139,11 @@ export type TaskSpec = {
   restartPolicy?: 'Always';
   /** Choose the id yourself, to keep it in step with a row in your own database. */
   id?: string;
+  /**
+   * Which queued task a free slot of its pool goes to first, higher first, as a Pod's priority: a whole number in int32. Absent is 0;
+   * tasks of one priority go in the order they were filed. Read by the pass's admission alone (`maxConcurrent`).
+   */
+  priority?: number;
 };
 
 /**
@@ -191,7 +199,7 @@ export type Engine = {
    * Refused — rejected with an `Error` whose `exitCode` is 2, and nothing journalled — when the task
    * names a harness this engine does not have; a `deadlineSeconds` that is not a number of seconds; a `maxAttempts` or a
    * `resume`, whatever its value, which are retired: the runtime makes one attempt per start; an empty brief, cwd or resumeFrom;
-   * a `cwd` that is not absolute; a `priority`, whatever its value, which is retired: the runtime chooses no order. And in its `config`: a
+   * a `cwd` that is not absolute; a `priority` that is not a whole number in int32. And in its `config`: a
    * key that is no harness argument, or one filed beside `config` instead — `budgetUsd` among them; a `budgetUsd` that is not dollars above
    * 0, or one its harness would not keep (`codex`); an empty model or effort; a `tools` that is not a list of names; a `disallowedTools` or
    * `allowedTools` that is not a list of permission rules; an `mcp` whose entries are not MCP servers in a `.mcp.json`'s shape; a word its
@@ -207,9 +215,10 @@ export type Engine = {
    */
   file: (spec: TaskSpec) => Promise<string>;
   /**
-   * One pass: start what may start — every task not queued, and each queued one `admit`ted — notice what ended, settle what
-   * is over. Takes nothing: refused, an `Error` whose `exitCode` is 2 and nothing read, when handed any argument — a ceiling
-   * or pools among them, which the runtime does not keep.
+   * One pass: start what may start — every task not queued, and each queued one admitted — notice what ended, settle what
+   * is over, and admit the queued tasks the ceiling has room for (`maxConcurrent`), which the next pass starts. Takes nothing:
+   * refused, an `Error` whose `exitCode` is 2 and nothing read, when handed any argument — a ceiling or pools among them, which
+   * are the engine's options.
    *
    * An engine keeps, for as long as it lives, the settled tasks its passes have folded (`core/engine/memo.ts`): a pass reads the
    * feed on from where the last stopped, and reads the journal of a task only when it is not settled, the feed has named
@@ -461,22 +470,34 @@ export const runnersOf = (
     ]),
   );
 
+/** Why `maxConcurrent` is not a ceiling, or `undefined`: anything but a whole number from 1. */
+const ceilingRefusalOf = (maxConcurrent: unknown): string | undefined =>
+  maxConcurrent === undefined || (Number.isInteger(maxConcurrent) && (maxConcurrent as number) >= 1)
+    ? undefined
+    : `\`maxConcurrent: ${typeof maxConcurrent === 'number' ? maxConcurrent : JSON.stringify(maxConcurrent)}\` is not a ceiling. Give the sessions each pool may have at work at once, a whole number from 1, or leave it out for none.`;
+
+/** Why the harness `name` cannot be taken as given, or `undefined`: a `pool` that is not a name, and a remote agent's config. */
+const harnessConfigRefusalOf = (name: string, h: HarnessConfig): string | undefined => {
+  const pooled: Record<string, unknown> = typeof h === 'object' && h !== null ? h : {};
+  if (Object.hasOwn(pooled, 'pool') && (typeof pooled.pool !== 'string' || !pooled.pool.trim())) {
+    return `the \`${name}\` harness names the \`pool\` ${JSON.stringify(pooled.pool) ?? String(pooled.pool)}, which is not a name. Give the name of the pool its sessions share a ceiling in, or leave it out for a pool of its own.`;
+  }
+  const { pool: _, ...agent } = pooled;
+  return typeof h === 'object' && h !== null && isRemote(h) ? remoteConfigRefusal(name, agent) : undefined;
+};
+
 /**
  * Why an engine cannot be built from these options, in a sentence that says what to do instead — or `undefined`. Asked of the
- * options as handed in, untyped, and refuses, in this order: a `maxConcurrent` at any value, and a harness brought as an object
- * that names a `pool` — each, taken and dropped, a ceiling nobody keeps; a remote agent's entry `remoteConfigRefusal` refuses;
- * and a `credentials` or `missingCredential` that is not a function.
+ * options as handed in, untyped, and refuses, in this order: a `maxConcurrent` that is not a whole number from 1; a harness
+ * brought as an object whose `pool` is not a name; a remote agent's entry `remoteConfigRefusal` refuses, its `pool` aside; and a
+ * `credentials` or `missingCredential` that is not a function.
  */
 export const optionsRefusalOf = (options: EngineOptions): string | undefined => {
-  if (Object.hasOwn(options, 'maxConcurrent')) {
-    return `\`maxConcurrent\` is retired: the runtime keeps no ceiling, and starts every task it is given. ${ADMIT_INSTEAD}`;
-  }
+  const ceiling = ceilingRefusalOf(options.maxConcurrent);
+  if (ceiling) return ceiling;
   for (const [name, h] of Object.entries(options.harnesses ?? {})) {
-    if (typeof h === 'object' && h !== null && Object.hasOwn(h, 'pool')) {
-      return `the \`${name}\` harness names a \`pool\`, which is retired: the runtime counts no pools. Take \`pool\` off it; a layer above that pools harnesses under one rate limit keeps its own list (the orchestrator's \`POOLS\` in \`src/cap/cap.ts\`). ${ADMIT_INSTEAD}`;
-    }
-    const remote = typeof h === 'object' && h !== null && isRemote(h) ? remoteConfigRefusal(name, h) : undefined;
-    if (remote) return remote;
+    const refused = harnessConfigRefusalOf(name, h);
+    if (refused) return refused;
   }
   if (options.credentials !== undefined && typeof options.credentials !== 'function') {
     return '`credentials` is a function, `(scheme, agentUrl, harness) => secret | undefined`: give one, or leave it out.';
@@ -486,6 +507,19 @@ export const optionsRefusalOf = (options: EngineOptions): string | undefined => 
   }
   return undefined;
 };
+
+/**
+ * What an engine over `options` admits under (`Admission`): its `maxConcurrent`, and the pool each of `harnesses` counts in — the
+ * `pool` it names, else its own name; a task with no harness counts in `default`.
+ */
+export const admissionOf = (options: EngineOptions, harnesses: Record<string, HarnessConfig>) =>
+  Layer.succeed(Admission)({
+    ...(options.maxConcurrent !== undefined ? { ceiling: options.maxConcurrent } : {}),
+    poolOf: (harness) => {
+      const h = harness !== undefined && Object.hasOwn(harnesses, harness) ? harnesses[harness] : undefined;
+      return typeof h === 'object' && h !== null && typeof h.pool === 'string' ? h.pool : (harness ?? 'default');
+    },
+  });
 
 /**
  * Why a task cannot be filed on its harness, in that harness's words — or `undefined`. Asked after `refusalOf`, the

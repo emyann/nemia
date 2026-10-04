@@ -374,10 +374,10 @@ test("say's failure that is not a refusal is SayUnsent at the Effect door, with 
 });
 
 test('options an engine cannot be built from: EngineRefused from the layer, and a throw at the call from promiseEngine', async () => {
-  const options = { journal: memoryJournal(), maxConcurrent: 2 } as unknown as EngineOptions;
+  const options = { journal: memoryJournal(), maxConcurrent: 0 } as unknown as EngineOptions;
   const refused = await failure(Effect.runPromise(Engine.use((e) => Effect.succeed(e)).pipe(Effect.provide(Engine.layer(options)))));
   assert.equal(refused._tag, 'EngineRefused');
-  assert.match(refused.message, /^`maxConcurrent` is retired/);
+  assert.match(refused.message, /^`maxConcurrent: 0` is not a ceiling\./);
   assert.throws(
     () => promiseEngine(Engine.layer(options)),
     (e: Error & { exitCode?: number }) => e.exitCode === 2 && e.message === `promiseEngine: ${refused.message}`,

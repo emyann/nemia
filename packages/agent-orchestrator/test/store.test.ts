@@ -36,7 +36,6 @@ import { scratch } from './scratch.ts';
 import { TEAM_DEV } from './team.ts';
 import { decideScreen } from './screens.ts';
 import { isGitRun, shownNote, shownStatus, SIGNOFF } from '../src/run.ts';
-import { momentumOf, toAdmit } from '../src/cap/cap.ts';
 
 const ROOT = scratch('wf-store-');
 const WORKFLOW = path.join(ROOT, 'workflow');
@@ -2485,20 +2484,13 @@ test("a round files its target with the target's tools, deny list and effort, an
 });
 
 /**
- * The momentum admission gives each task of a run (`momentumOf`, off the run's record as the tick reads it), by the name the run gives it:
- * `implement`, `implement-check`, `review-try2`. Every one is filed with no `priority`: the runtime is told nothing of it.
+ * The `priority` each task of a run is filed with, its momentum, by the name the run gives it: `implement`, `implement-check`,
+ * `review-try2`. Every one names it, 0 included, so a filing that left it out would read as none here.
  */
-const momentaOf = (b: ReturnType<typeof board>, id: string) => {
-  const run = readRun(id);
-  const m = momentumOf([{ run, steps: stepsOf(run) }]);
-  const tasks = [...b.tasks].filter(([task]) => task.startsWith(`${id}-`));
-  assert.deepEqual(
-    tasks.filter(([, t]) => 'priority' in t.spec).map(([task]) => task),
-    [],
-    'filed with no priority',
+const momentaOf = (b: ReturnType<typeof board>, id: string) =>
+  Object.fromEntries(
+    [...b.tasks].filter(([task]) => task.startsWith(`${id}-`)).map(([task, t]) => [task.slice(id.length + 1), t.spec.priority ?? 'none']),
   );
-  return Object.fromEntries(tasks.map(([task]) => [task.slice(id.length + 1), m(task)]));
-};
 
 test('a run in flight keeps its momentum: its first step has none, and everything after it — its check, a step after another, a round, a try `retries:` files and one `wf retry` asks for — has 1', async () => {
   const run = started(looped());
@@ -2589,7 +2581,7 @@ const startsInOrder = (sessions: Map<string, Sighting>): PromiseRunner => ({
   },
 });
 
-test("REFUSED without the momentum: at a ceiling of one, the orchestrator admits a run's next step before a newer run's first step filed ahead of it — and, with no momentum, the newer run", async () => {
+test("REFUSED without the momentum: at a ceiling of one, the runtime admits a run's next step before a newer run's first step filed ahead of it — and, with no priority, the newer run", async () => {
   const a = started(folder());
   const b = started(folder());
   const filedBy = board();
@@ -2603,30 +2595,34 @@ test("REFUSED without the momentum: at a ceiling of one, the orchestrator admits
   );
   const newer = filedBy.tasks.get(`${b.id}-implement`)!.spec;
   const next = filedBy.tasks.get(`${a.id}-review`)!.spec;
-  const runs = [readRun(a.id), readRun(b.id)].map((run) => ({ run, steps: stepsOf(run) }));
 
-  const admitted = async (momentum: (id: string) => number) => {
+  const admitted = async (weigh: (spec: typeof next) => typeof next) => {
     const sessions = new Map<string, Sighting>();
     const e = promiseEngine(
-      RuntimeEngine.layer({ journal: memoryJournal(), harnesses: { claude: startsInOrder(sessions) }, defaultHarness: 'claude' }),
+      RuntimeEngine.layer({
+        journal: memoryJournal(),
+        harnesses: { claude: startsInOrder(sessions) },
+        defaultHarness: 'claude',
+        maxConcurrent: 1,
+      }),
     );
-    const as = (spec: typeof next) => ({ ...spec, harness: 'claude', queued: true }) as Parameters<Engine['file']>[0];
+    const as = (spec: typeof next) => ({ ...weigh(spec), harness: 'claude', queued: true }) as Parameters<Engine['file']>[0];
     await e.file(as(newer));
     await new Promise((r) => setTimeout(r, 5));
     await e.file(as(next));
-    const report = await e.tick();
-    assert.deepEqual([...sessions.keys()], [], 'nothing starts before it is admitted');
-    await e.admit(toAdmit({ views: report.views, momentum, ceiling: 1 }));
+    await e.tick();
+    assert.deepEqual([...sessions.keys()], [], 'nothing starts on the pass that admits it');
     await e.tick();
     return [...sessions.keys()];
   };
   assert.deepEqual(
-    await admitted(momentumOf(runs)),
+    await admitted((spec) => spec),
     [nameFor(`${a.id}-review`, 1)],
-    "the two filings queued in the order they were filed, on a runtime with no ceiling of its own, one slot admitted off the first pass's " +
-      "views: the next pass starts the run in flight's next step, filed later",
+    'the two filings queued in the order they were filed, as the orchestrator filed them, one slot: the next pass starts the run in ' +
+      "flight's next step, filed later",
   );
-  assert.deepEqual(await admitted(() => 0), [nameFor(`${b.id}-implement`, 1)], 'without it, the newer run, filed first');
+  const unweighed = ({ priority: _, ...spec }: typeof next) => spec;
+  assert.deepEqual(await admitted(unweighed), [nameFor(`${b.id}-implement`, 1)], 'without it, the newer run, filed first');
 });
 
 test('a step with `background: true` and `remote: true` reaches `e.file` with both — on its first filing, a try `retries:` files, and a try `wf retry` asks for — and its check, and a step without the lines, with neither', async () => {

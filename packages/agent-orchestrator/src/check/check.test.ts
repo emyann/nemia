@@ -145,7 +145,7 @@ test('the engine the run builds keeps its three harnesses, and gains the check',
     "the engine's own Claude Code harness, which runs a step as a job, and one that says background: true as a background session",
   );
   assert.equal(HARNESSES.codex, engine.codex);
-  assert.equal(HARNESSES['claude-detached'], engine.claudeDetached);
+  assert.deepEqual(HARNESSES['claude-detached'], { ...engine.claudeDetached, pool: 'claude' }, 'one subscription with claude: one pool');
   assert.equal(HARNESSES.check.name, 'check');
 });
 

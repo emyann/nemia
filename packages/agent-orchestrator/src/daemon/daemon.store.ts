@@ -40,10 +40,10 @@ const Count = Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0));
 const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
 
 /**
- * The daemon's two ceilings, read from the environment when asked. `sessions` (`WF_MAX_CONCURRENT`, `maxConcurrent`) is the tick's
- * admission's (`toAdmit` in `cap.ts`): sessions per pool at once, counted apart for each — a check on the `check` harness is in a pool of
- * its own, and a `dev` run's review competes with another run's implement, both on `claude`. `runs` (`WF_MAX_RUNS`, `maxRuns`) is the
- * tick's: runs in flight at once, 0 — or unset — for no cap.
+ * The daemon's two ceilings, read from the environment when asked. `sessions` (`WF_MAX_CONCURRENT`, `maxConcurrent`) is handed to the
+ * runtime, which admits under it (`engine()` in `runtime-client.ts`): sessions per pool at once, counted apart for each — a check on the
+ * `check` harness is in a pool of its own, and a `dev` run's review competes with another run's implement, both in the `claude` pool.
+ * `runs` (`WF_MAX_RUNS`, `maxRuns`) is the tick's: runs in flight at once, 0 — or unset — for no cap.
  */
 export const ceilings = (): { sessions: number; runs: number } => ({
   sessions: maxConcurrent(),

@@ -10,8 +10,8 @@
  * approvals, acceptances and answers. `journals`: the runtime's journals, read through the engine (`view`, `feed`, `logs`, `output`), less
  * the observing a view does. `observe`: asking each harness what runs — the harnesses of one pass at once, so the slowest's time.
  * `runtime`: the runtime's own pass, less its observe. `git`: every git command, whether it judged (is a branch shipped) or acted (a
- * worktree, a hand-off). `assess`: the judgement — which queued tasks to admit among it — and any time not counted as another phase. `act`:
- * filing, admitting, stopping, collecting a step's artifacts, and writing the run's record, the feed and the ceilings.
+ * worktree, a hand-off). `assess`: the judgement, and any time not counted as another phase. `act`: filing, admitting, stopping,
+ * collecting a step's artifacts, and writing the run's record, the feed and the ceilings.
  */
 export const PHASES = ['records', 'asks', 'journals', 'observe', 'runtime', 'git', 'assess', 'act'] as const;
 export type Phase = (typeof PHASES)[number];

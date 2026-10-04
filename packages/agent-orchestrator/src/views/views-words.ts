@@ -14,8 +14,8 @@ export type WordAttempt = AttemptClock & { ended: string | null; stated?: boolea
 
 /**
  * A task as the words read it off the engine's view: its word, its brief, how it settled, its attempts, the answers it was given, whether
- * it is held open or closed, and the closeout it was asked for. Written out here because a pure file imports no runtime, a type included,
- * as `AdmissionView` in `cap/cap.ts` is.
+ * it is held open or closed, and the closeout it was asked for. Written out here because a pure file imports no runtime's
+ * behaviour, a type included.
  */
 export type WordView = TaskClock & {
   phase: string;

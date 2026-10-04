@@ -131,23 +131,90 @@ test('the order is the journal’s: an engine that never saw the filing admits b
   assert.deepEqual(started(after.sessions), [nameFor('high', 1)]);
 });
 
-test('toAdmit: a slot is held by a session at work, one starting and one admitted, and by none blocked or between attempts', () => {
-  const view = (id: string, phase: string, admission?: 'queued' | 'admitted', harness?: string): AdmissionView => ({
+const T0 = Date.parse('2026-10-04T10:00:00.000Z');
+const at = (sec: number) => new Date(T0 + sec * 1000).toISOString();
+const queued = (id: string, filed: number, harness = 'a', priority?: number): AdmissionView => ({
+  id,
+  phase: 'pending',
+  admission: 'queued',
+  state: { harness, filedAt: at(filed), ...(priority !== undefined ? { priority } : {}) },
+});
+const live = (id: string, phase: string, harness = 'a'): AdmissionView => ({ id, phase, state: { harness, filedAt: at(0) } });
+const under = (ceiling: number, poolOf = ownPool) => ({ ceiling, poolOf });
+const sharing = (harness: string | undefined) => (harness === 'b' ? 'a' : ownPool(harness));
+
+test('holdsSlot: a session at work, one starting, and one admitted and not yet started hold a slot; one blocked, held, between attempts or settled none', () => {
+  for (const phase of ['running (working)', 'working (quiescent)', 'starting']) assert.equal(holdsSlot({ phase }), true, phase);
+  assert.equal(holdsSlot({ phase: 'pending', admission: 'admitted' }), true);
+  assert.equal(holdsSlot({ phase: 'pending', admission: 'queued' }), false);
+  assert.equal(holdsSlot({ phase: 'pending' }), false);
+  for (const phase of ['needs-human', 'input-required', 'between attempts', 'succeeded', 'failed', 'stopped'])
+    assert.equal(holdsSlot({ phase }), false, phase);
+});
+
+test('toAdmit: a harness that shares a pool counts against its ceiling, listed first so a pool by harness name alone reads two', () => {
+  const views = [live('b-1', 'running (working)', 'b'), live('a-1', 'running (working)'), queued('a-2', 1), queued('b-2', 2, 'b')];
+  assert.deepEqual(toAdmit(views, under(2, sharing)), []);
+  assert.deepEqual(toAdmit(views, under(3, sharing)), ['a-2']);
+  assert.deepEqual(toAdmit(views, under(2)), ['a-2', 'b-2'], 'each its own pool');
+});
+
+test('toAdmit: the ceiling is counted per pool, and a task with no harness counts in `default`', () => {
+  const views = [
+    live('x-1', 'running (working)', 'x'),
+    live('x-2', 'running (working)', 'x'),
+    live('k-1', 'running (working)', 'k'),
+    queued('a-1', 1),
+    queued('x-3', 2, 'x'),
+    queued('k-2', 3, 'k'),
+    queued('k-3', 4, 'k'),
+    queued('f-1', 5, 'f'),
+  ];
+  assert.deepEqual(toAdmit(views, under(2)), ['a-1', 'k-2', 'f-1']);
+  const bare = (id: string, admission?: 'queued'): AdmissionView => ({
     id,
-    phase,
+    phase: admission ? 'pending' : 'running (working)',
     ...(admission ? { admission } : {}),
-    state: { ...(harness ? { harness } : {}), filedAt: '2026-10-04T09:00:00.000Z' },
+    state: {},
   });
-  for (const phase of ['running (working)', 'working (quiescent)', 'starting']) assert.equal(holdsSlot(view('h', phase)), true, phase);
-  assert.equal(holdsSlot(view('h', 'pending', 'admitted')), true, 'admitted');
-  for (const phase of ['needs-human', 'input-required', 'between attempts', 'pending'])
-    assert.equal(holdsSlot(view('h', phase)), false, phase);
-  const rule = { ceiling: 1, poolOf: ownPool };
+  assert.deepEqual(toAdmit([bare('d-1'), bare('d-2', 'queued'), queued('def', 1, 'default')], under(1)), [], '`default` is full');
+  assert.deepEqual(toAdmit([bare('d-1'), queued('a-1', 1)], under(1)), ['a-1']);
+});
+
+test('toAdmit: each task admitted is counted at once, a full pool admits nothing more, and it drains one for one', () => {
+  const waiting = [queued('a-1', 1), queued('a-2', 2), queued('a-3', 3)];
+  assert.deepEqual(toAdmit(waiting, under(2)), ['a-1', 'a-2']);
+  const next = [{ ...waiting[0], admission: 'admitted' as const }, { ...waiting[1], admission: 'admitted' as const }, waiting[2]];
+  assert.deepEqual(toAdmit(next, under(2)), [], 'the pass after: those two hold their slots');
+  assert.deepEqual(toAdmit([next[0], next[2]], under(2)), ['a-3'], 'one ended: exactly one more');
+});
+
+test('toAdmit: a session blocked on a person holds no slot, and counts again once it works again', () => {
+  assert.deepEqual(toAdmit([live('a-1', 'needs-human'), live('a-2', 'input-required'), queued('a-3', 1)], under(1)), ['a-3']);
+  assert.deepEqual(toAdmit([live('a-1', 'running (working)'), live('a-2', 'input-required'), queued('a-3', 1)], under(1)), []);
+});
+
+test('toAdmit: the higher priority first, then the earlier filing, then the lower id, each against the order it is given in', () => {
+  assert.deepEqual(toAdmit([queued('first', 1, 'a', 0), queued('after', 9, 'a', 1)], under(1)), ['after'], 'priority over the filing');
+  assert.deepEqual(toAdmit([queued('first', 1), queued('after', 9)], under(1)), ['first'], 'with none, filing order');
+  assert.deepEqual(toAdmit([queued('low', 1, 'a', -1), queued('none', 2)], under(1)), ['none'], 'no priority is 0, above -1');
+  assert.deepEqual(toAdmit([queued('a-a', 20), queued('a-b', 10)], under(1)), ['a-b'], 'the later id filed first');
+  assert.deepEqual(toAdmit([queued('a-b', 5), queued('a-a', 5)], under(1)), ['a-a']);
+  assert.deepEqual(toAdmit([queued('a-a', 5), queued('a-b', 5)], under(1)), ['a-a']);
+  const garbled = { ...queued('a-a', 0), state: { harness: 'a', filedAt: 'garbage' } };
+  assert.deepEqual(toAdmit([garbled, queued('a-b', 50)], under(1)), ['a-b'], 'a time that does not parse goes last');
+});
+
+test('toAdmit: no ceiling admits nothing, and a task admitted or not queued is never admitted again', () => {
+  assert.deepEqual(toAdmit([queued('w', 1)], { poolOf: ownPool }), []);
   assert.deepEqual(
-    toAdmit([view('busy', 'running (working)'), view('w', 'pending', 'queued')], rule),
+    toAdmit(
+      [
+        { ...queued('a-1', 1), admission: 'admitted' as const },
+        { ...queued('a-2', 2), admission: undefined },
+      ],
+      under(5),
+    ),
     [],
-    'a task with no harness counts in `default`',
   );
-  assert.deepEqual(toAdmit([view('busy', 'running (working)', undefined, 'x'), view('w', 'pending', 'queued')], rule), ['w']);
-  assert.deepEqual(toAdmit([view('w', 'pending', 'queued')], { poolOf: ownPool }), [], 'no ceiling admits nothing');
 });

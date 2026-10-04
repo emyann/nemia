@@ -13,7 +13,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import type { Engine } from 'agent-runtime';
 import type { Run } from '../record/record.ts';
-import { breakdownLines, PHASES, type PassCost } from './meter.ts';
+import { PHASES, type PassCost } from './meter.ts';
 import { scratch } from '../../test/scratch.ts';
 
 const ROOT = scratch('wf-meter-');
@@ -39,10 +39,8 @@ const busy = (ms: number) => {
 /**
  * An engine whose tasks stay pending, and whose pass takes `passMs`, of which `observeMs` is one harness's observe: the runtime's report of
  * it (`io()`) grows by that observe during the pass, as the real one's does, and reading it takes `ioMs`. `withIo: false` is a fake that
- * keeps no totals at all. `queued` names tasks its pass reports waiting to be admitted, and admitting them takes `admitMs`; `admitted` has
- * each word, and `took.admit` the time the admits took, measured inside them. Reading a queued view's `admission` takes `unphasedMs`: the
- * pass reads it outside every phase. `unread`, when given, is how many of each pass's observes could not read the harness; not given, the
- * fake is a runtime that counts none.
+ * keeps no totals at all. `queued` names tasks its pass reports waiting to be admitted, and `admitted` has each word said to it.
+ * `unread`, when given, is how many of each pass's observes could not read the harness; not given, the fake is a runtime that counts none.
  */
 const fake = ({
   passMs = 0,
@@ -50,12 +48,9 @@ const fake = ({
   withIo = true,
   ioMs = 0,
   queued = [] as string[],
-  admitMs = 0,
-  unphasedMs = 0,
   unread = undefined as number | undefined,
 } = {}) => {
   const admitted: string[][] = [];
-  const took = { admit: 0 };
   const io = {
     bytesRead: 0,
     reads: 0,
@@ -79,18 +74,12 @@ const fake = ({
       const views = queued.map((id) => ({
         id,
         phase: 'pending',
-        get admission() {
-          busy(unphasedMs);
-          return 'queued';
-        },
+        admission: 'queued',
         state: { harness: 'claude', filedAt: '2026-09-25T10:00:00.000Z' },
       }));
       return { tasks: queued.length, actions: 0, running: {}, views };
     },
     admit: async (ids: string[]) => {
-      const t0 = performance.now();
-      busy(admitMs);
-      took.admit += performance.now() - t0;
       admitted.push(ids);
       return ids;
     },
@@ -113,7 +102,7 @@ const fake = ({
         }
       : {}),
   } as unknown as Engine;
-  return Object.assign(e, { admitted, took });
+  return Object.assign(e, { admitted });
 };
 
 const emptyStore = () => {
@@ -306,38 +295,14 @@ test('outside a pass the readers count nothing, and a pass inside a metered call
   assert.ok(outer.tallies!.kinds.act.ms >= 2);
 });
 
-test('the word that admits a queued task is charged to act, and `wf tick --stats` says so, however long the pass spends in no phase', async () => {
+test('a pass says no `admit` of its own: the runtime admits inside its own pass, so a task it reports queued costs `act` nothing', async () => {
   emptyStore();
-  const idle = fake({ admitMs: 25 });
+  const idle = fake();
   const base = (await tick(idle)).cost!;
-  assert.deepEqual(idle.admitted, [], 'nothing queued, no word said');
-  for (const unphasedMs of [0, 30]) {
-    emptyStore();
-    const e = fake({ queued: ['t-1'], admitMs: 25, unphasedMs });
-    const { cost } = await tick(e);
-    assert.deepEqual(e.admitted, [['t-1']], 'the pass admitted the task its runtime reported queued, once');
-    assert.ok(cost);
-    assert.equal(
-      cost.phases.act.calls,
-      base.phases.act.calls + 1,
-      `the admit is one more call of act than the same pass with nothing queued (${base.phases.act.calls})`,
-    );
-    assert.ok(e.took.admit >= 25, `the admit spun its 25 ms (${e.took.admit} ms)`);
-    assert.ok(
-      cost.phases.act.ms >= e.took.admit,
-      `act holds at least the ${e.took.admit} ms the admit measured inside itself (act took ${cost.phases.act.ms} ms)`,
-    );
-    assert.ok(
-      cost.phases.assess.ms >= unphasedMs,
-      `the ${unphasedMs} ms spent reading the queued view, in no phase, are assess's (${cost.phases.assess.ms} ms)`,
-    );
-    assert.ok(phaseSum(cost) <= cost.ms + ROUNDING_MS, `the phases (${phaseSum(cost)} ms) are no more than the pass (${cost.ms} ms)`);
-    const row = breakdownLines(cost).find((l) => /^ {2}act /.test(l));
-    assert.ok(row, breakdownLines(cost).join('\n'));
-    const [, ms, calls] = row.trim().split(/ +/);
-    assert.ok(Number(ms) >= 25, `the breakdown's act row carries the admit's time: ${row}`);
-    assert.equal(Number(calls), cost.phases.act.calls, `the breakdown's act row carries act's calls: ${row}`);
-  }
+  const e = fake({ queued: ['t-1'] });
+  const { cost } = await tick(e);
+  assert.deepEqual([idle.admitted, e.admitted], [[], []], 'no word said, the queued task left to the runtime');
+  assert.equal(cost?.phases.act.calls, base.phases.act.calls, 'act made the calls the same pass with nothing queued made');
 });
 
 test("a program metered as a pass counts as a Promise metered does: its reads, its kinds, and a program inside another's meter no counts", async () => {

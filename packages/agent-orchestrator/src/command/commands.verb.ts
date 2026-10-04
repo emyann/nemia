@@ -7,9 +7,11 @@
  * alone serves: a run's decision (`decideRun`), whether its branches still merge (`MERGES`) and the run slots (`slotsOf`), the agents of
  * both places (`wf agents`, `agentsRead`), one agent's card (`wf agents card`, `agentCardRead`) and its custom instructions
  * (`wf agents custom`, `AGENTS_CUSTOM`), a run's course (`wf cancel`, `wf hold`, `wf rm`, `wf prune`), and the store's pause (`wf pause`,
- * `wf resume`, and its read the api alone serves): `runs.verb.ts`; and the reads of the store (`wf show`, `wf logs`, `wf feed`,
- * `wf stats`: `reads.verb.ts`). The whole table (`TABLE`) adds the commands the CLI serves alone and runs itself, with no handler:
- * `wf plan`, `wf tick`, `wf up` and `wf watch` (`RAN`).
+ * `wf resume`, and its read the api alone serves): `runs.verb.ts`; the reads of the store (`wf show`, `wf logs`, `wf feed`,
+ * `wf stats`: `reads.verb.ts`); and what the board alone reads and writes, each served on the api alone: a card's page (`INBOXES`), a
+ * run's page and its steps' files, path and conversation (`PAGES`), the agent and skill libraries (`LIBRARY_ENTRIES`, `SKILL_ENTRIES`)
+ * and the workflow builder (`WORKFLOW_ENTRIES`). The whole table (`TABLE`) adds the commands the CLI serves alone and runs itself, with
+ * no handler: `wf plan`, `wf tick`, `wf up` and `wf watch` (`RAN`).
  */
 import { approvalWordsRefusal } from '../gate/gate.ts';
 import { approve } from '../gate/gate.verb.ts';

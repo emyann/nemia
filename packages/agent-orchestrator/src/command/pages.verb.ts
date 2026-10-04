@@ -8,7 +8,7 @@
 import type { Engine } from '../runtime-client.ts';
 import type { Args, Flag, Positional, Spec } from './command.ts';
 import type { Command } from './entry.verb.ts';
-import { artifactFile, fileIn } from '../record/artifacts.store.ts';
+import { artifactFile, fileIn } from '../artifacts/artifacts.store.ts';
 import { runStore } from '../record/files.store.ts';
 import { isGitRun, type Run } from '../record/record.ts';
 

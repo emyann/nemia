@@ -14,6 +14,7 @@ import { stats as flowNumbers } from 'agent-orchestrator';
 import type { Stats } from './stats.ts';
 import { app, runtime } from '../app.ts';
 import { Engine } from '../store.ts';
+import { ReadMemo } from '../layer.ts';
 
 const e = await runtime.runPromise(Engine.useSync((engine) => engine));
 
@@ -270,4 +271,18 @@ test("GET /api/stats reads no run's journal again while the store is as it was, 
   const after = await unverified(() => asked(''));
   assert.equal(e.io().reads - before, 1, "r-home's one journal, and no other run's");
   assert.deepEqual(after.body, await flowNumbers(e, {}));
+});
+
+test("REFUSED at shipped defaults: under WF_VERIFY_REST=1, GET /api/stats refuses an answer of the app's memo unlike a read afresh, naming the run", async () => {
+  await asked('');
+  const { stats: memo } = await runtime.runPromise(ReadMemo.useSync((kept) => kept));
+  const kept = memo.runs.get('r-home')?.read;
+  assert.ok(kept, "r-home is in the app's memo");
+  kept.facts.tries = [];
+  kept.facts.runs = [];
+  assert.equal((await unverified(() => asked(''))).status, 200, 'unverified, the memo answers as it stands');
+  const { status, body } = await asked('');
+  assert.equal(status, 500);
+  assert.equal(body.error, "the stats' memo answered the run r-home unlike a read of it afresh: an input of its facts is not in its stamp");
+  memo.runs.clear();
 });

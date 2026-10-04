@@ -5,7 +5,17 @@
  */
 import { Schema } from 'effect';
 import { Hono, type Context } from 'hono';
-import { type Args, type Command, COMMANDS, type CommandSpec, type Flag, type Positional } from 'agent-orchestrator';
+import {
+  type Args,
+  type Command,
+  COMMANDS,
+  type CommandSpec,
+  type Flag,
+  generated,
+  type Positional,
+  type Route,
+  routeList,
+} from 'agent-orchestrator';
 import { isRefusal } from 'agent-orchestrator/effect';
 import { decodeBody, NotBlank } from '../body.ts';
 import { type Refusal, refusedBeforeReading } from '../guard.ts';
@@ -18,26 +28,26 @@ import { type Named, type RouteWords, WORDS } from './words.ts';
 const valueSchema = (kind: Positional['kind'] | Flag['kind']): Schema.Decoder<unknown> =>
   kind === 'name' ? NotBlank : kind === 'amount' ? Schema.Number : kind === 'switch' ? Schema.Boolean : Schema.String;
 
-/** The arguments a command's route fixes (`sets`), whatever a request says: none on a read. */
-const fixedOf = (command: CommandSpec): Readonly<Record<string, string | boolean>> =>
-  command.route && 'sets' in command.route ? (command.route.sets ?? {}) : {};
+/** The arguments a route fixes (`sets`), whatever a request says: none on a read. */
+const fixedOf = (route: Route): Readonly<Record<string, string | boolean>> => ('sets' in route ? (route.sets ?? {}) : {});
 
 /**
  * The body a command takes on its route, derived from its spec: each positional its path does not name, required unless it is optional;
  * each key a flag sets, required, as one of the values its flags set it to — a body says its way, and takes no default; each flag's value,
- * optional, a switch's as true or false; and the keys its extension takes (extend.ts), optional. A key its route fixes (`sets`) is none
- * of the body's.
+ * optional, a switch's as true or false, but a flag the CLI alone takes, and one the api alone takes required where it says so; and the
+ * keys its extension takes (extend.ts), optional. A key its route fixes (`sets`) is none of the body's.
  */
-export function bodySchema(command: CommandSpec, inPath: readonly string[]) {
+export function bodySchema(command: CommandSpec, inPath: readonly string[], route: Route) {
   const fields: Record<string, Schema.Decoder<unknown>> = {};
-  const fixed = Object.keys(fixedOf(command));
+  const fixed = Object.keys(fixedOf(route));
   for (const p of command.spec.positionals.filter((p) => !inPath.includes(p.key)))
     fields[p.key] = p.takes === 'optional' ? Schema.optionalKey(valueSchema(p.kind)) : valueSchema(p.kind);
   const set = new Map<string, string[]>();
   for (const [key, value] of command.spec.flags.flatMap((f) => Object.entries(f.sets ?? {})))
     set.set(key, [...new Set([...(set.get(key) ?? []), value])]);
   for (const [key, values] of set) fields[key] = Schema.Literals(values);
-  for (const f of command.spec.flags) if (f.key !== undefined) fields[f.key] = Schema.optionalKey(valueSchema(f.kind));
+  for (const f of command.spec.flags.filter((f) => f.key !== undefined && f.only?.side !== 'cli'))
+    fields[f.key!] = f.only?.required ? valueSchema(f.kind) : Schema.optionalKey(valueSchema(f.kind));
   for (const key of command.apiTakes ?? []) {
     const takes = EXTENSIONS[command.name]?.takes[key];
     if (takes) fields[key] = Schema.optionalKey(takes);
@@ -82,11 +92,11 @@ function located(at: Named, step: string | undefined, home: string): { run: Fold
 }
 
 /** A request's JSON body, or why it is none, in the route's words (400). */
-async function jsonOf(c: Context<ApiEnv>, name: string, words: RouteWords): Promise<{ value: unknown } | Refusal> {
+async function jsonOf(c: Context<ApiEnv>, name: string, words: RouteWords, at: Named): Promise<{ value: unknown } | Refusal> {
   try {
     return { value: await c.req.json() };
   } catch {
-    return { status: 400, error: `POST …/${name} takes a JSON body: ${words.shape}.` };
+    return { status: 400, error: words.notJson?.(at) ?? `POST …/${name} takes a JSON body: ${words.shape}.` };
   }
 }
 
@@ -107,14 +117,14 @@ function split(command: CommandSpec, body: Readonly<Record<string, unknown>>) {
  * it carries none: its JSON body (400), a key another command takes on the api alone (422), the body's schema (400) — a key the schema has
  * not refused before those it has where the route's words are strict.
  */
-async function bodyOf(c: Context<ApiEnv>, command: CommandSpec, at: Named, inPath: readonly string[]) {
+async function bodyOf(c: Context<ApiEnv>, command: CommandSpec, at: Named, route: Route) {
   const words = WORDS[command.name];
-  const json = await jsonOf(c, command.name, words);
+  const json = await jsonOf(c, command.name, words, at);
   if ('status' in json) return json;
   const foreign = foreignKey(command, COMMANDS, json.value, words.shape);
   if (foreign) return foreign;
   const options = words.strict ? ({ onExcessProperty: 'error' } as const) : undefined;
-  const read = decodeBody(bodySchema(command, inPath), json.value, words.issue(at), options);
+  const read = decodeBody(bodySchema(command, Object.keys(c.req.param()), route), json.value, words.issue(at), options);
   return 'status' in read ? read : split(command, read.body);
 }
 
@@ -123,14 +133,14 @@ async function bodyOf(c: Context<ApiEnv>, command: CommandSpec, at: Named, inPat
  * (404), its body (`bodyOf`), a step its body names (404), and the extension's own refusals. A delete reads no body: its arguments are
  * what its path names. What the route fixes (`sets`) is said over the body's.
  */
-async function argsOf(c: Context<ApiEnv>, command: CommandSpec, at: Named, s: Served): Promise<{ args: Args } | Refusal> {
-  if (!at.runId) return storeArgsOf(c, command);
-  const bound = at.step ? at : { runId: at.runId };
+async function argsOf(c: Context<ApiEnv>, command: CommandSpec, route: Route, at: Named, s: Served) {
+  if (!at.runId) return storeArgsOf(c, command, route, at);
+  const bound = c.req.param();
   const named = located(at, at.step || undefined, s.home);
   if ('status' in named) return named;
-  const read = command.route?.method === 'DELETE' ? { args: {}, taken: {} } : await bodyOf(c, command, at, Object.keys(bound));
+  const read = route.method === 'DELETE' ? { args: {}, taken: {} } : await bodyOf(c, command, at, route);
   if ('status' in read) return read;
-  const args: Args = { ...read.args, ...fixedOf(command), ...bound };
+  const args: Args = { ...read.args, ...fixedOf(route), ...bound };
   const found = !at.step && typeof args.step === 'string' ? located(at, args.step, s.home) : named;
   if ('status' in found) return found;
   const extension = EXTENSIONS[command.name];
@@ -139,65 +149,86 @@ async function argsOf(c: Context<ApiEnv>, command: CommandSpec, at: Named, s: Se
 }
 
 /**
- * The arguments of a request on a route that names no run — the store's own, as `POST /api/cordon` — or why it carries none: its body
- * (`bodyOf`). A delete reads no body: its arguments are what its route fixes (`sets`).
+ * The arguments of a request on a route that names no run — the store's own, as `POST /api/cordon`, a card or an agent — or why it carries
+ * none: its body (`bodyOf`), or the text a route that reads none was sent (`RouteWords.bodyless`), 400. A delete reads no body. Its
+ * arguments are what its path names and its route fixes (`sets`), said over the body's.
  */
-async function storeArgsOf(c: Context<ApiEnv>, command: CommandSpec): Promise<{ args: Args } | Refusal> {
-  if (command.route?.method === 'DELETE') return { args: { ...fixedOf(command) } };
-  const read = await bodyOf(c, command, { runId: '', step: '' }, []);
-  return 'status' in read ? read : { args: { ...read.args, ...fixedOf(command) } };
+async function storeArgsOf(c: Context<ApiEnv>, command: CommandSpec, route: Route, at: Named): Promise<{ args: Args } | Refusal> {
+  const bound = { ...c.req.param(), ...fixedOf(route) };
+  const bodyless = WORDS[command.name].bodyless;
+  if (bodyless) {
+    const wrong = bodyless(at, await c.req.text());
+    return wrong === null ? { args: bound } : { status: 400, error: wrong };
+  }
+  if (route.method === 'DELETE') return { args: bound };
+  const read = await bodyOf(c, command, at, route);
+  return 'status' in read ? read : { args: { ...read.args, ...bound } };
 }
+
+/** A flag keyed `repo` that the CLI alone takes: on the api, the repository the request is served on (`Served.repo`). */
+const servedRepo = (command: CommandSpec, args: Args, s: Served): Args =>
+  command.spec.flags.some((f) => f.key === 'repo' && f.only?.side === 'cli') ? { ...args, repo: s.repo } : args;
 
 /** What the api answers of a command's data: the keys it declares the api answers (`apiKeys`), or the whole of it. */
 const answerOf = (command: Command, data: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> =>
   command.apiKeys ? Object.fromEntries(command.apiKeys.map((key) => [key, data[key]])) : data;
 
-/**
- * A routed command's handler: the guard where it writes, its arguments, its check (422), and its handler's data at its route's status —
- * or, where the command throws a refusal in place of data that did nothing (`apiRefusal`), that refusal, answered by `app.onError`; or 502
- * in its words.
- */
-const route =
-  (command: Command, { status }: NonNullable<Command['route']>) =>
-  (c: Context<ApiEnv>) =>
-    served(c, async (s) => {
-      const words = WORDS[command.name];
-      const at: Named = { runId: c.req.param('runId') ?? '', step: c.req.param('step') ?? '' };
-      if (command.writes) {
-        const guard = words.guard(at);
-        const refused = refusedBeforeReading(guard, c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
-        if (refused) return c.json({ error: refused.error }, refused.status);
-      }
-      const read = await argsOf(c, command, at, s);
-      if ('status' in read) return c.json({ error: read.error }, read.status);
-      const wrong = command.check?.(read.args);
-      if (wrong) return c.json({ error: wrong }, 422);
-      try {
-        const data = await command.handler(s.e, read.args, s.env);
-        const refusal = command.apiRefusal?.(data, read.args);
-        if (refusal) throw refusal;
-        return c.json(answerOf(command, data), status);
-      } catch (err) {
-        if (isRefusal(err)) throw err;
-        return c.json({ error: words.failed(at, err instanceof Error ? err.message : String(err)) }, 502);
-      }
-    });
+/** What a request on a route names, as its words say it (`Named`). */
+const namedBy = (c: Context<ApiEnv>): Named => ({
+  runId: c.req.param('runId') ?? '',
+  step: c.req.param('step') ?? '',
+  name: c.req.param('name') ?? '',
+  method: c.req.method,
+  path: c.req.path,
+});
 
 /**
- * The routes of every command of `table` the api posts or deletes on, each answered from its entry; a read the api gets is served by the
+ * A routed command's handler: the guard where it writes, a name its path names (400), its arguments, its check (422), and its handler's
+ * data at its route's status — or, where the command throws a refusal in place of data that did nothing (`apiRefusal`), that refusal,
+ * answered by `app.onError`; or 502 in its words, where it has words for a failure (`RouteWords.failed`).
+ */
+const route = (command: Command, at: Route) => (c: Context<ApiEnv>) =>
+  served(c, async (s) => {
+    const words = WORDS[command.name];
+    const named = namedBy(c);
+    if (command.writes) {
+      const guard = words.guard(named);
+      const refused = refusedBeforeReading(guard, c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
+      if (refused) return c.json({ error: refused.error }, refused.status);
+    }
+    const misnamed = words.named?.(named);
+    if (misnamed) return c.json({ error: misnamed }, 400);
+    const read = await argsOf(c, command, at, named, s);
+    if ('status' in read) return c.json({ error: read.error }, read.status);
+    const wrong = command.check?.(read.args);
+    if (wrong) return c.json({ error: wrong }, 422);
+    try {
+      const args = servedRepo(command, read.args, s);
+      const data = await command.handler(s.e, args, s.env, s.home);
+      const refusal = command.apiRefusal?.(data, args);
+      if (refusal) throw refusal;
+      return c.json(answerOf(command, data), at.status);
+    } catch (err) {
+      if (isRefusal(err) || !words.failed) throw err;
+      return c.json({ error: words.failed(named, err instanceof Error ? err.message : String(err)) }, 502);
+    }
+  });
+
+/**
+ * The routes the table generates (`generated`): every route of a command of `table` the api posts, puts or deletes on that it serves by
+ * no hand of its own, each answered from its entry. A read the api gets, and a write it serves by hand (`Route.hand`), are served by the
  * api's own route for it, which calls the entry's handler.
  */
 export function routesOf(table: readonly Command[]): Hono<ApiEnv> {
   const router = new Hono<ApiEnv>();
-  for (const command of table)
-    if (command.route && command.route.method !== 'GET') router.on(command.route.method, command.route.path, route(command, command.route));
+  for (const command of table) for (const at of routeList(command).filter(generated)) router.on(at.method, at.path, route(command, at));
   return router;
 }
 
-/** Where the table asks the api for words it does not have, a sentence each: a command posted or deleted on with none in words.ts. */
+/** Where the table asks the api for words it does not have, a sentence each: a command with a route generated and none in words.ts. */
 export const wordBreaks = (table: readonly Pick<CommandSpec, 'name' | 'route'>[]): string[] =>
   table
-    .filter((c) => c.route !== undefined && c.route.method !== 'GET' && !Object.hasOwn(WORDS, c.name))
+    .filter((c) => routeList(c).some(generated) && !Object.hasOwn(WORDS, c.name))
     .map((c) => `${c.name} is routed on the api, and words.ts has no words for it: give it its guard, its shape and its refusals there`);
 
 /**

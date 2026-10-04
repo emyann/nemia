@@ -5,19 +5,34 @@
 import type { BodyIssue, Words } from '../body.ts';
 import type { Guarded } from '../guard.ts';
 
-/** The run and the step a route's path names: `step` is empty on a route that names none. */
-export type Named = { readonly runId: string; readonly step: string };
+/**
+ * What a route's path names: the run and the step — `step` empty on a route that names none, both on a route of the store's own — the
+ * `name` of what else it names, a card or an agent, and the request's `method` and `path`, as a refusal says the route.
+ */
+export type Named = {
+  readonly runId: string;
+  readonly step: string;
+  readonly name: string;
+  readonly method: string;
+  readonly path: string;
+};
 
 /**
- * A routed command's words: `shape`, its body as a refusal shows it; `guard`, `issue` and `failed`, each said of the run it names; and
- * `strict`, where its body is refused a key its schema does not have, named before any it does.
+ * A routed command's words: `shape`, its body as a refusal shows it; `guard`, `issue` and `failed`, each said of what it names; `strict`,
+ * where its body is refused a key its schema does not have, named before any it does; `named`, the refusal of a name in its path, 400,
+ * before its body is read; `bodyless`, where its route reads no body but none or `{}`, the refusal of the text it was sent, 400; `notJson`,
+ * the refusal of a body that is not JSON, 400, where it has words of its own. A route with no `failed` lets a failure that is no refusal
+ * through, to `app.onError`, as a 500.
  */
 export type RouteWords = {
   readonly shape: string;
   readonly guard: (at: Named) => Guarded;
   readonly issue: (at: Named) => Words;
-  readonly failed: (at: Named, said: string) => string;
+  readonly failed?: (at: Named, said: string) => string;
   readonly strict?: true;
+  readonly named?: (at: Named) => string | null;
+  readonly bodyless?: (at: Named, text: string) => string | null;
+  readonly notJson?: (at: Named) => string;
 };
 
 /** The body `POST …/retry` takes: `wf retry`'s flags, as JSON. */

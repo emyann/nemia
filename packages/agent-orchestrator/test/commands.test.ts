@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { TABLE, commandBreaks } from '../src/runner.ts';
+import { TABLE, commandBreaks, routeList } from '../src/runner.ts';
 import { RUNS, VERBS } from '../src/cli/main.ts';
 
 test('the shipped table breaks none of its rules against the CLI’s verbs and runners', () => {
@@ -49,7 +49,7 @@ test('every command the api posts or deletes on writes, and the api guards it; t
     ['ls', 'show', 'logs', 'feed', 'stats', 'decide', 'ceilings', 'agents', 'agents card', 'cordoned', 'watch'],
   );
   assert.deepEqual(
-    TABLE.filter((c) => c.route && c.writes !== (c.route.method !== 'GET')).map((c) => c.name),
+    TABLE.filter((c) => routeList(c).some((r) => r.hand === undefined && c.writes !== (r.method !== 'GET'))).map((c) => c.name),
     [],
   );
 });

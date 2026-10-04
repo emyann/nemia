@@ -507,3 +507,75 @@ test("REFUSED at shipped defaults: wf tick's, wf up's and wf watch's arguments, 
   for (const argv of [['x'], ['1', '2'], ['--from']]) assert.equal(refusedBy(entry('watch'), argv), cursor, argv.join(' '));
   assert.equal(refusedBy(entry('watch'), ['12']), null);
 });
+
+/** A spec that takes a card's `name`, and the words a person or the api alone gives. */
+const CARD: Spec = {
+  positionals: [{ key: 'name', takes: 'required', kind: 'name' }],
+  flags: [
+    { flag: '--file', kind: 'text', key: 'file', only: { side: 'cli', why: 'the api is sent the words' } },
+    { flag: '--words', kind: 'text', key: 'words', only: { side: 'api', why: 'a command line names a file', required: true } },
+  ],
+  unknown: (arg) => `UNKNOWN ${arg}`,
+};
+
+test('a table breaks its rules: a name in a route’s path that no argument of its spec takes', () => {
+  const route = { method: 'PUT', path: '/api/cards/:name', status: 200 } as const;
+  assert.deepEqual(commandBreaks([{ name: 'a', route, spec: CARD, handler }], []), []);
+  assert.deepEqual(commandBreaks([{ name: 'a', route: { ...route, path: '/api/cards/:card' }, spec: CARD, handler }], []), [
+    "a's route PUT /api/cards/:card names :card, which no argument of its spec takes: key a positional card",
+  ]);
+});
+
+test('a table breaks its rules: a why left empty, of a route served by hand, of a side alone, of a flag one side alone takes', () => {
+  const route = { method: 'POST', path: '/api/x', status: 201, hand: 'it answers a Location' } as const;
+  assert.deepEqual(commandBreaks([{ name: 'a', route, handler }], []), []);
+  assert.deepEqual(commandBreaks([{ name: 'a', route: { ...route, hand: ' ' }, handler }], []), [
+    "a's route POST /api/x is served by hand and says no why: say why the table does not generate it",
+  ]);
+  assert.deepEqual(commandBreaks([{ name: 'a', only: { side: 'cli', why: '' }, handler }], []), [
+    'a is served on the cli alone and says no why: say why',
+  ]);
+  const put = { method: 'PUT', path: '/api/cards/:name', status: 200 } as const;
+  const said = { ...CARD, flags: [{ ...CARD.flags[0], only: { side: 'cli', why: '' } } as const, CARD.flags[1]] };
+  assert.deepEqual(commandBreaks([{ name: 'a', route: put, spec: said, handler }], []), [
+    "a's --file is taken on the cli alone and says no why: say why",
+  ]);
+});
+
+test('a table breaks its rules: a flag the api alone takes on an entry the table generates no route of', () => {
+  const put = { method: 'PUT', path: '/api/cards/:name', status: 200 } as const;
+  assert.deepEqual(commandBreaks([{ name: 'a', route: put, spec: CARD, handler }], []), []);
+  const broken = ["a's --words is taken on the api alone, and the table generates no route of it: route it, or take the flag out"];
+  assert.deepEqual(commandBreaks([{ name: 'a', route: { ...put, hand: 'by hand' }, spec: CARD, handler }], []), broken);
+  assert.deepEqual(
+    commandBreaks([{ name: 'a', route: { method: 'GET', path: '/api/cards/:name', status: 200 }, spec: CARD, handler }], []),
+    broken,
+  );
+});
+
+test('a table breaks its rules on each of an entry’s routes: one routed on another’s path, and a key one of them sets that no flag fills', () => {
+  const routes = [
+    { method: 'POST', path: '/api/x', status: 200 },
+    { method: 'DELETE', path: '/api/x', status: 200, sets: { off: true } },
+  ] as const;
+  assert.deepEqual(commandBreaks([{ name: 'a', route: routes, spec: HOLDING, handler }], []), []);
+  assert.deepEqual(
+    commandBreaks(
+      [
+        { name: 'a', route: routes, spec: HOLDING, handler },
+        { name: 'b', route: { method: 'DELETE', path: '/api/x', status: 200 }, handler },
+      ],
+      [],
+    ),
+    ['b is routed on DELETE /api/x, as a is: give it a path of its own'],
+  );
+  assert.deepEqual(commandBreaks([{ name: 'a', route: routes, spec: SPEC, handler }], []), [
+    "a's route sets off, which no flag of its spec fills: name a key the command reads",
+  ]);
+});
+
+test('a command line refuses a flag the api alone takes, as one the command does not take, and reads one the CLI alone takes', () => {
+  assert.equal(refusalOf(['x', '--words', 'hi'], CARD), 'UNKNOWN --words');
+  assert.equal(refusalOf(['x', '--words=hi'], CARD), 'UNKNOWN --words=hi');
+  assert.deepEqual(parseArgv(CARD, ['x', '--file', 'f.md']), { name: 'x', file: 'f.md' });
+});

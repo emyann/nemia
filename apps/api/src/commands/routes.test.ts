@@ -12,7 +12,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { app } from '../app.ts';
-import { approvalFile, COMMANDS, engine, parseArgv, triesDir } from 'agent-orchestrator';
+import { approvalFile, COMMANDS, engine, parseArgv, routeList, triesDir } from 'agent-orchestrator';
 import { extensionBreaks } from './extend.ts';
 import { wordBreaks } from './routes.ts';
 
@@ -165,14 +165,25 @@ test('a round on its route writes what `wf round` writes: the same step, round a
 
 test('REFUSED at shipped defaults: every route that writes, asked by a page on another site — 403, nothing written', async () => {
   gatedRun('r-guard');
-  const routed = COMMANDS.filter((c) => c.route && c.writes);
+  const routed = COMMANDS.filter((c) => c.writes).flatMap((c) => routeList(c).map((r) => ({ command: c, r })));
   assert.deepEqual(
-    routed.map((c) => c.name),
-    ['retry', 'approve', 'round', 'accept', 'say', 'hold', 'rm', 'prune', 'cordon', 'uncordon'],
+    routed.map(({ command, r }) => `${command.name} ${r.method}`),
+    [
+      'retry POST',
+      'approve POST',
+      'round POST',
+      'accept POST',
+      'say POST',
+      'hold DELETE',
+      'rm DELETE',
+      'prune POST',
+      'cordon POST',
+      'uncordon DELETE',
+    ],
   );
-  for (const command of routed) {
-    const { method, path: route } = command.route!;
-    const url = route.replace(':runId', 'r-guard').replace(':step', 'plan');
+  for (const { command, r } of routed) {
+    const { method, path: route } = r;
+    const url = route.replace(':runId', 'r-guard').replace(':step', 'plan').replace(':name', 'g-guard');
     const body = JSON.stringify({ mode: 'nudge', message: 'Go.', text: 'Go.' });
     const res = await app.request(url, { method, headers: { ...BOARD, 'sec-fetch-site': 'cross-site' }, body });
     assert.equal(res.status, 403, command.name);
@@ -219,7 +230,11 @@ test('the table asks the api for nothing it lacks: words for each routed command
 test('every command the table routes is served by the api on its method and path: the posts the table generates, and the reads the api answers', () => {
   const served = new Set(app.routes.map((r) => `${r.method} ${r.path}`));
   assert.deepEqual(
-    COMMANDS.filter((c) => c.route && !served.has(`${c.route.method} ${c.route.path}`)).map((c) => c.name),
+    COMMANDS.flatMap((c) =>
+      routeList(c)
+        .filter((r) => !served.has(`${r.method} ${r.path}`))
+        .map((r) => `${c.name} ${r.method}`),
+    ),
     [],
   );
 });

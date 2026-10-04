@@ -7,10 +7,13 @@ import tailwindcss from '@tailwindcss/vite';
 import { tanstackRouter } from '@tanstack/router-plugin/vite';
 
 /**
- * Where `/api` goes, for `vite` and `vite preview` alike: the api `HKB_API_URL` names (`npm run e2e` starts one on a free port), else
- * the one `npm run dev` starts, at 127.0.0.1 as the api listens (apps/api/src/port.ts), since localhost can resolve to ::1 first.
+ * Where `/api` goes: the api `HKB_API_URL` names, for `vite` and `vite preview` alike (`npm run e2e` starts one on a free port); else,
+ * for `vite`, the viewer `npm run dev` starts beside the daemon (`--no-tick`, 8788), and for `vite preview` the daemon itself (8787), each
+ * at 127.0.0.1 as the api listens (apps/api/src/port.ts), since localhost can resolve to ::1 first.
  */
-const api = process.env.HKB_API_URL ?? 'http://127.0.0.1:8787';
+const named = process.env.HKB_API_URL;
+const viewer = named ?? 'http://127.0.0.1:8788';
+const daemon = named ?? 'http://127.0.0.1:8787';
 
 /** Warns, one line each, of every component or hook the React Compiler leaves uncompiled: it still works, unmemoized. */
 const logger: Logger = {
@@ -49,9 +52,9 @@ export default defineConfig({
   ],
   resolve: { tsconfigPaths: true },
   server: {
-    proxy: { '/api': api },
+    proxy: { '/api': viewer },
   },
   preview: {
-    proxy: { '/api': api },
+    proxy: { '/api': daemon },
   },
 });

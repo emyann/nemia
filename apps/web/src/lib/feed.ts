@@ -26,8 +26,8 @@ export const REOPEN_MS = 5_000;
  * be a queued card started — the feed carries no card events, so the inbox is read again on it. A run removed is gone from the list and
  * from the cap, and its record is read again too: the read that finds none is how a page open on the run learns it is gone (`runGone`).
  *
- * And every event reads again whether a daemon ticks the store (`daemonQuery`): a line on the feed is written by a tick, so a daemon
- * started while the board says none does is seen on its first line, not on the fallback a minute later.
+ * And every event reads again whether a daemon ticks the store (`daemonQuery`): a line on the feed is written by a tick — the api's,
+ * or a wf up's — so a daemon started while the board says none does is seen on its first line, not on the fallback a minute later.
  */
 export function keysOf(event: FeedEvent, run: string): QueryKey[] {
   switch (event) {

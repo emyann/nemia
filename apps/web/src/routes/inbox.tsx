@@ -59,7 +59,8 @@ function InboxPage() {
       <p className="text-sm text-neutral-500">
         An idea parked as a card until you start a workflow on it: a file each in the store&apos;s {code('inbox/')}, as{' '}
         {code('wf inbox add')} parks one. Starting a card writes its run&apos;s record as {code('wf start')} does, and removes the card. A
-        card queued starts on its own, on the workflow it names, when {code('wf up')} has a run slot free: the oldest queued first.
+        card queued starts on its own, on the workflow it names, when the daemon — this api, or {code('wf up')} — has a run slot free: the
+        oldest queued first.
       </p>
       <FileCard />
       <section aria-label="Cards" className="space-y-3">

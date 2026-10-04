@@ -280,9 +280,11 @@ export const wordBreaks = (table: readonly Pick<CommandSpec, 'name' | 'route'>[]
  *   was held asked again. Refused in the package's words, by `app.onError`: a run nobody holds — a pruned one among them, since no verb
  *   holds one — and a hold put again as it was lifted are a 409 (`Conflict`), a run gone since the route read it a 404; any other failure
  *   is a 502. Its 200 is `{ id, lifted: true, hold }`. No feed line: the tick is the feed's one writer, and the board reads the run again.
- * - `POST /api/pause` — the store paused, as `wf pause` pauses it (`putPause`), its body `wf pause`'s `--why` and `--by`, and the
- *   route names no run: no pass starts new work until the lift. Refuses what `wf pause` refuses of `--why` and `--by` with 422, and a
- *   pause that stands with 409 (`Conflict`). Its 200 is `{ pause }`, as written.
+ * - `POST /api/pause` — the store paused, as `wf pause` pauses it (`putPause`), its body `wf pause`'s `--why`, `--by` and `--now`, its
+ *   route setting `yes`, and the route names no run: no pass starts new work until the lift. Refuses what `wf pause` refuses of `--why` and
+ *   `--by` with 422, and a pause that stands without `now` with 409 (`Conflict`). Its 200 is `{ pause }`, as written. With `now`, as
+ *   `wf pause --now --yes`, it pauses at once (`pauseNow`): it keeps a pause that stands as it was put, and asks each step session or check
+ *   at work but a landing to stop, each tried again once the store is resumed; its 200 is `{ pause, kept, interrupted, skipped }`.
  * - `DELETE /api/pause` — the store's pause lifted, as `wf resume` lifts it (`resumePause`); it reads no body. None standing is a 404
  *   (`Missing`). Its 200 is `{ pause }`, the pause lifted.
  * - `DELETE /api/runs/:id` — a try's run removed, as `wf rm <run>` removes it (`forget`): its record, and the folders it worked in with it;

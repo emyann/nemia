@@ -207,8 +207,17 @@ const HOLD: RouteWords = {
     `DELETE /api/runs/${runId}/hold: the hold was not lifted — ${said}. Lift it with \`wf hold ${runId} --off\`.`,
 };
 
-/** The body `POST /api/pause` takes: `wf pause`'s flags, as JSON. */
-const PAUSE_SHAPE = '`{ "why"?: "<words>", "by"?: "<name>" }`';
+/** The body `POST /api/pause` takes: `wf pause`'s flags, as JSON, `now` its `--now`, which the route acts on as `--yes` does. */
+const PAUSE_SHAPE = '`{ "why"?: "<words>", "by"?: "<name>", "now"?: true }`';
+
+/** What `issue` says of a key of `POST /api/pause`'s body sent wrong, `input` what the request sent. */
+const pauseKeyWords = (key: unknown, input: unknown): string => {
+  const was = `This request's was ${JSON.stringify(input)}: ${PAUSE_SHAPE}.`;
+  if (key === 'now') return `\`now\` stops what still finishes, as \`wf pause --now --yes\` does: true, or left out. ${was}`;
+  if (key === 'why' || key === 'by')
+    return `\`${key}\` is ${key === 'why' ? 'why the store is paused' : 'who pauses it'}, as \`wf pause --${key} "<words>"\` takes it: text, or left out. ${was}`;
+  return `POST /api/pause takes a JSON object: ${PAUSE_SHAPE}.`;
+};
 
 /** The store paused, as the guard's refusals word it, its body and its failures; a pause that stands is the package's 409. */
 const PAUSE: RouteWords = {
@@ -217,7 +226,7 @@ const PAUSE: RouteWords = {
     route: 'POST /api/pause',
     does: 'pauses the store',
     forAnother: 'pause it',
-    why: 'a pause stops every pass from starting new work in every repository the store runs in, until a person resumes it',
+    why: 'a pause stops every pass from starting new work in every repository the store runs in, until a person resumes it, and a pause at once stops what is at work',
     reach: "pause it from the board's bottom bar",
     instead: 'Pause it from the board\'s bottom bar, or with `wf pause --why "<words>"`',
     shape: PAUSE_SHAPE,
@@ -225,9 +234,7 @@ const PAUSE: RouteWords = {
   issue:
     () =>
     ({ path: [key], input }) =>
-      key === 'why' || key === 'by'
-        ? `\`${key}\` is ${key === 'why' ? 'why the store is paused' : 'who pauses it'}, as \`wf pause --${key} "<words>"\` takes it: text, or left out. This request's was ${JSON.stringify(input)}: ${PAUSE_SHAPE}.`
-        : `POST /api/pause takes a JSON object: ${PAUSE_SHAPE}.`,
+      pauseKeyWords(key, input),
   failed: (_at, said) => `POST /api/pause: the store was not paused — ${said}. Pause it with \`wf pause\`.`,
 };
 

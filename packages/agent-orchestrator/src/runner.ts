@@ -382,8 +382,10 @@ export {
   RESUMED,
   stagedWords,
   type Finishing,
+  type Interrupt,
   type Pause,
   type Paused,
+  type PausedNow,
   type PauseStaged,
 } from './pause/pause.ts';
 export { readPause } from './pause/pause.store.ts';

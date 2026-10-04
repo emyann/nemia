@@ -11,7 +11,7 @@ import { DEFAULT_HARNESS } from '../harness/harness.ts';
 import { disallowedBy } from '../keys/index.ts';
 import type { SkillRule } from '../skills/skills.ts';
 import type { Workflow } from '../step/step.ts';
-import type { TaskSpan } from '../timeline/timeline.ts';
+import type { TaskSpan } from '../timeline/index.ts';
 
 /** The harnesses whose sessions say what they were denied: a job, `claude -p`, on either. */
 const RECORDING = ['claude', 'claude-detached'];

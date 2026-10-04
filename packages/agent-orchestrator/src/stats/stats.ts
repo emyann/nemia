@@ -17,7 +17,7 @@ import type { Closeout } from '../closeout/closeout.ts';
 import type { Workflow } from '../step/step.ts';
 import { DEFAULT_FACTORY } from '../factory/factory.ts';
 import { askedAgain, landsOnCheck } from '../status/status.ts';
-import type { Timeline, TimelineTry } from '../timeline/timeline.ts';
+import type { Timeline, TimelineTry } from '../timeline/index.ts';
 import { marksOf, type Mark, type RunFrozen } from './marks.ts';
 import { deniesRecorded, ranAsJob, ruleRowsOf, rulesOfTry, type RuleFact, type RuleRow } from './discipline.ts';
 import type { SkillRule } from '../skills/skills.ts';

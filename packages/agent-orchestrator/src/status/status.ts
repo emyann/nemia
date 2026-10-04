@@ -8,7 +8,7 @@
 import type { Verdict } from '../check/check.ts';
 import { DEFAULT_ROUNDS, LOOP_REPLIES, outputFields, type Workflow } from '../step/step.ts';
 import { loopSpan } from '../workflow/index.ts';
-import type { TaskClock } from '../timeline/timeline.ts';
+import type { TaskClock } from '../timeline/index.ts';
 import { declaredOutput, isLoopTarget, type Closeout } from '../closeout/closeout.ts';
 import type { Retry, RetryHow } from '../retry/index.ts';
 import {

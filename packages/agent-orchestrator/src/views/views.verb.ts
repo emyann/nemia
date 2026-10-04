@@ -20,7 +20,7 @@ import { taskSpend, type SpendOf, type Consumed } from '../status/status.ts';
 import { gated, type ParentRun } from '../wait/wait.ts';
 import { decision } from '../decide/decide.ts';
 import { parseCloseout, type Closeout } from '../closeout/closeout.ts';
-import { taskUsage } from '../timeline/timeline.ts';
+import { taskUsage } from '../timeline/index.ts';
 import { runStore } from '../record/files.store.ts';
 import { stepsOf } from '../record/record.store.ts';
 import { oneByOne, parentRecord, shippedOf, type BranchReader } from '../branches/branches.store.ts';

@@ -30,8 +30,10 @@ import {
   capOf,
   holdsOpenOn,
   landsOnCheck,
+  MOMENTUM,
   ownStatus,
   sentBack,
+  stepMomentum,
   stepSpend,
   triedFrom,
   type Round,
@@ -391,6 +393,7 @@ const trySpec = (
   brief: t.brief,
   cwd: record.workspace ?? f.run.workspace,
   harness: step.harness,
+  priority: MOMENTUM,
   ...localFields(step, () => ({
     config: filedConfig(step, f.reads.steps, f.run, {
       model: tryModel(step, record, r),
@@ -471,6 +474,7 @@ function roundSpec(f: Filing, r: Round, looping: Workflow, target: Workflow, tas
     ),
     cwd: record.workspace ?? run.workspace,
     harness: target.harness,
+    priority: MOMENTUM,
     ...localFields(target, () => ({
       config: filedConfig(target, reads.steps, run, {
         model: sessionModel(target, record),
@@ -530,6 +534,7 @@ async function fileCheck(f: Filing, name: string): Promise<void> {
     await e.file({
       id: taskId,
       harness: 'check',
+      priority: MOMENTUM,
       brief: step.check!,
       cwd: workspace,
       deadlineSeconds: CHECK_DEADLINE_SECONDS,
@@ -615,6 +620,7 @@ function readySpec(
         ),
     cwd: place.workspace,
     harness: step.harness,
+    priority: stepMomentum(step),
     deadlineSeconds: step.deadlineSeconds,
     ...localFields(step, () => ({
       config: filedConfig(step, reads.steps, run, {

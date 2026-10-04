@@ -349,12 +349,6 @@
       }
     },
     {
-      "files": ["apps/api/src/workflows/builder.ts"],
-      "rules": {
-        "max-lines": ["error", { "max": 505, "skipBlankLines": true, "skipComments": true }]
-      }
-    },
-    {
       "files": ["apps/api/src/workflows/workflows.ts"],
       "rules": {
         "complexity": ["error", { "max": 25 }]
@@ -471,7 +465,7 @@
     {
       "files": ["apps/web/src/components/WorkflowBuilder.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 208, "skipBlankLines": true, "skipComments": true }],
+        "max-lines-per-function": ["error", { "max": 206, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 25 }]
       }
     },
@@ -574,12 +568,6 @@
       "rules": {
         "max-lines-per-function": ["error", { "max": 113, "skipBlankLines": true, "skipComments": true }],
         "sonarjs/cognitive-complexity": ["error", 28]
-      }
-    },
-    {
-      "files": ["packages/agent-orchestrator/src/cap/cap.ts"],
-      "rules": {
-        "sonarjs/cognitive-complexity": ["error", 16]
       }
     },
     {

@@ -214,11 +214,14 @@ export {
   STALE_PASSES,
   daemonLine,
   everyOf,
+  holderOf,
+  holderWords,
   staleAfterMs,
+  START_WORDS,
   takenFromLine,
   takeoverLine,
 } from './daemon/daemon.ts';
-export type { DaemonFile, DaemonStanding, Identity } from './daemon/daemon.ts';
+export type { DaemonFile, DaemonStanding, HolderKind, Identity } from './daemon/daemon.ts';
 export {
   HOME,
   acceptFile,
@@ -252,6 +255,8 @@ export {
   takeStore,
 } from './daemon/daemon.store.ts';
 export type { TakenStore } from './daemon/daemon.store.ts';
+export { holdUrl, runMain, up } from './daemon/up.verb.ts';
+export type { UpOptions } from './daemon/up.verb.ts';
 export { addPass, breakdownLines, heaviest, PHASES, STATS_EVERY_MS, summaryDue, summaryLine } from './meter/meter.ts';
 export type { HarnessCost, Interval, PassCost, Phase, PhaseCost } from './meter/meter.ts';
 export { feedCursorRefusal, feedFile, freshFeedMemo, readFeed, recordFeed, watchFeed } from './feed/feed.store.ts';
@@ -373,6 +378,7 @@ export { readCordon } from './cordon/cordon.store.ts';
 export { retry } from './retry/retry.verb.ts';
 export { say } from './say/say.verb.ts';
 export { COMMANDS, TABLE } from './command/commands.verb.ts';
+export { PRUNE, RM } from './command/runs.verb.ts';
 export type { Command, Ran } from './command/entry.verb.ts';
 export { CLI, commandBreaks, commandLine, helpOf, parseArgv } from './command/command.ts';
 export type { Args, CommandSpec, Flag, Positional, Spec } from './command/command.ts';

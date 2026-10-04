@@ -873,7 +873,7 @@ test('ae show prints the budget and the context window a task was filed with, an
   assert.deepEqual(limitLines(fold('t-1', [filed({})])), []);
 });
 
-test('ae ls prints no priority, even of an old journal that carries one: the runtime keeps no order', () => {
+test('ae ls prints no priority, which only orders admission under a ceiling `ae` runs without', () => {
   const filed = (extra: object): Event => ({ kind: 'filed', at: '2026-09-16T09:00:00Z', brief: 'review it', cwd: '/r', ...extra });
   const shown = (extra: object) => taskLine({ id: 't-1', state: fold('t-1', [filed(extra)]), phase: 'pending', sessionId: null });
   for (const extra of [{ priority: 3 }, { priority: -1 }, {}])

@@ -1,13 +1,13 @@
 /**
- * Pools by subscription, at shipped defaults, through the orchestrator's admission: the client's `engine()`, which files every task
- * `queued`, and `tick()`, which admits off the runtime's report. `WF_MAX_CONCURRENT` is unset, so the ceiling is 2 on every pass.
- * `WF_ROOT` is read as the module loads, so it is set before the import; `WF_VERIFY_REST=1` judges in full every run a pass answers
- * from its memo of runs at rest, and a difference throws (`verifyRest` in tick.verb.ts).
+ * Pools by subscription, at shipped defaults, through the client's `engine()`, which files every task `queued` and hands the runtime its
+ * ceiling and pools, and `tick()`, whose engine pass admits. `WF_MAX_CONCURRENT` is unset, so the ceiling is 2 on every pass. `WF_ROOT`
+ * is read as the module loads, so it is set before the import; `WF_VERIFY_REST=1` judges in full every run a pass answers from its memo
+ * of runs at rest, and a difference throws (`verifyRest` in tick.verb.ts).
  *
  * A fake `claude` and `codex` first on PATH run until the test opens their gate — a file named for the task's id, which is its brief — and
  * `claude agents` prints a registry and counts itself. The tasks are filed straight through the client, with no run record, so `advance`
- * views none of them: every `claude agents` call a pass makes is the runtime's observe, or admission's — and the observe asks it only for
- * a session expected that is not a job (`agents-calls.test.ts` has a run's steps, a background session and a restart).
+ * views none of them: every `claude agents` call a pass makes is the runtime's observe, which asks it only for a session expected that
+ * is not a job (`agents-calls.test.ts` has a run's steps, a background session and a restart).
  *
  * An admitted task starts on the runtime's next pass, so a freed slot is taken one pass after it is admitted into: each case ticks
  * once to admit and once to start.
@@ -107,8 +107,8 @@ const file = (id: string, harness: string) =>
   });
 
 /**
- * Files `tasks` in their order, a millisecond apart on a seeded clock: admission takes the earlier filing first (`toAdmit`), and the
- * runtime stamps a filing with the clock, which a step back between two filings would turn round.
+ * Files `tasks` in their order, a millisecond apart on a seeded clock: the runtime's admission takes the earlier filing first of one
+ * priority, and it stamps a filing with the clock, which a step back between two filings would turn round.
  */
 const fileInOrder = async (t: TestContext, tasks: ReadonlyArray<readonly [string, string]>) => {
   t.mock.timers.enable({ apis: ['Date'], now: Date.now() });
@@ -218,7 +218,7 @@ test('REFUSED at shipped defaults: a check keeps its own pool beside a full Clau
   }
 });
 
-test("one pass — the runtime's tick, admission and admit — asks `claude agents` nothing, with claude jobs at work and waiting", async (t) => {
+test("one pass — the runtime's tick, which admits — asks `claude agents` nothing, with claude jobs at work and waiting", async (t) => {
   try {
     await fileInOrder(
       t,
@@ -229,7 +229,7 @@ test("one pass — the runtime's tick, admission and admit — asks `claude agen
     assert.equal(
       fake.agentsCalls() - admitting,
       0,
-      'no `claude agents` for the pass that admits s1 and s2: its `admit` is a word to the journals, and nothing has started',
+      'no `claude agents` for the pass that admits s1 and s2: an admission is a word to the journals, and nothing has started',
     );
     assert.deepEqual([(await e.view('s1')).admission, (await e.view('s3')).admission], ['admitted', 'queued']);
     assert.equal(first?.harnesses.claude?.calls, 1, 'and the meter counts the observe, which listed the jobs alone');
@@ -255,6 +255,25 @@ test("one pass — the runtime's tick, admission and admit — asks `claude agen
     );
     assert.equal(await attempts('s3'), 0, 'and s3 still waits');
   } finally {
+    await drain();
+  }
+});
+
+test('REFUSED: `WF_MAX_CONCURRENT=abc` refuses the pass, and the engine `engine()` builds under it has no ceiling, so it admits nothing', async () => {
+  process.env.WF_MAX_CONCURRENT = 'abc';
+  try {
+    const refused = engine();
+    await refused.file({ id: 'r1', cwd, harness: 'claude', brief: 'r1' });
+    const err = await tick(refused).then(
+      () => assert.fail('a pass under a ceiling that does not read resolved'),
+      (x: unknown) => x as Error,
+    );
+    assert.match(err.message, /^WF_MAX_CONCURRENT=abc is not a count from 1/);
+    for (let i = 0; i < 2; i++) await refused.tick();
+    assert.equal((await refused.view('r1')).admission, 'queued', "the runtime's own passes admit nothing with no ceiling");
+    assert.equal((await refused.view('r1')).state.attempts.length, 0);
+  } finally {
+    delete process.env.WF_MAX_CONCURRENT;
     await drain();
   }
 });

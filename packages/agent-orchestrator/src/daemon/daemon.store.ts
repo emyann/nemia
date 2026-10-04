@@ -20,6 +20,7 @@ import {
   type DaemonFile,
   type DaemonRead,
   type DaemonStanding,
+  type HolderKind,
   type Identity,
   type Instant,
   type Monotonic,
@@ -40,10 +41,10 @@ const Count = Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0));
 const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
 
 /**
- * The daemon's two ceilings, read from the environment when asked. `sessions` (`WF_MAX_CONCURRENT`, `maxConcurrent`) is the tick's
- * admission's (`toAdmit` in `cap.ts`): sessions per pool at once, counted apart for each — a check on the `check` harness is in a pool of
- * its own, and a `dev` run's review competes with another run's implement, both on `claude`. `runs` (`WF_MAX_RUNS`, `maxRuns`) is the
- * tick's: runs in flight at once, 0 — or unset — for no cap.
+ * The daemon's two ceilings, read from the environment when asked. `sessions` (`WF_MAX_CONCURRENT`, `maxConcurrent`) is handed to the
+ * runtime, which admits under it (`engine()` in `runtime-client.ts`): sessions per pool at once, counted apart for each — a check on the
+ * `check` harness is in a pool of its own, and a `dev` run's review competes with another run's implement, both in the `claude` pool.
+ * `runs` (`WF_MAX_RUNS`, `maxRuns`) is the tick's: runs in flight at once, 0 — or unset — for no cap.
  */
 export const ceilings = (): { sessions: number; runs: number } => ({
   sessions: maxConcurrent(),
@@ -157,7 +158,7 @@ export function recordPassCost(cost: PassCost): number {
   return performance.now() - t0;
 }
 
-/** `$WF_ROOT/daemon.json`: the store taken by one `wf up`, written by it alone (`daemon.ts`). */
+/** `$WF_ROOT/daemon.json`: the store taken by one daemon, the api or a `wf up`, written by it alone (`daemon.ts`). */
 export const daemonFile = (): string => path.join(HOME, DAEMON_FILE);
 
 const When = Schema.String.check(Schema.makeFilter((at: string) => !Number.isNaN(Date.parse(at))));
@@ -166,12 +167,14 @@ const When = Schema.String.check(Schema.makeFilter((at: string) => !Number.isNaN
 const MonotonicSchema = Schema.Struct({ boot: Schema.String.check(Schema.isNonEmpty()), ms: Schema.Finite });
 
 /**
- * `daemon.json` as `wf up` writes it (`DaemonFile`). A pid that is not a positive whole number is not read as one: `kill(0)` and `kill(-n)`
- * signal process groups, not a process. `passedAt` may be absent, and is read as `null`. A key it does not name is dropped: the file is
- * the daemon's alone, and written whole by it.
+ * `daemon.json` as a daemon writes it (`DaemonFile`). A pid that is not a positive whole number is not read as one: `kill(0)` and
+ * `kill(-n)` signal process groups, not a process. `passedAt` may be absent, and is read as `null`. A key it does not name is dropped: the
+ * file is the daemon's alone, and written whole by it.
  */
 const DaemonFileSchema = Schema.Struct({
   pid: Schema.Int.check(Schema.isGreaterThan(0)),
+  by: Schema.optionalKey(Schema.Literals(['api', 'wf up'])),
+  url: Schema.optionalKey(Schema.String),
   startedAt: When,
   startedMono: Schema.optionalKey(MonotonicSchema),
   cwd: Schema.String,
@@ -184,7 +187,7 @@ const DaemonFileSchema = Schema.Struct({
   stoppedAt: Schema.optionalKey(When),
 });
 
-/** The file as `wf up` writes it, or undefined when the text does not read as one (`DaemonFileSchema`). */
+/** The file as a daemon writes it, or undefined when the text does not read as one (`DaemonFileSchema`). */
 export function parseDaemonFile(text: string): DaemonFile | undefined {
   const decoded = Schema.decodeUnknownResult(DaemonFileSchema)(jsonOr(text));
   if (Result.isFailure(decoded)) return undefined;
@@ -301,16 +304,28 @@ function writeDaemon(file: DaemonFile): void {
 export type TakenStore = { held: DaemonFile; replaced: DaemonStanding };
 
 /**
- * `wf up` takes the store: refused by name, exit 2, while another daemon ticks it (`holdRefusal`); otherwise the file names this process.
+ * A daemon takes the store, as the kind it is (`by`): refused by name, exit 2, while another daemon of either kind ticks it, in the words
+ * for the kind that asks (`holdRefusal`); otherwise the file names this process and its kind.
  * An empty store is claimed with a link, which fails when the file appeared in between, so two starts on an empty store cannot both win —
  * the loser judges again. A file already there is replaced by a rename; two takeovers of one stale file both rename, and the loser learns
  * it at its first pass (`stillHeld`).
  */
-export function takeStore({ every, cwd, now = instantNow() }: { every: number; cwd: string; now?: Instant }): TakenStore {
+export function takeStore({
+  every,
+  cwd,
+  by,
+  now = instantNow(),
+}: {
+  every: number;
+  cwd: string;
+  by: HolderKind;
+  now?: Instant;
+}): TakenStore {
   fs.mkdirSync(HOME, { recursive: true });
   const procStart = procStartOf(process.pid);
   const held: DaemonFile = {
     pid: process.pid,
+    by,
     startedAt: new Date(now.at).toISOString(),
     ...(now.mono ? { startedMono: now.mono } : {}),
     cwd,
@@ -321,7 +336,7 @@ export function takeStore({ every, cwd, now = instantNow() }: { every: number; c
   for (let tries = 0; ; tries++) {
     const replaced = daemonStanding(now);
     const holder = holderAgainst(replaced, process.pid);
-    if (holder) throw new Conflict({ message: holdRefusal(holder, 'up', HOME, now.at) });
+    if (holder) throw new Conflict({ message: holdRefusal(holder, by === 'api' ? 'api' : 'up', HOME, now.at) });
     if (replaced.kind !== 'none') {
       writeDaemon(held);
       return { held, replaced };
@@ -350,12 +365,26 @@ export function stillHeld(held: DaemonFile): DaemonFile | undefined {
 
 /**
  * Write down a pass this daemon completed, at `now` on both clocks — only while the store is still its own: a file that names another
- * holder is that holder's to write. Answers the file as it now stands.
+ * holder is that holder's to write. Stamped on the file as it stands when it names this daemon, so what was written since it took the
+ * store — its url, its beat — stays. Answers the file as it now stands.
  */
 export function passed(held: DaemonFile, now: Instant = instantNow()): DaemonFile {
-  const file = stamped(held, 'passedAt', now);
-  if (!stillHeld(held)) writeDaemon(file);
-  return file;
+  const file = readDaemon()?.file;
+  if (file && file.pid !== held.pid) return stamped(held, 'passedAt', now);
+  const next = stamped(file ?? held, 'passedAt', now);
+  writeDaemon(next);
+  return next;
+}
+
+/**
+ * Write down where the api serves, `url`, into the file this process holds the store by — only while it names this process and has not
+ * let the store go: a file of another holder, or none, is not this process's to write. Answers whether it was written.
+ */
+export function heldUrl(url: string): boolean {
+  const file = readDaemon()?.file;
+  if (file?.pid !== process.pid || file.stoppedAt) return false;
+  writeDaemon({ ...file, url });
+  return true;
 }
 
 /**
@@ -382,7 +411,10 @@ export function releaseStore(held: DaemonFile, at = new Date().toISOString()): v
   } catch {}
 }
 
-/** Why a pass by hand may not run now — a daemon ticks the store — or undefined when it may. A `wf tick` never writes the file. */
+/**
+ * Why a pass by hand may not run now — a daemon of either kind ticks the store, named — or undefined when it may. A `wf tick` never
+ * writes the file.
+ */
 export function storeRefusal(verb: 'tick', now: Instant = instantNow()): string | undefined {
   const holder = holderAgainst(daemonStanding(now), process.pid);
   return holder ? holdRefusal(holder, verb, HOME, now.at) : undefined;

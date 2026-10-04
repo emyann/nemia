@@ -5,8 +5,8 @@
  * runs at rest answers (`verifyRest`), and one in the middle starts with no memo at all, as a restarted daemon does.
  *
  * Walked through the runtime itself over an in-memory journal and a harness the test signs by hand, as rest-store.test.ts does, and every
- * filing `queued` as the store's own engine files it (`engineOf`), so admission is the runtime's: a task filed waits until a pass admits
- * it. A store of its own, since `tick` reads every run under `WF_ROOT`, which is read as the module loads and so set before the import.
+ * filing `queued` as the store's own engine files it (`engineOf`), under the store's own admission (`storeAdmission`), so admission is
+ * the runtime's: a task filed waits until a pass admits it, and none is admitted while the cordon stands. A store of its own, since `tick` reads every run under `WF_ROOT`, which is read as the module loads and so set before the import.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -28,7 +28,7 @@ delete process.env.WF_MAX_RUNS;
 const { addToInbox, approve, queueInInbox, readInbox, retry, start } = await import('../runner.ts');
 const { approvalFile, asksDir, readRun } = await import('../record/record.store.ts');
 const { tick, freshRestMemo } = await import('./tick.verb.ts');
-const { engineOf } = await import('../runtime-client.ts');
+const { engineOf, storeAdmission } = await import('../runtime-client.ts');
 const { liftCordon, putCordon } = await import('../cordon/cordon.store.ts');
 const { cordonRead, runsListed } = await import('../list/list.verb.ts');
 const { COMMANDS } = await import('../command/commands.verb.ts');
@@ -118,6 +118,7 @@ const engine = () => {
       journal: memoryJournal(starts),
       harnesses: { claude: runner, codex: runner, check: runner },
       defaultHarness: 'claude',
+      ...storeAdmission(),
     }),
   );
   const of = (name: string, runs: readonly Run[]) => runs.some((r) => name.startsWith(`ae/${r.id}-`));

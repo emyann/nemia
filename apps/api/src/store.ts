@@ -10,10 +10,11 @@ import { isGitRun, runTasks, type Run, unjudgedWords } from 'agent-orchestrator/
 import type { Workflow } from 'agent-orchestrator/workflow';
 
 /**
- * The engine the api reads through — `list`, `view` and `logs`, never `tick` or `file` — one for an app, built with its runtime (`live`:
- * the package's `engine()`). Filing and advancing work is `wf`'s job, so a board left open in a tab cannot start anything. The one write
- * through it is a try's removal (`DELETE /api/runs/:id`), `wf rm`'s own code, which closes a task that waits for a word nobody will give
- * once the record is gone.
+ * The engine the api reads through — `list`, `view` and `logs` — one for an app, built with its runtime (`live`: the package's
+ * `engine()`). The api's process, started without `--no-tick`, is the store's daemon, and ticks on this engine (main.ts), so a board
+ * served by it keeps the store ticking; its routes still file and advance nothing but through `wf`'s own verbs, and an api under
+ * `--no-tick` ticks nothing. The one write through it from a route is a try's removal (`DELETE /api/runs/:id`), `wf rm`'s own code,
+ * which closes a task that waits for a word nobody will give once the record is gone.
  */
 export class Engine extends Context.Service<Engine, ReturnType<typeof engine>>()('api/Engine') {
   static readonly live: Layer.Layer<Engine> = Layer.sync(Engine)(engine);

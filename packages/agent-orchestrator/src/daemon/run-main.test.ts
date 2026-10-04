@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import { Conflict } from '../refusal/refusal.ts';
-import { runMain } from './main.ts';
+import { runMain } from './up.verb.ts';
 
 const SIGNALS = ['SIGINT', 'SIGTERM', 'SIGHUP'] as const;
 const listening = () => SIGNALS.map((s) => process.listenerCount(s));

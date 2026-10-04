@@ -162,7 +162,7 @@ const minimapFill = (node: RunFlowNode) =>
  *
  * The inbox's queued cards of `factory` (`queuedIn`) wait at the floor's left edge, as ghosts, in the order the tick starts them
  * (`QueueLane`), and the header says the run slots taken of the cap the daemon runs with (`CapLine`), and the subscription's quota as the
- * api last asked Claude Code for it (`QuotaLine`), each said to be this machine's, not the factory's — and, when no wf up ticks the store,
+ * api last asked Claude Code for it (`QuotaLine`), each said to be this machine's, not the factory's — and, when no daemon ticks the store,
  * that nothing does and how to start one (`DaemonLine`), since a run waiting its turn and a run nobody moves look alike on the floor. The
  * cap is read again as the runs are, on each run's event of the workflow feed; the queue every 5 s, since the feed carries no card's
  * events: the daemon starts a card when a run slot frees, and nothing on the board asks it to.
@@ -611,7 +611,7 @@ function Empty({ anyRuns, queued }: { anyRuns: boolean; queued: number }) {
                 {queued === 1
                   ? 'The card queued beside it starts on its own'
                   : `The ${queued} cards queued beside it start on their own`}{' '}
-                while <code>npx wf up</code> runs.
+                while a daemon ticks the store: the api, <code>npm start</code> in apps/api.
               </>
             )}
           </CardDescription>

@@ -962,6 +962,12 @@ Moved out of the open list on 2026-09-28, each as it was written. Issues 19 to 2
 held by fake registries and transcripts, and what they did not measure stays said under each. 30 was fixed on 2026-09-23, in
 review of stage 3, and says how under its heading. 19 to 22, 24 and 25 each have their row in *Fixed*, below.
 
+Since Nemia platform slice 3 (2026-10-04), admission is the runtime's again, and 19 to 22 are its once more, each as it is
+said below with `src/core/admission.ts` where it names the orchestrator's `src/cap/cap.ts`: `holdsSlot` and `toAdmit` there,
+a harness's `pool` on `Engine.layer` (the orchestrator gives `claude-detached` the pool `claude`), one `maxConcurrent` for
+every pool, and `priority` carried again, a whole number in int32, which the orchestrator files as its run's momentum.
+`test/admission.test.ts` holds each order and pool with a fixture that breaks it.
+
 ### 19. A `blocked` session holds no slot, on reasoning rather than a measurement (moved to the orchestrator)
 
 **Where it is now** (2026-09-25). The runtime keeps no ceiling since thin runtime stage 4c part 2, so it counts no slot:

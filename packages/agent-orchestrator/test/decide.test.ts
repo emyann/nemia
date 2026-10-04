@@ -73,7 +73,7 @@ const branchOff = (repo: string, branch: string, change: () => void) => {
  * (`queued`, `admitted`, and the view's `admission` while it waits) and the `claude.remoteControl` it was filed with.
  */
 const board = () => {
-  type Filed = { id: string; closeoutSchema?: object; config?: { claude?: { remoteControl?: true | string } } };
+  type Filed = { id: string; priority?: number; closeoutSchema?: object; config?: { claude?: { remoteControl?: true | string } } };
   const tasks = new Map<
     string,
     { spec: Filed; phase: TaskPhase; closeout?: unknown; usage?: object; reason?: string; exitCode?: number; filedAt: number }
@@ -304,13 +304,13 @@ test("`wf decide` and `wf ls` say nothing of a run's momentum, its admission or 
   const { run, e, carries, filed } = await awaiting('background: true\nremote: true\n');
   const ids = [`${run.id}-implement`, `${run.id}-implement-check`, `${run.id}-review`];
   assert.deepEqual(
-    ids.map((id) => ['priority' in filed(id)!, filed(id)?.config?.claude?.remoteControl]),
+    ids.map((id) => [filed(id)?.priority, filed(id)?.config?.claude?.remoteControl]),
     [
-      [false, true],
-      [false, undefined],
-      [false, undefined],
+      [0, true],
+      [1, undefined],
+      [1, undefined],
     ],
-    "filed with their Remote Control, and none with a priority: momentum is the orchestrator's (momentumOf), read off the run's record",
+    'filed with their Remote Control, and each with its momentum as `priority`: a first step 0, its check and the step after it 1',
   );
   const screens = async () => ({ decide: await screen(t, e, run.id), ls: await listed(t, e, run.id) });
   const carried = await screens();

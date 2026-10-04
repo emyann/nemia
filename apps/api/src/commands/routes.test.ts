@@ -8,10 +8,11 @@
 import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { app } from '../app.ts';
-import { approvalFile, COMMANDS, engine, parseArgv } from 'agent-orchestrator';
+import { approvalFile, COMMANDS, engine, parseArgv, triesDir } from 'agent-orchestrator';
 import { extensionBreaks } from './extend.ts';
 import { wordBreaks } from './routes.ts';
 
@@ -167,7 +168,7 @@ test('REFUSED at shipped defaults: every route that writes, asked by a page on a
   const routed = COMMANDS.filter((c) => c.route && c.writes);
   assert.deepEqual(
     routed.map((c) => c.name),
-    ['retry', 'approve', 'round', 'accept', 'say', 'hold', 'cordon', 'uncordon'],
+    ['retry', 'approve', 'round', 'accept', 'say', 'hold', 'rm', 'prune', 'cordon', 'uncordon'],
   );
   for (const command of routed) {
     const { method, path: route } = command.route!;
@@ -238,4 +239,67 @@ test('REFUSED: a routed command the api has no words for, and a key taken on the
   assert.deepEqual(extensionBreaks([{ name: 'retry', apiTakes: ['notes'] }]), [
     'retry takes `notes` on the api, and extend.ts folds none: give retry an extension that takes it, or drop it',
   ]);
+});
+
+/** A removal on the board, as its run page sends it. */
+const remove = (id: string) => app.request(`/api/runs/${id}`, { method: 'DELETE', headers: BOARD, body: '{}' });
+
+test('REFUSED at shipped defaults: a run that is no try, removed on the board — a 409 naming `wf rm`, in its words whole, and the record kept', async () => {
+  gatedRun('r-no-try');
+  const res = await remove('r-no-try');
+  assert.equal(res.status, 409);
+  assert.equal(
+    ((await res.json()) as { error: string }).error,
+    `DELETE /api/runs/r-no-try: the board removes only a try, a run started from an agent's page, and r-no-try is a run of ${path.join(root, 'no-such-workflow')}. Remove it with \`wf rm r-no-try\`, which says what it hands off and what it leaves.`,
+  );
+  assert.ok(fs.existsSync(path.join(root, 'runs', 'r-no-try.json')), 'the record is kept');
+});
+
+test("REFUSED at shipped defaults: a try whose worktree git will not remove — locked — is a 409 in `wf rm`'s line whole, and its record kept", async () => {
+  const id = 'r-held-try';
+  const repo = fs.mkdtempSync(path.join(root, 'repo-'));
+  const git = (...args: string[]) =>
+    execFileSync(
+      'git',
+      ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', ...args],
+      {
+        cwd: repo,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      },
+    );
+  git('init', '-q', '-b', 'main');
+  fs.writeFileSync(path.join(repo, 'README.md'), '# app\n');
+  git('add', '-A');
+  git('commit', '-q', '-m', 'base');
+  const worktree = path.join(root, 'worktrees', id, 'implement');
+  git('worktree', 'add', '-q', '-b', `wf/${id}/implement`, worktree);
+  git('worktree', 'lock', '--reason', 'a person holds it', worktree);
+  signedOff(`${id}-implement`, DONE);
+  runRecord(
+    id,
+    [{ name: 'implement', after: [], body: 'Implement it.', harness: 'codex' }],
+    { implement: { taskId: `${id}-implement`, workspace: worktree, branch: `wf/${id}/implement`, handedOff: `${id}-implement` } },
+    { repo, workspace: repo, baseRef: git('rev-parse', 'HEAD').trim(), workflowDir: path.join(triesDir(root), 'scribe') },
+  );
+  const res = await remove(id);
+  assert.equal(res.status, 409);
+  assert.equal(
+    ((await res.json()) as { error: string }).error,
+    `${id}  not forgotten: ${worktree} is locked (a person holds it), and git will not remove it — unlock it if nothing needs it: git -C ${repo} worktree unlock ${worktree}. Its record, files and branches are kept until every worktree is gone: wf rm ${id} again then.`,
+  );
+  assert.ok(fs.existsSync(path.join(root, 'runs', `${id}.json`)), 'the record is kept');
+  assert.ok(fs.existsSync(worktree), 'and the worktree');
+});
+
+test("REFUSED at shipped defaults: a key the route fixes is none of the body's — `yes` sent to a prune is a 400 naming it, and nothing is touched", async () => {
+  gatedRun('r-prune-yes');
+  const before = fs.readdirSync(path.join(root, 'runs')).sort();
+  const res = await post('/api/runs/r-prune-yes/prune', { yes: true });
+  assert.equal(res.status, 400);
+  assert.equal(
+    ((await res.json()) as { error: string }).error,
+    'POST …/prune does not take `yes`: it takes `{ "artifacts"?: boolean, "unmerged"?: boolean }`, as `wf prune` takes --artifacts and --unmerged.',
+  );
+  assert.deepEqual(fs.readdirSync(path.join(root, 'runs')).sort(), before);
 });

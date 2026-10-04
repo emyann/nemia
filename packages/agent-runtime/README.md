@@ -30,8 +30,8 @@ Definition of done — a closed list, and it is closed:
 - [x] any harness, chosen per task (`claude`, `codex`, `claude-detached`, `command`)
 - [x] attempts, stop, logs — as text, each stream of a process whole (`output`), and as the conversation to follow (`transcript`)
 - [x] a person's words into a session while it runs, on the record (`say`)
-- [x] queued and admitted — a task waits for a word before it starts, and the layer above says when; the runtime keeps
-      no ceiling, no pools and no order of its own (retired in thin runtime stage 4c part 2)
+- [x] queued and admitted — a task waits for a word before it starts: `admit`'s, or the engine's own under its ceiling
+      (`maxConcurrent`), per pool, the highest `priority` first
 - [x] the feed — a cursored stream of everything that happened
 - [x] resume — a task filed with `resumeFrom` continues that session; one attempt per start, and nothing tried again here
 - [x] deadline — the time the machine was up since an attempt started, or a held-open turn's first one: on the monotonic
@@ -410,9 +410,8 @@ The other way round, the run file removed is a stop: `stop` finds the worker by 
 alone or with its store, ends its harness and exits at its next write, and never writes the file again (open issue 32).
 
 **Adding a harness is a value, not code** — `HarnessSpec` is a command, an optional regex, and
-optionally the words it refuses, a reader of what it prints, and where it keeps its conversation. It names
-no pool: `Engine.layer` refuses a harness with a `pool` key (exit 2), since the runtime counts none — a layer
-above that shares a ceiling between harnesses keeps its own list (agent-orchestrator's `POOLS`):
+optionally the words it refuses, a reader of what it prints, and where it keeps its conversation. Given to
+`Engine.layer`, it may name a `pool` to share the engine's ceiling with another harness (*Queued and admitted*):
 
 ```ts
 export const codex: HarnessSpec = {
@@ -652,7 +651,7 @@ after a space starts a comment. The keys are a closed list:
 | `contextTokens` | the session's context window, in tokens, digits only — `claude` and `claude-detached`, 100000 to 1000000; see below |
 | `background` | `true` or `false` — `claude` only: `true` runs the session as `claude --bg`, which a person can attach to and bridge to claude.ai, instead of as a job (`claude -p`); either can be told something with `ae say`; see below |
 | `holdOpen` | `true` or `false` — `true` has the task wait for `ae answer` or `ae close` when an attempt signs, rather than settle; see below |
-| `queued` | `true` or `false` — `true` has the task wait for `ae admit <id>` before it starts: the one way to hold a task back, since the runtime keeps no ceiling; see *Queued and admitted* |
+| `queued` | `true` or `false` — `true` has the task wait for `ae admit <id>` before it starts: the one way to hold a task back under `ae`, which runs its engine with no ceiling; see *Queued and admitted* |
 | `restartPolicy` | `Always` — with `background: true` only: the session stays open between turns, idle, until `ae stop`; see *A long-lived session* |
 | `trustFrom` | `codex` only: an absolute directory you trust in `~/.codex/config.toml`, whose trust extends to the `cwd` — name it to work in a worktree of a repository you trust; see *Letting a sandboxed Codex step commit* |
 
@@ -674,7 +673,7 @@ a harness the engine does not have (it used to run on the fallback, silently), c
 it cannot use, a retired `maxAttempts` or `resume`, an empty brief, cwd, model, resumeFrom or effort, a `cwd` that is
 not absolute (the process that ticks a task need not be the one that filed it, and a detached worker
 once resolved a relative one twice; `ae start` resolves it for you), a `tools` that
-is not a list of names, a `disallowedTools` that is not a list of permission rules, an `mcp` that is not a map of `.mcp.json` servers (below), a `budgetUsd` that is not dollars above 0 or that its harness would not keep (below), a `contextTokens` that is not a whole number of tokens its harness takes, or any on a harness with no window to set (below), a `remoteControl` that is not true or false or that its harness has no flag for (below), a `background` that is not true or false or on a harness with no such mode (below), a `claude` that is not Claude Code's flags, names one the runtime gives itself, or is on a harness that is not Claude Code (below), a `priority` at any value, which is retired (below), and a word the
+is not a list of names, a `disallowedTools` that is not a list of permission rules, an `mcp` that is not a map of `.mcp.json` servers (below), a `budgetUsd` that is not dollars above 0 or that its harness would not keep (below), a `contextTokens` that is not a whole number of tokens its harness takes, or any on a harness with no window to set (below), a `remoteControl` that is not true or false or that its harness has no flag for (below), a `background` that is not true or false or on a harness with no such mode (below), a `claude` that is not Claude Code's flags, names one the runtime gives itself, or is on a harness that is not Claude Code (below), a `priority` that is not a whole number from -2147483648 to 2147483647 (below), and a word the
 task's harness does not have. Those words belong to the
 harness, so each harness says them — `refuses` on a `HarnessSpec`, the lists beside `claudeOps` —
 and `domain.ts` never learns them:
@@ -984,10 +983,23 @@ unqueued, or whose turn has started, and refuses one it has no record of and a s
 any task in the call). `queued` that is not true or false is refused at `file()`, at both doors, and in a brief, where
 `queued: true` is how `ae start` files one.
 
-It is for a layer above that decides itself what runs when: agent-orchestrator files every task `queued`, and admits per
-pool, under its own ceiling and in its own order (`agent-orchestrator/src/cap/cap.ts`, thin runtime stage 4c). It reads what to admit
-off the pass it just ran: `tick()` returns the view of every task it left unsettled (`TickReport.views`, built by
-`viewOfState` off the pass's one observation), so the layer above decides with no second look at any harness.
+**The engine admits too, under its ceiling.** `Engine.layer({ maxConcurrent })` is how many sessions of each pool may be
+at work at once; with it, each pass ends by admitting the queued tasks its pools have room for, and the next pass starts
+them (`toAdmit`, `src/core/admission.ts`, pure, called by the pass off the views it built from its one observation). A
+session holds a slot while it works, starts, or is admitted and not yet started; one blocked on a person, held for an
+answer or between attempts holds none. A free slot goes to the waiting task of the highest `priority` (a whole number in
+int32, 0 when not given, as a Pod's), then to the earliest filed, then to the lower id. Nothing running is stopped for a
+waiting task. A harness counts in a pool named as it is; one given as an object may name a `pool` (`Pooled`), so two
+harnesses under one rate limit share one ceiling. With no `maxConcurrent` the pass admits nothing: a queued task waits for
+`admit`, as under `ae`, which builds its engine with no ceiling and refuses `AE_MAX_CONCURRENT` (exit 2, naming the option).
+agent-orchestrator files every task `queued` with its run's momentum as `priority`, and hands the engine its ceiling.
+
+**An engine can be unschedulable**, as a node is (`Node.spec.unschedulable`): `Engine.layer({ unschedulable })` is a
+function the pass asks before it admits, every pass, so it is never fixed when the engine is built. While it says true the
+pass admits no queued task, whatever room its pools have; what is at work goes on, a task `admit` names still starts, and
+so does one filed unqueued. Once it says false, the next pass admits as before. One that is not a function is refused
+(exit 2). agent-orchestrator hands it a read of its store's own flag file, so no queued task starts while the store is
+held, whichever process ticks it (`test/admission.test.ts`).
 
 `file` writes the key on every filing, `false` when not asked for. **A filing with no key reads as queued**: it is a
 journal from before stage 4c, and a daemon restarted onto it must start nothing it has not admitted, since the layer above
@@ -996,25 +1008,20 @@ started, stays `pending` — `ae ls` says `queued` — until `ae admit` names it
 before. An older engine reading a store this one wrote passes over the `admitted` entries and the key, and reads each task
 as it did.
 
-A task filed with no `queued` starts on the next pass, whatever else is at work: **the runtime keeps no ceiling, no pools
-and no order.** Until thin runtime stage 4c part 2 (2026-09-25) it had all three — `AE_MAX_CONCURRENT` sessions at work
-per pool, `claude` and `claude-detached` sharing one, and a waiting task's `priority` choosing which went first. They
-moved to the orchestrator in part 1 and were retired here in part 2, each refused by name rather than dropped, since a
-ceiling taken and ignored would start every task at once and say nothing:
+A task filed with no `queued` starts on the next pass, whatever else is at work: a ceiling holds back queued tasks only.
+A ceiling handed anywhere but `Engine.layer` is refused by name rather than dropped, since a ceiling taken and ignored would
+start every task at once and say nothing:
 
-- `priority` on a filing, at any value, `0` and `undefined` as an own key included, at both doors (exit 2);
-- `maxConcurrent` on `Engine.layer`, at any value, and a harness — a `HarnessSpec` or a `PromiseRunner` — that names a
-  `pool` (exit 2, naming the harness);
-- any argument to `tick()`, at both doors, which took the ceiling and the pools (the Effect door fails `TickRefused`);
+- `maxConcurrent` that is not a whole number from 1, and a `pool` that is not a name (exit 2, naming the harness);
+- a `priority` that is not a whole number in int32, at both doors (exit 2);
+- any argument to `tick()`, at both doors (the Effect door fails `TickRefused`);
 - a third argument to `step`, and a `maxSteps` to `settleTask` that is not a whole number above nought, on the Effect door:
-  each took the ceiling's `slots` third, and an old `settleTask(id, observed, slots)` would have settled nothing and said so
-  nowhere (`StepRefused`);
+  each took the ceiling's `slots` third (`StepRefused`);
 - `AE_MAX_CONCURRENT` in `ae`'s environment, set to anything, empty too (exit 2, before anything is read or written).
 
-Each names what to do instead: file `queued: true`, and `admit` each task when it may start (`ae admit <id>`). A journal
-written before part 2 may carry `priority` on its `filed` entry: it is folded unread, and `ae ls` prints no priority.
-`tick()` still returns `running`, the sessions at work per harness (`claude`, `codex`, `claude-detached`, a harness you
-add), each counted under the harness its task resolved to: an attempt open whose session is `working`, or not yet seen.
+A journal may carry a `priority` that is not a whole number on its `filed` entry, `null` where JSON wrote a `NaN`: it is
+read as none. `tick()` returns `running`, the sessions at work per harness (`claude`, `codex`, `claude-detached`, a harness
+you add), each counted under the harness its task resolved to: an attempt open whose session is `working`, or not yet seen.
 
 ## What "done" means, and who decides it
 

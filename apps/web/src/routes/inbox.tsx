@@ -2,7 +2,6 @@ import { useId, useState } from 'react';
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { FactoryCardStart } from '../components/FactoryCardStart';
-import { FactoryFilter } from '../components/FactoryTag';
 import { CardMeta, GoneItem, PageLink, PRIMARY, Refused, SECONDARY, Tried } from '../components/InboxParts';
 import { StartRun } from '../components/StartRun';
 import { FIELD, WorkflowOptions } from '../components/WorkflowOptions';
@@ -39,13 +38,12 @@ const code = (text: string) => <code className="font-mono text-xs">{text}</code>
  * refusal stays where it was listed until dismissed. A refusal is kept by the entry's file, as `cardLines` matches them: a card and a stray
  * file beside it answer to one name, and a refusal is of one of them.
  *
- * Every factory's cards are listed, each tagged with its own, and a filter over them keeps one factory's (`FactoryFilter`), kept in the
- * address as `?factory=<name>`; the counts are of the cards it keeps, and a filter that keeps none says so and how to clear it.
+ * Every factory's cards are listed, each tagged with its own; the factory the sidebar picks, kept in the address as `?factory=<name>`,
+ * keeps only its own: the counts are of the cards it keeps, and a factory that keeps none says so and how to show every factory's.
  */
 function InboxPage() {
   const { data: entries } = useSuspenseQuery(inboxQuery);
   const { factory } = Route.useSearch();
-  const navigate = Route.useNavigate();
   const [refusals, setRefusals] = useState<CardRefusal[]>([]);
   const all = newestCardsFirst(entries);
   const cards = shownIn(all, factory);
@@ -59,15 +57,11 @@ function InboxPage() {
       <p className="text-sm text-neutral-500">
         An idea parked as a card until you start a workflow on it: a file each in the store&apos;s {code('inbox/')}, as{' '}
         {code('wf inbox add')} parks one. Starting a card writes its run&apos;s record as {code('wf start')} does, and removes the card. A
-        card queued starts on its own, on the workflow it names, when {code('wf up')} has a run slot free: the oldest queued first.
+        card queued starts on its own, on the workflow it names, when the daemon — this api, or {code('wf up')} — has a run slot free: the
+        oldest queued first.
       </p>
       <FileCard />
       <section aria-label="Cards" className="space-y-3">
-        <FactoryFilter
-          items={all}
-          factory={factory}
-          onChange={(picked) => void navigate({ search: picked === undefined ? {} : { factory: picked }, replace: true })}
-        />
         <h2 className="flex items-baseline gap-2 text-sm font-semibold">
           Cards{' '}
           <span data-count className="text-xs font-normal text-neutral-500">

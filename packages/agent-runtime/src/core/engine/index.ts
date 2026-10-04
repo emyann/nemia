@@ -2,6 +2,7 @@
  * The face of `core/engine/`: the engine's verbs, its journal, its memo and its tally, as the doors take them.
  */
 export {
+  Admission,
   GRACE_MS,
   StepRefused,
   TickRefused,
@@ -17,7 +18,7 @@ export {
 } from './engine.ts';
 export type { RefusedMove, TaskList, TaskView, UnreadableTask } from './engine.ts';
 export {
-  ADMIT_INSTEAD,
+  CEILING_INSTEAD,
   AdmitRefused,
   FileRefused,
   InputRefused,

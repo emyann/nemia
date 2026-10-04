@@ -11,7 +11,7 @@ test('the shipped table breaks none of its rules against the CLI’s verbs and r
   assert.deepEqual(commandBreaks(TABLE, [...VERBS.keys()], [...RUNS.keys()]), []);
 });
 
-test('each command is served on the api where it was before the table, the lift of a hold where its route was', () => {
+test('each command is served on the api where it was before the table, the lift of a hold, a removal and a prune where their routes were', () => {
   assert.deepEqual(
     TABLE.map((c) => [c.name, c.route ?? c.only?.side]),
     [
@@ -27,6 +27,8 @@ test('each command is served on the api where it was before the table, the lift 
       ['agents card', { method: 'GET', path: '/api/agents/:from/:name/card', status: 200 }],
       ['cancel', 'cli'],
       ['hold', { method: 'DELETE', path: '/api/runs/:runId/hold', status: 200, sets: { off: true } }],
+      ['rm', { method: 'DELETE', path: '/api/runs/:runId', status: 200 }],
+      ['prune', { method: 'POST', path: '/api/runs/:runId/prune', status: 200, sets: { yes: true } }],
       ['cordon', { method: 'POST', path: '/api/cordon', status: 200 }],
       ['uncordon', { method: 'DELETE', path: '/api/cordon', status: 200 }],
       ['cordoned', { method: 'GET', path: '/api/cordon', status: 200 }],

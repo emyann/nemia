@@ -1,12 +1,18 @@
 /**
- * The commands over a run's course and the store's tick, each defined once: `wf cancel` and `wf hold`, whose handlers call the package's
- * verbs (`cancel`, `hold`, `unhold`), the store's cordon (`wf cordon`, `wf uncordon`, and the api's read of it), and `wf tick`, `wf up` and
+ * The commands over a run's course and the store's tick, each defined once: `wf cancel`, `wf hold`, `wf rm` and `wf prune`, whose
+ * handlers call the package's verbs (`cancel`, `hold`, `unhold`, `forget`, `prune`) on one run — the CLI's runners walk the many runs
+ * `wf rm` and `wf prune` take — the store's cordon (`wf cordon`, `wf uncordon`, and the api's read of it), and `wf tick`, `wf up` and
  * `wf watch`, which the CLI alone serves and runs itself (`RAN`): their specs, refusals and help, with no handler.
  */
 import { cancel } from '../cancel/cancel.verb.ts';
 import type { CancelPlan } from '../cancel/cancel.ts';
 import { everyOf } from '../daemon/daemon.ts';
 import { cursorTakes } from '../feed/feed.ts';
+import { forgetLine, type Forgot } from '../forget/forget.ts';
+import { forget } from '../forget/forget.verb.ts';
+import { pruneLines, type Pruning } from '../prune/prune.ts';
+import { prune } from '../prune/prune.verb.ts';
+import { Conflict, Missing } from '../refusal/refusal.ts';
 import { BY_CAP, oneLine, WHY_CAP, type Hold } from '../record/record.ts';
 import { holdWord } from '../wait/wait.ts';
 import { hold, unhold } from '../wait/wait.verb.ts';
@@ -176,6 +182,123 @@ export const HOLD: Command<{ id: string; lifted: boolean; hold: Hold }> = {
   ],
 };
 
+/** `wf rm`'s form, as its refusals end on it. */
+const RM_FORM = 'wf rm <runId> [<runId> ...] [--delete-branches [--force-unmerged]]';
+
+/**
+ * Refused of `wf rm`'s arguments before any run is read: `--force-unmerged` without `--delete-branches` — it forces what that flag deletes,
+ * and alone would delete nothing, silently — then a switch with no run to forget.
+ */
+function rmRefusal(args: Args): string | null {
+  if (args.forceUnmerged === true && args.deleteBranches !== true)
+    return "--force-unmerged forces --delete-branches to delete a branch not merged into its run's base branch, and alone deletes nothing: wf rm <runId> --delete-branches --force-unmerged.";
+  if (args.runId === undefined && args.deleteBranches === true)
+    return 'wf rm takes the runs to forget, by id: wf rm <runId> [<runId> ...] — wf ls lists them.';
+  return null;
+}
+
+/**
+ * `wf rm`: one run forgotten, judged on its own (`forget`), and what was done with it (`forgot`), a refusal included. The api removes a
+ * run only once it is gone: what `forget` refused, or held, is a 409 in its words, and a run gone since the route read it a 404.
+ */
+export const RM: Command<{ id: string; removed: boolean; forgot: Forgot }> = {
+  name: 'rm',
+  usage: '<runId> [<runId> ...] [--delete-branches [--force-unmerged]]',
+  help: [
+    "forget runs that are over, a line each: a run's worktrees removed",
+    'through git, what one held uncommitted committed first, then its',
+    'record and every file under WF_ROOT keyed by its id. Refused while',
+    'a task of it is in flight, anything is due to be filed or asked',
+    'for, or a run waiting on it has not started. Its branches are kept:',
+    "--delete-branches deletes those merged into the run's base branch,",
+    'and --force-unmerged beside it the others, with their work',
+  ],
+  spec: {
+    positionals: [{ key: 'runId', takes: 'many', kind: 'name' }],
+    flags: [
+      { flag: '--delete-branches', kind: 'switch', key: 'deleteBranches' },
+      { flag: '--force-unmerged', kind: 'switch', key: 'forceUnmerged' },
+    ],
+    unknown: (arg) =>
+      `wf rm does not take ${arg}. It takes the runs to forget, then --delete-branches, and --force-unmerged beside it: ${RM_FORM}.`,
+  },
+  check: rmRefusal,
+  writes: true,
+  route: { method: 'DELETE', path: '/api/runs/:runId', status: 200 },
+  async handler(e, args) {
+    const forgot = await forget(e, textOf(args, 'runId') ?? '', {
+      deleteBranches: args.deleteBranches === true,
+      forceUnmerged: args.forceUnmerged === true,
+    });
+    return { id: forgot.id, removed: forgot.kind === 'forgotten', forgot };
+  },
+  print: ({ forgot }) => [forgetLine(forgot)],
+  apiKeys: ['id', 'removed'],
+  apiRefusal: ({ forgot }) => {
+    if (forgot.kind === 'refused') return new Conflict({ message: forgot.refusal ?? forgetLine(forgot) });
+    if (forgot.kind === 'held') return new Conflict({ message: forgetLine(forgot) });
+    return forgot.kind === 'missing' ? new Missing({ message: forgetLine(forgot) }) : null;
+  },
+};
+
+/**
+ * `wf prune`: one run judged for what it holds that a prune frees (`prune`), and removed on `yes`; the api always prunes as `--yes` does,
+ * its route fixing `yes`. What `prune` refused, or found nothing to prune of, is a 409 on the api, in its words.
+ */
+export const PRUNE: Command<{
+  id: string;
+  pruned: boolean;
+  lines: readonly string[];
+  worktrees: Pruning['worktrees'];
+  artifacts: NonNullable<Pruning['artifacts']> | null;
+  left: Pruning['left'];
+  pruning: Pruning;
+}> = {
+  name: 'prune',
+  usage: '[<runId> ...] [--unmerged] [--artifacts] [--yes]',
+  help: [
+    'free the space runs that are over hold: their worktrees, removed',
+    "through git, and nothing else — each run's record, branches and",
+    'files are kept, and it stays on wf ls, wf decide and the board,',
+    'marked pruned. --artifacts removes its files too (runs/<id>/',
+    'artifacts/: screenshots, logs), of a run whose worktrees are',
+    'already gone as well; its record and branches are still kept.',
+    'Lists what it would remove, with its size, and removes it on',
+    '--yes, or on y at the prompt. With no run, every run. Refused',
+    'while a run is not over, owes a hand-off, is a folder run, or has',
+    'a worktree locked, on no branch, or with changes no commit has;',
+    'and a finished run not merged unless --unmerged, with --artifacts',
+    'as without: its files are what a person reads to decide it',
+  ],
+  spec: {
+    positionals: [{ key: 'runId', takes: 'many', kind: 'name' }],
+    flags: [
+      { flag: '--unmerged', kind: 'switch', key: 'unmerged' },
+      { flag: '--artifacts', kind: 'switch', key: 'artifacts' },
+      { flag: '--yes', kind: 'switch', key: 'yes' },
+    ],
+    unknown: (arg) =>
+      `wf prune does not take ${arg}. It takes the runs to prune — none is every run — then --unmerged, --artifacts and --yes: wf prune [<runId> ...] [--unmerged] [--artifacts] [--yes].`,
+  },
+  writes: true,
+  route: { method: 'POST', path: '/api/runs/:runId/prune', status: 200, sets: { yes: true } },
+  async handler(e, args) {
+    const p = await prune(e, textOf(args, 'runId') ?? '', {
+      unmerged: args.unmerged === true,
+      artifacts: args.artifacts === true,
+      yes: args.yes === true,
+    });
+    const { id, worktrees, left } = p;
+    return { id, pruned: p.kind === 'pruned', lines: pruneLines(p), worktrees, artifacts: p.artifacts ?? null, left, pruning: p };
+  },
+  print: ({ pruning }) => pruneLines(pruning),
+  apiKeys: ['id', 'pruned', 'lines', 'worktrees', 'artifacts', 'left'],
+  apiRefusal: ({ pruning }) => {
+    if (pruning.kind === 'refused') return new Conflict({ message: pruning.refusal ?? pruneLines(pruning).join('\n') });
+    return pruning.kind === 'nothing' ? new Conflict({ message: `Nothing to prune: ${pruning.nothing}.` }) : null;
+  },
+};
+
 /** `wf cordon`'s form, as each of its refusals ends on it. */
 const CORDON_SHAPE = 'wf cordon [--why "<words>"] [--by <name>]';
 
@@ -259,7 +382,8 @@ const TICK: Ran = {
   usage: '[--stats]',
   help: [
     'one pass: tick the engine, file what became ready — refused while a',
-    'wf up ticks the store, since it runs the same pass (daemon.json);',
+    'daemon (the api, or a wf up) ticks the store, since it runs the same',
+    'pass (daemon.json);',
     '--stats says after it what the pass cost, phase by phase',
   ],
   spec: {
@@ -268,7 +392,7 @@ const TICK: Ran = {
     unknown: (arg) => `wf tick takes no ${arg}: wf tick runs one pass, and wf tick --stats says after it what the pass cost.`,
   },
   writes: true,
-  only: { side: 'cli', why: 'a pass is run where the store is, by a person or by wf up; the api runs none' },
+  only: { side: 'cli', why: 'a pass is run where the store is, by a person or by a daemon; the api serves none on a route' },
 };
 
 /** Refused of `wf up`'s arguments: an interval beside `--stats`, which ticks nothing, or one `everyOf` refuses. */
@@ -286,15 +410,18 @@ const UP: Ran = {
   name: 'up',
   usage: '[ms]',
   help: [
-    'the same, on a timer (4000 unless given; whole ms, 1 to 2147483647),',
-    'holding the store: a second wf up is refused while this one ticks,',
-    'and takes the store over once its process is gone or it has been',
-    'silent for 10 intervals, at least 15 minutes; it writes',
-    'WF_ROOT/daemon.json — pid, start, last pass, and a beat each interval;',
+    'the headless daemon, where no board is served: the same pass on a',
+    'timer (4000 unless given; whole ms, 1 to 2147483647), holding the',
+    "store. The api's process (npm start in apps/api) is the daemon where",
+    'one is: one store takes one, and each is refused while the other',
+    "ticks. It takes the store over once its holder's process is gone or",
+    'it has been silent for 10 intervals, at least 15 minutes; it writes',
+    'WF_ROOT/daemon.json — who holds it, pid, start, last pass, and a beat',
+    'each interval;',
     'once a minute, a line of what its passes cost (tick-stats.json); the',
     "store's cordon once it is put, and again once it is lifted.",
     'wf up --stats: what the last pass cost, phase by phase — read, not',
-    'run, so it fits while a wf up holds the store; where none does,',
+    'run, so it fits while a daemon holds the store; where none does,',
     'wf tick --stats',
   ],
   spec: {

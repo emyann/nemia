@@ -1,5 +1,5 @@
 import type { Page } from 'playwright';
-import { cancelledAt, PLACES, sidebar } from '../board.ts';
+import { cancelledAt, SECTIONS, sectionsOf, sidebar } from '../board.ts';
 import { expectBeneath, expectCount, expectVisible, Refused, WAIT_MS } from '../checks.ts';
 import { COSTLY, DIAMOND, ENDING, FAKE, GATED, LOOPING, SHIPPED, UNMERGED } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -9,12 +9,12 @@ import type { PageSpec } from '../visit.ts';
  * a click. The browser clicks a link on Enter's keydown, and React Aria lets that click through: only the root's `RouterProvider` keeps it
  * from loading the whole page. Nothing else in the e2e presses a link from the keyboard.
  */
-async function enterOnPlace(page: Page, place: (typeof PLACES)[number], route: string): Promise<void> {
+async function enterOnPlace(page: Page, place: (typeof SECTIONS)[number], route: string): Promise<void> {
   const before = await page.evaluate(() => {
     (window as unknown as { e2eNotReloaded?: true }).e2eNotReloaded = true;
     return history.length;
   });
-  await page.locator('[data-sidebar="content"] [data-sidebar="menu-button"]', { hasText: place }).focus();
+  await sectionsOf(page).filter({ hasText: place }).focus();
   await page.keyboard.press('Enter');
   await page.waitForURL((url) => url.pathname === route, { timeout: WAIT_MS });
   const [kept, after] = await page.evaluate(

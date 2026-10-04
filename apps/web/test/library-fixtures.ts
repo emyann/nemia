@@ -147,7 +147,14 @@ export const workflow = (extra: Partial<WorkflowListing> = {}): WorkflowListing 
   dir: '/store/workflows/build',
   description: 'An intent to main.',
   steps: [
-    { name: 'ship', spec: stepSpec(), body: 'Land it.', own: { keys: ['workspace', 'slot', 'gate'], body: 'Land it.' }, hired: null },
+    {
+      name: 'ship',
+      spec: stepSpec(),
+      body: 'Land it.',
+      own: { keys: ['workspace', 'slot', 'gate'], body: 'Land it.' },
+      hired: null,
+      layers: null,
+    },
   ],
   graph: { roots: ['ship'], edges: [{ from: 'review', to: 'ship', kind: 'after' }] },
   schemas: ['ship.schema.json'],
@@ -183,6 +190,7 @@ export const keyForm = (extra: Partial<KeyForm> = {}): KeyForm => ({
   ],
   defaultHarness: 'claude',
   roleKeys: ['harness', 'model', 'output'],
+  policyKeys: ['tools', 'allowedTools', 'disallowedTools', 'permissionMode', 'sandbox', 'skills'],
   agents: { otto: { harness: 'claude', gate: true, tools: ['Read'] }, bare: {} },
   remote: { prefix: 'a2a:', refuses: ['tools', 'workspace'] },
   ...extra,

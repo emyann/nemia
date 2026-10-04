@@ -1,6 +1,6 @@
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { photograph, themeOf } from '../board.ts';
+import { photograph, startOf, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled } from '../checks.ts';
 import { FACTORIES } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -38,14 +38,11 @@ async function visit(page: Page, to: string): Promise<void> {
   await idle(page);
 }
 
-/** The header's Start a run, which opens the bar. */
-const opener = (page: Page) => page.locator('header').getByRole('button', { name: 'Start a run' });
-
-/** Presses the header's Start a run and waits for the bar it opens. */
-async function openFromHeader(page: Page): Promise<Locator> {
-  await opener(page).click();
+/** Presses the sidebar's Start a run and waits for the bar it opens. */
+async function openFromSidebar(page: Page): Promise<Locator> {
+  await startOf(page).click();
   const bar = barOf(page);
-  await expectVisible(bar, "the header's Start a run opens the floating bar");
+  await expectVisible(bar, "the sidebar's Start a run opens the floating bar");
   return bar;
 }
 
@@ -57,11 +54,11 @@ async function expectClosed(page: Page, pathname: string, assertion: string): Pr
     throw new Refused(`${assertion}: the address keeps ${pathname} and loses bar — it is ${url.pathname}${url.search}`);
 }
 
-/** Refuses unless the focus is back on the header's Start a run, which opened the bar. */
+/** Refuses unless the focus is back on the sidebar's Start a run, which opened the bar. */
 async function expectFocusBack(page: Page, assertion: string): Promise<void> {
-  if (!(await opener(page).evaluate((el) => el === document.activeElement))) {
+  if (!(await startOf(page).evaluate((el) => el === document.activeElement))) {
     const now = await page.evaluate(() => document.activeElement?.outerHTML.slice(0, 120) ?? 'nothing');
-    throw new Refused(`${assertion}: the header's Start a run holds the focus — ${now} does`);
+    throw new Refused(`${assertion}: the sidebar's Start a run holds the focus — ${now} does`);
   }
 }
 
@@ -69,7 +66,7 @@ async function expectFocusBack(page: Page, assertion: string): Promise<void> {
 async function floats(page: Page): Promise<void> {
   const main = page.locator('main');
   const before = (await boxOf(main, 'the page')).width;
-  const bar = await openFromHeader(page);
+  const bar = await openFromSidebar(page);
   if (barInUrl(page) !== OPEN) throw new Refused(`the address names the bar as bar=${OPEN} — it is ${page.url()}`);
   const after = (await boxOf(main, 'the page')).width;
   if (Math.abs(after - before) > 1) throw new Refused(`the page keeps its width under the bar — ${before} became ${after}`);
@@ -98,22 +95,22 @@ async function inTheAddress(page: Page): Promise<void> {
 
 /**
  * Escape closes the bar, from inside it and from the page, in place of the history entry; so does its Close button; both give the focus
- * back to the header's Start a run.
+ * back to the sidebar's Start a run.
  */
 async function closes(page: Page): Promise<void> {
   await visit(page, FLOOR);
-  let bar = await openFromHeader(page);
+  let bar = await openFromSidebar(page);
   if (!(await bar.evaluate((el) => el.contains(document.activeElement)))) throw new Refused('the bar takes the focus as it opens');
   await page.keyboard.press('Escape');
   await expectClosed(page, FLOOR, 'Escape inside the bar closes it');
   await expectFocusBack(page, 'Escape gives the focus back');
   await page.goBack({ waitUntil: 'load' });
   await expectClosed(page, FLOOR, 'and replaces its entry: Back after closing it does not open it again');
-  await openFromHeader(page);
+  await openFromSidebar(page);
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await page.keyboard.press('Escape');
   await expectClosed(page, FLOOR, 'Escape with the focus on the page closes the bar');
-  bar = await openFromHeader(page);
+  bar = await openFromSidebar(page);
   await bar.getByRole('button', { name: 'Close' }).click();
   await expectClosed(page, FLOOR, 'its Close button closes the bar');
   await expectFocusBack(page, 'its Close button gives the focus back');
@@ -141,7 +138,7 @@ async function pageField(page: Page): Promise<void> {
 /** The bar's width: dragged, moved with the keys, the same on another page and after a reload. */
 async function resizes(page: Page): Promise<void> {
   await visit(page, FLOOR);
-  const bar = await openFromHeader(page);
+  const bar = await openFromSidebar(page);
   const edge = bar.getByRole('separator', { name: 'Resize the bar' });
   const most = Number(await edge.getAttribute('aria-valuemax'));
   const room = await page.evaluate(() => window.innerWidth - 96);
@@ -199,7 +196,7 @@ async function onPhone(page: Page): Promise<void> {
 
 export default {
   /**
-   * The frame's floating bar, opened by the header's Start a run on a factory's floor: it floats over the page below the header, and the
+   * The frame's floating bar, opened by the sidebar's Start a run on a factory's floor: it floats over the page below the header, and the
    * page keeps its width. The address holds it, `?bar=start:<factory>`, the same on every page: a reload keeps it, Back closes it, and a
    * link to another page closes it. Escape and its Close button close it, Escape in place of its history entry, and give the focus back
    * to what opened it; a menu that takes Escape keeps it, and Escape in a field of the page that holds text leaves the field, not for the

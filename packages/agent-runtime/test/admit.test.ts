@@ -1,7 +1,7 @@
 /**
- * Queued and admitted: a task filed `queued` starts only once the layer above says so, and the pass that
- * starts it is the one after the word. The runtime keeps the wait and the word; which task gets the word, and when, is
- * the orchestrator's (`agent-orchestrator/src/cap/cap.ts`).
+ * Queued and admitted: a task filed `queued` starts only once it is given the word, and the pass that starts it is the
+ * one after the word. Here the word is `admit`'s, on an engine with no ceiling; the engine's own, under its ceiling and
+ * pools, is `admission.test.ts`'s.
  *
  * Each refusal here is made to refuse at shipped defaults, and the counting test proves the word costs no look at any
  * harness: a tick observes each harness once, whatever it hands back, and `admit` observes none.

@@ -1,12 +1,11 @@
 /**
- * The verbs' table, the runners of the commands the CLI runs itself — `wf tick`, `wf up` and `wf watch` (`RUNS`) — `wf feed`, and
- * `runMain`, which runs a command that lives as long as its process.
+ * The verbs' table, the runners of the commands the CLI runs itself — `wf tick`, `wf up`, `wf watch`, `wf rm` and `wf prune` (`RUNS`) —
+ * and `wf feed`.
  */
 import path from 'node:path';
-import { Cause, Effect, Exit, Fiber } from 'effect';
+import { Effect } from 'effect';
 import {
   addPass,
-  beat,
   breakdownLines,
   ceilingLines,
   ceilings,
@@ -20,23 +19,21 @@ import {
   feedLineWords,
   HOME,
   lastPassCost,
-  passed,
   queueLine,
   readFeed,
   refusalLines,
-  releaseStore,
   slotWord,
-  stillHeld,
   storeRefusal,
   summaryDue,
   summaryLine,
-  takeStore,
-  takenFromLine,
   takeoverLine,
+  runMain,
   tick,
+  up,
   waitWord,
   watchFeed,
   type Interval,
+  type TakenStore,
   cursorTakes,
   parseArgv,
   TABLE,
@@ -50,45 +47,6 @@ import { statsVerb } from './stats/stats.ts';
 import { factoryVerb } from './factory/factory.ts';
 import { agentsCustom, logsVerb, pruneVerb, rmVerb, showVerb } from './runs.ts';
 import { inboxVerb, planVerb, startVerb } from './start.ts';
-
-/**
- * The signals that stop a command, each with the code the process exits with once the command has let go of what it held: 128 + its number.
- */
-const SIGNALS = [
-  ['SIGINT', 130],
-  ['SIGTERM', 143],
-  ['SIGHUP', 129],
-] as const;
-
-/**
- * Runs `program` as the process's command. SIGINT, SIGTERM and SIGHUP interrupt it, and once its finalizers have run the process exits 130,
- * 143 or 129, by the signal that came. Otherwise the promise resolves with its value, or rejects with what it failed or died with, that
- * very value, so a refusal's `exitCode` reaches `bin/wf.ts`. The handlers are its own, taken off as it ends: a second signal while the
- * finalizers run is Node's to handle.
- *
- * Not the `runMain` of `@effect/platform-node`'s NodeRuntime: its teardown exits 130 on any interruption, whatever signal came, it
- * handles no SIGHUP, and it hands no failure back to the caller.
- */
-export function runMain<A, E>(program: Effect.Effect<A, E>): Promise<A> {
-  return new Promise<A>((resolve, reject) => {
-    const fiber = Effect.runFork(program);
-    let stoppedWith: number | undefined;
-    const stops = SIGNALS.map(([signal, code]) => {
-      const stop = () => {
-        stoppedWith = code;
-        Effect.runFork(Fiber.interrupt(fiber));
-      };
-      process.once(signal, stop);
-      return [signal, stop] as const;
-    });
-    fiber.addObserver((exit) => {
-      for (const [signal, stop] of stops) process.off(signal, stop);
-      if (stoppedWith !== undefined) process.exit(stoppedWith);
-      if (Exit.isSuccess(exit)) resolve(exit.value);
-      else reject(Cause.squash(exit.cause));
-    });
-  });
-}
 
 /**
  * The cursor `wf feed` reads from: 0 when none is given, a whole number of bytes otherwise, and nothing more; `wf watch`'s entry says the
@@ -176,13 +134,13 @@ function upStats(): void {
   const daemon = storeRefusal('tick') !== undefined;
   if (!cost)
     return console.log(
-      `no pass has written what it cost to ${path.join(HOME, 'tick-stats.json')} yet — ${daemon ? 'the wf up that holds this store writes it after its next pass' : 'no wf up holds this store: run wf tick --stats, or start wf up'}`,
+      `no pass has written what it cost to ${path.join(HOME, 'tick-stats.json')} yet — ${daemon ? 'the daemon that holds this store writes it after its next pass' : 'no daemon holds this store: run wf tick --stats, or start one (npm start in apps/api, or wf up)'}`,
     );
   for (const line of breakdownLines(cost)) console.log(line);
   return console.log(
     daemon
-      ? 'written by the wf up that holds this store, after its last pass'
-      : 'no wf up holds this store now, so this was the last pass anyone ran: wf tick --stats runs one and says what it cost',
+      ? 'written by the daemon that holds this store, after its last pass'
+      : 'no daemon holds this store now, so this was the last pass anyone ran: wf tick --stats runs one and says what it cost',
   );
 }
 
@@ -246,11 +204,9 @@ function passLines(pass: Pass, was: UpSaid): UpSaid {
 }
 
 /**
- * `wf up`: a pass every interval until it is stopped, or `--stats`. It refuses its interval (`everyOf`) and its ceilings (`ceilings`)
- * before it takes the store. It runs as an Effect (`runMain`): the store is taken in its scope and let go as the scope closes, however it
- * ends, so a signal that stops it leaves the store free at once. It beats on a fiber forked in that scope, so a long pass is not taken for
- * stalled and taken over mid-pass; it stops at the first pass that finds the store taken over (`stillHeld`). It says each failure once
- * while it lasts (`UpSaid`). A queued card that names no repository starts on the one it is typed in, as `wf start` takes `.`.
+ * `wf up`: the headless daemon, a pass every interval until it is stopped, or `--stats`. It refuses its interval (`everyOf`) and its
+ * ceilings (`ceilings`) before it takes the store, then runs the daemon's controller (`up`) as `wf up` under `runMain`, saying each
+ * failure once while it lasts (`UpSaid`). A queued card that names no repository starts on the one it is typed in, as `wf start` takes `.`.
  */
 function upVerb(args: Args, e: Engine): void | Promise<void> {
   if (args.stats === true) return upStats();
@@ -258,41 +214,28 @@ function upVerb(args: Args, e: Engine): void | Promise<void> {
   const every = 'refusal' in asked ? usage(asked.refusal) : asked.every;
   const ceiling = ceilings();
   const store = HOME;
-  return runMain(
-    Effect.gen(function* () {
-      const { held, replaced } = yield* Effect.acquireRelease(
-        Effect.try({ try: () => takeStore({ every, cwd: path.resolve('.') }), catch: (err) => err }),
-        ({ held }) => Effect.sync(() => releaseStore(held)),
-      );
+  let was: UpSaid = {
+    said: undefined,
+    cordonSaid: undefined,
+    feedSaid: undefined,
+    refusedSaid: new Set(),
+    unreadableSaid: new Set(),
+    interval: undefined,
+  };
+  const onTaken = ({ held, replaced }: TakenStore) =>
+    Effect.sync(() => {
       console.log(`up — every ${every}ms, ^C to stop`);
       for (const line of ceilingLines(ceiling)) console.log(`   ${line}`);
       console.log(
-        `   holds ${store} as pid ${held.pid} — a second wf up, or a wf tick, on this store is refused while it ticks (daemon.json)`,
+        `   holds ${store} as pid ${held.pid} — a second daemon, the api or a wf up, or a wf tick, on this store is refused while it ticks (daemon.json)`,
       );
       const took = takeoverLine(replaced, store, Date.now());
       if (took) console.log(`   ${took}`);
-      yield* Effect.forkScoped(Effect.forever(Effect.sleep(every).pipe(Effect.andThen(Effect.sync(() => beat(held))))));
-      let was: UpSaid = {
-        said: undefined,
-        cordonSaid: undefined,
-        feedSaid: undefined,
-        refusedSaid: new Set(),
-        unreadableSaid: new Set(),
-        interval: undefined,
-      };
-      for (;;) {
-        const by = stillHeld(held);
-        if (by) return yield* Effect.fail(new Error(takenFromLine(by, store)));
-        const pass = yield* Effect.tryPromise({
-          try: () => tick(e, { repo: path.resolve('.') }),
-          catch: (err) => err,
-        });
-        passed(held);
-        was = passLines(pass, was);
-        yield* Effect.sleep(every);
-      }
-    }).pipe(Effect.scoped),
-  );
+    });
+  const onPass = (pass: Pass) => {
+    was = passLines(pass, was);
+  };
+  return runMain(up(e, { every, repo: path.resolve('.'), holder: 'wf up', onTaken, onPass }).pipe(Effect.scoped));
 }
 
 /** `wf feed`: the store's cordon while one stands, first, then the feed's lines from a cursor, and the cursor to read from next. */
@@ -319,8 +262,6 @@ export const VERBS: ReadonlyMap<string, Verb> = new Map<string, Verb>([
   ['inbox', inboxVerb],
   ['factory', factoryVerb],
   ['feed', feedVerb],
-  ['rm', rmVerb],
-  ['prune', pruneVerb],
   ['decide', decideVerb],
   ['stats', statsVerb],
   ['show', showVerb],
@@ -328,24 +269,30 @@ export const VERBS: ReadonlyMap<string, Verb> = new Map<string, Verb>([
   ['agents custom', agentsCustom],
 ]);
 
-/** The runner of each command the CLI runs itself (`RAN`), by its name: handed its arguments once read and checked. */
+/**
+ * The runner of each command the CLI runs itself, by its name — those it serves alone (`RAN`), and `wf rm` and `wf prune`, whose runners
+ * walk the many runs a command line names through their handlers: handed its arguments once read and checked.
+ */
 export const RUNS: ReadonlyMap<string, (args: Args, e: Engine) => void | Promise<void>> = new Map([
   ['tick', tickVerb],
   ['up', upVerb],
   ['watch', watchVerb],
+  ['rm', rmVerb],
+  ['prune', pruneVerb],
 ]);
 
 /**
  * A command of the table (`TABLE`), run from the command line: its arguments read against its spec — the help printed for too little —
- * then refused by its `check`, and handed to its runner (`RUNS`) where the CLI runs it itself; else to its handler, and the lines it prints
- * of the answer printed.
+ * then refused by its `check`, and handed to its runner (`RUNS`) where it has one; else to its handler, and the lines it prints of the
+ * answer printed.
  */
 async function commanded(command: Command | Ran, rest: string[], e: Engine): Promise<void> {
   const args = parseArgv(command.spec, rest);
   if (args === undefined) return console.log(HELP);
   const wrong = command.check?.(args);
   if (wrong) usage(wrong);
-  if (command.handler === undefined) return RUNS.get(command.name)!(args, e);
+  const runner = RUNS.get(command.name);
+  if (runner || command.handler === undefined) return runner!(args, e);
   const data = await command.handler(e, args);
   for (const line of command.print(data, args)) console.log(line);
   for (const line of command.note?.(data, args) ?? []) console.error(line);

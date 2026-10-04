@@ -5,7 +5,8 @@
  *  2. Seeds a store in a temporary WF_ROOT with six fake runs, the first with a real repository and branch to decide
  *     on, and beside it a checkout for the api to serve (`HKB_REPO`) on the Capabilities page, and workflows in both for
  *     the Workflows page (seed.ts).
- *  3. Starts the api on a free port (`PORT=0`, reading the port it prints) and `vite preview` on another,
+ *  3. Starts the api on a free port (`PORT=0`, reading the port it prints), ticking nothing (`--no-tick`: the pages seed the store's
+ *     daemon themselves), and `vite preview` on another,
  *     proxying `/api` to it (`HKB_API_URL`, vite.config.ts): the same two processes and the same proxy
  *     as `npm run dev`, never on :8787 or :5173, so it runs beside a person's dev servers and beside
  *     another worktree's e2e.
@@ -227,7 +228,7 @@ async function main(): Promise<void> {
   });
   const apiPort = await startServer(
     'the api',
-    [path.join(API, 'src', 'main.ts')],
+    [path.join(API, 'src', 'main.ts'), '--no-tick'],
     API,
     apiEnv,
     /api listening on http:\/\/127\.0\.0\.1:(\d+)/,

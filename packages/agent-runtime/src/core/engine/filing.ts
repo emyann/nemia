@@ -26,6 +26,8 @@ export type Filing = {
   queued?: boolean;
   /** Long-lived: the session stays open while idle, and only a stop ends it. See the `filed` event. */
   restartPolicy?: 'Always';
+  /** Which waiting task a free slot goes to first, higher first: a whole number in int32. See the `filed` event. */
+  priority?: number;
 };
 
 /** A task `file` would not journal, and why, in the sentence `refusalOf` gives. Nothing was written. */
@@ -51,15 +53,21 @@ export const RETIRED_INSTEAD =
 export const retiredKeyRefusal = (key: keyof typeof RETIRED_KEYS) => `\`${key}\` is retired: ${RETIRED_KEYS[key]}. ${RETIRED_INSTEAD}`;
 
 /**
- * What to do instead of a ceiling, pools or a priority, none of which the runtime keeps: the layer above chooses what starts,
- * and when. Shared by every refusal of them — `priority` here, the pass's arguments, `Engine.layer`'s `maxConcurrent` and a
- * harness's `pool` (`facade/consumer.ts`), and `AE_MAX_CONCURRENT` (`cli/main.ts`).
+ * Where a ceiling and its pools go: the engine's own options, given to `Engine.layer` by the program that hosts it. Shared by every
+ * refusal of a ceiling given anywhere else — the pass's arguments, and `AE_MAX_CONCURRENT` (`cli/main.ts`).
  */
-export const ADMIT_INSTEAD =
-  'File tasks `queued: true` and `admit` each when it may start (`ae admit <id>`); in a workflow the orchestrator admits by pool under `WF_MAX_CONCURRENT`.';
+export const CEILING_INSTEAD =
+  "A ceiling is the engine's: give `Engine.layer` a `maxConcurrent`, and a harness a `pool` to share one with another; with none, file tasks `queued: true` and `admit` each when it may start (`ae admit <id>`).";
 
-/** Why a task filed with `priority`, at any value, is refused: the runtime chooses no order since it keeps no slots. */
-export const PRIORITY_RETIRED = `\`priority\` is retired: the runtime starts a task on its next pass once it is admitted, so it chooses no order. ${ADMIT_INSTEAD}`;
+/** The largest priority a task takes: a Pod's priority is an int32. */
+const PRIORITY_MOST = 2 ** 31 - 1;
+
+/** Why a task's `priority` cannot be carried, or `undefined`: anything but a whole number in int32. */
+const priorityRefusalOf = (priority: unknown): string | undefined =>
+  priority === undefined ||
+  (typeof priority === 'number' && Number.isInteger(priority) && priority >= -PRIORITY_MOST - 1 && priority <= PRIORITY_MOST)
+    ? undefined
+    : `\`priority: ${typeof priority === 'number' ? priority : JSON.stringify(priority)}\` is not a priority. Give a whole number from ${-PRIORITY_MOST - 1} to ${PRIORITY_MOST}, higher first, or leave it out for 0.`;
 
 /**
  * Why a task cannot be filed, as a sentence that says what to write instead — or `undefined`: the half of it that is the
@@ -68,10 +76,10 @@ export const PRIORITY_RETIRED = `\`priority\` is retired: the runtime starts a t
  * 1. an empty `brief`, or an empty `cwd`;
  * 2. a `cwd` that is not absolute: it would resolve against whichever process ticks the task, which need not be the one
  *    filing it;
- * 3. a retired key (`RETIRED_KEYS`), then `priority`, each present at any value: asked of the spec as handed in, untyped,
- *    since a caller built from JSON or against an older `TaskSpec` still sends them;
- * 4. a `deadlineSeconds` that is not seconds above 0, an empty `resumeFrom`, a `holdOpen` that is not `true`, and a `queued`
- *    that is not a boolean;
+ * 3. a retired key (`RETIRED_KEYS`), present at any value: asked of the spec as handed in, untyped, since a caller built
+ *    from JSON or against an older `TaskSpec` still sends them;
+ * 4. a `deadlineSeconds` that is not seconds above 0, an empty `resumeFrom`, a `holdOpen` that is not `true`, a `queued`
+ *    that is not a boolean, and a `priority` that is not a whole number in int32;
  * 5. what a long-lived task cannot honour (`restartRefusalOf`).
  *
  * Checked by `file` itself, so neither door journals what the loop cannot use. A journalled task is a promise the loop
@@ -88,7 +96,6 @@ export const refusalOf = (spec: Filing): string | undefined => {
     return `\`cwd: ${spec.cwd}\` is not an absolute path, and the process that runs the task need not be the one filing it. Give the directory resolved — from here that is ${path.resolve(spec.cwd)}.`;
   }
   for (const key of Object.keys(RETIRED_KEYS) as (keyof typeof RETIRED_KEYS)[]) if (Object.hasOwn(spec, key)) return retiredKeyRefusal(key);
-  if (Object.hasOwn(spec, 'priority')) return PRIORITY_RETIRED;
   if (spec.deadlineSeconds !== undefined && !(Number.isFinite(spec.deadlineSeconds) && spec.deadlineSeconds > 0)) {
     return `\`deadlineSeconds: ${spec.deadlineSeconds}\` is not a number of seconds. Give seconds above 0, or leave it out for no deadline.`;
   }
@@ -99,7 +106,7 @@ export const refusalOf = (spec: Filing): string | undefined => {
   if (spec.queued !== undefined && typeof spec.queued !== 'boolean') {
     return `\`queued: ${JSON.stringify(spec.queued)}\` is not a yes or a no. Give true to have the task wait for \`admit\` before it starts, or leave it out to start it on the next pass.`;
   }
-  return restartRefusalOf(spec);
+  return priorityRefusalOf(spec.priority) ?? restartRefusalOf(spec);
 };
 
 /**
@@ -151,6 +158,7 @@ export const file = Effect.fn('file')(function* (spec: Filing) {
     closeoutSchema: spec.closeoutSchema,
     holdOpen: spec.holdOpen,
     queued: spec.queued === true,
+    ...(spec.priority !== undefined && spec.priority !== 0 ? { priority: spec.priority } : {}),
     ...(spec.restartPolicy === 'Always' ? { restartPolicy: 'Always' as const } : {}),
   });
   return id;
@@ -171,7 +179,7 @@ export const admitRefusalOf = (taskId: string, state: State | undefined): string
 
 /**
  * The layer above's word that queued tasks may start: journals `admitted` for each whose current turn waits for
- * it (`awaitsAdmission`), and returns those ids. The next pass starts them, under its own ceiling. Reads each task's
+ * it (`awaitsAdmission`), and returns those ids. The next pass starts them, whatever the engine's ceiling. Reads each task's
  * record and nothing else — no harness is asked — so it is a message, and can cross a seam. Idempotent: a task already
  * admitted, not filed queued, or whose turn has started is left as it is. Refused, and nothing written for any of them,
  * when one is not on the board or has settled.

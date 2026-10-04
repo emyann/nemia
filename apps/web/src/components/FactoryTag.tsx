@@ -1,10 +1,8 @@
-/** The factory tags a row or a card shows, and the filter by factory over the Runs and Inbox pages. */
+/** The factory tags a row or a card shows. */
 import { Factory } from 'lucide-react';
-import { useId } from 'react';
-import { DEFAULT_NAME, factoryCounts } from '@/lib/factories';
+import { DEFAULT_NAME } from '@/lib/factories';
 import { cn } from '@/lib/utils';
 import { RouteLink } from './AgentParts';
-import { FIELD } from './WorkflowOptions';
 
 const TAG = 'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] leading-none font-medium whitespace-nowrap';
 const NAMED = 'border-sky-200 bg-sky-50 text-sky-900 dark:border-sky-900 dark:bg-sky-950/60 dark:text-sky-200';
@@ -62,45 +60,5 @@ export function FactoryTags({ names, linked = false, className }: { names: reado
         <FactoryTag key={name} name={name} linked={linked} />
       ))}
     </span>
-  );
-}
-
-/**
- * The filter by factory over a page's runs or cards: `All factories (n)`, then each factory they name with how many (`factoryCounts`), the
- * default first. `factory` is the one kept, none for all; a factory none of them names any more stays offered, at 0, until it is cleared.
- * Nothing while they name one factory and none is kept: there is nothing to choose.
- */
-export function FactoryFilter({
-  items,
-  factory,
-  onChange,
-}: {
-  items: readonly { factory: string | null }[];
-  factory: string | undefined;
-  onChange: (factory: string | undefined) => void;
-}) {
-  const id = useId();
-  const counts = factoryCounts(items);
-  if (counts.length < 2 && factory === undefined) return null;
-  const offered = factory === undefined || counts.some((c) => c.name === factory) ? counts : [...counts, { name: factory, count: 0 }];
-  return (
-    <div data-factory-filter className="flex items-center gap-2">
-      <label htmlFor={id} className="text-sm font-medium">
-        Factory
-      </label>
-      <select
-        id={id}
-        value={factory ?? ''}
-        onChange={(event) => onChange(event.target.value || undefined)}
-        className={cn(FIELD, 'w-auto min-w-40')}
-      >
-        <option value="">All factories ({items.length})</option>
-        {offered.map(({ name, count }) => (
-          <option key={name} value={name}>
-            {name} ({count})
-          </option>
-        ))}
-      </select>
-    </div>
   );
 }

@@ -219,6 +219,9 @@ export const ceilings = (extra: Partial<Ceilings> = {}): Ceilings => ({
 /** A daemon that ticks the store. */
 export const daemon = (extra: Partial<Daemon> = {}): Daemon => ({
   kind: 'ticking',
+  by: 'api',
+  url: 'http://127.0.0.1:8787',
+  start: 'npm start in apps/api',
   ticking: true,
   pid: 4242,
   cwd: '/work/repo',

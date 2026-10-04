@@ -8,13 +8,13 @@ import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { Data, Effect } from 'effect';
 import { EngineService, awaited, refusedText, tried, unreadableJournal, type Engine, type RefusedMove } from '../runtime-client.ts';
-import type { Workflow } from '../workflow.ts';
 import type { QueueStarted } from '../inbox/inbox.ts';
 import { tipsSeen } from '../branches/branches.ts';
 import { admissionOrder, slotFree, type RunSlot } from '../cap/cap.ts';
+import { readCordon } from '../cordon/cordon.store.ts';
+import type { Cordon } from '../cordon/cordon.ts';
 import { isGitRun, type Run } from '../record/record.ts';
 import { hasStarted } from '../wait/wait.ts';
-import { stepsOf } from '../record/record.store.ts';
 import { runStore } from '../record/files.store.ts';
 import { ceilings, recordCeilings, recordPassCost } from '../daemon/daemon.store.ts';
 import { verifiesRest } from '../config/config.store.ts';
@@ -23,9 +23,6 @@ import { headsOf } from '../branches/branches.store.ts';
 import { followedFeed } from '../rest/rest.verb.ts';
 import { reportedEngine } from '../views/views.verb.ts';
 import { startQueued } from '../inbox/inbox.verb.ts';
-import { readCordon } from '../cordon/cordon.store.ts';
-import type { Cordon } from '../cordon/cordon.ts';
-import { momentumOf, toAdmit } from '../cap/cap.ts';
 import { countRested, meteredPass, within } from '../meter/tally.store.ts';
 import type { PassCost } from '../meter/meter.ts';
 import { advanceRun, type Advanced } from './advance.verb.ts';
@@ -97,9 +94,9 @@ type PassOptions = { repo: string; memo: RestMemo; verify: boolean };
  * Every run, advanced once, after one engine tick — then, with a run slot free, the queue's next card started. This is the whole daemon: an
  * Effect program that requires the engine as a service (`EngineService`), whose plain face is `tick`.
  *
- * First, what the engine's tick saw waiting is admitted per pool under `WF_MAX_CONCURRENT` (`toAdmit`), off the views its pass built from
- * its one observation of each harness; the engine starts it on its next pass. So a task filed on this pass is admitted on the next and
- * started on the one after, and a slot freed is taken a pass after it is freed.
+ * First, the engine's own tick, which admits what waits per pool under the ceiling `engine()` gave it (`WF_MAX_CONCURRENT`), the filed
+ * `priority` first, and starts it on its next pass. So a task filed on this pass is admitted on the next and started on the one after,
+ * and a slot freed is taken a pass after it is freed.
  *
  * Every run that has started first, which the cap on runs in flight (`WF_MAX_RUNS`) never holds: what each has in flight once its pass is
  * done is what the cap counts. Then each run with nothing filed, oldest first (`admissionOrder`), judged against the runs in flight so far
@@ -155,8 +152,7 @@ export const tick = (e: Engine, options: { repo?: string; memo?: RestMemo; verif
  * - the runs are listed, each run the memo holds whose stamp has not moved answered with the memo's run, its record not read (`keptOf`):
  *   the one listing of the pass, handed to every run judged for the claims on a repository's checkout, and to the queue.
  * - the ceilings the pass runs with are written (`recordCeilings`), for `wf ls` and `wf decide`, which judge the cap from a shell of their
- *   own.
- * - queued tasks are admitted off the views the runtime's pass reported (`admitted`), unless the store is cordoned (`readCordon`).
+ *   own; the runtime's pass admitted no queued task while the store was cordoned (`engine()`'s `unschedulable`).
  * - every run that has started is judged, finished ones included (`advanceResting`); then each run with nothing filed, oldest first, with
  *   its slot (`waitingJudged`); then one queued card, while a slot is free and the store is not cordoned, read again.
  * - last, and apart, the feed is written where it changed: a feed that cannot be written costs the report (`feedError`), never the pass.
@@ -173,7 +169,6 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }
   const runs = yield* tried(() => runStore.runs.list(undefined, resting && keptOf(resting)));
   if (resting) forgotten(memo, runs);
   const cordon = yield* tried(() => readCordon());
-  if (!cordon) yield* admitted(e, report, runs, ran.sessions);
   const judging: Judging = { done: new Map(), unjudged: new Map() };
   for (const run of runs.filter(hasStarted)) yield* judged(e, judging, runs, run, resting);
   const counted = yield* waitingJudged(e, judging, runs, resting, ran.runs);
@@ -195,15 +190,6 @@ const forgotten = (memo: RestMemo, runs: readonly Run[]): void => {
   const listed = new Set(runs.map((r) => r.id));
   for (const id of memo.runs.keys()) if (!listed.has(id)) memo.runs.delete(id);
 };
-
-/**
- * Queued tasks admitted off the views the runtime's pass reported (`toAdmit`), never off a read of `e.list()` or `e.view`, which would ask
- * each harness again; with nothing to admit the engine is not called, since a call costs two reads of its totals.
- */
-const admitted = Effect.fn('admitted')(function* (e: Engine, { views }: TickReport, runs: readonly Run[], ceiling: number) {
-  const admitting = toAdmit({ views, momentum: momentumOf(runsWithSteps(runs)), ceiling });
-  if (admitting.length) yield* awaited(() => e.admit(admitting));
-});
 
 /**
  * One run of the pass's listing `runs` judged into `judging` (`advanceResting`), and what it was judged: undefined when a read of its
@@ -434,16 +420,3 @@ const verified = Effect.fn('verified')(function* (
     ),
   );
 });
-
-/** Each run with its workflow's steps, for `momentumOf`; a run whose workflow does not read names no task. */
-function* runsWithSteps(runs: readonly Run[]): Generator<{ run: Run; steps: Workflow[] }> {
-  for (const run of runs) {
-    let steps: Workflow[];
-    try {
-      steps = stepsOf(run);
-    } catch {
-      continue;
-    }
-    yield { run, steps };
-  }
-}

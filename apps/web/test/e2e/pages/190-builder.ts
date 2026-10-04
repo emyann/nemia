@@ -48,6 +48,28 @@ async function addStep(builder: Locator, name: string, body: string): Promise<vo
   await expectVisible(builder.locator(`.react-flow__node[data-id="${name}"]`), `the step added, ${name}, is a block on the canvas`);
 }
 
+/**
+ * Refuses unless `keys`, the form of a step on the agent `agent` of the crew's, is read by layer: its agent's instructions folded, your
+ * custom instructions (none), then the step's policy holding its words and the fence key its file sets, and its other keys after.
+ */
+async function expectLayers(keys: Locator, agent: string): Promise<void> {
+  const layers = ['instructions', 'custom', 'policy'];
+  const drawn = await keys.locator('[data-layer]').evaluateAll((all) => all.map((el) => el.getAttribute('data-layer')));
+  if (drawn.join() !== layers.join()) throw new Refused(`the layers are drawn ${layers.join(', ')} — they are ${drawn.join(', ')}`);
+  const instructions = keys.locator('[data-layer="instructions"]');
+  await expectCount(instructions.locator('details:not([open]) pre', { hasText: 'You write code.' }), 1, `${agent}'s words, folded`);
+  await expectVisible(keys.locator('[data-layer="custom"]', { hasText: `None. Write them on ${agent}'s page.` }), 'no custom instructions');
+  const policy = keys.locator('[data-layer="policy"]');
+  await expectVisible(policy.getByRole('textbox', { name: 'Its words' }), "the step's words are its policy");
+  await expectCount(policy.locator('[data-field="disallowedTools"]'), 1, 'and the fence key it sets');
+  await expectCount(keys.locator('[data-field="disallowedTools"]'), 1, 'drawn once: never again among the wiring keys');
+  await expectVisible(policy.getByText(`May only tighten ${agent}'s fence: a loosening is refused on save.`), 'which may only tighten');
+  await expectCount(policy.locator('[data-field="check"], [data-field="model"]'), 0, 'and no wiring key is in it');
+  await instructions.locator('summary').click();
+  await expectVisible(instructions.locator('pre', { hasText: 'You write code.' }), `opened, the fold reads ${agent}'s words`);
+  await instructions.locator('summary').click();
+}
+
 export default {
   /**
    * The builder, on the store's workflows: a workflow of yours made with a first step, a step added, an edge drawn from one block to the
@@ -246,7 +268,10 @@ export default {
       fs.writeFileSync(path.join(agentsDir, `${agent}.md`), '---\nharness: claude\nmodel: opus\neffort: high\n---\nYou write code.\n');
       fs.writeFileSync(path.join(agentsDir, `${other}.md`), '---\nmodel: sonnet\n---\nYou review code.\n');
       fs.mkdirSync(crewDir, { recursive: true });
-      fs.writeFileSync(path.join(crewDir, 'build.md'), `---\nagent: ${agent}\ncheck: npm test\n---\nMind the cache.\n`);
+      fs.writeFileSync(
+        path.join(crewDir, 'build.md'),
+        `---\nagent: ${agent}\ncheck: npm test\ndisallowedTools: Bash(rm:*)\n---\nMind the cache.\n`,
+      );
       const { problems } = watch(crewed);
       await crewed.goto(page.url(), { waitUntil: 'load' });
       await idle(crewed);
@@ -254,15 +279,16 @@ export default {
       const builder = card(crewed, crew).locator(`section[data-builder="${crew}"]`);
       const keys = builder.locator('[data-step-form="build"]');
       await expectVisible(keys, "build's form, open as the builder opens");
-      const note = keys.getByRole('textbox', { name: 'Its own note' });
-      await expectVisible(note, 'its body is its own note');
+      const note = keys.getByRole('textbox', { name: 'Its words' });
+      await expectVisible(note, 'its body is its own words');
       if ((await note.inputValue()) !== 'Mind the cache.')
         throw new Refused(`the note is the step's own words, not its agent's — it shows ${JSON.stringify(await note.inputValue())}`);
       await expectTexts(
         keys.locator('[data-agent-note]'),
-        [`Told after ${agent}'s instructions, agents/${agent}.md.`],
+        [`Told after ${agent}'s instructions; where they conflict, these words win.`],
         'and says whose instructions it is told after',
       );
+      await expectLayers(keys, agent);
       const picker = keys.locator('[data-field="agent"] select');
       const offered = await picker.locator('option').allTextContents();
       if (
@@ -290,9 +316,15 @@ export default {
       await picker.selectOption(other);
       await expectTexts(
         keys.locator('[data-agent-note]'),
-        [`Told after ${other}'s instructions, agents/${other}.md.`],
+        [`Told after ${other}'s instructions, and any custom instructions you wrote for it; where they conflict, these words win.`],
         `moved to ${other}, the note is told after ${other}'s`,
       );
+      await expectTexts(
+        keys.locator('[data-agent-layers-unread]'),
+        [`Save to read ${other}'s instructions here.`],
+        `and ${other}'s instructions are read once saved, never drawn as ${agent}'s`,
+      );
+      await expectCount(keys.locator('[data-layer="instructions"], [data-layer="custom"]'), 0, `no layer of ${agent}'s is left`);
       if ((await model.getAttribute('placeholder')) !== `sonnet — ${other}'s`)
         throw new Refused(
           `moved to ${other}, the model is ${other}'s — it reads ${JSON.stringify(await model.getAttribute('placeholder'))}`,
@@ -304,6 +336,7 @@ export default {
 
       await picker.selectOption('');
       await expectCount(keys.locator('[data-agent-note]'), 0, 'with no agent, nothing is told before its body');
+      await expectCount(keys.locator('[data-layer]'), 0, 'and it has no layers');
       await expectVisible(keys.getByRole('textbox', { name: 'What it is told' }), 'and its body is all it is told');
       await idle(crewed);
       if (problems().length) throw new Refused(`the agent's page saw nothing refused — it saw:\n    ${problems().join('\n    ')}`);

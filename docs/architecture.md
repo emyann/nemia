@@ -35,10 +35,18 @@ runtime's.
 **Above the runtime by design**: run slots, checkout holds, worktrees and landing, what a check means, budgets across tries, gates, the
 inbox, factories, stats, agent definitions.
 
+**In the runtime since platform slice 3**: session admission and pools. The runtime admits a queued task under the engine's ceiling
+and its harness's pool, the highest priority first (`agent-runtime/src/core/admission.ts`); the orchestrator hands it the ceiling
+(`WF_MAX_CONCURRENT`) and files each step's momentum as its task's priority, and keeps its run slots (`src/cap/cap.ts`, `WF_MAX_RUNS`).
+
+**The daemon and its lease** are the orchestrator's (`src/daemon/`, `up` in `src/daemon/up.verb.ts`): one store takes one daemon, which
+holds `daemon.json` (its pid, `by` and the `url` an api serves at) and ticks. The api's process is that daemon unless started with
+`--no-tick` (`apps/api/src/main.ts`), and `wf up` is it on a machine that serves no board; each refuses the other while it ticks. A board
+served by the daemon keeps its store ticking; a board served with `--no-tick` ticks nothing, and a run filed on it moves on the daemon's
+next pass. A cordon that pauses a store its daemon ticks is a verb on this lease, still to come.
+
 **In the orchestrator today, a candidate for the runtime**:
 
-- session admission and pools (`src/cap/cap.ts`, `WF_MAX_CONCURRENT`);
-- the daemon and its lease (`src/daemon/`, `upVerb` in `src/cli/main.ts`);
 - rendering agents and skills for Claude Code (`src/agents/agents.ts`, `src/agents/agents.store.ts`, `toldOf` in
   `src/tick/file.verb.ts`);
 - the rules about a harness's knobs the runtime cannot refuse (`tools:` on codex, `skills:` and `harnessPrompt:` on codex or a remote

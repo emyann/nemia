@@ -247,7 +247,7 @@ test("`ae` refuses to run with `AE_MAX_CONCURRENT` set, at any value, empty too:
       assert.equal(r.status, 2, `${args} with ${JSON.stringify(value)}: ${r.stderr}`);
       assert.match(
         r.stderr,
-        /^ae: `AE_MAX_CONCURRENT` is retired: the runtime keeps no ceiling, and starts every task it is given\. Unset it, file with `queued: true` and start each with `ae admit <id>`/,
+        /^ae: `AE_MAX_CONCURRENT` is retired: `ae` runs its engine with no ceiling, since a ceiling is the option `maxConcurrent` a program gives `Engine\.layer`\. Unset it, file with `queued: true` and start each with `ae admit <id>`/,
       );
       assert.deepEqual(fs.readdirSync(dir), [], 'nothing written');
     }

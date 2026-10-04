@@ -1,8 +1,8 @@
 /**
  * The machine split by factory, without React Flow: a block for each factory, with what it holds; the runs and the queued cards of one
- * factory; the factories the menu lists; where a factory's floor starts a run; and, for the pages that list the whole machine, the factory
- * each run or card is tagged with, the factories their filter offers and what it keeps, and the factories a workflow is in. A run or a card
- * belongs to the factory it names, and one naming none to the default factory. Pure.
+ * factory; where a factory's floor starts a run; and, for the pages that list the whole machine, the factory each run or card is tagged
+ * with, what the factory picked keeps, the factories a workflow is in and the workflows the factory picked offers. A run or a card belongs
+ * to the factory it names, and one naming none to the default factory. Pure.
  */
 import type { Factory, InboxEntry, RunSummary, WorkflowListing } from './api.ts';
 import { inFlight, repoName, waitsOnYou } from './factory.ts';
@@ -10,7 +10,7 @@ import { inFlight, repoName, waitsOnYou } from './factory.ts';
 /** What the blocks read of a run: the factory it names, and what `inFlight` and `waitsOnYou` read. */
 export type FactoryRun = Pick<RunSummary, 'factory' | 'status' | 'moving' | 'waitingOnYou' | 'cancelledAt' | 'waiting' | 'holding'>;
 
-/** A factory as the menu and a block read it: its name, and whether it is the default factory, which holds whatever names none. */
+/** A factory as a block reads it: its name, and whether it is the default factory, which holds whatever names none. */
 export type FactoryPlace = Pick<Factory, 'name' | 'default'>;
 
 /**
@@ -92,24 +92,6 @@ export const factoryBlocks = (factories: readonly Factory[], runs: readonly Fact
 export const startRepo = (factory: Pick<Factory, 'repos'>, cardRepo: string | null): string | null =>
   cardRepo ?? (factory.repos.length === 1 ? factory.repos[0] : null);
 
-/** How many factories the menu lists before it offers the rest. */
-export const MENU_SHOWN = 5;
-
-/**
- * The factories the menu lists: the first `MENU_SHOWN` of `blocks`, or every one once `all` is asked, and how many it leaves out. The
- * factory named `open`, whose floor is open, is listed all the same: past the first five, it follows them, and they never move.
- */
-export const menuFactories = <T extends { name: string }>(
-  blocks: readonly T[],
-  all: boolean,
-  open?: string,
-): { shown: T[]; hidden: number } => {
-  const first = all ? [...blocks] : blocks.slice(0, MENU_SHOWN);
-  const lit = first.some((b) => b.name === open) ? undefined : blocks.find((b) => b.name === open);
-  const shown = lit ? [...first, lit] : first;
-  return { shown, hidden: blocks.length - shown.length };
-};
-
 /**
  * Where a factory's floor starts a run: the factory, its repositories and the one it starts on — its only one, else null until a person
  * picks — or why it cannot start, for a factory whose file does not read or one on no repository. Null for the default factory, whose
@@ -146,14 +128,6 @@ export const keptBy =
 export const shownIn = <T extends { factory: string | null }>(items: readonly T[], filter: string | undefined): T[] =>
   items.filter(keptBy(filter));
 
-/** Each factory `items` are tagged with (`factoryOf`) and how many of them are, the default factory first, then by name. */
-export const factoryCounts = (items: readonly { factory: string | null }[]): { name: string; count: number }[] => {
-  const counts = new Map<string, number>();
-  for (const item of items) counts.set(factoryOf(item), (counts.get(factoryOf(item)) ?? 0) + 1);
-  const rank = (name: string) => (name === DEFAULT_NAME ? '' : name);
-  return [...counts].map(([name, count]) => ({ name, count })).sort((a, b) => rank(a.name).localeCompare(rank(b.name)));
-};
-
 /**
  * The factories a listed workflow is in, by name, sorted: each named factory whose file reads and that attaches it by its folder's name,
  * on a repository it is found on. One of yours is found on every repository; one of the repository's only on the api's, the default
@@ -167,6 +141,17 @@ export const workflowFactories = (workflow: Pick<WorkflowListing, 'name' | 'from
     .map((f) => f.name)
     .sort();
 };
+
+/**
+ * Whether a listed workflow is listed with the factory `factory` picked: every one is with none picked, or the default factory, which
+ * offers every workflow; else only one the factory is in (`workflowFactories`), and none while `factories` are unread.
+ */
+export const offeredIn =
+  (factory: string | undefined, factories: readonly Factory[] | undefined) =>
+  (workflow: Pick<WorkflowListing, 'name' | 'from'>): boolean =>
+    factory === undefined ||
+    factory === DEFAULT_NAME ||
+    (factories !== undefined && workflowFactories(workflow, factories).includes(factory));
 
 /** The factory a page's address filters by, `?factory=<name>`: none when it names none, or names it with nothing, or with no string. */
 export const factorySearch = (search: Record<string, unknown>): { factory?: string } =>

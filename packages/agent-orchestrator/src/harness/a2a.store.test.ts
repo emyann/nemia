@@ -158,7 +158,7 @@ test('a secret not given is refused naming the variable to set, where to set it,
   const said = missingCredential('api-key', 'https://a.example', 'a2a:second-opinion');
   assert.match(
     said,
-    /^set WF_A2A_SECOND_OPINION_API_KEY to the secret for the scheme `api-key` second-opinion's card declares, in the environment of `wf up`/,
+    /^set WF_A2A_SECOND_OPINION_API_KEY to the secret for the scheme `api-key` second-opinion's card declares, in the environment of the daemon — the api, or `wf up` —/,
   );
   assert.match(said, /restart it; then `wf retry` the step/);
 });

@@ -75,6 +75,7 @@ import {
   isClaude,
   runnersOf,
   optionsRefusalOf,
+  admissionOf,
   harnessRefusalOf,
   type EngineIo,
   type EngineOptions,
@@ -302,7 +303,8 @@ const countedInto =
  * - every observe of a harness — a pass's, a view's, and an `observeFor`, an observe told what to look for — made through its
  *   runner and counted on the way (`ObserveCount`, `io`), where `spawned` says whether it asked a registry;
  * - one memo of the settled tasks its passes may skip (`core/engine/memo.ts`), which lives as long as this engine, so a new engine
- *   folds every task on its first pass.
+ *   folds every task on its first pass;
+ * - what its passes admit under (`admissionOf`): `maxConcurrent`, `unschedulable`, and each harness's pool.
  *
  * Fails with `EngineRefused` for what `optionsRefusalOf` refuses.
  */
@@ -327,7 +329,7 @@ const make = (options: EngineOptions) =>
         counted(name, isRemote(harnesses[name]) ? ops : a2aOps(name, ops, events)),
       ]),
     );
-    const layer = Layer.mergeAll(journal, Runner.layer(composite(runners, fallback)), tickMemoLayer());
+    const layer = Layer.mergeAll(journal, Runner.layer(composite(runners, fallback)), tickMemoLayer(), admissionOf(options, harnesses));
     const go = <A, E>(e: Effect.Effect<A, E, Journal | Runner>): Effect.Effect<A, E> => e.pipe(Effect.provide(layer));
     const read = (taskId: string) => go(Effect.flatMap(Journal, (j) => j.read(taskId)));
 

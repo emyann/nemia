@@ -581,17 +581,16 @@ export function budgetUsdFor(cap: number | undefined, spent: Spend = NOTHING_SPE
 }
 
 /**
- * The momentum of every filing of a run after its first steps — a step after another, a try, a round, a check: which waiting task a free
- * slot goes to first when a pool is at its ceiling, higher first and filing order within (`toAdmit` in `cap.ts`). A run's next step
- * is filed a check and a pass after its last ended, and in filing order alone any run's first step filed in that gap would take the slot;
- * above them, a run in flight keeps its momentum. Nothing running is stopped for it, and it is read at admission and nowhere else: the cap
- * on runs in flight and the queue are the tick's. Nothing is carried on the filing: `momentumOf` reads it off the run records by these
- * rules.
+ * The momentum of every filing of a run after its first steps — a step after another, a try, a round, a check: the `priority` it is filed
+ * with, which the runtime's admission reads to choose the waiting task a free slot goes to when a pool is at its ceiling, higher first and
+ * filing order within. A run's next step is filed a check and a pass after its last ended, and in filing order alone any run's first step
+ * filed in that gap would take the slot; above them, a run in flight keeps its momentum. Nothing running is stopped for it, and it is read
+ * at admission and nowhere else: the cap on runs in flight and the queue are the tick's.
  */
 export const MOMENTUM = 1;
 
 /**
- * The momentum a step's own filing has (`MOMENTUM`, read by `momentumOf`): none — 0 — for a run's first steps, which wait on nothing and
+ * The momentum a step's own filing has, filed as its `priority` (`MOMENTUM`): none — 0 — for a run's first steps, which wait on nothing and
  * are filed as the run starts, so a newer run never goes before one in flight; `MOMENTUM` for a step after another. A try, a round and a
  * check are never a run's first filing, and carry `MOMENTUM` whatever step they are of.
  */

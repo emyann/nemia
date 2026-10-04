@@ -1,9 +1,9 @@
 import path from 'node:path';
 import type { Page } from 'playwright';
-import { photograph, sidebar, themeOf } from '../board.ts';
+import { pick, pickerOf, photograph, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectUncut, expectVisible, idle, Refused } from '../checks.ts';
 import type { PageSpec } from '../visit.ts';
-import { FAKE } from '../seed.ts';
+import { FACTORIES, FAKE } from '../seed.ts';
 import { OUT } from '../world.ts';
 
 /** The headline numbers the page draws as tiles, by the api's key, in its order. */
@@ -135,8 +135,9 @@ export default {
   /**
    * The Stats page: the sidebar lights Stats; each tile holds what the api serves for the last 14 days, null kept; each chart a column per
    * served day of the 28, with a rule on each day marked, skills loaded drawn as a chart with no tile; a row per served step in the skills
-   * loaded and the calls refused, side by side from 1280 wide and stacked on a phone; All asks for every day and draws each; and a factory
-   * picked from its picker is asked for as `ofFactory`, never `factory`, and lit.
+   * loaded and the calls refused, side by side from 1280 wide and stacked on a phone; All asks for every day and draws each; and a
+   * factory picked in the sidebar's picker keeps the period, is asked for as `ofFactory`, never `factory`, and has no picker of its own
+   * on the page.
    */
   name: 'stats',
   route: '/stats',
@@ -172,24 +173,21 @@ export default {
     await expectVisible(page.locator('[data-period="all"][data-active]'), 'All lit once chosen');
     await expectCharts(page, await served(page, ''), 'over every day');
 
-    await page.locator('[data-filter="factory"] button').click();
-    const choice = page
-      .getByRole('option')
-      .filter({ hasNotText: /^any$/ })
-      .filter({ hasNotText: /reading/ })
-      .first();
-    await expectVisible(choice, 'the factory picker offers the factories the runs were in, read as it opens');
-    const factory = (await choice.textContent())?.trim() ?? '';
+    await expectCount(page.locator('[data-filter="factory"]'), 0, "the page has no factory picker: the sidebar's picks it");
+    const factory = FACTORIES.hiring.name;
     const kept = page.waitForRequest((r) => {
       const url = new URL(r.url());
       return url.pathname === '/api/stats' && url.searchParams.get('ofFactory') === factory && !url.searchParams.has('by');
     });
-    await choice.click();
+    await pick(page, factory);
     const asked = new URL((await kept).url());
     if (asked.searchParams.has('factory') || asked.searchParams.has('from'))
       throw new Refused(`the factory kept is asked for as ofFactory alone, over every day — asked ${asked.search}`);
     await idle(page);
-    await expectVisible(page.locator('[data-filter="factory"][data-kept]'), `the factory picker lit, keeping ${factory}`);
+    const at = new URL(page.url());
+    if (at.pathname !== '/stats' || at.searchParams.get('factory') !== factory || at.searchParams.get('period') !== 'all')
+      throw new Refused(`picked in the sidebar, ${factory} is kept in the address with the period — it is ${at.pathname}${at.search}`);
+    await expectVisible(pickerOf(page).getByText(factory, { exact: true }), `the sidebar's picker reads ${factory}`);
     await expectCharts(page, await served(page, `ofFactory=${encodeURIComponent(factory)}`), `over every day of ${factory}`);
     await onPhone(page);
   },

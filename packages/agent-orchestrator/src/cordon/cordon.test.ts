@@ -53,6 +53,21 @@ test('under the cordon a try a person asked for is not due, and the step it asks
   assert.equal(held.status, 'running', 'a run asked to go on is not failed while it waits for the lift');
 });
 
+test('under the cordon a round its loop asks for is not due, and the looping step is still running', () => {
+  const steps = [step('implement'), step('review', ['implement'], { loop: 'implement', rounds: 3 })];
+  const r = run({ implement: { taskId: 't1' }, review: { taskId: 't2' } });
+  const again = (name: string) => (name === 'review' ? { ...signed(), output: { again: true } } : signed());
+  const free = assess(steps, r, phases({ t1: 'succeeded', t2: 'succeeded' }), again, asked);
+  assert.deepEqual(
+    free.round.map((d) => [d.step, d.target]),
+    [['review', 'implement']],
+    'without it, the round is due',
+  );
+  const held = assess(steps, { ...r, cordon: CORDON }, phases({ t1: 'succeeded', t2: 'succeeded' }), again, asked);
+  assert.deepEqual(held, { ...free, round: [], cordoned: { steps: ['review'], checks: [] } });
+  assert.equal(held.status, 'running', 'a run whose loop goes round again is not over while it waits for the lift');
+});
+
 test('a run the cordon holds nothing of is judged as without it', () => {
   const steps = [step('implement')];
   const r = run({ implement: { taskId: 't1' } });

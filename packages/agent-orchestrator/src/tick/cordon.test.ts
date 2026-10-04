@@ -5,8 +5,8 @@
  * runs at rest answers (`verifyRest`), and one in the middle starts with no memo at all, as a restarted daemon does.
  *
  * Walked through the runtime itself over an in-memory journal and a harness the test signs by hand, as rest-store.test.ts does, and every
- * filing `queued` as the store's own engine files it (`engineOf`), so admission is the runtime's: a task filed waits until a pass admits it. A store of its own, since `tick` reads every run
- * under `WF_ROOT`, which is read as the module loads and so set before the import.
+ * filing `queued` as the store's own engine files it (`engineOf`), so admission is the runtime's: a task filed waits until a pass admits
+ * it. A store of its own, since `tick` reads every run under `WF_ROOT`, which is read as the module loads and so set before the import.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

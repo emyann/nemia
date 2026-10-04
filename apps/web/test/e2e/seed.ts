@@ -413,6 +413,13 @@ export const GATED = {
   /** What the `gate` page approves plan with, and what it sends plan back with. */
   words: 'Ship the second reading.\nStore the flag before you parse it.',
   objection: 'Say where the flag is stored, and for how long.',
+  /** plan's agent, frozen on the record, and what plan's own file sets over it: its words and one deny, the policy its gate draws open. */
+  planner: {
+    name: 'planner',
+    instructions: 'You are the planner: you plan before anyone builds.',
+    policy: 'Plan it.',
+    deny: 'Bash(git push:*)',
+  },
 } as const;
 
 /**
@@ -2126,7 +2133,21 @@ export function seed(root: string, now = Date.now()): void {
         brief: `${GATED.title}\n\nA sixth run seeded by npm run e2e, started --gate plan: plan signed off, and nothing after it is filed until a person approves it.`,
         workflowDir: gateDir,
         workflow: [
-          { name: 'plan', after: [], body: 'Plan it.', harness: 'claude', output: { file: 'plan.json', schema: planSchema } },
+          {
+            name: 'plan',
+            after: [],
+            body: `${GATED.planner.instructions}\n\n${GATED.planner.policy}`,
+            harness: 'claude',
+            output: { file: 'plan.json', schema: planSchema },
+            disallowedTools: [GATED.planner.deny],
+            agent: {
+              name: GATED.planner.name,
+              keys: ['disallowedTools'],
+              body: GATED.planner.policy,
+              given: {},
+              instructions: GATED.planner.instructions,
+            },
+          },
           { name: 'implement', after: ['plan'], body: 'Implement the plan.', harness: 'claude' },
         ],
         gates: [GATED.gated],

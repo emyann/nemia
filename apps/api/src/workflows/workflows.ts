@@ -56,6 +56,7 @@ import {
   type StepKey,
   type Workflow,
 } from 'agent-orchestrator/workflow';
+import { toldLayers, type ToldLayers } from 'agent-orchestrator/run';
 import { NotBlank, readBody, valueAt, type BodyIssue } from '../body.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from '../guard.ts';
 import { type ApiEnv, served } from '../layer.ts';
@@ -184,6 +185,12 @@ export type ListedStep = {
    * no step file. Null for a step it does not hire into, and in the default factory, which hires no one.
    */
   hired: string | null;
+  /**
+   * What a run of the step would be told, by layer (`toldLayers`, with no brief): its agent's instructions, your custom instructions for
+   * it, and the step's policy — its own note, the skills it adds and the fence lines it tightens. The builder draws a step's layers from
+   * it, and a save never writes it back. Null for a step with no agent, whose file is all of it.
+   */
+  layers: ToldLayers | null;
 };
 
 /**
@@ -315,6 +322,7 @@ const listedStep =
     body: step.body,
     own: step.agent ? { keys: step.agent.keys.filter((key) => key !== 'agent'), body: step.agent.body } : null,
     hired: hires.get(step.name) ?? null,
+    layers: step.agent ? toldLayers(step, null) : null,
   });
 
 /**

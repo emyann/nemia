@@ -20,6 +20,7 @@ import {
   HARNESSES,
   parseFolder,
   parseWorkflow,
+  POLICY_KEYS,
   REMOTE_REFUSED_KEYS,
   renderStep,
   STEP_KEY_MEANINGS,
@@ -223,6 +224,12 @@ test("GET /api/workflows/keys is the form a step is drawn in: every key in the p
     AGENT_KEYS.filter((k) => !agentOnly.includes(k)),
     'the role keys are the agent keys but role, description, skills and harnessPrompt',
   );
+  assert.deepEqual(
+    form.policyKeys,
+    ['tools', 'allowedTools', 'disallowedTools', 'permissionMode', 'sandbox', 'skills'],
+    "the policy keys, which the builder groups as the step's policy over its agent: the fence keys and the skills it adds",
+  );
+  assert.deepEqual(form.policyKeys, [...POLICY_KEYS], "the package's list, never one of the api's own");
   for (const own of agentOnly)
     assert.equal(
       form.roleKeys.includes(own as never),
@@ -312,6 +319,17 @@ test('a step with an agent is listed resolved, with what its file sets itself (`
     body: 'You write code.\n\nAnd mind the cache.',
     own: { keys: ['check'], body: 'And mind the cache.' },
     hired: null,
+    layers: {
+      agent: 'coder',
+      instructions: 'You write code.',
+      custom: null,
+      agentSkills: [],
+      policy: 'And mind the cache.',
+      addedSkills: [],
+      fence: [],
+      task: null,
+      via: 'prompt',
+    },
   });
 
   let res = await put('with-agent', { steps: [build] });
@@ -344,6 +362,35 @@ test('a step with an agent is listed resolved, with what its file sets itself (`
     '---\nagent: coder\ncheck: npm test\n---\nMind nothing.\n',
     'a step sent without `own`, as one drafted by hand, has every key it sets as its own, and its body as its note',
   );
+});
+
+test("a step with an agent is listed with its layers — the agent's instructions, your custom instructions, the step's policy and the fence lines it tightens — and a save of the listing writes none of them", async () => {
+  const dir = path.join(STORE, 'layered');
+  write(path.join(STORE, 'agents', 'scribe.md'), '---\nmodel: opus\n---\nYou write things down.\n');
+  write(path.join(root, 'custom-instructions', 'scribe.md'), 'Write it in French.\n');
+  write(path.join(dir, 'note.md'), '---\nagent: scribe\nmodel: sonnet\ndisallowedTools: Bash(rm:*)\n---\nNote the decisions.\n');
+  write(path.join(dir, 'tidy.md'), '---\nafter: note\n---\nTidy up.\n');
+  try {
+    const before = snapshot(dir);
+    const [note, tidy] = (await listedSteps('layered')) as [ListedStep, ListedStep];
+    assert.deepEqual(note.layers, {
+      agent: 'scribe',
+      instructions: 'You write things down.',
+      custom: 'Write it in French.',
+      agentSkills: [],
+      policy: 'Note the decisions.',
+      addedSkills: [],
+      fence: [{ key: 'disallowedTools', value: 'Bash(rm:*)' }],
+      task: null,
+      via: 'prompt',
+    });
+    assert.equal(tidy.layers, null, 'a step with no agent has no layers over one');
+    const res = await put('layered', { steps: [note, tidy] });
+    assert.equal(res.status, 200, await res.clone().text());
+    assert.deepEqual(snapshot(dir), before, 'the layers are read, never written back');
+  } finally {
+    fs.rmSync(path.join(root, 'custom-instructions', 'scribe.md'));
+  }
 });
 
 test("REFUSED at shipped defaults: a step's `own` that is not the listing's shape is a 400 naming the step, and a step naming an agent agents/ does not have is the package's 422 — and nothing is written", async () => {
@@ -614,6 +661,7 @@ test('PUT /api/workflows/yours/:name writes the folder the steps make — a step
     body: 'Review the build.',
     own: null,
     hired: null,
+    layers: null,
   };
   const res = await put('drawn', {
     steps: [plan, { ...build, spec: { ...build.spec, retries: 1 } }, review],

@@ -22,6 +22,7 @@ import { checkContract, checkHandedSection, landingContract, type CheckHanded } 
 import { artifactsContract } from '../artifacts/artifacts.ts';
 import { briefBody, rendersAgent, skillLayers } from '../agents/agents.ts';
 import { ownNote } from '../ending/ending.ts';
+import { FENCE_KEYS } from '../workflow/index.ts';
 import { inputsLine, mountsLine } from '../start/inputs.ts';
 import { resultSteps, workChecks } from '../branches/branches.ts';
 
@@ -381,8 +382,9 @@ function fromRunSection(parent: ParentCloseout, remote = false): string {
 
 /**
  * What a step was told, by layer: its agent and the agent's instructions, the person's custom instructions for it and the agent's own
- * skills; the step's policy, its own note and the skills its line adds (`skillLayers`); and the task, what its brief told it after them.
- * Null where the step has none. `via` says where the first two went: the session's prompt (`prompt`), or the head of its brief (`brief`).
+ * skills; the step's policy, its own note, the skills its line adds (`skillLayers`) and the fence lines it tightens its agent's with
+ * (`fenceLines`); and the task, what its brief told it after them. Null where the step has none. `via` says where the first two went:
+ * the session's prompt (`prompt`), or the head of its brief (`brief`).
  */
 export type ToldLayers = {
   agent: string | null;
@@ -391,9 +393,23 @@ export type ToldLayers = {
   agentSkills: string[];
   policy: string;
   addedSkills: string[];
+  fence: Array<{ key: string; value: string }>;
   task: string | null;
   via: 'prompt' | 'brief';
 };
+
+/**
+ * The fence lines step `step`'s own file sets over its agent's (`StepAgent.keys`), each as resolved, a list joined with `, `, in the
+ * order of `FENCE_KEYS`: none for a step with no agent, whose fence is no layer over another's.
+ */
+function fenceLines(step: Workflow): ToldLayers['fence'] {
+  const own = step.agent?.keys ?? [];
+  return FENCE_KEYS.flatMap((key) => {
+    const value = step[key];
+    if (!own.includes(key) || value === undefined) return [];
+    return [{ key, value: Array.isArray(value) ? value.join(', ') : value }];
+  });
+}
 
 /**
  * What the frozen `step` was told, by layer (`ToldLayers`), its task cut from `brief`, the brief it was filed with or would be: after its
@@ -421,6 +437,7 @@ export function toldLayers(step: Workflow, brief: string | null): ToldLayers {
     agentSkills: skills.agent,
     policy,
     addedSkills: skills.added,
+    fence: fenceLines(step),
     task: brief === null || !opened ? brief : brief.slice(opened.opening.length + 2),
     via: opened?.via ?? (rendersAgent(step) ? 'prompt' : 'brief'),
   };

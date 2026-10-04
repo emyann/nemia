@@ -51,7 +51,8 @@ const KeyFieldSchema = Schema.Struct({
 
 /**
  * Mirrors `KeyForm` in apps/api/src/workflows/builder.ts: every key a step may set, in the package's order, the harness a step runs on when
- * it names none, the keys a step with an agent takes from it (`roleKeys`), what each agent of yours gives a step (`agents`), and how a step
+ * it names none, the keys a step with an agent takes from it (`roleKeys`), those its file sets as its policy over the agent's
+ * (`policyKeys`: the fence keys and the skills it adds), what each agent of yours gives a step (`agents`), and how a step
  * names a remote A2A agent — `harness: <prefix><name>` — with the keys such a step may not set (`remote`), which the form leaves off it
  * (`takes`).
  */
@@ -59,6 +60,7 @@ export type KeyForm = {
   keys: KeyField[];
   defaultHarness: string;
   roleKeys: StepKey[];
+  policyKeys: StepKey[];
   agents: Record<string, Partial<WorkflowStepSpec>>;
   remote: { prefix: string; refuses: StepKey[] };
 };
@@ -68,6 +70,7 @@ const KeyFormSchema = Schema.Struct({
   keys: Schema.mutable(Schema.Array(KeyFieldSchema)),
   defaultHarness: Schema.String,
   roleKeys: Schema.mutable(Schema.Array(StepKeySchema)),
+  policyKeys: Schema.mutable(Schema.Array(StepKeySchema)),
   agents: Schema.Record(Schema.String, StepSpecPartSchema),
   remote: Schema.Struct({ prefix: Schema.String, refuses: Schema.mutable(Schema.Array(StepKeySchema)) }),
 }) satisfies Schema.Schema<KeyForm>;

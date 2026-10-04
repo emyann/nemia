@@ -10,6 +10,9 @@ import { OUT } from '../world.ts';
 /** The frame's bottom bar. */
 const footerOf = (page: Page): Locator => page.locator('footer[data-frame-footer]');
 
+/** The Factory's queue lane, beside the floor. */
+const lane = (page: Page): Locator => page.getByRole('complementary', { name: 'Queued cards' });
+
 /** The box of `target`, refused when it is not drawn. */
 async function boxOf(target: Locator, what: string) {
   const box = await target.boundingBox();
@@ -63,7 +66,10 @@ async function groups(page: Page): Promise<void> {
   await expectUncut(bar.locator('[data-feed-word], [data-at-work], [data-quota-short], [data-version]'), 'each group is read whole');
 }
 
-/** A group pressed opens the machine's gauges in the floating bar, above the bottom bar, and pressed again closes them. */
+/**
+ * A group pressed opens the machine's gauges in the floating bar, above the bottom bar, the queue lane giving its room to the floor, and
+ * pressed again closes them.
+ */
 async function gauges(page: Page): Promise<void> {
   const press = footerOf(page)
     .getByRole('button')
@@ -75,11 +81,13 @@ async function gauges(page: Page): Promise<void> {
   await expectVisible(page.locator('[data-gauges] [data-quota="fresh"]'), 'and the quota');
   await aboveFooter(page, page.getByRole('complementary', { name: 'This machine' }), 'the floating bar of the gauges');
   if ((await press.getAttribute('aria-expanded')) !== 'true') throw new Refused('the group pressed says the gauges are open');
+  await expectCount(lane(page), 0, 'the queue lane gives its room to the floor while the gauges are open');
   await settled(page);
   await photograph(page, path.join(OUT, `bottom-bar-gauges-${await themeOf(page)}.png`));
   await press.click();
   await page.waitForURL((url) => !url.searchParams.has('bar'));
   await expectCount(page.locator('[data-gauges]'), 0, 'pressed again, the gauges close');
+  await expectVisible(lane(page), 'and the queue lane is back');
 }
 
 /** On a phone's screen the bar keeps the daemon's dot, named, and the quota, whole, and nothing else. */
@@ -99,7 +107,8 @@ export default {
    * The frame's bottom bar, on the Factory: across the foot of the page under the rail, the sidebar and the floor. At its left the daemon's
    * dot and whether the board follows the feed, in its centre the runs in flight and the sessions at work across every factory, as the
    * api's runs make them, and at its right the quota and the version the api answers. A group pressed opens the machine's gauges in the
-   * floating bar, above the bottom bar, and pressed again closes them. A phone keeps the dot and the quota. The window's size is put back.
+   * floating bar, above the bottom bar, the queue lane giving its room to the floor, and pressed again closes them. A phone keeps the dot
+   * and the quota. The window's size is put back.
    */
   name: 'bottom-bar',
   route: '/factories/default',

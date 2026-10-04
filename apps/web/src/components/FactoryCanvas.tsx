@@ -218,9 +218,9 @@ const placing = (change: NodeChange<RunFlowNode>): change is NodePositionChange 
  *   Beside the counts it draws the cap (`CapLine`), and the Show finished switch, named by a label beside it.
  * - The floor fills the screen between the root's header and its bottom bar, its frame narrowed by what the bar covers of it
  *   (`useBarOver`), so the card inspected and every panel over the floor stay clear of the bar. The queue lane sits at its left, and gives
- *   its room to the floor while the bar shows a run or a step. The floor's buttons wrap to a narrow floor, its hint shows only where the
- *   floor is wide enough beside them, and the legend wraps short of the minimap when there is one; arrowheads take their edges' colour in
- *   both themes.
+ *   its room to the floor while the bar shows a run, a step or the machine's gauges. The floor's buttons wrap to a narrow floor, its hint
+ *   shows only where the floor is wide enough beside them, and the legend wraps short of the minimap when there is one; arrowheads take
+ *   their edges' colour in both themes.
  * - A click on a card, or Enter on the card itself, shows the run in the bar or closes it; a click or Enter on a link or a button in it
  *   does only what that does (`useFloorPress`).
  */
@@ -238,7 +238,7 @@ function Floor({ runs, factory }: { runs: readonly RunSummary[]; factory: Factor
 
   const [open, setOpen] = useState<string[]>(readFactoryOpen);
   const openSet = useMemo(() => new Set(open), [open]);
-  const { inspecting, inspected, step: barStep, onStep, ...press } = useFloorPress();
+  const { inspecting, inspected, step: barStep, onStep, gauges, ...press } = useFloorPress();
 
   const opened = useMemo(() => open.filter((id) => ids.includes(id)), [open, ids]);
   const reads = useQueries({ queries: opened.map((id) => runQuery(id)), combine: readsOf });
@@ -423,7 +423,7 @@ function Floor({ runs, factory }: { runs: readonly RunSummary[]; factory: Factor
   const toDecide = runs.filter((run) => toDecideOf(run) !== null).length;
   const queue = useQuery({ ...inboxQuery, refetchInterval: 5_000 });
   const queued = queue.data ? queueOf(queuedIn(queue.data, factory)) : [];
-  const laned = queued.length > 0;
+  const laned = queued.length > 0 && !gauges;
   const wasLaned = useRef(laned);
   useEffect(() => {
     if (wasLaned.current === laned) return;
@@ -509,14 +509,15 @@ function Floor({ runs, factory }: { runs: readonly RunSummary[]; factory: Factor
 /**
  * What a press on the floor does (`useCanvasPress`): a card shows its run in the frame's bar, or closes it, and a double click opens the
  * run's page; a step's tile shows that step, or closes it (`onStep`). With the run whose card or step the bar shows (`inspecting`), the run
- * it shows (`inspected`) and the step (`step`), each none while it shows anything else.
+ * it shows (`inspected`) and the step (`step`), each none while it shows anything else; and whether it shows the machine's gauges.
  */
 function useFloorPress() {
   const navigate = useNavigate();
   const { shown, ...press } = useCanvasPress(runBar, (runId) => void navigate({ to: '/runs/$runId', params: { runId } }));
-  const { toggle } = useBar();
+  const { open, toggle } = useBar();
   const onStep = useCallback((run: string, step: string) => toggle({ kind: 'step', run, step }), [toggle]);
   return {
+    gauges: open?.kind === 'gauges',
     inspecting: shown?.kind === 'run' || shown?.kind === 'step' ? shown.run : null,
     inspected: shown?.kind === 'run' ? shown.run : null,
     step: shown?.kind === 'step' ? shown : null,

@@ -51,9 +51,7 @@ export default {
 
     await expectVisible(
       page.locator('[data-daemon="none"]', {
-        hasText: new RegExp(
-          `^Nothing ticks this store, so no run moves: no daemon has held it\\. ${START}\\.$`,
-        ),
+        hasText: new RegExp(`^Nothing ticks this store, so no run moves: no daemon has held it\\. ${START}\\.$`),
       }),
       'with no daemon.json, the header says nothing ticks the store, and how to start what does',
     );

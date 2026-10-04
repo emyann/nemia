@@ -1,20 +1,18 @@
 /**
  * The factories as the board splits the machine by them (src/lib/factories.ts): a block a factory, the default one only while no factory
- * is filed and it holds runs; each run and queued card in the factory its record or card names, the default factory's naming none; the
- * menu's sub-items, the open one among them; where a floor starts a run; and, for the pages that list the whole machine, the factory each
- * run or card is tagged with, the factories a filter offers and what it keeps, and the factories a workflow is in.
+ * is filed and it holds runs; each run and queued card in the factory its record or card names, the default factory's naming none; where a
+ * floor starts a run; and, for the pages that list the whole machine, the factory each run or card is tagged with, what the factory picked
+ * keeps, the factories a workflow is in and the workflows the factory picked offers.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Factory, InboxEntry, RunSummary } from '../src/lib/api.ts';
 import {
   factoryBlocks,
-  factoryCounts,
   factoryOf,
   factorySearch,
   floorPlace,
-  MENU_SHOWN,
-  menuFactories,
+  offeredIn,
   queuedIn,
   runsIn,
   shownIn,
@@ -124,36 +122,6 @@ test('a factory whose file does not read is still a block, with why, and hides n
   );
 });
 
-test('the menu shows the first five factories and says how many more there are; all of them once asked', () => {
-  assert.equal(MENU_SHOWN, 5);
-  const blocks = (n: number) =>
-    factoryBlocks(
-      Array.from({ length: n }, (_, i) => factory(`f-${i}`)),
-      [],
-    );
-  const seven = menuFactories(blocks(7), false);
-  assert.deepEqual([names(seven.shown), seven.hidden], [['f-0', 'f-1', 'f-2', 'f-3', 'f-4'], 2]);
-  const all = menuFactories(blocks(7), true);
-  assert.deepEqual([all.shown.length, all.hidden], [7, 0]);
-  const five = menuFactories(blocks(5), false);
-  assert.deepEqual([five.shown.length, five.hidden], [5, 0]);
-  const six = menuFactories(blocks(6), false);
-  assert.deepEqual([six.shown.length, six.hidden], [5, 1]);
-});
-
-test('the open factory is appended as a sixth entry past the first five; one shown already, or none open, leaves the menu as it was', () => {
-  const blocks = Array.from({ length: 7 }, (_, i) => factory(`f-${i}`));
-  const past = menuFactories(blocks, false, 'f-6');
-  assert.deepEqual([names(past.shown), past.hidden], [['f-0', 'f-1', 'f-2', 'f-3', 'f-4', 'f-6'], 1]);
-  const first = ['f-0', 'f-1', 'f-2', 'f-3', 'f-4'];
-  for (const open of ['f-2', 'nope', undefined]) {
-    const menu = menuFactories(blocks, false, open);
-    assert.deepEqual([names(menu.shown), menu.hidden], [first, 2], `open ${open}`);
-  }
-  const all = menuFactories(blocks, true, 'f-6');
-  assert.deepEqual([names(all.shown), all.hidden], [names(blocks), 0]);
-});
-
 test("a card starts on its repo:, else on the factory's one repository; with several and no repo:, on none until a person picks", () => {
   assert.equal(startRepo(factory('solo', { repos: ['/r/a', '/r/b'] }), '/r/b'), '/r/b');
   assert.equal(startRepo(factory('solo'), null), '/code/nemia');
@@ -212,19 +180,6 @@ test("a filter keeps the runs or cards of its factory in their order — the def
   assert.deepEqual(ids(shownIn(tagged, 'gone')), []);
 });
 
-test('the filter offers each factory the runs or cards name, with how many, the default first and then by name, whatever their order', () => {
-  assert.deepEqual(factoryCounts([...tagged, { factory: 'amber' }]), [
-    { name: 'default', count: 2 },
-    { name: 'amber', count: 1 },
-    { name: 'nemia', count: 2 },
-    { name: 'quay', count: 1 },
-  ]);
-  assert.deepEqual(factoryCounts(tagged.filter((item) => item.factory !== null && item.factory !== 'default')), [
-    { name: 'nemia', count: 2 },
-    { name: 'quay', count: 1 },
-  ]);
-});
-
 test("REFUSED: a workflow is tagged only with the factories that attach it where it is found — the repository's on its repository, yours on any — never the default or a factory whose file does not read", () => {
   const factories = [
     factory('default', { default: true, repos: ['/r'], workflows: null, hires: {} }),
@@ -238,6 +193,28 @@ test("REFUSED: a workflow is tagged only with the factories that attach it where
   assert.deepEqual(workflowFactories({ name: 'build', from: 'repo' }, factories), ['d-here']);
   assert.deepEqual(workflowFactories({ name: 'intake', from: 'yours' }, factories), []);
   assert.deepEqual(workflowFactories({ name: 'dev', from: 'repo' }, []), [], 'with no factories read, a workflow is in none');
+});
+
+test('REFUSED: the Workflows page lists only the workflows the factory picked is in; every one with none picked or the default; none while the factories are unread', () => {
+  const factories = [
+    factory('default', { default: true, repos: ['/r'], workflows: null, hires: {} }),
+    factory('nemia', { repos: ['/r'], workflows: ['dev'] }),
+    factory('quay', { repos: ['/elsewhere'], workflows: ['build'] }),
+  ];
+  const listed = [
+    { name: 'dev', from: 'repo' as const },
+    { name: 'build', from: 'yours' as const },
+    { name: 'intake', from: 'repo' as const },
+  ];
+  const offered = (picked: string | undefined, read: typeof factories | undefined) =>
+    listed.filter(offeredIn(picked, read)).map((workflow) => workflow.name);
+  assert.deepEqual(offered(undefined, factories), ['dev', 'build', 'intake']);
+  assert.deepEqual(offered(undefined, undefined), ['dev', 'build', 'intake'], 'with none picked, every one, read or not');
+  assert.deepEqual(offered('default', factories), ['dev', 'build', 'intake'], 'the default factory offers every workflow');
+  assert.deepEqual(offered('nemia', factories), ['dev']);
+  assert.deepEqual(offered('quay', factories), ['build']);
+  assert.deepEqual(offered('gone', factories), []);
+  assert.deepEqual(offered('nemia', undefined), [], 'none while the factories are unread');
 });
 
 test("a page's address filters by the factory it names, and by none when it names none, an empty one or not one string", () => {

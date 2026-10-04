@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { photograph, themeOf } from '../board.ts';
+import { photograph, startOf, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { FACTORIES, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -18,13 +18,13 @@ const REVIEWER = 'reviewer-e2e';
 const withHires = (text: string, hires: Record<string, string>): string =>
   JSON.stringify({ ...(JSON.parse(text) as object), hires }, null, 2);
 
-/** Open the header's start on a fresh load of the floor, and the floating bar it opens. */
+/** Open the sidebar's start on a fresh load of the floor, and the floating bar it opens. */
 async function openStart(page: Page): Promise<Locator> {
   await page.goto(page.url(), { waitUntil: 'load' });
   await idle(page);
-  await page.locator('header').getByRole('button', { name: 'Start a run' }).click();
+  await startOf(page).click();
   const bar = page.getByRole('complementary', { name: `Start a run in ${FACTORIES.hiring.name}` });
-  await expectVisible(bar, "the header's Start a run opens the floating bar naming the factory");
+  await expectVisible(bar, "the sidebar's Start a run opens the floating bar naming the factory");
   return bar;
 }
 
@@ -54,7 +54,7 @@ async function keptOnEscape(page: Page, bar: Locator, form: Locator): Promise<vo
 
 export default {
   /**
-   * A run is started from a factory's floor: the header's Start a run opens the floating bar on the factory's one repository, fixed,
+   * A run is started from a factory's floor: the sidebar's Start a run opens the floating bar on the factory's one repository, fixed,
    * listing the workflows it offers there with its hires. A workflow whose step the factory hires no one into says so in the package's
    * words and cannot be picked. Once the factory hires into it, it is picked; Escape in its brief leaves the field and keeps the brief,
    * and a second Escape closes the bar. Picked again, the start sends `?factory=` and `?repo=`: the record names both. The hires, the

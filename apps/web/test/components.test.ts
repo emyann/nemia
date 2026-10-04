@@ -5083,14 +5083,24 @@ test('a step row says its step, its agent or —, its total as served, and each 
 });
 
 test('the filters link each period with the filters kept, the default period left out, and light the key a value is kept of', async () => {
-  const markup = await routedWith(createElement(StatsFilters, { search: { factory: 'nemia' }, now: new Date('2026-09-30T12:00:00Z') }));
+  const markup = await routedWith(
+    createElement(StatsFilters, { search: { factory: 'nemia', agent: 'ada' }, now: new Date('2026-09-30T12:00:00Z') }),
+  );
   const link = (period: string) => markup.match(new RegExp(`<a [^>]*data-period="${period}"[^>]*>`))?.[0] ?? '';
-  assert.match(link('28d'), /href="\/stats\?factory=nemia"/);
+  assert.match(link('28d'), /href="\/stats\?factory=nemia&amp;agent=ada"/);
   assert.match(link('28d'), /data-active="true"/);
-  assert.match(link('all'), /href="\/stats\?factory=nemia&amp;period=all"|href="\/stats\?period=all&amp;factory=nemia"/);
+  assert.match(link('all'), /href="\/stats\?factory=nemia&amp;agent=ada&amp;period=all"/);
   assert.doesNotMatch(link('all'), /data-active/);
-  assert.match(markup, /data-filter="factory"[^>]*data-kept=""/);
-  assert.doesNotMatch(markup, /data-filter="agent"[^>]*data-kept/);
+  assert.match(markup, /data-filter="agent"[^>]*data-kept=""/);
+  assert.doesNotMatch(markup, /data-filter="step"[^>]*data-kept/);
+});
+
+test('REFUSED: the Stats page draws no picker of the factory, which the sidebar picks, and draws one for each other key', async () => {
+  const markup = await routedWith(createElement(StatsFilters, { search: { factory: 'nemia' }, now: new Date('2026-09-30T12:00:00Z') }));
+  assert.deepEqual(
+    [...markup.matchAll(/data-filter="([^"]+)"/g)].map((m) => m[1]),
+    ['agent', 'step', 'workflow', 'repo'],
+  );
 });
 
 /** A run's card on the floor, inside the router its title links with, as the floor draws it: shown in the bar or not (`inspected`). */
@@ -5322,6 +5332,169 @@ test("the rail is a nav of the four places, each a link named for a screen reade
     [true, false, false, false],
     "a factory's floor lights Home",
   );
+});
+
+/** A factory as the api lists it, for the sidebar: on one repository, offering one workflow; `extra` puts keys over it. */
+const filed = (name: string, extra: Partial<import('../src/lib/api.ts').Factory> = {}): import('../src/lib/api.ts').Factory => ({
+  name,
+  default: false,
+  repos: ['/code/nemia'],
+  workflows: ['build'],
+  hires: {},
+  error: null,
+  ...extra,
+});
+
+/** The frame's sidebar at `path` with `search`, in the provider it sits in, as a loaded page, the factories `factories` read and no run. */
+async function sidebarAt(path: string, search: Record<string, unknown>, factories = [filed('nemia')]): Promise<string> {
+  const { FrameSidebar } = await import('../src/components/FrameSidebar.tsx');
+  const { SidebarProvider } = await import('../src/components/ui/sidebar.tsx');
+  return pagedWith(
+    // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
+    createElement(SidebarProvider, { children: createElement(FrameSidebar, { path, search }) }),
+    [
+      [['factories'], factories],
+      [['runs'], []],
+    ],
+  );
+}
+
+/** The sidebar's sections, in their order: each one's label, `href` and whether it is lit. */
+const sectionLinks = (html: string) =>
+  [...(/<ul[^>]*aria-label="Sections"[^>]*>([\s\S]*?)<\/ul>/.exec(html)?.[1] ?? '').matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/g)].map(
+    ([, tag, body]) => ({
+      label: /<span>([^<]*)<\/span>/.exec(body)?.[1],
+      href: /href="([^"]*)"/.exec(tag)?.[1]?.replaceAll('&amp;', '&'),
+      lit: /data-active="true"/.test(tag),
+    }),
+  );
+
+test("REFUSED: the sidebar's sections carry the factory the address picks, the Floor first to its floor; under All factories none carries one, and there is no Floor", async () => {
+  assert.deepEqual(sectionLinks(await sidebarAt('/runs', { factory: 'nemia' })), [
+    { label: 'Floor', href: '/factories/nemia', lit: false },
+    { label: 'Inbox', href: '/inbox?factory=nemia', lit: false },
+    { label: 'Runs', href: '/runs?factory=nemia', lit: true },
+    { label: 'Workflows', href: '/workflows?factory=nemia', lit: false },
+    { label: 'Stats', href: '/stats?factory=nemia', lit: false },
+  ]);
+  assert.deepEqual(
+    (await sidebarAt('/factories/nemia', {})).match(/data-factory-picker[\s\S]*?<\/button>/)?.[0].includes('>nemia<'),
+    true,
+    "a floor's picker reads its factory",
+  );
+  for (const [path, search] of [
+    ['/runs', {}],
+    ['/runs/r-1', { factory: 'nemia' }],
+  ] as const) {
+    const links = sectionLinks(await sidebarAt(path, search));
+    assert.deepEqual(
+      links.map((link) => link.label),
+      ['Inbox', 'Runs', 'Workflows', 'Stats'],
+      `${path}: no Floor under All factories`,
+    );
+    assert.equal(links.filter((link) => link.href?.includes('factory=')).length, 0, `${path}: no section carries a factory`);
+    assert.match(await sidebarAt(path, search), /data-factory-picker[\s\S]*?All factories[\s\S]*?<\/button>/);
+  }
+});
+
+test('the sidebar starts a run in the factory picked, or in none yet under All factories, and none in a factory that starts none; favourites none yet says so', async () => {
+  const start = (html: string) => html.match(/<button[^>]*>(?:(?!<\/button>)[\s\S])*Start a run<\/button>/)?.[0];
+  assert.ok(start(await sidebarAt('/runs', {})), 'under All factories');
+  assert.ok(start(await sidebarAt('/factories/nemia', {})), 'in nemia');
+  const defaults = [filed('default', { default: true, workflows: null }), filed('nemia')];
+  assert.equal(start(await sidebarAt('/factories/default', {}, defaults)), undefined, 'refused: the default factory starts none here');
+  assert.equal(start(await sidebarAt('/factories/gone', {})), undefined, 'refused: a factory the api lists by no such name');
+  const html = await sidebarAt('/runs', {});
+  assert.match(html, /data-favorites[\s\S]*Favorites[\s\S]*Nothing starred yet\./);
+});
+
+test('a favourite run links to its page, and a workflow to its card on the Workflows page, under every factory, yours said so', async () => {
+  const { FavoriteLinks } = await import('../src/components/FrameSidebar.tsx');
+  const { SidebarProvider } = await import('../src/components/ui/sidebar.tsx');
+  const favorites = [
+    { kind: 'run' as const, run: 'r-1' },
+    { kind: 'workflow' as const, from: 'yours' as const, workflow: 'dev' },
+    { kind: 'workflow' as const, from: 'repo' as const, workflow: 'build' },
+  ];
+  // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
+  const html = await routedWith(createElement(SidebarProvider, { children: createElement(FavoriteLinks, { favorites }) }));
+  assert.deepEqual(
+    [...html.matchAll(/<a\b[^>]*href="([^"]*)"/g)].map((m) => m[1]),
+    ['/runs/r-1', '/workflows#workflow-yours-dev', '/workflows#workflow-repo-build'],
+  );
+  assert.match(html, />dev<span[^>]*> \(yours\)<\/span>/);
+  assert.doesNotMatch(html, /build<span[^>]*> \(yours\)/);
+  assert.doesNotMatch(html, /Nothing starred yet/);
+});
+
+test('REFUSED: the sidebar is drawn folded only where the cookie keeps sidebar_state=false, whole', async () => {
+  const { sidebarOpenOf } = await import('../src/components/ui/sidebar.tsx');
+  assert.equal(sidebarOpenOf('a=1; sidebar_state=false'), false);
+  assert.equal(sidebarOpenOf('sidebar_state=false'), false);
+  for (const open of ['', 'sidebar_state=true', 'sidebar_statex=false', 'xsidebar_state=false', 'a=sidebar_state=false'])
+    assert.equal(sidebarOpenOf(open), true, open);
+});
+
+test("the picker offers the factories Home lists, then the address's own when they leave it out, never twice", async () => {
+  const { pickerFactories } = await import('../src/components/FactoryPicker.tsx');
+  const factories = [filed('default', { default: true, workflows: null }), filed('nemia'), filed('quay')];
+  const names = (picked: string | undefined) => pickerFactories(factories, [], picked).map((item) => item.name);
+  assert.deepEqual(names(undefined), ['nemia', 'quay']);
+  assert.deepEqual(names('quay'), ['nemia', 'quay']);
+  assert.deepEqual(names('default'), ['nemia', 'quay', 'default']);
+  assert.deepEqual(names('gone'), ['nemia', 'quay', 'gone']);
+  assert.equal(pickerFactories(factories, [], 'gone').at(-1)?.factory, undefined);
+});
+
+test("a factory in the picker reads its repositories by their folders' names, whole in the tooltip, and why its file does not read", async () => {
+  const { FactoryItemBody } = await import('../src/components/FactoryPicker.tsx');
+  const broken = filed('nemia', { repos: ['/code/nemia', '/code/web'], error: '/wf/factories/nemia.json is not JSON' });
+  const html = renderToStaticMarkup(createElement(FactoryItemBody, { item: { name: 'nemia', factory: broken } }));
+  assert.match(html, /data-factory="nemia"/);
+  assert.match(html, /title="\/code\/nemia\n\/code\/web"[^>]*>on nemia, web</);
+  assert.match(html, /data-error[^>]*>Its file does not read: \/wf\/factories\/nemia\.json is not JSON</);
+  const gone = renderToStaticMarkup(createElement(FactoryItemBody, { item: { name: 'gone' } }));
+  assert.match(gone, />no such factory</);
+  assert.doesNotMatch(gone, /data-error/);
+});
+
+test("REFUSED: the picker's trigger holds the picked factory's repositories whole and why its file does not read, and none under All factories", async () => {
+  const broken = filed('nemia', { repos: ['/code/nemia', '/code/web'], error: '/wf/factories/nemia.json is not JSON' });
+  const trigger = (html: string) => /data-factory-picker[\s\S]*?<button[\s\S]*?<\/button>/.exec(html)![0];
+  const picked = trigger(await sidebarAt('/factories/nemia', {}, [broken]));
+  assert.match(picked, /title="\/code\/nemia\n\/code\/web\nIts file does not read: \/wf\/factories\/nemia\.json is not JSON"/);
+  assert.doesNotMatch(trigger(await sidebarAt('/runs', {}, [broken])), /title=/);
+});
+
+test('REFUSED: the start in no factory yet offers each factory a run starts in, the default left out, one that cannot start saying why', async () => {
+  const { FactoryChoice } = await import('../src/components/FactoryStart.tsx');
+  const factories = [
+    filed('default', { default: true, workflows: null }),
+    filed('nemia'),
+    filed('quay', { error: '/wf/factories/quay.json is not JSON' }),
+  ];
+  const html = await pagedWith(createElement(FactoryChoice, { factories }));
+  assert.deepEqual(
+    [...html.matchAll(/data-start-factory="([^"]+)"/g)].map((m) => m[1]),
+    ['nemia', 'quay'],
+  );
+  assert.match(html, /data-start-factory="quay"[\s\S]*disabled=""[\s\S]*data-why-not[^>]*>The factory quay&#x27;s file does not read/);
+  assert.doesNotMatch(html.slice(0, html.indexOf('data-start-factory="quay"')), /disabled=""|data-why-not/);
+  assert.equal([...html.matchAll(/<button[^>]*>(nemia|quay)<\/button>/g)].length, 2, 'each factory a button, which a press picks');
+  assert.doesNotMatch(html, /type="radio"/, 'refused: a radio, which an arrow key checks, and so picks, while moving past it');
+  assert.match(await pagedWith(createElement(FactoryChoice, { factories: [factories[0]] })), /No factory is filed to start a run in/);
+});
+
+test("the header reads the section's name alone: a floor reads Floor, with no factory's crumb and no start of a run", async () => {
+  const { FrameHeader } = await import('../src/components/FrameHeader.tsx');
+  const { SidebarProvider } = await import('../src/components/ui/sidebar.tsx');
+  const html = await routedWith(
+    // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
+    createElement(SidebarProvider, { children: createElement(FrameHeader, { section: 'Floor', feed: 'open' }) }),
+    [[['factories'], [filed('nemia')]]],
+  );
+  assert.match(html, /<span class="text-sm font-medium">Floor<\/span>/);
+  assert.doesNotMatch(html, /Start a run|aria-label="Factory"|<h1/);
 });
 
 /** The layers of a step whose agent `writer` was given `alpha` and the person's words, its line adding `gamma`, told in its prompt. */

@@ -44,6 +44,14 @@ function useSidebar() {
   return context;
 }
 
+/**
+ * Whether the sidebar opens, as the provider last kept its fold in `cookie`, the page's `document.cookie`: folded only where a
+ * `sidebar_state=false` pair is kept, open for none.
+ */
+function sidebarOpenOf(cookie: string): boolean {
+  return !cookie.split(';').some((pair) => pair.trim() === `${SIDEBAR_COOKIE_NAME}=false`);
+}
+
 function SidebarProvider({
   defaultOpen = true,
   open: openProp,
@@ -602,5 +610,6 @@ export {
   SidebarRail,
   SidebarSeparator,
   SidebarTrigger,
+  sidebarOpenOf,
   useSidebar,
 };

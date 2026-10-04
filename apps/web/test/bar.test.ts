@@ -30,10 +30,23 @@ const SPEC: Bar = { kind: 'spec', from: 'repo', workflow: 'dev', step: 'review' 
 const STATE: Bar = { kind: 'state', machine: 'lifecycle', state: 'input-required' };
 
 test('the address opens a bar only for a known kind with a name: anything else opens none', () => {
-  for (const value of [undefined, '', 'start', 'start:', 'nope:x', ':hiring', 42, ['start:hiring'], null])
+  for (const value of [undefined, '', 'start:', 'starts', 'run', 'factory', 'nope:x', ':hiring', 42, ['start:hiring'], null])
     assert.equal(barOf(value), undefined, `${JSON.stringify(value)} opens no bar`);
   assert.deepEqual(barOf('start:hiring'), HIRING);
   assert.deepEqual(barOf('start:a:b'), { kind: 'start', factory: 'a:b' });
+});
+
+test('the bare word start opens the start of a run in no factory yet, which asks for one, and no other kind is a bare word', () => {
+  const ASKING: Bar = { kind: 'start', factory: null };
+  assert.deepEqual(barOf('start'), ASKING);
+  assert.equal(barValue(ASKING), 'start');
+  assert.deepEqual(barOf(barValue(ASKING)), ASKING);
+  for (const value of ['starts', 'run', 'factory', 'step', 'spec', 'state', 'start:', 'Start', ' start'])
+    assert.equal(barOf(value), undefined, `${value} opens no bar`);
+  assert.equal(inspects(ASKING), false, 'a press beside it closes it not');
+  assert.equal(barOpens(ASKING), null, 'it has no page');
+  assert.deepEqual(nextBar(ASKING, HIRING), HIRING, 'the start in a factory is another bar');
+  assert.equal(nextBar(ASKING, ASKING), undefined);
 });
 
 test("a run's address names the run, and a step's names its run up to the first slash and the step after it", () => {

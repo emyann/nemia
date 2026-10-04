@@ -1,6 +1,6 @@
 /**
- * The runners of the commands that start work from where they are typed — `wf start`, `wf plan` and `wf inbox add`: each reads the files
- * and folders its command line names, hands its entry's handler what it found, and prints what the entry says of it.
+ * The runners of the commands that start work from where they are typed — `wf start`, `wf plan`, `wf inbox add` and `wf inbox queue`:
+ * each reads the files and folders its command line names, hands its entry's handler what it found, and prints what the entry says of it.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -9,6 +9,7 @@ import {
   inboxDir,
   inboxNameAt,
   INBOX_ADD,
+  INBOX_QUEUE,
   planLines,
   planStopped,
   repoFor,
@@ -129,4 +130,12 @@ export async function inboxAddRun(args: Args, e: Engine): Promise<void> {
   };
   const data = await INBOX_ADD.handler(e, asked);
   for (const line of INBOX_ADD.print(data, asked)) console.log(line);
+}
+
+/** `wf inbox queue`: a card queued or taken back (`INBOX_QUEUE`), with a `--workflow` path read from where it is typed (`workflowAt`). */
+export async function inboxQueueRun(args: Args, e: Engine): Promise<void> {
+  const workflow = textOf(args, 'workflow');
+  const asked: Args = { ...args, workflow: workflow === undefined ? undefined : workflowAt(workflow, process.cwd()) };
+  const data = await INBOX_QUEUE.handler(e, asked);
+  for (const line of INBOX_QUEUE.print(data, asked)) console.log(line);
 }

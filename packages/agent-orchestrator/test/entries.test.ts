@@ -31,6 +31,7 @@ const PINNED: Record<string, string[]> = {
     'HOME',
     'INBOX',
     'INBOX_ADD',
+    'INBOX_QUEUE',
     'INBOX_KEYS',
     'INBOX_KEY_MEANINGS',
     'Invalid',

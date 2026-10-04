@@ -381,7 +381,7 @@ export { COMMANDS, TABLE } from './command/commands.verb.ts';
 export { PRUNE, RM } from './command/runs.verb.ts';
 export { LOGS, STATS } from './command/reads.verb.ts';
 export { START } from './start/commands.verb.ts';
-export { INBOX, INBOX_ADD } from './inbox/commands.verb.ts';
+export { INBOX, INBOX_ADD, INBOX_QUEUE } from './inbox/commands.verb.ts';
 export { FACTORY } from './factory/factory.verb.ts';
 export { AGENTS_CUSTOM } from './agents/custom.verb.ts';
 export type { Command, Ran } from './command/entry.verb.ts';

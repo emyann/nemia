@@ -9,7 +9,7 @@ import type { Command } from '../command/entry.verb.ts';
 import { defaultStartsAllowed } from '../factory/factory.store.ts';
 import { inboxDir } from '../record/files.store.ts';
 import { Missing } from '../refusal/refusal.ts';
-import { inboxLines, noCardLine, workflowAt, type InboxCard, type InboxListing } from './inbox.ts';
+import { inboxLines, noCardLine, type InboxCard, type InboxListing } from './inbox.ts';
 import { addToInbox, dropFromInbox, queueInInbox, readInbox, type InboxDropped, type InboxQueued } from './inbox.store.ts';
 
 export const INBOX_HELP = `wf inbox
@@ -191,8 +191,8 @@ type Queued = {
 };
 
 /**
- * `wf inbox queue`: a card marked to start on its own, or with `--off` the mark taken back; a `--workflow` path is written absolute, read
- * from where it is typed (`workflowAt`) — the command line's alone.
+ * `wf inbox queue`: a card marked to start on its own, or with `--off` the mark taken back. `--workflow` is the command line's alone, and
+ * written as it is handed: its runner reads a path from where it is typed (`inboxQueueRun`), and this handler reads no folder of its own.
  */
 export const INBOX_QUEUE: Command<Queued> = {
   name: 'inbox queue',
@@ -210,8 +210,7 @@ export const INBOX_QUEUE: Command<Queued> = {
   ],
   apiKeys: ['name', 'file', 'was', 'queued', 'place', 'of'],
   async handler(_e, args) {
-    const given = textOf(args, 'workflow');
-    const workflow = given === undefined ? undefined : workflowAt(given, process.cwd());
+    const workflow = textOf(args, 'workflow');
     const done = queueInInbox(textOf(args, 'name') ?? '', { off: args.off === true, ...(workflow !== undefined ? { workflow } : {}) });
     return {
       name: done.card.name,

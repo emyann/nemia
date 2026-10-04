@@ -41,7 +41,7 @@ import {
 import { HELP, usage, type Engine, type Verb } from './flags.ts';
 import { decideVerb } from './decide/decide.ts';
 import { agentsCustomRun, pruneVerb, rmVerb } from './runs.ts';
-import { inboxAddRun, planRun, startRun } from './start.ts';
+import { inboxAddRun, inboxQueueRun, planRun, startRun } from './start.ts';
 
 /**
  * `wf watch` from a cursor already checked: the feed's lines as they are written, on stdout, until `stop()`; a feed cut under the watch is
@@ -237,8 +237,9 @@ export const VERBS: ReadonlyMap<string, Verb> = new Map<string, Verb>([['decide'
 
 /**
  * The runner of each command the CLI runs itself, by its name — those it serves alone (`RAN`, `wf plan`); `wf rm` and `wf prune`, whose
- * runners walk the many runs a command line names through their handlers; and `wf start`, `wf inbox add` and `wf agents custom`, whose
- * runners read the files and folders a command line names before their handlers: handed its arguments once read and checked.
+ * runners walk the many runs a command line names through their handlers; and `wf start`, `wf inbox add`, `wf inbox queue` and
+ * `wf agents custom`, whose runners read the files and folders a command line names before their handlers: handed its arguments once read
+ * and checked.
  */
 export const RUNS: ReadonlyMap<string, (args: Args, e: Engine) => void | Promise<void>> = new Map([
   ['tick', tickVerb],
@@ -249,6 +250,7 @@ export const RUNS: ReadonlyMap<string, (args: Args, e: Engine) => void | Promise
   ['start', startRun],
   ['plan', planRun],
   ['inbox add', inboxAddRun],
+  ['inbox queue', inboxQueueRun],
   ['agents custom', agentsCustomRun],
 ]);
 

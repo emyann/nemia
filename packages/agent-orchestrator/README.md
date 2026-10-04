@@ -2257,6 +2257,34 @@ is held until says so and names the `wf hold … --off` that lets it go.
 - a circle: a run named that already waits on this one, through `--after` while it has not started or
   through a hold, however far round. Each would wait on the other for ever
 
+## Cordoning the whole store: `wf cordon`
+
+```bash
+wf cordon --why "merging by hand on main" --by operator   # nothing new starts, in any run, until it is lifted
+wf uncordon                                               # the next pass files what waits
+```
+
+`wf hold` pauses one run; `wf cordon` pauses the store, as Kubernetes cordons a node. While it stands no pass
+starts new work: no step, try, round or check is filed (the check of a step that has ended among them), no
+queued task is admitted on the runtime, and no queued inbox card is started. What runs finishes: a session in
+flight ends and its closeout is recorded, and a landing whose check has already ended commits or aborts as it
+would. A filing in flight when the cordon is put stops before its next part, as it does for a cancel or a hold.
+`wf start` still writes the run, and says the cordon: nothing of it is filed until the lift. An approval, a
+retry, a round or an answer written meanwhile is kept, and the first pass after `wf uncordon` files what it
+lets through, with what waited.
+
+A cordon says since when, by whom and why, on every screen that says it: the first line of `wf ls`, of
+`wf feed` and of `wf start`, a line of `wf up` when it is put and another when it is lifted, and the board's
+Cordon switch. `--by` defaults to the OS user; `--why` and `--by` are refused blank, twice, or over their caps
+(200 characters, 64), as a hold's are. A landing whose merge the ending has staged in the repository's checkout, and whose check the
+cordon holds, is named under it — `r-1's ship has its merge staged in /repo (MERGE_HEAD), and its check waits on
+wf uncordon` — so a person who cordoned to use main knows whose `MERGE_HEAD` is there.
+
+The cordon is a person's file, `$WF_ROOT/cordon`, `{ at, by, why? }`, one for the store, read on every pass and
+composed onto every run read; no record is written with it, and the runtime is not told. A file that is there
+cordons the store whatever it holds. `wf cordon` refuses a store already cordoned, naming who cordoned it, and
+`wf uncordon` a store none stands on; the api serves the same as `POST`, `DELETE` and `GET /api/cordon`.
+
 ## A plan as a folder of cards: `wf plan`
 
 A person who describes a plan in prose (parse the flag, then store it and document it, then show it) writes it as

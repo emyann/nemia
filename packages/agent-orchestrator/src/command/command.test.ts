@@ -82,8 +82,8 @@ test('a flag the command has none of, given where a required argument stands, is
   assert.equal(parseArgv(SPEC, ['--note=hi']), undefined);
   assert.equal(
     refusalOf(['--nope'], { ...SPEC, missing: 'MISSING' }),
-    'UNKNOWN --nope',
-    'a spec that says its own refusal of an argument left out still refuses a flag it has none of as one it does not take',
+    'MISSING',
+    'a spec that says its own refusal of an argument left out says it',
   );
   assert.equal(refusalOf(['-n'], { ...SPEC, missing: 'MISSING' }), 'MISSING');
 });

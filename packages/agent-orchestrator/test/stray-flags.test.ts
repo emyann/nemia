@@ -1,7 +1,8 @@
 /**
  * The commands that start work, the inbox's, the factories' and `wf agents custom`, as entries of the table: a flag none of them takes is
- * refused in the command's own words, before or after its required arguments, and before anything is read; a word `wf inbox` or
- * `wf factory` has no command of is refused, and their `--help` prints their own help.
+ * refused in the command's own words, before anything is read — where its required arguments stand, as the argument left out by a command
+ * that says its refusal of one (`missing`), and after them as the flag it does not take; a word `wf inbox` or `wf factory` has no command
+ * of is refused, and their `--help` prints their own help.
  *
  * `WF_ROOT` is set before the import, since the store's modules read it as they load.
  */
@@ -71,6 +72,31 @@ const REFUSALS: Array<[string[], string[], string]> = [
   ],
 ];
 
+/**
+ * What each command that says its own refusal of a required argument left out says of a flag where that argument stands: the argument
+ * left out, before the flag is looked at. The others say there what they say of the flag after their arguments.
+ */
+const MISSING: Readonly<Record<string, string>> = {
+  'inbox add':
+    'wf inbox add takes the idea, first: wf inbox add "<idea>" [--workflow <name>] [--repo <path>] [--factory <name>], or a file: ' +
+    'wf inbox add ./idea.md. Nothing was filed.',
+  'inbox queue':
+    'wf inbox queue takes the name of the card to queue, as wf inbox lists it: wf inbox queue <name> [--workflow <w>] [--off].',
+  'inbox rm': 'wf inbox rm takes the name of the card to drop, as wf inbox lists it: wf inbox rm <name>.',
+  'factory add':
+    "wf factory add takes the factory's name, first: wf factory add <name> --repo <path> [--repo <path> ...]. Nothing was filed.",
+  'factory attach':
+    "wf factory attach takes the factory, then the workflow, by its folder's name: wf factory attach <factory> <workflow>. Nothing was " +
+    'attached.',
+  'factory detach':
+    "wf factory detach takes the factory, then the workflow, by its folder's name: wf factory detach <factory> <workflow>. Nothing was " +
+    'detached.',
+  'factory hire':
+    'wf factory hire takes the factory, then the agent: wf factory hire <factory> <agent> --step <workflow>/<step>. Nothing was hired.',
+  'factory fire': 'wf factory fire takes the factory first: wf factory fire <factory> --step <workflow>/<step>. Nothing was fired.',
+  'factory rm': 'wf factory rm takes the name of the factory to remove, as wf factory ls lists it: wf factory rm <name>.',
+};
+
 /** `main` on `argv`, refused: its words and its exit code. */
 async function refusalOf(argv: string[]): Promise<{ message: string; exitCode?: number }> {
   try {
@@ -83,11 +109,10 @@ async function refusalOf(argv: string[]): Promise<{ message: string; exitCode?: 
 
 test('REFUSED at shipped defaults: a flag the command does not take, where its required arguments stand and after them', async () => {
   for (const [command, required, message] of REFUSALS) {
-    for (const argv of [
-      [...command, '--nope'],
-      [...command, ...required, '--nope'],
-    ])
-      assert.deepEqual(await refusalOf(argv), { message, exitCode: 2 }, `wf ${argv.join(' ')}`);
+    const where = required.length > 0 ? (MISSING[command.join(' ')] ?? message) : message;
+    assert.deepEqual(await refusalOf([...command, '--nope']), { message: where, exitCode: 2 }, `wf ${command.join(' ')} --nope`);
+    const after = [...command, ...required, '--nope'];
+    assert.deepEqual(await refusalOf(after), { message, exitCode: 2 }, `wf ${after.join(' ')}`);
   }
 });
 

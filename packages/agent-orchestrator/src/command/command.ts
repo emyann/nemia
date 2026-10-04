@@ -245,7 +245,7 @@ export function parseArgv(typed: Spec, argv: readonly string[]): Args | undefine
   const spec: Spec = { ...typed, flags: typed.flags.filter((f) => f.only?.side !== 'api') };
   const required = spec.positionals.filter((p) => p.takes === 'required');
   const head = argv.slice(0, required.length);
-  const stray = head.find((a) => strayFlag(spec, a));
+  const stray = spec.missing === undefined ? head.find((a) => strayFlag(spec, a)) : undefined;
   if (stray !== undefined) return usage(spec.unknown(stray));
   if (head.length < required.length || head.some((a, i) => unfilled(spec, required[i], a))) {
     return spec.missing === undefined ? undefined : usage(spec.missing);

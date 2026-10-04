@@ -76,7 +76,7 @@ function Floor({ blocks }: { blocks: readonly FactoryBlock[] }) {
   const over = useBarOver(whole);
   useKeepClear(frame, inspected);
   return (
-    <div ref={whole} className="flex h-[calc(100svh-3rem)] min-h-96" aria-label="The factories">
+    <div ref={whole} className="flex h-[calc(100svh-5rem)] min-h-96" aria-label="The factories">
       <div ref={frame} className="min-h-0 min-w-0 flex-1" style={{ marginRight: over }}>
         <ReactFlow
           id="factories"
@@ -140,7 +140,7 @@ function useKeepClear(frame: RefObject<HTMLDivElement | null>, inspected: string
 /** No factory, and no run in the default one: say how to make one. */
 function NoFactory() {
   return (
-    <div className="flex h-[calc(100svh-3rem)] min-h-96 items-center justify-center p-6">
+    <div className="flex h-[calc(100svh-5rem)] min-h-96 items-center justify-center p-6">
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle>No factory yet</CardTitle>

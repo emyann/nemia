@@ -4,22 +4,20 @@ import { FactoryCanvas } from '@/components/FactoryCanvas';
 import { LinkButton } from '@/components/ui/button';
 import { routeLink } from '@/components/routeLink';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { daemonQuery, factoriesQuery, inboxQuery, quotaQuery, runsQuery } from '@/lib/api';
+import { factoriesQuery, inboxQuery, runsQuery } from '@/lib/api';
 import { runsIn } from '@/lib/factories';
 
 export const Route = createFileRoute('/factories/$factory')({
   /**
-   * Waits for the factories and the runs, and prefetches the inbox for the queue's ghosts beside the floor, the quota, and whether a
-   * daemon ticks over it, so the floor is fitted beside them with the first cards. A prefetch never throws: what cannot be read says so
-   * over the floor, and the runs are drawn all the same.
+   * Waits for the factories and the runs, and prefetches the inbox for the queue's ghosts beside the floor, so the floor is fitted beside
+   * them with the first cards. A prefetch never throws: what cannot be read says so over
+   * the floor, and the runs are drawn all the same.
    */
   loader: ({ context }) =>
     Promise.all([
       context.queryClient.ensureQueryData(factoriesQuery),
       context.queryClient.ensureQueryData(runsQuery),
       context.queryClient.prefetchQuery(inboxQuery),
-      context.queryClient.prefetchQuery(quotaQuery),
-      context.queryClient.prefetchQuery(daemonQuery),
     ]),
   staticData: { fullBleed: true },
   component: FactoryPage,
@@ -50,7 +48,7 @@ const RouterLinkButton = routeLink(LinkButton);
 /** A name no factory has: say so, and lead back to the Factories. */
 function NoSuchFactory({ name }: { name: string }) {
   return (
-    <div className="flex h-[calc(100svh-3rem)] items-center justify-center p-6">
+    <div className="flex h-[calc(100svh-5rem)] items-center justify-center p-6">
       <Card className="w-full max-w-sm" data-no-factory={name}>
         <CardHeader>
           <CardTitle>No factory named {name}</CardTitle>

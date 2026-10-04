@@ -2,6 +2,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {
+  type AtWork,
+  atWork,
   artifactsDir,
   budgetWord,
   closeoutAsked,
@@ -16,6 +18,8 @@ import {
   type Retry,
   type RetryMode,
   runStartedAt,
+  type RunTokens,
+  runTokens,
   type Said,
   type Spend,
   type SpendOf,
@@ -262,6 +266,10 @@ export type RunDetail = {
   moving: boolean;
   /** As on `RunSummary`. */
   cost: Spent | null;
+  /** As on `RunSummary`. */
+  atWork: AtWork | null;
+  /** As on `RunSummary`, whose split the run's page shows. */
+  tokens: RunTokens | null;
   /**
    * What the sessions of every try of every step read, by price, beside `cost`, which is theirs too (`RunRead`): each class only where
    * every session measured it, and the largest peak against the cap of the step that reached it. Null where none of it was measured.
@@ -635,6 +643,8 @@ export async function detail(run: Run, { e, home, memo }: Pick<Served, 'e' | 'ho
     status: judged.status,
     moving: judged.moving,
     cost: judged.cost,
+    atWork: atWork(run, views),
+    tokens: runTokens(run, views),
     read: readOf(
       totalOf(
         steps,

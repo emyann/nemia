@@ -1,10 +1,12 @@
 /**
  * What the api does for a command beyond its spec, keyed by the command's name: the keys of a body it takes that the command line has no
- * flag for (`apiTakes`), with their schemas, and its fold — refusals of the api's own (400), and the arguments those keys carry.
+ * flag for (`apiTakes`), with their schemas, and its fold — refusals of the api's own (400, and 409 for a run the board does not remove),
+ * and the arguments those keys carry.
  */
 import { Schema } from 'effect';
 import { type Args, budgetRefusal, type CommandSpec, commandLine, type RetryHow, roundBudgetRefusal } from 'agent-orchestrator';
 import type { Run } from 'agent-orchestrator/run';
+import { tryOf } from '../agents/try.ts';
 import { answeredHow } from '../asks/answers.ts';
 import type { Refusal } from '../guard.ts';
 import type { Engine } from '../store.ts';
@@ -75,8 +77,23 @@ const ROUND: Extension = {
   },
 };
 
+/**
+ * Rm's: the board removes only a try, a run started from an agent's page (`tryOf`); any other run is a 409 naming `wf rm`, which says what
+ * it hands off and what it leaves, since a git run's worktrees and branches are a person's to read before they go.
+ */
+const RM: Extension = {
+  takes: {},
+  async fold({ home, run }, _command, args) {
+    if (tryOf(run, home)) return { args };
+    return {
+      status: 409,
+      error: `DELETE /api/runs/${run.id}: the board removes only a try, a run started from an agent's page, and ${run.id} is a run of ${run.workflowDir}. Remove it with \`wf rm ${run.id}\`, which says what it hands off and what it leaves.`,
+    };
+  },
+};
+
 /** The api's extension of each command that has one, by its name. */
-export const EXTENSIONS: Readonly<Record<string, Extension>> = { retry: RETRY, round: ROUND };
+export const EXTENSIONS: Readonly<Record<string, Extension>> = { retry: RETRY, round: ROUND, rm: RM };
 
 /** Where a table asks the api for what it does not do, a sentence each: a key a command's `apiTakes` names that no extension takes. */
 export const extensionBreaks = (table: readonly Pick<CommandSpec, 'name' | 'apiTakes'>[]): string[] =>

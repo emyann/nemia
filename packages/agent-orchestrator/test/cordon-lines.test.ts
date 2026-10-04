@@ -18,6 +18,7 @@ process.env.WF_VERIFY_REST = '1';
 const { main, cordonSaid } = await import('../src/cli/main.ts');
 const { liftCordon, putCordon } = await import('../src/cordon/cordon.store.ts');
 const { cordonWords, UNCORDONED } = await import('../src/cordon/cordon.ts');
+const { addFactory, attachWorkflow, hireAgent } = await import('../src/runner.ts');
 
 /** What `fn` printed on stdout, line by line. */
 const printed = async (t: TestContext, fn: () => unknown): Promise<string[]> => {
@@ -33,16 +34,26 @@ const printed = async (t: TestContext, fn: () => unknown): Promise<string[]> => 
   return lines.join('\n').split('\n');
 };
 
-/** A repository with one commit, and a workflow folder of one step on it. */
+let factories = 0;
+
+/** A repository with one commit, a team of one step and one agent, and a factory of its own on the repository that offers it, hired. */
 const aStart = (): string[] => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   const git = (...args: string[]) =>
     execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: 'ignore' });
   git('init', '-q');
   git('commit', '-q', '--allow-empty', '-m', 'base');
-  const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-  fs.writeFileSync(path.join(dir, 'work.md'), '---\nharness: codex\n---\nwork it\n');
-  return ['start', 'a cordoned start', '--workflows', dir, '--repo', repo, '--no-worktree'];
+  const team = fs.mkdtempSync(path.join(ROOT, 'team-'));
+  const dir = path.join(team, 'lines');
+  fs.mkdirSync(dir);
+  fs.mkdirSync(path.join(team, 'agents'));
+  fs.writeFileSync(path.join(team, 'agents', 'worker.md'), '---\nharness: codex\n---\nDo the work.\n');
+  fs.writeFileSync(path.join(dir, 'work.md'), 'work it\n');
+  const factory = `lines${++factories}`;
+  addFactory({ name: factory, repos: [repo] });
+  attachWorkflow({ factory, workflow: 'lines' });
+  hireAgent({ factory, agent: 'worker', step: 'lines/work' });
+  return ['start', 'a cordoned start', '--workflows', dir, '--repo', repo, '--factory', factory, '--no-worktree'];
 };
 
 test('wf feed opens with the cordon while one stands, and says none once it is lifted', async (t) => {

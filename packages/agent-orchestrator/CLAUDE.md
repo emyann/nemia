@@ -63,8 +63,8 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
 ## Runs, phases and asks
 
 - **The runtime's words stop here**: the orchestrator translates a runtime phase into its own status (`harnessBlocked`, `waitingOf`,
-  `settledOf` in `listing`, `phaseOfView`), and the api and the board read only the orchestrator's words `(no test yet)`; today the
-  api's `needsOf` and the web's `stepState` still compare `needs-human`. A new runtime phase is translated in `listing` and
+  `settledOf` in `listing`, `phaseOfView`), and the api and the board read only the orchestrator's words `(no test yet)`; today
+  `needsOf` (`summary/judged.verb.ts`) and the web's `stepState` still compare `needs-human`. A new runtime phase is translated in `listing` and
   `phaseOfView`; put a new word beside a phase (`waitingOf`), never into it.
 - **A new step status is `working` on the board until `stepState` knows it**.
 - **A word from outside is made one line before it is measured into a column** (`waitingWords`).

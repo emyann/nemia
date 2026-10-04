@@ -57,7 +57,7 @@ function restore(before: ReturnType<typeof snapshot>): void {
   for (const dir of asksDirs().filter((name) => !before.asks.has(name))) fs.rmSync(path.join(store!, 'runs', dir), { recursive: true });
 }
 
-/** Writes LANDING: ENDING's run with its ending filed, and ship's session at work in the repository's checkout, on the engine's feed too. */
+/** Writes LANDING: ENDING's run with its ending filed, and ship's session at work in the repository's checkout, on the engine's feed. */
 function writeLanding(): void {
   const record = JSON.parse(fs.readFileSync(path.join(store!, 'runs', `${ENDING.id}.json`), 'utf8')) as {
     steps: Record<string, object>;

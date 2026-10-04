@@ -1,8 +1,10 @@
-import type { Page } from 'playwright';
-import { cancelledAt, SECTIONS, sectionsOf, sidebar } from '../board.ts';
-import { expectBeneath, expectCount, expectVisible, Refused, WAIT_MS } from '../checks.ts';
+import path from 'node:path';
+import type { Locator, Page } from 'playwright';
+import { cancelledAt, photograph, SECTIONS, sectionsOf, sidebar, themeOf } from '../board.ts';
+import { expectBeneath, expectCount, expectUncut, expectVisible, Refused, WAIT_MS } from '../checks.ts';
 import { COSTLY, DIAMOND, ENDING, FAKE, GATED, LOOPING, SHIPPED, UNMERGED } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
+import { OUT } from '../world.ts';
 
 /**
  * A place in the menu pressed with Enter, as from the keyboard: the page is not loaded again, and the history has one entry more, as after
@@ -23,6 +25,32 @@ async function enterOnPlace(page: Page, place: (typeof SECTIONS)[number], route:
   if (!kept) throw new Refused(`Enter on ${place} in the menu goes to ${route} in the page — the whole page was loaded again`);
   if (after !== before + 1)
     throw new Refused(`Enter on ${place} in the menu adds one entry to the history, as a click does — it went from ${before} to ${after}`);
+}
+
+/**
+ * COSTLY's row says what the run took beside what it cost: its clock — at work, since it waits on you — with its start and the wall time on
+ * hover, and its tokens, their split on hover; each read whole, the phone's width too, and photographed at both.
+ */
+async function tookOnTheRow(page: Page, costly: Locator): Promise<void> {
+  await expectVisible(
+    costly.locator('[data-clock][title^="At work "][title*="from start to now"]', { hasText: new RegExp(`^${COSTLY.took}$`) }),
+    'the row says how long the run has been at work, not what it took: it waits on you; its start and the wall time on hover',
+  );
+  await expectVisible(
+    costly.locator(`[data-tokens][title="${COSTLY.tokens.split}"]`, { hasText: COSTLY.tokens.said }),
+    `and the tokens its sessions used (${COSTLY.tokens.said}), their split on hover`,
+  );
+  const size = page.viewportSize();
+  for (const width of [size?.width ?? 1280, 390]) {
+    await page.setViewportSize({ width, height: size?.height ?? 844 });
+    await costly.scrollIntoViewIfNeeded();
+    await expectUncut(
+      costly.locator('[data-clock], [data-cost], [data-tokens]'),
+      `the clock, the cost and the tokens read whole, ${width} wide`,
+    );
+    await photograph(costly, path.join(OUT, `runs-row-took${width === 390 ? '-phone' : ''}-${await themeOf(page)}.png`));
+  }
+  if (size) await page.setViewportSize(size);
 }
 
 export default {
@@ -156,6 +184,7 @@ export default {
       `the row shows ${COSTLY.over.step} over its budget as an amber chip, with the amounts (${COSTLY.over.status})`,
     );
     await expectVisible(costly.getByText(`waiting on you: ${COSTLY.steps.join(', ')}`), 'and says every step past its budget waits on you');
+    await tookOnTheRow(page, costly);
     await expectCount(
       page.locator('li', { has: page.locator(`a[href="/runs/${FAKE.id}"]`) }).locator('[data-cost]'),
       0,

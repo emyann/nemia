@@ -5,20 +5,24 @@ import { pace } from '../feed.ts';
 import { get, send } from './read.ts';
 import { RunGraphSchema, type RunGraph } from './graph.ts';
 import {
+  AtWorkSchema,
   PlaceKindSchema,
   RunHoldingSchema,
   RunStatusSchema,
   RunStoppedOnSchema,
   RunToDecideSchema,
+  RunTokensSchema,
   RunWaitingSchema,
   SpentSchema,
   StepNeedsFields,
   StringsSchema,
+  type AtWork,
   type PlaceKind,
   type RunHolding,
   type RunStatus,
   type RunStoppedOn,
   type RunToDecide,
+  type RunTokens,
   type RunWaiting,
   type Spent,
   type StepNeeds,
@@ -75,6 +79,10 @@ export type RunSummary = {
   moving: boolean;
   /** What the run has cost so far, every step's tries together, as `wf ls` adds it up (`Spent`); null until a cost was measured. */
   cost: Spent | null;
+  /** What the run took at work (`AtWork`), off its tasks' intervals; null where the api could not read it. */
+  atWork: AtWork | null;
+  /** The tokens its sessions used (`RunTokens`); null until one measured any. */
+  tokens: RunTokens | null;
   /**
    * `note` is what `wf ls` prints beside the status — the try or round a step is on, or the one due — and null where it prints nothing.
    * `needs` and `blockedByHarness` are what a person has to know to act on it (`StepNeeds`).
@@ -122,6 +130,8 @@ const RunSummarySchema = Schema.Struct({
   stoppedOn: Schema.NullOr(RunStoppedOnSchema),
   moving: Schema.Boolean,
   cost: Schema.NullOr(SpentSchema),
+  atWork: Schema.NullOr(AtWorkSchema),
+  tokens: Schema.NullOr(RunTokensSchema),
   steps: Schema.mutable(
     Schema.Array(
       Schema.Struct({

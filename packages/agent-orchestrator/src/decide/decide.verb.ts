@@ -20,7 +20,7 @@ import { assess } from '../tick/assess.ts';
 import { acceptedLines, gateLines } from '../brief/index.ts';
 import { parseCloseout, type Closeout } from '../closeout/closeout.ts';
 import { answerLines, answerOf, overBudgetLine, retriesDue, retryOffers, type Retry, type RetryAsk } from '../retry/index.ts';
-import { timeline, type Timeline } from '../timeline/timeline.ts';
+import { timeline, type Timeline } from '../timeline/index.ts';
 import { runStore } from '../record/files.store.ts';
 import { stepsOf } from '../record/record.store.ts';
 import { branchReader, shippedOf, standingsOf } from '../branches/branches.store.ts';

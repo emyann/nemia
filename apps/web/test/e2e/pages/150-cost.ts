@@ -2,10 +2,33 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { photograph, sidebar, themeOf, stepBar } from '../board.ts';
-import { expectCount, expectInside, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
+import { expectCount, expectInside, expectUncut, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { COSTLY } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
+
+/**
+ * The run's header says what the run took beside what it cost: its clock — at work, since it waits on you — with its start and the wall
+ * time on hover, and its tokens with their split, in full; photographed, and at the phone's width, where the header wraps and cuts nothing.
+ */
+async function tookInTheHeader(page: Page): Promise<void> {
+  const header = page.locator('article header').first();
+  await expectVisible(
+    header.locator('[data-run-took] time[title^="At work "][title*="from start to now"]', { hasText: new RegExp(`^${COSTLY.took}$`) }),
+    "the run's header says how long it has been at work, not what it took: it waits on you; its start and the wall time on hover",
+  );
+  await expectVisible(
+    header.locator('[data-run-tokens]', { hasText: `${COSTLY.tokens.said} (${COSTLY.tokens.split})` }),
+    `and the tokens its sessions used, with their split (${COSTLY.tokens.said} (${COSTLY.tokens.split}))`,
+  );
+  const size = page.viewportSize();
+  for (const width of [size?.width ?? 1280, 390]) {
+    await page.setViewportSize({ width, height: size?.height ?? 844 });
+    await expectUncut(header.locator('[data-run-took], [data-run-cost], [data-run-tokens]'), `each figure read whole, ${width} wide`);
+    await photograph(header, path.join(OUT, `cost-header-took${width === 390 ? '-phone' : ''}-${await themeOf(page)}.png`));
+  }
+  if (size) await page.setViewportSize(size);
+}
 
 export default {
   /**
@@ -28,6 +51,7 @@ export default {
       page.locator('article header [data-run-cost]', { hasText: `cost ${COSTLY.cost}` }),
       `the run's header says what it cost (${COSTLY.cost})`,
     );
+    await tookInTheHeader(page);
     const runRead = page.locator('article header [data-run-read]');
     await expectVisible(
       runRead.locator('.font-mono', { hasText: COSTLY.read.run }),

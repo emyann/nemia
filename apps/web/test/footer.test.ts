@@ -41,6 +41,8 @@ const run = (statuses: readonly string[], extra: Partial<RunSummary> = {}): RunS
   stoppedOn: null,
   moving: true,
   cost: null,
+  atWork: null,
+  tokens: null,
   steps: statuses.map((status, i) => ({
     name: `step-${i}`,
     taskId: `t-${i}`,

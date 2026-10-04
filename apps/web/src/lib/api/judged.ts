@@ -84,6 +84,52 @@ export const SpentSchema = Schema.Struct({
 }) satisfies Schema.Schema<Spent>;
 
 /**
+ * Mirrors `AtWork` in agent-orchestrator's timeline/took.ts: a run's time at work, two tasks at once counted once and a wait counted for
+ * nothing. `ms` is what ran and ended, `since` the earliest start of what still runs (null when nothing does), `endedAt` the last end once
+ * nothing runs.
+ */
+export type AtWork = { ms: number; since: string | null; endedAt: string | null };
+
+/** Decodes an `AtWork`. */
+export const AtWorkSchema = Schema.Struct({
+  ms: Schema.Number,
+  since: Schema.NullOr(Schema.String),
+  endedAt: Schema.NullOr(Schema.String),
+}) satisfies Schema.Schema<AtWork>;
+
+/**
+ * Mirrors `RunTokens` in agent-orchestrator's timeline/took.ts: the tokens a run's sessions used — `total`, the `input` and its parts
+ * (null where a session lacks one), the `output` — how many sessions measured them and how many did not, `said` its word for a card and
+ * `split` its parts for a title.
+ */
+export type RunTokens = {
+  total: number;
+  input: number;
+  output: number;
+  cacheRead: number | null;
+  cacheWrite: number | null;
+  uncached: number | null;
+  measured: number;
+  unmeasured: number;
+  said: string;
+  split: string;
+};
+
+/** Decodes a `RunTokens`. */
+export const RunTokensSchema = Schema.Struct({
+  total: Schema.Number,
+  input: Schema.Number,
+  output: Schema.Number,
+  cacheRead: Schema.NullOr(Schema.Number),
+  cacheWrite: Schema.NullOr(Schema.Number),
+  uncached: Schema.NullOr(Schema.Number),
+  measured: Schema.Number,
+  unmeasured: Schema.Number,
+  said: Schema.String,
+  split: Schema.String,
+}) satisfies Schema.Schema<RunTokens>;
+
+/**
  * Mirrors `RunWaiting` in apps/api/src/runs/judged.ts: what a run started `--after` still waits on, in the package's words. `runs` are each
  * run not shipped, and why one never will without a person (`missing`, `cancelledAt`, `gone`); `word` is what `wf ls` prints on its roots —
  * `waiting on a-1x2y (cancelled)` — and `advice` the line `wf decide` prints under it; `onYou` whether a person has to act.

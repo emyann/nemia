@@ -22,7 +22,8 @@ import { barValue } from '../lib/bar';
 import { spentTitle } from '../lib/cost';
 import { decidableRun } from '../lib/decide';
 import { duration } from '../lib/canvas';
-import { waitedMs } from '../lib/factory';
+import { clockCounts, inFlight, runClock, waitedMs } from '../lib/factory';
+import { useNow } from '../lib/useNow';
 
 /**
  * `step`, the old address of one step of the run, opens that step in the frame's bar: the page is loaded again in place of that address,
@@ -105,6 +106,7 @@ function Run({ run }: { run: RunDetail }) {
       <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h1 className="font-mono text-sm text-neutral-500">{run.id}</h1>
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+          <RunTook run={run} />
           {run.cost && (
             <p data-run-cost title={spentTitle(run.cost, "the run's tries")} className="text-sm">
               <span className="text-neutral-500">cost </span>
@@ -118,6 +120,11 @@ function Run({ run }: { run: RunDetail }) {
               title="What every try of every step read: from the cache, written to it, and the largest context one response carried."
             >
               <Read said={run.read.said} peak={run.read.peak} rebuilt={run.read.rebuilt} />
+            </p>
+          )}
+          {run.tokens && (
+            <p data-run-tokens className="text-sm">
+              <span className="font-mono">{run.tokens.said}</span> <span className="text-neutral-500">({run.tokens.split})</span>
             </p>
           )}
           <StartedFrom run={run} />
@@ -317,6 +324,24 @@ function StepSection({ run, step, runCancelled }: { run: RunDetail; step: Step; 
 
       {gate?.approval && <Approved step={step.name} approval={gate.approval} ends={ends} />}
     </section>
+  );
+}
+
+/**
+ * What the run took, or how long it has been at work, as its card's clock says it (`runClock`), the start, the end and the wall time on
+ * hover; it moves every second while a task of it runs (`clockCounts`). Nothing before the run started, which the `started` row says.
+ */
+function RunTook({ run }: { run: RunDetail }) {
+  const finished = !inFlight(run);
+  const now = useNow(clockCounts(run, finished) ? 1_000 : 30_000);
+  if (run.startedAt === null) return null;
+  const clock = runClock(run, now, finished);
+  return (
+    <p data-run-took className="text-sm">
+      <time dateTime={clock.at} title={clock.title} className="font-mono">
+        {clock.words}
+      </time>
+    </p>
   );
 }
 

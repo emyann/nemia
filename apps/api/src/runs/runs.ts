@@ -1,7 +1,18 @@
 /** The runs, for the board: every run listed, one run in full, and what `wf decide` shows of it. */
 import { isDeepStrictEqual } from 'node:util';
 import { Hono } from 'hono';
-import { type BranchReader, branchReader, runStartedAt, unjudgedWord, verifiesRest, runStore } from 'agent-orchestrator';
+import {
+  type AtWork,
+  atWork,
+  type BranchReader,
+  branchReader,
+  runStartedAt,
+  type RunTokens,
+  runTokens,
+  unjudgedWord,
+  verifiesRest,
+  runStore,
+} from 'agent-orchestrator';
 import { isGitRun, type PlaceKind, placeOf, prunedKept, prunedWords, type Run } from 'agent-orchestrator/run';
 import { decisionOf } from '../decide/index.ts';
 import { detail } from '../detail/index.ts';
@@ -102,6 +113,17 @@ export type RunSummary = {
    */
   cost: Spent | null;
   /**
+   * How long the run has been at work (`atWork`): the time any session or check of it ran, two at once counted once, and a wait at a gate,
+   * a hold, a slot or another run counted for nothing — `since` while a task runs, from which the board counts on, and `endedAt` once none
+   * does. Null for a run not judged (`unreadable`).
+   */
+  atWork: AtWork | null;
+  /**
+   * The tokens its sessions used, every try's, and their split by the cache, in the package's words (`runTokens`); null until a session
+   * measured any, and for a run not judged.
+   */
+  tokens: RunTokens | null;
+  /**
    * `status` is what `wf ls` prints for the step — see `judge` for the one word it corrects. `note` is what `wf ls` prints
    * beside it, for a step tried again or about to be, or in a loop past its first round — `try 2, by retries: 1`,
    * `round 2 of 3`, `round 3 asked (wf round) — …` — and null where it prints nothing.
@@ -164,6 +186,8 @@ async function summarize(run: Run, views: Views, reader: Engine['Service'], git:
     stoppedOn: judged.stoppedOn,
     moving: judged.moving,
     cost: judged.cost,
+    atWork: atWork(run, views),
+    tokens: runTokens(run, views),
     steps: names.map((name) => ({
       name,
       taskId: run.steps[name]?.taskId ?? null,
@@ -211,6 +235,8 @@ function unjudged(run: Run, views: Views, unreadable: Unreadable, said: string, 
     stoppedOn: null,
     moving: true,
     cost: null,
+    atWork: null,
+    tokens: null,
     steps: names.map((name) => ({
       name,
       taskId: run.steps[name]?.taskId ?? null,

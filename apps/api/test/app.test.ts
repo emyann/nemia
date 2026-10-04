@@ -7,7 +7,7 @@ import { scratch } from './scratch.ts';
 import type { RunDetail } from '../src/detail/detail.ts';
 import type { RunSummary } from '../src/runs/runs.ts';
 import { app } from '../src/app.ts';
-import { engine, list, readFilings, timeline, runStore, VERSION } from 'agent-orchestrator';
+import { atWork, engine, list, readFilings, runTokens, timeline, runStore, VERSION } from 'agent-orchestrator';
 import { claudeDetached, claudeOps } from 'agent-runtime/effect';
 import { Effect } from 'effect';
 import { DEFAULT_ROUNDS } from 'agent-orchestrator/workflow';
@@ -223,6 +223,10 @@ test('runs are read from the workflow store and summarized, with what each step 
       moving: false,
       /** Nothing of it was measured: no cost, which is not $0. */
       cost: null,
+      /** Its one task is on no engine here: nothing of it ran, so nothing at work, and no end. */
+      atWork: { ms: 0, since: null, endedAt: null },
+      /** No session measured tokens: no figure, which is not 0. */
+      tokens: null,
       steps: [
         {
           name: 'implement',
@@ -369,6 +373,9 @@ test("a run in full: the brief, each step's spec and prose, what it was told, an
       status: 'failed',
       moving: false,
       cost: null,
+      /** implement spawned and ended at the same instant, and nothing else ran: at work for no time, and over. */
+      atWork: { ms: 0, since: null, endedAt: at },
+      tokens: null,
       read: null,
       waitingOnYou: ['implement'],
       onYou: ['implement'],
@@ -2603,6 +2610,60 @@ test("the detail carries where each step's time went — per try and per check, 
       ran: 'still running, no end yet',
     },
     'a try filed later is read on from where the last read of the feed stopped: its filing is known on the next poll, not "not known"',
+  );
+});
+
+test("a run's list line and its page say what it took — its time at work and its sessions' tokens — as the package has them off the same views", async () => {
+  const T = (m: number) => new Date(Date.UTC(2026, 8, 14, 9, m)).toISOString();
+  const used = (input: number, read: number, write: number, output: number) => ({
+    inputTokens: input,
+    cacheReadTokens: read,
+    cacheWriteTokens: write,
+    uncachedTokens: input - read - write,
+    outputTokens: output,
+  });
+  ranTask('r-61-plan', 'codex', T(0), T(0), {
+    at: T(20),
+    outcome: 'succeeded',
+    more: { closeout: done, usage: used(1_000_000, 900_000, 80_000, 10_000) },
+  });
+  ranTask('r-61-plan-check', 'check', T(20), T(20), { at: T(22), outcome: 'succeeded', more: { exitCode: 0 } });
+  ranTask('r-61-build', 'codex', T(90), T(90), {
+    at: T(100),
+    outcome: 'succeeded',
+    more: { closeout: done, usage: used(2_000_000, 1_800_000, 150_000, 30_000) },
+  });
+  writeRun({
+    ...r2,
+    id: 'r-61',
+    workflowDir: gone,
+    workflow: [
+      { name: 'plan', after: [], body: 'Plan it.', check: 'npm test' },
+      { name: 'build', after: ['plan'], body: 'Build it.' },
+    ],
+    steps: { plan: { taskId: 'r-61-plan', check: { taskId: 'r-61-plan-check' } }, build: { taskId: 'r-61-build' } },
+  });
+
+  const summary = await listed('r-61');
+  const run = await detailOf('r-61');
+  assert.deepEqual(
+    [summary.atWork, run.atWork],
+    [
+      { ms: 32 * 60_000, since: null, endedAt: T(100) },
+      { ms: 32 * 60_000, since: null, endedAt: T(100) },
+    ],
+    'the session, its check, and the next step an hour later: 32 minutes at work, the wait between counted for nothing',
+  );
+  assert.equal(summary.tokens?.said, '3.04M tokens');
+  assert.deepEqual(run.tokens, summary.tokens, "the run's page carries the same total, with its split");
+  assert.equal(run.tokens?.split, '2.7M read from the cache · 230k written to it · 70k uncached · 40k out');
+
+  const views = new Map((await engine().list()).views.map((view) => [view.id, view]));
+  const record = runStore.runs.read('r-61');
+  assert.deepEqual(
+    { atWork: summary.atWork, tokens: summary.tokens },
+    JSON.parse(JSON.stringify({ atWork: atWork(record, views), tokens: runTokens(record, views) })),
+    "the package's figures over the engine's own views, word for word",
   );
 });
 

@@ -238,6 +238,10 @@ test('wf pause --now says each task it would stop, what that costs, and the line
   ]);
   assert.equal(NOW_COST, 'An interrupted step redoes its unfinished work and reads its context again.');
   assert.match(nowLines([])[0], /stops nothing/);
+  assert.equal(
+    nowLines([], true)[0],
+    "wf pause --now would keep the store's pause as it stands; nothing outside a landing is at work, so it stops nothing.",
+  );
 });
 
 test('a task asked to stop finishes as stopping', () => {

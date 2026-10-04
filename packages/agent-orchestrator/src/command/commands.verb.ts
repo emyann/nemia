@@ -35,7 +35,7 @@ import { AGENTS_CUSTOM } from '../agents/custom.verb.ts';
 import { FACTORIES } from '../factory/factory.verb.ts';
 import { INBOXES } from '../inbox/commands.verb.ts';
 import { PLAN, START } from '../start/commands.verb.ts';
-import { CANCEL, PAUSE, PAUSED, HOLD, PRUNE, RAN, RM, RESUME } from './runs.verb.ts';
+import { CANCEL, PAUSE, PAUSED, PAUSE_NOW, HOLD, PRUNE, RAN, RM, RESUME } from './runs.verb.ts';
 
 /** The text under `key`, or undefined where none was given. */
 const textOf = (args: Args, key: string): string | undefined => {
@@ -492,6 +492,7 @@ export const COMMANDS: readonly Command[] = [
   PAUSE,
   RESUME,
   PAUSED,
+  PAUSE_NOW,
 ];
 
 /**

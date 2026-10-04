@@ -73,7 +73,7 @@ const REFUSALS: Array<[string[], string[], string]> = [
     ['scribe'],
     "wf agents custom takes one agent's name, then --file <path> (or --file - for stdin), --clear or --repo <r>, not --nope.",
   ],
-  [['pause'], [], 'wf pause does not take --nope: wf pause [--why "<words>"] [--by <name>].'],
+  [['pause'], [], 'wf pause does not take --nope: wf pause [--why "<words>"] [--by <name>] [--now [--yes]].'],
   [['resume'], [], 'wf resume takes no --nope: it resumes the store, whoever paused it.'],
 ];
 

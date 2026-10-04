@@ -136,3 +136,34 @@ test('what a pause at once would stop is read, and nothing is written nor stoppe
   assert.equal(readPause(), null);
   assert.equal(fs.existsSync(asksDir('r-a')), false);
 });
+
+test('wf pause --now says what it would stop and writes nothing; --yes acts; a plain pause on a standing one names --now', async () => {
+  const { PAUSE } = await import('../command/runs.verb.ts');
+  writeRun('r-a', { implement: { taskId: 't1' } });
+  const { e, stops } = engineOf(['t1']);
+  const preview = await PAUSE.handler(e, { now: true });
+  assert.deepEqual(PAUSE.print(preview, { now: true }), [
+    'wf pause --now would pause the store and stop 1 at work, each tried again on wf resume:',
+    "   r-a's implement: its session",
+    'An interrupted step redoes its unfinished work and reads its context again. A landing that checks or merges is left to finish.',
+    'wf pause --now --yes does it.',
+  ]);
+  assert.equal(fs.existsSync(pauseFile()), false);
+  assert.equal(fs.existsSync(asksDir('r-a')), false);
+  assert.deepEqual(stops, []);
+  await PAUSE.handler(e, { yes: true, why: 'lunch', by: 'ann' });
+  assert.deepEqual(stops, [], '--yes alone pauses as a plain pause does');
+  assert.equal(readPause()?.why, 'lunch');
+  await assert.rejects(PAUSE.handler(e, { why: 'other' }), (err: Error) => {
+    assert.match(err.message, /wf pause --now stops what still finishes under it/);
+    return true;
+  });
+  const acted = await PAUSE.handler(e, { now: true, yes: true, why: 'other' });
+  assert.equal(
+    PAUSE.print(acted, {})[0],
+    "the store's pause stands as it was put, since " + readPause()?.at + ' by ann: lunch; now what runs is asked to stop',
+  );
+  assert.deepEqual(stops, [{ taskId: 't1', askOnDisk: true }]);
+  fs.rmSync(asksDir('r-a'), { recursive: true });
+  resumePause();
+});

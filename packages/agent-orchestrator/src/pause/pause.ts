@@ -103,7 +103,7 @@ export function interruptsOf(run: Run, steps: readonly Workflow[], viewOf: (task
     );
 }
 
-/** Each task a pause at once stops among `runs` (`interruptsOf`), each run's steps read (`stepsOf`) only where one of its tasks is at work. */
+/** Each task a pause at once stops among `runs` (`interruptsOf`), a run's steps read (`stepsOf`) only where one of its tasks is at work. */
 export function interruptsAmong(
   runs: readonly Run[],
   viewOf: (taskId: string) => FinishingView | undefined,
@@ -174,17 +174,20 @@ export type PausedNow = { pause: Pause; kept: boolean; interrupted: Interrupt[];
 export const NOW_LINE = 'wf pause --now --yes';
 
 /**
- * What `wf pause --now` says before it acts: each task it would stop, what that costs (`NOW_COST`), that a landing finishes, and the line
- * that acts (`NOW_LINE`). With nothing at work, it says so.
+ * What `wf pause --now` says before it acts: that it would put the pause, or keep the one that stands (`standing`); each task it would
+ * stop, what that costs (`NOW_COST`), that a landing finishes, and the line that acts (`NOW_LINE`). With nothing at work, it says so.
  */
-export const nowLines = (interrupts: readonly Interrupt[]): string[] => [
-  interrupts.length
-    ? `wf pause --now would pause the store and stop ${interrupts.length} at work, each tried again on ${RESUME_LINE}:`
-    : 'wf pause --now would pause the store; nothing outside a landing is at work, so it stops nothing.',
-  ...interrupts.map((i) => `   ${interruptWords(i)}`),
-  `${NOW_COST} A landing that checks or merges is left to finish.`,
-  `${NOW_LINE} does it.`,
-];
+export const nowLines = (interrupts: readonly Interrupt[], standing = false): string[] => {
+  const pausing = standing ? "would keep the store's pause as it stands" : 'would pause the store';
+  return [
+    interrupts.length
+      ? `wf pause --now ${pausing} and stop ${interrupts.length} at work, each tried again on ${RESUME_LINE}:`
+      : `wf pause --now ${pausing}; nothing outside a landing is at work, so it stops nothing.`,
+    ...interrupts.map((i) => `   ${interruptWords(i)}`),
+    `${NOW_COST} A landing that checks or merges is left to finish.`,
+    `${NOW_LINE} does it.`,
+  ];
+};
 
 /**
  * What `wf pause --now --yes` says once it acted: the pause put, or the one that stood kept as it was put; each task it stopped, or that

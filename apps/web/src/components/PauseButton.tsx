@@ -188,7 +188,8 @@ function PauseFacts({
  * It opens a popover with the whole of it — since when, by whom and why, each task still finishing, each landing held with its merge
  * staged, so a person who paused to use main knows why `MERGE_HEAD` is there — and a list of what may be done: Pause…, which asks an
  * optional why (`WhyForm`) and puts the pause (`POST /api/pause`); Pause now…, which says what it stops and what that costs (`NowForm`)
- * and pauses at once (`POST /api/pause` with `now`); or Resume (`DELETE /api/pause`); the popover closes once the api answered. A refusal — a pause put or resumed elsewhere meanwhile — is said in the package's words, the popover open.
+ * and pauses at once (`POST /api/pause` with `now`); or Resume (`DELETE /api/pause`); the popover closes once the api answered. A
+ * refusal — a pause put or resumed elsewhere meanwhile — is said in the package's words, the popover open.
  */
 export function PauseButton() {
   const queryClient = useQueryClient();

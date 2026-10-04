@@ -1,5 +1,6 @@
 /**
- * The verbs' table, and the runners of the commands the CLI runs itself — `wf tick`, `wf up`, `wf watch`, `wf rm` and `wf prune` (`RUNS`).
+ * The verbs' table, and the runners of the commands the CLI runs itself (`RUNS`): `wf tick`, `wf up` and `wf watch` here, the others
+ * beside.
  */
 import path from 'node:path';
 import { Effect } from 'effect';
@@ -9,8 +10,10 @@ import {
   ceilingLines,
   ceilings,
   Conflict,
-  cordonWords,
-  UNCORDONED,
+  pausedLines,
+  pausedWords,
+  RESUMED,
+  stagedWords,
   engine,
   everyOf,
   feedCursorRefusal,
@@ -39,9 +42,8 @@ import {
 } from '../runner.ts';
 import { HELP, usage, type Engine, type Verb } from './flags.ts';
 import { decideVerb } from './decide/decide.ts';
-import { factoryVerb } from './factory/factory.ts';
-import { agentsCustom, pruneVerb, rmVerb } from './runs.ts';
-import { inboxVerb, planVerb, startVerb } from './start.ts';
+import { agentsCustomRun, pruneVerb, rmVerb } from './runs.ts';
+import { inboxAddRun, inboxQueueRun, planRun, startRun } from './start.ts';
 
 /**
  * `wf watch` from a cursor already checked: the feed's lines as they are written, on stdout, until `stop()`; a feed cut under the watch is
@@ -86,12 +88,12 @@ function tickRunLines(r: Pass['runs'][number]): void {
 }
 
 /**
- * A pass's lines on `wf tick`: the cordon it read, what failed or was left out on stderr, then what it refused, the queue's card and each
- * run; returns it.
+ * A pass's lines on `wf tick`: the pause it read and what finishes under it, what failed or was left out on stderr, then what it refused,
+ * the queue's card and each run; returns it.
  */
 function tickLines(pass: Pass): Pass {
-  const { runs: results, queue, feedError, refused, unreadable, cordon } = pass;
-  if (cordon) console.log(cordonWords(cordon));
+  const { runs: results, queue, feedError, refused, unreadable, pause } = pass;
+  if (pause) for (const line of pausedLines(pause)) console.log(line);
   if (feedError) console.error(feedError);
   for (const why of unreadable ?? []) console.error(`left out: ${why}`);
   for (const line of refusalLines(refused ?? [], new Set()).lines) console.log(line);
@@ -132,12 +134,12 @@ function upStats(): void {
 
 /**
  * What `wf up` has said while it lasts, so it says each failure once: a queued card's start (`said`), the feed's (`feedSaid`), a move the
- * lifecycle refused (`refusedSaid`), a journal left out (`unreadableSaid`); the store's cordon (`cordonSaid`), said once put and once
- * lifted; and the passes its next summary counts (`interval`).
+ * lifecycle refused (`refusedSaid`), a journal left out (`unreadableSaid`); the store's pause (`pauseSaid`), said once put, on each
+ * change of its words and once resumed; and the passes its next summary counts (`interval`).
  */
 type UpSaid = {
   said: string | undefined;
-  cordonSaid: string | undefined;
+  pauseSaid: string | undefined;
   feedSaid: string | undefined;
   refusedSaid: ReadonlySet<string>;
   unreadableSaid: ReadonlySet<string>;
@@ -162,17 +164,22 @@ function advancedLines(advanced: Pass['runs']): void {
   }
 }
 
-/** The store's cordon on `wf up`, once when it is put or changed and once when it is lifted; returns the cordon it said, if any. */
-export function cordonSaid(cordon: Pass['cordon'], said: string | undefined): string | undefined {
-  const now = cordon ? cordonWords(cordon) : undefined;
-  if (now !== said) console.log(`${new Date().toISOString().slice(11, 19)}  ${now ?? UNCORDONED}`);
+/**
+ * The store's pause on `wf up` (`pausedWords`) and each landing it holds with its merge staged (`stagedWords`), once when it is put, again
+ * each time their words change — Pausing with fewer finishing, then Paused, a landing staged — and once when it is resumed; returns the
+ * lines it said, if any, as one string.
+ */
+export function pauseSaid(pause: Pass['pause'], said: string | undefined): string | undefined {
+  const lines = pause ? [pausedWords(pause) ?? '', ...pause.staged.map((s) => `   ${stagedWords(s)}`)] : [RESUMED];
+  const now = pause ? lines.join('\n') : undefined;
+  if (now !== said) for (const line of lines) console.log(`${new Date().toISOString().slice(11, 19)}  ${line}`);
   return now;
 }
 
 /** One pass's lines on `wf up`, going by what it has printed (`was`), not by the store; returns what it has printed now. */
 function passLines(pass: Pass, was: UpSaid): UpSaid {
   const { runs: advanced, queue, feedError, cost, refused, unreadable } = pass;
-  const cordoned = cordonSaid(pass.cordon, was.cordonSaid);
+  const paused = pauseSaid(pass.pause, was.pauseSaid);
   let interval = was.interval;
   if (cost) interval = addPass(interval, cost, Date.now());
   if (summaryDue(interval, Date.now())) {
@@ -186,7 +193,7 @@ function passLines(pass: Pass, was: UpSaid): UpSaid {
     if (!was.unreadableSaid.has(why)) console.error(`${new Date().toISOString().slice(11, 19)}  left out: ${why}`);
   const said = queue ? queueSaid(queue, was.said) : was.said;
   advancedLines(advanced);
-  return { said, cordonSaid: cordoned, feedSaid: feedError, refusedSaid: stalled.said, unreadableSaid: new Set(unreadable), interval };
+  return { said, pauseSaid: paused, feedSaid: feedError, refusedSaid: stalled.said, unreadableSaid: new Set(unreadable), interval };
 }
 
 /**
@@ -202,7 +209,7 @@ function upVerb(args: Args, e: Engine): void | Promise<void> {
   const store = HOME;
   let was: UpSaid = {
     said: undefined,
-    cordonSaid: undefined,
+    pauseSaid: undefined,
     feedSaid: undefined,
     refusedSaid: new Set(),
     unreadableSaid: new Set(),
@@ -233,18 +240,13 @@ function watchVerb(args: Args): void | Promise<void> {
 }
 
 /** Each verb `wf` takes, by its name on the command line: a `Map`, so a name every object has is no verb. */
-export const VERBS: ReadonlyMap<string, Verb> = new Map<string, Verb>([
-  ['start', startVerb],
-  ['plan', planVerb],
-  ['inbox', inboxVerb],
-  ['factory', factoryVerb],
-  ['decide', decideVerb],
-  ['agents custom', agentsCustom],
-]);
+export const VERBS: ReadonlyMap<string, Verb> = new Map<string, Verb>([['decide', decideVerb]]);
 
 /**
- * The runner of each command the CLI runs itself, by its name — those it serves alone (`RAN`), and `wf rm` and `wf prune`, whose runners
- * walk the many runs a command line names through their handlers: handed its arguments once read and checked.
+ * The runner of each command the CLI runs itself, by its name — those it serves alone (`RAN`, `wf plan`); `wf rm` and `wf prune`, whose
+ * runners walk the many runs a command line names through their handlers; and `wf start`, `wf inbox add`, `wf inbox queue` and
+ * `wf agents custom`, whose runners read the files and folders a command line names before their handlers: handed its arguments once read
+ * and checked.
  */
 export const RUNS: ReadonlyMap<string, (args: Args, e: Engine) => void | Promise<void>> = new Map([
   ['tick', tickVerb],
@@ -252,6 +254,11 @@ export const RUNS: ReadonlyMap<string, (args: Args, e: Engine) => void | Promise
   ['watch', watchVerb],
   ['rm', rmVerb],
   ['prune', pruneVerb],
+  ['start', startRun],
+  ['plan', planRun],
+  ['inbox add', inboxAddRun],
+  ['inbox queue', inboxQueueRun],
+  ['agents custom', agentsCustomRun],
 ]);
 
 /**
@@ -277,17 +284,13 @@ const NAMES = [...TABLE.filter((c) => c.only?.side !== 'api').map((c) => c.name)
 
 /**
  * The name `argv` opens with, the longest of `NAMES` whose words it starts with, and the arguments after it — or none. A name that heads
- * others (`agents`, before `agents card`) given a word that is none of its flags is given too little, and gets the help.
+ * others (`agents`, before `agents card`) given a word none of them is gets that word, and refuses it in its own words.
  */
 function namedIn(argv: readonly string[]): { name: string; rest: string[] } | undefined {
   const opens = (name: string) => name.split(' ').every((word, i) => argv[i] === word);
   const name = NAMES.filter(opens).sort((a, b) => b.length - a.length)[0];
   if (name === undefined) return undefined;
-  const rest = argv.slice(name.split(' ').length);
-  const heads = NAMES.some((other) => other.startsWith(`${name} `));
-  const flags = TABLE.find((c) => c.name === name)?.spec.flags.map((f) => f.flag) ?? [];
-  if (heads && rest[0] !== undefined && !flags.includes(rest[0].split('=')[0])) return undefined;
-  return { name, rest };
+  return { name, rest: argv.slice(name.split(' ').length) };
 }
 
 /**

@@ -13,7 +13,7 @@ import { EngineService, awaited, denialText, unreadableJournal, type Engine, typ
 import { refusedCheck, type Run } from '../record/record.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 import type { Workflow } from '../step/step.ts';
-import { timeline } from '../timeline/timeline.ts';
+import { timeline } from '../timeline/index.ts';
 import { runStore } from '../record/files.store.ts';
 import { stepsOf } from '../record/record.store.ts';
 import { closeoutReader, everyTryOf, taskCloseout, taskPhases, viewedOnce } from '../views/views.verb.ts';

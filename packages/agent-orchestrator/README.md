@@ -2257,38 +2257,54 @@ is held until says so and names the `wf hold … --off` that lets it go.
 - a circle: a run named that already waits on this one, through `--after` while it has not started or
   through a hold, however far round. Each would wait on the other for ever
 
-## Cordoning the whole store: `wf cordon`
+## Pausing the whole store: `wf pause`
 
 ```bash
-wf cordon --why "merging by hand on main" --by operator   # nothing new starts, in any run, until it is lifted
-wf uncordon                                               # the next pass files what waits
+wf pause --why "merging by hand on main" --by operator   # nothing new starts, in any run, until it is resumed
+wf resume                                               # the next pass files what waits
 ```
 
-`wf hold` pauses one run; `wf cordon` pauses the store, as Kubernetes cordons a node. While it stands no pass
+`wf hold` pauses one run; `wf pause` pauses the store, as Kubernetes cordons a node. While it stands no pass
 starts new work: no step, try, round or check is filed (the check of a step that has ended among them), no
 queued task is admitted on the runtime, and no queued inbox card is started. What runs finishes: a session in
 flight ends and its closeout is recorded, and a landing whose check has already ended commits or aborts as it
-would. A filing in flight when the cordon is put stops before its next part, as it does for a cancel or a hold.
-`wf start` still writes the run, and says the cordon: nothing of it is filed until the lift. An approval, a
-retry, a round or an answer written meanwhile is kept, and the first pass after `wf uncordon` files what it
+would. A filing in flight when the pause is put stops before its next part, as it does for a cancel or a hold.
+`wf start` still writes the run, and says the pause: nothing of it is filed until the resume. An approval, a
+retry, a round or an answer written meanwhile is kept, and the first pass after `wf resume` files what it
 lets through, with what waited.
 
-A cordon says since when, by whom and why, on every screen that says it: the first line of `wf ls` and of
-`wf feed`, the line of `wf start` after how to start the run, a line of `wf up` when it is put or changed and
-another when it is lifted, and the board's Cordon switch. `--by` defaults to the OS user; `--why` and `--by` are refused blank, twice, or over their caps
-(200 characters, 64), as a hold's are. A landing whose merge the ending has staged in the repository's checkout, and whose check the
-cordon holds, is named under it — `r-1's ship has its merge staged in /repo (MERGE_HEAD), and its check waits on
-wf uncordon` — so a person who cordoned to use main knows whose `MERGE_HEAD` is there.
+A pause says how far it has come, read from the world on each pass and never stored:
 
-The cordon is a person's file, `$WF_ROOT/cordon`, `{ at, by, why? }`, one for the store, read on every pass and
-composed onto every run read; no record is written with it. The runtime is told only that it may admit nothing:
-the store's engine is `unschedulable` while the file is there (`storeAdmission` in `src/runtime-client.ts`),
-asked by the runtime's own pass before it admits, so no queued task starts under the cordon whichever process
-ticks the store, the api's or `wf up`. A task admitted on the pass just before the cordon was put still starts
-on the next, as a Pod bound to a node before it is cordoned runs there; draining what is at work is out of
-scope, and `wf cancel` or `wf hold` is how a run is stopped. A file that is there cordons the store whatever it
-holds. `wf cordon` refuses a store already cordoned, naming who cordoned it, and
-`wf uncordon` a store none stands on; the api serves the same as `POST`, `DELETE` and `GET /api/cordon`.
+```text
+Pausing: 2 finishing — the store is paused since 2026-10-04T12:00:00.000Z by ann: merging by hand; nothing new starts, …
+   r-1's plan is finishing: its session is at work
+   r-2's ship is finishing: the check of its landing runs
+Paused since 2026-10-04T12:00:00.000Z by ann: merging by hand — nothing runs and nothing new starts; wf resume resumes it
+```
+
+What finishes is each step's current task and its check's, pending or running on the runtime: a session at
+work, a check that runs, or the check of a landing (an ending that lands on its check). A task the runtime
+holds queued for a slot is not, since no pass admits it under the pause; nor is a session that waits on a
+person (`needs-human`), which holds no slot and does no work until answered. The board, `wf ls` and
+`wf feed` say the first line, and `wf ls` names each task under it; `wf start` says it after how to start the
+run, and `wf up` once when it is put, again each time its words change, and once more when it is resumed.
+`--by` defaults to the OS user; `--why` and `--by` are refused blank, twice, or over their caps (200
+characters, 64), as a hold's are. A landing whose merge the ending has staged in the repository's checkout,
+and whose check the pause holds, is named under it on the board, `wf ls`, `wf tick` and `wf up` — `r-1's ship
+has its merge staged in /repo (MERGE_HEAD), and its check waits on wf resume` — so a person who paused to use
+main knows whose `MERGE_HEAD` is there.
+
+The pause is a person's file, `$WF_ROOT/cordon`, `{ at, by, why? }`, one for the store, read on every pass and
+composed onto every run read; no record is written with it. The file keeps the name it had when the verbs were
+`wf cordon` and `wf uncordon`, so a pause put before they were renamed still stands and `wf resume` lifts it.
+The runtime is told only that it may admit nothing: the store's engine is `unschedulable` while the file is
+there (`storeAdmission` in `src/runtime-client.ts`), asked by the runtime's own pass before it admits, so no
+queued task starts under the pause whichever process ticks the store, the api's or `wf up`. A task admitted on
+the pass just before the pause was put still starts on the next, as a Pod bound to a node before it is
+cordoned runs there; interrupting what is at work is out of scope, and `wf cancel` or `wf hold` is how a run
+is stopped. A file that is there pauses the store whatever it holds. `wf pause` refuses a store already
+paused, naming who paused it, and `wf resume` a store none stands on; the api serves the same as `POST`,
+`DELETE` and `GET /api/pause`, whose read carries what finishes and what is staged.
 
 ## A plan as a folder of cards: `wf plan`
 
@@ -3176,9 +3192,9 @@ holding a concurrency slot forever.
 | `src/feed/feed.ts` | the feed of what the tick judged — pure: the line, the fold of the lines and what a pass owes it (`foldFeed`, `feedChanges`), a line in words (`feedLineWords`), and a run's steps as the feed says them (`feedWords`); the file is `src/feed/feed.store.ts`'s |
 | `src/cli/main.ts` | the verbs' table: `main`, which looks up the command in the table or the verb in `VERBS` and runs it, or prints the help; and the runners of the commands the CLI runs itself (`RUNS`): `wf tick`, `wf up` and `wf watch`, and `wf rm` and `wf prune` |
 | `src/daemon/up.verb.ts` | the daemon's loop, one for its two kinds, the api's process and `wf up`: `up`, which takes the store's lease in its scope and lets it go as the scope closes; `holdUrl`, which writes into the lease where the api serves; and `runMain`, which runs either as the process's command |
-| `src/cli/flags.ts`, `src/cli/start.ts`, `src/cli/runs.ts`, `src/cli/asks.ts` | each verb, its flags, read off the command line, and its help, by family: the help, a verb's shape (`Verb`) and the flag reader beneath them all (`readFlags`), then `wf start`, `wf plan` and `wf inbox`; `wf ls`, `wf cancel`, `wf rm`, `wf prune`, `wf hold` and `wf agents`; `wf retry`, `wf approve`, `wf round`, `wf accept` and `wf say` |
+| `src/cli/flags.ts`, `src/cli/start.ts`, `src/cli/runs.ts` | what the CLI's verbs and runners share: the help, a verb's shape (`Verb`), a usage refusal, a person's yes; the runners of `wf start`, `wf plan` and `wf inbox add`, which read the files and folders their command line names; and the runners of `wf agents custom`, `wf rm` and `wf prune` |
+| `src/start/commands.verb.ts`, `src/inbox/commands.verb.ts`, `src/factory/factory.verb.ts`, `src/agents/custom.verb.ts` | entries of the command table: `wf start` and `wf plan` (`START`, `PLAN`); `wf inbox`, bare, `add`, `queue` and `rm` (`INBOXES`); `wf factory`, bare, `ls`, `add`, `attach`, `detach`, `hire`, `fire` and `rm` (`FACTORIES`); `wf agents custom` (`AGENTS_CUSTOM`) — each its usage, help, arguments, handler and route |
 | `src/cli/decide/decide.ts` | `wf decide`: its help, its one flag, and the screen it prints (`decideVerb`) |
-| `src/cli/factory/factory.ts` | `wf factory`: its help, the arguments of `add`, `attach`, `detach`, `hire` and `fire`, and what `ls`, `add`, `attach`, `detach`, `hire`, `fire` and `rm` print (`factoryVerb`) |
 | `src/cli/exit.ts` | what `wf` exits with (`exitCodeOf`), imported by `bin/wf.ts` before the package |
 
 The package's contract is its `exports`: `agent-orchestrator` (`src/runner.ts`), `agent-orchestrator/run` (`src/run.ts`),

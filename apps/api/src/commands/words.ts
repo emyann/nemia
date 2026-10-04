@@ -2,22 +2,40 @@
  * The api's own words for each command it serves, keyed by the command's name: the write guard's (guard.ts), the body its route takes,
  * why a body is not one (400), and what a failure that is not a refusal answers (502).
  */
-import type { BodyIssue, Words } from '../body.ts';
+import { Schema } from 'effect';
+import { inboxNameRefusal } from 'agent-orchestrator';
+import { agentNameRefusal } from 'agent-orchestrator/workflow';
+import { decodeBody, valueAt, type BodyIssue, type Words } from '../body.ts';
 import type { Guarded } from '../guard.ts';
 
-/** The run and the step a route's path names: `step` is empty on a route that names none. */
-export type Named = { readonly runId: string; readonly step: string };
+/**
+ * What a route's path names: the run and the step — `step` empty on a route that names none, both on a route of the store's own — the
+ * `name` of what else it names, a card or an agent, and the request's `method` and `path`, as a refusal says the route.
+ */
+export type Named = {
+  readonly runId: string;
+  readonly step: string;
+  readonly name: string;
+  readonly method: string;
+  readonly path: string;
+};
 
 /**
- * A routed command's words: `shape`, its body as a refusal shows it; `guard`, `issue` and `failed`, each said of the run it names; and
- * `strict`, where its body is refused a key its schema does not have, named before any it does.
+ * A routed command's words: `shape`, its body as a refusal shows it; `guard`, `issue` and `failed`, each said of what it names; `strict`,
+ * where its body is refused a key its schema does not have, named before any it does; `named`, the refusal of a name in its path, 400,
+ * before its body is read; `bodyless`, where its route reads no body but none or `{}`, the refusal of the text it was sent, 400; `notJson`,
+ * the refusal of a body that is not JSON, 400, where it has words of its own. A route with no `failed` lets a failure that is no refusal
+ * through, to `app.onError`, as a 500.
  */
 export type RouteWords = {
   readonly shape: string;
   readonly guard: (at: Named) => Guarded;
   readonly issue: (at: Named) => Words;
-  readonly failed: (at: Named, said: string) => string;
+  readonly failed?: (at: Named, said: string) => string;
   readonly strict?: true;
+  readonly named?: (at: Named) => string | null;
+  readonly bodyless?: (at: Named, text: string) => string | null;
+  readonly notJson?: (at: Named) => string;
 };
 
 /** The body `POST …/retry` takes: `wf retry`'s flags, as JSON. */
@@ -189,44 +207,44 @@ const HOLD: RouteWords = {
     `DELETE /api/runs/${runId}/hold: the hold was not lifted — ${said}. Lift it with \`wf hold ${runId} --off\`.`,
 };
 
-/** The body `POST /api/cordon` takes: `wf cordon`'s flags, as JSON. */
-const CORDON_SHAPE = '`{ "why"?: "<words>", "by"?: "<name>" }`';
+/** The body `POST /api/pause` takes: `wf pause`'s flags, as JSON. */
+const PAUSE_SHAPE = '`{ "why"?: "<words>", "by"?: "<name>" }`';
 
-/** The store cordoned, as the guard's refusals word it, its body and its failures; a cordon that stands is the package's 409. */
-const CORDON: RouteWords = {
-  shape: CORDON_SHAPE,
+/** The store paused, as the guard's refusals word it, its body and its failures; a pause that stands is the package's 409. */
+const PAUSE: RouteWords = {
+  shape: PAUSE_SHAPE,
   guard: () => ({
-    route: 'POST /api/cordon',
-    does: 'cordons the store',
-    forAnother: 'cordon it',
-    why: 'a cordon stops every pass from starting new work in every repository the store runs in, until a person lifts it',
-    reach: "cordon it from the board's header",
-    instead: 'Cordon it from the board\'s header, or with `wf cordon --why "<words>"`',
-    shape: CORDON_SHAPE,
+    route: 'POST /api/pause',
+    does: 'pauses the store',
+    forAnother: 'pause it',
+    why: 'a pause stops every pass from starting new work in every repository the store runs in, until a person resumes it',
+    reach: "pause it from the board's bottom bar",
+    instead: 'Pause it from the board\'s bottom bar, or with `wf pause --why "<words>"`',
+    shape: PAUSE_SHAPE,
   }),
   issue:
     () =>
     ({ path: [key], input }) =>
       key === 'why' || key === 'by'
-        ? `\`${key}\` is ${key === 'why' ? 'why the store is cordoned' : 'who cordons it'}, as \`wf cordon --${key} "<words>"\` takes it: text, or left out. This request's was ${JSON.stringify(input)}: ${CORDON_SHAPE}.`
-        : `POST /api/cordon takes a JSON object: ${CORDON_SHAPE}.`,
-  failed: (_at, said) => `POST /api/cordon: the store was not cordoned — ${said}. Cordon it with \`wf cordon\`.`,
+        ? `\`${key}\` is ${key === 'why' ? 'why the store is paused' : 'who pauses it'}, as \`wf pause --${key} "<words>"\` takes it: text, or left out. This request's was ${JSON.stringify(input)}: ${PAUSE_SHAPE}.`
+        : `POST /api/pause takes a JSON object: ${PAUSE_SHAPE}.`,
+  failed: (_at, said) => `POST /api/pause: the store was not paused — ${said}. Pause it with \`wf pause\`.`,
 };
 
-/** The store's cordon lifted, as the guard's refusals word it; it takes no body, and none standing is the package's 404. */
-const UNCORDON: RouteWords = {
+/** The store resumed, as the guard's refusals word it; it takes no body, and none standing is the package's 404. */
+const RESUME: RouteWords = {
   shape: '`{}`',
   guard: () => ({
-    route: 'DELETE /api/cordon',
-    does: "lifts the store's cordon",
-    forAnother: 'lift it',
-    why: 'a cordon lifted lets the next pass file every step, try and check that waits, in every repository the store runs in',
-    reach: "lift it from the board's header",
-    instead: "Lift it from the board's header, or with `wf uncordon`",
+    route: 'DELETE /api/pause',
+    does: 'resumes the store',
+    forAnother: 'resume it',
+    why: 'a store resumed lets the next pass file every step, try and check that waits, in every repository the store runs in',
+    reach: "resume it from the board's bottom bar",
+    instead: "Resume it from the board's bottom bar, or with `wf resume`",
     shape: '`{}`',
   }),
-  issue: () => () => 'DELETE /api/cordon takes no body: `{}`.',
-  failed: (_at, said) => `DELETE /api/cordon: the cordon was not lifted — ${said}. Lift it with \`wf uncordon\`.`,
+  issue: () => () => 'DELETE /api/pause takes no body: `{}`.',
+  failed: (_at, said) => `DELETE /api/pause: the store was not resumed — ${said}. Resume it with \`wf resume\`.`,
 };
 
 /** A try's run removed, as the guard's refusals word it; it takes no body, and a failure that is no refusal names `wf rm`. */
@@ -282,6 +300,116 @@ const PRUNE: RouteWords = {
   strict: true,
 };
 
+/** A drop of the card `name`, as the guard's refusals word it. */
+const dropGuard = (name: string): Guarded => ({
+  route: `DELETE /api/inbox/${name}`,
+  does: 'drops a card',
+  forAnother: 'drop one',
+  why: 'a card dropped is an idea gone, and nothing keeps a copy',
+  reach: 'drop the card from the board',
+  instead: `Drop it from the board's Inbox page, or with \`wf inbox rm ${name}\``,
+  shape: 'no body, or `{}`: the card is named in the path',
+});
+
+/** A card dropped, as the guard's refusals word it; a name that would leave the inbox is refused in the package's words. */
+const INBOX_RM: RouteWords = {
+  shape: '`{}`',
+  guard: ({ name }) => dropGuard(name),
+  issue: () => () => 'DELETE /api/inbox/:name takes no body: `{}`.',
+  named: ({ name }) => inboxNameRefusal(name) ?? null,
+};
+
+const QUEUE_SHAPE = 'no body, or `{}`: the card is named in the path, and queued on the workflow it names';
+
+/** A queue of the card `name`, or its taking back (`off`), as the guard's refusals word it. */
+const queueGuard = (name: string, off: boolean): Guarded =>
+  off
+    ? {
+        route: `DELETE /api/inbox/${name}/queue`,
+        does: 'takes a card off the queue',
+        forAnother: 'take one off',
+        why: 'a card taken off the queue is an idea the tick no longer starts, and its place is lost',
+        reach: 'take the card off the queue from the board',
+        instead: `Take it off from the board's Inbox page, or with \`wf inbox queue ${name} --off\``,
+        shape: QUEUE_SHAPE,
+      }
+    : {
+        route: `POST /api/inbox/${name}/queue`,
+        does: 'queues a card',
+        forAnother: 'queue one',
+        why: 'a queued card is started by the tick when a run slot frees, and its body is what the run is asked to do, in the repository it names',
+        reach: 'queue the card from the board',
+        instead: `Queue it from the board's Inbox page, or with \`wf inbox queue ${name}\``,
+        shape: QUEUE_SHAPE,
+      };
+
+/** The one JSON body a queue takes: `{}`, an object with no key. */
+const QUEUE_BODY = Schema.Record(Schema.String, Schema.Never);
+
+/**
+ * Why a queue's body is refused, or null: it takes none, or `{}`. `wf inbox queue --workflow <w>` writes a workflow with the mark, and the
+ * api does not: a card is queued from the board on the workflow it names, and one that names none is the package's to refuse — so a
+ * `workflow` sent is refused by name rather than read as nothing.
+ */
+function queueBodyRefusal(route: string, text: string): string | null {
+  if (!text.trim()) return null;
+  let body: unknown;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    return `${route} takes ${QUEUE_SHAPE}, and this request's body is not JSON.`;
+  }
+  const decoded = decodeBody(QUEUE_BODY, body, () => {
+    const named =
+      valueAt(body, ['workflow']) !== undefined
+        ? ' A card is queued on the workflow it names: file it with one, or queue it with `wf inbox queue <name> --workflow <w>`, which writes both.'
+        : '';
+    return `${route} takes ${QUEUE_SHAPE}, and this request sent ${JSON.stringify(body)}.${named}`;
+  });
+  return 'status' in decoded ? decoded.error : null;
+}
+
+/**
+ * A card queued, or taken off the queue, as the guard's refusals word it: a name that would leave the inbox is refused in the package's
+ * words, and a body but none or `{}` in the queue's (`queueBodyRefusal`), each before the card is read.
+ */
+const INBOX_QUEUE: RouteWords = {
+  shape: QUEUE_SHAPE,
+  guard: ({ name, method }) => queueGuard(name, method === 'DELETE'),
+  issue: () => () => `the queue takes ${QUEUE_SHAPE}.`,
+  named: ({ name }) => inboxNameRefusal(name) ?? null,
+  bodyless: ({ name, method }, text) => queueBodyRefusal(queueGuard(name, method === 'DELETE').route, text),
+};
+
+const CUSTOM_PUT_SHAPE = '`{ "words": "<what the agent is told after its instructions>" }`';
+
+/** The route of the custom instructions `at` names, as a refusal says it: `PUT /api/custom-instructions/<name>`. */
+const customRoute = ({ method, name }: Named): string => `${method} /api/custom-instructions/${name}`;
+
+/**
+ * A write or a clear of an agent's custom instructions, as the guard's refusals word it: a name that would leave the folder is refused in
+ * the package's words, and the words that are not a string in the api's.
+ */
+const AGENTS_CUSTOM: RouteWords = {
+  shape: CUSTOM_PUT_SHAPE,
+  guard: (at) => ({
+    route: customRoute(at),
+    does: "writes an agent's custom instructions",
+    forAnother: 'write them',
+    why: 'they are told to the agent in every run started after, in every step that names it',
+    reach: "write them on the agent's page on the board",
+    instead: "Write them on the agent's page on the board",
+    shape: at.method === 'DELETE' ? '`{}`' : CUSTOM_PUT_SHAPE,
+  }),
+  issue: (at) => (_issue, body) =>
+    `${customRoute(at)}: \`words\` are what the agent is told after its instructions, a string: ${CUSTOM_PUT_SHAPE}. This request's was ${JSON.stringify(valueAt(body, ['words']))}.`,
+  named: (at) => {
+    const wrong = agentNameRefusal(at.name);
+    return wrong === undefined ? null : `${customRoute(at)}: ${wrong}`;
+  },
+  notJson: (at) => `${customRoute(at)} takes a JSON body: ${CUSTOM_PUT_SHAPE}.`,
+};
+
 /** The api's words for each routed command, by its name. */
 export const WORDS: Readonly<Record<string, RouteWords>> = {
   retry: RETRY,
@@ -290,8 +418,11 @@ export const WORDS: Readonly<Record<string, RouteWords>> = {
   accept: ACCEPT,
   say: SAY,
   hold: HOLD,
-  cordon: CORDON,
-  uncordon: UNCORDON,
+  pause: PAUSE,
+  resume: RESUME,
   rm: RM,
   prune: PRUNE,
+  'inbox queue': INBOX_QUEUE,
+  'inbox rm': INBOX_RM,
+  'agents custom': AGENTS_CUSTOM,
 };

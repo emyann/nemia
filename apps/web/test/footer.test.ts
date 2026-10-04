@@ -41,6 +41,8 @@ const run = (statuses: readonly string[], extra: Partial<RunSummary> = {}): RunS
   stoppedOn: null,
   moving: true,
   cost: null,
+  atWork: null,
+  tokens: null,
   steps: statuses.map((status, i) => ({
     name: `step-${i}`,
     taskId: `t-${i}`,
@@ -193,9 +195,9 @@ test('the quota, short: a read that failed is a word, not a throw', () => {
   assert.equal(short.title, 'The quota could not be read: the api answered 500');
 });
 
-test('the groups: a phone keeps exactly the daemon and the quota; a wide screen all five, left to right', () => {
-  assert.deepEqual(footerParts(true), ['daemon', 'quota']);
-  assert.deepEqual(footerParts(false), ['daemon', 'feed', 'work', 'quota', 'version']);
+test('the groups: a phone keeps exactly the daemon, the pause and the quota; a wide screen all six, the pause after the daemon', () => {
+  assert.deepEqual(footerParts(true), ['daemon', 'pause', 'quota']);
+  assert.deepEqual(footerParts(false), ['daemon', 'pause', 'feed', 'work', 'quota', 'version']);
 });
 
 /** Every `.tsx` under `src`, by its path from the app. */

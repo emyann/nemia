@@ -10,18 +10,22 @@ import type { RetryMode, Said } from './asks.ts';
 import { RunGraphSchema, type RunGraph } from './graph.ts';
 import { StepLayersSchema, type StepLayers } from './layers.ts';
 import {
+  AtWorkSchema,
   PlaceKindSchema,
   RunHoldingSchema,
   RunStatusSchema,
   RunToDecideSchema,
+  RunTokensSchema,
   RunWaitingSchema,
   SpentSchema,
   StepNeedsFields,
   StringsSchema,
+  type AtWork,
   type PlaceKind,
   type RunHolding,
   type RunStatus,
   type RunToDecide,
+  type RunTokens,
   type RunWaiting,
   type Spent,
   type StepNeeds,
@@ -258,6 +262,10 @@ export type RunDetail = {
   moving: boolean;
   /** As on `RunSummary`. */
   cost: Spent | null;
+  /** As on `RunSummary`. */
+  atWork: AtWork | null;
+  /** As on `RunSummary`, whose split the run's page shows. */
+  tokens: RunTokens | null;
   /** What every try of every step read, by price, beside `cost` (`RunRead`); null where none of it was measured. */
   read: RunRead | null;
   waitingOnYou: string[];
@@ -490,6 +498,8 @@ const RunDetailSchema = Schema.Struct({
   status: RunStatusSchema,
   moving: Schema.Boolean,
   cost: Schema.NullOr(SpentSchema),
+  atWork: Schema.NullOr(AtWorkSchema),
+  tokens: Schema.NullOr(RunTokensSchema),
   read: Schema.NullOr(RunReadSchema),
   waitingOnYou: StringsSchema,
   onYou: StringsSchema,

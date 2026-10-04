@@ -9,7 +9,7 @@ import { customInstructions } from './custom/custom.ts';
 import { commands } from './commands/index.ts';
 import { capabilitiesWithSteps, McpAsker } from './capabilities/index.ts';
 import { factories } from './factories/index.ts';
-import { ceilingsOf, cordonOf, feed, QuotaAsker, readDaemon } from './factory/index.ts';
+import { ceilingsOf, pauseOf, feed, QuotaAsker, readDaemon } from './factory/index.ts';
 import { inbox } from './inbox/inbox.ts';
 import { ApiConfig, type ApiEnv, type ApiRuntime, ReadMemo, served, type Services } from './layer.ts';
 import { machines } from './machines/machines.ts';
@@ -68,20 +68,22 @@ export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Servic
  *   pasted for them; two writes, guarded as a start is, each through the package's `writeWorkflow`.
  * - agents/agents.ts — the agents beside each place workflows are listed from, each with the nodes that name it; one of yours made, put
  *   back or removed; three writes, guarded as a start is, through the package's `writeAgent` and `removeAgent`.
- * - custom/custom.ts — a person's custom instructions for an agent, by its name: read, written and cleared through the package's
- *   `writeCustomInstructions` and `clearCustomInstructions`, the functions `wf agents custom` calls; two writes, guarded as a start is.
+ * - custom/custom.ts — a person's custom instructions for an agent, by its name, read through `wf agents custom`'s entry; written and
+ *   cleared on the routes the table generates from it (commands/routes.ts).
  * - agents/skills.ts — the skills an agent of yours can be given, by place; one skill on its page; and one of yours written — made,
  *   changed, or one Nemia ships copied into your library — each a write, guarded as a start is, through the package's `writeSkill` and
  *   `copySkill`.
- * - inbox/inbox.ts — the inbox: its cards listed, one filed, one dropped; two writes, guarded as a start is.
+ * - inbox/inbox.ts — the inbox: its cards listed and one filed, through `wf inbox`'s and `wf inbox add`'s entries; one dropped and one
+ *   queued on the routes the table generates (commands/routes.ts).
  * - runs/runs.ts — the runs listed, one run in full, and what `wf decide` shows of it.
  * - stats/stats.ts — the flow numbers of every run in the store, as `wf stats --json` prints them.
  * - `GET /api/ceilings` — the cap on runs in flight the daemon's last pass ran with, and the runs it counts and holds: what the Factory
  *   says over its floor. 422 for a `WF_MAX_RUNS` in the api's environment that is not a count, before any pass wrote the daemon's
  *   (`maxRuns`, an `Invalid`).
- * - `GET /api/cordon` — the store's cordon, `{ cordon, staged }`: since when, by whom and why, or null; and each landing it holds with its
- *   merge staged in the repository's checkout (MERGE_HEAD), its check not filed until the lift (`cordonRead`). Put on
- *   `POST /api/cordon` and lifted on `DELETE /api/cordon` (commands/routes.ts).
+ * - `GET /api/pause` — the store's pause, `{ pause, finishing, staged }`: since when, by whom and why, or null; each task still finishing
+ *   under it (`{ run, step, kind }`, a `session`, `check` or `landing`), none once it is Paused; and each landing it holds with its merge
+ *   staged in the repository's checkout (MERGE_HEAD), its check not filed until it resumes (`pausedRead`). Put on
+ *   `POST /api/pause` and lifted on `DELETE /api/pause` (commands/routes.ts).
  * - `GET /api/daemon` — whether a wf up ticks the store, and since when, and when it last passed: read off daemon.json and the process
  *   table as wf ls reads them, and never written, the file being the daemon's. What the Factory says over its floor when nothing ticks.
  *   500 for a daemon.json that is there and cannot be read — a directory in its place, a permission: the package throws rather than call
@@ -91,7 +93,8 @@ export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Servic
  *   Every case is a 200 with a sentence, the harness's failures and the engine's refusals included.
  * - commands/routes.ts — a person's asks of a run, generated from the package's command table: a try (with answers to its questions,
  *   commands/extend.ts and asks/answers.ts), a round, words for a running session, an approval and an acceptance; five writes. And the
- *   store's cordon put and lifted, `wf cordon` and `wf uncordon`'s routes.
+ *   store's pause put and lifted, `wf pause` and `wf resume`'s routes; an inbox card dropped, queued and taken off the queue; and an
+ *   agent's custom instructions written and cleared.
  * - steps/steps.ts — a step's own reads: its output, its files, and its conversation, once or followed.
  * - factory/feed.ts — the workflow feed followed, as server-sent events.
  * - machines/machines.ts — the state machines the board draws, listed, and one machine's graph, read off its code.
@@ -123,7 +126,7 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     .route('/', runs)
     .route('/', stats)
     .get('/api/ceilings', (c) => served(c, async ({ e, env }) => c.json(await ceilingsOf(e, env))))
-    .get('/api/cordon', (c) => served(c, async ({ e }) => c.json(await cordonOf(e))))
+    .get('/api/pause', (c) => served(c, async ({ e }) => c.json(await pauseOf(e))))
     .get('/api/daemon', (c) => c.json(readDaemon()))
     .get('/api/quota', (c) => served(c, async ({ e, env, quota }) => c.json(await quota({ env, ask: () => e.quota('claude') }))))
     .route('/', commands)

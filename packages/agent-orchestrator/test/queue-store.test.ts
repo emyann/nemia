@@ -1201,3 +1201,17 @@ test('the whole screen of a run held by the cap on runs in flight', async (t) =>
     '  nothing of <id> is filed until a run in flight settles, oldest held first; nothing to decide yet',
   ]);
 });
+
+test('`wf inbox queue --workflow` given a path reads it from where it is typed, and writes it absolute on the card', async (t) => {
+  emptyStore(undefined);
+  const b = board();
+  const repo = aRepoWith('dev');
+  const card = addToInbox({ text: 'Queued on a folder', repo });
+  const folder = path.join(repo, 'workflows', 'dev');
+  await printedBy(t, b.e, 'inbox', 'queue', card.card.name, '--workflow', path.relative(process.cwd(), folder));
+  assert.match(
+    fs.readFileSync(card.file, 'utf8'),
+    new RegExp(`^---\\nworkflow: ${folder.replace(/[.]/g, '\\.')}\\nrepo: `),
+    'the folder as typed, from where it was typed',
+  );
+});

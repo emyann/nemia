@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { commandBreaks, commandLine, helpOf, parseArgv, type Spec } from './command.ts';
+import { commandBreaks, commandLine, helpOf, leftOut, parseArgv, type Spec } from './command.ts';
 import { COMMANDS, TABLE } from './commands.verb.ts';
 
 const SPEC: Spec = {
@@ -85,6 +85,7 @@ test('a flag the command has none of, given where a required argument stands, is
     'MISSING',
     'a spec that says its own refusal of an argument left out says it',
   );
+  assert.equal(refusalOf(['-n'], { ...SPEC, missing: 'MISSING' }), 'MISSING');
 });
 
 test('an argument the command does not take is refused in its words', () => {
@@ -150,6 +151,23 @@ test('a spec that says its refusal of a required argument left out says it where
   assert.equal(parseArgv(SPEC, ['-x'])?.runId, '-x');
 });
 
+test('an empty text where a spec says its refusal is given to the handler, which refuses it in its own words; an empty name is not', () => {
+  const idea: Spec = { ...HOLDING, positionals: [{ key: 'idea', takes: 'required', kind: 'text' }] };
+  assert.deepEqual(parseArgv(idea, ['']), { idea: '' });
+  assert.equal(refusalOf(['-x'], idea), 'MISSING');
+  assert.equal(refusalOf([''], HOLDING), 'MISSING');
+  assert.equal(parseArgv({ ...idea, missing: undefined }, ['']), undefined);
+});
+
+test("a text flag's value left out — empty, or a word starting -- — is refused in its own takes; one the api alone takes is not looked at", () => {
+  const spec: Spec = { ...SPEC, flags: [...SPEC.flags, { flag: '--words', kind: 'text', key: 'words', only: { side: 'api', why: 'w' } }] };
+  assert.equal(leftOut(spec, { runId: 'r-1', note: '' }), 'NOTE TAKES');
+  assert.equal(leftOut(spec, { runId: 'r-1', note: '--slow' }), 'NOTE TAKES');
+  assert.equal(leftOut(spec, { runId: 'r-1', note: ['hi', '--x'] }), 'NOTE TAKES');
+  assert.equal(leftOut(spec, { runId: 'r-1', note: 'hi -- there', words: '' }), null);
+  assert.equal(leftOut(spec, { runId: 'r-1', who: '' }), null, 'a name flag is refused by the reader, not here');
+});
+
 test("retry's command line keeps today's refusals", () => {
   assert.equal(
     refusalOf(['r-1', 'impl', '--fresh', '--recheck'], RETRY.spec),
@@ -190,6 +208,63 @@ test("the table's help is today's, word for word", () => {
   assert.equal(
     helpOf(TABLE),
     [
+      '  wf start <brief.md|card.md|"text"> [--workflows ./workflows] [--repo .] [--no-worktree] [--after <runId> ...] [--input <file> ...] [--gate <step> ...] [--factory <name>] [--brief "<brief>"]',
+      '                               --after <runId>: file nothing of this run until wf decide says that',
+      '                               run has shipped — finished, and its result branch on the base',
+      '                               branch — and start from the base as it is then; once per run.',
+      "                               --gate <step>: that step's closeout waits for wf approve before",
+      "                               anything after it is filed, as a step's own gate: true does; once",
+      "                               per step. An inbox card's gate: <step> is one more",
+      '                               --workflows takes a folder, or a name under <repo>/workflows/: dev',
+      '                               a card of a plan (wf plan --help) starts its body: --workflows is its',
+      '                               workflow: unless given, and its after: needs an --after for each',
+      "                               --input <file>: copied into the run's own inputs/ directory, and named",
+      "                               on every step's brief under what was asked for; once per file",
+      '                               --factory <name>: the workflow must be attached to the factory, whose',
+      '                               hires fill its steps, and a step left with no agent is refused (wf',
+      '                               factory --help). A factory with one repository gives the run its',
+      "                               --repo, and a repository not one of the factory's is refused, naming",
+      '                               them. Without it, the run is started in the factory whose repository',
+      '                               holds --repo, else where wf start is typed, on that repository, when',
+      '                               one factory alone does; none, or two, is refused, naming the fix.',
+      '                               The default factory is history only: --factory default is refused',
+      '                               a card of the inbox (wf inbox --help) starts its body, or --brief',
+      '                               "<brief>" in its place, and leaves the inbox: --workflows is its workflow:',
+      '                               unless given, --repo its repo:, --factory its factory:, and a card',
+      '                               that names no factory either way is refused',
+      '  wf plan <folder> [--repo .] [--factory <name>]',
+      '                               start a plan: one run per card in the folder, parents first, each',
+      '                               --after the runs of the cards its after: names, in the factory as',
+      '                               wf start finds it (wf plan --help)',
+      '  wf inbox',
+      '                               the cards parked before they are started: name, first line, workflow',
+      '                               and repo when set, and started as <runId> (wf inbox --help)',
+      '  wf inbox add "<idea>"|<file> [--workflow <name>] [--repo <path>] [--factory <name>]',
+      '                               park an idea as a card in the inbox, named from its first line',
+      '  wf inbox queue <name> [--workflow <w>] [--off]',
+      '                               mark a card to start on its own: the tick starts the oldest queued',
+      '                               card once a run slot is free; --off takes the mark back',
+      '  wf inbox rm <name>',
+      '                               drop a card without starting it',
+      '  wf factory',
+      "                               the store's factories: the default first — every run and card that",
+      '                               names no factory, read, never written — then each by name with its',
+      '                               repositories (wf factory --help)',
+      '  wf factory ls',
+      '                               the same, by its name',
+      '  wf factory add <name> --repo <path> [--repo <path> ...]',
+      '                               file a factory: a lowercase slug naming one or more directories',
+      '  wf factory attach <factory> <workflow>',
+      "                               offer a workflow in a factory, by its folder's name: a factory offers",
+      '                               only the workflows attached to it',
+      '  wf factory detach <factory> <workflow>',
+      '                               take a workflow back, once no hire fills its steps',
+      '  wf factory hire <factory> <agent> --step <workflow>/<step>',
+      "                               hire an agent into a workflow's step: one a step, a second replaces it",
+      '  wf factory fire <factory> --step <workflow>/<step>',
+      "                               take a step's hire back",
+      '  wf factory rm <name>',
+      "                               remove a factory's file",
       '  wf retry <runId> <step> [--nudge | --fresh | --model <m> | --recheck] [--message "<answer>"] [--budget <amount>]',
       '                               try a step waiting on you again, once, on the next tick:',
       '                               --nudge (default) continues its session, told what happened;',
@@ -227,8 +302,9 @@ test("the table's help is today's, word for word", () => {
       '                               one the cap on runs in flight holds waiting for a run slot (2 of 2 in',
       "                               flight); what each step's tries and the run have cost, where measured;",
       '                               last, whether a wf up ticks the store and when its last pass was;',
-      '                               first, while the store is cordoned, the cordon and each landing it',
-      '                               holds with its merge staged in the checkout (MERGE_HEAD)',
+      '                               first, while the store is paused, Pausing: N finishing and each',
+      '                               session, check or landing at work, or Paused once none is, then each',
+      '                               landing it holds with its merge staged in the checkout (MERGE_HEAD)',
       '  wf show <runId>',
       '                               the run, and what each step was told',
       '  wf logs <runId> <step>',
@@ -253,6 +329,12 @@ test("the table's help is today's, word for word", () => {
       '                               nothing else — every field the protocol marks REQUIRED but',
       '                               supportedInterfaces, which is left out because nothing here serves an',
       '                               agent over A2A. The card describes; it is not an address',
+      '  wf agents custom <name> [--file <path>|-] [--clear] [--repo .]',
+      '                               your custom instructions for that agent: words you add to it without',
+      '                               rewriting it, kept in <store>/custom-instructions/<name>.md and told',
+      '                               after its instructions. Bare, prints them; --file writes them (- for',
+      '                               stdin); --clear removes them. Words only: a frontmatter block is',
+      '                               refused. A run keeps the words it was started with',
       '  wf cancel <runId>',
       '                               stop what it has in flight; file nothing more',
       '  wf hold <runId> --until <runId> [--until <runId> ...] [--why "<words>"] [--by <name>]',
@@ -288,18 +370,20 @@ test("the table's help is today's, word for word", () => {
       '                               a worktree locked, on no branch, or with changes no commit has;',
       '                               and a finished run not merged unless --unmerged, with --artifacts',
       '                               as without: its files are what a person reads to decide it',
-      '  wf cordon [--why "<words>"] [--by <name>]',
-      '                               cordon the store, as kubectl cordon marks a node: no pass starts new',
-      '                               work — no step, try, round or check filed, no queued task admitted,',
-      '                               no queued card started — and what runs finishes, its end and closeout',
-      '                               recorded; a landing whose check has ended commits or aborts. wf start',
-      '                               still writes a run, and approvals, retries and answers are kept, not',
-      '                               acted on: the pass after wf uncordon files what waits. wf ls, wf feed,',
-      '                               wf start and wf up say it. Refused while a cordon stands.',
-      '                               --why: the reason, said wherever the cordon is; --by: who cordons it',
+      '  wf pause [--why "<words>"] [--by <name>]',
+      '                               pause the store: no pass starts new work — no step, try, round or',
+      '                               check filed, no queued task admitted, no queued card started — and',
+      '                               what runs finishes, its end and closeout recorded; a landing whose',
+      '                               check has ended commits or aborts. Pausing: N finishing while a',
+      '                               session works or a check or landing runs, Paused once none does.',
+      '                               wf start still writes a run, and approvals, retries and answers are',
+      '                               kept, not acted on: the pass after wf resume files what waits. wf ls,',
+      '                               wf feed, wf start and wf up say it, and wf ls names what finishes.',
+      '                               Refused while a pause stands.',
+      '                               --why: the reason, said wherever the pause is; --by: who pauses it',
       '                               (default: your OS user)',
-      '  wf uncordon',
-      "                               lift the store's cordon: the next pass files what waits",
+      '  wf resume',
+      '                               resume the store: the next pass files what waits',
       '  wf tick [--stats]',
       '                               one pass: tick the engine, file what became ready — refused while a',
       '                               daemon (the api, or a wf up) ticks the store, since it runs the same',
@@ -315,7 +399,8 @@ test("the table's help is today's, word for word", () => {
       '                               WF_ROOT/daemon.json — who holds it, pid, start, last pass, and a beat',
       '                               each interval;',
       '                               once a minute, a line of what its passes cost (tick-stats.json); the',
-      "                               store's cordon once it is put, and again once it is lifted.",
+      "                               store's pause once it is put, again each time it says another thing",
+      '                               (Pausing: N finishing, then Paused), and once it is resumed.',
       '                               wf up --stats: what the last pass cost, phase by phase — read, not',
       '                               run, so it fits while a daemon holds the store; where none does,',
       '                               wf tick --stats',
@@ -461,23 +546,23 @@ test("REFUSED at shipped defaults: wf hold's arguments, before any run is read, 
   assert.equal(refusedBy(hold, ['r-x', '--off', '--off']), null);
 });
 
-test("REFUSED at shipped defaults: wf cordon's and wf uncordon's arguments, before the store is read, in their words whole", () => {
-  const cordon = entry('cordon');
-  const shape = 'wf cordon [--why "<words>"] [--by <name>]';
-  assert.equal(refusedBy(cordon, ['--why', '--by']), `--why takes the words for why the store is cordoned: ${shape}.`);
-  assert.equal(refusedBy(cordon, ['--by']), `--by takes who cordons it, by a name: ${shape}.`);
-  assert.equal(refusedBy(cordon, ['--why', '--x']), `--why takes the words for why the store is cordoned: ${shape}.`);
+test("REFUSED at shipped defaults: wf pause's and wf resume's arguments, before the store is read, in their words whole", () => {
+  const pause = entry('pause');
+  const shape = 'wf pause [--why "<words>"] [--by <name>]';
+  assert.equal(refusedBy(pause, ['--why', '--by']), `--why takes the words for why the store is paused: ${shape}.`);
+  assert.equal(refusedBy(pause, ['--by']), `--by takes who pauses it, by a name: ${shape}.`);
+  assert.equal(refusedBy(pause, ['--why', '--x']), `--why takes the words for why the store is paused: ${shape}.`);
   assert.equal(
-    refusedBy(cordon, ['--why', ' \n ']),
-    '--why takes the words for why the store is cordoned, and was given only blanks: give it words, or leave --why out.',
+    refusedBy(pause, ['--why', ' \n ']),
+    '--why takes the words for why the store is paused, and was given only blanks: give it words, or leave --why out.',
   );
-  assert.equal(refusedBy(cordon, ['--by', 'b'.repeat(65)]), '--by takes at most 64 characters, and was given 65: say it shorter.');
-  assert.equal(refusedBy(cordon, ['--by', 'a', '--by', 'b']), `wf cordon takes --by once: a cordon says one by. ${shape}.`);
-  assert.equal(refusedBy(cordon, ['now']), `wf cordon does not take now: ${shape}.`);
-  assert.equal(refusedBy(cordon, ['--why', 'merging by hand', '--by=ann']), null);
-  assert.equal(refusedBy(cordon, []), null);
-  assert.equal(refusedBy(entry('uncordon'), ['--all']), "wf uncordon takes no --all: it lifts the store's cordon, whoever put it.");
-  assert.equal(refusedBy(entry('uncordon'), []), null);
+  assert.equal(refusedBy(pause, ['--by', 'b'.repeat(65)]), '--by takes at most 64 characters, and was given 65: say it shorter.');
+  assert.equal(refusedBy(pause, ['--by', 'a', '--by', 'b']), `wf pause takes --by once: a pause says one by. ${shape}.`);
+  assert.equal(refusedBy(pause, ['now']), `wf pause does not take now: ${shape}.`);
+  assert.equal(refusedBy(pause, ['--why', 'merging by hand', '--by=ann']), null);
+  assert.equal(refusedBy(pause, []), null);
+  assert.equal(refusedBy(entry('resume'), ['--all']), 'wf resume takes no --all: it resumes the store, whoever paused it.');
+  assert.equal(refusedBy(entry('resume'), []), null);
 });
 
 test("REFUSED at shipped defaults: wf tick's, wf up's and wf watch's arguments, in today's words whole", () => {
@@ -506,4 +591,76 @@ test("REFUSED at shipped defaults: wf tick's, wf up's and wf watch's arguments, 
     'wf watch takes one cursor at most, a whole number of bytes — 0, or the number a `cursor:` line printed: wf watch [cursor]';
   for (const argv of [['x'], ['1', '2'], ['--from']]) assert.equal(refusedBy(entry('watch'), argv), cursor, argv.join(' '));
   assert.equal(refusedBy(entry('watch'), ['12']), null);
+});
+
+/** A spec that takes a card's `name`, and the words a person or the api alone gives. */
+const CARD: Spec = {
+  positionals: [{ key: 'name', takes: 'required', kind: 'name' }],
+  flags: [
+    { flag: '--file', kind: 'text', key: 'file', only: { side: 'cli', why: 'the api is sent the words' } },
+    { flag: '--words', kind: 'text', key: 'words', only: { side: 'api', why: 'a command line names a file', required: true } },
+  ],
+  unknown: (arg) => `UNKNOWN ${arg}`,
+};
+
+test('a table breaks its rules: a name in a route’s path that no argument of its spec takes', () => {
+  const route = { method: 'PUT', path: '/api/cards/:name', status: 200 } as const;
+  assert.deepEqual(commandBreaks([{ name: 'a', route, spec: CARD, handler }], []), []);
+  assert.deepEqual(commandBreaks([{ name: 'a', route: { ...route, path: '/api/cards/:card' }, spec: CARD, handler }], []), [
+    "a's route PUT /api/cards/:card names :card, which no argument of its spec takes: key a positional card",
+  ]);
+});
+
+test('a table breaks its rules: a why left empty, of a route served by hand, of a side alone, of a flag one side alone takes', () => {
+  const route = { method: 'POST', path: '/api/x', status: 201, hand: 'it answers a Location' } as const;
+  assert.deepEqual(commandBreaks([{ name: 'a', route, handler }], []), []);
+  assert.deepEqual(commandBreaks([{ name: 'a', route: { ...route, hand: ' ' }, handler }], []), [
+    "a's route POST /api/x is served by hand and says no why: say why the table does not generate it",
+  ]);
+  assert.deepEqual(commandBreaks([{ name: 'a', only: { side: 'cli', why: '' }, handler }], []), [
+    'a is served on the cli alone and says no why: say why',
+  ]);
+  const put = { method: 'PUT', path: '/api/cards/:name', status: 200 } as const;
+  const said = { ...CARD, flags: [{ ...CARD.flags[0], only: { side: 'cli', why: '' } } as const, CARD.flags[1]] };
+  assert.deepEqual(commandBreaks([{ name: 'a', route: put, spec: said, handler }], []), [
+    "a's --file is taken on the cli alone and says no why: say why",
+  ]);
+});
+
+test('a table breaks its rules: a flag the api alone takes on an entry the table generates no route of', () => {
+  const put = { method: 'PUT', path: '/api/cards/:name', status: 200 } as const;
+  assert.deepEqual(commandBreaks([{ name: 'a', route: put, spec: CARD, handler }], []), []);
+  const broken = ["a's --words is taken on the api alone, and the table generates no route of it: route it, or take the flag out"];
+  assert.deepEqual(commandBreaks([{ name: 'a', route: { ...put, hand: 'by hand' }, spec: CARD, handler }], []), broken);
+  assert.deepEqual(
+    commandBreaks([{ name: 'a', route: { method: 'GET', path: '/api/cards/:name', status: 200 }, spec: CARD, handler }], []),
+    broken,
+  );
+});
+
+test('a table breaks its rules on each of an entry’s routes: one routed on another’s path, and a key one of them sets that no flag fills', () => {
+  const routes = [
+    { method: 'POST', path: '/api/x', status: 200 },
+    { method: 'DELETE', path: '/api/x', status: 200, sets: { off: true } },
+  ] as const;
+  assert.deepEqual(commandBreaks([{ name: 'a', route: routes, spec: HOLDING, handler }], []), []);
+  assert.deepEqual(
+    commandBreaks(
+      [
+        { name: 'a', route: routes, spec: HOLDING, handler },
+        { name: 'b', route: { method: 'DELETE', path: '/api/x', status: 200 }, handler },
+      ],
+      [],
+    ),
+    ['b is routed on DELETE /api/x, as a is: give it a path of its own'],
+  );
+  assert.deepEqual(commandBreaks([{ name: 'a', route: routes, spec: SPEC, handler }], []), [
+    "a's route sets off, which no flag of its spec fills: name a key the command reads",
+  ]);
+});
+
+test('a command line refuses a flag the api alone takes, as one the command does not take, and reads one the CLI alone takes', () => {
+  assert.equal(refusalOf(['x', '--words', 'hi'], CARD), 'UNKNOWN --words');
+  assert.equal(refusalOf(['x', '--words=hi'], CARD), 'UNKNOWN --words=hi');
+  assert.deepEqual(parseArgv(CARD, ['x', '--file', 'f.md']), { name: 'x', file: 'f.md' });
 });

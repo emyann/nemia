@@ -1,10 +1,10 @@
 /**
  * The factories, for the board: the default factory and every factory in the store, each with the repositories it works on, the workflows
- * it offers and the agents it hires. Read from the store on each request (`readFactories`), never written: `wf factory` is the one writer
- * of a factory's file.
+ * it offers and the agents it hires. Read from the store on each request, by `wf factory`'s entry (`FACTORY`), never written: `wf factory`
+ * is the one writer of a factory's file.
  */
 import { Hono } from 'hono';
-import { DEFAULT_FACTORY, readFactories, type FactoryListing, type Hires } from 'agent-orchestrator';
+import { DEFAULT_FACTORY, FACTORY, type FactoryListing, type Hires } from 'agent-orchestrator';
 import { repoOf } from '../capabilities/capabilities.ts';
 import { type ApiEnv, served } from '../layer.ts';
 
@@ -41,13 +41,14 @@ const answerOf = (listing: FactoryListing): FactoryAnswer =>
  * - `GET /api/factories` — the default factory first, on the api's own repository (`repoOf`), offering every workflow and hiring no one;
  *   then each factory in the store, by name (`FactoryAnswer`), a file that does not read listed with why, so it hides no other. A request
  *   is answered in one of them, on one of their repositories, by naming it: `?factory=<name>` and `?repo=<path>` on any route
- *   (factories/place.ts).
+ *   (factories/place.ts). Served by hand, through the entry's handler (`FACTORY`), since the default factory is the api's to add.
  */
 export const factories = new Hono<ApiEnv>().get('/api/factories', (c) =>
-  served(c, ({ env }) =>
-    c.json([
+  served(c, async ({ e, env }) => {
+    const listed = await FACTORY.handler(e, {});
+    return c.json([
       { name: DEFAULT_FACTORY, default: true, repos: [repoOf(env)], workflows: null, hires: {}, error: null },
-      ...readFactories().map(answerOf),
-    ] satisfies FactoryAnswer[]),
-  ),
+      ...listed.factories.map(answerOf),
+    ] satisfies FactoryAnswer[]);
+  }),
 );

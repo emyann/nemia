@@ -50,6 +50,8 @@ export function unstartedRun(workflow: WorkflowListing): RunDetail {
     status: 'running',
     moving: false,
     cost: null,
+    atWork: null,
+    tokens: null,
     read: null,
     waitingOnYou: [],
     onYou: [],

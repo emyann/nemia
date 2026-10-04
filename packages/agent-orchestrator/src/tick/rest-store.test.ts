@@ -28,7 +28,7 @@ process.env.WF_MAX_CONCURRENT = '10000';
 delete process.env.WF_MAX_RUNS;
 const { addToInbox, approve, forget, isGitRun, prune, queueInInbox, readInbox, retry, start } = await import('../runner.ts');
 const { listRuns, readRun } = await import('../record/record.store.ts');
-const { liftCordon, putCordon } = await import('../cordon/cordon.store.ts');
+const { resumePause, putPause } = await import('../pause/pause.store.ts');
 const { tick, freshRestMemo } = await import('./tick.verb.ts');
 const { acceptFile, approvalFile, asksDir, holdFile, markCancelled, pruneFile, restStamps, runFile, runsDir, writeAsk } =
   await import('../record/record.store.ts');
@@ -222,22 +222,18 @@ test('a second pass over the same store reads no record of a finished run, and a
   await measured();
 });
 
-test('the same store cordoned: once the pass after the cordon has read every run with it, every finished run is answered from memory', async () => {
+test('the same store paused: once the pass after the pause has read every run with it, every finished run is answered from memory', async () => {
   const [none] = sizes.map((s) => s.cost) as [PassCost];
-  putCordon({ why: 'merging by hand', by: 'ann' });
+  putPause({ why: 'merging by hand', by: 'ann' });
   try {
     await measured();
-    const cordoned = await measured();
+    const paused = await measured();
     const listed = listRuns().length;
-    assert.equal(cordoned.rested, 200, 'every finished run answered from memory while the cordon stands');
-    assert.equal(
-      cordoned.records,
-      listed - cordoned.rested,
-      `only the records of the runs in flight read (${cordoned.records} of ${listed})`,
-    );
-    assert.equal(journals(cordoned), journals(none), 'no journal read more than the runs in flight make');
+    assert.equal(paused.rested, 200, 'every finished run answered from memory while the pause stands');
+    assert.equal(paused.records, listed - paused.rested, `only the records of the runs in flight read (${paused.records} of ${listed})`);
+    assert.equal(journals(paused), journals(none), 'no journal read more than the runs in flight make');
   } finally {
-    liftCordon();
+    resumePause();
   }
   await measured();
   assert.equal((await measured()).rested, 200, 'and once it is lifted, as before');

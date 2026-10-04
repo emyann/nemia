@@ -2,7 +2,7 @@
  * What the Factory works out about the runs, without React Flow: which are in flight, what a card
  * says, where a card goes, and how many cells an open card takes. Pure.
  */
-import type { RunSummary, RunToDecide } from './api';
+import type { AtWork, RunSummary, RunToDecide } from './api';
 import { duration, type EdgeState } from './canvas.ts';
 import type { Flow } from './flow.ts';
 import { layers, type Point } from './layout.ts';
@@ -82,25 +82,67 @@ export const standingOf = (
 ): 'cancelled' | 'waiting on you' | 'in flight' | 'finished' =>
   run.cancelledAt ? 'cancelled' : waitsOnYou(run) ? 'waiting on you' : inFlight(run) ? 'in flight' : 'finished';
 
-type Clocked = Pick<RunSummary, 'createdAt' | 'startedAt' | 'cancelledAt'> & { waiting?: RunSummary['waiting'] };
+type Clocked = Pick<RunSummary, 'createdAt' | 'startedAt' | 'cancelledAt'> &
+  Held & { waitingOnYou?: RunSummary['waitingOnYou']; atWork?: AtWork | null };
 
 /** How long a run waited before it started — created to its first filing — or null while nothing of it is filed. */
 export const waitedMs = (run: Pick<RunSummary, 'createdAt' | 'startedAt'>): number | null =>
   run.startedAt === null ? null : Math.max(0, Date.parse(run.startedAt) - Date.parse(run.createdAt));
 
 /**
- * Whether a run's clock still counts, second by second: the time at work of a run in flight, and the wait of a run nothing of which is
- * filed yet and nobody called off — `finished` on the floor for one that waits on a run that never ships, and waiting all the same.
+ * Whether a run's clock still counts, second by second: the time at work of a run a task of which still runs (`AtWork.since`), and the
+ * wait of a run nothing of which is filed yet and nobody called off — `finished` on the floor for one that waits on a run that never
+ * ships, and waiting all the same. A run without the api's time at work counts while it is in flight, as `finished` says.
  */
-export const clockCounts = (run: Clocked, finished: boolean): boolean => (run.startedAt === null ? run.cancelledAt === null : !finished);
+export const clockCounts = (run: Clocked, finished: boolean): boolean => {
+  if (run.startedAt === null) return run.cancelledAt === null;
+  return run.atWork ? run.atWork.since !== null : !finished;
+};
+
+/** A run's time at work at `now`: what ran and ended (`AtWork.ms`), and the time since what still runs started. */
+const atWorkMs = (atWork: AtWork, now: number): number =>
+  atWork.ms + (atWork.since === null ? 0 : Math.max(0, now - Date.parse(atWork.since)));
+
+/**
+ * Whether a run is over, for its clock: nothing of it runs (`AtWork.since`), and it is called off, or `finished` and waiting on nobody
+ * (`waitsOnYou`) — a run at a gate has only stopped until a person answers.
+ */
+const isOver = (run: Clocked & { atWork: AtWork }, finished: boolean): boolean =>
+  run.atWork.since === null && (run.cancelledAt !== null || (finished && !waitsOnYou({ ...run, waitingOnYou: run.waitingOnYou ?? [] })));
+
+/** The sentence a clock's title ends on for a run that waited a second or more before its first filing (`waitedMs`); else nothing. */
+const waitedSentence = (run: Pick<RunSummary, 'createdAt' | 'startedAt'>): string => {
+  const waited = waitedMs(run) ?? 0;
+  return waited >= 1000
+    ? ` Created ${new Date(run.createdAt).toLocaleString()}, and waited ${duration(waited)} before its first step was filed.`
+    : '';
+};
+
+/** The clock's title past the start: the time at work, the start, the end or that it still goes, the wall time, and the wait before. */
+function workedTitle(run: Clocked & { startedAt: string; atWork: AtWork }, now: number, over: boolean): string {
+  const local = (iso: string) => new Date(iso).toLocaleString();
+  const started = Date.parse(run.startedAt);
+  const { endedAt } = run.atWork;
+  const end = !over
+    ? `still going: ${duration(now - started)} from start to now`
+    : endedAt === null
+      ? 'and no session or check of it ran'
+      : `ended ${local(endedAt)}: ${duration(Date.parse(endedAt) - started)} from start to end`;
+  return `At work ${duration(atWorkMs(run.atWork, now))}. Started ${local(run.startedAt)}, ${end}.${waitedSentence(run)}`;
+}
 
 /**
  * What a run's clock says, wherever the board says how long a run has been going: `words` on the Factory's card, `at` the instant they
  * count from, and `title` the times in full. `finished` is the card's: not in flight.
  *
+ * Its time at work (`AtWork`), the api's: how long any session or check of it ran, two at once counted once, a wait at a gate, a hold or
+ * a slot counted for nothing. A run that is over took it (`took 2h 10m`); any other is at work (`1h 05m at work`), the time since what
+ * still runs started added as `now` moves. The title gives the start, the end or that it still goes, and the wall time between.
+ *
  * Counted from when it started (`startedAt`, its first filing), never from when it was created: a run started `--after` runs is created,
  * then waits, doing nothing, until they ship, and that wait is not time at work. Until it starts it says it is waiting, for as long as it
  * has — what it waits on is the card's line above (`waiting.word`), and the title's — and a run called off before it started never did.
+ * A run the api could not judge has no time at work, and says when it started.
  */
 export function runClock(run: Clocked, now: number, finished: boolean): { words: string; at: string; title: string } {
   const local = (iso: string) => new Date(iso).toLocaleString();
@@ -115,10 +157,19 @@ export function runClock(run: Clocked, now: number, finished: boolean): { words:
           title: `${created} Nothing of it is filed yet${run.waiting ? `: ${run.waiting.word}` : ''}.`,
         };
   }
-  const since = duration(now - Date.parse(run.startedAt));
-  const waited = waitedMs(run)!;
-  const title = `Started ${local(run.startedAt)}.${waited >= 1000 ? ` Created ${local(run.createdAt)}, and waited ${duration(waited)} before its first step was filed.` : ''}`;
-  return { words: finished ? `started ${since} ago` : `${since} since it started`, at: run.startedAt, title };
+  const { startedAt, atWork } = run;
+  if (atWork) {
+    const over = isOver({ ...run, atWork }, finished);
+    const worked = duration(atWorkMs(atWork, now));
+    return {
+      words: over ? `took ${worked}` : `${worked} at work`,
+      at: startedAt,
+      title: workedTitle({ ...run, startedAt, atWork }, now, over),
+    };
+  }
+  const since = duration(now - Date.parse(startedAt));
+  const title = `Started ${local(startedAt)}.${waitedSentence(run)}`;
+  return { words: finished ? `started ${since} ago` : `${since} since it started`, at: startedAt, title };
 }
 
 type FloorRun = Pick<RunSummary, 'id' | 'createdAt' | 'status' | 'moving' | 'waiting' | 'after' | 'waitingOnYou' | 'cancelledAt'> & {

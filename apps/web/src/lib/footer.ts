@@ -1,7 +1,7 @@
 /**
  * The words of the frame's bottom bar (`FrameFooter`): what is at work, the daemon's dot, whether the board follows the feed, the quota in
- * short, and which of them a phone keeps. Each short form fits the bar's one line, and its whole sentence is its `title`. Pure: the time is
- * handed in, the browser's own on the page.
+ * short, and which of them a phone keeps; the pause says its own (`pauseWords`). Each short form fits the bar's one line, and its whole
+ * sentence is its `title`. Pure: the time is handed in, the browser's own on the page.
  */
 import type { Daemon, Quota, RunSummary } from './api';
 import { daemonSentence, daemonWords } from './daemon.ts';
@@ -130,11 +130,14 @@ export function quotaShort(
 }
 
 /** A group of the bottom bar. */
-export type FooterPart = 'daemon' | 'feed' | 'work' | 'quota' | 'version';
+export type FooterPart = 'daemon' | 'pause' | 'feed' | 'work' | 'quota' | 'version';
 
-/** The groups the bar shows, left to right: all five, and on a `narrow` screen the daemon's dot and the quota alone. */
+/**
+ * The groups the bar shows, left to right: all six, the pause right after the daemon's dot; and on a `narrow` screen the daemon's
+ * dot, the pause and the quota alone.
+ */
 export const footerParts = (narrow: boolean): readonly FooterPart[] =>
-  narrow ? ['daemon', 'quota'] : ['daemon', 'feed', 'work', 'quota', 'version'];
+  narrow ? ['daemon', 'pause', 'quota'] : ['daemon', 'pause', 'feed', 'work', 'quota', 'version'];
 
 /**
  * Each place in `source` that sizes a page as the screen less the header alone (`100svh-3rem`), a line break inside or not: under the

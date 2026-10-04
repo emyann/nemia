@@ -43,7 +43,7 @@ const {
 } = await import('../src/runner.ts');
 const { readRun } = await import('../src/record/record.store.ts');
 const { runStore } = await import('../src/record/files.store.ts');
-const { liftCordon, putCordon } = await import('../src/cordon/cordon.store.ts');
+const { resumePause, putPause } = await import('../src/pause/pause.store.ts');
 const { main } = await import('../src/cli/main.ts');
 const { abortMerge, checkoutParts, commitMerge, mergeInProgress, mergeState } = await import('../src/workspace/worktree.store.ts');
 
@@ -2123,18 +2123,18 @@ test('the whole screen of a run whose ending waits for the checkout, first filed
   ]);
 });
 
-test('while the store is cordoned, a landing whose check has ended commits on its exit 0, and one its check refused is aborted, as without it', async () => {
+test('while the store is paused, a landing whose check has ended commits on its exit 0, and one its check refused is aborted, as without it', async () => {
   for (const [exit, phase] of [
     [0, 'succeeded'],
     [1, 'failed'],
   ] as const) {
     const { repo, id, e, settle, base, checkId } = await stagedAndSigned();
-    putCordon({ why: 'merging by hand', by: 'ann' });
+    putPause({ why: 'merging by hand', by: 'ann' });
     try {
       settle(checkId, phase, undefined, exit);
-      const cordoned = runStore.runs.read(id);
-      assert.ok(cordoned.cordon, 'the run is read with the cordon, as every pass reads it');
-      const advanced = await advance(e, cordoned);
+      const paused = runStore.runs.read(id);
+      assert.ok(paused.pause, 'the run is read with the pause, as every pass reads it');
+      const advanced = await advance(e, paused);
       assert.deepEqual(advanced.filed, [], `exit ${exit}: nothing filed`);
       assert.equal(mergeHead(repo), false, `exit ${exit}: the merge is not left staged in the checkout`);
       const landed = readRun(id).steps.ship.landed;
@@ -2146,7 +2146,7 @@ test('while the store is cordoned, a landing whose check has ended commits on it
         assert.equal(git(repo, 'rev-parse', 'HEAD'), base, 'aborted, the base branch where it was');
       }
     } finally {
-      liftCordon();
+      resumePause();
     }
   }
 });

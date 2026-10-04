@@ -74,12 +74,8 @@ async function named(page: Page): Promise<void> {
   const header = page.locator('header[data-frame-header]');
   await header.getByRole('link', { name: 'Nemia' }).focus();
   await page.keyboard.press('Tab');
-  const cordon = header.getByRole('switch', { name: 'Cordon' });
-  if (!(await cordon.evaluate((element) => element === document.activeElement)))
-    throw new Refused("Tab from the logo reaches the header's Cordon switch");
-  await page.keyboard.press('Tab');
   if (!(await header.locator('button[data-bell]').evaluate((element) => element === document.activeElement)))
-    throw new Refused("Tab from the Cordon switch reaches the header's bell, its last control before the rail");
+    throw new Refused("Tab from the logo reaches the header's bell, its one control before the rail");
   await page.keyboard.press('Tab');
   await expectVisible(
     page.getByRole('tooltip').filter({ hasText: 'Home' }),

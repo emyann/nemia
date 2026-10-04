@@ -154,7 +154,6 @@ test('the help, once and alone, for a verb given too little to act on', async (t
     ['logs', 'r-1'],
     ['agents', 'card'],
     ['agents', 'card', '--repo'],
-    ['agents', 'nope'],
   ])
     assert.deepEqual(await typed(t, e, ...argv), { out: help, err: [] }, `wf ${argv.join(' ')}`);
 });

@@ -11,7 +11,10 @@ import path from 'node:path';
 import type { Engine } from '../runtime-client.ts';
 import { scratch } from '../../test/scratch.ts';
 import { cursorTakes, feedLineWords, type FeedLine } from '../feed/feed.ts';
-import { cordonWords } from '../cordon/cordon.ts';
+import { pausedWords } from '../pause/pause.ts';
+
+/** The store's pause as read while none stands. */
+const NONE = { pause: null, finishing: [], staged: [] };
 import { statsLine, statsLines } from '../stats/index.ts';
 import { statsOf } from '../stats/stats.ts';
 import { parseArgv, type CommandSpec } from './command.ts';
@@ -19,7 +22,7 @@ import { parseArgv, type CommandSpec } from './command.ts';
 const ROOT = scratch('wf-reads-');
 process.env.WF_ROOT = ROOT;
 const { FEED, LOGS, SHOW, STATS } = await import('./reads.verb.ts');
-const { liftCordon, putCordon } = await import('../cordon/cordon.store.ts');
+const { resumePause, putPause } = await import('../pause/pause.store.ts');
 
 /** What `command` refuses of `argv` before anything is read, its parser's words or its check's; null where it takes it. */
 function refusedBy(command: CommandSpec, argv: readonly string[]): string | null {
@@ -90,7 +93,7 @@ test('wf stats prints JSON with --json, one line with --line, and its tiles and 
   assert.deepEqual(STATS.print?.(s, {}), statsLines(s));
 });
 
-test("wf feed reads the store's feed from a cursor, and prints the cordon first while one stands, then the lines and the cursor", async () => {
+test("wf feed reads the store's feed from a cursor, and prints the pause first while one stands, then the lines and the cursor", async () => {
   const first: FeedLine = { at: '2026-10-04T12:00:00.000Z', run: 'r-1', word: 'running' };
   const second: FeedLine = { at: '2026-10-04T12:01:00.000Z', run: 'r-1', step: 'implement', word: 'succeeded' };
   const head = `${JSON.stringify(first)}\n`;
@@ -99,16 +102,16 @@ test("wf feed reads the store's feed from a cursor, and prints the cordon first 
   const end = Buffer.byteLength(whole);
   const e = {} as Engine;
 
-  assert.deepEqual(await FEED.handler(e, {}), { lines: [first, second], cursor: end, cordon: null });
+  assert.deepEqual(await FEED.handler(e, {}), { lines: [first, second], cursor: end, pause: NONE });
   const after = await FEED.handler(e, { cursor: String(Buffer.byteLength(head)) });
-  assert.deepEqual(after, { lines: [second], cursor: end, cordon: null });
+  assert.deepEqual(after, { lines: [second], cursor: end, pause: NONE });
   assert.deepEqual(FEED.print(after, {}), [feedLineWords(second), `cursor: ${end}`]);
 
-  const cordon = putCordon({ why: 'merging by hand', by: 'ann' });
+  const pause = putPause({ why: 'merging by hand', by: 'ann' });
   try {
-    const cordoned = await FEED.handler(e, { cursor: String(Buffer.byteLength(head)) });
-    assert.deepEqual(FEED.print(cordoned, {}), [cordonWords(cordon), feedLineWords(second), `cursor: ${end}`]);
+    const paused = await FEED.handler(e, { cursor: String(Buffer.byteLength(head)) });
+    assert.deepEqual(FEED.print(paused, {}), [pausedWords({ pause, finishing: [] }), feedLineWords(second), `cursor: ${end}`]);
   } finally {
-    liftCordon();
+    resumePause();
   }
 });

@@ -7,8 +7,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { Schema } from 'effect';
-import { cordonFile, readCordon } from '../cordon/cordon.store.ts';
-import type { Cordon } from '../cordon/cordon.ts';
+import { pauseFile, readPause } from '../pause/pause.store.ts';
+import type { Pause } from '../pause/pause.ts';
 import type { QueueTry } from '../inbox/inbox.ts';
 import type { AskKey, AskKind, AskWritten, PersonAsk, Pruned, Run, RunStore } from './record.ts';
 import {
@@ -198,34 +198,34 @@ function putTry(name: string, tried: QueueTry): void {
 }
 
 /**
- * The run as it reads with the store's cordon (`readCordon`) composed onto it — the one given, read where none is — or without one while
- * none stands: a run the tick's memo kept is read with the cordon as it stands now, so the cordon is in no run's stamp (`restStamps`): a
+ * The run as it reads with the store's pause (`readPause`) composed onto it — the one given, read where none is — or without one while
+ * none stands: a run the tick's memo kept is read with the pause as it stands now, so the pause is in no run's stamp (`restStamps`): a
  * run at rest has nothing due for it to hold, and one it holds anything of is `running`, never at rest. A run that already reads with
- * the cordon as it stands, or with none while none does, is the very run given, which the memo knows by identity (`keptOf`). Never
+ * the pause as it stands, or with none while none does, is the very run given, which the memo knows by identity (`keptOf`). Never
  * written into the record.
  */
-function cordoned(run: Run, cordon: Cordon | null = readCordon()): Run {
-  if (isDeepStrictEqual(run.cordon ?? null, cordon)) return run;
-  const { cordon: _, ...bare } = run;
-  return cordon ? { ...bare, cordon } : bare;
+function paused(run: Run, pause: Pause | null = readPause()): Run {
+  if (isDeepStrictEqual(run.pause ?? null, pause)) return run;
+  const { pause: _, ...bare } = run;
+  return pause ? { ...bare, pause } : bare;
 }
 
 /**
- * A run's record and a person's files beside it, each a file of its own under `runs/`, with the store's cordon composed onto each run read
- * (`cordoned`); the inbox's cards and the tick's tries.
+ * A run's record and a person's files beside it, each a file of its own under `runs/`, with the store's pause composed onto each run read
+ * (`paused`); the inbox's cards and the tick's tries.
  */
 export const filesStore: RunStore = {
   runs: {
-    read: (id) => cordoned(readRun(id)),
+    read: (id) => paused(readRun(id)),
     list: (said, kept) => {
-      const cordon = readCordon();
-      return listRuns(said, kept).map((run) => cordoned(run, cordon));
+      const pause = readPause();
+      return listRuns(said, kept).map((run) => paused(run, pause));
     },
     create: writeRun,
     rewrite: rewriteRun,
     stamps: restStamps,
     exists: (id) => fs.existsSync(runFile(id)),
-    calledOff: (id) => [cancelFile, pruneFile, holdFile].some((file) => fs.existsSync(file(id))) || fs.existsSync(cordonFile()),
+    calledOff: (id) => [cancelFile, pruneFile, holdFile].some((file) => fs.existsSync(file(id))) || fs.existsSync(pauseFile()),
     cancel: markCancelled,
     forget: removeRunFiles,
     prune: writePruned,

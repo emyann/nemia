@@ -126,7 +126,7 @@ export {
 } from './run.ts';
 export { outputLines } from './closeout/closeout.ts';
 export { dueNote, messageRefusal, signoffsSpent } from './retry/index.ts';
-export { firstFiledAt, runStartedAt, timeline, timelineLines, timelineTotalLines } from './timeline/timeline.ts';
+export { atWork, firstFiledAt, runStartedAt, runTokens, timeline, timelineLines, timelineTotalLines } from './timeline/index.ts';
 export type { FolderRun, GitRun, PlaceKind } from './run.ts';
 export type {
   Acceptance,
@@ -153,7 +153,7 @@ export type {
   TaskSpend,
   Wait,
 } from './run.ts';
-export type { SlotWait, TaskSpan, Timeline, TimelineTotal, TimelineTry } from './timeline/timeline.ts';
+export type { AtWork, RunTokens, SlotWait, TaskSpan, Timeline, TimelineTotal, TimelineTry } from './timeline/index.ts';
 export type { Retry, RetryAsk, RetryHow, RetryMode } from './retry/index.ts';
 export {
   agentsFor,
@@ -374,16 +374,31 @@ export { accept, round } from './round/round.verb.ts';
 export { approve } from './gate/gate.verb.ts';
 export { cancel } from './cancel/cancel.verb.ts';
 export { hold, unhold } from './wait/wait.verb.ts';
-export { cordonWords, UNCORDONED, type Cordon, type Cordoned, type CordonStaged } from './cordon/cordon.ts';
-export { readCordon } from './cordon/cordon.store.ts';
+export {
+  finishingWords,
+  pausedLines,
+  pausedWords,
+  pauseWords,
+  RESUMED,
+  stagedWords,
+  type Finishing,
+  type Pause,
+  type Paused,
+  type PauseStaged,
+} from './pause/pause.ts';
+export { readPause } from './pause/pause.store.ts';
 export { retry } from './retry/retry.verb.ts';
 export { say } from './say/say.verb.ts';
 export { COMMANDS, TABLE } from './command/commands.verb.ts';
 export { PRUNE, RM } from './command/runs.verb.ts';
 export { LOGS, STATS } from './command/reads.verb.ts';
+export { START } from './start/commands.verb.ts';
+export { INBOX, INBOX_ADD, INBOX_QUEUE } from './inbox/commands.verb.ts';
+export { FACTORY } from './factory/factory.verb.ts';
+export { AGENTS_CUSTOM } from './agents/custom.verb.ts';
 export type { Command, Ran } from './command/entry.verb.ts';
-export { CLI, commandBreaks, commandLine, helpOf, parseArgv } from './command/command.ts';
-export type { Args, CommandSpec, Flag, Positional, Spec } from './command/command.ts';
+export { CLI, commandBreaks, commandLine, generated, helpOf, leftOut, parseArgv, routeList } from './command/command.ts';
+export type { Args, CommandSpec, Flag, Positional, Route, Spec } from './command/command.ts';
 export type { Accepted, RoundAsked } from './round/round.verb.ts';
 export type { Approved } from './gate/gate.verb.ts';
 export type { Asked } from './retry/retry.verb.ts';
@@ -397,7 +412,7 @@ export { freshStatsMemo, stats } from './stats/stats.verb.ts';
 export type { StatsMemo, StatsOptions } from './stats/stats.verb.ts';
 export { BY_KEYS, statsLine, statsLines, statsQueryOf } from './stats/index.ts';
 export type { ByKey, QueryKey, Stats, StatsQuery } from './stats/index.ts';
-export { list, runReading, unjudgedOf } from './list/list.verb.ts';
+export { list, pausedRead, runReading, unjudgedOf } from './list/list.verb.ts';
 export type { ReadingHow, RunReading } from './list/list.verb.ts';
 export type { Answered, Decided } from './decide/decide.verb.ts';
 export type { DecideCommand } from './decide/decide.ts';

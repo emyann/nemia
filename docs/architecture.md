@@ -43,7 +43,7 @@ and its harness's pool, the highest priority first (`agent-runtime/src/core/admi
 holds `daemon.json` (its pid, `by` and the `url` an api serves at) and ticks. The api's process is that daemon unless started with
 `--no-tick` (`apps/api/src/main.ts`), and `wf up` is it on a machine that serves no board; each refuses the other while it ticks. A board
 served by the daemon keeps its store ticking; a board served with `--no-tick` ticks nothing, and a run filed on it moves on the daemon's
-next pass. A cordon that pauses a store its daemon ticks is a verb on this lease, still to come.
+next pass. Stopping the daemon itself, beyond `wf pause`, is a verb on this lease, still to come.
 
 **In the orchestrator today, a candidate for the runtime**:
 

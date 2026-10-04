@@ -53,6 +53,11 @@ export type Flag = {
   readonly twice?: string;
   /** A text flag given once for each value, its values collected in the order given, never refused as given twice. */
   readonly many?: boolean;
+  /**
+   * The side that takes it alone, and why: one the CLI alone takes is no key of a body; one the api alone takes is no flag of a command
+   * line, which refuses it as one it does not take, and a key of a body — required there where it says so.
+   */
+  readonly only?: { readonly side: 'cli' | 'api'; readonly why: string; readonly required?: true };
 };
 
 /**
@@ -60,7 +65,8 @@ export type Flag = {
  * (`unknown`), two ways given (`oneWay`), and a text flag's value given apart that is one of the command's own flags, which reads as the
  * value left out (`apart`, handed the value and the flag it was given to) — `--flag=<value>` carries even that. `defaults` is what the
  * command line takes when no way is given; a body says its way. `missing` is the refusal of a required argument left out, empty or starting
- * `-`, said where the CLI would print its help.
+ * `-`, said where the CLI would print its help; `flagFirst`, that a flag the command does not take is refused as one even where a required
+ * argument stands, before `missing`.
  */
 export type Spec = {
   readonly positionals: readonly Positional[];
@@ -70,26 +76,30 @@ export type Spec = {
   readonly oneWay?: string;
   readonly apart?: (value: string, flag: string) => string;
   readonly missing?: string;
+  readonly flagFirst?: true;
 };
 
 /** The arguments a write's route fixes, as its path fixes the run: a body never carries them. */
 type Fixed = Readonly<Record<string, string | boolean>>;
 
 /**
- * Where the api serves a command: a write posted and accepted (202) or done (200), a write deleting what it names, done (200), or a read
- * got and answered. `sets`: the arguments a write's route fixes (`Fixed`), so the api serves the one way of the command it routes.
+ * Where the api serves a command: a write posted and accepted (202), done (200) or made (201), a write putting what it names in place,
+ * done (200), a write deleting what it names, done (200), or a read got and answered. `sets`: the arguments a write's route fixes
+ * (`Fixed`), so the api serves the one way of the command it routes. `hand`: why the api serves the route by a hand of its own, which
+ * calls the command's handler, in place of the route the table would generate.
  */
 export type Route =
-  | { readonly method: 'POST'; readonly path: string; readonly status: 202 | 200; readonly sets?: Fixed }
-  | { readonly method: 'DELETE'; readonly path: string; readonly status: 200; readonly sets?: Fixed }
-  | { readonly method: 'GET'; readonly path: string; readonly status: 200 };
+  | { readonly method: 'POST'; readonly path: string; readonly status: 202 | 200 | 201; readonly sets?: Fixed; readonly hand?: string }
+  | { readonly method: 'PUT'; readonly path: string; readonly status: 200; readonly sets?: Fixed; readonly hand?: string }
+  | { readonly method: 'DELETE'; readonly path: string; readonly status: 200; readonly sets?: Fixed; readonly hand?: string }
+  | { readonly method: 'GET'; readonly path: string; readonly status: 200; readonly hand?: string };
 
 /**
  * A command, as data: its `name`, its `usage` after the name and its `help` lines, as `wf`'s help prints them; its `spec`; `check`, the
  * refusal of its arguments before anything is read, the same on both sides, or null; `writes`, a write the api guards; its `route` on the
- * api — a write is posted and accepted (202), a read is got (200) — or `only`, the side it is served on alone and why; and `apiTakes`, the
- * keys of a body the api folds into its arguments, which the command line has no flag for; `manual`, the long help `wf <name> --help`
- * prints in place of running it, where it has one.
+ * api — a write is posted and accepted (202), a read is got (200), and one command may be served on more than one — or `only`, the side
+ * it is served on alone and why; and `apiTakes`, the keys of a body the api folds into its arguments, which the command line has no flag
+ * for; `manual`, the long help `wf <name> --help` prints in place of running it, where it has one.
  */
 export type CommandSpec = {
   readonly name: string;
@@ -98,11 +108,31 @@ export type CommandSpec = {
   readonly spec: Spec;
   readonly check?: (args: Args) => string | null;
   readonly writes: boolean;
-  readonly route?: Route;
+  readonly route?: Route | readonly Route[];
   readonly only?: { readonly side: 'cli' | 'api'; readonly why: string };
   readonly apiTakes?: readonly string[];
   readonly manual?: string;
 };
+
+/** Every route the api serves a command on: none, its one, or each of its many. */
+export const routeList = (command: Pick<CommandSpec, 'route'>): readonly Route[] =>
+  command.route === undefined ? [] : Array.isArray(command.route) ? command.route : [command.route as Route];
+
+/** A route the table generates on the api: a write the api serves by no hand of its own. */
+export const generated = (route: Route): boolean => route.method !== 'GET' && route.hand === undefined;
+
+/**
+ * The refusal of a text flag's value left out on the command line — empty, or starting `--`, which reads as the value left out — in the
+ * flag's own `takes`, or null. A flag the api alone takes is not looked at: its value is whatever a body sends.
+ */
+export function leftOut(spec: Spec, args: Args): string | null {
+  for (const flag of spec.flags.filter((f) => f.kind === 'text' && f.key !== undefined && f.only?.side !== 'api')) {
+    const value = args[flag.key!];
+    const values = Array.isArray(value) ? value : typeof value === 'string' ? [value] : [];
+    if (values.some((v) => !v || v.startsWith('--'))) return flag.takes ?? null;
+  }
+  return null;
+}
 
 /** A refusal of what was typed, before anything is read: exit 2. */
 const usage = (message: string): never => {
@@ -200,19 +230,28 @@ const strayFlag = (spec: Spec, arg: string): boolean =>
   arg.startsWith('--') && arg !== '--help' && !spec.flags.some((f) => f.flag === arg.split('=')[0]);
 
 /**
+ * Whether `arg`, where the required positional `p` stands, leaves it out: a flag — any word starting `-` where the spec says its own
+ * refusal (`missing`) — or empty, but for a text whose spec says its refusal, which its handler is given to refuse in its own words.
+ */
+const unfilled = (spec: Spec, p: Positional, arg: string): boolean =>
+  arg.startsWith(spec.missing === undefined ? '--' : '-') || (!arg && (spec.missing === undefined || p.kind !== 'text'));
+
+/**
  * A command line's arguments after the command's name, read against `spec` — or undefined when it is given too little to act on: a
  * required argument missing, empty, `--help` or one of its own flags, for which the CLI prints its help, unless the spec says its refusal
- * (`missing`), which a required argument starting `-` gets too. Refused, exit 2, in the spec's own words: an argument it does not take — a
- * flag it has none of among them, wherever it stands — a value flag with no value, given twice, or with one of the command's own flags
- * for its value, and two ways.
+ * (`missing`), which a required argument starting `-` gets too, but for a flag it does not take where it says `flagFirst`. Refused, exit 2,
+ * in the spec's own words: an argument it does not take — a flag it has none of among them, wherever it stands, and one the api alone
+ * takes (`Flag.only`) — a value flag with no value, given twice, or with one of the command's own flags for its value, and two ways.
  */
-export function parseArgv(spec: Spec, argv: readonly string[]): Args | undefined {
+export function parseArgv(typed: Spec, argv: readonly string[]): Args | undefined {
+  const spec: Spec = { ...typed, flags: typed.flags.filter((f) => f.only?.side !== 'api') };
   const required = spec.positionals.filter((p) => p.takes === 'required');
   const head = argv.slice(0, required.length);
-  const stray = spec.missing === undefined ? head.find((a) => strayFlag(spec, a)) : undefined;
+  const stray = spec.missing === undefined || spec.flagFirst ? head.find((a) => strayFlag(spec, a)) : undefined;
   if (stray !== undefined) return usage(spec.unknown(stray));
-  const left = (a: string) => !a || a.startsWith(spec.missing === undefined ? '--' : '-');
-  if (head.length < required.length || head.some(left)) return spec.missing === undefined ? undefined : usage(spec.missing);
+  if (head.length < required.length || head.some((a, i) => unfilled(spec, required[i], a))) {
+    return spec.missing === undefined ? undefined : usage(spec.missing);
+  }
   const given = Object.fromEntries(required.map((p, i) => [p.key, head[i]]));
   const rest = spec.positionals.find((p) => p.takes === 'rest');
   if (rest) return { ...given, [rest.key]: argv.slice(required.length).join(' ') };
@@ -261,9 +300,47 @@ function runBreaks(c: Entry, runners: readonly string[]): string[] {
   if (c.handler === undefined && cliOnly && !runners.includes(c.name))
     breaks.push(`${c.name} has no handler and no runner: give it a handler, or a runner in the CLI's RUNS`);
   const filled = (key: string) => c.spec?.flags.some((f) => f.key === key || (f.sets !== undefined && key in f.sets)) === true;
-  const fixed = c.route && 'sets' in c.route && c.route.sets ? Object.keys(c.route.sets) : [];
-  for (const key of fixed.filter((k) => !filled(k)))
+  const fixed = routeList(c).flatMap((r) => ('sets' in r && r.sets ? Object.keys(r.sets) : []));
+  for (const key of [...new Set(fixed)].filter((k) => !filled(k)))
     breaks.push(`${c.name}'s route sets ${key}, which no flag of its spec fills: name a key the command reads`);
+  return breaks;
+}
+
+/**
+ * Where an entry's words for its sides break the rules: a name in a route's path that no argument of its spec takes, which the command
+ * would never read; a why left empty, of a route served by hand, of the side that serves it alone, or of a flag one side alone takes; and a
+ * flag the api alone takes on an entry the table generates no route of, which nothing would ever hand it.
+ */
+function sideBreaks(c: Entry): string[] {
+  const breaks: string[] = [];
+  const takes = (key: string) =>
+    c.spec?.positionals.some((p) => p.key === key) === true || c.spec?.flags.some((f) => f.key === key) === true;
+  for (const r of routeList(c)) {
+    for (const key of [...r.path.matchAll(/:(\w+)/g)].map((m) => m[1]).filter((k) => !takes(k)))
+      breaks.push(`${c.name}'s route ${r.method} ${r.path} names :${key}, which no argument of its spec takes: key a positional ${key}`);
+    if (r.hand !== undefined && !r.hand.trim())
+      breaks.push(`${c.name}'s route ${r.method} ${r.path} is served by hand and says no why: say why the table does not generate it`);
+  }
+  if (c.only !== undefined && !c.only.why.trim()) breaks.push(`${c.name} is served on the ${c.only.side} alone and says no why: say why`);
+  for (const f of c.spec?.flags ?? []) {
+    if (f.only !== undefined && !f.only.why.trim())
+      breaks.push(`${c.name}'s ${f.flag} is taken on the ${f.only.side} alone and says no why: say why`);
+    if (f.only?.side === 'api' && !routeList(c).some(generated))
+      breaks.push(
+        `${c.name}'s ${f.flag} is taken on the api alone, and the table generates no route of it: route it, or take the flag out`,
+      );
+  }
+  return breaks;
+}
+
+/** Each route of `c` on a method and path an entry before it is routed on (`routed`, which takes the rest of them). */
+function routedTwice(c: Entry, routed: Map<string, string>): string[] {
+  const breaks: string[] = [];
+  for (const at of routeList(c).map((r) => `${r.method} ${r.path}`)) {
+    const first = routed.get(at);
+    if (first) breaks.push(`${c.name} is routed on ${at}, as ${first} is: give it a path of its own`);
+    else routed.set(at, c.name);
+  }
   return breaks;
 }
 
@@ -272,7 +349,7 @@ function runBreaks(c: Entry, runners: readonly string[]): string[] {
  * the api would serve the first alone; an entry served nowhere — neither routed on the api nor said to be served on one side alone
  * (`only`) — so a gap between the CLI and the api is never left unsaid; a name that is both a command the CLI serves and one of the CLI's
  * own verbs (`verbs`), which the CLI would run twice over — an entry served on the api alone shares a verb's name freely; how an entry runs
- * (`runBreaks`); and a runner of the CLI (`runners`) that runs no entry the CLI serves.
+ * (`runBreaks`); its words for its sides (`sideBreaks`); and a runner of the CLI (`runners`) that runs no entry the CLI serves.
  */
 export function commandBreaks(table: readonly Entry[], verbs: readonly string[], runners: readonly string[] = []): string[] {
   const breaks: string[] = [];
@@ -281,15 +358,12 @@ export function commandBreaks(table: readonly Entry[], verbs: readonly string[],
   for (const c of table) {
     if (seen.has(c.name)) breaks.push(`${c.name} is defined twice: a command is one entry of the table`);
     seen.add(c.name);
-    const at = c.route && `${c.route.method} ${c.route.path}`;
-    const first = at && routed.get(at);
-    if (first) breaks.push(`${c.name} is routed on ${at}, as ${first} is: give it a path of its own`);
-    else if (at) routed.set(at, c.name);
-    if (!c.route && !c.only)
+    breaks.push(...routedTwice(c, routed));
+    if (!routeList(c).length && !c.only)
       breaks.push(`${c.name} has no route and no only: give it its route on the api, or say which side alone serves it, and why`);
     if (c.only?.side !== 'api' && verbs.includes(c.name))
       breaks.push(`${c.name} is a command of the table and a verb of the CLI: take it out of VERBS`);
-    breaks.push(...runBreaks(c, runners));
+    breaks.push(...runBreaks(c, runners), ...sideBreaks(c));
   }
   for (const name of runners.filter((r) => !table.some((c) => c.name === r && c.only?.side !== 'api')))
     breaks.push(`${name} has a runner and no entry the CLI serves: give it its entry in the table, or take it out of RUNS`);

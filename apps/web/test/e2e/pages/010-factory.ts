@@ -23,6 +23,7 @@ import {
   expectLeftOf,
   expectMovedAlone,
   expectTexts,
+  expectUncut,
   expectVisible,
   Refused,
   settled,
@@ -48,6 +49,28 @@ import {
 } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
+
+/**
+ * COSTLY's card says what the run took, in its footer and whole: its time at work, what it cost and its tokens, the split on hover. A
+ * run that waits on you, so at work and not over; photographed.
+ */
+async function tookOnTheCard(page: Page): Promise<void> {
+  const costly = cardOf(page, COSTLY.id);
+  await expectVisible(
+    costly.locator('[data-cost]', { hasText: `· ${COSTLY.cost}` }),
+    `the card of a run whose sessions were priced says what it cost beside its clock (${COSTLY.cost})`,
+  );
+  await expectVisible(
+    costly.locator(`[data-tokens][title="${COSTLY.tokens.split}"]`, { hasText: `· ${COSTLY.tokens.said}` }),
+    `and the tokens its sessions used (${COSTLY.tokens.said}), their split on hover`,
+  );
+  await expectVisible(
+    costly.locator('time', { hasText: new RegExp(`^${COSTLY.took}$`) }),
+    `and its time at work, its sessions and checks side by side counted once (${COSTLY.took}): it waits on you`,
+  );
+  await expectUncut(costly.locator('time, [data-cost], [data-tokens]'), 'the clock, the cost and the tokens are read whole');
+  await photographCard(page, costly, path.join(OUT, `factory-card-took-${await themeOf(page)}.png`));
+}
 
 /**
  * The diamond's cards laid out as a diamond: every run left of each run that waits on it, and its top and bottom level with the middle of
@@ -169,7 +192,7 @@ export default {
       beside,
       `a failed run whose session still runs is in flight: its card is on the Factory by default (${NEIGHBOUR.id})`,
     );
-    await expectVisible(beside.getByText(/since it started$/), 'its card counts the time since it started, as a card in flight does');
+    await expectVisible(beside.getByText(/ at work$/), 'its card counts its time at work, as a card in flight does');
     await expectVisible(
       page.locator(`.react-flow__node[data-id="${HELD.id}"] [data-need="harness"][data-step="${HELD.blocked}"]`, {
         hasText: new RegExp(`^${HELD.blocked} is blocked by the harness: ${HELD.wait}$`),
@@ -184,8 +207,8 @@ export default {
       await expectVisible(cardOf(page, run.id), `the diamond's card ${run.id} is on the floor by default`);
     for (const run of [top, shipped]) {
       await expectVisible(
-        cardOf(page, run.id).getByText(/^started .+ ago$/),
-        `${run.id}, shipped, is drawn finished — on the floor because a run in flight waits on it`,
+        cardOf(page, run.id).getByText(/^took .+$/),
+        `${run.id}, shipped, is drawn finished — on the floor because a run in flight waits on it — and says what it took`,
       );
     }
     await expectCount(cardOf(page, cancelled.id), 0, `${cancelled.id} is not on the floor by default: called off, it waits on nobody`);
@@ -237,7 +260,7 @@ export default {
     for (const run of [top, shipped, running, orphan])
       await expectCount(cardOf(page, run.id).locator('[data-ghost-run]'), 0, `${run.id}'s card is no ghost: it started, or waits on you`);
     await expectVisible(
-      cardOf(page, running.id).locator(`time[title*="${DIAMOND.words.running}"]`, { hasText: /^\d+m \d{2}s since it started$/ }),
+      cardOf(page, running.id).locator(`time[title*="${DIAMOND.words.running}"]`, { hasText: /^\d+m \d{2}s at work$/ }),
       `${running.id}'s card counts its time at work from its first filing, and says on hover that it ${DIAMOND.words.running}`,
     );
     const times = (await (await page.request.get(new URL(`/api/runs/${running.id}`, page.url()).href)).json()) as {
@@ -392,12 +415,16 @@ export default {
       `the loop's rail shows ${LOOPING.exhausted} out of rounds as an amber pill, its note after what that means on hover (${LOOPING.id})`,
     );
     await expectVisible(card, `the fake run's card, once finished runs are shown (${FAKE.id})`);
-    await expectVisible(card.getByText(/^started .+ ago$/), 'the card reads finished: when it started, not a clock still counting');
     await expectVisible(
-      cardOf(page, COSTLY.id).locator('[data-cost]', { hasText: `· ${COSTLY.cost}` }),
-      `the card of a run whose sessions were priced says what it cost beside its age (${COSTLY.cost})`,
+      card.locator('time[title^="At work "][title*="still going"]', { hasText: / at work$/ }),
+      'the card reads waiting on you: its time at work, not what it took, since a person is to answer — and nothing of it ticks',
     );
+    await tookOnTheCard(page);
     await expectCount(card.locator('[data-cost]'), 0, "the fake run's card says no cost, not $0: none of its sessions was priced");
+    await expectVisible(
+      card.locator('[data-tokens]', { hasText: /^· ≥\S+ tokens$/ }),
+      "the fake run's card marks its tokens the least they were: its codex session measured them, and its claude ones did not",
+    );
     const gated = cardOf(page, GATED.id);
     await expectVisible(
       gated.locator(`[data-gate-line="${GATED.gated}"]`, { hasText: `approve what ${GATED.gated} handed on, or send it back` }),

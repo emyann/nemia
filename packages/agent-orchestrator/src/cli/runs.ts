@@ -1,26 +1,11 @@
 /**
- * The verb over agents — `wf agents custom` — its flags, read off the command line, and what it prints; and the runners of `wf rm` and
- * `wf prune` (`RM`, `PRUNE`), which walk the many runs a command line names through the entry's handler, ask a person's yes, and tally
- * what was not done into the exit code.
+ * The runner of `wf agents custom`, which reads the words a file holds; and the runners of `wf rm` and `wf prune` (`RM`, `PRUNE`), which
+ * walk the many runs a command line names through the entry's handler, ask a person's yes, and tally what was not done into the exit code.
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import {
-  clearCustomInstructions,
-  customInstructionsFile,
-  customInstructionsFor,
-  HOME,
-  PRUNE,
-  pruneLines,
-  pruningBytes,
-  RM,
-  runStore,
-  sizeOf,
-  writeCustomInstructions,
-  type Args,
-  type Pruning,
-} from '../runner.ts';
-import { HELP, usage, readFlags, confirmed, type Engine } from './flags.ts';
+import { AGENTS_CUSTOM, HOME, PRUNE, pruneLines, pruningBytes, RM, runStore, sizeOf, type Args, type Pruning } from '../runner.ts';
+import { HELP, usage, confirmed, type Engine } from './flags.ts';
 
 /** The runs a command line named, in the order given, each once (`RM`'s and `PRUNE`'s many positional). */
 const idsOf = (args: Args): readonly string[] => (Array.isArray(args.runId) ? args.runId : []);
@@ -168,25 +153,6 @@ export async function pruneVerb(args: Args, e: Engine): Promise<void> {
   return refusedNamed(tally);
 }
 
-/** `wf agents custom`'s flags after the agent's name: the words to write (`--file <path>`, or `-` for stdin), `--clear`, and `--repo`. */
-function customHow(argv: string[]): { file?: string; clear: boolean; repo: string } {
-  const { values, switches } = readFlags(argv, {
-    takes: {
-      '--file': 'the file whose words to write, or - to read them from stdin: wf agents custom <name> --file <path>',
-      '--repo': 'the repository whose agents to look in: wf agents custom <name> --repo <r>',
-    },
-    switches: ['--clear'],
-    unknown: (arg) =>
-      `wf agents custom takes one agent's name, then --file <path> (or --file - for stdin), --clear or --repo <r>, not ${arg}.`,
-    twice: (flag) => `wf agents custom takes ${flag} once: one agent's words are one file.`,
-  });
-  const clear = switches.includes('--clear');
-  const file = values['--file']?.[0];
-  if (clear && file !== undefined)
-    usage('wf agents custom takes --file or --clear, not both: --file writes the words, --clear removes them.');
-  return { ...(file !== undefined && { file }), clear, repo: values['--repo']?.[0] ?? '.' };
-}
-
 /** The words `--file` names: the file's text, or stdin's for `-`. Refused, naming the file, when it cannot be read. */
 function wordsFrom(file: string): string {
   try {
@@ -199,30 +165,12 @@ function wordsFrom(file: string): string {
 }
 
 /**
- * `wf agents custom`: a person's custom instructions for one agent, kept in their store (`customInstructionsFile`) — printed bare, written
- * from `--file`, removed with `--clear`. Refused, writing nothing: a name no place has, and what `writeCustomInstructions` refuses. A run
- * already started keeps the words it was started with.
+ * `wf agents custom`'s runner: the words `--file` names read (`wordsFrom`), handed to its entry's handler (`AGENTS_CUSTOM`) in its store,
+ * and what the entry says of them printed.
  */
-export function agentsCustom(args: string[]): void {
-  const [name, ...flags] = args;
-  if (!name || name.startsWith('-')) return console.log(HELP);
-  const how = customHow(flags);
-  const file = customInstructionsFile(HOME, name);
-  const kept = 'a run already started keeps the words it was started with';
-  if (how.clear)
-    return console.log(
-      clearCustomInstructions(HOME, name, how.repo)
-        ? `${name}: custom instructions removed, ${file} — ${kept}`
-        : `${name} has no custom instructions to remove`,
-    );
-  if (how.file !== undefined) {
-    writeCustomInstructions(HOME, name, wordsFrom(how.file), how.repo);
-    return console.log(
-      `${name}: custom instructions written to ${file}, told after its instructions in every run started from now — ${kept}`,
-    );
-  }
-  const words = customInstructionsFor(HOME, name, how.repo);
-  if (words === undefined)
-    return console.log(`${name} has no custom instructions. Set them with wf agents custom ${name} --file <path>, or --file - for stdin.`);
-  console.log(`${file}\n\n${words}`);
+export async function agentsCustomRun(args: Args, e: Engine): Promise<void> {
+  const file = typeof args.file === 'string' ? args.file : undefined;
+  const asked: Args = file === undefined ? args : { ...args, words: wordsFrom(file) };
+  const data = await AGENTS_CUSTOM.handler(e, asked, undefined, HOME);
+  for (const line of AGENTS_CUSTOM.print(data, asked)) console.log(line);
 }

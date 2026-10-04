@@ -1,0 +1,305 @@
+/**
+ * `wf factory`, each of its forms an entry of the command table: the store's factories listed — bare, which the api serves on its own
+ * route, and `ls` — then filed, given workflows and relieved of them, hired into, fired from and removed, which the command line alone
+ * does. Their handlers answer data, and the CLI prints it.
+ */
+import { leftOut, type Args, type Flag, type Spec } from '../command/command.ts';
+import type { Command } from '../command/entry.verb.ts';
+import { factoryLines, type FactoryListing } from './factory.ts';
+import {
+  addFactory,
+  attachWorkflow,
+  detachWorkflow,
+  factoriesDir,
+  fireAgent,
+  hireAgent,
+  readFactories,
+  removeFactory,
+} from './factory.store.ts';
+
+export const FACTORY_HELP = `wf factory [ls]
+wf factory add <name> --repo <path> [--repo <path> ...]
+wf factory attach <factory> <workflow>
+wf factory detach <factory> <workflow>
+wf factory hire <factory> <agent> --step <workflow>/<step>
+wf factory fire <factory> --step <workflow>/<step>
+wf factory rm <name>
+
+A factory is a named grouping in the store: \${WF_ROOT:-~/.agent-workflows}/factories/, one <name>.json per
+factory, naming the repositories its work is on, the workflows it offers and the agents it hires into their steps:
+
+    { "repos": ["/home/me/code/app"], "workflows": ["build"], "hires": { "build/implement": "implementer" } }
+
+  wf factory     lists the default factory first — every run and card that names no factory; it is no file,
+                 and is read, never written — then each factory by name with its repositories. A file that
+                 does not read as a factory is listed with why.
+  wf factory add files a factory: its name a lowercase slug (letters, digits, dashes; 40 at most), and one
+                 --repo at least, each a directory, written as an absolute path and named once. Git is not asked.
+  wf factory attach attaches a workflow, by its folder's name: the factory then offers it, and only the
+                 workflows attached to it — none, until one is. Only the name is stored, and a step that
+                 names its own agent is filled already; whether the workflow exists is judged at the start.
+  wf factory detach takes a workflow back, once the factory hires no one into its steps.
+  wf factory hire hires an agent into a step, <workflow>/<step> — the workflow by its folder's name, the step
+                 by its file's, without .md: one agent a step, so a second hire replaces the first. Any agent
+                 fills any step; it is found, when the run starts, where the step's own agent: would be.
+  wf factory fire takes a step's hire back.
+  wf factory rm  removes a factory's file, one that does not read included.
+
+wf start --factory <name> starts a run in a factory, of a workflow attached to it: each step its hires fill runs
+as its agent, and the start is refused while a step names no agent and is hired none, or names its own agent
+and is hired one too. Every run is started in a factory: with no --factory, in the one whose repository holds
+--repo or the directory wf start is typed in, and refused where none or two do; a card names its own, by its
+factory: line or --factory. The default factory holds the history of runs and cards that named none, and an
+agent's try; no start names it.
+
+Refused by name, and nothing written: a name that is not a slug, the name default, an add with no --repo or
+with a --repo that is not a directory, an add of a name already filed, an rm, attach, detach, hire or fire of a
+name with no factory, a workflow's name that is empty, hidden, holds a slash or is agents or skills, a detach
+of a workflow not attached or still hired into, a --step that is not <workflow>/<step>, a hire into a workflow
+not attached, and a fire of a step with no hire. A start in a factory of a workflow it has not attached is
+refused, naming the attach.`;
+
+/** Why the api writes no factory: the board reads them, and the command line is their one writer. */
+const WRITTEN_HERE = { side: 'cli', why: 'the board reads factories and writes none: wf factory is their one writer' } as const;
+
+/** The text under `key`: what the spec read there. */
+const textOf = (args: Args, key: string): string => {
+  const value = args[key];
+  return typeof value === 'string' ? value : '';
+};
+
+/** The listing every factory shares: those of the store, as `readFactories` reads them. */
+type Listed = { factories: FactoryListing[] };
+
+/** The lines `wf factory` prints of the store's factories, and how to file one or remove one. */
+const listed = ({ factories }: Listed): string[] => [
+  ...factoryLines(factories),
+  `\nfile one: wf factory add <name> --repo <path> — remove one: wf factory rm <name> — in ${factoriesDir()}`,
+];
+
+/** `wf factory`: the default factory, then each in the store; a word it does not take is refused naming its seven forms. */
+export const FACTORY: Command<Listed> = {
+  name: 'factory',
+  usage: '',
+  help: [
+    "the store's factories: the default first — every run and card that",
+    'names no factory, read, never written — then each by name with its',
+    'repositories (wf factory --help)',
+  ],
+  spec: {
+    positionals: [],
+    flags: [],
+    unknown: (arg) =>
+      `wf factory does not take ${arg}. It lists the factories — wf factory ls — files one with wf factory add <name> --repo <path>, attaches a workflow with wf factory attach <factory> <workflow>, detaches it with wf factory detach <factory> <workflow>, hires an agent into a step with wf factory hire <factory> <agent> --step <workflow>/<step>, fires it with wf factory fire <factory> --step <workflow>/<step>, and removes one with wf factory rm <name> (wf factory --help).`,
+  },
+  writes: false,
+  route: { method: 'GET', path: '/api/factories', status: 200 },
+  manual: FACTORY_HELP,
+  handler: async () => ({ factories: readFactories() }),
+  print: listed,
+};
+
+/** `wf factory ls`: the same listing, by its name. */
+const FACTORY_LS: Command<Listed> = {
+  name: 'factory ls',
+  usage: '',
+  help: ['the same, by its name'],
+  spec: {
+    positionals: [],
+    flags: [],
+    unknown: (arg) => `wf factory ls takes nothing, and was given ${arg}: wf factory ls lists every factory.`,
+  },
+  writes: false,
+  only: { side: 'cli', why: "the api lists the factories on wf factory's route: ls is the command line's second name for it" },
+  handler: async () => ({ factories: readFactories() }),
+  print: listed,
+};
+
+/** `--repo <path>`, once per repository a factory is filed with. */
+const REPOS: Flag = {
+  flag: '--repo',
+  kind: 'text',
+  key: 'repos',
+  many: true,
+  takes: "--repo takes a repository's directory: wf factory add <name> --repo <path> [--repo <path> ...]",
+};
+
+/** `wf factory add`'s spec: the factory's name, then `--repo` once per repository. */
+const ADD_SPEC: Spec = {
+  positionals: [{ key: 'name', takes: 'required', kind: 'name' }],
+  flags: [REPOS],
+  unknown: (arg) =>
+    arg.startsWith('-')
+      ? `wf factory add does not take ${arg}. It takes the factory's name, then --repo <path>, once per repository.`
+      : `wf factory add files one factory, and ${arg} is a second: wf factory add <name> --repo <path>, once per factory.`,
+  apart: () => REPOS.takes!,
+  missing: "wf factory add takes the factory's name, first: wf factory add <name> --repo <path> [--repo <path> ...]. Nothing was filed.",
+};
+
+/** `wf factory add`: one factory filed, and where. */
+const FACTORY_ADD: Command<{ name: string; repos: readonly string[]; file: string }> = {
+  name: 'factory add',
+  usage: '<name> --repo <path> [--repo <path> ...]',
+  help: ['file a factory: a lowercase slug naming one or more directories'],
+  spec: ADD_SPEC,
+  check: (args) => leftOut(ADD_SPEC, args),
+  writes: true,
+  only: WRITTEN_HERE,
+  async handler(_e, args) {
+    const repos = Array.isArray(args.repos) ? args.repos : [];
+    const { factory, file } = addFactory({ name: textOf(args, 'name'), repos });
+    return { name: factory.name, repos: factory.repos, file };
+  },
+  print: ({ name, repos, file }) => [`${name}  ${repos.join(', ')}`, `filed: ${file}`],
+};
+
+/** `wf factory attach`'s and `detach`'s spec: the factory, then the workflow, and no flag, refused as one wherever it stands. */
+const workflowSpec = (verb: 'attach' | 'detach'): Spec => ({
+  positionals: [
+    { key: 'factory', takes: 'required', kind: 'name' },
+    { key: 'workflow', takes: 'required', kind: 'name' },
+  ],
+  flags: [],
+  unknown: (arg) =>
+    arg.startsWith('-')
+      ? `wf factory ${verb} does not take ${arg}. It takes the factory, then the workflow: wf factory ${verb} <factory> <workflow>.`
+      : `wf factory ${verb} takes one workflow, and ${arg} is a second: wf factory ${verb} <factory> <workflow>, once per workflow.`,
+  missing: `wf factory ${verb} takes the factory, then the workflow, by its folder's name: wf factory ${verb} <factory> <workflow>. Nothing was ${verb}ed.`,
+  flagFirst: true,
+});
+
+/** `wf factory attach`: one workflow attached to one factory, or said to be attached already. */
+const FACTORY_ATTACH: Command<{ file: string; already: boolean }> = {
+  name: 'factory attach',
+  usage: '<factory> <workflow>',
+  help: ["offer a workflow in a factory, by its folder's name: a factory offers", 'only the workflows attached to it'],
+  spec: workflowSpec('attach'),
+  writes: true,
+  only: WRITTEN_HERE,
+  async handler(_e, args) {
+    const { file, already } = attachWorkflow({ factory: textOf(args, 'factory'), workflow: textOf(args, 'workflow') });
+    return { file, already: already === true };
+  },
+  print: ({ file, already }, args) => [
+    `${textOf(args, 'factory')}  ${already ? 'already attached' : 'attached'} ${textOf(args, 'workflow')}`,
+    `${already ? 'unchanged' : 'attached'}: ${file}`,
+  ],
+};
+
+/** `wf factory detach`: one workflow taken from one factory. */
+const FACTORY_DETACH: Command<{ file: string }> = {
+  name: 'factory detach',
+  usage: '<factory> <workflow>',
+  help: ['take a workflow back, once no hire fills its steps'],
+  spec: workflowSpec('detach'),
+  writes: true,
+  only: WRITTEN_HERE,
+  handler: async (_e, args) => detachWorkflow({ factory: textOf(args, 'factory'), workflow: textOf(args, 'workflow') }),
+  print: ({ file }, args) => [`${textOf(args, 'factory')}  detached ${textOf(args, 'workflow')}`, `detached: ${file}`],
+};
+
+/** `wf factory hire`'s and `fire`'s spec: `shape`, their positional arguments, then `--step <workflow>/<step>` once. */
+function stepSpec(verb: 'hire' | 'fire', shape: string, missing: string): Spec {
+  const step: Flag = {
+    flag: '--step',
+    kind: 'text',
+    key: 'step',
+    takes: `--step takes the step, as <workflow>/<step>: wf factory ${verb} ${shape} --step build/implement`,
+    twice: `wf factory ${verb} takes --step once: one step at a time.`,
+  };
+  return {
+    positionals: shape.split(' ').map((p) => ({ key: p.slice(1, -1), takes: 'required', kind: 'name' })),
+    flags: [step],
+    unknown: (arg) =>
+      arg.startsWith('-')
+        ? `wf factory ${verb} does not take ${arg}. It takes ${shape}, then --step <workflow>/<step>.`
+        : `wf factory ${verb} takes ${shape}, and ${arg} is one more: wf factory ${verb} ${shape} --step <workflow>/<step>, once per step.`,
+    apart: () => step.takes!,
+    missing,
+  };
+}
+
+/** The refusal of `wf factory hire` or `fire` given no step, or a step's value left out. */
+const stepCheck =
+  (verb: 'hire' | 'fire', shape: string, spec: Spec) =>
+  (args: Args): string | null =>
+    args.step === undefined
+      ? `wf factory ${verb} names the step with --step: wf factory ${verb} ${shape} --step <workflow>/<step>. Nothing was ${verb}d.`
+      : leftOut(spec, args);
+
+const HIRE_SPEC = stepSpec(
+  'hire',
+  '<factory> <agent>',
+  'wf factory hire takes the factory, then the agent: wf factory hire <factory> <agent> --step <workflow>/<step>. Nothing was hired.',
+);
+
+/** `wf factory hire`: one agent hired into one step, and the agent it replaced, if any. */
+const FACTORY_HIRE: Command<{ file: string; replaced: string | null }> = {
+  name: 'factory hire',
+  usage: '<factory> <agent> --step <workflow>/<step>',
+  help: ["hire an agent into a workflow's step: one a step, a second replaces it"],
+  spec: HIRE_SPEC,
+  check: stepCheck('hire', '<factory> <agent>', HIRE_SPEC),
+  writes: true,
+  only: WRITTEN_HERE,
+  async handler(_e, args) {
+    const { file, replaced } = hireAgent({
+      factory: textOf(args, 'factory'),
+      agent: textOf(args, 'agent'),
+      step: textOf(args, 'step'),
+    });
+    return { file, replaced: replaced ?? null };
+  },
+  print: ({ file, replaced }, args) => [
+    `${textOf(args, 'factory')}  ${textOf(args, 'step')} ← ${textOf(args, 'agent')}${replaced === null ? '' : ` (was ${replaced})`}`,
+    `hired: ${file}`,
+  ],
+};
+
+const FIRE_SPEC = stepSpec(
+  'fire',
+  '<factory>',
+  'wf factory fire takes the factory first: wf factory fire <factory> --step <workflow>/<step>. Nothing was fired.',
+);
+
+/** `wf factory fire`: one step's hire taken back. */
+const FACTORY_FIRE: Command<{ file: string; fired: string }> = {
+  name: 'factory fire',
+  usage: '<factory> --step <workflow>/<step>',
+  help: ["take a step's hire back"],
+  spec: FIRE_SPEC,
+  check: stepCheck('fire', '<factory>', FIRE_SPEC),
+  writes: true,
+  only: WRITTEN_HERE,
+  handler: async (_e, args) => fireAgent({ factory: textOf(args, 'factory'), step: textOf(args, 'step') }),
+  print: ({ file, fired }, args) => [`${textOf(args, 'factory')}  ${textOf(args, 'step')}  fired ${fired}`, `fired: ${file}`],
+};
+
+/** `wf factory rm`: one factory's file removed. */
+const FACTORY_RM: Command<{ file: string }> = {
+  name: 'factory rm',
+  usage: '<name>',
+  help: ["remove a factory's file"],
+  spec: {
+    positionals: [{ key: 'name', takes: 'required', kind: 'name' }],
+    flags: [],
+    unknown: (arg) => `wf factory rm removes one factory, and ${arg} is a second: wf factory rm <name>, once per factory.`,
+    missing: 'wf factory rm takes the name of the factory to remove, as wf factory ls lists it: wf factory rm <name>.',
+  },
+  writes: true,
+  only: WRITTEN_HERE,
+  handler: async (_e, args) => removeFactory(textOf(args, 'name')),
+  print: ({ file }, args) => [`${textOf(args, 'name')}  removed — ${file}`],
+};
+
+/** `wf factory`'s entries, in the order `wf`'s help lists them. */
+export const FACTORIES: readonly Command[] = [
+  FACTORY,
+  FACTORY_LS,
+  FACTORY_ADD,
+  FACTORY_ATTACH,
+  FACTORY_DETACH,
+  FACTORY_HIRE,
+  FACTORY_FIRE,
+  FACTORY_RM,
+] as readonly Command[];

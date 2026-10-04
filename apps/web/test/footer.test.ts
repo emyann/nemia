@@ -172,6 +172,15 @@ test('the quota, short: a state with no windows gives the last reading, said to 
   assert.match(short.title, /^The usage service gave nothing\. Asked of Claude Code/);
 });
 
+test('the quota, short: the last reading keeps its mark, and a window reset since loses it', () => {
+  const last = { askedAt: '2026-09-30T04:00:00.000Z', windows: [win({ key: 'seven_day', label: 'week', usedPercentage: 86 })] };
+  const short = quotaShort(quota({ state: 'unanswered', windows: [], last }), null, NOW);
+  assert.equal(short.text, 'week 86%');
+  assert.equal(short.marked, true);
+  const reset = { ...last, windows: [win({ key: 'seven_day', label: 'week', usedPercentage: 86, reset: true })] };
+  assert.equal(quotaShort(quota({ state: 'unanswered', windows: [], last: reset }), null, NOW).marked, false);
+});
+
 test('the quota, short: a state with nothing to show says its word', () => {
   const short = quotaShort(quota({ state: 'no-plan', windows: [], said: 'No Claude plan is signed in.' }), null, NOW);
   assert.equal(short.text, 'no plan');

@@ -96,25 +96,13 @@ export function feedWords(feed: FeedStatus): { word: string; title: string } {
   }
 }
 
-/** Each state with no windows to show, in a word. */
-const QUOTA_WORDS: Record<Quota['state'], string> = {
-  fresh: 'fresh',
-  asking: 'asking',
-  'no-plan': 'no plan',
-  unanswered: 'unanswered',
-  'no-claude': 'no Claude',
-  timeout: 'timed out',
-  failed: 'failed',
-  unknown: 'unknown',
-};
-
 /** Windows in short: `5-hour 82% · week 40%`. */
 const windowsText = (windows: readonly WindowWords[]): string => windows.map((w) => `${w.label} ${w.used}`).join(' · ');
 
 /**
  * The quota in short: each window's label and percentage — `marked` when one is used past the mark and not reset since — and the hover's
- * sentence (`quotaTitle`). A state with nothing to show now gives the last good reading, `stale`, or its word when there is none, the api's
- * sentence first in the title. A read that failed is the word `unread`.
+ * sentence (`quotaTitle`). A state with nothing to show now gives the last good reading, `stale` and marked as the gauges mark it, or the
+ * api's word for its state when there is none, the api's sentence first in the title. A read that failed is the word `unread`.
  */
 export function quotaShort(
   quota: Quota | undefined,
@@ -130,8 +118,15 @@ export function quotaShort(
   }
   const said = quota.said ? `${quota.said} ${title}` : title;
   const last = lastWords(quota, now);
-  if (last) return { text: windowsText(last.windows), marked: false, stale: true, title: `${said} Last read ${last.asOf}.` };
-  return { text: QUOTA_WORDS[quota.state], marked: false, stale: false, title: said };
+  if (last) {
+    return {
+      text: windowsText(last.windows),
+      marked: last.windows.some((w) => w.marked),
+      stale: true,
+      title: `${said} Last read ${last.asOf}.`,
+    };
+  }
+  return { text: quota.state.replace('-', ' '), marked: false, stale: false, title: said };
 }
 
 /** A group of the bottom bar. */

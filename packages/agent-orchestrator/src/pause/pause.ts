@@ -34,8 +34,8 @@ export type Finishing = { run: string; step: string; kind: 'session' | 'check' |
  */
 export type Paused = { pause: Pause | null; finishing: Finishing[]; staged: PauseStaged[] };
 
-/** The pause as a pass reads it while it stands: the pause, and each task still finishing under it. */
-export type PauseStanding = { pause: Pause; finishing: Finishing[] };
+/** The pause as a pass reads it while it stands: the pause, each task still finishing under it, and each landing it holds staged. */
+export type PauseStanding = { pause: Pause; finishing: Finishing[]; staged: PauseStaged[] };
 
 /** A task's view as `finishingOf` reads it: the words' view (`WordView`), and whether the runtime holds it queued for a slot. */
 export type FinishingView = WordView & { admission?: string };
@@ -121,11 +121,10 @@ export const stagedWords = ({ run, step, repo }: PauseStaged): string =>
  * Every line said of the pause: none when the store is not paused, else the pause as it stands (`pausedWords`), then each task still
  * finishing and each landing it holds, indented.
  */
-export const pausedLines = (paused: Pick<Paused, 'pause' | 'finishing'> & { staged?: readonly PauseStaged[] }): string[] => {
+export const pausedLines = (paused: Paused): string[] => {
   const line = pausedWords(paused);
   if (line === null) return [];
-  const staged = paused.staged ?? [];
-  return [line, ...paused.finishing.map((f) => `   ${finishingWords(f)}`), ...staged.map((s) => `   ${stagedWords(s)}`)];
+  return [line, ...paused.finishing.map((f) => `   ${finishingWords(f)}`), ...paused.staged.map((s) => `   ${stagedWords(s)}`)];
 };
 
 /** What `wf up` says once the pause it said is resumed. */

@@ -1,7 +1,7 @@
 /**
  * The store's pause as the CLI says it (`pausedWords`): first on `wf feed`, after how to start the run on `wf start`, and on `wf up` once
- * when it is put, again each time its words change — Pausing with fewer finishing, then Paused — and `resumed` once when it is resumed
- * (`pauseSaid`); none of them while no pause stands.
+ * when it is put, again each time its words change — Pausing with fewer finishing, then Paused, then a landing held staged — and
+ * `resumed` once when it is resumed (`pauseSaid`); none of them while no pause stands.
  *
  * `WF_ROOT` is set before the import, since the module reads it as it loads.
  */
@@ -101,19 +101,28 @@ test('wf up says the pause once across passes, again each time its words change,
       { run: 'r-1', step: 'a', kind: 'session' as const },
       { run: 'r-2', step: 'b', kind: 'check' as const },
     ],
+    staged: [],
   };
-  const one = { pause, finishing: two.finishing.slice(1) };
-  const none = { pause, finishing: [] };
+  const one = { ...two, finishing: two.finishing.slice(1) };
+  const none = { ...two, finishing: [] };
+  const held = { ...none, staged: [{ run: 'r-3', step: 'ship', repo: '/code/app' }] };
   let said: string | undefined;
   const lines = await printed(t, () => {
-    for (const standing of [undefined, two, two, one, none, none, undefined, undefined]) said = pauseSaid(standing, said);
+    for (const standing of [undefined, two, two, one, none, none, held, held, undefined, undefined]) said = pauseSaid(standing, said);
   });
   assert.deepEqual(
     lines.map((l) => l.slice(10)),
-    [pausedWords(two), pausedWords(one), pausedWords(none), RESUMED],
+    [
+      pausedWords(two),
+      pausedWords(one),
+      pausedWords(none),
+      pausedWords(held),
+      "   r-3's ship has its merge staged in /code/app (MERGE_HEAD), and its check waits on wf resume",
+      RESUMED,
+    ],
   );
   assert.deepEqual(
     lines.map((l) => l.slice(10, 17)),
-    ['Pausing', 'Pausing', 'Paused ', 'the sto'],
+    ['Pausing', 'Pausing', 'Paused ', 'Paused ', "   r-3'", 'the sto'],
   );
 });

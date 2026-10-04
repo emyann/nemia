@@ -294,6 +294,7 @@ const PINNED: Record<string, string[]> = {
     'slotsOf',
     'spendReader',
     'spentWord',
+    'stagedWords',
     'staleAfterMs',
     'start',
     'startFactory',

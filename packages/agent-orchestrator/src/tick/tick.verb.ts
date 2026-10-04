@@ -36,6 +36,7 @@ import { startQueued } from '../inbox/inbox.verb.ts';
 import { countRested, meteredPass, within } from '../meter/tally.store.ts';
 import type { PassCost } from '../meter/meter.ts';
 import { advanceRun, type Advanced } from './advance.verb.ts';
+import { stagedRead } from '../list/list.verb.ts';
 import { costOf, ioOf, meteredEngine } from '../meter/meter.verb.ts';
 
 /**
@@ -69,9 +70,9 @@ export type Pass = {
    */
   unreadable?: string[];
   /**
-   * The store's pause as the pass read it (`readPause`), while one stands, and each task still finishing under it, read off the views the
-   * runtime reported on this pass (`finishingOf`): the pass admitted no queued task and started no queued card, and filed nothing new of
-   * any run (`assess`). Absent while the store is not paused.
+   * The store's pause as the pass read it (`readPause`), while one stands; each task still finishing under it, read off the views the
+   * runtime reported on this pass (`finishingOf`); and each landing it holds with its merge staged (`stagedRead`): the pass admitted no
+   * queued task and started no queued card, and filed nothing new of any run (`assess`). Absent while the store is not paused.
    */
   pause?: PauseStanding;
 };
@@ -189,7 +190,9 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }
       : undefined;
   return {
     ...passOf(report, runs, judging, queue),
-    ...(pause ? { pause: { pause, finishing: finishingReported(runs, report.views ?? []) } } : {}),
+    ...(pause
+      ? { pause: { pause, finishing: finishingReported(runs, report.views ?? []), staged: yield* awaited(() => stagedRead(e, runs)) } }
+      : {}),
   };
 });
 

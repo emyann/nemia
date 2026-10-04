@@ -380,6 +380,7 @@ export {
   pausedWords,
   pauseWords,
   RESUMED,
+  stagedWords,
   type Finishing,
   type Pause,
   type Paused,

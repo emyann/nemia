@@ -2290,8 +2290,9 @@ person (`needs-human`), which holds no slot and does no work until answered. The
 run, and `wf up` once when it is put, again each time its words change, and once more when it is resumed.
 `--by` defaults to the OS user; `--why` and `--by` are refused blank, twice, or over their caps (200
 characters, 64), as a hold's are. A landing whose merge the ending has staged in the repository's checkout,
-and whose check the pause holds, is named under it — `r-1's ship has its merge staged in /repo (MERGE_HEAD),
-and its check waits on wf resume` — so a person who paused to use main knows whose `MERGE_HEAD` is there.
+and whose check the pause holds, is named under it on the board, `wf ls`, `wf tick` and `wf up` — `r-1's ship
+has its merge staged in /repo (MERGE_HEAD), and its check waits on wf resume` — so a person who paused to use
+main knows whose `MERGE_HEAD` is there.
 
 The pause is a person's file, `$WF_ROOT/cordon`, `{ at, by, why? }`, one for the store, read on every pass and
 composed onto every run read; no record is written with it. The file keeps the name it had when the verbs were

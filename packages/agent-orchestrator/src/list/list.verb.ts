@@ -198,11 +198,33 @@ export async function pausedRead(e: Engine): Promise<Paused> {
   const pause = readPause();
   if (!pause) return { pause: null, finishing: [], staged: [] };
   const runs = runStore.runs.list();
-  const staging = runs.filter((run) => isGitRun(run) && stepsOf(run).some((s) => landsOnCheck(s, run)) && mergeInProgress(run.repo));
   const viewed = viewedOnce(e);
-  const reads = await Promise.all(staging.map(async (run) => ({ run, read: await runReading(viewed, run) })));
-  return pausedOf(viewed, pause, runs, reads);
+  return pausedOf(viewed, pause, runs, await stagingReads(viewed, runs));
 }
+
+/**
+ * The readings of those of `runs` whose ending lands on its check while MERGE_HEAD is in their checkout: the runs `stagedOf` can name. A
+ * run a task journal of which does not read (`unreadableJournal`) is left out, as the tick leaves it unjudged; any other failure throws.
+ */
+async function stagingReads(e: Engine, runs: readonly Run[]): Promise<Read[]> {
+  const staging = runs.filter((run) => isGitRun(run) && stepsOf(run).some((s) => landsOnCheck(s, run)) && mergeInProgress(run.repo));
+  const reads = await Promise.all(
+    staging.map((run) =>
+      runReading(e, run).then(
+        (read): Read | undefined => ({ run, read }),
+        (err: unknown) => {
+          if (unreadableJournal(err) === undefined) throw err;
+          return undefined;
+        },
+      ),
+    ),
+  );
+  return reads.filter((r) => r !== undefined);
+}
+
+/** Each landing among `runs` the pause holds with its merge staged (`stagedOf`), as the tick's pass says it under the pause. */
+export const stagedRead = async (e: Engine, runs: readonly Run[]): Promise<PauseStaged[]> =>
+  (await stagingReads(e, runs)).flatMap(stagedOf);
 
 /**
  * A run a read of which rejected with `err`, answered off its record when that is a task journal that does not read (`unreadableJournal`),

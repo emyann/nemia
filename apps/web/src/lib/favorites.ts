@@ -35,3 +35,6 @@ export function favoritesOf(raw: string | null): Favorite[] {
   if (!Array.isArray(parsed)) return [];
   return parsed.map(favoriteOf).filter((item): item is Favorite => item !== undefined);
 }
+
+/** The anchor of a workflow's card on the Workflows page, by where it is read from and its name, which a favourite links to. */
+export const workflowAnchor = ({ from, workflow }: { from: 'repo' | 'yours'; workflow: string }): string => `workflow-${from}-${workflow}`;

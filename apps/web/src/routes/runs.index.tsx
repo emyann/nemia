@@ -1,6 +1,6 @@
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
-import { FactoryFilter, FactoryTag } from '../components/FactoryTag';
+import { FactoryTag } from '../components/FactoryTag';
 import { StatusChip } from '../components/StatusChip';
 import { StartedFrom } from '../components/TryTag';
 import { runsQuery, type RunSummary } from '../lib/api';
@@ -28,13 +28,12 @@ export const Route = createFileRoute('/runs/')({
  * waiting for a person; a run that is somehow both in flight and to decide is in flight, since what still moves is not yet a result to
  * decide. Every row reads how long its run has been at work against one clock for the page (`useNow`), not in the render.
  *
- * Every factory's runs are listed, each tagged with its own, and a filter over them keeps one factory's (`FactoryFilter`), kept in the
- * address as `?factory=<name>` so it survives a reload, the list's poll and a link; a filter that keeps none says so and how to clear it.
+ * Every factory's runs are listed, each tagged with its own; the factory the sidebar picks, kept in the address as `?factory=<name>` so it
+ * survives a reload, the list's poll and a link, keeps only its own, and one that keeps none says so and how to show every factory's.
  */
 function Runs() {
   const { data: runs } = useSuspenseQuery(runsQuery);
   const { factory } = Route.useSearch();
-  const navigate = Route.useNavigate();
   const now = useNow(60_000);
 
   if (!runs.length) {
@@ -56,11 +55,6 @@ function Runs() {
 
   return (
     <article className="space-y-8">
-      <FactoryFilter
-        items={runs}
-        factory={factory}
-        onChange={(picked) => void navigate({ search: picked === undefined ? {} : { factory: picked }, replace: true })}
-      />
       {!ordered.length && (
         <p data-filtered-out className="text-sm text-neutral-500">
           No run of the factory <span className="font-mono">{factory}</span>.{' '}

@@ -1,13 +1,14 @@
 /**
- * A run's start from a factory's floor: the root header's button that opens it in the frame's floating bar (`FloatingBar`), and what the
- * bar then shows — the repository the run starts on, the factory's one or picked among its several, the workflows the factory offers
- * there, each that cannot start saying why, and `StartRun` in the factory for the one picked, as `wf start --factory` starts it.
+ * A run's start: the sidebar's button that opens it in the frame's floating bar (`FloatingBar`), and what the bar then shows — with no
+ * factory yet, the factories to start it in; then the repository the run starts on, the factory's one or picked among its several, the
+ * workflows the factory offers there, each that cannot start saying why, and `StartRun` in the factory for the one picked, as
+ * `wf start --factory` starts it.
  */
 import { useId, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { factoriesQuery, factoryWorkflowsQuery, type Place, type WorkflowListing } from '@/lib/api';
+import { factoriesQuery, factoryWorkflowsQuery, type Factory, type Place, type WorkflowListing } from '@/lib/api';
 import { floorPlace, whyNotStarted } from '@/lib/factories';
 import { workflowKey } from '@/lib/inbox';
 import { useBar } from '@/lib/useBar';
@@ -19,36 +20,45 @@ const code = (text: string) => <code className="font-mono text-xs">{text}</code>
 const path = (text: string) => <code className="font-mono text-xs break-all">{text}</code>;
 
 /**
- * The header's 'Start a run' in the factory `name`, which opens the bar on its start, pressed while it is open on its start or not. Nothing
- * is drawn before the factories are read, for a name the api lists no factory by, or for the default factory, whose floor starts no run
- * (`floorPlace`).
+ * The sidebar's 'Start a run' in the factory `name`, or in none yet, which asks which first, that opens the bar on its start, pressed while
+ * it is open on its start or not, and runs `onPress`. Nothing is drawn for a name the api lists no factory by, nor for the default
+ * factory, whose floor starts no run (`floorPlace`), nor before the factories are read, unless it names none.
  */
-export function FactoryStart({ name }: { name: string }) {
+export function FactoryStart({ name, onPress }: { name?: string; onPress?: () => void }) {
   const factories = useQuery(factoriesQuery);
   const { open, show } = useBar();
   const factory = factories.data?.find((f) => f.name === name);
   const place = factory ? floorPlace(factory) : null;
-  if (!place) return null;
+  if (name !== undefined && !place) return null;
   return (
     <Button
       variant="outline"
       size="sm"
-      aria-label="Start a run"
-      aria-expanded={open?.kind === 'start' && open.factory === name}
-      onPress={() => show({ kind: 'start', factory: name })}
-      className="ml-auto shrink-0"
+      aria-expanded={open?.kind === 'start' && open.factory === (name ?? null)}
+      onPress={() => {
+        onPress?.();
+        show({ kind: 'start', factory: name ?? null });
+      }}
+      className="w-full justify-start"
     >
       <Play data-icon="inline-start" />
-      <span className="hidden sm:inline">Start a run</span>
+      Start a run
     </Button>
   );
 }
 
 /**
  * The bar on the start of a run in the factory `factory`, which the address can name whatever factories there are: once they are read, a
- * factory the api lists by no such name, or the default one, starts no run from here and says so.
+ * factory the api lists by no such name, or the default one, starts no run from here and says so. With no factory yet, it asks which
+ * (`FactoryChoice`).
  */
-export function StartBar({ factory: name }: { factory: string }) {
+export function StartBar({ factory: name }: { factory: string | null }) {
+  if (name === null) return <AskFactory />;
+  return <StartIn name={name} />;
+}
+
+/** The bar on the start of a run in the factory `name`. */
+function StartIn({ name }: { name: string }) {
   const factories = useQuery(factoriesQuery);
   const factory = factories.data?.find((f) => f.name === name);
   const place = factory ? floorPlace(factory) : null;
@@ -73,6 +83,73 @@ export function StartBar({ factory: name }: { factory: string }) {
         <OnRepo place={place} />
       )}
     </FloatingBar>
+  );
+}
+
+/** The bar on the start of a run in no factory yet: which factory, read once the factories are. */
+function AskFactory() {
+  const factories = useQuery(factoriesQuery);
+  return (
+    <FloatingBar title="Start a run" description="A run starts in a factory: pick the one it starts in, then its repository and workflow.">
+      {factories.error ? (
+        <p className="text-sm text-red-700 dark:text-red-400">Could not read the factories: {factories.error.message}</p>
+      ) : !factories.data ? (
+        <p className="text-xs text-neutral-500">Reading the factories…</p>
+      ) : (
+        <FactoryChoice factories={factories.data} />
+      )}
+    </FloatingBar>
+  );
+}
+
+/**
+ * The factories a run can be started in, one a radio, the default factory left out, since its floor starts none: one that cannot start says
+ * why (`floorPlace`) and cannot be picked. A pick opens the bar on the start in that factory, which the address then names.
+ */
+export function FactoryChoice({ factories }: { factories: readonly Factory[] }) {
+  const { show } = useBar();
+  const legend = useId();
+  const places = factories.flatMap((factory) => {
+    const place = floorPlace(factory);
+    return place ? [{ name: factory.name, why: 'why' in place ? place.why : null }] : [];
+  });
+  return (
+    <fieldset aria-labelledby={legend} className="space-y-1.5">
+      <legend id={legend} className="text-sm font-medium">
+        Factory
+      </legend>
+      {!places.length ? (
+        <p className="text-xs text-neutral-500">No factory is filed to start a run in: a run in none starts from the Workflows page.</p>
+      ) : (
+        <ul className="divide-y divide-neutral-200 rounded border border-neutral-300 dark:divide-neutral-800 dark:border-neutral-700">
+          {places.map(({ name, why }) => (
+            <li key={name} data-start-factory={name}>
+              <label
+                className={`flex items-baseline gap-2 px-2 py-1.5 text-sm ${why ? 'cursor-not-allowed' : 'cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-900'}`}
+              >
+                <input
+                  type="radio"
+                  name={legend}
+                  value={name}
+                  checked={false}
+                  disabled={why !== null}
+                  onChange={() => show({ kind: 'start', factory: name })}
+                  className="translate-y-0.5 self-start"
+                />
+                <span className="min-w-0 flex-1 space-y-0.5">
+                  <span className={`block font-medium ${why ? 'text-neutral-500' : ''}`}>{name}</span>
+                  {why && (
+                    <span data-why-not className="block text-xs whitespace-pre-wrap break-words text-amber-700 dark:text-amber-400">
+                      {why}
+                    </span>
+                  )}
+                </span>
+              </label>
+            </li>
+          ))}
+        </ul>
+      )}
+    </fieldset>
   );
 }
 

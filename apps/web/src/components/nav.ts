@@ -26,7 +26,8 @@ export type Section = (typeof SECTIONS)[number];
 type Listing = Exclude<Section['to'], '/factories/$factory'>;
 
 /** Whether `path` is the page of a section that reads `?factory=`, itself and not a page under it. */
-const isListing = (path: string): path is Listing => SECTIONS.some((section) => section.to === path && section.to !== '/factories/$factory');
+const isListing = (path: string): path is Listing =>
+  SECTIONS.some((section) => section.to === path && section.to !== '/factories/$factory');
 
 /**
  * The rail, the frame's narrow column of icons at the left: Home, the factories' canvas, lit on it and on a factory's floor only; Agents,

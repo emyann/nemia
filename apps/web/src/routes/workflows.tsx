@@ -8,11 +8,13 @@ import { StartRun } from '../components/StartRun';
 import { WorkflowBuilder } from '../components/WorkflowBuilder';
 import { WorkflowCanvas } from '../components/WorkflowCanvas';
 import { factoriesQuery, workflowsQuery, type WorkflowListing } from '../lib/api';
-import { workflowFactories } from '../lib/factories';
+import { factorySearch, offeredIn, workflowFactories } from '../lib/factories';
+import { workflowAnchor } from '../lib/favorites';
 import { specStep } from '../lib/bar';
 import { useBar } from '../lib/useBar';
 
 export const Route = createFileRoute('/workflows')({
+  validateSearch: factorySearch,
   loader: ({ context }) =>
     Promise.all([context.queryClient.ensureQueryData(workflowsQuery), context.queryClient.prefetchQuery(factoriesQuery)]),
   component: WorkflowsPage,
@@ -28,11 +30,15 @@ const yours = <code className="font-mono text-xs">~/.agent-workflows/workflows/<
 
 /**
  * Every workflow the repository carries, then yours: a card each, drawn, and startable — and yours built on the board, the one just made
- * opened in its builder.
+ * opened in its builder. With a factory picked in the address, `?factory=<name>`, only those it offers (`offeredIn`); one that is in none
+ * says so, and how to show every factory's.
  */
 function WorkflowsPage() {
-  const { data: workflows } = useSuspenseQuery(workflowsQuery);
+  const { data: all } = useSuspenseQuery(workflowsQuery);
+  const { data: factories } = useQuery(factoriesQuery);
+  const { factory } = Route.useSearch();
   const [made, setMade] = useState<string | null>(null);
+  const workflows = all.filter(offeredIn(factory, factories));
 
   return (
     <article className="space-y-6">
@@ -44,15 +50,23 @@ function WorkflowsPage() {
         </p>
         <NewWorkflow onCreated={setMade} />
       </div>
-      {workflows.length ? (
-        workflows.map((workflow) => (
-          <WorkflowCard
-            key={`${workflow.from}:${workflow.name}`}
-            workflow={workflow}
-            building={workflow.from === 'yours' && workflow.name === made}
-          />
-        ))
-      ) : (
+      {workflows.length === 0 && all.length > 0 && (
+        <p data-filtered-out className="text-sm text-neutral-500">
+          No workflow is in the factory <span className="font-mono">{factory}</span>.{' '}
+          <Link to="/workflows" search={{}} replace className="underline underline-offset-2">
+            Show every factory&apos;s
+          </Link>
+          .
+        </p>
+      )}
+      {workflows.map((workflow) => (
+        <WorkflowCard
+          key={`${workflow.from}:${workflow.name}`}
+          workflow={workflow}
+          building={workflow.from === 'yours' && workflow.name === made}
+        />
+      ))}
+      {all.length === 0 && (
         <p className="text-sm text-neutral-500">
           No workflows. Add a folder of steps under {where} in the repository —{' '}
           <code className="font-mono text-xs">workflows/dev/implement.md</code>, say — or under {yours}.
@@ -81,6 +95,7 @@ function WorkflowCard({ workflow, building: opened = false }: { workflow: Workfl
   return (
     <section
       ref={card}
+      id={workflowAnchor({ from, workflow: name })}
       aria-label={`Workflow ${name}`}
       data-from={from}
       className="space-y-4 rounded-lg border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950"
@@ -88,15 +103,7 @@ function WorkflowCard({ workflow, building: opened = false }: { workflow: Workfl
       <header className="space-y-1">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <h2 className="font-mono text-base font-semibold">{name}</h2>
-          <span
-            className={`rounded-full px-2 py-0.5 text-[11px] leading-none font-medium ${
-              from === 'yours'
-                ? 'bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300'
-                : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300'
-            }`}
-          >
-            {from === 'yours' ? 'yours' : 'this repository'}
-          </span>
+          <FromBadge from={from} />
           <FactoryTags names={workflowFactories(workflow, factories ?? [])} linked />
           {!error && (
             <span className="text-xs text-neutral-500">
@@ -150,6 +157,21 @@ function WorkflowCard({ workflow, building: opened = false }: { workflow: Workfl
         </>
       )}
     </section>
+  );
+}
+
+/** Where a workflow is read from, on its card: yours, or this repository's. */
+function FromBadge({ from }: { from: WorkflowListing['from'] }) {
+  return (
+    <span
+      className={`rounded-full px-2 py-0.5 text-[11px] leading-none font-medium ${
+        from === 'yours'
+          ? 'bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300'
+          : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300'
+      }`}
+    >
+      {from === 'yours' ? 'yours' : 'this repository'}
+    </span>
   );
 }
 

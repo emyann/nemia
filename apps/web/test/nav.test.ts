@@ -85,7 +85,7 @@ test("the picked factory is read from the address alone: a floor's name, else a 
   assert.equal(pickedOf('/runs', {}), undefined);
   assert.equal(pickedOf('/runs', { factory: '' }), undefined, 'an empty name picks none');
   assert.equal(pickedOf('/runs', { factory: 3 }), undefined, 'a name that is no string picks none');
-  assert.equal(pickedOf('/factories/nemia', { factory: 'hiring' }), 'nemia', "on a floor the path wins over a stray ?factory=");
+  assert.equal(pickedOf('/factories/nemia', { factory: 'hiring' }), 'nemia', 'on a floor the path wins over a stray ?factory=');
   for (const path of ['/runs/r-1', '/agents', '/inbox/card', '/', '/workflows/repo/dev/review'])
     assert.equal(pickedOf(path, {}), undefined, `${path} picks none`);
   for (const path of ['/runs/r-1', '/agents', '/inbox/card', '/'])
@@ -98,7 +98,11 @@ test("a section's link carries the picked factory, and none under All factories;
   for (const label of ['Inbox', 'Runs', 'Workflows', 'Stats']) {
     const { to } = section(label);
     assert.deepEqual(sectionLink(section(label), 'nemia'), { to, search: { factory: 'nemia' } });
-    assert.deepEqual(sectionLink(section(label), undefined), { to, search: {} }, `refused: ${label} carries no factory under All factories`);
+    assert.deepEqual(
+      sectionLink(section(label), undefined),
+      { to, search: {} },
+      `refused: ${label} carries no factory under All factories`,
+    );
   }
 });
 

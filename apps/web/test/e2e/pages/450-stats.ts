@@ -135,8 +135,9 @@ export default {
   /**
    * The Stats page: the sidebar lights Stats; each tile holds what the api serves for the last 14 days, null kept; each chart a column per
    * served day of the 28, with a rule on each day marked, skills loaded drawn as a chart with no tile; a row per served step in the skills
-   * loaded and the calls refused, side by side from 1280 wide and stacked on a phone; All asks for every day and draws each; and a factory
-   * picked in the sidebar's picker keeps the period, is asked for as `ofFactory`, never `factory`, and has no picker of its own on the page.
+   * loaded and the calls refused, side by side from 1280 wide and stacked on a phone; All asks for every day and draws each; and a
+   * factory picked in the sidebar's picker keeps the period, is asked for as `ofFactory`, never `factory`, and has no picker of its own
+   * on the page.
    */
   name: 'stats',
   route: '/stats',

@@ -143,8 +143,8 @@ export const workflowFactories = (workflow: Pick<WorkflowListing, 'name' | 'from
 };
 
 /**
- * Whether a listed workflow is listed with the factory `factory` picked: every one is with none picked, or the default factory, which offers
- * every workflow; else only one the factory is in (`workflowFactories`), and none while `factories` are unread.
+ * Whether a listed workflow is listed with the factory `factory` picked: every one is with none picked, or the default factory, which
+ * offers every workflow; else only one the factory is in (`workflowFactories`), and none while `factories` are unread.
  */
 export const offeredIn =
   (factory: string | undefined, factories: readonly Factory[] | undefined) =>

@@ -4,8 +4,9 @@
  */
 
 /**
- * What the bar shows: the start of a run in a factory, or in none yet (`null`), which asks which first; a factory, a run, a step of a run, a step of a workflow (`spec`), read from the
- * repository's workflows or yours (`from`), or a state of one of the code's state machines.
+ * What the bar shows: the start of a run in a factory, or in none yet (`null`), which asks which first; a factory, a run, a step of a
+ * run, a step of a workflow (`spec`), read from the repository's workflows or yours (`from`), or a state of one of the code's state
+ * machines.
  */
 export type Bar =
   | { kind: 'start'; factory: string | null }
@@ -69,9 +70,10 @@ const PARSERS: Record<string, (name: string) => Bar | undefined> = {
 /**
  * The bar `value` names in the address — `start`, the bare word, for a start that asks its factory first, `start:<factory>`,
  * `factory:<factory>`, `run:<run>`, `step:<run>/<step>`, `spec:<from>/<workflow>/<step>` or `state:<machine>/<state>` — or none for
- * anything else: another kind bare or with an empty name, a run with a `/` in its id, a `from` other than `repo` or `yours`, not a string. A factory keeps its whole name. A run id is a file name in the store, a
- * workflow's name its folder's, and a machine's name a word, so a step's and a state's address split at its first `/`, a workflow's
- * step's at its first two, and the step or the state keeps any `/` or `:` of its own.
+ * anything else: another kind bare or with an empty name, a run with a `/` in its id, a `from` other than `repo` or `yours`, not a
+ * string. A factory keeps its whole name. A run id is a file name in the store, a workflow's name its folder's, and a machine's name a
+ * word, so a step's and a state's address split at its first `/`, a workflow's step's at its first two, and the step or the state keeps
+ * any `/` or `:` of its own.
  */
 export function barOf(value: unknown): Bar | undefined {
   if (typeof value !== 'string') return undefined;

@@ -218,6 +218,8 @@ export const detail = (extra: Partial<RunDetail> = {}): RunDetail => ({
   status: 'running',
   moving: true,
   cost: { usd: 1.25, measured: 1, unmeasured: 0, said: '$1.25' },
+  atWork: null,
+  tokens: null,
   read: { said: 'read 21.4M', peak: 'cap', rebuilt: 1 },
   waitingOnYou: ['implement'],
   onYou: ['approve implement'],

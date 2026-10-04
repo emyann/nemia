@@ -57,6 +57,8 @@ const run = (statuses: readonly string[], extra: Partial<RunSummary> = {}): RunS
   stoppedOn: null,
   moving: false,
   cost: null,
+  atWork: null,
+  tokens: null,
   steps: statuses.map((status, i) => ({
     name: `step-${i}`,
     taskId: status === 'waiting' ? null : `t-${i}`,
@@ -1254,6 +1256,48 @@ test("a card's clock counts from when the run started — its first filing — n
     ['6h 14m since it started', `Started ${new Date(createdAt).toLocaleString()}.`],
     'started at once, or with its filings off the feed where the api gives createdAt: no wait to speak of',
   );
+});
+
+test("a card's clock is the run's time at work: a run that is over took it, one still going is at work and counts up while a task of it runs, and the wall time is on hover", () => {
+  const startedAt = '2026-09-20T12:00:00.000Z';
+  const base = { createdAt: startedAt, startedAt, cancelledAt: null, waiting: null, waitingOnYou: [] };
+  const local = (iso: string) => new Date(iso).toLocaleString();
+  const done = { ...base, atWork: { ms: (2 * 60 + 10) * 60_000, since: null, endedAt: '2026-09-20T15:00:00.000Z' } };
+  const later = Date.parse('2026-09-20T16:30:00.000Z');
+  assert.deepEqual(runClock(done, later, true), {
+    words: 'took 2h 10m',
+    at: startedAt,
+    title: `At work 2h 10m. Started ${local(startedAt)}, ended ${local('2026-09-20T15:00:00.000Z')}: 3h 00m from start to end.`,
+  });
+  assert.equal(clockCounts(done, true), false, 'over, it counts no more');
+
+  const running = { ...base, atWork: { ms: 20 * 60_000, since: '2026-09-20T13:00:00.000Z', endedAt: null } };
+  const now = Date.parse('2026-09-20T13:05:30.000Z');
+  assert.equal(runClock(running, now, false).words, '25m 30s at work', 'what ran before, and the time since what runs started');
+  assert.equal(runClock(running, now + 10_000, false).words, '25m 40s at work', 'it counts up with now');
+  assert.equal(runClock(running, now, false).title, `At work 25m 30s. Started ${local(startedAt)}, still going: 1h 05m from start to now.`);
+  assert.equal(clockCounts(running, false), true);
+
+  const called = { ...done, cancelledAt: '2026-09-20T15:10:00.000Z' };
+  assert.equal(runClock(called, later, true).words, 'took 2h 10m', 'called off, it is over too');
+  const nothingRan = { ...base, atWork: { ms: 0, since: null, endedAt: null } };
+  assert.equal(runClock(nothingRan, later, true).title, `At work 0s. Started ${local(startedAt)}, and no session or check of it ran.`);
+  assert.equal(
+    runClock({ ...base, startedAt: '2026-09-20T14:45:00.000Z', atWork: null }, later, true).words,
+    'started 1h 45m ago',
+    'a run the api could not judge has no time at work, and says when it started',
+  );
+});
+
+test('REFUSED: a run at a gate is not over — it is at work for what it ran, says no end, and its clock stands still until a person answers', () => {
+  const startedAt = '2026-09-20T12:00:00.000Z';
+  const atWork = { ms: 20 * 60_000, since: null, endedAt: '2026-09-20T12:20:00.000Z' };
+  const gated = { createdAt: startedAt, startedAt, cancelledAt: null, waiting: null, waitingOnYou: ['plan'], atWork };
+  const now = Date.parse('2026-09-20T14:00:00.000Z');
+  const clock = runClock(gated, now, true);
+  assert.equal(clock.words, '20m 00s at work', 'off the moving floor, finished, and not over: a person is to answer');
+  assert.equal(clock.title, `At work 20m 00s. Started ${new Date(startedAt).toLocaleString()}, still going: 2h 00m from start to now.`);
+  assert.deepEqual([clockCounts(gated, true), clockCounts(gated, false)], [false, false], 'nothing of it runs, so nothing counts');
 });
 
 test('REFUSED: a run nothing of which is filed has no time at work — it is waiting, and for how long, whether it waits on runs, for a slot, or on you; called off first, it never started', () => {

@@ -57,6 +57,19 @@ const row = (extra: object = {}): RunSummary => ({
   stoppedOn: null,
   moving: true,
   cost: { usd: 4.2, measured: 1, unmeasured: 0, said: '$4.20' },
+  atWork: { ms: 1_920_000, since: null, endedAt: '2026-09-30T05:40:00.000Z' },
+  tokens: {
+    total: 3_040_000,
+    input: 3_000_000,
+    output: 40_000,
+    cacheRead: 2_700_000,
+    cacheWrite: 230_000,
+    uncached: 70_000,
+    measured: 2,
+    unmeasured: 0,
+    said: '3.04M tokens',
+    split: '2.7M read from the cache · 230k written to it · 70k uncached · 40k out',
+  },
   steps: [
     {
       name: 'implement',

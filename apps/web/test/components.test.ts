@@ -144,6 +144,8 @@ function runWith(note: string | null): RunDetail {
     status: 'failed',
     moving: false,
     cost: null,
+    atWork: null,
+    tokens: null,
     read: null,
     waitingOnYou: ['review'],
     onYou: ['review'],
@@ -549,6 +551,8 @@ function summaryRun(): RunSummary {
     status: 'running',
     moving: true,
     cost: null,
+    atWork: null,
+    tokens: null,
     steps: [
       step('implement', 'verified ✓'),
       step('review', 'running (working)'),

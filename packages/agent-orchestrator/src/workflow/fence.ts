@@ -4,8 +4,11 @@
  * agent's, a step that runs a fenced agent on the other harness, whose fence cannot be compared with the agent's, and a step's
  * `background: true` over an agent an allow rule would widen: a background session also reads the person's own settings.
  * `addedSkillsRefusal` judges a skill a step adds to its agent's, which the agent's fence must let the session load.
+ *
+ * `writable:` is the one key that reaches past the fence's directory, and it widens where a step's writes reach, never what it may do:
+ * `refuseUnwritable` refuses it over a fence that writes nothing.
  */
-import { AGENTS_FOLDER, type StepKey, type Workflow } from '../step/step.ts';
+import { AGENTS_FOLDER, refuse, type StepKey, type Workflow } from '../step/step.ts';
 import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
 import { rulesOf, toolsOf } from '../keys/index.ts';
 import type { Agent } from '../agents/agents.ts';
@@ -290,4 +293,39 @@ function pathCovers(by: string, path: string): boolean {
   if (under === undefined || (under !== '' && !under.endsWith('/'))) return false;
   if (path.split('/').includes('..')) return false;
   return under === '' ? !/^[/~]/.test(path) : path.startsWith(under);
+}
+
+/** The tools that write a file: the Edit tool's family, and Bash, whose redirection writes where an edit rule lets it. */
+const WRITING_TOOLS = ['Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'Bash'];
+
+/**
+ * Why step `step`'s fence, as resolved with its agent's, writes nothing, or `undefined` when it writes: the narrowest word of its harness,
+ * `plan` or `read-only`; a `tools:` list with no tool that writes a file (`WRITING_TOOLS`); or a permission mode narrower than the
+ * narrowest that writes unasked (`editsUnasked`) with no `Edit` rule in `allowedTools:`, where the rule a writable mount is filed with
+ * would be its first write.
+ */
+function unwrittenBy(step: Workflow): string | undefined {
+  const reach = reachOf(step.harness);
+  const word = step.sandbox ?? step.permissionMode ?? reach.given;
+  if (Object.hasOwn(reach.rank, word) && rankOf(reach, word) === 0) return `runs in \`${word}\`, which writes nothing`;
+  if (step.tools && !step.tools.some((tool) => WRITING_TOOLS.includes(tool)))
+    return `has ${step.tools.length ? `only the tools ${listed(step.tools)}` : 'no tool'}, and none writes a file`;
+  const edits = (step.allowedTools ?? []).some((rule) => ruleParts(rule).tool === 'Edit');
+  if (reach.by === 'mode' && rankOf(reach, word) < reach.writes && !edits)
+    return `runs in \`${word}\`, which asks before an edit, and allows no \`Edit\` rule, so it writes nothing`;
+  return undefined;
+}
+
+/**
+ * Refuses `writable:` on a step whose fence, as resolved with its agent's (`agent`, by name), writes nothing (`unwrittenBy`). The key
+ * widens where a step's writes reach, and gives no write to a step that has none.
+ */
+export function refuseUnwritable(step: Workflow, agent: string | undefined): void {
+  if (!step.writable) return;
+  const why = unwrittenBy(step);
+  if (!why) return;
+  const whose = agent === undefined ? 'its fence' : `its fence, with ${AGENTS_FOLDER}/${agent}.md's`;
+  refuse(
+    `${step.name}: \`writable: ${step.writable.join(', ')}\` lets the step write those folders, and ${whose}, ${why}: \`writable:\` widens where a step's writes reach, never what it may do. Delete the line, or run the step on a fence that writes — an agent whose file allows \`Edit(**)\`, say.`,
+  );
 }

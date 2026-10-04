@@ -194,6 +194,7 @@ export {
   factoryLines,
   factoryNameRefusal,
   factoryRepo,
+  writersOf,
   fillsOf,
   hireRefusal,
   noFactoryLine,

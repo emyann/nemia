@@ -41,6 +41,14 @@ export type Workflow = {
    */
   workspace?: 'main' | 'folder';
   /**
+   * `writable: [web]`: the folders of the run's factory this step may write, each by its directory's name. A run in a factory mounts its
+   * other repositories read-only for every local step; this step alone is given the ones it names writable, and one that is the run's
+   * own repository is its workspace already, and mounts nothing. It widens where the step's writes reach, never what it may do: refused
+   * at load over a fence that writes nothing (`refuseUnwritable`) and on a remote agent, and at `wf start` when a name is no folder
+   * of the factory, or two share it (`writableRefusal`), and on a harness that cannot hold a writable mount.
+   */
+  writable?: string[];
+  /**
    * `slot: none`: a run of this workflow takes no run slot (`WF_MAX_RUNS`).
    *
    * The cap on runs in flight is a cap on the work in flight — N runs' steps at once, and a run with nothing filed waits for one of
@@ -277,6 +285,7 @@ export const STEP_KEYS = [
   'resume',
   'input',
   'workspace',
+  'writable',
   'slot',
   'agent',
   'skills',
@@ -323,6 +332,8 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
   input: 'the steps whose declared output (`output:`) this one is handed in its brief, as data: each one it waits on',
   workspace:
     "`main`: the step runs in the repository's own checkout rather than a worktree of its own — a workflow's last step, which acts on the base branch. `folder`: the step works in a folder the run makes, and the run needs no git repository — said by every step of the team, or by none",
+  writable:
+    "the folders of the run's factory this step may write, each by its directory's name — every other step of the run only reads them; one that is the run's own repository is the step's workspace already — over a fence that writes",
   slot: "`none`: the run takes no run slot (`WF_MAX_RUNS`) — a session that watches the other runs rather than doing a run's work, on a workflow of one step",
   agent:
     "what is attached to this node to do its work: an agent in agents/, whose role keys are this step's defaults and whose instructions come before this step's own note; the step's own keys win",

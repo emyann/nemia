@@ -332,6 +332,7 @@ const PINNED: Record<string, string[]> = {
     'writeSkill',
     'writeTryFolder',
     'writeWorkflow',
+    'writersOf',
   ],
   'agent-orchestrator/run': [
     'BY_CAP',

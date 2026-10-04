@@ -80,6 +80,7 @@ const spec = (fields: Partial<WorkflowStepSpec>): WorkflowStepSpec => ({
   resume: null,
   input: [],
   workspace: null,
+  writable: [],
   slot: null,
   agent: null,
   skills: [],

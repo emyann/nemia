@@ -61,7 +61,7 @@ export async function pick(page: Page, choice: string): Promise<void> {
 export async function sidebar(page: Page): Promise<void> {
   const header = page.locator('header[data-frame-header]');
   await expectVisible(header.getByRole('link', { name: 'Nemia' }), 'the header has the logo, a link to Home');
-  await expectVisible(header.getByRole('button', { name: 'Notifications' }), 'the header has the bell');
+  await expectVisible(header.locator('button[data-bell]'), 'the header has the bell');
   const rail = railOf(page);
   for (const place of RAIL_PLACES) await expectVisible(railPlace(page, place), `the rail has ${place}`);
   const named = await rail.getByRole('link').evaluateAll((links) => links.map((link) => link.getAttribute('aria-label')));

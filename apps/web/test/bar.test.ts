@@ -18,6 +18,7 @@ import {
   machineState,
   specStep,
   type Bar,
+  wholeMachine,
 } from '../src/lib/bar.ts';
 
 const HIRING: Bar = { kind: 'start', factory: 'hiring' };
@@ -58,6 +59,19 @@ test("the bare word gauges opens the machine's gauges, and gauges with a name op
   assert.equal(barOpens(GAUGES), null, 'it has no page');
   assert.equal(nextBar(GAUGES, GAUGES), undefined, 'pressing the bottom bar again closes it');
   assert.deepEqual(nextBar(GAUGES, HIRING), HIRING);
+});
+
+test('the bare word waiting opens the runs waiting on you, and waiting with a name opens none', () => {
+  const WAITING: Bar = { kind: 'waiting' };
+  assert.deepEqual(barOf('waiting'), WAITING);
+  assert.equal(barValue(WAITING), 'waiting');
+  assert.deepEqual(barOf(barValue(WAITING)), WAITING);
+  for (const value of ['waiting:', 'waiting:x', 'Waiting', 'waitings', 'wait'])
+    assert.equal(barOf(value), undefined, `${value} opens no bar`);
+  assert.equal(barOpens(WAITING), null, 'it has no page: each row opens its run');
+  assert.equal(inspects(WAITING), true, 'a press on the empty canvas closes it');
+  assert.equal(nextBar(WAITING, WAITING), undefined, 'pressing the bell again closes it');
+  assert.deepEqual(nextBar(WAITING, { kind: 'gauges' }), { kind: 'gauges' });
 });
 
 test("a run's address names the run, and a step's names its run up to the first slash and the step after it", () => {
@@ -252,4 +266,22 @@ test('the bar covers the part of a frame right of its left edge, and none with n
   assert.equal(barOver(1280, 704, true), 0);
   assert.equal(barOver(900, 1000, false), 0);
   assert.equal(barOver(1280, 1280 - BAR_DEFAULT, false), BAR_DEFAULT);
+});
+
+test("REFUSED: the floor gives its queue lane's room to a bar of the whole machine alone: its gauges, the runs waiting on you", () => {
+  assert.equal(wholeMachine({ kind: 'gauges' }), true);
+  assert.equal(wholeMachine({ kind: 'waiting' }), true);
+  const pages: Bar[] = [
+    { kind: 'factory', factory: 'nemia' },
+    { kind: 'run', run: 'r' },
+    { kind: 'step', run: 'r', step: 'plan' },
+    { kind: 'spec', from: 'repo', workflow: 'dev', step: 'plan' },
+    { kind: 'start', factory: null },
+    { kind: 'state', machine: 'lifecycle', state: 'running' },
+  ];
+  assert.deepEqual(
+    pages.map((bar) => [bar.kind, wholeMachine(bar)]),
+    pages.map((bar) => [bar.kind, false]),
+  );
+  assert.equal(wholeMachine(undefined), false, 'nor no bar at all');
 });

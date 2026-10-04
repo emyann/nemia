@@ -12,6 +12,7 @@ import { RunBar } from './RunBar';
 import { SpecBar } from './SpecBar';
 import { StateBar } from './StateBar';
 import { StepBar } from './StepBar';
+import { WaitingBar } from './WaitingBar';
 
 /**
  * The bar the address opens, keyed by what it shows, so a switch to another thing starts from nothing; none while it is closed. A step's
@@ -36,5 +37,7 @@ export function OpenBar({ feed }: { feed: FeedStatus }) {
       return <StateBar key={barValue(open)} machine={open.machine} state={open.state} />;
     case 'gauges':
       return <GaugesBar feed={feed} />;
+    case 'waiting':
+      return <WaitingBar />;
   }
 }

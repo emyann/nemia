@@ -5403,8 +5403,16 @@ const filed = (name: string, extra: Partial<import('../src/lib/api.ts').Factory>
   ...extra,
 });
 
-/** The frame's sidebar at `path` with `search`, in the provider it sits in, as a loaded page, the factories `factories` read and no run. */
-async function sidebarAt(path: string, search: Record<string, unknown>, factories = [filed('nemia')]): Promise<string> {
+/**
+ * The frame's sidebar at `path` with `search`, in the provider it sits in, as a loaded page, the factories `factories` read, the inbox
+ * `inbox` and no run.
+ */
+async function sidebarAt(
+  path: string,
+  search: Record<string, unknown>,
+  factories = [filed('nemia')],
+  inbox: import('../src/lib/api.ts').InboxEntry[] = [],
+): Promise<string> {
   const { FrameSidebar } = await import('../src/components/FrameSidebar.tsx');
   const { SidebarProvider } = await import('../src/components/ui/sidebar.tsx');
   return pagedWith(
@@ -5413,6 +5421,7 @@ async function sidebarAt(path: string, search: Record<string, unknown>, factorie
     [
       [['factories'], factories],
       [['runs'], []],
+      [['inbox'], inbox],
     ],
   );
 }
@@ -5543,14 +5552,88 @@ test('REFUSED: the start in no factory yet offers each factory a run starts in, 
   assert.match(await pagedWith(createElement(FactoryChoice, { factories: [factories[0]] })), /No factory is filed to start a run in/);
 });
 
-test("the header reads the section's name alone: a floor reads Floor, with no factory's crumb and no start of a run", async () => {
+/** A card of the inbox in `factory` (none for the default factory's), not started, and `extra` over it. */
+const card = (name: string, factory: string | null, extra: Partial<import('../src/lib/api.ts').InboxEntry> = {}) => ({
+  name,
+  file: `${name}.md`,
+  title: name,
+  workflow: 'build',
+  repo: null,
+  factory,
+  startedAs: [],
+  error: null,
+  body: name,
+  filedAt: null,
+  ...extra,
+});
+
+/** The sidebar's Inbox item, its `<li>` whole. */
+const inboxItem = (html: string): string =>
+  /<li[^>]*>(?:(?!<\/li>)[\s\S])*?href="\/inbox[^"]*"[\s\S]*?<\/li>/.exec(
+    /<ul[^>]*aria-label="Sections"[^>]*>([\s\S]*?)<\/ul>/.exec(html)?.[1] ?? '',
+  )?.[0] ?? '';
+
+test("REFUSED: the Inbox's badge counts the picked factory's cards not yet started, every factory's under All factories, beside its link and not in it", async () => {
+  const inbox = [
+    card('one', 'nemia'),
+    card('two', 'nemia', { queued: { at: at, place: 1 } }),
+    card('started', 'nemia', { startedAs: ['r-1'] }),
+    card('hire', 'hiring'),
+    card('broken', 'nemia', { error: 'the card has no front matter' }),
+  ];
+  const badge = (html: string) => /<div[^>]*data-inbox-badge[^>]*>[\s\S]*?<\/div>/.exec(inboxItem(html))?.[0];
+  const nemia = await sidebarAt('/runs', { factory: 'nemia' }, [filed('nemia')], inbox);
+  assert.match(badge(nemia) ?? '', />2<span class="sr-only"> 2 cards not yet started, in nemia<\/span>/);
+  assert.match(inboxItem(nemia), /^<li[^>]*title="2 cards not yet started, in nemia"/, 'said whole on hover over the Inbox');
+  assert.doesNotMatch(badge(nemia) ?? '', /pointer-events-auto/, 'a press on the count reaches the link beneath it');
+  assert.doesNotMatch(/<a\b[\s\S]*?<\/a>/.exec(inboxItem(nemia))?.[0] ?? '', /data-inbox-badge/, 'the badge is not inside the link');
+  const all = await sidebarAt('/runs', {}, [filed('nemia')], inbox);
+  assert.match(badge(all) ?? '', />3</);
+  assert.match(inboxItem(all), /^<li[^>]*title="3 cards not yet started, in every factory"/);
+  assert.equal(badge(await sidebarAt('/runs', { factory: 'quay' }, [filed('nemia')], inbox)), undefined, 'none for none');
+  assert.equal(badge(await sidebarAt('/runs', {}, [filed('nemia')], [card('started', 'nemia', { startedAs: ['r-1'] })])), undefined);
+  assert.deepEqual(
+    sectionLinks(nemia).map((link) => link.label),
+    ['Floor', 'Inbox', 'Runs', 'Workflows', 'Stats'],
+    'each link still reads its section alone',
+  );
+  assert.equal([...nemia.matchAll(/data-inbox-badge/g)].length, 1, 'on the Inbox alone');
+});
+
+/** The header with the section Floor, the factories read and the runs `runs`, or the runs not read yet for none. */
+async function headerWith(runs?: RunSummary[]): Promise<string> {
   const { FrameHeader } = await import('../src/components/FrameHeader.tsx');
   const { SidebarProvider } = await import('../src/components/ui/sidebar.tsx');
-  const html = await routedWith(
+  return pagedWith(
     // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
     createElement(SidebarProvider, { children: createElement(FrameHeader, { section: 'Floor' }) }),
-    [[['factories'], [filed('nemia')]]],
+    runs
+      ? [
+          [['factories'], [filed('nemia')]],
+          [['runs'], runs],
+        ]
+      : [[['factories'], [filed('nemia')]]],
   );
+}
+
+test("REFUSED: the header's bell counts the runs waiting on you, named in full; with none it says so and draws no count", async () => {
+  const bell = (html: string) => /<button[^>]*data-bell[^>]*>[\s\S]*?<\/button>/.exec(html)?.[0] ?? '';
+  const waits = summaryRun();
+  const two = await headerWith([waits, { ...waits, id: 'r-2', factory: 'nemia' }, { ...waits, id: 'r-3', cancelledAt: at }]);
+  assert.match(bell(two), /aria-label="Waiting on you: 2"/);
+  assert.match(bell(two), /aria-expanded="false"/);
+  assert.doesNotMatch(bell(two), / disabled=""|data-disabled/, 'the bell is pressed, not drawn disabled');
+  assert.match(bell(two), /data-bell-count[^>]*>2<\/span>/);
+  const none = await headerWith([{ ...waits, waitingOnYou: [], onYou: [] }]);
+  assert.match(bell(none), /aria-label="Nothing waits on you"/);
+  assert.doesNotMatch(bell(none), /data-bell-count/);
+  const unread = bell(await headerWith());
+  assert.match(unread, /aria-label="Waiting on you"/, 'before the runs are read, the bell says no number');
+  assert.doesNotMatch(unread, /data-bell-count/);
+});
+
+test("the header reads the section's name alone: a floor reads Floor, with no factory's crumb and no start of a run", async () => {
+  const html = await headerWith([]);
   assert.match(html, /<span class="text-sm font-medium">Floor<\/span>/);
   assert.doesNotMatch(html, /Start a run|aria-label="Factory"|<h1/);
 });

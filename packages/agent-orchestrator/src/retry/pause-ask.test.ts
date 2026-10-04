@@ -14,19 +14,18 @@ import { pauseAskVoid, pauseAsksVoid, retriesDue, tryNote } from './retry.ts';
 const IMPLEMENT: Workflow = { name: 'implement', after: [], body: 'do it', check: 'npm test' };
 
 /** A run whose implement is on its first try: its session `taskId`, and its check's where one is given. */
-const runOn = (taskId: string, check?: string): Run =>
-  ({
-    id: 'r-1',
-    repo: '/repo',
-    workspace: '/wt',
-    baseRef: 'abc',
-    branch: 'main',
-    isolate: true,
-    brief: 'b',
-    workflowDir: '/wf',
-    createdAt: '2026-10-04T00:00:00Z',
-    steps: { implement: { taskId, ...(check ? { check: { taskId: check } } : {}) } },
-  }) as Run;
+const runOn = (taskId: string, check?: string): Run => ({
+  id: 'r-1',
+  repo: '/repo',
+  workspace: '/wt',
+  baseRef: 'abc',
+  branch: 'main',
+  isolate: true,
+  brief: 'b',
+  workflowDir: '/wf',
+  createdAt: '2026-10-04T00:00:00Z',
+  steps: { implement: { taskId, ...(check ? { check: { taskId: check } } : {}) } },
+});
 
 const phases = (m: Record<string, TaskPhase>) => (id: string) => m[id] ?? 'unknown';
 

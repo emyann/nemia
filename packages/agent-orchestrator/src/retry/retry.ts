@@ -41,7 +41,7 @@ import {
   budgetWord,
 } from '../status/status.ts';
 import type { Verdict } from '../check/check.ts';
-import { retriesSpent, signoffsSpent, type Retry, type RetryAsk, type RetryMode } from './retry-ask.ts';
+import { retriesSpent, signoffsSpent, type EarlierTry, type Retry, type RetryAsk, type RetryMode } from './retry-ask.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 import type { Decision, Offer } from '../decide/decide.ts';
 import { filedDenies, landedWords } from '../ending/ending.ts';
@@ -266,6 +266,7 @@ export function retriesDue(
   spendOf: SpendOf = () => undefined,
 ): Retry[] {
   const due: Retry[] = [];
+  const open = asks.filter((a) => pauseAskDue(run, a, phaseOf));
   for (const step of steps) {
     const record = run.steps[step.name];
     const { status, modes, blockedByHarness, sendsBack, back, raise } = retryable(
@@ -285,14 +286,8 @@ export function retriesDue(
     const ways = unsettled ? STOPPED_FIRST : modes;
     if (!ways.length) continue;
     const next = tryOf(run, step.name) + 1;
-    const ask = asks.find(
-      (a) =>
-        a.step === step.name &&
-        a.try === next &&
-        ways.includes(a.mode) &&
-        carries(a, raise) &&
-        heard(a, sendsBack) &&
-        pauseAskDue(run, a, phaseOf),
+    const ask = open.find(
+      (a) => a.step === step.name && a.try === next && ways.includes(a.mode) && carries(a, raise) && heard(a, sendsBack),
     );
     if (ask) {
       due.push({
@@ -302,7 +297,7 @@ export function retriesDue(
         ...(ask.model ? { model: ask.model } : {}),
         ...(ask.message !== undefined ? { message: ask.message } : {}),
         ...(raise && ask.mode !== 'recheck' ? { budget: ask.budget } : {}),
-        by: ask.interrupted === undefined ? 'ask' : 'pause',
+        by: askedBy(ask),
         ...(unsettled ? { stopFirst: true as const, ...(blockedByHarness ? {} : { runsOn: true as const }) } : {}),
         ...(back && !unsettled ? { back } : {}),
       });
@@ -319,6 +314,9 @@ export function retriesDue(
   }
   return due.filter((r) => !due.some((o) => o.back?.includes(r.step)));
 }
+
+/** Who asked for a try by its ask: `wf pause --now`, where the ask names the task it stopped, else a person. */
+const askedBy = (ask: RetryAsk): 'ask' | 'pause' => (ask.interrupted === undefined ? 'ask' : 'pause');
 
 /**
  * The ways a person's try of a step whose task has not settled may be asked for: those `retryable` takes for a session its harness blocked.
@@ -340,21 +338,18 @@ export function tryNote(step: Workflow, record: StepRecord | undefined, steps: r
   const inRound = looping && round > 1 ? roundWord(round, capOf(looping)) : '';
   const raised = last.budget !== undefined ? `budget ${budgetWord(last.budget)}` : '';
   if (last.then === 'round') return [inRound, raised].filter(Boolean).join(', ');
-  const how =
-    last.then === 'retries'
-      ? `by retries: ${step.retries ?? 0}`
-      : last.then === 'signoff'
-        ? 'nudged to sign off by the run'
-        : last.paused
-          ? `${last.then === 'recheck' ? 'rechecked' : 'continued'} after wf pause --now`
-          : last.then === 'recheck'
-            ? 'rechecked on your word'
-            : last.then === 'fresh'
-              ? `fresh${last.model ? ` on ${last.model}` : ''}, on your word`
-              : last.then === 'back'
-                ? 'sent back with the work, on your word'
-                : 'nudged on your word';
+  const how = howOf(step, last);
   return [inRound, `try ${record!.tries!.length + 1}, ${how}`, raised, answered ? 'answered' : ''].filter(Boolean).join(', ');
+}
+
+/** How a try was asked for, as `tryNote` says it: by `retries:`, the run's sign-off nudge, the pause, or a person's word and its mode. */
+function howOf(step: Workflow, last: EarlierTry): string {
+  if (last.then === 'retries') return `by retries: ${step.retries ?? 0}`;
+  if (last.then === 'signoff') return 'nudged to sign off by the run';
+  if (last.paused) return `${last.then === 'recheck' ? 'rechecked' : 'continued'} after wf pause --now`;
+  if (last.then === 'recheck') return 'rechecked on your word';
+  if (last.then === 'fresh') return `fresh${last.model ? ` on ${last.model}` : ''}, on your word`;
+  return last.then === 'back' ? 'sent back with the work, on your word' : 'nudged on your word';
 }
 
 /** What a new session of a step over its budget needs, beside an offer that files one: a `--budget` above what its tries have cost. */

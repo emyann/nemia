@@ -189,14 +189,26 @@ export const spentAsks = (run: Run, asks: readonly RetryAsk[]): RetryAsk[] => as
  * A try due now, as `wf ls` and `wf decide` say it — and, for a step whose session the tick stops first, that it does:
  * `its blocked session` while its harness says so, and `its session` once it works again (`runsOn`).
  */
-export const dueNote = (step: Workflow, run: Run, r: Retry): string =>
-  r.by === 'ask'
-    ? `try ${r.try} asked (${modeWord(r)}${r.budget !== undefined ? `, --budget ${r.budget}` : ''}${r.message !== undefined ? ', with your answer' : ''}) — ${r.stopFirst ? `stopping its ${r.runsOn ? '' : 'blocked '}session, then the tick files it` : 'the next tick files it'}`
-    : r.by === 'signoff'
-      ? `try ${r.try} due — a nudge to sign off, once a round: its session ended without its closeout`
-      : r.by === 'pause'
-        ? `try ${r.try} due — ${r.mode === 'recheck' ? 'its check' : 'its session'} was stopped by wf pause --now, and the next tick ${r.mode === 'recheck' ? 'runs it again' : 'continues it'}`
-        : `try ${r.try} due — retries: ${step.retries ?? 0}, ${retriesSpent(run.steps[step.name])} spent`;
+export const dueNote = (step: Workflow, run: Run, r: Retry): string => {
+  if (r.by === 'ask') return askedNote(r);
+  if (r.by === 'signoff') return `try ${r.try} due — a nudge to sign off, once a round: its session ended without its closeout`;
+  if (r.by === 'pause') return pausedNote(r);
+  return `try ${r.try} due — retries: ${step.retries ?? 0}, ${retriesSpent(run.steps[step.name])} spent`;
+};
+
+/** A try a person asked for, as `dueNote` says it: its mode, budget and answer, and whether its session is stopped first. */
+const askedNote = (r: Retry): string => {
+  const budget = r.budget !== undefined ? `, --budget ${r.budget}` : '';
+  const answer = r.message !== undefined ? ', with your answer' : '';
+  const next = r.stopFirst ? `stopping its ${r.runsOn ? '' : 'blocked '}session, then the tick files it` : 'the next tick files it';
+  return `try ${r.try} asked (${modeWord(r)}${budget}${answer}) — ${next}`;
+};
+
+/** A try `wf pause --now` asked for, as `dueNote` says it once its task is stopped: the session continued, or the check run again. */
+const pausedNote = (r: Retry): string =>
+  r.mode === 'recheck'
+    ? `try ${r.try} due — its check was stopped by wf pause --now, and the next tick runs it again`
+    : `try ${r.try} due — its session was stopped by wf pause --now, and the next tick continues it`;
 
 /**
  * The ask a step's current try answers: a person's ask for exactly that try, with a message, honoured the way it asked — the try

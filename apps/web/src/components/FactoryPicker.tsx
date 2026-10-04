@@ -101,7 +101,7 @@ export function FactoryPicker({
           <SelectValue className="min-w-0 truncate">{() => picked ?? 'All factories'}</SelectValue>
         </span>
       </SelectTrigger>
-      <SelectContent className="min-w-56">
+      <SelectContent placement="bottom start" className="min-w-56">
         <SelectItem id={ALL} textValue="All factories">
           All factories
         </SelectItem>

@@ -326,7 +326,7 @@
     {
       "files": ["apps/api/src/detail/detail.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 99, "skipBlankLines": true, "skipComments": true }],
+        "max-lines-per-function": ["error", { "max": 97, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 22 }]
       }
     },
@@ -476,12 +476,6 @@
       }
     },
     {
-      "files": ["apps/web/src/components/WorkflowCanvas.tsx"],
-      "rules": {
-        "max-lines-per-function": ["error", { "max": 98, "skipBlankLines": true, "skipComments": true }]
-      }
-    },
-    {
       "files": ["apps/web/src/components/conversation/PromptBox.tsx"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 96, "skipBlankLines": true, "skipComments": true }]
@@ -564,7 +558,7 @@
     {
       "files": ["apps/web/src/routes/runs.$runId.tsx"],
       "rules": {
-        "complexity": ["error", { "max": 24 }]
+        "complexity": ["error", { "max": 23 }]
       }
     },
     {
@@ -679,7 +673,7 @@
     {
       "files": ["packages/agent-orchestrator/src/list/list.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 171, "skipBlankLines": true, "skipComments": true }],
+        "max-lines-per-function": ["error", { "max": 169, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 49 }],
         "sonarjs/cognitive-complexity": ["error", 41]
       }

@@ -305,15 +305,3 @@ function Stream({ name, log }: { name: string; log: StepLog }) {
 }
 
 export const when = (iso: string) => <time dateTime={iso}>{new Date(iso).toLocaleString()}</time>;
-
-/** What a step was told, folded away: it is long, and it does not change while you look at the step. */
-export function Told({ told, filed }: { told: string; filed: boolean }) {
-  return (
-    <details className="text-sm">
-      <summary className="cursor-pointer text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100">
-        {filed ? 'What it was told' : 'What it would be told now'}
-      </summary>
-      <pre className="mt-2 overflow-x-auto whitespace-pre-wrap rounded bg-neutral-100 p-3 text-xs dark:bg-neutral-900">{told}</pre>
-    </details>
-  );
-}

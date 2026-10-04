@@ -95,3 +95,4 @@ export { denialText, fold, nameFor } from './core/index.ts';
 export { CLAUDE_AUTO_DROPPED, CLAUDE_CONTEXT_TOKENS, CLAUDE_EFFORTS, CLAUDE_PERMISSION_MODES } from './harness/claude/index.ts';
 export { fenceReach, type FenceReach } from './harness/reach.ts';
 export { CODEX_EFFORTS, CODEX_SANDBOXES } from './harness/codex/vocabulary.ts';
+export { HARNESS_CHOICES } from './harness/choices.ts';

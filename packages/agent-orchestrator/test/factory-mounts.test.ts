@@ -295,8 +295,8 @@ test('REFUSED: a factory folder whose path a permission rule cannot name refuses
       "\nThat folder is the factory spaced's: a run in it mounts every repository of the factory but its own, read-only, for each local " +
         'step, and none is left off by hand. Hire into loop/implement an agent whose harness holds the mount (wf factory hire spaced ' +
         '<agent> --step loop/implement); move or rename the folder, then file the factory again on its new path (wf factory rm spaced, ' +
-        'then wf factory add spaced --repo <path> for each, and attach and hire again); or start the run without --factory. Nothing ' +
-        'was written.',
+        'then wf factory add spaced --repo <path> for each, and attach and hire again); or start it in a factory whose repositories ' +
+        "that step's harness can hold. Nothing was written.",
     ),
     message,
   );

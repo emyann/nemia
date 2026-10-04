@@ -78,7 +78,7 @@ const MOVES = {
   },
   defaults: { move: 'the default harness and its settings', to: "packages/agent-runtime's own default harnesses" },
   knobs: {
-    move: "a harness's knobs as a step writes them: the keys, the rules the runtime cannot refuse, the fence's ranking and the form's choices",
+    move: "a harness's knobs as a step writes them: the keys, the rules the runtime cannot refuse and the fence's ranking",
     to: "packages/agent-runtime, the runtime describing each harness's knobs",
   },
   wait: {
@@ -129,8 +129,7 @@ type Baseline = Readonly<Record<string, Entry>>;
 
 /** Each file outside the runtime that says a harness's word today, with its count and what removes them. */
 const HARNESS_WORDS: Baseline = {
-  'apps/api/src/agents/agents.ts': { count: 6, ...MOVES.prompt },
-  'apps/api/src/agents/listing.ts': { count: 1, ...MOVES.api },
+  'apps/api/src/agents/agents.ts': { count: 3, ...MOVES.prompt },
   'apps/api/src/agents/skills.ts': { count: 9, ...MOVES.checkout },
   'apps/api/src/agents/try.ts': { count: 15, ...MOVES.api },
   'apps/api/src/app.ts': { count: 3, ...MOVES.quota },
@@ -143,7 +142,7 @@ const HARNESS_WORDS: Baseline = {
   'apps/api/src/stats/stats.ts': { count: 1, card: 'u42s' },
   'apps/api/src/steps/steps.ts': { count: 1, ...MOVES.wait },
   'apps/api/src/store.ts': { count: 3, ...MOVES.wait },
-  'apps/api/src/workflows/builder.ts': { count: 5, ...MOVES.defaults },
+  'apps/api/src/workflows/builder.ts': { count: 3, ...MOVES.defaults },
   'apps/api/src/workflows/workflows.ts': { count: 10, ...MOVES.api },
   'apps/web/src/components/AgentCard.tsx': { count: 1, ...MOVES.prompt },
   'apps/web/src/components/AgentForm.tsx': { count: 7, ...MOVES.web },
@@ -167,7 +166,7 @@ const HARNESS_WORDS: Baseline = {
   'apps/web/src/lib/skills.ts': { count: 2, ...MOVES.prompt },
   'apps/web/src/lib/transcript.ts': { count: 11, ...MOVES.web },
   'apps/web/src/routes/capabilities.tsx': { count: 19, ...MOVES.reach },
-  'packages/agent-orchestrator/src/agents/agents.store.ts': { count: 8, ...MOVES.render },
+  'packages/agent-orchestrator/src/agents/agents.store.ts': { count: 7, ...MOVES.render },
   'packages/agent-orchestrator/src/agents/agents.ts': { count: 35, ...MOVES.render },
   'packages/agent-orchestrator/src/artifacts/artifacts.store.ts': { count: 2, card: 'slice-2' },
   'packages/agent-orchestrator/src/artifacts/artifacts.ts': { count: 3, card: 'slice-2' },
@@ -191,7 +190,7 @@ const HARNESS_WORDS: Baseline = {
   'packages/agent-orchestrator/src/record/record.ts': { count: 1, card: 'u42s' },
   'packages/agent-orchestrator/src/retry/retry-refusal.ts': { count: 3, ...MOVES.knobs },
   'packages/agent-orchestrator/src/runner.ts': { count: 1, ...MOVES.wait },
-  'packages/agent-orchestrator/src/runtime-client.ts': { count: 18, ...MOVES.defaults },
+  'packages/agent-orchestrator/src/runtime-client.ts': { count: 12, ...MOVES.defaults },
   'packages/agent-orchestrator/src/skills/skills.ts': { count: 11, ...MOVES.render },
   'packages/agent-orchestrator/src/stats/discipline.ts': { count: 10, card: 'u42s' },
   'packages/agent-orchestrator/src/status/status.ts': { count: 11, card: 'u42s' },

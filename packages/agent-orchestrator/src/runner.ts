@@ -2,26 +2,27 @@
  * The package's root: what `agent-orchestrator` exports, each name re-exported by name from the file that holds it, and nothing else here.
  *
  * The runtime is reached through one client, `runtime-client.ts`, the only file that imports `agent-runtime`: it creates the runtime
- * (`engine()`, `HARNESSES`) and names its types. The controllers are a verb each, in its feature's folder, and each imports the client, or
- * a controller that does, never the runtime: `views.verb.ts` (what the runtime's views of a run's tasks say), `start.verb.ts`,
- * `plan.verb.ts` and `inbox.verb.ts` (starting runs, plans and inbox cards), `tick.verb.ts` and `advance.verb.ts` (a pass — `tick`,
- * `advance` — and the filings it adopts), what a person asks of a run (`cancel.verb.ts`, `retry.verb.ts`, `gate.verb.ts`, `say.verb.ts`,
- * `wait.verb.ts`, `round.verb.ts`), the table of the commands that call them, each defined once (`commands.verb.ts`), `forget.verb.ts`
- * and `prune.verb.ts` (`wf rm` and `wf prune`), `list.verb.ts` and `decide.verb.ts` (what a person reads of a run: `wf ls` and
- * `wf decide`), and `stats.verb.ts` (what the store's runs add up to: `wf stats`). They import
- * one way — views and starting beneath the tick, the tick beneath the rest — so no cycle forms among them (`test/boundary.test.ts`).
+ * (`engine()`, `HARNESSES`) and names its types. Its words come through its pure door, `agent-runtime/vocabulary`, which any file imports:
+ * `HARNESS_CHOICES`, the words each harness takes per key, is re-exported from there. The controllers are a verb each, in its feature's
+ * folder, and each imports the client, or a controller that does, never the runtime: `views.verb.ts` (what the runtime's views of a run's
+ * tasks say), `start.verb.ts`, `plan.verb.ts` and `inbox.verb.ts` (starting runs, plans and inbox cards), `tick.verb.ts` and
+ * `advance.verb.ts` (a pass — `tick`, `advance` — and the filings it adopts), what a person asks of a run (`cancel.verb.ts`,
+ * `retry.verb.ts`, `gate.verb.ts`, `say.verb.ts`, `wait.verb.ts`, `round.verb.ts`), the table of the commands that call them, each defined
+ * once (`commands.verb.ts`), `forget.verb.ts` and `prune.verb.ts` (`wf rm` and `wf prune`), `list.verb.ts` and `decide.verb.ts` (what a
+ * person reads of a run: `wf ls` and `wf decide`), and `stats.verb.ts` (what the store's runs add up to: `wf stats`). They import one way —
+ * views and starting beneath the tick, the tick beneath the rest — so no cycle forms among them (`test/boundary.test.ts`).
  *
  * What of the I/O never names the engine sits beneath the controllers, and this file re-exports what it exported of them:
  * `record.store.ts` (a run's id, its files' names, a step's check stderr, artifacts and inputs), `files.store.ts` (the run store a run's
  * record, a person's files beside it and the inbox's are read and written through, `runStore`, and the inbox's folder, `inboxDir`),
  * `daemon.store.ts` (`tick.json` and who ticks the store), `feed.store.ts` (the feed's file), `worktree.store.ts` (git, a step's worktree,
  * its `node_modules`, the hand-off commit), `branches.store.ts` (what git says of a run's result branches), `artifacts.store.ts` (the files
- * a step hands over), `folder.store.ts` and `write.store.ts` (a workflow folder read and written), `agents.store.ts`, `custom.store.ts` and
- * `skills.store.ts` (an agent, a person's custom instructions for one, and a skill written), `place.store.ts` (a place skill's verbs run
- * and heard), `plan.store.ts` (a plan folder read), `inbox.store.ts` (the inbox's cards filed, queued and dropped), `factory.store.ts` (the
- * factories, `factoriesDir`) and `config.store.ts` (the `WF_` environment). They import neither the runtime nor a controller, and load as a
- * tree: the bottom, beneath `record.store.ts`, beneath `worktree.store.ts` and `write.store.ts`, beneath the rest, so no cycle can form
- * (`test/boundary.test.ts`).
+ * a step hands over), `folder.store.ts` and `write.store.ts` (a workflow folder read and written), `agents.store.ts`, `roster.store.ts`,
+ * `custom.store.ts` and `skills.store.ts` (an agent, the agents of both places read, a person's custom instructions for one, and a skill
+ * written), `place.store.ts` (a place skill's verbs run and heard), `plan.store.ts` (a plan folder read), `inbox.store.ts` (the inbox's
+ * cards filed, queued and dropped), `factory.store.ts` (the factories, `factoriesDir`) and `config.store.ts` (the `WF_` environment). They
+ * import neither the runtime nor a controller, and load as a tree: the bottom, beneath `record.store.ts`, beneath `worktree.store.ts` and
+ * `write.store.ts`, beneath the rest, so no cycle can form (`test/boundary.test.ts`).
  */
 export { verdictWord } from './check/check.ts';
 export { Conflict, Invalid, Missing } from './refusal/refusal.ts';
@@ -269,7 +270,7 @@ export {
   type BranchReader,
 } from './branches/branches.store.ts';
 export { evictedBy } from './rest/rest.ts';
-export { AgentWriteError, agentPlaces, agentSkillsFound, findAgent, listAgents, removeAgent, writeAgent } from './agents/agents.store.ts';
+export { AgentWriteError, removeAgent, writeAgent } from './agents/agents.store.ts';
 export { copySkill, SkillWriteError, writeSkill } from './skills/skills.store.ts';
 export { readPlaceJson, runPlaceVerb } from './place/place.store.ts';
 export type {
@@ -294,7 +295,9 @@ export type {
   Unread,
 } from './place/place.ts';
 export { writeWorkflow } from './folder/write.store.ts';
-export type { AgentPlace, AgentSchema, AgentSidecar, AgentWritten } from './agents/agents.store.ts';
+export type { AgentSchema, AgentSidecar, AgentWritten } from './agents/agents.store.ts';
+export { agentPlaces, agentRead, agentSkillsFound, findAgent, listAgents, type Readings } from './roster/roster.store.ts';
+export type { AgentPlace, AgentReading, AgentsRead, AgentUser, CardRead } from './roster/roster.ts';
 export type { SkillChange, SkillCopied, SkillWritten } from './skills/skills.store.ts';
 export type { WorkflowWritten } from './folder/write.store.ts';
 export { addToInbox, dropFromInbox, inboxNameAt, queueInInbox, readInbox } from './inbox/inbox.store.ts';
@@ -302,6 +305,7 @@ export type { InboxDropped, InboxQueued } from './inbox/inbox.store.ts';
 export {
   addFactory,
   attachWorkflow,
+  defaultStartsAllowed,
   detachWorkflow,
   factoriesDir,
   fireAgent,
@@ -309,8 +313,10 @@ export {
   readFactories,
   readFactory,
   removeFactory,
+  startFactory,
 } from './factory/factory.store.ts';
-export { HARNESS_CHOICES, HARNESSES, engine, remoteAgents } from './runtime-client.ts';
+export { HARNESSES, engine, remoteAgents } from './runtime-client.ts';
+export { HARNESS_CHOICES } from 'agent-runtime/vocabulary';
 export { A2A_AGENTS_FILE, envNameOf } from './harness/a2a.store.ts';
 export {
   closeoutAsked,
@@ -321,6 +327,7 @@ export {
   exitVerdicts,
   harnessBlocked,
   parentOf,
+  parentsOf,
   readFilings,
   saidCount,
   spendReader,
@@ -365,7 +372,8 @@ export { freshStatsMemo, stats } from './stats/stats.verb.ts';
 export type { StatsMemo, StatsOptions } from './stats/stats.verb.ts';
 export { BY_KEYS, statsLine, statsLines, statsQueryOf } from './stats/index.ts';
 export type { ByKey, QueryKey, Stats, StatsQuery } from './stats/index.ts';
-export { list, unjudgedOf } from './list/list.verb.ts';
+export { list, runReading, unjudgedOf } from './list/list.verb.ts';
+export type { ReadingHow, RunReading } from './list/list.verb.ts';
 export type { Answered, Decided } from './decide/decide.verb.ts';
 export type { DecideCommand } from './decide/decide.ts';
-export type { Unjudged } from './list/list.verb.ts';
+export type { RunsListed, Unjudged } from './list/list.ts';

@@ -199,7 +199,12 @@ test('a spawn the harness refused: the attempt ends unstartable in its words, an
       reason: 'unstartable',
       error: 'fake: no binary called `fake` on PATH',
     },
-    { kind: 'settled', at: '<at>', outcome: 'failed', note: '1 attempt(s), none succeeded' },
+    {
+      kind: 'settled',
+      at: '<at>',
+      outcome: 'failed',
+      note: '1 attempt(s), none succeeded: the last could not start: fake: no binary called `fake` on PATH; fix what it names and file the task again',
+    },
   ]);
   assert.deepEqual(b.asked, [['spawn', spawnAsked]]);
 });

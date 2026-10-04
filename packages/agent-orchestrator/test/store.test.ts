@@ -35,7 +35,7 @@ import { verdictWord } from '../src/check/check.ts';
 import { scratch } from './scratch.ts';
 import { TEAM_DEV } from './team.ts';
 import { decideScreen } from './screens.ts';
-import { isGitRun, SIGNOFF } from '../src/run.ts';
+import { isGitRun, shownNote, shownStatus, SIGNOFF } from '../src/run.ts';
 import { momentumOf, toAdmit } from '../src/cap/cap.ts';
 
 const ROOT = scratch('wf-store-');
@@ -3749,7 +3749,8 @@ test('a step whose harness blocked its session says what the harness waits for �
   const taskId = `${run.id}-implement`;
   b.settle(taskId, 'needs-human' as TaskPhase);
   b.waiting.set(taskId, 'permission prompt');
-  const status = async () => (await list(b.e, readRun(run.id))).steps[0].status;
+  const step = async () => (await list(b.e, readRun(run.id))).steps[0];
+  const status = async () => shownStatus(await step());
   const printed: string[] = [];
   t.mock.method(console, 'log', (...args: unknown[]) => {
     printed.push(args.join(' '));
@@ -3762,6 +3763,7 @@ test('a step whose harness blocked its session says what the harness waits for �
   };
 
   assert.equal(await status(), 'needs-human: waiting for a permission prompt', '`wf ls`: beside the phase');
+  assert.equal((await step()).status, 'needs-human', 'and the status every reader compares is the bare word');
   assert.match(
     await decided(),
     new RegExp(`\n {2}implement: waiting for a permission prompt — answer it in Claude Code: claude agents, session ae/${taskId}/1$`, 'm'),
@@ -3806,7 +3808,7 @@ test('a step whose job was denied a call says so — on `wf ls` beside its line 
 
   const [implement, review] = (await list(b.e, readRun(run.id))).steps;
   assert.deepEqual(
-    [implement.status, implement.note],
+    [implement.status, shownNote(implement)],
     ['unverified · done', 'denied: Skill(look), Bash(pytest)'],
     'each call once, and the status as it was',
   );
@@ -3850,7 +3852,7 @@ test('a step that says `denials: fail`, denied a call, is stopped: nothing after
 
   const listed = await list(b.e, readRun(run.id));
   assert.deepEqual(
-    [listed.steps[0].status, listed.steps[0].note, listed.waitingOnYou],
+    [listed.steps[0].status, shownNote(listed.steps[0]), listed.waitingOnYou],
     ['denied', 'denied: Write(/tmp/w/notes.md)', ['implement']],
   );
   const decided = await printedBy('decide', run.id);
@@ -4041,7 +4043,7 @@ test('REFUSED by name: `wf plan` with --after, --workflows or --no-worktree — 
   await assert.rejects(typed('--no-worktree', '--repo', repo), refusedWith(/^wf plan does not take --no-worktree:/));
   await assert.rejects(
     typed('--repos', repo),
-    refusedWith(/^wf plan does not take --repos\. It takes the plan folder, then --repo <r>\.$/),
+    refusedWith(/^wf plan does not take --repos\. It takes the plan folder, then --repo <r> and --factory <name>\.$/),
   );
   await assert.rejects(typed('--repo', repo, '--repo', repo), refusedWith(/^wf plan takes --repo once: a plan works on one repository\.$/));
   await assert.rejects(typed('--repo'), refusedWith(/^--repo takes the repository the plan works on: wf plan <folder> --repo <r>$/));

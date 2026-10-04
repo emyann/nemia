@@ -240,6 +240,12 @@ export type StepAgent = {
    */
   customInstructions?: string;
   skills?: string[];
+  /**
+   * The skills the step's own `skills:` line gives that its agent does not, in the line's order, frozen at `wf start` so the run tells the
+   * agent's skills from the step's: on every step with its own line, empty when each it names is the agent's already, and absent on a step
+   * without one. Read by no session, which is given `skills`.
+   */
+  addedSkills?: string[];
   harnessPrompt?: HarnessPrompt;
 };
 

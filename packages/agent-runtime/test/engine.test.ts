@@ -1183,6 +1183,24 @@ test('an unstartable attempt settles the task failed like any other failure: not
   assert.equal(v.state.settled, 'failed');
 });
 
+test('a long-lived task whose spawn the harness refuses settles failed in its words, and nothing is spawned again', async () => {
+  const b = refusingBoard();
+  const id = await b.run(file({ ...spec, brief: 'refuse', restartPolicy: 'Always', config: { background: true } }));
+  for (let pass = 0; pass < 3; pass++) await b.run(tick());
+  const v = await b.run(view(id, new Map()));
+  assert.deepEqual(
+    v.state.attempts.map((a) => a.reason),
+    ['unstartable'],
+  );
+  assert.equal(v.state.settled, 'failed');
+  const settled = (await b.run(Effect.flatMap(Journal, (j) => j.read(id)))).find((e) => e.kind === 'settled');
+  assert.match(
+    settled?.kind === 'settled' ? (settled.note ?? '') : '',
+    /could not start: .*argument 'yolo' is invalid.*; fix what it names and file the task again$/,
+  );
+  assert.equal(b.sessions.has(nameFor(id, 2)), false, 'no second attempt');
+});
+
 test('a spawn error that does not say nothing started is recorded as spawned, and its session adopted — the session exists though the spawn call failed, and ending the attempt would leave a working session nothing adopts, stops or bounds', async () => {
   const b = refusingBoard();
   const id = await b.run(file({ ...spec, brief: 'start-then-fail' }));

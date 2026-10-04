@@ -11,11 +11,15 @@ import path from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { Result, Schema } from 'effect';
 import {
+  ambiguousFactoryRefusal,
   defaultFactoryRefusal,
+  defaultStartRefusal,
   DEFAULT_FACTORY,
+  factoriesHolding,
   factoryNameRefusal,
   hireRefusal,
   noFactoryLine,
+  noFactoryRefusal,
   workflowNameRefusal,
   type Factory,
   type FactoryListing,
@@ -194,6 +198,53 @@ export function readFactory(name: string): Factory {
   if (!fs.existsSync(read.file)) throw noFactory(name, 'Nothing was started.');
   if ('error' in read) throw new Invalid({ message: `the factory ${name}: ${read.file} ${read.error}` });
   return factoryOf(name, read.content);
+}
+
+/**
+ * Whether a start may go to the default factory when it names none and no factory holds its folder, or when it starts a card that names
+ * none: only with `WF_DEFAULT_FACTORY_STARTS=1`, which the package's and the api's tests set for the starts they make in scratch folders.
+ * Unset, as shipped, every such start is refused.
+ */
+export const defaultStartsAllowed = (): boolean => process.env.WF_DEFAULT_FACTORY_STARTS === '1';
+
+/** The store's factories that read, and the names of those whose file does not. */
+function readable(): { factories: Factory[]; unread: string[] } {
+  const listing = readFactories();
+  return {
+    factories: listing.flatMap((f) => ('error' in f ? [] : [f])),
+    unread: listing.flatMap((f) => ('error' in f ? [f.name] : [])),
+  };
+}
+
+/** The names of the store's factories that read, as a refusal offers them. */
+export const factoryNames = (): string[] => readable().factories.map((f) => f.name);
+
+/**
+ * The factory a start of a workflow is made in, and, when it was found from the folder, the repository there (`repo`): the factory
+ * `named`, read as a run reads it (`readFactory`), else the one factory of the store a repository of which holds the folder `at`
+ * (`factoriesHolding`), with that repository; none, the default factory, only when none holds it and `defaultStartsAllowed`. `fix` is the
+ * start's words for naming one, `<name>` in them: `--factory <name>`, or `?factory=<name>`.
+ *
+ * Refused, `Invalid`, before anything is written: the default factory named, whatever the environment (`defaultStartRefusal`); two or more
+ * factories holding the folder (`ambiguousFactoryRefusal`); and none holding it (`noFactoryRefusal`). A factory whose file does not read is
+ * not looked at, and the refusal of none names it.
+ */
+export function startFactory(named: string | undefined, at: string, fix: string): { factory?: Factory; repo?: string } {
+  if (named === DEFAULT_FACTORY) throw new Invalid({ message: defaultStartRefusal(fix, factoryNames()) });
+  if (named !== undefined) return { factory: readFactory(named) };
+  const { factories, unread } = readable();
+  const holding = factoriesHolding(factories, at);
+  if (holding.length === 1) return holding[0];
+  if (holding.length > 1) throw new Invalid({ message: ambiguousFactoryRefusal(at, holding, fix) });
+  if (defaultStartsAllowed()) return {};
+  throw new Invalid({
+    message: noFactoryRefusal(
+      at,
+      factories.map((f) => f.name),
+      fix,
+      unread,
+    ),
+  });
 }
 
 /** What each verb that changes a factory's file does, as its refusals say it was not done. */

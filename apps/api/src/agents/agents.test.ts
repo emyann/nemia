@@ -12,7 +12,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
 import { TEAM } from '../../test/team.ts';
-import { app } from '../app.ts';
+import { Layer } from 'effect';
+import { COMMANDS, clearCustomInstructions, engine, writeCustomInstructions, type AgentsRead, type CardRead } from 'agent-orchestrator';
+import { app, appOf, liveOf } from '../app.ts';
+import { StoreRoot } from '../store.ts';
 const repo = scratch('nemia-api-agents-repo-');
 process.env.HKB_REPO = repo;
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
@@ -761,4 +764,48 @@ test('an agent is listed with each skill it gives, found where a start finds it,
     );
   }
   assert.deepEqual(all.find((a) => a.from === 'yours' && a.name === 'broken')?.given ?? [], [], 'none for an agent that does not read');
+});
+
+test("the listing and a card are the package's wf agents and wf agents card, answered with what the board adds and without a person's custom file", async () => {
+  const AGENTS_ENTRY = COMMANDS.find((c) => c.name === 'agents')!;
+  const CARD_ENTRY = COMMANDS.find((c) => c.name === 'agents card')!;
+  writeCustomInstructions(root, 'reviewer', 'Say it in French.');
+  try {
+    const all = await listed();
+    assert.deepEqual(
+      all.filter((a) => 'custom' in a).map((a) => `${a.from}/${a.name}`),
+      [],
+      "the file of a person's custom instructions is the CLI's to print, not a key of the board's",
+    );
+    const { agents: read } = (await AGENTS_ENTRY.handler(engine(), { repo }, process.env, root)) as AgentsRead;
+    assert.ok(read.find((a) => a.name === 'reviewer' && a.from === 'yours')?.custom, 'the package read the custom file');
+    const board = (one: object) => {
+      const { given: _given, untried: _untried, fills: _fills, factories: _factories, ...rest } = one as Record<string, unknown>;
+      return rest;
+    };
+    assert.deepEqual(
+      all.map(board),
+      read.map(({ custom: _custom, ...rest }) => rest),
+    );
+    const res = await app.request('/api/agents/yours/reviewer/card');
+    assert.equal(res.status, 200, await res.clone().text());
+    const { card } = (await CARD_ENTRY.handler(engine(), { name: 'reviewer', repo, from: 'yours' }, process.env, root)) as CardRead;
+    assert.deepEqual(((await res.json()) as { card: unknown }).card, card);
+  } finally {
+    clearCustomInstructions(root, 'reviewer');
+  }
+});
+
+test("the listing and a card read yours under the store's root of the app they are asked through, not the package's", async () => {
+  const home = scratch('nemia-api-agents-home-');
+  fs.mkdirSync(path.join(home, 'workflows', 'agents'), { recursive: true });
+  fs.writeFileSync(path.join(home, 'workflows', 'agents', 'elsewhere.md'), '---\ndescription: Lives elsewhere.\n---\nDo it.\n');
+  const { app: own } = appOf(Layer.merge(liveOf(), Layer.succeed(StoreRoot)(home)));
+  const yours = async (on: typeof app) =>
+    ((await (await on.request('/api/agents')).json()) as AgentListing[]).filter((a) => a.from === 'yours').map((a) => a.name);
+  assert.deepEqual(await yours(own), ['elsewhere'], "yours, read under the layer's root");
+  assert.equal((await yours(app)).includes('elsewhere'), false, "the process's app reads yours under its own root");
+  const res = await own.request('/api/agents/yours/elsewhere/card');
+  assert.equal(res.status, 200, await res.clone().text());
+  assert.equal(((await res.json()) as { card: { description: string } }).card.description, 'Lives elsewhere.');
 });

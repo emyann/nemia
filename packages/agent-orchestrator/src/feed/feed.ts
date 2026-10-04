@@ -22,7 +22,7 @@
  * Pure: the line, the fold, what a pass owes and what it judged of a run in the feed's words (`feedWords`). The file — read, appended to
  * and followed — is `feed.store.ts`'s, and the controllers hand the rest of the package what it needs.
  */
-import { onYouWords, type Listing } from '../list/list.ts';
+import { onYouWords, shownStatus, type Listing } from '../list/list.ts';
 import { oneLine, type Run } from '../record/record.ts';
 import type { Assessment } from '../tick/assess.ts';
 import type { Closeout } from '../closeout/closeout.ts';
@@ -123,11 +123,12 @@ export const feedPhase = (word: string): string =>
  * What the feed says of a run as a pass judged it: the listing `wf ls` prints (`listing`, handed the engine's words through `feedPhase`),
  * in the feed's words. Pure.
  *
- * Each step's word is its status on `wf ls`, and its note the note beside it there — the try due or on, the gate and what answers it, how
- * many times it was said to — which is where a person's writes show. Not its cost, which moves while nothing is decided. A step that signed
- * off blocked puts what it needs before that note (`needsNote`). The run's word is `assess`'s status — or, for a run `failed` that nothing
- * failed in, what stopped it (`stoppedOn`: `awaiting approval` at a gate, as `wf decide` says it) — `(pruned)` beside it as `wf ls` says
- * it, and its note who it waits on you for (`onYouWords`) — or, on a held run, what it is held until (`holdWord`), and nobody is waited on.
+ * Each step's word is its status as `wf ls` prints it (`shownStatus`), and its note the note beside it there — the try due or on, the gate
+ * and what answers it, how many times it was said to — which is where a person's writes show. Not its cost, which moves while nothing is
+ * decided. A step that signed off blocked puts what it needs before that note (`needsNote`). The run's word is `assess`'s status — or, for
+ * a run `failed` that nothing failed in, what stopped it (`stoppedOn`: `awaiting approval` at a gate, as `wf decide` says it) — `(pruned)`
+ * beside it as `wf ls` says it, and its note who it waits on you for (`onYouWords`) — or, on a held run, what it is held until
+ * (`holdWord`), and nobody is waited on.
  *
  * One more departure from `wf ls`: a root the cap on runs in flight holds says `waiting for a run slot`, without the count in flight, which
  * moves with every other run's start and end while nothing of this one does.
@@ -153,7 +154,7 @@ export function feedWords(
     },
     steps: l.steps.map((s) => {
       const note = [needsNote(closeoutOf(s.name)), s.note].filter(Boolean).join(' · ');
-      return { name: s.name, word: l.slot && s.status === slotWord(l.slot) ? SLOT_WAIT : s.status, ...(note ? { note } : {}) };
+      return { name: s.name, word: l.slot && s.status === slotWord(l.slot) ? SLOT_WAIT : shownStatus(s), ...(note ? { note } : {}) };
     }),
   };
 }

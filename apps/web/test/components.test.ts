@@ -59,6 +59,7 @@ const { Chips, DecideSection, DiffFileView, GroupBar, LessonChip, TouchedBranch 
 const { ReactFlowProvider } = await import('@xyflow/react');
 const { AllowedReach } = await import('../src/components/Reach.tsx');
 const { stateMeaning } = await import('../src/lib/status.ts');
+const { Told } = await import('../src/components/Told.tsx');
 type RunDetail = import('../src/lib/api.ts').RunDetail;
 type StepReach = import('../src/lib/api.ts').StepReach;
 type ReadOnlyCommands = import('../src/lib/api.ts').ReadOnlyCommands;
@@ -66,6 +67,7 @@ type GraphEdge = import('../src/lib/api.ts').GraphEdge;
 type RunSummary = import('../src/lib/api.ts').RunSummary;
 type StepUsed = import('../src/lib/api.ts').StepUsed;
 type Decidable = import('../src/lib/api.ts').Decidable;
+type StepLayers = import('../src/lib/api.ts').StepLayers;
 type StateFlowEdge = import('../src/components/StateEdge.tsx').StateFlowEdge;
 type EdgeMarker = import('@xyflow/react').EdgeMarker;
 
@@ -156,6 +158,7 @@ function runWith(note: string | null): RunDetail {
         filed: null,
         body: 'Review it.',
         told: null,
+        layers: null,
         taskId: 't-1',
         workspace: null,
         files: [],
@@ -5317,4 +5320,63 @@ test("the rail is a nav of the four places, each a link named for a screen reade
     [true, false, false, false],
     "a factory's floor lights Home",
   );
+});
+
+/** The layers of a step whose agent `writer` was given `alpha` and the person's words, its line adding `gamma`, told in its prompt. */
+const LAYERS: StepLayers = {
+  agent: 'writer',
+  instructions: 'You are the writer.',
+  custom: 'Be terse.',
+  agentSkills: ['alpha'],
+  policy: 'Write the note.',
+  addedSkills: ['gamma'],
+  task: '## What was asked for\n\nA note.',
+  via: 'prompt',
+};
+
+/** `Told` drawn as a server draws it, the fold open as a person opens it. */
+const toldMarkup = (props: { told: string | null; layers: StepLayers | null; filed: boolean }): string =>
+  renderToStaticMarkup(createElement(Told, props));
+
+test('what a step was told is drawn by layer, in the order it reads them, each skill under the layer that gives it, and the brief whole never', () => {
+  const html = toldMarkup({ told: 'Write the note.\n\n## What was asked for\n\nA note.', layers: LAYERS, filed: true });
+  const at = (needle: string): number => {
+    const i = html.indexOf(needle);
+    assert.ok(i >= 0, `${needle} in ${html}`);
+    return i;
+  };
+  const order = [at('data-layer="instructions"'), at('data-layer="custom"'), at('data-layer="policy"'), at('data-layer="task"')];
+  assert.deepEqual(
+    [...order].sort((a, b) => a - b),
+    order,
+    'instructions, custom, policy, task',
+  );
+  assert.ok(at('Instructions — writer&#x27;s') < at('You are the writer.'));
+  assert.ok(order[0] < at('data-skill="alpha"') && at('data-skill="alpha"') < order[1], "the agent's skill under its instructions");
+  assert.ok(order[2] < at('data-skill="gamma"') && at('data-skill="gamma"') < order[3], "the step's added skill under its policy");
+  assert.ok(at('Be terse.') > order[1] && at('Be terse.') < order[2]);
+  assert.equal(html.split('Write the note.').length - 1, 1, 'the policy is drawn once: the brief is not drawn whole beside the layers');
+  assert.match(html, /What it was told/);
+  assert.match(html, /in the session&#x27;s system prompt/);
+  assert.match(toldMarkup({ told: null, layers: { ...LAYERS, via: 'brief' }, filed: false }), /at the head of its brief/);
+});
+
+test("a layer the run froze none of says so; a step with no agent draws no agent's layer; a run that froze no layers draws its brief whole", () => {
+  const unwritten = toldMarkup({ told: 'x', layers: { ...LAYERS, custom: null, agentSkills: [], addedSkills: [] }, filed: true });
+  assert.match(unwritten, /data-layer="custom"[^]*None frozen on this run[^]*data-layer="policy"/);
+  assert.doesNotMatch(unwritten, /data-skill|Its skills|Adds the skills/);
+
+  const agentless = toldMarkup({
+    told: 'x',
+    layers: { ...LAYERS, agent: null, instructions: null, custom: null, agentSkills: [] },
+    filed: true,
+  });
+  assert.doesNotMatch(agentless, /data-layer="instructions"|data-layer="custom"/);
+  assert.match(agentless, /No agent: its own words are all it was told, before the task\.[^]*data-layer="policy"/);
+
+  const whole = toldMarkup({ told: 'Write the note.\n\n## What was asked for', layers: null, filed: false });
+  assert.match(whole, /What it would be told now/);
+  assert.match(whole, /Write the note\.\n\n## What was asked for/);
+  assert.doesNotMatch(whole, /data-layer/);
+  assert.equal(toldMarkup({ told: null, layers: null, filed: true }), '', 'nothing to fold, no fold');
 });

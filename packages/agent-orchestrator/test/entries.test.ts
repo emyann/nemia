@@ -51,6 +51,7 @@ const PINNED: Record<string, string[]> = {
     'addToInbox',
     'advance',
     'agentPlaces',
+    'agentRead',
     'agentSkillsFound',
     'agentUsers',
     'agentVersion',
@@ -99,6 +100,7 @@ const PINNED: Record<string, string[]> = {
     'daemonLine',
     'daemonStanding',
     'decide',
+    'defaultStartsAllowed',
     'deniedOf',
     'deniedWords',
     'detachWorkflow',
@@ -188,6 +190,7 @@ const PINNED: Record<string, string[]> = {
     'owedFields',
     'ownNote',
     'parentOf',
+    'parentsOf',
     'parentRecord',
     'parseArgv',
     'parseDaemonFile',
@@ -243,6 +246,7 @@ const PINNED: Record<string, string[]> = {
     'runCostLines',
     'runId',
     'runPlaceVerb',
+    'runReading',
     'runSlots',
     'runStore',
     'runSpend',
@@ -262,6 +266,7 @@ const PINNED: Record<string, string[]> = {
     'spentWord',
     'staleAfterMs',
     'start',
+    'startFactory',
     'startFromInbox',
     'startPlan',
     'startQueued',
@@ -465,6 +470,8 @@ const PINNED: Record<string, string[]> = {
     'sendBackTo',
     'sentBack',
     'sessionTasks',
+    'shownNote',
+    'shownStatus',
     'sizeOf',
     'slotFree',
     'slotNeed',
@@ -485,6 +492,7 @@ const PINNED: Record<string, string[]> = {
     'tipsSeen',
     'toDecide',
     'toDecideWords',
+    'toldLayers',
     'triedFrom',
     'tryNote',
     'unheld',
@@ -599,4 +607,10 @@ test('each entry exports exactly its pinned names', async () => {
   for (const [entry, pinned] of Object.entries(PINNED)) {
     assert.deepEqual(drift(entry, Object.keys(await import(entry)), pinned), [], entry);
   }
+});
+
+test("HARNESS_CHOICES, which the api offers on a step's form, is the runtime's own table from its vocabulary door, not a copy", async () => {
+  const { HARNESS_CHOICES } = await import('agent-orchestrator');
+  const vocabulary = await import('agent-runtime/vocabulary');
+  assert.equal(HARNESS_CHOICES, vocabulary.HARNESS_CHOICES);
 });

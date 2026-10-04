@@ -192,9 +192,19 @@ export { fromNote, inputRefusal, inputsLine, inputsNote } from './start/inputs.t
 export type { InputFile } from './start/inputs.ts';
 export { choicesOf, costLine, decision, runCostLines } from './decide/decide.ts';
 export type { DecideCommand, Decision, Offer, Shipped } from './decide/decide.ts';
-export { answerIn, deniedWords, harnessWaitLine, listing, onYouWords, waitingWords } from './list/list.ts';
+export { answerIn, deniedWords, harnessWaitLine, listing, onYouWords, shownNote, shownStatus, waitingWords } from './list/list.ts';
 export type { Listing } from './list/list.ts';
 export { feedPhase, feedWords } from './feed/feed.ts';
 export type { FeedSaid, FeedWords } from './feed/feed.ts';
-export { acceptedLines, composeBrief, gateLines, loopSection, remoteBrief, retrySection, roundSection, SIGNOFF } from './brief/index.ts';
-export type { EndingStopped, ParentCloseout, ParentStep, RetryBriefing, RoundBriefing } from './brief/index.ts';
+export {
+  acceptedLines,
+  composeBrief,
+  gateLines,
+  loopSection,
+  remoteBrief,
+  retrySection,
+  roundSection,
+  SIGNOFF,
+  toldLayers,
+} from './brief/index.ts';
+export type { EndingStopped, ParentCloseout, ParentStep, RetryBriefing, RoundBriefing, ToldLayers } from './brief/index.ts';

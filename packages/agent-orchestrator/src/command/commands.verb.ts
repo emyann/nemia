@@ -2,7 +2,9 @@
  * The orchestrator's commands, each defined once (`COMMANDS`): its spec (`command.ts`), the one package verb its handler calls, the data
  * it answers, and the lines the CLI prints of that data. The CLI parses, refuses, helps and prints from an entry, and the api serves the
  * same entry on its route; an entry served on one side alone says so (`only`). Today: a person's asks of a run — `wf retry`, `wf approve`,
- * `wf round`, `wf accept` and `wf say` — and two reads the api alone serves: a run's decision (`decideRun`) and the run slots (`slotsOf`).
+ * `wf round`, `wf accept` and `wf say` — the runs and their steps (`wf ls`, `runsListed`), two reads the api alone serves: a run's
+ * decision (`decideRun`) and the run slots (`slotsOf`), and the agents of both places (`wf agents`, `agentsRead`) and one agent's card
+ * (`wf agents card`, `agentCardRead`).
  */
 import type { Engine } from '../runtime-client.ts';
 import { approvalWordsRefusal } from '../gate/gate.ts';
@@ -18,17 +20,22 @@ import { say } from '../say/say.verb.ts';
 import { budgetRefusal, budgetWord } from '../status/status.ts';
 import { decide, type Decided } from '../decide/decide.verb.ts';
 import { slotsOf, type Slots } from '../cap/cap.verb.ts';
-import { commandLine, type Args, type CommandSpec } from './command.ts';
+import { runsListed } from '../list/list.verb.ts';
+import { lsLines, type RunsListed } from '../list/list.ts';
+import { agentCardRead, agentsRead } from '../roster/roster.store.ts';
+import { agentsLines, cardNote, type AgentsRead, type CardRead } from '../roster/roster.ts';
+import { commandLine, type Args, type CommandSpec, type Flag } from './command.ts';
 
 /**
  * A command whole: its spec, `handler`, which calls one package verb with the arguments and answers data — never printed lines — and
  * `print`, the lines the CLI prints of that data. The api answers the data as JSON, or only its `apiKeys` where the CLI prints more of
- * it than the api answers. A handler reads its settings (`WF_MAX_RUNS`) from `env`: the process's own at the command line, the app's on
- * the api.
+ * it than the api answers. A handler reads its settings (`WF_MAX_RUNS`) from `env`, and a person's own files from the store `home`: the
+ * process's own at the command line, the app's on the api. `note` is what the CLI says of the data on stderr, beside what it prints.
  */
 export type Command<D extends object = Readonly<Record<string, unknown>>> = CommandSpec & {
-  handler(e: Engine, args: Args, env?: NodeJS.ProcessEnv): Promise<D>;
+  handler(e: Engine, args: Args, env?: NodeJS.ProcessEnv, home?: string): Promise<D>;
   print(data: D, args: Args): readonly string[];
+  note?(data: D, args: Args): readonly string[];
   readonly apiKeys?: readonly (keyof D & string)[];
 };
 
@@ -322,6 +329,30 @@ const SAY: Command<{ at: string; attempt: number; text: string; try: number; tas
   },
 };
 
+/**
+ * `wf ls`: every run, or the one named, and its steps, as the package reads each (`runsListed`). The api serves the runs on this route off
+ * the same reading of each (`runReading`), as the board's summaries.
+ */
+const LS: Command<RunsListed> = {
+  name: 'ls',
+  usage: '[<runId>]',
+  help: [
+    'runs and their steps — a run waiting on another says waiting on <run>,',
+    'one the cap on runs in flight holds waiting for a run slot (2 of 2 in',
+    "flight); what each step's tries and the run have cost, where measured;",
+    'last, whether a wf up ticks the store and when its last pass was',
+  ],
+  spec: {
+    positionals: [{ key: 'runId', takes: 'optional', kind: 'name' }],
+    flags: [],
+    unknown: (arg) => `wf ls takes one run's id, or none: not ${arg}.`,
+  },
+  writes: false,
+  route: { method: 'GET', path: '/api/runs', status: 200 },
+  handler: (e, args) => runsListed(e, textOf(args, 'runId')),
+  print: (listed) => lsLines(listed, Date.now()),
+};
+
 const DECIDE: Command<Decided> = {
   name: 'decide',
   usage: '<runId>',
@@ -357,4 +388,84 @@ const CEILINGS: Command<Slots> = {
 };
 
 /** Every command defined once, in the order `wf`'s help lists them. */
-export const COMMANDS: readonly Command[] = [RETRY, APPROVE, ROUND, ACCEPT, SAY, DECIDE, CEILINGS];
+/** The refusal of a value left out of each of `wf agents`' two flags, saying what it takes. */
+const AGENTS_TAKES = {
+  '--repo': '--repo takes the repository whose workflows/agents to read: wf agents --repo <r>',
+  '--from': '--from takes which place the agent is in: wf agents card <name> --from repo|yours',
+} as const;
+
+/** `--repo <r>` once, and `--from repo|yours` once, which the listing takes and leaves unread. */
+const AGENTS_FLAGS = (['--repo', '--from'] as const).map((flag): Flag => ({
+  flag,
+  kind: 'text',
+  key: flag.slice(2),
+  takes: AGENTS_TAKES[flag],
+  twice: `wf agents takes ${flag} once: an agent is read from one ${flag === '--repo' ? 'repository' : 'place'}.`,
+}));
+
+/** `wf agents`' spec, after the name of the card it is asked for: its flags, and an argument it does not take in its own words. */
+const agentsSpec = (positionals: CommandSpec['spec']['positionals']): CommandSpec['spec'] => ({
+  positionals,
+  flags: AGENTS_FLAGS,
+  unknown: (arg) =>
+    arg.startsWith('-')
+      ? `wf agents does not take ${arg}. It takes --repo <r>, and for a card --from repo|yours.`
+      : `wf agents takes no argument but card <name> or custom <name>: wf agents, wf agents card ${arg}, or wf agents custom ${arg}.`,
+  apart: (_value, flag) => AGENTS_TAKES[flag as keyof typeof AGENTS_TAKES],
+});
+
+/** Refused of `wf agents`' flags: a value empty or starting `--`, which reads as the value left out, and a place but repo or yours. */
+function agentsRefusal(args: Args): string | null {
+  for (const flag of ['--repo', '--from'] as const) {
+    const value = textOf(args, flag.slice(2));
+    if (value !== undefined && (!value || value.startsWith('--'))) return AGENTS_TAKES[flag];
+  }
+  const from = textOf(args, 'from');
+  if (from === undefined || from === 'repo' || from === 'yours') return null;
+  return `wf agents --from takes repo or yours, not ${from}: repo is <repo>/workflows/agents, yours is your store's.`;
+}
+
+/** `wf agents`: every agent of both places, the repository's then yours, each read now from disk. */
+const AGENTS: Command<AgentsRead> = {
+  name: 'agents',
+  usage: '[--repo .]',
+  help: [
+    "the agents a step may name, the repository's then yours: what each is",
+    'for, what it says it can do (an entry for each skill, read off its',
+    'SKILL.md), and the skills it is given (its skills:)',
+  ],
+  spec: agentsSpec([]),
+  check: agentsRefusal,
+  writes: false,
+  route: { method: 'GET', path: '/api/agents', status: 200 },
+  handler: async (_e, args, _env, home) => agentsRead({ repo: textOf(args, 'repo') ?? '.', ...(home !== undefined && { home }) }),
+  print: agentsLines,
+};
+
+/** `wf agents card`: one agent in the shape of an A2A Agent Card, from the place it is in. */
+const AGENT_CARD: Command<CardRead> = {
+  name: 'agents card',
+  usage: '<name> [--repo .] [--from repo|yours]',
+  help: [
+    'that agent in the shape of an A2A Agent Card, JSON on stdout and',
+    'nothing else — every field the protocol marks REQUIRED but',
+    'supportedInterfaces, which is left out because nothing here serves an',
+    'agent over A2A. The card describes; it is not an address',
+  ],
+  spec: agentsSpec([{ key: 'name', takes: 'required', kind: 'name' }]),
+  check: agentsRefusal,
+  writes: false,
+  route: { method: 'GET', path: '/api/agents/:from/:name/card', status: 200 },
+  async handler(_e, args, _env, home) {
+    const from = textOf(args, 'from');
+    return agentCardRead(textOf(args, 'name') ?? '', {
+      repo: textOf(args, 'repo') ?? '.',
+      ...(home !== undefined && { home }),
+      ...((from === 'repo' || from === 'yours') && { from }),
+    });
+  },
+  print: ({ card }) => [JSON.stringify(card, null, 2)],
+  note: (data, args) => cardNote(data, textOf(args, 'name') ?? ''),
+};
+
+export const COMMANDS: readonly Command[] = [RETRY, APPROVE, ROUND, ACCEPT, SAY, LS, DECIDE, CEILINGS, AGENTS, AGENT_CARD];

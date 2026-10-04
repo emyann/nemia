@@ -150,6 +150,66 @@ export function outsideRefusal(factory: Pick<Factory, 'name' | 'repos'>, repo: s
   return `${repo}: the factory ${factory.name} works on ${sorted.join(', ')}, and this repository is not one of them. Name one of them — --repo ${sorted[0]} — or file a factory on this one: wf factory add <name> --repo ${path.resolve(repo)}. Nothing was started.`;
 }
 
+/** A factory one of whose repositories holds a folder, and that repository, as `path.resolve` spells it: the run's root there. */
+export type Holding = { factory: Factory; repo: string };
+
+/** Whether the folder `repo` is `folder` or one of its ancestors, each as `path.resolve` spells it: on a separator, never a prefix. */
+const holds = (repo: string, folder: string): boolean =>
+  folder === repo || folder.startsWith(repo.endsWith(path.sep) ? repo : `${repo}${path.sep}`);
+
+/**
+ * Every factory of `factories` with a repository that is the folder `at` or one of its ancestors, in their order, each with that repository
+ * — its deepest, when two of one factory's hold it. No winner is chosen: a start resolves a factory only when one alone holds its folder,
+ * so nested repositories of two factories are two holders.
+ */
+export function factoriesHolding(factories: readonly Factory[], at: string): Holding[] {
+  const folder = path.resolve(at);
+  return factories.flatMap((factory) => {
+    const repo = factory.repos
+      .map((r) => path.resolve(r))
+      .filter((r) => holds(r, folder))
+      .sort((a, b) => b.length - a.length)[0];
+    return repo === undefined ? [] : [{ factory, repo }];
+  });
+}
+
+/** The fix `fix` — a start's words with `<name>` in them, `--factory <name>` say — for the factory `name`. */
+const fixFor = (fix: string, name: string): string => fix.replace('<name>', name);
+
+/** The store's factories, by name, as a refusal names them to choose from, or how to file the first. */
+const choices = (names: readonly string[]): string =>
+  names.length ? `one of ${[...names].sort().join(', ')}` : 'once one is filed: wf factory add <name> --repo <root>';
+
+/**
+ * Why a start that names no factory cannot start in the folder `at`: no factory of the store works on it. Names the store's factories
+ * (`names`), the start's own fix (`fix`, `--factory <name>` or `?factory=<name>`), the `wf factory add` that files one on the folder's
+ * repository, and the factories whose files do not read (`unread`), which were not looked at.
+ */
+export function noFactoryRefusal(at: string, names: readonly string[], fix: string, unread: readonly string[] = []): string {
+  const skipped = unread.length
+    ? ` These factories' files do not read, and were not looked at: ${[...unread].sort().join(', ')} (wf factory ls).`
+    : '';
+  return `${path.resolve(at)}: no factory works on this folder, and every run is started in a factory. Name the factory — ${fix}, ${choices(names)} — or file one on this repository and attach the workflow to it: wf factory add <name> --repo <root>, then wf factory attach <name> <workflow>.${skipped} Nothing was started.`;
+}
+
+/**
+ * Why a start that names no factory cannot start in the folder `at`: more than one factory works on it (`holding`), each named with the
+ * repository that holds the folder, and a factory is taken from a folder only when one alone does; the fix (`fix`) for each.
+ */
+export function ambiguousFactoryRefusal(at: string, holding: readonly Holding[], fix: string): string {
+  const sorted = [...holding].sort((a, b) => a.factory.name.localeCompare(b.factory.name));
+  const which = sorted.map((h) => `${h.factory.name} on ${h.repo}`).join(', ');
+  const fixes = sorted.map((h) => fixFor(fix, h.factory.name)).join(', or ');
+  return `${path.resolve(at)}: ${sorted.length} factories work on this folder — ${which} — and a start that names none is started in a factory only when one alone works on its folder. Name the one: ${fixes}. Nothing was started.`;
+}
+
+/**
+ * Why a start cannot name the default factory: it holds the history of the runs and cards that named none, and no run is started in it
+ * now. Names the fix (`fix`) and the store's factories (`names`).
+ */
+export const defaultStartRefusal = (fix: string, names: readonly string[]): string =>
+  `\`${DEFAULT_FACTORY}\` is the default factory: it holds the history of the runs and cards that named no factory, and no run is started in it. Name a factory — ${fix}, ${choices(names)}. Nothing was started.`;
+
 /**
  * Why a run in `factory` cannot start: the runtime refuses the step `where` (`<workflow>/<step>`) a folder of the factory, mounted for
  * it (`factoryMounts`), in its words (`why`); then where the mount came from, and what a person can do, since no flag leaves one off.
@@ -159,7 +219,7 @@ export const factoryMountRefusal = (factory: Pick<Factory, 'name'>, where: strin
   `for each local step, and none is left off by hand. Hire into ${where} an agent whose harness holds the mount ` +
   `(wf factory hire ${factory.name} <agent> --step ${where}); move or rename the folder, then file the factory again on its new path ` +
   `(wf factory rm ${factory.name}, then wf factory add ${factory.name} --repo <path> for each, and attach and hire again); ` +
-  `or start the run without --factory. Nothing was written.`;
+  `or start it in a factory whose repositories that step's harness can hold. Nothing was written.`;
 
 /**
  * The folders a run in `factory` mounts: its repositories, each as `path.resolve` spells it, sorted and once each, but `repo`, the one

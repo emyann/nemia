@@ -75,6 +75,18 @@ test('a command line given too little is no refusal: the CLI prints its help', (
   assert.equal(parseArgv(SPEC, ['--fast']), undefined);
 });
 
+test('a flag the command has none of, given where a required argument stands, is refused in its words; --help and its own print the help', () => {
+  assert.equal(refusalOf(['--nope']), 'UNKNOWN --nope');
+  assert.equal(refusalOf(['--nope=r-1']), 'UNKNOWN --nope=r-1');
+  assert.equal(parseArgv(SPEC, ['--help']), undefined);
+  assert.equal(parseArgv(SPEC, ['--note=hi']), undefined);
+  assert.equal(
+    refusalOf(['--nope'], { ...SPEC, missing: 'MISSING' }),
+    'MISSING',
+    'a spec that says its own refusal of an argument left out says it',
+  );
+});
+
 test('an argument the command does not take is refused in its words', () => {
   assert.equal(refusalOf(['r-1', '--loud']), 'UNKNOWN --loud');
   assert.equal(refusalOf(['r-1', 'impl', 'extra']), 'UNKNOWN extra');

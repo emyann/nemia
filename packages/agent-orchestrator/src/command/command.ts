@@ -195,15 +195,22 @@ function readTail(spec: Spec, argv: readonly string[], given: Filling): Args {
   return { ...spec.defaults, ...args };
 }
 
+/** A word given where a required argument stands that is a flag no command takes: neither one of `spec`'s, nor `--help`. */
+const strayFlag = (spec: Spec, arg: string): boolean =>
+  arg.startsWith('--') && arg !== '--help' && !spec.flags.some((f) => f.flag === arg.split('=')[0]);
+
 /**
  * A command line's arguments after the command's name, read against `spec` — or undefined when it is given too little to act on: a
- * required argument missing, empty or starting `--`, for which the CLI prints its help, unless the spec says its refusal (`missing`), which
- * a required argument starting `-` gets too. Refused, exit 2, in the spec's own words: an argument it does not take, a value flag with no
- * value, given twice, or with one of the command's own flags for its value, and two ways.
+ * required argument missing, empty, `--help` or one of its own flags, for which the CLI prints its help, unless the spec says its refusal
+ * (`missing`), which a required argument starting `-` gets too. Refused, exit 2, in the spec's own words: an argument it does not take — a
+ * flag it has none of among them, wherever it stands — a value flag with no value, given twice, or with one of the command's own flags
+ * for its value, and two ways.
  */
 export function parseArgv(spec: Spec, argv: readonly string[]): Args | undefined {
   const required = spec.positionals.filter((p) => p.takes === 'required');
   const head = argv.slice(0, required.length);
+  const stray = spec.missing === undefined ? head.find((a) => strayFlag(spec, a)) : undefined;
+  if (stray !== undefined) return usage(spec.unknown(stray));
   const left = (a: string) => !a || a.startsWith(spec.missing === undefined ? '--' : '-');
   if (head.length < required.length || head.some(left)) return spec.missing === undefined ? undefined : usage(spec.missing);
   const given = Object.fromEntries(required.map((p, i) => [p.key, head[i]]));

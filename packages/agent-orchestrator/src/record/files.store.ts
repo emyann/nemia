@@ -5,6 +5,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 import { Schema } from 'effect';
 import { cordonFile, readCordon } from '../cordon/cordon.store.ts';
 import type { Cordon } from '../cordon/cordon.ts';
@@ -199,11 +200,12 @@ function putTry(name: string, tried: QueueTry): void {
 /**
  * The run as it reads with the store's cordon (`readCordon`) composed onto it — the one given, read where none is — or without one while
  * none stands: a run the tick's memo kept is read with the cordon as it stands now, so the cordon is in no run's stamp (`restStamps`): a
- * run at rest has nothing due for it to hold, and one it holds anything of is `running`, never at rest. A run with no cordon to compose
- * or strip is the very run given, which the memo knows by identity (`keptOf`). Never written into the record.
+ * run at rest has nothing due for it to hold, and one it holds anything of is `running`, never at rest. A run that already reads with
+ * the cordon as it stands, or with none while none does, is the very run given, which the memo knows by identity (`keptOf`). Never
+ * written into the record.
  */
 function cordoned(run: Run, cordon: Cordon | null = readCordon()): Run {
-  if (!cordon && !run.cordon) return run;
+  if (isDeepStrictEqual(run.cordon ?? null, cordon)) return run;
   const { cordon: _, ...bare } = run;
   return cordon ? { ...bare, cordon } : bare;
 }

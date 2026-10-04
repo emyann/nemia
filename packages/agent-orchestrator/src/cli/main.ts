@@ -219,7 +219,7 @@ function advancedLines(advanced: Pass['runs']): void {
 }
 
 /** The store's cordon on `wf up`, once when it is put or changed and once when it is lifted; returns the cordon it said, if any. */
-function cordonSaid(cordon: Pass['cordon'], said: string | undefined): string | undefined {
+export function cordonSaid(cordon: Pass['cordon'], said: string | undefined): string | undefined {
   const now = cordon ? cordonWords(cordon) : undefined;
   if (now !== said) console.log(`${new Date().toISOString().slice(11, 19)}  ${now ?? UNCORDONED}`);
   return now;
@@ -295,12 +295,12 @@ function upVerb(args: Args, e: Engine): void | Promise<void> {
   );
 }
 
-/** `wf feed`: the feed's lines from a cursor, the store's cordon while one stands, and the cursor to read from next. */
+/** `wf feed`: the store's cordon while one stands, first, then the feed's lines from a cursor, and the cursor to read from next. */
 export function feedVerb(rest: string[]): void {
   const { lines, cursor } = readFeed(feedCursor(rest));
-  for (const line of lines) console.log(feedLineWords(line));
   const cordon = readCordon();
   if (cordon) console.log(cordonWords(cordon));
+  for (const line of lines) console.log(feedLineWords(line));
   return console.log(`cursor: ${cursor}`);
 }
 

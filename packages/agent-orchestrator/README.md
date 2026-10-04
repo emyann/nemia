@@ -2273,9 +2273,9 @@ would. A filing in flight when the cordon is put stops before its next part, as 
 retry, a round or an answer written meanwhile is kept, and the first pass after `wf uncordon` files what it
 lets through, with what waited.
 
-A cordon says since when, by whom and why, on every screen that says it: the first line of `wf ls`, of
-`wf feed` and of `wf start`, a line of `wf up` when it is put and another when it is lifted, and the board's
-Cordon switch. `--by` defaults to the OS user; `--why` and `--by` are refused blank, twice, or over their caps
+A cordon says since when, by whom and why, on every screen that says it: the first line of `wf ls` and of
+`wf feed`, the line of `wf start` after how to start the run, a line of `wf up` when it is put or changed and
+another when it is lifted, and the board's Cordon switch. `--by` defaults to the OS user; `--why` and `--by` are refused blank, twice, or over their caps
 (200 characters, 64), as a hold's are. A landing whose merge the ending has staged in the repository's checkout, and whose check the
 cordon holds, is named under it — `r-1's ship has its merge staged in /repo (MERGE_HEAD), and its check waits on
 wf uncordon` — so a person who cordoned to use main knows whose `MERGE_HEAD` is there.

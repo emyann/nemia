@@ -5430,6 +5430,7 @@ test("a step with an agent is read by layer on the builder: its agent, the agent
     html,
   );
   assert.match(html, /<details[^>]*>[^]*Read them[^]*You are the writer\.[^]*<\/details>/, 'the instructions are folded');
+  assert.equal(html.split('data-field="disallowedTools"').length - 1, 1, 'a policy key is drawn once: never again among the wiring keys');
   assert.match(html, /May only tighten writer&#x27;s fence/);
   assert.match(html, /Told after writer&#x27;s instructions and your custom instructions; where they conflict, these words win\./);
 
@@ -5439,6 +5440,11 @@ test("a step with an agent is read by layer on the builder: its agent, the agent
 
   const unread = await stepFormMarkup({ ...LAYERS, agent: 'critic' });
   assert.match(unread, /data-agent-layers-unread[^>]*>Save to read writer&#x27;s instructions here\./);
+  assert.match(
+    unread,
+    /Told after writer&#x27;s instructions, and any custom instructions you wrote for it; where they conflict, these words win\./,
+    'unread, the note claims no custom instructions it has not read',
+  );
   assert.doesNotMatch(unread, /You are the writer\.|data-layer="instructions"/, "another agent's words are never drawn as this one's");
 
   const agentless = await stepFormMarkup(null, null);

@@ -61,7 +61,8 @@ async function expectLayers(keys: Locator, agent: string): Promise<void> {
   await expectVisible(keys.locator('[data-layer="custom"]', { hasText: `None. Write them on ${agent}'s page.` }), 'no custom instructions');
   const policy = keys.locator('[data-layer="policy"]');
   await expectVisible(policy.getByRole('textbox', { name: 'Its words' }), "the step's words are its policy");
-  await expectVisible(policy.locator('[data-field="disallowedTools"]'), 'and the fence key it sets');
+  await expectCount(policy.locator('[data-field="disallowedTools"]'), 1, 'and the fence key it sets');
+  await expectCount(keys.locator('[data-field="disallowedTools"]'), 1, 'drawn once: never again among the wiring keys');
   await expectVisible(policy.getByText(`May only tighten ${agent}'s fence: a loosening is refused on save.`), 'which may only tighten');
   await expectCount(policy.locator('[data-field="check"], [data-field="model"]'), 0, 'and no wiring key is in it');
   await instructions.locator('summary').click();
@@ -315,7 +316,7 @@ export default {
       await picker.selectOption(other);
       await expectTexts(
         keys.locator('[data-agent-note]'),
-        [`Told after ${other}'s instructions and your custom instructions; where they conflict, these words win.`],
+        [`Told after ${other}'s instructions, and any custom instructions you wrote for it; where they conflict, these words win.`],
         `moved to ${other}, the note is told after ${other}'s`,
       );
       await expectTexts(

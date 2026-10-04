@@ -51,7 +51,7 @@ export function AgentLayers({ agent, layers }: { agent: string; layers: StepLaye
 /**
  * The step's policy over agent `agent`: its own words (`note`), then the keys its file sets as its policy (`children`), which may only
  * tighten the agent's fence. `layers` says whether there are custom instructions it is told after; where it was read for another agent,
- * both are named.
+ * only that any are told before it.
  */
 export function PolicyLayer({
   agent,
@@ -64,14 +64,19 @@ export function PolicyLayer({
   note: ReactNode;
   children: ReactNode;
 }) {
-  const custom = layers?.agent !== agent || layers.custom !== null;
+  const custom =
+    layers?.agent !== agent
+      ? ', and any custom instructions you wrote for it'
+      : layers.custom === null
+        ? ''
+        : ' and your custom instructions';
   return (
     <Layer name="policy" title="The step's policy">
       <div className="space-y-3">
         <div className="space-y-1">
           {note}
           <p data-agent-note className={LINE}>
-            Told after {agent}'s instructions{custom ? ' and your custom instructions' : ''}; where they conflict, these words win.
+            Told after {agent}'s instructions{custom}; where they conflict, these words win.
           </p>
         </div>
         <p data-fence-note className={LINE}>

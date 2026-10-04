@@ -97,9 +97,10 @@ async function expectClearOfLabels(frame: Locator, assertion: string): Promise<v
 
 export default {
   /**
-   * The Machines page, a tab of Machines & Capabilities: the task's lifecycle drawn from the graph the api reads off the runtime's code, every state a box and every edge a
-   * line of a route's label or of its state's box, every verb a person takes a line on each route it takes, a route only a verb takes
-   * dashed, the first state and the final ones marked, and nothing drawn over anything else or cut short at 1280 wide.
+   * The Machines page, a tab of Machines & Capabilities: the task's lifecycle drawn from the graph the api reads off the runtime's code,
+   * every state a box and every edge a line of a route's label or of its state's box, every verb a person takes a line on each route it
+   * takes, a route only a verb takes dashed, the first state and the final ones marked, and nothing drawn over anything else or cut short
+   * at 1280 wide.
    */
   name: 'machines',
   route: '/machines',

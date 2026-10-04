@@ -5,9 +5,9 @@ import type { PageSpec } from '../visit.ts';
 
 export default {
   /**
-   * The Capabilities page, a tab of Machines & Capabilities: the checkout's skills, agents, MCP servers, deny rules and ask rules, each with where it was read from, and
-   * what each step gets — the checkout's dev, review fenced to its tools in dontAsk and implement on the harness's own set, and yours, on
-   * Codex, which claims nothing it was not measured to have.
+   * The Capabilities page, a tab of Machines & Capabilities: the checkout's skills, agents, MCP servers, deny rules and ask rules, each
+   * with where it was read from, and what each step gets — the checkout's dev, review fenced to its tools in dontAsk and implement on the
+   * harness's own set, and yours, on Codex, which claims nothing it was not measured to have.
    */
   name: 'capabilities',
   route: '/capabilities',

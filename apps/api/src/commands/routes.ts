@@ -68,7 +68,8 @@ const apiOnly = (table: readonly CommandSpec[]): ReadonlyMap<string, readonly Ro
 /** A route as a refusal names it: its method, then its path from its last fixed word — `POST …/approve`, `PUT …/custom-instructions`. */
 const routeShort = ({ method, path }: Route): string => {
   const parts = path.split('/');
-  return `${method} …/${parts.slice(parts.findLastIndex((p) => p !== '' && !p.startsWith(':'))).join('/')}`;
+  const fixed = parts.filter((p) => p !== '' && !p.startsWith(':')).at(-1) ?? '';
+  return `${method} …/${parts.slice(parts.lastIndexOf(fixed)).join('/')}`;
 };
 
 /**

@@ -27,11 +27,11 @@ import {
   agentsFor,
   agentVersion,
   cardSkills,
+  COMMANDS,
   DEFAULT_FACTORY,
   fillsOf,
   foldersIn,
   inboxNameRefusal,
-  loadWorkflows,
   lookupRoots,
   skillsFor,
   skillVersion,
@@ -42,6 +42,7 @@ import {
   workflowDescription,
   Missing,
   type Factory,
+  type FolderLoaded,
   type Places,
 } from 'agent-orchestrator';
 import {
@@ -247,21 +248,36 @@ export const sourcesOf = (repo: string, home: string): Array<{ from: WorkflowSou
   { from: 'yours', dir: path.join(home, 'workflows') },
 ];
 
+/** The table's entries the board's workflows are read through, each served on the api alone. */
+const LIST = COMMANDS.find((c) => c.name === 'workflows list')!;
+const STEP = COMMANDS.find((c) => c.name === 'workflows step')!;
+
+/**
+ * Each folder `dirs` names, loaded as a start on `repo` would load it, in `factory` with its hires: the table's `workflows list`, by
+ * folder.
+ */
+export const loadedOf = async (e: Engine['Service'], dirs: readonly string[], repo: string, home: string, factory?: Factory) =>
+  (await LIST.handler(e, { dirs, repo, ...(factory && { factory: factory.name }) }, undefined, home)) as Record<string, FolderLoaded>;
+
 /**
  * Every workflow `repo` and `home` have that `factory` offers: each folder in each source, by name — in a factory, only those attached to
  * it. Loads every folder, so each can say whether it reads, and, in a factory, which steps its hires leave unfilled.
  */
-export function listWorkflows(repo: string, home: string, factory?: Factory): WorkflowListing[] {
-  return sourcesOf(repo, home).flatMap(({ from, dir }) =>
+export async function listWorkflows(e: Engine['Service'], repo: string, home: string, factory?: Factory): Promise<WorkflowListing[]> {
+  const folders = sourcesOf(repo, home).flatMap(({ from, dir }) =>
     foldersIn(dir)
       .filter((name) => !factory || factory.workflows.includes(name))
-      .map((name) => listed(name, from, path.join(dir, name), { repo, home }, factory)),
+      .map((name) => ({ name, from, dir: path.join(dir, name) })),
   );
+  const loaded = await loadedOf(
+    e,
+    folders.map((f) => f.dir),
+    repo,
+    home,
+    factory,
+  );
+  return folders.map(({ name, from, dir }) => listed(name, from, dir, { repo, home }, loaded[dir], factory));
 }
-
-/** What the loader fills the steps of the workflow `workflow` with in `factory`: its hires into them (`fillsOf`); none with no factory. */
-const fillsIn = (factory: Factory | undefined, workflow: string) =>
-  factory && { factory: factory.name, workflow, agents: fillsOf(factory.hires, workflow) };
 
 /**
  * Where a folder's agents and skills are looked for beyond its own `agents/` and `skills/`, as `wf start --repo <repo>` looks: the
@@ -271,17 +287,22 @@ const fillsIn = (factory: Factory | undefined, workflow: string) =>
 export const placesOf = (repo: string, home: string): Places => ({ repo, home });
 
 /**
- * One folder as the board lists it, read from disk now: what the listing has for it, and what the builder answers a write with. In
- * `factory`, its steps are read with the factory's hires, and those left with no agent named (`unfilled`).
+ * One folder as the board lists it, read from disk now, its steps as the table's `workflows list` loaded them (`loaded`): what the listing
+ * has for it, and what the builder answers a write with. In `factory`, its steps are read with the factory's hires, and those left with no
+ * agent named (`unfilled`).
  */
-export function listed(name: string, from: WorkflowSource, dir: string, places: Places, factory?: Factory): WorkflowListing {
+export function listed(
+  name: string,
+  from: WorkflowSource,
+  dir: string,
+  places: Places,
+  loaded: FolderLoaded,
+  factory?: Factory,
+): WorkflowListing {
   const description = workflowDescription(dir);
   const schemas = schemasIn(dir);
   const version = versionOf(dir, places);
-  let steps: Workflow[];
-  try {
-    steps = loadWorkflows(dir, places, fillsIn(factory, name));
-  } catch (err) {
+  if ('error' in loaded) {
     return {
       name,
       from,
@@ -292,10 +313,11 @@ export function listed(name: string, from: WorkflowSource, dir: string, places: 
       schemas,
       folderTeam: false,
       version,
-      error: err instanceof Error ? err.message : String(err),
+      error: loaded.error,
       unfilled: null,
     };
   }
+  const { steps } = loaded;
   return {
     name,
     from,
@@ -649,9 +671,9 @@ async function cardStarted(e: Engine['Service'], asked: Extract<Asked, { card: s
  *   of a workflow or a card, is refused, `Invalid` (`defaultStartRefusal`): the default factory holds history, and no start names it.
  */
 export const workflows = new Hono<ApiEnv>()
-  .get('/api/workflows', (c) => served(c, ({ repo, home, factory }) => c.json(listWorkflows(repo, home, factory))))
+  .get('/api/workflows', (c) => served(c, async ({ e, repo, home, factory }) => c.json(await listWorkflows(e, repo, home, factory))))
   .get('/api/workflows/:from/:name/:step', (c) =>
-    served(c, async ({ repo, home, factory }) => {
+    served(c, async ({ e, repo, home, factory }) => {
       const { from, name, step } = c.req.param();
       if (from !== 'repo' && from !== 'yours') {
         return c.json(
@@ -665,13 +687,10 @@ export const workflows = new Hono<ApiEnv>()
       if (unattached) throw new Missing({ message: unattached });
       const folder = folderOf(name, from, repo, home);
       if ('status' in folder) return c.json({ error: folder.error }, folder.status);
-      const steps = loadWorkflows(folder.dir, placesOf(repo, home), fillsIn(factory, name));
-      const found = steps.find((s) => s.name === step);
+      const args = { from, name, step, dir: folder.dir, repo, ...(factory && { factory: factory.name }) };
+      const { step: found, steps } = (await STEP.handler(e, args, undefined, home)) as { step: Workflow | null; steps: string[] };
       if (!found) {
-        return c.json(
-          { error: `No step '${step}' in workflow ${name} (${folder.dir}). Its steps are: ${steps.map((s) => s.name).join(', ')}.` },
-          404,
-        );
+        return c.json({ error: `No step '${step}' in workflow ${name} (${folder.dir}). Its steps are: ${steps.join(', ')}.` }, 404);
       }
       const source = fs.readFileSync(path.join(folder.dir, `${found.name}.md`), 'utf8');
       const agentSkills = agentSkillsOf(found, folder.dir, placesOf(repo, home));

@@ -1,7 +1,8 @@
 /**
  * The files a step hands over: each one its closeout names, copied out of its workspace into the step's files directory
  * (`collectArtifacts`), each it named that the run does not have, and why (`missingArtifacts`), and what that directory holds
- * (`artifactFiles`), and the pictures an ending's check took of the merged tree, removed once it has landed (`dropLandedPictures`).
+ * (`artifactFiles`), and the pictures an ending's check took of the merged tree, removed once it has landed (`dropLandedPictures`); and
+ * one file of that directory or of a step's folder, read by its name and never by a path (`artifactFile`, `fileIn`).
  *
  * Beneath the controllers, beside `record.store.ts` and `worktree.store.ts`: it imports neither the engine nor a controller, and
  * `runner.ts` re-exports `artifactFiles` and `missingArtifacts`. The closeout itself is read off the engine's record, so `closeoutOf` is
@@ -255,3 +256,28 @@ function landedPicturesNote(
     '',
   ].join('\n');
 }
+
+/** Whether `name` names a file directly in a folder: a name with a separator of either kind, `..` or a NUL is a path, and names none. */
+export const isFileName = (name: string): boolean => Boolean(name) && !/[/\\\0]/.test(name) && !name.includes('..');
+
+/**
+ * The bytes of the regular file `name` directly in `dir`, or null where there is none: a name that is a path (`isFileName`), a file not
+ * there, a folder, or a link, which is opened without being followed, so what is read is what was looked at.
+ */
+export function fileIn(dir: string, name: string): Buffer | null {
+  if (!isFileName(name)) return null;
+  let fd: number;
+  try {
+    fd = fs.openSync(path.join(dir, name), fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+  } catch {
+    return null;
+  }
+  try {
+    return fs.fstatSync(fd).isFile() ? fs.readFileSync(fd) : null;
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+/** The file `name` of the files directory of `step` in `run` (`artifactsDir`), read as `fileIn` reads it. */
+export const artifactFile = (run: Pick<Run, 'id'>, step: string, name: string): Buffer | null => fileIn(artifactsDir(run, step), name);

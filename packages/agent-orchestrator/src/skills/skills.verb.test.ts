@@ -1,0 +1,53 @@
+/**
+ * The board's skill entries (`SKILLS_LIST`, `SKILLS_READ`, `SKILLS_WRITE`), served on the api alone: a skill written from its form, read
+ * back for its page and in the list, and a skill Nemia ships copied into your library; and a copy over a skill of that name refused in the
+ * package's words whole. `WF_ROOT` is set before the import, since the store reads it as it loads.
+ */
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { scratch } from '../../test/scratch.ts';
+
+const ROOT = scratch('wf-skills-verb-root-');
+process.env.WF_ROOT = ROOT;
+const { SKILLS_LIST, SKILLS_READ, SKILLS_WRITE } = await import('./skills.verb.ts');
+const { engine } = await import('../runner.ts');
+
+const e = engine();
+const library = path.join(ROOT, 'workflows', 'skills');
+
+/** A folder of skills, as Nemia ships one, holding the skill `name`. */
+function shippedWith(name: string): string {
+  const shipped = path.join(scratch('wf-skills-shipped-'), 'skills');
+  fs.mkdirSync(path.join(shipped, name), { recursive: true });
+  fs.writeFileSync(path.join(shipped, name, 'SKILL.md'), `---\nname: ${name}\ndescription: Tidy a change before review.\n---\nTidy it.\n`);
+  return shipped;
+}
+
+test('a skill written from its form reads back for its page and in the list, at the version its write answered', async () => {
+  const change = JSON.stringify({ name: 'notes', description: 'Write the notes of a change.', body: 'Write them.' });
+  const made = await SKILLS_WRITE.handler(e, { from: 'yours', library, change });
+  assert.ok('version' in made, JSON.stringify(made));
+  const dir = path.join(library, 'notes');
+  const page = await SKILLS_READ.handler(e, { from: 'yours', name: 'notes', dir });
+  assert.equal(page.version, made.version);
+  assert.match(page.text, /Write them\./);
+  assert.equal(page.entry?.id, 'notes');
+  const listed = await SKILLS_LIST.handler(e, { skills: [dir] });
+  assert.deepEqual(Object.keys(listed), [dir]);
+  assert.equal(listed[dir]?.entry?.id, 'notes');
+});
+
+test("REFUSED: a copy over a skill your library has, in the package's words whole; the copy before it is Nemia's skill whole", async () => {
+  const shipped = shippedWith('tidy');
+  const copied = await SKILLS_WRITE.handler(e, { from: 'yours', library, copy: 'tidy', shipped });
+  assert.deepEqual(copied, { dir: path.join(library, 'tidy'), name: 'tidy', written: ['SKILL.md'] });
+  await assert.rejects(SKILLS_WRITE.handler(e, { from: 'yours', library, copy: 'tidy', shipped }), (err: Error) => {
+    assert.equal(
+      err.message,
+      `skills/tidy is there already, in ${library}, and a copy would write over it. Give it as it is, or remove that folder first.`,
+    );
+    return true;
+  });
+});

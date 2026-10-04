@@ -14,7 +14,7 @@ import { TEAM } from '../../test/team.ts';
 import { app } from '../app.ts';
 import { DEFAULT_HARNESS, putSchemasBack, stepsNamed } from './builder.ts';
 import { listWorkflows, versionOf as versionIn } from './workflows.ts';
-import { HARNESS_CHOICES, loadWorkflows, writeWorkflow } from 'agent-orchestrator';
+import { engine, HARNESS_CHOICES, loadWorkflows, writeWorkflow } from 'agent-orchestrator';
 import {
   AGENT_KEYS,
   HARNESSES,
@@ -297,7 +297,7 @@ test("PUT /api/workflows/yours/:name with a folder's steps as the listing has th
   assert.deepEqual(snapshot(dir), before, 'byte for byte');
   assert.deepEqual(
     saved.workflow,
-    listWorkflows(repo, root).find((w) => w.name === 'as-listed' && w.from === 'yours'),
+    (await listWorkflows(engine(), repo, root)).find((w) => w.name === 'as-listed' && w.from === 'yours'),
     'answered as the listing reads it',
   );
 });
@@ -422,7 +422,7 @@ test("versionOf covers the agents a folder's steps name: an edit of one changes 
   fs.rmSync(path.join(STORE, 'agents', 'unnamed.md'));
 });
 
-test("versionOf reads `agent:` as the parser does — indented, or with a space before its colon — and covers the schema the agent's output: names", () => {
+test("versionOf reads `agent:` as the parser does — indented, or with a space before its colon — and covers the schema the agent's output: names", async () => {
   for (const [folder, line] of [
     ['indented', '  agent: critic'],
     ['spaced', 'agent : critic'],
@@ -434,7 +434,7 @@ test("versionOf reads `agent:` as the parser does — indented, or with a space 
       JSON.stringify({ type: 'object', properties: { verdict: { type: 'string' } }, required: ['verdict'], additionalProperties: false }),
     );
     write(path.join(dir, 'judge.md'), `---\n${line}\n---\n`);
-    const listing = listWorkflows(repo, root).find((w) => w.name === `version-${folder}`);
+    const listing = (await listWorkflows(engine(), repo, root)).find((w) => w.name === `version-${folder}`);
     assert.equal(
       listing?.steps[0]?.spec.agent,
       'critic',
@@ -469,7 +469,7 @@ test("a folder whose agent's skill is in the repository's `.claude/skills/` is l
       (e: Error) => /gives the skill `mind-the-cache`, and no skills folder has it/.test(e.message),
       'read with its own place alone, the skill is not there',
     );
-    const listing = listWorkflows(repo, root).find((w) => w.name === 'skilled' && w.from === 'yours');
+    const listing = (await listWorkflows(engine(), repo, root)).find((w) => w.name === 'skilled' && w.from === 'yours');
     assert.equal(
       listing?.error,
       null,
@@ -696,7 +696,7 @@ test('PUT /api/workflows/yours/:name writes the folder the steps make — a step
   assert.equal(saved.workflow.description, 'Plan, build, review.');
   assert.deepEqual(
     saved.workflow,
-    listWorkflows(repo, root).find((w) => w.name === 'drawn'),
+    (await listWorkflows(engine(), repo, root)).find((w) => w.name === 'drawn'),
     'answered as the listing reads it',
   );
 
@@ -950,7 +950,7 @@ test('POST /api/workflows/yours makes a folder with its first step, and a README
   assert.deepEqual(saved.written, ['README.md', 'plan.md']);
   assert.deepEqual(
     saved.workflow,
-    listWorkflows(repo, root).find((w) => w.name === 'fresh'),
+    (await listWorkflows(engine(), repo, root)).find((w) => w.name === 'fresh'),
   );
   assert.equal(saved.workflow.from, 'yours');
   assert.deepEqual(

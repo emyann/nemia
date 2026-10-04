@@ -9,6 +9,7 @@ import {
   CHECK_AFFECTING,
   COMMANDS,
   type Decided,
+  type StandingMerge,
   type DecideCommand,
   diffStat,
   lessonLine,
@@ -19,7 +20,6 @@ import {
 } from 'agent-orchestrator';
 import { type CheckoutHold, type GitRun, holdsOf, isGitRun, type Run, type RunSlot, waitsOf } from 'agent-orchestrator/run';
 import { holdingOf, judge, type RunHolding, type RunWaiting, waitingOf } from '../runs/judged.ts';
-import { mergesOnto, mergeWord, type MergeWord } from './merge.ts';
 import { type Engine, judgedSteps, stepNames, viewsOf, workflowsOf } from '../store.ts';
 import { type StepUsed, totalOf, usedOf } from '../detail/usage.ts';
 
@@ -36,11 +36,7 @@ export type Touched = { branch: string; radius: ReturnType<typeof touchedBy> };
  */
 export type Standing = BranchStanding & { said: string; stat: string | null; merge: StandingMerge | null };
 
-/**
- * Whether a branch ahead of the base still merges onto it as the base is now (`mergesOnto`, git's `merge-tree`), and that in words
- * (`mergeWord`): what an ending that merges would find. Null for a branch on the base or gone, which nothing would merge.
- */
-export type StandingMerge = MergeWord & { said: string };
+export type { StandingMerge };
 
 /** One file of a branch's check-affecting diff: its unified diff, at most `DIFF_LINES` lines, and how many more it had. */
 export type DiffFile = { path: string; lines: string[]; cut: number };
@@ -172,6 +168,9 @@ function lessonOf(touched: readonly Touched[]): Lesson {
 /** The package's own `wf decide` of a run (`decideRun`), through its entry of the command table, served on the api alone. */
 const DECIDE = COMMANDS.find((c) => c.name === 'decide')!;
 
+/** The merge check, the table's entry served on the api alone. */
+const MERGES = COMMANDS.find((c) => c.name === 'merges')!;
+
 /**
  * What `wf decide` shows a person about a run, decided by the package (`DECIDE`, the table's entry whose handler is `decideRun`): its
  * decision, commands (`choicesOf`), costs and checkout, read with the branches and diffs the api reads beside them.
@@ -206,7 +205,7 @@ export async function decisionOf(run: Run, e: Engine['Service'], home: string, e
   const nothing = nothingOf(run, d);
   if (nothing) return { nothing };
   const steps = judgedSteps(run, folder);
-  const { touched, standings } = branchesOf(run, steps, d.kind === 'awaiting' ? d.branches : undefined);
+  const { touched, standings } = await branchesOf(e, run, steps, d.kind === 'awaiting' ? d.branches : undefined);
   const filed = Object.keys(run.steps).filter((name) => run.steps[name]?.taskId);
   const git = isGitRun(run) ? run : undefined;
   return {
@@ -239,7 +238,7 @@ function nothingOf(run: Run, d: Decided['decision']): string | undefined {
  * (`Standing`): the branches `awaiting` names, or the result steps' while the run still runs. None for a folder run, and no standings for a
  * run that worked on its base branch itself.
  */
-function branchesOf(run: Run, steps: Parameters<typeof resultSteps>[0], awaiting: string[] | undefined) {
+async function branchesOf(e: Engine['Service'], run: Run, steps: Parameters<typeof resultSteps>[0], awaiting: string[] | undefined) {
   const results = [
     ...new Set(
       resultSteps(steps)
@@ -253,20 +252,24 @@ function branchesOf(run: Run, steps: Parameters<typeof resultSteps>[0], awaiting
     Object.values(run.steps).map((s) => s.branch),
     run.isolate ? run.branch : undefined,
   ).map((branch) => ({ branch, radius: touchedBy(run, branch) }));
-  const standings: Standing[] = run.isolate
-    ? branchStandings(run, results).map((s) => ({
-        ...s,
-        said: branchWord(run, s),
-        stat: diffStat(run, s.branch).trim() || null,
-        merge: mergeOf(run, s),
-      }))
-    : [];
+  if (!run.isolate) return { touched, standings: [] };
+  const read = branchStandings(run, results);
+  const merges = await mergesOf(e, run, read);
+  const standings: Standing[] = read.map((s) => ({
+    ...s,
+    said: branchWord(run, s),
+    stat: diffStat(run, s.branch).trim() || null,
+    merge: s.where === 'ahead' ? (merges[s.branch] ?? null) : null,
+  }));
   return { touched, standings };
 }
 
-/** Whether a branch ahead of the base still merges onto it (`StandingMerge`); null for one that is not ahead, which nothing would merge. */
-function mergeOf(run: GitRun, standing: BranchStanding): StandingMerge | null {
-  if (standing.where !== 'ahead') return null;
-  const merge = mergesOnto(run.repo, run.branch, standing.branch);
-  return { ...merge, said: mergeWord(merge, run.branch) };
+/**
+ * Whether each branch ahead of the base still merges onto it (`StandingMerge`), keyed by branch, as the table's merge check answers it
+ * (`MERGES`, served on the api alone); none asked when no branch is ahead, which nothing would merge.
+ */
+async function mergesOf(e: Engine['Service'], run: GitRun, standings: readonly BranchStanding[]) {
+  const branches = standings.filter((s) => s.where === 'ahead').map((s) => s.branch);
+  if (!branches.length) return {};
+  return (await MERGES.handler(e, { runId: run.id, branches })) as Record<string, StandingMerge>;
 }

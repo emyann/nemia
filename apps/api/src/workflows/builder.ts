@@ -21,7 +21,17 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Schema } from 'effect';
 import { Hono } from 'hono';
-import { agentsFor, foldersIn, HARNESS_CHOICES, loadAgents, remoteAgents, skillsFor, writeWorkflow, type Places } from 'agent-orchestrator';
+import {
+  agentsFor,
+  COMMANDS,
+  foldersIn,
+  HARNESS_CHOICES,
+  loadAgents,
+  remoteAgents,
+  skillsFor,
+  type Places,
+  type WorkflowWritten,
+} from 'agent-orchestrator';
 import {
   AGENT_KEYS,
   AGENT_OWN_KEYS,
@@ -47,7 +57,8 @@ import { readBody, valueAt, type BodyIssue, type Words } from '../body.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from '../guard.ts';
 import { type ApiEnv, served } from '../layer.ts';
 import { schemaNameRefusal, workflowNameRefusal } from './names.ts';
-import { folderOf, listed, placesOf, specOf, versionOf, type WorkflowListing, type WorkflowStepSpec } from './workflows.ts';
+import type { Engine } from '../store.ts';
+import { folderOf, listed, loadedOf, placesOf, specOf, versionOf, type WorkflowListing, type WorkflowStepSpec } from './workflows.ts';
 
 /**
  * How a key is set on a step's form, which is what its value is in JSON: `steps`, a list of the workflow's steps (`after`, `input`);
@@ -538,9 +549,15 @@ export function putSchemasBack(dir: string, written: readonly SchemaWas[]): void
   }
 }
 
+/** The table's entry a folder of yours is written through, served on the api alone. */
+const WRITE = COMMANDS.find((c) => c.name === 'workflows write')!;
+
+/** A write of the folder `name` at `dir`, of yours, read as a start on `repo` reads it, through the engine `e`. */
+type Writing = { e: Engine['Service']; name: string; dir: string; repo: string; home: string };
+
 /**
- * A folder written through the package, with the schemas pasted for it, or its refusal (422, with the steps it names), then read back from
- * disk.
+ * A folder written through the package (`WRITE`, the table's `workflows write`), with the schemas pasted for it, or its refusal (422,
+ * with the steps it names), then read back from disk.
  *
  * Judged whole before a byte is written: the steps' names by `writeWorkflow` itself, which refuses them before anything; the schemas and
  * the steps together by `judgedWith`. Then the schemas are written and the folder after them, whose parse now reads them from disk. Should
@@ -551,14 +568,13 @@ export function putSchemasBack(dir: string, written: readonly SchemaWas[]): void
  * Every schema the save has reached is put back, the one it was writing among them, should that write fail, or a later one, or the folder:
  * a write that fails partway has changed the file all the same, so a schema counts as written before its write, not after it.
  */
-function write(
-  name: string,
-  dir: string,
-  places: Places,
+async function write(
+  { e, name, dir, repo, home }: Writing,
   steps: readonly StepDraft[],
   readme: string | undefined,
   schemas: readonly SchemaFile[] = [],
-): WorkflowSaved | BuildRefused {
+): Promise<WorkflowSaved | BuildRefused> {
+  const places = placesOf(repo, home);
   const refused = (message: string): BuildRefused => ({
     error: message,
     steps: stepsNamed(
@@ -586,7 +602,8 @@ function write(
       written.push(before[i]);
       fs.writeFileSync(path.join(dir, file), text);
     }
-    result = writeWorkflow(dir, steps, readme, { places });
+    const args = { from: 'yours', name, dir, draft: JSON.stringify(steps), repo, ...(readme !== undefined && { readme }) };
+    result = (await WRITE.handler(e, args, undefined, home)) as WorkflowWritten;
   } catch (err) {
     putSchemasBack(dir, written);
     if (err instanceof WorkflowError) return refused(err.message);
@@ -594,7 +611,7 @@ function write(
   }
   const kept = writing.filter((s) => !schemasWritten.includes(s.file)).map((s) => s.file);
   return {
-    workflow: listed(name, 'yours', dir, places),
+    workflow: listed(name, 'yours', dir, places, (await loadedOf(e, [dir], repo, home))[dir]),
     written: [...result.written, ...schemasWritten].sort(),
     kept: [...result.kept, ...kept].sort(),
     removed: result.removed,
@@ -620,7 +637,7 @@ const staleWords = (dir: string, version: string, now: string): string =>
 export const builder = new Hono<ApiEnv>()
   .get('/api/workflows/keys', (c) => served(c, ({ home }) => c.json(keyForm(home))))
   .post('/api/workflows/:from', (c) =>
-    served(c, async ({ repo, home }) => {
+    served(c, async ({ e, repo, home }) => {
       const { from } = c.req.param();
       const route = `POST /api/workflows/${from}`;
       const refused = refusedBeforeReading(
@@ -649,13 +666,13 @@ export const builder = new Hono<ApiEnv>()
           409,
         );
       }
-      const saved = write(name, dir, placesOf(repo, home), [step], readme);
+      const saved = await write({ e, name, dir, repo, home }, [step], readme);
       if ('error' in saved) return c.json(saved, 422);
       return c.json(saved, 201);
     }),
   )
   .put('/api/workflows/:from/:name', (c) =>
-    served(c, async ({ repo, home }) => {
+    served(c, async ({ e, repo, home }) => {
       const { from, name } = c.req.param();
       const route = `PUT /api/workflows/${from}/${name}`;
       const refused = refusedBeforeReading(
@@ -685,7 +702,7 @@ export const builder = new Hono<ApiEnv>()
       }
       const now = versionOf(folder.dir, placesOf(repo, home));
       if (now !== body.version) return c.json({ error: staleWords(folder.dir, body.version, now), steps: [] }, 409);
-      const saved = write(name, folder.dir, placesOf(repo, home), steps, body.readme, schemas);
+      const saved = await write({ e, name, dir: folder.dir, repo, home }, steps, body.readme, schemas);
       if ('error' in saved) return c.json(saved, 422);
       return c.json(saved, 200);
     }),

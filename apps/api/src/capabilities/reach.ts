@@ -26,6 +26,7 @@ import {
   type Capabilities,
   type DeniedRule,
 } from './capabilities.ts';
+import type { Engine } from '../store.ts';
 import { listWorkflows, type WorkflowListing, type WorkflowSource, type WorkflowStepSpec } from '../workflows/workflows.ts';
 
 /** The harnesses that are Claude Code, as the engine names them: its jobs and background sessions (`claude`), and `claude -p` detached. */
@@ -434,12 +435,12 @@ function stepReach(
  */
 export async function capabilitiesWithSteps(
   repo: string,
-  { env, home, asker }: { env: NodeJS.ProcessEnv; home: string; asker: AskServer },
+  { e, env, home, asker }: { e: Engine['Service']; env: NodeJS.ProcessEnv; home: string; asker: AskServer },
 ): Promise<CapabilitiesWithSteps> {
   const capabilities = await capabilitiesOf(repo, { env, asker });
   let workflows: WorkflowListing[] = [];
   try {
-    workflows = listWorkflows(repo, home);
+    workflows = await listWorkflows(e, repo, home);
   } catch (err) {
     capabilities.warnings.push(`${err instanceof Error ? err.message : String(err)} What each step gets is not shown for any workflow.`);
   }

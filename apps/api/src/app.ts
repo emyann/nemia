@@ -53,7 +53,10 @@ export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Servic
  * `runtime.context()` needs it, and put on every request before any router is reached (`served`, layer.ts). A service the layer gives
  * twice is the one given last (`Layer.merge`): how a test gives the api an engine, a root or an asker of its own.
  *
- * The api's routes: every one the board reads and writes, its groups each in a router of their own.
+ * The api's routes: every one the board reads and writes, its groups each in a router of their own. Each is declared by an entry of the
+ * package's command table — a command of the CLI's on its route, or one the api serves alone (`only: api`), the board's library, pages
+ * and merge check among them — or is the api's own, a stream or a read of the server or the machine, each with why
+ * (`OWN` in test/served.test.ts).
  *
  * - `GET /api/health` — `{ ok: true }` while the api answers.
  * - `GET /api/version` — `{ version }`, the orchestrator's package version (`VERSION`): what the board's bottom bar says.
@@ -65,14 +68,13 @@ export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Servic
  *   tools once while the app runs (`McpAsker`); one that fails is an `error` on its entry, never a failed request.
  * - workflows/workflows.ts — a repository's workflows, listed, and a run of one started, the board's first write, or of an inbox card.
  * - workflows/builder.ts — a folder of yours built on the board: made with a first step, and put back from its steps with the schemas
- *   pasted for them; two writes, guarded as a start is, each through the package's `writeWorkflow`.
+ *   pasted for them; two writes, guarded as a start is, each through the package's entry `workflows write`.
  * - agents/agents.ts — the agents beside each place workflows are listed from, each with the nodes that name it; one of yours made, put
- *   back or removed; three writes, guarded as a start is, through the package's `writeAgent` and `removeAgent`.
+ *   back or removed; three writes, guarded as a start is, through the package's entries `agents write` and `agents remove`.
  * - custom/custom.ts — a person's custom instructions for an agent, by its name, read through `wf agents custom`'s entry; written and
  *   cleared on the routes the table generates from it (commands/routes.ts).
  * - agents/skills.ts — the skills an agent of yours can be given, by place; one skill on its page; and one of yours written — made,
- *   changed, or one Nemia ships copied into your library — each a write, guarded as a start is, through the package's `writeSkill` and
- *   `copySkill`.
+ *   changed, or one Nemia ships copied into your library — each a write, guarded as a start is, through the package's entry `skills write`.
  * - inbox/inbox.ts — the inbox: its cards listed and one filed, through `wf inbox`'s and `wf inbox add`'s entries; one dropped and one
  *   queued on the routes the table generates (commands/routes.ts).
  * - runs/runs.ts — the runs listed, one run in full, and what `wf decide` shows of it.
@@ -114,7 +116,7 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     .get('/api/health', (c) => c.json({ ok: true }))
     .get('/api/version', (c) => c.json({ version: VERSION }))
     .get('/api/capabilities', (c) =>
-      served(c, async ({ env, repo, home, mcp }) => c.json(await capabilitiesWithSteps(repo, { env, home, asker: mcp }))),
+      served(c, async ({ e, env, repo, home, mcp }) => c.json(await capabilitiesWithSteps(repo, { e, env, home, asker: mcp }))),
     )
     .route('/', factories)
     .route('/', workflows)

@@ -38,11 +38,8 @@ const PROCESS_ENV = /\bprocess\s*(?:\.\s*env\b|\[\s*['"`]env['"`]\s*\])|\{[^}]*\
  */
 const FETCH = /(?:^|[^.\w$'"`-])fetch(?![\w$-])(?!\s*:)|\bglobalThis\s*\.\s*fetch\b/m;
 
-/** The cards filed to move a reach out of an api reader, by the id an entry names. */
-const CARDS: Readonly<Record<string, string>> = {
-  'slice-4':
-    'Nemia platform slice 4 (amend-the-nemia-intent-one-n-y2vp): the command table and the rename to nemia; the api rebuilds no verb',
-};
+/** The cards filed to move a reach out of an api reader, by the id an entry names: none filed today. */
+const CARDS: Readonly<Record<string, string>> = {};
 
 type Move = { move: string; to: string };
 type Entry = { reaches: readonly string[]; card: string } | ({ reaches: readonly string[] } & Move);
@@ -63,7 +60,6 @@ const MOVES: Readonly<Record<string, Entry>> = {
     move: "reading a harness's settings and servers off the machine",
     to: 'packages/agent-runtime, answered per harness through the orchestrator',
   },
-  'src/decide/merge.ts': { reaches: ['node:child_process'], card: 'slice-4' },
   'src/detail/detail.ts': { reaches: ['node:fs'], ...RUN_STORE },
   'src/factory/quota.ts': {
     reaches: ['global:process.env'],
@@ -133,10 +129,10 @@ const sourceTexts = (): Map<string, string> =>
 const measured = (texts: ReadonlyMap<string, string>): Record<string, string[]> =>
   Object.fromEntries([...texts].map(([file, text]) => [file, reachesIn(text)]).filter(([, reaches]) => reaches.length > 0));
 
-/** What an entry fails to name: a card `CARDS` knows, else a move with where it goes. */
-function namingBreak(file: string, entry: Entry): string | undefined {
+/** What an entry fails to name: a card `cards` knows, else a move with where it goes. */
+function namingBreak(file: string, entry: Entry, cards: Readonly<Record<string, string>>): string | undefined {
   if ('card' in entry)
-    return entry.card in CARDS
+    return entry.card in cards
       ? undefined
       : `${file}'s entry in MOVES names ${entry.card}, a card CARDS does not know: name a filed card, or the move and where it goes`;
   if (!entry.move.trim() || !entry.to.trim())
@@ -144,11 +140,15 @@ function namingBreak(file: string, entry: Entry): string | undefined {
   return undefined;
 }
 
+/** What tells an entry's file on disk, and the cards an entry may name (`CARDS`). */
+type Where = { exists: (file: string) => boolean; cards: Readonly<Record<string, string>> };
+
 /** What one entry of `MOVES` and its file's reaches disagree on. */
-function entryBreaks(file: string, entry: Entry, reaches: readonly string[], exists: (file: string) => boolean): string[] {
+function entryBreaks(file: string, entry: Entry, reaches: readonly string[], at: Where): string[] {
+  const { exists, cards } = at;
   if (ENTRY.includes(file)) return [`${file} is an entry file, free to reach the machine: take its entry off MOVES`];
   if (!exists(file)) return [`${file} has an entry in MOVES but is not on disk: where it moved, rename its entry; else take it off`];
-  const naming = namingBreak(file, entry);
+  const naming = namingBreak(file, entry, cards);
   return [
     ...(naming ? [naming] : []),
     ...entry.reaches
@@ -161,7 +161,12 @@ function entryBreaks(file: string, entry: Entry, reaches: readonly string[], exi
  * What the readers' reaches and `MOVES` disagree on, each a sentence naming the fix: a reach no entry lists, a reach an entry lists that
  * the file no longer has, an entry for an entry file or a file gone, and an entry that names no card it can be held to.
  */
-function kindBreaks(reached: Record<string, string[]>, moves: Readonly<Record<string, Entry>>, exists: (file: string) => boolean) {
+function kindBreaks(
+  reached: Record<string, string[]>,
+  moves: Readonly<Record<string, Entry>>,
+  exists: (file: string) => boolean,
+  cards: Readonly<Record<string, string>> = CARDS,
+) {
   const out: string[] = [];
   for (const [file, reaches] of Object.entries(reached)) {
     if (ENTRY.includes(file)) continue;
@@ -169,7 +174,7 @@ function kindBreaks(reached: Record<string, string[]>, moves: Readonly<Record<st
     for (const r of reaches.filter((x) => !listed.includes(x)))
       out.push(`${file} is a reader and reaches ${r}: only ${ENTRY.join(', ')} touch the machine; reach it through the orchestrator`);
   }
-  for (const [file, entry] of Object.entries(moves)) out.push(...entryBreaks(file, entry, reached[file] ?? [], exists));
+  for (const [file, entry] of Object.entries(moves)) out.push(...entryBreaks(file, entry, reached[file] ?? [], { exists, cards }));
   return out;
 }
 
@@ -224,8 +229,9 @@ test('REFUSED: a reader that imports the disk or the node server, reads the envi
 
 test('REFUSED: a baselined reader reaching more, an entry listing a reach gone, an entry for an entry file or a file gone, and one unnamed', () => {
   const exists = (file: string): boolean => file !== 'src/gone.ts';
-  const held: Entry = { reaches: ['node:fs'], card: 'slice-4' };
-  const breaks = (reached: Record<string, string[]>, moves: Record<string, Entry>): string[] => kindBreaks(reached, moves, exists);
+  const held: Entry = { reaches: ['node:fs'], card: 'c-1' };
+  const cards = { 'c-1': 'A card filed to move the reach' };
+  const breaks = (reached: Record<string, string[]>, moves: Record<string, Entry>): string[] => kindBreaks(reached, moves, exists, cards);
   assert.deepEqual(breaks({ 'src/a.ts': ['node:fs'] }, { 'src/a.ts': held }), [], 'the reaches the entry lists are let through');
   assert.deepEqual(breaks({ 'src/a.ts': ['node:fs', 'node:os'] }, { 'src/a.ts': held }), [
     'src/a.ts is a reader and reaches node:os: only src/main.ts, src/app.ts, src/layer.ts touch the machine; reach it through the orchestrator',

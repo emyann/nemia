@@ -190,7 +190,8 @@ export type Filing = { e: Engine; run: Run; reads: PassReads; closer: Closer; ma
 
 /**
  * Whether a pass may file for this run still, read off the store before each filing: not once the run is called off, forgotten, pruned
- * or held while the pass was at work. Once it has said no it says no for the rest of the pass, whatever the store reads after.
+ * or held, or the store cordoned, while the pass was at work. Once it has said no it says no for the rest of the pass, whatever the store
+ * reads after.
  */
 export const mayFileOf = (run: Run): (() => boolean) => {
   let calledOff = false;

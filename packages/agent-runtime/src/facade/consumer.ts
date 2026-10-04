@@ -68,6 +68,11 @@ export type Pooled = { pool?: string };
 export type EngineOptions = {
   /** The sessions at work at once in each pool: a whole number from 1. Absent: no ceiling, and nothing is admitted but by `admit`. */
   maxConcurrent?: number;
+  /**
+   * Asked on every pass before it admits: while it says true the pass admits no queued task, as a node marked `unschedulable` takes no
+   * new Pod; what is at work goes on, `admit` still admits, and a task filed unqueued still starts. Absent: always schedulable.
+   */
+  unschedulable?: () => boolean;
   /** Where the file-backed store lives. Ignored when you bring your own `journal`. */
   root?: string;
   journal?: PromiseJournal;
@@ -489,8 +494,8 @@ const harnessConfigRefusalOf = (name: string, h: HarnessConfig): string | undefi
 /**
  * Why an engine cannot be built from these options, in a sentence that says what to do instead — or `undefined`. Asked of the
  * options as handed in, untyped, and refuses, in this order: a `maxConcurrent` that is not a whole number from 1; a harness
- * brought as an object whose `pool` is not a name; a remote agent's entry `remoteConfigRefusal` refuses, its `pool` aside; and a
- * `credentials` or `missingCredential` that is not a function.
+ * brought as an object whose `pool` is not a name; a remote agent's entry `remoteConfigRefusal` refuses, its `pool` aside; and an
+ * `unschedulable`, a `credentials` or a `missingCredential` that is not a function.
  */
 export const optionsRefusalOf = (options: EngineOptions): string | undefined => {
   const ceiling = ceilingRefusalOf(options.maxConcurrent);
@@ -498,6 +503,9 @@ export const optionsRefusalOf = (options: EngineOptions): string | undefined => 
   for (const [name, h] of Object.entries(options.harnesses ?? {})) {
     const refused = harnessConfigRefusalOf(name, h);
     if (refused) return refused;
+  }
+  if (options.unschedulable !== undefined && typeof options.unschedulable !== 'function') {
+    return '`unschedulable` is a function, `() => boolean`, asked on every pass: give one, or leave it out.';
   }
   if (options.credentials !== undefined && typeof options.credentials !== 'function') {
     return '`credentials` is a function, `(scheme, agentUrl, harness) => secret | undefined`: give one, or leave it out.';
@@ -509,12 +517,13 @@ export const optionsRefusalOf = (options: EngineOptions): string | undefined => 
 };
 
 /**
- * What an engine over `options` admits under (`Admission`): its `maxConcurrent`, and the pool each of `harnesses` counts in — the
- * `pool` it names, else its own name; a task with no harness counts in `default`.
+ * What an engine over `options` admits under (`Admission`): its `maxConcurrent`, its `unschedulable`, and the pool each of `harnesses`
+ * counts in — the `pool` it names, else its own name; a task with no harness counts in `default`.
  */
 export const admissionOf = (options: EngineOptions, harnesses: Record<string, HarnessConfig>) =>
   Layer.succeed(Admission)({
     ...(options.maxConcurrent !== undefined ? { ceiling: options.maxConcurrent } : {}),
+    ...(options.unschedulable !== undefined ? { unschedulable: options.unschedulable } : {}),
     poolOf: (harness) => {
       const h = harness !== undefined && Object.hasOwn(harnesses, harness) ? harnesses[harness] : undefined;
       return typeof h === 'object' && h !== null && typeof h.pool === 'string' ? h.pool : (harness ?? 'default');

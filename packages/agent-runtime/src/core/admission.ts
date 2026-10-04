@@ -12,10 +12,11 @@ export type AdmissionView = {
 };
 
 /**
- * What the engine admits under: `ceiling`, the sessions at work at once in each pool, and `poolOf`, the pool a harness's sessions count
+ * What the engine admits under: `ceiling`, the sessions at work at once in each pool; `unschedulable`, asked on every pass, true while
+ * the engine admits nothing, as a node marked `unschedulable` takes no new Pod; and `poolOf`, the pool a harness's sessions count
  * against. No ceiling admits nothing: a task filed `queued` then waits for `admit`.
  */
-export type AdmissionRule = { ceiling?: number; poolOf: (harness: string | undefined) => string };
+export type AdmissionRule = { ceiling?: number; unschedulable?: () => boolean; poolOf: (harness: string | undefined) => string };
 
 /** The pool a harness counts against when the engine names none for it: its own name, and `default` for a task with no harness. */
 export const ownPool = (harness: string | undefined): string => harness ?? 'default';
@@ -48,11 +49,12 @@ const byTurn = (a: AdmissionView, b: AdmissionView): number => {
 
 /**
  * The queued tasks to admit: per pool, while the sessions holding a slot (`holdsSlot`) are under the ceiling, the waiting tasks in turn
- * (`byTurn`), each one admitted counted at once. Nothing running is stopped for a waiting task, and no ceiling admits nothing.
+ * (`byTurn`), each one admitted counted at once. Nothing running is stopped for a waiting task; no ceiling admits nothing, and nor does
+ * a rule `unschedulable` says true of as the pass asks it.
  */
 export function toAdmit(views: readonly AdmissionView[], rule: AdmissionRule): string[] {
   const { ceiling, poolOf } = rule;
-  if (ceiling === undefined) return [];
+  if (ceiling === undefined || rule.unschedulable?.()) return [];
   const used = new Map<string, number>();
   for (const v of views) if (holdsSlot(v)) used.set(poolOf(v.state.harness), (used.get(poolOf(v.state.harness)) ?? 0) + 1);
   const admitted: string[] = [];

@@ -5,9 +5,12 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 import { Schema } from 'effect';
+import { cordonFile, readCordon } from '../cordon/cordon.store.ts';
+import type { Cordon } from '../cordon/cordon.ts';
 import type { QueueTry } from '../inbox/inbox.ts';
-import type { AskKey, AskKind, AskWritten, PersonAsk, Pruned, RunStore } from './record.ts';
+import type { AskKey, AskKind, AskWritten, PersonAsk, Pruned, Run, RunStore } from './record.ts';
 import {
   HOME,
   acceptFile,
@@ -194,16 +197,35 @@ function putTry(name: string, tried: QueueTry): void {
   fs.writeFileSync(path.join(queueDir(), `${name}.json`), JSON.stringify(tried, null, 2));
 }
 
-/** A run's record and a person's files beside it, each a file of its own under `runs/`; the inbox's cards and the tick's tries. */
+/**
+ * The run as it reads with the store's cordon (`readCordon`) composed onto it — the one given, read where none is — or without one while
+ * none stands: a run the tick's memo kept is read with the cordon as it stands now, so the cordon is in no run's stamp (`restStamps`): a
+ * run at rest has nothing due for it to hold, and one it holds anything of is `running`, never at rest. A run that already reads with
+ * the cordon as it stands, or with none while none does, is the very run given, which the memo knows by identity (`keptOf`). Never
+ * written into the record.
+ */
+function cordoned(run: Run, cordon: Cordon | null = readCordon()): Run {
+  if (isDeepStrictEqual(run.cordon ?? null, cordon)) return run;
+  const { cordon: _, ...bare } = run;
+  return cordon ? { ...bare, cordon } : bare;
+}
+
+/**
+ * A run's record and a person's files beside it, each a file of its own under `runs/`, with the store's cordon composed onto each run read
+ * (`cordoned`); the inbox's cards and the tick's tries.
+ */
 export const filesStore: RunStore = {
   runs: {
-    read: readRun,
-    list: listRuns,
+    read: (id) => cordoned(readRun(id)),
+    list: (said, kept) => {
+      const cordon = readCordon();
+      return listRuns(said, kept).map((run) => cordoned(run, cordon));
+    },
     create: writeRun,
     rewrite: rewriteRun,
     stamps: restStamps,
     exists: (id) => fs.existsSync(runFile(id)),
-    calledOff: (id) => [cancelFile, pruneFile, holdFile].some((file) => fs.existsSync(file(id))),
+    calledOff: (id) => [cancelFile, pruneFile, holdFile].some((file) => fs.existsSync(file(id))) || fs.existsSync(cordonFile()),
     cancel: markCancelled,
     forget: removeRunFiles,
     prune: writePruned,

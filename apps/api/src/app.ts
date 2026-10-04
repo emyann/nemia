@@ -8,7 +8,7 @@ import { customInstructions } from './custom/custom.ts';
 import { commands } from './commands/index.ts';
 import { capabilitiesWithSteps, McpAsker } from './capabilities/index.ts';
 import { factories } from './factories/index.ts';
-import { ceilingsOf, feed, QuotaAsker, readDaemon } from './factory/index.ts';
+import { ceilingsOf, cordonOf, feed, QuotaAsker, readDaemon } from './factory/index.ts';
 import { inbox } from './inbox/inbox.ts';
 import { ApiConfig, type ApiEnv, type ApiRuntime, ReadMemo, served, type Services } from './layer.ts';
 import { machines } from './machines/machines.ts';
@@ -77,6 +77,9 @@ export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Servic
  * - `GET /api/ceilings` — the cap on runs in flight the daemon's last pass ran with, and the runs it counts and holds: what the Factory
  *   says over its floor. 422 for a `WF_MAX_RUNS` in the api's environment that is not a count, before any pass wrote the daemon's
  *   (`maxRuns`, an `Invalid`).
+ * - `GET /api/cordon` — the store's cordon, `{ cordon, staged }`: since when, by whom and why, or null; and each landing it holds with its
+ *   merge staged in the repository's checkout (MERGE_HEAD), its check not filed until the lift (`cordonRead`). Put on
+ *   `POST /api/cordon` and lifted on `DELETE /api/cordon` (commands/routes.ts).
  * - `GET /api/daemon` — whether a wf up ticks the store, and since when, and when it last passed: read off daemon.json and the process
  *   table as wf ls reads them, and never written, the file being the daemon's. What the Factory says over its floor when nothing ticks.
  *   500 for a daemon.json that is there and cannot be read — a directory in its place, a permission: the package throws rather than call
@@ -85,7 +88,8 @@ export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Servic
  *   request), asked at most once a keep however many boards read (`QuotaAsker`, factory/quota.ts): what the Factory says over its floor.
  *   Every case is a 200 with a sentence, the harness's failures and the engine's refusals included.
  * - commands/routes.ts — a person's asks of a run, generated from the package's command table: a try (with answers to its questions,
- *   commands/extend.ts and asks/answers.ts), a round, words for a running session, an approval and an acceptance; five writes.
+ *   commands/extend.ts and asks/answers.ts), a round, words for a running session, an approval and an acceptance; five writes. And the
+ *   store's cordon put and lifted, `wf cordon` and `wf uncordon`'s routes.
  * - steps/steps.ts — a step's own reads: its output, its files, and its conversation, once or followed.
  * - factory/feed.ts — the workflow feed followed, as server-sent events.
  * - machines/machines.ts — the state machines the board draws, listed, and one machine's graph, read off its code.
@@ -116,6 +120,7 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     .route('/', runs)
     .route('/', stats)
     .get('/api/ceilings', (c) => served(c, async ({ e, env }) => c.json(await ceilingsOf(e, env))))
+    .get('/api/cordon', (c) => served(c, async ({ e }) => c.json(await cordonOf(e))))
     .get('/api/daemon', (c) => c.json(readDaemon()))
     .get('/api/quota', (c) => served(c, async ({ e, env, quota }) => c.json(await quota({ env, ask: () => e.quota('claude') }))))
     .route('/', commands)

@@ -218,3 +218,44 @@ test('toAdmit: no ceiling admits nothing, and a task admitted or not queued is n
     [],
   );
 });
+
+test('toAdmit: a rule unschedulable admits nothing while it says so, and admits again once it does not, asked each time', () => {
+  const waiting = [queued('a-1', 1), queued('a-2', 2)];
+  let unschedulable = true;
+  const rule = { ...under(2), unschedulable: () => unschedulable };
+  assert.deepEqual(toAdmit(waiting, rule), [], 'unschedulable: nothing admitted, though the pool has room');
+  unschedulable = false;
+  assert.deepEqual(toAdmit(waiting, rule), ['a-1', 'a-2'], 'schedulable again: the same rule admits as a ceiling does');
+});
+
+test('an engine unschedulable admits no queued task on any pass while it says so; what works goes on, and `admit` still admits', async () => {
+  const journal = memoryJournal();
+  const sessions = new Map<string, Sighting>();
+  let unschedulable = false;
+  const harnesses: Record<string, HarnessConfig> = { a: fake(sessions) };
+  const engine = promiseEngine(
+    Engine.layer({ journal, harnesses, defaultHarness: 'a', maxConcurrent: 3, unschedulable: () => unschedulable }),
+  );
+  await fileAt(journal, 'before', '2026-10-04T09:00:00.000Z');
+  await engine.tick();
+  unschedulable = true;
+  await fileAt(journal, 'held', '2026-10-04T09:00:01.000Z');
+  for (let i = 0; i < 3; i++) await engine.tick();
+  assert.deepEqual(started(sessions), [nameFor('before', 1)], 'admitted before, it starts; filed after, it waits');
+  assert.equal((await engine.view('held')).admission, 'queued');
+  await fileAt(journal, 'named', '2026-10-04T09:00:02.000Z');
+  await engine.admit(['named']);
+  await engine.tick();
+  assert.deepEqual(started(sessions), [nameFor('before', 1), nameFor('named', 1)], 'a task `admit` names starts all the same');
+  unschedulable = false;
+  await engine.tick();
+  await engine.tick();
+  assert.deepEqual(started(sessions), [nameFor('before', 1), nameFor('held', 1), nameFor('named', 1)], 'the flag down, it is admitted');
+});
+
+test('REFUSED at shipped defaults: an `unschedulable` that is not a function builds no engine', () => {
+  assert.throws(
+    () => promiseEngine(Engine.layer({ journal: memoryJournal(), unschedulable: true } as never)),
+    (err: Error) => err.message.includes('`unschedulable` is a function, `() => boolean`, asked on every pass'),
+  );
+});

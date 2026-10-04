@@ -10,6 +10,9 @@ import {
   ceilingLines,
   ceilings,
   Conflict,
+  cordonWords,
+  readCordon,
+  UNCORDONED,
   engine,
   everyOf,
   feedCursorRefusal,
@@ -96,9 +99,13 @@ function tickRunLines(r: Pass['runs'][number]): void {
   for (const note of r.notes) console.log(`   ${note}`);
 }
 
-/** A pass's lines on `wf tick`: what failed or was left out on stderr, then what it refused, the queue's card and each run; returns it. */
+/**
+ * A pass's lines on `wf tick`: the cordon it read, what failed or was left out on stderr, then what it refused, the queue's card and each
+ * run; returns it.
+ */
 function tickLines(pass: Pass): Pass {
-  const { runs: results, queue, feedError, refused, unreadable } = pass;
+  const { runs: results, queue, feedError, refused, unreadable, cordon } = pass;
+  if (cordon) console.log(cordonWords(cordon));
   if (feedError) console.error(feedError);
   for (const why of unreadable ?? []) console.error(`left out: ${why}`);
   for (const line of refusalLines(refused ?? [], new Set()).lines) console.log(line);
@@ -139,10 +146,12 @@ function upStats(): void {
 
 /**
  * What `wf up` has said while it lasts, so it says each failure once: a queued card's start (`said`), the feed's (`feedSaid`), a move the
- * lifecycle refused (`refusedSaid`), a journal left out (`unreadableSaid`); and the passes its next summary counts (`interval`).
+ * lifecycle refused (`refusedSaid`), a journal left out (`unreadableSaid`); the store's cordon (`cordonSaid`), said once put and once
+ * lifted; and the passes its next summary counts (`interval`).
  */
 type UpSaid = {
   said: string | undefined;
+  cordonSaid: string | undefined;
   feedSaid: string | undefined;
   refusedSaid: ReadonlySet<string>;
   unreadableSaid: ReadonlySet<string>;
@@ -167,9 +176,17 @@ function advancedLines(advanced: Pass['runs']): void {
   }
 }
 
+/** The store's cordon on `wf up`, once when it is put or changed and once when it is lifted; returns the cordon it said, if any. */
+export function cordonSaid(cordon: Pass['cordon'], said: string | undefined): string | undefined {
+  const now = cordon ? cordonWords(cordon) : undefined;
+  if (now !== said) console.log(`${new Date().toISOString().slice(11, 19)}  ${now ?? UNCORDONED}`);
+  return now;
+}
+
 /** One pass's lines on `wf up`, going by what it has printed (`was`), not by the store; returns what it has printed now. */
 function passLines(pass: Pass, was: UpSaid): UpSaid {
   const { runs: advanced, queue, feedError, cost, refused, unreadable } = pass;
+  const cordoned = cordonSaid(pass.cordon, was.cordonSaid);
   let interval = was.interval;
   if (cost) interval = addPass(interval, cost, Date.now());
   if (summaryDue(interval, Date.now())) {
@@ -183,7 +200,7 @@ function passLines(pass: Pass, was: UpSaid): UpSaid {
     if (!was.unreadableSaid.has(why)) console.error(`${new Date().toISOString().slice(11, 19)}  left out: ${why}`);
   const said = queue ? queueSaid(queue, was.said) : was.said;
   advancedLines(advanced);
-  return { said, feedSaid: feedError, refusedSaid: stalled.said, unreadableSaid: new Set(unreadable), interval };
+  return { said, cordonSaid: cordoned, feedSaid: feedError, refusedSaid: stalled.said, unreadableSaid: new Set(unreadable), interval };
 }
 
 /**
@@ -197,7 +214,14 @@ function upVerb(args: Args, e: Engine): void | Promise<void> {
   const every = 'refusal' in asked ? usage(asked.refusal) : asked.every;
   const ceiling = ceilings();
   const store = HOME;
-  let was: UpSaid = { said: undefined, feedSaid: undefined, refusedSaid: new Set(), unreadableSaid: new Set(), interval: undefined };
+  let was: UpSaid = {
+    said: undefined,
+    cordonSaid: undefined,
+    feedSaid: undefined,
+    refusedSaid: new Set(),
+    unreadableSaid: new Set(),
+    interval: undefined,
+  };
   const onTaken = ({ held, replaced }: TakenStore) =>
     Effect.sync(() => {
       console.log(`up — every ${every}ms, ^C to stop`);
@@ -214,9 +238,11 @@ function upVerb(args: Args, e: Engine): void | Promise<void> {
   return runMain(up(e, { every, repo: path.resolve('.'), holder: 'wf up', onTaken, onPass }).pipe(Effect.scoped));
 }
 
-/** `wf feed`: the feed's lines from a cursor, and the cursor to read from next. */
+/** `wf feed`: the store's cordon while one stands, first, then the feed's lines from a cursor, and the cursor to read from next. */
 export function feedVerb(rest: string[]): void {
   const { lines, cursor } = readFeed(feedCursor(rest));
+  const cordon = readCordon();
+  if (cordon) console.log(cordonWords(cordon));
   for (const line of lines) console.log(feedLineWords(line));
   return console.log(`cursor: ${cursor}`);
 }

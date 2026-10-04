@@ -230,7 +230,11 @@ test('the same store cordoned: once the pass after the cordon has read every run
     const cordoned = await measured();
     const listed = listRuns().length;
     assert.equal(cordoned.rested, 200, 'every finished run answered from memory while the cordon stands');
-    assert.equal(cordoned.records, listed - cordoned.rested, `only the records of the runs in flight read (${cordoned.records} of ${listed})`);
+    assert.equal(
+      cordoned.records,
+      listed - cordoned.rested,
+      `only the records of the runs in flight read (${cordoned.records} of ${listed})`,
+    );
     assert.equal(journals(cordoned), journals(none), 'no journal read more than the runs in flight make');
   } finally {
     liftCordon();

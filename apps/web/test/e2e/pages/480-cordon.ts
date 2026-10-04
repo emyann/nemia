@@ -10,11 +10,15 @@ import { OUT, store } from '../world.ts';
 /** The header's cordon: its switch, its label and its words. */
 const cordonOf = (page: Page) => page.locator('header[data-feed] [data-cordon]');
 
+/** Why the page cordons the store, given in the switch's popover. */
+const WHY = 'merging by hand on main';
+
 export default {
   /**
    * The store cordoned and uncordoned from the frame's header, as `wf cordon` and `wf uncordon` do (`POST` and `DELETE /api/cordon`), on
-   * the Factory, whose header is the fullest. The switch is labelled Cordon with `nothing new starts` beside it; pressed, the store's
-   * cordon file is written and the header says since when and by whom; pressed again, the file is gone. A landing held with its merge
+   * the Factory, whose header is the fullest. The switch is labelled Cordon with `nothing new starts` beside it; pressed, it asks why in a
+   * popover, and once sent the store's cordon file holds it and the header says since when, by whom and why; pressed again, the file is
+   * gone. A landing held with its merge
    * staged is then shown by the api's answer held with `route`: the run is named beside the switch, and its sentence is on hover. Which
    * landings those are is the package's judgement, proven in its own tests (`packages/agent-orchestrator/src/tick/cordon.test.ts`).
    */
@@ -33,12 +37,20 @@ export default {
       await photograph(page.locator('header[data-feed]'), path.join(OUT, `cordon-off-${theme}.png`));
 
       await label.click();
-      await expectVisible(cordon.and(page.locator('[data-cordon="on"]')), 'pressed, the store is cordoned');
-      if (!fs.existsSync(file)) throw new Refused(`the switch put the cordon once the api answered — ${file} is not there`);
-      const put = JSON.parse(fs.readFileSync(file, 'utf8')) as { at: string; by: string };
+      const ask = page.locator('[data-cordon-ask]');
+      await expectVisible(ask.getByText('Cordon the store', { exact: true }), 'pressed, it asks why first');
+      if (fs.existsSync(file)) throw new Refused(`nothing is put while it asks why — ${file} is there`);
+      await ask.locator('[data-cordon-why]').fill(WHY);
+      await settled(page);
+      await photograph(page.locator('[data-cordon-ask]'), path.join(OUT, `cordon-why-${theme}.png`));
+      await ask.getByRole('button', { name: 'Cordon', exact: true }).click();
+      await expectVisible(cordon.and(page.locator('[data-cordon="on"]')), 'sent, the store is cordoned');
+      if (!fs.existsSync(file)) throw new Refused(`the popover put the cordon once the api answered — ${file} is not there`);
+      const put = JSON.parse(fs.readFileSync(file, 'utf8')) as { at: string; by: string; why?: string };
+      if (put.why !== WHY) throw new Refused(`the cordon's file holds the why given, "${WHY}" — it holds ${JSON.stringify(put.why)}`);
       await expectVisible(
-        cordon.getByText(new RegExp(`^nothing new starts · since .+ by ${put.by}$`)),
-        'and the header says since when, by whom',
+        cordon.getByText(new RegExp(`^nothing new starts · since .+ by ${put.by}: ${WHY}$`)),
+        'and the header says since when, by whom and why',
       );
       await settled(page);
       await photograph(page.locator('header[data-feed]'), path.join(OUT, `cordon-on-${theme}.png`));

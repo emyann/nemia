@@ -153,10 +153,7 @@ test("the store's cordon is composed onto every run read and listed, and written
   try {
     const read = filesStore.runs.read(run.id);
     assert.deepEqual(read.cordon, cordon);
-    assert.deepEqual(
-      filesStore.runs.list().find((r) => r.id === run.id)?.cordon,
-      cordon,
-    );
+    assert.deepEqual(filesStore.runs.list().find((r) => r.id === run.id)?.cordon, cordon);
     assert.deepEqual(
       filesStore.runs.list(undefined, (id) => (id === run.id ? run : undefined)).find((r) => r.id === run.id)?.cordon,
       cordon,

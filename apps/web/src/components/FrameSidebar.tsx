@@ -1,8 +1,8 @@
 /**
  * The frame's sidebar beside the rail: the factory picker, the start of a run in the factory picked, the factory's sections, the Inbox's
- * with how many of its cards are not yet started, and the favourites this browser keeps.
+ * with how many of its cards are not yet started, and the favourites this browser keeps: every factory's, in the order starred, each by
+ * its title, one gone said so, each with a star that takes it off.
  */
-import { useSyncExternalStore } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { List, Star, Waypoints } from 'lucide-react';
 import {
@@ -13,13 +13,15 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuAction,
   SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@/components/ui/sidebar';
-import { inboxQuery } from '@/lib/api';
-import { FAVORITES_KEY, favoritesOf, workflowAnchor, type Favorite } from '@/lib/favorites';
+import { inboxQuery, runsQuery, workflowsQuery } from '@/lib/api';
+import { favoriteRows, workflowAnchor, type Favorite, type FavoriteRow } from '@/lib/favorites';
 import { inboxBadgeTitle, notStarted } from '@/lib/inbox';
+import { toggleFavorite, useFavorites } from '@/lib/useFavorites';
 import { FactoryPicker } from './FactoryPicker';
 import { FactoryStart } from './FactoryStart';
 import { pickedOf, sectionLink, SECTIONS } from './nav';
@@ -35,7 +37,8 @@ const PlaceLink = routeLink(SidebarMenuButton);
  */
 export function FrameSidebar({ path, search, onPick }: { path: string; search: Record<string, unknown>; onPick?: () => void }) {
   const picked = pickedOf(path, search);
-  const favorites = useFavorites();
+  const { favorites } = useFavorites();
+  const rows = useFavoriteRows(favorites);
   const inbox = useInboxBadge(picked);
   return (
     <Sidebar collapsible="none" className="min-w-0 flex-1">
@@ -70,7 +73,7 @@ export function FrameSidebar({ path, search, onPick }: { path: string; search: R
             Favorites
           </SidebarGroupLabel>
           <SidebarGroupContent>
-            <FavoriteLinks favorites={favorites} onPick={onPick} />
+            <FavoriteLinks rows={rows} onPick={onPick} />
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
@@ -101,57 +104,78 @@ function InboxBadge({ count, title }: { count: number; title: string }) {
   );
 }
 
-/** Calls `onChange` each time another page of this browser changes what it keeps, and returns what stops it. */
-const onStorage = (onChange: () => void) => {
-  window.addEventListener('storage', onChange);
-  return () => window.removeEventListener('storage', onChange);
-};
-
-/** The favourites as this browser keeps them, as text; none where storage is refused. */
-function storedFavorites(): string | null {
-  try {
-    return localStorage.getItem(FAVORITES_KEY);
-  } catch {
-    return null;
-  }
+/**
+ * The sidebar's row of each favourite (`favoriteRows`): a run by its title once the runs are read, gone once the api's list lacks it. Each
+ * list is read only while something of its kind is starred.
+ */
+function useFavoriteRows(favorites: readonly Favorite[]): FavoriteRow[] {
+  const runs = useQuery({ ...runsQuery, enabled: favorites.some((favorite) => favorite.kind === 'run') });
+  const workflows = useQuery({ ...workflowsQuery, enabled: favorites.some((favorite) => favorite.kind === 'workflow') });
+  return favoriteRows(favorites, runs.data, workflows.data);
 }
 
-/** None, where no browser keeps anything: a server's render. */
-const noFavorites = () => null;
+/** The key a favourite's row is drawn under: its kind and every key it is known by. */
+const rowKey = (favorite: Favorite): string =>
+  favorite.kind === 'run' ? `run:${favorite.run}` : `workflow:${favorite.from}:${favorite.workflow}`;
 
-/** The favourites this browser keeps (`favoritesOf`), read again when another of its pages changes them. */
-function useFavorites(): Favorite[] {
-  return favoritesOf(useSyncExternalStore(onStorage, storedFavorites, noFavorites));
-}
+/** How a favourite is named to a person: a run by its title, a workflow by its name, yours said so. */
+const rowName = ({ favorite, title }: FavoriteRow): string =>
+  favorite.kind === 'workflow' && favorite.from === 'yours' ? `${title} (yours)` : title;
 
 /**
- * The favourites, a link each — a run to its page, a workflow to its card on the Workflows page — or a line saying none is starred yet. A
- * press runs `onPick`.
+ * The favourites (`rows`), each with a star that takes it off, shown on hover: a run a link to its page, read by its title with its id on
+ * hover; a workflow a link to its card on the Workflows page; one the api no longer lists said gone, no link, its star always shown. None
+ * starred says so. A press on a link runs `onPick`.
  */
-export function FavoriteLinks({ favorites, onPick }: { favorites: readonly Favorite[]; onPick?: () => void }) {
-  if (!favorites.length) return <p className="px-2 text-xs text-muted-foreground">Nothing starred yet.</p>;
+export function FavoriteLinks({ rows, onPick }: { rows: readonly FavoriteRow[]; onPick?: () => void }) {
+  if (!rows.length) return <p className="px-2 text-xs text-muted-foreground">Nothing starred yet.</p>;
   return (
     <SidebarMenu aria-label="Favorites">
-      {favorites.map((favorite) =>
-        favorite.kind === 'run' ? (
-          <SidebarMenuItem key={`run:${favorite.run}`}>
-            <PlaceLink to="/runs/$runId" params={{ runId: favorite.run }} size="sm" onPress={onPick}>
-              <List />
-              <span className="truncate">{favorite.run}</span>
-            </PlaceLink>
-          </SidebarMenuItem>
-        ) : (
-          <SidebarMenuItem key={`workflow:${favorite.from}:${favorite.workflow}`}>
-            <PlaceLink to="/workflows" search={{}} hash={workflowAnchor(favorite)} size="sm" onPress={onPick}>
-              <Waypoints />
-              <span className="truncate">
-                {favorite.workflow}
-                {favorite.from === 'yours' && <span className="text-muted-foreground"> (yours)</span>}
-              </span>
-            </PlaceLink>
-          </SidebarMenuItem>
-        ),
-      )}
+      {rows.map((row) => (
+        <SidebarMenuItem
+          key={rowKey(row.favorite)}
+          data-favorite={row.favorite.kind}
+          data-gone={row.gone || undefined}
+          title={row.gone ? `${rowName(row)}: the api no longer lists it` : row.favorite.kind === 'run' ? row.favorite.run : undefined}
+        >
+          {row.gone ? <GoneRow row={row} /> : <FavoriteLink row={row} onPick={onPick} />}
+          <SidebarMenuAction showOnHover={!row.gone} aria-label={`Unstar ${rowName(row)}`} onPress={() => toggleFavorite(row.favorite)}>
+            <Star className="fill-amber-400 text-amber-500 dark:fill-amber-300 dark:text-amber-300" />
+          </SidebarMenuAction>
+        </SidebarMenuItem>
+      ))}
     </SidebarMenu>
+  );
+}
+
+/** A favourite the api lists, a link: a run to its page, a workflow to its card on the Workflows page, yours said so. */
+function FavoriteLink({ row: { favorite, title }, onPick }: { row: FavoriteRow; onPick?: () => void }) {
+  if (favorite.kind === 'run')
+    return (
+      <PlaceLink to="/runs/$runId" params={{ runId: favorite.run }} size="sm" onPress={onPick}>
+        <List />
+        <span className="truncate">{title}</span>
+      </PlaceLink>
+    );
+  return (
+    <PlaceLink to="/workflows" search={{}} hash={workflowAnchor(favorite)} size="sm" onPress={onPick}>
+      <Waypoints />
+      <span className="truncate">
+        {title}
+        {favorite.from === 'yours' && <span className="text-muted-foreground"> (yours)</span>}
+      </span>
+    </PlaceLink>
+  );
+}
+
+/** A favourite the api no longer lists: its id or name, muted, and the word gone, linking nowhere. */
+function GoneRow({ row }: { row: FavoriteRow }) {
+  const Icon = row.favorite.kind === 'run' ? List : Waypoints;
+  return (
+    <div className="flex h-7 items-center gap-2 p-2 pr-8 text-xs text-muted-foreground [&_svg]:size-4 [&_svg]:shrink-0">
+      <Icon />
+      <span className="min-w-0 truncate line-through decoration-muted-foreground/50">{rowName(row)}</span>
+      <span className="shrink-0">gone</span>
+    </div>
   );
 }

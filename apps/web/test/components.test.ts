@@ -5475,23 +5475,78 @@ test('the sidebar starts a run in the factory picked, or in none yet under All f
   assert.match(html, /data-favorites[\s\S]*Favorites[\s\S]*Nothing starred yet\./);
 });
 
-test('a favourite run links to its page, and a workflow to its card on the Workflows page, under every factory, yours said so', async () => {
+test('a favourite run links to its page by its title, and a workflow to its card on the Workflows page, yours said so, each with its unstar', async () => {
   const { FavoriteLinks } = await import('../src/components/FrameSidebar.tsx');
   const { SidebarProvider } = await import('../src/components/ui/sidebar.tsx');
-  const favorites = [
-    { kind: 'run' as const, run: 'r-1' },
-    { kind: 'workflow' as const, from: 'yours' as const, workflow: 'dev' },
-    { kind: 'workflow' as const, from: 'repo' as const, workflow: 'build' },
+  const rows = [
+    { favorite: { kind: 'run' as const, run: 'r-1' }, title: 'Star the runs', gone: false },
+    { favorite: { kind: 'workflow' as const, from: 'yours' as const, workflow: 'dev' }, title: 'dev', gone: false },
+    { favorite: { kind: 'workflow' as const, from: 'repo' as const, workflow: 'build' }, title: 'build', gone: false },
   ];
   // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
-  const html = await routedWith(createElement(SidebarProvider, { children: createElement(FavoriteLinks, { favorites }) }));
+  const html = await routedWith(createElement(SidebarProvider, { children: createElement(FavoriteLinks, { rows }) }));
   assert.deepEqual(
     [...html.matchAll(/<a\b[^>]*href="([^"]*)"/g)].map((m) => m[1]),
     ['/runs/r-1', '/workflows#workflow-yours-dev', '/workflows#workflow-repo-build'],
   );
+  assert.match(html, /<li[^>]*title="r-1"[^>]*>[\s\S]*?>Star the runs<\/span>/, 'a run reads its title, its id on hover');
   assert.match(html, />dev<span[^>]*> \(yours\)<\/span>/);
   assert.doesNotMatch(html, /build<span[^>]*> \(yours\)/);
-  assert.doesNotMatch(html, /Nothing starred yet/);
+  assert.deepEqual(
+    [...html.matchAll(/aria-label="(Unstar [^"]*)"/g)].map((m) => m[1]),
+    ['Unstar Star the runs', 'Unstar dev (yours)', 'Unstar build'],
+  );
+  assert.doesNotMatch(html, /Nothing starred yet|data-gone/);
+});
+
+test('REFUSED: a favourite the api no longer lists is said gone, by its id or name, linking nowhere, its unstar always shown', async () => {
+  const { FavoriteLinks } = await import('../src/components/FrameSidebar.tsx');
+  const { SidebarProvider } = await import('../src/components/ui/sidebar.tsx');
+  const rows = [
+    { favorite: { kind: 'run' as const, run: 'r-1' }, title: 'Star the runs', gone: false },
+    { favorite: { kind: 'run' as const, run: 'r-9' }, title: 'r-9', gone: true },
+    { favorite: { kind: 'workflow' as const, from: 'yours' as const, workflow: 'flow' }, title: 'flow', gone: true },
+  ];
+  // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
+  const html = await routedWith(createElement(SidebarProvider, { children: createElement(FavoriteLinks, { rows }) }));
+  assert.deepEqual(
+    [...html.matchAll(/<a\b[^>]*href="([^"]*)"/g)].map((m) => m[1]),
+    ['/runs/r-1'],
+    'a gone favourite links nowhere',
+  );
+  const gone = [...html.matchAll(/<li[^>]*data-gone="true"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => m[0]);
+  assert.equal(gone.length, 2);
+  assert.match(gone[0], /title="r-9: the api no longer lists it"[\s\S]*>r-9<\/span><span[^>]*>gone<\/span>/);
+  assert.match(gone[1], />flow \(yours\)<\/span><span[^>]*>gone<\/span>[\s\S]*aria-label="Unstar flow \(yours\)"/);
+  for (const row of gone) assert.doesNotMatch(row, /md:opacity-0/, 'its unstar is shown without a hover');
+  assert.match(html, /<li[^>]*title="r-1"[\s\S]*?md:opacity-0[\s\S]*?<\/li>/, 'a live one shows its unstar on hover');
+});
+
+test('REFUSED: the star is a toggle named Star and its name, pressed only while this browser keeps its favourite', async () => {
+  const { FavoriteStar } = await import('../src/components/FavoriteStar.tsx');
+  const { FAVORITES_KEY } = await import('../src/lib/favorites.ts');
+  const kept = JSON.stringify([{ kind: 'run', run: 'r-1' }, { kind: 'workflow', from: 'repo', workflow: 'dev' }]);
+  Object.assign(globalThis, { localStorage: { getItem: (key: string) => (key === FAVORITES_KEY ? kept : null) } });
+  try {
+    const star = (favorite: Record<string, string>, name: string) =>
+      renderToStaticMarkup(createElement(FavoriteStar, { favorite: favorite as never, name }));
+    const on = star({ kind: 'run', run: 'r-1' }, 'Star the runs');
+    assert.match(on, /<button[^>]*aria-label="Star Star the runs"/);
+    assert.match(on, /aria-pressed="true"/);
+    assert.match(on, /data-starred="true"/);
+    assert.match(on, /title="Starred: take it off Favorites"/);
+    for (const off of [
+      star({ kind: 'run', run: 'r-2' }, 'r-2'),
+      star({ kind: 'workflow', from: 'yours', workflow: 'dev' }, 'dev'),
+      star({ kind: 'workflow', from: 'repo', workflow: 'r-1' }, 'r-1'),
+    ]) {
+      assert.match(off, /aria-pressed="false"/);
+      assert.doesNotMatch(off, /data-starred/);
+      assert.match(off, /title="Star: list it under Favorites"/);
+    }
+  } finally {
+    Reflect.deleteProperty(globalThis, 'localStorage');
+  }
 });
 
 test('REFUSED: the sidebar is drawn folded only where the cookie keeps sidebar_state=false, whole', async () => {

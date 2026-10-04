@@ -10,6 +10,7 @@ import type { Workflow } from '../step/step.ts';
 import type { SpendOf } from '../status/status.ts';
 import { nextTry, type RetryAsk } from './retry-ask.ts';
 import { pauseAskVoid, pauseAsksVoid, retriesDue, tryNote } from './retry.ts';
+import { retrySection } from '../brief/brief-sections.ts';
 
 const IMPLEMENT: Workflow = { name: 'implement', after: [], body: 'do it', check: 'npm test' };
 
@@ -109,4 +110,13 @@ test('the try a pause filed keeps its mode, is marked paused, and is said as the
   const record = nextTry(runOn('t1').steps.implement, { step: 'implement', try: 2, mode: 'nudge', by: 'pause' }, 't2');
   assert.deepEqual(record.tries, [{ taskId: 't1', then: 'nudge', paused: true }]);
   assert.equal(tryNote(IMPLEMENT, record), 'try 2, continued after wf pause --now');
+});
+
+test('the brief of a try the pause filed says the pause stopped its session and the run filed the try, never a person', () => {
+  const brief = retrySection(IMPLEMENT, { try: 2, by: 'pause', mode: 'nudge', resumed: true, status: 'stopped' });
+  assert.match(
+    brief,
+    /The store was paused at once \(`wf pause --now`\), which stopped this session before it signed off; once resumed, the run filed/,
+  );
+  assert.doesNotMatch(brief, /A person asked for this try/);
 });

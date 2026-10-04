@@ -32,6 +32,7 @@ const { approvalFile, asksDir, readRun } = await import('../record/record.store.
 const { tick, freshRestMemo } = await import('./tick.verb.ts');
 const { engineOf, storeAdmission } = await import('../runtime-client.ts');
 const { resumePause, putPause } = await import('../pause/pause.store.ts');
+const { pauseNow } = await import('../pause/pause.verb.ts');
 const { pausedRead, runsListed } = await import('../list/list.verb.ts');
 const { COMMANDS } = await import('../command/commands.verb.ts');
 const { pausedLines, pausedWords } = await import('../pause/pause.ts');
@@ -295,4 +296,84 @@ test('while the store is paused nothing new starts and what runs finishes; the p
   await pass();
   assert.ok(h.spawned.length > before, 'and sessions started again');
   assert.notEqual((await h.e.view(queuedTask)).admission, 'queued', 'the queued task admitted');
+});
+
+test('a pause at once stops each session and check at work but a landing, and the resume continues each; one that ended first is not tried', async () => {
+  for (let k = 0; k < 6; k++) {
+    h.signAll();
+    await pass();
+  }
+  const lands = aRepo();
+  const session = begun(ONE);
+  const checking = begun(CHECKED);
+  const ended = begun(ONE);
+  const landing = begun(SHIP, { repo: lands, isolate: true });
+  await pass();
+  worked(lands, readRun(landing.id).steps.work.branch!);
+  await pass();
+  await pass();
+  h.signAll([session, ended]);
+  for (let k = 0; k < 3; k++) await pass();
+  await approve(h.e, landing.id, 'ship');
+  for (let k = 0; k < 3; k++) await pass();
+  const sessionTask = taskOf(session, 'work')!;
+  const checkTask = readRun(checking.id).steps.work?.check?.taskId;
+  assert.ok(checkTask && (await h.e.view(checkTask)).phase.startsWith('running'), "checking's check runs as the pause is put");
+  assert.ok(taskOf(landing, 'ship'), "landing's ship at work as the pause is put");
+  const before = h.spawned.length;
+
+  const endedTask = taskOf(ended, 'work')!;
+  const racing = new Proxy(h.e, {
+    get: (target, key) =>
+      key === 'stop'
+        ? async (taskId: string) => {
+            if (taskId === endedTask) {
+              h.signAll([session, checking, landing]);
+              await pass();
+            }
+            return target.stop(taskId);
+          }
+        : Reflect.get(target, key),
+  });
+  const now = await pauseNow(racing, { why: 'the bill', by: 'ann' });
+  const mine = (i: { run: string }) => [session.id, checking.id, ended.id, landing.id].includes(i.run);
+  assert.deepEqual(
+    now.interrupted
+      .filter(mine)
+      .map((i) => `${i.run} ${i.step} ${i.kind}`)
+      .sort(),
+    [`${checking.id} work check`, `${ended.id} work session`, `${session.id} work session`].sort(),
+    'the landing is left to finish',
+  );
+  for (let k = 0; k < 3; k++) await pass();
+  assert.equal((await h.e.view(sessionTask)).phase, 'stopped');
+  assert.equal((await h.e.view(checkTask)).phase, 'stopped');
+  assert.equal((await h.e.view(endedTask)).phase, 'succeeded', 'a session that ended before its stop was taken');
+  assert.notEqual((await h.e.view(taskOf(landing, 'ship')!)).phase, 'stopped', 'the landing finishes');
+  assert.deepEqual(
+    fs.readdirSync(asksDir(landing.id)).filter((f) => f.startsWith('retry-')),
+    [],
+    'and is asked no try',
+  );
+  assert.deepEqual(
+    fs.readdirSync(asksDir(ended.id)).filter((f) => f !== 'done'),
+    [],
+    'its ask set aside',
+  );
+  assert.deepEqual(fs.readdirSync(path.join(asksDir(ended.id), 'done')), ['retry-work-2']);
+  await pass(freshRestMemo());
+  assert.deepEqual(h.spawned.slice(before), [], 'a restarted daemon files nothing while paused');
+  assert.equal(taskOf(session, 'work'), sessionTask);
+
+  resumePause();
+  await pass();
+  const resumed = readRun(session.id).steps.work;
+  assert.notEqual(resumed.taskId, sessionTask, "session's try 2 filed");
+  assert.deepEqual(resumed.tries, [{ taskId: sessionTask, then: 'nudge', paused: true }]);
+  const stoppedAttempt = (await h.e.view(sessionTask)).state.attempts.at(-1)!;
+  assert.equal((await h.e.view(resumed.taskId!)).state.resumeFrom, stoppedAttempt.nativeId, 'continuing the session it stopped');
+  const rechecked = readRun(checking.id).steps.work;
+  assert.notEqual(rechecked.check?.taskId, checkTask, "checking's check filed again");
+  assert.deepEqual(rechecked.tries?.at(-1), { taskId: rechecked.taskId, check: { taskId: checkTask }, then: 'recheck', paused: true });
+  assert.equal(readRun(ended.id).steps.work?.tries, undefined, 'the run whose session ended first is not tried');
 });

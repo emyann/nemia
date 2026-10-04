@@ -230,22 +230,26 @@ export function recordedUsage(name: 'no-plan' | 'unsupported' | 'unanswered'): s
 export const QUOTA_ASKS_MS = 2 * 15_000;
 
 /**
- * The longest a reload waits for the quota from an ask begun after a change, as a bound on a hang and never as when it comes: the api's
- * wait for the asks (`QUOTA_ASKS_MS`), and the board's next read, 2 s after a read told `asking`.
+ * The longest a reload waits for the quota a change makes, as a bound on a hang and never as when it comes: the api's wait for the asks
+ * (`QUOTA_ASKS_MS`), and the board's next read, 2 s after a read told `asking`.
  */
 export const QUOTA_ANSWER_MS = QUOTA_ASKS_MS + 2_000;
 
 /**
- * Reloads `page` and waits for the board's `GET /api/quota` answered from an ask begun at `since` or after — its `askedAt`, and not
- * `asking` — then for the page to idle: the quota the api read after what the page changed at `since`, the time taken before the change.
- * Refuses, naming that answer, when none came within `QUOTA_ANSWER_MS`.
+ * Reloads `page` and waits for the board's `GET /api/quota` answered in `state`, the state the page's change makes, then for the page to
+ * idle. It waits on the state, never on a time compared between the e2e's clock and the api's, which steps: at its keep of 0 the api
+ * answers a read only from an ask begun after the read came, and each change a quota page makes gives a state other than the one before
+ * it. A page that wrote the same state twice in a row would pass on an answer from before its change. Refuses, naming the state it waited
+ * for and the state and `askedAt` of each answer it saw, when none came in `state` within `QUOTA_ANSWER_MS`.
  */
-export async function reloadForQuota(page: Page, since: number): Promise<void> {
+export async function reloadForQuota(page: Page, state: string): Promise<void> {
+  const seen: string[] = [];
   const answered = page.waitForResponse(
     async (r) => {
       if (r.request().method() !== 'GET' || new URL(r.url()).pathname !== '/api/quota' || !r.ok()) return false;
-      const { state, askedAt } = (await r.json()) as { state?: unknown; askedAt?: unknown };
-      return state !== 'asking' && typeof askedAt === 'string' && Date.parse(askedAt) >= since;
+      const quota = (await r.json()) as { state?: unknown; askedAt?: unknown };
+      seen.push(`${String(quota.state)} asked at ${String(quota.askedAt)}`);
+      return quota.state === state;
     },
     { timeout: QUOTA_ANSWER_MS },
   );
@@ -254,7 +258,7 @@ export async function reloadForQuota(page: Page, since: number): Promise<void> {
     await answered;
   } catch {
     throw new Refused(
-      `the board reads the quota from an ask begun after ${new Date(since).toISOString()} — no answer to GET /api/quota came from one in ${QUOTA_ANSWER_MS} ms`,
+      `the board reads the quota ${state} after the change — GET /api/quota answered ${seen.length ? seen.join('; ') : 'nothing'} in ${QUOTA_ANSWER_MS} ms`,
     );
   }
   await idle(page);

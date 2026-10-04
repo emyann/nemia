@@ -21,10 +21,9 @@ export default {
     const file = path.join(store!, QUOTA.file);
     const written = fs.readFileSync(file, 'utf8');
     await expectCount(page.locator('[data-quota="fresh"]'), 1, 'the header shows a good reading first: the last one, to keep in sight');
-    let since = Date.now();
     try {
       fs.writeFileSync(file, recordedUsage('unanswered'));
-      await reloadForQuota(page, since);
+      await reloadForQuota(page, 'unanswered');
       const line = page.locator('[data-quota="unanswered"]');
       await expectVisible(
         line.filter({
@@ -66,10 +65,9 @@ export default {
       await settled(page);
       await expectClearOfEachOther(page);
     } finally {
-      since = Date.now();
       fs.writeFileSync(file, written);
     }
-    await reloadForQuota(page, since);
+    await reloadForQuota(page, 'fresh');
     await expectCount(
       page.locator('[data-quota="fresh"]'),
       1,

@@ -262,12 +262,13 @@ test('REFUSED: an ask that rejects is held as failed, with its words, and asked 
   fresh();
   let clock = NOW;
   const now = () => clock;
+  const mono = () => clock - NOW;
   let rejected = 0;
   const ask = async (): Promise<HarnessQuota> => {
     rejected += 1;
     throw Object.assign(new Error('quota: the `claude` harness reports no quota.'), { exitCode: 2 });
   };
-  const q = await readQuota({ ask, now });
+  const q = await readQuota({ ask, now, mono });
   assert.equal(q.state, 'failed');
   assert.equal(
     q.said,
@@ -276,39 +277,43 @@ test('REFUSED: an ask that rejects is held as failed, with its words, and asked 
       'the api runs has no claude harness that answers a quota: see README.md, The quota on the board. Asked again in 10 min.',
   );
   clock += QUOTA_KEEP_MS - 1;
-  assert.equal((await readQuota({ ask, now })).state, 'failed');
+  assert.equal((await readQuota({ ask, now, mono })).state, 'failed');
   assert.equal(rejected, 1, 'held for the keep, as any failure');
   clock += 1;
-  const again = await readQuota({ ask, now });
+  const again = await readQuota({ ask, now, mono });
   assert.equal(again.state, 'failed');
   assert.equal(rejected, 2, 'past the keep, a rejected ask is asked again');
 });
 
 test('REFUSED: a second read inside the keep asks nothing; one past it asks again', async () => {
   fresh();
-  let clock = Date.now();
+  const base = Date.now();
+  let clock = base;
   const now = () => clock;
+  const mono = () => clock - base;
   const before = fake.asked;
-  assert.equal((await read({ now })).state, 'fresh');
+  assert.equal((await read({ now, mono })).state, 'fresh');
   clock += QUOTA_KEEP_MS - 1;
-  const kept = await read({ now });
+  const kept = await read({ now, mono });
   assert.equal(kept.state, 'fresh');
   assert.equal(kept.ageMs, QUOTA_KEEP_MS - 1);
   assert.equal(fake.asked, before + 1, 'held for the keep');
   fake.next = { kind: 'failed', code: 3, signal: null, said: '' };
   clock += 1;
-  assert.equal((await read({ now })).state, 'failed');
+  assert.equal((await read({ now, mono })).state, 'failed');
   clock += 60_000;
-  assert.equal((await read({ now })).state, 'failed');
+  assert.equal((await read({ now, mono })).state, 'failed');
   assert.equal(fake.asked, before + 2, 'a failure is held as long');
 });
 
 test('REFUSED: after an unanswered answer no read asks inside the wait, however many boards read; the waits grow, and a good reading begins them again', async () => {
   fresh();
-  let clock = Date.now();
+  const base = Date.now();
+  let clock = base;
   const now = () => clock;
+  const mono = () => clock - base;
   const before = fake.asked;
-  const many = async () => (await Promise.all(Array.from({ length: 12 }, () => read({ now })))).map((q) => q.state);
+  const many = async () => (await Promise.all(Array.from({ length: 12 }, () => read({ now, mono })))).map((q) => q.state);
   const readsAt = async (offset: number, state: string, asked: number, why: string) => {
     const from = clock;
     clock = from + offset;
@@ -321,34 +326,34 @@ test('REFUSED: after an unanswered answer no read asks inside the wait, however 
     clock = from;
   };
   fake.next = UNANSWERED;
-  const first = await read({ now });
+  const first = await read({ now, mono });
   assert.equal(first.state, 'unanswered');
   assert.match(first.said!, /Asked again in 20 min\.$/);
   assert.equal(fake.asked, before + 1);
   await readsAt(QUOTA_KEEP_MS, 'unanswered', 1, 'past the keep of a good reading, and still inside the wait: nothing asked');
   await readsAt(QUOTA_BACKOFF_MS - 1, 'unanswered', 1, 'a millisecond short of twenty minutes: nothing asked');
   clock += QUOTA_BACKOFF_MS;
-  const second = await read({ now });
+  const second = await read({ now, mono });
   assert.equal(fake.asked, before + 2, 'the wait over: one ask');
   assert.match(second.said!, /Asked again in 40 min\.$/);
   await readsAt(40 * 60e3 - 1, 'unanswered', 2, 'the second wait is forty minutes');
   clock += 40 * 60e3;
-  assert.match((await read({ now })).said!, /Asked again in 1 h 20 min\.$/);
+  assert.match((await read({ now, mono })).said!, /Asked again in 1 h 20 min\.$/);
   assert.equal(fake.asked, before + 3);
   fake.next = { kind: 'failed', code: 3, signal: null, said: '' };
   clock += 80 * 60e3;
-  assert.equal((await read({ now })).state, 'failed');
+  assert.equal((await read({ now, mono })).state, 'failed');
   fake.next = UNANSWERED;
   clock += QUOTA_KEEP_MS;
   assert.match(
-    (await read({ now })).said!,
+    (await read({ now, mono })).said!,
     /Asked again in 2 h 40 min\.$/,
     'a failure in between is kept the keep, and neither ends the row nor adds to it',
   );
   assert.equal(fake.asked, before + 5);
   fake.next = plan();
   clock += 160 * 60e3;
-  const good = await read({ now });
+  const good = await read({ now, mono });
   assert.equal(good.state, 'fresh');
   assert.equal(
     good.againAt,
@@ -359,7 +364,7 @@ test('REFUSED: after an unanswered answer no read asks inside the wait, however 
   await readsAt(QUOTA_KEEP_MS - 1, 'fresh', 6, 'a good reading is kept ten minutes');
   fake.next = UNANSWERED;
   clock += QUOTA_KEEP_MS;
-  const again = await read({ now });
+  const again = await read({ now, mono });
   assert.equal(again.state, 'unanswered');
   assert.match(again.said!, /Asked again in 20 min\.$/, 'the row begun again: twenty minutes, not five hours and twenty');
   assert.equal(again.last?.windows.length, 2, 'with the good reading beside it');
@@ -456,6 +461,73 @@ test('REFUSED: at a keep of 0, a read that comes while an ask begun before it is
   );
   assert.equal(counts.began, 2, 'one ask for the read that came first, one for the two that came after');
   assert.equal(counts.most, 1, 'never two asks at once');
+});
+
+test('REFUSED: at a keep of 0, three reads that come while an ask is in flight share one ask queued behind it: one begins, not three', async () => {
+  fresh();
+  const env = { ...process.env, HKB_QUOTA_KEEP_MS: '0', HKB_QUOTA_BACKOFF_MS: '0' };
+  const { ask, answers, counts, begun } = handAsks();
+  const a = readQuota({ ask, env, waitMs: 60_000 });
+  await begun(1);
+  const later = [0, 1, 2].map(() => readQuota({ ask, env, waitMs: 60_000 }));
+  answers[0](plan());
+  assert.equal((await a).state, 'fresh');
+  await begun(2);
+  for (let turn = 0; turn < 10; turn += 1) await new Promise((r) => setImmediate(r));
+  assert.equal(counts.began, 2, 'one ask for the first read, and one queued for the three after it');
+  assert.equal(counts.most, 1, 'never two asks at once');
+  answers[1]({ kind: 'no-plan' });
+  assert.deepEqual(
+    (await Promise.all(later)).map((q) => q.state),
+    ['no-plan', 'no-plan', 'no-plan'],
+    'the three reads are answered by the one ask they share',
+  );
+});
+
+test('REFUSED: at a keep of 0, a read after the wall clock stepped back behind the start of the held ask asks again', async (t) => {
+  fresh();
+  t.mock.timers.enable({ apis: ['Date'], now: NOW });
+  const env = { ...process.env, HKB_QUOTA_KEEP_MS: '0', HKB_QUOTA_BACKOFF_MS: '0' };
+  assert.equal((await read({ env })).state, 'fresh');
+  const before = fake.asked;
+  fake.next = UNANSWERED;
+  t.mock.timers.setTime(NOW - 1_500);
+  assert.equal((await read({ env })).state, 'unanswered', 'the read is answered by an ask begun after it');
+  assert.equal(fake.asked, before + 1, 'asked again, however far back the wall clock went');
+});
+
+test('REFUSED: at a keep of 0, a read that comes while an ask is in flight, with the wall clock stepped back behind its start, queues behind it and does not join it', async (t) => {
+  fresh();
+  t.mock.timers.enable({ apis: ['Date'], now: NOW });
+  const env = { ...process.env, HKB_QUOTA_KEEP_MS: '0', HKB_QUOTA_BACKOFF_MS: '0' };
+  const { ask, answers, counts, begun } = handAsks();
+  const a = readQuota({ ask, env, waitMs: 60_000 });
+  await begun(1);
+  t.mock.timers.setTime(NOW - 1_500);
+  const b = readQuota({ ask, env, waitMs: 60_000 });
+  answers[0](plan());
+  assert.equal((await a).state, 'fresh');
+  await begun(2);
+  answers[1](UNANSWERED);
+  assert.equal((await b).state, 'unanswered', 'the read is answered by the ask begun after it, not the one begun before');
+  assert.equal(counts.most, 1, 'never two asks at once');
+});
+
+test('a wall clock stepped forward past the keep asks nothing while the monotonic clock says the keep holds; past it there, it asks', async () => {
+  fresh();
+  const clock = { wall: NOW, mono: 0 };
+  const now = () => clock.wall;
+  const mono = () => clock.mono;
+  const env = { ...process.env, HKB_QUOTA_KEEP_MS: '' };
+  assert.equal((await read({ env, now, mono })).state, 'fresh');
+  const before = fake.asked;
+  clock.wall = NOW + QUOTA_KEEP_MS + 60_000;
+  clock.mono = 1_000;
+  assert.equal((await read({ env, now, mono })).state, 'fresh');
+  assert.equal(fake.asked, before, 'a second later on the monotonic clock: held');
+  clock.mono = QUOTA_KEEP_MS;
+  await read({ env, now, mono });
+  assert.equal(fake.asked, before + 1, 'the keep over on the monotonic clock: asked again');
 });
 
 test('REFUSED: an ask whose answer cannot be read fails the reads that share it, and the ask queued behind it still begins', async () => {

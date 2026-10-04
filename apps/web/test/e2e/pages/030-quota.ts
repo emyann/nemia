@@ -14,7 +14,7 @@ export default {
    * time where it is, to the minute, with the weekday when it falls on another day than today (`clockWord`), never assumed: the week
    * resets three days out and always reads with one, and the five-hour window's reset crosses midnight for the two hours before it. Then
    * three ways the harness cannot answer — no plan, a request it refuses, and a `claude` that ends before it answers — each asked again on
-   * the reload, read from an ask begun after the answer changed (`reloadForQuota`), and said in a sentence, with no number. The answer is
+   * the reload, read in the state the change makes (`reloadForQuota`), and said in a sentence, with no number. The answer is
    * put back as seeded, and the header, taller with the quota, leaves every card clear of the one beneath it.
    */
   name: 'quota',
@@ -27,9 +27,8 @@ export default {
       await settled(page);
       await photograph(page, path.join(OUT, `factory-quota-${what}-${await themeOf(page)}.png`), { fullPage: true });
     };
-    let since = Date.now();
     const said = async (state: string, text: RegExp, why: string) => {
-      await reloadForQuota(page, since);
+      await reloadForQuota(page, state);
       await expectVisible(page.locator(`[data-quota="${state}"]`, { hasText: text }), why);
       await expectCount(page.locator('[data-quota-window]'), 0, 'and no number reads as now');
       await shoot(state);
@@ -76,7 +75,6 @@ export default {
       await expectVisible(line.locator('[data-quota-age]').filter({ hasText: /^read just now$/ }), 'and how old the answer is');
       await shoot('fresh');
 
-      since = Date.now();
       fs.writeFileSync(file, recordedUsage('no-plan'));
       await said(
         'no-plan',
@@ -84,7 +82,6 @@ export default {
         'Claude Code with no subscription says how to sign in',
       );
 
-      since = Date.now();
       fs.writeFileSync(file, recordedUsage('unsupported'));
       await said(
         'unknown',
@@ -92,7 +89,6 @@ export default {
         'a Claude Code without get_usage says what it answered',
       );
 
-      since = Date.now();
       fs.rmSync(file);
       await said(
         'failed',
@@ -100,10 +96,9 @@ export default {
         'a claude that ends before it answers says how it ended',
       );
     } finally {
-      since = Date.now();
       fs.writeFileSync(file, written);
     }
-    await reloadForQuota(page, since);
+    await reloadForQuota(page, 'fresh');
     await expectCount(page.locator('[data-quota="fresh"]'), 1, 'with the answer put back, the header shows the quota again');
 
     await page.getByRole('button', { name: 'Reset layout' }).click();

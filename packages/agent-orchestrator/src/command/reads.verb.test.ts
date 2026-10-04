@@ -1,14 +1,25 @@
 /**
  * `wf show`, `wf logs`, `wf feed` and `wf stats` as entries of the table: what each refuses of a command line before anything is read,
- * matched whole in the words `wf` has always said them, and how `wf stats` prints what it answers.
+ * matched whole in the words `wf` has always said them; what `wf feed` reads of a store of its own, and how it and `wf stats` print it.
+ *
+ * `WF_ROOT` is set before the import, since the store's modules read it as they load.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cursorTakes } from '../feed/feed.ts';
+import fs from 'node:fs';
+import path from 'node:path';
+import type { Engine } from '../runtime-client.ts';
+import { scratch } from '../../test/scratch.ts';
+import { cursorTakes, feedLineWords, type FeedLine } from '../feed/feed.ts';
+import { cordonWords } from '../cordon/cordon.ts';
 import { statsLine, statsLines } from '../stats/index.ts';
 import { statsOf } from '../stats/stats.ts';
 import { parseArgv, type CommandSpec } from './command.ts';
-import { FEED, LOGS, SHOW, STATS } from './reads.verb.ts';
+
+const ROOT = scratch('wf-reads-');
+process.env.WF_ROOT = ROOT;
+const { FEED, LOGS, SHOW, STATS } = await import('./reads.verb.ts');
+const { liftCordon, putCordon } = await import('../cordon/cordon.store.ts');
 
 /** What `command` refuses of `argv` before anything is read, its parser's words or its check's; null where it takes it. */
 function refusedBy(command: CommandSpec, argv: readonly string[]): string | null {
@@ -32,6 +43,7 @@ test('wf feed takes one cursor of digits or none, and refuses anything else with
 
 test('wf show takes one run and wf logs one run and one step, and each refuses a word more by naming it', () => {
   assert.equal(refusedBy(SHOW, ['r']), null);
+  assert.equal(refusedBy(SHOW, ['--x']), "wf show takes one run's id: not --x.");
   assert.equal(refusedBy(SHOW, ['r', 'extra']), "wf show takes one run's id: not extra.");
   assert.equal(refusedBy(LOGS, ['r', 's']), null);
   assert.equal(refusedBy(LOGS, ['r', 's', 'extra']), "wf logs takes one run's id and one step's name: not extra.");
@@ -76,4 +88,27 @@ test('wf stats prints JSON with --json, one line with --line, and its tiles and 
   assert.deepEqual(STATS.print?.(s, { json: true }), [JSON.stringify(s, null, 2)]);
   assert.deepEqual(STATS.print?.(s, { line: true }), [statsLine(s)]);
   assert.deepEqual(STATS.print?.(s, {}), statsLines(s));
+});
+
+test("wf feed reads the store's feed from a cursor, and prints the cordon first while one stands, then the lines and the cursor", async () => {
+  const first: FeedLine = { at: '2026-10-04T12:00:00.000Z', run: 'r-1', word: 'running' };
+  const second: FeedLine = { at: '2026-10-04T12:01:00.000Z', run: 'r-1', step: 'implement', word: 'succeeded' };
+  const head = `${JSON.stringify(first)}\n`;
+  const whole = `${head}${JSON.stringify(second)}\n`;
+  fs.writeFileSync(path.join(ROOT, 'feed.jsonl'), whole);
+  const end = Buffer.byteLength(whole);
+  const e = {} as Engine;
+
+  assert.deepEqual(await FEED.handler(e, {}), { lines: [first, second], cursor: end, cordon: null });
+  const after = await FEED.handler(e, { cursor: String(Buffer.byteLength(head)) });
+  assert.deepEqual(after, { lines: [second], cursor: end, cordon: null });
+  assert.deepEqual(FEED.print(after, {}), [feedLineWords(second), `cursor: ${end}`]);
+
+  const cordon = putCordon({ why: 'merging by hand', by: 'ann' });
+  try {
+    const cordoned = await FEED.handler(e, { cursor: String(end) });
+    assert.deepEqual(FEED.print(cordoned, {}), [cordonWords(cordon), `cursor: ${end}`]);
+  } finally {
+    liftCordon();
+  }
 });

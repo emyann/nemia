@@ -37,8 +37,8 @@ export const cordonQuery = queryOptions({
 });
 
 /**
- * Cordons the store, as the package's `cordon` does: from the next pass nothing new starts, and what runs finishes. Rejects with the api's refusal
- * in full — the package's words for a store already cordoned — or its own about the request.
+ * Cordons the store, as the package's `cordon` does: from the next pass nothing new starts, and what runs finishes. Rejects with the api's
+ * refusal in full — the package's words for a store already cordoned — or its own about the request.
  */
 export const putCordon = (): Promise<{ cordon: Cordon }> =>
   send('POST', '/api/cordon', CordonAnswerSchema, {
@@ -46,7 +46,10 @@ export const putCordon = (): Promise<{ cordon: Cordon }> =>
     may: 'The store may be cordoned: read the board again before cordoning it again.',
   });
 
-/** Lifts the store's cordon, as the package's `uncordon` does: the next pass files what waits. Rejects as `putCordon` does, for a store none stands on. */
+/**
+ * Lifts the store's cordon, as the package's `uncordon` does: the next pass files what waits. Rejects as `putCordon` does, for a store none
+ * stands on.
+ */
 export const liftCordon = (): Promise<{ cordon: Cordon }> =>
   send('DELETE', '/api/cordon', CordonAnswerSchema, {
     body: {},

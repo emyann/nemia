@@ -21,8 +21,8 @@
  * store's `tries/` and a run's record, and a try's run removed (`DELETE /api/runs/:id`, runs.ts), which removes the record and the folders
  * it worked in; and a person's hold on a run lifted (`DELETE /api/runs/:id/hold`, commands/routes.ts, the route of `wf hold --off`), which
  * removes the hold file, so the run goes on at the next tick; and the store cordoned (`POST /api/cordon`) or its cordon lifted
- * (`DELETE /api/cordon`), commands/routes.ts, the routes of `wf cordon` and `wf uncordon`, which write or remove the store's cordon file, so
- * no pass starts new work until the lift; and a finished run pruned (`POST /api/runs/:id/prune`, runs.ts), which
+ * (`DELETE /api/cordon`), commands/routes.ts, the routes of `wf cordon` and `wf uncordon`, which write or remove the store's cordon
+ * file, so no pass starts new work until the lift; and a finished run pruned (`POST /api/runs/:id/prune`, runs.ts), which
  * removes its worktrees, and its files when asked, for good. Each is what an agent acts on in the repository — once a tick files it, or at
  * once, or once a person starts the card or the workflow, or once a run slot frees for a queued card — or a person's idea or step gone, or
  * its place, so a page on another site must not be able to make any of them; and a `fetch` with a body, from any page, reaches the api

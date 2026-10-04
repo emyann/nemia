@@ -121,7 +121,6 @@ export {
   waitWord,
 } from './wait/wait.ts';
 export type { ParentRun, Wait } from './wait/wait.ts';
-export { cordonLines, cordonWords, stagedWords, UNCORDONED } from './cordon/cordon.ts';
 export type { Cordon, Cordoned, CordonStaged } from './cordon/cordon.ts';
 export { artifactLines, artifactPlace, artifactsContract, sizeOf } from './artifacts/artifacts.ts';
 export type { ArtifactFile, ArtifactPlace, MissingArtifact } from './artifacts/artifacts.ts';

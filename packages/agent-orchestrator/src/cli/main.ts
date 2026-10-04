@@ -141,7 +141,10 @@ function tickRunLines(r: Pass['runs'][number]): void {
   for (const note of r.notes) console.log(`   ${note}`);
 }
 
-/** A pass's lines on `wf tick`: the cordon it read, what failed or was left out on stderr, then what it refused, the queue's card and each run; returns it. */
+/**
+ * A pass's lines on `wf tick`: the cordon it read, what failed or was left out on stderr, then what it refused, the queue's card and each
+ * run; returns it.
+ */
 function tickLines(pass: Pass): Pass {
   const { runs: results, queue, feedError, refused, unreadable, cordon } = pass;
   if (cordon) console.log(cordonWords(cordon));

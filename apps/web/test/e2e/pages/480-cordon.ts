@@ -13,10 +13,10 @@ const cordonOf = (page: Page) => page.locator('header[data-feed] [data-cordon]')
 export default {
   /**
    * The store cordoned and uncordoned from the frame's header, as `wf cordon` and `wf uncordon` do (`POST` and `DELETE /api/cordon`), on
-   * the Factory, whose header is the fullest. The switch is labelled Cordon with `nothing new starts` beside it; pressed, the store's cordon
-   * file is written and the header says since when and by whom; pressed again, the file is gone. A landing held with its merge staged is
-   * then shown by the api's answer held with `route`: the run is named beside the switch, and its sentence is on hover. Which landings
-   * those are is the package's judgement, proven in its own tests (`packages/agent-orchestrator/src/tick/cordon.test.ts`).
+   * the Factory, whose header is the fullest. The switch is labelled Cordon with `nothing new starts` beside it; pressed, the store's
+   * cordon file is written and the header says since when and by whom; pressed again, the file is gone. A landing held with its merge
+   * staged is then shown by the api's answer held with `route`: the run is named beside the switch, and its sentence is on hover. Which
+   * landings those are is the package's judgement, proven in its own tests (`packages/agent-orchestrator/src/tick/cordon.test.ts`).
    */
   name: 'cordon',
   route: '/factories/default',

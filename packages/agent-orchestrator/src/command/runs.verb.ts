@@ -1,7 +1,7 @@
 /**
  * The commands over a run's course and the store's tick, each defined once: `wf cancel` and `wf hold`, whose handlers call the package's
- * verbs (`cancel`, `hold`, `unhold`), the store's cordon (`wf cordon`, `wf uncordon`, and the api's read of it), and `wf tick`, `wf up` and `wf watch`, which the CLI alone serves and runs itself (`RAN`): their
- * specs, refusals and help, with no handler.
+ * verbs (`cancel`, `hold`, `unhold`), the store's cordon (`wf cordon`, `wf uncordon`, and the api's read of it), and `wf tick`, `wf up` and
+ * `wf watch`, which the CLI alone serves and runs itself (`RAN`): their specs, refusals and help, with no handler.
  */
 import { cancel } from '../cancel/cancel.verb.ts';
 import type { CancelPlan } from '../cancel/cancel.ts';
@@ -219,7 +219,9 @@ export const CORDON: Command<{ cordon: Cordon }> = {
   print: ({ cordon }) => [cordonWords(cordon)],
 };
 
-/** `wf uncordon`: the store's cordon lifted (`liftCordon`), on `DELETE /api/cordon` too; the cordon lifted. Refused with none (`Missing`). */
+/**
+ * `wf uncordon`: the store's cordon lifted (`liftCordon`), on `DELETE /api/cordon` too; the cordon lifted. Refused with none (`Missing`).
+ */
 export const UNCORDON: Command<{ cordon: Cordon }> = {
   name: 'uncordon',
   usage: '',

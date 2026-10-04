@@ -199,9 +199,14 @@ function putTry(name: string, tried: QueueTry): void {
 /**
  * The run as it reads with the store's cordon (`readCordon`) composed onto it — the one given, read where none is — or without one while
  * none stands: a run the tick's memo kept is read with the cordon as it stands now, so the cordon is in no run's stamp (`restStamps`): a
- * run at rest has nothing due for it to hold, and one it holds anything of is `running`, never at rest. Never written into the record.
+ * run at rest has nothing due for it to hold, and one it holds anything of is `running`, never at rest. A run with no cordon to compose
+ * or strip is the very run given, which the memo knows by identity (`keptOf`). Never written into the record.
  */
-const cordoned = ({ cordon: _, ...run }: Run, cordon: Cordon | null = readCordon()): Run => (cordon ? { ...run, cordon } : run);
+function cordoned(run: Run, cordon: Cordon | null = readCordon()): Run {
+  if (!cordon && !run.cordon) return run;
+  const { cordon: _, ...bare } = run;
+  return cordon ? { ...bare, cordon } : bare;
+}
 
 /**
  * A run's record and a person's files beside it, each a file of its own under `runs/`, with the store's cordon composed onto each run read

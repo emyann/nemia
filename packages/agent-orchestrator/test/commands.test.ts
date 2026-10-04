@@ -27,6 +27,9 @@ test('each command is served on the api where it was before the table, the lift 
       ['agents card', { method: 'GET', path: '/api/agents/:from/:name/card', status: 200 }],
       ['cancel', 'cli'],
       ['hold', { method: 'DELETE', path: '/api/runs/:runId/hold', status: 200, sets: { off: true } }],
+      ['cordon', { method: 'POST', path: '/api/cordon', status: 200 }],
+      ['uncordon', { method: 'DELETE', path: '/api/cordon', status: 200 }],
+      ['cordoned', { method: 'GET', path: '/api/cordon', status: 200 }],
       ['tick', 'cli'],
       ['up', 'cli'],
       ['watch', 'cli'],
@@ -34,10 +37,10 @@ test('each command is served on the api where it was before the table, the lift 
   );
 });
 
-test('every command the api posts or deletes on writes, and the api guards it; the five it gets write nothing', () => {
+test('every command the api posts or deletes on writes, and the api guards it; the six it gets write nothing', () => {
   assert.deepEqual(
     TABLE.filter((c) => !c.writes).map((c) => c.name),
-    ['ls', 'decide', 'ceilings', 'agents', 'agents card', 'watch'],
+    ['ls', 'decide', 'ceilings', 'agents', 'agents card', 'cordoned', 'watch'],
   );
   assert.deepEqual(
     TABLE.filter((c) => c.route && c.writes !== (c.route.method !== 'GET')).map((c) => c.name),

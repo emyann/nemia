@@ -201,6 +201,8 @@ export default {
       await expectCount(asked.locator('input, textarea, button'), 0, 'with nothing to answer it with: design is done');
       await settled(page);
       await photograph(inspector, path.join(OUT, `questions-asked-${theme}.png`));
+      await inspector.getByRole('button', { name: 'Close', exact: true }).click();
+      await expectCount(inspector, 0, "the inspector's Close closes it, and uncovers the Decide it floated over");
 
       const row = page.locator(`section[aria-label="Decide"] li[data-offer="answer"][data-questions][data-step="spec"]`);
       const form = row.getByRole('form', { name: 'Answer spec' });

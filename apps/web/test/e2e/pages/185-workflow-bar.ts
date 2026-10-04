@@ -146,8 +146,8 @@ async function opens(page: Page): Promise<void> {
 }
 
 /**
- * Build swaps a workflow's canvas for its builder and closes the bar showing one of its steps; a click on a step in the builder selects it
- * for its form, and shows no bar.
+ * Build, pressed from the keyboard under the bar that floats over it, swaps a workflow's canvas for its builder and closes the bar showing
+ * one of its steps; a click on a step in the builder selects it for its form, and shows no bar.
  */
 async function builds(page: Page): Promise<void> {
   const [mine] = yours.steps;
@@ -155,7 +155,8 @@ async function builds(page: Page): Promise<void> {
   await card.scrollIntoViewIfNeeded();
   await nodeOf(page, yours.name, mine).click();
   await expectSpec(page, 'yours', yours.name, mine, `a click on ${mine}'s node shows it`);
-  await card.getByRole('button', { name: 'Build', exact: true }).click();
+  await card.getByRole('button', { name: 'Build', exact: true }).focus();
+  await page.keyboard.press('Enter');
   const builder = card.locator(`section[data-builder="${yours.name}"]`);
   await expectVisible(builder, `Build opens ${yours.name}'s builder`);
   await expectNoBar(page, `and closes the bar showing a step of ${yours.name}`);

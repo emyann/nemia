@@ -220,6 +220,8 @@ export default {
     );
     await inspected.getByRole('tab', { name: 'Details' }).click();
     await expectVisible(inspected.locator('dd', { hasText: FAKE.used }), `the inspector's Details say what ${FAKE.unverified} used`);
+    await inspected.getByRole('button', { name: 'Close', exact: true }).click();
+    await expectCount(inspected, 0, "the inspector's Close closes it, and uncovers the steps it floated over");
 
     await graph.locator('.react-flow__node[data-id="review"]').click();
     await expectVisible(stepBar(page, FAKE.id, 'review'), 'the step inspector opens on a click on review');

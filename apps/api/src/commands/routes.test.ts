@@ -189,6 +189,8 @@ test('REFUSED at shipped defaults: every route that writes, asked by a page on a
       'agents write PUT',
       'agents remove DELETE',
       'agents try POST',
+      'skills write POST',
+      'skills write PUT',
       'hold DELETE',
       'rm DELETE',
       'prune POST',
@@ -210,6 +212,7 @@ test('REFUSED at shipped defaults: every route that writes, asked by a page on a
   assert.equal(fs.existsSync(path.join(root, 'cordon')), false, 'the store not paused');
   assert.equal(fs.existsSync(path.join(root, 'workflows', 'g-guard')), false, 'no workflow written');
   assert.equal(fs.existsSync(path.join(root, 'workflows', 'agents')), false, 'no agent written');
+  assert.equal(fs.existsSync(path.join(root, 'workflows', 'skills')), false, 'no skill written');
   assert.deepEqual(
     fs.readdirSync(path.join(root, 'runs')).filter((f) => !f.startsWith('r-')),
     [],

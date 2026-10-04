@@ -19,11 +19,17 @@ const LISTINGS = ['/inbox', '/runs', '/workflows', '/stats'];
 export const pickedIn = (url: URL): string | null =>
   /^\/factories\/([^/]+)$/.exec(url.pathname)?.[1] ?? (LISTINGS.includes(url.pathname) ? url.searchParams.get('factory') || null : null);
 
-/** The rail's places, in its order: Home first, Capabilities at its foot. */
-export const RAIL_PLACES = ['Home', 'Agents', 'Machines', 'Capabilities'];
+/** The rail's places, in its order, one column from the top: Home first, and Machines & Capabilities, a place of two tabs, last. */
+export const RAIL_PLACES = ['Home', 'Agents', 'Machines & Capabilities'];
 
 /** The rail of places at the frame's left, under the header. */
 export const railOf = (page: Page): Locator => page.locator('nav[aria-label="Places"]');
+
+/** The rail's place named `name`, and none whose name only holds it. */
+export const railPlace = (page: Page, name: string): Locator => railOf(page).getByRole('link', { name, exact: true });
+
+/** The frame's strip of a place's tabs, under the header and above the page. */
+export const frameTabsOf = (page: Page): Locator => page.locator('[data-slot="tabs-list"][role="tablist"]');
 
 /** The sidebar beside the rail. */
 export const sidebarOf = (page: Page): Locator => page.locator('[data-sidebar="sidebar"]');
@@ -57,7 +63,7 @@ export async function sidebar(page: Page): Promise<void> {
   await expectVisible(header.getByRole('link', { name: 'Nemia' }), 'the header has the logo, a link to Home');
   await expectVisible(header.getByRole('button', { name: 'Notifications' }), 'the header has the bell');
   const rail = railOf(page);
-  for (const place of RAIL_PLACES) await expectVisible(rail.getByRole('link', { name: place }), `the rail has ${place}`);
+  for (const place of RAIL_PLACES) await expectVisible(railPlace(page, place), `the rail has ${place}`);
   const named = await rail.getByRole('link').evaluateAll((links) => links.map((link) => link.getAttribute('aria-label')));
   if (named.join() !== RAIL_PLACES.join())
     throw new Refused(`the rail lists its places in order, ${RAIL_PLACES.join(', ')} — it lists ${named.join(', ')}`);

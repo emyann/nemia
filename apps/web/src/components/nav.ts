@@ -1,4 +1,4 @@
-import { Blocks, Bot, ChartColumn, Factory, House, Inbox, List, Network, Waypoints } from 'lucide-react';
+import { Bot, ChartColumn, Factory, House, Inbox, List, Network, Waypoints } from 'lucide-react';
 import { factorySearch } from '../lib/factories.ts';
 
 /** Whether `path` is `to` or a page under it: `/agents/new` is under `/agents`, `/agentsx` is not. */
@@ -29,16 +29,28 @@ type Listing = Exclude<Section['to'], '/factories/$factory'>;
 const isListing = (path: string): path is Listing =>
   SECTIONS.some((section) => section.to === path && section.to !== '/factories/$factory');
 
+/** The tabs of Machines & Capabilities, in their order: the state machines drawn from their code, and what the repository offers a step. */
+export const PLACE_TABS = [
+  { to: '/machines', label: 'Machines' },
+  { to: '/capabilities', label: 'Capabilities' },
+] as const;
+
+/** A tab of a place (`PLACE_TABS`): its page and its name. */
+export type PlaceTab = (typeof PLACE_TABS)[number];
+
+/** The tabs of the place whose tab's page `path` is, itself and not a page under it; none on any other page. */
+export const tabsOf = (path: string): readonly PlaceTab[] | undefined =>
+  PLACE_TABS.some((tab) => tab.to === path) ? PLACE_TABS : undefined;
+
 /**
- * The rail, the frame's narrow column of icons at the left: Home, the factories' canvas, lit on it and on a factory's floor only; Agents,
- * what a workflow's nodes may have attached, lit on an agent's page; Machines, the state machines drawn from their code; and, at its foot,
- * Capabilities, what the repository offers a step.
+ * The rail, the frame's narrow column of icons at the left, in one column from the top: Home, the factories' canvas, lit on it and on a
+ * factory's floor only; Agents, what a workflow's nodes may have attached, lit on an agent's page; and Machines & Capabilities, lit on
+ * either of its tabs (`PLACE_TABS`).
  */
 export const RAIL = [
   { to: '/', label: 'Home', icon: House, active: (path: string) => path === '/' || path.startsWith('/factories/') },
   { to: '/agents', label: 'Agents', icon: Bot, active: under('/agents') },
-  { to: '/machines', label: 'Machines', icon: Network, active: (path: string) => path === '/machines' },
-  { to: '/capabilities', label: 'Capabilities', icon: Blocks, active: (path: string) => path === '/capabilities' },
+  { to: '/machines', label: 'Machines & Capabilities', icon: Network, active: (path: string) => tabsOf(path) === PLACE_TABS },
 ] as const;
 
 /**

@@ -6,6 +6,7 @@ import { RouterProvider as AriaRouterProvider } from 'react-aria-components';
 import { FrameHeader } from '@/components/FrameHeader';
 import { FrameRail } from '@/components/FrameRail';
 import { FrameSidebar } from '@/components/FrameSidebar';
+import { FrameTabs } from '@/components/FrameTabs';
 import { sectionOf } from '@/components/nav';
 import { OpenBar } from '@/components/OpenBar';
 import { Sidebar, SidebarInset, SidebarProvider, SidebarRail, sidebarOpenOf, useSidebar } from '@/components/ui/sidebar';
@@ -20,7 +21,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 /**
  * The frame of every page: a header across the top (`FrameHeader`) naming the section, and below it the sidebar, the rail of places beside
  * the factory's sidebar (`FrameSidebar`), open or folded as this browser's `sidebar_state` cookie last left it (`sidebarOpenOf`), then the
- * page, in a centred column unless a matched route's `staticData` asks for `fullBleed`. The header is `h-12`, the height the Factory leaves
+ * page, under the strip of its place's tabs when it is one (`FrameTabs`), in a centred column unless a matched route's `staticData` asks
+ * for `fullBleed`. The header is `h-12`, the height the Factory leaves
  * above itself, and the sidebar starts under it. Over the page, below the header, the floating bar (`OpenBar`) shows what the address's
  * `?bar=` names, the same on every page, and a link to another page, which carries no `bar`, closes it. It follows the workflow feed once
  * for the whole page: what moves on it is read again at once, and the polls slow while it is open. React Aria's `RouterProvider` sends
@@ -41,13 +43,15 @@ function Root() {
         <div className="flex flex-1">
           <AppSidebar path={path} search={search} />
           <SidebarInset className="min-w-0">
-            {fullBleed ? (
-              <Outlet />
-            ) : (
-              <div className="mx-auto w-full max-w-4xl px-4 py-6">
+            <FrameTabs path={path}>
+              {fullBleed ? (
                 <Outlet />
-              </div>
-            )}
+              ) : (
+                <div className="mx-auto w-full max-w-4xl px-4 py-6">
+                  <Outlet />
+                </div>
+              )}
+            </FrameTabs>
           </SidebarInset>
         </div>
       </SidebarProvider>

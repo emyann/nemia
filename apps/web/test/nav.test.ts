@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pickedOf, pickTo, RAIL, sectionLink, sectionOf, SECTIONS } from '../src/components/nav.ts';
+import { PLACE_TABS, pickedOf, pickTo, RAIL, sectionLink, sectionOf, SECTIONS, tabsOf } from '../src/components/nav.ts';
 
 /** The section labelled `label`. */
 const section = (label: string) => SECTIONS.find((item) => item.label === label)!;
@@ -33,30 +33,48 @@ test("each page lights one section — a factory's floor the Floor, a run and it
     assert.deepEqual(lit(path), [], `refused: a path that only begins with a section's name is not under it (${path})`);
 });
 
-test('the rail holds Home, Agents, Machines and Capabilities, in that order', () => {
+test('the rail holds Home, Agents, then Machines & Capabilities, in that order', () => {
   assert.deepEqual(
     RAIL.map((item) => item.label),
-    ['Home', 'Agents', 'Machines', 'Capabilities'],
+    ['Home', 'Agents', 'Machines & Capabilities'],
   );
   assert.deepEqual(
     RAIL.map((item) => item.to),
-    ['/', '/agents', '/machines', '/capabilities'],
+    ['/', '/agents', '/machines'],
   );
 });
 
-test("each page lights at most one place in the rail — Home on the canvas and a factory's floor only, Agents on an agent's page — and a path that only begins with a place's name lights none", () => {
+test("each page lights at most one place in the rail — Home on the canvas and a factory's floor only, Agents on an agent's page, Machines & Capabilities on either of its tabs — and a path that only begins with a place's name lights none", () => {
   const lit = (path: string) => RAIL.filter((item) => item.active(path)).map((item) => item.label);
   for (const item of RAIL) assert.deepEqual(lit(item.to), [item.label], item.to);
   assert.deepEqual(lit('/factories/nemia'), ['Home']);
   assert.deepEqual(lit('/agents/new'), ['Agents']);
   assert.deepEqual(lit('/agents/skills/x/y'), ['Agents']);
+  assert.deepEqual(lit('/machines'), ['Machines & Capabilities']);
+  assert.deepEqual(lit('/capabilities'), ['Machines & Capabilities'], 'the place is lit on its second tab too');
   assert.deepEqual(lit('/runs'), [], 'a run is not Home');
   assert.deepEqual(lit('/inbox'), [], 'the Inbox is not Home');
   assert.deepEqual(lit('/nowhere'), []);
-  assert.deepEqual(lit('/agentsx'), [], "refused: a path that only begins with a place's name is not under it");
-  assert.deepEqual(lit('/machinesx'), [], "refused: a path that only begins with a place's name is not under it");
-  assert.deepEqual(lit('/capabilitiesx'), [], "refused: a path that only begins with a place's name is not under it");
-  assert.deepEqual(lit('/factoriesx'), [], "refused: a path that only begins with a place's name is not under it");
+  for (const path of ['/agentsx', '/machinesx', '/capabilitiesx', '/factoriesx', '/machines/x', '/capabilities/x'])
+    assert.deepEqual(lit(path), [], `refused: a path that only begins with a place's name is not under it (${path})`);
+});
+
+test("Machines & Capabilities has two tabs, Machines then Capabilities, each its own page's address", () => {
+  assert.deepEqual(PLACE_TABS, [
+    { to: '/machines', label: 'Machines' },
+    { to: '/capabilities', label: 'Capabilities' },
+  ]);
+});
+
+test("a tab's page has its place's tabs, in their order, and any other page has none, a path that only begins with a tab's name included", () => {
+  for (const path of ['/machines', '/capabilities'])
+    assert.deepEqual(
+      tabsOf(path)?.map((tab) => tab.label),
+      ['Machines', 'Capabilities'],
+      path,
+    );
+  for (const path of ['/machinesx', '/capabilitiesx', '/machines/x', '/capabilities/', '/agents', '/', '/runs'])
+    assert.equal(tabsOf(path), undefined, `refused: ${path} is no tab's page`);
 });
 
 test('the rail and the sections share no route', () => {
@@ -71,8 +89,8 @@ test("the header names a page by its section first — Floor on a factory's floo
   assert.equal(sectionOf('/workflows'), 'Workflows');
   assert.equal(sectionOf('/agents'), 'Agents');
   assert.equal(sectionOf('/agents/scribe'), 'Agents');
-  assert.equal(sectionOf('/machines'), 'Machines');
-  assert.equal(sectionOf('/capabilities'), 'Capabilities');
+  assert.equal(sectionOf('/machines'), 'Machines & Capabilities');
+  assert.equal(sectionOf('/capabilities'), 'Machines & Capabilities');
   assert.equal(sectionOf('/machinesx'), undefined);
 });
 

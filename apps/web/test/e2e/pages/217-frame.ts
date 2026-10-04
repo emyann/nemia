@@ -1,6 +1,6 @@
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { photograph, RAIL_PLACES, railOf, themeOf } from '../board.ts';
+import { photograph, RAIL_PLACES, railOf, railPlace, themeOf } from '../board.ts';
 import { expectCount, expectVisible, Refused, settled } from '../checks.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT } from '../world.ts';
@@ -44,24 +44,29 @@ async function pointAt(page: Page, target: Locator, what: string): Promise<void>
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 8 });
 }
 
-/** Capabilities sits at the rail's foot, its bottom near the rail's, far below Machines, the rail's room between them left empty. */
-async function capabilitiesAtFoot(page: Page): Promise<void> {
+/**
+ * The rail's places stand in one column from the top, nothing pushed to its foot: each gap between two places no wider than the one between
+ * Home and Agents, and the last place ending far above the rail's bottom.
+ */
+async function oneColumn(page: Page): Promise<void> {
   const rail = await boxOf(railOf(page), 'the rail');
-  const machines = await boxOf(railOf(page).getByRole('link', { name: 'Machines' }), "the rail's Machines");
-  const capabilities = await boxOf(railOf(page).getByRole('link', { name: 'Capabilities' }), "the rail's Capabilities");
-  const foot = rail.y + rail.height - (capabilities.y + capabilities.height);
-  const gap = capabilities.y - (machines.y + machines.height);
-  if (foot > 24 || gap < rail.height / 2)
+  const boxes = await Promise.all(RAIL_PLACES.map((place) => boxOf(railPlace(page, place), `the rail's ${place}`)));
+  const gaps = boxes.slice(1).map((box, i) => box.y - (boxes[i].y + boxes[i].height));
+  const last = boxes.at(-1)!;
+  const foot = rail.y + rail.height - (last.y + last.height);
+  if (gaps.some((gap) => gap > gaps[0] + 1) || foot < rail.height / 2)
     throw new Refused(
-      `Capabilities sits at the rail's foot, far below Machines — it ends ${foot}px above the rail's bottom, ${gap}px below Machines, in a rail ${rail.height}px tall`,
+      `the rail's places stand in one column from the top — the gaps between them are ${gaps.join(', ')}px, and the last ends ${foot}px above the bottom of a rail ${rail.height}px tall`,
     );
 }
 
 /** Each place in the rail is named by a tooltip: on hover, and on focus from the keyboard. */
 async function named(page: Page): Promise<void> {
-  const rail = railOf(page);
-  await pointAt(page, rail.getByRole('link', { name: 'Machines' }), "the rail's Machines");
-  await expectVisible(page.getByRole('tooltip').filter({ hasText: 'Machines' }), 'hovering Machines in the rail names it in a tooltip');
+  await pointAt(page, railPlace(page, 'Machines & Capabilities'), "the rail's Machines & Capabilities");
+  await expectVisible(
+    page.getByRole('tooltip').filter({ hasText: 'Machines & Capabilities' }),
+    'hovering Machines & Capabilities in the rail names it in a tooltip',
+  );
   await settled(page);
   await photograph(page, path.join(OUT, `frame-open-${await themeOf(page)}.png`));
   await page.mouse.move(600, 500);
@@ -79,7 +84,7 @@ async function named(page: Page): Promise<void> {
 async function folds(page: Page): Promise<void> {
   await trigger(page).click();
   await expectCount(runsLink(page), 0, "folded, the sidebar's list is not drawn");
-  for (const place of RAIL_PLACES) await expectVisible(railOf(page).getByRole('link', { name: place }), `folded, the rail keeps ${place}`);
+  for (const place of RAIL_PLACES) await expectVisible(railPlace(page, place), `folded, the rail keeps ${place}`);
   await settled(page);
   const folded = await boxOf(page.locator('[data-slot="sidebar-container"]'), 'the folded sidebar');
   if (folded.width > 49) throw new Refused(`folded, the sidebar is the rail's width, 48 — it is ${folded.width}`);
@@ -97,7 +102,7 @@ async function onPhone(page: Page): Promise<void> {
   await expectVisible(sheet, "the header's button opens the menu's sheet");
   for (const place of RAIL_PLACES)
     await expectVisible(
-      sheet.locator('nav[aria-label="Places"]').getByRole('link', { name: place }),
+      sheet.locator('nav[aria-label="Places"]').getByRole('link', { name: place, exact: true }),
       `the sheet holds the rail's ${place}`,
     );
   await expectVisible(sheet.getByRole('link', { name: 'Runs' }), "and the list's places");
@@ -109,7 +114,8 @@ async function onPhone(page: Page): Promise<void> {
 
 export default {
   /**
-   * The frame's header and rail: the header across the whole top, the rail under it at the left, its places named by a tooltip on hover
+   * The frame's header and rail: the header across the whole top, the rail under it at the left, its places in one column from the top,
+   * nothing at its foot, named by a tooltip on hover
    * and on keyboard focus, Agents lit on its page. The header's button folds the sidebar down to the rail and opens it again; on a phone's
    * screen the rail leaves the page's side and the button's sheet holds it with the list, and a pick in it closes it. The fold and the
    * window's size are taken back.
@@ -120,7 +126,7 @@ export default {
     const size = page.viewportSize();
     try {
       await headerOverRail(page);
-      await capabilitiesAtFoot(page);
+      await oneColumn(page);
       await expectVisible(railOf(page).locator('a[data-active="true"][aria-label="Agents"]'), 'the rail lights Agents on its page');
       await expectCount(railOf(page).locator('a[data-active="true"]'), 1, 'and no other place');
       await named(page);

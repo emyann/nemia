@@ -21,11 +21,12 @@ type Filling = Record<string, string | number | boolean | readonly string[] | un
 
 /**
  * An argument given by its place. `required`: the command is given too little without it, and the CLI prints its help; `optional`: at
- * most one, after the required, never starting `--`; `rest`: every word after the required, joined by spaces, as one text.
+ * most one, after the required, never starting `--`; `rest`: every word after the required, joined by spaces, as one text; `many`: every
+ * word after the required that starts with no `-`, among the flags, each once, in the order given — on the api, its path's one text.
  */
 export type Positional = {
   readonly key: string;
-  readonly takes: 'required' | 'optional' | 'rest';
+  readonly takes: 'required' | 'optional' | 'rest' | 'many';
   /** `name`: something but spaces, as a run's id or a step's name; `text`: anything, empty included. */
   readonly kind: 'name' | 'text';
 };
@@ -138,7 +139,25 @@ function put(args: Filling, flag: Flag, key: string, value: string | number): vo
 }
 
 /**
- * Reads the argument at `i` of `argv` into `args`: a flag and its value, or the optional positional, else refused in the spec's words.
+ * `arg`, a word that is no flag, put under the positional that takes it: a many positional's, beside the values before it unless it is one
+ * of them, where it starts with no `-`; else the optional one's, once, where it starts with no `--`. Returns whether one took it.
+ */
+function placed(spec: Spec, arg: string, args: Filling): boolean {
+  const many = spec.positionals.find((p) => p.takes === 'many');
+  if (many && !arg.startsWith('-')) {
+    const before = args[many.key];
+    const values = Array.isArray(before) ? before : [];
+    args[many.key] = values.includes(arg) ? values : [...values, arg];
+    return true;
+  }
+  const optional = spec.positionals.find((p) => p.takes === 'optional');
+  if (!optional || arg.startsWith('--') || args[optional.key] !== undefined) return false;
+  args[optional.key] = arg;
+  return true;
+}
+
+/**
+ * Reads the argument at `i` of `argv` into `args`: a flag and its value, or a positional (`placed`), else refused in the spec's words.
  * Returns the index of the last argument it took, and whether it was one of the command's ways.
  */
 function readArg(spec: Spec, argv: readonly string[], i: number, args: Filling) {
@@ -147,9 +166,7 @@ function readArg(spec: Spec, argv: readonly string[], i: number, args: Filling) 
   const name = joined ? arg.slice(0, arg.indexOf('=')) : arg;
   const flag = flagOf(spec, name, joined);
   if (!flag) {
-    const optional = spec.positionals.find((p) => p.takes === 'optional');
-    if (optional && !arg.startsWith('--') && args[optional.key] === undefined) args[optional.key] = arg;
-    else usage(spec.unknown(arg));
+    if (!placed(spec, arg, args)) usage(spec.unknown(arg));
     return { last: i, way: false };
   }
   if (once(flag) && args[flag.key!] !== undefined) usage(flag.twice ?? spec.unknown(arg));
@@ -163,7 +180,7 @@ function readArg(spec: Spec, argv: readonly string[], i: number, args: Filling) 
   return { last, way: flag.way === true };
 }
 
-/** The arguments after the required ones: flags in any order, and the optional positional; two ways given are refused. */
+/** The arguments after the required ones: flags in any order, and the optional or many positional; two ways given are refused. */
 function readTail(spec: Spec, argv: readonly string[], given: Filling): Args {
   const args = { ...given };
   let ways = 0;
@@ -193,15 +210,20 @@ export function parseArgv(spec: Spec, argv: readonly string[]): Args | undefined
   return readTail(spec, argv.slice(required.length), given);
 }
 
+/** How the usage says a positional not given: `<step>`, `[<step>]` where it is optional, `[<runId> ...]` where it takes many. */
+const unsaid = (p: Positional): string =>
+  p.takes === 'many' ? `[<${p.key}> ...]` : p.takes === 'optional' ? `[<${p.key}>]` : `<${p.key}>`;
+
 /**
- * The command line that names `command` on these arguments, as a refusal says what to type: `wf retry r-1 implement`. A positional not
- * given is said as the usage says it, `<step>`, or `[<step>]` where it is optional; a rest is left out.
+ * The command line that names `command` on these arguments, as a refusal says what to type: `wf retry r-1 implement`, `wf rm a b`. A
+ * positional not given is said as the usage says it (`unsaid`); a rest is left out.
  */
 export function commandLine(command: Pick<CommandSpec, 'name' | 'spec'>, args: Args): string {
-  const placed = command.spec.positionals
+  const said = (value: Args[string]) => (Array.isArray(value) ? value.join(' ') : String(value));
+  const words = command.spec.positionals
     .filter((p) => p.takes !== 'rest')
-    .map((p) => (args[p.key] !== undefined ? String(args[p.key]) : p.takes === 'optional' ? `[<${p.key}>]` : `<${p.key}>`));
-  return [CLI, command.name, ...placed].join(' ');
+    .map((p) => (args[p.key] !== undefined ? said(args[p.key]) : unsaid(p)));
+  return [CLI, command.name, ...words].join(' ');
 }
 
 /** The column the help's lines under a command start at. */

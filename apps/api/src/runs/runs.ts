@@ -1,11 +1,8 @@
 /** The runs, for the board: every run listed, one run in full, and what `wf decide` shows of it. */
 import { isDeepStrictEqual } from 'node:util';
-import { Schema } from 'effect';
 import { Hono } from 'hono';
-import { type BranchReader, branchReader, forget, prune, runStartedAt, unjudgedWord, verifiesRest, runStore } from 'agent-orchestrator';
-import { isRefusal } from 'agent-orchestrator/effect';
-import { isGitRun, type PlaceKind, placeOf, pruneLines, prunedKept, prunedWords, type Run } from 'agent-orchestrator/run';
-import { readBody, type BodyIssue } from '../body.ts';
+import { type BranchReader, branchReader, runStartedAt, unjudgedWord, verifiesRest, runStore } from 'agent-orchestrator';
+import { isGitRun, type PlaceKind, placeOf, prunedKept, prunedWords, type Run } from 'agent-orchestrator/run';
 import { decisionOf } from '../decide/index.ts';
 import { detail } from '../detail/index.ts';
 import {
@@ -23,7 +20,6 @@ import {
 } from './judged.ts';
 import { type RunGraph, runGraph } from './graph.ts';
 import { restingRead } from './resting.ts';
-import { refusedBeforeReading, type Guarded } from '../guard.ts';
 import { tryOf } from '../agents/try.ts';
 import { type ApiEnv, type Served, served } from '../layer.ts';
 import {
@@ -262,52 +258,6 @@ export async function judgedNow(e: Engine['Service'], home: string, some: readon
   return out;
 }
 
-const REMOVE_SHAPE = '`{}`';
-
-/** A removal of a try's run, as the guard's refusals word it (guard.ts). */
-const removeGuard = (route: string): Guarded => ({
-  route,
-  does: 'removes a run',
-  forAnother: 'remove one',
-  why: 'a run removed takes its record and every folder it worked in with it, and nothing brings them back',
-  reach: "remove it on the board's run page",
-  instead: "Remove it on the board's run page, or with `wf rm`",
-  shape: REMOVE_SHAPE,
-});
-
-/** What a prune takes, as its refusal of another content type says it: `wf prune`'s two flags, each a switch. */
-const PRUNE_SHAPE = '`{ "artifacts"?: boolean, "unmerged"?: boolean }`';
-
-/** A finished run pruned, as the guard's refusals word it (guard.ts). */
-const pruneGuard = (route: string): Guarded => ({
-  route,
-  does: 'prunes a run',
-  forAnother: 'prune one',
-  why: 'a run pruned has its worktrees removed, and its files with `artifacts`, and none of its steps can be tried again, sent round or approved',
-  reach: "prune it on the board's run page",
-  instead: "Prune it on the board's run page, or with `wf prune <run>`",
-  shape: PRUNE_SHAPE,
-});
-
-/**
- * A prune's body, as `wf prune` reads its flags: `artifacts` is `--artifacts` and `unmerged` is `--unmerged`, each absent or a boolean, and
- * nothing else — decoded with `onExcessProperty: 'error'` (`PRUNE_OPTIONS`), which reads a key it does not have before those it does.
- */
-const PRUNE_BODY = Schema.Struct({ artifacts: Schema.optionalKey(Schema.Boolean), unmerged: Schema.optionalKey(Schema.Boolean) });
-const PRUNE_OPTIONS = { onExcessProperty: 'error' } as const;
-const PRUNE_FLAGS = { artifacts: '--artifacts', unmerged: '--unmerged' } as const;
-
-/** Why a prune's body is not one (400), by the first thing its schema refused: every key it does not take, named at once. */
-function pruneWords({ path: [key], kind, input }: BodyIssue, body: unknown): string {
-  if (kind === 'excess' && typeof body === 'object' && body !== null) {
-    const unknown = Object.keys(body).filter((k) => !Object.hasOwn(PRUNE_FLAGS, k));
-    return `POST …/prune does not take ${unknown.map((k) => `\`${k}\``).join(', ')}: it takes ${PRUNE_SHAPE}, as \`wf prune\` takes --artifacts and --unmerged.`;
-  }
-  if (key === 'artifacts' || key === 'unmerged')
-    return `POST …/prune takes \`${key}\` as true or false — \`wf prune\`'s ${PRUNE_FLAGS[key]} — and this request sent ${JSON.stringify(input)}.`;
-  return `POST …/prune takes a JSON object: ${PRUNE_SHAPE}.`;
-}
-
 /**
  * Whether a run's summary may be kept (`resting.ts`): a run at rest, which nothing but a person, git or the engine's journals can move. Its
  * status final or the run pruned, nothing of it moving, waited on or held, every task it has filed settled, the workflow it is judged by
@@ -370,7 +320,8 @@ async function listed({ e, env, home, memo }: Served): Promise<RunSummary[]> {
 }
 
 /**
- * The runs' routes: the list, one run in full, what `wf decide` shows of it, and the three writes the board makes on a run.
+ * The runs' routes: the list, one run in full, and what `wf decide` shows of it. The board's writes on a run — its removal and its prune
+ * among them — are the command table's routes (`commands`, commands/routes.ts).
  *
  * - `GET /api/runs` — every run's summary (`RunSummary`), in the store's order. One request costs, however many runs there are, one
  *   harness observation (one `claude agents --json`, one scan of the detached runs' files), a read of every task journal in the engine's
@@ -386,18 +337,6 @@ async function listed({ e, env, home, memo }: Served): Promise<RunSummary[]> {
  * - `GET /api/runs/:runId/decision` — what `wf decide` shows a person (`decisionOf`), the route of its entry of the command table. Not on
  *   the page's poll, since it runs `git diff`. Refused as the run's page is: a 404 with no such run, and a 502 when a task it reads does
  *   not, in the words the list says it with (`RunSummary.unreadable`).
- * - `DELETE /api/runs/:id` — a try's run removed, as `wf rm` removes it (`forget`): its record, and the folders it worked in with it.
- *   Guarded as a write (`removeGuard`). Only a try: any other run is a 409 naming `wf rm`, which says what it hands off and what it leaves,
- *   and a git run's worktrees and branches are a person's to read before they go. A try still working is a 409 in the package's words; a
- *   thrown refusal of the package's goes to `app.onError`, which answers it by its kind (app.ts), and any other failure is a 500.
- * - `POST /api/runs/:id/prune` — a finished run pruned, as `wf prune <run> --yes` prunes it (`prune`), with `artifacts` its `--artifacts`
- *   and `unmerged` its `--unmerged` (`PRUNE_BODY`): its worktrees removed, and its files with `artifacts`; its record and every branch
- *   kept. Guarded as a write (`pruneGuard`). The page asks twice before it sends this, so there is no dry run here. The package decides
- *   everything and words it, and the api maps its answer to a status: refused (a folder run, a run not over, a finished run nobody merged
- *   without `unmerged`, a worktree holding what no commit has…) and nothing left to prune (one pruned already) are each a 409 in `wf
- *   prune`'s words alone, as `DELETE …` sends `forget`'s, the page saying `Not pruned` above them itself (`Refusal`); a thrown refusal of
- *   the package's goes to `app.onError`, which answers it by its kind, and any other failure is a 502. No feed line: the marker the prune
- *   writes moves the run's stamp in `runStore`, and the board reads the run again itself.
  */
 
 export const runs = new Hono<ApiEnv>()
@@ -410,59 +349,6 @@ export const runs = new Hono<ApiEnv>()
       const full = await detail(run, s);
       if ('unjudged' in full) return c.json({ error: full.unjudged }, 502);
       return c.json(full);
-    }),
-  )
-  .delete('/api/runs/:id', (c) =>
-    served(c, async ({ e, home }) => {
-      const id = c.req.param('id');
-      const route = `DELETE /api/runs/${id}`;
-      const refused = refusedBeforeReading(
-        removeGuard(route),
-        c.req.header('host'),
-        c.req.header('sec-fetch-site'),
-        c.req.header('content-type'),
-      );
-      if (refused) return c.json({ error: refused.error }, refused.status);
-      const run = findRun(id);
-      if (!run) return c.json({ error: noSuchRun(id) }, 404);
-      if (!tryOf(run, home)) {
-        return c.json(
-          {
-            error: `${route}: the board removes only a try, a run started from an agent's page, and ${id} is a run of ${run.workflowDir}. Remove it with \`wf rm ${id}\`, which says what it hands off and what it leaves.`,
-          },
-          409,
-        );
-      }
-      const gone = await forget(e, id);
-      if (gone.kind === 'refused') return c.json({ error: gone.refusal }, 409);
-      return c.json({ id, removed: true });
-    }),
-  )
-  .post('/api/runs/:id/prune', (c) =>
-    served(c, async ({ e }) => {
-      const id = c.req.param('id');
-      const route = `POST /api/runs/${id}/prune`;
-      const refused = refusedBeforeReading(
-        pruneGuard(route),
-        c.req.header('host'),
-        c.req.header('sec-fetch-site'),
-        c.req.header('content-type'),
-      );
-      if (refused) return c.json({ error: refused.error }, refused.status);
-      const read = await readBody(c.req, PRUNE_BODY, `POST …/prune takes a JSON body: ${PRUNE_SHAPE}.`, pruneWords, PRUNE_OPTIONS);
-      if ('status' in read) return c.json({ error: read.error }, read.status);
-      if (!findRun(id)) return c.json({ error: noSuchRun(id) }, 404);
-      try {
-        const { artifacts = false, unmerged = false } = read.body;
-        const p = await prune(e, id, { artifacts, unmerged, yes: true });
-        if (p.kind === 'refused') return c.json({ error: p.refusal }, 409);
-        if (p.kind === 'nothing') return c.json({ error: `Nothing to prune: ${p.nothing}.` }, 409);
-        return c.json({ id, pruned: true, lines: pruneLines(p), worktrees: p.worktrees, artifacts: p.artifacts ?? null, left: p.left });
-      } catch (err) {
-        if (isRefusal(err)) throw err;
-        const message = err instanceof Error ? err.message : String(err);
-        return c.json({ error: `${route}: ${id} was not pruned — ${message}. Prune it with \`wf prune ${id}\`.` }, 502);
-      }
     }),
   )
   .get('/api/runs/:runId/decision', (c) =>

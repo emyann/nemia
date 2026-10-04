@@ -1,5 +1,5 @@
 import { useId, useState, type ReactNode } from 'react';
-import type { KeyField, KeyForm, WorkflowStepSpec } from '../lib/api';
+import type { KeyField, KeyForm, StepLayers, WorkflowStepSpec } from '../lib/api';
 import {
   contextText,
   listOf,
@@ -13,8 +13,8 @@ import {
   tokensOf,
   type DraftStep,
 } from '../lib/builder';
-import { AgentLink } from './AgentParts';
 import { Markdown } from './Markdown';
+import { AgentLayers, PolicyLayer } from './StepLayers';
 
 /** A change to the whole draft, made in one step so a key and what comes with it land together. */
 export type DraftUpdate = (change: (steps: DraftStep[]) => DraftStep[]) => void;
@@ -32,9 +32,10 @@ const PASTE = '(paste)';
  * made to the draft at once; nothing is judged here that the package judges on save, and a refusal of the last save for this step is shown
  * above its fields.
  *
- * A step with an agent (`agent:`) is edited as its file is written: the text is its own note, which follows the agent's instructions, and a
- * key the agent gives it shows the agent's value in place of none — set, it is the step's own; unset, the agent's again. Its agent's file
- * is not edited here.
+ * A step with an agent (`agent:`) is edited as its file is written, and read by layer: its agent, then what the agent brings
+ * (`AgentLayers`, from the listing's `layers`), then the step's policy (`PolicyLayer`) — its own note and the keys its file sets as its
+ * policy (`policyKeys`) — then the rest of its keys. A key the agent gives it shows the agent's value in place of none — set, it is the
+ * step's own; unset, the agent's again. Its agent's file and your custom instructions are not edited here.
  */
 export function StepForm({
   step,
@@ -42,6 +43,7 @@ export function StepForm({
   form,
   schemas,
   refused,
+  layers,
   update,
   onRemoved,
 }: {
@@ -50,23 +52,78 @@ export function StepForm({
   form: KeyForm;
   schemas: readonly string[];
   refused: string | null;
+  layers: StepLayers | null;
   update: DraftUpdate;
   onRemoved: () => void;
 }) {
   const body = useId();
   const others = steps.filter((s) => s.name !== step.name).map((s) => s.name);
+  const agent = step.own ? (step.spec.agent ?? '') : null;
+  const input = (field: KeyField) => (
+    <KeyInput key={`${step.name}:${field.key}`} field={field} step={step} others={others} form={form} schemas={schemas} update={update} />
+  );
+  const note = (
+    <>
+      <label htmlFor={body} className="block text-xs font-medium">
+        {agent === null ? 'What it is told' : 'Its words'}
+      </label>
+      <textarea
+        id={body}
+        value={step.own ? step.own.body : step.body}
+        rows={5}
+        placeholder={agent === null ? undefined : `Nothing of its own: ${agent}'s instructions are all it is told.`}
+        onChange={(event) => update((all) => setBody(all, step.name, event.target.value))}
+        className={`${INPUT} resize-y`}
+      />
+    </>
+  );
 
   return (
     <section aria-label={`Keys of ${step.name}`} data-step-form={step.name} className="space-y-3">
+      <StepHead name={step.name} refused={refused} update={update} onRemoved={onRemoved} />
+
+      {agent === null ? (
+        <>
+          {note}
+          {form.keys.map(input)}
+        </>
+      ) : (
+        <>
+          {form.keys.filter((field) => field.key === 'agent').map(input)}
+          <AgentLayers agent={agent} layers={layers} />
+          <PolicyLayer agent={agent} layers={layers} note={note}>
+            {form.keys.filter((field) => form.policyKeys.includes(field.key)).map(input)}
+          </PolicyLayer>
+          {form.keys.filter((field) => field.key !== 'agent' && !form.policyKeys.includes(field.key)).map(input)}
+        </>
+      )}
+    </section>
+  );
+}
+
+/** The heading of step `name`'s form, with its Remove button, and the refusal of the last save for it, if any. */
+function StepHead({
+  name,
+  refused,
+  update,
+  onRemoved,
+}: {
+  name: string;
+  refused: string | null;
+  update: DraftUpdate;
+  onRemoved: () => void;
+}) {
+  return (
+    <>
       <div className="flex items-baseline justify-between gap-2">
-        <h3 className="min-w-0 truncate font-mono text-sm font-semibold" title={step.name}>
-          {step.name}
+        <h3 className="min-w-0 truncate font-mono text-sm font-semibold" title={name}>
+          {name}
           <span className="font-sans text-xs font-normal text-neutral-500">.md</span>
         </h3>
         <button
           type="button"
           onClick={() => {
-            update((all) => removeStep(all, step.name));
+            update((all) => removeStep(all, name));
             onRemoved();
           }}
           className="shrink-0 rounded border border-neutral-300 px-2 py-0.5 text-xs text-neutral-600 hover:border-red-400 hover:text-red-700 dark:border-neutral-700 dark:text-neutral-400 dark:hover:border-red-500 dark:hover:text-red-400"
@@ -80,43 +137,11 @@ export function StepForm({
           data-refused-here
           className="space-y-1 rounded border border-red-300 bg-red-50 px-2 py-1.5 dark:border-red-900 dark:bg-red-950/40"
         >
-          <p className="text-xs font-medium text-red-800 dark:text-red-300">The last save was refused for {step.name}:</p>
+          <p className="text-xs font-medium text-red-800 dark:text-red-300">The last save was refused for {name}:</p>
           <p className="font-mono text-[11px] whitespace-pre-wrap break-words text-red-800 dark:text-red-300">{refused}</p>
         </div>
       )}
-
-      <div className="space-y-1">
-        <label htmlFor={body} className="block text-xs font-medium">
-          {step.own ? 'Its own note' : 'What it is told'}
-        </label>
-        {step.own && (
-          <p data-agent-note className="text-[11px] leading-snug text-neutral-500 dark:text-neutral-400">
-            Told after <AgentLink from="yours" name={step.spec.agent ?? ''} />
-            's instructions, <span className="font-mono">agents/{step.spec.agent}.md</span>.
-          </p>
-        )}
-        <textarea
-          id={body}
-          value={step.own ? step.own.body : step.body}
-          rows={5}
-          placeholder={step.own ? `Nothing of its own: ${step.spec.agent}'s instructions are all it is told.` : undefined}
-          onChange={(event) => update((all) => setBody(all, step.name, event.target.value))}
-          className={`${INPUT} resize-y`}
-        />
-      </div>
-
-      {form.keys.map((field) => (
-        <KeyInput
-          key={`${step.name}:${field.key}`}
-          field={field}
-          step={step}
-          others={others}
-          form={form}
-          schemas={schemas}
-          update={update}
-        />
-      ))}
-    </section>
+    </>
   );
 }
 

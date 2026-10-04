@@ -59,7 +59,7 @@ const { Chips, DecideSection, DiffFileView, GroupBar, LessonChip, TouchedBranch 
 const { ReactFlowProvider } = await import('@xyflow/react');
 const { AllowedReach } = await import('../src/components/Reach.tsx');
 const { stateMeaning } = await import('../src/lib/status.ts');
-const { Told } = await import('../src/components/Told.tsx');
+const { StepPolicy, Told } = await import('../src/components/Told.tsx');
 type RunDetail = import('../src/lib/api.ts').RunDetail;
 type StepReach = import('../src/lib/api.ts').StepReach;
 type ReadOnlyCommands = import('../src/lib/api.ts').ReadOnlyCommands;
@@ -5233,6 +5233,7 @@ test("the bar for a workflow's step says what it runs on, its keys as its node l
     body: '',
     own: { keys: [], body: '' },
     hired: null,
+    layers: null,
   });
   const listing = workflow({
     name: 'dev',
@@ -5331,6 +5332,7 @@ const LAYERS: StepLayers = {
   agentSkills: ['alpha'],
   policy: 'Write the note.',
   addedSkills: ['gamma'],
+  fence: [],
   task: '## What was asked for\n\nA note.',
   via: 'prompt',
 };
@@ -5380,4 +5382,118 @@ test("a layer the run froze none of says so; a step with no agent draws no agent
   assert.match(whole, /Write the note\.\n\n## What was asked for/);
   assert.doesNotMatch(whole, /data-layer/);
   assert.equal(toldMarkup({ told: null, layers: null, filed: true }), '', 'nothing to fold, no fold');
+});
+
+/** `StepPolicy` drawn as a server draws it. */
+const policyMarkup = (layers: StepLayers): string => renderToStaticMarkup(createElement(StepPolicy, { layers }));
+
+/** The layers of `LAYERS`, its step tightening the agent's fence with a deny of its own. */
+const FENCED: StepLayers = { ...LAYERS, fence: [{ key: 'disallowedTools', value: 'Bash(git push:*)' }] };
+
+test('the fence lines a step tightens are drawn under its policy layer, and under no other', () => {
+  const html = toldMarkup({ told: null, layers: FENCED, filed: true });
+  const fence = html.indexOf('data-fence="disallowedTools"');
+  assert.ok(fence > html.indexOf('data-layer="policy"') && fence < html.indexOf('data-layer="task"'), html);
+  assert.match(html, /Tightens writer&#x27;s fence:[^]*disallowedTools: Bash\(git push:\*\)/);
+  assert.doesNotMatch(toldMarkup({ told: null, layers: LAYERS, filed: true }), /data-fence|Tightens/, 'no fence line, no fence');
+});
+
+test("at a gate, the step's policy is drawn open: its words, the skills it adds, its fence lines, and what was told before it — never the agent's words", () => {
+  const html = policyMarkup(FENCED);
+  assert.match(html, /data-gate-policy[^]*data-layer="policy"[^]*The step&#x27;s policy[^]*Write the note\./);
+  assert.match(html, /data-skill="gamma"/);
+  assert.doesNotMatch(html, /data-skill="alpha"/, "the agent's own skill is the agent's layer");
+  assert.match(html, /data-fence="disallowedTools"/);
+  assert.match(html, /Told after writer&#x27;s instructions and your custom instructions; where they conflict, this wins\./);
+  assert.doesNotMatch(html, /You are the writer\.|Be terse\./, "the agent's words and the person's are in the fold, not here");
+  assert.match(policyMarkup({ ...LAYERS, custom: null }), /Told after writer&#x27;s instructions; where they conflict/);
+  assert.match(
+    policyMarkup({ ...LAYERS, policy: '', addedSkills: [], fence: [] }),
+    /No words of its own: writer&#x27;s instructions are all it was told/,
+  );
+  assert.equal(
+    policyMarkup({ ...LAYERS, agent: null, instructions: null, custom: null }),
+    '',
+    'a step with no agent has no policy over one',
+  );
+});
+
+/** `StepForm` for one step of `writer`'s, inside a router, with the listing's layers `layers`: its agent, a policy key and a wiring key. */
+async function stepFormMarkup(layers: StepLayers | null, agent: string | null = 'writer'): Promise<string> {
+  const { StepForm } = await import('../src/components/StepForm.tsx');
+  const { keyForm, stepSpec } = await import('./library-fixtures.ts');
+  const { createMemoryHistory, createRootRoute, createRouter, RouterContextProvider } = await import('@tanstack/react-router');
+  const router = createRouter({ routeTree: createRootRoute(), history: createMemoryHistory() });
+  const form = keyForm({
+    keys: [
+      { key: 'workspace', meaning: 'Where the step works.', kind: 'choice', choices: ['main', 'folder'], byHarness: null },
+      { key: 'disallowedTools', meaning: 'What it may never run.', kind: 'list', choices: null, byHarness: null },
+      { key: 'agent', meaning: 'Who it is.', kind: 'choice', choices: ['writer'], byHarness: null },
+    ],
+  });
+  const step = {
+    name: 'write',
+    spec: stepSpec({ agent, disallowedTools: ['Bash(git push:*)'] }),
+    body: 'Write the note.',
+    own: agent === null ? null : { keys: ['agent', 'disallowedTools'], body: 'Write the note.' },
+    schema: null,
+  };
+  const element = createElement(StepForm, {
+    step,
+    steps: [step],
+    form,
+    schemas: [],
+    refused: null,
+    layers,
+    update: () => {},
+    onRemoved: () => {},
+  } as never);
+  // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
+  return renderToStaticMarkup(createElement(RouterContextProvider, { router, children: element }));
+}
+
+test("a step with an agent is read by layer on the builder: its agent, the agent's instructions folded, your custom instructions, then the step's policy holding its words and its fence keys, then its wiring", async () => {
+  const html = await stepFormMarkup(LAYERS);
+  const at = (mark: string): number => {
+    const index = html.indexOf(mark);
+    assert.ok(index >= 0, `${mark} in ${html}`);
+    return index;
+  };
+  const order = [
+    'data-field="agent"',
+    'data-layer="instructions"',
+    'You are the writer.',
+    'data-layer="custom"',
+    'Be terse.',
+    'data-layer="policy"',
+    'Its words',
+    'data-field="disallowedTools"',
+    'data-field="workspace"',
+  ].map(at);
+  assert.deepEqual(
+    order,
+    [...order].sort((a, b) => a - b),
+    html,
+  );
+  assert.match(html, /<details[^>]*>[^]*Read them[^]*You are the writer\.[^]*<\/details>/, 'the instructions are folded');
+  assert.equal(html.split('data-field="disallowedTools"').length - 1, 1, 'a policy key is drawn once: never again among the wiring keys');
+  assert.match(html, /May only tighten writer&#x27;s fence/);
+  assert.match(html, /Told after writer&#x27;s instructions and your custom instructions; where they conflict, these words win\./);
+
+  const uncustomised = await stepFormMarkup({ ...LAYERS, custom: null });
+  assert.match(uncustomised, /data-layer="custom"[^]*None\. Write them on[^]*writer[^]*&#x27;s page\./);
+  assert.match(uncustomised, /Told after writer&#x27;s instructions; where they conflict/);
+
+  const unread = await stepFormMarkup({ ...LAYERS, agent: 'critic' });
+  assert.match(unread, /data-agent-layers-unread[^>]*>Save to read writer&#x27;s instructions here\./);
+  assert.match(
+    unread,
+    /Told after writer&#x27;s instructions, and any custom instructions you wrote for it; where they conflict, these words win\./,
+    'unread, the note claims no custom instructions it has not read',
+  );
+  assert.doesNotMatch(unread, /You are the writer\.|data-layer="instructions"/, "another agent's words are never drawn as this one's");
+
+  const agentless = await stepFormMarkup(null, null);
+  assert.doesNotMatch(agentless, /data-layer|data-agent-note/);
+  assert.match(agentless, /What it is told/);
 });

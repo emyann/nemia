@@ -91,8 +91,9 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
 
 ## The tick
 
-- **A command that lives as long as its process is an Effect run by `runMain`** (`src/cli/main.ts`): what it holds is taken with
-  `acquireRelease` in its scope, never let go in a signal handler, and a signal exits 128 + its number once the scope is closed.
+- **A command that lives as long as its process is an Effect run by `runMain`** (`src/daemon/up.verb.ts`, run by `wf up` and the api's
+  `src/main.ts`): what it holds is taken with `acquireRelease` in its scope, never let go in a signal handler, and a signal exits 128 +
+  its number once the scope is closed.
 - **Admission is the runtime's**: the orchestrator files a task `queued` with its `priority` (`stepMomentum`, `MOMENTUM`), and `engine()`
   hands the runtime the ceiling and the pools. A new engine verb goes into `ENGINE_PHASES` and `ENGINE_WRITES`; an admitted task starts on
   the runtime's next pass.

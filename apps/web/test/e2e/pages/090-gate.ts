@@ -1,11 +1,28 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Page } from 'playwright';
+import type { Locator, Page } from 'playwright';
 import { expectRendered, fed, photograph, sidebar, themeOf, stepBar } from '../board.ts';
 import { expectCount, expectLeftOf, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { GATED } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
+
+/**
+ * Refuses unless `policy`, the step's policy at the gate `where`, is drawn open once: plan's own words and the deny its file adds, named as
+ * a tightening of planner's fence, and what was told before it — never the planner's own instructions, which stay in the Told fold.
+ */
+async function expectPolicy(policy: Locator, where: string): Promise<void> {
+  const { planner } = GATED;
+  await expectCount(policy, 1, `${GATED.gated}'s policy is drawn open at its gate, ${where}`);
+  await expectVisible(policy.locator('[data-layer="policy"] pre', { hasText: planner.policy }), `with its words, ${planner.policy}`);
+  await expectVisible(
+    policy.locator('[data-fence="disallowedTools"]', { hasText: `disallowedTools: ${planner.deny}` }),
+    `and the deny its file adds, ${planner.deny}`,
+  );
+  await expectVisible(policy.getByText(`Tightens ${planner.name}'s fence:`), `named as a tightening of ${planner.name}'s fence`);
+  await expectVisible(policy.getByText(`Told after ${planner.name}'s instructions; where they conflict, this wins.`), 'after what');
+  await expectCount(policy.getByText(planner.instructions), 0, `and never ${planner.name}'s own words: they are in the Told fold`);
+}
 
 export default {
   /**
@@ -118,8 +135,11 @@ export default {
       0,
       'and does not say the run is still moving: it waits on you',
     );
+    const policy = section.locator('[data-gate-policy]');
+    await expectPolicy(policy, 'on the run page');
     await settled(page);
     await photograph(page, path.join(OUT, `gate-awaiting-${await themeOf(page)}.png`), { fullPage: true });
+    await photograph(policy, path.join(OUT, `gate-policy-${await themeOf(page)}.png`));
     await files.locator('summary').click();
     await expectVisible(handedOn.getByText(GATED.output.files[0].path), 'opened, the fold draws the files');
     await handedOn.locator('details[data-fold="files"] summary').click();
@@ -139,6 +159,10 @@ export default {
     await settled(page);
     await expectLeftOf(node, inspector, `the run is too wide to fit beside the bar at 1280, so ${gated} alone is fitted clear of it`);
     await photograph(page, path.join(OUT, `gate-inspector-${await themeOf(page)}.png`), { fullPage: true });
+    await inspector.getByRole('tab', { name: 'Details' }).click();
+    await expectPolicy(inspector.locator('[data-gate-policy]'), 'in its inspector, under Details');
+    await settled(page);
+    await photograph(inspector, path.join(OUT, `gate-inspector-policy-${await themeOf(page)}.png`));
     await inspector.getByRole('button', { name: 'Close', exact: true }).click();
     await expectCount(inspector, 0, 'closed, so the rest of the page reads one gate');
 

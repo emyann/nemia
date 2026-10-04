@@ -16,15 +16,21 @@ import { type Named, type RouteWords, WORDS } from './words.ts';
 
 /** The schema of a positional's or a flag's value in a body. */
 const valueSchema = (kind: Positional['kind'] | Flag['kind']): Schema.Decoder<unknown> =>
-  kind === 'name' ? NotBlank : kind === 'amount' ? Schema.Number : Schema.String;
+  kind === 'name' ? NotBlank : kind === 'amount' ? Schema.Number : kind === 'switch' ? Schema.Boolean : Schema.String;
+
+/** The arguments a command's route fixes (`sets`), whatever a request says: none on a read. */
+const fixedOf = (command: CommandSpec): Readonly<Record<string, string | boolean>> =>
+  command.route && 'sets' in command.route ? (command.route.sets ?? {}) : {};
 
 /**
  * The body a command takes on its route, derived from its spec: each positional its path does not name, required unless it is optional;
  * each key a flag sets, required, as one of the values its flags set it to — a body says its way, and takes no default; each flag's value,
- * optional; and the keys its extension takes (extend.ts), optional.
+ * optional, a switch's as true or false; and the keys its extension takes (extend.ts), optional. A key its route fixes (`sets`) is none
+ * of the body's.
  */
 export function bodySchema(command: CommandSpec, inPath: readonly string[]) {
   const fields: Record<string, Schema.Decoder<unknown>> = {};
+  const fixed = Object.keys(fixedOf(command));
   for (const p of command.spec.positionals.filter((p) => !inPath.includes(p.key)))
     fields[p.key] = p.takes === 'optional' ? Schema.optionalKey(valueSchema(p.kind)) : valueSchema(p.kind);
   const set = new Map<string, string[]>();
@@ -36,6 +42,7 @@ export function bodySchema(command: CommandSpec, inPath: readonly string[]) {
     const takes = EXTENSIONS[command.name]?.takes[key];
     if (takes) fields[key] = Schema.optionalKey(takes);
   }
+  for (const key of fixed) delete fields[key];
   return Schema.Struct(fields);
 }
 
@@ -86,39 +93,48 @@ async function jsonOf(c: Context<ApiEnv>, name: string, words: RouteWords): Prom
 /** The body's values that are arguments, and those under the keys the command takes on the api alone. */
 function split(command: CommandSpec, body: Readonly<Record<string, unknown>>) {
   const own = new Set(command.apiTakes);
-  const args: Record<string, string | number> = {};
+  const args: Record<string, string | number | boolean> = {};
   const taken: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(body)) {
     if (own.has(key)) taken[key] = value;
-    else if (typeof value === 'string' || typeof value === 'number') args[key] = value;
+    else if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') args[key] = value;
   }
   return { args, taken };
 }
 
 /**
- * The arguments a request carries, made whole by the command's extension, or why it carries none: the run and the step its path names
- * (404), its JSON body (400), a key another command takes on the api alone (422), the body's schema (400), a step its body names (404),
- * and the extension's own refusals. A delete reads no body: its arguments are what its path names and what its route fixes (`sets`).
+ * What a request's body carries, under its route's schema: the arguments it gives and the keys the command takes on the api alone; or why
+ * it carries none: its JSON body (400), a key another command takes on the api alone (422), the body's schema (400) — a key the schema has
+ * not refused before those it has where the route's words are strict.
  */
-async function argsOf(c: Context<ApiEnv>, command: CommandSpec, at: Named, s: Served): Promise<{ args: Args } | Refusal> {
+async function bodyOf(c: Context<ApiEnv>, command: CommandSpec, at: Named, inPath: readonly string[]) {
   const words = WORDS[command.name];
-  const bound = at.step ? at : { runId: at.runId };
-  const named = located(at, at.step || undefined, s.home);
-  if ('status' in named) return named;
-  if (command.route?.method === 'DELETE') return { args: { ...command.route.sets, ...bound } };
   const json = await jsonOf(c, command.name, words);
   if ('status' in json) return json;
   const foreign = foreignKey(command, COMMANDS, json.value, words.shape);
   if (foreign) return foreign;
-  const read = decodeBody(bodySchema(command, Object.keys(bound)), json.value, words.issue(at));
+  const options = words.strict ? ({ onExcessProperty: 'error' } as const) : undefined;
+  const read = decodeBody(bodySchema(command, inPath), json.value, words.issue(at), options);
+  return 'status' in read ? read : split(command, read.body);
+}
+
+/**
+ * The arguments a request carries, made whole by the command's extension, or why it carries none: the run and the step its path names
+ * (404), its body (`bodyOf`), a step its body names (404), and the extension's own refusals. A delete reads no body: its arguments are
+ * what its path names. What the route fixes (`sets`) is said over the body's.
+ */
+async function argsOf(c: Context<ApiEnv>, command: CommandSpec, at: Named, s: Served): Promise<{ args: Args } | Refusal> {
+  const bound = at.step ? at : { runId: at.runId };
+  const named = located(at, at.step || undefined, s.home);
+  if ('status' in named) return named;
+  const read = command.route?.method === 'DELETE' ? { args: {}, taken: {} } : await bodyOf(c, command, at, Object.keys(bound));
   if ('status' in read) return read;
-  const { args: given, taken } = split(command, read.body);
-  const args: Args = { ...given, ...bound };
+  const args: Args = { ...read.args, ...fixedOf(command), ...bound };
   const found = !at.step && typeof args.step === 'string' ? located(at, args.step, s.home) : named;
   if ('status' in found) return found;
   const extension = EXTENSIONS[command.name];
   if (!extension) return { args };
-  return extension.fold({ e: s.e, home: s.home, run: found.run }, command, args, taken);
+  return extension.fold({ e: s.e, home: s.home, run: found.run }, command, args, read.taken);
 }
 
 /** What the api answers of a command's data: the keys it declares the api answers (`apiKeys`), or the whole of it. */
@@ -126,8 +142,9 @@ const answerOf = (command: Command, data: Readonly<Record<string, unknown>>): Re
   command.apiKeys ? Object.fromEntries(command.apiKeys.map((key) => [key, data[key]])) : data;
 
 /**
- * A routed command's handler: the guard where it writes, its arguments, its check (422), and its handler's data at its route's status, or
- * 502 in its words.
+ * A routed command's handler: the guard where it writes, its arguments, its check (422), and its handler's data at its route's status —
+ * or, where the command throws a refusal in place of data that did nothing (`apiRefusal`), that refusal, answered by `app.onError`; or 502
+ * in its words.
  */
 const route =
   (command: Command, { status }: NonNullable<Command['route']>) =>
@@ -145,7 +162,10 @@ const route =
       const wrong = command.check?.(read.args);
       if (wrong) return c.json({ error: wrong }, 422);
       try {
-        return c.json(answerOf(command, await command.handler(s.e, read.args, s.env)), status);
+        const data = await command.handler(s.e, read.args, s.env);
+        const refusal = command.apiRefusal?.(data, read.args);
+        if (refusal) throw refusal;
+        return c.json(answerOf(command, data), status);
       } catch (err) {
         if (isRefusal(err)) throw err;
         return c.json({ error: words.failed(at, err instanceof Error ? err.message : String(err)) }, 502);
@@ -211,5 +231,18 @@ export const wordBreaks = (table: readonly Pick<CommandSpec, 'name' | 'route'>[]
  *   was held asked again. Refused in the package's words, by `app.onError`: a run nobody holds — a pruned one among them, since no verb
  *   holds one — and a hold put again as it was lifted are a 409 (`Conflict`), a run gone since the route read it a 404; any other failure
  *   is a 502. Its 200 is `{ id, lifted: true, hold }`. No feed line: the tick is the feed's one writer, and the board reads the run again.
+ * - `DELETE /api/runs/:id` — a try's run removed, as `wf rm <run>` removes it (`forget`): its record, and the folders it worked in with it;
+ *   it reads no body. Only a try (rm's extension, extend.ts): any other run is a 409 naming `wf rm`, which says what it hands off and what
+ *   it leaves, and a git run's worktrees and branches are a person's to read before they go. What removed nothing is thrown in `wf rm`'s
+ *   line (`RM.apiRefusal`): a try still working, and a worktree a session holds — the record kept — are a 409, a record gone since the
+ *   route read it a 404; any other failure is a 502. Its 200 is `{ id, removed: true }`.
+ * - `POST /api/runs/:id/prune` — a finished run pruned, as `wf prune <run> --yes` prunes it (`prune`), its route setting `yes`, with
+ *   `artifacts` its `--artifacts` and `unmerged` its `--unmerged`, each true or false, and no other key, every one named at once (400):
+ *   its worktrees removed, and its files with `artifacts`; its record and every branch kept. The page asks twice before it sends this, so
+ *   there is no dry run here. The package decides everything and words it (`PRUNE.apiRefusal`): refused — a folder run, a run not over, a
+ *   finished run nobody merged without `unmerged`, a worktree holding what no commit has — and nothing left to prune are each a 409 in `wf
+ *   prune`'s words alone, the page saying `Not pruned` above them itself; any other failure is a 502. Its 200 is `{ id, pruned: true,
+ *   lines, worktrees, artifacts, left }`. No feed line: the marker the prune writes moves the run's stamp in `runStore`, and the board
+ *   reads the run again itself.
  */
 export const commands = routesOf(COMMANDS);

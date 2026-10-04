@@ -16,6 +16,7 @@ const LAYERED = {
   policy: 'Write a short note on what was asked.',
   agentSkill: 'plain-words',
   addedSkill: 'cite-sources',
+  deny: 'WebFetch',
   review: 'Read the note, and say whether it holds up.',
   brief: 'Told by layer\n\nA run written by the told-layers page: a step whose agent, person and policy each told it something.',
 } as const;
@@ -27,8 +28,8 @@ const goto = async (page: Page, to: string): Promise<void> => {
 
 /**
  * Writes LAYERED's record into the e2e's store, as `wf start` freezes it: `write`, hired from `writer` with the person's custom
- * instructions and one skill of its own, its line adding another; and `review`, with no agent. Neither is filed, so each says what it would
- * be told now.
+ * instructions and one skill of its own, its line adding another and a deny; and `review`, with no agent. Neither is filed, so each says
+ * what it would be told now.
  */
 function written(): string {
   const record = path.join(store!, 'runs', `${LAYERED.id}.json`);
@@ -42,9 +43,10 @@ function written(): string {
     workspace: 'folder',
     permissionMode: 'dontAsk',
     skills: [LAYERED.addedSkill],
+    disallowedTools: [LAYERED.deny],
     agent: {
       name: LAYERED.agent,
-      keys: ['skills'],
+      keys: ['skills', 'disallowedTools'],
       body: LAYERED.policy,
       given: {},
       instructions: LAYERED.instructions,
@@ -82,9 +84,9 @@ const sectionOf = (page: Page, step: string) =>
 export default {
   /**
    * What a step was told, by layer, from what its run froze. `write`'s fold, opened, draws the agent's instructions with its skill, the
-   * person's custom instructions, the step's policy with the skill its line adds, and the task, in that order, each once, and says the
-   * first two went into the session's system prompt; `review`, with no agent, says its own words are all it was told. The page writes its
-   * run and takes it back, so each visit reads the store as seeded.
+   * person's custom instructions, the step's policy with the skill and the deny its line adds, and the task, in that order, each once, and
+   * says the first two went into the session's system prompt; `review`, with no agent, says its own words are all it was told. The page
+   * writes its run and takes it back, so each visit reads the store as seeded.
    */
   name: 'told-layers',
   route: `/runs/${FOLDER.id}`,
@@ -118,6 +120,12 @@ export default {
       );
       await expectVisible(fold.locator(`[data-layer="policy"] [data-skill="${LAYERED.addedSkill}"]`), "the step's skill under its policy");
       await expectCount(fold.locator('[data-skill]'), 2, 'each skill once, under the layer that gives it');
+      await expectCount(
+        fold.locator('[data-layer="policy"] [data-fence="disallowedTools"]', { hasText: LAYERED.deny }),
+        1,
+        "the deny its line adds, under its policy as a tightening of the agent's fence",
+      );
+      await expectCount(fold.locator('[data-fence]'), 1, 'and under no other layer');
       await expectCount(fold.getByText(LAYERED.policy), 1, 'the policy once: the brief is not drawn whole beside the layers');
       await expectVisible(fold.getByText("in the session's system prompt", { exact: false }), 'where the first two went');
 

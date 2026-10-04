@@ -8,12 +8,16 @@ import type { Guarded } from '../guard.ts';
 /** The run and the step a route's path names: `step` is empty on a route that names none. */
 export type Named = { readonly runId: string; readonly step: string };
 
-/** A routed command's words: `shape`, its body as a refusal shows it; `guard`, `issue` and `failed`, each said of the run it names. */
+/**
+ * A routed command's words: `shape`, its body as a refusal shows it; `guard`, `issue` and `failed`, each said of the run it names; and
+ * `strict`, where its body is refused a key its schema does not have, named before any it does.
+ */
 export type RouteWords = {
   readonly shape: string;
   readonly guard: (at: Named) => Guarded;
   readonly issue: (at: Named) => Words;
   readonly failed: (at: Named, said: string) => string;
+  readonly strict?: true;
 };
 
 /** The body `POST …/retry` takes: `wf retry`'s flags, as JSON. */
@@ -185,6 +189,59 @@ const HOLD: RouteWords = {
     `DELETE /api/runs/${runId}/hold: the hold was not lifted — ${said}. Lift it with \`wf hold ${runId} --off\`.`,
 };
 
+/** A try's run removed, as the guard's refusals word it; it takes no body, and a failure that is no refusal names `wf rm`. */
+const RM: RouteWords = {
+  shape: '`{}`',
+  guard: ({ runId }) => ({
+    route: `DELETE /api/runs/${runId}`,
+    does: 'removes a run',
+    forAnother: 'remove one',
+    why: 'a run removed takes its record and every folder it worked in with it, and nothing brings them back',
+    reach: "remove it on the board's run page",
+    instead: "Remove it on the board's run page, or with `wf rm`",
+    shape: '`{}`',
+  }),
+  issue: () => () => 'DELETE /api/runs/:id takes no body: `{}`.',
+  failed: ({ runId }, said) => `DELETE /api/runs/${runId}: ${runId} was not removed — ${said}. Remove it with \`wf rm ${runId}\`.`,
+};
+
+/** The body `POST …/prune` takes: `wf prune`'s two flags, each a switch; `--yes` is its route's own. */
+const PRUNE_SHAPE = '`{ "artifacts"?: boolean, "unmerged"?: boolean }`';
+
+/** The flag of `wf prune` each key of its body is. */
+const PRUNE_FLAGS = { artifacts: '--artifacts', unmerged: '--unmerged' } as const;
+
+/** Why `POST …/prune`'s body is not one (400), by the first thing its schema refused: every key it does not take, named at once. */
+function pruneWords({ path: [key], kind, input }: BodyIssue, body: unknown): string {
+  if (kind === 'excess' && typeof body === 'object' && body !== null) {
+    const unknown = Object.keys(body).filter((k) => !Object.hasOwn(PRUNE_FLAGS, k));
+    return `POST …/prune does not take ${unknown.map((k) => `\`${k}\``).join(', ')}: it takes ${PRUNE_SHAPE}, as \`wf prune\` takes --artifacts and --unmerged.`;
+  }
+  if (key === 'artifacts' || key === 'unmerged')
+    return `POST …/prune takes \`${key}\` as true or false — \`wf prune\`'s ${PRUNE_FLAGS[key]} — and this request sent ${JSON.stringify(input)}.`;
+  return `POST …/prune takes a JSON object: ${PRUNE_SHAPE}.`;
+}
+
+/**
+ * A finished run pruned, as the guard's refusals word it, its body — strict, every key it does not take named — and a failure that is no
+ * refusal, naming `wf prune`.
+ */
+const PRUNE: RouteWords = {
+  shape: PRUNE_SHAPE,
+  guard: ({ runId }) => ({
+    route: `POST /api/runs/${runId}/prune`,
+    does: 'prunes a run',
+    forAnother: 'prune one',
+    why: 'a run pruned has its worktrees removed, and its files with `artifacts`, and none of its steps can be tried again, sent round or approved',
+    reach: "prune it on the board's run page",
+    instead: "Prune it on the board's run page, or with `wf prune <run>`",
+    shape: PRUNE_SHAPE,
+  }),
+  issue: () => pruneWords,
+  failed: ({ runId }, said) => `POST /api/runs/${runId}/prune: ${runId} was not pruned — ${said}. Prune it with \`wf prune ${runId}\`.`,
+  strict: true,
+};
+
 /** The api's words for each routed command, by its name. */
 export const WORDS: Readonly<Record<string, RouteWords>> = {
   retry: RETRY,
@@ -193,4 +250,6 @@ export const WORDS: Readonly<Record<string, RouteWords>> = {
   accept: ACCEPT,
   say: SAY,
   hold: HOLD,
+  rm: RM,
+  prune: PRUNE,
 };

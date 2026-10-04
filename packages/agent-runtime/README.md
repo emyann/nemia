@@ -994,6 +994,13 @@ harnesses under one rate limit share one ceiling. With no `maxConcurrent` the pa
 `admit`, as under `ae`, which builds its engine with no ceiling and refuses `AE_MAX_CONCURRENT` (exit 2, naming the option).
 agent-orchestrator files every task `queued` with its run's momentum as `priority`, and hands the engine its ceiling.
 
+**An engine can be unschedulable**, as a node is (`Node.spec.unschedulable`): `Engine.layer({ unschedulable })` is a
+function the pass asks before it admits, every pass, so it is never fixed when the engine is built. While it says true the
+pass admits no queued task, whatever room its pools have; what is at work goes on, a task `admit` names still starts, and
+so does one filed unqueued. Once it says false, the next pass admits as before. One that is not a function is refused
+(exit 2). agent-orchestrator hands it a read of its store's own flag file, so no queued task starts while the store is
+held, whichever process ticks it (`test/admission.test.ts`).
+
 `file` writes the key on every filing, `false` when not asked for. **A filing with no key reads as queued**: it is a
 journal from before stage 4c, and a daemon restarted onto it must start nothing it has not admitted, since the layer above
 counts what is at work before it lets more start. So a task filed into an `ae` store by an older engine, and not yet

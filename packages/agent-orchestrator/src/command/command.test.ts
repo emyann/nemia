@@ -214,7 +214,9 @@ test("the table's help is today's, word for word", () => {
       '                               runs and their steps — a run waiting on another says waiting on <run>,',
       '                               one the cap on runs in flight holds waiting for a run slot (2 of 2 in',
       "                               flight); what each step's tries and the run have cost, where measured;",
-      '                               last, whether a wf up ticks the store and when its last pass was',
+      '                               last, whether a wf up ticks the store and when its last pass was;',
+      '                               first, while the store is cordoned, the cordon and each landing it',
+      '                               holds with its merge staged in the checkout (MERGE_HEAD)',
       '  wf show <runId>',
       '                               the run, and what each step was told',
       '  wf logs <runId> <step>',
@@ -274,6 +276,18 @@ test("the table's help is today's, word for word", () => {
       '                               a worktree locked, on no branch, or with changes no commit has;',
       '                               and a finished run not merged unless --unmerged, with --artifacts',
       '                               as without: its files are what a person reads to decide it',
+      '  wf cordon [--why "<words>"] [--by <name>]',
+      '                               cordon the store, as kubectl cordon marks a node: no pass starts new',
+      '                               work — no step, try, round or check filed, no queued task admitted,',
+      '                               no queued card started — and what runs finishes, its end and closeout',
+      '                               recorded; a landing whose check has ended commits or aborts. wf start',
+      '                               still writes a run, and approvals, retries and answers are kept, not',
+      '                               acted on: the pass after wf uncordon files what waits. wf ls, wf feed,',
+      '                               wf start and wf up say it. Refused while a cordon stands.',
+      '                               --why: the reason, said wherever the cordon is; --by: who cordons it',
+      '                               (default: your OS user)',
+      '  wf uncordon',
+      "                               lift the store's cordon: the next pass files what waits",
       '  wf tick [--stats]',
       '                               one pass: tick the engine, file what became ready — refused while a',
       '                               daemon (the api, or a wf up) ticks the store, since it runs the same',
@@ -288,7 +302,8 @@ test("the table's help is today's, word for word", () => {
       '                               it has been silent for 10 intervals, at least 15 minutes; it writes',
       '                               WF_ROOT/daemon.json — who holds it, pid, start, last pass, and a beat',
       '                               each interval;',
-      '                               once a minute, a line of what its passes cost (tick-stats.json).',
+      '                               once a minute, a line of what its passes cost (tick-stats.json); the',
+      "                               store's cordon once it is put, and again once it is lifted.",
       '                               wf up --stats: what the last pass cost, phase by phase — read, not',
       '                               run, so it fits while a daemon holds the store; where none does,',
       '                               wf tick --stats',
@@ -432,6 +447,25 @@ test("REFUSED at shipped defaults: wf hold's arguments, before any run is read, 
   );
   assert.equal(refusedBy(hold, ['r-x', '--until', 'a', '--until', 'b', '--why', 'w']), null);
   assert.equal(refusedBy(hold, ['r-x', '--off', '--off']), null);
+});
+
+test("REFUSED at shipped defaults: wf cordon's and wf uncordon's arguments, before the store is read, in their words whole", () => {
+  const cordon = entry('cordon');
+  const shape = 'wf cordon [--why "<words>"] [--by <name>]';
+  assert.equal(refusedBy(cordon, ['--why', '--by']), `--why takes the words for why the store is cordoned: ${shape}.`);
+  assert.equal(refusedBy(cordon, ['--by']), `--by takes who cordons it, by a name: ${shape}.`);
+  assert.equal(refusedBy(cordon, ['--why', '--x']), `--why takes the words for why the store is cordoned: ${shape}.`);
+  assert.equal(
+    refusedBy(cordon, ['--why', ' \n ']),
+    '--why takes the words for why the store is cordoned, and was given only blanks: give it words, or leave --why out.',
+  );
+  assert.equal(refusedBy(cordon, ['--by', 'b'.repeat(65)]), '--by takes at most 64 characters, and was given 65: say it shorter.');
+  assert.equal(refusedBy(cordon, ['--by', 'a', '--by', 'b']), `wf cordon takes --by once: a cordon says one by. ${shape}.`);
+  assert.equal(refusedBy(cordon, ['now']), `wf cordon does not take now: ${shape}.`);
+  assert.equal(refusedBy(cordon, ['--why', 'merging by hand', '--by=ann']), null);
+  assert.equal(refusedBy(cordon, []), null);
+  assert.equal(refusedBy(entry('uncordon'), ['--all']), "wf uncordon takes no --all: it lifts the store's cordon, whoever put it.");
+  assert.equal(refusedBy(entry('uncordon'), []), null);
 });
 
 test("REFUSED at shipped defaults: wf tick's, wf up's and wf watch's arguments, in today's words whole", () => {

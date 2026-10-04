@@ -304,7 +304,7 @@ const countedInto =
  *   runner and counted on the way (`ObserveCount`, `io`), where `spawned` says whether it asked a registry;
  * - one memo of the settled tasks its passes may skip (`core/engine/memo.ts`), which lives as long as this engine, so a new engine
  *   folds every task on its first pass;
- * - what its passes admit under (`admissionOf`): `maxConcurrent`, and each harness's pool.
+ * - what its passes admit under (`admissionOf`): `maxConcurrent`, `unschedulable`, and each harness's pool.
  *
  * Fails with `EngineRefused` for what `optionsRefusalOf` refuses.
  */

@@ -373,6 +373,8 @@ export { accept, round } from './round/round.verb.ts';
 export { approve } from './gate/gate.verb.ts';
 export { cancel } from './cancel/cancel.verb.ts';
 export { hold, unhold } from './wait/wait.verb.ts';
+export { cordonWords, UNCORDONED, type Cordon, type Cordoned, type CordonStaged } from './cordon/cordon.ts';
+export { readCordon } from './cordon/cordon.store.ts';
 export { retry } from './retry/retry.verb.ts';
 export { say } from './say/say.verb.ts';
 export { COMMANDS, TABLE } from './command/commands.verb.ts';

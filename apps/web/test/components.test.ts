@@ -5311,17 +5311,22 @@ const railFoot = (html: string) =>
     .filter((item) => /^<li\b[^>]*\bmt-auto\b/.test(item))
     .map((item) => /aria-label="([^"]*)"/.exec(item)?.[1]);
 
-test('Capabilities, and it alone, sits at the foot of the rail, the room above it left empty', async () => {
-  assert.deepEqual(railFoot(await railAt('/agents')), ['Capabilities']);
+test("no place sits at the rail's foot: its places stand in one column from the top", async () => {
+  assert.equal(railFoot(await railAt('/agents')).length, 0);
 });
 
-test("the rail is a nav of the four places, each a link named for a screen reader, and only the page's own is lit", async () => {
-  assert.deepEqual(railLinks(await railAt('/machines')), [
+test("the rail is a nav of the three places, each a link named for a screen reader, and only the page's own is lit", async () => {
+  assert.deepEqual(railLinks(await railAt('/agents')), [
     { href: '/', name: 'Home', lit: false },
-    { href: '/agents', name: 'Agents', lit: false },
-    { href: '/machines', name: 'Machines', lit: true },
-    { href: '/capabilities', name: 'Capabilities', lit: false },
+    { href: '/agents', name: 'Agents', lit: true },
+    { href: '/machines', name: 'Machines &amp; Capabilities', lit: false },
   ]);
+  for (const path of ['/machines', '/capabilities'])
+    assert.deepEqual(
+      railLinks(await railAt(path)).map((link) => link.lit),
+      [false, false, true],
+      `Machines & Capabilities, and it alone, is lit on its tab ${path}`,
+    );
   assert.deepEqual(
     railLinks(await railAt('/machinesx')).filter((link) => link.lit),
     [],
@@ -5329,9 +5334,58 @@ test("the rail is a nav of the four places, each a link named for a screen reade
   );
   assert.deepEqual(
     railLinks(await railAt('/factories/nemia')).map((link) => link.lit),
-    [true, false, false, false],
+    [true, false, false],
     "a factory's floor lights Home",
   );
+});
+
+/** The frame's tab strip at `path`, inside a router, around a page that reads `the page`. */
+async function frameTabsAt(path: string): Promise<string> {
+  const { FrameTabs } = await import('../src/components/FrameTabs.tsx');
+  // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
+  return routedWith(createElement(FrameTabs, { path, children: createElement('p', { 'data-page': '' }, 'the page') }));
+}
+
+/** The strip's tabs, in their order: each one's tag, `href`, name and whether it is selected. */
+const tabsIn = (html: string) =>
+  [...(/<div[^>]*role="tablist"[^>]*>([\s\S]*?)<\/div>/.exec(html)?.[1] ?? '').matchAll(/<(\w+)\b([^>]*role="tab"[^>]*)>([^<]*)</g)].map(
+    ([, tag, attrs, name]) => ({
+      tag,
+      href: /href="([^"]*)"/.exec(attrs ?? '')?.[1],
+      name,
+      selected: /aria-selected="true"/.test(attrs ?? ''),
+    }),
+  );
+
+test("a tab's page is drawn under a strip of its place's tabs, each a link to its own address, its own alone selected", async () => {
+  const html = await frameTabsAt('/capabilities');
+  assert.match(
+    html,
+    /role="tablist"[^>]*aria-label="Machines &amp; Capabilities"|aria-label="Machines &amp; Capabilities"[^>]*role="tablist"/,
+    html,
+  );
+  assert.deepEqual(tabsIn(html), [
+    { tag: 'a', href: '/machines', name: 'Machines', selected: false },
+    { tag: 'a', href: '/capabilities', name: 'Capabilities', selected: true },
+  ]);
+  assert.match(
+    html,
+    /<div[^>]*role="tabpanel"[^>]*>\s*<p data-page="">the page<\/p>/,
+    `the page sits in the selected tab's panel: ${html}`,
+  );
+  assert.doesNotMatch(
+    /<div[^>]*role="tabpanel"[^>]*>/.exec(html)?.[0] ?? '',
+    /\btext-sm\b/,
+    "the panel leaves the page's text its own size",
+  );
+});
+
+test('a page with one view draws no strip: its page bare', async () => {
+  for (const path of ['/agents', '/machinesx']) {
+    const html = await frameTabsAt(path);
+    assert.doesNotMatch(html, /role="tab/, `refused: ${path} has no tabs`);
+    assert.equal(html, '<p data-page="">the page</p>', path);
+  }
 });
 
 /** A factory as the api lists it, for the sidebar: on one repository, offering one workflow; `extra` puts keys over it. */

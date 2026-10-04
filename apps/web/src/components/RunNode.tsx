@@ -66,9 +66,10 @@ export type RunFlowNode = Node<RunNodeData, 'run'>;
  * - A result nobody decided, in a line that fits, whole on hover in `wf ls`'s words, a link to where it is decided on the run's page.
  * - Once opened: how far a run waiting on you reaches (`TouchedLine`), and why its record, which adds each tile's attempt and cost,
  *   could not be read.
- * - In its footer, so the card is no taller for them (`CELL_HEIGHT`): what it has cost, `≥` where an ended attempt has none on it; the
- *   tokens its sessions used, `≥` where one measured none, their split on hover; its chips; the hold lifted here, as `wf hold --off`
- *   lifts it (`CardLift`); pruned; and why the run is not judged (`RunSummary.unreadable`), whole on hover.
+ * - In its footer, so the card is no taller for them than a line (`CELL_HEIGHT`): what it has cost, `≥` where an ended attempt has none
+ *   on it; the tokens its sessions used, `≥` where one measured none, their split on hover; and on its right, or under them where both
+ *   do not fit, its chips; the hold lifted here, as `wf hold --off` lifts it (`CardLift`); pruned; and why the run is not judged
+ *   (`RunSummary.unreadable`), whole on hover.
  * - A handle on its left where the edge from a run it waits on comes in, and one on its right where the edge into each card that
  *   waits on it leaves.
  */
@@ -201,9 +202,9 @@ export function RunNode({ data: { run, finished, open, detail, trouble, inspecte
 
         {open && trouble && <p className="px-3 text-[11px] text-red-600 dark:text-red-400">{trouble}</p>}
 
-        <div className="flex min-h-6 items-center justify-between gap-2 border-t px-3 pt-2">
+        <div className="flex min-h-6 flex-wrap items-center justify-between gap-x-2 gap-y-1 border-t px-3 pt-2">
           <Took run={run} clock={clock} />
-          <span className="flex items-center gap-1">
+          <span className="ml-auto flex items-center gap-1">
             {decide && <Badge className="bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-300">to decide</Badge>}
             {waitsOnYou(run) && <Badge className="bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300">waiting on you</Badge>}
             {run.holding && !cancelled && (

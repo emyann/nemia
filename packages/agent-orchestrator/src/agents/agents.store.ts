@@ -2,8 +2,8 @@
  * The agent files: where `wf start` renders each step's agent for Claude Code (`agentFilesDir`), the render itself (`writeAgentFiles`), the
  * version of each skill it rendered (`renderedSkillVersions`) and the rules each declares (`renderedSkillRules`), and a skill read again
  * once its rendered folder is gone (`skillsAgain`); and what the board's Agents page writes — an agent and the files beside it
- * (`writeAgent`, `removeAgent`, refused as `AgentWriteError`) — and the agents of the two places the board lists them from (`agentPlaces`,
- * `listAgents`, `findAgent`). What a folder holds is `agents.ts`'s; this writes and reads it.
+ * (`writeAgent`, `removeAgent`, refused as `AgentWriteError`). What a folder holds is `agents.ts`'s; this writes and reads it, and the
+ * agents of the two places the board lists them from are read in `roster.store.ts`.
  *
  * Beneath the controllers, beside `record.store.ts`, whose run folder holds the agent files: it imports neither the engine nor a
  * controller, and no pure file imports it (`test/boundary.test.ts`). A run is changed by none of the writes: it froze its agents at
@@ -32,7 +32,7 @@ import {
 } from './agents.ts';
 import { frontmatterKey } from '../former/former.ts';
 import { linkRefusal } from '../folder/folder.ts';
-import { agentUsers, agentVersion, loadAgents, preloads, readSkillRules, skillsFor, skillVersion } from '../folder/folder.store.ts';
+import { agentUsers, agentVersion, preloads, readSkillRules, skillsFor, skillVersion } from '../folder/folder.store.ts';
 import type { SkillRule } from '../skills/skills.ts';
 import { isWorkflowsHolder } from '../folder/write.store.ts';
 import { HOME, isDirectory, runsDir } from '../record/record.store.ts';
@@ -433,66 +433,9 @@ export function removeAgent(
 }
 
 /**
- * Where the skills of the agents in `dir` (`<workflows>/agents`) are found, as a start finds them for a workflow beside it (`skillsFor`):
- * that root first, then `repo`'s `.claude/`, then the store. What a card (`cardSkills`) and an agent's version are read with outside a
- * start, so the card names the skills a run would be given and its version moves with them.
- */
-export const agentSkillsFound = (dir: string, repo: string): SkillsFound =>
-  skillsFor(path.join(path.dirname(path.resolve(dir)), '_'), { repo: path.resolve(repo), home: HOME });
-
-/**
  * The skills a write's or a removal's version is read with: found as `repo`'s start finds them, as the board's listing reads the version
  * the write carries back, or beside the folder alone with no `repo`. Read one way and checked another, an agent whose skill is in the
  * repository's `.claude/skills/` would be refused as changed since it was read on every save.
  */
 const skillsAt = (at: string, repo: string | undefined): SkillsFound | undefined =>
-  repo === undefined ? undefined : agentSkillsFound(at, repo);
-
-/**
- * Where an agent may be, in order: the repository's `workflows/agents`, then your store's. The board's two places (`sourcesOf`, apps/api).
- */
-export const agentPlaces = (repo: string): Array<{ from: AgentPlace; dir: string }> => [
-  { from: 'repo', dir: path.join(path.resolve(repo), 'workflows', AGENTS_FOLDER) },
-  { from: 'yours', dir: path.join(HOME, 'workflows', AGENTS_FOLDER) },
-];
-
-export type AgentPlace = 'repo' | 'yours';
-
-/** Every agent of both places, in the order the places come, each read now. An agent that does not read carries its refusal. */
-export function listAgents(repo: string): Array<{ from: AgentPlace; dir: string; name: string; agent: Agent | WorkflowError }> {
-  return agentPlaces(repo).flatMap(({ from, dir }) =>
-    [...loadAgents(dir).entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([name, agent]) => ({ from, dir, name, agent })),
-  );
-}
-
-/**
- * One agent by name, from `from` when it is given and otherwise the first place that has it. Refused, naming the fix, when no place has it,
- * when both do and nothing says which, or when the file is there and does not read — that last in the parser's own words.
- */
-export function findAgent(name: string, repo: string, from?: AgentPlace): { from: AgentPlace; dir: string; agent: Agent } {
-  const places = agentPlaces(repo).filter((place) => from === undefined || place.from === from);
-  const found = places.flatMap((place) => {
-    const agent = loadAgents(place.dir).get(name);
-    return agent === undefined ? [] : [{ ...place, agent }];
-  });
-  const where = (list: ReadonlyArray<{ from: AgentPlace }>) => list.map((p) => `--from ${p.from}`).join(' or ');
-  if (!found.length) {
-    const has = agentPlaces(repo)
-      .filter((place) => fs.existsSync(place.dir))
-      .map((place) => `${place.dir} (${[...loadAgents(place.dir).keys()].sort().join(', ') || 'no agents'})`);
-    throw new WorkflowError(
-      `no agent named ${name}${from ? ` in ${from}` : ''}. Looked in ${
-        has.length
-          ? has.join(' and ')
-          : agentPlaces(repo)
-              .map((p) => p.dir)
-              .join(' and ')
-      }. wf agents lists them.`,
-    );
-  }
-  if (found.length > 1)
-    throw new WorkflowError(`${name} is an agent in both places — ${found.map((p) => p.dir).join(' and ')}. Say which: ${where(found)}.`);
-  const one = found[0];
-  if (one.agent instanceof Error) throw one.agent;
-  return { from: one.from, dir: one.dir, agent: one.agent };
-}
+  repo === undefined ? undefined : skillsFor(path.join(path.dirname(path.resolve(at)), '_'), { repo: path.resolve(repo), home: HOME });

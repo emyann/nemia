@@ -4,14 +4,18 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  ambiguousFactoryRefusal,
   DEFAULT_FACTORY,
   defaultFactoryRefusal,
+  defaultStartRefusal,
+  factoriesHolding,
   factoryLines,
   factoryNameRefusal,
   factoryRepo,
   fillsOf,
   hireRefusal,
   noFactoryLine,
+  noFactoryRefusal,
   outsideRefusal,
   unattachedRefusal,
   unfilledRefusal,
@@ -199,4 +203,84 @@ test('REFUSED: a repository outside the factory, naming its list, sorted, the --
     '/r/c: the factory pipao works on /r/a, /r/b, and this repository is not one of them. Name one of them — --repo /r/a — or file a factory on this one: wf factory add <name> --repo /r/c. Nothing was started.',
   );
   assert.doesNotMatch(outsideRefusal(pipao, '/r/c')!, /default factory/, "only the factory's own fix");
+});
+
+/** A factory on `repos`, attaching and hiring nothing. */
+const on = (name: string, ...repos: string[]) => ({ name, repos, workflows: [], hires: {} });
+
+test("the factories holding a folder: its repository itself, or an ancestor of it, with that repository as the run's root", () => {
+  const a = on('a', '/s/repo', '/s/other');
+  assert.deepEqual(factoriesHolding([a], '/s/repo'), [{ factory: a, repo: '/s/repo' }]);
+  assert.deepEqual(factoriesHolding([a], '/s/repo/src/deep'), [{ factory: a, repo: '/s/repo' }]);
+  assert.deepEqual(factoriesHolding([a], '/s/repo/../other/x'), [{ factory: a, repo: '/s/other' }], 'spelled as path.resolve spells it');
+});
+
+test("REFUSED to hold: a sibling whose name starts with the repository's, and a parent of it", () => {
+  const a = on('a', '/s/repo');
+  assert.deepEqual(factoriesHolding([a], '/s/repo2'), []);
+  assert.deepEqual(factoriesHolding([a], '/s/repo-old/x'), []);
+  assert.deepEqual(factoriesHolding([a], '/s'), []);
+});
+
+test('every factory that holds a folder is returned, none chosen: one repository in two factories, and nested repositories in two', () => {
+  const a = on('a', '/s/repo');
+  const b = on('b', '/s/repo');
+  assert.deepEqual(factoriesHolding([a, b], '/s/repo/x'), [
+    { factory: a, repo: '/s/repo' },
+    { factory: b, repo: '/s/repo' },
+  ]);
+  const outer = on('outer', '/s/outer');
+  const inner = on('inner', '/s/outer/inner');
+  assert.deepEqual(factoriesHolding([outer, inner], '/s/outer/inner/x'), [
+    { factory: outer, repo: '/s/outer' },
+    { factory: inner, repo: '/s/outer/inner' },
+  ]);
+  assert.deepEqual(
+    factoriesHolding([on('both', '/s/outer', '/s/outer/inner')], '/s/outer/inner/x'),
+    [{ factory: on('both', '/s/outer', '/s/outer/inner'), repo: '/s/outer/inner' }],
+    "of one factory's two, the deepest",
+  );
+});
+
+test("REFUSED: a start no factory holds, naming the folder, the factories, the fix in the start's words, the add, and the files that do not read", () => {
+  assert.equal(
+    noFactoryRefusal('/s/loose', ['pipao', 'abc'], '--factory <name>', ['broken']),
+    "/s/loose: no factory works on this folder, and every run is started in a factory. Name the factory — --factory <name>, one of abc, pipao — or file one on this repository and attach the workflow to it: wf factory add <name> --repo <root>, then wf factory attach <name> <workflow>. These factories' files do not read, and were not looked at: broken (wf factory ls). Nothing was started.",
+  );
+  assert.match(
+    noFactoryRefusal('/s/loose', [], '?factory=<name>'),
+    / — \?factory=<name>, once one is filed: wf factory add <name> --repo <root> — /,
+  );
+});
+
+test('REFUSED: a start two factories hold, naming the folder, each with the repository that holds it, and the fix for each', () => {
+  assert.equal(
+    ambiguousFactoryRefusal(
+      '/s/repo/x',
+      [
+        { factory: on('b', '/s/repo'), repo: '/s/repo' },
+        { factory: on('a', '/s/repo'), repo: '/s/repo' },
+      ],
+      '--factory <name>',
+    ),
+    '/s/repo/x: 2 factories work on this folder — a on /s/repo, b on /s/repo — and a start that names none is started in a factory only when one alone works on its folder. Name the one: --factory a, or --factory b. Nothing was started.',
+  );
+  assert.match(
+    ambiguousFactoryRefusal(
+      '/s/repo',
+      [
+        { factory: on('a', '/s/repo'), repo: '/s/repo' },
+        { factory: on('b', '/s/repo'), repo: '/s/repo' },
+      ],
+      '?factory=<name>',
+    ),
+    /Name the one: \?factory=a, or \?factory=b\./,
+  );
+});
+
+test('REFUSED: a start that names the default factory, which holds history only, naming the fix and the factories', () => {
+  assert.equal(
+    defaultStartRefusal('--factory <name>', ['pipao']),
+    '`default` is the default factory: it holds the history of the runs and cards that named no factory, and no run is started in it. Name a factory — --factory <name>, one of pipao. Nothing was started.',
+  );
 });

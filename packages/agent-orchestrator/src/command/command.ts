@@ -48,8 +48,8 @@ export type Flag = {
 /**
  * How a command line spells a command's arguments, and the refusals of a line that does not: an argument the command does not take
  * (`unknown`), two ways given (`oneWay`), and a text flag's value given apart that is one of the command's own flags, which reads as the
- * value left out (`apart`) — `--flag=<value>` carries even that. `defaults` is what the command line takes when no way is given; a body
- * says its way.
+ * value left out (`apart`, handed the value and the flag it was given to) — `--flag=<value>` carries even that. `defaults` is what the
+ * command line takes when no way is given; a body says its way.
  */
 export type Spec = {
   readonly positionals: readonly Positional[];
@@ -57,7 +57,7 @@ export type Spec = {
   readonly defaults?: Readonly<Record<string, string>>;
   readonly unknown: (arg: string) => string;
   readonly oneWay?: string;
-  readonly apart?: (flag: string) => string;
+  readonly apart?: (value: string, flag: string) => string;
 };
 
 /** Where the api serves a command: a write posted and accepted, or a read got and answered. */
@@ -102,7 +102,7 @@ export function amountOf(text: string | undefined, takes: string, form: string):
 function valueOf(spec: Spec, flag: Flag, value: string | undefined, joined: boolean): string | number {
   if (flag.kind === 'amount') return amountOf(value, flag.takes ?? '', flag.form ?? '');
   if (value === undefined || (flag.kind === 'name' && (!value || value.startsWith('--')))) return usage(flag.takes ?? '');
-  if (!joined && spec.apart && spec.flags.some((f) => f.flag === value)) usage(spec.apart(value));
+  if (!joined && spec.apart && spec.flags.some((f) => f.flag === value)) usage(spec.apart(value, flag.flag));
   return value;
 }
 

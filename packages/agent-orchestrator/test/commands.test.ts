@@ -23,14 +23,16 @@ test('each command is served on the api where it was before the table', () => {
       ['ls', { method: 'GET', path: '/api/runs', status: 200 }],
       ['decide', { method: 'GET', path: '/api/runs/:runId/decision', status: 200 }],
       ['ceilings', { method: 'GET', path: '/api/ceilings', status: 200 }],
+      ['agents', { method: 'GET', path: '/api/agents', status: 200 }],
+      ['agents card', { method: 'GET', path: '/api/agents/:from/:name/card', status: 200 }],
     ],
   );
 });
 
-test('every command the api posts writes, and the api guards it; the three it gets write nothing', () => {
+test('every command the api posts writes, and the api guards it; the five it gets write nothing', () => {
   assert.deepEqual(
     COMMANDS.filter((c) => !c.writes).map((c) => c.name),
-    ['ls', 'decide', 'ceilings'],
+    ['ls', 'decide', 'ceilings', 'agents', 'agents card'],
   );
   assert.deepEqual(
     COMMANDS.filter((c) => c.writes !== (c.route?.method === 'POST')).map((c) => c.name),

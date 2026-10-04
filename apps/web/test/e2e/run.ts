@@ -210,6 +210,8 @@ async function main(): Promise<void> {
     ...process.env,
     PORT: '0',
     WF_ROOT: store,
+    /** The e2e's starts are made in its scratch checkout, which no factory of its store holds: they go to the default factory. */
+    WF_DEFAULT_FACTORY_STARTS: '1',
     HKB_REPO: checkout,
     CLAUDE_CONFIG_DIR: path.join(store, 'claude'),
     /** The quota asked of the e2e's claude on every read, so the quota page reads the answer it has just written. */

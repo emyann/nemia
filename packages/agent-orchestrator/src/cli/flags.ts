@@ -28,15 +28,20 @@ export const HELP = `wf — run a workflow of agent steps
                                on every step's brief under what was asked for; once per file
                                --factory <name>: the workflow must be attached to the factory, whose
                                hires fill its steps, and a step left with no agent is refused (wf
-                               factory --help); without it, every workflow is offered and such a
-                               step runs as a plain session. A factory with one repository gives
-                               the run its --repo, and a repository not one of the factory's is
-                               refused, naming them
+                               factory --help). A factory with one repository gives the run its
+                               --repo, and a repository not one of the factory's is refused, naming
+                               them. Without it, the run is started in the factory whose repository
+                               holds --repo, else where wf start is typed, on that repository, when
+                               one factory alone does; none, or two, is refused, naming the fix.
+                               The default factory is history only: --factory default is refused
                                a card of the inbox (wf inbox --help) starts its body, or --brief
                                "<brief>" in its place, and leaves the inbox: --workflows is its workflow:
-                               unless given, --repo its repo:, --factory its factory:
-  wf plan <folder> [--repo .]  start a plan: one run per card in the folder, parents first, each
-                               --after the runs of the cards its after: names (wf plan --help)
+                               unless given, --repo its repo:, --factory its factory:, and a card
+                               that names no factory either way is refused
+  wf plan <folder> [--repo .] [--factory <name>]
+                               start a plan: one run per card in the folder, parents first, each
+                               --after the runs of the cards its after: names, in the factory as
+                               wf start finds it (wf plan --help)
   wf inbox                     the cards parked before they are started: name, first line, workflow
                                and repo when set, and started as <runId> (wf inbox --help)
   wf inbox add "<idea>"|<file> [--workflow <name>] [--repo <path>] [--factory <name>]
@@ -120,14 +125,6 @@ export const HELP = `wf — run a workflow of agent steps
 ${helpOf(COMMANDS)}
   wf show <runId>              the run, and what each step was told
   wf logs <runId> <step>       that step's session output
-  wf agents [--repo .]         the agents a step may name, the repository's then yours: what each is
-                               for, what it says it can do (an entry for each skill, read off its
-                               SKILL.md), and the skills it is given (its skills:)
-  wf agents card <name> [--repo .] [--from repo|yours]
-                               that agent in the shape of an A2A Agent Card, JSON on stdout and
-                               nothing else — every field the protocol marks REQUIRED but
-                               supportedInterfaces, which is left out because nothing here serves an
-                               agent over A2A. The card describes; it is not an address
   wf agents custom <name> [--file <path>|-] [--clear] [--repo .]
                                your custom instructions for that agent: words you add to it without
                                rewriting it, kept in <store>/custom-instructions/<name>.md and told

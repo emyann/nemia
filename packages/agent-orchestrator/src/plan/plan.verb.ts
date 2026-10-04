@@ -7,6 +7,7 @@ import { type Card, type Planned } from './plan.ts';
 import { readPlan } from './plan.store.ts';
 import { refuseInclude, start, stepsToStart } from '../start/start.verb.ts';
 import { placesOf } from '../folder/lookup.store.ts';
+import { readFactory } from '../factory/factory.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 
 /**
@@ -29,15 +30,20 @@ export type PlanStarted = {
  * workflow folder (`workflowFolder`, from the plan folder), or one `start` would refuse — that refusal, behind the card; and a
  * `.worktreeinclude` `start` would refuse. A `start()` that refuses after that, part-way, stops the plan: the runs already started stand,
  * and `stopped` says which card refused and which are left. `startRun` is `start`, unless a test hands it one of its own.
+ *
+ * `factory` names the factory every card's run is started in, as `wf start --factory` names it: read first (`readFactory`), and each
+ * card's workflow is judged in it before the first run, a workflow it has not attached or a step its hires leave unfilled among what is
+ * refused. Left out, each run is started with none, the default factory's.
  */
-export function startPlan(opts: { dir: string; repo: string; startRun?: typeof start }): PlanStarted {
+export function startPlan(opts: { dir: string; repo: string; factory?: string; startRun?: typeof start }): PlanStarted {
   const cards = readPlan(opts.dir);
+  const factory = opts.factory === undefined ? undefined : readFactory(opts.factory);
   refuseInclude(opts.repo, true);
   const folders = new Map<string, string>();
   for (const card of cards) {
     try {
       const folder = workflowFolder(card.workflow, opts.dir, opts.repo);
-      stepsToStart(folder, true, placesOf(opts.repo));
+      stepsToStart(folder, true, placesOf(opts.repo), factory);
       folders.set(card.name, folder);
     } catch (err) {
       throw new Invalid({ message: `${card.file}: \`workflow: ${card.workflow}\` — ${(err as Error).message}` });
@@ -49,7 +55,13 @@ export function startPlan(opts: { dir: string; repo: string; startRun?: typeof s
   for (const [i, card] of cards.entries()) {
     const runOf = new Map(started.map((p) => [p.card.name, p.runId]));
     try {
-      const run = startRun({ brief: card.body, repo: opts.repo, workflowDir: folderOf(card), after: card.after.map((a) => runOf.get(a)!) });
+      const run = startRun({
+        brief: card.body,
+        repo: opts.repo,
+        workflowDir: folderOf(card),
+        after: card.after.map((a) => runOf.get(a)!),
+        ...(opts.factory !== undefined ? { factory: opts.factory } : {}),
+      });
       started.push({ card, runId: run.id, workflowDir: run.workflowDir });
     } catch (err) {
       return { started, folderOf, stopped: { card, error: err as Error, rest: cards.slice(i + 1) } };

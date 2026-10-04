@@ -106,8 +106,8 @@ test("wf feed reads the store's feed from a cursor, and prints the cordon first 
 
   const cordon = putCordon({ why: 'merging by hand', by: 'ann' });
   try {
-    const cordoned = await FEED.handler(e, { cursor: String(end) });
-    assert.deepEqual(FEED.print(cordoned, {}), [cordonWords(cordon), `cursor: ${end}`]);
+    const cordoned = await FEED.handler(e, { cursor: String(Buffer.byteLength(head)) });
+    assert.deepEqual(FEED.print(cordoned, {}), [cordonWords(cordon), feedLineWords(second), `cursor: ${end}`]);
   } finally {
     liftCordon();
   }

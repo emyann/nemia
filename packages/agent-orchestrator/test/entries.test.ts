@@ -45,6 +45,7 @@ const PINNED: Record<string, string[]> = {
     'SkillWriteError',
     'TABLE',
     'TRY_STEP',
+    'VERSION',
     'WHY_CAP',
     'accept',
     'acceptAsk',

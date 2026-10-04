@@ -26,6 +26,7 @@
  * beneath `worktree.store.ts` and `write.store.ts`, beneath the rest, so no cycle can form (`test/boundary.test.ts`).
  */
 export { verdictWord } from './check/check.ts';
+export { VERSION } from './version/version.ts';
 export { Conflict, Invalid, Missing } from './refusal/refusal.ts';
 export { maxConcurrent, maxRuns, verifiesRest, wfRoot } from './config/config.store.ts';
 export type { Refusal } from './refusal/refusal.ts';

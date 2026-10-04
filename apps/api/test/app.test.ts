@@ -7,7 +7,7 @@ import { scratch } from './scratch.ts';
 import type { RunDetail } from '../src/detail/detail.ts';
 import type { RunSummary } from '../src/runs/runs.ts';
 import { app } from '../src/app.ts';
-import { engine, list, readFilings, timeline, runStore } from 'agent-orchestrator';
+import { engine, list, readFilings, timeline, runStore, VERSION } from 'agent-orchestrator';
 import { claudeDetached, claudeOps } from 'agent-runtime/effect';
 import { Effect } from 'effect';
 import { DEFAULT_ROUNDS } from 'agent-orchestrator/workflow';
@@ -165,6 +165,14 @@ test('health answers', async () => {
   const res = await app.request('/api/health');
   assert.equal(res.status, 200);
   assert.deepEqual(await res.json(), { ok: true });
+});
+
+test("the version answers: the orchestrator's package version, a non-empty string", async () => {
+  const res = await app.request('/api/version');
+  assert.equal(res.status, 200);
+  const body = (await res.json()) as { version: string };
+  assert.deepEqual(body, { version: VERSION });
+  assert.ok(body.version.length > 0, 'the version is a word, not empty');
 });
 
 test('an empty store lists no runs', async () => {

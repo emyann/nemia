@@ -30,6 +30,7 @@ import {
   HARNESSES,
   parseFolder,
   parseWorkflow,
+  POLICY_KEYS,
   REMOTE_PREFIX,
   REMOTE_REFUSED_KEYS,
   renderStep,
@@ -125,7 +126,8 @@ export type KeyField = {
 /**
  * What the builder's form is drawn from (`GET /api/workflows/keys`): every key a step may set, in the package's order, and the default
  * harness. `roleKeys` are the keys an agent may set (the package's `AGENT_KEYS` but its description), which a step with an agent takes from
- * it unless its file sets them itself: the form shows those as the agent's until one is changed.
+ * it unless its file sets them itself: the form shows those as the agent's until one is changed. `policyKeys` are those a step's file sets
+ * as its policy over its agent (the package's `POLICY_KEYS`): the fence keys, which only tighten the agent's, and the skills it adds.
  *
  * `agents` are the role values of each agent of yours that loads, as a step's spec gives them and only those it sets: a step attached to
  * one on the board shows its values before the save reads them back, and a step moved from one agent to another shows the other's.
@@ -138,6 +140,7 @@ export type KeyForm = {
   keys: KeyField[];
   defaultHarness: string;
   roleKeys: StepKey[];
+  policyKeys: StepKey[];
   agents: Record<string, Partial<WorkflowStepSpec>>;
   remote: { prefix: string; refuses: StepKey[] };
 };
@@ -205,6 +208,7 @@ export const keyForm = (home: string): KeyForm => ({
   })),
   defaultHarness: DEFAULT_HARNESS,
   roleKeys: [...ROLE_KEYS],
+  policyKeys: [...POLICY_KEYS],
   agents: agentValues(home),
   remote: { prefix: REMOTE_PREFIX, refuses: [...REMOTE_REFUSED_KEYS] },
 });

@@ -1,8 +1,9 @@
 /**
  * The store's pause on the api, as `wf pause` and `wf resume` put and lift it, through their entries of the package's command table:
  * `POST /api/pause` pauses the store, `GET /api/pause` reads it back with what finishes and the landings it holds staged, a second
- * pause is the package's 409, `DELETE /api/pause` lifts it, and a second lift is its 404; the cordon's former route is gone; a body that is not a pause, and words `wf pause` refuses, are refused
- * before the store is written; and a page on another site is refused by the guard.
+ * pause is the package's 409, `DELETE /api/pause` lifts it, and a second lift is its 404; the cordon's former route is gone; a body
+ * that is not a pause, and words `wf pause` refuses, are refused before the store is written; and a page on another site is refused by
+ * the guard.
  *
  * At shipped defaults: the api's own engine over the harness's scratch store (`root`), which no run of this file seeds.
  */

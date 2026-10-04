@@ -1,6 +1,7 @@
 /**
- * The store's pause on disk: `$WF_ROOT/pause`, a person's file, `{at, by, why?}`, put by `wf pause` and deleted by `wf resume`. Every
+ * The store's pause on disk: `$WF_ROOT/cordon`, a person's file, `{at, by, why?}`, put by `wf pause` and deleted by `wf resume`. Every
  * pass reads it, as `runStore` composes it onto each run it reads, so a pause put or lifted between two passes is honoured by the next.
+ * The file keeps the name it had before the verbs were renamed, so a pause put then still stands and `wf resume` lifts it.
  *
  * Beneath the controllers, beside `files.store.ts`, which imports it: it imports no store of runs.
  */

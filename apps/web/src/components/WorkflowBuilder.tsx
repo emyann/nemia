@@ -264,6 +264,7 @@ export function WorkflowBuilder({ workflow, onClose }: { workflow: WorkflowListi
               form={form.data}
               schemas={base.schemas}
               refused={refusal?.steps.includes(step.name) ? refusal.message : null}
+              layers={base.steps.find((listed) => listed.name === step.name)?.layers ?? null}
               update={update}
               onRemoved={() => setSelected(null)}
             />

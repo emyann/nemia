@@ -5371,3 +5371,77 @@ test("at a gate, the step's policy is drawn open: its words, the skills it adds,
     'a step with no agent has no policy over one',
   );
 });
+
+/** `StepForm` for one step of `writer`'s, inside a router, with the listing's layers `layers`: its agent, a policy key and a wiring key. */
+async function stepFormMarkup(layers: StepLayers | null, agent: string | null = 'writer'): Promise<string> {
+  const { StepForm } = await import('../src/components/StepForm.tsx');
+  const { keyForm, stepSpec } = await import('./library-fixtures.ts');
+  const { createMemoryHistory, createRootRoute, createRouter, RouterContextProvider } = await import('@tanstack/react-router');
+  const router = createRouter({ routeTree: createRootRoute(), history: createMemoryHistory() });
+  const form = keyForm({
+    keys: [
+      { key: 'workspace', meaning: 'Where the step works.', kind: 'choice', choices: ['main', 'folder'], byHarness: null },
+      { key: 'disallowedTools', meaning: 'What it may never run.', kind: 'list', choices: null, byHarness: null },
+      { key: 'agent', meaning: 'Who it is.', kind: 'choice', choices: ['writer'], byHarness: null },
+    ],
+  });
+  const step = {
+    name: 'write',
+    spec: stepSpec({ agent, disallowedTools: ['Bash(git push:*)'] }),
+    body: 'Write the note.',
+    own: agent === null ? null : { keys: ['agent', 'disallowedTools'], body: 'Write the note.' },
+    schema: null,
+  };
+  const element = createElement(StepForm, {
+    step,
+    steps: [step],
+    form,
+    schemas: [],
+    refused: null,
+    layers,
+    update: () => {},
+    onRemoved: () => {},
+  } as never);
+  // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
+  return renderToStaticMarkup(createElement(RouterContextProvider, { router, children: element }));
+}
+
+test("a step with an agent is read by layer on the builder: its agent, the agent's instructions folded, your custom instructions, then the step's policy holding its words and its fence keys, then its wiring", async () => {
+  const html = await stepFormMarkup(LAYERS);
+  const at = (mark: string): number => {
+    const index = html.indexOf(mark);
+    assert.ok(index >= 0, `${mark} in ${html}`);
+    return index;
+  };
+  const order = [
+    'data-field="agent"',
+    'data-layer="instructions"',
+    'You are the writer.',
+    'data-layer="custom"',
+    'Be terse.',
+    'data-layer="policy"',
+    'Its words',
+    'data-field="disallowedTools"',
+    'data-field="workspace"',
+  ].map(at);
+  assert.deepEqual(
+    order,
+    order.toSorted((a, b) => a - b),
+    html,
+  );
+  assert.match(html, /<details[^>]*>[^]*Read them[^]*You are the writer\.[^]*<\/details>/, 'the instructions are folded');
+  assert.match(html, /May only tighten writer&#x27;s fence/);
+  assert.match(html, /Told after writer&#x27;s instructions and your custom instructions; where they conflict, these words win\./);
+
+  const uncustomised = await stepFormMarkup({ ...LAYERS, custom: null });
+  assert.match(uncustomised, /data-layer="custom"[^]*None\. Write them on[^]*writer[^]*&#x27;s page\./);
+  assert.match(uncustomised, /Told after writer&#x27;s instructions; where they conflict/);
+
+  const unread = await stepFormMarkup({ ...LAYERS, agent: 'critic' });
+  assert.match(unread, /data-agent-layers-unread[^>]*>Save to read writer&#x27;s instructions here\./);
+  assert.doesNotMatch(unread, /You are the writer\.|data-layer="instructions"/, "another agent's words are never drawn as this one's");
+
+  const agentless = await stepFormMarkup(null, null);
+  assert.doesNotMatch(agentless, /data-layer|data-agent-note/);
+  assert.match(agentless, /What it is told/);
+});

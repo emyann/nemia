@@ -1,33 +1,36 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { NAV, RAIL, sectionOf } from '../src/components/nav.ts';
+import { pickedOf, pickTo, RAIL, sectionLink, sectionOf, SECTIONS } from '../src/components/nav.ts';
 
-test('the menu starts with the Inbox, and the rest follow in their order', () => {
+/** The section labelled `label`. */
+const section = (label: string) => SECTIONS.find((item) => item.label === label)!;
+
+test("the sidebar's sections are the factory's Floor, then the Inbox, Runs, Workflows and Stats, in that order", () => {
   assert.deepEqual(
-    NAV.map((item) => item.label),
-    ['Inbox', 'Factories', 'Runs', 'Stats', 'Workflows'],
+    SECTIONS.map((item) => item.label),
+    ['Floor', 'Inbox', 'Runs', 'Workflows', 'Stats'],
   );
   assert.deepEqual(
-    NAV.map((item) => item.to),
-    ['/inbox', '/', '/runs', '/stats', '/workflows'],
+    SECTIONS.map((item) => item.to),
+    ['/factories/$factory', '/inbox', '/runs', '/workflows', '/stats'],
   );
 });
 
-test("each page lights one place in the menu — a run and its steps lighting Runs, a card's page the Inbox, a factory's floor the Factories, a step's page Workflows — and a page the menu has no place for lights none", () => {
-  const lit = (path: string) => NAV.filter((item) => item.active(path)).map((item) => item.label);
-  for (const item of NAV) assert.deepEqual(lit(item.to), [item.label], item.to);
+test("each page lights one section — a factory's floor the Floor, a run and its steps Runs, a card's page the Inbox, a step's page Workflows — and a page no section has a place for lights none", () => {
+  const lit = (path: string) => SECTIONS.filter((item) => item.active(path)).map((item) => item.label);
+  for (const item of SECTIONS.filter((one) => one.label !== 'Floor')) assert.deepEqual(lit(item.to), [item.label], item.to);
+  assert.deepEqual(lit('/factories/x'), ['Floor']);
   assert.deepEqual(lit('/runs/r-1'), ['Runs']);
-  assert.deepEqual(lit('/runs/r-1/steps/implement'), ['Runs']);
+  assert.deepEqual(lit('/runs/r-1/steps/s'), ['Runs']);
   assert.deepEqual(lit('/inbox/card'), ['Inbox']);
-  assert.deepEqual(lit('/factories/nemia'), ['Factories']);
   assert.deepEqual(lit('/workflows/repo/dev/review'), ['Workflows']);
-  assert.deepEqual(lit('/agents'), [], 'Agents is in the rail, not the menu');
-  assert.deepEqual(lit('/machines'), [], 'Machines is in the rail, not the menu');
+  assert.deepEqual(lit('/'), [], 'Home is in the rail, not the sections');
+  assert.deepEqual(lit('/agents'), [], 'Agents is in the rail, not the sections');
   assert.deepEqual(lit('/nowhere'), []);
-  assert.deepEqual(lit('/inboxes'), [], "refused: a path that only begins with a place's name is not under it");
-  assert.deepEqual(lit('/workflowsx/repo'), [], "refused: a path that only begins with a place's name is not under it");
-  assert.deepEqual(lit('/factoriesx'), [], "refused: a path that only begins with a place's name is not under it");
-  assert.deepEqual(lit('/statsx'), [], "refused: a path that only begins with a place's name is not under it");
+  assert.deepEqual(lit('/factories/'), [], 'refused: a floor names its factory');
+  assert.deepEqual(lit('/factories/x/y'), [], "refused: nothing under a floor is the floor's");
+  for (const path of ['/runsx', '/factoriesx', '/statsx', '/inboxes', '/workflowsx/repo'])
+    assert.deepEqual(lit(path), [], `refused: a path that only begins with a section's name is not under it (${path})`);
 });
 
 test('the rail holds Home, Agents, Machines and Capabilities, in that order', () => {
@@ -56,19 +59,58 @@ test("each page lights at most one place in the rail — Home on the canvas and 
   assert.deepEqual(lit('/factoriesx'), [], "refused: a path that only begins with a place's name is not under it");
 });
 
-test('the rail and the menu share no route but Home, the factories canvas, until the menu is rebuilt', () => {
+test('the rail and the sections share no route', () => {
   const rail = new Set<string>(RAIL.map((item) => item.to));
-  const shared = NAV.map((item) => item.to).filter((to) => rail.has(to));
-  assert.deepEqual(shared, ['/']);
+  assert.equal(SECTIONS.filter((item) => rail.has(item.to)).length, 0);
 });
 
-test("the header names a page by the menu's place first — Factories on the canvas and a factory's floor — then by the rail's, and a page neither has a place for goes unnamed", () => {
-  assert.equal(sectionOf('/'), 'Factories');
-  assert.equal(sectionOf('/factories/nemia'), 'Factories');
+test("the header names a page by its section first — Floor on a factory's floor — then by the rail's place, Home on the canvas, and a page neither has a place for goes unnamed", () => {
+  assert.equal(sectionOf('/'), 'Home');
+  assert.equal(sectionOf('/factories/nemia'), 'Floor');
   assert.equal(sectionOf('/runs/r-1'), 'Runs');
+  assert.equal(sectionOf('/workflows'), 'Workflows');
   assert.equal(sectionOf('/agents'), 'Agents');
   assert.equal(sectionOf('/agents/scribe'), 'Agents');
   assert.equal(sectionOf('/machines'), 'Machines');
   assert.equal(sectionOf('/capabilities'), 'Capabilities');
   assert.equal(sectionOf('/machinesx'), undefined);
+});
+
+test("the picked factory is read from the address alone: a floor's name, else a section page's ?factory=, else none", () => {
+  assert.equal(pickedOf('/factories/nemia', {}), 'nemia');
+  assert.equal(pickedOf('/runs', { factory: 'hiring' }), 'hiring');
+  assert.equal(pickedOf('/stats', { factory: 'hiring', period: '90d' }), 'hiring');
+  assert.equal(pickedOf('/workflows', { factory: 'hiring' }), 'hiring');
+  assert.equal(pickedOf('/inbox', { factory: 'hiring' }), 'hiring');
+  assert.equal(pickedOf('/runs', {}), undefined);
+  assert.equal(pickedOf('/runs', { factory: '' }), undefined, 'an empty name picks none');
+  assert.equal(pickedOf('/runs', { factory: 3 }), undefined, 'a name that is no string picks none');
+  assert.equal(pickedOf('/factories/nemia', { factory: 'hiring' }), 'nemia', "on a floor the path wins over a stray ?factory=");
+  for (const path of ['/runs/r-1', '/agents', '/inbox/card', '/', '/workflows/repo/dev/review'])
+    assert.equal(pickedOf(path, {}), undefined, `${path} picks none`);
+  for (const path of ['/runs/r-1', '/agents', '/inbox/card', '/'])
+    assert.equal(pickedOf(path, { factory: 'hiring' }), undefined, `refused: ${path} reads no ?factory=, which its route keeps none of`);
+});
+
+test("a section's link carries the picked factory, and none under All factories; the Floor is drawn only with a factory picked", () => {
+  assert.equal(sectionLink(section('Floor'), undefined), null);
+  assert.deepEqual(sectionLink(section('Floor'), 'nemia'), { to: '/factories/$factory', params: { factory: 'nemia' } });
+  for (const label of ['Inbox', 'Runs', 'Workflows', 'Stats']) {
+    const { to } = section(label);
+    assert.deepEqual(sectionLink(section(label), 'nemia'), { to, search: { factory: 'nemia' } });
+    assert.deepEqual(sectionLink(section(label), undefined), { to, search: {} }, `refused: ${label} carries no factory under All factories`);
+  }
+});
+
+test("a pick on a section's page stays there, keeping its other keys; on a floor it opens the picked one's, or Home; elsewhere it opens the picked one's floor, or stays", () => {
+  const search = { period: '90d', agent: 'ada', factory: 'hiring' };
+  assert.deepEqual(pickTo('/stats', search, 'nemia'), { to: '/stats', search: { period: '90d', agent: 'ada', factory: 'nemia' } });
+  assert.deepEqual(pickTo('/stats', search, undefined), { to: '/stats', search: { period: '90d', agent: 'ada' } });
+  assert.deepEqual(pickTo('/runs', {}, 'nemia'), { to: '/runs', search: { factory: 'nemia' } });
+  assert.deepEqual(pickTo('/factories/nemia', {}, undefined), { to: '/' });
+  assert.deepEqual(pickTo('/factories/nemia', {}, 'hiring'), { to: '/factories/$factory', params: { factory: 'hiring' } });
+  assert.deepEqual(pickTo('/runs/r-1', {}, 'nemia'), { to: '/factories/$factory', params: { factory: 'nemia' } });
+  assert.deepEqual(pickTo('/inbox/card', { factory: 'x' }, 'nemia'), { to: '/factories/$factory', params: { factory: 'nemia' } });
+  assert.equal(pickTo('/runs/r-1', {}, undefined), null);
+  assert.equal(pickTo('/agents', {}, undefined), null);
 });

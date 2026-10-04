@@ -571,12 +571,6 @@
       }
     },
     {
-      "files": ["packages/agent-orchestrator/src/cli/flags.ts"],
-      "rules": {
-        "sonarjs/cognitive-complexity": ["error", 19]
-      }
-    },
-    {
       "files": ["packages/agent-orchestrator/src/feed/feed.store.ts"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 82, "skipBlankLines": true, "skipComments": true }],

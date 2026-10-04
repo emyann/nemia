@@ -42,6 +42,8 @@ const {
   toDecideWords,
 } = await import('../src/runner.ts');
 const { readRun } = await import('../src/record/record.store.ts');
+const { runStore } = await import('../src/record/files.store.ts');
+const { liftCordon, putCordon } = await import('../src/cordon/cordon.store.ts');
 const { main } = await import('../src/cli/main.ts');
 const { abortMerge, checkoutParts, commitMerge, mergeInProgress, mergeState } = await import('../src/workspace/worktree.store.ts');
 
@@ -2119,4 +2121,32 @@ test('the whole screen of a run whose ending waits for the checkout, first filed
     "  ship: waiting on the checkout (<first>'s ship has it) — it works in the repository's own checkout, and two endings never do at once; the next tick files ship once <first>'s ship has settled",
     '  nothing to decide yet',
   ]);
+});
+
+test('while the store is cordoned, a landing whose check has ended commits on its exit 0, and one its check refused is aborted, as without it', async () => {
+  for (const [exit, phase] of [
+    [0, 'succeeded'],
+    [1, 'failed'],
+  ] as const) {
+    const { repo, id, e, settle, base, checkId } = await stagedAndSigned();
+    putCordon({ why: 'merging by hand', by: 'ann' });
+    try {
+      settle(checkId, phase, undefined, exit);
+      const cordoned = runStore.runs.read(id);
+      assert.ok(cordoned.cordon, 'the run is read with the cordon, as every pass reads it');
+      const advanced = await advance(e, cordoned);
+      assert.deepEqual(advanced.filed, [], `exit ${exit}: nothing filed`);
+      assert.equal(mergeHead(repo), false, `exit ${exit}: the merge is not left staged in the checkout`);
+      const landed = readRun(id).steps.ship.landed;
+      if (exit === 0) {
+        assert.deepEqual(landed, { commit: git(repo, 'rev-parse', 'HEAD') }, 'committed onto the base branch');
+        assert.notEqual(git(repo, 'rev-parse', 'HEAD'), base);
+      } else {
+        assert.ok(landed && 'aborted' in landed, JSON.stringify(landed));
+        assert.equal(git(repo, 'rev-parse', 'HEAD'), base, 'aborted, the base branch where it was');
+      }
+    } finally {
+      liftCordon();
+    }
+  }
 });

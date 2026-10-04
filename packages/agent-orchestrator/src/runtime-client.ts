@@ -13,6 +13,7 @@
  * program requires that same Promise engine as a service (`EngineService`), which its plain face provides from the engine it is handed, and
  * lifts each read with `tried` or `awaited`: a refusal is the program's failure, anything else a defect it dies of.
  */
+import fs from 'node:fs';
 import path from 'node:path';
 import { Context, Effect, Layer } from 'effect';
 import { Engine as RuntimeEngine, promiseEngine } from 'agent-runtime/effect';
@@ -29,6 +30,7 @@ import {
 import { envNameOf, readRemoteAgents, remoteAgentsFile } from './harness/a2a.store.ts';
 import { HOME } from './record/record.store.ts';
 import { maxConcurrent } from './config/config.store.ts';
+import { cordonFile } from './cordon/cordon.store.ts';
 import { REMOTE_PREFIX, remoteNameOf } from './harness/harness.ts';
 import { Invalid, isRefusal, type Refusal } from './refusal/refusal.ts';
 
@@ -82,7 +84,8 @@ export const HARNESSES = {
  * The engine the controllers use. Every filing goes out `queued`, and the runtime admits it per pool under the ceiling handed to it here,
  * `maxConcurrent` from `WF_MAX_CONCURRENT` (`maxConcurrent` in `config.store.ts`), the filed `priority` first. A value the variable
  * refuses gives the engine no ceiling, so nothing is admitted: the tick refuses its pass on the same read (`ceilings`), so the daemon
- * says why, and every other command works on.
+ * says why, and every other command works on. While the store is cordoned the engine is `unschedulable`, asked on every pass, so no
+ * queued task is admitted, whichever process ticks the store.
  *
  * Its `a2a:<name>` harnesses are what the store's `a2a-agents.json` declares and the runtime takes (`readRemote`). A file refused as it
  * stands gives none, and an entry refused gives no harness of its name: each is said on stderr and left out, so every other command —
@@ -95,7 +98,7 @@ export const engine = (): Engine => {
   const remote = Object.fromEntries([...read.agents].map(([name, agent]) => [`${REMOTE_PREFIX}${name}`, agent]));
   for (const why of refusalsOf(read)) console.error(`wf: ${why} ${LEFT_OUT}`);
   const harnesses = { ...HARNESSES, ...remote };
-  return engineOf(RuntimeEngine.layer({ root: path.join(HOME, 'engine'), harnesses, credentials, missingCredential, ...ceilingOf() }));
+  return engineOf(RuntimeEngine.layer({ root: path.join(HOME, 'engine'), harnesses, credentials, missingCredential, ...storeAdmission() }));
 };
 
 /**
@@ -138,6 +141,16 @@ export const tried = <A>(read: () => A): Effect.Effect<A, Refusal> =>
  */
 export const awaited = <A>(read: () => Promise<A>): Effect.Effect<A, Refusal> =>
   Effect.tryPromise({ try: read, catch: (err) => err }).pipe(Effect.catch(orRefusal));
+
+/**
+ * What the store's engine admits under, as `engine()` hands it to the runtime: its ceiling (`ceilingOf`), and `unschedulable`, asked by
+ * the runtime's pass before it admits, true while the store's cordon's file is there (`cordonFile`), whatever it holds, as `readCordon`
+ * reads a file that is there as a cordon.
+ */
+export const storeAdmission = (): { maxConcurrent?: number; unschedulable: () => boolean } => ({
+  unschedulable: () => fs.existsSync(cordonFile()),
+  ...ceilingOf(),
+});
 
 /** The engine's ceiling, `WF_MAX_CONCURRENT`'s sessions per pool, or none when the variable is refused (`maxConcurrent`). */
 const ceilingOf = (): { maxConcurrent?: number } => {

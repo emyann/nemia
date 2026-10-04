@@ -62,9 +62,9 @@ export type RunSlot = { inFlight: number; cap: number };
  *
  * `inFlight`: it counts against the cap — a task of it, a step's or a check's, filed and not settled (`inFlight`), or, on a run that has
  * started and nobody called off, something the pass files (a step ready, a check, try or round due) or the checkout holds back
- * (`Assessment.held`): a run between two steps is still in flight, and one whose ending waits on another run's in one directory waits on
- * no person, and would otherwise free the very slot it is queued for. A cancelled run counts while the engine is still stopping what it
- * had in flight; one that waits on a person, or has finished, does not.
+ * (`Assessment.held`) or the store's cordon does (`Assessment.cordoned`): a run between two steps is still in flight, and one whose ending
+ * waits on another run's in one directory, or on the lift, waits on no person, and would otherwise free the very slot it is queued for. A
+ * cancelled run counts while the engine is still stopping what it had in flight; one that waits on a person, or has finished, does not.
  *
  * `wants`: it has nothing filed, nobody called it off, the runs it waits on have shipped (`runReady`), and a root is ready — a run slot is
  * what it waits for. A run waiting on runs (`--after`) wants none, and counts only once it is filed.
@@ -77,13 +77,13 @@ export type RunSlot = { inFlight: number; cap: number };
 export function slotNeed(
   run: Run,
   phaseOf: (taskId: string) => TaskPhase,
-  a: Pick<Assessment, 'ready' | 'check' | 'retry' | 'round' | 'held'>,
+  a: Pick<Assessment, 'ready' | 'check' | 'retry' | 'round' | 'held' | 'cordoned'>,
   shipped: (runId: string) => boolean,
   steps: readonly Pick<Workflow, 'slot'>[] = [],
 ): { inFlight: boolean; wants: boolean } {
   if (takesNoSlot(steps)) return { inFlight: false, wants: false };
   const started = hasStarted(run);
-  const due = a.ready.length + a.check.length + a.retry.length + a.round.length + a.held.length > 0;
+  const due = a.ready.length + a.check.length + a.retry.length + a.round.length + a.held.length + (a.cordoned?.steps.length ?? 0) > 0;
   return {
     inFlight: inFlight(run, phaseOf).length > 0 || (started && !run.cancelledAt && due),
     wants: !started && !run.cancelledAt && a.ready.length > 0 && runReady(run, shipped),

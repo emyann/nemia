@@ -189,6 +189,46 @@ const HOLD: RouteWords = {
     `DELETE /api/runs/${runId}/hold: the hold was not lifted — ${said}. Lift it with \`wf hold ${runId} --off\`.`,
 };
 
+/** The body `POST /api/cordon` takes: `wf cordon`'s flags, as JSON. */
+const CORDON_SHAPE = '`{ "why"?: "<words>", "by"?: "<name>" }`';
+
+/** The store cordoned, as the guard's refusals word it, its body and its failures; a cordon that stands is the package's 409. */
+const CORDON: RouteWords = {
+  shape: CORDON_SHAPE,
+  guard: () => ({
+    route: 'POST /api/cordon',
+    does: 'cordons the store',
+    forAnother: 'cordon it',
+    why: 'a cordon stops every pass from starting new work in every repository the store runs in, until a person lifts it',
+    reach: "cordon it from the board's header",
+    instead: 'Cordon it from the board\'s header, or with `wf cordon --why "<words>"`',
+    shape: CORDON_SHAPE,
+  }),
+  issue:
+    () =>
+    ({ path: [key], input }) =>
+      key === 'why' || key === 'by'
+        ? `\`${key}\` is ${key === 'why' ? 'why the store is cordoned' : 'who cordons it'}, as \`wf cordon --${key} "<words>"\` takes it: text, or left out. This request's was ${JSON.stringify(input)}: ${CORDON_SHAPE}.`
+        : `POST /api/cordon takes a JSON object: ${CORDON_SHAPE}.`,
+  failed: (_at, said) => `POST /api/cordon: the store was not cordoned — ${said}. Cordon it with \`wf cordon\`.`,
+};
+
+/** The store's cordon lifted, as the guard's refusals word it; it takes no body, and none standing is the package's 404. */
+const UNCORDON: RouteWords = {
+  shape: '`{}`',
+  guard: () => ({
+    route: 'DELETE /api/cordon',
+    does: "lifts the store's cordon",
+    forAnother: 'lift it',
+    why: 'a cordon lifted lets the next pass file every step, try and check that waits, in every repository the store runs in',
+    reach: "lift it from the board's header",
+    instead: "Lift it from the board's header, or with `wf uncordon`",
+    shape: '`{}`',
+  }),
+  issue: () => () => 'DELETE /api/cordon takes no body: `{}`.',
+  failed: (_at, said) => `DELETE /api/cordon: the cordon was not lifted — ${said}. Lift it with \`wf uncordon\`.`,
+};
+
 /** A try's run removed, as the guard's refusals word it; it takes no body, and a failure that is no refusal names `wf rm`. */
 const RM: RouteWords = {
   shape: '`{}`',
@@ -250,6 +290,8 @@ export const WORDS: Readonly<Record<string, RouteWords>> = {
   accept: ACCEPT,
   say: SAY,
   hold: HOLD,
+  cordon: CORDON,
+  uncordon: UNCORDON,
   rm: RM,
   prune: PRUNE,
 };

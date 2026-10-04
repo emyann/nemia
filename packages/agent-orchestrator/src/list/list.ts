@@ -44,6 +44,7 @@ import { saidWord } from '../say/say.ts';
 import { assess } from '../tick/assess.ts';
 import { neverApproved } from '../prune/prune.ts';
 import { daemonLine, type DaemonStanding } from '../daemon/daemon.ts';
+import type { Cordoned } from '../cordon/cordon.ts';
 
 export type Listing = {
   /**
@@ -89,9 +90,13 @@ export type Unjudged = { said: string; steps: Array<{ name: string; status: stri
 
 /**
  * `wf ls`'s answer (`runsListed` in list.verb.ts): each run with its record, judged or left unjudged, and its result branches
- * (`resultBranches`); and whether a wf up ticks the store.
+ * (`resultBranches`); whether a wf up ticks the store; and, while the store is cordoned, the cordon and the landings it holds staged.
  */
-export type RunsListed = { runs: Array<{ run: Run; listed: Listing | Unjudged; result: string[] }>; daemon: DaemonStanding };
+export type RunsListed = {
+  runs: Array<{ run: Run; listed: Listing | Unjudged; result: string[] }>;
+  daemon: DaemonStanding;
+  cordoned?: Cordoned;
+};
 
 /** What `listing` reads a run's steps off: the run, the engine's words for its tasks, and what people and git said of it. */
 export interface ListingInput {

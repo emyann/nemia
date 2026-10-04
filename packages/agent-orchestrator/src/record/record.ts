@@ -10,6 +10,7 @@ import type { Workflow } from '../step/step.ts';
 import type { EarlierTry, RetryAsk } from '../retry/index.ts';
 import type { RoundAsk } from '../status/status.ts';
 import type { QueueTry } from '../inbox/inbox.ts';
+import type { Cordon } from '../cordon/cordon.ts';
 
 /**
  * A folder a step may reach beyond its workspace, as the runtime takes it (`config.mounts`): an absolute path, and whether the step may
@@ -164,6 +165,13 @@ type RunBase = {
    * shipped (`removeHold`); `wf hold <run> --off` lifts it by hand. Absent on a run nobody holds.
    */
   hold?: Hold;
+  /**
+   * That a person cordoned the whole store (`wf cordon`), by whom and why — composed on read onto every run from the store's one file,
+   * `$WF_ROOT/cordon`, and never written into a record. While it stands the run files nothing new, no step, try, round or check, and
+   * what a person writes meanwhile waits on its own files for the lift (`assess`); what is in flight runs on. Absent while the store is not
+   * cordoned.
+   */
+  cordon?: Cordon;
   /**
    * Per step: the task the engine ran, and the workspace and branch it ran in.
    *
@@ -491,7 +499,7 @@ export type RunStore = {
     readonly stamps: () => Map<string, string>;
     /** Whether the run's record is there. */
     readonly exists: (id: string) => boolean;
-    /** Whether a person called the run off: cancelled it, pruned it, or holds it. */
+    /** Whether a person called the run off: cancelled it, pruned it, or holds it — or cordoned the whole store. */
     readonly calledOff: (id: string) => boolean;
     /** Write down that a person cancelled the run (`wf cancel`), and answer with the time that stands: the first cancellation is kept. */
     readonly cancel: (id: string) => string;

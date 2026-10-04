@@ -23,6 +23,8 @@ import { headsOf } from '../branches/branches.store.ts';
 import { followedFeed } from '../rest/rest.verb.ts';
 import { reportedEngine } from '../views/views.verb.ts';
 import { startQueued } from '../inbox/inbox.verb.ts';
+import { readCordon } from '../cordon/cordon.store.ts';
+import type { Cordon } from '../cordon/cordon.ts';
 import { momentumOf, toAdmit } from '../cap/cap.ts';
 import { countRested, meteredPass, within } from '../meter/tally.store.ts';
 import type { PassCost } from '../meter/meter.ts';
@@ -59,6 +61,11 @@ export type Pass = {
    * line carries the runtime's words, said once. Absent when there were none. `wf up` says each once while it lasts.
    */
   unreadable?: string[];
+  /**
+   * The store's cordon as the pass read it (`readCordon`), while one stands: the pass admitted no queued task and started no queued card,
+   * and filed nothing new of any run (`assess`). Absent while the store is not cordoned.
+   */
+  cordon?: Cordon;
 };
 
 /**
@@ -149,9 +156,9 @@ export const tick = (e: Engine, options: { repo?: string; memo?: RestMemo; verif
  *   the one listing of the pass, handed to every run judged for the claims on a repository's checkout, and to the queue.
  * - the ceilings the pass runs with are written (`recordCeilings`), for `wf ls` and `wf decide`, which judge the cap from a shell of their
  *   own.
- * - queued tasks are admitted off the views the runtime's pass reported (`admitted`).
+ * - queued tasks are admitted off the views the runtime's pass reported (`admitted`), unless the store is cordoned (`readCordon`).
  * - every run that has started is judged, finished ones included (`advanceResting`); then each run with nothing filed, oldest first, with
- *   its slot (`waitingJudged`); then one queued card, while a slot is free.
+ *   its slot (`waitingJudged`); then one queued card, while a slot is free and the store is not cordoned, read again.
  * - last, and apart, the feed is written where it changed: a feed that cannot be written costs the report (`feedError`), never the pass.
  *
  * A run a read of whose task journal is refused (`unreadableJournal`) is left unjudged, out of the feed's `removed` and counted in
@@ -165,14 +172,16 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }
   yield* tried(() => within('act', () => recordCeilings(ran)));
   const runs = yield* tried(() => runStore.runs.list(undefined, resting && keptOf(resting)));
   if (resting) forgotten(memo, runs);
-  yield* admitted(e, report, runs, ran.sessions);
+  const cordon = yield* tried(() => readCordon());
+  if (!cordon) yield* admitted(e, report, runs, ran.sessions);
   const judging: Judging = { done: new Map(), unjudged: new Map() };
   for (const run of runs.filter(hasStarted)) yield* judged(e, judging, runs, run, resting);
   const counted = yield* waitingJudged(e, judging, runs, resting, ran.runs);
-  const queue = slotFree({ inFlight: counted, cap: ran.runs })
-    ? yield* tried(() => within('act', () => startQueued(repo, runs)))
-    : undefined;
-  return passOf(report, runs, judging, queue);
+  const queue =
+    slotFree({ inFlight: counted, cap: ran.runs }) && !(yield* tried(() => readCordon()))
+      ? yield* tried(() => within('act', () => startQueued(repo, runs)))
+      : undefined;
+  return { ...passOf(report, runs, judging, queue), ...(cordon ? { cordon } : {}) };
 });
 
 /** What a pass has judged so far: each run it advanced, and each run it left unjudged with the runtime's words for why. */

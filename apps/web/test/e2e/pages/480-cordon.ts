@@ -8,7 +8,7 @@ import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
 /** The header's cordon: its switch, its label and its words. */
-const cordonOf = (page: Page) => page.locator('header[data-feed] [data-cordon]');
+const cordonOf = (page: Page) => page.locator('header[data-frame-header] [data-cordon]');
 
 /** Why the page cordons the store, given in the switch's popover. */
 const WHY = 'merging by hand on main';
@@ -34,7 +34,7 @@ export default {
       await expectVisible(cordon.getByText('nothing new starts', { exact: true }), 'with what it does beside it');
       if (fs.existsSync(file)) throw new Refused(`no cordon before the page puts one — ${file} is there`);
       await settled(page);
-      await photograph(page.locator('header[data-feed]'), path.join(OUT, `cordon-off-${theme}.png`));
+      await photograph(page.locator('header[data-frame-header]'), path.join(OUT, `cordon-off-${theme}.png`));
 
       await label.click();
       const ask = page.locator('[data-cordon-ask]');
@@ -53,7 +53,7 @@ export default {
         'and the header says since when, by whom and why',
       );
       await settled(page);
-      await photograph(page.locator('header[data-feed]'), path.join(OUT, `cordon-on-${theme}.png`));
+      await photograph(page.locator('header[data-frame-header]'), path.join(OUT, `cordon-on-${theme}.png`));
 
       const staged = { run: GATED.id, step: 'ship', repo: '/code/app' };
       await page.route('**/api/cordon', (route) =>
@@ -67,7 +67,7 @@ export default {
       const sentence = `${staged.run}'s ship has its merge staged in /code/app (MERGE_HEAD), and its check waits on the lift`;
       if (title !== sentence) throw new Refused(`its sentence is on hover, "${sentence}" — it is "${title}"`);
       await settled(page);
-      await photograph(page.locator('header[data-feed]'), path.join(OUT, `cordon-staged-${theme}.png`));
+      await photograph(page.locator('header[data-frame-header]'), path.join(OUT, `cordon-staged-${theme}.png`));
       await page.unroute('**/api/cordon');
       await page.reload({ waitUntil: 'load' });
       await idle(page);

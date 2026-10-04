@@ -6,9 +6,9 @@ import type { PageSpec } from '../visit.ts';
 export default {
   /**
    * A settled step's session, read once: its chip and a link back to the run at the top, then the conversation down to the prompt box,
-   * which ends the window — the prompt, the calls with nothing said between them folded into one line, thoughts folded, the session's words
-   * from their markdown, a system line and the closeout. The session has ended, so the prompt box is closed, with why and where to go
-   * instead. The conversation is photographed from its start, scrolled up as a reader scrolls to it.
+   * which ends where the frame's bottom bar begins — the prompt, the calls with nothing said between them folded into one line, thoughts
+   * folded, the session's words from their markdown, a system line and the closeout. The session has ended, so the prompt box is closed,
+   * with why and where to go instead. The conversation is photographed from its start, scrolled up as a reader scrolls to it.
    */
   name: 'session',
   route: `/runs/${FAKE.id}/steps/${SESSION.step}`,
@@ -24,11 +24,15 @@ export default {
     await expectVisible(talk, 'the conversation');
     const prompt = page.locator(`section[aria-label="Say something to ${SESSION.step}"]`);
     await expectVisible(prompt, 'a prompt box below the conversation');
-    const [box, below, window] = [await talk.boundingBox(), await prompt.boundingBox(), page.viewportSize()];
-    if (!box || !below || !window || Math.abs(box.y + box.height - below.y) > 2 || Math.abs(below.y + below.height - window.height) > 2) {
+    const [box, below, foot] = [
+      await talk.boundingBox(),
+      await prompt.boundingBox(),
+      await page.locator('footer[data-frame-footer]').boundingBox(),
+    ];
+    if (!box || !below || !foot || Math.abs(box.y + box.height - below.y) > 2 || Math.abs(below.y + below.height - foot.y) > 2) {
       throw new Refused(
-        `the conversation takes the page's height down to the prompt box, which ends the window — the conversation ends at ${box ? Math.round(box.y + box.height) : 'nothing'} px, ` +
-          `the box spans ${below ? `${Math.round(below.y)}–${Math.round(below.y + below.height)}` : 'nothing'} px, the window ends at ${window?.height} px`,
+        `the conversation takes the page's height down to the prompt box, which ends where the bottom bar begins — the conversation ends at ${box ? Math.round(box.y + box.height) : 'nothing'} px, ` +
+          `the box spans ${below ? `${Math.round(below.y)}–${Math.round(below.y + below.height)}` : 'nothing'} px, the bottom bar begins at ${foot ? Math.round(foot.y) : 'nothing'} px`,
       );
     }
     await expectVisible(

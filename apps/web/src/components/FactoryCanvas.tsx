@@ -22,9 +22,7 @@ import { routeLink } from '@/components/routeLink';
 import { Button, LinkButton } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
-import { DaemonLine } from '@/components/DaemonLine';
-import { QuotaLine } from '@/components/QuotaLine';
-import { ceilingsQuery, daemonQuery, inboxQuery, quotaQuery, runQuery, type RunDetail, type RunSummary } from '@/lib/api';
+import { ceilingsQuery, inboxQuery, runQuery, type RunDetail, type RunSummary } from '@/lib/api';
 import {
   forgetFactoryLayout,
   forgetFactoryOpen,
@@ -161,11 +159,10 @@ const minimapFill = (node: RunFlowNode) =>
  * layout.
  *
  * The inbox's queued cards of `factory` (`queuedIn`) wait at the floor's left edge, as ghosts, in the order the tick starts them
- * (`QueueLane`), and the header says the run slots taken of the cap the daemon runs with (`CapLine`), and the subscription's quota as the
- * api last asked Claude Code for it (`QuotaLine`), each said to be this machine's, not the factory's — and, when no daemon ticks the store,
- * that nothing does and how to start one (`DaemonLine`), since a run waiting its turn and a run nobody moves look alike on the floor. The
- * cap is read again as the runs are, on each run's event of the workflow feed; the queue every 5 s, since the feed carries no card's
- * events: the daemon starts a card when a run slot frees, and nothing on the board asks it to.
+ * (`QueueLane`), and the header says the run slots taken of the cap the daemon runs with (`CapLine`), said to be this machine's, not the
+ * factory's; the daemon and the quota are the frame's bottom bar's (`FrameFooter`). The cap is read again as the runs are, on each run's
+ * event of the workflow feed; the queue every 5 s, since the feed carries no card's events: the daemon starts a card when a run slot frees,
+ * and nothing on the board asks it to.
  */
 export function FactoryCanvas({ runs, factory }: { runs: readonly RunSummary[]; factory: FactoryPlace }) {
   return (
@@ -210,20 +207,20 @@ const placing = (change: NodeChange<RunFlowNode>): change is NodePositionChange 
  *   any of it is off screen, and zoomed out only as far as it must be, to `REVEAL_MIN_ZOOM` at most (`revealView`); a card taller than the
  *   frame even then shows its head, below the panels at the frame's top. Its box is the cells it takes (`openSpan`, `boxOf`).
  * - The floor is fitted once per ask, never before the cards asked for are on it: first on mount, unanimated, in place of React Flow's
- *   own fit so it keeps clear of the panels too (`fitClear`); then on Fit view, Reset layout, Show finished, and whenever the queue lane,
- *   the quota line or the daemon line comes, goes or changes its words, which may wrap the header; and when the frame changes size with
- *   no run inspected and leaves no card in view (`anyInView`).
+ *   own fit so it keeps clear of the panels too (`fitClear`); then on Fit view, Reset layout, Show finished, and whenever the queue lane
+ *   comes or goes; and when the frame changes size with no run inspected and leaves no card in view (`anyInView`).
  * - No view is aimed at a frame without a size (`sized`), nor a reveal at one with no room below its panels: a reveal or a fit asked
  *   for while the frame is hidden or squeezed flat waits until it has a size.
  * - Reset layout lays the cards on the grid again with every run closed and the saved arrangement forgotten; Collapse all closes every
  *   card and leaves the cards they moved aside where they went. The effect that keeps the open runs is their one writer.
  * - The header counts runs in flight, finished, to decide as `wf ls` says them, and waiting on you. A run waiting on you, or to decide,
  *   is counted finished too, and stays on the floor whatever Show finished says (`floorRuns`); a run at its ending's gate is in both.
- *   Beside the counts it draws the cap (`CapLine`), the daemon and the quota, and the Show finished switch, named by a label beside it.
- * - The floor fills the screen under the root's header, its frame narrowed by what the bar covers of it (`useBarOver`), so the card
- *   inspected and every panel over the floor stay clear of the bar. The queue lane sits at its left, and gives its room to the floor
- *   while the bar shows a run or a step. The floor's buttons wrap to a narrow floor, its hint shows only where the floor is wide enough
- *   beside them, and the legend wraps short of the minimap when there is one; arrowheads take their edges' colour in both themes.
+ *   Beside the counts it draws the cap (`CapLine`), and the Show finished switch, named by a label beside it.
+ * - The floor fills the screen between the root's header and its bottom bar, its frame narrowed by what the bar covers of it
+ *   (`useBarOver`), so the card inspected and every panel over the floor stay clear of the bar. The queue lane sits at its left, and gives
+ *   its room to the floor while the bar shows a run, a step or the machine's gauges. The floor's buttons wrap to a narrow floor, its hint
+ *   shows only where the floor is wide enough beside them, and the legend wraps short of the minimap when there is one; arrowheads take
+ *   their edges' colour in both themes.
  * - A click on a card, or Enter on the card itself, shows the run in the bar or closes it; a click or Enter on a link or a button in it
  *   does only what that does (`useFloorPress`).
  */
@@ -241,7 +238,7 @@ function Floor({ runs, factory }: { runs: readonly RunSummary[]; factory: Factor
 
   const [open, setOpen] = useState<string[]>(readFactoryOpen);
   const openSet = useMemo(() => new Set(open), [open]);
-  const { inspecting, inspected, step: barStep, onStep, ...press } = useFloorPress();
+  const { inspecting, inspected, step: barStep, onStep, gauges, ...press } = useFloorPress();
 
   const opened = useMemo(() => open.filter((id) => ids.includes(id)), [open, ids]);
   const reads = useQueries({ queries: opened.map((id) => runQuery(id)), combine: readsOf });
@@ -426,36 +423,20 @@ function Floor({ runs, factory }: { runs: readonly RunSummary[]; factory: Factor
   const toDecide = runs.filter((run) => toDecideOf(run) !== null).length;
   const queue = useQuery({ ...inboxQuery, refetchInterval: 5_000 });
   const queued = queue.data ? queueOf(queuedIn(queue.data, factory)) : [];
-  const laned = queued.length > 0;
+  const laned = queued.length > 0 && !gauges;
   const wasLaned = useRef(laned);
   useEffect(() => {
     if (wasLaned.current === laned) return;
     wasLaned.current = laned;
     setFits((n) => n + 1);
   }, [laned]);
-  const quota = useQuery(quotaQuery);
-  const quotaShown = quota.error ? 'error' : `${quota.data?.state ?? 'none'}${quota.data?.last ? ' with the last reading' : ''}`;
-  const wasQuota = useRef(quotaShown);
-  useEffect(() => {
-    if (wasQuota.current === quotaShown) return;
-    wasQuota.current = quotaShown;
-    setFits((n) => n + 1);
-  }, [quotaShown]);
-  const daemon = useQuery(daemonQuery);
-  const daemonShown = daemon.error ? 'error' : daemon.data && !daemon.data.ticking ? daemon.data.kind : 'nothing';
-  const wasDaemon = useRef(daemonShown);
-  useEffect(() => {
-    if (wasDaemon.current === daemonShown) return;
-    wasDaemon.current = daemonShown;
-    setFits((n) => n + 1);
-  }, [daemonShown]);
   const cells = placed.reduce((sum, node) => {
     const { columns, rows } = spans.get(node.id) ?? ONE_CELL;
     return sum + columns * rows;
   }, 0);
 
   return (
-    <div className="flex h-[calc(100svh-3rem)] min-h-96 flex-col">
+    <div className="flex h-[calc(100svh-5rem)] min-h-96 flex-col">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b px-4 py-2">
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
           <p className="text-sm text-muted-foreground">
@@ -465,8 +446,6 @@ function Floor({ runs, factory }: { runs: readonly RunSummary[]; factory: Factor
             {waiting > 0 && ` · ${waiting} waiting on you`}
           </p>
           <CapLine queued={queued.length} queueError={queue.error} />
-          <DaemonLine daemon={daemon.data} error={daemon.error} />
-          <QuotaLine quota={quota.data} error={quota.error} />
         </div>
         <div className="flex items-center gap-2 text-sm">
           <Switch id={finishedSwitch} isSelected={showFinished} onChange={toggleFinished} />
@@ -530,14 +509,15 @@ function Floor({ runs, factory }: { runs: readonly RunSummary[]; factory: Factor
 /**
  * What a press on the floor does (`useCanvasPress`): a card shows its run in the frame's bar, or closes it, and a double click opens the
  * run's page; a step's tile shows that step, or closes it (`onStep`). With the run whose card or step the bar shows (`inspecting`), the run
- * it shows (`inspected`) and the step (`step`), each none while it shows anything else.
+ * it shows (`inspected`) and the step (`step`), each none while it shows anything else; and whether it shows the machine's gauges.
  */
 function useFloorPress() {
   const navigate = useNavigate();
   const { shown, ...press } = useCanvasPress(runBar, (runId) => void navigate({ to: '/runs/$runId', params: { runId } }));
-  const { toggle } = useBar();
+  const { open, toggle } = useBar();
   const onStep = useCallback((run: string, step: string) => toggle({ kind: 'step', run, step }), [toggle]);
   return {
+    gauges: open?.kind === 'gauges',
     inspecting: shown?.kind === 'run' || shown?.kind === 'step' ? shown.run : null,
     inspected: shown?.kind === 'run' ? shown.run : null,
     step: shown?.kind === 'step' ? shown : null,

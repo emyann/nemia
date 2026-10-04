@@ -3,7 +3,6 @@ import { CordonSwitch } from '@/components/CordonSwitch';
 import { routeLink } from '@/components/routeLink';
 import { Button, LinkButton } from '@/components/ui/button';
 import { SidebarTrigger } from '@/components/ui/sidebar';
-import type { FeedStatus } from '@/lib/feed';
 
 /** The logo: a ghost button that is React Aria's link, given the router's `to`. */
 const LogoLink = routeLink(LinkButton);
@@ -12,11 +11,10 @@ const LogoLink = routeLink(LinkButton);
  * The frame's header, across the top of every page, `h-12`, above the rail, the sidebar and the page: the button that folds the sidebar (or
  * opens its sheet on a narrow screen), the logo, a link to Home, then the section's name alone: the factory picked is the sidebar's. At its
  * right, room kept for a search, the store's cordon (`CordonSwitch`), the bell, drawn and not yet wired, and a place for the user's menu.
- * `feed` is the workflow feed's state, which it carries as `data-feed`.
  */
-export function FrameHeader({ section, feed }: { section?: string; feed: FeedStatus }) {
+export function FrameHeader({ section }: { section?: string }) {
   return (
-    <header className="sticky top-0 z-30 flex h-12 shrink-0 items-center gap-2 border-b bg-background px-3" data-feed={feed}>
+    <header data-frame-header className="sticky top-0 z-30 flex h-12 shrink-0 items-center gap-2 border-b bg-background px-3">
       <SidebarTrigger />
       <LogoLink to="/" variant="ghost" className="gap-2 px-1.5 font-semibold tracking-tight">
         <span className="flex size-6 items-center justify-center rounded-md bg-foreground text-background">

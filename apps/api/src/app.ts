@@ -2,6 +2,7 @@ import { Layer, ManagedRuntime } from 'effect';
 import { type ErrorHandler, Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
+import { VERSION } from 'agent-orchestrator';
 import { isRefusal, type Refusal } from 'agent-orchestrator/effect';
 import { agents, skills } from './agents/index.ts';
 import { customInstructions } from './custom/custom.ts';
@@ -55,6 +56,7 @@ export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Servic
  * The api's routes: every one the board reads and writes, its groups each in a router of their own.
  *
  * - `GET /api/health` — `{ ok: true }` while the api answers.
+ * - `GET /api/version` — `{ version }`, the orchestrator's package version (`VERSION`): what the board's bottom bar says.
  * - factories/factories.ts — the factories a request may be answered in, each with its repositories, workflows and hires. Every route is
  *   answered in the factory and on the repository its query names (`?factory=`, `?repo=`), resolved before its handler runs, and refused
  *   when it names a repository no factory has (`placeFor`, factories/place.ts); a request naming neither is answered on the api's own.
@@ -107,6 +109,7 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
       await next();
     })
     .get('/api/health', (c) => c.json({ ok: true }))
+    .get('/api/version', (c) => c.json({ version: VERSION }))
     .get('/api/capabilities', (c) =>
       served(c, async ({ env, repo, home, mcp }) => c.json(await capabilitiesWithSteps(repo, { env, home, asker: mcp }))),
     )

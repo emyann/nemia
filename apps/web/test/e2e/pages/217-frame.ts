@@ -13,7 +13,7 @@ async function boxOf(target: Locator, what: string) {
 }
 
 /** The header's button that folds the sidebar, or opens its sheet on a narrow screen. */
-const trigger = (page: Page) => page.locator('header[data-feed]').locator('[data-sidebar="trigger"]');
+const trigger = (page: Page) => page.locator('header[data-frame-header]').locator('[data-sidebar="trigger"]');
 
 /** The sidebar's own state, `expanded` or `collapsed`, as the provider draws it. */
 const foldOf = (page: Page) => page.locator('[data-slot="sidebar"][data-state]').getAttribute('data-state');
@@ -24,7 +24,7 @@ const runsLink = (page: Page) => page.locator('[data-sidebar="sidebar"]').getByR
 /** The header runs across the whole top of the page, and the rail starts below it, at the left. */
 async function headerOverRail(page: Page): Promise<void> {
   const width = page.viewportSize()?.width ?? 0;
-  const header = await boxOf(page.locator('header[data-feed]'), 'the header');
+  const header = await boxOf(page.locator('header[data-frame-header]'), 'the header');
   if (Math.abs(header.x) > 1 || Math.abs(header.y) > 1 || Math.abs(header.width - width) > 1)
     throw new Refused(`the header spans the top of the page, ${width} wide at 0,0 — it is ${header.width} wide at ${header.x},${header.y}`);
   const rail = await boxOf(railOf(page), 'the rail');
@@ -71,7 +71,7 @@ async function named(page: Page): Promise<void> {
   await photograph(page, path.join(OUT, `frame-open-${await themeOf(page)}.png`));
   await page.mouse.move(600, 500);
   await expectCount(page.getByRole('tooltip'), 0, 'the tooltip goes when the pointer leaves');
-  const header = page.locator('header[data-feed]');
+  const header = page.locator('header[data-frame-header]');
   await header.getByRole('link', { name: 'Nemia' }).focus();
   await page.keyboard.press('Tab');
   const cordon = header.getByRole('switch', { name: 'Cordon' });

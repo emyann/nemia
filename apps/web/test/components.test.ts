@@ -5544,7 +5544,7 @@ test("the header reads the section's name alone: a floor reads Floor, with no fa
   const { SidebarProvider } = await import('../src/components/ui/sidebar.tsx');
   const html = await routedWith(
     // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
-    createElement(SidebarProvider, { children: createElement(FrameHeader, { section: 'Floor', feed: 'open' }) }),
+    createElement(SidebarProvider, { children: createElement(FrameHeader, { section: 'Floor' }) }),
     [[['factories'], [filed('nemia')]]],
   );
   assert.match(html, /<span class="text-sm font-medium">Floor<\/span>/);

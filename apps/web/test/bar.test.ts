@@ -49,6 +49,17 @@ test('the bare word start opens the start of a run in no factory yet, which asks
   assert.equal(nextBar(ASKING, ASKING), undefined);
 });
 
+test("the bare word gauges opens the machine's gauges, and gauges with a name opens none", () => {
+  const GAUGES: Bar = { kind: 'gauges' };
+  assert.deepEqual(barOf('gauges'), GAUGES);
+  assert.equal(barValue(GAUGES), 'gauges');
+  assert.deepEqual(barOf(barValue(GAUGES)), GAUGES);
+  for (const value of ['gauges:', 'gauges:x', 'Gauges', 'gauge']) assert.equal(barOf(value), undefined, `${value} opens no bar`);
+  assert.equal(barOpens(GAUGES), null, 'it has no page');
+  assert.equal(nextBar(GAUGES, GAUGES), undefined, 'pressing the bottom bar again closes it');
+  assert.deepEqual(nextBar(GAUGES, HIRING), HIRING);
+});
+
 test("a run's address names the run, and a step's names its run up to the first slash and the step after it", () => {
   assert.deepEqual(barOf('run:abc'), RUN);
   assert.deepEqual(barOf('step:abc/review'), REVIEW);

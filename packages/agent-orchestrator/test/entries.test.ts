@@ -48,6 +48,7 @@ const PINNED: Record<string, string[]> = {
     'TABLE',
     'TRY_STEP',
     'UNCORDONED',
+    'VERSION',
     'WHY_CAP',
     'accept',
     'acceptAsk',

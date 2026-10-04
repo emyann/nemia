@@ -3,6 +3,7 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { createRootRouteWithContext, Outlet, useMatches, useRouter, useRouterState } from '@tanstack/react-router';
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools';
 import { RouterProvider as AriaRouterProvider } from 'react-aria-components';
+import { FrameFooter } from '@/components/FrameFooter';
 import { FrameHeader } from '@/components/FrameHeader';
 import { FrameRail } from '@/components/FrameRail';
 import { FrameSidebar } from '@/components/FrameSidebar';
@@ -22,10 +23,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
  * The frame of every page: a header across the top (`FrameHeader`) naming the section, and below it the sidebar, the rail of places beside
  * the factory's sidebar (`FrameSidebar`), open or folded as this browser's `sidebar_state` cookie last left it (`sidebarOpenOf`), then the
  * page, under the strip of its place's tabs when it is one (`FrameTabs`), in a centred column unless a matched route's `staticData` asks
- * for `fullBleed`. The header is `h-12`, the height the Factory leaves
- * above itself, and the sidebar starts under it. Over the page, below the header, the floating bar (`OpenBar`) shows what the address's
- * `?bar=` names, the same on every page, and a link to another page, which carries no `bar`, closes it. It follows the workflow feed once
- * for the whole page: what moves on it is read again at once, and the polls slow while it is open. React Aria's `RouterProvider` sends
+ * for `fullBleed`. The header is `h-12` and the bottom bar across the foot (`FrameFooter`) `h-8`, the heights the Factory leaves beside
+ * itself, and the sidebar starts under the header and ends above the bottom bar. Over the page, between the header and the bottom bar, the
+ * floating bar (`OpenBar`) shows what the address's `?bar=` names, the same on every page, and a link to another page, which carries no
+ * `bar`, closes it. It follows the workflow feed once for the whole page: what moves on it is read again at once, the polls slow while it
+ * is open, and the bottom bar says which. React Aria's `RouterProvider` sends
  * every React Aria link, pressed with Enter or clicked, through the router, so no link loads the whole page again.
  */
 function Root() {
@@ -39,7 +41,7 @@ function Root() {
   return (
     <AriaRouterProvider navigate={(href) => void router.navigate({ href })}>
       <SidebarProvider defaultOpen={sidebarOpenOf(document.cookie)} className="flex-col">
-        <FrameHeader section={section} feed={feed} />
+        <FrameHeader section={section} />
         <div className="flex flex-1">
           <AppSidebar path={path} search={search} />
           <SidebarInset className="min-w-0">
@@ -54,8 +56,9 @@ function Root() {
             </FrameTabs>
           </SidebarInset>
         </div>
+        <FrameFooter feed={feed} />
       </SidebarProvider>
-      <OpenBar />
+      <OpenBar feed={feed} />
       <ReactQueryDevtools buttonPosition="bottom-left" />
       <TanStackRouterDevtools position="bottom-right" />
     </AriaRouterProvider>
@@ -74,7 +77,7 @@ function AppSidebar({ path, search }: { path: string; search: Record<string, unk
   };
 
   return (
-    <Sidebar collapsible="icon" className="top-12 h-[calc(100svh-3rem)]! overflow-hidden">
+    <Sidebar collapsible="icon" className="top-12 h-[calc(100svh-5rem)]! overflow-hidden">
       <div className="flex size-full">
         <FrameRail path={path} onPick={picked} />
         {(state === 'expanded' || isMobile) && <FrameSidebar path={path} search={search} onPick={picked} />}

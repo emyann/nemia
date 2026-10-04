@@ -577,6 +577,7 @@ const PINNED: Record<string, string[]> = {
     'parseAgent',
     'parseFolder',
     'parseWorkflow',
+    'POLICY_KEYS',
     'readmeDescription',
     'remoteNameOf',
     'remoteRetryRefusal',

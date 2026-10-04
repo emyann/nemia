@@ -67,7 +67,13 @@ export function directoryFence(
 export const sandboxed = (harness: string): boolean => fenceReach(harness)?.by === 'sandbox';
 
 /** The keys of a step's fence, either harness's: a sandboxed step's `permissionMode:` is read as its `sandbox:` before this sees it. */
-const FENCE_KEYS = ['tools', 'allowedTools', 'disallowedTools', 'permissionMode', 'sandbox'] as const;
+export const FENCE_KEYS = ['tools', 'allowedTools', 'disallowedTools', 'permissionMode', 'sandbox'] as const;
+
+/**
+ * The keys a step's own file sets as its policy over its agent: the fence keys, which only tighten the agent's (`fenceRefusal`), and
+ * `skills:`, which adds to the agent's (`addedSkillsRefusal`). Every other key is the step's wiring, or its agent's role.
+ */
+export const POLICY_KEYS = [...FENCE_KEYS, 'skills'] as const satisfies readonly StepKey[];
 
 /** One of a fence's keys. */
 type FenceKey = (typeof FENCE_KEYS)[number];

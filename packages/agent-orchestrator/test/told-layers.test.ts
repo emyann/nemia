@@ -13,6 +13,7 @@ const AGENTS: Agents = new Map([
   ['ada', { ...parseAgent('ada', '---\nskills: alpha, beta\n---\nYou are Ada.\n'), customInstructions: 'Be terse.' }],
   ['bare', parseAgent('bare', '---\n---\nYou are bare.\n')],
   ['cody', { ...parseAgent('cody', '---\n---\nYou are Cody.\n'), customInstructions: 'Be terse.' }],
+  ['dee', parseAgent('dee', '---\nmodel: opus\ndisallowedTools: Bash(git push:*)\n---\nYou are Dee.\n')],
 ]);
 
 /** The step `name` written with `lines` as its frontmatter and `note` as its own words, resolved with the agents above. */
@@ -97,6 +98,7 @@ test('a step with no agent: its own words are the policy, no agent layer, and a 
     agentSkills: [],
     policy: 'Build it.',
     addedSkills: [],
+    fence: [],
     task: null,
     via: 'brief',
   });
@@ -114,4 +116,12 @@ test("a record frozen before the added skills were: every skill the step's line 
   const step = stepOf('agent: ada\nskills: beta, gamma');
   const { addedSkills: _added, ...agent } = step.agent!;
   assert.deepEqual(skillLayers({ ...step, agent }), { agent: ['alpha'], added: ['beta', 'gamma'] });
+});
+
+test("the step's fence lines are the fence keys its own file sets, as resolved: never a role key, never its agent's fence", () => {
+  const step = stepOf('agent: dee\nmodel: sonnet\ndisallowedTools: Bash(git push:*), Bash(rm:*)');
+  assert.deepEqual(toldLayers(step, null).fence, [{ key: 'disallowedTools', value: 'Bash(git push:*), Bash(rm:*)' }]);
+  const inherited = stepOf('agent: dee');
+  assert.deepEqual(inherited.disallowedTools, ['Bash(git push:*)'], "the step runs its agent's fence");
+  assert.deepEqual(toldLayers(inherited, null).fence, [], "the agent's fence is not the step's policy");
 });

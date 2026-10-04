@@ -65,7 +65,8 @@ export type Flag = {
  * (`unknown`), two ways given (`oneWay`), and a text flag's value given apart that is one of the command's own flags, which reads as the
  * value left out (`apart`, handed the value and the flag it was given to) — `--flag=<value>` carries even that. `defaults` is what the
  * command line takes when no way is given; a body says its way. `missing` is the refusal of a required argument left out, empty or starting
- * `-`, said where the CLI would print its help.
+ * `-`, said where the CLI would print its help; `flagFirst`, that a flag the command does not take is refused as one even where a required
+ * argument stands, before `missing`.
  */
 export type Spec = {
   readonly positionals: readonly Positional[];
@@ -75,6 +76,7 @@ export type Spec = {
   readonly oneWay?: string;
   readonly apart?: (value: string, flag: string) => string;
   readonly missing?: string;
+  readonly flagFirst?: true;
 };
 
 /** The arguments a write's route fixes, as its path fixes the run: a body never carries them. */
@@ -237,15 +239,15 @@ const unfilled = (spec: Spec, p: Positional, arg: string): boolean =>
 /**
  * A command line's arguments after the command's name, read against `spec` — or undefined when it is given too little to act on: a
  * required argument missing, empty, `--help` or one of its own flags, for which the CLI prints its help, unless the spec says its refusal
- * (`missing`), which a required argument starting `-` gets too. Refused, exit 2, in the spec's own words: an argument it does not take — a
- * flag it has none of among them, wherever it stands, and one the api alone takes (`Flag.only`) — a value flag with no value, given
- * twice, or with one of the command's own flags for its value, and two ways.
+ * (`missing`), which a required argument starting `-` gets too, but for a flag it does not take where it says `flagFirst`. Refused, exit 2,
+ * in the spec's own words: an argument it does not take — a flag it has none of among them, wherever it stands, and one the api alone
+ * takes (`Flag.only`) — a value flag with no value, given twice, or with one of the command's own flags for its value, and two ways.
  */
 export function parseArgv(typed: Spec, argv: readonly string[]): Args | undefined {
   const spec: Spec = { ...typed, flags: typed.flags.filter((f) => f.only?.side !== 'api') };
   const required = spec.positionals.filter((p) => p.takes === 'required');
   const head = argv.slice(0, required.length);
-  const stray = spec.missing === undefined ? head.find((a) => strayFlag(spec, a)) : undefined;
+  const stray = spec.missing === undefined || spec.flagFirst ? head.find((a) => strayFlag(spec, a)) : undefined;
   if (stray !== undefined) return usage(spec.unknown(stray));
   if (head.length < required.length || head.some((a, i) => unfilled(spec, required[i], a))) {
     return spec.missing === undefined ? undefined : usage(spec.missing);

@@ -1,8 +1,8 @@
 /**
  * The commands that start work, the inbox's, the factories' and `wf agents custom`, as entries of the table: a flag none of them takes is
  * refused in the command's own words, before anything is read — where its required arguments stand, as the argument left out by a command
- * that says its refusal of one (`missing`), and after them as the flag it does not take; a word `wf inbox` or `wf factory` has no command
- * of is refused, and their `--help` prints their own help.
+ * that says its refusal of one (`missing`) but for one that refuses the flag first (`flagFirst`), and after them as the flag it does not
+ * take; a word `wf inbox` or `wf factory` has no command of is refused, and their `--help` prints their own help.
  *
  * `WF_ROOT` is set before the import, since the store's modules read it as they load.
  */
@@ -74,7 +74,8 @@ const REFUSALS: Array<[string[], string[], string]> = [
 
 /**
  * What each command that says its own refusal of a required argument left out says of a flag where that argument stands: the argument
- * left out, before the flag is looked at. The others say there what they say of the flag after their arguments.
+ * left out, before the flag is looked at. The others, and `wf factory attach` and `detach`, which refuse the flag first (`flagFirst`), say
+ * there what they say of the flag after their arguments.
  */
 const MISSING: Readonly<Record<string, string>> = {
   'inbox add':
@@ -85,12 +86,6 @@ const MISSING: Readonly<Record<string, string>> = {
   'inbox rm': 'wf inbox rm takes the name of the card to drop, as wf inbox lists it: wf inbox rm <name>.',
   'factory add':
     "wf factory add takes the factory's name, first: wf factory add <name> --repo <path> [--repo <path> ...]. Nothing was filed.",
-  'factory attach':
-    "wf factory attach takes the factory, then the workflow, by its folder's name: wf factory attach <factory> <workflow>. Nothing was " +
-    'attached.',
-  'factory detach':
-    "wf factory detach takes the factory, then the workflow, by its folder's name: wf factory detach <factory> <workflow>. Nothing was " +
-    'detached.',
   'factory hire':
     'wf factory hire takes the factory, then the agent: wf factory hire <factory> <agent> --step <workflow>/<step>. Nothing was hired.',
   'factory fire': 'wf factory fire takes the factory first: wf factory fire <factory> --step <workflow>/<step>. Nothing was fired.',

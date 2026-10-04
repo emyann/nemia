@@ -153,7 +153,7 @@ const FACTORY_ADD: Command<{ name: string; repos: readonly string[]; file: strin
   print: ({ name, repos, file }) => [`${name}  ${repos.join(', ')}`, `filed: ${file}`],
 };
 
-/** `wf factory attach`'s and `detach`'s spec: the factory, then the workflow, and nothing else. */
+/** `wf factory attach`'s and `detach`'s spec: the factory, then the workflow, and no flag, refused as one wherever it stands. */
 const workflowSpec = (verb: 'attach' | 'detach'): Spec => ({
   positionals: [
     { key: 'factory', takes: 'required', kind: 'name' },
@@ -165,6 +165,7 @@ const workflowSpec = (verb: 'attach' | 'detach'): Spec => ({
       ? `wf factory ${verb} does not take ${arg}. It takes the factory, then the workflow: wf factory ${verb} <factory> <workflow>.`
       : `wf factory ${verb} takes one workflow, and ${arg} is a second: wf factory ${verb} <factory> <workflow>, once per workflow.`,
   missing: `wf factory ${verb} takes the factory, then the workflow, by its folder's name: wf factory ${verb} <factory> <workflow>. Nothing was ${verb}ed.`,
+  flagFirst: true,
 });
 
 /** `wf factory attach`: one workflow attached to one factory, or said to be attached already. */

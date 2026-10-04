@@ -47,7 +47,7 @@ export function pauseWords(paused: Paused | undefined, error: Error | null, now:
     return { state: 'reading', text: null, label: 'The store’s pause, not read', line, ...lists };
   }
   if (!paused.pause) {
-    const line = 'The store runs: pause it, and nothing new starts while what runs finishes.';
+    const line = 'Nothing is paused. Once paused, no run starts new work, and what runs finishes.';
     return { state: 'running', text: null, label: 'Pause the store', line, ...lists };
   }
   const since = pauseSince(paused.pause, now);

@@ -114,7 +114,7 @@ function NowForm({
           <p className="text-xs text-muted-foreground">
             {read.data.interrupts.length === 0
               ? 'Nothing outside a landing is at work: pausing now stops nothing.'
-              : `Stops ${read.data.interrupts.length} at work, each tried again on Resume; a landing finishes:`}
+              : `A landing finishes; this stops ${read.data.interrupts.length} at work, each tried again on Resume:`}
           </p>
           <Lines lines={read.data.interrupts.map(interruptSentence)} data="data-pause-interrupt" />
           <p data-pause-cost className="text-xs">

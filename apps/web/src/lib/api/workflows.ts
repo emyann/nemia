@@ -6,6 +6,7 @@ import { queryOptions } from '@tanstack/react-query';
 import { Option, Schema } from 'effect';
 import { get, send, type SendHow } from './read.ts';
 import { RunGraphSchema, type RunGraph } from './graph.ts';
+import { StepLayersSchema, type StepLayers } from './layers.ts';
 import {
   AgentSkillSchema,
   KeyRowSchema,
@@ -21,12 +22,21 @@ import {
 /**
  * Mirrors `ListedStep` in apps/api/src/workflows/workflows.ts: a step as a workflow's listing has it. `spec` and `body` are the step
  * resolved; `own` is what a step with an agent sets itself, null for a step with none; `hired` is the agent the factory the listing is in
- * hires into it, which `spec.agent` then names too — null for a step it hires no one into, and in the default factory.
+ * hires into it, which `spec.agent` then names too — null for a step it hires no one into, and in the default factory. `layers` is what
+ * a run of a step with an agent would be told, by layer — the agent's instructions, your custom instructions, the step's policy — null for
+ * a step with none.
  */
-export type ListedStep = { name: string; spec: WorkflowStepSpec; body: string; own: StepOwn | null; hired: string | null };
+export type ListedStep = {
+  name: string;
+  spec: WorkflowStepSpec;
+  body: string;
+  own: StepOwn | null;
+  hired: string | null;
+  layers: StepLayers | null;
+};
 
-/** A step as the builder puts it back: a listed step without `hired`, which no step file writes. */
-export type StepWritten = Omit<ListedStep, 'hired'>;
+/** A step as the builder puts it back: a listed step without `hired` and `layers`, which no step file writes. */
+export type StepWritten = Omit<ListedStep, 'hired' | 'layers'>;
 
 /**
  * Mirrors `StepOwn` in apps/api/src/workflows/workflows.ts: the keys a step with an agent sets itself — the rest are its agent's — and its
@@ -47,6 +57,7 @@ const ListedStepSchema = Schema.Struct({
   body: Schema.String,
   own: Schema.NullOr(StepOwnSchema),
   hired: Schema.NullOr(Schema.String),
+  layers: Schema.NullOr(StepLayersSchema),
 }) satisfies Schema.Schema<ListedStep>;
 
 /**

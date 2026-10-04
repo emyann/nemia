@@ -1,0 +1,36 @@
+/**
+ * What a step is told, by layer, as the api answers it on a run's detail (what its run froze) and on a workflow's listing (what a run of it
+ * would be told): one schema, which `detail.ts` and `workflows.ts` both decode with.
+ */
+import { Schema } from 'effect';
+
+/**
+ * Mirrors `ToldLayers` (agent-orchestrator/run), the api's `layers`: what a step was told, by layer — its agent, the agent's
+ * instructions and own skills, the person's custom instructions for it, the step's own note, the skills its line adds and the fence lines
+ * it tightens the agent's with, and the task, its brief after them. `via` says where the agent's words and the person's went: the
+ * session's system prompt (`prompt`), or the head of its brief (`brief`).
+ */
+export type StepLayers = {
+  agent: string | null;
+  instructions: string | null;
+  custom: string | null;
+  agentSkills: string[];
+  policy: string;
+  addedSkills: string[];
+  fence: Array<{ key: string; value: string }>;
+  task: string | null;
+  via: 'prompt' | 'brief';
+};
+
+/** Decodes a `StepLayers`. */
+export const StepLayersSchema = Schema.Struct({
+  agent: Schema.NullOr(Schema.String),
+  instructions: Schema.NullOr(Schema.String),
+  custom: Schema.NullOr(Schema.String),
+  agentSkills: Schema.mutable(Schema.Array(Schema.String)),
+  policy: Schema.String,
+  addedSkills: Schema.mutable(Schema.Array(Schema.String)),
+  fence: Schema.mutable(Schema.Array(Schema.Struct({ key: Schema.String, value: Schema.String }))),
+  task: Schema.NullOr(Schema.String),
+  via: Schema.Literals(['prompt', 'brief']),
+}) satisfies Schema.Schema<StepLayers>;

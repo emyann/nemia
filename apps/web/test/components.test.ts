@@ -59,7 +59,7 @@ const { Chips, DecideSection, DiffFileView, GroupBar, LessonChip, TouchedBranch 
 const { ReactFlowProvider } = await import('@xyflow/react');
 const { AllowedReach } = await import('../src/components/Reach.tsx');
 const { stateMeaning } = await import('../src/lib/status.ts');
-const { Told } = await import('../src/components/Told.tsx');
+const { StepPolicy, Told } = await import('../src/components/Told.tsx');
 type RunDetail = import('../src/lib/api.ts').RunDetail;
 type StepReach = import('../src/lib/api.ts').StepReach;
 type ReadOnlyCommands = import('../src/lib/api.ts').ReadOnlyCommands;
@@ -5233,6 +5233,7 @@ test("the bar for a workflow's step says what it runs on, its keys as its node l
     body: '',
     own: { keys: [], body: '' },
     hired: null,
+    layers: null,
   });
   const listing = workflow({
     name: 'dev',
@@ -5285,6 +5286,7 @@ const LAYERS: StepLayers = {
   agentSkills: ['alpha'],
   policy: 'Write the note.',
   addedSkills: ['gamma'],
+  fence: [],
   task: '## What was asked for\n\nA note.',
   via: 'prompt',
 };
@@ -5334,4 +5336,38 @@ test("a layer the run froze none of says so; a step with no agent draws no agent
   assert.match(whole, /Write the note\.\n\n## What was asked for/);
   assert.doesNotMatch(whole, /data-layer/);
   assert.equal(toldMarkup({ told: null, layers: null, filed: true }), '', 'nothing to fold, no fold');
+});
+
+/** `StepPolicy` drawn as a server draws it. */
+const policyMarkup = (layers: StepLayers): string => renderToStaticMarkup(createElement(StepPolicy, { layers }));
+
+/** The layers of `LAYERS`, its step tightening the agent's fence with a deny of its own. */
+const FENCED: StepLayers = { ...LAYERS, fence: [{ key: 'disallowedTools', value: 'Bash(git push:*)' }] };
+
+test('the fence lines a step tightens are drawn under its policy layer, and under no other', () => {
+  const html = toldMarkup({ told: null, layers: FENCED, filed: true });
+  const fence = html.indexOf('data-fence="disallowedTools"');
+  assert.ok(fence > html.indexOf('data-layer="policy"') && fence < html.indexOf('data-layer="task"'), html);
+  assert.match(html, /Tightens writer&#x27;s fence:[^]*disallowedTools: Bash\(git push:\*\)/);
+  assert.doesNotMatch(toldMarkup({ told: null, layers: LAYERS, filed: true }), /data-fence|Tightens/, 'no fence line, no fence');
+});
+
+test("at a gate, the step's policy is drawn open: its words, the skills it adds, its fence lines, and what was told before it — never the agent's words", () => {
+  const html = policyMarkup(FENCED);
+  assert.match(html, /data-gate-policy[^]*data-layer="policy"[^]*The step&#x27;s policy[^]*Write the note\./);
+  assert.match(html, /data-skill="gamma"/);
+  assert.doesNotMatch(html, /data-skill="alpha"/, "the agent's own skill is the agent's layer");
+  assert.match(html, /data-fence="disallowedTools"/);
+  assert.match(html, /Told after writer&#x27;s instructions and your custom instructions; where they conflict, this wins\./);
+  assert.doesNotMatch(html, /You are the writer\.|Be terse\./, "the agent's words and the person's are in the fold, not here");
+  assert.match(policyMarkup({ ...LAYERS, custom: null }), /Told after writer&#x27;s instructions; where they conflict/);
+  assert.match(
+    policyMarkup({ ...LAYERS, policy: '', addedSkills: [], fence: [] }),
+    /No words of its own: writer&#x27;s instructions are all it was told/,
+  );
+  assert.equal(
+    policyMarkup({ ...LAYERS, agent: null, instructions: null, custom: null }),
+    '',
+    'a step with no agent has no policy over one',
+  );
 });

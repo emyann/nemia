@@ -8,6 +8,7 @@ import { pace } from '../feed.ts';
 import { ReadRefusal, get } from './read.ts';
 import type { RetryMode, Said } from './asks.ts';
 import { RunGraphSchema, type RunGraph } from './graph.ts';
+import { StepLayersSchema, type StepLayers } from './layers.ts';
 import {
   PlaceKindSchema,
   RunHoldingSchema,
@@ -172,35 +173,6 @@ const StepSpecSchema = Schema.Struct({
   loop: Schema.NullOr(Schema.String),
   rounds: Schema.NullOr(Schema.Number),
 }) satisfies Schema.Schema<StepSpec>;
-
-/**
- * Mirrors `ToldLayers` (agent-orchestrator/run), the api's `layers`: what a step was told, by layer, from what its run froze — its
- * agent, the agent's instructions and own skills, the person's custom instructions for it, the step's own note and the skills its line
- * adds, and the task, its brief after them. `via` says where the agent's words and the person's went: the session's system prompt
- * (`prompt`), or the head of its brief (`brief`).
- */
-export type StepLayers = {
-  agent: string | null;
-  instructions: string | null;
-  custom: string | null;
-  agentSkills: string[];
-  policy: string;
-  addedSkills: string[];
-  task: string | null;
-  via: 'prompt' | 'brief';
-};
-
-/** Decodes a `StepLayers`. */
-const StepLayersSchema = Schema.Struct({
-  agent: Schema.NullOr(Schema.String),
-  instructions: Schema.NullOr(Schema.String),
-  custom: Schema.NullOr(Schema.String),
-  agentSkills: Schema.mutable(Schema.Array(Schema.String)),
-  policy: Schema.String,
-  addedSkills: Schema.mutable(Schema.Array(Schema.String)),
-  task: Schema.NullOr(Schema.String),
-  via: Schema.Literals(['prompt', 'brief']),
-}) satisfies Schema.Schema<StepLayers>;
 
 /**
  * Mirrors `StepFiled` in apps/api/src/detail/detail.ts: what the engine filed a step's current try with. Each field is null where the

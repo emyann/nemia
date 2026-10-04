@@ -6,7 +6,7 @@ import { Decide } from '../components/Decide';
 import { Markdown } from '../components/Markdown';
 import { NeedsBanner, ToDecideBanner } from '../components/Needs';
 import { Check, code, Facts, pathRow, Read, readRows, specRows, spentRows, when } from '../components/Facts';
-import { Told } from '../components/Told';
+import { StepPolicy, Told } from '../components/Told';
 import { ActsOn, Approved, endsTheRun, Gate, gateWord } from '../components/Gate';
 import { RunCanvas } from '../components/RunCanvas';
 import { RunGone } from '../components/RunGone';
@@ -227,7 +227,7 @@ const deniedRow = (calls: readonly string[]): ReactNode => (
  * list would say the step made nothing when nobody could look. A git step's work is its branch, and has no such list.
  *
  * At its gate — waiting on you as `wf ls` asks it (`approve`), on a run nobody called off, and not sent back already (`gateOffered`) — the
- * gate, with what the step handed on, every field it declared, which is what a person approves, beside Approve and Send back. An ending
+ * step's policy drawn open (`StepPolicy`), then the gate, with what the step handed on, every field it declared, which is what a person approves, beside Approve and Send back. An ending
  * step's gate (`endsTheRun`) holds before the step is filed: it has handed nothing on, and shows instead the work it would act on
  * (`ActsOn`), the branch's standing and diff stat and each work step's closeout with its files, since approving is what runs it. An ending
  * that has already run — filed, aborted, retried — is at its gate for its own closeout, as any gated step is. A send-back names the steps
@@ -297,6 +297,8 @@ function StepSection({ run, step, runCancelled }: { run: RunDetail; step: Step; 
           )}
         </div>
       )}
+
+      {atGate && step.layers && <StepPolicy layers={step.layers} />}
 
       {atGate ? (
         acts ? (

@@ -6,6 +6,7 @@ import { gateBrief, gateFacts, gateOfStep, needWords, type GateFact } from '../l
 import { cn } from '../lib/utils';
 import { RouteLink } from './AgentParts';
 import { Gate } from './Gate';
+import { StepPolicy } from './Told';
 
 type Step = RunDetail['steps'][number];
 
@@ -14,7 +15,7 @@ const LINK =
 
 /**
  * What a run asks of a person at this step, first in its inspector, above everything else: at a gate, which step waits, what approving
- * does and what sending back does, the facts to decide on, and the answer itself (`Gate`); for a question or a blocked session, what is
+ * does and what sending back does, the facts to decide on, the step's policy (`StepPolicy`), and the answer itself (`Gate`); for a question or a blocked session, what is
  * asked and a link to the run's page where it is answered; for a result nobody decided, the same, on whichever step is open. Nothing where
  * the run waits on nobody.
  */
@@ -70,6 +71,7 @@ function GateBrief({ run, step }: { run: RunDetail; step: Step }) {
           </div>
         ))}
       </dl>
+      {step.layers && <StepPolicy layers={step.layers} />}
       <div className="border-t border-amber-200 pt-3 dark:border-amber-900">
         <Gate runId={run.id} step={step.name} back={gate.back} acts={gate.ends} framed={false} />
       </div>

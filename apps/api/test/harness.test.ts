@@ -44,7 +44,7 @@ const testFiles = (): string[] => [
 test('every api test file imports the harness first, by its path from the file, before anything that could observe this machine', () => {
   const files = testFiles();
   assert.ok(files.includes('test/app.test.ts') && files.includes('test/harness.test.ts'), "and this is looking at the api's tests");
-  assert.ok(files.includes('src/runs/graph.test.ts'), 'and at the ones beside the code');
+  assert.ok(files.includes('src/runs/prune.test.ts'), 'and at the ones beside the code');
   assert.deepEqual(
     files
       .map((file) => {
@@ -176,7 +176,7 @@ test('no api test file loads a module with import(): the harness sets the store 
     ...testFiles().filter((f) => f.startsWith('src/')),
   ];
   assert.ok(files.includes('test/app.test.ts') && files.includes('test/harness.ts'), "and this is looking at the api's tests");
-  assert.ok(files.includes('src/runs/graph.test.ts'), 'and at the ones beside the code');
+  assert.ok(files.includes('src/runs/prune.test.ts'), 'and at the ones beside the code');
   assert.deepEqual(
     files.flatMap((file) =>
       importCalls(fs.readFileSync(path.join(API, file), 'utf8')).map(

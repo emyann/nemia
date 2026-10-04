@@ -28,10 +28,13 @@ import {
   waitAdvice,
   waitWord,
   wordOfView,
+  bare,
+  judgedSteps,
+  type Views,
 } from 'agent-orchestrator';
 import { type Assessment, inFlight, isGitRun, onYouWords, type Run, type ToDecide } from 'agent-orchestrator/run';
 import { isRemoteHarness, type Workflow } from 'agent-orchestrator/workflow';
-import { bare, type Engine, judgedSteps, type Views } from '../store.ts';
+import { type Engine } from '../store.ts';
 
 /** Where a run stands, as `assess` decides it: `running` until every step is final one way or the other. */
 export type RunStatus = Assessment['status'];

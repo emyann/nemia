@@ -1,5 +1,5 @@
 /** A step's tries, earliest first, each with its attempts and how it signed off, as the run's record keeps them. */
-import { endWords, type RetryAsk } from 'agent-orchestrator';
+import { endWords, type RetryAsk, bare, type TaskView, type Views } from 'agent-orchestrator';
 import {
   answerOf,
   type Asked,
@@ -16,7 +16,6 @@ import { LOOP_REPLIES, outputFields, type Workflow } from 'agent-orchestrator/wo
 import { artifactOf, type StepArtifact } from '../steps/artifacts.ts';
 import { wordOf } from '../runs/judged.ts';
 import { checkIn, type CheckStderr, type StepCheck } from '../steps/logs.ts';
-import { bare, type TaskView, type Views } from '../store.ts';
 
 /** A loop's target's answer to one finding it was handed, as its closeout gave it. */
 export type StepReply = { finding: string; answer: string; why: string };

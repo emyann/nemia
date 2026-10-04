@@ -17,10 +17,14 @@ import {
   resultSteps,
   sensitiveDiff,
   touchedBy,
+  judgedSteps,
+  stepNames,
+  viewsOf,
+  workflowsOf,
 } from 'agent-orchestrator';
 import { type CheckoutHold, type GitRun, holdsOf, isGitRun, type Run, type RunSlot, waitsOf } from 'agent-orchestrator/run';
 import { holdingOf, judge, type RunHolding, type RunWaiting, waitingOf } from '../runs/judged.ts';
-import { type Engine, judgedSteps, stepNames, viewsOf, workflowsOf } from '../store.ts';
+import { type Engine } from '../store.ts';
 import { type StepUsed, totalOf, usedOf } from '../detail/usage.ts';
 
 export type { DecideCommand };

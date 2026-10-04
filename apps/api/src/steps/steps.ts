@@ -4,13 +4,13 @@
  */
 import { Hono } from 'hono';
 import { type SSEStreamingApi, streamSSE } from 'hono/streaming';
-import { COMMANDS, LOGS, phaseOfView } from 'agent-orchestrator';
+import { COMMANDS, LOGS, phaseOfView, type TaskView } from 'agent-orchestrator';
 import { filesPrunedWords } from 'agent-orchestrator/run';
 import { refusedName, typeOf } from './artifacts.ts';
 import { type StepLog, tailOf } from './logs.ts';
 import { type LifecycleStep, pathToTurn, type StepPath, tryOfStep } from './path.ts';
 import { type ApiEnv, served } from '../layer.ts';
-import { type Engine, taskOfStep, type TaskView } from '../store.ts';
+import { type Engine, taskOfStep } from '../store.ts';
 
 /**
  * The board's reads of a step in the package's table, each served on the api alone: a file of its files directory (`step artifact`) and of

@@ -72,7 +72,6 @@ const MOVES: Readonly<Record<string, Entry>> = {
     to: "packages/agent-orchestrator's runStore inbox, read through its entry",
   },
   'src/steps/artifacts.ts': { reaches: ['node:fs'], ...RUN_STORE },
-  'src/store.ts': { reaches: ['node:fs'], ...RUN_STORE },
   'src/workflows/builder.ts': { reaches: ['node:fs'], ...FOLDER_STORE },
   'src/workflows/workflows.ts': { reaches: ['node:fs'], ...FOLDER_STORE },
 };

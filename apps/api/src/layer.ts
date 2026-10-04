@@ -6,14 +6,14 @@
  * (`StoreRoot`, store.ts).
  */
 import { Context, Effect, Layer, type ManagedRuntime } from 'effect';
-import { freshStatsMemo, type Factory, type StatsMemo } from 'agent-orchestrator';
+import { freshStatsMemo, type Factory, type StatsMemo, type Filings } from 'agent-orchestrator';
 import { McpAsker } from './capabilities/capabilities.ts';
 import type { LastSaid } from './detail/detail.ts';
 import { placeFor } from './factories/place.ts';
 import { QuotaAsker } from './factory/quota.ts';
 import { type RestingMemo, restingMemo } from './runs/resting.ts';
 import type { RunSummary } from './runs/runs.ts';
-import { Engine, type Filings, StoreRoot } from './store.ts';
+import { Engine, StoreRoot } from './store.ts';
 
 /**
  * The environment the api reads its settings from, on each request, as it read `process.env` before: `HKB_REPO` (`repoOf`), `WF_MAX_RUNS`

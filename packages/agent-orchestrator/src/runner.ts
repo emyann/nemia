@@ -422,3 +422,17 @@ export type { DecideCommand } from './decide/decide.ts';
 export type { RunsListed, Unjudged } from './list/list.ts';
 export { graphOf, runGraph } from './summary/graph.ts';
 export type { GraphEdge, RunGraph } from './summary/graph.ts';
+export {
+  bare,
+  filedTimes,
+  judgedSteps,
+  judgedUnlessUnreadable,
+  seenBy,
+  stepNames,
+  tryOf,
+  unreadableOf,
+  viewsFor,
+  viewsOf,
+  workflowsOf,
+} from './summary/reads.verb.ts';
+export type { Filings, TaskView, Unreadable, Views } from './summary/reads.verb.ts';

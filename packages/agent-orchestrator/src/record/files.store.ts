@@ -6,7 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Schema } from 'effect';
-import { cordonFile, cordonStamp, readCordon } from '../cordon/cordon.store.ts';
+import { cordonFile, readCordon } from '../cordon/cordon.store.ts';
 import type { Cordon } from '../cordon/cordon.ts';
 import type { QueueTry } from '../inbox/inbox.ts';
 import type { AskKey, AskKind, AskWritten, PersonAsk, Pruned, Run, RunStore } from './record.ts';
@@ -198,13 +198,14 @@ function putTry(name: string, tried: QueueTry): void {
 
 /**
  * The run as it reads with the store's cordon (`readCordon`) composed onto it — the one given, read where none is — or without one while
- * none stands: a run the tick's memo kept is read with the cordon as it stands now. Never written into the record (`rewriteRun`).
+ * none stands: a run the tick's memo kept is read with the cordon as it stands now, so the cordon is in no run's stamp (`restStamps`): a
+ * run at rest has nothing due for it to hold, and one it holds anything of is `running`, never at rest. Never written into the record.
  */
 const cordoned = ({ cordon: _, ...run }: Run, cordon: Cordon | null = readCordon()): Run => (cordon ? { ...run, cordon } : run);
 
 /**
  * A run's record and a person's files beside it, each a file of its own under `runs/`, with the store's cordon composed onto each run read
- * (`cordoned`) and its file's stamp in each run's (`cordonStamp`); the inbox's cards and the tick's tries.
+ * (`cordoned`); the inbox's cards and the tick's tries.
  */
 export const filesStore: RunStore = {
   runs: {
@@ -215,10 +216,7 @@ export const filesStore: RunStore = {
     },
     create: writeRun,
     rewrite: rewriteRun,
-    stamps: () => {
-      const cordon = `cordon=${cordonStamp()}`;
-      return new Map([...restStamps()].map(([id, stamp]) => [id, `${stamp};${cordon}`]));
-    },
+    stamps: restStamps,
     exists: (id) => fs.existsSync(runFile(id)),
     calledOff: (id) => [cancelFile, pruneFile, holdFile].some((file) => fs.existsSync(file(id))) || fs.existsSync(cordonFile()),
     cancel: markCancelled,

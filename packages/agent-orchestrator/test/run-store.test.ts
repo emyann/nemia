@@ -23,6 +23,7 @@ const ROOT = scratch('wf-run-store-');
 process.env.WF_ROOT = ROOT;
 const { filesStore } = await import('../src/record/files.store.ts');
 const { mayFileOf } = await import('../src/tick/file.verb.ts');
+const { liftCordon, putCordon } = await import('../src/cordon/cordon.store.ts');
 const {
   acceptFile,
   acceptanceIn,
@@ -133,6 +134,40 @@ test('a held run is called off', () => {
   const run = made('r-held');
   writeHold(run.id, ['other-run']);
   assert.equal(filesStore.runs.calledOff(run.id), true);
+});
+
+test('every run is called off while the store is cordoned, and none once the cordon is lifted', () => {
+  const run = made('r-cordoned');
+  putCordon({ by: 'ann' });
+  try {
+    assert.equal(filesStore.runs.calledOff(run.id), true);
+  } finally {
+    liftCordon();
+  }
+  assert.equal(filesStore.runs.calledOff(run.id), false);
+});
+
+test("the store's cordon is composed onto every run read and listed, and written back into none", () => {
+  const run = made('r-cordon-read');
+  const cordon = putCordon({ why: 'merging by hand', by: 'ann' });
+  try {
+    const read = filesStore.runs.read(run.id);
+    assert.deepEqual(read.cordon, cordon);
+    assert.deepEqual(
+      filesStore.runs.list().find((r) => r.id === run.id)?.cordon,
+      cordon,
+    );
+    assert.deepEqual(
+      filesStore.runs.list(undefined, (id) => (id === run.id ? run : undefined)).find((r) => r.id === run.id)?.cordon,
+      cordon,
+      'a run the memo kept is read with the cordon as it stands',
+    );
+    assert.equal(filesStore.runs.rewrite(read), true);
+    assert.equal('cordon' in JSON.parse(fs.readFileSync(runFile(run.id), 'utf8')), false, 'the cordon is written into the record');
+  } finally {
+    liftCordon();
+  }
+  assert.equal('cordon' in filesStore.runs.read(run.id), false, 'lifted, no run reads it');
 });
 
 test('a pruned run is called off', () => {

@@ -19,15 +19,6 @@ const ROOT = wfRoot();
 /** The cordon's file: one for the whole store. */
 export const cordonFile = (): string => path.join(ROOT, 'cordon');
 
-/**
- * The cordon's file, stamped as `restStamps` stamps a run's: its inode, size and modification time to the nanosecond, or `none` while no
- * cordon stands — so a cordon put, lifted or put again moves the stamp of every run, onto which it is composed.
- */
-export function cordonStamp(): string {
-  const s = fs.statSync(cordonFile(), { bigint: true, throwIfNoEntry: false });
-  return s ? `${s.ino}:${s.size}:${s.mtimeNs}` : 'none';
-}
-
 /** A field of the file as it was written: one line of words, or absent. */
 const Said = Schema.optional(Schema.String);
 

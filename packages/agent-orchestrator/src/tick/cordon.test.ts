@@ -165,6 +165,7 @@ test('while the store is cordoned nothing new starts and what runs finishes; the
 
   const first = await pass();
   assert.deepEqual(first.cordon, cordon, 'the pass says the cordon it read');
+  assert.equal(first.queue, undefined, 'and started no queued card');
   h.signAll();
   await pass(freshRestMemo());
   await pass();

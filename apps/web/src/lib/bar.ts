@@ -159,6 +159,23 @@ export function barOpens(bar: Bar): BarPage | null {
   }
 }
 
+/** Whether `open` shows what is the whole machine's, not a page's: its gauges, or the runs waiting on you across every factory. */
+export function wholeMachine(open: Bar | undefined): boolean {
+  switch (open?.kind) {
+    case 'gauges':
+    case 'waiting':
+      return true;
+    case 'factory':
+    case 'run':
+    case 'step':
+    case 'spec':
+    case 'start':
+    case 'state':
+    case undefined:
+      return false;
+  }
+}
+
 /** The step of the workflow `workflow` read from `from` that `open` shows, or null for a bar that shows none of its steps. */
 export const specStep = (open: Bar | undefined, from: string, workflow: string): string | null =>
   open?.kind === 'spec' && open.from === from && open.workflow === workflow ? open.step : null;

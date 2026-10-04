@@ -56,7 +56,7 @@ import { anyInView, boxesOf, revealView, sized, sizeOf, type Box, type Size, typ
 import { queuedIn, type FactoryPlace } from '@/lib/factories';
 import { capLine, queueOf } from '@/lib/inbox';
 import { passLine, passTitle } from '@/lib/pass';
-import type { Bar } from '@/lib/bar';
+import { wholeMachine, type Bar } from '@/lib/bar';
 import { useBar } from '@/lib/useBar';
 import { useBarOver } from '@/lib/useBarOver';
 import { useCanvasPress } from '@/lib/useCanvasPress';
@@ -518,7 +518,7 @@ function useFloorPress() {
   const { open, toggle } = useBar();
   const onStep = useCallback((run: string, step: string) => toggle({ kind: 'step', run, step }), [toggle]);
   return {
-    machine: open?.kind === 'gauges' || open?.kind === 'waiting',
+    machine: wholeMachine(open),
     inspecting: shown?.kind === 'run' || shown?.kind === 'step' ? shown.run : null,
     inspected: shown?.kind === 'run' ? shown.run : null,
     step: shown?.kind === 'step' ? shown : null,

@@ -18,6 +18,7 @@ import {
   machineState,
   specStep,
   type Bar,
+  wholeMachine,
 } from '../src/lib/bar.ts';
 
 const HIRING: Bar = { kind: 'start', factory: 'hiring' };
@@ -265,4 +266,22 @@ test('the bar covers the part of a frame right of its left edge, and none with n
   assert.equal(barOver(1280, 704, true), 0);
   assert.equal(barOver(900, 1000, false), 0);
   assert.equal(barOver(1280, 1280 - BAR_DEFAULT, false), BAR_DEFAULT);
+});
+
+test("REFUSED: the floor gives its queue lane's room to a bar of the whole machine alone: its gauges, the runs waiting on you", () => {
+  assert.equal(wholeMachine({ kind: 'gauges' }), true);
+  assert.equal(wholeMachine({ kind: 'waiting' }), true);
+  const pages: Bar[] = [
+    { kind: 'factory', factory: 'nemia' },
+    { kind: 'run', run: 'r' },
+    { kind: 'step', run: 'r', step: 'plan' },
+    { kind: 'spec', from: 'repo', workflow: 'dev', step: 'plan' },
+    { kind: 'start', factory: null },
+    { kind: 'state', machine: 'lifecycle', state: 'running' },
+  ];
+  assert.deepEqual(
+    pages.map((bar) => [bar.kind, wholeMachine(bar)]),
+    pages.map((bar) => [bar.kind, false]),
+  );
+  assert.equal(wholeMachine(undefined), false, 'nor no bar at all');
 });

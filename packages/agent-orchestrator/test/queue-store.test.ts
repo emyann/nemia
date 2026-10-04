@@ -417,7 +417,7 @@ test('`wf up` says both ceilings in words before its first pass — and REFUSED 
     if (concurrent === undefined) delete process.env.WF_MAX_CONCURRENT;
     else process.env.WF_MAX_CONCURRENT = concurrent;
   }
-  const holds = `   holds ${ROOT} as pid ${process.pid} — a second wf up, or a wf tick, on this store is refused while it ticks (daemon.json)`;
+  const holds = `   holds ${ROOT} as pid ${process.pid} — a second daemon, the api or a wf up, or a wf tick, on this store is refused while it ticks (daemon.json)`;
   assert.deepEqual(
     printed,
     [

@@ -14,6 +14,7 @@ import {
   daemonStanding as standingOf,
   holdRefusal,
   holderAgainst,
+  holderOf,
   staleAfterMs,
   takeoverLine,
   type DaemonFile,
@@ -199,14 +200,14 @@ test('the refusals name the pid, where and since when it ticks, its last pass, a
     up,
     /^wf up: \/store is held by the wf up of pid 4242, started 2026-09-22T11:00:00\.000Z in \/home\/me\/repo, every 4000ms — last pass 3s ago \(2026-09-22T11:59:57\.000Z\)\. /,
   );
-  assert.match(up, /stop it with kill 4242 — that pid is the node process that ticks, not an npm exec wrapper around it/);
-  assert.match(up, /a holder silent for 15m00s is taken over by the next wf up\.$/);
+  assert.match(up, /stop it with kill 4242 — that pid is the node process that ticks, not an npm wrapper around it/);
+  assert.match(up, /a holder silent for 15m00s is taken over by the next daemon\.$/);
   const tick = holdRefusal(held(holder({ passedAt: null, startedAt: ago(0.5) })), 'tick', '/store', NOW);
   assert.match(
     tick,
     /^wf tick: \/store is held by the wf up of pid 4242, started \S+ in \/home\/me\/repo, every 4000ms — no pass completed yet, started 30s ago \(\S+\), which runs this same pass within its interval: a pass by hand beside it would be a second writer\. /,
   );
-  assert.match(tick, /kill 4242 — that pid is the node process that ticks, not an npm exec wrapper .* and tick by hand then\.$/);
+  assert.match(tick, /kill 4242 — that pid is the node process that ticks, not an npm wrapper .* and tick by hand then\.$/);
   for (const [file, why] of [
     [holder({ procStart: 99 }), 'no /proc/4242/stat to compare its start with'],
     [holder(), 'the file names no process start'],
@@ -225,6 +226,25 @@ test('the refusals name the pid, where and since when it ticks, its last pass, a
       'it is named, said unconfirmed, and how to check it comes before the kill',
     );
   }
+});
+
+test('REFUSED both ways round: an api holding the store refuses a wf up, naming its url and pid, and a wf up holding it refuses an api', () => {
+  const held = (file: DaemonFile) => holderAgainst(judged(text(file), live), 1)!;
+  const api = holder({ by: 'api', url: 'http://127.0.0.1:8787' });
+  assert.match(
+    holdRefusal(held(api), 'up', '/store', NOW),
+    /^wf up: \/store is held by the api of pid 4242 at http:\/\/127\.0\.0\.1:8787, started .* One store takes one daemon, the api or a wf up: .* stop it with kill 4242 — /,
+  );
+  const second = holdRefusal(held(api), 'api', '/store', NOW);
+  assert.match(second, /^api: \/store is held by the api of pid 4242 at http:\/\/127\.0\.0\.1:8787, /);
+  assert.match(second, /serve a board beside it with --no-tick, or start this api again once it has stopped: stop it with kill 4242 — /);
+  assert.match(holdRefusal(held(holder()), 'api', '/store', NOW), /^api: \/store is held by the wf up of pid 4242, started /);
+  assert.match(holdRefusal(held(api), 'tick', '/store', NOW), /^wf tick: \/store is held by the api of pid 4242 at http:/);
+  assert.equal(holderOf({}), 'wf up', 'a record written before the api ticked is a wf up');
+  assert.equal(
+    daemonLine(judged(text(api), live), NOW),
+    'api: ticking, pid 4242 at http://127.0.0.1:8787, every 4000ms — last pass 3s ago (2026-09-22T11:59:57.000Z)',
+  );
 });
 
 test('what wf up says of the store it took: a holder gone, stalled or unreadable is named, and a clean stop or an empty store is not', () => {
@@ -251,15 +271,18 @@ test('what wf up says of the store it took: a holder gone, stalled or unreadable
 
 test("wf ls's line: whether a daemon ticks the store, and when its last pass was", () => {
   const line = (file: DaemonFile | undefined, how = live) => daemonLine(judged(file && text(file), how), NOW);
-  assert.equal(line(undefined), 'wf up: none has held this store — nothing ticks it; start one with wf up');
+  assert.equal(
+    line(undefined),
+    'daemon: none has held this store — nothing ticks it; start one with npm start in apps/api, or wf up where no board is served',
+  );
   assert.equal(
     daemonLine(judged('nope', live), NOW),
-    'wf up: none known — daemon.json does not read as a holder, so nothing is known to tick this store; wf up takes it over',
+    'daemon: none known — daemon.json does not read as a holder, so nothing is known to tick this store; the next daemon takes it over',
   );
   assert.equal(line(holder()), 'wf up: ticking, pid 4242, every 4000ms — last pass 3s ago (2026-09-22T11:59:57.000Z)');
   assert.equal(
     line(holder({ passedAt: ago(20) })),
-    'wf up: stalled, pid 4242, every 4000ms — alive, but silent for 20m00s: last pass 20m00s ago (2026-09-22T11:40:00.000Z); the next wf up takes the store over, and kill 4242 stops it',
+    'wf up: stalled, pid 4242, every 4000ms — alive, but silent for 20m00s: last pass 20m00s ago (2026-09-22T11:40:00.000Z); the next daemon takes the store over, and kill 4242 stops it',
   );
   assert.equal(
     line(holder({ passedAt: ago(40), beatAt: ago(0.05) })),
@@ -273,11 +296,11 @@ test("wf ls's line: whether a daemon ticks the store, and when its last pass was
   );
   assert.equal(
     line(holder(), dead),
-    'wf up: none ticking — pid 4242 is gone, its last pass 3s ago (2026-09-22T11:59:57.000Z); start one with wf up',
+    'wf up: none ticking — pid 4242 is gone, its last pass 3s ago (2026-09-22T11:59:57.000Z); start one with npm start in apps/api, or wf up where no board is served',
   );
   assert.equal(
     line(holder(), as('other')),
-    "wf up: none ticking — the wf up of pid 4242 is gone, that pid another process's now; its last pass 3s ago (2026-09-22T11:59:57.000Z); start one with wf up",
+    "wf up: none ticking — the wf up of pid 4242 is gone, that pid another process's now; its last pass 3s ago (2026-09-22T11:59:57.000Z); start one with npm start in apps/api, or wf up where no board is served",
   );
   assert.equal(
     line(holder(), as('unknown')),
@@ -286,7 +309,7 @@ test("wf ls's line: whether a daemon ticks the store, and when its last pass was
   assert.doesNotMatch(line(holder({ passedAt: ago(20) }), as('unknown')), /kill 4242 stops it/);
   assert.equal(
     line(holder({ passedAt: ago(6), stoppedAt: ago(5) })),
-    'wf up: none ticking — pid 4242 stopped 5m00s ago (2026-09-22T11:55:00.000Z), its last pass 6m00s ago (2026-09-22T11:54:00.000Z); start one with wf up',
+    'wf up: none ticking — pid 4242 stopped 5m00s ago (2026-09-22T11:55:00.000Z), its last pass 6m00s ago (2026-09-22T11:54:00.000Z); start one with npm start in apps/api, or wf up where no board is served',
   );
 });
 

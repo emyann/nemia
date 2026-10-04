@@ -59,7 +59,11 @@ test('with no daemon.json, nothing ticks the store, and the api makes none', asy
   assert.equal(d.kind, 'none');
   assert.equal(d.ticking, false);
   assert.equal(d.pid, null);
-  assert.equal(d.line, 'wf up: none has held this store — nothing ticks it; start one with wf up');
+  assert.equal(
+    d.line,
+    'daemon: none has held this store — nothing ticks it; start one with npm start in apps/api, or wf up where no board is served',
+  );
+  assert.deepEqual([d.by, d.url, d.start], [null, null, 'npm start in apps/api']);
   assert.equal(fs.existsSync(FILE), false);
 });
 
@@ -79,6 +83,15 @@ test('a live wf up heard from recently is ticking: its pid, where, since when, a
   assert.equal(d.staleAfterMs, STALE_FLOOR_MS);
   assert.equal(d.identity, procStartOf(process.pid) === undefined ? 'unknown' : 'same');
   assert.match(d.line, new RegExp(`^wf up: ticking, pid ${process.pid}, every 4000ms — last pass `));
+  assert.deepEqual([d.by, d.url], ['wf up', null], 'a file that names no holder is a wf up');
+});
+
+test('a live api holding the store is ticking as the api, at the url it serves the board on', async () => {
+  put(written(3_000, { by: 'api', url: 'http://127.0.0.1:8787' }));
+  const d = await get();
+  assert.equal(d.ticking, true);
+  assert.deepEqual([d.by, d.url, d.start], ['api', 'http://127.0.0.1:8787', 'npm start in apps/api']);
+  assert.match(d.line, new RegExp(`^api: ticking, pid ${process.pid} at http://127\\.0\\.0\\.1:8787, every 4000ms — `));
 });
 
 test('a pass that runs long is still ticking: silence is measured from the beat, not from the last pass', async () => {
@@ -160,6 +173,9 @@ test("daemonOf: the standing as facts, and wf ls's line with them", () => {
   const standing = { kind: 'stalled' as const, file, last: Date.parse(file.beatAt!), quiet: 25 * MIN, identity: 'unknown' as const };
   assert.deepEqual(daemonOf(standing, now), {
     kind: 'stalled',
+    by: 'wf up',
+    url: null,
+    start: 'npm start in apps/api',
     ticking: false,
     pid: 42,
     cwd: '/r',

@@ -66,16 +66,18 @@ export const HELP = `wf — run a workflow of agent steps
                                take a step's hire back
   wf factory rm <name>         remove a factory's file
   wf tick [--stats]            one pass: tick the engine, file what became ready — refused while a
-                               wf up ticks the store, since it runs the same pass (daemon.json);
+                               daemon ticks the store, since it runs the same pass (daemon.json);
                                --stats says after it what the pass cost, phase by phase
-  wf up [ms]                   the same, on a timer (4000 unless given; whole ms, 1 to 2147483647),
-                               holding the store: a second wf up is refused while this one ticks,
-                               and takes the store over once its process is gone or it has been
-                               silent for 10 intervals, at least 15 minutes; it writes
-                               WF_ROOT/daemon.json — pid, start, last pass, and a beat each interval;
+  wf up [ms]                   the headless daemon: the same, on a timer (4000 unless given; whole
+                               ms, 1 to 2147483647), where no board is served. The api's process
+                               (npm start in apps/api) is the daemon where one is: one store takes
+                               one, and each is refused while the other ticks. It takes the store
+                               over once its holder's process is gone or it has been silent for
+                               10 intervals, at least 15 minutes; it writes WF_ROOT/daemon.json —
+                               who holds it, pid, start, last pass, and a beat each interval;
                                once a minute, a line of what its passes cost (tick-stats.json)
   wf up --stats                what the last pass cost, phase by phase — read, not run, so it fits
-                               while a wf up holds the store; where none does, wf tick --stats
+                               while a daemon holds the store; where none does, wf tick --stats
   wf stats [--from <day>] [--to <day>] [--by agent|step|factory|workflow|repo] [--agent|--step|--factory|--workflow|--repo <v>] [--line|--json]
                                what every run in the store adds up to, by UTC day: rounds to
                                acceptance of each loop: step, landings of the workspace: main step

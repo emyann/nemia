@@ -1,12 +1,10 @@
 /**
- * The verbs' table, the daemon's verbs — `wf tick`, `wf up`, `wf feed` and `wf watch` — and `runMain`, which runs a command that lives as
- * long as its process.
+ * The verbs' table, and the daemon's verbs — `wf tick`, `wf up`, `wf feed` and `wf watch`.
  */
 import path from 'node:path';
-import { Cause, Effect, Exit, Fiber } from 'effect';
+import { Effect } from 'effect';
 import {
   addPass,
-  beat,
   breakdownLines,
   ceilingLines,
   ceilings,
@@ -17,23 +15,21 @@ import {
   feedLineWords,
   HOME,
   lastPassCost,
-  passed,
   queueLine,
   readFeed,
   refusalLines,
-  releaseStore,
   slotWord,
-  stillHeld,
   storeRefusal,
   summaryDue,
   summaryLine,
-  takeStore,
-  takenFromLine,
   takeoverLine,
+  runMain,
   tick,
+  up,
   waitWord,
   watchFeed,
   type Interval,
+  type TakenStore,
   COMMANDS,
   parseArgv,
   type Command,
@@ -44,45 +40,6 @@ import { statsVerb } from './stats/stats.ts';
 import { factoryVerb } from './factory/factory.ts';
 import { agentsCustom, cancelVerb, holdVerb, logsVerb, pruneVerb, rmVerb, showVerb } from './runs.ts';
 import { inboxVerb, planVerb, startVerb } from './start.ts';
-
-/**
- * The signals that stop a command, each with the code the process exits with once the command has let go of what it held: 128 + its number.
- */
-const SIGNALS = [
-  ['SIGINT', 130],
-  ['SIGTERM', 143],
-  ['SIGHUP', 129],
-] as const;
-
-/**
- * Runs `program` as the process's command. SIGINT, SIGTERM and SIGHUP interrupt it, and once its finalizers have run the process exits 130,
- * 143 or 129, by the signal that came. Otherwise the promise resolves with its value, or rejects with what it failed or died with, that
- * very value, so a refusal's `exitCode` reaches `bin/wf.ts`. The handlers are its own, taken off as it ends: a second signal while the
- * finalizers run is Node's to handle.
- *
- * Not the `runMain` of `@effect/platform-node`'s NodeRuntime: its teardown exits 130 on any interruption, whatever signal came, it
- * handles no SIGHUP, and it hands no failure back to the caller.
- */
-export function runMain<A, E>(program: Effect.Effect<A, E>): Promise<A> {
-  return new Promise<A>((resolve, reject) => {
-    const fiber = Effect.runFork(program);
-    let stoppedWith: number | undefined;
-    const stops = SIGNALS.map(([signal, code]) => {
-      const stop = () => {
-        stoppedWith = code;
-        Effect.runFork(Fiber.interrupt(fiber));
-      };
-      process.once(signal, stop);
-      return [signal, stop] as const;
-    });
-    fiber.addObserver((exit) => {
-      for (const [signal, stop] of stops) process.off(signal, stop);
-      if (stoppedWith !== undefined) process.exit(stoppedWith);
-      if (Exit.isSuccess(exit)) resolve(exit.value);
-      else reject(Cause.squash(exit.cause));
-    });
-  });
-}
 
 /**
  * The cursor `wf feed` and `wf watch` read from: 0 when none is given, a whole number of bytes otherwise, and nothing more. Whether the
@@ -166,7 +123,7 @@ export async function tickVerb(rest: string[], e: Engine): Promise<void> {
   return;
 }
 
-/** `wf up --stats`: what the last pass cost, read off the store, ticking nothing, and who wrote it. */
+/** `wf up --stats`: what the last pass cost, read off the store, ticking nothing, and which daemon wrote it. */
 function upStats(rest: string[]): void {
   const other = rest.find((a) => a !== '--stats');
   if (other !== undefined)
@@ -177,13 +134,13 @@ function upStats(rest: string[]): void {
   const daemon = storeRefusal('tick') !== undefined;
   if (!cost)
     return console.log(
-      `no pass has written what it cost to ${path.join(HOME, 'tick-stats.json')} yet — ${daemon ? 'the wf up that holds this store writes it after its next pass' : 'no wf up holds this store: run wf tick --stats, or start wf up'}`,
+      `no pass has written what it cost to ${path.join(HOME, 'tick-stats.json')} yet — ${daemon ? 'the daemon that holds this store writes it after its next pass' : 'no daemon holds this store: run wf tick --stats, or start one (npm start in apps/api, or wf up)'}`,
     );
   for (const line of breakdownLines(cost)) console.log(line);
   return console.log(
     daemon
-      ? 'written by the wf up that holds this store, after its last pass'
-      : 'no wf up holds this store now, so this was the last pass anyone ran: wf tick --stats runs one and says what it cost',
+      ? 'written by the daemon that holds this store, after its last pass'
+      : 'no daemon holds this store now, so this was the last pass anyone ran: wf tick --stats runs one and says what it cost',
   );
 }
 
@@ -249,40 +206,21 @@ export function upVerb(rest: string[], e: Engine): void | Promise<void> {
   const every = 'refusal' in asked ? usage(asked.refusal) : asked.every;
   const ceiling = ceilings();
   const store = HOME;
-  return runMain(
-    Effect.gen(function* () {
-      const { held, replaced } = yield* Effect.acquireRelease(
-        Effect.try({ try: () => takeStore({ every, cwd: path.resolve('.') }), catch: (err) => err }),
-        ({ held }) => Effect.sync(() => releaseStore(held)),
-      );
+  let was: UpSaid = { said: undefined, feedSaid: undefined, refusedSaid: new Set(), unreadableSaid: new Set(), interval: undefined };
+  const onTaken = ({ held, replaced }: TakenStore) =>
+    Effect.sync(() => {
       console.log(`up — every ${every}ms, ^C to stop`);
       for (const line of ceilingLines(ceiling)) console.log(`   ${line}`);
       console.log(
-        `   holds ${store} as pid ${held.pid} — a second wf up, or a wf tick, on this store is refused while it ticks (daemon.json)`,
+        `   holds ${store} as pid ${held.pid} — a second daemon, the api or a wf up, or a wf tick, on this store is refused while it ticks (daemon.json)`,
       );
       const took = takeoverLine(replaced, store, Date.now());
       if (took) console.log(`   ${took}`);
-      yield* Effect.forkScoped(Effect.forever(Effect.sleep(every).pipe(Effect.andThen(Effect.sync(() => beat(held))))));
-      let was: UpSaid = {
-        said: undefined,
-        feedSaid: undefined,
-        refusedSaid: new Set(),
-        unreadableSaid: new Set(),
-        interval: undefined,
-      };
-      for (;;) {
-        const by = stillHeld(held);
-        if (by) return yield* Effect.fail(new Error(takenFromLine(by, store)));
-        const pass = yield* Effect.tryPromise({
-          try: () => tick(e, { repo: path.resolve('.') }),
-          catch: (err) => err,
-        });
-        passed(held);
-        was = passLines(pass, was);
-        yield* Effect.sleep(every);
-      }
-    }).pipe(Effect.scoped),
-  );
+    });
+  const onPass = (pass: Pass) => {
+    was = passLines(pass, was);
+  };
+  return runMain(up(e, { every, repo: path.resolve('.'), holder: 'wf up', onTaken, onPass }).pipe(Effect.scoped));
 }
 
 /** `wf feed`: the feed's lines from a cursor, and the cursor to read from next. */

@@ -377,6 +377,7 @@ export { retry } from './retry/retry.verb.ts';
 export { say } from './say/say.verb.ts';
 export { COMMANDS, TABLE } from './command/commands.verb.ts';
 export { PRUNE, RM } from './command/runs.verb.ts';
+export { LOGS, STATS } from './command/reads.verb.ts';
 export type { Command, Ran } from './command/entry.verb.ts';
 export { CLI, commandBreaks, commandLine, helpOf, parseArgv } from './command/command.ts';
 export type { Args, CommandSpec, Flag, Positional, Spec } from './command/command.ts';

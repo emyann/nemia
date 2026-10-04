@@ -681,7 +681,6 @@ test('the CLI reaches the package only through runner.ts, workflow.ts and its ow
         'src/cli/flags.ts',
         'src/cli/runs.ts',
         'src/cli/start.ts',
-        'src/cli/stats/stats.ts',
         'src/runner.ts',
       ],
       ['src/runner.ts'],

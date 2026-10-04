@@ -4,6 +4,7 @@
  */
 import type { Engine } from '../runtime-client.ts';
 import type { Conflict, Missing } from '../refusal/refusal.ts';
+import type { StatsMemo } from '../stats/stats.verb.ts';
 import type { Args, CommandSpec } from './command.ts';
 
 /**
@@ -11,11 +12,12 @@ import type { Args, CommandSpec } from './command.ts';
  * `print`, the lines the CLI prints of that data. The api answers the data as JSON, or only its `apiKeys` where the CLI prints more of
  * it than the api answers; or, where `apiRefusal` makes one of the data, throws that refusal in its place: a verb that answers what it
  * would not do as data, a line on the CLI, is refused by its kind on the api. A handler reads its settings (`WF_MAX_RUNS`) from `env`,
- * and a person's own files from the store `home`: the process's own at the command line, the app's on the api. `note` is what the CLI
- * says of the data on stderr, beside what it prints.
+ * and a person's own files from the store `home`: the process's own at the command line, the app's on the api; and what a caller that lives
+ * long keeps between its calls from `kept` — the api's memo of the stats — which the command line, calling once, hands none of. `note` is
+ * what the CLI says of the data on stderr, beside what it prints.
  */
 export type Command<D extends object = Readonly<Record<string, unknown>>> = CommandSpec & {
-  handler(e: Engine, args: Args, env?: NodeJS.ProcessEnv, home?: string): Promise<D>;
+  handler(e: Engine, args: Args, env?: NodeJS.ProcessEnv, home?: string, kept?: { readonly stats?: StatsMemo }): Promise<D>;
   print(data: D, args: Args): readonly string[];
   note?(data: D, args: Args): readonly string[];
   readonly apiKeys?: readonly (keyof D & string)[];

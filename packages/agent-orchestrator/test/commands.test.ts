@@ -21,6 +21,10 @@ test('each command is served on the api where it was before the table, the lift 
       ['accept', { method: 'POST', path: '/api/runs/:runId/steps/:step/accept', status: 202 }],
       ['say', { method: 'POST', path: '/api/runs/:runId/steps/:step/say', status: 202 }],
       ['ls', { method: 'GET', path: '/api/runs', status: 200 }],
+      ['show', 'cli'],
+      ['logs', { method: 'GET', path: '/api/runs/:runId/steps/:step/log', status: 200 }],
+      ['feed', 'cli'],
+      ['stats', { method: 'GET', path: '/api/stats', status: 200 }],
       ['decide', { method: 'GET', path: '/api/runs/:runId/decision', status: 200 }],
       ['ceilings', { method: 'GET', path: '/api/ceilings', status: 200 }],
       ['agents', { method: 'GET', path: '/api/agents', status: 200 }],
@@ -36,10 +40,10 @@ test('each command is served on the api where it was before the table, the lift 
   );
 });
 
-test('every command the api posts or deletes on writes, and the api guards it; the five it gets write nothing', () => {
+test('every command the api posts or deletes on writes, and the api guards it; the reads write nothing', () => {
   assert.deepEqual(
     TABLE.filter((c) => !c.writes).map((c) => c.name),
-    ['ls', 'decide', 'ceilings', 'agents', 'agents card', 'watch'],
+    ['ls', 'show', 'logs', 'feed', 'stats', 'decide', 'ceilings', 'agents', 'agents card', 'watch'],
   );
   assert.deepEqual(
     TABLE.filter((c) => c.route && c.writes !== (c.route.method !== 'GET')).map((c) => c.name),

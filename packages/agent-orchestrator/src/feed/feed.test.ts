@@ -878,7 +878,7 @@ test('a watch says each read that works, before the lines it found and whether o
 
 test('`wf --help` names wf feed and wf watch, and says which feed is whose', async (t) => {
   const printed = (await printedBy(t, board().e, '--help')).join('\n');
-  assert.match(printed, /^ {2}wf feed \[cursor\] /m);
+  assert.match(printed, /^ {2}wf feed \[cursor\]$/m);
   assert.match(printed, /^ {2}wf watch \[cursor\]$/m);
   assert.match(printed, /wf watch follows what the workflow decides/);
   assert.match(printed, /ae watch/);

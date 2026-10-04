@@ -1,6 +1,5 @@
 /**
- * The verbs' table, the runners of the commands the CLI runs itself — `wf tick`, `wf up`, `wf watch`, `wf rm` and `wf prune` (`RUNS`) —
- * and `wf feed`.
+ * The verbs' table, and the runners of the commands the CLI runs itself — `wf tick`, `wf up`, `wf watch`, `wf rm` and `wf prune` (`RUNS`).
  */
 import path from 'node:path';
 import { Effect } from 'effect';
@@ -17,7 +16,6 @@ import {
   HOME,
   lastPassCost,
   queueLine,
-  readFeed,
   refusalLines,
   slotWord,
   storeRefusal,
@@ -31,7 +29,6 @@ import {
   watchFeed,
   type Interval,
   type TakenStore,
-  cursorTakes,
   parseArgv,
   TABLE,
   type Args,
@@ -40,19 +37,9 @@ import {
 } from '../runner.ts';
 import { HELP, usage, type Engine, type Verb } from './flags.ts';
 import { decideVerb } from './decide/decide.ts';
-import { statsVerb } from './stats/stats.ts';
 import { factoryVerb } from './factory/factory.ts';
-import { agentsCustom, logsVerb, pruneVerb, rmVerb, showVerb } from './runs.ts';
+import { agentsCustom, pruneVerb, rmVerb } from './runs.ts';
 import { inboxVerb, planVerb, startVerb } from './start.ts';
-
-/**
- * The cursor `wf feed` reads from: 0 when none is given, a whole number of bytes otherwise, and nothing more; `wf watch`'s entry says the
- * same of its own. Whether the feed has a line starting there is the feed's to say (`feedCursorRefusal`), in its words.
- */
-function feedCursor(argv: string[]): number {
-  if (argv.length > 1 || (argv[0] !== undefined && !/^\d+$/.test(argv[0]))) usage(cursorTakes('feed'));
-  return argv[0] === undefined ? 0 : Number(argv[0]);
-}
 
 /**
  * `wf watch` from a cursor already checked: the feed's lines as they are written, on stdout, until `stop()`; a feed cut under the watch is
@@ -214,13 +201,6 @@ function upVerb(args: Args, e: Engine): void | Promise<void> {
   return runMain(up(e, { every, repo: path.resolve('.'), holder: 'wf up', onTaken, onPass }).pipe(Effect.scoped));
 }
 
-/** `wf feed`: the feed's lines from a cursor, and the cursor to read from next. */
-export function feedVerb(rest: string[]): void {
-  const { lines, cursor } = readFeed(feedCursor(rest));
-  for (const line of lines) console.log(feedLineWords(line));
-  return console.log(`cursor: ${cursor}`);
-}
-
 /** `wf watch`: the feed's lines as they come, from a cursor, until it is stopped (`watching`). */
 function watchVerb(args: Args): void | Promise<void> {
   const from = typeof args.cursor === 'string' ? Number(args.cursor) : 0;
@@ -235,11 +215,7 @@ export const VERBS: ReadonlyMap<string, Verb> = new Map<string, Verb>([
   ['plan', planVerb],
   ['inbox', inboxVerb],
   ['factory', factoryVerb],
-  ['feed', feedVerb],
   ['decide', decideVerb],
-  ['stats', statsVerb],
-  ['show', showVerb],
-  ['logs', logsVerb],
   ['agents custom', agentsCustom],
 ]);
 
@@ -256,11 +232,12 @@ export const RUNS: ReadonlyMap<string, (args: Args, e: Engine) => void | Promise
 ]);
 
 /**
- * A command of the table (`TABLE`), run from the command line: its arguments read against its spec — the help printed for too little —
- * then refused by its `check`, and handed to its runner (`RUNS`) where it has one; else to its handler, and the lines it prints of the
- * answer printed.
+ * A command of the table (`TABLE`), run from the command line: its long help printed for `--help` where it has one (`manual`); else its
+ * arguments read against its spec — the help printed for too little — then refused by its `check`, and handed to its runner (`RUNS`)
+ * where it has one; else to its handler, and the lines it prints of the answer printed.
  */
 async function commanded(command: Command | Ran, rest: string[], e: Engine): Promise<void> {
+  if (command.manual !== undefined && rest.includes('--help')) return console.log(command.manual);
   const args = parseArgv(command.spec, rest);
   if (args === undefined) return console.log(HELP);
   const wrong = command.check?.(args);

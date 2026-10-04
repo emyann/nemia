@@ -6,7 +6,8 @@
  *
  * Walked through the runtime itself over an in-memory journal and a harness the test signs by hand, as rest-store.test.ts does, and every
  * filing `queued` as the store's own engine files it (`engineOf`), under the store's own admission (`storeAdmission`), so admission is
- * the runtime's: a task filed waits until a pass admits it, and none is admitted while the cordon stands. A store of its own, since `tick` reads every run under `WF_ROOT`, which is read as the module loads and so set before the import.
+ * the runtime's: a task filed waits until a pass admits it, and none is admitted while the cordon stands. A store of its own, since
+ * `tick` reads every run under `WF_ROOT`, which is read as the module loads and so set before the import.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

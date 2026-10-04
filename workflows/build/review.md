@@ -4,6 +4,6 @@ input: design
 agent: agora
 loop: implement
 rounds: 3
-budget: 8
+budget: 16
 tally: findings, findings.kind=placement, mutants.proves
 ---

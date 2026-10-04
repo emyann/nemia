@@ -1,5 +1,5 @@
 ---
 agent: seldon
 gate: true
-budget: 5
+budget: 10
 ---

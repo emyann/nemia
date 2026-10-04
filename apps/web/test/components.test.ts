@@ -3470,7 +3470,7 @@ test("the timeline has a cost column: what each session cost, `not measured` whe
   ]);
   assert.match(
     html,
-    /<td data-cell="cost" title="What the run&#x27;s tries cost, as its harness priced each session: 1 attempt measured; 1 ended attempt had no cost on it, so it cost at least this"/,
+    /<td data-cell="cost" title="What the run&#x27;s tries cost, as its harness priced each session: 1 attempt measured; 1 ended attempt had no cost on it, so it cost at least this. An attempt still running is priced once it ends."/,
     'what a `≥` leaves out, on hover',
   );
 });

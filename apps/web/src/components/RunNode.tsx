@@ -47,8 +47,9 @@ export type RunFlowNode = Node<RunNodeData, 'run'>;
  * preloaded on hover: only an open run reads its detail. `w-88` is `CARD_WIDTH`, narrower than the grid's cell, which leaves the gap
  * between cards.
  *
- * - Its clock (`runClock`) says how long it has been at work from its first filing, or how long it has waited before that; it moves
- *   every second while it counts (`clockCounts`), and every 30 s otherwise.
+ * - Its clock (`runClock`) says how long the run took, or has been at work, from its first filing — its sessions' and checks' time,
+ *   a wait counted for nothing, the wall time on hover — or how long it has waited before that; it moves every second while it counts
+ *   (`clockCounts`), and every 30 s otherwise.
  * - A card nobody has decided the result of is ringed, and not dimmed as a finished card is: it is the one finished card on the floor
  *   that waits for a person rather than for a machine.
  * - Beside its id, where its steps work: its repository, or folders the run made (`workspace: folder`); a try of an agent, a folder
@@ -65,9 +66,9 @@ export type RunFlowNode = Node<RunNodeData, 'run'>;
  * - A result nobody decided, in a line that fits, whole on hover in `wf ls`'s words, a link to where it is decided on the run's page.
  * - Once opened: how far a run waiting on you reaches (`TouchedLine`), and why its record, which adds each tile's attempt and cost,
  *   could not be read.
- * - In its footer, so the card is no taller for them (`CELL_HEIGHT`): what it has cost, `≥` where an ended attempt has none on it; its
- *   chips; the hold lifted here, as `wf hold --off` lifts it (`CardLift`); pruned; and why the run is not judged
- *   (`RunSummary.unreadable`), whole on hover.
+ * - In its footer, so the card is no taller for them (`CELL_HEIGHT`): what it has cost, `≥` where an ended attempt has none on it; the
+ *   tokens its sessions used, `≥` where one measured none, their split on hover; its chips; the hold lifted here, as `wf hold --off`
+ *   lifts it (`CardLift`); pruned; and why the run is not judged (`RunSummary.unreadable`), whole on hover.
  * - A handle on its left where the edge from a run it waits on comes in, and one on its right where the edge into each card that
  *   waits on it leaves.
  */
@@ -201,16 +202,7 @@ export function RunNode({ data: { run, finished, open, detail, trouble, inspecte
         {open && trouble && <p className="px-3 text-[11px] text-red-600 dark:text-red-400">{trouble}</p>}
 
         <div className="flex min-h-6 items-center justify-between gap-2 border-t px-3 pt-2">
-          <span className="flex min-w-0 items-baseline gap-1.5 font-mono text-[11px] text-muted-foreground">
-            <time dateTime={clock.at} title={clock.title} className="truncate">
-              {clock.words}
-            </time>
-            {run.cost && (
-              <span data-cost title={spentTitle(run.cost, "the run's tries")} className="shrink-0 text-foreground">
-                · {run.cost.said}
-              </span>
-            )}
-          </span>
+          <Took run={run} clock={clock} />
           <span className="flex items-center gap-1">
             {decide && <Badge className="bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-300">to decide</Badge>}
             {waitsOnYou(run) && <Badge className="bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300">waiting on you</Badge>}
@@ -320,5 +312,29 @@ function TouchedLine({ run }: { run: RunSummary }) {
     <p data-touched-line className="truncate px-3 font-mono text-[11px] text-muted-foreground" title={line}>
       {line}
     </p>
+  );
+}
+
+/**
+ * What a run took, at the left of its card's footer: its clock (`runClock`), with the times in full on hover; what it has cost, `≥`
+ * where an ended attempt has none on it; and the tokens its sessions used, their split on hover. Each figure only once there is one.
+ */
+function Took({ run, clock }: { run: RunSummary; clock: ReturnType<typeof runClock> }) {
+  return (
+    <span className="flex min-w-0 items-baseline gap-1.5 font-mono text-[11px] text-muted-foreground">
+      <time dateTime={clock.at} title={clock.title} className="truncate">
+        {clock.words}
+      </time>
+      {run.cost && (
+        <span data-cost title={spentTitle(run.cost, "the run's tries")} className="shrink-0 text-foreground">
+          · {run.cost.said}
+        </span>
+      )}
+      {run.tokens && (
+        <span data-tokens title={run.tokens.split} className="shrink-0 text-foreground">
+          · {run.tokens.said}
+        </span>
+      )}
+    </span>
   );
 }

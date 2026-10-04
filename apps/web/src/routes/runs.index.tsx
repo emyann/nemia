@@ -112,12 +112,14 @@ function RunGroup({ group, title, about, runs, now }: { group: string; title: st
  * what there is to decide about its result, in `wf ls`'s words (`toDecideWords`): the ending step's gate with the command that approves it,
  * or a branch nobody has merged, the step's own `approve <step>` on this line alone; why the run is not judged, a task it reads that does
  * not read (`RunSummary.unreadable`); and each step's state. Beside the link, since a link inside a link is not HTML: when it was created,
- * which orders the list, with when it started and how long it waited before on hover, in the card's words; what it has cost, as `wf ls`
- * puts it on the run's line, once a cost was measured; and the workflow it was started from.
+ * which orders the list; the card's clock (`runClock`), how long it took or has been at work, with its start, its end and the wall time
+ * on hover; what it has cost, as `wf ls` puts it on the run's line, once a cost was measured; the tokens its sessions used, their split
+ * on hover, once one measured any; and the workflow it was started from.
  */
 function RunRow({ run, now }: { run: RunSummary; now: number }) {
   const title = titleOf(run);
   const decide = toDecideOf(run);
+  const clock = runClock(run, now, !inFlight(run));
 
   return (
     <li
@@ -171,12 +173,20 @@ function RunRow({ run, now }: { run: RunSummary; now: number }) {
         </ul>
       </Link>
       <div className="flex shrink-0 flex-col items-end gap-1 pt-0.5">
-        <time className="text-xs text-neutral-500" dateTime={run.createdAt} title={runClock(run, now, !inFlight(run)).title}>
+        <time className="text-xs text-neutral-500" dateTime={run.createdAt}>
           {new Date(run.createdAt).toLocaleString()}
         </time>
+        <span data-clock title={clock.title} className="font-mono text-xs text-neutral-500">
+          {clock.words}
+        </span>
         {run.cost && (
           <span data-cost title={spentTitle(run.cost, "the run's tries")} className="font-mono text-xs">
             {run.cost.said}
+          </span>
+        )}
+        {run.tokens && (
+          <span data-tokens title={run.tokens.split} className="font-mono text-xs">
+            {run.tokens.said}
           </span>
         )}
         <StartedFrom run={run} />

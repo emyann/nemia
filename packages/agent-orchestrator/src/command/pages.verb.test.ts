@@ -12,7 +12,7 @@ import { scratch } from '../../test/scratch.ts';
 
 const ROOT = scratch('wf-pages-');
 process.env.WF_ROOT = ROOT;
-const { RUN } = await import('./pages.verb.ts');
+const { RUN, STEP_ARTIFACT, STEP_FILE } = await import('./pages.verb.ts');
 const { start } = await import('../runner.ts');
 
 /** No read here asks the engine anything. */
@@ -43,4 +43,15 @@ test('a run is read for its page by its id, and an id the store does not have, n
   assert.equal(run?.brief, 'read me');
   assert.deepEqual(await RUN.handler(NO_ENGINE, { id: 'r-nowhere' }), { run: null });
   assert.deepEqual(await RUN.handler(NO_ENGINE, { id: `../runs/${started.id}` }), { run: null });
+});
+
+test("a step's file is read off the run the store lists, never off a path made of its id; a git run's step has no folder", async () => {
+  const started = start({ brief: 'files', repo: aRepo(), workflowDir: oneStep() });
+  const dir = path.join(ROOT, 'runs', started.id, 'artifacts', 'implement');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'notes.md'), 'notes');
+  const asked = { step: 'implement', name: 'notes.md' };
+  assert.equal((await STEP_ARTIFACT.handler(NO_ENGINE, { id: started.id, ...asked })).file?.toString(), 'notes');
+  assert.deepEqual(await STEP_ARTIFACT.handler(NO_ENGINE, { id: `x/../${started.id}`, ...asked }), { file: null });
+  assert.deepEqual(await STEP_FILE.handler(NO_ENGINE, { id: started.id, ...asked }), { folder: null, file: null });
 });

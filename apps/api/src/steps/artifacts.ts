@@ -40,7 +40,9 @@ const TYPES: Record<string, { type: string; kind: ArtifactKind }> = {
   ),
 };
 
-const typeOf = (name: string) => TYPES[path.extname(name).toLowerCase()] ?? { type: 'application/octet-stream', kind: 'other' as const };
+/** The type the file `name` is served with, by its extension, and what the board does with it; an unknown one is bytes, linked. */
+export const typeOf = (name: string) =>
+  TYPES[path.extname(name).toLowerCase()] ?? { type: 'application/octet-stream', kind: 'other' as const };
 
 /**
  * Why a name is not one the artifacts route serves, or null when it is. A name, never a path: one with a separator of either
@@ -125,30 +127,4 @@ export function folderFiles(run: Pick<Run, 'id'>, step: string, dir: string): { 
       return { path: here, name, url, kind: typeOf(name).kind, size: stat.size };
     });
   return { files, error: null };
-}
-
-/**
- * One file of a step's files directory, by name: its bytes and the type they are served with, or null when the directory has
- * no regular file by that name. Opened without following a link, so what is read is what was looked at.
- */
-export function readArtifactFile(run: Pick<Run, 'id'>, step: string, name: string): { body: Buffer; type: string } | null {
-  return readFileIn(artifactsDir(run, step), name);
-}
-
-/** One file of a folder step's own folder, by name, read as an artifact is: without following a link. */
-export const readFolderFile = (dir: string, name: string): { body: Buffer; type: string } | null => readFileIn(dir, name);
-
-function readFileIn(dir: string, name: string): { body: Buffer; type: string } | null {
-  let fd: number;
-  try {
-    fd = fs.openSync(path.join(dir, name), fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
-  } catch {
-    return null;
-  }
-  try {
-    if (!fs.fstatSync(fd).isFile()) return null;
-    return { body: fs.readFileSync(fd), type: typeOf(name).type };
-  } finally {
-    fs.closeSync(fd);
-  }
 }

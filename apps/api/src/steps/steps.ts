@@ -4,13 +4,26 @@
  */
 import { Hono } from 'hono';
 import { type SSEStreamingApi, streamSSE } from 'hono/streaming';
-import { LOGS, phaseOfView } from 'agent-orchestrator';
+import { COMMANDS, LOGS, phaseOfView } from 'agent-orchestrator';
 import { filesPrunedWords } from 'agent-orchestrator/run';
-import { readArtifactFile, readFolderFile, refusedName } from './artifacts.ts';
+import { refusedName, typeOf } from './artifacts.ts';
 import { type StepLog, tailOf } from './logs.ts';
-import { pathToTurn, type StepPath, tryOfStep } from './path.ts';
+import { type LifecycleStep, pathToTurn, type StepPath, tryOfStep } from './path.ts';
 import { type ApiEnv, served } from '../layer.ts';
-import { type Engine, taskOfStep, type TaskView, workFolderOf } from '../store.ts';
+import { type Engine, taskOfStep, type TaskView } from '../store.ts';
+
+/**
+ * The board's reads of a step in the package's table, each served on the api alone: a file of its files directory (`step artifact`) and of
+ * its own folder (`step file`), the path of one of its tasks (`step path`), and a read of its conversation (`step transcript`).
+ */
+const ARTIFACT = COMMANDS.find((c) => c.name === 'step artifact')!;
+const FILE = COMMANDS.find((c) => c.name === 'step file')!;
+const PATH = COMMANDS.find((c) => c.name === 'step path')!;
+const TRANSCRIPT = COMMANDS.find((c) => c.name === 'step transcript')!;
+
+/** One read of the conversation of `task`, a task of the step `step` of the run `id`, from `after` (`step transcript`). */
+const transcriptOf = async (e: Engine['Service'], id: string, step: string, task: string, after?: string) =>
+  (await TRANSCRIPT.handler(e, { id, step, task, ...(after !== undefined && { after }) })) as Omit<Read, 'live'>;
 
 /** How much of a step's output the board is given: the end of it, which is where a running step is. */
 const LOG_LINES = 200;
@@ -82,7 +95,7 @@ async function readTranscript(e: Engine['Service'], id: string, step: string, ta
     );
   }
   try {
-    const { events, cursor } = await e.transcript(taskId, after);
+    const { events, cursor } = await transcriptOf(e, id, step, taskId, after);
     return { events, cursor, live: phase === 'running' || phase === 'pending' };
   } catch (err) {
     const why = err instanceof Error ? err.message : String(err);
@@ -94,7 +107,7 @@ async function readTranscript(e: Engine['Service'], id: string, step: string, ta
     }
     if (
       after !== undefined &&
-      (await e.transcript(taskId).then(
+      (await transcriptOf(e, id, step, taskId).then(
         () => true,
         () => false,
       ))
@@ -135,16 +148,17 @@ async function send(stream: SSEStreamingApi, read: Read): Promise<void> {
  * - `GET /api/runs/:runId/steps/:step/log` — the end of the step's session output as text (`LOG_LINES`), read by `wf logs`' entry
  *   (`LOGS`), which reads it whole; empty for a step not filed yet; 502 when the engine could not read it. The board reads the
  *   conversation from the transcript routes.
- * - `GET /api/runs/:id/steps/:step/artifacts/:name` — one file of the step's files directory, by name and never by path (artifacts.ts),
+ * - `GET /api/runs/:id/steps/:step/artifacts/:name` — one file of the step's files directory, by name and never by path (`step artifact`),
  *   as its closeout's `artifacts` link it; read on each request and never kept, since a step that runs again writes its files again.
  *   400 for a name that is not one; 410 for a file gone because `wf prune --artifacts` removed the run's files, leaving its record,
  *   closeouts and branches; 404 for a file the directory does not have.
- * - `GET /api/runs/:id/steps/:step/files/:name` — one file of a folder step's own folder, by name and never by path, as `files` on the
- *   step links it: what the step made, named in its closeout or not. Read on each request and never kept: the folder is the step's, and
- *   it may write in it again. 400 for a name that is not one; 404 for a step that works on a branch, or a file the folder does not have.
+ * - `GET /api/runs/:id/steps/:step/files/:name` — one file of a folder step's own folder, by name and never by path (`step file`), as
+ *   `files` on the step links it: what the step made, named in its closeout or not. Read on each request and never kept: the folder is
+ *   the step's, and it may write in it again. 400 for a name that is not one; 404 for a step that works on a branch, or a file the folder
+ *   does not have.
  * - `GET /api/runs/:id/steps/:step/transcript` — the step's conversation read once from the cursor `after` (an empty one is none, read
- *   from the start): the engine's events for the step's current task, and whether it is live. A step not filed yet has nothing to read,
- *   and nothing of it moves until a tick files it. Refusals are `readTranscript`'s.
+ *   from the start): the engine's events for the step's current task, and whether it is live, read through `step transcript`. A step
+ *   not filed yet has nothing to read, and nothing of it moves until a tick files it. Refusals are `readTranscript`'s.
  * - `GET /api/runs/:id/steps/:step/transcript/stream` — the same conversation followed, as server-sent events: read again every second
  *   while the task is live, each new event sent as `transcript`, then `settled` when the task is, or is held open and signed and so waits
  *   on a person, and the stream closed. It starts after the Last-Event-ID an EventSource sends when it reconnects, else after `after`.
@@ -153,10 +167,11 @@ async function send(stream: SSEStreamingApi, read: Read): Promise<void> {
  *   the stream, an answer about the conversation — its task gone from the engine's record — is an `unreadable` event with `retrying:
  *   false`, and ends it. Any other failure is of that read, not the conversation: it is said once as `unreadable` with `retrying: true`,
  *   read again on the next beat from the same cursor, and cleared with `readable` by the first read that works.
- * - `GET /api/runs/:id/steps/:step/path` — the path of the task of the step's try `try` through the runtime's lifecycle (`StepPath`), the
- *   current try's by default: each state its journal says, the entry that moved it and when, from the filing to now, replayed off the
- *   journal alone, so it asks no harness. An earlier try of a task held open, which later tries share, runs to the answer that opened the
- *   next turn (`pathToTurn`). A step not filed yet has an empty path. Refusals are `tryOfStep`'s; 502 when the journal could not be read.
+ * - `GET /api/runs/:id/steps/:step/path` — the path of the task of the step's try `try` through the runtime's lifecycle (`StepPath`,
+ *   through `step path`), the current try's by default: each state its journal says, the entry that moved it and when, from the filing to
+ *   now, replayed off the journal alone, so it asks no harness. An earlier try of a task held open, which later tries share, runs to the
+ *   answer that opened the next turn (`pathToTurn`). A step not filed yet has an empty path. Refusals are `tryOfStep`'s; 502 when the
+ *   journal could not be read.
  */
 export const steps = new Hono<ApiEnv>()
   .get('/api/runs/:runId/steps/:step/log', (c) =>
@@ -181,7 +196,7 @@ export const steps = new Hono<ApiEnv>()
     }),
   )
   .get('/api/runs/:id/steps/:step/artifacts/:name', (c) =>
-    served(c, async ({ home }) => {
+    served(c, async ({ e, home }) => {
       const id = c.req.param('id');
       const step = c.req.param('step');
       const name = c.req.param('name');
@@ -189,7 +204,7 @@ export const steps = new Hono<ApiEnv>()
       if ('error' in found) return c.json({ error: found.error }, 404);
       const refused = refusedName(name);
       if (refused) return c.json({ error: refused }, 400);
-      const file = readArtifactFile(found.run, step, name);
+      const { file } = (await ARTIFACT.handler(e, { id, step, name })) as { file: Buffer | null };
       const pruned = found.run.pruned?.artifacts;
       if (!file && pruned) {
         return c.json(
@@ -208,11 +223,11 @@ export const steps = new Hono<ApiEnv>()
           404,
         );
       }
-      return c.body(new Uint8Array(file.body), 200, servedAs(file.type));
+      return c.body(new Uint8Array(file), 200, servedAs(typeOf(name).type));
     }),
   )
   .get('/api/runs/:id/steps/:step/files/:name', (c) =>
-    served(c, async ({ home }) => {
+    served(c, async ({ e, home }) => {
       const id = c.req.param('id');
       const step = c.req.param('step');
       const name = c.req.param('name');
@@ -220,8 +235,8 @@ export const steps = new Hono<ApiEnv>()
       if ('error' in found) return c.json({ error: found.error }, 404);
       const refused = refusedName(name);
       if (refused) return c.json({ error: refused }, 400);
-      const dir = workFolderOf(found.run, step);
-      if (!dir) {
+      const { folder, file } = (await FILE.handler(e, { id, step, name })) as { folder: string | null; file: Buffer | null };
+      if (!folder) {
         return c.json(
           {
             error: `Step '${step}' of run '${id}' works on a branch, not in a folder: it has no files to read here. GET /api/runs/${id} gives the \`url\` of each file its closeout named, under \`artifacts\`.`,
@@ -229,7 +244,6 @@ export const steps = new Hono<ApiEnv>()
           404,
         );
       }
-      const file = readFolderFile(dir, name);
       if (!file) {
         return c.json(
           {
@@ -238,7 +252,7 @@ export const steps = new Hono<ApiEnv>()
           404,
         );
       }
-      return c.body(new Uint8Array(file.body), 200, servedAs(file.type));
+      return c.body(new Uint8Array(file), 200, servedAs(typeOf(name).type));
     }),
   )
   .get('/api/runs/:id/steps/:step/path', (c) =>
@@ -250,7 +264,8 @@ export const steps = new Hono<ApiEnv>()
       if ('error' in asked) return c.json({ error: asked.error }, asked.status);
       if (!asked.taskId) return c.json({ taskId: null, try: asked.try, path: [] } satisfies StepPath);
       try {
-        const path = pathToTurn(await e.path(asked.taskId), asked.turn);
+        const whole = (await PATH.handler(e, { id: found.run.id, step, task: asked.taskId })) as { path: LifecycleStep[] };
+        const path = pathToTurn(whole.path, asked.turn);
         return c.json({ taskId: asked.taskId, try: asked.try, path } satisfies StepPath);
       } catch (err) {
         const why = err instanceof Error ? err.message : String(err);

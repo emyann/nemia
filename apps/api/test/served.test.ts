@@ -27,14 +27,6 @@ const OWN: Readonly<Record<string, string>> = {
   'GET /api/repository': 'the repository the request is served on, as the request names it',
 };
 
-/** The routes the table does not declare yet, each with the step of this change that makes it an entry. */
-const PENDING: Readonly<Record<string, string>> = {
-  'GET /api/runs/:id/steps/:step/artifacts/:name': 'step reads',
-  'GET /api/runs/:id/steps/:step/files/:name': 'step reads',
-  'GET /api/runs/:id/steps/:step/path': 'step reads',
-  'GET /api/runs/:id/steps/:step/transcript': 'step reads',
-};
-
 type Table = readonly Parameters<typeof routeList>[0][];
 type Named = { readonly name: string };
 
@@ -48,20 +40,18 @@ const declaredBy = (table: readonly (Table[number] & Named)[]): Map<string, stri
   new Map(table.flatMap((c) => routeList(c).map((r) => [`${r.method} ${r.path}`, c.name] as const)));
 
 /**
- * Where the routes the api serves and the table disagree, a sentence each naming the fix: a route no entry declares and neither `own`
- * nor `pending` lists; an `own` line the api does not serve, one an entry declares, and one with no why; a `pending` line an entry
- * declares now.
+ * Where the routes the api serves and the table disagree, a sentence each naming the fix: a route no entry declares and `own` does not
+ * list; an `own` line the api does not serve, one an entry declares, and one with no why.
  */
 function servedBreaks(
   routes: readonly { method: string; path: string }[],
   table: readonly (Table[number] & Named)[],
   own: Readonly<Record<string, string>>,
-  pending: Readonly<Record<string, string>> = {},
 ): string[] {
   const served = routesOf(routes);
   const declared = declaredBy(table);
   const breaks: string[] = [];
-  for (const at of served.filter((r) => !declared.has(r) && !(r in own) && !(r in pending)))
+  for (const at of served.filter((r) => !declared.has(r) && !(r in own)))
     breaks.push(
       `${at} is served by no entry of the command table, and OWN does not list it: declare it on an entry (only: api, with its why), or say why it is the api's own in OWN.`,
     );
@@ -70,13 +60,11 @@ function servedBreaks(
     if (declared.has(at)) breaks.push(`OWN lists ${at}, which ${declared.get(at)} declares: take it off OWN.`);
     if (!why.trim()) breaks.push(`OWN lists ${at} and says no why: say why it is the api's own.`);
   }
-  for (const at of Object.keys(pending).filter((r) => declared.has(r)))
-    breaks.push(`PENDING lists ${at}, which ${declared.get(at)} declares now: take it off PENDING.`);
   return breaks;
 }
 
 test('every route the api serves is declared by an entry of the command table, or is its own with a why', () => {
-  assert.deepEqual(servedBreaks(app.routes, COMMANDS, OWN, PENDING), []);
+  assert.deepEqual(servedBreaks(app.routes, COMMANDS, OWN), []);
 });
 
 test('REFUSED: a route no entry declares and OWN does not list, matched whole; middleware and a route mounted twice are none', () => {
@@ -86,23 +74,23 @@ test('REFUSED: a route no entry declares and OWN does not list, matched whole; m
     .route('/', app)
     .route('/', extra)
     .route('/', extra);
-  assert.deepEqual(servedBreaks(more.routes, COMMANDS, OWN, PENDING), [
+  assert.deepEqual(servedBreaks(more.routes, COMMANDS, OWN), [
     "GET /api/x is served by no entry of the command table, and OWN does not list it: declare it on an entry (only: api, with its why), or say why it is the api's own in OWN.",
   ]);
   const { 'GET /api/health': _health, ...rest } = OWN;
-  assert.deepEqual(servedBreaks(app.routes, COMMANDS, rest, PENDING), [
+  assert.deepEqual(servedBreaks(app.routes, COMMANDS, rest), [
     "GET /api/health is served by no entry of the command table, and OWN does not list it: declare it on an entry (only: api, with its why), or say why it is the api's own in OWN.",
   ]);
 });
 
 test('REFUSED: an OWN line the api does not serve, one an entry declares, and one with no why', () => {
-  assert.deepEqual(servedBreaks(app.routes, COMMANDS, { ...OWN, 'GET /api/gone': 'a route since removed' }, PENDING), [
+  assert.deepEqual(servedBreaks(app.routes, COMMANDS, { ...OWN, 'GET /api/gone': 'a route since removed' }), [
     'OWN lists GET /api/gone, which the api does not serve: take it off OWN.',
   ]);
-  assert.deepEqual(servedBreaks(app.routes, COMMANDS, { ...OWN, 'GET /api/runs': 'the runs' }, PENDING), [
+  assert.deepEqual(servedBreaks(app.routes, COMMANDS, { ...OWN, 'GET /api/runs': 'the runs' }), [
     'OWN lists GET /api/runs, which ls declares: take it off OWN.',
   ]);
-  assert.deepEqual(servedBreaks(app.routes, COMMANDS, { ...OWN, 'GET /api/health': ' ' }, PENDING), [
+  assert.deepEqual(servedBreaks(app.routes, COMMANDS, { ...OWN, 'GET /api/health': ' ' }), [
     "OWN lists GET /api/health and says no why: say why it is the api's own.",
   ]);
 });

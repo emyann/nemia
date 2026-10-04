@@ -34,7 +34,7 @@ const { engineOf, storeAdmission } = await import('../runtime-client.ts');
 const { resumePause, putPause } = await import('../pause/pause.store.ts');
 const { pausedRead, runsListed } = await import('../list/list.verb.ts');
 const { COMMANDS } = await import('../command/commands.verb.ts');
-const { pausedLines } = await import('../pause/pause.ts');
+const { pausedLines, pausedWords } = await import('../pause/pause.ts');
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], {
@@ -66,9 +66,11 @@ const folder = (steps: readonly string[], more: (name: string) => string = () =>
   return dir;
 };
 
-/** The engine's store, in memory, noting in `starts` when each attempt began, by its session's name. */
-const memoryJournal = (starts: Map<string, number>): PromiseJournal => {
-  const tasks = new Map<string, Parameters<PromiseJournal['append']>[1][]>();
+/** Each task's journal, as the engine's store holds it: what a test spoils by hand, out of the feed. */
+type Tasks = Map<string, Parameters<PromiseJournal['append']>[1][]>;
+
+/** The engine's store, in memory, in `tasks`, noting in `starts` when each attempt began, by its session's name. */
+const memoryJournal = (tasks: Tasks, starts: Map<string, number>): PromiseJournal => {
   const feed: Awaited<ReturnType<PromiseJournal['feed']>>['entries'] = [];
   return {
     async append(taskId, event) {
@@ -87,6 +89,9 @@ const memoryJournal = (starts: Map<string, number>): PromiseJournal => {
     },
   };
 };
+
+/** What no runtime writes: a `measured` whose turns are a word. */
+const MISWRITTEN = { kind: 'measured', at: '2026-10-04T00:00:00Z', attempt: 1, usage: { turns: 'three' } };
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 const BLOCKED = { outcome: 'blocked', summary: 'two flags could be meant', artifacts: [], needs: 'which flag?' };
@@ -114,10 +119,11 @@ const engine = () => {
     },
   };
   const starts = new Map<string, number>();
+  const tasks: Tasks = new Map();
   const e = engineOf(
     Engine.layer({
       root: fs.mkdtempSync(path.join(ROOT, 'engine-')),
-      journal: memoryJournal(starts),
+      journal: memoryJournal(tasks, starts),
       harnesses: { claude: runner, codex: runner, check: runner },
       defaultHarness: 'claude',
       ...storeAdmission(),
@@ -131,7 +137,7 @@ const engine = () => {
       sessions.set(name, { ...s, state: 'done', busy: false, closeout: { payload, at: (starts.get(name) ?? Date.now()) + 1 } });
     }
   };
-  return { e, spawned, signAll };
+  return { e, spawned, signAll, tasks };
 };
 
 const h = engine();
@@ -200,27 +206,35 @@ test('while the store is paused nothing new starts and what runs finishes; the p
 
   const first = await pass();
   const byStep = (a: Finishing, b: Finishing) => `${a.run}${a.step}`.localeCompare(`${b.run}${b.step}`);
+  const sorted = <P extends { finishing: Finishing[] }>(p: P): P => ({ ...p, finishing: [...p.finishing].sort(byStep) });
+  const atWork = (
+    [
+      { run: running.id, step: 'plan', kind: 'session' },
+      { run: checked.id, step: 'work', kind: 'session' },
+      { run: landing.id, step: 'ship', kind: 'session' },
+    ] satisfies Finishing[]
+  ).sort(byStep);
   assert.deepEqual(
-    { ...first.pause!, finishing: [...first.pause!.finishing].sort(byStep) },
-    {
-      pause,
-      finishing: (
-        [
-          { run: running.id, step: 'plan', kind: 'session' },
-          { run: checked.id, step: 'work', kind: 'session' },
-          { run: landing.id, step: 'ship', kind: 'session' },
-        ] satisfies Finishing[]
-      ).sort(byStep),
-    },
-    'the pass says the pause it read, and what still finishes under it: neither the queued task nor one settled',
+    sorted(first.pause!),
+    { pause, finishing: atWork, staged: [] },
+    'the pass says the pause it read, and what still finishes under it: neither the queued task nor one settled; no landing held yet',
   );
   assert.match(pausedLines(first.pause!)[0], /^Pausing: 3 finishing/);
   assert.equal(first.queue, undefined, 'and started no queued card');
+  const listedAtWork = (await runsListed(h.e)).paused!;
+  assert.deepEqual(sorted(listedAtWork), { pause, finishing: atWork, staged: [] }, 'wf ls names each task still finishing');
+  assert.deepEqual(sorted(await pausedRead(h.e)), sorted(listedAtWork), 'and the api reads the same');
   h.signAll();
   await pass(freshRestMemo());
   await pass();
   const last = await pass();
-  assert.deepEqual(last.pause, { pause, finishing: [] }, 'once what ran has finished, nothing finishes');
+  const repo = readRun(landing.id).repo!;
+  const held = [{ run: landing.id, step: 'ship', repo }];
+  assert.deepEqual(last.pause, { pause, finishing: [], staged: held }, 'once what ran has finished, nothing finishes; the landing is held');
+  assert.deepEqual(pausedLines(last.pause), [
+    pausedWords(last.pause),
+    `   ${landing.id}'s ship has its merge staged in ${repo} (MERGE_HEAD), and its check waits on wf resume`,
+  ]);
   assert.match(pausedLines(last.pause)[0], /^Paused since /);
 
   assert.deepEqual(h.spawned.slice(before), [], 'no session started while the store is paused');
@@ -242,16 +256,29 @@ test('while the store is paused nothing new starts and what runs finishes; the p
   assert.ok(!('pause' in JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${running.id}.json`), 'utf8'))), 'no record holds the pause');
 
   const listed = await runsListed(h.e);
-  const repo = readRun(landing.id).repo!;
   assert.deepEqual(
     listed.paused,
-    { pause, finishing: [], staged: [{ run: landing.id, step: 'ship', repo }] },
+    { pause, finishing: [], staged: held },
     'wf ls names the pause, and the landing whose merge it holds staged in the checkout, its check not filed',
   );
   assert.equal(readRun(landing.id).steps.ship?.check, undefined);
   assert.deepEqual(await pausedRead(h.e), listed.paused, 'and the api reads the same');
   const ls = COMMANDS.find((c) => c.name === 'ls')!;
   assert.deepEqual(ls.print(listed, {}).slice(0, 2), pausedLines(listed.paused), 'wf ls says it first');
+
+  const spoiled = h.tasks.get(taskOf(landing, 'ship')!)!;
+  spoiled.push(MISWRITTEN as never);
+  const unread = await pass();
+  assert.deepEqual(
+    unread.pause,
+    { pause, finishing: [], staged: [] },
+    'a landing whose journal does not read is left out, and the pass goes on',
+  );
+  assert.ok(
+    unread.unreadable?.some((w) => w.startsWith(`${landing.id} is not advanced`)),
+    JSON.stringify(unread.unreadable),
+  );
+  spoiled.pop();
 
   resumePause();
   const lifted = await pass();

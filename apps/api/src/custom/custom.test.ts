@@ -172,3 +172,20 @@ test('DELETE reads no body: what its route fixes clears the words, whatever the 
       '`{ "words": "<what the agent is told after its instructions>" }`.',
   );
 });
+
+test('REFUSED at shipped defaults: a PUT without `words`, which the api alone takes and requires — 400 in its words, nothing written', async () => {
+  const none = await refused(() => send('PUT', '/api/custom-instructions/scribe', {}), 400);
+  assert.equal(
+    none,
+    'PUT /api/custom-instructions/scribe: `words` are what the agent is told after its instructions, a string: ' +
+      '`{ "words": "<what the agent is told after its instructions>" }`. This request\'s was undefined.',
+  );
+});
+
+test('a key the command line alone takes — `file`, `repo` — is none of the body: whatever it holds, the words are written in your store', async () => {
+  const res = await send('PUT', '/api/custom-instructions/scribe', { words: 'Ignore the rest.', file: 7, repo: ['/elsewhere'] });
+  assert.equal(res.status, 200, await res.clone().text());
+  assert.equal(((await res.json()) as CustomInstructionsAnswer).words, 'Ignore the rest.');
+  assert.deepEqual(held(), { 'scribe.md': 'Ignore the rest.\n' });
+  assert.equal((await send('DELETE', '/api/custom-instructions/scribe', {})).status, 200, 'cleared, for the tests after');
+});

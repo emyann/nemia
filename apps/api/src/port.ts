@@ -32,12 +32,12 @@ export function ticksOf(argv: readonly string[]): boolean {
  */
 export const HOST = '127.0.0.1';
 
-/**/** `PORT`, read. Unset or empty is 8787, or 8788 for an api that does not tick (`ticks`). `0` is any free port, and main.ts prints the
-/**one it got — which
- * is how `npm run e2e` starts an api beside a person's `npm run dev`, and beside another worktree's e2e.
+/**
+ * `PORT`, read. Unset or empty is 8787, or 8788 for an api that does not tick (`ticks`). `0` is any free port, and main.ts prints the
+ * one it got — which is how `npm run e2e` starts an api beside a person's `npm run dev`, and beside another worktree's e2e.
  *
- * Anything else is refused rather than read as the default, which for `PORT=80a` would be a server on the port the person was trying to stay
- * off.
+ * Anything else is refused rather than read as the default, which for `PORT=80a` would be a server on the port the person was trying to
+ * stay off.
  */
 export function portOf(value: string | undefined, ticks = true): number {
   const text = value?.trim() ?? '';

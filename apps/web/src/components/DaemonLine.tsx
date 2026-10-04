@@ -4,10 +4,10 @@ import { daemonWords } from '@/lib/daemon';
 import { useNow } from '@/lib/useNow';
 
 /**
- * Over the Factory's floor when nothing ticks the store: why — no daemon, the api or a wf up stopped, gone, or silent past its stale mark — and how to
- * start one, so a run that waits is not read as a machine being slow. Nothing while a daemon ticks, and nothing until it is read; why, when
- * it cannot be. `wf ls`'s own line on hover. A row of its own under the counts, since it never fits beside them. Its age moves between
- * reads, on a clock of its own: the api is read again every minute while the feed is followed.
+ * Over the Factory's floor when nothing ticks the store: why — no daemon, the api or a wf up stopped, gone, or silent past its stale mark —
+ * and how to start one, so a run that waits is not read as a machine being slow. Nothing while a daemon ticks, and nothing until it is
+ * read; why, when it cannot be. `wf ls`'s own line on hover. A row of its own under the counts, since it never fits beside them. Its age
+ * moves between reads, on a clock of its own: the api is read again every minute while the feed is followed.
  */
 export function DaemonLine({ daemon, error }: { daemon: Daemon | undefined; error: Error | null }) {
   const now = new Date(useNow(30_000));

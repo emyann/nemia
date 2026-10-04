@@ -1,8 +1,9 @@
 /**
- * The frame's sidebar beside the rail: the factory picker, the start of a run in the factory picked, the factory's sections, and the
- * favourites this browser keeps.
+ * The frame's sidebar beside the rail: the factory picker, the start of a run in the factory picked, the factory's sections, the Inbox's
+ * with how many of its cards are not yet started, and the favourites this browser keeps.
  */
 import { useSyncExternalStore } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { List, Star, Waypoints } from 'lucide-react';
 import {
   Sidebar,
@@ -12,10 +13,13 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@/components/ui/sidebar';
+import { inboxQuery } from '@/lib/api';
 import { FAVORITES_KEY, favoritesOf, workflowAnchor, type Favorite } from '@/lib/favorites';
+import { inboxBadgeTitle, notStarted } from '@/lib/inbox';
 import { FactoryPicker } from './FactoryPicker';
 import { FactoryStart } from './FactoryStart';
 import { pickedOf, sectionLink, SECTIONS } from './nav';
@@ -26,8 +30,8 @@ const PlaceLink = routeLink(SidebarMenuButton);
 
 /**
  * The sidebar at `path` with `search`: the picker of the factory the address picks (`pickedOf`), the start of a run in it, its sections,
- * each linked with the factory picked (`sectionLink`) and lit on its own pages, the Floor only once a factory is picked, and the
- * favourites. A press anywhere in it runs `onPick`, which closes the sheet on a narrow screen.
+ * each linked with the factory picked (`sectionLink`) and lit on its own pages, the Floor only once a factory is picked, the Inbox with its
+ * badge (`InboxBadge`), and the favourites. A press anywhere in it runs `onPick`, which closes the sheet on a narrow screen.
  */
 export function FrameSidebar({ path, search, onPick }: { path: string; search: Record<string, unknown>; onPick?: () => void }) {
   const picked = pickedOf(path, search);
@@ -51,6 +55,7 @@ export function FrameSidebar({ path, search, onPick }: { path: string; search: R
                       <section.icon />
                       <span>{section.label}</span>
                     </PlaceLink>
+                    {section.to === '/inbox' && <InboxBadge picked={picked} />}
                   </SidebarMenuItem>
                 );
               })}
@@ -68,6 +73,24 @@ export function FrameSidebar({ path, search, onPick }: { path: string; search: R
         </SidebarGroup>
       </SidebarContent>
     </Sidebar>
+  );
+}
+
+/**
+ * The Inbox's badge, beside its link and not in it, so the link reads its section's name alone: how many cards of the factory `picked` are
+ * not yet started (`notStarted`), every factory's under All factories, said whole on hover and to a screen reader (`inboxBadgeTitle`);
+ * nothing for none, nor before the inbox is read.
+ */
+function InboxBadge({ picked }: { picked: string | undefined }) {
+  const inbox = useQuery(inboxQuery);
+  const count = inbox.data ? notStarted(inbox.data, picked).length : 0;
+  if (!count) return null;
+  const title = inboxBadgeTitle(count, picked);
+  return (
+    <SidebarMenuBadge data-inbox-badge title={title} className="pointer-events-auto cursor-default">
+      {count}
+      <span className="sr-only"> {title}</span>
+    </SidebarMenuBadge>
   );
 }
 

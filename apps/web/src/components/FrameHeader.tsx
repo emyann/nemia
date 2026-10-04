@@ -1,8 +1,12 @@
+import { useQuery } from '@tanstack/react-query';
 import { Bell, Workflow } from 'lucide-react';
 import { CordonSwitch } from '@/components/CordonSwitch';
 import { routeLink } from '@/components/routeLink';
 import { Button, LinkButton } from '@/components/ui/button';
 import { SidebarTrigger } from '@/components/ui/sidebar';
+import { runsQuery } from '@/lib/api';
+import { bellCount, bellRuns } from '@/lib/bell';
+import { useBar } from '@/lib/useBar';
 
 /** The logo: a ghost button that is React Aria's link, given the router's `to`. */
 const LogoLink = routeLink(LinkButton);
@@ -10,7 +14,7 @@ const LogoLink = routeLink(LinkButton);
 /**
  * The frame's header, across the top of every page, `h-12`, above the rail, the sidebar and the page: the button that folds the sidebar (or
  * opens its sheet on a narrow screen), the logo, a link to Home, then the section's name alone: the factory picked is the sidebar's. At its
- * right, room kept for a search, the store's cordon (`CordonSwitch`), the bell, drawn and not yet wired, and a place for the user's menu.
+ * right, room kept for a search, the store's cordon (`CordonSwitch`), the bell (`BellButton`), and a place for the user's menu.
  */
 export function FrameHeader({ section }: { section?: string }) {
   return (
@@ -27,10 +31,43 @@ export function FrameHeader({ section }: { section?: string }) {
       <span className="flex-1" />
       <span aria-hidden data-slot="search" className="hidden h-8 w-64 md:block" />
       <CordonSwitch />
-      <Button variant="ghost" size="icon" aria-label="Notifications" isDisabled>
-        <Bell />
-      </Button>
+      <BellButton />
       <span aria-hidden data-slot="user-menu" className="size-7 shrink-0 rounded-full border bg-muted" />
     </header>
+  );
+}
+
+/** The bar the bell opens: the runs waiting on you. */
+const WAITING = { kind: 'waiting' } as const;
+
+/**
+ * The bell: how many runs wait on you across every factory (`bellRuns`), named in full and drawn as a count over the bell while there are
+ * any; a press opens the runs waiting on you in the floating bar, kept in the address, and pressed again closes it.
+ */
+function BellButton() {
+  const runs = useQuery(runsQuery);
+  const { open, toggle } = useBar();
+  const count = runs.data ? bellRuns(runs.data).length : 0;
+  return (
+    <Button
+      data-bell
+      variant="ghost"
+      size="icon"
+      aria-label={count ? `Waiting on you: ${count}` : 'Nothing waits on you'}
+      aria-expanded={open?.kind === 'waiting'}
+      onPress={() => toggle(WAITING)}
+      className="relative"
+    >
+      <Bell />
+      {count > 0 && (
+        <span
+          aria-hidden
+          data-bell-count
+          className="absolute top-0.5 right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] leading-none font-semibold text-amber-950 tabular-nums"
+        >
+          {bellCount(count)}
+        </span>
+      )}
+    </Button>
   );
 }

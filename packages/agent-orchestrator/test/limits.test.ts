@@ -54,7 +54,6 @@ const RECORD: Record<string, Partial<Record<Rule, number>>> = {
   'apps/api/src/capabilities/reach.ts': { 'max-lines-per-function': 1, complexity: 1, 'sonarjs/cognitive-complexity': 1 },
   'apps/api/src/detail/detail.ts': { 'max-lines-per-function': 1, complexity: 1 },
   'packages/agent-orchestrator/src/summary/judged.verb.ts': { complexity: 1 },
-  'apps/api/src/runs/runs.ts': { 'sonarjs/cognitive-complexity': 1 },
   'apps/api/src/steps/steps.ts': { 'sonarjs/cognitive-complexity': 1 },
   'apps/api/src/workflows/workflows.ts': { complexity: 1 },
   'apps/web/src/components/AgentForm.tsx': { 'max-lines-per-function': 1 },

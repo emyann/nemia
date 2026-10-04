@@ -13,7 +13,7 @@ below its layer is in `docs/architecture.md`, *Who owns what*.
 - **A body read off a response is `unknown`**: name the api's own answer type (`(await res.json()) as RunDetail`).
 - **An encoded `..` never reaches a route in a test**: `app.request` resolves `%2E%2E` before the router sees it. Send `..%2F…` to reach
   a name refusal.
-- **The list answers a finished run from memory** (`runs/resting.ts`) while its record, its stamps, the feed for its tasks and its branch tips
+- **The list answers a finished run from memory** (`restingRead`, the package's `rest/resting.verb.ts`) while its record, its stamps, the feed for its tasks and its branch tips
   stand. A new input `summarize` reads for a finished run goes into one of those, or a poll answers it stale. `WF_VERIFY_REST=1` (set by
   the harness) judges every kept answer afresh; a test that counts reads turns that off for its request (`unverified`). Requests overlap
   and share the feed cursor: a request keeps nothing once another has read the feed past where it read to.

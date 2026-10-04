@@ -448,3 +448,5 @@ export type {
   Spent,
   StepNeeds,
 } from './summary/judged.verb.ts';
+export { restingMemo, restingRead } from './rest/resting.verb.ts';
+export type { RestingMemo, RestingRead } from './rest/resting.verb.ts';

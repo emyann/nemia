@@ -1,5 +1,4 @@
 /** The runs, for the board: every run listed, one run in full, and what `wf decide` shows of it. */
-import { isDeepStrictEqual } from 'node:util';
 import { Hono } from 'hono';
 import {
   type AtWork,
@@ -34,12 +33,12 @@ import {
   type Spent,
   standingsOf,
   type StepNeeds,
+  restingRead,
 } from 'agent-orchestrator';
 import { isGitRun, type PlaceKind, placeOf, prunedKept, prunedWords, type Run } from 'agent-orchestrator/run';
 import { decisionOf } from '../decide/decision.ts';
 import { detail } from '../detail/index.ts';
 import { type RunGraph, runGraph } from 'agent-orchestrator';
-import { restingRead } from './resting.ts';
 import { type ApiEnv, type Served, served } from '../layer.ts';
 import { type Engine, findRun, noSuchRun } from '../store.ts';
 
@@ -280,9 +279,9 @@ export async function judgedNow(e: Engine['Service'], home: string, some: readon
 }
 
 /**
- * Whether a run's summary may be kept (`resting.ts`): a run at rest, which nothing but a person, git or the engine's journals can move. Its
- * status final or the run pruned, nothing of it moving, waited on or held, every task it has filed settled, the workflow it is judged by
- * frozen on its record — a folder on disk is watched by nothing — and git's every answer given. The tick's own test (`atRest` in the
+ * Whether a run's summary may be kept (`restingRead`): a run at rest, which nothing but a person, git or the engine's journals can move.
+ * Its status final or the run pruned, nothing of it moving, waited on or held, every task it has filed settled, the workflow it is judged
+ * by frozen on its record — a folder on disk is watched by nothing — and git's every answer given. The tick's own test (`atRest` in the
  * package's rest.ts) reads what a pass would file; this reads what the list says, which is what it keeps.
  */
 async function atRest(run: Run, judged: Judged, reader: Engine['Service']): Promise<boolean> {
@@ -322,13 +321,8 @@ async function listed({ e, env, home, memo }: Served): Promise<RunSummary[]> {
       continue;
     }
     judged.set(run.id, one);
-    const was = kept.get(run.id);
-    if (was && !isDeepStrictEqual(was, one.summary)) {
-      throw new Error(
-        `The list's memo of runs at rest answered ${run.id} differently from a fresh read (WF_VERIFY_REST): something it was judged on is not watched.`,
-      );
-    }
-    if (was) continue;
+    read.answered(run, one.summary);
+    if (kept.has(run.id)) continue;
     if (await atRest(run, one, reader)) read.keep(run, one.summary, one.asked.branches, git.heads);
     else read.drop(run);
   }
@@ -353,7 +347,7 @@ const RUN = COMMANDS.find((c) => c.name === 'run')!;
  *   the id on the run, so every id read is in the listing that follows; the other way round, a task filed between the two reads would show
  *   as `unknown` until the next poll. A run that waits on runs reads each of them off the same views (`seenBy`): its record and git, and
  *   its tasks as they were listed. The feed's filing times are read once, on from where the last read stopped (`filedTimes`): when each
- *   run started. A run at rest is answered from the list's memo (`resting.ts`) while nothing it was judged on has moved, so a poll reads
+ *   run started. A run at rest is answered from the list's memo (`restingRead`) while nothing it was judged on has moved, so a poll reads
  *   the journals of the runs still moving and of none other; the rest are read through the request's own engine and git (`viewsFor`,
  *   `branchReader`). With `WF_VERIFY_REST` a kept answer is judged afresh too, and one that differs fails the request.
  * - `GET /api/runs/:id` — a run in full (`detail`), found by the package's entry (`run`): refused with a 404 when there is no such run,

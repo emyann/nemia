@@ -227,12 +227,13 @@ const deniedRow = (calls: readonly string[]): ReactNode => (
  * list would say the step made nothing when nobody could look. A git step's work is its branch, and has no such list.
  *
  * At its gate — waiting on you as `wf ls` asks it (`approve`), on a run nobody called off, and not sent back already (`gateOffered`) — the
- * step's policy drawn open (`StepPolicy`), then the gate, with what the step handed on, every field it declared, which is what a person approves, beside Approve and Send back. An ending
- * step's gate (`endsTheRun`) holds before the step is filed: it has handed nothing on, and shows instead the work it would act on
- * (`ActsOn`), the branch's standing and diff stat and each work step's closeout with its files, since approving is what runs it. An ending
- * that has already run — filed, aborted, retried — is at its gate for its own closeout, as any gated step is. A send-back names the steps
- * the package names (`sendBackTo`): the step itself once it has run, or the steps it waits on. Once approved, under the step: when, and the
- * words every step after the gate is handed — or, for the step that ends the run, what its own approval filed and the terms it acts on.
+ * step's policy drawn open (`StepPolicy`), then the gate, with what the step handed on, every field it declared, which is what a person
+ * approves, beside Approve and Send back. An ending step's gate (`endsTheRun`) holds before the step is filed: it has handed nothing on,
+ * and shows instead the work it would act on (`ActsOn`), the branch's standing and diff stat and each work step's closeout with its files,
+ * since approving is what runs it. An ending that has already run — filed, aborted, retried — is at its gate for its own closeout, as any
+ * gated step is. A send-back names the steps the package names (`sendBackTo`): the step itself once it has run, or the steps it waits on.
+ * Once approved, under the step: when, and the words every step after the gate is handed — or, for the step that ends the run, what its own
+ * approval filed and the terms it acts on.
  */
 function StepSection({ run, step, runCancelled }: { run: RunDetail; step: Step; runCancelled: boolean }) {
   const runId = run.id;
@@ -298,17 +299,18 @@ function StepSection({ run, step, runCancelled }: { run: RunDetail; step: Step; 
         </div>
       )}
 
-      {atGate && step.layers && <StepPolicy layers={step.layers} />}
-
       {atGate ? (
-        acts ? (
-          <div className="grid items-start gap-4 lg:grid-cols-2">
-            <ActsOn run={run} step={step} />
-            <Gate runId={runId} step={step.name} back={back} acts={acts} />
-          </div>
-        ) : (
-          <Gate runId={runId} step={step.name} back={back} closeout={closeout} />
-        )
+        <>
+          <StepPolicy layers={step.layers} />
+          {acts ? (
+            <div className="grid items-start gap-4 lg:grid-cols-2">
+              <ActsOn run={run} step={step} />
+              <Gate runId={runId} step={step.name} back={back} acts={acts} />
+            </div>
+          ) : (
+            <Gate runId={runId} step={step.name} back={back} closeout={closeout} />
+          )}
+        </>
       ) : (
         handedOn
       )}

@@ -5426,7 +5426,7 @@ test("a step with an agent is read by layer on the builder: its agent, the agent
   ].map(at);
   assert.deepEqual(
     order,
-    order.toSorted((a, b) => a - b),
+    [...order].sort((a, b) => a - b),
     html,
   );
   assert.match(html, /<details[^>]*>[^]*Read them[^]*You are the writer\.[^]*<\/details>/, 'the instructions are folded');

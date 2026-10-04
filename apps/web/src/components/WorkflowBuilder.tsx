@@ -1,7 +1,15 @@
 import { useCallback, useId, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Background, BackgroundVariant, MarkerType, Position, ReactFlow, type Connection } from '@xyflow/react';
-import { BuildRefusal, keyFormQuery, saveWorkflow, workflowsQuery, type WorkflowListing, type WorkflowSaved } from '../lib/api';
+import {
+  BuildRefusal,
+  keyFormQuery,
+  saveWorkflow,
+  workflowsQuery,
+  type StepLayers,
+  type WorkflowListing,
+  type WorkflowSaved,
+} from '../lib/api';
 import {
   addStep,
   connect,
@@ -264,15 +272,12 @@ export function WorkflowBuilder({ workflow, onClose }: { workflow: WorkflowListi
               form={form.data}
               schemas={base.schemas}
               refused={refusal?.steps.includes(step.name) ? refusal.message : null}
-              layers={base.steps.find((listed) => listed.name === step.name)?.layers ?? null}
+              layers={layersOf(base, step.name)}
               update={update}
               onRemoved={() => setSelected(null)}
             />
           ) : (
-            <p className="text-xs text-neutral-500">
-              Click a step to set its keys. Drag from a step&apos;s right-hand dot to another&apos;s left-hand dot to have it wait; from the
-              violet dot underneath, to loop back.
-            </p>
+            <NoStepPicked />
           )}
         </aside>
       </div>
@@ -386,5 +391,19 @@ function AddStep({
         </button>
       </div>
     </form>
+  );
+}
+
+/** What the listing `listing` read of step `name`'s layers, or null for a step it does not list or one with no agent. */
+const layersOf = (listing: WorkflowListing, name: string): StepLayers | null =>
+  listing.steps.find((listed) => listed.name === name)?.layers ?? null;
+
+/** The aside while no step is picked: how to pick one, and how to wire two. */
+function NoStepPicked() {
+  return (
+    <p className="text-xs text-neutral-500">
+      Click a step to set its keys. Drag from a step&apos;s right-hand dot to another&apos;s left-hand dot to have it wait; from the violet
+      dot underneath, to loop back.
+    </p>
   );
 }

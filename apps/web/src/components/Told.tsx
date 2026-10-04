@@ -59,12 +59,13 @@ function Layers({ layers }: { layers: StepLayers }) {
 
 /**
  * The step's policy, drawn open at its gate: its own words, the skills it adds and the fence lines it tightens, then what it was told
- * before — its agent's instructions, and the person's custom instructions where there are any — which win where they conflict, and where
- * every layer is. Nothing for a step with no agent, whose own words are all it was told and are drawn as its body.
+ * before — its agent's instructions, and the person's custom instructions where there are any — over which it wins where they conflict,
+ * and where every layer is. Nothing for a step with no agent, whose own words are all it was told and are drawn as its body, nor for a
+ * run that froze no layers (`layers` null).
  */
-export function StepPolicy({ layers }: { layers: StepLayers }) {
-  const { agent } = layers;
-  if (agent === null) return null;
+export function StepPolicy({ layers }: { layers: StepLayers | null }) {
+  const agent = layers?.agent ?? null;
+  if (layers === null || agent === null) return null;
   const before = layers.custom === null ? `${agent}'s instructions` : `${agent}'s instructions and your custom instructions`;
   return (
     <div data-gate-policy className="flex flex-col gap-2 rounded border border-neutral-200 p-3 dark:border-neutral-800">

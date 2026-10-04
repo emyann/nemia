@@ -32,10 +32,10 @@ const PASTE = '(paste)';
  * made to the draft at once; nothing is judged here that the package judges on save, and a refusal of the last save for this step is shown
  * above its fields.
  *
- * A step with an agent (`agent:`) is edited as its file is written, and read by layer: its agent, then what the agent brings (`AgentLayers`,
- * from the listing's `layers`), then the step's policy (`PolicyLayer`) — its own note and the keys its file sets as its policy
- * (`policyKeys`) — then the rest of its keys. A key the agent gives it shows the agent's value in place of none — set, it is the step's own;
- * unset, the agent's again. Its agent's file and your custom instructions are not edited here.
+ * A step with an agent (`agent:`) is edited as its file is written, and read by layer: its agent, then what the agent brings
+ * (`AgentLayers`, from the listing's `layers`), then the step's policy (`PolicyLayer`) — its own note and the keys its file sets as its
+ * policy (`policyKeys`) — then the rest of its keys. A key the agent gives it shows the agent's value in place of none — set, it is the
+ * step's own; unset, the agent's again. Its agent's file and your custom instructions are not edited here.
  */
 export function StepForm({
   step,
@@ -80,32 +80,7 @@ export function StepForm({
 
   return (
     <section aria-label={`Keys of ${step.name}`} data-step-form={step.name} className="space-y-3">
-      <div className="flex items-baseline justify-between gap-2">
-        <h3 className="min-w-0 truncate font-mono text-sm font-semibold" title={step.name}>
-          {step.name}
-          <span className="font-sans text-xs font-normal text-neutral-500">.md</span>
-        </h3>
-        <button
-          type="button"
-          onClick={() => {
-            update((all) => removeStep(all, step.name));
-            onRemoved();
-          }}
-          className="shrink-0 rounded border border-neutral-300 px-2 py-0.5 text-xs text-neutral-600 hover:border-red-400 hover:text-red-700 dark:border-neutral-700 dark:text-neutral-400 dark:hover:border-red-500 dark:hover:text-red-400"
-        >
-          Remove step
-        </button>
-      </div>
-
-      {refused && (
-        <div
-          data-refused-here
-          className="space-y-1 rounded border border-red-300 bg-red-50 px-2 py-1.5 dark:border-red-900 dark:bg-red-950/40"
-        >
-          <p className="text-xs font-medium text-red-800 dark:text-red-300">The last save was refused for {step.name}:</p>
-          <p className="font-mono text-[11px] whitespace-pre-wrap break-words text-red-800 dark:text-red-300">{refused}</p>
-        </div>
-      )}
+      <StepHead name={step.name} refused={refused} update={update} onRemoved={onRemoved} />
 
       {agent === null ? (
         <>
@@ -123,6 +98,50 @@ export function StepForm({
         </>
       )}
     </section>
+  );
+}
+
+/** The heading of step `name`'s form, with its Remove button, and the refusal of the last save for it, if any. */
+function StepHead({
+  name,
+  refused,
+  update,
+  onRemoved,
+}: {
+  name: string;
+  refused: string | null;
+  update: DraftUpdate;
+  onRemoved: () => void;
+}) {
+  return (
+    <>
+      <div className="flex items-baseline justify-between gap-2">
+        <h3 className="min-w-0 truncate font-mono text-sm font-semibold" title={name}>
+          {name}
+          <span className="font-sans text-xs font-normal text-neutral-500">.md</span>
+        </h3>
+        <button
+          type="button"
+          onClick={() => {
+            update((all) => removeStep(all, name));
+            onRemoved();
+          }}
+          className="shrink-0 rounded border border-neutral-300 px-2 py-0.5 text-xs text-neutral-600 hover:border-red-400 hover:text-red-700 dark:border-neutral-700 dark:text-neutral-400 dark:hover:border-red-500 dark:hover:text-red-400"
+        >
+          Remove step
+        </button>
+      </div>
+
+      {refused && (
+        <div
+          data-refused-here
+          className="space-y-1 rounded border border-red-300 bg-red-50 px-2 py-1.5 dark:border-red-900 dark:bg-red-950/40"
+        >
+          <p className="text-xs font-medium text-red-800 dark:text-red-300">The last save was refused for {name}:</p>
+          <p className="font-mono text-[11px] whitespace-pre-wrap break-words text-red-800 dark:text-red-300">{refused}</p>
+        </div>
+      )}
+    </>
   );
 }
 

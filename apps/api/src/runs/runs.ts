@@ -30,7 +30,7 @@ import {
   standingsOf,
   type StepNeeds,
 } from './judged.ts';
-import { type RunGraph, runGraph } from './graph.ts';
+import { type RunGraph, runGraph } from 'agent-orchestrator';
 import { restingRead } from './resting.ts';
 import { tryOf } from '../agents/try.ts';
 import { type ApiEnv, type Served, served } from '../layer.ts';

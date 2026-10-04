@@ -50,7 +50,7 @@ import {
 } from 'agent-orchestrator/run';
 import { loopSpan, remoteNameOf, type Workflow } from 'agent-orchestrator/workflow';
 import { folderFiles, type StepArtifact } from '../steps/artifacts.ts';
-import { type RunGraph, runGraph } from '../runs/graph.ts';
+import { type RunGraph, runGraph } from 'agent-orchestrator';
 import {
   judge,
   needsOf,

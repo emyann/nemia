@@ -59,21 +59,21 @@ test('a daemon ticking says nothing — a long pass included, its last pass minu
 test('no daemon has held the store: nothing ticks, and the api the board names starts one', () => {
   assert.equal(
     said(free('none')),
-    'Nothing ticks this store, so no run moves: no daemon has held it. Start one with npm start in apps/api, or wf up where no board is served.',
+    'Nothing ticks this store, so no run moves: no daemon has held it. Start one with npm start in apps/api.',
   );
 });
 
 test('a daemon.json that does not read: nothing is known to tick, and the next daemon takes it over', () => {
   assert.equal(
     said(free('unreadable')),
-    'Nothing ticks this store, so no run moves: its daemon.json does not read as a daemon’s. Start one with npm start in apps/api — it takes the store over, or wf up where no board is served.',
+    'Nothing ticks this store, so no run moves: its daemon.json does not read as a daemon’s. Start one with npm start in apps/api — it takes the store over.',
   );
 });
 
 test('REFUSED: a daemon that stopped is said by its kind, the api or a wf up, with when', () => {
   assert.equal(
     said(held({ kind: 'stopped', ticking: false, stoppedAt: at(12), lastHeardAt: at(12) })),
-    'Nothing ticks this store, so no run moves: the wf up of pid 4242 stopped 12 min ago. Start one with npm start in apps/api, or wf up where no board is served.',
+    'Nothing ticks this store, so no run moves: the wf up of pid 4242 stopped 12 min ago. Start one with npm start in apps/api.',
   );
   assert.match(
     said(held({ kind: 'stopped', by: 'api', url: 'http://127.0.0.1:8787', ticking: false, stoppedAt: at(12) }))!,
@@ -89,14 +89,14 @@ test('REFUSED: a daemon that stopped is said by its kind, the api or a wf up, wi
 test('REFUSED: a daemon whose process is gone is said, with when it was last heard from', () => {
   assert.equal(
     said(held({ kind: 'gone', by: 'api', ticking: false, identity: 'gone', lastHeardAt: at(3) })),
-    'Nothing ticks this store, so no run moves: the api of pid 4242 is gone, last heard from 3 min ago. Start one with npm start in apps/api, or wf up where no board is served.',
+    'Nothing ticks this store, so no run moves: the api of pid 4242 is gone, last heard from 3 min ago. Start one with npm start in apps/api.',
   );
 });
 
 test('REFUSED: a daemon alive but silent past its stale mark is said as stalled, and the next daemon takes it over', () => {
   assert.equal(
     said(held({ kind: 'stalled', ticking: false, passedAt: at(20), lastHeardAt: at(20) })),
-    'Nothing ticks this store, so no run moves: the wf up of pid 4242 is alive but silent, last heard from 20 min ago. Start one with npm start in apps/api — it takes the store over, or wf up where no board is served.',
+    'Nothing ticks this store, so no run moves: the wf up of pid 4242 is alive but silent, last heard from 20 min ago. Start one with npm start in apps/api — it takes the store over.',
   );
 });
 

@@ -22,7 +22,7 @@ const daemonFile = (quiet: number, holder: Record<string, string> = {}) => {
 /** The api's own holder: what an api started without `--no-tick` writes. */
 const API_HOLDER = { by: 'api', url: 'http://127.0.0.1:8787' };
 
-/** How the line ends: the api's own start, and the headless daemon where no board is served. */
+/** How the line ends: the api's own start. */
 const START = 'Start one with npm start in apps/api';
 
 const reload = async (page: Page) => {
@@ -52,7 +52,7 @@ export default {
     await expectVisible(
       page.locator('[data-daemon="none"]', {
         hasText: new RegExp(
-          `^Nothing ticks this store, so no run moves: no daemon has held it\\. ${START}, or wf up where no board is served\\.$`,
+          `^Nothing ticks this store, so no run moves: no daemon has held it\\. ${START}\\.$`,
         ),
       }),
       'with no daemon.json, the header says nothing ticks the store, and how to start what does',
@@ -62,7 +62,7 @@ export default {
       await reload(page);
       const stalled = page.locator('[data-daemon="stalled"]', {
         hasText: new RegExp(
-          `^Nothing ticks this store, so no run moves: the wf up of pid ${process.pid} is alive but silent, last heard from 20 min ago\\. ${START} — it takes the store over, or wf up where no board is served\\.$`,
+          `^Nothing ticks this store, so no run moves: the wf up of pid ${process.pid} is alive but silent, last heard from 20 min ago\\. ${START} — it takes the store over\\.$`,
         ),
       });
       await expectVisible(

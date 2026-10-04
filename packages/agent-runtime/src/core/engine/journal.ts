@@ -145,6 +145,12 @@ const decodeFeed = (raw: readonly unknown[], after: Cursor, located: StoreOps['l
 const argsOf = (config: Record<string, unknown>): HarnessArgs =>
   Schema.is(HarnessArgsSchema)(config) ? config : Schema.decodeUnknownSync(HarnessArgsSchema)(config);
 
+/** A stored `filed` event with its `priority` kept only when it is a whole number. */
+const weighed = (event: Extract<StoredEvent, { kind: 'filed' }>) => {
+  const { priority, ...unweighed } = event;
+  return Number.isInteger(priority) ? { ...unweighed, priority: priority! } : unweighed;
+};
+
 /**
  * An event in the shape the runtime reads, whatever shape it was written in. Nothing on disk is rewritten: the journal is
  * append-only, and a line is what was said when it was said, so a change to an event's shape is made where it is read.
@@ -165,12 +171,6 @@ const argsOf = (config: Record<string, unknown>): HarnessArgs =>
  * - A `filed` event's `priority` that is not a whole number — `null`, as JSON writes a `NaN` an older runtime took: left out,
  *   so the task waits at 0.
  */
-/** A stored `filed` event with its `priority` kept only when it is a whole number. */
-const weighed = (event: Extract<StoredEvent, { kind: 'filed' }>) => {
-  const { priority, ...unweighed } = event;
-  return Number.isInteger(priority) ? { ...unweighed, priority: priority! } : unweighed;
-};
-
 export const upgrade = (event: StoredEvent): Event => {
   if (event.kind === 'input') {
     const { budgetUsd, ...rest } = event;

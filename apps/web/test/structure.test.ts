@@ -91,7 +91,6 @@ const COMMAND_TEXT: Baseline = {
   'src/lib/api/workflows.ts': { count: 4, card: COMMANDS_CARD },
   'src/lib/asks.ts': { count: 14, card: COMMANDS_CARD },
   'src/lib/canvas.ts': { count: 4, card: COMMANDS_CARD },
-  'src/lib/daemon.ts': { count: 1, card: COMMANDS_CARD },
   'src/lib/decide.ts': { count: 5, card: COMMANDS_CARD },
   'src/lib/factories.ts': { count: 2, card: COMMANDS_CARD },
   'src/lib/factory.ts': { count: 5, card: COMMANDS_CARD },

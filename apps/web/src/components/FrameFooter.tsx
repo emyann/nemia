@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { TriangleAlert } from 'lucide-react';
+import { PauseButton } from '@/components/PauseButton';
 import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { daemonQuery, quotaQuery, runsQuery, versionQuery } from '@/lib/api';
@@ -55,10 +56,11 @@ function Part({
 
 /**
  * The frame's bottom bar, across the foot of every page, `h-8`, under the rail, the sidebar and the page, its height whatever it says.
- * Left, the daemon's dot — the api's own standing as the store's daemon (`GET /api/daemon`) — and whether the board follows the workflow
- * feed (`feed`, carried as `data-feed`); in the centre, what is at work across every factory (`atWork`, off `GET /api/runs`); at the right,
- * the subscription's quota in short (`GET /api/quota`) and the version (`GET /api/version`). All of it is read from the api over HTTP. A
- * phone keeps the daemon's dot and the quota (`footerParts`). Each group opens the gauges, whole, in the floating bar (`GaugesBar`).
+ * Left, the daemon's dot — the api's own standing as the store's daemon (`GET /api/daemon`) — the store's pause (`PauseButton`), and
+ * whether the board follows the workflow feed (`feed`, carried as `data-feed`); in the centre, what is at work across every factory
+ * (`atWork`, off `GET /api/runs`); at the right, the subscription's quota in short (`GET /api/quota`) and the version (`GET /api/version`).
+ * All of it is read from the api over HTTP. A phone keeps the daemon's dot, the pause and the quota (`footerParts`). Each group but the
+ * pause opens the gauges, whole, in the floating bar (`GaugesBar`); the pause opens its own popover.
  */
 export function FrameFooter({ feed }: { feed: FeedStatus }) {
   const parts = footerParts(useIsMobile());
@@ -87,6 +89,7 @@ export function FrameFooter({ feed }: { feed: FeedStatus }) {
         <span aria-hidden className={`size-2 shrink-0 rounded-full ${DOT[dot.tone]}`} />
         {!narrow && <span className="truncate">daemon {dot.word}</span>}
       </Part>
+      {parts.includes('pause') && <PauseButton />}
       {parts.includes('feed') && (
         <Part title={live.title} data={{ 'data-feed-word': feed }}>
           <span className="truncate">feed {live.word}</span>

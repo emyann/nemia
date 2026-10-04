@@ -366,11 +366,14 @@ export const RESUME: Command<{ pause: Pause }> = {
 export const PAUSED: Command<Paused> = {
   name: 'paused',
   usage: '',
-  help: ["the store's pause, and each landing it holds with its merge staged"],
+  help: ["the store's pause, what finishes under it, and each landing it holds with its merge staged"],
   spec: { positionals: [], flags: [], unknown: (arg) => `the pause takes no ${arg}.` },
   writes: false,
   route: { method: 'GET', path: '/api/pause', status: 200 },
-  only: { side: 'api', why: 'the board says the pause over its frame; at the command line, wf ls says it, and each landing it holds' },
+  only: {
+    side: 'api',
+    why: 'the board says the pause in its bottom bar; at the command line, wf ls says it, what finishes and each landing it holds',
+  },
   handler: (e) => pausedRead(e),
   print: () => [],
 };
@@ -421,7 +424,8 @@ const UP: Ran = {
     'WF_ROOT/daemon.json — who holds it, pid, start, last pass, and a beat',
     'each interval;',
     'once a minute, a line of what its passes cost (tick-stats.json); the',
-    "store's pause once it is put, and again once it is lifted.",
+    "store's pause once it is put, again each time it says another thing",
+    '(Pausing: N finishing, then Paused), and once it is resumed.',
     'wf up --stats: what the last pass cost, phase by phase — read, not',
     'run, so it fits while a daemon holds the store; where none does,',
     'wf tick --stats',

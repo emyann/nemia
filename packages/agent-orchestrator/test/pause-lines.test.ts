@@ -62,7 +62,7 @@ test('wf feed opens with the pause while one stands, Paused with nothing at work
   try {
     const feed = await printed(t, () => main(['feed'], {} as Engine));
     assert.equal(feed[0], pausedWords({ pause, finishing: [] }), feed.join('\n'));
-    assert.match(feed[0]!, /^Paused since /);
+    assert.match(feed[0], /^Paused since /);
   } finally {
     resumePause();
   }

@@ -214,14 +214,14 @@ test('while the store is paused nothing new starts and what runs finishes; the p
     },
     'the pass says the pause it read, and what still finishes under it: neither the queued task nor one settled',
   );
-  assert.match(pausedLines(first.pause!)[0]!, /^Pausing: 3 finishing/);
+  assert.match(pausedLines(first.pause!)[0], /^Pausing: 3 finishing/);
   assert.equal(first.queue, undefined, 'and started no queued card');
   h.signAll();
   await pass(freshRestMemo());
   await pass();
   const last = await pass();
   assert.deepEqual(last.pause, { pause, finishing: [] }, 'once what ran has finished, nothing finishes');
-  assert.match(pausedLines(last.pause!)[0]!, /^Paused since /);
+  assert.match(pausedLines(last.pause)[0], /^Paused since /);
 
   assert.deepEqual(h.spawned.slice(before), [], 'no session started while the store is paused');
   assert.equal((await h.e.view(queuedTask)).admission, 'queued', 'the queued task not admitted');

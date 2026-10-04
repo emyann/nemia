@@ -334,8 +334,9 @@ const LS: Command<RunsListed> = {
     'one the cap on runs in flight holds waiting for a run slot (2 of 2 in',
     "flight); what each step's tries and the run have cost, where measured;",
     'last, whether a wf up ticks the store and when its last pass was;',
-    'first, while the store is paused, the pause and each landing it',
-    'holds with its merge staged in the checkout (MERGE_HEAD)',
+    'first, while the store is paused, Pausing: N finishing and each',
+    'session, check or landing at work, or Paused once none is, then each',
+    'landing it holds with its merge staged in the checkout (MERGE_HEAD)',
   ],
   spec: {
     positionals: [{ key: 'runId', takes: 'optional', kind: 'name' }],

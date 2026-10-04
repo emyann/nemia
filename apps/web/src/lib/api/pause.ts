@@ -10,8 +10,14 @@ export type Pause = { at: string; by: string; why?: string };
 /** Mirrors the package's `PauseStaged`: a run whose ending has its merge staged in `repo`'s checkout, its check held by the pause. */
 export type PauseStaged = { run: string; step: string; repo: string };
 
-/** Mirrors the package's `Paused`: the pause, null where none stands, and each landing it holds with its merge staged. */
-export type Paused = { pause: Pause | null; staged: readonly PauseStaged[] };
+/** Mirrors the package's `Finishing`: `run`'s `step`, still at work under the pause, as a session, a check, or a landing's check. */
+export type Finishing = { run: string; step: string; kind: 'session' | 'check' | 'landing' };
+
+/**
+ * Mirrors the package's `Paused`: the pause, null where none stands; each task still finishing under it, none once it is Paused; and each
+ * landing it holds with its merge staged.
+ */
+export type Paused = { pause: Pause | null; finishing: readonly Finishing[]; staged: readonly PauseStaged[] };
 
 /** Decodes a `Pause`. */
 const PauseSchema = Schema.Struct({
@@ -23,13 +29,16 @@ const PauseSchema = Schema.Struct({
 /** Decodes a `Paused`. */
 const PausedSchema = Schema.Struct({
   pause: Schema.NullOr(PauseSchema),
+  finishing: Schema.Array(
+    Schema.Struct({ run: Schema.String, step: Schema.String, kind: Schema.Literals(['session', 'check', 'landing']) }),
+  ),
   staged: Schema.Array(Schema.Struct({ run: Schema.String, step: Schema.String, repo: Schema.String })),
 }) satisfies Schema.Schema<Paused>;
 
 /** Decodes what a pause or a lift answers: the pause put, or the one lifted. */
 const PauseAnswerSchema = Schema.Struct({ pause: PauseSchema }) satisfies Schema.Schema<{ pause: Pause }>;
 
-/** Whether the store is paused: polled at `pace`, since the feed says nothing of a pause put or lifted. */
+/** Whether the store is paused, and what finishes under it: polled at `pace`, since the feed says nothing of either. */
 export const pauseQuery = queryOptions({
   queryKey: ['pause'],
   queryFn: () => get('/api/pause', PausedSchema),
@@ -47,11 +56,11 @@ export const putPause = (why?: string): Promise<{ pause: Pause }> =>
   });
 
 /**
- * Lifts the store's pause, as the package's `resume` does: the next pass files what waits. Rejects as `putPause` does, for a store none
- * stands on.
+ * Resumes the store, as the package's `resume` does: the next pass files what waits. Rejects as `putPause` does, for a store none stands
+ * on.
  */
 export const resumePause = (): Promise<{ pause: Pause }> =>
   send('DELETE', '/api/pause', PauseAnswerSchema, {
     body: {},
-    may: 'The pause may be lifted: read the board again before lifting it again.',
+    may: 'The store may be resumed: read the board again before resuming it again.',
   });

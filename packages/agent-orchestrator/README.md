@@ -365,8 +365,9 @@ What an agent is told comes in four layers, each written by whoever owns it:
    are kept in the person's store, one file per agent name, `$WF_ROOT/custom-instructions/<agent>.md`
    (`~/.agent-workflows/custom-instructions/<agent>.md` by default), never in the agent's folder, which may be the repository's; the
    same words reach whichever agent of that name a run finds. `wf agents custom <name> --file <path>` writes them (`--file -` reads
-   stdin), `wf agents custom <name>` prints them, and `--clear` removes them; it refuses a name no place has, blank words, and a
-   frontmatter block. They only add words: they set no key, so they never widen the agent's fence, give it a tool, or change its model,
+   stdin), `wf agents custom <name>` prints them, and `--clear` removes them; the board's page of an agent reads, writes and clears them
+   through the same functions (`writeCustomInstructions`, `clearCustomInstructions`). Both refuse a name no place has, blank words, and a
+   frontmatter block, in the same words. They only add words: they set no key, so they never widen the agent's fence, give it a tool, or change its model,
    mode or skills — a frontmatter block written by hand, or a link, stops a start of every step naming the agent, naming the file.
    `wf start` reads them once and freezes them with the step (`StepAgent.customInstructions`): a run started before an edit or a
    `--clear` keeps the words it froze, and only runs started after it get the new ones.
@@ -449,8 +450,8 @@ card moves with the version, and the board refuses a save against a stale read. 
 session loads through the `Skill` tool. The card entry is the sentence about it.
 
 `wf agents` lists both places, each agent by its description with its skills under it, and the file of your custom instructions for it
-when you have some (*Four layers*, above; `wf agents custom <name>` prints, writes or clears them). `wf agents card <name>` prints one
-in the shape of an A2A Agent Card, JSON on stdout and nothing else:
+when you have some (*Four layers*, above; `wf agents custom <name>`, or the agent's page on the board, prints, writes or clears them).
+`wf agents card <name>` prints one in the shape of an A2A Agent Card, JSON on stdout and nothing else:
 
 ```
 $ wf agents card reviewer

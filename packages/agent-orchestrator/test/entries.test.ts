@@ -98,6 +98,7 @@ const PINNED: Record<string, string[]> = {
     'copySkill',
     'costLine',
     'customInstructionsFile',
+    'customInstructionsFor',
     'daemonFile',
     'daemonLine',
     'daemonStanding',

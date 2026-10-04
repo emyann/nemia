@@ -5,21 +5,19 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {
-  agentsFor,
   cancel,
   clearCustomInstructions,
   customInstructionsFile,
+  customInstructionsFor,
   forget,
   forgetLine,
   BY_CAP,
   HOME,
   hold,
   holdWord,
-  Missing,
   prune,
   pruneLines,
   pruningBytes,
-  readCustomInstructions,
   runStore,
   sizeOf,
   unhold,
@@ -349,13 +347,6 @@ function wordsFrom(file: string): string {
 }
 
 /**
- * The names of the agents a run on `repo` may name, sorted: the repository's own, then yours, as a workflow of the repository finds them
- * (`agentsFor`). A name whose file does not read is one all the same.
- */
-const agentNamesAround = (repo: string): string[] =>
-  [...agentsFor(path.join(path.resolve(repo), 'workflows', '_'), { repo: path.resolve(repo), home: HOME }).keys()].sort();
-
-/**
  * `wf agents custom`: a person's custom instructions for one agent, kept in their store (`customInstructionsFile`) — printed bare, written
  * from `--file`, removed with `--clear`. Refused, writing nothing: a name no place has, and what `writeCustomInstructions` refuses. A run
  * already started keeps the words it was started with.
@@ -364,26 +355,21 @@ export function agentsCustom(args: string[]): void {
   const [name, ...flags] = args;
   if (!name || name.startsWith('-')) return console.log(HELP);
   const how = customHow(flags);
-  const names = agentNamesAround(how.repo);
-  if (!names.includes(name))
-    throw new Missing({
-      message: `no agent named ${name} where a run on ${path.resolve(how.repo)} looks for one, nor in yours (${path.join(HOME, 'workflows', 'agents')}). ${names.length ? `The agents there: ${names.join(', ')}.` : 'There are none.'} Name one of them, or the repository it is in: --repo <r>.`,
-    });
   const file = customInstructionsFile(HOME, name);
   const kept = 'a run already started keeps the words it was started with';
   if (how.clear)
     return console.log(
-      clearCustomInstructions(HOME, name)
+      clearCustomInstructions(HOME, name, how.repo)
         ? `${name}: custom instructions removed, ${file} — ${kept}`
         : `${name} has no custom instructions to remove`,
     );
   if (how.file !== undefined) {
-    writeCustomInstructions(HOME, name, wordsFrom(how.file));
+    writeCustomInstructions(HOME, name, wordsFrom(how.file), how.repo);
     return console.log(
       `${name}: custom instructions written to ${file}, told after its instructions in every run started from now — ${kept}`,
     );
   }
-  const words = readCustomInstructions(HOME, name);
+  const words = customInstructionsFor(HOME, name, how.repo);
   if (words === undefined)
     return console.log(`${name} has no custom instructions. Set them with wf agents custom ${name} --file <path>, or --file - for stdin.`);
   console.log(`${file}\n\n${words}`);

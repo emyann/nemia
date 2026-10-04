@@ -4,6 +4,7 @@ import { HTTPException } from 'hono/http-exception';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { isRefusal, type Refusal } from 'agent-orchestrator/effect';
 import { agents, skills } from './agents/index.ts';
+import { customInstructions } from './custom/custom.ts';
 import { commands } from './commands/index.ts';
 import { capabilitiesWithSteps, McpAsker } from './capabilities/index.ts';
 import { factories } from './factories/index.ts';
@@ -65,6 +66,8 @@ export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Servic
  *   pasted for them; two writes, guarded as a start is, each through the package's `writeWorkflow`.
  * - agents/agents.ts — the agents beside each place workflows are listed from, each with the nodes that name it; one of yours made, put
  *   back or removed; three writes, guarded as a start is, through the package's `writeAgent` and `removeAgent`.
+ * - custom/custom.ts — a person's custom instructions for an agent, by its name: read, written and cleared through the package's
+ *   `writeCustomInstructions` and `clearCustomInstructions`, the functions `wf agents custom` calls; two writes, guarded as a start is.
  * - agents/skills.ts — the skills an agent of yours can be given, by place; one skill on its page; and one of yours written — made,
  *   changed, or one Nemia ships copied into your library — each a write, guarded as a start is, through the package's `writeSkill` and
  *   `copySkill`.
@@ -107,6 +110,7 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     .route('/', workflows)
     .route('/', builder)
     .route('/', agents)
+    .route('/', customInstructions)
     .route('/', skills)
     .route('/', inbox)
     .route('/', runs)

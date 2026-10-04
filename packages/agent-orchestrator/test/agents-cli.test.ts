@@ -236,7 +236,7 @@ test("wf agents custom takes an agent of the repository's .claude/agents, and re
   fs.rmSync(path.join(CUSTOM, 'helper.md'));
 });
 
-test('REFUSED at shipped defaults: wf agents custom for no agent, with --file and --clear, from no file, blank, or with a frontmatter block — writing nothing', async (t) => {
+test('REFUSED at shipped defaults: wf agents custom for no agent — printed, with --file or with --clear — from no file, blank, or with a frontmatter block — writing nothing', async (t) => {
   const repo = repoAt('custom-refused');
   anAgent(path.join(repo, 'workflows', 'agents'), 'scribe', 'Writes it down.');
   const text = (name: string, words: string): string => {
@@ -246,9 +246,13 @@ test('REFUSED at shipped defaults: wf agents custom for no agent, with --file an
   };
   const ghost = await customRefused(t, 'ghost', '--file', text('ghost.md', 'Boo.\n'), '--repo', repo);
   assert.ok(
-    ghost.startsWith('no agent named ghost where a run on ') && ghost.includes('The agents there: scribe.') && ghost.includes('--repo <r>'),
+    ghost.startsWith(`no agent named ghost where a run on ${repo} looks for one`) &&
+      ghost.includes('The agents there: scribe.') &&
+      ghost.includes('the repository it is in'),
     ghost,
   );
+  assert.equal(await customRefused(t, 'ghost', '--repo', repo), ghost, 'printing the words of no agent is refused in the same words');
+  assert.equal(await customRefused(t, 'ghost', '--clear', '--repo', repo), ghost, 'and so is clearing them');
   assert.match(
     await customRefused(t, 'scribe', '--file', text('both.md', 'Both.\n'), '--clear', '--repo', repo),
     /^wf agents custom takes --file or --clear, not both/,

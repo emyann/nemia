@@ -1,12 +1,23 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
 import { AgentForm } from '../components/AgentForm';
 import { AgentFace, AgentRefused, FromBadge, personOf, UsedBy } from '../components/AgentParts';
+import { CustomInstructions } from '../components/CustomInstructions';
 import { AsWritten } from '../components/FilePage';
 import { TryAgent, TryYours } from '../components/TryAgent';
-import { agentQuery, AgentRefusal, keyFormQuery, readAgent, removeAgent, saveAgent, type AgentDraft, type AgentListing } from '../lib/api';
+import {
+  agentQuery,
+  AgentRefusal,
+  customInstructionsQuery,
+  keyFormQuery,
+  readAgent,
+  removeAgent,
+  saveAgent,
+  type AgentDraft,
+  type AgentListing,
+} from '../lib/api';
 import { formKeyOf, keptAfterCopy, keptAfterSave, settleSave, type KeptForm } from '../lib/agents';
 import { invalidateAgents } from '../lib/agentWrites';
 import { BackToAgents } from './agents_.new';
@@ -17,6 +28,7 @@ export const Route = createFileRoute('/agents_/$from/$agent')({
     Promise.all([
       context.queryClient.ensureQueryData(agentQuery(params.from, params.agent)),
       context.queryClient.prefetchQuery(keyFormQuery),
+      context.queryClient.prefetchQuery(customInstructionsQuery(params.agent)),
     ]),
   component: AgentPage,
   errorComponent: ({ error }) => (
@@ -34,8 +46,9 @@ const code = (text: string) => <code className="font-mono text-xs">{text}</code>
  * repository's, which the board does not write. Yours has no Source, whose toggle would drop what was typed. The form is drawn under
  * `formKeyOf`'s key, so a new version is a new form. Save puts it back against the version it was read at, and Remove takes it away while
  * no node names it. Once the form copies a skill, the page reads the agent past the cache, before the copy's invalidation lands, to keep
- * the form (`keptAfterCopy`); a read that fails keeps nothing, and the page reads the agent again as after any write. Under it, the Try
- * panel for an agent of yours; the repository's is not tried, since a try runs with no repository, where its agents are not read.
+ * the form (`keptAfterCopy`); a read that fails keeps nothing, and the page reads the agent again as after any write. Under it, your custom
+ * instructions for its name, for an agent of either place, then the Try panel for an agent of yours; the repository's is not tried, since a
+ * try runs with no repository, where its agents are not read.
  */
 function AgentPage() {
   const { from, agent: name } = Route.useParams();
@@ -105,33 +118,46 @@ function AgentPage() {
 
       <AgentHeader agent={agent} mine={mine} />
 
-      {agent.error !== null && (
-        <div
-          data-agent-error
-          className="space-y-1 rounded border border-red-300 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40"
-        >
-          <p className="text-sm font-medium text-red-800 dark:text-red-300">
-            Does not read as an agent, so no run can start a node that names it:
-          </p>
-          <p className="font-mono text-xs whitespace-pre-wrap break-words text-red-800 dark:text-red-300">{agent.error}</p>
-        </div>
-      )}
+      {agent.error !== null && <Unread error={agent.error} />}
 
-      {mine ? (
-        <>
-          <p className="border-b border-neutral-200 pb-2 font-mono text-[11px] break-all text-neutral-500 dark:border-neutral-800">
-            {agent.file}
-          </p>
-          {form}
-        </>
-      ) : (
-        <AsWritten file={agent.file} source={agent.source}>
-          {form}
-        </AsWritten>
-      )}
+      <FormIn agent={agent} mine={mine}>
+        {form}
+      </FormIn>
+
+      <CustomInstructions name={agent.name} />
 
       {mine ? <TryAgent agent={agent} /> : <TryYours agent={agent} />}
     </article>
+  );
+}
+
+/** The form in its frame: under the file's path for an agent of yours, beside its Source for the repository's. */
+function FormIn({ agent, mine, children }: { agent: AgentListing; mine: boolean; children: ReactNode }) {
+  if (!mine)
+    return (
+      <AsWritten file={agent.file} source={agent.source}>
+        {children}
+      </AsWritten>
+    );
+  return (
+    <>
+      <p className="border-b border-neutral-200 pb-2 font-mono text-[11px] break-all text-neutral-500 dark:border-neutral-800">
+        {agent.file}
+      </p>
+      {children}
+    </>
+  );
+}
+
+/** Why the agent's file does not read as an agent, in the parser's words: no run can start a node that names it. */
+function Unread({ error }: { error: string }) {
+  return (
+    <div data-agent-error className="space-y-1 rounded border border-red-300 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40">
+      <p className="text-sm font-medium text-red-800 dark:text-red-300">
+        Does not read as an agent, so no run can start a node that names it:
+      </p>
+      <p className="font-mono text-xs whitespace-pre-wrap break-words text-red-800 dark:text-red-300">{error}</p>
+    </div>
   );
 }
 

@@ -1,19 +1,44 @@
 /**
  * A person's custom instructions, written: one file per agent name in their store (`customInstructionsFile`), what they add to an agent
  * they use without rewriting it. Read by the load (`readCustomInstructions`), which a run does once, at `wf start`: a write or a clear
- * reaches only the runs started after it. The one writer of the folder.
+ * reaches only the runs started after it. The one writer of the folder, and its reader for a person's command and the board alike: a name
+ * no place has is refused here, read, written or cleared, so both refuse it in the same words.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { customInstructionsRefusal } from './agents.ts';
-import { customInstructionsFile } from '../folder/folder.store.ts';
-import { Invalid } from '../refusal/refusal.ts';
+import { agentsFor, customInstructionsFile, readCustomInstructions } from '../folder/folder.store.ts';
+import { Invalid, Missing } from '../refusal/refusal.ts';
 
 /**
- * Write `text` as the custom instructions for the agent `name` in the store `home`, and the file written. Refused, writing nothing: blank
- * text, and a frontmatter block (`customInstructionsRefusal`). A link at the file is replaced, never written through.
+ * Refuse, as `Missing`, an agent `name` a run on `repo` could not name: none of the repository's places for agents has it, nor yours in the
+ * store `home` (`agentsFor`). The refusal lists the names there are. A name whose file does not read is one all the same.
  */
-export function writeCustomInstructions(home: string, name: string, text: string): string {
+function refuseNoAgent(home: string, name: string, repo: string): void {
+  const at = path.resolve(repo);
+  const names = [...agentsFor(path.join(at, 'workflows', '_'), { repo: at, home }).keys()].sort();
+  if (names.includes(name)) return;
+  throw new Missing({
+    message: `no agent named ${name} where a run on ${at} looks for one, nor in yours (${path.join(home, 'workflows', 'agents')}). ${names.length ? `The agents there: ${names.join(', ')}.` : 'There are none.'} Name one of them, or the repository it is in.`,
+  });
+}
+
+/**
+ * The custom instructions for the agent `name` in the store `home`, as `readCustomInstructions` reads them, for a person's command and the
+ * board alike. Refused, reading nothing: a name a run on `repo` could not name (`Missing`).
+ */
+export function customInstructionsFor(home: string, name: string, repo: string): string | undefined {
+  refuseNoAgent(home, name, repo);
+  return readCustomInstructions(home, name);
+}
+
+/**
+ * Write `text` as the custom instructions for the agent `name` in the store `home`, and the file written. Refused, writing nothing: a name
+ * a run on `repo` could not name (`Missing`), blank text, and a frontmatter block (`customInstructionsRefusal`). A link at the file is
+ * replaced, never written through.
+ */
+export function writeCustomInstructions(home: string, name: string, text: string, repo: string): string {
+  refuseNoAgent(home, name, repo);
   const file = customInstructionsFile(home, name);
   if (!text.trim())
     throw new Invalid({
@@ -27,8 +52,12 @@ export function writeCustomInstructions(home: string, name: string, text: string
   return file;
 }
 
-/** Remove the custom instructions for the agent `name` from the store `home`: whether there were any. */
-export function clearCustomInstructions(home: string, name: string): boolean {
+/**
+ * Remove the custom instructions for the agent `name` from the store `home`: whether there were any. Refused, removing nothing, for a name
+ * a run on `repo` could not name (`Missing`).
+ */
+export function clearCustomInstructions(home: string, name: string, repo: string): boolean {
+  refuseNoAgent(home, name, repo);
   const file = customInstructionsFile(home, name);
   if (!fs.lstatSync(file, { throwIfNoEntry: false })) return false;
   fs.rmSync(file, { recursive: true, force: true });

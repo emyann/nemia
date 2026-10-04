@@ -769,7 +769,7 @@ test('an agent is listed with each skill it gives, found where a start finds it,
 test("the listing and a card are the package's wf agents and wf agents card, answered with what the board adds and without a person's custom file", async () => {
   const AGENTS_ENTRY = COMMANDS.find((c) => c.name === 'agents')!;
   const CARD_ENTRY = COMMANDS.find((c) => c.name === 'agents card')!;
-  writeCustomInstructions(root, 'reviewer', 'Say it in French.');
+  writeCustomInstructions(root, 'reviewer', 'Say it in French.', repo);
   try {
     const all = await listed();
     assert.deepEqual(
@@ -792,7 +792,7 @@ test("the listing and a card are the package's wf agents and wf agents card, ans
     const { card } = (await CARD_ENTRY.handler(engine(), { name: 'reviewer', repo, from: 'yours' }, process.env, root)) as CardRead;
     assert.deepEqual(((await res.json()) as { card: unknown }).card, card);
   } finally {
-    clearCustomInstructions(root, 'reviewer');
+    clearCustomInstructions(root, 'reviewer', repo);
   }
 });
 

@@ -5525,7 +5525,10 @@ test('REFUSED: a favourite the api no longer lists is said gone, by its id or na
 test('REFUSED: the star is a toggle named Star and its name, pressed only while this browser keeps its favourite', async () => {
   const { FavoriteStar } = await import('../src/components/FavoriteStar.tsx');
   const { FAVORITES_KEY } = await import('../src/lib/favorites.ts');
-  const kept = JSON.stringify([{ kind: 'run', run: 'r-1' }, { kind: 'workflow', from: 'repo', workflow: 'dev' }]);
+  const kept = JSON.stringify([
+    { kind: 'run', run: 'r-1' },
+    { kind: 'workflow', from: 'repo', workflow: 'dev' },
+  ]);
   Object.assign(globalThis, { localStorage: { getItem: (key: string) => (key === FAVORITES_KEY ? kept : null) } });
   try {
     const star = (favorite: Record<string, string>, name: string) =>

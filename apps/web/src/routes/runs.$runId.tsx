@@ -13,6 +13,7 @@ import { RunGone } from '../components/RunGone';
 import { StatusChip, StepNote } from '../components/StatusChip';
 import { Timeline } from '../components/Timeline';
 import { StartedFrom } from '../components/TryTag';
+import { FavoriteStar } from '../components/FavoriteStar';
 import { RemoveRun } from '../components/RemoveRun';
 import { LiftHold } from '../components/LiftHold';
 import { PruneRun } from '../components/PruneRun';
@@ -22,7 +23,7 @@ import { barValue } from '../lib/bar';
 import { spentTitle } from '../lib/cost';
 import { decidableRun } from '../lib/decide';
 import { duration } from '../lib/canvas';
-import { clockCounts, inFlight, runClock, waitedMs } from '../lib/factory';
+import { clockCounts, inFlight, runClock, titleOf, waitedMs } from '../lib/factory';
 import { useNow } from '../lib/useNow';
 
 /**
@@ -69,14 +70,13 @@ function RunPage() {
 
 /**
  * One run, top to bottom: what is left to decide about its result, above who else it waits on, as `wf ls` prints the two; the runs it waits
- * on and a person's hold; its warning; its id, with what it has cost, every step's tries, once a cost was measured (`≥` where an ended
- * attempt has none on it), what the same sessions read, by price, where every one of them measured it, what it was started from, and, once
- * it is over, what it holds on disk to give back as `wf prune` does; then Decide, between the banners and the canvas, for a run with
- * something to decide and never while it runs: an answer to give, or a try a person has asked for, since a session the harness blocked is
- * continued from the banner and Decide draws it only once its try is asked; the graph, the whole width of the page, a step pressed on it
- * inspected in the frame's bar; the brief,
- * with the inbox card it was started from under it, as `wf decide` puts it under the run's line; its facts; its timeline; and each step's
- * section.
+ * on and a person's hold; its warning; its id and its star (`RunHeading`), with what it has cost, every step's tries, once a cost was
+ * measured (`≥` where an ended attempt has none on it), what the same sessions read, by price, where every one of them measured it, what
+ * it was started from, and, once it is over, what it holds on disk to give back as `wf prune` does; then Decide, between the banners and
+ * the canvas, for a run with something to decide and never while it runs: an answer to give, or a try a person has asked for, since a
+ * session the harness blocked is continued from the banner and Decide draws it only once its try is asked; the graph, the whole width of
+ * the page, a step pressed on it inspected in the frame's bar; the brief, with the inbox card it was started from under it, as
+ * `wf decide` puts it under the run's line; its facts; its timeline; and each step's section.
  *
  * Its facts: a folder run has no repository, base or branch, and names where its work is instead, the one thing a person needs to find what
  * it made; when it started, its first step filed, and the wait before, which a run started `--after` runs spends doing nothing; and, only
@@ -104,7 +104,7 @@ function Run({ run }: { run: RunDetail }) {
       )}
 
       <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h1 className="font-mono text-sm text-neutral-500">{run.id}</h1>
+        <RunHeading run={run} />
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
           <RunTook run={run} />
           {run.cost && (
@@ -433,6 +433,16 @@ function HeldUntil({ run }: { run: RunDetail }) {
       )}
       <LiftHold id={run.id} />
     </section>
+  );
+}
+
+/** A run's id, its page's heading, and its star, named by its title, which puts it under Favorites. */
+function RunHeading({ run }: { run: RunDetail }) {
+  return (
+    <div className="flex items-center gap-1">
+      <h1 className="font-mono text-sm text-neutral-500">{run.id}</h1>
+      <FavoriteStar favorite={{ kind: 'run', run: run.id }} name={titleOf(run)} />
+    </div>
   );
 }
 

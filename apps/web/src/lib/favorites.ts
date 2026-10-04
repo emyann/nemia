@@ -6,7 +6,6 @@
 import type { RunSummary, WorkflowListing } from './api';
 import { titleOf } from './factory.ts';
 
-
 /** A favourite: a run by its id, or a workflow by its name and where it is read from, the repository's or yours. */
 export type Favorite = { kind: 'run'; run: string } | { kind: 'workflow'; from: 'repo' | 'yours'; workflow: string };
 

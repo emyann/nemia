@@ -25,7 +25,10 @@ export function FavoriteStar({ favorite, name, className }: { favorite: Favorite
       data-starred={on || undefined}
       className={cn(buttonVariants({ variant: 'ghost', size: 'icon-xs' }), 'text-muted-foreground', className)}
     >
-      <span title={on ? 'Starred: take it off Favorites' : 'Star: list it under Favorites'} className="flex size-full items-center justify-center">
+      <span
+        title={on ? 'Starred: take it off Favorites' : 'Star: list it under Favorites'}
+        className="flex size-full items-center justify-center"
+      >
         <Star aria-hidden className={on ? 'fill-amber-400 text-amber-500 dark:fill-amber-300 dark:text-amber-300' : undefined} />
       </span>
     </ToggleButton>

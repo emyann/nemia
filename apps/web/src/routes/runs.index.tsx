@@ -1,6 +1,7 @@
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { FactoryTag } from '../components/FactoryTag';
+import { FavoriteStar } from '../components/FavoriteStar';
 import { StatusChip } from '../components/StatusChip';
 import { StartedFrom } from '../components/TryTag';
 import { runsQuery, type RunSummary } from '../lib/api';
@@ -111,10 +112,10 @@ function RunGroup({ group, title, about, runs, now }: { group: string; title: st
  * what is yours to resolve; a person's hold (`wf hold`) in `wf ls`'s word, with how to lift it on hover, amber once only a person lifts it;
  * what there is to decide about its result, in `wf ls`'s words (`toDecideWords`): the ending step's gate with the command that approves it,
  * or a branch nobody has merged, the step's own `approve <step>` on this line alone; why the run is not judged, a task it reads that does
- * not read (`RunSummary.unreadable`); and each step's state. Beside the link, since a link inside a link is not HTML: when it was created,
- * which orders the list; the card's clock (`runClock`), how long it took or has been at work, with its start, its end and the wall time
- * on hover; what it has cost, as `wf ls` puts it on the run's line, once a cost was measured; the tokens its sessions used, their split
- * on hover, once one measured any; and the workflow it was started from.
+ * not read (`RunSummary.unreadable`); and each step's state. Beside the link, since a link inside a link is not HTML (`RowSide`): its
+ * star, which puts it under Favorites; when it was created, which orders the list; the card's clock (`runClock`), how long it took or has
+ * been at work, with its start, its end and the wall time on hover; what it has cost, as `wf ls` puts it on the run's line, once a cost
+ * was measured; the tokens its sessions used, their split on hover, once one measured any; and the workflow it was started from.
  */
 function RunRow({ run, now }: { run: RunSummary; now: number }) {
   const title = titleOf(run);
@@ -172,25 +173,33 @@ function RunRow({ run, now }: { run: RunSummary; now: number }) {
           ))}
         </ul>
       </Link>
-      <div className="flex shrink-0 flex-col items-end gap-1 pt-0.5">
-        <time className="text-xs text-neutral-500" dateTime={run.createdAt}>
-          {new Date(run.createdAt).toLocaleString()}
-        </time>
-        <span data-clock title={clock.title} className="font-mono text-xs text-neutral-500">
-          {clock.words}
-        </span>
-        {run.cost && (
-          <span data-cost title={spentTitle(run.cost, "the run's tries")} className="font-mono text-xs">
-            {run.cost.said}
-          </span>
-        )}
-        {run.tokens && (
-          <span data-tokens title={run.tokens.split} className="font-mono text-xs">
-            {run.tokens.said}
-          </span>
-        )}
-        <StartedFrom run={run} />
-      </div>
+      <RowSide run={run} title={title} clock={clock} />
     </li>
+  );
+}
+
+/** The right of a run's row, beside its link: its star (`FavoriteStar`) and what `RunRow` says sits there. */
+function RowSide({ run, title, clock }: { run: RunSummary; title: string; clock: ReturnType<typeof runClock> }) {
+  return (
+    <div className="flex shrink-0 flex-col items-end gap-1 pt-0.5">
+      <FavoriteStar favorite={{ kind: 'run', run: run.id }} name={title} className="-mt-0.5 -mr-1" />
+      <time className="text-xs text-neutral-500" dateTime={run.createdAt}>
+        {new Date(run.createdAt).toLocaleString()}
+      </time>
+      <span data-clock title={clock.title} className="font-mono text-xs text-neutral-500">
+        {clock.words}
+      </span>
+      {run.cost && (
+        <span data-cost title={spentTitle(run.cost, "the run's tries")} className="font-mono text-xs">
+          {run.cost.said}
+        </span>
+      )}
+      {run.tokens && (
+        <span data-tokens title={run.tokens.split} className="font-mono text-xs">
+          {run.tokens.said}
+        </span>
+      )}
+      <StartedFrom run={run} />
+    </div>
   );
 }

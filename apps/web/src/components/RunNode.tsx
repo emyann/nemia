@@ -16,6 +16,7 @@ import { decideLine, gateOfSummary } from '@/lib/gate';
 import { useNow } from '@/lib/useNow';
 import { RouteLink } from './AgentParts';
 import { CardGate, type Taken } from './CardGate';
+import { FavoriteStar } from './FavoriteStar';
 import { CardLift } from './LiftHold';
 import { StepRail, StepTiles } from './StepRail';
 
@@ -42,7 +43,7 @@ export type RunFlowNode = Node<RunNodeData, 'run'>;
  * One run on the Factory floor: what was asked, where, what each step is doing — a small flowchart of them (`StepRail`) — and for
  * how long.
  *
- * The chevron opens it: the card grows to the right with every step a tile (`StepTiles`), and a tile shows its step in the frame's bar.
+ * Its star puts it under the sidebar's Favorites (`FavoriteStar`). The chevron opens it: the card grows to the right with every step a tile (`StepTiles`), and a tile shows its step in the frame's bar.
  * A click on the card shows the run there, and the card is ringed while it does (`lookOf`). The title opens the run's page, and is not
  * preloaded on hover: only an open run reads its detail. `w-88` is `CARD_WIDTH`, narrower than the grid's cell, which leaves the gap
  * between cards.
@@ -98,30 +99,7 @@ export function RunNode({ data: { run, finished, open, detail, trouble, inspecte
     <Card size="sm" {...look.marks} className={`w-fit flex-row items-start gap-0 shadow-sm transition-opacity ${look.className}`}>
       <div className="flex w-88 shrink-0 flex-col gap-3">
         <div className="min-w-0 px-3">
-          <div className="flex items-center gap-1">
-            <Link
-              to="/runs/$runId"
-              params={{ runId: run.id }}
-              preload={false}
-              title={title}
-              className="nodrag block min-w-0 flex-1 truncate text-sm font-semibold hover:underline"
-            >
-              {title}
-            </Link>
-            <button
-              type="button"
-              aria-expanded={open}
-              aria-label={open ? 'Hide steps' : 'Show steps'}
-              title={open ? 'Hide its steps' : 'Open its steps'}
-              onClick={(event) => {
-                event.stopPropagation();
-                onToggle(run.id);
-              }}
-              className="nodrag -mr-1.5 shrink-0 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
-              <ChevronRight aria-hidden className={`size-4 transition-transform ${open ? 'rotate-180' : ''}`} />
-            </button>
-          </div>
+          <CardTitle run={run} title={title} open={open} onToggle={onToggle} />
           <p className="mt-0.5 flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
             <span className="truncate font-mono" title={run.id}>
               {run.id}
@@ -238,6 +216,40 @@ export function RunNode({ data: { run, finished, open, detail, trouble, inspecte
       <Handle type="target" position={Position.Left} isConnectable={false} className="opacity-0" />
       <Handle type="source" position={Position.Right} isConnectable={false} className="opacity-0" />
     </Card>
+  );
+}
+
+/**
+ * A run card's title line: its title, a link to the run's page, not preloaded; its star (`FavoriteStar`); and the chevron that opens or
+ * closes its steps (`onToggle`). Neither button drags the card nor shows the run in the bar.
+ */
+function CardTitle({ run, title, open, onToggle }: { run: RunSummary; title: string; open: boolean; onToggle: (runId: string) => void }) {
+  return (
+    <div className="flex items-center gap-1">
+      <Link
+        to="/runs/$runId"
+        params={{ runId: run.id }}
+        preload={false}
+        title={title}
+        className="nodrag block min-w-0 flex-1 truncate text-sm font-semibold hover:underline"
+      >
+        {title}
+      </Link>
+      <FavoriteStar favorite={{ kind: 'run', run: run.id }} name={title} className="nodrag -my-1" />
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-label={open ? 'Hide steps' : 'Show steps'}
+        title={open ? 'Hide its steps' : 'Open its steps'}
+        onClick={(event) => {
+          event.stopPropagation();
+          onToggle(run.id);
+        }}
+        className="nodrag -mr-1.5 shrink-0 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+      >
+        <ChevronRight aria-hidden className={`size-4 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+    </div>
   );
 }
 

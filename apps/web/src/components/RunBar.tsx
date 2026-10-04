@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { runGone, runQuery, type RunDetail } from '@/lib/api';
 import { titleOf } from '@/lib/factory';
 import { useBar } from '@/lib/useBar';
+import { FavoriteStar } from './FavoriteStar';
 import { FloatingBar } from './FloatingBar';
 import { Markdown } from './Markdown';
 import { NeedsBanner, ToDecideBanner } from './Needs';
@@ -14,13 +15,17 @@ import { StatusChip } from './StatusChip';
 import { Unread } from './StepBar';
 
 /**
- * The bar for the run `run`, titled by the run once read, with its id under the title. While the run is read it says so; a run gone from
+ * The bar for the run `run`, titled by the run once read, with its id under the title and its star beside Open. While the run is read it says so; a run gone from
  * the store and a read that failed are each said in the bar, which stays open until a person closes it: a read never writes the address.
  */
 export function RunBar({ run: id }: { run: string }) {
   const { data: run, error } = useQuery(runQuery(id));
   return (
-    <FloatingBar title={run ? titleOf(run) : id} description={<span className="font-mono text-xs">{id}</span>}>
+    <FloatingBar
+      title={run ? titleOf(run) : id}
+      description={<span className="font-mono text-xs">{id}</span>}
+      actions={<FavoriteStar favorite={{ kind: 'run', run: id }} name={run ? titleOf(run) : id} className="-mt-0.5" />}
+    >
       <RunBody id={id} run={run} error={error} />
     </FloatingBar>
   );

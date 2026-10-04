@@ -7,6 +7,7 @@ import {
   addToInbox,
   approvedFirst,
   cardToStart,
+  cordonWords,
   dropFromInbox,
   endingSteps,
   formerKeyLines,
@@ -23,6 +24,7 @@ import {
   planLines,
   planStopped,
   queueInInbox,
+  readCordon,
   readInbox,
   repoFor,
   start,
@@ -269,9 +271,30 @@ const mountLines = (run: ReturnType<typeof start>): string[] => {
   ];
 };
 
+/** The steps of a run just started that wait on a person: each gated, and the ending a person approves before it is filed. */
+function gateLines(run: ReturnType<typeof start>, steps: ReturnType<typeof stepsOf>): string[] {
+  const gates = gatesOf(steps, run);
+  const ends = endingSteps(steps, run)
+    .filter((s) => approvedFirst(s, run))
+    .map((s) => s.name);
+  const held = gates.filter((name) => !ends.includes(name));
+  return [
+    ...(held.length
+      ? [
+          `gated at: ${held.join(', ')} — nothing after ${held.length > 1 ? 'each' : 'it'} is filed until wf approve ${run.id} <step>, once it has signed off`,
+        ]
+      : []),
+    ...(ends.length
+      ? [
+          `ends at: ${ends.join(', ')} — nothing of ${ends.length > 1 ? 'them' : 'it'} runs until wf approve ${run.id} ${ends[0]}, which is what files ${ends.length > 1 ? 'them' : 'it'}`,
+        ]
+      : []),
+  ];
+}
+
 /**
  * What `wf start` prints of a run it started: its steps, where it came from when said, its factory, the folders it mounts, where it works,
- * and what it waits on and ends at.
+ * and what it waits on and ends at; and, while the store is cordoned, that nothing of it is filed until the lift.
  */
 function printStarted(run: ReturnType<typeof start>, from?: string): void {
   const steps = stepsOf(run);
@@ -283,20 +306,10 @@ function printStarted(run: ReturnType<typeof start>, from?: string): void {
   if (run.inputs?.length) console.log(`inputs: ${run.inputs.join(', ')} — copied into ${inputsDir(run)}`);
   if (run.after?.length)
     console.log(`waits on: ${run.after.join(', ')} — nothing is filed until wf decide says each has shipped onto ${run.branch}`);
-  const gates = gatesOf(steps, run);
-  const ends = endingSteps(steps, run)
-    .filter((s) => approvedFirst(s, run))
-    .map((s) => s.name);
-  const held = gates.filter((name) => !ends.includes(name));
-  if (held.length)
-    console.log(
-      `gated at: ${held.join(', ')} — nothing after ${held.length > 1 ? 'each' : 'it'} is filed until wf approve ${run.id} <step>, once it has signed off`,
-    );
-  if (ends.length)
-    console.log(
-      `ends at: ${ends.join(', ')} — nothing of ${ends.length > 1 ? 'them' : 'it'} runs until wf approve ${run.id} ${ends[0]}, which is what files ${ends.length > 1 ? 'them' : 'it'}`,
-    );
+  for (const line of gateLines(run, steps)) console.log(line);
   console.log(`run 'wf tick' (or 'wf up') to start it`);
+  const cordon = readCordon();
+  if (cordon) console.log(`${cordonWords(cordon)}: nothing of this run is filed until then`);
   for (const line of formerKeyLines(run.workflowDir)) console.log(line);
 }
 

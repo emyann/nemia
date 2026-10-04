@@ -1,6 +1,6 @@
 /**
  * The commands over a run's course and the store's tick, each defined once: `wf cancel` and `wf hold`, whose handlers call the package's
- * verbs (`cancel`, `hold`, `unhold`), and `wf tick`, `wf up` and `wf watch`, which the CLI alone serves and runs itself (`RAN`): their
+ * verbs (`cancel`, `hold`, `unhold`), the store's cordon (`wf cordon`, `wf uncordon`, and the api's read of it), and `wf tick`, `wf up` and `wf watch`, which the CLI alone serves and runs itself (`RAN`): their
  * specs, refusals and help, with no handler.
  */
 import { cancel } from '../cancel/cancel.verb.ts';
@@ -10,6 +10,9 @@ import { cursorTakes } from '../feed/feed.ts';
 import { BY_CAP, oneLine, WHY_CAP, type Hold } from '../record/record.ts';
 import { holdWord } from '../wait/wait.ts';
 import { hold, unhold } from '../wait/wait.verb.ts';
+import { liftCordon, putCordon } from '../cordon/cordon.store.ts';
+import { cordonWords, UNCORDONED, type Cordon, type Cordoned } from '../cordon/cordon.ts';
+import { cordonRead } from '../list/list.verb.ts';
 import type { Args } from './command.ts';
 import type { Command, Ran } from './entry.verb.ts';
 
@@ -53,16 +56,23 @@ export const CANCEL: Command<{ id: string; plan: CancelPlan }> = {
 /** `wf hold`'s two forms, as each of its refusals ends on them. */
 const HOLD_SHAPE = 'wf hold <runId> --until <runId> [--until <runId> ...] [--why "<words>"] [--by <name>], or wf hold <runId> --off';
 
-/** `--why` and `--by`: the flag, the key it fills, what it takes as its refusals say it, and the longest it may be. */
-const SAID = [
+/** `--why` or `--by`: the flag, the key it fills, what it takes as its refusals say it, and the longest it may be. */
+type Said = { readonly flag: '--why' | '--by'; readonly key: 'why' | 'by'; readonly takes: string; readonly cap: number };
+
+/** `wf hold`'s `--why` and `--by`. */
+const SAID: readonly Said[] = [
   { flag: '--why', key: 'why', takes: 'the words for why the run is held', cap: WHY_CAP },
   { flag: '--by', key: 'by', takes: 'who puts the hold, by a name', cap: BY_CAP },
-] as const;
+];
+
+/** Each of `said`'s refusals of a value left out, saying what it takes, ending on the command's forms. */
+const takesOf = (said: readonly Said[], shape: string): Readonly<Record<string, string>> =>
+  Object.fromEntries(said.map(({ flag, takes }) => [flag, `${flag} takes ${takes}: ${shape}.`]));
 
 /** `--until`, `--why` and `--by`, each with its refusal of a value left out, saying what it takes. */
 const HOLD_TAKES: Readonly<Record<string, string>> = {
   '--until': `--until takes the run to wait on, by id: ${HOLD_SHAPE}.`,
-  ...Object.fromEntries(SAID.map(({ flag, takes }) => [flag, `${flag} takes ${takes}: ${HOLD_SHAPE}.`])),
+  ...takesOf(SAID, HOLD_SHAPE),
 };
 
 /** `--why` or `--by`'s value as one line: every run of whitespace, a newline included, one space. */
@@ -71,16 +81,29 @@ const saidOf = (args: Args, key: 'why' | 'by'): string | undefined => {
   return value === undefined ? undefined : oneLine(value, Number.POSITIVE_INFINITY);
 };
 
-/** Refused of `--why` or `--by`: a value starting `--`, which reads as the value left out, blank, or longer than its cap. */
-function saidRefusal(args: Args, { flag, key, takes, cap }: (typeof SAID)[number]): string | null {
+/**
+ * Refused of `--why` or `--by`: a value starting `--`, which reads as the value left out (its refusal in `takes`), blank, or longer than
+ * its cap.
+ */
+function saidRefusal(args: Args, { flag, key, takes, cap }: Said, refusals: Readonly<Record<string, string>>): string | null {
   const value = textOf(args, key);
   if (value === undefined) return null;
-  if (value.startsWith('--')) return HOLD_TAKES[flag];
+  if (value.startsWith('--')) return refusals[flag];
   const line = saidOf(args, key) ?? '';
   if (!line) return `${flag} takes ${takes}, and was given only blanks: give it words, or leave ${flag} out.`;
   if (line.length > cap) return `${flag} takes at most ${cap} characters, and was given ${line.length}: say it shorter.`;
   return null;
 }
+
+/** `--why` and `--by` as `command` takes them, for what it puts (`a hold`): each a text flag given once, refused in `refusals`' words. */
+const saidFlags = (said: readonly Said[], command: string, puts: string, refusals: Readonly<Record<string, string>>, shape: string) =>
+  said.map(({ flag, key }) => ({
+    flag,
+    kind: 'text' as const,
+    key,
+    takes: refusals[flag],
+    twice: `${command} takes ${flag} once: ${puts} says one ${key}. ${shape}.`,
+  }));
 
 /**
  * Refused of `wf hold`'s arguments before any run is read: a run to wait on empty or starting `-`, what `saidRefusal` refuses of `--why`
@@ -91,7 +114,7 @@ function holdArgsRefusal(args: Args): string | null {
   const until = listOf(args, 'until');
   const off = args.off === true;
   if (until.some((id) => !id || id.startsWith('-'))) return HOLD_TAKES['--until'];
-  const said = SAID.map((s) => saidRefusal(args, s)).find((r) => r !== null);
+  const said = SAID.map((s) => saidRefusal(args, s, HOLD_TAKES)).find((r) => r !== null);
   if (said) return said;
   if (off && until.length) return `wf hold takes --until or --off, not both: lift the hold first, then hold it again — ${HOLD_SHAPE}.`;
   if (off && (args.why !== undefined || args.by !== undefined))
@@ -124,13 +147,7 @@ export const HOLD: Command<{ id: string; lifted: boolean; hold: Hold }> = {
     positionals: [{ key: 'runId', takes: 'required', kind: 'name' }],
     flags: [
       { flag: '--until', kind: 'text', key: 'until', takes: HOLD_TAKES['--until'], many: true },
-      ...SAID.map(({ flag, key }) => ({
-        flag,
-        kind: 'text' as const,
-        key,
-        takes: HOLD_TAKES[flag],
-        twice: `wf hold takes ${flag} once: a hold says one ${key}. ${HOLD_SHAPE}.`,
-      })),
+      ...saidFlags(SAID, 'wf hold', 'a hold', HOLD_TAKES, HOLD_SHAPE),
       { flag: '--off', kind: 'switch', key: 'off' },
     ],
     unknown: (arg) => `wf hold does not take ${arg}. It takes the run, then the runs it waits on or --off: ${HOLD_SHAPE}.`,
@@ -157,6 +174,78 @@ export const HOLD: Command<{ id: string; lifted: boolean; hold: Hold }> = {
           put,
         )} — nothing more of it is filed, and nothing is asked of you, until then; the next tick lifts the hold`,
   ],
+};
+
+/** `wf cordon`'s form, as each of its refusals ends on it. */
+const CORDON_SHAPE = 'wf cordon [--why "<words>"] [--by <name>]';
+
+/** `wf cordon`'s `--why` and `--by`. */
+const CORDON_SAID: readonly Said[] = [
+  { flag: '--why', key: 'why', takes: 'the words for why the store is cordoned', cap: WHY_CAP },
+  { flag: '--by', key: 'by', takes: 'who cordons it, by a name', cap: BY_CAP },
+];
+
+/** `wf cordon`'s `--why` and `--by`, each with its refusal of a value left out. */
+const CORDON_TAKES = takesOf(CORDON_SAID, CORDON_SHAPE);
+
+/**
+ * `wf cordon`: the store cordoned, as `kubectl cordon` marks a node (`putCordon`), on `POST /api/cordon` too; the cordon as written.
+ * Refused while a cordon stands (`Conflict`).
+ */
+export const CORDON: Command<{ cordon: Cordon }> = {
+  name: 'cordon',
+  usage: '[--why "<words>"] [--by <name>]',
+  help: [
+    'cordon the store, as kubectl cordon marks a node: no pass starts new',
+    'work — no step, try, round or check filed, no queued task admitted,',
+    'no queued card started — and what runs finishes, its end and closeout',
+    'recorded; a landing whose check has ended commits or aborts. wf start',
+    'still writes a run, and approvals, retries and answers are kept, not',
+    'acted on: the pass after wf uncordon files what waits. wf ls, wf feed,',
+    'wf start and wf up say it. Refused while a cordon stands.',
+    '--why: the reason, said wherever the cordon is; --by: who cordons it',
+    '(default: your OS user)',
+  ],
+  spec: {
+    positionals: [],
+    flags: saidFlags(CORDON_SAID, 'wf cordon', 'a cordon', CORDON_TAKES, CORDON_SHAPE),
+    unknown: (arg) => `wf cordon does not take ${arg}: ${CORDON_SHAPE}.`,
+    apart: (_value, flag) => CORDON_TAKES[flag],
+  },
+  check: (args) => CORDON_SAID.map((s) => saidRefusal(args, s, CORDON_TAKES)).find((r) => r !== null) ?? null,
+  writes: true,
+  route: { method: 'POST', path: '/api/cordon', status: 200 },
+  handler: async (_e, args) => ({ cordon: putCordon({ why: saidOf(args, 'why'), by: saidOf(args, 'by') }) }),
+  print: ({ cordon }) => [cordonWords(cordon)],
+};
+
+/** `wf uncordon`: the store's cordon lifted (`liftCordon`), on `DELETE /api/cordon` too; the cordon lifted. Refused with none (`Missing`). */
+export const UNCORDON: Command<{ cordon: Cordon }> = {
+  name: 'uncordon',
+  usage: '',
+  help: ["lift the store's cordon: the next pass files what waits"],
+  spec: {
+    positionals: [],
+    flags: [],
+    unknown: (arg) => `wf uncordon takes no ${arg}: it lifts the store's cordon, whoever put it.`,
+  },
+  writes: true,
+  route: { method: 'DELETE', path: '/api/cordon', status: 200 },
+  handler: async () => ({ cordon: liftCordon() }),
+  print: () => [UNCORDONED],
+};
+
+/** The store's cordon and the landings it holds with their merge staged (`cordonRead`), which the api alone serves. */
+export const CORDONED: Command<Cordoned> = {
+  name: 'cordoned',
+  usage: '',
+  help: ["the store's cordon, and each landing it holds with its merge staged"],
+  spec: { positionals: [], flags: [], unknown: (arg) => `the cordon takes no ${arg}.` },
+  writes: false,
+  route: { method: 'GET', path: '/api/cordon', status: 200 },
+  only: { side: 'api', why: 'the board says the cordon over its frame; at the command line, wf ls says it, and each landing it holds' },
+  handler: (e) => cordonRead(e),
+  print: () => [],
 };
 
 /** The `--stats` switch of `wf tick` and `wf up`. */
@@ -200,7 +289,8 @@ const UP: Ran = {
     'and takes the store over once its process is gone or it has been',
     'silent for 10 intervals, at least 15 minutes; it writes',
     'WF_ROOT/daemon.json — pid, start, last pass, and a beat each interval;',
-    'once a minute, a line of what its passes cost (tick-stats.json).',
+    'once a minute, a line of what its passes cost (tick-stats.json); the',
+    "store's cordon once it is put, and again once it is lifted.",
     'wf up --stats: what the last pass cost, phase by phase — read, not',
     'run, so it fits while a wf up holds the store; where none does,',
     'wf tick --stats',

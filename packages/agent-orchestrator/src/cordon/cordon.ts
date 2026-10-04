@@ -19,16 +19,16 @@ export type CordonStaged = { run: string; step: string; repo: string };
 /** What a reader of the whole store is told of the cordon: the cordon, or null, and each landing it holds with its merge staged. */
 export type Cordoned = { cordon: Cordon | null; staged: CordonStaged[] };
 
-/** How `wf cordon` and `wf uncordon` are typed, as every line that offers them says them. */
-export const UNCORDON = 'wf uncordon';
+/** How `wf uncordon` is typed, as every line that offers it says it. */
+export const UNCORDON_LINE = 'wf uncordon';
 
 /** The cordon in one line: since when, by whom and why, what it stops, and the verb that lifts it. */
 export const cordonWords = ({ at, by, why }: Cordon): string =>
-  `the store is cordoned since ${at || 'a time its file no longer says'} by ${by || 'someone its file no longer names'}${why ? `: ${why}` : ''} — nothing new starts, and what runs finishes; ${UNCORDON} lifts it`;
+  `the store is cordoned since ${at || 'a time its file no longer says'} by ${by || 'someone its file no longer names'}${why ? `: ${why}` : ''} — nothing new starts, and what runs finishes; ${UNCORDON_LINE} lifts it`;
 
 /** A landing the cordon holds, in one line: its run, and the checkout its merge is staged in until the lift. */
 export const stagedWords = ({ run, step, repo }: CordonStaged): string =>
-  `${run}'s ${step} has its merge staged in ${repo} (MERGE_HEAD), and its check waits on ${UNCORDON}`;
+  `${run}'s ${step} has its merge staged in ${repo} (MERGE_HEAD), and its check waits on ${UNCORDON_LINE}`;
 
 /** Every line said of the cordon: none when the store is not cordoned, else the cordon, then each landing it holds, indented. */
 export const cordonLines = ({ cordon, staged }: Cordoned): string[] =>

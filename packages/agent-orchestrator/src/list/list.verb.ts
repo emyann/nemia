@@ -7,7 +7,7 @@
 import { unreadableJournal, type Engine, type TaskView } from '../runtime-client.ts';
 import type { RunSlot } from '../cap/cap.ts';
 import { runSlots } from '../cap/cap.verb.ts';
-import { runTasks, unjudgedWords, type Run, type TaskPhase } from '../record/record.ts';
+import { isGitRun, runTasks, unjudgedWords, type Run, type TaskPhase } from '../record/record.ts';
 import type { Workflow } from '../step/step.ts';
 import { holdsOf, waitsOf, type ParentRun } from '../wait/wait.ts';
 import { listing, type Listing, type RunsListed, type Unjudged } from './list.ts';
@@ -35,6 +35,10 @@ import {
 } from '../views/views.verb.ts';
 import { engineWord, phaseOfView } from '../views/views-words.ts';
 import { checkoutHold } from '../ending/ending.verb.ts';
+import { landsOnCheck } from '../status/status.ts';
+import { mergeInProgress } from '../workspace/worktree.store.ts';
+import { readCordon } from '../cordon/cordon.store.ts';
+import type { Cordon, Cordoned, CordonStaged } from '../cordon/cordon.ts';
 
 /**
  * How a caller reads a run (`runReading`): what it already holds, and what it asks to be read. Each left out is read as `wf ls` reads it.
@@ -141,6 +145,7 @@ export const list = (e: Engine, run: Run, slot?: RunSlot, git: BranchReader = br
 export async function runsListed(e: Engine, runId?: string): Promise<RunsListed> {
   const runs = runId ? [runStore.runs.read(runId)] : runStore.runs.list();
   const listed: RunsListed['runs'] = [];
+  const reads: Read[] = [];
   if (runs.length) {
     const viewed = viewedOnce(e);
     const git = branchReader();
@@ -153,9 +158,42 @@ export async function runsListed(e: Engine, runId?: string): Promise<RunsListed>
         return unjudged;
       });
       listed.push({ run, listed: read, result: resultBranches(run) });
+      reads.push({ run, read });
     }
   }
-  return { runs: listed, daemon: daemonStanding() };
+  const cordon = readCordon();
+  const cordoned = cordon ? { cordoned: cordonedOf(cordon, reads) } : {};
+  return { runs: listed, daemon: daemonStanding(), ...cordoned };
+}
+
+/** A run, and the package's reading of it, or why it is left unjudged. */
+type Read = { run: Run; read: RunReading | Unjudged };
+
+/**
+ * The landings of `run` the cordon holds with their merge staged: an ending that lands on its check (`landsOnCheck`), whose check the
+ * cordon keeps from being filed (`cordoned.checks`), while MERGE_HEAD is in the repository's own checkout (`mergeInProgress`).
+ */
+const stagedOf = ({ run, read }: Read): CordonStaged[] => {
+  const checks = 'assessed' in read ? (read.assessed.cordoned?.checks ?? []) : [];
+  const held = stepsOf(run).filter((s) => checks.includes(s.name) && landsOnCheck(s, run));
+  return held.length && isGitRun(run) && mergeInProgress(run.repo) ? held.map((s) => ({ run: run.id, step: s.name, repo: run.repo })) : [];
+};
+
+/** The cordon, and each landing it holds with its merge staged among the runs read. */
+const cordonedOf = (cordon: Cordon, reads: readonly Read[]): Cordoned => ({ cordon, staged: reads.flatMap(stagedOf) });
+
+/**
+ * The store's cordon, as `GET /api/cordon` answers it: the cordon or null, and each landing it holds with its merge staged — read of the
+ * runs whose ending lands on its check while MERGE_HEAD is in their checkout, the one landing the cordon can leave staged.
+ */
+export async function cordonRead(e: Engine): Promise<Cordoned> {
+  const cordon = readCordon();
+  if (!cordon) return { cordon: null, staged: [] };
+  const staging = runStore.runs
+    .list()
+    .filter((run) => isGitRun(run) && stepsOf(run).some((s) => landsOnCheck(s, run)) && mergeInProgress(run.repo));
+  const viewed = viewedOnce(e);
+  return cordonedOf(cordon, await Promise.all(staging.map(async (run) => ({ run, read: await runReading(viewed, run) }))));
 }
 
 /**

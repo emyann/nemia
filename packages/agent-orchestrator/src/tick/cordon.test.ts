@@ -30,6 +30,9 @@ const { approvalFile, asksDir, readRun } = await import('../record/record.store.
 const { tick, freshRestMemo } = await import('./tick.verb.ts');
 const { engineOf } = await import('../runtime-client.ts');
 const { liftCordon, putCordon } = await import('../cordon/cordon.store.ts');
+const { cordonRead, runsListed } = await import('../list/list.verb.ts');
+const { COMMANDS } = await import('../command/commands.verb.ts');
+const { cordonLines } = await import('../cordon/cordon.ts');
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], {
@@ -46,13 +49,16 @@ const aRepo = (): string => {
   return repo;
 };
 
-/** A workflow folder of the steps given, each `after` the one before it, on codex, with the frontmatter lines `more` gives each. */
+/**
+ * A workflow folder of the steps given, each `after` the one before it, with the frontmatter lines `more` gives each: on codex, unless
+ * they name a harness.
+ */
 const folder = (steps: readonly string[], more: (name: string) => string = () => '') => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   steps.forEach((name, k) =>
     fs.writeFileSync(
       path.join(dir, `${name}.md`),
-      `---\nharness: codex\n${k ? `after: ${steps[k - 1]}\n` : ''}${more(name)}---\n${name} it\n`,
+      `---\n${more(name).includes('harness:') ? '' : 'harness: codex\n'}${k ? `after: ${steps[k - 1]}\n` : ''}${more(name)}---\n${name} it\n`,
     ),
   );
   return dir;
@@ -137,16 +143,41 @@ const taskOf = (run: Run, step: string): string | undefined => readRun(run.id).s
 const TWO = folder(['plan', 'work']);
 const ONE = folder(['work']);
 const CHECKED = folder(['work'], () => 'check: "true"\n');
+const SHIP = folder(['work', 'ship'], (name) => (name === 'ship' ? 'harness: claude\ngate: true\nworkspace: main\ncheck: "true"\n' : ''));
+const LANDS = aRepo();
+
+/** A file left in the worktree of `branch` of `repo`, for the step at work there to hand off, as a session leaves its work. */
+const worked = (repo: string, branch: string) => {
+  const lines = git(repo, 'worktree', 'list', '--porcelain').split('\n');
+  const at = lines.indexOf(`branch refs/heads/${branch}`);
+  assert.ok(at > 0, `${branch} has a worktree`);
+  fs.writeFileSync(path.join(lines[at - 2].replace(/^worktree /, ''), 'work.txt'), 'work\n');
+};
+
+/** The merge staged in `repo`'s checkout, uncommitted, as a landing's session leaves it for its check. */
+const staged = (repo: string) => {
+  git(repo, 'checkout', '-q', '-b', 'side');
+  fs.writeFileSync(path.join(repo, 'side.txt'), 'side\n');
+  git(repo, 'add', '-A');
+  git(repo, 'commit', '-q', '-m', 'side');
+  git(repo, 'checkout', '-q', '-');
+  git(repo, 'merge', '-q', '--no-ff', '--no-commit', 'side');
+};
 
 test('while the store is cordoned nothing new starts and what runs finishes; the pass after the lift files what waits', async () => {
   const running = begun(TWO);
   const checked = begun(CHECKED);
   const refused = begun(ONE);
   const gated = begun(TWO, { gates: ['plan'] });
+  const landing = begun(SHIP, { repo: LANDS, isolate: true });
   for (let k = 0; k < 6; k++) {
     await pass();
+    if (k === 0) worked(LANDS, readRun(landing.id).steps.work!.branch!);
     h.signAll([running, checked], [refused]);
   }
+  await approve(h.e, landing.id, 'ship');
+  for (let k = 0; k < 3; k++) await pass();
+  assert.ok(taskOf(landing, 'ship'), "landing's ship at work as the cordon is put");
   assert.ok(taskOf(running, 'plan') && taskOf(checked, 'work'), "running's plan and checked's work at work as the cordon is put");
   assert.ok(taskOf(gated, 'plan') && !taskOf(gated, 'work'), "gated's plan signed, its work waiting at the gate");
   assert.equal(taskOf(refused, 'work'), `${refused.id}-work`, "refused's work signed blocked, on its first try");
@@ -162,6 +193,7 @@ test('while the store is cordoned nothing new starts and what runs finishes; the
   const { card } = addToInbox({ text: 'an idea queued meanwhile', workflow: ONE, repo: REPO });
   queueInInbox(card.name);
   const before = h.spawned.length;
+  staged(LANDS);
 
   const first = await pass();
   assert.deepEqual(first.cordon, cordon, 'the pass says the cordon it read');
@@ -192,6 +224,18 @@ test('while the store is cordoned nothing new starts and what runs finishes; the
     'no record holds the cordon',
   );
 
+  const listed = await runsListed(h.e);
+  const repo = readRun(landing.id).repo!;
+  assert.deepEqual(
+    listed.cordoned,
+    { cordon, staged: [{ run: landing.id, step: 'ship', repo }] },
+    'wf ls names the cordon, and the landing whose merge it holds staged in the checkout, its check not filed',
+  );
+  assert.equal(readRun(landing.id).steps.ship?.check, undefined);
+  assert.deepEqual(await cordonRead(h.e), listed.cordoned, 'and the api reads the same');
+  const ls = COMMANDS.find((c) => c.name === 'ls')!;
+  assert.deepEqual(ls.print(listed, {}).slice(0, 2), cordonLines(listed.cordoned!), 'wf ls says it first');
+
   liftCordon();
   const lifted = await pass();
   assert.equal(lifted.cordon, undefined, 'the pass after the lift says no cordon');
@@ -201,6 +245,9 @@ test('while the store is cordoned nothing new starts and what runs finishes; the
   assert.ok(taskOf(gated, 'work'), "gated's work filed on the approval");
   assert.ok(taskOf(born, 'work'), 'the run started while cordoned filed');
   assert.ok(lifted.queue, 'the queued card tried');
+  assert.ok(readRun(landing.id).steps.ship?.check, "landing's check filed");
+  assert.equal((await runsListed(h.e)).cordoned, undefined, 'and wf ls says no cordon');
+  assert.deepEqual(await cordonRead(h.e), { cordon: null, staged: [] });
   await pass();
   assert.ok(h.spawned.length > before, 'and sessions started again');
   assert.notEqual((await h.e.view(queuedTask)).admission, 'queued', 'the queued task admitted');

@@ -11,7 +11,7 @@ import { Schema } from 'effect';
 import { wfRoot } from '../config/config.store.ts';
 import { oneLine } from '../record/record.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
-import { UNCORDON, type Cordon } from './cordon.ts';
+import { UNCORDON_LINE, type Cordon } from './cordon.ts';
 
 /** The store whose cordon this is, read once as the package loads, as `record.store.ts` reads its `HOME`. */
 const ROOT = wfRoot();
@@ -74,7 +74,7 @@ export function putCordon(said: { why?: string; by?: string }, now: Date = new D
     if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
     const stands = readCordon();
     throw new Conflict({
-      message: `the store is already cordoned${stands?.by ? ` by ${stands.by}` : ''}${stands?.at ? ` since ${stands.at}` : ''}: ${UNCORDON} lifts it first.`,
+      message: `the store is already cordoned${stands?.by ? ` by ${stands.by}` : ''}${stands?.at ? ` since ${stands.at}` : ''}: ${UNCORDON_LINE} lifts it first.`,
     });
   }
   return cordon;

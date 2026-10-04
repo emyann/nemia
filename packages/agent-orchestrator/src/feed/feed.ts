@@ -174,3 +174,7 @@ const needsNote = (c: Closeout | { error: string } | undefined): string => {
   const needs = c && !('error' in c) && c.outcome === 'blocked' && typeof c.needs === 'string' ? oneLine(c.needs, NEEDS_CAP) : '';
   return needs ? `needs: ${needs}` : '';
 };
+
+/** The refusal of a cursor `wf feed` or `wf watch` does not take: a second, or anything but a whole number of bytes. */
+export const cursorTakes = (verb: 'feed' | 'watch'): string =>
+  `wf ${verb} takes one cursor at most, a whole number of bytes — 0, or the number a \`cursor:\` line printed: wf ${verb} [cursor]`;

@@ -1,5 +1,5 @@
 /**
- * The verbs' table, and the daemon's verbs — `wf tick`, `wf up`, `wf feed` and `wf watch`.
+ * The verbs' table, the runners of the commands the CLI runs itself — `wf tick`, `wf up` and `wf watch` (`RUNS`) — and `wf feed`.
  */
 import path from 'node:path';
 import { Effect } from 'effect';
@@ -30,27 +30,26 @@ import {
   watchFeed,
   type Interval,
   type TakenStore,
-  COMMANDS,
+  cursorTakes,
   parseArgv,
+  TABLE,
+  type Args,
   type Command,
+  type Ran,
 } from '../runner.ts';
 import { HELP, usage, type Engine, type Verb } from './flags.ts';
 import { decideVerb } from './decide/decide.ts';
 import { statsVerb } from './stats/stats.ts';
 import { factoryVerb } from './factory/factory.ts';
-import { agentsCustom, cancelVerb, holdVerb, logsVerb, pruneVerb, rmVerb, showVerb } from './runs.ts';
+import { agentsCustom, logsVerb, pruneVerb, rmVerb, showVerb } from './runs.ts';
 import { inboxVerb, planVerb, startVerb } from './start.ts';
 
 /**
- * The cursor `wf feed` and `wf watch` read from: 0 when none is given, a whole number of bytes otherwise, and nothing more. Whether the
- * feed has a line starting there is the feed's to say (`feedCursorRefusal`), in its words.
+ * The cursor `wf feed` reads from: 0 when none is given, a whole number of bytes otherwise, and nothing more; `wf watch`'s entry says the
+ * same of its own. Whether the feed has a line starting there is the feed's to say (`feedCursorRefusal`), in its words.
  */
-function feedCursor(verb: 'feed' | 'watch', argv: string[]): number {
-  if (argv.length > 1 || (argv[0] !== undefined && !/^\d+$/.test(argv[0]))) {
-    usage(
-      `wf ${verb} takes one cursor at most, a whole number of bytes — 0, or the number a \`cursor:\` line printed: wf ${verb} [cursor]`,
-    );
-  }
+function feedCursor(argv: string[]): number {
+  if (argv.length > 1 || (argv[0] !== undefined && !/^\d+$/.test(argv[0]))) usage(cursorTakes('feed'));
   return argv[0] === undefined ? 0 : Number(argv[0]);
 }
 
@@ -112,10 +111,8 @@ function tickLines(pass: Pass): Pass {
  * `wf tick`: one pass, and what it did to each run; with `--stats`, what the pass cost. Beside a daemon that ticks the store it is refused,
  * with no way to force it. A queued card that names no repository starts on the one it is typed in, as `wf start` takes `.`.
  */
-export async function tickVerb(rest: string[], e: Engine): Promise<void> {
-  const stats = rest.includes('--stats');
-  const other = rest.find((a) => a !== '--stats');
-  if (other !== undefined) usage(`wf tick takes no ${other}: wf tick runs one pass, and wf tick --stats says after it what the pass cost.`);
+async function tickVerb(args: Args, e: Engine): Promise<void> {
+  const stats = args.stats === true;
   const held = storeRefusal('tick');
   if (held) throw new Conflict({ message: stats ? `${held} What its last pass cost is read without a pass: wf up --stats.` : held });
   const { cost } = tickLines(await tick(e, { repo: path.resolve('.') }));
@@ -123,13 +120,8 @@ export async function tickVerb(rest: string[], e: Engine): Promise<void> {
   return;
 }
 
-/** `wf up --stats`: what the last pass cost, read off the store, ticking nothing, and which daemon wrote it. */
-function upStats(rest: string[]): void {
-  const other = rest.find((a) => a !== '--stats');
-  if (other !== undefined)
-    usage(
-      `wf up --stats reads what the last pass cost and ticks nothing, so it takes no ${other}: wf up --stats alone, or wf up ${other} to tick.`,
-    );
+/** `wf up --stats`: what the last pass cost, read off the store, ticking nothing, and who wrote it. */
+function upStats(): void {
   const cost = lastPassCost();
   const daemon = storeRefusal('tick') !== undefined;
   if (!cost)
@@ -194,15 +186,13 @@ function passLines(pass: Pass, was: UpSaid): UpSaid {
 }
 
 /**
- * `wf up`: a pass every interval until it is stopped, or `--stats`. It refuses its interval (`everyOf`) and its ceilings (`ceilings`)
- * before it takes the store. It runs as an Effect (`runMain`): the store is taken in its scope and let go as the scope closes, however it
- * ends, so a signal that stops it leaves the store free at once. It beats on a fiber forked in that scope, so a long pass is not taken for
- * stalled and taken over mid-pass; it stops at the first pass that finds the store taken over (`stillHeld`). It says each failure once
- * while it lasts (`UpSaid`). A queued card that names no repository starts on the one it is typed in, as `wf start` takes `.`.
+ * `wf up`: the headless daemon, a pass every interval until it is stopped, or `--stats`. It refuses its interval (`everyOf`) and its
+ * ceilings (`ceilings`) before it takes the store, then runs the daemon's controller (`up`) as `wf up` under `runMain`, saying each
+ * failure once while it lasts (`UpSaid`). A queued card that names no repository starts on the one it is typed in, as `wf start` takes `.`.
  */
-export function upVerb(rest: string[], e: Engine): void | Promise<void> {
-  if (rest.includes('--stats')) return upStats(rest);
-  const asked = everyOf(rest[0]);
+function upVerb(args: Args, e: Engine): void | Promise<void> {
+  if (args.stats === true) return upStats();
+  const asked = everyOf(typeof args.every === 'string' ? args.every : undefined);
   const every = 'refusal' in asked ? usage(asked.refusal) : asked.every;
   const ceiling = ceilings();
   const store = HOME;
@@ -225,14 +215,14 @@ export function upVerb(rest: string[], e: Engine): void | Promise<void> {
 
 /** `wf feed`: the feed's lines from a cursor, and the cursor to read from next. */
 export function feedVerb(rest: string[]): void {
-  const { lines, cursor } = readFeed(feedCursor('feed', rest));
+  const { lines, cursor } = readFeed(feedCursor(rest));
   for (const line of lines) console.log(feedLineWords(line));
   return console.log(`cursor: ${cursor}`);
 }
 
 /** `wf watch`: the feed's lines as they come, from a cursor, until it is stopped (`watching`). */
-export function watchVerb(rest: string[]): void | Promise<void> {
-  const from = feedCursor('watch', rest);
+function watchVerb(args: Args): void | Promise<void> {
+  const from = typeof args.cursor === 'string' ? Number(args.cursor) : 0;
   const refusal = feedCursorRefusal(from);
   if (refusal) usage(refusal);
   return runMain(watching(from));
@@ -244,14 +234,9 @@ export const VERBS: ReadonlyMap<string, Verb> = new Map<string, Verb>([
   ['plan', planVerb],
   ['inbox', inboxVerb],
   ['factory', factoryVerb],
-  ['tick', tickVerb],
-  ['up', upVerb],
   ['feed', feedVerb],
-  ['watch', watchVerb],
-  ['cancel', cancelVerb],
   ['rm', rmVerb],
   ['prune', pruneVerb],
-  ['hold', holdVerb],
   ['decide', decideVerb],
   ['stats', statsVerb],
   ['show', showVerb],
@@ -259,22 +244,31 @@ export const VERBS: ReadonlyMap<string, Verb> = new Map<string, Verb>([
   ['agents custom', agentsCustom],
 ]);
 
+/** The runner of each command the CLI runs itself (`RAN`), by its name: handed its arguments once read and checked. */
+export const RUNS: ReadonlyMap<string, (args: Args, e: Engine) => void | Promise<void>> = new Map([
+  ['tick', tickVerb],
+  ['up', upVerb],
+  ['watch', watchVerb],
+]);
+
 /**
- * A command of the table (`COMMANDS`), run from the command line: its arguments read against its spec — the help printed for too little —
- * then refused by its `check`, handed to its handler, and the lines it prints of the answer printed.
+ * A command of the table (`TABLE`), run from the command line: its arguments read against its spec — the help printed for too little —
+ * then refused by its `check`, and handed to its runner (`RUNS`) where the CLI runs it itself; else to its handler, and the lines it prints
+ * of the answer printed.
  */
-async function commanded(command: Command, rest: string[], e: Engine): Promise<void> {
+async function commanded(command: Command | Ran, rest: string[], e: Engine): Promise<void> {
   const args = parseArgv(command.spec, rest);
   if (args === undefined) return console.log(HELP);
   const wrong = command.check?.(args);
   if (wrong) usage(wrong);
+  if (command.handler === undefined) return RUNS.get(command.name)!(args, e);
   const data = await command.handler(e, args);
   for (const line of command.print(data, args)) console.log(line);
   for (const line of command.note?.(data, args) ?? []) console.error(line);
 }
 
 /** The names `wf` takes, its commands' and its verbs', a name of two words among them: `agents card`. */
-const NAMES = [...COMMANDS.filter((c) => c.only?.side !== 'api').map((c) => c.name), ...VERBS.keys()];
+const NAMES = [...TABLE.filter((c) => c.only?.side !== 'api').map((c) => c.name), ...VERBS.keys()];
 
 /**
  * The name `argv` opens with, the longest of `NAMES` whose words it starts with, and the arguments after it — or none. A name that heads
@@ -286,7 +280,7 @@ function namedIn(argv: readonly string[]): { name: string; rest: string[] } | un
   if (name === undefined) return undefined;
   const rest = argv.slice(name.split(' ').length);
   const heads = NAMES.some((other) => other.startsWith(`${name} `));
-  const flags = COMMANDS.find((c) => c.name === name)?.spec.flags.map((f) => f.flag) ?? [];
+  const flags = TABLE.find((c) => c.name === name)?.spec.flags.map((f) => f.flag) ?? [];
   if (heads && rest[0] !== undefined && !flags.includes(rest[0].split('=')[0])) return undefined;
   return { name, rest };
 }
@@ -298,7 +292,7 @@ function namedIn(argv: readonly string[]): { name: string; rest: string[] } | un
 export async function main(argv: string[], e: Engine = engine()): Promise<void> {
   const named = namedIn(argv);
   if (named === undefined) return console.log(HELP);
-  const command = COMMANDS.find((c) => c.name === named.name && c.only?.side !== 'api');
+  const command = TABLE.find((c) => c.name === named.name && c.only?.side !== 'api');
   if (command) return commanded(command, named.rest, e);
   return VERBS.get(named.name)!(named.rest, e);
 }

@@ -3,10 +3,10 @@
  * it answers, and the lines the CLI prints of that data. The CLI parses, refuses, helps and prints from an entry, and the api serves the
  * same entry on its route; an entry served on one side alone says so (`only`). Today: a person's asks of a run — `wf retry`, `wf approve`,
  * `wf round`, `wf accept` and `wf say` — the runs and their steps (`wf ls`, `runsListed`), two reads the api alone serves: a run's
- * decision (`decideRun`) and the run slots (`slotsOf`), and the agents of both places (`wf agents`, `agentsRead`) and one agent's card
- * (`wf agents card`, `agentCardRead`).
+ * decision (`decideRun`) and the run slots (`slotsOf`), the agents of both places (`wf agents`, `agentsRead`) and one agent's card
+ * (`wf agents card`, `agentCardRead`), and a run's course (`wf cancel`, `wf hold`: `runs.verb.ts`). The whole table (`TABLE`) adds the
+ * commands the CLI serves alone and runs itself, with no handler: `wf tick`, `wf up` and `wf watch` (`RAN`).
  */
-import type { Engine } from '../runtime-client.ts';
 import { approvalWordsRefusal } from '../gate/gate.ts';
 import { approve } from '../gate/gate.verb.ts';
 import { runStore } from '../record/files.store.ts';
@@ -25,19 +25,8 @@ import { lsLines, type RunsListed } from '../list/list.ts';
 import { agentCardRead, agentsRead } from '../roster/roster.store.ts';
 import { agentsLines, cardNote, type AgentsRead, type CardRead } from '../roster/roster.ts';
 import { commandLine, type Args, type CommandSpec, type Flag } from './command.ts';
-
-/**
- * A command whole: its spec, `handler`, which calls one package verb with the arguments and answers data — never printed lines — and
- * `print`, the lines the CLI prints of that data. The api answers the data as JSON, or only its `apiKeys` where the CLI prints more of
- * it than the api answers. A handler reads its settings (`WF_MAX_RUNS`) from `env`, and a person's own files from the store `home`: the
- * process's own at the command line, the app's on the api. `note` is what the CLI says of the data on stderr, beside what it prints.
- */
-export type Command<D extends object = Readonly<Record<string, unknown>>> = CommandSpec & {
-  handler(e: Engine, args: Args, env?: NodeJS.ProcessEnv, home?: string): Promise<D>;
-  print(data: D, args: Args): readonly string[];
-  note?(data: D, args: Args): readonly string[];
-  readonly apiKeys?: readonly (keyof D & string)[];
-};
+import type { Command, Ran } from './entry.verb.ts';
+import { CANCEL, HOLD, RAN } from './runs.verb.ts';
 
 /** The text under `key`, or undefined where none was given. */
 const textOf = (args: Args, key: string): string | undefined => {
@@ -467,5 +456,8 @@ const AGENT_CARD: Command<CardRead> = {
   note: (data, args) => cardNote(data, textOf(args, 'name') ?? ''),
 };
 
-/** Every command defined once, in the order `wf`'s help lists them. */
-export const COMMANDS: readonly Command[] = [RETRY, APPROVE, ROUND, ACCEPT, SAY, LS, DECIDE, CEILINGS, AGENTS, AGENT_CARD];
+/** Every command with a handler defined once, in the order `wf`'s help lists them: what the api may serve. */
+export const COMMANDS: readonly Command[] = [RETRY, APPROVE, ROUND, ACCEPT, SAY, LS, DECIDE, CEILINGS, AGENTS, AGENT_CARD, CANCEL, HOLD];
+
+/** The whole table: every command with a handler, then those the CLI runs itself (`RAN`), in the order `wf`'s help lists them. */
+export const TABLE: readonly (Command | Ran)[] = [...COMMANDS, ...RAN];

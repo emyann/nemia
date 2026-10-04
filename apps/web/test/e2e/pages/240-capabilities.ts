@@ -1,4 +1,4 @@
-import { sidebar } from '../board.ts';
+import { railOf, sidebar } from '../board.ts';
 import { expectCount, expectVisible } from '../checks.ts';
 import { CHECKOUT, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -14,8 +14,8 @@ export default {
   expect: async (page) => {
     await sidebar(page);
     await expectVisible(
-      page.locator('[data-sidebar="sidebar"] a[data-active="true"]', { hasText: 'Capabilities' }),
-      'the sidebar lights Capabilities on its page',
+      railOf(page).locator('a[data-active="true"][aria-label="Capabilities"]'),
+      'the rail lights Capabilities on its page',
     );
     const { skill, bareSkill, agent, server, missing, denied, asked } = CHECKOUT;
     const section = (title: string) => page.locator(`section[aria-label="${title}"]`);

@@ -3,7 +3,7 @@
  * person's yes.
  */
 import readline from 'node:readline/promises';
-import { COMMANDS, Invalid, helpOf, type engine } from '../runner.ts';
+import { Invalid, TABLE, helpOf, type engine } from '../runner.ts';
 
 /** The engine the verbs talk to: the board under `WF_ROOT`, unless a test hands one of its own. */
 export type Engine = ReturnType<typeof engine>;
@@ -65,19 +65,6 @@ export const HELP = `wf — run a workflow of agent steps
   wf factory fire <factory> --step <workflow>/<step>
                                take a step's hire back
   wf factory rm <name>         remove a factory's file
-  wf tick [--stats]            one pass: tick the engine, file what became ready — refused while a
-                               daemon ticks the store, since it runs the same pass (daemon.json);
-                               --stats says after it what the pass cost, phase by phase
-  wf up [ms]                   the headless daemon: the same, on a timer (4000 unless given; whole
-                               ms, 1 to 2147483647), where no board is served. The api's process
-                               (npm start in apps/api) is the daemon where one is: one store takes
-                               one, and each is refused while the other ticks. It takes the store
-                               over once its holder's process is gone or it has been silent for
-                               10 intervals, at least 15 minutes; it writes WF_ROOT/daemon.json —
-                               who holds it, pid, start, last pass, and a beat each interval;
-                               once a minute, a line of what its passes cost (tick-stats.json)
-  wf up --stats                what the last pass cost, phase by phase — read, not run, so it fits
-                               while a daemon holds the store; where none does, wf tick --stats
   wf stats [--from <day>] [--to <day>] [--by agent|step|factory|workflow|repo] [--agent|--step|--factory|--workflow|--repo <v>] [--line|--json]
                                what every run in the store adds up to, by UTC day: rounds to
                                acceptance of each loop: step, landings of the workspace: main step
@@ -88,8 +75,6 @@ export const HELP = `wf — run a workflow of agent steps
   wf feed [cursor]             what the tick judged, a line each time it changed: a run's status, a
                                step's word as wf ls says it, and what a person's word changed — then
                                cursor: <n>, to read on from with wf feed <n>; from the start with none
-  wf watch [cursor]            the same, followed as the tick writes it, until ^C
-  wf cancel <runId>            stop what it has in flight; file nothing more
   wf rm <runId> [<runId> ...] [--delete-branches [--force-unmerged]]
                                forget runs that are over, a line each: a run's worktrees removed
                                through git, what one held uncommitted committed first, then its
@@ -111,20 +96,9 @@ export const HELP = `wf — run a workflow of agent steps
                                a worktree locked, on no branch, or with changes no commit has;
                                and a finished run not merged unless --unmerged, with --artifacts
                                as without: its files are what a person reads to decide it
-  wf hold <runId> --until <runId> [--until <runId> ...] [--why "<words>"] [--by <name>]
-                               file nothing more of a run until other runs ship, as --after would
-                               have: what is in flight finishes, nothing new is filed, and nothing
-                               is asked of you — wf ls and wf decide say held until <run> ships, and
-                               what a step asks is asked once the hold lifts. The tick lifts it when
-                               every run named has shipped. Refused of a run cancelled, pruned,
-                               finished or already held, and of a run named that is unknown, the run
-                               itself, or one that already waits on it, through --after or a hold.
-                               --why: the reason, shown beside held until <run> ships wherever it is
-                               said; --by: who puts the hold (default: your OS user)
-  wf hold <runId> --off        lift the hold now: the next tick goes on as if it had never been put
   wf decide <runId> [--sensitive <globs>]
                                what the run produced, and the choice it leaves you (wf decide --help)
-${helpOf(COMMANDS)}
+${helpOf(TABLE)}
   wf show <runId>              the run, and what each step was told
   wf logs <runId> <step>       that step's session output
   wf agents custom <name> [--file <path>|-] [--clear] [--repo .]

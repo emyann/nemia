@@ -23,7 +23,7 @@ const ROOT = scratch('wf-run-store-');
 process.env.WF_ROOT = ROOT;
 const { filesStore } = await import('../src/record/files.store.ts');
 const { mayFileOf } = await import('../src/tick/file.verb.ts');
-const { liftCordon, putCordon } = await import('../src/cordon/cordon.store.ts');
+const { resumePause, putPause } = await import('../src/pause/pause.store.ts');
 const {
   acceptFile,
   acceptanceIn,
@@ -136,35 +136,35 @@ test('a held run is called off', () => {
   assert.equal(filesStore.runs.calledOff(run.id), true);
 });
 
-test('every run is called off while the store is cordoned, and none once the cordon is lifted', () => {
-  const run = made('r-cordoned');
-  putCordon({ by: 'ann' });
+test('every run is called off while the store is paused, and none once the pause is lifted', () => {
+  const run = made('r-paused');
+  putPause({ by: 'ann' });
   try {
     assert.equal(filesStore.runs.calledOff(run.id), true);
   } finally {
-    liftCordon();
+    resumePause();
   }
   assert.equal(filesStore.runs.calledOff(run.id), false);
 });
 
-test("the store's cordon is composed onto every run read and listed, and written back into none", () => {
-  const run = made('r-cordon-read');
-  const cordon = putCordon({ why: 'merging by hand', by: 'ann' });
+test("the store's pause is composed onto every run read and listed, and written back into none", () => {
+  const run = made('r-pause-read');
+  const pause = putPause({ why: 'merging by hand', by: 'ann' });
   try {
     const read = filesStore.runs.read(run.id);
-    assert.deepEqual(read.cordon, cordon);
-    assert.deepEqual(filesStore.runs.list().find((r) => r.id === run.id)?.cordon, cordon);
+    assert.deepEqual(read.pause, pause);
+    assert.deepEqual(filesStore.runs.list().find((r) => r.id === run.id)?.pause, pause);
     assert.deepEqual(
-      filesStore.runs.list(undefined, (id) => (id === run.id ? run : undefined)).find((r) => r.id === run.id)?.cordon,
-      cordon,
-      'a run the memo kept is read with the cordon as it stands',
+      filesStore.runs.list(undefined, (id) => (id === run.id ? run : undefined)).find((r) => r.id === run.id)?.pause,
+      pause,
+      'a run the memo kept is read with the pause as it stands',
     );
     assert.equal(filesStore.runs.rewrite(read), true);
-    assert.equal('cordon' in JSON.parse(fs.readFileSync(runFile(run.id), 'utf8')), false, 'the cordon is written into the record');
+    assert.equal('pause' in JSON.parse(fs.readFileSync(runFile(run.id), 'utf8')), false, 'the pause is written into the record');
   } finally {
-    liftCordon();
+    resumePause();
   }
-  assert.equal('cordon' in filesStore.runs.read(run.id), false, 'lifted, no run reads it');
+  assert.equal('pause' in filesStore.runs.read(run.id), false, 'lifted, no run reads it');
 });
 
 test('a pruned run is called off', () => {

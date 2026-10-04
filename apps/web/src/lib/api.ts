@@ -42,4 +42,4 @@ export * from './api/machines.ts';
 export * from './api/factories.ts';
 export type * from './api/stats.ts';
 export { statsKeysQuery, statsQuery } from './api/stats.ts';
-export * from './api/cordon.ts';
+export * from './api/pause.ts';

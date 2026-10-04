@@ -281,8 +281,8 @@ export const removeHold = (id: string, at: string): boolean => {
 /**
  * A run: its record, with what people own beside it composed on read — the cancellation (`cancelFile`), its pruning (`pruneFile`), its hold
  * (`holdFile`), each approval at a gate (`readApprovals`), and each loop a person ended as it stands (`readAcceptances`). None of them is
- * ever written into the record (`rewriteRun`), and whatever the record carries under their keys is dropped, the store's cordon's
- * (`cordon`, which `runStore` composes) with them. Counted as one record read (`countRecord`) under `records` while a pass is metered.
+ * ever written into the record (`rewriteRun`), and whatever the record carries under their keys is dropped, the store's pause's
+ * (`pause`, which `runStore` composes) with them. Counted as one record read (`countRecord`) under `records` while a pass is metered.
  *
  * The frozen steps are read under the names their keys have now (`asNamed`), and written back under them (`recordText`), in their place
  * among the record's keys, so a record read and written back moves no line. Refused: an id with no record, as `no such run` naming
@@ -302,7 +302,7 @@ const readRecord = (id: string): Run => {
   }
   if (!isRunRecord(raw)) throw new UnreadableRecord(id, recordRefusal(raw));
   const read = { ...raw };
-  for (const key of ['approvals', 'acceptances', 'pruned', 'hold', 'cordon']) delete read[key];
+  for (const key of ['approvals', 'acceptances', 'pruned', 'hold', 'pause', 'cordon']) delete read[key];
   const { workflow, ...unfrozen } = read;
   const run = workflow ? { ...read, workflow: workflow.map(asNamed) } : unfrozen;
   const at = fs.existsSync(cancelFile(id)) ? readText(cancelFile(id)).trim() : '';
@@ -748,10 +748,10 @@ export const restStamps = (): Map<string, string> =>
   });
 
 /** A record as it is written, by both writers: its frozen steps under the names their keys have now. */
-const recordText = (run: Omit<Run, 'approvals' | 'acceptances' | 'pruned' | 'hold' | 'cordon'>): string => JSON.stringify(run, null, 2);
+const recordText = (run: Omit<Run, 'approvals' | 'acceptances' | 'pruned' | 'hold' | 'pause'>): string => JSON.stringify(run, null, 2);
 
-/** A new run's record: `start`'s, and the one writer that makes one. Without the store's cordon, a person's file. */
-export const writeRun = ({ cordon: _, ...run }: Run) => {
+/** A new run's record: `start`'s, and the one writer that makes one. Without the store's pause, a person's file. */
+export const writeRun = ({ pause: _, ...run }: Run) => {
   fs.mkdirSync(runsDir(), { recursive: true });
   fs.writeFileSync(runFile(run.id), recordText(run));
 };
@@ -764,12 +764,12 @@ export const writeRun = ({ cordon: _, ...run }: Run) => {
  * `r+`, which never makes a file. Its existence is read at the moment of writing, and nothing is carried to decide it; a record removed
  * after it is opened takes the write with it.
  *
- * Without the approvals, acceptances, pruning and hold `readRun` composed onto it, nor the cordon `runStore` did: they are a person's
+ * Without the approvals, acceptances, pruning and hold `readRun` composed onto it, nor the pause `runStore` did: they are a person's
  * files, and a copy in the record would outlive the file it was read from.
  */
 export const rewriteRun = (run: Run): boolean => within('act', () => rewriteNow(run));
 
-const rewriteNow = ({ approvals: _, acceptances: __, pruned: ___, hold: ____, cordon: _____, ...run }: Run): boolean => {
+const rewriteNow = ({ approvals: _, acceptances: __, pruned: ___, hold: ____, pause: _____, ...run }: Run): boolean => {
   let fd: number;
   try {
     fd = fs.openSync(runFile(run.id), 'r+');

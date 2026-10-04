@@ -33,9 +33,9 @@ test('each command is served on the api where it was before the table, the lift 
       ['hold', { method: 'DELETE', path: '/api/runs/:runId/hold', status: 200, sets: { off: true } }],
       ['rm', { method: 'DELETE', path: '/api/runs/:runId', status: 200 }],
       ['prune', { method: 'POST', path: '/api/runs/:runId/prune', status: 200, sets: { yes: true } }],
-      ['cordon', { method: 'POST', path: '/api/cordon', status: 200 }],
-      ['uncordon', { method: 'DELETE', path: '/api/cordon', status: 200 }],
-      ['cordoned', { method: 'GET', path: '/api/cordon', status: 200 }],
+      ['pause', { method: 'POST', path: '/api/pause', status: 200 }],
+      ['resume', { method: 'DELETE', path: '/api/pause', status: 200 }],
+      ['paused', { method: 'GET', path: '/api/pause', status: 200 }],
       ['tick', 'cli'],
       ['up', 'cli'],
       ['watch', 'cli'],
@@ -46,7 +46,7 @@ test('each command is served on the api where it was before the table, the lift 
 test('every command the api posts or deletes on writes, and the api guards it; the reads write nothing', () => {
   assert.deepEqual(
     TABLE.filter((c) => !c.writes).map((c) => c.name),
-    ['ls', 'show', 'logs', 'feed', 'stats', 'decide', 'ceilings', 'agents', 'agents card', 'cordoned', 'watch'],
+    ['ls', 'show', 'logs', 'feed', 'stats', 'decide', 'ceilings', 'agents', 'agents card', 'paused', 'watch'],
   );
   assert.deepEqual(
     TABLE.filter((c) => c.route && c.writes !== (c.route.method !== 'GET')).map((c) => c.name),

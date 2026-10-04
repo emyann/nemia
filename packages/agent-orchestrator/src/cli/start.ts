@@ -7,7 +7,7 @@ import {
   addToInbox,
   approvedFirst,
   cardToStart,
-  cordonWords,
+  pauseWords,
   dropFromInbox,
   endingSteps,
   formerKeyLines,
@@ -24,7 +24,7 @@ import {
   planLines,
   planStopped,
   queueInInbox,
-  readCordon,
+  readPause,
   readInbox,
   repoFor,
   start,
@@ -294,7 +294,7 @@ function gateLines(run: ReturnType<typeof start>, steps: ReturnType<typeof steps
 
 /**
  * What `wf start` prints of a run it started: its steps, where it came from when said, its factory, the folders it mounts, where it works,
- * and what it waits on and ends at; and, while the store is cordoned, that nothing of it is filed until the lift.
+ * and what it waits on and ends at; and, while the store is paused, that nothing of it is filed until the lift.
  */
 function printStarted(run: ReturnType<typeof start>, from?: string): void {
   const steps = stepsOf(run);
@@ -308,8 +308,8 @@ function printStarted(run: ReturnType<typeof start>, from?: string): void {
     console.log(`waits on: ${run.after.join(', ')} — nothing is filed until wf decide says each has shipped onto ${run.branch}`);
   for (const line of gateLines(run, steps)) console.log(line);
   console.log(`run 'wf tick' (or 'wf up') to start it`);
-  const cordon = readCordon();
-  if (cordon) console.log(`${cordonWords(cordon)}: nothing of this run is filed until then`);
+  const pause = readPause();
+  if (pause) console.log(`${pauseWords(pause)}: nothing of this run is filed until then`);
   for (const line of formerKeyLines(run.workflowDir)) console.log(line);
 }
 

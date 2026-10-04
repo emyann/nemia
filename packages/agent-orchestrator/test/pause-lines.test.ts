@@ -1,6 +1,6 @@
 /**
- * The store's cordon as the CLI says it: first on `wf feed`, after how to start the run on `wf start`, and on `wf up` once when it is
- * put, again when it changes, and `uncordoned` once when it is lifted (`cordonSaid`); none of them while no cordon stands.
+ * The store's pause as the CLI says it: first on `wf feed`, after how to start the run on `wf start`, and on `wf up` once when it is
+ * put, again when it changes, and `resumed` once when it is lifted (`pauseSaid`); none of them while no pause stands.
  *
  * `WF_ROOT` is set before the import, since the module reads it as it loads.
  */
@@ -12,12 +12,12 @@ import { execFileSync } from 'node:child_process';
 import type { Engine } from 'agent-runtime';
 import { scratch } from './scratch.ts';
 
-const ROOT = scratch('wf-cordon-lines-');
+const ROOT = scratch('wf-pause-lines-');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
-const { main, cordonSaid } = await import('../src/cli/main.ts');
-const { liftCordon, putCordon } = await import('../src/cordon/cordon.store.ts');
-const { cordonWords, UNCORDONED } = await import('../src/cordon/cordon.ts');
+const { main, pauseSaid } = await import('../src/cli/main.ts');
+const { resumePause, putPause } = await import('../src/pause/pause.store.ts');
+const { pauseWords, RESUMED } = await import('../src/pause/pause.ts');
 const { addFactory, attachWorkflow, hireAgent } = await import('../src/runner.ts');
 
 /** What `fn` printed on stdout, line by line. */
@@ -53,36 +53,36 @@ const aStart = (): string[] => {
   addFactory({ name: factory, repos: [repo] });
   attachWorkflow({ factory, workflow: 'lines' });
   hireAgent({ factory, agent: 'worker', step: 'lines/work' });
-  return ['start', 'a cordoned start', '--workflows', dir, '--repo', repo, '--factory', factory, '--no-worktree'];
+  return ['start', 'a paused start', '--workflows', dir, '--repo', repo, '--factory', factory, '--no-worktree'];
 };
 
-test('wf feed opens with the cordon while one stands, and says none once it is lifted', async (t) => {
-  const cordon = putCordon({ why: 'merging by hand', by: 'ann' });
+test('wf feed opens with the pause while one stands, and says none once it is lifted', async (t) => {
+  const pause = putPause({ why: 'merging by hand', by: 'ann' });
   try {
     const feed = await printed(t, () => main(['feed'], {} as Engine));
-    assert.equal(feed[0], cordonWords(cordon), feed.join('\n'));
+    assert.equal(feed[0], pauseWords(pause), feed.join('\n'));
   } finally {
-    liftCordon();
+    resumePause();
   }
   const lifted = await printed(t, () => main(['feed'], {} as Engine));
   assert.equal(
-    lifted.some((l) => l.startsWith('the store is cordoned')),
+    lifted.some((l) => l.startsWith('the store is paused')),
     false,
     lifted.join('\n'),
   );
 });
 
-test('wf start says, after how to start the run, that nothing of it is filed until the lift, and nothing of a cordon with none', async (t) => {
-  const cordon = putCordon({ by: 'ann' });
+test('wf start says, after how to start the run, that nothing of it is filed until the lift, and nothing of a pause with none', async (t) => {
+  const pause = putPause({ by: 'ann' });
   let started: string[];
   try {
     started = await printed(t, () => main(aStart(), {} as Engine));
   } finally {
-    liftCordon();
+    resumePause();
   }
   const at = started.indexOf("run 'wf tick' (or 'wf up') to start it");
   assert.ok(at > 0, started.join('\n'));
-  assert.equal(started[at + 1], `${cordonWords(cordon)}: nothing of this run is filed until then`);
+  assert.equal(started[at + 1], `${pauseWords(pause)}: nothing of this run is filed until then`);
   const free = await printed(t, () => main(aStart(), {} as Engine));
   assert.equal(
     free.some((l) => l.includes('nothing of this run is filed')),
@@ -91,15 +91,15 @@ test('wf start says, after how to start the run, that nothing of it is filed unt
   );
 });
 
-test('wf up says the cordon once across passes, again when it changes, and uncordoned once when it is lifted', async (t) => {
+test('wf up says the pause once across passes, again when it changes, and resumed once when it is lifted', async (t) => {
   const first = { at: '2026-10-04T12:00:00.000Z', by: 'ann', why: 'merging by hand' };
   const second = { ...first, by: 'bob' };
   let said: string | undefined;
   const lines = await printed(t, () => {
-    for (const cordon of [undefined, first, first, second, second, undefined, undefined]) said = cordonSaid(cordon, said);
+    for (const pause of [undefined, first, first, second, second, undefined, undefined]) said = pauseSaid(pause, said);
   });
   assert.deepEqual(
     lines.map((l) => l.slice(10)),
-    [cordonWords(first), cordonWords(second), UNCORDONED],
+    [pauseWords(first), pauseWords(second), RESUMED],
   );
 });

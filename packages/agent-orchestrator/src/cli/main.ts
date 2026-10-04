@@ -9,8 +9,8 @@ import {
   ceilingLines,
   ceilings,
   Conflict,
-  cordonWords,
-  UNCORDONED,
+  pauseWords,
+  RESUMED,
   engine,
   everyOf,
   feedCursorRefusal,
@@ -86,12 +86,12 @@ function tickRunLines(r: Pass['runs'][number]): void {
 }
 
 /**
- * A pass's lines on `wf tick`: the cordon it read, what failed or was left out on stderr, then what it refused, the queue's card and each
+ * A pass's lines on `wf tick`: the pause it read, what failed or was left out on stderr, then what it refused, the queue's card and each
  * run; returns it.
  */
 function tickLines(pass: Pass): Pass {
-  const { runs: results, queue, feedError, refused, unreadable, cordon } = pass;
-  if (cordon) console.log(cordonWords(cordon));
+  const { runs: results, queue, feedError, refused, unreadable, pause } = pass;
+  if (pause) console.log(pauseWords(pause));
   if (feedError) console.error(feedError);
   for (const why of unreadable ?? []) console.error(`left out: ${why}`);
   for (const line of refusalLines(refused ?? [], new Set()).lines) console.log(line);
@@ -132,12 +132,12 @@ function upStats(): void {
 
 /**
  * What `wf up` has said while it lasts, so it says each failure once: a queued card's start (`said`), the feed's (`feedSaid`), a move the
- * lifecycle refused (`refusedSaid`), a journal left out (`unreadableSaid`); the store's cordon (`cordonSaid`), said once put and once
+ * lifecycle refused (`refusedSaid`), a journal left out (`unreadableSaid`); the store's pause (`pauseSaid`), said once put and once
  * lifted; and the passes its next summary counts (`interval`).
  */
 type UpSaid = {
   said: string | undefined;
-  cordonSaid: string | undefined;
+  pauseSaid: string | undefined;
   feedSaid: string | undefined;
   refusedSaid: ReadonlySet<string>;
   unreadableSaid: ReadonlySet<string>;
@@ -162,17 +162,17 @@ function advancedLines(advanced: Pass['runs']): void {
   }
 }
 
-/** The store's cordon on `wf up`, once when it is put or changed and once when it is lifted; returns the cordon it said, if any. */
-export function cordonSaid(cordon: Pass['cordon'], said: string | undefined): string | undefined {
-  const now = cordon ? cordonWords(cordon) : undefined;
-  if (now !== said) console.log(`${new Date().toISOString().slice(11, 19)}  ${now ?? UNCORDONED}`);
+/** The store's pause on `wf up`, once when it is put or changed and once when it is lifted; returns the pause it said, if any. */
+export function pauseSaid(pause: Pass['pause'], said: string | undefined): string | undefined {
+  const now = pause ? pauseWords(pause) : undefined;
+  if (now !== said) console.log(`${new Date().toISOString().slice(11, 19)}  ${now ?? RESUMED}`);
   return now;
 }
 
 /** One pass's lines on `wf up`, going by what it has printed (`was`), not by the store; returns what it has printed now. */
 function passLines(pass: Pass, was: UpSaid): UpSaid {
   const { runs: advanced, queue, feedError, cost, refused, unreadable } = pass;
-  const cordoned = cordonSaid(pass.cordon, was.cordonSaid);
+  const paused = pauseSaid(pass.pause, was.pauseSaid);
   let interval = was.interval;
   if (cost) interval = addPass(interval, cost, Date.now());
   if (summaryDue(interval, Date.now())) {
@@ -186,7 +186,7 @@ function passLines(pass: Pass, was: UpSaid): UpSaid {
     if (!was.unreadableSaid.has(why)) console.error(`${new Date().toISOString().slice(11, 19)}  left out: ${why}`);
   const said = queue ? queueSaid(queue, was.said) : was.said;
   advancedLines(advanced);
-  return { said, cordonSaid: cordoned, feedSaid: feedError, refusedSaid: stalled.said, unreadableSaid: new Set(unreadable), interval };
+  return { said, pauseSaid: paused, feedSaid: feedError, refusedSaid: stalled.said, unreadableSaid: new Set(unreadable), interval };
 }
 
 /**
@@ -202,7 +202,7 @@ function upVerb(args: Args, e: Engine): void | Promise<void> {
   const store = HOME;
   let was: UpSaid = {
     said: undefined,
-    cordonSaid: undefined,
+    pauseSaid: undefined,
     feedSaid: undefined,
     refusedSaid: new Set(),
     unreadableSaid: new Set(),

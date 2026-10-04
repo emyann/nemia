@@ -11,8 +11,8 @@ import { EngineService, awaited, refusedText, tried, unreadableJournal, type Eng
 import type { QueueStarted } from '../inbox/inbox.ts';
 import { tipsSeen } from '../branches/branches.ts';
 import { admissionOrder, slotFree, type RunSlot } from '../cap/cap.ts';
-import { readCordon } from '../cordon/cordon.store.ts';
-import type { Cordon } from '../cordon/cordon.ts';
+import { readPause } from '../pause/pause.store.ts';
+import type { Pause } from '../pause/pause.ts';
 import { isGitRun, type Run } from '../record/record.ts';
 import { hasStarted } from '../wait/wait.ts';
 import { runStore } from '../record/files.store.ts';
@@ -59,10 +59,10 @@ export type Pass = {
    */
   unreadable?: string[];
   /**
-   * The store's cordon as the pass read it (`readCordon`), while one stands: the pass admitted no queued task and started no queued card,
-   * and filed nothing new of any run (`assess`). Absent while the store is not cordoned.
+   * The store's pause as the pass read it (`readPause`), while one stands: the pass admitted no queued task and started no queued card,
+   * and filed nothing new of any run (`assess`). Absent while the store is not paused.
    */
-  cordon?: Cordon;
+  pause?: Pause;
 };
 
 /**
@@ -152,9 +152,9 @@ export const tick = (e: Engine, options: { repo?: string; memo?: RestMemo; verif
  * - the runs are listed, each run the memo holds whose stamp has not moved answered with the memo's run, its record not read (`keptOf`):
  *   the one listing of the pass, handed to every run judged for the claims on a repository's checkout, and to the queue.
  * - the ceilings the pass runs with are written (`recordCeilings`), for `wf ls` and `wf decide`, which judge the cap from a shell of their
- *   own; the runtime's pass admitted no queued task while the store was cordoned (`engine()`'s `unschedulable`).
+ *   own; the runtime's pass admitted no queued task while the store was paused (`engine()`'s `unschedulable`).
  * - every run that has started is judged, finished ones included (`advanceResting`); then each run with nothing filed, oldest first, with
- *   its slot (`waitingJudged`); then one queued card, while a slot is free and the store is not cordoned, read again.
+ *   its slot (`waitingJudged`); then one queued card, while a slot is free and the store is not paused, read again.
  * - last, and apart, the feed is written where it changed: a feed that cannot be written costs the report (`feedError`), never the pass.
  *
  * A run a read of whose task journal is refused (`unreadableJournal`) is left unjudged, out of the feed's `removed` and counted in
@@ -168,15 +168,15 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }
   yield* tried(() => within('act', () => recordCeilings(ran)));
   const runs = yield* tried(() => runStore.runs.list(undefined, resting && keptOf(resting)));
   if (resting) forgotten(memo, runs);
-  const cordon = yield* tried(() => readCordon());
+  const pause = yield* tried(() => readPause());
   const judging: Judging = { done: new Map(), unjudged: new Map() };
   for (const run of runs.filter(hasStarted)) yield* judged(e, judging, runs, run, resting);
   const counted = yield* waitingJudged(e, judging, runs, resting, ran.runs);
   const queue =
-    slotFree({ inFlight: counted, cap: ran.runs }) && !(yield* tried(() => readCordon()))
+    slotFree({ inFlight: counted, cap: ran.runs }) && !(yield* tried(() => readPause()))
       ? yield* tried(() => within('act', () => startQueued(repo, runs)))
       : undefined;
-  return { ...passOf(report, runs, judging, queue), ...(cordon ? { cordon } : {}) };
+  return { ...passOf(report, runs, judging, queue), ...(pause ? { pause } : {}) };
 });
 
 /** What a pass has judged so far: each run it advanced, and each run it left unjudged with the runtime's words for why. */

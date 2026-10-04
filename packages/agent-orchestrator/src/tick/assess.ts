@@ -60,11 +60,11 @@ export type Assessment = {
    */
   heldUntil?: string[];
   /**
-   * What the store's cordon (`Run.cordon`) holds back on this pass: every step whose session, try, round or check the pass would file, by
+   * What the store's pause (`Run.pause`) holds back on this pass: every step whose session, try, round or check the pass would file, by
    * name (`steps`), and the steps among them whose check is what waits (`checks`). Nothing of them is filed, and the run counts against the
-   * cap on runs in flight for them, as for `held`. Absent while the store is not cordoned, and on a run the cordon holds nothing of.
+   * cap on runs in flight for them, as for `held`. Absent while the store is not paused, and on a run the pause holds nothing of.
    */
-  cordoned?: { steps: string[]; checks: string[] };
+  paused?: { steps: string[]; checks: string[] };
 };
 
 /**
@@ -82,8 +82,8 @@ export type Assessment = {
  *   still counts against the cap on runs in flight.
  * - An ending held at its gate on work this pass files again (`unheld`) is `waiting`: its gate holds on what that work says.
  * - A check already filed is never filed twice; a step that waits on one final without satisfying `after` is `blocked`, never left to hang.
- * - While the store is cordoned (`Run.cordon`) nothing is due — no step, check, try or round, nor one the checkout holds — and what would
- *   be goes to `cordoned`; a person's asks are honoured as for any run, so a step asked for again is `running`, and its ask waits on its
+ * - While the store is paused (`Run.pause`) nothing is due — no step, check, try or round, nor one the checkout holds — and what would
+ *   be goes to `paused`; a person's asks are honoured as for any run, so a step asked for again is `running`, and its ask waits on its
  *   file for the lift. What a person decides (`toDecide`, `stoppedOn`) is still asked: a word given is kept for the next pass.
  *
  * @param closeoutOf How each step signed off, when it left a closeout: a session that ends cleanly can still say `outcome: "blocked"`,
@@ -166,16 +166,16 @@ export function assess(
     ...(stoppedOn ? { stoppedOn } : {}),
     ...(decide ? { toDecide: decide } : {}),
   };
-  return underCordon(run, assessed);
+  return underPause(run, assessed);
 }
 
-/** The assessment as the store's cordon leaves it (`Run.cordon`): nothing due, and what was due named in `cordoned`. Pure. */
-function underCordon(run: Run, a: Assessment): Assessment {
-  if (!run.cordon) return a;
+/** The assessment as the store's pause leaves it (`Run.pause`): nothing due, and what was due named in `paused`. Pure. */
+function underPause(run: Run, a: Assessment): Assessment {
+  if (!run.pause) return a;
   const steps = [...new Set([...a.ready, ...a.check, ...a.retry.map((r) => r.step), ...a.round.map((r) => r.step), ...a.held])];
   const checks = [...new Set([...a.check, ...a.retry.filter((r) => r.mode === 'recheck').map((r) => r.step)])];
-  const cordoned = steps.length ? { cordoned: { steps, checks } } : {};
-  return { ...a, ready: [], check: [], retry: [], round: [], held: [], ...cordoned };
+  const paused = steps.length ? { paused: { steps, checks } } : {};
+  return { ...a, ready: [], check: [], retry: [], round: [], held: [], ...paused };
 }
 
 /**

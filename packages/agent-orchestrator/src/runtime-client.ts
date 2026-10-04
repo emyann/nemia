@@ -30,7 +30,7 @@ import {
 import { envNameOf, readRemoteAgents, remoteAgentsFile } from './harness/a2a.store.ts';
 import { HOME } from './record/record.store.ts';
 import { maxConcurrent } from './config/config.store.ts';
-import { cordonFile } from './cordon/cordon.store.ts';
+import { pauseFile } from './pause/pause.store.ts';
 import { REMOTE_PREFIX, remoteNameOf } from './harness/harness.ts';
 import { Invalid, isRefusal, type Refusal } from './refusal/refusal.ts';
 
@@ -84,7 +84,7 @@ export const HARNESSES = {
  * The engine the controllers use. Every filing goes out `queued`, and the runtime admits it per pool under the ceiling handed to it here,
  * `maxConcurrent` from `WF_MAX_CONCURRENT` (`maxConcurrent` in `config.store.ts`), the filed `priority` first. A value the variable
  * refuses gives the engine no ceiling, so nothing is admitted: the tick refuses its pass on the same read (`ceilings`), so the daemon
- * says why, and every other command works on. While the store is cordoned the engine is `unschedulable`, asked on every pass, so no
+ * says why, and every other command works on. While the store is paused the engine is `unschedulable`, asked on every pass, so no
  * queued task is admitted, whichever process ticks the store.
  *
  * Its `a2a:<name>` harnesses are what the store's `a2a-agents.json` declares and the runtime takes (`readRemote`). A file refused as it
@@ -144,11 +144,11 @@ export const awaited = <A>(read: () => Promise<A>): Effect.Effect<A, Refusal> =>
 
 /**
  * What the store's engine admits under, as `engine()` hands it to the runtime: its ceiling (`ceilingOf`), and `unschedulable`, asked by
- * the runtime's pass before it admits, true while the store's cordon's file is there (`cordonFile`), whatever it holds, as `readCordon`
- * reads a file that is there as a cordon.
+ * the runtime's pass before it admits, true while the store's pause's file is there (`pauseFile`), whatever it holds, as `readPause`
+ * reads a file that is there as a pause.
  */
 export const storeAdmission = (): { maxConcurrent?: number; unschedulable: () => boolean } => ({
-  unschedulable: () => fs.existsSync(cordonFile()),
+  unschedulable: () => fs.existsSync(pauseFile()),
   ...ceilingOf(),
 });
 

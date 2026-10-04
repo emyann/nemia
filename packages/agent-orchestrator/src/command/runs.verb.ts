@@ -1,7 +1,7 @@
 /**
  * The commands over a run's course and the store's tick, each defined once: `wf cancel`, `wf hold`, `wf rm` and `wf prune`, whose
  * handlers call the package's verbs (`cancel`, `hold`, `unhold`, `forget`, `prune`) on one run — the CLI's runners walk the many runs
- * `wf rm` and `wf prune` take — the store's cordon (`wf cordon`, `wf uncordon`, and the api's read of it), and `wf tick`, `wf up` and
+ * `wf rm` and `wf prune` take — the store's pause (`wf pause`, `wf resume`, and the api's read of it), and `wf tick`, `wf up` and
  * `wf watch`, which the CLI alone serves and runs itself (`RAN`): their specs, refusals and help, with no handler.
  */
 import { cancel } from '../cancel/cancel.verb.ts';
@@ -16,9 +16,9 @@ import { Conflict, Missing } from '../refusal/refusal.ts';
 import { BY_CAP, oneLine, WHY_CAP, type Hold } from '../record/record.ts';
 import { holdWord } from '../wait/wait.ts';
 import { hold, unhold } from '../wait/wait.verb.ts';
-import { liftCordon, putCordon } from '../cordon/cordon.store.ts';
-import { cordonWords, UNCORDONED, type Cordon, type Cordoned } from '../cordon/cordon.ts';
-import { cordonRead } from '../list/list.verb.ts';
+import { resumePause, putPause } from '../pause/pause.store.ts';
+import { pauseWords, RESUMED, type Pause, type Paused } from '../pause/pause.ts';
+import { pausedRead } from '../list/list.verb.ts';
 import type { Args } from './command.ts';
 import type { Command, Ran } from './entry.verb.ts';
 
@@ -299,77 +299,79 @@ export const PRUNE: Command<{
   },
 };
 
-/** `wf cordon`'s form, as each of its refusals ends on it. */
-const CORDON_SHAPE = 'wf cordon [--why "<words>"] [--by <name>]';
+/** `wf pause`'s form, as each of its refusals ends on it. */
+const PAUSE_SHAPE = 'wf pause [--why "<words>"] [--by <name>]';
 
-/** `wf cordon`'s `--why` and `--by`. */
-const CORDON_SAID: readonly Said[] = [
-  { flag: '--why', key: 'why', takes: 'the words for why the store is cordoned', cap: WHY_CAP },
-  { flag: '--by', key: 'by', takes: 'who cordons it, by a name', cap: BY_CAP },
+/** `wf pause`'s `--why` and `--by`. */
+const PAUSE_SAID: readonly Said[] = [
+  { flag: '--why', key: 'why', takes: 'the words for why the store is paused', cap: WHY_CAP },
+  { flag: '--by', key: 'by', takes: 'who pauses it, by a name', cap: BY_CAP },
 ];
 
-/** `wf cordon`'s `--why` and `--by`, each with its refusal of a value left out. */
-const CORDON_TAKES = takesOf(CORDON_SAID, CORDON_SHAPE);
+/** `wf pause`'s `--why` and `--by`, each with its refusal of a value left out. */
+const PAUSE_TAKES = takesOf(PAUSE_SAID, PAUSE_SHAPE);
 
 /**
- * `wf cordon`: the store cordoned, as `kubectl cordon` marks a node (`putCordon`), on `POST /api/cordon` too; the cordon as written.
- * Refused while a cordon stands (`Conflict`).
+ * `wf pause`: the store paused (`putPause`), on `POST /api/pause` too; the pause as written.
+ * Refused while a pause stands (`Conflict`).
  */
-export const CORDON: Command<{ cordon: Cordon }> = {
-  name: 'cordon',
+export const PAUSE: Command<{ pause: Pause }> = {
+  name: 'pause',
   usage: '[--why "<words>"] [--by <name>]',
   help: [
-    'cordon the store, as kubectl cordon marks a node: no pass starts new',
-    'work — no step, try, round or check filed, no queued task admitted,',
-    'no queued card started — and what runs finishes, its end and closeout',
-    'recorded; a landing whose check has ended commits or aborts. wf start',
-    'still writes a run, and approvals, retries and answers are kept, not',
-    'acted on: the pass after wf uncordon files what waits. wf ls, wf feed,',
-    'wf start and wf up say it. Refused while a cordon stands.',
-    '--why: the reason, said wherever the cordon is; --by: who cordons it',
+    'pause the store: no pass starts new work — no step, try, round or',
+    'check filed, no queued task admitted, no queued card started — and',
+    'what runs finishes, its end and closeout recorded; a landing whose',
+    'check has ended commits or aborts. Pausing: N finishing while a',
+    'session works or a check or landing runs, Paused once none does.',
+    'wf start still writes a run, and approvals, retries and answers are',
+    'kept, not acted on: the pass after wf resume files what waits. wf ls,',
+    'wf feed, wf start and wf up say it, and wf ls names what finishes.',
+    'Refused while a pause stands.',
+    '--why: the reason, said wherever the pause is; --by: who pauses it',
     '(default: your OS user)',
   ],
   spec: {
     positionals: [],
-    flags: saidFlags(CORDON_SAID, 'wf cordon', 'a cordon', CORDON_TAKES, CORDON_SHAPE),
-    unknown: (arg) => `wf cordon does not take ${arg}: ${CORDON_SHAPE}.`,
-    apart: (_value, flag) => CORDON_TAKES[flag],
+    flags: saidFlags(PAUSE_SAID, 'wf pause', 'a pause', PAUSE_TAKES, PAUSE_SHAPE),
+    unknown: (arg) => `wf pause does not take ${arg}: ${PAUSE_SHAPE}.`,
+    apart: (_value, flag) => PAUSE_TAKES[flag],
   },
-  check: (args) => CORDON_SAID.map((s) => saidRefusal(args, s, CORDON_TAKES)).find((r) => r !== null) ?? null,
+  check: (args) => PAUSE_SAID.map((s) => saidRefusal(args, s, PAUSE_TAKES)).find((r) => r !== null) ?? null,
   writes: true,
-  route: { method: 'POST', path: '/api/cordon', status: 200 },
-  handler: async (_e, args) => ({ cordon: putCordon({ why: saidOf(args, 'why'), by: saidOf(args, 'by') }) }),
-  print: ({ cordon }) => [cordonWords(cordon)],
+  route: { method: 'POST', path: '/api/pause', status: 200 },
+  handler: async (_e, args) => ({ pause: putPause({ why: saidOf(args, 'why'), by: saidOf(args, 'by') }) }),
+  print: ({ pause }) => [pauseWords(pause)],
 };
 
 /**
- * `wf uncordon`: the store's cordon lifted (`liftCordon`), on `DELETE /api/cordon` too; the cordon lifted. Refused with none (`Missing`).
+ * `wf resume`: the store's pause lifted (`resumePause`), on `DELETE /api/pause` too; the pause lifted. Refused with none (`Missing`).
  */
-export const UNCORDON: Command<{ cordon: Cordon }> = {
-  name: 'uncordon',
+export const RESUME: Command<{ pause: Pause }> = {
+  name: 'resume',
   usage: '',
-  help: ["lift the store's cordon: the next pass files what waits"],
+  help: ["lift the store's pause: the next pass files what waits"],
   spec: {
     positionals: [],
     flags: [],
-    unknown: (arg) => `wf uncordon takes no ${arg}: it lifts the store's cordon, whoever put it.`,
+    unknown: (arg) => `wf resume takes no ${arg}: it lifts the store's pause, whoever put it.`,
   },
   writes: true,
-  route: { method: 'DELETE', path: '/api/cordon', status: 200 },
-  handler: async () => ({ cordon: liftCordon() }),
-  print: () => [UNCORDONED],
+  route: { method: 'DELETE', path: '/api/pause', status: 200 },
+  handler: async () => ({ pause: resumePause() }),
+  print: () => [RESUMED],
 };
 
-/** The store's cordon and the landings it holds with their merge staged (`cordonRead`), which the api alone serves. */
-export const CORDONED: Command<Cordoned> = {
-  name: 'cordoned',
+/** The store's pause and the landings it holds with their merge staged (`pausedRead`), which the api alone serves. */
+export const PAUSED: Command<Paused> = {
+  name: 'paused',
   usage: '',
-  help: ["the store's cordon, and each landing it holds with its merge staged"],
-  spec: { positionals: [], flags: [], unknown: (arg) => `the cordon takes no ${arg}.` },
+  help: ["the store's pause, and each landing it holds with its merge staged"],
+  spec: { positionals: [], flags: [], unknown: (arg) => `the pause takes no ${arg}.` },
   writes: false,
-  route: { method: 'GET', path: '/api/cordon', status: 200 },
-  only: { side: 'api', why: 'the board says the cordon over its frame; at the command line, wf ls says it, and each landing it holds' },
-  handler: (e) => cordonRead(e),
+  route: { method: 'GET', path: '/api/pause', status: 200 },
+  only: { side: 'api', why: 'the board says the pause over its frame; at the command line, wf ls says it, and each landing it holds' },
+  handler: (e) => pausedRead(e),
   print: () => [],
 };
 
@@ -419,7 +421,7 @@ const UP: Ran = {
     'WF_ROOT/daemon.json — who holds it, pid, start, last pass, and a beat',
     'each interval;',
     'once a minute, a line of what its passes cost (tick-stats.json); the',
-    "store's cordon once it is put, and again once it is lifted.",
+    "store's pause once it is put, and again once it is lifted.",
     'wf up --stats: what the last pass cost, phase by phase — read, not',
     'run, so it fits while a daemon holds the store; where none does,',
     'wf tick --stats',

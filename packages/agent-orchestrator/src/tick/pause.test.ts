@@ -1,12 +1,12 @@
 /**
- * The store's cordon, as the tick honours it: while `$WF_ROOT/cordon` stands no pass starts new work — no step, try or check filed, no
+ * The store's pause, as the tick honours it: while `$WF_ROOT/pause` stands no pass starts new work — no step, try or check filed, no
  * queued task admitted, no queued card started, nothing of a run `wf start` wrote meanwhile — and what runs finishes; a person's retry and
  * approval written meanwhile wait on their files; and the pass after the lift files what waits. Every pass judges afresh what the memo of
  * runs at rest answers (`verifyRest`), and one in the middle starts with no memo at all, as a restarted daemon does.
  *
  * Walked through the runtime itself over an in-memory journal and a harness the test signs by hand, as rest-store.test.ts does, and every
  * filing `queued` as the store's own engine files it (`engineOf`), under the store's own admission (`storeAdmission`), so admission is
- * the runtime's: a task filed waits until a pass admits it, and none is admitted while the cordon stands. A store of its own, since
+ * the runtime's: a task filed waits until a pass admits it, and none is admitted while the pause stands. A store of its own, since
  * `tick` reads every run under `WF_ROOT`, which is read as the module loads and so set before the import.
  */
 import { test } from 'node:test';
@@ -19,7 +19,7 @@ import { Engine } from 'agent-runtime/effect';
 import type { Run } from '../run.ts';
 import { scratch } from '../../test/scratch.ts';
 
-const ROOT = scratch('wf-cordon-');
+const ROOT = scratch('wf-pause-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
 process.env.WF_ROOT = ROOT;
@@ -30,10 +30,10 @@ const { addToInbox, approve, queueInInbox, readInbox, retry, start } = await imp
 const { approvalFile, asksDir, readRun } = await import('../record/record.store.ts');
 const { tick, freshRestMemo } = await import('./tick.verb.ts');
 const { engineOf, storeAdmission } = await import('../runtime-client.ts');
-const { liftCordon, putCordon } = await import('../cordon/cordon.store.ts');
-const { cordonRead, runsListed } = await import('../list/list.verb.ts');
+const { resumePause, putPause } = await import('../pause/pause.store.ts');
+const { pausedRead, runsListed } = await import('../list/list.verb.ts');
 const { COMMANDS } = await import('../command/commands.verb.ts');
-const { cordonLines } = await import('../cordon/cordon.ts');
+const { pausedLines } = await import('../pause/pause.ts');
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], {
@@ -139,7 +139,7 @@ const MEMO = freshRestMemo();
 /** A pass as the daemon makes one, with the memo it keeps — or with none, as a restarted daemon's first pass. */
 const pass = (memo = MEMO) => tick(h.e, { repo: ROOT, memo, verifyRest: true });
 const begun = (workflowDir: string, more: Partial<Parameters<typeof start>[0]> = {}) =>
-  start({ brief: 'cordoned', repo: REPO, workflowDir, isolate: false, ...more });
+  start({ brief: 'paused', repo: REPO, workflowDir, isolate: false, ...more });
 const taskOf = (run: Run, step: string): string | undefined => readRun(run.id).steps[step]?.taskId ?? undefined;
 
 const TWO = folder(['plan', 'work']);
@@ -166,7 +166,7 @@ const staged = (repo: string) => {
   git(repo, 'merge', '-q', '--no-ff', '--no-commit', 'side');
 };
 
-test('while the store is cordoned nothing new starts and what runs finishes; the pass after the lift files what waits', async () => {
+test('while the store is paused nothing new starts and what runs finishes; the pass after the lift files what waits', async () => {
   const running = begun(TWO);
   const checked = begun(CHECKED);
   const refused = begun(ONE);
@@ -179,8 +179,8 @@ test('while the store is cordoned nothing new starts and what runs finishes; the
   }
   await approve(h.e, landing.id, 'ship');
   for (let k = 0; k < 3; k++) await pass();
-  assert.ok(taskOf(landing, 'ship'), "landing's ship at work as the cordon is put");
-  assert.ok(taskOf(running, 'plan') && taskOf(checked, 'work'), "running's plan and checked's work at work as the cordon is put");
+  assert.ok(taskOf(landing, 'ship'), "landing's ship at work as the pause is put");
+  assert.ok(taskOf(running, 'plan') && taskOf(checked, 'work'), "running's plan and checked's work at work as the pause is put");
   assert.ok(taskOf(gated, 'plan') && !taskOf(gated, 'work'), "gated's plan signed, its work waiting at the gate");
   assert.equal(taskOf(refused, 'work'), `${refused.id}-work`, "refused's work signed blocked, on its first try");
   const queued = begun(ONE);
@@ -188,7 +188,7 @@ test('while the store is cordoned nothing new starts and what runs finishes; the
   const queuedTask = taskOf(queued, 'work')!;
   assert.equal((await h.e.view(queuedTask)).admission, 'queued', 'a task filed and not yet admitted');
 
-  const cordon = putCordon({ why: 'merging by hand', by: 'ann' });
+  const pause = putPause({ why: 'merging by hand', by: 'ann' });
   const born = begun(ONE);
   await retry(h.e, refused.id, 'work', { mode: 'fresh' });
   await approve(h.e, gated.id, 'plan');
@@ -198,14 +198,14 @@ test('while the store is cordoned nothing new starts and what runs finishes; the
   staged(LANDS);
 
   const first = await pass();
-  assert.deepEqual(first.cordon, cordon, 'the pass says the cordon it read');
+  assert.deepEqual(first.pause, pause, 'the pass says the pause it read');
   assert.equal(first.queue, undefined, 'and started no queued card');
   h.signAll();
   await pass(freshRestMemo());
   await pass();
   const last = await pass();
 
-  assert.deepEqual(h.spawned.slice(before), [], 'no session started while the store is cordoned');
+  assert.deepEqual(h.spawned.slice(before), [], 'no session started while the store is paused');
   assert.equal((await h.e.view(queuedTask)).admission, 'queued', 'the queued task not admitted');
   assert.equal((await h.e.view(taskOf(running, 'plan')!)).phase, 'succeeded', "running's plan finished");
   assert.equal(taskOf(running, 'work'), undefined, "running's work, ready, not filed");
@@ -218,38 +218,35 @@ test('while the store is cordoned nothing new starts and what runs finishes; the
   );
   assert.ok(fs.existsSync(approvalFile(gated.id, 'plan', 1)), "gated's approval kept");
   assert.equal(taskOf(gated, 'work'), undefined, "gated's work not filed on it");
-  assert.equal(taskOf(born, 'work'), undefined, 'nothing filed of the run started while cordoned');
+  assert.equal(taskOf(born, 'work'), undefined, 'nothing filed of the run started while paused');
   assert.equal(last.queue, undefined, 'no queued card started');
   assert.equal(readInbox().find((l) => l.name === card.name)?.tried, undefined, 'nor tried');
-  assert.ok(
-    !('cordon' in JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${running.id}.json`), 'utf8'))),
-    'no record holds the cordon',
-  );
+  assert.ok(!('pause' in JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${running.id}.json`), 'utf8'))), 'no record holds the pause');
 
   const listed = await runsListed(h.e);
   const repo = readRun(landing.id).repo!;
   assert.deepEqual(
-    listed.cordoned,
-    { cordon, staged: [{ run: landing.id, step: 'ship', repo }] },
-    'wf ls names the cordon, and the landing whose merge it holds staged in the checkout, its check not filed',
+    listed.paused,
+    { pause, staged: [{ run: landing.id, step: 'ship', repo }] },
+    'wf ls names the pause, and the landing whose merge it holds staged in the checkout, its check not filed',
   );
   assert.equal(readRun(landing.id).steps.ship?.check, undefined);
-  assert.deepEqual(await cordonRead(h.e), listed.cordoned, 'and the api reads the same');
+  assert.deepEqual(await pausedRead(h.e), listed.paused, 'and the api reads the same');
   const ls = COMMANDS.find((c) => c.name === 'ls')!;
-  assert.deepEqual(ls.print(listed, {}).slice(0, 2), cordonLines(listed.cordoned), 'wf ls says it first');
+  assert.deepEqual(ls.print(listed, {}).slice(0, 2), pausedLines(listed.paused), 'wf ls says it first');
 
-  liftCordon();
+  resumePause();
   const lifted = await pass();
-  assert.equal(lifted.cordon, undefined, 'the pass after the lift says no cordon');
+  assert.equal(lifted.pause, undefined, 'the pass after the lift says no pause');
   assert.ok(taskOf(running, 'work'), "running's work filed");
   assert.ok(readRun(checked.id).steps.work?.check, "checked's check filed");
   assert.equal(taskOf(refused, 'work'), `${refused.id}-work-try2`, "refused's try filed");
   assert.ok(taskOf(gated, 'work'), "gated's work filed on the approval");
-  assert.ok(taskOf(born, 'work'), 'the run started while cordoned filed');
+  assert.ok(taskOf(born, 'work'), 'the run started while paused filed');
   assert.ok(lifted.queue, 'the queued card tried');
   assert.ok(readRun(landing.id).steps.ship?.check, "landing's check filed");
-  assert.equal((await runsListed(h.e)).cordoned, undefined, 'and wf ls says no cordon');
-  assert.deepEqual(await cordonRead(h.e), { cordon: null, staged: [] });
+  assert.equal((await runsListed(h.e)).paused, undefined, 'and wf ls says no pause');
+  assert.deepEqual(await pausedRead(h.e), { pause: null, staged: [] });
   await pass();
   assert.ok(h.spawned.length > before, 'and sessions started again');
   assert.notEqual((await h.e.view(queuedTask)).admission, 'queued', 'the queued task admitted');

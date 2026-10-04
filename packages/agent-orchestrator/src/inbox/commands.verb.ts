@@ -1,13 +1,13 @@
 /**
  * `wf inbox`, each of its forms an entry of the command table: the cards listed, an idea filed as one, a card queued to start on its own
  * or taken off the queue, and a card dropped. The api serves each: the list and the filing by routes of its own, which call these
- * handlers, the queue and the drop on the routes the table generates.
+ * handlers, the queue and the drop on the routes the table generates. One card read for its page is an entry the api serves alone.
  */
 import path from 'node:path';
 import { leftOut, type Args, type Flag, type Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { defaultStartsAllowed } from '../factory/factory.store.ts';
-import { inboxDir } from '../record/files.store.ts';
+import { inboxDir, runStore } from '../record/files.store.ts';
 import { Missing } from '../refusal/refusal.ts';
 import { inboxLines, noCardLine, type InboxCard, type InboxListing } from './inbox.ts';
 import { addToInbox, dropFromInbox, queueInInbox, readInbox, type InboxDropped, type InboxQueued } from './inbox.store.ts';
@@ -254,5 +254,46 @@ export const INBOX_RM: Command<InboxDropped> = {
   ],
 };
 
-/** `wf inbox`'s entries, in the order `wf`'s help lists them. */
-export const INBOXES: readonly Command[] = [INBOX, INBOX_ADD, INBOX_QUEUE, INBOX_RM] as readonly Command[];
+/** The file a card's text is read from, swallowing a read that fails: null for a card dropped since it was listed. */
+const sourceOf = (file: string): string | null => {
+  try {
+    return runStore.inbox.read(file);
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * One card, for its page: the entry the inbox lists by `name` — a card before a stray file of the same name (`notes.md` and `notes` both
+ * list as `notes`), never a path joined from the name — with its file as written (`source`). A `Missing` naming the cards there are, in
+ * `noCardLine`'s words, for a name with none, and for a card dropped since the listing read it.
+ */
+export const INBOX_CARD: Command<{ card: InboxListing; source: string }> = {
+  name: 'inbox card',
+  usage: '<name>',
+  help: ['one card, read for its page'],
+  spec: {
+    positionals: [{ key: 'name', takes: 'required', kind: 'name' }],
+    flags: [],
+    unknown: (arg) => `the board's card page reads one card, and ${arg} is a second.`,
+  },
+  writes: false,
+  route: { method: 'GET', path: '/api/inbox/:name', status: 200 },
+  only: { side: 'api', why: "the board's card page reads one card with its file as written; at the command line a person opens the file" },
+  async handler(_e, args) {
+    const name = textOf(args, 'name') ?? '';
+    const cards = readInbox();
+    const named = (c: InboxListing): boolean => c.name === name;
+    const card = cards.find((c) => named(c) && c.file.endsWith('.md')) ?? cards.find(named);
+    const source = card === undefined ? null : sourceOf(card.file);
+    if (card === undefined || source === null) {
+      const others = cards.filter((c) => c !== card && c.file.endsWith('.md')).map((c) => c.name);
+      throw new Missing({ message: noCardLine(name, others) });
+    }
+    return { card, source };
+  },
+  print: () => [],
+};
+
+/** `wf inbox`'s entries, in the order `wf`'s help lists them, and the board's card page after them. */
+export const INBOXES: readonly Command[] = [INBOX, INBOX_ADD, INBOX_QUEUE, INBOX_RM, INBOX_CARD] as readonly Command[];

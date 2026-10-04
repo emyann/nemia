@@ -185,16 +185,24 @@ test('REFUSED at shipped defaults: every route that writes, asked by a page on a
       'say POST',
       'agents custom PUT',
       'agents custom DELETE',
+      'agents write POST',
+      'agents write PUT',
+      'agents remove DELETE',
+      'agents try POST',
+      'skills write POST',
+      'skills write PUT',
       'hold DELETE',
       'rm DELETE',
       'prune POST',
       'pause POST',
       'resume DELETE',
+      'workflows write POST',
+      'workflows write PUT',
     ],
   );
   for (const { command, r } of routed) {
     const { method, path: route } = r;
-    const url = route.replace(':runId', 'r-guard').replace(':step', 'plan').replace(':name', 'g-guard');
+    const url = route.replace(':runId', 'r-guard').replace(':step', 'plan').replace(':name', 'g-guard').replace(':from', 'yours');
     const body = JSON.stringify({ mode: 'nudge', message: 'Go.', text: 'Go.' });
     const res = await app.request(url, { method, headers: { ...BOARD, 'sec-fetch-site': 'cross-site' }, body });
     assert.equal(res.status, 403, command.name);
@@ -202,6 +210,9 @@ test('REFUSED at shipped defaults: every route that writes, asked by a page on a
   }
   assert.deepEqual(asked('r-guard'), [], 'nothing written');
   assert.equal(fs.existsSync(path.join(root, 'cordon')), false, 'the store not paused');
+  assert.equal(fs.existsSync(path.join(root, 'workflows', 'g-guard')), false, 'no workflow written');
+  assert.equal(fs.existsSync(path.join(root, 'workflows', 'agents')), false, 'no agent written');
+  assert.equal(fs.existsSync(path.join(root, 'workflows', 'skills')), false, 'no skill written');
   assert.deepEqual(
     fs.readdirSync(path.join(root, 'runs')).filter((f) => !f.startsWith('r-')),
     [],

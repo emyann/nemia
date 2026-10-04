@@ -6,6 +6,7 @@ import {
   atWork,
   type BranchReader,
   branchReader,
+  COMMANDS,
   runStartedAt,
   type RunTokens,
   runTokens,
@@ -14,7 +15,7 @@ import {
   runStore,
 } from 'agent-orchestrator';
 import { isGitRun, type PlaceKind, placeOf, prunedKept, prunedWords, type Run } from 'agent-orchestrator/run';
-import { decisionOf } from '../decide/index.ts';
+import { decisionOf } from '../decide/decision.ts';
 import { detail } from '../detail/index.ts';
 import {
   type Asked,
@@ -345,6 +346,9 @@ async function listed({ e, env, home, memo }: Served): Promise<RunSummary[]> {
   return summaries;
 }
 
+/** One run read for its page (`run`), an entry of the package's table the api serves alone: on `GET /api/runs/:id`. */
+const RUN = COMMANDS.find((c) => c.name === 'run')!;
+
 /**
  * The runs' routes: the list, one run in full, and what `wf decide` shows of it. The board's writes on a run — its removal and its prune
  * among them — are the command table's routes (`commands`, commands/routes.ts).
@@ -358,8 +362,8 @@ async function listed({ e, env, home, memo }: Served): Promise<RunSummary[]> {
  *   run started. A run at rest is answered from the list's memo (`resting.ts`) while nothing it was judged on has moved, so a poll reads
  *   the journals of the runs still moving and of none other; the rest are read through the request's own engine and git (`viewsFor`,
  *   `branchReader`). With `WF_VERIFY_REST` a kept answer is judged afresh too, and one that differs fails the request.
- * - `GET /api/runs/:id` — a run in full (`detail`): refused with a 404 when there is no such run, and with a 502 when a task it reads does
- *   not, in the words the list says it with (`RunSummary.unreadable`).
+ * - `GET /api/runs/:id` — a run in full (`detail`), found by the package's entry (`run`): refused with a 404 when there is no such run,
+ *   and with a 502 when a task it reads does not, in the words the list says it with (`RunSummary.unreadable`).
  * - `GET /api/runs/:runId/decision` — what `wf decide` shows a person (`decisionOf`), the route of its entry of the command table. Not on
  *   the page's poll, since it runs `git diff`. Refused as the run's page is: a 404 with no such run, and a 502 when a task it reads does
  *   not, in the words the list says it with (`RunSummary.unreadable`).
@@ -370,7 +374,7 @@ export const runs = new Hono<ApiEnv>()
   .get('/api/runs/:id', (c) =>
     served(c, async (s) => {
       const id = c.req.param('id');
-      const run = findRun(id);
+      const { run } = (await RUN.handler(s.e, { id })) as { run: Run | null };
       if (!run) return c.json({ error: noSuchRun(id) }, 404);
       const full = await detail(run, s);
       if ('unjudged' in full) return c.json({ error: full.unjudged }, 502);

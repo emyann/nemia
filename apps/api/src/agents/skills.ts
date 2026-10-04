@@ -20,21 +20,19 @@ import { Schema } from 'effect';
 import { Hono } from 'hono';
 import {
   agentSkillsFound,
-  copySkill,
+  COMMANDS,
   givenSkills as givenRead,
   listAgents,
   loadAgents,
   SkillWriteError,
   skillDirIn,
   skillFolders,
-  skillRead,
   skillsFor,
-  skillText,
-  skillVersion,
-  writeSkill,
   type AgentPlace,
   type SkillChange,
   type SkillCopied,
+  type SkillPage,
+  type SkillRead,
   type SkillWritten,
 } from 'agent-orchestrator';
 import {
@@ -52,6 +50,7 @@ import { readBody, valueAt, type BodyIssue, type Words } from '../body.ts';
 import { HOME_REPO } from '../capabilities/capabilities.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from '../guard.ts';
 import { type ApiEnv, served } from '../layer.ts';
+import type { Engine } from '../store.ts';
 import { placesOf } from '../workflows/workflows.ts';
 
 /**
@@ -109,9 +108,27 @@ export function sourceOf(dir: string, repo: string, home: string): SkillSource |
   return null;
 }
 
-/** One skill read now, as the picker lists it: the package's reading of its folder (`skillRead`), where it is, and who gives it. */
-export function skillRow(name: string, dir: string, from: SkillSource, usedBy: string[] = [], found: SkillRow['found'] = null): SkillRow {
-  const { entry, error, preload, cost } = skillRead(name, dir);
+/**
+ * The board's skill library in the package's table, each entry served on the api alone: the skill folders listed, each read
+ * (`skills list`), one skill read for its page (`skills read`), and one of yours written or copied (`skills write`).
+ */
+const LIST = COMMANDS.find((c) => c.name === 'skills list')!;
+const READ = COMMANDS.find((c) => c.name === 'skills read')!;
+const WRITE = COMMANDS.find((c) => c.name === 'skills write')!;
+
+/** Each skill folder of `dirs` read now, through the table's `skills list`, by folder. */
+const readsOf = async (e: Engine['Service'], dirs: readonly string[]) =>
+  (await LIST.handler(e, { skills: dirs })) as Record<string, SkillRead>;
+
+/** One skill as the picker lists it: the package's reading of its folder (`read`), where it is, and who gives it. */
+export function skillRow(
+  name: string,
+  dir: string,
+  from: SkillSource,
+  { entry, error, preload, cost }: SkillRead,
+  usedBy: string[] = [],
+  found: SkillRow['found'] = null,
+): SkillRow {
   return { name, from, dir, entry, error, preload, cost, usedBy, found };
 }
 
@@ -128,7 +145,12 @@ function yourAgentsSkills(home: string): Array<[string, string[]]> {
  * repository's places for skills have, which happens only when the store is in that repository and nothing says which is given, is listed
  * in yours with the package's refusal as its `error`.
  */
-export function listSkills(repo: string, home: string, shipped: string = SHIPPED_SKILLS): SkillPlace[] {
+export async function listSkills(
+  e: Engine['Service'],
+  repo: string,
+  home: string,
+  shipped: string = SHIPPED_SKILLS,
+): Promise<SkillPlace[]> {
   const found = skillsOfYours(repo, home);
   const agents = yourAgentsSkills(home);
   const usedBy = (name: string) => agents.filter(([, skills]) => skills.includes(name)).map(([agent]) => agent);
@@ -136,21 +158,29 @@ export function listSkills(repo: string, home: string, shipped: string = SHIPPED
     { from: 'yours', dir: librarySkills(home), skills: [] },
     { from: 'repo', dir: path.join(path.resolve(repo), '.claude', SKILLS_FOLDER), skills: [] },
   ];
+  const sorted = [...found.at].sort(([a], [b]) => a.localeCompare(b));
+  const dirOf = ([name, at]: (typeof sorted)[number]) => (at instanceof WorkflowError ? path.join(places[0].dir, name) : at);
+  const shippedNames = skillFolders(shipped);
+  const reads = await readsOf(e, [...sorted.map(dirOf), ...shippedNames.map((name) => path.join(shipped, name))]);
   const where = new Map<string, 'yours' | 'repo'>();
-  for (const [name, at] of [...found.at].sort(([a], [b]) => a.localeCompare(b))) {
+  for (const [name, at] of sorted) {
+    const dir = dirOf([name, at]);
     if (at instanceof WorkflowError) {
-      places[0].skills.push({ ...skillRow(name, path.join(places[0].dir, name), 'yours', usedBy(name)), entry: null, error: at.message });
+      places[0].skills.push({ ...skillRow(name, dir, 'yours', reads[dir], usedBy(name)), entry: null, error: at.message });
       where.set(name, 'yours');
       continue;
     }
     const from = sourceOf(at, repo, home) === 'yours' ? 'yours' : 'repo';
-    places[from === 'yours' ? 0 : 1].skills.push(skillRow(name, at, from, usedBy(name)));
+    places[from === 'yours' ? 0 : 1].skills.push(skillRow(name, at, from, reads[dir], usedBy(name)));
     where.set(name, from);
   }
   places.push({
     from: 'shipped',
     dir: shipped,
-    skills: skillFolders(shipped).map((name) => skillRow(name, path.join(shipped, name), 'shipped', [], where.get(name) ?? null)),
+    skills: shippedNames.map((name) => {
+      const dir = path.join(shipped, name);
+      return skillRow(name, dir, 'shipped', reads[dir], [], where.get(name) ?? null);
+    }),
   });
   return places;
 }
@@ -337,24 +367,26 @@ export const copyCommand = (dir: string, into: string): string => `mkdir -p ${qu
  * The skill `name` of `from` read now, for its page. Null when that place has no such skill. A SKILL.md that cannot be read, or does not
  * read as a draft, leaves `draft` null, the row saying why, and the page is filled from the body.
  */
-export function skillDetail(
+export async function skillDetail(
+  e: Engine['Service'],
   from: SkillSource,
   name: string,
   repo: string,
   home: string,
   shipped: string = SHIPPED_SKILLS,
-): SkillDetail | null {
+): Promise<SkillDetail | null> {
   const dir = skillDirOf(from, name, repo, home, shipped);
   if (dir === null) return null;
   const users = skillUsers(dir, name, repo);
+  const { text, version, ...read } = (await READ.handler(e, { from, name, dir })) as SkillPage;
   const skill = skillRow(
     name,
     dir,
     from,
+    read,
     users.filter((user) => user.from === 'yours').map((user) => user.name),
   );
   const file = path.join(dir, 'SKILL.md');
-  const text = skillText(dir);
   let draft: SkillDraft | null = null;
   try {
     draft = skillDraftOf(file, name, text);
@@ -371,7 +403,7 @@ export function skillDetail(
       : from === 'repo'
         ? copyCommand(dir, librarySkills(home))
         : null;
-  return { skill, version: skillVersion(dir) ?? '', draft, body, users, copyHint };
+  return { skill, version: version ?? '', draft, body, users, copyHint };
 }
 
 /** A draft from a skill as sent, refused (400) when it has a key no skill has: each value is then judged by the package, in its words. */
@@ -402,20 +434,31 @@ function writeRefused(err: unknown): Refusal {
   return { status: err.why === 'missing' ? 404 : err.why === 'exists' || err.why === 'stale' ? 409 : 422, error: err.message };
 }
 
-/** A skill of yours written into the library, and answered as its page reads it now. */
-function written(
+/**
+ * A skill of yours written into the library through the table's `skills write` (`WRITE`), and answered as its page reads it now. `name`
+ * is the skill's name on the path, none for a skill made.
+ */
+async function written(
+  e: Engine['Service'],
   change: SkillChange,
-  version: string | null,
+  { version, name }: { version: string | null; name?: string },
   repo: string,
   home: string,
-): { status: 200 | 201; body: SkillSaved } | Refusal | { status: 500; error: string } {
+): Promise<{ status: 200 | 201; body: SkillSaved } | Refusal | { status: 500; error: string }> {
   let wrote: SkillWritten;
+  const args = {
+    from: 'yours',
+    library: librarySkills(home),
+    change: JSON.stringify(change),
+    ...(version !== null && { version }),
+    ...(name !== undefined && { name }),
+  };
   try {
-    wrote = writeSkill(librarySkills(home), change, { version });
+    wrote = (await WRITE.handler(e, args)) as SkillWritten;
   } catch (err) {
     return writeRefused(err);
   }
-  const detail = skillDetail('yours', wrote.name, repo, home);
+  const detail = await skillDetail(e, 'yours', wrote.name, repo, home);
   if (detail === null) return { status: 500, error: `${wrote.dir} was written, and then could not be read back.` };
   return { status: version === null ? 201 : 200, body: { ...detail, written: wrote.written } };
 }
@@ -442,9 +485,9 @@ const repoRefusal = (route: string, name: string | null, repo: string, home: str
  *   otherwise: its name is its folder.
  */
 export const skills = new Hono<ApiEnv>()
-  .get('/api/skills', (c) => served(c, ({ repo, home }) => c.json(listSkills(repo, home))))
+  .get('/api/skills', (c) => served(c, async ({ e, repo, home }) => c.json(await listSkills(e, repo, home))))
   .get('/api/skills/:from/:name', (c) =>
-    served(c, async ({ repo, home }) => {
+    served(c, async ({ e, repo, home }) => {
       const { from, name } = c.req.param();
       if (from !== 'yours' && from !== 'repo' && from !== 'shipped')
         return c.json(
@@ -455,7 +498,7 @@ export const skills = new Hono<ApiEnv>()
         );
       const wrong = skillNameRefusal(name);
       if (wrong) return c.json({ error: wrong }, 400);
-      const detail = skillDetail(from, name, repo, home);
+      const detail = await skillDetail(e, from, name, repo, home);
       if (detail === null)
         return c.json(
           {
@@ -467,7 +510,7 @@ export const skills = new Hono<ApiEnv>()
     }),
   )
   .post('/api/skills/:from', (c) =>
-    served(c, async ({ repo, home }) => {
+    served(c, async ({ e, repo, home }) => {
       const { from } = c.req.param();
       const route = `POST /api/skills/${from}`;
       const refused = refusedBeforeReading(
@@ -494,13 +537,13 @@ export const skills = new Hono<ApiEnv>()
       if (skill) {
         const draft = skillDraftFrom(skill, route, POST_SHAPE);
         if ('status' in draft) return c.json({ error: draft.error }, draft.status);
-        const answer = written(draft, null, repo, home);
+        const answer = await written(e, draft, { version: null }, repo, home);
         return 'body' in answer ? c.json(answer.body, answer.status) : c.json({ error: answer.error }, answer.status);
       }
       if (name === undefined) return c.json({ error: copyOrSkill(route)('neither') }, 400);
       let copied: SkillCopied;
       try {
-        copied = copySkill(SHIPPED_SKILLS, library, name);
+        copied = (await WRITE.handler(e, { from, library, copy: name, shipped: SHIPPED_SKILLS })) as SkillCopied;
       } catch (err) {
         const answer = writeRefused(err);
         return c.json({ error: answer.error }, answer.status);
@@ -508,11 +551,12 @@ export const skills = new Hono<ApiEnv>()
       const agents = yourAgentsSkills(home)
         .filter(([, given]) => given.includes(name))
         .map(([agent]) => agent);
-      return c.json({ skill: skillRow(name, copied.dir, 'yours', agents), written: copied.written } satisfies SkillAdded, 201);
+      const reading = (await readsOf(e, [copied.dir]))[copied.dir];
+      return c.json({ skill: skillRow(name, copied.dir, 'yours', reading, agents), written: copied.written } satisfies SkillAdded, 201);
     }),
   )
   .put('/api/skills/:from/:name', (c) =>
-    served(c, async ({ repo, home }) => {
+    served(c, async ({ e, repo, home }) => {
       const { from, name } = c.req.param();
       const route = `PUT /api/skills/${from}/${name}`;
       const refused = refusedBeforeReading(
@@ -553,7 +597,7 @@ export const skills = new Hono<ApiEnv>()
       } else {
         return c.json({ error: skillOrPreload(route)('neither') }, 400);
       }
-      const answer = written(change, version, repo, home);
+      const answer = await written(e, change, { version, name }, repo, home);
       return 'body' in answer ? c.json(answer.body, answer.status) : c.json({ error: answer.error }, answer.status);
     }),
   );

@@ -20,14 +20,12 @@ import {
   inFactory,
   loadAgents,
   readFactories,
-  removeAgent,
-  start,
   stepsFilled,
-  writeAgent,
   type AgentFill,
   type AgentReading,
   type AgentsRead,
   type AgentSchema,
+  type AgentWritten,
   type CardRead,
   runStore,
 } from 'agent-orchestrator';
@@ -36,6 +34,7 @@ import { readBody, valueAt, type BodyIssue, type Words } from '../body.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from '../guard.ts';
 import { type ApiEnv, served } from '../layer.ts';
 import { judgedNow } from '../runs/runs.ts';
+import type { Engine } from '../store.ts';
 import { copyCommand, givenSkills, librarySkills, type GivenSkill } from './skills.ts';
 import { tryFolder, tryOf, untriedOf, type Untried } from './try.ts';
 import { sourcesOf, type WorkflowSource } from '../workflows/workflows.ts';
@@ -64,6 +63,15 @@ const AGENTS = COMMANDS.find((c) => c.name === 'agents')!;
 
 /** The package's card of one agent (`wf agents card`), its handler `agentCardRead`: on `GET /api/agents/:from/:name/card`. */
 const AGENT_CARD = COMMANDS.find((c) => c.name === 'agents card')!;
+
+/**
+ * The board's agent library in the package's table, each entry served on the api alone: an agent written (`agents write`), removed
+ * (`agents remove`), tried (`agents try`) and read for its page (`agents read`).
+ */
+const WRITE = COMMANDS.find((c) => c.name === 'agents write')!;
+const REMOVE = COMMANDS.find((c) => c.name === 'agents remove')!;
+const TRY = COMMANDS.find((c) => c.name === 'agents try')!;
+const READ = COMMANDS.find((c) => c.name === 'agents read')!;
 
 /** Where the agents of each place are: `<workflows>/agents`, the repository's then yours. */
 const agentPlaces = (repo: string, home: string): Array<{ from: WorkflowSource; dir: string }> =>
@@ -297,13 +305,13 @@ export const agents = new Hono<ApiEnv>()
     }),
   )
   .get('/api/agents/:from/:name', (c) =>
-    served(c, async ({ repo, home }) => {
+    served(c, async ({ e, env, repo, home }) => {
       const { from, name } = c.req.param();
       const place = placeOf(from, name, `GET /api/agents/${from}/${name}`, repo, home);
       if ('status' in place) return c.json({ error: place.error }, place.status);
-      const agent = listedAgent(from as WorkflowSource, place.dir, name, repo, home);
+      const { agent } = (await READ.handler(e, { from, name, dir: place.dir, repo }, env, home)) as { agent: AgentReading | null };
       if (!agent) return c.json({ error: noAgentWords(from, name, place.dir) }, 404);
-      return c.json(agent);
+      return c.json(listingOf(agent, repo, home));
     }),
   )
   .get('/api/agents/:from/:name/card', (c) =>
@@ -324,7 +332,7 @@ export const agents = new Hono<ApiEnv>()
     }),
   )
   .post('/api/agents/:from', (c) =>
-    served(c, async ({ repo, home }) => {
+    served(c, async ({ e, repo, home }) => {
       const { from } = c.req.param();
       const route = `POST /api/agents/${from}`;
       const refused = refusedBeforeReading(
@@ -341,12 +349,12 @@ export const agents = new Hono<ApiEnv>()
       const place = placeOf(from, read.body.name, route, repo, home);
       if ('status' in place) return c.json({ error: place.error }, place.status);
       const given = draftOf(read.body, read.body.name);
-      const answer = saved(place.dir, given.draft, { version: null, schema: given.schema, repo }, home, 201);
+      const answer = await saved(e, { from, dir: place.dir, repo, home }, given, 201);
       return c.json(answer.body, answer.status);
     }),
   )
   .put('/api/agents/:from/:name', (c) =>
-    served(c, async ({ repo, home }) => {
+    served(c, async ({ e, repo, home }) => {
       const { from, name } = c.req.param();
       const route = `PUT /api/agents/${from}/${name}`;
       const refused = refusedBeforeReading(
@@ -369,7 +377,7 @@ export const agents = new Hono<ApiEnv>()
       if ('status' in read) return c.json({ error: read.error }, read.status);
       const { version } = read.body;
       const given = draftOf(read.body, read.body.name ?? name);
-      const answer = saved(place.dir, given.draft, { version, from: name, schema: given.schema, repo }, home, 200);
+      const answer = await saved(e, { from, dir: place.dir, repo, home }, { ...given, version, name }, 200);
       return c.json(answer.body, answer.status);
     }),
   )
@@ -437,7 +445,7 @@ export const agents = new Hono<ApiEnv>()
             409,
           );
         const workflowDir = tryFolder(name, agent.version, agent.keys, home);
-        const run = start({ brief: brief.trim(), repo: '', workflowDir });
+        const run = (await TRY.handler(e, { from, name, dir: workflowDir, brief: brief.trim() }, undefined, home)) as AgentTried;
         return c.json({ id: run.id } satisfies AgentTried, 201);
       } catch (err) {
         const answer = refusalOf(err);
@@ -447,7 +455,7 @@ export const agents = new Hono<ApiEnv>()
     }),
   )
   .delete('/api/agents/:from/:name', (c) =>
-    served(c, async ({ repo, home }) => {
+    served(c, async ({ e, repo, home }) => {
       const { from, name } = c.req.param();
       const route = `DELETE /api/agents/${from}/${name}`;
       const refused = refusedBeforeReading(
@@ -471,7 +479,7 @@ export const agents = new Hono<ApiEnv>()
       if ('status' in read) return c.json({ error: read.error }, read.status);
       const { version } = read.body;
       try {
-        return c.json(removeAgent(place.dir, name, { version, repo }));
+        return c.json(await REMOVE.handler(e, { from, name, dir: place.dir, version, repo }, undefined, home));
       } catch (err) {
         const answer = refusalOf(err);
         if (answer) return c.json(answer.body, answer.status);
@@ -480,18 +488,32 @@ export const agents = new Hono<ApiEnv>()
     }),
   );
 
-/** `writeAgent`, answered: the agent as it now reads, or its `AgentWriteError` with its status. Throws any other error. */
-function saved(
-  dir: string,
-  draft: AgentDraft,
-  how: Parameters<typeof writeAgent>[2] & { repo: string },
-  home: string,
+/** Where an agent is written: its place on the path (`from`), the agents folder resolved for it, and the repository and store it reads. */
+type AgentAt = { from: string; dir: string; repo: string; home: string };
+
+/**
+ * `writeAgent`, through the table's `agents write` (`WRITE`), answered: the agent as it now reads, or its `AgentWriteError` with its
+ * status. `version` is what the agent was read at, none for a new one, and `name` the one it is renamed from. Throws any other error.
+ */
+async function saved(
+  e: Engine['Service'],
+  { from, dir, repo, home }: AgentAt,
+  { draft, schema, version, name }: { draft: AgentDraft; schema: AgentSchema | null; version?: string; name?: string },
   ok: 200 | 201,
-): { body: AgentSaved | AgentRefused; status: 200 | 201 | 404 | 409 | 422 } {
+): Promise<{ body: AgentSaved | AgentRefused; status: 200 | 201 | 404 | 409 | 422 }> {
+  const args = {
+    from,
+    dir,
+    repo,
+    draft: JSON.stringify(draft),
+    schema: JSON.stringify(schema),
+    ...(version !== undefined && { version }),
+    ...(name !== undefined && { name }),
+  };
   try {
-    const done = writeAgent(dir, draft, how);
+    const done = (await WRITE.handler(e, args, undefined, home)) as AgentWritten;
     return {
-      body: { agent: listedAgent('yours', done.dir, done.agent.name, how.repo, home)!, written: done.written, removed: done.removed },
+      body: { agent: listedAgent('yours', done.dir, done.agent.name, repo, home)!, written: done.written, removed: done.removed },
       status: ok,
     };
   } catch (err) {

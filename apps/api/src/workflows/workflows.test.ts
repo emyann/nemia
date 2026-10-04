@@ -14,7 +14,7 @@ import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
 import { app } from '../app.ts';
 import { listWorkflows, versionOf as versionIn } from './workflows.ts';
-import { loadWorkflows, parentRecord, runStore } from 'agent-orchestrator';
+import { engine, loadWorkflows, parentRecord, runStore } from 'agent-orchestrator';
 import { afterRefusal } from 'agent-orchestrator/run';
 import { AGENTS_FOLDER, STEP_KEY_MEANINGS, STEP_KEYS } from 'agent-orchestrator/workflow';
 /** The scratch repository, set as `HKB_REPO`, which the api reads on each request: a git repository, as `wf start` reads its HEAD. */
@@ -569,7 +569,7 @@ test("REFUSED at shipped defaults: what `start()` refuses is a 422 carrying its 
   write(path.join(clash, 'build.md'), '---\ncheck: npm run build\n---\nBuild it.\n');
   write(path.join(clash, 'build-check.md'), '---\nafter: build\n---\nCheck the build by hand.\n');
   assert.equal(
-    listWorkflows(repo, root).find((w) => w.name === 'clash')?.error,
+    (await listWorkflows(engine(), repo, root)).find((w) => w.name === 'clash')?.error,
     null,
     "the loader reads this folder; `wf start` refuses it, as the run files build's check as `build-check`",
   );

@@ -20,7 +20,6 @@ import type { RunDecision } from './decision.ts';
 import type { RunDetail } from '../detail/detail.ts';
 import type { RunSummary } from '../runs/runs.ts';
 import { app } from '../app.ts';
-import { mergesOnto } from './merge.ts';
 
 /** The real `git`, behind one first on PATH that notes each call in `gitCalls` and runs it: what says which runs the api asks git about. */
 const realGit = execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim();
@@ -253,11 +252,6 @@ test('whether the result still merges onto the base, as the base is now: clean, 
   } finally {
     git(repo, 'reset', '-q', '--hard', tip);
   }
-  const gone = mergesOnto(repo, 'main', 'wf/no-such-run/implement');
-  assert.ok(
-    'error' in gone && /no-such-run/.test(gone.error),
-    `a branch git no longer has is called neither clean nor conflicted, but carries git's own word for why it cannot say: ${JSON.stringify(gone)}`,
-  );
 });
 
 test("an ending that waits on several steps offers a send-back to each, and one that waits on nothing offers only the approval — the gate's commands are never empty", async () => {

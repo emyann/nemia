@@ -1,5 +1,5 @@
 import type { Ceilings, Factory, InboxEntry, WorkflowListing } from './api';
-import { startRepo } from './factories.ts';
+import { shownIn, startRepo } from './factories.ts';
 
 /**
  * The inbox as the page lists it: the newest card first, by when its file was written (`filedAt`) — a card carries no time of its own —
@@ -194,3 +194,17 @@ export function capLine(ceilings: Pick<Ceilings, 'cap' | 'inFlight'>, queued: nu
       : 'no cap on this machine';
   return queued > 0 ? `${cap} · ${queued} queued` : cap;
 }
+
+/**
+ * The cards of the factory `picked` names that are not yet started, as the sidebar's Inbox badge counts them: each card that reads and no
+ * record says was started, queued or not; every factory's while `picked` names none (`shownIn`), as the Inbox page lists them then.
+ */
+export const notStarted = (entries: readonly InboxEntry[], picked: string | undefined): InboxEntry[] =>
+  shownIn(
+    entries.filter((entry) => entry.error === null && entry.startedAs.length === 0),
+    picked,
+  );
+
+/** What the Inbox badge's `count` is, said whole for its hover and a screen reader: in the factory `picked`, or in every factory. */
+export const inboxBadgeTitle = (count: number, picked: string | undefined): string =>
+  `${count} ${count === 1 ? 'card' : 'cards'} not yet started, ${picked === undefined ? 'in every factory' : `in ${picked}`}`;

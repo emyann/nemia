@@ -14,6 +14,7 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { engine } from 'agent-orchestrator';
 import { skillTurnCost } from 'agent-orchestrator/workflow';
 import { scratch } from '../../test/scratch.ts';
 import { app } from '../app.ts';
@@ -164,8 +165,8 @@ test('a skill whose SKILL.md is no card entry is listed with the refusal, and a 
   }
 });
 
-test('a shipped skill says where an agent of yours already finds its name: in your library, in the repository, or nowhere yet', () => {
-  const places = listSkills(repo, root, TEAM_SKILLS);
+test('a shipped skill says where an agent of yours already finds its name: in your library, in the repository, or nowhere yet', async () => {
+  const places = await listSkills(engine(), repo, root, TEAM_SKILLS);
   assert.equal(rowOf(places, 'shipped', inLibrary)!.found, 'yours');
   assert.equal(rowOf(places, 'shipped', inRepo)!.found, 'repo');
   assert.equal(rowOf(places, 'shipped', toCopy)!.found, null);
@@ -311,7 +312,7 @@ test("a skill's page says what it says, what it costs a turn, the agents of eith
     assert.equal(broken.body, '# Scratch\n\nNo frontmatter.');
     assert.match(broken.skill.error ?? '', /has no frontmatter/);
     assert.equal(
-      skillDetail('shipped', toCopy, repo, root, TEAM_SKILLS)?.copyHint,
+      (await skillDetail(engine(), 'shipped', toCopy, repo, root, TEAM_SKILLS))?.copyHint,
       null,
       'a shipped skill is copied with the board, not by hand',
     );

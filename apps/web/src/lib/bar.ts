@@ -6,7 +6,8 @@
 /**
  * What the bar shows: the start of a run in a factory, or in none yet (`null`), which asks which first; a factory, a run, a step of a
  * run, a step of a workflow (`spec`), read from the repository's workflows or yours (`from`), a state of one of the code's state
- * machines, or the machine's gauges the bottom bar opens: the daemon, the feed, what is at work, the quota and the version, whole.
+ * machines, the machine's gauges the bottom bar opens: the daemon, the feed, what is at work, the quota and the version, whole, or the
+ * runs waiting on you across every factory, which the header's bell opens.
  */
 export type Bar =
   | { kind: 'start'; factory: string | null }
@@ -15,7 +16,8 @@ export type Bar =
   | { kind: 'step'; run: string; step: string }
   | { kind: 'spec'; from: 'repo' | 'yours'; workflow: string; step: string }
   | { kind: 'state'; machine: string; state: string }
-  | { kind: 'gauges' };
+  | { kind: 'gauges' }
+  | { kind: 'waiting' };
 
 /** The key this browser keeps the bar's one width under, for every page. */
 export const BAR_KEY = 'nemia:bar-width';
@@ -61,6 +63,9 @@ const ASKING = 'start';
 /** The address of the machine's gauges: the bare word, since there is one machine. */
 const GAUGES = 'gauges';
 
+/** The address of the runs waiting on you: the bare word, since the bell lists them across every factory. */
+const WAITING = 'waiting';
+
 /** Each kind of bar the address names, by its word, read from the non-empty name after its `:`; none for a name the kind refuses. */
 const PARSERS: Record<string, (name: string) => Bar | undefined> = {
   start: (name) => ({ kind: 'start', factory: name }),
@@ -73,7 +78,7 @@ const PARSERS: Record<string, (name: string) => Bar | undefined> = {
 
 /**
  * The bar `value` names in the address — `start`, the bare word, for a start that asks its factory first, `gauges`, the bare word, for the
- * machine's gauges, `start:<factory>`, `factory:<factory>`, `run:<run>`, `step:<run>/<step>`, `spec:<from>/<workflow>/<step>` or
+ * machine's gauges, `waiting`, the bare word, for the runs waiting on you, `start:<factory>`, `factory:<factory>`, `run:<run>`, `step:<run>/<step>`, `spec:<from>/<workflow>/<step>` or
  * `state:<machine>/<state>` — or none for anything else: another kind bare or with an empty name, a run with a `/` in its id, a `from`
  * other than `repo` or `yours`, not a string. A factory keeps its whole name. A run id is a file name in the store, a workflow's name its
  * folder's, and a machine's name a word, so a step's and a state's address split at its first `/`, a workflow's step's at its first two,
@@ -83,6 +88,7 @@ export function barOf(value: unknown): Bar | undefined {
   if (typeof value !== 'string') return undefined;
   if (value === ASKING) return { kind: 'start', factory: null };
   if (value === GAUGES) return { kind: 'gauges' };
+  if (value === WAITING) return { kind: 'waiting' };
   const at = value.indexOf(':');
   const name = value.slice(at + 1);
   const parse = Object.hasOwn(PARSERS, value.slice(0, at)) ? PARSERS[value.slice(0, at)] : undefined;
@@ -106,6 +112,8 @@ export function barValue(bar: Bar): string {
       return `state:${bar.machine}/${bar.state}`;
     case 'gauges':
       return GAUGES;
+    case 'waiting':
+      return WAITING;
   }
 }
 
@@ -120,7 +128,7 @@ export const nextBar = (open: Bar | undefined, pressed: Bar): Bar | undefined =>
 
 /**
  * The page Open visits from the bar: a factory's floor, a run's page, a step's session, a workflow's step's page, or none for what is no
- * page, the start of a run, a state of a machine and the gauges.
+ * page, the start of a run, a state of a machine, the gauges and the runs waiting on you.
  */
 export type BarPage =
   | { to: '/factories/$factory'; params: { factory: string } }
@@ -130,7 +138,8 @@ export type BarPage =
 
 /**
  * The page the bar's Open visits for `bar`: a factory's floor for a factory, a run's page for a run, the step's session for a step, the
- * step's page for a workflow's step, and none for the start of a run, a state of a machine or the gauges, which have no page of their own.
+ * step's page for a workflow's step, and none for the start of a run, a state of a machine, the gauges or the runs waiting on you, which
+ * have no page of their own: each row of those opens its run's.
  */
 export function barOpens(bar: Bar): BarPage | null {
   switch (bar.kind) {
@@ -145,6 +154,7 @@ export function barOpens(bar: Bar): BarPage | null {
     case 'start':
     case 'state':
     case 'gauges':
+    case 'waiting':
       return null;
   }
 }

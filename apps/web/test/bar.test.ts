@@ -60,6 +60,19 @@ test("the bare word gauges opens the machine's gauges, and gauges with a name op
   assert.deepEqual(nextBar(GAUGES, HIRING), HIRING);
 });
 
+test('the bare word waiting opens the runs waiting on you, and waiting with a name opens none', () => {
+  const WAITING: Bar = { kind: 'waiting' };
+  assert.deepEqual(barOf('waiting'), WAITING);
+  assert.equal(barValue(WAITING), 'waiting');
+  assert.deepEqual(barOf(barValue(WAITING)), WAITING);
+  for (const value of ['waiting:', 'waiting:x', 'Waiting', 'waitings', 'wait'])
+    assert.equal(barOf(value), undefined, `${value} opens no bar`);
+  assert.equal(barOpens(WAITING), null, 'it has no page: each row opens its run');
+  assert.equal(inspects(WAITING), true, 'a press on the empty canvas closes it');
+  assert.equal(nextBar(WAITING, WAITING), undefined, 'pressing the bell again closes it');
+  assert.deepEqual(nextBar(WAITING, { kind: 'gauges' }), { kind: 'gauges' });
+});
+
 test("a run's address names the run, and a step's names its run up to the first slash and the step after it", () => {
   assert.deepEqual(barOf('run:abc'), RUN);
   assert.deepEqual(barOf('step:abc/review'), REVIEW);

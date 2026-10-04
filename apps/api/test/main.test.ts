@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
+import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { DEFAULT_PORT, portOf, ticksOf, VIEWER_PORT } from '../src/port.ts';
@@ -173,6 +174,24 @@ test('(e) SIGTERM ends the api with 143 and lets the lease go, and the next api 
   const next = startApi('0', [], first.root);
   t.after(() => next.child.kill());
   await leaseSays(first.root, (l) => l.pid === next.child.pid && l.by === 'api');
+});
+
+test('REFUSED: a port another process holds ends the daemon with exit 2, naming the port and PORT=, and lets the lease go', async (t) => {
+  const holder = net.createServer();
+  await new Promise<void>((resolve) => holder.listen(0, '127.0.0.1', resolve));
+  t.after(() => holder.close());
+  const taken = String((holder.address() as net.AddressInfo).port);
+  const api = startApi(taken);
+  assert.equal(await api.ended, 2, 'a refusal, not a crash');
+  assert.match(
+    api.output(),
+    new RegExp(`^api: 127\\.0\\.0\\.1:${taken} is in use by another process\\. Stop what listens there, or give PORT= another port`, 'm'),
+  );
+  assert.doesNotMatch(api.output(), /listening|    at /, 'no stack, and nothing listening');
+  assert.ok(leaseOf(api.root).stoppedAt, 'the lease taken before the port is let go, so the next daemon takes it at once');
+  const viewer = startApi(taken, ['--no-tick']);
+  assert.equal(await viewer.ended, 2, 'a viewer on a held port is refused the same way');
+  assert.match(viewer.output(), new RegExp(`^api: 127\\.0\\.0\\.1:${taken} is in use`, 'm'));
 });
 
 test('(f) --no-tick serves the board and writes no lease; (g) any other argument is refused naming --no-tick', async (t) => {

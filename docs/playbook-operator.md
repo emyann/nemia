@@ -112,15 +112,16 @@ rm "$S"/node_modules; git worktree remove "$S"
 ## After a landing
 
 - **The daemon is the api**, started without `--no-tick`: it holds the store (`~/.agent-workflows/daemon.json`, `by: "api"`, its `url`),
-  ticks it, and serves the board on 8787. Start it detached, so no harness's time limit ends it, from the main checkout:
+  ticks it, and answers the board's `/api` on 8787; the board is the web's `vite preview` (`npm run preview` in apps/web, after
+  `npm run build`), which proxies `/api` there. Start the api detached, so no harness's time limit ends it, from the main checkout:
 
   ```sh
   cd apps/api && env -u CLAUDECODE -u CLAUDE_CODE_SESSION_ID … WF_MAX_CONCURRENT=50 setsid nohup node src/main.ts >> ~/.agent-workflows/api.log 2>&1 &
   ```
 
   Find it by its lease, never by a pattern: `npx wf ls`'s last line names the holder, its pid and its url, and `daemon.json` holds the
-  same. A second api or a `wf up` on the store is refused while it ticks, naming it. `npm run dev` in apps/api serves a board on 8788
-  without ticking (`--no-tick`), for working on the board; `wf up` is the daemon on a machine with no board.
+  same. A second api or a `wf up` on the store is refused while it ticks, naming it. `npm run dev` serves an api on 8788 that
+  ticks nothing (`--no-tick`), behind the vite dev server on 5173, for working on the board; `wf up` is the daemon on a machine with no board.
 - **Restart the daemon** when the landing changed `packages/agent-runtime/src`, `packages/agent-orchestrator/src` or `apps/api/src` (not
   for a doc, a skill, a test or the web alone), at a gap: only when no landing holds the checkout. Stop it by the pid its lease names, and
   wait for the lease to say it stopped before starting the next:

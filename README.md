@@ -29,9 +29,10 @@ npm run typecheck
 npx wf              # the workspace CLIs are linked at the root
 ```
 
-`npm start` in `apps/api` is the store's daemon and its board at once: it holds `~/.agent-workflows/daemon.json`, ticks the runs and
-serves the built web on :8787. `npx wf up` is the same daemon on a machine that serves no board. One store takes one daemon: each refuses
-the other while it ticks, naming its pid.
+`npm start` in `apps/api` is the store's daemon and the board's api at once: it holds `~/.agent-workflows/daemon.json`, ticks the runs
+and answers `/api` on :8787. The board itself is the web's server: `npm run build` then `npm run preview` in `apps/web`, which proxies
+`/api` to :8787. `npx wf up` is the same daemon on a machine that serves no board. One store takes one daemon: each refuses the other
+while it ticks, naming its pid.
 
 ## No build step, except the web app
 

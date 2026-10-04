@@ -2693,10 +2693,10 @@ task is never refused, however many passes read it.
 ## One daemon per store: `daemon.json`
 
 The tick keeps one writer per file, and two ticks are two writers. So the store's daemon takes the store for itself, through a file of its
-own, `$WF_ROOT/daemon.json`, which it alone writes. The daemon is the api's process (`npm start` in `apps/api`), which serves the board as
-it ticks, or `wf up` on a machine that serves none: both run `up` (`src/daemon/up.verb.ts`), which takes the store before anything else,
+own, `$WF_ROOT/daemon.json`, which it alone writes. The daemon is the api's process (`npm start` in `apps/api`), which answers the board's
+`/api` as it ticks (the board itself is the web's server, which proxies to it), or `wf up` on a machine that serves none: both run `up` (`src/daemon/up.verb.ts`), which takes the store before anything else,
 and the file names which one holds it (`by`, `"api"` or `"wf up"`, read as `wf up` when absent) and where an api serves (`url`, written
-once it listens). An api started with `--no-tick` serves the board on 8788 and takes nothing: it ticks no store, so a run filed on it
+once it listens). An api started with `--no-tick` answers on 8788, behind the vite dev server, and takes nothing: it ticks no store, so a run filed on it
 moves on the daemon's next pass.
 
 ```json

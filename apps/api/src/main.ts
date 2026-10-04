@@ -31,13 +31,27 @@ try {
   fail(err);
 }
 
+/**
+ * Why the app cannot listen on `port`, as a refusal (exit 2) naming the fix: a port in use is another process's, so another `PORT` —
+ * `0` for any free one — or that process stopped; any other error is said with its own words beside the same fix.
+ */
+const unserved = (err: Error & { code?: string }): Error =>
+  Object.assign(
+    new Error(
+      `api: ${HOST}:${port} ${err.code === 'EADDRINUSE' ? 'is in use by another process' : `cannot be listened on: ${err.message}`}. ` +
+        'Stop what listens there, or give PORT= another port (PORT=0 for any free one).',
+    ),
+    { exitCode: 2 },
+  );
+
 /** The app served on `port`, once it listens, at the port it got; the server closed, every connection with it, as the scope closes. */
 const listening = Effect.acquireRelease(
-  Effect.callback<{ server: ReturnType<typeof serve>; port: number }>((resume) => {
+  Effect.callback<{ server: ReturnType<typeof serve>; port: number }, Error>((resume) => {
     const server = serve({ fetch: app.fetch, port, hostname: HOST }, (info) => {
       console.log(`api listening on http://${HOST}:${info.port}`);
       resume(Effect.succeed({ server, port: info.port }));
     });
+    server.once('error', (err) => resume(Effect.fail(unserved(err))));
   }),
   ({ server }) =>
     Effect.sync(() => {
@@ -46,7 +60,7 @@ const listening = Effect.acquireRelease(
     }),
 );
 
-if (!ticks!) await Effect.runPromise(Effect.scoped(Effect.andThen(listening, Effect.never)));
+if (!ticks!) await Effect.runPromise(Effect.scoped(Effect.andThen(listening, Effect.never))).catch(fail);
 else
   await runMain(
     up(e!, {

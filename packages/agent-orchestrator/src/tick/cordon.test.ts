@@ -172,7 +172,7 @@ test('while the store is cordoned nothing new starts and what runs finishes; the
   const landing = begun(SHIP, { repo: LANDS, isolate: true });
   for (let k = 0; k < 6; k++) {
     await pass();
-    if (k === 0) worked(LANDS, readRun(landing.id).steps.work!.branch!);
+    if (k === 0) worked(LANDS, readRun(landing.id).steps.work.branch!);
     h.signAll([running, checked], [refused]);
   }
   await approve(h.e, landing.id, 'ship');
@@ -234,7 +234,7 @@ test('while the store is cordoned nothing new starts and what runs finishes; the
   assert.equal(readRun(landing.id).steps.ship?.check, undefined);
   assert.deepEqual(await cordonRead(h.e), listed.cordoned, 'and the api reads the same');
   const ls = COMMANDS.find((c) => c.name === 'ls')!;
-  assert.deepEqual(ls.print(listed, {}).slice(0, 2), cordonLines(listed.cordoned!), 'wf ls says it first');
+  assert.deepEqual(ls.print(listed, {}).slice(0, 2), cordonLines(listed.cordoned), 'wf ls says it first');
 
   liftCordon();
   const lifted = await pass();

@@ -8,21 +8,12 @@
  * The folder is not among the workflows the board lists (`tries/` is no place of them), and a run of it is a try by where it was started
  * from (`tryOf`), read off the record alone: nothing new is written on it.
  */
-import fs from 'node:fs';
 import path from 'node:path';
+import { triesDir, tryDir, writeTryFolder } from 'agent-orchestrator';
 import { AGENTS_FOLDER, directoryFence, isRemoteHarness, SKILLS_FOLDER } from 'agent-orchestrator/workflow';
 import type { Run } from 'agent-orchestrator/run';
 import { Invalid } from 'agent-orchestrator/effect';
 import { quoted } from './skills.ts';
-
-/** Where every try's folder is: `tries/` in the store, beside `workflows/`. */
-export const triesDir = (home: string): string => path.join(home, 'tries');
-
-/** The folder an agent's try is started from. */
-export const tryDir = (name: string, home: string): string => path.join(triesDir(home), name);
-
-/** The step a try's folder has, and so the one step of its run. */
-export const TRY_STEP = 'try';
 
 /** The cap on a try, in dollars: what its step's `budget:` says. */
 export const TRY_BUDGET = 1;
@@ -130,31 +121,13 @@ export function untriedOf(
 }
 
 /**
- * The try folder of an agent whose keys are `keys` (`tryText`), written when its step file does not read or was written at another
- * version of the agent, and left as it is otherwise. A folder or a step file that is a link is refused (`Invalid`): written through, it
- * would change whatever it points at; and so is an agent the try cannot fence (`tryFence`).
+ * The try folder of an agent whose keys are `keys`, written by the package (`writeTryFolder`) with its step file (`tryText`); answers the
+ * folder. Refuses (`Invalid`) an agent the try cannot fence (`tryFence`), and the package refuses a folder or a step file that is a link.
  */
-export function writeTryFolder(name: string, version: string, keys: FencedKeys, home: string): string {
-  const dir = tryDir(name, home);
-  const file = path.join(dir, `${TRY_STEP}.md`);
-  for (const at of [triesDir(home), dir, file]) {
-    if (fs.lstatSync(at, { throwIfNoEntry: false })?.isSymbolicLink()) {
-      throw new Invalid({
-        message: `${at} is a link, and a try's folder is written by the api: make it a folder of its own, or remove it.`,
-      });
-    }
-  }
+export function tryFolder(name: string, version: string, keys: FencedKeys, home: string): string {
   const fence = tryFence(name, keys);
   if (typeof fence === 'string') throw new Invalid({ message: fence });
-  const text = tryText(name, version, fence);
-  let was: string | undefined;
-  try {
-    was = fs.readFileSync(file, 'utf8');
-  } catch {}
-  if (was === text) return dir;
-  fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(file, text);
-  return dir;
+  return writeTryFolder(name, tryText(name, version, fence), home);
 }
 
 /** The agent a run tried, when it is a try: started from a folder directly under `tries/`. Null for every other run. */

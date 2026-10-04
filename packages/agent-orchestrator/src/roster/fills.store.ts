@@ -7,22 +7,13 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { fillsOf, lookupRoots, readFactories, type Factory, type Places } from 'agent-orchestrator';
-import { AGENTS_FOLDER, frontmatterKey, stepFiles } from 'agent-orchestrator/workflow';
-import type { AgentListing } from './agents.ts';
-import { foldersIn, placesOf, sourcesOf, type WorkflowSource } from '../workflows/workflows.ts';
-
-/** A step an agent fills: the step `step` of the workflow `workflow`, read from `from`, and whether a factory hired it there. */
-export type AgentFill = { from: WorkflowSource; workflow: string; step: string; hired: boolean };
-
-/** A step filled, and the agent file that fills it, as `path.resolve` spells it. */
-export type FilledStep = AgentFill & { file: string };
-
-/**
- * An agent as the Agents page lists it: its listing, the steps it fills in the factory the request names (`fills`), and the names of
- * the factories it fills a step in, sorted (`factories`): the default factory is none of them.
- */
-export type LibraryAgent = AgentListing & { fills: AgentFill[]; factories: string[] };
+import { AGENTS_FOLDER } from '../step/step.ts';
+import { frontmatterKey } from '../former/former.ts';
+import { stepFiles } from '../folder/folder.ts';
+import { fillsOf, type Factory, type FactoryListing } from '../factory/factory.ts';
+import { lookupRoots, type Places } from '../folder/folder.store.ts';
+import { foldersIn } from '../folder/lookup.store.ts';
+import type { AgentPlace, FilledStep } from './roster.ts';
 
 /**
  * The file a start of the workflow in `workflowDir` runs for the agent `name`: `agents/<name>.md` in the first of its `lookupRoots` that
@@ -48,7 +39,7 @@ function writtenAgent(file: string): string | undefined {
  * Each step of the workflow `workflow`, in `dir`, filled: by the agent its file names, and by the one `hires` puts in it, each credited to
  * its file. A step both name counts under both. None for a folder that cannot be read.
  */
-function filledIn(from: WorkflowSource, dir: string, workflow: string, hires: ReadonlyMap<string, string>, places: Places): FilledStep[] {
+function filledIn(from: AgentPlace, dir: string, workflow: string, hires: ReadonlyMap<string, string>, places: Places): FilledStep[] {
   let entries: string[];
   try {
     entries = fs.readdirSync(dir);
@@ -69,13 +60,17 @@ function filledIn(from: WorkflowSource, dir: string, workflow: string, hires: Re
 }
 
 /**
- * Every step `factory` fills on `repo` — in the workflows it attaches, of the repository's and of yours — with its hires; with no factory,
- * every step of every workflow, by what its file names. In the order they are listed: by place, then workflow, then step. Throws where a
- * place's folder cannot be listed (`foldersIn`).
+ * Every step `factory` fills on `repo` — in the workflows it attaches, of the repository's `workflows/` and of the store `home`'s — with
+ * its hires; with no factory, every step of every workflow, by what its file names. In the order they are listed: by place, then workflow,
+ * then step. Throws where a place's folder cannot be listed (`foldersIn`).
  */
 export function stepsFilled(repo: string, home: string, factory?: Factory): FilledStep[] {
-  const places = placesOf(repo, home);
-  return sourcesOf(repo, home).flatMap(({ from, dir }) =>
+  const places: Places = { repo, home };
+  const sources: Array<{ from: AgentPlace; dir: string }> = [
+    { from: 'repo', dir: path.join(repo, 'workflows') },
+    { from: 'yours', dir: path.join(home, 'workflows') },
+  ];
+  return sources.flatMap(({ from, dir }) =>
     foldersIn(dir)
       .filter((workflow) => !factory || factory.workflows.includes(workflow))
       .flatMap((workflow) => {
@@ -96,35 +91,14 @@ const filesFilledBy = (factory: Factory, home: string): string[] =>
   });
 
 /**
- * Each agent file a factory in the store fills a step with, and the names of those factories, sorted and named once. A factory whose file
- * does not read fills nothing, and hides no other.
+ * Each agent file one of `factories` (`readFactories`) fills a step with, and the names of those factories, sorted and named once. A
+ * factory whose file does not read fills nothing, and hides no other.
  */
-export function factoriesFilling(home: string): Map<string, string[]> {
+export function factoriesFilling(factories: readonly FactoryListing[], home: string): Map<string, string[]> {
   const byFile = new Map<string, Set<string>>();
-  for (const listing of readFactories()) {
+  for (const listing of factories) {
     if ('error' in listing) continue;
     for (const file of filesFilledBy(listing, home)) byFile.set(file, (byFile.get(file) ?? new Set<string>()).add(listing.name));
   }
   return new Map([...byFile].map(([file, names]) => [file, [...names].sort()]));
-}
-
-/**
- * The agents the Agents page lists, the one writer of their `fills` and `factories`: each of `listings` with the steps of `filled` its file
- * fills, and the factories `byFile` names for its file. In a factory, only the agents that fill a step in it; in the default factory, all.
- */
-export function inFactory(
-  listings: readonly AgentListing[],
-  filled: readonly FilledStep[],
-  byFile: ReadonlyMap<string, readonly string[]>,
-  factory?: Factory,
-): LibraryAgent[] {
-  const tagged = listings.map((listing) => {
-    const file = path.resolve(listing.file);
-    return {
-      ...listing,
-      fills: filled.filter((fill) => fill.file === file).map(({ from, workflow, step, hired }) => ({ from, workflow, step, hired })),
-      factories: [...(byFile.get(file) ?? [])],
-    };
-  });
-  return factory ? tagged.filter((agent) => agent.fills.length > 0) : tagged;
 }

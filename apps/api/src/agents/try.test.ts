@@ -18,7 +18,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
 import { app } from '../app.ts';
-import { writeTryFolder } from './try.ts';
+import { tryFolder } from './try.ts';
 import { start } from 'agent-orchestrator';
 /** The board's repository: a plain directory, with agents of its own and a skill only it has. */
 const repo = scratch('nemia-api-try-repo-');
@@ -234,7 +234,7 @@ test("REFUSED: a try never runs with its agent's rules outside its folder — an
   assert.equal(agents.find((agent) => agent.name === 'careful')!.untried, null);
   const keys = { permissionMode: 'default', allowedTools: 'Bash, Edit(/home/**)' };
   assert.throws(
-    () => writeTryFolder('outward', 'v1', keys, root),
+    () => tryFolder('outward', 'v1', keys, root),
     (err: Error) => err.message === why,
     'the folder is refused by its writer too, not only by the route',
   );

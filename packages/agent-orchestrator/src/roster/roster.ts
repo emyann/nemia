@@ -1,19 +1,49 @@
 /**
  * One reading of an agent, as `wf agents` prints it and the api answers it (`AgentReading`): the one with nothing in it, which each reading
  * starts from (`emptyReading`), the one of a file that does not read as an agent, its lines as written so a form can show what to fix
- * (`unreadReading`), and the lines `wf agents` and `wf agents card` print of what was read (`agentsLines`, `cardNote`). Pure: the reading
- * off disk is `roster.store.ts`.
+ * (`unreadReading`), the lines `wf agents` and `wf agents card` print of what was read (`agentsLines`, `cardNote`), and the agents the
+ * Agents page lists with the steps each fills (`inFactory`). Pure: the reading off disk is `roster.store.ts`, and the steps filled
+ * `fills.store.ts`.
  */
+import path from 'node:path';
 import { AGENTS_FOLDER, splitFrontmatter } from '../step/step.ts';
 import { codexSandboxNamed, FORMER_KEYS, frontmatterKey, harnessPromptNamed } from '../former/former.ts';
 import type { AgentSkill } from '../skills/skills.ts';
 import { AGENT_KEYS, AGENT_OWN_KEYS, isCardFile, type AgentCardShape, type RoleKey } from '../agents/agents.ts';
+import type { Factory } from '../factory/factory.ts';
 
 /** The two places an agent is read from: the repository's `workflows/agents`, then your store's. */
 export type AgentPlace = 'repo' | 'yours';
 
 /** A node that names an agent: the step `step` of the workflow `workflow`, read from `from` — the agent's own place. */
 export type AgentUser = { from: AgentPlace; workflow: string; step: string };
+
+/** A step an agent fills: the step `step` of the workflow `workflow`, read from `from`, and whether a factory hired it there. */
+export type AgentFill = { from: AgentPlace; workflow: string; step: string; hired: boolean };
+
+/** A step filled, and the agent file that fills it, as `path.resolve` spells it. */
+export type FilledStep = AgentFill & { file: string };
+
+/**
+ * The agents the Agents page lists, the one writer of their `fills` and `factories`: each of `listings` with the steps of `filled` its file
+ * fills, and the factories `byFile` names for its file. In a factory, only the agents that fill a step in it; in the default factory, all.
+ */
+export function inFactory<L extends { file: string }>(
+  listings: readonly L[],
+  filled: readonly FilledStep[],
+  byFile: ReadonlyMap<string, readonly string[]>,
+  factory?: Factory,
+): Array<L & { fills: AgentFill[]; factories: string[] }> {
+  const tagged = listings.map((listing) => {
+    const file = path.resolve(listing.file);
+    return {
+      ...listing,
+      fills: filled.filter((fill) => fill.file === file).map(({ from, workflow, step, hired }) => ({ from, workflow, step, hired })),
+      factories: [...(byFile.get(file) ?? [])],
+    };
+  });
+  return factory ? tagged.filter((agent) => agent.fills.length > 0) : tagged;
+}
 
 /**
  * One agent as it is read: its file's keys as written, its instructions, the result schema its `output:` names as that file holds it, the

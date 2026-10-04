@@ -13,8 +13,10 @@ import {
   cardPlace,
   hasPage,
   ignoredRepoNote,
+  inboxBadgeTitle,
   namedElsewhere,
   newestCardsFirst,
+  notStarted,
   ordinal,
   presetOf,
   queueable,
@@ -565,4 +567,25 @@ test('REFUSED: no place for a card naming a factory the store does not list, or 
       why: 'The card names the factory bad, whose file does not read: /store/factories/bad.json is not JSON',
     },
   );
+});
+
+test("REFUSED: the Inbox badge counts the picked factory's cards not yet started, queued ones too; never one started, nor one that does not read", () => {
+  const cards = [
+    entry('waits-a1', null, { factory: 'nemia' }),
+    entry('queued-b2', null, { factory: 'nemia', queued: { at: '2026-10-01T00:00:00.000Z', place: 1 } }),
+    entry('started-c3', null, { factory: 'nemia', startedAs: ['r-1'] }),
+    entry('broken-d4', null, { factory: 'nemia', error: 'the card has no front matter' }),
+    entry('hiring-e5', null, { factory: 'hiring' }),
+    entry('default-f6', null),
+  ];
+  const names = (picked: string | undefined) => notStarted(cards, picked).map((card) => card.name);
+  assert.deepEqual(names('nemia'), ['waits-a1', 'queued-b2']);
+  assert.deepEqual(names(undefined), ['waits-a1', 'queued-b2', 'hiring-e5', 'default-f6'], 'every factory under All factories');
+  assert.deepEqual(names('default'), ['default-f6'], "a card naming no factory is the default factory's");
+  assert.equal(names('quay').length, 0);
+});
+
+test("the Inbox badge's title says what it counts whole: in the factory picked, or in every factory", () => {
+  assert.equal(inboxBadgeTitle(3, undefined), '3 cards not yet started, in every factory');
+  assert.equal(inboxBadgeTitle(1, 'nemia'), '1 card not yet started, in nemia');
 });

@@ -127,6 +127,7 @@ export {
 export { outputLines } from './closeout/closeout.ts';
 export { dueNote, messageRefusal, signoffsSpent } from './retry/index.ts';
 export { firstFiledAt, runStartedAt, timeline, timelineLines, timelineTotalLines } from './timeline/timeline.ts';
+export { atWork, runTokens } from './timeline/took.ts';
 export type { FolderRun, GitRun, PlaceKind } from './run.ts';
 export type {
   Acceptance,
@@ -154,6 +155,7 @@ export type {
   Wait,
 } from './run.ts';
 export type { SlotWait, TaskSpan, Timeline, TimelineTotal, TimelineTry } from './timeline/timeline.ts';
+export type { AtWork, RunTokens } from './timeline/took.ts';
 export type { Retry, RetryAsk, RetryHow, RetryMode } from './retry/index.ts';
 export {
   agentsFor,

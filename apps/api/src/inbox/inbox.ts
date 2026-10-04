@@ -21,12 +21,12 @@ import path from 'node:path';
 import { Schema } from 'effect';
 import { Hono } from 'hono';
 import {
+  COMMANDS,
   INBOX,
   INBOX_ADD,
   INBOX_KEY_MEANINGS,
   INBOX_KEYS,
   inboxNameRefusal,
-  noCardLine,
   parseInboxCard,
   readInbox,
   runStore,
@@ -70,6 +70,9 @@ export type InboxQueueAnswer = {
   place: number | null;
   of: number | null;
 };
+
+/** One card read for its page (`inbox card`), an entry of the package's table the api serves alone: on `GET /api/inbox/:name`. */
+const CARD = COMMANDS.find((c) => c.name === 'inbox card')!;
 
 const isDirectory = (at: string): boolean => Boolean(fs.statSync(at, { throwIfNoEntry: false })?.isDirectory());
 
@@ -162,12 +165,6 @@ function filingOf(body: typeof FILE_BODY.Type, repo: string, home: string): { te
 }
 
 /**
- * The cards a sentence about a card not there names, as the package's does (`wf inbox rm`, a start): every `.md` file, read as a card or
- * not — never a stray file or a folder, which no name reaches as a card.
- */
-const cardsIn = (entries: readonly InboxEntry[]): string[] => entries.filter((e) => e.file.endsWith('.md')).map((e) => e.name);
-
-/**
  * The inbox's routes. Each write passes the guard (guard.ts) before its body is read.
  *
  * - `GET /api/inbox` — `wf inbox`'s cards, through its entry's handler, and every entry of the folder that does not read as one, with
@@ -175,9 +172,9 @@ const cardsIn = (entries: readonly InboxEntry[]): string[] => entries.filter((e)
  *   for the runs a card was started as.
  * - `GET /api/inbox/:name` — one card, for its page (`InboxCardPage`). A name that would leave the inbox, or a hidden one, is refused in
  *   the package's words (400) before anything is read; a card is found among the entries the inbox lists, never by a path joined from what
- *   was sent, and a card before a stray file of the same name (`notes.md` and `notes` both list as `notes`). 404 for a card not there, or
- *   dropped since the listing read it, the sentence naming the cards that are. Its keys are as the listing reads them: `queued` is when it
- *   was queued (the listing carries its place too), null when unset.
+ *   was sent, and a card before a stray file of the same name (`notes.md` and `notes` both list as `notes`), through the package's entry
+ *   (`inbox card`). 404 for a card not there, or dropped since the listing read it, the package's `Missing` naming the cards that are.
+ *   Its keys are as the listing reads them: `queued` is when it was queued (the listing carries its place too), null when unset.
  * - `POST /api/inbox` — `wf inbox add "<idea>" --workflow <name> --repo <path>`, through its entry's handler: a card filed, under the
  *   slug of its first line (201, `InboxFiled`). The body and its workflow are refused as `filingOf` says; the package's refusal, word for
  *   word, is an `Invalid`, which `app.onError` answers 422: an idea with nothing in it, a key it would write on two lines, a repo that is
@@ -198,25 +195,19 @@ export const inbox = new Hono<ApiEnv>()
     const name = c.req.param('name');
     const wrong = inboxNameRefusal(name);
     if (wrong) return c.json({ error: wrong }, 400);
-    const entries = listInbox();
-    const entry = entries.find((e) => e.name === name && e.file.endsWith('.md')) ?? entries.find((e) => e.name === name);
-    if (!entry) return c.json({ error: noCardLine(name, cardsIn(entries)) }, 404);
-    let source: string | null;
-    try {
-      source = runStore.inbox.read(entry.file);
-    } catch {
-      source = null;
-    }
-    if (source === null) return c.json({ error: noCardLine(name, cardsIn(entries.filter((e) => e !== entry))) }, 404);
-    const keys =
-      entry.error === null
-        ? INBOX_KEYS.map((key) => ({
-            key,
-            value: key === 'queued' ? (entry.queued?.at ?? null) : (entry[key] ?? null),
-            meaning: INBOX_KEY_MEANINGS[key],
-          }))
-        : null;
-    return c.json({ ...entry, source, keys } satisfies InboxCardPage);
+    return served(c, async ({ e }) => {
+      const { card, source } = (await CARD.handler(e, { name })) as { card: InboxListing; source: string };
+      const [entry] = listInbox([card]);
+      const keys =
+        entry.error === null
+          ? INBOX_KEYS.map((key) => ({
+              key,
+              value: key === 'queued' ? (entry.queued?.at ?? null) : (entry[key] ?? null),
+              meaning: INBOX_KEY_MEANINGS[key],
+            }))
+          : null;
+      return c.json({ ...entry, source, keys } satisfies InboxCardPage);
+    });
   })
   .post('/api/inbox', (c) =>
     served(c, async ({ e, repo, home }) => {

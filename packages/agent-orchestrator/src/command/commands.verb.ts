@@ -32,6 +32,7 @@ import { agentsLines, cardNote, type AgentsRead, type CardRead } from '../roster
 import { commandLine, type Args, type CommandSpec, type Flag } from './command.ts';
 import type { Command, Ran } from './entry.verb.ts';
 import { READS } from './reads.verb.ts';
+import { PAGES } from './pages.verb.ts';
 import { AGENTS_CUSTOM } from '../agents/custom.verb.ts';
 import { LIBRARY_ENTRIES } from '../agents/library.verb.ts';
 import { SKILL_ENTRIES } from '../skills/skills.verb.ts';
@@ -485,6 +486,7 @@ export const COMMANDS: readonly Command[] = [
   SAY,
   LS,
   ...READS,
+  ...PAGES,
   DECIDE,
   MERGES,
   CEILINGS,

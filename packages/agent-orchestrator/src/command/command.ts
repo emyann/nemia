@@ -310,6 +310,17 @@ function sideBreaks(c: Entry): string[] {
   return breaks;
 }
 
+/** Each route of `c` on a method and path an entry before it is routed on (`routed`, which takes the rest of them). */
+function routedTwice(c: Entry, routed: Map<string, string>): string[] {
+  const breaks: string[] = [];
+  for (const at of routeList(c).map((r) => `${r.method} ${r.path}`)) {
+    const first = routed.get(at);
+    if (first) breaks.push(`${c.name} is routed on ${at}, as ${first} is: give it a path of its own`);
+    else routed.set(at, c.name);
+  }
+  return breaks;
+}
+
 /**
  * Where a table of commands breaks its rules, a sentence each: a name defined twice; two entries routed on one method and path, of which
  * the api would serve the first alone; an entry served nowhere — neither routed on the api nor said to be served on one side alone
@@ -324,11 +335,7 @@ export function commandBreaks(table: readonly Entry[], verbs: readonly string[],
   for (const c of table) {
     if (seen.has(c.name)) breaks.push(`${c.name} is defined twice: a command is one entry of the table`);
     seen.add(c.name);
-    for (const at of routeList(c).map((r) => `${r.method} ${r.path}`)) {
-      const first = routed.get(at);
-      if (first) breaks.push(`${c.name} is routed on ${at}, as ${first} is: give it a path of its own`);
-      else routed.set(at, c.name);
-    }
+    breaks.push(...routedTwice(c, routed));
     if (!routeList(c).length && !c.only)
       breaks.push(`${c.name} has no route and no only: give it its route on the api, or say which side alone serves it, and why`);
     if (c.only?.side !== 'api' && verbs.includes(c.name))

@@ -2749,7 +2749,7 @@ not read, a holder that `stopped`, one whose process is `gone` (`kill(pid, 0)` f
 before the store is taken: `wf up -5` would write an interval the file does not read back, and a holder that does not read holds nothing.
 
 - **A second daemon is refused by name, exit 2, while the store is ticked**, both ways round — an api while a `wf up` ticks, a `wf up`
-  while an api does, and either while one of its own kind does — — naming the pid, where and since when it ticks, its last pass,
+  while an api does, and either while one of its own kind does — naming the pid, where and since when it ticks, its last pass,
   and how to stop it: `kill <pid>`, that pid, which is the node process and not an `npm exec` wrapper around it (killing the wrapper can
   leave the child ticking, reparented to init). Anything else is taken over, and the daemon says from whom when it was not a clean stop:
   `took ~/.agent-workflows over from pid 51234, whose process is gone`.
@@ -3174,8 +3174,9 @@ holding a concurrency slot forever.
 | `src/runner.ts` | the package's root: each name it exports re-exported by name from the file that holds it, and nothing else |
 | `src/meter/meter.ts` | what a pass costs — pure: its phases (`PHASES`), its cost composed (`passCost`) and read off disk (`parsePassCost`), the passes of an interval (`addPass`, `summaryDue`), and the line `wf up` says once a minute and the breakdown `--stats` prints (`summaryLine`, `breakdownLines`) |
 | `src/feed/feed.ts` | the feed of what the tick judged — pure: the line, the fold of the lines and what a pass owes it (`foldFeed`, `feedChanges`), a line in words (`feedLineWords`), and a run's steps as the feed says them (`feedWords`); the file is `src/feed/feed.store.ts`'s |
-| `src/cli/main.ts` | the verbs' table: `main`, which looks up the verb in `VERBS` and runs it, or prints the help; the daemon's verbs, `wf tick`, `wf up`, `wf feed` and `wf watch`; and `runMain`, which runs `wf up` and `wf watch` as Effects |
-| `src/cli/flags.ts`, `src/cli/start.ts`, `src/cli/runs.ts`, `src/cli/asks.ts` | each verb, its flags, read off the command line, and its help, by family: the help, a verb's shape (`Verb`) and the flag reader beneath them all (`readFlags`), then `wf start`, `wf plan` and `wf inbox`; `wf ls`, `wf cancel`, `wf rm`, `wf prune`, `wf hold`, `wf show`, `wf logs` and `wf agents`; `wf retry`, `wf approve`, `wf round`, `wf accept` and `wf say` |
+| `src/cli/main.ts` | the verbs' table: `main`, which looks up the command in the table or the verb in `VERBS` and runs it, or prints the help; and the runners of the commands the CLI runs itself (`RUNS`): `wf tick`, `wf up` and `wf watch`, and `wf rm` and `wf prune` |
+| `src/daemon/up.verb.ts` | the daemon's loop, one for its two kinds, the api's process and `wf up`: `up`, which takes the store's lease in its scope and lets it go as the scope closes; `holdUrl`, which writes into the lease where the api serves; and `runMain`, which runs either as the process's command |
+| `src/cli/flags.ts`, `src/cli/start.ts`, `src/cli/runs.ts`, `src/cli/asks.ts` | each verb, its flags, read off the command line, and its help, by family: the help, a verb's shape (`Verb`) and the flag reader beneath them all (`readFlags`), then `wf start`, `wf plan` and `wf inbox`; `wf ls`, `wf cancel`, `wf rm`, `wf prune`, `wf hold` and `wf agents`; `wf retry`, `wf approve`, `wf round`, `wf accept` and `wf say` |
 | `src/cli/decide/decide.ts` | `wf decide`: its help, its one flag, and the screen it prints (`decideVerb`) |
 | `src/cli/factory/factory.ts` | `wf factory`: its help, the arguments of `add`, `attach`, `detach`, `hire` and `fire`, and what `ls`, `add`, `attach`, `detach`, `hire`, `fire` and `rm` print (`factoryVerb`) |
 | `src/cli/exit.ts` | what `wf` exits with (`exitCodeOf`), imported by `bin/wf.ts` before the package |

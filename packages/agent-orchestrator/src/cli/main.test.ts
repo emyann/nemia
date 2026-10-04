@@ -150,6 +150,7 @@ test('the help, once and alone, for a verb given too little to act on', async (t
     ['accept'],
     ['say', 'r-1'],
     ['show'],
+    ['show', '--help'],
     ['logs', 'r-1'],
     ['agents', 'card'],
     ['agents', 'card', '--repo'],
@@ -220,6 +221,25 @@ test('wf logs: a step that has not run, and the output of one that has, from the
   assert.deepEqual(await typed(t, b.e, 'logs', run.id, 'implement'), { out: ['implement has not run yet'], err: [] });
   await advance(b.e, readRun(run.id));
   assert.deepEqual(await typed(t, b.e, 'logs', run.id, 'implement'), { out: [`the output of ${run.id}-implement`], err: [] });
+  assert.deepEqual(
+    await typed(t, b.e, 'logs', run.id, 'deploy'),
+    { out: ['deploy has not run yet'], err: [] },
+    'a step the run does not have is one that has not run, exit 0',
+  );
+});
+
+test('REFUSED at shipped defaults: wf show and wf logs given a flag where a run or a step stands, in their words whole', async (t) => {
+  const b = board();
+  for (const [argv, said] of [
+    [['show', '--x'], "wf show takes one run's id: not --x."],
+    [['logs', '--x', 'implement'], "wf logs takes one run's id and one step's name: not --x."],
+    [['logs', 'r-1', '--x'], "wf logs takes one run's id and one step's name: not --x."],
+  ] as const)
+    await assert.rejects(typed(t, b.e, ...argv), (err: Error & { exitCode?: number }) => {
+      assert.equal(err.message, said, `wf ${argv.join(' ')}`);
+      assert.equal(err.exitCode, 2);
+      return true;
+    });
 });
 
 test('wf accept of a loop out of rounds: what it accepted, and the file it wrote', async (t) => {

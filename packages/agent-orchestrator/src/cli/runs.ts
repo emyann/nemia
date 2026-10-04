@@ -1,7 +1,7 @@
 /**
- * The verbs over runs and agents — `wf show`, `wf logs` and `wf agents custom` — their flags, read off the command line, and what each
- * prints; and the runners of `wf rm` and `wf prune` (`RM`, `PRUNE`), which walk the many runs a command line names through the entry's
- * handler, ask a person's yes, and tally what was not done into the exit code.
+ * The verb over agents — `wf agents custom` — its flags, read off the command line, and what it prints; and the runners of `wf rm` and
+ * `wf prune` (`RM`, `PRUNE`), which walk the many runs a command line names through the entry's handler, ask a person's yes, and tally
+ * what was not done into the exit code.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -166,24 +166,6 @@ export async function pruneVerb(args: Args, e: Engine): Promise<void> {
   if (!(await removing(prunable, named, { unmerged, yes, artifacts }))) return refusedNamed(tally);
   await prunedAll(e, prunable, args, tally);
   return refusedNamed(tally);
-}
-
-/** `wf show`: the run's record as JSON, its brief and each step's body cut short. */
-export function showVerb(rest: string[]): void {
-  if (!rest[0]) return console.log(HELP);
-  const run = runStore.runs.read(rest[0]);
-  const workflow = run.workflow?.map(({ body, ...keys }) => ({ ...keys, body: `${body.slice(0, 60)}…` }));
-  console.log(JSON.stringify({ ...run, brief: `${run.brief.slice(0, 120)}…`, workflow }, null, 2));
-  return;
-}
-
-/** `wf logs`: a step's session output, from the engine, or that it has not run yet. */
-export async function logsVerb(rest: string[], e: Engine): Promise<void> {
-  const [runId, stepName] = rest;
-  if (!runId || !stepName) return console.log(HELP);
-  const taskId = runStore.runs.read(runId).steps[stepName]?.taskId;
-  if (!taskId) return console.log(`${stepName} has not run yet`);
-  return console.log(await e.logs(taskId));
 }
 
 /** `wf agents custom`'s flags after the agent's name: the words to write (`--file <path>`, or `-` for stdin), `--clear`, and `--repo`. */

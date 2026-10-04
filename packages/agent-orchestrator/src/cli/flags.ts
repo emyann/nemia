@@ -65,21 +65,9 @@ export const HELP = `wf — run a workflow of agent steps
   wf factory fire <factory> --step <workflow>/<step>
                                take a step's hire back
   wf factory rm <name>         remove a factory's file
-  wf stats [--from <day>] [--to <day>] [--by agent|step|factory|workflow|repo] [--agent|--step|--factory|--workflow|--repo <v>] [--line|--json]
-                               what every run in the store adds up to, by UTC day: rounds to
-                               acceptance of each loop: step, landings of the workspace: main step
-                               and on which try, cost and time per landed run, and each step's
-                               tries, time, cost, checks and gate waits; first the last 14 days
-                               against the 14 before. A number nothing measured reads —, never 0.
-                               --line: one line, for a recap; --json: the whole answer
-  wf feed [cursor]             what the tick judged, a line each time it changed: a run's status, a
-                               step's word as wf ls says it, and what a person's word changed — then
-                               cursor: <n>, to read on from with wf feed <n>; from the start with none
   wf decide <runId> [--sensitive <globs>]
                                what the run produced, and the choice it leaves you (wf decide --help)
 ${helpOf(TABLE)}
-  wf show <runId>              the run, and what each step was told
-  wf logs <runId> <step>       that step's session output
   wf agents custom <name> [--file <path>|-] [--clear] [--repo .]
                                your custom instructions for that agent: words you add to it without
                                rewriting it, kept in <store>/custom-instructions/<name>.md and told

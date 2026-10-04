@@ -5,8 +5,9 @@
  * `wf round`, `wf accept` and `wf say` — the runs and their steps (`wf ls`, `runsListed`), two reads the api alone serves: a run's
  * decision (`decideRun`) and the run slots (`slotsOf`), the agents of both places (`wf agents`, `agentsRead`) and one agent's card
  * (`wf agents card`, `agentCardRead`), a run's course (`wf cancel`, `wf hold`, `wf rm`, `wf prune`), and the store's cordon (`wf cordon`,
- * `wf uncordon`, and its read the api alone serves): `runs.verb.ts`. The whole table (`TABLE`) adds the commands the CLI serves alone and
- * runs itself, with no handler: `wf tick`, `wf up` and `wf watch` (`RAN`).
+ * `wf uncordon`, and its read the api alone serves): `runs.verb.ts`; and the reads of the store (`wf show`, `wf logs`, `wf feed`,
+ * `wf stats`: `reads.verb.ts`). The whole table (`TABLE`) adds the commands the CLI serves alone and runs itself, with no handler:
+ * `wf tick`, `wf up` and `wf watch` (`RAN`).
  */
 import { approvalWordsRefusal } from '../gate/gate.ts';
 import { approve } from '../gate/gate.verb.ts';
@@ -28,6 +29,7 @@ import { agentCardRead, agentsRead } from '../roster/roster.store.ts';
 import { agentsLines, cardNote, type AgentsRead, type CardRead } from '../roster/roster.ts';
 import { commandLine, type Args, type CommandSpec, type Flag } from './command.ts';
 import type { Command, Ran } from './entry.verb.ts';
+import { READS } from './reads.verb.ts';
 import { CANCEL, CORDON, CORDONED, HOLD, PRUNE, RAN, RM, UNCORDON } from './runs.verb.ts';
 
 /** The text under `key`, or undefined where none was given. */
@@ -468,6 +470,7 @@ export const COMMANDS: readonly Command[] = [
   ACCEPT,
   SAY,
   LS,
+  ...READS,
   DECIDE,
   CEILINGS,
   AGENTS,

@@ -75,6 +75,18 @@ test('a command line given too little is no refusal: the CLI prints its help', (
   assert.equal(parseArgv(SPEC, ['--fast']), undefined);
 });
 
+test('a flag the command has none of, given where a required argument stands, is refused in its words; --help and its own print the help', () => {
+  assert.equal(refusalOf(['--nope']), 'UNKNOWN --nope');
+  assert.equal(refusalOf(['--nope=r-1']), 'UNKNOWN --nope=r-1');
+  assert.equal(parseArgv(SPEC, ['--help']), undefined);
+  assert.equal(parseArgv(SPEC, ['--note=hi']), undefined);
+  assert.equal(
+    refusalOf(['--nope'], { ...SPEC, missing: 'MISSING' }),
+    'MISSING',
+    'a spec that says its own refusal of an argument left out says it',
+  );
+});
+
 test('an argument the command does not take is refused in its words', () => {
   assert.equal(refusalOf(['r-1', '--loud']), 'UNKNOWN --loud');
   assert.equal(refusalOf(['r-1', 'impl', 'extra']), 'UNKNOWN extra');
@@ -217,6 +229,21 @@ test("the table's help is today's, word for word", () => {
       '                               last, whether a wf up ticks the store and when its last pass was;',
       '                               first, while the store is cordoned, the cordon and each landing it',
       '                               holds with its merge staged in the checkout (MERGE_HEAD)',
+      '  wf show <runId>',
+      '                               the run, and what each step was told',
+      '  wf logs <runId> <step>',
+      "                               that step's session output",
+      '  wf feed [cursor]',
+      "                               what the tick judged, a line each time it changed: a run's status, a",
+      "                               step's word as wf ls says it, and what a person's word changed — then",
+      '                               cursor: <n>, to read on from with wf feed <n>; from the start with none',
+      '  wf stats [--from <day>] [--to <day>] [--by agent|step|factory|workflow|repo] [--agent|--step|--factory|--workflow|--repo <v>] [--line|--json]',
+      '                               what every run in the store adds up to, by UTC day: rounds to',
+      '                               acceptance of each loop: step, landings of the workspace: main step',
+      "                               and on which try, cost and time per landed run, and each step's",
+      '                               tries, time, cost, checks and gate waits; first the last 14 days',
+      '                               against the 14 before. A number nothing measured reads —, never 0.',
+      '                               --line: one line, for a recap; --json: the whole answer',
       '  wf agents [--repo .]',
       "                               the agents a step may name, the repository's then yours: what each is",
       '                               for, what it says it can do (an entry for each skill, read off its',

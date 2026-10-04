@@ -96,7 +96,7 @@ async function badgeAt(page: Page, to: string, count: number, picked: string | u
   if (!count) return expectCount(badgeOf(page), 0, `${to}: no badge for no card`);
   await expectTexts(badgeOf(page), [`${count} ${inboxBadgeTitle(count, picked)}`], `${to}: the Inbox badge counts ${count}`);
   const title = await sidebarOf(page)
-    .locator('li', { has: badgeOf(page) })
+    .locator('li', { has: page.locator('[data-inbox-badge]') })
     .getAttribute('title');
   if (title !== inboxBadgeTitle(count, picked))
     throw new Refused(`${to}: the Inbox says ${inboxBadgeTitle(count, picked)} on hover — it says ${title}`);

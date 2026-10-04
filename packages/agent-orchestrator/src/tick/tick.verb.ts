@@ -7,13 +7,14 @@
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { Data, Effect } from 'effect';
-import { EngineService, awaited, refusedText, tried, unreadableJournal, type Engine, type RefusedMove } from '../runtime-client.ts';
+import { EngineService, awaited, refusedText, tried, unreadableJournal, type Engine, type RefusedMove, type TaskView } from '../runtime-client.ts';
 import type { QueueStarted } from '../inbox/inbox.ts';
 import { tipsSeen } from '../branches/branches.ts';
 import { admissionOrder, slotFree, type RunSlot } from '../cap/cap.ts';
 import { readPause } from '../pause/pause.store.ts';
-import type { Pause } from '../pause/pause.ts';
+import { finishingAmong, type Finishing, type PauseStanding } from '../pause/pause.ts';
 import { isGitRun, type Run } from '../record/record.ts';
+import { stepsOf } from '../record/record.store.ts';
 import { hasStarted } from '../wait/wait.ts';
 import { runStore } from '../record/files.store.ts';
 import { ceilings, recordCeilings, recordPassCost } from '../daemon/daemon.store.ts';
@@ -59,10 +60,11 @@ export type Pass = {
    */
   unreadable?: string[];
   /**
-   * The store's pause as the pass read it (`readPause`), while one stands: the pass admitted no queued task and started no queued card,
-   * and filed nothing new of any run (`assess`). Absent while the store is not paused.
+   * The store's pause as the pass read it (`readPause`), while one stands, and each task still finishing under it, read off the views the
+   * runtime reported on this pass (`finishingOf`): the pass admitted no queued task and started no queued card, and filed nothing new of
+   * any run (`assess`). Absent while the store is not paused.
    */
-  pause?: Pause;
+  pause?: PauseStanding;
 };
 
 /**
@@ -176,8 +178,15 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }
     slotFree({ inFlight: counted, cap: ran.runs }) && !(yield* tried(() => readPause()))
       ? yield* tried(() => within('act', () => startQueued(repo, runs)))
       : undefined;
-  return { ...passOf(report, runs, judging, queue), ...(pause ? { pause } : {}) };
+  return { ...passOf(report, runs, judging, queue), ...(pause ? { pause: { pause, finishing: finishingReported(runs, report.views ?? []) } } : {}) };
 });
+
+
+/** Each task of `runs` still finishing under the pause (`finishingAmong`), read off the views the runtime reported on the pass. */
+const finishingReported = (runs: readonly Run[], views: readonly TaskView[]): Finishing[] => {
+  const reported = new Map(views.map((v) => [v.id, v]));
+  return finishingAmong(runs, (taskId) => reported.get(taskId), stepsOf);
+};
 
 /** What a pass has judged so far: each run it advanced, and each run it left unjudged with the runtime's words for why. */
 type Judging = { done: Map<string, Advanced>; unjudged: Map<string, string> };

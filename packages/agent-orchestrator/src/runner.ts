@@ -374,7 +374,17 @@ export { accept, round } from './round/round.verb.ts';
 export { approve } from './gate/gate.verb.ts';
 export { cancel } from './cancel/cancel.verb.ts';
 export { hold, unhold } from './wait/wait.verb.ts';
-export { pauseWords, RESUMED, type Pause, type Paused, type PauseStaged } from './pause/pause.ts';
+export {
+  finishingWords,
+  pausedLines,
+  pausedWords,
+  pauseWords,
+  RESUMED,
+  type Finishing,
+  type Pause,
+  type Paused,
+  type PauseStaged,
+} from './pause/pause.ts';
 export { readPause } from './pause/pause.store.ts';
 export { retry } from './retry/retry.verb.ts';
 export { say } from './say/say.verb.ts';
@@ -397,7 +407,7 @@ export { freshStatsMemo, stats } from './stats/stats.verb.ts';
 export type { StatsMemo, StatsOptions } from './stats/stats.verb.ts';
 export { BY_KEYS, statsLine, statsLines, statsQueryOf } from './stats/index.ts';
 export type { ByKey, QueryKey, Stats, StatsQuery } from './stats/index.ts';
-export { list, runReading, unjudgedOf } from './list/list.verb.ts';
+export { list, pausedRead, runReading, unjudgedOf } from './list/list.verb.ts';
 export type { ReadingHow, RunReading } from './list/list.verb.ts';
 export type { Answered, Decided } from './decide/decide.verb.ts';
 export type { DecideCommand } from './decide/decide.ts';

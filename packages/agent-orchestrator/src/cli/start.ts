@@ -7,7 +7,9 @@ import {
   addToInbox,
   approvedFirst,
   cardToStart,
-  pauseWords,
+  pausedRead,
+  pausedWords,
+  type Paused,
   dropFromInbox,
   endingSteps,
   formerKeyLines,
@@ -24,7 +26,6 @@ import {
   planLines,
   planStopped,
   queueInInbox,
-  readPause,
   readInbox,
   repoFor,
   start,
@@ -37,7 +38,7 @@ import {
   workflowFolder,
   writersOf,
 } from '../runner.ts';
-import { HELP, usage, readFlags } from './flags.ts';
+import { HELP, usage, readFlags, type Engine } from './flags.ts';
 
 export const PLAN_HELP = `wf plan <folder> [--repo .] [--factory <name>]
 
@@ -294,9 +295,9 @@ function gateLines(run: ReturnType<typeof start>, steps: ReturnType<typeof steps
 
 /**
  * What `wf start` prints of a run it started: its steps, where it came from when said, its factory, the folders it mounts, where it works,
- * and what it waits on and ends at; and, while the store is paused, that nothing of it is filed until the lift.
+ * and what it waits on and ends at; and, while the store is paused (`paused`), that nothing of it is filed until it resumes.
  */
-function printStarted(run: ReturnType<typeof start>, from?: string): void {
+function printStarted(run: ReturnType<typeof start>, paused: Paused, from?: string): void {
   const steps = stepsOf(run);
   console.log(`${run.id}  ${steps.length} step(s): ${steps.map((s) => (s.agent ? `${s.name} (${s.agent.name})` : s.name)).join(' → ')}`);
   if (from) console.log(from);
@@ -308,13 +309,13 @@ function printStarted(run: ReturnType<typeof start>, from?: string): void {
     console.log(`waits on: ${run.after.join(', ')} — nothing is filed until wf decide says each has shipped onto ${run.branch}`);
   for (const line of gateLines(run, steps)) console.log(line);
   console.log(`run 'wf tick' (or 'wf up') to start it`);
-  const pause = readPause();
-  if (pause) console.log(`${pauseWords(pause)}: nothing of this run is filed until then`);
+  const pause = pausedWords(paused);
+  if (pause) console.log(`${pause}: nothing of this run is filed until then`);
   for (const line of formerKeyLines(run.workflowDir)) console.log(line);
 }
 
 /** `wf start` of the inbox's card `inboxName`: its body, or `--brief` in its place — a file's text, or the words — started and said. */
-function startInboxCard(inboxName: string, how: StartHow): void {
+async function startInboxCard(inboxName: string, how: StartHow, e: Engine): Promise<void> {
   const brief =
     how.brief === undefined
       ? undefined
@@ -336,6 +337,7 @@ function startInboxCard(inboxName: string, how: StartHow): void {
   });
   printStarted(
     started.run,
+    await pausedRead(e),
     started.removed
       ? `${fromNote(started.run)} — removed from the inbox`
       : `${fromNote(started.run)} — still in the inbox: ${started.why}. wf inbox lists it as started as ${started.run.id}: drop it with wf inbox rm ${inboxName}`,
@@ -347,12 +349,12 @@ function startInboxCard(inboxName: string, how: StartHow): void {
  * `wf start`: a run of a brief, a plan's card or an inbox card, and what it prints of it. A file that is not a plan's card
  * (`cardToStart`) is the whole brief, frontmatter and all, and a card's own `workflow:` is found from its plan folder.
  */
-export function startVerb(rest: string[]): void {
+export async function startVerb(rest: string[], e: Engine): Promise<void> {
   const arg = rest[0];
   if (!arg || arg.startsWith('--')) return console.log(HELP);
   const how = startHow(rest.slice(1));
   const inboxName = inboxNameAt(arg);
-  if (inboxName !== null) return startInboxCard(inboxName, how);
+  if (inboxName !== null) return startInboxCard(inboxName, how, e);
   if (how.brief !== undefined)
     usage(
       `wf start takes --brief only for a card of the inbox, in place of its body: wf start ${path.join(inboxDir(), '<name>.md')} --brief "<brief>". Anywhere else the brief is its first argument: wf start "<brief>".`,
@@ -374,7 +376,7 @@ export function startVerb(rest: string[]): void {
     gates: how.gates,
     ...(factory !== undefined ? { factory } : {}),
   });
-  printStarted(run);
+  printStarted(run, await pausedRead(e));
 }
 
 /**

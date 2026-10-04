@@ -2280,7 +2280,7 @@ another when it is lifted, and the board's Pause switch. `--by` defaults to the 
 pause holds, is named under it — `r-1's ship has its merge staged in /repo (MERGE_HEAD), and its check waits on
 wf resume` — so a person who paused to use main knows whose `MERGE_HEAD` is there.
 
-The pause is a person's file, `$WF_ROOT/pause`, `{ at, by, why? }`, one for the store, read on every pass and
+The pause is a person's file, `$WF_ROOT/cordon`, `{ at, by, why? }`, one for the store, read on every pass and
 composed onto every run read; no record is written with it. The runtime is told only that it may admit nothing:
 the store's engine is `unschedulable` while the file is there (`storeAdmission` in `src/runtime-client.ts`),
 asked by the runtime's own pass before it admits, so no queued task starts under the pause whichever process

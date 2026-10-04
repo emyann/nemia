@@ -9,7 +9,8 @@ import {
   ceilingLines,
   ceilings,
   Conflict,
-  pauseWords,
+  pausedLines,
+  pausedWords,
   RESUMED,
   engine,
   everyOf,
@@ -86,12 +87,12 @@ function tickRunLines(r: Pass['runs'][number]): void {
 }
 
 /**
- * A pass's lines on `wf tick`: the pause it read, what failed or was left out on stderr, then what it refused, the queue's card and each
+ * A pass's lines on `wf tick`: the pause it read and what finishes under it, what failed or was left out on stderr, then what it refused, the queue's card and each
  * run; returns it.
  */
 function tickLines(pass: Pass): Pass {
   const { runs: results, queue, feedError, refused, unreadable, pause } = pass;
-  if (pause) console.log(pauseWords(pause));
+  if (pause) for (const line of pausedLines(pause)) console.log(line);
   if (feedError) console.error(feedError);
   for (const why of unreadable ?? []) console.error(`left out: ${why}`);
   for (const line of refusalLines(refused ?? [], new Set()).lines) console.log(line);
@@ -132,8 +133,8 @@ function upStats(): void {
 
 /**
  * What `wf up` has said while it lasts, so it says each failure once: a queued card's start (`said`), the feed's (`feedSaid`), a move the
- * lifecycle refused (`refusedSaid`), a journal left out (`unreadableSaid`); the store's pause (`pauseSaid`), said once put and once
- * lifted; and the passes its next summary counts (`interval`).
+ * lifecycle refused (`refusedSaid`), a journal left out (`unreadableSaid`); the store's pause (`pauseSaid`), said once put, on each
+ * change of its words and once resumed; and the passes its next summary counts (`interval`).
  */
 type UpSaid = {
   said: string | undefined;
@@ -162,9 +163,12 @@ function advancedLines(advanced: Pass['runs']): void {
   }
 }
 
-/** The store's pause on `wf up`, once when it is put or changed and once when it is lifted; returns the pause it said, if any. */
+/**
+ * The store's pause on `wf up` (`pausedWords`), once when it is put, again each time its words change — Pausing with fewer finishing, then
+ * Paused — and once when it is resumed; returns the line it said, if any.
+ */
 export function pauseSaid(pause: Pass['pause'], said: string | undefined): string | undefined {
-  const now = pause ? pauseWords(pause) : undefined;
+  const now = pause ? (pausedWords(pause) ?? undefined) : undefined;
   if (now !== said) console.log(`${new Date().toISOString().slice(11, 19)}  ${now ?? RESUMED}`);
   return now;
 }

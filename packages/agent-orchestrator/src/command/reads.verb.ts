@@ -9,8 +9,8 @@ import type { Run } from '../record/record.ts';
 import { cursorTakes, feedLineWords, type FeedLine } from '../feed/feed.ts';
 import { readFeed } from '../feed/feed.store.ts';
 import { verifiesRest } from '../config/config.store.ts';
-import { pauseWords, type Pause } from '../pause/pause.ts';
-import { readPause } from '../pause/pause.store.ts';
+import { pausedWords, type Paused } from '../pause/pause.ts';
+import { pausedRead } from '../list/list.verb.ts';
 import { BY_KEYS, statsLine, statsLines, statsQueryOf, type QueryKey, type Stats } from '../stats/index.ts';
 import { stats } from '../stats/stats.verb.ts';
 import type { Args } from './command.ts';
@@ -74,7 +74,7 @@ export const LOGS: Command<{ taskId?: string; output?: string }> = {
  * `wf feed`: the store's pause while one stands, the feed's lines after a cursor, 0 when none is given, and the cursor to read on from;
  * printed in that order.
  */
-export const FEED: Command<{ pause: Pause | null; lines: FeedLine[]; cursor: number }> = {
+export const FEED: Command<{ pause: Paused; lines: FeedLine[]; cursor: number }> = {
   name: 'feed',
   usage: '[cursor]',
   help: [
@@ -93,8 +93,11 @@ export const FEED: Command<{ pause: Pause | null; lines: FeedLine[]; cursor: num
   },
   writes: false,
   only: { side: 'cli', why: 'the board follows the feed through GET /api/feed/stream, the counterpart of wf watch' },
-  handler: async (_e, args) => ({ ...readFeed(Number(textOf(args, 'cursor') ?? 0)), pause: readPause() }),
-  print: ({ pause, lines, cursor }) => [...(pause ? [pauseWords(pause)] : []), ...lines.map(feedLineWords), `cursor: ${cursor}`],
+  handler: async (e, args) => ({ ...readFeed(Number(textOf(args, 'cursor') ?? 0)), pause: await pausedRead(e) }),
+  print: ({ pause, lines, cursor }) => {
+    const paused = pausedWords(pause);
+    return [...(paused ? [paused] : []), ...lines.map(feedLineWords), `cursor: ${cursor}`];
+  },
 };
 
 /** The value flags `wf stats` takes, by the query key each sets, and what each takes. */

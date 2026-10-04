@@ -1,5 +1,5 @@
 /**
- * The store's pause, as the tick honours it: while `$WF_ROOT/pause` stands no pass starts new work — no step, try or check filed, no
+ * The store's pause, as the tick honours it: while `$WF_ROOT/cordon` stands no pass starts new work — no step, try or check filed, no
  * queued task admitted, no queued card started, nothing of a run `wf start` wrote meanwhile — and what runs finishes; a person's retry and
  * approval written meanwhile wait on their files; and the pass after the lift files what waits. Every pass judges afresh what the memo of
  * runs at rest answers (`verifyRest`), and one in the middle starts with no memo at all, as a restarted daemon does.
@@ -17,6 +17,7 @@ import { execFileSync } from 'node:child_process';
 import type { PromiseJournal, PromiseRunner, PromiseSighting } from 'agent-runtime';
 import { Engine } from 'agent-runtime/effect';
 import type { Run } from '../run.ts';
+import type { Finishing } from '../pause/pause.ts';
 import { scratch } from '../../test/scratch.ts';
 
 const ROOT = scratch('wf-pause-');
@@ -198,12 +199,27 @@ test('while the store is paused nothing new starts and what runs finishes; the p
   staged(LANDS);
 
   const first = await pass();
-  assert.deepEqual(first.pause, pause, 'the pass says the pause it read');
+  const byStep = (a: Finishing, b: Finishing) => `${a.run}${a.step}`.localeCompare(`${b.run}${b.step}`);
+  assert.deepEqual(
+    { ...first.pause!, finishing: [...first.pause!.finishing].sort(byStep) },
+    {
+      pause,
+      finishing: ([
+        { run: running.id, step: 'plan', kind: 'session' },
+        { run: checked.id, step: 'work', kind: 'session' },
+        { run: landing.id, step: 'ship', kind: 'session' },
+      ] satisfies Finishing[]).sort(byStep),
+    },
+    'the pass says the pause it read, and what still finishes under it: neither the queued task nor one settled',
+  );
+  assert.match(pausedLines(first.pause!)[0]!, /^Pausing: 3 finishing/);
   assert.equal(first.queue, undefined, 'and started no queued card');
   h.signAll();
   await pass(freshRestMemo());
   await pass();
   const last = await pass();
+  assert.deepEqual(last.pause, { pause, finishing: [] }, 'once what ran has finished, nothing finishes');
+  assert.match(pausedLines(last.pause!)[0]!, /^Paused since /);
 
   assert.deepEqual(h.spawned.slice(before), [], 'no session started while the store is paused');
   assert.equal((await h.e.view(queuedTask)).admission, 'queued', 'the queued task not admitted');
@@ -227,7 +243,7 @@ test('while the store is paused nothing new starts and what runs finishes; the p
   const repo = readRun(landing.id).repo!;
   assert.deepEqual(
     listed.paused,
-    { pause, staged: [{ run: landing.id, step: 'ship', repo }] },
+    { pause, finishing: [], staged: [{ run: landing.id, step: 'ship', repo }] },
     'wf ls names the pause, and the landing whose merge it holds staged in the checkout, its check not filed',
   );
   assert.equal(readRun(landing.id).steps.ship?.check, undefined);
@@ -246,7 +262,7 @@ test('while the store is paused nothing new starts and what runs finishes; the p
   assert.ok(lifted.queue, 'the queued card tried');
   assert.ok(readRun(landing.id).steps.ship?.check, "landing's check filed");
   assert.equal((await runsListed(h.e)).paused, undefined, 'and wf ls says no pause');
-  assert.deepEqual(await pausedRead(h.e), { pause: null, staged: [] });
+  assert.deepEqual(await pausedRead(h.e), { pause: null, finishing: [], staged: [] });
   await pass();
   assert.ok(h.spawned.length > before, 'and sessions started again');
   assert.notEqual((await h.e.view(queuedTask)).admission, 'queued', 'the queued task admitted');

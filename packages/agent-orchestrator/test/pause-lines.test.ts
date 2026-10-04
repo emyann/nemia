@@ -1,6 +1,7 @@
 /**
- * The store's pause as the CLI says it: first on `wf feed`, after how to start the run on `wf start`, and on `wf up` once when it is
- * put, again when it changes, and `resumed` once when it is lifted (`pauseSaid`); none of them while no pause stands.
+ * The store's pause as the CLI says it (`pausedWords`): first on `wf feed`, after how to start the run on `wf start`, and on `wf up` once
+ * when it is put, again each time its words change — Pausing with fewer finishing, then Paused — and `resumed` once when it is resumed
+ * (`pauseSaid`); none of them while no pause stands.
  *
  * `WF_ROOT` is set before the import, since the module reads it as it loads.
  */
@@ -17,7 +18,7 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 const { main, pauseSaid } = await import('../src/cli/main.ts');
 const { resumePause, putPause } = await import('../src/pause/pause.store.ts');
-const { pauseWords, RESUMED } = await import('../src/pause/pause.ts');
+const { pausedWords, RESUMED } = await import('../src/pause/pause.ts');
 const { addFactory, attachWorkflow, hireAgent } = await import('../src/runner.ts');
 
 /** What `fn` printed on stdout, line by line. */
@@ -56,23 +57,24 @@ const aStart = (): string[] => {
   return ['start', 'a paused start', '--workflows', dir, '--repo', repo, '--factory', factory, '--no-worktree'];
 };
 
-test('wf feed opens with the pause while one stands, and says none once it is lifted', async (t) => {
+test('wf feed opens with the pause while one stands, Paused with nothing at work, and says none once it is resumed', async (t) => {
   const pause = putPause({ why: 'merging by hand', by: 'ann' });
   try {
     const feed = await printed(t, () => main(['feed'], {} as Engine));
-    assert.equal(feed[0], pauseWords(pause), feed.join('\n'));
+    assert.equal(feed[0], pausedWords({ pause, finishing: [] }), feed.join('\n'));
+    assert.match(feed[0]!, /^Paused since /);
   } finally {
     resumePause();
   }
   const lifted = await printed(t, () => main(['feed'], {} as Engine));
   assert.equal(
-    lifted.some((l) => l.startsWith('the store is paused')),
+    lifted.some((l) => l.startsWith('Paus')),
     false,
     lifted.join('\n'),
   );
 });
 
-test('wf start says, after how to start the run, that nothing of it is filed until the lift, and nothing of a pause with none', async (t) => {
+test('wf start says, after how to start the run, that nothing of it is filed until it resumes, and nothing of a pause with none', async (t) => {
   const pause = putPause({ by: 'ann' });
   let started: string[];
   try {
@@ -82,7 +84,7 @@ test('wf start says, after how to start the run, that nothing of it is filed unt
   }
   const at = started.indexOf("run 'wf tick' (or 'wf up') to start it");
   assert.ok(at > 0, started.join('\n'));
-  assert.equal(started[at + 1], `${pauseWords(pause)}: nothing of this run is filed until then`);
+  assert.equal(started[at + 1], `${pausedWords({ pause, finishing: [] })}: nothing of this run is filed until then`);
   const free = await printed(t, () => main(aStart(), {} as Engine));
   assert.equal(
     free.some((l) => l.includes('nothing of this run is filed')),
@@ -91,15 +93,21 @@ test('wf start says, after how to start the run, that nothing of it is filed unt
   );
 });
 
-test('wf up says the pause once across passes, again when it changes, and resumed once when it is lifted', async (t) => {
-  const first = { at: '2026-10-04T12:00:00.000Z', by: 'ann', why: 'merging by hand' };
-  const second = { ...first, by: 'bob' };
+test('wf up says the pause once across passes, again each time its words change, and resumed once when it is resumed', async (t) => {
+  const pause = { at: '2026-10-04T12:00:00.000Z', by: 'ann', why: 'merging by hand' };
+  const two = { pause, finishing: [{ run: 'r-1', step: 'a', kind: 'session' as const }, { run: 'r-2', step: 'b', kind: 'check' as const }] };
+  const one = { pause, finishing: two.finishing.slice(1) };
+  const none = { pause, finishing: [] };
   let said: string | undefined;
   const lines = await printed(t, () => {
-    for (const pause of [undefined, first, first, second, second, undefined, undefined]) said = pauseSaid(pause, said);
+    for (const standing of [undefined, two, two, one, none, none, undefined, undefined]) said = pauseSaid(standing, said);
   });
   assert.deepEqual(
     lines.map((l) => l.slice(10)),
-    [pauseWords(first), pauseWords(second), RESUMED],
+    [pausedWords(two), pausedWords(one), pausedWords(none), RESUMED],
+  );
+  assert.deepEqual(
+    lines.map((l) => l.slice(10, 17)),
+    ['Pausing', 'Pausing', 'Paused ', 'the sto'],
   );
 });

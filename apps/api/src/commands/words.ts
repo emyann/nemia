@@ -168,5 +168,29 @@ const SAY: RouteWords = {
   failed: (_at, said) => said,
 };
 
+/** A person's hold lifted, as the guard's refusals word it; it takes no body, and a failure that is no refusal names `wf hold --off`. */
+const HOLD: RouteWords = {
+  shape: '`{}`',
+  guard: ({ runId }) => ({
+    route: `DELETE /api/runs/${runId}/hold`,
+    does: "lifts a run's hold",
+    forAnother: 'lift one',
+    why: 'a hold lifted lets the run go on at the next tick, its steps filed and what they asked asked again',
+    reach: "lift it on the board's run page",
+    instead: "Lift it on the board's run page, or with `wf hold <run> --off`",
+    shape: '`{}`',
+  }),
+  issue: () => () => 'DELETE …/hold takes no body: `{}`.',
+  failed: ({ runId }, said) =>
+    `DELETE /api/runs/${runId}/hold: the hold was not lifted — ${said}. Lift it with \`wf hold ${runId} --off\`.`,
+};
+
 /** The api's words for each routed command, by its name. */
-export const WORDS: Readonly<Record<string, RouteWords>> = { retry: RETRY, round: ROUND, approve: APPROVE, accept: ACCEPT, say: SAY };
+export const WORDS: Readonly<Record<string, RouteWords>> = {
+  retry: RETRY,
+  round: ROUND,
+  approve: APPROVE,
+  accept: ACCEPT,
+  say: SAY,
+  hold: HOLD,
+};

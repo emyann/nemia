@@ -167,15 +167,32 @@ test('REFUSED at shipped defaults: every route that writes, asked by a page on a
   const routed = COMMANDS.filter((c) => c.route && c.writes);
   assert.deepEqual(
     routed.map((c) => c.name),
-    ['retry', 'approve', 'round', 'accept', 'say'],
+    ['retry', 'approve', 'round', 'accept', 'say', 'hold'],
   );
   for (const command of routed) {
-    const url = command.route!.path.replace(':runId', 'r-guard').replace(':step', 'plan');
-    const res = await post(url, { mode: 'nudge', message: 'Go.', text: 'Go.' }, { ...BOARD, 'sec-fetch-site': 'cross-site' });
+    const { method, path: route } = command.route!;
+    const url = route.replace(':runId', 'r-guard').replace(':step', 'plan');
+    const body = JSON.stringify({ mode: 'nudge', message: 'Go.', text: 'Go.' });
+    const res = await app.request(url, { method, headers: { ...BOARD, 'sec-fetch-site': 'cross-site' }, body });
     assert.equal(res.status, 403, command.name);
-    assert.match(((await res.json()) as { error: string }).error, new RegExp(`^POST ${url.replaceAll('/', '\\/')} `), command.name);
+    assert.match(((await res.json()) as { error: string }).error, new RegExp(`^${method} ${url.replaceAll('/', '\\/')} `), command.name);
   }
   assert.deepEqual(asked('r-guard'), [], 'nothing written');
+});
+
+test('a lift on its route reads no body: what its route fixes lifts the hold, whatever the body says, and the hold file is gone', async () => {
+  for (const [id, body] of [
+    ['r-lift-off', JSON.stringify({ off: false, until: ['r-other'] })],
+    ['r-lift-bare', 'not json'],
+  ]) {
+    gatedRun(id);
+    const held = path.join(root, 'runs', `${id}.hold`);
+    write(held, JSON.stringify({ at: at(0), until: ['r-other'] }));
+    const res = await app.request(`/api/runs/${id}/hold`, { method: 'DELETE', headers: BOARD, body });
+    assert.equal(res.status, 200, `${id}: ${await res.clone().text()}`);
+    assert.deepEqual(await res.json(), { id, lifted: true, hold: { at: at(0), until: ['r-other'] } });
+    assert.equal(fs.existsSync(held), false, id);
+  }
 });
 
 test('REFUSED at shipped defaults: `answers` sent to an approval, which takes none on the api — 422 naming the key, nothing written', async () => {
@@ -209,6 +226,9 @@ test('REFUSED: a routed command the api has no words for, and a key taken on the
   const route = { method: 'POST', path: '/api/runs/:runId/sing', status: 202 } as const;
   assert.deepEqual(wordBreaks([{ name: 'sing', route }]), [
     'sing is routed on the api, and words.ts has no words for it: give it its guard, its shape and its refusals there',
+  ]);
+  assert.deepEqual(wordBreaks([{ name: 'hush', route: { method: 'DELETE', path: '/api/runs/:runId/song', status: 200 } }]), [
+    'hush is routed on the api, and words.ts has no words for it: give it its guard, its shape and its refusals there',
   ]);
   assert.deepEqual(wordBreaks([{ name: 'sing' }]), [], 'a command served on the command line alone needs no words');
   assert.deepEqual(extensionBreaks([{ name: 'approve', apiTakes: ['answers'] }]), [

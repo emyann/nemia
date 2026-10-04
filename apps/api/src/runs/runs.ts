@@ -2,17 +2,7 @@
 import { isDeepStrictEqual } from 'node:util';
 import { Schema } from 'effect';
 import { Hono } from 'hono';
-import {
-  type BranchReader,
-  branchReader,
-  forget,
-  prune,
-  runStartedAt,
-  unhold,
-  unjudgedWord,
-  verifiesRest,
-  runStore,
-} from 'agent-orchestrator';
+import { type BranchReader, branchReader, forget, prune, runStartedAt, unjudgedWord, verifiesRest, runStore } from 'agent-orchestrator';
 import { isRefusal } from 'agent-orchestrator/effect';
 import { isGitRun, type PlaceKind, placeOf, pruneLines, prunedKept, prunedWords, type Run } from 'agent-orchestrator/run';
 import { readBody, type BodyIssue } from '../body.ts';
@@ -285,17 +275,6 @@ const removeGuard = (route: string): Guarded => ({
   shape: REMOVE_SHAPE,
 });
 
-/** A person's hold lifted, as the guard's refusals word it (guard.ts). */
-const liftGuard = (route: string): Guarded => ({
-  route,
-  does: "lifts a run's hold",
-  forAnother: 'lift one',
-  why: 'a hold lifted lets the run go on at the next tick, its steps filed and what they asked asked again',
-  reach: "lift it on the board's run page",
-  instead: "Lift it on the board's run page, or with `wf hold <run> --off`",
-  shape: '`{}`',
-});
-
 /** What a prune takes, as its refusal of another content type says it: `wf prune`'s two flags, each a switch. */
 const PRUNE_SHAPE = '`{ "artifacts"?: boolean, "unmerged"?: boolean }`';
 
@@ -411,11 +390,6 @@ async function listed({ e, env, home, memo }: Served): Promise<RunSummary[]> {
  *   Guarded as a write (`removeGuard`). Only a try: any other run is a 409 naming `wf rm`, which says what it hands off and what it leaves,
  *   and a git run's worktrees and branches are a person's to read before they go. A try still working is a 409 in the package's words; a
  *   thrown refusal of the package's goes to `app.onError`, which answers it by its kind (app.ts), and any other failure is a 500.
- * - `DELETE /api/runs/:id/hold` — a person's hold lifted, as `wf hold <run> --off` lifts it (`unhold`): its file removed, and the run goes
- *   on at the next tick, what its steps asked while it was held asked again. Guarded as a write (`liftGuard`). Refused in the package's
- *   words, by `app.onError`: a run nobody holds — a pruned one among them, since no verb holds one — and a hold put again as it was lifted
- *   are a 409 (`Conflict`), a run gone since the route read it a 404; any other failure is a 502. No feed line: the tick is the feed's one
- *   writer, and the board reads the run again itself.
  * - `POST /api/runs/:id/prune` — a finished run pruned, as `wf prune <run> --yes` prunes it (`prune`), with `artifacts` its `--artifacts`
  *   and `unmerged` its `--unmerged` (`PRUNE_BODY`): its worktrees removed, and its files with `artifacts`; its record and every branch
  *   kept. Guarded as a write (`pruneGuard`). The page asks twice before it sends this, so there is no dry run here. The package decides
@@ -464,26 +438,6 @@ export const runs = new Hono<ApiEnv>()
       return c.json({ id, removed: true });
     }),
   )
-  .delete('/api/runs/:id/hold', async (c) => {
-    const id = c.req.param('id');
-    const route = `DELETE /api/runs/${id}/hold`;
-    const refused = refusedBeforeReading(
-      liftGuard(route),
-      c.req.header('host'),
-      c.req.header('sec-fetch-site'),
-      c.req.header('content-type'),
-    );
-    if (refused) return c.json({ error: refused.error }, refused.status);
-    if (!findRun(id)) return c.json({ error: noSuchRun(id) }, 404);
-    try {
-      const { hold } = unhold(id);
-      return c.json({ id, lifted: true, hold });
-    } catch (err) {
-      if (isRefusal(err)) throw err;
-      const message = err instanceof Error ? err.message : String(err);
-      return c.json({ error: `${route}: the hold was not lifted — ${message}. Lift it with \`wf hold ${id} --off\`.` }, 502);
-    }
-  })
   .post('/api/runs/:id/prune', (c) =>
     served(c, async ({ e }) => {
       const id = c.req.param('id');

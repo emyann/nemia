@@ -32,7 +32,8 @@ import { configForTurn } from '../../harness/args.ts';
 import { Runner, type ExpectedSession } from '../../harness/seam.ts';
 import { transition, type Move, type Refusal } from '../lifecycle.ts';
 import { divergence, releasableOf, TickMemo, TickMemoDiverged, type Releasable, type TickMemoState } from './memo.ts';
-import { ADMIT_INSTEAD } from './filing.ts';
+import { CEILING_INSTEAD } from './filing.ts';
+import { ownPool, toAdmit, type AdmissionRule } from '../admission.ts';
 import { countedFacts } from './counted.ts';
 import { instantNow } from './now.ts';
 
@@ -41,6 +42,12 @@ import { instantNow } from './now.ts';
  * refused edge is planted to prove the pass reports it. Exported by neither entry, as the machine is not.
  */
 export const Lifecycle = Context.Reference<Move>('engine/Lifecycle', { defaultValue: () => transition });
+
+/**
+ * What the pass admits under (`AdmissionRule`): the engine's ceiling and pools, which `Engine.layer` provides from its options. By
+ * default none, so a task filed `queued` waits for `admit`.
+ */
+export const Admission = Context.Reference<AdmissionRule>('engine/Admission', { defaultValue: () => ({ poolOf: ownPool }) });
 
 /** How long a spawned session may go unregistered by the harness before we call it gone. */
 export const GRACE_MS = 30_000;
@@ -168,7 +175,7 @@ export class StepRefused extends Schema.TaggedError<StepRefused>()('StepRefused'
 export const stepRefusalOf = (extra: readonly unknown[]): string | undefined =>
   extra.length === 0
     ? undefined
-    : `step takes a task and an observation, and was handed ${extra.length} more: its third argument was the ceiling's slots, and the runtime has no ceiling since stage 4c part 2. ${ADMIT_INSTEAD}`;
+    : `step takes a task and an observation, and was handed ${extra.length} more: its third argument was the ceiling's slots, and a ceiling is the engine's own now. ${CEILING_INSTEAD}`;
 
 /**
  * Why `settleTask` refuses its `maxSteps`, or `undefined`: a count of steps is a whole number above nought, and nothing
@@ -179,7 +186,7 @@ export const settleRefusalOf = (maxSteps: unknown, extra: readonly unknown[]): s
   Number.isInteger(maxSteps) && (maxSteps as number) > 0 && extra.length === 0
     ? undefined
     : // oxlint-disable-next-line typescript/no-base-to-string -- `String` is reached only once an object and a function are ruled out
-      `settleTask takes a task, an observation and a number of steps above nought, and was handed ${extra.length ? `${extra.length} more` : `a maxSteps of ${typeof maxSteps === 'object' || typeof maxSteps === 'function' ? JSON.stringify(maxSteps) : String(maxSteps)}`}: its third argument was the ceiling's slots, and the runtime has no ceiling since stage 4c part 2. ${ADMIT_INSTEAD}`;
+      `settleTask takes a task, an observation and a number of steps above nought, and was handed ${extra.length ? `${extra.length} more` : `a maxSteps of ${typeof maxSteps === 'object' || typeof maxSteps === 'function' ? JSON.stringify(maxSteps) : String(maxSteps)}`}: its third argument was the ceiling's slots, and a ceiling is the engine's own now. ${CEILING_INSTEAD}`;
 
 /** Nothing left unread: what `step` and `settleTask` decide on, handed an observation and no more. */
 const ALL_READ: ReadonlySet<string> = new Set();
@@ -475,7 +482,7 @@ export class TickRefused extends Schema.TaggedError<TickRefused>()('TickRefused'
 export const tickRefusalOf = (args: readonly unknown[]): string | undefined =>
   args.length === 0
     ? undefined
-    : `the pass takes no arguments, and was handed ${args.length}: it has no ceiling and no pools since stage 4c part 2. ${ADMIT_INSTEAD}`;
+    : `the pass takes no arguments, and was handed ${args.length}: a ceiling and its pools are the engine's own, never a pass's. ${CEILING_INSTEAD}`;
 
 /**
  * Whether an unsettled task's session is at work as the pass left it: its last attempt open, and its harness listing it
@@ -543,13 +550,23 @@ const verifyKept = Effect.fn('verifyKept')(function* (
 });
 
 /**
+ * Admits the queued tasks the engine's ceiling has room for (`toAdmit`), off the views the pass built, and journals `admitted` for
+ * each: the next pass starts them. Returns the views with those marked admitted, as `view` reads them after the pass.
+ */
+const admitWaiting = Effect.fn('admitWaiting')(function* (views: readonly TaskView[]) {
+  const ids = new Set(toAdmit(views, yield* Admission));
+  const journal = yield* Journal;
+  for (const id of ids) yield* journal.append(id, { kind: 'admitted', at: new Date().toISOString() });
+  return views.map((v): TaskView => (ids.has(v.id) ? { ...v, admission: 'admitted' } : v));
+});
+
+/**
  * One pass over every task on the board. This is the whole daemon.
  *
- * Each task is stepped in the order `journal.list` gives, against one observation of every harness. The pass chooses
- * nothing: a task filed unqueued starts on it, and one filed `queued` starts on the pass after the layer above `admit`s it.
- * How many run at once, in which pool, and which first is that layer's — the orchestrator's `toAdmit`, off the `views` this
- * pass returns: the board as the pass left it, off its one observation and the fold it already made, with no second look
- * at any harness.
+ * Each task is stepped in the order `journal.list` gives, against one observation of every harness. A task filed unqueued
+ * starts on it, and one filed `queued` starts on the pass after it is admitted: by `admit`, or by the pass itself under the
+ * engine's ceiling (`Admission`), off the board as the pass left it — its one observation and the fold it already made, with
+ * no second look at any harness. Per pool, the waiting task of the highest `priority` goes first, then the earliest filed.
  *
  * `running` is a count, per harness, of the sessions at work as the pass left them (`atWork`), off the same observation
  * and the fold the pass already made: what `ae tick` prints, and no rule reads.
@@ -583,6 +600,7 @@ const verifyKept = Effect.fn('verifyKept')(function* (
  *    end written now is let go now — and read again when the release wrote down what an attempt consumed, so the view the
  *    pass reports is what `view` reads after it.
  * 6. It drops from the memo every task the store no longer lists.
+ * 7. It admits the queued tasks the ceiling has room for (`admitWaiting`), which the next pass starts.
  */
 export const tick = Effect.fn('tick')(function* () {
   const refused = tickRefusalOf([...arguments]);
@@ -650,7 +668,7 @@ export const tick = Effect.fn('tick')(function* () {
     tasks: ids.length,
     actions: taken.filter((a) => a.do !== 'nothing').length,
     running,
-    views,
+    views: yield* admitWaiting(views),
     refused: stalled,
     unreadable,
   };

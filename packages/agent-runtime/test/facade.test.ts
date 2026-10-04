@@ -758,44 +758,52 @@ test('file() refuses a config.budgetUsd that is not dollars above 0, and one on 
   }
 });
 
-test('file() refuses `priority` at any value, on every harness, and journals nothing: the runtime chooses no order', async () => {
+test('file() carries a whole `priority` in int32 on the record, and refuses any other value on every harness, journalling nothing', async () => {
   const { journal, engine } = shipped();
   for (const harness of ['claude', 'codex', 'claude-detached', 'check']) {
-    for (const priority of [2, -1, 0.5, 0, Number.NaN, 'high', null, undefined]) {
+    for (const priority of [1.5, '1', 2 ** 31, -(2 ** 31) - 1, Number.NaN, null, Infinity]) {
       await refused(
         engine,
         { brief: 'b', cwd: '/r', harness, priority } as unknown as TaskSpec,
-        /^file: `priority` is retired: the runtime starts a task on its next pass once it is admitted, so it chooses no order\. File tasks `queued: true` and `admit` each when it may start/,
+        /^file: `priority: .*` is not a priority\. Give a whole number from -2147483648 to 2147483647, higher first, or leave it out for 0\./,
       );
     }
   }
   assert.deepEqual(await journal.list(), [], 'nothing was journalled');
+  for (const priority of [1, -1, 2 ** 31 - 1]) {
+    const id = await engine.file({ brief: 'b', cwd: '/r', harness: 'codex', priority });
+    assert.equal((await engine.view(id)).state.priority, priority, 'carried on the record');
+  }
 });
 
-test('the Promise engine refuses `maxConcurrent` at any value, as an own key: the runtime keeps no ceiling', () => {
-  for (const maxConcurrent of [2, 1, Infinity, 0, undefined]) {
+test('the Promise engine refuses a `maxConcurrent` that is not a whole number from 1, and takes one that is', () => {
+  for (const maxConcurrent of [0, -1, 1.5, '2', Infinity, null]) {
     assert.throws(
       () => promiseEngine(EngineService.layer({ journal: memoryJournal(), maxConcurrent } as unknown as EngineOptions)),
       (e: Error & { exitCode?: number }) => {
         assert.equal(e.exitCode, 2, e.message);
         assert.match(
           e.message,
-          /^promiseEngine: `maxConcurrent` is retired: the runtime keeps no ceiling, and starts every task it is given\. File tasks `queued: true` and `admit` each/,
+          /^promiseEngine: `maxConcurrent: .*` is not a ceiling\. Give the sessions each pool may have at work at once, a whole number from 1/,
         );
         return true;
       },
     );
   }
+  for (const maxConcurrent of [1, 3, undefined]) {
+    assert.doesNotThrow(() => promiseEngine(EngineService.layer({ journal: memoryJournal(), maxConcurrent })));
+  }
 });
 
-test('the Promise engine refuses a harness that names a `pool`, a spec or a Promise runner, and names the harness', () => {
+test('the Promise engine refuses a harness whose `pool` is not a name, naming the harness, and takes one that is', () => {
   const sessions = new Map<string, Sighting>();
-  const withPool = [
-    ['codex-pooled', { ...codex, pool: 'codex' }],
-    ['fake', { ...fakeHarness(sessions), pool: 'claude' }],
+  const badPool = [
+    ['codex-pooled', { ...codex, pool: '' }],
+    ['fake', { ...fakeHarness(sessions), pool: 3 }],
     ['unpooled', { ...fakeHarness(sessions), pool: undefined }],
+    ['remote', { url: 'https://agent.example', pool: ' ' }],
   ] as const;
-  for (const [name, harness] of withPool) {
+  for (const [name, harness] of badPool) {
     assert.throws(
       () =>
         promiseEngine(
@@ -803,13 +811,7 @@ test('the Promise engine refuses a harness that names a `pool`, a spec or a Prom
         ),
       (e: Error & { exitCode?: number }) => {
         assert.equal(e.exitCode, 2, e.message);
-        assert.match(
-          e.message,
-          new RegExp(
-            `^promiseEngine: the \`${name}\` harness names a \`pool\`, which is retired: the runtime counts no pools\\. Take \`pool\` off it`,
-          ),
-        );
-        assert.match(e.message, /the orchestrator's `POOLS` in `src\/cap\/cap\.ts`/);
+        assert.match(e.message, new RegExp(`^promiseEngine: the \`${name}\` harness names the \`pool\` .*, which is not a name\\.`));
         return true;
       },
     );
@@ -817,9 +819,17 @@ test('the Promise engine refuses a harness that names a `pool`, a spec or a Prom
   assert.doesNotThrow(
     () =>
       promiseEngine(
-        EngineService.layer({ journal: memoryJournal(), harnesses: { codex, bg: claudeDetached, fake: fakeHarness(sessions) } }),
+        EngineService.layer({
+          journal: memoryJournal(),
+          harnesses: {
+            codex: { ...codex, pool: 'x' },
+            bg: claudeDetached,
+            fake: fakeHarness(sessions),
+            remote: { url: 'https://agent.example', pool: 'x' },
+          },
+        }),
       ),
-    'every shipped harness is taken as it is',
+    'a pool on a spec, a runner and a remote agent is taken',
   );
 });
 
@@ -836,7 +846,7 @@ test("the facade's tick refuses any argument, with exit 2 and nothing started â€
       assert.match(
         e.message,
         new RegExp(
-          `^tick: the pass takes no arguments, and was handed ${args.length}: it has no ceiling and no pools since stage 4c part 2\\. File tasks`,
+          `^tick: the pass takes no arguments, and was handed ${args.length}: a ceiling and its pools are the engine's own, never a pass's\\. A ceiling is the engine's`,
         ),
       );
       return true;

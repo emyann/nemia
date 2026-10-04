@@ -500,11 +500,12 @@ const HELP = `ae — an engine for agent sessions
   AE_ROOT            a different board, the way a kubeconfig points at a different cluster`;
 
 /**
- * Why `ae` refuses to run with `AE_MAX_CONCURRENT` set, empty too: the runtime keeps no ceiling, and read and dropped, the
- * variable would have a person who set it believe in a ceiling nothing keeps.
+ * Why `ae` refuses to run with `AE_MAX_CONCURRENT` set, empty too: `ae` builds its engine with no ceiling, since a ceiling is the
+ * engine's option (`maxConcurrent`) and no variable's; read and dropped, the variable would have a person who set it believe in a
+ * ceiling nothing keeps.
  */
 export const AE_MAX_CONCURRENT_RETIRED =
-  'ae: `AE_MAX_CONCURRENT` is retired: the runtime keeps no ceiling, and starts every task it is given. Unset it, file with `queued: true` and start each with `ae admit <id>` when it may run; in a workflow the orchestrator admits under `WF_MAX_CONCURRENT`.';
+  'ae: `AE_MAX_CONCURRENT` is retired: `ae` runs its engine with no ceiling, since a ceiling is the option `maxConcurrent` a program gives `Engine.layer`. Unset it, file with `queued: true` and start each with `ae admit <id>` when it may run.';
 
 /**
  * The words and the `--budget <usd>` of `ae answer`, taken from the arguments after its id; refuses, with exit code 2, a budget

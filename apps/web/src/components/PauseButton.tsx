@@ -11,15 +11,18 @@ import { type PauseState, type PauseWords, pauseWords } from '@/lib/pause';
 import { cn } from '@/lib/utils';
 import { useNow } from '@/lib/useNow';
 
-/** The popover's heading, by the pause's state. */
+/** The popover's heading: the pause's state. */
 const HEADINGS: Record<PauseState, string> = {
-  running: 'The store runs',
+  running: 'Running',
   pausing: 'Pausing',
   paused: 'Paused',
-  reading: 'The store’s pause',
+  reading: 'Reading',
 };
 
-/** Why the store is paused, asked in the popover before the pause is put: optional, and sent as given (`onPut`); `onClose` puts nothing. */
+/**
+ * Why all factories are paused, asked in the popover before the pause is put: optional, and sent as given (`onPut`); `onClose` puts
+ * nothing.
+ */
 function WhyForm({ onPut, onClose, isPending }: { onPut: (why: string) => void; onClose: () => void; isPending: boolean }) {
   const [why, setWhy] = useState('');
   return (
@@ -30,7 +33,7 @@ function WhyForm({ onPut, onClose, isPending }: { onPut: (why: string) => void; 
         onPut(why.trim());
       }}
     >
-      <p className="text-xs text-muted-foreground">Nothing new starts, in any run, until it is resumed; what runs finishes.</p>
+      <p className="text-xs text-muted-foreground">Nothing new starts in any factory until they resume; what runs finishes.</p>
       <TextField value={why} onChange={setWhy} maxLength={200} className="flex flex-col gap-1">
         <Label className="text-xs">Why (optional)</Label>
         <Input data-pause-why placeholder="merging by hand on main" />
@@ -61,7 +64,7 @@ function Lines({ lines, data, className }: { lines: readonly string[]; data: str
 
 /**
  * The pause in the popover: its whole sentence, each task still finishing and each landing held, then what may be done — Pause… while
- * the store runs (`onPause`), Resume while a pause stands (`onResume`).
+ * all factories run (`onPause`), Resume while a pause stands (`onResume`).
  */
 function PauseFacts({
   words,
@@ -104,8 +107,9 @@ function PauseFacts({
 }
 
 /**
- * The store's pause, in the frame's bottom bar right after the daemon's dot: one button, a pause icon while the store runs, `Pausing · N`
- * while what runs finishes, and a play icon with `Paused` once nothing does (`pauseWords`, read again on each poll of `GET /api/pause`).
+ * The pause of all factories, in the frame's bottom bar right after the daemon's dot: one button, a pause icon while they run,
+ * `Pausing · N` while what runs finishes, and a play icon with `Paused` once nothing does (`pauseWords`, read again on each poll of
+ * `GET /api/pause`).
  * It opens a popover with the whole of it — since when, by whom and why, each task still finishing, each landing held with its merge
  * staged, so a person who paused to use main knows why `MERGE_HEAD` is there — and a list of what may be done: Pause…, which asks an
  * optional why (`WhyForm`) and puts the pause (`POST /api/pause`), or Resume (`DELETE /api/pause`); the popover closes once the api
@@ -153,9 +157,9 @@ export function PauseButton() {
         )}
       </Button>
       <Popover placement="top start" offset={6} className={POPOVER}>
-        <Dialog aria-label="The store’s pause" data-pause-popover className="flex flex-col gap-2 outline-none">
+        <Dialog aria-label="The pause of all factories" data-pause-popover className="flex flex-col gap-2 outline-none">
           <Heading slot="title" className="font-medium">
-            {asking ? 'Pause the store' : HEADINGS[words.state]}
+            {asking ? 'Pause all factories' : HEADINGS[words.state]}
           </Heading>
           {asking ? (
             <WhyForm onPut={(why) => act.mutate({ why })} onClose={() => setAsking(false)} isPending={act.isPending} />

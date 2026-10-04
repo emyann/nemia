@@ -1,5 +1,5 @@
 /**
- * The store's pause on the board (src/lib/pause.ts): the store runs where no pause stands, Pausing with how many still finish while any
+ * The pause of all factories on the board (src/lib/pause.ts): they run where no pause stands, Pausing with how many still finish while any
  * does, Paused once none does, each task and each landing held named in a sentence, and a read that failed said. `npm run e2e` presses
  * the button itself (`480-pause.ts`).
  */
@@ -16,11 +16,12 @@ const PAUSE = { at: AT, by: 'ann', why: 'merging by hand' };
 /** What `GET /api/pause` answers, with `extra` over a pause and nothing at work. */
 const paused = (extra: Partial<Paused> = {}): Paused => ({ pause: PAUSE, finishing: [], staged: [], ...extra });
 
-test('no pause: the store runs, with no short form, and the button pauses it', () => {
+test('no pause: all factories run, with no short form, and the button pauses them all', () => {
   const words = pauseWords({ pause: null, finishing: [], staged: [] }, null, NOW);
   assert.equal(words.state, 'running');
   assert.equal(words.text, null);
-  assert.equal(words.label, 'Pause the store');
+  assert.equal(words.label, 'Pause all factories');
+  assert.equal(words.line, 'Pause all factories: nothing new starts, and what runs finishes.');
 });
 
 test('a pause with tasks at work is Pausing with their count, and names each, and each landing held', () => {
@@ -64,5 +65,5 @@ test('nothing read yet is reading, and a read that failed says why', () => {
   assert.equal(pauseWords(undefined, null, NOW).state, 'reading');
   const failed = pauseWords(undefined, new Error('the api answered 500'), NOW);
   assert.equal(failed.state, 'reading');
-  assert.equal(failed.line, 'Whether the store is paused could not be read: the api answered 500');
+  assert.equal(failed.line, 'Whether all factories are paused could not be read: the api answered 500');
 });

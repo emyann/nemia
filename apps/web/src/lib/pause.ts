@@ -1,15 +1,16 @@
 /**
- * The words of the store's pause on the board (`PauseButton`): whether it runs, is Pausing while what runs finishes, or is Paused once
- * nothing does, as the package says it (`pausedWords`), read off `GET /api/pause` on each poll and never kept. Pure: the time is handed in.
+ * The words of the pause of all factories on the board (`PauseButton`): whether they run, are Pausing while what runs finishes, or are
+ * Paused once nothing does, as the package says it (`pausedWords`), read off `GET /api/pause` on each poll and never kept. Pure: the time
+ * is handed in.
  */
 import type { Finishing, Pause, Paused, PauseStaged } from './api';
 import { clockWord } from './quota.ts';
 
-/** What the button shows: the store runs, a pause stands while tasks still finish, or nothing runs under it; or nothing is read yet. */
+/** What the button shows: all factories run, a pause stands while tasks still finish, or nothing runs under it; or nothing is read yet. */
 export type PauseState = 'running' | 'pausing' | 'paused' | 'reading';
 
 /**
- * The pause in words: its `state`; `text`, the button's short form (`Pausing · 2`, `Paused`, none while the store runs); `label`, the
+ * The pause in words: its `state`; `text`, the button's short form (`Pausing · 2`, `Paused`, none while all factories run); `label`, the
  * button's name; `line`, the whole sentence, its `title` and the popover's first line; and each task finishing and landing held, a
  * sentence each.
  */
@@ -37,18 +38,20 @@ export const stagedSentence = ({ run, step, repo }: PauseStaged): string =>
   `${run}'s ${step} has its merge staged in ${repo} (MERGE_HEAD), and its check waits on the resume`;
 
 /**
- * The pause as `paused` says it at `now`: Pausing with how many tasks still finish, Paused once none does, the store running where no
- * pause stands, and reading while nothing is read; a read that failed says why.
+ * The pause as `paused` says it at `now`: Pausing with how many tasks still finish, Paused once none does, all factories running where
+ * no pause stands, and reading while nothing is read; a read that failed says why.
  */
 export function pauseWords(paused: Paused | undefined, error: Error | null, now: Date): PauseWords {
   const lists = { finishing: (paused?.finishing ?? []).map(finishingSentence), staged: (paused?.staged ?? []).map(stagedSentence) };
   if (!paused) {
-    const line = error ? `Whether the store is paused could not be read: ${error.message}` : 'Reading whether the store is paused.';
-    return { state: 'reading', text: null, label: 'The store’s pause, not read', line, ...lists };
+    const line = error
+      ? `Whether all factories are paused could not be read: ${error.message}`
+      : 'Reading whether all factories are paused.';
+    return { state: 'reading', text: null, label: 'The pause of all factories, not read', line, ...lists };
   }
   if (!paused.pause) {
-    const line = 'Nothing is paused. Once paused, no run starts new work, and what runs finishes.';
-    return { state: 'running', text: null, label: 'Pause the store', line, ...lists };
+    const line = 'Pause all factories: nothing new starts, and what runs finishes.';
+    return { state: 'running', text: null, label: 'Pause all factories', line, ...lists };
   }
   const since = pauseSince(paused.pause, now);
   const count = paused.finishing.length;
@@ -57,5 +60,5 @@ export function pauseWords(paused: Paused | undefined, error: Error | null, now:
     return { state: 'pausing', text: `Pausing · ${count}`, label: `Pausing, ${count} finishing`, line, ...lists };
   }
   const line = `Paused ${since}. Nothing runs and nothing new starts.`;
-  return { state: 'paused', text: 'Paused', label: 'Paused: resume the store', line, ...lists };
+  return { state: 'paused', text: 'Paused', label: 'Paused: resume all factories', line, ...lists };
 }

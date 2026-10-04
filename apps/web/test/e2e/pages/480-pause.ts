@@ -15,7 +15,7 @@ const pauseOf = (page: Page) => page.locator('footer[data-frame-footer] button[d
 /** The pause's popover. */
 const popoverOf = (page: Page) => page.locator('[data-pause-popover]');
 
-/** Why the page pauses the store, given in the popover. */
+/** Why the page pauses all factories, given in the popover. */
 const WHY = 'merging by hand on main';
 
 /** Refuses unless the bar's pause stands right after the daemon's dot. */
@@ -30,6 +30,10 @@ async function afterTheDot(page: Page): Promise<void> {
     throw new Refused(`the pause stands right after the daemon's dot — the bar stands ${order.join(', ')}`);
 }
 
+/** Refuses unless the popover's heading is `state`: Running, Pausing or Paused. */
+const headed = (page: Page, state: string) =>
+  expectTexts(popoverOf(page).getByRole('heading'), [state], `the popover's heading is the state, ${state}`);
+
 /** Opens the popover and photographs the bottom bar's corner with it, as `<what>`. */
 async function opened(page: Page, what: string): Promise<void> {
   await pauseOf(page).click();
@@ -40,10 +44,10 @@ async function opened(page: Page, what: string): Promise<void> {
 
 export default {
   /**
-   * The store paused and resumed from the bottom bar's one button, right after the daemon's dot, as `wf pause` and `wf resume` do
-   * (`POST` and `DELETE /api/pause`), on the Factory. Running, the button is a pause icon; its popover says the store runs and offers
-   * Pause…, which asks an optional why, and once sent the store's pause file holds it and the popover says since when, by whom and
-   * why: `Pausing · N` while the seed's sessions are at work, as the api reads them, its popover naming each; once nothing finishes and a
+   * All factories paused and resumed from the bottom bar's one button, right after the daemon's dot, as `wf pause` and `wf resume` do
+   * (`POST` and `DELETE /api/pause`), on the Factory. The popover's heading is the state: Running, Pausing or Paused. Running, the button
+   * is a pause icon; its popover says what pausing all factories does and offers Pause…, which asks an optional why, and once sent the
+   * pause's file holds it and the popover says since when, by whom and why: `Pausing · N` while the seed's sessions are at work, as the api reads them, its popover naming each; once nothing finishes and a
    * landing is held with its merge staged — the api's answer held with `route` — `Paused`, its popover naming the landing. Which tasks
    * finish, and which landings are held, is the package's judgement, proven in its own tests
    * (`packages/agent-orchestrator/src/tick/pause.test.ts`). On a phone's screen the button is still there, and its popover fits. Resume,
@@ -58,14 +62,20 @@ export default {
     const popover = popoverOf(page);
     const size = page.viewportSize();
     try {
-      await expectVisible(button.and(page.locator('[data-pause="running"]')), 'the bottom bar has the pause, the store running');
+      await expectVisible(button.and(page.locator('[data-pause="running"]')), 'the bottom bar has the pause, all factories running');
       await afterTheDot(page);
       if (fs.existsSync(file)) throw new Refused(`no pause before the page puts one — ${file} is there`);
       await opened(page, 'running');
-      await expectTexts(popover.locator('[data-pause-actions] li'), ['Pause…'], 'its actions: Pause…, the store running');
+      await headed(page, 'Running');
+      await expectTexts(
+        popover.locator('[data-pause-line]'),
+        ['Pause all factories: nothing new starts, and what runs finishes.'],
+        'its popover says what pausing does, to all factories',
+      );
+      await expectTexts(popover.locator('[data-pause-actions] li'), ['Pause…'], 'its actions: Pause…, all factories running');
 
       await popover.getByRole('button', { name: 'Pause…' }).click();
-      await expectVisible(popover.getByText('Pause the store', { exact: true }), 'Pause… asks why first');
+      await expectVisible(popover.getByText('Pause all factories', { exact: true }), 'Pause… asks why first');
       if (fs.existsSync(file)) throw new Refused(`nothing is put while it asks why — ${file} is there`);
       await popover.locator('[data-pause-why]').fill(WHY);
       await settled(page);
@@ -84,6 +94,7 @@ export default {
         `with the seed's sessions at work, the button says Pausing · ${count}, as the api reads it`,
       );
       await opened(page, 'pausing');
+      await headed(page, 'Pausing');
       await expectVisible(
         popover
           .locator('[data-pause-line]')
@@ -103,6 +114,7 @@ export default {
       await idle(page);
       await expectTexts(button.and(page.locator('[data-pause="paused"]')), ['Paused'], 'once nothing finishes, the button says Paused');
       await opened(page, 'paused');
+      await headed(page, 'Paused');
       await expectVisible(
         popover
           .locator('[data-pause-line]')
@@ -128,7 +140,7 @@ export default {
 
       await pauseOf(page).click();
       await popover.getByRole('button', { name: 'Resume' }).click();
-      await expectVisible(button.and(page.locator('[data-pause="running"]')), 'Resume resumes the store');
+      await expectVisible(button.and(page.locator('[data-pause="running"]')), 'Resume resumes all factories');
       if (fs.existsSync(file)) throw new Refused(`Resume took the pause away once the api answered — ${file} is still there`);
       await expectCount(popover, 0, 'the popover closes once the api answered');
     } finally {

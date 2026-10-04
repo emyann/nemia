@@ -16,10 +16,15 @@ import {
   agentRead,
   agentSkillsFound,
   COMMANDS,
+  factoriesFilling,
+  inFactory,
   loadAgents,
+  readFactories,
   removeAgent,
   start,
+  stepsFilled,
   writeAgent,
+  type AgentFill,
   type AgentReading,
   type AgentsRead,
   type AgentSchema,
@@ -32,8 +37,7 @@ import { refusedBeforeReading, type Guarded, type Refusal } from '../guard.ts';
 import { type ApiEnv, served } from '../layer.ts';
 import { judgedNow } from '../runs/runs.ts';
 import { copyCommand, givenSkills, librarySkills, type GivenSkill } from './skills.ts';
-import { factoriesFilling, inFactory, stepsFilled } from './fills.ts';
-import { tryOf, untriedOf, writeTryFolder, type Untried } from './try.ts';
+import { tryFolder, tryOf, untriedOf, type Untried } from './try.ts';
 import { sourcesOf, type WorkflowSource } from '../workflows/workflows.ts';
 
 export type { AgentUser } from 'agent-orchestrator';
@@ -48,6 +52,12 @@ export type { AgentUser } from 'agent-orchestrator';
  *   reads (`untriedOf`, which the try's route refuses on); null when nothing does. The page draws it in place of the Try it button.
  */
 export type AgentListing = Omit<AgentReading, 'custom'> & { given: GivenSkill[]; untried: Untried | null };
+
+/**
+ * An agent as the Agents page lists it: its listing, the steps it fills in the factory the request names (`fills`), and the names of
+ * the factories it fills a step in, sorted (`factories`): the default factory is none of them. Both are the package's (`inFactory`).
+ */
+export type LibraryAgent = AgentListing & { fills: AgentFill[]; factories: string[] };
 
 /** The package's listing of the agents (`wf agents`), its handler `agentsRead`: the api answers it on `GET /api/agents`. */
 const AGENTS = COMMANDS.find((c) => c.name === 'agents')!;
@@ -248,10 +258,10 @@ const noAgentWords = (from: string, name: string, dir: string): string =>
  * 403 for the repository's); a write the package refuses has `refusalOf`'s statuses, and any other refusal is answered by its kind
  * (`app.onError`).
  *
- * - `GET /api/agents` — the agents of the factory the request names (`LibraryAgent`, fills.ts), read from disk on each request, so an agent
- *   a person has just edited lists as it is now. Each with the steps it fills in that factory (`fills`) and the factories it fills a step
- *   in (`factories`), a step credited to the agent file a start would run it with. In a factory, only the agents it hires into a step or
- *   its attached workflows' steps name; in the default factory, every agent (`AGENTS`, the package's `wf agents`).
+ * - `GET /api/agents` — the agents of the factory the request names (`LibraryAgent`, the package's `inFactory`), read from disk on each
+ *   request, so an agent a person has just edited lists as it is now. Each with the steps it fills in that factory (`fills`) and the
+ *   factories it fills a step in (`factories`), a step credited to the agent file a start would run it with. In a factory, only the agents
+ *   it hires into a step or its attached workflows' steps name; in the default factory, every agent (`AGENTS`, the package's `wf agents`).
  * - `GET /api/agents/:from/:name` — one agent, for its page; 404 for a name the place has no file of.
  * - `GET /api/agents/:from/:name/card` — one agent in the shape of an A2A Agent Card (`AgentCardAnswer`), as `wf agents card` prints it
  *   (`AGENT_CARD`). Not a valid card and it says so: A2A marks `supportedInterfaces` REQUIRED, an interface is a transport and a URL, and
@@ -262,7 +272,7 @@ const noAgentWords = (from: string, name: string, dir: string): string =>
  * - `PUT /api/agents/:from/:name` — an agent of yours put back, and renamed when the body names it otherwise, against the `version` it was
  *   read at, so a save of an agent changed since is refused rather than written over what changed.
  * - `POST /api/agents/:from/:name/try` — an agent of yours tried on a short brief: its try's folder written, or written again when the
- *   agent's version has moved (`writeTryFolder`), and a run of it started with no repository, as any folder team's is — a tick files it.
+ *   agent's version has moved (`tryFolder`), and a run of it started with no repository, as any folder team's is — a tick files it.
  *   The try is the one start made in the default factory: an agent is tried before any factory hires it, and on no factory's repository.
  *   201 with the run (`AgentTried`). Refuses the repository's agents, which a start with no repository does not find, with 403 and the
  *   command that copies one, its schema beside it, into the store this api reads (read off its file when it has one); an empty brief (422);
@@ -277,7 +287,13 @@ export const agents = new Hono<ApiEnv>()
     served(c, async ({ e, env, repo, home, factory }) => {
       const { agents: read } = (await AGENTS.handler(e, { repo }, env, home)) as AgentsRead;
       const listings = read.map((one) => listingOf(one, repo, home));
-      return c.json(inFactory(listings, stepsFilled(repo, home, factory), factoriesFilling(home), factory));
+      const answer: LibraryAgent[] = inFactory(
+        listings,
+        stepsFilled(repo, home, factory),
+        factoriesFilling(readFactories(), home),
+        factory,
+      );
+      return c.json(answer);
     }),
   )
   .get('/api/agents/:from/:name', (c) =>
@@ -420,7 +436,7 @@ export const agents = new Hono<ApiEnv>()
             },
             409,
           );
-        const workflowDir = writeTryFolder(name, agent.version, agent.keys, home);
+        const workflowDir = tryFolder(name, agent.version, agent.keys, home);
         const run = start({ brief: brief.trim(), repo: '', workflowDir });
         return c.json({ id: run.id } satisfies AgentTried, 201);
       } catch (err) {

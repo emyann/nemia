@@ -1,6 +1,8 @@
 /**
- * What the board's skill picker and skill page write: a skill copied whole from another folder of skills (`copySkill`), and a skill made or
- * changed (`writeSkill`), each refused as `SkillWriteError`.
+ * What the board's skill picker and skill page read and write: one skill folder read (`skillRead`), the skills an agent gives, each read
+ * where a start finds it (`givenSkills`), the skill folders of a folder of skills (`skillFolders`), the first of several that has a skill
+ * (`skillDirIn`), a SKILL.md's text (`skillText`); a skill copied whole from another folder of skills (`copySkill`), and a skill made or
+ * changed (`writeSkill`), each write refused as `SkillWriteError`.
  *
  * Beneath the controllers, beside `record.store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports it. A run
  * is changed by none of it: it froze its folder, and its agents' skills, at `wf start`.
@@ -9,11 +11,98 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { AGENTS_FOLDER, SKILLS_FOLDER, WorkflowError } from '../step/step.ts';
 import { linkRefusal } from '../folder/folder.ts';
-import { skillNameRefusal } from '../agents/agents.ts';
-import { skillEntryOf, renderSkill, withPreload, type SkillDraft } from './skills.ts';
+import { skillNameRefusal, skillTurnCost, type SkillCost, type SkillsFound } from '../agents/agents.ts';
+import { skillEntryOf, renderSkill, withPreload, type AgentSkill, type SkillDraft } from './skills.ts';
 import { skillVersion } from '../folder/folder.store.ts';
 import { HOME } from '../record/record.store.ts';
 import { isWorkflowsHolder } from '../folder/write.store.ts';
+
+/** One skill folder read now: its card entry, or null with `error` saying why no agent can be given it; and what it costs a turn. */
+export type SkillRead = {
+  entry: AgentSkill | null;
+  error: string | null;
+  /** Whether it is loaded every turn, whole (`preload: true`), rather than named for the session to load. */
+  preload: boolean;
+  /** What it costs a turn, about (`skillTurnCost`); null when its SKILL.md cannot be read. */
+  cost: SkillCost | null;
+};
+
+/**
+ * The skill `name` whose folder is `dir`, read now. A folder or SKILL.md that is a link is refused unread: what it points at is outside the
+ * folder of skills, and a copy refuses one too. A SKILL.md that cannot be read says why; one the card reader refuses (`skillEntryOf`) has
+ * its refusal as `error`, and its cost all the same.
+ */
+export function skillRead(name: string, dir: string): SkillRead {
+  const file = path.join(dir, 'SKILL.md');
+  const none: SkillRead = { entry: null, error: null, preload: false, cost: null };
+  const linked = [dir, file].find((at) => fs.lstatSync(at, { throwIfNoEntry: false })?.isSymbolicLink());
+  if (linked)
+    return {
+      ...none,
+      error: `${path.relative(path.dirname(dir), linked)} is a link, and what it points at is outside the folder of skills: make it a folder of its own.`,
+    };
+  let text: string;
+  try {
+    text = fs.readFileSync(file, 'utf8');
+  } catch (err) {
+    return { ...none, error: `${file} cannot be read (${err instanceof Error ? err.message : String(err)}).` };
+  }
+  const cost = skillTurnCost(name, text);
+  try {
+    return { entry: skillEntryOf(file, name, text), error: null, preload: cost.preload, cost };
+  } catch (err) {
+    return { entry: null, error: err instanceof Error ? err.message : String(err), preload: cost.preload, cost };
+  }
+}
+
+/** A skill an agent gives, read: the folder it is found in, null where none is, and its reading or why it has none. */
+export type GivenRead = { name: string; dir: string | null } & SkillRead;
+
+/**
+ * The skills `skills` an agent gives, one each in its order, each found where a start finds it (`found`, the agent's `skillsFor`) and read
+ * there (`skillRead`). A name two folders of one place have is the package's refusal; a name no folder has, the refusal its card states.
+ */
+export function givenSkills(skills: readonly string[], found: SkillsFound): GivenRead[] {
+  return skills.map((name) => {
+    const at = found.at.get(name);
+    const none = { name, dir: null, entry: null, preload: false, cost: null };
+    if (at instanceof WorkflowError) return { ...none, error: at.message };
+    if (at === undefined) return { ...none, error: `No skills folder has \`${name}\` — looked in ${found.looked.join(', ')}.` };
+    return { name, dir: at, ...skillRead(name, at) };
+  });
+}
+
+/**
+ * The skill folders of the folder of skills `dir` by name, sorted, each a folder holding a SKILL.md, as `skillsFor` reads one. None for a
+ * folder that cannot be read.
+ */
+export function skillFolders(dir: string): string[] {
+  let names: string[];
+  try {
+    names = fs.readdirSync(dir).sort();
+  } catch {
+    return [];
+  }
+  return names.filter((name) => fs.statSync(path.join(dir, name, 'SKILL.md'), { throwIfNoEntry: false })?.isFile());
+}
+
+/**
+ * The folder of the skill `name` in the first of the folders of skills `roots` where `<name>/SKILL.md` is there, or null where none has
+ * it.
+ */
+export function skillDirIn(roots: readonly string[], name: string): string | null {
+  const dir = roots.map((root) => path.join(root, name)).find((at) => fs.lstatSync(path.join(at, 'SKILL.md'), { throwIfNoEntry: false }));
+  return dir ?? null;
+}
+
+/** The text of the SKILL.md in the skill folder `dir`, or empty where it cannot be read: `skillRead` says why. */
+export function skillText(dir: string): string {
+  try {
+    return fs.readFileSync(path.join(dir, 'SKILL.md'), 'utf8');
+  } catch {
+    return '';
+  }
+}
 
 /**
  * A write of a skill refused, as the api answers it: a skill not there (`missing`), a name already taken (`exists`), a skill that changed

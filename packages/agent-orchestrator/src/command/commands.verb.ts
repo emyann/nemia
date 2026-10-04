@@ -387,7 +387,6 @@ const CEILINGS: Command<Slots> = {
   print: () => [],
 };
 
-/** Every command defined once, in the order `wf`'s help lists them. */
 /** The refusal of a value left out of each of `wf agents`' two flags, saying what it takes. */
 const AGENTS_TAKES = {
   '--repo': '--repo takes the repository whose workflows/agents to read: wf agents --repo <r>',
@@ -468,4 +467,5 @@ const AGENT_CARD: Command<CardRead> = {
   note: (data, args) => cardNote(data, textOf(args, 'name') ?? ''),
 };
 
+/** Every command defined once, in the order `wf`'s help lists them. */
 export const COMMANDS: readonly Command[] = [RETRY, APPROVE, ROUND, ACCEPT, SAY, LS, DECIDE, CEILINGS, AGENTS, AGENT_CARD];

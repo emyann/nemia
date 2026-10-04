@@ -1,16 +1,17 @@
 /**
  * The inbox, for the board: cards parked before they are started — listed, filed and dropped.
  *
- * The package's inbox (agent-orchestrator's `readInbox`, `addToInbox`, `dropFromInbox`), `wf inbox`'s own: `$WF_ROOT/inbox/`, a card per
- * `<name>.md`, read from disk on each request, as the workflows are, so a card a person has just filed or dropped at the command line lists
- * as it is now. Starting a card is a start, so it is `POST /api/runs` with `card` (workflows.ts), through `startFromInbox`.
+ * The package's inbox, through the entries of its command table (`INBOX`, `INBOX_ADD`, and the routes it generates), `wf inbox`'s own:
+ * `$WF_ROOT/inbox/`, a card per `<name>.md`, read from disk on each request, as the workflows are, so a card a person has just filed or
+ * dropped at the command line lists as it is now. Starting a card is a start, so it is `POST /api/runs` with `card` (workflows.ts),
+ * through `startFromInbox`.
  *
  * A card's page reads one card: as the inbox lists it, as its file is written, and its keys (`GET /api/inbox/:name`).
  *
  * A card is queued to start on its own, and taken off the queue, as `wf inbox queue <name>` and `wf inbox queue <name> --off` do (`POST`
- * and `DELETE /api/inbox/:name/queue`, through `queueInInbox`): the tick starts the next card in the queue's order when a run slot is free.
- * The listing already says where each queued card stands — `queued`, its time and place, and `tried`, the tick's last start of it that did
- * not happen — since each entry is the package's.
+ * and `DELETE /api/inbox/:name/queue`, generated from `wf inbox queue`'s entry): the tick starts the next card in the queue's order when
+ * a run slot is free. The listing already says where each queued card stands — `queued`, its time and place, and `tried`, the tick's
+ * last start of it that did not happen — since each entry is the package's.
  *
  * Every refusal is the package's sentence with the api's status, but for the body's shape, which is the api's own (400). Filing and
  * dropping are writes a page on another site must not make, so each passes the guard (guard.ts) before its body is read.
@@ -18,21 +19,20 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Schema } from 'effect';
-import { Hono, type Context } from 'hono';
+import { Hono } from 'hono';
 import {
-  addToInbox,
-  dropFromInbox,
+  INBOX,
+  INBOX_ADD,
   INBOX_KEY_MEANINGS,
   INBOX_KEYS,
   inboxNameRefusal,
   noCardLine,
   parseInboxCard,
-  queueInInbox,
   readInbox,
   runStore,
   type InboxListing,
 } from 'agent-orchestrator';
-import { decodeBody, readBody, valueAt, type BodyIssue } from '../body.ts';
+import { readBody, type BodyIssue } from '../body.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from '../guard.ts';
 import { type ApiEnv, served } from '../layer.ts';
 import { folderOf, type KeyRow } from '../workflows/workflows.ts';
@@ -74,12 +74,12 @@ export type InboxQueueAnswer = {
 const isDirectory = (at: string): boolean => Boolean(fs.statSync(at, { throwIfNoEntry: false })?.isDirectory());
 
 /**
- * The inbox as the package lists it, each entry with its body and when its file was written (`InboxEntry`). An entry dropped, or edited
- * into a card that does not read, since the listing read it is listed as the listing has it, with no body or time, and read again next
- * time.
+ * The inbox as the package lists it (`cards`, every entry by default), each entry with its body and when its file was written
+ * (`InboxEntry`). An entry dropped, or edited into a card that does not read, since the listing read it is listed as the listing has it,
+ * with no body or time, and read again next time.
  */
-export function listInbox(): InboxEntry[] {
-  return readInbox().map((entry) => {
+export function listInbox(cards: readonly InboxListing[] = readInbox()): InboxEntry[] {
+  return cards.map((entry) => {
     let filedAt: string | null = null;
     let body: string | null = null;
     try {
@@ -129,67 +129,6 @@ const FILE: Guarded = {
   shape: FILE_SHAPE,
 };
 
-/** A drop of `name`, as the guard's refusals word it. */
-const dropGuard = (name: string): Guarded => ({
-  route: `DELETE /api/inbox/${name}`,
-  does: 'drops a card',
-  forAnother: 'drop one',
-  why: 'a card dropped is an idea gone, and nothing keeps a copy',
-  reach: 'drop the card from the board',
-  instead: `Drop it from the board's Inbox page, or with \`wf inbox rm ${name}\``,
-  shape: 'no body, or `{}`: the card is named in the path',
-});
-
-const QUEUE_SHAPE = 'no body, or `{}`: the card is named in the path, and queued on the workflow it names';
-
-/** A queue of `name`, or its taking back (`off`), as the guard's refusals word it. */
-const queueGuard = (name: string, off: boolean): Guarded =>
-  off
-    ? {
-        route: `DELETE /api/inbox/${name}/queue`,
-        does: 'takes a card off the queue',
-        forAnother: 'take one off',
-        why: 'a card taken off the queue is an idea the tick no longer starts, and its place is lost',
-        reach: 'take the card off the queue from the board',
-        instead: `Take it off from the board's Inbox page, or with \`wf inbox queue ${name} --off\``,
-        shape: QUEUE_SHAPE,
-      }
-    : {
-        route: `POST /api/inbox/${name}/queue`,
-        does: 'queues a card',
-        forAnother: 'queue one',
-        why: 'a queued card is started by the tick when a run slot frees, and its body is what the run is asked to do, in the repository it names',
-        reach: 'queue the card from the board',
-        instead: `Queue it from the board's Inbox page, or with \`wf inbox queue ${name}\``,
-        shape: QUEUE_SHAPE,
-      };
-
-/** The one JSON body a queue takes: `{}`, an object with no key. */
-const QUEUE_BODY = Schema.Record(Schema.String, Schema.Never);
-
-/**
- * Why a queue's body is refused, or null: it takes none, or `{}`. `wf inbox queue --workflow <w>` writes a workflow with the mark, and the
- * api does not: a card is queued from the board on the workflow it names, and one that names none is the package's to refuse — so a
- * `workflow` sent is refused by name rather than read as nothing.
- */
-function queueBodyRefusal(route: string, text: string): Refusal | null {
-  if (!text.trim()) return null;
-  let body: unknown;
-  try {
-    body = JSON.parse(text);
-  } catch {
-    return { status: 400, error: `${route} takes ${QUEUE_SHAPE}, and this request's body is not JSON.` };
-  }
-  const decoded = decodeBody(QUEUE_BODY, body, () => {
-    const named =
-      valueAt(body, ['workflow']) !== undefined
-        ? ' A card is queued on the workflow it names: file it with one, or queue it with `wf inbox queue <name> --workflow <w>`, which writes both.'
-        : '';
-    return `${route} takes ${QUEUE_SHAPE}, and this request sent ${JSON.stringify(body)}.${named}`;
-  });
-  return 'status' in decoded ? decoded : null;
-}
-
 /**
  * What `POST /api/inbox` files, or why not, before the package is asked: the body's shape (400), and the workflow, found among the folders
  * a start finds one in (`folderOf`: 404, 409) — so a card names a workflow a start from the board can run, never a path that was sent.
@@ -231,24 +170,30 @@ const cardsIn = (entries: readonly InboxEntry[]): string[] => entries.filter((e)
 /**
  * The inbox's routes. Each write passes the guard (guard.ts) before its body is read.
  *
- * - `GET /api/inbox` — the cards, and every entry of the folder that does not read as one, with why: never hidden, as a workflow that
- *   does not load is not. 500 for a run's record that does not parse: the listing reads them all, for the runs a card was started as.
+ * - `GET /api/inbox` — `wf inbox`'s cards, through its entry's handler, and every entry of the folder that does not read as one, with
+ *   why: never hidden, as a workflow that does not load is not. 500 for a run's record that does not parse: the listing reads them all,
+ *   for the runs a card was started as.
  * - `GET /api/inbox/:name` — one card, for its page (`InboxCardPage`). A name that would leave the inbox, or a hidden one, is refused in
  *   the package's words (400) before anything is read; a card is found among the entries the inbox lists, never by a path joined from what
  *   was sent, and a card before a stray file of the same name (`notes.md` and `notes` both list as `notes`). 404 for a card not there, or
  *   dropped since the listing read it, the sentence naming the cards that are. Its keys are as the listing reads them: `queued` is when it
  *   was queued (the listing carries its place too), null when unset.
- * - `POST /api/inbox` — `wf inbox add "<idea>" --workflow <name> --repo <path>`: a card filed, under the slug of its first line (201,
- *   `InboxFiled`). The body and its workflow are refused as `filingOf` says; the package's refusal, word for word, is an `Invalid`, which
- *   `app.onError` answers 422: an idea with nothing in it, a key it would write on two lines, a repo that is not an absolute path to a
- *   directory, an `after:` in the idea's own frontmatter. Anything else is the store's, 500: the inbox could not be written.
- * - `DELETE /api/inbox/:name` — `wf inbox rm <name>`: a card dropped without being started. A name that would leave the inbox, or a hidden
- *   one, is refused in the package's words (400) before anything is read; 404 for a card not there.
- * - `POST` and `DELETE /api/inbox/:name/queue` — `wf inbox queue <name>`: the card marked to start on its own, on the workflow it names;
- *   and `--off`, the mark taken back (`queueRoute`).
+ * - `POST /api/inbox` — `wf inbox add "<idea>" --workflow <name> --repo <path>`, through its entry's handler: a card filed, under the
+ *   slug of its first line (201, `InboxFiled`). The body and its workflow are refused as `filingOf` says; the package's refusal, word for
+ *   word, is an `Invalid`, which `app.onError` answers 422: an idea with nothing in it, a key it would write on two lines, a repo that is
+ *   not an absolute path to a directory, an `after:` in the idea's own frontmatter. Anything else is the store's, 500: the inbox could not
+ *   be written.
+ *
+ * A card dropped (`DELETE /api/inbox/:name`) and queued or taken off the queue (`POST` and `DELETE /api/inbox/:name/queue`) are routes the
+ * package's command table generates (commands/routes.ts), each from its entry, `wf inbox rm`'s and `wf inbox queue`'s.
  */
 export const inbox = new Hono<ApiEnv>()
-  .get('/api/inbox', (c) => c.json(listInbox()))
+  .get('/api/inbox', (c) =>
+    served(c, async ({ e }) => {
+      const { cards } = await INBOX.handler(e, {});
+      return c.json(listInbox(cards));
+    }),
+  )
   .get('/api/inbox/:name', (c) => {
     const name = c.req.param('name');
     const wrong = inboxNameRefusal(name);
@@ -274,64 +219,17 @@ export const inbox = new Hono<ApiEnv>()
     return c.json({ ...entry, source, keys } satisfies InboxCardPage);
   })
   .post('/api/inbox', (c) =>
-    served(c, async ({ repo, home }) => {
+    served(c, async ({ e, repo, home }) => {
       const refused = refusedBeforeReading(FILE, c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
       if (refused) return c.json({ error: refused.error }, refused.status);
       const read = await readBody(c.req, FILE_BODY, `POST /api/inbox takes a JSON body: ${FILE_SHAPE}.`, fileWords);
       if ('status' in read) return c.json({ error: read.error }, read.status);
       const asked = filingOf(read.body, repo, home);
       if ('status' in asked) return c.json({ error: asked.error }, asked.status);
-      const { card, file } = addToInbox({
-        text: asked.text,
-        ...(asked.workflow !== undefined ? { workflow: asked.workflow } : {}),
-        ...(asked.repo !== undefined ? { repo: asked.repo } : {}),
-      });
+      const { card, file } = await INBOX_ADD.handler(e, { idea: asked.text, workflow: asked.workflow, repo: asked.repo });
       return c.json(
         { name: card.name, file, workflow: card.workflow ?? null, repo: card.repo ?? null, body: card.body } satisfies InboxFiled,
         201,
       );
     }),
-  )
-  .delete('/api/inbox/:name', (c) => {
-    const name = c.req.param('name');
-    const refused = refusedBeforeReading(
-      dropGuard(name),
-      c.req.header('host'),
-      c.req.header('sec-fetch-site'),
-      c.req.header('content-type'),
-    );
-    if (refused) return c.json({ error: refused.error }, refused.status);
-    const wrong = inboxNameRefusal(name);
-    if (wrong) return c.json({ error: wrong }, 400);
-    const dropped = dropFromInbox(name);
-    if (!dropped.removed) return c.json({ error: noCardLine(name, dropped.cards) }, 404);
-    return c.json(dropped);
-  })
-  .post('/api/inbox/:name/queue', (c) => queueRoute(c, false))
-  .delete('/api/inbox/:name/queue', (c) => queueRoute(c, true));
-
-/**
- * A queue, or its taking back: the guard, then the name in the package's words (400) and the body (400), before the card is read; then
- * `queueInInbox`, whose refusals go to `app.onError` (app.ts), which answers each by its kind in its words: 404 for a card not there
- * (`Missing`); 409 for a card a run's record already names, or queued already — a card whose state is not the one the request was made
- * against (`Conflict`); 422 for a card that does not read, or a card to queue that names no workflow (`Invalid`).
- */
-async function queueRoute(c: Context, off: boolean) {
-  const name = c.req.param('name')!;
-  const guard = queueGuard(name, off);
-  const refused = refusedBeforeReading(guard, c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
-  if (refused) return c.json({ error: refused.error }, refused.status);
-  const wrong = inboxNameRefusal(name);
-  if (wrong) return c.json({ error: wrong }, 400);
-  const shaped = queueBodyRefusal(guard.route, await c.req.text());
-  if (shaped) return c.json({ error: shaped.error }, shaped.status);
-  const done = queueInInbox(name, { off });
-  return c.json({
-    name: done.card.name,
-    file: done.file,
-    was: done.was,
-    queued: done.card.queued ?? null,
-    place: done.place ?? null,
-    of: done.of ?? null,
-  } satisfies InboxQueueAnswer);
-}
+  );

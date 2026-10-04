@@ -1,5 +1,6 @@
 /**
- * The verbs' table, and the runners of the commands the CLI runs itself — `wf tick`, `wf up`, `wf watch`, `wf rm` and `wf prune` (`RUNS`).
+ * The verbs' table, and the runners of the commands the CLI runs itself (`RUNS`): `wf tick`, `wf up` and `wf watch` here, the others
+ * beside.
  */
 import path from 'node:path';
 import { Effect } from 'effect';
@@ -39,9 +40,8 @@ import {
 } from '../runner.ts';
 import { HELP, usage, type Engine, type Verb } from './flags.ts';
 import { decideVerb } from './decide/decide.ts';
-import { factoryVerb } from './factory/factory.ts';
-import { agentsCustom, pruneVerb, rmVerb } from './runs.ts';
-import { inboxVerb, planVerb, startVerb } from './start.ts';
+import { agentsCustomRun, pruneVerb, rmVerb } from './runs.ts';
+import { inboxAddRun, inboxQueueRun, planRun, startRun } from './start.ts';
 
 /**
  * `wf watch` from a cursor already checked: the feed's lines as they are written, on stdout, until `stop()`; a feed cut under the watch is
@@ -233,18 +233,13 @@ function watchVerb(args: Args): void | Promise<void> {
 }
 
 /** Each verb `wf` takes, by its name on the command line: a `Map`, so a name every object has is no verb. */
-export const VERBS: ReadonlyMap<string, Verb> = new Map<string, Verb>([
-  ['start', startVerb],
-  ['plan', planVerb],
-  ['inbox', inboxVerb],
-  ['factory', factoryVerb],
-  ['decide', decideVerb],
-  ['agents custom', agentsCustom],
-]);
+export const VERBS: ReadonlyMap<string, Verb> = new Map<string, Verb>([['decide', decideVerb]]);
 
 /**
- * The runner of each command the CLI runs itself, by its name — those it serves alone (`RAN`), and `wf rm` and `wf prune`, whose runners
- * walk the many runs a command line names through their handlers: handed its arguments once read and checked.
+ * The runner of each command the CLI runs itself, by its name — those it serves alone (`RAN`, `wf plan`); `wf rm` and `wf prune`, whose
+ * runners walk the many runs a command line names through their handlers; and `wf start`, `wf inbox add`, `wf inbox queue` and
+ * `wf agents custom`, whose runners read the files and folders a command line names before their handlers: handed its arguments once read
+ * and checked.
  */
 export const RUNS: ReadonlyMap<string, (args: Args, e: Engine) => void | Promise<void>> = new Map([
   ['tick', tickVerb],
@@ -252,6 +247,11 @@ export const RUNS: ReadonlyMap<string, (args: Args, e: Engine) => void | Promise
   ['watch', watchVerb],
   ['rm', rmVerb],
   ['prune', pruneVerb],
+  ['start', startRun],
+  ['plan', planRun],
+  ['inbox add', inboxAddRun],
+  ['inbox queue', inboxQueueRun],
+  ['agents custom', agentsCustomRun],
 ]);
 
 /**
@@ -277,17 +277,13 @@ const NAMES = [...TABLE.filter((c) => c.only?.side !== 'api').map((c) => c.name)
 
 /**
  * The name `argv` opens with, the longest of `NAMES` whose words it starts with, and the arguments after it — or none. A name that heads
- * others (`agents`, before `agents card`) given a word that is none of its flags is given too little, and gets the help.
+ * others (`agents`, before `agents card`) given a word none of them is gets that word, and refuses it in its own words.
  */
 function namedIn(argv: readonly string[]): { name: string; rest: string[] } | undefined {
   const opens = (name: string) => name.split(' ').every((word, i) => argv[i] === word);
   const name = NAMES.filter(opens).sort((a, b) => b.length - a.length)[0];
   if (name === undefined) return undefined;
-  const rest = argv.slice(name.split(' ').length);
-  const heads = NAMES.some((other) => other.startsWith(`${name} `));
-  const flags = TABLE.find((c) => c.name === name)?.spec.flags.map((f) => f.flag) ?? [];
-  if (heads && rest[0] !== undefined && !flags.includes(rest[0].split('=')[0])) return undefined;
-  return { name, rest };
+  return { name, rest: argv.slice(name.split(' ').length) };
 }
 
 /**

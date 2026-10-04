@@ -282,15 +282,29 @@ test('wf agents and wf agents card take --repo joined as they take it apart', as
   );
 });
 
-test('wf agents given a word that is none of its flags prints the help, as it did before it was a command', async (t) => {
+test('wf agents card and wf agents custom with no name print the help', async (t) => {
   const help = (await printedBy(t)).out;
   for (const argv of [
-    ['agents', 'nope'],
-    ['agents', '--nope'],
     ['agents', 'card'],
     ['agents', 'custom'],
   ])
     assert.deepEqual(await printedBy(t, ...argv), { out: help, err: '' }, `wf ${argv.join(' ')}`);
+});
+
+test('REFUSED at shipped defaults: wf agents given a word that is none of its commands or flags, in its own words', async (t) => {
+  const refusals: Array<[string[], string]> = [
+    [
+      ['agents', 'nope'],
+      'wf agents takes no argument but card <name> or custom <name>: wf agents, wf agents card nope, or wf agents custom nope.',
+    ],
+    [['agents', '--nope'], 'wf agents does not take --nope. It takes --repo <r>, and for a card --from repo|yours.'],
+  ];
+  for (const [argv, message] of refusals)
+    await assert.rejects(
+      () => printedBy(t, ...argv),
+      (err: Error & { exitCode?: number }) => err.message === message && err.exitCode === 2,
+      `wf ${argv.join(' ')}`,
+    );
 });
 
 test('REFUSED at shipped defaults: wf agents with a flag left out, given twice, or one it does not take — in its own words', async (t) => {

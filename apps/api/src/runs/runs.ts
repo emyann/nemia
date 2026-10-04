@@ -14,7 +14,7 @@ import {
   runStore,
 } from 'agent-orchestrator';
 import { isGitRun, type PlaceKind, placeOf, prunedKept, prunedWords, type Run } from 'agent-orchestrator/run';
-import { decisionOf } from '../decide/index.ts';
+import { decisionOf } from '../decide/decision.ts';
 import { detail } from '../detail/index.ts';
 import {
   type Asked,

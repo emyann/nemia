@@ -3,12 +3,13 @@
  * it answers, and the lines the CLI prints of that data. The CLI parses, refuses, helps and prints from an entry, and the api serves the
  * same entry on its route; an entry served on one side alone says so (`only`). Today: a start of work (`wf start`, `START`, and
  * `wf plan`, `PLAN`, which the CLI alone runs), the inbox (`INBOXES`) and the factories (`FACTORIES`), a person's asks of a run —
- * `wf retry`, `wf approve`, `wf round`, `wf accept` and `wf say` — the runs and their steps (`wf ls`, `runsListed`), two reads the api
- * alone serves: a run's decision (`decideRun`) and the run slots (`slotsOf`), the agents of both places (`wf agents`, `agentsRead`), one
- * agent's card (`wf agents card`, `agentCardRead`) and its custom instructions (`wf agents custom`, `AGENTS_CUSTOM`), a run's course
- * (`wf cancel`, `wf hold`, `wf rm`, `wf prune`), and the store's pause (`wf pause`, `wf resume`, and its read the api alone serves):
- * `runs.verb.ts`; and the reads of the store (`wf show`, `wf logs`, `wf feed`, `wf stats`: `reads.verb.ts`). The whole table (`TABLE`)
- * adds the commands the CLI serves alone and runs itself, with no handler: `wf plan`, `wf tick`, `wf up` and `wf watch` (`RAN`).
+ * `wf retry`, `wf approve`, `wf round`, `wf accept` and `wf say` — the runs and their steps (`wf ls`, `runsListed`), three reads the api
+ * alone serves: a run's decision (`decideRun`), whether its branches still merge (`MERGES`) and the run slots (`slotsOf`), the agents of
+ * both places (`wf agents`, `agentsRead`), one agent's card (`wf agents card`, `agentCardRead`) and its custom instructions
+ * (`wf agents custom`, `AGENTS_CUSTOM`), a run's course (`wf cancel`, `wf hold`, `wf rm`, `wf prune`), and the store's pause (`wf pause`,
+ * `wf resume`, and its read the api alone serves): `runs.verb.ts`; and the reads of the store (`wf show`, `wf logs`, `wf feed`,
+ * `wf stats`: `reads.verb.ts`). The whole table (`TABLE`) adds the commands the CLI serves alone and runs itself, with no handler:
+ * `wf plan`, `wf tick`, `wf up` and `wf watch` (`RAN`).
  */
 import { approvalWordsRefusal } from '../gate/gate.ts';
 import { approve } from '../gate/gate.verb.ts';
@@ -32,6 +33,7 @@ import { commandLine, type Args, type CommandSpec, type Flag } from './command.t
 import type { Command, Ran } from './entry.verb.ts';
 import { READS } from './reads.verb.ts';
 import { AGENTS_CUSTOM } from '../agents/custom.verb.ts';
+import { MERGES } from '../branches/merges.verb.ts';
 import { FACTORIES } from '../factory/factory.verb.ts';
 import { INBOXES } from '../inbox/commands.verb.ts';
 import { PLAN, START } from '../start/commands.verb.ts';
@@ -481,6 +483,7 @@ export const COMMANDS: readonly Command[] = [
   LS,
   ...READS,
   DECIDE,
+  MERGES,
   CEILINGS,
   AGENTS,
   AGENT_CARD,

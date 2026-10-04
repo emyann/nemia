@@ -1,6 +1,6 @@
 /**
- * The verbs' table, the runners of the commands the CLI runs itself — `wf tick`, `wf up` and `wf watch` (`RUNS`) — `wf feed`, and
- * `runMain`, which runs a command that lives as long as its process.
+ * The verbs' table, the runners of the commands the CLI runs itself — `wf tick`, `wf up`, `wf watch`, `wf rm` and `wf prune` (`RUNS`) —
+ * `wf feed`, and `runMain`, which runs a command that lives as long as its process.
  */
 import path from 'node:path';
 import { Cause, Effect, Exit, Fiber } from 'effect';
@@ -299,8 +299,6 @@ export const VERBS: ReadonlyMap<string, Verb> = new Map<string, Verb>([
   ['inbox', inboxVerb],
   ['factory', factoryVerb],
   ['feed', feedVerb],
-  ['rm', rmVerb],
-  ['prune', pruneVerb],
   ['decide', decideVerb],
   ['stats', statsVerb],
   ['show', showVerb],
@@ -308,24 +306,30 @@ export const VERBS: ReadonlyMap<string, Verb> = new Map<string, Verb>([
   ['agents custom', agentsCustom],
 ]);
 
-/** The runner of each command the CLI runs itself (`RAN`), by its name: handed its arguments once read and checked. */
+/**
+ * The runner of each command the CLI runs itself, by its name — those it serves alone (`RAN`), and `wf rm` and `wf prune`, whose runners
+ * walk the many runs a command line names through their handlers: handed its arguments once read and checked.
+ */
 export const RUNS: ReadonlyMap<string, (args: Args, e: Engine) => void | Promise<void>> = new Map([
   ['tick', tickVerb],
   ['up', upVerb],
   ['watch', watchVerb],
+  ['rm', rmVerb],
+  ['prune', pruneVerb],
 ]);
 
 /**
  * A command of the table (`TABLE`), run from the command line: its arguments read against its spec — the help printed for too little —
- * then refused by its `check`, and handed to its runner (`RUNS`) where the CLI runs it itself; else to its handler, and the lines it prints
- * of the answer printed.
+ * then refused by its `check`, and handed to its runner (`RUNS`) where it has one; else to its handler, and the lines it prints of the
+ * answer printed.
  */
 async function commanded(command: Command | Ran, rest: string[], e: Engine): Promise<void> {
   const args = parseArgv(command.spec, rest);
   if (args === undefined) return console.log(HELP);
   const wrong = command.check?.(args);
   if (wrong) usage(wrong);
-  if (command.handler === undefined) return RUNS.get(command.name)!(args, e);
+  const runner = RUNS.get(command.name);
+  if (runner || command.handler === undefined) return runner!(args, e);
   const data = await command.handler(e, args);
   for (const line of command.print(data, args)) console.log(line);
   for (const line of command.note?.(data, args) ?? []) console.error(line);

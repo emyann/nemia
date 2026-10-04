@@ -4,8 +4,8 @@
  * same entry on its route; an entry served on one side alone says so (`only`). Today: a person's asks of a run — `wf retry`, `wf approve`,
  * `wf round`, `wf accept` and `wf say` — the runs and their steps (`wf ls`, `runsListed`), two reads the api alone serves: a run's
  * decision (`decideRun`) and the run slots (`slotsOf`), the agents of both places (`wf agents`, `agentsRead`) and one agent's card
- * (`wf agents card`, `agentCardRead`), and a run's course (`wf cancel`, `wf hold`: `runs.verb.ts`). The whole table (`TABLE`) adds the
- * commands the CLI serves alone and runs itself, with no handler: `wf tick`, `wf up` and `wf watch` (`RAN`).
+ * (`wf agents card`, `agentCardRead`), and a run's course (`wf cancel`, `wf hold`, `wf rm`, `wf prune`: `runs.verb.ts`). The whole table
+ * (`TABLE`) adds the commands the CLI serves alone and runs itself, with no handler: `wf tick`, `wf up` and `wf watch` (`RAN`).
  */
 import { approvalWordsRefusal } from '../gate/gate.ts';
 import { approve } from '../gate/gate.verb.ts';
@@ -26,7 +26,7 @@ import { agentCardRead, agentsRead } from '../roster/roster.store.ts';
 import { agentsLines, cardNote, type AgentsRead, type CardRead } from '../roster/roster.ts';
 import { commandLine, type Args, type CommandSpec, type Flag } from './command.ts';
 import type { Command, Ran } from './entry.verb.ts';
-import { CANCEL, HOLD, RAN } from './runs.verb.ts';
+import { CANCEL, HOLD, PRUNE, RAN, RM } from './runs.verb.ts';
 
 /** The text under `key`, or undefined where none was given. */
 const textOf = (args: Args, key: string): string | undefined => {
@@ -457,7 +457,22 @@ const AGENT_CARD: Command<CardRead> = {
 };
 
 /** Every command with a handler defined once, in the order `wf`'s help lists them: what the api may serve. */
-export const COMMANDS: readonly Command[] = [RETRY, APPROVE, ROUND, ACCEPT, SAY, LS, DECIDE, CEILINGS, AGENTS, AGENT_CARD, CANCEL, HOLD];
+export const COMMANDS: readonly Command[] = [
+  RETRY,
+  APPROVE,
+  ROUND,
+  ACCEPT,
+  SAY,
+  LS,
+  DECIDE,
+  CEILINGS,
+  AGENTS,
+  AGENT_CARD,
+  CANCEL,
+  HOLD,
+  RM,
+  PRUNE,
+];
 
 /** The whole table: every command with a handler, then those the CLI runs itself (`RAN`), in the order `wf`'s help lists them. */
 export const TABLE: readonly (Command | Ran)[] = [...COMMANDS, ...RAN];

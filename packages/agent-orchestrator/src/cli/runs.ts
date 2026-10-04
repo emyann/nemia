@@ -1,6 +1,7 @@
 /**
- * The verbs over runs and agents — `wf rm`, `wf prune`, `wf show`, `wf logs` and `wf agents custom` — their
- * flags, read off the command line, and what each prints.
+ * The verbs over runs and agents — `wf show`, `wf logs` and `wf agents custom` — their flags, read off the command line, and what each
+ * prints; and the runners of `wf rm` and `wf prune` (`RM`, `PRUNE`), which walk the many runs a command line names through the entry's
+ * handler, ask a person's yes, and tally what was not done into the exit code.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -8,86 +9,50 @@ import {
   clearCustomInstructions,
   customInstructionsFile,
   customInstructionsFor,
-  forget,
-  forgetLine,
   HOME,
-  prune,
+  PRUNE,
   pruneLines,
   pruningBytes,
+  RM,
   runStore,
   sizeOf,
   writeCustomInstructions,
-  type ForgetHow,
+  type Args,
   type Pruning,
 } from '../runner.ts';
 import { HELP, usage, readFlags, confirmed, type Engine } from './flags.ts';
 
-/**
- * `wf rm`'s arguments: the runs to forget, each once, and its two switches. Refused before any run is read: a flag it does not take, and
- * `--force-unmerged` without `--delete-branches` — it forces what that flag deletes, and alone would delete nothing, silently.
- */
-export function rmHow(argv: string[]): { ids: string[]; how: ForgetHow } {
-  const ids: string[] = [];
-  const how: ForgetHow = {};
-  for (const arg of argv) {
-    if (arg === '--delete-branches') how.deleteBranches = true;
-    else if (arg === '--force-unmerged') how.forceUnmerged = true;
-    else if (arg.startsWith('-'))
-      usage(
-        `wf rm does not take ${arg}. It takes the runs to forget, then --delete-branches, and --force-unmerged beside it: wf rm <runId> [<runId> ...] [--delete-branches [--force-unmerged]].`,
-      );
-    else if (!ids.includes(arg)) ids.push(arg);
-  }
-  if (how.forceUnmerged && !how.deleteBranches) {
-    usage(
-      "--force-unmerged forces --delete-branches to delete a branch not merged into its run's base branch, and alone deletes nothing: wf rm <runId> --delete-branches --force-unmerged.",
-    );
-  }
-  if (!ids.length && argv.length) usage('wf rm takes the runs to forget, by id: wf rm <runId> [<runId> ...] — wf ls lists them.');
-  return { ids, how };
-}
+/** The runs a command line named, in the order given, each once (`RM`'s and `PRUNE`'s many positional). */
+const idsOf = (args: Args): readonly string[] => (Array.isArray(args.runId) ? args.runId : []);
 
 /**
- * `wf prune`'s arguments: the runs to prune, each once — none is every run — and its three switches. Refused before any run is read: a flag
- * it does not take.
+ * One run `wf rm` was given, forgotten through `RM`'s handler and said in its line; returns whether it is still there, and whether that is
+ * a failure other than a refusal.
  */
-export function pruneHow(argv: string[]): { ids: string[]; unmerged: boolean; yes: boolean; artifacts: boolean } {
-  const ids: string[] = [];
-  let unmerged = false;
-  let yes = false;
-  let artifacts = false;
-  for (const arg of argv) {
-    if (arg === '--unmerged') unmerged = true;
-    else if (arg === '--yes') yes = true;
-    else if (arg === '--artifacts') artifacts = true;
-    else if (arg.startsWith('-'))
-      usage(
-        `wf prune does not take ${arg}. It takes the runs to prune — none is every run — then --unmerged, --artifacts and --yes: wf prune [<runId> ...] [--unmerged] [--artifacts] [--yes].`,
-      );
-    else if (!ids.includes(arg)) ids.push(arg);
+async function rmOne(e: Engine, id: string, args: Args): Promise<{ kept: boolean; failed: boolean }> {
+  try {
+    const data = await RM.handler(e, { ...args, runId: id });
+    for (const line of RM.print(data, args)) console.log(line);
+    return { kept: data.forgot.kind === 'refused' || data.forgot.kind === 'held', failed: false };
+  } catch (err) {
+    console.log(`${id}  not forgotten: ${(err as Error).message}`);
+    return { kept: true, failed: (err as { exitCode?: number }).exitCode !== 2 };
   }
-  return { ids, unmerged, yes, artifacts };
 }
 
 /**
  * `wf rm`: each run forgotten, judged on its own, a line each, a refusal included; once every run has had its say, it fails naming those
  * not forgotten, exit 2, or 1 when one failed otherwise.
  */
-export async function rmVerb(rest: string[], e: Engine): Promise<void> {
-  const { ids, how } = rmHow(rest);
+export async function rmVerb(args: Args, e: Engine): Promise<void> {
+  const ids = idsOf(args);
   if (!ids.length) return console.log(HELP);
   const notForgotten: string[] = [];
   let failed = false;
   for (const id of ids) {
-    try {
-      const forgot = await forget(e, id, how);
-      console.log(forgetLine(forgot));
-      if (forgot.kind === 'refused' || forgot.kind === 'held') notForgotten.push(id);
-    } catch (err) {
-      console.log(`${id}  not forgotten: ${(err as Error).message}`);
-      notForgotten.push(id);
-      if ((err as { exitCode?: number }).exitCode !== 2) failed = true;
-    }
+    const one = await rmOne(e, id, args);
+    if (one.kept) notForgotten.push(id);
+    failed ||= one.failed;
   }
   if (notForgotten.length) {
     throw Object.assign(
@@ -122,12 +87,12 @@ function refusedNamed(tally: PruneTally): void {
   }
 }
 
-/** Each of `ids` judged for `wf prune`, removing nothing; a run it cannot judge is said and tallied. */
-async function judged(e: Engine, ids: string[], how: { unmerged: boolean; artifacts: boolean }, tally: PruneTally): Promise<Pruning[]> {
+/** Each of `ids` judged for `wf prune`, removing nothing whatever `args` says; a run it cannot judge is said and tallied. */
+async function judged(e: Engine, ids: readonly string[], args: Args, tally: PruneTally): Promise<Pruning[]> {
   const found: Pruning[] = [];
   for (const id of ids) {
     try {
-      found.push(await prune(e, id, how));
+      found.push((await PRUNE.handler(e, { ...args, runId: id, yes: false })).pruning);
     } catch (err) {
       notPrunedLine(id, err, tally);
     }
@@ -151,11 +116,12 @@ function printFound(found: Pruning[], named: boolean, tally: PruneTally): void {
 }
 
 /** The runs `wf prune` removes once a person has said yes, each judged again as it is pruned, never trusted from the listing. */
-async function prunedAll(e: Engine, prunable: Pruning[], how: { unmerged: boolean; artifacts: boolean }, tally: PruneTally): Promise<void> {
+async function prunedAll(e: Engine, prunable: Pruning[], args: Args, tally: PruneTally): Promise<void> {
   for (const p of prunable) {
     try {
-      const done = await prune(e, p.id, { ...how, yes: true });
-      for (const line of pruneLines(done)) console.log(line);
+      const data = await PRUNE.handler(e, { ...args, runId: p.id, yes: true });
+      const done = data.pruning;
+      for (const line of PRUNE.print(data, args)) console.log(line);
       if (done.kind === 'refused' || done.left.length) tally.notPruned.push(p.id);
     } catch (err) {
       notPrunedLine(p.id, err, tally);
@@ -180,11 +146,14 @@ async function removing(
  * `wf prune`: the space runs that are over hold, listed with its size and freed on `--yes` or a person's y. Named runs are judged each on
  * its own, a line each, a refusal included; with none, every run.
  */
-export async function pruneVerb(rest: string[], e: Engine): Promise<void> {
-  const { ids, unmerged, yes, artifacts } = pruneHow(rest);
+export async function pruneVerb(args: Args, e: Engine): Promise<void> {
+  const ids = idsOf(args);
+  const unmerged = args.unmerged === true;
+  const yes = args.yes === true;
+  const artifacts = args.artifacts === true;
   const named = ids.length > 0;
   const tally: PruneTally = { notPruned: [], failed: false };
-  const found = await judged(e, named ? ids : runStore.runs.list().map((r) => r.id), { unmerged, artifacts }, tally);
+  const found = await judged(e, named ? ids : runStore.runs.list().map((r) => r.id), args, tally);
   printFound(found, named, tally);
   const prunable = found.filter((p) => p.kind === 'prunable');
   if (!prunable.length) {
@@ -195,7 +164,7 @@ export async function pruneVerb(rest: string[], e: Engine): Promise<void> {
   const total = sizeOf(prunable.reduce((sum, p) => sum + pruningBytes(p), 0));
   console.log(`${prunable.length} run${prunable.length > 1 ? 's' : ''} to prune, ${total} in all`);
   if (!(await removing(prunable, named, { unmerged, yes, artifacts }))) return refusedNamed(tally);
-  await prunedAll(e, prunable, { unmerged, artifacts }, tally);
+  await prunedAll(e, prunable, args, tally);
   return refusedNamed(tally);
 }
 

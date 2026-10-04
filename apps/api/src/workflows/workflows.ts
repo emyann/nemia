@@ -82,6 +82,8 @@ export type WorkflowStepSpec = {
    * Null for a step without the line.
    */
   workspace: 'main' | 'folder' | null;
+  /** The factory's folders the step may write (`writable:`), each by its directory's name: empty where it writes none of them. */
+  writable: string[];
   /**
    * `slot: none`: the run takes no run slot (`WF_MAX_RUNS`). Null for a step without the line, which is the only other thing a step can
    * say.
@@ -418,6 +420,7 @@ function schemasIn(dir: string): string[] {
 /** The keys of a step that are lists, each empty where the step leaves it unset. */
 const listsOf = (step: Workflow) => ({
   input: step.input ?? [],
+  writable: step.writable ?? [],
   skills: step.skills ?? [],
   disallowedTools: step.disallowedTools ?? [],
   allowedTools: step.allowedTools ?? [],

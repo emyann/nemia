@@ -351,7 +351,7 @@
     {
       "files": ["apps/api/src/workflows/builder.ts"],
       "rules": {
-        "max-lines": ["error", { "max": 506, "skipBlankLines": true, "skipComments": true }]
+        "max-lines": ["error", { "max": 505, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
@@ -526,12 +526,6 @@
       "rules": {
         "complexity": ["error", { "max": 22 }],
         "sonarjs/cognitive-complexity": ["error", 21]
-      }
-    },
-    {
-      "files": ["apps/web/src/routes/agents_.$from.$agent.tsx"],
-      "rules": {
-        "max-lines-per-function": ["error", { "max": 91, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
@@ -884,7 +878,7 @@
     {
       "files": ["packages/agent-runtime/src/harness/claude/code.ts"],
       "rules": {
-        "complexity": ["error", { "max": 28 }]
+        "complexity": ["error", { "max": 24 }]
       }
     },
     {

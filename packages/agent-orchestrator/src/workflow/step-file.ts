@@ -33,6 +33,7 @@ import {
   remoteOf,
   rulesOf,
   skillNamesOf,
+  writableNamesOf,
   slotOf,
   toolsOf,
   wordOf,
@@ -41,7 +42,7 @@ import {
 import { codexModeWritten, codexSandboxNamed, FORMER_KEYS, formerKeyWritten, readKeys, type Spelled } from '../former/former.ts';
 import type { Agent, Agents, SkillsFound } from '../agents/agents.ts';
 import { tallyOf } from '../tally/tally.ts';
-import { addedSkillsRefusal, fenceRefusal } from './fence.ts';
+import { addedSkillsRefusal, fenceRefusal, refuseUnwritable } from './fence.ts';
 
 /**
  * One step, from its file's text.
@@ -85,6 +86,7 @@ export function parseWorkflow(
       refuse(
         `${name}: \`skills: ${meta.skills}\` adds skills to the step's agent, and this step has none. Name one — \`agent: <name>\` — whose skills these add to, or delete the line.`,
       );
+    refuseUnwritable(step, undefined);
     return step;
   }
   const agent = agentOf(name, attached, agents, hired);
@@ -98,6 +100,7 @@ export function parseWorkflow(
   const fromAgent = meta.output === undefined && agent.keys.output !== undefined;
   const step = stepFrom(name, { ...inherited, ...meta }, body, fromAgent ? agent.read : read, spelled);
   agentStepRefusal(name, agent, meta, step, skills);
+  refuseUnwritable(step, agent.name);
   const added = step.skills?.filter((skill) => !agent.skills?.includes(skill));
   const sessionSkills = [...(agent.skills ?? []), ...(added ?? [])];
   const keys = STEP_KEYS.filter((key) => Object.hasOwn(meta, key));
@@ -249,6 +252,7 @@ export function stepFrom(
     after,
     resume: meta.resume,
     workspace: workspaceOf(name, meta.workspace, meta.check, meta.resume, meta.gate, meta.retries, harness),
+    writable: writableNamesOf(name, meta.writable),
     slot: slotOf(name, meta.slot),
     body,
     skills: skillNamesOf(name, meta.skills),
@@ -326,7 +330,7 @@ export type StepDraft = Omit<Workflow, 'output' | 'agent'> & { output?: Pick<Ste
  * The keys whose empty list says what no line says: nothing to wait on, to read, to deny, to add. Not `tools:`, where none reads as every
  * tool to one person.
  */
-const EMPTY_IS_UNSET: readonly StepKey[] = ['after', 'input', 'skills', 'disallowedTools', 'allowedTools', 'tally'];
+const EMPTY_IS_UNSET: readonly StepKey[] = ['after', 'input', 'writable', 'skills', 'disallowedTools', 'allowedTools', 'tally'];
 
 /**
  * A step as its file: the frontmatter, with the keys the step sets in `STEP_KEYS`' order, each written as the parser reads it — a list as

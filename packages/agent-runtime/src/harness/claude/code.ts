@@ -29,6 +29,7 @@ import {
   CLAUDE_CONTEXT_TOKENS,
   CLAUDE_DEFAULT_MODE,
   claudeCodeRefuses,
+  claudeAllowArgs,
   claudeDenyArgs,
   claudeFlagsOf,
   claudeMountArgs,
@@ -58,7 +59,8 @@ export const claudePrintArgs = (r: SpawnRequest, io: HarnessIO | undefined, outp
  *    be used without asking a person who is not there. In `dontAsk` a mode that never asks also never allows a write, even
  *    in the session's own cwd, so a fenced session that must write its own work is given `Edit(**)`, a glob resolved
  *    against its `cwd`: unscoped (`Write`) it would write anywhere, scoped it is denied outside. A deny still beats it.
- *    The deny list also holds each read-only mount: an edit under it is denied (`claudeDenies`).
+ *    The deny list also holds each read-only mount: an edit under it is denied (`claudeDenies`); the allow list each writable
+ *    one: an edit under it is allowed (`claudeAllows`).
  * 2. `--add-dir` and each mount's path (`claudeMountArgs`): variadic, and ended by the flag after it.
  * 3. The caller's own flags (`config.claude`): after the variadic lists, which any flag ends, and before the mode.
  * 4. `--permission-mode`, `auto` unless the task names one.
@@ -80,7 +82,7 @@ export const claudePrintArgs = (r: SpawnRequest, io: HarnessIO | undefined, outp
 export const claudePrintFlags = (r: SpawnRequest, io: HarnessIO | undefined): string[] => [
   ...(r.config?.tools ? ['--tools', r.config?.tools.join(',')] : []),
   ...claudeDenyArgs(r.config),
-  ...(r.config?.allowedTools?.length ? ['--allowedTools', r.config?.allowedTools.join(',')] : []),
+  ...claudeAllowArgs(r.config),
   ...claudeMountArgs(r.config),
   ...claudeFlagsOf(r.config?.claude),
   '--permission-mode',

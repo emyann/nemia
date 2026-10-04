@@ -365,8 +365,9 @@ What an agent is told comes in four layers, each written by whoever owns it:
    are kept in the person's store, one file per agent name, `$WF_ROOT/custom-instructions/<agent>.md`
    (`~/.agent-workflows/custom-instructions/<agent>.md` by default), never in the agent's folder, which may be the repository's; the
    same words reach whichever agent of that name a run finds. `wf agents custom <name> --file <path>` writes them (`--file -` reads
-   stdin), `wf agents custom <name>` prints them, and `--clear` removes them; it refuses a name no place has, blank words, and a
-   frontmatter block. They only add words: they set no key, so they never widen the agent's fence, give it a tool, or change its model,
+   stdin), `wf agents custom <name>` prints them, and `--clear` removes them; the board's page of an agent reads, writes and clears them
+   through the same functions (`writeCustomInstructions`, `clearCustomInstructions`). Both refuse a name no place has, blank words, and a
+   frontmatter block, in the same words. They only add words: they set no key, so they never widen the agent's fence, give it a tool, or change its model,
    mode or skills — a frontmatter block written by hand, or a link, stops a start of every step naming the agent, naming the file.
    `wf start` reads them once and freezes them with the step (`StepAgent.customInstructions`): a run started before an edit or a
    `--clear` keeps the words it froze, and only runs started after it get the new ones.
@@ -391,7 +392,8 @@ step's `tools:` may name only tools its agent's list has; its `allowedTools:` on
 which replaces its agent's list, must keep each of its agent's denies. Its `permissionMode:` or `sandbox:` may be no wider than its
 agent's, or than its harness's default when the agent names none: from narrowest, `plan`; `dontAsk`, `default` and `manual`;
 `acceptEdits`; `auto`; `bypassPermissions` — and on codex `read-only`; `workspace-write`; `danger-full-access`. And it may not run a
-fenced agent on the other harness, whose fence cannot be compared. Nor may it set `background: true` over an agent in any mode but
+fenced agent on the other harness, whose fence cannot be compared. Its `writable:` widens where its writes reach and never what it may
+do, so it is refused over a fence that writes nothing (*A factory's other folders*, below). Nor may it set `background: true` over an agent in any mode but
 `bypassPermissions`: a background session also reads the person's user settings and the checkout's `settings.local.json`, where each
 "don't ask again" writes an allow rule, and every other mode runs more of what such a rule allows. Delete the line, and the step runs as
 a job, or attach an agent in `bypassPermissions` that denies by name what it must never do. One rule covers another when it is the
@@ -448,8 +450,8 @@ card moves with the version, and the board refuses a save against a stale read. 
 session loads through the `Skill` tool. The card entry is the sentence about it.
 
 `wf agents` lists both places, each agent by its description with its skills under it, and the file of your custom instructions for it
-when you have some (*Four layers*, above; `wf agents custom <name>` prints, writes or clears them). `wf agents card <name>` prints one
-in the shape of an A2A Agent Card, JSON on stdout and nothing else:
+when you have some (*Four layers*, above; `wf agents custom <name>`, or the agent's page on the board, prints, writes or clears them).
+`wf agents card <name>` prints one in the shape of an A2A Agent Card, JSON on stdout and nothing else:
 
 ```
 $ wf agents card reviewer
@@ -2539,6 +2541,29 @@ $ wf start "add a flag" --workflows build
 - **`WF_DEFAULT_FACTORY_STARTS=1` is the tests' switch**, off as shipped: with it, a start no factory holds, and a card that names
   none, go to the default factory, as the package's and the api's tests start runs in scratch folders. A start that names `default`
   and a folder two factories hold are refused all the same.
+
+### A factory's other folders: read-only, and `writable:`
+
+A run in a factory works in one of its repositories, and every other is mounted for each local step read-only, frozen on the record
+at `wf start` as `mounts` (`factoryMounts`); a folder that is no directory then is left out, and `wf start` says it. A step may write
+some of them on purpose:
+
+```md
+---
+writable: web, docs   # the factory's folders this step may write, each by its directory's name
+---
+```
+
+The run files those folders writable for that step alone — its first filing, a try and a round (`stepMounts`) — and every other step
+of the run still only reads them; the step's brief and `wf start` say which. A name is a directory's, never a path, so a workflow
+stays the same on every machine; the run's own repository is the step's workspace already, and names nothing more. Refused at load:
+a name that is not a directory's or is given twice, the key on a remote agent, and the key over a fence that writes nothing — `plan`,
+codex `read-only`, a `tools:` list with no tool that writes a file, a mode that asks before an edit (`dontAsk`, `default`) with no
+`Edit` rule in `allowedTools:`, where the rule the mount is filed with would be its first write (`refuseUnwritable`). Fences only
+tighten, and this is where,
+not what: the key widens where a step's writes reach, never what it may do. Refused at `wf start`, before anything is written
+(`writableRefusal`): a name no folder of the factory has, one two share, one that is no directory now, a `writable:` in a run in no
+factory, and a step whose harness holds no writable mount, Codex's, in the runtime's words (`writableMountRefusal`).
 
 ## How much runs at once: `WF_MAX_CONCURRENT` and `WF_MAX_RUNS`
 

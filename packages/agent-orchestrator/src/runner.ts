@@ -173,7 +173,7 @@ export {
   workflowsIn,
 } from './folder/folder.store.ts';
 export type { Places } from './folder/folder.store.ts';
-export { clearCustomInstructions, writeCustomInstructions } from './agents/custom.store.ts';
+export { clearCustomInstructions, customInstructionsFor, writeCustomInstructions } from './agents/custom.store.ts';
 export { cardToStart, planLines, planStopped } from './plan/plan.ts';
 export type { Card, Planned } from './plan/plan.ts';
 export {
@@ -194,6 +194,7 @@ export {
   factoryLines,
   factoryNameRefusal,
   factoryRepo,
+  writersOf,
   fillsOf,
   hireRefusal,
   noFactoryLine,

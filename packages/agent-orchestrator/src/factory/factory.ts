@@ -233,6 +233,89 @@ export function factoryMounts(factory: Pick<Factory, 'repos'>, repo: string | un
     .map((r) => ({ path: r, readOnly: true }));
 }
 
+/**
+ * The folders the step `step` is filed with, of those its run mounts (`mounts`, frozen at start): each writable that its `writable:` names
+ * by its directory's name, and read-only otherwise. Undefined for a run that mounts none.
+ */
+export function stepMounts(step: Pick<Workflow, 'writable'>, mounts: readonly Mount[] | undefined): Mount[] | undefined {
+  if (!mounts) return undefined;
+  return mounts.map((m) => (step.writable?.includes(path.basename(m.path)) ? { path: m.path, readOnly: false } : m));
+}
+
+/** Each folder of `mounts` a local step of `steps` writes (`stepMounts`), with those steps by name, in `mounts`' order. */
+export const writersOf = (
+  steps: readonly Pick<Workflow, 'name' | 'harness' | 'writable'>[],
+  mounts: readonly Mount[] | undefined,
+): { path: string; steps: string[] }[] =>
+  (mounts ?? [])
+    .map((m) => ({
+      path: m.path,
+      steps: steps.filter((s) => !isRemoteHarness(s.harness) && stepMounts(s, [m])?.[0].readOnly === false).map((s) => s.name),
+    }))
+    .filter((w) => w.steps.length);
+
+/** The `<workflow>/<step>` where and the line a `writable:` refusal starts with. */
+const writableSaid = (workflow: string, step: Pick<Workflow, 'name' | 'writable'>): string =>
+  `${workflow}/${step.name}: \`writable: ${(step.writable ?? []).join(', ')}\``;
+
+/**
+ * Why the name `name` a step's `writable:` gives (`said`) names no folder the run can mount writable, or undefined: none or two of the
+ * factory's repositories (`repos`, resolved) have it as their directory's name, or the one that does is no directory at start — it is
+ * not among `mounts`. The run's own repository (`own`) is the step's workspace already, and taken.
+ */
+function writableNameRefusal(
+  said: string,
+  name: string,
+  repos: readonly string[],
+  own: string | undefined,
+  mounts: readonly Mount[],
+): string | undefined {
+  const named = repos.filter((r) => path.basename(r) === name);
+  if (!named.length) {
+    const names = [...new Set(repos.map((r) => path.basename(r)))].sort().join(', ');
+    return `${said} names \`${name}\`, and no folder of the factory has that name — its folders are ${names}. Name one of them by its directory's name, or delete the name. Nothing was started.`;
+  }
+  if (named.length > 1)
+    return `${said} names \`${name}\`, and ${named.length} folders of the factory have that name: ${named.join(', ')}. A step names a folder only when one alone has its name: rename one of the folders, then file the factory again on its new path. Nothing was started.`;
+  if (named[0] === own || mounts.some((m) => m.path === named[0])) return undefined;
+  return `${said} names \`${name}\`, and ${named[0]} is no directory now, so the run would not mount it. Start the run again once it is there, or delete the name. Nothing was started.`;
+}
+
+/**
+ * Why a run of `workflow` in `factory` on the repository `repo` (none for a folder run), mounting `mounts` (`factoryMounts`, each a
+ * directory now), cannot start, or undefined: a step's `writable:` names a folder by a name no folder of the factory has, or two have, or
+ * one that is no directory at start (`writableNameRefusal`); or names any in a run started in no factory, which mounts none.
+ */
+export function writableRefusal(
+  steps: readonly Pick<Workflow, 'name' | 'writable'>[],
+  workflow: string,
+  factory: Pick<Factory, 'name' | 'repos'> | undefined,
+  repo: string | undefined,
+  mounts: readonly Mount[],
+): string | undefined {
+  const repos = [...new Set((factory?.repos ?? []).map((r) => path.resolve(r)))];
+  const own = repo === undefined ? undefined : path.resolve(repo);
+  for (const step of steps.filter((s) => s.writable?.length)) {
+    const said = writableSaid(workflow, step);
+    if (!factory)
+      return `${said} names folders of the run's factory, and this run is started in none, so it mounts no folder. Start it in a factory — wf start --factory <name> — or delete the line. Nothing was started.`;
+    for (const name of step.writable ?? []) {
+      const why = writableNameRefusal(said, name, repos, own, mounts);
+      if (why) return why;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Why a run in `factory` cannot start: the runtime refuses the step `where` (`<workflow>/<step>`) a folder of the factory its `writable:`
+ * names, mounted writable for it (`stepMounts`), in its words (`why`); then what a person can do.
+ */
+export const writableMountRefusal = (factory: Pick<Factory, 'name'>, where: string, why: string): string =>
+  `${why}\nThat folder is the factory ${factory.name}'s, and ${where} names it in \`writable:\`, so the run would mount it writable for that ` +
+  `step. Hire into ${where} an agent whose harness holds a writable mount (wf factory hire ${factory.name} <agent> --step ${where}), ` +
+  `or delete the name from \`writable:\`, so the step only reads the folder. Nothing was written.`;
+
 /** A factory's hires as `wf factory ls` lists them under its line, sorted by step: `build/implement ← ada`. */
 const hireLines = (hires: Hires, width: number): string[] =>
   Object.keys(hires)

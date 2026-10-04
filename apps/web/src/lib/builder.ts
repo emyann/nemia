@@ -41,6 +41,7 @@ export const UNSET: Readonly<WorkflowStepSpec> = {
   resume: null,
   input: [],
   workspace: null,
+  writable: [],
   slot: null,
   agent: null,
   skills: [],
@@ -88,6 +89,7 @@ export const draftOf = (workflow: Pick<WorkflowListing, 'steps'>): DraftStep[] =
       after: [...spec.after],
       input: [...spec.input],
       skills: [...spec.skills],
+      writable: [...spec.writable],
       disallowedTools: [...spec.disallowedTools],
       allowedTools: [...spec.allowedTools],
       tally: [...spec.tally],
@@ -172,7 +174,7 @@ export function addStep(steps: readonly DraftStep[], name: string, body: string)
     ...steps,
     {
       name,
-      spec: { ...UNSET, after: [], input: [], skills: [], disallowedTools: [], allowedTools: [], tally: [] },
+      spec: { ...UNSET, after: [], input: [], skills: [], writable: [], disallowedTools: [], allowedTools: [], tally: [] },
       body,
       own: null,
       schema: null,
@@ -347,6 +349,7 @@ export const listOf = (typed: string): string[] =>
 const LIST_UNSET: Readonly<Partial<Record<keyof WorkflowStepSpec, string>>> = {
   tools: "the harness's own set",
   skills: 'no skills added',
+  writable: 'none writable',
   disallowedTools: 'nothing denied',
   allowedTools: 'nothing allowed',
   tally: 'nothing counted',

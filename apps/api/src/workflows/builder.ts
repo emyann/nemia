@@ -68,6 +68,7 @@ const KINDS: Readonly<Record<StepKey, KeyKind>> = {
   resume: 'step',
   input: 'steps',
   workspace: 'choice',
+  writable: 'list',
   slot: 'choice',
   agent: 'choice',
   skills: 'list',
@@ -184,13 +185,11 @@ function agentValues(home: string): Record<string, Partial<WorkflowStepSpec>> {
  * drawn, a step already naming one keeps its word, and `wf start` and `wf up` say what is wrong with the file.
  */
 function harnessChoices(): readonly string[] {
-  let names: string[];
   try {
-    names = [...remoteAgents().keys()];
+    return [...HARNESSES, ...[...remoteAgents().keys()].map((name) => `${REMOTE_PREFIX}${name}`)];
   } catch {
-    names = [];
+    return [...HARNESSES];
   }
-  return [...HARNESSES, ...names.map((name) => `${REMOTE_PREFIX}${name}`)];
 }
 
 /** The words a key of a fixed list may be set to, the flags' among them; the harness and the agent are offered as the store has them. */

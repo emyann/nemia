@@ -135,13 +135,7 @@ export function skillsFor(workflowDir: string, places: Places = {}): SkillsFound
   const found = new Map<string, { at: string; dir: string | WorkflowError }>();
   for (const root of roots) {
     const dir = path.join(root, SKILLS_FOLDER);
-    let names: string[];
-    try {
-      names = fs.readdirSync(dir).sort();
-    } catch {
-      continue;
-    }
-    for (const name of names) {
+    for (const name of entriesOf(dir).sort()) {
       const at = path.join(dir, name);
       if (!fs.statSync(path.join(at, 'SKILL.md'), { throwIfNoEntry: false })?.isFile()) continue;
       const first = found.get(name);
@@ -333,13 +327,7 @@ const formerModeOf = (text: string, harness: string | undefined): string | undef
  * agent's. None for a folder that is not there.
  */
 function stepTexts(dir: string): { file: string; text: string; agent?: string; harness?: string }[] {
-  let files: string[];
-  try {
-    files = stepFiles(fs.readdirSync(dir));
-  } catch {
-    return [];
-  }
-  return files.map((file) => {
+  return stepFiles(entriesOf(dir)).map((file) => {
     const text = textAt(path.join(dir, file));
     const agent = frontmatterKey(text, 'agent');
     const harness =
@@ -363,22 +351,18 @@ function noStepsBecause(dir: string, entries: readonly string[]): string {
 
 /** The folders in `dir` that hold steps, sorted: the workflows a folder of workflows has. None for a folder that is not there. */
 export function workflowsIn(dir: string, entries?: readonly string[]): string[] {
-  let names: readonly string[];
+  return (entries ?? entriesOf(dir))
+    .filter((name) => name !== AGENTS_FOLDER && name !== SKILLS_FOLDER && stepFiles(entriesOf(path.join(dir, name))).length > 0)
+    .sort();
+}
+
+/** The names in the folder `dir`, unsorted; none for a folder that is not there or cannot be read. */
+function entriesOf(dir: string): string[] {
   try {
-    names = entries ?? fs.readdirSync(dir);
+    return fs.readdirSync(dir);
   } catch {
     return [];
   }
-  return names
-    .filter((name) => {
-      if (name === AGENTS_FOLDER || name === SKILLS_FOLDER) return false;
-      try {
-        return stepFiles(fs.readdirSync(path.join(dir, name))).length > 0;
-      } catch {
-        return false;
-      }
-    })
-    .sort();
 }
 
 const isFolder = (at: string): boolean => Boolean(fs.statSync(at, { throwIfNoEntry: false })?.isDirectory());
@@ -661,6 +645,7 @@ const frozenStepFields = {
   resume: Schema.optionalKey(Schema.String),
   input: Schema.optionalKey(Strings),
   workspace: Schema.optionalKey(Schema.Literals(['main', 'folder'])),
+  writable: Schema.optionalKey(Strings),
   slot: Schema.optionalKey(Schema.Literal('none')),
   agent: Schema.optionalKey(StepAgentSchema),
   skills: Schema.optionalKey(Strings),

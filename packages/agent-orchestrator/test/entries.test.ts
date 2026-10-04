@@ -100,6 +100,7 @@ const PINNED: Record<string, string[]> = {
     'costLine',
     'cursorTakes',
     'customInstructionsFile',
+    'customInstructionsFor',
     'daemonFile',
     'daemonLine',
     'daemonStanding',
@@ -334,6 +335,7 @@ const PINNED: Record<string, string[]> = {
     'writeSkill',
     'writeTryFolder',
     'writeWorkflow',
+    'writersOf',
   ],
   'agent-orchestrator/run': [
     'BY_CAP',

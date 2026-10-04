@@ -198,6 +198,7 @@ const LOCAL_ONLY: Record<string, string> = {
   resume: 'plan',
   check: 'npm test',
   skills: 'review-a-change',
+  writable: 'web',
 };
 
 test('each key that tells a harness of ours how to run is refused on a remote step, naming the key and the harness', () => {

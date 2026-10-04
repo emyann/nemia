@@ -302,3 +302,156 @@ test('REFUSED: a factory folder whose path a permission rule cannot name refuses
   );
   assert.deepEqual(runs(), before, 'nothing written');
 });
+
+/** `loop`'s implement step, rewritten to say `writable: <names>`. */
+const writing = (loop: string, names: string) =>
+  fs.writeFileSync(path.join(loop, 'implement.md'), `---\nwritable: ${names}\n---\nBuild what was asked.\n`);
+
+/** The runs in the store, by file. */
+const runFiles = () => (fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')).sort() : []);
+
+/** The refusal `start(opts)` fails with, after checking it is an `Invalid` and that no run was written. */
+function refusal(opts: Parameters<typeof start>[0]): string {
+  const before = runFiles();
+  let failed: (Error & { _tag?: string }) | undefined;
+  try {
+    start(opts);
+  } catch (err) {
+    failed = err as Error & { _tag?: string };
+  }
+  assert.equal(failed?._tag, 'Invalid', String(failed?.message));
+  assert.deepEqual(runFiles(), before, 'nothing written');
+  return failed.message;
+}
+
+test("a step's `writable:` folder is filed writable for that step alone, on its first filing, a try and a round, and said on its brief and by wf start", async () => {
+  const { repos, loop } = fresh();
+  writing(loop, path.basename(repos[1]));
+  const run = start({ brief: 'build it', repo: repos[0], workflowDir: loop, isolate: false, factory: 'trio' });
+  assert.deepEqual(readRun(run.id).mounts, readOnly(repos[1], repos[2]), 'the record keeps the run read-only list');
+  const writes = [
+    { path: repos[1], readOnly: false },
+    { path: repos[2], readOnly: true },
+  ];
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  const first = b.filed.get(`${run.id}-implement`)!;
+  assert.deepEqual(first.config?.mounts, writes, 'the first filing');
+  assert.ok(
+    first.brief.includes(
+      `Folders of this factory you may write, as this step's \`writable:\` names them: \`${repos[1]}\`. Each is mounted writable for this step alone; every other step of the run only reads it.\n` +
+        `Folders of this factory you may read, and must not write: \`${repos[2]}\`.`,
+    ),
+    first.brief,
+  );
+  b.settle(`${run.id}-implement`, 'failed');
+  await advance(b.e, readRun(run.id));
+  await retry(b.e, run.id, 'implement', { mode: 'fresh' });
+  await advance(b.e, readRun(run.id));
+  const tried = readRun(run.id).steps.implement.taskId!;
+  assert.deepEqual(b.filed.get(tried)?.config?.mounts, writes, 'a try');
+  b.settle(tried, 'succeeded', SIGNED);
+  await advance(b.e, readRun(run.id));
+  const review = b.filed.get(`${run.id}-review`)!;
+  assert.deepEqual(review.config?.mounts, readOnly(repos[1], repos[2]), 'every other step reads it');
+  assert.doesNotMatch(review.brief, /you may write/);
+  b.settle(`${run.id}-review`, 'succeeded', { ...SIGNED, again: true });
+  await advance(b.e, readRun(run.id));
+  const round = readRun(run.id).steps.implement.taskId!;
+  assert.notEqual(round, tried);
+  assert.deepEqual(b.filed.get(round)?.config?.mounts, writes, 'a round');
+  const out = await typed(['start', 'build it', '--workflows', loop, '--factory', 'trio', '--repo', repos[0], '--no-worktree']);
+  assert.ok(out.includes(`mounts: ${repos[1]}, ${repos[2]} — read-only, for every local step but where written below`), out.join('\n'));
+  assert.ok(out.includes(`writable: ${repos[1]} — for implement alone`), out.join('\n'));
+});
+
+test("a step's `writable:` that names the run's own repository mounts nothing more: that folder is its workspace", () => {
+  const { repos, loop } = fresh();
+  writing(loop, path.basename(repos[0]));
+  const run = start({ brief: 'build it', repo: repos[0], workflowDir: loop, isolate: false, factory: 'trio' });
+  assert.deepEqual(readRun(run.id).mounts, readOnly(repos[1], repos[2]));
+});
+
+test("REFUSED at shipped defaults: a `writable:` name no folder of the factory has, naming the step, its line, the factory's folders and the fix", () => {
+  const { repos, loop } = fresh();
+  writing(loop, 'nope');
+  const names = repos.map((r) => path.basename(r)).join(', ');
+  assert.equal(
+    refusal({ brief: 'build it', repo: repos[0], workflowDir: loop, isolate: false, factory: 'trio' }),
+    `loop/implement: \`writable: nope\` names \`nope\`, and no folder of the factory has that name — its folders are ${names}. Name one of them by its directory's name, or delete the name. Nothing was started.`,
+  );
+});
+
+test('REFUSED: a `writable:` name two folders of the factory share, naming both', () => {
+  const { loop } = fresh();
+  const own = aRepo();
+  const [one, two] = ['p1-', 'p2-'].map((p) => {
+    const parent = fs.mkdtempSync(path.join(ROOT, p));
+    const repo = aRepo();
+    fs.renameSync(repo, path.join(parent, 'web'));
+    return path.join(parent, 'web');
+  });
+  addFactory({ name: 'twins', repos: [own, one, two] });
+  attachWorkflow({ factory: 'twins', workflow: 'loop' });
+  hireAgent({ factory: 'twins', agent: 'implementer', step: 'loop/implement' });
+  hireAgent({ factory: 'twins', agent: 'reviewer', step: 'loop/review' });
+  writing(loop, 'web');
+  assert.equal(
+    refusal({ brief: 'build it', repo: own, workflowDir: loop, isolate: false, factory: 'twins' }),
+    `loop/implement: \`writable: web\` names \`web\`, and 2 folders of the factory have that name: ${one}, ${two}. A step names a folder only when one alone has its name: rename one of the folders, then file the factory again on its new path. Nothing was started.`,
+  );
+});
+
+test('REFUSED: a `writable:` folder that is no directory at start', () => {
+  const { repos, loop } = fresh();
+  writing(loop, path.basename(repos[2]));
+  fs.rmSync(repos[2], { recursive: true });
+  assert.equal(
+    refusal({ brief: 'build it', repo: repos[0], workflowDir: loop, isolate: false, factory: 'trio' }),
+    `loop/implement: \`writable: ${path.basename(repos[2])}\` names \`${path.basename(repos[2])}\`, and ${repos[2]} is no directory now, so the run would not mount it. Start the run again once it is there, or delete the name. Nothing was started.`,
+  );
+});
+
+test('REFUSED: a `writable:` in a run started in no factory', () => {
+  const { repos, loop } = fresh();
+  writing(loop, path.basename(repos[1]));
+  assert.equal(
+    refusal({ brief: 'build it', repo: repos[0], workflowDir: loop, isolate: false }),
+    `loop/implement: \`writable: ${path.basename(repos[1])}\` names folders of the run's factory, and this run is started in none, so it mounts no folder. Start it in a factory — wf start --factory <name> — or delete the line. Nothing was started.`,
+  );
+});
+
+test("REFUSED: a read-only folder no permission rule can name, beside a step's `writable:` one, is said as the read-only mount it is", () => {
+  const { loop } = fresh();
+  const own = aRepo();
+  const spaced = aRepo('First Last-');
+  const web = aRepo();
+  addFactory({ name: 'spaced-web', repos: [own, spaced, web] });
+  attachWorkflow({ factory: 'spaced-web', workflow: 'loop' });
+  hireAgent({ factory: 'spaced-web', agent: 'implementer', step: 'loop/implement' });
+  hireAgent({ factory: 'spaced-web', agent: 'reviewer', step: 'loop/review' });
+  writing(loop, path.basename(web));
+  const message = refusal({ brief: 'build it', repo: own, workflowDir: loop, isolate: false, factory: 'spaced-web' });
+  assert.match(message, /^implement: `mounts` gives the session /, 'no `writable:` line quoted: the folder refused is no folder it names');
+  assert.ok(message.includes(`\`mounts\` gives the session ${JSON.stringify(spaced)} read-only, and Claude Code holds a folder`), message);
+  assert.ok(
+    message.includes("\nThat folder is the factory spaced-web's: a run in it mounts every repository of the factory but its own"),
+    message,
+  );
+});
+
+test('REFUSED at shipped defaults: a `writable:` folder on a harness that cannot hold a writable mount, in the runtime words quoted by the line, with the fix', () => {
+  const { repos, loop } = fresh();
+  const team = path.dirname(loop);
+  fs.writeFileSync(path.join(team, 'agents', 'coder.md'), '---\nharness: codex\n---\nWrite the code.\n');
+  const coded = path.join(team, 'coded');
+  fs.mkdirSync(coded);
+  fs.writeFileSync(path.join(coded, 'code.md'), `---\nwritable: ${path.basename(repos[1])}\n---\nCode it.\n`);
+  attachWorkflow({ factory: 'trio', workflow: 'coded' });
+  hireAgent({ factory: 'trio', agent: 'coder', step: 'coded/code' });
+  assert.equal(
+    refusal({ brief: 'code it', repo: repos[0], workflowDir: coded, isolate: false, factory: 'trio' }),
+    `code: \`writable: ${path.basename(repos[1])}\` (filed as \`mounts\`): \`mounts\` gives the session ${repos[1]} writable, and the \`codex\` harness cannot hold a writable mount: its session would not reach the folder as asked. File the task on \`claude\` or \`claude-detached\`, or leave the mount off.\n` +
+      `That folder is the factory trio's, and coded/code names it in \`writable:\`, so the run would mount it writable for that step. Hire into coded/code an agent whose harness holds a writable mount (wf factory hire trio <agent> --step coded/code), or delete the name from \`writable:\`, so the step only reads the folder. Nothing was written.`,
+  );
+});

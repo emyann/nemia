@@ -34,6 +34,8 @@ import {
   DEFAULT_FACTORY,
   factoryMountRefusal,
   factoryMounts,
+  writableMountRefusal,
+  writableRefusal,
   factoryRepo,
   fillsOf,
   outsideRefusal,
@@ -260,6 +262,29 @@ const mountsAt = (factory: Factory | undefined, repo: string | undefined): Mount
   factory ? factoryMounts(factory, repo).filter((m) => isDirectory(m.path)) : [];
 
 /**
+ * Why `steps`, started from `opts` in `factory` on `own` (none for a folder run), cannot be given `mounts`: a `writable:` name no folder
+ * answers (`writableRefusal`), or a step whose harness cannot hold its mounts: asked first of every folder read-only, as the run mounts
+ * them (`factoryMountRefusal`), then of the folders its `writable:` names writable (`writableMountRefusal`). Nothing when every step can.
+ */
+function mountRefusal(
+  opts: StartOptions,
+  steps: Workflow[],
+  places: Places,
+  factory: Factory | undefined,
+  own: string | undefined,
+  mounts: readonly Mount[],
+): string | undefined {
+  const workflow = path.basename(path.resolve(opts.workflowDir));
+  const unwritable = writableRefusal(steps, workflow, factory, own, mounts);
+  if (unwritable || !factory || !mounts.length) return unwritable;
+  const ask = (asked: readonly Workflow[]) => refusedStep(asked, places, opts.gates ?? [], formerModesWritten(opts.workflowDir), mounts);
+  const reading = ask(steps.map(({ writable: _, ...step }) => step));
+  if (reading) return factoryMountRefusal(factory, `${workflow}/${reading.step.name}`, reading.why);
+  const writing = ask(steps);
+  return writing && writableMountRefusal(factory, `${workflow}/${writing.step.name}`, writing.why);
+}
+
+/**
  * The factory's folders `startRun` left out of `run`'s mounts, as `wf start` says them: each of its repositories but the run's own that
  * is no directory now, as none was at start. None for a run in the default factory, or in one whose file no longer reads.
  */
@@ -412,7 +437,9 @@ export const repoFor = (name: string | undefined, named: string | undefined, fal
  *
  * In a factory, the run mounts its folders (`factoryMounts`): every repository of the factory but the one a git run works on, each
  * read-only, and all of them for a folder run, which works on none. A folder that is no directory at start is left out, and `wf start`
- * says it (`leftOutMounts`); a step whose harness cannot hold them is refused before anything is written (`configRefused`). The list
+ * says it (`leftOutMounts`); a step whose harness cannot hold them is refused before anything is written (`configRefused`). A step's
+ * `writable:` names the folders it alone is filed writable (`stepMounts`), each refused unless one folder of the factory has the name and
+ * is mounted or the run's own (`writableRefusal`), and on a harness that holds no writable mount (`writableMountRefusal`). The list
  * is frozen on the record as `mounts`, filed with every local step and named on its brief, so a later change to the factory changes
  * no run started. Left out when none is mounted, and in the default factory.
  *
@@ -437,13 +464,8 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   if (refusedInputs) return yield* Effect.fail(new Invalid({ message: refusedInputs }));
   const id = runId(opts.brief);
   const mounts = mountsAt(factory, folder ? undefined : opts.repo);
-  const refusedMounts = mounts.length
-    ? refusedStep(steps, places, opts.gates ?? [], formerModesWritten(opts.workflowDir), mounts)
-    : undefined;
-  if (factory && refusedMounts) {
-    const where = `${path.basename(path.resolve(opts.workflowDir))}/${refusedMounts.step.name}`;
-    return yield* Effect.fail(new Invalid({ message: factoryMountRefusal(factory, where, refusedMounts.why) }));
-  }
+  const unmounted = mountRefusal(opts, steps, places, factory, folder ? undefined : opts.repo, mounts);
+  if (unmounted) return yield* Effect.fail(new Invalid({ message: unmounted }));
   const told = toldOf(opts, steps, inputs, factory, mounts);
   const stepRecords = Object.fromEntries(steps.map((s) => [s.name, { taskId: null }]));
   const run = yield* folder ? folderRun(id, told, stepRecords) : gitRun(id, told, stepRecords, opts.repo, isolate);

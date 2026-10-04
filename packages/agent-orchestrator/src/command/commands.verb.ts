@@ -33,6 +33,7 @@ import { commandLine, type Args, type CommandSpec, type Flag } from './command.t
 import type { Command, Ran } from './entry.verb.ts';
 import { READS } from './reads.verb.ts';
 import { AGENTS_CUSTOM } from '../agents/custom.verb.ts';
+import { LIBRARY_ENTRIES } from '../agents/library.verb.ts';
 import { MERGES } from '../branches/merges.verb.ts';
 import { WORKFLOW_ENTRIES } from '../folder/workflows.verb.ts';
 import { FACTORIES } from '../factory/factory.verb.ts';
@@ -489,6 +490,7 @@ export const COMMANDS: readonly Command[] = [
   AGENTS,
   AGENT_CARD,
   AGENTS_CUSTOM,
+  ...LIBRARY_ENTRIES,
   CANCEL,
   HOLD,
   RM,

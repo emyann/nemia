@@ -56,26 +56,32 @@ export function bodySchema(command: CommandSpec, inPath: readonly string[], rout
   return Schema.Struct(fields);
 }
 
-/** Every key a command of the table takes on the api alone, and the commands that take it. */
-const apiOnly = (table: readonly CommandSpec[]): ReadonlyMap<string, readonly string[]> =>
+/** Every key a command of the table takes on the api alone, and the routes that write it. */
+const apiOnly = (table: readonly CommandSpec[]): ReadonlyMap<string, readonly Route[]> =>
   new Map(
     [...new Set(table.flatMap((c) => c.apiTakes ?? []))].map((key) => [
       key,
-      table.filter((c) => c.apiTakes?.includes(key)).map((c) => c.name),
+      table.filter((c) => c.apiTakes?.includes(key)).flatMap((c) => routeList(c).filter(generated)),
     ]),
   );
+
+/** A route as a refusal names it: its method, then its path from its last fixed word — `POST …/approve`, `PUT …/custom-instructions`. */
+const routeShort = ({ method, path }: Route): string => {
+  const parts = path.split('/');
+  return `${method} …/${parts.slice(parts.findLastIndex((p) => p !== '' && !p.startsWith(':'))).join('/')}`;
+};
 
 /**
  * Why a body carries a key another command takes on the api alone and this one does not, 422 — a person's `answers` sent to an
  * approval, which would go nowhere — or null.
  */
-function foreignKey(command: CommandSpec, table: readonly CommandSpec[], value: unknown, shape: string): Refusal | null {
+function foreignKey(command: CommandSpec, route: Route, table: readonly CommandSpec[], value: unknown, shape: string): Refusal | null {
   if (typeof value !== 'object' || value === null) return null;
   for (const [key, takers] of apiOnly(table)) {
-    if (!Object.hasOwn(value, key) || takers.includes(command.name)) continue;
+    if (!Object.hasOwn(value, key) || command.apiTakes?.includes(key)) continue;
     return {
       status: 422,
-      error: `\`${key}\` is not a key POST …/${command.name} takes — ${takers.map((n) => `POST …/${n}`).join(', ')} takes it — so it would go nowhere: ${shape}.`,
+      error: `\`${key}\` is not a key ${routeShort(route)} takes — ${takers.map(routeShort).join(', ')} takes it — so it would go nowhere: ${shape}.`,
     };
   }
   return null;
@@ -121,7 +127,7 @@ async function bodyOf(c: Context<ApiEnv>, command: CommandSpec, at: Named, route
   const words = WORDS[command.name];
   const json = await jsonOf(c, command.name, words, at);
   if ('status' in json) return json;
-  const foreign = foreignKey(command, COMMANDS, json.value, words.shape);
+  const foreign = foreignKey(command, route, COMMANDS, json.value, words.shape);
   if (foreign) return foreign;
   const options = words.strict ? ({ onExcessProperty: 'error' } as const) : undefined;
   const read = decodeBody(bodySchema(command, Object.keys(c.req.param()), route), json.value, words.issue(at), options);

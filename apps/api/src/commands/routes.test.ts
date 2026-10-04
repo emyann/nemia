@@ -165,15 +165,26 @@ test('a round on its route writes what `wf round` writes: the same step, round a
 
 test('REFUSED at shipped defaults: every route that writes, asked by a page on another site — 403, nothing written', async () => {
   gatedRun('r-guard');
-  const routed = COMMANDS.filter((c) => c.writes).flatMap((c) => routeList(c).map((r) => ({ command: c, r })));
+  const routed = COMMANDS.filter((c) => c.writes).flatMap((c) =>
+    routeList(c)
+      .filter((r) => r.method !== 'GET')
+      .map((r) => ({ command: c, r })),
+  );
   assert.deepEqual(
     routed.map(({ command, r }) => `${command.name} ${r.method}`),
     [
+      'start POST',
+      'inbox add POST',
+      'inbox queue POST',
+      'inbox queue DELETE',
+      'inbox rm DELETE',
       'retry POST',
       'approve POST',
       'round POST',
       'accept POST',
       'say POST',
+      'agents custom PUT',
+      'agents custom DELETE',
       'hold DELETE',
       'rm DELETE',
       'prune POST',
@@ -191,6 +202,11 @@ test('REFUSED at shipped defaults: every route that writes, asked by a page on a
   }
   assert.deepEqual(asked('r-guard'), [], 'nothing written');
   assert.equal(fs.existsSync(path.join(root, 'cordon')), false, 'the store not cordoned');
+  assert.deepEqual(
+    fs.readdirSync(path.join(root, 'runs')).filter((f) => !f.startsWith('r-')),
+    [],
+    'no run started',
+  );
 });
 
 test('a lift on its route reads no body: what its route fixes lifts the hold, whatever the body says, and the hold file is gone', async () => {

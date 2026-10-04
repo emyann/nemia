@@ -157,3 +157,18 @@ test("GET answers a file that does not read with the package's refusal in `error
     fs.rmSync(CUSTOM, { recursive: true, force: true });
   }
 });
+
+test('DELETE reads no body: what its route fixes clears the words, whatever the body says; a key another command takes on the api is a 422', async () => {
+  for (const body of [undefined, 'not json', JSON.stringify({ words: 'Kept?' })]) {
+    writeCustomInstructions(root, 'scribe', 'Mind the margins.', repo);
+    const res = await app.request('/api/custom-instructions/scribe', { method: 'DELETE', headers: json, body });
+    assert.equal(res.status, 200, `${body}: ${await res.clone().text()}`);
+    assert.deepEqual(held(), {}, String(body));
+  }
+  const foreign = await refused(() => send('PUT', '/api/custom-instructions/scribe', { words: 'Hi.', answers: [] }), 422);
+  assert.equal(
+    foreign,
+    '`answers` is not a key PUT …/custom-instructions/:name takes — POST …/retry takes it — so it would go nowhere: ' +
+      '`{ "words": "<what the agent is told after its instructions>" }`.',
+  );
+});

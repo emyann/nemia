@@ -6,9 +6,10 @@
  * `~/.agent-workflows/workflows/`, or under `WF_ROOT` when that is set. Each folder is read with the package's loader,
  * so one `wf start` would refuse is listed with the loader's refusal, never hidden.
  *
- * The start is the package's `start()`, `wf start`'s own: it writes the run's record and files nothing — `wf tick` or
- * `wf up` files the first step, as it does for a run started at the command line. A start that names an inbox card (`card`) is the
- * package's `startFromInbox()` instead, `wf start <inbox>/<name>.md`'s own: the same record, with `from` on it, and the card removed.
+ * The start is `wf start`'s entry of the package's command table (`START`), its handler `start()`: it writes the run's record and files
+ * nothing — `wf tick` or `wf up` files the first step, as it does for a run started at the command line. A start that names an inbox card
+ * (`card`) is the same handler's `startFromInbox()`, `wf start <inbox>/<name>.md`'s: the same record, with `from` on it, and the card
+ * removed.
  * Nothing else here writes; the inbox's own writes are inbox.ts's, and a folder the builder puts back is builder.ts's.
  *
  * A step's page reads one step of one folder, as written and as the loader read it (`GET /api/workflows/:from/:name/:step`), at the address
@@ -34,9 +35,8 @@ import {
   lookupRoots,
   skillsFor,
   skillVersion,
-  start,
+  START as START_ENTRY,
   startFactory,
-  startFromInbox,
   unattachedRefusal,
   unfilledRefusal,
   workflowDescription,
@@ -60,6 +60,7 @@ import { toldLayers, type ToldLayers } from 'agent-orchestrator/run';
 import { NotBlank, readBody, valueAt, type BodyIssue } from '../body.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from '../guard.ts';
 import { type ApiEnv, served } from '../layer.ts';
+import type { Engine } from '../store.ts';
 import { graphOf, type RunGraph } from '../runs/graph.ts';
 
 /** Where a workflow is read from: the repository's `workflows/`, or yours, in the store. */
@@ -583,24 +584,24 @@ function agentSkillsOf(step: Workflow, dir: string, places: Places): AgentSkill[
 }
 
 /**
- * The inbox card `asked` names, started by the package's `startFromInbox` with `repo` as the caller's and in the factory `factory` when
- * one is named, over the card's `factory:` — one that names none either way is refused, its fix `?factory=<name>` — and what
+ * The inbox card `asked` names, started by `wf start`'s entry (`START`) with `repo` as the caller's and in the factory `factory` when one
+ * is named, over the card's `factory:` — one that names none either way is refused, its fix `?factory=<name>` — and what
  * `POST /api/runs` answers: the run's id and the card's name, whether the card was removed and why not, and the card's `repo:` the run
  * did not look at.
  */
-function cardStarted(asked: Extract<Asked, { card: string }>, repo: string, factory: string | undefined) {
-  const started = startFromInbox({
-    name: asked.card,
-    callerRepo: repo,
-    ...(factory !== undefined ? { factory } : {}),
+async function cardStarted(e: Engine['Service'], asked: Extract<Asked, { card: string }>, repo: string, factory: string | undefined) {
+  const started = await START_ENTRY.handler(e, {
+    card: asked.card,
+    at: repo,
+    factory,
     fix: '?factory=<name>',
-    workflow: asked.dir,
-    ...(asked.brief !== undefined ? { brief: asked.brief } : {}),
-    ...(asked.after ? { after: asked.after } : {}),
+    workflows: asked.dir,
+    instead: asked.brief,
+    after: asked.after,
   });
   return {
-    id: started.run.id,
-    card: started.card.name,
+    id: started.id,
+    card: started.card,
     removed: started.removed,
     ...(started.removed ? {} : { why: started.why }),
     ...(started.ignoredRepo !== undefined ? { ignoredRepo: started.ignoredRepo } : {}),
@@ -626,7 +627,8 @@ function cardStarted(asked: Extract<Asked, { card: string }>, repo: string, fact
  *   lists the runs of, for a run to wait on.
  * - `POST /api/runs` — the board's first write, and the one a person makes at the command line: `wf start <brief> --workflows <folder>
  *   --repo <repo> --after <runId>`, or, with `card`, `wf start <inbox>/<card>.md --brief <brief> --workflows <folder> --after <runId>`.
- *   Guarded (guard.ts); the body is refused as `startWords` and `startOf` say. 201 with the run's `Location` once its record is written.
+ *   Served by hand, through the entry's handler (`START`). Guarded (guard.ts); the body is refused as `startWords` and `startOf` say.
+ *   201 with the run's `Location` once its record is written.
  *   A refusal goes to `app.onError`, which answers it by its kind, word for word (app.ts). Without a card, `wf start`'s refusal is an
  *   `Invalid`, 422: a folder that does not read as a workflow, a step named for another's check or try, a `.worktreeinclude` it cannot
  *   use, or a run this one cannot wait on (`afterRefusal`). A failure that is not a refusal is a 500, git's on a repository it cannot
@@ -687,7 +689,7 @@ export const workflows = new Hono<ApiEnv>()
   )
   .get('/api/repository', (c) => served(c, ({ repo }) => c.json({ repo })))
   .post('/api/runs', (c) =>
-    served(c, async ({ repo, home, factory }) => {
+    served(c, async ({ e, repo, home, factory }) => {
       const refused = refusedBeforeReading(START, c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
       if (refused) return c.json({ error: refused.error }, refused.status);
       const read = await readBody(c.req, START_BODY, `POST /api/runs takes a JSON body: ${SHAPE}.`, startWords);
@@ -696,17 +698,17 @@ export const workflows = new Hono<ApiEnv>()
       if ('status' in asked) return c.json({ error: asked.error }, asked.status);
       const named = c.req.query('factory') === DEFAULT_FACTORY ? DEFAULT_FACTORY : factory?.name;
       if (asked.card !== undefined) {
-        const started = cardStarted(asked, repo, named);
+        const started = await cardStarted(e, asked, repo, named);
         c.header('Location', `/api/runs/${encodeURIComponent(started.id)}`);
         return c.json(started, 201);
       }
       const found = factory ? { factory, repo } : startFactory(named, repo, '?factory=<name>');
-      const { id } = start({
+      const { id } = await START_ENTRY.handler(e, {
         brief: asked.brief,
         repo: found.repo ?? repo,
-        workflowDir: asked.dir,
-        ...(asked.after ? { after: asked.after } : {}),
-        ...(found.factory ? { factory: found.factory.name } : {}),
+        workflows: asked.dir,
+        after: asked.after,
+        factory: found.factory?.name,
       });
       c.header('Location', `/api/runs/${encodeURIComponent(id)}`);
       return c.json({ id }, 201);

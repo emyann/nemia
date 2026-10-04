@@ -2,7 +2,10 @@
  * The api's own words for each command it serves, keyed by the command's name: the write guard's (guard.ts), the body its route takes,
  * why a body is not one (400), and what a failure that is not a refusal answers (502).
  */
-import type { BodyIssue, Words } from '../body.ts';
+import { Schema } from 'effect';
+import { inboxNameRefusal } from 'agent-orchestrator';
+import { agentNameRefusal } from 'agent-orchestrator/workflow';
+import { decodeBody, valueAt, type BodyIssue, type Words } from '../body.ts';
 import type { Guarded } from '../guard.ts';
 
 /**
@@ -297,6 +300,116 @@ const PRUNE: RouteWords = {
   strict: true,
 };
 
+/** A drop of the card `name`, as the guard's refusals word it. */
+const dropGuard = (name: string): Guarded => ({
+  route: `DELETE /api/inbox/${name}`,
+  does: 'drops a card',
+  forAnother: 'drop one',
+  why: 'a card dropped is an idea gone, and nothing keeps a copy',
+  reach: 'drop the card from the board',
+  instead: `Drop it from the board's Inbox page, or with \`wf inbox rm ${name}\``,
+  shape: 'no body, or `{}`: the card is named in the path',
+});
+
+/** A card dropped, as the guard's refusals word it; a name that would leave the inbox is refused in the package's words. */
+const INBOX_RM: RouteWords = {
+  shape: '`{}`',
+  guard: ({ name }) => dropGuard(name),
+  issue: () => () => 'DELETE /api/inbox/:name takes no body: `{}`.',
+  named: ({ name }) => inboxNameRefusal(name) ?? null,
+};
+
+const QUEUE_SHAPE = 'no body, or `{}`: the card is named in the path, and queued on the workflow it names';
+
+/** A queue of the card `name`, or its taking back (`off`), as the guard's refusals word it. */
+const queueGuard = (name: string, off: boolean): Guarded =>
+  off
+    ? {
+        route: `DELETE /api/inbox/${name}/queue`,
+        does: 'takes a card off the queue',
+        forAnother: 'take one off',
+        why: 'a card taken off the queue is an idea the tick no longer starts, and its place is lost',
+        reach: 'take the card off the queue from the board',
+        instead: `Take it off from the board's Inbox page, or with \`wf inbox queue ${name} --off\``,
+        shape: QUEUE_SHAPE,
+      }
+    : {
+        route: `POST /api/inbox/${name}/queue`,
+        does: 'queues a card',
+        forAnother: 'queue one',
+        why: 'a queued card is started by the tick when a run slot frees, and its body is what the run is asked to do, in the repository it names',
+        reach: 'queue the card from the board',
+        instead: `Queue it from the board's Inbox page, or with \`wf inbox queue ${name}\``,
+        shape: QUEUE_SHAPE,
+      };
+
+/** The one JSON body a queue takes: `{}`, an object with no key. */
+const QUEUE_BODY = Schema.Record(Schema.String, Schema.Never);
+
+/**
+ * Why a queue's body is refused, or null: it takes none, or `{}`. `wf inbox queue --workflow <w>` writes a workflow with the mark, and the
+ * api does not: a card is queued from the board on the workflow it names, and one that names none is the package's to refuse — so a
+ * `workflow` sent is refused by name rather than read as nothing.
+ */
+function queueBodyRefusal(route: string, text: string): string | null {
+  if (!text.trim()) return null;
+  let body: unknown;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    return `${route} takes ${QUEUE_SHAPE}, and this request's body is not JSON.`;
+  }
+  const decoded = decodeBody(QUEUE_BODY, body, () => {
+    const named =
+      valueAt(body, ['workflow']) !== undefined
+        ? ' A card is queued on the workflow it names: file it with one, or queue it with `wf inbox queue <name> --workflow <w>`, which writes both.'
+        : '';
+    return `${route} takes ${QUEUE_SHAPE}, and this request sent ${JSON.stringify(body)}.${named}`;
+  });
+  return 'status' in decoded ? decoded.error : null;
+}
+
+/**
+ * A card queued, or taken off the queue, as the guard's refusals word it: a name that would leave the inbox is refused in the package's
+ * words, and a body but none or `{}` in the queue's (`queueBodyRefusal`), each before the card is read.
+ */
+const INBOX_QUEUE: RouteWords = {
+  shape: QUEUE_SHAPE,
+  guard: ({ name, method }) => queueGuard(name, method === 'DELETE'),
+  issue: () => () => `the queue takes ${QUEUE_SHAPE}.`,
+  named: ({ name }) => inboxNameRefusal(name) ?? null,
+  bodyless: ({ name, method }, text) => queueBodyRefusal(queueGuard(name, method === 'DELETE').route, text),
+};
+
+const CUSTOM_PUT_SHAPE = '`{ "words": "<what the agent is told after its instructions>" }`';
+
+/** The route of the custom instructions `at` names, as a refusal says it: `PUT /api/custom-instructions/<name>`. */
+const customRoute = ({ method, name }: Named): string => `${method} /api/custom-instructions/${name}`;
+
+/**
+ * A write or a clear of an agent's custom instructions, as the guard's refusals word it: a name that would leave the folder is refused in
+ * the package's words, and the words that are not a string in the api's.
+ */
+const AGENTS_CUSTOM: RouteWords = {
+  shape: CUSTOM_PUT_SHAPE,
+  guard: (at) => ({
+    route: customRoute(at),
+    does: "writes an agent's custom instructions",
+    forAnother: 'write them',
+    why: 'they are told to the agent in every run started after, in every step that names it',
+    reach: "write them on the agent's page on the board",
+    instead: "Write them on the agent's page on the board",
+    shape: at.method === 'DELETE' ? '`{}`' : CUSTOM_PUT_SHAPE,
+  }),
+  issue: (at) => (_issue, body) =>
+    `${customRoute(at)}: \`words\` are what the agent is told after its instructions, a string: ${CUSTOM_PUT_SHAPE}. This request's was ${JSON.stringify(valueAt(body, ['words']))}.`,
+  named: (at) => {
+    const wrong = agentNameRefusal(at.name);
+    return wrong === undefined ? null : `${customRoute(at)}: ${wrong}`;
+  },
+  notJson: (at) => `${customRoute(at)} takes a JSON body: ${CUSTOM_PUT_SHAPE}.`,
+};
+
 /** The api's words for each routed command, by its name. */
 export const WORDS: Readonly<Record<string, RouteWords>> = {
   retry: RETRY,
@@ -309,4 +422,7 @@ export const WORDS: Readonly<Record<string, RouteWords>> = {
   uncordon: UNCORDON,
   rm: RM,
   prune: PRUNE,
+  'inbox queue': INBOX_QUEUE,
+  'inbox rm': INBOX_RM,
+  'agents custom': AGENTS_CUSTOM,
 };

@@ -3,7 +3,7 @@
  * Paused once nothing does, as the package says it (`pausedWords`), read off `GET /api/pause` on each poll and never kept. Pure: the time
  * is handed in.
  */
-import type { Finishing, Pause, Paused, PauseStaged } from './api';
+import type { Finishing, Interrupt, Pause, Paused, PauseStaged } from './api';
 import { clockWord } from './quota.ts';
 
 /** What the button shows: all factories run, a pause stands while tasks still finish, or nothing runs under it; or nothing is read yet. */
@@ -29,9 +29,17 @@ export function pauseSince(pause: Pause, now: Date): string {
   return `since ${at} by ${pause.by || 'someone its file no longer names'}${pause.why ? `: ${pause.why}` : ''}`;
 }
 
-/** A task still finishing under the pause, in a sentence: its run, its step, and what of it is at work. */
-export const finishingSentence = ({ run, step, kind }: Finishing): string =>
-  `${run}'s ${step} is finishing: ${kind === 'session' ? 'its session is at work' : kind === 'check' ? 'its check runs' : 'the check of its landing runs'}`;
+/**
+ * A task still finishing under the pause, in a sentence: its run, its step, and what of it is at work; or, once a pause at once asked it to
+ * stop, that it is stopping and tried again on the resume.
+ */
+export const finishingSentence = ({ run, step, kind, stopping }: Finishing): string =>
+  stopping
+    ? `${run}'s ${step} is stopping: its ${kind === 'session' ? 'session' : 'check'} was asked to stop, and is tried again on the resume`
+    : `${run}'s ${step} is finishing: ${kind === 'session' ? 'its session is at work' : kind === 'check' ? 'its check runs' : 'the check of its landing runs'}`;
+
+/** A task a pause at once would stop, in a few words: its run, then its step's session or check. */
+export const interruptSentence = ({ run, step, kind }: Interrupt): string => `${run}: ${step}'s ${kind}`;
 
 /** A landing the pause holds with its merge staged, in a sentence: whose, where, and that its check waits on the resume. */
 export const stagedSentence = ({ run, step, repo }: PauseStaged): string =>

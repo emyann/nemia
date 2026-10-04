@@ -1,13 +1,14 @@
 /**
  * The pause of all factories on the board (src/lib/pause.ts): they run where no pause stands, Pausing with how many still finish while any
- * does, Paused once none does, each task and each landing held named in a sentence, and a read that failed said. `npm run e2e` presses
- * the button itself (`480-pause.ts`).
+ * does, Paused once none does, each task and each landing held named in a sentence, and a read that failed said; what a pause at once
+ * would stop, and a task it asked to stop, each in its words. `npm run e2e` presses the buttons themselves (`480-pause.ts`,
+ * `481-pause-now.ts`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Paused } from '../src/lib/api.ts';
 import { clockWord } from '../src/lib/quota.ts';
-import { pauseWords } from '../src/lib/pause.ts';
+import { finishingSentence, interruptSentence, pauseWords } from '../src/lib/pause.ts';
 
 const NOW = new Date('2026-10-04T16:00:00.000Z');
 const AT = '2026-10-04T15:40:00.000Z';
@@ -66,4 +67,21 @@ test('nothing read yet is reading, and a read that failed says why', () => {
   const failed = pauseWords(undefined, new Error('the api answered 500'), NOW);
   assert.equal(failed.state, 'reading');
   assert.equal(failed.line, 'Whether all factories are paused could not be read: the api answered 500');
+});
+
+test("what a pause at once would stop is named by its run, then its step's session or check", () => {
+  assert.equal(interruptSentence({ run: 'r-1', step: 'implement', kind: 'session' }), "r-1: implement's session");
+  assert.equal(interruptSentence({ run: 'r-2', step: 'review', kind: 'check' }), "r-2: review's check");
+});
+
+test('a task a pause at once asked to stop is stopping, and tried again on the resume, not finishing', () => {
+  assert.equal(
+    finishingSentence({ run: 'r-1', step: 'implement', kind: 'session', stopping: true }),
+    "r-1's implement is stopping: its session was asked to stop, and is tried again on the resume",
+  );
+  assert.equal(
+    finishingSentence({ run: 'r-2', step: 'review', kind: 'check', stopping: true }),
+    "r-2's review is stopping: its check was asked to stop, and is tried again on the resume",
+  );
+  assert.equal(finishingSentence({ run: 'r-2', step: 'review', kind: 'check' }), "r-2's review is finishing: its check runs");
 });

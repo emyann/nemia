@@ -20,13 +20,13 @@ const heard = (at: string | null, now: Date): string => {
 
 /**
  * Why nothing ticks the store and how to start what does, or null when a daemon ticks it — nothing to say then. The holder is named by
- * its kind, the api or a wf up; the daemon is started as the api says (`start`: the api's own process, which serves the board as it
- * ticks), or a wf up where no board is served. One silent past its stale mark, or a file that does not read, is taken over by the next
- * daemon, and the line says so, since a person would otherwise stop to clear it first.
+ * its kind as the api answers it (`by`); the daemon is started as the api says (`start`: the api's own process, which serves the board
+ * as it ticks), or headless where no board is served. One silent past its stale mark, or a file that does not read, is taken over by the
+ * next daemon, and the line says so, since a person would otherwise stop to clear it first.
  */
 export function daemonWords(d: Daemon, now: Date): DaemonWords | null {
   if (d.ticking) return null;
-  const who = `${d.by === 'api' ? 'the api' : 'the wf up'} of pid ${d.pid}`;
+  const who = `the ${d.by} of pid ${d.pid}`;
   let why: string;
   switch (d.kind) {
     case 'none':

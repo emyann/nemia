@@ -2139,6 +2139,27 @@ the file's place, and after every read the file's bytes and mtime unchanged and 
 `apps/web/test/daemon.test.ts` (the words of each kind, nothing for ticking) and the e2e's `daemon` page (the seeded store's `none` line, a
 stalled file's line and the floor fitted clear of it, no line for a fresh one, the file taken back).
 
+## Shipped: one daemon, the api's, and admission in the runtime (Nemia platform slice 3)
+
+The board and the store's daemon were two processes a person started apart, and a board left open beside a stopped `wf up` showed runs
+that never moved. Admission was the orchestrator's, read off the views after the runtime's pass. What was built:
+
+- **Admission is the runtime's** (`agent-runtime/src/core/admission.ts`): the engine admits queued tasks per pool under its ceiling, the
+  highest priority first, then the earlier filing, then the lower id. The orchestrator hands it `WF_MAX_CONCURRENT` and files each step's
+  momentum as its task's `priority`; run slots (`WF_MAX_RUNS`) stay its own.
+- **The api's process is the store's daemon** unless started with `--no-tick`: it takes the lease before it binds a port, writes `by:
+  "api"` and the `url` it serves at once it listens, and ticks through `up` (`src/daemon/up.verb.ts`), as `wf up` does with `by: "wf
+  up"`. Each refuses the other by name, exit 2, with `kill <pid>`. `--no-tick` takes nothing and serves on 8788, which `npm run dev`
+  uses and the vite dev server proxies to; `vite preview` proxies to 8787, the daemon's, and `HKB_API_URL` overrides both.
+- **The board names the holder**: `/api/daemon` answers `by`, `url` and how to start one (`start`), and the Factory's line says *the api*
+  or *the wf up*, and *npm start in apps/api*, with `wf up` where no board is served.
+
+Tested in `agent-runtime/test/admission.test.ts`, `test/pool.test.ts`, `src/daemon/daemon.test.ts` and `src/daemon/daemon.store.test.ts`
+(both refusals at shipped defaults, both ways round; an api taken over mid-run stopping), `apps/api/test/main.test.ts` (a spawned api:
+its lease through `/api/daemon`, a second api and a `wf up` refused, SIGTERM writing `stoppedAt` and the next api taking over,
+`--no-tick` taking nothing), `apps/web/test/daemon.test.ts` and the e2e's `daemon` page (each holder stalled, and fresh). Starting the
+daemon on demand from the board stays card 4e; a cordon that pauses a store its daemon ticks is a verb on this lease, still to come.
+
 ## Shipped: freeing the space — `wf prune`
 
 `wf rm` frees a run's space only by forgetting it, and a finished run is still read: its closeouts, its cost, what it decided. A

@@ -47,11 +47,11 @@ export default {
    * All factories paused and resumed from the bottom bar's one button, right after the daemon's dot, as `wf pause` and `wf resume` do
    * (`POST` and `DELETE /api/pause`), on the Factory. The popover's heading is the state: Running, Pausing or Paused. Running, the button
    * is a pause icon; its popover says what pausing all factories does and offers Pause…, which asks an optional why, and once sent the
-   * pause's file holds it and the popover says since when, by whom and why: `Pausing · N` while the seed's sessions are at work, as the api reads them, its popover naming each; once nothing finishes and a
-   * landing is held with its merge staged — the api's answer held with `route` — `Paused`, its popover naming the landing. Which tasks
-   * finish, and which landings are held, is the package's judgement, proven in its own tests
-   * (`packages/agent-orchestrator/src/tick/pause.test.ts`). On a phone's screen the button is still there, and its popover fits. Resume,
-   * in the popover, takes the file away. The window's size is put back.
+   * pause's file holds it and the popover says since when, by whom and why: `Pausing · N` while the seed's sessions are at work, as the
+   * api reads them, its popover naming each; once nothing finishes and a landing is held with its merge staged — the api's answer held
+   * with `route` — `Paused`, its popover naming the landing. Which tasks finish, and which landings are held, is the package's judgement,
+   * proven in its own tests (`packages/agent-orchestrator/src/tick/pause.test.ts`). On a phone's screen the button is still there, and
+   * its popover fits. Resume, in the popover, takes the file away. The window's size is put back.
    */
   name: 'pause',
   route: '/factories/default',

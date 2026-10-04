@@ -5579,13 +5579,13 @@ test("REFUSED: the Inbox's badge counts the picked factory's cards not yet start
   ];
   const badge = (html: string) => /<div[^>]*data-inbox-badge[^>]*>[\s\S]*?<\/div>/.exec(inboxItem(html))?.[0];
   const nemia = await sidebarAt('/runs', { factory: 'nemia' }, [filed('nemia')], inbox);
-  assert.match(
-    badge(nemia) ?? '',
-    /title="2 cards not yet started, in nemia"[^>]*>2<span class="sr-only"> 2 cards not yet started, in nemia<\/span>/,
-  );
+  assert.match(badge(nemia) ?? '', />2<span class="sr-only"> 2 cards not yet started, in nemia<\/span>/);
+  assert.match(inboxItem(nemia), /^<li[^>]*title="2 cards not yet started, in nemia"/, 'said whole on hover over the Inbox');
+  assert.doesNotMatch(badge(nemia) ?? '', /pointer-events-auto/, 'a press on the count reaches the link beneath it');
   assert.doesNotMatch(/<a\b[\s\S]*?<\/a>/.exec(inboxItem(nemia))?.[0] ?? '', /data-inbox-badge/, 'the badge is not inside the link');
   const all = await sidebarAt('/runs', {}, [filed('nemia')], inbox);
-  assert.match(badge(all) ?? '', /title="3 cards not yet started, in every factory"[^>]*>3</);
+  assert.match(badge(all) ?? '', />3</);
+  assert.match(inboxItem(all), /^<li[^>]*title="3 cards not yet started, in every factory"/);
   assert.equal(badge(await sidebarAt('/runs', { factory: 'quay' }, [filed('nemia')], inbox)), undefined, 'none for none');
   assert.equal(badge(await sidebarAt('/runs', {}, [filed('nemia')], [card('started', 'nemia', { startedAs: ['r-1'] })])), undefined);
   assert.deepEqual(
@@ -5596,17 +5596,19 @@ test("REFUSED: the Inbox's badge counts the picked factory's cards not yet start
   assert.equal([...nemia.matchAll(/data-inbox-badge/g)].length, 1, 'on the Inbox alone');
 });
 
-/** The header with the section Floor, the factories read and the runs `runs`. */
-async function headerWith(runs: RunSummary[]): Promise<string> {
+/** The header with the section Floor, the factories read and the runs `runs`, or the runs not read yet for none. */
+async function headerWith(runs?: RunSummary[]): Promise<string> {
   const { FrameHeader } = await import('../src/components/FrameHeader.tsx');
   const { SidebarProvider } = await import('../src/components/ui/sidebar.tsx');
   return pagedWith(
     // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
     createElement(SidebarProvider, { children: createElement(FrameHeader, { section: 'Floor' }) }),
-    [
-      [['factories'], [filed('nemia')]],
-      [['runs'], runs],
-    ],
+    runs
+      ? [
+          [['factories'], [filed('nemia')]],
+          [['runs'], runs],
+        ]
+      : [[['factories'], [filed('nemia')]]],
   );
 }
 
@@ -5621,6 +5623,9 @@ test("REFUSED: the header's bell counts the runs waiting on you, named in full; 
   const none = await headerWith([{ ...waits, waitingOnYou: [], onYou: [] }]);
   assert.match(bell(none), /aria-label="Nothing waits on you"/);
   assert.doesNotMatch(bell(none), /data-bell-count/);
+  const unread = bell(await headerWith());
+  assert.match(unread, /aria-label="Waiting on you"/, 'before the runs are read, the bell says no number');
+  assert.doesNotMatch(unread, /data-bell-count/);
   assert.match(two, /data-cordon|role="switch"/, "the cordon's switch is still there");
 });
 

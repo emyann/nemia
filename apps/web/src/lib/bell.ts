@@ -40,3 +40,16 @@ export const bellHash = (row: Pick<BellRow, 'gate'>): string | undefined => (row
 
 /** The bell's count as its badge reads it: nothing for none, the number up to 99, and `99+` past it. */
 export const bellCount = (count: number): string => (count <= 0 ? '' : count > 99 ? '99+' : String(count));
+
+/**
+ * The bell's name, given how many runs wait on you, undefined while they are not read, and whether their read `failed`: the count, that
+ * nothing waits on you only once they are read, and no number before or when the read failed.
+ */
+export const bellLabel = (count: number | undefined, failed: boolean): string =>
+  count === undefined
+    ? failed
+      ? 'Waiting on you: the runs could not be read'
+      : 'Waiting on you'
+    : count
+      ? `Waiting on you: ${count}`
+      : 'Nothing waits on you';

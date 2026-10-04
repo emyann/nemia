@@ -90,14 +90,16 @@ async function follows(page: Page, rows: readonly BellRow[]): Promise<void> {
   await page.waitForURL((back) => !back.searchParams.has('bar'), { timeout: WAIT_MS });
 }
 
-/** The Inbox's badge, at `to`, counts `count` cards not yet started, said whole for the factory `picked`; none for none. */
+/** The Inbox's badge, at `to`, counts `count` cards not yet started, said whole on hover over the Inbox for `picked`; none for none. */
 async function badgeAt(page: Page, to: string, count: number, picked: string | undefined): Promise<void> {
   await visit(page, to);
   if (!count) return expectCount(badgeOf(page), 0, `${to}: no badge for no card`);
   await expectTexts(badgeOf(page), [`${count} ${inboxBadgeTitle(count, picked)}`], `${to}: the Inbox badge counts ${count}`);
-  const title = await badgeOf(page).getAttribute('title');
+  const title = await sidebarOf(page)
+    .locator('li', { has: badgeOf(page) })
+    .getAttribute('title');
   if (title !== inboxBadgeTitle(count, picked))
-    throw new Refused(`${to}: the badge's title is ${inboxBadgeTitle(count, picked)} — it is ${title}`);
+    throw new Refused(`${to}: the Inbox says ${inboxBadgeTitle(count, picked)} on hover — it says ${title}`);
   await expectTexts(
     sectionsOf(page).filter({ has: page.getByText('Inbox', { exact: true }) }),
     ['Inbox'],
@@ -106,8 +108,8 @@ async function badgeAt(page: Page, to: string, count: number, picked: string | u
 }
 
 /**
- * The Inbox's badge counts the cards not yet started: every factory's under All factories, refused for none; a factory's that has cards;
- * and none in a factory that has none.
+ * The Inbox's badge counts the cards not yet started: every factory's under All factories, refused for none, and a press on its count
+ * opens the Inbox; a factory's that has cards; and none in a factory that has none.
  */
 async function badges(page: Page): Promise<void> {
   const inbox = await answer<InboxEntry[]>(page, '/api/inbox');
@@ -116,6 +118,11 @@ async function badges(page: Page): Promise<void> {
   await badgeAt(page, '/runs', all.length, undefined);
   await settled(page);
   await photograph(page, path.join(OUT, `bell-badge-${await themeOf(page)}.png`));
+  const count = await badgeOf(page).boundingBox();
+  if (!count) throw new Refused('the Inbox badge is drawn');
+  await page.mouse.click(count.x + count.width / 2, count.y + count.height / 2);
+  await page.waitForURL((url) => url.pathname === '/inbox', { timeout: WAIT_MS });
+  await idle(page);
   const factory = factoryOf(all.find((card) => factoryOf(card) !== 'default') ?? all[0]);
   await badgeAt(page, `/runs?factory=${factory}`, notStarted(inbox, factory).length, factory);
   const other = FACTORIES.others[1];

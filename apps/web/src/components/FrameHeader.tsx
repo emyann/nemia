@@ -5,7 +5,7 @@ import { routeLink } from '@/components/routeLink';
 import { Button, LinkButton } from '@/components/ui/button';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { runsQuery } from '@/lib/api';
-import { bellCount, bellRuns } from '@/lib/bell';
+import { bellCount, bellLabel, bellRuns } from '@/lib/bell';
 import { useBar } from '@/lib/useBar';
 
 /** The logo: a ghost button that is React Aria's link, given the router's `to`. */
@@ -47,25 +47,26 @@ const WAITING = { kind: 'waiting' } as const;
 function BellButton() {
   const runs = useQuery(runsQuery);
   const { open, toggle } = useBar();
-  const count = runs.data ? bellRuns(runs.data).length : 0;
+  const count = runs.data ? bellRuns(runs.data).length : undefined;
+  const shown = bellCount(count ?? 0);
   return (
     <Button
       data-bell
       variant="ghost"
       size="icon"
-      aria-label={count ? `Waiting on you: ${count}` : 'Nothing waits on you'}
+      aria-label={bellLabel(count, runs.isError)}
       aria-expanded={open?.kind === 'waiting'}
       onPress={() => toggle(WAITING)}
       className="relative"
     >
       <Bell />
-      {count > 0 && (
+      {shown && (
         <span
           aria-hidden
           data-bell-count
           className="absolute top-0.5 right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] leading-none font-semibold text-amber-950 tabular-nums"
         >
-          {bellCount(count)}
+          {shown}
         </span>
       )}
     </Button>

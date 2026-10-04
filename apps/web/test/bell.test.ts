@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { RunSummary } from '../src/lib/api.ts';
-import { bellCount, bellHash, bellRuns } from '../src/lib/bell.ts';
+import { bellCount, bellHash, bellLabel, bellRuns } from '../src/lib/bell.ts';
 
 /** A run of the default factory with a step per name in `steps`, nobody waited on, and `extra` over it. */
 const run = (id: string, extra: Partial<RunSummary> = {}, steps: readonly string[] = ['plan', 'build', 'ship']): RunSummary => ({
@@ -147,4 +147,11 @@ test('a row names its factory: the one the run names, or default for one naming 
 
 test("the bell's badge says nothing for none, the count up to 99, and 99+ past it", () => {
   assert.deepEqual([0, 7, 99, 100, 120].map(bellCount), ['', '7', '99', '99+', '99+']);
+});
+
+test('REFUSED: the bell says nothing waits on you only once the runs are read; before, or when the read failed, it says no number', () => {
+  assert.equal(bellLabel(2, false), 'Waiting on you: 2');
+  assert.equal(bellLabel(0, false), 'Nothing waits on you');
+  assert.equal(bellLabel(undefined, false), 'Waiting on you', 'the runs not read yet');
+  assert.equal(bellLabel(undefined, true), 'Waiting on you: the runs could not be read');
 });

@@ -36,6 +36,7 @@ const PlaceLink = routeLink(SidebarMenuButton);
 export function FrameSidebar({ path, search, onPick }: { path: string; search: Record<string, unknown>; onPick?: () => void }) {
   const picked = pickedOf(path, search);
   const favorites = useFavorites();
+  const inbox = useInboxBadge(picked);
   return (
     <Sidebar collapsible="none" className="min-w-0 flex-1">
       <SidebarHeader className="gap-2">
@@ -49,13 +50,14 @@ export function FrameSidebar({ path, search, onPick }: { path: string; search: R
               {SECTIONS.map((section) => {
                 const link = sectionLink(section, picked);
                 if (!link) return null;
+                const badge = section.to === '/inbox' ? inbox : null;
                 return (
-                  <SidebarMenuItem key={section.to}>
+                  <SidebarMenuItem key={section.to} title={badge?.title}>
                     <PlaceLink {...link} isActive={section.active(path)} onPress={onPick}>
                       <section.icon />
                       <span>{section.label}</span>
                     </PlaceLink>
-                    {section.to === '/inbox' && <InboxBadge picked={picked} />}
+                    {badge && <InboxBadge {...badge} />}
                   </SidebarMenuItem>
                 );
               })}
@@ -77,17 +79,22 @@ export function FrameSidebar({ path, search, onPick }: { path: string; search: R
 }
 
 /**
- * The Inbox's badge, beside its link and not in it, so the link reads its section's name alone: how many cards of the factory `picked` are
- * not yet started (`notStarted`), every factory's under All factories, said whole on hover and to a screen reader (`inboxBadgeTitle`);
- * nothing for none, nor before the inbox is read.
+ * What the Inbox's badge says: how many cards of the factory `picked` are not yet started (`notStarted`), every factory's under All
+ * factories, and that count said whole (`inboxBadgeTitle`); null for none, nor before the inbox is read.
  */
-function InboxBadge({ picked }: { picked: string | undefined }) {
+function useInboxBadge(picked: string | undefined): { count: number; title: string } | null {
   const inbox = useQuery(inboxQuery);
   const count = inbox.data ? notStarted(inbox.data, picked).length : 0;
-  if (!count) return null;
-  const title = inboxBadgeTitle(count, picked);
+  return count ? { count, title: inboxBadgeTitle(count, picked) } : null;
+}
+
+/**
+ * The Inbox's badge, beside its link and not in it, so the link reads its section's name alone: the count, said whole to a screen reader;
+ * a press on it passes to the link beneath, and its Inbox's item says it whole on hover.
+ */
+function InboxBadge({ count, title }: { count: number; title: string }) {
   return (
-    <SidebarMenuBadge data-inbox-badge title={title} className="pointer-events-auto cursor-default">
+    <SidebarMenuBadge data-inbox-badge>
       {count}
       <span className="sr-only"> {title}</span>
     </SidebarMenuBadge>

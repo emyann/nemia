@@ -14,7 +14,7 @@ import { byAge, titleOf, waitsOnYou } from './factory.ts';
 export type BellRow = { run: string; title: string; factory: string; waitsFor: string[]; gate: string | null };
 
 /**
- * What `run` waits for, in the package's words: each step as `wf ls` asks it (`onYou`), else each by name; the run it waits on that never
+ * What `run` waits for, in the package's words: each step as the api asks it (`onYou`), else each by name; the run it waits on that never
  * ships without a person (`waiting.word`); and the hold only a person lifts (`holding.word`).
  */
 function waitsForOf(run: RunSummary): string[] {

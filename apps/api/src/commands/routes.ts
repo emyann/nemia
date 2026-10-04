@@ -102,6 +102,7 @@ function split(command: CommandSpec, body: Readonly<Record<string, unknown>>) {
  */
 async function argsOf(c: Context<ApiEnv>, command: CommandSpec, at: Named, s: Served): Promise<{ args: Args } | Refusal> {
   const words = WORDS[command.name];
+  if (!at.runId) return storeArgsOf(c, command, words);
   const bound = at.step ? at : { runId: at.runId };
   const named = located(at, at.step || undefined, s.home);
   if ('status' in named) return named;
@@ -119,6 +120,21 @@ async function argsOf(c: Context<ApiEnv>, command: CommandSpec, at: Named, s: Se
   const extension = EXTENSIONS[command.name];
   if (!extension) return { args };
   return extension.fold({ e: s.e, home: s.home, run: found.run }, command, args, taken);
+}
+
+/**
+ * The arguments of a request on a route that names no run — the store's own, as `POST /api/cordon` — or why it carries none: its JSON body
+ * (400), a key another command takes on the api alone (422), the body's schema (400). A delete reads no body: its arguments are what its
+ * route fixes (`sets`).
+ */
+async function storeArgsOf(c: Context<ApiEnv>, command: CommandSpec, words: RouteWords): Promise<{ args: Args } | Refusal> {
+  if (command.route?.method === 'DELETE') return { args: { ...command.route.sets } };
+  const json = await jsonOf(c, command.name, words);
+  if ('status' in json) return json;
+  const foreign = foreignKey(command, COMMANDS, json.value, words.shape);
+  if (foreign) return foreign;
+  const read = decodeBody(bodySchema(command, []), json.value, words.issue({ runId: '', step: '' }));
+  return 'status' in read ? read : { args: split(command, read.body).args };
 }
 
 /** What the api answers of a command's data: the keys it declares the api answers (`apiKeys`), or the whole of it. */
@@ -211,5 +227,10 @@ export const wordBreaks = (table: readonly Pick<CommandSpec, 'name' | 'route'>[]
  *   was held asked again. Refused in the package's words, by `app.onError`: a run nobody holds — a pruned one among them, since no verb
  *   holds one — and a hold put again as it was lifted are a 409 (`Conflict`), a run gone since the route read it a 404; any other failure
  *   is a 502. Its 200 is `{ id, lifted: true, hold }`. No feed line: the tick is the feed's one writer, and the board reads the run again.
+ * - `POST /api/cordon` — the store cordoned, as `wf cordon` cordons it (`putCordon`), its body `wf cordon`'s `--why` and `--by`, and the
+ *   route names no run: no pass starts new work until the lift. Refuses what `wf cordon` refuses of `--why` and `--by` with 422, and a
+ *   cordon that stands with 409 (`Conflict`). Its 200 is `{ cordon }`, as written.
+ * - `DELETE /api/cordon` — the store's cordon lifted, as `wf uncordon` lifts it (`liftCordon`); it reads no body. None standing is a 404
+ *   (`Missing`). Its 200 is `{ cordon }`, the cordon lifted.
  */
 export const commands = routesOf(COMMANDS);

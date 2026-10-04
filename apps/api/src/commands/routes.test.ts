@@ -167,7 +167,7 @@ test('REFUSED at shipped defaults: every route that writes, asked by a page on a
   const routed = COMMANDS.filter((c) => c.route && c.writes);
   assert.deepEqual(
     routed.map((c) => c.name),
-    ['retry', 'approve', 'round', 'accept', 'say', 'hold'],
+    ['retry', 'approve', 'round', 'accept', 'say', 'hold', 'cordon', 'uncordon'],
   );
   for (const command of routed) {
     const { method, path: route } = command.route!;
@@ -178,6 +178,7 @@ test('REFUSED at shipped defaults: every route that writes, asked by a page on a
     assert.match(((await res.json()) as { error: string }).error, new RegExp(`^${method} ${url.replaceAll('/', '\\/')} `), command.name);
   }
   assert.deepEqual(asked('r-guard'), [], 'nothing written');
+  assert.equal(fs.existsSync(path.join(root, 'cordon')), false, 'the store not cordoned');
 });
 
 test('a lift on its route reads no body: what its route fixes lifts the hold, whatever the body says, and the hold file is gone', async () => {

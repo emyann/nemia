@@ -1,6 +1,6 @@
 /** The flow numbers of every run in the store, for the board: what `wf stats --json` prints. */
 import { Hono } from 'hono';
-import { stats as flowNumbers, statsQueryOf, verifiesRest, type QueryKey, type Stats } from 'agent-orchestrator';
+import { STATS, statsQueryOf, type QueryKey, type Stats } from 'agent-orchestrator';
 import { type ApiEnv, served } from '../layer.ts';
 
 export type { Stats };
@@ -21,7 +21,7 @@ const QUERY_KEYS: Record<QueryKey, string> = {
 };
 
 /**
- * - `GET /api/stats` — `Stats`, as `wf stats --json` prints it (`flowNumbers`, the package's `stats`): the flow numbers of every run in
+ * - `GET /api/stats` — `Stats`, as `wf stats --json` prints it, answered by its entry (`STATS`): the flow numbers of every run in
  *   the store, whatever factory and repository the request is answered in, like `GET /api/runs`. `from` and `to` are UTC days
  *   (YYYY-MM-DD), `by` one of agent, step, factory, workflow or repo, and `agent`, `step`, `workflow`, `ofFactory` and `ofRepo` keep only
  *   the facts that have that value, compared as strings: `ofRepo` a repository's path as a run's record names it. A number nothing
@@ -39,9 +39,14 @@ const QUERY_KEYS: Record<QueryKey, string> = {
  *   finished run's facts are answered from the app's memo (`ReadMemo`) while they stand, and read afresh too under `WF_VERIFY_REST=1`.
  */
 export const stats = new Hono<ApiEnv>().get('/api/stats', (c) =>
-  served(c, async ({ e, env, memo }) => {
-    const given = Object.fromEntries(Object.entries(QUERY_KEYS).map(([key, name]) => [key, c.req.query(name)]));
-    const query = statsQueryOf(given, (key) => `?${QUERY_KEYS[key]}=`);
-    return c.json(await flowNumbers(e, query, new Date(), { memo: memo.stats, verify: verifiesRest(env) }));
+  served(c, async ({ e, env, home, memo }) => {
+    const given = Object.fromEntries(
+      Object.entries(QUERY_KEYS).flatMap(([key, name]) => {
+        const value = c.req.query(name);
+        return value === undefined ? [] : [[key, value]];
+      }),
+    );
+    statsQueryOf(given, (key) => `?${QUERY_KEYS[key]}=`);
+    return c.json(await STATS.handler(e, given, env, home, { stats: memo.stats }));
   }),
 );

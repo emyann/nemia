@@ -4,7 +4,8 @@
  */
 import { Hono } from 'hono';
 import { type SSEStreamingApi, streamSSE } from 'hono/streaming';
-import { phaseOfView } from 'agent-orchestrator';
+import { LOGS, phaseOfView } from 'agent-orchestrator';
+import { isRefusal } from 'agent-orchestrator/effect';
 import { filesPrunedWords } from 'agent-orchestrator/run';
 import { readArtifactFile, readFolderFile, refusedName } from './artifacts.ts';
 import { type StepLog, tailOf } from './logs.ts';
@@ -132,8 +133,9 @@ async function send(stream: SSEStreamingApi, read: Read): Promise<void> {
 /**
  * A step's own reads. Each answers 404 for a run or a step the run does not have.
  *
- * - `GET /api/runs/:id/steps/:step/log` — the end of the step's session output as text (`LOG_LINES`), for `wf logs` parity; empty for a
- *   step not filed yet; 502 when the engine could not read it. The board reads the conversation from the transcript routes.
+ * - `GET /api/runs/:runId/steps/:step/log` — the end of the step's session output as text (`LOG_LINES`), read by `wf logs`' entry
+ *   (`LOGS`), which reads it whole; empty for a step not filed yet; 502 when the engine could not read it. The board reads the
+ *   conversation from the transcript routes.
  * - `GET /api/runs/:id/steps/:step/artifacts/:name` — one file of the step's files directory, by name and never by path (artifacts.ts),
  *   as its closeout's `artifacts` link it; read on each request and never kept, since a step that runs again writes its files again.
  *   400 for a name that is not one; 410 for a file gone because `wf prune --artifacts` removed the run's files, leaving its record,
@@ -158,17 +160,18 @@ async function send(stream: SSEStreamingApi, read: Read): Promise<void> {
  *   next turn (`pathToTurn`). A step not filed yet has an empty path. Refusals are `tryOfStep`'s; 502 when the journal could not be read.
  */
 export const steps = new Hono<ApiEnv>()
-  .get('/api/runs/:id/steps/:step/log', (c) =>
-    served(c, async ({ e, home }) => {
-      const id = c.req.param('id');
+  .get('/api/runs/:runId/steps/:step/log', (c) =>
+    served(c, async ({ e, env, home }) => {
+      const id = c.req.param('runId');
       const step = c.req.param('step');
       const found = taskOfStep(id, step, home);
       if ('error' in found) return c.json({ error: found.error }, 404);
       const { taskId } = found;
-      if (!taskId) return c.json({ lines: [], truncated: false } satisfies StepLog);
       try {
-        return c.json(tailOf(await e.logs(taskId), LOG_LINES));
+        const { output } = await LOGS.handler(e, { runId: id, step }, env, home);
+        return c.json(output === undefined ? ({ lines: [], truncated: false } satisfies StepLog) : tailOf(output, LOG_LINES));
       } catch (err) {
+        if (isRefusal(err)) throw err;
         const why = err instanceof Error ? err.message : String(err);
         return c.json(
           {

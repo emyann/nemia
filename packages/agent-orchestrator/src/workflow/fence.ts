@@ -300,8 +300,9 @@ const WRITING_TOOLS = ['Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'Bash'];
 
 /**
  * Why step `step`'s fence, as resolved with its agent's, writes nothing, or `undefined` when it writes: the narrowest word of its harness,
- * `plan` or `read-only`; a `tools:` list with no tool that writes a file (`WRITING_TOOLS`); or a permission mode that asks before an edit
- * (`dontAsk`, `default`) with no `Edit` rule in `allowedTools:`, where the rule a writable mount is filed with would be its first write.
+ * `plan` or `read-only`; a `tools:` list with no tool that writes a file (`WRITING_TOOLS`); or a permission mode narrower than the
+ * narrowest that writes unasked (`editsUnasked`) with no `Edit` rule in `allowedTools:`, where the rule a writable mount is filed with
+ * would be its first write.
  */
 function unwrittenBy(step: Workflow): string | undefined {
   const reach = reachOf(step.harness);

@@ -436,3 +436,15 @@ export {
   workflowsOf,
 } from './summary/reads.verb.ts';
 export type { Filings, TaskView, Unreadable, Views } from './summary/reads.verb.ts';
+export { holdingOf, judge, needsOf, runWaitingOf, spentOf, standingsOf, wordOf } from './summary/judged.verb.ts';
+export type {
+  GitAsked,
+  JudgeHow,
+  RunHolding,
+  RunStatus,
+  RunStoppedOn,
+  RunToDecide,
+  RunWaiting,
+  Spent,
+  StepNeeds,
+} from './summary/judged.verb.ts';

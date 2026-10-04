@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { app } from '../src/app.ts';
-import { needsOf } from '../src/runs/judged.ts';
+import { needsOf } from 'agent-orchestrator';
 
 type TaskView = import('agent-orchestrator').TaskView;
 type Run = import('agent-orchestrator/run').Run;

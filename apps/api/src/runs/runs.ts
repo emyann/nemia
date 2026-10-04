@@ -23,12 +23,7 @@ import {
   viewsOf,
   workflowsOf,
   tryOf,
-} from 'agent-orchestrator';
-import { isGitRun, type PlaceKind, placeOf, prunedKept, prunedWords, type Run } from 'agent-orchestrator/run';
-import { decisionOf } from '../decide/decision.ts';
-import { detail } from '../detail/index.ts';
-import {
-  type Asked,
+  type GitAsked,
   judge,
   needsOf,
   type RunHolding,
@@ -39,7 +34,10 @@ import {
   type Spent,
   standingsOf,
   type StepNeeds,
-} from './judged.ts';
+} from 'agent-orchestrator';
+import { isGitRun, type PlaceKind, placeOf, prunedKept, prunedWords, type Run } from 'agent-orchestrator/run';
+import { decisionOf } from '../decide/decision.ts';
+import { detail } from '../detail/index.ts';
 import { type RunGraph, runGraph } from 'agent-orchestrator';
 import { restingRead } from './resting.ts';
 import { type ApiEnv, type Served, served } from '../layer.ts';
@@ -152,12 +150,12 @@ export type RunSummary = {
 };
 
 /** A run's summary but when it started, which is read off the feed on each request, and what git was asked for it. */
-type Judged = { summary: Omit<RunSummary, 'startedAt'>; asked: Asked };
+type Judged = { summary: Omit<RunSummary, 'startedAt'>; asked: GitAsked };
 
 async function summarize(run: Run, views: Views, reader: Engine['Service'], git: BranchReader, home: string): Promise<Judged> {
   const folder = workflowsOf(run, home).steps;
   const names = stepNames(run, folder);
-  const asked: Asked = { branches: [], failed: false };
+  const asked: GitAsked = { branches: [], failed: false };
   const judged = await judge(run, names, folder, views, {
     reader,
     git,

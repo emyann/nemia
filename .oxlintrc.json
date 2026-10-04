@@ -331,7 +331,7 @@
       }
     },
     {
-      "files": ["apps/api/src/runs/judged.ts"],
+      "files": ["packages/agent-orchestrator/src/summary/judged.verb.ts"],
       "rules": {
         "complexity": ["error", { "max": 22 }]
       }

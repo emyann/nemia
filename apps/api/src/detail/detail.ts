@@ -38,6 +38,16 @@ import {
   viewsFor,
   workflowsOf,
   tryOf,
+  judge,
+  needsOf,
+  type RunHolding,
+  type RunStatus,
+  type RunToDecide,
+  type RunWaiting,
+  type Spent,
+  spentOf,
+  standingsOf,
+  type StepNeeds,
 } from 'agent-orchestrator';
 import {
   acceptanceOf,
@@ -61,18 +71,6 @@ import {
 import { loopSpan, remoteNameOf, type Workflow } from 'agent-orchestrator/workflow';
 import { folderFiles, type StepArtifact } from '../steps/artifacts.ts';
 import { type RunGraph, runGraph } from 'agent-orchestrator';
-import {
-  judge,
-  needsOf,
-  type RunHolding,
-  type RunStatus,
-  type RunToDecide,
-  type RunWaiting,
-  type Spent,
-  spentOf,
-  standingsOf,
-  type StepNeeds,
-} from '../runs/judged.ts';
 import { checksOf, refusedStderr, type StepCheck } from '../steps/logs.ts';
 import { type Engine, workFolderOf } from '../store.ts';
 import {

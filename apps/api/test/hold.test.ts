@@ -18,7 +18,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { RunDecision } from '../src/decide/decision.ts';
 import type { RunDetail } from '../src/detail/detail.ts';
-import type { RunHolding } from '../src/runs/judged.ts';
 import type { RunSummary } from '../src/runs/runs.ts';
 import { app } from '../src/app.ts';
 import {
@@ -34,6 +33,7 @@ import {
   round,
   unhold,
   runStore,
+  type RunHolding,
 } from 'agent-orchestrator';
 
 type Wait = import('agent-orchestrator').Wait;

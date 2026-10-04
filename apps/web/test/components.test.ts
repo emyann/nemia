@@ -5457,6 +5457,14 @@ test("a factory in the picker reads its repositories by their folders' names, wh
   assert.doesNotMatch(gone, /data-error/);
 });
 
+test("REFUSED: the picker's trigger holds the picked factory's repositories whole and why its file does not read, and none under All factories", async () => {
+  const broken = filed('nemia', { repos: ['/code/nemia', '/code/web'], error: '/wf/factories/nemia.json is not JSON' });
+  const trigger = (html: string) => /data-factory-picker[\s\S]*?<button[\s\S]*?<\/button>/.exec(html)![0];
+  const picked = trigger(await sidebarAt('/factories/nemia', {}, [broken]));
+  assert.match(picked, /title="\/code\/nemia\n\/code\/web\nIts file does not read: \/wf\/factories\/nemia\.json is not JSON"/);
+  assert.doesNotMatch(trigger(await sidebarAt('/runs', {}, [broken])), /title=/);
+});
+
 test('REFUSED: the start in no factory yet offers each factory a run starts in, the default left out, one that cannot start saying why', async () => {
   const { FactoryChoice } = await import('../src/components/FactoryStart.tsx');
   const factories = [
@@ -5471,6 +5479,8 @@ test('REFUSED: the start in no factory yet offers each factory a run starts in, 
   );
   assert.match(html, /data-start-factory="quay"[\s\S]*disabled=""[\s\S]*data-why-not[^>]*>The factory quay&#x27;s file does not read/);
   assert.doesNotMatch(html.slice(0, html.indexOf('data-start-factory="quay"')), /disabled=""|data-why-not/);
+  assert.equal([...html.matchAll(/<button[^>]*>(nemia|quay)<\/button>/g)].length, 2, 'each factory a button, which a press picks');
+  assert.doesNotMatch(html, /type="radio"/, 'refused: a radio, which an arrow key checks, and so picks, while moving past it');
   assert.match(await pagedWith(createElement(FactoryChoice, { factories: [factories[0]] })), /No factory is filed to start a run in/);
 });
 

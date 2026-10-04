@@ -65,7 +65,10 @@ async function picks(page: Page): Promise<void> {
   await expectAt(page, `/factories/${FACTORY}`, '', "picked on a run's page, a factory opens its floor");
 }
 
-/** Under All factories, Start a run asks for the factory first; picking one opens the start in it, named in the address. */
+/**
+ * Under All factories, Start a run asks for the factory first; moving through the factories with the keyboard picks none, and pressing one
+ * opens the start in it, named in the address.
+ */
 async function asksItsFactory(page: Page): Promise<void> {
   await visit(page, '/runs');
   await startOf(page).click();
@@ -73,16 +76,24 @@ async function asksItsFactory(page: Page): Promise<void> {
   await expectVisible(bar, 'under All factories, Start a run opens the bar asking for the factory');
   await expectAt(page, '/runs', '?bar=start', 'the address names the start in no factory yet with the bare word');
   await expectTexts(
-    bar.locator('[data-start-factory]').locator('span.font-medium'),
+    bar.locator('[data-start-factory] button'),
     [FACTORIES.broken, ...FACTORIES.others.slice(0, 2), FACTORY, FACTORIES.bare, FACTORIES.others[2]],
     'it offers every factory filed, as the api lists them, the default none',
   );
   await expectVisible(bar.locator(`[data-start-factory="${FACTORIES.broken}"] [data-why-not]`), `${FACTORIES.broken} says why it cannot`);
-  if (!(await bar.locator(`[data-start-factory="${FACTORIES.broken}"] input`).isDisabled()))
+  if (!(await bar.locator(`[data-start-factory="${FACTORIES.broken}"] button`).isDisabled()))
     throw new Refused(`${FACTORIES.broken}, whose file does not read, cannot be picked`);
   await settled(page);
   await photograph(page, path.join(OUT, `sidebar-asking-${await themeOf(page)}.png`));
-  await bar.locator(`[data-start-factory="${FACTORY}"] label`).click();
+  const choice = (name: string) => bar.locator(`[data-start-factory="${name}"] button`);
+  await choice(FACTORIES.others[0]).focus();
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Tab');
+  if (!(await choice(FACTORY).evaluate((button) => button === document.activeElement)))
+    throw new Refused(`Tab moves from ${FACTORIES.others[0]} past ${FACTORIES.others[1]} to ${FACTORY}`);
+  await expectAt(page, '/runs', '?bar=start', 'and moving through the factories with the keyboard picks none of them');
+  await choice(FACTORY).click();
   await expectVisible(page.getByRole('complementary', { name: `Start a run in ${FACTORY}` }), `picked, the bar starts a run in ${FACTORY}`);
   await expectAt(page, '/runs', `?bar=start%3A${FACTORY}`, `and the address names it start:${FACTORY}`);
   await page.getByRole('complementary').getByRole('button', { name: 'Close' }).click();

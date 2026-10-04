@@ -103,8 +103,9 @@ function AskFactory() {
 }
 
 /**
- * The factories a run can be started in, one a radio, the default factory left out, since its floor starts none: one that cannot start says
- * why (`floorPlace`) and cannot be picked. A pick opens the bar on the start in that factory, which the address then names.
+ * The factories a run can be started in, one a button, the default factory left out, since its floor starts none: one that cannot start
+ * says why (`floorPlace`) and cannot be pressed. A press opens the bar on the start in that factory, which the address then names; moving
+ * through the list with the keyboard picks none.
  */
 export function FactoryChoice({ factories }: { factories: readonly Factory[] }) {
   const { show } = useBar();
@@ -123,28 +124,25 @@ export function FactoryChoice({ factories }: { factories: readonly Factory[] }) 
       ) : (
         <ul className="divide-y divide-neutral-200 rounded border border-neutral-300 dark:divide-neutral-800 dark:border-neutral-700">
           {places.map(({ name, why }) => (
-            <li key={name} data-start-factory={name}>
-              <label
-                className={`flex items-baseline gap-2 px-2 py-1.5 text-sm ${why ? 'cursor-not-allowed' : 'cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-900'}`}
+            <li key={name} data-start-factory={name} className="px-1 py-1">
+              <Button
+                variant="ghost"
+                isDisabled={why !== null}
+                aria-describedby={why ? `${legend}-${name}` : undefined}
+                onPress={() => show({ kind: 'start', factory: name })}
+                className="h-auto w-full justify-start px-2 py-1"
               >
-                <input
-                  type="radio"
-                  name={legend}
-                  value={name}
-                  checked={false}
-                  disabled={why !== null}
-                  onChange={() => show({ kind: 'start', factory: name })}
-                  className="translate-y-0.5 self-start"
-                />
-                <span className="min-w-0 flex-1 space-y-0.5">
-                  <span className={`block font-medium ${why ? 'text-neutral-500' : ''}`}>{name}</span>
-                  {why && (
-                    <span data-why-not className="block text-xs whitespace-pre-wrap break-words text-amber-700 dark:text-amber-400">
-                      {why}
-                    </span>
-                  )}
+                {name}
+              </Button>
+              {why && (
+                <span
+                  id={`${legend}-${name}`}
+                  data-why-not
+                  className="block px-2 pb-1 text-xs whitespace-pre-wrap break-words text-amber-700 dark:text-amber-400"
+                >
+                  {why}
                 </span>
-              </label>
+              )}
             </li>
           ))}
         </ul>

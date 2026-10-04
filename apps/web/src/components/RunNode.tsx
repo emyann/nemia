@@ -43,7 +43,8 @@ export type RunFlowNode = Node<RunNodeData, 'run'>;
  * One run on the Factory floor: what was asked, where, what each step is doing — a small flowchart of them (`StepRail`) — and for
  * how long.
  *
- * Its star puts it under the sidebar's Favorites (`FavoriteStar`). The chevron opens it: the card grows to the right with every step a tile (`StepTiles`), and a tile shows its step in the frame's bar.
+ * Its star puts it under the sidebar's Favorites (`FavoriteStar`). The chevron opens it: the card grows to the right with every step a
+ * tile (`StepTiles`), and a tile shows its step in the frame's bar.
  * A click on the card shows the run there, and the card is ringed while it does (`lookOf`). The title opens the run's page, and is not
  * preloaded on hover: only an open run reads its detail. `w-88` is `CARD_WIDTH`, narrower than the grid's cell, which leaves the gap
  * between cards.

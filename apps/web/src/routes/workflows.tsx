@@ -78,11 +78,12 @@ function WorkflowsPage() {
 }
 
 /**
- * A workflow's card: what it is, its star, which puts it under Favorites, shown for one that does not read too, the factories it is in (`workflowFactories`), each linked to its floor — nothing while they are unread or
- * for one in none — drawn, its steps' pages and a start — or, for one of yours, its builder in their place
- * (`WorkflowBuilder`). `building` opens it in the builder, as a workflow just made is. The repository's show none, and say why: the api
- * writes nothing into a checkout. The canvas inspects a step in the frame's bar and the builder edits one, never both on one card: Build
- * swaps the one for the other, and closes the bar where it shows a step of this workflow (`useBuilding`).
+ * A workflow's card: what it is, its star, which puts it under Favorites, shown for one that does not read too, the factories it is in
+ * (`workflowFactories`), each linked to its floor — nothing while they are unread or for one in none — drawn, its steps' pages and a start
+ * — or, for one of yours, its builder in their place (`WorkflowBuilder`). `building` opens it in the builder, as a workflow just made is.
+ * The repository's show none, and say why: the api writes nothing into a checkout. The canvas inspects a step in the frame's bar and the
+ * builder edits one, never both on one card: Build swaps the one for the other, and closes the bar where it shows a step of this workflow
+ * (`useBuilding`).
  */
 function WorkflowCard({ workflow, building: opened = false }: { workflow: WorkflowListing; building?: boolean }) {
   const { name, from, dir, description, steps, error } = workflow;

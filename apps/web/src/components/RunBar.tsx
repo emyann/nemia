@@ -15,8 +15,9 @@ import { StatusChip } from './StatusChip';
 import { Unread } from './StepBar';
 
 /**
- * The bar for the run `run`, titled by the run once read, with its id under the title and its star beside Open. While the run is read it says so; a run gone from
- * the store and a read that failed are each said in the bar, which stays open until a person closes it: a read never writes the address.
+ * The bar for the run `run`, titled by the run once read, with its id under the title and its star beside Open. While the run is read
+ * it says so; a run gone from the store and a read that failed are each said in the bar, which stays open until a person closes it: a
+ * read never writes the address.
  */
 export function RunBar({ run: id }: { run: string }) {
   const { data: run, error } = useQuery(runQuery(id));

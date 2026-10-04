@@ -11,7 +11,10 @@ import path from 'node:path';
 import type { Engine } from '../runtime-client.ts';
 import { scratch } from '../../test/scratch.ts';
 import { cursorTakes, feedLineWords, type FeedLine } from '../feed/feed.ts';
-import { pauseWords } from '../pause/pause.ts';
+import { pausedWords } from '../pause/pause.ts';
+
+/** The store's pause as read while none stands. */
+const NONE = { pause: null, finishing: [], staged: [] };
 import { statsLine, statsLines } from '../stats/index.ts';
 import { statsOf } from '../stats/stats.ts';
 import { parseArgv, type CommandSpec } from './command.ts';
@@ -99,15 +102,15 @@ test("wf feed reads the store's feed from a cursor, and prints the pause first w
   const end = Buffer.byteLength(whole);
   const e = {} as Engine;
 
-  assert.deepEqual(await FEED.handler(e, {}), { lines: [first, second], cursor: end, pause: null });
+  assert.deepEqual(await FEED.handler(e, {}), { lines: [first, second], cursor: end, pause: NONE });
   const after = await FEED.handler(e, { cursor: String(Buffer.byteLength(head)) });
-  assert.deepEqual(after, { lines: [second], cursor: end, pause: null });
+  assert.deepEqual(after, { lines: [second], cursor: end, pause: NONE });
   assert.deepEqual(FEED.print(after, {}), [feedLineWords(second), `cursor: ${end}`]);
 
   const pause = putPause({ why: 'merging by hand', by: 'ann' });
   try {
     const paused = await FEED.handler(e, { cursor: String(Buffer.byteLength(head)) });
-    assert.deepEqual(FEED.print(paused, {}), [pauseWords(pause), feedLineWords(second), `cursor: ${end}`]);
+    assert.deepEqual(FEED.print(paused, {}), [pausedWords({ pause, finishing: [] }), feedLineWords(second), `cursor: ${end}`]);
   } finally {
     resumePause();
   }

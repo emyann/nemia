@@ -127,7 +127,10 @@ const view = (phase: string, more: { settled?: 'succeeded'; attempts?: number; a
 });
 
 test('what finishes under the pause: a session at work, a check that runs, and an ending’s check as a landing', () => {
-  const steps = [step('implement', [], { check: 'npm test' }), step('ship', ['implement'], { gate: true, workspace: 'main', check: 'npm test' })];
+  const steps = [
+    step('implement', [], { check: 'npm test' }),
+    step('ship', ['implement'], { gate: true, workspace: 'main', check: 'npm test' }),
+  ];
   const r = run({ implement: { taskId: 't1', check: { taskId: 'c1' } }, ship: { taskId: 't2', check: { taskId: 'c2' } } });
   const views: Record<string, FinishingView> = {
     t1: view('running (working)'),
@@ -135,11 +138,14 @@ test('what finishes under the pause: a session at work, a check that runs, and a
     t2: view('done', { settled: 'succeeded' }),
     c2: view('running (working)'),
   };
-  assert.deepEqual(finishingOf(r, steps, (id) => views[id]), [
-    { run: 'r-1', step: 'implement', kind: 'session' },
-    { run: 'r-1', step: 'implement', kind: 'check' },
-    { run: 'r-1', step: 'ship', kind: 'landing' },
-  ]);
+  assert.deepEqual(
+    finishingOf(r, steps, (id) => views[id]),
+    [
+      { run: 'r-1', step: 'implement', kind: 'session' },
+      { run: 'r-1', step: 'implement', kind: 'check' },
+      { run: 'r-1', step: 'ship', kind: 'landing' },
+    ],
+  );
 });
 
 test('nothing finishes of a task queued for a slot, a session waiting on a person, or one settled', () => {
@@ -157,7 +163,11 @@ test('finishingAmong reads the steps of a run only where one of its tasks is at 
   const live = run({ implement: { taskId: 't2' } }, { id: 'r-live' });
   const read: string[] = [];
   const views: Record<string, FinishingView> = { t1: view('done', { settled: 'succeeded' }), t2: view('running (working)') };
-  const finishing = finishingAmong([idle, live], (id) => views[id], (r) => (read.push(r.id), [step('implement')]));
+  const finishing = finishingAmong(
+    [idle, live],
+    (id) => views[id],
+    (r) => (read.push(r.id), [step('implement')]),
+  );
   assert.deepEqual(finishing, [{ run: 'r-live', step: 'implement', kind: 'session' }]);
   assert.deepEqual(read, ['r-live']);
 });

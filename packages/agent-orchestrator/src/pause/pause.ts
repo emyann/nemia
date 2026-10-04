@@ -1,7 +1,7 @@
 /**
- * The store's pause, which the runtime calls unschedulable: while it stands no pass starts new work — no step, try, round or check filed, no
- * queued task admitted, no queued card started — and what runs finishes. What still finishes under it (`finishingOf`), read off the views
- * on each pass and never stored, and its words: "Pausing" while anything finishes, "Paused" once nothing does, as `wf ls`, `wf feed`,
+ * The store's pause, which the runtime calls unschedulable: while it stands no pass starts new work — no step, try, round or check
+ * filed, no queued task admitted, no queued card started — and what runs finishes. What still finishes under it (`finishingOf`), read off
+ * the views on each pass and never stored, and its words: "Pausing" while anything finishes, "Paused" once nothing does, as `wf ls`, `wf feed`,
  * `wf start`, `wf up` and the board say it. Pure: its file is `pause.store.ts`'s, and the gates that honour it are `assess` and the tick's
  * `pass`.
  */

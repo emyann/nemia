@@ -95,7 +95,13 @@ test('wf start says, after how to start the run, that nothing of it is filed unt
 
 test('wf up says the pause once across passes, again each time its words change, and resumed once when it is resumed', async (t) => {
   const pause = { at: '2026-10-04T12:00:00.000Z', by: 'ann', why: 'merging by hand' };
-  const two = { pause, finishing: [{ run: 'r-1', step: 'a', kind: 'session' as const }, { run: 'r-2', step: 'b', kind: 'check' as const }] };
+  const two = {
+    pause,
+    finishing: [
+      { run: 'r-1', step: 'a', kind: 'session' as const },
+      { run: 'r-2', step: 'b', kind: 'check' as const },
+    ],
+  };
   const one = { pause, finishing: two.finishing.slice(1) };
   const none = { pause, finishing: [] };
   let said: string | undefined;

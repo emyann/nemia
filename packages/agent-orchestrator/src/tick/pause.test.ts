@@ -204,11 +204,13 @@ test('while the store is paused nothing new starts and what runs finishes; the p
     { ...first.pause!, finishing: [...first.pause!.finishing].sort(byStep) },
     {
       pause,
-      finishing: ([
-        { run: running.id, step: 'plan', kind: 'session' },
-        { run: checked.id, step: 'work', kind: 'session' },
-        { run: landing.id, step: 'ship', kind: 'session' },
-      ] satisfies Finishing[]).sort(byStep),
+      finishing: (
+        [
+          { run: running.id, step: 'plan', kind: 'session' },
+          { run: checked.id, step: 'work', kind: 'session' },
+          { run: landing.id, step: 'ship', kind: 'session' },
+        ] satisfies Finishing[]
+      ).sort(byStep),
     },
     'the pass says the pause it read, and what still finishes under it: neither the queued task nor one settled',
   );

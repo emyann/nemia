@@ -350,11 +350,11 @@ export const PAUSE: Command<{ pause: Pause }> = {
 export const RESUME: Command<{ pause: Pause }> = {
   name: 'resume',
   usage: '',
-  help: ["lift the store's pause: the next pass files what waits"],
+  help: ['resume the store: the next pass files what waits'],
   spec: {
     positionals: [],
     flags: [],
-    unknown: (arg) => `wf resume takes no ${arg}: it lifts the store's pause, whoever put it.`,
+    unknown: (arg) => `wf resume takes no ${arg}: it resumes the store, whoever paused it.`,
   },
   writes: true,
   route: { method: 'DELETE', path: '/api/pause', status: 200 },

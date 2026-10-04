@@ -79,8 +79,9 @@ export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Servic
  * - `GET /api/ceilings` — the cap on runs in flight the daemon's last pass ran with, and the runs it counts and holds: what the Factory
  *   says over its floor. 422 for a `WF_MAX_RUNS` in the api's environment that is not a count, before any pass wrote the daemon's
  *   (`maxRuns`, an `Invalid`).
- * - `GET /api/pause` — the store's pause, `{ pause, staged }`: since when, by whom and why, or null; and each landing it holds with its
- *   merge staged in the repository's checkout (MERGE_HEAD), its check not filed until the lift (`pausedRead`). Put on
+ * - `GET /api/pause` — the store's pause, `{ pause, finishing, staged }`: since when, by whom and why, or null; each task still finishing
+ *   under it (`{ run, step, kind }`, a `session`, `check` or `landing`), none once it is Paused; and each landing it holds with its merge
+ *   staged in the repository's checkout (MERGE_HEAD), its check not filed until it resumes (`pausedRead`). Put on
  *   `POST /api/pause` and lifted on `DELETE /api/pause` (commands/routes.ts).
  * - `GET /api/daemon` — whether a wf up ticks the store, and since when, and when it last passed: read off daemon.json and the process
  *   table as wf ls reads them, and never written, the file being the daemon's. What the Factory says over its floor when nothing ticks.

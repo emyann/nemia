@@ -199,9 +199,9 @@ const PAUSE: RouteWords = {
     route: 'POST /api/pause',
     does: 'pauses the store',
     forAnother: 'pause it',
-    why: 'a pause stops every pass from starting new work in every repository the store runs in, until a person lifts it',
-    reach: "pause it from the board's header",
-    instead: 'Pause it from the board\'s header, or with `wf pause --why "<words>"`',
+    why: 'a pause stops every pass from starting new work in every repository the store runs in, until a person resumes it',
+    reach: "pause it from the board's bottom bar",
+    instead: 'Pause it from the board\'s bottom bar, or with `wf pause --why "<words>"`',
     shape: PAUSE_SHAPE,
   }),
   issue:
@@ -213,20 +213,20 @@ const PAUSE: RouteWords = {
   failed: (_at, said) => `POST /api/pause: the store was not paused — ${said}. Pause it with \`wf pause\`.`,
 };
 
-/** The store's pause lifted, as the guard's refusals word it; it takes no body, and none standing is the package's 404. */
+/** The store resumed, as the guard's refusals word it; it takes no body, and none standing is the package's 404. */
 const RESUME: RouteWords = {
   shape: '`{}`',
   guard: () => ({
     route: 'DELETE /api/pause',
-    does: "lifts the store's pause",
-    forAnother: 'lift it',
-    why: 'a pause lifted lets the next pass file every step, try and check that waits, in every repository the store runs in',
-    reach: "lift it from the board's header",
-    instead: "Lift it from the board's header, or with `wf resume`",
+    does: 'resumes the store',
+    forAnother: 'resume it',
+    why: 'a store resumed lets the next pass file every step, try and check that waits, in every repository the store runs in',
+    reach: "resume it from the board's bottom bar",
+    instead: "Resume it from the board's bottom bar, or with `wf resume`",
     shape: '`{}`',
   }),
   issue: () => () => 'DELETE /api/pause takes no body: `{}`.',
-  failed: (_at, said) => `DELETE /api/pause: the pause was not lifted — ${said}. Lift it with \`wf resume\`.`,
+  failed: (_at, said) => `DELETE /api/pause: the store was not resumed — ${said}. Resume it with \`wf resume\`.`,
 };
 
 /** A try's run removed, as the guard's refusals word it; it takes no body, and a failure that is no refusal names `wf rm`. */

@@ -87,8 +87,8 @@ function tickRunLines(r: Pass['runs'][number]): void {
 }
 
 /**
- * A pass's lines on `wf tick`: the pause it read and what finishes under it, what failed or was left out on stderr, then what it refused, the queue's card and each
- * run; returns it.
+ * A pass's lines on `wf tick`: the pause it read and what finishes under it, what failed or was left out on stderr, then what it refused,
+ * the queue's card and each run; returns it.
  */
 function tickLines(pass: Pass): Pass {
   const { runs: results, queue, feedError, refused, unreadable, pause } = pass;

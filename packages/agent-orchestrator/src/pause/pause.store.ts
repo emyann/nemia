@@ -87,7 +87,7 @@ export function resumePause(): Pause {
     fs.unlinkSync(pauseFile());
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
-    throw new Missing({ message: 'the store is not paused: there is nothing to lift (wf pause puts one).' });
+    throw new Missing({ message: 'the store is not paused: there is nothing to resume (wf pause puts one).' });
   }
   return pause ?? { at: '', by: '' };
 }

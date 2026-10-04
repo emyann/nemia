@@ -301,7 +301,7 @@ test("the table's help is today's, word for word", () => {
       '                               --why: the reason, said wherever the pause is; --by: who pauses it',
       '                               (default: your OS user)',
       '  wf resume',
-      "                               lift the store's pause: the next pass files what waits",
+      '                               resume the store: the next pass files what waits',
       '  wf tick [--stats]',
       '                               one pass: tick the engine, file what became ready — refused while a',
       '                               daemon (the api, or a wf up) ticks the store, since it runs the same',
@@ -478,7 +478,7 @@ test("REFUSED at shipped defaults: wf pause's and wf resume's arguments, before 
   assert.equal(refusedBy(pause, ['now']), `wf pause does not take now: ${shape}.`);
   assert.equal(refusedBy(pause, ['--why', 'merging by hand', '--by=ann']), null);
   assert.equal(refusedBy(pause, []), null);
-  assert.equal(refusedBy(entry('resume'), ['--all']), "wf resume takes no --all: it lifts the store's pause, whoever put it.");
+  assert.equal(refusedBy(entry('resume'), ['--all']), 'wf resume takes no --all: it resumes the store, whoever paused it.');
   assert.equal(refusedBy(entry('resume'), []), null);
 });
 

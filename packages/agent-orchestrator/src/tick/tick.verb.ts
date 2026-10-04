@@ -7,7 +7,16 @@
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { Data, Effect } from 'effect';
-import { EngineService, awaited, refusedText, tried, unreadableJournal, type Engine, type RefusedMove, type TaskView } from '../runtime-client.ts';
+import {
+  EngineService,
+  awaited,
+  refusedText,
+  tried,
+  unreadableJournal,
+  type Engine,
+  type RefusedMove,
+  type TaskView,
+} from '../runtime-client.ts';
 import type { QueueStarted } from '../inbox/inbox.ts';
 import { tipsSeen } from '../branches/branches.ts';
 import { admissionOrder, slotFree, type RunSlot } from '../cap/cap.ts';
@@ -178,9 +187,11 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }
     slotFree({ inFlight: counted, cap: ran.runs }) && !(yield* tried(() => readPause()))
       ? yield* tried(() => within('act', () => startQueued(repo, runs)))
       : undefined;
-  return { ...passOf(report, runs, judging, queue), ...(pause ? { pause: { pause, finishing: finishingReported(runs, report.views ?? []) } } : {}) };
+  return {
+    ...passOf(report, runs, judging, queue),
+    ...(pause ? { pause: { pause, finishing: finishingReported(runs, report.views ?? []) } } : {}),
+  };
 });
-
 
 /** Each task of `runs` still finishing under the pause (`finishingAmong`), read off the views the runtime reported on the pass. */
 const finishingReported = (runs: readonly Run[], views: readonly TaskView[]): Finishing[] => {

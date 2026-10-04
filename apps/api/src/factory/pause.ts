@@ -1,6 +1,7 @@
 /**
  * The store's pause, each task still finishing under it, and each landing it holds with its merge staged: what the board's bottom bar says
- * (`GET /api/pause`, app.ts); and what a pause at once would stop, with what it costs: what the board's confirm says (`GET /api/pause/now`).
+ * (`GET /api/pause`, app.ts); and what a pause at once would stop, with what it costs: what the board's confirm says
+ * (`GET /api/pause/now`).
  */
 import { COMMANDS, type Interrupt, type Paused } from 'agent-orchestrator';
 import type { Engine } from '../store.ts';

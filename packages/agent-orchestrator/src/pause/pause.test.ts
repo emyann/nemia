@@ -10,6 +10,10 @@ import type { Workflow } from '../step/step.ts';
 import {
   finishingAmong,
   finishingOf,
+  interruptsAmong,
+  interruptsOf,
+  NOW_COST,
+  nowLines,
   pausedLines,
   pausedWords,
   pauseWords,
@@ -116,13 +120,17 @@ test('the pause says Pausing with how many still finish, names each and each lan
 const ATTEMPT = { startedAt: '2026-10-04T12:00:00.000Z', spawnedAt: null, endedAt: null, reason: null, usage: null, ended: null };
 
 /** A task's view as `finishingOf` reads it: settled or not, with attempts or not, the runtime's phase, and its admission. */
-const view = (phase: string, more: { settled?: 'succeeded'; attempts?: number; admission?: string } = {}): FinishingView => ({
+const view = (
+  phase: string,
+  more: { settled?: 'succeeded'; attempts?: number; admission?: string; stopRequested?: true } = {},
+): FinishingView => ({
   phase,
   ...(more.admission ? { admission: more.admission } : {}),
   state: {
     brief: 'b',
     settled: more.settled ?? null,
     attempts: Array.from({ length: more.attempts ?? 1 }, () => ATTEMPT),
+    ...(more.stopRequested ? { stopRequested: true } : {}),
   },
 });
 
@@ -170,4 +178,73 @@ test('finishingAmong reads the steps of a run only where one of its tasks is at 
   );
   assert.deepEqual(finishing, [{ run: 'r-live', step: 'implement', kind: 'session' }]);
   assert.deepEqual(read, ['r-live']);
+});
+
+test('a pause at once interrupts a session at work and a check that runs, by their task ids', () => {
+  const steps = [step('implement', [], { check: 'npm test' }), step('review', ['implement'], { check: 'npm test' })];
+  const r = run({ implement: { taskId: 't1' }, review: { taskId: 't2', check: { taskId: 'c2' } } });
+  const views: Record<string, FinishingView> = {
+    t1: view('running (working)'),
+    t2: view('done', { settled: 'succeeded' }),
+    c2: view('running'),
+  };
+  assert.deepEqual(
+    interruptsOf(r, steps, (id) => views[id]),
+    [
+      { run: 'r-1', step: 'implement', kind: 'session', taskId: 't1' },
+      { run: 'r-1', step: 'review', kind: 'check', taskId: 'c2' },
+    ],
+  );
+});
+
+test('a pause at once leaves a landing to finish: the session and the check of a step in the own checkout', () => {
+  const ship = step('ship', [], { gate: true, workspace: 'main', check: 'npm test' });
+  const r = run({ ship: { taskId: 't1', check: { taskId: 'c1' } } });
+  const working = (id: string) => (id === 't1' || id === 'c1' ? view('running (working)') : undefined);
+  assert.equal(interruptsOf(r, [{ ...ship, workspace: undefined }], working).length, 2, 'the fixture: in a worktree, both are interrupted');
+  assert.deepEqual(interruptsOf(r, [ship], working), []);
+});
+
+test('a pause at once leaves a task already asked to stop, one queued for a slot, and one waiting on a person', () => {
+  const steps = [step('implement')];
+  const r = run({ implement: { taskId: 't1' } });
+  const interrupted = (v: FinishingView) => interruptsOf(r, steps, () => v);
+  assert.equal(interrupted(view('running (working)')).length, 1, 'the fixture: a session at work is interrupted');
+  assert.deepEqual(interrupted(view('running (working)', { stopRequested: true })), [], 'already asked to stop');
+  assert.deepEqual(interrupted(view('pending', { attempts: 0, admission: 'queued' })), [], 'queued for a slot');
+  assert.deepEqual(interrupted(view('needs-human')), [], 'waiting on a person');
+});
+
+test('interruptsAmong reads the steps of a run only where one of its tasks is at work', () => {
+  const idle = run({ implement: { taskId: 't1' } }, { id: 'r-idle' });
+  const live = run({ implement: { taskId: 't2' } }, { id: 'r-live' });
+  const read: string[] = [];
+  const views: Record<string, FinishingView> = { t1: view('done', { settled: 'succeeded' }), t2: view('running (working)') };
+  const interrupts = interruptsAmong(
+    [idle, live],
+    (id) => views[id],
+    (r) => (read.push(r.id), [step('implement')]),
+  );
+  assert.deepEqual(interrupts, [{ run: 'r-live', step: 'implement', kind: 'session', taskId: 't2' }]);
+  assert.deepEqual(read, ['r-live']);
+});
+
+test('wf pause --now says each task it would stop, what that costs, and the line that acts', () => {
+  assert.deepEqual(nowLines([{ run: 'r-1', step: 'implement', kind: 'session', taskId: 't1' }]), [
+    'wf pause --now would pause the store and stop 1 at work, each tried again on wf resume:',
+    "   r-1's implement: its session",
+    `${NOW_COST} A landing that checks or merges is left to finish.`,
+    'wf pause --now --yes does it.',
+  ]);
+  assert.equal(NOW_COST, 'An interrupted step redoes its unfinished work and reads its context again.');
+  assert.match(nowLines([])[0], /stops nothing/);
+});
+
+test('a task asked to stop finishes as stopping', () => {
+  const r = run({ implement: { taskId: 't1' } });
+  const finishing = finishingOf(r, [step('implement')], () => view('running (working)', { stopRequested: true }));
+  assert.deepEqual(finishing, [{ run: 'r-1', step: 'implement', kind: 'session', stopping: true }]);
+  assert.deepEqual(pausedLines({ pause: PAUSE, finishing, staged: [] }).slice(1), [
+    "   r-1's implement is stopping: its session was asked to stop",
+  ]);
 });

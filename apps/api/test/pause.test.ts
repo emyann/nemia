@@ -38,7 +38,7 @@ test('the board pauses the store, reads the pause back, is refused a second, lif
   assert.deepEqual(await asked('GET'), { status: 200, body: { pause, finishing: [], staged: [] } });
   assert.deepEqual(await asked('POST', {}), {
     status: 409,
-    body: { error: `the store is already paused by ann since ${pause.at}: wf resume lifts it first.` },
+    body: { error: `the store is already paused by ann since ${pause.at}: wf resume lifts it first, and wf pause --now stops what still finishes under it.` },
   });
   assert.deepEqual(await asked('DELETE'), { status: 200, body: { pause } });
   assert.equal(fs.existsSync(FILE), false, 'the file removed');

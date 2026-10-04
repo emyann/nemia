@@ -6,12 +6,19 @@
  * (`StoreRoot`, store.ts).
  */
 import { Context, Effect, Layer, type ManagedRuntime } from 'effect';
-import { freshStatsMemo, type Factory, type StatsMemo, type Filings, type RestingMemo, restingMemo } from 'agent-orchestrator';
+import {
+  freshStatsMemo,
+  type Factory,
+  type StatsMemo,
+  type Filings,
+  type RestingMemo,
+  restingMemo,
+  type RunSummary,
+} from 'agent-orchestrator';
 import { McpAsker } from './capabilities/capabilities.ts';
 import type { LastSaid } from './detail/detail.ts';
 import { placeFor } from './factories/place.ts';
 import { QuotaAsker } from './factory/quota.ts';
-import type { RunSummary } from './runs/runs.ts';
 import { Engine, StoreRoot } from './store.ts';
 
 /**

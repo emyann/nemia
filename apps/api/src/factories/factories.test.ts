@@ -33,7 +33,7 @@ import {
 
 type WorkflowListing = import('../workflows/workflows.ts').WorkflowListing;
 type WorkflowStepPage = import('../workflows/workflows.ts').WorkflowStepPage;
-type RunSummary = import('../runs/runs.ts').RunSummary;
+type RunSummary = import('agent-orchestrator').RunSummary;
 type FactoryAnswer = import('./factories.ts').FactoryAnswer;
 
 const write = (file: string, text: string): void => {

@@ -29,12 +29,12 @@ import {
   type CardRead,
   runStore,
   tryOf,
+  judgedNow,
 } from 'agent-orchestrator';
 import { AGENTS_FOLDER, agentNameRefusal, type AgentCardShape, type AgentDraft } from 'agent-orchestrator/workflow';
 import { readBody, valueAt, type BodyIssue, type Words } from '../body.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from '../guard.ts';
 import { type ApiEnv, served } from '../layer.ts';
-import { judgedNow } from '../runs/runs.ts';
 import type { Engine } from '../store.ts';
 import { copyCommand, givenSkills, librarySkills, type GivenSkill } from './skills.ts';
 import { tryFolder, untriedOf, type Untried } from './try.ts';

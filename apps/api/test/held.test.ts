@@ -16,9 +16,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { RunDetail } from '../src/detail/detail.ts';
-import type { RunSummary } from '../src/runs/runs.ts';
 import { app } from '../src/app.ts';
-import { approve, engine, list, runStore } from 'agent-orchestrator';
+import { approve, engine, list, runStore, type RunSummary } from 'agent-orchestrator';
 
 const T0 = Date.parse('2026-09-24T01:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();

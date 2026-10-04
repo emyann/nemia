@@ -19,9 +19,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { RunDecision } from '../src/decide/decision.ts';
 import type { RunDetail } from '../src/detail/detail.ts';
-import type { RunSummary } from '../src/runs/runs.ts';
 import { app } from '../src/app.ts';
-import { decide, engine, list, waitAdvice, waitWord, runStore } from 'agent-orchestrator';
+import { decide, engine, list, waitAdvice, waitWord, runStore, type RunSummary } from 'agent-orchestrator';
 
 type Wait = import('agent-orchestrator').Wait;
 

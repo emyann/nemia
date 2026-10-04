@@ -14,11 +14,10 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { RunSummary } from './runs.ts';
 import { app, runtime } from '../app.ts';
 import { ReadMemo } from '../layer.ts';
 import { Engine, findRun } from '../store.ts';
-import { approve, engine, verifiesRest, restingRead } from 'agent-orchestrator';
+import { approve, engine, verifiesRest, restingRead, type RunSummary } from 'agent-orchestrator';
 
 /** The engine the app's requests read through: its reads are what a poll costs. */
 const e = await runtime.runPromise(Engine.useSync((engine) => engine));

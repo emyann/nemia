@@ -18,8 +18,8 @@ import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
 import type { RunDecision } from './decision.ts';
 import type { RunDetail } from '../detail/detail.ts';
-import type { RunSummary } from '../runs/runs.ts';
 import { app } from '../app.ts';
+import { type RunSummary } from 'agent-orchestrator';
 
 /** The real `git`, behind one first on PATH that notes each call in `gitCalls` and runs it: what says which runs the api asks git about. */
 const realGit = execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim();

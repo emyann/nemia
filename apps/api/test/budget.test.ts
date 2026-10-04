@@ -13,9 +13,20 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { RunDecision } from '../src/decide/decision.ts';
 import type { RunDetail } from '../src/detail/detail.ts';
-import type { RunSummary } from '../src/runs/runs.ts';
 import { app } from '../src/app.ts';
-import { askFile, budgetRefusal, decide, engine, list, retry, round, roundAskFile, usedLines, runStore } from 'agent-orchestrator';
+import {
+  askFile,
+  budgetRefusal,
+  decide,
+  engine,
+  list,
+  retry,
+  round,
+  roundAskFile,
+  usedLines,
+  runStore,
+  type RunSummary,
+} from 'agent-orchestrator';
 
 type RetryHow = import('agent-orchestrator').RetryHow;
 

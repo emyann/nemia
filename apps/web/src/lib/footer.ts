@@ -133,7 +133,7 @@ export function quotaShort(
 export type FooterPart = 'daemon' | 'pause' | 'feed' | 'work' | 'quota' | 'version';
 
 /**
- * The groups the bar shows, left to right: all six, the store's pause right after the daemon's dot; and on a `narrow` screen the daemon's
+ * The groups the bar shows, left to right: all six, the pause right after the daemon's dot; and on a `narrow` screen the daemon's
  * dot, the pause and the quota alone.
  */
 export const footerParts = (narrow: boolean): readonly FooterPart[] =>

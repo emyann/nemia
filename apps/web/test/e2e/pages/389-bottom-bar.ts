@@ -90,12 +90,12 @@ async function gauges(page: Page): Promise<void> {
   await expectVisible(lane(page), 'and the queue lane is back');
 }
 
-/** On a phone's screen the bar keeps the daemon's dot, named, the store's pause, and the quota, whole, and nothing else. */
+/** On a phone's screen the bar keeps the daemon's dot, named, the pause, and the quota, whole, and nothing else. */
 async function onPhone(page: Page): Promise<void> {
   await page.setViewportSize({ width: 390, height: 844 });
   const bar = footerOf(page);
   await expectVisible(bar.getByRole('button', { name: 'Daemon none' }), "a phone keeps the daemon's dot, named by its word");
-  await expectVisible(bar.getByRole('button', { name: 'Pause the store' }), "and the store's pause");
+  await expectVisible(bar.getByRole('button', { name: 'Pause all factories' }), 'and the pause of all factories');
   await expectUncut(bar.locator('[data-quota-short]'), 'and the quota, read whole');
   await expectCount(bar.locator('[data-feed-word], [data-at-work], [data-version]'), 0, 'and nothing else');
   await expectCount(bar.getByRole('button'), 3, 'three groups');
@@ -109,7 +109,7 @@ export default {
    * dot and whether the board follows the feed, in its centre the runs in flight and the sessions at work across every factory, as the
    * api's runs make them, and at its right the quota and the version the api answers. A group pressed opens the machine's gauges in the
    * floating bar, above the bottom bar, the queue lane giving its room to the floor, and pressed again closes them. A phone keeps the dot,
-   * the store's pause and the quota. The store's pause is its own page's (`480-pause.ts`). The window's size is put back.
+   * the pause and the quota. The pause is its own page's (`480-pause.ts`). The window's size is put back.
    */
   name: 'bottom-bar',
   route: '/factories/default',

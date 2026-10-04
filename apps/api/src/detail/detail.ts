@@ -645,12 +645,7 @@ export async function detail(run: Run, { e, home, memo }: Pick<Served, 'e' | 'ho
     cost: judged.cost,
     atWork: atWork(run, views),
     tokens: runTokens(run, views),
-    read: readOf(
-      totalOf(
-        steps,
-        names.flatMap((name) => (clock.steps[name] ?? []).flatMap((t) => (t.session ? [[name, t.used] as const] : []))),
-      ),
-    ),
+    read: runRead(clock, steps, names),
     waitingOnYou: judged.waitingOnYou,
     onYou: judged.onYou,
     toDecide: judged.toDecide,
@@ -701,6 +696,15 @@ export async function detail(run: Run, { e, home, memo }: Pick<Served, 'e' | 'ho
     },
   };
 }
+
+/** What the sessions of every try of every step read, by price (`RunRead`), off the run's timeline; null where none of it was measured. */
+const runRead = (clock: Timeline, steps: readonly Workflow[], names: readonly string[]): RunRead | null =>
+  readOf(
+    totalOf(
+      steps,
+      names.flatMap((name) => (clock.steps[name] ?? []).flatMap((t) => (t.session ? [[name, t.used] as const] : []))),
+    ),
+  );
 
 /**
  * What the engine filed a step's current try with (`StepFiled`), off its record; null for no task, or one the engine has no record of. The

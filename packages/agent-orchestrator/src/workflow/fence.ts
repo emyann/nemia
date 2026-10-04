@@ -299,20 +299,29 @@ function pathCovers(by: string, path: string): boolean {
 const WRITING_TOOLS = ['Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'Bash'];
 
 /**
- * Refuses `writable:` on a step whose fence, as resolved with its agent's (`agent`, by name), writes nothing — the narrowest word of its
- * harness, `plan` or `read-only`, or a `tools:` list with no tool that writes a file (`WRITING_TOOLS`). The key widens where a step's
- * writes reach, and gives no write to a step that has none.
+ * Why step `step`'s fence, as resolved with its agent's, writes nothing, or `undefined` when it writes: the narrowest word of its harness,
+ * `plan` or `read-only`; a `tools:` list with no tool that writes a file (`WRITING_TOOLS`); or a permission mode that asks before an edit
+ * (`dontAsk`, `default`) with no `Edit` rule in `allowedTools:`, where the rule a writable mount is filed with would be its first write.
+ */
+function unwrittenBy(step: Workflow): string | undefined {
+  const reach = reachOf(step.harness);
+  const word = step.sandbox ?? step.permissionMode ?? reach.given;
+  if (Object.hasOwn(reach.rank, word) && rankOf(reach, word) === 0) return `runs in \`${word}\`, which writes nothing`;
+  if (step.tools && !step.tools.some((tool) => WRITING_TOOLS.includes(tool)))
+    return `has ${step.tools.length ? `only the tools ${listed(step.tools)}` : 'no tool'}, and none writes a file`;
+  const edits = (step.allowedTools ?? []).some((rule) => ruleParts(rule).tool === 'Edit');
+  if (reach.by === 'mode' && rankOf(reach, word) < reach.writes && !edits)
+    return `runs in \`${word}\`, which asks before an edit, and allows no \`Edit\` rule, so it writes nothing`;
+  return undefined;
+}
+
+/**
+ * Refuses `writable:` on a step whose fence, as resolved with its agent's (`agent`, by name), writes nothing (`unwrittenBy`). The key
+ * widens where a step's writes reach, and gives no write to a step that has none.
  */
 export function refuseUnwritable(step: Workflow, agent: string | undefined): void {
   if (!step.writable) return;
-  const reach = reachOf(step.harness);
-  const word = step.sandbox ?? step.permissionMode ?? reach.given;
-  const writesNothing = Object.hasOwn(reach.rank, word) && rankOf(reach, word) === 0;
-  const why = writesNothing
-    ? `runs in \`${word}\`, which writes nothing`
-    : step.tools && !step.tools.some((tool) => WRITING_TOOLS.includes(tool))
-      ? `has ${step.tools.length ? `only the tools ${listed(step.tools)}` : 'no tool'}, and none writes a file`
-      : undefined;
+  const why = unwrittenBy(step);
   if (!why) return;
   const whose = agent === undefined ? 'its fence' : `its fence, with ${AGENTS_FOLDER}/${agent}.md's`;
   refuse(

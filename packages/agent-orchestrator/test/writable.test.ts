@@ -67,6 +67,22 @@ test('REFUSED at load: `writable:` over a fence that writes nothing — `plan`, 
   assert.equal(said('writable: web'), 'read', "the runtime's default mode writes");
 });
 
+test('REFUSED at load: `writable:` over a mode that asks before an edit and allows no `Edit` rule, whose mount would be its first write', () => {
+  const rule =
+    "`writable:` widens where a step's writes reach, never what it may do. Delete the line, or run the step on a fence that writes — an agent whose file allows `Edit(**)`, say.";
+  assert.equal(
+    said('permissionMode: dontAsk\nallowedTools: Bash(npm test)\nwritable: web'),
+    `review: \`writable: web\` lets the step write those folders, and its fence, runs in \`dontAsk\`, which asks before an edit, and allows no \`Edit\` rule, so it writes nothing: ${rule}`,
+  );
+  assert.equal(
+    said('permissionMode: default\nwritable: web'),
+    `review: \`writable: web\` lets the step write those folders, and its fence, runs in \`default\`, which asks before an edit, and allows no \`Edit\` rule, so it writes nothing: ${rule}`,
+  );
+  assert.equal(said('permissionMode: dontAsk\nallowedTools: Bash(npm test), Edit(src/**)\nwritable: web'), 'read', 'an edit rule writes');
+  assert.equal(said('permissionMode: acceptEdits\nwritable: web'), 'read', 'a mode that edits unasked writes');
+  assert.equal(said('harness: codex\nsandbox: workspace-write\nwritable: web'), 'read', 'a sandbox that writes takes no rule');
+});
+
 test("REFUSED at load: `writable:` on a step whose agent's fence writes nothing, naming the agent's file", () => {
   const team = teamCopy();
   fs.writeFileSync(path.join(team, 'agents', 'planner.md'), '---\npermissionMode: plan\n---\nPlan it.\n');

@@ -2557,7 +2557,9 @@ The run files those folders writable for that step alone — its first filing, a
 of the run still only reads them; the step's brief and `wf start` say which. A name is a directory's, never a path, so a workflow
 stays the same on every machine; the run's own repository is the step's workspace already, and names nothing more. Refused at load:
 a name that is not a directory's or is given twice, the key on a remote agent, and the key over a fence that writes nothing — `plan`,
-codex `read-only`, a `tools:` list with no tool that writes a file (`writableFenceRefusal`). Fences only tighten, and this is where,
+codex `read-only`, a `tools:` list with no tool that writes a file, a mode that asks before an edit (`dontAsk`, `default`) with no
+`Edit` rule in `allowedTools:`, where the rule the mount is filed with would be its first write (`refuseUnwritable`). Fences only
+tighten, and this is where,
 not what: the key widens where a step's writes reach, never what it may do. Refused at `wf start`, before anything is written
 (`writableRefusal`): a name no folder of the factory has, one two share, one that is no directory now, a `writable:` in a run in no
 factory, and a step whose harness holds no writable mount, Codex's, in the runtime's words (`writableMountRefusal`).

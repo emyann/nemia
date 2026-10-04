@@ -21,19 +21,18 @@ function RailButton({ label, ...props }: ComponentProps<typeof SidebarMenuButton
 const RailLink = routeLink(RailButton);
 
 /**
- * The rail: a narrow column of the frame's places (`RAIL`), each an icon linking to its page (`RailButton`), lit when `path` is its page.
- * Capabilities sits at its foot. A pick runs `onPick`, which closes the menu's sheet on a narrow screen.
+ * The rail: a narrow column of the frame's places (`RAIL`) from the top, each an icon linking to its page (`RailButton`), lit when `path`
+ * is its page. A pick runs `onPick`, which closes the menu's sheet on a narrow screen.
  */
 export function FrameRail({ path, onPick }: { path: string; onPick?: () => void }) {
-  const foot = RAIL.length - 1;
   return (
     <Sidebar collapsible="none" className="w-[calc(var(--sidebar-width-icon)+1px)]! border-r">
       <nav aria-label="Places" className="flex min-h-0 flex-1 flex-col">
         <SidebarGroup className="flex-1 px-1.5 md:px-2">
           <SidebarGroupContent className="flex flex-1 flex-col">
             <SidebarMenu className="flex-1 gap-1">
-              {RAIL.map((item, index) => (
-                <SidebarMenuItem key={item.to} className={index === foot ? 'mt-auto' : undefined}>
+              {RAIL.map((item) => (
+                <SidebarMenuItem key={item.to}>
                   <RailLink to={item.to} label={item.label} isActive={item.active(path)} onPress={onPick} className="px-2">
                     <item.icon />
                   </RailLink>

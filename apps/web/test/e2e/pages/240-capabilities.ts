@@ -1,11 +1,11 @@
-import { railOf, sidebar } from '../board.ts';
-import { expectCount, expectVisible } from '../checks.ts';
+import { frameTabsOf, railOf, sidebar } from '../board.ts';
+import { expectCount, expectTexts, expectVisible } from '../checks.ts';
 import { CHECKOUT, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 
 export default {
   /**
-   * The Capabilities page: the checkout's skills, agents, MCP servers, deny rules and ask rules, each with where it was read from, and
+   * The Capabilities page, a tab of Machines & Capabilities: the checkout's skills, agents, MCP servers, deny rules and ask rules, each with where it was read from, and
    * what each step gets — the checkout's dev, review fenced to its tools in dontAsk and implement on the harness's own set, and yours, on
    * Codex, which claims nothing it was not measured to have.
    */
@@ -14,9 +14,10 @@ export default {
   expect: async (page) => {
     await sidebar(page);
     await expectVisible(
-      railOf(page).locator('a[data-active="true"][aria-label="Capabilities"]'),
-      'the rail lights Capabilities on its page',
+      railOf(page).locator('a[data-active="true"][aria-label="Machines & Capabilities"]'),
+      'the rail lights Machines & Capabilities on its page',
     );
+    await expectTexts(frameTabsOf(page).locator('[aria-selected="true"]'), ['Capabilities'], "the strip's Capabilities tab is selected");
     const { skill, bareSkill, agent, server, missing, denied, asked } = CHECKOUT;
     const section = (title: string) => page.locator(`section[aria-label="${title}"]`);
     for (const [title, count] of [

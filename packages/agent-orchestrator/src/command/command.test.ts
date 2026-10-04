@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { commandBreaks, commandLine, helpOf, parseArgv, type Spec } from './command.ts';
+import { commandBreaks, commandLine, helpOf, leftOut, parseArgv, type Spec } from './command.ts';
 import { COMMANDS, TABLE } from './commands.verb.ts';
 
 const SPEC: Spec = {
@@ -82,9 +82,10 @@ test('a flag the command has none of, given where a required argument stands, is
   assert.equal(parseArgv(SPEC, ['--note=hi']), undefined);
   assert.equal(
     refusalOf(['--nope'], { ...SPEC, missing: 'MISSING' }),
-    'MISSING',
-    'a spec that says its own refusal of an argument left out says it',
+    'UNKNOWN --nope',
+    'a spec that says its own refusal of an argument left out still refuses a flag it has none of as one it does not take',
   );
+  assert.equal(refusalOf(['-n'], { ...SPEC, missing: 'MISSING' }), 'MISSING');
 });
 
 test('an argument the command does not take is refused in its words', () => {
@@ -150,6 +151,23 @@ test('a spec that says its refusal of a required argument left out says it where
   assert.equal(parseArgv(SPEC, ['-x'])?.runId, '-x');
 });
 
+test('an empty text where a spec says its refusal is given to the handler, which refuses it in its own words; an empty name is not', () => {
+  const idea: Spec = { ...HOLDING, positionals: [{ key: 'idea', takes: 'required', kind: 'text' }] };
+  assert.deepEqual(parseArgv(idea, ['']), { idea: '' });
+  assert.equal(refusalOf(['-x'], idea), 'MISSING');
+  assert.equal(refusalOf([''], HOLDING), 'MISSING');
+  assert.equal(parseArgv({ ...idea, missing: undefined }, ['']), undefined);
+});
+
+test("a text flag's value left out — empty, or a word starting -- — is refused in its own takes; one the api alone takes is not looked at", () => {
+  const spec: Spec = { ...SPEC, flags: [...SPEC.flags, { flag: '--words', kind: 'text', key: 'words', only: { side: 'api', why: 'w' } }] };
+  assert.equal(leftOut(spec, { runId: 'r-1', note: '' }), 'NOTE TAKES');
+  assert.equal(leftOut(spec, { runId: 'r-1', note: '--slow' }), 'NOTE TAKES');
+  assert.equal(leftOut(spec, { runId: 'r-1', note: ['hi', '--x'] }), 'NOTE TAKES');
+  assert.equal(leftOut(spec, { runId: 'r-1', note: 'hi -- there', words: '' }), null);
+  assert.equal(leftOut(spec, { runId: 'r-1', who: '' }), null, 'a name flag is refused by the reader, not here');
+});
+
 test("retry's command line keeps today's refusals", () => {
   assert.equal(
     refusalOf(['r-1', 'impl', '--fresh', '--recheck'], RETRY.spec),
@@ -190,6 +208,63 @@ test("the table's help is today's, word for word", () => {
   assert.equal(
     helpOf(TABLE),
     [
+      '  wf start <brief.md|card.md|"text"> [--workflows ./workflows] [--repo .] [--no-worktree] [--after <runId> ...] [--input <file> ...] [--gate <step> ...] [--factory <name>] [--brief "<brief>"]',
+      '                               --after <runId>: file nothing of this run until wf decide says that',
+      '                               run has shipped — finished, and its result branch on the base',
+      '                               branch — and start from the base as it is then; once per run.',
+      "                               --gate <step>: that step's closeout waits for wf approve before",
+      "                               anything after it is filed, as a step's own gate: true does; once",
+      "                               per step. An inbox card's gate: <step> is one more",
+      '                               --workflows takes a folder, or a name under <repo>/workflows/: dev',
+      '                               a card of a plan (wf plan --help) starts its body: --workflows is its',
+      '                               workflow: unless given, and its after: needs an --after for each',
+      "                               --input <file>: copied into the run's own inputs/ directory, and named",
+      "                               on every step's brief under what was asked for; once per file",
+      '                               --factory <name>: the workflow must be attached to the factory, whose',
+      '                               hires fill its steps, and a step left with no agent is refused (wf',
+      '                               factory --help). A factory with one repository gives the run its',
+      "                               --repo, and a repository not one of the factory's is refused, naming",
+      '                               them. Without it, the run is started in the factory whose repository',
+      '                               holds --repo, else where wf start is typed, on that repository, when',
+      '                               one factory alone does; none, or two, is refused, naming the fix.',
+      '                               The default factory is history only: --factory default is refused',
+      '                               a card of the inbox (wf inbox --help) starts its body, or --brief',
+      '                               "<brief>" in its place, and leaves the inbox: --workflows is its workflow:',
+      '                               unless given, --repo its repo:, --factory its factory:, and a card',
+      '                               that names no factory either way is refused',
+      '  wf plan <folder> [--repo .] [--factory <name>]',
+      '                               start a plan: one run per card in the folder, parents first, each',
+      '                               --after the runs of the cards its after: names, in the factory as',
+      '                               wf start finds it (wf plan --help)',
+      '  wf inbox',
+      '                               the cards parked before they are started: name, first line, workflow',
+      '                               and repo when set, and started as <runId> (wf inbox --help)',
+      '  wf inbox add "<idea>"|<file> [--workflow <name>] [--repo <path>] [--factory <name>]',
+      '                               park an idea as a card in the inbox, named from its first line',
+      '  wf inbox queue <name> [--workflow <w>] [--off]',
+      '                               mark a card to start on its own: the tick starts the oldest queued',
+      '                               card once a run slot is free; --off takes the mark back',
+      '  wf inbox rm <name>',
+      '                               drop a card without starting it',
+      '  wf factory',
+      "                               the store's factories: the default first — every run and card that",
+      '                               names no factory, read, never written — then each by name with its',
+      '                               repositories (wf factory --help)',
+      '  wf factory ls',
+      '                               the same, by its name',
+      '  wf factory add <name> --repo <path> [--repo <path> ...]',
+      '                               file a factory: a lowercase slug naming one or more directories',
+      '  wf factory attach <factory> <workflow>',
+      "                               offer a workflow in a factory, by its folder's name: a factory offers",
+      '                               only the workflows attached to it',
+      '  wf factory detach <factory> <workflow>',
+      '                               take a workflow back, once no hire fills its steps',
+      '  wf factory hire <factory> <agent> --step <workflow>/<step>',
+      "                               hire an agent into a workflow's step: one a step, a second replaces it",
+      '  wf factory fire <factory> --step <workflow>/<step>',
+      "                               take a step's hire back",
+      '  wf factory rm <name>',
+      "                               remove a factory's file",
       '  wf retry <runId> <step> [--nudge | --fresh | --model <m> | --recheck] [--message "<answer>"] [--budget <amount>]',
       '                               try a step waiting on you again, once, on the next tick:',
       '                               --nudge (default) continues its session, told what happened;',
@@ -253,6 +328,12 @@ test("the table's help is today's, word for word", () => {
       '                               nothing else — every field the protocol marks REQUIRED but',
       '                               supportedInterfaces, which is left out because nothing here serves an',
       '                               agent over A2A. The card describes; it is not an address',
+      '  wf agents custom <name> [--file <path>|-] [--clear] [--repo .]',
+      '                               your custom instructions for that agent: words you add to it without',
+      '                               rewriting it, kept in <store>/custom-instructions/<name>.md and told',
+      '                               after its instructions. Bare, prints them; --file writes them (- for',
+      '                               stdin); --clear removes them. Words only: a frontmatter block is',
+      '                               refused. A run keeps the words it was started with',
       '  wf cancel <runId>',
       '                               stop what it has in flight; file nothing more',
       '  wf hold <runId> --until <runId> [--until <runId> ...] [--why "<words>"] [--by <name>]',

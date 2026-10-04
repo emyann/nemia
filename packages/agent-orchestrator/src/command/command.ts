@@ -95,9 +95,9 @@ export type Route =
 /**
  * A command, as data: its `name`, its `usage` after the name and its `help` lines, as `wf`'s help prints them; its `spec`; `check`, the
  * refusal of its arguments before anything is read, the same on both sides, or null; `writes`, a write the api guards; its `route` on the
- * api — a write is posted and accepted (202), a read is got (200), and one command may be served on more than one — or `only`, the side it is served on alone and why; and `apiTakes`, the
- * keys of a body the api folds into its arguments, which the command line has no flag for; `manual`, the long help `wf <name> --help`
- * prints in place of running it, where it has one.
+ * api — a write is posted and accepted (202), a read is got (200), and one command may be served on more than one — or `only`, the side
+ * it is served on alone and why; and `apiTakes`, the keys of a body the api folds into its arguments, which the command line has no flag
+ * for; `manual`, the long help `wf <name> --help` prints in place of running it, where it has one.
  */
 export type CommandSpec = {
   readonly name: string;
@@ -118,6 +118,19 @@ export const routeList = (command: Pick<CommandSpec, 'route'>): readonly Route[]
 
 /** A route the table generates on the api: a write the api serves by no hand of its own. */
 export const generated = (route: Route): boolean => route.method !== 'GET' && route.hand === undefined;
+
+/**
+ * The refusal of a text flag's value left out on the command line — empty, or starting `--`, which reads as the value left out — in the
+ * flag's own `takes`, or null. A flag the api alone takes is not looked at: its value is whatever a body sends.
+ */
+export function leftOut(spec: Spec, args: Args): string | null {
+  for (const flag of spec.flags.filter((f) => f.kind === 'text' && f.key !== undefined && f.only?.side !== 'api')) {
+    const value = args[flag.key!];
+    const values = Array.isArray(value) ? value : typeof value === 'string' ? [value] : [];
+    if (values.some((v) => !v || v.startsWith('--'))) return flag.takes ?? null;
+  }
+  return null;
+}
 
 /** A refusal of what was typed, before anything is read: exit 2. */
 const usage = (message: string): never => {
@@ -215,20 +228,28 @@ const strayFlag = (spec: Spec, arg: string): boolean =>
   arg.startsWith('--') && arg !== '--help' && !spec.flags.some((f) => f.flag === arg.split('=')[0]);
 
 /**
+ * Whether `arg`, where the required positional `p` stands, leaves it out: a flag — any word starting `-` where the spec says its own
+ * refusal (`missing`) — or empty, but for a text whose spec says its refusal, which its handler is given to refuse in its own words.
+ */
+const unfilled = (spec: Spec, p: Positional, arg: string): boolean =>
+  arg.startsWith(spec.missing === undefined ? '--' : '-') || (!arg && (spec.missing === undefined || p.kind !== 'text'));
+
+/**
  * A command line's arguments after the command's name, read against `spec` — or undefined when it is given too little to act on: a
  * required argument missing, empty, `--help` or one of its own flags, for which the CLI prints its help, unless the spec says its refusal
  * (`missing`), which a required argument starting `-` gets too. Refused, exit 2, in the spec's own words: an argument it does not take — a
- * flag it has none of among them, wherever it stands, and one the api alone takes (`Flag.only`) — a value flag with no value, given twice, or with one of the command's own flags
- * for its value, and two ways.
+ * flag it has none of among them, wherever it stands, and one the api alone takes (`Flag.only`) — a value flag with no value, given
+ * twice, or with one of the command's own flags for its value, and two ways.
  */
 export function parseArgv(typed: Spec, argv: readonly string[]): Args | undefined {
   const spec: Spec = { ...typed, flags: typed.flags.filter((f) => f.only?.side !== 'api') };
   const required = spec.positionals.filter((p) => p.takes === 'required');
   const head = argv.slice(0, required.length);
-  const stray = spec.missing === undefined ? head.find((a) => strayFlag(spec, a)) : undefined;
+  const stray = head.find((a) => strayFlag(spec, a));
   if (stray !== undefined) return usage(spec.unknown(stray));
-  const left = (a: string) => !a || a.startsWith(spec.missing === undefined ? '--' : '-');
-  if (head.length < required.length || head.some(left)) return spec.missing === undefined ? undefined : usage(spec.missing);
+  if (head.length < required.length || head.some((a, i) => unfilled(spec, required[i], a))) {
+    return spec.missing === undefined ? undefined : usage(spec.missing);
+  }
   const given = Object.fromEntries(required.map((p, i) => [p.key, head[i]]));
   const rest = spec.positionals.find((p) => p.takes === 'rest');
   if (rest) return { ...given, [rest.key]: argv.slice(required.length).join(' ') };

@@ -24,9 +24,9 @@ import { teamCopy } from './team.ts';
 const ROOT = scratch('wf-factory-start-');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
-const { addFactory, attachWorkflow, hireAgent, inboxDir, repoFor, start, startFromInbox } = await import('../src/runner.ts');
+const { addFactory, attachWorkflow, hireAgent, inboxDir, parseArgv, repoFor, START, start, startFromInbox } =
+  await import('../src/runner.ts');
 const { readRun } = await import('../src/record/record.store.ts');
-const { startHow } = await import('../src/cli/start.ts');
 const { main } = await import('../src/cli/main.ts');
 
 /** Refused by kind, exit 2, and the message — never `String(err)`, which starts with `Error: `. */
@@ -203,11 +203,12 @@ test('REFUSED: a start in a factory the store does not have is Missing, naming t
 });
 
 test('wf start reads --factory once, and refuses it twice', () => {
-  assert.equal(startHow(['--factory', 'pipao']).factory, 'pipao');
-  assert.equal(startHow(['--factory=pipao']).factory, 'pipao');
-  assert.equal(startHow([]).factory, undefined);
+  const factoryOf = (...argv: string[]) => parseArgv(START.spec, ['build it', ...argv])?.factory;
+  assert.equal(factoryOf('--factory', 'pipao'), 'pipao');
+  assert.equal(factoryOf('--factory=pipao'), 'pipao');
+  assert.equal(factoryOf(), undefined);
   assert.throws(
-    () => startHow(['--factory', 'pipao', '--factory', 'nemia']),
+    () => factoryOf('--factory', 'pipao', '--factory', 'nemia'),
     refusedWith('Invalid', /^wf start takes --factory once: a run is started in one factory\.$/),
   );
 });

@@ -18,7 +18,7 @@ process.env.WF_ROOT = ROOT;
 const { addFactory, attachWorkflow, detachWorkflow, factoriesDir, fireAgent, hireAgent, readFactories, readFactory } =
   await import('../runner.ts');
 const { main } = await import('../cli/main.ts');
-const { FACTORY_HELP } = await import('../cli/factory/factory.ts');
+const { FACTORY_HELP } = await import('./factory.verb.ts');
 
 /** No verb here asks the engine anything. */
 const NO_ENGINE = {} as Engine;

@@ -237,7 +237,6 @@ const WORKFLOW_WORDS: Baseline = {
 
 /** Each package file that names an agent of the team today, with its count and what removes them. */
 const TEAM_NAMES: Baseline = {
-  'packages/agent-orchestrator/src/cli/factory/factory.ts': { count: 1, ...MOVES.team },
   'packages/agent-orchestrator/src/factory/factory.ts': { count: 2, ...MOVES.team },
 };
 

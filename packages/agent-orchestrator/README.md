@@ -2257,38 +2257,54 @@ is held until says so and names the `wf hold … --off` that lets it go.
 - a circle: a run named that already waits on this one, through `--after` while it has not started or
   through a hold, however far round. Each would wait on the other for ever
 
-## Cordoning the whole store: `wf cordon`
+## Pausing the whole store: `wf pause`
 
 ```bash
-wf cordon --why "merging by hand on main" --by operator   # nothing new starts, in any run, until it is lifted
-wf uncordon                                               # the next pass files what waits
+wf pause --why "merging by hand on main" --by operator   # nothing new starts, in any run, until it is resumed
+wf resume                                               # the next pass files what waits
 ```
 
-`wf hold` pauses one run; `wf cordon` pauses the store, as Kubernetes cordons a node. While it stands no pass
+`wf hold` pauses one run; `wf pause` pauses the store, as Kubernetes cordons a node. While it stands no pass
 starts new work: no step, try, round or check is filed (the check of a step that has ended among them), no
 queued task is admitted on the runtime, and no queued inbox card is started. What runs finishes: a session in
 flight ends and its closeout is recorded, and a landing whose check has already ended commits or aborts as it
-would. A filing in flight when the cordon is put stops before its next part, as it does for a cancel or a hold.
-`wf start` still writes the run, and says the cordon: nothing of it is filed until the lift. An approval, a
-retry, a round or an answer written meanwhile is kept, and the first pass after `wf uncordon` files what it
+would. A filing in flight when the pause is put stops before its next part, as it does for a cancel or a hold.
+`wf start` still writes the run, and says the pause: nothing of it is filed until the resume. An approval, a
+retry, a round or an answer written meanwhile is kept, and the first pass after `wf resume` files what it
 lets through, with what waited.
 
-A cordon says since when, by whom and why, on every screen that says it: the first line of `wf ls` and of
-`wf feed`, the line of `wf start` after how to start the run, a line of `wf up` when it is put or changed and
-another when it is lifted, and the board's Cordon switch. `--by` defaults to the OS user; `--why` and `--by` are refused blank, twice, or over their caps
-(200 characters, 64), as a hold's are. A landing whose merge the ending has staged in the repository's checkout, and whose check the
-cordon holds, is named under it — `r-1's ship has its merge staged in /repo (MERGE_HEAD), and its check waits on
-wf uncordon` — so a person who cordoned to use main knows whose `MERGE_HEAD` is there.
+A pause says how far it has come, read from the world on each pass and never stored:
 
-The cordon is a person's file, `$WF_ROOT/cordon`, `{ at, by, why? }`, one for the store, read on every pass and
-composed onto every run read; no record is written with it. The runtime is told only that it may admit nothing:
-the store's engine is `unschedulable` while the file is there (`storeAdmission` in `src/runtime-client.ts`),
-asked by the runtime's own pass before it admits, so no queued task starts under the cordon whichever process
-ticks the store, the api's or `wf up`. A task admitted on the pass just before the cordon was put still starts
-on the next, as a Pod bound to a node before it is cordoned runs there; draining what is at work is out of
-scope, and `wf cancel` or `wf hold` is how a run is stopped. A file that is there cordons the store whatever it
-holds. `wf cordon` refuses a store already cordoned, naming who cordoned it, and
-`wf uncordon` a store none stands on; the api serves the same as `POST`, `DELETE` and `GET /api/cordon`.
+```text
+Pausing: 2 finishing — the store is paused since 2026-10-04T12:00:00.000Z by ann: merging by hand; nothing new starts, …
+   r-1's plan is finishing: its session is at work
+   r-2's ship is finishing: the check of its landing runs
+Paused since 2026-10-04T12:00:00.000Z by ann: merging by hand — nothing runs and nothing new starts; wf resume resumes it
+```
+
+What finishes is each step's current task and its check's, pending or running on the runtime: a session at
+work, a check that runs, or the check of a landing (an ending that lands on its check). A task the runtime
+holds queued for a slot is not, since no pass admits it under the pause; nor is a session that waits on a
+person (`needs-human`), which holds no slot and does no work until answered. The board, `wf ls` and
+`wf feed` say the first line, and `wf ls` names each task under it; `wf start` says it after how to start the
+run, and `wf up` once when it is put, again each time its words change, and once more when it is resumed.
+`--by` defaults to the OS user; `--why` and `--by` are refused blank, twice, or over their caps (200
+characters, 64), as a hold's are. A landing whose merge the ending has staged in the repository's checkout,
+and whose check the pause holds, is named under it on the board, `wf ls`, `wf tick` and `wf up` — `r-1's ship
+has its merge staged in /repo (MERGE_HEAD), and its check waits on wf resume` — so a person who paused to use
+main knows whose `MERGE_HEAD` is there.
+
+The pause is a person's file, `$WF_ROOT/cordon`, `{ at, by, why? }`, one for the store, read on every pass and
+composed onto every run read; no record is written with it. The file keeps the name it had when the verbs were
+`wf cordon` and `wf uncordon`, so a pause put before they were renamed still stands and `wf resume` lifts it.
+The runtime is told only that it may admit nothing: the store's engine is `unschedulable` while the file is
+there (`storeAdmission` in `src/runtime-client.ts`), asked by the runtime's own pass before it admits, so no
+queued task starts under the pause whichever process ticks the store, the api's or `wf up`. A task admitted on
+the pass just before the pause was put still starts on the next, as a Pod bound to a node before it is
+cordoned runs there; interrupting what is at work is out of scope, and `wf cancel` or `wf hold` is how a run
+is stopped. A file that is there pauses the store whatever it holds. `wf pause` refuses a store already
+paused, naming who paused it, and `wf resume` a store none stands on; the api serves the same as `POST`,
+`DELETE` and `GET /api/pause`, whose read carries what finishes and what is staged.
 
 ## A plan as a folder of cards: `wf plan`
 

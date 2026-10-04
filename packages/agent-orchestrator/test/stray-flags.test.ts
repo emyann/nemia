@@ -1,13 +1,16 @@
 /**
- * The commands that start work, the inbox's, the factories' and `wf agents custom`, as entries of the table: a flag none of them takes is
- * refused in the command's own words, before anything is read — where its required arguments stand, as the argument left out by a command
- * that says its refusal of one (`missing`) but for one that refuses the flag first (`flagFirst`), and after them as the flag it does not
- * take; a word `wf inbox` or `wf factory` has no command of is refused, and their `--help` prints their own help.
+ * The commands that start work, the inbox's, the factories', `wf agents custom`, and `wf pause` and `wf resume`, as entries of the table: a
+ * flag none of them takes is refused in the command's own words, before anything is read or written — where its required arguments
+ * stand, as the argument left out by a command that says its refusal of one (`missing`) but for one that refuses the flag first
+ * (`flagFirst`), and after them as the flag it does not take; a word `wf inbox` or `wf factory` has no command of is refused, and their
+ * `--help` prints their own help.
  *
  * `WF_ROOT` is set before the import, since the store's modules read it as they load.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import type { Engine } from 'agent-runtime';
 import { scratch } from './scratch.ts';
 
@@ -70,6 +73,8 @@ const REFUSALS: Array<[string[], string[], string]> = [
     ['scribe'],
     "wf agents custom takes one agent's name, then --file <path> (or --file - for stdin), --clear or --repo <r>, not --nope.",
   ],
+  [['pause'], [], 'wf pause does not take --nope: wf pause [--why "<words>"] [--by <name>].'],
+  [['resume'], [], 'wf resume takes no --nope: it resumes the store, whoever paused it.'],
 ];
 
 /**
@@ -109,6 +114,7 @@ test('REFUSED at shipped defaults: a flag the command does not take, where its r
     const after = [...command, ...required, '--nope'];
     assert.deepEqual(await refusalOf(after), { message, exitCode: 2 }, `wf ${after.join(' ')}`);
   }
+  assert.equal(fs.existsSync(path.join(ROOT, 'cordon')), false, 'the store not paused');
 });
 
 test('REFUSED at shipped defaults: a word wf inbox or wf factory has no command of', async () => {

@@ -74,13 +74,9 @@ async function named(page: Page): Promise<void> {
   const header = page.locator('header[data-frame-header]');
   await header.getByRole('link', { name: 'Nemia' }).focus();
   await page.keyboard.press('Tab');
-  const cordon = header.getByRole('switch', { name: 'Cordon' });
-  if (!(await cordon.evaluate((element) => element === document.activeElement)))
-    throw new Refused("Tab from the logo reaches the header's Cordon switch, its last control before the rail");
-  await page.keyboard.press('Tab');
   await expectVisible(
     page.getByRole('tooltip').filter({ hasText: 'Home' }),
-    'Tab from the Cordon switch reaches Home in the rail, named in a tooltip',
+    'Tab from the logo reaches Home in the rail, named in a tooltip: the header holds no other control the keyboard reaches yet',
   );
   await page.keyboard.press('Escape');
 }

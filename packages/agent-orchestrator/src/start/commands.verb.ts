@@ -5,8 +5,6 @@
  */
 import { leftOut, type Args, type Flag, type Spec } from '../command/command.ts';
 import type { Command, Ran } from '../command/entry.verb.ts';
-import { cordonWords } from '../cordon/cordon.ts';
-import { readCordon } from '../cordon/cordon.store.ts';
 import { endingSteps } from '../ending/ending.ts';
 import { writersOf } from '../factory/factory.ts';
 import { formerKeyLines } from '../folder/folder.store.ts';
@@ -17,6 +15,8 @@ import { inputsDir, stepsOf } from '../record/record.store.ts';
 import { approvedFirst, gatesOf } from '../status/status.ts';
 import { fromNote } from './inputs.ts';
 import { leftOutMounts, start } from './start.verb.ts';
+import { pausedRead } from '../list/list.verb.ts';
+import { pausedWords, type Paused } from '../pause/pause.ts';
 
 export const PLAN_HELP = `wf plan <folder> [--repo .] [--factory <name>]
 
@@ -119,8 +119,11 @@ const START_SPEC: Spec = {
   apart: (_value, flag) => START_SPEC.flags.find((f) => f.flag === flag)?.takes ?? '',
 };
 
-/** A run started, and, for an inbox card, the card, whether it left the inbox and why not, and a `repo:` the start did not take. */
-type Started = { id: string; run: Run; card?: string; removed?: boolean; why?: string; ignoredRepo?: string };
+/**
+ * A run started, and, for an inbox card, the card, whether it left the inbox and why not, and a `repo:` the start did not take; and the
+ * store's pause as it stood once the run was written (`pausedRead`), while one stands.
+ */
+type Started = { id: string; run: Run; card?: string; removed?: boolean; why?: string; ignoredRepo?: string; paused?: Paused };
 
 /**
  * The folders of its factory a run mounts, read-only, and those left out because they were no directory; none in the default factory.
@@ -173,12 +176,12 @@ const fromLines = ({ run, card, removed, why }: Started): string[] =>
 
 /**
  * What `wf start` prints of a run it started: its steps, where it came from, its factory, the folders it mounts, where it works, and what
- * it waits on and ends at; while the store is cordoned, that nothing of it is filed until the lift; and a card's `repo:` not taken.
+ * it waits on and ends at; while the store is paused (`pausedWords`), that nothing of it is filed until it resumes; and a card's `repo:`
+ * not taken.
  */
 function startedLines(started: Started): string[] {
   const { run } = started;
   const steps = stepsOf(run);
-  const cordon = readCordon();
   return [
     `${run.id}  ${steps.length} step(s): ${steps.map((s) => (s.agent ? `${s.name} (${s.agent.name})` : s.name)).join(' → ')}`,
     ...fromLines(started),
@@ -191,7 +194,7 @@ function startedLines(started: Started): string[] {
       : []),
     ...gateLines(run),
     `run 'wf tick' (or 'wf up') to start it`,
-    ...(cordon ? [`${cordonWords(cordon)}: nothing of this run is filed until then`] : []),
+    ...(started.paused ? [`${pausedWords(started.paused)}: nothing of this run is filed until then`] : []),
     ...formerKeyLines(run.workflowDir),
     ...(started.ignoredRepo !== undefined ? [ignoredRepoLine(started.ignoredRepo)] : []),
   ];
@@ -271,25 +274,32 @@ export const START: Command<Started> = {
     status: 201,
     hand: 'its body names a workflow by `from` and name, or an inbox card by name, which the api finds among the folders a start finds one in, in the factory the request is served in: never a path sent',
   },
-  async handler(_e, args) {
-    const card = textOf(args, 'card');
-    if (card !== undefined) return cardStart(card, args);
-    const factory = textOf(args, 'factory');
-    const run = start({
-      brief: textOf(args, 'brief') ?? '',
-      repo: textOf(args, 'repo') ?? '.',
-      repoNamed: args.repoNamed === true,
-      workflowDir: textOf(args, 'workflows') ?? '',
-      isolate: args.noWorktree !== true,
-      after: listOf(args, 'after'),
-      inputs: listOf(args, 'inputs'),
-      gates: listOf(args, 'gates'),
-      ...(factory !== undefined ? { factory } : {}),
-    });
-    return { id: run.id, run };
+  async handler(e, args) {
+    const started = startOf(args);
+    const paused = await pausedRead(e);
+    return paused.pause ? { ...started, paused } : started;
   },
   print: startedLines,
 };
+
+/** A run of a brief, or of an inbox card under `card`, started off the handler's arguments (`START`). */
+function startOf(args: Args): Started {
+  const card = textOf(args, 'card');
+  if (card !== undefined) return cardStart(card, args);
+  const factory = textOf(args, 'factory');
+  const run = start({
+    brief: textOf(args, 'brief') ?? '',
+    repo: textOf(args, 'repo') ?? '.',
+    repoNamed: args.repoNamed === true,
+    workflowDir: textOf(args, 'workflows') ?? '',
+    isolate: args.noWorktree !== true,
+    after: listOf(args, 'after'),
+    inputs: listOf(args, 'inputs'),
+    gates: listOf(args, 'gates'),
+    ...(factory !== undefined ? { factory } : {}),
+  });
+  return { id: run.id, run };
+}
 
 /** The flags of `wf start` that `wf plan` refuses, each with why the folder says it instead. */
 const PLAN_REFUSES: Readonly<Record<string, string>> = {

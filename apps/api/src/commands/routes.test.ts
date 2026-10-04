@@ -188,8 +188,8 @@ test('REFUSED at shipped defaults: every route that writes, asked by a page on a
       'hold DELETE',
       'rm DELETE',
       'prune POST',
-      'cordon POST',
-      'uncordon DELETE',
+      'pause POST',
+      'resume DELETE',
     ],
   );
   for (const { command, r } of routed) {
@@ -201,7 +201,7 @@ test('REFUSED at shipped defaults: every route that writes, asked by a page on a
     assert.match(((await res.json()) as { error: string }).error, new RegExp(`^${method} ${url.replaceAll('/', '\\/')} `), command.name);
   }
   assert.deepEqual(asked('r-guard'), [], 'nothing written');
-  assert.equal(fs.existsSync(path.join(root, 'cordon')), false, 'the store not cordoned');
+  assert.equal(fs.existsSync(path.join(root, 'cordon')), false, 'the store not paused');
   assert.deepEqual(
     fs.readdirSync(path.join(root, 'runs')).filter((f) => !f.startsWith('r-')),
     [],

@@ -156,7 +156,7 @@ async function argsOf(c: Context<ApiEnv>, command: CommandSpec, route: Route, at
 }
 
 /**
- * The arguments of a request on a route that names no run — the store's own, as `POST /api/cordon`, a card or an agent — or why it carries
+ * The arguments of a request on a route that names no run — the store's own, as `POST /api/pause`, a card or an agent — or why it carries
  * none: its body (`bodyOf`), or the text a route that reads none was sent (`RouteWords.bodyless`), 400. A delete reads no body. Its
  * arguments are what its path names and its route fixes (`sets`), said over the body's.
  */
@@ -280,11 +280,11 @@ export const wordBreaks = (table: readonly Pick<CommandSpec, 'name' | 'route'>[]
  *   was held asked again. Refused in the package's words, by `app.onError`: a run nobody holds — a pruned one among them, since no verb
  *   holds one — and a hold put again as it was lifted are a 409 (`Conflict`), a run gone since the route read it a 404; any other failure
  *   is a 502. Its 200 is `{ id, lifted: true, hold }`. No feed line: the tick is the feed's one writer, and the board reads the run again.
- * - `POST /api/cordon` — the store cordoned, as `wf cordon` cordons it (`putCordon`), its body `wf cordon`'s `--why` and `--by`, and the
- *   route names no run: no pass starts new work until the lift. Refuses what `wf cordon` refuses of `--why` and `--by` with 422, and a
- *   cordon that stands with 409 (`Conflict`). Its 200 is `{ cordon }`, as written.
- * - `DELETE /api/cordon` — the store's cordon lifted, as `wf uncordon` lifts it (`liftCordon`); it reads no body. None standing is a 404
- *   (`Missing`). Its 200 is `{ cordon }`, the cordon lifted.
+ * - `POST /api/pause` — the store paused, as `wf pause` pauses it (`putPause`), its body `wf pause`'s `--why` and `--by`, and the
+ *   route names no run: no pass starts new work until the lift. Refuses what `wf pause` refuses of `--why` and `--by` with 422, and a
+ *   pause that stands with 409 (`Conflict`). Its 200 is `{ pause }`, as written.
+ * - `DELETE /api/pause` — the store's pause lifted, as `wf resume` lifts it (`resumePause`); it reads no body. None standing is a 404
+ *   (`Missing`). Its 200 is `{ pause }`, the pause lifted.
  * - `DELETE /api/runs/:id` — a try's run removed, as `wf rm <run>` removes it (`forget`): its record, and the folders it worked in with it;
  *   it reads no body. Only a try (rm's extension, extend.ts): any other run is a 409 naming `wf rm`, which says what it hands off and what
  *   it leaves, and a git run's worktrees and branches are a person's to read before they go. What removed nothing is thrown in `wf rm`'s

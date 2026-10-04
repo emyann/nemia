@@ -6,7 +6,7 @@
  * `wf retry`, `wf approve`, `wf round`, `wf accept` and `wf say` — the runs and their steps (`wf ls`, `runsListed`), two reads the api
  * alone serves: a run's decision (`decideRun`) and the run slots (`slotsOf`), the agents of both places (`wf agents`, `agentsRead`), one
  * agent's card (`wf agents card`, `agentCardRead`) and its custom instructions (`wf agents custom`, `AGENTS_CUSTOM`), a run's course
- * (`wf cancel`, `wf hold`, `wf rm`, `wf prune`), and the store's cordon (`wf cordon`, `wf uncordon`, and its read the api alone serves):
+ * (`wf cancel`, `wf hold`, `wf rm`, `wf prune`), and the store's pause (`wf pause`, `wf resume`, and its read the api alone serves):
  * `runs.verb.ts`; and the reads of the store (`wf show`, `wf logs`, `wf feed`, `wf stats`: `reads.verb.ts`). The whole table (`TABLE`)
  * adds the commands the CLI serves alone and runs itself, with no handler: `wf plan`, `wf tick`, `wf up` and `wf watch` (`RAN`).
  */
@@ -25,7 +25,7 @@ import { decide, type Decided } from '../decide/decide.verb.ts';
 import { slotsOf, type Slots } from '../cap/cap.verb.ts';
 import { runsListed } from '../list/list.verb.ts';
 import { lsLines, type RunsListed } from '../list/list.ts';
-import { cordonLines } from '../cordon/cordon.ts';
+import { pausedLines } from '../pause/pause.ts';
 import { agentCardRead, agentsRead } from '../roster/roster.store.ts';
 import { agentsLines, cardNote, type AgentsRead, type CardRead } from '../roster/roster.ts';
 import { commandLine, type Args, type CommandSpec, type Flag } from './command.ts';
@@ -35,7 +35,7 @@ import { AGENTS_CUSTOM } from '../agents/custom.verb.ts';
 import { FACTORIES } from '../factory/factory.verb.ts';
 import { INBOXES } from '../inbox/commands.verb.ts';
 import { PLAN, START } from '../start/commands.verb.ts';
-import { CANCEL, CORDON, CORDONED, HOLD, PRUNE, RAN, RM, UNCORDON } from './runs.verb.ts';
+import { CANCEL, PAUSE, PAUSED, HOLD, PRUNE, RAN, RM, RESUME } from './runs.verb.ts';
 
 /** The text under `key`, or undefined where none was given. */
 const textOf = (args: Args, key: string): string | undefined => {
@@ -339,8 +339,9 @@ const LS: Command<RunsListed> = {
     'one the cap on runs in flight holds waiting for a run slot (2 of 2 in',
     "flight); what each step's tries and the run have cost, where measured;",
     'last, whether a wf up ticks the store and when its last pass was;',
-    'first, while the store is cordoned, the cordon and each landing it',
-    'holds with its merge staged in the checkout (MERGE_HEAD)',
+    'first, while the store is paused, Pausing: N finishing and each',
+    'session, check or landing at work, or Paused once none is, then each',
+    'landing it holds with its merge staged in the checkout (MERGE_HEAD)',
   ],
   spec: {
     positionals: [{ key: 'runId', takes: 'optional', kind: 'name' }],
@@ -350,7 +351,7 @@ const LS: Command<RunsListed> = {
   writes: false,
   route: { method: 'GET', path: '/api/runs', status: 200 },
   handler: (e, args) => runsListed(e, textOf(args, 'runId')),
-  print: (listed) => [...(listed.cordoned ? cordonLines(listed.cordoned) : []), ...lsLines(listed, Date.now())],
+  print: (listed) => [...(listed.paused ? pausedLines(listed.paused) : []), ...lsLines(listed, Date.now())],
 };
 
 const DECIDE: Command<Decided> = {
@@ -488,9 +489,9 @@ export const COMMANDS: readonly Command[] = [
   HOLD,
   RM,
   PRUNE,
-  CORDON,
-  UNCORDON,
-  CORDONED,
+  PAUSE,
+  RESUME,
+  PAUSED,
 ];
 
 /**

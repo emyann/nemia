@@ -266,7 +266,7 @@ test('REFUSED on the source: a value import of the tick from the cap it reads be
   const files = new Map(sourceFiles().map((f) => [f, read(f)]));
   files.set('src/cap/cap.verb.ts', `${files.get('src/cap/cap.verb.ts')}\nimport { tick } from '../tick/tick.verb.ts';`);
   assert.deepEqual(cycles(valueGraph(files)), [
-    ['src/cap/cap.verb.ts', 'src/ending/ending.verb.ts', 'src/tick/advance.verb.ts', 'src/tick/tick.verb.ts'],
+    ['src/cap/cap.verb.ts', 'src/ending/ending.verb.ts', 'src/list/list.verb.ts', 'src/tick/advance.verb.ts', 'src/tick/tick.verb.ts'],
   ]);
 });
 

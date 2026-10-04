@@ -2158,7 +2158,7 @@ Tested in `agent-runtime/test/admission.test.ts`, `test/pool.test.ts`, `src/daem
 (both refusals at shipped defaults, both ways round; an api taken over mid-run stopping), `apps/api/test/main.test.ts` (a spawned api:
 its lease through `/api/daemon`, a second api and a `wf up` refused, SIGTERM writing `stoppedAt` and the next api taking over,
 `--no-tick` taking nothing), `apps/web/test/daemon.test.ts` and the e2e's `daemon` page (each holder stalled, and fresh). Starting the
-daemon on demand from the board stays card 4e; a cordon that pauses a store its daemon ticks is a verb on this lease, still to come.
+daemon on demand from the board stays card 4e; stopping the daemon itself, beyond `wf pause`, is a verb on this lease, still to come.
 
 ## Shipped: freeing the space — `wf prune`
 

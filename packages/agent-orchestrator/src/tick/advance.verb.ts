@@ -25,7 +25,7 @@ import { feedPhase, feedWords, type FeedWords } from '../feed/feed.ts';
 import { listing } from '../list/list.ts';
 import { roundFiled, roundsDue } from '../round/round.ts';
 import type { Closeout } from '../closeout/closeout.ts';
-import { nextTry, retriesDue, turnsOf, type RetryAsk } from '../retry/index.ts';
+import { nextTry, pauseAsksVoid, retriesDue, turnsOf, type RetryAsk } from '../retry/index.ts';
 import { runsDir, stepsOf } from '../record/record.store.ts';
 import { runStore } from '../record/files.store.ts';
 import { handOff } from '../workspace/worktree.store.ts';
@@ -276,7 +276,8 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
  * - keeps the tip of each result branch as git has it (`tipsSeen`), written only when a tip moved, so git can still be asked whether a
  *   branch a person deleted after its merge is on the base (`isShipped`).
  * - writes the record (`rewriteRun`) only where the pass changed it and only while it is there, then consumes the asks it holds
- *   (`consumeAsks`), never before: an ask a pass died before consuming is consumed by the next.
+ *   (`consumeAsks`), never before: an ask a pass died before consuming is consumed by the next. An ask `wf pause --now` wrote that is void
+ *   on this pass (`pauseAsksVoid`) is consumed with them, paused or not.
  *
  * A try goes on in the workspace and on the branch the step had, under its next try's id; an ending the work is sent back from moves behind
  * in the same write, so it waits for the work again (`sentBack`). A try of a step whose task has not settled — its session blocked by its
@@ -331,7 +332,7 @@ export async function advanceRun(
     [filed, checked, tried, looped, adopted].some((names) => names.length > 0) ||
     Boolean(tips || heldFirst || handed.marked || landing.landed);
   if (wrote) runStore.runs.rewrite(run);
-  runStore.asks.consume(run, asks, roundAsks);
+  runStore.asks.consume(run, asks, roundAsks, pauseAsksVoid(steps, run, asks, phaseOf, spendOf));
 
   const done = { filed, checked, tried, looped, notes, feed };
   return answerOf(run, reads, assessed, admission, done, { acted: wrote || closer.closed.size > 0, tipped });

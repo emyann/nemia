@@ -186,6 +186,9 @@ function stoppedWords(c: Judged, ending: Workflow): string {
 /** An ask already waiting: for this try — one no tick honours, or one it will — or a send-back or a ship again that takes the same try. */
 function pendingRefusal(c: Judged): string | undefined {
   const { run, name, command, asks, next, pending, status, raise, sendsBack, back, stoppedAt } = c;
+  if (pending?.interrupted !== undefined) {
+    return `try ${next} of ${name} is asked by wf pause --now (at ${pending.at}), which stopped its ${pending.mode === 'recheck' ? 'check' : 'session'}: it is tried once the store is resumed (wf resume), or set aside if it ended on its own first. Wait for it: wf ls ${run.id}.`;
+  }
   if (pending && !carries(pending, raise)) {
     return `try ${next} of ${name} is asked for (${modeWord(pending)}, at ${pending.at}) without a --budget above ${aboveWord(raise!)}, and ${name} ${raiseWords(status, raise!)}, so no tick honours it. Delete that ask — retry-${name}-${next}, in the run's .asks directory — and ask again: ${command} --budget <amount>.`;
   }

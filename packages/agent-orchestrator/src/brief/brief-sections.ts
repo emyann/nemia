@@ -125,6 +125,10 @@ export const SIGNOFF = [
   'finished, finish it first and then sign off. If it cannot be finished, sign off anyway, saying what stops it.',
 ].join('\n');
 
+/** Who filed a try the store's pause stopped (`by: 'pause'`): the run, once resumed, and no person. */
+const PAUSED_WHO =
+  'The store was paused at once (`wf pause --now`), which stopped this session before it signed off; once resumed, the run filed this try itself.';
+
 const NEW_SESSION =
   'This is a new session. An earlier one worked on this step in this workspace, and what it left is committed on\n' +
   'this branch. You have not been given its reasoning, on purpose: read the change, not an account of it.';
@@ -178,8 +182,10 @@ export function retrySection(step: Workflow, r: RetryBriefing, inFolder = false)
       ? `The run filed this try itself: this step declares \`retries: ${step.retries ?? 0}\`.`
       : r.by === 'signoff'
         ? 'The run filed this try itself, once in a round, before it waits on a person.'
-        : `A person asked for this try: \`wf retry ${modeWord(r)}${r.budget !== undefined ? ` --budget ${r.budget}` : ''}${r.message !== undefined ? ' --message' : ''}\`` +
-          `${r.budget !== undefined ? `, raising this step's budget to ${budgetWord(r.budget)}` : ''}${r.message !== undefined ? ', with what they said below' : ''}.`;
+        : r.by === 'pause'
+          ? PAUSED_WHO
+          : `A person asked for this try: \`wf retry ${modeWord(r)}${r.budget !== undefined ? ` --budget ${r.budget}` : ''}${r.message !== undefined ? ' --message' : ''}\`` +
+            `${r.budget !== undefined ? `, raising this step's budget to ${budgetWord(r.budget)}` : ''}${r.message !== undefined ? ', with what they said below' : ''}.`;
   const where = r.resumed
     ? "This is the last try's session, continued. Finish the work, then sign off again."
     : inFolder

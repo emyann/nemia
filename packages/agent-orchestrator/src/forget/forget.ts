@@ -250,7 +250,7 @@ function dueOf(a: Assessment, steps: readonly Workflow[], waits: boolean): strin
   for (const r of a.retry) {
     const step = steps.find((s) => s.name === r.step);
     due.push(
-      `try ${r.try} of ${r.step} is due (${r.by === 'retries' ? `retries: ${step?.retries}` : r.by === 'signoff' ? 'a nudge to sign off' : `wf retry ${modeWord(r)}`})`,
+      `try ${r.try} of ${r.step} is due (${r.by === 'retries' ? `retries: ${step?.retries}` : r.by === 'signoff' ? 'a nudge to sign off' : r.by === 'pause' ? 'wf pause --now' : `wf retry ${modeWord(r)}`})`,
     );
   }
   for (const r of a.round) due.push(`round ${r.round} of ${r.step}'s loop is due (${r.by === 'again' ? 'again: true' : 'wf round'})`);
@@ -262,7 +262,11 @@ function unheardOf(f: Forgetting, a: Assessment | undefined): AskName[] {
   const { run, asks, roundAsks } = f;
   const unheard: AskName[] = [];
   for (const ask of asks) {
-    if (spentAsks(run, [ask]).length || a?.retry.some((r) => r.by === 'ask' && r.step === ask.step && r.try === ask.try)) continue;
+    if (
+      spentAsks(run, [ask]).length ||
+      a?.retry.some((r) => (r.by === 'ask' || r.by === 'pause') && r.step === ask.step && r.try === ask.try)
+    )
+      continue;
     unheard.push({ kind: 'retry', step: ask.step, n: ask.try });
   }
   for (const ask of roundAsks) {

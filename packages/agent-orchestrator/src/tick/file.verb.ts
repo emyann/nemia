@@ -237,7 +237,7 @@ async function stopFirst(f: Filing, r: Retry, taskId: string): Promise<void> {
 
 /** The note that says a try, and on whose word: `retries:`, a nudge to sign off, or `wf retry` and what it was typed with. */
 const tryWord = (r: Retry, step: Workflow): string =>
-  `${r.step}: try ${r.try} — ${r.by === 'retries' ? `retries: ${step.retries}` : r.by === 'signoff' ? 'a nudge to sign off, once a round' : `wf retry ${modeWord(r)}${r.budget !== undefined ? ` --budget ${r.budget}` : ''}${r.message !== undefined ? ', with your answer' : ''}`}`;
+  `${r.step}: try ${r.try} — ${r.by === 'retries' ? `retries: ${step.retries}` : r.by === 'signoff' ? 'a nudge to sign off, once a round' : r.by === 'pause' ? `${r.mode === 'recheck' ? 'rechecked' : 'continued'} after wf pause --now` : `wf retry ${modeWord(r)}${r.budget !== undefined ? ` --budget ${r.budget}` : ''}${r.message !== undefined ? ', with your answer' : ''}`}`;
 
 /** Whether a try is a person's nudge that answers the step's task held open, in the session that signed, rather than a task of its own. */
 const answersHeld = (f: Filing, r: Retry, step: Workflow, record: StepRecord): boolean => {

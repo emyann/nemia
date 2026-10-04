@@ -295,7 +295,7 @@ function remoteTrySection(step: Workflow, r: RetryBriefing): string {
   const who =
     r.by === 'retries'
       ? `The run filed this try itself: this step declares \`retries: ${step.retries ?? 0}\`.`
-      : r.by === 'signoff'
+      : r.by === 'signoff' || r.by === 'pause'
         ? 'The run filed this try itself.'
         : `A person asked for this try (\`wf retry\`)${r.message !== undefined ? ', with what they said below' : ''}.`;
   return [

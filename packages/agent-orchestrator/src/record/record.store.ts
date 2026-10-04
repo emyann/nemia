@@ -34,6 +34,7 @@ const EarlierTrySchema = Schema.StructWithRest(
     then: Schema.Literals(['retries', 'signoff', 'nudge', 'fresh', 'recheck', 'round', 'back']),
     model: Schema.optional(Schema.String),
     budget: Schema.optional(Schema.Finite),
+    paused: Schema.optional(Schema.Literal(true)),
   }),
   Rest,
 );
@@ -426,6 +427,7 @@ const RetryAskFileSchema = Schema.StructWithRest(
     model: Schema.optionalKey(Schema.NonEmptyString),
     message: Schema.optionalKey(Said),
     budget: Schema.optionalKey(Dollars),
+    interrupted: Schema.optionalKey(Schema.NonEmptyString),
     at: Schema.optionalKey(Schema.Unknown),
   }),
   Rest,
@@ -582,9 +584,10 @@ export function askIn(file: string, step: string, n: number): RetryAsk | string 
     if (read.refused === 'model') return 'its model is not a name';
     if (read.refused === 'message') return messageWords(held.read);
     if (read.refused === 'budget') return BUDGET_WORDS;
+    if (read.refused === 'interrupted') return 'the task it names as interrupted is not an id';
     return `it asks for no mode wf retry knows (${JSON.stringify(fieldOf(held.read, 'mode'))})`;
   }
-  const { mode, model, message, budget, at } = read.read;
+  const { mode, model, message, budget, interrupted, at } = read.read;
   if (message !== undefined && mode === 'recheck') return 'it carries a message and asks for a recheck, which files no session to read it';
   if (budget !== undefined && mode === 'recheck') return 'it carries a budget and asks for a recheck, which files no session to spend it';
   return {
@@ -594,6 +597,7 @@ export function askIn(file: string, step: string, n: number): RetryAsk | string 
     ...(model === undefined ? {} : { model }),
     ...(message === undefined ? {} : { message }),
     ...(budget === undefined ? {} : { budget }),
+    ...(interrupted === undefined ? {} : { interrupted }),
     at: isText(at) ? at : '',
   };
 }
@@ -650,18 +654,19 @@ export function writeAsk(file: string, ask: RetryAsk | RoundAsk | Approval | Acc
 }
 
 /**
- * Move each ask the run's record already answers into `done/` — and each approval a later try of its step spent (`spentApprovals`), and
+ * Move each ask the run's record already answers into `done/`, and each one of `voided` — an ask `wf pause --now` wrote that the pass found
+ * void (`pauseAskVoid`) — and each approval a later try of its step spent (`spentApprovals`), and
  * each acceptance one spent (`spentAcceptances`). The tick's one touch on a person's file, and never an edit. `done/` is made inside the
  * run's asks directory, never the directory itself, which `wf rm` may remove mid-pass; an ask already moved by a pass beside this one, or
  * removed with its run, is passed over.
  */
-export function consumeAsks(run: Run, asks: readonly RetryAsk[], rounds: readonly RoundAsk[]): void {
-  within('act', () => consumeNow(run, asks, rounds));
+export function consumeAsks(run: Run, asks: readonly RetryAsk[], rounds: readonly RoundAsk[], voided: readonly RetryAsk[] = []): void {
+  within('act', () => consumeNow(run, asks, rounds, voided));
 }
 
-function consumeNow(run: Run, asks: readonly RetryAsk[], rounds: readonly RoundAsk[]): void {
+function consumeNow(run: Run, asks: readonly RetryAsk[], rounds: readonly RoundAsk[], voided: readonly RetryAsk[]): void {
   const spent = [
-    ...spentAsks(run, asks).map((a) => askFile(run.id, a.step, a.try)),
+    ...[...new Set([...spentAsks(run, asks), ...voided])].map((a) => askFile(run.id, a.step, a.try)),
     ...spentRoundAsks(run, rounds).map((a) => roundAskFile(run.id, a.step, a.round)),
     ...spentApprovals(run).map((a) => approvalFile(run.id, a.step, a.try)),
     ...spentAcceptances(run).map((a) => acceptFile(run.id, a.step, a.try)),

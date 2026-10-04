@@ -34,7 +34,6 @@ import {
   DEFAULT_FACTORY,
   factoryMountRefusal,
   factoryMounts,
-  stepMounts,
   writableMountRefusal,
   writableRefusal,
   factoryRepo,
@@ -264,8 +263,8 @@ const mountsAt = (factory: Factory | undefined, repo: string | undefined): Mount
 
 /**
  * Why `steps`, started from `opts` in `factory` on `own` (none for a folder run), cannot be given `mounts`: a `writable:` name no folder
- * answers (`writableRefusal`), or a step whose harness cannot hold its mounts — said for a writable one (`writableMountRefusal`), else
- * for the read-only ones (`factoryMountRefusal`). Nothing when every step can.
+ * answers (`writableRefusal`), or a step whose harness cannot hold its mounts: asked first of every folder read-only, as the run mounts
+ * them (`factoryMountRefusal`), then of the folders its `writable:` names writable (`writableMountRefusal`). Nothing when every step can.
  */
 function mountRefusal(
   opts: StartOptions,
@@ -278,10 +277,11 @@ function mountRefusal(
   const workflow = path.basename(path.resolve(opts.workflowDir));
   const unwritable = writableRefusal(steps, workflow, factory, own, mounts);
   if (unwritable || !factory || !mounts.length) return unwritable;
-  const refused = refusedStep(steps, places, opts.gates ?? [], formerModesWritten(opts.workflowDir), mounts);
-  if (!refused) return undefined;
-  const writes = stepMounts(refused.step, mounts)?.some((m) => !m.readOnly);
-  return (writes ? writableMountRefusal : factoryMountRefusal)(factory, `${workflow}/${refused.step.name}`, refused.why);
+  const ask = (asked: readonly Workflow[]) => refusedStep(asked, places, opts.gates ?? [], formerModesWritten(opts.workflowDir), mounts);
+  const reading = ask(steps.map(({ writable: _, ...step }) => step));
+  if (reading) return factoryMountRefusal(factory, `${workflow}/${reading.step.name}`, reading.why);
+  const writing = ask(steps);
+  return writing && writableMountRefusal(factory, `${workflow}/${writing.step.name}`, writing.why);
 }
 
 /**

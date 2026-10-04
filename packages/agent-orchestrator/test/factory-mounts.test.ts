@@ -421,6 +421,25 @@ test('REFUSED: a `writable:` in a run started in no factory', () => {
   );
 });
 
+test("REFUSED: a read-only folder no permission rule can name, beside a step's `writable:` one, is said as the read-only mount it is", () => {
+  const { loop } = fresh();
+  const own = aRepo();
+  const spaced = aRepo('First Last-');
+  const web = aRepo();
+  addFactory({ name: 'spaced-web', repos: [own, spaced, web] });
+  attachWorkflow({ factory: 'spaced-web', workflow: 'loop' });
+  hireAgent({ factory: 'spaced-web', agent: 'implementer', step: 'loop/implement' });
+  hireAgent({ factory: 'spaced-web', agent: 'reviewer', step: 'loop/review' });
+  writing(loop, path.basename(web));
+  const message = refusal({ brief: 'build it', repo: own, workflowDir: loop, isolate: false, factory: 'spaced-web' });
+  assert.match(message, /^implement: `mounts` gives the session /, 'no `writable:` line quoted: the folder refused is no folder it names');
+  assert.ok(message.includes(`\`mounts\` gives the session ${JSON.stringify(spaced)} read-only, and Claude Code holds a folder`), message);
+  assert.ok(
+    message.includes("\nThat folder is the factory spaced-web's: a run in it mounts every repository of the factory but its own"),
+    message,
+  );
+});
+
 test('REFUSED at shipped defaults: a `writable:` folder on a harness that cannot hold a writable mount, in the runtime words quoted by the line, with the fix', () => {
   const { repos, loop } = fresh();
   const team = path.dirname(loop);

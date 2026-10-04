@@ -1,5 +1,6 @@
 /**
- * The board's reads of one run, each an entry of the command table served on the api alone: the run for its page (`RUN`), and of one of
+ * The board's reads of its runs, each an entry of the command table served on the api alone: every run's summary for its list (`RUNS`),
+ * the run for its page (`RUN`), and of one of
  * its steps a file of its files directory (`STEP_ARTIFACT`) or of its own folder (`STEP_FILE`), the path of one of its tasks through the
  * runtime's lifecycle (`STEP_PATH`), and a read of that task's conversation (`STEP_TRANSCRIPT`). A run is found among those the store
  * lists, never by a path made of its id, and a file by its name, never by a path. The api resolves the task a request names, words the
@@ -11,6 +12,10 @@ import type { Command } from './entry.verb.ts';
 import { artifactFile, fileIn } from '../artifacts/artifacts.store.ts';
 import { runStore } from '../record/files.store.ts';
 import { isGitRun, type Run } from '../record/record.ts';
+import { verifiesRest } from '../config/config.store.ts';
+import { restingMemo } from '../rest/resting.verb.ts';
+import { HOME } from '../record/record.store.ts';
+import { type RunSummary, runsSummarized } from '../summary/summary.verb.ts';
 
 /** The text under `key`, or undefined where none was given. */
 const textOf = (args: Args, key: string): string | undefined => {
@@ -51,6 +56,31 @@ export const RUN: Command<{ run: Run | null }> = {
     why: "the board's run page is a run judged, with its steps and their files; at the command line, wf show reads its record",
   },
   handler: async (_e, args) => ({ run: runOf(args) ?? null }),
+  print: () => [],
+};
+
+/**
+ * Every run's summary, in the store's order (`runsSummarized`): read off the memo of runs at rest and the feed's filing times the caller
+ * keeps (`kept.runs`, `kept.filings`), verified as its environment says (`verifiesRest`); a caller that keeps neither judges every run.
+ */
+export const RUNS: Command<RunSummary[]> = {
+  name: 'runs',
+  usage: '',
+  help: ["every run's summary, for the board's list"],
+  spec: { positionals: [], flags: [], unknown: (arg) => `the board's list of runs takes no ${arg}.` },
+  writes: false,
+  route: { method: 'GET', path: '/api/runs', status: 200 },
+  only: {
+    side: 'api',
+    why: "the board's list is every run judged into a summary, kept between its polls while the run rests; the command line prints each run's lines",
+  },
+  handler: (e, _args, env, home, kept) =>
+    runsSummarized(e, {
+      home: home ?? HOME,
+      memo: kept?.runs ?? restingMemo(),
+      filings: kept?.filings ?? { filed: new Map(), cursor: 0 },
+      verify: env ? verifiesRest(env) : false,
+    }),
   print: () => [],
 };
 
@@ -132,4 +162,4 @@ export const STEP_TRANSCRIPT: Command<{ events: ConversationEvent[]; cursor: str
 };
 
 /** The board's reads of one run and its steps, in the order the table lists them. */
-export const PAGES: readonly Command[] = [RUN, STEP_ARTIFACT, STEP_FILE, STEP_PATH, STEP_TRANSCRIPT] as readonly Command[];
+export const PAGES: readonly Command[] = [RUNS, RUN, STEP_ARTIFACT, STEP_FILE, STEP_PATH, STEP_TRANSCRIPT] as readonly Command[];

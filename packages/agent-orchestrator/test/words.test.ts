@@ -137,7 +137,6 @@ const HARNESS_WORDS: Baseline = {
   'apps/api/src/capabilities/reach.ts': { count: 50, ...MOVES.reach },
   'apps/api/src/detail/detail.ts': { count: 23, card: 'u42s' },
   'apps/api/src/factory/quota.ts': { count: 36, ...MOVES.quota },
-  'apps/api/src/runs/runs.ts': { count: 1, ...MOVES.wait },
   'apps/api/src/stats/stats.ts': { count: 1, card: 'u42s' },
   'apps/api/src/steps/steps.ts': { count: 1, ...MOVES.wait },
   'apps/api/src/workflows/builder.ts': { count: 3, ...MOVES.defaults },

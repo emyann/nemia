@@ -67,6 +67,17 @@ test('every route the api serves is declared by an entry of the command table, o
   assert.deepEqual(servedBreaks(app.routes, COMMANDS, OWN), []);
 });
 
+test("the runs' list is declared by runs, an entry the api serves alone, and ls routes nothing: the CLI serves it alone", () => {
+  const runs = COMMANDS.find((c) => c.name === 'runs');
+  const ls = COMMANDS.find((c) => c.name === 'ls');
+  assert.equal(declaredBy(COMMANDS).get('GET /api/runs'), 'runs');
+  assert.equal(runs?.only?.side, 'api', 'the runs entry is served on the api alone');
+  assert.ok(runs?.only?.why.trim(), 'and says why');
+  assert.deepEqual(routeList(ls!), [], 'ls has no route');
+  assert.equal(ls?.only?.side, 'cli', 'ls is served on the CLI alone');
+  assert.ok(ls?.only?.why.trim(), 'and says why');
+});
+
 test('REFUSED: a route no entry declares and OWN does not list, matched whole; middleware and a route mounted twice are none', () => {
   const extra = new Hono().get('/api/x', (c) => c.text('x'));
   const more = new Hono()
@@ -88,7 +99,7 @@ test('REFUSED: an OWN line the api does not serve, one an entry declares, and on
     'OWN lists GET /api/gone, which the api does not serve: take it off OWN.',
   ]);
   assert.deepEqual(servedBreaks(app.routes, COMMANDS, { ...OWN, 'GET /api/runs': 'the runs' }), [
-    'OWN lists GET /api/runs, which ls declares: take it off OWN.',
+    'OWN lists GET /api/runs, which runs declares: take it off OWN.',
   ]);
   assert.deepEqual(servedBreaks(app.routes, COMMANDS, { ...OWN, 'GET /api/health': ' ' }), [
     "OWN lists GET /api/health and says no why: say why it is the api's own.",

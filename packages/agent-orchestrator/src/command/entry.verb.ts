@@ -5,7 +5,20 @@
 import type { Engine } from '../runtime-client.ts';
 import type { Conflict, Missing } from '../refusal/refusal.ts';
 import type { StatsMemo } from '../stats/stats.verb.ts';
+import type { RestingMemo } from '../rest/resting.verb.ts';
+import type { Filings } from '../summary/reads.verb.ts';
+import type { RunSummary } from '../summary/summary.verb.ts';
 import type { Args, CommandSpec } from './command.ts';
+
+/**
+ * What a caller that lives long keeps between its calls of the table's handlers: the stats' memo of each run's facts (`stats`), the list's
+ * memo of runs at rest (`runs`), and the feed's filing times (`filings`).
+ */
+export type Kept = {
+  readonly stats?: StatsMemo;
+  readonly runs?: RestingMemo<Omit<RunSummary, 'startedAt'>>;
+  readonly filings?: Filings;
+};
 
 /**
  * A command whole: its spec, `handler`, which calls one package verb with the arguments and answers data — never printed lines — and
@@ -13,11 +26,11 @@ import type { Args, CommandSpec } from './command.ts';
  * it than the api answers; or, where `apiRefusal` makes one of the data, throws that refusal in its place: a verb that answers what it
  * would not do as data, a line on the CLI, is refused by its kind on the api. A handler reads its settings (`WF_MAX_RUNS`) from `env`,
  * and a person's own files from the store `home`: the process's own at the command line, the app's on the api; and what a caller that lives
- * long keeps between its calls from `kept` — the api's memo of the stats — which the command line, calling once, hands none of. `note` is
- * what the CLI says of the data on stderr, beside what it prints.
+ * long keeps between its calls from `kept` — the api's memos of the stats and of the runs at rest, and the feed's filing times it read —
+ * which the command line, calling once, hands none of. `note` is what the CLI says of the data on stderr, beside what it prints.
  */
 export type Command<D extends object = Readonly<Record<string, unknown>>> = CommandSpec & {
-  handler(e: Engine, args: Args, env?: NodeJS.ProcessEnv, home?: string, kept?: { readonly stats?: StatsMemo }): Promise<D>;
+  handler(e: Engine, args: Args, env?: NodeJS.ProcessEnv, home?: string, kept?: Kept): Promise<D>;
   print(data: D, args: Args): readonly string[];
   note?(data: D, args: Args): readonly string[];
   readonly apiKeys?: readonly (keyof D & string)[];

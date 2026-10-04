@@ -5,7 +5,6 @@
 import { Hono } from 'hono';
 import { type SSEStreamingApi, streamSSE } from 'hono/streaming';
 import { LOGS, phaseOfView } from 'agent-orchestrator';
-import { isRefusal } from 'agent-orchestrator/effect';
 import { filesPrunedWords } from 'agent-orchestrator/run';
 import { readArtifactFile, readFolderFile, refusedName } from './artifacts.ts';
 import { type StepLog, tailOf } from './logs.ts';
@@ -171,7 +170,6 @@ export const steps = new Hono<ApiEnv>()
         const { output } = await LOGS.handler(e, { runId: id, step }, env, home);
         return c.json(output === undefined ? ({ lines: [], truncated: false } satisfies StepLog) : tailOf(output, LOG_LINES));
       } catch (err) {
-        if (isRefusal(err)) throw err;
         const why = err instanceof Error ? err.message : String(err);
         return c.json(
           {

@@ -42,6 +42,7 @@ test('wf stats refuses a value left out, empty or given as a flag in what the fl
   const from = '--from takes a day, YYYY-MM-DD in UTC: the first day counted';
   assert.equal(refusedBy(STATS, ['--from']), from);
   assert.equal(refusedBy(STATS, ['--from', '--to']), from);
+  assert.equal(refusedBy(STATS, ['--from', '--to', '2026-09-30']), from);
   assert.equal(refusedBy(STATS, ['--from', '']), from);
   assert.equal(refusedBy(STATS, ['--agent=']), "--agent takes an agent's name: only the steps it fills");
   assert.equal(refusedBy(STATS, ['--by=--line']), '--by takes what the rows go by: agent, step, factory, workflow, repo');

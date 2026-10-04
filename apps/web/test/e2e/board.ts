@@ -6,8 +6,18 @@ import { expectCount, expectTexts, expectVisible, idle, Refused, WAIT_MS, watch 
 import { DIAMOND } from './seed.ts';
 import { API, store } from './world.ts';
 
-/** The sidebar list's places, in its order: the Inbox first. */
-export const PLACES = ['Inbox', 'Factories', 'Runs', 'Stats', 'Workflows'];
+/** The sidebar's sections under All factories, in their order: the Inbox first. */
+export const SECTIONS = ['Inbox', 'Runs', 'Workflows', 'Stats'] as const;
+
+/** The sidebar's sections with a factory picked: its Floor first, then the others. */
+export const PICKED_SECTIONS = ['Floor', ...SECTIONS] as const;
+
+/** The pages whose `?factory=` picks a factory; on any other page only a floor's path does. */
+const LISTINGS = ['/inbox', '/runs', '/workflows', '/stats'];
+
+/** The factory `url` picks, as the board reads it: a floor's name, else a listing's `?factory=`, else none. */
+export const pickedIn = (url: URL): string | null =>
+  /^\/factories\/([^/]+)$/.exec(url.pathname)?.[1] ?? (LISTINGS.includes(url.pathname) ? url.searchParams.get('factory') || null : null);
 
 /** The rail's places, in its order: Home first, Capabilities at its foot. */
 export const RAIL_PLACES = ['Home', 'Agents', 'Machines', 'Capabilities'];
@@ -15,7 +25,33 @@ export const RAIL_PLACES = ['Home', 'Agents', 'Machines', 'Capabilities'];
 /** The rail of places at the frame's left, under the header. */
 export const railOf = (page: Page): Locator => page.locator('nav[aria-label="Places"]');
 
-/** On every page: the header with the logo and the bell, the rail with its places in their order, and the list with each of its own. */
+/** The sidebar beside the rail. */
+export const sidebarOf = (page: Page): Locator => page.locator('[data-sidebar="sidebar"]');
+
+/** The sidebar's factory picker. */
+export const pickerOf = (page: Page): Locator => sidebarOf(page).locator('[data-factory-picker]');
+
+/** The sidebar's sections, each a link. */
+export const sectionsOf = (page: Page): Locator => sidebarOf(page).locator('ul[aria-label="Sections"] a[data-sidebar="menu-button"]');
+
+/** The sidebar's Start a run, which opens the floating bar on the start of a run. */
+export const startOf = (page: Page): Locator => sidebarOf(page).getByRole('button', { name: 'Start a run' });
+
+/** Picks `choice` in the sidebar's factory picker, a factory's name or All factories. */
+export async function pick(page: Page, choice: string): Promise<void> {
+  await pickerOf(page).locator('button').first().click();
+  await page
+    .getByRole('option')
+    .filter({
+      has: choice === 'All factories' ? page.getByText('All factories', { exact: true }) : page.locator(`[data-factory="${choice}"]`),
+    })
+    .click();
+}
+
+/**
+ * On every page: the header with the logo and the bell, the rail with its places in their order, and the sidebar with its factory picker,
+ * reading the factory the address picks or All factories, and its sections in their order, the Floor only with a factory picked.
+ */
 export async function sidebar(page: Page): Promise<void> {
   const header = page.locator('header[data-feed]');
   await expectVisible(header.getByRole('link', { name: 'Nemia' }), 'the header has the logo, a link to Home');
@@ -25,13 +61,14 @@ export async function sidebar(page: Page): Promise<void> {
   const named = await rail.getByRole('link').evaluateAll((links) => links.map((link) => link.getAttribute('aria-label')));
   if (named.join() !== RAIL_PLACES.join())
     throw new Refused(`the rail lists its places in order, ${RAIL_PLACES.join(', ')} — it lists ${named.join(', ')}`);
-  const menu = page.locator('[data-sidebar="sidebar"]');
-  for (const place of PLACES) await expectVisible(menu.getByRole('link', { name: place }), `the sidebar has ${place}`);
+  const picked = pickedIn(new URL(page.url()));
   await expectTexts(
-    menu.locator('[data-sidebar="content"] [data-sidebar="menu-button"]'),
-    PLACES,
-    'the sidebar lists its places in order, the Inbox first',
+    pickerOf(page).locator('button').first(),
+    [picked ?? 'All factories'],
+    'the picker reads the factory the address picks',
   );
+  const sections = picked === null ? SECTIONS : PICKED_SECTIONS;
+  await expectTexts(sectionsOf(page), [...sections], `the sidebar lists its sections in order, ${sections.join(', ')}`);
 }
 
 /**

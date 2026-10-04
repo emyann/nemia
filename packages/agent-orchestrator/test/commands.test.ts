@@ -68,6 +68,15 @@ test('each command is served on the api where it was before the table, the lift 
       ['pause', { method: 'POST', path: '/api/pause', status: 200 }],
       ['resume', { method: 'DELETE', path: '/api/pause', status: 200 }],
       ['paused', { method: 'GET', path: '/api/pause', status: 200 }],
+      [
+        'workflows write',
+        [
+          { method: 'POST', path: '/api/workflows/:from', status: 201, hand: true },
+          { method: 'PUT', path: '/api/workflows/:from/:name', status: 200, hand: true },
+        ],
+      ],
+      ['workflows list', { method: 'GET', path: '/api/workflows', status: 200 }],
+      ['workflows step', { method: 'GET', path: '/api/workflows/:from/:name/:step', status: 200 }],
       ['tick', 'cli'],
       ['up', 'cli'],
       ['watch', 'cli'],
@@ -93,6 +102,8 @@ test('every command the api posts or deletes on writes, and the api guards it; t
       'agents',
       'agents card',
       'paused',
+      'workflows list',
+      'workflows step',
       'watch',
     ],
   );

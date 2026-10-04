@@ -34,6 +34,7 @@ import type { Command, Ran } from './entry.verb.ts';
 import { READS } from './reads.verb.ts';
 import { AGENTS_CUSTOM } from '../agents/custom.verb.ts';
 import { MERGES } from '../branches/merges.verb.ts';
+import { WORKFLOW_ENTRIES } from '../folder/workflows.verb.ts';
 import { FACTORIES } from '../factory/factory.verb.ts';
 import { INBOXES } from '../inbox/commands.verb.ts';
 import { PLAN, START } from '../start/commands.verb.ts';
@@ -495,6 +496,7 @@ export const COMMANDS: readonly Command[] = [
   PAUSE,
   RESUME,
   PAUSED,
+  ...WORKFLOW_ENTRIES,
 ];
 
 /**

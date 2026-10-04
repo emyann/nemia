@@ -29,10 +29,6 @@ const OWN: Readonly<Record<string, string>> = {
 
 /** The routes the table does not declare yet, each with the step of this change that makes it an entry. */
 const PENDING: Readonly<Record<string, string>> = {
-  'POST /api/workflows/:from': 'workflows',
-  'PUT /api/workflows/:from/:name': 'workflows',
-  'GET /api/workflows': 'workflows',
-  'GET /api/workflows/:from/:name/:step': 'workflows',
   'POST /api/agents/:from': 'agents',
   'PUT /api/agents/:from/:name': 'agents',
   'DELETE /api/agents/:from/:name': 'agents',

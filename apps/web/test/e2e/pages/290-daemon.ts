@@ -32,18 +32,21 @@ const reload = async (page: Page) => {
 
 export default {
   /**
-   * Whether a daemon ticks the store, over the Factory's floor. The seeded store has no daemon.json, which is true — the e2e's api runs
-   * with `--no-tick` — so the Factory says so and how to start one: the api. Then a wf up alive and silent for 20 minutes, past the 15
-   * that are stale at every 4 s: said as stalled, with its silence and the command, the header taller with the line and the floor fitted
-   * clear of it, every card clear of the one beneath it and of the panels. Then an api holder silent as long: said by its kind. Then each
-   * heard from just now: nothing is said, and the cap still is. The file is taken back, and the store reads as seeded again.
+   * Whether a daemon ticks the store: a dot at the left of the frame's bottom bar, and whole in the machine's gauges it opens. The seeded
+   * store has no daemon.json, which is true — the e2e's api runs with `--no-tick` — so the dot is down and the gauges say so and how to
+   * start one: the api. Then a wf up alive and silent for 20 minutes, past the 15 that are stale at every 4 s: the dot warns, and the
+   * gauges say it stalled, with its silence and the command, each card on the floor beside them clear of the one beneath it and of the
+   * panels. Then an api holder silent as long: said by its kind. Then each heard from just now: the dot is ok, the gauges say the api's
+   * own line and no sentence, and the cap is still over the floor. The file is taken back, and the store reads as seeded again.
    */
   name: 'daemon',
-  route: '/factories/default',
+  route: '/factories/default?bar=gauges',
   expect: async (page) => {
     const file = path.join(store!, 'daemon.json');
     if (fs.existsSync(file)) throw new Refused(`the seeded store has no daemon.json — ${file} is there`);
-    const line = page.locator('[data-daemon]');
+    const line = page.locator('[data-gauges] [data-daemon]');
+    const dot = (kind: string, tone: string, why: string) =>
+      expectCount(page.locator(`footer[data-frame-footer] [data-daemon-dot="${kind}"][data-tone="${tone}"]`), 1, why);
     const shoot = async (what: string) => {
       await settled(page);
       await photograph(page, path.join(OUT, `daemon-${what}-${await themeOf(page)}.png`), { fullPage: true });
@@ -53,8 +56,9 @@ export default {
       page.locator('[data-daemon="none"]', {
         hasText: new RegExp(`^Nothing ticks this store, so no run moves: no daemon has held it\\. ${START}\\.$`),
       }),
-      'with no daemon.json, the header says nothing ticks the store, and how to start what does',
+      'with no daemon.json, the gauges say nothing ticks the store, and how to start what does',
     );
+    await dot('none', 'down', "and the bottom bar's dot is down");
     try {
       fs.writeFileSync(file, daemonFile(20 * MIN + 30_000));
       await reload(page);
@@ -69,6 +73,10 @@ export default {
       );
       await expectVisible(stalled.locator('code', { hasText: /^npm start in apps\/api$/ }), "the api's start set apart as code");
       await expectCount(line, 1, 'one line, and no other');
+      await dot('stalled', 'warn', "the bottom bar's dot warns: the next daemon takes the store over");
+      const title = await page.locator('[data-daemon-dot="stalled"]').getAttribute('title');
+      if (!title?.startsWith(`Nothing ticks this store, so no run moves: the wf up of pid ${process.pid} is alive but silent`))
+        throw new Refused(`the dot's hover says the gauges' sentence — its title is ${JSON.stringify(title)}`);
       if (!(await stalled.getAttribute('title'))?.startsWith(`wf up: stalled, pid ${process.pid}`)) {
         throw new Refused(
           `the line holds wf ls's own words on hover — its title is ${JSON.stringify(await stalled.getAttribute('title'))}`,
@@ -79,7 +87,7 @@ export default {
       await page.getByRole('button', { name: 'Reset layout' }).click();
       await settled(page);
       await expectClearOfEachOther(page);
-      await expectClearOfPanels(page, 'with the stalled line over the floor');
+      await expectClearOfPanels(page, 'with the gauges beside the floor');
 
       fs.writeFileSync(file, daemonFile(20 * MIN + 30_000, API_HOLDER));
       await reload(page);
@@ -102,7 +110,12 @@ export default {
         await expectCount(
           line,
           0,
-          `${what === 'api' ? 'an api' : 'a wf up'} heard from just now is ticking, and the Factory says nothing of it`,
+          `${what === 'api' ? 'an api' : 'a wf up'} heard from just now is ticking, and no sentence says nothing ticks`,
+        );
+        await dot('ticking', 'ok', "the bottom bar's dot is ok");
+        await expectVisible(
+          page.locator('[data-gauges] [data-daemon-ticks]', { hasText: new RegExp(`^${what}: ticking, pid ${process.pid}`) }),
+          "the gauges say the api's own line for the daemon that ticks",
         );
         await shoot(what === 'api' ? 'api-fresh' : 'fresh');
       }
@@ -113,7 +126,8 @@ export default {
     await expectCount(
       page.locator('[data-daemon="none"]'),
       1,
-      'with the file taken back, the header says again that nothing ticks the store',
+      'with the file taken back, the gauges say again that nothing ticks the store',
     );
+    await dot('none', 'down', 'and the dot is down again');
   },
 } satisfies PageSpec;

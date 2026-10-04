@@ -28,8 +28,8 @@ export default {
     const asks = path.join(store!, 'runs', `${id}.asks`);
     if (fs.existsSync(asks))
       throw new Refused(`the store is as seeded before the page approves anything — ${asks} holds ${fs.readdirSync(asks).join(', ')}`);
-    const header = page.locator('header[data-feed]');
-    await expectVisible(page.locator('header[data-feed="open"]'), 'the header says the feed is followed (data-feed="open")');
+    const footer = page.locator('footer[data-feed]');
+    await expectVisible(page.locator('footer[data-feed="open"]'), 'the bottom bar says the feed is followed (data-feed="open")');
     await idle(page);
 
     let streams = 0;
@@ -47,8 +47,8 @@ export default {
     await idle(page);
     if (streams !== 0)
       throw new Refused(`one stream of the feed a page, kept across a navigation inside the board — ${streams} more opened`);
-    if ((await header.getAttribute('data-feed')) !== 'open')
-      throw new Refused(`the feed is still followed after the navigation — the header says ${await header.getAttribute('data-feed')}`);
+    if ((await footer.getAttribute('data-feed')) !== 'open')
+      throw new Refused(`the feed is still followed after the navigation — the bottom bar says ${await footer.getAttribute('data-feed')}`);
 
     const gate = page.locator(`section[aria-label="The gate of ${gated}"]`);
     const approve = gate.getByRole('button', { name: 'Approve', exact: true });

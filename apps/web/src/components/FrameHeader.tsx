@@ -13,7 +13,7 @@ const LogoLink = routeLink(LinkButton);
  */
 export function FrameHeader({ section }: { section?: string }) {
   return (
-    <header className="sticky top-0 z-30 flex h-12 shrink-0 items-center gap-2 border-b bg-background px-3">
+    <header data-frame-header className="sticky top-0 z-30 flex h-12 shrink-0 items-center gap-2 border-b bg-background px-3">
       <SidebarTrigger />
       <LogoLink to="/" variant="ghost" className="gap-2 px-1.5 font-semibold tracking-tight">
         <span className="flex size-6 items-center justify-center rounded-md bg-foreground text-background">

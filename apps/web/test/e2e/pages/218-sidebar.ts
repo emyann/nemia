@@ -34,7 +34,7 @@ const hrefsOf = (page: Page) => sectionsOf(page).evaluateAll((links) => links.ma
 const foldOf = (page: Page) => page.locator('[data-slot="sidebar"][data-state]').getAttribute('data-state');
 
 /** The header's button that folds the sidebar, or opens its sheet on a narrow screen. */
-const trigger = (page: Page): Locator => page.locator('header[data-feed]').locator('[data-sidebar="trigger"]');
+const trigger = (page: Page): Locator => page.locator('header[data-frame-header]').locator('[data-sidebar="trigger"]');
 
 /**
  * A factory picked on a section's page stays on it with `?factory=`, every section carrying it and the Floor drawn first; a section keeps

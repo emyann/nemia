@@ -2,27 +2,28 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { photograph, recordedUsage, reloadForQuota, themeOf } from '../board.ts';
 import { expectClearOfEachOther } from '../canvas.ts';
-import { expectCount, expectTexts, expectVisible, Refused, settled } from '../checks.ts';
+import { expectCount, expectTexts, expectUncut, expectVisible, Refused, settled } from '../checks.ts';
 import { QUOTA } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
 export default {
   /**
-   * The subscription's quota over the Factory's floor, as the api asked the e2e's `claude` for it (get_usage): each window's percentage
-   * and its reset in the browser's own time, the week marked past 80%, and the answer's age. Each reset is read here as the browser says a
-   * time where it is, to the minute, with the weekday when it falls on another day than today (`clockWord`), never assumed: the week
-   * resets three days out and always reads with one, and the five-hour window's reset crosses midnight for the two hours before it. Then
-   * three ways the harness cannot answer — no plan, a request it refuses, and a `claude` that ends before it answers — each asked again on
-   * the reload, read in the state the change makes (`reloadForQuota`), and said in a sentence, with no number. The answer is
-   * put back as seeded, and the header, taller with the quota, leaves every card clear of the one beneath it.
+   * The subscription's quota in the frame's bottom bar, and whole in the machine's gauges it opens, as the api asked the e2e's `claude` for
+   * it (get_usage). The bar says each window's label and percentage on one line, the week marked past 80%; the gauges say each window's
+   * reset in the browser's own time, to the minute, with the weekday when it falls on another day than today (`clockWord`), never assumed:
+   * the week resets three days out and always reads with one, and the five-hour window's reset crosses midnight in the two hours before it.
+   * Then three ways the harness cannot answer — no plan, a request it refuses, and a `claude` that ends before it answers — each asked
+   * again on the reload, read in the state the change makes (`reloadForQuota`), and said in a sentence, with no number. The answer is put
+   * back as seeded, and the floor beside the gauges leaves every card clear of the one beneath it.
    */
   name: 'quota',
-  route: '/factories/default',
+  route: '/factories/default?bar=gauges',
   expect: async (page) => {
     const file = path.join(store!, QUOTA.file);
     const written = fs.readFileSync(file, 'utf8');
-    const line = page.locator('[data-quota]');
+    const line = page.locator('[data-gauges] [data-quota]');
+    const short = page.locator('footer[data-frame-footer] [data-quota-short]');
     const shoot = async (what: string) => {
       await settled(page);
       await photograph(page, path.join(OUT, `factory-quota-${what}-${await themeOf(page)}.png`), { fullPage: true });
@@ -34,7 +35,15 @@ export default {
       await shoot(state);
     };
     try {
-      await expectCount(page.locator('[data-quota="fresh"]'), 1, 'the header shows the quota Claude Code answered with');
+      await expectCount(page.locator('[data-quota="fresh"]'), 1, 'the gauges show the quota Claude Code answered with');
+      const fiveUsed = Math.round(QUOTA.fiveHour.used);
+      await expectCount(
+        short.and(page.locator(`[data-quota-short="5-hour ${fiveUsed}% · week ${QUOTA.week.used}%"][data-marked]`)),
+        1,
+        `the bottom bar says each window's label and percentage, marked: the week is ${QUOTA.week.used}% used`,
+      );
+      await expectTexts(short, [`quota 5-hour ${fiveUsed}% · week ${QUOTA.week.used}%`], 'on one line, led by the word quota');
+      await expectUncut(short, 'and read whole');
       await expectTexts(
         line.locator('[data-quota-machine]'),
         ['Quota on this machine:'],
@@ -54,7 +63,7 @@ export default {
       const weekResets = await clock(limits.seven_day.resets_at);
       await expectTexts(
         line.locator('[data-quota-window="five_hour"]'),
-        [`5-hour ${Math.round(QUOTA.fiveHour.used)}% · resets ${fiveResets}`],
+        [`5-hour ${fiveUsed}% · resets ${fiveResets}`],
         'the five-hour window, used and when it resets, in the browser’s time',
       );
       await expectTexts(
@@ -99,7 +108,7 @@ export default {
       fs.writeFileSync(file, written);
     }
     await reloadForQuota(page, 'fresh');
-    await expectCount(page.locator('[data-quota="fresh"]'), 1, 'with the answer put back, the header shows the quota again');
+    await expectCount(page.locator('[data-quota="fresh"]'), 1, 'with the answer put back, the gauges show the quota again');
 
     await page.getByRole('button', { name: 'Reset layout' }).click();
     await settled(page);

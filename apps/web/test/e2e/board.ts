@@ -59,7 +59,7 @@ export async function pick(page: Page, choice: string): Promise<void> {
  * reading the factory the address picks or All factories, and its sections in their order, the Floor only with a factory picked.
  */
 export async function sidebar(page: Page): Promise<void> {
-  const header = page.locator('header[data-feed]');
+  const header = page.locator('header[data-frame-header]');
   await expectVisible(header.getByRole('link', { name: 'Nemia' }), 'the header has the logo, a link to Home');
   await expectVisible(header.getByRole('button', { name: 'Notifications' }), 'the header has the bell');
   const rail = railOf(page);

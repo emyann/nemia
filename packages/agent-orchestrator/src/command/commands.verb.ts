@@ -33,7 +33,7 @@ import { agentCardRead, agentsRead } from '../roster/roster.store.ts';
 import { agentsLines, cardNote, type AgentsRead, type CardRead } from '../roster/roster.ts';
 import { commandLine, type Args, type CommandSpec, type Flag } from './command.ts';
 import type { Command, Ran } from './entry.verb.ts';
-import { READS } from './reads.verb.ts';
+import { READS, SERIES } from './reads.verb.ts';
 import { PAGES } from './pages.verb.ts';
 import { AGENTS_CUSTOM } from '../agents/custom.verb.ts';
 import { LIBRARY_ENTRIES } from '../agents/library.verb.ts';
@@ -45,7 +45,6 @@ import { INBOXES } from '../inbox/commands.verb.ts';
 import { PLAN, START } from '../start/commands.verb.ts';
 import { CANCEL, PAUSE, PAUSED, PAUSE_NOW, HOLD, PRUNE, RAN, RM, RESUME } from './runs.verb.ts';
 import { PASSES } from '../meter/passes.verb.ts';
-import { SERIES } from '../series/series.verb.ts';
 
 /** The text under `key`, or undefined where none was given. */
 const textOf = (args: Args, key: string): string | undefined => {

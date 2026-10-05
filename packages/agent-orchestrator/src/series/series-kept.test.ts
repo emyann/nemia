@@ -1,7 +1,8 @@
 /**
- * The series kept and read (`series.verb.ts`): passes rolled into minutes and the minutes into an hour once it is done, a restart rolling
- * nothing twice, the days past their retention deleted, a range read that writes nothing and is answered from a memo while its file has
- * not moved, and `nemia series` with a range it does not take refused. A store of its own: `WF_ROOT` is read as the module loads.
+ * The series kept and read (`keepSeries`, `seriesRead` in `series.store.ts`): passes rolled into minutes and the minutes into an hour
+ * once it is done, a restart rolling nothing twice, the days past their retention deleted, a range read that writes nothing and is
+ * answered from a memo while its file has not moved, and `nemia series` with a range it does not take refused. A store of its own:
+ * `WF_ROOT` is read as the module loads.
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -9,14 +10,13 @@ import fs from 'node:fs';
 import type { Engine } from 'agent-runtime';
 import { scratch } from '../../test/scratch.ts';
 
-process.env.WF_ROOT = scratch('wf-series-verb-');
+process.env.WF_ROOT = scratch('wf-series-kept-');
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_METRICS_MINUTE_DAYS;
 delete process.env.WF_METRICS_HOUR_DAYS;
 const { main } = await import('../cli/main.ts');
 const { PHASES } = await import('../meter/meter.ts');
-const { appendLines, dayFile, days, readDay, tierDir } = await import('./series.store.ts');
-const { keepSeries, rangeOf, seriesHealth, seriesRead } = await import('./series.verb.ts');
+const { appendLines, dayFile, days, keepSeries, rangeOf, readDay, seriesHealth, seriesRead, tierDir } = await import('./series.store.ts');
 const { seriesMemo } = await import('./series.ts');
 type RecentPass = import('../meter/meter.ts').RecentPass;
 

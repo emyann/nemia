@@ -1,15 +1,38 @@
 /**
  * The series' files: a tier's lines by UTC day, `$WF_ROOT/metrics/<tier>/<YYYY-MM-DD>.jsonl`, a line of JSON a series over a span
- * (`RollupLine`), appended by the ticking daemon's pass alone (`keepSeries`) and deleted by date as their retention passes. Beneath the
- * controllers: it imports the store's root and the pass's meter, and no controller.
+ * (`RollupLine`), appended by the ticking daemon's pass alone and deleted by date as their retention passes (`keepSeries`); read over a
+ * range by `nemia series` and `GET /api/series` (`seriesRead`, the command `SERIES` in `command/reads.verb.ts`), and over a period's days
+ * by `nemia stats` (`seriesHealth`). What is due is read off the files on every pass, so a restart rolls nothing twice and loses nothing
+ * the ring still holds. Beneath the controllers: it imports the store's root, its retention and the pass's meter, and no controller.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { Schema } from 'effect';
 import { HOME } from '../record/record.store.ts';
+import { metricsHourDays, metricsMinuteDays } from '../config/config.store.ts';
 import { countRead } from '../meter/tally.store.ts';
+import { RECENT_KEPT, type RecentPass } from '../meter/meter.ts';
 import { Invalid } from '../refusal/refusal.ts';
-import { dayOf, LABEL_KEYS, strangeLabels, type RollupLine, type Tier } from './series.ts';
+import {
+  dayOf,
+  daysOfRange,
+  daysPast,
+  healthOf,
+  hoursDue,
+  isRange,
+  LABEL_KEYS,
+  minutesDue,
+  RANGES,
+  rollHours,
+  rollMinutes,
+  seriesOf,
+  strangeLabels,
+  type Health,
+  type RollupLine,
+  type SeriesMemo,
+  type SeriesRead,
+  type Tier,
+} from './series.ts';
 
 /** The folder of a tier's files. */
 export const tierDir = (tier: Tier): string => path.join(HOME, 'metrics', tier);
@@ -136,3 +159,68 @@ export const dayStamp = (tier: Tier, day: string): string | undefined => {
 
 /** A tier's day deleted; nothing for one that is gone. */
 export const dropDay = (tier: Tier, day: string): void => fs.rmSync(dayFile(tier, day), { force: true });
+
+/**
+ * The series kept on a pass at `now`, from the passes the ring holds after it (`ring`, oldest first): the minutes due rolled and appended,
+ * then the hours due rolled from the minute files, then each tier's days past its retention deleted (`WF_METRICS_MINUTE_DAYS`,
+ * `WF_METRICS_HOUR_DAYS`). Throws what a read or a write threw, a retention refused among them: the tick's to say, never to stop on.
+ */
+export const keepSeries = (ring: readonly RecentPass[], now: number = Date.now()): void => {
+  const lastMinute = lastLine('minute')?.t;
+  appendLines('minute', rollMinutes(ring, minutesDue(ring, lastMinute, now, RECENT_KEPT)));
+  const due = hoursDue(lastMinute, lastLine('hour')?.t, now);
+  if (due) {
+    const from = due.after === undefined ? '' : dayOf(due.after);
+    const minutes = days('minute')
+      .filter((d) => d >= from && d <= dayOf(due.before))
+      .flatMap((d) => readDay('minute', d));
+    appendLines('hour', rollHours(minutes, due));
+  }
+  for (const day of daysPast(days('minute'), now, metricsMinuteDays())) dropDay('minute', day);
+  for (const day of daysPast(days('hour'), now, metricsHourDays())) dropDay('hour', day);
+};
+
+/** A tier's day, answered from `memo` while its file has not moved since it was read, and read again once it has. */
+const dayLines = (tier: Tier, day: string, memo: SeriesMemo | undefined): RollupLine[] => {
+  if (!memo) return readDay(tier, day);
+  const key = `${tier}/${day}`;
+  const stamp = dayStamp(tier, day);
+  const held = memo.get(key);
+  if (stamp !== undefined && held?.stamp === stamp) return held.lines;
+  const lines = readDay(tier, day);
+  if (stamp === undefined) memo.delete(key);
+  else memo.set(key, { stamp, lines });
+  return lines;
+};
+
+/** What `--range` takes, as its refusal says it. */
+export const RANGE_TAKES = `--range takes ${Object.keys(RANGES).join(', ')}: nemia series --range 7d`;
+
+/** The range `text` names, `24h` when none is given. Refuses as `Invalid` a range that is not one of `RANGES`. */
+export const rangeOf = (text: string | undefined): keyof typeof RANGES => {
+  if (text === undefined) return '24h';
+  if (!isRange(text)) throw new Invalid({ message: `${RANGE_TAKES}, not ${JSON.stringify(text)}.` });
+  return text;
+};
+
+/** The series over `range` (`rangeOf`) at `now`, read off its tier's days, past days from `memo` where one is handed. Writes nothing. */
+export const seriesRead = (range: string | undefined, memo?: SeriesMemo, now: number = Date.now()): SeriesRead => {
+  const r = rangeOf(range);
+  const tier = RANGES[r].tier;
+  return seriesOf(
+    r,
+    daysOfRange(r, days(tier), now).flatMap((d) => dayLines(tier, d, memo)),
+    now,
+  );
+};
+
+/**
+ * The system's health over the UTC days from `from` (every day kept, for null) to `to`, both included, read off the hour lines: each
+ * figure null where nothing was kept.
+ */
+export const seriesHealth = (from: string | null, to: string, memo?: SeriesMemo): Health =>
+  healthOf(
+    days('hour')
+      .filter((d) => (from === null || d >= from) && d <= to)
+      .flatMap((d) => dayLines('hour', d, memo)),
+  );

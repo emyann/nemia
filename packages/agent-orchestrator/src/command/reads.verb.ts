@@ -1,6 +1,7 @@
 /**
  * The reads of the store, each defined once: `nemia show` (a run's record), `nemia logs` (a step's session output), `nemia feed` (what the
- * tick judged, from a cursor) and `nemia stats` (what the store's runs add up to). Their handlers answer data, and the CLI prints it; the
+ * tick judged, from a cursor), `nemia stats` (what the store's runs add up to) and `nemia series` (what the system's passes were, kept
+ * a minute and an hour at a time; listed in the help beside the passes). Their handlers answer data, and the CLI prints it; the
  * api serves a step's log and the stats on their routes from the same entries, and the board reads a run and the feed through reads of its
  * own (`only`).
  */
@@ -13,6 +14,8 @@ import { pausedWords, type Paused } from '../pause/pause.ts';
 import { pausedRead } from '../list/list.verb.ts';
 import { BY_KEYS, statsLine, statsLines, statsQueryOf, type QueryKey, type Stats } from '../stats/index.ts';
 import { stats } from '../stats/stats.verb.ts';
+import { RANGE_TAKES, seriesRead } from '../series/series.store.ts';
+import { seriesLines, type SeriesRead } from '../series/series.ts';
 import type { Args } from './command.ts';
 import type { Command } from './entry.verb.ts';
 
@@ -201,6 +204,32 @@ export const STATS: Command<Stats> = {
       },
     ),
   print: (s, args) => (args.json === true ? [JSON.stringify(s, null, 2)] : args.line === true ? [statsLine(s)] : statsLines(s)),
+};
+
+/** `nemia series`: the system's series over a range, a point a minute, an hour or a day. */
+export const SERIES: Command<SeriesRead> = {
+  name: 'series',
+  usage: '[--range 24h|7d|30d|all] [--json]',
+  help: [
+    "the system's series over a range: a pass's time and its phases, its",
+    'journal reads, the runs in the store, the sessions queued and admitted',
+    'and the longest wait, the load, and the quota used. --range: 24h (a',
+    'point a minute, the default), 7d or 30d (an hour), all (a day);',
+    '--json: the whole answer',
+  ],
+  spec: {
+    positionals: [],
+    flags: [
+      { flag: '--range', kind: 'text', key: 'range', takes: RANGE_TAKES, twice: 'nemia series takes --range once.' },
+      { flag: '--json', kind: 'switch', key: 'json', only: { side: 'cli', why: 'the api answers the whole answer, as JSON' } },
+    ],
+    unknown: (arg) => `nemia series does not take ${arg}. It takes --range <range> and --json.`,
+    apart: () => RANGE_TAKES,
+  },
+  writes: false,
+  route: { method: 'GET', path: '/api/series', status: 200 },
+  handler: async (_e, args, _env, _home, kept) => seriesRead(textOf(args, 'range'), kept?.series),
+  print: (read, args) => (args.json === true ? [JSON.stringify(read, null, 2)] : seriesLines(read)),
 };
 
 /** The reads, in the order `nemia`'s help lists them. */

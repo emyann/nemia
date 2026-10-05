@@ -306,11 +306,12 @@ export type Headline = {
 
 /**
  * One step's totals, for one agent: its tries, their known run time and their checks' (`checkMs`), what the measured ones cost
- * (`costTries` of them measured), their checks' verdicts, and the mean gate wait; and the calls refused it, `deniedCalls` over the `deniedTries` tries measured (null with none),
- * each call with its count (`denials`), most first, then by call; and the skills its sessions loaded, `skillLoads` over the `skillTries`
- * tries measured (null with none), each skill loaded or touched with its loads, its tries and how often it was loaded when its paths were
- * touched (`skills`, `skillRowsOf`), most loads first, then by name; and each rule its skills declare, kept
- * or broken over the tries whose denials were measured (`rules`, `ruleRowsOf`), empty with none declared or measured.
+ * (`costTries` of them measured), their checks' verdicts, and the mean gate wait; and the calls refused it, `deniedCalls` over the
+ * `deniedTries` tries measured (null with none), each call with its count (`denials`), most first, then by call; and the skills its
+ * sessions loaded, `skillLoads` over the `skillTries` tries measured (null with none), each skill loaded or touched with its loads, its
+ * tries and how often it was loaded when its paths were touched (`skills`, `skillRowsOf`), most loads first, then by name; and each rule
+ * its skills declare, kept or broken over the tries whose denials were measured (`rules`, `ruleRowsOf`), empty with none declared or
+ * measured.
  */
 export type StepRow = {
   step: string;

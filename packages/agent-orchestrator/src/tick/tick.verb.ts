@@ -36,7 +36,7 @@ import { reportedEngine } from '../views/views.verb.ts';
 import { startQueued } from '../inbox/inbox.verb.ts';
 import { countRested, meteredPass, noteSeen, within } from '../meter/tally.store.ts';
 import { RECENT_KEPT, sessionsOf, type PassCost, type Reading, type RecentPass } from '../meter/meter.ts';
-import { keepSeries } from '../series/series.verb.ts';
+import { keepSeries } from '../series/series.store.ts';
 import { advanceRun, type Advanced } from './advance.verb.ts';
 import { stagedRead } from '../list/list.verb.ts';
 import { costOf, ioOf, meteredEngine, recordPassMetrics } from '../meter/meter.verb.ts';

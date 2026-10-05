@@ -84,8 +84,8 @@ const skillsWord = (s: StepRow): string =>
   s.skillLoads === null ? NONE : s.skillTries === s.tries ? String(s.skillLoads) : `${s.skillLoads} (${s.skillTries} of ${s.tries})`;
 
 /**
- * A row per step and agent: its tries, their run time, its checks' run time and cost, its checks' verdicts, its mean gate wait, the calls it was refused, the
- * skills it loaded.
+ * A row per step and agent: its tries, their run time, its checks' run time and cost, its checks' verdicts, its mean gate wait, the calls
+ * it was refused, the skills it loaded.
  */
 function stepLines(steps: readonly StepRow[]): string[] {
   if (!steps.length) return [];

@@ -2,7 +2,7 @@
  * The system's series, the pure half: what a pass is sampled into (`samplesOf`), a minute's samples rolled into lines (`rollMinutes`),
  * lines merged into hours and days (`mergeLines`), which minutes and hours are due to roll (`minutesDue`, `hoursDue`), which days are past
  * their retention (`daysPast`), a range read into points (`seriesOf`), a period's health (`healthOf`), and the words `nemia series` says.
- * The files are `series.store.ts`'s; the passes that roll and prune, `series.verb.ts`'s.
+ * The files, and the passes that roll and prune them, are `series.store.ts`'s.
  *
  * A line is one series over one span: its start `t`, its series `s`, its labels `l`, how many samples `n`, their `sum`, `min`, `max` and
  * `last`, and for a histogram the counts of its buckets `b` with `p50` and `p95` — exact for a minute, to the bucket for a merged span.

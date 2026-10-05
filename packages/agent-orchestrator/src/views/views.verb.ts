@@ -290,11 +290,11 @@ export const waitingOf =
     views.get(taskId)?.waitingFor;
 
 /**
- * What a task's sessions were denied, off views already read: every call the harness refused on an attempt that ended, as a permission rule
- * names it (`denialText`: `Skill(look)`, `Bash(pytest)`), each text once, in the order first denied. Empty for a task nobody read, one
- * whose attempts denied nothing, and one whose harness cannot say — a `background: true` session records none (the runtime's
- * `Attempt.denials`) — so an empty list is not a claim that nothing was denied. Costs no observation of its own: the denials are on the
- * engine's journal.
+ * What a task's sessions were denied, off views already read: every call the harness refused on an attempt, a running one's so far, as
+ * a permission rule names it (`denialText`: `Skill(look)`, `Bash(pytest)`), each text once, in the order first denied. Empty for a task
+ * nobody read, one whose attempts denied nothing, and one whose harness cannot say — a `background: true` session records none (the
+ * runtime's `Attempt.denials`) — so an empty list is not a claim that nothing was denied. Costs no observation of its own: the denials
+ * are on the engine's journal.
  *
  * Every attempt of the task, not only its last: an attempt the engine started again within one filing is the same try, and what the first
  * was denied is still what the step could not do. A try is a task of its own (`checkTaskId`, `sessionTasks`), so the current try's task

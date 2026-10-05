@@ -500,7 +500,7 @@ Since thin runtime stage 2 part 1 (2026-09-23), `claude` runs a task as a job, `
 --verbose --permission-prompts none` in the worker the engine detaches, and as `claude --bg` when its task says
 `config.background: true` (`src/harness/claude/code.ts`); since part 2a (the same day) a job reads its brief, and the words
 said to it, on its stdin (`--input-format stream-json`). Measured by hand on **Claude Code 2.1.280**, haiku, in folders under
-`/tmp`, before it was built; `test/live.test.ts` keeps each measurable (`AE_LIVE=1`, the tests named M1 to M12).
+`/tmp`, before it was built; `test/live.test.ts` keeps each measurable (`AE_LIVE=1`, the tests named M1 to M12, and M14).
 
 - **M1: a job waits on nobody.** `claude -p` in `auto`, `dontAsk` (with `--allowedTools 'Edit(**),Bash(npm test)'`), `default`
   and `acceptEdits`, each with and without `--permission-prompts none`, told to write outside its folder, run a command and
@@ -572,15 +572,24 @@ said to it, on its stdin (`--input-format stream-json`). Measured by hand on **C
   attempt ends with the id the turn continued, and a continuation resumes a conversation that holds the failure. Where the
   turn began would be kept by resuming each turn with `--fork-session`, a new id per turn and the signed session left as it
   was: not built, a change to the runner's arguments for one harness.
+- **M14: a job's denial reaches its capture before its result.** On **2.1.289**, haiku, `dontAsk` with only `Bash(sleep:*)`
+  allowed, told to run `curl` (expected to be denied) and then `sleep 40`: the `permission_denied` line was in the job's
+  capture about 4 s in, its result about 50 s in. So a sighting of the working job names the denial, and since then the
+  engine journals it as a `denied` entry on the attempt in flight (`deniedFacts`, `src/core/engine/denied.ts`); the end's
+  `permission_denials` still replace the list. Measured first by hand on the raw stream, then as M14, twice. A `ls` was not
+  denied in `dontAsk` (a read-only command), and a brief that does not say the denial is expected ends on it.
 
 What a job gives up, or what is not done:
 
 - **A job is told on its stdin, until its result** (issue 29). A person who means to attach to a step, or bridge it to
   claude.ai, still files it with `background: true`.
-- **A background session's denials are not read.** M1's two shapes are `claude -p`'s output, which a `--bg` session does
-  not print; what its transcript writes for a denied call was not measured, and the attempt of a `--bg` session carries no
-  `denials`. Since stage 2 part 2 every orchestrator step is a job, and its attempt carries its denials, but for a step that
-  says `background: true`: the shipped supervisor, in `dontAsk`, whose calls off its `allowedTools:` list are denied unread.
+- **A background session's denials are read nowhere, neither while it works nor at its end.** M1's two shapes are
+  `claude -p`'s output, which a `--bg` session does not print; what its transcript writes for a denied call was not measured,
+  and the attempt of a `--bg` session carries no `denials`. Since stage 2 part 2 every orchestrator step is a job, and its
+  attempt carries its denials, live since M14, but for a step that says `background: true` and the system agent's own
+  long-lived session, in `dontAsk`, whose calls off its `allowedTools:` list are denied unread. The candidate source is the
+  transcript's refused `tool_result` for the call, to be measured on its own before a reader is built. `claude-detached`,
+  Codex and a remote agent report no denial while they work either.
 - **A session journalled on `claude` before part 1 is a `--bg` session with no `background` in its config.** It is still
   observed, stopped, released and settled by its id's shape, and `say` reaches it the same way: `say` reads the mode off the
   running session's id, as the runner does, and off the config only when nothing runs (`test/say.test.ts`).

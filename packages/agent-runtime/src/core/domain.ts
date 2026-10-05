@@ -284,6 +284,9 @@ export type EndReason = 'harness' | 'lost' | 'unsigned' | 'unstartable' | 'opera
  *   sighting each time they differ from the record (`countedFacts`). Replaces the attempt's `usage` whole, so a count its runner
  *   no longer gives — tokens past a compaction — is dropped, not kept stale; an end that carries none keeps it. `decide` never
  *   reads it.
+ * - `denied`: a tool call the harness refused the attempt in flight, as it said so while the attempt ran: written by the engine
+ *   off a working sighting, once per denial past those the attempt holds (`deniedFacts`). Joins the attempt's `denials`; an
+ *   end that names its own replaces them. `decide` never reads it.
  * - `stop-requested`: the operator asked for it to stop.
  * - `said`: a person's words, handed to the session of the attempt in flight through its harness (`say`). Written once
  *   the harness took them, so it means they were handed over — not that the session read them, or did what they asked.
@@ -378,6 +381,7 @@ export type Event =
     }
   | { kind: 'measured'; at: string; attempt: number; usage: Usage }
   | { kind: 'counted'; at: string; attempt: number; usage: Usage }
+  | ({ kind: 'denied'; at: string; attempt: number } & Denial)
   | { kind: 'gap'; at: string; attempt: number; mono?: Monotonic }
   | { kind: 'process'; at: string; attempt: number; pid?: number }
   | { kind: 'stop-requested'; at: string }
@@ -516,7 +520,10 @@ function endAttempt(a: Attempt, e: Extract<Event, { kind: 'ended' }>): void {
 }
 
 /** An event about one attempt, `e`, written into that attempt's fold `a`. */
-function foldInto(a: Attempt, e: Extract<Event, { kind: 'spawned' | 'ended' | 'measured' | 'counted' | 'gap' | 'process' }>): void {
+function foldInto(
+  a: Attempt,
+  e: Extract<Event, { kind: 'spawned' | 'ended' | 'measured' | 'counted' | 'denied' | 'gap' | 'process' }>,
+): void {
   switch (e.kind) {
     case 'spawned':
       a.spawnedAt = e.at;
@@ -530,6 +537,9 @@ function foldInto(a: Attempt, e: Extract<Event, { kind: 'spawned' | 'ended' | 'm
       return;
     case 'counted':
       a.usage = e.usage;
+      return;
+    case 'denied':
+      a.denials = [...(a.denials ?? []), e.what === undefined ? { tool: e.tool } : { tool: e.tool, what: e.what }];
       return;
     case 'gap':
       if (a.gapSince === undefined && e.mono) a.gapMono = e.mono;
@@ -600,6 +610,7 @@ export function fold(taskId: string, events: readonly Event[]): State {
       case 'ended':
       case 'measured':
       case 'counted':
+      case 'denied':
       case 'gap':
       case 'process': {
         const a = s.attempts.find((x) => x.n === e.attempt);

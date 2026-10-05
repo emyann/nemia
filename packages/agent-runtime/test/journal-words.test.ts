@@ -274,6 +274,7 @@ test('what the harness denied the session is written on its end, as it said it, 
   const denials = [{ tool: 'Skill', what: 'look' }, { tool: 'Bash', what: 'pytest' }, { tool: 'WebFetch' }];
   b.sessions.set(name, { ...b.sessions.get(name)!, state: 'failed', busy: false, denials });
   await Effect.runPromise(b.engine.tick());
+  assert.equal((await b.record(id)).filter((e) => e.kind === 'denied').length, 0, 'a session seen only over is written no denied entry');
   const ended = (await b.record(id)).find((e) => e.kind === 'ended');
   assert.deepEqual(ended, {
     kind: 'ended',
@@ -302,6 +303,32 @@ test('what the harness denied the session is written on its end, as it said it, 
   assert.equal('denials' in old.attempts[0], false, 'an attempt whose end names no denial carries no key');
   assert.deepEqual(fold(id, none), old, 'a journal an older runtime wrote, with no `denials` key, folds as one written with none denied');
   assert.deepEqual(fold(id, events), { ...old, attempts: [{ ...old.attempts[0], denials }] });
+});
+
+test('what the harness denies a session while it works is written as it says it, each denial once, and its end names them all', async () => {
+  const b = board();
+  const id = await Effect.runPromise(b.engine.file(filing));
+  await Effect.runPromise(b.engine.tick());
+  const name = 'ae/t-words/1';
+  const working = b.sessions.get(name)!;
+  const [ls, glob] = [{ tool: 'Bash', what: 'ls' }, { tool: 'Glob' }];
+  const denied = async () => (await b.record(id)).filter((e) => e.kind === 'denied');
+  b.sessions.set(name, { ...working, denials: [ls] });
+  await Effect.runPromise(b.engine.tick());
+  assert.deepEqual(await denied(), [{ kind: 'denied', at: '<at>', attempt: 1, tool: 'Bash', what: 'ls' }]);
+  b.sessions.set(name, { ...working, denials: [ls, glob] });
+  await Effect.runPromise(b.engine.tick());
+  await Effect.runPromise(b.engine.tick());
+  assert.deepEqual(await denied(), [
+    { kind: 'denied', at: '<at>', attempt: 1, tool: 'Bash', what: 'ls' },
+    { kind: 'denied', at: '<at>', attempt: 1, tool: 'Glob' },
+  ]);
+  assert.deepEqual((await Effect.runPromise(b.engine.view(id))).state.attempts[0]?.denials, [ls, glob], 'the attempt in flight says them');
+  b.sessions.set(name, { ...working, state: 'failed', busy: false, denials: [ls, ls, glob] });
+  await Effect.runPromise(b.engine.tick());
+  assert.equal((await denied()).length, 2, 'the end writes no denied entry');
+  assert.deepEqual((await b.record(id)).find((e) => e.kind === 'ended')?.denials, [ls, ls, glob]);
+  assert.deepEqual((await Effect.runPromise(b.engine.view(id))).state.attempts[0]?.denials, [ls, ls, glob], 'the end stands');
 });
 
 test('the skills the session loaded are written on its end as its harness said them, an empty list kept, and an end without the key folds with none', async () => {

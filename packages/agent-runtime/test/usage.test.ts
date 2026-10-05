@@ -864,6 +864,18 @@ test("ae feed prints a long-lived attempt's counts as they grow, with no cost, w
   );
 });
 
+test('ae feed prints each call the harness denied a running attempt as it is written, and ae show the running attempt with what it was denied so far', () => {
+  const denied: Event = { kind: 'denied', at: '2026-10-05T19:40:00Z', attempt: 1, tool: 'Bash', what: 'ls' };
+  assert.equal(entryLine('t-1', denied), `19:40:00  ${'t-1'.padEnd(34)} ${'denied'.padEnd(10)}  attempt 1: Bash(ls)`);
+  const state = fold('t-1', [
+    { kind: 'filed', at: '2026-10-05T19:39:00Z', brief: 'b', cwd: '/r' },
+    { kind: 'starting', at: '2026-10-05T19:39:01Z', attempt: 1 },
+    denied,
+    { kind: 'denied', at: '2026-10-05T19:40:01Z', attempt: 1, tool: 'Glob' },
+  ]);
+  assert.match(attemptLine(state.attempts[0]), /^attempt 1 {2}running since \S+ {2}denied: Bash\(ls\), Glob$/);
+});
+
 test('ae show prints the budget and the context window a task was filed with, and nothing for either it was not', () => {
   const filed = (extra: object): Event => ({ kind: 'filed', at: '2026-09-19T09:00:00Z', brief: 'b', cwd: '/r', ...extra });
   assert.deepEqual(limitLines(fold('t-1', [filed({ config: { contextTokens: 200000, budgetUsd: 0.25 } })])), [

@@ -85,16 +85,16 @@ const unstated = (stated: boolean | undefined): string => (stated === false ? ' 
 /**
  * One attempt, for `ae show`: how it ended, when it ran, how its process exited if it has one, what it consumed. A session
  * its harness ended at its spend cap says so as `failed (budget)`, the limit beside the end; what the harness denied the
- * session is said as the rules a person would write to allow it: the calls it went on without.
+ * session is said as the rules a person would write to allow it: the calls it went on without, a running attempt's so far.
  */
 export const attemptLine = (a: Attempt): string => {
   const when = ranLine(a);
-  if (a.ended === null) return `attempt ${a.n}  running ${when}`;
+  const denied = a.denials?.length ? `  denied: ${a.denials.map(denialText).join(', ')}` : '';
+  if (a.ended === null) return `attempt ${a.n}  running ${when}${denied}`;
   if (a.reason === 'unstartable') return `attempt ${a.n}  ${a.ended} (unstartable)  ${when}  ${a.error?.split('\n')[0] ?? ''}`.trimEnd();
   const how = `${a.ended}${a.reason === 'lost' ? ' (lost)' : a.limit ? ` (${a.limit})` : unstated(a.stated)}`;
   const exit = a.exitCode !== null ? `  exit ${a.exitCode}` : '';
   const failedCall = a.error ? `  — the spawn call failed: ${a.error.split('\n')[0]}` : '';
-  const denied = a.denials?.length ? `  denied: ${a.denials.map(denialText).join(', ')}` : '';
   return `attempt ${a.n}  ${how}  ${when}${exit}  ${usageLine(a.usage)}${denied}${failedCall}`;
 };
 
@@ -121,6 +121,7 @@ const KINDS: Record<string, string> = {
   ended: 'ended',
   measured: 'measured',
   counted: 'counted',
+  denied: 'denied',
   settled: 'SETTLED',
   'stop-requested': 'stop asked',
   said: 'said',
@@ -134,6 +135,7 @@ const EXTRAS: { [K in Event['kind']]?: (event: Extract<Event, { kind: K }>) => s
   settled: (e) => `  ${e.outcome}`,
   measured: (e) => `  attempt ${e.attempt}: ${costLine(e.usage)}`,
   counted: (e) => `  attempt ${e.attempt}: ${runningLine(e.usage)}`,
+  denied: (e) => `  attempt ${e.attempt}: ${denialText(e)}`,
   ended: (e) =>
     `  ${e.observed}${e.limit ? ` (${e.limit})` : e.reason === 'harness' ? unstated(e.stated) : ` (${e.reason})`}${e.error ? `: ${e.error.split('\n')[0].slice(0, 160)}` : ''}`,
   spawned: (e) => (e.error ? `  but the call failed: ${e.error.split('\n')[0].slice(0, 160)}` : ''),

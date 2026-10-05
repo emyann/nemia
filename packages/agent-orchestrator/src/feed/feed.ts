@@ -181,15 +181,16 @@ export const feedPhase = (word: string): string =>
  *
  * @param closeoutOf How each step signed off, as `listing` was handed it: a step that signed off blocked says what it needs beside its
  *   word.
- * @param deniedOf Each call a step's task was denied, in the runtime's words (`denialText`), as its ended attempts journalled them: a step
- *   denied a call says which beside its word (`deniedNote`).
+ * @param deniedOf What a step's task was denied so far, in the runtime's words (`denialText`): every call of its ended attempts (`ended`),
+ *   and each distinct call of one still running (`running`, `deniedSoFarOf`). A step denied a call says which beside its word
+ *   (`deniedNote`).
  */
 export function feedWords(
   l: Listing,
   run: Pick<Run, 'pruned' | 'hold'>,
   { status, stoppedOn }: Pick<Assessment, 'status' | 'stoppedOn'>,
   closeoutOf: (step: string) => Closeout | { error: string } | undefined = () => undefined,
-  deniedOf: (step: string) => readonly string[] = () => [],
+  deniedOf: (step: string) => { ended: readonly string[]; running: readonly string[] } = () => ({ ended: [], running: [] }),
 ): FeedWords {
   const onYou = onYouWords(l);
   return {
@@ -202,7 +203,8 @@ export function feedWords(
           : {}),
     },
     steps: l.steps.map((s) => {
-      const note = [needsNote(closeoutOf(s.name)), deniedNote(deniedOf(s.name)), s.note].filter(Boolean).join(' · ');
+      const denied = deniedOf(s.name);
+      const note = [needsNote(closeoutOf(s.name)), deniedNote(denied.ended, denied.running), s.note].filter(Boolean).join(' · ');
       return { name: s.name, word: l.slot && s.status === slotWord(l.slot) ? SLOT_WAIT : shownStatus(s), ...(note ? { note } : {}) };
     }),
   };
@@ -228,15 +230,18 @@ const needsNote = (c: Closeout | { error: string } | undefined): string => {
 const DENIED_CAP = 5;
 
 /**
- * The calls a step's task was denied, for its line in the feed: `denied: <call> ×<n>, …`, each distinct call once with how many times it
- * was denied, in the order first denied, at most `DENIED_CAP` named and the rest counted — or nothing, for a step denied nothing. A
- * subscriber woken by `denied:` reads the call a grant would have let through.
+ * The calls a step's task was denied, for its line in the feed: `denied: <call> ×<n>, …`, each distinct call of its ended attempts
+ * (`calls`) once with how many times they denied it, then each call a running attempt was denied that they did not (`running`) by its
+ * name alone, with no count until its attempt ends; in the order first denied, at most `DENIED_CAP` named and the rest counted — or
+ * nothing, for a step denied nothing. The note changes, and wakes a subscriber, on a running call not yet named, and once more with the
+ * counts when the attempt ends. A subscriber woken by `denied:` reads the call a grant would have let through.
  */
-export const deniedNote = (calls: readonly string[]): string => {
-  const counts = new Map<string, number>();
+export const deniedNote = (calls: readonly string[], running: readonly string[] = []): string => {
+  const counts = new Map<string, number | null>();
   for (const call of calls.map((c) => oneLine(c, NEEDS_CAP))) counts.set(call, (counts.get(call) ?? 0) + 1);
+  for (const call of running.map((c) => oneLine(c, NEEDS_CAP))) if (!counts.has(call)) counts.set(call, null);
   if (!counts.size) return '';
-  const named = [...counts].slice(0, DENIED_CAP).map(([call, n]) => `${call} ×${n}`);
+  const named = [...counts].slice(0, DENIED_CAP).map(([call, n]) => (n === null ? call : `${call} ×${n}`));
   const more = counts.size > DENIED_CAP ? [`and ${counts.size - DENIED_CAP} more`] : [];
   return `denied: ${[...named, ...more].join(', ')}`;
 };

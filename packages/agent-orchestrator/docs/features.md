@@ -2295,7 +2295,8 @@ stateDiagram-v2
 <!-- diagram:nemia:end -->
 
 - **A step denied a call says so on its feed line**: a note part `denied: <call> ×<n>, …` (`deniedNote`, `src/feed/feed.ts`), off the
-  denials its task's ended attempts journalled (`deniedCallsOf`), each distinct call counted, at most five named. `denied:` is one of
+  denials its task's attempts journalled (`deniedSoFarOf`): a running attempt's each distinct call once, by its name alone, as the
+  runtime journals it (`denied`), and each call counted when its attempt ends, at most five named. `denied:` is one of
   her wake words, and her `grant-access` skill proposes the narrowest allow that would have let the call through, or says the deny
   stands.
 - **Her quota and her spend**: her task is allowed `curl -s <url>/api/quota` unasked, the address read off `daemon.json` at filing
@@ -2307,7 +2308,8 @@ instruction` is not on her allow list, since its write flags share its prefix.
 
 Tested in `src/nemia/nemia.test.ts` (what the keeper owes; a task stopped from outside never filed again; the levels; the diagram;
 `denied:` waking her alone), `src/nemia/keep.verb.test.ts` (the untrusted refusal, the filing and its fields, the quota allow, her spend,
-a stop from outside, manual, memory), `src/feed/feed.test.ts` (the `denied:` note, and a tick that says it once),
+a stop from outside, manual, memory), `src/feed/feed.test.ts` (the `denied:` note, a tick that says it once, and a running step's calls said as they come),
+`src/stats/discipline.test.ts` (the calls so far beside the ended ones the stats count),
 `src/subscription/subscription.verb.test.ts` (the name `nemia` refused), `test/agent-fences.test.ts` (her deny list, and a mode but
 `default` refused) and `test/nemia-shipped.test.ts` (no team name ships; each skill named ships).
 

@@ -45,12 +45,13 @@ const refusedWith = (pattern: RegExp) => (err: Error & { exitCode?: number }) =>
 
 /**
  * An engine board a test settles by hand, as queue-store.test.ts's: a task filed is `pending`, one given a live word (`running (working)`)
- * is running with it, and a settled one carries the closeout it is given. It counts its reads, so a test can say the feed asked for none.
+ * is running with it, and a settled one carries the closeout it is given. A task denied calls has its attempt ended, or running with
+ * them (`live`). It counts its reads, so a test can say the feed asked for none.
  */
 const board = () => {
   const tasks = new Map<
     string,
-    { spec: { id: string; brief: string; closeoutSchema?: object }; phase: string; closeout?: unknown; denials?: object[] }
+    { spec: { id: string; brief: string; closeoutSchema?: object }; phase: string; closeout?: unknown; denials?: object[]; live?: boolean }
   >();
   const settledPhase = (p: string) => ['succeeded', 'failed', 'stopped'].includes(p);
   let views = 0;
@@ -76,7 +77,7 @@ const board = () => {
               : [
                   {
                     n: 1,
-                    ended: t.denials ? { at: '2026-09-22T10:05:00.000Z' } : null,
+                    ended: t.denials && !t.live ? { at: '2026-09-22T10:05:00.000Z' } : null,
                     ...(t.denials ? { denials: t.denials } : {}),
                     nativeId: `native-${id}`,
                     closeout: t.closeout,
@@ -103,7 +104,7 @@ const board = () => {
     feed: async () => ({ entries: [], cursor: 0 }),
   });
   const set = (id: string, phase: string, closeout?: unknown) => Object.assign(tasks.get(id)!, { phase, closeout });
-  const deny = (id: string, denials: object[]) => Object.assign(tasks.get(id)!, { denials });
+  const deny = (id: string, denials: object[], live = false) => Object.assign(tasks.get(id)!, { denials, live });
   return { e, set, deny, views: () => views };
 };
 
@@ -380,6 +381,36 @@ test('a step at work that is denied a call says it while its word stands at runn
     { word: plan.at(-1)!.word, note: plan.at(-1)!.note },
     { word: 'running', note: 'denied: Bash(git push) ×1' },
     'the same word, with the denial beside it, is a line',
+  );
+});
+
+test('a running step says each distinct call it is denied on its line in the feed as it is denied, and the counts once its attempt ends', async () => {
+  emptyStore();
+  const b = board();
+  const run = await started('the live denial');
+  await runWith(b.e, tickRun());
+  const [ls, glob] = [{ tool: 'Bash', what: 'ls' }, { tool: 'Glob' }];
+  const id = `${run.id}-plan`;
+  b.set(id, 'running (working)');
+  const denied = () => lines().filter((l) => l.run === run.id && l.step === 'plan' && l.note?.startsWith('denied:'));
+  b.deny(id, [ls], true);
+  await runWith(b.e, tickRun());
+  assert.deepEqual(
+    denied().map((l) => l.note),
+    ['denied: Bash(ls)'],
+    'said while the attempt runs, with no count: the attempt has not ended',
+  );
+  b.deny(id, [ls, ls], true);
+  await runWith(b.e, tickRun());
+  assert.equal(denied().length, 1, 'the same call denied again says nothing new');
+  b.deny(id, [ls, ls, glob], true);
+  await runWith(b.e, tickRun());
+  b.deny(id, [ls, ls, glob]);
+  for (let i = 0; i < 2; i++) await runWith(b.e, tickRun());
+  assert.deepEqual(
+    denied().map((l) => l.note),
+    ['denied: Bash(ls)', 'denied: Bash(ls), Glob', 'denied: Bash(ls) ×2, Glob ×1'],
+    'a new call says itself, and the end counts each',
   );
 });
 
@@ -1080,11 +1111,17 @@ test('feedWords says the run with its prune, what waits on a person as a note, a
   assert.deepEqual(feedWords(held, run, { status: 'failed' }).run, { word: 'failed' }, 'and one that broke says failed');
 });
 
-test("a step's denied calls are its note's denied: part, each distinct call counted, in the order first denied, the rest past five counted", () => {
+test("a step's denied calls are its note's denied: part, each distinct ended call counted, a running one named, in the order first denied, the rest past five counted", () => {
   assert.equal(deniedNote([]), '', 'a step denied nothing says nothing of it');
   assert.equal(deniedNote(['Bash(git push)', 'WebFetch', 'Bash(git push)']), 'denied: Bash(git push) ×2, WebFetch ×1');
   assert.equal(deniedNote(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'a']), 'denied: a ×2, b ×1, c ×1, d ×1, e ×1, and 2 more');
   assert.equal(deniedNote(['Bash(echo\nrm)']), 'denied: Bash(echo rm) ×1', 'one line');
+  assert.equal(
+    deniedNote(['WebFetch', 'Bash(ls)'], ['Bash(ls)', 'Glob']),
+    'denied: WebFetch ×1, Bash(ls) ×1, Glob',
+    'a running call is named with no count, and one an ended attempt was denied keeps that count',
+  );
+  assert.equal(deniedNote([], ['a', 'b', 'c', 'd', 'e', 'f']), 'denied: a, b, c, d, e, and 1 more', 'running calls are capped alike');
   const steps = [{ name: 'build', after: [], brief: 'build it' }] as unknown as Parameters<typeof listing>[0]['steps'];
   const run = {
     id: 'r-1',
@@ -1101,7 +1138,7 @@ test("a step's denied calls are its note's denied: part, each distinct call coun
     run,
     { status: 'running' },
     () => undefined,
-    (step) => (step === 'build' ? ['Bash(git push)'] : []),
+    (step) => ({ ended: step === 'build' ? ['Bash(git push)'] : [], running: [] }),
   );
   assert.equal(words.steps[0].note?.split(' · ')[0], 'denied: Bash(git push) ×1', 'a part of its own, first beside a need');
 });

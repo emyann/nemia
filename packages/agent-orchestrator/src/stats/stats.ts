@@ -18,6 +18,7 @@ import type { Workflow } from '../step/step.ts';
 import { DEFAULT_FACTORY } from '../factory/factory.ts';
 import { askedAgain, landsOnCheck } from '../status/status.ts';
 import type { Timeline, TimelineTry } from '../timeline/index.ts';
+import { healthOf, type Health } from '../series/series.ts';
 import { marksOf, type Mark, type RunFrozen } from './marks.ts';
 import {
   deniesRecorded,
@@ -54,8 +55,9 @@ export type RunKeys = { run: string; factory: string; workflow: string; repo: st
 
 /**
  * One try of one step that ended, on the UTC day it ended: its check's end, or its session's where it has no check. `agent` is the
- * step's agent, null where it names none. `ranMs` is its session's and its check's run times, `costUsd` what its session cost, `check` its
- * check's verdict, null with no check, and `gateWaitMs` the wait for a person's approval of this try: each null where not measured.
+ * step's agent, null where it names none. `ranMs` is its session's and its check's run times, `checkMs` its check's alone, `costUsd`
+ * what its session cost, `check` its check's verdict, null with no check, and `gateWaitMs` the wait for a person's approval of this try:
+ * each null where not measured.
  * `denied` names each call its session was refused, one per call; null for a try that ran no session of its own (a recheck's), on a step
  * whose harness records no denial (`deniesRecorded`), and for a session filed before steps ran as jobs (`ranAsJob`). `skills` names each
  * skill its session loaded, one per load, `[]` for none; null for a try with no session of its own, and for a session an end of which does
@@ -72,6 +74,7 @@ export type TryFact = RunKeys & {
   agent: string | null;
   try: number;
   ranMs: number | null;
+  checkMs: number | null;
   costUsd: number | null;
   check: CheckVerdict | null;
   gateWaitMs: number | null;
@@ -180,6 +183,7 @@ function tryFactsOf(r: RunRead): TryFact[] {
           agent: step.agent?.name ?? null,
           try: t.try,
           ranMs: knownSum([t.session?.ranMs, t.check?.ranMs]),
+          checkMs: t.check?.ranMs ?? null,
           costUsd: t.used?.costUsd ?? null,
           check: t.check ? r.verdictOf(t.check.taskId) : null,
           gateWaitMs: gateWaitOf(r, step, t),
@@ -301,18 +305,20 @@ export type Headline = {
 };
 
 /**
- * One step's totals, for one agent: its tries, their known run time, what the measured ones cost (`costTries` of them measured), their
- * checks' verdicts, and the mean gate wait; and the calls refused it, `deniedCalls` over the `deniedTries` tries measured (null with none),
- * each call with its count (`denials`), most first, then by call; and the skills its sessions loaded, `skillLoads` over the `skillTries`
- * tries measured (null with none), each skill loaded or touched with its loads, its tries and how often it was loaded when its paths were
- * touched (`skills`, `skillRowsOf`), most loads first, then by name; and each rule its skills declare, kept
- * or broken over the tries whose denials were measured (`rules`, `ruleRowsOf`), empty with none declared or measured.
+ * One step's totals, for one agent: its tries, their known run time and their checks' (`checkMs`), what the measured ones cost
+ * (`costTries` of them measured), their checks' verdicts, and the mean gate wait; and the calls refused it, `deniedCalls` over the
+ * `deniedTries` tries measured (null with none), each call with its count (`denials`), most first, then by call; and the skills its
+ * sessions loaded, `skillLoads` over the `skillTries` tries measured (null with none), each skill loaded or touched with its loads, its
+ * tries and how often it was loaded when its paths were touched (`skills`, `skillRowsOf`), most loads first, then by name; and each rule
+ * its skills declare, kept or broken over the tries whose denials were measured (`rules`, `ruleRowsOf`), empty with none declared or
+ * measured.
  */
 export type StepRow = {
   step: string;
   agent: string | null;
   tries: number;
   ranMs: number | null;
+  checkMs: number | null;
   costUsd: number | null;
   costTries: number;
   checks: Record<CheckVerdict, number>;
@@ -346,7 +352,7 @@ export type Group = {
 /**
  * What `nemia stats` and `GET /api/stats` answer: the days asked for, the filters and the key, the numbers of every fact kept (`all`), and,
  * with a key, one group per value of it (`key`, null for a step with no agent or a run with no repository). `unreadable` names each run
- * left out because a journal of it does not read.
+ * left out because a journal of it does not read. `health` is the system's over the same days, off the series' hour lines (`Health`).
  */
 export type Stats = {
   from: string | null;
@@ -356,6 +362,7 @@ export type Stats = {
   all: Group;
   groups: Array<Group & { key: string | null }>;
   unreadable: string[];
+  health: Health;
 };
 
 const mean = (values: ReadonlyArray<number | null>): number | null => {
@@ -402,6 +409,7 @@ function stepRowsOf(tries: readonly TryFact[]): StepRow[] {
     agent: of[0].agent,
     tries: of.length,
     ranMs: knownSum(of.map((t) => t.ranMs)),
+    checkMs: knownSum(of.map((t) => t.checkMs)),
     costUsd: knownSum(of.map((t) => t.costUsd)),
     costTries: of.filter((t) => t.costUsd !== null).length,
     checks: {
@@ -477,9 +485,16 @@ const byKey = (a: string | null, b: string | null): number => (a === b ? 0 : a =
  * before `from` or of another factory is still compared with; the facts and marks are then filtered by each key the query gives a value,
  * then kept between its days: `from` defaults to the first fact's or mark's day, `to` to `now`'s. With `by`, one group per value of that
  * key, sorted by key (`byKey`); a step with no agent, and a run with no repository, are a group of their own (`key` null), last. The tiles
- * are always the last 14 days to `now`'s day and the 14 before.
+ * are always the last 14 days to `now`'s day and the 14 before. `healthOver` reads the system's health over the days answered: none
+ * kept, unless handed.
  */
-export function statsOf(facts: Facts, query: StatsQuery, now: Date, unreadable: readonly string[] = []): Stats {
+export function statsOf(
+  facts: Facts,
+  query: StatsQuery,
+  now: Date,
+  unreadable: readonly string[] = [],
+  healthOver: (from: string | null, to: string) => Health = () => healthOf([]),
+): Stats {
   const filters = Object.fromEntries(BY_KEYS.flatMap((k) => (query[k] === undefined ? [] : [[k, query[k]]]))) as Partial<
     Record<ByKey, string>
   >;
@@ -498,6 +513,7 @@ export function statsOf(facts: Facts, query: StatsQuery, now: Date, unreadable: 
     all: groupOf(kept, from, to, today),
     groups: keys.map((key) => ({ key, ...groupOf(having(kept, query.by!, key), from, to, today) })),
     unreadable: [...unreadable],
+    health: healthOver(from, to),
   };
 }
 

@@ -64,7 +64,8 @@ import { phaseOfView } from '../views/views-words.ts';
 import { placesOf } from '../folder/lookup.store.ts';
 import { skillsFor } from '../folder/folder.store.ts';
 import { renderedFlags, rendersAgent, unrendered } from '../agents/agents.ts';
-import { within } from '../meter/tally.store.ts';
+import { noteFiledCheck, within } from '../meter/tally.store.ts';
+import { keysOf } from '../stats/index.ts';
 import { answerHeld, stopAsked } from './held.verb.ts';
 import { forStep } from '../telemetry/telemetry.store.ts';
 
@@ -513,6 +514,7 @@ export const fileChecks = Effect.fn('fileChecks')(function* (f: Filing, names: r
 /**
  * File a step's check where the engine does not hold it, on the `check` harness, with the command the run froze and a deadline, a landing's
  * its own, and put it on the record: an ending's installs first what the staged merge's lockfile asks for (`checkoutParts`), and says so.
+ * A check filed is noted to the pass's meter by what it belongs to (`noteFiledCheck`), never its run.
  */
 const fileCheck = Effect.fnUntraced(function* (f: Filing, name: string) {
   const { e, run } = f;
@@ -550,6 +552,8 @@ const fileCheck = Effect.fnUntraced(function* (f: Filing, name: string) {
         config: { command: checkArgv(step.check!, install !== undefined), env, niceness: CHECK_NICENESS },
       }),
     );
+    const { factory, workflow } = keysOf(run);
+    noteFiledCheck({ factory, workflow, step: name, agent: step.agent?.name ?? '' });
   }
   run.steps[name] = { ...run.steps[name], check: { taskId } };
 });

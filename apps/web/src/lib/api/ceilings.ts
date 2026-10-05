@@ -104,7 +104,10 @@ export const ceilingsQuery = queryOptions({
 /** What a pass saw: the runs in the store, the tasks not settled, and the sessions queued and admitted. */
 type Seen = { runs: number; tasks: number; queued: number; admitted: number };
 
-/** Mirrors the package's `RecentPass`: one of the recent passes, its time, what it saw and read, and each phase's time. */
+/**
+ * Mirrors the package's `RecentPass`: one of the recent passes, its time, what it saw and read, and each phase's time; and the machine's
+ * load per core and the longest a queued session had waited, absent from a pass an older tick kept.
+ */
 export type RecentPass = Seen & {
   at: string;
   ms: number;
@@ -112,6 +115,8 @@ export type RecentPass = Seen & {
   rested: number;
   reads: number;
   phases: Record<PassPhase, number>;
+  load?: number;
+  waitMs?: number;
 };
 
 /** Mirrors `PassesRead` (`GET /api/passes`): the recent passes, oldest first; their histogram (`le` null past the last bound); each
@@ -139,6 +144,8 @@ const PassesReadSchema = Schema.Struct({
         records: Schema.Number,
         rested: Schema.Number,
         reads: Schema.Number,
+        load: Schema.optionalKey(Schema.Number),
+        waitMs: Schema.optionalKey(Schema.Number),
         phases: Schema.Struct({
           records: Schema.Number,
           asks: Schema.Number,

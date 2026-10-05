@@ -302,6 +302,7 @@ const PINNED: Record<string, string[]> = {
     'seenBy',
     'sendBackTo',
     'sensitiveDiff',
+    'seriesMemo',
     'setInstruction',
     'signoffsSpent',
     'sizeOf',

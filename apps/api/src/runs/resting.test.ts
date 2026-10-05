@@ -31,9 +31,11 @@ const git = (repo: string, ...args: string[]) =>
     { cwd: repo, encoding: 'utf8' },
   );
 
+/** A file written whole, by a rename over it: as a hand edit of a journal must be, since the engine reads one only past what it kept. */
 const write = (file: string, text: string) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, text);
+  fs.writeFileSync(`${file}.new`, text);
+  fs.renameSync(`${file}.new`, file);
 };
 
 const repo = fs.mkdtempSync(path.join(root, 'repo-'));
@@ -155,6 +157,29 @@ function aRefusedRun(id: string) {
   writeRun(id, 'Refuse it', 'npm test');
 }
 
+/**
+ * The journals `f` asks the engine for: a task it views, and each task a list answers, read or unreadable. What a poll costs whether or
+ * not the engine's reader reads their bytes again: it reads a journal only for what was appended since it last read it.
+ */
+async function journalsAsked<T>(f: () => Promise<T>): Promise<{ value: T; asked: number }> {
+  const { view, list } = e;
+  let asked = 0;
+  e.view = async (taskId) => {
+    asked++;
+    return view(taskId);
+  };
+  e.list = async (...args: unknown[]) => {
+    const listed = await Reflect.apply(list, e, args);
+    asked += listed.views.length + listed.unreadable.length;
+    return listed;
+  };
+  try {
+    return { value: await f(), asked };
+  } finally {
+    Object.assign(e, { view, list });
+  }
+}
+
 const list = async () => {
   const res = await app.request('/api/runs');
   assert.equal(res.status, 200, await res.clone().text());
@@ -185,11 +210,10 @@ test("a finished run is kept and a moving one is not, and a poll then reads the 
   assert.ok(resting.runs.has('r-rest'), 'kept');
   assert.ok(!resting.runs.has('r-moving'), 'not kept: its task is in flight');
 
-  const reads = e.io().reads;
   const hits = resting.hits;
-  const again = await unverified(list);
+  const { value: again, asked } = await journalsAsked(() => unverified(list));
   assert.deepEqual(again, first, 'the same answer from memory');
-  assert.equal(e.io().reads - reads, 1, "the moving run's one journal, and not the finished run's");
+  assert.equal(asked, 1, "the moving run's one journal, and not the finished run's");
   assert.equal(resting.hits - hits, 1);
 });
 
@@ -280,11 +304,7 @@ test("runs waiting on the same run read its journals once between them, off the 
     );
   child('r-child-1');
   await list();
-  const cost = async () => {
-    const reads = e.io().reads;
-    await unverified(list);
-    return e.io().reads - reads;
-  };
+  const cost = async () => (await journalsAsked(() => unverified(list))).asked;
   const one = await cost();
   child('r-child-2');
   await list();
@@ -407,11 +427,7 @@ test('a gated run read by the list at every event from being filed to being appr
 
 test("a poll's reads: a run at rest, a moving one and one whose check refused it cost the journals of the moving one alone, and judged afresh their own journals and no more", async () => {
   await list();
-  const cost = async () => {
-    const reads = e.io().reads;
-    await unverified(list);
-    return e.io().reads - reads;
-  };
+  const cost = async () => (await journalsAsked(() => unverified(list))).asked;
   const before = await cost();
   aFinishedRun('r-count-rest');
   running('r-count-moving-implement');

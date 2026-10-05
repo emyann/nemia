@@ -10,7 +10,7 @@ import path from 'node:path';
 import { Schema } from 'effect';
 import { HOME } from '../record/record.store.ts';
 import { countRead, within } from '../meter/tally.store.ts';
-import { feedChanges, foldFeed, freshMemo, type FeedLine, type FeedMemo, type FeedWords } from './feed.ts';
+import { feedChanges, foldFeed, freshMemo, type FeedAppended, type FeedLine, type FeedMemo, type FeedWords } from './feed.ts';
 import { Invalid } from '../refusal/refusal.ts';
 
 /** The workflow layer's feed (`feed.ts`): beside `runs/`, one for the store, written by the tick alone. */
@@ -20,10 +20,10 @@ export const feedFile = (): string => path.join(HOME, 'feed.jsonl');
 const feedMemo: FeedMemo = freshMemo();
 
 /**
- * Write what the pass judged of every run in the store, where it is not what the feed said of it last (`recordFeedFile`), and the lines
- * written. `now` is every run the pass judged: one the feed still names that is not in it is gone, and gets its `removed` — but for one of
- * `unjudged`, which the pass read and could not judge (`feedChanges`). `memo` is for a test, which starts one afresh to be a restarted
- * daemon.
+ * Write what the pass judged of every run in the store, where it is not what the feed said of it last (`recordFeedFile`): the lines
+ * written, and where their bytes went (`FeedAppended`). `now` is every run the pass judged: one the feed still names that is not in it is
+ * gone, and gets its `removed` — but for one of `unjudged`, which the pass read and could not judge (`feedChanges`). `memo` is for a test,
+ * which starts one afresh to be a restarted daemon.
  */
 export const recordFeed = (
   now: ReadonlyMap<string, FeedWords>,
@@ -32,7 +32,7 @@ export const recordFeed = (
     memo = feedMemo,
     unjudged = new Set<string>(),
   }: { at?: string; memo?: FeedMemo; unjudged?: ReadonlySet<string> } = {},
-): FeedLine[] => within('act', () => recordFeedFile(feedFile(), now, at, memo, unjudged));
+): FeedAppended => within('act', () => recordFeedFile(feedFile(), now, at, memo, unjudged));
 
 /** A fold of nothing, for a test that plays a restarted daemon. */
 export const freshFeedMemo = freshMemo;
@@ -45,6 +45,15 @@ export const readFeed = (after = 0): { lines: FeedLine[]; cursor: number } => re
 
 /** Why `after` cannot be read from — or undefined when it can (`cursorRefusalAt`). */
 export const feedCursorRefusal = (after: number): string | undefined => cursorRefusalAt(feedFile(), after);
+
+/** The feed's size in bytes, 0 for a feed not written yet: what a live reader compares its cursor with before it reads. */
+export const feedSize = (): number => statOf(feedFile())?.size ?? 0;
+
+/**
+ * The lines after `after`, each with the byte just after it (`ends`), and the cursor to read on from (`readEnds`): what a live reader
+ * hands on. A cursor that is not the start of a line, or is past the end, is refused by name (exit 2).
+ */
+export const readFeedEnds = (after: number): { lines: FeedLine[]; ends: number[]; cursor: number } => readEnds(feedFile(), after);
 
 /**
  * Follow the feed from `from` until `stop()` (`watchFeedFile`), each line with the cursor just after it: refused before anything is watched
@@ -152,7 +161,8 @@ function readEnds(file: string, after: number): { lines: FeedLine[]; ends: numbe
 }
 
 /**
- * The pass's words written where they changed (`feedChanges`), in one append, and the lines written.
+ * The pass's words written where they changed (`feedChanges`), in one append: the lines written, the file's size before and after the
+ * append, and the newline written before them, if any (`FeedAppended`).
  *
  * `memo` is the fold this process has read so far. It is read on to the end of the feed first — the lines this process wrote last pass,
  * and any another wrote — and read again from the start when it does not fit the file: another file, or a cursor the file has no line
@@ -168,7 +178,7 @@ function recordFeedFile(
   at: string,
   memo: FeedMemo,
   unjudged: ReadonlySet<string>,
-): FeedLine[] {
+): FeedAppended {
   const stat = statOf(file);
   const size = stat?.size ?? 0;
   if ((memo.ino !== undefined && stat?.ino !== memo.ino) || cursorRefusalAt(file, memo.cursor) !== undefined)
@@ -178,11 +188,13 @@ function recordFeedFile(
   memo.cursor = read.cursor;
   memo.ino = stat?.ino;
   const lines = feedChanges(memo.fold, now, at, unjudged);
-  if (!lines.length) return [];
+  if (!lines.length) return { lines, before: size, after: size, leading: '' };
+  const leading = read.cursor < size ? '\n' : '';
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.appendFileSync(file, `${read.cursor < size ? '\n' : ''}${lines.map((l) => JSON.stringify(l)).join('\n')}\n`);
-  if (memo.ino === undefined) memo.ino = statOf(file)?.ino;
-  return lines;
+  fs.appendFileSync(file, `${leading}${lines.map((l) => JSON.stringify(l)).join('\n')}\n`);
+  const after = statOf(file);
+  if (memo.ino === undefined) memo.ino = after?.ino;
+  return { lines, before: size, after: after?.size ?? 0, leading };
 }
 
 /**

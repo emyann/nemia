@@ -15,7 +15,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { Cause, Context, Effect, Exit, Layer, Scope } from 'effect';
+import { Cause, Context, Effect, Exit, Layer, Logger, Scope } from 'effect';
 import { Engine as RuntimeEngine, refusalWords, type EngineShape } from 'agent-runtime/effect';
 import {
   claudeDetached,
@@ -147,10 +147,11 @@ export const asked = <A, E>(verb: string, effect: Effect.Effect<A, E>): Effect.E
 
 /**
  * `program` over the engine `e`, run to a Promise: what the CLI, the api and the tests run a controller with. Rejects with the refusal
- * the program failed with, or with whatever else it died of, as it was thrown.
+ * the program failed with, or with whatever else it died of, as it was thrown. Its logs go to no logger unless the program provides its
+ * own: a command run once says what it did in its own lines, and only a process that lives (`nemia up`, the api) says its passes.
  */
 export const runWith = <A, E>(e: Engine, program: Effect.Effect<A, E, EngineService>): Promise<A> =>
-  Effect.runPromise(program.pipe(Effect.provide(EngineService.layer(e))));
+  Effect.runPromise(program.pipe(Effect.provide(EngineService.layer(e)), Effect.provide(Logger.layer([]))));
 
 /**
  * `program` over the engine `e` in place of the one in its context: what a pass hands a read the engine it reads through

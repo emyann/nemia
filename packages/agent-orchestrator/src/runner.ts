@@ -207,7 +207,7 @@ export {
 } from './factory/factory.ts';
 export type { Factory, FactoryListing, Hires } from './factory/factory.ts';
 export { cursorTakes, feedLineWords, REMOVED } from './feed/feed.ts';
-export type { FeedLine } from './feed/feed.ts';
+export type { FeedLine, FeedPublished } from './feed/feed.ts';
 export type { FeedSaid, FeedWords } from './run.ts';
 export {
   DAEMON_FILE,
@@ -275,7 +275,9 @@ export type {
   PhaseCost,
   RecentPass,
 } from './meter/meter.ts';
-export { feedCursorRefusal, feedFile, freshFeedMemo, readFeed, recordFeed, watchFeed } from './feed/feed.store.ts';
+export { feedCursorRefusal, feedFile, freshFeedMemo, readFeed, watchFeed } from './feed/feed.store.ts';
+export { emitFeed, FEED_FOLLOW_BEATS, FEED_FOLLOW_READS, FEED_FOLLOWERS, FeedHub, feedHubLayer, followFeed } from './feed/feed.verb.ts';
+export type { Followed } from './feed/feed.verb.ts';
 export { lockfileParts, provisionDeps } from './workspace/worktree.store.ts';
 export { artifactFiles, missingArtifacts } from './artifacts/artifacts.store.ts';
 export {

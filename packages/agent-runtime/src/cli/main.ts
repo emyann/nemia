@@ -427,7 +427,10 @@ const sweepBodies = async (engine: EngineShape, rest: readonly string[]): Promis
   console.log(sweepLine(await run('sweep', engine.sweep({ yes })), yes));
 };
 
-/** What `ae forget` is asked, off the arguments after it: the task ids, and `yes`, given `--yes`. Refuses, with exit code 2, no id or a flag. */
+/**
+ * What `ae forget` is asked, off the arguments after it: the task ids, and `yes`, given `--yes`. Refuses, with exit code 2, no id or
+ * a flag.
+ */
 export const forgetAsked = (rest: readonly string[]): { taskIds: string[]; yes: boolean } => {
   const taskIds = rest.filter((a) => a !== '--yes');
   const flags = taskIds.filter((a) => a.startsWith('-'));
@@ -441,7 +444,10 @@ export const forgetAsked = (rest: readonly string[]): { taskIds: string[]; yes: 
   return { taskIds, yes: taskIds.length < rest.length };
 };
 
-/** The lines `ae forget` prints for `report`: per task what went, or without `yes` what would, what each harness leaves, and the next command. */
+/**
+ * The lines `ae forget` prints for `report`: per task what went, or without `yes` what would, what each harness leaves, and the next
+ * command.
+ */
 export const forgetLines = (report: ForgetReport): string[] => {
   const lines: string[] = [];
   for (const t of report.tasks) {

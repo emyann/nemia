@@ -34,7 +34,10 @@ export const HEADER_BYTES = 34;
 /** What a rotation forgot, and the feed's bytes, both files, before and after it. */
 export type ForgottenFeed = { linesForgotten: number; bytesBefore: number; bytesAfter: number };
 
-/** A read of the feed: the entries after the cursor asked with, still kept, where to resume, and how many lines after it were forgotten, when any. */
+/**
+ * A read of the feed: the entries after the cursor asked with, still kept, where to resume, and how many lines after it were
+ * forgotten, when any.
+ */
 export type FeedRead = { entries: unknown[]; cursor: number; forgotten?: number };
 
 /** The three files of the feed under `root`. */

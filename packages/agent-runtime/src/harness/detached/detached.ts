@@ -506,39 +506,28 @@ const outputOps = (spec: HarnessSpec, dir: string): Pick<RunnerOps, 'output'> =>
       }
     : {};
 
-/** The files a detached run keeps beside its run file, by their ends: every one `detachedOps` and its worker write. */
-const RUN_FILE_ENDS = [
-  'json',
-  'json.tmp',
-  'log',
-  'closeout.json',
-  'schema.json',
-  'mcp.json',
-  'inbox.jsonl',
-  'stop',
-  'said',
-  'stdout',
-  'stderr',
-];
-
 /**
- * A detached runner's `forget`: the session's run file and every file beside it; the harness's own record of its
- * conversation, when the spec keeps one, left and named.
+ * A detached runner's `forget`: the session's run file and every file beside it, each named by the run's name and an end
+ * after a dot; the harness's own record of its conversation, when the spec keeps one, left and named.
  */
 const forgetRunOf =
   (spec: HarnessSpec, root: string): NonNullable<RunnerOps['forget']> =>
   (session, { dry }) => {
-    const base = path.join(root, 'runs', spec.name, safe(session.name));
+    const dir = path.join(root, 'runs', spec.name);
     const transcript = () => {
       const file = session.nativeId ? spec.transcript?.file(session.nativeId) : undefined;
       return file ? [file] : [];
     };
-    return forgetFiles(
-      spec.name,
-      RUN_FILE_ENDS.map((end) => `${base}.${end}`),
-      transcript,
-      dry,
-    );
+    return Effect.suspend(() => {
+      const prefix = `${safe(session.name)}.`;
+      const files = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f.startsWith(prefix)) : [];
+      return forgetFiles(
+        spec.name,
+        files.map((f) => path.join(dir, f)),
+        transcript,
+        dry,
+      );
+    });
   };
 
 /** The verbs of a detached runner over the files beside a run's: its streams (`outputOps`), and `forget`. */

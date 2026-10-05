@@ -27,8 +27,8 @@ const ctx = new ServerCallContext();
 
 /**
  * A harness a test moves by hand, what it was asked, and a journal in memory, behind one handler. It has every verb a
- * driver may have — `find`, `release`, `quota`, `say`, `output`, `transcript`, `observeFor`, `forget` — unless `bare`, which leaves it the four every
- * driver has; `noFind` takes `find` alone away. `acted` is what the harness was asked, reads left out.
+ * driver may have — `find`, `release`, `quota`, `say`, `output`, `transcript`, `observeFor`, `forget` — unless `bare`, which leaves
+ * it the four every driver has; `noFind` takes `find` alone away. `acted` is what the harness was asked, reads left out.
  */
 const harness = (
   o: {

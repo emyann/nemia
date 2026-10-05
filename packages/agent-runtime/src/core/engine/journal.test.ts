@@ -736,7 +736,10 @@ test('the stored schema names every field of every event, of the harness argumen
   assert.equal(none, true);
 });
 
-/** One `filesOps` over a fresh directory, a task journal of three events in it, filed first, and what its reads cost (`ioCounts` deltas). */
+/**
+ * One `filesOps` over a fresh directory, a task journal of three events in it, filed first, and what its reads cost (`ioCounts`
+ * deltas).
+ */
 const cursorStore = async () => {
   const dir = root();
   const ops = Journal.filesOps(dir);

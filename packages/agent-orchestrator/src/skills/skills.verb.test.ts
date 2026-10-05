@@ -12,7 +12,7 @@ import { scratch } from '../../test/scratch.ts';
 const ROOT = scratch('wf-skills-verb-root-');
 process.env.WF_ROOT = ROOT;
 const { SKILLS_LIST, SKILLS_READ, SKILLS_WRITE } = await import('./skills.verb.ts');
-const { engine } = await import('../runner.ts');
+const { runWith, engine } = await import('../runner.ts');
 
 const e = engine();
 const library = path.join(ROOT, 'workflows', 'skills');
@@ -27,23 +27,23 @@ function shippedWith(name: string): string {
 
 test('a skill written from its form reads back for its page and in the list, at the version its write answered', async () => {
   const change = JSON.stringify({ name: 'notes', description: 'Write the notes of a change.', body: 'Write them.' });
-  const made = await SKILLS_WRITE.handler(e, { from: 'yours', library, change });
+  const made = await runWith(e, SKILLS_WRITE.handler({ from: 'yours', library, change }));
   assert.ok('version' in made, JSON.stringify(made));
   const dir = path.join(library, 'notes');
-  const page = await SKILLS_READ.handler(e, { from: 'yours', name: 'notes', dir });
+  const page = await runWith(e, SKILLS_READ.handler({ from: 'yours', name: 'notes', dir }));
   assert.equal(page.version, made.version);
   assert.match(page.text, /Write them\./);
   assert.equal(page.entry?.id, 'notes');
-  const listed = await SKILLS_LIST.handler(e, { skills: [dir] });
+  const listed = await runWith(e, SKILLS_LIST.handler({ skills: [dir] }));
   assert.deepEqual(Object.keys(listed), [dir]);
   assert.equal(listed[dir]?.entry?.id, 'notes');
 });
 
 test("REFUSED: a copy over a skill your library has, in the package's words whole; the copy before it is Nemia's skill whole", async () => {
   const shipped = shippedWith('tidy');
-  const copied = await SKILLS_WRITE.handler(e, { from: 'yours', library, copy: 'tidy', shipped });
+  const copied = await runWith(e, SKILLS_WRITE.handler({ from: 'yours', library, copy: 'tidy', shipped }));
   assert.deepEqual(copied, { dir: path.join(library, 'tidy'), name: 'tidy', written: ['SKILL.md'] });
-  await assert.rejects(SKILLS_WRITE.handler(e, { from: 'yours', library, copy: 'tidy', shipped }), (err: Error) => {
+  await assert.rejects(runWith(e, SKILLS_WRITE.handler({ from: 'yours', library, copy: 'tidy', shipped })), (err: Error) => {
     assert.equal(
       err.message,
       `skills/tidy is there already, in ${library}, and a copy would write over it. Give it as it is, or remove that folder first.`,

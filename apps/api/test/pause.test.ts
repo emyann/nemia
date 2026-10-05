@@ -14,7 +14,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Layer } from 'effect';
+import { Effect, Layer } from 'effect';
 import { engine, runStore } from 'agent-orchestrator';
 import { app, appOf, liveOf } from '../src/app.ts';
 import { Engine } from '../src/store.ts';
@@ -96,14 +96,16 @@ function appAtWork(working: string) {
   const stops: string[] = [];
   const own = {
     ...engine(),
-    list: async (ids: string[]) => ({
-      views: ids
-        .filter((id) => id === working)
-        .map((id) => ({ id, phase: 'running (working)', state: { brief: 'b', settled: null, attempts: [{ startedAt: 'x' }] } })),
-    }),
-    stop: async (taskId: string) => {
-      stops.push(taskId);
-    },
+    list: (ids: string[]) =>
+      Effect.succeed({
+        views: ids
+          .filter((id) => id === working)
+          .map((id) => ({ id, phase: 'running (working)', state: { brief: 'b', settled: null, attempts: [{ startedAt: 'x' }] } })),
+      }),
+    stop: (taskId: string) =>
+      Effect.sync(() => {
+        stops.push(taskId);
+      }),
   } as never;
   return { on: appOf(Layer.merge(liveOf(), Layer.succeed(Engine)(own))).app, stops };
 }

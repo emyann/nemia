@@ -4,11 +4,12 @@
  * client (`runtime-client.ts`).
  */
 import path from 'node:path';
-import type { Engine } from '../runtime-client.ts';
+import { Effect } from 'effect';
+import { asked, over, type Engine } from '../runtime-client.ts';
 import type { Verdict } from '../check/check.ts';
 import type { Workflow } from '../workflow.ts';
 import { sizeOf } from '../artifacts/artifacts.ts';
-import { heldCheckouts, runAdmitted, type CheckoutHold, type MainClaim, type RunSlot } from '../cap/cap.ts';
+import { heldCheckouts, runAdmitted, type MainClaim, type RunSlot } from '../cap/cap.ts';
 import { endingAsked, landedWords, landingDue, landingOpen } from './ending.ts';
 import { isGitRun, type CloseoutAsked, type Landed, type Run, type TaskPhase } from '../record/record.ts';
 import { landsOnCheck, ownStatus, type SpendOf } from '../status/status.ts';
@@ -19,7 +20,15 @@ import { runStore } from '../record/files.store.ts';
 import { stepsOf } from '../record/record.store.ts';
 import { abortMerge, commitMerge, mergeInProgress, mergeState } from '../workspace/worktree.store.ts';
 import { dropLandedPictures, LANDED_PICTURES } from '../artifacts/artifacts.store.ts';
-import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, parentsOf, spendReader, taskPhases } from '../views/views.verb.ts';
+import {
+  closeoutAsked,
+  closeoutReader,
+  exitVerdicts,
+  harnessBlocked,
+  parentsRead,
+  spendReader,
+  taskPhasesRead,
+} from '../views/views.verb.ts';
 import { phaseOfView } from '../views/views-words.ts';
 import { runSlots } from '../cap/cap.verb.ts';
 import { resultTips } from '../branches/branches.store.ts';
@@ -40,27 +49,27 @@ import { resultTips } from '../branches/branches.store.ts';
  *   filed it on; the store's, listed only past the run's own asks, when none is given.
  * @param env Where the cap on runs in flight is read before any pass has written one (`runSlots`): the process's, or the api's own.
  */
-export async function checkoutHold(
+export const checkoutHold = Effect.fn('checkoutHold')(function* (
   e: Engine,
   run: Run,
   steps: readonly Workflow[],
   runs?: readonly Run[],
   env: NodeJS.ProcessEnv = process.env,
-): Promise<CheckoutHold | undefined> {
+) {
   const ending = steps.find((s) => s.workspace === 'main');
   if (!ending || run.cancelledAt || endingAsked(run, ending, runStore.asks.read(run.id).asks) === undefined) return undefined;
   const listed = runs ?? runStore.runs.list();
-  const slots = await runSlots(e, listed, env);
-  const mine = await mainClaim(e, run, slots.get(run.id));
+  const slots = yield* runSlots(e, listed, env);
+  const mine = yield* mainClaim(e, run, slots.get(run.id));
   if (!mine || mine.holds) return undefined;
   const claims: MainClaim[] = [mine];
   for (const other of listed) {
     if (other.id === run.id || !isGitRun(other) || path.resolve(other.repo) !== mine.repo) continue;
-    const claim = await mainClaim(e, other, slots.get(other.id));
+    const claim = yield* mainClaim(e, other, slots.get(other.id));
     if (claim) claims.push(claim);
   }
   return heldCheckouts(claims).get(run.id);
-}
+});
 
 /**
  * A run's claim on the repository's own checkout, as a pass reads it now (`MainClaim`) — or undefined for a run with no ending step, for a
@@ -82,7 +91,7 @@ export async function checkoutHold(
  * questions `advance` asks before it files a ready step, and they bite only on a run with nothing filed: an ending is one when it is also
  * its root, which a folder whose one step merges has. Neither touches a try, since a run with a try due has started.
  */
-async function mainClaim(e: Engine, run: Run, slot: RunSlot | undefined): Promise<MainClaim | undefined> {
+const mainClaim = Effect.fnUntraced(function* (e: Engine, run: Run, slot: RunSlot | undefined) {
   let steps: Workflow[];
   try {
     steps = stepsOf(run);
@@ -93,10 +102,10 @@ async function mainClaim(e: Engine, run: Run, slot: RunSlot | undefined): Promis
   if (!ending || !isGitRun(run)) return undefined;
   const repo = path.resolve(run.repo);
   const taskId = run.steps[ending.name]?.taskId;
-  const phase = taskId ? phaseOfView(await e.view(taskId)) : 'unknown';
+  const phase = taskId ? phaseOfView(yield* asked('view', e.view(taskId))) : 'unknown';
   if (taskId && (phase === 'pending' || phase === 'running')) return { id: run.id, repo, step: ending.name, holds: true };
   if (taskId && landsOnCheck(ending, run) && !run.steps[ending.name]?.landed) {
-    const { views, phaseOf } = await taskPhases(e, run);
+    const { views, phaseOf } = yield* taskPhasesRead(run).pipe(over(e));
     const own = ownStatus(ending, run, phaseOf, closeoutReader(views, run), closeoutAsked(views), steps, spendReader(views));
     const merging = mergeInProgress(run.repo) ? mergeState(run.repo, resultTips(run)).merging : 'none';
     if (landingOpen(ending, run, own, phaseOf, merging)) return { id: run.id, repo, step: ending.name, holds: true };
@@ -105,7 +114,7 @@ async function mainClaim(e: Engine, run: Run, slot: RunSlot | undefined): Promis
   const { asks, rounds } = runStore.asks.read(run.id);
   const at = endingAsked(run, ending, asks);
   if (at === undefined) return undefined;
-  const { views, phaseOf } = await taskPhases(e, run);
+  const { views, phaseOf } = yield* taskPhasesRead(run).pipe(over(e));
   const a = assess(
     steps,
     run,
@@ -118,12 +127,12 @@ async function mainClaim(e: Engine, run: Run, slot: RunSlot | undefined): Promis
     harnessBlocked(views),
     spendReader(views),
   );
-  const parent = await parentsOf(e, run);
+  const parent = yield* parentsRead(run).pipe(over(e));
   const files = runReady(run, (id) => parent(id).shipped) && runAdmitted(run, slot);
   return (files && a.ready.includes(ending.name)) || a.retry.some((r) => r.step === ending.name)
     ? { id: run.id, repo, step: ending.name, holds: false, at }
     : undefined;
-}
+});
 
 /**
  * Land the merge the run's ending staged in the repository's checkout, where one lands on its check (`landingDue`): commit it with the

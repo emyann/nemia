@@ -4,6 +4,8 @@
  * api serves a step's log and the stats on their routes from the same entries, and the board reads a run and the feed through reads of its
  * own (`only`).
  */
+import { Effect } from 'effect';
+import { EngineService, asked, tried } from '../runtime-client.ts';
 import { runStore } from '../record/files.store.ts';
 import type { Run } from '../record/record.ts';
 import { cursorTakes, feedLineWords, type FeedLine } from '../feed/feed.ts';
@@ -12,9 +14,9 @@ import { verifiesRest } from '../config/config.store.ts';
 import { pausedWords, type Paused } from '../pause/pause.ts';
 import { pausedRead } from '../list/list.verb.ts';
 import { BY_KEYS, statsLine, statsLines, statsQueryOf, type QueryKey, type Stats } from '../stats/index.ts';
-import { stats } from '../stats/stats.verb.ts';
+import { statsRun } from '../stats/stats.verb.ts';
 import type { Args } from './command.ts';
-import type { Command } from './entry.verb.ts';
+import type { Command, Kept } from './entry.verb.ts';
 
 /** The text under `key`, or undefined where none was given. */
 const textOf = (args: Args, key: string): string | undefined => {
@@ -37,11 +39,12 @@ export const SHOW: Command<Run> = {
   },
   writes: false,
   only: { side: 'cli', why: "the board's run page is the api's judged view of a run (GET /api/runs/:id), not its record" },
-  async handler(_e, args) {
-    const run = runStore.runs.read(textOf(args, 'runId') ?? '');
-    const workflow = run.workflow?.map(({ body, ...keys }) => ({ ...keys, body: `${body.slice(0, 60)}…` }));
-    return { ...run, brief: `${run.brief.slice(0, 120)}…`, workflow };
-  },
+  handler: (args) =>
+    tried(() => {
+      const run = runStore.runs.read(textOf(args, 'runId') ?? '');
+      const workflow = run.workflow?.map(({ body, ...keys }) => ({ ...keys, body: `${body.slice(0, 60)}…` }));
+      return { ...run, brief: `${run.brief.slice(0, 120)}…`, workflow };
+    }),
   print: (run) => [JSON.stringify(run, null, 2)],
 };
 
@@ -63,10 +66,11 @@ export const LOGS: Command<{ taskId?: string; output?: string }> = {
   },
   writes: false,
   route: { method: 'GET', path: '/api/runs/:runId/steps/:step/log', status: 200 },
-  async handler(e, args) {
+  handler: Effect.fnUntraced(function* (args: Args) {
+    const e = yield* EngineService;
     const taskId = runStore.runs.read(textOf(args, 'runId') ?? '').steps[textOf(args, 'step') ?? '']?.taskId;
-    return taskId ? { taskId, output: await e.logs(taskId) } : {};
-  },
+    return taskId ? { taskId, output: yield* asked('logs', e.logs(taskId)) } : {};
+  }),
   print: ({ output }, args) => [output ?? `${textOf(args, 'step') ?? ''} has not run yet`],
 };
 
@@ -93,7 +97,9 @@ export const FEED: Command<{ pause: Paused; lines: FeedLine[]; cursor: number }>
   },
   writes: false,
   only: { side: 'cli', why: 'the board follows the feed through GET /api/feed/stream, the counterpart of nemia watch' },
-  handler: async (e, args) => ({ ...readFeed(Number(textOf(args, 'cursor') ?? 0)), pause: await pausedRead(e) }),
+  handler: Effect.fnUntraced(function* (args: Args) {
+    return { ...readFeed(Number(textOf(args, 'cursor') ?? 0)), pause: yield* pausedRead() };
+  }),
   print: ({ pause, lines, cursor }) => {
     const paused = pausedWords(pause);
     return [...(paused ? [paused] : []), ...lines.map(feedLineWords), `cursor: ${cursor}`];
@@ -189,9 +195,8 @@ export const STATS: Command<Stats> = {
   check: statsRefusal,
   writes: false,
   route: { method: 'GET', path: '/api/stats', status: 200 },
-  handler: (e, args, env, _home, kept) =>
-    stats(
-      e,
+  handler: (args, env, _home, kept?: Kept) =>
+    statsRun(
       statsQueryOf(givenOf(args), (key) => `--${key}`),
       new Date(),
       {

@@ -1,8 +1,9 @@
 /**
- * Starting an inbox card (`startFromInbox`) and the queue's next card (`startQueued`, which the tick calls), each through `start`, then
- * taking the card out of the inbox. A controller: it reaches the runtime through `start/start.verb.ts`.
+ * Starting an inbox card (`startFromInbox`) and the queue's next card (`startQueued`, which the tick calls), each through `startRun`, then
+ * taking the card out of the inbox. A controller: Effect programs, which reach the runtime through `start/start.verb.ts`.
  */
 import path from 'node:path';
+import { Cause, Effect, Exit } from 'effect';
 import { WorkflowError } from '../step/step.ts';
 import { loadWorkflows, workflowFolder, workflowsIn } from '../folder/folder.store.ts';
 import {
@@ -26,7 +27,7 @@ import { isGitRun, type Run } from '../record/record.ts';
 import { isDirectory } from '../record/record.store.ts';
 import { inboxDir, runStore } from '../record/files.store.ts';
 import { inboxCards } from './inbox.store.ts';
-import { repoFor, start } from '../start/start.verb.ts';
+import { repoFor, startRun } from '../start/start.verb.ts';
 import { placesOf } from '../folder/lookup.store.ts';
 import { defaultStartsAllowed, factoryNames, readFactories } from '../factory/factory.store.ts';
 import { DEFAULT_FACTORY, defaultStartRefusal, type Factory } from '../factory/factory.ts';
@@ -125,7 +126,7 @@ function cardFactory(opts: Pick<InboxStart, 'factory' | 'fix'>, named: string | 
  * refused as `start()` refuses it: an `--after`, an `--input` or a `--gate` it refuses, a factory not there, or one that does not offer
  * the workflow or does not work on the repository.
  */
-export function startFromInbox(opts: InboxStart): InboxStarted {
+export const startFromInbox = Effect.fn('startFromInbox')(function* (opts: InboxStart) {
   const refused = inboxNameRefusal(opts.name);
   if (refused) throw new WorkflowError(refused);
   const file = runStore.inbox.where(`${opts.name}.md`);
@@ -157,7 +158,7 @@ export function startFromInbox(opts: InboxStart): InboxStarted {
   }
   const gates = [...(card.gate !== undefined && !flags.includes(card.gate) ? [card.gate] : []), ...flags];
 
-  const run = start({
+  const run = yield* startRun({
     brief: opts.brief?.trim() ?? card.body,
     repo,
     repoNamed: opts.repo !== undefined,
@@ -173,10 +174,16 @@ export function startFromInbox(opts: InboxStart): InboxStarted {
   try {
     runStore.inbox.drop(`${opts.name}.md`);
   } catch (err) {
-    return { run, card, removed: false, why: `${file} could not be removed — ${(err as Error).message}`, ...ignoredRepo };
+    return {
+      run,
+      card,
+      removed: false,
+      why: `${file} could not be removed — ${(err as Error).message}`,
+      ...ignoredRepo,
+    } satisfies InboxStarted;
   }
-  return { run, card, removed: true, ...ignoredRepo };
-}
+  return { run, card, removed: true, ...ignoredRepo } satisfies InboxStarted;
+});
 
 /** The store's factories that read, by name: what a queued card's repository is chosen from (`queueRepo`). One not read is none. */
 const readableFactories = (): Map<string, Factory> => new Map(readFactories().flatMap((f) => ('error' in f ? [] : [[f.name, f] as const])));
@@ -218,7 +225,7 @@ const daemonsRepo = (card: Pick<InboxListing, 'factory'>, on: string, fromDaemon
  * card again. The inbox, the tries and, with a card queued, the factories are read once. A try written for a card that is no longer
  * queued as it was is removed on the way, or on a later pass when it cannot be.
  */
-export function startQueued(repo: string, runs: readonly Run[] = runStore.runs.list()): QueueStarted | undefined {
+export const startQueued = Effect.fn('startQueued')(function* (repo: string, runs: readonly Run[] = runStore.runs.list()) {
   const files = runStore.inbox.entries();
   const tries = runStore.inbox.tries();
   const listing = inboxListing(files, runs, isDirectory, tries);
@@ -229,26 +236,29 @@ export function startQueued(repo: string, runs: readonly Run[] = runStore.runs.l
   if (!next) return undefined;
   const { repo: on, fromDaemon } = queueRepo(next, repo, factories);
   const where = daemonsRepo(next, on, fromDaemon);
-  try {
-    const started = startFromInbox({ name: next.name, callerRepo: repo });
+  const tried = yield* Effect.exit(startFromInbox({ name: next.name, callerRepo: repo }));
+  if (Exit.isSuccess(tried)) {
+    const started = tried.value;
     const ignored = started.ignoredRepo !== undefined ? { ignoredRepo: started.ignoredRepo } : {};
     return started.removed
-      ? { card: next.name, run: started.run.id, removed: true, ...ignored }
-      : { card: next.name, run: started.run.id, removed: false, why: started.why, ...ignored };
-  } catch (err) {
-    const refused = (err as { exitCode?: number }).exitCode === 2;
-    const why = (err instanceof Error ? err.message : String(err))
-      .split('\n')
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .join(' / ');
-    const last = next.tried;
-    if (!refused && last && !last.refused && last.why === why && last.repo === on)
-      return { card: next.name, failed: why, again: true, ...where };
-    const tried: QueueTry = { at: new Date().toISOString(), text: files.find((f) => f.file === next.file)!.text, repo: on, why, refused };
-    try {
-      runStore.inbox.putTry(next.name, tried);
-    } catch {}
-    return refused ? { card: next.name, refused: why, ...where } : { card: next.name, failed: why, again: false, ...where };
+      ? ({ card: next.name, run: started.run.id, removed: true, ...ignored } satisfies QueueStarted)
+      : ({ card: next.name, run: started.run.id, removed: false, why: started.why, ...ignored } satisfies QueueStarted);
   }
-}
+  const err = Cause.squash(tried.cause);
+  const refused = (err as { exitCode?: number }).exitCode === 2;
+  const why = (err instanceof Error ? err.message : String(err))
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .join(' / ');
+  const last = next.tried;
+  if (!refused && last && !last.refused && last.why === why && last.repo === on)
+    return { card: next.name, failed: why, again: true, ...where } satisfies QueueStarted;
+  const record: QueueTry = { at: new Date().toISOString(), text: files.find((f) => f.file === next.file)!.text, repo: on, why, refused };
+  try {
+    runStore.inbox.putTry(next.name, record);
+  } catch {}
+  return refused
+    ? ({ card: next.name, refused: why, ...where } satisfies QueueStarted)
+    : ({ card: next.name, failed: why, again: false, ...where } satisfies QueueStarted);
+});

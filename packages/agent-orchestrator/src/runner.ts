@@ -6,7 +6,7 @@
  * `HARNESS_CHOICES`, the words each harness takes per key, is re-exported from there. The controllers are a verb each, in its feature's
  * folder, and each imports the client, or a controller that does, never the runtime: `views.verb.ts` (what the runtime's views of a run's
  * tasks say), `start.verb.ts`, `plan.verb.ts` and `inbox.verb.ts` (starting runs, plans and inbox cards), `tick.verb.ts` and
- * `advance.verb.ts` (a pass — `tick`, `advance` — and the filings it adopts), what a person asks of a run (`cancel.verb.ts`,
+ * `advance.verb.ts` (a pass — `tickRun`, `advanceRun` — and the filings it adopts), what a person asks of a run (`cancel.verb.ts`,
  * `retry.verb.ts`, `gate.verb.ts`, `say.verb.ts`, `wait.verb.ts`, `round.verb.ts`), the table of the commands that call them, each defined
  * once (`commands.verb.ts`), `forget.verb.ts` and `prune.verb.ts` (`nemia rm` and `nemia prune`), `list.verb.ts` and `decide.verb.ts` (what
  * a person reads of a run: `nemia ls` and `nemia decide`), and `stats.verb.ts` (what the store's runs add up to: `nemia stats`). They
@@ -336,7 +336,7 @@ export {
   removeFactory,
   startFactory,
 } from './factory/factory.store.ts';
-export { HARNESSES, engine, remoteAgents } from './runtime-client.ts';
+export { EngineService, HARNESSES, asked, engine, remoteAgents, runWith } from './runtime-client.ts';
 export { HARNESS_CHOICES } from 'agent-runtime/vocabulary';
 export { A2A_AGENTS_FILE, envNameOf } from './harness/a2a.store.ts';
 export {
@@ -347,9 +347,10 @@ export {
   deniedOf,
   exitVerdicts,
   harnessBlocked,
-  parentOf,
-  parentsOf,
-  readFilings,
+  parentRead,
+  parentsRead,
+  filingsRead,
+  taskPhasesRead,
   saidCount,
   spendReader,
   viewedOnce,
@@ -359,13 +360,13 @@ export {
 export { endWords, phaseOfView, wordOfView } from './views/views-words.ts';
 export type { CheckReport } from './views/views.verb.ts';
 export { readPlan } from './plan/plan.store.ts';
-export { leftOutMounts, repoFor, start } from './start/start.verb.ts';
+export { leftOutMounts, repoFor, startRun } from './start/start.verb.ts';
 export { startFromInbox, startQueued } from './inbox/inbox.verb.ts';
 export { startPlan } from './plan/plan.verb.ts';
 export type { InboxStart, InboxStarted } from './inbox/inbox.verb.ts';
 export type { PlanStarted } from './plan/plan.verb.ts';
-export { advance } from './tick/advance.verb.ts';
-export { refusalLines, tick } from './tick/tick.verb.ts';
+export { advanceRun } from './tick/advance.verb.ts';
+export { refusalLines, tickRun } from './tick/tick.verb.ts';
 export { checkoutHold } from './ending/ending.verb.ts';
 export { runSlots, type Slots, slotsOf } from './cap/cap.verb.ts';
 export type { MergeWord, StandingMerge } from './branches/merge.store.ts';
@@ -373,9 +374,9 @@ export type { FolderLoaded } from './folder/workflows.verb.ts';
 export type { SkillPage } from './skills/skills.verb.ts';
 export type { Advanced } from './tick/advance.verb.ts';
 export type { Pass } from './tick/tick.verb.ts';
-export { accept, round } from './round/round.verb.ts';
-export { approve } from './gate/gate.verb.ts';
-export { cancel } from './cancel/cancel.verb.ts';
+export { acceptRun, roundRun } from './round/round.verb.ts';
+export { approveRun } from './gate/gate.verb.ts';
+export { cancelRun } from './cancel/cancel.verb.ts';
 export { hold, unhold } from './wait/wait.verb.ts';
 export {
   finishingWords,
@@ -392,8 +393,8 @@ export {
   type PauseStaged,
 } from './pause/pause.ts';
 export { readPause } from './pause/pause.store.ts';
-export { retry } from './retry/retry.verb.ts';
-export { say } from './say/say.verb.ts';
+export { retryRun } from './retry/retry.verb.ts';
+export { sayRun } from './say/say.verb.ts';
 export { COMMANDS, TABLE } from './command/commands.verb.ts';
 export { PRUNE, RM } from './command/runs.verb.ts';
 export { LOGS, STATS } from './command/reads.verb.ts';
@@ -410,10 +411,10 @@ export type { Asked } from './retry/retry.verb.ts';
 export type { Cancelled } from './cancel/cancel.verb.ts';
 export type { Holding } from './wait/wait.verb.ts';
 export type { Told } from './say/say.verb.ts';
-export { forget } from './forget/forget.verb.ts';
+export { forgetRun } from './forget/forget.verb.ts';
 export { prune } from './prune/prune.verb.ts';
-export { decide } from './decide/decide.verb.ts';
-export { freshStatsMemo, stats } from './stats/stats.verb.ts';
+export { decideRun } from './decide/decide.verb.ts';
+export { freshStatsMemo, statsRun } from './stats/stats.verb.ts';
 export type { StatsMemo, StatsOptions } from './stats/stats.verb.ts';
 export { BY_KEYS, statsLine, statsLines, statsQueryOf } from './stats/index.ts';
 export type { ByKey, QueryKey, Stats, StatsQuery } from './stats/index.ts';

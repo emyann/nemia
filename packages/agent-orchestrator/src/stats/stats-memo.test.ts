@@ -3,7 +3,7 @@
  * files in the store (their stamp), its tasks' journals (the engine's feed) — and never keeps a run in flight; it answers what a call
  * without it answers.
  *
- * Walked through the runtime itself, `promiseEngine` over an in-memory journal whose feed every append reaches, as the runtime's own
+ * Walked through the runtime itself, `plainEngine` over an in-memory journal whose feed every append reaches, as the runtime's own
  * journal does, and the engine's `view` counted by task id. A file of its own, since `stats` reads every run under `WF_ROOT`, read as the
  * store loads, so it is set before the import.
  */
@@ -12,13 +12,16 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { PromiseJournal, PromiseRunner } from 'agent-runtime';
-import { Engine, promiseEngine } from 'agent-runtime/effect';
+import { Engine } from 'agent-runtime/effect';
 import { scratch } from '../../test/scratch.ts';
+import { Effect } from 'effect';
+import { plainEngine } from '../../test/promised.ts';
 
 const ROOT = scratch('wf-stats-memo-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 process.env.WF_ROOT = ROOT;
-const { freshStatsMemo, stats } = await import('./stats.verb.ts');
+const { freshStatsMemo, statsRun } = await import('./stats.verb.ts');
+const { runWith } = await import('../runtime-client.ts');
 
 type Event = Parameters<PromiseJournal['append']>[1];
 
@@ -60,7 +63,7 @@ const idle: PromiseRunner = {
 };
 
 const journal = memoryJournal();
-const engine = promiseEngine(
+const engine = plainEngine(
   Engine.layer({ root: path.join(ROOT, 'engine'), journal, harnesses: { codex: idle, check: idle }, defaultHarness: 'codex' }),
 );
 /** Every task id the engine was asked to view since the last `viewedRuns`. */
@@ -69,16 +72,17 @@ let viewed: string[] = [];
 let during: { when: string; then: () => Promise<unknown> } | undefined;
 const e = {
   ...engine,
-  view: async (taskId: string) => {
-    viewed.push(taskId);
-    const view = await engine.view(taskId);
-    const hook = during?.when === taskId ? during : undefined;
-    if (hook) {
-      during = undefined;
-      await hook.then();
-    }
-    return view;
-  },
+  view: (taskId: string) =>
+    Effect.gen(function* () {
+      viewed.push(taskId);
+      const view = yield* engine.view(taskId);
+      const hook = during?.when === taskId ? during : undefined;
+      if (hook) {
+        during = undefined;
+        yield* Effect.promise(() => hook.then());
+      }
+      return view;
+    }),
 };
 
 /** The runs whose tasks were viewed since the last call, by run id, sorted. */
@@ -151,41 +155,41 @@ const unverified = { verify: false };
 
 test('a second call on a store whose runs are as they were views no task of a finished run, and answers what a call without the memo answers', async () => {
   const memo = freshStatsMemo();
-  const first = await stats(e, {}, NOW, { memo, ...unverified });
+  const first = await runWith(e, statsRun({}, NOW, { memo, ...unverified }));
   assert.deepEqual(viewedRuns(), [...FINISHED, 's-moving'], 'the first call reads every run');
-  const second = await stats(e, {}, NOW, { memo, ...unverified });
+  const second = await runWith(e, statsRun({}, NOW, { memo, ...unverified }));
   assert.deepEqual(viewedRuns(), ['s-moving'], 'the second reads only the run in flight');
   assert.deepStrictEqual(second, first);
-  assert.deepStrictEqual(second, await stats(e, {}, NOW));
+  assert.deepStrictEqual(second, await runWith(e, statsRun({}, NOW)));
   viewed = [];
 });
 
 test('a run whose files in the store changed is read again, and no other', async () => {
   const memo = freshStatsMemo();
-  await stats(e, {}, NOW, { memo, ...unverified });
+  await runWith(e, statsRun({}, NOW, { memo, ...unverified }));
   viewedRuns();
   fs.writeFileSync(path.join(ROOT, 'runs', 's-b.cancelled'), `${ended}\n`);
-  const answer = await stats(e, {}, NOW, { memo, ...unverified });
+  const answer = await runWith(e, statsRun({}, NOW, { memo, ...unverified }));
   assert.deepEqual(viewedRuns(), ['s-b', 's-moving']);
-  assert.deepStrictEqual(answer, await stats(e, {}, NOW));
+  assert.deepStrictEqual(answer, await runWith(e, statsRun({}, NOW)));
   fs.rmSync(path.join(ROOT, 'runs', 's-b.cancelled'));
   viewed = [];
 });
 
 test("a line on the engine's feed for a run's task takes the run out of the memo, and no other", async () => {
   const memo = freshStatsMemo();
-  await stats(e, {}, NOW, { memo, ...unverified });
+  await runWith(e, statsRun({}, NOW, { memo, ...unverified }));
   viewedRuns();
   await journal.append('s-c-implement', { kind: 'measured', at: ended, attempt: 1, usage: { costUsd: 5 } });
-  const answer = await stats(e, {}, NOW, { memo, ...unverified });
+  const answer = await runWith(e, statsRun({}, NOW, { memo, ...unverified }));
   assert.deepEqual(viewedRuns(), ['s-c', 's-moving']);
-  assert.deepStrictEqual(answer, await stats(e, {}, NOW));
+  assert.deepStrictEqual(answer, await runWith(e, statsRun({}, NOW)));
   viewed = [];
 });
 
 test('a run with a task in flight is never kept, and read on every call', async () => {
   const memo = freshStatsMemo();
-  await stats(e, {}, NOW, { memo, ...unverified });
+  await runWith(e, statsRun({}, NOW, { memo, ...unverified }));
   assert.equal(memo.runs.has('s-moving'), false, 'nothing kept of the run in flight');
   assert.deepEqual(
     FINISHED.filter((id) => memo.runs.has(id)),
@@ -193,29 +197,29 @@ test('a run with a task in flight is never kept, and read on every call', async 
     'every finished run kept',
   );
   viewedRuns();
-  await stats(e, {}, NOW, { memo, ...unverified });
+  await runWith(e, statsRun({}, NOW, { memo, ...unverified }));
   assert.deepEqual(viewedRuns(), ['s-moving']);
 });
 
 test('a feed that went back empties the memo, and the next call reads every run', async () => {
   const memo = freshStatsMemo();
-  await stats(e, {}, NOW, { memo, ...unverified });
+  await runWith(e, statsRun({}, NOW, { memo, ...unverified }));
   viewedRuns();
   memo.cursor = Number.MAX_SAFE_INTEGER - 1;
-  await stats(e, {}, NOW, { memo, ...unverified });
+  await runWith(e, statsRun({}, NOW, { memo, ...unverified }));
   assert.deepEqual(viewedRuns(), [...FINISHED, 's-moving']);
 });
 
 test('verify reads every run the memo answers afresh, and refuses one that differs, naming it', async () => {
   const memo = freshStatsMemo();
-  const fresh = await stats(e, {}, NOW, { memo, ...unverified });
+  const fresh = await runWith(e, statsRun({}, NOW, { memo, ...unverified }));
   const kept = memo.runs.get('s-a')?.read;
   assert.ok(kept, 's-a is kept');
   kept.facts.tries = [];
   kept.facts.runs = [];
-  assert.notDeepStrictEqual(await stats(e, {}, NOW, { memo, ...unverified }), fresh, 'unverified, the stale answer is given');
+  assert.notDeepStrictEqual(await runWith(e, statsRun({}, NOW, { memo, ...unverified })), fresh, 'unverified, the stale answer is given');
   await assert.rejects(
-    stats(e, {}, NOW, { memo, verify: true }),
+    runWith(e, statsRun({}, NOW, { memo, verify: true })),
     (err: Error) => err.message.includes('the run s-a ') && err.message.includes('stamp'),
   );
   viewed = [];
@@ -224,12 +228,12 @@ test('verify reads every run the memo answers afresh, and refuses one that diffe
 test('a run gone from the store is gone from the memo and from the answer', async () => {
   await aRun('s-gone', 7);
   const memo = freshStatsMemo();
-  await stats(e, {}, NOW, { memo, ...unverified });
+  await runWith(e, statsRun({}, NOW, { memo, ...unverified }));
   assert.equal(memo.runs.has('s-gone'), true);
   fs.rmSync(recordFile('s-gone'));
-  const answer = await stats(e, {}, NOW, { memo, ...unverified });
+  const answer = await runWith(e, statsRun({}, NOW, { memo, ...unverified }));
   assert.equal(memo.runs.has('s-gone'), false);
-  assert.deepStrictEqual(answer, await stats(e, {}, NOW));
+  assert.deepStrictEqual(answer, await runWith(e, statsRun({}, NOW)));
   assert.equal(answer.all.total.runs, FINISHED.length, 's-gone no longer counted');
   viewed = [];
 });
@@ -240,9 +244,9 @@ test('a run whose workflow is not frozen on its record is never kept: its steps 
   fs.writeFileSync(path.join(folder, 'implement.md'), '---\nharness: codex\n---\nImplement it.\n');
   await aRun('s-unfrozen', 6, true, folder);
   const memo = freshStatsMemo();
-  await stats(e, {}, NOW, { memo, ...unverified });
+  await runWith(e, statsRun({}, NOW, { memo, ...unverified }));
   viewedRuns();
-  await stats(e, {}, NOW, { memo, ...unverified });
+  await runWith(e, statsRun({}, NOW, { memo, ...unverified }));
   assert.deepEqual(viewedRuns(), ['s-moving', 's-unfrozen']);
   fs.rmSync(recordFile('s-unfrozen'));
 });
@@ -253,13 +257,13 @@ test("a call keeps nothing once another has read the engine's feed on past where
     when: 's-b-implement',
     then: async () => {
       await journal.append('s-b-implement', { kind: 'measured', at: ended, attempt: 1, usage: { costUsd: 9 } });
-      await stats(e, {}, NOW, { memo, ...unverified });
+      await runWith(e, statsRun({}, NOW, { memo, ...unverified }));
     },
   };
-  await stats(e, {}, NOW, { memo, ...unverified });
+  await runWith(e, statsRun({}, NOW, { memo, ...unverified }));
   assert.equal(during, undefined, 'the overlapping call ran');
-  const answer = await stats(e, {}, NOW, { memo, verify: true });
-  assert.deepStrictEqual(answer, await stats(e, {}, NOW));
+  const answer = await runWith(e, statsRun({}, NOW, { memo, verify: true }));
+  assert.deepStrictEqual(answer, await runWith(e, statsRun({}, NOW)));
   viewed = [];
 });
 
@@ -267,40 +271,38 @@ test('a run a journal of which does not read is never kept, and is counted again
   await aRun('s-spoiled', 5);
   spoiled.add('s-spoiled-implement');
   const memo = freshStatsMemo();
-  const first = await stats(e, {}, NOW, { memo, ...unverified });
+  const first = await runWith(e, statsRun({}, NOW, { memo, ...unverified }));
   assert.deepEqual(first.unreadable, ['s-spoiled']);
   assert.equal(memo.runs.has('s-spoiled'), false, 'nothing kept of the run a journal of which does not read');
   viewedRuns();
   spoiled.delete('s-spoiled-implement');
-  const healed = await stats(e, {}, NOW, { memo, ...unverified });
+  const healed = await runWith(e, statsRun({}, NOW, { memo, ...unverified }));
   assert.deepEqual(viewedRuns(), ['s-moving', 's-spoiled']);
   assert.deepEqual(healed.unreadable, []);
-  assert.deepStrictEqual(healed, await stats(e, {}, NOW));
+  assert.deepStrictEqual(healed, await runWith(e, statsRun({}, NOW)));
   fs.rmSync(recordFile('s-spoiled'));
   viewed = [];
 });
 
 test('an engine whose feed does not read answers nothing from memory, and keeps nothing', async () => {
   const memo = freshStatsMemo();
-  await stats(e, {}, NOW, { memo, ...unverified });
+  await runWith(e, statsRun({}, NOW, { memo, ...unverified }));
   viewedRuns();
   const unfed = {
     ...e,
-    feed: async () => {
-      throw new Error('the feed does not read');
-    },
+    feed: () => Effect.fail(new Error('the feed does not read') as never),
   };
-  await stats(unfed, {}, NOW, { memo, ...unverified });
+  await runWith(unfed, statsRun({}, NOW, { memo, ...unverified }));
   assert.deepEqual(viewedRuns(), [...FINISHED, 's-moving']);
   assert.equal(memo.runs.size, 0);
 });
 
 test('an engine with no feed answers nothing from memory, and keeps nothing', async () => {
   const memo = freshStatsMemo();
-  await stats(e, {}, NOW, { memo, ...unverified });
+  await runWith(e, statsRun({}, NOW, { memo, ...unverified }));
   viewedRuns();
   const feedless = { ...e, feed: undefined } as never;
-  await stats(feedless, {}, NOW, { memo, ...unverified });
+  await runWith(feedless, statsRun({}, NOW, { memo, ...unverified }));
   assert.deepEqual(viewedRuns(), [...FINISHED, 's-moving']);
   assert.equal(memo.runs.size, 0);
 });

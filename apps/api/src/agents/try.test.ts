@@ -19,7 +19,7 @@ import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
 import { app } from '../app.ts';
 import { tryFolder } from './try.ts';
-import { start } from 'agent-orchestrator';
+import { runWith, startRun, engine } from 'agent-orchestrator';
 /** The board's repository: a plain directory, with agents of its own and a skill only it has. */
 const repo = scratch('nemia-api-try-repo-');
 process.env.HKB_REPO = repo;
@@ -242,7 +242,7 @@ test("REFUSED: a try never runs with its agent's rules outside its folder — an
 });
 
 test('a run that is no try says so', async () => {
-  const run = start({ brief: 'Write a note.', repo: '', workflowDir: other });
+  const run = await runWith(engine(), startRun({ brief: 'Write a note.', repo: '', workflowDir: other }));
   try {
     assert.equal((await listed()).find((r) => r.id === run.id)!.try, null);
     assert.equal(((await (await app.request(`/api/runs/${run.id}`)).json()) as RunDetail).try, null);

@@ -38,6 +38,7 @@ import {
   viewsFor,
   workflowsOf,
   tryOf,
+  runWith,
   judge,
   needsOf,
   type RunHolding,
@@ -72,7 +73,7 @@ import { loopSpan, remoteNameOf, type Workflow } from 'agent-orchestrator/workfl
 import { folderFiles, type StepArtifact } from '../steps/artifacts.ts';
 import { type RunGraph, runGraph } from 'agent-orchestrator';
 import { checksOf, refusedStderr, type StepCheck } from '../steps/logs.ts';
-import { type Engine, workFolderOf } from '../store.ts';
+import { engineRead, type Engine, workFolderOf } from '../store.ts';
 import {
   attemptsIn,
   closeoutIn,
@@ -522,7 +523,7 @@ export type LastSaid = Map<string, { cursor: string; line: string | null }>;
  */
 async function lastLineOf(e: Engine['Service'], view: TaskView, said: LastSaid): Promise<string | null> {
   const key = `${view.id}#${view.state.attempts.length}`;
-  const read = (after?: string) => e.transcript(view.id, after).catch(() => undefined);
+  const read = (after?: string) => engineRead('transcript', e.transcript(view.id, after)).catch(() => undefined);
   let from = said.get(key);
   let got = from ? await read(from.cursor) : undefined;
   if (!got) {
@@ -585,6 +586,18 @@ const prunedOf = (run: Run): RunDetail['pruned'] =>
       }
     : null;
 
+/** The views of `run`'s tasks, read over one look at the harnesses, and what the run is judged as off them (`judgedUnlessUnreadable`). */
+async function judgedOn(e: Engine['Service'], run: Run, names: readonly string[], workflows: readonly Workflow[] | null) {
+  const { views, reader, unreadable } = await runWith(e, viewsFor(e, [run]));
+  const read = await runWith(
+    e,
+    judgedUnlessUnreadable(run, unreadable, () =>
+      judge(run, names, workflows, views, { reader, standings: (status, steps) => standingsOf(run, steps, status) }),
+    ),
+  );
+  return { views, read };
+}
+
 /**
  * A run in full, judged off the views of its tasks; or, when a task it reads does not (`judgedUnlessUnreadable`), why it is not judged, in
  * the words the list says it with (`RunSummary.unreadable`), and nothing else: the page shows no step as the engine's missing record would.
@@ -601,10 +614,7 @@ export async function detail(run: Run, { e, home, memo }: Pick<Served, 'e' | 'ho
   const folder = workflowsOf(run, home);
   const workflows = folder.steps;
   const names = stepNames(run, workflows);
-  const { views, reader: seen, unreadable } = await viewsFor(e, [run]);
-  const read = await judgedUnlessUnreadable(run, unreadable, async () =>
-    judge(run, names, workflows, views, { reader: seen, standings: (status, steps) => standingsOf(run, steps, status) }),
-  );
+  const { views, read } = await judgedOn(e, run, names, workflows);
   if ('unreadable' in read) return { unjudged: read.unreadable };
   const judged = read.judged;
   const steps = judgedSteps(run, workflows);
@@ -612,7 +622,7 @@ export async function detail(run: Run, { e, home, memo }: Pick<Served, 'e' | 'ho
   const checks = await checksOf(e, run, steps, views, stderr);
   const source = shownWorkflow(run, workflows);
   const used = consumption(views, run);
-  const filed = await filedTimes(e, memo.filings);
+  const filed = await runWith(e, filedTimes(e, memo.filings));
   const clock = timeline(run, views, filed, steps);
   return {
     id: run.id,

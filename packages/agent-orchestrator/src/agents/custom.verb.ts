@@ -2,6 +2,7 @@
  * `nemia agents custom`, an entry of the command table: a person's custom instructions for one agent, read, written and cleared. The api
  * serves the write and the clear on the routes the table generates, and the read by a route of its own, which calls the same handler.
  */
+import { tried } from '../runtime-client.ts';
 import { leftOut, type Args, type Flag, type Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { customInstructionsFile } from '../folder/folder.store.ts';
@@ -96,15 +97,16 @@ export const AGENTS_CUSTOM: Command<Read | Cleared> = {
     { method: 'PUT', path: '/api/custom-instructions/:name', status: 200, sets: { clear: false } },
     { method: 'DELETE', path: '/api/custom-instructions/:name', status: 200, sets: { clear: true } },
   ],
-  async handler(_e, args, _env, home = HOME) {
-    const name = textOf(args, 'name') ?? '';
-    const repo = textOf(args, 'repo') ?? '.';
-    const file = customInstructionsFile(home, name);
-    if (args.clear === true) return { name, file, removed: clearCustomInstructions(home, name, repo) };
-    const words = textOf(args, 'words');
-    if (words !== undefined) writeCustomInstructions(home, name, words, repo);
-    return { name, file, words: customInstructionsFor(home, name, repo) ?? null, error: null };
-  },
+  handler: (args, _env, home = HOME) =>
+    tried(() => {
+      const name = textOf(args, 'name') ?? '';
+      const repo = textOf(args, 'repo') ?? '.';
+      const file = customInstructionsFile(home, name);
+      if (args.clear === true) return { name, file, removed: clearCustomInstructions(home, name, repo) };
+      const words = textOf(args, 'words');
+      if (words !== undefined) writeCustomInstructions(home, name, words, repo);
+      return { name, file, words: customInstructionsFor(home, name, repo) ?? null, error: null };
+    }),
   print(data, args) {
     const name = data.name;
     if ('removed' in data)

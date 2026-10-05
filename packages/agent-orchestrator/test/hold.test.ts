@@ -9,34 +9,37 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import type { Engine } from 'agent-runtime';
+import type { Engine } from '../src/runtime-client.ts';
 import type { TaskPhase } from '../src/run.ts';
 import { scratch } from './scratch.ts';
 import { decideScreen } from './screens.ts';
+import { promised } from './promised.ts';
+import { Effect } from 'effect';
 
 const ROOT = scratch('wf-hold-');
 process.env.WF_ROOT = ROOT;
 delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
 const {
-  accept,
-  advance,
+  acceptRun,
+  advanceRun,
   BY_CAP,
-  approve,
-  decide,
-  forget,
+  approveRun,
+  decideRun,
+  forgetRun,
   hold,
   holdAdvice,
   holdRefusal,
   holdWord,
   holdsOf,
   prune,
-  retry,
-  round,
-  say,
-  start,
+  retryRun,
+  roundRun,
+  sayRun,
+  startRun,
   unhold,
   WHY_CAP,
+  runWith,
 } = await import('../src/runner.ts');
 const { readRun } = await import('../src/record/record.store.ts');
 const { main } = await import('../src/cli/main.ts');
@@ -121,7 +124,7 @@ const looping = () => {
 const board = () => {
   const tasks = new Map<string, { phase: TaskPhase; closeout?: unknown }>();
   const filings: string[] = [];
-  const e = {
+  const e = promised({
     view: async (id: string) => {
       const t = tasks.get(id);
       const settled = t && ['succeeded', 'failed', 'stopped'].includes(t.phase) ? t.phase : null;
@@ -147,7 +150,7 @@ const board = () => {
       return spec.id;
     },
     stop: async () => {},
-  } as unknown as Engine;
+  });
   const settle = (id: string, phase: TaskPhase, closeout?: unknown) => tasks.set(id, { phase, closeout });
   return { e, filings, settle };
 };
@@ -156,22 +159,22 @@ const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null 
 
 /** A run of `oneStep` in `repo`, its step filed, `fix.ts` committed on its branch and signed off: merged into main with `merged`. */
 const aDone = async (b: ReturnType<typeof board>, repo: string, { merged = false } = {}) => {
-  const run = start({ brief: 'add a flag', repo, workflowDir: oneStep() });
-  await advance(b.e, readRun(run.id));
+  const run = await Effect.runPromise(startRun({ brief: 'add a flag', repo, workflowDir: oneStep() }));
+  await runWith(b.e, advanceRun(readRun(run.id)));
   const wt = readRun(run.id).steps.implement.workspace!;
   fs.writeFileSync(path.join(wt, `fix-${run.id}.ts`), 'export const fixed = true;\n');
   git(wt, 'add', '-A');
   git(wt, 'commit', '-q', '-m', 'add fix');
   b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
-  await advance(b.e, readRun(run.id));
+  await runWith(b.e, advanceRun(readRun(run.id)));
   if (merged) git(repo, 'merge', '-q', '--no-ff', '-m', 'merge', `wf/${run.id}/implement`);
   return run;
 };
 
 /** A run of `oneStep` in `repo`, its step filed and still running. */
 const aRunning = async (b: ReturnType<typeof board>, repo: string) => {
-  const run = start({ brief: 'still going', repo, workflowDir: oneStep() });
-  await advance(b.e, readRun(run.id));
+  const run = await Effect.runPromise(startRun({ brief: 'still going', repo, workflowDir: oneStep() }));
+  await runWith(b.e, advanceRun(readRun(run.id)));
   return run;
 };
 
@@ -344,7 +347,7 @@ test('REFUSED at shipped defaults: a hold that closes a circle — on a run star
   const b = board();
   const repo = aRepo();
   const a = await aRunning(b, repo);
-  const child = start({ brief: 'after a', repo, workflowDir: oneStep(), after: [a.id] });
+  const child = await Effect.runPromise(startRun({ brief: 'after a', repo, workflowDir: oneStep(), after: [a.id] }));
   await refused(
     t,
     b.e,
@@ -381,15 +384,15 @@ test('a held run files nothing — the next step, nor on a hold written between 
   const b = board();
   const repo = aRepo();
   const target = await aRunning(b, repo);
-  const run = start({ brief: 'waits for the target', repo, workflowDir: oneStep() });
+  const run = await Effect.runPromise(startRun({ brief: 'waits for the target', repo, workflowDir: oneStep() }));
   const { printed } = await typed(t, b.e, 'hold', run.id, '--until', target.id);
   assert.equal(
     printed,
     `${run.id}  held until ${target.id} ships (by ${os.userInfo().username}) — nothing more of it is filed, and nothing is asked of you, until then; the next tick lifts the hold`,
   );
   asOlder(run.id);
-  await advance(b.e, readRun(run.id));
-  const quiet = await advance(b.e, readRun(run.id));
+  await runWith(b.e, advanceRun(readRun(run.id)));
+  const quiet = await runWith(b.e, advanceRun(readRun(run.id)));
   assert.ok(!b.filings.includes(`${run.id}-implement`), 'nothing filed while held');
   assert.equal(quiet.feed.run.note, `held until ${target.id} ships`, 'the feed says the hold, and not that the run waits on you');
   const ls = (await typed(t, b.e, 'ls', run.id)).printed;
@@ -402,10 +405,10 @@ test('a held run files nothing — the next step, nor on a hold written between 
     ),
   );
 
-  const other = start({ brief: 'read before its hold', repo, workflowDir: oneStep() });
+  const other = await Effect.runPromise(startRun({ brief: 'read before its hold', repo, workflowDir: oneStep() }));
   const stale = readRun(other.id);
   fs.writeFileSync(holdFileOf(other.id), JSON.stringify({ at: 'by hand', until: [target.id] }));
-  await advance(b.e, stale);
+  await runWith(b.e, advanceRun(stale));
   assert.ok(
     !b.filings.includes(`${other.id}-implement`),
     "the pass's own check at the filing: a run read before the hold was put is not filed on that read, since the file on disk holds",
@@ -416,14 +419,14 @@ test('a held run files nothing — the next step, nor on a hold written between 
   git(wt, 'add', '-A');
   git(wt, 'commit', '-q', '-m', 'target');
   b.settle(`${target.id}-implement`, 'succeeded', SIGNED);
-  await advance(b.e, readRun(target.id));
-  await advance(b.e, readRun(run.id));
+  await runWith(b.e, advanceRun(readRun(target.id)));
+  await runWith(b.e, advanceRun(readRun(run.id)));
   assert.ok(
     fs.existsSync(holdFileOf(run.id)) && !b.filings.includes(`${run.id}-implement`),
     'signed off and not merged has not shipped: the hold stands',
   );
   git(repo, 'merge', '-q', '--no-ff', '-m', 'merge', `wf/${target.id}/implement`);
-  const lifted = await advance(b.e, readRun(run.id));
+  const lifted = await runWith(b.e, advanceRun(readRun(run.id)));
   assert.ok(lifted.notes.includes(`the hold is lifted: ${target.id} has shipped`), lifted.notes.join('\n'));
   assert.ok(!fs.existsSync(holdFileOf(run.id)), 'the hold file is gone');
   assert.ok(b.filings.includes(`${run.id}-implement`), 'and the run went on on the same pass');
@@ -434,8 +437,8 @@ test('a hold a pass reads while it files its checks stops the rest of that pass,
   const b = board();
   const repo = aRepo();
   const other = await aRunning(b, repo);
-  const run = start({ brief: 'two checks and a step after', repo, workflowDir: twoChecks() });
-  await advance(b.e, readRun(run.id));
+  const run = await Effect.runPromise(startRun({ brief: 'two checks and a step after', repo, workflowDir: twoChecks() }));
+  await runWith(b.e, advanceRun(readRun(run.id)));
   const id = run.id;
   assert.deepEqual(
     [`${id}-a`, `${id}-b`, `${id}-d`].filter((task) => b.filings.includes(task)),
@@ -448,7 +451,7 @@ test('a hold a pass reads while it files its checks stops the rest of that pass,
   const hold = holdFileOf(id);
   const file = b.e.file.bind(b.e);
   let held = false;
-  t.mock.method(b.e, 'file', async (spec: Parameters<Engine['file']>[0]) => {
+  t.mock.method(b.e, 'file', (spec: Parameters<Engine['file']>[0]) => {
     if (!held && spec.id?.endsWith('-check')) {
       held = true;
       fs.writeFileSync(hold, JSON.stringify({ at: 'by hand', until: [other.id] }));
@@ -465,7 +468,7 @@ test('a hold a pass reads while it files its checks stops the rest of that pass,
     }
     return there;
   });
-  await advance(b.e, readRun(id));
+  await runWith(b.e, advanceRun(readRun(id)));
   t.mock.restoreAll();
 
   const checks = [`${id}-a-check`, `${id}-b-check`];
@@ -477,7 +480,7 @@ test('a hold a pass reads while it files its checks stops the rest of that pass,
     'the ready step c is not filed: the pass read the hold in its checks, and its refusal holds for every phase after, though the store reads clear',
   );
 
-  await advance(b.e, readRun(id));
+  await runWith(b.e, advanceRun(readRun(id)));
   assert.deepEqual(
     [...checks, `${id}-c`].filter((task) => b.filings.includes(task)),
     [...checks, `${id}-c`],
@@ -490,16 +493,16 @@ test('REFUSED while held: an approval, a retry, a round and an acceptance — an
   const repo = aRepo();
   const target = await aRunning(b, repo);
 
-  const atGate = start({ brief: 'at its gate', repo, workflowDir: gated() });
-  await advance(b.e, readRun(atGate.id));
+  const atGate = await Effect.runPromise(startRun({ brief: 'at its gate', repo, workflowDir: gated() }));
+  await runWith(b.e, advanceRun(readRun(atGate.id)));
   b.settle(`${atGate.id}-implement`, 'succeeded', SIGNED);
-  await advance(b.e, readRun(atGate.id));
+  await runWith(b.e, advanceRun(readRun(atGate.id)));
   assert.match((await typed(t, b.e, 'ls', atGate.id)).printed, /waiting on you: approve implement/, 'the gate is asked before');
   assert.equal((await typed(t, b.e, 'hold', atGate.id, '--until', target.id)).error, undefined);
   asOlder(atGate.id);
   const held = `${atGate.id} is held until ${target.id} ships (nemia hold, at `;
   await assert.rejects(
-    approve(b.e, atGate.id, 'implement'),
+    runWith(b.e, approveRun(atGate.id, 'implement')),
     (err: Error & { exitCode?: number }) =>
       err.message.startsWith(held) &&
       err.exitCode === 2 &&
@@ -507,7 +510,7 @@ test('REFUSED while held: an approval, a retry, a round and an acceptance — an
       err.message.endsWith(`nemia hold ${atGate.id} --off.`),
   );
   await assert.rejects(
-    retry(b.e, atGate.id, 'implement', { mode: 'nudge', message: 'change it' }),
+    runWith(b.e, retryRun(atGate.id, 'implement', { mode: 'nudge', message: 'change it' })),
     (err: Error) => err.message.startsWith(held) && err.message.includes('a retry would release'),
   );
   const ls = (await typed(t, b.e, 'ls', atGate.id)).printed;
@@ -518,7 +521,7 @@ test('REFUSED while held: an approval, a retry, a round and an acceptance — an
   const screen = (await typed(t, b.e, 'decide', atGate.id)).printed;
   assert.doesNotMatch(screen, /waiting on you|AWAITING APPROVAL/, screen);
   assert.doesNotMatch(screen, VERBS, screen);
-  const d = await decide(b.e, atGate.id);
+  const d = await runWith(b.e, decideRun(atGate.id));
   assert.deepEqual([d.retrying, d.rounding, d.offers, d.answering], [[], [], [], {}]);
   assert.deepEqual(
     d.gates,
@@ -529,7 +532,7 @@ test('REFUSED while held: an approval, a retry, a round and an acceptance — an
   const approvals = path.join(ROOT, 'runs', `${atGate.id}.approvals`);
   fs.mkdirSync(approvals, { recursive: true });
   fs.writeFileSync(path.join(approvals, 'implement'), JSON.stringify({ at: new Date().toISOString(), step: 'implement' }));
-  await advance(b.e, readRun(atGate.id));
+  await runWith(b.e, advanceRun(readRun(atGate.id)));
   assert.ok(!b.filings.includes(`${atGate.id}-review`), 'a pass files nothing on an approval written by hand beside the hold');
   fs.rmSync(approvals, { recursive: true });
   assert.equal(
@@ -543,29 +546,29 @@ test('REFUSED while held: an approval, a retry, a round and an acceptance — an
   );
   assert.match((await typed(t, b.e, 'decide', atGate.id)).printed, new RegExp(`nemia approve ${atGate.id} implement`));
 
-  const loop = start({ brief: 'a loop', repo, workflowDir: looping() });
-  await advance(b.e, readRun(loop.id));
+  const loop = await Effect.runPromise(startRun({ brief: 'a loop', repo, workflowDir: looping() }));
+  await runWith(b.e, advanceRun(readRun(loop.id)));
   b.settle(`${loop.id}-implement`, 'succeeded', SIGNED);
-  await advance(b.e, readRun(loop.id));
+  await runWith(b.e, advanceRun(readRun(loop.id)));
   b.settle(`${loop.id}-review`, 'succeeded', { ...SIGNED, again: true });
-  await advance(b.e, readRun(loop.id));
+  await runWith(b.e, advanceRun(readRun(loop.id)));
   const roundTwo = readRun(loop.id);
   const implement2 = roundTwo.steps.implement.taskId!;
   b.settle(implement2, 'succeeded', SIGNED);
-  await advance(b.e, readRun(loop.id));
+  await runWith(b.e, advanceRun(readRun(loop.id)));
   const review2 = readRun(loop.id).steps.review.taskId!;
   b.settle(review2, 'succeeded', { ...SIGNED, again: true });
-  await advance(b.e, readRun(loop.id));
+  await runWith(b.e, advanceRun(readRun(loop.id)));
   const before = (await typed(t, b.e, 'decide', loop.id)).printed;
   assert.match(before, /ROUNDS EXHAUSTED, waiting on you/, before);
   assert.equal((await typed(t, b.e, 'hold', loop.id, '--until', target.id)).error, undefined);
   await assert.rejects(
-    round(b.e, loop.id, 'review'),
+    runWith(b.e, roundRun(loop.id, 'review')),
     (err: Error) => err.message.startsWith(`${loop.id} is held until ${target.id} ships`) && err.message.includes('a round would release'),
     'a loop out of rounds: once more is refused while held',
   );
   await assert.rejects(
-    accept(b.e, loop.id, 'review', 'as it stands'),
+    runWith(b.e, acceptRun(loop.id, 'review', 'as it stands')),
     (err: Error) =>
       err.message.startsWith(`${loop.id} is held until ${target.id} ships`) && err.message.includes('an acceptance would release'),
     'and so is enough',
@@ -584,25 +587,25 @@ test("a blocked step's question stays on its record while the run is held, asked
   const b = board();
   const repo = aRepo();
   const target = await aRunning(b, repo);
-  const run = start({ brief: 'asks a question', repo, workflowDir: twoSteps() });
-  await advance(b.e, readRun(run.id));
+  const run = await Effect.runPromise(startRun({ brief: 'asks a question', repo, workflowDir: twoSteps() }));
+  await runWith(b.e, advanceRun(readRun(run.id)));
   b.settle(`${run.id}-implement`, 'succeeded', { ...SIGNED, outcome: 'blocked', needs: 'which colour?' });
-  await advance(b.e, readRun(run.id));
+  await runWith(b.e, advanceRun(readRun(run.id)));
   assert.match((await typed(t, b.e, 'ls', run.id)).printed, /waiting on you: implement/);
-  await hold(b.e, run.id, [target.id]);
+  await runWith(b.e, hold(run.id, [target.id]));
   const ls = (await typed(t, b.e, 'ls', run.id)).printed;
   assert.doesNotMatch(ls, /waiting on you/, ls);
   assert.doesNotMatch(ls, VERBS, ls);
   const screen = (await typed(t, b.e, 'decide', run.id)).printed;
   assert.doesNotMatch(screen, /waiting on you|BLOCKED/, screen);
   assert.doesNotMatch(screen, VERBS, screen);
-  assert.equal((await decide(b.e, run.id)).decision.kind, 'running');
+  assert.equal((await runWith(b.e, decideRun(run.id))).decision.kind, 'running');
   assert.equal(readRun(run.id).steps.implement.taskId, `${run.id}-implement`, 'the step and its closeout are untouched');
   const asks = path.join(ROOT, 'runs', `${run.id}.asks`);
   fs.mkdirSync(asks, { recursive: true });
   fs.writeFileSync(path.join(asks, 'retry-implement-2'), JSON.stringify({ mode: 'nudge' }));
   const filings = [...b.filings];
-  const pass = await advance(b.e, readRun(run.id));
+  const pass = await runWith(b.e, advanceRun(readRun(run.id)));
   assert.deepEqual(
     [pass.blocked, pass.tried, b.filings],
     [['review'], [], filings],
@@ -619,12 +622,12 @@ test('REFUSED at shipped defaults: nemia rm of a run another holds on names the 
   const b = board();
   const repo = aRepo();
   const target = await aRunning(b, repo);
-  const run = start({ brief: 'waits for the target', repo, workflowDir: oneStep() });
-  await hold(b.e, run.id, [target.id]);
+  const run = await Effect.runPromise(startRun({ brief: 'waits for the target', repo, workflowDir: oneStep() }));
+  await runWith(b.e, hold(run.id, [target.id]));
   asOlder(run.id);
   assert.equal((await typed(t, b.e, 'cancel', target.id)).error, undefined);
   b.settle(`${target.id}-implement`, 'stopped');
-  const refusedRm = await forget(b.e, target.id, {});
+  const refusedRm = await runWith(b.e, forgetRun(target.id, {}));
   assert.equal(refusedRm.kind, 'refused');
   assert.match(
     refusedRm.refusal ?? '',
@@ -641,9 +644,9 @@ test('REFUSED at shipped defaults: nemia rm of a run another holds on names the 
     'the held run is told why it will never go on, and how to let it go',
   );
   assert.equal((await typed(t, b.e, 'cancel', run.id)).error, undefined);
-  assert.equal((await forget(b.e, run.id, {})).kind, 'forgotten');
+  assert.equal((await runWith(b.e, forgetRun(run.id, {}))).kind, 'forgotten');
   assert.ok(!fs.existsSync(holdFileOf(run.id)), 'the hold went with the run');
-  assert.equal((await forget(b.e, target.id, {})).kind, 'forgotten');
+  assert.equal((await runWith(b.e, forgetRun(target.id, {}))).kind, 'forgotten');
 });
 
 /** A team whose one step works in a folder the run makes, with no repository. */
@@ -661,7 +664,7 @@ test('REFUSED at shipped defaults: a hold on a pruned run and on a folder run, a
   const target = await aRunning(b, repo);
 
   const pruned = await aDone(b, repo);
-  assert.equal((await prune(b.e, pruned.id, { yes: true, unmerged: true })).kind, 'pruned');
+  assert.equal((await runWith(b.e, prune(pruned.id, { yes: true, unmerged: true }))).kind, 'pruned');
   await refused(
     t,
     b.e,
@@ -672,7 +675,9 @@ test('REFUSED at shipped defaults: a hold on a pruned run and on a folder run, a
     target.id,
   );
 
-  const folder = start({ brief: 'a note', repo: fs.mkdtempSync(path.join(ROOT, 'plain-')), workflowDir: folderTeam() });
+  const folder = await Effect.runPromise(
+    startRun({ brief: 'a note', repo: fs.mkdtempSync(path.join(ROOT, 'plain-')), workflowDir: folderTeam() }),
+  );
   await refused(
     t,
     b.e,
@@ -692,7 +697,7 @@ test('REFUSED at shipped defaults: a hold on a pruned run and on a folder run, a
     folder.id,
   );
 
-  const inPlace = start({ brief: 'on main itself', repo, workflowDir: oneStep(), isolate: false });
+  const inPlace = await Effect.runPromise(startRun({ brief: 'on main itself', repo, workflowDir: oneStep(), isolate: false }));
   await refused(
     t,
     b.e,
@@ -704,7 +709,7 @@ test('REFUSED at shipped defaults: a hold on a pruned run and on a folder run, a
   );
 
   git(repo, 'checkout', '-q', '-b', 'release');
-  const onRelease = start({ brief: 'onto release', repo, workflowDir: oneStep() });
+  const onRelease = await Effect.runPromise(startRun({ brief: 'onto release', repo, workflowDir: oneStep() }));
   git(repo, 'checkout', '-q', 'main');
   await refused(
     t,
@@ -740,11 +745,11 @@ test('REFUSED at shipped defaults: a hold put again while the tick or --off lift
   const target = await aRunning(b, repo);
   const other = await aRunning(b, repo);
 
-  const run = start({ brief: 'held twice', repo, workflowDir: oneStep() });
-  await hold(b.e, run.id, [target.id]);
+  const run = await Effect.runPromise(startRun({ brief: 'held twice', repo, workflowDir: oneStep() }));
+  await runWith(b.e, hold(run.id, [target.id]));
   const stale = readRun(run.id);
   unhold(run.id);
-  await hold(b.e, run.id, [other.id]);
+  await runWith(b.e, hold(run.id, [other.id]));
   const second = fs.readFileSync(holdFileOf(run.id), 'utf8');
   assert.notEqual(JSON.parse(second).at, stale.hold!.at, 'two holds, told apart by when they were put');
   const wt = readRun(target.id).steps.implement.workspace!;
@@ -752,9 +757,9 @@ test('REFUSED at shipped defaults: a hold put again while the tick or --off lift
   git(wt, 'add', '-A');
   git(wt, 'commit', '-q', '-m', 'target');
   b.settle(`${target.id}-implement`, 'succeeded', SIGNED);
-  await advance(b.e, readRun(target.id));
+  await runWith(b.e, advanceRun(readRun(target.id)));
   git(repo, 'merge', '-q', '--no-ff', '-m', 'merge', `wf/${target.id}/implement`);
-  const pass = await advance(b.e, stale);
+  const pass = await runWith(b.e, advanceRun(stale));
   assert.ok(
     !pass.notes.some((n) => n.startsWith('the hold is lifted')),
     `the tick read hold A, and a person lifted it and put hold B before the tick's lift: B names what the tick never read\n${pass.notes.join('\n')}`,
@@ -791,7 +796,7 @@ test('REFUSED at shipped defaults: a hold put again while the tick or --off lift
     return write.apply(this, args);
   });
   await assert.rejects(
-    hold(b.e, race.id, [other.id]),
+    runWith(b.e, hold(race.id, [other.id])),
     (err: Error & { exitCode?: number }) =>
       err.exitCode === 2 &&
       err.message.startsWith(`${race.id} is already held until ${other.id} ships (nemia hold, at ${first.at}). A hold is put once, whole`),
@@ -810,8 +815,8 @@ test('nemia decide on a held run that also waits --after a run says both, and th
   const repo = aRepo();
   const parent = await aRunning(b, repo);
   const target = await aRunning(b, repo);
-  const child = start({ brief: 'after the parent', repo, workflowDir: oneStep(), after: [parent.id] });
-  await hold(b.e, child.id, [target.id]);
+  const child = await Effect.runPromise(startRun({ brief: 'after the parent', repo, workflowDir: oneStep(), after: [parent.id] }));
+  await runWith(b.e, hold(child.id, [target.id]));
   asOlder(child.id);
   const screen = (await typed(t, b.e, 'decide', child.id)).printed;
   assert.match(screen, new RegExp(`\n  waiting on ${parent.id}`), screen);
@@ -838,15 +843,15 @@ test('REFUSED while held or pruned: nemia say to a step that has settled offers 
   const done = await aDone(b, repo);
   const run = await aRunning(b, repo);
   b.settle(`${run.id}-implement`, 'succeeded', { ...SIGNED, outcome: 'blocked', needs: 'a word' });
-  await advance(b.e, readRun(run.id));
+  await runWith(b.e, advanceRun(readRun(run.id)));
   await assert.rejects(
-    say(b.e, run.id, 'implement', 'hello'),
+    runWith(b.e, sayRun(run.id, 'implement', 'hello')),
     (err: Error) => /: nemia retry /.test(err.message),
     'offered before the hold on a step that signed off blocked: settled, and the run not finished, so it may be held',
   );
-  await hold(b.e, run.id, [target.id]);
+  await runWith(b.e, hold(run.id, [target.id]));
   await assert.rejects(
-    say(b.e, run.id, 'implement', 'hello'),
+    runWith(b.e, sayRun(run.id, 'implement', 'hello')),
     (err: Error & { exitCode?: number }) =>
       err.exitCode === 2 &&
       err.message.endsWith(
@@ -855,9 +860,9 @@ test('REFUSED while held or pruned: nemia say to a step that has settled offers 
       !VERBS.test(err.message),
   );
   unhold(run.id);
-  assert.equal((await prune(b.e, done.id, { yes: true, unmerged: true })).kind, 'pruned');
+  assert.equal((await runWith(b.e, prune(done.id, { yes: true, unmerged: true }))).kind, 'pruned');
   await assert.rejects(
-    say(b.e, done.id, 'implement', 'hello'),
+    runWith(b.e, sayRun(done.id, 'implement', 'hello')),
     (err: Error) => /Nor is it tried again: .* was pruned at /.test(err.message) && !VERBS.test(err.message),
   );
 });
@@ -870,7 +875,7 @@ test('the whole screen of a run held by a person while its step runs, of one wai
   const ids = { '<parent>': parent.id, '<target>': target.id, '<root>': ROOT };
 
   const going = await aRunning(b, repo);
-  await hold(b.e, going.id, [target.id]);
+  await runWith(b.e, hold(going.id, [target.id]));
   asOlder(going.id);
   assert.deepEqual(await decideScreen(t, b.e, [going.id], { ...ids, '<id>': going.id }), [
     '<id>  still going',
@@ -880,14 +885,14 @@ test('the whole screen of a run held by a person while its step runs, of one wai
     '  nothing of <id> is filed, and nothing is asked of you, until nemia decide says <target> has shipped; to go on before then: nemia hold <id> --off',
   ]);
 
-  const child = start({ brief: 'after the parent', repo, workflowDir: oneStep(), after: [parent.id] });
+  const child = await Effect.runPromise(startRun({ brief: 'after the parent', repo, workflowDir: oneStep(), after: [parent.id] }));
   assert.deepEqual(await decideScreen(t, b.e, [child.id], { ...ids, '<id>': child.id }), [
     '<id>  after the parent',
     '',
     '  waiting on <parent>',
     '  nothing of <id> is filed until nemia decide says <parent> has shipped onto main; nothing to decide yet',
   ]);
-  await hold(b.e, child.id, [target.id]);
+  await runWith(b.e, hold(child.id, [target.id]));
   asOlder(child.id);
   assert.deepEqual(await decideScreen(t, b.e, [child.id], { ...ids, '<id>': child.id }), [
     '<id>  after the parent',
@@ -915,16 +920,16 @@ test('the whole screen of a run held by a person while its step runs, of one wai
 
 /** A loop run on `b` whose review asked for another round on the last one its `rounds:` allows. */
 async function outOfRounds(b: ReturnType<typeof board>) {
-  const loop = start({ brief: 'a loop', repo: aRepo(), workflowDir: looping() });
-  await advance(b.e, readRun(loop.id));
+  const loop = await Effect.runPromise(startRun({ brief: 'a loop', repo: aRepo(), workflowDir: looping() }));
+  await runWith(b.e, advanceRun(readRun(loop.id)));
   b.settle(`${loop.id}-implement`, 'succeeded', SIGNED);
-  await advance(b.e, readRun(loop.id));
+  await runWith(b.e, advanceRun(readRun(loop.id)));
   b.settle(`${loop.id}-review`, 'succeeded', { ...SIGNED, again: true });
-  await advance(b.e, readRun(loop.id));
+  await runWith(b.e, advanceRun(readRun(loop.id)));
   b.settle(readRun(loop.id).steps.implement.taskId!, 'succeeded', SIGNED);
-  await advance(b.e, readRun(loop.id));
+  await runWith(b.e, advanceRun(readRun(loop.id)));
   b.settle(readRun(loop.id).steps.review.taskId!, 'succeeded', { ...SIGNED, again: true });
-  await advance(b.e, readRun(loop.id));
+  await runWith(b.e, advanceRun(readRun(loop.id)));
   return loop;
 }
 
@@ -971,7 +976,7 @@ test('the whole screen of a loop out of rounds, and of the round a person asks f
     '  ship it   git -C <repo> merge --no-ff wf/<id>/implement',
     '  drop it   git -C <repo> branch -D wf/<id>/implement',
   ]);
-  await round(b.e, loop.id, 'review');
+  await runWith(b.e, roundRun(loop.id, 'review'));
   assert.deepEqual(await decideScreen(t, b.e, [loop.id], { '<id>': loop.id, '<root>': ROOT }), [
     '<id>  a loop',
     '',
@@ -988,12 +993,12 @@ test('the whole screen of a loop a person accepted as it stands', async (t) => {
   fs.writeFileSync(path.join(wt, 'loop.ts'), 'export const looped = true;\n');
   git(wt, 'add', '-A');
   git(wt, 'commit', '-q', '-m', 'add loop.ts');
-  await accept(b.e, loop.id, 'review', 'as it stands');
+  await runWith(b.e, acceptRun(loop.id, 'review', 'as it stands'));
   const asks = path.join(ROOT, 'runs', `${loop.id}.asks`);
   const [accepted] = fs.readdirSync(asks).filter((f) => f.startsWith('accept-review-'));
   const file = path.join(asks, accepted);
   fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), at: '2026-09-17T08:00:00.000Z' }));
-  await advance(b.e, readRun(loop.id));
+  await runWith(b.e, advanceRun(readRun(loop.id)));
   assert.deepEqual(await decideScreen(t, b.e, [loop.id], { '<id>': loop.id, '<repo>': readRun(loop.id).repo!, '<root>': ROOT }), [
     '<id>  a loop',
     '',
@@ -1060,7 +1065,7 @@ test("nemia hold writes the person's why, one line, and who they are into the ho
   const b = board();
   const repo = aRepo();
   const target = await aRunning(b, repo);
-  const said = start({ brief: 'held with words', repo, workflowDir: oneStep() });
+  const said = await Effect.runPromise(startRun({ brief: 'held with words', repo, workflowDir: oneStep() }));
   const { printed, error } = await typed(t, b.e, 'hold', said.id, '--until', target.id, '--why', '  two\n words ', '--by', 'operator');
   assert.equal(error, undefined);
   assert.deepEqual((({ why, by }) => ({ why, by }))(JSON.parse(fs.readFileSync(holdFileOf(said.id), 'utf8')) as Record<string, unknown>), {
@@ -1071,7 +1076,7 @@ test("nemia hold writes the person's why, one line, and who they are into the ho
     printed,
     `${said.id}  held until ${target.id} ships (why: two words; by operator) — nothing more of it is filed, and nothing is asked of you, until then; the next tick lifts the hold`,
   );
-  const plain = start({ brief: 'held with none', repo, workflowDir: oneStep() });
+  const plain = await Effect.runPromise(startRun({ brief: 'held with none', repo, workflowDir: oneStep() }));
   assert.equal((await typed(t, b.e, 'hold', plain.id, '--until=' + target.id, '--why=it waits')).error, undefined);
   assert.equal(readRun(plain.id).hold?.why, 'it waits', '--why=<words> is --why <words>');
   assert.equal((await typed(t, b.e, 'hold', plain.id, '--off')).error, undefined);
@@ -1080,7 +1085,7 @@ test("nemia hold writes the person's why, one line, and who they are into the ho
   assert.deepEqual(Object.keys(file), ['at', 'until', 'by'], 'a hold put with no --why writes no why');
   assert.equal(file.by, os.userInfo().username, 'nor --by: it is put by the OS user');
 
-  const nameless = start({ brief: 'held by a user the system cannot name', repo, workflowDir: oneStep() });
+  const nameless = await Effect.runPromise(startRun({ brief: 'held by a user the system cannot name', repo, workflowDir: oneStep() }));
   t.mock.method(os, 'userInfo', () => {
     throw new Error('ENOENT: no such file or directory, uv_os_get_passwd');
   });
@@ -1090,7 +1095,7 @@ test("nemia hold writes the person's why, one line, and who they are into the ho
 
 test("a hold's file written by hand is read as it is: a why or a by that is no words is left out, and a long why is one line within its cap", async () => {
   const repo = aRepo();
-  const run = start({ brief: 'held by hand', repo, workflowDir: oneStep() });
+  const run = await Effect.runPromise(startRun({ brief: 'held by hand', repo, workflowDir: oneStep() }));
   for (const bad of [7, null, '', ' \n\t ', ['x'], { a: 1 }]) {
     fs.writeFileSync(holdFileOf(run.id), JSON.stringify({ at: 't', until: ['a-1'], why: bad, by: bad }));
     const read = readRun(run.id).hold!;
@@ -1111,7 +1116,7 @@ test('REFUSED at shipped defaults: --why and --by with no value, given twice, wi
   const b = board();
   const repo = aRepo();
   const target = await aRunning(b, repo);
-  const run = start({ brief: 'not held', repo, workflowDir: oneStep() });
+  const run = await Effect.runPromise(startRun({ brief: 'not held', repo, workflowDir: oneStep() }));
   const u = ['hold', run.id, '--until', target.id];
   await refused(t, b.e, /^--why takes the words for why the run is held: nemia hold <runId>/, ...u, '--why');
   await refused(t, b.e, /^--why takes the words for why the run is held/, ...u, '--why', '--by', 'x');
@@ -1146,7 +1151,7 @@ test('REFUSED at shipped defaults: a hold on a run already held with words names
   const b = board();
   const repo = aRepo();
   const target = await aRunning(b, repo);
-  const run = start({ brief: 'held once', repo, workflowDir: oneStep() });
+  const run = await Effect.runPromise(startRun({ brief: 'held once', repo, workflowDir: oneStep() }));
   assert.equal((await typed(t, b.e, 'hold', run.id, '--until', target.id, '--why', "it's blocked", '--by', 'operator')).error, undefined);
   await refused(
     t,
@@ -1157,7 +1162,7 @@ test('REFUSED at shipped defaults: a hold on a run already held with words names
     '--until',
     target.id,
   );
-  const plain = start({ brief: 'held once, with no words', repo, workflowDir: oneStep() });
+  const plain = await Effect.runPromise(startRun({ brief: 'held once, with no words', repo, workflowDir: oneStep() }));
   assert.equal((await typed(t, b.e, 'hold', plain.id, '--until', target.id)).error, undefined);
   await refused(
     t,
@@ -1177,14 +1182,14 @@ test("nemia ls, nemia decide and the feed say a hold's why and who put it beside
   const words = `held until ${target.id} ships (why: merge conflicts in five files; by operator)`;
   const why = ['--why', 'merge conflicts in five files', '--by', 'operator'];
 
-  const atGate = start({ brief: 'at its gate', repo, workflowDir: gated() });
-  await advance(b.e, readRun(atGate.id));
+  const atGate = await Effect.runPromise(startRun({ brief: 'at its gate', repo, workflowDir: gated() }));
+  await runWith(b.e, advanceRun(readRun(atGate.id)));
   b.settle(`${atGate.id}-implement`, 'succeeded', SIGNED);
-  await advance(b.e, readRun(atGate.id));
-  const olderGate = start({ brief: 'at its gate, held by older code', repo, workflowDir: gated() });
-  await advance(b.e, readRun(olderGate.id));
+  await runWith(b.e, advanceRun(readRun(atGate.id)));
+  const olderGate = await Effect.runPromise(startRun({ brief: 'at its gate, held by older code', repo, workflowDir: gated() }));
+  await runWith(b.e, advanceRun(readRun(olderGate.id)));
   b.settle(`${olderGate.id}-implement`, 'succeeded', SIGNED);
-  await advance(b.e, readRun(olderGate.id));
+  await runWith(b.e, advanceRun(readRun(olderGate.id)));
   assert.equal((await typed(t, b.e, 'hold', atGate.id, '--until', target.id, ...why)).error, undefined);
   assert.equal((await typed(t, b.e, 'hold', olderGate.id, '--until', target.id)).error, undefined);
   asOlder(olderGate.id);
@@ -1198,24 +1203,24 @@ test("nemia ls, nemia decide and the feed say a hold's why and who put it beside
 
   const screen = (await typed(t, b.e, 'decide', atGate.id)).printed;
   assert.match(screen, new RegExp(`\n  ${literal(words)}\n`), screen);
-  assert.deepEqual((await decide(b.e, atGate.id)).gates, {
+  assert.deepEqual((await runWith(b.e, decideRun(atGate.id))).gates, {
     implement: `awaiting approval:  ${words}; its approval is asked once the hold lifts`,
   });
   assert.match((await typed(t, b.e, 'decide', olderGate.id)).printed, new RegExp(`\n  held until ${target.id} ships\n`));
 
   const parent = await aRunning(b, repo);
-  const child = start({ brief: 'after the parent', repo, workflowDir: oneStep(), after: [parent.id] });
+  const child = await Effect.runPromise(startRun({ brief: 'after the parent', repo, workflowDir: oneStep(), after: [parent.id] }));
   assert.equal((await typed(t, b.e, 'hold', child.id, '--until', target.id, ...why)).error, undefined);
   assert.match(
     (await typed(t, b.e, 'decide', child.id)).printed,
     new RegExp(`\n  ${literal(words)} as well — nemia hold ${child.id} --off lifts the hold, and not the wait above$`),
   );
 
-  const quiet = start({ brief: 'held before it files', repo, workflowDir: oneStep() });
+  const quiet = await Effect.runPromise(startRun({ brief: 'held before it files', repo, workflowDir: oneStep() }));
   assert.equal((await typed(t, b.e, 'hold', quiet.id, '--until', target.id, ...why)).error, undefined);
-  assert.equal((await advance(b.e, readRun(quiet.id))).feed.run.note, words, "the feed's note says the words");
-  const olderQuiet = start({ brief: 'held before it files, by older code', repo, workflowDir: oneStep() });
+  assert.equal((await runWith(b.e, advanceRun(readRun(quiet.id)))).feed.run.note, words, "the feed's note says the words");
+  const olderQuiet = await Effect.runPromise(startRun({ brief: 'held before it files, by older code', repo, workflowDir: oneStep() }));
   assert.equal((await typed(t, b.e, 'hold', olderQuiet.id, '--until', target.id)).error, undefined);
   asOlder(olderQuiet.id);
-  assert.equal((await advance(b.e, readRun(olderQuiet.id))).feed.run.note, `held until ${target.id} ships`);
+  assert.equal((await runWith(b.e, advanceRun(readRun(olderQuiet.id)))).feed.run.note, `held until ${target.id} ships`);
 });

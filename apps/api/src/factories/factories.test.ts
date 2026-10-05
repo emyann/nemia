@@ -235,7 +235,7 @@ test('POST /api/runs?factory= starts a card in the factory: the record names the
   assert.ok(!readInbox().some((c) => c.name === card.name), 'the card has left the inbox');
 });
 
-test("REFUSED at shipped defaults: a card started in a factory whose hires leave the workflow's steps unfilled is a 422 in `start()`'s words, the card stays and nothing is written", async () => {
+test("REFUSED at shipped defaults: a card started in a factory whose hires leave the workflow's steps unfilled is a 422 in `startRun`'s words, the card stays and nothing is written", async () => {
   const { card } = addToInbox({ text: 'Cache the lists' });
   const before = runFiles();
   const res = await post('/api/runs?factory=solo', { workflow: 'alpha', card: card.name });

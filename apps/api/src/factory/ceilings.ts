@@ -2,7 +2,7 @@
  * The cap on runs in flight, and the runs it counts and holds, and what the last pass cost: what the Factory says over its floor
  * (`GET /api/ceilings`, app.ts).
  */
-import { COMMANDS, lastCeilings, lastPassCost, type PassCost, type Slots, slotWord } from 'agent-orchestrator';
+import { COMMANDS, lastCeilings, lastPassCost, type PassCost, type Slots, slotWord, runWith } from 'agent-orchestrator';
 import type { Engine } from '../store.ts';
 
 /**
@@ -38,7 +38,7 @@ const CEILINGS = COMMANDS.find((c) => c.name === 'ceilings')!;
  * ran with and cost. Read through `e`; the cap, before any pass wrote one, is `WF_MAX_RUNS` of `env`, the app's environment.
  */
 export async function ceilingsOf(e: Engine['Service'], env: NodeJS.ProcessEnv): Promise<Ceilings> {
-  const { cap, inFlight, held } = (await CEILINGS.handler(e, {}, env)) as Slots;
+  const { cap, inFlight, held } = (await runWith(e, CEILINGS.handler({}, env))) as Slots;
   return {
     last: lastCeilings() ?? null,
     cap,

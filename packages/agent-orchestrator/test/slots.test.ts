@@ -1,7 +1,7 @@
 /**
  * The cap on runs in flight between passes (`slotsOf`): the runs that count against it in the order a pass admits them, the runs it holds,
  * and one look at the harnesses for the whole store — never a view per task — with `runSlots` its held runs. Walked through the runtime
- * itself, `promiseEngine` over an in-memory journal, whose `list` and `view` the test counts.
+ * itself, `plainEngine` over an in-memory journal, whose `list` and `view` the test counts.
  *
  * `WF_ROOT` is set before the package is imported; `WF_MAX_RUNS` is set by each test, and no pass has written a cap.
  */
@@ -10,12 +10,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { PromiseJournal, PromiseRunner } from 'agent-runtime';
-import { Engine, promiseEngine } from 'agent-runtime/effect';
+import { Engine } from 'agent-runtime/effect';
 import { scratch } from './scratch.ts';
+import { plainEngine } from './promised.ts';
 
 const ROOT = scratch('wf-slots-');
 process.env.WF_ROOT = ROOT;
-const { runSlots, slotsOf } = await import('../src/runner.ts');
+const { runWith, runSlots, slotsOf } = await import('../src/runner.ts');
 const { readRun } = await import('../src/record/record.store.ts');
 
 const at = (minute: number) => `2026-10-02T09:0${minute}:00.000Z`;
@@ -61,7 +62,7 @@ const runner: PromiseRunner = {
     return '';
   },
 };
-const engine = promiseEngine(
+const engine = plainEngine(
   Engine.layer({
     root: scratch('wf-slots-engine-'),
     journal,
@@ -109,7 +110,7 @@ const RUNS = () => ['r-a', 'r-bad', 'r-new', 'r-old'].map(readRun);
 test('slotsOf: the runs in flight in the order a pass admits them, one unreadable among them, and the runs the cap holds — off one list', async () => {
   process.env.WF_MAX_RUNS = '2';
   calls.list = calls.view = 0;
-  const slots = await slotsOf(e, RUNS());
+  const slots = await runWith(e, slotsOf(e, RUNS()));
   assert.deepEqual(
     { ...slots, held: [...slots.held] },
     {
@@ -122,19 +123,22 @@ test('slotsOf: the runs in flight in the order a pass admits them, one unreadabl
     },
   );
   assert.deepEqual(calls, { list: 1, view: 0 }, 'one look at the harnesses for the whole store, and no task viewed again');
-  assert.deepEqual([...(await runSlots(e, RUNS()))], [...slots.held], 'runSlots answers slotsOf’s held runs');
+  assert.deepEqual([...(await runWith(e, runSlots(e, RUNS())))], [...slots.held], 'runSlots answers slotsOf’s held runs');
 });
 
 test('slotsOf with no cap reads nothing, and runSlots reads nothing on a store with no run waiting to start', async () => {
   process.env.WF_MAX_RUNS = '0';
   calls.list = calls.view = 0;
-  assert.deepEqual(await slotsOf(e, RUNS()), { cap: 0, inFlight: null, held: new Map() });
+  assert.deepEqual(await runWith(e, slotsOf(e, RUNS())), { cap: 0, inFlight: null, held: new Map() });
   process.env.WF_MAX_RUNS = '2';
   assert.deepEqual(
     [
-      ...(await runSlots(
+      ...(await runWith(
         e,
-        RUNS().filter((r) => Object.keys(r.steps).length),
+        runSlots(
+          e,
+          RUNS().filter((r) => Object.keys(r.steps).length),
+        ),
       )),
     ],
     [],

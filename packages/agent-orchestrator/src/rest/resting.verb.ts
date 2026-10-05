@@ -15,6 +15,7 @@
  */
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
+import { Effect } from 'effect';
 import type { Engine } from '../runtime-client.ts';
 import { headsOf } from '../branches/branches.store.ts';
 import { runStore } from '../record/files.store.ts';
@@ -73,8 +74,8 @@ const tipsOf = (
  * keeps where it read the feed to: a line past it is read by the next read, unless another read takes it first, and then its `keep` keeps
  * nothing. The feed is read through `e`, and `verify` is `WF_VERIFY_REST` as the caller's environment gives it (`verifiesRest`).
  */
-export async function restingRead<T>(e: Engine, memo: RestingMemo<T>, verify: boolean): Promise<RestingRead<T>> {
-  const fed = await followedFeed(e, memo);
+export const restingRead = Effect.fn('restingRead')(function* <T>(e: Engine, memo: RestingMemo<T>, verify: boolean) {
+  const fed = yield* followedFeed(e, memo);
   const readTo = memo.cursor;
   const stamps = runStore.runs.stamps();
   const heads = new Map<string, ReadonlyMap<string, string>>();
@@ -84,7 +85,7 @@ export async function restingRead<T>(e: Engine, memo: RestingMemo<T>, verify: bo
     return heads.get(at)!;
   };
   const given = new Map<string, T>();
-  return {
+  const read: RestingRead<T> = {
     verify,
     kept(run) {
       const kept = memo.runs.get(run.id);
@@ -116,4 +117,5 @@ export async function restingRead<T>(e: Engine, memo: RestingMemo<T>, verify: bo
       for (const id of memo.runs.keys()) if (!present.has(id)) memo.runs.delete(id);
     },
   };
-}
+  return read;
+});

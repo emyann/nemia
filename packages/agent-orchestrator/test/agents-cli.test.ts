@@ -10,15 +10,15 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import type { Engine } from 'agent-runtime';
 import { scratch } from './scratch.ts';
+import { promised } from './promised.ts';
 
 const ROOT = scratch('wf-agents-cli-');
 process.env.WF_ROOT = ROOT;
 const { main } = await import('../src/cli/main.ts');
 
 /** No verb here asks the engine anything. */
-const NO_ENGINE = {} as Engine;
+const NO_ENGINE = promised({});
 
 type Mock = { mock: { method: (o: object, m: string, f: (...a: unknown[]) => void) => { mock: { restore: () => void } } } };
 

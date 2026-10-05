@@ -4,7 +4,8 @@
  * `nemia ls` reads the repository's own checkout as the pass that would file into it reads it (`checkoutHold`, in `ending.verb.ts`). A
  * controller, reaching the runtime through the client (`runtime-client.ts`).
  */
-import { unreadableJournal, type Engine, type TaskView } from '../runtime-client.ts';
+import { Cause, Effect, Exit } from 'effect';
+import { EngineService, asked, over, unreadableJournal, type Engine, type TaskView } from '../runtime-client.ts';
 import type { RunSlot } from '../cap/cap.ts';
 import { runSlots } from '../cap/cap.verb.ts';
 import { isGitRun, runTasks, unjudgedWords, type Run, type TaskPhase } from '../record/record.ts';
@@ -25,10 +26,10 @@ import {
   deniedOf,
   exitVerdicts,
   harnessBlocked,
-  parentsOf,
+  parentsRead,
   saidCount,
   spendReader,
-  taskPhases,
+  taskPhasesRead,
   unjudgedWord,
   viewedOnce,
   waitingOf,
@@ -44,7 +45,7 @@ import { currentTasks, finishingAmong, type Pause, type Paused, type PauseStaged
  * How a caller reads a run (`runReading`): what it already holds, and what it asks to be read. Each left out is read as `nemia ls` reads
  * it.
  *
- * @param views The engine's view of every task the run filed, an earlier try's included; left out, read one by one (`taskPhases`).
+ * @param views The engine's view of every task the run filed, an earlier try's included; left out, read one by one (`taskPhasesRead`).
  * @param steps The steps the run is judged by; left out, its frozen workflow (`stepsOf`).
  * @param shown The steps listed, a line each; left out, `steps`.
  * @param standings Where each result branch stands against the base branch, asked once the run's status is known; left out, every result
@@ -52,7 +53,7 @@ import { currentTasks, finishingAmong, type Pause, type Paused, type PauseStaged
  * @param slot The cap on runs in flight holding this run (`runSlots`), said where `waiting` would be; left out, none.
  * @param checkout Whether to read the run whose `workspace: main` step holds the repository's own checkout (`checkoutHold`); off, none.
  * @param git The call's branch reader (`branchReader`): one listing of a repository's branches for every run of it.
- * @param parent The runs it waits on and is held until, as `parentsOf` read them; left out, read here.
+ * @param parent The runs it waits on and is held until, as `parentsRead` read them; left out, read here.
  */
 export type ReadingHow = {
   views?: ReadonlyMap<string, TaskView>;
@@ -85,31 +86,31 @@ export type RunReading = Listing & {
  * Each step's status is `listing`'s, the engine's bare word while a step runs (`needs-human`, compared exactly), with what the harness says
  * it waits for and what it was denied as fields beside it. A refused check's verdict is its exit off the engine's record of the check
  * (`exitVerdicts`), never its output or logs: the check prints the code it exits with, so the two agree, and a read of either per refused
- * check would cost every poll of the list. The runs it waits on and is held until are each read once (`parentsOf`), and where its result
+ * check would cost every poll of the list. The runs it waits on and is held until are each read once (`parentsRead`), and where its result
  * branches stand is asked once its status is known.
  */
-export async function runReading(e: Engine, run: Run, how: ReadingHow = {}): Promise<RunReading> {
+export const runReading = Effect.fn('runReading')(function* (e: Engine, run: Run, how: ReadingHow = {}) {
   const git = how.git ?? branchReader();
   const steps = how.steps ?? stepsOf(run);
-  const views = how.views ?? (await taskPhases(e, run)).views;
+  const views = how.views ?? (yield* taskPhasesRead(run).pipe(over(e))).views;
   const phaseOf = (taskId: string): TaskPhase => phaseOfView(views.get(taskId));
-  const asked = closeoutAsked(views);
+  const closeoutsAsked = closeoutAsked(views);
   const verdictOf = exitVerdicts(views, run);
   const { asks, rounds } = runStore.asks.read(run.id);
   const answers = runStore.asks.answers(run.id);
   const spendOf = spendReader(views);
   const assessOf = (on: Run): Assessment =>
-    assess(steps, on, phaseOf, closeoutReader(views, run), asked, verdictOf, asks, rounds, harnessBlocked(views), spendOf);
+    assess(steps, on, phaseOf, closeoutReader(views, run), closeoutsAsked, verdictOf, asks, rounds, harnessBlocked(views), spendOf);
   const assessed = assessOf(run);
   const standings = how.standings ? how.standings(assessed.status, steps) : standingsOf(run, git);
-  const checkout = how.checkout ? await checkoutHold(e, run, steps) : undefined;
-  const parent = how.parent ?? (await parentsOf(e, run, git));
+  const checkout = how.checkout ? yield* checkoutHold(e, run, steps) : undefined;
+  const parent = how.parent ?? (yield* parentsRead(run, git).pipe(over(e)));
   const listed = listing({
     steps: how.shown ?? steps,
     run,
     phaseOf: engineWord(views),
     closeoutOf: (name) => closeoutOf(views, run, name),
-    askedCloseout: asked,
+    askedCloseout: closeoutsAsked,
     verdictOf,
     asks,
     roundAsks: rounds,
@@ -124,8 +125,8 @@ export async function runReading(e: Engine, run: Run, how: ReadingHow = {}): Pro
     deniedOf: deniedOf(views),
     holds: holdsOf(run, parent),
   });
-  return { ...listed, assessed, assessOf, phaseOf, answers, spendOf, spend: runSpend(run, spendOf) };
-}
+  return { ...listed, assessed, assessOf, phaseOf, answers, spendOf, spend: runSpend(run, spendOf) } satisfies RunReading;
+});
 
 /**
  * What `nemia ls` shows for one run (`runReading`): every result branch asked of git, and the run holding the checkout read.
@@ -134,8 +135,19 @@ export async function runReading(e: Engine, run: Run, how: ReadingHow = {}): Pro
  * person reading the list wants the detail. Where the run's result stands against the base branch is read off git on this call: it is what
  * says a finished run is one nobody has decided.
  */
-export const list = (e: Engine, run: Run, slot?: RunSlot, git: BranchReader = branchReader()): Promise<RunReading> =>
+export const list = (e: Engine, run: Run, slot?: RunSlot, git: BranchReader = branchReader()) =>
   runReading(e, run, { slot, git, checkout: true });
+
+/**
+ * What `list` reads of `run`, or why it is left unjudged (`unjudgedOf`): a run a task journal of which does not read; any other failure of
+ * the read is the program's.
+ */
+const readOrUnjudged = Effect.fnUntraced(function* (e: Engine, run: Run, slot: RunSlot | undefined, git: BranchReader) {
+  const exit = yield* Effect.exit(list(e, run, slot, git));
+  if (Exit.isSuccess(exit)) return exit.value;
+  const unjudged = yield* unjudgedOf(e, run, Cause.squash(exit.cause), 'nemia ls');
+  return unjudged ?? (yield* Effect.failCause(exit.cause));
+});
 
 /**
  * `nemia ls`'s answer: every run, or the one named, each as `list` reads it, and which daemon ticks the store (`daemonStanding`). The cap
@@ -143,7 +155,8 @@ export const list = (e: Engine, run: Run, slot?: RunSlot, git: BranchReader = br
  * (`viewedOnce`, `branchReader`). A run a task journal of which does not read is answered unjudged (`unjudgedOf`); any other failure
  * rejects. Refuses a run named that is not in the store, as `runStore.runs.read` does.
  */
-export async function runsListed(e: Engine, runId?: string): Promise<RunsListed> {
+export const runsListed = Effect.fn('runsListed')(function* (runId?: string) {
+  const e = yield* EngineService;
   const runs = runId ? [runStore.runs.read(runId)] : runStore.runs.list();
   const listed: RunsListed['runs'] = [];
   const reads: Read[] = [];
@@ -151,21 +164,17 @@ export async function runsListed(e: Engine, runId?: string): Promise<RunsListed>
     const viewed = viewedOnce(e);
     const git = branchReader();
     git.prime(runs);
-    const held = await runSlots(viewed, runId ? runStore.runs.list() : runs);
+    const held = yield* runSlots(viewed, runId ? runStore.runs.list() : runs);
     for (const run of runs) {
-      const read = await list(viewed, run, held.get(run.id), git).catch(async (err: unknown) => {
-        const unjudged = await unjudgedOf(viewed, run, err, 'nemia ls');
-        if (!unjudged) throw err;
-        return unjudged;
-      });
+      const read = yield* readOrUnjudged(viewed, run, held.get(run.id), git);
       listed.push({ run, listed: read, result: resultBranches(run) });
       reads.push({ run, read });
     }
   }
   const pause = readPause();
-  const paused = pause ? { paused: await pausedOf(e, pause, runId ? runStore.runs.list() : runs, reads) } : {};
-  return { runs: listed, daemon: daemonStanding(), ...paused };
-}
+  const paused = pause ? { paused: yield* pausedOf(e, pause, runId ? runStore.runs.list() : runs, reads) } : {};
+  return { runs: listed, daemon: daemonStanding(), ...paused } satisfies RunsListed;
+});
 
 /** A run, and the package's reading of it, or why it is left unjudged. */
 type Read = { run: Run; read: RunReading | Unjudged };
@@ -185,9 +194,9 @@ const stagedOf = ({ run, read }: Read): PauseStaged[] => {
  * with the asks waiting on its run; and each landing it holds with its merge staged among the runs read. A task whose journal does not
  * read is not counted.
  */
-async function pausedOf(e: Engine, pause: Pause, runs: readonly Run[], reads: readonly Read[]): Promise<Paused> {
+const pausedOf = Effect.fnUntraced(function* (e: Engine, pause: Pause, runs: readonly Run[], reads: readonly Read[]) {
   const ids = [...new Set(runs.flatMap(currentTasks))];
-  const read = new Map((ids.length ? (await e.list(ids)).views : []).map((v) => [v.id, v]));
+  const read = new Map((ids.length ? (yield* asked('list', e.list(ids))).views : []).map((v) => [v.id, v]));
   return {
     pause,
     finishing: finishingAmong(
@@ -197,45 +206,45 @@ async function pausedOf(e: Engine, pause: Pause, runs: readonly Run[], reads: re
       (run) => runStore.asks.read(run.id).asks,
     ),
     staged: reads.flatMap(stagedOf),
-  };
-}
+  } satisfies Paused;
+});
 
 /**
  * The store's pause, as `GET /api/pause`, `nemia feed` and `nemia start` answer it: the pause or null; each task still finishing under it,
  * read on this call while a pause stands; and each landing it holds with its merge staged — read of the runs whose ending lands on its
  * check while MERGE_HEAD is in their checkout, the one landing the pause can leave staged.
  */
-export async function pausedRead(e: Engine): Promise<Paused> {
+export const pausedRead = Effect.fn('pausedRead')(function* () {
+  const e = yield* EngineService;
   const pause = readPause();
-  if (!pause) return { pause: null, finishing: [], staged: [] };
+  if (!pause) return { pause: null, finishing: [], staged: [] } satisfies Paused;
   const runs = runStore.runs.list();
   const viewed = viewedOnce(e);
-  return pausedOf(viewed, pause, runs, await stagingReads(viewed, runs));
-}
+  return yield* pausedOf(viewed, pause, runs, yield* stagingReads(viewed, runs));
+});
 
 /**
  * The readings of those of `runs` whose ending lands on its check while MERGE_HEAD is in their checkout: the runs `stagedOf` can name. A
  * run a task journal of which does not read (`unreadableJournal`) is left out, as the tick leaves it unjudged; any other failure throws.
  */
-async function stagingReads(e: Engine, runs: readonly Run[]): Promise<Read[]> {
+const stagingReads = Effect.fnUntraced(function* (e: Engine, runs: readonly Run[]) {
   const staging = runs.filter((run) => isGitRun(run) && stepsOf(run).some((s) => landsOnCheck(s, run)) && mergeInProgress(run.repo));
-  const reads = await Promise.all(
+  const reads = yield* Effect.all(
     staging.map((run) =>
-      runReading(e, run).then(
-        (read): Read | undefined => ({ run, read }),
-        (err: unknown) => {
-          if (unreadableJournal(err) === undefined) throw err;
-          return undefined;
-        },
+      Effect.exit(runReading(e, run)).pipe(
+        Effect.flatMap((exit) => {
+          if (Exit.isSuccess(exit)) return Effect.succeed<Read | undefined>({ run, read: exit.value });
+          return unreadableJournal(Cause.squash(exit.cause)) === undefined ? Effect.failCause(exit.cause) : Effect.succeed(undefined);
+        }),
       ),
     ),
+    { concurrency: 'unbounded' },
   );
   return reads.filter((r) => r !== undefined);
-}
+});
 
 /** Each landing among `runs` the pause holds with its merge staged (`stagedOf`), as the tick's pass says it under the pause. */
-export const stagedRead = async (e: Engine, runs: readonly Run[]): Promise<PauseStaged[]> =>
-  (await stagingReads(e, runs)).flatMap(stagedOf);
+export const stagedRead = (e: Engine, runs: readonly Run[]) => Effect.map(stagingReads(e, runs), (reads) => reads.flatMap(stagedOf));
 
 /**
  * A run a read of which rejected with `err`, answered off its record when that is a task journal that does not read (`unreadableJournal`),
@@ -243,11 +252,11 @@ export const stagedRead = async (e: Engine, runs: readonly Run[]): Promise<Pause
  * read of the run's own tasks (`list`), which names every one of them that does not read — a check's and an earlier try's among them.
  * Undefined for any other failure, which the caller throws.
  */
-export async function unjudgedOf(e: Engine, run: Run, err: unknown, by: string): Promise<Unjudged | undefined> {
+export const unjudgedOf = Effect.fn('unjudgedOf')(function* (e: Engine, run: Run, err: unknown, by: string) {
   const why = unreadableJournal(err);
   if (why === undefined) return undefined;
   const tasks = runTasks(run);
-  const listed = await e.list(tasks);
+  const listed = yield* asked('list', e.list(tasks));
   const unreadable = new Map(listed.unreadable.map((u) => [u.taskId, u.why]));
   const named = (err as { taskId: string }).taskId;
   const own = tasks.find((id) => unreadable.has(id)) ?? tasks.find((id) => id === named);
@@ -255,5 +264,5 @@ export async function unjudgedOf(e: Engine, run: Run, err: unknown, by: string):
   return {
     said: unjudgedWords(run.id, own, (own && unreadable.get(own)) ?? why, by),
     steps: stepsOf(run).map(({ name }) => ({ name, status: word(run.steps[name]), branch: run.steps[name]?.branch })),
-  };
-}
+  } satisfies Unjudged;
+});

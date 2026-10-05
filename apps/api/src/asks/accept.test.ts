@@ -1,7 +1,7 @@
 /**
  * POST /api/runs/:id/steps/:step/accept: a person's acceptance of a loop out of rounds, as it stands, from the board — through the
- * package's `accept()`, `nemia accept`'s own, which writes the acceptance and nothing else, and refused in the package's words. The api
- * judges none of it: every refusal here is asserted equal to what `accept()` itself says.
+ * package's `acceptRun`, `nemia accept`'s own, which writes the acceptance and nothing else, and refused in the package's words. The api
+ * judges none of it: every refusal here is asserted equal to what `acceptRun` itself says.
  *
  * At shipped defaults: the api's own engine over a store this file seeds, the harness's fake `claude` (test/harness.ts) first on PATH.
  */
@@ -14,7 +14,7 @@ import type { Acceptance } from 'agent-orchestrator';
 import type { RunDecision } from '../decide/decision.ts';
 import type { RunDetail } from '../detail/detail.ts';
 import { app } from '../app.ts';
-import { accept, acceptFile, engine, list, round, runStore } from 'agent-orchestrator';
+import { acceptFile, acceptRun, engine, list, roundRun, runStore, runWith } from 'agent-orchestrator';
 import { acceptWordsRefusal } from 'agent-orchestrator/run';
 
 const T0 = Date.parse('2026-09-22T09:00:00.000Z');
@@ -116,10 +116,10 @@ const acceptOver = (step: string, body: unknown, headers: Record<string, string>
     body: typeof body === 'string' ? body : JSON.stringify(body),
   });
 
-/** What the package's `accept()` refuses, word for word: what `nemia accept` prints. */
+/** What the package's `acceptRun` refuses, word for word: what `nemia accept` prints. */
 const acceptRefuses = async (step: string, message?: string, run = R): Promise<string> => {
   try {
-    await accept(engine(), run, step, message);
+    await runWith(engine(), acceptRun(run, step, message));
   } catch (err) {
     return (err as Error).message;
   }
@@ -173,7 +173,7 @@ test('REFUSED at shipped defaults: an acceptance another site could make — a p
   nothingWritten('a request another site could make');
 });
 
-test("REFUSED: a body that is not an acceptance (400), a run or a step that does not exist (404), and words missing or empty (422, in `acceptWordsRefusal`'s words, which are `accept()`'s) — and nothing is written", async () => {
+test("REFUSED: a body that is not an acceptance (400), a run or a step that does not exist (404), and words missing or empty (422, in `acceptWordsRefusal`'s words, which are `acceptRun`'s) — and nothing is written", async () => {
   const bodies: Array<[unknown, RegExp]> = [
     ['not json', /^POST …\/accept takes a JSON body/],
     [[WHY], /^POST …\/accept takes a JSON object/],
@@ -207,7 +207,7 @@ test("REFUSED: a body that is not an acceptance (400), a run or a step that does
     const { error } = (await res.json()) as { error: string };
     const message = (body as { message?: string }).message;
     assert.equal(error, acceptWordsRefusal(message, `nemia accept ${R} review`), "the package's own sentence");
-    assert.equal(error, await acceptRefuses('review', message), 'and the one `accept()` refuses with');
+    assert.equal(error, await acceptRefuses('review', message), 'and the one `acceptRun` refuses with');
     assert.match(error, words);
   }
   nothingWritten('a body that is not an acceptance');
@@ -241,13 +241,13 @@ test("REFUSED at shipped defaults: a round the run files itself, a loop that end
     nothingWritten(`${run} ${step}, which the package will not accept`, run);
   }
 
-  const { file } = await round(engine(), R, 'review');
+  const { file } = await runWith(engine(), roundRun(R, 'review'));
   try {
     const res = await acceptOver('review', { message: WHY });
     assert.equal(
       res.status,
       409,
-      "a round asked for, which the next tick files, written by the package's own `round()` as `nemia round` writes it",
+      "a round asked for, which the next tick files, written by the package's own `roundRun` as `nemia round` writes it",
     );
     const { error } = (await res.json()) as { error: string };
     assert.equal(error, await acceptRefuses('review', WHY));
@@ -273,7 +273,7 @@ test("an acceptance as the board sends it is the package's: 202 with the step, t
   const run = (await (await app.request(`/api/runs/${R}`)).json()) as RunDetail;
   const review = run.steps.find((s) => s.name === 'review')!;
   assert.deepEqual(review.accepted, { try: 2, at: took.at, message: WHY });
-  const words = await list(engine(), runStore.runs.read(R));
+  const words = await runWith(engine(), list(engine(), runStore.runs.read(R)));
   const listed = words.steps.find((s) => s.name === 'review')!;
   assert.equal(review.status, listed.status, 'as `nemia ls` has it until the tick files what waits');
   assert.notEqual(review.status, 'exhausted', "the loop over on the person's word");

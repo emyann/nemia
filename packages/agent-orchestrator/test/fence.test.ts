@@ -9,9 +9,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseAgent, parseWorkflow, WorkflowError, type Agents, type Workflow } from '../src/workflow.ts';
 import { CLAUDE_PERMISSION_MODES, fenceReach } from 'agent-runtime/vocabulary';
-import { Engine, promiseEngine } from 'agent-runtime/effect';
+import { Engine } from 'agent-runtime/effect';
 import { directoryFence } from '../src/workflow/fence.ts';
 import { scratch } from './scratch.ts';
+import { Effect } from 'effect';
+import { plainEngine } from './promised.ts';
 
 const ROOT = scratch('wf-fence-');
 process.env.WF_ROOT = ROOT;
@@ -341,12 +343,12 @@ test("a step that names no mode is filed in the mode the parser refuses `auto` f
   const prev = process.env.PATH;
   process.env.PATH = `${dir}:${prev}`;
   try {
-    const e = promiseEngine(Engine.layer({ root: path.join(dir, 'root'), harnesses: { claude: 'claude' } }));
-    const id = await e.file({ brief: 'b', cwd: dir, harness: 'claude', config: { claude } });
+    const e = plainEngine(Engine.layer({ root: path.join(dir, 'root'), harnesses: { claude: 'claude' } }));
+    const id = await Effect.runPromise(e.file({ brief: 'b', cwd: dir, harness: 'claude', config: { claude } }));
     const until = Date.now() + 20_000;
-    while (!(await e.view(id)).state.settled) {
+    while (!(await Effect.runPromise(e.view(id))).state.settled) {
       assert.ok(Date.now() < until, 'settled');
-      await e.tick();
+      await Effect.runPromise(e.tick());
       await new Promise((r) => setTimeout(r, 50));
     }
   } finally {

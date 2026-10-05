@@ -1,6 +1,6 @@
 /**
  * `GET /api/stats`: the flow numbers of every run in the store, whatever factory and repository the request is answered in, as the
- * package's `stats` answers them; kept to one factory or one repository by `ofFactory` and `ofRepo`, and refused with a 422 for a query
+ * package's `statsRun` answers them; kept to one factory or one repository by `ofFactory` and `ofRepo`, and refused with a 422 for a query
  * the package refuses.
  *
  * At shipped defaults: the api's own engine over a store this file seeds, the harness's fake `claude` (test/harness.ts) first on PATH.
@@ -8,9 +8,10 @@
 import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { Effect } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
-import { stats as flowNumbers } from 'agent-orchestrator';
+import { runWith, statsRun as flowNumbers } from 'agent-orchestrator';
 import type { Stats } from './stats.ts';
 import { app, runtime } from '../app.ts';
 import { Engine } from '../store.ts';
@@ -171,7 +172,7 @@ test('GET /api/stats counts every run in the store, of every factory and reposit
     ],
     'a run of another factory, on a repository the api does not serve, is counted; one with no try that day is a group of none',
   );
-  assert.deepEqual(body, await flowNumbers(e, { from: '2026-09-28', to: '2026-09-28', by: 'factory' }));
+  assert.deepEqual(body, await runWith(e, flowNumbers({ from: '2026-09-28', to: '2026-09-28', by: 'factory' })));
 });
 
 test('GET /api/stats answers the calls refused per try as null, never 0, where every try ran on a harness that records none', async () => {
@@ -218,7 +219,7 @@ test('GET /api/stats answers the change marks as the package does: a rendered sk
     body.all.marks.map((m) => [m.day, m.run, m.kind, m.name, m.since]),
     [['2026-09-27', 'm-2', 'skill', 'review-a-change', 'm-1']],
   );
-  assert.deepEqual(body, await flowNumbers(e, { workflow: 'review' }));
+  assert.deepEqual(body, await runWith(e, flowNumbers({ workflow: 'review' })));
 });
 
 test('GET /api/stats answers each tally a step froze, per day and over the range, as null — never 0 — where no closeout measured it', async () => {
@@ -261,16 +262,16 @@ async function unverified<T>(f: () => Promise<T>): Promise<T> {
 
 test("GET /api/stats reads no run's journal again while the store is as it was, and reads again only the run whose record changed", async () => {
   const first = await asked('');
-  const reads = e.io().reads;
+  const reads = Effect.runSync(e.io()).reads;
   const again = await unverified(() => asked(''));
-  assert.equal(e.io().reads - reads, 0, "the app's memo answered every run");
+  assert.equal(Effect.runSync(e.io()).reads - reads, 0, "the app's memo answered every run");
   assert.deepEqual(again, first);
   const record = path.join(root, 'runs', 'r-home.json');
   write(record, JSON.stringify({ ...JSON.parse(fs.readFileSync(record, 'utf8')), brief: 'The brief of r-home, said again' }));
-  const before = e.io().reads;
+  const before = Effect.runSync(e.io()).reads;
   const after = await unverified(() => asked(''));
-  assert.equal(e.io().reads - before, 1, "r-home's one journal, and no other run's");
-  assert.deepEqual(after.body, await flowNumbers(e, {}));
+  assert.equal(Effect.runSync(e.io()).reads - before, 1, "r-home's one journal, and no other run's");
+  assert.deepEqual(after.body, await runWith(e, flowNumbers({})));
 });
 
 test("REFUSED at shipped defaults: under WF_VERIFY_REST=1, GET /api/stats refuses an answer of the app's memo unlike a read afresh, naming the run", async () => {

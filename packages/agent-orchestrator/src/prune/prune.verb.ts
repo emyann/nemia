@@ -7,7 +7,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import type { Engine } from '../runtime-client.ts';
+import { Effect } from 'effect';
+import { EngineService } from '../runtime-client.ts';
 import type { Workflow } from '../step/step.ts';
 import type { MergeState } from '../ending/ending.ts';
 import { pruneAgain, pruneRefusal, type Pruning } from './prune.ts';
@@ -19,7 +20,7 @@ import { HOME, lstatOf, runsDir, stepsOf } from '../record/record.store.ts';
 import { runStore } from '../record/files.store.ts';
 import { gitSays, mergeInProgress, mergeState } from '../workspace/worktree.store.ts';
 import { resultTips, shippedOf, standingsOf } from '../branches/branches.store.ts';
-import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, spendReader, taskPhases } from '../views/views.verb.ts';
+import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, spendReader, taskPhasesRead } from '../views/views.verb.ts';
 import { adoptChecks, adoptRounds, adoptTries, handOffOwed, unrecordedSteps } from '../tick/advance.verb.ts';
 import { Invalid } from '../refusal/refusal.ts';
 
@@ -60,17 +61,19 @@ export const merging = (run: Run, steps: readonly Workflow[] | undefined): Merge
  * what was removed. The marker's time moves only when a worktree goes. A prune that removed nothing takes the marker back: gone on a
  * run never pruned before, as it was on one that was. The tick never calls this.
  */
-export async function prune(
-  e: Engine,
+export const prune = (...args: Parameters<typeof pruning>) => pruning(...args).pipe(Effect.map((p): Pruning => p));
+
+const pruning = Effect.fn('prune')(function* (
   id: string,
   { unmerged = false, yes = false, artifacts = false }: { unmerged?: boolean; yes?: boolean; artifacts?: boolean } = {},
-): Promise<Pruning> {
+) {
+  const e = yield* EngineService;
   const refusedId = idRefusal(id, 'prune');
   if (refusedId) throw new Invalid({ message: refusedId });
   const run = runStore.runs.read(id);
   const none = { worktrees: [], left: [] };
   const folder = pruneRefusal(run, { decided: undefined, held: null, owed: [], worktrees: [] });
-  if (!isGitRun(run)) return { id, kind: 'refused', refusal: folder!, ...none };
+  if (!isGitRun(run)) return { id, kind: 'refused', refusal: folder!, ...none } satisfies Pruning;
 
   const within = resolved(path.join(HOME, 'worktrees', id));
   let steps: Workflow[] | undefined;
@@ -102,10 +105,10 @@ export async function prune(
       ? worktrees
       : `${worktrees}, and ${run.pruned?.artifacts ? filesPrunedWords(run.pruned.artifacts) : 'it has no files'}`;
     if (yes && run.pruned) gitSays(run.repo, 'worktree', 'prune');
-    return { id, kind: 'nothing', nothing, ...none };
+    return { id, kind: 'nothing', nothing, ...none } satisfies Pruning;
   }
 
-  const { views, phaseOf } = await taskPhases(e, run);
+  const { views, phaseOf } = yield* taskPhasesRead(run);
   const { asks, rounds } = runStore.asks.read(id);
   const reader = closeoutReader(views, run);
   const asked = closeoutAsked(views);
@@ -115,10 +118,10 @@ export async function prune(
   let held: string | null = null;
   let owed: string[] = [];
   if (steps) {
-    await adoptRounds(e, run, steps, views, phaseOf, reader, asked, rounds, spendOf);
-    await adoptTries(e, run, steps, views, phaseOf, reader, asked, verdictOf, asks, spendOf);
-    await adoptChecks(e, run, steps, views, phaseOf, reader, asked, spendOf);
-    for (const { name, taskId } of await unrecordedSteps(e, run, steps, views, phaseOf, reader, asked, verdictOf, asks, rounds, spendOf)) {
+    yield* adoptRounds(e, run, steps, views, phaseOf, reader, asked, rounds, spendOf);
+    yield* adoptTries(e, run, steps, views, phaseOf, reader, asked, verdictOf, asks, spendOf);
+    yield* adoptChecks(e, run, steps, views, phaseOf, reader, asked, spendOf);
+    for (const { name, taskId } of yield* unrecordedSteps(e, run, steps, views, phaseOf, reader, asked, verdictOf, asks, rounds, spendOf)) {
       run.steps[name] = { ...run.steps[name], taskId };
     }
     decided = decision(steps, run, phaseOf, shippedOf(run), reader, asked, verdictOf, asks, rounds, harnessBlocked(views), spendOf).kind;
@@ -158,11 +161,11 @@ export async function prune(
     return { path: w.path, ...hold, ...(changes.length || unread.length ? { changes: [...changes, ...unread] } : {}) };
   });
   const refusal = pruneRefusal(run, { decided, held, owed, worktrees: facts, files: Boolean(files) }, { unmerged, artifacts });
-  if (refusal) return { id, kind: 'refused', refusal, ...none };
+  if (refusal) return { id, kind: 'refused', refusal, ...none } satisfies Pruning;
 
   const worktrees = listed.map((w) => ({ path: w.path, bytes: diskBytes(w.path, path.join(run.repo, 'node_modules')) }));
   const kept = files ? { path: files, bytes: diskBytes(files) } : undefined;
-  if (!yes) return { id, kind: 'prunable', worktrees, ...(kept ? { artifacts: kept } : {}), left: [] };
+  if (!yes) return { id, kind: 'prunable', worktrees, ...(kept ? { artifacts: kept } : {}), left: [] } satisfies Pruning;
 
   const now = new Date().toISOString();
   const at = worktrees.length || !run.pruned ? now : run.pruned.at;
@@ -216,8 +219,8 @@ export async function prune(
     left,
     at,
     ...(unmerged ? { unmerged: true as const } : {}),
-  };
-}
+  } satisfies Pruning;
+});
 
 /**
  * What removing a directory frees on disk, in bytes, as `du` counts it: a link as a link, and a file hardlinked from `beside` not at all

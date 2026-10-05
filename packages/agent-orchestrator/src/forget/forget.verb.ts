@@ -1,15 +1,15 @@
 /**
- * Forgetting a run that is over (`forget`, `nemia rm`): it reads a run as `cancel` does, adopting what a pass filed and never wrote down
- * (`tick/advance.verb.ts`), refuses by name before anything is touched, and removes through git. A controller, reaching the runtime through
- * the client (`runtime-client.ts`): an Effect program that requires the engine as a service (`forgetRun`, over `EngineService`), and
- * `forget`, its plain face in a Promise, over the engine it is handed. It never stops anything. `nemia rm` closes a task held open that
- * waits for a word, which runs nothing and is settled as it signed: no pass reads the run again to close it.
+ * Forgetting a run that is over (`forgetRun`, `nemia rm`): it reads a run as `cancelRun` does, adopting what a pass filed and never wrote
+ * down (`tick/advance.verb.ts`), refuses by name before anything is touched, and removes through git. A controller, reaching the runtime
+ * through the client (`runtime-client.ts`): an Effect program that requires the engine as a service (`EngineService`), run with `runWith`.
+ * It never stops anything. `nemia rm` closes a task held open that waits for a word, which runs nothing and is settled as it signed: no
+ * pass reads the run again to close it.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { Effect } from 'effect';
-import { EngineService, awaited, tried, type Engine } from '../runtime-client.ts';
+import { EngineService, over, tried, type Engine } from '../runtime-client.ts';
 import type { Workflow } from '../step/step.ts';
 import { isGitRun, namesInOrder, type GitRun, type Run } from '../record/record.ts';
 import { approvedFirst } from '../status/status.ts';
@@ -32,7 +32,7 @@ import { runStore } from '../record/files.store.ts';
 import { gitSays, handOff } from '../workspace/worktree.store.ts';
 import { standingsOf } from '../branches/branches.store.ts';
 import { gitWords, merging, resolved } from '../prune/prune.verb.ts';
-import { closeoutAsked, closeoutReader, exitVerdicts, spendReader, taskPhases } from '../views/views.verb.ts';
+import { closeoutAsked, closeoutReader, exitVerdicts, spendReader, taskPhasesRead } from '../views/views.verb.ts';
 import { adoptChecks, adoptRounds, adoptTries, closeWaitingTasks, unrecordedSteps } from '../tick/advance.verb.ts';
 import { Invalid } from '../refusal/refusal.ts';
 
@@ -75,7 +75,7 @@ type Worktrees = Pick<Forgot, 'removed' | 'handedOff' | 'gone' | 'left'>;
  * whose they are — and a run whose worktrees or branches are already gone says so. Refused before anything is read, with exit code 2: an id
  * that is not a name (`idRefusal`). Fails with a refusal a read threw; dies of anything else (`tried`, `awaited`).
  */
-export const forgetRun = Effect.fn('forget')(function* (id: string, how: ForgetHow) {
+export const forgetRun = Effect.fn('forget')(function* (id: string, how: ForgetHow = {}) {
   const e = yield* EngineService;
   const refusedId = idRefusal(id);
   if (refusedId) return yield* Effect.fail(new Invalid({ message: refusedId }));
@@ -86,7 +86,7 @@ export const forgetRun = Effect.fn('forget')(function* (id: string, how: ForgetH
   const said = { id, repo: run.repo, base: run.branch, isolate: run.isolate, ...(unfrozen ? { unfrozen } : {}) };
   const refusal = yield* tried(() => refusalOf(id, f));
   if (refusal) return { ...said, kind: 'refused', refusal, ...nothing() } satisfies Forgot;
-  yield* awaited(() => closeWaitingTasks(e, run, f.views));
+  yield* closeWaitingTasks(e, run, f.views);
   if (!isGitRun(run)) {
     return {
       ...said,
@@ -102,13 +102,6 @@ export const forgetRun = Effect.fn('forget')(function* (id: string, how: ForgetH
   const files = yield* tried(() => removeKeyed(id, Object.keys(run.steps)));
   return { ...said, kind: 'forgotten', ...worktrees, branches, files } satisfies Forgot;
 });
-
-/**
- * `nemia rm` (`forgetRun`) in a Promise, over `e`: what the CLI, the api and the tests call. Rejects with the refusal the program failed
- * with, or with whatever else it died of, as it was thrown.
- */
-export const forget = (e: Engine, id: string, how: ForgetHow = {}): Promise<Forgot> =>
-  Effect.runPromise(forgetRun(id, how).pipe(Effect.provide(EngineService.layer(e))));
 
 /** A run whose record is gone: what is left under its id removed and named, and `worktrees/<id>` named as orphaned, never removed. */
 const forgetMissing = (id: string, dir: string): Forgot => ({
@@ -138,19 +131,17 @@ function frozenSteps(run: Run): { steps?: Workflow[]; unfrozen?: string } {
 const readForgetting = Effect.fn('readForgetting')(function* (e: Engine, id: string) {
   const run = yield* tried(() => runStore.runs.read(id));
   const { steps, unfrozen } = frozenSteps(run);
-  const { views, phaseOf } = yield* awaited(() => taskPhases(e, run));
+  const { views, phaseOf } = yield* taskPhasesRead(run).pipe(over(e));
   const { asks, rounds } = yield* tried(() => runStore.asks.read(id));
   const reader = closeoutReader(views, run);
   const asked = closeoutAsked(views);
   const verdictOf = exitVerdicts(views, run);
   const spendOf = spendReader(views);
   if (steps) {
-    yield* awaited(() => adoptRounds(e, run, steps, views, phaseOf, reader, asked, rounds, spendOf));
-    yield* awaited(() => adoptTries(e, run, steps, views, phaseOf, reader, asked, verdictOf, asks, spendOf));
-    yield* awaited(() => adoptChecks(e, run, steps, views, phaseOf, reader, asked, spendOf));
-    const unrecorded = yield* awaited(() =>
-      unrecordedSteps(e, run, steps, views, phaseOf, reader, asked, verdictOf, asks, rounds, spendOf),
-    );
+    yield* adoptRounds(e, run, steps, views, phaseOf, reader, asked, rounds, spendOf);
+    yield* adoptTries(e, run, steps, views, phaseOf, reader, asked, verdictOf, asks, spendOf);
+    yield* adoptChecks(e, run, steps, views, phaseOf, reader, asked, spendOf);
+    const unrecorded = yield* unrecordedSteps(e, run, steps, views, phaseOf, reader, asked, verdictOf, asks, rounds, spendOf);
     for (const { name, taskId } of unrecorded) run.steps[name] = { ...run.steps[name], taskId };
   }
   return { run, steps, unfrozen, views, phaseOf, asks, rounds, reader, asked, verdictOf, spendOf };

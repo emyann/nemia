@@ -17,19 +17,20 @@ import path from 'node:path';
 import type { Run } from '../src/run.ts';
 import { checkArgv } from '../src/check/check.ts';
 import { scratch } from './scratch.ts';
+import { Effect } from 'effect';
 
 const ROOT = scratch('wf-check-views-');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
-const { engine, tick } = await import('../src/runner.ts');
-const { taskPhases } = await import('../src/views/views.verb.ts');
+const { engine, tickRun, runWith } = await import('../src/runner.ts');
+const { taskPhasesRead } = await import('../src/views/views.verb.ts');
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const e = engine();
 const gates = scratch('wf-check-views-gates-');
-const calls = () => e.io().observed.check?.calls ?? 0;
+const calls = async () => (await Effect.runPromise(e.io())).observed.check?.calls ?? 0;
 
 /**
  * A check filed as the tick files one, through the client, its argv in `config`; `held` runs until its gate is opened, and every other
@@ -51,36 +52,36 @@ const file = (id: string, held = false) =>
 const until = async (ids: string[], done: (phase: string) => boolean) => {
   const deadline = Date.now() + 20_000;
   for (;;) {
-    const phases = await Promise.all(ids.map(async (id) => (await e.view(id)).phase));
+    const phases = await Promise.all(ids.map(async (id) => (await Effect.runPromise(e.view(id))).phase));
     if (phases.every(done)) return;
     assert.ok(Date.now() < deadline, `never all there: ${ids.map((id, i) => `${id} ${phases[i]}`).join(', ')}`);
-    await tick(e);
+    await runWith(e, tickRun());
     await sleep(50);
   }
 };
 
 test("a pass that views a run's every check observes the check harness once, and once more for each check in flight — none for a settled one", async () => {
   const settled = ['c1', 'c2', 'c3', 'c4', 'c5'];
-  for (const id of settled) await file(id);
+  for (const id of settled) await Effect.runPromise(file(id));
   await until(settled, (p) => p === 'succeeded');
-  await file('live', true);
+  await Effect.runPromise(file('live', true));
   await until(['live'], (p) => p.startsWith('running'));
 
   const run = { steps: Object.fromEntries([...settled, 'live'].map((id) => [id, { check: { taskId: id } }])) } as unknown as Run;
-  const before = calls();
-  const { cost } = await tick(e);
-  const { phaseOf } = await taskPhases(e, run);
+  const before = await calls();
+  const { cost } = await runWith(e, tickRun());
+  const { phaseOf } = await runWith(e, taskPhasesRead(run));
   assert.equal(cost?.harnesses.check?.calls, 1, 'the pass observes the check harness once, as `nemia up --stats` counts it');
   assert.deepEqual(
     [...settled, 'live'].map(phaseOf),
     [...settled.map(() => 'succeeded'), 'running'],
     "every check a run's steps name is viewed, as advance does every pass, and read right",
   );
-  assert.equal(calls() - before, 2, 'the pass, and the one check in flight: none for the five settled');
+  assert.equal((await calls()) - before, 2, 'the pass, and the one check in flight: none for the five settled');
 
   fs.writeFileSync(path.join(gates, 'live'), '');
   await until(['live'], (p) => p === 'succeeded');
-  const after = calls();
-  await taskPhases(e, run);
-  assert.equal(calls() - after, 0, 'with none in flight, the views observe nothing');
+  const after = await calls();
+  await runWith(e, taskPhasesRead(run));
+  assert.equal((await calls()) - after, 0, 'with none in flight, the views observe nothing');
 });

@@ -1,7 +1,7 @@
 /**
  * A gate on the board: a step's handoff that waits for a person, as the api carries it — `gates` and each step's `gate` on a run's detail,
  * the need `approve <step>` on the list and the detail — and POST /api/runs/:id/steps/:step/approve, which approves the step as
- * `nemia approve` does, through the package's `approve()`, refused in the package's words. Sending a step back from its gate is POST
+ * `nemia approve` does, through the package's `approveRun`, refused in the package's words. Sending a step back from its gate is POST
  * …/retry with words, as `nemia retry --message` is.
  *
  * At shipped defaults: the api's own engine over the harness's scratch store (`root`), which this file seeds, the harness's fake `claude`
@@ -15,7 +15,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { app } from '../app.ts';
-import { approvalFile, approve, askFile, engine, list, retry, runStore, type RunSummary } from 'agent-orchestrator';
+import { approvalFile, approveRun, askFile, engine, list, retryRun, runStore, runWith, type RunSummary } from 'agent-orchestrator';
 import { approvalWordsRefusal, onYouWords } from 'agent-orchestrator/run';
 
 const T0 = Date.parse('2026-09-16T21:00:00.000Z');
@@ -120,10 +120,10 @@ const nothingWritten = (why: string, run = R) => {
   );
 };
 
-/** What the package's `approve()` refuses, word for word: what `nemia approve` prints. */
+/** What the package's `approveRun` refuses, word for word: what `nemia approve` prints. */
 const approveRefuses = async (step: string, message?: string, run = R): Promise<string> => {
   try {
-    await approve(engine(), run, step, message);
+    await runWith(engine(), approveRun(run, step, message));
   } catch (err) {
     return (err as Error).message;
   }
@@ -159,7 +159,7 @@ test("a run's detail carries its gates and each gated step's gate — awaiting a
   assert.deepEqual(run.waitingOnYou, ['plan']);
   assert.deepEqual(run.onYou, ['approve plan']);
 
-  const words = await list(engine(), runStore.runs.read(R));
+  const words = await runWith(engine(), list(engine(), runStore.runs.read(R)));
   assert.deepEqual(run.onYou, onYouWords(words), "as `nemia ls` has it: the words after `→ waiting on you:` are the package's");
   const listed = await summary();
   assert.deepEqual(listed.waitingOnYou, words.waitingOnYou);
@@ -258,7 +258,7 @@ test("REFUSED: a body that is not an approval (400), a run or a step that does n
     assert.equal(res.status, 422, JSON.stringify(message));
     const { error } = (await res.json()) as { error: string };
     assert.equal(error, approvalWordsRefusal(message, `nemia approve ${R} plan`), "the package's own sentence");
-    assert.equal(error, await approveRefuses('plan', message), 'the one `approve()` refuses with');
+    assert.equal(error, await approveRefuses('plan', message), 'the one `approveRun` refuses with');
     assert.match(error, /^--message is empty, and an approval's words are handed to every step after the gate/);
   }
   nothingWritten('a body that is not an approval');
@@ -313,7 +313,7 @@ test("an approval as the board sends it is the package's: 202 with the try, when
   assert.deepEqual(plan.gate, { awaiting: false, approval: { try: 1, at: took.at, message: 'Ship the second reading.' } });
   assert.equal(plan.approve, null);
   assert.deepEqual([run.waitingOnYou, run.onYou], [[], []]);
-  const words = await list(engine(), runStore.runs.read(R));
+  const words = await runWith(engine(), list(engine(), runStore.runs.read(R)));
   assert.equal(
     plan.status,
     words.steps.find((s) => s.name === 'plan')?.status,
@@ -352,7 +352,7 @@ test("REFUSED at shipped defaults: sending a step back from its gate without wor
     assert.equal(res.status, 409, JSON.stringify(how));
     const { error } = (await res.json()) as { error: string };
     let refused = '';
-    await retry(engine(), id, 'plan', how, { stopBlocked: true }).catch((err: Error) => {
+    await runWith(engine(), retryRun(id, 'plan', how, { stopBlocked: true })).catch((err: Error) => {
       refused = err.message;
     });
     assert.equal(error, refused);

@@ -12,7 +12,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { app } from '../app.ts';
-import { approvalFile, COMMANDS, engine, parseArgv, routeList, triesDir } from 'agent-orchestrator';
+import { approvalFile, COMMANDS, engine, parseArgv, routeList, runWith, triesDir } from 'agent-orchestrator';
 import { extensionBreaks } from './extend.ts';
 import { wordBreaks } from './routes.ts';
 
@@ -119,7 +119,7 @@ async function asTyped(name: string, argv: string[]) {
   const args = parseArgv(command.spec, argv);
   assert.ok(args, `nemia ${name} ${argv.join(' ')} is given enough`);
   assert.equal(command.check?.(args) ?? null, null, `nemia ${name} ${argv.join(' ')} passes its check`);
-  return command.handler(engine(), args);
+  return runWith(engine(), command.handler(args));
 }
 
 /** Every file under a run's asks directory, waiting or consumed. */

@@ -10,6 +10,7 @@
 import { config, observations, registry, root } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { Effect } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -172,7 +173,7 @@ test("a step's transcript is the engine's read of its task's session — its eve
   const res = await app.request(url('implement'));
   assert.equal(res.status, 200);
   const body = await res.json();
-  const engines = await engine().transcript('t-implement');
+  const engines = await Effect.runPromise(engine().transcript('t-implement'));
   assert.deepEqual(body, { ...engines, live: false });
   assert.deepEqual(
     body.events.map((e: { kind: string }) => e.kind),
@@ -186,14 +187,14 @@ test("a step's transcript is the engine's read of its task's session — its eve
 });
 
 test('a held step that signed waits on a person, and nothing of it runs: its conversation is read, and not live — nor followed, its stream settled at once', async () => {
-  assert.equal((await engine().view('t-held')).phase, 'input-required', "the seed is the engine's held task, waiting");
+  assert.equal((await Effect.runPromise(engine().view('t-held'))).phase, 'input-required', "the seed is the engine's held task, waiting");
   assert.equal(
-    (await engine().view('t-closed')).phase,
+    (await Effect.runPromise(engine().view('t-closed'))).phase,
     'between attempts',
     'closed and not yet settled: the engine calls it between attempts until its next pass',
   );
   for (const step of ['held', 'closed']) {
-    const engines = await engine().transcript(`t-${step}`);
+    const engines = await Effect.runPromise(engine().transcript(`t-${step}`));
     assert.equal(engines.events.length, 8, step);
     assert.deepEqual(await (await app.request(url(step))).json(), { ...engines, live: false }, step);
     const said = blocks(await (await app.request(streamUrl(step))).text());
@@ -203,7 +204,7 @@ test('a held step that signed waits on a person, and nothing of it runs: its con
 });
 
 test('a held step a person answered is live again, under the same task: its next turn is to run', async () => {
-  assert.equal((await engine().view('t-answered')).phase, 'between attempts');
+  assert.equal((await Effect.runPromise(engine().view('t-answered'))).phase, 'between attempts');
   const body = (await (await app.request(url('answered'))).json()) as StepTranscript;
   assert.equal(body.live, true);
   assert.equal(body.events.length, 8);
@@ -263,7 +264,7 @@ test('a step not filed yet has no conversation and nothing live to follow', asyn
 });
 
 test("the stream of a settled task sends each event, the read's cursor as the id of the last, then `settled` — and closes", async () => {
-  const engines = await engine().transcript('t-implement');
+  const engines = await Effect.runPromise(engine().transcript('t-implement'));
   const res = await app.request(streamUrl('implement'));
   assert.equal(res.status, 200);
   assert.match(res.headers.get('content-type') ?? '', /^text\/event-stream/);
@@ -284,11 +285,11 @@ test('a stream reconnected with Last-Event-ID resumes from that cursor, over any
   const lines = conversation(sessionId);
   journal('t-resumed', [...started, ...ending('t-resumed', sessionId)]);
   writeTranscript(sessionId, lines.slice(0, 4));
-  const first = await engine().transcript('t-resumed');
+  const first = await Effect.runPromise(engine().transcript('t-resumed'));
   assert.equal(first.events.length, 3, "the first connection was sent up to here, and was cut off; the session's transcript went on");
   writeTranscript(sessionId, lines.slice(4));
 
-  const whole = await engine().transcript('t-resumed');
+  const whole = await Effect.runPromise(engine().transcript('t-resumed'));
   const res = await app.request(streamUrl('resumed', '?after=not-a-cursor'), { headers: { 'Last-Event-ID': first.cursor } });
   assert.equal(res.status, 200);
   const said = blocks(await res.text());
@@ -338,7 +339,7 @@ test(
     journal('t-live', ending('t-live', sessionId));
 
     const said = await readUntil(reader, text, () => false);
-    const whole = await engine().transcript('t-live');
+    const whole = await Effect.runPromise(engine().transcript('t-live'));
     assert.deepEqual(eventsIn(said), whole.events, 'every event, once each');
     assert.equal(said.at(-1)?.event, 'settled', 'and then settled, and the stream closed');
   },
@@ -418,7 +419,7 @@ test(
     assert.equal(said.filter((b) => b.event === 'readable').length, 1);
     assert.deepEqual(
       eventsIn(said),
-      (await engine().transcript('t-flaky')).events,
+      (await Effect.runPromise(engine().transcript('t-flaky'))).events,
       'every event, once each: read again from the cursor it had',
     );
     assert.equal(said.at(-1)?.event, 'settled');

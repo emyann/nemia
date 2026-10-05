@@ -3,7 +3,7 @@
  * input of a run takes it out of the memo (`advanceResting` in tick.verb.ts): its record, the files a person keeps beside it, its asks and
  * what is done with them, its tasks' journals, and its result branches. What makes a run at rest is pure, and lives in rest.test.ts.
  *
- * Walked through the runtime itself, `promiseEngine` over an in-memory journal and a harness the test signs by hand, as held.test.ts does.
+ * Walked through the runtime itself, `plainEngine` over an in-memory journal and a harness the test signs by hand, as held.test.ts does.
  * A file of its own, since `tick` reads every run under `WF_ROOT`. Every pass that is not a measurement judges the runs the memo answered
  * in full as well (`verifyRest`), and throws where the two differ. `WF_ROOT` is read as the module loads, so it is set before the import;
  * no cap on runs in flight, and sessions enough that every task filed is admitted on the pass after, so a store of two hundred runs is
@@ -15,10 +15,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { nameFor, type PromiseJournal, type PromiseRunner, type PromiseSighting } from 'agent-runtime';
-import { Engine, promiseEngine } from 'agent-runtime/effect';
+import { Engine } from 'agent-runtime/effect';
 import type { GitRun, Run } from '../run.ts';
 import type { PassCost } from '../meter/meter.ts';
 import { scratch } from '../../test/scratch.ts';
+import { Effect } from 'effect';
+import { plainEngine } from '../../test/promised.ts';
 
 const ROOT = scratch('wf-rest-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -26,13 +28,14 @@ fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 process.env.WF_ROOT = ROOT;
 process.env.WF_MAX_CONCURRENT = '10000';
 delete process.env.WF_MAX_RUNS;
-const { addToInbox, approve, forget, isGitRun, prune, queueInInbox, readInbox, retry, start } = await import('../runner.ts');
+const { addToInbox, approveRun, forgetRun, isGitRun, prune, queueInInbox, readInbox, retryRun, startRun } = await import('../runner.ts');
 const { listRuns, readRun } = await import('../record/record.store.ts');
 const { resumePause, putPause } = await import('../pause/pause.store.ts');
-const { tick, freshRestMemo } = await import('./tick.verb.ts');
+const { tickRun, freshRestMemo } = await import('./tick.verb.ts');
 const { acceptFile, approvalFile, asksDir, holdFile, markCancelled, pruneFile, restStamps, runFile, runsDir, writeAsk } =
   await import('../record/record.store.ts');
 const { feedFile } = await import('../feed/feed.store.ts');
+const { runWith } = await import('../runtime-client.ts');
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], {
@@ -114,7 +117,7 @@ const engine = () => {
   };
   const starts = new Map<string, number>();
   const journal = memoryJournal(starts);
-  const e = promiseEngine(
+  const e = plainEngine(
     Engine.layer({
       root: fs.mkdtempSync(path.join(ROOT, 'engine-')),
       journal,
@@ -140,9 +143,9 @@ const inFlight: Run[] = [];
 /** The memo every pass here keeps, as the daemon keeps its engine's: handed in, so a test can read what it holds. */
 const MEMO = freshRestMemo();
 /** A pass that judges every run the memo answers again in full, and throws where the two differ. */
-const verified = () => tick(h.e, { repo: ROOT, memo: MEMO, verifyRest: true });
+const verified = () => runWith(h.e, tickRun({ repo: ROOT, memo: MEMO, verifyRest: true }));
 /** A pass as the daemon makes it: the memo trusted. */
-const measured = async (memo = MEMO): Promise<PassCost> => (await tick(h.e, { repo: ROOT, memo, verifyRest: false })).cost!;
+const measured = async (memo = MEMO): Promise<PassCost> => (await runWith(h.e, tickRun({ repo: ROOT, memo, verifyRest: false }))).cost!;
 
 /**
  * Passes until every run but those in flight has finished and the memo answers it: filed, admitted, started, signed, settled, at rest. A
@@ -165,8 +168,11 @@ const steady = async (): Promise<PassCost> => {
   return measured();
 };
 
-const started = (n: number, workflowDir = ONE, repo = REPO, isolate = false) =>
-  Array.from({ length: n }, (_, k) => start({ brief: `run ${k}`, repo, workflowDir, isolate }));
+const started = async (n: number, workflowDir = ONE, repo = REPO, isolate = false) => {
+  const runs: Run[] = [];
+  for (let k = 0; k < n; k++) runs.push(await Effect.runPromise(startRun({ brief: `run ${k}`, repo, workflowDir, isolate })));
+  return runs;
+};
 
 const journals = (c: PassCost) => c.phases.journals.calls;
 const observes = (c: PassCost) => c.phases.observe.calls;
@@ -177,14 +183,14 @@ const sizes: Array<{ finished: number; cost: PassCost; fresh?: PassCost }> = [];
 const ISOLATED_REPOS = [aRepo(), aRepo()];
 
 test('a pass costs as many journal reads, observes and git processes on 200 finished runs as on none: what is in flight sets it', async () => {
-  inFlight.push(...started(3));
+  inFlight.push(...(await started(3)));
   sizes.push({ finished: 0, cost: await steady() });
 
-  started(3, TWO, ISOLATED_REPOS[0], true);
-  started(3, TWO, ISOLATED_REPOS[1], true);
-  started(94);
+  await started(3, TWO, ISOLATED_REPOS[0], true);
+  await started(3, TWO, ISOLATED_REPOS[1], true);
+  await started(94);
   sizes.push({ finished: 100, cost: await steady() });
-  started(100);
+  await started(100);
   sizes.push({ finished: 200, cost: await steady() });
 
   const [none, hundred, twoHundred] = sizes.map((s) => s.cost) as [PassCost, PassCost, PassCost];
@@ -352,16 +358,16 @@ test("a hold takes a run out of the memo for as long as it holds: what it waits 
 });
 
 test('an ask takes a run out, and the try it asks for is filed: a retry, and an approval at a gate', async () => {
-  const [run] = started(1);
+  const [run] = await started(1);
   touched.add(run.id);
   const before = (await finish([run.id])).rested;
   assert.equal((await answered(run.id)).status, 'failed', 'its step signed blocked');
-  await retry(h.e, run.id, 'work', { mode: 'fresh' });
+  await runWith(h.e, retryRun(run.id, 'work', { mode: 'fresh' }));
   assert.equal(await rested(), before - 1, 'the ask read');
   assert.equal((await finish()).rested, before, 'the try filed, signed, settled, and the run at rest again');
   assert.equal(readRun(run.id).steps.work.taskId, `${run.id}-work-try2`, 'on its second try');
 
-  const gated = start({ brief: 'gated', repo: REPO, workflowDir: TWO, isolate: false, gates: ['plan'] });
+  const gated = await Effect.runPromise(startRun({ brief: 'gated', repo: REPO, workflowDir: TWO, isolate: false, gates: ['plan'] }));
   touched.add(gated.id);
   for (let k = 0; k < 8 && !MEMO.runs.has(gated.id); k++) {
     await verified();
@@ -370,7 +376,7 @@ test('an ask takes a run out, and the try it asks for is filed: a retry, and an 
   assert.ok(MEMO.runs.has(gated.id), 'a run waiting at a gate, its task settled, is at rest');
   assert.equal(readRun(gated.id).steps.work?.taskId ?? null, null, 'work waits on the gate');
   const waiting = await rested();
-  await approve(h.e, gated.id, 'plan');
+  await runWith(h.e, approveRun(gated.id, 'plan'));
   assert.ok(fs.existsSync(approvalFile(gated.id, 'plan', 1)), 'the approval is a file in the asks');
   assert.equal(await rested(), waiting - 1, 'the approval read');
   assert.ok(readRun(gated.id).steps.work?.taskId, 'and work filed on it');
@@ -428,7 +434,7 @@ test('a run forgotten leaves the memo, and passes over runs at rest write nothin
   await rested();
   await rested();
   assert.equal(fs.statSync(feedFile()).size, size, 'nothing moved, nothing said');
-  await forget(h.e, run.id);
+  await runWith(h.e, forgetRun(run.id));
   await rested();
   assert.equal(MEMO.runs.has(run.id), false, 'gone from the memo with its record');
 });
@@ -438,11 +444,9 @@ test('a feed that cannot be read empties the memo and costs the pass nothing: ev
   assert.ok(before > 0 && MEMO.cursor !== undefined, 'the memo holds runs at rest, and where on the feed it read to');
   const unread = {
     ...h.e,
-    feed: async () => {
-      throw new Error('the journal cannot be read');
-    },
+    feed: () => Effect.fail(new Error('the journal cannot be read') as never),
   };
-  const pass = await tick(unread, { repo: ROOT, memo: MEMO, verifyRest: true });
+  const pass = await runWith(unread, tickRun({ repo: ROOT, memo: MEMO, verifyRest: true }));
   assert.equal(pass.cost?.rested, 0, 'no run answered from memory');
   assert.deepEqual(
     pass.runs.map((a) => a.run.id),
@@ -508,7 +512,7 @@ test('REFUSED: a memo that holds a run a full pass finds not at rest throws unde
   await rested();
 });
 
-test("a run's stamp moves with any file named for it, a marker nobody has named yet included, and not with its own directory", () => {
+test("a run's stamp moves with any file named for it, a marker nobody has named yet included, and not with its own directory", async () => {
   const run = aResting();
   const stamp = () => restStamps().get(run.id);
   const was = stamp();
@@ -544,7 +548,7 @@ const worktreesGone = (run: Run) => {
 };
 
 test('a run called off before anything of it was filed rests like a finished one: answered from memory, and judged the same in full', async () => {
-  const [run] = started(1);
+  const [run] = await started(1);
   markCancelled(run.id);
   touched.add(run.id);
   const before = await rested();
@@ -562,7 +566,7 @@ test('a run called off before anything of it was filed rests like a finished one
 });
 
 test('a finished run whose worktrees are gone owes no hand-off, and rests — succeeded, failed at a step, and called off', async () => {
-  const [ok, broke, off] = started(3, TWO, ISOLATED_REPOS[0], true);
+  const [ok, broke, off] = await started(3, TWO, ISOLATED_REPOS[0], true);
   for (const run of [ok, broke, off]) touched.add(run.id);
   await finish([broke.id]);
   markCancelled(off.id);
@@ -596,7 +600,7 @@ test('a finished run whose worktrees are gone owes no hand-off, and rests — su
 test('REFUSED: nemia prune does not wait on a hand-off from a worktree that is gone — no pass could make one there', async () => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   for (const name of ['left', 'right']) fs.writeFileSync(path.join(dir, `${name}.md`), `---\nharness: codex\n---\n${name} it\n`);
-  const run = start({ brief: 'two roots', repo: ISOLATED_REPOS[1], workflowDir: dir, isolate: true });
+  const run = await Effect.runPromise(startRun({ brief: 'two roots', repo: ISOLATED_REPOS[1], workflowDir: dir, isolate: true }));
   touched.add(run.id);
   for (let k = 0; k < 12 && (await answered(run.id)).status !== 'succeeded'; k++) h.signAll(inFlight);
   const record = JSON.parse(fs.readFileSync(runFile(run.id), 'utf8')) as {
@@ -610,7 +614,7 @@ test('REFUSED: nemia prune does not wait on a hand-off from a worktree that is g
   delete record.steps.right.handedOff;
   fs.rmSync(record.steps.right.workspace, { recursive: true, force: true });
   fs.writeFileSync(runFile(run.id), JSON.stringify(record, null, 2));
-  const pruning = await prune(h.e, run.id, { unmerged: true });
+  const pruning = await runWith(h.e, prune(run.id, { unmerged: true }));
   assert.equal(
     pruning.kind,
     'prunable',
@@ -628,7 +632,7 @@ const shipping = () => {
 
 test('a pass lists the store once: an ending waiting on the checkout and a refused queued card read no record of a finished run', async () => {
   const repo = aRepo();
-  const [first, second] = started(2, shipping(), repo, true);
+  const [first, second] = await started(2, shipping(), repo, true);
   for (const run of [first, second]) touched.add(run.id);
   for (let k = 0; k < 8 && ![first, second].every((r) => MEMO.runs.has(r.id)); k++) {
     await verified();
@@ -639,11 +643,11 @@ test('a pass lists the store once: an ending waiting on the checkout and a refus
     h.signAll(inFlight);
   }
   assert.ok(MEMO.runs.has(first.id) && MEMO.runs.has(second.id), 'both runs at rest at the gate of their ending');
-  await approve(h.e, first.id, 'ship', 'Merge it.');
+  await runWith(h.e, approveRun(first.id, 'ship', 'Merge it.'));
   await verified();
   assert.ok(readRun(first.id).steps.ship?.taskId, "the first run's ending filed in the checkout");
   inFlight.push(first);
-  await approve(h.e, second.id, 'ship', 'Merge it too.');
+  await runWith(h.e, approveRun(second.id, 'ship', 'Merge it too.'));
 
   const gone = folder('work');
   const { card } = addToInbox({ text: 'an idea whose workflow is gone', workflow: gone, repo: REPO });
@@ -653,7 +657,7 @@ test('a pass lists the store once: an ending waiting on the checkout and a refus
   assert.ok(refused.queue && 'refused' in refused.queue, `the card's start refused (${JSON.stringify(refused.queue)})`);
 
   await verified();
-  const pass = await tick(h.e, { repo: ROOT, memo: MEMO, verifyRest: false });
+  const pass = await runWith(h.e, tickRun({ repo: ROOT, memo: MEMO, verifyRest: false }));
   const cost = pass.cost!;
   const listed = listRuns().length;
   assert.ok(cost.rested >= 200, `the finished runs answered from memory (${cost.rested})`);

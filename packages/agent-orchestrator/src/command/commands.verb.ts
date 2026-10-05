@@ -13,19 +13,21 @@
  * (`LIBRARY_ENTRIES`, `SKILL_ENTRIES`) and the workflow builder (`WORKFLOW_ENTRIES`). The whole table (`TABLE`) adds the commands the CLI
  * serves alone and runs itself, with no handler: `nemia plan`, `nemia tick`, `nemia up` and `nemia watch` (`RAN`).
  */
+import { Effect } from 'effect';
+import { tried } from '../runtime-client.ts';
 import { approvalWordsRefusal } from '../gate/gate.ts';
-import { approve } from '../gate/gate.verb.ts';
+import { approveRun } from '../gate/gate.verb.ts';
 import { runStore } from '../record/files.store.ts';
 import { stepsOf } from '../record/record.store.ts';
 import { messageRefusal, type RetryHow } from '../retry/index.ts';
-import { retry } from '../retry/retry.verb.ts';
+import { retryRun } from '../retry/retry.verb.ts';
 import { acceptWordsRefusal } from '../round/round.ts';
-import { accept, round } from '../round/round.verb.ts';
+import { acceptRun, roundRun } from '../round/round.verb.ts';
 import { saidLines } from '../say/say.ts';
-import { say } from '../say/say.verb.ts';
+import { sayRun } from '../say/say.verb.ts';
 import { budgetRefusal, budgetWord } from '../status/status.ts';
-import { decide, type Decided } from '../decide/decide.verb.ts';
-import { slotsOf, type Slots } from '../cap/cap.verb.ts';
+import { decideRun, type Decided } from '../decide/decide.verb.ts';
+import { slotsRead, type Slots } from '../cap/cap.verb.ts';
 import { runsListed } from '../list/list.verb.ts';
 import { lsLines, type RunsListed } from '../list/list.ts';
 import { pausedLines } from '../pause/pause.ts';
@@ -144,11 +146,11 @@ const RETRY: Command<{ try: number; file: string; stopFirst: boolean }> = {
   writes: true,
   route: { method: 'POST', path: '/api/runs/:runId/steps/:step/retry', status: 202 },
   apiTakes: ['answers'],
-  async handler(e, args) {
+  handler: Effect.fnUntraced(function* (args: Args) {
     const { runId, step } = named(args);
-    const { ask, file, stopFirst } = await retry(e, runId, step, howOf(args), { stopBlocked: true });
+    const { ask, file, stopFirst } = yield* retryRun(runId, step, howOf(args), { stopBlocked: true });
     return { try: ask.try, file, stopFirst };
-  },
+  }),
   print({ try: tryNo, file, stopFirst }, args) {
     const { runId, step } = named(args);
     const ask = howOf(args);
@@ -194,13 +196,13 @@ const APPROVE: Command<{ try: number; at: string; message: string | null; file: 
   writes: true,
   route: { method: 'POST', path: '/api/runs/:runId/steps/:step/approve', status: 202 },
   apiKeys: ['try', 'at', 'message', 'file'],
-  async handler(e, args) {
+  handler: Effect.fnUntraced(function* (args: Args) {
     const { runId, step } = named(args);
-    const { approval, file } = await approve(e, runId, step, textOf(args, 'message'));
+    const { approval, file } = yield* approveRun(runId, step, textOf(args, 'message'));
     const after = runStore.runs.read(runId);
     const next: Next = !after.steps[step]?.taskId ? 'step' : stepsOf(after).some((s) => s.after.includes(step)) ? 'waiting' : 'nothing';
     return { try: approval.try, at: approval.at, message: approval.message ?? null, file, next };
-  },
+  }),
   print({ try: tryNo, message, file, next }, args) {
     const { runId, step } = named(args);
     const then =
@@ -241,10 +243,10 @@ const ROUND: Command<{ step: string; round: number; file: string; budget?: numbe
   writes: true,
   route: { method: 'POST', path: '/api/runs/:runId/round', status: 202 },
   apiKeys: ['step', 'round', 'file'],
-  async handler(e, args) {
-    const { ask, file } = await round(e, named(args).runId, textOf(args, 'step'), amountIn(args, 'budget'));
+  handler: Effect.fnUntraced(function* (args: Args) {
+    const { ask, file } = yield* roundRun(named(args).runId, textOf(args, 'step'), amountIn(args, 'budget'));
     return { step: ask.step, round: ask.round, file, ...(ask.budget !== undefined ? { budget: ask.budget } : {}) };
-  },
+  }),
   print({ step, round: n, file, budget }, args) {
     return [
       `${named(args).runId}  asked: round ${n} of ${step}'s loop${budget !== undefined ? `, its cap raised to ${budgetWord(budget)}` : ''} — the next tick files it, once`,
@@ -285,12 +287,12 @@ const ACCEPT: Command<{ step: string; try: number; at: string; message: string; 
   writes: true,
   route: { method: 'POST', path: '/api/runs/:runId/steps/:step/accept', status: 202 },
   apiKeys: ['step', 'try', 'at', 'message', 'file'],
-  async handler(e, args) {
+  handler: Effect.fnUntraced(function* (args: Args) {
     const { runId } = named(args);
-    const { acceptance, file } = await accept(e, runId, textOf(args, 'step'), textOf(args, 'message'));
+    const { acceptance, file } = yield* acceptRun(runId, textOf(args, 'step'), textOf(args, 'message'));
     const waited = stepsOf(runStore.runs.read(runId)).some((s) => s.after.includes(acceptance.step));
     return { step: acceptance.step, try: acceptance.try, at: acceptance.at, message: acceptance.message, file, waited };
-  },
+  }),
   print({ step, try: tryNo, file, waited }, args) {
     return [
       `${named(args).runId}  accepted: try ${tryNo} of ${step} as it stands, its findings open — ${waited ? 'the next tick files what waits on it' : 'nothing waits on it: its run can be decided'}`,
@@ -320,12 +322,12 @@ const SAY: Command<{ at: string; attempt: number; text: string; try: number; tas
   writes: true,
   route: { method: 'POST', path: '/api/runs/:runId/steps/:step/say', status: 202 },
   apiKeys: ['at', 'attempt', 'text'],
-  async handler(e, args) {
+  handler: Effect.fnUntraced(function* (args: Args) {
     const { runId, step } = named(args);
-    const told = await say(e, runId, step, textOf(args, 'text') ?? '');
+    const told = yield* sayRun(runId, step, textOf(args, 'text') ?? '');
     const { at, attempt, text } = told.said;
     return { at, attempt, text, try: told.try, taskId: told.taskId };
-  },
+  }),
   print({ at, attempt, text, try: tryNo, taskId }, args) {
     const { runId, step } = named(args);
     return [
@@ -364,7 +366,7 @@ const LS: Command<RunsListed> = {
     side: 'cli',
     why: "its lines are each run's for a person at a terminal; the board reads every run judged into a summary, kept between its polls, off the runs entry",
   },
-  handler: (e, args) => runsListed(e, textOf(args, 'runId')),
+  handler: (args) => runsListed(textOf(args, 'runId')),
   print: (listed) => [...(listed.paused ? pausedLines(listed.paused) : []), ...lsLines(listed, Date.now())],
 };
 
@@ -383,7 +385,7 @@ const DECIDE: Command<Decided> = {
     side: 'api',
     why: "nemia decide is the CLI's own verb: it prints a run's whole screen — its steps, closeouts, checks and diffs — off this decision, which the api answers as data",
   },
-  handler: (e, args, env) => decide(e, named(args).runId, env),
+  handler: (args, env) => decideRun(named(args).runId, env),
   print: () => [],
 };
 
@@ -398,7 +400,7 @@ const CEILINGS: Command<Slots> = {
     side: 'api',
     why: 'the board says the run slots over its Factory; at the command line, nemia ls and nemia decide say a run held for one beside the run',
   },
-  handler: (e, _args, env) => slotsOf(e, undefined, env),
+  handler: (_args, env) => slotsRead(env),
   print: () => [],
 };
 
@@ -452,7 +454,7 @@ const AGENTS: Command<AgentsRead> = {
   check: agentsRefusal,
   writes: false,
   route: { method: 'GET', path: '/api/agents', status: 200 },
-  handler: async (_e, args, _env, home) => agentsRead({ repo: textOf(args, 'repo') ?? '.', ...(home !== undefined && { home }) }),
+  handler: (args, _env, home) => tried(() => agentsRead({ repo: textOf(args, 'repo') ?? '.', ...(home !== undefined && { home }) })),
   print: agentsLines,
 };
 
@@ -470,14 +472,15 @@ const AGENT_CARD: Command<CardRead> = {
   check: agentsRefusal,
   writes: false,
   route: { method: 'GET', path: '/api/agents/:from/:name/card', status: 200 },
-  async handler(_e, args, _env, home) {
-    const from = textOf(args, 'from');
-    return agentCardRead(textOf(args, 'name') ?? '', {
-      repo: textOf(args, 'repo') ?? '.',
-      ...(home !== undefined && { home }),
-      ...((from === 'repo' || from === 'yours') && { from }),
-    });
-  },
+  handler: (args, _env, home) =>
+    tried(() => {
+      const from = textOf(args, 'from');
+      return agentCardRead(textOf(args, 'name') ?? '', {
+        repo: textOf(args, 'repo') ?? '.',
+        ...(home !== undefined && { home }),
+        ...((from === 'repo' || from === 'yours') && { from }),
+      });
+    }),
   print: ({ card }) => [JSON.stringify(card, null, 2)],
   note: (data, args) => cardNote(data, textOf(args, 'name') ?? ''),
 };

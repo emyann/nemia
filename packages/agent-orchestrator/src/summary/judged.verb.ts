@@ -3,6 +3,7 @@
  * where the run stands, whether it still moves, what it has cost, and what a person has to decide about its result. The board's reading
  * of a run, as the list and a run's page give it. A controller: it reads the run through `runReading` and git through `branchStandings`.
  */
+import { Effect } from 'effect';
 import { type Engine, nameFor } from '../runtime-client.ts';
 import { answerIn, onYouWords } from '../list/list.ts';
 import { runReading } from '../list/list.verb.ts';
@@ -338,7 +339,7 @@ export type GitAsked = { branches: string[]; failed: boolean };
  * What `judge` reads with: the request's reader (`seenBy`), which answers the run's tasks and those of the runs it waits on off the views
  * already read; the request's branch reader (`branchReader`), one listing of a repository's branches for every run of it, a fresh one
  * left out; where the run's result branches stand once its status is known (`standingsOf`), no branch read left out; and the runs it
- * waits on and is held until as the caller read them (`parentsOf`), read afresh left out.
+ * waits on and is held until as the caller read them (`parentsRead`), read afresh left out.
  */
 export type JudgeHow = {
   reader: Engine;
@@ -367,16 +368,16 @@ export type JudgeHow = {
  * Where the run's result branches stand is asked once the run's status is known (`standings`): left out, no branch is read, only a gate
  * says a run is one nobody has decided, and a finished run whose branch nobody merged says there is nothing to decide.
  */
-export async function judge(
+export const judge = Effect.fn('judge')(function* (
   run: Run,
   names: readonly string[],
   folder: readonly Workflow[] | null,
   views: Views,
   { reader, git, standings = () => [], parent }: JudgeHow,
-): Promise<Judged> {
+) {
   const steps = judgedSteps(run, folder);
   const shown = [...steps, ...names.filter((name) => !steps.some((s) => s.name === name)).map(bare)];
-  const read = await runReading(reader, run, { views, steps, shown, standings, ...(git ? { git } : {}), ...(parent ? { parent } : {}) });
+  const read = yield* runReading(reader, run, { views, steps, shown, standings, ...(git ? { git } : {}), ...(parent ? { parent } : {}) });
   const { status, stoppedOn, ready, check, retry, round } = read.assessed;
   const waiting = runWaitingOf(run, read.waiting);
   const holding = holdingOf(run, read.holding ?? []);
@@ -402,8 +403,8 @@ export async function judge(
     answers: read.answers,
     spendOf: read.spendOf,
     cost: spentOf(read.spend),
-  };
-}
+  } satisfies Judged;
+});
 
 /**
  * What a person has to know to act on a step (`StepNeeds`), off the views the request already read, with no observation of its own: its

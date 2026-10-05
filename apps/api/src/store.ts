@@ -3,8 +3,8 @@
  * task's view, a run found by its id, and the task a step's routes read. What the board's reading of a run stands on — the views of its
  * tasks, its workflow and steps, the feed's filing times — is the package's (`viewsFor`, `workflowsOf`, `filedTimes`).
  */
-import { Context, Layer } from 'effect';
-import { engine, HOME, runStore, stepNames, type Unreadable, type Views, workflowsOf } from 'agent-orchestrator';
+import { Context, Effect, Layer } from 'effect';
+import { asked, engine, HOME, runStore, stepNames, type Unreadable, type Views, workflowsOf } from 'agent-orchestrator';
 import { isGitRun, type Run } from 'agent-orchestrator/run';
 
 /**
@@ -31,6 +31,14 @@ export class StoreRoot extends Context.Service<StoreRoot, string>()('api/StoreRo
 type Reader = Engine['Service'];
 
 /**
+ * One verb of the engine, `read`, run to a Promise: what it succeeds with; its refusal as an `Error` whose `exitCode` is 2 and whose
+ * message is led by `verb` (`output: …`), as a caller of the command line reads it (`asked`); and any other failure — a `JournalError`, a
+ * `RunnerError` — as it failed, so `unreadableJournal` still recognises one task's journal. Takes no service: it is the Effect a verb of
+ * the request's engine already is.
+ */
+export const engineRead = <A, F>(verb: string, read: Effect.Effect<A, F>): Promise<A> => Effect.runPromise(asked(verb, read));
+
+/**
  * The engine's view of every task in its store, over one observation, by task id.
  *
  * `list` observes the harnesses once and folds every task's journal against that; `view` observes
@@ -39,7 +47,7 @@ type Reader = Engine['Service'];
  * (`judgedUnlessUnreadable`).
  */
 export async function everyView(e: Reader): Promise<{ views: Views; unreadable: Unreadable }> {
-  const listed = await e.list();
+  const listed = await engineRead('list', e.list());
   return {
     views: new Map(listed.views.map((view) => [view.id, view])),
     unreadable: new Map(listed.unreadable.map(({ taskId, why }) => [taskId, why])),

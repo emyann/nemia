@@ -8,15 +8,16 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import type { Engine } from 'agent-runtime';
 import { scratch } from './scratch.ts';
+import { promised } from './promised.ts';
+import { Effect } from 'effect';
 
 const REAL = scratch('wf-linked-');
 const ROOT = path.join(scratch('wf-link-'), 'store');
 fs.mkdirSync(path.join(REAL, 'store'));
 fs.symlinkSync(path.join(REAL, 'store'), ROOT);
 process.env.WF_ROOT = ROOT;
-const { advance, forget, start } = await import('../src/runner.ts');
+const { advanceRun, forgetRun, startRun, runWith } = await import('../src/runner.ts');
 const { readRun } = await import('../src/record/record.store.ts');
 
 const git = (cwd: string, ...args: string[]) =>
@@ -33,7 +34,7 @@ test("REFUSED before, now forgotten: a store under a link — git lists each wor
   const folder = fs.mkdtempSync(path.join(REAL, 'wf-'));
   fs.writeFileSync(path.join(folder, 'implement.md'), 'implement it\n');
   const tasks = new Map<string, string>();
-  const e = {
+  const e = promised({
     view: async (id: string) => ({
       id,
       phase: tasks.get(id) ?? 'pending',
@@ -49,10 +50,10 @@ test("REFUSED before, now forgotten: a store under a link — git lists each wor
       return spec.id;
     },
     stop: async () => {},
-  } as unknown as Engine;
+  });
 
-  const run = start({ brief: 'under a link', repo, workflowDir: folder });
-  await advance(e, readRun(run.id));
+  const run = await Effect.runPromise(startRun({ brief: 'under a link', repo, workflowDir: folder }));
+  await runWith(e, advanceRun(readRun(run.id)));
   const wt = readRun(run.id).steps.implement.workspace!;
   assert.ok(wt.startsWith(ROOT), 'the record names it through the link');
   assert.match(
@@ -63,7 +64,7 @@ test("REFUSED before, now forgotten: a store under a link — git lists each wor
   tasks.set(`${run.id}-implement`, 'failed');
   fs.writeFileSync(path.join(wt, 'left.txt'), 'left\n');
 
-  const forgot = await forget(e, run.id);
+  const forgot = await runWith(e, forgetRun(run.id));
   assert.deepEqual(
     [forgot.kind, forgot.left, forgot.removed.length, forgot.handedOff.map((h) => h.step)],
     ['forgotten', [], 1, ['implement']],

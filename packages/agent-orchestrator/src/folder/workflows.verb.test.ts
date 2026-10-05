@@ -13,7 +13,7 @@ import { scratch } from '../../test/scratch.ts';
 const ROOT = scratch('wf-workflows-root-');
 process.env.WF_ROOT = ROOT;
 const { WORKFLOWS_LIST, WORKFLOWS_STEP, WORKFLOWS_WRITE } = await import('./workflows.verb.ts');
-const { engine } = await import('../runner.ts');
+const { runWith, engine } = await import('../runner.ts');
 
 const e = engine();
 
@@ -31,9 +31,9 @@ test('a folder written from its steps through the entry is the folder its list a
     { name: 'plan', after: [], body: 'Plan it.' },
     { name: 'build', after: ['plan'], body: 'Build it.' },
   ]);
-  const done = await WORKFLOWS_WRITE.handler(e, { from: 'yours', name: 'written', dir, draft }, undefined, ROOT);
+  const done = await runWith(e, WORKFLOWS_WRITE.handler({ from: 'yours', name: 'written', dir, draft }, undefined, ROOT));
   assert.deepEqual(done.written, ['build.md', 'plan.md']);
-  const listed = await WORKFLOWS_LIST.handler(e, { dirs: [dir] }, undefined, ROOT);
+  const listed = await runWith(e, WORKFLOWS_LIST.handler({ dirs: [dir] }, undefined, ROOT));
   const loaded = listed[dir];
   assert.ok(loaded && 'steps' in loaded, JSON.stringify(loaded));
   assert.deepEqual(
@@ -43,21 +43,21 @@ test('a folder written from its steps through the entry is the folder its list a
       ['build', ['plan']],
     ],
   );
-  const read = await WORKFLOWS_STEP.handler(e, { from: 'yours', name: 'written', step: 'build', dir }, undefined, ROOT);
+  const read = await runWith(e, WORKFLOWS_STEP.handler({ from: 'yours', name: 'written', step: 'build', dir }, undefined, ROOT));
   assert.equal(read.step?.body, 'Build it.');
   assert.deepEqual(read.steps, ['plan', 'build']);
 });
 
 test('a step the folder does not have is none, with the names of those it has', async () => {
   const dir = folder('one-step', { 'only.md': 'Do it.\n' });
-  const read = await WORKFLOWS_STEP.handler(e, { from: 'yours', name: 'one-step', step: 'other', dir }, undefined, ROOT);
+  const read = await runWith(e, WORKFLOWS_STEP.handler({ from: 'yours', name: 'one-step', step: 'other', dir }, undefined, ROOT));
   assert.deepEqual(read, { step: null, steps: ['only'] });
 });
 
 test("REFUSED: a folder that does not load is listed with the loader's words whole, and the folder beside it still loads", async () => {
   const good = folder('good', { 'only.md': 'Do it.\n' });
   const bad = folder('bad', { 'only.md': '---\nafter: nowhere\n---\nDo it.\n' });
-  const listed = await WORKFLOWS_LIST.handler(e, { dirs: [bad, good] }, undefined, ROOT);
+  const listed = await runWith(e, WORKFLOWS_LIST.handler({ dirs: [bad, good] }, undefined, ROOT));
   assert.deepEqual(listed[bad], { error: 'only: waits on "nowhere", which is not a step here' });
   assert.deepEqual(Object.keys(listed), [bad, good]);
   assert.ok(listed[good] && 'steps' in listed[good]);
@@ -69,7 +69,7 @@ test("REFUSED: a draft the writer refuses is thrown in the writer's words whole,
     { name: 'plan', after: [], body: 'Plan it.' },
     { name: 'plan', after: [], body: 'Plan it again.' },
   ]);
-  await assert.rejects(WORKFLOWS_WRITE.handler(e, { from: 'yours', name: 'twice', dir, draft }, undefined, ROOT), (err: Error) => {
+  await assert.rejects(runWith(e, WORKFLOWS_WRITE.handler({ from: 'yours', name: 'twice', dir, draft }, undefined, ROOT)), (err: Error) => {
     assert.equal(err.message, 'two steps are named plan, and a step is its file, plan.md. Rename one of them.');
     return true;
   });

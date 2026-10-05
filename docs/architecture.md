@@ -45,6 +45,11 @@ holds `daemon.json` (its pid, `by` and the `url` an api serves at) and ticks. Th
 served by the daemon keeps its store ticking; a board served with `--no-tick` ticks nothing, and a run filed on it moves on the daemon's
 next pass. Stopping the daemon itself, beyond `wf pause`, is a verb on this lease, still to come.
 
+**Logs and traces**: each layer logs and spans in its own words — the runtime its task, kind and attempt (`appendFields` in
+`agent-runtime/src/core/engine/journal.ts`), the orchestrator its run and step (`advancePass`, `forStep`) — and the process chooses the
+exporter: the daemon's provides `telemetryLayer` (`src/telemetry/telemetry.store.ts`), its lines always, OTLP only when
+`OTEL_EXPORTER_OTLP_ENDPOINT` is set.
+
 **In the orchestrator today, a candidate for the runtime**:
 
 - rendering agents and skills for Claude Code (`src/agents/agents.ts`, `src/agents/agents.store.ts`, `toldOf` in

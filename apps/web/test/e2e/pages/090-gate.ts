@@ -14,7 +14,10 @@ import { OUT, store } from '../world.ts';
 async function expectPolicy(policy: Locator, where: string): Promise<void> {
   const { planner } = GATED;
   await expectCount(policy, 1, `${GATED.gated}'s policy is drawn open at its gate, ${where}`);
-  await expectVisible(policy.locator('[data-layer="policy"] pre', { hasText: planner.policy }), `with its words, ${planner.policy}`);
+  await expectVisible(
+    policy.locator('[data-layer="policy"] [data-markdown]', { hasText: planner.policy }),
+    `with its words, ${planner.policy}`,
+  );
   await expectVisible(
     policy.locator('[data-fence="disallowedTools"]', { hasText: `disallowedTools: ${planner.deny}` }),
     `and the deny its file adds, ${planner.deny}`,

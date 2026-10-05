@@ -978,6 +978,8 @@ export const WORKFLOWS = {
       person: 'Implementer',
       role: 'Software engineer',
       runsOn: 'implementer · claude · opus',
+      /** Its instructions, the body of its file: markdown, which its page reads as markdown and not as the source. */
+      body: '## How you work\n\nYou implement what is asked, and **test** it:\n\n- the failing test first\n- then the change\n',
       /**
        * What it says it can do, as an A2A skill: the one skill its `skills:` gives, `skills/<id>/SKILL.md` beside `agents/`, whose
        * frontmatter is the card's entry (`title:` its name), which its step's page shows under its name.
@@ -1072,7 +1074,7 @@ export function seedWorkflows(repo: string, root: string): void {
   write(path.join(dev, 'README.md'), `# ${good.name}\n\n${good.description}\n\nA second paragraph, which the page does not show.\n`);
   write(
     path.join(repo, 'workflows', 'agents', `${good.agent.name}.md`),
-    `---\nrole: ${good.agent.role}\nskills: ${good.agent.skill.id}\nharness: claude\nmodel: opus\n---\nYou implement what is asked, and test it.\n`,
+    `---\nrole: ${good.agent.role}\nskills: ${good.agent.skill.id}\nharness: claude\nmodel: opus\n---\n${good.agent.body}`,
   );
   writeSkill(path.join(repo, 'workflows', 'skills'), good.agent.skill);
   write(

@@ -1013,7 +1013,8 @@ test('two texts with footnotes on one page name theirs apart — no id twice, ea
 });
 
 test('given a level, `#` is drawn as that heading and deeper ones follow it, sized by their own level and never past h6', () => {
-  const panel = renderToStaticMarkup(createElement(Markdown, { level: 5 }, '# A\n## B\n### C'));
+  // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
+  const panel = renderToStaticMarkup(createElement(Markdown, { level: 5, children: '# A\n## B\n### C' }));
   assert.match(panel, /<h5 class="[^"]*text-\[1\.15em\][^"]*">A<\/h5>/, "a text's `#` keeps its size in a panel");
   assert.match(panel, /<h6 class="[^"]*text-\[1\.08em\][^"]*">B<\/h6>/);
   assert.match(panel, /<h6[^>]*>C<\/h6>/);

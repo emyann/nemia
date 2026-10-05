@@ -510,7 +510,10 @@ project` (the runtime's README, *Settings: the checkout's, never the operator's*
 carries it. A rule goes in the repository's `.claude/settings.json` or on the step (`allowedTools:`). A rule in a checkout's
 `.claude/settings.local.json`, where "don't ask again" writes, reaches no step's job, only a background session. A step in the checkout
 itself (`workspace: main`) is given one rule by the run: a read of its own run's artifacts folder, where the steps before it left their
-files, and of no other run's (`filedAllows`). A step's `model:` and `effort:` go on
+files, and of no other run's (`filedAllows`). Every step on a harness fenced by a permission mode is filed the artifacts folder of each
+step it comes after, through `after:` and on, mounted read-only (`handedMounts`): it reads what they handed over, a picture included,
+and writes none of it in any mode. Its own folder is as it was, and the folder of a step it does not come after is not mounted. A step's
+`model:` and `effort:` go on
 the step or its agent, or it gets Claude Code's default rather than whatever the person running `wf up` set. And a repository whose commits
 must carry no `Co-Authored-By` trailer says `attribution` in its settings, as this one does. The skills a step is listed are its plugin's and
 the repository's, and none from `~/.claude/skills` or the operator's plugins (F24).
@@ -2613,6 +2616,10 @@ tighten, and this is where,
 not what: the key widens where a step's writes reach, never what it may do. Refused at `wf start`, before anything is written
 (`writableRefusal`): a name no folder of the factory has, one two share, one that is no directory now, a `writable:` in a run in no
 factory, and a step whose harness holds no writable mount, Codex's, in the runtime's words (`writableMountRefusal`).
+
+The same mounts carry what the steps before a step handed over: the artifacts folder of each step it comes after, read-only, after the
+factory's (`handedMounts`, in `filedConfig`), on a harness fenced by a permission mode and never named on its brief. A store whose path
+no permission rule can name refuses `wf start` of a workflow with such a later step, in the runtime's words, before anything is written.
 
 ## How much runs at once: `WF_MAX_CONCURRENT` and `WF_MAX_RUNS`
 

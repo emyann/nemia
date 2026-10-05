@@ -10,7 +10,7 @@ import { useNow } from '../lib/useNow';
 import { StatusChip } from './StatusChip';
 
 /**
- * `index` is the step's place in the run's order, which is the order `wf ls` lists it in. `waitingOnYou` is whether the
+ * `index` is the step's place in the run's order, which is the order the CLI's `ls` lists it in. `waitingOnYou` is whether the
  * run's `waitingOnYou` names the step: the api's word, which leaves out a step a person has already asked something of.
  */
 export type StepNodeData = {

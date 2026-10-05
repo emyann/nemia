@@ -138,7 +138,7 @@ function AsItCame({ raw }: { raw: unknown }) {
   );
 }
 
-/** What a person said to a try when they asked for it, as `wf decide` prints it under the question of the try before: `your answer`. */
+/** What a person said to a try when they asked for it, as the CLI's `decide` prints it under the try before's question: `your answer`. */
 function YourAnswer({ answer }: { answer: string }) {
   return (
     <p data-your-answer className="whitespace-pre-wrap break-words">

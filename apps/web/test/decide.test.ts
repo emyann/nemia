@@ -231,20 +231,16 @@ test("a diff's file is found among the branch's changes by its name, a rename by
   assert.equal(changeOf(undefined, 'CLAUDE.md'), undefined);
 });
 
-test('the board presses `accept` on the step its command names, and on no other row, nor a command it cannot read the step off', () => {
-  const accept = (command: string) => ({ label: 'accept' as const, command });
-  assert.equal(acceptStepOf(accept('nemia accept r-1 review --message "<why>"'), 'r-1'), 'review');
-  assert.equal(acceptStepOf(accept('nemia accept r 1 review --message "<why>"'), 'r 1'), 'review');
-  assert.equal(acceptStepOf({ label: 'once more', command: 'nemia round r-1 review' }, 'r-1'), null, 'every other row only copies');
-  assert.equal(acceptStepOf(accept('nemia accept r-2 review --message "<why>"'), 'r-1'), null, 'not `nemia accept` for this run');
-  assert.equal(acceptStepOf(accept('nemia accept r-1 --message "<why>"'), 'r-1'), null, 'names no step');
-  assert.equal(acceptStepOf(accept('nemia accept r-1 review extra --message "<why>"'), 'r-1'), null, 'names no one step');
-  assert.equal(acceptStepOf(accept('nemia accept r-1 review'), 'r-1'), null);
+test('the board presses `accept` on the step the api names beside it, never on one read off its text, and on no other row', () => {
+  const accept = (command: string, step: string | null) => ({ label: 'accept' as const, command, step });
+  assert.equal(acceptStepOf(accept('nemia accept r-1 review --message "<why>"', 'review')), 'review');
   assert.equal(
-    acceptStepOf(accept('wf accept r-1 review --message "<why>"'), 'r-1'),
-    null,
-    'REFUSED: the old name is no command the api hands over',
+    acceptStepOf(accept('nemia accept r-1 implement --message "<why>"', 'review')),
+    'review',
+    'REFUSED: the step is the one the api names, not the one the text spells',
   );
+  assert.equal(acceptStepOf({ label: 'once more', step: 'review' }), null, 'every other row only copies');
+  assert.equal(acceptStepOf(accept('nemia accept r-1 review --message "<why>"', null)), null, 'names no step');
 });
 
 test('a decision is read again when a hold is written, lifted, or its runs ship — the hold is what the api answers for a held run', () => {

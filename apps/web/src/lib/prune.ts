@@ -4,8 +4,8 @@ import { isDecidable } from './decide.ts';
 import type { PruneHow } from './api/runs.ts';
 
 /**
- * One thing a person may give back of a finished run, as `wf prune` takes it: its worktrees; with its files too (`--artifacts`); and with
- * them a run nobody merged (`--unmerged`). Each takes in what the one before it gives back. `unavailable` says why a choice would be
+ * One thing a person may give back of a finished run, as the CLI's `prune` takes it: its worktrees; with its files too (`--artifacts`); and
+ * with them a run nobody merged (`--unmerged`). Each takes in what the one before it gives back. `unavailable` says why a choice would be
  * refused.
  */
 export type PruneChoice = {
@@ -23,9 +23,9 @@ type Prunable = Pick<RunDetail, 'id' | 'place' | 'status' | 'moving' | 'onDisk'>
 
 /**
  * Whether the run finished and nobody has decided it, as the api's decision says it off the package's own (`Decidable['awaiting']`): the
- * reading `wf prune` refuses without `--unmerged` (`pruneRefusal`). Taken from the decision, never worked out here: the run's status says
- * nothing of a failed run whose branch a person merged by hand (shipped, the package says), and the list's `toDecide` is never said of a
- * run that worked on its base branch itself, which waits on a decision all the same.
+ * reading the CLI's `prune` refuses without `--unmerged` (`pruneRefusal`). Taken from the decision, never worked out here: the run's status
+ * says nothing of a failed run whose branch a person merged by hand (shipped, the package says), and the list's `toDecide` is never said of
+ * a run that worked on its base branch itself, which waits on a decision all the same.
  */
 export type Awaiting = NonNullable<Decidable['awaiting']>;
 
@@ -77,7 +77,7 @@ export function pruneOffer(run: Prunable, awaiting: Awaiting | null): PruneOffer
           {
             key: 'files' as const,
             label: most,
-            says: 'And the files its steps handed on (wf prune --artifacts): a closeout that names one then says it was pruned. Its record and branches are kept.',
+            says: 'And the files its steps handed on: a closeout that names one then says it was pruned. Its record and branches are kept.',
             how: { artifacts: true, unmerged: false },
             unavailable: merge,
           },
@@ -103,7 +103,7 @@ export function pruneOffer(run: Prunable, awaiting: Awaiting | null): PruneOffer
  * a run that worked on its base branch itself, what it would be decided on is gone.
  */
 export function unmergedWarning(id: string, awaiting: Awaiting): string {
-  const after = 'No branch is ever deleted, and none of its steps can be tried again, sent round or approved (wf prune --unmerged).';
+  const after = 'No branch is ever deleted, and none of its steps can be tried again, sent round or approved.';
   if (awaiting.direct)
     return `It worked on ${awaiting.branches[0] ?? 'its base branch'} itself and nobody has decided it: once pruned, the files you would read to decide it are gone. ${after}`;
   const branches = awaiting.branches.length ? awaiting.branches.join(', ') : `wf/${id}/…`;

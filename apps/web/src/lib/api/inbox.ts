@@ -6,9 +6,9 @@ import { KeyRowSchema, type KeyRow } from './library.ts';
 import type { WorkflowListing } from './workflows.ts';
 
 /**
- * Mirrors `InboxEntry` in apps/api/src/inbox/inbox.ts: a card as `wf inbox` lists it — or an entry of the inbox that does not read as one,
- * `error` saying why — with its body, the brief a start is prefilled with, and when its file was written, which the page orders the cards
- * by.
+ * Mirrors `InboxEntry` in apps/api/src/inbox/inbox.ts: a card as the CLI's `inbox` lists it — or an entry of the inbox that does not read
+ * as one, `error` saying why — with its body, the brief a start is prefilled with, and when its file was written, which the page orders the
+ * cards by.
  */
 export type InboxEntry = {
   name: string;
@@ -26,8 +26,8 @@ export type InboxEntry = {
   body: string | null;
   filedAt: string | null;
   /**
-   * On a queued card only (`wf inbox queue`): when it was queued, and its place in the order the tick starts cards in, from 1 — null for a
-   * card a record says was started, which the tick never starts again.
+   * On a queued card only (the CLI's `inbox queue`): when it was queued, and its place in the order the tick starts cards in, from 1 — null
+   * for a card a record says was started, which the tick never starts again.
    */
   queued?: { at: string; place: number | null };
   /**
@@ -86,9 +86,9 @@ export const cardQuery = (name: string) =>
   });
 
 /**
- * File an idea as a card, as `wf inbox add "<idea>" --workflow <name> --repo <path>` does. Resolves with the card's name; rejects with the
- * api's refusal in full — the package's words for an idea with nothing in it or a repository that is not an absolute path to a directory,
- * or the api's own about the request or a workflow it has none of.
+ * File an idea as a card, as the CLI's `inbox add "<idea>" --workflow <name> --repo <path>` does. Resolves with the card's name; rejects
+ * with the api's refusal in full — the package's words for an idea with nothing in it or a repository that is not an absolute path to a
+ * directory, or the api's own about the request or a workflow it has none of.
  *
  * Sent as `application/json`, which the api requires of it, as of a start.
  */
@@ -100,25 +100,25 @@ export const fileCard = (card: {
 }): Promise<{ name: string }> =>
   send('POST', '/api/inbox', Schema.Struct({ name: Schema.String }), {
     body: card,
-    may: 'The card may be filed: look in the inbox (`wf inbox`) before filing it again.',
+    may: 'The card may be filed: look in the inbox before filing it again.',
   });
 
 /**
- * Drop a card without starting it, as `wf inbox rm <name>` does. Rejects with the api's refusal in full: the package's words for a card
- * that is not there, naming the cards that are, or for a name that is not a card's.
+ * Drop a card without starting it, as the CLI's `inbox rm <name>` does. Rejects with the api's refusal in full: the package's words for a
+ * card that is not there, naming the cards that are, or for a name that is not a card's.
  *
  * Sent as `application/json`, with no body, which the api requires of it, as of every write: a request another site's page cannot make
  * unasked.
  */
 export async function dropCard(name: string): Promise<void> {
   await send('DELETE', `/api/inbox/${encodeURIComponent(name)}`, Schema.Struct({ removed: Schema.Literal(true) }), {
-    may: 'The card may be dropped: look in the inbox (`wf inbox`) before dropping it again.',
+    may: 'The card may be dropped: look in the inbox before dropping it again.',
   });
 }
 
 /**
- * Mirrors `InboxQueueAnswer` in apps/api/src/inbox/inbox.ts: what `wf inbox queue` did, the card's `queued:` as it now reads, and its place
- * once queued.
+ * Mirrors `InboxQueueAnswer` in apps/api/src/inbox/inbox.ts: what the CLI's `inbox queue` did, the card's `queued:` as it now reads, and
+ * its place once queued.
  */
 export type Queued = {
   name: string;
@@ -140,14 +140,14 @@ const QueuedSchema = Schema.Struct({
 }) satisfies Schema.Schema<Queued>;
 
 /**
- * Queue a card to start on its own, as `wf inbox queue <name>` does — or, `off`, take it off the queue, as `--off` does. The tick starts
- * the next card in the queue when a run slot frees, on the workflow the card names. Resolves with what was done; rejects with the api's
- * refusal in full — the package's words for a card that is not there, names no workflow, is queued already or was started — or the api's
- * own about the request.
+ * Queue a card to start on its own, as the CLI's `inbox queue <name>` does — or, `off`, take it off the queue, as `--off` does. The tick
+ * starts the next card in the queue when a run slot frees, on the workflow the card names. Resolves with what was done; rejects with the
+ * api's refusal in full — the package's words for a card that is not there, names no workflow, is queued already or was started — or the
+ * api's own about the request.
  *
  * Sent as `application/json`, with no body, which the api requires of it, as of every write.
  */
 export const queueCard = (name: string, { off = false }: { off?: boolean } = {}): Promise<Queued> =>
   send(off ? 'DELETE' : 'POST', `/api/inbox/${encodeURIComponent(name)}/queue`, QueuedSchema, {
-    may: 'The card may be queued, or not: look in the inbox (`wf inbox`) before asking again.',
+    may: 'The card may be queued, or not: look in the inbox before asking again.',
   });

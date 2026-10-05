@@ -7,8 +7,8 @@ import { get } from './read.ts';
 /**
  * Mirrors `Daemon` in apps/api/src/factory/daemon.ts: whether a daemon ticks the store, as the package judges `daemon.json` — `ticking`
  * alone moves the runs; `none`, `unreadable`, `stopped`, `gone` and `stalled` (alive, silent past `staleAfterMs`) do not. `by` is the
- * holder's kind as the api names it, `url` where an api holder serves the board, and `start` how a person starts one. Times are ISO,
- * null where the file says none; `lastHeardAt` is the latest of its start, its last pass and its beat. `line` is `wf ls`'s own sentence.
+ * holder's kind as the api names it, `url` where an api holder serves the board, and `start` how a person starts one. Times are ISO, null
+ * where the file says none; `lastHeardAt` is the latest of its start, its last pass and its beat. `line` is the CLI `ls`'s own sentence.
  */
 export type Daemon = {
   kind: 'none' | 'unreadable' | 'stopped' | 'gone' | 'stalled' | 'ticking';

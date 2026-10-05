@@ -22,7 +22,7 @@ export function Facts({ rows }: { rows: Array<[label: string, value: ReactNode]>
  * A step's frontmatter, as rows for `Facts` — and, given what the engine filed its current try with, what it runs with. A field
  * its workflow leaves unset reads as the value the engine filed the task with, marked `default`: `1 · default`, `no limit ·
  * default`. The permission mode reads as the session runs in it, its harness's choice where none was filed: `auto · default`,
- * `read-only · by tools`. One the try was filed with other than the workflow's word — a `wf retry --model` — reads as the try's,
+ * `read-only · by tools`. One the try was filed with other than the workflow's word — the CLI's `retry --model` — reads as the try's,
  * marked `this try`. For a step not filed, what the workflow says, or a dash. A step on a remote A2A agent (`remoteRows`) reads otherwise.
  *
  * The context is the session's window as the step writes it — `200k` — and the model's whole window where neither the step nor the try has
@@ -101,7 +101,7 @@ function ranWith(
 }
 
 /**
- * The model, as `ranWith` reads it — and the model a person's `wf retry --model` asked this try for, marked `this try`, whatever the
+ * The model, as `ranWith` reads it — and the model a person's `retry --model` asked this try for, marked `this try`, whatever the
  * workflow says.
  */
 function modelRow(workflow: string | null, filed: StepFiled | null): ReactNode {
@@ -111,7 +111,7 @@ function modelRow(workflow: string | null, filed: StepFiled | null): ReactNode {
     <Marked
       value={filed.model ?? filed.askedModel}
       mark="this try"
-      title={`Asked for with wf retry --model ${filed.askedModel}; the workflow ${says}.`}
+      title={`Asked for on this try: ${filed.askedModel}; the workflow ${says}.`}
     />
   );
 }
@@ -207,8 +207,8 @@ export function spentRows(step: Priced): Array<[string, ReactNode]> {
 }
 
 /**
- * A `read` row for `Facts`, beside a step's `cost`: what its sessions read, by price, in `wf decide`'s words, where anything measured it.
- * None where nothing did — a runner that counted its input as one number has nothing to say here, which is not 0.
+ * A `read` row for `Facts`, beside a step's `cost`: what its sessions read, by price, in the CLI `decide`'s words, where anything measured
+ * it. None where nothing did — a runner that counted its input as one number has nothing to say here, which is not 0.
  */
 export function readRows(used: StepUsed | null | undefined): Array<[string, ReactNode]> {
   return used?.read ? [['read', <Read key="read" said={used.read} peak={used.peak} rebuilt={used.rebuilt} />]] : [];

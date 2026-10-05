@@ -76,6 +76,8 @@ export const step = (extra: Partial<Step> = {}): Step => ({
   branch: 'wf/r-1/implement',
   status: 'failed (check)',
   note: 'try 2',
+  roundDue: false,
+  commands: { approve: 'nemia approve r-1 implement', retry: 'nemia retry r-1 implement', say: 'nemia say r-1 implement' },
   needs: null,
   blockedByHarness: false,
   waitingFor: null,
@@ -181,6 +183,7 @@ export const step = (extra: Partial<Step> = {}): Step => ({
 export const detail = (extra: Partial<RunDetail> = {}): RunDetail => ({
   id: 'r-1',
   brief: 'Decode the reads',
+  decide: 'nemia decide r-1',
   repo: '/work/repo',
   place: 'git',
   work: null,
@@ -276,7 +279,7 @@ export const decidable = (extra: Partial<Decidable> = {}): Decidable => ({
   total: used(),
   cost: '$1.25',
   overBudget: null,
-  commands: [{ label: 'ship it', command: 'git merge wf/r-1/b', said: null }],
+  commands: [{ label: 'ship it', command: 'git merge wf/r-1/b', said: null, step: null }],
   awaiting: { branches: ['wf/r-1/b'], direct: false },
   ...extra,
 });

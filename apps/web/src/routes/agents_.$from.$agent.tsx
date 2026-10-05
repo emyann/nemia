@@ -163,7 +163,7 @@ function Unread({ error }: { error: string }) {
 
 /**
  * Who the agent is, at the head of its page: its face and name as a person's, the job it holds and the name a node gives it, what it is
- * for, the nodes that name it, and, for the repository's, how to start one of yours from it.
+ * for, the nodes that name it, and, for the repository's, how to start one of yours from it: the copy the api answers (`untried`).
  */
 function AgentHeader({ agent, mine }: { agent: AgentListing; mine: boolean }) {
   return (
@@ -184,8 +184,8 @@ function AgentHeader({ agent, mine }: { agent: AgentListing; mine: boolean }) {
       <UsedBy listing={agent} />
       {!mine && (
         <p data-read-only className="text-xs text-neutral-500">
-          The repository's agents are read here, not written: they change with the repository, in a commit. To start one of yours from this
-          one, {code(`cp ${agent.file} ~/.agent-workflows/workflows/agents/`)}.
+          The repository's agents are read here, not written: they change with the repository, in a commit.
+          {agent.untried?.copy && <> To start one of yours from this one, {code(agent.untried.copy)}.</>}
         </p>
       )}
     </header>

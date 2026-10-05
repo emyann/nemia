@@ -3,7 +3,8 @@
  *
  * The facts are the api's, off the package: which step waits at its gate (`toDecide`, a step's `approve`), where a send-back goes
  * (`sendBackTo`, carried as `back`), the base branch (`onto`, `branch`), each step's tries, closeout and check, and the run's decision. The
- * sentences joining them are the board's, so a person reads what approving does without knowing the package: `wf ls` prints the command.
+ * sentences joining them are the board's, so a person reads what approving does without knowing the package: the CLI's `ls` prints the
+ * command.
  */
 import type { Decidable, RunDetail, RunSummary, StepAsked } from './api';
 import { askedSaid, needsOf, stepAnchor, type Need } from './asks.ts';
@@ -20,10 +21,10 @@ export type GateAsk = { step: string; ends: boolean; back: readonly string[]; on
 
 /**
  * The gate the Factory's card answers, off the list alone: the ending's gate the run's to-decide says, or the first step waiting at its
- * gate on you. Null on a run called off, on a run a person holds (`wf hold`, whose approval the package refuses), and where no gate waits.
- * A to-decide gate whose `back` names the step itself holds after the step ran (`sendBackTo` gives the step once it has a task); one whose
- * `back` does not is an ending, not filed until approved. A list from an api without `back` reads the step alone as where a send-back goes,
- * which the package would refuse for an ending, in its words.
+ * gate on you. Null on a run called off, on a run a person holds (the CLI's `hold`, whose approval the package refuses), and where no gate
+ * waits. A to-decide gate whose `back` names the step itself holds after the step ran (`sendBackTo` gives the step once it has a task); one
+ * whose `back` does not is an ending, not filed until approved. A list from an api without `back` reads the step alone as where a send-back
+ * goes, which the package would refuse for an ending, in its words.
  */
 export function gateOfSummary(
   run: Pick<RunSummary, 'cancelledAt' | 'waitingOnYou' | 'steps' | 'toDecide'> & { holding?: RunSummary['holding'] },
@@ -81,7 +82,7 @@ export const readLink = (gate: Pick<GateAsk, 'step' | 'ends'>): { words: string;
 
 /**
  * A gate's node, under its name, where one line fits: `approve ship to run it`, or `approve plan's hand-off`. Both name the step as
- * `wf ls` does (`approve plan`), and the inspector says the rest.
+ * the CLI's `ls` does (`approve plan`), and the inspector says the rest.
  */
 export const gateNodeLine = (gate: Pick<GateAsk, 'step' | 'ends'>): string =>
   gate.ends ? `approve ${gate.step} to run it` : `approve ${gate.step}'s hand-off`;
@@ -130,12 +131,12 @@ export type GateFact = { label: string; said: string; state?: 'good' | 'bad'; st
 
 /**
  * The facts under a gate, each off the record: the round the run is on of its loop's cap, and what it has cost; the last word of each
- * looping step (a review) — no further round asked, or how many findings it left; each check's verdict on its final try; and, off the
- * run's decision when it has been read, what the result touched and whether each branch still merges onto the base.
+ * looping step (a review) — no further round asked, or how many findings it left; each check's verdict on its final try; and, off the run's
+ * decision when it has been read, what the result touched and whether each branch still merges onto the base.
  *
  * A looping step's word is read off its closeout's output, the keys `wf`'s loop reads (`again`) and the reviewer's `findings`; a closeout
- * without them says it signed off, and how. A step not run says so. A looping step a person ended out of rounds (`wf accept`) is said
- * accepted as it stands, with their words, not as asking another round, though its closeout still says `again: true`.
+ * without them says it signed off, and how. A step not run says so. A looping step a person ended out of rounds (the CLI's `accept`) is
+ * said accepted as it stands, with their words, not as asking another round, though its closeout still says `again: true`.
  */
 export function gateFacts(run: Pick<RunDetail, 'steps' | 'cost'>, decision: Decidable | null): GateFact[] {
   const facts: GateFact[] = [];
@@ -191,7 +192,7 @@ export type Waits = { said: string; step: string | null };
 
 /**
  * The card's line for a result nobody decided, which fits whatever the branch is called: `decide its result: a branch ahead of the base
- * that nothing merges`. `wf ls`'s own words, with the branch and the command, are the card's title and the run page's Decide section.
+ * that nothing merges`. The CLI `ls`'s own words, with the branch and the command, are the card's title and the run page's Decide section.
  */
 export const decideLine = (branches: readonly string[]): string =>
   `decide its result: ${branches.length === 1 ? 'a branch' : `${branches.length} branches`} ahead of the base that nothing merges`;

@@ -1,8 +1,8 @@
 /**
  * What a step needs from a person, as the board says it, and what the run's page offers to answer it with. Pure.
  *
- * The facts are the api's — a closeout's `needs`, a session the harness blocked and, on a run's detail, what it said last, what `wf ls`
- * asks of you for a step at its gate (`approve plan`), `waitingOnYou`, a try a person `asked` for — which are the package's and the
+ * The facts are the api's — a closeout's `needs`, a session the harness blocked and, on a run's detail, what it said last, what the CLI's
+ * `ls` asks of you for a step at its gate (`approve plan`), `waitingOnYou`, a try a person `asked` for — which are the package's and the
  * engine's. The words that join the first two to a step, `asks` and `blocked by the harness`, are the board's: the package has none for
  * them.
  */
@@ -18,7 +18,7 @@ type NeedsStep = Pick<RunSummary['steps'][number], 'name' | 'needs' | 'blockedBy
  * What one step needs from a person: the question it signed off blocked with; that the harness blocked its session — with what that harness
  * says it waits for where it says anything (`waitingFor`, the package's words, on the list as on the detail), and what the session said
  * last where the api read it (a run's detail), null where it did not (the list) or the session said nothing; or, at its gate, its approval
- * — `said` in `wf ls`'s words, `approve plan`.
+ * — `said` in the CLI `ls`'s words, `approve plan`.
  */
 export type Need =
   | { step: string; kind: 'asks'; needs: string }
@@ -46,8 +46,8 @@ export function needOf(step: NeedsStep, waitingOnYou: boolean, runCancelled: boo
 /**
  * Each step's need, in the run's order: what the Factory's card and the run's banner say.
  *
- * Without the ending step whose gate the run's to-decide line already says, as `wf ls` leaves it out of `→ waiting on you` (cli/main.ts):
- * that line names the step and the command that approves it, and the same step is not asked for twice.
+ * Without the ending step whose gate the run's to-decide line already says, as the CLI's `ls` leaves it out of `→ waiting on you`
+ * (cli/main.ts): that line names the step and the command that approves it, and the same step is not asked for twice.
  */
 export const needsOf = (
   run: Pick<RunSummary, 'cancelledAt' | 'waitingOnYou'> & { steps: readonly NeedsStep[]; toDecide?: RunToDecide | null },
@@ -61,8 +61,8 @@ export const needsOf = (
 
 /**
  * A need as its step's node says it, under the step's name: `asks: <needs>`, `blocked by the harness: <what it waits for> · <what it said
- * last>` — and at a gate, `wf ls`'s own words, which name the step: `approve plan`. The wait before the last line: it is why the session
- * has not moved, and the line is only the last thing it happened to say.
+ * last>` — and at a gate, the CLI `ls`'s own words, which name the step: `approve plan`. The wait before the last line: it is why the
+ * session has not moved, and the line is only the last thing it happened to say.
  *
  * What a person does about the wait is not here — a card has one line and a node has one line, and `advice` needs its own (`NeedsBanner`).
  */
@@ -97,9 +97,10 @@ export const needLine = (need: Need): string =>
   need.kind === 'approve' ? need.said : `${need.step} ${need.kind === 'asks' ? '' : 'is '}${needText(need)}`;
 
 /**
- * Whether a step's section offers its gate — Approve and Send back — beside what it handed on: it waits at its gate on you, as `wf ls` asks
- * it (`approve plan`), on a run nobody called off. Only words offer it: a step approved or sent back carries none, and neither does a
- * detail from an api that has no approve route, whose `approve` is not there at all (the read refuses such a detail first, `runQuery`).
+ * Whether a step's section offers its gate — Approve and Send back — beside what it handed on: it waits at its gate on you, as the CLI's
+ * `ls` asks it (`approve plan`), on a run nobody called off. Only words offer it: a step approved or sent back carries none, and neither
+ * does a detail from an api that has no approve route, whose `approve` is not there at all (the read refuses such a detail first,
+ * `runQuery`).
  */
 export const gateOffered = (step: Pick<RunDetail['steps'][number], 'approve'>, runCancelled: boolean): boolean =>
   Boolean(step.approve) && !runCancelled;
@@ -108,22 +109,21 @@ export const gateOffered = (step: Pick<RunDetail['steps'][number], 'approve'>, r
 export const stepAnchor = (step: string): string => `step-${step}`;
 
 /**
- * What a run's page offers for a step, each a `wf retry` the api asks for (`askTry`):
+ * What a run's page offers for a step, each the CLI's `retry` the api asks for (`askTry`):
  *
  *   answer     it signed off blocked: an answer to its `needs`, carried into a nudge, or a fresh session — and where its closeout asks
- *              questions as data (`StepCloseout.questions`), those, every field's in the schema's order, answered by choosing
- *   try-again  its check refused it, or it ended without its closeout: another session, with something to say if you like — and
- *              where a check did not pass, the check run again; first, when it did not finish
- *   denied     its harness denied its try a call, and it says `denials: fail`: another session, a new one first, as `wf decide` offers it —
- *              the run's `allowedTools:` is frozen, so a try is denied the same call again. `calls` is the line naming them
- *              (`StepNeeds.denied`)
- *   raise      a try of it, or its loop's round, has to carry a raise of its cap (`StepRaise`): over its budget, ended at it, or a check
- *              that did not finish past it. With its try — `wf retry --budget`, a nudge or a new session, and for a step that signed off
- *              blocked the answer to its `needs` beside it (`--message`), or its check again, which needs no raise — or with its loop's
- *              round, `wf round --budget`. `status` is its word, with the amounts; `unfinished` whether its check did not finish
- *   continue   the harness blocked its session, with nothing signed: a nudge, with something to say if you like, which the package takes
- *              as `wf retry` does — the tick stops the session, then files the try. The banner offers it, beside what the session said last
- *   asked      a person asked for its next try, which the next tick files: `wf ls`'s note says so
+ * questions as data (`StepCloseout.questions`), those, every field's in the schema's order, answered by choosing   try-again  its check
+ * refused it, or it ended without its closeout: another session, with something to say if you like — and              where a check did not
+ * pass, the check run again; first, when it did not finish   denied     its harness denied its try a call, and it says `denials: fail`:
+ * another session, a new one first, as the CLI's `decide` offers it —              the run's `allowedTools:` is frozen, so a try is denied
+ * the same call again. `calls` is the line naming them              (`StepNeeds.denied`)   raise      a try of it, or its loop's round, has
+ * to carry a raise of its cap (`StepRaise`): over its budget, ended at it, or a check              that did not finish past it. With its
+ * try — the CLI's `retry --budget`, a nudge or a new session, and for a step that signed off              blocked the answer to its `needs`
+ * beside it (`--message`), or its check again, which needs no raise — or with its loop's              round, the CLI's `round --budget`.
+ * `status` is its word, with the amounts; `unfinished` whether its check did not finish   continue   the harness blocked its session, with
+ * nothing signed: a nudge, with something to say if you like, which the package takes              as the CLI's `retry` does — the tick
+ * stops the session, then files the try. The banner offers it, beside what the session said last   asked      a person asked for its next
+ * try, which the next tick files: the CLI `ls`'s note says so
  */
 export type Offer =
   | { step: string; kind: 'answer'; needs: string | null; questions: Question[] }
@@ -140,14 +140,14 @@ export type Answer = Exclude<Offer, { kind: 'continue' }>;
 
 /**
  * The offers of a run's page, in the run's order: one per step waiting on you that a try can answer, one per session the harness blocked,
- * and each step a person asked for a try of. A session the harness blocked is not waiting on you in the package's words — it asked
- * nothing — and is offered Continue all the same. A loop out of rounds goes round with `wf round`, among the Decide section's commands, and
+ * and each step a person asked for a try of. A session the harness blocked is not waiting on you in the package's words — it asked nothing
+ * — and is offered Continue all the same. A loop out of rounds goes round with the CLI's `round`, among the Decide section's commands, and
  * has none. A step the api carries a raise for (`raise`) is offered that, whatever its word: over its budget its word is `over budget`,
  * whether it signed off blocked, ended unsigned or was refused by its check, and a check that did not finish past its budget reads as any
  * such check — and a try of either that files a session is refused without the raise. None where the package takes none: the target of a
  * loop held on its budget goes again with its looping step's round, whose row that is. Nothing on a run called off, and nothing on a run a
- * person holds (`wf hold`): the package refuses every one of these verbs on it (`heldRefusal`), so an offer would be a button that fails.
- * A run without `holding` is taken for one nobody holds.
+ * person holds (the CLI's `hold`): the package refuses every one of these verbs on it (`heldRefusal`), so an offer would be a button that
+ * fails. A run without `holding` is taken for one nobody holds.
  */
 export function offersOf(run: Pick<RunDetail, 'cancelledAt' | 'waitingOnYou' | 'steps'> & { holding?: RunDetail['holding'] }): Offer[] {
   if (run.cancelledAt !== null || run.holding != null) return [];
@@ -181,8 +181,8 @@ export const answersOf = (run: Pick<RunDetail, 'cancelledAt' | 'waitingOnYou' | 
   offersOf(run).filter((offer): offer is Answer => offer.kind !== 'continue');
 
 /**
- * A try the api has just taken, as the board says it until the run is read again and the step's note says it in `wf ls`'s words: what the
- * tick does with it — for a step whose session the harness blocked (`stopFirst`, the package's), stop that session first.
+ * A try the api has just taken, as the board says it until the run is read again and the step's note says it in the CLI `ls`'s words: what
+ * the tick does with it — for a step whose session the harness blocked (`stopFirst`, the package's), stop that session first.
  */
 export const askedSaid = (asked: { try: number; stopFirst: boolean }): string =>
   `try ${asked.try} asked — ${asked.stopFirst ? 'stopping its blocked session, then the tick files it' : 'the next tick files it'}`;

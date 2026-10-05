@@ -171,6 +171,7 @@ export {
   skillVersion,
   workflowDescription,
   workflowFolder,
+  workflowReadme,
   workflowsIn,
 } from './folder/folder.store.ts';
 export type { Places } from './folder/folder.store.ts';

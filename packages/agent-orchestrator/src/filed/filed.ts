@@ -13,8 +13,8 @@ import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
  * the run froze: its model and cap as the filing chooses them (`t`), its context window off the session it continues
  * (`sessionContext`), its deny list with an ending's (`filedDenies`), its allow list with an ending's read of the run's artifacts folder
  * (`runArtifacts`, `filedAllows`), the folders the run mounts (`mounts`, frozen at start), writable where the step's `writable:` names
- * one (`stepMounts`), then the artifacts folder of each step it comes after, read-only (`handedMounts`), then the store's folders its
- * `reads:` names, read-only (`readsMounts`, the inbox at `t.inbox`), the key left out with none, and the harness's own arguments (`own`)
+ * one (`stepMounts`), then the folders its brief names beside them (`filedFolders`): the artifacts folder of each step it comes after,
+ * read-only, then the store's folders its `reads:` names, read-only, the inbox at `t.inbox`; the key left out with none, and the harness's own arguments (`own`)
  * last. The runtime judges no budget: `budgetUsd` is the harness's own cap,
  * and whether the step went over is this package's (`ownStatus`). Pure.
  */
@@ -33,9 +33,26 @@ export const filedConfig = <Own extends object>(
   allowedTools: filedAllows(step, t.runArtifacts),
   background: step.background,
   budgetUsd: t.budgetUsd,
-  ...mountsOf([...(stepMounts(step, run.mounts) ?? []), ...handedMounts(step, steps, t.runArtifacts), ...readsMounts(step, t.inbox)]),
+  ...mountsOf([...(stepMounts(step, run.mounts) ?? []), ...folders(filedFolders(step, steps, t))]),
   ...t.own,
 });
+
+/** The folders a step is filed with beyond its factory's, each read-only: those the steps before it handed over, then the store's. */
+export type FiledFolders = { handed: Mount[]; store: Mount[] };
+
+/**
+ * The folders a step is filed with beyond its factory's, the one source of the filing's (`filedConfig`) and of what its brief names
+ * (`mountsLine`): the artifacts folder of each step it comes after, under `t.runArtifacts` (`handedMounts`), and the store's folders its
+ * `reads:` names, the inbox at `t.inbox` (`readsMounts`). Pure.
+ */
+export const filedFolders = (
+  step: Workflow,
+  steps: readonly Workflow[],
+  t: { runArtifacts: string; inbox: string },
+): FiledFolders => ({ handed: handedMounts(step, steps, t.runArtifacts), store: readsMounts(step, t.inbox) });
+
+/** A step's folders beyond its factory's, in the order they are filed: the handed ones, then the store's. */
+const folders = (f: FiledFolders): Mount[] => [...f.handed, ...f.store];
 
 /**
  * The store's folders a step's `reads:` names, each read-only: the inbox (`inbox`, its absolute path) when it names it. It reads the

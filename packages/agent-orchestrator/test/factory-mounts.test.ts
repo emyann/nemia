@@ -506,9 +506,66 @@ test("a step's `reads: inbox` is filed the store's inbox read-only, on its first
 });
 
 test('mountsLine names the inbox for a local step whose `reads:` names it, and nothing for one without it or on a remote agent', () => {
-  const told = (step: { harness: string; reads?: string[] }) => mountsLine(step, {}, readsMounts(step, '/s/inbox'));
+  const told = (step: { harness: string; reads?: string[] }) => mountsLine(step, {}, { handed: [], store: readsMounts(step, '/s/inbox') });
   assert.match(told({ harness: 'claude', reads: ['inbox'] }).join('\n'), /reads:` names them: `\/s\/inbox`/);
   assert.deepEqual(told({ harness: 'claude' }), []);
   assert.deepEqual(told({ harness: 'a2a:peer', reads: ['inbox'] }), []);
   assert.deepEqual(told({ harness: 'codex', reads: ['inbox'] }), [], 'codex reads the disk in its sandbox already');
+});
+
+test("mountsLine names each folder the steps before it handed over, by its path and step, read-only, and how to list one; nothing for none", () => {
+  const handed = readOnly('/s/runs/r-1/artifacts/design', '/s/runs/r-1/artifacts/implement');
+  assert.deepEqual(mountsLine({ harness: 'claude' }, {}, { handed, store: [] }), [
+    '',
+    "Folders the steps before you handed over, which you may read and must not write: `/s/runs/r-1/artifacts/design` (design's), `/s/runs/r-1/artifacts/implement` (implement's). Each is mounted on its own path, and the run's artifacts folder above them is not: list one with Glob under its own path, as `/s/runs/r-1/artifacts/design/**`.",
+  ]);
+  assert.deepEqual(mountsLine({ harness: 'claude' }, {}, { handed: [], store: [] }), [], 'a step handed none');
+  assert.deepEqual(mountsLine({ harness: 'a2a:peer' }, {}, { handed, store: [] }), [], 'a remote agent is filed none');
+});
+
+/**
+ * The folders a filing mounts that its brief does not name as it mounts them: a writable one on the line that says it may be written, a
+ * read-only one on a line that says it must not be. Each by its path.
+ */
+const unnamed = (filing: { brief: string; config?: { mounts?: unknown } }): string[] => {
+  const lines = filing.brief.split('\n');
+  const mounts = (filing.config?.mounts ?? []) as { path: string; readOnly: boolean }[];
+  return mounts
+    .filter((m) => !lines.some((l) => l.includes(`\`${m.path}\``) && (m.readOnly ? /must not write/ : /you may write/).test(l)))
+    .map((m) => m.path);
+};
+
+test("every folder a local step is filed with is named on its brief, as it is mounted: the factory's, the steps' before it, the store's", async () => {
+  const { repos, loop } = fresh();
+  fs.writeFileSync(
+    path.join(loop, 'implement.md'),
+    `---\nwritable: ${path.basename(repos[1])}\nreads: inbox\n---\nBuild what was asked.\n`,
+  );
+  const run = start({ brief: 'build it', repo: repos[0], workflowDir: loop, isolate: false, factory: 'trio' });
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  b.settle(`${run.id}-implement`, 'failed');
+  await advance(b.e, readRun(run.id));
+  await retry(b.e, run.id, 'implement', { mode: 'fresh' });
+  await advance(b.e, readRun(run.id));
+  b.settle(readRun(run.id).steps.implement.taskId!, 'succeeded', SIGNED);
+  await advance(b.e, readRun(run.id));
+  const filings = [...b.filed.values()];
+  assert.equal(filings.length, 3, 'a first filing, a try, and the step after it');
+  const kinds = filings.flatMap((f) => (f.config?.mounts ?? []) as { path: string; readOnly: boolean }[]);
+  assert.ok(kinds.some((m) => !m.readOnly) && kinds.some((m) => m.path === artifactsDir(run, 'implement')), 'every kind is filed');
+  assert.ok(kinds.some((m) => m.path === path.join(ROOT, 'inbox')), "and the store's");
+  for (const filing of filings) assert.deepEqual(unnamed(filing), [], filing.brief);
+  const review = b.filed.get(`${run.id}-review`)!;
+  assert.ok(review.brief.includes(`\`${artifactsDir(run, 'implement')}\` (implement's)`), review.brief);
+  assert.equal(review.brief.includes(path.join(ROOT, 'inbox')), false, 'the step after it reads no inbox, and is told none');
+});
+
+test('REFUSED: a brief that leaves out a folder its filing mounts names that folder', () => {
+  const handed = artifactsDir({ id: 'r-1' }, 'implement');
+  const brief = ['## What was asked for', '', 'build it', ...mountsLine({ harness: 'claude' }, {}, { handed: [], store: [] })].join('\n');
+  assert.deepEqual(unnamed({ brief, config: { mounts: readOnly(handed) } }), [handed]);
+  const told = [brief, ...mountsLine({ harness: 'claude' }, {}, { handed: readOnly(handed), store: [] })].join('\n');
+  assert.deepEqual(unnamed({ brief: told, config: { mounts: readOnly(handed) } }), []);
+  assert.deepEqual(unnamed({ brief: told.replace('must not write', 'may write'), config: { mounts: readOnly(handed) } }), [handed]);
 });

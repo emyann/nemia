@@ -127,6 +127,11 @@ export type Sighting = {
    */
   skills?: string[];
   /**
+   * Every file the session read or wrote through its file tools, once, relative to its folder: `[]` when it touched none. Absent
+   * when the harness cannot say. **Carried, never judged**: `decide` does not read it.
+   */
+  files?: string[];
+  /**
    * Whether the harness still holds the session's process — Claude Code's registry lists a pid for it. A fact about the
    * process, beside `state`, which is the turn's: a turn that ended (`completed`, or Claude Code's idle `blocked`) leaves a
    * process that is still there. Absent from a harness that cannot say, which reads as not held. Read by `decide` only for a
@@ -267,8 +272,8 @@ export type EndReason = 'harness' | 'lost' | 'unsigned' | 'unstartable' | 'opera
  * - `spawned`: RESULT — the spawn call returned, and the session is the harness's problem now. `error` when the call
  *   failed without the harness vouching that nothing started: whether a session exists is then the grace window's to
  *   find out.
- * - `ended`: an attempt reached a terminal state, as observed — never as assumed. `usage`, `exitCode`, `denials`, `skills`
- *   and `limit` come from the same sighting, when its runner measured them; `decide` reads none of them. `stated`, on an end
+ * - `ended`: an attempt reached a terminal state, as observed — never as assumed. `usage`, `exitCode`, `denials`, `skills`,
+ *   `files` and `limit` come from the same sighting, when its runner measured them; `decide` reads none of them. `stated`, on an end
  *   read off a sighting of a task that asked for a closing statement: whether one came. A fact, never a verdict — `decide`
  *   does not read it, and the layer above judges what a missing statement means. Absent from an end an older runtime
  *   wrote, and from an end with no sighting behind it (`lost`, `unstartable`, a cut).
@@ -366,6 +371,7 @@ export type Event =
       exitCode?: number;
       denials?: Denial[];
       skills?: string[];
+      files?: string[];
       limit?: string;
       error?: string;
       mono?: Monotonic;
@@ -432,6 +438,8 @@ export type Attempt = {
   denials?: Denial[];
   /** The skills its session loaded, `[]` for none, when its harness said. Carried, never read. */
   skills?: string[];
+  /** The files its session read or wrote, relative to its folder, `[]` for none, when its harness said. Carried, never read. */
+  files?: string[];
   /** The limit its configuration set that its harness says it ended the session at — `budget` — when it said one. Carried, never read. */
   limit?: string;
   /**
@@ -487,7 +495,7 @@ export type State = {
 };
 
 /**
- * Ends the attempt `a` as the `ended` event `e` says: an empty list of skills kept, an empty one of denials not, and an end with no
+ * Ends the attempt `a` as the `ended` event `e` says: an empty list of skills or files kept, an empty one of denials not, and an end with no
  * usage keeping what was counted while it ran (`counted`).
  */
 function endAttempt(a: Attempt, e: Extract<Event, { kind: 'ended' }>): void {
@@ -502,6 +510,7 @@ function endAttempt(a: Attempt, e: Extract<Event, { kind: 'ended' }>): void {
   a.exitCode = e.exitCode ?? null;
   if (e.denials?.length) a.denials = e.denials;
   if (e.skills) a.skills = e.skills;
+  if (e.files) a.files = e.files;
   if (e.limit) a.limit = e.limit;
   a.error = e.error ?? a.error;
 }

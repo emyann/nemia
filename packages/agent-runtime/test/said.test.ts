@@ -127,9 +127,11 @@ test('a kept output of another version is read again from the log, never trusted
 });
 
 test('a kept output of a version the readers only added fields to is taken as it is: the log is not read, and what it lacks is absent', async () => {
-  assert.deepEqual(SAID_EXTENDED, [1]);
-  const kept = await withKept(({ log, kept }) => keep(kept, log, { version: 1 }));
-  assert.deepEqual(kept, { payload: 'kept', reads: 0 }, 'no skills: the capture was read before they were');
+  assert.deepEqual(SAID_EXTENDED, [1, 2]);
+  for (const version of SAID_EXTENDED) {
+    const kept = await withKept(({ log, kept }) => keep(kept, log, { version }));
+    assert.deepEqual(kept, { payload: 'kept', reads: 0 }, `version ${version}: no skills nor files, read before they were`);
+  }
 });
 
 test('a kept output whose skills are not a list of names is read again from the log, never trusted', async () => {

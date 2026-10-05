@@ -33,19 +33,25 @@ import path from 'node:path';
 export type ForgetHow = { deleteBranches?: boolean; forceUnmerged?: boolean };
 
 /**
- * Why `nemia rm` — or `nemia prune` or `nemia hold`, the `verb` — will not take this as a run's id — or null. Pure, and asked before
+ * Why `nemia rm` — or `nemia prune`, `nemia hold`, or a `read` of a run's record by `command`, the `verb` — will not take this as a run's
+ * id — or null. Pure, and asked before
  * anything is read. A run's id names files under `WF_ROOT` with a suffix added — `runs/<id>.json`, `.cancelled`, `.pruned`, `.hold`,
  * `.asks` — and directories — `runs/<id>/`, `worktrees/<id>/` — so only what `runId` mints is taken: lowercase letters, digits and dashes,
  * starting with a letter or a digit. With a dot, `r-xyz.json` — what `ls runs/` gives — names `runs/r-xyz.json` as a run's directory, which
  * is another run's record, and a run with no record of its own is swept of it with nothing asked. `..` or a path would name a directory
  * that is not the run's. One that is an id with a file's suffix on it is told the id.
  */
-export function idRefusal(id: string, verb: 'rm' | 'prune' | 'hold' = 'rm', command = `nemia ${verb}`): string | null {
+export function idRefusal(id: string, verb: 'rm' | 'prune' | 'hold' | 'read' = 'rm', command = `nemia ${verb}`): string | null {
   if (/^[a-z0-9][a-z0-9-]*$/.test(id)) return null;
   const file = /^([a-z0-9][a-z0-9-]*)(\.json|\.cancelled|\.pruned|\.hold|\.asks)$/.exec(id);
   if (file)
     return `${JSON.stringify(id)} is not a run's id: ${file[2]} is on the name of one of its files under runs/, not on the run's. Give the id nemia ls prints: ${command} ${file[1]}.`;
-  const does = verb === 'hold' ? 'nemia hold writes its file under WF_ROOT by id' : `nemia ${verb} removes what is under WF_ROOT by id`;
+  const does =
+    verb === 'hold'
+      ? 'nemia hold writes its file under WF_ROOT by id'
+      : verb === 'read'
+        ? `${command} reads a run's record under WF_ROOT by id`
+        : `nemia ${verb} removes what is under WF_ROOT by id`;
   return `${JSON.stringify(id)} is not a run's id, and ${does} — lowercase letters, digits and dashes: give the id nemia ls prints, as in ${command} add-a-flag-x1y2.`;
 }
 

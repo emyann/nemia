@@ -2224,6 +2224,27 @@ A record written before `after` existed waits on nothing.
 A run that waited is told what its parents concluded, under `## From run <id>` (*What one step knows of another*,
 above). To start a whole graph of runs at once, write it as a folder of cards: `wf plan`, below.
 
+## Context without a wait: `wf start --from`
+
+```bash
+wf start ./e.md --repo ~/code/myapp --from a-1x2y                    # filed at once, handed what a-1x2y concluded
+wf start ./f.md --repo ~/code/myapp --after b-3z4w --from c-5v6u     # waits on b-3z4w alone
+wf concluded a-1x2y                                                  # the section a run handed a-1x2y is given
+```
+
+`--after` is a wait and a hand-off at once. `--from <runId>`, given once for each run, is the hand-off alone: frozen on the
+record as `context`, it is never read by what decides whether a run's steps are filed, so a run started only `--from` files its
+roots on the first pass. Each source becomes a `## From run <id>` section on the roots, worded as context, after the sections of
+the runs it waited on. A source that had shipped when the roots were filed is labelled so; one still in flight is accepted, read
+once, then, and labelled *not shipped, not judged*: what it had concluded so far, its change not in this workspace and its account
+judged by nobody. `wf start` says so on a `reads:` line for each.
+
+`wf concluded <runId>` prints the section exactly as a root would be handed it now, and the board's start form previews it. A
+card's `from:` (`wf inbox from`, below) and the api's start body key `context` are the same list. `wf start` refuses, by name: a
+run the store does not have, one named twice, one also given to `--after` (whose section `--after` hands already), and the run
+itself.
+
+
 ## Holding a run that has started: `wf hold`
 
 ```bash
@@ -2438,7 +2459,10 @@ run 'wf tick' (or 'wf up') to start it
   the step of its workflow whose closeout waits for a person in the run it starts, one step, refused as a list or as a step's
   `true` ([*A gate*](#a-gate-a-handoff-that-waits-for-a-person--gate---gate-and-wf-approve)). A fifth, `factory: <name>`, names
   the factory the card is started in ([below](#factories-a-named-grouping-in-the-store--wf-factory)); a card that names none
-  starts only with `--factory` ([*Every run in a factory*](#every-run-in-a-factory)).
+  starts only with `--factory` ([*Every run in a factory*](#every-run-in-a-factory)). A sixth, `from: a-1x2y, b-3z4w`, names the
+  runs the card is handed as context when it starts, as `--from` names them ([above](#context-without-a-wait-wf-start---from)):
+  `wf inbox from <name> <run>...` writes it, refused for a run the store does not have, and `wf inbox from <name> --off` takes it
+  back; a started card is not rewritten.
 - **`repo:` is what makes one inbox serve several repositories.** A card that names its repository starts on it from
   wherever `wf start` is typed, and a board that one day serves more than one repository can group its inbox by it. A card
   without one is about the repository its start names: `--repo`, else `.`.
@@ -2466,7 +2490,7 @@ run 'wf tick' (or 'wf up') to start it
   - the factory is `--factory`, else the card's `factory:`, else the default;
   - the repository is `--repo`, else the card's `repo:`, else the factory's one repository, else `.` — chosen before the card's
     `workflow:` is found in it;
-  - `--after`, `--input` and `--no-worktree` are `wf start`'s, as for any brief.
+  - `--after`, `--from`, `--input` and `--no-worktree` are `wf start`'s, as for any brief; `--from` adds to the card's `from:`.
 - **The record is written first, then the card is removed.** The record carries `from: { inbox: <name> }`, and `wf decide`
   prints `from inbox card <name>` under the run's line. A removal that fails leaves a card `wf inbox` lists as
   `started as <runId>` — never a run with no trace of its card — and `wf start` refuses that card, naming its run, until
@@ -3256,6 +3280,8 @@ holding a concurrency slot forever.
 | `src/list/list.ts` | what `wf ls` shows of a run and its steps (`listing`), and the words it and the board say of a wait (`waitingWords`, `harnessWaitLine`, `deniedWords`, `onYouWords`) — pure |
 | `src/brief/brief.ts` | what a step is told — pure: its brief (`composeBrief`), or on a remote agent its remote brief (`remoteBrief`), with what the runs it waited on concluded (`ParentCloseout`) |
 | `src/brief/brief-sections.ts` | the sections of a brief — pure: `## From <step>`, `## From run <id>`, `## Approved`, `## Try <n>` and `## Round <n> of <N>` (`fromSection`, `approvedSection`, `retrySection`, `roundSection`, `loopSection`), and the lines `wf decide` prints of a gate and an accepted loop (`gateLines`, `acceptedLines`) |
+| `src/brief/handed.ts` | what a run is handed of another — pure: its `## From run <id>` section, labelled waited on, or read as context shipped or not shipped, not judged (`handedSection`, `contextSection`), and a task split into its parts (`handedParts`) |
+| `src/brief/handed.verb.ts` | what a run's roots are handed of other runs, read off their records and the engine (`parentCloseouts`, `handedOf`) |
 | `src/record/record.ts` | a run's record, as data — pure: its shape (`Run`, `GitRun`, `FolderRun`, `placeOf`), the facts a person files beside it (`Hold`, `Approval`, `Acceptance`, `Pruned`), a step's status words and its own record (`StepStatus`, `StepRecord`, `refusedCheck`), the task ids a run files (`stepTaskId`, `checkTaskId`, `stepTasks`, `runTasks`), the try a step is on (`tryOf`), why a run is left unjudged (`unjudgedWords`), and the small words the run's judgement shares (`andList`, `fenced`, `oneLine`); `record.store.ts` reads and writes it |
 | `src/status/status.ts` | where one step stands — pure: **`stepStatus`** and `ownStatus`, a gate's facts (`hasGate`, `approvalOf`, `atGate`), an ending's (`landsOnCheck`, `resultOnBase`), what a step may spend (`taskSpend`, `overBudget`, `budgetRefusal`), its momentum (`stepMomentum`), and a loop's (`roundOf`, `loopOf`, `owedFields`); and what a step consumed, in words (`sumUsage`, `readWords`, `usedLines`, `dollars`, `durationWord`) |
 | `src/wait/wait.ts` | what a run waits on before its steps are filed — pure: **`runReady`**, whether a run's roots may be filed yet (`--after`, `waitsOf`), the holds a person put on it (`holdsOf`), their words and advice, and what they refuse (`holdRefusal`, `afterRefusal`) |
@@ -3299,7 +3325,7 @@ holding a concurrency slot forever.
 | `src/inbox/inbox.verb.ts` | an inbox card started (`startFromInbox`), and a queued card started by the tick (`startQueued`) |
 | `src/tick/tick.verb.ts` | a pass over every run: the engine's pass and the queued tasks it reported admitted, then started runs and the rest admitted oldest first: the program `tickRun`; and the memo of runs at rest (`RestMemo`) |
 | `src/tick/advance.verb.ts` | a pass over one run (`advanceRun`), which writes its record, and what a pass filed and never wrote down, adopted |
-| `src/tick/file.verb.ts` | what a pass files a step with: the first steps given their parents' closeouts (`parentCloseouts`), and the step as it is told (`toldOf`) |
+| `src/tick/file.verb.ts` | what a pass files a step with: the first steps given what the runs they waited on and read concluded (`handedOf`), and the step as it is told (`toldOf`) |
 | `src/ending/ending.verb.ts` | the repository's own checkout, held for one run's ending at a time (`checkoutHold`), and an ending's staged merge committed or aborted on its check (`landEnding`) |
 | `src/cap/cap.verb.ts` | the runs the cap on runs in flight holds between passes (`runSlots`) |
 | `src/meter/meter.verb.ts` | the engine metered, each verb counted in its phase (`meteredEngine`), and a pass's cost (`costOf`) |

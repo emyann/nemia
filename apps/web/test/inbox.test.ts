@@ -34,6 +34,7 @@ const entry = (name: string, filedAt: string | null, extra: Partial<InboxEntry> 
   workflow: null,
   repo: null,
   factory: null,
+  from: [],
   startedAs: [],
   error: null,
   body: name,

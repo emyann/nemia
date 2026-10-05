@@ -4,6 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  fromText,
   ideaCard,
   INBOX_KEY_MEANINGS,
   INBOX_KEYS,
@@ -25,7 +26,7 @@ import {
   workflowAt,
   type InboxListing,
 } from './inbox.ts';
-import { fromNote } from '../start/inputs.ts';
+import { fromNote } from '../start/index.ts';
 
 /**
  * A table of one line of meaning per key, as the board lays a card's keys out: why `meanings` is not one, or null (as
@@ -58,7 +59,7 @@ test("each of an inbox card's keys has one line of meaning, in the keys' order",
 });
 
 test('an inbox card is its file: the name without .md, `workflow:` and `repo:` from its frontmatter when set — each optional — and the body', () => {
-  assert.deepEqual(INBOX_KEYS, ['workflow', 'repo', 'queued', 'gate', 'factory']);
+  assert.deepEqual(INBOX_KEYS, ['workflow', 'repo', 'queued', 'gate', 'factory', 'from']);
   assert.deepEqual(read('---\nworkflow: dev\nrepo: /home/me/code/app\n---\nCache the views.\n\nBetween passes.\n'), {
     name: 'cache-the-views-k2q9',
     file: 'cache-the-views-k2q9.md',
@@ -108,7 +109,7 @@ test('REFUSED by name at shipped defaults: a key an inbox card does not have —
   assert.throws(
     () => read('---\nworkflow: dev\nharness: codex\n---\nx\n'),
     refusedWith(
-      /^cache-the-views-k2q9\.md: `harness` is not a key an inbox card has\. An inbox card's keys are: workflow, repo, queued, gate, factory, each optional — what runs it, the repository it is about, when it was queued to start on its own, the step its run waits at for a person, and the factory that processes it;/,
+      /^cache-the-views-k2q9\.md: `harness` is not a key an inbox card has\. An inbox card's keys are: workflow, repo, queued, gate, factory, from, each optional — what runs it, the repository it is about, when it was queued to start on its own, the step its run waits at for a person, the factory that processes it, and the runs it is handed as context;/,
     ),
   );
   assert.throws(
@@ -303,6 +304,7 @@ test("`inboxListing`: each card by file name, with the runs whose record's `from
       repo: null,
       factory: null,
       startedAs: ['broken-gh78'],
+      from: [],
       error:
         'broken-a1b2.md: `after` is not a key an inbox card has: what a card waits on is said when it is started, once the runs it could wait on are known — nemia start <inbox>/broken-a1b2.md --after <runId>. Delete the line.',
     },
@@ -314,6 +316,7 @@ test("`inboxListing`: each card by file name, with the runs whose record's `from
       repo: '/home/me/code/app',
       factory: null,
       startedAs: [],
+      from: [],
       error: null,
     },
     {
@@ -324,6 +327,7 @@ test("`inboxListing`: each card by file name, with the runs whose record's `from
       repo: null,
       factory: null,
       startedAs: [],
+      from: [],
       error: 'drafts/: not a card. The inbox holds one markdown file per card, <name>.md — move it out, or, for a card, name it <name>.md.',
     },
     {
@@ -334,6 +338,7 @@ test("`inboxListing`: each card by file name, with the runs whose record's `from
       repo: null,
       factory: null,
       startedAs: [],
+      from: [],
       error:
         'notes.txt: not a card. The inbox holds one markdown file per card, <name>.md — move it out, or, for a card, name it <name>.md.',
     },
@@ -345,6 +350,7 @@ test("`inboxListing`: each card by file name, with the runs whose record's `from
       repo: null,
       factory: null,
       startedAs: ['parse-the-flag-ab12', 'parse-the-flag-ef56'],
+      from: [],
       error: null,
     },
   ] satisfies InboxListing[]);
@@ -858,4 +864,20 @@ test("REFUSED: a card that names no factory, naming its file, the line to write 
   const queued = unfactoredCardRefusal('/s/inbox/a.md', []);
   assert.match(queued, /— once one is filed: nemia factory add <name> --repo <root>; a new card/);
   assert.equal(queued.includes('at start'), false, 'the queue has no start words of its own');
+});
+
+test("`from:` names the runs a card's run is handed as context, in the order written, listed and written back — REFUSED by name: a blank run and one named twice; `after:` is still refused", () => {
+  const card = read('---\nworkflow: build\nfrom: a-1x2y,  b-3z4w\n---\nCache the views.\n');
+  assert.deepEqual(card.from, ['a-1x2y', 'b-3z4w']);
+  assert.equal(Object.hasOwn(read('---\nworkflow: dev\n---\nx\n'), 'from'), false, 'none unless it says so');
+  const [listed] = inboxListing([{ file: card.file, text: '---\nfrom: a-1x2y\n---\nx\n' }], [], isDirectory);
+  assert.deepEqual(listed.from, ['a-1x2y']);
+
+  const set = fromText(card, ['c-5v6u'], isDirectory);
+  assert.equal(set, '---\nworkflow: build\nfrom: c-5v6u\n---\nCache the views.\n');
+  assert.equal(fromText(card, [], isDirectory), '---\nworkflow: build\n---\nCache the views.\n', 'taken back: the line goes');
+
+  assert.throws(() => read('---\nfrom: a-1x2y, \n---\nx\n'), refusedWith(/`from:` names runs by id, comma-separated/));
+  assert.throws(() => read('---\nfrom: a-1x2y, a-1x2y\n---\nx\n'), refusedWith(/names a-1x2y twice/));
+  assert.throws(() => read('---\nafter: a-1x2y\n---\nx\n'), refusedWith(/`after` is not a key an inbox card has/));
 });

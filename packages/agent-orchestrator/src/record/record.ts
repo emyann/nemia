@@ -89,6 +89,11 @@ type RunBase = {
    */
   after?: string[];
   /**
+   * The runs this one is handed as context (`nemia start --from`, a card's `from:`), frozen at start: what each concluded is read once, on
+   * the pass that files the roots, and none is ever waited on. Absent on a run handed none.
+   */
+  context?: string[];
+  /**
    * The files `nemia start --input` copied into the run's own `inputs/` directory (`inputsDir` in record.store.ts), by name, in the order
    * given. Named on every step's brief that carries what was asked for (`inputsLine`), and under the run's line in `nemia decide`. Absent
    * on a run given none.

@@ -481,7 +481,7 @@ export const specOf = (step: Workflow): WorkflowStepSpec => ({
 });
 
 const SHAPE =
-  '`{ "workflow": "<name>", "brief": "<what to do>" }`, with `"from": "repo"` or `"yours"` when both have a workflow of that name, `"after": ["<runId>", …]` for the runs it waits on, and `"card": "<name>"` for an inbox card it starts';
+  '`{ "workflow": "<name>", "brief": "<what to do>" }`, with `"from": "repo"` or `"yours"` when both have a workflow of that name, `"after": ["<runId>", …]` for the runs it waits on, `"context": ["<runId>", …]` for the runs it reads as context, and `"card": "<name>"` for an inbox card it starts';
 
 /** Why a start with no card and no brief is not one (422). */
 const NO_BRIEF = `A run needs a brief: what to do, as \`nemia start <brief>\` takes it. Write it in \`brief\` — the run's steps are told it, under "What was asked for".`;
@@ -494,17 +494,22 @@ const START_BODY = Schema.Struct({
   workflow: Schema.NonEmptyString,
   from: Schema.optionalKey(Schema.Literals(['repo', 'yours'])),
   after: Schema.optionalKey(Schema.Array(NotBlank)),
+  context: Schema.optionalKey(Schema.Array(NotBlank)),
   card: Schema.optionalKey(Schema.String.check(Schema.makeFilter((card: string) => inboxNameRefusal(card) === undefined))),
   brief: Schema.optionalKey(Schema.String),
 });
 
-/** Why `POST /api/runs`'s body is not a start, by the first key its schema refused. */
+/** Why `POST /api/runs`'s body is not a start, by the first key its schema refused: a `context` that is not a list of run ids is a 422. */
 function startWords({ path: [key], input }: BodyIssue, body: unknown): string | Refusal {
   if (key === 'workflow') return `POST /api/runs names the workflow to start in \`workflow\`, a folder's name: ${SHAPE}.`;
   if (key === 'from')
     return `\`from\` is where the workflow is read from: "repo" or "yours", or left out when only one has a workflow named '${String(valueAt(body, ['workflow']))}'.`;
   if (key === 'after')
     return `\`after\` is the runs this one waits on, by id, as \`nemia start --after <runId>\` takes each: a list of run ids, such as \`"after": ["add-a-cache-k2q9"]\`, or left out for a run that waits on none. This request's was ${JSON.stringify(valueAt(body, ['after']))}. GET /api/runs lists the runs there are.`;
+  if (key === 'context') {
+    const error = `\`context\` is the runs this one is handed as context, by id, as \`nemia start --from <runId>\` takes each, never waited on: a list of run ids, such as \`"context": ["add-a-cache-k2q9"]\`, or left out for a run handed none. This request's was ${JSON.stringify(valueAt(body, ['context']))}. GET /api/runs lists the runs there are.`;
+    return { status: 422, error };
+  }
   if (key === 'card') {
     return typeof input === 'string'
       ? (inboxNameRefusal(input) ?? `POST /api/runs takes a JSON object: ${SHAPE}.`)
@@ -561,15 +566,16 @@ export function folderOf(name: string, from: WorkflowSource | undefined, repo: s
  * body.
  */
 export type Asked =
-  | { dir: string; brief: string; after: string[] | undefined; card?: undefined }
-  | { dir: string; brief: string | undefined; after: string[] | undefined; card: string };
+  | { dir: string; brief: string; after: string[] | undefined; context: string[] | undefined; card?: undefined }
+  | { dir: string; brief: string | undefined; after: string[] | undefined; context: string[] | undefined; card: string };
 
 /**
  * What `POST /api/runs` starts off its decoded body, or why it does not: the workflow it names (404, 409), and the brief (422) — the api's
  * own, since `startRun` takes any string and `nemia start` prints its help for none. The body's shape (400) is `START_BODY`'s.
  *
  * `after` is only shaped here: a list of run ids, as `nemia start --after <runId>` takes each, and never a blank one, which the CLI refuses
- * too (`--after=`). Whether this run may wait on each is `startRun`'s to say (`afterRefusal`), in its words.
+ * too (`--after=`). Whether this run may wait on each is `startRun`'s to say (`afterRefusal`), in its words. `context` is shaped the same,
+ * as `nemia start --from <runId>` takes each; whether each may be handed is `startRun`'s to say (`contextRefusal`).
  *
  * `card` names an inbox card to start, as `nemia inbox` lists it: refused here only for a name that is not a card's (`inboxNameRefusal`,
  * 400, in the package's words), before any folder is read. Whether the card is there, and may start, is `startFromInbox`'s to say. With a
@@ -577,13 +583,13 @@ export type Asked =
  * as `nemia start <card> --brief ""` is.
  */
 function startOf(body: typeof START_BODY.Type, repo: string, home: string): Asked | Refusal {
-  const { workflow, brief, from, after, card } = body;
+  const { workflow, brief, from, after, context, card } = body;
   const folder = folderOf(workflow, from, repo, home);
   if ('status' in folder) return folder;
-  const waits = after && [...after];
-  if (card !== undefined) return { dir: folder.dir, brief, after: waits, card };
+  const handed = { after: after && [...after], context: context && [...context] };
+  if (card !== undefined) return { dir: folder.dir, brief, ...handed, card };
   if (brief === undefined || !brief.trim()) return { status: 422, error: NO_BRIEF };
-  return { dir: folder.dir, brief: brief.trim(), after: waits };
+  return { dir: folder.dir, brief: brief.trim(), ...handed };
 }
 
 /**
@@ -617,6 +623,7 @@ async function cardStarted(e: Engine['Service'], asked: Extract<Asked, { card: s
       workflows: asked.dir,
       instead: asked.brief,
       after: asked.after,
+      context: asked.context,
     }),
   );
   return {
@@ -638,7 +645,8 @@ async function cardStarted(e: Engine['Service'], asked: Extract<Asked, { card: s
  * - `GET /api/repository` — the repository a start runs in, as the request's `?factory=` and `?repo=` resolve it: what the start form
  *   lists the runs of, for a run to wait on.
  * - `POST /api/runs` — the board's first write, and the one a person makes at the command line: `nemia start <brief> --workflows <folder>
- *   --repo <repo> --after <runId>`, or, with `card`, `nemia start <inbox>/<card>.md --brief <brief> --workflows <folder> --after <runId>`.
+ *   --repo <repo> --after <runId> --from <runId>`, or, with `card`, `nemia start <inbox>/<card>.md --brief <brief> --workflows <folder>
+ *   --after <runId>`.
  *   Served by hand, through the entry's handler (`START`). Guarded (guard.ts); the body is refused as `startWords` and `startOf` say.
  *   201 with the run's `Location` once its record is written.
  *   A refusal goes to `app.onError`, which answers it by its kind, word for word (app.ts). Without a card, `nemia start`'s refusal is an
@@ -685,6 +693,7 @@ export const workflows = new Hono<ApiEnv>()
           repo: found.repo ?? repo,
           workflows: asked.dir,
           after: asked.after,
+          context: asked.context,
           factory: found.factory?.name,
         }),
       );

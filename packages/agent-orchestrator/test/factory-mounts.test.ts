@@ -16,7 +16,7 @@ import { execFileSync } from 'node:child_process';
 import { scratch } from './scratch.ts';
 import { teamCopy } from './team.ts';
 import { factoryMounts } from '../src/factory/factory.ts';
-import { mountsLine } from '../src/start/inputs.ts';
+import { mountsLine } from '../src/start/index.ts';
 import { promised } from './promised.ts';
 import { Effect } from 'effect';
 import { readsMounts } from '../src/filed/filed.ts';

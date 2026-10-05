@@ -45,7 +45,7 @@ import { MERGE } from '../merge/merge.verb.ts';
 import { WORKFLOW_ENTRIES } from '../folder/workflows.verb.ts';
 import { FACTORIES } from '../factory/factory.verb.ts';
 import { INBOXES } from '../inbox/commands.verb.ts';
-import { PLAN, START } from '../start/commands.verb.ts';
+import { CONCLUDED, PLAN, START } from '../start/commands.verb.ts';
 import { CANCEL, PAUSE, PAUSED, PAUSE_NOW, HOLD, PRUNE, RAN, RM, RESUME } from './runs.verb.ts';
 import { PASSES } from '../meter/passes.verb.ts';
 
@@ -492,6 +492,7 @@ const AGENT_CARD: Command<CardRead> = {
 /** Every command with a handler defined once, in the order `nemia`'s help lists them: what the api may serve. */
 export const COMMANDS: readonly Command[] = [
   START,
+  CONCLUDED,
   ...INBOXES,
   ...FACTORIES,
   RETRY,

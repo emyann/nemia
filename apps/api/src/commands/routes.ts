@@ -33,7 +33,8 @@ const valueSchema = (kind: Positional['kind'] | Flag['kind']): Schema.Decoder<un
 const fixedOf = (route: Route): Readonly<Record<string, string | boolean>> => ('sets' in route ? (route.sets ?? {}) : {});
 
 /**
- * The body a command takes on its route, derived from its spec: each positional its path does not name, required unless it is optional;
+ * The body a command takes on its route, derived from its spec: each positional its path does not name, required unless it is optional,
+ * and a list, optional, where it takes many;
  * each key a flag sets, required, as one of the values its flags set it to — a body says its way, and takes no default; each flag's value,
  * optional, a switch's as true or false, but a flag the CLI alone takes, and one the api alone takes required where it says so; and the
  * keys its extension takes (extend.ts), optional. A key its route fixes (`sets`) is none of the body's.
@@ -42,7 +43,12 @@ export function bodySchema(command: CommandSpec, inPath: readonly string[], rout
   const fields: Record<string, Schema.Decoder<unknown>> = {};
   const fixed = Object.keys(fixedOf(route));
   for (const p of command.spec.positionals.filter((p) => !inPath.includes(p.key)))
-    fields[p.key] = p.takes === 'optional' ? Schema.optionalKey(valueSchema(p.kind)) : valueSchema(p.kind);
+    fields[p.key] =
+      p.takes === 'many'
+        ? Schema.optionalKey(Schema.Array(valueSchema(p.kind)))
+        : p.takes === 'optional'
+          ? Schema.optionalKey(valueSchema(p.kind))
+          : valueSchema(p.kind);
   const set = new Map<string, string[]>();
   for (const [key, value] of command.spec.flags.flatMap((f) => Object.entries(f.sets ?? {})))
     set.set(key, [...new Set([...(set.get(key) ?? []), value])]);
@@ -111,11 +117,12 @@ async function jsonOf(c: Context<ApiEnv>, name: string, words: RouteWords, at: N
 /** The body's values that are arguments, and those under the keys the command takes on the api alone. */
 function split(command: CommandSpec, body: Readonly<Record<string, unknown>>) {
   const own = new Set(command.apiTakes);
-  const args: Record<string, string | number | boolean> = {};
+  const args: Record<string, string | number | boolean | readonly string[]> = {};
   const taken: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(body)) {
     if (own.has(key)) taken[key] = value;
     else if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') args[key] = value;
+    else if (Array.isArray(value) && value.every((v) => typeof v === 'string')) args[key] = value;
   }
   return { args, taken };
 }

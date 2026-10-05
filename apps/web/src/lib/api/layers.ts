@@ -34,3 +34,22 @@ export const StepLayersSchema = Schema.Struct({
   task: Schema.NullOr(Schema.String),
   via: Schema.Literals(['prompt', 'brief']),
 }) satisfies Schema.Schema<StepLayers>;
+
+/**
+ * Mirrors `TaskPart` in apps/api/src/detail/told.ts: a part of a step's task — its own text, or a run it was handed, by its id, the first
+ * line that run was asked (empty where its section could not read it), the section's body, and how it was handed: waited on until it
+ * shipped (`--after`), or read as context (`--from`); absent where the record names it as neither.
+ */
+export type TaskPart = { kind: 'from'; run: string; asked: string; body: string; how?: 'waited' | 'read' } | { kind: 'text'; text: string };
+
+/** Decodes a `TaskPart`: the `from` member first, the wider one, so a part is never read as the narrower. */
+export const TaskPartSchema = Schema.Union([
+  Schema.Struct({
+    kind: Schema.Literal('from'),
+    run: Schema.String,
+    asked: Schema.String,
+    body: Schema.String,
+    how: Schema.optionalKey(Schema.Literals(['waited', 'read'])),
+  }),
+  Schema.Struct({ kind: Schema.Literal('text'), text: Schema.String }),
+]) satisfies Schema.Schema<TaskPart>;

@@ -71,6 +71,11 @@ export type RunSummary = {
   pruned: { said: string } | null;
   /** The runs this one waits on (`nemia start --after`), as the record froze them at start: none for a run started without. */
   after: string[];
+  /**
+   * The runs this one is handed as context (`nemia start --from`, a card's `from:`), as the record froze them at start: never waited on,
+   * so no line of the floor waits on one. None for a run started without.
+   */
+  context: string[];
   /** The runs its roots still wait on, in the package's words (`RunWaiting`); null once there are none, or the run has started. */
   waiting: RunWaiting | null;
   /**
@@ -174,6 +179,7 @@ const summarize = Effect.fnUntraced(function* (run: Run, views: Views, reader: E
     cancelledAt: run.cancelledAt ?? null,
     pruned: run.pruned ? { said: `${prunedWords(run.pruned)}; ${prunedKept(run.pruned)}` } : null,
     after: run.after ?? [],
+    context: run.context ?? [],
     waiting: judged.waiting,
     heldUntil: judged.holding ? run.hold!.until : [],
     holding: judged.holding,
@@ -224,6 +230,7 @@ function unjudged(run: Run, views: Views, unreadable: Unreadable, said: string, 
     cancelledAt: run.cancelledAt ?? null,
     pruned: run.pruned ? { said: `${prunedWords(run.pruned)}; ${prunedKept(run.pruned)}` } : null,
     after: run.after ?? [],
+    context: run.context ?? [],
     waiting: null,
     heldUntil: run.hold && !run.cancelledAt ? run.hold.until : [],
     holding: null,

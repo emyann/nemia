@@ -71,6 +71,7 @@ const runBase = {
   workflowDir: Schema.String,
   workflow: Schema.optional(Schema.mutable(Schema.Array(FrozenStepSchema))),
   after: Schema.optional(Strings),
+  context: Schema.optional(Strings),
   inputs: Schema.optional(Strings),
   from: Schema.optional(Schema.StructWithRest(Schema.Struct({ inbox: Schema.String }), Rest)),
   gates: Schema.optional(Strings),
@@ -736,8 +737,7 @@ export const restStamps = (): Map<string, string> =>
       if (dot <= 0) continue;
       const id = name.slice(0, dot);
       const parts = stamps.get(id) ?? [];
-      stamps.set(id, parts);
-      parts.push(`${name}=${stat(path.join(runsDir(), name), 0)}`);
+      stamps.set(id, [...parts, `${name}=${stat(path.join(runsDir(), name), 0)}`]);
     }
     return new Map([...stamps].map(([id, parts]) => [id, parts.join(';')]));
   });

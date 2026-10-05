@@ -1,16 +1,18 @@
 import type { ReactNode } from 'react';
 import { Panel } from '@xyflow/react';
 import { edgeLine, edgeStroke, type EdgeState } from '../lib/canvas';
-import { Travelling } from './StateEdge';
+import { READ_LINE, Travelling } from './StateEdge';
 
 /**
  * Beside a canvas's zoom controls, under its nodes: what the drawing means. An edge in each state it is drawn in, drawn as `StateEdge`
  * draws it — dashed and still, moving into a running step, solid, looping back — and the human gate. The moving sample moves as a running
  * edge does, and is as still as one where the person asked for reduced motion.
  *
- * `cards`, on the Factory: the edge between two cards too, from a run to one that waits on it (`afterEdges`) — started `--after` it, or
- * held until it ships (the CLI's `hold`), which are both a wait on that run and drawn alike; the card itself says which. And the ring round
- * a card whose result nobody has decided, which stays on the floor, finished, until a person decides it.
+ * `cards`, on the Factory: the edge between two cards too, from a run to one that waits until it ships (`afterEdges`) — filed `--after`
+ * it, or held until it ships (the CLI's `hold`), which are both a wait on that run and drawn alike; the card itself says which; a run that
+ * has started draws none from its waits. The faint dotted line of a run read as context, drawn for the card hovered or selected
+ * (`readEdges`), which waits on nothing. And the ring round a card whose result nobody has decided, which stays on the floor, finished,
+ * until a person decides it.
  */
 export function CanvasLegend({ className = '', cards = false }: { className?: string; cards?: boolean }) {
   return (
@@ -32,7 +34,16 @@ export function CanvasLegend({ className = '', cards = false }: { className?: st
       </Item>
       <Item sample={<Sample state="done" />}>done</Item>
       <Item sample={<Sample state="to-come" loop />}>loops back</Item>
-      {cards && <Item sample={<CardsSample />}>waits on a run</Item>}
+      {cards && (
+        <Item sample={<CardsSample />} title="A run that has started draws no line from its waits.">
+          waits until it ships
+        </Item>
+      )}
+      {cards && (
+        <Item sample={<CardsSample read />} title="Drawn for the card hovered or selected: it does not wait.">
+          reads what it concluded
+        </Item>
+      )}
       <Item sample={<span className="size-2.5 rounded-sm border-2 border-amber-500" />}>human gate</Item>
       {cards && <Item sample={<span className="size-2.5 rounded-sm ring-1 ring-emerald-500" />}>to decide</Item>}
     </Panel>
@@ -40,23 +51,30 @@ export function CanvasLegend({ className = '', cards = false }: { className?: st
 }
 
 /**
- * Two cards and the edge from the one into the other, dashed as it is while the second waits: solid once it has started, as any edge is.
+ * Two cards and the edge from the one into the other, dashed as it is while the second waits; or, `read`, the faint dotted line with no
+ * arrow of a run the second reads as context (`READ_LINE`).
  */
-function CardsSample() {
+function CardsSample({ read = false }: { read?: boolean }) {
   const stroke = edgeStroke('to-come', false);
   const card = (x: number) => <rect x={x} y={1.75} width={8} height={8.5} rx={1.5} fill="none" stroke="currentColor" strokeWidth={1.5} />;
   return (
-    <svg width={44} height={12} viewBox="0 0 44 12" aria-hidden data-sample="cards" className="overflow-visible">
+    <svg width={44} height={12} viewBox="0 0 44 12" aria-hidden data-sample={read ? 'reads' : 'cards'} className="overflow-visible">
       {card(0.75)}
-      <path d="M 10,6 H 28" fill="none" style={{ stroke, ...edgeLine('to-come', false) }} />
-      <path d="M 28,2.5 L 34,6 L 28,9.5 Z" fill={stroke} />
+      {read ? (
+        <path d="M 10,6 H 34" fill="none" style={READ_LINE} />
+      ) : (
+        <>
+          <path d="M 10,6 H 28" fill="none" style={{ stroke, ...edgeLine('to-come', false) }} />
+          <path d="M 28,2.5 L 34,6 L 28,9.5 Z" fill={stroke} />
+        </>
+      )}
       {card(35.25)}
     </svg>
   );
 }
 
-const Item = ({ sample, children }: { sample: ReactNode; children: ReactNode }) => (
-  <span className="flex items-center gap-1">
+const Item = ({ sample, title, children }: { sample: ReactNode; title?: string; children: ReactNode }) => (
+  <span className="flex items-center gap-1" title={title}>
     {sample}
     {children}
   </span>

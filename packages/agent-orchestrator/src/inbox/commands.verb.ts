@@ -12,10 +12,12 @@ import { inboxDir, runStore } from '../record/files.store.ts';
 import { Missing } from '../refusal/refusal.ts';
 import { inboxLines, noCardLine, type InboxCard, type InboxListing } from './inbox.ts';
 import { addToInbox, dropFromInbox, queueInInbox, readInbox, type InboxDropped, type InboxQueued } from './inbox.store.ts';
+import { setFrom, type InboxFrom } from './inbox.verb.ts';
 
 export const INBOX_HELP = `nemia inbox
 nemia inbox add "<idea>"|<file> [--workflow <name>] [--repo <path>] [--factory <name>]
 nemia inbox queue <name> [--workflow <w>] [--off]
+nemia inbox from <name> <run>... | --off
 nemia inbox rm <name>
 
 An inbox is cards before they are started: \${WF_ROOT:-~/.agent-workflows}/inbox/, one <name>.md per card, beside
@@ -28,6 +30,7 @@ is said at start:
     queued: 2026-09-16T10:00:00.000Z   # when it was queued to start on its own: nemia inbox queue writes it
     gate: plan                 # the step whose closeout waits for nemia approve in the run it starts
     factory: pipao             # the factory it is started in (nemia factory --help); required to start
+    from: add-cache-a1b2       # runs its run is handed as context, comma-separated: read, never waited on
     ---
     Cache the engine's views between passes.
 
@@ -44,6 +47,9 @@ is said at start:
                  not tried again until it is edited or queued again (or, with no repository named by the card or its
                  factory, nemia up runs in another repository); a start that failed otherwise is said once, and tried
                  again on the next pass.
+  nemia inbox from  sets the runs a card's run is handed as context (from:), each by its id, shipped or still in
+                 flight: what each concluded is read when the run's steps are filed, and none is waited on.
+                 --off takes the key off.
   nemia inbox rm    drops a card without starting it. A name with no card says so, and which cards there are.
 
 Refused by name: a key a card does not have, a key set to nothing, a repo: that is not an absolute path to a
@@ -52,7 +58,7 @@ saying true, a factory: that is not a factory's name — and, at start, a gate: 
 card that names no factory and is started with no --factory, never one taken from its folder or its repo:, a
 factory: the store does not have, default, or one that does not offer the workflow — an add with no idea, and a name that would
 leave the folder; and a queue of a name with no card, of a card with no workflow and no --workflow, of one
-already queued, and of one a run was started from.`;
+already queued, and of one a run was started from; a from: naming a run the store does not have, or one twice.`;
 
 /** The text under `key`, or undefined where none was given. */
 const textOf = (args: Args, key: string): string | undefined => {
@@ -237,6 +243,53 @@ export const INBOX_QUEUE: Command<Queued> = {
   },
 };
 
+/** `nemia inbox from`'s spec: the card's name, then the runs it is handed as context, or `--off`. */
+const FROM_SPEC: Spec = {
+  positionals: [
+    { key: 'name', takes: 'required', kind: 'name' },
+    { key: 'runs', takes: 'many', kind: 'name' },
+  ],
+  flags: [{ flag: '--off', kind: 'switch', key: 'off' }],
+  unknown: (arg) =>
+    `nemia inbox from does not take ${arg}. It takes the card's name, then the runs it is handed as context by id, or --off to take its from: off.`,
+  missing: 'nemia inbox from takes the name of the card, as nemia inbox lists it: nemia inbox from <name> <run>... or --off.',
+};
+
+/** The runs `args` names, as `nemia inbox from` takes them: none for `--off`. */
+const runsOf = (args: Args): string[] => (Array.isArray(args.runs) ? args.runs.map(String) : []);
+
+/**
+ * `nemia inbox from`: the runs a card's run is handed as context (its `from:`), set, or with `--off` taken off. Context is no wait: the
+ * run reads what each concluded when its steps are filed, shipped or in flight, and waits on none (`setFrom`).
+ */
+export const INBOX_FROM: Command<InboxFrom & { name: string; from: string[] }> = {
+  name: 'inbox from',
+  usage: '<name> <run>... | --off',
+  help: ['set the runs a card is handed as context (from:), read and', 'never waited on; --off takes them off'],
+  spec: FROM_SPEC,
+  check: (args) => {
+    if (args.off === true) return runsOf(args).length ? '--off takes the from: off, and the runs set it: give one of them.' : null;
+    return runsOf(args).length
+      ? null
+      : 'nemia inbox from takes the runs the card is handed as context, by id — nemia inbox from <name> <run>... — or --off to take them off.';
+  },
+  writes: true,
+  route: [
+    { method: 'PUT', path: '/api/inbox/:name/from', status: 200, sets: { off: false } },
+    { method: 'DELETE', path: '/api/inbox/:name/from', status: 200, sets: { off: true } },
+  ],
+  apiKeys: ['name', 'file', 'from', 'was'],
+  handler: (args) =>
+    tried(() => {
+      const done = setFrom(textOf(args, 'name') ?? '', args.off === true ? [] : runsOf(args));
+      return { ...done, name: done.card.name, from: done.card.from ?? [] };
+    }),
+  print: ({ card, file, was }) =>
+    card.from?.length
+      ? [`${card.name}  from: ${card.from.join(', ')} — its run is handed what each concluded, as context, and waits on none (${file})`]
+      : [`${card.name}  ${was.length ? `from: taken off (was ${was.join(', ')})` : 'no from: — nothing to take off'}`],
+};
+
 /** `nemia inbox rm`: one card dropped without starting it, or, for a name with no card, which cards there are — on the api, a `Missing`. */
 export const INBOX_RM: Command<InboxDropped> = {
   name: 'inbox rm',
@@ -302,4 +355,4 @@ export const INBOX_CARD: Command<{ card: InboxListing; source: string }> = {
 };
 
 /** `nemia inbox`'s entries, in the order `nemia`'s help lists them, and the board's card page after them. */
-export const INBOXES: readonly Command[] = [INBOX, INBOX_ADD, INBOX_QUEUE, INBOX_RM, INBOX_CARD] as readonly Command[];
+export const INBOXES: readonly Command[] = [INBOX, INBOX_ADD, INBOX_QUEUE, INBOX_FROM, INBOX_RM, INBOX_CARD] as readonly Command[];

@@ -43,6 +43,7 @@ import {
   ONE_CELL,
   openSpan,
   placeRuns,
+  readsLines,
   titleOf,
   toDecideOf,
   toggleOpen,
@@ -69,7 +70,7 @@ import { CanvasLegend } from './CanvasLegend';
 import { QueueLane } from './QueueLane';
 import { RunNode, type RunFlowNode } from './RunNode';
 import { StateEdge } from './StateEdge';
-import { afterEdges } from './stepGraph';
+import { afterEdges, readEdges } from './stepGraph';
 
 /**
  * Where the cards were left in this browser: the arrangement saved at the cell width, or else the one saved at the narrower width, widened
@@ -185,6 +186,21 @@ type Read = { detail: RunDetail | null; trouble: string | null };
 const NOT_READ: Read = { detail: null, trouble: null };
 const readsOf = (results: UseQueryResult<RunDetail>[]): Read[] =>
   results.map(({ data, error }) => ({ detail: data ?? null, trouble: error ? `Could not read its steps: ${error.message}` : null }));
+
+/** The floor's header counts: the runs in flight (`flying` of `runs`), finished, to decide and waiting on you. */
+function FloorCounts({ runs, flying }: { runs: readonly RunSummary[]; flying: number }) {
+  const finished = runs.length - flying;
+  const waiting = runs.filter(waitsOnYou).length;
+  const toDecide = runs.filter((run) => toDecideOf(run) !== null).length;
+  return (
+    <p className="text-sm text-muted-foreground">
+      <span className="font-medium text-foreground">{flying}</span> in flight
+      {finished > 0 && ` · ${finished} finished`}
+      {toDecide > 0 && <span className="text-emerald-700 dark:text-emerald-400"> · {toDecide} to decide</span>}
+      {waiting > 0 && ` · ${waiting} waiting on you`}
+    </p>
+  );
+}
 
 /**
  * A drag moving a card, or React Flow measuring one: the only changes the floor takes, since it adds, removes and selects no card itself.
@@ -341,6 +357,7 @@ function Floor({ runs, factory }: { runs: readonly RunSummary[]; factory: Factor
           data: {
             run,
             finished: !flying.has(run.id),
+            reads: readsLines(run, runs),
             open: isOpen,
             detail: read?.detail ?? null,
             trouble: read?.trouble ?? null,
@@ -352,9 +369,13 @@ function Floor({ runs, factory }: { runs: readonly RunSummary[]; factory: Factor
         },
       ];
     });
-  }, [placed, shown, flying, openSet, details, inspected, barStep, toggle, onStep]);
+  }, [placed, shown, runs, flying, openSet, details, inspected, barStep, toggle, onStep]);
 
-  const edges = useMemo((): Edge[] => afterEdges(shown), [shown]);
+  const [hovered, setHovered] = useState<string | null>(null);
+  const focus = hovered ?? inspected;
+  const edges = useMemo((): Edge[] => [...afterEdges(shown), ...readEdges(shown, focus)], [shown, focus]);
+  const onNodeMouseEnter = useCallback((_: unknown, node: RunFlowNode) => setHovered(node.id), []);
+  const onNodeMouseLeave = useCallback(() => setHovered(null), []);
 
   const onFloor = shown.length > 0;
   const size = useFrameSize(frame, onFloor);
@@ -418,9 +439,6 @@ function Floor({ runs, factory }: { runs: readonly RunSummary[]; factory: Factor
     setShowFinished(on);
     setFits((n) => n + 1);
   };
-  const finished = runs.length - flying.size;
-  const waiting = runs.filter(waitsOnYou).length;
-  const toDecide = runs.filter((run) => toDecideOf(run) !== null).length;
   const queue = useQuery({ ...inboxQuery, refetchInterval: 5_000 });
   const queued = queue.data ? queueOf(queuedIn(queue.data, factory)) : [];
   const laned = queued.length > 0 && !machine;
@@ -439,12 +457,7 @@ function Floor({ runs, factory }: { runs: readonly RunSummary[]; factory: Factor
     <div className="flex h-[calc(100svh-5rem)] min-h-96 flex-col">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b px-4 py-2">
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-          <p className="text-sm text-muted-foreground">
-            <span className="font-medium text-foreground">{flying.size}</span> in flight
-            {finished > 0 && ` · ${finished} finished`}
-            {toDecide > 0 && <span className="text-emerald-700 dark:text-emerald-400"> · {toDecide} to decide</span>}
-            {waiting > 0 && ` · ${waiting} waiting on you`}
-          </p>
+          <FloorCounts runs={runs} flying={flying.size} />
           <CapLine queued={queued.length} queueError={queue.error} />
         </div>
         <FloorOptions factory={factory} showFinished={showFinished} onShowFinished={toggleFinished} />
@@ -461,6 +474,8 @@ function Floor({ runs, factory }: { runs: readonly RunSummary[]; factory: Factor
                 nodeTypes={nodeTypes}
                 edgeTypes={edgeTypes}
                 onNodesChange={onNodesChange}
+                onNodeMouseEnter={onNodeMouseEnter}
+                onNodeMouseLeave={onNodeMouseLeave}
                 {...press}
                 nodesConnectable={false}
                 elementsSelectable={false}

@@ -9,7 +9,7 @@ import { ReadRefusal, get } from './read.ts';
 import type { RetryMode, Said } from './asks.ts';
 import { RunGraphSchema, type RunGraph } from './graph.ts';
 import { WorkflowPageAddressSchema, type WorkflowPageAddress } from './address.ts';
-import { StepLayersSchema, type StepLayers } from './layers.ts';
+import { StepLayersSchema, TaskPartSchema, type StepLayers, type TaskPart } from './layers.ts';
 import {
   AtWorkSchema,
   PlaceKindSchema,
@@ -257,6 +257,8 @@ export type RunDetail = {
   onDisk: { worktrees: boolean; files: boolean };
   /** As on `RunSummary`. */
   after: string[];
+  /** As on `RunSummary`. */
+  context: string[];
   /** The inbox card the run was started from, as its record carries it; absent for a run started without one. */
   from?: { inbox: string };
   /** Where it came from, in the CLI `decide`'s words (`fromNote` in agent-orchestrator): absent with `from`. */
@@ -295,6 +297,8 @@ export type RunDetail = {
     told: string | null;
     /** What it was told, by layer, from what the run froze; null for a run that froze no workflow, whose `told` is all there is. */
     layers: StepLayers | null;
+    /** The task split into its own text and each run it was handed, how it was handed; null for a step not filed. */
+    taskParts: TaskPart[] | null;
     taskId: string | null;
     workspace: string | null;
     /**
@@ -450,6 +454,7 @@ const DetailStepSchema = Schema.Struct({
   body: Schema.NullOr(Schema.String),
   told: Schema.NullOr(Schema.String),
   layers: Schema.NullOr(StepLayersSchema),
+  taskParts: Schema.NullOr(Schema.mutable(Schema.Array(TaskPartSchema))),
   taskId: Schema.NullOr(Schema.String),
   workspace: Schema.NullOr(Schema.String),
   files: Schema.mutable(Schema.Array(StepArtifactSchema)),
@@ -506,6 +511,7 @@ const RunDetailSchema = Schema.Struct({
   ),
   onDisk: Schema.Struct({ worktrees: Schema.Boolean, files: Schema.Boolean }),
   after: StringsSchema,
+  context: StringsSchema,
   from: Schema.optionalKey(Schema.Struct({ inbox: Schema.String })),
   fromNote: Schema.optionalKey(Schema.String),
   waiting: Schema.NullOr(RunWaitingSchema),

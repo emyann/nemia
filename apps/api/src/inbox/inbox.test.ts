@@ -151,6 +151,7 @@ test("POST /api/inbox files a card as `nemia inbox add` does: the idea alone; a 
       workflow: null,
       repo: null,
       factory: null,
+      from: [],
       startedAs: [],
       error: null,
       body: 'Cache the views between passes\n\nThe tick reads each task twice.',
@@ -246,6 +247,7 @@ test("GET /api/inbox/:name is a card's page: the card as the inbox lists it, its
     { key: 'queued', value: null, meaning: INBOX_KEY_MEANINGS.queued },
     { key: 'gate', value: null, meaning: INBOX_KEY_MEANINGS.gate },
     { key: 'factory', value: null, meaning: INBOX_KEY_MEANINGS.factory },
+    { key: 'from', value: null, meaning: INBOX_KEY_MEANINGS.from },
   ]);
 
   const bare = (await (await cardPage('bare-idea-a1b2')).json()) as InboxCardPage;
@@ -258,6 +260,7 @@ test("GET /api/inbox/:name is a card's page: the card as the inbox lists it, its
       { key: 'queued', value: null, meaning: INBOX_KEY_MEANINGS.queued },
       { key: 'gate', value: null, meaning: INBOX_KEY_MEANINGS.gate },
       { key: 'factory', value: null, meaning: INBOX_KEY_MEANINGS.factory },
+      { key: 'from', value: null, meaning: INBOX_KEY_MEANINGS.from },
     ],
     'a card that sets no key: every key, none set',
   );

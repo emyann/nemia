@@ -2689,13 +2689,15 @@ reads: inbox, costs   # what of the store this step reads and never writes, from
   round (`readsMounts`, in `filedConfig`) — and a new session's brief names it (`mountsLine`). A harness that reads the disk in its
   sandbox (Codex) is filed no mount. A store whose path no permission rule can name refuses `wf start` of such a step, quoting its
   `reads:` line, before anything is written.
-- **`costs`**, what recent runs of its workflow cost. A new session's brief — its first filing, a fresh try and a round, never a try
-  that continues the last session — says it under *What runs of this workflow cost* (`costsSection`): over the newest `RECENT_RUNS`
-  finished runs of the same workflow in the same factory, the run being filed left out, per step the median and p90 of what it cost a
-  run, every try and round of it summed, and the median and most of its tries a run; and the same for the whole run, over the runs every
-  session of which was measured, with the rounds each loop ran to acceptance. The facts are `wf stats`'s (`factsRead`), read newest
-  first until the window is full (`costsRead`), never the whole store's journals; a figure nothing measured is left out, never 0. It
-  mounts nothing. What a run of the workflow should cost is the workflow's to say, in the step's note: the package holds no line.
+- **`costs`**, what recent runs of its workflow cost. A new session's brief — its first filing, a fresh try, a round of a session not
+  continued, never a try or round that continues the last session — says it under *What runs of this workflow cost* (`costsSection`):
+  over the newest `RECENT_RUNS` finished runs of the same workflow in the same factory, the run being filed left out, per step the
+  median and p90 of what it cost a run, every try and round of it summed, and the median and most of its tries a run; and the same for
+  the whole run, over the runs every session of which was measured, with the rounds each loop ran to acceptance. The steps follow the
+  newest run's order, then any other met: a step a newer run no longer has still shows while it was measured in the window. The facts
+  are `wf stats`'s (`factsRead`), read newest first until the window is full (`costsRead`), never the whole store's journals; a figure
+  nothing measured is left out, never 0. It mounts nothing. What a run of the workflow should cost is the workflow's to say, in the
+  step's note: the package holds no line.
 
 A step without the line reads none of it. Refused at load: a name off `STORE_READS`, one given twice, none, and the key on a remote
 agent.

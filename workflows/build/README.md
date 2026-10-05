@@ -24,3 +24,6 @@ doc or a workflow file, cannot land on a pass turbo replays from its cache.
 
 Start it after the intake run whose intent it builds: `wf start "<the intent's title>" --workflows build --after <intake-run>`. Its
 first step, design, is told the intent under *From run*; the steps after it read the spec.
+
+Design reads `costs` (`reads: costs`): its brief says what the last finished runs of build in its factory cost, per step and whole. Its
+note gives the owner's line, about $80 a run, and asks for the cut and each step's budget from those figures.

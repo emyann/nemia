@@ -2,7 +2,7 @@
  * A step whose `reads:` names `costs` is told, on each new session's brief, what the newest finished runs of its workflow in its factory
  * cost (`costsRead`, `costsSection`): read off the store's records, newest first by when they were started, as many as the window holds
  * (`RECENT_RUNS`), a run unfinished or whose journal does not read passed over, and a run of another workflow or factory never counted. A
- * step without the line is told none, and a try that continues the last session neither reads them nor is told them again.
+ * step without the line is told none, and a try or a round that continues the last session neither reads them nor is told them again.
  *
  * Walked through the runtime itself, `plainEngine` over an in-memory journal: the finished runs are journalled by hand, as the stats read
  * them, and the run filed is the tick's. `WF_ROOT` is set before the runner is imported: it is read as the module loads.
@@ -58,11 +58,14 @@ const starts = new Map<string, number>();
 const journal = memoryJournal(starts);
 const sessions = new Map<string, Sighting>();
 const spawned: SpawnRequest[] = [];
+/** The sessions the harness never names: a try after one has nothing to continue. */
+const nameless = new Set<string>();
 /** A harness the test signs by hand: every session it starts works until `sign` ends it. */
 const runner: AsyncRunner = {
   async spawn(r) {
     spawned.push(r);
-    sessions.set(r.name, { sessionId: `s-${spawned.length}`, nativeId: `native-${spawned.length}`, state: 'working', busy: true });
+    const named = nameless.has(r.name) ? {} : { nativeId: `native-${spawned.length}` };
+    sessions.set(r.name, { sessionId: `s-${spawned.length}`, ...named, state: 'working', busy: true });
   },
   async observe() {
     return new Map(sessions);
@@ -104,14 +107,14 @@ const fail = (taskId: string, n: number) => {
   sessions.set(name, { ...sessions.get(name)!, state: 'failed', busy: false });
 };
 
-/** Attempt `n` of `taskId` signed off done. */
-const sign = (taskId: string, n: number) => {
+/** Attempt `n` of `taskId` signed off done, with `more` in its closeout. */
+const sign = (taskId: string, n: number, more: object = {}) => {
   const name = nameFor(taskId, n);
   sessions.set(name, {
     ...sessions.get(name)!,
     state: 'completed',
     busy: false,
-    closeout: { payload: { outcome: 'done', summary: 'did it', artifacts: [], needs: null }, at: starts.get(name)! + 1 },
+    closeout: { payload: { outcome: 'done', summary: 'did it', artifacts: [], needs: null, ...more }, at: starts.get(name)! + 1 },
   });
 };
 
@@ -119,6 +122,15 @@ const sign = (taskId: string, n: number) => {
 const pass = async (id: string) => {
   await Effect.runPromise(engine.tick());
   return runWith(e, advanceRun(readRun(id)));
+};
+
+/**
+ * Passes of `id` until attempt 1 of `taskId` has a session, at most three: the engine admits a try on one pass and starts it on the
+ * next.
+ */
+const started = async (id: string, taskId: string) => {
+  for (let i = 0; i < 3 && !sessions.has(nameFor(taskId, 1)); i++) await pass(id);
+  assert.ok(sessions.has(nameFor(taskId, 1)), `${taskId} started`);
 };
 
 /** A repository with one commit, so `nemia start` has a base to record. */
@@ -134,6 +146,22 @@ const WORKFLOW = path.join(ROOT, 'costed');
 fs.mkdirSync(WORKFLOW);
 fs.writeFileSync(path.join(WORKFLOW, 'design.md'), '---\nreads: costs\n---\nDesign it.\n');
 fs.writeFileSync(path.join(WORKFLOW, 'implement.md'), '---\nafter: design\n---\nBuild it.\n');
+
+/**
+ * The same workflow `costed`, in another folder, as a loop: `implement`, reading `costs`, then `review`, which may send it back twice
+ * (`rounds: 3`).
+ */
+const LOOPED = path.join(ROOT, 'looped', 'costed');
+fs.mkdirSync(LOOPED, { recursive: true });
+fs.writeFileSync(path.join(LOOPED, 'implement.md'), '---\nreads: costs\n---\nBuild it.\n');
+fs.writeFileSync(
+  path.join(LOOPED, 'review.md'),
+  '---\nafter: implement\noutput: review.schema.json\nloop: implement\nrounds: 3\n---\nReview it.\n',
+);
+fs.writeFileSync(
+  path.join(LOOPED, 'review.schema.json'),
+  JSON.stringify({ type: 'object', properties: { again: { type: 'boolean' } }, required: ['again'], additionalProperties: false }),
+);
 
 /** The hour `i` from the first run's start, as a record and a journal stamp it. */
 const hour = (i: number) => new Date(Date.UTC(2026, 8, 1, i)).toISOString();
@@ -250,4 +278,39 @@ test("a fresh try of the step is told the costs again, and one that continues th
   const nudged = readRun(run.id).steps.design.taskId!;
   assert.notEqual(nudged, fresh);
   assert.equal(briefs.get(nudged)!.includes(SECTION), false, briefs.get(nudged));
+});
+
+test('a round whose target starts a new session is told the costs, and one that continues the last session neither reads nor is told them', async () => {
+  const run = await Effect.runPromise(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: LOOPED, isolate: false }));
+  const first = `${run.id}-implement`;
+  nameless.add(nameFor(first, 1));
+  assert.deepEqual((await pass(run.id)).filed, ['implement']);
+  await started(run.id, first);
+  sign(first, 1);
+  assert.deepEqual((await pass(run.id)).filed, ['review']);
+  await started(run.id, `${run.id}-review`);
+  sign(`${run.id}-review`, 1, { again: true });
+  viewed.length = 0;
+  await pass(run.id);
+  const cold = readRun(run.id).steps.implement.taskId!;
+  assert.notEqual(cold, first, 'the round is filed');
+  assert.ok(viewed.includes('c24-design'), 'the pass that files a round on a new session reads the newest run');
+  assert.ok(briefs.get(cold)!.includes(SECTION), briefs.get(cold));
+
+  await started(run.id, cold);
+  sign(cold, 1, { replies: [{ finding: 'review', answer: 'fixed', why: 'did it' }] });
+  assert.deepEqual((await pass(run.id)).filed, ['review']);
+  const review = readRun(run.id).steps.review.taskId!;
+  await started(run.id, review);
+  sign(review, 1, { again: true });
+  viewed.length = 0;
+  await pass(run.id);
+  const continued = readRun(run.id).steps.implement.taskId!;
+  assert.notEqual(continued, cold, 'the second round is filed');
+  assert.deepEqual(
+    viewed.filter((taskId) => !taskId.startsWith(run.id)),
+    [],
+    'the pass that files a round on a continued session reads no other run',
+  );
+  assert.equal(briefs.get(continued)!.includes(SECTION), false, briefs.get(continued));
 });

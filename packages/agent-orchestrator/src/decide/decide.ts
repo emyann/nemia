@@ -284,28 +284,32 @@ export function runCostLines(run: Run, spendOf: SpendOf): string[] {
 }
 
 /**
- * A verb `nemia decide` offers a person for one step (`retryOffers`, `roundOffers`): the sentence it prints, and the bare command that
- * sentence ends on — `nemia retry <run> <step>`, with `--recheck`, `--fresh`, `--budget <amount>` or `--message "<objection>"`; `nemia
- * round <run> <step>`, with `--budget <amount>` past a cap; or `nemia accept <run> <step> --message "<why>"`.
+ * A verb `nemia decide` offers a person for one step (`retryOffers`, `roundOffers`, `mergeOffer`): the sentence it prints, and the bare
+ * command that sentence ends on — `nemia retry <run> <step>`, with `--recheck`, `--fresh`, `--budget <amount>` or `--message
+ * "<objection>"`; `nemia round <run> <step>`, with `--budget <amount>` past a cap; `nemia accept <run> <step> --message "<why>"`; or
+ * `nemia merge <run> <step>`.
  */
 export type Offer = { step: string; command: string; said: string };
 
 /**
  * A command `nemia decide` offers, and runs none of: ship it, drop it, read it for a run worked on its base branch, forget it for a folder
- * run, each once-more (`nemia retry`, `nemia round`) and accept with the line it prints it in, and for a step waiting at its gate on you,
- * the approval (`nemia approve`) and a send-back (`nemia retry --message`) for each step it names. `said` is null where the label is all it
- * says; `step`, the step it acts on, null for a command on the whole run.
+ * run, each once-more (`nemia retry`, `nemia round`), accept and merge (`nemia merge`) with the line it prints it in, and for a step
+ * waiting at its gate on you, the approval (`nemia approve`) and a send-back (`nemia retry --message`) for each step it names. `said` is
+ * null where the label is all it says; `step`, the step it acts on, null for a command on the whole run.
  */
 export type DecideCommand = {
-  label: 'ship it' | 'drop it' | 'read it' | 'once more' | 'accept' | 'approve' | 'send back' | 'forget it';
+  label: 'ship it' | 'drop it' | 'read it' | 'once more' | 'accept' | 'merge' | 'approve' | 'send back' | 'forget it';
   command: string;
   said: string | null;
   step: string | null;
 };
 
-/** The label of an offer's command: an acceptance, a send-back with its objection, or once more. */
-const labelOf = (command: string): DecideCommand['label'] =>
-  command.startsWith('nemia accept ') ? 'accept' : command.endsWith('--message "<objection>"') ? 'send back' : 'once more';
+/** The label of an offer's command: an acceptance, a merge of the base, a send-back with its objection, or once more. */
+const labelOf = (command: string): DecideCommand['label'] => {
+  if (command.startsWith('nemia accept ')) return 'accept';
+  if (command.startsWith('nemia merge ')) return 'merge';
+  return command.endsWith('--message "<objection>"') ? 'send back' : 'once more';
+};
 
 /** For each step waiting at its gate on you (`awaitingApproval`), its approval and a send-back for each step it names (`sendBackTo`). */
 function gateChoices(steps: readonly Workflow[], run: Run, waiting: readonly string[]): DecideCommand[] {

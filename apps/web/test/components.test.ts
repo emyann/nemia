@@ -1647,6 +1647,21 @@ test("the inspector's Details list a step's rounds, a row a try: its round and h
   assert.match(once, />attempts<\/dt>/);
 });
 
+test('a try a merge replaced decodes as the api serves it and reads as a merge, on the round it was on: the board says merge, never round', async () => {
+  const { Schema } = await import('effect');
+  const { StepTrySchema } = await import('../src/lib/api/tries.ts');
+  const merged = [
+    threeTries[0],
+    Schema.decodeUnknownSync(StepTrySchema)({ ...threeTries[1], then: 'merge', note: 'try 2, by retries: 1' }),
+    { ...threeTries[2], round: 1, note: 'try 3, merged the base, on your word (nemia merge), the round unchanged' },
+  ];
+  const run = runWith('round 1 of 3');
+  const step = { ...run.steps[0], name: 'implement', status: 'running (working)', attempts: merged[2].attempts, tries: merged };
+  const html = renderToStaticMarkup(createElement(StepTabs, { run, step }));
+  assert.ok(html.includes('round 1 · try 3 (merge)'), html);
+  assert.ok(!html.includes('(round)'), html);
+});
+
 test("the Output tab opens on the outcome and who said it, then draws each field by its shape — findings a table, replies with badges, a yes or no with what it means, anything else JSON — and every other try's folded beneath it", () => {
   const replies = [
     { finding: '`src/cache.ts:12` — the cache never expires', answer: 'fixed', why: 'Entries expire after the **TTL** now.' },

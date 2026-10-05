@@ -16,6 +16,7 @@ import { spentAsks, type RetryAsk } from '../retry/index.ts';
 import { asNamed, orderSteps, type Workflow } from '../workflow.ts';
 import { FrozenStepSchema, loadWorkflows } from '../folder/folder.store.ts';
 import { inputsRoot } from './places.store.ts';
+import type { AsksRead, MergeAskHeld } from './record.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 import { wfRoot } from '../config/config.store.ts';
 import { countRecord, readText, within } from '../meter/tally.store.ts';
@@ -31,7 +32,7 @@ const EarlierTrySchema = Schema.StructWithRest(
   Schema.Struct({
     taskId: Schema.String,
     check: Schema.optional(TaskRef),
-    then: Schema.Literals(['retries', 'signoff', 'nudge', 'fresh', 'recheck', 'round', 'back']),
+    then: Schema.Literals(['retries', 'signoff', 'nudge', 'fresh', 'recheck', 'round', 'merge', 'back']),
     model: Schema.optional(Schema.String),
     budget: Schema.optional(Schema.Finite),
     paused: Schema.optional(Schema.Literal(true)),
@@ -364,7 +365,8 @@ export const markCancelled = (id: string): string => {
  * pass that dies after filing the try and before consuming the ask files nothing more, because the next pass
  * finds the try on the board (`adoptTries`) or on the record (`spentAsks`).
  *
- * `nemia round` is the same, in `round-<step>-<n>`: the looping step, and the round it asks for (`adoptRounds`, `spentRoundAsks`).
+ * `nemia round` is the same, in `round-<step>-<n>`: the looping step, and the round it asks for (`adoptRounds`, `spentRoundAsks`); and
+ * `nemia merge`, in `merge-<step>-<n>`, read and consumed beside the rest (`readMergeAsks`, `consumeMergeAsks`).
  *
  * `nemia approve` too, in `approve-<step>-<n>`: the gated step, and the try it approves. It is never consumed while it opens the gate — the
  * record holds no approval, and every pass reads the file (`readRun`) — only once a later try of the step spent it (`spentApprovals`).
@@ -380,7 +382,7 @@ export const approvalFile = (id: string, step: string, n: number): string => pat
 export const acceptFile = (id: string, step: string, n: number): string => path.join(asksDir(id), `accept-${step}-${n}`);
 
 /** The names of the files in `dir`, sorted; undefined where it cannot be listed, as when it was never made. */
-const fileNames = (dir: string): string[] | undefined => {
+export const fileNames = (dir: string): string[] | undefined => {
   try {
     return fs
       .readdirSync(dir, { withFileTypes: true })
@@ -421,7 +423,7 @@ function readApprovalsNow(id: string, names = fileNames(asksDir(id))): { approva
  * tick never reads it as a time (a round, a retry). A key none of them names is kept, as a newer `nemia` may write one.
  */
 const Said = Schema.String.check(Schema.makeFilter((text: string) => text.trim() !== ''));
-const When = Schema.String.check(Schema.makeFilter((at: string) => !Number.isNaN(Date.parse(at))));
+export const When = Schema.String.check(Schema.makeFilter((at: string) => !Number.isNaN(Date.parse(at))));
 /** An amount an ask file may carry as its budget: dollars above zero, as `nemia retry --budget` and `nemia round --budget` write one. */
 const Dollars = Schema.Finite.check(Schema.isGreaterThan(0));
 const BUDGET_WORDS = 'its budget is not an amount of dollars above zero';
@@ -445,7 +447,7 @@ const RetryAskFileSchema = Schema.StructWithRest(
 );
 
 /** An ask file's JSON, or why it cannot be read. */
-function heldIn(file: string): { read: unknown } | { unreadable: string } {
+export function heldIn(file: string): { read: unknown } | { unreadable: string } {
   try {
     return { read: JSON.parse(readText(file)) };
   } catch (err) {
@@ -454,7 +456,7 @@ function heldIn(file: string): { read: unknown } | { unreadable: string } {
 }
 
 /** `value` read with `schema`, or the first key it refuses (`''` for the value itself, which holds no object). */
-function readAs<S extends Schema.ConstraintDecoder<unknown>>(schema: S, value: unknown): { read: S['Type'] } | { refused: string } {
+export function readAs<S extends Schema.ConstraintDecoder<unknown>>(schema: S, value: unknown): { read: S['Type'] } | { refused: string } {
   const decoded = Schema.decodeUnknownResult(schema)(value);
   if (Result.isSuccess(decoded)) return { read: decoded.success };
   const [key] = firstRefusal(value, decoded.failure).path;
@@ -527,32 +529,30 @@ export function acceptanceIn(file: string, step: string, n: number): Acceptance 
  * otherwise is no ask, the dot-named one a verb writes before linking it into place (`writeAsk`) among them. The directory is listed once,
  * and each file in it read once.
  */
-export function readAsks(id: string): { asks: RetryAsk[]; rounds: RoundAsk[]; notes: string[] } {
+export function readAsks(id: string): AsksRead {
   return within('asks', () => readAsksNow(id));
 }
 
-function readAsksNow(id: string): { asks: RetryAsk[]; rounds: RoundAsk[]; notes: string[] } {
-  const asks: RetryAsk[] = [];
-  const rounds: RoundAsk[] = [];
-  const notes: string[] = [];
+function readAsksNow(id: string): AsksRead {
+  const read: AsksRead = { asks: [], rounds: [], notes: [] };
   const names = fileNames(asksDir(id));
-  if (!names) return { asks, rounds, notes };
-  notes.push(...readApprovalsNow(id, names).notes, ...readAcceptancesNow(id, names).notes);
+  if (!names) return read;
+  read.notes.push(...readApprovalsNow(id, names).notes, ...readAcceptancesNow(id, names).notes);
   for (const name of names) {
     const tried = /^retry-(.+)-(\d+)$/.exec(name);
     const again = /^round-(.+)-(\d+)$/.exec(name);
     const file = path.join(asksDir(id), name);
     if (tried) {
       const ask = askIn(file, tried[1], Number(tried[2]));
-      if (typeof ask === 'string') notes.push(`${file}: ${ask}, so it is not honoured — remove it, and ask with nemia retry`);
-      else asks.push(ask);
+      if (typeof ask === 'string') read.notes.push(`${file}: ${ask}, so it is not honoured — remove it, and ask with nemia retry`);
+      else read.asks.push(ask);
     } else if (again) {
       const ask = roundAskIn(file, again[1], Number(again[2]));
-      if (typeof ask === 'string') notes.push(`${file}: ${ask}, so it is not honoured — remove it, and ask with nemia round`);
-      else rounds.push(ask);
+      if (typeof ask === 'string') read.notes.push(`${file}: ${ask}, so it is not honoured — remove it, and ask with nemia round`);
+      else read.rounds.push(ask);
     }
   }
-  return { asks, rounds, notes };
+  return read;
 }
 
 /** One round ask file, read: the looping step and the round from its name, when from what it holds — or why it cannot be read. */
@@ -627,7 +627,7 @@ function readAnswersNow(id: string): RetryAsk[] {
  * name that exists, as `wx` does, and unlike `wx` leaves no moment in which the tick can read an ask that has
  * been created and not yet written. False when an ask for that try was already there.
  */
-export function writeAsk(file: string, ask: RetryAsk | RoundAsk | Approval | Acceptance): boolean {
+export function writeAsk(file: string, ask: RetryAsk | RoundAsk | Approval | Acceptance | MergeAskHeld): boolean {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const whole = path.join(path.dirname(file), `.${path.basename(file)}.${process.pid}.${Date.now()}`);
   fs.writeFileSync(whole, `${JSON.stringify(ask, null, 2)}\n`, { flag: 'wx' });
@@ -650,18 +650,20 @@ export function writeAsk(file: string, ask: RetryAsk | RoundAsk | Approval | Acc
  * or removed with its run, is passed over.
  */
 export function consumeAsks(run: Run, asks: readonly RetryAsk[], rounds: readonly RoundAsk[], voided: readonly RetryAsk[] = []): void {
-  within('act', () => consumeNow(run, asks, rounds, voided));
+  within('act', () =>
+    doneWith(run.id, [
+      ...[...new Set([...spentAsks(run, asks), ...voided])].map((a) => askFile(run.id, a.step, a.try)),
+      ...spentRoundAsks(run, rounds).map((a) => roundAskFile(run.id, a.step, a.round)),
+      ...spentApprovals(run).map((a) => approvalFile(run.id, a.step, a.try)),
+      ...spentAcceptances(run).map((a) => acceptFile(run.id, a.step, a.try)),
+    ]),
+  );
 }
 
-function consumeNow(run: Run, asks: readonly RetryAsk[], rounds: readonly RoundAsk[], voided: readonly RetryAsk[]): void {
-  const spent = [
-    ...[...new Set([...spentAsks(run, asks), ...voided])].map((a) => askFile(run.id, a.step, a.try)),
-    ...spentRoundAsks(run, rounds).map((a) => roundAskFile(run.id, a.step, a.round)),
-    ...spentApprovals(run).map((a) => approvalFile(run.id, a.step, a.try)),
-    ...spentAcceptances(run).map((a) => acceptFile(run.id, a.step, a.try)),
-  ];
+/** Move each of a run's ask files `spent` into `done/` in its asks directory, passing over one already moved or removed with its run. */
+export function doneWith(id: string, spent: readonly string[]): void {
   for (const file of spent) {
-    const done = path.join(asksDir(run.id), 'done', path.basename(file));
+    const done = path.join(asksDir(id), 'done', path.basename(file));
     try {
       fs.mkdirSync(path.dirname(done));
     } catch {}

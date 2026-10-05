@@ -178,13 +178,13 @@ export function notHandedOn(
  * alone still reads the work as handed on. Read off the record, such an ending would offer its merge in the very moment somebody objected
  * to the work it would merge; so `assess` and `listing` take these steps as waiting, which is what the next pass will say anyway.
  *
- * Also an ending that stopped on the base branch whose work a try due sends back (`Retry.back`): the pass that files the try moves the
- * ending's try behind (`sentBack`), and it waits for the work again.
+ * Also an ending that stopped on the base branch whose work a try due sends back (`Retry.back`), or a merge of the base due (`Round.back`):
+ * the pass that files it moves the ending's try behind (`sentBack`), and it waits for the work again.
  */
 export function unheld(steps: readonly Workflow[], run: Run, retry: readonly Retry[], round: readonly Round[]): Set<string> {
   const filing = new Set([...retry.map((r) => r.step), ...roundSpans(steps, round)]);
   const held = steps.filter((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId && s.after.some((a) => filing.has(a)));
-  return new Set([...held.map((s) => s.name), ...retry.flatMap((r) => r.back ?? [])]);
+  return new Set([...held.map((s) => s.name), ...[...retry, ...round].flatMap((r) => r.back ?? [])]);
 }
 
 /**
@@ -639,28 +639,41 @@ export function budgetRefusal(how: RetryHow, command = 'nemia retry <runId> <ste
 
 /**
  * A loop going round again: the looping step, the step its `loop:` runs again, the round to file, and on whose word — the looping step's
- * `again: true` with rounds left, or a person's `nemia round` once they are spent.
+ * `again: true` with rounds left, a person's `nemia round` once they are spent, or a person's `nemia merge`, which files the loop again on
+ * the round it is on (`mergeDue`).
  */
 export type Round = {
   step: string;
   target: string;
   round: number;
-  by: 'again' | 'ask';
+  by: 'again' | 'ask' | 'merge';
   /**
    * On a person's round past a step of the loop's budget (`nemia round --budget`): the cap, and the steps of the loop it is raised for —
    * those over it.
    */
   budget?: number;
   raise?: string[];
+  /** On a merge (`by: 'merge'`): the base branch, and the commit of it the target merges, which the run's base moves to. */
+  merge?: MergeOf;
+  /** On a merge: the endings that stopped on the base branch it sends the work back from, each moved behind (`sentBack`). */
+  back?: string[];
 };
 
-/** A person's `nemia round`, as its ask file says it: the looping step, the round it asks for, the cap `--budget` raises, and when. */
-export type RoundAsk = { step: string; round: number; budget?: number; at: string };
+/** What a person's `nemia merge` asks: the step that merges (the loop's target), its try that does, the base branch, and its commit. */
+export type MergeOf = { target: string; try: number; onto: string; sha: string };
+
+/**
+ * A person's `nemia round`, as its ask file says it: the looping step, the round it asks for, the cap `--budget` raises, and when. A
+ * person's `nemia merge` is one too, with `merge`: the looping step, the round it is on, which the merge leaves as it is (`mergeAskIn`).
+ */
+export type RoundAsk = { step: string; round: number; budget?: number; at: string; merge?: MergeOf };
 
 /** The rounds a looping step's loop runs on its own word: its `rounds:`, which the parser always sets. */
 export const capOf = (looping: Workflow): number => looping.rounds ?? DEFAULT_ROUNDS;
 
-/** The round a step's record is on: the first, and one more for each round that moved a try behind it. */
+/**
+ * The round a step's record is on: the first, and one more for each round that moved a try behind it. A merge (`then: 'merge'`) is not one.
+ */
 export const roundIn = (record: StepRecord | undefined): number => 1 + (record?.tries?.filter((t) => t.then === 'round').length ?? 0);
 
 /** The round a step of a run is on (`roundIn`). Every step of a loop moves on together, so the looping step's is the loop's. */
@@ -675,11 +688,19 @@ export const roundWord = (round: number, cap: number): string =>
   round <= cap ? `round ${round} of ${cap}` : `round ${round}, past rounds: ${cap}, on your word`;
 
 /**
- * Whether a loop's target owes `replies` on the try it is on: every try from its second round, since it was handed findings to answer.
- * Round 1's are asked for all the same (`closeoutSchemaOf`), and owed nothing: an empty list, read by nobody.
+ * Whether a loop's target owes `replies` on the try it is on: every try from its second round, since it was handed findings to answer —
+ * but a try after a merge (`merged`), which was handed a base to merge and no findings. Round 1's are asked for all the same
+ * (`closeoutSchemaOf`), and owed nothing: an empty list, read by nobody.
  */
 export const owesReplies = (steps: readonly Workflow[], run: Run, name: string): boolean =>
-  isLoopTarget(steps, name) && roundOf(run, name) > 1;
+  isLoopTarget(steps, name) && roundOf(run, name) > 1 && !merged(run.steps[name]);
+
+/**
+ * Whether a step of a loop is on the tries a merge filed (`nemia merge`): the last try a round or a merge moved behind it was a merge's,
+ * whatever tries came after it within the round.
+ */
+export const merged = (record: StepRecord | undefined): boolean =>
+  [...(record?.tries ?? [])].reverse().find((t) => t.then === 'round' || t.then === 'merge')?.then === 'merge';
 
 /**
  * The looping step, and its try that asked for the round a loop's target is on — or undefined when the target owes no `replies`.

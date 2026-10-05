@@ -35,7 +35,6 @@ import {
   askingTry,
   budgetOf,
   budgetUsdFor,
-  capOf,
   holdsOpenOn,
   landsOnCheck,
   MOMENTUM,
@@ -50,7 +49,8 @@ import {
 } from '../status/status.ts';
 import { composeBrief, remoteBrief, type EndingStopped, type ParentCloseout, type RetryBriefing } from '../brief/index.ts';
 import { handedOf } from '../brief/handed.verb.ts';
-import { roundFiled } from '../round/round.ts';
+import { roundBriefed, roundFiled, roundFiledNote } from '../round/round.ts';
+import { closeoutsAfterMerge } from '../merge/merge.verb.ts';
 import { filedConfig, filedFolders, tryModel } from '../filed/filed.ts';
 import { closeoutSchemaOf, parseCloseout, type Closeout } from '../closeout/closeout.ts';
 import { modeWord, nextTry, sessionModel, tryWord, type Retry, type RetryAsk } from '../retry/index.ts';
@@ -386,12 +386,11 @@ const fileRound = Effect.fnUntraced(function* (f: Filing, r: Round, looped: stri
     return;
   }
   looped.push(r.step);
-  notes.push(
-    `${r.step}: round ${r.round} — ${r.by === 'again' ? `again, rounds: ${capOf(looping)}` : `nemia round${r.budget !== undefined ? ` --budget ${r.budget}` : ''}`}; ${r.target} goes again`,
-  );
+  notes.push(roundFiledNote(r, looping));
   if (!(yield* asked('view', e.view(taskId))).state.brief)
     yield* asked('file', e.file(roundSpec(f, r, looping, stepNamed(f, r.target), taskId)));
   Object.assign(run.steps, roundFiled(f.reads.steps, run, r, taskId));
+  if (r.merge && isGitRun(run)) run.baseRef = r.merge.sha;
 });
 
 /** A round's target filed under its next try's id: its session continued, told the round, with its cap for the round. */
@@ -414,10 +413,7 @@ function roundSpec(f: Filing, r: Round, looping: Workflow, target: Workflow, tas
       undefined,
       undefined,
       {
-        loop: r.step,
-        round: r.round,
-        rounds: capOf(looping),
-        by: r.by,
+        ...roundBriefed(r, looping),
         resumed: Boolean(resumeFrom),
         ...(resumeFrom ? { said: saidIn(reads.views.get(record.taskId!)) } : {}),
       },
@@ -529,7 +525,8 @@ export const fileReady = Effect.fn('fileReady')(function* (f: Filing, ready: rea
     const files = artifactsDir(run, name);
     fs.mkdirSync(files, { recursive: true });
     const checked = isRemoteHarness(step.harness) ? [] : yield* checksHandedRead(run, f.reads.steps, step).pipe(over(asRead(f)));
-    const taskId = yield* asked('file', e.file(readySpec(f, step, place, files, { parents, checked }))).pipe(forStep(run.id, name));
+    const told = { parents, checked, closeoutOf: yield* closeoutsAfterMerge(e, run, step, f.reads.signedOff) };
+    const taskId = yield* asked('file', e.file(readySpec(f, step, place, files, told))).pipe(forStep(run.id, name));
     run.steps[name] = { ...run.steps[name], taskId, workspace: place.workspace, branch: place.branch };
     filed.push(name);
   }
@@ -550,9 +547,9 @@ function readySpec(
   step: Workflow,
   place: Place,
   files: string,
-  said: { parents: ParentCloseout[] | undefined; checked: readonly CheckHanded[] },
+  said: { parents: ParentCloseout[] | undefined; checked: readonly CheckHanded[]; closeoutOf: (step: string) => Closeout | undefined },
 ): Spec {
-  const { parents } = said;
+  const { parents, closeoutOf } = said;
   const { run, reads } = f;
   const told = toldOf(run, step);
   return {
@@ -566,12 +563,12 @@ function readySpec(
      * nothing of this machine (`remoteBrief`).
      */
     brief: isRemoteHarness(step.harness)
-      ? remoteBrief(step, run, reads.steps, reads.signedOff, undefined, step.after.length ? undefined : parents)
+      ? remoteBrief(step, run, reads.steps, closeoutOf, undefined, step.after.length ? undefined : parents)
       : composeBrief(
           told.step,
           run,
           reads.steps,
-          reads.signedOff,
+          closeoutOf,
           files,
           place.deps,
           undefined,

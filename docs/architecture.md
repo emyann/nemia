@@ -35,6 +35,14 @@ runtime's.
 **Above the runtime by design**: run slots, checkout holds, worktrees and landing, what a check means, budgets across tries, gates, the
 inbox, factories, stats, agent definitions.
 
+**A loop's rounds** are the orchestrator's, counted off the looping step's tries that went `then: 'round'` (`roundIn`,
+`src/status/status.ts`): a reviewer's `again: true`, and a person's `nemia round`. A merge of the base (`nemia merge`, `src/merge/`) is
+no round: the loop's target is filed again to merge the base at the commit a trial merge read, its try `then: 'merge'`, the run's
+`baseRef` moves to that commit, and the reviewer after it reads the merge; a finding of it with `again: true` is a round, counted as any
+(`test/ship.test.ts`, *a merge send-back leaves the round count unchanged*). A merge of work that merges cleanly is refused, pointed to
+the landing's approval; one of a run whose result step closes no loop, to `nemia retry`. While a merge is asked, `nemia round` and
+`nemia accept` of its loop are refused, since either would drop it; `nemia decide` offers the merge wherever the verb would take it.
+
 **In the runtime since platform slice 3**: session admission and pools. The runtime admits a queued task under the engine's ceiling
 and its harness's pool, the highest priority first (`agent-runtime/src/core/admission.ts`); the orchestrator hands it the ceiling
 (`WF_MAX_CONCURRENT`) and files each step's momentum as its task's priority, and keeps its run slots (`src/cap/cap.ts`, `WF_MAX_RUNS`).
@@ -147,7 +155,7 @@ A file at the top of `src/` is named in `PURE`, `STORE`, `CONTROLLER` or `CLIENT
 - **pure** imports no agent-runtime, no node:fs (nor fs/promises), no node:child_process, no node:http, node:https,
   node:net or node:os, reads neither `process.env` nor `fetch`, and imports no file of the other kinds: radius, rendering,
   retry, run and workflow at the top, and the folders' own — agents, artifacts, branches, cap,
-  check, closeout, daemon, ending, feed, folder, former, gate, harness, inbox, keys, meter, plan, prune, record, refusal,
+  check, closeout, daemon, ending, feed, folder, former, gate, harness, inbox, keys, merge, meter, plan, prune, record, refusal,
   rest, say, series, skills, status, step, subscription, timeline, views, wait, workflow, workspace.
 - **store** is the I/O beneath the controllers. It imports no agent-runtime, never a controller and not the client:
   branches and artifacts at the top, and record.store, folder.store, write.store, worktree.store, agents.store,
@@ -161,7 +169,7 @@ A file at the top of `src/` is named in `PURE`, `STORE`, `CONTROLLER` or `CLIENT
 - **controller** uses the runtime through the client: runner.ts, the package's root, which re-exports by name; the tick
   (tick.verb, advance.verb) and the verbs beneath it, one feature each (views.verb, file.verb, ending.verb, cap.verb,
   meter.verb, start.verb, plan.verb, inbox.verb, cancel.verb, retry.verb, gate.verb, say.verb, wait.verb, round.verb,
-  list.verb, decide.verb, forget.verb, prune.verb); and src/cli/ and the bins,
+  merge.verb, list.verb, decide.verb, forget.verb, prune.verb); and src/cli/ and the bins,
   bin/nemia.ts and its alias bin/wf.ts, above it. A verb reaches the client itself or through a controller it imports.
   src/cli/ reaches the package only through runner.ts, workflow.ts and its own files, and each bin only through cli/main.ts
   and cli/exit.ts. The client and

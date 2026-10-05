@@ -85,7 +85,7 @@ const LessonSchema = Schema.Struct({
  * `accept` (`acceptLoop`).
  */
 export type DecideCommand = {
-  label: 'ship it' | 'drop it' | 'read it' | 'once more' | 'accept' | 'approve' | 'send back' | 'forget it';
+  label: 'ship it' | 'drop it' | 'read it' | 'once more' | 'accept' | 'merge' | 'approve' | 'send back' | 'forget it';
   command: string;
   said: string | null;
   step: string | null;
@@ -93,7 +93,7 @@ export type DecideCommand = {
 
 /** Decodes a `DecideCommand`. */
 const DecideCommandSchema = Schema.Struct({
-  label: Schema.Literals(['ship it', 'drop it', 'read it', 'once more', 'accept', 'approve', 'send back', 'forget it']),
+  label: Schema.Literals(['ship it', 'drop it', 'read it', 'once more', 'accept', 'merge', 'approve', 'send back', 'forget it']),
   command: Schema.String,
   said: Schema.NullOr(Schema.String),
   step: Schema.NullOr(Schema.String),

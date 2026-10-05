@@ -45,6 +45,9 @@ const RETRY_SHAPE =
 /** The body `POST …/round` takes: `nemia round`'s arguments, as JSON. */
 const ROUND_SHAPE = '`{ "step"?: "<looping step>", "budget"?: <amount> }`';
 
+/** The body `POST …/merge` takes: `nemia merge`'s argument, as JSON. */
+const MERGE_SHAPE = '`{ "step"?: "<looping step>" }`';
+
 /** The body `POST …/approve` takes: `nemia approve`'s `--message`, as JSON. */
 const APPROVE_SHAPE = '`{ "message"?: "<words>" }`';
 
@@ -123,6 +126,28 @@ const ROUND: RouteWords = {
   issue: ({ runId }) => roundWords(runId),
   failed: ({ runId }, said) =>
     `Could not ask for another round of ${runId}'s loop: ${said}. \`nemia round ${runId}\` asks the same way from the command line.`,
+};
+
+/** A merge of the base into a loop's work, as the guard's refusals word it, its body and its failures. */
+const MERGE: RouteWords = {
+  shape: MERGE_SHAPE,
+  guard: ({ runId }) => ({
+    route: `POST /api/runs/${runId}/merge`,
+    does: "sends a loop's work back to merge its base branch",
+    forAnother: 'ask for one',
+    why: "the next tick files the merge a person asks for, which runs the loop's target again in this repository to merge the base into its work",
+    reach: "ask it from the run's page on the board",
+    instead: `Ask it from the run's page on the board, or with \`nemia merge ${runId} [<step>]\``,
+    shape: MERGE_SHAPE,
+  }),
+  issue:
+    ({ runId }) =>
+    ({ path: [key], input }) =>
+      key === 'step'
+        ? `\`step\` names the looping step whose work merges, as \`nemia merge ${runId} <step>\` does: a name, or left out for a run with one loop. This request's was ${JSON.stringify(input)}: ${MERGE_SHAPE}.`
+        : `POST …/merge takes a JSON object: ${MERGE_SHAPE}.`,
+  failed: ({ runId }, said) =>
+    `Could not ask for a merge of ${runId}'s base: ${said}. \`nemia merge ${runId}\` asks the same way from the command line.`,
 };
 
 /** An approval of a step waiting at its gate, as the guard's refusals word it, its body and its failures. */
@@ -557,6 +582,7 @@ const FACTORY_INSTRUCT: RouteWords = {
 export const WORDS: Readonly<Record<string, RouteWords>> = {
   retry: RETRY,
   round: ROUND,
+  merge: MERGE,
   approve: APPROVE,
   accept: ACCEPT,
   say: SAY,

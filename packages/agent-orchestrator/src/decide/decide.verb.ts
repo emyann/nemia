@@ -42,6 +42,7 @@ import {
   type CheckReport,
 } from '../views/views.verb.ts';
 import { checkoutHold } from '../ending/ending.verb.ts';
+import { mergeOffers } from '../merge/merge.verb.ts';
 import { slotsOf } from '../cap/cap.verb.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 
@@ -266,7 +267,11 @@ export const decideRun = Effect.fn('decide')(function* (id: string, env: NodeJS.
   const denied = deniedLinesOf(run, views);
   const held = !hasStarted(run) && !run.cancelledAt ? (yield* slotsOf(e, undefined, env)).held.get(id) : undefined;
   const ended = Boolean(run.cancelledAt || run.pruned || run.hold);
-  const offers = [...roundOffers(steps, run, d, spendOf), ...retryOffers(steps, run, d, phaseOf, reader, asked, spendOf, verdictOf)];
+  const offers = [
+    ...roundOffers(steps, run, d, spendOf),
+    ...mergeOffers(steps, run, d, rounds, phaseOf, reader, asked, spendOf),
+    ...retryOffers(steps, run, d, phaseOf, reader, asked, spendOf, verdictOf),
+  ];
   const parent = yield* parentsRead(run, git).pipe(over(e));
   const answer: Decided = {
     run,

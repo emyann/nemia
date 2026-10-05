@@ -66,6 +66,7 @@ test('each command is served on the api where it was before the table, the lift 
       ['approve', { method: 'POST', path: '/api/runs/:runId/steps/:step/approve', status: 202 }],
       ['round', { method: 'POST', path: '/api/runs/:runId/round', status: 202 }],
       ['accept', { method: 'POST', path: '/api/runs/:runId/steps/:step/accept', status: 202 }],
+      ['merge', { method: 'POST', path: '/api/runs/:runId/merge', status: 202 }],
       ['say', { method: 'POST', path: '/api/runs/:runId/steps/:step/say', status: 202 }],
       ['ls', 'cli'],
       ['show', 'cli'],

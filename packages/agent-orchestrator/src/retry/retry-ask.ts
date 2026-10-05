@@ -39,13 +39,14 @@ export const continuesFrom = (
  * nudge on the workflow's word — or `signoff`, the run continuing a session that ended without its closeout, once a
  * round, before it waits on a person (`retriesDue`) — or the mode a person asked for, with the model a `--model` named. A
  * recheck replaces only the check, so the try after one has the same `taskId`. Or `round`: the step's loop
- * went round again (`roundFiled`), and the try after it is the next round's. Or `back`: an ending that stopped on the base branch, sent
- * back with its work (`sentBack`), whose next try is filed on a new approval.
+ * went round again (`roundFiled`), and the try after it is the next round's. Or `merge`: the loop was filed again on the round it is on,
+ * for its target to merge the base (`nemia merge`), which no round counts (`roundIn`). Or `back`: an ending that stopped on the base
+ * branch, sent back with its work (`sentBack`), whose next try is filed on a new approval.
  */
 export type EarlierTry = {
   taskId: string;
   check?: { taskId: string };
-  then: 'retries' | 'signoff' | RetryMode | 'round' | 'back';
+  then: 'retries' | 'signoff' | RetryMode | 'round' | 'merge' | 'back';
   model?: string;
   /** The pause filed the try after this one (`nemia pause --now` stopped it, and the resume tried it again): `then` stays its mode. */
   paused?: true;
@@ -119,13 +120,16 @@ export function messageRefusal(how: RetryHow, command = 'nemia retry <runId> <st
   return null;
 }
 
+/** Whether a try moved behind starts the step's count of tries afresh: a round, a merge, an ending sent back. */
+const anew = (t: EarlierTry): boolean => t.then === 'round' || t.then === 'merge' || t.then === 'back';
+
 /**
  * The tries `retries:` has filed for a step in the round it is on. A person's do not count: `retries` is what the run may spend on its
- * own word. Nor do an earlier round's: a round is new work for the step, and its check may refuse it afresh.
+ * own word. Nor do an earlier round's: a round is new work for the step, and its check may refuse it afresh — and so is a merge.
  */
 export const retriesSpent = (record: StepRecord | undefined): number => {
   let spent = 0;
-  for (const t of record?.tries ?? []) spent = t.then === 'round' || t.then === 'back' ? 0 : spent + (t.then === 'retries' ? 1 : 0);
+  for (const t of record?.tries ?? []) spent = anew(t) ? 0 : spent + (t.then === 'retries' ? 1 : 0);
   return spent;
 };
 
@@ -135,7 +139,7 @@ export const retriesSpent = (record: StepRecord | undefined): number => {
  */
 export const signoffsSpent = (record: StepRecord | undefined): number => {
   let spent = 0;
-  for (const t of record?.tries ?? []) spent = t.then === 'round' || t.then === 'back' ? 0 : spent + (t.then === 'signoff' ? 1 : 0);
+  for (const t of record?.tries ?? []) spent = anew(t) ? 0 : spent + (t.then === 'signoff' ? 1 : 0);
   return spent;
 };
 

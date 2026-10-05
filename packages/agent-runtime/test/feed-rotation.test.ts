@@ -93,6 +93,20 @@ test('a reader parked at line 7 and one at line 20 each read on across a rotatio
   assert.equal(whole.forgotten, aLines(0));
 });
 
+test('a reader parked inside a run of forgotten lines is told of those after it alone', async () => {
+  const { ops, head } = await store();
+  const gone = (n: number) => ownerOf(n) !== 'b';
+  assert.ok(gone(5) && gone(6) && gone(20) && gone(21), 'lines 5 and 6, and 20 and 21, are each one run of the forgotten');
+  const parked = [5, 20].map((n) => ({ n, at: cursorAfter(head, n) }));
+  await forget(ops, ['a', 'c']);
+  for (const { n, at } of parked) {
+    const now = await read(ops, at);
+    const after = [...Array(30).keys()].map((i) => i + 1).filter((m) => m > n);
+    assert.equal(now.forgotten, after.filter(gone).length, `the reader at line ${n} is told of the forgotten lines after it`);
+    assert.equal(now.entries.length, after.filter((m) => !gone(m)).length, 'and reads the kept ones');
+  }
+});
+
 test('a feed written before rotations, with no header and a line cut short at its end, is rotated without moving a cursor or losing the cut line', async () => {
   const root = scratch('ae-feed-legacy-');
   const head = path.join(root, 'feed.jsonl');
@@ -114,6 +128,33 @@ test('a feed written before rotations, with no header and a line cut short at it
   const completed = await read(ops, after.cursor);
   assert.deepEqual(texts(completed.entries), ['b n4'], 'the cut line, completed, is read whole');
   assert.equal(completed.cursor, Buffer.byteLength(whole + cut), 'at the cursor it would have had with no rotation');
+});
+
+test('a reader that opened the head before an append and a rotation, and the sealed file after, resumes past what it read, once', async () => {
+  const { root, ops, head } = await store();
+  const end = cursorAfter(head, 30);
+  const sealed = path.join(root, 'feed.sealed.jsonl');
+  const open = fs.openSync;
+  let between = true;
+  fs.openSync = ((file: fs.PathLike, ...rest: never[]) => {
+    if (between && file === sealed) {
+      between = false;
+      Effect.runSync(ops.append('b', said(31) as never));
+      Effect.runSync(ops.forget!(['a']));
+    }
+    return open(file, ...rest);
+  }) as typeof fs.openSync;
+  let first: Awaited<ReturnType<typeof read>>;
+  try {
+    first = await read(ops, end);
+  } finally {
+    fs.openSync = open;
+  }
+  assert.equal(between, false, 'the rotation ran between the opens');
+  assert.deepEqual(texts(first.entries), ['b n31'], 'the line appended before the rotation, from the sealed file');
+  const again = await read(ops, first.cursor);
+  assert.deepEqual(texts(again.entries), [], `resumed at ${first.cursor}, it reads nothing twice`);
+  assert.equal(again.cursor, first.cursor);
 });
 
 test('a rotation stopped between its renames leaves every reader right, and the next forget finishes it', async () => {
@@ -288,11 +329,15 @@ test('a writer stopped between its journal and its feed line keeps a rotation ou
     assert.ok(!fs.existsSync(path.join(root, 'feed.sealed.jsonl')), 'the rotation did nothing');
     assert.ok(fs.existsSync(path.join(root, 'tasks', 'a.jsonl')));
 
+    const parked = await read(ops, 0);
     child.kill('SIGCONT');
     assert.equal(await exited(child), 0);
     await forget(ops, ['a']);
     const all = await read(ops, 0);
     assert.deepEqual(texts(all.entries).at(-1), 'b n31', "the writer's line is in the feed, last");
+    const resumed = await read(ops, parked.cursor);
+    assert.deepEqual(texts(resumed.entries), ['b n31'], 'a reader parked at the end before the rotation reads it, once');
+    assert.deepEqual(texts((await read(ops, resumed.cursor)).entries), []);
   } finally {
     reap(child);
   }

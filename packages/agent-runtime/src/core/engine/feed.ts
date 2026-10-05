@@ -186,8 +186,9 @@ const readSealed = (sealed: Opened, after: number) => {
 
 /**
  * The feed under `root` after `after`: the sealed lines kept past it, then the head's complete lines past it, in order; the cursor
- * past the last read, or the end of the feed for a cursor past it (a store wiped since); and how many lines after `after` were
- * forgotten. No feed at all is nothing, at the cursor given.
+ * past the last read, or the end of the feed for a cursor past it (a store wiped since), never before what the sealed file holds,
+ * though the head was opened before a rotation; and how many lines after `after` were forgotten. No feed at all is nothing, at the
+ * cursor given.
  */
 export const readFeed = (root: string, after: number): FeedRead => {
   const files = feedFiles(root);
@@ -197,7 +198,7 @@ export const readFeed = (root: string, after: number): FeedRead => {
     if (!head && !sealed) return answer([], after, 0);
     const { entries, cursor, forgotten } = sealed && after < sealed.base ? readSealed(sealed, after) : nothingAt(after);
     const base = head?.base ?? sealed?.base ?? 0;
-    const end = head ? base + head.size - head.at : base;
+    const end = Math.max(head ? base + head.size - head.at : base, sealed?.base ?? 0);
     const from = Math.max(cursor, base);
     if (!head || from >= end) return answer(entries, Math.min(cursor, end), forgotten);
     const read = headLines(head, from);

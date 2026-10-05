@@ -372,6 +372,19 @@ test('each refusal is a tagged error, and refusalWords words it behind the verb,
       () => effect((e) => untyped(e.forget)('one')),
       /^takes the ids of settled tasks, a list of one or more strings/,
     ],
+    ...[[[]], [['one'], { yes: 'y' }], [['one'], { yes: true, all: true }]].map(
+      (args): [string, string, () => Promise<unknown>, RegExp] => [
+        'forget',
+        'ForgetRefused',
+        () => effect((e) => untyped(e.forget)(...args)),
+        new RegExp(
+          `it was handed ${args
+            .map((a) => JSON.stringify(a))
+            .join(', ')
+            .replace(/[[\]{}]/g, '\\$&')}: nothing was forgotten\\.$`,
+        ),
+      ],
+    ),
     [
       'forget',
       'ForgetRefused',

@@ -71,7 +71,7 @@ const made = (id: string): Run => {
   return run;
 };
 
-/** A prune marker, as `wf prune` writes one. */
+/** A prune marker, as `nemia prune` writes one. */
 const pruned = (id: string): void => fs.writeFileSync(pruneFile(id), JSON.stringify({ at, worktrees: [] }, null, 2));
 
 test('a run made is read back with the hold, the approval and the cancellation beside it composed onto it', () => {
@@ -97,7 +97,7 @@ test('a record removed is not written back: rewrite answers false and makes no f
   );
 });
 
-test('a record read and written back moves no byte, a key no wf writes included', () => {
+test('a record read and written back moves no byte, a key no nemia writes included', () => {
   const id = 'r-bytes';
   const text = JSON.stringify({ ...aRun(id), laterKey: { kept: [1, 2] } }, null, 2);
   fs.mkdirSync(runsDir(), { recursive: true });

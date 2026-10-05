@@ -133,7 +133,8 @@ const ADD_SPEC: Spec = {
       ? `nemia factory add does not take ${arg}. It takes the factory's name, then --repo <path>, once per repository.`
       : `nemia factory add files one factory, and ${arg} is a second: nemia factory add <name> --repo <path>, once per factory.`,
   apart: () => REPOS.takes!,
-  missing: "nemia factory add takes the factory's name, first: nemia factory add <name> --repo <path> [--repo <path> ...]. Nothing was filed.",
+  missing:
+    "nemia factory add takes the factory's name, first: nemia factory add <name> --repo <path> [--repo <path> ...]. Nothing was filed.",
 };
 
 /** `nemia factory add`: one factory filed, and where. */

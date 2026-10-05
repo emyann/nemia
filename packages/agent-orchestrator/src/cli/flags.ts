@@ -11,7 +11,7 @@ export type Engine = ReturnType<typeof engine>;
 export type Verb = (rest: string[], e: Engine) => void | Promise<void>;
 
 /** What `wf`, the alias of `nemia`, prints on stderr before it runs the command it is given, one line naming what to type next. */
-export const WF_HINT = 'nemia is now nemia: type `nemia <args>`; nemia stays an alias until a later release removes it.';
+export const WF_HINT = 'wf is now nemia: type `nemia <args>`; wf stays an alias until a later release removes it.';
 
 /** What `nemia` prints for no verb, for a verb it does not know, and for a verb given too little to act on. */
 export const HELP = `nemia — run a workflow of agent steps

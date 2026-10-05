@@ -276,8 +276,8 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
  * - keeps the tip of each result branch as git has it (`tipsSeen`), written only when a tip moved, so git can still be asked whether a
  *   branch a person deleted after its merge is on the base (`isShipped`).
  * - writes the record (`rewriteRun`) only where the pass changed it and only while it is there, then consumes the asks it holds
- *   (`consumeAsks`), never before: an ask a pass died before consuming is consumed by the next. An ask `nemia pause --now` wrote that is void
- *   on this pass (`pauseAsksVoid`) is consumed with them, paused or not.
+ *   (`consumeAsks`), never before: an ask a pass died before consuming is consumed by the next. An ask `nemia pause --now` wrote that is
+ *   void on this pass (`pauseAsksVoid`) is consumed with them, paused or not.
  *
  * A try goes on in the workspace and on the branch the step had, under its next try's id; an ending the work is sent back from moves behind
  * in the same write, so it waits for the work again (`sentBack`). A try of a step whose task has not settled — its session blocked by its
@@ -578,8 +578,8 @@ function answerOf(
  * The steps a pass hands off now (`handOffDue`), where there is somewhere to hand one off from: none of a pruned run, which owed none when
  * its worktrees went (`pruneRefusal`), and no step whose workspace is not on disk — removed by hand, or with no record of the removal —
  * since what the step left went with it; a hand-off tried there would fail on every pass, keep the run out of the tick's memo of runs at
- * rest, and have `nemia prune` refuse the run as still owed one. What the pass hands off, what its memo judges, and what `nemia prune` waits
- * for, read off this one function.
+ * rest, and have `nemia prune` refuse the run as still owed one. What the pass hands off, what its memo judges, and what `nemia prune`
+ * waits for, read off this one function.
  */
 export const handOffOwed = (steps: readonly Workflow[], run: Run, phaseOf: (taskId: string) => TaskPhase): string[] =>
   run.pruned ? [] : handOffDue(steps, run, phaseOf).filter((name) => fs.existsSync(run.steps[name].workspace!));

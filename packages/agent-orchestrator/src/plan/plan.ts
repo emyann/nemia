@@ -127,11 +127,11 @@ export type StartCard = { file: string; workflow?: string; after: string[]; body
  * with any other key or a line that is not a key, one with nothing in it, or one that never closes. Null means the file's whole text is the
  * brief, so a brief that happens to start with `---` is not eaten. Pure.
  *
- * `nemia plan` prints `nemia start <card> --after …` for each card it did not start, and this is what makes that command start the card's body.
- * Read as a card, a file is held to what `nemia plan` holds a card to — a key set twice or to nothing, an empty body, an `after:` naming no
- * card or one twice — and refused, naming the file and the ids to give, when its `after:` names cards and `nemia start` was given no `--after`
- * (`after`): started so, it would not wait for the runs it was written to wait for. Which runs those are is `nemia start --after`'s to check,
- * as it does.
+ * `nemia plan` prints `nemia start <card> --after …` for each card it did not start, and this is what makes that command start the card's
+ * body. Read as a card, a file is held to what `nemia plan` holds a card to — a key set twice or to nothing, an empty body, an `after:`
+ * naming no card or one twice — and refused, naming the file and the ids to give, when its `after:` names cards and `nemia start` was given
+ * no `--after` (`after`): started so, it would not wait for the runs it was written to wait for. Which runs those are is `nemia start
+ * --after`'s to check, as it does.
  */
 export function cardToStart(file: string, text: string, after: readonly string[]): StartCard | null {
   let split: { block: string | null; body: string };
@@ -287,9 +287,9 @@ const quoted = (p: string): string => `'${p.replace(/'/g, `'\\''`)}'`;
 
 /**
  * Why `nemia plan` stopped part-way, and what to do: the card whose `nemia start` refused and its refusal, the runs already started — which
- * stand, and the tick files as their edges allow — and a `nemia start` for each card not started, parents first, with `--after` the runs its
- * parents have or will have, each path quoted for the shell. `folderOf` is the workflow folder each card's `workflow:` was found at; `dir`
- * is the plan folder. `nemia start` on a card file starts its body (`cardToStart`).
+ * stand, and the tick files as their edges allow — and a `nemia start` for each card not started, parents first, with `--after` the runs
+ * its parents have or will have, each path quoted for the shell. `folderOf` is the workflow folder each card's `workflow:` was found at;
+ * `dir` is the plan folder. `nemia start` on a card file starts its body (`cardToStart`).
  */
 export function planStopped(
   stopped: { card: Card; why: string; rest: readonly Card[] },

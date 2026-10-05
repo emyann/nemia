@@ -59,7 +59,10 @@ function factoryFile(name: string): FileRead {
   const badName = factoryNameRefusal(name);
   if (badName) return { file, error: `${badName} Remove the file by hand.` };
   if (name === DEFAULT_FACTORY)
-    return { file, error: 'is no factory: the default factory is no file, and nemia factory rm does not take it. Remove this file by hand.' };
+    return {
+      file,
+      error: 'is no factory: the default factory is no file, and nemia factory rm does not take it. Remove this file by hand.',
+    };
   let raw: unknown;
   try {
     raw = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -90,8 +93,8 @@ function factoryAt(file: string): FactoryListing {
 }
 
 /**
- * `nemia factory ls`: every factory in the store, its `.json` files by name — a hidden file, such as one `addFactory` is writing, left out —
- * each read as a factory or listed with why, so one bad file hides no other. None when there is no folder yet.
+ * `nemia factory ls`: every factory in the store, its `.json` files by name — a hidden file, such as one `addFactory` is writing, left out
+ * — each read as a factory or listed with why, so one bad file hides no other. None when there is no folder yet.
  */
 export function readFactories(): FactoryListing[] {
   let names: string[];
@@ -107,8 +110,8 @@ export function readFactories(): FactoryListing[] {
 }
 
 /**
- * The repositories a factory is given, each resolved from where `nemia` is typed, as `nemia start --repo` records one, and named once. Refused,
- * `Invalid`: none given, and any that is not a directory, every one named. A directory is enough: git is never asked.
+ * The repositories a factory is given, each resolved from where `nemia` is typed, as `nemia start --repo` records one, and named once.
+ * Refused, `Invalid`: none given, and any that is not a directory, every one named. A directory is enough: git is never asked.
  */
 function factoryRepos(name: string, given: readonly string[]): string[] {
   if (!given.length)
@@ -132,8 +135,8 @@ function refuseName(name: string, verb: FactoryWrite): void {
 }
 
 /**
- * `nemia factory add`: a factory filed as `<name>.json`, written whole to a hidden file first and linked onto its name, which fails when the
- * name is taken: no reader sees half a file, and two adds of one name file one. Refused before anything is written: the name
+ * `nemia factory add`: a factory filed as `<name>.json`, written whole to a hidden file first and linked onto its name, which fails when
+ * the name is taken: no reader sees half a file, and two adds of one name file one. Refused before anything is written: the name
  * (`refuseName`) and the repositories (`factoryRepos`); and, the file already there, `Conflict`, the file left as it was.
  */
 export function addFactory(opts: { name: string; repos: readonly string[] }): { factory: Factory; file: string } {
@@ -296,8 +299,8 @@ export function hireAgent(opts: { factory: string; agent: string; step: string }
 }
 
 /**
- * `nemia factory fire`: the hire of the factory `factory` into the step `step` taken back, every other key of the file kept; returns the agent
- * it hired. Refused: the factory (`fileToChange`), and a step it hires no one into (`Missing`, naming its hires).
+ * `nemia factory fire`: the hire of the factory `factory` into the step `step` taken back, every other key of the file kept; returns the
+ * agent it hired. Refused: the factory (`fileToChange`), and a step it hires no one into (`Missing`, naming its hires).
  */
 export function fireAgent(opts: { factory: string; step: string }): { file: string; fired: string } {
   const { file, content } = fileToChange(opts.factory, 'fire');

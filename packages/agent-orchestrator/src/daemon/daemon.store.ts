@@ -54,8 +54,8 @@ export const ceilings = (): { sessions: number; runs: number } => ({
 /**
  * What the last pass ran with: `$WF_ROOT/tick.json`, the tick's to write — the ceilings of the process that ran it, `nemia up`'s or
  * `nemia tick`'s. `nemia ls` and `nemia decide` run in a shell of their own, whose environment is not the daemon's:
- * `WF_MAX_CONCURRENT=4 WF_MAX_RUNS=2 nemia up` sets the cap on the daemon alone, and read from the shell, a run the daemon holds read as plain
- * `waiting`.
+ * `WF_MAX_CONCURRENT=4 WF_MAX_RUNS=2 nemia up` sets the cap on the daemon alone, and read from the shell, a run the daemon holds read as
+ * plain `waiting`.
  */
 const tickFile = (): string => path.join(HOME, 'tick.json');
 
@@ -77,9 +77,9 @@ export function lastCeilings(): { sessions: number; runs: number } | undefined {
 }
 
 /**
- * The ceilings a pass runs with, written down for `nemia ls` and `nemia decide` — only when they differ from what is there, and through a hidden
- * file renamed over it, so a reader never reads half of it. A store that cannot be written loses only this: a reader falls back to its own
- * environment, and the pass goes on.
+ * The ceilings a pass runs with, written down for `nemia ls` and `nemia decide` — only when they differ from what is there, and through a
+ * hidden file renamed over it, so a reader never reads half of it. A store that cannot be written loses only this: a reader falls back to
+ * its own environment, and the pass goes on.
  */
 export function recordCeilings(c: { sessions: number; runs: number }): void {
   const last = lastCeilings();
@@ -93,8 +93,8 @@ export function recordCeilings(c: { sessions: number; runs: number }): void {
 }
 
 /**
- * What the last pass cost, phase by phase: `$WF_ROOT/tick-stats.json`, written by the pass that measured it, `nemia up`'s or `nemia tick`'s, and
- * read by `nemia up --stats` and the api. One pass's numbers, replaced by the next's: nothing reads it to decide.
+ * What the last pass cost, phase by phase: `$WF_ROOT/tick-stats.json`, written by the pass that measured it, `nemia up`'s or `nemia
+ * tick`'s, and read by `nemia up --stats` and the api. One pass's numbers, replaced by the next's: nothing reads it to decide.
  */
 export const statsFile = (): string => path.join(HOME, 'tick-stats.json');
 

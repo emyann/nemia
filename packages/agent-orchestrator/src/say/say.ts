@@ -7,9 +7,9 @@ import { fenced, prunedWords, tryOf, type Run, type TaskPhase } from '../record/
 import { holdWord } from '../wait/wait.ts';
 
 /**
- * A person's words, said to a step's session while it ran (`nemia say`), as the engine journalled them: when, to which attempt of the step's
- * task, and the words as given. The engine's own `Said`, named here because this file does not import the engine: views.verb.ts reads it
- * off the task's `state.said`. The engine's journal is the record, and the run keeps no copy.
+ * A person's words, said to a step's session while it ran (`nemia say`), as the engine journalled them: when, to which attempt of the
+ * step's task, and the words as given. The engine's own `Said`, named here because this file does not import the engine: views.verb.ts
+ * reads it off the task's `state.said`. The engine's journal is the record, and the run keeps no copy.
  */
 export type Said = { at: string; attempt: number; text: string };
 
@@ -21,8 +21,8 @@ export type SaidTo = Said & { try: number };
  *
  * The package's own refusals, before the engine is asked: a step the run does not have; a cancelled run, whose sessions are being stopped;
  * a step with no task filed; and a step whose current try's task has settled, where no session is running to hear anything — words for such
- * a step go into its next try's brief, with `nemia retry --message`. Everything else about the session — words that are empty, an attempt not
- * started, a harness with no way in, a session its harness does not list — is the engine's to refuse, in its own words (`Engine.say`).
+ * a step go into its next try's brief, with `nemia retry --message`. Everything else about the session — words that are empty, an attempt
+ * not started, a harness with no way in, a session its harness does not list — is the engine's to refuse, in its own words (`Engine.say`).
  * A settled step of a pruned or a held run is told that the try that would carry the words is refused (`prunedRefusal`, `heldRefusal`).
  */
 export function sayRefusal(steps: readonly Workflow[], run: Run, name: string, phaseOf: (taskId: string) => TaskPhase): string | null {
@@ -48,9 +48,9 @@ export function sayRefusal(steps: readonly Workflow[], run: Run, name: string, p
 export const saidWord = (times: number): string => (times > 0 ? `said to ${times}×` : '');
 
 /**
- * What `nemia decide` prints under a step, before its closeout: each thing a person said to its sessions while they ran (`nemia say`), in the
- * order given — when, to which try, and to which attempt where it was not the first — and the words as data, in a fence longer than any run
- * of backticks in them (`fenced`), as a try's brief carries an answer: words that read as a heading or a command are shown as what was
+ * What `nemia decide` prints under a step, before its closeout: each thing a person said to its sessions while they ran (`nemia say`), in
+ * the order given — when, to which try, and to which attempt where it was not the first — and the words as data, in a fence longer than any
+ * run of backticks in them (`fenced`), as a try's brief carries an answer: words that read as a heading or a command are shown as what was
  * said. Pure. None when nothing was said, so the screen of a step nobody spoke to is what it was.
  */
 export function saidLines(said: readonly SaidTo[]): string[] {

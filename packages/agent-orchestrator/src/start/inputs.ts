@@ -17,9 +17,9 @@ import { stepMounts } from '../factory/factory.ts';
 export type InputFile = { given: string; resolved: string; kind: 'file' | 'directory' | 'missing' | 'other' };
 
 /**
- * Why `nemia start --input` will not copy these files into the run, in words that name the fix — or null. Pure, and asked before anything is
- * written: a file that is not there, a directory, anything else that is not a regular file, and two inputs that would take one name in the
- * run's `inputs/` — one file given twice, or two files of the same name.
+ * Why `nemia start --input` will not copy these files into the run, in words that name the fix — or null. Pure, and asked before anything
+ * is written: a file that is not there, a directory, anything else that is not a regular file, and two inputs that would take one name in
+ * the run's `inputs/` — one file given twice, or two files of the same name.
  */
 export function inputRefusal(inputs: readonly InputFile[]): string | null {
   for (const f of inputs) {
@@ -91,8 +91,8 @@ export const mountsLine = (step: Pick<Workflow, 'harness' | 'writable'>, run: Pi
 export const fromNote = (run: Pick<Run, 'from'>): string | undefined => (run.from ? `from inbox card ${run.from.inbox}` : undefined);
 
 /**
- * What `nemia decide` says under a run's line when `nemia start --input` gave it files: each by name, and where they are. Undefined for a run
- * given none.
+ * What `nemia decide` says under a run's line when `nemia start --input` gave it files: each by name, and where they are. Undefined for a
+ * run given none.
  */
 export const inputsNote = (dir: string, names: readonly string[] | undefined): string | undefined =>
   names?.length ? `inputs  ${names.join(', ')}  —  in ${dir}` : undefined;

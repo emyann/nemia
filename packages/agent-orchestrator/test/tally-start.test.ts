@@ -1,7 +1,7 @@
 /**
- * `wf start` of a folder whose step declares a `tally:`: one the step's closeout cannot hold is refused with exit 2, naming the step's
+ * `nemia start` of a folder whose step declares a `tally:`: one the step's closeout cannot hold is refused with exit 2, naming the step's
  * file, its schema's and the field, and no run is written; one it can hold is frozen on the run record with the step, which is what
- * `wf stats` counts the run by. This repository's build workflow declares a real count. `WF_ROOT` is set before the import, since the
+ * `nemia stats` counts the run by. This repository's build workflow declares a real count. `WF_ROOT` is set before the import, since the
  * module reads it as it loads.
  */
 import { test } from 'node:test';
@@ -47,7 +47,7 @@ function triage(name: string, tally: string): string {
   return dir;
 }
 
-/** `wf start` of `dir`, from the store, and the run's id. */
+/** `nemia start` of `dir`, from the store, and the run's id. */
 async function started(dir: string): Promise<string> {
   const out: string[] = [];
   const { log, error } = console;
@@ -66,7 +66,7 @@ async function started(dir: string): Promise<string> {
 
 const runsWritten = () => (fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')).length : 0);
 
-test('REFUSED: wf start of a step whose tally its closeout cannot hold exits 2, naming the file, the schema and the field, and writes no run', async () => {
+test('REFUSED: nemia start of a step whose tally its closeout cannot hold exits 2, naming the file, the schema and the field, and writes no run', async () => {
   const runs = runsWritten();
   await assert.rejects(started(triage('unheld', 'issues, issues.closed')), (err: Error & { exitCode?: number }) => {
     assert.equal(err.exitCode, 2);
@@ -81,7 +81,7 @@ test('REFUSED: wf start of a step whose tally its closeout cannot hold exits 2, 
   assert.equal(runsWritten(), runs, 'no run was written');
 });
 
-test('wf start of a step whose tally its closeout holds freezes the tally with the step on the run record', async () => {
+test('nemia start of a step whose tally its closeout holds freezes the tally with the step on the run record', async () => {
   const id = await started(triage('held', 'issues, issues.open'));
   assert.deepEqual(readRun(id).workflow?.find((s) => s.name === 'triage')?.tally, ['issues', 'issues.open']);
 });

@@ -168,8 +168,8 @@ export const landingOpen = (
 
 /**
  * What the run did with an ending's merge — `the run committed its merge onto main as 1a2b3c4`, or why it made no commit — as the tick's
- * note says it (the daemon's log), `nemia ls` on the step's line (`listing`, clipped), and `nemia decide` in its offer of a try of a merge the
- * run aborted (`retryLines`).
+ * note says it (the daemon's log), `nemia ls` on the step's line (`listing`, clipped), and `nemia decide` in its offer of a try of a merge
+ * the run aborted (`retryLines`).
  */
 export const landedWords = (run: Pick<Run, 'branch'>, landed: Landed): string =>
   'commit' in landed
@@ -202,16 +202,16 @@ export const endingAsked = (run: Run, step: Workflow, asks: readonly RetryAsk[])
 export const checkoutWord = (hold: CheckoutHold): string => `waiting on the checkout (${hold.run}'s ${hold.step} has it)`;
 
 /**
- * What `nemia decide` says for an ending step still waiting for the repository's own checkout: which run's step is in it, and what frees this
- * one. Pure.
+ * What `nemia decide` says for an ending step still waiting for the repository's own checkout: which run's step is in it, and what frees
+ * this one. Pure.
  */
 export const checkoutLine = (step: string, hold: CheckoutHold): string =>
   `${step}: ${checkoutWord(hold)} — it works in the repository's own checkout, and two endings never do at once; the next tick files ${step} once ${hold.run}'s ${hold.step} has settled`;
 
 /**
- * An ending at its gate whose work git already has on the base branch, beside its line on `nemia ls` where the approval would be: where each
- * branch stands, that nothing is left for the step to merge and the run has shipped as git reads it (`decision`), and the one command there
- * still is. Pure.
+ * An ending at its gate whose work git already has on the base branch, beside its line on `nemia ls` where the approval would be: where
+ * each branch stands, that nothing is left for the step to merge and the run has shipped as git reads it (`decision`), and the one command
+ * there still is. Pure.
  */
 export const onBaseNote = (run: Pick<Run, 'id' | 'branch'>, step: string, standings: readonly BranchStanding[]): string =>
   `${standings.map((s) => branchWord(run, s)).join(', ')} — nothing is left for ${step} to merge: the run has shipped as git reads it, and nothing waits on you; close the record if you want it closed: nemia cancel ${run.id}`;

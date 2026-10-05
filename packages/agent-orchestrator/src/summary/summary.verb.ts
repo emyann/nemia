@@ -64,8 +64,8 @@ export type RunSummary = {
   startedAt: string | null;
   cancelledAt: string | null;
   /**
-   * That `nemia prune` removed the run's worktrees, and its files too once `--artifacts` did, in `nemia prune`'s words — what it removed and what
-   * it kept — for the mark beside its status; null on a run never pruned.
+   * That `nemia prune` removed the run's worktrees, and its files too once `--artifacts` did, in `nemia prune`'s words — what it removed
+   * and what it kept — for the mark beside its status; null on a run never pruned.
    */
   pruned: { said: string } | null;
   /** The runs this one waits on (`nemia start --after`), as the record froze them at start: none for a run started without. */
@@ -99,8 +99,8 @@ export type RunSummary = {
    */
   moving: boolean;
   /**
-   * What the run has cost so far, every step's tries together, as `nemia ls` adds it up on the run's line (`runSpend`); null until a cost was
-   * measured.
+   * What the run has cost so far, every step's tries together, as `nemia ls` adds it up on the run's line (`runSpend`); null until a cost
+   * was measured.
    */
   cost: Spent | null;
   /**
@@ -128,8 +128,8 @@ export type RunSummary = {
    */
   waitingOnYou: string[];
   /**
-   * `waitingOnYou` as `nemia ls` names it after `→ waiting on you:` (`onYouWords`), one entry a step, in its order: the step's name — and for
-   * a step at its gate, what is asked of you, `approve plan`.
+   * `waitingOnYou` as `nemia ls` names it after `→ waiting on you:` (`onYouWords`), one entry a step, in its order: the step's name — and
+   * for a step at its gate, what is asked of you, `approve plan`.
    */
   onYou: string[];
   /**

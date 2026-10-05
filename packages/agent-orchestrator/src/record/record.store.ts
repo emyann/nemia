@@ -138,8 +138,8 @@ function recordRefusal(raw: unknown): string {
 }
 
 /**
- * A run record that is there and does not read as one: a person's or a program's edit, or a newer `nemia`'s. Said by `readRun` with the fix,
- * and left out of `listRuns`, so one record nobody can read stops no other run.
+ * A run record that is there and does not read as one: a person's or a program's edit, or a newer `nemia`'s. Said by `readRun` with the
+ * fix, and left out of `listRuns`, so one record nobody can read stops no other run.
  */
 export class UnreadableRecord extends Invalid {
   constructor(id: string, why: string) {
@@ -211,7 +211,8 @@ export const pruneFile = (id: string) => path.join(runsDir(), `${id}.pruned`);
 
 /**
  * The prune marker, read: undefined for a run never pruned. A marker that does not read as one still says the run is pruned, and each
- * field that does not read is empty. Its files (`nemia prune --artifacts`) are pruned when the marker names them, at the time it says or none.
+ * field that does not read is empty. Its files (`nemia prune --artifacts`) are pruned when the marker names them, at the time it says or
+ * none.
  */
 function readPruned(id: string): Pruned | undefined {
   const marker = markerOf(pruneFile(id));
@@ -228,15 +229,17 @@ function readPruned(id: string): Pruned | undefined {
 }
 
 /**
- * That a person holds the run until other runs ship (`nemia hold`): `{ at, until, why?, by? }`, a person's fact in a file of its own for the
- * reason `cancelFile` is. Written by `hold` alone, exclusively; removed by `nemia hold --off`, by the tick once every run it names has shipped
- * (`removeHold`), and by `nemia rm` with the run. Composed onto the run on read as `hold`, its `why` and `by` each one line within its cap.
+ * That a person holds the run until other runs ship (`nemia hold`): `{ at, until, why?, by? }`, a person's fact in a file of its own for
+ * the reason `cancelFile` is. Written by `hold` alone, exclusively; removed by `nemia hold --off`, by the tick once every run it names has
+ * shipped (`removeHold`), and by `nemia rm` with the run. Composed onto the run on read as `hold`, its `why` and `by` each one line within
+ * its cap.
  */
 export const holdFile = (id: string) => path.join(runsDir(), `${id}.hold`);
 
 /**
  * The hold, read: undefined for a run nobody holds. A file that does not read as a hold still holds the run, on no run named: the tick
- * never lifts a hold that names nothing, so only `nemia hold --off` lifts it, and the run files nothing while the file is there (`advance`).
+ * never lifts a hold that names nothing, so only `nemia hold --off` lifts it, and the run files nothing while the file is there
+ * (`advance`).
  */
 function readHold(id: string): Hold | undefined {
   const marker = markerOf(holdFile(id));
@@ -410,9 +413,9 @@ function readApprovalsNow(id: string): { approvals: Approval[]; notes: string[] 
 }
 
 /**
- * The ask files a person's verbs write (`nemia approve`, `nemia accept`, `nemia round`, `nemia retry`), each checked for what the verb refuses to
- * write, in the order the verb checks it, so a file written by hand is held to the verb's word. `at` is read leniently where the tick never
- * reads it as a time (a round, a retry). A key none of them names is kept, as a newer `nemia` may write one.
+ * The ask files a person's verbs write (`nemia approve`, `nemia accept`, `nemia round`, `nemia retry`), each checked for what the verb
+ * refuses to write, in the order the verb checks it, so a file written by hand is held to the verb's word. `at` is read leniently where the
+ * tick never reads it as a time (a round, a retry). A key none of them names is kept, as a newer `nemia` may write one.
  */
 const Said = Schema.String.check(Schema.makeFilter((text: string) => text.trim() !== ''));
 const When = Schema.String.check(Schema.makeFilter((at: string) => !Number.isNaN(Date.parse(at))));
@@ -498,8 +501,8 @@ function readAcceptancesNow(id: string): { acceptances: Acceptance[]; notes: str
 
 /**
  * One acceptance file, read: the looping step and the try from its name, when and what was said from what it holds — or why it cannot be
- * read. What `nemia accept` refuses to write is refused here too, so a file written by hand is held to the verb's word: an acceptance with no
- * words ends a loop with findings open and tells the steps after it nothing, which is the whole of what it is for.
+ * read. What `nemia accept` refuses to write is refused here too, so a file written by hand is held to the verb's word: an acceptance with
+ * no words ends a loop with findings open and tells the steps after it nothing, which is the whole of what it is for.
  */
 export function acceptanceIn(file: string, step: string, n: number): Acceptance | string {
   const held = heldIn(file);
@@ -637,11 +640,11 @@ export function writeAsk(file: string, ask: RetryAsk | RoundAsk | Approval | Acc
 }
 
 /**
- * Move each ask the run's record already answers into `done/`, and each one of `voided` — an ask `nemia pause --now` wrote that the pass found
- * void (`pauseAskVoid`) — and each approval a later try of its step spent (`spentApprovals`), and
+ * Move each ask the run's record already answers into `done/`, and each one of `voided` — an ask `nemia pause --now` wrote that the pass
+ * found void (`pauseAskVoid`) — and each approval a later try of its step spent (`spentApprovals`), and
  * each acceptance one spent (`spentAcceptances`). The tick's one touch on a person's file, and never an edit. `done/` is made inside the
- * run's asks directory, never the directory itself, which `nemia rm` may remove mid-pass; an ask already moved by a pass beside this one, or
- * removed with its run, is passed over.
+ * run's asks directory, never the directory itself, which `nemia rm` may remove mid-pass; an ask already moved by a pass beside this one,
+ * or removed with its run, is passed over.
  */
 export function consumeAsks(run: Run, asks: readonly RetryAsk[], rounds: readonly RoundAsk[], voided: readonly RetryAsk[] = []): void {
   within('act', () => consumeNow(run, asks, rounds, voided));
@@ -747,10 +750,10 @@ export const writeRun = ({ pause: _, ...run }: Run) => {
 /**
  * Write back the record a pass read — only while it is still there, and false when it is not.
  *
- * A pass reads a run, spends seconds on the engine and git, and writes the run back. `nemia rm` may remove the record in those seconds, and a
- * pass that wrote a whole new file would put it back: a run nobody can forget, pointing at worktrees that are gone. So the record is opened
- * `r+`, which never makes a file. Its existence is read at the moment of writing, and nothing is carried to decide it; a record removed
- * after it is opened takes the write with it.
+ * A pass reads a run, spends seconds on the engine and git, and writes the run back. `nemia rm` may remove the record in those seconds, and
+ * a pass that wrote a whole new file would put it back: a run nobody can forget, pointing at worktrees that are gone. So the record is
+ * opened `r+`, which never makes a file. Its existence is read at the moment of writing, and nothing is carried to decide it; a record
+ * removed after it is opened takes the write with it.
  *
  * Without the approvals, acceptances, pruning and hold `readRun` composed onto it, nor the pause `runStore` did: they are a person's
  * files, and a copy in the record would outlive the file it was read from.
@@ -786,8 +789,8 @@ const rewriteNow = ({ approvals: _, acceptances: __, pruned: ___, hold: ____, pa
 export const artifactsDir = (run: Pick<Run, 'id'>, step: string): string => path.join(runsDir(), run.id, 'artifacts', step);
 
 /**
- * The directory `nemia start --input` copies a run's files into: the run's own, beside its artifacts and outside every workspace, so a file a
- * person gave the run reaches each step without riding a branch. Named on each brief (`inputsLine`) with the names on the record.
+ * The directory `nemia start --input` copies a run's files into: the run's own, beside its artifacts and outside every workspace, so a file
+ * a person gave the run reaches each step without riding a branch. Named on each brief (`inputsLine`) with the names on the record.
  *
  * Outside every workspace is what a folder run's steps cannot reach: they run in `dontAsk`, fenced to their own folder. So a folder run
  * copies this directory into each folder it makes (`folderPlace.make`), and their briefs name that copy. The path itself is

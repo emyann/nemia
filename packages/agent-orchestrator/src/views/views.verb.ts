@@ -74,10 +74,10 @@ export function reportedEngine(e: Engine, views: readonly TaskView[]): Engine {
 }
 
 /**
- * The engine a command reads — `nemia ls`, `nemia decide` — whose `view` of a task is read once for the whole command: `nemia ls` views a run's
- * tasks, and again each run another waits on, and `nemia decide` its current tries and then every try. A view is the engine's word at the
- * moment it was read, and a command is one moment; nothing is kept past the command. A verb that changes a task drops what was read of it,
- * as `reportedEngine` does, and a pass — a `tick` or a `start` — drops all of it, so a command that acts reads the engine's word after
+ * The engine a command reads — `nemia ls`, `nemia decide` — whose `view` of a task is read once for the whole command: `nemia ls` views a
+ * run's tasks, and again each run another waits on, and `nemia decide` its current tries and then every try. A view is the engine's word at
+ * the moment it was read, and a command is one moment; nothing is kept past the command. A verb that changes a task drops what was read of
+ * it, as `reportedEngine` does, and a pass — a `tick` or a `start` — drops all of it, so a command that acts reads the engine's word after
  * its act. A view that failed is not kept: the next read asks the engine again.
  */
 export function viewedOnce(e: Engine): Engine {
@@ -241,8 +241,8 @@ export const deniedOf =
 
 /**
  * What each task's sessions cost, off views already read (`taskSpend`): what holds a step to its `budget:`, and what `nemia ls` and
- * `nemia decide` print beside it — and what they were denied (`deniedOf`), which stops a step that says `denials: fail`. Exported, log-free,
- * for a consumer that words a step as `nemia ls` does. A task with no view read has no spend known.
+ * `nemia decide` print beside it — and what they were denied (`deniedOf`), which stops a step that says `denials: fail`. Exported,
+ * log-free, for a consumer that words a step as `nemia ls` does. A task with no view read has no spend known.
  */
 export const spendReader =
   (views: ReadonlyMap<string, TaskView>): SpendOf =>
@@ -298,7 +298,9 @@ export const saidCount =
     return (taskId ? views.get(taskId)?.state.said?.length : undefined) ?? 0;
   };
 
-/** What was said to a task's sessions while they ran (`nemia say`), off its view: none for a task with no view, or a view with no `said`. */
+/**
+ * What was said to a task's sessions while they ran (`nemia say`), off its view: none for a task with no view, or a view with no `said`.
+ */
 export const saidIn = (view: TaskView | undefined): readonly Said[] => view?.state.said ?? [];
 
 /**
@@ -457,12 +459,12 @@ export const closeoutReader =
 /**
  * A run another waits on (`--after`), read by the pass that asks and carried nowhere — what `runReady` and `waitsOf` are handed.
  *
- * Shipped is the run's own `nemia decide`'s word, and nothing stricter or looser: `decision` says `shipped` — the run is not running, it was
- * not cancelled, and every result branch is on its base branch (`isShipped`), with work past its base or with every step succeeded. A child
- * starts when its parent's `nemia decide` says shipped, and a child waits exactly while it does not. A result branch is cut at its run's base,
- * which is on the base branch, so a branch nobody has committed to is on it from the moment it is cut: a parent still running has not
- * shipped for that, nor one that ended failed, blocked or unsigned with nothing committed; one whose steps all signed off with nothing to
- * commit has, as its `nemia decide` says. A run that worked on its base branch itself (`--no-worktree`) never has.
+ * Shipped is the run's own `nemia decide`'s word, and nothing stricter or looser: `decision` says `shipped` — the run is not running, it
+ * was not cancelled, and every result branch is on its base branch (`isShipped`), with work past its base or with every step succeeded. A
+ * child starts when its parent's `nemia decide` says shipped, and a child waits exactly while it does not. A result branch is cut at its
+ * run's base, which is on the base branch, so a branch nobody has committed to is on it from the moment it is cut: a parent still running
+ * has not shipped for that, nor one that ended failed, blocked or unsigned with nothing committed; one whose steps all signed off with
+ * nothing to commit has, as its `nemia decide` says. A run that worked on its base branch itself (`--no-worktree`) never has.
  *
  * Git first, which costs no harness observe: a result branch not on the base branch has not shipped, whatever the run's steps say. The
  * engine's view of the parent's tasks is read only once every one is.

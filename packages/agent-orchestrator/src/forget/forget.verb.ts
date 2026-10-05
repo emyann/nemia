@@ -46,8 +46,8 @@ type Forgetting = Effect.Success<ReturnType<typeof readForgetting>>;
 type Worktrees = Pick<Forgot, 'removed' | 'handedOff' | 'gone' | 'left'>;
 
 /**
- * Forget a run that is over — `nemia rm` — or say why not and touch nothing (`forgetRefusal`). It never stops anything: calling a run off is
- * `cancel`, a decision of its own.
+ * Forget a run that is over — `nemia rm` — or say why not and touch nothing (`forgetRefusal`). It never stops anything: calling a run off
+ * is `cancel`, a decision of its own.
  *
  * Read as `cancel` reads a run: a check, a try, a round or a step a pass filed and never wrote down is adopted in memory, so it is in
  * flight too — on a cancelled run as well, which a pass that read it before the cancel may be filing now. A record with no frozen workflow
@@ -104,8 +104,8 @@ export const forgetRun = Effect.fn('forget')(function* (id: string, how: ForgetH
 });
 
 /**
- * `nemia rm` (`forgetRun`) in a Promise, over `e`: what the CLI, the api and the tests call. Rejects with the refusal the program failed with,
- * or with whatever else it died of, as it was thrown.
+ * `nemia rm` (`forgetRun`) in a Promise, over `e`: what the CLI, the api and the tests call. Rejects with the refusal the program failed
+ * with, or with whatever else it died of, as it was thrown.
  */
 export const forget = (e: Engine, id: string, how: ForgetHow = {}): Promise<Forgot> =>
   Effect.runPromise(forgetRun(id, how).pipe(Effect.provide(EngineService.layer(e))));
@@ -157,8 +157,8 @@ const readForgetting = Effect.fn('readForgetting')(function* (e: Engine, id: str
 });
 
 /**
- * Why `nemia rm` will not forget the run `id`, read (`forgetRefusal`), or null: judged against the store's other runs, where its result stands
- * for an ending that has not run, and a merge the ending staged.
+ * Why `nemia rm` will not forget the run `id`, read (`forgetRefusal`), or null: judged against the store's other runs, where its result
+ * stands for an ending that has not run, and a merge the ending staged.
  */
 function refusalOf(id: string, f: Forgetting): string | null {
   const { run, steps } = f;

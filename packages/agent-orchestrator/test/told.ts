@@ -1,7 +1,7 @@
 /**
  * What a shipped step is told: its body, then the body of each skill its agent gives it, in the order the agent names them. The shipped
  * agents' procedures are skills (`workflows/skills/`), and their bodies keep the role and the limits, so a sentence a step must be told
- * is looked for here, not in the body alone. The skills are found as `wf start` finds them (`skillsFor`), from the
+ * is looked for here, not in the body alone. The skills are found as `nemia start` finds them (`skillsFor`), from the
  * step's folder, and one that is not there throws rather than reading as a step told less.
  */
 import fs from 'node:fs';

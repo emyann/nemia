@@ -1,8 +1,8 @@
 /**
- * `nemia prune`: remove a run's worktrees alone (`prune`), reading the run as `cancel` does and refusing by name before anything is touched;
- * and the words `nemia rm` shares with it — a path as git names a worktree (`resolved`), what git said when it refused (`gitWords`), and whose
- * merge is in the checkout (`merging`). A controller, reaching the runtime through the client (`runtime-client.ts`); it never stops
- * anything.
+ * `nemia prune`: remove a run's worktrees alone (`prune`), reading the run as `cancel` does and refusing by name before anything is
+ * touched; and the words `nemia rm` shares with it — a path as git names a worktree (`resolved`), what git said when it refused
+ * (`gitWords`), and whose merge is in the checkout (`merging`). A controller, reaching the runtime through the client
+ * (`runtime-client.ts`); it never stops anything.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -30,9 +30,9 @@ export const merging = (run: Run, steps: readonly Workflow[] | undefined): Merge
     : 'none';
 
 /**
- * Remove the worktrees of a run that is over, and nothing else — `nemia prune`. Its record, asks, closeouts and costs, its branches, its files
- * directory, its check logs and inputs, and the engine's record of its sessions are kept, so `nemia decide`, `nemia ls` and the board still read
- * it, and a run waiting on it still reads whether it shipped.
+ * Remove the worktrees of a run that is over, and nothing else — `nemia prune`. Its record, asks, closeouts and costs, its branches, its
+ * files directory, its check logs and inputs, and the engine's record of its sessions are kept, so `nemia decide`, `nemia ls` and the board
+ * still read it, and a run waiting on it still reads whether it shipped.
  *
  * With `artifacts` — `nemia prune --artifacts` — its files directory too (`runs/<id>/artifacts/`: the screenshots and logs its steps and
  * checks left, which are on no branch), by far the most of what a run keeps once its worktrees are gone. It is judged exactly as the
@@ -41,11 +41,11 @@ export const merging = (run: Run, steps: readonly Workflow[] | undefined): Merge
  * rendered (`agents/`), the check logs and the engine's journals, each small and each read by `nemia decide` or the board — which say the
  * files were removed where they would list them, as the api's file route does (410).
  *
- * Read as `nemia rm` reads a run (`forget`), and refused, before anything is touched, for every reason `pruneRefusal` names: a folder run, a
- * run not over, anything that holds `nemia rm`, a finished run not merged unless `unmerged`, a hand-off owed, and a worktree that is locked,
- * on no branch with something a removal would leave on none, or holds a change no commit has — or whose status git cannot read. No other
- * run is asked: one waiting on this run reads its record, which stays. A run once pruned is not asked its merge again for its worktrees;
- * for its files it is. A record whose workflow folder is gone is judged without its steps, and `pruneRefusal` says so.
+ * Read as `nemia rm` reads a run (`forget`), and refused, before anything is touched, for every reason `pruneRefusal` names: a folder run,
+ * a run not over, anything that holds `nemia rm`, a finished run not merged unless `unmerged`, a hand-off owed, and a worktree that is
+ * locked, on no branch with something a removal would leave on none, or holds a change no commit has — or whose status git cannot read. No
+ * other run is asked: one waiting on this run reads its record, which stays. A run once pruned is not asked its merge again for its
+ * worktrees; for its files it is. A record whose workflow folder is gone is judged without its steps, and `pruneRefusal` says so.
  *
  * The worktrees are the run's as git lists them: a directory already gone is git's to forget (`git worktree prune`), not a removal, and a
  * run with no worktree left answers `nothing`, and says why. A link as the files directory is removed as a link, and read as nothing to

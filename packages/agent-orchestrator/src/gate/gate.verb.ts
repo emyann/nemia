@@ -1,7 +1,7 @@
 /**
- * `nemia approve`: approve a step waiting at its gate, by writing the person's approval and nothing else, refused before anything is written.
- * A controller, reaching the runtime through the client (`runtime-client.ts`): an Effect program that requires the engine as a service
- * (`approveRun`, over `EngineService`), and `approve`, its plain face in a Promise, over the engine it is handed.
+ * `nemia approve`: approve a step waiting at its gate, by writing the person's approval and nothing else, refused before anything is
+ * written. A controller, reaching the runtime through the client (`runtime-client.ts`): an Effect program that requires the engine as a
+ * service (`approveRun`, over `EngineService`), and `approve`, its plain face in a Promise, over the engine it is handed.
  */
 import { Effect } from 'effect';
 import { EngineService, awaited, tried, type Engine } from '../runtime-client.ts';
@@ -29,14 +29,16 @@ export type Approved = { run: Run; approval: Approval; file: string };
  * such an ending (`approvedFirst`): no other gate's approval turns on it. An approval written by someone else between the look and the
  * write is refused as the look would have refused it, and a file at the approval's name that is not one is named, with how to clear it.
  *
- * Sending back is not this verb's: `nemia retry <run> <step> --message "<objection>"` — the try it files is one this approval does not name.
- * Fails with a refusal, the verb's or one a read threw; dies of anything else (`tried`, `awaited`).
+ * Sending back is not this verb's: `nemia retry <run> <step> --message "<objection>"` — the try it files is one this approval does not
+ * name. Fails with a refusal, the verb's or one a read threw; dies of anything else (`tried`, `awaited`).
  */
 export const approveRun = Effect.fn('approve')(function* (id: string, stepName: string, message?: string) {
   const e = yield* EngineService;
   if (!(yield* tried(() => runStore.runs.exists(id))))
     return yield* Effect.fail(
-      new Missing({ message: `no such run: ${id}. nemia approve takes a run by its id, as nemia ls lists it: nemia approve <runId> <step>.` }),
+      new Missing({
+        message: `no such run: ${id}. nemia approve takes a run by its id, as nemia ls lists it: nemia approve <runId> <step>.`,
+      }),
     );
   const run = yield* tried(() => runStore.runs.read(id));
   const steps = yield* tried(() => stepsOf(run));
@@ -81,8 +83,8 @@ export const approveRun = Effect.fn('approve')(function* (id: string, stepName: 
 });
 
 /**
- * `nemia approve` (`approveRun`) in a Promise, over `e`: what the CLI, the api and the tests call. Rejects with the refusal the program failed
- * with, or with whatever else it died of, as it was thrown.
+ * `nemia approve` (`approveRun`) in a Promise, over `e`: what the CLI, the api and the tests call. Rejects with the refusal the program
+ * failed with, or with whatever else it died of, as it was thrown.
  */
 export const approve = (e: Engine, id: string, stepName: string, message?: string): Promise<Approved> =>
   Effect.runPromise(approveRun(id, stepName, message).pipe(Effect.provide(EngineService.layer(e))));

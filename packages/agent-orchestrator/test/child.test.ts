@@ -1,6 +1,6 @@
 /**
- * `nodeChild` (`test/child.ts`): the wait a test puts on a `wf` child ends on the event it counts, or on the child's end, which fails it at
- * once with what the child said — never on a length of time. And a child is bound by its parent: the end of its stdin ends it, while a
+ * `nodeChild` (`test/child.ts`): the wait a test puts on a `nemia` child ends on the event it counts, or on the child's end, which fails it
+ * at once with what the child said — never on a length of time. And a child is bound by its parent: the end of its stdin ends it, while a
  * program that returns still ends on its own.
  */
 import { test } from 'node:test';

@@ -81,8 +81,8 @@ export type Workflow = {
    */
   context?: number;
   /**
-   * Claude Code's permission mode, `--permission-mode`, which the runtime judges for the harness the step runs on at `nemia start`. On codex,
-   * whose fence is its sandbox, the line is the former name of `sandbox:`.
+   * Claude Code's permission mode, `--permission-mode`, which the runtime judges for the harness the step runs on at `nemia start`. On
+   * codex, whose fence is its sandbox, the line is the former name of `sandbox:`.
    */
   permissionMode?: string;
   /**
@@ -90,9 +90,9 @@ export type Workflow = {
    * `danger-full-access`. Absent: Codex's `workspace-write`. Refused on claude and claude-detached, whose fence is `permissionMode`.
    *
    * On codex the key's former name, `permissionMode:`, is still read in a folder or an agent: a sandbox's word is read as `sandbox:`
-   * (`codexSandboxNamed`, with `bypassPermissions` as `danger-full-access`), and `nemia start` names the line to rename (`codexModeLine`). The
-   * engine's task calls it `permissionMode`: the tick hands it over under that name (`modeOf`), so a run record that holds a codex step's
-   * sandbox as `permissionMode` is filed with it all the same.
+   * (`codexSandboxNamed`, with `bypassPermissions` as `danger-full-access`), and `nemia start` names the line to rename (`codexModeLine`).
+   * The engine's task calls it `permissionMode`: the tick hands it over under that name (`modeOf`), so a run record that holds a codex
+   * step's sandbox as `permissionMode` is filed with it all the same.
    */
   sandbox?: string;
   /**
@@ -129,11 +129,11 @@ export type Workflow = {
   /**
    * `denials: fail`: a try whose session the harness denied a call is not passed on. It signs off as ever, and the step reads `denied` —
    * nothing after it is filed, no check is run on work done without the tool, and it waits on a person — rather than going on with the
-   * `denied: …` note beside its word. `retries:` never spends a try on it: `allowedTools:` is frozen on the run at `nemia start`, so a try the
-   * run filed on its own would be denied the same call again. A person tries it again with `nemia retry` (a new session, told what it was
-   * denied, to do without it), or adds the rule the offer names to the folder's `allowedTools:` and starts a new run. Absent: denials are
-   * recorded and said, and decide nothing. Every denial counts, one the checkout's settings or the step's own `disallowedTools:` make on
-   * purpose included. Refused where no denial is ever read, rather than accepted and never met: on codex, which records none, and beside
+   * `denied: …` note beside its word. `retries:` never spends a try on it: `allowedTools:` is frozen on the run at `nemia start`, so a try
+   * the run filed on its own would be denied the same call again. A person tries it again with `nemia retry` (a new session, told what it
+   * was denied, to do without it), or adds the rule the offer names to the folder's `allowedTools:` and starts a new run. Absent: denials
+   * are recorded and said, and decide nothing. Every denial counts, one the checkout's settings or the step's own `disallowedTools:` make
+   * on purpose included. Refused where no denial is ever read, rather than accepted and never met: on codex, which records none, and beside
    * `background: true`, whose `claude --bg` session records none either (agent-runtime's open issue 28).
    */
   denials?: 'fail';
@@ -177,8 +177,8 @@ export type Workflow = {
   /**
    * `gate: true`: the step's closeout waits for a person before anything after it is filed. Verified first, where it has a `check:`, then
    * held — `awaiting approval` — until `nemia approve` is on disk for the try it is on. Not control flow: the run files nothing on a
-   * condition, it waits for a person's word, as it does at the run boundary. Absent: no gate, as `nemia start --gate <step>` can still set one
-   * for a run.
+   * condition, it waits for a person's word, as it does at the run boundary. Absent: no gate, as `nemia start --gate <step>` can still set
+   * one for a run.
    */
   gate?: true;
   /**
@@ -249,9 +249,9 @@ export type StepAgent = {
   customInstructions?: string;
   skills?: string[];
   /**
-   * The skills the step's own `skills:` line gives that its agent does not, in the line's order, frozen at `nemia start` so the run tells the
-   * agent's skills from the step's: on every step with its own line, empty when each it names is the agent's already, and absent on a step
-   * without one. Read by no session, which is given `skills`.
+   * The skills the step's own `skills:` line gives that its agent does not, in the line's order, frozen at `nemia start` so the run tells
+   * the agent's skills from the step's: on every step with its own line, empty when each it names is the agent's already, and absent on a
+   * step without one. Read by no session, which is given `skills`.
    */
   addedSkills?: string[];
   harnessPrompt?: HarnessPrompt;

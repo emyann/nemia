@@ -62,8 +62,9 @@ const REMOTE_REFUSED: Partial<Record<StepKey, string>> = {
 };
 
 /**
- * Why a remote step's try may not be asked for with `nemia retry --<key>` — `--model`, `--budget` — in the words its load refuses the key in,
- * or undefined for a local harness: the tick files a remote try with no harness arguments (`localFields`), so the flag would be dropped.
+ * Why a remote step's try may not be asked for with `nemia retry --<key>` — `--model`, `--budget` — in the words its load refuses the key
+ * in, or undefined for a local harness: the tick files a remote try with no harness arguments (`localFields`), so the flag would be
+ * dropped.
  */
 export function remoteRetryRefusal(step: Workflow, flag: 'model' | 'budget', value: string | number, command: string): string | undefined {
   if (!isRemoteHarness(step.harness)) return undefined;

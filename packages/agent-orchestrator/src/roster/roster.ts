@@ -1,9 +1,9 @@
 /**
- * One reading of an agent, as `nemia agents` prints it and the api answers it (`AgentReading`): the one with nothing in it, which each reading
- * starts from (`emptyReading`), the one of a file that does not read as an agent, its lines as written so a form can show what to fix
- * (`unreadReading`), the lines `nemia agents` and `nemia agents card` print of what was read (`agentsLines`, `cardNote`), and the agents the
- * Agents page lists with the steps each fills (`inFactory`). Pure: the reading off disk is `roster.store.ts`, and the steps filled
- * `fills.store.ts`.
+ * One reading of an agent, as `nemia agents` prints it and the api answers it (`AgentReading`): the one with nothing in it, which each
+ * reading starts from (`emptyReading`), the one of a file that does not read as an agent, its lines as written so a form can show what to
+ * fix (`unreadReading`), the lines `nemia agents` and `nemia agents card` print of what was read (`agentsLines`, `cardNote`), and the
+ * agents the Agents page lists with the steps each fills (`inFactory`). Pure: the reading off disk is `roster.store.ts`, and the steps
+ * filled `fills.store.ts`.
  */
 import path from 'node:path';
 import { AGENTS_FOLDER, splitFrontmatter } from '../step/step.ts';

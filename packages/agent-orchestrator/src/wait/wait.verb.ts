@@ -17,9 +17,9 @@ import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 export type Holding = { run: Run; hold: Hold };
 
 /**
- * Hold a run until other runs ship — `nemia hold <run> --until <run>…`: while any of them has not shipped, as `nemia decide` says it of that run
- * (`parentOf`, which `--after` reads), nothing of this run is filed and nothing of it is asked of a person (`assess`); what is in flight
- * runs on. The tick lifts the hold on the pass that reads every one of them shipped (`advance`).
+ * Hold a run until other runs ship — `nemia hold <run> --until <run>…`: while any of them has not shipped, as `nemia decide` says it of
+ * that run (`parentOf`, which `--after` reads), nothing of this run is filed and nothing of it is asked of a person (`assess`); what is in
+ * flight runs on. The tick lifts the hold on the pass that reads every one of them shipped (`advance`).
  *
  * Refused before anything is written, exit 2, with what to do instead: an id that is not a run's (`idRefusal`), and one named after
  * `--until`, whose fix keeps the run to hold; a run not there, and what `holdRefusal` refuses — nothing named, a run cancelled, pruned,
@@ -73,7 +73,8 @@ export async function hold(e: Engine, id: string, until: readonly string[], said
   if (!put)
     throw new Conflict({
       message:
-        holdRefusal(runStore.runs.read(id), until, (u) => read.get(u) ?? { shipped: false }, []) ?? `${id} is already held: nemia ls ${id}.`,
+        holdRefusal(runStore.runs.read(id), until, (u) => read.get(u) ?? { shipped: false }, []) ??
+        `${id} is already held: nemia ls ${id}.`,
     });
   return { run: { ...run, hold: put }, hold: put };
 }

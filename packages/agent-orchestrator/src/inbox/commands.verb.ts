@@ -116,9 +116,9 @@ const ADD_SPEC: Spec = {
 };
 
 /**
- * `nemia inbox add`: an idea filed as a card. Its handler is handed the idea's text under `idea`, and, for an idea read from a file, the file
- * under `from` and its folder under `dir`, the folder a workflow's path is read from: the CLI's runner reads the file, and the api's route
- * finds the workflow among the folders a start finds one in, so neither a path nor a file reaches the handler from a body.
+ * `nemia inbox add`: an idea filed as a card. Its handler is handed the idea's text under `idea`, and, for an idea read from a file, the
+ * file under `from` and its folder under `dir`, the folder a workflow's path is read from: the CLI's runner reads the file, and the api's
+ * route finds the workflow among the folders a start finds one in, so neither a path nor a file reaches the handler from a body.
  */
 export const INBOX_ADD: Command<{ card: InboxCard; file: string }> = {
   name: 'inbox add',
@@ -176,7 +176,8 @@ const QUEUE_SPEC: Spec = {
       ? `nemia inbox queue does not take ${arg}. It takes the card's name, then --workflow <w>, or --off to take the card back.`
       : `nemia inbox queue queues one card, and ${arg} is a second: nemia inbox queue <name>, once per card.`,
   apart: () => QUEUE_WORKFLOW.takes!,
-  missing: 'nemia inbox queue takes the name of the card to queue, as nemia inbox lists it: nemia inbox queue <name> [--workflow <w>] [--off].',
+  missing:
+    'nemia inbox queue takes the name of the card to queue, as nemia inbox lists it: nemia inbox queue <name> [--workflow <w>] [--off].',
 };
 
 /** What `nemia inbox queue` did, as the api answers it, and the card as it now reads. */
@@ -191,8 +192,9 @@ type Queued = {
 };
 
 /**
- * `nemia inbox queue`: a card marked to start on its own, or with `--off` the mark taken back. `--workflow` is the command line's alone, and
- * written as it is handed: its runner reads a path from where it is typed (`inboxQueueRun`), and this handler reads no folder of its own.
+ * `nemia inbox queue`: a card marked to start on its own, or with `--off` the mark taken back. `--workflow` is the command line's alone,
+ * and written as it is handed: its runner reads a path from where it is typed (`inboxQueueRun`), and this handler reads no folder of its
+ * own.
  */
 export const INBOX_QUEUE: Command<Queued> = {
   name: 'inbox queue',

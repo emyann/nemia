@@ -41,9 +41,9 @@ export const runReady = (run: Run, shipped: (runId: string) => boolean): boolean
 export type ParentRun = { record?: Run; shipped: boolean; gone?: string[] };
 
 /**
- * A run this one waits on, as `nemia ls` and `nemia decide` name it: its id and, when it may never ship without a person, why — the store has
- * no such run, it was cancelled, or a result branch it recorded is gone, and git cannot find it on the base. `shipped` only on a hold whose
- * every run has shipped, in the moment before the tick lifts it (`holdsOf`).
+ * A run this one waits on, as `nemia ls` and `nemia decide` name it: its id and, when it may never ship without a person, why — the store
+ * has no such run, it was cancelled, or a result branch it recorded is gone, and git cannot find it on the base. `shipped` only on a hold
+ * whose every run has shipped, in the moment before the tick lifts it (`holdsOf`).
  */
 export type Wait = { run: string; missing?: true; cancelledAt?: string; gone?: string[]; shipped?: true };
 
@@ -65,8 +65,8 @@ export const waitWord = (waits: readonly Wait[]): string =>
   `waiting on ${waits.map((w) => `${w.run}${w.missing ? ' (no such run)' : w.cancelledAt ? ' (cancelled)' : w.gone?.length ? ` (${w.gone.join(', ')} gone)` : ''}`).join(', ')}`;
 
 /**
- * What a run waiting on runs leaves a person to do, in one line, for `nemia decide` and for `nemia ls`'s `→ waiting on you`. Pure. Nothing, while
- * each parent may still ship: the tick files the roots when it does. For a parent that never will without a person — no such run, a
+ * What a run waiting on runs leaves a person to do, in one line, for `nemia decide` and for `nemia ls`'s `→ waiting on you`. Pure. Nothing,
+ * while each parent may still ship: the tick files the roots when it does. For a parent that never will without a person — no such run, a
  * cancelled one, a result branch gone — why, and the two ways out: cancel this run, or start the work again without that edge.
  */
 export function waitAdvice(run: Run, waits: readonly Wait[]): string {
@@ -85,9 +85,9 @@ export function waitAdvice(run: Run, waits: readonly Wait[]): string {
 }
 
 /**
- * The runs a held run waits on to ship (`Run.hold`), as `nemia ls` and `nemia decide` name them: each that has not shipped, and why it may never
- * (`waitsOf`'s words). Pure. None for a run nobody holds. While every one has shipped and the tick has not yet lifted the hold, each is
- * named all the same, marked `shipped`: the run is still held, and says why for the moment it is.
+ * The runs a held run waits on to ship (`Run.hold`), as `nemia ls` and `nemia decide` name them: each that has not shipped, and why it may
+ * never (`waitsOf`'s words). Pure. None for a run nobody holds. While every one has shipped and the tick has not yet lifted the hold, each
+ * is named all the same, marked `shipped`: the run is still held, and says why for the moment it is.
  */
 export function holdsOf(run: Run, parentOf: (runId: string) => ParentRun): Wait[] {
   if (!run.hold) return [];
@@ -119,8 +119,8 @@ const saidWord = ({ why, by }: Pick<Hold, 'why' | 'by'>): string => {
 };
 
 /**
- * A held run, as `nemia ls` and `nemia decide` say it: `held until a-1x2y ships`, each run it waits on with why it may never, as `waitWord` names
- * them, then what the person who put the hold said of it when `said` is given: `held until a-1x2y ships (why: merge conflicts; by
+ * A held run, as `nemia ls` and `nemia decide` say it: `held until a-1x2y ships`, each run it waits on with why it may never, as `waitWord`
+ * names them, then what the person who put the hold said of it when `said` is given: `held until a-1x2y ships (why: merge conflicts; by
  * operator)`. Pure. Never `waiting on you`: a hold is a person's word already given, and nothing is asked of anyone while it stands.
  *
  * @param said The hold's `why` and `by`, each shown when it is there; a hold file older code wrote has neither, and shows the plain line.
@@ -141,10 +141,10 @@ export function holdWord(waits: readonly Wait[], said: Pick<Hold, 'why' | 'by'> 
 }
 
 /**
- * What a held run leaves a person to do, in one line, for `nemia decide` and `nemia ls`. Pure. Nothing, while each run it waits on may still
- * ship: the tick lifts the hold when they have, and what the run's steps ask is asked then. For a run that never will without a person —
- * no such run, a cancelled one, a result branch gone — or a hold that names no run, why, and the ways out: lift the hold, or cancel the
- * run.
+ * What a held run leaves a person to do, in one line, for `nemia decide` and `nemia ls`. Pure. Nothing, while each run it waits on may
+ * still ship: the tick lifts the hold when they have, and what the run's steps ask is asked then. For a run that never will without a
+ * person — no such run, a cancelled one, a result branch gone — or a hold that names no run, why, and the ways out: lift the hold, or
+ * cancel the run.
  */
 export function holdAdvice(run: Run, waits: readonly Wait[]): string {
   const off = `nemia hold ${run.id} --off`;
@@ -257,8 +257,8 @@ export function holdRefusal(
  *
  * Refused: an id given twice; a run the store does not have; a run on another repository, or shipping onto another base branch — it would
  * never ship onto this run's, or this run would never start from a base with its work; a run that worked on its base branch itself
- * (`--no-worktree`), which has no result branch to ship; a cancelled run, which `nemia decide` never calls shipped, whatever git says of its
- * branch; and one whose result branch is gone, and whose commit git cannot find on the base — this run would wait for ever on either. A
+ * (`--no-worktree`), which has no result branch to ship; a cancelled run, which `nemia decide` never calls shipped, whatever git says of
+ * its branch; and one whose result branch is gone, and whose commit git cannot find on the base — this run would wait for ever on either. A
  * folder run is refused on either side, since it ships onto no branch: as the parent, and as this run, whatever the id names. Handed only
  * what the record and git say (`parentRecord` in branches.store.ts): nothing here needs the engine. The run itself cannot be named: it has
  * no id yet.
@@ -277,7 +277,8 @@ export function afterRefusal(
       return `--after ${id}: this run's team works in folders (workspace: folder), and --after waits for a run to ship onto a git branch, which a folder run has none of. Start it without --after, once ${id} is done.`;
     }
     const { record, gone } = parentOf(id);
-    if (!record) return `--after ${id}: the store has no run ${id}. --after takes a run this one waits on, by its id — nemia ls lists them.`;
+    if (!record)
+      return `--after ${id}: the store has no run ${id}. --after takes a run this one waits on, by its id — nemia ls lists them.`;
     if (record.repo === undefined) {
       return `--after ${id}: ${id} is a folder run (workspace: folder), which never ships onto a branch, so this run would wait for ever. When ${id}'s work is done, ${without}.`;
     }

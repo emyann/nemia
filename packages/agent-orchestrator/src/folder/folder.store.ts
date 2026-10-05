@@ -258,8 +258,8 @@ export function loadWorkflows(dir: string, places: Places = {}, fills?: Fills): 
 
 /**
  * A line for each file of the workflow in `dir` that still writes a key under its former name (`formerKeyLine`): its step files, then each
- * agent a step names, once. What `nemia start` prints after it has started the run, which the former names do not stop. None for a folder that
- * is not there, and a file that cannot be read says nothing here: the load has said why.
+ * agent a step names, once. What `nemia start` prints after it has started the run, which the former names do not stop. None for a folder
+ * that is not there, and a file that cannot be read says nothing here: the load has said why.
  *
  * A file that runs on codex — by its own `harness:` line, or a step's by its agent's — and still names its sandbox as `permissionMode:` is
  * named too (`codexModeLine`): the parser reads the line as `sandbox:`. So is an agent that still says `systemPrompt:`

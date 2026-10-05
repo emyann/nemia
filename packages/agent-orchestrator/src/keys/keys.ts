@@ -165,8 +165,8 @@ export function dollarsOf(written: string): number | undefined {
 
 /**
  * `budget:` as dollars, refused unless an amount above zero (`dollarsOf`). Which harnesses keep a cap, and beside what, is the runtime's to
- * say at `nemia start` (`configRefused` in start.verb.ts). `$5` and `5 USD` are what the author meant, so the refusal writes the amount back
- * without its unit, as `deadlineSeconds: 5m`'s does the arithmetic.
+ * say at `nemia start` (`configRefused` in start.verb.ts). `$5` and `5 USD` are what the author meant, so the refusal writes the amount
+ * back without its unit, as `deadlineSeconds: 5m`'s does the arithmetic.
  */
 export function budgetOf(step: string, budget: string | undefined): number | undefined {
   if (budget === undefined) return undefined;

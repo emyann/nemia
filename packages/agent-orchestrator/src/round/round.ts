@@ -1,6 +1,6 @@
 /**
- * A loop's rounds: those due now (`roundsDue`) and the steps once one is filed (`roundFiled`), what `nemia round` and `nemia accept` ask and
- * refuse (`roundAsk`, `acceptAsk`), and what `nemia ls` and `nemia decide` say of a loop (`roundDueNote`, `roundLines`). Pure.
+ * A loop's rounds: those due now (`roundsDue`) and the steps once one is filed (`roundFiled`), what `nemia round` and `nemia accept` ask
+ * and refuse (`roundAsk`, `acceptAsk`), and what `nemia ls` and `nemia decide` say of a loop (`roundDueNote`, `roundLines`). Pure.
  */
 import { DEFAULT_ROUNDS, type Workflow } from '../step/step.ts';
 import {
@@ -139,9 +139,9 @@ export const roundBudgetRefusal = (id: string, budget?: number): string | null =
  * A round of a loop whose step is over its budget is a person's to ask for, at the cap or below it, and only with `budget` — `--budget`
  * above what each such step has cost — which is refused by name when it is not, and refused on a loop with no step over its budget.
  *
- * A loop a person ended themselves (`nemia accept`) reads `verified` again: while nothing waiting on it is filed, the way back into the loop
- * is to take the acceptance back; once something is, a round is refused, since it would file the loop's work again under a step that ran
- * on it and take none of that back. A step of the loop that stopped in the round, on its own status whatever its budget, is a try's to
+ * A loop a person ended themselves (`nemia accept`) reads `verified` again: while nothing waiting on it is filed, the way back into the
+ * loop is to take the acceptance back; once something is, a round is refused, since it would file the loop's work again under a step that
+ * ran on it and take none of that back. A step of the loop that stopped in the round, on its own status whatever its budget, is a try's to
  * take on; one over budget only because a round would file it again has not stopped. A step of the loop at its gate is moved by a
  * person's word, not a round. A loop that is over, with an ending held at its gate before it is filed (`waitsAtGate`) waiting on it, is
  * offered that approval and the send-back of the work (`sendBackTo`); with an ending that stopped on the base branch (`endingStopped`),
@@ -314,8 +314,8 @@ export const acceptWordsRefusal = (message: string | undefined, command: string)
  * What `nemia accept` accepts — the looping step and the try — or why it will not, in words that say what to do instead. Pure.
  *
  * `name` may be left out when the workflow has one loop. Only a loop out of rounds with `again` still true — `exhausted`, where the one
- * thing `nemia decide` could offer was another paid round — may be ended on a person's word: what waits on the looping step is then filed as
- * if it had said `again: false`, and its findings stay on the record and travel on the next step's brief (`acceptedSection`).
+ * thing `nemia decide` could offer was another paid round — may be ended on a person's word: what waits on the looping step is then filed
+ * as if it had said `again: false`, and its findings stay on the record and travel on the next step's brief (`acceptedSection`).
  *
  * Refused: words that are missing or empty; a cancelled run, which files nothing; a step that is not here or has no `loop:`, a workflow
  * with no loop, or several and none named; a try already accepted; a round already asked for, which the next tick files; a round the run
@@ -432,8 +432,8 @@ export function roundDueNote(steps: readonly Workflow[], r: Round): string {
 
 /**
  * A loop out of rounds, beside its looping step's line: where it stands, and the command that takes it once more — with `--budget`, past a
- * step's. On a pruned run, where it stands and why there is no more: `nemia round` is refused there (`prunedRefusal`), and a note never offers
- * a refused verb.
+ * step's. On a pruned run, where it stands and why there is no more: `nemia round` is refused there (`prunedRefusal`), and a note never
+ * offers a refused verb.
  */
 export const exhaustedNote = (step: Workflow, run: Run, raise = false): string =>
   `${roundWord(roundOf(run, step.name), capOf(step))}, and it asked again — ${run.pruned ? noMoreRounds(run.pruned) : run.hold ? heldLater(run.hold, 'once more') : `once more: nemia round ${run.id} ${step.name}${raise ? ' --budget <amount>' : ''}`}`;
@@ -463,13 +463,13 @@ const overWords = (over: ReadonlyArray<{ name: string; spent: Spend; cap: number
   over.map((o) => `${o.name} has cost ${spentWord(o.spent)} of its ${budgetWord(o.cap)} budget`).join(', and ');
 
 /**
- * What `nemia decide` offers for each loop out of rounds, and each whose round waits on a step's budget: the `nemia round` that takes it once
- * more, with `--budget` where a step of it is over its budget, and what that files. Pure. `spendOf` as `stepStatus` takes it.
+ * What `nemia decide` offers for each loop out of rounds, and each whose round waits on a step's budget: the `nemia round` that takes it
+ * once more, with `--budget` where a step of it is over its budget, and what that files. Pure. `spendOf` as `stepStatus` takes it.
  *
  * None on a pruned run (`prunedRefusal`), nor on a held one (`heldRefusal`). A loop over budget and not held for it, its own try stopped,
- * is `retryLines`' to offer. `nemia accept` is offered only out of rounds: below the cap the run goes round itself, and on a round held for a
- * budget raising it is the way on (`acceptAsk`). Each offer is its sentence and the bare command it ends on (`Offer`), the sentence written
- * around the command.
+ * is `retryLines`' to offer. `nemia accept` is offered only out of rounds: below the cap the run goes round itself, and on a round held for
+ * a budget raising it is the way on (`acceptAsk`). Each offer is its sentence and the bare command it ends on (`Offer`), the sentence
+ * written around the command.
  */
 export function roundOffers(steps: readonly Workflow[], run: Run, d: Decision, spendOf: SpendOf = () => undefined): Offer[] {
   if (d.kind !== 'awaiting' || run.pruned || run.hold) return [];

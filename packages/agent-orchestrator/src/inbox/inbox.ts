@@ -13,11 +13,11 @@
  * that is chosen at start. `repo:` is a key of its own, optional too: the absolute path of the repository the idea is about. And an inbox
  * card has no `after:`: what it waits on is said at start, when the runs it could wait on are known.
  *
- * `queued:` marks a card to start on its own (`nemia inbox queue`): the time it was queued, which orders the queue. The tick starts the oldest
- * such card when a run slot is free (`queueOrder`, `startQueued` in inbox.verb.ts).
+ * `queued:` marks a card to start on its own (`nemia inbox queue`): the time it was queued, which orders the queue. The tick starts the
+ * oldest such card when a run slot is free (`queueOrder`, `startQueued` in inbox.verb.ts).
  *
- * `gate:` names a step of the card's workflow whose closeout waits for a person — `nemia approve` — before anything after it is filed, for the
- * run the card starts and no other: a plan read before anyone implements it. Whether the workflow has that step is the start's to say.
+ * `gate:` names a step of the card's workflow whose closeout waits for a person — `nemia approve` — before anything after it is filed, for
+ * the run the card starts and no other: a plan read before anyone implements it. Whether the workflow has that step is the start's to say.
  *
  * `factory:` names the factory that processes the card: its run is started in it, on its repository when it has one. A card is started
  * only in a factory named for it, here or at start, never one inferred from its folder or its `repo:` (`unfactoredCardRefusal`). Whether
@@ -189,8 +189,8 @@ export function inboxNameRefusal(name: string): string | undefined {
 }
 
 /**
- * That the inbox has no card `name`, and which it has — the cards `nemia inbox` lists, by name — with the name without its `.md` when that is
- * one of them.
+ * That the inbox has no card `name`, and which it has — the cards `nemia inbox` lists, by name — with the name without its `.md` when that
+ * is one of them.
  */
 export function noCardLine(name: string, cards: readonly string[]): string {
   const bare =
@@ -244,11 +244,11 @@ export type InboxListing = {
 export type QueueTry = { at: string; text: string; repo: string; why: string; refused: boolean };
 
 /**
- * The inbox as `nemia inbox` lists it, by file name: every entry of the folder — a folder inside it by its name and a trailing `/` — each card
- * with the runs its name is on (`startedAs`), and each entry that is not a card listed with why, never hidden. A hidden file and a README
- * are not listed: the one is an editor's, the other says what the folder is for. A queued card says when, and its place in the order; and,
- * when the tick's last try of its start is of the card as it stands (`tries`, by name), that try. A queued card that reads but for a
- * `repo:` naming no directory keeps its place, with its workflow and repository as written, the repository keying its try: the start
+ * The inbox as `nemia inbox` lists it, by file name: every entry of the folder — a folder inside it by its name and a trailing `/` — each
+ * card with the runs its name is on (`startedAs`), and each entry that is not a card listed with why, never hidden. A hidden file and a
+ * README are not listed: the one is an editor's, the other says what the folder is for. A queued card says when, and its place in the
+ * order; and, when the tick's last try of its start is of the card as it stands (`tries`, by name), that try. A queued card that reads but
+ * for a `repo:` naming no directory keeps its place, with its workflow and repository as written, the repository keying its try: the start
  * refuses it by name, as it refuses a workflow gone, and it never leaves the queue with nothing said. An entry that does not read for
  * another reason is not queued.
  */
@@ -376,9 +376,9 @@ export const ignoredRepoLine = (repo: string): string =>
   `the card's repo: ${repo} was not looked at — this workflow's steps work in folders, with no git repository`;
 
 /**
- * A pass's start of a queued card, as `nemia up` and `nemia tick` log it: `started <card> as <runId>`, or why it was not started, and what then.
- * A card whose `repo:` the run looked at none of says so in the same line (`ignoredRepoLine`). A failure is said once by the daemon that
- * says it — `nemia up` keeps the last one it printed, rather than reading `again`, which is a fact about the store and not about this
+ * A pass's start of a queued card, as `nemia up` and `nemia tick` log it: `started <card> as <runId>`, or why it was not started, and what
+ * then. A card whose `repo:` the run looked at none of says so in the same line (`ignoredRepoLine`). A failure is said once by the daemon
+ * that says it — `nemia up` keeps the last one it printed, rather than reading `again`, which is a fact about the store and not about this
  * terminal.
  */
 export function queueLine(q: QueueStarted): string {
@@ -495,8 +495,8 @@ export function ideaCard(
 
 /**
  * A card's text with `queued:` set to `at` — or taken off, for `null` — and `workflow:` written over its own when given, its `repo:`,
- * `gate:` and `factory:` kept: what `nemia inbox queue` writes. The frontmatter is written again in the keys' order, its comments dropped, as
- * `nemia inbox add` writes a card, and a body that opens with a `---` rule of its own is kept from being read as the frontmatter, as
+ * `gate:` and `factory:` kept: what `nemia inbox queue` writes. The frontmatter is written again in the keys' order, its comments dropped,
+ * as `nemia inbox add` writes a card, and a body that opens with a `---` rule of its own is kept from being read as the frontmatter, as
  * `ideaCard` keeps it. Pure; the text it gives reads back as a card (`parseInboxCard`), or is refused as one would be.
  */
 export function queuedText(card: InboxCard, at: string | null, isDirectory: (at: string) => boolean, workflow?: string): string {
@@ -532,8 +532,8 @@ export function queueRefusal(
 
 /**
  * The name of the inbox card `at` names — a path under the inbox `dir`, as its path from there, less a trailing `.md`, so `<dir>/<name>` is
- * the card `nemia inbox` lists as `<name>` — or null for a path outside it, and for the inbox itself: what makes `nemia start <path>` start a
- * card out of the inbox. Both paths are taken as given; inbox.store.ts resolves links first.
+ * the card `nemia inbox` lists as `<name>` — or null for a path outside it, and for the inbox itself: what makes `nemia start <path>` start
+ * a card out of the inbox. Both paths are taken as given; inbox.store.ts resolves links first.
  *
  * Every path under the inbox goes to the start, never to a brief: whether the card is there, and whether the name is a card's — a folder
  * inside the inbox gives one with a slash — is `startFromInbox`'s to say, by name. Taken as a brief, a card's name typed without its `.md`

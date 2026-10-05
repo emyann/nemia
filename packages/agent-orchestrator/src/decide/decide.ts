@@ -251,10 +251,10 @@ export function decision(
 }
 
 /**
- * A step's `cost` line on `nemia decide`, under its `used`: what its current try cost (`used`, as `consumption` reads it) and what it read, by
- * price (`readWords`: `read 21.4M · wrote 412k · peak 167k`, its peak against the step's `context:`) — and for a step whose tries ran more
- * than one session, what they have cost together (`stepSpend`) — then the cap in force on it. Pure. `not measured` where nobody measured,
- * never $0, and nothing of what it read where nobody counted that.
+ * A step's `cost` line on `nemia decide`, under its `used`: what its current try cost (`used`, as `consumption` reads it) and what it read,
+ * by price (`readWords`: `read 21.4M · wrote 412k · peak 167k`, its peak against the step's `context:`) — and for a step whose tries ran
+ * more than one session, what they have cost together (`stepSpend`) — then the cap in force on it. Pure. `not measured` where nobody
+ * measured, never $0, and nothing of what it read where nobody counted that.
  */
 export function costLine(step: Workflow | undefined, run: Run, name: string, used: Consumed | undefined, spendOf: SpendOf): string {
   const current = used?.costUsd !== undefined ? dollars(used.costUsd) : 'not measured';
@@ -271,8 +271,8 @@ export function costLine(step: Workflow | undefined, run: Run, name: string, use
 }
 
 /**
- * The run's `cost` on `nemia decide`, after its steps: every step's tries together (`runSpend`), with how many ended attempts have no cost on
- * them — or `not measured`. Pure. None before any attempt has ended.
+ * The run's `cost` on `nemia decide`, after its steps: every step's tries together (`runSpend`), with how many ended attempts have no cost
+ * on them — or `not measured`. Pure. None before any attempt has ended.
  */
 export function runCostLines(run: Run, spendOf: SpendOf): string[] {
   const spent = runSpend(run, spendOf);
@@ -285,15 +285,16 @@ export function runCostLines(run: Run, spendOf: SpendOf): string[] {
 
 /**
  * A verb `nemia decide` offers a person for one step (`retryOffers`, `roundOffers`): the sentence it prints, and the bare command that
- * sentence ends on — `nemia retry <run> <step>`, with `--recheck`, `--fresh`, `--budget <amount>` or `--message "<objection>"`; `nemia round
- * <run> <step>`, with `--budget <amount>` past a cap; or `nemia accept <run> <step> --message "<why>"`.
+ * sentence ends on — `nemia retry <run> <step>`, with `--recheck`, `--fresh`, `--budget <amount>` or `--message "<objection>"`; `nemia
+ * round <run> <step>`, with `--budget <amount>` past a cap; or `nemia accept <run> <step> --message "<why>"`.
  */
 export type Offer = { step: string; command: string; said: string };
 
 /**
  * A command `nemia decide` offers, and runs none of: ship it, drop it, read it for a run worked on its base branch, forget it for a folder
- * run, each once-more (`nemia retry`, `nemia round`) and accept with the line it prints it in, and for a step waiting at its gate on you, the
- * approval (`nemia approve`) and a send-back (`nemia retry --message`) for each step it names. `said` is null where the label is all it says.
+ * run, each once-more (`nemia retry`, `nemia round`) and accept with the line it prints it in, and for a step waiting at its gate on you,
+ * the approval (`nemia approve`) and a send-back (`nemia retry --message`) for each step it names. `said` is null where the label is all it
+ * says.
  */
 export type DecideCommand = {
   label: 'ship it' | 'drop it' | 'read it' | 'once more' | 'accept' | 'approve' | 'send back' | 'forget it';

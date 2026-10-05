@@ -63,13 +63,13 @@ export type Decided = {
   /** The rounds the next tick files: asked for with `again: true`, or with `nemia round`. */
   rounding: Round[];
   /**
-   * For each loop out of rounds, the `nemia round` that goes once more (`roundLines`); for each step a person may try again, the `nemia retry`
-   * (`retryLines`).
+   * For each loop out of rounds, the `nemia round` that goes once more (`roundLines`); for each step a person may try again, the `nemia
+   * retry` (`retryLines`).
    */
   offers: string[];
   /**
-   * The commands a person may type on a run awaiting them (`choicesOf`), each a bare `nemia` or `git -C` line with its label: what the board
-   * offers and `nemia decide` prints. None on a run that awaits nobody.
+   * The commands a person may type on a run awaiting them (`choicesOf`), each a bare `nemia` or `git -C` line with its label: what the
+   * board offers and `nemia decide` prints. None on a run that awaits nobody.
    */
   commands: DecideCommand[];
   /** The OVER BUDGET line, saying why each step over its budget is held (`overBudgetLine`); undefined with none. */
@@ -300,8 +300,8 @@ export const decideRun = Effect.fn('decide')(function* (id: string, env: NodeJS.
 });
 
 /**
- * `nemia decide` (`decideRun`) in a Promise, over `engine`: what the CLI and the tests call. Rejects with the refusal the program failed with,
- * or with whatever else it died of, as it was thrown.
+ * `nemia decide` (`decideRun`) in a Promise, over `engine`: what the CLI and the tests call. Rejects with the refusal the program failed
+ * with, or with whatever else it died of, as it was thrown.
  */
 export const decide = (engine: Engine, id: string, env?: NodeJS.ProcessEnv): Promise<Decided> =>
   Effect.runPromise(decideRun(id, env).pipe(Effect.provide(EngineService.layer(engine))));

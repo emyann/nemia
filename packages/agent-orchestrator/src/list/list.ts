@@ -1,6 +1,6 @@
 /**
- * What `nemia ls` shows of a run and each of its steps (`listing`), and the words it and the board say of a wait: a harness's (`waitingWords`,
- * `harnessWaitLine`), a denial's (`deniedWords`), a person's (`onYouWords`). Pure.
+ * What `nemia ls` shows of a run and each of its steps (`listing`), and the words it and the board say of a wait: a harness's
+ * (`waitingWords`, `harnessWaitLine`), a denial's (`deniedWords`), a person's (`onYouWords`). Pure.
  */
 import { gated, hasStarted, holdAdvice, holdWord, waitAdvice, waitWord, type Wait } from '../wait/wait.ts';
 import { slotWord, type CheckoutHold, type RunSlot } from '../cap/cap.ts';
@@ -51,8 +51,8 @@ export type Listing = {
    * One line per step: its name, what to say about it, and the branch it is on — and, only for a step tried
    * again or about to be, `note`: the try it is on and how it got there (`tryNote`), or the try due (`dueNote`).
    * Beside the status and never in it, so the words stay the vocabulary a reader of them keys on: so are `waits`, what the harness says a
-   * `needs-human` session waits for (`waitingWords`), and `denied`, what its current try was denied (`deniedWords`), which `nemia ls` prints
-   * in the line (`shownStatus`, `shownNote`) and the board does not.
+   * `needs-human` session waits for (`waitingWords`), and `denied`, what its current try was denied (`deniedWords`), which `nemia ls`
+   * prints in the line (`shownStatus`, `shownNote`) and the board does not.
    */
   steps: Array<{ name: string; status: string; branch: string | null; note?: string; cost?: string; waits?: string; denied?: string }>;
   /**
@@ -393,8 +393,8 @@ const DETERMINED = /^(a|an|the|its|their|another|some|one|no)\b/i;
  * wrong for `permission prompt`.
  *
  * **One line, whatever the harness sent.** The word is free text, so it can carry a newline — `permission prompt` naming a command it
- * would run, say — and `nemia ls` pads each status to the width of the widest (`cli/main.ts`): a status with a newline in it breaks its row in
- * two and mis-aligns every other row of that run, and `nemia decide` splits the same way. So every run of whitespace becomes one space
+ * would run, say — and `nemia ls` pads each status to the width of the widest (`cli/main.ts`): a status with a newline in it breaks its row
+ * in two and mis-aligns every other row of that run, and `nemia decide` splits the same way. So every run of whitespace becomes one space
  * before the word is measured or clipped.
  */
 export function waitingWords(waitingFor: string): string {
@@ -406,10 +406,10 @@ export function waitingWords(waitingFor: string): string {
 /**
  * What a step's sessions were denied, in a line a person reads: `denied: Skill(look), Bash(pytest)` — or nothing, for none. Pure.
  *
- * **One writer for these words**, as `waitingWords` is for a wait: `nemia ls`, `nemia decide` and the board say the same fact. Each call is the
- * harness's own free text — a path, a command's first word — so each is made one line (`oneLine`) before it is joined: `nemia ls` prints the
- * line in its note, `nemia decide` under the step, and a newline in either breaks the screen. At most `DENIED_SHOWN` are named, then how many
- * more.
+ * **One writer for these words**, as `waitingWords` is for a wait: `nemia ls`, `nemia decide` and the board say the same fact. Each call is
+ * the harness's own free text — a path, a command's first word — so each is made one line (`oneLine`) before it is joined: `nemia ls`
+ * prints the line in its note, `nemia decide` under the step, and a newline in either breaks the screen. At most `DENIED_SHOWN` are named,
+ * then how many more.
  */
 export function deniedWords(denied: readonly string[]): string {
   if (!denied.length) return '';
@@ -442,7 +442,9 @@ export const harnessWaitLine = (waitingFor: string, session: string | null, remo
 /** A row's `denied`, what a step's current try was denied (`deniedWords`); none for a step denied nothing. */
 const deniedRow = (denied: readonly string[]): { denied?: string } => (denied.length ? { denied: deniedWords(denied) } : {});
 
-/** A step's word as `nemia ls` prints it: the bare `needs-human` the row's status keeps, then what the harness says it waits for (`waits`). */
+/**
+ * A step's word as `nemia ls` prints it: the bare `needs-human` the row's status keeps, then what the harness says it waits for (`waits`).
+ */
 export const shownStatus = (s: Pick<Listing['steps'][number], 'status' | 'waits'>): string =>
   s.waits ? s.status.replace(/^needs-human/, (word) => `${word}: ${s.waits}`) : s.status;
 
@@ -453,7 +455,8 @@ export const shownNote = (s: Pick<Listing['steps'][number], 'note' | 'denied'>):
 /**
  * A step at its gate, beside its line on `nemia ls`: the two things a person can say, as the commands that say them. The send-back goes to
  * the step itself once it has run, and to the work it would act on at an ending step's gate, which holds before it is filed (`sendBackTo`).
- * Pruned, neither word is left: `nemia approve` and `nemia retry` are each refused there (`prunedRefusal`). Held, neither is yet (`heldRefusal`).
+ * Pruned, neither word is left: `nemia approve` and `nemia retry` are each refused there (`prunedRefusal`). Held, neither is yet
+ * (`heldRefusal`).
  */
 const gateNote = (run: Pick<Run, 'id' | 'pruned' | 'hold'>, step: string, back: readonly string[]): string =>
   run.pruned
@@ -490,8 +493,9 @@ function asksLines(run: Run, { steps, waitingOnYou, waiting, holding, toDecide }
 }
 
 /**
- * A run's lines on `nemia ls`: its brief and what it cost, a step a line — its word with what the harness says it waits for (`shownStatus`),
- * its cost, its branch, and its note with what it was denied (`shownNote`) — and what it asks; unjudged, its steps and why.
+ * A run's lines on `nemia ls`: its brief and what it cost, a step a line — its word with what the harness says it waits for
+ * (`shownStatus`), its cost, its branch, and its note with what it was denied (`shownNote`) — and what it asks; unjudged, its steps and
+ * why.
  */
 function runLines({ run, listed, result }: RunsListed['runs'][number]): string[] {
   const calledOff = `${run.cancelledAt ? '  (cancelled)' : ''}${run.pruned ? '  (pruned)' : ''}`;

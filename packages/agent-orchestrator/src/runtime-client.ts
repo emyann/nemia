@@ -89,9 +89,9 @@ export const HARNESSES = {
  *
  * Its `a2a:<name>` harnesses are what the store's `a2a-agents.json` declares and the runtime takes (`readRemote`). A file refused as it
  * stands gives none, and an entry refused gives no harness of its name: each is said on stderr and left out, so every other command —
- * `nemia ls`, `nemia up`, `nemia rm`, the api — works on. It is `nemia start` that refuses a step naming what was left out, in the file's words.
- * A step already filed on it runs on no other harness: the runtime routes a task whose harness it does not have to none, so one at work
- * on the agent is held, neither there nor gone, and one not yet started is refused its start (`composite` in the runtime).
+ * `nemia ls`, `nemia up`, `nemia rm`, the api — works on. It is `nemia start` that refuses a step naming what was left out, in the file's
+ * words. A step already filed on it runs on no other harness: the runtime routes a task whose harness it does not have to none, so one at
+ * work on the agent is held, neither there nor gone, and one not yet started is refused its start (`composite` in the runtime).
  */
 export const engine = (): Engine => {
   const read = readRemote();
@@ -208,8 +208,8 @@ export function remoteAgents(): ReadonlyMap<string, RemoteAgent> {
 
 /**
  * The secret for a scheme a remote agent's card asks for: the environment's `WF_A2A_<NAME>_<SCHEME>` (`envNameOf`), read on every request,
- * so a variable set for a running `nemia up` is not seen until it restarts, and none is ever on disk. An empty one is none. None for a local
- * harness.
+ * so a variable set for a running `nemia up` is not seen until it restarts, and none is ever on disk. An empty one is none. None for a
+ * local harness.
  */
 export const credentials: Credentials = (scheme, _agentUrl, harness) => {
   const name = remoteNameOf(harness);

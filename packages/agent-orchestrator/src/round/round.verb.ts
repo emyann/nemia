@@ -1,6 +1,6 @@
 /**
- * `nemia round` and `nemia accept`: go round a loop once more, and end a loop as it stands. Each refuses before anything is written, and writes a
- * person's own file — never the run's record, which the tick owns. A controller, reaching the runtime through the client
+ * `nemia round` and `nemia accept`: go round a loop once more, and end a loop as it stands. Each refuses before anything is written, and
+ * writes a person's own file — never the run's record, which the tick owns. A controller, reaching the runtime through the client
  * (`runtime-client.ts`): Effect programs that require the engine as a service (`roundRun` and `acceptRun`, over `EngineService`), and
  * `round` and `accept`, their plain faces in a Promise, over the engine they are handed.
  */
@@ -76,12 +76,12 @@ export type Accepted = { run: Run; acceptance: Acceptance; file: string };
  *
  * Refused before anything is written, with what to do instead (`acceptAsk`): no words, a round the run files itself or that waits on a
  * budget, a round already asked for, a loop that ended `again: false`, a round still running, a try already accepted, a cancelled run. Like
- * `nemia round`'s, the acceptance is the person's own file, and the verb never writes the run's json, which the tick owns. `stepName` may be
- * left out when the run has one loop. An acceptance written by someone else between the look and the write is refused as the look would
+ * `nemia round`'s, the acceptance is the person's own file, and the verb never writes the run's json, which the tick owns. `stepName` may
+ * be left out when the run has one loop. An acceptance written by someone else between the look and the write is refused as the look would
  * have refused it, and a file at the acceptance's name that ends no loop is named, with how to clear it.
  *
- * Going round once more is not this verb's: `nemia round <run> [<step>]` — and the two are offered side by side (`roundLines`). Fails with a
- * refusal, the verb's or one a read threw; dies of anything else (`tried`, `awaited`).
+ * Going round once more is not this verb's: `nemia round <run> [<step>]` — and the two are offered side by side (`roundLines`). Fails with
+ * a refusal, the verb's or one a read threw; dies of anything else (`tried`, `awaited`).
  */
 export const acceptRun = Effect.fn('accept')(function* (id: string, stepName?: string, message?: string) {
   const e = yield* EngineService;
@@ -113,8 +113,8 @@ export const acceptRun = Effect.fn('accept')(function* (id: string, stepName?: s
 });
 
 /**
- * `nemia accept` (`acceptRun`) in a Promise, over `e`: what the CLI, the api and the tests call. Rejects with the refusal the program failed
- * with, or with whatever else it died of, as it was thrown.
+ * `nemia accept` (`acceptRun`) in a Promise, over `e`: what the CLI, the api and the tests call. Rejects with the refusal the program
+ * failed with, or with whatever else it died of, as it was thrown.
  */
 export const accept = (e: Engine, id: string, stepName?: string, message?: string): Promise<Accepted> =>
   Effect.runPromise(acceptRun(id, stepName, message).pipe(Effect.provide(EngineService.layer(e))));

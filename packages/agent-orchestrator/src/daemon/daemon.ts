@@ -105,15 +105,18 @@ export const STALE_FLOOR_MS = 15 * 60_000;
 /** How long a holder of interval `every` may be silent before it reads as stalled: ten of its intervals, never under fifteen minutes. */
 export const staleAfterMs = (every: number): number => Math.max(STALE_PASSES * every, STALE_FLOOR_MS);
 
-/** The longest interval a timer keeps: Node fires a longer one after 1 ms, so `nemia up 1e10` would pass without pause and never go stale. */
+/**
+ * The longest interval a timer keeps: Node fires a longer one after 1 ms, so `nemia up 1e10` would pass without pause and never go stale.
+ */
 export const MAX_EVERY_MS = 2 ** 31 - 1;
 
 /** The interval `nemia up` ticks at when it is given none. */
 export const DEFAULT_EVERY_MS = 4_000;
 
 /**
- * `nemia up [ms]`'s interval, or why it is refused. A whole number of milliseconds from 1 to `MAX_EVERY_MS`: the interval is written into the
- * file, and one that does not read there — `-5`, or `1e400`, which JSON writes as `null` — would make the daemon no holder while it ticks.
+ * `nemia up [ms]`'s interval, or why it is refused. A whole number of milliseconds from 1 to `MAX_EVERY_MS`: the interval is written into
+ * the file, and one that does not read there — `-5`, or `1e400`, which JSON writes as `null` — would make the daemon no holder while it
+ * ticks.
  */
 export function everyOf(arg: string | undefined): { every: number } | { refusal: string } {
   if (arg === undefined) return { every: DEFAULT_EVERY_MS };
@@ -214,8 +217,8 @@ const stopWords = ({ file, identity }: Pick<Standing, 'file' | 'identity'>): str
       `and a pid is reused once its process ends — if ps -p ${file.pid} -o lstart=,args= shows ${holderOf(file) === 'api' ? 'the api' : 'a nemia up'} started at ${file.startedAt}, kill ${file.pid}`;
 
 /**
- * Why a daemon — `nemia up`, or the api (`verb`) — or a `nemia tick` by hand may not tick `store`, held by `holder` of either kind: which one,
- * its pid, url, where and since when, its last pass, how to stop it, and when it would be taken over on its own. An api is told it can
+ * Why a daemon — `nemia up`, or the api (`verb`) — or a `nemia tick` by hand may not tick `store`, held by `holder` of either kind: which
+ * one, its pid, url, where and since when, its last pass, how to stop it, and when it would be taken over on its own. An api is told it can
  * serve beside it with `--no-tick`. A hand tick has no force: a live daemon runs the same pass within its interval.
  */
 export function holdRefusal(standing: Standing, verb: 'up' | 'api' | 'tick', store: string, now: number): string {
@@ -271,8 +274,8 @@ const unconfirmed = ({ file, identity }: Standing): string =>
 const at = (file: DaemonFile): string => (file.url ? ` at ${file.url}` : '');
 
 /**
- * `nemia ls`'s last line: whether a daemon is ticking the store, which — the api, with its url, or a `nemia up` — and when its last pass was.
- * The line starts with the holder's kind, `daemon` when the store names none.
+ * `nemia ls`'s last line: whether a daemon is ticking the store, which — the api, with its url, or a `nemia up` — and when its last pass
+ * was. The line starts with the holder's kind, `daemon` when the store names none.
  */
 export function daemonLine(standing: DaemonStanding, now: number): string {
   switch (standing.kind) {

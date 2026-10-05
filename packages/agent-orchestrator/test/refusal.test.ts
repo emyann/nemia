@@ -75,7 +75,7 @@ test('REFUSED: a verb throws the kind of what it refuses, with its words', () =>
     () => unhold('r-nope'),
     (err: unknown) =>
       err instanceof Missing &&
-      err.message === 'no such run: r-nope. wf hold takes a run by its id, as wf ls lists it: wf hold <runId> --off.',
+      err.message === 'no such run: r-nope. nemia hold takes a run by its id, as nemia ls lists it: nemia hold <runId> --off.',
   );
   assert.throws(
     () => maxRuns({ WF_MAX_RUNS: 'two' }),

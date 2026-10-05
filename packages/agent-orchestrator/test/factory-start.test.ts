@@ -1,5 +1,5 @@
 /**
- * `wf start --factory`: a run started in a factory, of a workflow attached to it, whose hires fill the workflow's steps. Refused, before
+ * `nemia start --factory`: a run started in a factory, of a workflow attached to it, whose hires fill the workflow's steps. Refused, before
  * anything is written: a workflow the factory has not attached, first; then a step left unfilled, or filled twice — by its own `agent:` and
  * a hire. Started in the default factory, every workflow is offered, and a step that names no agent is a plain session, as it always was.
  *
@@ -73,7 +73,7 @@ test('REFUSED: a start in a factory that has attached no workflow offers none, n
     () => start({ brief: 'build it', repo, workflowDir: build, isolate: false, factory: 'pipao' }),
     refusedWith(
       'Invalid',
-      /^build: the factory pipao does not offer this workflow — it offers none yet\. Attach it: wf factory attach pipao build\. Nothing was started\.$/,
+      /^build: the factory pipao does not offer this workflow — it offers none yet\. Attach it: nemia factory attach pipao build\. Nothing was started\.$/,
     ),
   );
   assert.throws(
@@ -91,7 +91,7 @@ test('REFUSED: a start of a workflow its factory has not attached, before its st
     () => start({ brief: 'build it', repo, workflowDir: build, isolate: false, factory: 'pipao' }),
     refusedWith(
       'Invalid',
-      /^build: the factory pipao does not offer this workflow — it offers: dev\. Attach it: wf factory attach pipao build\. Nothing was started\.$/,
+      /^build: the factory pipao does not offer this workflow — it offers: dev\. Attach it: nemia factory attach pipao build\. Nothing was started\.$/,
     ),
     'the unattached refusal, not the unfilled one, though build has steps no one fills',
   );
@@ -116,7 +116,7 @@ test('REFUSED: a start in a factory that hires no one into its steps names each 
     () => start({ brief: 'build it', repo, workflowDir: build, isolate: false, factory: 'pipao' }),
     refusedWith(
       'Invalid',
-      /^build: in the factory pipao, 2 steps name no agent, and pipao hires none into them: implement, review\. Hire an agent into each — wf factory hire pipao <agent> --step build\/implement; wf factory hire pipao <agent> --step build\/review\. Nothing was started\.$/,
+      /^build: in the factory pipao, 2 steps name no agent, and pipao hires none into them: implement, review\. Hire an agent into each — nemia factory hire pipao <agent> --step build\/implement; nemia factory hire pipao <agent> --step build\/review\. Nothing was started\.$/,
     ),
   );
   assert.deepEqual(runsWritten(), before);
@@ -175,7 +175,7 @@ test('REFUSED: a hire into a step whose file names its own agent, naming both an
     () => start({ brief: 'build it', repo, workflowDir: build, isolate: false, factory: 'pipao' }),
     refusedWith(
       'Invalid',
-      /^named: `agent: reviewer` fills this step in every factory, and the factory pipao hires implementer into it too\. Take the hire back — wf factory fire pipao --step build\/named — /,
+      /^named: `agent: reviewer` fills this step in every factory, and the factory pipao hires implementer into it too\. Take the hire back — nemia factory fire pipao --step build\/named — /,
     ),
   );
   assert.deepEqual(runsWritten(), before);
@@ -189,7 +189,7 @@ test('REFUSED: a hire of an agent there is not, in the words of the factory that
     () => start({ brief: 'build it', repo, workflowDir: build, isolate: false, factory: 'pipao' }),
     refusedWith(
       'Invalid',
-      /^implement: the factory pipao hires `ada` into it, which is not an agent here\. The agents are: implementer, reviewer, shipper — hire one — wf factory hire pipao <agent> --step build\/implement, /,
+      /^implement: the factory pipao hires `ada` into it, which is not an agent here\. The agents are: implementer, reviewer, shipper — hire one — nemia factory hire pipao <agent> --step build\/implement, /,
     ),
   );
 });
@@ -202,14 +202,14 @@ test('REFUSED: a start in a factory the store does not have is Missing, naming t
   );
 });
 
-test('wf start reads --factory once, and refuses it twice', () => {
+test('nemia start reads --factory once, and refuses it twice', () => {
   const factoryOf = (...argv: string[]) => parseArgv(START.spec, ['build it', ...argv])?.factory;
   assert.equal(factoryOf('--factory', 'pipao'), 'pipao');
   assert.equal(factoryOf('--factory=pipao'), 'pipao');
   assert.equal(factoryOf(), undefined);
   assert.throws(
     () => factoryOf('--factory', 'pipao', '--factory', 'nemia'),
-    refusedWith('Invalid', /^wf start takes --factory once: a run is started in one factory\.$/),
+    refusedWith('Invalid', /^nemia start takes --factory once: a run is started in one factory\.$/),
   );
 });
 
@@ -219,7 +219,7 @@ function hired(factory = 'pipao'): void {
   hireAgent({ factory, agent: 'reviewer', step: 'build/review' });
 }
 
-/** What `wf <argv>` prints, typed from `cwd`, a line each. */
+/** What `nemia <argv>` prints, typed from `cwd`, a line each. */
 async function typedFrom(cwd: string, argv: string[]): Promise<string[]> {
   const lines: string[] = [];
   const log = console.log;
@@ -237,7 +237,7 @@ async function typedFrom(cwd: string, argv: string[]): Promise<string[]> {
   return lines.join('\n').split('\n');
 }
 
-/** The id of the run `wf start` printed first. */
+/** The id of the run `nemia start` printed first. */
 const startedId = (lines: readonly string[]): string => lines[0].split(' ')[0];
 
 test('a run started in a factory names it on its record, as written to disk', () => {
@@ -260,7 +260,7 @@ test("REFUSED: a git run on a repository outside its factory, naming the factory
       err._tag === 'Invalid' &&
       err.exitCode === 2 &&
       err.message ===
-        `${other}: the factory pipao works on ${repo}, and this repository is not one of them. Name one of them — --repo ${repo} — or file a factory on this one: wf factory add <name> --repo ${other}. Nothing was started.`,
+        `${other}: the factory pipao works on ${repo}, and this repository is not one of them. Name one of them — --repo ${repo} — or file a factory on this one: nemia factory add <name> --repo ${other}. Nothing was started.`,
   );
   assert.throws(
     () => start({ brief: 'build it', repo: other, repoNamed: true, workflowDir: build, isolate: false, factory: 'pipao' }),
@@ -270,7 +270,7 @@ test("REFUSED: a git run on a repository outside its factory, naming the factory
   assert.deepEqual(runsWritten(), before);
 });
 
-test('a factory with one repository gives the run its repository: wf start --factory from any directory runs on it', async () => {
+test('a factory with one repository gives the run its repository: nemia start --factory from any directory runs on it', async () => {
   const { repo, build } = fresh();
   hired();
   assert.equal(repoFor('pipao', undefined, ROOT), repo);
@@ -283,7 +283,7 @@ test('a factory with one repository gives the run its repository: wf start --fac
   assert.ok(out.includes(`factory: pipao, on ${repo}`), out.join('\n'));
 });
 
-test('a factory with two repositories: the one named, else where wf start is typed if it is one of them, else refused naming both', async () => {
+test('a factory with two repositories: the one named, else where nemia start is typed if it is one of them, else refused naming both', async () => {
   const { build } = fresh();
   const [first, second] = [aRepo(), aRepo()];
   addFactory({ name: 'duo', repos: [first, second] });
@@ -334,7 +334,7 @@ function aCard(name: string, text: string): string {
   return card;
 }
 
-test('wf start <card> --factory starts the card in the factory, on its one repository from any directory, and removes it', async () => {
+test('nemia start <card> --factory starts the card in the factory, on its one repository from any directory, and removes it', async () => {
   const { repo, build } = fresh();
   hired();
   const card = aCard('build-it', 'Build it.\n');
@@ -405,7 +405,7 @@ test("REFUSED: a card's factory: the store does not have, and one that does not 
     () => startFromInbox({ name: 'unattached', workflow: build, callerRepo: repo, isolate: false }),
     refusedWith(
       'Invalid',
-      /^build: the factory pipao does not offer this workflow — it offers: dev\. Attach it: wf factory attach pipao build\. Nothing was started\.$/,
+      /^build: the factory pipao does not offer this workflow — it offers: dev\. Attach it: nemia factory attach pipao build\. Nothing was started\.$/,
     ),
   );
   assert.deepEqual(runsWritten(), before);
@@ -467,7 +467,7 @@ function filed(name: string, ...repos: string[]): void {
 const worktrees = (repo: string): string =>
   execFileSync('git', ['worktree', 'list', '--porcelain'], { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
 
-test('REFUSED as shipped: wf start with no --factory in a folder two factories hold, naming each and the fix, with nothing written; --factory picks one', async (t) => {
+test('REFUSED as shipped: nemia start with no --factory in a folder two factories hold, naming each and the fix, with nothing written; --factory picks one', async (t) => {
   asShipped(t);
   const { build } = fresh();
   const shared = aRepo();
@@ -510,7 +510,7 @@ test('REFUSED as shipped: nested repositories of two factories are two holders, 
   assert.deepEqual(runsWritten(), before);
 });
 
-test('REFUSED as shipped: wf start with no --factory in a repository no factory holds, naming --factory and wf factory add, with nothing written', async (t) => {
+test('REFUSED as shipped: nemia start with no --factory in a repository no factory holds, naming --factory and nemia factory add, with nothing written', async (t) => {
   asShipped(t);
   const { build } = fresh();
   const loose = aRepo();
@@ -520,14 +520,14 @@ test('REFUSED as shipped: wf start with no --factory in a repository no factory 
     refusedWith(
       'Invalid',
       new RegExp(
-        `^${escaped(loose)}: no factory works on this folder, .* Name the factory — --factory <name>, one of pipao — or file one on this repository .*: wf factory add <name> --repo <root>,`,
+        `^${escaped(loose)}: no factory works on this folder, .* Name the factory — --factory <name>, one of pipao — or file one on this repository .*: nemia factory add <name> --repo <root>,`,
       ),
     ),
   );
   assert.deepEqual(runsWritten(), before);
 });
 
-test("as shipped, wf start with no --factory typed in a subfolder of a repository one factory alone holds runs in it, on that repository's root", async (t) => {
+test("as shipped, nemia start with no --factory typed in a subfolder of a repository one factory alone holds runs in it, on that repository's root", async (t) => {
   asShipped(t);
   const { repo, build } = fresh();
   hired();
@@ -541,7 +541,7 @@ test("as shipped, wf start with no --factory typed in a subfolder of a repositor
   assert.equal(named.repo, repo);
 });
 
-test('REFUSED: wf start --factory default, as shipped and with WF_DEFAULT_FACTORY_STARTS=1, with nothing written', async (t) => {
+test('REFUSED: nemia start --factory default, as shipped and with WF_DEFAULT_FACTORY_STARTS=1, with nothing written', async (t) => {
   const { repo, build } = fresh();
   const before = runsWritten();
   const refusal = /^`default` is the default factory: .* Name a factory — --factory <name>, one of pipao\. Nothing was started\.$/;
@@ -557,7 +557,7 @@ test('REFUSED: wf start --factory default, as shipped and with WF_DEFAULT_FACTOR
   assert.deepEqual(runsWritten(), before);
 });
 
-test('with WF_DEFAULT_FACTORY_STARTS=1, wf start no factory holds goes to the default factory; a folder two hold is refused all the same', async () => {
+test('with WF_DEFAULT_FACTORY_STARTS=1, nemia start no factory holds goes to the default factory; a folder two hold is refused all the same', async () => {
   const { build } = fresh();
   const loose = aRepo();
   const run = readRun(startedId(await typedFrom(loose, ['start', 'build it', '--workflows', build, '--no-worktree'])));
@@ -580,13 +580,13 @@ function aPlanOf(build: string): string {
   return dir;
 }
 
-/** The runs `wf plan` started: the records written since `before`. */
+/** The runs `nemia plan` started: the records written since `before`. */
 const plannedRuns = (before: readonly string[]) =>
   runsWritten()
     .filter((f) => f.endsWith('.json') && !before.includes(f))
     .map((f) => readRun(f.slice(0, -'.json'.length)));
 
-test('REFUSED as shipped: wf plan with no --factory where no factory, or two, holds the folder, before its first card is started', async (t) => {
+test('REFUSED as shipped: nemia plan with no --factory where no factory, or two, holds the folder, before its first card is started', async (t) => {
   asShipped(t);
   const { build } = fresh();
   const plan = aPlanOf(build);
@@ -603,7 +603,7 @@ test('REFUSED as shipped: wf plan with no --factory where no factory, or two, ho
   assert.deepEqual(runsWritten(), before);
 });
 
-test('as shipped, wf plan runs every card in the factory one alone holds the folder of, or in --factory', async (t) => {
+test('as shipped, nemia plan runs every card in the factory one alone holds the folder of, or in --factory', async (t) => {
   asShipped(t);
   const { repo, build } = fresh();
   hired();
@@ -621,7 +621,7 @@ test('as shipped, wf plan runs every card in the factory one alone holds the fol
   for (const run of named) assert.deepEqual([run.factory, run.repo], ['duo', second]);
 });
 
-test("REFUSED as shipped: wf start <card> naming no factory, though one alone holds where it is typed and its repo:; --factory or the card's factory: starts it", async (t) => {
+test("REFUSED as shipped: nemia start <card> naming no factory, though one alone holds where it is typed and its repo:; --factory or the card's factory: starts it", async (t) => {
   asShipped(t);
   const { repo, build } = fresh();
   hired();

@@ -1,8 +1,8 @@
 /**
  * A store's `a2a-agents.json` refused — as it stands, or one entry of it — stops only a step that names what is refused. `engine()`, which
- * every command and the api make, leaves it out and says why on stderr, so `wf ls` and `wf tick` of a run with no remote step go on as
- * before, at shipped defaults: `main` with the engine it makes itself. A fake `claude` and `codex` first on PATH, so nothing real is asked.
- * `WF_ROOT` is set before the import, since the module reads it as it loads.
+ * every command and the api make, leaves it out and says why on stderr, so `nemia ls` and `nemia tick` of a run with no remote step go on
+ * as before, at shipped defaults: `main` with the engine it makes itself. A fake `claude` and `codex` first on PATH, so nothing real is
+ * asked. `WF_ROOT` is set before the import, since the module reads it as it loads.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -50,7 +50,7 @@ function team(name: string, harness: string): string {
   return dir;
 }
 
-/** `wf start` of `dir`, from the store, and the run's id. */
+/** `nemia start` of `dir`, from the store, and the run's id. */
 async function started(dir: string): Promise<string> {
   const cwd = process.cwd();
   process.chdir(ROOT);
@@ -72,7 +72,7 @@ for (const [what, text, why] of [
     /a2a-agents\.json: `reviewer`: .*the `a2a:reviewer` harness/,
   ],
 ] as const) {
-  test(`a2a-agents.json ${what} leaves the engine made, wf ls and wf tick of a local run working, and refuses only a step that names it`, async () => {
+  test(`a2a-agents.json ${what} leaves the engine made, nemia ls and nemia tick of a local run working, and refuses only a step that names it`, async () => {
     fs.rmSync(FILE, { force: true });
     const id = await started(LOCAL);
     fs.writeFileSync(FILE, text);
@@ -82,7 +82,7 @@ for (const [what, text, why] of [
       assert.match(made.err, why, 'engine() says why it left the file or the entry out');
       assert.match(
         made.err,
-        /It is left out until the file is fixed and this process restarts: a step that names it is refused by `wf start`, one at work on it is held/,
+        /It is left out until the file is fixed and this process restarts: a step that names it is refused by `nemia start`, one at work on it is held/,
       );
       const ticked = await said(['tick']);
       assert.match(ticked.err, why);
@@ -91,7 +91,7 @@ for (const [what, text, why] of [
       await assert.rejects(
         said(['start', 'a review', '--workflows', REMOTE]),
         (err: Error & { exitCode?: number }) => err.exitCode === 2 && why.test(err.message),
-        "wf start of a step on the agent is refused, in the file's words",
+        "nemia start of a step on the agent is refused, in the file's words",
       );
       assert.equal(fs.readdirSync(path.join(ROOT, 'runs')).length, runs, 'no run was written');
     } finally {

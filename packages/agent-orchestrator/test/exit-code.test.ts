@@ -1,7 +1,7 @@
 /**
- * `wf` run as a process exits with a refusal's code, and 1 on anything else. The package refuses with `exitCode` 2 and a sentence saying
- * what to do next (CLAUDE.md, *Errors say what to do next*); a `bin/wf.ts` that exits 1 on every error leaves a script unable to tell a
- * refusal from a crash. The verbs' own tests read `exitCode` off what `main` throws; only a process shows what `wf` exits with.
+ * `nemia` run as a process exits with a refusal's code, and 1 on anything else. The package refuses with `exitCode` 2 and a sentence saying
+ * what to do next (CLAUDE.md, *Errors say what to do next*); a bin that exits 1 on every error leaves a script unable to tell a
+ * refusal from a crash. The verbs' own tests read `exitCode` off what `main` throws; only a process shows what `nemia` exits with.
  * A fake `claude` and `codex` first on PATH, so nothing real is asked.
  */
 import { test } from 'node:test';
@@ -13,11 +13,11 @@ import { scratch } from './scratch.ts';
 
 import { exitCodeOf } from '../src/cli/exit.ts';
 
-const WF = path.join(import.meta.dirname, '..', 'bin', 'wf.ts');
+const WF = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');
 const BIN = scratch('wf-exit-code-bin-');
 for (const name of ['claude', 'codex']) fs.writeFileSync(path.join(BIN, name), '#!/bin/sh\nexit 1\n', { mode: 0o755 });
 
-/** `wf <argv>` over the store at `root`, with the engine's store beside it, in `cwd`, the directory above the store unless given. */
+/** `nemia <argv>` over the store at `root`, with the engine's store beside it, in `cwd`, the directory above the store unless given. */
 function wf(root: string, argv: string[], cwd = path.dirname(root)): { status: number | null; stderr: string } {
   const dir = path.dirname(root);
   const { status, stderr } = spawnSync(process.execPath, [WF, ...argv], {
@@ -28,20 +28,20 @@ function wf(root: string, argv: string[], cwd = path.dirname(root)): { status: n
   return { status, stderr };
 }
 
-test('a refusal exits 2 and prints its sentence: wf approve of a run that does not exist', () => {
+test('a refusal exits 2 and prints its sentence: nemia approve of a run that does not exist', () => {
   const { status, stderr } = wf(path.join(scratch('wf-exit-code-refused-'), 'store'), ['approve', 'r-nope', 'implement']);
-  assert.equal(status, 2, `wf approve of no run exits with the refusal's code; it said: ${stderr}`);
-  assert.equal(stderr, 'no such run: r-nope. wf approve takes a run by its id, as wf ls lists it: wf approve <runId> <step>.\n');
+  assert.equal(status, 2, `nemia approve of no run exits with the refusal's code; it said: ${stderr}`);
+  assert.equal(stderr, 'no such run: r-nope. nemia approve takes a run by its id, as nemia ls lists it: nemia approve <runId> <step>.\n');
 });
 
-test("REFUSED: wf retry and wf say of a run that does not exist exit 2, with the store's sentence naming wf ls", () => {
+test("REFUSED: nemia retry and nemia say of a run that does not exist exit 2, with the store's sentence naming nemia ls", () => {
   for (const argv of [
     ['retry', 'r-nope', 'implement'],
     ['say', 'r-nope', 'implement', 'the words'],
   ]) {
     const { status, stderr } = wf(path.join(scratch('wf-exit-code-no-run-'), 'store'), argv);
-    assert.equal(status, 2, `wf ${argv[0]} of no run exits with the refusal's code; it said: ${stderr}`);
-    assert.equal(stderr, "no such run: r-nope  (try 'wf ls')\n", `wf ${argv[0]}`);
+    assert.equal(status, 2, `nemia ${argv[0]} of no run exits with the refusal's code; it said: ${stderr}`);
+    assert.equal(stderr, "no such run: r-nope  (try 'nemia ls')\n", `nemia ${argv[0]}`);
   }
 });
 
@@ -78,12 +78,12 @@ test('REFUSED at shipped defaults: a WF_ROOT that is not an absolute path, relat
   }
 });
 
-test('a crash exits 1 and prints its message, with no stack: wf ls over a store that is a file', () => {
+test('a crash exits 1 and prints its message, with no stack: nemia ls over a store that is a file', () => {
   const dir = scratch('wf-exit-code-crash-');
   const root = path.join(dir, 'store');
   fs.writeFileSync(root, 'not a directory');
   const { status, stderr } = wf(root, ['ls']);
-  assert.equal(status, 1, `a store wf cannot read is no refusal; it said: ${stderr}`);
+  assert.equal(status, 1, `a store nemia cannot read is no refusal; it said: ${stderr}`);
   const last = stderr.trimEnd().split('\n').at(-1)!;
   assert.ok(last.startsWith('ENOTDIR: not a directory'), `the message, as the error has it: ${stderr}`);
   assert.ok(!/^\s+at /m.test(stderr), `no stack: ${stderr}`);

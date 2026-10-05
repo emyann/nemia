@@ -1,6 +1,6 @@
 /**
- * `nemia start` and `nemia plan`, entries of the command table. A start is served on both sides: the CLI's runner reads the brief and finds the
- * workflow from where it is typed, the api's route from its body, and each hands the same handler what it found. A plan is the command
+ * `nemia start` and `nemia plan`, entries of the command table. A start is served on both sides: the CLI's runner reads the brief and finds
+ * the workflow from where it is typed, the api's route from its body, and each hands the same handler what it found. A plan is the command
  * line's alone, run by its runner.
  */
 import { leftOut, type Args, type Flag, type Spec } from '../command/command.ts';
@@ -172,12 +172,14 @@ const fromLines = ({ run, card, removed, why }: Started): string[] =>
     ? []
     : removed
       ? [`${fromNote(run)} — removed from the inbox`]
-      : [`${fromNote(run)} — still in the inbox: ${why}. nemia inbox lists it as started as ${run.id}: drop it with nemia inbox rm ${card}`];
+      : [
+          `${fromNote(run)} — still in the inbox: ${why}. nemia inbox lists it as started as ${run.id}: drop it with nemia inbox rm ${card}`,
+        ];
 
 /**
- * What `nemia start` prints of a run it started: its steps, where it came from, its factory, the folders it mounts, where it works, and what
- * it waits on and ends at; while the store is paused (`pausedWords`), that nothing of it is filed until it resumes; and a card's `repo:`
- * not taken.
+ * What `nemia start` prints of a run it started: its steps, where it came from, its factory, the folders it mounts, where it works, and
+ * what it waits on and ends at; while the store is paused (`pausedWords`), that nothing of it is filed until it resumes; and a card's
+ * `repo:` not taken.
  */
 function startedLines(started: Started): string[] {
   const { run } = started;

@@ -37,8 +37,8 @@ export const inboxCards = (): string[] =>
     .map((l) => l.name);
 
 /**
- * `nemia inbox`: every card in the inbox, by name, with the runs a record says it was started as (`inboxListing`) — and every entry that does
- * not read as a card, with why. The run records are read for their `from`, so a card whose removal failed after its start is listed as
+ * `nemia inbox`: every card in the inbox, by name, with the runs a record says it was started as (`inboxListing`) — and every entry that
+ * does not read as a card, with why. The run records are read for their `from`, so a card whose removal failed after its start is listed as
  * started; and the tick's tries, so a queued card whose start was refused, or failed, says why.
  */
 export const readInbox = (): InboxListing[] =>
@@ -73,9 +73,9 @@ function cardRepoRefusal(opts: { workflow?: string; repo?: string; dir?: string 
 }
 
 /**
- * `nemia inbox add`: an idea filed as a card (`ideaCard`), under the slug `runId` makes of its body's first line, suffix and all, so two ideas
- * alike are two cards, and a name already taken is drawn again, never written over. `text` is a note, or a file's text; `from` is what a
- * refusal calls it; `dir` is the folder a path in the text's own `workflow:` is read from — the file's — and it is written absolute
+ * `nemia inbox add`: an idea filed as a card (`ideaCard`), under the slug `runId` makes of its body's first line, suffix and all, so two
+ * ideas alike are two cards, and a name already taken is drawn again, never written over. `text` is a note, or a file's text; `from` is
+ * what a refusal calls it; `dir` is the folder a path in the text's own `workflow:` is read from — the file's — and it is written absolute
  * (`ideaCard`). `workflow`, `repo` and `factory` are written as the card's keys, over the text's own: `repo` an absolute path to a
  * directory, `workflow` a name or an absolute path (`workflowAt`), as a start would be given it, and `factory` a factory's name, whose
  * factory the start judges.
@@ -96,7 +96,8 @@ export function addToInbox(opts: { text: string; from?: string; dir?: string; wo
 }
 
 /**
- * What `nemia inbox queue` did: the card as it now reads, its file, and — once queued — its place in the queue's order and how many are in it.
+ * What `nemia inbox queue` did: the card as it now reads, its file, and — once queued — its place in the queue's order and how many are in
+ * it.
  */
 export type InboxQueued = { card: InboxCard; file: string; place?: number; of?: number; was: 'queued' | 'taken back' | 'not queued' };
 
@@ -154,8 +155,8 @@ export function queueInInbox(name: string, how: { off?: boolean; workflow?: stri
 export type InboxDropped = { removed: true; file: string } | { removed: false; cards: string[] };
 
 /**
- * `nemia inbox rm`: a card dropped without being started. Refused, exit 2, for a name that is not a card's (`inboxNameRefusal`). A name with
- * no card is normal — dropped already, or never filed — and says which cards there are.
+ * `nemia inbox rm`: a card dropped without being started. Refused, exit 2, for a name that is not a card's (`inboxNameRefusal`). A name
+ * with no card is normal — dropped already, or never filed — and says which cards there are.
  */
 export function dropFromInbox(name: string): InboxDropped {
   const refused = inboxNameRefusal(name);
@@ -176,8 +177,8 @@ export function dropFromInbox(name: string): InboxDropped {
 
 /**
  * The name of the inbox card `given` is a path to — any path under the inbox, `<inbox>/<name>.md` or `<inbox>/<name>`, links resolved on
- * the way to both (`inboxNameOf`) — or null for a path outside it, and for text: what makes `nemia start <path>` go through `startFromInbox`.
- * A card not there is still a card's path, refused by name at start.
+ * the way to both (`inboxNameOf`) — or null for a path outside it, and for text: what makes `nemia start <path>` go through
+ * `startFromInbox`. A card not there is still a card's path, refused by name at start.
  */
 export function inboxNameAt(given: string): string | null {
   const real = (at: string): string => {

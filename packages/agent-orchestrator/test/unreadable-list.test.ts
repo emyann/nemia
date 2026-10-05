@@ -1,11 +1,11 @@
 /**
- * A journal that does not read is a check's, or an earlier try's: `wf ls` says the run it belongs to is unreadable, in the words the
+ * A journal that does not read is a check's, or an earlier try's: `nemia ls` says the run it belongs to is unreadable, in the words the
  * board's list says it with (`unjudgedWords`), marks `unreadable` the step whose check or try it is, and lists every other run — a run
- * waiting on it among them, and with a cap on runs in flight (`runSlots`) — while `wf decide` of such a run refuses in those words. Walked
- * through the runtime itself, `promiseEngine` over an in-memory journal that hands back what was put in it, as a store does.
+ * waiting on it among them, and with a cap on runs in flight (`runSlots`) — while `nemia decide` of such a run refuses in those words.
+ * Walked through the runtime itself, `promiseEngine` over an in-memory journal that hands back what was put in it, as a store does.
  *
- * `WF_ROOT` is set before the command line is imported, which reads it as the module loads; `WF_MAX_RUNS` caps the runs, so `wf ls` reads
- * the slots.
+ * `WF_ROOT` is set before the command line is imported, which reads it as the module loads; `WF_MAX_RUNS` caps the runs, so `nemia ls`
+ * reads the slots.
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -154,10 +154,10 @@ const printedBy = async (t: TestContext, argv: string[]) => {
   return out.join('\n').split('\n');
 };
 
-/** The lines `wf ls` printed for one run: its own line and those under it, up to the next run's. */
+/** The lines `nemia ls` printed for one run: its own line and those under it, up to the next run's. */
 const blockOf = (lines: readonly string[], id: string): string[] => {
   const from = lines.findIndex((l) => l.startsWith(`${id}  `));
-  assert.ok(from >= 0, `wf ls lists ${id}:\n${lines.join('\n')}`);
+  assert.ok(from >= 0, `nemia ls lists ${id}:\n${lines.join('\n')}`);
   const to = lines.findIndex((l, i) => i > from && !l.startsWith(' '));
   return lines.slice(from, to < 0 ? undefined : to);
 };
@@ -165,7 +165,7 @@ const blockOf = (lines: readonly string[], id: string): string[] => {
 const unreadableLine = (block: readonly string[]) =>
   block.find((l) => l.startsWith('   → unreadable: '))?.slice('   → unreadable: '.length);
 
-test("wf ls says a run whose check's journal, or an earlier try's, does not read is unreadable, on that step, and lists every other run", async (t) => {
+test("nemia ls says a run whose check's journal, or an earlier try's, does not read is unreadable, on that step, and lists every other run", async (t) => {
   const lines = await printedBy(t, ['ls']);
   for (const [id, task] of [
     ['r-check', 'r-check-implement-check'],
@@ -179,7 +179,7 @@ test("wf ls says a run whose check's journal, or an earlier try's, does not read
       ),
       block.join('\n'),
     );
-    assert.ok(said?.includes('So wf ls does not judge the run, and the tick does not advance it'), said);
+    assert.ok(said?.includes('So nemia ls does not judge the run, and the tick does not advance it'), said);
     assert.match(
       block.find((l) => l.startsWith('   implement'))!,
       /^ {3}implement\s+unreadable\s/,
@@ -198,19 +198,19 @@ test("wf ls says a run whose check's journal, or an earlier try's, does not read
   assert.doesNotMatch(good.join('\n'), /unreadable/);
 });
 
-test('wf ls of one such run says it, as the list does', async (t) => {
+test('nemia ls of one such run says it, as the list does', async (t) => {
   const said = unreadableLine(blockOf(await printedBy(t, ['ls', 'r-try']), 'r-try'));
   assert.ok(said?.startsWith(`r-try's record reads, but the journal of its task r-try-implement does not: `), said);
 });
 
-test("wf decide of such a run refuses in the list's words, and decides a run whose tasks read", async (t) => {
+test("nemia decide of such a run refuses in the list's words, and decides a run whose tasks read", async (t) => {
   const listed = await printedBy(t, ['ls']);
   for (const id of ['r-check', 'r-try']) {
     const err = await main(['decide', id], e).then(
-      () => assert.fail(`wf decide ${id} decided`),
+      () => assert.fail(`nemia decide ${id} decided`),
       (thrown: unknown) => thrown as Error,
     );
-    assert.equal(err.message, unreadableLine(blockOf(listed, id))!.replace('So wf ls does not', 'So wf decide does not'));
+    assert.equal(err.message, unreadableLine(blockOf(listed, id))!.replace('So nemia ls does not', 'So nemia decide does not'));
   }
   const good = await printedBy(t, ['decide', 'r-good']);
   assert.ok(good[0].startsWith('r-good  The brief of r-good'), good.join('\n'));

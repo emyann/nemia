@@ -4,8 +4,8 @@
  * - **A harness's words stay in the runtime** (`HARNESS`): the names Claude Code, Codex and Anthropic, and the runtime's own permission
  *   modes and sandboxes, imported from its public entry, but the plain English ones (`PLAIN_HARNESS`). Refused in the orchestrator's `src`
  *   and `bin`, `apps/api/src` and `apps/web/src`.
- * - **A workflow's words stay above the runtime** (`WORKFLOW`): a workflow, a step, a gate, a factory, a closeout, the orchestrator, `wf`
- *   and Nemia. Refused in the runtime's `src` and `bin`.
+ * - **A workflow's words stay above the runtime** (`WORKFLOW`): a workflow, a step, a gate, a factory, a closeout, the orchestrator,
+ *   `nemia` and Nemia. Refused in the runtime's `src` and `bin`.
  * - **This repository's team stays out of the packages** (`teamOf`): the name of each agent of `workflows/agents/`, read as the test
  *   runs, so a new agent is refused with no edit here. Refused in every package's `src`. A name that is plain English (`PLAIN_NAMES`)
  *   counts only as a quoted literal or a path segment.
@@ -107,7 +107,7 @@ const MOVES = {
     to: "packages/agent-runtime's own word for it, in its export lists",
   },
   reword: {
-    move: "a workflow's word in the runtime's prose: its callers' names (`wf up`, the orchestrator, a step) and the same word in another sense (the SDK's client factory, Claude Code's gate)",
+    move: "a workflow's word in the runtime's prose: its callers' names (`nemia up`, the orchestrator, a step) and the same word in another sense (the SDK's client factory, Claude Code's gate)",
     to: 'the same files in packages/agent-runtime, said in its own words: a caller, a task, an attempt, a session',
   },
   quota: {

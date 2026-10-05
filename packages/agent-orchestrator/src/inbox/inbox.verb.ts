@@ -43,8 +43,8 @@ export type InboxStart = {
   /** Where a relative `workflow` is read from: where `nemia start` was typed. The current directory when left out. */
   from?: string;
   /**
-   * The repository, over the card's `repo:`: named by a person at start (`nemia start <card> --repo`), and refused as `start()` refuses it for
-   * a team that says `workspace: folder`. The card's own `repo:` is not: the board writes one on every card it files, so a folder team
+   * The repository, over the card's `repo:`: named by a person at start (`nemia start <card> --repo`), and refused as `start()` refuses it
+   * for a team that says `workspace: folder`. The card's own `repo:` is not: the board writes one on every card it files, so a folder team
    * takes it as it takes the directory `nemia start` is typed in, and never looks at it.
    */
   repo?: string;
@@ -107,8 +107,8 @@ function cardFactory(opts: Pick<InboxStart, 'factory' | 'fix'>, named: string | 
 }
 
 /**
- * `nemia start <inbox>/<name>.md`, and the board's start of a card: a card out of the inbox started with `start()`, `from: { inbox: <name> }`
- * on its record, then removed from the inbox.
+ * `nemia start <inbox>/<name>.md`, and the board's start of a card: a card out of the inbox started with `start()`, `from: { inbox: <name>
+ * }` on its record, then removed from the inbox.
  *
  * The brief is `brief`, or else the card's body. The workflow is `workflow`, else the card's `workflow:` — found from the inbox folder as
  * `nemia plan` finds a card's from its plan folder: a name under the repository's `workflows/`, or a path — else refused, naming the
@@ -116,9 +116,9 @@ function cardFactory(opts: Pick<InboxStart, 'factory' | 'fix'>, named: string | 
  * card's `repo:`, else the factory's one repository, else `callerRepo` (`repoFor`), chosen before the workflow is found in it; `start()`
  * judges the factory. The run is gated at the card's `gate:` and at `gates`, the card's first; a step both name is gated once.
  *
- * The record is written first, so a removal that fails leaves a card `nemia inbox` lists as started — never a run with no trace of its card.
- * It says so in `why`, and the card is not started again (`startedRefusal`) until a person drops it. Refused by name before anything is
- * written, exit 2: a name that is not a card's (`inboxNameRefusal`), a card not there (`Missing`) — naming the cards there are — a card
+ * The record is written first, so a removal that fails leaves a card `nemia inbox` lists as started — never a run with no trace of its
+ * card. It says so in `why`, and the card is not started again (`startedRefusal`) until a person drops it. Refused by name before anything
+ * is written, exit 2: a name that is not a card's (`inboxNameRefusal`), a card not there (`Missing`) — naming the cards there are — a card
  * that does not read, a card already started (`Conflict`), no factory from either — `Invalid`, naming the line to write and `fix`
  * (`unfactoredCardRefusal`), unless `defaultStartsAllowed` — or the default factory named (`defaultStartRefusal`), no workflow, a
  * workflow that does not load behind the card, a `gate:` naming no step of it, in the card's words, and a `brief` with nothing in it. And

@@ -1,6 +1,7 @@
 /**
- * The runner of `nemia agents custom`, which reads the words a file holds; and the runners of `nemia rm` and `nemia prune` (`RM`, `PRUNE`), which
- * walk the many runs a command line names through the entry's handler, ask a person's yes, and tally what was not done into the exit code.
+ * The runner of `nemia agents custom`, which reads the words a file holds; and the runners of `nemia rm` and `nemia prune` (`RM`, `PRUNE`),
+ * which walk the many runs a command line names through the entry's handler, ask a person's yes, and tally what was not done into the exit
+ * code.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -11,8 +12,8 @@ import { HELP, usage, confirmed, type Engine } from './flags.ts';
 const idsOf = (args: Args): readonly string[] => (Array.isArray(args.runId) ? args.runId : []);
 
 /**
- * One run `nemia rm` was given, forgotten through `RM`'s handler and said in its line; returns whether it is still there, and whether that is
- * a failure other than a refusal.
+ * One run `nemia rm` was given, forgotten through `RM`'s handler and said in its line; returns whether it is still there, and whether that
+ * is a failure other than a refusal.
  */
 async function rmOne(e: Engine, id: string, args: Args): Promise<{ kept: boolean; failed: boolean }> {
   try {
@@ -86,8 +87,8 @@ async function judged(e: Engine, ids: readonly string[], args: Args, tally: Prun
 }
 
 /**
- * What `nemia prune` found, a run's lines each. Of named runs, a refusal is tallied; of every run, a run with nothing to prune is not said at
- * all, and the runs not over are said in one line.
+ * What `nemia prune` found, a run's lines each. Of named runs, a refusal is tallied; of every run, a run with nothing to prune is not said
+ * at all, and the runs not over are said in one line.
  */
 function printFound(found: Pruning[], named: boolean, tally: PruneTally): void {
   const running = found.filter((p) => !named && p.kind === 'refused' && /\bit is not over\b/.test(p.refusal ?? ''));
@@ -128,8 +129,8 @@ async function removing(
 }
 
 /**
- * `nemia prune`: the space runs that are over hold, listed with its size and freed on `--yes` or a person's y. Named runs are judged each on
- * its own, a line each, a refusal included; with none, every run.
+ * `nemia prune`: the space runs that are over hold, listed with its size and freed on `--yes` or a person's y. Named runs are judged each
+ * on its own, a line each, a refusal included; with none, every run.
  */
 export async function pruneVerb(args: Args, e: Engine): Promise<void> {
   const ids = idsOf(args);
@@ -165,8 +166,8 @@ function wordsFrom(file: string): string {
 }
 
 /**
- * `nemia agents custom`'s runner: the words `--file` names read (`wordsFrom`), handed to its entry's handler (`AGENTS_CUSTOM`) in its store,
- * and what the entry says of them printed.
+ * `nemia agents custom`'s runner: the words `--file` names read (`wordsFrom`), handed to its entry's handler (`AGENTS_CUSTOM`) in its
+ * store, and what the entry says of them printed.
  */
 export async function agentsCustomRun(args: Args, e: Engine): Promise<void> {
   const file = typeof args.file === 'string' ? args.file : undefined;

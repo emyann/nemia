@@ -1,6 +1,6 @@
 /**
- * `nemia rm`, from the run's side: whether a run may be forgotten (`idRefusal`, `forgetRefusal`), what becomes of its worktrees, branches and
- * check logs (`runWorktrees`, `heldWorktree`, `branchFates`, `checkLogsOf`), and the line that says what was done (`forgetLine`). Pure:
+ * `nemia rm`, from the run's side: whether a run may be forgotten (`idRefusal`, `forgetRefusal`), what becomes of its worktrees, branches
+ * and check logs (`runWorktrees`, `heldWorktree`, `branchFates`, `checkLogsOf`), and the line that says what was done (`forgetLine`). Pure:
  * what git lists is handed in.
  */
 import type { Workflow } from '../step/step.ts';
@@ -26,18 +26,18 @@ import { inside } from '../workspace/workspace.ts';
 import path from 'node:path';
 
 /**
- * How `nemia rm` treats a run's branches. Kept by default, since a branch is where the work is: `deleteBranches` deletes each one merged into
- * the run's base branch, and `forceUnmerged`, beside it, each one that is not — and the work on it.
+ * How `nemia rm` treats a run's branches. Kept by default, since a branch is where the work is: `deleteBranches` deletes each one merged
+ * into the run's base branch, and `forceUnmerged`, beside it, each one that is not — and the work on it.
  */
 export type ForgetHow = { deleteBranches?: boolean; forceUnmerged?: boolean };
 
 /**
- * Why `nemia rm` — or `nemia prune` or `nemia hold`, the `verb` — will not take this as a run's id — or null. Pure, and asked before anything is
- * read. A run's id names files under `WF_ROOT` with a suffix added — `runs/<id>.json`, `.cancelled`, `.pruned`, `.hold`, `.asks` — and
- * directories — `runs/<id>/`, `worktrees/<id>/` — so only what `runId` mints is taken: lowercase letters, digits and dashes, starting with
- * a letter or a digit. With a dot, `r-xyz.json` — what `ls runs/` gives — names `runs/r-xyz.json` as a run's directory, which is another
- * run's record, and a run with no record of its own is swept of it with nothing asked. `..` or a path would name a directory that is not
- * the run's. One that is an id with a file's suffix on it is told the id.
+ * Why `nemia rm` — or `nemia prune` or `nemia hold`, the `verb` — will not take this as a run's id — or null. Pure, and asked before
+ * anything is read. A run's id names files under `WF_ROOT` with a suffix added — `runs/<id>.json`, `.cancelled`, `.pruned`, `.hold`,
+ * `.asks` — and directories — `runs/<id>/`, `worktrees/<id>/` — so only what `runId` mints is taken: lowercase letters, digits and dashes,
+ * starting with a letter or a digit. With a dot, `r-xyz.json` — what `ls runs/` gives — names `runs/r-xyz.json` as a run's directory, which
+ * is another run's record, and a run with no record of its own is swept of it with nothing asked. `..` or a path would name a directory
+ * that is not the run's. One that is an id with a file's suffix on it is told the id.
  */
 export function idRefusal(id: string, verb: 'rm' | 'prune' | 'hold' = 'rm', command = `nemia ${verb}`): string | null {
   if (/^[a-z0-9][a-z0-9-]*$/.test(id)) return null;
@@ -52,9 +52,9 @@ export function idRefusal(id: string, verb: 'rm' | 'prune' | 'hold' = 'rm', comm
 export type AskName = { kind: 'retry' | 'round'; step: string; n: number };
 
 /**
- * Why `nemia rm` will not forget this run, in words that say what to do instead — or null, when it may. Pure: handed the run with every task
- * a pass filed and never wrote down adopted onto it — a check, a try, a round, and a step, on a cancelled run too, since a pass that read
- * it before the cancel may be filing one — the asks in its directory, and the store's other runs.
+ * Why `nemia rm` will not forget this run, in words that say what to do instead — or null, when it may. Pure: handed the run with every
+ * task a pass filed and never wrote down adopted onto it — a check, a try, a round, and a step, on a cancelled run too, since a pass that
+ * read it before the cancel may be filing one — the asks in its directory, and the store's other runs.
  * Every reason is named at once, so a person clears them in one go.
  *
  * Refused:
@@ -86,11 +86,13 @@ export type AskName = { kind: 'retry' | 'round'; step: string; n: number };
  * @param askAt Where an ask's file is, for the command that takes it back.
  * @param standings Where each result branch stands against the base branch, as git says it now (`branchStandings` in branches.store.ts): an
  *   ending whose result git already has holds nothing (`resultOnBase`). Left out, git is not asked, and every gate holds.
- * @param verb The verb the fixes name: `nemia prune` is held by every reason `nemia rm` is (`pruneRefusal`), and its fixes end in `nemia prune`.
+ * @param verb The verb the fixes name: `nemia prune` is held by every reason `nemia rm` is (`pruneRefusal`), and its fixes end in `nemia
+ * prune`.
  * @param merging Whose merge is in progress in the repository's checkout (`mergeState` in worktree.store.ts), for an ending that lands on
  *   its check: one staged and not landed holds the run (`landingOpen`). Left out, git is not asked, and only what the record and the
  *   engine say holds it.
- * @param command The command its fixes name, when it is more than `nemia <verb> <id>`: a prune's, with the flags it was given (`pruneAgain`).
+ * @param command The command its fixes name, when it is more than `nemia <verb> <id>`: a prune's, with the flags it was given
+ * (`pruneAgain`).
  */
 export function forgetRefusal(
   steps: readonly Workflow[] | undefined,
@@ -465,10 +467,10 @@ export function runWorktrees(
 }
 
 /**
- * Why `nemia rm` leaves a worktree as it is — or null, when git may be asked to remove it. Pure: handed what git lists of it and, for one on
- * no branch, what git says of it. Locked: git refuses, and so does `nemia rm`. Detached — a rebase, a bisect or a checkout of a commit left
- * its HEAD on no branch, as a session stopped in the middle of one does — unless nothing is uncommitted in it and its HEAD's commit is on a
- * branch already: a hand-off there commits onto no branch, and removing it leaves that commit, and any the session made, on none.
+ * Why `nemia rm` leaves a worktree as it is — or null, when git may be asked to remove it. Pure: handed what git lists of it and, for one
+ * on no branch, what git says of it. Locked: git refuses, and so does `nemia rm`. Detached — a rebase, a bisect or a checkout of a commit
+ * left its HEAD on no branch, as a session stopped in the middle of one does — unless nothing is uncommitted in it and its HEAD's commit is
+ * on a branch already: a hand-off there commits onto no branch, and removing it leaves that commit, and any the session made, on none.
  */
 export function heldWorktree(
   w: GitWorktree,

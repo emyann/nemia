@@ -1,5 +1,5 @@
 /**
- * What a pass costs, in words (`meter.ts`): the totals, the heaviest phases, the line `wf up` says once an interval, the breakdown
+ * What a pass costs, in words (`meter.ts`): the totals, the heaviest phases, the line `nemia up` says once an interval, the breakdown
  * `--stats` prints, and a cost read back off disk. Pure: the counting is `tally.store.ts`'s, proven on a store in tally.store.test.ts.
  */
 import { test } from 'node:test';
@@ -51,7 +51,7 @@ test('the heaviest phases, longest first, three at most, none that took no time'
   assert.deepEqual(heaviest(phases({})), []);
 });
 
-/** `wf up`'s loop, as it keeps the interval: a pass every `everyMs`, and the lines it says. */
+/** `nemia up`'s loop, as it keeps the interval: a pass every `everyMs`, and the lines it says. */
 const loop = (passes: number, everyMs: number): string[] => {
   const said: string[] = [];
   let interval: Interval | undefined;
@@ -66,7 +66,7 @@ const loop = (passes: number, everyMs: number): string[] => {
   return said;
 };
 
-test('`wf up` says one line an interval, not one a pass: 61 passes four seconds apart are three lines of 16 passes each', () => {
+test('`nemia up` says one line an interval, not one a pass: 61 passes four seconds apart are three lines of 16 passes each', () => {
   assert.equal(STATS_EVERY_MS, 60_000);
   assert.deepEqual(loop(15, 4000), [], 'fifteen passes are 56 seconds: nothing said yet');
   const said = loop(61, 4000);

@@ -1,6 +1,6 @@
 /**
- * `nemia plan`: every card of a plan folder started, parents first (`startPlan`), each through `start`. A controller: it reaches the runtime
- * through `start/start.verb.ts`.
+ * `nemia plan`: every card of a plan folder started, parents first (`startPlan`), each through `start`. A controller: it reaches the
+ * runtime through `start/start.verb.ts`.
  */
 import { workflowFolder } from '../folder/folder.store.ts';
 import { type Card, type Planned } from './plan.ts';
@@ -21,9 +21,9 @@ export type PlanStarted = {
 };
 
 /**
- * `nemia plan`: every card of a plan folder started, parents first, each with `start()` and `after` the runs of the cards its `after:` names —
- * the record `nemia start --after` writes, so the tick, `nemia ls`, `nemia decide` and the board need nothing new; parents first, so every card a
- * card's `after:` names has a run by then. Nothing else is written: no plan
+ * `nemia plan`: every card of a plan folder started, parents first, each with `start()` and `after` the runs of the cards its `after:`
+ * names — the record `nemia start --after` writes, so the tick, `nemia ls`, `nemia decide` and the board need nothing new; parents first,
+ * so every card a card's `after:` names has a run by then. Nothing else is written: no plan
  * record, and no file of its own. The runs and their `after` are the plan.
  *
  * Refused before the first run is started, naming the card and the fix: a folder `parsePlan` refuses; a card whose `workflow:` names no

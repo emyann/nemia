@@ -1,8 +1,8 @@
 /**
- * The commands over a run's course and the store's tick, each defined once: `nemia cancel`, `nemia hold`, `nemia rm` and `nemia prune`, whose
- * handlers call the package's verbs (`cancel`, `hold`, `unhold`, `forget`, `prune`) on one run — the CLI's runners walk the many runs
- * `nemia rm` and `nemia prune` take — the store's pause (`nemia pause`, `nemia resume`, and the api's read of it), and `nemia tick`, `nemia up` and
- * `nemia watch`, which the CLI alone serves and runs itself (`RAN`): their specs, refusals and help, with no handler.
+ * The commands over a run's course and the store's tick, each defined once: `nemia cancel`, `nemia hold`, `nemia rm` and `nemia prune`,
+ * whose handlers call the package's verbs (`cancel`, `hold`, `unhold`, `forget`, `prune`) on one run — the CLI's runners walk the many runs
+ * `nemia rm` and `nemia prune` take — the store's pause (`nemia pause`, `nemia resume`, and the api's read of it), and `nemia tick`, `nemia
+ * up` and `nemia watch`, which the CLI alone serves and runs itself (`RAN`): their specs, refusals and help, with no handler.
  */
 import { cancel } from '../cancel/cancel.verb.ts';
 import type { CancelPlan } from '../cancel/cancel.ts';
@@ -198,8 +198,8 @@ export const HOLD: Command<{ id: string; lifted: boolean; hold: Hold }> = {
 const RM_FORM = 'nemia rm <runId> [<runId> ...] [--delete-branches [--force-unmerged]]';
 
 /**
- * Refused of `nemia rm`'s arguments before any run is read: `--force-unmerged` without `--delete-branches` — it forces what that flag deletes,
- * and alone would delete nothing, silently — then a switch with no run to forget.
+ * Refused of `nemia rm`'s arguments before any run is read: `--force-unmerged` without `--delete-branches` — it forces what that flag
+ * deletes, and alone would delete nothing, silently — then a switch with no run to forget.
  */
 function rmRefusal(args: Args): string | null {
   if (args.forceUnmerged === true && args.deleteBranches !== true)
@@ -254,8 +254,8 @@ export const RM: Command<{ id: string; removed: boolean; forgot: Forgot }> = {
 };
 
 /**
- * `nemia prune`: one run judged for what it holds that a prune frees (`prune`), and removed on `yes`; the api always prunes as `--yes` does,
- * its route fixing `yes`. What `prune` refused, or found nothing to prune of, is a 409 on the api, in its words.
+ * `nemia prune`: one run judged for what it holds that a prune frees (`prune`), and removed on `yes`; the api always prunes as `--yes`
+ * does, its route fixing `yes`. What `prune` refused, or found nothing to prune of, is a 409 on the api, in its words.
  */
 export const PRUNE: Command<{
   id: string;
@@ -326,7 +326,9 @@ const PAUSE_TAKES = takesOf(PAUSE_SAID, PAUSE_SHAPE);
 /** What `nemia pause --now` would stop, before it acts: the pause that stands, if one does, and each task at work but a landing. */
 type PauseNowRead = { pause: Pause | null; interrupts: Interrupt[] };
 
-/** What `nemia pause` answers: the pause put; with `--now`, what it would stop (`PauseNowRead`), or with `--yes` what it did (`PausedNow`). */
+/**
+ * What `nemia pause` answers: the pause put; with `--now`, what it would stop (`PauseNowRead`), or with `--yes` what it did (`PausedNow`).
+ */
 type PauseAnswer = { pause: Pause } | PausedNow | PauseNowRead;
 
 /** `nemia pause`'s handler, by its flags: a plain pause, refused while one stands; `--now`, which only reads; `--now --yes`, which acts. */

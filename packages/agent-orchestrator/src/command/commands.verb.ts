@@ -3,15 +3,15 @@
  * it answers, and the lines the CLI prints of that data. The CLI parses, refuses, helps and prints from an entry, and the api serves the
  * same entry on its route; an entry served on one side alone says so (`only`). Today: a start of work (`nemia start`, `START`, and
  * `nemia plan`, `PLAN`, which the CLI alone runs), the inbox (`INBOXES`) and the factories (`FACTORIES`), a person's asks of a run —
- * `nemia retry`, `nemia approve`, `nemia round`, `nemia accept` and `nemia say` — the runs and their steps (`nemia ls`, `runsListed`), three reads the api
- * alone serves: a run's decision (`decideRun`), whether its branches still merge (`MERGES`) and the run slots (`slotsOf`), the agents of
- * both places (`nemia agents`, `agentsRead`), one agent's card (`nemia agents card`, `agentCardRead`) and its custom instructions
- * (`nemia agents custom`, `AGENTS_CUSTOM`), a run's course (`nemia cancel`, `nemia hold`, `nemia rm`, `nemia prune`), and the store's pause (`nemia pause`,
- * `nemia resume`, and its read the api alone serves): `runs.verb.ts`; the reads of the store (`nemia show`, `nemia logs`, `nemia feed`,
- * `nemia stats`: `reads.verb.ts`); and what the board alone reads and writes, each served on the api alone: a card's page (`INBOXES`), a
- * run's page and its steps' files, path and conversation (`PAGES`), the agent and skill libraries (`LIBRARY_ENTRIES`, `SKILL_ENTRIES`)
- * and the workflow builder (`WORKFLOW_ENTRIES`). The whole table (`TABLE`) adds the commands the CLI serves alone and runs itself, with
- * no handler: `nemia plan`, `nemia tick`, `nemia up` and `nemia watch` (`RAN`).
+ * `nemia retry`, `nemia approve`, `nemia round`, `nemia accept` and `nemia say` — the runs and their steps (`nemia ls`, `runsListed`),
+ * three reads the api alone serves: a run's decision (`decideRun`), whether its branches still merge (`MERGES`) and the run slots
+ * (`slotsOf`), the agents of both places (`nemia agents`, `agentsRead`), one agent's card (`nemia agents card`, `agentCardRead`) and its
+ * custom instructions (`nemia agents custom`, `AGENTS_CUSTOM`), a run's course (`nemia cancel`, `nemia hold`, `nemia rm`, `nemia prune`),
+ * and the store's pause (`nemia pause`, `nemia resume`, and its read the api alone serves): `runs.verb.ts`; the reads of the store (`nemia
+ * show`, `nemia logs`, `nemia feed`, `nemia stats`: `reads.verb.ts`); and what the board alone reads and writes, each served on the api
+ * alone: a card's page (`INBOXES`), a run's page and its steps' files, path and conversation (`PAGES`), the agent and skill libraries
+ * (`LIBRARY_ENTRIES`, `SKILL_ENTRIES`) and the workflow builder (`WORKFLOW_ENTRIES`). The whole table (`TABLE`) adds the commands the CLI
+ * serves alone and runs itself, with no handler: `nemia plan`, `nemia tick`, `nemia up` and `nemia watch` (`RAN`).
  */
 import { approvalWordsRefusal } from '../gate/gate.ts';
 import { approve } from '../gate/gate.verb.ts';
@@ -253,7 +253,9 @@ const ROUND: Command<{ step: string; round: number; file: string; budget?: numbe
   },
 };
 
-/** `nemia accept`: a loop out of rounds closed on its last try as it stands, its findings open, and the file the acceptance is written to. */
+/**
+ * `nemia accept`: a loop out of rounds closed on its last try as it stands, its findings open, and the file the acceptance is written to.
+ */
 const ACCEPT: Command<{ step: string; try: number; at: string; message: string; file: string; waited: boolean }> = {
   name: 'accept',
   usage: '<runId> [<step>] --message "<why>"',
@@ -271,7 +273,8 @@ const ACCEPT: Command<{ step: string; try: number; at: string; message: string; 
         flag: '--message',
         kind: 'text',
         key: 'message',
-        takes: '--message takes why the work is good enough with its findings open, quoted: nemia accept <runId> [<step>] --message "<why>".',
+        takes:
+          '--message takes why the work is good enough with its findings open, quoted: nemia accept <runId> [<step>] --message "<why>".',
         twice: 'nemia accept takes --message once: put all your words in it, quoted — nemia accept <runId> [<step>] --message "<why>".',
       },
     ],
@@ -297,8 +300,8 @@ const ACCEPT: Command<{ step: string; try: number; at: string; message: string; 
 };
 
 /**
- * `nemia say`: words to a step's session, journalled on its task, and printed as `nemia decide` prints them. It takes every word after the step
- * as one message, so an unquoted sentence is one; empty words are the engine's to refuse.
+ * `nemia say`: words to a step's session, journalled on its task, and printed as `nemia decide` prints them. It takes every word after the
+ * step as one message, so an unquoted sentence is one; empty words are the engine's to refuse.
  */
 const SAY: Command<{ at: string; attempt: number; text: string; try: number; taskId: string }> = {
   name: 'say',
@@ -336,8 +339,8 @@ const SAY: Command<{ at: string; attempt: number; text: string; try: number; tas
 };
 
 /**
- * `nemia ls`: every run, or the one named, and its steps, as the package reads each (`runsListed`). The board's list is the runs' summaries,
- * judged off the same reading of each (`runReading`), on the entry the api serves alone (`RUNS`).
+ * `nemia ls`: every run, or the one named, and its steps, as the package reads each (`runsListed`). The board's list is the runs'
+ * summaries, judged off the same reading of each (`runReading`), on the entry the api serves alone (`RUNS`).
  */
 const LS: Command<RunsListed> = {
   name: 'ls',
@@ -512,7 +515,7 @@ export const COMMANDS: readonly Command[] = [
 ];
 
 /**
- * The whole table, in the order `nemia`'s help lists them: `nemia start` and `nemia plan`, then every other command with a handler, then those the
- * CLI runs itself (`RAN`).
+ * The whole table, in the order `nemia`'s help lists them: `nemia start` and `nemia plan`, then every other command with a handler, then
+ * those the CLI runs itself (`RAN`).
  */
 export const TABLE: readonly (Command | Ran)[] = [COMMANDS[0], PLAN, ...COMMANDS.slice(1), ...RAN];

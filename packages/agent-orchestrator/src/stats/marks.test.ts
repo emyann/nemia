@@ -189,7 +189,7 @@ test('stats mark a run in their days against a run before them, filtered and gro
   assert.equal(statsOf(facts, {}, NOW).from, '2026-09-20', 'with no fact, the first mark is the first day');
 });
 
-test('wf stats in words prints a changed row per mark, and nothing where there is none', () => {
+test('nemia stats in words prints a changed row per mark, and nothing where there is none', () => {
   const lines = statsLines(statsOf({ tries: [], runs: [], frozen: history() }, {}, NOW));
   assert.match(lines.join('\n'), /^day\s+changed\s+run\s+since$/m);
   assert.match(lines.join('\n'), new RegExp(`^2026-09-20\\s+skill ${SKILL}\\s+r2\\s+r1$`, 'm'));

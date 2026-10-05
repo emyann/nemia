@@ -1,6 +1,6 @@
 /**
  * A step's policy may add skills to its agent's (`skills:` on a step): the session is given the agent's skills and then the step's, each
- * once, frozen at `wf start`; the step's file is written back with its own line; and a step never takes one away. Refused: a skill the
+ * once, frozen at `nemia start`; the step's file is written back with its own line; and a step never takes one away. Refused: a skill the
  * agent's fence cannot load (`addedSkillsRefusal`), one no place has, a line on a step with no agent, and one the step's harness or
  * `resume:` cannot reach. Each refusal beside what still loads.
  */
@@ -187,7 +187,7 @@ test('REFUSED: a skill the step adds that no place has, naming every place looke
   assert.deepEqual(step.agent?.skills, ['implement-a-change', 'review-a-change']);
 });
 
-test("`wf start` freezes the step's own line and the session's list, renders the added skill and names it; a later edit changes nothing", () => {
+test("`nemia start` freezes the step's own line and the session's list, renders the added skill and names it; a later edit changes nothing", () => {
   const root = teamWith('---\nagent: implementer\nskills: review-a-change\n---\n');
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   const git = (...args: string[]) =>

@@ -1,5 +1,5 @@
 /**
- * A factory's name and what `wf factory ls` says of the store's factories — pure, as data.
+ * A factory's name and what `nemia factory ls` says of the store's factories — pure, as data.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -38,12 +38,12 @@ test('the default factory is refused to add and rm in words of its own', () => {
   assert.equal(DEFAULT_FACTORY, 'default');
   assert.match(
     defaultFactoryRefusal('add'),
-    /^`default` is the default factory: .* read, never written, so wf factory add does not take it/,
+    /^`default` is the default factory: .* read, never written, so nemia factory add does not take it/,
   );
-  assert.match(defaultFactoryRefusal('rm'), /wf factory rm does not take it/);
+  assert.match(defaultFactoryRefusal('rm'), /nemia factory rm does not take it/);
 });
 
-test('wf factory ls: the default first, then each factory by name with its repositories, and one that does not read with why', () => {
+test('nemia factory ls: the default first, then each factory by name with its repositories, and one that does not read with why', () => {
   assert.deepEqual(factoryLines([]), ['default  every run and card that names no factory — read, never written']);
   assert.deepEqual(
     factoryLines([
@@ -62,10 +62,10 @@ test('wf factory ls: the default first, then each factory by name with its repos
 
 test('no factory of that name: which there are, or that there is none but the default', () => {
   assert.equal(noFactoryLine('nope', ['pipao', 'abc']), 'no factory nope in the store. Its factories are: abc, pipao.');
-  assert.match(noFactoryLine('nope', []), /It has none but the default: file one with wf factory add <name> --repo <path>\.$/);
+  assert.match(noFactoryLine('nope', []), /It has none but the default: file one with nemia factory add <name> --repo <path>\.$/);
 });
 
-test("wf factory ls: a factory's hires under its line, sorted by step, whatever order its file has them in", () => {
+test("nemia factory ls: a factory's hires under its line, sorted by step, whatever order its file has them in", () => {
   assert.deepEqual(
     factoryLines([
       {
@@ -121,12 +121,12 @@ test('REFUSED: every step no agent fills, naming the factory and hiring as the w
   const why = unfilledRefusal(steps, 'pipao', 'build');
   assert.ok(why);
   assert.match(why, /^build: in the factory pipao, 2 steps name no agent, and pipao hires none into them: implement, ship\./);
-  assert.match(why, /wf factory hire pipao <agent> --step build\/implement/);
-  assert.match(why, /wf factory hire pipao <agent> --step build\/ship/);
+  assert.match(why, /nemia factory hire pipao <agent> --step build\/implement/);
+  assert.match(why, /nemia factory hire pipao <agent> --step build\/ship/);
   assert.doesNotMatch(why, /build\/review|build\/ask/);
   assert.ok(
     why.endsWith(
-      '. Hire an agent into each — wf factory hire pipao <agent> --step build/implement; wf factory hire pipao <agent> --step build/ship. Nothing was started.',
+      '. Hire an agent into each — nemia factory hire pipao <agent> --step build/implement; nemia factory hire pipao <agent> --step build/ship. Nothing was started.',
     ),
     why,
   );
@@ -136,11 +136,11 @@ test('REFUSED: every step no agent fills, naming the factory and hiring as the w
 });
 
 test('the default factory is refused to hire and fire, since it is never written', () => {
-  assert.match(defaultFactoryRefusal('hire'), /wf factory hire does not take it/);
-  assert.match(defaultFactoryRefusal('fire'), /wf factory fire does not take it/);
+  assert.match(defaultFactoryRefusal('hire'), /nemia factory hire does not take it/);
+  assert.match(defaultFactoryRefusal('fire'), /nemia factory fire does not take it/);
 });
 
-test('wf factory ls: the workflows a factory offers on one line under its own, by name, before its hires; no such line when it has none', () => {
+test('nemia factory ls: the workflows a factory offers on one line under its own, by name, before its hires; no such line when it has none', () => {
   assert.deepEqual(
     factoryLines([
       { name: 'pipao', file: '/s/pipao.json', repos: ['/code/pipao'], workflows: ['intake', 'build'], hires: { 'build/implement': 'ada' } },
@@ -169,11 +169,11 @@ test('REFUSED: a start of a workflow its factory has not attached, saying what i
   assert.equal(unattachedRefusal({ name: 'pipao', workflows: ['intake', 'build'] }, 'build'), undefined);
   assert.equal(
     unattachedRefusal({ name: 'pipao', workflows: [] }, 'build'),
-    'build: the factory pipao does not offer this workflow — it offers none yet. Attach it: wf factory attach pipao build. Nothing was started.',
+    'build: the factory pipao does not offer this workflow — it offers none yet. Attach it: nemia factory attach pipao build. Nothing was started.',
   );
   assert.equal(
     unattachedRefusal({ name: 'pipao', workflows: ['intake', 'dev'] }, 'build'),
-    'build: the factory pipao does not offer this workflow — it offers: dev, intake. Attach it: wf factory attach pipao build. Nothing was started.',
+    'build: the factory pipao does not offer this workflow — it offers: dev, intake. Attach it: nemia factory attach pipao build. Nothing was started.',
   );
   for (const workflows of [[], ['intake', 'dev']])
     assert.doesNotMatch(unattachedRefusal({ name: 'pipao', workflows }, 'build')!, /default factory/, "only the factory's own fix");
@@ -181,8 +181,8 @@ test('REFUSED: a start of a workflow its factory has not attached, saying what i
 });
 
 test('the default factory is refused to attach and detach, since it offers every workflow and is never written', () => {
-  assert.match(defaultFactoryRefusal('attach'), /wf factory attach does not take it\. It offers every workflow found already/);
-  assert.match(defaultFactoryRefusal('detach'), /wf factory detach does not take it\. It offers every workflow found/);
+  assert.match(defaultFactoryRefusal('attach'), /nemia factory attach does not take it\. It offers every workflow found already/);
+  assert.match(defaultFactoryRefusal('detach'), /nemia factory detach does not take it\. It offers every workflow found/);
 });
 
 test("the repository of a run in a factory: the one named, else the factory's only one, else where it is started from", () => {
@@ -200,7 +200,7 @@ test('REFUSED: a repository outside the factory, naming its list, sorted, the --
   assert.equal(outsideRefusal(pipao, '/r/b/'), undefined);
   assert.equal(
     outsideRefusal(pipao, '/r/c'),
-    '/r/c: the factory pipao works on /r/a, /r/b, and this repository is not one of them. Name one of them — --repo /r/a — or file a factory on this one: wf factory add <name> --repo /r/c. Nothing was started.',
+    '/r/c: the factory pipao works on /r/a, /r/b, and this repository is not one of them. Name one of them — --repo /r/a — or file a factory on this one: nemia factory add <name> --repo /r/c. Nothing was started.',
   );
   assert.doesNotMatch(outsideRefusal(pipao, '/r/c')!, /default factory/, "only the factory's own fix");
 });
@@ -245,11 +245,11 @@ test('every factory that holds a folder is returned, none chosen: one repository
 test("REFUSED: a start no factory holds, naming the folder, the factories, the fix in the start's words, the add, and the files that do not read", () => {
   assert.equal(
     noFactoryRefusal('/s/loose', ['pipao', 'abc'], '--factory <name>', ['broken']),
-    "/s/loose: no factory works on this folder, and every run is started in a factory. Name the factory — --factory <name>, one of abc, pipao — or file one on this repository and attach the workflow to it: wf factory add <name> --repo <root>, then wf factory attach <name> <workflow>. These factories' files do not read, and were not looked at: broken (wf factory ls). Nothing was started.",
+    "/s/loose: no factory works on this folder, and every run is started in a factory. Name the factory — --factory <name>, one of abc, pipao — or file one on this repository and attach the workflow to it: nemia factory add <name> --repo <root>, then nemia factory attach <name> <workflow>. These factories' files do not read, and were not looked at: broken (nemia factory ls). Nothing was started.",
   );
   assert.match(
     noFactoryRefusal('/s/loose', [], '?factory=<name>'),
-    / — \?factory=<name>, once one is filed: wf factory add <name> --repo <root> — /,
+    / — \?factory=<name>, once one is filed: nemia factory add <name> --repo <root> — /,
   );
 });
 

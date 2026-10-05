@@ -69,8 +69,8 @@ export const localFields = <T extends object>(step: Workflow, fields: () => T): 
 
 /**
  * A step as the tick tells it and files it: with its agent's instructions in Claude Code's prompt and its skills in a plugin, where
- * `nemia start` rendered them (`rendersAgent`, `renderedFlags`); a step it does not render — a codex step, a record that gives no agent — is
- * filed with no flags and told everything in its brief. Where the rendered folder is not there as its flags name it (`unrendered`,
+ * `nemia start` rendered them (`rendersAgent`, `renderedFlags`); a step it does not render — a codex step, a record that gives no agent —
+ * is filed with no flags and told everything in its brief. Where the rendered folder is not there as its flags name it (`unrendered`,
  * `renderedIn`) — gone, or rendered under the plugin's former name — a flag naming a file that is not there would end the session at its
  * start, so its brief tells it its skills whole, read again from where a start of this run's folder finds them (`skillsAgain`). Bridged to
  * claude.ai, where anyone signed in can drive it, only when the step says `remote: true`, never by default: as Claude Code's own flag,
@@ -232,14 +232,18 @@ async function stopFirst(f: Filing, r: Retry, taskId: string): Promise<void> {
   const asked = refused
     ? `but the engine did not take the stop (${refused}), and the try is filed once it has settled`
     : 'so the engine is asked to stop it, and the try is filed once it has';
-  f.notes.push(`${r.step}: try ${r.try} — nemia retry ${modeWord(r)}${r.message !== undefined ? ', with your answer' : ''}; ${why}, ${asked}`);
+  f.notes.push(
+    `${r.step}: try ${r.try} — nemia retry ${modeWord(r)}${r.message !== undefined ? ', with your answer' : ''}; ${why}, ${asked}`,
+  );
 }
 
 /** The note that says a try, and on whose word: `retries:`, a nudge to sign off, or `nemia retry` and what it was typed with. */
 const tryWord = (r: Retry, step: Workflow): string =>
   `${r.step}: try ${r.try} — ${r.by === 'retries' ? `retries: ${step.retries}` : r.by === 'signoff' ? 'a nudge to sign off, once a round' : askedWord(r)}`;
 
-/** A try asked for, as `tryWord` says it: by `nemia pause --now`, which stopped its session or check, or by `nemia retry` as it was typed. */
+/**
+ * A try asked for, as `tryWord` says it: by `nemia pause --now`, which stopped its session or check, or by `nemia retry` as it was typed.
+ */
 const askedWord = (r: Retry): string =>
   r.by === 'pause'
     ? `${r.mode === 'recheck' ? 'rechecked' : 'continued'} after nemia pause --now`

@@ -21,7 +21,7 @@ const FORCED = 'npx turbo run test --force --continue && npx turbo run typecheck
 
 const UNFORCED = 'npm test && npm run typecheck && ';
 
-/** The shipped landing step's check, read from the folder as `wf start` reads it. */
+/** The shipped landing step's check, read from the folder as `nemia start` reads it. */
 const landCheck = (): string => {
   const check = loadWorkflows(BUILD, placesOf(BUILD)).find((step) => step.name === 'land')?.check;
   assert.equal(typeof check, 'string', 'workflows/build has a land step with a check');

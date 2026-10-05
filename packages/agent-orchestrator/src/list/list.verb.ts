@@ -41,7 +41,8 @@ import { readPause } from '../pause/pause.store.ts';
 import { currentTasks, finishingAmong, type Pause, type Paused, type PauseStaged } from '../pause/pause.ts';
 
 /**
- * How a caller reads a run (`runReading`): what it already holds, and what it asks to be read. Each left out is read as `nemia ls` reads it.
+ * How a caller reads a run (`runReading`): what it already holds, and what it asks to be read. Each left out is read as `nemia ls` reads
+ * it.
  *
  * @param views The engine's view of every task the run filed, an earlier try's included; left out, read one by one (`taskPhases`).
  * @param steps The steps the run is judged by; left out, its frozen workflow (`stepsOf`).
@@ -200,9 +201,9 @@ async function pausedOf(e: Engine, pause: Pause, runs: readonly Run[], reads: re
 }
 
 /**
- * The store's pause, as `GET /api/pause`, `nemia feed` and `nemia start` answer it: the pause or null; each task still finishing under it, read
- * on this call while a pause stands; and each landing it holds with its merge staged — read of the runs whose ending lands on its check
- * while MERGE_HEAD is in their checkout, the one landing the pause can leave staged.
+ * The store's pause, as `GET /api/pause`, `nemia feed` and `nemia start` answer it: the pause or null; each task still finishing under it,
+ * read on this call while a pause stands; and each landing it holds with its merge staged — read of the runs whose ending lands on its
+ * check while MERGE_HEAD is in their checkout, the one landing the pause can leave staged.
  */
 export async function pausedRead(e: Engine): Promise<Paused> {
   const pause = readPause();

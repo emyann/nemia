@@ -2,8 +2,8 @@
  * The store's pause, which the runtime calls unschedulable: while it stands no pass starts new work — no step, try, round or check
  * filed, no queued task admitted, no queued card started — and what runs finishes. What still finishes under it (`finishingOf`), read off
  * the views on each pass and never stored, and its words: "Pausing" while anything finishes, "Paused" once nothing does, as `nemia ls`,
- * `nemia feed`, `nemia start`, `nemia up` and the board say it. Pure: its file is `pause.store.ts`'s, and the gates that honour it are `assess`
- * and the tick's `pass`.
+ * `nemia feed`, `nemia start`, `nemia up` and the board say it. Pure: its file is `pause.store.ts`'s, and the gates that honour it are
+ * `assess` and the tick's `pass`.
  */
 import type { Run } from '../record/record.ts';
 import type { RetryAsk } from '../retry/index.ts';
@@ -26,7 +26,8 @@ export type PauseStaged = { run: string; step: string; repo: string };
 /**
  * A task still at work under the pause, which it lets finish: `run`'s `step`, as a `session` at work, the `check` of its work, or the
  * check of a `landing` (an ending that lands on its check) — `stopping` once the engine was asked to stop it, and `resumed` while an ask
- * `nemia pause --now` wrote names it (`interrupted`), which tries it again on the resume. A stop asked by another hand carries no `resumed`.
+ * `nemia pause --now` wrote names it (`interrupted`), which tries it again on the resume. A stop asked by another hand carries no
+ * `resumed`.
  */
 export type Finishing = { run: string; step: string; kind: 'session' | 'check' | 'landing'; stopping?: true; resumed?: true };
 

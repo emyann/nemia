@@ -38,7 +38,7 @@ const { readAsks, readRun } = await import('../src/record/record.store.ts');
 const { closeoutAsked, closeoutOf, deniedOf } = await import('../src/views/views.verb.ts');
 const { phaseOfView } = await import('../src/views/views-words.ts');
 
-/** A repository with one commit, so `wf start` has a base to record. */
+/** A repository with one commit, so `nemia start` has a base to record. */
 const aRepo = (): string => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   const git = (...args: string[]) =>
@@ -140,7 +140,7 @@ const engine = () => {
   return { e, sign, pass, spawned, sessions, refusing };
 };
 
-/** Each step's line on `wf ls`, by name. */
+/** Each step's line on `nemia ls`, by name. */
 const statuses = async (e: Engine, id: string): Promise<Record<string, string>> =>
   Object.fromEntries((await list(e, readRun(id))).steps.map((s) => [s.name, s.status]));
 
@@ -196,7 +196,7 @@ test('an ungated step that signed off is closed on the pass that reads it waitin
   assert.equal(readRun(run.id).steps.plan.taskId, `${run.id}-plan`);
 });
 
-test("a step that signed off blocked stays open, and a person's answer — `wf retry --message` — is its next turn: the same task, in the session that signed, nothing filed", async () => {
+test("a step that signed off blocked stays open, and a person's answer — `nemia retry --message` — is its next turn: the same task, in the session that signed, nothing filed", async () => {
   const { run, e, signed, pass, spawned, sign } = await signedPlan({}, BLOCKED);
   const plan = `${run.id}-plan`;
   assert.deepEqual(signed.filed, []);
@@ -338,7 +338,7 @@ const answeredTurn = async () => {
 
 /**
  * What every end of the turn but a sign-off leaves: the task settled `failed` and the step read `failed`, nothing tried again on its own,
- * and a person's `wf retry --message` filed as a task of its own — `-try3`, the answered turn being try 2 — and the settled task never
+ * and a person's `nemia retry --message` filed as a task of its own — `-try3`, the answered turn being try 2 — and the settled task never
  * answered again, continuing `from`.
  */
 const triedAgain = async (h: Awaited<ReturnType<typeof answeredTurn>>, from: string, end: string) => {
@@ -355,7 +355,7 @@ const triedAgain = async (h: Awaited<ReturnType<typeof answeredTurn>>, from: str
     ['failed', ['plan']],
     `${end}: the run failed, as any failed step fails it`,
   );
-  assert.match(decided.offers.join('\n'), /wf retry \S+ plan/, `${end}: and \`wf decide\` offers the retry`);
+  assert.match(decided.offers.join('\n'), /nemia retry \S+ plan/, `${end}: and \`nemia decide\` offers the retry`);
 
   await retry(e, run.id, 'plan', { mode: 'nudge', message: 'the --dry-run flag, again' });
   assert.deepEqual((await pass(run.id)).tried, ['plan'], `${end}: the nudge`);
@@ -373,7 +373,7 @@ const triedAgain = async (h: Awaited<ReturnType<typeof answeredTurn>>, from: str
   );
 };
 
-test("an answer's turn that FAILED settles its task failed, and a `wf retry --message` is a `-tryN` task continuing the session that failed", async () => {
+test("an answer's turn that FAILED settles its task failed, and a `nemia retry --message` is a `-tryN` task continuing the session that failed", async () => {
   const h = await answeredTurn();
   await h.pass(h.run.id);
   assert.deepEqual(
@@ -387,7 +387,7 @@ test("an answer's turn that FAILED settles its task failed, and a `wf retry --me
   await triedAgain(h, 'native-2', 'failed');
 });
 
-test("an answer's turn that was LOST settles its task failed, and a `wf retry --message` is a `-tryN` task continuing the session that asked, since the lost one was never named", async () => {
+test("an answer's turn that was LOST settles its task failed, and a `nemia retry --message` is a `-tryN` task continuing the session that asked, since the lost one was never named", async () => {
   const h = await answeredTurn();
   await h.pass(h.run.id);
   assert.equal(h.spawned.at(-1)!.name, h.turn);
@@ -410,7 +410,7 @@ test("an answer's turn that was LOST settles its task failed, and a `wf retry --
   await triedAgain(h, 'native-1', 'lost');
 });
 
-test("an answer's turn that COULD NOT START settles its task failed, and a `wf retry --message` is a `-tryN` task continuing the session that asked", async () => {
+test("an answer's turn that COULD NOT START settles its task failed, and a `nemia retry --message` is a `-tryN` task continuing the session that asked", async () => {
   const h = await answeredTurn();
   h.refusing.add(h.turn);
   await h.pass(h.run.id);
@@ -424,7 +424,7 @@ test("an answer's turn that COULD NOT START settles its task failed, and a `wf r
   await triedAgain(h, 'native-1', 'unstartable');
 });
 
-test('a gated step that signed stays open until `wf approve`, and is closed on the pass that files what waits on it', async () => {
+test('a gated step that signed stays open until `nemia approve`, and is closed on the pass that files what waits on it', async () => {
   const { run, e, signed, pass } = await signedPlan({ plan: 'gate: true' }, SIGNED);
   assert.deepEqual(signed.filed, []);
   assert.equal((await statuses(e, run.id)).plan, 'awaiting approval');
@@ -438,7 +438,7 @@ test('a gated step that signed stays open until `wf approve`, and is closed on t
   assert.equal((await stateOf(e, `${run.id}-plan`)).state.closed, true);
 });
 
-test('a gated step closed on its approval reads on `wf ls` as it signed, in the pass before the engine settles it — as the tick, which filed what follows, reads it', async () => {
+test('a gated step closed on its approval reads on `nemia ls` as it signed, in the pass before the engine settles it — as the tick, which filed what follows, reads it', async () => {
   const { run, e, pass } = await signedPlan({ plan: 'gate: true' }, SIGNED);
   const plan = `${run.id}-plan`;
   await approve(e, run.id, 'plan');
@@ -477,7 +477,7 @@ test('a gated step stays open while its check runs, so a send-back once the chec
   assert.equal((await stateOf(e, plan)).state.inputs.length, 1, 'answered, in the session that signed');
 });
 
-test("a send-back from a gate — `wf retry --message` on a signed gated step — is an answer to its task, and the next turn's sign-off waits for an approval of its own", async () => {
+test("a send-back from a gate — `nemia retry --message` on a signed gated step — is an answer to its task, and the next turn's sign-off waits for an approval of its own", async () => {
   const { run, e, pass, sign } = await signedPlan({}, SIGNED, ['plan']);
   const plan = `${run.id}-plan`;
   await retry(e, run.id, 'plan', { mode: 'nudge', message: 'smaller steps, please' });
@@ -504,7 +504,7 @@ test("a send-back from a gate — `wf retry --message` on a signed gated step �
   assert.equal((await stateOf(e, plan)).state.closed, true);
 });
 
-test('`wf cancel` closes a task that waits for a word — nothing runs, so nothing is stopped — and a cancelled run closes one the verb did not', async () => {
+test('`nemia cancel` closes a task that waits for a word — nothing runs, so nothing is stopped — and a cancelled run closes one the verb did not', async () => {
   const { run, e, pass } = await signedPlan({ plan: 'gate: true' }, SIGNED);
   const { plan } = await cancel(e, run.id);
   assert.deepEqual(plan.kind === 'cancel' ? plan.stop : plan, []);
@@ -523,7 +523,7 @@ test('`wf cancel` closes a task that waits for a word — nothing runs, so nothi
   );
 });
 
-test('`wf rm` of a run whose step waits for a word closes its task: no pass reads the run again to close it', async () => {
+test('`nemia rm` of a run whose step waits for a word closes its task: no pass reads the run again to close it', async () => {
   const { run, e } = await signedPlan({}, BLOCKED);
   const forgot = await forget(e, run.id);
   assert.equal(forgot.kind, 'forgotten', forgot.refusal);

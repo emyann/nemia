@@ -1,7 +1,7 @@
 /**
  * The sections of a step's brief: a try (`retrySection`), a round and a loop (`roundSection`, `loopSection`), what a step reads and what a
- * person approved or accepted before it (`fromSection`, `approvedSection`, `acceptedSection`); and the lines `nemia decide` prints of a gate
- * and of an accepted loop (`gateLines`, `acceptedLines`). Pure.
+ * person approved or accepted before it (`fromSection`, `approvedSection`, `acceptedSection`); and the lines `nemia decide` prints of a
+ * gate and of an accepted loop (`gateLines`, `acceptedLines`). Pure.
  */
 import { LOOP_REPLIES, outputFields, type Workflow } from '../step/step.ts';
 import { andList, dataBlock, fenced, type CloseoutAsked, type Run, type StepStatus, type TaskPhase } from '../record/record.ts';
@@ -72,8 +72,8 @@ export type RetryBriefing = {
   /** The cap the person who asked for this try raised the step's budget to (`nemia retry --budget`). */
   budget?: number;
   /**
-   * What a person said to the last try's session while it ran (`nemia say`): the engine's `said` on its task, in the order said. Given again
-   * to a try that continues that session (`saidSection`), since a session may never have read it — and to no new session.
+   * What a person said to the last try's session while it ran (`nemia say`): the engine's `said` on its task, in the order said. Given
+   * again to a try that continues that session (`saidSection`), since a session may never have read it — and to no new session.
    */
   said?: readonly Said[];
   /**
@@ -251,7 +251,9 @@ export type RoundBriefing = {
   by: Round['by'];
   /** Whether this round continues the target's last session. With none to continue it starts a new one, and its brief says so. */
   resumed: boolean;
-  /** What a person said to the target's last session while it ran (`nemia say`), given again to a round that continues it (`saidSection`). */
+  /**
+   * What a person said to the target's last session while it ran (`nemia say`), given again to a round that continues it (`saidSection`).
+   */
   said?: readonly Said[];
 };
 
@@ -431,9 +433,9 @@ export function fromSection(
 
 /**
  * `## Approved`: what a person approved at each gate this step comes after, directly or through another (`hasGate`, `upstreamOf`), in the
- * order the steps run — the step, the try, when, and the words given with it (`nemia approve --message`), fenced as data. Nothing for a step
- * after no approved gate, so a run with no gate composes no such section. An ending step approved before it runs (`approvedFirst`) is given
- * its own approval too: the words a person gave with it are the terms it acts on.
+ * order the steps run — the step, the try, when, and the words given with it (`nemia approve --message`), fenced as data. Nothing for a
+ * step after no approved gate, so a run with no gate composes no such section. An ending step approved before it runs (`approvedFirst`) is
+ * given its own approval too: the words a person gave with it are the terms it acts on.
  *
  * It travels as a parent run's closeout does, one level down: a person read what the gated step handed on and said it may go on, and their
  * words are part of what the work after it is judged by — the implementer's, and the reviewer's after it. The approval of the try the gated
@@ -508,19 +510,22 @@ export function acceptedSection(
       "a person's decision on the record, beside what was asked for — do what was asked for on the terms they gave.",
       '',
       ...fenced(given.message, 'text'),
-      fromSection(looping.name, steps, closeoutOf, { because: `a person ended its loop with these open (\`nemia accept\`)`, omit: ['again'] }),
+      fromSection(looping.name, steps, closeoutOf, {
+        because: `a person ended its loop with these open (\`nemia accept\`)`,
+        omit: ['again'],
+      }),
     ]),
   ].join('\n');
 }
 
 /**
- * What `nemia decide` prints under each gated step whose gate has something to say: `approved 23:10Z — "ship the second reading"` for the try
- * it is on, or `awaiting approval` with the two commands a person has. Nothing for a gated step not yet signed off, nor for one with no
+ * What `nemia decide` prints under each gated step whose gate has something to say: `approved 23:10Z — "ship the second reading"` for the
+ * try it is on, or `awaiting approval` with the two commands a person has. Nothing for a gated step not yet signed off, nor for one with no
  * gate. Pure.
  *
  * An ending whose work a try or round due files again holds no gate (`unheld`), as `assess`, `listing` and `decision` read it, since
- * `nemia approve` refuses it then. On a pruned run the gate is never approved (`prunedRefusal`); on a held one it is not asked for until the
- * hold lifts (`heldRefusal`).
+ * `nemia approve` refuses it then. On a pruned run the gate is never approved (`prunedRefusal`); on a held one it is not asked for until
+ * the hold lifts (`heldRefusal`).
  *
  * @param asks What people asked for with `nemia retry`, and the run has not consumed yet: what un-holds an ending's gate (`unheld`).
  * @param roundAsks What people asked for with `nemia round`, and the run has not consumed yet: the same.
@@ -568,8 +573,9 @@ export function gateLines(
 }
 
 /**
- * What `nemia decide` prints under a looping step whose loop a person ended as it stands (`nemia accept`): when, and the words they gave, which
- * are the whole reason its findings are still open. Nothing for a loop nobody accepted, nor for an acceptance a later try has spent. Pure.
+ * What `nemia decide` prints under a looping step whose loop a person ended as it stands (`nemia accept`): when, and the words they gave,
+ * which are the whole reason its findings are still open. Nothing for a loop nobody accepted, nor for an acceptance a later try has spent.
+ * Pure.
  */
 export function acceptedLines(steps: readonly Workflow[], run: Run): Record<string, string> {
   const lines: Record<string, string> = {};

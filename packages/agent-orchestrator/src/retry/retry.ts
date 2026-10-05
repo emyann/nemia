@@ -201,7 +201,9 @@ export function pauseAskVoid(
   return phase !== 'stopped' || !carries(a, overBudget(step, run, spendOf) ? raiseOf(step, run, spendOf) : undefined);
 }
 
-/** The asks among `asks` that `nemia pause --now` wrote and that are void on this pass (`pauseAskVoid`), each of a step of `steps`. Pure. */
+/**
+ * The asks among `asks` that `nemia pause --now` wrote and that are void on this pass (`pauseAskVoid`), each of a step of `steps`. Pure.
+ */
 export const pauseAsksVoid = (
   steps: readonly Workflow[],
   run: Run,
@@ -324,8 +326,8 @@ const askedBy = (ask: RetryAsk): 'ask' | 'pause' => (ask.interrupted === undefin
 const STOPPED_FIRST: readonly RetryMode[] = ['nudge', 'fresh'];
 
 /**
- * How a step's record reached the try it is on, for `nemia ls` and `nemia decide`: `try 2, by retries: 2` — and for a step of a loop past its
- * first round, the round, before any try within it: `round 2 of 3`, `round 2 of 3, try 3, by retries: 1`. Empty on a first try.
+ * How a step's record reached the try it is on, for `nemia ls` and `nemia decide`: `try 2, by retries: 2` — and for a step of a loop past
+ * its first round, the round, before any try within it: `round 2 of 3`, `round 2 of 3, try 3, by retries: 1`. Empty on a first try.
  * A try a person asked for with a message says so, last: `try 2, nudged on your word, answered` — `answered` is the caller's
  * reading of the ask files (`answerOf`), since the record keeps no message. A cap a person raised is said beside the try it was raised
  * for: `budget $5`.
@@ -569,10 +571,10 @@ export function overBudgetLine(steps: readonly Workflow[], run: Run, d: Decision
 }
 
 /**
- * For each step that signed off blocked and may be tried again, the `nemia retry` that answers its `needs`, as `nemia decide` prints it under the
- * question. Pure. Not among `retryLines`' offers, whose shape the board reads. None for a blocked step whose session has not settled, which
- * a try would run beside, and none on a run that is not waiting on a person. None on a pruned run (`prunedRefusal`), whose question stays
- * with nothing to answer it, nor on a held one (`heldRefusal`), whose question is asked again once the hold lifts.
+ * For each step that signed off blocked and may be tried again, the `nemia retry` that answers its `needs`, as `nemia decide` prints it
+ * under the question. Pure. Not among `retryLines`' offers, whose shape the board reads. None for a blocked step whose session has not
+ * settled, which a try would run beside, and none on a run that is not waiting on a person. None on a pruned run (`prunedRefusal`), whose
+ * question stays with nothing to answer it, nor on a held one (`heldRefusal`), whose question is asked again once the hold lifts.
  *
  * @param spendOf What each task's sessions cost (`taskSpend`): a blocked step over its budget is answered with `--budget` too.
  */

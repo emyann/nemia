@@ -53,7 +53,7 @@ const STORE: readonly string[] = [];
  */
 const CONTROLLER = ['src/runner.ts', 'bin/nemia.ts', 'bin/wf.ts'];
 
-/** The package's bins: `nemia`, and `wf`, its alias. */
+/** The package's bins: `nemia`, and `nemia`, its alias. */
 const BINS = ['bin/nemia.ts', 'bin/wf.ts'];
 
 /** The CLI's folder: every file in it is a controller, and the CLI. */

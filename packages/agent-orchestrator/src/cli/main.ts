@@ -1,6 +1,6 @@
 /**
- * The verbs' table, and the runners of the commands the CLI runs itself (`RUNS`): `nemia tick`, `nemia up` and `nemia watch` here, the others
- * beside.
+ * The verbs' table, and the runners of the commands the CLI runs itself (`RUNS`): `nemia tick`, `nemia up` and `nemia watch` here, the
+ * others beside.
  */
 import path from 'node:path';
 import { Effect } from 'effect';
@@ -46,8 +46,8 @@ import { agentsCustomRun, pruneVerb, rmVerb } from './runs.ts';
 import { inboxAddRun, inboxQueueRun, planRun, startRun } from './start.ts';
 
 /**
- * `nemia watch` from a cursor already checked: the feed's lines as they are written, on stdout, until `stop()`; a feed cut under the watch is
- * said once on stderr, and followed from the start of the feed there is now (`watchFeed`).
+ * `nemia watch` from a cursor already checked: the feed's lines as they are written, on stdout, until `stop()`; a feed cut under the watch
+ * is said once on stderr, and followed from the start of the feed there is now (`watchFeed`).
  *
  * The banner is printed once the watch holds its cursor, not before: a reader that acts on `watching from` — cuts the feed, or writes to it
  * — finds a watch already there to see it, where a cut before the watch holds its cursor would have it refuse the cursor it was given.
@@ -88,8 +88,8 @@ function tickRunLines(r: Pass['runs'][number]): void {
 }
 
 /**
- * A pass's lines on `nemia tick`: the pause it read and what finishes under it, what failed or was left out on stderr, then what it refused,
- * the queue's card and each run; returns it.
+ * A pass's lines on `nemia tick`: the pause it read and what finishes under it, what failed or was left out on stderr, then what it
+ * refused, the queue's card and each run; returns it.
  */
 function tickLines(pass: Pass): Pass {
   const { runs: results, queue, feedError, refused, unreadable, pause } = pass;
@@ -104,8 +104,8 @@ function tickLines(pass: Pass): Pass {
 }
 
 /**
- * `nemia tick`: one pass, and what it did to each run; with `--stats`, what the pass cost. Beside a daemon that ticks the store it is refused,
- * with no way to force it. A queued card that names no repository starts on the one it is typed in, as `nemia start` takes `.`.
+ * `nemia tick`: one pass, and what it did to each run; with `--stats`, what the pass cost. Beside a daemon that ticks the store it is
+ * refused, with no way to force it. A queued card that names no repository starts on the one it is typed in, as `nemia start` takes `.`.
  */
 async function tickVerb(args: Args, e: Engine): Promise<void> {
   const stats = args.stats === true;
@@ -133,8 +133,8 @@ function upStats(): void {
 }
 
 /**
- * What `nemia up` has said while it lasts, so it says each failure once: a queued card's start (`said`), the feed's (`feedSaid`), a move the
- * lifecycle refused (`refusedSaid`), a journal left out (`unreadableSaid`); the store's pause (`pauseSaid`), said once put, on each
+ * What `nemia up` has said while it lasts, so it says each failure once: a queued card's start (`said`), the feed's (`feedSaid`), a move
+ * the lifecycle refused (`refusedSaid`), a journal left out (`unreadableSaid`); the store's pause (`pauseSaid`), said once put, on each
  * change of its words and once resumed; and the passes its next summary counts (`interval`).
  */
 type UpSaid = {
@@ -165,9 +165,9 @@ function advancedLines(advanced: Pass['runs']): void {
 }
 
 /**
- * The store's pause on `nemia up` (`pausedWords`) and each landing it holds with its merge staged (`stagedWords`), once when it is put, again
- * each time their words change — Pausing with fewer finishing, then Paused, a landing staged — and once when it is resumed; returns the
- * lines it said, if any, as one string.
+ * The store's pause on `nemia up` (`pausedWords`) and each landing it holds with its merge staged (`stagedWords`), once when it is put,
+ * again each time their words change — Pausing with fewer finishing, then Paused, a landing staged — and once when it is resumed; returns
+ * the lines it said, if any, as one string.
  */
 export function pauseSaid(pause: Pass['pause'], said: string | undefined): string | undefined {
   const lines = pause ? [pausedWords(pause) ?? '', ...pause.staged.map((s) => `   ${stagedWords(s)}`)] : [RESUMED];
@@ -199,7 +199,8 @@ function passLines(pass: Pass, was: UpSaid): UpSaid {
 /**
  * `nemia up`: the headless daemon, a pass every interval until it is stopped, or `--stats`. It refuses its interval (`everyOf`) and its
  * ceilings (`ceilings`) before it takes the store, then runs the daemon's controller (`up`) as `nemia up` under `runMain`, saying each
- * failure once while it lasts (`UpSaid`). A queued card that names no repository starts on the one it is typed in, as `nemia start` takes `.`.
+ * failure once while it lasts (`UpSaid`). A queued card that names no repository starts on the one it is typed in, as `nemia start` takes
+ * `.`.
  */
 function upVerb(args: Args, e: Engine): void | Promise<void> {
   if (args.stats === true) return upStats();
@@ -243,10 +244,10 @@ function watchVerb(args: Args): void | Promise<void> {
 export const VERBS: ReadonlyMap<string, Verb> = new Map<string, Verb>([['decide', decideVerb]]);
 
 /**
- * The runner of each command the CLI runs itself, by its name — those it serves alone (`RAN`, `nemia plan`); `nemia rm` and `nemia prune`, whose
- * runners walk the many runs a command line names through their handlers; and `nemia start`, `nemia inbox add`, `nemia inbox queue` and
- * `nemia agents custom`, whose runners read the files and folders a command line names before their handlers: handed its arguments once read
- * and checked.
+ * The runner of each command the CLI runs itself, by its name — those it serves alone (`RAN`, `nemia plan`); `nemia rm` and `nemia prune`,
+ * whose runners walk the many runs a command line names through their handlers; and `nemia start`, `nemia inbox add`, `nemia inbox queue`
+ * and `nemia agents custom`, whose runners read the files and folders a command line names before their handlers: handed its arguments once
+ * read and checked.
  */
 export const RUNS: ReadonlyMap<string, (args: Args, e: Engine) => void | Promise<void>> = new Map([
   ['tick', tickVerb],

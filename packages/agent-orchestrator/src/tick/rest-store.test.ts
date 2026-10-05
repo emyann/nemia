@@ -41,7 +41,7 @@ const git = (repo: string, ...args: string[]) =>
     stdio: ['ignore', 'pipe', 'pipe'],
   }).trim();
 
-/** A repository with one commit, so `wf start` has a base to record. */
+/** A repository with one commit, so `nemia start` has a base to record. */
 const aRepo = (): string => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   git(repo, 'init', '-q');
@@ -593,7 +593,7 @@ test('a finished run whose worktrees are gone owes no hand-off, and rests — su
   assert.equal(journals(after), journals(before), 'and no journal read');
 });
 
-test('REFUSED: wf prune does not wait on a hand-off from a worktree that is gone — no pass could make one there', async () => {
+test('REFUSED: nemia prune does not wait on a hand-off from a worktree that is gone — no pass could make one there', async () => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   for (const name of ['left', 'right']) fs.writeFileSync(path.join(dir, `${name}.md`), `---\nharness: codex\n---\n${name} it\n`);
   const run = start({ brief: 'two roots', repo: ISOLATED_REPOS[1], workflowDir: dir, isolate: true });
@@ -605,7 +605,7 @@ test('REFUSED: wf prune does not wait on a hand-off from a worktree that is gone
   assert.notEqual(
     record.steps.left.workspace,
     record.steps.right.workspace,
-    'two roots, a worktree each: one of them removed, the other still there for `wf prune` to remove',
+    'two roots, a worktree each: one of them removed, the other still there for `nemia prune` to remove',
   );
   delete record.steps.right.handedOff;
   fs.rmSync(record.steps.right.workspace, { recursive: true, force: true });

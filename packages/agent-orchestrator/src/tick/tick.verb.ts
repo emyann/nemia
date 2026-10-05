@@ -160,11 +160,12 @@ export const tick = (e: Engine, options: { repo?: string; memo?: RestMemo; verif
  * The pass `tickRun` meters: the runtime's own pass, then every run judged off the views it reported (`reportedEngine`) — a task it did not
  * report, settled or changed by this pass since, is read off the engine's record where it is settled. In this order:
  * - the memo is brought up to the engine's feed after the runtime's pass (`restingPass`), so what it appended on it — a settled task's
- *   `measured` — is read on this one, and what is appended after is read on the next; a run `nemia rm` forgot leaves the memo (`forgotten`).
+ *   `measured` — is read on this one, and what is appended after is read on the next; a run `nemia rm` forgot leaves the memo
+ *   (`forgotten`).
  * - the runs are listed, each run the memo holds whose stamp has not moved answered with the memo's run, its record not read (`keptOf`):
  *   the one listing of the pass, handed to every run judged for the claims on a repository's checkout, and to the queue.
- * - the ceilings the pass runs with are written (`recordCeilings`), for `nemia ls` and `nemia decide`, which judge the cap from a shell of their
- *   own; the runtime's pass admitted no queued task while the store was paused (`engine()`'s `unschedulable`).
+ * - the ceilings the pass runs with are written (`recordCeilings`), for `nemia ls` and `nemia decide`, which judge the cap from a shell of
+ *   their own; the runtime's pass admitted no queued task while the store was paused (`engine()`'s `unschedulable`).
  * - every run that has started is judged, finished ones included (`advanceResting`); then each run with nothing filed, oldest first, with
  *   its slot (`waitingJudged`); then one queued card, while a slot is free and the store is not paused, read again.
  * - last, and apart, the feed is written where it changed: a feed that cannot be written costs the report (`feedError`), never the pass.

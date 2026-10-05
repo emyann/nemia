@@ -82,7 +82,8 @@ import { resultSteps, workChecks } from '../branches/branches.ts';
  * @param parents For a root of a run that waited on runs (`--after`), filed on the pass that saw them ship: what each concluded
  *   (`fromRunSection`), gathered by file.verb.ts. Given to no other step: a run without `after`, and every step after a root, is composed
  *   without it.
- * @param inputsDir The directory the run copied `nemia start --input` files into (`inputsDir` in record.store.ts): named, with `run.inputs`,
+ * @param inputsDir The directory the run copied `nemia start --input` files into (`inputsDir` in record.store.ts): named, with
+ * `run.inputs`,
  *   under what was asked for.
  * @param checked For a step filed after checked steps: what each of their checks said on the try or round it follows
  *   (`checkHandedSection`), read by file.verb.ts. Absent, and nothing is said of a check: the board's preview composes without it.

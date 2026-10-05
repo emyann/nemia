@@ -90,25 +90,25 @@ type RunBase = {
   after?: string[];
   /**
    * The files `nemia start --input` copied into the run's own `inputs/` directory (`inputsDir` in record.store.ts), by name, in the order
-   * given. Named on every step's brief that carries what was asked for (`inputsLine`), and under the run's line in `nemia decide`. Absent on a
-   * run given none.
+   * given. Named on every step's brief that carries what was asked for (`inputsLine`), and under the run's line in `nemia decide`. Absent
+   * on a run given none.
    */
   inputs?: string[];
   /**
-   * Where the run came from, when it was not typed at `nemia start`: `{ inbox: <name> }` for a card started out of the inbox (`startFromInbox`
-   * in inbox.verb.ts), which removes the card once this record is written. `nemia inbox` reads it to say a card still there was `started as`
-   * this run, and `nemia decide` names the card under the run's line. Absent on a run started any other way.
+   * Where the run came from, when it was not typed at `nemia start`: `{ inbox: <name> }` for a card started out of the inbox
+   * (`startFromInbox` in inbox.verb.ts), which removes the card once this record is written. `nemia inbox` reads it to say a card still
+   * there was `started as` this run, and `nemia decide` names the card under the run's line. Absent on a run started any other way.
    */
   from?: { inbox: string };
   /**
-   * The steps this run is gated at beyond those its workflow gates (`gate: true`), frozen at start: `nemia start --gate <step>`, and an inbox
-   * card's `gate:`. Each such step's closeout waits for a person — `nemia approve` — before anything after it is filed (`hasGate`). Absent on
-   * a run given none.
+   * The steps this run is gated at beyond those its workflow gates (`gate: true`), frozen at start: `nemia start --gate <step>`, and an
+   * inbox card's `gate:`. Each such step's closeout waits for a person — `nemia approve` — before anything after it is filed (`hasGate`).
+   * Absent on a run given none.
    */
   gates?: string[];
   /**
-   * The factory the run was started in (`nemia start --factory`), frozen at start: its hires filled the steps, and a git run's `repo` is one
-   * of its repositories. Absent on a run in the default factory, which is every record written before a run named its factory.
+   * The factory the run was started in (`nemia start --factory`), frozen at start: its hires filled the steps, and a git run's `repo` is
+   * one of its repositories. Absent on a run in the default factory, which is every record written before a run named its factory.
    */
   factory?: string;
   /**
@@ -118,10 +118,10 @@ type RunBase = {
    */
   mounts?: Mount[];
   /**
-   * What people approved at a gate (`nemia approve`), each in a file of its own beside the retry asks — `runs/<id>.asks/approve-<step>-<try>`
-   * — composed on read, as `cancelledAt` is (`readRun` in record.store.ts), and never written into the record: the tick owns the record, a
-   * person owns their word. An approval opens a gate for the try it names (`approvalOf`), and one for an earlier try is spent. Absent when
-   * there are none.
+   * What people approved at a gate (`nemia approve`), each in a file of its own beside the retry asks —
+   * `runs/<id>.asks/approve-<step>-<try>` — composed on read, as `cancelledAt` is (`readRun` in record.store.ts), and never written into
+   * the record: the tick owns the record, a person owns their word. An approval opens a gate for the try it names (`approvalOf`), and one
+   * for an earlier try is spent. Absent when there are none.
    */
   approvals?: Approval[];
   /**
@@ -139,7 +139,8 @@ type RunBase = {
   /**
    * Each result branch's commit, as this run's own tick last saw it once the run had finished (`tipsSeen`): what `nemia decide` offers to
    * ship. Kept so that once a person has deleted the branch after the merge, git can still be asked whether that commit is on the base
-   * (`isShipped` in branches.store.ts) — by this run's own `nemia decide`, and by a run that waits on it. Absent until the run has finished.
+   * (`isShipped` in branches.store.ts) — by this run's own `nemia decide`, and by a run that waits on it. Absent until the run has
+   * finished.
    */
   tips?: Record<string, string>;
   /**
@@ -199,8 +200,8 @@ export const WHY_CAP = 200;
 export const BY_CAP = 64;
 
 /**
- * What `nemia prune` removed of a run, as its file says it: when, and each worktree with the bytes it held (`du`), which are what it freed —
- * and, once `nemia prune --artifacts` removed its files directory (`runs/<id>/artifacts/`), when that was and what it freed. `at` is when
+ * What `nemia prune` removed of a run, as its file says it: when, and each worktree with the bytes it held (`du`), which are what it freed
+ * — and, once `nemia prune --artifacts` removed its files directory (`runs/<id>/artifacts/`), when that was and what it freed. `at` is when
  * its worktrees went; a prune of the files alone, of a run whose worktrees were already gone or never cut, says its own time there too.
  */
 export type Pruned = { at: string; worktrees: Array<{ path: string; bytes: number }>; artifacts?: PrunedFiles };
@@ -236,8 +237,9 @@ export type Acceptance = { step: string; try: number; at: string; message: strin
  *   verified         its check exited 0
  *   unverified       signed off, and it declared no `check:` — nothing but its own word says it worked
  *   awaiting approval verified or unverified, at a gate (`hasGate`), with no approval of the try it is on: nothing after it is filed until
- *                    a person says so — `nemia approve`, or `nemia retry --message` to send it back. And, on an ending step in the repository's
- *                    checkout (`approvedFirst`), the same word before it is filed: its approval is what runs it (`waitsAtGate`)
+ *                    a person says so — `nemia approve`, or `nemia retry --message` to send it back. And, on an ending step in the
+ *                    repository's checkout (`approvedFirst`), the same word before it is filed: its approval is what runs it
+ *                    (`waitsAtGate`)
  *   exhausted        verified or unverified, and it asked for another round of its `loop:` on the last one `rounds:` allows
  *   over budget      its tries have together cost its `budget:` or more, so nothing is left to spend, and the way on is another session
  *                    of it — its last try ended without letting what waits on it run (a check that did not finish is not that: it
@@ -373,8 +375,8 @@ export const andList = (items: readonly string[]): string =>
   items.length > 1 ? `${items.slice(0, -1).join(', ')} and ${items.at(-1)}` : (items[0] ?? '');
 
 /**
- * A pruned run in words, as `nemia decide` says it under the run's line and where a decision would otherwise wait on a person's verb: when it
- * was pruned — or that its marker no longer says — and what was removed. Pure.
+ * A pruned run in words, as `nemia decide` says it under the run's line and where a decision would otherwise wait on a person's verb: when
+ * it was pruned — or that its marker no longer says — and what was removed. Pure.
  */
 export const prunedWords = (pruned: Pruned): string => {
   const files = pruned.artifacts ? filesPrunedWords(pruned.artifacts) : '';
@@ -384,8 +386,8 @@ export const prunedWords = (pruned: Pruned): string => {
 };
 
 /**
- * That `nemia prune --artifacts` removed a run's files, and when, as every surface that reads a pruned run says it: `nemia decide`, a refusal,
- * and the api's answer for a file that was there. Pure.
+ * That `nemia prune --artifacts` removed a run's files, and when, as every surface that reads a pruned run says it: `nemia decide`, a
+ * refusal, and the api's answer for a file that was there. Pure.
  */
 export const filesPrunedWords = (files: PrunedFiles): string =>
   `its files were removed at ${files.at || 'a time its marker no longer says'} (nemia prune --artifacts)`;
@@ -446,7 +448,10 @@ export function unjudgedWords(runId: string, own: string | undefined, why: strin
 /** The asks waiting beside a run, tries and rounds, and a line for each file named as one that cannot be read as one. */
 export type AsksRead = { asks: RetryAsk[]; rounds: RoundAsk[]; notes: string[] };
 
-/** The kinds of ask a person writes: a try (`nemia retry`), a round (`nemia round`), an approval (`nemia approve`), an acceptance (`nemia accept`). */
+/**
+ * The kinds of ask a person writes: a try (`nemia retry`), a round (`nemia round`), an approval (`nemia approve`), an acceptance (`nemia
+ * accept`).
+ */
 export type AskKind = 'retry' | 'round' | 'approve' | 'accept';
 
 /** Which ask: its kind, its step, and its number — the try it names, or the round a round ask asks for. */
@@ -501,7 +506,9 @@ export type RunStore = {
     readonly exists: (id: string) => boolean;
     /** Whether a person called the run off: cancelled it, pruned it, or holds it — or paused the whole store. */
     readonly calledOff: (id: string) => boolean;
-    /** Write down that a person cancelled the run (`nemia cancel`), and answer with the time that stands: the first cancellation is kept. */
+    /**
+     * Write down that a person cancelled the run (`nemia cancel`), and answer with the time that stands: the first cancellation is kept.
+     */
     readonly cancel: (id: string) => string;
     /**
      * Remove what the store keeps under the run's id, whether or not its record is there — the record, the cancellation, the prune marker,

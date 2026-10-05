@@ -62,8 +62,8 @@ export const cancelRun = Effect.fn('cancel')(function* (id: string) {
 });
 
 /**
- * `nemia cancel` (`cancelRun`) in a Promise, over `e`: what the CLI, the api and the tests call. Rejects with the refusal the program failed
- * with, or with whatever else it died of, as it was thrown.
+ * `nemia cancel` (`cancelRun`) in a Promise, over `e`: what the CLI, the api and the tests call. Rejects with the refusal the program
+ * failed with, or with whatever else it died of, as it was thrown.
  */
 export const cancel = (e: Engine, id: string): Promise<Cancelled> =>
   Effect.runPromise(cancelRun(id).pipe(Effect.provide(EngineService.layer(e))));

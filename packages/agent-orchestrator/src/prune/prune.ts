@@ -17,8 +17,8 @@ export const neverApproved = (pruned: Pruned): string => `not approved, and neve
 /**
  * Why a verb that would file work into a pruned run is refused — or null, for a run nobody pruned. Pure. A retry continues in the step's
  * worktree, a round and an approval file what inherits one, and an acceptance files what waits on a loop: every one of them would start a
- * session in a directory `nemia prune` removed. What is left of the run is its branches, which a person ships by hand, and its record. A run
- * whose files alone were pruned, its worktrees gone or never cut, is over all the same, and refused in words that name its files.
+ * session in a directory `nemia prune` removed. What is left of the run is its branches, which a person ships by hand, and its record. A
+ * run whose files alone were pruned, its worktrees gone or never cut, is over all the same, and refused in words that name its files.
  */
 export function prunedRefusal(run: Run, what: string): string | null {
   if (!run.pruned) return null;
@@ -42,11 +42,11 @@ export function heldRefusal(run: Run, what: string): string | null {
 }
 
 /**
- * What `nemia prune` found of one run, as git and the engine say it now: what `pruneRefusal` judges. `decided` is the kind `nemia decide` says
- * (`decision`), undefined for a record that froze no workflow and whose folder does not read; `held` is why `nemia rm` would not forget it
- * (`forgetRefusal`, worded for `nemia prune`); `owed` the steps a pass still owes a hand-off (`handOffOwed` in advance.verb.ts); and each
- * worktree git lists as the run's, with its lock, its detached HEAD when a removal would leave what it holds on no branch (`heldWorktree`),
- * and each change `git status --porcelain` lists in it.
+ * What `nemia prune` found of one run, as git and the engine say it now: what `pruneRefusal` judges. `decided` is the kind `nemia decide`
+ * says (`decision`), undefined for a record that froze no workflow and whose folder does not read; `held` is why `nemia rm` would not
+ * forget it (`forgetRefusal`, worded for `nemia prune`); `owed` the steps a pass still owes a hand-off (`handOffOwed` in advance.verb.ts);
+ * and each worktree git lists as the run's, with its lock, its detached HEAD when a removal would leave what it holds on no branch
+ * (`heldWorktree`), and each change `git status --porcelain` lists in it.
  */
 export type PruneFacts = {
   decided: Decision['kind'] | undefined;
@@ -68,9 +68,10 @@ export const pruneAgain = (id: string, { unmerged = false, artifacts = false }: 
  * Why `nemia prune` will not remove this run's worktrees, in words that say what to do instead — or null, when it may. Pure. Every reason
  * is named at once, so a person clears them in one go.
  *
- * `nemia prune` removes a run's worktrees and nothing else: they are most of the space a run holds (a `node_modules` per workspace package),
- * and nothing that reads a run that is over reads them — `nemia decide`, the board and a run that waits on this one read its branches, its
- * files directory and the engine's record. So it takes only what is rebuildable, and refuses where a worktree still holds anything else:
+ * `nemia prune` removes a run's worktrees and nothing else: they are most of the space a run holds (a `node_modules` per workspace
+ * package), and nothing that reads a run that is over reads them — `nemia decide`, the board and a run that waits on this one read its
+ * branches, its files directory and the engine's record. So it takes only what is rebuildable, and refuses where a worktree still holds
+ * anything else:
  *
  * - **a folder run**: its steps' folders are its work, not a checkout of a branch, and they are kept until `nemia rm` forgets the run.
  * - **a run that is not over** (`decision` says running), or whose workflow no longer reads, so that nobody can say.

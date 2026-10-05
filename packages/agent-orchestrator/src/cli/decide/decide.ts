@@ -1,6 +1,6 @@
 /**
- * `nemia decide`: what a run produced and the choice it leaves a person — its help, its one flag, read off the command line, and the screen it
- * prints.
+ * `nemia decide`: what a run produced and the choice it leaves a person — its help, its one flag, read off the command line, and the screen
+ * it prints.
  */
 import {
   AGENT_FACING,
@@ -118,17 +118,18 @@ export function decideHow(argv: string[]): { sensitive?: string[] } {
  * others (`--after`), held (`nemia hold`), or held by the cap on runs in flight is offered nothing: its screen says what it waits on, and a
  * hold beside a wait says that lifting it does not start the run. A running run's screen says what a step its harness blocked waits for,
  * and the tries and rounds the next tick files, but a try the repository's checkout holds; an ending waiting for that checkout is said
- * there and on the deciding screen. A shipped run whose ending never ran says so, as `nemia ls` still shows it at its gate. A pruned run waits
- * on nobody (`prunedRefusal`): how each step ended is said, and not that it waits on you. A run a task journal of which does not read fails
- * with the runtime's words (`unjudgedOf`). Each step's closeout, in the order the steps run (`namesInOrder`), is read off the engine's
- * record, never a branch, so a dropped branch keeps its review. The top-level markdown files a branch added are printed, 120 lines at most.
- * The git commands to ship or drop are printed only where no step merges (`merges`), never for a run that worked on its base branch itself
- * (`--no-worktree`), and a folder run is offered `nemia rm` alone.
+ * there and on the deciding screen. A shipped run whose ending never ran says so, as `nemia ls` still shows it at its gate. A pruned run
+ * waits on nobody (`prunedRefusal`): how each step ended is said, and not that it waits on you. A run a task journal of which does not read
+ * fails with the runtime's words (`unjudgedOf`). Each step's closeout, in the order the steps run (`namesInOrder`), is read off the
+ * engine's record, never a branch, so a dropped branch keeps its review. The top-level markdown files a branch added are printed, 120 lines
+ * at most. The git commands to ship or drop are printed only where no step merges (`merges`), never for a run that worked on its base
+ * branch itself (`--no-worktree`), and a folder run is offered `nemia rm` alone.
  */
 export async function decideVerb(rest: string[], e: Engine): Promise<void> {
   if (rest.includes('--help')) return console.log(DECIDE_HELP);
   if (!rest[0]) return console.log(HELP);
-  if (rest[0].startsWith('--')) usage(`nemia decide takes the run first: nemia decide <runId> [--sensitive <globs>] — not ${rest[0]} before it.`);
+  if (rest[0].startsWith('--'))
+    usage(`nemia decide takes the run first: nemia decide <runId> [--sensitive <globs>] — not ${rest[0]} before it.`);
   const { sensitive } = decideHow(rest.slice(1));
   const decided = await decide(e, rest[0]).catch(async (err: unknown) => {
     const unjudged = await unjudgedOf(e, runStore.runs.read(rest[0]), err, 'nemia decide');
@@ -431,8 +432,8 @@ function printStanding({ run, standings }: Decided, decision: Awaiting, git: Git
 }
 
 /**
- * What is left to decide, as the run's commands say it (`Decided.commands`): the gated step to approve or send back, `nemia rm` for a folder
- * run, or the git commands to ship or drop.
+ * What is left to decide, as the run's commands say it (`Decided.commands`): the gated step to approve or send back, `nemia rm` for a
+ * folder run, or the git commands to ship or drop.
  */
 function printChoice({ toDecide, commands }: Decided, steps: Steps): void {
   if (toDecide?.kind === 'approve') return printApprove(toDecide, steps, commands);

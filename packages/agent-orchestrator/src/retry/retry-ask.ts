@@ -1,7 +1,7 @@
 /**
  * Trying again, as a person asks it and a record keeps it: how a person asks for a try (`nemia retry`), the tries a step's record keeps
- * behind the one it is on, a try due and how its record moves on once it is filed — and the words `nemia ls` and `nemia decide` say of them.
- * Pure; what reads a step's standing to judge a try — `retryable` and `retriesDue` — is `retry.ts`'s, and `retryRefusal`
+ * behind the one it is on, a try due and how its record moves on once it is filed — and the words `nemia ls` and `nemia decide` say of
+ * them. Pure; what reads a step's standing to judge a try — `retryable` and `retriesDue` — is `retry.ts`'s, and `retryRefusal`
  * `retry-refusal.ts`'s.
  */
 import { tryOf, type Run, type StepRecord } from '../record/record.ts';

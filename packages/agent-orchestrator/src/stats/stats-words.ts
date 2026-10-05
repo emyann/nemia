@@ -144,8 +144,8 @@ function tallyLines(g: Group): string[] {
 }
 
 /**
- * What `nemia stats` prints: the tiles, a row per day — per group, with a key — then a row per change to what the runs froze, a row per step,
- * a row per call a step was refused, a row per skill a step loaded, a row per rule its skills declare, a row per day and count a step
+ * What `nemia stats` prints: the tiles, a row per day — per group, with a key — then a row per change to what the runs froze, a row per
+ * step, a row per call a step was refused, a row per skill a step loaded, a row per rule its skills declare, a row per day and count a step
  * declares, and the runs left out.
  */
 export function statsLines(s: Stats): string[] {

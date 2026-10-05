@@ -1,7 +1,7 @@
 /**
- * The reads of the store, each defined once: `nemia show` (a run's record), `nemia logs` (a step's session output), `nemia feed` (what the tick
- * judged, from a cursor) and `nemia stats` (what the store's runs add up to). Their handlers answer data, and the CLI prints it; the api
- * serves a step's log and the stats on their routes from the same entries, and the board reads a run and the feed through reads of its
+ * The reads of the store, each defined once: `nemia show` (a run's record), `nemia logs` (a step's session output), `nemia feed` (what the
+ * tick judged, from a cursor) and `nemia stats` (what the store's runs add up to). Their handlers answer data, and the CLI prints it; the
+ * api serves a step's log and the stats on their routes from the same entries, and the board reads a run and the feed through reads of its
  * own (`only`).
  */
 import { runStore } from '../record/files.store.ts';
@@ -136,8 +136,8 @@ const givenOf = (args: Args): Partial<Record<QueryKey, string>> =>
   Object.fromEntries(KEYS.flatMap((key) => (textOf(args, key) === undefined ? [] : [[key, textOf(args, key)]])));
 
 /**
- * Refused of `nemia stats`' flags before anything is read: a value empty or starting `--`, which reads as the value left out, in what the flag
- * takes; then what `statsQueryOf` refuses of the query, in the flags' names.
+ * Refused of `nemia stats`' flags before anything is read: a value empty or starting `--`, which reads as the value left out, in what the
+ * flag takes; then what `statsQueryOf` refuses of the query, in the flags' names.
  */
 function statsRefusal(args: Args): string | null {
   const left = KEYS.find((key) => {

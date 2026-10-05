@@ -97,7 +97,9 @@ export function feedChanges(
   return out;
 }
 
-/** One line of the feed, for a person: `10:02:13  r-1  plan  awaiting approval  · approve it: …`. Shared by `nemia feed` and `nemia watch`. */
+/**
+ * One line of the feed, for a person: `10:02:13  r-1  plan  awaiting approval  · approve it: …`. Shared by `nemia feed` and `nemia watch`.
+ */
 export const feedLineWords = (l: FeedLine): string =>
   `${l.at.slice(11, 19)}  ${l.run}  ${l.step ?? '—'}  ${l.word}${l.note ? `  · ${l.note}` : ''}`;
 
@@ -120,18 +122,18 @@ export const feedPhase = (word: string): string =>
   word.startsWith('running (') || word === 'working (quiescent)' || word === 'starting' || word === 'between attempts' ? 'running' : word;
 
 /**
- * What the feed says of a run as a pass judged it: the listing `nemia ls` prints (`listing`, handed the engine's words through `feedPhase`),
- * in the feed's words. Pure.
+ * What the feed says of a run as a pass judged it: the listing `nemia ls` prints (`listing`, handed the engine's words through
+ * `feedPhase`), in the feed's words. Pure.
  *
- * Each step's word is its status as `nemia ls` prints it (`shownStatus`), and its note the note beside it there — the try due or on, the gate
- * and what answers it, how many times it was said to — which is where a person's writes show. Not its cost, which moves while nothing is
- * decided. A step that signed off blocked puts what it needs before that note (`needsNote`). The run's word is `assess`'s status — or, for
- * a run `failed` that nothing failed in, what stopped it (`stoppedOn`: `awaiting approval` at a gate, as `nemia decide` says it) — `(pruned)`
- * beside it as `nemia ls` says it, and its note who it waits on you for (`onYouWords`) — or, on a held run, what it is held until
- * (`holdWord`), and nobody is waited on.
+ * Each step's word is its status as `nemia ls` prints it (`shownStatus`), and its note the note beside it there — the try due or on, the
+ * gate and what answers it, how many times it was said to — which is where a person's writes show. Not its cost, which moves while nothing
+ * is decided. A step that signed off blocked puts what it needs before that note (`needsNote`). The run's word is `assess`'s status — or,
+ * for a run `failed` that nothing failed in, what stopped it (`stoppedOn`: `awaiting approval` at a gate, as `nemia decide` says it) —
+ * `(pruned)` beside it as `nemia ls` says it, and its note who it waits on you for (`onYouWords`) — or, on a held run, what it is held
+ * until (`holdWord`), and nobody is waited on.
  *
- * One more departure from `nemia ls`: a root the cap on runs in flight holds says `waiting for a run slot`, without the count in flight, which
- * moves with every other run's start and end while nothing of this one does.
+ * One more departure from `nemia ls`: a root the cap on runs in flight holds says `waiting for a run slot`, without the count in flight,
+ * which moves with every other run's start and end while nothing of this one does.
  *
  * @param closeoutOf How each step signed off, as `listing` was handed it: a step that signed off blocked says what it needs beside its
  *   word.

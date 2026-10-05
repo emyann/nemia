@@ -1,5 +1,5 @@
 /**
- * `wf prune`: a run's worktrees removed, and nothing else of it — over a store and repositories of its own, with git for real. A file of
+ * `nemia prune`: a run's worktrees removed, and nothing else of it — over a store and repositories of its own, with git for real. A file of
  * its own, since `WF_ROOT` is read once, as the package loads.
  */
 import { test, type TestContext } from 'node:test';
@@ -128,7 +128,7 @@ const aFinished = async (
   return { run, repo, wt, branch, outside };
 };
 
-/** `wf <verb>`, through the CLI, as a person types it: the lines it printed, and the error it ended with, if it did. */
+/** `nemia <verb>`, through the CLI, as a person types it: the lines it printed, and the error it ended with, if it did. */
 const typed = async (t: TestContext, e: Engine, ...argv: string[]) => {
   const printed: string[] = [];
   const log = t.mock.method(console, 'log', (...a: unknown[]) => {
@@ -150,7 +150,7 @@ const worktreesOf = (repo: string) =>
     .filter((l) => l.startsWith('worktree '))
     .map((l) => fs.realpathSync(l.slice('worktree '.length)));
 
-test('`wf prune` on a run that shipped: listed with its size and nothing removed, until --yes — then its worktree is removed through git, what git ignores with it and nothing a link leads to; its record, closeout, branch, files and asks are kept; `wf ls` and `wf decide` say it is pruned, and a second prune has nothing to do', async (t) => {
+test('`nemia prune` on a run that shipped: listed with its size and nothing removed, until --yes — then its worktree is removed through git, what git ignores with it and nothing a link leads to; its record, closeout, branch, files and asks are kept; `nemia ls` and `nemia decide` say it is pruned, and a second prune has nothing to do', async (t) => {
   const b = board();
   const { run, repo, wt, branch, outside } = await aFinished(b, { merged: true });
   fs.mkdirSync(path.join(ROOT, 'runs', run.id, 'artifacts', 'implement'), { recursive: true });
@@ -166,7 +166,7 @@ test('`wf prune` on a run that shipped: listed with its size and nothing removed
   assert.match(dry.printed[0], new RegExp(`^${run.id}  would remove 1 worktree, \\d+\\.\\d KB$`));
   assert.match(dry.printed[1], new RegExp(`^   ${wt.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}  \\d+\\.\\d KB$`));
   assert.match(dry.printed[2], /^1 run to prune, \d+\.\d KB in all$/);
-  assert.equal(dry.printed[3], `nothing removed: wf prune ${run.id} --yes removes them`);
+  assert.equal(dry.printed[3], `nothing removed: nemia prune ${run.id} --yes removes them`);
   assert.ok(fs.existsSync(wt) && !under('runs', `${run.id}.pruned`), 'a dry run touches nothing');
   const measured = (await prune(b.e, run.id)).worktrees[0].bytes;
   assert.ok(measured >= 64 * 1024, `what node_modules holds is counted (${measured})`);
@@ -208,7 +208,7 @@ test('`wf prune` on a run that shipped: listed with its size and nothing removed
   const screen = await typed(t, b.e, 'decide', run.id);
   assert.equal(
     screen.printed.join('\n').split('\n')[1],
-    `  pruned at ${pruned.at} — its worktrees were removed (wf prune); its branches, record and files are kept`,
+    `  pruned at ${pruned.at} — its worktrees were removed (nemia prune); its branches, record and files are kept`,
   );
 
   const filings = [...b.filings];
@@ -216,10 +216,10 @@ test('`wf prune` on a run that shipped: listed with its size and nothing removed
   assert.deepEqual(b.filings, filings, 'a tick after it files nothing');
 
   const again = await prune(b.e, run.id, { yes: true });
-  assert.deepEqual([again.kind, again.nothing], ['nothing', `its worktrees were removed at ${pruned.at} (wf prune)`]);
+  assert.deepEqual([again.kind, again.nothing], ['nothing', `its worktrees were removed at ${pruned.at} (nemia prune)`]);
   assert.equal(readRun(run.id).pruned!.at, pruned.at, 'a prune with nothing to do leaves the marker as it was');
 
-  assert.equal((await forget(b.e, run.id)).kind, 'forgotten', '`wf rm` still forgets it');
+  assert.equal((await forget(b.e, run.id)).kind, 'forgotten', '`nemia rm` still forgets it');
   assert.ok(!under('runs', `${run.id}.pruned`), 'and the marker goes with it');
 });
 
@@ -233,7 +233,7 @@ test('REFUSED at shipped defaults: a run not over — named, and told to cancel 
   assert.equal(error?.exitCode, 2);
   assert.equal(
     printed[0],
-    `${run.id}  not pruned: it is not over — wf decide ${run.id} says it is still running. Pruning is not cancelling: wf cancel ${run.id} files nothing more, then wf prune ${run.id} --unmerged once what was in flight has settled.`,
+    `${run.id}  not pruned: it is not over — nemia decide ${run.id} says it is still running. Pruning is not cancelling: nemia cancel ${run.id} files nothing more, then nemia prune ${run.id} --unmerged once what was in flight has settled.`,
   );
   assert.ok(fs.existsSync(wt) && !under('runs', `${run.id}.pruned`));
 });
@@ -245,7 +245,7 @@ test('REFUSED at shipped defaults: a finished run not merged — pruned, it coul
   assert.equal(refused.kind, 'refused');
   assert.equal(
     refused.refusal,
-    `it finished and is not merged into main: pruned, none of its steps can be tried again, sent round or approved, and its branch is the one place its work is left. Merge it first, or prune it all the same: wf prune ${run.id} --unmerged.`,
+    `it finished and is not merged into main: pruned, none of its steps can be tried again, sent round or approved, and its branch is the one place its work is left. Merge it first, or prune it all the same: nemia prune ${run.id} --unmerged.`,
   );
   assert.ok(fs.existsSync(wt) && !under('runs', `${run.id}.pruned`));
 
@@ -265,7 +265,7 @@ test('REFUSED at shipped defaults: a worktree with a change no commit has — un
     assert.equal(refused.kind, 'refused', change);
     assert.equal(
       refused.refusal,
-      `${wt} holds changes no commit has (${change === 'untracked' ? 'notes.md' : 'README.md'}), and they would be lost with it: commit them on its branch, or discard them (git -C ${wt} status), then wf prune ${run.id}.`,
+      `${wt} holds changes no commit has (${change === 'untracked' ? 'notes.md' : 'README.md'}), and they would be lost with it: commit them on its branch, or discard them (git -C ${wt} status), then nemia prune ${run.id}.`,
     );
     assert.ok(fs.existsSync(wt) && !under('runs', `${run.id}.pruned`), change);
   }
@@ -282,7 +282,7 @@ test('REFUSED at shipped defaults: a worktree on no branch, holding a commit no 
   const d = await prune(b.e, detached.run.id, { yes: true, unmerged: true });
   assert.equal(
     d.refusal,
-    `${detached.wt} is on no branch — its HEAD is detached at ${head.slice(0, 7)} — and removing it would leave what it holds on none: put it on one (git -C ${detached.wt} switch -c <branch>), then wf prune ${detached.run.id} --unmerged.`,
+    `${detached.wt} is on no branch — its HEAD is detached at ${head.slice(0, 7)} — and removing it would leave what it holds on none: put it on one (git -C ${detached.wt} switch -c <branch>), then nemia prune ${detached.run.id} --unmerged.`,
   );
   assert.ok(fs.existsSync(detached.wt));
 
@@ -306,14 +306,14 @@ test('REFUSED at shipped defaults: a hand-off still owed — a step settled and 
   const refused = await prune(b.e, run.id, { yes: true, unmerged: true });
   assert.equal(
     refused.refusal,
-    `implement is still to be handed off — a pass commits what it left, and collects its files, from the worktree: let a tick run (wf tick), then wf prune ${run.id} --unmerged.`,
+    `implement is still to be handed off — a pass commits what it left, and collects its files, from the worktree: let a tick run (nemia tick), then nemia prune ${run.id} --unmerged.`,
   );
   assert.ok(fs.existsSync(wt));
   await advance(b.e, readRun(run.id));
   assert.equal((await prune(b.e, run.id, { yes: true, unmerged: true })).kind, 'pruned');
 });
 
-test('REFUSED at shipped defaults: a folder run — its folders are its work, kept until `wf rm`', async () => {
+test('REFUSED at shipped defaults: a folder run — its folders are its work, kept until `nemia rm`', async () => {
   const b = board();
   const team = fs.mkdtempSync(path.join(ROOT, 'team-'));
   fs.writeFileSync(path.join(team, 'write.md'), '---\nworkspace: folder\npermissionMode: dontAsk\n---\nwrite the note\n');
@@ -326,13 +326,13 @@ test('REFUSED at shipped defaults: a folder run — its folders are its work, ke
     [refused.kind, refused.refusal],
     [
       'refused',
-      `a folder run: its steps' folders are its work, kept with the run until it is forgotten — no worktree to prune. wf rm ${run.id} forgets it with them.`,
+      `a folder run: its steps' folders are its work, kept with the run until it is forgotten — no worktree to prune. nemia rm ${run.id} forgets it with them.`,
     ],
   );
   assert.ok(!under('runs', `${run.id}.pruned`));
 });
 
-test('REFUSED at shipped defaults: whatever holds `wf rm` — a step waiting at its gate, named with the approval that answers it, and an ask no pass has spent, named with the file that takes it back', async (t) => {
+test('REFUSED at shipped defaults: whatever holds `nemia rm` — a step waiting at its gate, named with the approval that answers it, and an ask no pass has spent, named with the file that takes it back', async (t) => {
   const b = board();
   const gated = fs.mkdtempSync(path.join(ROOT, 'gated-'));
   fs.writeFileSync(path.join(gated, 'implement.md'), '---\ngate: true\n---\nimplement it\n');
@@ -344,7 +344,7 @@ test('REFUSED at shipped defaults: whatever holds `wf rm` — a step waiting at 
   await advance(b.e, readRun(run.id));
   assert.equal((await decide(b.e, run.id)).decision.kind, 'awaiting', 'over, as `decide` reads it: not refused as running');
   const gateWords = (flags: string) =>
-    `implement waits at its gate for your approval, and what waits on it is filed once it is approved: wf approve ${run.id} implement. Pruning is not cancelling: wf cancel ${run.id} files nothing more, then wf prune ${run.id}${flags}.`;
+    `implement waits at its gate for your approval, and what waits on it is filed once it is approved: nemia approve ${run.id} implement. Pruning is not cancelling: nemia cancel ${run.id} files nothing more, then nemia prune ${run.id}${flags}.`;
   const atGate = await prune(b.e, run.id, { yes: true, unmerged: true });
   assert.equal(
     atGate.kind,
@@ -378,7 +378,7 @@ test('REFUSED at shipped defaults: whatever holds `wf rm` — a step waiting at 
   );
   assert.equal(
     asked.refusal,
-    `try 2 of implement is asked for, and no pass files it as the run stands. Take that ask back, then wf prune ${shipped.run.id}: rm ${path.join(asks, 'retry-implement-2')}.`,
+    `try 2 of implement is asked for, and no pass files it as the run stands. Take that ask back, then nemia prune ${shipped.run.id}: rm ${path.join(asks, 'retry-implement-2')}.`,
   );
   assert.ok(fs.existsSync(shipped.wt) && !under('runs', `${shipped.run.id}.pruned`));
   fs.rmSync(path.join(asks, 'retry-implement-2'));
@@ -401,10 +401,10 @@ test('REFUSED after a prune: a retry, a round, an approval and an acceptance —
     true,
     'a step that signed off blocked: a person may try it again, and an answer is offered before the run is pruned',
   );
-  assert.match((await typed(t, b.e, 'ls', run.id)).printed.join('\n'), /waiting on you: implement/, 'and `wf ls` says it waits on you');
+  assert.match((await typed(t, b.e, 'ls', run.id)).printed.join('\n'), /waiting on you: implement/, 'and `nemia ls` says it waits on you');
   assert.equal((await prune(b.e, run.id, { yes: true, unmerged: true })).kind, 'pruned');
   const at = readRun(run.id).pruned!.at;
-  const said = `${run.id} was pruned at ${at}: its worktrees were removed (wf prune), and`;
+  const said = `${run.id} was pruned at ${at}: its worktrees were removed (nemia prune), and`;
 
   await assert.rejects(retry(b.e, run.id, 'implement', { mode: 'nudge' }), (err: Error) =>
     err.message.startsWith(`${said} a retry would file work into one of them.`),
@@ -420,7 +420,7 @@ test('REFUSED after a prune: a retry, a round, an approval and an acceptance —
   );
   const d = await decide(b.e, run.id);
   assert.deepEqual([d.retrying, d.rounding, d.offers, d.answering], [[], [], [], {}], 'and nothing is offered');
-  assert.doesNotMatch((await typed(t, b.e, 'ls', run.id)).printed.join('\n'), /waiting on you/, 'and `wf ls` waits on nobody');
+  assert.doesNotMatch((await typed(t, b.e, 'ls', run.id)).printed.join('\n'), /waiting on you/, 'and `nemia ls` waits on nobody');
 
   const asks = path.join(ROOT, 'runs', `${run.id}.asks`);
   fs.mkdirSync(asks, { recursive: true });
@@ -435,11 +435,11 @@ test('REFUSED after a prune: a retry, a round, an approval and an acceptance —
   assert.doesNotMatch(
     (await typed(t, b.e, 'ls', run.id)).printed.join('\n'),
     /asked|due|files it/,
-    '`wf ls` says no try is coming of the ask written by hand',
+    '`nemia ls` says no try is coming of the ask written by hand',
   );
 });
 
-test('REFUSED after a prune: a step over its budget is offered no raise — `decide`, `wf decide` and the api say the run was pruned where they said it waits on you, as `wf ls` does', async (t) => {
+test('REFUSED after a prune: a step over its budget is offered no raise — `decide`, `nemia decide` and the api say the run was pruned where they said it waits on you, as `nemia ls` does', async (t) => {
   const b = board();
   const { run } = await aFinished(b, { budget: 3, costUsd: 3.4, closeout: { ...SIGNED, outcome: 'blocked', needs: 'a word' } });
   const before = await decide(b.e, run.id);
@@ -447,16 +447,16 @@ test('REFUSED after a prune: a step over its budget is offered no raise — `dec
     before.overBudgetLine,
     'OVER BUDGET, waiting on you: implement ($3.40 of $3)  — the run files nothing more for it on its own; nothing after it ran',
   );
-  assert.match(before.offers.join('\n'), new RegExp(`:  wf retry ${run.id} implement --budget <amount>`), 'its raise is offered before');
+  assert.match(before.offers.join('\n'), new RegExp(`:  nemia retry ${run.id} implement --budget <amount>`), 'its raise is offered before');
   assert.equal(
     before.answering.implement,
-    `to answer it, its cap raised above $3.40:  wf retry ${run.id} implement --budget <amount> --message "<answer>"`,
+    `to answer it, its cap raised above $3.40:  nemia retry ${run.id} implement --budget <amount> --message "<answer>"`,
   );
   assert.match((await typed(t, b.e, 'ls', run.id)).printed.join('\n'), /waiting on you: implement/);
   assert.equal(
     (await prune(b.e, run.id, { yes: true, unmerged: true })).kind,
     'pruned',
-    'signed off blocked past its budget, finished and not merged: nothing about a budget holds `wf prune` under --unmerged',
+    'signed off blocked past its budget, finished and not merged: nothing about a budget holds `nemia prune` under --unmerged',
   );
   const at = readRun(run.id).pruned!.at;
 
@@ -464,7 +464,7 @@ test('REFUSED after a prune: a step over its budget is offered no raise — `dec
   assert.equal(d.decision.kind, 'awaiting', 'still a run to decide: its branch holds its work');
   assert.equal(
     d.overBudgetLine,
-    `OVER BUDGET: implement ($3.40 of $3)  — nothing more is filed for it, raised or not, since the run was pruned at ${at} — its worktrees were removed (wf prune); nothing after it ran`,
+    `OVER BUDGET: implement ($3.40 of $3)  — nothing more is filed for it, raised or not, since the run was pruned at ${at} — its worktrees were removed (nemia prune); nothing after it ran`,
   );
   assert.deepEqual([d.offers, d.answering, d.gates], [[], {}, {}]);
   await assert.rejects(
@@ -477,10 +477,10 @@ test('REFUSED after a prune: a step over its budget is offered no raise — `dec
   assert.ok(screen.includes(`\n  ${d.overBudgetLine}\n`), screen);
   assert.doesNotMatch(screen, /waiting on you/, screen);
   assert.doesNotMatch(screen, /wf (retry|round|accept|approve) /, 'no verb a pruned run refuses');
-  assert.doesNotMatch((await typed(t, b.e, 'ls', run.id)).printed.join('\n'), /waiting on you/, 'and `wf ls` agrees');
+  assert.doesNotMatch((await typed(t, b.e, 'ls', run.id)).printed.join('\n'), /waiting on you/, 'and `nemia ls` agrees');
 });
 
-test('`wf prune` with no run reads every run: one not over is summed up on a line, one with nothing to prune is not said, and the rest are listed with the total', async (t) => {
+test('`nemia prune` with no run reads every run: one not over is summed up on a line, one with nothing to prune is not said, and the rest are listed with the total', async (t) => {
   const b = board();
   const merged = await aFinished(b, { merged: true });
   const running = start({ brief: 'running', repo: aRepo(), workflowDir: oneStep() });
@@ -496,18 +496,18 @@ test('`wf prune` with no run reads every run: one not over is summed up on a lin
   assert.match(text, new RegExp(`^${merged.run.id}  would remove 1 worktree, `, 'm'));
   assert.match(text, new RegExp(`^\\d+ runs? not over, not pruned: .*${running.id}`, 'm'));
   assert.doesNotMatch(text, new RegExp(`^${inPlace.id} `, 'm'), 'a run that cut no worktree is not a line');
-  assert.match(text, /^nothing removed: wf prune --yes removes them$/m);
+  assert.match(text, /^nothing removed: nemia prune --yes removes them$/m);
   assert.ok(listRuns().some((r) => r.id === merged.run.id) && fs.existsSync(merged.wt));
 });
 
-test('REFUSED before anything is read: a flag `wf prune` does not take, and an id that is not a name', async (t) => {
+test('REFUSED before anything is read: a flag `nemia prune` does not take, and an id that is not a name', async (t) => {
   const b = board();
   const flag = await typed(t, b.e, 'prune', '--force');
   assert.equal(flag.error?.exitCode, 2);
-  assert.match(flag.error.message, /^wf prune does not take --force\./);
+  assert.match(flag.error.message, /^nemia prune does not take --force\./);
   for (const id of ['../x', 'r-1.pruned']) {
-    assert.match(idRefusal(id, 'prune')!, /wf prune/);
-    await assert.rejects(prune(b.e, id), (err: Error & { exitCode?: number }) => err.exitCode === 2 && /wf prune/.test(err.message), id);
+    assert.match(idRefusal(id, 'prune')!, /nemia prune/);
+    await assert.rejects(prune(b.e, id), (err: Error & { exitCode?: number }) => err.exitCode === 2 && /nemia prune/.test(err.message), id);
   }
 });
 
@@ -521,13 +521,13 @@ const aShot = (id: string, name = 'shot.png', bytes = 32 * 1024): string => {
 
 /** Runs the prune a refusal offers, as a person would type it, with `--yes`: the command is read off the refusal, never written here. */
 const followed = async (t: TestContext, e: Engine, refusal: string) => {
-  const command = /(wf prune \S+(?: --[a-z]+)*)\.$/.exec(refusal)?.[1];
+  const command = /(nemia prune \S+(?: --[a-z]+)*)\.$/.exec(refusal)?.[1];
   assert.ok(command, `a refusal that offers a prune: ${refusal}`);
   return { command, ...(await typed(t, e, ...command.split(' ').slice(1), '--yes')) };
 };
 const escaped = (s: string) => s.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
 
-test('`wf prune --artifacts` on a run that shipped: its worktree and its files, listed with their sizes until --yes, then removed — a link among the files as a link — and what freed said; its record, asks, inputs and rendered prompts are kept; `wf decide` reads it and says the files went; a second prune has nothing to do', async (t) => {
+test('`nemia prune --artifacts` on a run that shipped: its worktree and its files, listed with their sizes until --yes, then removed — a link among the files as a link — and what freed said; its record, asks, inputs and rendered prompts are kept; `nemia decide` reads it and says the files went; a second prune has nothing to do', async (t) => {
   const b = board();
   const shotOf = (id: string) => path.join(ROOT, 'runs', id, 'artifacts', 'implement', 'shot.png');
   const run0 = await aFinished(b, { merged: true, closeout: (id) => ({ ...SIGNED, artifacts: [shotOf(id)] }) });
@@ -549,7 +549,7 @@ test('`wf prune --artifacts` on a run that shipped: its worktree and its files, 
   assert.match(dry.printed[0], new RegExp(`^${id}  would remove 1 worktree and its files, \\d+\\.\\d KB$`));
   assert.match(dry.printed[1], new RegExp(`^   ${escaped(run0.wt)}  \\d+\\.\\d KB$`));
   assert.match(dry.printed[2], new RegExp(`^   ${escaped(files)}  \\d+\\.\\d KB$`));
-  assert.equal(dry.printed[4], `nothing removed: wf prune ${id} --artifacts --yes removes them`);
+  assert.equal(dry.printed[4], `nothing removed: nemia prune ${id} --artifacts --yes removes them`);
   assert.ok(fs.existsSync(shot) && !under('runs', `${id}.pruned`), 'a dry run touches nothing');
   const measured = (await prune(b.e, id, { artifacts: true })).artifacts!.bytes;
   assert.ok(measured >= 32 * 1024, `what the files hold is counted (${measured})`);
@@ -575,11 +575,11 @@ test('`wf prune --artifacts` on a run that shipped: its worktree and its files, 
   const d = await decide(b.e, id);
   assert.equal(d.decision.kind, 'shipped');
   const screen = await typed(t, b.e, 'decide', id);
-  assert.equal(screen.error, undefined, 'wf decide reads it');
+  assert.equal(screen.error, undefined, 'nemia decide reads it');
   const text = screen.printed.join('\n');
   assert.equal(
     text.split('\n')[1],
-    `  pruned at ${pruned.at} — its worktrees were removed (wf prune), and its files were removed at ${pruned.artifacts.at} (wf prune --artifacts); its branches and record are kept`,
+    `  pruned at ${pruned.at} — its worktrees were removed (nemia prune), and its files were removed at ${pruned.artifacts.at} (nemia prune --artifacts); its branches and record are kept`,
   );
   assert.doesNotMatch(text, /not kept|missing/, 'a shipped run is said shipped, as before');
 
@@ -588,10 +588,10 @@ test('`wf prune --artifacts` on a run that shipped: its worktree and its files, 
   assert.equal((await prune(b.e, open.run.id, { artifacts: true, unmerged: true, yes: true })).kind, 'pruned');
   const openAt = readRun(open.run.id).pruned!.artifacts!.at;
   const read = await typed(t, b.e, 'decide', open.run.id);
-  assert.equal(read.error, undefined, 'wf decide reads it');
+  assert.equal(read.error, undefined, 'nemia decide reads it');
   const openText = read.printed.join('\n');
   assert.ok(
-    openText.includes(`    !! not kept: ${openShot}  — its files were removed at ${openAt} (wf prune --artifacts)`),
+    openText.includes(`    !! not kept: ${openShot}  — its files were removed at ${openAt} (nemia prune --artifacts)`),
     `a run a person agreed to prune unmerged is still decided on its closeouts: a file its step named reads as pruned, not as never made:\n${openText}`,
   );
   assert.doesNotMatch(openText, /!! missing|not there/, 'the file is not said to be missing as if never written');
@@ -602,18 +602,18 @@ test('`wf prune --artifacts` on a run that shipped: its worktree and its files, 
     [again.kind, again.nothing],
     [
       'nothing',
-      `its worktrees were removed at ${pruned.at} (wf prune), and its files were removed at ${pruned.artifacts.at} (wf prune --artifacts)`,
+      `its worktrees were removed at ${pruned.at} (nemia prune), and its files were removed at ${pruned.artifacts.at} (nemia prune --artifacts)`,
     ],
   );
   assert.deepEqual(readRun(id).pruned, pruned, 'a prune with nothing to do leaves the marker as it was');
   await assert.rejects(retry(b.e, id, 'implement', { mode: 'nudge' }), (err: Error) =>
     err.message.startsWith(
-      `${id} was pruned at ${pruned.at}: its worktrees were removed (wf prune), its files at ${pruned.artifacts!.at} (wf prune --artifacts), and a retry would file work into one of them.`,
+      `${id} was pruned at ${pruned.at}: its worktrees were removed (nemia prune), its files at ${pruned.artifacts!.at} (nemia prune --artifacts), and a retry would file work into one of them.`,
     ),
   );
 });
 
-test("`wf prune --artifacts` of a run whose worktrees a plain prune already removed: its files alone, the worktrees' time kept; and of a run that cut none, its files alone, which then reads pruned", async (t) => {
+test("`nemia prune --artifacts` of a run whose worktrees a plain prune already removed: its files alone, the worktrees' time kept; and of a run that cut none, its files alone, which then reads pruned", async (t) => {
   const b = board();
   const { run } = await aFinished(b, { merged: true });
   aShot(run.id);
@@ -643,7 +643,7 @@ test("`wf prune --artifacts` of a run whose worktrees a plain prune already remo
   );
   assert.equal(
     (await prune(b.e, inPlace.id, { artifacts: true, yes: true })).refusal,
-    `it finished on main itself and waits on your decision: pruned, none of its steps can be tried again, sent round or approved, and its files are part of what you read to decide it. Decide it first, or prune it all the same: wf prune ${inPlace.id} --unmerged --artifacts.`,
+    `it finished on main itself and waits on your decision: pruned, none of its steps can be tried again, sent round or approved, and its files are part of what you read to decide it. Decide it first, or prune it all the same: nemia prune ${inPlace.id} --unmerged --artifacts.`,
   );
   assert.ok(
     under('runs', inPlace.id, 'artifacts', 'implement', 'shot.png') && !under('runs', `${inPlace.id}.pruned`),
@@ -665,22 +665,22 @@ test("`wf prune --artifacts` of a run whose worktrees a plain prune already remo
   assert.equal(marked.at, marked.artifacts!.at, 'pruned once its files go');
   await assert.rejects(retry(b.e, inPlace.id, 'implement', { mode: 'nudge' }), (err: Error) =>
     err.message.startsWith(
-      `${inPlace.id} was pruned at ${marked.at}: its files were removed (wf prune --artifacts), and a retry would file work`,
+      `${inPlace.id} was pruned at ${marked.at}: its files were removed (nemia prune --artifacts), and a retry would file work`,
     ),
   );
   const screen = await typed(t, b.e, 'decide', inPlace.id);
   assert.equal(screen.error, undefined);
   assert.equal(
     screen.printed.join('\n').split('\n')[1],
-    `  pruned at ${marked.at} — its files were removed at ${marked.at} (wf prune --artifacts); its branches and record are kept`,
+    `  pruned at ${marked.at} — its files were removed at ${marked.at} (nemia prune --artifacts); its branches and record are kept`,
   );
   assert.equal(
     (await prune(b.e, inPlace.id, { artifacts: true })).nothing,
-    `it cut no worktree — it worked in ${inPlace.repo} itself, and its files were removed at ${marked.at} (wf prune --artifacts)`,
+    `it cut no worktree — it worked in ${inPlace.repo} itself, and its files were removed at ${marked.at} (nemia prune --artifacts)`,
   );
 });
 
-test('`wf prune --artifacts` marks the run before its files go, and a prune that removed nothing takes the mark back — gone on a run never pruned, as it was on one that was', async (t) => {
+test('`nemia prune --artifacts` marks the run before its files go, and a prune that removed nothing takes the mark back — gone on a run never pruned, as it was on one that was', async (t) => {
   const b = board();
   const { run } = await aFinished(b, { merged: true });
   aShot(run.id);
@@ -716,7 +716,7 @@ test('`wf prune --artifacts` marks the run before its files go, and a prune that
   assert.match(
     pruneLines(never).at(-1)!,
     new RegExp(
-      `^   kept what is left in ${escaped(path.join(ROOT, 'runs', inPlace.id, 'artifacts'))}: .*EACCES.* — what is still there is kept, and read as it is; wf prune ${inPlace.id} --unmerged --artifacts removes it once it can be$`,
+      `^   kept what is left in ${escaped(path.join(ROOT, 'runs', inPlace.id, 'artifacts'))}: .*EACCES.* — what is still there is kept, and read as it is; nemia prune ${inPlace.id} --unmerged --artifacts removes it once it can be$`,
     ),
   );
   assert.ok(!under('runs', `${inPlace.id}.pruned`), 'a run never pruned is not marked');
@@ -753,7 +753,7 @@ test('REFUSED at shipped defaults under --artifacts: a run not over, a finished 
   const u = await prune(b.e, unmerged.run.id, { artifacts: true, yes: true });
   assert.equal(
     u.refusal,
-    `it finished and is not merged into main: pruned, none of its steps can be tried again, sent round or approved, and its branch is the one place its work is left. Merge it first, or prune it all the same: wf prune ${unmerged.run.id} --unmerged --artifacts.`,
+    `it finished and is not merged into main: pruned, none of its steps can be tried again, sent round or approved, and its branch is the one place its work is left. Merge it first, or prune it all the same: nemia prune ${unmerged.run.id} --unmerged --artifacts.`,
   );
   kept(unmerged.run.id, unmergedShot);
   assert.equal((await prune(b.e, unmerged.run.id, { yes: true, unmerged: true })).kind, 'pruned');
@@ -817,7 +817,7 @@ test('REFUSED at shipped defaults under --artifacts: a run not over, a finished 
 
   const flag = await typed(t, b.e, 'prune', '--artifact');
   assert.equal(flag.error?.exitCode, 2, 'a flag near it is not taken for it');
-  assert.match(flag.error.message, /^wf prune does not take --artifact\. .*--artifacts/);
+  assert.match(flag.error.message, /^nemia prune does not take --artifact\. .*--artifacts/);
 });
 
 test('pruneLines and sizeOf say what a person reads', () => {
@@ -834,12 +834,12 @@ test('pruneLines and sizeOf say what a person reads', () => {
   const files = { path: '/s/runs/r-1/artifacts', files: 'EACCES' } as const;
   assert.equal(
     pruneLines({ id: 'r-1', kind: 'pruned', worktrees: [], left: [files], unmerged: true }).at(-1),
-    '   kept what is left in /s/runs/r-1/artifacts: EACCES — what is still there is kept, and read as it is; wf prune r-1 --unmerged --artifacts removes it once it can be',
+    '   kept what is left in /s/runs/r-1/artifacts: EACCES — what is still there is kept, and read as it is; nemia prune r-1 --unmerged --artifacts removes it once it can be',
     'files that would not go are offered the prune that removes them later: given --unmerged, repeated, or a run nobody decided is refused it',
   );
   assert.equal(
     pruneLines({ id: 'r-1', kind: 'pruned', worktrees: [], left: [files] }).at(-1),
-    '   kept what is left in /s/runs/r-1/artifacts: EACCES — what is still there is kept, and read as it is; wf prune r-1 --artifacts removes it once it can be',
+    '   kept what is left in /s/runs/r-1/artifacts: EACCES — what is still there is kept, and read as it is; nemia prune r-1 --artifacts removes it once it can be',
   );
 });
 
@@ -852,10 +852,10 @@ test('the whole screen of a pruned run over its budget', async (t) => {
     await decideScreen(t, b.e, [over.run.id], { '<id>': over.run.id, '<root>': ROOT, '<repo>': over.repo, '<at>': overAt }),
     [
       '<id>  add a flag',
-      '  pruned at <at> — its worktrees were removed (wf prune); its branches, record and files are kept',
+      '  pruned at <at> — its worktrees were removed (nemia prune); its branches, record and files are kept',
       '',
       '  BLOCKED: implement',
-      '  OVER BUDGET: implement ($3.40 of $3)  — nothing more is filed for it, raised or not, since the run was pruned at <at> — its worktrees were removed (wf prune); nothing after it ran',
+      '  OVER BUDGET: implement ($3.40 of $3)  — nothing more is filed for it, raised or not, since the run was pruned at <at> — its worktrees were removed (nemia prune); nothing after it ran',
       '',
       '  touched  wf/<id>/implement',
       '    (root)  1 file   +1 −0',

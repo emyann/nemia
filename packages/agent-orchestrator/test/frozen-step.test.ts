@@ -1,7 +1,7 @@
 /**
  * The schema a frozen step is read back by (`FrozenStepSchema`), held to the parser it reads the output of: every step of every folder
- * shipped and of the tests' team, as `wf start` freezes it, reads back as it was; the decoded type and `Workflow` are each the other; and a
- * key of `STEP_KEYS` the schema has no field for fails the typecheck.
+ * shipped and of the tests' team, as `nemia start` freezes it, reads back as it was; the decoded type and `Workflow` are each the other;
+ * and a key of `STEP_KEYS` the schema has no field for fails the typecheck.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -16,7 +16,7 @@ const FOLDERS = [...shippedFolders(), TEAM_DEV];
 
 const decode = Schema.decodeUnknownResult(FrozenStepSchema);
 
-/** A step as a record holds it: through JSON, as `wf start` writes it and `readRun` reads it. */
+/** A step as a record holds it: through JSON, as `nemia start` writes it and `readRun` reads it. */
 const frozen = (step: Workflow): unknown => JSON.parse(JSON.stringify(step));
 
 test("every step of every folder shipped and of the tests' team, frozen, reads back by the schema as it was frozen", () => {

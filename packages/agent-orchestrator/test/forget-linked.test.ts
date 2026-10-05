@@ -1,6 +1,6 @@
 /**
- * `wf rm` on a store under a link. Git names a worktree by its real path, every link on the way followed, so a store reached through one —
- * a home directory on another disk, or a temporary directory on macOS, `/var` in `/private/var` — reads its worktrees under a path the
+ * `nemia rm` on a store under a link. Git names a worktree by its real path, every link on the way followed, so a store reached through one
+ * — a home directory on another disk, or a temporary directory on macOS, `/var` in `/private/var` — reads its worktrees under a path the
  * store never wrote. A file of its own, since `WF_ROOT` is read once, as the package loads.
  */
 import { test } from 'node:test';
@@ -26,7 +26,7 @@ const git = (cwd: string, ...args: string[]) =>
     stdio: ['ignore', 'pipe', 'pipe'],
   }).trim();
 
-test("REFUSED before, now forgotten: a store under a link — git lists each worktree by its real path, and `wf rm` still finds them as the run's, hands the directory's work off under the step whose it is, and removes them; nothing is held as a stray", async () => {
+test("REFUSED before, now forgotten: a store under a link — git lists each worktree by its real path, and `nemia rm` still finds them as the run's, hands the directory's work off under the step whose it is, and removes them; nothing is held as a stray", async () => {
   const repo = fs.mkdtempSync(path.join(REAL, 'repo-'));
   git(repo, 'init', '-q');
   git(repo, 'commit', '-q', '--allow-empty', '-m', 'base');

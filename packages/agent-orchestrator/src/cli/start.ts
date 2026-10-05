@@ -1,6 +1,7 @@
 /**
- * The runners of the commands that start work from where they are typed — `nemia start`, `nemia plan`, `nemia inbox add` and `nemia inbox queue`:
- * each reads the files and folders its command line names, hands its entry's handler what it found, and prints what the entry says of it.
+ * The runners of the commands that start work from where they are typed — `nemia start`, `nemia plan`, `nemia inbox add` and `nemia inbox
+ * queue`: each reads the files and folders its command line names, hands its entry's handler what it found, and prints what the entry says
+ * of it.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -109,8 +110,8 @@ export function planRun(args: Args): void {
 }
 
 /**
- * `nemia inbox add`: an idea, the words or a file's text, filed as a card (`INBOX_ADD`), with a `--workflow` path read from where it is typed
- * (`workflowAt`); a directory is refused.
+ * `nemia inbox add`: an idea, the words or a file's text, filed as a card (`INBOX_ADD`), with a `--workflow` path read from where it is
+ * typed (`workflowAt`); a directory is refused.
  */
 export async function inboxAddRun(args: Args, e: Engine): Promise<void> {
   const idea = textOf(args, 'idea') ?? '';
@@ -132,7 +133,9 @@ export async function inboxAddRun(args: Args, e: Engine): Promise<void> {
   for (const line of INBOX_ADD.print(data, asked)) console.log(line);
 }
 
-/** `nemia inbox queue`: a card queued or taken back (`INBOX_QUEUE`), with a `--workflow` path read from where it is typed (`workflowAt`). */
+/**
+ * `nemia inbox queue`: a card queued or taken back (`INBOX_QUEUE`), with a `--workflow` path read from where it is typed (`workflowAt`).
+ */
 export async function inboxQueueRun(args: Args, e: Engine): Promise<void> {
   const workflow = textOf(args, 'workflow');
   const asked: Args = { ...args, workflow: workflow === undefined ? undefined : workflowAt(workflow, process.cwd()) };

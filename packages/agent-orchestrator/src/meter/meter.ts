@@ -61,8 +61,8 @@ export const heaviest = (phases: Record<Phase, { ms: number }>, n = 3): Array<{ 
 export const STATS_EVERY_MS = 60_000;
 
 /**
- * The passes since the last line `nemia up` said of them: numbers only, summed, and started afresh after each line (`summaryDue`). All that is
- * carried between passes.
+ * The passes since the last line `nemia up` said of them: numbers only, summed, and started afresh after each line (`summaryDue`). All that
+ * is carried between passes.
  */
 export type Interval = {
   from: number;

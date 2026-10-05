@@ -40,14 +40,15 @@ export type Assessment = {
   held: string[];
   status: 'running' | 'succeeded' | 'failed' | 'cancelled';
   /**
-   * A run `failed` that nothing failed in: what stopped it instead, as `nemia decide` tells the two apart (`Decision`'s `outcome`). `awaiting
-   * approval` when every step that stops what follows it waits at its gate, and `blocked` when a person's word is what stops it otherwise —
-   * a step that signed off blocked, or unsigned, a loop out of rounds, a cap reached. Absent where a step broke: its task failed or was
-   * stopped, or its check refused it or did not finish — that run is `failed` in every word — and on a run that is not `failed`.
+   * A run `failed` that nothing failed in: what stopped it instead, as `nemia decide` tells the two apart (`Decision`'s `outcome`).
+   * `awaiting approval` when every step that stops what follows it waits at its gate, and `blocked` when a person's word is what stops it
+   * otherwise — a step that signed off blocked, or unsigned, a loop out of rounds, a cap reached. Absent where a step broke: its task
+   * failed or was stopped, or its check refused it or did not finish — that run is `failed` in every word — and on a run that is not
+   * `failed`.
    *
    * `status` stays `failed` for these, since everything that reads it (the cap on runs in flight, `nemia cancel`, `toDecide`) reads a run
-   * that stopped. This word is for what a person reads of it, so that the feed does not say `failed` of a run `nemia ls` and `nemia decide` say
-   * is awaiting approval.
+   * that stopped. This word is for what a person reads of it, so that the feed does not say `failed` of a run `nemia ls` and `nemia decide`
+   * say is awaiting approval.
    */
   stoppedOn?: 'awaiting approval' | 'blocked';
   /**

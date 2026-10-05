@@ -81,6 +81,7 @@ async function expectLayers(keys: Locator, agent: string): Promise<void> {
 async function writesReadme(page: Page, builder: Locator, name: string, put: (r: Response) => boolean): Promise<void> {
   const readme = builder.getByRole('textbox', { name: /^README/ });
   await expectVisible(readme, 'the builder has a box for the README');
+  await expectCount(page.getByRole('region', { name: 'README' }), 0, 'and the page shows it there alone, not again above the builder');
   await readme.fill('A draft let go.');
   await expectVisible(builder.locator('[data-readme-unsaved]'), 'a README typed is marked unsaved');
   await builder.getByRole('button', { name: 'Discard changes' }).click();

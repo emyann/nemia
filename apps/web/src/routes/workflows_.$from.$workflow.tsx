@@ -41,8 +41,8 @@ export const Route = createFileRoute('/workflows_/$from/$workflow')({
 /**
  * One workflow: what it is, its star, the factories it is in, its README whole — the workflow level's instruction — then, for one that
  * reads, its graph, its steps a row each, and a start; for one that does not, the loader's refusal in their place. One of yours is built
- * here, its builder in place of the graph, the rows and the start while `build` is in the address, and removed, which leaves for the
- * Workflows page; the repository's says why it has neither.
+ * here, its builder in place of the README, the graph, the rows and the start while `build` is in the address — the README is edited
+ * there — and removed, which leaves for the Workflows page; the repository's says why it has neither.
  */
 function WorkflowPage() {
   const { from, workflow: name } = Route.useParams();
@@ -75,7 +75,7 @@ function WorkflowPage() {
         onRemoved={() => navigate({ to: '/workflows' })}
         removable={workflow.from === 'yours' && !open}
       />
-      <Readme text={workflow.readme} />
+      {!open && <Readme text={workflow.readme} />}
       {workflow.error ? (
         <Refused error={workflow.error} />
       ) : open ? (

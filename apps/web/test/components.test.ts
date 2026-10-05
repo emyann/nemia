@@ -2715,6 +2715,11 @@ test("in the frame's bar, the banners name a step by a button that opens the ste
 test('the gate: Approve with a box for the words, which may stay empty, and Send back — the answer box — with an objection it waits for, continuing the session or in a new one', () => {
   const html = withClient(createElement(Gates.Gate, { runId: 'r-1', step: 'plan', approveLine: 'nemia approve r-1 plan' }));
   assert.match(html, /^<section aria-label="The gate of plan" data-gate="awaiting"/);
+  assert.match(
+    html,
+    /as <code>nemia approve r-1 plan<\/code> approves it: the next tick files what waits on it/,
+    'beside Approve, the line it answers',
+  );
   const forms = new Map([...html.matchAll(/<form aria-label="([^"]+)"[^>]*>([\s\S]*?)<\/form>/g)].map((m) => [m[1], m[2]]));
   assert.deepEqual([...forms.keys()], ['Approve plan', 'Send plan back']);
   const buttons = (form: string) =>

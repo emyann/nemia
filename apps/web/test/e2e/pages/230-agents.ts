@@ -30,6 +30,10 @@ export default {
     const card = (p: Page, from: string, name: string) => p.locator(`section[data-agent="${name}"][data-from="${from}"]`);
     const agentPath = (from: string, name: string) => `/agents/${from}/${name}`;
 
+    await expectVisible(
+      page.locator('article > div > p').getByText(`${agentsDir}/`, { exact: true }),
+      `the page says where yours are, as the api reads its store: ${agentsDir}/`,
+    );
     const yours = page.locator('section[aria-label="Yours"]');
     const theirs = page.locator('section[aria-label="This repository"]');
     await expectCount(yours.locator('section[data-agent]'), 1, `yours lists one agent, ${seeded.name}`);
@@ -112,9 +116,9 @@ export default {
     await expectCount(page.getByRole('button', { name: 'Remove…' }), 0, 'nor Remove');
     await expectVisible(
       page.locator('[data-read-only]', {
-        hasText: `cp ${path.join(store!, 'checkout', 'workflows', 'agents', `${good.agent.name}.md`)} ~/.agent-workflows/workflows/agents/`,
+        hasText: `mkdir -p '${agentsDir}' && cp '${path.join(store!, 'checkout', 'workflows', 'agents', `${good.agent.name}.md`)}' '${agentsDir}/'`,
       }),
-      'and says how to start one of yours from it',
+      "and says how to start one of yours from it, in the api's line: into your store's agents folder, absolute",
     );
     const file = page.locator('section[aria-label="The file"]');
     await file.getByRole('button', { name: 'Source' }).click();

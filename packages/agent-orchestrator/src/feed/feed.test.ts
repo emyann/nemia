@@ -35,6 +35,7 @@ const store = await import('./feed.store.ts');
 /** The lines the feed's writer wrote (`recordFeed`), as a pass hands it what it judged. */
 const recordFeed = (...args: Parameters<typeof store.recordFeed>) => store.recordFeed(...args).lines;
 const { readRun } = await import('../record/record.store.ts');
+const { freshRestMemo } = await import('../tick/tick.verb.ts');
 const { main, watchPrinted, watching } = await import('../cli/main.ts');
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
@@ -291,6 +292,74 @@ test('a step whose ended attempt was denied a call says it on its line in the fe
     ['denied: Bash(git push) ×2'],
     'said once, over three passes',
   );
+});
+
+/** A workflow of `plan → implement`, with no gate: a run on it finishes once both steps sign off. */
+const ungated = (() => {
+  const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
+  fs.writeFileSync(path.join(dir, 'plan.md'), '---\n---\nplan it\n');
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nafter: plan\n---\nimplement it\n');
+  return dir;
+})();
+
+/** The run's last word in the feed, and each step's. */
+const lastSaid = (run: string): string[] => [words(run).at(-1)!, ...['plan', 'implement'].map((s) => words(run, s).at(-1)!)];
+
+test('REFUSED: finished runs whose notes are worded anew, as a new denied: part words them, write no line — a restarted daemon judges them at rest', async () => {
+  emptyStore();
+  const b = board();
+  const runs = await Promise.all(
+    ['one', 'two', 'three'].map(
+      async (brief) => await Effect.runPromise(startRun({ brief, repo: aRepo(), workflowDir: ungated, isolate: false })),
+    ),
+  );
+  await runWith(b.e, tickRun());
+  for (const r of runs) b.set(`${r.id}-plan`, 'succeeded', SIGNED);
+  for (let i = 0; i < 3; i++) await runWith(b.e, tickRun());
+  for (const r of runs) b.set(`${r.id}-implement`, 'succeeded', SIGNED);
+  for (let i = 0; i < 3; i++) await runWith(b.e, tickRun());
+  for (const r of runs) assert.deepEqual(lastSaid(r.id), ['succeeded', 'unverified · done', 'unverified · done'], 'each run finished, and the feed said so');
+
+  for (const r of runs) b.deny(`${r.id}-plan`, [{ tool: 'Bash', what: 'git push' }]);
+  const quiet = size();
+  for (let i = 0; i < 2; i++) {
+    const pass = await runWith(b.e, tickRun({ memo: freshRestMemo() }));
+    for (const r of runs) {
+      const said = judged(pass).get(r.id)!;
+      assert.equal(said.atRest, true, 'the pass found the run at rest');
+      assert.equal(
+        said.steps.find((s) => s.name === 'plan')?.note,
+        'denied: Bash(git push) ×1',
+        "the listing's words for its plan did change",
+      );
+    }
+  }
+  assert.equal(size(), quiet, 'and the feed wrote nothing for runs nothing happened to');
+  assert.deepEqual(
+    lines().filter((l) => l.note?.startsWith('denied:')),
+    [],
+  );
+});
+
+test("a step whose attempt ends with a new denial says it on the pass that reads it ended, as the run finishes: no rest hides a step's own end", async () => {
+  emptyStore();
+  const b = board();
+  const run = await Effect.runPromise(startRun({ brief: 'the late denial', repo: aRepo(), workflowDir: ungated, isolate: false }));
+  await runWith(b.e, tickRun());
+  b.set(`${run.id}-plan`, 'succeeded', SIGNED);
+  for (let i = 0; i < 3; i++) await runWith(b.e, tickRun());
+  assert.equal(words(run.id, 'implement').at(-1), 'pending', 'implement is filed');
+
+  b.deny(`${run.id}-implement`, [{ tool: 'Bash', what: 'git push' }]);
+  b.set(`${run.id}-implement`, 'succeeded', SIGNED);
+  for (let i = 0; i < 2; i++) await runWith(b.e, tickRun({ memo: freshRestMemo() }));
+  const implement = lines().filter((l) => l.run === run.id && l.step === 'implement');
+  assert.deepEqual(
+    { word: implement.at(-1)!.word, note: implement.at(-1)!.note },
+    { word: 'unverified · done', note: 'denied: Bash(git push) ×1' },
+    'the step that ended denied a call says it',
+  );
+  assert.equal(words(run.id).at(-1), 'succeeded', 'and the run says it finished');
 });
 
 test('a step that signed off blocked says what it needs on its line in the feed, made one line, beside BLOCKED — and the run says blocked, not failed', async () => {

@@ -101,7 +101,9 @@ and `agent-orchestrator/workflow` alone. `./workflow` is the pure format, and wh
 refusals by kind, are exported from `agent-orchestrator`. XState is a dependency
 of the runtime alone: `src/core/lifecycle.ts` is the one file of any workspace that imports it, and neither entry exports it,
 the machine, or the readings `decide` moves by. `agent-runtime` exports the lifecycle's graph as plain data (`lifecycleGraph`: its states, edges and a person's verbs),
-which the board draws.
+which the board draws. The packages' entries are Effect, and the api is the system's public interface: a controller is a program its
+caller runs over the engine with `runWith`, and `ae` runs each verb of `Engine.layer(…)` as an Effect. The runtime's Promise door
+(`agent-runtime`, `src/facade.ts`) is left to the runtime's own tests until it goes.
 
 Lint holds the layers' imports as they are typed: `.oxlintrc.json` sets `no-restricted-imports` in one block per layer, over its
 source. The web's imports no workspace package, no harness SDK and no path into `packages/`; the api's imports the orchestrator

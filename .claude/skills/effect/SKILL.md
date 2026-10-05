@@ -105,7 +105,7 @@ version, and the version above must be the pin. An upgrade re-measures the table
 
 ## Programs
 
-- The layers speak Effect to each other; the api is the system's public face. A caller of the runtime builds its engine once from
+- The packages' entries are Effect, and the api is the system's public interface. A caller of the runtime builds its engine once from
   `Engine.layer(options)` (`agent-runtime/effect`) and runs each verb as an Effect: `ae` (`packages/agent-runtime/src/cli/main.ts`)
   and the orchestrator's client (`engineOf` in `packages/agent-orchestrator/src/runtime-client.ts`). A refusal a caller answers with
   a sentence and an exit code is worded by `refusalWords` (`src/service/refusal.ts`): an `Error` led by the verb whose `exitCode` is 2.

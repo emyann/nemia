@@ -24,13 +24,30 @@
  * Pure: no disk, no process, no engine. `file.verb.ts` is the file that files these.
  */
 /**
- * The seconds a check may run before the engine stops it. A hung suite must not hold a run for ever.
+ * The seconds a step's check may run before the engine stops it, where the check does not land the run. A hung suite must not hold a run
+ * for ever.
  *
- * A guard against a hang, not a budget, so it is set well above the slowest check that finishes: the web build and
- * its e2e, with several runs on the machine, and longer as e2e pages are added. A constant rather than a step key:
+ * A guard against a hang, not a budget, so it is set well above the slowest such check that finishes: the suite on the step's branch, the
+ * web build at most, and no e2e, which only the landing check runs (`LANDING_CHECK_DEADLINE_SECONDS`). A constant rather than a step key:
  * every shipped check is the same command family and none needs another number.
  */
 export const CHECK_DEADLINE_SECONDS = 1200;
+
+/**
+ * The seconds the check of an ending that lands on it (`landsOnCheck`) may run before the engine stops it: the whole suite on the merged
+ * tree, the e2e's every page in both themes included, while other runs build on the same machine. It guards against a hung check, never a
+ * slow one, so the number is twice the slowest landing check over a week, never less than 2400.
+ *
+ * Measured from the landing checks' journals, spawned to ended, with the load counted from the other tasks running at the time: 227 passed
+ * landing checks over a week, median 482 s, p90 971 s, p95 1019 s, slowest 1150 s, beside five agent sessions and another check. One more,
+ * beside six sessions, was stopped at the old 1200 s two pages short of its e2e's end, an estimated 1230 s whole. Twice that, rounded up
+ * to five minutes, is 2700.
+ *
+ * The e2e grows by a page at a time, so the number is measured again the same way whenever a passing landing check takes more than half
+ * of it. A constant beside `CHECK_DEADLINE_SECONDS` rather than a step key: one shipped command family lands, and a round's check,
+ * which runs no e2e, keeps the shorter bound on a hang.
+ */
+export const LANDING_CHECK_DEADLINE_SECONDS = 2700;
 
 /**
  * The niceness a check starts at, over the orchestrator's own: `nice -n 10`, and where the machine runs it, the idle IO class, which the

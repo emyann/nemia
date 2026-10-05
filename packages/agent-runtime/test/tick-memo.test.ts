@@ -4,18 +4,20 @@
  * feed names, until the engine is made again (`core/engine/memo.ts`): the files store reads a journal's bytes once per engine
  * (`journalReader` in `core/engine/journal.ts`).
  *
- * The harness is a `PromiseRunner` that lists nothing and refuses every spawn, so each task settles on its first pass and
+ * The harness is a `AsyncRunner` that lists nothing and refuses every spawn, so each task settles on its first pass and
  * the only bytes a pass reads are the journal's: a detached harness would read its run files through the same meter.
  */
+import { Effect } from 'effect';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { PromiseRunner } from '../src/facade.ts';
-import { Engine, promiseEngine } from '../src/index.ts';
+import { Engine } from '../src/index.ts';
 import { scratch } from './scratch.ts';
+import { asyncOps, type AsyncRunner } from './promise-runner.ts';
+import { builtEngine } from './engine.ts';
 
-const refusing: PromiseRunner = {
+const refusing: AsyncRunner = {
   spawn: async () => {
     throw Object.assign(new Error('not today'), { refused: true });
   },
@@ -33,12 +35,12 @@ const N = 40;
 const settledStore = async () => {
   const root = scratch('ae-memo-root-');
   const cwd = scratch('ae-memo-cwd-');
-  const engine = promiseEngine(Engine.layer({ root, harnesses: { refusing } }));
+  const engine = builtEngine(Engine.layer({ root, harnesses: { refusing: asyncOps(refusing) } }));
   const ids: string[] = [];
-  for (let i = 0; i < N; i++) ids.push(await engine.file({ brief: `task ${i}`, cwd }));
-  const first = await engine.tick();
+  for (let i = 0; i < N; i++) ids.push(await Effect.runPromise(engine.file({ brief: `task ${i}`, cwd })));
+  const first = await Effect.runPromise(engine.tick());
   assert.equal(first.views.length, 0, 'every task settled on the first pass');
-  await engine.tick();
+  await Effect.runPromise(engine.tick());
   return { root, cwd, engine, ids };
 };
 
@@ -48,9 +50,9 @@ const journalsOf = (root: string) =>
 
 test('a pass over settled tasks nothing has written to reads no journal, and nothing of a feed with nothing new', async () => {
   const { engine } = await settledStore();
-  const before = engine.io();
-  const report = await engine.tick();
-  const after = engine.io();
+  const before = Effect.runSync(engine.io());
+  const report = await Effect.runPromise(engine.tick());
+  const after = Effect.runSync(engine.io());
   assert.equal(report.tasks, N, 'every task is still counted');
   assert.deepEqual(report.refused, [], 'and no skipped task is refused');
   assert.equal(after.bytesRead - before.bytesRead, 0, 'no byte read');
@@ -63,15 +65,15 @@ test("a pass after an entry is appended to one settled task reads the feed's new
   const feed0 = sizeOf(feed);
   const journalFile = path.join(root, 'tasks', `${ids[7]}.jsonl`);
   const journal0 = sizeOf(journalFile);
-  await engine.file({ brief: 'task 7, filed again under its id', cwd, id: ids[7] });
+  await Effect.runPromise(engine.file({ brief: 'task 7, filed again under its id', cwd, id: ids[7] }));
   const grown = sizeOf(feed) - feed0;
   assert.ok(grown > 0, 'the filing was written to the feed');
   const appended = sizeOf(journalFile) - journal0;
   assert.ok(appended > 0, 'the filing was written to the journal');
 
-  const before = engine.io();
-  await engine.tick();
-  const after = engine.io();
+  const before = Effect.runSync(engine.io());
+  await Effect.runPromise(engine.tick());
+  const after = Effect.runSync(engine.io());
   assert.equal(
     after.bytesRead - before.bytesRead,
     grown + appended,
@@ -79,34 +81,37 @@ test("a pass after an entry is appended to one settled task reads the feed's new
   );
   assert.equal(after.reads - before.reads, 2, "the feed's new bytes, then what was appended to the one journal it names, once");
 
-  const again = engine.io();
-  await engine.tick();
-  assert.equal(engine.io().bytesRead - again.bytesRead, 0, 'folded, it is skipped again');
+  const again = Effect.runSync(engine.io());
+  await Effect.runPromise(engine.tick());
+  assert.equal(Effect.runSync(engine.io()).bytesRead - again.bytesRead, 0, 'folded, it is skipped again');
 });
 
 test("a task filed again under a settled task's id is folded again on the next pass", async () => {
   const { root, cwd, engine, ids } = await settledStore();
   const journal = path.join(root, 'tasks', `${ids[3]}.jsonl`);
   const journal0 = sizeOf(journal);
-  await engine.file({ id: ids[3], brief: 'again', cwd });
-  const before = engine.io();
-  await engine.tick();
-  assert.ok(engine.io().bytesRead - before.bytesRead >= sizeOf(journal) - journal0, 'what was appended to its journal was read');
+  await Effect.runPromise(engine.file({ id: ids[3], brief: 'again', cwd }));
+  const before = Effect.runSync(engine.io());
+  await Effect.runPromise(engine.tick());
+  assert.ok(
+    Effect.runSync(engine.io()).bytesRead - before.bytesRead >= sizeOf(journal) - journal0,
+    'what was appended to its journal was read',
+  );
 });
 
 test('a fresh engine on the same store folds every task on its first pass, and reads the whole feed once to learn where it ends', async () => {
   const { root } = await settledStore();
-  const engine = promiseEngine(Engine.layer({ root, harnesses: { refusing } }));
-  const before = engine.io();
-  await engine.tick();
-  const first = engine.io().bytesRead - before.bytesRead;
+  const engine = builtEngine(Engine.layer({ root, harnesses: { refusing: asyncOps(refusing) } }));
+  const before = Effect.runSync(engine.io());
+  await Effect.runPromise(engine.tick());
+  const first = Effect.runSync(engine.io()).bytesRead - before.bytesRead;
   const journals = journalsOf(root);
   const feed = sizeOf(path.join(root, 'feed.jsonl'));
   assert.equal(first, feed + journals, `read ${first}: the feed's ${feed} bytes, and each journal once (${journals} bytes)`);
-  const second = engine.io();
-  await engine.tick();
+  const second = Effect.runSync(engine.io());
+  await Effect.runPromise(engine.tick());
   assert.equal(
-    engine.io().bytesRead - second.bytesRead,
+    Effect.runSync(engine.io()).bytesRead - second.bytesRead,
     0,
     'its second pass reads nothing: every task settled before this engine was made, so its first pass wrote nothing for the feed to name',
   );

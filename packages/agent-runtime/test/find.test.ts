@@ -21,7 +21,7 @@ import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
-import type { Sighting, TranscriptEvent } from '../src/facade.ts';
+import type { Sighting, TranscriptEvent } from '../src/index.ts';
 import { scratch } from './scratch.ts';
 
 const tmp = (label: string) => scratch(`ae-find-${label}-`);
@@ -29,7 +29,9 @@ const tmp = (label: string) => scratch(`ae-find-${label}-`);
 const config = tmp('config');
 process.env.CLAUDE_CONFIG_DIR = config;
 const sessions = path.join(config, 'sessions');
-const { Engine, promiseEngine } = await import('../src/index.ts');
+const { Engine } = await import('../src/index.ts');
+const { asyncOps } = await import('./promise-runner.ts');
+const { builtEngine } = await import('./engine.ts');
 const { claudeOps } = await import('../src/harness/claude/bg.ts');
 const { claudeRegistered, processStart } = await import('../src/harness/claude/inbox.ts');
 
@@ -120,28 +122,32 @@ const find = (name: string) => Effect.runPromise(claudeOps({ root: tmp('root') }
 test("a session registered under its attempt's name is found by it: its conversation is read with no `claude agents`, and a settled task is viewed off its record", async () => {
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
-    const engine = promiseEngine(Engine.layer({ root: tmp('root') }));
-    const id = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd') });
-    await engine.tick();
+    const engine = builtEngine(Engine.layer({ root: tmp('root') }));
+    const id = await Effect.runPromise(engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd') }));
+    await Effect.runPromise(engine.tick());
     const [row] = claude.rows();
     register(row);
     wrote(row.sessionId, 'working on it');
 
     const before = claude.agents();
     assert.deepEqual(await find(row.name), { sessionId: row.sessionId }, 'found by name, at shipped defaults');
-    assert.deepEqual(texts((await engine.transcript(id)).events), ['working on it'], "the running attempt's conversation");
+    assert.deepEqual(
+      texts((await Effect.runPromise(engine.transcript(id))).events),
+      ['working on it'],
+      "the running attempt's conversation",
+    );
     assert.equal(claude.agents(), before, 'read with no `claude agents` call');
 
-    assert.equal((await engine.view(id)).phase, 'running (working)', "its state is the registry's");
+    assert.equal((await Effect.runPromise(engine.view(id))).phase, 'running (working)', "its state is the registry's");
     assert.equal(claude.agents(), before + 1, 'a view of an attempt in flight observes');
 
     claude.setRows(claude.rows().map((r) => ({ ...r, state: 'done', status: 'idle' })));
-    await engine.tick();
+    await Effect.runPromise(engine.tick());
     const settled = claude.agents();
-    const v = await engine.view(id);
+    const v = await Effect.runPromise(engine.view(id));
     assert.equal(v.phase, 'succeeded', 'ended and settled: its phase is on the record');
     assert.equal(v.sessionId, row.sessionId, 'the id its end was recorded with');
-    assert.deepEqual(texts((await engine.transcript(id)).events), ['working on it']);
+    assert.deepEqual(texts((await Effect.runPromise(engine.transcript(id))).events), ['working on it']);
     assert.equal(claude.agents(), settled, 'a settled task is viewed, and read, with no `claude agents` call');
   });
 });
@@ -149,9 +155,9 @@ test("a session registered under its attempt's name is found by it: its conversa
 test('a registration whose process has gone is not found, nor one whose pid another process has taken since — the session is observed instead', async () => {
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
-    const engine = promiseEngine(Engine.layer({ root: tmp('root') }));
-    const id = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd') });
-    await engine.tick();
+    const engine = builtEngine(Engine.layer({ root: tmp('root') }));
+    const id = await Effect.runPromise(engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd') }));
+    await Effect.runPromise(engine.tick());
     const [row] = claude.rows();
     wrote(row.sessionId, 'hello');
 
@@ -159,7 +165,7 @@ test('a registration whose process has gone is not found, nor one whose pid anot
     register(row, exited);
     assert.equal(await find(row.name), undefined, 'its process has exited: not found');
     const before = claude.agents();
-    assert.deepEqual(texts((await engine.transcript(id)).events), ['hello'], 'the running session is still read');
+    assert.deepEqual(texts((await Effect.runPromise(engine.transcript(id))).events), ['hello'], 'the running session is still read');
     assert.equal(claude.agents(), before + 1, 'found through `claude agents` instead');
     fs.rmSync(path.join(sessions, `${exited}.json`));
 
@@ -222,9 +228,9 @@ test('a name no running session registered is not found — nor an interactive s
 test("a registration and the registry that disagree: the registry's word is taken — by a view, by say, and by the pass", async () => {
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
-    const engine = promiseEngine(Engine.layer({ root: tmp('root') }));
-    const id = await engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd') });
-    await engine.tick();
+    const engine = builtEngine(Engine.layer({ root: tmp('root') }));
+    const id = await Effect.runPromise(engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd') }));
+    await Effect.runPromise(engine.tick());
     const [row] = claude.rows();
 
     const other = randomUUID();
@@ -232,23 +238,23 @@ test("a registration and the registry that disagree: the registry's word is take
     claude.setRows([{ ...row, state: 'stopped', status: 'idle' }]);
     assert.deepEqual(await find(row.name), { sessionId: other }, 'the registration says one runs under the name');
 
-    const v = await engine.view(id);
+    const v = await Effect.runPromise(engine.view(id));
     assert.equal(v.phase, 'running (stopped)', "its state is the registry's");
     assert.equal(v.sessionId, row.sessionId, 'and so is which session it is');
     await assert.rejects(
-      engine.say(id, 'hello'),
-      (e: Error & { exitCode?: number }) => e.exitCode === 2 && /session is `stopped` on its harness, not running/.test(e.message),
+      Effect.runPromise(engine.say(id, 'hello')),
+      (e: Error & { _tag?: string }) => e._tag === 'SayRefused' && /session is `stopped` on its harness, not running/.test(e.message),
     );
 
-    await engine.tick();
-    const after = await engine.view(id);
+    await Effect.runPromise(engine.tick());
+    const after = await Effect.runPromise(engine.view(id));
     assert.equal(after.state.attempts[0]?.ended, 'stopped', 'the pass ended the attempt as the registry has it');
     assert.equal(after.state.attempts[0]?.nativeId, row.sessionId);
     assert.equal(after.state.settled, 'stopped');
   });
 });
 
-test("a PromiseRunner without find is observed while its task runs; one with find is asked by name, and only for an attempt's session; neither once settled", async () => {
+test("an AsyncRunner without find is observed while its task runs; one with find is asked by name, and only for an attempt's session; neither once settled", async () => {
   const harness = (withFind: boolean) => {
     const sessions = new Map<string, Sighting>();
     const counts = { observe: 0, find: [] as string[] };
@@ -286,25 +292,25 @@ test("a PromiseRunner without find is observed while its task runs; one with fin
 
   for (const withFind of [false, true]) {
     const h = harness(withFind);
-    const engine = promiseEngine(Engine.layer({ root: tmp('root'), harnesses: { mine: h.runner } }));
-    const id = await engine.file({ brief: 'the prompt', cwd: tmp('cwd') });
-    await engine.tick();
+    const engine = builtEngine(Engine.layer({ root: tmp('root'), harnesses: { mine: asyncOps(h.runner) } }));
+    const id = await Effect.runPromise(engine.file({ brief: 'the prompt', cwd: tmp('cwd') }));
+    await Effect.runPromise(engine.tick());
     const at = `with find: ${withFind}`;
 
     let before = h.counts.observe;
-    assert.deepEqual(texts((await engine.transcript(id)).events), ['s-1'], at);
+    assert.deepEqual(texts((await Effect.runPromise(engine.transcript(id))).events), ['s-1'], at);
     assert.equal(h.counts.observe, before + (withFind ? 0 : 1), `${at}: a running attempt's session`);
     assert.deepEqual(h.counts.find, withFind ? [`ae/${id}/1`] : [], `${at}: asked by its name`);
-    assert.equal((await engine.view(id)).phase, 'running (working)', at);
+    assert.equal((await Effect.runPromise(engine.view(id))).phase, 'running (working)', at);
     assert.equal(h.counts.observe, before + (withFind ? 1 : 2), `${at}: a view of it observes either way`);
 
     h.sessions.set(`ae/${id}/1`, { ...h.sessions.get(`ae/${id}/1`)!, state: 'completed' });
-    await engine.tick();
+    await Effect.runPromise(engine.tick());
     before = h.counts.observe;
-    const v = await engine.view(id);
+    const v = await Effect.runPromise(engine.view(id));
     assert.equal(v.phase, 'succeeded', at);
     assert.equal(v.sessionId, 's-1', at);
-    assert.equal(await engine.logs(id), 'logs of s-1', at);
+    assert.equal(await Effect.runPromise(engine.logs(id)), 'logs of s-1', at);
     assert.equal(h.counts.observe, before, `${at}: a settled task, viewed and its logs read, off its record`);
     assert.equal(h.counts.find.length, withFind ? 1 : 0, `${at}: its id is on the record, and nobody is asked for it`);
   }
@@ -333,17 +339,17 @@ test("a view asks its task's own harness and no other, on harnesses that cannot 
   const a = harness('a');
   const b = harness('b');
   const root = tmp('root');
-  const engine = promiseEngine(Engine.layer({ root, harnesses: { a: a.runner, b: b.runner } }));
-  const running = await engine.file({ brief: 'runs on b', cwd: tmp('cwd'), harness: 'b', id: 'running' });
-  const settled = await engine.file({ brief: 'ends on b', cwd: tmp('cwd'), harness: 'b', id: 'settled' });
-  await engine.tick();
+  const engine = builtEngine(Engine.layer({ root, harnesses: { a: asyncOps(a.runner), b: asyncOps(b.runner) } }));
+  const running = await Effect.runPromise(engine.file({ brief: 'runs on b', cwd: tmp('cwd'), harness: 'b', id: 'running' }));
+  const settled = await Effect.runPromise(engine.file({ brief: 'ends on b', cwd: tmp('cwd'), harness: 'b', id: 'settled' }));
+  await Effect.runPromise(engine.tick());
   b.sessions.set(`ae/${settled}/1`, { ...b.sessions.get(`ae/${settled}/1`)!, state: 'completed' });
-  await engine.tick();
+  await Effect.runPromise(engine.tick());
 
   const before = { a: a.counts.observe, b: b.counts.observe };
-  assert.equal((await engine.view(running)).phase, 'running (working)', 'an attempt in flight, observed');
-  assert.equal((await engine.view(settled)).phase, 'succeeded', 'a settled task on a harness that cannot find');
-  assert.equal(await engine.logs(running), 'b logs of b-1');
+  assert.equal((await Effect.runPromise(engine.view(running))).phase, 'running (working)', 'an attempt in flight, observed');
+  assert.equal((await Effect.runPromise(engine.view(settled))).phase, 'succeeded', 'a settled task on a harness that cannot find');
+  assert.equal(await Effect.runPromise(engine.logs(running)), 'b logs of b-1');
   assert.equal(a.counts.observe, before.a, "no view of a task on b asks a's registry");
   assert.equal(
     b.counts.observe,
@@ -353,12 +359,12 @@ test("a view asks its task's own harness and no other, on harnesses that cannot 
 
   const c = harness('c');
   for (const [name, s] of b.sessions) c.sessions.set(name, s);
-  const reopened = promiseEngine(Engine.layer({ root, harnesses: { a: a.runner, c: c.runner }, defaultHarness: 'c' }));
+  const reopened = builtEngine(Engine.layer({ root, harnesses: { a: asyncOps(a.runner), c: asyncOps(c.runner) }, defaultHarness: 'c' }));
   const at = { a: a.counts.observe, c: c.counts.observe };
-  const recorded = await reopened.view(running);
+  const recorded = await Effect.runPromise(reopened.view(running));
   assert.equal(recorded.phase, 'starting', 'what the record says of an attempt it has seen spawned and nothing since');
   assert.equal(recorded.state.attempts[0]?.ended, null, 'held open, not ended');
-  assert.equal(await reopened.logs(running), '(no session yet)', 'no harness it has can name the session');
-  assert.equal((await reopened.view(settled)).phase, 'succeeded', 'a settled task reads as ever');
+  assert.equal(await Effect.runPromise(reopened.logs(running)), '(no session yet)', 'no harness it has can name the session');
+  assert.equal((await Effect.runPromise(reopened.view(settled))).phase, 'succeeded', 'a settled task reads as ever');
   assert.deepEqual({ a: a.counts.observe, c: c.counts.observe }, at, 'neither the first harness named nor the fallback was asked');
 });

@@ -1,11 +1,7 @@
 /**
- * The engine's **Effect** surface — `import { ... } from 'agent-runtime/effect'`.
- *
- * Most consumers want `agent-runtime` instead, which is the same engine with Promises at the
- * boundary and no Effect in any signature. Use this one when you are already writing Effect and
- * want Layer composition and typed error channels — and then keep your `effect` version aligned
- * with this package's, because Context tags are identity-based and two copies do not see each
- * other's services.
+ * The engine — `import { ... } from 'agent-runtime'`: the package's one face, Effect. Its verbs are Effects with typed errors, run
+ * by a program that provides `Engine.layer(options)`; a caller that writes no Effect reaches the system through the api. Keep your
+ * `effect` version aligned with this package's: Context tags are identity-based, and two copies do not see each other's services.
  *
  * Everything an upper layer may use, and nothing else.
  *
@@ -28,14 +24,13 @@
  *
  * The list, in groups:
  *
- * - the engine as a service (`Engine`, `service/engine.ts`): a layer made from the engine's options, whose verbs are Effects with
- *   typed errors, and `promiseEngine`, which runs each verb of a layer's `Engine` as a Promise: `promiseEngine(Engine.layer(options))`
- *   is the engine a consumer uses without writing Effect;
+ * - the engine as a service (`Engine`, `service/engine.ts`): a layer made from the engine's options (`service/options.ts`), whose
+ *   verbs are Effects with typed errors, and `refusalWords`, which words a refusal as `ae` says it;
  * - filing work, asking about it and stopping it, verb by verb (`filing.ts`, `engine.ts`);
  * - the feed: how an upper layer reacts without polling a task (`journal.ts`);
  * - the harnesses: bring your own (`Runner`, and each runner the package ships);
  * - the vocabulary (`domain.ts`), with the words each harness takes, as lists: what an upper layer
- *   that checks a task before filing it holds its own copy to.
+ *   that checks a task before filing it holds its own copy to, and the lifecycle as plain data for a board to draw.
  */
 
 export {
@@ -50,16 +45,22 @@ export {
   refusalWords,
 } from './service/index.ts';
 export type { EngineShape } from './service/index.ts';
-export { promiseEngine } from './facade/engine.ts';
-export type { EngineOptions, TaskSpec, TickReport, EngineIo, ObserveCount } from './facade/consumer.ts';
+export type { EngineOptions, HarnessConfig, Pooled, TaskSpec, TickReport, EngineIo, ObserveCount } from './service/options.ts';
+/**
+ * Why a task's configuration on one of the harnesses an engine runs by default is one `file()` refuses, in the runtime's words, or
+ * `undefined`: for a caller that checks a task before it files it, and words the refusal in its own keys.
+ */
+export { configRefusal } from './service/harnesses.ts';
 
 export { file, FileRefused, requestStop, StopRefused, answer, close, InputRefused, admit, AdmitRefused } from './core/engine/index.ts';
 export { view, viewOfState, tick, TickRefused, step, settleTask, StepRefused, GRACE_MS } from './core/engine/index.ts';
 export type { Filing } from './core/engine/index.ts';
-export type { RefusedMove, TaskView } from './core/engine/index.ts';
+export type { RefusedMove, TaskList, TaskView, UnreadableTask } from './core/engine/index.ts';
+export { refusedText, retiredKeyRefusal } from './core/engine/index.ts';
 
 export { Journal, JournalError } from './core/engine/index.ts';
-export type { FeedEntry, FeedRefusal, Cursor, JournalOps } from './core/engine/index.ts';
+export type { FeedEntry, FeedRefusal, Cursor, JournalOps, StoreOps } from './core/engine/index.ts';
+export type { IoCounts } from './core/engine/index.ts';
 
 export { Runner, RunnerError, testOps } from './harness/index.ts';
 export { claudeOps } from './harness/claude/index.ts';
@@ -81,7 +82,12 @@ export type { ClaudeFlags } from './harness/claude/index.ts';
 export { detachedOps, STALE_MS } from './harness/detached/detached.ts';
 export type { HarnessSpec } from './harness/detached/detached.ts';
 export { remoteOps } from './a2a/index.ts';
-export type { Credentials, RemoteAgent } from './a2a/index.ts';
+export type { Credentials, MissingCredential, RemoteAgent } from './a2a/index.ts';
+/**
+ * Why a remote agent's entry is not one the runtime can reach, or `undefined`: what `Engine.layer` refuses, for a caller that reads entries
+ * from a file of its own and words the refusal there.
+ */
+export { remoteConfigRefusal } from './a2a/index.ts';
 export { codex } from './harness/codex/codex.ts';
 export { claudeDetached } from './harness/claude/index.ts';
 export { commandHarness } from './harness/command/command.ts';
@@ -91,7 +97,12 @@ export { a2aRunner } from './a2a/index.ts';
 
 export type { Event, State, Attempt, Sighting, EndReason, Usage, Said, Denial, Input } from './core/index.ts';
 export type { SessionState, Ended, Outcome } from './core/index.ts';
-export type { LifecycleStep, LifecycleState } from './core/index.ts';
+/**
+ * The task's lifecycle as plain data — states, edges, first and final states, and the verbs written from outside it — for a board to
+ * draw; never the machine or its move.
+ */
+export { lifecycleGraph } from './core/index.ts';
+export type { LifecycleEdge, LifecycleGraph, LifecycleState, LifecycleStep, LifecycleVerb } from './core/index.ts';
 export { denialText, fold, nameFor } from './core/index.ts';
 export { CLAUDE_AUTO_DROPPED, CLAUDE_CONTEXT_TOKENS, CLAUDE_EFFORTS, CLAUDE_PERMISSION_MODES } from './harness/claude/index.ts';
 export { fenceReach, type FenceReach } from './harness/reach.ts';

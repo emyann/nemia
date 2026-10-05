@@ -7,11 +7,12 @@
 import { afterEach, test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
-import type { Engine, EngineOptions, TaskSpec, TaskView } from '../src/facade.ts';
-import { Engine as EngineService, promiseEngine } from '../src/index.ts';
+import type { EngineShape, EngineOptions, TaskSpec, TaskView } from '../src/index.ts';
+import { Engine as EngineService } from '../src/index.ts';
 import { remoteOps } from '../src/a2a/remote.ts';
 import { apiKey, bearer, remoteServer, type RemoteServer, type ServerOptions } from './remote-server.ts';
 import { scratch } from './scratch.ts';
+import { builtEngine } from './engine.ts';
 
 const servers: RemoteServer[] = [];
 afterEach(async () => {
@@ -32,12 +33,12 @@ const task: TaskSpec = { brief: 'paint the fence', cwd: '/nowhere/in/particular'
 
 /** The first attempt of a task filed on an engine whose harness is `s`, once the task has settled. */
 const attemptOn = async (s: RemoteServer, o: Partial<EngineOptions> = {}) => {
-  const e: Engine = promiseEngine(EngineService.layer({ root: scratch('ae-quote-'), harnesses: { remote: { url: s.url } }, ...o }));
-  const id = await e.file(task);
+  const e: EngineShape = builtEngine(EngineService.layer({ root: scratch('ae-quote-'), harnesses: { remote: { url: s.url } }, ...o }));
+  const id = await Effect.runPromise(e.file(task));
   let v: TaskView | undefined;
   for (let i = 0; i < 60 && v?.state.settled == null; i++) {
-    await e.tick();
-    v = await e.view(id);
+    await Effect.runPromise(e.tick());
+    v = await Effect.runPromise(e.view(id));
     if (v.state.settled == null) await new Promise((r) => setTimeout(r, 15));
   }
   assert.ok(v?.state.settled, `${id} never settled`);

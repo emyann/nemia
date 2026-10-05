@@ -2,9 +2,9 @@
 
 Agent sessions on one harness each, durably: a job that runs to its end, and a long-lived session that runs until stopped (not built
 yet). It owns how a session runs: the task's command, mounts, restart and spend, the journal, the attempts, the harnesses' vocabulary.
-`decide` (`src/core/domain.ts`) is the whole judgement, pure (`test/engine.test.ts`); `src/facade.ts`, `src/index.ts` and
-`src/vocabulary.ts` are the only doors (`test/contract.test.ts`); the last, the harnesses' words, `HARNESS_CHOICES` and `fenceReach`,
-loads no Effect and no I/O (`test/vocabulary-door.test.ts`). The orchestrator reaches it through its one client; what is still above it
+`decide` (`src/core/domain.ts`) is the whole judgement, pure (`test/engine.test.ts`); `src/index.ts` and `src/vocabulary.ts` are the
+only doors (`test/contract.test.ts`); the second, the harnesses' words, `HARNESS_CHOICES` and `fenceReach`, loads no Effect and no I/O
+(`test/vocabulary-door.test.ts`). The orchestrator reaches it through its one client; what is still above it
 and a candidate to come down is in `docs/architecture.md`, *Who owns what*.
 
 ## Layout
@@ -56,11 +56,13 @@ and a candidate to come down is in `docs/architecture.md`, *Who owns what*.
 
 - **A parameter taken away is refused, never ignored** (`Object.hasOwn`, the argument count: `tickRefusalOf`, `StepRefused`).
 - **A flag only Claude Code has goes under `config.claude`**, never a named argument; a key moved there is read at its old place off a
-  journal (`upgrade`) and refused there at both doors (`FORMER_ARGS`). Pin the argv before a move and compare after.
-- **An optional verb renamed on its way through a seam is dropped by every door that takes the old type**: keep the old verb beside the
-  new one, and test each door by calling the verb through it.
-- **A verb is written once, on the `Engine` service** (`src/service/engine.ts`), and reaches the Promise door through `promiseEngine`;
-  `test/doors.test.ts` refuses a verb one door lacks, and proves each verb and its refusals through both.
+  journal (`upgrade`) and refused there (`FORMER_ARGS`). Pin the argv before a move and compare after.
+- **An optional verb renamed on its way through a seam is dropped by every adapter that takes the old type**: keep the old verb beside
+  the new one, and test the verb through the `Engine` service.
+- **A verb is written once, on the `Engine` service** (`src/service/engine.ts`); `test/verb-refusals.test.ts` pins the verbs (`VERBS`)
+  and proves each verb's refusal a tagged error, worded by `refusalWords`.
+- **A test that sets `CLAUDE_CONFIG_DIR` (or another env read at load) before a dynamic import of `src`** imports
+  `test/promise-runner.ts` and `test/engine.ts` dynamically too: their static import loads `src` first.
 - **Node's type stripping refuses a parameter property** (`constructor(private readonly ops)`): declare the field and assign it.
 - **A journal is decoded before `upgrade`, as any store gives it back** (`Journal.layer`, `event-schema.ts`): an entry no runtime
   wrote fails that task's read with a `JournalError` naming the file, the entry and its first wrong field (`entryWords`); the pass

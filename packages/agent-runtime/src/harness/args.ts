@@ -4,7 +4,7 @@
  * The runtime keeps a durable journal, a deadline and the lifecycle; how a session is started — which model, what it may
  * touch, how hard it thinks — is the adapter's. So a task carries these under `config`, `domain.ts` and `engine.ts` pass
  * the object through without opening it (`test/core-reads.test.ts`), and the checks every adapter shares live here: asked
- * by every `Runner` made with `Runner.layer`, and by `file` itself at both doors, so a runner built with `Runner.of` alone
+ * by every `Runner` made with `Runner.layer`, and by `file` itself, so a runner built with `Runner.of` alone
  * is refused them too. What one harness takes and refuses — its modes, its efforts, its windows — stays with that
  * harness's runner.
  */
@@ -55,7 +55,7 @@ export type HarnessArgs = {
    * `claude -p` alike. Every attempt gets the same window, a continuation included. Absent: the harness's own, which is the
    * model's whole window. Refused unless a whole number of tokens in the range the harness takes (`CLAUDE_CONTEXT_TOKENS`:
    * 100000 to 1000000 on Claude Code), and on a harness with no such knob: `codex`, and a `HarnessSpec` that declares no
-   * `contextTokens` range. A harness brought as a `PromiseRunner` is handed it and asked nothing.
+   * `contextTokens` range. A harness brought as a `RunnerOps` is handed it, and asked only its own `refuses`.
    */
   contextTokens?: number;
   /**
@@ -211,9 +211,9 @@ const RULE = /^[A-Za-z][^\s,()]*(?:\([^()]+\))?$/;
  * Why a task's harness arguments cannot be filed, as a sentence that says what to write instead — or `undefined`.
  *
  * The checks every adapter shares: a value no harness could use, refused before it is journalled, since a journalled task
- * is a promise the loop keeps trying to honour. Asked by every `Runner` (`Runner.layer`), so the Effect door and
+ * is a promise the loop keeps trying to honour. Asked by every `Runner` (`Runner.layer`), so a bare `Runner` and
  * the `file` of an engine `Engine.layer` builds give one sentence for each. A harness's own words — the modes and efforts it takes — are
- * its runner's (`harnessRefusalOf` in `facade/consumer.ts`).
+ * its runner's (`harnessRefusalOf` in `service/harness-refusal.ts`).
  *
  * In order:
  *

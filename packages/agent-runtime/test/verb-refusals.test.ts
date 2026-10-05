@@ -1,0 +1,359 @@
+/**
+ * The engine's verbs, written once on the `Engine` service, and their refusals. Two engines over one store — one built once, one
+ * provided its layer for each call — give each verb the same answer, since what a task is lives in the store; each refusal is a tagged
+ * error, and `refusalWords(verb)` words it as `ae` and a layer above say it: behind the verb, exit code 2.
+ */
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { Effect } from 'effect';
+import {
+  Engine,
+  refusalWords,
+  type EngineOptions,
+  type EngineShape,
+  type Event,
+  type FeedEntry,
+  type Sighting,
+  type TickReport,
+} from '../src/index.ts';
+import { scratch } from './scratch.ts';
+import { asyncOps, asyncStore, type AsyncJournal, type AsyncRunner } from './promise-runner.ts';
+import { builtEngine } from './engine.ts';
+
+/** A store in memory, which both engines are handed. */
+const memoryJournal = (): AsyncJournal => {
+  const tasks = new Map<string, Event[]>();
+  const feed: FeedEntry[] = [];
+  return {
+    async append(taskId, event) {
+      tasks.set(taskId, [...(tasks.get(taskId) ?? []), event]);
+      feed.push({ taskId, event });
+    },
+    async read(taskId) {
+      return [...(tasks.get(taskId) ?? [])];
+    },
+    async list() {
+      return [...tasks.keys()].sort();
+    },
+    async feed(after = 0) {
+      return { entries: feed.slice(after), cursor: feed.length };
+    },
+  };
+};
+
+/**
+ * A harness whose sessions are a map, that hears words, keeps a transcript of them and each stream apart; `observe` rejects while
+ * `unreadable` is set.
+ */
+const fakeHarness = (sessions: Map<string, Sighting>, heard: string[], unreadable = { now: false }): AsyncRunner => ({
+  async spawn(r) {
+    sessions.set(r.name, { sessionId: `s-${r.name}`, state: 'working' });
+  },
+  async observe() {
+    if (unreadable.now) throw new Error('the registry is not there');
+    return new Map(sessions);
+  },
+  async stop(id) {
+    for (const [n, s] of sessions) if (s.sessionId === id) sessions.set(n, { ...s, state: 'canceled' });
+  },
+  async logs(id) {
+    return `logs of ${id}`;
+  },
+  async output(name, stream, lastBytes) {
+    return `${stream} of ${name}${lastBytes === undefined ? '' : `, its last ${lastBytes} bytes`}`;
+  },
+  async transcript() {
+    return {
+      events: heard.map((text, i) => ({
+        id: String(i),
+        at: '2026-09-28T00:00:00.000Z',
+        role: 'user' as const,
+        kind: 'text' as const,
+        text,
+      })),
+      cursor: String(heard.length),
+    };
+  },
+  async say(_session, text) {
+    heard.push(text);
+  },
+});
+
+/** One store and one harness, and two engines over them: one built once, and one provided its layer for each call. */
+const engines = () => {
+  const sessions = new Map<string, Sighting>();
+  const heard: string[] = [];
+  const unreadable = { now: false };
+  const options: EngineOptions = {
+    root: scratch('ae-verbs-'),
+    journal: asyncStore(memoryJournal()),
+    harnesses: { fake: asyncOps(fakeHarness(sessions, heard, unreadable)), claude: 'claude' },
+    defaultHarness: 'fake',
+  };
+  const layer = Engine.layer(options);
+  const effect = <A, E>(f: (e: EngineShape) => Effect.Effect<A, E>): Promise<A> =>
+    Effect.runPromise(Engine.use(f).pipe(Effect.provide(layer)));
+  return { effect, built: builtEngine(Engine.layer(options)), sessions, heard, unreadable, options };
+};
+
+/** What a call rejected with; a call that resolved fails the test. */
+const failure = (p: Promise<unknown>): Promise<Error & { _tag?: string; exitCode?: number; cause?: unknown }> =>
+  p.then(
+    (v) => assert.fail(`resolved with ${JSON.stringify(v)}`),
+    (e) => e,
+  );
+
+/** The verbs the `Engine` service has: a verb added or dropped is a change to the runtime's face, and to this list. */
+const VERBS = [
+  'admit',
+  'answer',
+  'close',
+  'feed',
+  'file',
+  'io',
+  'list',
+  'logs',
+  'output',
+  'path',
+  'quota',
+  'say',
+  'start',
+  'stop',
+  'tick',
+  'transcript',
+  'view',
+  'watch',
+];
+
+test('the Engine service has the verbs pinned, each a function', async () => {
+  const { effect } = engines();
+  const service = await effect((e) => Effect.succeed(e));
+  assert.deepEqual(Object.keys(service).sort(), VERBS);
+  for (const verb of VERBS) assert.equal(typeof service[verb as keyof EngineShape], 'function', verb);
+});
+
+test('each verb gives the same answer through either engine, over one store', async () => {
+  const { effect, built, sessions, heard } = engines();
+  assert.equal(await effect((e) => e.file({ brief: 'one', cwd: '/r', id: 'one', queued: true })), 'one');
+  assert.equal(await Effect.runPromise(built.file({ brief: 'two', cwd: '/r', id: 'two', queued: true })), 'two');
+  assert.deepEqual(await effect((e) => e.view('one')), await Effect.runPromise(built.view('one')));
+  assert.deepEqual(await effect((e) => e.list(['one', 'two'])), await Effect.runPromise(built.list(['one', 'two'])));
+  assert.deepEqual(await effect((e) => e.list()), await Effect.runPromise(built.list()));
+  assert.deepEqual(await effect((e) => e.feed(0)), await Effect.runPromise(built.feed(0)));
+  assert.deepEqual(
+    [await effect((e) => e.output('one', 'stdout')), await Effect.runPromise(built.output('two', 'stdout'))],
+    [undefined, undefined],
+  );
+
+  assert.deepEqual(await effect((e) => e.admit(['one'])), ['one']);
+  assert.deepEqual(await Effect.runPromise(built.admit(['two'])), ['two']);
+  const report = await effect((e) => e.tick());
+  assert.deepEqual([report.tasks, sessions.size, report.observed.fake?.calls], [2, 2, 1]);
+  const again = await Effect.runPromise(built.tick());
+  assert.deepEqual(Object.keys(again).sort(), Object.keys(report).sort());
+  for (const id of ['one', 'two']) {
+    const view = await Effect.runPromise(built.view(id));
+    assert.equal(view.phase, 'running (working)', id);
+    assert.deepEqual(await effect((e) => e.view(id)), view, id);
+    assert.equal(await effect((e) => e.logs(id)), await Effect.runPromise(built.logs(id)));
+    const observed = Effect.runSync(built.io()).observed;
+    assert.deepEqual(
+      [await effect((e) => e.output(id, 'stderr', 5)), await Effect.runPromise(built.output(id, 'stdout'))],
+      [`stderr of ae/${id}/1, its last 5 bytes`, `stdout of ae/${id}/1`],
+      'asked of the latest attempt, by the name the engine chose',
+    );
+    assert.deepEqual(Effect.runSync(built.io()).observed, observed, 'output observes nothing');
+    const path = await Effect.runPromise(built.path(id));
+    assert.deepEqual(
+      path.map((s) => `${s.state} <- ${s.event}`),
+      ['submitted <- filed', 'submitted <- admitted', 'starting <- starting', 'working <- spawned'],
+      id,
+    );
+    assert.deepEqual(await effect((e) => e.path(id)), path, id);
+  }
+  assert.deepEqual([await effect((e) => e.path('ghost')), await Effect.runPromise(built.path('ghost'))], [[], []]);
+
+  const toOne = await effect((e) => e.say('one', 'from the service'));
+  const toTwo = await Effect.runPromise(built.say('two', 'from the built engine'));
+  assert.deepEqual(
+    [toOne.text, toTwo.text, heard],
+    ['from the service', 'from the built engine', ['from the service', 'from the built engine']],
+  );
+  assert.deepEqual(await effect((e) => e.transcript('one')), await Effect.runPromise(built.transcript('one')));
+  assert.deepEqual((await Effect.runPromise(built.view('one'))).state.said, [toOne]);
+
+  await effect((e) => e.stop('one'));
+  await Effect.runPromise(built.stop('two'));
+  for (const id of ['one', 'two']) assert.equal((await effect((e) => e.view(id))).state.stopRequested, true, id);
+
+  const io = await effect((e) => e.io());
+  assert.deepEqual(Object.keys(io).sort(), Object.keys(Effect.runSync(built.io())).sort());
+});
+
+test('a long-lived task through either engine: filed with its restart policy, idle and left open across passes, and ended by a stop alone', async () => {
+  const { effect, built, sessions, heard } = engines();
+  await effect((e) => e.file({ brief: 'one', cwd: '/r', id: 'one', restartPolicy: 'Always' }));
+  await Effect.runPromise(built.file({ brief: 'two', cwd: '/r', id: 'two', restartPolicy: 'Always' }));
+  await Effect.runPromise(built.tick());
+  assert.equal(sessions.size, 2);
+  for (const [name, s] of sessions) sessions.set(name, { ...s, state: 'input-required', busy: false, held: true });
+  for (let pass = 0; pass < 3; pass++) {
+    await effect((e) => e.tick());
+    await Effect.runPromise(built.tick());
+  }
+  for (const id of ['one', 'two']) {
+    const view = await Effect.runPromise(built.view(id));
+    assert.deepEqual([view.phase, view.state.restartPolicy, view.state.settled], ['idle', 'Always', null], id);
+    assert.deepEqual(await effect((e) => e.view(id)), view, id);
+  }
+  assert.deepEqual(
+    [...sessions.values()].map((s) => s.state),
+    ['input-required', 'input-required'],
+    'no pass stopped an idle session',
+  );
+  assert.equal((await effect((e) => e.say('one', 'look again'))).text, 'look again', 'an idle session hears its next words');
+  assert.equal((await Effect.runPromise(built.say('two', 'and again'))).text, 'and again');
+  for (const [name, s] of sessions) sessions.set(name, { ...s, state: 'completed', busy: false, held: true });
+  await Effect.runPromise(built.tick());
+  assert.equal((await effect((e) => e.say('one', 'once more'))).text, 'once more', 'a session listed done, its process held, hears too');
+  assert.equal((await Effect.runPromise(built.say('two', 'and once more'))).text, 'and once more');
+  assert.deepEqual(heard.slice(-2), ['once more', 'and once more']);
+  sessions.set('ae/one/1', { ...sessions.get('ae/one/1')!, held: false });
+  assert.match(
+    (await failure(effect((e) => e.say('one', 'gone')))).message,
+    /^`one`'s session is `done` on its harness, not running: the next pass writes its end\./,
+    'a session listed done with no process is gone, and refused as for a job',
+  );
+  sessions.set('ae/one/1', { ...sessions.get('ae/one/1')!, held: true });
+
+  await effect((e) => e.stop('one'));
+  await Effect.runPromise(built.stop('two'));
+  for (let pass = 0; pass < 3; pass++) await Effect.runPromise(built.tick());
+  for (const id of ['one', 'two']) assert.equal((await effect((e) => e.view(id))).state.settled, 'stopped', id);
+});
+
+test('watch and start run through either engine, and each stops', async () => {
+  const { effect, built } = engines();
+  await Effect.runPromise(built.file({ brief: 'one', cwd: '/r', id: 'one' }));
+  type Handle = { stop: () => void };
+  const firstOf = async <A>(begin: (got: (a: A) => void, failed: (e: unknown) => void) => Promise<Handle>): Promise<A> => {
+    const got: A[] = [];
+    let heard!: () => void;
+    let failed!: (e: unknown) => void;
+    const once = new Promise<void>((resolve, reject) => ((heard = resolve), (failed = reject)));
+    const handle = await begin((a) => (got.push(a), heard()), failed);
+    await once;
+    handle.stop();
+    return got[0];
+  };
+
+  const heardByService = await firstOf<FeedEntry>((onEntry, onError) => effect((e) => e.watch({ onEntry, onError })));
+  const heardByPromise = await firstOf<FeedEntry>(async (onEntry, onError) => Effect.runSync(built.watch({ onEntry, onError })));
+  assert.deepEqual(heardByService, heardByPromise);
+  assert.equal(heardByService.event.kind, 'filed');
+
+  const tickedByService = await firstOf<TickReport>((onTick, onError) => effect((e) => e.start({ intervalMs: 1, onTick, onError })));
+  const tickedByPromise = await firstOf<TickReport>(async (onTick, onError) =>
+    Effect.runSync(built.start({ intervalMs: 1, onTick, onError })),
+  );
+  assert.deepEqual([tickedByService.tasks, tickedByPromise.tasks], [1, 1]);
+});
+
+test('each refusal is a tagged error, and refusalWords words it behind the verb, exit code 2', async () => {
+  const { effect, built } = engines();
+  await Effect.runPromise(built.file({ brief: 'one', cwd: '/r', id: 'one' }));
+  const untyped = <F>(f: F) => f as (...args: unknown[]) => never;
+  const cases: Array<[string, string, () => Promise<unknown>, RegExp]> = [
+    [
+      'file',
+      'FileRefused',
+      () => effect((e) => e.file({ brief: 'b', cwd: '/r', harness: 'nope' })),
+      /^`harness: nope` is not a harness this engine has\. Its harnesses are: fake, claude\.$/,
+    ],
+    [
+      'file',
+      'FileRefused',
+      () => effect((e) => e.file({ brief: 'b', cwd: '/r', harness: 'claude', config: { permissionMode: 'yolo' } })),
+      /^`permissionMode: yolo` is not a mode Claude Code has\./,
+    ],
+    ['file', 'FileRefused', () => effect((e) => e.file({ brief: ' ', cwd: '/r' })), /^`brief` is empty/],
+    ['tick', 'TickRefused', () => effect((e) => untyped(e.tick)(3)), /takes nothing|handed/],
+    ['admit', 'AdmitRefused', () => effect((e) => e.admit(['ghost'])), /`ghost`/],
+    ['list', 'ListRefused', () => effect((e) => untyped(e.list)('one')), /^takes the task ids to view/],
+    ['transcript', 'TranscriptRefused', () => effect((e) => e.transcript('ghost')), /^`ghost` is not a task on this board\./],
+    ['say', 'SayRefused', () => effect((e) => e.say('ghost', 'hi')), /^`ghost` is not a task on this board\./],
+    ['say', 'SayRefused', () => effect((e) => e.say('one', ' ')), /^`text` is empty\./],
+    ['answer', 'InputRefused', () => effect((e) => e.answer('one', 'go on')), /`one`/],
+    [
+      'answer',
+      'InputRefused',
+      () => effect((e) => e.answer('one', 'go on', { budgetUsd: 1 } as never)),
+      /^`budgetUsd` is the harness's configuration/,
+    ],
+    ['close', 'InputRefused', () => effect((e) => e.close('one')), /`one`/],
+    ['stop', 'StopRefused', () => effect((e) => e.stop('ghost')), /^`ghost` is not a task on this board\./],
+    ['output', 'OutputRefused', () => effect((e) => e.output('ghost', 'stdout')), /^`ghost` is not a task on this board\./],
+    [
+      'output',
+      'OutputRefused',
+      () => effect((e) => e.output('one', 'both' as never)),
+      /^`both` is not a stream: ask for `stdout` or `stderr`\.$/,
+    ],
+    ...[0, -1, 1.5, Number.NaN, '5'].map((lastBytes): [string, string, () => Promise<unknown>, RegExp] => [
+      'output',
+      'OutputRefused',
+      () => effect((e) => e.output('one', 'stdout', lastBytes as never)),
+      new RegExp(`^\`lastBytes: ${String(lastBytes).replace('.', '\\.')}\` is not a count of bytes`),
+    ]),
+    ['quota', 'QuotaRefused', () => effect((e) => e.quota('fake')), /^the `fake` harness reports no quota\. Ask one that does: claude\.$/],
+  ];
+  for (const [verb, tag, refused, words] of cases) {
+    const tagged = await failure(refused());
+    assert.equal(tagged._tag, tag, `${verb}: ${tagged.message}`);
+    assert.match(tagged.message, words, verb);
+    const plain = refusalWords(verb)(tagged) as Error & { _tag?: string; exitCode?: number };
+    assert.deepEqual([plain.message, plain.exitCode, plain._tag], [`${verb}: ${tagged.message}`, 2, undefined], verb);
+  }
+  assert.deepEqual(
+    (await Effect.runPromise(built.feed(0))).entries.map((e) => [e.taskId, e.event.kind]),
+    [['one', 'filed']],
+    'nothing refused was journalled',
+  );
+});
+
+test("say's failure that is not a refusal is SayUnsent, with its cause, and refusalWords words it behind the verb with the cause and no exit code", async () => {
+  const { effect, built, unreadable } = engines();
+  await Effect.runPromise(built.file({ brief: 'one', cwd: '/r', id: 'one' }));
+  await Effect.runPromise(built.tick());
+  unreadable.now = true;
+  const unsent = await failure(effect((e) => e.say('one', 'hi')));
+  assert.equal(unsent._tag, 'SayUnsent');
+  assert.match(
+    unsent.message,
+    /^the `fake` registry could not be read \(.*the registry is not there.*\), so ae\/one\/1 could not be found\./,
+  );
+  const plain = refusalWords('say')(unsent) as Error & { _tag?: string; exitCode?: number };
+  assert.deepEqual([plain.message, plain.exitCode, plain._tag], [`say: ${unsent.message}`, undefined, undefined]);
+  assert.ok(unsent.cause instanceof Error && plain.cause instanceof Error, 'each carries what failed');
+  assert.equal(plain.cause.message, unsent.cause.message);
+});
+
+test('options an engine cannot be built from: EngineRefused from the layer, worded by refusalWords as ae says it', async () => {
+  const options = { journal: asyncStore(memoryJournal()), maxConcurrent: 0 } as unknown as EngineOptions;
+  const refused = await failure(Effect.runPromise(Engine.use((e) => Effect.succeed(e)).pipe(Effect.provide(Engine.layer(options)))));
+  assert.equal(refused._tag, 'EngineRefused');
+  assert.match(refused.message, /^`maxConcurrent: 0` is not a ceiling\./);
+  const plain = refusalWords('ae')(refused) as Error & { exitCode?: number };
+  assert.deepEqual([plain.message, plain.exitCode], [`ae: ${refused.message}`, 2]);
+});
+
+test('output refuses a task whose harness keeps no whole streams, naming logs', async () => {
+  const { effect, built } = engines();
+  await Effect.runPromise(built.file({ brief: 'one', cwd: '/r', id: 'one', harness: 'claude', queued: true }));
+  const tagged = await failure(effect((e) => e.output('one', 'stdout')));
+  assert.equal(tagged._tag, 'OutputRefused');
+  assert.equal(
+    tagged.message,
+    'the `claude` harness keeps no whole streams: it mixes them in one log. `logs` gives what its session printed.',
+  );
+});

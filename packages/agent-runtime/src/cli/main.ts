@@ -21,7 +21,7 @@ import {
   type TaskSpec,
   type TaskView,
   type Usage,
-} from '../facade.ts';
+} from '../index.ts';
 
 /**
  * Every key a brief may have — a closed list, on purpose.

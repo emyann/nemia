@@ -462,9 +462,8 @@ What it leaves:
   that sandbox. A Claude reviewer with `tools: Read, Grep, Glob, Bash` has the tool for it, and the operator's own
   folders run review on Claude. But Bash can also write. And the `auto` classifier that refused `node --test`
   (plan §4b) is not a tool list, so whether it lets a tool-fenced reviewer's `npm test` through is unmeasured.
-- **The engine's lists are not exported from its root.** The vocabulary test reads them from the engine modules
-  beside the root the package resolves. One export line in `agent-runtime/src/facade.ts` would let it import
-  them by name.
+- **The engine's lists are exported by name**, done since: `agent-runtime` (`src/index.ts`) and its pure door
+  `agent-runtime/vocabulary` (`src/vocabulary.ts`) both give them.
 - **The api still carries its copies.** `apps/api/src/app.ts` has `phaseOf`, `askedOf` and `verdictOf`, and
   its test leaves a lost task out of the words it holds to `list`'s. Both go when the api swaps to these
   exports, in a follow-up.

@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect, Layer } from 'effect';
-import { Engine, EngineRefused, StopRefused } from 'agent-runtime/effect';
+import { Engine, EngineRefused, StopRefused } from 'agent-runtime';
 import { board } from './engine-board.ts';
 import { scratch } from './scratch.ts';
 

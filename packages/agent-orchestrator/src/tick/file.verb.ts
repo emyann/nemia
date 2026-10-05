@@ -50,11 +50,11 @@ import {
 } from '../status/status.ts';
 import { composeBrief, remoteBrief, type EndingStopped, type ParentCloseout, type ParentStep, type RetryBriefing } from '../brief/index.ts';
 import { roundFiled } from '../round/round.ts';
-import { filedConfig, tryModel } from '../filed/filed.ts';
+import { filedConfig, readsMounts, tryModel } from '../filed/filed.ts';
 import { closeoutSchemaOf, parseCloseout, type Closeout } from '../closeout/closeout.ts';
 import { modeWord, nextTry, sessionModel, type Retry, type RetryAsk } from '../retry/index.ts';
 import { artifactsDir, inputsDir, stepsOf } from '../record/record.store.ts';
-import { runStore } from '../record/files.store.ts';
+import { inboxDir, runStore } from '../record/files.store.ts';
 import { checkCloseout, writeCheckCloseout } from '../check/check.store.ts';
 import { checkoutParts, gitSays, realRepoOf, workspaceFor } from '../workspace/worktree.store.ts';
 import { agentFilesDir, renderedIn, skillsAgain } from '../agents/agents.store.ts';
@@ -342,6 +342,7 @@ async function sendTry(f: Filing, r: Retry, step: Workflow, taskId: string, answ
         undefined,
         inputsDir(run),
         checked,
+        readsMounts(told.step, inboxDir()),
       );
   const budgetUsd = budgetUsdFor(r.budget ?? budgetOf(step, record), stepSpend(run, r.step, reads.spendOf));
   if (answers) return answerHeld(e, taskId, brief, budgetUsd);
@@ -417,6 +418,7 @@ const trySpec = (
       model: tryModel(step, record, r),
       budgetUsd: t.budgetUsd,
       runArtifacts: path.dirname(artifactsDir(f.run, step.name)),
+      inbox: inboxDir(),
       own: t.told.own,
     }),
     resumeFrom: t.resumeFrom,
@@ -489,6 +491,8 @@ function roundSpec(f: Filing, r: Round, looping: Workflow, target: Workflow, tas
       },
       undefined,
       inputsDir(run),
+      undefined,
+      readsMounts(told.step, inboxDir()),
     ),
     cwd: record.workspace ?? run.workspace,
     harness: target.harness,
@@ -497,6 +501,7 @@ function roundSpec(f: Filing, r: Round, looping: Workflow, target: Workflow, tas
       config: filedConfig(target, reads.steps, run, {
         model: sessionModel(target, record),
         runArtifacts: path.dirname(artifactsDir(run, target.name)),
+        inbox: inboxDir(),
         budgetUsd: budgetUsdFor(
           r.budget !== undefined && r.raise?.includes(r.target) ? r.budget : budgetOf(target, record),
           stepSpend(run, r.target, reads.spendOf),
@@ -636,6 +641,7 @@ function readySpec(
           step.after.length ? undefined : parents,
           inputsDir(run),
           said.checked,
+          readsMounts(told.step, inboxDir()),
         ),
     cwd: place.workspace,
     harness: step.harness,
@@ -645,6 +651,7 @@ function readySpec(
       config: filedConfig(step, reads.steps, run, {
         model: step.model,
         runArtifacts: path.dirname(artifactsDir(run, step.name)),
+        inbox: inboxDir(),
         budgetUsd: budgetUsdFor(budgetOf(step, run.steps[step.name]), stepSpend(run, step.name, reads.spendOf)),
         own: told.own,
       }),

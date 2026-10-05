@@ -25,8 +25,8 @@ intent, so restate the intent's goal and constraints in it.
 7. **Ask what is the person's.** A choice the intent leaves open, a trade-off only they can weigh: ask it in a round, numbered, each with
    your recommended answer. Record each answer, and who gave it, in `decisions`.
 
-Read a file with Read and search with Grep or Glob; never `head`, `cat`, `grep`, `awk`, `sed` or a pipe in Bash: it runs only the checks
-below.
+Read a file with Read, list a folder with Glob and search with Grep; never `ls`, `find`, `head`, `cat`, `grep`, `awk`, `sed` or a pipe in
+Bash: it runs only the checks below.
 
 Run each check bare, as your fence allows it — `npx turbo run test --force --continue`, `npm run typecheck`, `npm run lint` — one
 command per call: never wrapped in `timeout` or `( … )`, piped to `tail` or `grep`, or redirected; paths from the workspace root, never

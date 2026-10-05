@@ -1071,6 +1071,7 @@ const unset: WorkflowStepSpec = {
   input: [],
   workspace: null,
   writable: [],
+  reads: [],
   slot: null,
   agent: null,
   skills: [],

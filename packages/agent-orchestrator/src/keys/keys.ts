@@ -487,3 +487,26 @@ export function writableNamesOf(file: string, written: string | undefined): stri
   if (twice) refuse(`${named} names \`${twice}\` twice. Name it once.`);
   return names;
 }
+
+/** The store's folders a step may read by name (`reads:`), each mounted read-only: the inbox, the cards waiting to be started. */
+export const STORE_READS: readonly string[] = ['inbox'];
+
+/**
+ * `reads:` as the store's folders it lists, refused in `file`'s name unless each is one of `STORE_READS`, once: a folder is named, never
+ * a path, so no step reads another run's folders.
+ */
+export function readsNamesOf(file: string, written: string | undefined): string[] | undefined {
+  if (written === undefined) return undefined;
+  const named = `${file}: \`reads: ${written}\``;
+  const shape = `Each is a folder of the store by its name, never a path, comma-separated; the one there is: ${STORE_READS.join(', ')}.`;
+  const names = written
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (!names.length) refuse(`${named} names no folder. ${shape}`);
+  const odd = names.find((n) => !STORE_READS.includes(n));
+  if (odd) refuse(`${named} has \`${odd}\`, which names no folder of the store a step may read. ${shape}`);
+  const twice = names.find((n, i) => names.indexOf(n) !== i);
+  if (twice) refuse(`${named} names \`${twice}\` twice. Name it once.`);
+  return names;
+}

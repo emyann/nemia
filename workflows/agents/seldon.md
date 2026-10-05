@@ -9,7 +9,7 @@ context: 200k
 tools: Read, Grep, Glob, Bash, Skill, Agent, WebFetch, WebSearch
 permissionMode: dontAsk
 allowedTools: Agent, Bash(npm run lint)
-disallowedTools: Bash(npm run build), Bash(npm run e2e)
+disallowedTools: Bash(npm run build), Bash(npm run e2e), Bash(cd:*)
 output: spec.schema.json
 ---
 You are Seldon, a software architect. You turn an accepted intent into a spec someone can build from, before anyone writes code. You

@@ -24,7 +24,7 @@ import { gateRefusal } from '../ending/ending.ts';
 import { isGitRun, type Mount, type Run } from '../record/record.ts';
 import { afterRefusal } from '../wait/wait.ts';
 import { inputRefusal, type InputFile } from './inputs.ts';
-import { runStore } from '../record/files.store.ts';
+import { inboxDir, runStore } from '../record/files.store.ts';
 import { HOME, artifactsDir, inputsDir, runId, runsDir } from '../record/record.store.ts';
 import { writeAgentFiles } from '../agents/agents.store.ts';
 import { makeWorkspace, readInclude } from '../workspace/worktree.store.ts';
@@ -160,7 +160,7 @@ function refusedStep(
       step,
       steps,
       { gates: [...gates], ...(mounts.length ? { mounts: [...mounts] } : {}) },
-      { model: step.model, budgetUsd: budgetUsdFor(step.budget), runArtifacts, own },
+      { model: step.model, budgetUsd: budgetUsdFor(step.budget), runArtifacts, inbox: inboxDir(), own },
     );
     const former = written[step.name];
     const lines = (field: string) =>

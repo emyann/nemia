@@ -61,14 +61,19 @@ const pathsOf = (mounts: readonly Mount[]): string => mounts.map((m) => `\`${m.p
 
 /**
  * What a step's brief says of the folders its run mounts, under what was asked for: each by its absolute path, those its `writable:` names
- * to write (`stepMounts`), the others to read and never write; a blank line before them. Nothing for a run that mounts none, and for a
- * step on a remote agent, which is filed none.
+ * to write (`stepMounts`), the others to read and never write; then the store's folders its `reads:` names (`store`, as `readsMounts` in
+ * filed.ts files them), to read and never write; a blank line before them. Nothing for a run that mounts none and a step given no store
+ * folder, and for a step on a remote agent, which is filed none.
  */
-export const mountsLine = (step: Pick<Workflow, 'harness' | 'writable'>, run: Pick<Run, 'mounts'>): string[] => {
+export const mountsLine = (
+  step: Pick<Workflow, 'harness' | 'writable'>,
+  run: Pick<Run, 'mounts'>,
+  store: readonly Mount[] = [],
+): string[] => {
   const mounts = isRemoteHarness(step.harness) ? undefined : stepMounts(step, run.mounts);
-  if (!mounts?.length) return [];
-  const writes = mounts.filter((m) => !m.readOnly);
-  const reads = mounts.filter((m) => m.readOnly);
+  if (!mounts?.length && !store.length) return [];
+  const writes = (mounts ?? []).filter((m) => !m.readOnly);
+  const reads = (mounts ?? []).filter((m) => m.readOnly);
   return [
     '',
     ...(writes.length
@@ -79,6 +84,11 @@ export const mountsLine = (step: Pick<Workflow, 'harness' | 'writable'>, run: Pi
     ...(reads.length
       ? [
           `Folders of this factory you may read, and must not write: ${pathsOf(reads)}. Each is mounted read-only; your own work stays in your workspace.`,
+        ]
+      : []),
+    ...(store.length
+      ? [
+          `Folders of the store you may read, and must not write, as this step's \`reads:\` names them: ${pathsOf(store)}. Each is mounted read-only; read it with Read, Grep and Glob.`,
         ]
       : []),
   ];

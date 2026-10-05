@@ -3,7 +3,7 @@
  * on concluded (`ParentCloseout`). Pure; the sections a brief is made of are `brief-sections.ts`'s.
  */
 import { outputFields, type Workflow } from '../step/step.ts';
-import { dataBlock, fenced, placeOf, type Run } from '../record/record.ts';
+import { dataBlock, fenced, placeOf, type Mount, type Run } from '../record/record.ts';
 import { closeoutContract, declaredOutput, isLoopTarget, type Closeout } from '../closeout/closeout.ts';
 import { depsLines, givenPlan, workspacePlan, type Provisioned } from '../workspace/workspace.ts';
 import {
@@ -87,6 +87,8 @@ import { resultSteps, workChecks } from '../branches/branches.ts';
  *   under what was asked for.
  * @param checked For a step filed after checked steps: what each of their checks said on the try or round it follows
  *   (`checkHandedSection`), read by file.verb.ts. Absent, and nothing is said of a check: the board's preview composes without it.
+ * @param store The store's folders the step reads, read-only, as its `reads:` names them (`readsMounts` in filed.ts): named under what
+ *   was asked for (`mountsLine`). Absent, and nothing is said of them.
  */
 export function composeBrief(
   step: Workflow,
@@ -100,6 +102,7 @@ export function composeBrief(
   parents?: readonly ParentCloseout[],
   inputsDir?: string,
   checked?: readonly CheckHanded[],
+  store?: readonly Mount[],
 ): string {
   const inFolder = placeOf(run) === 'folder';
   const contracts = [
@@ -133,17 +136,13 @@ export function composeBrief(
     : steps.filter((s) => s.name !== step.name && run.steps[s.name]?.taskId).map((s) => s.name);
 
   const inputs = inputsLine(inputsDir, run.inputs, inFolder);
-  const request = [run.brief, ...(inputs ? ['', inputs] : []), ...mountsLine(step, run)];
+  const request = [run.brief, ...(inputs ? ['', inputs] : []), ...mountsLine(step, run, store)];
   const opening = briefBody(step) ? [briefBody(step), ''] : [];
   const parts = [...opening, '## What was asked for', '', ...request, ...handed];
 
   if (step.after.length > 1 && step.workspace !== 'main' && !inFolder) {
     return [
-      ...opening,
-      '## What was asked for',
-      '',
-      ...request,
-      ...handed,
+      ...parts,
       '',
       '## What is in this workspace',
       '',

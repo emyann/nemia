@@ -6,7 +6,7 @@
  * what lets them be tested as data. `STORE` files are the I/O beneath the controllers: they import no runtime, never a controller and never
  * the client, and load as a tree with no cycle; only the client and the controllers beneath the CLI import them. `CONTROLLER` files use the
  * runtime through the client: `runner.ts`, the package's root, the verbs it re-exports, one feature each, and the CLI above them, which
- * parses, calls and prints, and so reaches the package through `runner.ts` and the format through `workflow.ts` alone — as `bin/wf.ts`
+ * parses, calls and prints, and so reaches the package through `runner.ts` and the format through `workflow.ts` alone — as each bin
  * reaches it through the CLI. The client and the controllers import one another with no cycle. A file in `src/` or `bin/` that no kind
  * names fails the suite: a new file is sorted when it is written.
  *
@@ -51,13 +51,16 @@ const STORE: readonly string[] = [];
  * What uses the runtime at the root of `src` and in `bin`, through the client: the root, the controllers it re-exports, and the CLI
  * above them.
  */
-const CONTROLLER = ['src/runner.ts', 'bin/wf.ts'];
+const CONTROLLER = ['src/runner.ts', 'bin/nemia.ts', 'bin/wf.ts'];
+
+/** The package's bins: `nemia`, and `wf`, its alias. */
+const BINS = ['bin/nemia.ts', 'bin/wf.ts'];
 
 /** The CLI's folder: every file in it is a controller, and the CLI. */
 const CLI_FOLDER = 'src/cli/';
 
 /** The CLI's files, which reach the package through the root (`CLI_REACHES`, `BIN_REACHES`), never the client or the store. */
-const isCli = (file: string): boolean => file === 'bin/wf.ts' || file.startsWith(CLI_FOLDER);
+const isCli = (file: string): boolean => BINS.includes(file) || file.startsWith(CLI_FOLDER);
 
 /** The one file that imports agent-runtime. */
 const CLIENT = 'src/runtime-client.ts';
@@ -112,7 +115,7 @@ const STORE_SHARED: Record<string, readonly string[]> = {
 /** The package's files the CLI may import, beside the files of its own folder. */
 const CLI_REACHES = ['src/runner.ts', 'src/workflow.ts'];
 
-/** The package's files `bin/wf.ts` may import: the CLI, and what it exits with, imported before the package loads. */
+/** The package's files a bin may import: the CLI, and what it exits with, imported before the package loads. */
 const BIN_REACHES = ['src/cli/main.ts', 'src/cli/exit.ts'];
 
 /** The node modules a pure file never imports, bare or as `node:`: the disk, a process, the network and the machine. */
@@ -236,7 +239,7 @@ function impurities(sources: Sources): string[] {
 
 /**
  * A store file imports no runtime, no controller and not the client, and store files import each other only as the tree has it; outside
- * the store, only the client and the controllers beneath the CLI import a store file — never `bin/wf.ts` or a file of `src/cli/`, which
+ * the store, only the client and the controllers beneath the CLI import a store file — never a bin or a file of `src/cli/`, which
  * reach the package through the root — and some one of them imports each.
  */
 function treeBreaks(sources: Sources): string[] {
@@ -268,7 +271,7 @@ function treeBreaks(sources: Sources): string[] {
 }
 
 /**
- * The CLI reaches the package only through `runner.ts`, `workflow.ts` and its own folder, and `bin/wf.ts` only through the CLI and what it
+ * The CLI reaches the package only through `runner.ts`, `workflow.ts` and its own folder, and each bin only through the CLI and what it
  * exits with.
  */
 function cliBreaks(sources: Sources): string[] {
@@ -277,11 +280,11 @@ function cliBreaks(sources: Sources): string[] {
       .filter((m) => (m.startsWith('src/') || m.startsWith('bin/')) && !reaches.includes(m) && !own(m))
       .map((m) => `${file} imports ${m}: it reaches the package through ${reaches.join(' and ')}`);
   const cli = Object.keys(sources)
-    .filter((f) => isCli(f) && f !== 'bin/wf.ts')
+    .filter((f) => isCli(f) && !BINS.includes(f))
     .sort();
   return [
     ...cli.flatMap((file) => reaching(file, CLI_REACHES, (m) => m.startsWith(CLI_FOLDER))),
-    ...reaching('bin/wf.ts', BIN_REACHES, () => false),
+    ...BINS.flatMap((bin) => reaching(bin, BIN_REACHES, () => false)),
   ];
 }
 
@@ -660,6 +663,9 @@ test('REFUSED: a store file that imports the runtime, a controller or the client
   assert.deepEqual(treeBreaks(adding('bin/wf.ts', 'src/branches/branches.store.ts')), [
     'bin/wf.ts imports src/branches/branches.store.ts, a store file: only the client and the controllers beneath the CLI import the store',
   ]);
+  assert.deepEqual(treeBreaks(adding('bin/nemia.ts', 'src/branches/branches.store.ts')), [
+    'bin/nemia.ts imports src/branches/branches.store.ts, a store file: only the client and the controllers beneath the CLI import the store',
+  ]);
   assert.deepEqual(treeBreaks(adding('src/cli/main.ts', 'src/record/record.store.ts')), [
     'src/cli/main.ts imports src/record/record.store.ts, a store file: only the client and the controllers beneath the CLI import the store',
   ]);
@@ -668,19 +674,20 @@ test('REFUSED: a store file that imports the runtime, a controller or the client
   ]);
 });
 
-test('the CLI reaches the package only through runner.ts, workflow.ts and its own folder, and bin/wf.ts only through cli/main.ts and cli/exit.ts', () => {
+test('the CLI reaches the package only through runner.ts, workflow.ts and its own folder, and each bin only through cli/main.ts and cli/exit.ts', () => {
   const sources = packageSources();
   assert.deepEqual(cliBreaks(sources), []);
   assert.deepEqual(
-    [sources['src/cli/main.ts'], sources['src/cli/flags.ts'], sources['bin/wf.ts']].map((imports) =>
+    [sources['src/cli/main.ts'], sources['src/cli/flags.ts'], sources['bin/nemia.ts'], sources['bin/wf.ts']].map((imports) =>
       imports.filter((m) => m.startsWith('src/')).sort(),
     ),
     [
       ['src/cli/decide/decide.ts', 'src/cli/flags.ts', 'src/cli/runs.ts', 'src/cli/start.ts', 'src/runner.ts'],
       ['src/runner.ts'],
       ['src/cli/exit.ts', 'src/cli/main.ts'],
+      ['src/cli/exit.ts', 'src/cli/main.ts'],
     ],
-    "a file of the CLI's folder reaches the root and its own folder, and bin/wf.ts the CLI's two doors: let through",
+    "a file of the CLI's folder reaches the root and its own folder, and each bin the CLI's two doors: let through",
   );
   assert.deepEqual(
     cliBreaks(adding('src/cli/main.ts', 'src/record/record.store.ts')),
@@ -717,6 +724,16 @@ test('the CLI reaches the package only through runner.ts, workflow.ts and its ow
     ['bin/wf.ts imports src/cli/flags.ts: it reaches the package through src/cli/main.ts and src/cli/exit.ts'],
     "REFUSED: bin/wf.ts reaching a family of the CLI's folder past its doors",
   );
+  assert.deepEqual(
+    cliBreaks(adding('bin/nemia.ts', 'src/runner.ts')),
+    ['bin/nemia.ts imports src/runner.ts: it reaches the package through src/cli/main.ts and src/cli/exit.ts'],
+    'REFUSED: bin/nemia.ts reaching past the CLI',
+  );
+  assert.deepEqual(
+    cliBreaks(adding('bin/wf.ts', 'bin/nemia.ts')),
+    ['bin/wf.ts imports bin/nemia.ts: it reaches the package through src/cli/main.ts and src/cli/exit.ts'],
+    'REFUSED: the alias reaching the other bin',
+  );
 });
 
 test(`the runtime is reached through one client: only ${CLIENT} imports agent-runtime — not even for a type — and every controller beneath the CLI imports it`, () => {
@@ -747,6 +764,9 @@ test('REFUSED: a type imported from the runtime by a controller, a store file, a
   ]);
   assert.deepEqual(clientBreaks(adding('bin/wf.ts', 'agent-runtime')), [
     'bin/wf.ts imports agent-runtime, and only src/runtime-client.ts may',
+  ]);
+  assert.deepEqual(clientBreaks(adding('bin/nemia.ts', 'agent-runtime')), [
+    'bin/nemia.ts imports agent-runtime, and only src/runtime-client.ts may',
   ]);
   assert.deepEqual(clientBreaks(adding('src/agents/agents.store.ts', 'agent-runtime/vocabulary/x')), [
     'src/agents/agents.store.ts imports agent-runtime, and only src/runtime-client.ts may',

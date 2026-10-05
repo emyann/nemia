@@ -10,6 +10,9 @@ export type Engine = ReturnType<typeof engine>;
 /** A verb: it takes what follows it on the command line and the engine, and prints what it did, or throws a refusal. */
 export type Verb = (rest: string[], e: Engine) => void | Promise<void>;
 
+/** What `wf`, the alias of `nemia`, prints on stderr before it runs the command it is given, one line naming what to type next. */
+export const WF_HINT = 'wf is now nemia: type `nemia <args>`; wf stays an alias until a later release removes it.';
+
 /** What `wf` prints for no verb, for a verb it does not know, and for a verb given too little to act on. */
 export const HELP = `wf — run a workflow of agent steps
 

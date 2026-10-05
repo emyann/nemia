@@ -40,7 +40,7 @@ import {
   type Command,
   type Ran,
 } from '../runner.ts';
-import { HELP, usage, type Engine, type Verb } from './flags.ts';
+import { HELP, usage, WF_HINT, type Engine, type Verb } from './flags.ts';
 import { decideVerb } from './decide/decide.ts';
 import { agentsCustomRun, pruneVerb, rmVerb } from './runs.ts';
 import { inboxAddRun, inboxQueueRun, planRun, startRun } from './start.ts';
@@ -303,4 +303,10 @@ export async function main(argv: string[], e: Engine = engine()): Promise<void> 
   const command = TABLE.find((c) => c.name === named.name && c.only?.side !== 'api');
   if (command) return commanded(command, named.rest, e);
   return VERBS.get(named.name)!(named.rest, e);
+}
+
+/** Runs `argv` as `main` does, for the `wf` alias: its one-line hint first, on stderr, so what a script reads off stdout stays the same. */
+export function aliased(argv: string[], e?: Engine): Promise<void> {
+  process.stderr.write(`${WF_HINT}\n`);
+  return main(argv, e);
 }

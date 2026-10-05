@@ -1,6 +1,6 @@
 ---
 name: effect
-description: "Any change to a file that imports from effect — a service, a layer, a verb, a schema at a boundary, a stream, a fiber, a schedule, a log or a metric — and the design or review of one: load it before reading, writing or judging such a file. How this repository writes Effect 4: read the docs installed with it first, reach for Effect's own primitives before writing one by hand, leave the Effect 3 names it no longer has, and keep our services, layers, Effect.fn verbs, tagged errors and plain faces, each where the runtime shows it."
+description: "Any change to a file that imports from effect — a service, a layer, a verb, a schema at a boundary, a stream, a fiber, a schedule, a log or a metric — and the design or review of one: load it before reading, writing or judging such a file. How this repository writes Effect 4: read the docs installed with it first, reach for Effect's own primitives before writing one by hand, leave the Effect 3 names it no longer has, and keep our services, layers, Effect.fn verbs, tagged errors and programs, each where the runtime shows it."
 applies: ["packages/agent-runtime/src/**", "packages/agent-orchestrator/src/**/*.store.ts", "packages/agent-orchestrator/src/**/*.verb.ts", "packages/agent-orchestrator/src/runtime-client.ts", "packages/agent-orchestrator/src/cli/**", "apps/api/src/**", "apps/web/src/lib/api/**"]
 ---
 
@@ -35,6 +35,7 @@ here and read its page.
 | Count or measure what the code does: passes, reads, durations | `Metric.counter`, `Metric.histogram` | `node_modules/effect/dist/Metric.d.ts` |
 | Say what happened, at a level, with its fields | `Effect.logInfo`, `Effect.annotateLogs`, `Logger.layer` | `node_modules/effect/ai-docs/src/08_observability/10_logging.ts` |
 | Time a verb and tie it to its caller | `Effect.fn`, `Effect.withSpan`, `Tracer` | `node_modules/effect/ai-docs/src/08_observability/20_otlp-tracing.ts` |
+| Send the spans and logs to a collector, over OTLP | `OtlpTracer.layer`, `OtlpLogger.layer`, `OtlpSerialization.layerJson` | `node_modules/effect/ai-docs/src/08_observability/20_otlp-tracing.ts` |
 | Read a value that crosses a boundary: a file, a request, a harness's line, JSON | `Schema.Struct`, `Schema.decodeUnknownEffect` | `node_modules/effect/ai-docs/src/01_effect/02_schema/10_schema-basics.ts` |
 | Hold a resource and let it go whatever happens, the last taken first | `Effect.acquireRelease`, `Scope.addFinalizer` | `node_modules/effect/ai-docs/src/01_effect/05_resources/10_acquire-release.ts` |
 | Build a service from others and give it to a program | `Layer.effect`, `Layer.provide`, `Layer.mergeAll` | `node_modules/effect/ai-docs/src/01_effect/03_services/20_layer-composition.ts` |
@@ -43,11 +44,12 @@ In a review, a hand-rolled version of one of these is a finding.
 
 v4 is not v3: read the page, not your memory.
 
-`effect-version.test.ts` reads this table: each name must be one the pinned version exports, and each page installed.
+`effect-version.test.ts` reads this table: each name must be one the pinned version exports, from `effect` or, for the exporters,
+`effect/observability`, and each page installed.
 
 ## Effect 3 names this version does not have
 
-Measured on `4.0.0-rc.116`. `tsc` catches each, but writing from memory costs a round per name.
+Measured on `4.0.1`. `tsc` catches each, but writing from memory costs a round per name.
 
 | Effect 3 | Effect 4 |
 | --- | --- |
@@ -97,8 +99,8 @@ version, and the version above must be the pin. An upgrade re-measures the table
   `Data.TaggedError` imported from `effect/Data`, never from `effect`, and carries `exitCode: 2` as every refusal here does
   (the root `CLAUDE.md`, *Errors say what to do next*): `Missing`, `Conflict` and `Invalid` in
   `packages/agent-orchestrator/src/refusal/refusal.ts`, thrown as `new Invalid({ message })`, and exported to the api by
-  `agent-orchestrator/effect`, which loads `effect/Data` alone. `effect/Data` loads 14 modules; the
-  barrel loads 203, about 100 ms, on every consumer of `agent-orchestrator/run` and `agent-orchestrator/workflow`, whose modules
+  `agent-orchestrator`. `effect/Data` loads 15 modules; the
+  barrel loads 216, about 130 ms, on every consumer of `agent-orchestrator/run` and `agent-orchestrator/workflow`, whose modules
   `packages/agent-orchestrator/test/refusal.test.ts` pins.
 
 ## Resources and the process
@@ -131,25 +133,42 @@ version, and the version above must be the pin. An upgrade re-measures the table
   and the routes catch what they word themselves. `runPromise` rejects with the failure itself, so a refusal reaches `app.onError`
   as the instance it was.
 
-## Plain faces
+## Programs
 
-- Consumers never adopt Effect. `agent-runtime` gives the Promise engine's types and plain helpers; the engine a consumer uses
-  in Promises is `promiseEngine(Engine.layer(options))` from `agent-runtime/effect`: `promiseEngine` in `src/facade/engine.ts`
-  builds the layer once and runs each verb with `Effect.runPromise`, a tagged refusal turned into a plain `Error`. There is no
-  `createEngine`.
-- `agent-runtime/effect` (`src/index.ts`) is the one door that hands out Effect values, and it does not export `decide`.
+- The packages' entries are Effect, and the api is the system's public interface. No function the runtime's entries export runs a
+  program for its caller or answers a Promise (`packages/agent-runtime/test/plain-faces.test.ts`, its `PROMISED` empty): a program is
+  run at its edge — the CLI (`ae`), the api's server, a test — with `Effect.runPromise` or `Effect.runSync`.
+- A caller of the runtime builds its engine once from `Engine.layer(options)` (`agent-runtime`, `src/index.ts`, which does not export
+  `decide`) and runs each verb as an Effect: `ae` (`packages/agent-runtime/src/cli/main.ts`) and the orchestrator's client (`engineOf`
+  in `packages/agent-orchestrator/src/runtime-client.ts`). A refusal a caller answers with a sentence and an exit code is worded by
+  `refusalWords` (`src/service/refusal.ts`): an `Error` led by the verb whose `exitCode` is 2.
 - Stores and pure files stay plain TypeScript: `decide` in `src/core/domain.ts` imports no Effect.
-- A controller's program is an `Effect.fn` that requires the Promise engine as a service (`EngineService`) and lifts each read
-  with `tried` or `awaited` (`packages/agent-orchestrator/src/runtime-client.ts`): it fails with a `Refusal` and dies of anything
-  else. Its plain face runs it with `Effect.runPromise` over the engine it is handed, and rejects with either as it was thrown:
-  `decideRun` and `decide`, `forgetRun` and `forget`, and the verbs a person asks of a run (`roundRun` and `round`, `acceptRun`,
-  `retryRun`, `approveRun`, `sayRun`, `cancelRun`), and the views' reads (`taskPhasesRead` and `taskPhases`, `checkReportsRead`,
-  `refusalRead`, `parentRead` and `parentOf`, `parentsRead`, `filingsRead` and `readFilings`), and the tick (`tickRun` and
-  `tick`), whose pass is metered through `meteredPass` over the module-global meter. An engine refusal is mapped in one place:
-  `toldBy` in `say.verb.ts` turns the runtime's exit-code-2 error into a `Conflict`, which `awaited` alone would make a defect.
-- A controller that reads no engine requires nothing: `startRun`, whose plain face `start` runs it with `Effect.runSync` and
-  throws either as it was thrown (`runSync` throws the first failure, else the first defect, itself). Its face stays synchronous,
-  so a read it lifts must be too.
+- A controller is an `Effect.fn` program that requires the engine as a service (`EngineService`): it reads the engine with `asked`,
+  which dies of a runtime refusal in the runtime's words, and lifts every other read with `tried` or `awaited`, failing with a
+  `Refusal` and dying of anything else. Its caller runs it with `runWith(e, program)` over the engine it built once — the CLI, the
+  daemon, the api's handlers and the tests — and the Promise rejects with the refusal or the defect as it was thrown: `decideRun`,
+  `forgetRun`, the verbs a person asks of a run (`roundRun`, `acceptRun`, `retryRun`, `approveRun`, `sayRun`, `cancelRun`), the
+  views' reads (`taskPhasesRead`, `checkReportsRead`, `refusalRead`, `parentRead`, `parentsRead`, `filingsRead`), and the tick
+  (`tickRun`), whose pass is metered through `meteredPass` over the module-global meter. A command's `handler` is a program too. An
+  engine refusal a controller answers itself is read off the raw verb: `toldBy` in `say.verb.ts` turns the runtime's refusal into a
+  `Conflict`, and a journal that does not read is told by `unreadableJournal`.
+- A controller that reads no engine requires nothing: `startRun`, run with `Effect.runPromise` or `runWith` alike.
+
+## Logs and traces
+
+- **A span is a verb's `Effect.fn` name**, nested by the fiber: `tick` > `pass` > `advancePass` > `fileReady` in the orchestrator's tick,
+  then the runtime's `file` > `append` (`packages/agent-orchestrator/test/telemetry-nesting.test.ts`). A runtime verb run in its own
+  `Effect.runPromise` starts a root of its own: a caller yields the engine's verbs (`engineOf`), never runs them apart.
+- **Each layer annotates in its own words**, on its spans and its logs alike: the orchestrator the `run` (`advancePass`) and the `step`
+  (`forStep` in `packages/agent-orchestrator/src/telemetry/telemetry.store.ts`); the runtime the `task`, `kind` and `attempt`
+  (`appendFields` in `packages/agent-runtime/src/core/engine/journal.ts`), and never a run or a step.
+- **Levels**: Info is what a person reads in `nemia up`'s lines (`logPass` in `packages/agent-orchestrator/src/daemon/up.verb.ts`); a
+  warning or worse goes to stderr; Debug is the journal, an append said by its kind, below the default level.
+- **One `telemetryLayer`, provided by the process around its program**, never by a verb: `nemia up` in
+  `packages/agent-orchestrator/src/cli/main.ts` and the api's daemon in `apps/api/src/main.ts`. A test provides its own logger
+  (`Logger.layer`) and tracer (`Effect.withTracer`), and `References.MinimumLogLevel` to read Debug.
+- **OTLP only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set**, under the service `OTEL_SERVICE_NAME`, `nemia` by default (`otlpOf` in
+  `packages/agent-orchestrator/src/telemetry/telemetry.ts`); a test that spawns a daemon sets it, blank where it wants none.
 
 ## Tests
 

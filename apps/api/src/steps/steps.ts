@@ -2,15 +2,16 @@
  * A step's own reads: its session output, the files it wrote, its conversation, read once from a cursor or followed, and its task's path
  * through the runtime's lifecycle.
  */
+import type { Effect } from 'effect';
 import { Hono } from 'hono';
 import { type SSEStreamingApi, streamSSE } from 'hono/streaming';
-import { COMMANDS, LOGS, phaseOfView, type TaskView } from 'agent-orchestrator';
+import { COMMANDS, LOGS, phaseOfView, type TaskView, runWith } from 'agent-orchestrator';
 import { filesPrunedWords } from 'agent-orchestrator/run';
 import { refusedName, typeOf } from './artifacts.ts';
 import { type StepLog, tailOf } from './logs.ts';
 import { type LifecycleStep, pathToTurn, type StepPath, tryOfStep } from './path.ts';
 import { type ApiEnv, served } from '../layer.ts';
-import { type Engine, taskOfStep } from '../store.ts';
+import { engineRead, type Engine, taskOfStep } from '../store.ts';
 
 /**
  * The board's reads of a step in the package's table, each served on the api alone: a file of its files directory (`step artifact`) and of
@@ -23,7 +24,7 @@ const TRANSCRIPT = COMMANDS.find((c) => c.name === 'step transcript')!;
 
 /** One read of the conversation of `task`, a task of the step `step` of the run `id`, from `after` (`step transcript`). */
 const transcriptOf = async (e: Engine['Service'], id: string, step: string, task: string, after?: string) =>
-  (await TRANSCRIPT.handler(e, { id, step, task, ...(after !== undefined && { after }) })) as Omit<Read, 'live'>;
+  (await runWith(e, TRANSCRIPT.handler({ id, step, task, ...(after !== undefined && { after }) }))) as Omit<Read, 'live'>;
 
 /** How much of a step's output the board is given: the end of it, which is where a running step is. */
 const LOG_LINES = 200;
@@ -38,7 +39,7 @@ const servedAs = (type: string) => ({
 });
 
 /** One of the engine's events in a session's conversation, as `transcript` gives it (`TranscriptEvent` in agent-runtime). */
-export type TranscriptEvent = Awaited<ReturnType<Engine['Service']['transcript']>>['events'][number];
+export type TranscriptEvent = Effect.Success<ReturnType<Engine['Service']['transcript']>>['events'][number];
 
 /** A read of a step's conversation: the engine's events from the cursor asked with, where to ask again, and whether more may come. */
 export type StepTranscript = {
@@ -79,7 +80,7 @@ class Unread extends Error {
 async function readTranscript(e: Engine['Service'], id: string, step: string, taskId: string, after: string | undefined): Promise<Read> {
   let view: TaskView;
   try {
-    view = await e.view(taskId);
+    view = await engineRead('view', e.view(taskId));
   } catch (err) {
     const why = err instanceof Error ? err.message : String(err);
     throw new Unread(
@@ -182,7 +183,7 @@ export const steps = new Hono<ApiEnv>()
       if ('error' in found) return c.json({ error: found.error }, 404);
       const { taskId } = found;
       try {
-        const { output } = await LOGS.handler(e, { runId: id, step }, env, home);
+        const { output } = await runWith(e, LOGS.handler({ runId: id, step }, env, home));
         return c.json(output === undefined ? ({ lines: [], truncated: false } satisfies StepLog) : tailOf(output, LOG_LINES));
       } catch (err) {
         const why = err instanceof Error ? err.message : String(err);
@@ -204,7 +205,7 @@ export const steps = new Hono<ApiEnv>()
       if ('error' in found) return c.json({ error: found.error }, 404);
       const refused = refusedName(name);
       if (refused) return c.json({ error: refused }, 400);
-      const { file } = (await ARTIFACT.handler(e, { id, step, name })) as { file: Buffer | null };
+      const { file } = (await runWith(e, ARTIFACT.handler({ id, step, name }))) as { file: Buffer | null };
       const pruned = found.run.pruned?.artifacts;
       if (!file && pruned) {
         return c.json(
@@ -235,7 +236,7 @@ export const steps = new Hono<ApiEnv>()
       if ('error' in found) return c.json({ error: found.error }, 404);
       const refused = refusedName(name);
       if (refused) return c.json({ error: refused }, 400);
-      const { folder, file } = (await FILE.handler(e, { id, step, name })) as { folder: string | null; file: Buffer | null };
+      const { folder, file } = (await runWith(e, FILE.handler({ id, step, name }))) as { folder: string | null; file: Buffer | null };
       if (!folder) {
         return c.json(
           {
@@ -264,7 +265,7 @@ export const steps = new Hono<ApiEnv>()
       if ('error' in asked) return c.json({ error: asked.error }, asked.status);
       if (!asked.taskId) return c.json({ taskId: null, try: asked.try, path: [] } satisfies StepPath);
       try {
-        const whole = (await PATH.handler(e, { id: found.run.id, step, task: asked.taskId })) as { path: LifecycleStep[] };
+        const whole = (await runWith(e, PATH.handler({ id: found.run.id, step, task: asked.taskId }))) as { path: LifecycleStep[] };
         const path = pathToTurn(whole.path, asked.turn);
         return c.json({ taskId: asked.taskId, try: asked.try, path } satisfies StepPath);
       } catch (err) {

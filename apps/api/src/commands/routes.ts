@@ -15,8 +15,9 @@ import {
   type Positional,
   type Route,
   routeList,
+  runWith,
 } from 'agent-orchestrator';
-import { isRefusal } from 'agent-orchestrator/effect';
+import { isRefusal } from 'agent-orchestrator';
 import { decodeBody, NotBlank } from '../body.ts';
 import { type Refusal, refusedBeforeReading } from '../guard.ts';
 import { type ApiEnv, type Served, served } from '../layer.ts';
@@ -218,7 +219,7 @@ const route = (command: Command, at: Route) => (c: Context<ApiEnv>) =>
     if (wrong) return c.json({ error: wrong }, 422);
     try {
       const args = servedRepo(command, read.args, s);
-      const data = await command.handler(s.e, args, s.env, s.home);
+      const data = await runWith(s.e, command.handler(args, s.env, s.home));
       const refusal = command.apiRefusal?.(data, args);
       if (refusal) throw refusal;
       return c.json(answerOf(command, data), at.status);
@@ -256,7 +257,7 @@ export const wordBreaks = (table: readonly Pick<CommandSpec, 'name' | 'route'>[]
  * command that asks the same way.
  *
  * - `POST /api/runs/:id/steps/:step/retry` — another try of a step: the answer to a step that signed off blocked, a nudge, a recheck. Made
- *   by `retry()`, `nemia retry`'s own, which writes the ask file and nothing else. Refuses a message or a budget that cannot ride on the
+ *   by `retryRun`, `nemia retry`'s own, which writes the ask file and nothing else. Refuses a message or a budget that cannot ride on the
  *   ask (`messageRefusal`, `budgetRefusal` — a budget on a recheck, which files no session to spend it) with 422 before the run is read,
  *   and a step that may not be tried again that way (`retryRefusal`) with 409 after. A step whose session its harness blocked, with nothing
  *   signed, is taken as `nemia retry` takes it (`stopBlocked`): the ask is written as any other, and the tick stops the session before it
@@ -264,21 +265,21 @@ export const wordBreaks = (table: readonly Pick<CommandSpec, 'name' | 'route'>[]
  *   `answers` to the questions the step's current closeout asks are checked against them and written as the try's message, the message
  *   given beside them its note (`answeredHow`): answers that do not fit, or on a recheck, are refused with 400.
  * - `POST /api/runs/:id/round` — another round of a run's loop: the loop out of rounds, or held on a step of it past its budget, with the
- *   cap raised. Made by `round()`, `nemia round`'s own, which writes the ask file and nothing else. Refuses a budget not above zero with
+ *   cap raised. Made by `roundRun`, `nemia round`'s own, which writes the ask file and nothing else. Refuses a budget not above zero with
  *   400, before the round is asked (`roundBudgetRefusal`, which `roundAsk` refuses first, whatever the run); a round the loop may not go,
  *   or a budget not above what its steps have cost (`roundAsk`), with 409.
- * - `POST /api/runs/:id/steps/:step/say` — a person's words to a step's running session, through `say()`, `nemia say`'s own, which hands
+ * - `POST /api/runs/:id/steps/:step/say` — a person's words to a step's running session, through `sayRun`, `nemia say`'s own, which hands
  *   them to the session through the engine, and the engine journals them: the api writes nothing, and the step's detail reads them back
  *   (`said`). Refuses, in the package's and the engine's words, with 409: a step not filed, settled, or of a cancelled run; empty words; a
- *   session its harness does not list running — the engine's refusals thrown as a `Conflict` by `say()`. Words the harness did not take are
- *   the engine's error, verbatim, with 502: nothing was journalled, and asking again may work. Its 202 means the session's harness took the
- *   words and the engine journalled them; whether the session reads them is the session's.
- * - `POST /api/runs/:id/steps/:step/approve` — an approval of a step waiting at its gate, through `approve()`, `nemia approve`'s own, which
- *   writes the approval file and nothing else; the next tick files what waits on the step. Refuses empty words (`approvalWordsRefusal`)
- *   with 422 before the run is read, and a step that may not be approved (`approvalRefusal`) with 409 after — not gated, not signed off
- *   yet, already approved, sent back, or of a run called off. Sending it back is `POST …/retry` with a message, as `nemia retry --message`
- *   is.
- * - `POST /api/runs/:id/steps/:step/accept` — an acceptance of a loop out of rounds, as it stands, through `accept()`, `nemia accept`'s
+ *   session its harness does not list running — the engine's refusals thrown as a `Conflict` by `sayRun`. Words the harness did not take
+ *   are the engine's error, verbatim, with 502: nothing was journalled, and asking again may work. Its 202 means the session's harness took
+ *   the words and the engine journalled them; whether the session reads them is the session's.
+ * - `POST /api/runs/:id/steps/:step/approve` — an approval of a step waiting at its gate, through `approveRun`, `nemia approve`'s own,
+ *   which writes the approval file and nothing else; the next tick files what waits on the step. Refuses empty words
+ *   (`approvalWordsRefusal`) with 422 before the run is read, and a step that may not be approved (`approvalRefusal`) with 409 after —
+ *   not gated, not signed off yet, already approved, sent back, or of a run called off. Sending it back is `POST …/retry` with a message,
+ *   as `nemia retry --message` is.
+ * - `POST /api/runs/:id/steps/:step/accept` — an acceptance of a loop out of rounds, as it stands, through `acceptRun`, `nemia accept`'s
  *   own, which writes the acceptance file and nothing else; the next tick files what waits on the looping step as if it had said `again:
  *   false`. Refuses words that are missing or empty (`acceptWordsRefusal`) with 422 before the run is read, and a loop that may not be
  *   accepted (`acceptAsk`) with 409 after — a step with no `loop:`, a round the run files itself or one already asked for, a loop that
@@ -296,9 +297,9 @@ export const wordBreaks = (table: readonly Pick<CommandSpec, 'name' | 'route'>[]
  *   skipped }`.
  * - `DELETE /api/pause` — the store's pause lifted, as `nemia resume` lifts it (`resumePause`); it reads no body. None standing is a 404
  *   (`Missing`). Its 200 is `{ pause }`, the pause lifted.
- * - `DELETE /api/runs/:id` — a try's run removed, as `nemia rm <run>` removes it (`forget`): its record, and the folders it worked in with
- *   it; it reads no body. Only a try (rm's extension, extend.ts): any other run is a 409 naming `nemia rm`, which says what it hands off
- *   and what it leaves, and a git run's worktrees and branches are a person's to read before they go. What removed nothing is thrown in
+ * - `DELETE /api/runs/:id` — a try's run removed, as `nemia rm <run>` removes it (`forgetRun`): its record, and the folders it worked in
+ *   with it; it reads no body. Only a try (rm's extension, extend.ts): any other run is a 409 naming `nemia rm`, which says what it hands
+ *   off and what it leaves, and a git run's worktrees and branches are a person's to read before they go. What removed nothing is thrown in
  *   `nemia rm`'s line (`RM.apiRefusal`): a try still working, and a worktree a session holds — the record kept — are a 409, a record gone
  *   since the route read it a 404; any other failure is a 502. Its 200 is `{ id, removed: true }`.
  * - `POST /api/runs/:id/prune` — a finished run pruned, as `nemia prune <run> --yes` prunes it (`prune`), its route setting `yes`, with

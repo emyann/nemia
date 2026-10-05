@@ -12,14 +12,15 @@ import {
   commandLine,
   engine,
   list,
-  readFilings,
+  filingsRead,
+  runWith,
   runTokens,
   timeline,
   runStore,
   VERSION,
   type RunSummary,
 } from 'agent-orchestrator';
-import { claudeDetached, claudeOps } from 'agent-runtime/effect';
+import { claudeDetached, claudeOps } from 'agent-runtime';
 import { Effect } from 'effect';
 import { DEFAULT_ROUNDS } from 'agent-orchestrator/workflow';
 /** A folder nothing is made in: a path under it names a workflow folder that is not there. */
@@ -574,7 +575,7 @@ test('a task the engine has no record of is unknown on both endpoints, not queue
 test('the api words a step as list does — `unknown` for a task the engine has no record of, `pending` for one queued', async () => {
   const e = engine();
   for (const id of ['r-2', 'r-4', 'r-5']) {
-    const words = await list(e, runStore.runs.read(id));
+    const words = await runWith(e, list(e, runStore.runs.read(id)));
     const run = await listed(id);
     assert.deepEqual(
       run.steps.map(({ name, status, branch }: { name: string; status: string; branch: string | null }) => ({ name, status, branch })),
@@ -1011,7 +1012,7 @@ test('a run that froze its workflow shows only its steps: one its folder gained 
     ['implement', 'review'],
   );
   assert.deepEqual(
-    (await list(engine(), runStore.runs.read('r-43'))).steps.map((s: { name: string }) => s.name),
+    (await runWith(engine(), list(engine(), runStore.runs.read('r-43')))).steps.map((s: { name: string }) => s.name),
     ['implement', 'review'],
     'the steps `nemia ls` lists, and no other',
   );
@@ -1355,7 +1356,7 @@ test("each step says what the run established, in `nemia ls`'s words, on both en
 test("the api's words, and who it says is waited on, are `list`'s — a refused check's exit code among them", async () => {
   const e = engine();
   for (const id of ['r-20', 'r-21']) {
-    const words = await list(e, runStore.runs.read(id));
+    const words = await runWith(e, list(e, runStore.runs.read(id)));
     const detail = await detailOf(id);
     for (const [where, run] of [
       ['list', await listed(id)],
@@ -1525,7 +1526,7 @@ test('a check that refused with `retries:` left reads as the tick has it — run
     ],
   ];
   for (const [id, status, moving, waitingOnYou, word, why] of cases) {
-    assert.deepEqual((await list(e, runStore.runs.read(id))).waitingOnYou, waitingOnYou, `${id}, nemia ls: ${why}`);
+    assert.deepEqual((await runWith(e, list(e, runStore.runs.read(id)))).waitingOnYou, waitingOnYou, `${id}, nemia ls: ${why}`);
     for (const [where, run] of [
       ['list', await listed(id)],
       ['detail', await detailOf(id)],
@@ -1612,7 +1613,7 @@ type Judgement = [
 async function expectJudged(cases: readonly Judgement[]) {
   const e = engine();
   for (const [id, status, moving, waitingOnYou, rows, why] of cases) {
-    const words = await list(e, runStore.runs.read(id));
+    const words = await runWith(e, list(e, runStore.runs.read(id)));
     for (const [where, run] of [
       ['list', await listed(id)],
       ['detail', await detailOf(id)],
@@ -2142,14 +2143,16 @@ test('a statement that could not be read reaches the board as it came, with why 
 });
 
 test("a step says what it runs with: the workflow's effort, context window and tools, and what the engine filed its try with where the workflow says nothing", async () => {
-  await engine().file({
-    id: 'r-51-implement',
-    brief: 'Implement it.',
-    cwd: '/code/app',
-    harness: 'claude',
-    /** Filed as the tick files a step, with its effort, window and tools, and as a step that sets no deadline, with none. */
-    config: { effort: 'high', contextTokens: 200_000, tools: ['Read', 'Grep'] },
-  });
+  await Effect.runPromise(
+    engine().file({
+      id: 'r-51-implement',
+      brief: 'Implement it.',
+      cwd: '/code/app',
+      harness: 'claude',
+      /** Filed as the tick files a step, with its effort, window and tools, and as a step that sets no deadline, with none. */
+      config: { effort: 'high', contextTokens: 200_000, tools: ['Read', 'Grep'] },
+    }),
+  );
   writeRun({
     ...r2,
     id: 'r-51',
@@ -2210,7 +2213,7 @@ test('a step says the mode its session runs in, as its harness decides it — a 
   ];
   for (const [id, spec, runsIn] of cases) {
     const { harness, ...config } = spec;
-    await e.file({ id: `${id}-implement`, brief: 'Implement it.', cwd: '/code/app', harness, config });
+    await Effect.runPromise(e.file({ id: `${id}-implement`, brief: 'Implement it.', cwd: '/code/app', harness, config }));
     writeRun({
       ...r2,
       id,
@@ -2230,13 +2233,15 @@ test("the mode the api says a Claude Code task runs in is the one the engine's `
     ['r-59-claude-mode', 'dontAsk'],
   ] as const) {
     const spec = { harness: 'claude', ...(permissionMode ? { permissionMode } : {}) };
-    await engine().file({
-      id: `${id}-implement`,
-      brief: 'Implement it.',
-      cwd: '/code/app',
-      harness: 'claude',
-      ...(permissionMode ? { config: { permissionMode } } : {}),
-    });
+    await Effect.runPromise(
+      engine().file({
+        id: `${id}-implement`,
+        brief: 'Implement it.',
+        cwd: '/code/app',
+        harness: 'claude',
+        ...(permissionMode ? { config: { permissionMode } } : {}),
+      }),
+    );
     writeRun({
       ...r2,
       id,
@@ -2291,13 +2296,15 @@ test("the mode the api says a Claude Code task runs in is the one the engine's `
 });
 
 test("a model a person's `nemia retry --model` asked for is on the try it was asked for, past a recheck — and on no other", async () => {
-  await engine().file({
-    id: 'r-55-implement-try2',
-    brief: 'Implement it.',
-    cwd: '/code/app',
-    harness: 'claude',
-    config: { model: 'sonnet' },
-  });
+  await Effect.runPromise(
+    engine().file({
+      id: 'r-55-implement-try2',
+      brief: 'Implement it.',
+      cwd: '/code/app',
+      harness: 'claude',
+      config: { model: 'sonnet' },
+    }),
+  );
   const asked = { taskId: 'r-55-implement', then: 'fresh', model: 'sonnet' };
   const cases: Array<[id: string, tries: object[], askedModel: string | null]> = [
     ['r-55', [asked], 'sonnet'],
@@ -2641,8 +2648,8 @@ test("the detail carries where each step's time went — per try and per check, 
   );
 
   const e = engine();
-  const views = new Map((await e.list()).views.map((view) => [view.id, view]));
-  const { filed } = await readFilings(e);
+  const views = new Map((await Effect.runPromise(e.list())).views.map((view) => [view.id, view]));
+  const { filed } = await runWith(e, filingsRead());
   const theirs = timeline(runStore.runs.read('r-60'), views, filed);
   const lessCost = ({ cost, ...total }: { cost: unknown }) => (assert.equal(cost, null, 'nobody priced these sessions'), total);
   assert.deepEqual(
@@ -2732,7 +2739,7 @@ test("a run's list line and its page say what it took — its time at work and i
   assert.deepEqual(run.tokens, summary.tokens, "the run's page carries the same total, with its split");
   assert.equal(run.tokens?.split, '2.7M read from the cache · 230k written to it · 70k uncached · 40k out');
 
-  const views = new Map((await engine().list()).views.map((view) => [view.id, view]));
+  const views = new Map((await Effect.runPromise(engine().list())).views.map((view) => [view.id, view]));
   const record = runStore.runs.read('r-61');
   assert.deepEqual(
     { atWork: summary.atWork, tokens: summary.tokens },

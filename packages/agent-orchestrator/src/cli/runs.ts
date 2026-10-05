@@ -1,11 +1,24 @@
 /**
- * The runner of `nemia agents custom`, which reads the words a file holds; and the runners of `nemia rm` and `nemia prune` (`RM`, `PRUNE`),
- * which walk the many runs a command line names through the entry's handler, ask a person's yes, and tally what was not done into the exit
- * code.
+ * The runners of `nemia agents custom` and `nemia factory instruct`, which read the words a file holds; and the runners of `nemia rm` and
+ * `nemia prune` (`RM`, `PRUNE`), which walk the many runs a command line names through the entry's handler, ask a person's yes, and tally
+ * what was not done into the exit code.
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { AGENTS_CUSTOM, HOME, PRUNE, pruneLines, pruningBytes, RM, runStore, sizeOf, type Args, type Pruning } from '../runner.ts';
+import {
+  AGENTS_CUSTOM,
+  FACTORY_INSTRUCT,
+  HOME,
+  PRUNE,
+  pruneLines,
+  pruningBytes,
+  RM,
+  runStore,
+  runWith,
+  sizeOf,
+  type Args,
+  type Pruning,
+} from '../runner.ts';
 import { HELP, usage, confirmed, type Engine } from './flags.ts';
 
 /** The runs a command line named, in the order given, each once (`RM`'s and `PRUNE`'s many positional). */
@@ -17,7 +30,7 @@ const idsOf = (args: Args): readonly string[] => (Array.isArray(args.runId) ? ar
  */
 async function rmOne(e: Engine, id: string, args: Args): Promise<{ kept: boolean; failed: boolean }> {
   try {
-    const data = await RM.handler(e, { ...args, runId: id });
+    const data = await runWith(e, RM.handler({ ...args, runId: id }));
     for (const line of RM.print(data, args)) console.log(line);
     return { kept: data.forgot.kind === 'refused' || data.forgot.kind === 'held', failed: false };
   } catch (err) {
@@ -78,7 +91,7 @@ async function judged(e: Engine, ids: readonly string[], args: Args, tally: Prun
   const found: Pruning[] = [];
   for (const id of ids) {
     try {
-      found.push((await PRUNE.handler(e, { ...args, runId: id, yes: false })).pruning);
+      found.push((await runWith(e, PRUNE.handler({ ...args, runId: id, yes: false }))).pruning);
     } catch (err) {
       notPrunedLine(id, err, tally);
     }
@@ -105,7 +118,7 @@ function printFound(found: Pruning[], named: boolean, tally: PruneTally): void {
 async function prunedAll(e: Engine, prunable: Pruning[], args: Args, tally: PruneTally): Promise<void> {
   for (const p of prunable) {
     try {
-      const data = await PRUNE.handler(e, { ...args, runId: p.id, yes: true });
+      const data = await runWith(e, PRUNE.handler({ ...args, runId: p.id, yes: true }));
       const done = data.pruning;
       for (const line of PRUNE.print(data, args)) console.log(line);
       if (done.kind === 'refused' || done.left.length) tally.notPruned.push(p.id);
@@ -154,24 +167,38 @@ export async function pruneVerb(args: Args, e: Engine): Promise<void> {
   return refusedNamed(tally);
 }
 
-/** The words `--file` names: the file's text, or stdin's for `-`. Refused, naming the file, when it cannot be read. */
-function wordsFrom(file: string): string {
+/**
+ * The words `--file` names for the command `name`: the file's text, or stdin's for `-`. Refused, naming the file, when it cannot be read.
+ */
+function wordsFrom(file: string, name: string): string {
   try {
     return fs.readFileSync(file === '-' ? 0 : file, 'utf8');
   } catch (err) {
     return usage(
-      `nemia agents custom cannot read ${file === '-' ? 'stdin' : path.resolve(file)}: ${(err as Error).message}. Name a file that is there.`,
+      `nemia ${name} cannot read ${file === '-' ? 'stdin' : path.resolve(file)}: ${(err as Error).message}. Name a file that is there.`,
     );
   }
 }
+
+/** The arguments of `command` with the words its `--file` names read in (`wordsFrom`), where it names one. */
+const withWords = (args: Args, command: string): Args =>
+  typeof args.file === 'string' ? { ...args, words: wordsFrom(args.file, command) } : args;
 
 /**
  * `nemia agents custom`'s runner: the words `--file` names read (`wordsFrom`), handed to its entry's handler (`AGENTS_CUSTOM`) in its
  * store, and what the entry says of them printed.
  */
 export async function agentsCustomRun(args: Args, e: Engine): Promise<void> {
-  const file = typeof args.file === 'string' ? args.file : undefined;
-  const asked: Args = file === undefined ? args : { ...args, words: wordsFrom(file) };
-  const data = await AGENTS_CUSTOM.handler(e, asked, undefined, HOME);
+  const asked = withWords(args, AGENTS_CUSTOM.name);
+  const data = await runWith(e, AGENTS_CUSTOM.handler(asked, undefined, HOME));
   for (const line of AGENTS_CUSTOM.print(data, asked)) console.log(line);
+}
+
+/**
+ * `nemia factory instruct`'s runner: the words `--file` names read (`wordsFrom`), handed to its entry's handler, and what it says printed.
+ */
+export async function factoryInstructRun(args: Args, e: Engine): Promise<void> {
+  const asked = withWords(args, FACTORY_INSTRUCT.name);
+  const data = await runWith(e, FACTORY_INSTRUCT.handler(asked, undefined, HOME));
+  for (const line of FACTORY_INSTRUCT.print(data, asked)) console.log(line);
 }

@@ -15,7 +15,7 @@
   "type": "module",
   "dependencies": {
     "agent-runtime": "*",
-    "effect": "4.0.0-rc.116"
+    "effect": "4.0.1"
   },
   "devDependencies": {
     "@a2a-js/sdk": "1.2.0",
@@ -35,7 +35,6 @@
     ".": "./src/runner.ts",
     "./run": "./src/run.ts",
     "./workflow": "./src/workflow.ts",
-    "./effect": "./src/effect.ts",
     "./package.json": "./package.json"
   }
 }

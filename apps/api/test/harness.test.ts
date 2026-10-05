@@ -6,6 +6,7 @@
 import { askEnded, bin, calls, observations, registry, root, scriptUnharnessed, unharnessed } from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { Effect } from 'effect';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -13,7 +14,7 @@ import ts from 'typescript';
 import { scratch } from './scratch.ts';
 import { app, runtime } from '../src/app.ts';
 import { Engine } from '../src/store.ts';
-import { engine, tick } from 'agent-orchestrator';
+import { engine, runWith, tickRun } from 'agent-orchestrator';
 
 /** What a file's text loads with `import()`, each as its call is written: never one in a string, a comment or a type (`import('…').T`). */
 function importCalls(text: string): string[] {
@@ -158,7 +159,7 @@ test("REFUSED, whatever the daemon's: a test that ticks with WF_MAX_CONCURRENT l
     else process.env.WF_MAX_RUNS = runs;
   });
   process.env.WF_MAX_RUNS = '0';
-  await assert.rejects(tick(engine()), (err: Error) => {
+  await assert.rejects(runWith(engine(), tickRun({})), (err: Error) => {
     assert.equal(
       err.message,
       'WF_MAX_CONCURRENT=set-it-in-the-test is not a count from 1. It is the most sessions at work per pool at once, a whole number: WF_MAX_CONCURRENT=4 — or unset, for 2.',
@@ -206,15 +207,15 @@ test("the `claude` the api's engine runs is the harness's: it resolves there, an
   fs.writeFileSync(registry, '[]');
 
   const e = engine();
-  await e.file({ id: 't-harness', brief: 'Read me.', cwd: scratch('nemia-api-cwd-'), harness: 'claude' });
+  await Effect.runPromise(e.file({ id: 't-harness', brief: 'Read me.', cwd: scratch('nemia-api-cwd-'), harness: 'claude' }));
   let before = observations();
-  await e.list();
+  await Effect.runPromise(e.list());
   assert.ok(
     observations() > before,
     "the package's engine, listing a task filed on its Claude harness, observed the harness's `claude`: a list observes every harness, where a view of a task with no attempt in flight reads its record alone",
   );
   before = observations();
-  await (await runtime.runPromise(Engine.useSync((e) => e))).list();
+  await Effect.runPromise((await runtime.runPromise(Engine.useSync((e) => e))).list());
   assert.ok(observations() > before, "and so did the api's");
   assert.match(fs.readFileSync(calls, 'utf8'), /^agents --all --json$/m);
 });

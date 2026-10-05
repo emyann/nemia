@@ -170,7 +170,7 @@ async function quotedOf(page: Page, id: string): Promise<string[]> {
 
 /** The start form's Reads list: a run picked shows what it would hand, badged where it has not shipped. */
 async function onTheStartForm(page: Page, what: string): Promise<void> {
-  const form = page.locator(`section[aria-label="Workflow ${WORKFLOWS.good.name}"] [data-context-picker]`);
+  const form = page.locator(`article[aria-label="Workflow ${WORKFLOWS.good.name}"] [data-context-picker]`);
   for (const id of [DIAMOND.running.id, DIAMOND.shipped.id]) {
     const box = form.locator(`li[data-run="${id}"] input[type="checkbox"]`);
     if (!(await box.isChecked())) await form.locator(`li[data-run="${id}"] label`).click();
@@ -256,7 +256,7 @@ export default {
     let files = written(false);
     try {
       await onTheFactory(page);
-      await goto(page, '/workflows');
+      await goto(page, `/workflows/repo/${WORKFLOWS.good.name}`);
       await wideThenPhone(page, (what) => onTheStartForm(page, what));
       await goto(page, '/inbox');
       await wideThenPhone(page, (what) => onTheCard(page, what));

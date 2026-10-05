@@ -1,6 +1,6 @@
 /**
  * The runtime's layout, held by path (`docs/architecture.md`): the core knows of the harnesses only their seam, a harness knows
- * nothing of A2A, of the engine service or of the doors, and the CLI reaches the runtime through its two faces alone. No two files
+ * nothing of A2A, of the engine service or of the entries, and the CLI reaches the runtime through its face alone. No two files
  * need each other's values, no source file imports a test, a face re-exports by name, and only the entries sit flat in `src/`.
  *
  * Each rule is made to refuse a planted import first: a rule that reads nothing passes too.
@@ -56,8 +56,8 @@ const sourceFiles = (): string[] =>
 
 const read = (file: string) => fs.readFileSync(path.join(PKG, file), 'utf8');
 
-const DOORS = ['src/facade.ts', 'src/index.ts'];
-/** The runtime's entries: its two doors, and the pure door to its vocabulary (`agent-runtime/vocabulary`). */
+const DOORS = ['src/index.ts'];
+/** The runtime's entries: its one face, and the pure door to its vocabulary (`agent-runtime/vocabulary`). */
 const ENTRIES = [...DOORS, 'src/vocabulary.ts'];
 const under = (file: string, dir: string) => file.startsWith(`src/${dir}/`);
 /** What the core may import of the harnesses: the seam, the arguments a task carries, and their face. */
@@ -66,8 +66,8 @@ const SEAM = ['src/harness/seam.ts', 'src/harness/args.ts', 'src/harness/index.t
 /** Why each rule refuses, and what to do instead. */
 const WHY = {
   core: `the core knows a harness only by ${SEAM.join(', ')} — put what it needs in the seam`,
-  below: 'the core and the harnesses sit below A2A, the engine service and the doors — move what both need down',
-  cli: `the CLI reaches the runtime through its two faces, ${DOORS.join(' and ')}, alone — export what it needs there`,
+  below: 'the core and the harnesses sit below A2A, the engine service and the entries — move what both need down',
+  cli: `the CLI reaches the runtime through its face, ${DOORS.join(' and ')}, alone — export what it needs there`,
 };
 
 /** Where `file` imports what its folder may not: each breach, worded with what to do instead. */
@@ -76,7 +76,7 @@ function pathBreaches(file: string, imports: Import[]): string[] {
   for (const { spec } of imports) {
     const target = resolved(file, spec);
     if (target === undefined || !target.startsWith('src/')) continue;
-    const above = ENTRIES.includes(target) || ['a2a', 'service', 'facade', 'cli'].some((dir) => under(target, dir));
+    const above = ENTRIES.includes(target) || ['a2a', 'service', 'cli'].some((dir) => under(target, dir));
     if (under(file, 'core') && under(target, 'harness') && !SEAM.includes(target)) {
       out.push(`${file} imports ${target}: ${WHY.core}`);
     } else if ((under(file, 'core') || under(file, 'harness')) && above) {
@@ -148,7 +148,7 @@ const starExports = (file: string, text: string): string[] =>
     (m) => `${file} re-exports all of ${m[1]}: re-export by name`,
   );
 
-test('REFUSED: the core reaching a driver, A2A, the engine service or a door; a harness reaching A2A, the service or a door; the CLI reaching past its two faces', () => {
+test('REFUSED: the core reaching a driver, A2A, the engine service or an entry; a harness reaching A2A, the service or an entry; the CLI reaching past its face', () => {
   const planted: Array<[string, string, string, string]> = [
     ['src/core/engine/engine.ts', "import { claudeOps } from '../../harness/claude/bg.ts';", 'src/harness/claude/bg.ts', WHY.core],
     [
@@ -158,14 +158,15 @@ test('REFUSED: the core reaching a driver, A2A, the engine service or a door; a 
       WHY.core,
     ],
     ['src/core/domain.ts', "import { nameParts } from '../a2a/map.ts';", 'src/a2a/map.ts', WHY.below],
-    ['src/core/engine/filing.ts', "import { promiseEngine } from '../../facade/engine.ts';", 'src/facade/engine.ts', WHY.below],
+    ['src/core/engine/filing.ts', "import { Engine } from '../../index.ts';", 'src/index.ts', WHY.below],
     ['src/core/engine/filing.ts', "import { Engine } from '../../service/index.ts';", 'src/service/index.ts', WHY.below],
     ['src/core/lifecycle.ts', "const cli = await import('../cli/main.ts');", 'src/cli/main.ts', WHY.below],
     ['src/harness/claude/code.ts', "import { nameParts } from '../../a2a/map.ts';", 'src/a2a/map.ts', WHY.below],
-    ['src/harness/seam.ts', "export { promiseOps } from '../facade/promise.ts';", 'src/facade/promise.ts', WHY.below],
-    ['src/harness/sdk.ts', "import type { Engine } from '../facade.ts';", 'src/facade.ts', WHY.below],
+    ['src/harness/seam.ts', "export { refusalWords } from '../service/refusal.ts';", 'src/service/refusal.ts', WHY.below],
+    ['src/harness/sdk.ts', "import type { EngineShape } from '../index.ts';", 'src/index.ts', WHY.below],
+    ['src/harness/claude/vocabulary.ts', "import { fenceReach } from '../../vocabulary.ts';", 'src/vocabulary.ts', WHY.below],
     ['src/cli/main.ts', "import { fold } from '../core/domain.ts';", 'src/core/domain.ts', WHY.cli],
-    ['src/cli/main.ts', "import { promiseEngine } from '../facade/engine.ts';", 'src/facade/engine.ts', WHY.cli],
+    ['src/cli/main.ts', "import { configRefusal } from '../service/options.ts';", 'src/service/options.ts', WHY.cli],
     ['src/cli/main.ts', "import { Engine } from '../service/index.ts';", 'src/service/index.ts', WHY.cli],
   ];
   for (const [file, line, target, why] of planted) {
@@ -181,9 +182,8 @@ test('REFUSED: the core reaching a driver, A2A, the engine service or a door; a 
     ['src/core/engine/engine.ts', "import { Runner } from '../../harness/index.ts';"],
     ['src/harness/detached/detached.ts', "import { countSpawn } from '../../core/engine/tally.ts';"],
     ['src/a2a/client.ts', "import { claudeOps } from '../harness/claude/bg.ts';"],
-    ['src/cli/main.ts', "import { promiseEngine } from '../index.ts';"],
+    ['src/cli/main.ts', "import { Engine } from '../index.ts';"],
     ['src/cli/main.ts', "import type { Event } from '../index.ts';"],
-    ['src/cli/main.ts', "import { denialText } from '../facade.ts';"],
     ['src/cli/main.ts', "import { BRIEF_KEYS } from './brief.ts';"],
     ['src/core/domain.ts', "// import { nameParts } from '../a2a/map.ts';"],
   ];
@@ -200,20 +200,21 @@ test('REFUSED: a source file flat in src/ that is not an entry', () => {
   assert.deepEqual(
     flatBreaches(['src/facade.ts', 'src/index.ts', 'src/vocabulary.ts', 'src/runner.ts', 'src/core/domain.ts', 'src/harness/claude/bg.ts']),
     [
-      "src/runner.ts sits flat in src/: only the entries src/facade.ts, src/index.ts, src/vocabulary.ts do — put it in its feature's folder",
+      "src/facade.ts sits flat in src/: only the entries src/index.ts, src/vocabulary.ts do — put it in its feature's folder",
+      "src/runner.ts sits flat in src/: only the entries src/index.ts, src/vocabulary.ts do — put it in its feature's folder",
     ],
   );
 });
 
 test('only the entries sit flat in src/', () => {
   const files = sourceFiles();
-  assert.ok(files.includes('src/facade.ts') && files.includes('src/core/domain.ts'), 'the scan reads the source and its folders');
+  assert.ok(files.includes('src/index.ts') && files.includes('src/core/domain.ts'), 'the scan reads the source and its folders');
   assert.deepEqual(flatBreaches(files), []);
 });
 
 test('each file imports only what its folder may', () => {
   const files = sourceFiles();
-  assert.ok(files.includes('src/facade.ts') && files.length > 20, 'the scan reads the source');
+  assert.ok(files.includes('src/index.ts') && files.length > 20, 'the scan reads the source');
   assert.deepEqual(
     files.flatMap((f) => pathBreaches(f, importsIn(read(f)))),
     [],

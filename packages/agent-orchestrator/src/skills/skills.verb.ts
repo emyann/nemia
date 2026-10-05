@@ -4,6 +4,7 @@
  * what Nemia ships (`SKILLS_WRITE`, `writeSkill`, `copySkill`). The api resolves which folders a request names, guards each write, and
  * words the board's answer around what each entry answers.
  */
+import { tried } from '../runtime-client.ts';
 import path from 'node:path';
 import type { Args, Flag, Positional, Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
@@ -44,10 +45,11 @@ export const SKILLS_LIST: Command<Record<string, SkillRead>> = {
   writes: false,
   route: { method: 'GET', path: '/api/skills', status: 200 },
   only: { side: 'api', why: "the board's skill picker lists every skill by place; at the command line a person lists the folders" },
-  async handler(_e, args) {
-    const dirs = Array.isArray(args.skills) ? args.skills : [];
-    return Object.fromEntries(dirs.map((dir) => [dir, skillRead(path.basename(dir), dir)]));
-  },
+  handler: (args) =>
+    tried(() => {
+      const dirs = Array.isArray(args.skills) ? args.skills : [];
+      return Object.fromEntries(dirs.map((dir) => [dir, skillRead(path.basename(dir), dir)]));
+    }),
   print: () => [],
 };
 
@@ -72,10 +74,11 @@ export const SKILLS_READ: Command<SkillPage> = {
     side: 'api',
     why: "the board's skill page reads one skill with its form and its users; at the command line a person reads its SKILL.md",
   },
-  async handler(_e, args) {
-    const dir = textOf(args, 'dir') ?? '';
-    return { ...skillRead(textOf(args, 'name') ?? '', dir), text: skillText(dir), version: skillVersion(dir) };
-  },
+  handler: (args) =>
+    tried(() => {
+      const dir = textOf(args, 'dir') ?? '';
+      return { ...skillRead(textOf(args, 'name') ?? '', dir), text: skillText(dir), version: skillVersion(dir) };
+    }),
   print: () => [],
 };
 
@@ -105,13 +108,14 @@ export const SKILLS_WRITE: Command<SkillWritten | SkillCopied> = {
     { method: 'PUT', path: '/api/skills/:from/:name', status: 200, hand: WRITE_HAND },
   ],
   only: { side: 'api', why: "the board's library writes a skill from a form; at the command line a person edits the skill's SKILL.md" },
-  async handler(_e, args) {
-    const library = textOf(args, 'library') ?? '';
-    const copy = textOf(args, 'copy');
-    if (copy !== undefined) return copySkill(textOf(args, 'shipped') ?? '', library, copy);
-    const change = JSON.parse(textOf(args, 'change') ?? 'null') as SkillChange;
-    return writeSkill(library, change, { version: textOf(args, 'version') ?? null });
-  },
+  handler: (args) =>
+    tried(() => {
+      const library = textOf(args, 'library') ?? '';
+      const copy = textOf(args, 'copy');
+      if (copy !== undefined) return copySkill(textOf(args, 'shipped') ?? '', library, copy);
+      const change = JSON.parse(textOf(args, 'change') ?? 'null') as SkillChange;
+      return writeSkill(library, change, { version: textOf(args, 'version') ?? null });
+    }),
   print: () => [],
 };
 

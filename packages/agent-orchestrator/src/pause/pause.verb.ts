@@ -4,7 +4,8 @@
  * again on the resume and asks the engine to stop it (`pauseNow`). A controller: it reaches the engine through the client, and writes
  * a person's files — the pause through `putPause`, each ask through `runStore.asks.write` — never a run's record.
  */
-import type { Engine } from '../runtime-client.ts';
+import { Effect } from 'effect';
+import { EngineService, asked } from '../runtime-client.ts';
 import { tryOf, type Run } from '../record/record.ts';
 import { runStore } from '../record/files.store.ts';
 import { stepsOf } from '../record/record.store.ts';
@@ -13,15 +14,21 @@ import { putPause, readPause } from './pause.store.ts';
 import { currentTasks, interruptsAmong, type Interrupt, type PausedNow } from './pause.ts';
 
 /** The runs a pause at once may stop the tasks of, by id, and those tasks (`interruptsAmong`), off one read of the engine. */
-async function interruptsRead(e: Engine): Promise<{ runs: Map<string, Run>; interrupts: Interrupt[] }> {
+const interruptsRead = Effect.fnUntraced(function* () {
+  const e = yield* EngineService;
   const runs = runStore.runs.list().filter((run) => !run.cancelledAt);
   const ids = [...new Set(runs.flatMap(currentTasks))];
-  const views = new Map((ids.length ? (await e.list(ids)).views : []).map((v) => [v.id, v]));
-  return { runs: new Map(runs.map((r) => [r.id, r])), interrupts: interruptsAmong(runs, (id) => views.get(id), stepsOf) };
-}
+  const views = new Map((ids.length ? (yield* asked('list', e.list(ids))).views : []).map((v) => [v.id, v]));
+  return {
+    runs: new Map<string, Run>(runs.map((r) => [r.id, r])),
+    interrupts: interruptsAmong(runs, (id) => views.get(id), stepsOf) satisfies Interrupt[],
+  };
+});
 
 /** Each task a pause at once would stop now, of every run not called off: what `nemia pause --now` and the board's confirm show. */
-export const nowRead = async (e: Engine): Promise<Interrupt[]> => (await interruptsRead(e)).interrupts;
+export const nowRead = Effect.fn('nowRead')(function* () {
+  return (yield* interruptsRead()).interrupts;
+});
 
 /**
  * Pauses the store at once: puts the pause (`putPause`), or keeps the one that stands as it was put — its since, its by and its why, so
@@ -31,10 +38,11 @@ export const nowRead = async (e: Engine): Promise<Interrupt[]> => (await interru
  * work (`skipped`). A stop the engine refuses — the task settled since it was read — is passed over: the tick sets its ask aside
  * (`pauseAskVoid`).
  */
-export async function pauseNow(e: Engine, said: { why?: string; by?: string }, now: Date = new Date()): Promise<PausedNow> {
+export const pauseNow = Effect.fn('pauseNow')(function* (said: { why?: string; by?: string }, now: Date = new Date()) {
+  const e = yield* EngineService;
   const stands = readPause();
   const pause = stands ?? putPause(said, now);
-  const { runs, interrupts } = await interruptsRead(e);
+  const { runs, interrupts } = yield* interruptsRead();
   const interrupted: Interrupt[] = [];
   const skipped: Interrupt[] = [];
   for (const i of interrupts) {
@@ -49,8 +57,8 @@ export async function pauseNow(e: Engine, said: { why?: string; by?: string }, n
       skipped.push(i);
       continue;
     }
-    await stopAsked(e, i.taskId);
+    yield* stopAsked(e, i.taskId);
     interrupted.push(i);
   }
-  return { pause, kept: stands !== null, interrupted, skipped };
-}
+  return { pause, kept: stands !== null, interrupted, skipped } satisfies PausedNow;
+});

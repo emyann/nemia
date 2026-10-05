@@ -7,7 +7,8 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import type { ClaudeFlags, CodexArgs, Engine, TaskView } from '../runtime-client.ts';
+import { Effect } from 'effect';
+import { asked, awaited, over, type ClaudeFlags, type CodexArgs, type Engine, type TaskView } from '../runtime-client.ts';
 import {
   CHECK_DEADLINE_SECONDS,
   CHECK_NICENESS,
@@ -52,18 +53,19 @@ import { handedOf } from '../brief/handed.verb.ts';
 import { roundFiled } from '../round/round.ts';
 import { filedConfig, filedFolders, tryModel } from '../filed/filed.ts';
 import { closeoutSchemaOf, parseCloseout, type Closeout } from '../closeout/closeout.ts';
-import { modeWord, nextTry, sessionModel, type Retry, type RetryAsk } from '../retry/index.ts';
+import { modeWord, nextTry, sessionModel, tryWord, type Retry, type RetryAsk } from '../retry/index.ts';
 import { artifactsDir, inputsDir } from '../record/record.store.ts';
-import { inboxDir, runStore } from '../record/files.store.ts';
+import { inboxDir } from '../record/files.store.ts';
 import { checkCloseout, writeCheckCloseout } from '../check/check.store.ts';
 import { checkoutParts, gitSays, realRepoOf, workspaceFor } from '../workspace/worktree.store.ts';
 import { agentFilesDir, renderedIn, skillsAgain } from '../agents/agents.store.ts';
-import { checksHandedOf, refusalOf, reportedEngine, saidIn, sessionIn } from '../views/views.verb.ts';
+import { checksHandedRead, refusalRead, reportedEngine, saidIn, sessionIn } from '../views/views.verb.ts';
 import { placesOf } from '../folder/lookup.store.ts';
 import { skillsFor } from '../folder/folder.store.ts';
 import { renderedFlags, rendersAgent, unrendered } from '../agents/agents.ts';
 import { within } from '../meter/tally.store.ts';
 import { answerHeld, stopAsked } from './held.verb.ts';
+import { forStep } from '../telemetry/telemetry.store.ts';
 
 /**
  * What a filing says of how its session runs — the harness's arguments, a session to continue, a hold and a closing statement's schema —
@@ -134,25 +136,16 @@ export type PassReads = {
  * not.
  */
 export type Closer = {
-  closeWaiting: (name: string, taskId: string) => Promise<string | undefined>;
+  closeWaiting: (name: string, taskId: string) => Effect.Effect<string | undefined>;
   awaitsWord: (taskId: string | null | undefined) => boolean;
 };
 
 /**
- * One pass's filing: the engine, the run, what the pass read (`PassReads`), its closer (`Closer`), whether it may file still (`mayFile`,
- * made by `mayFileOf` once a pass), and the pass's notes, which each filing adds to in the order it runs.
+ * One pass's filing: the engine, which files each brief with its parts beside it (`inParts`, given by `advancePass`), the run, what
+ * the pass read (`PassReads`), its closer (`Closer`), whether it may file still (`mayFile`, made by `mayFileOf` once a pass), and the
+ * pass's notes, which each filing adds to in the order it runs.
  */
 export type Filing = { e: Engine; run: Run; reads: PassReads; closer: Closer; mayFile: () => boolean; notes: string[] };
-
-/**
- * Whether a pass may file for this run still, read off the store before each filing: not once the run is called off, forgotten, pruned
- * or held, or the store paused, while the pass was at work. Once it has said no it says no for the rest of the pass, whatever the store
- * reads after.
- */
-export const mayFileOf = (run: Run): (() => boolean) => {
-  let calledOff = false;
-  return () => !(calledOff ||= !runStore.runs.exists(run.id) || runStore.runs.calledOff(run.id));
-};
 
 /** The engine as the pass read it: a check's verdict is read off the view the pass judged it by (`reportedEngine`), never a second time. */
 const asRead = (f: Filing): Engine => reportedEngine(f.e, [...f.reads.views.values()]);
@@ -161,8 +154,8 @@ const asRead = (f: Filing): Engine => reportedEngine(f.e, [...f.reads.views.valu
 const stepNamed = (f: Filing, name: string): Workflow => f.reads.steps.find((s) => s.name === name)!;
 
 /** Close the task held open a filing replaces, where it waits for a word (`Closer`): the engine's refusal as a note, or undefined. */
-const closeFirst = async (f: Filing, name: string, taskId: string | null | undefined): Promise<string | undefined> =>
-  f.closer.awaitsWord(taskId) ? f.closer.closeWaiting(name, taskId!) : undefined;
+const closeFirst = (f: Filing, name: string, taskId: string | null | undefined): Effect.Effect<string | undefined> =>
+  f.closer.awaitsWord(taskId) ? f.closer.closeWaiting(name, taskId!) : Effect.succeed(undefined);
 
 /** The steps a pass tried again, and those of them whose try is a recheck, whose checks are filed with the others. */
 type Tried = { tried: string[]; rechecked: string[] };
@@ -171,39 +164,27 @@ type Tried = { tried: string[]; rechecked: string[] };
  * File the tries due (the assessment's `retry`), in order: each a recheck, a stop of a session not settled, an answer to the task held
  * open (`answerHeld`), or a task of its own. Answers with the steps tried and those rechecked.
  */
-export async function fileTries(f: Filing, retry: readonly Retry[]): Promise<Tried> {
+export const fileTries = Effect.fn('fileTries')(function* (f: Filing, retry: readonly Retry[]) {
   const out: Tried = { tried: [], rechecked: [] };
-  for (const r of retry) await fileTry(f, r, out);
+  for (const r of retry) yield* fileTry(f, r, out).pipe(forStep(f.run.id, r.step));
   return out;
-}
+});
 
 /**
  * Ask the engine once to stop a try's session its harness blocked, or that runs on: the try is filed by a pass once it has settled. A stop
  * the engine refuses (`stopAsked`) is said, and the try waits for the same settling.
  */
-async function stopFirst(f: Filing, r: Retry, taskId: string): Promise<void> {
+const stopFirst = Effect.fnUntraced(function* (f: Filing, r: Retry, taskId: string) {
   if (f.reads.views.get(taskId)?.state.stopRequested) return;
-  const refused = await stopAsked(f.e, taskId);
+  const refused = yield* stopAsked(f.e, taskId);
   const why = r.runsOn ? 'its session runs on, asked for while its harness had blocked it' : 'its harness blocked its session';
-  const asked = refused
+  const stopped = refused
     ? `but the engine did not take the stop (${refused}), and the try is filed once it has settled`
     : 'so the engine is asked to stop it, and the try is filed once it has';
   f.notes.push(
-    `${r.step}: try ${r.try} — nemia retry ${modeWord(r)}${r.message !== undefined ? ', with your answer' : ''}; ${why}, ${asked}`,
+    `${r.step}: try ${r.try} — nemia retry ${modeWord(r)}${r.message !== undefined ? ', with your answer' : ''}; ${why}, ${stopped}`,
   );
-}
-
-/** The note that says a try, and on whose word: `retries:`, a nudge to sign off, or `nemia retry` and what it was typed with. */
-const tryWord = (r: Retry, step: Workflow): string =>
-  `${r.step}: try ${r.try} — ${r.by === 'retries' ? `retries: ${step.retries}` : r.by === 'signoff' ? 'a nudge to sign off, once a round' : askedWord(r)}`;
-
-/**
- * A try asked for, as `tryWord` says it: by `nemia pause --now`, which stopped its session or check, or by `nemia retry` as it was typed.
- */
-const askedWord = (r: Retry): string =>
-  r.by === 'pause'
-    ? `${r.mode === 'recheck' ? 'rechecked' : 'continued'} after nemia pause --now`
-    : `nemia retry ${modeWord(r)}${r.budget !== undefined ? ` --budget ${r.budget}` : ''}${r.message !== undefined ? ', with your answer' : ''}`;
+});
 
 /** Whether a try is a person's nudge that answers the step's task held open, in the session that signed, rather than a task of its own. */
 const answersHeld = (f: Filing, r: Retry, step: Workflow, record: StepRecord): boolean => {
@@ -221,11 +202,11 @@ const answersHeld = (f: Filing, r: Retry, step: Workflow, record: StepRecord): b
  * File one try due, or stop its session first, and put it on the record with its note: nothing once the pass may file no more, and
  * nothing but the note where the engine refuses the close or the answer it needs.
  */
-async function fileTry(f: Filing, r: Retry, out: Tried): Promise<void> {
+const fileTry = Effect.fnUntraced(function* (f: Filing, r: Retry, out: Tried) {
   const { run, notes } = f;
   const step = stepNamed(f, r.step);
   const record = run.steps[r.step];
-  if (r.stopFirst) return stopFirst(f, r, record.taskId!);
+  if (r.stopFirst) return yield* stopFirst(f, r, record.taskId!);
   if (!f.mayFile()) return;
   const said = tryWord(r, step);
   if (r.mode === 'recheck') {
@@ -236,13 +217,14 @@ async function fileTry(f: Filing, r: Retry, out: Tried): Promise<void> {
     return;
   }
   const answers = answersHeld(f, r, step, record);
-  const closeRefused = answers ? undefined : await closeFirst(f, r.step, record.taskId);
+  const closeRefused = answers ? undefined : yield* closeFirst(f, r.step, record.taskId);
   if (closeRefused) {
     notes.push(closeRefused);
     return;
   }
   const taskId = answers ? record.taskId! : stepTaskId(run, r.step, r.try);
-  const refused = answers || !(await f.e.view(taskId)).state.brief ? await sendTry(f, r, step, taskId, answers) : undefined;
+  const briefed = answers ? undefined : (yield* asked('view', f.e.view(taskId))).state.brief;
+  const refused = answers || !briefed ? yield* sendTry(f, r, step, taskId, answers) : undefined;
   if (refused) {
     notes.push(`${r.step}: ${refused}`);
     return;
@@ -251,22 +233,22 @@ async function fileTry(f: Filing, r: Retry, out: Tried): Promise<void> {
   notes.push(said);
   run.steps[r.step] = nextTry(record, r, taskId);
   for (const b of r.back ?? []) run.steps[b] = sentBack(run.steps[b]);
-}
+});
 
 /**
  * Send a try to the engine: filed as a task of its own, or given as the answer to the task held open (`answers`). Answers with the
  * engine's refusal of the answer, or undefined.
  */
-async function sendTry(f: Filing, r: Retry, step: Workflow, taskId: string, answers: boolean): Promise<string | undefined> {
+const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: Workflow, taskId: string, answers: boolean) {
   const { e, run, reads } = f;
   const record = run.steps[r.step];
   const files = artifactsDir(run, r.step);
   fs.mkdirSync(files, { recursive: true });
   const remote = isRemoteHarness(step.harness);
   const resumeFrom = r.mode === 'nudge' && !remote ? sessionIn(reads.views, record.taskId!) : undefined;
-  const refusal = record.check && step.check ? await refusalOf(asRead(f), step.check, record.check.taskId) : undefined;
-  const closeouts = await askingReads(f, r, resumeFrom);
-  const checked = remote ? [] : await checksHandedOf(asRead(f), run, reads.steps, step);
+  const refusal = record.check && step.check ? yield* refusalRead(step.check, record.check.taskId).pipe(over(asRead(f))) : undefined;
+  const closeouts = yield* askingReads(f, r, resumeFrom);
+  const checked = remote ? [] : yield* checksHandedRead(run, reads.steps, step).pipe(over(asRead(f)));
   const status = triedFrom(step, run, reads.phaseOf, reads.signedOff, reads.asked, reads.steps, reads.spendOf);
   const told = toldOf(run, step);
   const brief = remote
@@ -293,23 +275,23 @@ async function sendTry(f: Filing, r: Retry, step: Workflow, taskId: string, answ
         filedFolders(told.step, reads.steps, { runArtifacts: path.dirname(files), inbox: inboxDir() }),
       );
   const budgetUsd = budgetUsdFor(r.budget ?? budgetOf(step, record), stepSpend(run, r.step, reads.spendOf));
-  if (answers) return answerHeld(e, taskId, brief, budgetUsd);
-  await e.file(trySpec(f, r, step, record, { taskId, brief, resumeFrom, budgetUsd, told }));
+  if (answers) return yield* answerHeld(e, taskId, brief, budgetUsd);
+  yield* asked('file', e.file(trySpec(f, r, step, record, { taskId, brief, resumeFrom, budgetUsd, told })));
   return undefined;
-}
+});
 
 /**
  * How a try's brief reads the closeouts: a new session of a loop's target within a round reads the looping step's off the try that asked
  * for the round (`askingTry`), and every other as it signed.
  */
-async function askingReads(f: Filing, r: Retry, resumeFrom: string | undefined): Promise<(name: string) => Closeout | undefined> {
+const askingReads = Effect.fnUntraced(function* (f: Filing, r: Retry, resumeFrom: string | undefined) {
   const { e, run, reads } = f;
   const asking = resumeFrom ? undefined : askingTry(reads.steps, run, r.step);
-  const askedWith = asking ? (await e.view(asking.taskId)).state.attempts.at(-1)?.closeout : undefined;
+  const askedWith = asking ? (yield* asked('view', e.view(asking.taskId))).state.attempts.at(-1)?.closeout : undefined;
   const findings = askedWith === undefined ? undefined : parseCloseout(askedWith);
   return (name: string): Closeout | undefined =>
     asking && name === asking.looping.name && findings && !('error' in findings) ? findings : reads.signedOff(name);
-}
+});
 
 /** What the ending a try is sent back from said, for the work's brief: its status, its summary and needs, and where it merges. */
 const endingSaid = (f: Filing, ending: Workflow): EndingStopped => {
@@ -379,25 +361,25 @@ const trySpec = (
 /**
  * File the rounds due (the assessment's `round`), in order, until the pass may file no more: answers with the looping steps it took round.
  */
-export async function fileRounds(f: Filing, round: readonly Round[]): Promise<string[]> {
+export const fileRounds = Effect.fn('fileRounds')(function* (f: Filing, round: readonly Round[]) {
   const looped: string[] = [];
   for (const r of round) {
     if (!f.mayFile()) break;
-    await fileRound(f, r, looped);
+    yield* fileRound(f, r, looped).pipe(forStep(f.run.id, r.target));
   }
   return looped;
-}
+});
 
 /**
  * File one round: close the target's task held open first, say it, file the target's next try where the engine does not hold it, and move
  * the loop on (`roundFiled`). Nothing but the note where the engine refuses the close.
  */
-async function fileRound(f: Filing, r: Round, looped: string[]): Promise<void> {
+const fileRound = Effect.fnUntraced(function* (f: Filing, r: Round, looped: string[]) {
   const { e, run, notes } = f;
   const looping = stepNamed(f, r.step);
   const record = run.steps[r.target];
   const taskId = stepTaskId(run, r.target, tryOf(run, r.target) + 1);
-  const refused = await closeFirst(f, r.target, record.taskId);
+  const refused = yield* closeFirst(f, r.target, record.taskId);
   if (refused) {
     notes.push(refused);
     return;
@@ -406,9 +388,10 @@ async function fileRound(f: Filing, r: Round, looped: string[]): Promise<void> {
   notes.push(
     `${r.step}: round ${r.round} — ${r.by === 'again' ? `again, rounds: ${capOf(looping)}` : `nemia round${r.budget !== undefined ? ` --budget ${r.budget}` : ''}`}; ${r.target} goes again`,
   );
-  if (!(await e.view(taskId)).state.brief) await e.file(roundSpec(f, r, looping, stepNamed(f, r.target), taskId));
+  if (!(yield* asked('view', e.view(taskId))).state.brief)
+    yield* asked('file', e.file(roundSpec(f, r, looping, stepNamed(f, r.target), taskId)));
   Object.assign(run.steps, roundFiled(f.reads.steps, run, r, taskId));
-}
+});
 
 /** A round's target filed under its next try's id: its session continued, told the round, with its cap for the round. */
 function roundSpec(f: Filing, r: Round, looping: Workflow, target: Workflow, taskId: string): Spec {
@@ -465,26 +448,26 @@ function roundSpec(f: Filing, r: Round, looping: Workflow, target: Workflow, tas
 }
 
 /** File the checks of these steps, in order, until the pass may file no more: answers with the steps whose checks are on the record. */
-export async function fileChecks(f: Filing, names: readonly string[]): Promise<string[]> {
+export const fileChecks = Effect.fn('fileChecks')(function* (f: Filing, names: readonly string[]) {
   const checked: string[] = [];
   for (const name of names) {
     if (!f.mayFile()) break;
-    await fileCheck(f, name);
+    yield* fileCheck(f, name).pipe(forStep(f.run.id, name));
     checked.push(name);
   }
   return checked;
-}
+});
 
 /**
  * File a step's check where the engine does not hold it, on the `check` harness, with the command the run froze and a deadline, a landing's
  * its own, and put it on the record: an ending's installs first what the staged merge's lockfile asks for (`checkoutParts`), and says so.
  */
-async function fileCheck(f: Filing, name: string): Promise<void> {
+const fileCheck = Effect.fnUntraced(function* (f: Filing, name: string) {
   const { e, run } = f;
   const step = stepNamed(f, name);
   const workspace = run.steps[name].workspace ?? run.workspace;
   const taskId = checkTaskId(run, name);
-  if (!(await e.view(taskId)).state.brief) {
+  if (!(yield* asked('view', e.view(taskId))).state.brief) {
     fs.mkdirSync(path.dirname(checkCloseout(taskId)), { recursive: true });
     const files = artifactsDir(run, name);
     fs.mkdirSync(files, { recursive: true });
@@ -503,18 +486,21 @@ async function fileCheck(f: Filing, name: string): Promise<void> {
       WF_ARTIFACTS: files,
       ...(closeout ? { WF_CLOSEOUT: writeCheckCloseout(taskId, closeout) } : {}),
     };
-    await e.file({
-      id: taskId,
-      harness: 'check',
-      priority: MOMENTUM,
-      brief: step.check!,
-      cwd: workspace,
-      deadlineSeconds: lands ? LANDING_CHECK_DEADLINE_SECONDS : CHECK_DEADLINE_SECONDS,
-      config: { command: checkArgv(step.check!, install !== undefined), env, niceness: CHECK_NICENESS },
-    });
+    yield* asked(
+      'file',
+      e.file({
+        id: taskId,
+        harness: 'check',
+        priority: MOMENTUM,
+        brief: step.check!,
+        cwd: workspace,
+        deadlineSeconds: lands ? LANDING_CHECK_DEADLINE_SECONDS : CHECK_DEADLINE_SECONDS,
+        config: { command: checkArgv(step.check!, install !== undefined), env, niceness: CHECK_NICENESS },
+      }),
+    );
   }
   run.steps[name] = { ...run.steps[name], check: { taskId } };
-}
+});
 
 /** Where a step is filed and what it depends on, as its workspace was cut (`workspaceFor`). */
 type Place = Awaited<ReturnType<typeof workspaceFor>>;
@@ -524,27 +510,27 @@ type Place = Awaited<ReturnType<typeof workspaceFor>>;
  * that waited on runs, on the pass that files its roots, moves its base to its branch as it stands; and a run that waited on runs or was
  * handed runs as context reads what they concluded (`handedOf`).
  */
-export async function fileReady(f: Filing, ready: readonly string[], starting: boolean): Promise<string[]> {
+export const fileReady = Effect.fn('fileReady')(function* (f: Filing, ready: readonly string[], starting: boolean) {
   const { e, run } = f;
   if (ready.length && starting && run.after?.length && isGitRun(run))
     run.baseRef = gitSays(run.repo, 'rev-parse', '--verify', `${run.branch}^{commit}`)?.trim() || run.baseRef;
-  const parents = ready.length && starting ? await handedOf(e, run) : undefined;
+  const parents = ready.length && starting ? yield* handedOf(e, run) : undefined;
   const filed: string[] = [];
   for (const name of ready) {
     if (!f.mayFile()) break;
     const step = stepNamed(f, name);
-    const place = await within('act', () => workspaceFor(run, f.reads.steps, step));
+    const place = yield* awaited(() => within('act', () => workspaceFor(run, f.reads.steps, step)));
     f.notes.push(...place.notes.map((note) => `${name}: ${note}`));
     if (!f.mayFile()) break;
     const files = artifactsDir(run, name);
     fs.mkdirSync(files, { recursive: true });
-    const checked = isRemoteHarness(step.harness) ? [] : await checksHandedOf(asRead(f), run, f.reads.steps, step);
-    const taskId = await e.file(readySpec(f, step, place, files, { parents, checked }));
+    const checked = isRemoteHarness(step.harness) ? [] : yield* checksHandedRead(run, f.reads.steps, step).pipe(over(asRead(f)));
+    const taskId = yield* asked('file', e.file(readySpec(f, step, place, files, { parents, checked }))).pipe(forStep(run.id, name));
     run.steps[name] = { ...run.steps[name], taskId, workspace: place.workspace, branch: place.branch };
     filed.push(name);
   }
   return filed;
-}
+});
 
 /** The session of the step a step resumes, off its current task: undefined for a step with none. */
 const sessionOf = (f: Filing, stepName: string): string | undefined => {

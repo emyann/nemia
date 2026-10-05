@@ -51,7 +51,7 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
   `frontmatterValue` in `apps/api/src/workflows/workflows.ts` is one today.
 - **A test that needs a realistic folder reads the tests' team** (`test/fixtures/team`, `test/team.ts`), never a shipped one: a
   person's factories get no workflow or agent from the package, and a guard over what ships reads `shippedFolders()`.
-- **The api reads `agent-orchestrator/run`, `agent-orchestrator/workflow` and `agent-orchestrator/effect`**, its tests with
+- **The api reads `agent-orchestrator`, `agent-orchestrator/run` and `agent-orchestrator/workflow`**, its tests with
   `await import`: the api's typecheck fails on a name a subpath no longer exports, so before moving a name out of `run.ts` or
   `workflow.ts`, re-export from `run.ts` what the api reads there.
 
@@ -59,7 +59,7 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
 
 - **A refusal is thrown as `Missing`, `Conflict` or `Invalid`** (`src/refusal/refusal.ts`, `exitCode` 2): no such run, a state that
   forbids the verb, an input that is wrong. `test/refusal.test.ts` refuses `exitCode: 2` set by hand anywhere under `src`.
-- **A new refusal chooses its kind, never a status**: the api reads the kind off `agent-orchestrator/effect` and answers it from one
+- **A new refusal chooses its kind, never a status**: the api reads the kind off `agent-orchestrator` and answers it from one
   table (`REFUSAL_STATUS` in `apps/api/src/app.ts`); a plain `Error` there is a 500.
 
 ## Runs, phases and asks
@@ -96,6 +96,9 @@ the runtime is in `docs/architecture.md`, *Who owns what*.
 - **A command that lives as long as its process is an Effect run by `runMain`** (`src/daemon/up.verb.ts`, run by `wf up` and the api's
   `src/main.ts`): what it holds is taken with `acquireRelease` in its scope, never let go in a signal handler, and a signal exits 128 +
   its number once the scope is closed.
+- **The packages' entries are Effect, and the api is the system's public interface**: a controller is a program over `EngineService`,
+  run by its caller with `runWith` (`runtime-client.ts`), and reads the engine with `asked`. `await e.view(id)` compiles and answers
+  the Effect itself, unrun: only `typescript/await-thenable` in `npm run lint` refuses it.
 - **Admission is the runtime's**: the orchestrator files a task `queued` with its `priority` (`stepMomentum`, `MOMENTUM`), and `engine()`
   hands the runtime the ceiling and the pools. A new engine verb goes into `ENGINE_PHASES` and `ENGINE_WRITES`; an admitted task starts on
   the runtime's next pass.

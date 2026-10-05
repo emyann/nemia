@@ -199,6 +199,7 @@ export { feedPhase, feedWords } from './feed/feed.ts';
 export type { FeedSaid, FeedWords } from './feed/feed.ts';
 export {
   acceptedLines,
+  briefParts,
   composeBrief,
   gateLines,
   handedParts,

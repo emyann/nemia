@@ -21,17 +21,18 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import type { Engine } from 'agent-runtime';
 import type { TaskPhase } from '../src/run.ts';
 import { CLOSEOUT_SCHEMA, closeoutSchemaOf } from '../src/closeout/closeout.ts';
 import type { Workflow } from '../src/workflow.ts';
 import { scratch } from './scratch.ts';
 import { TEAM } from './team.ts';
+import { promised } from './promised.ts';
+import { Effect } from 'effect';
 
 const ROOT = scratch('wf-cache-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 process.env.WF_ROOT = ROOT;
-const { advance, retry, start, stepsOf } = await import('../src/runner.ts');
+const { advanceRun, retryRun, startRun, stepsOf, runWith } = await import('../src/runner.ts');
 const { readRun } = await import('../src/record/record.store.ts');
 
 const LOOPED = ['dev'];
@@ -80,7 +81,7 @@ const aRepo = (): string => {
 /** An engine board the walk settles by hand, keeping each task as it was filed. Each task's session is its own, `native-<id>`. */
 const board = () => {
   const tasks = new Map<string, { spec: Filed; phase: TaskPhase; closeout?: unknown; exitCode?: number; reason?: string }>();
-  const e = {
+  const e = promised({
     view: async (id: string) => {
       const t = tasks.get(id);
       const settled = t && ['succeeded', 'failed', 'stopped'].includes(t.phase) ? t.phase : null;
@@ -117,7 +118,7 @@ const board = () => {
     },
     stop: async () => {},
     logs: async () => '',
-  } as unknown as Engine;
+  });
   const settle = (id: string, phase: TaskPhase, closeout?: unknown, exitCode?: number, reason?: string) =>
     Object.assign(tasks.get(id)!, { phase, closeout, exitCode, reason });
   return { e, tasks, settle };
@@ -151,7 +152,7 @@ async function walk(
   dir: string,
   first: { mode: 'nudge' | 'fresh'; model?: string } = { mode: 'nudge' },
 ): Promise<{ id: string; filed: Filed[]; target: string; looping: string; steps: Workflow[] }> {
-  const run = start({ brief: 'add a flag', repo: aRepo(), workflowDir: dir });
+  const run = await Effect.runPromise(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: dir }));
   const steps = stepsOf(run);
   const looping = steps.find((s) => s.loop)!;
   const target = looping.loop!;
@@ -161,7 +162,7 @@ async function walk(
     id === `${run.id}-${step}` ? 1 : Number(new RegExp(`^${run.id}-${step}-try(\\d+)$`).exec(id)?.[1] ?? NaN);
 
   for (let pass = 0; pass < 60; pass++) {
-    const p = await advance(b.e, readRun(run.id));
+    const p = await runWith(b.e, advanceRun(readRun(run.id)));
     const pending = [...b.tasks.entries()].filter(([, t]) => t.phase === 'pending');
     if (!pending.length && !p.looped.length && !p.tried.length) break;
     for (const [id, t] of pending) {
@@ -194,9 +195,9 @@ async function walk(
       if (r) said.again = r < 3;
       b.settle(id, 'succeeded', said);
     }
-    if (pending.some(([id]) => tryOfId(id, target) === 1)) await retry(b.e, run.id, target, first);
+    if (pending.some(([id]) => tryOfId(id, target) === 1)) await runWith(b.e, retryRun(run.id, target, first));
     if (pending.some(([id]) => tryOfId(id, target) === 2))
-      await retry(b.e, run.id, target, { mode: 'nudge', message: 'the --dry-run flag' });
+      await runWith(b.e, retryRun(run.id, target, { mode: 'nudge', message: 'the --dry-run flag' }));
   }
   return { id: run.id, filed: order.map((id) => b.tasks.get(id)!.spec), target, looping: looping.name, steps };
 }
@@ -373,14 +374,14 @@ test('REFUSED by the check: a chain that changes its schema — round 1 without 
 
 for (const name of LOOPED) {
   test(`${name}, at shipped defaults: the run's own nudge to sign off continues an unsigned session filed as that session was — schema, model, effort, tools, window`, async () => {
-    const run = start({ brief: 'add a flag', repo: aRepo(), workflowDir: path.join(TEAM, name) });
+    const run = await Effect.runPromise(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: path.join(TEAM, name) }));
     const target = stepsOf(run).find((s) => s.loop)!.loop!;
     const b = board();
     const order: string[] = [];
     const first = `${run.id}-${target}`;
     const nudge = `${first}-try2`;
     for (let pass = 0; pass < 20 && !b.tasks.has(nudge); pass++) {
-      await advance(b.e, readRun(run.id));
+      await runWith(b.e, advanceRun(readRun(run.id)));
       for (const [id, t] of b.tasks) {
         if (t.phase !== 'pending' || id === nudge) continue;
         order.push(id);

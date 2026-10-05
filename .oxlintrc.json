@@ -218,8 +218,8 @@
           {
             "patterns": [
               {
-                "group": ["agent-orchestrator/**", "!agent-orchestrator/run", "!agent-orchestrator/workflow", "!agent-orchestrator/effect"],
-                "message": "The api reaches agent-orchestrator through its entries alone: agent-orchestrator, /run, /workflow or /effect"
+                "group": ["agent-orchestrator/**", "!agent-orchestrator/run", "!agent-orchestrator/workflow"],
+                "message": "The api reaches agent-orchestrator through its entries alone: agent-orchestrator, /run or /workflow"
               },
               {
                 "group": ["agent-runtime", "agent-runtime/**"],
@@ -326,7 +326,7 @@
     {
       "files": ["apps/api/src/detail/detail.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 94, "skipBlankLines": true, "skipComments": true }],
+        "max-lines-per-function": ["error", { "max": 91, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 22 }]
       }
     },
@@ -372,7 +372,7 @@
     {
       "files": ["apps/web/src/components/FactoryCanvas.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 255, "skipBlankLines": true, "skipComments": true }]
+        "max-lines-per-function": ["error", { "max": 249, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
@@ -459,8 +459,7 @@
     {
       "files": ["apps/web/src/components/WorkflowBuilder.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 206, "skipBlankLines": true, "skipComments": true }],
-        "complexity": ["error", { "max": 25 }]
+        "max-lines-per-function": ["error", { "max": 202, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
@@ -797,9 +796,9 @@
     {
       "files": ["packages/agent-runtime/src/cli/main.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 121, "skipBlankLines": true, "skipComments": true }],
-        "complexity": ["error", { "max": 49 }],
-        "sonarjs/cognitive-complexity": ["error", 53]
+        "max-lines-per-function": ["error", { "max": 89, "skipBlankLines": true, "skipComments": true }],
+        "complexity": ["error", { "max": 42 }],
+        "sonarjs/cognitive-complexity": ["error", 40]
       }
     },
     {
@@ -830,7 +829,7 @@
       }
     },
     {
-      "files": ["packages/agent-runtime/src/facade/consumer.ts"],
+      "files": ["packages/agent-runtime/src/service/harness-refusal.ts"],
       "rules": {
         "complexity": ["error", { "max": 25 }],
         "sonarjs/cognitive-complexity": ["error", 27]
@@ -893,7 +892,7 @@
     {
       "files": ["packages/agent-runtime/src/service/engine.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 263, "skipBlankLines": true, "skipComments": true }],
+        "max-lines-per-function": ["error", { "max": 228, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 25 }],
         "sonarjs/cognitive-complexity": ["error", 21]
       }

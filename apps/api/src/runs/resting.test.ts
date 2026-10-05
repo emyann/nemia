@@ -11,6 +11,7 @@
 import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { Effect } from 'effect';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -18,7 +19,7 @@ import { app, runtime } from '../app.ts';
 import { ReadMemo } from '../layer.ts';
 import type { MetricRead } from '../factory/ceilings.ts';
 import { Engine, findRun } from '../store.ts';
-import { approve, engine, verifiesRest, restingRead, type RunSummary } from 'agent-orchestrator';
+import { approveRun, engine, restingRead, runWith, type RunSummary, verifiesRest } from 'agent-orchestrator';
 
 /** The engine the app's requests read through: its reads are what a poll costs. */
 const e = await runtime.runPromise(Engine.useSync((engine) => engine));
@@ -172,15 +173,17 @@ function aRefusedRun(id: string) {
 async function journalsAsked<T>(f: () => Promise<T>): Promise<{ value: T; asked: number }> {
   const { view, list } = e;
   let asked = 0;
-  e.view = async (taskId) => {
-    asked++;
-    return view(taskId);
-  };
-  e.list = async (...args: unknown[]) => {
-    const listed = await Reflect.apply(list, e, args);
-    asked += listed.views.length + listed.unreadable.length;
-    return listed;
-  };
+  Object.assign(e, {
+    view: (taskId: string) => {
+      asked++;
+      return view(taskId);
+    },
+    list: (...args: unknown[]) =>
+      Effect.map(Reflect.apply(list, e, args) as ReturnType<typeof list>, (listed) => {
+        asked += listed.views.length + listed.unreadable.length;
+        return listed;
+      }),
+  });
   try {
     return { value: await f(), asked };
   } finally {
@@ -235,9 +238,9 @@ test("a poll's reads are counted into api.poll.reads under /api/runs as the engi
   await list();
   appended('r-moving-implement', { kind: 'said', at, attempt: 1, text: 'Keep going.' });
   const before = await readsOf();
-  const reads = e.io().reads;
+  const reads = Effect.runSync(e.io()).reads;
   await unverified(list);
-  const read = e.io().reads - reads;
+  const read = Effect.runSync(e.io()).reads - reads;
   const after = await readsOf();
   assert.ok(read > 0, "the line appended to the moving run's journal was read");
   assert.deepEqual(after, { count: before.count + 1, sum: before.sum + read }, "the poll's reads, the engine's own count");
@@ -348,10 +351,10 @@ test('two requests at once: the first reads the feed and judges the run succeede
   resting.runs.delete('r-raced');
   const { startedAt: _, ...judged } = answer;
 
-  const first = await restingRead(e, resting, false);
+  const first = await runWith(e, restingRead(e, resting, false));
   blocked('r-raced-implement');
   fed('r-raced-implement');
-  await restingRead(e, resting, false);
+  await runWith(e, restingRead(e, resting, false));
   first.keep(findRun('r-raced')!, judged, [], () => new Map());
   assert.ok(
     !resting.runs.has('r-raced'),
@@ -359,7 +362,7 @@ test('two requests at once: the first reads the feed and judges the run succeede
   );
   assert.equal((await unverified(() => listed('r-raced')))?.status, 'failed');
 
-  const alone = await restingRead(e, resting, false);
+  const alone = await runWith(e, restingRead(e, resting, false));
   alone.keep(findRun('r-raced')!, judged, [], () => new Map());
   assert.ok(resting.runs.has('r-raced'), 'a request no other overtook keeps what it judged');
   resting.runs.delete('r-raced');
@@ -436,7 +439,7 @@ test('a gated run read by the list at every event from being filed to being appr
   assert.deepEqual(gated.waitingOnYou, ['design']);
   assert.equal(gated.steps.find((s) => s.name === 'design')?.status, 'awaiting approval');
 
-  await approve(engine(), id, 'design');
+  await runWith(engine(), approveRun(id, 'design'));
   const approved = await read('approved');
   assert.ok(!resting.runs.has(id), 'the approval takes it out');
   assert.equal(approved.moving, true, 'implement is due: the tick files it');
@@ -503,13 +506,13 @@ test("a held run's decision reads what holds it and none of its own tasks: a ses
   writeRun('r-held', 'Held while it runs');
   write(path.join(root, 'runs', 'r-held.hold'), JSON.stringify({ at, until: ['r-nowhere'] }));
   try {
-    const reads = e.io().reads;
+    const reads = Effect.runSync(e.io()).reads;
     const res = await app.request('/api/runs/r-held/decision');
     assert.equal(res.status, 200, await res.clone().text());
     const decided = (await res.json()) as { holding?: unknown };
     assert.ok(decided.holding, JSON.stringify(decided));
     assert.equal(
-      e.io().reads - reads,
+      Effect.runSync(e.io()).reads - reads,
       1,
       "the route's check that the run's journal reads (`viewsFor`), and no view more: the hold is answered off the runs it is held until",
     );

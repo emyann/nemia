@@ -94,9 +94,8 @@ export const phaseWordOf = (state: SessionState): PhaseWord => PHASE_WORDS[state
 
 /**
  * A2A's name for one of the runtime's own former words for a session's state — `working`, `blocked`, `done`, `failed`,
- * `stopped` — which `Sighting.state` spoke before A2A's: what a `PromiseRunner` written against them may still report, and
- * what a remote registry entry an older runtime wrote still says. `blocked` is `input-required`, since those words never
- * said which wait; `undefined` for any other word.
+ * `stopped` — which `Sighting.state` spoke before A2A's: what a remote registry entry an older runtime wrote still says.
+ * `blocked` is `input-required`, since those words never said which wait; `undefined` for any other word.
  */
 export const formerStateOf = (word: unknown): SessionState | undefined =>
   typeof word === 'string' && Object.hasOwn(FORMER, word) ? FORMER[word as keyof typeof FORMER] : undefined;

@@ -18,8 +18,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import type { Engine } from 'agent-runtime';
+import { Effect } from 'effect';
 import type { Run, TaskPhase } from '../src/run.ts';
+import { promised } from './promised.ts';
 import { scratch } from './scratch.ts';
 import { TEAM, TEAM_DEV } from './team.ts';
 
@@ -30,7 +31,7 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 process.env.WF_MAX_RUNS = '40';
 delete process.env.WF_MAX_CONCURRENT;
-const { advance, approve, hold, retry, start, tick } = await import('../src/runner.ts');
+const { advanceRun, approveRun, hold, retryRun, runWith, startRun, tickRun } = await import('../src/runner.ts');
 const { acceptFile, askFile, asksDir, readAsks, readRun, roundAskFile, stepsOf } = await import('../src/record/record.store.ts');
 const { passRead } = await import('../src/cap/cap.verb.ts');
 const { checkoutHold } = await import('../src/ending/ending.verb.ts');
@@ -134,38 +135,38 @@ const board = () => {
     logs: async () => '(no output yet)',
     output: async () => '',
     feed: async () => ({ entries: [], cursor: 0 }),
-  } as unknown as Engine;
+  };
   const settle = (id: string, phase: TaskPhase, closeout?: unknown) => Object.assign(tasks.get(id)!, { phase, closeout });
-  return { e, reads, writes, lists, settle };
+  return { e: promised(e), reads, writes, lists, settle };
 };
 
 /** A run of `implement → ship` on `repo`, implement committed and signed: at the ending's gate. */
 const atTheGate = async (b: ReturnType<typeof board>, repo: string): Promise<Run> => {
-  const run = start({ brief: 'add sub', repo, workflowDir: shipFolder });
-  await advance(b.e, readRun(run.id));
+  const run = await Effect.runPromise(startRun({ brief: 'add sub', repo, workflowDir: shipFolder }));
+  await runWith(b.e, advanceRun(readRun(run.id)));
   const work = readRun(run.id).steps.implement;
   fs.appendFileSync(path.join(work.workspace!, 'add.ts'), `export const sub${run.id.slice(-4)} = 1;\n`);
   git(work.workspace!, 'add', '-A');
   git(work.workspace!, 'commit', '-q', '-m', 'add sub');
   b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
-  await advance(b.e, readRun(run.id));
+  await runWith(b.e, advanceRun(readRun(run.id)));
   return readRun(run.id);
 };
 
 /** A run of one step on `repo`, filed and settled `phase`. */
 const settledOne = async (b: ReturnType<typeof board>, repo: string, phase: TaskPhase): Promise<Run> => {
-  const run = start({ brief: 'one', repo, workflowDir: oneStep });
-  await advance(b.e, readRun(run.id));
+  const run = await Effect.runPromise(startRun({ brief: 'one', repo, workflowDir: oneStep }));
+  await runWith(b.e, advanceRun(readRun(run.id)));
   b.settle(`${run.id}-implement`, phase, phase === 'succeeded' ? SIGNED : undefined);
-  await advance(b.e, readRun(run.id));
+  await runWith(b.e, advanceRun(readRun(run.id)));
   return readRun(run.id);
 };
 
 /** Two runs started `--after` `parent`, and one held until it. */
 const waitingOn = async (b: ReturnType<typeof board>, repo: string, parent: string) => {
-  for (let i = 0; i < 2; i++) start({ brief: `after ${i}`, repo, workflowDir: oneStep, after: [parent] });
-  const held = start({ brief: 'held', repo, workflowDir: oneStep });
-  await hold(b.e, held.id, [parent]);
+  for (let i = 0; i < 2; i++) await Effect.runPromise(startRun({ brief: `after ${i}`, repo, workflowDir: oneStep, after: [parent] }));
+  const held = await Effect.runPromise(startRun({ brief: 'held', repo, workflowDir: oneStep }));
+  await runWith(b.e, hold(held.id, [parent]));
 };
 
 /** The store of runs not at rest the header names, on one repository and one board. */
@@ -174,23 +175,27 @@ const store = async () => {
   const repo = aRepo();
   for (let i = 0; i < 3; i++) {
     const failed = await atTheGate(b, repo);
-    await approve(b.e, failed.id, 'ship');
-    assert.deepEqual((await advance(b.e, readRun(failed.id))).filed, ['ship'], 'the checkout is free for it');
+    await runWith(b.e, approveRun(failed.id, 'ship'));
+    assert.deepEqual((await runWith(b.e, advanceRun(readRun(failed.id)))).filed, ['ship'], 'the checkout is free for it');
     b.settle(`${failed.id}-ship`, 'failed');
-    await advance(b.e, readRun(failed.id));
+    await runWith(b.e, advanceRun(readRun(failed.id)));
   }
   const working = await atTheGate(b, repo);
-  await approve(b.e, working.id, 'ship');
-  assert.deepEqual((await advance(b.e, readRun(working.id))).filed, ['ship'], "its ending is filed into the repository's checkout");
+  await runWith(b.e, approveRun(working.id, 'ship'));
+  assert.deepEqual(
+    (await runWith(b.e, advanceRun(readRun(working.id)))).filed,
+    ['ship'],
+    "its ending is filed into the repository's checkout",
+  );
   const waiting = await atTheGate(b, repo);
-  await approve(b.e, waiting.id, 'ship');
+  await runWith(b.e, approveRun(waiting.id, 'ship'));
   const second = await atTheGate(b, repo);
-  await approve(b.e, second.id, 'ship');
+  await runWith(b.e, approveRun(second.id, 'ship'));
   await waitingOn(b, repo, waiting.id);
   const trying = await settledOne(b, repo, 'failed');
   for (const n of [2, 3]) {
-    await retry(b.e, trying.id, 'implement', { mode: 'fresh' });
-    await advance(b.e, readRun(trying.id));
+    await runWith(b.e, retryRun(trying.id, 'implement', { mode: 'fresh' }));
+    await runWith(b.e, advanceRun(readRun(trying.id)));
     if (n === 2) b.settle(readRun(trying.id).steps.implement.taskId!, 'failed');
   }
   for (let i = 0; i < 10; i++) await settledOne(b, repo, 'succeeded');
@@ -205,7 +210,7 @@ const theStore = () => (built ??= store());
 const onePass = async (b: ReturnType<typeof board>) => {
   b.reads.clear();
   b.writes.clear();
-  const { value, tallies } = await metered(() => tick(b.e, { memo: freshRestMemo() }));
+  const { value, tallies } = await metered(() => runWith(b.e, tickRun({ memo: freshRestMemo() })));
   assert.ok(tallies, 'the pass was metered');
   return { pass: value, tallies };
 };
@@ -223,8 +228,8 @@ test("the cap's slots are read once for the pass, however many claims ask", asyn
   const { b } = await theStore();
   const read = passRead(b.e, runStore.runs.list());
   b.lists.calls = 0;
-  const first = await read.slots();
-  const second = await read.slots();
+  const first = await Effect.runPromise(read.slots);
+  const second = await Effect.runPromise(read.slots);
   assert.equal(b.lists.calls, 1, 'one look at the tasks');
   assert.equal(second, first, 'the same slots, not read again');
 });
@@ -233,11 +238,13 @@ test("a run's own claim on the checkout reads the slot its pass gave it, and the
   const { b, waiting } = await theStore();
   const run = readRun(waiting.id);
   let asked = 0;
-  const slots = async () => {
+  const slots = Effect.sync(() => {
     asked++;
     return new Map();
-  };
-  const hold = await checkoutHold(b.e, run, stepsOf(run), { read: { runs: [run], slots, parents: passParents() }, slot: undefined });
+  });
+  const hold = await Effect.runPromise(
+    checkoutHold(b.e, run, stepsOf(run), { read: { runs: [run], slots, parents: passParents() }, slot: undefined }),
+  );
   assert.equal(hold, undefined, 'no other run claims the checkout in what the pass listed');
   assert.equal(asked, 0, "the cap's slots are not read for the run's own claim");
 });
@@ -289,33 +296,32 @@ const askedEngine = () => {
     return { views: ids.map((id) => ({ id })), unreadable: [] };
   };
   const wrote = async () => undefined;
-  const e = { view, list, file: wrote, answer: wrote } as unknown as Engine;
-  return { e, asked, held };
+  return { e: promised({ view, list, file: wrote, answer: wrote }), asked, held };
 };
 
 test('a view kept for the pass is read again once a write names its task, and the views of the tasks it does not name are kept', async () => {
   const { e: engine, asked } = askedEngine();
   const e = reportedEngine(engine, []);
-  await e.view('t-1');
-  await e.list(['t-1', 't-2']);
-  await e.view('t-2');
+  await Effect.runPromise(e.view('t-1'));
+  await Effect.runPromise(e.list(['t-1', 't-2']));
+  await Effect.runPromise(e.view('t-2'));
   assert.deepEqual(asked, ['t-1', 't-2'], 'each read once');
-  await e.file({ id: 't-1' } as never);
-  await e.list(['t-1', 't-2']);
+  await Effect.runPromise(e.file({ id: 't-1' } as never));
+  await Effect.runPromise(e.list(['t-1', 't-2']));
   assert.deepEqual(asked, ['t-1', 't-2', 't-1'], 'the task filed is read again, and the other kept');
-  await e.answer('t-2', 'yes');
-  await e.view('t-2');
+  await Effect.runPromise(e.answer('t-2', 'yes'));
+  await Effect.runPromise(e.view('t-2'));
   assert.deepEqual(asked, ['t-1', 't-2', 't-1', 't-2'], 'the task answered is read again');
 });
 
 test('a view the engine was still reading when a write of the pass went through is not kept', async () => {
   const { e: engine, asked, held } = askedEngine();
   const e = reportedEngine(engine, []);
-  const slow = e.view('slow');
-  await e.file({ id: 'other' } as never);
+  const slow = Effect.runPromise(e.view('slow'));
+  await Effect.runPromise(e.file({ id: 'other' } as never));
   held.go?.();
   await slow;
-  const again = e.view('slow');
+  const again = Effect.runPromise(e.view('slow'));
   held.go?.();
   await again;
   assert.deepEqual(asked, ['slow', 'slow'], 'read again: what it read may be from before the write');

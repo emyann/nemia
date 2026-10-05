@@ -31,6 +31,7 @@ import {
   readInbox,
   runStore,
   type InboxListing,
+  runWith,
 } from 'agent-orchestrator';
 import { readBody, type BodyIssue } from '../body.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from '../guard.ts';
@@ -194,7 +195,7 @@ function filingOf(body: typeof FILE_BODY.Type, repo: string, home: string): { te
 export const inbox = new Hono<ApiEnv>()
   .get('/api/inbox', (c) =>
     served(c, async ({ e }) => {
-      const { cards } = await INBOX.handler(e, {});
+      const { cards } = await runWith(e, INBOX.handler({}));
       return c.json(listInbox(cards));
     }),
   )
@@ -203,7 +204,7 @@ export const inbox = new Hono<ApiEnv>()
     const wrong = inboxNameRefusal(name);
     if (wrong) return c.json({ error: wrong }, 400);
     return served(c, async ({ e }) => {
-      const { card, source } = (await CARD.handler(e, { name })) as { card: InboxListing; source: string };
+      const { card, source } = (await runWith(e, CARD.handler({ name }))) as { card: InboxListing; source: string };
       const [entry] = listInbox([card]);
       const keys =
         entry.error === null
@@ -224,7 +225,7 @@ export const inbox = new Hono<ApiEnv>()
       if ('status' in read) return c.json({ error: read.error }, read.status);
       const asked = filingOf(read.body, repo, home);
       if ('status' in asked) return c.json({ error: asked.error }, asked.status);
-      const { card, file } = await INBOX_ADD.handler(e, { idea: asked.text, workflow: asked.workflow, repo: asked.repo });
+      const { card, file } = await runWith(e, INBOX_ADD.handler({ idea: asked.text, workflow: asked.workflow, repo: asked.repo }));
       return c.json(
         { name: card.name, file, workflow: card.workflow ?? null, repo: card.repo ?? null, body: card.body } satisfies InboxFiled,
         201,

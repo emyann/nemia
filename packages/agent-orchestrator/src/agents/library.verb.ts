@@ -4,11 +4,13 @@
  * read for its page (`AGENTS_READ`, `agentRead`). The api resolves which folder a request names, guards each write, and words the board's
  * answer around what each entry answers.
  */
+import { Effect } from 'effect';
+import { tried } from '../runtime-client.ts';
 import type { Args, Flag, Positional, Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import type { AgentPlace, AgentReading } from '../roster/roster.ts';
 import { agentRead } from '../roster/roster.store.ts';
-import { start } from '../start/start.verb.ts';
+import { startRun } from '../start/start.verb.ts';
 import type { AgentDraft } from './agents.ts';
 import { removeAgent, writeAgent, type AgentSidecar, type AgentWritten } from './agents.store.ts';
 
@@ -60,15 +62,16 @@ export const AGENTS_WRITE: Command<AgentWritten> = {
     { method: 'PUT', path: '/api/agents/:from/:name', status: 200, hand: WRITE_HAND },
   ],
   only: { side: 'api', why: "the board's library writes an agent from a form; at the command line a person edits the agent's file" },
-  handler: async (_e, args) => {
-    const schema = textOf(args, 'schema');
-    return writeAgent(textOf(args, 'dir') ?? '', JSON.parse(textOf(args, 'draft') ?? '{}') as AgentDraft, {
-      version: textOf(args, 'version') ?? null,
-      ...(textOf(args, 'name') !== undefined && { from: textOf(args, 'name') }),
-      ...(schema !== undefined && { schema: JSON.parse(schema) as AgentSidecar | null }),
-      ...(textOf(args, 'repo') !== undefined && { repo: textOf(args, 'repo') }),
-    });
-  },
+  handler: (args) =>
+    tried(() => {
+      const schema = textOf(args, 'schema');
+      return writeAgent(textOf(args, 'dir') ?? '', JSON.parse(textOf(args, 'draft') ?? '{}') as AgentDraft, {
+        version: textOf(args, 'version') ?? null,
+        ...(textOf(args, 'name') !== undefined && { from: textOf(args, 'name') }),
+        ...(schema !== undefined && { schema: JSON.parse(schema) as AgentSidecar | null }),
+        ...(textOf(args, 'repo') !== undefined && { repo: textOf(args, 'repo') }),
+      });
+    }),
   print: () => [],
 };
 
@@ -86,11 +89,13 @@ export const AGENTS_REMOVE: Command<{ dir: string; removed: string[] }> = {
     hand: "the board guards the removal, and answers the package's refusal with the steps that still name the agent",
   },
   only: { side: 'api', why: "the board's library removes an agent; at the command line a person removes the agent's file" },
-  handler: async (_e, args) =>
-    removeAgent(textOf(args, 'dir') ?? '', textOf(args, 'name') ?? '', {
-      version: textOf(args, 'version') ?? '',
-      ...(textOf(args, 'repo') !== undefined && { repo: textOf(args, 'repo') }),
-    }),
+  handler: (args) =>
+    tried(() =>
+      removeAgent(textOf(args, 'dir') ?? '', textOf(args, 'name') ?? '', {
+        version: textOf(args, 'version') ?? '',
+        ...(textOf(args, 'repo') !== undefined && { repo: textOf(args, 'repo') }),
+      }),
+    ),
   print: () => [],
 };
 
@@ -111,7 +116,10 @@ export const AGENTS_TRY: Command<{ id: string }> = {
     hand: 'the board guards the try, refuses an agent a try could not run, one try of it at a time, and writes its try folder first',
   },
   only: { side: 'api', why: "the board's agent page tries an agent; at the command line a person starts a workflow that runs it" },
-  handler: async (_e, args) => ({ id: start({ brief: textOf(args, 'brief') ?? '', repo: '', workflowDir: textOf(args, 'dir') ?? '' }).id }),
+  handler: Effect.fnUntraced(function* (args: Args) {
+    const run = yield* startRun({ brief: textOf(args, 'brief') ?? '', repo: '', workflowDir: textOf(args, 'dir') ?? '' });
+    return { id: run.id };
+  }),
   print: () => [],
 };
 
@@ -130,12 +138,13 @@ export const AGENTS_READ: Command<{ agent: AgentReading | null }> = {
     side: 'api',
     why: "the board's agent page reads one agent with its versions and users; at the command line, nemia agents lists them",
   },
-  handler: async (_e, args, _env, home) => ({
-    agent: agentRead(textOf(args, 'from') as AgentPlace, textOf(args, 'dir') ?? '', textOf(args, 'name') ?? '', {
-      repo: textOf(args, 'repo') ?? '',
-      ...(home !== undefined && { home }),
-    }),
-  }),
+  handler: (args, _env, home) =>
+    tried(() => ({
+      agent: agentRead(textOf(args, 'from') as AgentPlace, textOf(args, 'dir') ?? '', textOf(args, 'name') ?? '', {
+        repo: textOf(args, 'repo') ?? '',
+        ...(home !== undefined && { home }),
+      }),
+    })),
   print: () => [],
 };
 

@@ -4,6 +4,7 @@
  * (`WORKFLOWS_LIST`, `loadWorkflows`), and one step of a folder (`WORKFLOWS_STEP`). The api resolves which folder a request names, and
  * words the board's answer around what each entry answers.
  */
+import { tried } from '../runtime-client.ts';
 import path from 'node:path';
 import type { Args, Flag, Positional, Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
@@ -76,10 +77,12 @@ export const WORKFLOWS_WRITE: Command<WorkflowWritten> = {
     { method: 'PUT', path: '/api/workflows/:from/:name', status: 200, hand: WRITE_HAND },
   ],
   only: { side: 'api', why: "the board's builder writes a folder from a form; at the command line a person edits the folder's files" },
-  handler: async (_e, args, _env, home) =>
-    writeWorkflow(textOf(args, 'dir') ?? '', JSON.parse(textOf(args, 'draft') ?? '[]') as StepDraft[], textOf(args, 'readme'), {
-      places: placesOf(args, home),
-    }),
+  handler: (args, _env, home) =>
+    tried(() =>
+      writeWorkflow(textOf(args, 'dir') ?? '', JSON.parse(textOf(args, 'draft') ?? '[]') as StepDraft[], textOf(args, 'readme'), {
+        places: placesOf(args, home),
+      }),
+    ),
   print: () => [],
 };
 
@@ -130,10 +133,11 @@ export const WORKFLOWS_REMOVE: Command<WorkflowRemoved> = {
     hand: 'the builder guards the removal, and refuses a folder changed since the board read it by its version',
   },
   only: { side: 'api', why: 'the board removes a workflow of yours; at the command line a person removes its folder' },
-  async handler(_e, args, _env, home) {
-    const dir = path.resolve(textOf(args, 'dir') ?? '');
-    return removeWorkflow(dir, { ...(home !== undefined && { home }), users: usersOf(dir) });
-  },
+  handler: (args, _env, home) =>
+    tried(() => {
+      const dir = path.resolve(textOf(args, 'dir') ?? '');
+      return removeWorkflow(dir, { ...(home !== undefined && { home }), users: usersOf(dir) });
+    }),
   print: () => [],
 };
 
@@ -152,18 +156,19 @@ export const WORKFLOWS_LIST: Command<Record<string, FolderLoaded>> = {
     side: 'api',
     why: 'the board lists every folder with its steps and its graph; at the command line, nemia start names the one it runs',
   },
-  async handler(_e, args, _env, home) {
-    const dirs = Array.isArray(args.dirs) ? args.dirs : [];
-    const fills = fillsIn(args);
-    const loads = dirs.map((dir): [string, FolderLoaded] => {
-      try {
-        return [dir, { steps: loadWorkflows(dir, placesOf(args, home), fills(path.basename(dir))) }];
-      } catch (err) {
-        return [dir, { error: err instanceof Error ? err.message : String(err) }];
-      }
-    });
-    return Object.fromEntries(loads);
-  },
+  handler: (args, _env, home) =>
+    tried(() => {
+      const dirs = Array.isArray(args.dirs) ? args.dirs : [];
+      const fills = fillsIn(args);
+      const loads = dirs.map((dir): [string, FolderLoaded] => {
+        try {
+          return [dir, { steps: loadWorkflows(dir, placesOf(args, home), fills(path.basename(dir))) }];
+        } catch (err) {
+          return [dir, { error: err instanceof Error ? err.message : String(err) }];
+        }
+      });
+      return Object.fromEntries(loads);
+    }),
   print: () => [],
 };
 
@@ -189,11 +194,12 @@ export const WORKFLOWS_STEP: Command<{ step: Workflow | null; steps: string[] }>
     side: 'api',
     why: "the board's page of a step reads it as the builder shows it; at the command line a person reads the step's file",
   },
-  async handler(_e, args, _env, home) {
-    const name = textOf(args, 'name') ?? '';
-    const steps = loadWorkflows(textOf(args, 'dir') ?? '', placesOf(args, home), fillsIn(args)(name));
-    return { step: steps.find((s) => s.name === textOf(args, 'step')) ?? null, steps: steps.map((s) => s.name) };
-  },
+  handler: (args, _env, home) =>
+    tried(() => {
+      const name = textOf(args, 'name') ?? '';
+      const steps = loadWorkflows(textOf(args, 'dir') ?? '', placesOf(args, home), fillsIn(args)(name));
+      return { step: steps.find((s) => s.name === textOf(args, 'step')) ?? null, steps: steps.map((s) => s.name) };
+    }),
   print: () => [],
 };
 

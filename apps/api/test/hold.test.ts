@@ -20,20 +20,21 @@ import type { RunDecision } from '../src/decide/decision.ts';
 import type { RunDetail } from '../src/detail/detail.ts';
 import { app } from '../src/app.ts';
 import {
-  accept,
-  approve,
-  decide,
+  acceptRun,
+  approveRun,
+  decideRun,
   engine,
   heldRefusal,
   holdAdvice,
   holdWord,
   list,
-  retry,
-  round,
-  unhold,
+  retryRun,
+  roundRun,
   runStore,
+  runWith,
   type RunHolding,
   type RunSummary,
+  unhold,
 } from 'agent-orchestrator';
 
 type Wait = import('agent-orchestrator').Wait;
@@ -291,14 +292,14 @@ test("the list carries each held run's `heldUntil` and `holding` in `nemia ls`'s
   for (const id of HELD) {
     const api = runs.get(id)!;
     const run = runStore.runs.read(id);
-    const cli = await list(e, run);
+    const cli = await runWith(e, list(e, run));
     assert.deepEqual(api.heldUntil, run.hold!.until, id);
     assert.ok(api.holding, id);
     assert.equal(api.holding.at, HELD_AT, id);
     assert.deepEqual(asWaits(api.holding), cli.holding, id);
     assert.equal(api.holding.word, holdWord(cli.holding!), id);
     assert.equal(api.holding.advice, holdAdvice(run, cli.holding!), id);
-    assert.deepEqual(asWaits(api.holding), (await decide(e, id)).holding, `${id}: nemia decide's reading, which is list's`);
+    assert.deepEqual(asWaits(api.holding), (await runWith(e, decideRun(id))).holding, `${id}: nemia decide's reading, which is list's`);
     assert.deepEqual(
       api.steps.map((s) => [s.name, s.status, s.note]),
       cli.steps.map((s) => [s.name, s.status, s.note ?? null]),
@@ -364,7 +365,7 @@ test("a held run's decision is `holding`, and nothing else: what `nemia decide` 
   for (const id of [GATE, LOOP, BUDGET, BLOCKS, 'h-on-live', 'h-on-missing']) {
     const body = await decisionOf(id);
     assert.deepEqual(body, { holding: runs.get(id)!.holding }, id);
-    const said = await decide(e, id);
+    const said = await runWith(e, decideRun(id));
     assert.deepEqual(said.offers, [], id);
     assert.deepEqual(said.answering, {}, id);
     assert.doesNotMatch(JSON.stringify(said.gates), VERBS, id);
@@ -395,7 +396,7 @@ test("a held run's decision is `holding`, and nothing else: what `nemia decide` 
 });
 
 test('a step over its budget on a held run is offered no raise, and `nemia decide` says nothing waits on you for it — the run is held, not over budget on you', async () => {
-  const said = await decide(engine(), BUDGET);
+  const said = await runWith(engine(), decideRun(BUDGET));
   assert.deepEqual(said.decision, { kind: 'running', waiting: [] });
   assert.doesNotMatch(said.overBudgetLine ?? '', /waiting on you/);
   assert.doesNotMatch(said.overBudgetLine ?? '', VERBS);
@@ -407,31 +408,31 @@ test('a step over its budget on a held run is offered no raise, and `nemia decid
 test("REFUSED at shipped defaults: every verb the board sends for a held run — approve, send back, try, raise, round, accept — is a 409 in `heldRefusal`'s words, the verb's own, and nothing is written", async () => {
   const e = engine();
   const cases: Array<[string, string, unknown, () => Promise<unknown>]> = [
-    [GATE, `/api/runs/${GATE}/steps/plan/approve`, { message: 'Ship it.' }, () => approve(e, GATE, 'plan', 'Ship it.')],
+    [GATE, `/api/runs/${GATE}/steps/plan/approve`, { message: 'Ship it.' }, () => runWith(e, approveRun(GATE, 'plan', 'Ship it.'))],
     [
       GATE,
       `/api/runs/${GATE}/steps/plan/retry`,
       { mode: 'nudge', message: 'Store it first.' },
-      () => retry(e, GATE, 'plan', { mode: 'nudge', message: 'Store it first.' }, { stopBlocked: true }),
+      () => runWith(e, retryRun(GATE, 'plan', { mode: 'nudge', message: 'Store it first.' }, { stopBlocked: true })),
     ],
     [
       BLOCKS,
       `/api/runs/${BLOCKS}/steps/implement/retry`,
       { mode: 'nudge', message: 'Warm ones.' },
-      () => retry(e, BLOCKS, 'implement', { mode: 'nudge', message: 'Warm ones.' }, { stopBlocked: true }),
+      () => runWith(e, retryRun(BLOCKS, 'implement', { mode: 'nudge', message: 'Warm ones.' }, { stopBlocked: true })),
     ],
     [
       BUDGET,
       `/api/runs/${BUDGET}/steps/palette/retry`,
       { mode: 'nudge', message: 'Warm ones.', budget: 5 },
-      () => retry(e, BUDGET, 'palette', { mode: 'nudge', message: 'Warm ones.', budget: 5 }, { stopBlocked: true }),
+      () => runWith(e, retryRun(BUDGET, 'palette', { mode: 'nudge', message: 'Warm ones.', budget: 5 }, { stopBlocked: true })),
     ],
-    [LOOP, `/api/runs/${LOOP}/round`, { step: 'review' }, () => round(e, LOOP, 'review', undefined)],
+    [LOOP, `/api/runs/${LOOP}/round`, { step: 'review' }, () => runWith(e, roundRun(LOOP, 'review', undefined))],
     [
       LOOP,
       `/api/runs/${LOOP}/steps/review/accept`,
       { message: 'The findings are follow-up work.' },
-      () => accept(e, LOOP, 'review', 'The findings are follow-up work.'),
+      () => runWith(e, acceptRun(LOOP, 'review', 'The findings are follow-up work.')),
     ],
   ];
   for (const [id, route, body, verb] of cases) {
@@ -513,7 +514,7 @@ test('a held run called off reads as called off: no hold, nothing waiting on you
   const page = await detail(CANCELLED);
   assert.deepEqual([page.heldUntil, page.holding], [[], null]);
   assert.deepEqual(await decisionOf(CANCELLED), { nothing: `cancelled at ${at(40)} — nothing to decide` });
-  assert.equal((await list(engine(), runStore.runs.read(CANCELLED))).holding, undefined);
+  assert.equal((await runWith(engine(), list(engine(), runStore.runs.read(CANCELLED)))).holding, undefined);
 });
 
 test('a run waiting on runs and held as well is both, as `nemia decide` says both: its decision carries the wait and the hold', async () => {
@@ -530,7 +531,7 @@ test('a run waiting on runs and held as well is both, as `nemia decide` says bot
   assert.ok('waiting' in body);
   assert.deepEqual(body.holding, run.holding);
   assert.equal(body.waiting.word, 'waiting on p-live');
-  const said = await decide(engine(), AFTER);
+  const said = await runWith(engine(), decideRun(AFTER));
   assert.deepEqual(asWaits(body.holding), said.holding);
 });
 
@@ -671,7 +672,7 @@ test("a hold's why and who put it are in `holding.word` on the list and the deta
   holdOn(SAID, ['p-live'], { why: 'merge conflicts in five files', by: 'operator' });
   const words = 'held until p-live ships (why: merge conflicts in five files; by operator)';
   const run = runStore.runs.read(SAID);
-  const cli = await list(engine(), run);
+  const cli = await runWith(engine(), list(engine(), run));
   const api = (await listed()).get(SAID)!;
   assert.equal(api.holding?.word, words);
   assert.equal(api.holding.word, holdWord(cli.holding!, run.hold));

@@ -1,14 +1,15 @@
 /**
- * One pass over one run (`advance`, `advanceRun`): read the world, adopt, stop a cancelled run's tasks, hand off, land an ending, lift a
- * hold, close the tasks held open, admit, and word the feed; then file through `file.verb.ts`, which holds the filings and the nudge that
- * answers a task held open; then keep the tips and write the run's record, which this file alone writes. Beside it, the filings a pass
- * made and died before writing down, adopted onto the record (`adoptChecks`, `adoptTries`, `adoptRounds`, `unrecordedSteps`), the steps
- * owed a hand-off (`handOffOwed`), and the tasks held open it closes (`closeWaitingTasks`). Those are here, and not beside the verbs that
- * call them first (`cancel`, `forget`, `prune`), because they write the record by the tick's own judgement: those verbs import this file,
- * and it imports none of them. A controller, reaching the runtime through the client (`runtime-client.ts`).
+ * One pass over one run (`advanceRun`, `advancePass`): read the world, adopt, stop a cancelled run's tasks, hand off, land an ending, lift
+ * a hold, close the tasks held open, admit, and word the feed; then file through `file.verb.ts`, which holds the filings and the nudge
+ * that answers a task held open; then keep the tips and write the run's record, which this file alone writes. Beside it, the filings a
+ * pass made and died before writing down, adopted onto the record (`adoptChecks`, `adoptTries`, `adoptRounds`, `unrecordedSteps`), the
+ * steps owed a hand-off (`handOffOwed`), and the tasks held open it closes (`closeWaitingTasks`). Those are here, and not beside the verbs
+ * that call them first (`cancelRun`, `forgetRun`, `prune`), because they write the record by the tick's own judgement: those verbs import
+ * this file, and it imports none of them. A controller, reaching the runtime through the client (`runtime-client.ts`).
  */
 import fs from 'node:fs';
-import type { Engine, TaskView } from '../runtime-client.ts';
+import { Effect } from 'effect';
+import { EngineService, asked as engineAsked, over, type Engine, type TaskView } from '../runtime-client.ts';
 import type { Verdict } from '../check/check.ts';
 import type { Workflow } from '../workflow.ts';
 import { folderPlace } from '../record/places.store.ts';
@@ -18,8 +19,9 @@ import { endingAsked } from '../ending/ending.ts';
 import { holdsOpen } from '../gate/gate.ts';
 import { checkTaskId, isGitRun, stepTaskId, tryOf, type CloseoutAsked, type Run, type TaskPhase } from '../record/record.ts';
 import { budgetOf, landsOnCheck, sentBack, stepStatus, type RoundAsk, type SpendOf } from '../status/status.ts';
-import { hasStarted, holdsOf, runReady, waitsOf, type Wait } from '../wait/wait.ts';
+import { hasStarted, holdsOf, runReady, waitsOf, type ParentRun, type Wait } from '../wait/wait.ts';
 import { handOffDue } from '../workspace/workspace.ts';
+import { inParts } from '../brief/index.ts';
 import { assess, type Assessment } from './assess.ts';
 import { feedPhase, feedWords, type FeedWords } from '../feed/feed.ts';
 import { listing } from '../list/list.ts';
@@ -39,11 +41,11 @@ import {
   closeoutReader,
   exitVerdicts,
   harnessBlocked,
-  parentOf,
-  parentsOf,
+  keptParent,
+  parentsRead,
   saidCount,
   spendReader,
-  taskPhases,
+  taskPhasesRead,
   waitingOf,
   type Parents,
 } from '../views/views.verb.ts';
@@ -51,7 +53,7 @@ import { engineWord, waitsForWord } from '../views/views-words.ts';
 import { within } from '../meter/tally.store.ts';
 import { checkoutHold, landEnding } from '../ending/ending.verb.ts';
 import type { PassRead } from '../cap/cap.verb.ts';
-import { fileChecks, fileReady, fileRounds, fileTries, mayFileOf, type Closer, type Filing, type PassReads } from './file.verb.ts';
+import { fileChecks, fileReady, fileRounds, fileTries, type Closer, type Filing, type PassReads } from './file.verb.ts';
 import { closeHeld, stopAsked } from './held.verb.ts';
 
 /**
@@ -70,7 +72,7 @@ const underBudget = (steps: readonly Workflow[], run: Run): boolean => steps.som
  * cancelled in that window files no more checks, so one adopted only at filing time would never be stopped, and its suite would run on to
  * the deadline. A task the engine holds no brief for was not filed, and is left for the pass to file.
  */
-export async function adoptChecks(
+export const adoptChecks = Effect.fn('adoptChecks')(function* (
   e: Engine,
   run: Run,
   steps: readonly Workflow[],
@@ -79,19 +81,19 @@ export async function adoptChecks(
   closeoutOf: (step: string) => Closeout | undefined,
   asked: (taskId: string) => CloseoutAsked,
   spendOf: SpendOf,
-): Promise<string[]> {
+) {
   const adopted: string[] = [];
   for (const step of steps) {
     if (run.steps[step.name]?.check || stepStatus(step, run, phaseOf, closeoutOf, asked, steps, spendOf) !== 'checking') continue;
     const taskId = checkTaskId(run, step.name);
-    const view = await e.view(taskId);
+    const view = yield* engineAsked('view', e.view(taskId));
     if (!view.state.brief) continue;
     views.set(taskId, view);
     run.steps[step.name] = { ...run.steps[step.name], check: { taskId } };
     adopted.push(step.name);
   }
   return adopted;
-}
+});
 
 /**
  * Tries a pass filed and never wrote down, put back on the record — in memory, as `adoptChecks` does, and before anything asks what is in
@@ -105,7 +107,7 @@ export async function adoptChecks(
  * than the record has turns (`answersIn`, `turnsOf`): the answered task reads running, so the ask reads as one to stop it first. It is
  * adopted as the turn it is, and nothing is stopped and nothing filed.
  */
-export async function adoptTries(
+export const adoptTries = Effect.fn('adoptTries')(function* (
   e: Engine,
   run: Run,
   steps: readonly Workflow[],
@@ -116,7 +118,7 @@ export async function adoptTries(
   verdictOf: (step: string) => Verdict | undefined,
   asks: readonly RetryAsk[],
   spendOf: SpendOf,
-): Promise<string[]> {
+) {
   const adopted: string[] = [];
   for (const r of retriesDue(steps, run, phaseOf, closeoutOf, asked, verdictOf, asks, () => false, spendOf)) {
     const current = run.steps[r.step]?.taskId;
@@ -126,7 +128,7 @@ export async function adoptTries(
       continue;
     }
     const taskId = r.mode === 'recheck' ? checkTaskId(run, r.step, r.try) : stepTaskId(run, r.step, r.try);
-    const view = await e.view(taskId);
+    const view = yield* engineAsked('view', e.view(taskId));
     if (!view.state.brief) continue;
     views.set(taskId, view);
     const record = run.steps[r.step];
@@ -135,7 +137,7 @@ export async function adoptTries(
     adopted.push(r.step);
   }
   return adopted;
-}
+});
 
 /**
  * Rounds a pass filed and never wrote down, put back on the record — in memory, and before anything asks what is in flight, as `adoptTries`
@@ -145,7 +147,7 @@ export async function adoptTries(
  * died left the looping step's `again: true` on the record, so the round reads due again; finding its task filed, this moves the loop on as
  * the pass would have (`roundFiled`), and nothing is filed twice. A task the engine holds no brief for is left for the pass to file.
  */
-export async function adoptRounds(
+export const adoptRounds = Effect.fn('adoptRounds')(function* (
   e: Engine,
   run: Run,
   steps: readonly Workflow[],
@@ -155,18 +157,18 @@ export async function adoptRounds(
   asked: (taskId: string) => CloseoutAsked,
   asks: readonly RoundAsk[],
   spendOf: SpendOf,
-): Promise<string[]> {
+) {
   const adopted: string[] = [];
   for (const r of roundsDue(steps, run, phaseOf, closeoutOf, asked, asks, spendOf)) {
     const taskId = stepTaskId(run, r.target, tryOf(run, r.target) + 1);
-    const view = await e.view(taskId);
+    const view = yield* engineAsked('view', e.view(taskId));
     if (!view.state.brief) continue;
     views.set(taskId, view);
     Object.assign(run.steps, roundFiled(steps, run, r, taskId));
     adopted.push(r.step);
   }
   return adopted;
-}
+});
 
 /**
  * Steps a pass filed and never wrote down: each step `assess` calls ready — blind to a cancellation, as a pass that read the run before it
@@ -174,7 +176,7 @@ export async function adoptRounds(
  * and put in `views`; it answers with them and changes nothing on the run. `forget` adopts them in memory, so a step being filed is in
  * flight, and `advance` stops them on a cancelled run, whose record would otherwise hide them from every stop.
  */
-export async function unrecordedSteps(
+export const unrecordedSteps = Effect.fn('unrecordedSteps')(function* (
   e: Engine,
   run: Run,
   steps: readonly Workflow[],
@@ -186,19 +188,19 @@ export async function unrecordedSteps(
   asks: readonly RetryAsk[],
   rounds: readonly RoundAsk[],
   spendOf: SpendOf,
-): Promise<Array<{ name: string; taskId: string }>> {
+) {
   const { cancelledAt: _, ...live } = run;
   const { ready } = assess(steps, live, phaseOf, closeoutOf, asked, verdictOf, asks, rounds, () => false, spendOf);
   const found: Array<{ name: string; taskId: string }> = [];
   for (const name of ready) {
     const taskId = stepTaskId(run, name, tryOf(run, name));
-    const view = views.get(taskId) ?? (await e.view(taskId));
+    const view = views.get(taskId) ?? (yield* engineAsked('view', e.view(taskId)));
     if (!view.state.brief) continue;
     views.set(taskId, view);
     found.push({ name, taskId });
   }
   return found;
-}
+});
 
 /**
  * One pass's work: the steps it filed, the steps whose checks it filed, the steps it tried again, and where the run stands — and `notes`,
@@ -236,14 +238,15 @@ export type Advanced = {
  * `slot` is the cap on runs in flight as `tick` judges this run (`runAdmitted`): a run with nothing filed files its roots only while a slot
  * is free, and the first pass that holds it writes when (`slotHeldAt`). Left out, nothing holds it.
  */
-export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Advanced> {
-  return (await advanceRun(e, run, slot)).advanced;
-}
+export const advanceRun = Effect.fn('advance')(function* (run: Run, slot?: RunSlot) {
+  const e = yield* EngineService;
+  return (yield* advancePass(e, run, slot)).advanced;
+});
 
 /**
- * `advance`, and whether the run is at rest once the pass is done (`atRest`): `blockers` names each clause that holds it out
- * (`restBlockers`), and a run with none carries `rest`, the branches whose tips the next pass would read (`tipBranches`), which is all of
- * git a pass asks of a run at rest.
+ * `advanceRun`, over the engine `e`, and whether the run is at rest once the pass is done (`atRest`): `blockers` names each clause that
+ * holds it out (`restBlockers`), and a run with none carries `rest`, the branches whose tips the next pass would read (`tipBranches`),
+ * which is all of git a pass asks of a run at rest.
  *
  * The pass reads a person's asks afresh, adopts what a pass before it filed and never wrote down, and then, in this order:
  * - stops a cancelled run's tasks, on every pass and not only in `nemia cancel`, which stops what it saw in flight: a step filed after it
@@ -259,7 +262,7 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
  *   reads it landed, and no try of it is filed over a merge still staged.
  * - holds this run's ending while another run's works in the repository's checkout (`checkoutHold`), read from the world on this pass,
  *   what it has filed included, so the order a pass takes the runs in decides nothing.
- * - lifts a person's hold on the pass that reads every run it names shipped (`parentOf`), and goes on on that pass. A lift sticks, as a
+ * - lifts a person's hold on the pass that reads every run it names shipped (`keptParent`), and goes on on that pass. A lift sticks, as a
  *   start after `--after` does; only the hold this pass read is lifted (`removeHold`), so one put again since stays; and one that names
  *   no run is never lifted here (`holdAdvice`).
  * - closes each step's task held open that waits for a word nobody is to give (`holdsOpen`): an ungated step that signed off, a gate a
@@ -299,80 +302,93 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
  * A run that waited on runs cuts its roots, and every worktree and diff after, from its base branch as it stands on the pass that files
  * them, with their work on it, and hands each root what they concluded (`parentCloseouts`); read on that pass, and never again.
  *
+ * Its span is annotated with the run, `run`, and so is every log said within it, the runtime's included; a filing of a step adds the
+ * step, `step`, to the runtime's spans and logs under it (`forStep`).
+ *
  * @param pass What the pass reads once for every run (`PassRead`): its own listing of the store, which `run` is one of, whose claims on the
  *   repository's checkout are read (`checkoutHold`), the runs the cap holds, and the runs others wait on, which lifting a hold (`liftHold`)
  *   and admitting the run (`admit`) read through. Left out, the store is listed afresh where the run's ending asks for the checkout, and
  *   the runs this run waits on are read for this call alone.
  */
-export async function advanceRun(
-  e: Engine,
-  run: Run,
-  slot?: RunSlot,
-  pass?: PassRead,
-): Promise<{ advanced: Advanced; blockers: string[]; rest?: { tipped: string[] } }> {
-  const { reads, askNotes } = await readPass(e, run);
-  const { steps, phaseOf, signedOff, asked, verdictOf, sessionBlocked, spendOf, asks, roundAsks } = reads;
-  const adopted = await adoptAll(e, run, reads);
-  if (run.cancelledAt) await stopCancelled(e, run, reads);
-  const handed = handOffAll(run, reads);
-  const landing = landEnding(run, steps, phaseOf, signedOff, asked, spendOf, verdictOf);
-  const parents = pass?.parents ?? { git: oneByOne, read: new Map() };
-  const checkout = await checkoutHold(e, run, steps, pass && { read: pass, slot });
-  const liftNotes = await liftHold(e, run, parents);
-  const assessed = assess(steps, run, phaseOf, signedOff, asked, verdictOf, asks, roundAsks, sessionBlocked, spendOf, [], checkout);
-  const closer = closerOf(e, reads.views);
-  const closeNotes = await closeHeldOpen(run, reads, closer);
-  const admission = await admit(e, run, slot, reads, assessed, parents);
-  const feed = wordFeed(run, reads, assessed, admission, checkout);
+export const advancePass = Effect.fn('advancePass')(
+  function* (e: Engine, run: Run, slot?: RunSlot, pass?: PassRead) {
+    yield* Effect.annotateCurrentSpan({ run: run.id });
+    const { reads, askNotes } = yield* readPass(e, run);
+    const { steps, phaseOf, signedOff, asked, verdictOf, sessionBlocked, spendOf, asks, roundAsks } = reads;
+    const adopted = yield* adoptAll(e, run, reads);
+    if (run.cancelledAt) yield* stopCancelled(e, run, reads);
+    const handed = handOffAll(run, reads);
+    const landing = landEnding(run, steps, phaseOf, signedOff, asked, spendOf, verdictOf);
+    const parents = pass?.parents ?? { git: oneByOne, read: new Map() };
+    const checkout = yield* checkoutHold(e, run, steps, pass && { read: pass, slot });
+    const liftNotes = yield* liftHold(e, run, parents);
+    const assessed = assess(steps, run, phaseOf, signedOff, asked, verdictOf, asks, roundAsks, sessionBlocked, spendOf, [], checkout);
+    const closer = closerOf(e, reads.views);
+    const closeNotes = yield* closeHeldOpen(run, reads, closer);
+    const admission = yield* admit(e, run, slot, reads, assessed, parents);
+    const feed = wordFeed(run, reads, assessed, admission, checkout);
 
-  const notes: string[] = [...askNotes, ...handed.collected, ...landing.notes, ...liftNotes, ...closeNotes];
-  const f: Filing = { e, run, reads, closer, mayFile: mayFileOf(run), notes };
-  const { tried, rechecked } = await fileTries(f, assessed.retry);
-  const looped = await fileRounds(f, assessed.round);
-  const checked = await fileChecks(f, [...assessed.check, ...rechecked]);
-  const filed = await fileReady(f, admission.ready, admission.starting);
-  const heldFirst = holdFirst(f, admission.held, assessed.ready);
-  const { tipped, tips } = keepTips(run, steps, assessed.status);
-  const wrote =
-    [filed, checked, tried, looped, adopted].some((names) => names.length > 0) ||
-    Boolean(tips || heldFirst || handed.marked || landing.landed);
-  if (wrote) runStore.runs.rewrite(run);
-  runStore.asks.consume(run, asks, roundAsks, pauseAsksVoid(steps, run, asks, phaseOf, spendOf));
+    const notes: string[] = [...askNotes, ...handed.collected, ...landing.notes, ...liftNotes, ...closeNotes];
+    const f: Filing = { e: { ...e, file: (spec) => e.file(inParts(spec)) }, run, reads, closer, mayFile: mayFileOf(run), notes };
+    const { tried, rechecked } = yield* fileTries(f, assessed.retry);
+    const looped = yield* fileRounds(f, assessed.round);
+    const checked = yield* fileChecks(f, [...assessed.check, ...rechecked]);
+    const filed = yield* fileReady(f, admission.ready, admission.starting);
+    const heldFirst = holdFirst(f, admission.held, assessed.ready);
+    const { tipped, tips } = keepTips(run, steps, assessed.status);
+    const wrote =
+      [filed, checked, tried, looped, adopted].some((names) => names.length > 0) ||
+      Boolean(tips || heldFirst || handed.marked || landing.landed);
+    if (wrote) runStore.runs.rewrite(run);
+    runStore.asks.consume(run, asks, roundAsks, pauseAsksVoid(steps, run, asks, phaseOf, spendOf));
 
-  const done = { filed, checked, tried, looped, notes, feed };
-  return answerOf(run, reads, assessed, admission, done, { acted: wrote || closer.closed.size > 0, tipped });
-}
+    const done = { filed, checked, tried, looped, notes, feed };
+    return answerOf(run, reads, assessed, admission, done, { acted: wrote || closer.closed.size > 0, tipped });
+  },
+  (advanced, _e: Engine, run: Run, _slot?: RunSlot, _pass?: PassRead) => advanced.pipe(Effect.annotateLogs({ run: run.id })),
+);
+
+/**
+ * Whether a pass may file for this run still, read off the store before each filing: not once the run is called off, forgotten, pruned
+ * or held, or the store paused, while the pass was at work. Once it has said no it says no for the rest of the pass, whatever the store
+ * reads after.
+ */
+export const mayFileOf = (run: Run): (() => boolean) => {
+  let calledOff = false;
+  return () => !(calledOff ||= !runStore.runs.exists(run.id) || runStore.runs.calledOff(run.id));
+};
 
 /** A pass's reads of a run, before it adopts or files anything: the engine's views of its tasks, the readers made of them, and its asks. */
-async function readPass(e: Engine, run: Run): Promise<{ reads: PassReads; askNotes: string[] }> {
+const readPass = Effect.fnUntraced(function* (e: Engine, run: Run) {
   const steps = stepsOf(run);
-  const { views, phaseOf } = await taskPhases(e, run, { earlierTries: underBudget(steps, run) });
+  const { views, phaseOf } = yield* taskPhasesRead(run, { earlierTries: underBudget(steps, run) }).pipe(over(e));
   const signedOff = closeoutReader(views, run);
   const asked = closeoutAsked(views);
   const verdictOf = exitVerdicts(views, run);
   const sessionBlocked = harnessBlocked(views);
   const spendOf = spendReader(views);
   const { asks, rounds: roundAsks, notes: askNotes } = runStore.asks.read(run.id);
-  return { reads: { steps, views, phaseOf, signedOff, asked, verdictOf, sessionBlocked, spendOf, asks, roundAsks }, askNotes };
-}
+  const reads: PassReads = { steps, views, phaseOf, signedOff, asked, verdictOf, sessionBlocked, spendOf, asks, roundAsks };
+  return { reads, askNotes };
+});
 
 /**
  * Adopt what a pass before this one filed and never wrote down: its rounds, then its tries, then its checks. Answers with every step
  * adopted.
  */
-async function adoptAll(e: Engine, run: Run, r: PassReads): Promise<string[]> {
-  const rounds = await adoptRounds(e, run, r.steps, r.views, r.phaseOf, r.signedOff, r.asked, r.roundAsks, r.spendOf);
-  const tries = await adoptTries(e, run, r.steps, r.views, r.phaseOf, r.signedOff, r.asked, r.verdictOf, r.asks, r.spendOf);
-  const checks = await adoptChecks(e, run, r.steps, r.views, r.phaseOf, r.signedOff, r.asked, r.spendOf);
+const adoptAll = Effect.fnUntraced(function* (e: Engine, run: Run, r: PassReads) {
+  const rounds = yield* adoptRounds(e, run, r.steps, r.views, r.phaseOf, r.signedOff, r.asked, r.roundAsks, r.spendOf);
+  const tries = yield* adoptTries(e, run, r.steps, r.views, r.phaseOf, r.signedOff, r.asked, r.verdictOf, r.asks, r.spendOf);
+  const checks = yield* adoptChecks(e, run, r.steps, r.views, r.phaseOf, r.signedOff, r.asked, r.spendOf);
   return [...rounds, ...tries, ...checks];
-}
+});
 
 /**
  * Stop a cancelled run's tasks in flight, those a pass filed and never wrote down included: none the engine was already asked to stop. A
  * stop the engine refuses (`stopAsked`) is one of a task that settled or was asked to stop since this pass read it: nothing left to do.
  */
-async function stopCancelled(e: Engine, run: Run, r: PassReads): Promise<void> {
-  const unrecorded = await unrecordedSteps(
+const stopCancelled = Effect.fnUntraced(function* (e: Engine, run: Run, r: PassReads) {
+  const unrecorded = yield* unrecordedSteps(
     e,
     run,
     r.steps,
@@ -387,9 +403,9 @@ async function stopCancelled(e: Engine, run: Run, r: PassReads): Promise<void> {
   );
   const live = unrecorded.filter(({ taskId }) => ['pending', 'running'].includes(r.phaseOf(taskId)));
   for (const { taskId } of [...inFlight(run, r.phaseOf), ...live]) {
-    if (!r.views.get(taskId)?.state.stopRequested) await stopAsked(e, taskId);
+    if (!r.views.get(taskId)?.state.stopRequested) yield* stopAsked(e, taskId);
   }
-}
+});
 
 /**
  * Hand off every step owed it (`handOffOwed`) while the run is there, and collect what each named: answers with the notes collecting said,
@@ -418,17 +434,17 @@ function handOffAll(run: Run, r: PassReads): { collected: string[]; marked: bool
  * Lift a person's hold once every run it names has shipped, each read through `parents`, and only the hold this pass read (`removeHold`):
  * answers with its note.
  */
-async function liftHold(e: Engine, run: Run, parents: Parents): Promise<string[]> {
+const liftHold = Effect.fnUntraced(function* (e: Engine, run: Run, parents: Parents) {
   if (!run.hold || run.cancelledAt || !run.hold.until.length) return [];
   let shipped = true;
-  for (const id of run.hold.until) if (!(shipped = (await parentOf(e, id, parents.git, parents.read)).shipped)) break;
+  for (const id of run.hold.until) if (!(shipped = (yield* keptParent(id, parents.git, parents.read).pipe(over(e))).shipped)) break;
   if (!shipped || !runStore.holds.lift(run.id, run.hold.at)) return [];
   const { until } = run.hold;
   delete run.hold;
   return [
     `the hold is lifted: ${until.length > 1 ? `${until.slice(0, -1).join(', ')} and ${until.at(-1)} have` : `${until[0]} has`} shipped`,
   ];
-}
+});
 
 /** The pass's closer (`Closer`), with the tasks waiting for a word as the pass read them (`waits`) and those it closed (`closed`). */
 type PassCloser = Closer & { waits: (taskId: string) => boolean; closed: Set<string> };
@@ -437,34 +453,34 @@ type PassCloser = Closer & { waits: (taskId: string) => boolean; closed: Set<str
 function closerOf(e: Engine, views: ReadonlyMap<string, TaskView>): PassCloser {
   const waits = waitsForWord(views);
   const closed = new Set<string>();
-  const closeWaiting = async (name: string, taskId: string): Promise<string | undefined> => {
-    const refused = await closeHeld(e, taskId);
+  const closeWaiting = Effect.fnUntraced(function* (name: string, taskId: string) {
+    const refused = yield* closeHeld(e, taskId);
     if (!refused) closed.add(taskId);
     return refused && `${name}: ${refused}`;
-  };
+  });
   const awaitsWord = (taskId: string | null | undefined): boolean => Boolean(taskId && waits(taskId) && !closed.has(taskId));
   return { closeWaiting, awaitsWord, waits, closed };
 }
 
 /** Close each step's task held open that waits for a word nobody is to give (`holdsOpen`): answers with the engine's refusals, worded. */
-async function closeHeldOpen(run: Run, r: PassReads, closer: PassCloser): Promise<string[]> {
+const closeHeldOpen = Effect.fnUntraced(function* (run: Run, r: PassReads, closer: PassCloser) {
   const notes: string[] = [];
   for (const step of r.steps) {
     const taskId = run.steps[step.name]?.taskId;
     if (!taskId || !closer.waits(taskId) || holdsOpen(step, run, r.phaseOf, r.signedOff, r.asked, r.steps, r.spendOf, r.verdictOf))
       continue;
-    const refused = await closer.closeWaiting(step.name, taskId);
+    const refused = yield* closer.closeWaiting(step.name, taskId);
     if (refused) notes.push(refused);
   }
   return notes;
-}
+});
 
 /**
  * Whether the run files its roots on this pass: the runs it waits on as they stand (`parent`), whether it has started, what it needs of a
  * slot (`slotNeed`), the slot it is held at, the steps it files, and the runs whose shipping it waits on (`waitsOf`).
  */
 type Admission = {
-  parent: Awaited<ReturnType<typeof parentsOf>>;
+  parent: (id: string) => ParentRun;
   starting: boolean;
   need: ReturnType<typeof slotNeed>;
   held: RunSlot | undefined;
@@ -476,22 +492,23 @@ type Admission = {
  * Admit the run's ready steps: while it has nothing filed, once every run it waits on, read through `parents`, has shipped and the cap
  * leaves it a slot.
  */
-async function admit(
+const admit = Effect.fnUntraced(function* (
   e: Engine,
   run: Run,
   slot: RunSlot | undefined,
   r: PassReads,
   assessed: Assessment,
   parents: Parents,
-): Promise<Admission> {
-  const parent = await parentsOf(e, run, parents.git, parents.read);
+) {
+  const parent = yield* parentsRead(run, parents.git, parents.read).pipe(over(e));
   const starting = !hasStarted(run);
   const need = slotNeed(run, r.phaseOf, assessed, (id) => parent(id).shipped, r.steps);
   const admitted = runAdmitted(run, slot, r.steps);
   const held = need.wants && !admitted ? slot : undefined;
   const ready = runReady(run, (id) => parent(id).shipped) && admitted ? assessed.ready : [];
-  return { parent, starting, need, held, ready, waiting: waitsOf(run, parent) };
-}
+  const admission: Admission = { parent, starting, need, held, ready, waiting: waitsOf(run, parent) };
+  return admission;
+});
 
 /** The feed's words for the run and each step (`feedWords`), off what the pass read before it filed anything. */
 function wordFeed(run: Run, r: PassReads, assessed: Assessment, admission: Admission, checkout: CheckoutHold | undefined): FeedWords {
@@ -608,13 +625,13 @@ export const handOffOwed = (steps: readonly Workflow[], run: Run, phaseOf: (task
  * task can wait: a try or a round filed as a task of its own closed the one before it. What the engine refuses is returned, worded, and a
  * cancelled run's next pass closes it again (the sweep in `advance`).
  */
-export async function closeWaitingTasks(e: Engine, run: Run, views: ReadonlyMap<string, TaskView>): Promise<string[]> {
+export const closeWaitingTasks = Effect.fn('closeWaitingTasks')(function* (e: Engine, run: Run, views: ReadonlyMap<string, TaskView>) {
   const waits = waitsForWord(views);
   const refused: string[] = [];
   for (const [name, { taskId }] of Object.entries(run.steps)) {
     if (!taskId || !waits(taskId)) continue;
-    const said = await closeHeld(e, taskId);
+    const said = yield* closeHeld(e, taskId);
     if (said) refused.push(`${name}: ${said}`);
   }
   return refused;
-}
+});

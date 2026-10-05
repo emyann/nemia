@@ -2,9 +2,9 @@
 
 Agent sessions on one harness each, durably: a job that runs to its end, and a long-lived session that runs until stopped (not built
 yet). It owns how a session runs: the task's command, mounts, restart and spend, the journal, the attempts, the harnesses' vocabulary.
-`decide` (`src/core/domain.ts`) is the whole judgement, pure (`test/engine.test.ts`); `src/facade.ts`, `src/index.ts` and
-`src/vocabulary.ts` are the only doors (`test/contract.test.ts`); the last, the harnesses' words, `HARNESS_CHOICES` and `fenceReach`,
-loads no Effect and no I/O (`test/vocabulary-door.test.ts`). The orchestrator reaches it through its one client; what is still above it
+`decide` (`src/core/domain.ts`) is the whole judgement, pure (`test/engine.test.ts`); `src/index.ts` and `src/vocabulary.ts` are the
+only doors (`test/contract.test.ts`); the second, the harnesses' words, `HARNESS_CHOICES` and `fenceReach`, loads no Effect and no I/O
+(`test/vocabulary-door.test.ts`). The orchestrator reaches it through its one client; what is still above it
 and a candidate to come down is in `docs/architecture.md`, *Who owns what*.
 
 ## Layout
@@ -56,11 +56,13 @@ and a candidate to come down is in `docs/architecture.md`, *Who owns what*.
 
 - **A parameter taken away is refused, never ignored** (`Object.hasOwn`, the argument count: `tickRefusalOf`, `StepRefused`).
 - **A flag only Claude Code has goes under `config.claude`**, never a named argument; a key moved there is read at its old place off a
-  journal (`upgrade`) and refused there at both doors (`FORMER_ARGS`). Pin the argv before a move and compare after.
-- **An optional verb renamed on its way through a seam is dropped by every door that takes the old type**: keep the old verb beside the
-  new one, and test each door by calling the verb through it.
-- **A verb is written once, on the `Engine` service** (`src/service/engine.ts`), and reaches the Promise door through `promiseEngine`;
-  `test/doors.test.ts` refuses a verb one door lacks, and proves each verb and its refusals through both.
+  journal (`upgrade`) and refused there (`FORMER_ARGS`). Pin the argv before a move and compare after.
+- **An optional verb renamed on its way through a seam is dropped by every adapter that takes the old type**: keep the old verb beside
+  the new one, and test the verb through the `Engine` service.
+- **A verb is written once, on the `Engine` service** (`src/service/engine.ts`); `test/verb-refusals.test.ts` pins the verbs (`VERBS`)
+  and proves each verb's refusal a tagged error, worded by `refusalWords`.
+- **A test that sets `CLAUDE_CONFIG_DIR` (or another env read at load) before a dynamic import of `src`** imports
+  `test/promise-runner.ts` and `test/engine.ts` dynamically too: their static import loads `src` first.
 - **Node's type stripping refuses a parameter property** (`constructor(private readonly ops)`): declare the field and assign it.
 - **A journal is decoded before `upgrade`, as any store gives it back** (`Journal.layer`, `event-schema.ts`): an entry no runtime
   wrote fails that task's read with a `JournalError` naming the file, the entry and its first wrong field (`entryWords`); the pass
@@ -70,6 +72,9 @@ and a candidate to come down is in `docs/architecture.md`, *Who owns what*.
   struct's rest is `unknown`). Each event keeps the keys it does not name (`StructWithRest`: a `Struct` strips them), and a decoded
   struct comes back with its keys in the schema's order, so where the object's own keys matter test it with `Schema.is` and decode
   only to say why not.
+- **A long text of a line is a body named by its sha256, resolved on every read** (`core/engine/bodies.ts`): its field takes the
+  place of the one it stands for (`STANDS_FOR`), so a read gives the event key for key; a body goes only through `sweep` or
+  `removeBody`, which read every journal and the feed first (`src/core/engine/bodies.test.ts`, `test/verb-refusals.test.ts`).
 - **A `claude agents --json` row of ours is decoded by `RegistryRowSchema` (`harness/claude/registry.ts`)**: one that does not decode
   fails the whole read, so every background session is unread, never absent. A field the runtime starts reading is added to the schema;
   a row not ours (no `ae/` name, no `state`) is skipped undecoded.
@@ -137,8 +142,9 @@ What Claude Code does as the steps meet it. Where the orchestrator's code holds 
 - **A session under `~/.claude/` cannot write there in any mode**: put a probe store elsewhere.
 - **A path a fenced step's brief names is inside its own folder**; a rule offered for the next run names no path of this one (in the
   orchestrator today: `givenPlan`, `folderPlace.make`, `allowRuleOf`, `disallowedBy`).
-- **A job's turn cannot end to wait for background work**: run long work in the foreground, or block on it
-  (`timeout 580 bash -c "while kill -0 <pid>; do sleep 5; done"`).
+- **A job runs with background tasks off and a call's default timeout at 10 minutes** (`CLAUDE_JOB_ENV`, `src/harness/claude/code.ts`):
+  measured on 2.1.289, `run_in_background` is ignored and the call runs in the foreground, a bare 130 s call completes (cut at 120 s
+  with background tasks off alone, moved to the background with neither), and a shell `&` still detaches, its `$!` alive to `kill -0`.
 - **A Bash deny reaches each part of `&&`, `||`, `;`, `|`, `&`, a `$(…)`, and a part behind `timeout`, `nohup` or `VAR=`** (2.1.288),
   but not `bash -c '…'` or `/usr/bin/pkill`; `partsOf` (`agent-orchestrator/test/agent-fences.test.ts`) models the parts. `Bash(pkill:*)`
   leaves `kill $(pgrep …)`, `pgrep … | xargs kill` and `kill -1` open, a known gap.

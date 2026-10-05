@@ -1,5 +1,5 @@
 /**
- * A remote A2A agent as a harness, end to end, at shipped defaults: `promiseEngine` with a harness that is a URL, against
+ * A remote A2A agent as a harness, end to end, at shipped defaults: `builtEngine` with a harness that is a URL, against
  * the SDK's own server over HTTP (`remote-server.ts`), on each binding the runtime speaks, in each order a card can list
  * them. What is proven is what crosses the wire, counted by the server itself: a spawn is one SendMessage and never two,
  * a pass one GetTask per open task and none once they settle, a stop one CancelTask. And what a refusal refuses: a card
@@ -15,13 +15,14 @@ import { spawn } from 'node:child_process';
 import { Effect } from 'effect';
 import { ClientFactory, JsonRpcTransportFactory, RestTransportFactory } from '@a2a-js/sdk/client';
 import { AgentCard, Role } from '@a2a-js/sdk';
-import type { Engine, EngineOptions, TaskSpec, TaskView } from '../src/facade.ts';
-import { Engine as EngineService, promiseEngine } from '../src/index.ts';
+import type { EngineShape, EngineOptions, TaskSpec, TaskView } from '../src/index.ts';
+import { Engine as EngineService } from '../src/index.ts';
 import { REQUEST_MS, SPAWN_WAIT_MS, remoteOps } from '../src/a2a/remote.ts';
 import { RUNTIME_EXTENSION } from '../src/a2a/map.ts';
 import { apiKey, bearer, mtls, remoteServer, type Binding, type RemoteServer, type ServerOptions } from './remote-server.ts';
 import { scratch } from './scratch.ts';
 import { stepClock } from './clock.ts';
+import { builtEngine } from './engine.ts';
 
 const servers: RemoteServer[] = [];
 afterEach(async () => {
@@ -39,7 +40,7 @@ const HELD = () => [{ state: 'working' as const }];
 
 const engineOn = (s: RemoteServer, o: Partial<EngineOptions> = {}, root = scratch('ae-remote-')) => ({
   root,
-  e: promiseEngine(EngineService.layer({ root, harnesses: { remote: { url: s.url } }, ...o })),
+  e: builtEngine(EngineService.layer({ root, harnesses: { remote: { url: s.url } }, ...o })),
 });
 
 const task = (o: Partial<TaskSpec> = {}): TaskSpec => ({
@@ -51,24 +52,24 @@ const task = (o: Partial<TaskSpec> = {}): TaskSpec => ({
 });
 
 /** Tick until the task's view meets `ok`, under a bound of passes. */
-const until = async (e: Engine, id: string, ok: (v: TaskView) => boolean, what: string, passes = 60): Promise<TaskView> => {
+const until = async (e: EngineShape, id: string, ok: (v: TaskView) => boolean, what: string, passes = 60): Promise<TaskView> => {
   let v: TaskView | undefined;
   for (let i = 0; i < passes; i++) {
-    await e.tick();
-    v = await e.view(id);
+    await Effect.runPromise(e.tick());
+    v = await Effect.runPromise(e.view(id));
     if (ok(v)) return v;
     await new Promise((r) => setTimeout(r, 15));
   }
   throw new Error(`${id} never ${what}: last seen ${v?.phase}`);
 };
-const settled = (e: Engine, id: string) => until(e, id, (v) => v.state.settled !== null, 'settled');
-const running = (e: Engine, id: string) => until(e, id, (v) => v.phase.startsWith('running'), 'ran');
+const settled = (e: EngineShape, id: string) => until(e, id, (v) => v.state.settled !== null, 'settled');
+const running = (e: EngineShape, id: string) => until(e, id, (v) => v.phase.startsWith('running'), 'ran');
 
-const refusal = async (f: () => unknown): Promise<Error & { exitCode?: number }> => {
+const refusal = async (f: () => unknown): Promise<Error & { _tag?: string }> => {
   try {
     await f();
   } catch (e) {
-    return e as Error & { exitCode?: number };
+    return e as Error & { _tag?: string };
   }
   throw new Error('it did not refuse');
 };
@@ -131,7 +132,7 @@ test('the test agent serves its card and answers a message on each binding it li
 test('a card that asks for a bearer token, with no credentials to give one: unstartable, naming the scheme, nothing sent', async () => {
   const s = await serve({ security: bearer('t0k'), script: HELD });
   const { e } = engineOn(s);
-  const id = await e.file(task());
+  const id = await Effect.runPromise(e.file(task()));
   const v = await settled(e, id);
   assert.equal(v.state.settled, 'failed');
   const a = v.state.attempts[0];
@@ -160,7 +161,7 @@ test('what the runtime cannot send refuses too: an API key in a query, mutual TL
   ] as const) {
     const s = await serve({ security, script: HELD });
     const { e } = engineOn(s, { credentials: () => 'a secret it has' });
-    const id = await e.file(task());
+    const id = await Effect.runPromise(e.file(task()));
     const a = (await settled(e, id)).state.attempts[0];
     assert.equal(a.reason, 'unstartable');
     assert.match(a.error ?? '', said);
@@ -179,7 +180,7 @@ test('a card with two requirements is met by the first the secrets meet whole', 
     },
   });
   const { e } = engineOn(s, { credentials: (scheme) => (scheme === 'key' ? 'k-1' : undefined) });
-  const id = await e.file(task());
+  const id = await Effect.runPromise(e.file(task()));
   assert.equal((await settled(e, id)).state.settled, 'succeeded');
   assert.equal(s.headers[0]['x-api-key'], 'k-1');
   assert.equal(s.headers[0].authorization, undefined);
@@ -188,7 +189,7 @@ test('a card with two requirements is met by the first the secrets meet whole', 
 test('a secret the agent refuses: unstartable, in words that say to check it, and the agent did nothing', async () => {
   const s = await serve({ security: bearer('right'), script: HELD });
   const { e, root } = engineOn(s, { credentials: () => 'wrong' });
-  const id = await e.file(task());
+  const id = await Effect.runPromise(e.file(task()));
   const a = (await settled(e, id)).state.attempts[0];
   assert.equal(a.reason, 'unstartable');
   assert.match(a.error ?? '', /refused the request's authentication \(401/);
@@ -199,7 +200,7 @@ test('a secret the agent refuses: unstartable, in words that say to check it, an
 test('a card that offers only gRPC: unstartable, naming what the runtime speaks', async () => {
   const s = await serve({ bindings: ['GRPC'], script: HELD });
   const { e } = engineOn(s);
-  const id = await e.file(task());
+  const id = await Effect.runPromise(e.file(task()));
   const a = (await settled(e, id)).state.attempts[0];
   assert.equal(a.reason, 'unstartable');
   assert.match(a.error ?? '', /offers GRPC 1\.0, and this runtime speaks JSON-RPC \(`JSONRPC`\) and REST \(`HTTP\+JSON`\)/);
@@ -211,8 +212,8 @@ test('an agent that is not there: unstartable, since its card could not be read 
   const url = s.url;
   await s.close();
   servers.splice(servers.indexOf(s), 1);
-  const e = promiseEngine(EngineService.layer({ root: scratch('ae-remote-'), harnesses: { remote: { url } } }));
-  const id = await e.file(task());
+  const e = builtEngine(EngineService.layer({ root: scratch('ae-remote-'), harnesses: { remote: { url } } }));
+  const id = await Effect.runPromise(e.file(task()));
   const a = (await settled(e, id)).state.attempts[0];
   assert.equal(a.reason, 'unstartable');
   assert.match(a.error ?? '', /could not be read at .*agent-card\.json .*not reachable/);
@@ -223,15 +224,15 @@ test('a card that could not be read is named by its origin and path, never its q
   const url = `${s.url}/agent.json?key=SECRET-in-the-query`;
   await s.close();
   servers.splice(servers.indexOf(s), 1);
-  const e = promiseEngine(EngineService.layer({ root: scratch('ae-remote-'), harnesses: { remote: { url } } }));
-  const id = await e.file(task());
+  const e = builtEngine(EngineService.layer({ root: scratch('ae-remote-'), harnesses: { remote: { url } } }));
+  const id = await Effect.runPromise(e.file(task()));
   const a = (await settled(e, id)).state.attempts[0];
   assert.equal(a.reason, 'unstartable');
   assert.match(a.error ?? '', /could not be read at http:\/\/[^ ]*\/agent\.json \(/, 'the card is still named, by its path');
   assert.ok(!(a.error ?? '').includes('SECRET'), a.error);
 });
 
-test('the Promise engine refuses a remote agent it could never reach, whose address carries a secret, or whose card does not decode', async () => {
+test('the engine refuses a remote agent it could never reach, whose address carries a secret, or whose card does not decode', async () => {
   const ONE = { url: 'https://a.example/a2a/jsonrpc', protocolBinding: 'JSONRPC', protocolVersion: '1.0' };
   const cases: Array<[unknown, RegExp]> = [
     [{ url: 'https://user:pw@agent.example' }, /carries a user name or password/],
@@ -260,14 +261,14 @@ test('the Promise engine refuses a remote agent it could never reach, whose addr
   ];
   for (const [agent, said] of cases) {
     const err = await refusal(() =>
-      promiseEngine(EngineService.layer({ root: scratch('ae-remote-'), harnesses: { remote: agent as never } })),
+      builtEngine(EngineService.layer({ root: scratch('ae-remote-'), harnesses: { remote: agent as never } })),
     );
-    assert.equal(err.exitCode, 2, String(said));
+    assert.equal(err._tag, 'EngineRefused', String(said));
     assert.match(err.message, said);
-    assert.ok(err.message.startsWith('promiseEngine: the `remote` harness'), err.message);
+    assert.ok(err.message.startsWith('the `remote` harness'), err.message);
   }
   const err = await refusal(() =>
-    promiseEngine(
+    builtEngine(
       EngineService.layer({
         root: scratch('ae-remote-'),
         harnesses: { remote: { url: 'https://a.example' } },
@@ -275,15 +276,15 @@ test('the Promise engine refuses a remote agent it could never reach, whose addr
       }),
     ),
   );
-  assert.equal(err.exitCode, 2);
+  assert.equal(err._tag, 'EngineRefused', err.message);
   assert.match(err.message, /`credentials` is a function/);
 });
 
 test('a task that carries harness arguments is refused on a remote agent, before anything is journalled', async () => {
   const s = await serve();
   const { e, root } = engineOn(s);
-  const err = await refusal(() => e.file(task({ config: { model: 'x' } })));
-  assert.equal(err.exitCode, 2);
+  const err = await refusal(() => Effect.runPromise(e.file(task({ config: { model: 'x' } }))));
+  assert.equal(err._tag, 'FileRefused', err.message);
   assert.match(
     err.message,
     /the `remote` harness is a remote A2A agent, which runs as its operator configured it, and takes no harness arguments: take `model` out of `config`/,
@@ -294,10 +295,10 @@ test('a task that carries harness arguments is refused on a remote agent, before
 test('say to a remote task at work is refused: its Task takes words only once it asks for input', async () => {
   const s = await serve({ script: HELD });
   const { e, root } = engineOn(s);
-  const id = await e.file(task());
+  const id = await Effect.runPromise(e.file(task()));
   await running(e, id);
-  const err = await refusal(() => e.say(id, 'hurry up'));
-  assert.equal(err.exitCode, 2);
+  const err = await refusal(() => Effect.runPromise(e.say(id, 'hurry up')));
+  assert.equal(err._tag, 'SayRefused', err.message);
   assert.match(err.message, /runs on the `remote` remote A2A agent, whose Task takes words only once it asks for input, and it is at work/);
   assert.equal(s.counts.sendMessage, 1, 'nothing sent');
   assert.ok(!journalOf(root, id).some((ev) => ev.kind === 'said'));
@@ -313,7 +314,7 @@ for (const bindings of BINDINGS) {
   test(`${on}: a task works, completes with a data artifact, and settles succeeded with that statement`, async () => {
     const s = await serve({ bindings, script: HELD });
     const { e } = engineOn(s);
-    const id = await e.file(task());
+    const id = await Effect.runPromise(e.file(task()));
     const v = await running(e, id);
     assert.equal(v.phase, 'running (working)');
     assert.equal(v.sessionId, s.tasks()[0]);
@@ -338,10 +339,10 @@ for (const bindings of BINDINGS) {
         t.turn === 1 ? [{ state: 'input-required', words: 'which colour?' }] : [{ data: { colour: t.text }, state: 'completed' }],
     });
     const { e, root } = engineOn(s);
-    const id = await e.file(task());
+    const id = await Effect.runPromise(e.file(task()));
     const v = await until(e, id, (x) => x.phase === 'needs-human', 'asked for input');
     assert.equal(v.waitingFor, 'input');
-    const said = await e.say(id, 'blue');
+    const said = await Effect.runPromise(e.say(id, 'blue'));
     assert.equal(said.text, 'blue');
     assert.equal(s.sent[1].taskId, s.tasks()[0], 'on the same Task');
     assert.equal(s.sent[1].contextId, v.state.attempts[0].nativeId ?? s.sent[1].contextId);
@@ -355,9 +356,9 @@ for (const bindings of BINDINGS) {
   test(`${on}: stop cancels the Task once, and it settles stopped`, async () => {
     const s = await serve({ bindings, script: HELD });
     const { e } = engineOn(s);
-    const id = await e.file(task());
+    const id = await Effect.runPromise(e.file(task()));
     await running(e, id);
-    await e.stop(id);
+    await Effect.runPromise(e.stop(id));
     const done = await settled(e, id);
     assert.equal(done.state.settled, 'stopped');
     assert.equal(s.counts.cancelTask, 1);
@@ -366,17 +367,17 @@ for (const bindings of BINDINGS) {
   test(`${on}: a Task that fails settles failed`, async () => {
     const s = await serve({ bindings, script: () => [{ state: 'failed', words: 'the paint ran out' }] });
     const { e } = engineOn(s);
-    const id = await e.file(task());
+    const id = await Effect.runPromise(e.file(task()));
     const done = await settled(e, id);
     assert.equal(done.state.settled, 'failed');
     assert.equal(done.state.attempts[0].reason, 'harness');
-    assert.match(await e.logs(id), /FAILED — the paint ran out/);
+    assert.match(await Effect.runPromise(e.logs(id)), /FAILED — the paint ran out/);
   });
 
   test(`${on}: a completion with no data part ends with no statement: stated false`, async () => {
     const s = await serve({ bindings, script: () => [{ text: 'done, in words', state: 'completed' }] });
     const { e } = engineOn(s);
-    const id = await e.file(task());
+    const id = await Effect.runPromise(e.file(task()));
     const done = await settled(e, id);
     assert.equal(done.state.attempts[0].stated, false);
     assert.equal(done.state.attempts[0].closeout, undefined);
@@ -386,59 +387,59 @@ for (const bindings of BINDINGS) {
 test('a task held open: its answer is a new Task in the same context, as A2A continues a conversation', async () => {
   const s = await serve({ script: (t) => [{ data: { turn: t.turn, heard: t.text }, state: 'completed' }] });
   const { e } = engineOn(s);
-  const id = await e.file(task({ holdOpen: true }));
+  const id = await Effect.runPromise(e.file(task({ holdOpen: true })));
   const first = await until(e, id, (v) => v.phase === 'input-required', 'waited for an answer');
-  await e.answer(id, 'once more');
+  await Effect.runPromise(e.answer(id, 'once more'));
   const second = await until(e, id, (v) => v.phase === 'input-required' && v.state.attempts.length === 2, 'took its answer');
   assert.equal(s.sent[1].contextId, first.state.attempts[0].nativeId, 'sent into the context of the first');
   assert.equal(s.sent[1].taskId, '');
   assert.equal(s.tasks().length, 2);
   assert.deepEqual(second.state.attempts[1].closeout, { turn: 1, heard: 'once more' });
   assert.equal(second.sessionId, first.state.attempts[0].nativeId, "settled on the context, the view's session is the conversation");
-  assert.match(await e.logs(id), /^user: once more\n/, 'and its logs are the latest Task in it');
-  await e.close(id);
+  assert.match(await Effect.runPromise(e.logs(id)), /^user: once more\n/, 'and its logs are the latest Task in it');
+  await Effect.runPromise(e.close(id));
   assert.equal((await settled(e, id)).state.settled, 'succeeded');
 });
 
 test('an agent that answers with a Message, not a Task: the session is its reply, ended', async () => {
   const s = await serve({ script: () => [{ reply: 'here you are', data: { answer: 42 } }] });
   const { e } = engineOn(s);
-  const id = await e.file(task());
+  const id = await Effect.runPromise(e.file(task()));
   const done = await settled(e, id);
   assert.equal(done.state.settled, 'succeeded');
   assert.deepEqual(done.state.attempts[0].closeout, { answer: 42 });
-  assert.match(await e.logs(id), /agent: here you are/);
+  assert.match(await Effect.runPromise(e.logs(id)), /agent: here you are/);
   assert.equal(s.counts.getTask ?? 0, 0, 'no Task to ask about');
 });
 
 test("a card served as the SDK's own objects is read with its security schemes whole", async () => {
   const s = await serve({ cardForm: 'sdk', security: bearer('sdk-token'), script: () => [{ data: { ok: true }, state: 'completed' }] });
   const bare = engineOn(s);
-  const refused = (await settled(bare.e, await bare.e.file(task()))).state.attempts[0];
+  const refused = (await settled(bare.e, await Effect.runPromise(bare.e.file(task())))).state.attempts[0];
   assert.equal(refused.reason, 'unstartable');
   assert.match(refused.error ?? '', /`token` needs a secret/);
   assert.equal(s.paths.length, 0, 'refused off the card, before any request: the scheme was read');
   const { e } = engineOn(s, { credentials: (scheme) => (scheme === 'token' ? 'sdk-token' : undefined) });
-  assert.equal((await settled(e, await e.file(task()))).state.settled, 'succeeded');
+  assert.equal((await settled(e, await Effect.runPromise(e.file(task())))).state.settled, 'succeeded');
 });
 
 test('a served card that does not decode: unstartable, naming its first wrong field and the card by its path alone, and nothing sent', async () => {
   const s = await serve({ script: HELD, cardJson: () => ({ supportedInterfaces: [{ url: 3, protocolBinding: 'JSONRPC' }] }) });
   const { e } = engineOn(s);
-  const a = (await settled(e, await e.file(task()))).state.attempts[0];
+  const a = (await settled(e, await Effect.runPromise(e.file(task())))).state.attempts[0];
   assert.equal(a.reason, 'unstartable');
   assert.match(a.error ?? '', /serves is not an A2A 1\.0 agent card this runtime reads: its `supportedInterfaces\.0\.url` is 3, where/);
   assert.ok((a.error ?? '').includes(`what ${s.url}/.well-known/agent-card.json serves`), a.error);
   assert.match(a.error ?? '', /The agent's operator serves the card; nothing was sent\.$/);
   assert.equal(s.paths.length, 0, 'no A2A request was made');
 
-  const q = promiseEngine(
+  const q = builtEngine(
     EngineService.layer({
       root: scratch('ae-remote-'),
       harnesses: { remote: { url: `${s.url}/.well-known/agent-card.json?key=SECRET` } },
     }),
   );
-  const b = (await settled(q, await q.file(task()))).state.attempts[0];
+  const b = (await settled(q, await Effect.runPromise(q.file(task())))).state.attempts[0];
   assert.match(b.error ?? '', /agent-card\.json serves is not an A2A 1\.0 agent card/);
   assert.ok(!(b.error ?? '').includes('SECRET'), b.error);
 });
@@ -447,7 +448,7 @@ test('a served card whose wrong field holds a huge value is refused in bounded w
   const huge = Array.from({ length: 100_000 }, (_, i) => i);
   const s = await serve({ script: HELD, cardJson: () => ({ supportedInterfaces: [{ url: huge, protocolBinding: 'JSONRPC' }] }) });
   const { e } = engineOn(s);
-  const a = (await settled(e, await e.file(task()))).state.attempts[0];
+  const a = (await settled(e, await Effect.runPromise(e.file(task())))).state.attempts[0];
   assert.equal(a.reason, 'unstartable');
   assert.ok((a.error ?? '').includes(`its \`supportedInterfaces.0.url\` is ${JSON.stringify(huge).slice(0, 60)}…, where`), a.error);
   assert.ok(JSON.stringify(huge).length > 500_000);
@@ -464,7 +465,7 @@ test('a scheme of a kind A2A 1.0 does not define is kept: a requirement that nam
       cardJson: (c) => ({ ...c, securitySchemes: { future: scheme }, securityRequirements: [{ schemes: { future: {} } }] }),
     });
     const { e } = engineOn(only, { credentials: () => 'a secret it has' });
-    const a = (await settled(e, await e.file(task()))).state.attempts[0];
+    const a = (await settled(e, await Effect.runPromise(e.file(task())))).state.attempts[0];
     assert.equal(a.reason, 'unstartable', form);
     assert.match(a.error ?? '', /`future` is a kind of scheme this runtime does not know, and cannot send\. Nothing was sent/, form);
     assert.equal(only.paths.length, 0, form);
@@ -479,14 +480,14 @@ test('a scheme of a kind A2A 1.0 does not define is kept: a requirement that nam
     }),
   });
   const { e } = engineOn(s, { credentials: (scheme) => (scheme === 'token' ? 't0k' : undefined) });
-  assert.equal((await settled(e, await e.file(task()))).state.settled, 'succeeded');
+  assert.equal((await settled(e, await Effect.runPromise(e.file(task())))).state.settled, 'succeeded');
 });
 
 test("a harness given by its card, not its URL, is reached on the card's interface", async () => {
   const s = await serve({ script: () => [{ data: { ok: true }, state: 'completed' }] });
   const card = (await (await fetch(`${s.url}/.well-known/agent-card.json`)).json()) as Record<string, unknown>;
   const asked: string[] = [];
-  const e = promiseEngine(
+  const e = builtEngine(
     EngineService.layer({
       root: scratch('ae-remote-'),
       harnesses: { remote: { card } },
@@ -496,7 +497,7 @@ test("a harness given by its card, not its URL, is reached on the card's interfa
       },
     }),
   );
-  assert.equal((await settled(e, await e.file(task()))).state.settled, 'succeeded');
+  assert.equal((await settled(e, await Effect.runPromise(e.file(task())))).state.settled, 'succeeded');
   assert.deepEqual(asked, [], 'a card that asks for no auth asks for no secret');
 });
 
@@ -504,23 +505,23 @@ test('an agent that lives under a path has its card read beneath that path, and 
   const done = () => [{ data: { ok: true }, state: 'completed' as const }];
   const under = await serve({ prefix: '/agents/reviewer', script: done });
   for (const url of [under.url, `${under.url}/`]) {
-    const e = promiseEngine(EngineService.layer({ root: scratch('ae-remote-'), harnesses: { remote: { url } } }));
-    assert.equal((await settled(e, await e.file(task()))).state.settled, 'succeeded', url);
+    const e = builtEngine(EngineService.layer({ root: scratch('ae-remote-'), harnesses: { remote: { url } } }));
+    assert.equal((await settled(e, await Effect.runPromise(e.file(task())))).state.settled, 'succeeded', url);
   }
   assert.deepEqual(under.cards, ['/agents/reviewer/.well-known/agent-card.json', '/agents/reviewer/.well-known/agent-card.json']);
   assert.ok(under.paths.length && under.paths.every((p) => p.startsWith('/agents/reviewer/a2a/')), under.paths.join(' '));
   const named = await serve({ prefix: '/agents/reviewer', cardAt: '/card.json', script: done });
-  const e = promiseEngine(EngineService.layer({ root: scratch('ae-remote-'), harnesses: { remote: { url: `${named.url}/card.json` } } }));
-  assert.equal((await settled(e, await e.file(task()))).state.settled, 'succeeded');
+  const e = builtEngine(EngineService.layer({ root: scratch('ae-remote-'), harnesses: { remote: { url: `${named.url}/card.json` } } }));
+  assert.equal((await settled(e, await Effect.runPromise(e.file(task())))).state.settled, 'succeeded');
   assert.deepEqual(named.cards, ['/agents/reviewer/card.json']);
 });
 
 test('restart after `spawned`: a new engine over the same root reads the Task by GetTask and settles it, sending nothing', async () => {
   const s = await serve({ script: HELD });
   const { e, root } = engineOn(s);
-  const id = await e.file(task());
+  const id = await Effect.runPromise(e.file(task()));
   await running(e, id);
-  const again = promiseEngine(EngineService.layer({ root, harnesses: { remote: { url: s.url } } }));
+  const again = builtEngine(EngineService.layer({ root, harnesses: { remote: { url: s.url } } }));
   const gets = s.counts.getTask ?? 0;
   s.move(s.tasks()[0], { data: { ok: true }, state: 'completed' });
   assert.equal((await settled(again, id)).state.settled, 'succeeded');
@@ -531,7 +532,7 @@ test('restart after `spawned`: a new engine over the same root reads the Task by
 test('restart with the Task recorded and only `starting` journalled: the Task is adopted, and nothing is sent again', async () => {
   const s = await serve({ script: HELD });
   const { e, root } = engineOn(s);
-  const id = await e.file(task());
+  const id = await Effect.runPromise(e.file(task()));
   await running(e, id);
   writeJournal(
     root,
@@ -539,7 +540,7 @@ test('restart with the Task recorded and only `starting` journalled: the Task is
     journalOf(root, id).filter((ev) => ev.kind !== 'spawned'),
   );
   await Effect.runPromise(remoteOps('remote', { url: s.url }, root).spawn({ name: `ae/${id}/1`, brief: 'b', cwd: '/w' }));
-  const again = promiseEngine(EngineService.layer({ root, harnesses: { remote: { url: s.url } } }));
+  const again = builtEngine(EngineService.layer({ root, harnesses: { remote: { url: s.url } } }));
   const v = await running(again, id);
   assert.equal(v.sessionId, s.tasks()[0]);
   s.move(s.tasks()[0], { data: { ok: true }, state: 'completed' });
@@ -550,22 +551,22 @@ test('restart with the Task recorded and only `starting` journalled: the Task is
 test('restart with the intent on disk and no Task: never sent twice — a spawn in doubt, then `lost` past the grace window', async () => {
   const s = await serve({ script: HELD });
   const root = scratch('ae-remote-');
-  const e = promiseEngine(EngineService.layer({ root, harnesses: { remote: { url: s.url } } }));
-  const id = await e.file(task({ id: 'in-doubt' }));
+  const e = builtEngine(EngineService.layer({ root, harnesses: { remote: { url: s.url } } }));
+  const id = await Effect.runPromise(e.file(task({ id: 'in-doubt' })));
   const name = `ae/${id}/1`;
   fs.mkdirSync(path.join(root, 'remote'), { recursive: true });
   fs.writeFileSync(entryFile(root, name), JSON.stringify({ name, agent: 'remote', messageId: 'm-lost', sentAt: new Date().toISOString() }));
-  await e.tick();
+  await Effect.runPromise(e.tick());
   const events = journalOf(root, id) as Array<{ kind: string; at: string; error?: string }>;
   const spawned = events.find((ev) => ev.kind === 'spawned');
   assert.match(
     spawned?.error ?? '',
     /its answer was never recorded, since the process sending it stopped first: whether the agent made a Task of it is not known, and it is not sent twice/,
   );
-  assert.equal((await e.view(id)).state.settled, null, 'no refusal: a session may exist');
+  assert.equal((await Effect.runPromise(e.view(id))).state.settled, null, 'no refusal: a session may exist');
   assert.equal(s.counts.sendMessage ?? 0, 0);
   writeJournal(root, id, agedBy(events, 10 * 60_000));
-  const again = promiseEngine(EngineService.layer({ root, harnesses: { remote: { url: s.url } } }));
+  const again = builtEngine(EngineService.layer({ root, harnesses: { remote: { url: s.url } } }));
   const done = await settled(again, id);
   assert.equal(done.state.attempts[0].reason, 'lost');
   assert.equal(s.counts.sendMessage ?? 0, 0);
@@ -576,8 +577,13 @@ test("a registry an older runtime wrote, `seen` in its former words, is read in 
     card: { supportedInterfaces: [{ url: 'http://127.0.0.1:9/a2a/jsonrpc', protocolBinding: 'JSONRPC', protocolVersion: '1.0' }] },
   };
   const root = scratch('ae-remote-');
-  const e = promiseEngine(EngineService.layer({ root, harnesses: { remote: dead } }));
-  const [signed, stopped, asked, odd] = [await e.file(task()), await e.file(task()), await e.file(task()), await e.file(task())];
+  const e = builtEngine(EngineService.layer({ root, harnesses: { remote: dead } }));
+  const [signed, stopped, asked, odd] = [
+    await Effect.runPromise(e.file(task())),
+    await Effect.runPromise(e.file(task())),
+    await Effect.runPromise(e.file(task())),
+    await Effect.runPromise(e.file(task())),
+  ];
   const at = new Date().toISOString();
   for (const id of [signed, stopped, asked, odd]) {
     writeJournal(root, id, [...journalOf(root, id), { kind: 'starting', at, attempt: 1 }, { kind: 'spawned', at, attempt: 1 }]);
@@ -632,8 +638,8 @@ test("a registry an older runtime wrote, `seen` in its former words, is read in 
     assert.deepEqual(JSON.parse(fs.readFileSync(entryFile(root, `ae/${id}/1`), 'utf8')), en, `${id}: the file keeps its words`);
   assert.deepEqual(JSON.parse(fs.readFileSync(doneFile, 'utf8')), replied);
 
-  for (let i = 0; i < 3; i++) await e.tick();
-  const views = await Promise.all([signed, stopped, asked, odd].map((id) => e.view(id)));
+  for (let i = 0; i < 3; i++) await Effect.runPromise(e.tick());
+  const views = await Promise.all([signed, stopped, asked, odd].map((id) => Effect.runPromise(e.view(id))));
   assert.deepEqual(
     views.map((v) => v.state.settled),
     ['succeeded', 'stopped', null, 'failed'],
@@ -648,10 +654,10 @@ test("a registry an older runtime wrote, `seen` in its former words, is read in 
 test('an agent unreachable for a pass is not a session lost: the task reads as last seen, and settles once it answers', async () => {
   const s = await serve({ script: HELD });
   const { e, root } = engineOn(s);
-  const id = await e.file(task());
+  const id = await Effect.runPromise(e.file(task()));
   await running(e, id);
   const entry = JSON.parse(fs.readFileSync(entryFile(root, `ae/${id}/1`), 'utf8'));
-  const dead = promiseEngine(
+  const dead = builtEngine(
     EngineService.layer({
       root,
       harnesses: {
@@ -662,8 +668,8 @@ test('an agent unreachable for a pass is not a session lost: the task reads as l
     }),
   );
   writeJournal(root, id, agedBy(journalOf(root, id), 10 * 60_000));
-  for (let i = 0; i < 3; i++) await dead.tick();
-  const v = await dead.view(id);
+  for (let i = 0; i < 3; i++) await Effect.runPromise(dead.tick());
+  const v = await Effect.runPromise(dead.view(id));
   assert.equal(v.phase, 'running (working)', 'past the grace window, and not lost');
   assert.equal(v.sessionId, entry.taskId, 'every GetTask fails at an address nothing answers: the task reads as last seen');
   s.move(s.tasks()[0], { data: { ok: true }, state: 'completed' });
@@ -682,7 +688,7 @@ test('the secret is sent, and written nowhere: not the journal, the registry, th
   const token = 'tok-3f9a-SECRET-7c21';
   const s = await serve({ security: bearer(token), script: HELD });
   const { e, root } = engineOn(s, { credentials: (scheme) => (scheme === 'token' ? token : undefined) });
-  const id = await e.file(task());
+  const id = await Effect.runPromise(e.file(task()));
   await running(e, id);
   s.move(s.tasks()[0], { data: { ok: true }, state: 'completed' });
   const v = await settled(e, id);
@@ -698,7 +704,7 @@ test('the secret is sent, and written nowhere: not the journal, the registry, th
   );
   for (const [file, text] of files) assert.ok(!text.includes(token), `${file} holds the secret`);
   assert.ok(!JSON.stringify(v).includes(token));
-  assert.ok(!JSON.stringify(await e.feed()).includes(token));
+  assert.ok(!JSON.stringify(await Effect.runPromise(e.feed())).includes(token));
 });
 
 test('a card served at one origin that names its interfaces on another: unstartable, and neither origin is sent the secret', async () => {
@@ -706,7 +712,7 @@ test('a card served at one origin that names its interfaces on another: unstarta
   const elsewhere = await serve({ security: apiKey(key), script: () => [{ data: { ok: true }, state: 'completed' }] });
   const s = await serve({ security: apiKey(key), interfacesAt: elsewhere.url, script: HELD });
   const { e, root } = engineOn(s, { credentials: () => key });
-  const a = (await settled(e, await e.file(task()))).state.attempts[0];
+  const a = (await settled(e, await Effect.runPromise(e.file(task())))).state.attempts[0];
   assert.equal(a.reason, 'unstartable');
   assert.match(
     a.error ?? '',
@@ -725,7 +731,7 @@ test('a redirect from the agent is not followed: the send is refused, and the ad
   const elsewhere = await serve({ security: apiKey(key), script: () => [{ data: { ok: true }, state: 'completed' }] });
   const s = await serve({ security: apiKey(key), redirectTo: elsewhere.url, script: HELD });
   const { e, root } = engineOn(s, { credentials: () => key });
-  const a = (await settled(e, await e.file(task()))).state.attempts[0];
+  const a = (await settled(e, await Effect.runPromise(e.file(task())))).state.attempts[0];
   assert.equal(a.reason, 'unstartable');
   assert.match(a.error ?? '', new RegExp(`answered 307 to ${elsewhere.url}/a2a/jsonrpc, and a redirect is not followed`));
   assert.equal(elsewhere.paths.length, 0, 'the address it named was sent nothing');
@@ -791,29 +797,29 @@ test('a request the agent holds is given up after its bound: a card not read ref
 test(`at shipped defaults an agent that holds every request holds a pass ${REQUEST_MS / 1000} s at most, and the task reads as last seen`, async () => {
   const s = await serve({ script: HELD });
   const { e } = engineOn(s);
-  const id = await e.file(task());
+  const id = await Effect.runPromise(e.file(task()));
   await running(e, id);
   s.hanging.a2a = true;
-  const [ms] = await timed(() => e.tick());
+  const [ms] = await timed(() => Effect.runPromise(e.tick()));
   assert.ok(ms >= REQUEST_MS - 100 && ms < REQUEST_MS + 5_000, `${ms} ms`);
-  assert.equal((await e.view(id)).phase, 'running (working)');
+  assert.equal((await Effect.runPromise(e.view(id))).phase, 'running (working)');
 });
 
 test(`at shipped defaults an agent that replies later than ${REQUEST_MS / 1000} s is read submitted, then ends with its reply, sent once: the send leaves the pass`, async () => {
   const s = await serve({ script: () => [{ reply: 'slow and sure', data: { verdict: 'fine' }, after: REQUEST_MS + 500 }] });
   const { root, e } = engineOn(s);
-  const id = await e.file(task());
+  const id = await Effect.runPromise(e.file(task()));
   const [ms] = await timed(async () => {
-    await e.tick();
-    await e.tick();
+    await Effect.runPromise(e.tick());
+    await Effect.runPromise(e.tick());
   });
   assert.ok(ms < SPAWN_WAIT_MS + 3_000, `${ms} ms: the pass waited ${SPAWN_WAIT_MS / 1000} s for the answer, and went on`);
   const spawned = (journalOf(root, id) as Array<{ kind: string; error?: string }>).find((ev) => ev.kind === 'spawned');
   assert.ok(spawned && spawned.error === undefined, 'spawned, with no doubt');
-  assert.equal((await e.view(id)).phase, 'running (working)', 'being sent: submitted, which runs as working');
+  assert.equal((await Effect.runPromise(e.view(id))).phase, 'running (working)', 'being sent: submitted, which runs as working');
   const t0 = Date.now();
   while (s.replies() === 0 && Date.now() - t0 < REQUEST_MS + 5_000) {
-    await e.tick();
+    await Effect.runPromise(e.tick());
     await new Promise((r) => setTimeout(r, 100));
   }
   assert.equal(s.replies(), 1);
@@ -822,7 +828,7 @@ test(`at shipped defaults an agent that replies later than ${REQUEST_MS / 1000} 
   assert.deepEqual(done.state.attempts[0].closeout, { verdict: 'fine' });
   assert.equal(done.state.attempts.length, 1);
   assert.equal(s.counts.sendMessage, 1, 'sent once');
-  assert.match(await e.logs(id), /agent: slow and sure/);
+  assert.match(await Effect.runPromise(e.logs(id)), /agent: slow and sure/);
 });
 
 /** A gate an agent's first step waits on, and its key. */
@@ -845,10 +851,10 @@ test(
     const held = await serve({ script: () => [{ until: g.shut, data: { ok: 'held' }, state: 'completed' }] });
     const quick = await serve({ script: () => [{ data: { ok: 'quick' }, state: 'completed' }] });
     const root = scratch('ae-remote-');
-    const e = promiseEngine(EngineService.layer({ root, harnesses: { held: { url: held.url }, quick: { url: quick.url } } }));
-    const a = await e.file(task({ harness: 'held' }));
-    const b = await e.file(task({ harness: 'quick' }));
-    await e.tick();
+    const e = builtEngine(EngineService.layer({ root, harnesses: { held: { url: held.url }, quick: { url: quick.url } } }));
+    const a = await Effect.runPromise(e.file(task({ harness: 'held' })));
+    const b = await Effect.runPromise(e.file(task({ harness: 'quick' })));
+    await Effect.runPromise(e.tick());
     assert.equal(
       held.counts.sendMessage,
       1,
@@ -859,8 +865,12 @@ test(
     const entry = JSON.parse(fs.readFileSync(entryFile(root, `ae/${a}/1`), 'utf8'));
     assert.equal(entry.taskId, undefined);
     assert.equal(entry.sending.pid, process.pid);
-    assert.equal((await e.view(a)).phase, 'running (working)', 'read submitted, a Task at work as far as anyone can tell');
-    assert.equal((await e.view(a)).state.settled, null);
+    assert.equal(
+      (await Effect.runPromise(e.view(a))).phase,
+      'running (working)',
+      'read submitted, a Task at work as far as anyone can tell',
+    );
+    assert.equal((await Effect.runPromise(e.view(a))).state.settled, null);
     g.open();
     const v = await settled(e, a);
     assert.equal(v.state.settled, 'succeeded');
@@ -873,7 +883,7 @@ test("a remote Task's statement is kept when the wall clock steps back after the
   const g = gate();
   const s = await serve({ script: () => [{ until: g.shut, data: { ok: 'held' }, state: 'completed' }] });
   const { e } = engineOn(s);
-  const id = await e.file(task());
+  const id = await Effect.runPromise(e.file(task()));
   await running(e, id);
   stepClock(t, -60_000);
   g.open();
@@ -887,7 +897,7 @@ test("a remote agent's Message reply keeps its data when the wall clock steps ba
   const g = gate();
   const s = await serve({ script: () => [{ reply: 'r', data: { ok: 'replied' }, until: g.shut }] });
   const { e } = engineOn(s);
-  const id = await e.file(task());
+  const id = await Effect.runPromise(e.file(task()));
   await running(e, id);
   stepClock(t, -60_000);
   g.open();
@@ -900,8 +910,8 @@ test("a remote agent's Message reply keeps its data when the wall clock steps ba
 test('an intent whose sending process lives is left to it: read submitted in another engine, and not sent again', async () => {
   const s = await serve({ script: HELD });
   const root = scratch('ae-remote-');
-  const e = promiseEngine(EngineService.layer({ root, harnesses: { remote: { url: s.url } } }));
-  const id = await e.file(task({ id: 'elsewhere' }));
+  const e = builtEngine(EngineService.layer({ root, harnesses: { remote: { url: s.url } } }));
+  const id = await Effect.runPromise(e.file(task({ id: 'elsewhere' })));
   const name = `ae/${id}/1`;
   const other = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60_000)'], { stdio: 'ignore' });
   try {
@@ -917,10 +927,10 @@ test('an intent whose sending process lives is left to it: read submitted in ano
       }),
     );
     const spawned = () => (journalOf(root, id) as Array<{ kind: string; error?: string }>).find((ev) => ev.kind === 'spawned');
-    for (let i = 0; i < 5 && !spawned(); i++) await e.tick();
+    for (let i = 0; i < 5 && !spawned(); i++) await Effect.runPromise(e.tick());
     assert.equal(spawned()?.error, undefined, 'the spawn leaves the send to the process making it');
-    await e.tick();
-    const v = await e.view(id);
+    await Effect.runPromise(e.tick());
+    const v = await Effect.runPromise(e.view(id));
     assert.equal(v.phase, 'running (working)');
     assert.equal(v.sessionId, 'm-there', 'the session is the message until the agent names its Task');
     assert.equal(s.counts.sendMessage ?? 0, 0, 'nothing sent from here');
@@ -965,8 +975,8 @@ test('a spawn writes its send lease on both clocks: `until` on the wall clock, a
 test('an intent whose sending process died is in doubt: not listed, never sent again, `lost` past the grace window', async () => {
   const s = await serve({ script: HELD });
   const root = scratch('ae-remote-');
-  const e = promiseEngine(EngineService.layer({ root, harnesses: { remote: { url: s.url } } }));
-  const id = await e.file(task({ id: 'died' }));
+  const e = builtEngine(EngineService.layer({ root, harnesses: { remote: { url: s.url } } }));
+  const id = await Effect.runPromise(e.file(task({ id: 'died' })));
   const name = `ae/${id}/1`;
   const gone = spawn(process.execPath, ['-e', ''], { stdio: 'ignore' });
   await new Promise((resolve) => gone.on('exit', resolve));
@@ -981,14 +991,14 @@ test('an intent whose sending process died is in doubt: not listed, never sent a
       sending: { pid: gone.pid, until: new Date(Date.now() + 60_000).toISOString() },
     }),
   );
-  for (let i = 0; i < 5 && !journalOf(root, id).some((ev) => ev.kind === 'spawned'); i++) await e.tick();
+  for (let i = 0; i < 5 && !journalOf(root, id).some((ev) => ev.kind === 'spawned'); i++) await Effect.runPromise(e.tick());
   const events = journalOf(root, id) as Array<{ kind: string; at: string; error?: string }>;
   assert.match(
     events.find((ev) => ev.kind === 'spawned')?.error ?? '',
     /its answer was never recorded, since the process sending it stopped first: whether the agent made a Task of it is not known, and it is not sent twice/,
   );
   writeJournal(root, id, agedBy(events, 10 * 60_000));
-  const done = await settled(promiseEngine(EngineService.layer({ root, harnesses: { remote: { url: s.url } } })), id);
+  const done = await settled(builtEngine(EngineService.layer({ root, harnesses: { remote: { url: s.url } } })), id);
   assert.equal(done.state.attempts[0].reason, 'lost', 'the grace window passed with nothing listed under the name');
   assert.equal(s.counts.sendMessage ?? 0, 0, 'never sent');
 });
@@ -997,18 +1007,18 @@ test('a stop while the agent holds the send cuts it: the task settles stopped, a
   const g = gate();
   const s = await serve({ script: () => [{ until: g.shut, state: 'working' }] });
   const { root, e } = engineOn(s);
-  const id = await e.file(task());
-  await e.tick();
+  const id = await Effect.runPromise(e.file(task()));
+  await Effect.runPromise(e.tick());
   assert.equal(s.counts.sendMessage, 1);
-  await e.stop(id);
+  await Effect.runPromise(e.stop(id));
   const v = await settled(e, id);
   assert.equal(v.state.settled, 'stopped');
-  assert.match(await e.logs(id), /CANCELED — stopped while it was being sent/);
+  assert.match(await Effect.runPromise(e.logs(id)), /CANCELED — stopped while it was being sent/);
   const let_go = path.join(root, 'remote', 'done', `${encodeURIComponent(`ae/${id}/1`)}.json`);
   assert.ok(fs.existsSync(let_go), 'let go of');
   g.open();
   await new Promise((r) => setTimeout(r, 200));
-  await e.tick();
+  await Effect.runPromise(e.tick());
   assert.equal(s.counts.sendMessage, 1, 'the agent answers a request the stop cut: nothing reads it, and nothing is sent again');
   assert.equal(fs.existsSync(entryFile(root, `ae/${id}/1`)), false, 'nothing brought back into the open registry');
 });
@@ -1016,11 +1026,11 @@ test('a stop while the agent holds the send cuts it: the task settles stopped, a
 test('a refusal that comes after the spawn returned ends the session `rejected`, in its words on `logs`, and the intent is kept', async () => {
   const s = await serve({ security: bearer('right'), slowMs: SPAWN_WAIT_MS + 500, script: HELD });
   const { root, e } = engineOn(s, { credentials: () => 'wrong' });
-  const id = await e.file(task());
+  const id = await Effect.runPromise(e.file(task()));
   const v = await until(e, id, (x) => x.state.settled !== null, 'settled', 400);
   assert.equal(v.state.settled, 'failed');
   assert.equal(v.state.attempts[0].reason, 'harness', 'the agent refused the work once it had the send: a failed end, not a spawn refused');
-  assert.match(await e.logs(id), /REJECTED — the agent refused the request's authentication \(401/);
+  assert.match(await Effect.runPromise(e.logs(id)), /REJECTED — the agent refused the request's authentication \(401/);
   assert.equal(s.counts.sendMessage ?? 0, 0, 'the agent did nothing');
   assert.ok(
     fs.existsSync(path.join(root, 'remote', 'done', `${encodeURIComponent(`ae/${id}/1`)}.json`)),
@@ -1032,7 +1042,7 @@ test("credentials is asked by the harness's name too, and missingCredential word
   const s = await serve({ security: bearer('t0k'), script: () => [{ data: { ok: 1 }, state: 'completed' }] });
   const asked: string[][] = [];
   const root = scratch('ae-remote-');
-  const e = promiseEngine(
+  const e = builtEngine(
     EngineService.layer({
       root,
       harnesses: { reviewer: { url: s.url }, other: { url: s.url } },
@@ -1043,29 +1053,27 @@ test("credentials is asked by the harness's name too, and missingCredential word
       missingCredential: (scheme, _url, harness) => `set WF_A2A_${harness.toUpperCase()}_${scheme.toUpperCase()}`,
     }),
   );
-  assert.equal((await settled(e, await e.file(task({ harness: 'reviewer' })))).state.settled, 'succeeded');
+  assert.equal((await settled(e, await Effect.runPromise(e.file(task({ harness: 'reviewer' }))))).state.settled, 'succeeded');
   assert.deepEqual(asked[0], ['token', s.url, 'reviewer']);
-  const a = (await settled(e, await e.file(task({ harness: 'other' })))).state.attempts[0];
+  const a = (await settled(e, await Effect.runPromise(e.file(task({ harness: 'other' }))))).state.attempts[0];
   assert.equal(a.reason, 'unstartable');
   assert.match(a.error ?? '', /`token` needs a secret, and `credentials` gave none: set WF_A2A_OTHER_TOKEN\./);
   assert.equal(s.counts.sendMessage, 1, 'only the task with its secret was sent');
 });
 
-test('the Promise engine refuses a missingCredential that is not a function', async () => {
-  const err = await refusal(() =>
-    promiseEngine(EngineService.layer({ root: scratch('ae-remote-'), missingCredential: 'set it' as never })),
-  );
+test('the engine refuses a missingCredential that is not a function', async () => {
+  const err = await refusal(() => builtEngine(EngineService.layer({ root: scratch('ae-remote-'), missingCredential: 'set it' as never })));
   assert.match(err.message, /`missingCredential` is a function, `\(scheme, agentUrl, harness\) => words`/);
 });
 
 test('every verb reaches the agent as an A2A method: SendMessage, GetTask, CancelTask', async () => {
   const s = await serve({ script: HELD });
   const { e } = engineOn(s);
-  const id = await e.file(task());
+  const id = await Effect.runPromise(e.file(task()));
   await running(e, id);
-  await e.view(id);
-  assert.match(await e.logs(id), /user: paint the fence\nWORKING/);
-  await e.stop(id);
+  await Effect.runPromise(e.view(id));
+  assert.match(await Effect.runPromise(e.logs(id)), /user: paint the fence\nWORKING/);
+  await Effect.runPromise(e.stop(id));
   await settled(e, id);
   assert.equal(s.counts.sendMessage, 1);
   assert.ok((s.counts.getTask ?? 0) >= 2);
@@ -1077,11 +1085,11 @@ test('a pass makes one GetTask per open remote task, and none once they settle',
   for (const n of [3, 6]) {
     const s = await serve({ script: HELD });
     const { e } = engineOn(s);
-    const ids = await Promise.all(Array.from({ length: n }, () => e.file(task())));
+    const ids = await Promise.all(Array.from({ length: n }, () => Effect.runPromise(e.file(task()))));
     for (const id of ids) await running(e, id);
     for (let pass = 1; pass <= 4; pass++) {
       const gets = s.counts.getTask ?? 0;
-      const report = await e.tick();
+      const report = await Effect.runPromise(e.tick());
       const o = report.observed.remote;
       assert.equal(o.calls, 1, `${n} tasks, pass ${pass}: one observe`);
       assert.equal(o.listed, n);
@@ -1092,9 +1100,9 @@ test('a pass makes one GetTask per open remote task, and none once they settle',
     }
     for (const taskId of s.tasks()) s.move(taskId, { data: { ok: true }, state: 'completed' });
     for (const id of ids) await settled(e, id);
-    await e.tick();
+    await Effect.runPromise(e.tick());
     const gets = s.counts.getTask ?? 0;
-    const report = await e.tick();
+    const report = await Effect.runPromise(e.tick());
     assert.equal((s.counts.getTask ?? 0) - gets, 0, 'settled: nothing asked');
     assert.equal(report.observed.remote?.listed ?? 0, 0, 'and nothing listed: each was let go of');
     t.diagnostic(`${n} settled: pass ${report.ms.toFixed(1)} ms`);

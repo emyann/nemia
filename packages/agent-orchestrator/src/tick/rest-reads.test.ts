@@ -14,20 +14,23 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import type { PromiseRunner, PromiseSighting } from 'agent-runtime';
-import { Engine, promiseEngine } from 'agent-runtime/effect';
+import type { Sighting } from 'agent-runtime';
+import { asyncOps, type AsyncRunner } from '../../test/promised.ts';
+import { Effect } from 'effect';
+import { Engine } from 'agent-runtime';
 import type { Run } from '../run.ts';
 import type { PassCost } from '../meter/meter.ts';
 import { scratch } from '../../test/scratch.ts';
+import { plainEngine } from '../../test/promised.ts';
 
 const ROOT = scratch('wf-rest-reads-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 process.env.WF_ROOT = ROOT;
 process.env.WF_MAX_CONCURRENT = '10000';
 delete process.env.WF_MAX_RUNS;
-const { start } = await import('../runner.ts');
+const { runWith, startRun, tickRun } = await import('../runner.ts');
 const { listRuns } = await import('../record/record.store.ts');
-const { tick, freshRestMemo } = await import('./tick.verb.ts');
+const { freshRestMemo } = await import('./tick.verb.ts');
 
 const REPO = fs.mkdtempSync(path.join(ROOT, 'repo-'));
 execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'base'], {
@@ -42,9 +45,9 @@ fs.writeFileSync(path.join(ONE, 'work.md'), '---\nharness: codex\n---\nwork it\n
  * what they are said.
  */
 const engine = () => {
-  const sessions = new Map<string, PromiseSighting>();
+  const sessions = new Map<string, Sighting>();
   let n = 0;
-  const runner: PromiseRunner = {
+  const runner: AsyncRunner = {
     async spawn(r) {
       n++;
       sessions.set(r.name, { sessionId: `s-${n}`, nativeId: `native-${n}`, state: 'working', busy: true });
@@ -58,15 +61,15 @@ const engine = () => {
     },
     async say() {},
   };
-  const e = promiseEngine(
-    Engine.layer({ root: fs.mkdtempSync(path.join(ROOT, 'engine-')), harnesses: { codex: runner }, defaultHarness: 'codex' }),
+  const e = plainEngine(
+    Engine.layer({ root: fs.mkdtempSync(path.join(ROOT, 'engine-')), harnesses: { codex: asyncOps(runner) }, defaultHarness: 'codex' }),
   );
   const signAll = (keep: readonly Run[]) => {
     for (const [name, s] of sessions)
       if (s.state === 'working' && !keep.some((r) => name.startsWith(`ae/${r.id}-`)))
         sessions.set(name, {
           ...s,
-          state: 'done',
+          state: 'completed',
           busy: false,
           closeout: { payload: { outcome: 'done', summary: 'did it', artifacts: [], needs: null }, at: Date.now() },
         });
@@ -76,12 +79,15 @@ const engine = () => {
 
 const h = engine();
 const MEMO = freshRestMemo();
-const inFlight = Array.from({ length: 3 }, (_, k) => start({ brief: `in flight ${k}`, repo: REPO, workflowDir: ONE, isolate: false }));
-const measured = async (): Promise<PassCost> => (await tick(h.e, { repo: ROOT, memo: MEMO, verifyRest: false })).cost!;
+const inFlight: Run[] = [];
+for (let k = 0; k < 3; k++)
+  inFlight.push(await Effect.runPromise(startRun({ brief: `in flight ${k}`, repo: REPO, workflowDir: ONE, isolate: false })));
+const measured = async (): Promise<PassCost> => (await runWith(h.e, tickRun({ repo: ROOT, memo: MEMO, verifyRest: false }))).cost!;
 
 /** A word said to the task of each run in flight, which the runtime appends to its journal. */
 const saidToInFlight = async () => {
-  for (const run of listRuns().filter((r) => inFlight.some((f) => f.id === r.id))) await h.e.say(run.steps.work.taskId!, 'Keep going.');
+  for (const run of listRuns().filter((r) => inFlight.some((f) => f.id === r.id)))
+    await Effect.runPromise(h.e.say(run.steps.work.taskId!, 'Keep going.'));
 };
 
 /**
@@ -89,9 +95,9 @@ const saidToInFlight = async () => {
  * pass at rest, measured.
  */
 const atRest = async (n: number): Promise<PassCost> => {
-  for (let k = 0; k < n; k++) start({ brief: `run ${k}`, repo: REPO, workflowDir: ONE, isolate: false });
+  for (let k = 0; k < n; k++) await Effect.runPromise(startRun({ brief: `run ${k}`, repo: REPO, workflowDir: ONE, isolate: false }));
   for (let k = 0; k < 12; k++) {
-    await tick(h.e, { repo: ROOT, memo: MEMO, verifyRest: true });
+    await runWith(h.e, tickRun({ repo: ROOT, memo: MEMO, verifyRest: true }));
     h.signAll(inFlight);
     if ((await measured()).rested === listRuns().length - inFlight.length) {
       await measured();

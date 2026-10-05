@@ -10,11 +10,11 @@ import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { answerError, app, REFUSAL_STATUS } from '../src/app.ts';
-import { Conflict, Invalid, Missing } from 'agent-orchestrator/effect';
+import { Conflict, Invalid, Missing } from 'agent-orchestrator';
 import { WorkflowError } from 'agent-orchestrator/workflow';
 import { noCardLine } from 'agent-orchestrator';
 
-type Refusal = import('agent-orchestrator/effect').Refusal;
+type Refusal = import('agent-orchestrator').Refusal;
 
 /** A router that throws `thrown`, mounted on an app that answers with `answerError`, as app.ts mounts its routers and answers. */
 const answered = async (thrown: unknown): Promise<{ status: number; body: unknown }> => {

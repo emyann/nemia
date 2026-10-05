@@ -5,12 +5,11 @@
  * engine's word for it are `views-words.ts`'s. A controller: it reads the runtime through the client (`runtime-client.ts`), and the
  * store's files beneath it, and files nothing — the tick (`tick.verb.ts`), the verbs and the screens read through it. Each read of the
  * engine is an Effect program that requires the engine as a service (`EngineService`) — `taskPhasesRead`, `checkReportsRead`,
- * `refusalRead`, `checksHandedRead`, `parentRead`, `parentsRead`, `filingsRead` — and fails with a refusal and dies of anything else;
- * beside each, its plain face in a Promise over the engine it is handed, which rejects with either as it was thrown. What reads only
- * views already read is plain.
+ * `refusalRead`, `checksHandedRead`, `parentRead`, `parentsRead`, `filingsRead` — and fails with a refusal and dies of anything else.
+ * What reads only views already read is plain.
  */
-import { Effect, Result } from 'effect';
-import { EngineService, awaited, denialText, tried, type Engine, type TaskView } from '../runtime-client.ts';
+import { Cause, Deferred, Effect, Exit } from 'effect';
+import { EngineService, asked, denialText, tried, type Engine, type TaskView } from '../runtime-client.ts';
 import { attemptVerdict, lastLines, reportedLines, type CheckHanded, type CheckRefusal, type Verdict } from '../check/check.ts';
 import type { Workflow } from '../step/step.ts';
 import { resultSteps } from '../branches/branches.ts';
@@ -55,8 +54,9 @@ export const answersIn = (view: TaskView | undefined): number => (view?.state.ho
  * that failed is not kept.
  *
  * And a task a verb of this pass has changed since is read again: `file`, `admit`, `answer`, `stop`, `close` and `say` each drop the view
- * of the tasks they name, so what `advance` reads after its own act is the engine's, never a report or a read from before it. A verb this
- * does not know drops every view, for the same reason, and so does any verb while a read is in flight: what that read answers is not kept.
+ * of the tasks they name, when the verb runs, so what `advance` reads after its own act is the engine's, never a report or a read from
+ * before it. A verb this does not know drops every view, for the same reason, and so does any verb while a read is in flight: what that
+ * read answers is not kept.
  */
 export function reportedEngine(e: Engine, views: readonly TaskView[]): Engine {
   const kept = new Map<unknown, TaskView>(views.map((v) => [v.id, v]));
@@ -64,86 +64,127 @@ export function reportedEngine(e: Engine, views: readonly TaskView[]): Engine {
   const keep = (read: readonly TaskView[], at: number) => {
     if (writes === at) for (const v of read) kept.set(v.id, v);
   };
-  const view = async (target: Engine, taskId: string) => {
-    const was = kept.get(taskId);
-    if (was) return was;
-    const at = writes;
-    const read = await target.view(taskId);
-    keep([read], at);
-    return read;
-  };
-  const list = async (target: Engine, ids: readonly string[]): Promise<TaskList> => {
-    const asked = [...new Set(ids)];
-    const missing = asked.filter((id) => !kept.has(id));
-    const at = writes;
-    const read = missing.length ? await target.list(missing) : { views: [], unreadable: [] };
-    const fresh = new Map<unknown, TaskView>(read.views.map((v) => [v.id, v]));
-    keep(read.views, at);
-    const answered = asked.flatMap((id) => fresh.get(id) ?? (missing.includes(id) ? [] : [kept.get(id)!]));
-    return { views: answered, unreadable: read.unreadable };
-  };
-  return new Proxy(e, {
-    get(target, key, receiver) {
-      const value = Reflect.get(target, key, receiver) as unknown;
-      if (key === 'view') return (taskId: string) => view(target, taskId);
-      if (key === 'list')
-        return (...args: unknown[]) =>
-          args.length === 1 && Array.isArray(args[0]) ? list(target, args[0] as string[]) : target.list(...(args as []));
-      if (typeof value !== 'function' || (typeof key === 'string' && ENGINE_READS.has(key))) return value;
-      return (...args: unknown[]) => {
-        const named = typeof key === 'string' ? ENGINE_WRITES[key] : undefined;
-        writes++;
-        if (named) for (const taskId of named(args)) kept.delete(taskId);
-        else kept.clear();
-        return (value as (...a: unknown[]) => unknown).apply(target, args);
-      };
+  const view = (taskId: string) =>
+    Effect.suspend(() => {
+      const was = kept.get(taskId);
+      if (was) return Effect.succeed(was);
+      const at = writes;
+      return e.view(taskId).pipe(Effect.tap((read) => Effect.sync(() => keep([read], at))));
+    });
+  const list = (ids: readonly string[]) =>
+    Effect.suspend(() => {
+      const wanted = [...new Set(ids)];
+      const missing = wanted.filter((id) => !kept.has(id));
+      const at = writes;
+      const read: Effect.Effect<TaskList, Effect.Error<ReturnType<Engine['list']>>> = missing.length
+        ? e.list(missing)
+        : Effect.succeed({ views: [], unreadable: [] });
+      return read.pipe(
+        Effect.map((got) => {
+          const fresh = new Map<unknown, TaskView>(got.views.map((v) => [v.id, v]));
+          keep(got.views, at);
+          const answered = wanted.flatMap((id) => fresh.get(id) ?? (missing.includes(id) ? [] : [kept.get(id)!]));
+          return { views: answered, unreadable: got.unreadable } satisfies TaskList;
+        }),
+      );
+    });
+  return droppingOnWrite(
+    e,
+    (taskId) => {
+      writes++;
+      kept.delete(taskId);
     },
-  });
+    () => {
+      writes++;
+      kept.clear();
+    },
+    {
+      view,
+      list: ((...args: unknown[]) =>
+        args.length === 1 && Array.isArray(args[0])
+          ? list(args[0] as string[])
+          : (e.list as (...a: unknown[]) => unknown)(...args)) as Engine['list'],
+    },
+    (key) => ENGINE_READS.has(key),
+  );
 }
 
 /** What the engine's `list` answers: the views of the tasks it read, and each whose journal did not read. */
-type TaskList = Awaited<ReturnType<Engine['list']>>;
+type TaskList = Effect.Success<ReturnType<Engine['list']>>;
 
 /**
  * The engine a command reads — `nemia ls`, `nemia decide` — whose `view` of a task is read once for the whole command: `nemia ls` views a
  * run's tasks, and again each run another waits on, and `nemia decide` its current tries and then every try. A view is the engine's word at
  * the moment it was read, and a command is one moment; nothing is kept past the command. A verb that changes a task drops what was read of
  * it, as `reportedEngine` does, and a pass — a `tick` or a `start` — drops all of it, so a command that acts reads the engine's word after
- * its act. A view that failed is not kept: the next read asks the engine again.
+ * its act. A view that failed is not kept: the next read asks the engine again. Two reads of one task at once share the one read.
  */
 export function viewedOnce(e: Engine): Engine {
-  const read = new Map<unknown, Promise<TaskView>>();
-  return new Proxy(e, {
-    get(target, key, receiver) {
-      const value = Reflect.get(target, key, receiver) as unknown;
-      if (key === 'view') {
-        return (taskId: string) => {
-          let v = read.get(taskId);
-          if (!v)
-            read.set(
-              taskId,
-              (v = target.view(taskId).catch((err: unknown) => {
-                read.delete(taskId);
-                throw err;
-              })),
-            );
-          return v;
-        };
-      }
-      if (typeof value !== 'function' || (typeof key === 'string' && ENGINE_READS.has(key) && key !== 'tick' && key !== 'start'))
-        return value;
-      return (...args: unknown[]) => {
-        const named = typeof key === 'string' ? ENGINE_WRITES[key] : undefined;
-        if (named) for (const taskId of named(args)) read.delete(taskId);
-        else read.clear();
-        return (value as (...a: unknown[]) => unknown).apply(target, args);
-      };
+  type Read = Deferred.Deferred<TaskView, Effect.Error<ReturnType<Engine['view']>>>;
+  const read = new Map<unknown, Read>();
+  return droppingOnWrite(
+    e,
+    (taskId) => read.delete(taskId),
+    () => read.clear(),
+    {
+      view: (taskId) =>
+        Effect.suspend(() => {
+          const held = read.get(taskId);
+          if (held) return Deferred.await(held);
+          const pending: Read = Deferred.makeUnsafe();
+          read.set(taskId, pending);
+          return e.view(taskId).pipe(
+            Effect.onExit((exit) => {
+              if (Exit.isFailure(exit) && read.get(taskId) === pending) read.delete(taskId);
+              return Deferred.done(pending, exit);
+            }),
+          );
+        }),
     },
-  });
+    (key) => ENGINE_READS.has(key) && key !== 'tick' && key !== 'start',
+  );
+}
+
+/**
+ * `e` with `own` in place of its verbs of the same name, and every other verb that changes a task dropping what a wrapper kept of it,
+ * when the Effect runs: the tasks `ENGINE_WRITES` names for it (`dropped`), else everything (`dropAll`). A verb `passes` is `e`'s own.
+ */
+function droppingOnWrite(
+  e: Engine,
+  dropped: (taskId: unknown) => void,
+  dropAll: () => void,
+  own: Partial<Engine>,
+  passes: (verb: string) => boolean,
+): Engine {
+  const wrapped: Record<string, unknown> = { ...e, ...own };
+  for (const [verb, value] of Object.entries(e)) {
+    if (verb in own || typeof value !== 'function' || passes(verb)) continue;
+    wrapped[verb] = (...args: unknown[]) =>
+      Effect.suspend(() => {
+        const named = ENGINE_WRITES[verb];
+        if (named) for (const taskId of named(args)) dropped(taskId);
+        else dropAll();
+        return (value as (...a: unknown[]) => Effect.Effect<unknown, unknown>).apply(e, args);
+      });
+  }
+  return wrapped as Engine;
 }
 
 /** The engine's verbs that change no task. */
-const ENGINE_READS = new Set(['tick', 'list', 'logs', 'output', 'transcript', 'path', 'feed', 'watch', 'io', 'start']);
+const ENGINE_READS = new Set([
+  'tick',
+  'list',
+  'logs',
+  'output',
+  'transcript',
+  'path',
+  'feed',
+  'watch',
+  'io',
+  'start',
+  'sweep',
+  'removeBody',
+]);
 
 /** The engine's verbs that change a task, each with the tasks it names: a filing names the task it files, which a read may have kept. */
 const ENGINE_WRITES: Readonly<Record<string, (args: unknown[]) => readonly unknown[]>> = {
@@ -170,15 +211,16 @@ const ENGINE_WRITES: Readonly<Record<string, (args: unknown[]) => readonly unkno
  * a step answered without limit — the supervisor, which is answered for as long as a person keeps answering — would otherwise add one
  * journal read per answer to every pass, for ever, buying nothing.
  *
- * Reads the tasks one at a time, in the order of the run's steps. Fails with a refusal a view rejected with; dies of anything else.
+ * Reads the tasks one at a time, in the order of the run's steps. Never fails: a view's refusal it dies of in the runtime's words
+ * (`asked`), and of anything else as it was thrown.
  */
 export const taskPhasesRead = Effect.fn('taskPhases')(function* (run: Run, { earlierTries = true }: { earlierTries?: boolean } = {}) {
   const e = yield* EngineService;
   const views = new Map<string, TaskView>();
   for (const { taskId, check, tries } of Object.values(run.steps)) {
-    if (taskId) views.set(taskId, yield* awaited(() => e.view(taskId)));
-    if (check) views.set(check.taskId, yield* awaited(() => e.view(check.taskId)));
-    if (earlierTries) for (const t of tries ?? []) if (!views.has(t.taskId)) views.set(t.taskId, yield* awaited(() => e.view(t.taskId)));
+    if (taskId) views.set(taskId, yield* asked('view', e.view(taskId)));
+    if (check) views.set(check.taskId, yield* asked('view', e.view(check.taskId)));
+    if (earlierTries) for (const t of tries ?? []) if (!views.has(t.taskId)) views.set(t.taskId, yield* asked('view', e.view(t.taskId)));
   }
   return {
     views,
@@ -186,26 +228,13 @@ export const taskPhasesRead = Effect.fn('taskPhases')(function* (run: Run, { ear
   };
 });
 
-/**
- * The engine's word on every task `run` has filed (`taskPhasesRead`) in a Promise, over `e`: its views, and each task's phase. Rejects
- * with the refusal the program failed with, or what it died of, as it was thrown.
- */
-export const taskPhases = (
-  e: Engine,
-  run: Run,
-  how: { earlierTries?: boolean } = {},
-): Promise<{
-  views: Map<string, TaskView>;
-  phaseOf: (taskId: string) => TaskPhase;
-}> => Effect.runPromise(taskPhasesRead(run, how).pipe(Effect.provide(EngineService.layer(e))));
-
 /** `views`, with the engine's view of every earlier try's task and check they do not hold (`e`, the call's `viewedOnce`). */
 export const everyTryOf = Effect.fn('everyTryOf')(function* (e: Engine, run: Run, views: ReadonlyMap<string, TaskView>) {
   const everyTry = new Map(views);
   for (const record of Object.values(run.steps)) {
     for (const t of record.tries ?? []) {
       for (const taskId of [t.taskId, t.check?.taskId]) {
-        if (taskId && !everyTry.has(taskId)) everyTry.set(taskId, yield* awaited(() => e.view(taskId)));
+        if (taskId && !everyTry.has(taskId)) everyTry.set(taskId, yield* asked('view', e.view(taskId)));
       }
     }
   }
@@ -364,34 +393,14 @@ export const checkReportsRead = Effect.fn('checkReports')(function* (
 });
 
 /**
- * What each step's settled check said whose phase `want` takes (`checkReportsRead`) in a Promise, over `e`. Rejects with the refusal the
- * program failed with, or what it died of, as it was thrown.
- */
-export const checkReports = (
-  e: Engine,
-  run: Run,
-  steps: readonly Workflow[],
-  phaseOf: (taskId: string) => TaskPhase,
-  want: (phase: TaskPhase) => boolean,
-): Promise<Map<string, CheckReport>> =>
-  Effect.runPromise(checkReportsRead(run, steps, phaseOf, want).pipe(Effect.provide(EngineService.layer(e))));
-
-/**
  * What a check said, off the engine: the verdict of its latest attempt (`attemptVerdict`), and the last lines of each stream the runtime
  * kept (`checkStreams`). Fails with a refusal a read rejected with; dies of anything else.
  */
 export const refusalRead = Effect.fn('refusalOf')(function* (command: string, taskId: string) {
   const e = yield* EngineService;
-  const { verdict, stdout, stderr } = yield* awaited(() => checkStreams(e, taskId, TAIL_BYTES));
+  const { verdict, stdout, stderr } = yield* checkStreams(e, taskId, TAIL_BYTES);
   return { command, verdict, stdout: lastLines(stdout), stderr: lastLines(stderr) } satisfies CheckRefusal;
 });
-
-/**
- * What a check said (`refusalRead`) in a Promise, over `e`. Rejects with the refusal the program failed with, or what it died of, as it
- * was thrown.
- */
-export const refusalOf = (e: Engine, command: string, taskId: string): Promise<CheckRefusal> =>
-  Effect.runPromise(refusalRead(command, taskId).pipe(Effect.provide(EngineService.layer(e))));
 
 /**
  * What a checked step's check said, for the step filed after it (`checkHandedSection`): the verdict, the tails of its streams, and the
@@ -401,14 +410,16 @@ export const refusalOf = (e: Engine, command: string, taskId: string): Promise<C
  */
 export const checkHandedRead = Effect.fn('checkHanded')(function* (step: string, command: string, taskId: string) {
   const e = yield* EngineService;
-  const read = yield* Effect.result(Effect.tryPromise({ try: () => checkStreams(e, taskId), catch: (err) => err }));
-  if (Result.isFailure(read))
+  const read = yield* Effect.exit(checkStreams(e, taskId));
+  if (Exit.isFailure(read)) {
+    const failed = Cause.squash(read.cause);
     return {
       step,
       command,
-      unreadable: `the engine could not give what its task ${taskId} printed: ${read.failure instanceof Error ? read.failure.message : String(read.failure)}`,
+      unreadable: `the engine could not give what its task ${taskId} printed: ${failed instanceof Error ? failed.message : String(failed)}`,
     } satisfies CheckHanded;
-  const { verdict, stdout, stderr, kept } = read.success;
+  }
+  const { verdict, stdout, stderr, kept } = read.value;
   const { lines, cut } = reportedLines(stdout);
   const said = { verdict, stdout: lastLines(stdout), stderr: lastLines(stderr), reported: lines, cut, partial: !kept };
   return { step, command, ...said } satisfies CheckHanded;
@@ -428,30 +439,25 @@ export const checksHandedRead = Effect.fn('checksHanded')(function* (run: Run, s
   return out;
 });
 
-/** What a step is told its checked steps' checks said (`checksHandedRead`), in a Promise over `e`. */
-export const checksHandedOf = (e: Engine, run: Run, steps: readonly Workflow[], step: Workflow): Promise<CheckHanded[]> =>
-  Effect.runPromise(checksHandedRead(run, steps, step).pipe(Effect.provide(EngineService.layer(e))));
-
 /** How much of the end of a stream a check's tail is read from. */
 const TAIL_BYTES = 64_000;
 
 /**
  * A check's verdict and streams, off the engine: the verdict of its latest attempt (`attemptVerdict`), its stderr's last `TAIL_BYTES`,
  * and its stdout — whole, or its last `stdoutBytes` — through `output`, which the runtime keeps whole for a check. Where it kept none
- * (`kept` false: a check run before the runtime kept them), stderr is empty and stdout is the end of the log. Rejects with what a read
- * rejected with.
+ * (`kept` false: a check run before the runtime kept them), stderr is empty and stdout is the end of the log. Dies of what a read failed
+ * with, in the runtime's words (`asked`).
  */
-async function checkStreams(
-  e: Engine,
-  taskId: string,
-  stdoutBytes?: number,
-): Promise<{ verdict: Verdict; stdout: string; stderr: string; kept: boolean }> {
-  const view = await e.view(taskId);
-  const [stdout, stderr] = await Promise.all([e.output(taskId, 'stdout', stdoutBytes), e.output(taskId, 'stderr', TAIL_BYTES)]);
+const checkStreams = Effect.fnUntraced(function* (e: Engine, taskId: string, stdoutBytes?: number) {
+  const view = yield* asked('view', e.view(taskId));
+  const [stdout, stderr] = yield* Effect.all(
+    [asked('output', e.output(taskId, 'stdout', stdoutBytes)), asked('output', e.output(taskId, 'stderr', TAIL_BYTES))],
+    { concurrency: 'unbounded' },
+  );
   const verdict = attemptVerdict(view.state.attempts.at(-1));
-  if (stdout === undefined) return { verdict, stdout: await e.logs(taskId), stderr: stderr ?? '', kept: false };
+  if (stdout === undefined) return { verdict, stdout: yield* asked('logs', e.logs(taskId)), stderr: stderr ?? '', kept: false };
   return { verdict, stdout, stderr: stderr ?? '', kept: true };
-}
+});
 
 /**
  * How a step signed off: its closing statement, as the engine recorded it on the attempt.
@@ -544,20 +550,13 @@ export const parentRead = Effect.fn('parentOf')(function* (id: string, git: Bran
 });
 
 /** A run another waits on as `read` holds it, else read (`parentRead`) over `git` and kept in `read` for whoever asks next. */
-const keptParent = Effect.fn('keptParent')(function* (id: string, git: BranchReader, read: Map<string, ParentRun>) {
+export const keptParent = Effect.fn('keptParent')(function* (id: string, git: BranchReader, read: Map<string, ParentRun>) {
   const was = read.get(id);
   if (was) return was;
   const now = yield* parentRead(id, git);
   read.set(id, now);
   return now;
 });
-
-/**
- * A run another waits on (`parentRead`) in a Promise, over `e`: what `read` holds of it where it holds it, read and kept there where it
- * does not. Rejects with the refusal the program failed with, or what it died of, as it was thrown.
- */
-export const parentOf = (e: Engine, id: string, git: BranchReader = oneByOne, read = new Map<string, ParentRun>()): Promise<ParentRun> =>
-  Effect.runPromise(keptParent(id, git, read).pipe(Effect.provide(EngineService.layer(e))));
 
 /**
  * The runs a pass reads as runs others wait on, each read once for the pass (`parentRead`) and kept by id, over one listing of branches per
@@ -582,17 +581,6 @@ export const parentsRead = Effect.fn('parentsOf')(function* (run: Run, git: Bran
 });
 
 /**
- * The runs this run waits on (`parentsRead`) in a Promise, over `e`, answered from `read` and kept there. Rejects with the refusal the
- * program failed with, or what it died of, as it was thrown.
- */
-export const parentsOf = (
-  e: Engine,
-  run: Run,
-  git: BranchReader = oneByOne,
-  read = new Map<string, ParentRun>(),
-): Promise<(id: string) => ParentRun> => Effect.runPromise(parentsRead(run, git, read).pipe(Effect.provide(EngineService.layer(e))));
-
-/**
  * What each step's current task consumed, summed over its attempts (`sumUsage`): the try whose closeout
  * and check `nemia decide` prints beside it. A settled attempt's usage is on the engine's record, the one in
  * flight on the view; an attempt that never started consumed nothing, and is left out.
@@ -613,23 +601,12 @@ export function consumption(views: ReadonlyMap<string, TaskView>, run: Run): Rec
 /**
  * When each task was filed, off the engine's feed from `after`, added to `into`: the one record of a filing time, since a task's view
  * carries none — and the time between filing and a first attempt is the wait for a slot (`timeline`). A filing is written once and never
- * changes, so a reader that keeps `into` and the cursor reads on from where it stopped. Fails with a refusal the feed rejected with; dies
- * of anything else.
+ * changes, so a reader that keeps `into` and the cursor reads on from where it stopped. Never fails: the feed's refusal it dies of in the
+ * runtime's words (`asked`), and of anything else as it was thrown.
  */
 export const filingsRead = Effect.fn('readFilings')(function* (after = 0, into = new Map<string, string>()) {
   const e = yield* EngineService;
-  const { entries, cursor } = yield* awaited(() => e.feed(after));
+  const { entries, cursor } = yield* asked('feed', e.feed(after));
   for (const { taskId, event } of entries) if (event.kind === 'filed') into.set(taskId, event.at);
   return { filed: into, cursor };
 });
-
-/**
- * When each task was filed (`filingsRead`) in a Promise, over `e`. Rejects with the refusal the program failed with, or what it died of,
- * as it was thrown.
- */
-export const readFilings = (
-  e: Engine,
-  after = 0,
-  into = new Map<string, string>(),
-): Promise<{ filed: Map<string, string>; cursor: number }> =>
-  Effect.runPromise(filingsRead(after, into).pipe(Effect.provide(EngineService.layer(e))));

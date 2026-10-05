@@ -219,7 +219,7 @@ export class Runner extends Context.Service<Runner, RunnerOps>()('engine/Runner'
   /**
    * Any implementation becomes a Layer. This is the only way a runner reaches the engine. Its `refuses` asks first what
    * no harness could use (`argsRefusalOf`), then the runner's own: the harness arguments are the adapter's, so they are
-   * refused on the adapter's side of the seam, beneath every runner, and so at the Effect door as at the Promise door.
+   * refused on the adapter's side of the seam, beneath every runner, whoever calls it.
    */
   static layer = (ops: RunnerOps) =>
     Layer.succeed(Runner)(

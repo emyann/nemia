@@ -23,7 +23,7 @@ const starIn = (scope: Locator, name: string): Locator => scope.getByRole('butto
 /** The run's row on the Runs page. */
 const rowOf = (page: Page): Locator => page.locator('main li[data-in-flight]', { has: page.locator(`a[href="/runs/${RUN.id}"]`) });
 /** The workflow's card on the Workflows page. */
-const flowCard = (page: Page): Locator => page.locator(`section#workflow-repo-${FLOW}`);
+const flowCard = (page: Page): Locator => page.locator(`section[aria-label="Workflow ${FLOW}"]`);
 
 /** Goes to `to` in this tab and waits for its reads. */
 async function visit(page: Page, to: string): Promise<void> {
@@ -95,7 +95,7 @@ async function fromTheFloorThenAWorkflow(page: Page): Promise<void> {
   await photograph(page, path.join(OUT, `favorites-both-${await themeOf(page)}.png`));
   await visit(page, '/runs');
   await linksOf(page).filter({ hasText: FLOW }).click();
-  await page.waitForURL((url) => url.pathname === '/workflows' && url.hash === `#workflow-repo-${FLOW}`, { timeout: WAIT_MS });
+  await page.waitForURL((url) => url.pathname === `/workflows/repo/${FLOW}` && url.hash === '', { timeout: WAIT_MS });
   await visit(page, `/runs?factory=${FACTORIES.others[0]}`);
   await expectTexts(linksOf(page), [RUN.title, FLOW], `with ${FACTORIES.others[0]} picked, every factory's favourites are listed`);
 }

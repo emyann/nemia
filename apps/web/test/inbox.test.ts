@@ -132,6 +132,7 @@ const listing = (name: string, from: 'repo' | 'yours', dir: string, error: strin
   from,
   dir,
   description: null,
+  readme: null,
   steps: [],
   graph: { roots: [], edges: [] },
   schemas: [],

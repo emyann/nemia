@@ -21,7 +21,8 @@ import {
   type StoredEvent,
 } from '../event-schema.ts';
 import { FORMER_ARGS, HARNESS_ARGS, type HarnessArgs } from '../../harness/args.ts';
-import { countRead } from './tally.ts';
+import { countRead, countWrite } from './tally.ts';
+import { readFeed, rotateFeed, withFeedLock, type ForgottenFeed } from './feed.ts';
 import { BodyRefused, filesBodies, memoryBodies, resolver, split, type BodyOps, type BodyRef, type Resolved } from './bodies.ts';
 import { removeBody, sweep } from './sweep.ts';
 
@@ -81,7 +82,15 @@ export type PlainJournalOps = {
    * The cursor never expires: the feed is append-only, so a consumer that was away for a week
    * replays rather than being told to start over. Pass 0 to read the whole history.
    */
-  readonly feed: (after: Cursor) => Effect.Effect<{ entries: FeedEntry[]; cursor: Cursor; refused?: FeedRefusal[] }, JournalError>;
+  readonly feed: (
+    after: Cursor,
+  ) => Effect.Effect<{ entries: FeedEntry[]; cursor: Cursor; refused?: FeedRefusal[]; forgotten?: number }, JournalError>;
+  /**
+   * Optional: remove the tasks `taskIds`, their journals and every feed line naming them, each cursor keeping its place, so
+   * that a read after a cursor says how many lines after it were forgotten (`forgotten`). Answers what the feed lost, where the
+   * store keeps it in bytes. The caller asks first that each task is settled (`Engine.forget`): the store asks nothing.
+   */
+  readonly forget?: (taskIds: readonly string[]) => Effect.Effect<ForgottenFeed | undefined, JournalError>;
   /**
    * Optional: call `onChange` when something has been appended, so a watcher can read instead of
    * poll. A store that cannot signal simply omits this and watchers fall back to a timer — the
@@ -105,7 +114,7 @@ export type BodiedJournalOps = Omit<PlainJournalOps, 'append' | 'read' | 'feed' 
    */
   readonly append: (taskId: string, entry: Event | StoredEvent) => Effect.Effect<void, JournalError>;
   readonly read: (taskId: string) => Effect.Effect<readonly unknown[], JournalError>;
-  readonly feed: (after: Cursor) => Effect.Effect<{ entries: readonly unknown[]; cursor: Cursor }, JournalError>;
+  readonly feed: (after: Cursor) => Effect.Effect<{ entries: readonly unknown[]; cursor: Cursor; forgotten?: number }, JournalError>;
   /** Optional: where the store keeps a task's journal and the feed, named in the words of an entry no runtime wrote. */
   readonly located?: { readonly journal: (taskId: string) => string; readonly feed: string };
 };
@@ -337,6 +346,10 @@ const journalReader = () => {
   };
 };
 
+/** The words of an append to `taskId`, whose journal `file` is not there: forgotten, or never filed. */
+const forgottenWords = (taskId: string, file: string) =>
+  `${taskId} has no journal (${file}): it was forgotten, or never filed, and is not written to again. File a new task.`;
+
 /** A refusal of a store's bodies as the journal's: a failing store said in its words. */
 const asJournal = (error: { _tag: string; message: string }) => new JournalError({ taskId: '*', message: error.message });
 
@@ -388,6 +401,7 @@ export class Journal extends Context.Service<Journal, JournalShape>()('engine/Jo
       Journal.of({
         list: ops.list,
         ...(ops.subscribe ? { subscribe: ops.subscribe } : {}),
+        ...(ops.forget ? { forget: ops.forget } : {}),
         append: appendSaid((taskId, event, briefParts) =>
           bodied ? appendSplit(bodied, taskId, event, briefParts) : ops.append(taskId, event),
         ),
@@ -399,11 +413,12 @@ export class Journal extends Context.Service<Journal, JournalShape>()('engine/Jo
           ),
         feed: (after) =>
           ops.feed(after).pipe(
-            Effect.flatMap(({ entries, cursor }) =>
+            Effect.flatMap(({ entries, cursor, forgotten }) =>
               Effect.map(decodeFeed(entries, after, ops.located, bodies), ({ entries: read, refused }) => ({
                 entries: read,
                 cursor,
                 ...(refused.length ? { refused } : {}),
+                ...(forgotten ? { forgotten } : {}),
               })),
             ),
           ),
@@ -437,16 +452,21 @@ export class Journal extends Context.Service<Journal, JournalShape>()('engine/Jo
       bodies: filesBodies(root),
       located: { journal: file, feed: feedFile },
       /**
-       * The task's journal, then the feed, in the one call every writer makes, so no writer can forget the feed. The task
-       * file is the source of truth; the feed is its index.
+       * The task's journal, then the feed, in the one call every writer makes, so no writer can forget the feed, holding the
+       * feed's lock (`withFeedLock`), so no rotation drops a line written meanwhile. The task file is the source of truth; the
+       * feed is its index. Refused for a task with no journal, but by its `filed`: a task forgotten is not written to again.
        */
       append: (taskId, event) =>
         Effect.try({
-          try: () => {
-            fs.mkdirSync(dir, { recursive: true });
-            fs.appendFileSync(file(taskId), JSON.stringify(event) + '\n');
-            fs.appendFileSync(feedFile, JSON.stringify({ taskId, event }) + '\n');
-          },
+          try: () =>
+            withFeedLock(root, () => {
+              fs.mkdirSync(dir, { recursive: true });
+              if (event.kind !== 'filed' && !fs.existsSync(file(taskId))) throw new Error(forgottenWords(taskId, file(taskId)));
+              fs.appendFileSync(file(taskId), JSON.stringify(event) + '\n');
+              countWrite();
+              fs.appendFileSync(feedFile, JSON.stringify({ taskId, event }) + '\n');
+              countWrite();
+            }),
           catch: fail(taskId),
         }),
       read: (taskId) => Effect.try({ try: () => journals(file(taskId)), catch: fail(taskId) }),
@@ -463,28 +483,17 @@ export class Journal extends Context.Service<Journal, JournalShape>()('engine/Jo
       }),
 
       /**
-       * The feed from byte `after` to its last complete line: a reader never consumes half an entry, and the cursor never
-       * advances past what was read.
+       * The feed after `after` to its last complete line (`readFeed`): a reader never consumes half an entry, the cursor never
+       * advances past what was read, and a rotation moves no cursor.
        */
-      feed: (after) =>
+      feed: (after) => Effect.try({ try: () => readFeed(root, after), catch: fail('*') }),
+      /** The tasks' lines out of the feed (`rotateFeed`), then, under the feed's lock still, their journals. */
+      forget: (taskIds) =>
         Effect.try({
-          try: () => {
-            if (!fs.existsSync(feedFile)) return { entries: [], cursor: after };
-            const size = fs.statSync(feedFile).size;
-            if (after >= size) return { entries: [], cursor: size };
-
-            const fd = fs.openSync(feedFile, 'r');
-            const buf = Buffer.alloc(size - after);
-            fs.readSync(fd, buf, 0, buf.length, after);
-            fs.closeSync(fd);
-            countRead(buf.length);
-
-            const text = buf.toString('utf8');
-            const end = text.lastIndexOf('\n');
-            if (end < 0) return { entries: [], cursor: after };
-            const entries = text.slice(0, end).split('\n').filter(Boolean).map(parsed);
-            return { entries, cursor: after + Buffer.byteLength(text.slice(0, end + 1)) };
-          },
+          try: () =>
+            rotateFeed(root, new Set(taskIds), () => {
+              for (const id of taskIds) fs.rmSync(file(id), { force: true });
+            }),
           catch: fail('*'),
         }),
 
@@ -512,7 +521,7 @@ export class Journal extends Context.Service<Journal, JournalShape>()('engine/Jo
    */
   static test = ({ bodies = true }: { bodies?: boolean } = {}) => {
     const store = new Map<string, unknown[]>();
-    const feed: { taskId: string; event: unknown }[] = [];
+    const feed: ({ taskId: string; event: unknown } | undefined)[] = [];
     const kept: BodyOps = memoryBodies();
     const append = (taskId: string, event: unknown) =>
       Effect.sync(() => {
@@ -522,8 +531,23 @@ export class Journal extends Context.Service<Journal, JournalShape>()('engine/Jo
     const reads = {
       read: (taskId: string) => Effect.sync(() => [...(store.get(taskId) ?? [])]),
       list: Effect.sync(() => [...store.keys()].sort()),
-      /** The cursor is an index into the feed rather than a byte offset: the same contract. */
-      feed: (after: Cursor) => Effect.sync(() => ({ entries: feed.slice(after), cursor: feed.length })),
+      /** The cursor is an index into the feed rather than a byte offset: the same contract, a forgotten line a hole kept in place. */
+      feed: (after: Cursor) =>
+        Effect.sync(() => {
+          const rest = feed.slice(after);
+          const entries = rest.filter((entry) => entry !== undefined);
+          const forgotten = rest.length - entries.length;
+          return { entries, cursor: feed.length, ...(forgotten ? { forgotten } : {}) };
+        }),
+      /** The tasks' journals gone, and each of their lines a hole: no bytes to say. */
+      forget: (taskIds: readonly string[]) =>
+        Effect.sync(() => {
+          for (const id of taskIds) store.delete(id);
+          feed.forEach((entry, i) => {
+            if (entry && taskIds.includes(entry.taskId)) feed[i] = undefined;
+          });
+          return undefined;
+        }),
     };
     return Journal.layer(bodies ? { ...reads, append, bodies: kept } : { ...reads, append });
   };

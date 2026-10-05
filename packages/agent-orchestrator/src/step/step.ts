@@ -49,11 +49,12 @@ export type Workflow = {
    */
   writable?: string[];
   /**
-   * `reads: inbox`: the store's folders this step reads and never writes, each by its name from a closed list (`STORE_READS`): `inbox`,
-   * the cards waiting to be started. Each is filed as a read-only mount of the folder on this machine (`readsMounts`), so Read, Grep and
-   * Glob reach it in any mode and every write is refused, and the brief names its path (`mountsLine`). A name, never a path: the
-   * workflow reads the same on every machine, and no step reads another run's folders. Refused at load for a name off the list, one
-   * given twice, and on a remote agent, and at `nemia start` on a harness that cannot hold the mount.
+   * `reads: inbox, costs`: what of the store this step reads and never writes, each by its name from a closed list (`STORE_READS`).
+   * `inbox`, the cards waiting to be started, is filed as a read-only mount of the folder on this machine (`readsMounts`), so Read, Grep
+   * and Glob reach it in any mode and every write is refused, and the brief names its path (`mountsLine`). `costs`, what the newest
+   * finished runs of its workflow in its factory cost (`costsRead`), is said in the brief of each new session, and mounts nothing. A
+   * name, never a path: the workflow reads the same on every machine, and no step reads another run's folders. Refused at load for a
+   * name off the list, one given twice, and on a remote agent, and at `nemia start` on a harness that cannot hold the mount.
    */
   reads?: string[];
   /**
@@ -344,7 +345,7 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
   writable:
     "the folders of the run's factory this step may write, each by its directory's name — every other step of the run only reads them; one that is the run's own repository is the step's workspace already — over a fence that writes",
   reads:
-    'the folders of the store this step reads and never writes, each by name — `inbox`, the cards waiting to be started, the one there is — mounted read-only and named on its brief',
+    'what of the store this step reads and never writes, each by name — `inbox`, the cards waiting to be started, mounted read-only and named on its brief; `costs`, what recent finished runs of its workflow cost, said in its brief',
   slot: "`none`: the run takes no run slot (`WF_MAX_RUNS`) — a session that watches the other runs rather than doing a run's work, on a workflow of one step",
   agent:
     "what is attached to this node to do its work: an agent in agents/, whose role keys are this step's defaults and whose instructions come before this step's own note; the step's own keys win",

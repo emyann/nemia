@@ -66,6 +66,8 @@ import { skillsFor } from '../folder/folder.store.ts';
 import { renderedFlags, rendersAgent, unrendered } from '../agents/agents.ts';
 import { noteFiledCheck, within } from '../meter/tally.store.ts';
 import { keysOf } from '../stats/index.ts';
+import type { WorkflowCosts } from '../costs/index.ts';
+import { costsRead } from '../costs/costs.verb.ts';
 import { answerHeld, stopAsked } from './held.verb.ts';
 import { forStep } from '../telemetry/telemetry.store.ts';
 
@@ -238,6 +240,15 @@ const fileTry = Effect.fnUntraced(function* (f: Filing, r: Retry, out: Tried) {
 });
 
 /**
+ * What recent runs of the run's workflow cost (`costsRead`), for a new session of a step on a local harness whose `reads:` names `costs`;
+ * undefined for any other, and for a session continued, told them on its first brief.
+ */
+const costsFor = Effect.fnUntraced(function* (f: Filing, step: Workflow, resumed: boolean) {
+  if (resumed || isRemoteHarness(step.harness) || !step.reads?.includes('costs')) return undefined;
+  return yield* costsRead(f.e, f.run);
+});
+
+/**
  * Send a try to the engine: filed as a task of its own, or given as the answer to the task held open (`answers`). Answers with the
  * engine's refusal of the answer, or undefined.
  */
@@ -275,6 +286,7 @@ const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: Workflow
         inputsDir(run),
         checked,
         filedFolders(told.step, reads.steps, { runArtifacts: path.dirname(files), inbox: inboxDir() }),
+        yield* costsFor(f, step, Boolean(resumeFrom)),
       );
   const budgetUsd = budgetUsdFor(r.budget ?? budgetOf(step, record), stepSpend(run, r.step, reads.spendOf));
   if (answers) return yield* answerHeld(e, taskId, brief, budgetUsd);
@@ -389,8 +401,12 @@ const fileRound = Effect.fnUntraced(function* (f: Filing, r: Round, looped: stri
   looped.push(r.step);
   notes.push(roundFiledNote(r, looping));
   if (!(yield* asked('view', e.view(taskId))).state.brief) {
-    const landing = yield* landingOf(f, r);
-    yield* asked('file', e.file(roundSpec(f, r, looping, stepNamed(f, r.target), taskId, landing)));
+    const target = stepNamed(f, r.target);
+    const said = {
+      landing: yield* landingOf(f, r),
+      costs: yield* costsFor(f, target, Boolean(record.taskId && sessionIn(f.reads.views, record.taskId))),
+    };
+    yield* asked('file', e.file(roundSpec(f, r, looping, target, taskId, said)));
   }
   Object.assign(run.steps, roundFiled(f.reads.steps, run, r, taskId));
   if (r.merge && isGitRun(run)) run.baseRef = r.merge.sha;
@@ -407,8 +423,18 @@ const landingOf = Effect.fnUntraced(function* (f: Filing, r: Round) {
   return yield* landingSaidRead(landing.step, command, landing.check).pipe(over(asRead(f)));
 });
 
-/** A round's target filed under its next try's id: its session continued, told the round, with its cap for the round. */
-function roundSpec(f: Filing, r: Round, looping: Workflow, target: Workflow, taskId: string, landing?: LandingSaid): Spec {
+/**
+ * A round's target filed under its next try's id: its session continued, told the round — and what the ending's check said of a merged
+ * tree it refused (`said.landing`), and for a new session, what recent runs cost (`said.costs`) — with its cap for the round.
+ */
+function roundSpec(
+  f: Filing,
+  r: Round,
+  looping: Workflow,
+  target: Workflow,
+  taskId: string,
+  said: { landing?: LandingSaid; costs?: WorkflowCosts },
+): Spec {
   const { run, reads } = f;
   const record = run.steps[r.target];
   const files = artifactsDir(run, r.target);
@@ -427,7 +453,7 @@ function roundSpec(f: Filing, r: Round, looping: Workflow, target: Workflow, tas
       undefined,
       undefined,
       {
-        ...roundBriefed(r, looping, landing),
+        ...roundBriefed(r, looping, said.landing),
         resumed: Boolean(resumeFrom),
         ...(resumeFrom ? { said: saidIn(reads.views.get(record.taskId!)) } : {}),
       },
@@ -435,6 +461,7 @@ function roundSpec(f: Filing, r: Round, looping: Workflow, target: Workflow, tas
       inputsDir(run),
       undefined,
       filedFolders(told.step, reads.steps, { runArtifacts: path.dirname(files), inbox: inboxDir() }),
+      said.costs,
     ),
     cwd: record.workspace ?? run.workspace,
     harness: target.harness,
@@ -539,7 +566,12 @@ export const fileReady = Effect.fn('fileReady')(function* (f: Filing, ready: rea
     const files = artifactsDir(run, name);
     fs.mkdirSync(files, { recursive: true });
     const checked = isRemoteHarness(step.harness) ? [] : yield* checksHandedRead(run, f.reads.steps, step).pipe(over(asRead(f)));
-    const told = { parents, checked, closeoutOf: yield* closeoutsAfterMerge(e, run, step, f.reads.signedOff) };
+    const told = {
+      parents,
+      checked,
+      closeoutOf: yield* closeoutsAfterMerge(e, run, step, f.reads.signedOff),
+      costs: yield* costsFor(f, step, false),
+    };
     const taskId = yield* asked('file', e.file(readySpec(f, step, place, files, told))).pipe(forStep(run.id, name));
     run.steps[name] = { ...run.steps[name], taskId, workspace: place.workspace, branch: place.branch };
     filed.push(name);
@@ -554,14 +586,20 @@ const sessionOf = (f: Filing, stepName: string): string | undefined => {
 };
 
 /**
- * A ready step as it is filed, in the workspace cut for it, told what the steps before it, their checks and the runs it waited on said.
+ * A ready step as it is filed, in the workspace cut for it, told what the steps before it, their checks and the runs it waited on said,
+ * and what recent runs of its workflow cost where it reads them.
  */
 function readySpec(
   f: Filing,
   step: Workflow,
   place: Place,
   files: string,
-  said: { parents: ParentCloseout[] | undefined; checked: readonly CheckHanded[]; closeoutOf: (step: string) => Closeout | undefined },
+  said: {
+    parents: ParentCloseout[] | undefined;
+    checked: readonly CheckHanded[];
+    closeoutOf: (step: string) => Closeout | undefined;
+    costs: WorkflowCosts | undefined;
+  },
 ): Spec {
   const { parents, closeoutOf } = said;
   const { run, reads } = f;
@@ -591,6 +629,7 @@ function readySpec(
           inputsDir(run),
           said.checked,
           filedFolders(told.step, reads.steps, { runArtifacts: path.dirname(files), inbox: inboxDir() }),
+          said.costs,
         ),
     cwd: place.workspace,
     harness: step.harness,

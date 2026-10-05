@@ -2829,7 +2829,11 @@ test('`reads:` is read as the store folders it names, written back as written, a
   assert.equal(fm('review', 'permissionMode: dontAsk').reads, undefined);
   assert.deepEqual(fm('review', 'reads: costs').reads, ['costs']);
   assert.deepEqual(fm('review', 'reads: inbox, costs').reads, ['inbox', 'costs']);
-  assert.deepEqual(readsMounts({ harness: 'claude', reads: ['costs'] }, '/s/inbox'), [], '`costs` is said in the brief, and mounts nothing');
+  assert.deepEqual(
+    readsMounts({ harness: 'claude', reads: ['costs'] }, '/s/inbox'),
+    [],
+    '`costs` is said in the brief, and mounts nothing',
+  );
 });
 
 test('REFUSED at load: a `reads:` name off the store list, one given twice, none, and the key on a remote A2A agent', () => {

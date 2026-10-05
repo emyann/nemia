@@ -494,6 +494,9 @@ export function writableNamesOf(file: string, written: string | undefined): stri
  */
 export const STORE_READS: readonly string[] = ['inbox', 'costs'];
 
+/** What of `STORE_READS` is a folder, filed as a read-only mount; the rest is said in the brief. */
+export const MOUNTED_READS: readonly string[] = ['inbox'];
+
 /**
  * `reads:` as what of the store it lists, refused in `file`'s name unless each is one of `STORE_READS`, once: a name, never a path, so
  * no step reads another run's folders.

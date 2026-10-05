@@ -84,6 +84,15 @@ export const HARNESSES = {
 } as const;
 
 /**
+ * The harnesses the daemon asks for their quota (`up`): each of the engine's that is a subscription of its own, so none that counts in
+ * another's pool. One that reports no quota refuses the ask, and is asked again all the same: the refusal costs no process.
+ */
+export const quotaHarnesses = (): string[] =>
+  Object.entries(HARNESSES)
+    .filter(([, h]) => typeof h === 'string' || !('pool' in h))
+    .map(([name]) => name);
+
+/**
  * The engine the controllers use. Every filing goes out `queued`, and the runtime admits it per pool under the ceiling handed to it here,
  * `maxConcurrent` from `WF_MAX_CONCURRENT` (`maxConcurrent` in `config.store.ts`), the filed `priority` first. A value the variable
  * refuses gives the engine no ceiling, so nothing is admitted: the tick refuses its pass on the same read (`ceilings`), so the daemon

@@ -35,7 +35,7 @@ import { agentCardRead, agentsRead } from '../roster/roster.store.ts';
 import { agentsLines, cardNote, type AgentsRead, type CardRead } from '../roster/roster.ts';
 import { commandLine, type Args, type CommandSpec, type Flag } from './command.ts';
 import type { Command, Ran } from './entry.verb.ts';
-import { READS } from './reads.verb.ts';
+import { READS, SERIES } from './reads.verb.ts';
 import { PAGES } from './pages.verb.ts';
 import { AGENTS_CUSTOM } from '../agents/custom.verb.ts';
 import { LIBRARY_ENTRIES } from '../agents/library.verb.ts';
@@ -503,6 +503,7 @@ export const COMMANDS: readonly Command[] = [
   MERGES,
   CEILINGS,
   PASSES,
+  SERIES,
   AGENTS,
   AGENT_CARD,
   AGENTS_CUSTOM,

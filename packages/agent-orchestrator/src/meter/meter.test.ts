@@ -47,6 +47,8 @@ const COST: PassCost = passCost({
   tasks: 5,
   queued: 2,
   admitted: 3,
+  waitMs: 4000,
+  load: 0.5,
 });
 
 test("a pass's totals are its phases' bytes and processes, summed", () => {
@@ -140,13 +142,36 @@ test('a pass keeps what it saw beside its time: the runs listed, the tasks, the 
 
 test("the sessions a runtime's pass reported: queued off the views, admitted off the views and the sessions at work", () => {
   assert.deepEqual(
-    sessionsOf({
-      views: [{ admission: 'queued' }, { admission: 'queued' }, { admission: 'admitted' }, {}],
-      running: { claude: 2, codex: 1 },
-    }),
-    { tasks: 4, queued: 2, admitted: 4 },
+    sessionsOf(
+      {
+        views: [{ admission: 'queued' }, { admission: 'queued' }, { admission: 'admitted' }, {}],
+        running: { claude: 2, codex: 1 },
+      },
+      0,
+    ),
+    { tasks: 4, queued: 2, admitted: 4, waitMs: 0 },
   );
-  assert.deepEqual(sessionsOf({}), { tasks: 0, queued: 0, admitted: 0 }, "a fake's report carries neither");
+  assert.deepEqual(sessionsOf({}, 0), { tasks: 0, queued: 0, admitted: 0, waitMs: 0 }, "a fake's report carries neither");
+});
+
+test("the wait is the oldest queued session's, since it was filed: never the newest, nor an admitted one, and 0 with none queued", () => {
+  const now = Date.parse('2026-10-05T12:00:00.000Z');
+  const ago = (s: number) => new Date(now - s * 1000).toISOString();
+  const views = [
+    { admission: 'queued' as const, state: { filedAt: ago(3) } },
+    { admission: 'queued' as const, state: { filedAt: ago(10) } },
+    { admission: 'admitted' as const, state: { filedAt: ago(60) } },
+  ];
+  assert.equal(sessionsOf({ views }, now).waitMs, 10_000);
+  assert.equal(sessionsOf({ views: views.slice(2) }, now).waitMs, 0, 'none queued, no wait');
+});
+
+test('a pass keeps its wait and load among the recent, and the quota and checks only where it has some', () => {
+  const kept = recentOf(COST);
+  assert.deepEqual([kept.waitMs, kept.load, 'quota' in kept, 'checks' in kept], [4000, 0.5, false, false]);
+  const check = { factory: 'nemia', workflow: 'build', step: 'implement', agent: 'ada' };
+  const also = recentOf(COST, { quota: { h: { w: 40 } }, checks: [check] });
+  assert.deepEqual([also.quota, also.checks], [{ h: { w: 40 } }, [check]]);
 });
 
 const recent = (ms: number, phases: Partial<Record<Phase, number>> = {}): RecentPass => ({

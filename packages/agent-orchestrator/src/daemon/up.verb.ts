@@ -4,10 +4,10 @@
  * `runMain` runs either as the process's command, a signal letting go of the lease before the process exits.
  */
 import { Cause, Effect, Exit, Fiber, type Scope } from 'effect';
-import { over, type Engine } from '../runtime-client.ts';
+import { over, quotaHarnesses, type Engine, type HarnessQuota } from '../runtime-client.ts';
 import { HOME } from '../record/record.store.ts';
 import { queueLine } from '../inbox/inbox.ts';
-import { addPass, summaryDue, summaryLine, type Interval } from '../meter/meter.ts';
+import { addPass, summaryDue, summaryLine, type Interval, type Reading } from '../meter/meter.ts';
 import { pausedWords, RESUMED, stagedWords } from '../pause/pause.ts';
 import { refusalLines, tickRun, type Pass } from '../tick/tick.verb.ts';
 import { beat, heldUrl, passed, releaseStore, stillHeld, takeStore, type TakenStore } from './daemon.store.ts';
@@ -24,6 +24,30 @@ export type UpOptions = {
   holder: HolderKind;
   onTaken?: (taken: TakenStore) => Effect.Effect<void, unknown, Scope.Scope>;
 };
+
+/** How often the daemon asks each harness for its quota: the series keep it over time. */
+export const QUOTA_EVERY_MS = 600_000;
+
+/** The percent of each window `q` reports used, or none when it reports no windows. */
+const usedOf = (q: HarnessQuota): Reading[string] | undefined =>
+  q.kind === 'windows' ? Object.fromEntries(q.limits.map((l) => [l.key, l.usedPercentage])) : undefined;
+
+/**
+ * Each harness's quota (`quotaHarnesses`) asked of `e`, over `last`: one that answers its windows replaces its own reading, the percent of
+ * each window used; one that refuses, fails, dies or answers no windows leaves its last.
+ */
+export const askedQuota = Effect.fn('askedQuota')(function* (e: Engine, last: Reading, names: readonly string[] = quotaHarnesses()) {
+  const next = { ...last };
+  for (const name of names) {
+    const used = yield* e.quota(name).pipe(
+      Effect.map(usedOf),
+      Effect.catch(() => Effect.succeed(undefined)),
+      Effect.catchDefect(() => Effect.succeed(undefined)),
+    );
+    if (used) next[name] = used;
+  }
+  return next;
+});
 
 /** A line the daemon says of a pass: its words, a warning when `warn`, and the run and the steps it is about, where it is about one. */
 export type PassLine = { text: string; warn?: true; run?: string; step?: string };
@@ -133,7 +157,8 @@ export const logPass = Effect.fn('logPass')(function* (pass: Pass, was: UpSaid) 
  * as its scope closes, however it ends, so a signal that stops it leaves the store free at once; `onTaken`; then a pass on `e` every
  * interval, each written down (`passed`) and logged (`logPass`), through whatever logger the process provides. It beats on a fiber forked
  * in the scope, so a long pass is not taken for stalled and taken over mid-pass, and it fails at the first pass that finds the store taken
- * over (`stillHeld`, `takenFromLine`).
+ * over (`stillHeld`, `takenFromLine`). On another fiber in the scope it asks each harness for its quota, at once and every
+ * `QUOTA_EVERY_MS` (`askedQuota`), and hands each pass the latest reading, which the pass keeps among the recent and so in the series.
  */
 export const up = (e: Engine, { every, repo, holder, onTaken }: UpOptions): Effect.Effect<never, unknown, Scope.Scope> =>
   Effect.gen(function* () {
@@ -142,12 +167,21 @@ export const up = (e: Engine, { every, repo, holder, onTaken }: UpOptions): Effe
       ({ held }) => Effect.sync(() => releaseStore(held)),
     );
     yield* Effect.forkScoped(Effect.forever(Effect.sleep(every).pipe(Effect.andThen(Effect.sync(() => beat(taken.held))))));
+    let reading: Reading = {};
+    yield* Effect.forkScoped(
+      Effect.forever(
+        Effect.suspend(() => askedQuota(e, reading)).pipe(
+          Effect.andThen((next) => Effect.sync(() => (reading = next))),
+          Effect.andThen(Effect.sleep(QUOTA_EVERY_MS)),
+        ),
+      ),
+    );
     if (onTaken) yield* onTaken(taken);
     let said = NOTHING_SAID;
     for (;;) {
       const by = stillHeld(taken.held);
       if (by) return yield* Effect.fail(new Error(takenFromLine(by, HOME, holder)));
-      const pass = yield* tickRun({ repo }).pipe(over(e));
+      const pass = yield* tickRun({ repo, quota: () => reading }).pipe(over(e));
       passed(taken.held);
       said = yield* logPass(pass, said);
       yield* Effect.sleep(every);

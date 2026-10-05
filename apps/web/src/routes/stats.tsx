@@ -5,8 +5,9 @@ import { StatsChart } from '../components/StatsChart';
 import { StatsFilters } from '../components/StatsFilters';
 import { StatsMarks } from '../components/StatsMarks';
 import { StatsPasses } from '../components/StatsPasses';
+import { StatsSystem } from '../components/StatsSystem';
 import { StatsTiles } from '../components/StatsTiles';
-import { passesQuery, statsQuery } from '../lib/api';
+import { passesQuery, seriesQuery, statsQuery } from '../lib/api';
 import { apiQueryOf, byStepOf, HEADLINES, marksByDay, searchOf } from '../lib/stats';
 
 /**
@@ -20,6 +21,7 @@ export const Route = createFileRoute('/stats')({
     const at = new Date().toISOString();
     const query = apiQueryOf(deps, new Date(at));
     void context.queryClient.prefetchQuery(passesQuery);
+    void context.queryClient.prefetchQuery(seriesQuery('24h'));
     await context.queryClient.ensureQueryData(statsQuery(query));
     return { query, at };
   },
@@ -36,9 +38,9 @@ export const Route = createFileRoute('/stats')({
 /**
  * How well the factory has worked, measured: the tiles for the last 14 days against the 14 before, then a daily chart per headline number
  * over the period chosen, with a rule on each day something a run froze changed; the skills each step and agent loaded beside the calls
- * refused it, side by side on a wide screen; the changes in words; and the tick's recent passes (`StatsPasses`, at `#passes`), read on
- * their own so a failed read leaves the page standing. Every number is the api's, as the CLI's `stats` counts it; one nothing measured
- * reads — and draws nothing.
+ * refused it, side by side on a wide screen; the changes in words; the system's series and its health over the period (`StatsSystem`, at
+ * `#system`); and the tick's recent passes (`StatsPasses`, at `#passes`), each read on their own so a failed read leaves the page
+ * standing. Every number is the api's, as the CLI's `stats` counts it; one nothing measured reads — and draws nothing.
  */
 function StatsPage() {
   const search = Route.useSearch();
@@ -86,6 +88,7 @@ function StatsPage() {
         />
       </div>
       <StatsMarks marks={data.all.marks} />
+      <StatsSystem health={data.health} />
       <StatsPasses />
       {data.unreadable.length > 0 && (
         <p data-unreadable className="text-xs text-amber-700 dark:text-amber-400">

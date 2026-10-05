@@ -138,11 +138,11 @@ A file at the top of `src/` is named in `PURE`, `STORE`, `CONTROLLER` or `CLIENT
   node:net or node:os, reads neither `process.env` nor `fetch`, and imports no file of the other kinds: radius, rendering,
   retry, run and workflow at the top, and the folders' own — agents, artifacts, branches, cap,
   check, closeout, daemon, ending, feed, folder, former, gate, harness, inbox, keys, meter, plan, prune, record, refusal,
-  rest, say, skills, status, step, timeline, views, wait, workflow, workspace.
+  rest, say, series, skills, status, step, timeline, views, wait, workflow, workspace.
 - **store** is the I/O beneath the controllers. It imports no agent-runtime, never a controller and not the client:
   branches and artifacts at the top, and record.store, folder.store, write.store, worktree.store, agents.store,
-  skills.store, plan.store, daemon.store, feed.store, inbox.store, tally.store, places.store, config.store and a2a.store in
-  the folders. They load as a tree. At the bottom are record/places.store.ts, folder/folder.store.ts, meter/tally.store.ts
+  skills.store, plan.store, daemon.store, feed.store, inbox.store, tally.store, places.store, config.store, series.store and
+  a2a.store in the folders. They load as a tree. At the bottom are record/places.store.ts, folder/folder.store.ts, meter/tally.store.ts
   (the pass's meter) and config/config.store.ts, which import no store file. record/record.store.ts imports only those
   four; workspace/worktree.store.ts imports only record.store.ts, places.store.ts and tally.store.ts; folder/write.store.ts
   imports only record.store.ts and folder.store.ts. Any other store file imports only these, and none imports it.

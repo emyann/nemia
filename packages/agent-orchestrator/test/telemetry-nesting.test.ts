@@ -1,8 +1,8 @@
 /**
  * The tick's spans and logs, and the runtime's under them: a pass of the tick (`tickRun`) over the runtime's engine as the client builds
  * it (`engineOf`), traced to a tracer that keeps its spans and logged at `Debug` to a logger that keeps its logs. The runtime's spans nest
- * under the pass's, its filing of a step carries the run and the step (`forStep`), and its journal's log says them beside its own task; what
- * it says of a run outside any filing — the stop of a called-off run's step — carries the run alone (`advancePass`).
+ * under the pass's, its filing of a step carries the run and the step (`forStep`), and its journal's log says them beside its own task;
+ * what it says of a run outside any filing — the stop of a called-off run's step — carries the run alone (`advancePass`).
  *
  * `WF_ROOT` is set before the runner is imported, which reads it as the module loads. `WF_VERIFY_REST=1` judges in full every run a pass
  * answers from its memo, sessions enough are admitted for the one run, and no cap is set on runs.

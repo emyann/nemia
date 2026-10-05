@@ -103,7 +103,7 @@ export function toldOf(run: Run, step: Workflow): { step: Workflow; own: { claud
  * The harness's own arguments a step is filed with (`toldOf`), off the flags its agent rendered to and its repository's real path, which
  * is asked only of a step whose harness takes it. Pure but for `repoOf`.
  */
-export const ownOf = (step: Workflow, rendered: ClaudeFlags | undefined, repoOf: () => string | undefined) => {
+export const ownOf = (step: Pick<Workflow, 'harness' | 'remote'>, rendered: ClaudeFlags | undefined, repoOf: () => string | undefined) => {
   const repo = step.harness === 'codex' ? repoOf() : undefined;
   return {
     claude: step.remote ? { remoteControl: true as const, ...rendered } : rendered,

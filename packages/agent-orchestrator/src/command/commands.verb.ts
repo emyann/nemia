@@ -7,7 +7,8 @@
  * three reads the api alone serves: a run's decision (`decideRun`), whether its branches still merge (`MERGES`) and the run slots
  * (`slotsOf`), the agents of both places (`nemia agents`, `agentsRead`), one agent's card (`nemia agents card`, `agentCardRead`) and its
  * custom instructions (`nemia agents custom`, `AGENTS_CUSTOM`), a run's course (`nemia cancel`, `nemia hold`, `nemia rm`, `nemia prune`),
- * and the store's pause (`nemia pause`, `nemia resume`, and its read the api alone serves): `runs.verb.ts`; the reads of the store (`nemia
+ * and the store's pause (`nemia pause`, `nemia resume`, and its read the api alone serves): `runs.verb.ts`; Nemia's level and memory
+ * (`nemia level`, `nemia memory`: `nemia/`); the reads of the store (`nemia
  * show`, `nemia logs`, `nemia feed`, `nemia stats`: `reads.verb.ts`); and what the board alone reads and writes, each served on the api
  * alone: a card's page (`INBOXES`), a run's page and its steps' files, path and conversation (`PAGES`), the agent and skill libraries
  * (`LIBRARY_ENTRIES`, `SKILL_ENTRIES`) and the workflow builder (`WORKFLOW_ENTRIES`). The whole table (`TABLE`) adds the commands the CLI
@@ -49,6 +50,8 @@ import { CONCLUDED, PLAN, START } from '../start/commands.verb.ts';
 import { CANCEL, PAUSE, PAUSED, PAUSE_NOW, HOLD, PRUNE, RAN, RM, RESUME } from './runs.verb.ts';
 import { SUBSCRIBE, UNSUBSCRIBE } from '../subscription/subscription.verb.ts';
 import { PASSES } from '../meter/passes.verb.ts';
+import { LEVEL } from '../nemia/level.verb.ts';
+import { MEMORY } from '../nemia/memory.verb.ts';
 
 /** The text under `key`, or undefined where none was given. */
 const textOf = (args: Args, key: string): string | undefined => {
@@ -525,6 +528,8 @@ export const COMMANDS: readonly Command[] = [
   PAUSE_NOW,
   SUBSCRIBE,
   UNSUBSCRIBE,
+  LEVEL,
+  MEMORY,
   ...WORKFLOW_ENTRIES,
 ];
 

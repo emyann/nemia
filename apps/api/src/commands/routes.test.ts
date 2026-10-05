@@ -222,6 +222,7 @@ test('REFUSED at shipped defaults: every route that writes, asked by a page on a
       'resume DELETE',
       'subscribe POST',
       'unsubscribe DELETE',
+      'level PUT',
       'workflows write POST',
       'workflows write PUT',
       'workflows remove DELETE',
@@ -239,6 +240,7 @@ test('REFUSED at shipped defaults: every route that writes, asked by a page on a
   assert.equal(fs.existsSync(path.join(root, 'cordon')), false, 'the store not paused');
   assert.equal(fs.existsSync(path.join(root, 'workflows', 'g-guard')), false, 'no workflow written');
   assert.equal(fs.existsSync(path.join(root, 'subscriptions')), false, 'no subscription written');
+  assert.equal(fs.existsSync(path.join(root, 'nemia', 'level.json')), false, "no Nemia's level written");
   assert.equal(fs.existsSync(path.join(root, 'workflows', 'agents')), false, 'no agent written');
   assert.equal(fs.existsSync(path.join(root, 'workflows', 'skills')), false, 'no skill written');
   assert.deepEqual(

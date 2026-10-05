@@ -328,6 +328,27 @@ const UNSUBSCRIBE: RouteWords = {
   named: ({ name }) => subscriptionNameRefusal(name) ?? null,
 };
 
+/** The body `PUT /api/level` takes: `nemia level`'s level, as JSON. */
+const LEVEL_SHAPE = '`{ "level": "manual" | "semi-auto" }`';
+
+/** Nemia's level set, as the guard's refusals word it, and its body; a level that is none is the package's 422. */
+const LEVEL: RouteWords = {
+  shape: LEVEL_SHAPE,
+  guard: () => ({
+    route: 'PUT /api/level',
+    does: "sets Nemia's level",
+    forAnother: 'set it',
+    why: "at semi-auto Nemia's session is kept, reading every factory's folders and told the feed's waits on a person; at manual it is stopped",
+    reach: 'set it with `nemia level`',
+    instead: 'Set it with `nemia level semi-auto` or `nemia level manual`',
+    shape: LEVEL_SHAPE,
+  }),
+  issue:
+    () =>
+    ({ input }) =>
+      `\`level\` is the level Nemia is set to, as \`nemia level <level>\` takes it: manual or semi-auto. This request's was ${JSON.stringify(input) ?? 'left out'}: ${LEVEL_SHAPE}.`,
+};
+
 /** A try's run removed, as the guard's refusals word it; it takes no body, and a failure that is no refusal names `nemia rm`. */
 const RM: RouteWords = {
   shape: '`{}`',
@@ -641,6 +662,7 @@ export const WORDS: Readonly<Record<string, RouteWords>> = {
   resume: RESUME,
   subscribe: SUBSCRIBE,
   unsubscribe: UNSUBSCRIBE,
+  level: LEVEL,
   rm: RM,
   prune: PRUNE,
   'inbox queue': INBOX_QUEUE,

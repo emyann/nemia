@@ -1,0 +1,107 @@
+/**
+ * The keeper of Nemia: each beat, the person's level read again (`readLevel`), her task read off the engine and her subscription off the
+ * store, and what is owed done (`nemiaDue`) — her task filed long-lived, her subscription put once it is open, both taken away at
+ * `manual`. Level-triggered: it carries nothing between beats, so a restart owes what the files and the engine say. A task stopped from
+ * outside is never filed again.
+ *
+ * A controller: it reaches the runtime through the client (`EngineService`), run by `up` (`daemon/up.verb.ts`) beside the deliverer.
+ */
+import { Cause, Effect, Metric, type Duration } from 'effect';
+import { DEFAULT_HARNESS } from '../harness/harness.ts';
+import { ownOf } from '../tick/file.verb.ts';
+import { factoryMounts } from '../factory/factory.ts';
+import type { Mount } from '../record/record.ts';
+import { readFactories } from '../factory/factory.store.ts';
+import { feedSize } from '../feed/feed.store.ts';
+import { dropSubscription, listSubscriptions, putSubscription } from '../subscription/subscription.store.ts';
+import { EngineService, asked, type Engine } from '../runtime-client.ts';
+import { composePrompt, memoryDir, nemiaDir, readLevel, readNemia, SHIPPED_NEMIA } from './level.store.ts';
+import { NEMIA_DIGEST_EVERY, NEMIA_SUBSCRIPTION, NEMIA_WAKE, nemiaDue, type HerTask, type NemiaAct } from './nemia.ts';
+
+/** What the keeper did, each act counted once done. */
+export const NEMIA_ACTS = Metric.counter('nemia.acts', {
+  description: "the keeper's acts on Nemia's session: filed, subscribed, stopped, dropped",
+});
+
+/** How often the keeper reads the level, her task and her subscription again. */
+export type KeepOptions = { every: Duration.Input };
+
+/** The keeper's pace when it is given none. */
+export const KEEP_DEFAULTS: KeepOptions = { every: '5 seconds' };
+
+/** Her priority among the tasks waiting for a slot: above every step, so the person's agent is never queued behind the work. */
+const NEMIA_PRIORITY = 1_000_000;
+
+/** What her session is told first, once filed: the rest is her instruction's. */
+const NEMIA_BRIEF =
+  'You are on, at semi-auto. Read your memory, then wait: the feed is said to you when it needs the person, and the person may open you.';
+
+/** Each factory's folders, read-only: what she reads of the work and never writes. A factory that does not read is left out. */
+const factoryFolders = (): Mount[] => {
+  const repos = readFactories().flatMap((f) => ('repos' in f ? f.repos : []));
+  return factoryMounts({ repos }, undefined);
+};
+
+/** Her task as the engine is asked to file it under `id`: long-lived, in the background, bridged, in her folder, by her definition. */
+export function nemiaSpec(id: string): Parameters<Engine['file']>[0] {
+  const step = readNemia();
+  const prompt = composePrompt(step.body);
+  const memory = `Edit(/${memoryDir()}/**)`;
+  return {
+    id,
+    brief: NEMIA_BRIEF,
+    cwd: nemiaDir(),
+    harness: step.harness ?? DEFAULT_HARNESS,
+    restartPolicy: 'Always',
+    priority: NEMIA_PRIORITY,
+    config: {
+      ...(step.model === undefined ? {} : { model: step.model }),
+      permissionMode: step.permissionMode ?? 'default',
+      ...(step.disallowedTools === undefined ? {} : { disallowedTools: step.disallowedTools }),
+      allowedTools: [...(step.allowedTools ?? []), memory],
+      background: true,
+      mounts: factoryFolders(),
+      ...ownOf({ harness: step.harness, remote: true }, { appendSystemPromptFile: prompt, pluginDir: [SHIPPED_NEMIA] }, () => undefined),
+    },
+  };
+}
+
+/** One act owed on her task `id`: a stop or a drop already done by another is no failure. */
+const act = (e: Engine, id: string, owed: NemiaAct) =>
+  Effect.gen(function* () {
+    if (owed === 'file') yield* asked('file', e.file(nemiaSpec(id)));
+    if (owed === 'stop') yield* asked('stop', e.stop(id).pipe(Effect.catchTag('StopRefused', () => Effect.void)));
+    if (owed === 'subscribe')
+      putSubscription(NEMIA_SUBSCRIPTION, { task: id, wake: [...NEMIA_WAKE], digestEvery: NEMIA_DIGEST_EVERY, from: feedSize() });
+    if (owed === 'drop' && listSubscriptions().some((s) => s.name === NEMIA_SUBSCRIPTION)) dropSubscription(NEMIA_SUBSCRIPTION);
+    yield* Metric.update(NEMIA_ACTS, 1);
+  });
+
+/** Her task's record off the engine, or undefined where none is filed under `id`. */
+const herTask = (e: Engine, id: string | undefined) =>
+  Effect.gen(function* () {
+    if (id === undefined) return undefined;
+    const { state } = yield* asked('view', e.view(id));
+    return state.filedAt ? ({ settled: Boolean(state.settled), stopRequested: state.stopRequested } satisfies HerTask) : undefined;
+  });
+
+/** One beat: the level, her task and her subscription read, and each act owed done in order. Answers the acts done. */
+export const keepOnce = Effect.fn('keepOnce')(function* () {
+  const e = yield* EngineService;
+  const level = readLevel();
+  const id = level?.task;
+  const task = yield* herTask(e, id);
+  const subscribedTo = listSubscriptions().find((s) => s.name === NEMIA_SUBSCRIPTION)?.subscription.task;
+  const owed = nemiaDue(level, task, subscribedTo);
+  for (const one of owed) if (id !== undefined || one === 'drop') yield* act(e, id ?? '', one);
+  return owed;
+});
+
+/** The keeper, for as long as it runs: a beat each `every`; a beat that fails is a warning, and the next is tried a beat later. */
+export const keep = (options: Partial<KeepOptions> = {}): Effect.Effect<never, never, EngineService> => {
+  const o = { ...KEEP_DEFAULTS, ...options };
+  const beat = Effect.suspend(() => keepOnce()).pipe(
+    Effect.catchCause((cause) => Effect.logWarning(`Nemia could not be kept this beat: ${Cause.pretty(cause)}`)),
+  );
+  return Effect.forever(beat.pipe(Effect.andThen(Effect.sleep(o.every))));
+};

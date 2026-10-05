@@ -30,8 +30,8 @@ function specifiersIn(text: string): string[] {
   return [...found].sort();
 }
 
-/** The seam's files that speak no protocol: a send's lease, read off the registry's own entry. */
-const SDK_FREE = ['src/a2a/sending.ts'];
+/** The seam's files that speak no protocol: the registry's entry, and a send's lease read off it. */
+const SDK_FREE = ['src/a2a/entry.ts', 'src/a2a/sending.ts'];
 
 /** The seam's files, by their path in the package. */
 const inSeam = (file: string) => /^src\/a2a\/[a-z0-9-]+\.ts$/.test(file) && file !== 'src/a2a/index.ts';
@@ -61,6 +61,7 @@ test('the scan reads the seam and the rest of the package — or it would pass b
   assert.deepEqual(files.filter(inSeam), [
     'src/a2a/card.ts',
     'src/a2a/client.ts',
+    'src/a2a/entry.ts',
     'src/a2a/handler.ts',
     'src/a2a/map.ts',
     'src/a2a/remote.ts',

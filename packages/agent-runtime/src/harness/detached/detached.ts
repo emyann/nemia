@@ -25,6 +25,7 @@ import { fileURLToPath } from 'node:url';
 import type { Denial, Sighting, Usage, SessionState } from '../../core/index.ts';
 import { RunnerError, type Observation, type RunnerOps, type SpawnRequest, type TranscriptEvent } from '../seam.ts';
 import { writeMcpConfig } from '../mcp.ts';
+import { forgetFiles } from '../forget.ts';
 import { readTranscript } from '../transcript.ts';
 import { countRead, countSpawn, readText } from '../../core/engine/tally.ts';
 import { instantNow } from '../../core/engine/now.ts';
@@ -505,6 +506,44 @@ const outputOps = (spec: HarnessSpec, dir: string): Pick<RunnerOps, 'output'> =>
       }
     : {};
 
+/** The files a detached run keeps beside its run file, by their ends: every one `detachedOps` and its worker write. */
+const RUN_FILE_ENDS = [
+  'json',
+  'json.tmp',
+  'log',
+  'closeout.json',
+  'schema.json',
+  'mcp.json',
+  'inbox.jsonl',
+  'stop',
+  'said',
+  'stdout',
+  'stderr',
+];
+
+/**
+ * A detached runner's `forget`: the session's run file and every file beside it; the harness's own record of its
+ * conversation, when the spec keeps one, left and named.
+ */
+const forgetRunOf =
+  (spec: HarnessSpec, root: string): NonNullable<RunnerOps['forget']> =>
+  (session, { dry }) => {
+    const base = path.join(root, 'runs', spec.name, safe(session.name));
+    const transcript = () => {
+      const file = session.nativeId ? spec.transcript?.file(session.nativeId) : undefined;
+      return file ? [file] : [];
+    };
+    return forgetFiles(
+      spec.name,
+      RUN_FILE_ENDS.map((end) => `${base}.${end}`),
+      transcript,
+      dry,
+    );
+  };
+
+/** The verbs of a detached runner over the files beside a run's: its streams (`outputOps`), and `forget`. */
+const runFileOps = (spec: HarnessSpec, root: string, dir: string) => ({ ...outputOps(spec, dir), forget: forgetRunOf(spec, root) });
+
 /**
  * The runner of a detached harness: a worker per session (`bin/ae-worker.ts`), and the directory `runs/<spec's name>`
  * under `root` as its registry, read fresh every pass, the same shape as `claude agents`. Beside each run file: the
@@ -775,7 +814,7 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
         catch: (cause) => new RunnerError({ verb: 'logs', message: String(cause) }),
       }),
 
-    ...outputOps(spec, dir),
+    ...runFileOps(spec, root, dir),
     ...(spec.transcript ? { transcript: transcriptOf(spec.transcript) } : {}),
     ...(spec.input ? { say: sayTo(spec, root, spec.input) } : {}),
   };

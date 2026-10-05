@@ -782,7 +782,7 @@
     {
       "files": ["packages/agent-runtime/src/a2a/client.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 104, "skipBlankLines": true, "skipComments": true }]
+        "max-lines-per-function": ["error", { "max": 102, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
@@ -794,8 +794,8 @@
     {
       "files": ["packages/agent-runtime/src/a2a/remote.ts"],
       "rules": {
-        "max-lines": ["error", { "max": 566, "skipBlankLines": true, "skipComments": true }],
-        "max-lines-per-function": ["error", { "max": 410, "skipBlankLines": true, "skipComments": true }],
+        "max-lines": ["error", { "max": 537, "skipBlankLines": true, "skipComments": true }],
+        "max-lines-per-function": ["error", { "max": 402, "skipBlankLines": true, "skipComments": true }],
         "sonarjs/cognitive-complexity": ["error", 19]
       }
     },

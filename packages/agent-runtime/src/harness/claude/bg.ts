@@ -26,6 +26,7 @@ import { countSpawn, readTextAsync } from '../../core/engine/tally.ts';
 import type { Monotonic } from '../../core/clock.ts';
 import { monoNow } from '../../core/engine/now.ts';
 import { RunnerError, refusedOsError } from '../error.ts';
+import { forgetFiles } from '../forget.ts';
 import { registryOf, type RegistryRow } from './registry.ts';
 import { type ParentCall, parentFileOf, parentOf, recordParent, whoseCall } from './parent.ts';
 import { clearSighting, quietFileOf, sightingOf } from './quiet.ts';
@@ -378,8 +379,26 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
     transcript: sessionTranscript,
     say: sayThrough(sessionsDir, registry.pids),
     quota: claudeQuota(),
+    forget: forgetUnder(root),
   };
 };
+
+/**
+ * A background session's `forget`: the files this runner wrote of it under `root` — its MCP config, its transcript's sighting
+ * and its parent's last call — and its transcript, Claude Code's, left and named.
+ */
+const forgetUnder =
+  (root: string): NonNullable<RunnerOps['forget']> =>
+  (session, { dry }) =>
+    forgetFiles(
+      'claude --bg',
+      [mcpFileOf(root, session.name), quietFileOf(root, session.name), parentFileOf(root, session.name)],
+      () => {
+        const file = session.nativeId ? transcriptFile(session.nativeId) : undefined;
+        return file ? [file] : [];
+      },
+      dry,
+    );
 
 /**
  * `claude --bg` under `r.name`, in the task's `cwd`, with its MCP configs written under `root`, and its parent's last call recorded

@@ -3,7 +3,7 @@
  * harness's `HarnessHandler`, in this process, with no HTTP between them.
  *
  * `spawn`, `observe`, `stop` and `say` go through the client, as A2A's own calls; `find`, `logs`, `release`, the
- * transcript, `observeFor` and `quota`, which A2A has no call for, through the runtime extension's methods on the same transport.
+ * transcript, `observeFor`, `quota` and `forget`, which A2A has no call for, through the runtime extension's methods on the same transport.
  * One reaches the driver directly: `refuses`, which is no call to a session but the harness judging a task before any is
  * filed. Nothing the engine reads changes: a harness's words come back as the same `RunnerError`, `refused` where the
  * harness vouched nothing started, and a driver's defect as the defect it is.
@@ -41,6 +41,7 @@ import {
   type HarnessQuota,
   type Observation,
   type RunnerOps,
+  type SessionForgotten,
   type SpawnRequest,
   type Transcript,
   type TranscriptCursor,
@@ -50,6 +51,7 @@ import {
   HarnessFailed,
   HarnessHandler,
   MOST_PER_PAGE,
+  type ForgetRequest,
   type RuntimeExtensionParams,
   type SessionMethods,
   type OutputRequest,
@@ -148,6 +150,10 @@ export class InProcessTransport implements Transport {
   harnessQuota(params: Record<string, never>): Promise<HarnessQuota> {
     return this.handler.harnessQuota(params, new ServerCallContext());
   }
+
+  forgetSession(params: ForgetRequest): Promise<SessionForgotten> {
+    return this.handler.forgetSession(params, new ServerCallContext());
+  }
 }
 
 /** One harness's seam: its card, a client over its handler in this process, and the transport the extension's methods take. */
@@ -188,11 +194,25 @@ const findThrough =
   (name: string): Effect.Effect<{ sessionId: string } | undefined, RunnerError> =>
     call('find', () => transport.findSession({ name })).pipe(Effect.map((found) => found ?? undefined));
 
+/** `forget` through the seam: what the harness keeps of a session, removed, or with `dry` only listed. */
+const forgetThrough =
+  (transport: InProcessTransport) =>
+  (session: { name: string; nativeId?: string }, options: { dry: boolean }): Effect.Effect<SessionForgotten, RunnerError> =>
+    call('forget', () => transport.forgetSession({ session, dry: options.dry }));
+
 /** `output` through the seam: one stream of the session under a name, whole or its last bytes; `undefined` when none was kept. */
 const outputThrough =
   (transport: InProcessTransport) =>
   (name: string, stream: 'stdout' | 'stderr', lastBytes?: number): Effect.Effect<string | undefined, RunnerError> =>
     call('output', () => transport.sessionOutput({ name, stream, lastBytes })).pipe(Effect.map((r) => r.output ?? undefined));
+
+/** The verbs the card offers that ask the transport alone, each left off when the card does not list its method. */
+const askedOfTransport = (offered: RuntimeExtensionParams, transport: InProcessTransport): Partial<RunnerOps> => ({
+  ...(offered.methods.includes('findSession') ? { find: findThrough(transport) } : {}),
+  ...(offered.methods.includes('sessionOutput') ? { output: outputThrough(transport) } : {}),
+  ...(offered.methods.includes('harnessQuota') ? { quota: call('quota', () => transport.harnessQuota({})) } : {}),
+  ...(offered.methods.includes('forgetSession') ? { forget: forgetThrough(transport) } : {}),
+});
 
 /**
  * What the seam offers the engine: a harness's verbs, and beside them the transcript asked by the session's name
@@ -251,7 +271,7 @@ const spawnThrough =
  * stop asks for it, and one no listing has is not stopped blindly but refused in words. The engine stops only a session the pass has just
  * seen live, so it never asks for that. A session that ended between the listing and the stop has nothing to stop, as a driver's
  * stop of an ended session does nothing: the next pass reads how it ended. `say` is a follow-up message on the session's
- * Task. `find`, `logs`, `release`, `transcript`, `transcriptOf`, `observeFor` and `quota` are the extension's methods; the names
+ * Task. `find`, `logs`, `release`, `transcript`, `transcriptOf`, `observeFor`, `quota` and `forget` are the extension's methods; the names
  * `observeFor`'s driver could not look for cross as it said them, names and nothing more. By id, a transcript is always
  * read: the handler answers `null` only for a name it found no session under, so a `null` by id is a defect. A verb is
  * offered as the card says — the verbs the harness's driver lacks are left off it — so the engine reads the absences the
@@ -362,12 +382,10 @@ export const a2aOps = (harness: string, ops: RunnerOps, events: (taskId: string)
     observe,
     stop,
     logs,
-    ...(offered.methods.includes('findSession') ? { find: findThrough(transport) } : {}),
-    ...(offered.methods.includes('sessionOutput') ? { output: outputThrough(transport) } : {}),
+    ...askedOfTransport(offered, transport),
     ...(offered.methods.includes('releaseSession') ? { release } : {}),
     ...(offered.methods.includes('sessionTranscript') ? { transcript, transcriptOf } : {}),
     ...(offered.methods.includes('observeSessions') ? { observeFor } : {}),
-    ...(offered.methods.includes('harnessQuota') ? { quota: call('quota', () => transport.harnessQuota({})) } : {}),
     ...(offered.say ? { say } : {}),
     ...(ops.refuses ? { refuses: ops.refuses } : {}),
   };

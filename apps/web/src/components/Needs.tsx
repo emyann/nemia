@@ -3,6 +3,7 @@ import type { RunDetail } from '../lib/api';
 import { needsOf, needText, offersOf, stepAnchor } from '../lib/asks';
 import { onYouOf, toDecideOf } from '../lib/factory';
 import { Continue } from './Decide';
+import { Markdown } from './Markdown';
 
 /** The line that continues `step` from a terminal, as the api answers it on the step (`commands.retry`); none for a step the run lacks. */
 const retryLineOf = (run: RunDetail, step: string): string => run.steps.find((s) => s.name === step)?.commands.retry ?? '';
@@ -48,6 +49,26 @@ export function ToDecideBanner({ run, onStep }: { run: RunDetail; onStep?: (step
         decide.said
       )}
     </section>
+  );
+}
+
+/**
+ * What a step needs, after its name, whole on hover: an agent's question drawn as its markdown, in a box that scrolls past a few lines;
+ * what the harness says, as it says it, cut at four lines.
+ */
+function NeedWords({ need }: { need: ReturnType<typeof needsOf>[number] }) {
+  if (need.kind === 'asks')
+    return (
+      <div data-need-words className="max-h-40 overflow-y-auto pr-1 break-words" title={needText(need)}>
+        <strong>{need.step}</strong> asks:{' '}
+        <Markdown>{need.needs}</Markdown>
+      </div>
+    );
+  return (
+    <p className="line-clamp-4 whitespace-pre-wrap break-words" title={needText(need)}>
+      <strong>{need.step}</strong> {need.kind === 'harness' ? 'is ' : ''}
+      {needText(need)}
+    </p>
   );
 }
 
@@ -106,10 +127,7 @@ export function NeedsBanner({ run, onStep }: { run: RunDetail; onStep?: (step: s
             const offer = need.kind === 'harness' ? offers.find((o) => o.step === need.step) : undefined;
             return (
               <li key={need.step} data-need={need.kind} data-step={need.step} className="space-y-1.5">
-                <p className="line-clamp-4 whitespace-pre-wrap break-words" title={needText(need)}>
-                  <strong>{need.step}</strong> {need.kind === 'harness' ? 'is ' : ''}
-                  {needText(need)}
-                </p>
+                <NeedWords need={need} />
                 {need.kind === 'harness' && need.waitingFor && offer?.kind !== 'asked' && (
                   <p data-advice className="break-words text-xs">
                     {need.waitingFor.advice}

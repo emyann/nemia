@@ -2644,7 +2644,7 @@ test("an agent's question is drawn as its markdown after `asks:`, in the banner 
   const needs = 'Which **database**?\n\n- one\n- two';
   const run = needing('succeeded · BLOCKED', { needs }, { waitingOnYou: ['review'] });
   const item = /<li data-need="asks"[^]*?<\/li>/.exec(bannerMarkup(run))![0];
-  assert.match(item, /<strong>review<\/strong> asks: <div data-markdown="true"[^>]*><p[^>]*>Which <strong>database<\/strong>\?<\/p><ul/);
+  assert.match(item, /<strong>review<\/strong> asks: <div data-markdown="true"[^>]*><p[^>]*>Which <strong>database<\/strong>\?<\/p>\s*<ul/);
   assert.match(item, /class="[^"]*max-h-40 overflow-y-auto[^"]*"/, 'a long question scrolls in a box of its own');
   assert.match(item, new RegExp(`title="asks: Which \\*\\*database\\*\\*\\?\\n\\n- one`));
   assert.ok(textContentOf(item).startsWith('review asks: Which database?'), item);

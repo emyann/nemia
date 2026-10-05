@@ -36,7 +36,7 @@ const { resumePause, putPause } = await import('../pause/pause.store.ts');
 const { pauseNow } = await import('../pause/pause.verb.ts');
 const { pausedRead, runsListed } = await import('../list/list.verb.ts');
 const { COMMANDS } = await import('../command/commands.verb.ts');
-const { pausedLines, pausedWords } = await import('../pause/pause.ts');
+const { PAUSE_WAIT, pausedLines, pausedWords } = await import('../pause/pause.ts');
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], {
@@ -150,6 +150,13 @@ const pass = (memo = MEMO) => runWith(h.e, tickRun({ repo: ROOT, memo, verifyRes
 const begun = async (workflowDir: string, more: Partial<Parameters<typeof startRun>[0]> = {}) =>
   await Effect.runPromise(startRun({ brief: 'paused', repo: REPO, workflowDir, isolate: false, ...more }));
 const taskOf = (run: Run, step: string): string | undefined => readRun(run.id).steps[step]?.taskId ?? undefined;
+/** The row `nemia ls` lists for `step` of `run`: its word and its note. */
+const rowOf = async (run: Run, step: string) => {
+  const [{ listed }] = (await runWith(h.e, runsListed(run.id))).runs;
+  const row = listed.steps.find((s) => s.name === step);
+  assert.ok(row, `${run.id} lists ${step}`);
+  return row as { status: string; note?: string };
+};
 
 const TWO = folder(['plan', 'work']);
 const ONE = folder(['work']);
@@ -218,13 +225,13 @@ test('while the store is paused nothing new starts and what runs finishes; the p
   ).sort(byStep);
   assert.deepEqual(
     sorted(first.pause!),
-    { pause, finishing: atWork, staged: [] },
+    { pause, finishing: atWork, staged: [], held: [] },
     'the pass says the pause it read, and what still finishes under it: neither the queued task nor one settled; no landing held yet',
   );
   assert.match(pausedLines(first.pause!)[0], /^Pausing: 3 finishing/);
   assert.equal(first.queue, undefined, 'and started no queued card');
   const listedAtWork = (await runWith(h.e, runsListed())).paused!;
-  assert.deepEqual(sorted(listedAtWork), { pause, finishing: atWork, staged: [] }, 'nemia ls names each task still finishing');
+  assert.deepEqual(sorted(listedAtWork), { pause, finishing: atWork, staged: [], held: [] }, 'nemia ls names each task still finishing');
   assert.deepEqual(sorted(await runWith(h.e, pausedRead())), sorted(listedAtWork), 'and the api reads the same');
   h.signAll();
   await pass(freshRestMemo());
@@ -232,12 +239,23 @@ test('while the store is paused nothing new starts and what runs finishes; the p
   const last = await pass();
   const repo = readRun(landing.id).repo!;
   const held = [{ run: landing.id, step: 'ship', repo }];
-  assert.deepEqual(last.pause, { pause, finishing: [], staged: held }, 'once what ran has finished, nothing finishes; the landing is held');
+  const checks = [{ run: checked.id, step: 'work' }];
+  assert.deepEqual(
+    last.pause,
+    { pause, finishing: [], staged: held, held: checks },
+    "once what ran has finished, nothing finishes; the landing is held staged, and checked's check held, each named once",
+  );
   assert.deepEqual(pausedLines(last.pause), [
     pausedWords(last.pause),
     `   ${landing.id}'s ship has its merge staged in ${repo} (MERGE_HEAD), and its check waits on nemia resume`,
+    `   ${checked.id}'s work has signed off, and its check waits on nemia resume`,
   ]);
-  assert.match(pausedLines(last.pause)[0], /^Paused since /);
+  assert.match(pausedLines(last.pause)[0], /^Paused since .* nothing new starts, 2 checks held; /);
+  const waits = await rowOf(checked, 'work');
+  assert.notEqual(waits.status, 'checking', 'a check the pause keeps from being filed is not checking');
+  assert.equal(waits.status, PAUSE_WAIT);
+  assert.match(waits.note ?? '', /its check is filed on nemia resume/);
+  assert.equal((await rowOf(landing, 'ship')).status, PAUSE_WAIT, 'nor is the landing whose check it holds');
 
   assert.deepEqual(h.spawned.slice(before), [], 'no session started while the store is paused');
   assert.equal((await Effect.runPromise(h.e.view(queuedTask))).admission, 'queued', 'the queued task not admitted');
@@ -260,20 +278,20 @@ test('while the store is paused nothing new starts and what runs finishes; the p
   const listed = await runWith(h.e, runsListed());
   assert.deepEqual(
     listed.paused,
-    { pause, finishing: [], staged: held },
+    { pause, finishing: [], staged: held, held: checks },
     'nemia ls names the pause, and the landing whose merge it holds staged in the checkout, its check not filed',
   );
   assert.equal(readRun(landing.id).steps.ship?.check, undefined);
   assert.deepEqual(await runWith(h.e, pausedRead()), listed.paused, 'and the api reads the same');
   const ls = COMMANDS.find((c) => c.name === 'ls')!;
-  assert.deepEqual(ls.print(listed, {}).slice(0, 2), pausedLines(listed.paused), 'nemia ls says it first');
+  assert.deepEqual(ls.print(listed, {}).slice(0, 3), pausedLines(listed.paused), 'nemia ls says it first');
 
   const spoiled = h.tasks.get(taskOf(landing, 'ship')!)!;
   spoiled.push(MISWRITTEN as never);
   const unread = await pass();
   assert.deepEqual(
     unread.pause,
-    { pause, finishing: [], staged: [] },
+    { pause, finishing: [], staged: [], held: checks },
     'a landing whose journal does not read is left out, and the pass goes on',
   );
   assert.ok(
@@ -287,13 +305,25 @@ test('while the store is paused nothing new starts and what runs finishes; the p
   assert.equal(lifted.pause, undefined, 'the pass after the lift says no pause');
   assert.ok(taskOf(running, 'work'), "running's work filed");
   assert.ok(readRun(checked.id).steps.work?.check, "checked's check filed");
+  assert.equal((await rowOf(checked, 'work')).status, 'checking', 'and checking, once its check is filed');
+  putPause({ why: 'again', by: 'ann' });
+  try {
+    assert.equal((await rowOf(checked, 'work')).status, 'checking', 'a check filed before the pause is checking under it');
+    assert.equal(
+      (await runWith(h.e, pausedRead())).held.some((c) => c.run === checked.id),
+      false,
+      'and the pause holds it not',
+    );
+  } finally {
+    resumePause();
+  }
   assert.equal(taskOf(refused, 'work'), `${refused.id}-work-try2`, "refused's try filed");
   assert.ok(taskOf(gated, 'work'), "gated's work filed on the approval");
   assert.ok(taskOf(await born, 'work'), 'the run started while paused filed');
   assert.ok(lifted.queue, 'the queued card tried');
   assert.ok(readRun(landing.id).steps.ship?.check, "landing's check filed");
   assert.equal((await runWith(h.e, runsListed())).paused, undefined, 'and nemia ls says no pause');
-  assert.deepEqual(await runWith(h.e, pausedRead()), { pause: null, finishing: [], staged: [] });
+  assert.deepEqual(await runWith(h.e, pausedRead()), { pause: null, finishing: [], staged: [], held: [] });
   await pass();
   assert.ok(h.spawned.length > before, 'and sessions started again');
   assert.notEqual((await Effect.runPromise(h.e.view(queuedTask))).admission, 'queued', 'the queued task admitted');

@@ -14,7 +14,7 @@ import { cursorTakes, feedLineWords, type FeedLine } from '../feed/feed.ts';
 import { pausedWords } from '../pause/pause.ts';
 
 /** The store's pause as read while none stands. */
-const NONE = { pause: null, finishing: [], staged: [] };
+const NONE = { pause: null, finishing: [], staged: [], held: [] };
 import { statsLine, statsLines } from '../stats/index.ts';
 import { statsOf } from '../stats/stats.ts';
 import { parseArgv, type CommandSpec } from './command.ts';
@@ -112,7 +112,7 @@ test("nemia feed reads the store's feed from a cursor, and prints the pause firs
   const pause = putPause({ why: 'merging by hand', by: 'ann' });
   try {
     const paused = await runWith(e, FEED.handler({ cursor: String(Buffer.byteLength(head)) }));
-    assert.deepEqual(FEED.print(paused, {}), [pausedWords({ pause, finishing: [] }), feedLineWords(second), `cursor: ${end}`]);
+    assert.deepEqual(FEED.print(paused, {}), [pausedWords({ pause, finishing: [], staged: [], held: [] }), feedLineWords(second), `cursor: ${end}`]);
   } finally {
     resumePause();
   }

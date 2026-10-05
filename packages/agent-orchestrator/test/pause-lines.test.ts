@@ -61,7 +61,7 @@ test('nemia feed opens with the pause while one stands, Paused with nothing at w
   const pause = putPause({ why: 'merging by hand', by: 'ann' });
   try {
     const feed = await printed(t, () => main(['feed'], promised({})));
-    assert.equal(feed[0], pausedWords({ pause, finishing: [] }), feed.join('\n'));
+    assert.equal(feed[0], pausedWords({ pause, finishing: [], staged: [], held: [] }), feed.join('\n'));
     assert.match(feed[0], /^Paused since /);
   } finally {
     resumePause();
@@ -84,7 +84,7 @@ test('nemia start says, after how to start the run, that nothing of it is filed 
   }
   const at = started.indexOf("run 'nemia tick' (or 'nemia up') to start it");
   assert.ok(at > 0, started.join('\n'));
-  assert.equal(started[at + 1], `${pausedWords({ pause, finishing: [] })}: nothing of this run is filed until then`);
+  assert.equal(started[at + 1], `${pausedWords({ pause, finishing: [], staged: [], held: [] })}: nothing of this run is filed until then`);
   const free = await printed(t, () => main(aStart(), promised({})));
   assert.equal(
     free.some((l) => l.includes('nothing of this run is filed')),
@@ -102,13 +102,15 @@ test('nemia up says the pause once across passes, again each time its words chan
       { run: 'r-2', step: 'b', kind: 'check' as const },
     ],
     staged: [],
+    held: [],
   };
   const one = { ...two, finishing: two.finishing.slice(1) };
   const none = { ...two, finishing: [] };
   const held = { ...none, staged: [{ run: 'r-3', step: 'ship', repo: '/code/app' }] };
+  const signed = { ...held, held: [{ run: 'r-4', step: 'land' }] };
   let said: string | undefined;
   const lines = await printed(t, () => {
-    for (const standing of [undefined, two, two, one, none, none, held, held, undefined, undefined]) said = pauseSaid(standing, said);
+    for (const standing of [undefined, two, two, one, none, none, held, held, signed, signed, undefined, undefined]) said = pauseSaid(standing, said);
   });
   assert.deepEqual(
     lines.map((l) => l.slice(10)),
@@ -118,11 +120,14 @@ test('nemia up says the pause once across passes, again each time its words chan
       pausedWords(none),
       pausedWords(held),
       "   r-3's ship has its merge staged in /code/app (MERGE_HEAD), and its check waits on nemia resume",
+      pausedWords(signed),
+      "   r-3's ship has its merge staged in /code/app (MERGE_HEAD), and its check waits on nemia resume",
+      "   r-4's land has signed off, and its check waits on nemia resume",
       RESUMED,
     ],
   );
   assert.deepEqual(
     lines.map((l) => l.slice(10, 17)),
-    ['Pausing', 'Pausing', 'Paused ', 'Paused ', "   r-3'", 'the sto'],
+    ['Pausing', 'Pausing', 'Paused ', 'Paused ', "   r-3'", 'Paused ', "   r-3'", "   r-4'", 'the sto'],
   );
 });

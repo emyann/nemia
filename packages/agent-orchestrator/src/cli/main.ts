@@ -11,9 +11,9 @@ import {
   ceilings,
   Conflict,
   pausedLines,
+  heldLines,
   pausedWords,
   RESUMED,
-  stagedWords,
   engine,
   everyOf,
   feedCursorRefusal,
@@ -166,12 +166,12 @@ function advancedLines(advanced: Pass['runs']): void {
 }
 
 /**
- * The store's pause on `nemia up` (`pausedWords`) and each landing it holds with its merge staged (`stagedWords`), once when it is put,
- * again each time their words change — Pausing with fewer finishing, then Paused, a landing staged — and once when it is resumed; returns
- * the lines it said, if any, as one string.
+ * The store's pause on `nemia up` (`pausedWords`) and each check it holds back, a landing with its merge staged among them (`heldLines`),
+ * once when it is put, again each time their words change — Pausing with fewer finishing, then Paused, a check held — and once when it is
+ * resumed; returns the lines it said, if any, as one string.
  */
 export function pauseSaid(pause: Pass['pause'], said: string | undefined): string | undefined {
-  const lines = pause ? [pausedWords(pause) ?? '', ...pause.staged.map((s) => `   ${stagedWords(s)}`)] : [RESUMED];
+  const lines = pause ? [pausedWords(pause) ?? '', ...heldLines(pause)] : [RESUMED];
   const now = pause ? lines.join('\n') : undefined;
   if (now !== said) for (const line of lines) console.log(`${new Date().toISOString().slice(11, 19)}  ${line}`);
   return now;

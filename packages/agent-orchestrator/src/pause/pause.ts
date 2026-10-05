@@ -23,6 +23,9 @@ export type Pause = { at: string; by: string; why?: string };
  */
 export type PauseStaged = { run: string; step: string; repo: string };
 
+/** A check the pause holds whose merge is not staged: `run`'s `step` has signed off, and its check is not filed until the resume. */
+export type PauseHeld = { run: string; step: string };
+
 /**
  * A task still at work under the pause, which it lets finish: `run`'s `step`, as a `session` at work, the `check` of its work, or the
  * check of a `landing` (an ending that lands on its check) — `stopping` once the engine was asked to stop it, and `resumed` while an ask
@@ -39,12 +42,15 @@ export type Interrupt = { run: string; step: string; kind: 'session' | 'check'; 
 
 /**
  * What a reader of the whole store is told of the pause: the pause, or null; each task still finishing under it, none once it is
- * "Paused"; and each landing it holds with its merge staged.
+ * "Paused"; each landing it holds with its merge staged; and each other check it keeps from being filed (`held`).
  */
-export type Paused = { pause: Pause | null; finishing: Finishing[]; staged: PauseStaged[] };
+export type Paused = { pause: Pause | null; finishing: Finishing[]; staged: PauseStaged[]; held: PauseHeld[] };
 
-/** The pause as a pass reads it while it stands: the pause, each task still finishing under it, and each landing it holds staged. */
-export type PauseStanding = { pause: Pause; finishing: Finishing[]; staged: PauseStaged[] };
+/**
+ * The pause as a pass reads it while it stands: the pause, each task still finishing under it, each landing it holds staged, and each
+ * other check it holds.
+ */
+export type PauseStanding = { pause: Pause; finishing: Finishing[]; staged: PauseStaged[]; held: PauseHeld[] };
 
 /**
  * A task's view as `finishingOf` reads it: the words' view (`WordView`), whether the runtime holds it queued for a slot, and whether it was
@@ -57,6 +63,12 @@ export const NOW_COST = 'An interrupted step redoes its unfinished work and read
 
 /** How `nemia resume` is typed, as every line that offers it says it. */
 export const RESUME_LINE = 'nemia resume';
+
+/** The word of a step whose check is due and the pause keeps from being filed, where `checking` would say its check exists. */
+export const PAUSE_WAIT = 'waiting on the pause';
+
+/** The note beside `PAUSE_WAIT`: when the check it waits for is filed. */
+export const PAUSE_WAIT_NOTE = `its check is filed on ${RESUME_LINE}`;
 
 /**
  * The tasks of `run` still at work, which the pause lets finish: each step's current task and its check's, pending or running. Left out:
@@ -159,14 +171,22 @@ const sinceWords = ({ at, by, why }: Pause): string =>
 export const pauseWords = (pause: Pause): string =>
   `the store is paused ${sinceWords(pause)} — nothing new starts, and what runs finishes; ${RESUME_LINE} resumes it`;
 
+/** How many checks the pause holds back, staged landings among them, in words: `, 2 checks held`, or nothing for none. */
+const heldCount = ({ staged, held }: Pick<Paused, 'staged' | 'held'>): string => {
+  const n = staged.length + held.length;
+  return n ? `, ${n} check${n === 1 ? '' : 's'} held` : '';
+};
+
 /**
- * The pause as it stands, in one line: "Pausing" with how many tasks still finish, or "Paused" once none does. Null when no pause stands.
+ * The pause as it stands, in one line: "Pausing" with how many tasks still finish, or "Paused" once none does, each with how many checks
+ * it holds back (`staged` and `held`), when any. Null when no pause stands.
  */
-export const pausedWords = ({ pause, finishing }: Pick<Paused, 'pause' | 'finishing'>): string | null => {
+export const pausedWords = (paused: Pick<Paused, 'pause' | 'finishing' | 'staged' | 'held'>): string | null => {
+  const { pause, finishing } = paused;
   if (!pause) return null;
   return finishing.length
-    ? `Pausing: ${finishing.length} finishing — the store is paused ${sinceWords(pause)}; nothing new starts, and what runs finishes; ${RESUME_LINE} resumes it`
-    : `Paused ${sinceWords(pause)} — nothing runs and nothing new starts; ${RESUME_LINE} resumes it`;
+    ? `Pausing: ${finishing.length} finishing${heldCount(paused)} — the store is paused ${sinceWords(pause)}; nothing new starts, and what runs finishes; ${RESUME_LINE} resumes it`
+    : `Paused ${sinceWords(pause)} — nothing runs and nothing new starts${heldCount(paused)}; ${RESUME_LINE} resumes it`;
 };
 
 /**
@@ -224,14 +244,23 @@ export const pausedNowLines = ({ pause, kept, interrupted, skipped }: PausedNow)
 export const stagedWords = ({ run, step, repo }: PauseStaged): string =>
   `${run}'s ${step} has its merge staged in ${repo} (MERGE_HEAD), and its check waits on ${RESUME_LINE}`;
 
+/** A check the pause holds, in one line: its run and step, signed off, and that its check waits on the resume. */
+export const heldWords = ({ run, step }: PauseHeld): string => `${run}'s ${step} has signed off, and its check waits on ${RESUME_LINE}`;
+
+/** Each check the pause holds back, a line each, indented: each landing with its merge staged (`stagedWords`), then each other. */
+export const heldLines = ({ staged, held }: Pick<Paused, 'staged' | 'held'>): string[] => [
+  ...staged.map((s) => `   ${stagedWords(s)}`),
+  ...held.map((h) => `   ${heldWords(h)}`),
+];
+
 /**
  * Every line said of the pause: none when the store is not paused, else the pause as it stands (`pausedWords`), then each task still
- * finishing and each landing it holds, indented.
+ * finishing and each check it holds back (`heldLines`), indented.
  */
 export const pausedLines = (paused: Paused): string[] => {
   const line = pausedWords(paused);
   if (line === null) return [];
-  return [line, ...paused.finishing.map((f) => `   ${finishingWords(f)}`), ...paused.staged.map((s) => `   ${stagedWords(s)}`)];
+  return [line, ...paused.finishing.map((f) => `   ${finishingWords(f)}`), ...heldLines(paused)];
 };
 
 /** What `nemia up` says once the pause it said is resumed. */

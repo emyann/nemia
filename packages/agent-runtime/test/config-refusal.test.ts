@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { configRefusal } from '../src/facade.ts';
+import { configRefusal } from '../src/index.ts';
 
 /** The refusal of `config` on `harness`, which the case expects there is. */
 const refused = (harness: string, config: Parameters<typeof configRefusal>[1]): string => {

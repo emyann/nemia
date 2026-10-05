@@ -315,8 +315,8 @@ export type RemoteOptions = { sendMs?: number; spawnWaitMs?: number; missingCred
  * - `release` runs once the engine has written the attempt's end: a send under way is cut and whatever answers is let
  *   go of; a Task still running is cancelled, since an attempt ends so only on its deadline or a stop; and the entry leaves
  *   the open registry, so no later pass asks the agent about it.
- * - `say` sends words to a Task that waits on its caller, as A2A's follow-up on it; the facade refuses them to a Task at
- *   work.
+ * - `say` sends words to a Task that waits on its caller, as A2A's follow-up on it; the engine's `say` refuses them to a Task
+ *   at work.
  */
 export const remoteOps = (
   harness: string,

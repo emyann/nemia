@@ -8,8 +8,8 @@ import { agents, skills } from './agents/index.ts';
 import { customInstructions } from './custom/custom.ts';
 import { commands } from './commands/index.ts';
 import { capabilitiesWithSteps, McpAsker } from './capabilities/index.ts';
-import { factories } from './factories/index.ts';
-import { ceilingsOf, metricsOf, passesOf, pauseNowOf, pauseOf, feed, QuotaAsker, readDaemon } from './factory/index.ts';
+import { factories, factoryInstruction } from './factories/index.ts';
+import { ceilingsOf, metricsOf, passesOf, seriesOf, pauseNowOf, pauseOf, feed, QuotaAsker, readDaemon } from './factory/index.ts';
 import { inbox } from './inbox/inbox.ts';
 import { ApiConfig, type ApiEnv, type ApiRuntime, ReadMemo, served, type Services } from './layer.ts';
 import { machines } from './machines/machines.ts';
@@ -64,6 +64,8 @@ export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Servic
  * - factories/factories.ts — the factories a request may be answered in, each with its repositories, workflows and hires. Every route is
  *   answered in the factory and on the repository its query names (`?factory=`, `?repo=`), resolved before its handler runs, and refused
  *   when it names a repository no factory has (`placeFor`, factories/place.ts); a request naming neither is answered on the api's own.
+ * - factories/instruction.ts — a factory's instruction, read through `nemia factory instruction`'s entry; where it is kept put and
+ *   cleared, and the store's text written and cleared, on the routes the table generates from it and `nemia factory instruct`'s.
  * - `GET /api/capabilities` — what the repository offers a step, read from the checkout on each request (capabilities/capabilities.ts), and
  *   what each step of each workflow gets of it (capabilities/reach.ts). Each MCP server the settings enable is started and asked for its
  *   tools once while the app runs (`McpAsker`); one that fails is an `error` on its entry, never a failed request.
@@ -89,6 +91,9 @@ export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Servic
  * - `GET /api/passes` — what the recent passes of the tick cost, `{ recent, histogram, parts, summary, bounds }`, as `nemia passes --json`
  *   prints it: read off the store's `tick-recent.json`, which the ticking process keeps, the api's own or a `nemia up`'s. `?last=<n>` keeps
  *   the last n; 422 for one that is not a whole number from 1.
+ * - `GET /api/series` — the system's series over a range, `{ range, span, from, to, series }`, as `nemia series --json` prints it: read
+ *   off the store's `metrics/` minute lines for `?range=24h` (the default) and its hour lines for `7d`, `30d` and `all`, which the ticking
+ *   process keeps; a past day off the app's memo while its file has not moved. 422 for a range it does not take.
  * - `GET /api/metrics` — the process's metrics, each `{ name, type, description, attributes }` and its value (`MetricRead`,
  *   factory/ceilings.ts), in the registry of the app's runtime: the files the runtime read for each request, its journals and every
  *   other, by its route's pattern (`api.poll.reads`, about, since a pass or another request reading at the same time is counted too),
@@ -110,8 +115,8 @@ export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Servic
  *   Every case is a 200 with a sentence, the harness's failures and the engine's refusals included.
  * - commands/routes.ts — a person's asks of a run, generated from the package's command table: a try (with answers to its questions,
  *   commands/extend.ts and asks/answers.ts), a round, words for a running session, an approval and an acceptance; five writes. And the
- *   store's pause put and lifted, `nemia pause` and `nemia resume`'s routes; an inbox card dropped, queued and taken off the queue; and an
- *   agent's custom instructions written and cleared.
+ *   store's pause put and lifted, `nemia pause` and `nemia resume`'s routes; an inbox card dropped, queued and taken off the queue; an
+ *   agent's custom instructions written and cleared; and a factory's instruction put where it is kept, and written and cleared.
  * - steps/steps.ts — a step's own reads: its output, its files, and its conversation, once or followed.
  * - factory/feed.ts — the workflow feed followed, as server-sent events.
  * - machines/machines.ts — the state machines the board draws, listed, and one machine's graph, read off its code.
@@ -134,6 +139,7 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
       served(c, async ({ e, env, repo, home, mcp }) => c.json(await capabilitiesWithSteps(repo, { e, env, home, asker: mcp }))),
     )
     .route('/', factories)
+    .route('/', factoryInstruction)
     .route('/', workflows)
     .route('/', step)
     .route('/', builder)
@@ -147,6 +153,7 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     .route('/', stats)
     .get('/api/ceilings', (c) => served(c, async ({ e, env }) => c.json(await ceilingsOf(e, env))))
     .get('/api/passes', (c) => served(c, async ({ e }) => c.json(await passesOf(e, c.req.query('last')))))
+    .get('/api/series', (c) => served(c, async ({ e, memo }) => c.json(await seriesOf(e, c.req.query('range'), memo.series))))
     .get('/api/metrics', async (c) => c.json(metricsOf(await runtime.runPromise(Metric.snapshot))))
     .get('/api/pause', (c) => served(c, async ({ e }) => c.json(await pauseOf(e))))
     .get('/api/pause/now', (c) => served(c, async ({ e }) => c.json(await pauseNowOf(e))))

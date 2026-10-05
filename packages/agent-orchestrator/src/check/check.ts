@@ -35,8 +35,8 @@ export const CHECK_DEADLINE_SECONDS = 1200;
 
 /**
  * The seconds the check of an ending that lands on it (`landsOnCheck`) may run before the engine stops it: the whole suite on the merged
- * tree, the e2e's every page in both themes included, while other runs build on the same machine. It guards against a hung check, never a
- * slow one, so the number is twice the slowest landing check over a week, never less than 2400.
+ * tree, the e2e included, which visits every page in the dark theme alone, while other runs build on the same machine. It guards against a
+ * hung check, never a slow one, so the number is twice the slowest landing check over a week, never less than 2400.
  *
  * Measured from the landing checks' journals, spawned to ended, with the load counted from the other tasks running at the time: 227 passed
  * landing checks over a week, median 482 s, p90 971 s, p95 1019 s, slowest 1150 s, beside five agent sessions and another check. One more,

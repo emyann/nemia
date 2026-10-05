@@ -17,7 +17,7 @@ import { Effect } from 'effect';
 import { claudeOps, type ClaudeOptions, QUIESCENT_AFTER_MS } from '../src/harness/claude/bg.ts';
 import { quietFileOf, sightingOf } from '../src/harness/claude/quiet.ts';
 import { lastStructuredOutput } from '../src/harness/claude/transcript.ts';
-import { Engine, promiseEngine } from '../src/index.ts';
+import { Engine } from '../src/index.ts';
 import { RunnerError } from '../src/harness/error.ts';
 import { Journal } from '../src/core/engine/journal.ts';
 import type { Event } from '../src/core/domain.ts';
@@ -795,6 +795,7 @@ test('Claude Code is handed the schema as --json-schema, and the prompt still co
 });
 
 import type { SpawnRequest } from '../src/harness/seam.ts';
+import { builtEngine } from './engine.ts';
 
 /** The argv `bgOps().spawn` hands to `claude`, recorded by a fake one on PATH. */
 const argvOf = async (r: Partial<SpawnRequest>) => {
@@ -886,9 +887,9 @@ if (args[0] === '--bg') {
   process.env.PATH = `${dir}:${prev}`;
   try {
     const root = scratch('ae-remote-');
-    const engine = promiseEngine(Engine.layer({ root }));
-    await engine.file({ brief: 'bridged', cwd: dir, config: { background: true, claude: { remoteControl: true } } });
-    await engine.file({ brief: 'plain', cwd: dir, config: { background: true } });
+    const engine = builtEngine(Engine.layer({ root }));
+    await Effect.runPromise(engine.file({ brief: 'bridged', cwd: dir, config: { background: true, claude: { remoteControl: true } } }));
+    await Effect.runPromise(engine.file({ brief: 'plain', cwd: dir, config: { background: true } }));
     const at = new Date().toISOString();
     await Effect.runPromise(
       Journal.filesOps(root).append('t-before-the-move', {
@@ -900,7 +901,7 @@ if (args[0] === '--bg') {
         config: { background: true, remoteControl: true },
       } as unknown as Event),
     );
-    await engine.tick();
+    await Effect.runPromise(engine.tick());
 
     const argvs = fs
       .readFileSync(runs, 'utf8')

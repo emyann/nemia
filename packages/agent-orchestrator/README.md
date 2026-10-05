@@ -1590,9 +1590,13 @@ it files the step.
   links followed. Any other absolute path — another step's directory, a `..` that climbs out, a link inside
   that leads out, `/etc/passwd` — is reported and never opened, stat-ed or resolved: a closeout is an
   agent's text. So is a path from the workspace root that climbs out of it, as written or through a link.
+  A path from the workspace root, or one inside `<dir>`, that passes through a folder a harness reads as its
+  own configuration (the runtime names them: `configFolderIn`, from `agent-runtime/vocabulary`) is refused
+  and never collected: every later step mounts `<dir>`, and its harness would take such a file as its own,
+  a skill among them.
 - **`wf decide` names each refusal** under the step's closeout, never passing one over: a path outside the
-  workspace or the directory, a directory, a file that is not there, and a file in the workspace that was
-  not collected. Then it lists the directory, each file by absolute path with its size.
+  workspace or the directory, a path through a configuration folder, a directory, a file that is not there,
+  and a file in the workspace that was not collected. Then it lists the directory, each file by absolute path with its size.
 
 A file reaches a later step by its path, declared: an `implement` that declares `screenshots`, the absolute paths
 of its PNGs, hands them to a `review` that reads them with `input: implement`.
@@ -2654,6 +2658,30 @@ new session's brief names it (`mountsLine`); a step without the line reads none 
 (Codex) is filed no mount. Refused at load: a name off `STORE_READS`, one given twice, none, and the key on a remote agent. A store
 whose path no permission rule can name refuses `wf start` of such a step, quoting its `reads:` line, before anything is written.
 
+### A factory's instruction: `wf factory instruction` and `wf factory instruct`
+
+A factory has one instruction: what its runs are to know about its work, in markdown. Where it is kept is a key of the factory's file:
+
+- **By default, `NEMIA.md` in its first repository** — the file is the checkout's, edited with the code it speaks of, and read as it is
+  on each request; no file there means no instruction yet.
+- **`"instruction": { "path": "docs/factory.md" }`** — another file of that folder, by its path from it. A path that is empty, absolute,
+  the folder itself or climbs out of it is refused when it is set (`instructionPathRefusal`); a file that is no regular file, or a link
+  that leads out of the folder, does not read, and the read says why (`readInstructionAt`).
+- **`"instruction": { "store": true }`** — `$WF_ROOT/factories/<name>/NEMIA.md`, beside the factory's file, for a factory whose
+  repository a person would rather not write into.
+
+**`wf factory instruction <name>`** says where it is kept and reads it; `--path <path>` points it at a file of the folder, `--store`
+keeps it in the store, and `--clear` drops the key, back to `NEMIA.md`. Each writes the whole file through a hidden file renamed onto
+it, keeping every other key, and never moves the words: the store's text stays, unread, while a folder's file is read.
+**`wf factory instruct <name> --file <path>`** (`--file -` for stdin) writes the words the store keeps, replacing a link there rather
+than writing through it, and `--clear` removes them; both are refused while the instruction is read from the factory's folder
+(`Conflict`, naming the file to edit instead), and blank words are refused (`Invalid`). **`wf factory rm`** removes the store's folder
+for the factory after its file. The default factory has no file, so it keeps no instruction: both verbs refuse it.
+
+The api serves both (`GET`, `PUT` and `DELETE` on `/api/factories/<name>/instruction`, and on `…/instruction/words`), and the board
+shows it on the factory's settings page, linked from its floor: the words of a store's instruction edited there, a folder's file shown as
+it reads.
+
 ## How much runs at once: `WF_MAX_CONCURRENT` and `WF_MAX_RUNS`
 
 Two ceilings, both read from the environment the store's daemon runs in — the api's process or `wf up` — through Effect's `Config` (`src/config/config.store.ts`), and both said in
@@ -2832,6 +2860,26 @@ before the store is taken: `wf up -5` would write an interval the file does not 
   pid to kill as it stands: it is said unconfirmed, with `ps -p <pid> -o lstart=,args=` to check it first. A daemon resumed from `^Z`
   after it was taken over finishes the pass it was in before it reads the file again.
 
+## What the daemon says: its lines, and OTLP — `OTEL_EXPORTER_OTLP_ENDPOINT`
+
+The daemon says each pass through Effect's log (`logPass` in `src/daemon/up.verb.ts`), and its process chooses where that goes, with one
+layer it provides around `up` (`telemetryLayer`, `src/telemetry/telemetry.store.ts`): `nemia up` in `src/cli/main.ts`, and the api's
+process in `apps/api/src/main.ts`. So the api's daemon, silent before, now prints the lines `nemia up` prints: a summary when one is due,
+a line when something changed, each stamped `08:09:10  …` — Info on stdout, a warning or worse on stderr. A line about a run is annotated
+with its `run`, and one about a step with its `step` too; the runtime's journal says each append at Debug, with its `task`, `kind` and
+`attempt`, which the lines leave out.
+
+- **`OTEL_EXPORTER_OTLP_ENDPOINT`** — unset or blank, nothing leaves the process. Set, as `http://localhost:4318`, the daemon also exports
+  its spans and its logs over OTLP/HTTP as JSON, to `<endpoint>/v1/traces` and `<endpoint>/v1/logs`, through Effect's own exporter
+  (`OtlpTracer`, `OtlpLogger`). The spans are the verbs' own (`Effect.fn`): `tick` > `pass` > `advancePass` > a filing (`fileReady`)
+  > the runtime's `file` > its journal's `append`, each annotated with the run, the step and the task it was for. A collector that does
+  not answer costs a failed post, never a pass.
+- **`OTEL_SERVICE_NAME`** — the service the export is under, `nemia` unless set. Without an endpoint it does nothing.
+
+```sh
+$ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 OTEL_SERVICE_NAME=factory nemia up
+```
+
 ## What a pass costs: `wf up --stats` and `wf passes`
 
 Every pass is measured as it runs, phase by phase (`src/meter/tally.store.ts` counts, `src/meter/meter.ts` composes and words it), and what it cost is
@@ -2872,6 +2920,23 @@ written to `$WF_ROOT/tick-stats.json`, over the last pass's. Nothing decides on 
   `PASS_BOUNDS`; `pass.journal_reads`; and the gauges `store.runs`, `sessions.queued` and `sessions.admitted`, as the last pass saw them.
   The api serves its own process's at `GET /api/metrics`, with `api.poll.reads`: the files the runtime read for each request, by the
   route's pattern. A process that does not tick (an api started with `--no-tick`, or beside a `wf up`) has none of the pass's.
+- **The system's series are kept as rollups**, so what the recent passes say outlives the ring (`src/series/`). Each pass also keeps among
+  the recent its oldest queued session's wait since it was filed (`waitMs`), the machine's load (the one-minute load average over the
+  cores), the checks it filed, by factory, workflow, step and agent, and the quota the daemon last read; the daemon asks each harness
+  for its quota at once and every 10 minutes (`QUOTA_EVERY_MS`, `askedQuota` in `src/daemon/up.verb.ts`), and keeps a harness's last
+  reading while it does not answer. After writing the ring, the pass rolls the minutes it holds that are done and not yet kept into
+  `$WF_ROOT/metrics/minute/<YYYY-MM-DD>.jsonl`, a line a series a minute: its count, sum, least, most and last, and for a histogram its
+  buckets with an exact p50 and p95 (`SERIES`, `rollMinutes`). Once an hour is done it merges its minutes into
+  `$WF_ROOT/metrics/hour/<YYYY-MM-DD>.jsonl`, the percentiles read off the summed buckets (`rollHours`). What is due is read off the
+  files' last lines on every pass, so a restart rolls nothing twice. A line's labels are only `factory`, `workflow`, `step`, `agent`,
+  `phase`, `harness` and `window`, and a line with another is refused, never written: a run's own detail stays in its record. A pass
+  that cannot keep its series says so on stderr and goes on.
+- **Minute lines are kept 30 days and hour lines until deleted**: `WF_METRICS_MINUTE_DAYS` (a whole number from 2) and
+  `WF_METRICS_HOUR_DAYS` (a whole number from 1; unset, every hour is kept) delete the days past them on each pass, and any other value
+  is refused by name (`metricsMinuteDays`, `metricsHourDays` in `src/config/config.store.ts`). `nemia series [--range 24h|7d|30d|all]
+  [--json]` reads them: a point a minute over the last day, an hour over 7 or 30 days, a day over all of them; it writes nothing, and a
+  range it does not take is refused as `Invalid`. The api serves the same at `GET /api/series?range=<range>`, reading a past day off a
+  memo while its file has not moved, and `nemia stats` says the period's health off the hour lines (`seriesHealth`).
 - **A finished run costs a pass nothing while nothing of it changed.** A run at rest — succeeded, failed, cancelled or pruned, its
   workflow frozen on it, every task settled, nothing due, nothing done and nothing said on its last pass (`atRest`, `src/rest/rest.ts`) — is
   answered from the tick's memo while its inputs are as they were: its record, every file beside it in the store (the markers, the

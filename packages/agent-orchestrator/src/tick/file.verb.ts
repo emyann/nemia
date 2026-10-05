@@ -64,8 +64,10 @@ import { phaseOfView } from '../views/views-words.ts';
 import { placesOf } from '../folder/lookup.store.ts';
 import { skillsFor } from '../folder/folder.store.ts';
 import { renderedFlags, rendersAgent, unrendered } from '../agents/agents.ts';
-import { within } from '../meter/tally.store.ts';
+import { noteFiledCheck, within } from '../meter/tally.store.ts';
+import { keysOf } from '../stats/index.ts';
 import { answerHeld, stopAsked } from './held.verb.ts';
+import { forStep } from '../telemetry/telemetry.store.ts';
 
 /**
  * What a filing says of how its session runs — the harness's arguments, a session to continue, a hold and a closing statement's schema —
@@ -192,20 +194,11 @@ export type Closer = {
 };
 
 /**
- * One pass's filing: the engine, the run, what the pass read (`PassReads`), its closer (`Closer`), whether it may file still (`mayFile`,
- * made by `mayFileOf` once a pass), and the pass's notes, which each filing adds to in the order it runs.
+ * One pass's filing: the engine, which files each brief with its parts beside it (`inParts`, given by `advancePass`), the run, what
+ * the pass read (`PassReads`), its closer (`Closer`), whether it may file still (`mayFile`, made by `mayFileOf` once a pass), and the
+ * pass's notes, which each filing adds to in the order it runs.
  */
 export type Filing = { e: Engine; run: Run; reads: PassReads; closer: Closer; mayFile: () => boolean; notes: string[] };
-
-/**
- * Whether a pass may file for this run still, read off the store before each filing: not once the run is called off, forgotten, pruned
- * or held, or the store paused, while the pass was at work. Once it has said no it says no for the rest of the pass, whatever the store
- * reads after.
- */
-export const mayFileOf = (run: Run): (() => boolean) => {
-  let calledOff = false;
-  return () => !(calledOff ||= !runStore.runs.exists(run.id) || runStore.runs.calledOff(run.id));
-};
 
 /** The engine as the pass read it: a check's verdict is read off the view the pass judged it by (`reportedEngine`), never a second time. */
 const asRead = (f: Filing): Engine => reportedEngine(f.e, [...f.reads.views.values()]);
@@ -226,7 +219,7 @@ type Tried = { tried: string[]; rechecked: string[] };
  */
 export const fileTries = Effect.fn('fileTries')(function* (f: Filing, retry: readonly Retry[]) {
   const out: Tried = { tried: [], rechecked: [] };
-  for (const r of retry) yield* fileTry(f, r, out);
+  for (const r of retry) yield* fileTry(f, r, out).pipe(forStep(f.run.id, r.step));
   return out;
 });
 
@@ -425,7 +418,7 @@ export const fileRounds = Effect.fn('fileRounds')(function* (f: Filing, round: r
   const looped: string[] = [];
   for (const r of round) {
     if (!f.mayFile()) break;
-    yield* fileRound(f, r, looped);
+    yield* fileRound(f, r, looped).pipe(forStep(f.run.id, r.target));
   }
   return looped;
 });
@@ -512,7 +505,7 @@ export const fileChecks = Effect.fn('fileChecks')(function* (f: Filing, names: r
   const checked: string[] = [];
   for (const name of names) {
     if (!f.mayFile()) break;
-    yield* fileCheck(f, name);
+    yield* fileCheck(f, name).pipe(forStep(f.run.id, name));
     checked.push(name);
   }
   return checked;
@@ -521,6 +514,7 @@ export const fileChecks = Effect.fn('fileChecks')(function* (f: Filing, names: r
 /**
  * File a step's check where the engine does not hold it, on the `check` harness, with the command the run froze and a deadline, a landing's
  * its own, and put it on the record: an ending's installs first what the staged merge's lockfile asks for (`checkoutParts`), and says so.
+ * A check filed is noted to the pass's meter by what it belongs to (`noteFiledCheck`), never its run.
  */
 const fileCheck = Effect.fnUntraced(function* (f: Filing, name: string) {
   const { e, run } = f;
@@ -558,6 +552,8 @@ const fileCheck = Effect.fnUntraced(function* (f: Filing, name: string) {
         config: { command: checkArgv(step.check!, install !== undefined), env, niceness: CHECK_NICENESS },
       }),
     );
+    const { factory, workflow } = keysOf(run);
+    noteFiledCheck({ factory, workflow, step: name, agent: step.agent?.name ?? '' });
   }
   run.steps[name] = { ...run.steps[name], check: { taskId } };
 });
@@ -585,7 +581,7 @@ export const fileReady = Effect.fn('fileReady')(function* (f: Filing, ready: rea
     const files = artifactsDir(run, name);
     fs.mkdirSync(files, { recursive: true });
     const checked = isRemoteHarness(step.harness) ? [] : yield* checksHandedRead(run, f.reads.steps, step).pipe(over(asRead(f)));
-    const taskId = yield* asked('file', e.file(readySpec(f, step, place, files, { parents, checked })));
+    const taskId = yield* asked('file', e.file(readySpec(f, step, place, files, { parents, checked }))).pipe(forStep(run.id, name));
     run.steps[name] = { ...run.steps[name], taskId, workspace: place.workspace, branch: place.branch };
     filed.push(name);
   }

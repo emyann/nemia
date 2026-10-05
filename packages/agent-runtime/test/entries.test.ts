@@ -7,35 +7,15 @@ import assert from 'node:assert/strict';
 
 const PINNED: Record<string, string[]> = {
   'agent-runtime': [
-    'CLAUDE_AUTO_DROPPED',
-    'CLAUDE_CONTEXT_TOKENS',
-    'CLAUDE_EFFORTS',
-    'CLAUDE_PERMISSION_MODES',
-    'CODEX_EFFORTS',
-    'CODEX_SANDBOXES',
-    'HARNESS_ARGS',
-    'HARNESS_CHOICES',
-    'TURN_ARGS',
-    'claudeDetached',
-    'codex',
-    'commandHarness',
-    'configRefusal',
-    'denialText',
-    'fenceReach',
-    'lifecycleGraph',
-    'nameFor',
-    'refusedText',
-    'remoteConfigRefusal',
-    'retiredKeyRefusal',
-  ],
-  'agent-runtime/effect': [
     'AdmitRefused',
+    'BodyRefused',
     'CLAUDE_AUTO_DROPPED',
     'CLAUDE_CONTEXT_TOKENS',
     'CLAUDE_EFFORTS',
     'CLAUDE_PERMISSION_MODES',
     'CODEX_EFFORTS',
     'CODEX_SANDBOXES',
+    'CONFIG_FOLDERS',
     'Engine',
     'EngineRefused',
     'FileRefused',
@@ -68,16 +48,21 @@ const PINNED: Record<string, string[]> = {
     'codex',
     'commandHarness',
     'composite',
+    'configFolderIn',
+    'configRefusal',
     'denialText',
     'detachedOps',
     'fenceReach',
     'file',
     'fold',
+    'lifecycleGraph',
     'nameFor',
-    'promiseEngine',
     'refusalWords',
+    'refusedText',
+    'remoteConfigRefusal',
     'remoteOps',
     'requestStop',
+    'retiredKeyRefusal',
     'sdkRunner',
     'settleTask',
     'step',
@@ -93,7 +78,9 @@ const PINNED: Record<string, string[]> = {
     'CLAUDE_PERMISSION_MODES',
     'CODEX_EFFORTS',
     'CODEX_SANDBOXES',
+    'CONFIG_FOLDERS',
     'HARNESS_CHOICES',
+    'configFolderIn',
     'fenceReach',
   ],
 };
@@ -121,19 +108,7 @@ test('each entry exports exactly its pinned names', async () => {
   }
 });
 
-test('a name both entries export is the same value in each', async () => {
-  const promises = { ...(await import('agent-runtime')) } as Record<string, unknown>;
-  const effect = { ...(await import('agent-runtime/effect')) } as Record<string, unknown>;
-  const shared = Object.keys(promises).filter((n) => Object.hasOwn(effect, n));
-  assert.ok(shared.includes('codex') && shared.includes('HARNESS_ARGS'), 'the entries share names');
-  for (const name of shared) assert.equal(promises[name], effect[name], name);
-});
-
-test('every name the vocabulary door exports is the same value on the other two', async () => {
-  const promises = { ...(await import('agent-runtime')) } as Record<string, unknown>;
-  const effect = { ...(await import('agent-runtime/effect')) } as Record<string, unknown>;
-  for (const [name, value] of Object.entries(await import('agent-runtime/vocabulary'))) {
-    assert.equal(promises[name], value, `agent-runtime: ${name}`);
-    assert.equal(effect[name], value, `agent-runtime/effect: ${name}`);
-  }
+test('every name the vocabulary door exports is the same value on the root', async () => {
+  const root = { ...(await import('agent-runtime')) } as Record<string, unknown>;
+  for (const [name, value] of Object.entries(await import('agent-runtime/vocabulary'))) assert.equal(root[name], value, name);
 });

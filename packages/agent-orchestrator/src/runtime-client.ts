@@ -4,7 +4,7 @@
  * runtime's types the controllers use (`Engine`, `TaskView`, `Usage`, `Denial`, `RefusedMove`, `HarnessQuota`, `QuotaLimit`, `nameFor`,
  * `denialText`, `refusedText` and `lifecycleGraph`), which they import from here and never from the runtime.
  *
- * It builds the runtime's `Engine` service (`agent-runtime/effect`) once, changed in one verb: `file`, so that every task the orchestrator
+ * It builds the runtime's `Engine` service (`agent-runtime`) once, changed in one verb: `file`, so that every task the orchestrator
  * files is `queued` and starts only once the runtime admits it under the ceiling `engine()` gives it. What the controllers do with the
  * runtime — file a task, view one, tick, admit, stop one, read its logs, say something to it, read the feed — are the verbs of that
  * service, each an Effect, which every controller takes as it is and every test hands one of (`engineOf` over a layer of its own). A
@@ -16,7 +16,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Cause, Context, Effect, Exit, Layer, Scope } from 'effect';
-import { Engine as RuntimeEngine, refusalWords, type EngineShape } from 'agent-runtime/effect';
 import {
   claudeDetached,
   codex,
@@ -25,6 +24,9 @@ import {
   type Credentials,
   type MissingCredential,
   type RemoteAgent,
+  Engine as RuntimeEngine,
+  refusalWords,
+  type EngineShape,
 } from 'agent-runtime';
 import { envNameOf, readRemoteAgents, remoteAgentsFile } from './harness/a2a.store.ts';
 import { HOME } from './record/record.store.ts';
@@ -80,6 +82,15 @@ export const HARNESSES = {
   'claude-detached': { ...claudeDetached, pool: 'claude' },
   check: { ...commandHarness, name: 'check' },
 } as const;
+
+/**
+ * The harnesses the daemon asks for their quota (`up`): each of the engine's that is a subscription of its own, so none that counts in
+ * another's pool. One that reports no quota refuses the ask, and is asked again all the same: the refusal costs no process.
+ */
+export const quotaHarnesses = (): string[] =>
+  Object.entries(HARNESSES)
+    .filter(([, h]) => typeof h === 'string' || !('pool' in h))
+    .map(([name]) => name);
 
 /**
  * The engine the controllers use. Every filing goes out `queued`, and the runtime admits it per pool under the ceiling handed to it here,

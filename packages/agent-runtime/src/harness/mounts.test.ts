@@ -1,28 +1,23 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
-import { Engine, promiseEngine } from '../index.ts';
+import { Engine } from '../index.ts';
 import { codex } from './codex/codex.ts';
 import { commandHarness } from './command/command.ts';
 import { scratch } from '../../test/scratch.ts';
+import { builtEngine } from '../../test/engine.ts';
 
-/** What `file` at both doors says of a task with `config`, at the engine's default harnesses, and what the store then holds. */
+/** What `file` says of a task with `config`, at the engine's default harnesses: `filed`, or its refusal; and what the store then holds. */
 const filed = async (config: unknown, harness = 'claude') => {
   const root = scratch('ae-mounts-');
-  const task = { brief: 'b', cwd: root, harness, config } as never;
-  const promise = promiseEngine(Engine.layer({ root }));
-  const said = await promise.file(task).then(
-    () => 'filed',
-    (err: Error) => err.message,
-  );
-  const effect = await Effect.runPromise(
-    Engine.use((e) => e.file(task)).pipe(
+  const engine = builtEngine(Engine.layer({ root }));
+  const said = await Effect.runPromise(
+    engine.file({ brief: 'b', cwd: root, harness, config } as never).pipe(
       Effect.map(() => 'filed'),
-      Effect.catch((err: { message: string }) => Effect.succeed(err.message)),
-      Effect.provide(Engine.layer({ root })),
+      Effect.catchTag('FileRefused', (err) => Effect.succeed(err.message)),
     ),
   );
-  return { said, effect, journalled: (await promise.list()).views.length };
+  return { said, journalled: (await Effect.runPromise(engine.list())).views.length };
 };
 
 test('REFUSED at shipped defaults: a mount that is not one — not a list, a relative path, a NUL, no `readOnly`, a `readOnly` that is no boolean, a key a mount has not, a path given twice — and nothing is journalled', async () => {
@@ -63,41 +58,41 @@ test('REFUSED at shipped defaults: a mount that is not one — not a list, a rel
     ],
   ];
   for (const [mounts, words] of cases) {
-    const { said, effect, journalled } = await filed({ mounts });
-    assert.equal(said, `file: ${words}`, JSON.stringify(mounts));
-    assert.equal(effect, words, `the Effect door: ${JSON.stringify(mounts)}`);
+    const { said, journalled } = await filed({ mounts });
+    assert.equal(said, words, JSON.stringify(mounts));
     assert.equal(journalled, 0, 'nothing journalled');
   }
-  const { said, effect, journalled } = await filed({
+  const { said, journalled } = await filed({
     mounts: [
       { path: '/srv/a', readOnly: true },
       { path: '/srv/b', readOnly: false },
     ],
   });
   assert.equal(said, 'filed', 'two folders, each in its mode, are filed on Claude Code');
-  assert.equal(effect, 'filed');
-  assert.equal(journalled, 2, 'one task at each door');
+  assert.equal(journalled, 1);
 });
 
 test('REFUSED at shipped defaults: a mount on a harness that cannot hold its mode — a command, a remote agent, a writable one on Codex — naming the harnesses that do', async () => {
   const root = scratch('ae-mounts-');
   const harnesses = { claude: 'claude', codex, command: commandHarness, remote: { url: 'https://agent.example' } } as const;
-  const engine = promiseEngine(Engine.layer({ root, harnesses }));
+  const engine = builtEngine(Engine.layer({ root, harnesses }));
   const says = (harness: string, readOnly: boolean) =>
-    engine.file({ brief: 'b', cwd: root, harness, config: { mounts: [{ path: '/srv/a', readOnly }] } }).then(
-      () => 'filed',
-      (err: Error) => err.message,
+    Effect.runPromise(
+      engine.file({ brief: 'b', cwd: root, harness, config: { mounts: [{ path: '/srv/a', readOnly }] } }).pipe(
+        Effect.map(() => 'filed'),
+        Effect.catchTag('FileRefused', (err) => Effect.succeed(err.message)),
+      ),
     );
   for (const harness of ['command', 'remote']) {
     assert.equal(
       await says(harness, true),
-      `file: \`mounts\` gives the session /srv/a read-only, and the \`${harness}\` harness cannot hold a read-only mount: its session would not reach the folder as asked. File the task on \`claude\` or \`codex\`, or leave the mount off.`,
+      `\`mounts\` gives the session /srv/a read-only, and the \`${harness}\` harness cannot hold a read-only mount: its session would not reach the folder as asked. File the task on \`claude\` or \`codex\`, or leave the mount off.`,
       harness,
     );
   }
   assert.equal(
     await says('codex', false),
-    'file: `mounts` gives the session /srv/a writable, and the `codex` harness cannot hold a writable mount: its session would not reach the folder as asked. File the task on `claude`, or leave the mount off.',
+    '`mounts` gives the session /srv/a writable, and the `codex` harness cannot hold a writable mount: its session would not reach the folder as asked. File the task on `claude`, or leave the mount off.',
   );
   assert.equal(await says('claude', true), 'filed');
   assert.equal(await says('claude', false), 'filed');
@@ -109,7 +104,7 @@ test("REFUSED at shipped defaults: a read-only mount on Codex's danger-full-acce
     const { said } = await filed({ permissionMode, mounts: [{ path: '/srv/a', readOnly: true }] }, 'codex');
     assert.equal(
       said,
-      "file: `mounts` gives the session /srv/a read-only, and Codex's `danger-full-access` sandbox writes everywhere. Name the `workspace-write` or `read-only` sandbox as `permissionMode`, or leave the mount off.",
+      "`mounts` gives the session /srv/a read-only, and Codex's `danger-full-access` sandbox writes everywhere. Name the `workspace-write` or `read-only` sandbox as `permissionMode`, or leave the mount off.",
       permissionMode,
     );
   }

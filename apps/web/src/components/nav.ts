@@ -7,6 +7,9 @@ const under = (to: string) => (path: string) => path === to || path.startsWith(`
 /** The factory whose floor `path` is, `/factories/<name>`; none for any other page. */
 const floorOf = (path: string): string | undefined => /^\/factories\/([^/]+)$/.exec(path)?.[1];
 
+/** The factory whose own page `path` is, its floor or its settings, `/factories/<name>/settings`; none for any other page. */
+const ownerOf = (path: string): string | undefined => /^\/factories\/([^/]+)(?:\/settings)?$/.exec(path)?.[1];
+
 /**
  * The sidebar's sections of the picked factory, in their order: its Floor, lit on a factory's floor; the Inbox, where an idea waits to be
  * started, lit on a card's page too; Runs, lit on a run's page; Workflows, lit on a step's page; and Stats, how well the runs went.
@@ -68,12 +71,12 @@ export const RAIL = [
 export const sectionOf = (path: string) => [...SECTIONS, ...RAIL].find((item) => item.active(path))?.label;
 
 /**
- * The factory the address at `path` with `search` picks, from the address alone: a floor's own name, else the `?factory=` of a section's
- * page — the Inbox, Runs, Workflows or Stats — or of a workflow's page or a step's, which read in it, and of no other page under them;
- * none, All factories, on every other page.
+ * The factory the address at `path` with `search` picks, from the address alone: the name of a factory's own page, its floor or its
+ * settings, else the `?factory=` of a section's page — the Inbox, Runs, Workflows or Stats — or of a workflow's page or a step's, which
+ * read in it, and of no other page under them; none, All factories, on every other page.
  */
 export function pickedOf(path: string, search: Record<string, unknown>): string | undefined {
-  return floorOf(path) ?? (isListing(path) || workflowPageAt(path) ? factorySearch(search).factory : undefined);
+  return ownerOf(path) ?? (isListing(path) || workflowPageAt(path) ? factorySearch(search).factory : undefined);
 }
 
 /** Where a section's link goes: a factory's floor, or a section's page with the factory it narrows to, none for every factory's. */
@@ -99,8 +102,9 @@ export type PickTarget =
 /**
  * Where picking `factory` (none for All factories) takes the page at `path` with `search`: on a section's page, the same page with every
  * other key of its search kept and `factory` set or dropped; on a workflow's page or a step's, the same page read in the picked factory,
- * on the repository it reads, its `repo` dropped with the factory it was of; on a floor, the picked factory's floor, or Home for All
- * factories; on any other page, the picked factory's floor, and nowhere for All factories, which that page already shows.
+ * on the repository it reads, its `repo` dropped with the factory it was of; on a factory's own page, its floor or its settings, the
+ * picked factory's floor, or Home for All factories; on any other page, the picked factory's floor, and nowhere for All factories, which
+ * that page already shows.
  */
 export function pickTo(path: string, search: Record<string, unknown>, factory: string | undefined): PickTarget | null {
   if (isListing(path)) {
@@ -117,5 +121,5 @@ export function pickTo(path: string, search: Record<string, unknown>, factory: s
       : { to: '/workflows/$from/$workflow/$step', params: { ...workflow, step }, search: picked };
   }
   if (factory !== undefined) return { to: '/factories/$factory', params: { factory } };
-  return floorOf(path) === undefined ? null : { to: '/' };
+  return ownerOf(path) === undefined ? null : { to: '/' };
 }

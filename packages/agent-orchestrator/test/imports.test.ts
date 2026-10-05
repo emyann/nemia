@@ -37,7 +37,7 @@ const LAYERS: { name: string; at: string[]; refused: string[]; allowed: string[]
       'agent-orchestrator',
       'agent-orchestrator/run',
       'agent-runtime',
-      'agent-runtime/effect',
+      'agent-runtime/vocabulary',
       ...SDKS,
       '../../../packages/agent-orchestrator/src/run.ts',
     ],
@@ -48,7 +48,7 @@ const LAYERS: { name: string; at: string[]; refused: string[]; allowed: string[]
     at: ['apps/api/src', 'apps/api/src/runs'],
     refused: [
       'agent-runtime',
-      'agent-runtime/effect',
+      'agent-runtime/harness',
       'agent-runtime/vocabulary',
       ...SDKS,
       'agent-orchestrator/effect',
@@ -64,13 +64,13 @@ const LAYERS: { name: string; at: string[]; refused: string[]; allowed: string[]
     name: 'orchestrator',
     at: ['packages/agent-orchestrator/src', 'packages/agent-orchestrator/bin', 'packages/agent-orchestrator/place/git/scripts'],
     refused: SDKS,
-    allowed: ['agent-runtime', 'agent-runtime/effect', 'agent-runtime/vocabulary', 'effect', 'node:fs', './runner.ts'],
+    allowed: ['agent-runtime', 'agent-runtime/vocabulary', 'effect', 'node:fs', './runner.ts'],
   },
   {
     name: 'runtime',
     at: ['packages/agent-runtime/src', 'packages/agent-runtime/bin'],
     refused: ['agent-orchestrator', 'agent-orchestrator/run', 'agent-orchestrator/effect', '../../agent-orchestrator/src/run.ts'],
-    allowed: [...SDKS, 'effect', 'xstate', './facade.ts'],
+    allowed: [...SDKS, 'effect', 'xstate', './index.ts'],
   },
 ];
 

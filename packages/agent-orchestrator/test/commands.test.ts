@@ -38,6 +38,21 @@ test('each command is served on the api where it was before the table, the lift 
       ['factory detach', 'cli'],
       ['factory hire', 'cli'],
       ['factory fire', 'cli'],
+      [
+        'factory instruction',
+        [
+          { method: 'GET', path: '/api/factories/:name/instruction', status: 200, hand: true },
+          { method: 'PUT', path: '/api/factories/:name/instruction', status: 200, sets: { clear: false } },
+          { method: 'DELETE', path: '/api/factories/:name/instruction', status: 200, sets: { clear: true } },
+        ],
+      ],
+      [
+        'factory instruct',
+        [
+          { method: 'PUT', path: '/api/factories/:name/instruction/words', status: 200, sets: { clear: false } },
+          { method: 'DELETE', path: '/api/factories/:name/instruction/words', status: 200, sets: { clear: true } },
+        ],
+      ],
       ['factory rm', 'cli'],
       ['retry', { method: 'POST', path: '/api/runs/:runId/steps/:step/retry', status: 202 }],
       ['approve', { method: 'POST', path: '/api/runs/:runId/steps/:step/approve', status: 202 }],
@@ -59,6 +74,7 @@ test('each command is served on the api where it was before the table, the lift 
       ['merges', 'api'],
       ['ceilings', { method: 'GET', path: '/api/ceilings', status: 200 }],
       ['passes', { method: 'GET', path: '/api/passes', status: 200 }],
+      ['series', { method: 'GET', path: '/api/series', status: 200 }],
       ['agents', { method: 'GET', path: '/api/agents', status: 200 }],
       ['agents card', { method: 'GET', path: '/api/agents/:from/:name/card', status: 200 }],
       [
@@ -136,6 +152,7 @@ test('every command the api posts or deletes on writes, and the api guards it; t
       'merges',
       'ceilings',
       'passes',
+      'series',
       'agents',
       'agents card',
       'agents read',

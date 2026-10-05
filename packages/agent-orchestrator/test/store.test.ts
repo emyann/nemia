@@ -14,9 +14,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { nameFor, type PromiseJournal, type PromiseRunner, type Sighting, type TaskSpec, type TaskView } from 'agent-runtime';
+import { nameFor, type Sighting, type TaskSpec, type TaskView, Engine as RuntimeEngine, StopRefused } from 'agent-runtime';
+import { asyncStore, type AsyncJournal, asyncOps, type AsyncRunner } from './promised.ts';
 import type { Engine } from '../src/runtime-client.ts';
-import { Engine as RuntimeEngine, StopRefused } from 'agent-runtime/effect';
 import type { GitRun, Run, TaskPhase } from '../src/run.ts';
 import type { Effect as EffectOf } from 'effect/Effect';
 import type { ForgetHow, Forgot } from '../src/forget/forget.ts';
@@ -2608,9 +2608,9 @@ test("a run's first steps are every step that waits on nothing: two roots with n
 });
 
 /** The engine's store, in memory, as its own tests keep one. */
-const memoryJournal = (): PromiseJournal => {
-  const tasks = new Map<string, Parameters<PromiseJournal['append']>[1][]>();
-  const feed: Awaited<ReturnType<PromiseJournal['feed']>>['entries'] = [];
+const memoryJournal = (): AsyncJournal => {
+  const tasks = new Map<string, Parameters<AsyncJournal['append']>[1][]>();
+  const feed: Awaited<ReturnType<AsyncJournal['feed']>>['entries'] = [];
   return {
     async append(taskId, event) {
       tasks.set(taskId, [...(tasks.get(taskId) ?? []), event]);
@@ -2629,7 +2629,7 @@ const memoryJournal = (): PromiseJournal => {
 };
 
 /** A harness that starts whatever it is asked to, and remembers the order: every session at work. */
-const startsInOrder = (sessions: Map<string, Sighting>): PromiseRunner => ({
+const startsInOrder = (sessions: Map<string, Sighting>): AsyncRunner => ({
   async spawn(r) {
     sessions.set(r.name, { sessionId: `s-${sessions.size + 1}`, state: 'working' });
   },
@@ -2661,8 +2661,8 @@ test("REFUSED without the momentum: at a ceiling of one, the runtime admits a ru
     const sessions = new Map<string, Sighting>();
     const e = plainEngine(
       RuntimeEngine.layer({
-        journal: memoryJournal(),
-        harnesses: { claude: startsInOrder(sessions) },
+        journal: asyncStore(memoryJournal()),
+        harnesses: { claude: asyncOps(startsInOrder(sessions)) },
         defaultHarness: 'claude',
         maxConcurrent: 1,
       }),
@@ -4729,6 +4729,29 @@ test('REFUSED at `nemia start`, before a run is written: an --input that is not 
     refusedWith(/^nemia plan does not take --input: a card has no input files of its own\./),
   );
   assert.equal(runsWritten(), before, 'nor by the CLI');
+});
+
+test('REFUSED at shipped defaults: a file a step names through a folder a harness reads as its own configuration is not collected into its files directory, which the steps after it mount, and `nemia decide` says why', async () => {
+  const run = await started(folder('check: npm test'));
+  const b = board();
+  await runWith(b.e, advanceRun(readRun(run.id)));
+  const files = artifactsDir(run, 'implement');
+  for (const file of ['.claude/skills/x/SKILL.md', 'notes/x.md']) {
+    fs.mkdirSync(path.dirname(path.join(run.repo, file)), { recursive: true });
+    fs.writeFileSync(path.join(run.repo, file), `# ${file}\n`);
+  }
+  gitIn(run.repo, 'add', '-A');
+  gitIn(run.repo, 'commit', '-q', '-m', 'the step, with a skill of its own');
+  const named = ['.claude/skills/x/SKILL.md', 'notes/x.md'];
+  b.settle(`${run.id}-implement`, 'succeeded', declaring(named));
+
+  const pass = await runWith(b.e, advanceRun(readRun(run.id)));
+  assert.deepEqual([pass.checked, pass.notes], [['implement'], [`implement: collected notes/x.md into ${files}`]]);
+  assert.equal(fs.readFileSync(path.join(files, 'notes', 'x.md'), 'utf8'), '# notes/x.md\n', 'a file anywhere else is handed over');
+  assert.ok(!fs.existsSync(path.join(files, '.claude')), 'nothing under the configuration folder reaches the files directory');
+  assert.deepEqual(missingArtifacts(readRun(run.id), 'implement', declaring(named)), [
+    { path: '.claude/skills/x/SKILL.md', why: 'configuration' },
+  ]);
 });
 
 test("a file `artifacts` names from the workspace root is collected into the step's files directory when the step hands off, before its check is filed — again, only what changed, after a pass that died — and read from there; an absolute path in the directory is read where it is", async () => {

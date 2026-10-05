@@ -6,11 +6,14 @@
  * Each refusal here is made to refuse at shipped defaults, and the counting test proves the word costs no look at any
  * harness: a tick observes each harness once, whatever it hands back, and `admit` observes none.
  */
+import { Effect } from 'effect';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { Event, FeedEntry, PromiseJournal, PromiseRunner, Sighting } from '../src/facade.ts';
-import { Engine, promiseEngine } from '../src/index.ts';
+import type { Event, FeedEntry, Sighting } from '../src/index.ts';
+import { Engine } from '../src/index.ts';
 import { admissionOf, awaitsAdmission, decide, fold, nameFor, type State } from '../src/core/domain.ts';
+import { asyncStore, asyncOps, type AsyncJournal, type AsyncRunner } from './promise-runner.ts';
+import { builtEngine } from './engine.ts';
 
 const T0 = new Date('2026-09-25T09:00:00Z');
 const at = (ms: number) => new Date(T0.getTime() + ms).toISOString();
@@ -91,7 +94,7 @@ test('a task held open waits for a word before each turn: the one given for its 
   assert.deepEqual(decide(let_, new Map(), now(7)), { do: 'start', attempt: 2, resumeFrom: 'native-1', nudge: 'again' });
 });
 
-const memoryJournal = (reads: { n: number } = { n: 0 }): PromiseJournal & { tasks: Map<string, Event[]> } => {
+const memoryJournal = (reads: { n: number } = { n: 0 }): AsyncJournal & { tasks: Map<string, Event[]> } => {
   const tasks = new Map<string, Event[]>();
   const feed: FeedEntry[] = [];
   return {
@@ -114,7 +117,7 @@ const memoryJournal = (reads: { n: number } = { n: 0 }): PromiseJournal & { task
 };
 
 /** A harness that counts how often it is observed. */
-const countingHarness = (sessions: Map<string, Sighting>, observes: { n: number }): PromiseRunner => ({
+const countingHarness = (sessions: Map<string, Sighting>, observes: { n: number }): AsyncRunner => ({
   async spawn(r) {
     sessions.set(r.name, { sessionId: `s-${sessions.size + 1}`, state: 'working' });
   },
@@ -135,24 +138,30 @@ const board = () => {
   const observes = { n: 0 };
   const reads = { n: 0 };
   const journal = memoryJournal(reads);
-  const engine = promiseEngine(Engine.layer({ journal, harnesses: { fake: countingHarness(sessions, observes) }, defaultHarness: 'fake' }));
+  const engine = builtEngine(
+    Engine.layer({
+      journal: asyncStore(journal),
+      harnesses: { fake: asyncOps(countingHarness(sessions, observes)) },
+      defaultHarness: 'fake',
+    }),
+  );
   return { engine, sessions, observes, reads, journal };
 };
 
 test('a queued task is started by the pass after the word, not before it and not by the pass that reported it', async () => {
   const b = board();
-  const id = await b.engine.file({ brief: 'b', cwd: '/r', queued: true });
+  const id = await Effect.runPromise(b.engine.file({ brief: 'b', cwd: '/r', queued: true }));
   assert.equal(b.journal.tasks.get(id)![0].kind === 'filed' && (b.journal.tasks.get(id)![0] as { queued?: boolean }).queued, true);
-  const first = await b.engine.tick();
+  const first = await Effect.runPromise(b.engine.tick());
   assert.equal(b.sessions.size, 0, 'nothing starts without the word');
   assert.deepEqual(
     first.views.map((v) => [v.id, v.phase, v.admission]),
     [[id, 'pending', 'queued']],
   );
-  assert.deepEqual(await b.engine.admit([id]), [id]);
+  assert.deepEqual(await Effect.runPromise(b.engine.admit([id])), [id]);
   assert.equal(b.sessions.size, 0, 'the word starts nothing by itself');
-  assert.equal((await b.engine.view(id)).admission, 'admitted');
-  const second = await b.engine.tick();
+  assert.equal((await Effect.runPromise(b.engine.view(id))).admission, 'admitted');
+  const second = await Effect.runPromise(b.engine.tick());
   assert.deepEqual([...b.sessions.keys()], [nameFor(id, 1)], 'the next pass starts it');
   assert.deepEqual(
     second.views.map((v) => [v.id, v.phase, v.admission]),
@@ -162,49 +171,49 @@ test('a queued task is started by the pass after the word, not before it and not
 
 test('a task filed with no `queued` starts on the next pass, as ever, and `file` writes the key on every filing', async () => {
   const b = board();
-  const id = await b.engine.file({ brief: 'b', cwd: '/r' });
+  const id = await Effect.runPromise(b.engine.file({ brief: 'b', cwd: '/r' }));
   assert.equal((b.journal.tasks.get(id)![0] as { queued?: boolean }).queued, false);
-  await b.engine.tick();
+  await Effect.runPromise(b.engine.tick());
   assert.deepEqual([...b.sessions.keys()], [nameFor(id, 1)]);
 });
 
 test('a tick reports the view of every task it left unsettled, and none it settled', async () => {
   const b = board();
-  const done = await b.engine.file({ brief: 'finishes', cwd: '/r' });
-  const waits = await b.engine.file({ brief: 'waits', cwd: '/r', queued: true });
-  await b.engine.tick();
+  const done = await Effect.runPromise(b.engine.file({ brief: 'finishes', cwd: '/r' }));
+  const waits = await Effect.runPromise(b.engine.file({ brief: 'waits', cwd: '/r', queued: true }));
+  await Effect.runPromise(b.engine.tick());
   b.sessions.set(nameFor(done, 1), { ...b.sessions.get(nameFor(done, 1))!, state: 'completed' });
-  const r = await b.engine.tick();
+  const r = await Effect.runPromise(b.engine.tick());
   assert.deepEqual(
     r.views.map((v) => v.id),
     [waits],
   );
-  assert.deepEqual(r.views[0], await b.engine.view(waits), 'the same view `view` gives of it, off the same record');
+  assert.deepEqual(r.views[0], await Effect.runPromise(b.engine.view(waits)), 'the same view `view` gives of it, off the same record');
 });
 
 test('admit is idempotent, and writes nothing for a task that waits for no word', async () => {
   const b = board();
-  const queued = await b.engine.file({ brief: 'q', cwd: '/r', queued: true });
-  const plain = await b.engine.file({ brief: 'p', cwd: '/r' });
-  assert.deepEqual(await b.engine.admit([queued, plain]), [queued]);
-  assert.deepEqual(await b.engine.admit([queued]), [], 'admitted already');
+  const queued = await Effect.runPromise(b.engine.file({ brief: 'q', cwd: '/r', queued: true }));
+  const plain = await Effect.runPromise(b.engine.file({ brief: 'p', cwd: '/r' }));
+  assert.deepEqual(await Effect.runPromise(b.engine.admit([queued, plain])), [queued]);
+  assert.deepEqual(await Effect.runPromise(b.engine.admit([queued])), [], 'admitted already');
   assert.equal(b.journal.tasks.get(queued)!.filter((e) => e.kind === 'admitted').length, 1);
   assert.equal(
     b.journal.tasks.get(plain)!.some((e) => e.kind === 'admitted'),
     false,
     'not filed queued',
   );
-  await b.engine.tick();
-  assert.deepEqual(await b.engine.admit([queued]), [], 'started');
+  await Effect.runPromise(b.engine.tick());
+  assert.deepEqual(await Effect.runPromise(b.engine.admit([queued])), [], 'started');
   assert.equal(b.journal.tasks.get(queued)!.filter((e) => e.kind === 'admitted').length, 1);
 });
 
-test('admit refuses a task it has no record of, and a settled one — exit 2, and nothing written for any task in the call', async () => {
+test('admit refuses a task it has no record of, and a settled one — AdmitRefused, and nothing written for any task in the call', async () => {
   const b = board();
-  const queued = await b.engine.file({ brief: 'q', cwd: '/r', queued: true });
+  const queued = await Effect.runPromise(b.engine.file({ brief: 'q', cwd: '/r', queued: true }));
   await assert.rejects(
-    b.engine.admit([queued, 'nobody']),
-    (e: Error & { exitCode?: number }) => e.exitCode === 2 && e.message.startsWith('admit: `nobody` is not a task on this board'),
+    Effect.runPromise(b.engine.admit([queued, 'nobody'])),
+    (e: Error & { _tag?: string }) => e._tag === 'AdmitRefused' && e.message.startsWith('`nobody` is not a task on this board'),
   );
   assert.equal(
     b.journal.tasks.get(queued)!.some((e) => e.kind === 'admitted'),
@@ -212,22 +221,22 @@ test('admit refuses a task it has no record of, and a settled one — exit 2, an
     'the known one was not admitted either',
   );
 
-  const settled = await b.engine.file({ brief: 's', cwd: '/r', queued: true });
-  await b.engine.stop(settled);
-  await b.engine.tick();
-  assert.equal((await b.engine.view(settled)).state.settled, 'stopped');
+  const settled = await Effect.runPromise(b.engine.file({ brief: 's', cwd: '/r', queued: true }));
+  await Effect.runPromise(b.engine.stop(settled));
+  await Effect.runPromise(b.engine.tick());
+  assert.equal((await Effect.runPromise(b.engine.view(settled))).state.settled, 'stopped');
   await assert.rejects(
-    b.engine.admit([settled]),
-    (e: Error & { exitCode?: number }) => e.exitCode === 2 && /^admit: `[^`]+` has settled \(stopped\)/.test(e.message),
+    Effect.runPromise(b.engine.admit([settled])),
+    (e: Error & { _tag?: string }) => e._tag === 'AdmitRefused' && /^`[^`]+` has settled \(stopped\)/.test(e.message),
   );
 });
 
-test('`file` refuses a `queued` that is not true or false, at both doors, and journals nothing', async () => {
+test('`file` refuses a `queued` that is not true or false, and journals nothing', async () => {
   const b = board();
   for (const queued of ['yes', 1, null]) {
     await assert.rejects(
-      b.engine.file({ brief: 'b', cwd: '/r', queued } as never),
-      (e: Error & { exitCode?: number }) => e.exitCode === 2 && /^file: `queued: .*` is not a yes or a no/.test(e.message),
+      Effect.runPromise(b.engine.file({ brief: 'b', cwd: '/r', queued } as never)),
+      (e: Error & { _tag?: string }) => e._tag === 'FileRefused' && /^`queued: .*` is not a yes or a no/.test(e.message),
       String(queued),
     );
   }
@@ -237,18 +246,18 @@ test('`file` refuses a `queued` that is not true or false, at both doors, and jo
 test('a tick observes each harness once, whatever it reports, and admit observes none — the word costs no look at a harness', async () => {
   const b = board();
   const ids = [];
-  for (let i = 0; i < 4; i++) ids.push(await b.engine.file({ brief: `t${i}`, cwd: '/r', queued: true }));
+  for (let i = 0; i < 4; i++) ids.push(await Effect.runPromise(b.engine.file({ brief: `t${i}`, cwd: '/r', queued: true })));
   b.observes.n = 0;
-  const r = await b.engine.tick();
+  const r = await Effect.runPromise(b.engine.tick());
   assert.equal(b.observes.n, 1, 'one observation for the pass and its report');
   assert.equal(r.views.length, 4);
   b.observes.n = 0;
   const reads = b.reads.n;
-  await b.engine.admit(ids.slice(0, 2));
+  await Effect.runPromise(b.engine.admit(ids.slice(0, 2)));
   assert.equal(b.observes.n, 0, 'admit asks no harness');
   assert.equal(b.reads.n - reads, 2, 'and reads each task it is handed once');
   b.observes.n = 0;
-  await b.engine.tick();
+  await Effect.runPromise(b.engine.tick());
   assert.equal(b.observes.n, 1);
   assert.equal(b.sessions.size, 2);
 });

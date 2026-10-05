@@ -1,6 +1,6 @@
 /**
  * The engine as an Effect service: `Engine`, built by `Engine.layer(options)` over the harnesses, the store and the memo, whose verbs
- * are Effects with typed errors. `promiseEngine` (`facade/engine.ts`) runs each verb of this service as a Promise.
+ * are Effects with typed errors.
  */
 import { Cause, Context, Effect, Exit, Layer, Schema } from 'effect';
 import path from 'node:path';
@@ -60,15 +60,18 @@ import {
   type Cursor,
   type FeedEntry,
   type FeedRefusal,
+  type SweepReport,
   type TaskList,
   type TaskView,
+  BodyRefused,
 } from '../core/engine/index.ts';
 import { claudeSayRefuses, isClaudeJob } from '../harness/claude/index.ts';
 import { OutputRefused, outputVerbOf } from './output.ts';
 import { DEFAULT_HARNESSES } from './harnesses.ts';
 import { a2aOps, type SeamOps } from '../a2a/index.ts';
+import { bodyVerbsOf } from './bodies.ts';
+import { watchOf } from './watch.ts';
 import {
-  journalOf,
   handleOf,
   isSpec,
   isRemote,
@@ -76,13 +79,13 @@ import {
   runnersOf,
   optionsRefusalOf,
   admissionOf,
-  harnessRefusalOf,
   type EngineIo,
   type EngineOptions,
   type ObserveCount,
   type TaskSpec,
   type TickReport,
-} from '../facade/consumer.ts';
+} from './options.ts';
+import { harnessRefusalOf } from './harness-refusal.ts';
 
 /** Options an engine cannot be built from (`optionsRefusalOf`), and why. Nothing was built. */
 export class EngineRefused extends Schema.TaggedError<EngineRefused>()('EngineRefused', {
@@ -130,43 +133,250 @@ export const listRefusalOf = (args: readonly unknown[]): string | undefined => {
 };
 
 /**
- * The engine's verbs, each an Effect with what refuses it on its error channel. Each does what the verb of the same name on
- * `agent-runtime`'s `Engine` does, where each is described, and fails with a tagged error where that one rejects with an `Error`
- * whose `exitCode` is 2: `FileRefused`, `TickRefused`, `AdmitRefused`, `ListRefused`, `TranscriptRefused`, `OutputRefused`,
- * `SayRefused`, `QuotaRefused`, `StopRefused` for `stop`, and `InputRefused` for `answer` and `close`. `SayUnsent` is `say`'s
- * failure that is not a refusal; a `JournalError` or a `RunnerError` is the store's or the harness's. `watch`, `io` and `start`
- * succeed at once: `watch` and `start` with a handle that stops them.
+ * The engine's verbs, each an Effect with what refuses it on its error channel, a tagged error whose message says what to do
+ * instead: `FileRefused`, `TickRefused`, `AdmitRefused`, `ListRefused`, `TranscriptRefused`, `OutputRefused`, `SayRefused`,
+ * `QuotaRefused`, `StopRefused` for `stop`, `InputRefused` for `answer` and `close`, and `BodyRefused` for `sweep` and `removeBody`.
+ * `SayUnsent` is `say`'s failure that is not a refusal; a `JournalError` or a `RunnerError` is the store's or the harness's.
+ * `refusalWords(verb)` words a refusal as `ae` says it.
+ * `watch`, `io` and `start` succeed at once: `watch` and `start` with a handle that stops them.
  */
 export type EngineShape = {
+  /**
+   * File work. Returns the task id. Nothing runs until a tick. A task that names no harness is filed on the default one
+   * (`defaultHarness`, else the first configured), named on its record and its view, so a layer above that pools by harness
+   * counts it with an identical task that named it.
+   *
+   * Refused — `FileRefused`, and nothing journalled — when the task
+   * names a harness this engine does not have; a `deadlineSeconds` that is not a number of seconds; a `maxAttempts` or a
+   * `resume`, whatever its value, which are retired: the runtime makes one attempt per start; an empty brief, cwd or resumeFrom;
+   * a `cwd` that is not absolute; a `priority` that is not a whole number in int32. And in its `config`: a
+   * key that is no harness argument, or one filed beside `config` instead — `budgetUsd` among them; a `budgetUsd` that is not dollars above
+   * 0, or one its harness would not keep (`codex`); an empty model or effort; a `tools` that is not a list of names; a `disallowedTools` or
+   * `allowedTools` that is not a list of permission rules; an `mcp` whose entries are not MCP servers in a `.mcp.json`'s shape; a word its
+   * harness does not take (a permission mode or an effort — a `HarnessSpec`'s own `refuses`, or Claude Code's lists); a `contextTokens`
+   * that is not a whole number of tokens its harness takes, or any on a harness with no context window to set (`codex`); a `remoteControl`
+   * under `config` or beside it, which is Claude Code's flag and goes in `config.claude`, and a `claude.remoteControl` on a harness with no
+   * such flag (any but one brought as `'claude-bg'` or a `RunnerOps`, and one brought as `'claude'` in a task whose `background` is not
+   * true); a `background` that is not true or false, or `true` on any harness not brought as `'claude'`; a `claude` on a `HarnessSpec`
+   * without `claudeFlags`, which is not Claude Code; a `codex` that is not an object holding only `trustFrom`, an absolute path, or one on
+   * any harness but a `HarnessSpec` with `codexArgs`, which is Codex; and, on `'claude'`, a
+   * `budgetUsd` beside `background: true`, which `claude --bg` does not keep. A harness brought as a `RunnerOps` is asked
+   * only its own `refuses`.
+   */
   readonly file: (spec: TaskSpec) => Effect.Effect<string, FileRefused | JournalError>;
+  /**
+   * One pass: start what may start — every task not queued, and each queued one admitted — notice what ended, settle what
+   * is over, and admit the queued tasks the ceiling has room for (`maxConcurrent`), which the next pass starts. Takes nothing:
+   * refused with `TickRefused`, nothing read, when handed any argument — a ceiling or pools among them, which
+   * are the engine's options.
+   *
+   * An engine keeps, for as long as it lives, the settled tasks its passes have folded (`core/engine/memo.ts`): a pass reads the
+   * feed on from where the last stopped, and reads the journal of a task only when it is not settled, the feed has named
+   * it since, or this engine has never folded it — so an engine's first pass reads every journal and the whole feed, and
+   * the passes after it read only what changed. A store (`StoreOps`) must therefore put every append on its feed.
+   */
   readonly tick: () => Effect.Effect<TickReport, TickRefused | JournalError | RunnerError>;
+  /**
+   * Let tasks filed `queued` start: journals an `admitted` entry for each whose current turn waits for one, and
+   * returns their ids; the next tick starts them. Reads the tasks' records and asks no
+   * harness. Idempotent: a task already admitted, not filed queued, or whose turn has started is left as it is, and not
+   * returned. Refused — `AdmitRefused`, and nothing journalled for any of them — when one
+   * is a task this engine has no record of, or has settled.
+   */
   readonly admit: (taskIds: readonly string[]) => Effect.Effect<string[], AdmitRefused | JournalError>;
+  /**
+   * One task, off one read of its journal. A settled task is read off its record, on every harness, and no registry is asked:
+   * its phase is its outcome, and a sighting would give it nothing else but its session's id — `waitingFor` is only a
+   * `needs-human` phase's, and `usage` only an attempt in flight's. Its session's id is the harness's own (`nativeId`) where it
+   * can `find` one, found by name when the record lacks it, and otherwise the handle its harness reported when the attempt
+   * ended: what the harness lists the session by and what its `logs` take (a detached runner's is the attempt's name, never
+   * `nativeId`: a check's `logs` are its verdict). An attempt in flight is observed, as a pass observes: its phase is its
+   * session's state, and only a registry has that. A task not settled with no attempt in flight is read off its record on a
+   * harness that can `find`, and observed on one that cannot.
+   *
+   * Whatever is observed is observed on the task's own harness — the one `logs` and `transcript` ask — and no other, since no
+   * other registry can name its session; a harness that can be told which sessions (`observeFor`) is told this task's own, so a
+   * view of a Claude Code job lists the jobs and asks no `claude agents`. A registry that cannot be read this time is nothing
+   * observed, as a pass reads it. A task on a harness this engine does not have is read off its record, and no harness is
+   * asked. `usage` is the attempt in flight's; an ended attempt's is on `state.attempts`.
+   */
   readonly view: (taskId: string) => Effect.Effect<TaskView, JournalError>;
+  /**
+   * The task's path through its lifecycle, replayed off its journal alone: for each entry, from its filing to now, the state the journal
+   * says once the entry is on it, the entry's kind and its `at` (`LifecycleStep`). Writes nothing and asks no harness. A task this engine
+   * has no record of has an empty path; a journal that does not read fails with its `JournalError`.
+   */
   readonly path: (taskId: string) => Effect.Effect<LifecycleStep[], JournalError>;
+  /**
+   * Every task on the board, each journal read, over one observation of every harness. Given `taskIds`, those tasks alone, in that order
+   * with no id twice: each journal read once, and every harness looked at once for the tasks among them in flight — told which sessions
+   * where it can be, so Claude Code jobs cost a listing of their run files and no `claude agents` — and not at all when none is. A view of
+   * a settled one is read off its record, as `view` reads it, but for a session id no record has, which `view` looks up and this does not.
+   *
+   * A task whose journal does not read — an entry no runtime wrote — is left out of `views` and named in `unreadable`, once, with why in
+   * the words the pass says it with (`TickReport.unreadable`): every other task is answered all the same. Any other failure, a store that
+   * cannot be listed or a harness that cannot be observed for `list()`, fails the call. Handed anything but a list of task ids, or
+   * more than one argument, it is refused with `ListRefused`, nothing read.
+   */
   readonly list: (taskIds?: readonly string[]) => Effect.Effect<TaskList, ListRefused | JournalError | RunnerError>;
+  /**
+   * Ask a task to stop. Takes effect on the next tick, and confirms on the one after. Refused — `StopRefused`, and nothing
+   * journalled — for a task this engine has no record of, one that has settled, and one asked to stop already.
+   */
   readonly stop: (taskId: string) => Effect.Effect<void, StopRefused | JournalError>;
+  /**
+   * What the task's session printed, asked of the task's own harness rather than of whichever listed the session this pass: a
+   * session its harness has released is in no observation, and its transcript is still there to read. `(no session yet)`
+   * before its harness names one.
+   */
   readonly logs: (taskId: string) => Effect.Effect<string, JournalError | RunnerError>;
+  /**
+   * The conversation of the task's session — the one `logs` reads, asked of the task's own harness alone, since no other
+   * registry can name it — as events from `after` on, and the `cursor` to ask again from. Pull-only: poll with the cursor
+   * the last read returned; nothing is pushed. No session yet is no events, and the cursor asked with — or one from the
+   * start — so a moment the registry could not be read costs a caller a poll, not a read from the start. The cursor of the
+   * start is handed to no runner: the session is read from its start.
+   *
+   * An attempt that has ended is read by the session id the journal recorded, and no registry is asked.
+   * One in flight is found by name when its harness can `find` it, and by observing its harness when it
+   * cannot or finds none; a registry that cannot be read this time is nothing observed, as a pass reads
+   * it: no events, and the cursor given back.
+   *
+   * Refused — `TranscriptRefused` — for a task this engine has no record of;
+   * a harness that keeps no conversation this engine can read (a `HarnessSpec` or a `RunnerOps`
+   * without `transcript`); and, for the engine's own readers (`claude`, `claude-bg` and a `HarnessSpec`), an
+   * `after` that none of them gave. A brought runner's cursor is its own, and passed through.
+   */
   readonly transcript: (
     taskId: string,
     after?: TranscriptCursor,
   ) => Effect.Effect<Transcript, TranscriptRefused | JournalError | RunnerError>;
+  /**
+   * One stream of the task's latest attempt, `stdout` or `stderr`, as its harness kept it whole, or its last `lastBytes` bytes:
+   * read from that stream alone, never the log both are mixed in. `undefined` before an attempt, or when the harness kept none
+   * for it. Observes nothing. Refused — `OutputRefused` — for a `stream` that is neither, a
+   * `lastBytes` that is not a positive whole number, a task this engine has no record of, and a harness that keeps no whole
+   * streams (any but a `HarnessSpec` with `streams`, or a `RunnerOps` with `output`).
+   */
   readonly output: (
     taskId: string,
     stream: 'stdout' | 'stderr',
     lastBytes?: number,
   ) => Effect.Effect<string | undefined, OutputRefused | JournalError | RunnerError>;
+  /**
+   * Tell the task's session something while it runs — `kubectl attach` with its audit line. `text` is handed, as
+   * given, to the session of the attempt in flight through the task's own harness, and then journalled as a
+   * `said` entry — `at`, `attempt`, `text` — which is returned, and which `view` carries as `state.said`.
+   *
+   * The words go before the entry: a `said` on the record is words a harness took, and a `say` that fails has
+   * journalled nothing. What the session makes of them is its own affair, and `decide` never reads them. Words
+   * taken are not words read: a harness may still set them aside (Claude Code: its `crossSessionInbound`
+   * setting, a rate limit, an identical repeat), and says nothing back when it does. A session its harness lists
+   * `blocked` is told too, as a working one is, and reads the words only if it moves again: one waiting on a permission
+   * prompt nobody answers keeps them queued, and a stopped or continued one has lost them. `claude agents` does not say
+   * which wait a session is in, so neither is refused. A quiet session is `working` too: its runner reports how long it
+   * has been quiet, not an end, and an idle session's inbox starts a turn.
+   *
+   * Refused — `SayRefused`, and nothing sent or journalled — in this order, what the
+   * record says before what the harness says, so a settled task's harness is not asked: an empty `text`; a task this
+   * engine has no record of; a harness with no channel into a running session (a `HarnessSpec`, in its own words, or a
+   * `RunnerOps` without `say`); what the harness cannot carry (Claude Code's background session: a task in
+   * `bypassPermissions`, or words longer than its inbox reads), asked of a task whose config makes it one; a task that
+   * has settled, or has been asked to stop; one with no attempt in flight; then, off its harness, an attempt its harness
+   * does not list; what a background session cannot carry, asked again of a session on `claude` that is no job (one an older
+   * runtime started `--bg` without `background` in its config); a session its harness lists ended; and a task on a remote A2A agent whose
+   * Task is at work, since A2A lets its caller speak only once the Task asks for input. A registry that cannot be read
+   * this time — on `claude`, a session Claude Code has registered that its listing does not show — or words the
+   * harness did not take, fail with `SayUnsent`, its `cause` what failed: ask again.
+   *
+   * A Claude Code job (`claude -p`) is told on its stdin: the words go to an inbox its worker writes on as the
+   * next user message, which the job takes into the turn it is working. Once it has given its result its input
+   * is closed, and words said then are not taken — a `SayUnsent`, since the job is still
+   * `working` until it exits, and its record settles on the next tick. Words said in the half second before its
+   * result are taken and may never be read.
+   */
   readonly say: (taskId: string, text: string) => Effect.Effect<Said, SayRefused | SayUnsent | JournalError>;
+  /**
+   * What a harness's subscription has left (`HarnessQuota`), asked of `harness`, or of the default harness when none is named: the
+   * plan's limits, each with its use and its reset, or why there are none. Claude Code answers it, as `claude` and as `claude-bg`, by
+   * starting the `claude` on PATH with its `get_usage` request: no prompt, no model called. Every way the ask goes is an answer —
+   * no `claude` on PATH is `missing`, one that ends or does not answer in time is `failed` or `timeout` — never a failure.
+   *
+   * Each call is one ask: nothing is kept, so a caller that reads often keeps the answer itself, since the usage endpoint behind
+   * Claude Code's answer is reported to refuse an account that asks in bursts. No session is touched, and nothing is journalled.
+   *
+   * Refused — `QuotaRefused` — in this order: an argument that is not one harness's name; a harness this
+   * engine does not have, naming the ones it has; and one that reports no quota (`codex`, a `HarnessSpec`, a remote A2A agent, a
+   * runner without `quota`), naming the ones that do.
+   */
   readonly quota: (harness?: string) => Effect.Effect<HarnessQuota, QuotaRefused | RunnerError>;
+  /**
+   * Answer a task held open (`holdOpen`) that waits for one — phase `input-required`. Journalled as an `input` entry — `at`,
+   * `text`, and `config` if given — which is returned, and which `view` carries as `state.inputs`. The next tick starts
+   * the task's next turn: an attempt that continues the session that signed (`--resume`), told `text` in place of the
+   * brief, with `config` laid over the task's own if given. A turn gives its own spend cap and nothing else
+   * (`config: { budgetUsd }`, `TURN_ARGS`): the rest of its configuration is the session's it continues. Nothing is
+   * sent to any session: none is running.
+   *
+   * Refused — `InputRefused`, and nothing journalled — for an empty `text`; a `config`
+   * with any key but `budgetUsd`, or a `budgetUsd` that is not dollars above 0, or one its harness would not keep (as
+   * `file` refuses one); a `budgetUsd` given beside `config` rather than in it, naming where it goes; a task this engine has no
+   * record of; one not filed to be held open; one settled, closed or asked to stop; and one not waiting — an attempt
+   * running (`say` reaches it), between attempts, not started, or answered already and its next turn not yet begun.
+   * Two answers journalled before the next turn begins are told to it both, in order.
+   */
   readonly answer: (taskId: string, text: string, options?: { config?: HarnessArgs }) => Effect.Effect<Input, InputRefused | JournalError>;
+  /**
+   * Settle a task held open that waits for an answer: journalled as a `closed` entry, and settled `succeeded`, note
+   * `closed`, by the next tick. Refused — `InputRefused`, nothing journalled — as `answer` is, for a task
+   * that is not waiting for one. To end one that is running, `stop` it.
+   */
   readonly close: (taskId: string) => Effect.Effect<void, InputRefused | JournalError>;
+  /**
+   * Count the bodies of the store no journal and no feed entry names, put more than a day ago (`BODY_GRACE_MS`), with their bytes;
+   * given `{ yes: true }`, remove them, each only if no put came since it was counted, and say those removed and their bytes. A long
+   * text a journal holds — a brief's part, a schema, a nudge, an answer — is kept once, as a body named by the sha256 of its text, and
+   * read back whole. A store that keeps no bodies has none to count. Refused — `BodyRefused` — for an argument other than nothing or
+   * `{ yes }`.
+   */
+  readonly sweep: (options?: { yes?: boolean }) => Effect.Effect<SweepReport, BodyRefused | JournalError>;
+  /**
+   * Remove the body `ref`, the sha256 of its text, as `sweep` would. Refused — `BodyRefused`, nothing removed — for a `ref` that is
+   * no reference, a body the store does not have, one a journal or the feed still names (naming it), one put within a day, whose
+   * line may still be on its way, and one put again while it was being removed.
+   */
+  readonly removeBody: (ref: string) => Effect.Effect<void, BodyRefused | JournalError>;
+  /**
+   * Everything that has happened since `after`, and where to resume. An entry no runtime wrote is skipped, the cursor past it, and
+   * said on `refused` (`FeedRefusal`), so it is met by one read and stops no reader.
+   */
   readonly feed: (after?: Cursor) => Effect.Effect<{ entries: FeedEntry[]; cursor: Cursor; refused?: FeedRefusal[] }, JournalError>;
+  /**
+   * Watch everything that happens, as it happens — the engine's event-driven surface.
+   *
+   * A consumer reacts to work finishing without polling a task or knowing what a tick is. Pushed
+   * by the store when it can signal (the file store watches the feed), and backed by a timer so
+   * that a store which cannot signal — or an OS that drops the event — costs latency rather than
+   * correctness. Delivery is in order and at-least-once; the cursor never expires, so starting at
+   * 0 replays the whole history first. An entry no runtime wrote is skipped, and said to `onError` as an `Error` naming it.
+   *
+   * One read of the feed runs at a time, so a push and a tick of the timer that arrive together never deliver an entry twice
+   * or out of order. The timer holds the process open until `stop()`, whatever the store: a store pushes only
+   * where it can (`subscribe`), and one that cannot is watched all the same.
+   */
   readonly watch: (options: {
     onEntry: (entry: FeedEntry) => void | Promise<void>;
     from?: Cursor;
     intervalMs?: number;
     onError?: (e: unknown) => void;
   }) => Effect.Effect<{ stop: () => void }>;
+  /** What this engine's reads, spawns and observes have cost so far (`EngineIo`): running totals, read by nothing in the engine. */
   readonly io: () => Effect.Effect<EngineIo>;
+  /**
+   * Tick on a timer until stopped. Ticks never overlap: a beat that comes while a tick runs is skipped, so a tick that
+   * outruns the interval is not joined by a second pass over the same board. The timer holds the process open, as a control
+   * loop must: `stop()` gives the process back.
+   */
   readonly start: (options?: {
     intervalMs?: number;
     onTick?: (r: TickReport) => void;
@@ -296,7 +506,7 @@ const countedInto =
  * The engine over `options` that `Engine.layer` builds: the file-backed store under `root` (`~/.agent-engine` by default) or the
  * `journal` given, and the `harnesses` given — by default `claude`, `codex` and `claude-detached`. Built once, and shared by every verb:
  *
- * - the store, and for the file store its `subscribe`, which pushes to `watch`;
+ * - the store, and its `subscribe` where it has one (the file store's does), which pushes to `watch`;
  * - each harness behind its A2A agent, reached through the SDK's client in this process (`a2a/client.ts`): the agent holds
  *   nothing, and answers a task it never started off the harness and this journal, so a restart loses no session. A remote
  *   agent is A2A already, spoken to by the SDK's client over HTTP, and wrapped in no seam of ours;
@@ -316,8 +526,8 @@ const make = (options: EngineOptions) =>
     const harnesses = options.harnesses ?? DEFAULT_HARNESSES;
     const fallback = options.defaultHarness ?? Object.keys(harnesses)[0] ?? 'claude';
 
-    const journalOps = options.journal ? undefined : Journal.filesOps(root);
-    const journal = options.journal ? journalOf(options.journal) : Journal.layer(journalOps!);
+    const journalOps = options.journal ?? Journal.filesOps(root);
+    const journal = Journal.layer(journalOps);
     const events = (taskId: string) => Effect.runPromise(Effect.flatMap(Journal, (j) => j.read(taskId)).pipe(Effect.provide(journal)));
     const observed: Record<string, ObserveCount> = {};
     const counted = countedInto(observed);
@@ -518,46 +728,6 @@ const make = (options: EngineOptions) =>
 
     const feedVerb = (after: Cursor = 0) => go(Effect.flatMap(Journal, (j) => j.feed(after)));
 
-    const watch: EngineShape['watch'] = ({ onEntry, from = 0, intervalMs = 1_000, onError }) =>
-      Effect.sync(() => {
-        let cursor = from;
-        let stopped = false;
-        let draining = false;
-
-        const drain = async () => {
-          if (stopped || draining) return;
-          draining = true;
-          try {
-            for (;;) {
-              const got = await Effect.runPromise(feedVerb(cursor));
-              if (!got.entries.length && !got.refused?.length) break;
-              cursor = got.cursor;
-              for (const r of got.refused ?? []) onError?.(new Error(r.why));
-              for (const entry of got.entries) {
-                if (stopped) return;
-                await onEntry(entry);
-              }
-            }
-          } catch (e) {
-            onError?.(e);
-          } finally {
-            draining = false;
-          }
-        };
-
-        const unsubscribe = journalOps?.subscribe?.(() => void drain());
-        const timer = setInterval(() => void drain(), intervalMs);
-        void drain();
-
-        return {
-          stop: () => {
-            stopped = true;
-            clearInterval(timer);
-            unsubscribe?.();
-          },
-        };
-      });
-
     return Engine.of({
       file: fileVerb,
       tick: tickVerb,
@@ -581,7 +751,8 @@ const make = (options: EngineOptions) =>
       answer: answerVerb,
       close: (taskId) => go(close(taskId)),
       feed: feedVerb,
-      watch,
+      ...bodyVerbsOf(go),
+      watch: watchOf(feedVerb, journalOps.subscribe),
       io: () => Effect.sync(() => ({ ...ioCounts(), observed: observedNow() })),
       start: startOf(tickVerb),
     });

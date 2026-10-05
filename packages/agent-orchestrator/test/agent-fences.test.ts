@@ -604,6 +604,16 @@ test('REFUSED: a call that breaks a shipped rule, allowed to the step given the 
   assert.deepEqual(brokenBy('Read(//etc/**)'), { tool: 'Read' });
 });
 
+test("REFUSED: cd to Seldon, Agora and Iris, each by a deny of its own, where the settings' allow would reach it", () => {
+  const cd = [{ id: 'never-cd', says: 'never cd', breaks: ['Bash(cd:*)'] }];
+  for (const agent of ['seldon', 'agora', 'iris']) {
+    const step = shippedStepOf(agent);
+    assert.deepEqual(unbreakable(step, cd), [], `${agent} is refused cd`);
+    const unDenied = { ...step, disallowedTools: (step.disallowedTools ?? []).filter((rule) => rule !== 'Bash(cd:*)') };
+    assert.deepEqual(unbreakable(unDenied, cd), [`${step.name}: never-cd Bash(cd:*)`], `${agent}: without its deny, cd is open`);
+  }
+});
+
 /** The run's artifacts folder the reach below is filed against, one folder per step under it. */
 const RUN_ARTIFACTS = '/s/runs/r-1/artifacts';
 

@@ -33,12 +33,12 @@ function refuseDefault(name: string, verb: FactoryWrite): void {
 
 /**
  * The instruction of the factory `name`, read afresh where its file says it is kept (`instructionAt`). Refused: the default factory
- * (`Conflict`), and the factory as `readFactory` refuses it — a name that is no slug or whose file does not read (`Invalid`), a name with no
- * file (`Missing`).
+ * (`Conflict`), and the factory as `readFactory` refuses it — a name that is no slug or whose file does not read (`Invalid`), a name
+ * with no file (`Missing`).
  */
 export function factoryInstruction(name: string): FactoryInstruction {
   refuseDefault(name, 'instruction');
-  const factory = readFactory(name);
+  const factory = readFactory(name, 'There is no instruction to read.');
   const at = instructionAt(factory, instructionFile(name));
   const read = readInstructionAt(at);
   return {

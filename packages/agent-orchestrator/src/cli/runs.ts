@@ -1,7 +1,7 @@
 /**
- * The runners of `nemia agents custom` and `nemia factory instruct`, which read the words a file holds; and the runners of `nemia rm` and `nemia prune` (`RM`, `PRUNE`),
- * which walk the many runs a command line names through the entry's handler, ask a person's yes, and tally what was not done into the exit
- * code.
+ * The runners of `nemia agents custom` and `nemia factory instruct`, which read the words a file holds; and the runners of `nemia rm` and
+ * `nemia prune` (`RM`, `PRUNE`), which walk the many runs a command line names through the entry's handler, ask a person's yes, and tally
+ * what was not done into the exit code.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -166,7 +166,9 @@ export async function pruneVerb(args: Args, e: Engine): Promise<void> {
   return refusedNamed(tally);
 }
 
-/** The words `--file` names for the command `name`: the file's text, or stdin's for `-`. Refused, naming the file, when it cannot be read. */
+/**
+ * The words `--file` names for the command `name`: the file's text, or stdin's for `-`. Refused, naming the file, when it cannot be read.
+ */
 function wordsFrom(file: string, name: string): string {
   try {
     return fs.readFileSync(file === '-' ? 0 : file, 'utf8');
@@ -191,7 +193,9 @@ export async function agentsCustomRun(args: Args, e: Engine): Promise<void> {
   for (const line of AGENTS_CUSTOM.print(data, asked)) console.log(line);
 }
 
-/** `nemia factory instruct`'s runner: the words `--file` names read (`wordsFrom`), handed to its entry's handler, and what it says printed. */
+/**
+ * `nemia factory instruct`'s runner: the words `--file` names read (`wordsFrom`), handed to its entry's handler, and what it says printed.
+ */
 export async function factoryInstructRun(args: Args, e: Engine): Promise<void> {
   const asked = withWords(args, FACTORY_INSTRUCT.name);
   const data = await FACTORY_INSTRUCT.handler(e, asked, undefined, HOME);

@@ -3,7 +3,7 @@
  * why a body is not one (400), and what a failure that is not a refusal answers (502).
  */
 import { Schema } from 'effect';
-import { inboxNameRefusal } from 'agent-orchestrator';
+import { factoryNameRefusal, inboxNameRefusal } from 'agent-orchestrator';
 import { agentNameRefusal } from 'agent-orchestrator/workflow';
 import { decodeBody, valueAt, type BodyIssue, type Words } from '../body.ts';
 import type { Guarded } from '../guard.ts';
@@ -417,6 +417,67 @@ const AGENTS_CUSTOM: RouteWords = {
   notJson: (at) => `${customRoute(at)} takes a JSON body: ${CUSTOM_PUT_SHAPE}.`,
 };
 
+const INSTRUCTION_PUT_SHAPE = '`{ "path": "<path in the factory\'s first folder>" }` or `{ "store": true }`';
+
+const INSTRUCT_PUT_SHAPE = '`{ "words": "<what the factory\'s runs are told>" }`';
+
+/**
+ * The route of a factory's instruction `at` names, as a refusal says it: `PUT /api/factories/<name>/instruction`, and `…/words` for its
+ * text.
+ */
+const instructionRoute = ({ method, name }: Named, words: boolean): string =>
+  `${method} /api/factories/${name}/instruction${words ? '/words' : ''}`;
+
+/** A name in a factory's instruction's route that is no factory's, in the package's words, before anything is read. */
+const factoryNamed =
+  (words: boolean) =>
+  (at: Named): string | null => {
+    const wrong = factoryNameRefusal(at.name);
+    return wrong === undefined ? null : `${instructionRoute(at, words)}: ${wrong}`;
+  };
+
+/**
+ * Where a factory's instruction is kept, put or cleared, as the guard's refusals word it: a name that is no factory's is refused in the
+ * package's words, a path or a store that is no string or `true` in the api's.
+ */
+const FACTORY_INSTRUCTION: RouteWords = {
+  shape: INSTRUCTION_PUT_SHAPE,
+  guard: (at) => ({
+    route: instructionRoute(at, false),
+    does: "says where a factory's instruction is kept",
+    forAnother: 'move it',
+    why: 'every run started in the factory after is told the instruction read there',
+    reach: "choose where it is kept on the factory's settings page on the board",
+    instead: "Choose where it is kept on the factory's settings page on the board",
+    shape: at.method === 'DELETE' ? '`{}`' : INSTRUCTION_PUT_SHAPE,
+  }),
+  issue: (at) => (_issue, body) =>
+    `${instructionRoute(at, false)}: a factory's instruction is kept at a \`path\` in its first folder, a string, or in the store, \`"store": true\`: ${INSTRUCTION_PUT_SHAPE}. This request sent ${JSON.stringify(body)}.`,
+  named: factoryNamed(false),
+  notJson: (at) => `${instructionRoute(at, false)} takes a JSON body: ${INSTRUCTION_PUT_SHAPE}.`,
+};
+
+/**
+ * The text the store keeps as a factory's instruction, written or cleared, as the guard's refusals word it: a name that is no factory's
+ * is refused in the package's words, words that are not a string in the api's.
+ */
+const FACTORY_INSTRUCT: RouteWords = {
+  shape: INSTRUCT_PUT_SHAPE,
+  guard: (at) => ({
+    route: instructionRoute(at, true),
+    does: "writes a factory's instruction",
+    forAnother: 'write it',
+    why: 'every run started in the factory after is told it',
+    reach: "write it on the factory's settings page on the board",
+    instead: "Write it on the factory's settings page on the board",
+    shape: at.method === 'DELETE' ? '`{}`' : INSTRUCT_PUT_SHAPE,
+  }),
+  issue: (at) => (_issue, body) =>
+    `${instructionRoute(at, true)}: \`words\` are what the factory's runs are told, a string: ${INSTRUCT_PUT_SHAPE}. This request's was ${JSON.stringify(valueAt(body, ['words']))}.`,
+  named: factoryNamed(true),
+  notJson: (at) => `${instructionRoute(at, true)} takes a JSON body: ${INSTRUCT_PUT_SHAPE}.`,
+};
+
 /** The api's words for each routed command, by its name. */
 export const WORDS: Readonly<Record<string, RouteWords>> = {
   retry: RETRY,
@@ -432,4 +493,6 @@ export const WORDS: Readonly<Record<string, RouteWords>> = {
   'inbox queue': INBOX_QUEUE,
   'inbox rm': INBOX_RM,
   'agents custom': AGENTS_CUSTOM,
+  'factory instruction': FACTORY_INSTRUCTION,
+  'factory instruct': FACTORY_INSTRUCT,
 };

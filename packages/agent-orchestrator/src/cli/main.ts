@@ -246,8 +246,8 @@ export const VERBS: ReadonlyMap<string, Verb> = new Map<string, Verb>([['decide'
 /**
  * The runner of each command the CLI runs itself, by its name — those it serves alone (`RAN`, `nemia plan`); `nemia rm` and `nemia prune`,
  * whose runners walk the many runs a command line names through their handlers; and `nemia start`, `nemia inbox add`, `nemia inbox queue`
- * and `nemia agents custom` and `nemia factory instruct`, whose runners read the files and folders a command line names before their handlers: handed its arguments once
- * read and checked.
+ * and `nemia agents custom` and `nemia factory instruct`, whose runners read the files and folders a command line names before their
+ * handlers: handed its arguments once read and checked.
  */
 export const RUNS: ReadonlyMap<string, (args: Args, e: Engine) => void | Promise<void>> = new Map([
   ['tick', tickVerb],

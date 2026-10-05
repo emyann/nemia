@@ -199,14 +199,14 @@ export function removeFactory(name: string): { file: string } {
 
 /**
  * The factory `name`, as a run started in it reads it. Refused: a name that is no slug (`Invalid`), a name with no file (`Missing`, naming
- * the factories there are), and a file that does not read as a factory (`Invalid`, quoting why). The default factory is no file, and is
- * never asked for here.
+ * the factories there are, then `notDone`, what the caller did not do), and a file that does not read as a factory (`Invalid`, quoting
+ * why). The default factory is no file, and is never asked for here.
  */
-export function readFactory(name: string): Factory {
+export function readFactory(name: string, notDone = 'Nothing was started.'): Factory {
   const bad = factoryNameRefusal(name);
   if (bad) throw new Invalid({ message: bad });
   const read = factoryFile(name);
-  if (!fs.existsSync(read.file)) throw noFactory(name, 'Nothing was started.');
+  if (!fs.existsSync(read.file)) throw noFactory(name, notDone);
   if ('error' in read) throw new Invalid({ message: `the factory ${name}: ${read.file} ${read.error}` });
   return factoryOf(name, read.content);
 }

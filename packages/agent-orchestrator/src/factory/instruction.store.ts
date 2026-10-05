@@ -1,8 +1,8 @@
 /**
- * A factory's instruction on disk: the text the store keeps for it, `$WF_ROOT/factories/<name>/NEMIA.md` — written (`writeInstructionText`),
- * cleared (`clearInstructionText`) and removed with its folder when the factory is (`removeInstructionFolder`), this file being its one
- * writer — and the reader of a factory's instruction wherever its file says it is kept (`readInstructionAt`), in the store or in its first
- * folder, which it never writes. Where it is kept is `factory.ts`'s to judge (`instructionAt`).
+ * A factory's instruction on disk: the text the store keeps for it, `$WF_ROOT/factories/<name>/NEMIA.md` — written
+ * (`writeInstructionText`), cleared (`clearInstructionText`) and removed with its folder when the factory is (`removeInstructionFolder`),
+ * this file being its one writer — and the reader of a factory's instruction wherever its file says it is kept (`readInstructionAt`), in
+ * the store or in its first folder, which it never writes. Where it is kept is `factory.ts`'s to judge (`instructionAt`).
  */
 import fs from 'node:fs';
 import path from 'node:path';

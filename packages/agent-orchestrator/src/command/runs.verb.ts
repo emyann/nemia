@@ -11,6 +11,7 @@ import { everyOf } from '../daemon/daemon.ts';
 import { cursorTakes } from '../feed/feed.ts';
 import { forgetLine, type Forgot } from '../forget/forget.ts';
 import { forgetRun } from '../forget/forget.verb.ts';
+import type { EngineForgetting } from '../forget/forgetting.ts';
 import { pruneLines, type Pruning } from '../prune/prune.ts';
 import { prune } from '../prune/prune.verb.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
@@ -212,10 +213,11 @@ function rmRefusal(args: Args): string | null {
 }
 
 /**
- * `nemia rm`: one run forgotten, judged on its own (`forget`), and what was done with it (`forgot`), a refusal included. The api removes a
+ * `nemia rm`: one run forgotten, judged on its own (`forget`), and what was done with it (`forgot`), a refusal included, and with its
+ * tasks on the engine (`engine`, null where nothing was removed). The api removes a
  * run only once it is gone: what `forget` refused, or held, is a 409 in its words, and a run gone since the route read it a 404.
  */
-export const RM: Command<{ id: string; removed: boolean; forgot: Forgot }> = {
+export const RM: Command<{ id: string; removed: boolean; engine: EngineForgetting | null; forgot: Forgot }> = {
   name: 'rm',
   usage: '<runId> [<runId> ...] [--delete-branches [--force-unmerged]]',
   help: [
@@ -225,7 +227,9 @@ export const RM: Command<{ id: string; removed: boolean; forgot: Forgot }> = {
     'a task of it is in flight, anything is due to be filed or asked',
     'for, or a run waiting on it has not started. Its branches are kept:',
     "--delete-branches deletes those merged into the run's base branch,",
-    'and --force-unmerged beside it the others, with their work',
+    'and --force-unmerged beside it the others, with their work. Then',
+    "the engine forgets the run's tasks: their journals and session",
+    'files; one not settled yet is forgotten by the next passes',
   ],
   spec: {
     positionals: [{ key: 'runId', takes: 'many', kind: 'name' }],
@@ -244,10 +248,10 @@ export const RM: Command<{ id: string; removed: boolean; forgot: Forgot }> = {
       deleteBranches: args.deleteBranches === true,
       forceUnmerged: args.forceUnmerged === true,
     });
-    return { id: forgot.id, removed: forgot.kind === 'forgotten', forgot };
+    return { id: forgot.id, removed: forgot.kind === 'forgotten', engine: forgot.engine ?? null, forgot };
   }),
   print: ({ forgot }) => [forgetLine(forgot)],
-  apiKeys: ['id', 'removed'],
+  apiKeys: ['id', 'removed', 'engine'],
   apiRefusal: ({ forgot }) => {
     if (forgot.kind === 'refused') return new Conflict({ message: forgot.refusal ?? forgetLine(forgot) });
     if (forgot.kind === 'held') return new Conflict({ message: forgetLine(forgot) });

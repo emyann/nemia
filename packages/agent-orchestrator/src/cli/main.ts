@@ -84,14 +84,15 @@ function tickRunLines(r: Pass['runs'][number]): void {
 }
 
 /**
- * A pass's lines on `nemia tick`: the pause it read and what finishes under it, what failed or was left out on stderr, then what it
+ * A pass's lines on `nemia tick`: the pause it read and what finishes under it, what failed or was left out and what it forgot of removed runs on stderr, then what it
  * refused, the queue's card and each run; returns it.
  */
 function tickLines(pass: Pass): Pass {
-  const { runs: results, queue, feedError, refused, unreadable, pause } = pass;
+  const { runs: results, queue, feedError, refused, unreadable, forgetting, pause } = pass;
   if (pause) for (const line of pausedLines(pause)) console.log(line);
   if (feedError) console.error(feedError);
   for (const why of unreadable ?? []) console.error(`left out: ${why}`);
+  for (const { text } of forgetting ?? []) console.error(text);
   for (const line of refusalLines(refused ?? [], new Set()).lines) console.log(line);
   if (queue) console.log(queueLine(queue));
   if (!results.length && !queue && !unreadable?.length) console.log('no runs');

@@ -93,7 +93,7 @@ const thrown = (refusal: { _tag: string; message: string } | null | undefined) =
   refusal && { tag: refusal._tag, message: refusal.message };
 
 test('REFUSED on the api: a removal that removed nothing is thrown in forget’s words — refused and held a Conflict, missing a Missing', () => {
-  const rmRefusal = (f: Forgot) => thrown(RM.apiRefusal?.({ id: f.id, removed: f.kind === 'forgotten', forgot: f }, { runId: f.id }));
+  const rmRefusal = (f: Forgot) => thrown(RM.apiRefusal?.({ id: f.id, removed: f.kind === 'forgotten', engine: null, forgot: f }, { runId: f.id }));
   const refused = forgot({ kind: 'refused', refusal: 'r-1 has a task in flight: nemia cancel r-1 first.' });
   assert.deepEqual(rmRefusal(refused), { tag: 'Conflict', message: 'r-1 has a task in flight: nemia cancel r-1 first.' });
   const held = forgot({ kind: 'held', left: [{ path: '/w/r-1/implement', locked: 'in use' }], removed: ['/w/r-1/plan'] });

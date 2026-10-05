@@ -38,6 +38,8 @@ import { Invalid, isRefusal, type Refusal } from './refusal/refusal.ts';
 /** The runtime's engine, built: each verb an Effect whose refusal is a tagged error, which a controller reads with `asked`. */
 export type Engine = EngineShape;
 export type { ClaudeFlags, CodexArgs, Denial, HarnessQuota, QuotaLimit, RefusedMove, TaskView, Usage } from 'agent-runtime';
+/** What the engine's `forget` removed, or would, and its refusal by task (`engineForgetting`). */
+export { ForgetRefused, type ForgetReport } from 'agent-runtime';
 /** The name the engine gives a task's session, which is the name `claude agents` lists it under (`harnessWaitLine`). */
 export { nameFor } from 'agent-runtime';
 /** The task's lifecycle as plain data, which the board draws: what the api serves at `/api/machines`. */

@@ -437,6 +437,7 @@ export type { Holding } from './wait/wait.verb.ts';
 export type { Told } from './say/say.verb.ts';
 export { forgetRun } from './forget/forget.verb.ts';
 export { prune } from './prune/prune.verb.ts';
+export { runsForgetting } from './forget/forgetting.verb.ts';
 export { decideRun } from './decide/decide.verb.ts';
 export { freshStatsMemo, statsRun } from './stats/stats.verb.ts';
 export type { StatsMemo, StatsOptions } from './stats/stats.verb.ts';

@@ -28,6 +28,7 @@ const ENGINE_PHASES: Readonly<Record<string, Phase>> = {
   answer: 'act',
   say: 'act',
   removeBody: 'act',
+  forget: 'act',
 };
 
 type EngineIo = Effect.Success<ReturnType<Engine['io']>>;

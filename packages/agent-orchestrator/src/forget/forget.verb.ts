@@ -11,7 +11,7 @@ import { execFileSync } from 'node:child_process';
 import { Effect } from 'effect';
 import { EngineService, over, tried, type Engine } from '../runtime-client.ts';
 import type { Workflow } from '../step/step.ts';
-import { isGitRun, namesInOrder, type GitRun, type Run } from '../record/record.ts';
+import { isGitRun, namesInOrder, runTasks, type GitRun, type Run } from '../record/record.ts';
 import { approvedFirst } from '../status/status.ts';
 import {
   branchFates,
@@ -35,6 +35,7 @@ import { gitWords, merging, resolved } from '../prune/prune.verb.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, spendReader, taskPhasesRead } from '../views/views.verb.ts';
 import { adoptChecks, adoptRounds, adoptTries, closeWaitingTasks, unrecordedSteps } from '../tick/advance.verb.ts';
 import { Invalid } from '../refusal/refusal.ts';
+import { forgetTasks } from './forgetting.verb.ts';
 
 /** A run's answer when nothing of its worktrees or branches was touched, afresh on each call. */
 const nothing = (): Omit<Forgot, 'id' | 'kind'> => ({ removed: [], handedOff: [], gone: [], left: [], branches: [], files: [] });
@@ -68,11 +69,14 @@ type Worktrees = Pick<Forgot, 'removed' | 'handedOff' | 'gone' | 'left'>;
  *    `held`, and nothing else is removed, so its record is there for `nemia rm` to find it by once a person has dealt with them.
  * 2. **Its branches**, as asked (`branchFates`): kept by default; deleted merged into the run's base branch, as git says it, or forced.
  * 3. **Its record, then every file under `WF_ROOT` keyed by its id** (`removeKeyed`): the record first, so the run is never read without
- *    the cancellation it had. A pass halfway through the run writes nothing back (`rewriteRun`). The engine's tasks, journal and sessions
- *    are the engine's, and are not touched.
+ *    the cancellation it had. A pass halfway through the run writes nothing back (`rewriteRun`).
+ * 4. **Its tasks, through the engine** (`forgetTasks`): every task its record names (`runTasks`, the adopted ones among them) was written
+ *    down once nothing refused (`runStore.forgetting`), before anything was removed, and the engine's `forget` removes each settled one's
+ *    journal, feed lines and session files. A task just closed has not settled: it waits, with the marker, for the tick to forget it
+ *    (`finishForgetting`), or for `nemia rm` again. A run `held` lifts its marker and forgets nothing: it is still listed.
  *
  * A run whose record is gone is normal: what is left under its id, its files, is removed and named — never a worktree, since nothing says
- * whose they are — and a run whose worktrees or branches are already gone says so. Refused before anything is read, with exit code 2: an id
+ * whose they are — and its tasks a marker names are forgotten; a run whose worktrees or branches are already gone says so. Refused before anything is read, with exit code 2: an id
  * that is not a name (`idRefusal`). Fails with a refusal a read threw; dies of anything else (`tried`, `awaited`).
  */
 export const forgetRun = Effect.fn('forget')(function* (id: string, how: ForgetHow = {}) {
@@ -80,36 +84,40 @@ export const forgetRun = Effect.fn('forget')(function* (id: string, how: ForgetH
   const refusedId = idRefusal(id);
   if (refusedId) return yield* Effect.fail(new Invalid({ message: refusedId }));
   const dir = path.join(HOME, 'worktrees', id);
-  if (!(yield* tried(() => runStore.runs.exists(id)))) return yield* tried(() => forgetMissing(id, dir));
+  if (!(yield* tried(() => runStore.runs.exists(id)))) return yield* forgetMissing(id, dir);
   const f = yield* readForgetting(e, id);
   const { run, steps, unfrozen } = f;
   const said = { id, repo: run.repo, base: run.branch, isolate: run.isolate, ...(unfrozen ? { unfrozen } : {}) };
   const refusal = yield* tried(() => refusalOf(id, f));
   if (refusal) return { ...said, kind: 'refused', refusal, ...nothing() } satisfies Forgot;
+  const taskIds = [...new Set(runTasks(run))];
+  yield* tried(() => runStore.forgetting.write(id, taskIds));
   yield* closeWaitingTasks(e, run, f.views);
   if (!isGitRun(run)) {
-    return {
-      ...said,
-      folder: true,
-      kind: 'forgotten',
-      ...nothing(),
-      files: yield* tried(() => removeKeyed(id, Object.keys(run.steps))),
-    } satisfies Forgot;
+    const files = yield* tried(() => removeKeyed(id, Object.keys(run.steps)));
+    return { ...said, folder: true, kind: 'forgotten', ...nothing(), files, engine: yield* forgetTasks(id, taskIds) } satisfies Forgot;
   }
   const worktrees = yield* tried(() => removeWorktrees(run, steps, dir));
-  if (worktrees.left.length) return { ...said, kind: 'held', ...worktrees, branches: [], files: [] } satisfies Forgot;
+  if (worktrees.left.length) {
+    yield* tried(() => runStore.forgetting.lift(id));
+    return { ...said, kind: 'held', ...worktrees, branches: [], files: [] } satisfies Forgot;
+  }
   const branches = yield* tried(() => deleteBranches(id, run, how));
   const files = yield* tried(() => removeKeyed(id, Object.keys(run.steps)));
-  return { ...said, kind: 'forgotten', ...worktrees, branches, files } satisfies Forgot;
+  return { ...said, kind: 'forgotten', ...worktrees, branches, files, engine: yield* forgetTasks(id, taskIds) } satisfies Forgot;
 });
 
-/** A run whose record is gone: what is left under its id removed and named, and `worktrees/<id>` named as orphaned, never removed. */
-const forgetMissing = (id: string, dir: string): Forgot => ({
-  id,
-  kind: 'missing',
-  ...nothing(),
-  files: removeKeyed(id, undefined),
-  left: lstatOf(dir) ? [{ path: dir, orphaned: true }] : [],
+/**
+ * A run whose record is gone: what is left under its id removed and named, `worktrees/<id>` named as orphaned, never removed, and the
+ * engine's tasks a `nemia rm` cut short or left waiting wrote down (`runStore.forgetting`) forgotten now (`forgetTasks`).
+ */
+const forgetMissing = Effect.fn('forgetMissing')(function* (id: string, dir: string) {
+  const files = yield* tried(() => removeKeyed(id, undefined));
+  const left: Forgot['left'] = lstatOf(dir) ? [{ path: dir, orphaned: true }] : [];
+  const taskIds = yield* tried(() => runStore.forgetting.read(id));
+  const engine = taskIds ? { engine: yield* forgetTasks(id, taskIds) } : {};
+  const forgot: Forgot = { id, kind: 'missing', ...nothing(), files, left, ...engine };
+  return forgot;
 });
 
 /**
@@ -280,7 +288,7 @@ function deleteBranches(id: string, run: GitRun, how: ForgetHow): BranchFate[] {
  * Remove what is under `WF_ROOT` keyed by a run's id, and answer with each path removed, from `WF_ROOT`: what the run store keeps under it
  * first (`runStore.runs.forget`: its record, cancellation, pruning, hold, asks and own directory of inputs and artifacts), its check
  * logs (`checkLogsOf`, by the steps `names`, or without them any under its id that is no other stored run's), and `worktrees/<id>` once
- * it is empty. Nothing else, and never the engine's.
+ * it is empty. Nothing else, and never the engine's, which `forgetTasks` asks the engine to forget.
  */
 function removeKeyed(id: string, names: readonly string[] | undefined): string[] {
   const removed = runStore.runs.forget(id);

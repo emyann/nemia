@@ -55,7 +55,7 @@ export type PassLine = { text: string; warn?: true; run?: string; step?: string 
 
 /**
  * What the daemon has said while it lasts, so it says each failure once: a queued card's start (`said`), the feed's (`feedSaid`), a move
- * the lifecycle refused (`refusedSaid`), a journal left out (`unreadableSaid`); the store's pause (`pauseSaid`), said once put, on each
+ * the lifecycle refused (`refusedSaid`), a journal left out (`unreadableSaid`), what a pass forgot of removed runs or what refused it (`forgettingSaid`); the store's pause (`pauseSaid`), said once put, on each
  * change of its words and once resumed; and the passes its next summary counts (`interval`).
  */
 export type UpSaid = {
@@ -64,6 +64,7 @@ export type UpSaid = {
   feedSaid: string | undefined;
   refusedSaid: ReadonlySet<string>;
   unreadableSaid: ReadonlySet<string>;
+  forgettingSaid: ReadonlySet<string>;
   interval: Interval | undefined;
 };
 
@@ -74,6 +75,7 @@ export const NOTHING_SAID: UpSaid = {
   feedSaid: undefined,
   refusedSaid: new Set(),
   unreadableSaid: new Set(),
+  forgettingSaid: new Set(),
   interval: undefined,
 };
 
@@ -121,7 +123,7 @@ export function pauseSaid(pause: Pass['pause'], said: string | undefined): { lin
  * and what has been said once they are.
  */
 export function passSaid(pass: Pass, was: UpSaid, now: number): { lines: PassLine[]; said: UpSaid } {
-  const { runs: advanced, queue, feedError, cost, refused, unreadable } = pass;
+  const { runs: advanced, queue, feedError, cost, refused, unreadable, forgetting } = pass;
   const paused = pauseSaid(pass.pause, was.pauseSaid);
   const lines: PassLine[] = paused.lines.map((text) => ({ text }));
   let interval = was.interval;
@@ -134,10 +136,11 @@ export function passSaid(pass: Pass, was: UpSaid, now: number): { lines: PassLin
   const stalled = refusalLines(refused ?? [], was.refusedSaid);
   lines.push(...stalled.lines.map((text) => ({ text })));
   for (const why of unreadable ?? []) if (!was.unreadableSaid.has(why)) lines.push({ text: `left out: ${why}`, warn: true });
+  for (const line of forgetting ?? []) if (!was.forgettingSaid.has(line.text)) lines.push(line);
   const queued = queue ? queueSaid(queue, was.said) : { lines: [], said: was.said };
   lines.push(...queued.lines, ...advancedLines(advanced));
   const said = { said: queued.said, pauseSaid: paused.said, feedSaid: feedError, refusedSaid: stalled.said, interval };
-  return { lines, said: { ...said, unreadableSaid: new Set(unreadable) } };
+  return { lines, said: { ...said, unreadableSaid: new Set(unreadable), forgettingSaid: new Set(forgetting?.map((l) => l.text)) } };
 }
 
 /** Logs `line`, Info or Warn, annotated with the run and the steps it is about. */

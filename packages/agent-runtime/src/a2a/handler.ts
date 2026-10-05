@@ -52,6 +52,7 @@ import {
   RunnerError,
   type ExpectedSession,
   type HarnessQuota,
+  type SessionForgotten,
   type RunnerOps,
   type Transcript,
   type TranscriptCursor,
@@ -123,6 +124,7 @@ export const cardOf = (harness: string, ops: RunnerOps): AgentCard => ({
             ...(ops.transcript ? ['sessionTranscript' as const] : []),
             ...(ops.observeFor ? ['observeSessions' as const] : []),
             ...(ops.quota ? ['harnessQuota' as const] : []),
+            ...(ops.forget ? ['forgetSession' as const] : []),
           ],
           say: ops.say !== undefined,
         } satisfies RuntimeExtensionParams,
@@ -147,6 +149,9 @@ export const cardOf = (harness: string, ops: RunnerOps): AgentCard => ({
 export type TranscriptRequest =
   | { name: string; sessionId?: undefined; after?: TranscriptCursor }
   | { sessionId: string; name?: undefined; after?: TranscriptCursor };
+
+/** A session to forget, by its name and the id its attempt ended with; `dry` lists what would go and removes nothing. */
+export type ForgetRequest = { session: { name: string; nativeId?: string }; dry: boolean };
 
 /** A stream of a session asked for by the session's name: `stdout` or `stderr`, whole or its last `lastBytes` bytes. */
 export type OutputRequest = { name: string; stream: 'stdout' | 'stderr'; lastBytes?: number };
@@ -181,6 +186,11 @@ export interface SessionMethods {
   ): Promise<{ tasks: Task[]; unread: string[] }>;
   /** What the harness's subscription has left, asked of the harness and of no session (`RunnerOps.quota`): one ask each call. */
   harnessQuota(params: Record<string, never>, context: ServerCallContext): Promise<HarnessQuota>;
+  /**
+   * What the harness keeps of a session, by its name and the id it ended with: removed, or with `dry` only listed, and what
+   * it leaves that is not its own to remove (`RunnerOps.forget`). Asked only of a session the harness no longer lists.
+   */
+  forgetSession(params: ForgetRequest, context: ServerCallContext): Promise<SessionForgotten>;
 }
 
 /** Every listed session, as one listing saw them: the pages of that listing are served from here. */
@@ -489,6 +499,21 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
       throw new UnsupportedOperationError(`the \`${this.harness}\` harness reports no quota: no subscription's use can be asked of it.`);
     }
     return this.run(this.ops.quota);
+  }
+
+  async forgetSession(params: ForgetRequest, _context: ServerCallContext): Promise<SessionForgotten> {
+    if (!this.ops.forget) {
+      throw new UnsupportedOperationError(`the \`${this.harness}\` harness keeps nothing of a session to forget.`);
+    }
+    if (typeof params.session?.name !== 'string' || !nameParts(params.session.name)) {
+      throw new RequestMalformedError('the request names no session: send `{ session: { name } }`, the name `ae/<task>/<n>`, n from 1.');
+    }
+    if (typeof params.dry !== 'boolean') {
+      throw new RequestMalformedError(
+        `\`dry: ${String(params.dry)}\` is not a yes or no: send \`dry: true\` to list, \`false\` to remove.`,
+      );
+    }
+    return this.run(this.ops.forget(params.session, { dry: params.dry }));
   }
 
   async createTaskPushNotificationConfig(

@@ -70,6 +70,7 @@ import { OutputRefused, outputVerbOf } from './output.ts';
 import { DEFAULT_HARNESSES } from './harnesses.ts';
 import { a2aOps, type SeamOps } from '../a2a/index.ts';
 import { bodyVerbsOf } from './bodies.ts';
+import { forgetVerbOf, journalBytesOf, type ForgetFailure, type ForgetReport } from './forget.ts';
 import { watchOf } from './watch.ts';
 import {
   handleOf,
@@ -135,7 +136,8 @@ export const listRefusalOf = (args: readonly unknown[]): string | undefined => {
 /**
  * The engine's verbs, each an Effect with what refuses it on its error channel, a tagged error whose message says what to do
  * instead: `FileRefused`, `TickRefused`, `AdmitRefused`, `ListRefused`, `TranscriptRefused`, `OutputRefused`, `SayRefused`,
- * `QuotaRefused`, `StopRefused` for `stop`, `InputRefused` for `answer` and `close`, and `BodyRefused` for `sweep` and `removeBody`.
+ * `QuotaRefused`, `StopRefused` for `stop`, `InputRefused` for `answer` and `close`, `BodyRefused` for `sweep` and `removeBody`, and
+ * `ForgetRefused` for `forget`.
  * `SayUnsent` is `say`'s failure that is not a refusal; a `JournalError` or a `RunnerError` is the store's or the harness's.
  * `refusalWords(verb)` words a refusal as `ae` says it.
  * `watch`, `io` and `start` succeed at once: `watch` and `start` with a handle that stops them.
@@ -347,10 +349,22 @@ export type EngineShape = {
    */
   readonly removeBody: (ref: string) => Effect.Effect<void, BodyRefused | JournalError>;
   /**
-   * Everything that has happened since `after`, and where to resume. An entry no runtime wrote is skipped, the cursor past it, and
-   * said on `refused` (`FeedRefusal`), so it is met by one read and stops no reader.
+   * Forget the settled tasks `taskIds`: their journals, the files their harness keeps of each session, and their lines in the
+   * feed, every cursor keeping its place. Without `{ yes: true }`, count what would go and remove nothing (`forgotten: false`). What
+   * a harness keeps of its own, a transcript or a remote party's Task, stays and is named in `left`; a body goes only by `sweep`.
+   * Refused — `ForgetRefused`, nothing removed, every id asked first — for an argument other than a list of ids and nothing or
+   * `{ yes }`; a store with no `forget`; an id the store does not list; a journal that cannot be read; a task not settled; one
+   * filed on a harness this engine does not have; and one whose harness still lists a session of it, or could not be read.
    */
-  readonly feed: (after?: Cursor) => Effect.Effect<{ entries: FeedEntry[]; cursor: Cursor; refused?: FeedRefusal[] }, JournalError>;
+  readonly forget: (taskIds: readonly string[], options?: { yes?: boolean }) => Effect.Effect<ForgetReport, ForgetFailure>;
+  /**
+   * Everything that has happened since `after`, and where to resume. An entry no runtime wrote is skipped, the cursor past it, and
+   * said on `refused` (`FeedRefusal`), so it is met by one read and stops no reader. Lines of tasks forgotten since are counted on
+   * `forgotten`, the count of those after `after`.
+   */
+  readonly feed: (
+    after?: Cursor,
+  ) => Effect.Effect<{ entries: FeedEntry[]; cursor: Cursor; refused?: FeedRefusal[]; forgotten?: number }, JournalError>;
   /**
    * Watch everything that happens, as it happens — the engine's event-driven surface.
    *
@@ -403,6 +417,10 @@ const openAttemptOf = (taskId: string, state: State, resume: string): { last: At
 
 /** An observe count with nothing counted: a harness this engine has not observed yet. */
 const NONE: ObserveCount = { calls: 0, ms: 0, listed: 0, spawned: 0, unread: 0 };
+
+/** The harnesses' observe counts as they stand, each copied, so a later call does not move what was read. */
+const copyOf = (observed: Record<string, ObserveCount>): Record<string, ObserveCount> =>
+  Object.fromEntries(Object.entries(observed).map(([name, o]) => [name, { ...o }]));
 
 /** What failed, in words, off a cause: its error's message, or the value itself. */
 const wordsOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
@@ -531,8 +549,7 @@ const make = (options: EngineOptions) =>
     const events = (taskId: string) => Effect.runPromise(Effect.flatMap(Journal, (j) => j.read(taskId)).pipe(Effect.provide(journal)));
     const observed: Record<string, ObserveCount> = {};
     const counted = countedInto(observed);
-    const observedNow = (): Record<string, ObserveCount> =>
-      Object.fromEntries(Object.entries(observed).map(([name, o]) => [name, { ...o }]));
+    const observedNow = () => copyOf(observed);
     const runners = Object.fromEntries(
       Object.entries(runnersOf(harnesses, root, options.credentials, options.missingCredential)).map(([name, ops]): [string, SeamOps] => [
         name,
@@ -752,6 +769,7 @@ const make = (options: EngineOptions) =>
       close: (taskId) => go(close(taskId)),
       feed: feedVerb,
       ...bodyVerbsOf(go),
+      forget: forgetVerbOf(go, runners, harnessOf, journalBytesOf(journalOps)),
       watch: watchOf(feedVerb, journalOps.subscribe),
       io: () => Effect.sync(() => ({ ...ioCounts(), observed: observedNow() })),
       start: startOf(tickVerb),

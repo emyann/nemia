@@ -76,6 +76,8 @@ owns what*.
 - **A long text of a line is a body named by its sha256, resolved on every read** (`core/engine/bodies.ts`): its field takes the
   place of the one it stands for (`STANDS_FOR`), so a read gives the event key for key; a body goes only through `sweep` or
   `removeBody`, which read every journal and the feed first (`src/core/engine/bodies.test.ts`, `test/verb-refusals.test.ts`).
+- **Every feed write goes through `filesOps.append` under `feed.lock`** (`withFeedLock`), a rotation too; a rotated feed has a header
+  and a sealed file (`core/engine/feed.ts`): read it through `readFeed`, never as plain lines from byte 0.
 - **A `claude agents --json` row of ours is decoded by `RegistryRowSchema` (`harness/claude/registry.ts`)**: one that does not decode
   fails the whole read, so every background session is unread, never absent. A field the runtime starts reading is added to the schema;
   a row not ours (no `ae/` name, no `state`) is skipped undecoded.

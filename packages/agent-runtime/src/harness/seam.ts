@@ -213,7 +213,21 @@ export type RunnerOps = {
    * with `Runner.of` and no layer.
    */
   readonly refuses?: (task: Omit<SpawnRequest, 'name'>) => string | undefined;
+  /**
+   * Remove what this harness keeps of a session whose task is settled and forgotten: optional, for a harness that keeps files
+   * of its own per session. Given the name the engine gave the session and the id the harness knew it by, when it had one;
+   * with `dry`, nothing is removed and the answer says what would be. Answers the files removed, and what it leaves that is
+   * not its own to remove (a conversation's transcript, a remote party's Task). Idempotent: a file already gone is no error,
+   * and not in the answer.
+   */
+  readonly forget?: (
+    session: { name: string; nativeId?: string },
+    options: { dry: boolean },
+  ) => Effect.Effect<SessionForgotten, RunnerError>;
 };
+
+/** What a harness removed of a session (`RunnerOps.forget`), or would remove, by path, and what it leaves, by name. */
+export type SessionForgotten = { files: string[]; left: string[] };
 
 export class Runner extends Context.Service<Runner, RunnerOps>()('engine/Runner') {
   /**

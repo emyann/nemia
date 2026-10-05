@@ -75,6 +75,7 @@ export const board = () => {
       start: unkept('start'),
       sweep: unkept('sweep'),
       removeBody: unkept('removeBody'),
+      forget: unkept('forget'),
     }),
   );
   const settle = (id: string, phase: TaskPhase, closeout?: unknown, exitCode?: number) =>

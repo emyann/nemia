@@ -495,8 +495,8 @@ export type State = {
 };
 
 /**
- * Ends the attempt `a` as the `ended` event `e` says: an empty list of skills or files kept, an empty one of denials not, and an end with no
- * usage keeping what was counted while it ran (`counted`).
+ * Ends the attempt `a` as the `ended` event `e` says: an empty list of skills or files kept, an empty one of denials not, and an end with
+ * no usage keeping what was counted while it ran (`counted`).
  */
 function endAttempt(a: Attempt, e: Extract<Event, { kind: 'ended' }>): void {
   a.ended = e.observed;

@@ -1,7 +1,8 @@
 /**
  * What a detached session's output says, as a spec's `readOutput` reads it: `claude -p`'s one result, and `claude -p`'s stream
  * of events — its closeout, what it consumed and cost, whether it spent its budget, what it was denied, and, off the stream,
- * the skills it loaded and the files it touched. Pure functions of the text. Codex's `exec --json` stream is read by `codexOutput` (`harness/codex/stream.ts`).
+ * the skills it loaded and the files it touched. Pure functions of the text. Codex's `exec --json` stream is read by `codexOutput`
+ * (`harness/codex/stream.ts`).
  */
 import path from 'node:path';
 import type { Denial, Usage } from '../../core/index.ts';
@@ -264,6 +265,13 @@ const fileIn = (cwd: string, tool: string, input: unknown): string | undefined =
   return rel && !rel.startsWith('..') && !path.isAbsolute(rel) ? rel : undefined;
 };
 
+/** A stream line that may say a session's folder, a file tool's call or a denial: the only lines `touchedFiles` parses. */
+const FILE_LINE = /"tool_use"|"init"|denied|"result"/;
+
+/** The folder a stream's `system` `init` line names, or none. */
+const initCwd = (e: StreamLine): string | undefined =>
+  e.type === 'system' && e.subtype === 'init' && typeof e.cwd === 'string' && e.cwd ? e.cwd : undefined;
+
 /**
  * Each file a stream's session read or wrote through its file tools (`FILE_KEYS`), a subagent's calls included, once, in the
  * order first touched, relative to the folder its `system` `init` line names (`cwd`). A call the session was denied, by its event
@@ -275,10 +283,9 @@ const touchedFiles = (output: string): string[] | undefined => {
   const denied = new Set<unknown>();
   let cwd: string | undefined;
   for (const line of output.split('\n')) {
-    if (!line.includes('"tool_use"') && !line.includes('"init"') && !line.includes('denied') && !line.includes('"result"')) continue;
-    const e = parsedLine(line);
+    const e = FILE_LINE.test(line) ? parsedLine(line) : undefined;
     if (!e) continue;
-    if (e.type === 'system' && e.subtype === 'init' && typeof e.cwd === 'string' && e.cwd) cwd ??= e.cwd;
+    cwd ??= initCwd(e);
     for (const [id, tool, input] of toolCalls(e, (t) => t in FILE_KEYS)) if (!calls.has(id)) calls.set(id, [tool, input]);
     for (const id of deniedIds(e)) denied.add(id);
   }

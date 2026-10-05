@@ -4,7 +4,7 @@
  * cursor held while `say` fails; an unsubscribe that stops delivery; and a feed cut under the cursor read again from its start. Each test
  * runs a deliverer of its own and waits for what it counts. A store of its own, since `WF_ROOT` is read as the module loads.
  */
-import { test } from 'node:test';
+import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -35,12 +35,14 @@ const e = {
     }),
 };
 
-/** A deliverer at a pace a test waits on, running until the answer is called. */
-const running = (): (() => Promise<void>) => {
+/** A deliverer at a pace a test waits on, running until the answer is called, or else until test `t` ends, whatever its verdict. */
+const running = (t: TestContext): (() => Promise<void>) => {
   const fiber = Effect.runFork(
     over(e)(deliver({ every: '10 millis', beat: '10 millis', digestCheck: '10 millis', retry: '5 millis', retryCap: '20 millis' })),
   );
-  return () => Effect.runPromise(Fiber.interrupt(fiber)).then(() => undefined);
+  const stop = () => Effect.runPromise(Fiber.interrupt(fiber)).then(() => undefined);
+  t.after(stop);
+  return stop;
 };
 
 /** Waits until `holds` does, saying `what` if it never does. */
@@ -64,9 +66,9 @@ const subscribed = (name: string, task: string): void =>
 
 const toldTo = (task: string): string[] => told.get(task) ?? [];
 
-test('a wake line is said once, the routine lines before it riding it as one digest, and the cursor kept once it is said', async () => {
+test('a wake line is said once, the routine lines before it riding it as one digest, and the cursor kept once it is said', async (t) => {
   subscribed('once', 't-once');
-  const stop = running();
+  const stop = running(t);
   appended(line('r-1', 'running'), line('r-1', 'verified ✓'), line('r-1', 'awaiting approval'));
   await until(() => toldTo('t-once').length === 1, 'the wake said');
   const [first] = toldTo('t-once');
@@ -84,11 +86,11 @@ test('a wake line is said once, the routine lines before it riding it as one dig
   dropSubscription('once');
 });
 
-test('a digest falls due after its minutes with no wake: said alone, then emptied', async () => {
+test('a digest falls due after its minutes with no wake: said alone, then emptied', async (t) => {
   subscribed('quiet', 't-quiet');
   const folded = line('r-3', 'verified ✓');
   writeDelivery('quiet', { cursor: feedSize(), digest: [folded], since: { at: Date.now() - 61 * 60_000 } });
-  const stop = running();
+  const stop = running(t);
   await until(() => toldTo('t-quiet').length === 1, 'the digest said');
   assert.match(
     toldTo('t-quiet')[0],
@@ -99,16 +101,16 @@ test('a digest falls due after its minutes with no wake: said alone, then emptie
   dropSubscription('quiet');
 });
 
-test('a restart reads where the deliverer was off its file: no line said again, none dropped', async () => {
+test('a restart reads where the deliverer was off its file: no line said again, none dropped', async (t) => {
   subscribed('restart', 't-restart');
-  let stop = running();
+  let stop = running(t);
   appended(line('r-4', 'failed ✗ check (exit 1)'));
   await until(() => toldTo('t-restart').length === 1, 'the first wake said');
   appended(line('r-4', 'running'));
   await until(() => readDelivery('restart')?.digest.length === 1, 'the routine line folded');
   await stop();
   appended(line('r-5', 'awaiting approval'));
-  stop = running();
+  stop = running(t);
   await until(() => toldTo('t-restart').length === 2, 'the wake written while it was down said');
   const [, second] = toldTo('t-restart');
   assert.match(second, /r-5 {2}build {2}awaiting approval/);
@@ -118,10 +120,10 @@ test('a restart reads where the deliverer was off its file: no line said again, 
   dropSubscription('restart');
 });
 
-test('the cursor stays while say fails, said again after a backoff until it is taken', async () => {
+test('the cursor stays while say fails, said again after a backoff until it is taken', async (t) => {
   subscribed('held', 't-held');
   failing.add('t-held');
-  const stop = running();
+  const stop = running(t);
   appended(line('r-6', 'running'));
   await until(() => readDelivery('held')?.digest.length === 1, 'the routine line folded');
   const before = readDelivery('held')!;
@@ -136,10 +138,10 @@ test('the cursor stays while say fails, said again after a backoff until it is t
   dropSubscription('held');
 });
 
-test('an unsubscribe stops delivery, and the deliverer drops its file', async () => {
+test('an unsubscribe stops delivery, and the deliverer drops its file', async (t) => {
   subscribed('leaving', 't-leaving');
   subscribed('staying', 't-staying');
-  const stop = running();
+  const stop = running(t);
   appended(line('r-7', 'awaiting approval'));
   await until(() => toldTo('t-leaving').length === 1 && toldTo('t-staying').length === 1, 'both told');
   dropSubscription('leaving');
@@ -155,9 +157,9 @@ test('an unsubscribe stops delivery, and the deliverer drops its file', async ()
   dropSubscription('staying');
 });
 
-test('a feed cut under the cursor is read again from its start', async () => {
+test('a feed cut under the cursor is read again from its start', async (t) => {
   subscribed('cut', 't-cut');
-  const stop = running();
+  const stop = running(t);
   appended(line('r-9', 'awaiting approval'));
   await until(() => toldTo('t-cut').length === 1, 'the wake said');
   fs.writeFileSync(feedFile(), `${JSON.stringify(line('r-10', 'blocked'))}\n`);

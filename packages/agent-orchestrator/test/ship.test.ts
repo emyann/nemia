@@ -2352,6 +2352,38 @@ test('a loop out of rounds is sent to merge without `nemia round`: the merge spe
   assert.equal(roundOf(readRun(id), 'review'), 1, 'still round 1 of 1');
 });
 
+test("a merge past round 1 owes no replies: the target's merge try is handed no findings, and its empty list signs it off, so review is filed after it", async () => {
+  const repo = aRepo();
+  const run = await Effect.runPromise(startRun({ brief: 'add sub', repo, workflowDir: loopingFolder(2) }));
+  const { e, settle, tasks } = board();
+  const id = run.id;
+  await runWith(e, advanceRun(readRun(id)));
+  const work = readRun(id).steps.implement;
+  addSub(work.workspace!);
+  git(work.workspace!, 'commit', '-q', '-am', 'add sub');
+  settle(`${id}-implement`, 'succeeded', SIGNED);
+  await runWith(e, advanceRun(readRun(id)));
+  settle(`${id}-review`, 'succeeded', { ...SIGNED, again: true });
+  await runWith(e, advanceRun(readRun(id)));
+  const unsigned = 'A closeout without it, or with an empty list, is unsigned.';
+  assert.ok(tasks.get(`${id}-implement-try2`)!.spec.brief.includes(unsigned), 'round 2 of a round owes its replies');
+  settle(`${id}-implement-try2`, 'succeeded', { ...SIGNED, replies: [{ finding: 'sub', answer: 'fixed', why: 'kept it' }] });
+  await runWith(e, advanceRun(readRun(id)));
+  settle(`${id}-review-try2`, 'succeeded', { ...SIGNED, again: true });
+  assert.deepEqual((await runWith(e, advanceRun(readRun(id)))).filed, [], 'out of rounds at round 2 of 2');
+
+  mainMoves(repo);
+  await runWith(e, mergeRun(id, 'review'));
+  assert.deepEqual((await runWith(e, advanceRun(readRun(id)))).looped, ['review']);
+  assert.equal(roundOf(readRun(id), 'review'), 2);
+  const brief = tasks.get(`${id}-implement-try3`)!.spec.brief;
+  assert.ok(brief.includes('You were handed no findings this round.'), brief);
+  assert.ok(!brief.includes(unsigned), brief);
+  settle(`${id}-implement-try3`, 'succeeded', { ...SIGNED, replies: [] });
+  await runWith(e, advanceRun(readRun(id)));
+  assert.ok(tasks.has(`${id}-review-try3`), 'the merge try signed off with no replies, and review reads the merge');
+});
+
 test('REFUSED at shipped defaults: a round or an acceptance of a loop out of rounds while a merge of it is asked — either would drop the merge unsaid, and the refusal names the ask to take back', async () => {
   const { repo, id, e } = await atTheCap();
   mainMoves(repo);

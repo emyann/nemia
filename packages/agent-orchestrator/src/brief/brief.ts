@@ -30,6 +30,17 @@ import { inputsLine, mountsLine } from '../start/index.ts';
 import { resultSteps, workChecks } from '../branches/branches.ts';
 
 /**
+ * What a step's closeout says of `replies` (`closeoutContract`): owed on a round filed, none on a merge filed — told by the round itself,
+ * since its brief is composed before the record moves the try behind — else owed past round 1 (`owesReplies`), none for any other try of
+ * a loop's target, and nothing for a step that closes no loop.
+ */
+const repliesOf = (step: Workflow, run: Run, steps: readonly Workflow[], round?: RoundBriefing): 'owed' | 'none' | false => {
+  if (round) return round.merge ? 'none' : 'owed';
+  if (owesReplies(steps, run, step.name)) return 'owed';
+  return isLoopTarget(steps, step.name) ? 'none' : false;
+};
+
+/**
  * What a step is told. THE decision about what one step knows of another.
  *
  * It gets: its own prose, the original request, and where to look. It does NOT get the previous
@@ -113,11 +124,7 @@ export function composeBrief(
   const contracts = [
     ...(step.check ? [landsOnCheck(step, run) ? landingContract(step.check) : checkContract(step.check)] : []),
     ...(artifactsDir ? [artifactsContract(artifactsDir, step.workspace === 'main', inFolder)] : []),
-    closeoutContract(
-      step,
-      (round && !round.merge) || owesReplies(steps, run, step.name) ? 'owed' : isLoopTarget(steps, step.name) ? 'none' : false,
-      inFolder,
-    ),
+    closeoutContract(step, repliesOf(step, run, steps, round), inFolder),
   ].join('\n');
   const again = againSection(step, run, steps, closeoutOf, inFolder, retry, round);
   if (retry?.resumed || round?.resumed) return again.slice(1) + contracts;

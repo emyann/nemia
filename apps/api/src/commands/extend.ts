@@ -4,9 +4,8 @@
  * and the arguments those keys carry.
  */
 import { Schema } from 'effect';
-import { type Args, budgetRefusal, type CommandSpec, commandLine, type RetryHow, roundBudgetRefusal } from 'agent-orchestrator';
+import { type Args, budgetRefusal, type CommandSpec, commandLine, type RetryHow, roundBudgetRefusal, tryOf } from 'agent-orchestrator';
 import type { Run } from 'agent-orchestrator/run';
-import { tryOf } from '../agents/try.ts';
 import { answeredHow } from '../asks/answers.ts';
 import type { Refusal } from '../guard.ts';
 import type { Engine } from '../store.ts';

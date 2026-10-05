@@ -17,10 +17,18 @@ import {
   resultSteps,
   sensitiveDiff,
   touchedBy,
+  judgedSteps,
+  stepNames,
+  viewsOf,
+  workflowsOf,
+  holdingOf,
+  judge,
+  type RunHolding,
+  type RunWaiting,
+  runWaitingOf,
 } from 'agent-orchestrator';
 import { type CheckoutHold, type GitRun, holdsOf, isGitRun, type Run, type RunSlot, waitsOf } from 'agent-orchestrator/run';
-import { holdingOf, judge, type RunHolding, type RunWaiting, waitingOf } from '../runs/judged.ts';
-import { type Engine, judgedSteps, stepNames, viewsOf, workflowsOf } from '../store.ts';
+import { type Engine } from '../store.ts';
 import { type StepUsed, totalOf, usedOf } from '../detail/usage.ts';
 
 export type { DecideCommand };
@@ -192,7 +200,7 @@ const MERGES = COMMANDS.find((c) => c.name === 'merges')!;
  */
 export async function decisionOf(run: Run, e: Engine['Service'], home: string, env: NodeJS.ProcessEnv): Promise<RunDecision> {
   const parent = await parentsOf(e, run);
-  const waiting = waitingOf(run, waitsOf(run, parent));
+  const waiting = runWaitingOf(run, waitsOf(run, parent));
   const holding = holdingOf(run, holdsOf(run, parent));
   if (waiting) return { waiting, ...(holding ? { holding } : {}) };
   if (holding) return { holding };

@@ -331,15 +331,9 @@
       }
     },
     {
-      "files": ["apps/api/src/runs/judged.ts"],
+      "files": ["packages/agent-orchestrator/src/summary/judged.verb.ts"],
       "rules": {
         "complexity": ["error", { "max": 22 }]
-      }
-    },
-    {
-      "files": ["apps/api/src/runs/runs.ts"],
-      "rules": {
-        "sonarjs/cognitive-complexity": ["error", 16]
       }
     },
     {

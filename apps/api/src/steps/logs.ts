@@ -1,8 +1,8 @@
 /** A step's session output and its check's, as the board is given them: the end of each, and what a refused check said. */
-import { phaseOfView, verdictWord } from 'agent-orchestrator';
+import { phaseOfView, verdictWord, type Views } from 'agent-orchestrator';
 import type { Run } from 'agent-orchestrator/run';
 import type { Workflow } from 'agent-orchestrator/workflow';
-import type { Engine, Views } from '../store.ts';
+import type { Engine } from '../store.ts';
 
 /**
  * The command a step is judged by, and what it said once it refused.

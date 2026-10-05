@@ -13,7 +13,7 @@ import { ceilingsOf, pauseOf, feed, QuotaAsker, readDaemon } from './factory/ind
 import { inbox } from './inbox/inbox.ts';
 import { ApiConfig, type ApiEnv, type ApiRuntime, ReadMemo, served, type Services } from './layer.ts';
 import { machines } from './machines/machines.ts';
-import { runs } from './runs/index.ts';
+import { runs } from './runs/runs.ts';
 import { stats } from './stats/stats.ts';
 import { steps } from './steps/index.ts';
 import { Engine, StoreRoot } from './store.ts';

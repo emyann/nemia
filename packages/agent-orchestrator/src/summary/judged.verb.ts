@@ -1,37 +1,25 @@
 /**
  * What a run established, over one read of its tasks (`judge`): each step's word and note in `wf ls`'s words, who is waited on and why,
- * where the run stands, whether it still moves, what it has cost, and what a person has to decide about its result.
+ * where the run stands, whether it still moves, what it has cost, and what a person has to decide about its result. The board's reading
+ * of a run, as the list and a run's page give it. A controller: it reads the run through `runReading` and git through `branchStandings`.
  */
-import {
-  answerIn,
-  type BranchReader,
-  branchReader,
-  type BranchStanding,
-  branchStandings,
-  closeoutOf,
-  deniedOf,
-  holdAdvice,
-  holdWord,
-  merges,
-  nameFor,
-  type ParentRun,
-  resultSteps,
-  type Retry,
-  type RetryAsk,
-  runReading,
-  sendBackTo,
-  type Spend,
-  type SpendOf,
-  spentWord,
-  toDecideWords,
-  type Wait,
-  waitAdvice,
-  waitWord,
-  wordOfView,
-} from 'agent-orchestrator';
-import { type Assessment, inFlight, isGitRun, onYouWords, type Run, type ToDecide } from 'agent-orchestrator/run';
-import { isRemoteHarness, type Workflow } from 'agent-orchestrator/workflow';
-import { bare, type Engine, judgedSteps, type Views } from '../store.ts';
+import { type Engine, nameFor } from '../runtime-client.ts';
+import { answerIn, onYouWords } from '../list/list.ts';
+import { runReading } from '../list/list.verb.ts';
+import { type BranchReader, branchReader, branchStandings } from '../branches/branches.store.ts';
+import { resultSteps } from '../branches/branches.ts';
+import { type BranchStanding, sendBackTo, type Spend, type SpendOf, spentWord } from '../status/status.ts';
+import { closeoutOf, deniedOf } from '../views/views.verb.ts';
+import { wordOfView } from '../views/views-words.ts';
+import { holdAdvice, holdWord, type ParentRun, type Wait, waitAdvice, waitWord } from '../wait/wait.ts';
+import { merges, type ToDecide, toDecideWords } from '../ending/ending.ts';
+import type { Retry, RetryAsk } from '../retry/index.ts';
+import type { Assessment } from '../tick/assess.ts';
+import { inFlight } from '../cap/cap.ts';
+import { isGitRun, type Run } from '../record/record.ts';
+import { isRemoteHarness } from '../harness/harness.ts';
+import type { Workflow } from '../step/step.ts';
+import { bare, judgedSteps, type Views } from './reads.verb.ts';
 
 /** Where a run stands, as `assess` decides it: `running` until every step is final one way or the other. */
 export type RunStatus = Assessment['status'];
@@ -75,7 +63,7 @@ function toDecideOf(run: Run, t: ToDecide | undefined, steps: readonly Workflow[
 /**
  * What sessions cost, as the package adds it up off the engine's `usage.costUsd` (`Spend`: `stepSpend`, `runSpend`): the dollars of the
  * attempts that ended with a cost on them, how many did (`measured`), and how many ended with none (`unmeasured`) — a session's cost is
- * known only once it ends, a job's (`claude -p`) with its result and a background session's with its attempt, and one killed first, or on a
+ * known only once it ends, a job's with its result and a background session's with its attempt, and one killed first, or on a
  * model its harness could not price, has none. An attempt still running is in neither. `said` is the package's word for it (`spentWord`):
  * `$4.20`, and `≥$4.20` where an ended attempt has no cost on it, so a part never reads as the whole. Null wherever no attempt was
  * measured: a cost nobody measured is not $0.
@@ -127,14 +115,14 @@ export type RunHolding = {
  * `needs` is the closeout's, for a step whose current try signed off blocked: its question. Null for any other step.
  *
  * `blockedByHarness` is whether the harness marked the step's session blocked while it gave no closeout — the engine's
- * `needs-human` — which is no question of the step's, as when a session stops on "Could not refresh your login because another Claude
- * Code process is refreshing it". What the session said last is on the run's detail alone (`lastLine`): reading it observes the
+ * `needs-human` — which is no question of the step's, as when a session stops on a login that another process of its
+ * harness is refreshing. What the session said last is on the run's detail alone: reading it observes the
  * harness again, and the list is read on every poll of the Factory for one observation.
  *
  * `waitingFor` is what that harness says the session waits for, where it says anything (`TaskView.waitingFor`, off the same
  * views — no observation of its own, unlike `lastLine`). Both halves are the package's words, never worded here: `words` is
  * the wait a card or a node says (`waiting for a permission prompt`), `advice` what a person does about it, naming the
- * session `claude agents` lists it under, or for a step on a remote A2A agent the `wf say` that answers its Task (`answerIn`). Said under
+ * session its harness lists it under, or for a step on a remote A2A agent the `wf say` that answers its Task (`answerIn`). Said under
  * the wait, never with it — one sentence between them, and a surface with room for both. Null where the harness said nothing, and for a
  * step nothing blocked — read afresh on every request, so a session that stops waiting stops carrying it.
  *
@@ -158,13 +146,13 @@ export type StepNeeds = {
  * A run waited on that never ships without a person: what `wf ls` prints `→ waiting on you:` for, and `waitAdvice` says is yours to
  * resolve.
  *
- * The package decides it (`neverShips` in its wait/wait.ts) and does not export it. Read here off `Wait`'s own contract — its id and, when
+ * The package decides it (`neverShips` in wait/wait.ts) and does not export it. Read here off `Wait`'s own contract — its id and, when
  * it may never ship without a person, why — so any reason it carries counts, not only `missing`, `cancelledAt` and `gone`.
  */
 const neverShips = (w: Wait): boolean => Object.entries(w).some(([key, why]) => key !== 'run' && why !== undefined);
 
 /** What a run still waits on (`RunWaiting`), in the package's words; null when it waits on no run. */
-export function waitingOf(run: Run, waits: readonly Wait[]): RunWaiting | null {
+export function runWaitingOf(run: Run, waits: readonly Wait[]): RunWaiting | null {
   if (!waits.length) return null;
   return {
     runs: waits.map((w) => ({ run: w.run, missing: Boolean(w.missing), cancelledAt: w.cancelledAt ?? null, gone: w.gone ?? [] })),
@@ -240,7 +228,7 @@ type Judged = {
    * fails on it.
    */
   moving: boolean;
-  /** The runs its roots wait on (`waitingOf`). */
+  /** The runs its roots wait on (`runWaitingOf`). */
   waiting: RunWaiting | null;
   /** A person's hold on it (`holdingOf`). */
   holding: RunHolding | null;
@@ -274,15 +262,17 @@ const toDecideBranches = (run: Run, steps: readonly Workflow[], status: RunStatu
  * Result branches this process has seen on their base branch, as `<run>/<branch>` — a run id has no slash, so the pair is unambiguous —
  * against the work the run had filed when git said so (`workFiled`).
  *
- * A branch merged into the base does not come off it again short of a history rewrite, and it is the answer that says there is nothing left
- * to decide: remembering it can only forget a decision, never invent one, which is the safe direction of the level-triggered rule (the
- * dangerous answer, `ahead`, is asked every time). A read's cache, as the feed's filing times are: a fresh api asks git again. It spares
- * the store's long tail — finished runs whose branches are already on the base — two `git` calls a branch on every poll of the list.
+ * A branch merged into the base does not come off it again short of a history rewrite, and it is the answer that says there is nothing
+ * left to decide: remembering it can only forget a decision, never invent one, which is the safe direction of the level-triggered rule
+ * (the dangerous answer, `ahead`, is asked every time). A read's cache, as the feed's filing times are: a fresh process asks git again.
+ * It spares the store's long tail — finished runs whose branches are already on the base — two `git` calls a branch on every poll of the
+ * list.
  *
  * The work is what the answer is remembered against, because the other way a branch grows is a person trying a finished run's step again:
  * a run whose branch had nothing on it past its base reads `on` too (`isShipped`'s `unchanged`), and its next try may commit. A try or a
  * round files a task, which the record carries, so the memo is dropped and git is asked afresh. What is left is a person committing to a
- * finished run's branch by hand, which nothing on the board is told of either: `wf decide` reads git every time, and so does a fresh api.
+ * finished run's branch by hand, which nothing on the board is told of either: `wf decide` reads git every time, and so does a fresh
+ * process.
  */
 const onTheBase = new Map<string, string>();
 
@@ -310,14 +300,14 @@ const workFiled = (run: Run, steps: readonly Workflow[]): string =>
  *
  * `git` is the request's reader (`branchReader`: one listing of a repository's branches for every run of it). `asked`, where given, is told
  * what git was asked of — the branches it did not find on the base, which only their tips can move, a branch on the base staying there as
- * `onTheBase` has it; and whether git answered — which is what the list's memo of runs at rest watches (`resting.ts`).
+ * `onTheBase` has it; and whether git answered — which is what the list's memo of runs at rest watches (`RestingMemo`).
  */
 export function standingsOf(
   run: Run,
   steps: readonly Workflow[],
   status: RunStatus,
   git: BranchReader = branchReader(),
-  asked?: Asked,
+  asked?: GitAsked,
 ): BranchStanding[] {
   if (!isGitRun(run)) return [];
   const filed = workFiled(run, steps);
@@ -335,7 +325,7 @@ export function standingsOf(
 }
 
 /** What `standingsOf` asked git about for one run: the result branches git did not find on the base, and whether git failed to answer. */
-export type Asked = { branches: string[]; failed: boolean };
+export type GitAsked = { branches: string[]; failed: boolean };
 
 /**
  * What `judge` reads with: the request's reader (`seenBy`), which answers the run's tasks and those of the runs it waits on off the views
@@ -344,7 +334,7 @@ export type Asked = { branches: string[]; failed: boolean };
  * waits on and is held until as the caller read them (`parentsOf`), read afresh left out.
  */
 export type JudgeHow = {
-  reader: Engine['Service'];
+  reader: Engine;
   git?: BranchReader;
   standings?: (status: RunStatus, steps: readonly Workflow[]) => readonly BranchStanding[];
   parent?: (id: string) => ParentRun;
@@ -381,7 +371,7 @@ export async function judge(
   const shown = [...steps, ...names.filter((name) => !steps.some((s) => s.name === name)).map(bare)];
   const read = await runReading(reader, run, { views, steps, shown, standings, ...(git ? { git } : {}), ...(parent ? { parent } : {}) });
   const { status, stoppedOn, ready, check, retry, round } = read.assessed;
-  const waiting = waitingOf(run, read.waiting);
+  const waiting = runWaitingOf(run, read.waiting);
   const holding = holdingOf(run, read.holding ?? []);
   const { hold: _, ...unheld } = run;
   const due = holding && !holding.onYou ? read.assessOf(unheld) : { ready, check, retry, round };
@@ -412,7 +402,7 @@ export async function judge(
  * What a person has to know to act on a step (`StepNeeds`), off the views the request already read, with no observation of its own: its
  * current try's closeout, the engine's word for its task, and what the run established of it (`judge`) — for a step at its gate that waits
  * on you, what `wf ls` asks of you, in its words (`onYouWords`). A wait is said only for a step the harness blocked, nothing else having
- * one for a person to answer: the words the reading put beside its status (`waits`), and the name `claude agents` lists that session under
+ * one for a person to answer: the words the reading put beside its status (`waits`), and the name its harness lists that session under
  * (`nameFor`). What its try was denied is the reading's words too (`denied`), with each call off the views (`deniedOf`).
  */
 export function needsOf(run: Run, name: string, views: Views, judged: Pick<Judged, 'words' | 'waitingOnYou' | 'beside'>): StepNeeds {

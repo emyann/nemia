@@ -336,8 +336,8 @@ const SAY: Command<{ at: string; attempt: number; text: string; try: number; tas
 };
 
 /**
- * `wf ls`: every run, or the one named, and its steps, as the package reads each (`runsListed`). The api serves the runs on this route off
- * the same reading of each (`runReading`), as the board's summaries.
+ * `wf ls`: every run, or the one named, and its steps, as the package reads each (`runsListed`). The board's list is the runs' summaries,
+ * judged off the same reading of each (`runReading`), on the entry the api serves alone (`RUNS`).
  */
 const LS: Command<RunsListed> = {
   name: 'ls',
@@ -357,7 +357,10 @@ const LS: Command<RunsListed> = {
     unknown: (arg) => `wf ls takes one run's id, or none: not ${arg}.`,
   },
   writes: false,
-  route: { method: 'GET', path: '/api/runs', status: 200 },
+  only: {
+    side: 'cli',
+    why: "its lines are each run's for a person at a terminal; the board reads every run judged into a summary, kept between its polls, off the runs entry",
+  },
   handler: (e, args) => runsListed(e, textOf(args, 'runId')),
   print: (listed) => [...(listed.paused ? pausedLines(listed.paused) : []), ...lsLines(listed, Date.now())],
 };

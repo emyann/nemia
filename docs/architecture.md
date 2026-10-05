@@ -93,8 +93,10 @@ its files in the store, its tasks on the runtime's feed, its result branches' ti
 restart, so it never decides what a full pass would not; the tests that tick judge every answer from it in full as well
 (`WF_VERIFY_REST`). The stats keep one more, on the same key, in the process that serves them: each finished run's facts,
 while its files in the store stamp the same and nothing of its tasks is on the feed (`StatsMemo` in
-`src/stats/stats.verb.ts`, both memos brought up to the feed by `src/rest/rest.verb.ts`). The api holds it for an app;
-`wf stats` keeps none, and the api's tests read every answer from it afresh as well.
+`src/stats/stats.verb.ts`), and the board's list of runs one more: each finished run's summary, while its record, its files in the
+store, its tasks on the feed and its branches' tips stand (`RestingMemo` in `src/rest/resting.verb.ts`, read by the list's `runs` entry
+through `runsSummarized` in `src/summary/summary.verb.ts`), every memo brought up to the feed by `src/rest/rest.verb.ts`. The api holds
+both for an app; `wf stats` and `wf ls` keep none, and the api's tests read every answer from them afresh as well (`WF_VERIFY_REST`).
 
 ## The rules
 
@@ -182,8 +184,8 @@ person uses — `runs/`, `detail/`, `steps/`, `decide/`, `asks/`, `inbox/`, `fac
 `served`, which runs it on the app's `ManagedRuntime`) and `body.ts` (the request-body reader every folder uses) and nothing else.
 A folder holds at most six source files; one of two or more has a face, `index.ts`, which holds only re-exports by name, and one of
 one file has none. `app.ts` mounts each folder through its face. An
-import between two folders names the file it needs wherever the face would close a cycle — `agents/` reads the runs'
-judgement and `runs/` an agent's try — since a cycle of values passes the typecheck and fails only as the modules load. No two api
+import between two folders names the file it needs wherever the face would close a cycle — `detail/` reads a step's artifacts
+and `steps/` a run's try — since a cycle of values passes the typecheck and fails only as the modules load. No two api
 files need each other's values, and no file or folder is named `utils`, `helpers`, `common`, `shared` or `misc`. Test:
 `apps/api/test/layout.test.ts`.
 

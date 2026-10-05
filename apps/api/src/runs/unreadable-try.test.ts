@@ -12,8 +12,8 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { RunSummary } from './runs.ts';
 import { app } from '../app.ts';
+import { type RunSummary } from 'agent-orchestrator';
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync(

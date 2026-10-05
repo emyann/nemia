@@ -80,7 +80,7 @@ fs.writeFileSync(
   '---\nworkspace: folder\npermissionMode: dontAsk\nallowedTools: Edit(**)\n---\nWrite the note.\n',
 );
 
-type RunSummary = import('../runs/runs.ts').RunSummary;
+type RunSummary = import('agent-orchestrator').RunSummary;
 type RunDetail = import('../detail/detail.ts').RunDetail;
 type AgentListing = import('./agents.ts').AgentListing;
 

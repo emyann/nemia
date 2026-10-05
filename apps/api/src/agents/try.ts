@@ -9,9 +9,8 @@
  * from (`tryOf`), read off the record alone: nothing new is written on it.
  */
 import path from 'node:path';
-import { triesDir, tryDir, writeTryFolder } from 'agent-orchestrator';
+import { tryDir, writeTryFolder } from 'agent-orchestrator';
 import { AGENTS_FOLDER, directoryFence, isRemoteHarness, SKILLS_FOLDER } from 'agent-orchestrator/workflow';
-import type { Run } from 'agent-orchestrator/run';
 import { Invalid } from 'agent-orchestrator/effect';
 import { quoted } from './skills.ts';
 
@@ -128,10 +127,4 @@ export function tryFolder(name: string, version: string, keys: FencedKeys, home:
   const fence = tryFence(name, keys);
   if (typeof fence === 'string') throw new Invalid({ message: fence });
   return writeTryFolder(name, tryText(name, version, fence), home);
-}
-
-/** The agent a run tried, when it is a try: started from a folder directly under `tries/`. Null for every other run. */
-export function tryOf(run: Pick<Run, 'workflowDir'>, home: string): { agent: string } | null {
-  const dir = path.resolve(run.workflowDir);
-  return path.dirname(dir) === path.resolve(triesDir(home)) ? { agent: path.basename(dir) } : null;
 }

@@ -1,7 +1,7 @@
 /** What a step was told, for the run page: the brief whole, and by layer from what the run froze (`toldLayers`). */
 import { composeBrief, type Run, type ToldLayers, toldLayers } from 'agent-orchestrator/run';
 import type { Workflow } from 'agent-orchestrator/workflow';
-import type { Views } from '../store.ts';
+import { type Views } from 'agent-orchestrator';
 
 /**
  * The brief a step was told, whole.

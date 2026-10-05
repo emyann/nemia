@@ -6,14 +6,20 @@
  * (`StoreRoot`, store.ts).
  */
 import { Context, Effect, Layer, type ManagedRuntime } from 'effect';
-import { freshStatsMemo, type Factory, type StatsMemo } from 'agent-orchestrator';
+import {
+  freshStatsMemo,
+  type Factory,
+  type StatsMemo,
+  type Filings,
+  type RestingMemo,
+  restingMemo,
+  type RunSummary,
+} from 'agent-orchestrator';
 import { McpAsker } from './capabilities/capabilities.ts';
 import type { LastSaid } from './detail/detail.ts';
 import { placeFor } from './factories/place.ts';
 import { QuotaAsker } from './factory/quota.ts';
-import { type RestingMemo, restingMemo } from './runs/resting.ts';
-import type { RunSummary } from './runs/runs.ts';
-import { Engine, type Filings, StoreRoot } from './store.ts';
+import { Engine, StoreRoot } from './store.ts';
 
 /**
  * The environment the api reads its settings from, on each request, as it read `process.env` before: `HKB_REPO` (`repoOf`), `WF_MAX_RUNS`
@@ -25,10 +31,10 @@ export class ApiConfig extends Context.Service<ApiConfig, { readonly env: NodeJS
 }
 
 /**
- * What an app's reads keep between requests, each read through its engine: the list's memo of runs at rest (`resting`, runs/resting.ts),
- * the stats' memo of each run's facts (`stats`, the package's `StatsMemo`), the feed's filing times (`filings`, `filedTimes`), and where
- * each blocked session's conversation was last read (`said`). One for an app,
- * built with its runtime (`live`), so an app over another engine starts with none. A cache: nothing is decided by it.
+ * What an app's reads keep between requests, each read through its engine: the list's memo of runs at rest (`resting`, the package's
+ * `RestingMemo`), the stats' memo of each run's facts (`stats`, the package's `StatsMemo`), the feed's filing times (`filings`,
+ * `filedTimes`), and where each blocked session's conversation was last read (`said`). One for an app, built with its runtime (`live`),
+ * so an app over another engine starts with none. A cache: nothing is decided by it.
  */
 export class ReadMemo extends Context.Service<
   ReadMemo,

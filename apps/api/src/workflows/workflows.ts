@@ -62,7 +62,7 @@ import { NotBlank, readBody, valueAt, type BodyIssue } from '../body.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from '../guard.ts';
 import { type ApiEnv, served } from '../layer.ts';
 import type { Engine } from '../store.ts';
-import { graphOf, type RunGraph } from '../runs/graph.ts';
+import { graphOf, type RunGraph } from 'agent-orchestrator';
 
 /** Where a workflow is read from: the repository's `workflows/`, or yours, in the store. */
 export type WorkflowSource = 'repo' | 'yours';

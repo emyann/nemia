@@ -14,9 +14,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { RunDetail } from '../detail/detail.ts';
-import type { RunSummary } from '../runs/runs.ts';
 import { app } from '../app.ts';
-import { askFile, engine, list, retry, runStore } from 'agent-orchestrator';
+import { askFile, engine, list, retry, runStore, type RunSummary } from 'agent-orchestrator';
 import { messageRefusal } from 'agent-orchestrator/run';
 
 type RetryHow = import('agent-orchestrator').RetryHow;

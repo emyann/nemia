@@ -29,7 +29,7 @@ const versionOf = (dir: string): string => versionIn(dir, { repo, home: root });
 type WorkflowStepSpec = import('./workflows.ts').WorkflowStepSpec;
 type WorkflowStepPage = import('./workflows.ts').WorkflowStepPage;
 type WorkflowListing = import('./workflows.ts').WorkflowListing;
-type RunSummary = import('../runs/runs.ts').RunSummary;
+type RunSummary = import('agent-orchestrator').RunSummary;
 type RunDetail = import('../detail/detail.ts').RunDetail;
 
 const write = (file: string, text: string): void => {

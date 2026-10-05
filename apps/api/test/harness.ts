@@ -4,7 +4,7 @@
  * through the package's `engine()`, whose `claude` harness is the engine's own — a job (`claude -p`), or a background session (`claude
  * --bg`) — and that harness runs `claude` from PATH: the harness a test hands the api is that `claude`, as the engine's own tests hand
  * theirs. So the runner itself — the registry it observes, the transcripts it reads, the flags it spawns with — is what the api's tests
- * exercise, and not a stand-in for it. It sets `WF_VERIFY_REST=1`: every answer the list's memo of runs at rest gives (`resting.ts`) is
+ * exercise, and not a stand-in for it. It sets `WF_VERIFY_REST=1`: every answer the list's memo of runs at rest gives (`RestingMemo`) is
  * judged afresh too, and a difference fails the request. And the store is a scratch folder too (`root`, `WF_ROOT`), never this machine's.
  * It sets the daemon's two ceilings, `WF_MAX_RUNS` and `WF_MAX_CONCURRENT`, to `set-it-in-the-test`, which the package refuses by name: a
  * run's check inherits the daemon's environment, so a test that reads a ceiling sets or deletes it itself. It sets

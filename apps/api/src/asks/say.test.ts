@@ -22,9 +22,8 @@ import { randomUUID } from 'node:crypto';
 import { scratch } from '../../test/scratch.ts';
 import type { Said } from 'agent-orchestrator';
 import type { RunDetail } from '../detail/detail.ts';
-import type { RunSummary } from '../runs/runs.ts';
 import { app } from '../app.ts';
-import { engine, list, say, runStore } from 'agent-orchestrator';
+import { engine, list, say, runStore, type RunSummary } from 'agent-orchestrator';
 
 const tmp = (label: string) => scratch(`nemia-api-say-${label}-`);
 

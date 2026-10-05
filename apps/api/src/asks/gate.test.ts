@@ -10,13 +10,12 @@
 import { root, stops } from '../../test/harness.ts';
 import type { DecideCommand, Decidable } from '../decide/decision.ts';
 import type { RunDetail } from '../detail/detail.ts';
-import type { RunSummary } from '../runs/runs.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { app } from '../app.ts';
-import { approvalFile, approve, askFile, engine, list, retry, runStore } from 'agent-orchestrator';
+import { approvalFile, approve, askFile, engine, list, retry, runStore, type RunSummary } from 'agent-orchestrator';
 import { approvalWordsRefusal, onYouWords } from 'agent-orchestrator/run';
 
 const T0 = Date.parse('2026-09-16T21:00:00.000Z');

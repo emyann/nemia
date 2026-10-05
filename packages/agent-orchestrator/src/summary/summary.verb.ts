@@ -1,0 +1,345 @@
+/**
+ * Each run's summary, as the board's list gives it (`RunSummary`): its record, its steps judged in `wf ls`'s words (`judge`), its graph,
+ * what it cost and how long it has been at work; a run whose task's journal does not read answered off its record alone (`unjudged`). A
+ * run at rest is answered from the list's memo (`restingRead`) while nothing it was judged on has moved, so a poll reads the journals of
+ * the runs still moving and of none other. A controller: it reads the store, the engine's journals and feed through the client, and git.
+ */
+import type { Engine } from '../runtime-client.ts';
+import { type AtWork, atWork, runStartedAt, type RunTokens, runTokens } from '../timeline/index.ts';
+import { unjudgedWord } from '../views/views.verb.ts';
+import { isGitRun, type PlaceKind, placeOf, prunedWords, type Run } from '../record/record.ts';
+import { runStore } from '../record/files.store.ts';
+import { prunedKept } from '../prune/prune.ts';
+import { type BranchReader, branchReader } from '../branches/branches.store.ts';
+import { type RestingMemo, restingRead } from '../rest/resting.verb.ts';
+import { type RunGraph, runGraph } from './graph.ts';
+import {
+  filedTimes,
+  type Filings,
+  judgedSteps,
+  judgedUnlessUnreadable,
+  stepNames,
+  tryOf,
+  type Unreadable,
+  type Views,
+  viewsFor,
+  viewsOf,
+  workflowsOf,
+} from './reads.verb.ts';
+import {
+  type GitAsked,
+  judge,
+  needsOf,
+  type RunHolding,
+  type RunStatus,
+  type RunStoppedOn,
+  type RunToDecide,
+  type RunWaiting,
+  type Spent,
+  standingsOf,
+  type StepNeeds,
+} from './judged.verb.ts';
+
+export type RunSummary = {
+  id: string;
+  /** The repository a git run is about; null for a folder run (`place`), which has none. */
+  repo: string | null;
+  /** The factory the run was started in, as its record names it; null for a run in the default factory, whose record names none. */
+  factory: string | null;
+  /** The kind of workspace its steps work in: `git`, or `folder` for a team whose every step says `workspace: folder`. */
+  place: PlaceKind;
+  /** Where a folder run's work is (`workRoot`), which its card names in place of a repository; null on a git run. */
+  work: string | null;
+  brief: string;
+  /** The workflow folder the run was started from, as `wf start` resolved it: its last segment names the workflow. */
+  workflowDir: string;
+  /** The agent it tried, for a try started from an agent's page (`tryOf`); null for every other run. */
+  try: { agent: string } | null;
+  createdAt: string;
+  /**
+   * When the run started (`runStartedAt`): its first task's filing, off the engine's feed — for a run started `--after` runs, or held for a
+   * run slot, well after `createdAt`. `createdAt` for a run started whose filings the feed does not have; null while nothing of it is
+   * filed.
+   */
+  startedAt: string | null;
+  cancelledAt: string | null;
+  /**
+   * That `wf prune` removed the run's worktrees, and its files too once `--artifacts` did, in `wf prune`'s words — what it removed and what
+   * it kept — for the mark beside its status; null on a run never pruned.
+   */
+  pruned: { said: string } | null;
+  /** The runs this one waits on (`wf start --after`), as the record froze them at start: none for a run started without. */
+  after: string[];
+  /** The runs its roots still wait on, in the package's words (`RunWaiting`); null once there are none, or the run has started. */
+  waiting: RunWaiting | null;
+  /**
+   * The runs a person holds this one until (`wf hold <run> --until <run>`), as its hold file names them: none for a run nobody holds, or
+   * one called off.
+   */
+  heldUntil: string[];
+  /**
+   * The hold, in the package's words (`RunHolding`); null for a run nobody holds, and one called off. While it stands nothing of the run is
+   * filed and nothing is asked of anyone: no step waits on you, and no verb is offered, as `wf ls` says it.
+   */
+  holding: RunHolding | null;
+  status: RunStatus;
+  /**
+   * What stopped a `failed` run in which no step broke, as `wf decide` and the feed say it: `awaiting approval` for a run at its gate,
+   * `blocked` for one whose step signed off blocked. Null for every other run, one whose step broke among them.
+   */
+  stoppedOn: RunStoppedOn | null;
+  /**
+   * Whether anything of the run still moves: a task the engine holds for it — a step's or a check's, filed
+   * and not settled — or a step, a check, a try or a round a tick would still file. `status` does not say: `assess` reads a
+   * fan-out as failed once one step is final without letting its followers run, while a sibling still works.
+   *
+   * A run waiting on runs moves: the tick files its roots once they ship. Not one waiting on a run that never ships without a
+   * person — no such run, a cancelled one, a result branch gone (`RunWaiting.onYou`): nothing the tick reads will change on its own.
+   * A held run the same: it moves as it would unheld while the hold may lift on its own (`RunHolding.onYou`), and files nothing until then.
+   */
+  moving: boolean;
+  /**
+   * What the run has cost so far, every step's tries together, as `wf ls` adds it up on the run's line (`runSpend`); null until a cost was
+   * measured.
+   */
+  cost: Spent | null;
+  /**
+   * How long the run has been at work (`atWork`): the time any session or check of it ran, two at once counted once, and a wait at a gate,
+   * a hold, a slot or another run counted for nothing — `since` while a task runs, from which the board counts on, and `endedAt` once none
+   * does. Null for a run not judged (`unreadable`).
+   */
+  atWork: AtWork | null;
+  /**
+   * The tokens its sessions used, every try's, and their split by the cache, in the package's words (`runTokens`); null until a session
+   * measured any, and for a run not judged.
+   */
+  tokens: RunTokens | null;
+  /**
+   * `status` is what `wf ls` prints for the step — see `judge` for the one word it corrects. `note` is what `wf ls` prints
+   * beside it, for a step tried again or about to be, or in a loop past its first round — `try 2, by retries: 1`,
+   * `round 2 of 3`, `round 3 asked (wf round) — …` — and null where it prints nothing.
+   */
+  steps: Array<{ name: string; taskId: string | null; branch: string | null; status: string; note: string | null } & StepNeeds>;
+  /** The steps as a graph, as the run's page has it (`runGraph`): the Factory's card draws its flow off it, with no read of the run. */
+  graph: RunGraph;
+  /**
+   * Steps a person has to act on — blocked, unsigned, refused by their check, awaiting approval at their gate, out of rounds or past their
+   * budget — on a run nobody has called off.
+   */
+  waitingOnYou: string[];
+  /**
+   * `waitingOnYou` as `wf ls` names it after `→ waiting on you:` (`onYouWords`), one entry a step, in its order: the step's name — and for
+   * a step at its gate, what is asked of you, `approve plan`.
+   */
+  onYou: string[];
+  /**
+   * What a person has to decide about the run's result, when the run is at it and nobody has (`RunToDecide`); null while there is nothing.
+   */
+  toDecide: RunToDecide | null;
+  /**
+   * Why the run is not judged, when a task it reads — its own, or one of a run it waits on — has a journal that does not read, in the
+   * runtime's words; null for every run whose tasks read. Such a run is answered off its record alone (`unjudged`), as the tick leaves it
+   * where it is and counts it in flight: `running`, moving, its steps as the engine last read them and the unreadable one `unreadable`,
+   * nothing waiting on you and nothing to decide.
+   */
+  unreadable: string | null;
+};
+
+/** A run's summary but when it started, which is read off the feed on each request, and what git was asked for it. */
+type Judged = { summary: Omit<RunSummary, 'startedAt'>; asked: GitAsked };
+
+async function summarize(run: Run, views: Views, reader: Engine, git: BranchReader, home: string): Promise<Judged> {
+  const folder = workflowsOf(run, home).steps;
+  const names = stepNames(run, folder);
+  const asked: GitAsked = { branches: [], failed: false };
+  const judged = await judge(run, names, folder, views, {
+    reader,
+    git,
+    standings: (status, steps) => standingsOf(run, steps, status, git, asked),
+  });
+  const summary = {
+    id: run.id,
+    repo: run.repo ?? null,
+    factory: run.factory ?? null,
+    place: placeOf(run),
+    work: isGitRun(run) ? null : run.workspace,
+    brief: run.brief,
+    workflowDir: run.workflowDir,
+    try: tryOf(run, home),
+    createdAt: run.createdAt,
+    cancelledAt: run.cancelledAt ?? null,
+    pruned: run.pruned ? { said: `${prunedWords(run.pruned)}; ${prunedKept(run.pruned)}` } : null,
+    after: run.after ?? [],
+    waiting: judged.waiting,
+    heldUntil: judged.holding ? run.hold!.until : [],
+    holding: judged.holding,
+    status: judged.status,
+    stoppedOn: judged.stoppedOn,
+    moving: judged.moving,
+    cost: judged.cost,
+    atWork: atWork(run, views),
+    tokens: runTokens(run, views),
+    steps: names.map((name) => ({
+      name,
+      taskId: run.steps[name]?.taskId ?? null,
+      branch: run.steps[name]?.branch ?? null,
+      status: judged.words.get(name)!,
+      note: judged.notes.get(name) ?? null,
+      ...needsOf(run, name, views, judged),
+    })),
+    graph: runGraph(judgedSteps(run, folder), names),
+    waitingOnYou: judged.waitingOnYou,
+    onYou: judged.onYou,
+    toDecide: judged.toDecide,
+    unreadable: null,
+  };
+  return { summary, asked };
+}
+
+/**
+ * A run a task of which does not read, answered off its record: what it asked, where, its steps and their graph, and each step's word off
+ * the views that did read — `unreadable` for a step any task of which does not, its check's or an earlier try's among them (`unjudgedWord`)
+ * — with `said` as `unreadable`. Nothing judged: the tick does not advance it either, and counts it in flight, so it is `running` and
+ * moving until the journal reads again.
+ */
+function unjudged(run: Run, views: Views, unreadable: Unreadable, said: string, home: string): Omit<RunSummary, 'startedAt'> {
+  const folder = workflowsOf(run, home).steps;
+  const names = stepNames(run, folder);
+  const wordOf = unjudgedWord(views, unreadable);
+  return {
+    id: run.id,
+    repo: run.repo ?? null,
+    factory: run.factory ?? null,
+    place: placeOf(run),
+    work: isGitRun(run) ? null : run.workspace,
+    brief: run.brief,
+    workflowDir: run.workflowDir,
+    try: tryOf(run, home),
+    createdAt: run.createdAt,
+    cancelledAt: run.cancelledAt ?? null,
+    pruned: run.pruned ? { said: `${prunedWords(run.pruned)}; ${prunedKept(run.pruned)}` } : null,
+    after: run.after ?? [],
+    waiting: null,
+    heldUntil: run.hold && !run.cancelledAt ? run.hold.until : [],
+    holding: null,
+    status: 'running',
+    stoppedOn: null,
+    moving: true,
+    cost: null,
+    atWork: null,
+    tokens: null,
+    steps: names.map((name) => ({
+      name,
+      taskId: run.steps[name]?.taskId ?? null,
+      branch: run.steps[name]?.branch ?? null,
+      status: wordOf(run.steps[name]),
+      note: null,
+      needs: null,
+      blockedByHarness: false,
+      waitingFor: null,
+      approve: null,
+      denied: null,
+    })),
+    graph: runGraph(judgedSteps(run, folder), names),
+    waitingOnYou: [],
+    onYou: [],
+    toDecide: null,
+    unreadable: said,
+  };
+}
+
+/** A run judged, or answered off its record (`unjudged`) when a task it reads does not (`judgedUnlessUnreadable`). */
+async function judgedOrNot(
+  run: Run,
+  views: Views,
+  unreadable: Unreadable,
+  reader: Engine,
+  git: BranchReader,
+  home: string,
+): Promise<Judged | { unjudged: Omit<RunSummary, 'startedAt'> }> {
+  const one = await judgedUnlessUnreadable(run, unreadable, () => summarize(run, views, reader, git, home));
+  return 'judged' in one ? one.judged : { unjudged: unjudged(run, views, unreadable, one.unreadable, home) };
+}
+
+/**
+ * Runs judged now, as the list judges them and never from its memo: for a write that must know whether one still moves (a try started
+ * from an agent's page).
+ */
+export async function judgedNow(e: Engine, home: string, some: readonly Run[]): Promise<Array<Omit<RunSummary, 'startedAt'>>> {
+  const { views, reader, unreadable } = await viewsFor(e, some);
+  const git = branchReader();
+  const out: Array<Omit<RunSummary, 'startedAt'>> = [];
+  for (const run of some) {
+    const one = await judgedOrNot(run, views, unreadable, reader, git, home);
+    out.push('unjudged' in one ? one.unjudged : one.summary);
+  }
+  return out;
+}
+
+/**
+ * Whether a run's summary may be kept (`restingRead`): a run at rest, which nothing but a person, git or the engine's journals can move.
+ * Its status final or the run pruned, nothing of it moving, waited on or held, every task it has filed settled, the workflow it is judged
+ * by frozen on its record — a folder on disk is watched by nothing — and git's every answer given. The tick's own test (`atRest` in the
+ * package's rest.ts) reads what a pass would file; this reads what the list says, which is what it keeps.
+ */
+async function atRest(run: Run, judged: Judged, reader: Engine): Promise<boolean> {
+  const { summary, asked } = judged;
+  if (!run.workflow || run.hold || asked.failed || summary.moving || summary.waiting || summary.holding) return false;
+  if (!run.pruned && !['succeeded', 'failed', 'cancelled'].includes(summary.status)) return false;
+  return [...(await viewsOf(run, reader)).values()].every((view) => view.state.settled);
+}
+
+/**
+ * How the list reads: `home`, the store a person's files are read from; `memo`, the memo of runs at rest it answers from and keeps in;
+ * `filings`, the feed's filing times it reads on from; and `verify`, whether each answer from memory is judged afresh too
+ * (`WF_VERIFY_REST`).
+ */
+export type SummaryHow = {
+  home: string;
+  memo: RestingMemo<Omit<RunSummary, 'startedAt'>>;
+  filings: Filings;
+  verify: boolean;
+};
+
+/**
+ * Every run's summary, in the store's order, as the board's list answers it: through `e`, off `how.memo` (`restingRead`), verified as
+ * `how.verify` says. Rejects where a verified answer differs from the memo's (`answered`).
+ */
+export async function runsSummarized(e: Engine, { home, memo, filings, verify }: SummaryHow): Promise<RunSummary[]> {
+  const read = await restingRead(e, memo, verify);
+  const runs = runStore.runs.list();
+  read.only(runs.map((run) => run.id));
+  const filed = await filedTimes(e, filings);
+  const kept = new Map<string, Omit<RunSummary, 'startedAt'>>();
+  const toJudge: Run[] = [];
+  for (const run of runs) {
+    const answer = read.kept(run);
+    if (answer) kept.set(run.id, answer);
+    if (!answer || read.verify) toJudge.push(run);
+  }
+  const { views, reader, unreadable } = await viewsFor(e, toJudge, () => runs);
+  const git = branchReader();
+  git.prime(toJudge);
+  const judged = new Map<string, Judged>();
+  const notJudged = new Map<string, Omit<RunSummary, 'startedAt'>>();
+  for (const run of toJudge) {
+    const one = await judgedOrNot(run, views, unreadable, reader, git, home);
+    if ('unjudged' in one) {
+      notJudged.set(run.id, one.unjudged);
+      kept.delete(run.id);
+      read.drop(run);
+      continue;
+    }
+    judged.set(run.id, one);
+    read.answered(run, one.summary);
+    if (kept.has(run.id)) continue;
+    if (await atRest(run, one, reader)) read.keep(run, one.summary, one.asked.branches, git.heads);
+    else read.drop(run);
+  }
+  const summaries: RunSummary[] = runs.map((run) => {
+    const summary = judged.get(run.id)?.summary ?? notJudged.get(run.id) ?? kept.get(run.id)!;
+    if (kept.has(run.id)) read.hit();
+    return { ...summary, startedAt: runStartedAt(run, filed) };
+  });
+  return summaries;
+}

@@ -209,6 +209,8 @@ export type { Factory, FactoryListing, Hires, InstructionAt } from './factory/fa
 export { cursorTakes, feedLineWords, REMOVED } from './feed/feed.ts';
 export type { FeedLine, FeedPublished } from './feed/feed.ts';
 export type { FeedSaid, FeedWords } from './run.ts';
+export { DEFAULT_DIGEST_EVERY, DEFAULT_WAKE, subscriptionNameRefusal } from './subscription/subscription.ts';
+export type { Subscription } from './subscription/subscription.ts';
 export {
   DAEMON_FILE,
   DEFAULT_EVERY_MS,

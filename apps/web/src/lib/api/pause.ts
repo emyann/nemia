@@ -13,6 +13,9 @@ export type Pause = { at: string; by: string; why?: string };
 /** Mirrors the package's `PauseStaged`: a run whose ending has its merge staged in `repo`'s checkout, its check held by the pause. */
 export type PauseStaged = { run: string; step: string; repo: string };
 
+/** Mirrors the package's `PauseHeld`: a run whose step signed off, its check held by the pause, its merge not staged. */
+export type PauseHeld = { run: string; step: string };
+
 /**
  * Mirrors the package's `Finishing`: `run`'s `step`, still at work under the pause, as a session, a check, or a landing's check;
  * `stopping` once it was asked to stop, and `resumed` while a pause at once's ask names it, which tries it again on the resume.
@@ -29,10 +32,15 @@ export type PauseNowRead = { interrupts: readonly Interrupt[]; cost: string };
 export type PauseAnswer = { pause: Pause; kept?: boolean; interrupted?: readonly Interrupt[] };
 
 /**
- * Mirrors the package's `Paused`: the pause, null where none stands; each task still finishing under it, none once it is Paused; and each
- * landing it holds with its merge staged.
+ * Mirrors the package's `Paused`: the pause, null where none stands; each task still finishing under it, none once it is Paused; each
+ * landing it holds with its merge staged; and each other check it holds.
  */
-export type Paused = { pause: Pause | null; finishing: readonly Finishing[]; staged: readonly PauseStaged[] };
+export type Paused = {
+  pause: Pause | null;
+  finishing: readonly Finishing[];
+  staged: readonly PauseStaged[];
+  held: readonly PauseHeld[];
+};
 
 /** Decodes a `Pause`. */
 const PauseSchema = Schema.Struct({
@@ -54,6 +62,7 @@ const PausedSchema = Schema.Struct({
     }),
   ),
   staged: Schema.Array(Schema.Struct({ run: Schema.String, step: Schema.String, repo: Schema.String })),
+  held: Schema.Array(Schema.Struct({ run: Schema.String, step: Schema.String })),
 }) satisfies Schema.Schema<Paused>;
 
 /** Decodes an `Interrupt`. */

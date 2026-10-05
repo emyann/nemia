@@ -8,7 +8,7 @@ import { over, quotaHarnesses, type Engine, type HarnessQuota } from '../runtime
 import { HOME } from '../record/record.store.ts';
 import { queueLine } from '../inbox/inbox.ts';
 import { addPass, summaryDue, summaryLine, type Interval, type Reading } from '../meter/meter.ts';
-import { pausedWords, RESUMED, stagedWords } from '../pause/pause.ts';
+import { heldLines, pausedWords, RESUMED } from '../pause/pause.ts';
 import { refusalLines, tickRun, type Pass } from '../tick/tick.verb.ts';
 import { beat, heldUrl, passed, releaseStore, stillHeld, takeStore, type TakenStore } from './daemon.store.ts';
 import { takenFromLine, type HolderKind } from './daemon.ts';
@@ -101,12 +101,12 @@ function advancedLines(advanced: Pass['runs']): PassLine[] {
 }
 
 /**
- * The store's pause (`pausedWords`) and each landing it holds with its merge staged (`stagedWords`), once when it is put, again each time
- * their words change — Pausing with fewer finishing, then Paused, a landing staged — and once when it is resumed: the lines said now, and
- * the words to compare the next pass's with.
+ * The store's pause (`pausedWords`) and each check it holds back (`heldLines`), a landing with its merge staged among them, once when it
+ * is put, again each time their words change — Pausing with fewer finishing, then Paused, a check held — and once when it is resumed:
+ * the lines said now, and the words to compare the next pass's with.
  */
 export function pauseSaid(pause: Pass['pause'], said: string | undefined): { lines: string[]; said: string | undefined } {
-  const lines = pause ? [pausedWords(pause) ?? '', ...pause.staged.map((s) => `   ${stagedWords(s)}`)] : [RESUMED];
+  const lines = pause ? [pausedWords(pause) ?? '', ...heldLines(pause)] : [RESUMED];
   const now = pause ? lines.join('\n') : undefined;
   return { lines: now !== said ? lines : [], said: now };
 }

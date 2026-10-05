@@ -35,13 +35,13 @@ async function asked(method: string, body?: unknown, headers: Record<string, str
 const FILE = path.join(root, 'cordon');
 
 test('the board pauses the store, reads the pause back, is refused a second, lifts it, and is refused a second lift', async () => {
-  assert.deepEqual(await asked('GET'), { status: 200, body: { pause: null, finishing: [], staged: [] } });
+  assert.deepEqual(await asked('GET'), { status: 200, body: { pause: null, finishing: [], staged: [], held: [] } });
   const put = await asked('POST', { why: 'merging by hand', by: 'ann' });
   assert.equal(put.status, 200);
   const pause = put.body.pause as { at: string; by: string; why: string };
   assert.deepEqual({ ...pause, at: typeof pause.at }, { at: 'string', by: 'ann', why: 'merging by hand' });
   assert.deepEqual(JSON.parse(fs.readFileSync(FILE, 'utf8')), pause, "the store's pause file holds it");
-  assert.deepEqual(await asked('GET'), { status: 200, body: { pause, finishing: [], staged: [] } });
+  assert.deepEqual(await asked('GET'), { status: 200, body: { pause, finishing: [], staged: [], held: [] } });
   assert.deepEqual(await asked('POST', {}), {
     status: 409,
     body: {
@@ -50,7 +50,7 @@ test('the board pauses the store, reads the pause back, is refused a second, lif
   });
   assert.deepEqual(await asked('DELETE'), { status: 200, body: { pause } });
   assert.equal(fs.existsSync(FILE), false, 'the file removed');
-  assert.deepEqual(await asked('GET'), { status: 200, body: { pause: null, finishing: [], staged: [] } });
+  assert.deepEqual(await asked('GET'), { status: 200, body: { pause: null, finishing: [], staged: [], held: [] } });
   assert.deepEqual(await asked('DELETE'), {
     status: 404,
     body: { error: 'the store is not paused: there is nothing to resume (nemia pause puts one).' },

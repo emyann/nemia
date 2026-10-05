@@ -100,7 +100,7 @@ export type Unjudged = { said: string; steps: Array<{ name: string; status: stri
 
 /**
  * `nemia ls`'s answer (`runsListed` in list.verb.ts): each run with its record, judged or left unjudged, and its result branches
- * (`resultBranches`); whether a nemia up ticks the store; and, while the store is paused, the pause and the landings it holds staged.
+ * (`resultBranches`); whether a nemia up ticks the store; and, while the store is paused, the pause and the checks it holds.
  */
 export type RunsListed = {
   runs: Array<{ run: Run; listed: Listing | Unjudged; result: string[] }>;
@@ -245,6 +245,20 @@ export function listing({
     run.cancelledAt || run.pruned || run.hold ? [] : roundsDue(steps, run, settledOf, readable, askedCloseout, roundAsks, spendOf);
   const refiled = roundSpans(steps, rounds);
   const waitingAgain = unheld(steps, run, due, rounds);
+  const assessed = assess(
+    steps,
+    run,
+    settledOf,
+    readable,
+    askedCloseout,
+    verdictOf,
+    asks,
+    roundAsks,
+    (taskId) => phaseOf(taskId) === 'needs-human',
+    spendOf,
+    standings,
+    checkout,
+  );
   const takenByHand = (name: string): boolean =>
     resultOnBase(standings) && !run.steps[name]?.taskId && steps.some((s) => s.name === name && approvedFirst(s, run));
 
@@ -286,7 +300,7 @@ export function listing({
           ? onBaseNote(run, step.name, standings)
           : gateNote(run, step.name, sendBackTo(step, run));
     const taskId = run.steps[step.name]?.taskId;
-    const note = [tried, gate, landingWord(run, step.name), saidWord(saidTo(step.name))].filter(Boolean).join(' · ');
+    const note = [tried, gate, row.note, landingWord(run, step.name), saidWord(saidTo(step.name))].filter(Boolean).join(' · ');
     const roundDue = round && !retry ? { roundDue: true as const } : {};
     return { ...row, ...(note ? { note } : {}), ...roundDue, ...deniedRow(taskId ? deniedOf(taskId) : []), ...cost };
   });
@@ -331,10 +345,8 @@ export function listing({
       exhausted.add(name);
       return { name, status: 'rounds exhausted', branch };
     }
-    if (status === 'verified') return { name, status: 'verified ✓', branch };
-    if (status === 'checking') return { name, status: 'checking', branch };
-    if (status === 'failed (check)') return { name, status: `failed ✗ check (${verdictWord(verdictOf(name) ?? 'unfinished')})`, branch };
-    if (status === 'denied') return { name, status: 'denied', branch };
+    const judged = judgedRow(status, () => verdictOf(name), assessed.paused?.checks.includes(name) === true);
+    if (judged) return { name, ...judged, branch };
 
     const c = closeoutOf(name);
     const said = !c ? '' : 'error' in c ? ' · closeout unreadable' : ` · ${c.outcome === 'blocked' ? 'BLOCKED' : 'done'}`;
@@ -356,20 +368,7 @@ export function listing({
   }
 
   const total = runSpend(run, spendOf);
-  const { toDecide: decide } = assess(
-    steps,
-    run,
-    settledOf,
-    readable,
-    askedCloseout,
-    verdictOf,
-    asks,
-    roundAsks,
-    (taskId) => phaseOf(taskId) === 'needs-human',
-    spendOf,
-    standings,
-    checkout,
-  );
+  const decide = assessed.toDecide;
   return {
     steps: rows,
     waitingOnYou: run.cancelledAt || run.pruned || run.hold ? [] : waitingOnYou,
@@ -382,12 +381,31 @@ export function listing({
 }
 
 /**
+ * The row of a step its run judged by its check or a person refused: `verified ✓`; `checking` while its check is filed, else `waiting on
+ * the pause` (`PAUSE_WAIT`) with its note, where the pause keeps it from being filed (`held`); `failed ✗ check (exit 1)` by its verdict
+ * (`verdictOf`); `denied`. Undefined for any other status.
+ */
+function judgedRow(status: StepStatus, verdictOf: () => Verdict | undefined, held: boolean): { status: string; note?: string } | undefined {
+  if (status === 'verified') return { status: 'verified ✓' };
+  if (status === 'checking') return held ? { status: PAUSE_WAIT, note: PAUSE_WAIT_NOTE } : { status: 'checking' };
+  if (status === 'failed (check)') return { status: `failed ✗ check (${verdictWord(verdictOf() ?? 'unfinished')})` };
+  if (status === 'denied') return { status: 'denied' };
+  return undefined;
+}
+
+/**
  * The longest harness word a screen will print. Whatever `waitingFor` holds is the harness's, shown to a person verbatim, and on
  * `nemia ls` it goes inside a column sized to the widest status: a long word from a future Claude Code would stretch the list. Clipped,
  * never dropped — but `claude agents` is the only place the rest of it is: every screen here words it through `waitingWords`, the
  * board's included (`StepNeeds.waitingFor.words`), so a word over this length is read whole nowhere else.
  */
 const WAIT_CAP = 60;
+
+/** The word of a step whose check is due and the pause keeps from being filed, where `checking` would say its check exists. */
+export const PAUSE_WAIT = 'waiting on the pause';
+
+/** The note beside `PAUSE_WAIT`: when the check it waits for is filed, on `nemia resume`. */
+const PAUSE_WAIT_NOTE = 'its check is filed on nemia resume';
 
 /** A word that already names its own thing. `permission prompt` does not, and reads as `a permission prompt`; `the login dialog` does. */
 const DETERMINED = /^(a|an|the|its|their|another|some|one|no)\b/i;

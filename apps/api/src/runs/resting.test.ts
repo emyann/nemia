@@ -65,6 +65,13 @@ const fed = (taskId: string) =>
     `${JSON.stringify({ taskId, event: { kind: 'settled', at, outcome: 'succeeded' } })}\n`,
   );
 
+/** A line appended to a task's journal, then the same event on the engine's feed, as the runtime's every append writes the two. */
+const appended = (taskId: string, event: object) => {
+  fs.mkdirSync(path.dirname(journal(taskId)), { recursive: true });
+  fs.appendFileSync(journal(taskId), `${JSON.stringify(event)}\n`);
+  fs.appendFileSync(path.join(root, 'engine', 'feed.jsonl'), `${JSON.stringify({ taskId, event })}\n`);
+};
+
 const started = () => [
   { kind: 'filed', at, brief: 'Do it.', cwd: repo, maxAttempts: 1, harness: 'codex' },
   { kind: 'starting', at, attempt: 1 },
@@ -226,12 +233,13 @@ test("a poll's reads are counted into api.poll.reads under /api/runs as the engi
     return { count: metric?.count ?? 0, sum: metric?.sum ?? 0 };
   };
   await list();
+  appended('r-moving-implement', { kind: 'said', at, attempt: 1, text: 'Keep going.' });
   const before = await readsOf();
   const reads = e.io().reads;
   await unverified(list);
   const read = e.io().reads - reads;
   const after = await readsOf();
-  assert.ok(read > 0, "the moving run's journal was read");
+  assert.ok(read > 0, "the line appended to the moving run's journal was read");
   assert.deepEqual(after, { count: before.count + 1, sum: before.sum + read }, "the poll's reads, the engine's own count");
 });
 
@@ -356,12 +364,6 @@ test('two requests at once: the first reads the feed and judges the run succeede
   assert.ok(resting.runs.has('r-raced'), 'a request no other overtook keeps what it judged');
   resting.runs.delete('r-raced');
 });
-
-/** A line appended to a task's journal, then the same event on the engine's feed, as the runtime's every append writes the two. */
-const appended = (taskId: string, event: object) => {
-  write(journal(taskId), `${fs.existsSync(journal(taskId)) ? fs.readFileSync(journal(taskId), 'utf8') : ''}${JSON.stringify(event)}\n`);
-  fs.appendFileSync(path.join(root, 'engine', 'feed.jsonl'), `${JSON.stringify({ taskId, event })}\n`);
-};
 
 /** A run of `design → implement` whose design is gated, its record as the tick writes it: design's task given once filed. */
 function writeGated(id: string, filed: boolean) {

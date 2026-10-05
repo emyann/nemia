@@ -85,8 +85,9 @@ const READ_BOUNDS: readonly number[] = [0, 1, 2, 5, 10, 25, 50, 100, 250, 500, 1
 /**
  * The files the runtime read for each request, its journals and every other file it reads (the engine's `io`), by the route it was
  * served on (`route`, the route's pattern, never its path), in the registry of the app's runtime: the process's own unless its layer
- * gives another. Counted off the engine's running totals before and after the handler, so about: a pass or another request reading at
- * the same time is counted here too.
+ * gives another. A read is one of bytes: a journal is counted when the engine reads what was appended to it since it last read it, and a
+ * journal it finds as it left it costs a `stat` and is not counted. Counted off the engine's running totals before and after the handler,
+ * so about: a pass or another request reading at the same time is counted here too.
  */
 export const POLL_READS = Metric.histogram('api.poll.reads', {
   description: 'the files the runtime read for a request',

@@ -23,6 +23,7 @@ const { MEMORY } = await import('./memory.verb.ts');
 const { memoryDir, nemiaDir, promptFile, readLevel, readNemia } = await import('./level.store.ts');
 const { listSubscriptions } = await import('../subscription/subscription.store.ts');
 const { customInstructionsFile } = await import('../folder/folder.store.ts');
+const { addFactory } = await import('../factory/factory.store.ts');
 const { DEFAULT_HARNESS } = await import('../harness/harness.ts');
 const { engineOf, runWith } = await import('../runtime-client.ts');
 
@@ -76,10 +77,12 @@ test('REFUSED: semi-auto while her folder is not trusted, naming the command tha
   assert.equal(await beat().then((owed) => owed.length), 0, 'no level set owes nothing');
 });
 
-test('at semi-auto the keeper files her task long-lived, subscribes it once open, and owes nothing on the next beat', async () => {
+test("at semi-auto the keeper files her task long-lived, reading every factory's folders, subscribes it once open, and owes nothing on the next beat", async () => {
   fs.mkdirSync(path.dirname(customInstructionsFile(ROOT, 'nemia')), { recursive: true });
   fs.writeFileSync(customInstructionsFile(ROOT, 'nemia'), 'Answer in French. Times in Montreal.\n');
   trust(true);
+  const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
+  addFactory({ name: 'pipao', repos: [repo] });
   const daemon = {
     pid: process.pid,
     by: 'api',
@@ -100,6 +103,8 @@ test('at semi-auto the keeper files her task long-lived, subscribes it once open
   assert.equal(spec.config.permissionMode, 'default');
   assert.equal(spec.config.background, true);
   assert.deepEqual(spec.config.disallowedTools, shipped.disallowedTools);
+  assert.deepEqual(spec.config.mounts, [{ path: repo, readOnly: true }], "every factory's folders, read-only");
+  assert.equal('closeoutSchema' in spec || 'closeoutSchema' in spec.config, false, 'no closeout: she never ends');
   assert.ok((spec.config.allowedTools as string[]).includes(`Edit(/${memoryDir()}/**)`), 'her memory hers to write');
   assert.ok((spec.config.allowedTools as string[]).includes('Bash(curl -s http://127.0.0.1:8787/api/quota)'), 'the quota hers to read');
   assert.match((spec as unknown as { brief: string }).brief, /`curl -s http:\/\/127\.0\.0\.1:8787\/api\/quota`/);

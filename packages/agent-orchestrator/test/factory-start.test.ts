@@ -29,6 +29,7 @@ const { addFactory, attachWorkflow, hireAgent, inboxDir, parseArgv, repoFor, STA
   await import('../src/runner.ts');
 const { readRun } = await import('../src/record/record.store.ts');
 const { main } = await import('../src/cli/main.ts');
+const { nemiaDefinition } = await import('../src/nemia/level.store.ts');
 
 /** Refused by kind, exit 2, and the message — never `String(err)`, which starts with `Error: `. */
 const refusedWith = (tag: 'Missing' | 'Invalid', pattern: RegExp) => (err: Error & { exitCode?: number; _tag?: string }) =>
@@ -195,6 +196,25 @@ test('REFUSED: a hire of an agent there is not, in the words of the factory that
       /^implement: the factory pipao hires `ada` into it, which is not an agent here\. The agents are: implementer, reviewer, shipper — hire one — nemia factory hire pipao <agent> --step build\/implement, /,
     ),
   );
+});
+
+test('REFUSED: Nemia is never a hire: a factory that hires nemia into a step starts nothing, her folder and her words in the store being no agent', async () => {
+  const { repo, build } = fresh();
+  fs.mkdirSync(path.join(ROOT, 'nemia'), { recursive: true });
+  fs.copyFileSync(nemiaDefinition(), path.join(ROOT, 'nemia', 'nemia.md'));
+  fs.mkdirSync(path.join(ROOT, 'custom-instructions'), { recursive: true });
+  fs.writeFileSync(path.join(ROOT, 'custom-instructions', 'nemia.md'), 'Answer in French.\n');
+  hireAgent({ factory: 'pipao', agent: 'nemia', step: 'build/implement' });
+  hireAgent({ factory: 'pipao', agent: 'reviewer', step: 'build/review' });
+  const before = runsWritten();
+  await assert.rejects(
+    async () => await Effect.runPromise(startRun({ brief: 'build it', repo, workflowDir: build, isolate: false, factory: 'pipao' })),
+    refusedWith(
+      'Invalid',
+      /^implement: the factory pipao hires `nemia` into it, which is not an agent here\. The agents are: implementer, /,
+    ),
+  );
+  assert.deepEqual(runsWritten(), before);
 });
 
 test('REFUSED: a start in a factory the store does not have is Missing, naming those it has', async () => {

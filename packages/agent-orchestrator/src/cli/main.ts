@@ -42,7 +42,7 @@ import {
 } from '../runner.ts';
 import { HELP, usage, WF_HINT, type Engine, type Verb } from './flags.ts';
 import { decideVerb } from './decide/decide.ts';
-import { agentsCustomRun, pruneVerb, rmVerb } from './runs.ts';
+import { agentsCustomRun, factoryInstructRun, pruneVerb, rmVerb } from './runs.ts';
 import { inboxAddRun, inboxQueueRun, planRun, startRun } from './start.ts';
 
 /**
@@ -246,7 +246,7 @@ export const VERBS: ReadonlyMap<string, Verb> = new Map<string, Verb>([['decide'
 /**
  * The runner of each command the CLI runs itself, by its name — those it serves alone (`RAN`, `nemia plan`); `nemia rm` and `nemia prune`,
  * whose runners walk the many runs a command line names through their handlers; and `nemia start`, `nemia inbox add`, `nemia inbox queue`
- * and `nemia agents custom`, whose runners read the files and folders a command line names before their handlers: handed its arguments once
+ * and `nemia agents custom` and `nemia factory instruct`, whose runners read the files and folders a command line names before their handlers: handed its arguments once
  * read and checked.
  */
 export const RUNS: ReadonlyMap<string, (args: Args, e: Engine) => void | Promise<void>> = new Map([
@@ -260,6 +260,7 @@ export const RUNS: ReadonlyMap<string, (args: Args, e: Engine) => void | Promise
   ['inbox add', inboxAddRun],
   ['inbox queue', inboxQueueRun],
   ['agents custom', agentsCustomRun],
+  ['factory instruct', factoryInstructRun],
 ]);
 
 /**

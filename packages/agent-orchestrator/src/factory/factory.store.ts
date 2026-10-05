@@ -1,8 +1,8 @@
 /**
  * The factories on disk: `$WF_ROOT/factories/<name>.json`, one file per factory, holding `{ "repos": [...], "workflows": [...], "hires":
  * {...} }` — read (`readFactories`, `readFactory`), filed (`addFactory`), given workflows and relieved of them (`attachWorkflow`,
- * `detachWorkflow`), hired into and fired from (`hireAgent`, `fireAgent`) and removed (`removeFactory`). A person's verbs are their one
- * writer; the judgement is `factory.ts`'s.
+ * `detachWorkflow`), hired into and fired from (`hireAgent`, `fireAgent`), told where its instruction is kept (`setInstruction`) and
+ * removed (`removeFactory`). A person's verbs are their one writer; the judgement is `factory.ts`'s.
  *
  * Beneath the controllers, beside `record.store.ts`, the one store file it imports; `runner.ts` re-exports what the package exports of it.
  */
@@ -18,12 +18,14 @@ import {
   factoriesHolding,
   factoryNameRefusal,
   hireRefusal,
+  instructionPathRefusal,
   noFactoryLine,
   noFactoryRefusal,
   workflowNameRefusal,
   type Factory,
   type FactoryListing,
   type FactoryWrite,
+  type InstructionAt,
 } from './factory.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { firstRefusal, HOME, isDirectory } from '../record/record.store.ts';
@@ -32,14 +34,16 @@ import { firstRefusal, HOME, isDirectory } from '../record/record.store.ts';
 export const factoriesDir = (): string => path.join(HOME, 'factories');
 
 /**
- * A factory's file: at least one repository, each a string; the workflows attached to it, each by its folder's name, and its hires, a
- * step's `<workflow>/<step>` to an agent's name, when it has any; a key a later `nemia` writes beside them is kept, not refused.
+ * A factory's file: at least one repository, each a string; the workflows attached to it, each by its folder's name, its hires, a
+ * step's `<workflow>/<step>` to an agent's name, when it has any, and where its instruction is kept, a path or the store, when it says;
+ * a key a later `nemia` writes beside them is kept, not refused.
  */
 const FactoryFileSchema = Schema.StructWithRest(
   Schema.Struct({
     repos: Schema.NonEmptyArray(Schema.String),
     workflows: Schema.optionalKey(Schema.Array(Schema.String)),
     hires: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
+    instruction: Schema.optionalKey(Schema.Union([Schema.Struct({ path: Schema.String }), Schema.Struct({ store: Schema.Literal(true) })])),
   }),
   [Schema.Record(Schema.String, Schema.Unknown)],
 );
@@ -76,12 +80,16 @@ function factoryFile(name: string): FileRead {
   return { file, error: `does not read as a factory: ${field} ${words}. nemia factory rm ${name}, then add it again.` };
 }
 
-/** The factory `name` its file's `content` says: none attached and none hired when the file names none. */
+/**
+ * The factory `name` its file's `content` says: none attached and none hired when the file names none, and where its instruction is kept
+ * only when the file says.
+ */
 const factoryOf = (name: string, content: FactoryFile): Factory => ({
   name,
   repos: content.repos,
   workflows: content.workflows ?? [],
   hires: content.hires ?? {},
+  ...(content.instruction === undefined ? {} : { instruction: content.instruction }),
 });
 
 /** One entry of the folder as `nemia factory ls` lists it: the factory its file says, or why the file does not read as one. */
@@ -251,7 +259,14 @@ export function startFactory(named: string | undefined, at: string, fix: string)
 }
 
 /** What each verb that changes a factory's file does, as its refusals say it was not done. */
-const DONE = { attach: 'attached', detach: 'detached', hire: 'hired', fire: 'fired' } as const;
+const DONE = {
+  attach: 'attached',
+  detach: 'detached',
+  hire: 'hired',
+  fire: 'fired',
+  instruction: 'changed',
+  instruct: 'written',
+} as const;
 
 /**
  * The file of the factory `name`, to be written back by `verb`. Refused: the name (`refuseName`), a name with no file (`Missing`), and a
@@ -359,5 +374,24 @@ export function detachWorkflow(opts: { factory: string; workflow: string }): { f
       message: `${opts.factory} hires into ${opts.workflow}'s steps: ${hired.join(', ')}. Fire each first — ${hired.map((step) => `nemia factory fire ${opts.factory} --step ${step}`).join('; ')} — then detach it. Nothing was detached.`,
     });
   writeWhole(file, { ...content, workflows: workflows.filter((w) => w !== opts.workflow) });
+  return { file };
+}
+
+/**
+ * `nemia factory instruction`: where the instruction of the factory `factory` is kept, written into its file — a path in its first folder,
+ * kept as `path.normalize` spells it, or the store — or, `at` undefined, the key removed, so the factory reads `NEMIA.md` in its first
+ * folder again. Every other key of the file is kept. Refused before anything is written: a path that is not one (`instructionPathRefusal`,
+ * `Invalid`) and the factory (`fileToChange`).
+ */
+export function setInstruction(opts: { factory: string; at: InstructionAt | undefined }): { file: string } {
+  const at = opts.at;
+  if (at !== undefined && 'path' in at) {
+    const bad = instructionPathRefusal(at.path);
+    if (bad) throw new Invalid({ message: `${bad} Nothing was changed.` });
+  }
+  const { file, content } = fileToChange(opts.factory, 'instruction');
+  const { instruction: _was, ...rest } = content;
+  const kept = at === undefined ? undefined : 'path' in at ? { path: path.normalize(at.path) } : { store: true as const };
+  writeWhole(file, kept === undefined ? rest : { ...rest, instruction: kept });
   return { file };
 }

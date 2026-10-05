@@ -6005,3 +6005,47 @@ test("a step with an agent is read by layer on the builder: its agent, the agent
   assert.doesNotMatch(agentless, /data-layer|data-agent-note/);
   assert.match(agentless, /What it is told/);
 });
+
+const { StatsPasses } = await import('../src/components/StatsPasses.tsx');
+const { passesRead } = await import('./factory-fixtures.ts');
+
+/** The Stats page's section on the tick's pass, its read answered by `passes`. */
+const passesMarkup = (passes: import('../src/lib/api.ts').PassesRead): string => {
+  const client = new QueryClient();
+  client.setQueryData(['passes'], passes);
+  return renderToStaticMarkup(createElement(QueryClientProvider, { client }, createElement(StatsPasses)));
+};
+
+test("the tick's pass on the Stats page: a column a bucket with its count, a bar a part heaviest first, and what the last pass saw", () => {
+  const html = passesMarkup(passesRead());
+  assert.match(html, /id="passes"/, 'the Factory links to it by its anchor');
+  const buckets = [...html.matchAll(/data-bucket="([^"]+)" data-count="(\d+)"/g)].map((m) => [m[1], Number(m[2])]);
+  assert.equal(buckets.length, 10, html);
+  assert.deepEqual(
+    buckets.filter(([, n]) => n),
+    [
+      ['10', 1],
+      ['50', 1],
+      ['over', 1],
+    ],
+  );
+  assert.match(html, /title="&gt; 5000 ms: 1 pass"/, 'the open bucket names its end on hover');
+  assert.deepEqual(
+    [...html.matchAll(/data-part="([a-z]+)"/g)].map((m) => m[1]),
+    ['git', 'records'],
+  );
+  assert.match(html, /data-part="records"[^]*?1\.00 ms <span[^>]*>&lt; 1%</);
+  assert.deepEqual(
+    [...html.matchAll(/data-fact="([a-z]+)"/g)].map((m) => m[1]),
+    ['median', 'slowest', 'reads', 'runs', 'tasks', 'queued', 'admitted'],
+  );
+  assert.match(html, /data-fact="slowest"[^]*?<dd[^>]*>6000 ms</);
+  assert.match(html, /data-fact="runs"[^]*?<dd[^>]*>43</);
+  assert.match(html, /the last 3 the daemon kept, since /);
+});
+
+test("the tick's pass with none kept says so, and draws no column", () => {
+  const html = passesMarkup(passesRead({ recent: [], parts: [], summary: null }));
+  assert.match(html, /data-passes-none[^>]*>No pass is kept yet/);
+  assert.doesNotMatch(html, /data-bucket|data-part|data-fact/);
+});

@@ -1,8 +1,9 @@
 /**
  * The cap on runs in flight, and the runs it counts and holds, and what the last pass cost: what the Factory says over its floor
- * (`GET /api/ceilings`, app.ts).
+ * (`GET /api/ceilings`, app.ts). And the process's metrics as JSON (`GET /api/metrics`, `metricsOf`).
  */
-import { COMMANDS, lastCeilings, lastPassCost, type PassCost, type Slots, slotWord } from 'agent-orchestrator';
+import type { Metric } from 'effect';
+import { COMMANDS, lastCeilings, lastPassCost, type PassCostRead, type PassesRead, type Slots, slotWord } from 'agent-orchestrator';
 import type { Engine } from '../store.ts';
 
 /**
@@ -19,14 +20,15 @@ import type { Engine } from '../store.ts';
  * (`heldRuns`, `slotWord`).
  *
  * `pass` is what the last pass cost, phase by phase, as it wrote it (`lastPassCost`, `$WF_ROOT/tick-stats.json`) — what `nemia up --stats`
- * prints; null before any pass has written it, or when the file does not read as one.
+ * prints, with what it saw (`runs`, `tasks`, `queued`, `admitted`), absent from a file an older tick wrote; null before any pass has
+ * written it, or when the file does not read as one.
  */
 export type Ceilings = {
   last: { sessions: number; runs: number } | null;
   cap: number;
   inFlight: string[] | null;
   held: Array<{ run: string; inFlight: number; cap: number; word: string }>;
-  pass: PassCost | null;
+  pass: PassCostRead | null;
 };
 
 /** The package's run slots (`slotsOf`), through its entry of the command table, served on the api alone. */
@@ -47,3 +49,51 @@ export async function ceilingsOf(e: Engine['Service'], env: NodeJS.ProcessEnv): 
     pass: lastPassCost() ?? null,
   };
 }
+
+/** The recent passes' entry of the command table, served on both sides. */
+const PASSES = COMMANDS.find((c) => c.name === 'passes')!;
+
+/**
+ * What the recent passes of the tick cost (`PassesRead`), as `nemia passes --json` prints it (`PASSES`): the last `last` of them, or
+ * every one kept; refused as `Invalid` for a `last` that is not a whole number from 1.
+ */
+export const passesOf = async (e: Engine['Service'], last: string | undefined): Promise<PassesRead> =>
+  (await PASSES.handler(e, last === undefined ? {} : { last })) as PassesRead;
+
+/**
+ * One metric as `GET /api/metrics` answers it: its name, kind, description and attributes, and its value — a counter's `count`, a gauge's
+ * `value`, or a histogram's `count`, `sum`, `min`, `max` and `buckets`, each the observations at most `le`, counted from the first bucket
+ * on (cumulative, as OpenTelemetry's are not). A kind the api keeps none of is answered with its name and kind alone.
+ */
+export type MetricRead = {
+  name: string;
+  type: string;
+  description: string | null;
+  attributes: Readonly<Record<string, string>>;
+  count?: number;
+  value?: number;
+  sum?: number;
+  min?: number;
+  max?: number;
+  buckets?: Array<{ le: number; count: number }>;
+};
+
+/** The metrics of a registry's snapshot (`Metric.snapshot`) as JSON (`MetricRead`), by name and then attributes. */
+export const metricsOf = (snapshot: ReadonlyArray<Metric.Metric.Snapshot>): MetricRead[] =>
+  snapshot
+    .map((m): MetricRead => {
+      const head = { name: m.id, type: m.type, description: m.description ?? null, attributes: { ...m.attributes } };
+      switch (m.type) {
+        case 'Counter':
+          return { ...head, count: Number(m.state.count) };
+        case 'Gauge':
+          return { ...head, value: Number(m.state.value) };
+        case 'Histogram': {
+          const { count, sum, min, max, buckets } = m.state;
+          return { ...head, count, sum, min, max, buckets: buckets.map(([le, n]) => ({ le, count: n })) };
+        }
+        default:
+          return head;
+      }
+    })
+    .sort((a, b) => a.name.localeCompare(b.name) || JSON.stringify(a.attributes).localeCompare(JSON.stringify(b.attributes)));

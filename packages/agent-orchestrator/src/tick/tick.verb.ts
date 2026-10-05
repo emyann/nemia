@@ -26,18 +26,18 @@ import { isGitRun, type Run } from '../record/record.ts';
 import { stepsOf } from '../record/record.store.ts';
 import { hasStarted } from '../wait/wait.ts';
 import { runStore } from '../record/files.store.ts';
-import { ceilings, recordCeilings, recordPassCost } from '../daemon/daemon.store.ts';
+import { ceilings, recordCeilings, recordPassCost, recordRecentPass } from '../daemon/daemon.store.ts';
 import { verifiesRest } from '../config/config.store.ts';
 import { feedFile, recordFeed } from '../feed/feed.store.ts';
 import { headsOf } from '../branches/branches.store.ts';
 import { followedFeed } from '../rest/rest.verb.ts';
 import { reportedEngine } from '../views/views.verb.ts';
 import { startQueued } from '../inbox/inbox.verb.ts';
-import { countRested, meteredPass, within } from '../meter/tally.store.ts';
-import type { PassCost } from '../meter/meter.ts';
+import { countRested, meteredPass, noteSeen, within } from '../meter/tally.store.ts';
+import { sessionsOf, type PassCost } from '../meter/meter.ts';
 import { advanceRun, type Advanced } from './advance.verb.ts';
 import { stagedRead } from '../list/list.verb.ts';
-import { costOf, ioOf, meteredEngine } from '../meter/meter.verb.ts';
+import { costOf, ioOf, meteredEngine, recordPassMetrics } from '../meter/meter.verb.ts';
 
 /**
  * One pass: every run advanced, in the store's order, and what the pass did with the queue of inbox cards, when it did anything
@@ -119,7 +119,8 @@ type PassOptions = { repo: string; memo: RestMemo; verify: boolean };
  * A run at rest — finished, every task settled, nothing due and nothing done — is answered from the memo of the passes before (`RestMemo`)
  * while none of its inputs changed, and costs no read of the engine and no git of its own: see `restMemo`.
  *
- * Metered as it goes (`meteredPass`), and its cost written down (`recordPassCost`) and returned. A pass run inside another's meter — a
+ * Metered as it goes (`meteredPass`), and its cost written down (`recordPassCost`), kept among the recent passes (`recordRecentPass`), put
+ * into the pass's metrics (`recordPassMetrics`) and returned. A pass run inside another's meter — a
  * test that meters its own — is counted as part of that one and carries no cost of its own.
  *
  * `memo` is the memo to answer from and keep, the engine's own by default: a fresh one each pass (`freshRestMemo`) is a daemon restarted
@@ -145,7 +146,8 @@ export const tickRun = Effect.fn('tick')(function* ({
   const t0 = performance.now();
   const measured = costOf(tallies, ms, io0, ioOf(e));
   const cost = { ...measured, overheadMs: measured.overheadMs + (performance.now() - t0) };
-  const written = yield* tried(() => recordPassCost(cost));
+  const written = yield* tried(() => recordPassCost(cost) + recordRecentPass(cost));
+  yield* recordPassMetrics(cost);
   return { ...value, cost: { ...cost, overheadMs: cost.overheadMs + written } };
 });
 
@@ -175,12 +177,14 @@ export const tick = (e: Engine, options: { repo?: string; memo?: RestMemo; verif
  */
 const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }: PassOptions) {
   const report = yield* awaited(() => engine.tick());
+  noteSeen(sessionsOf(report));
   const e = reportedEngine(engine, report.views ?? []);
   const resting = yield* restingPass(e, memo, verify);
   const ran = yield* tried(() => ceilings());
   yield* tried(() => within('act', () => recordCeilings(ran)));
   const runs = yield* tried(() => runStore.runs.list(undefined, resting && keptOf(resting)));
   if (resting) forgotten(memo, runs);
+  noteSeen({ runs: runs.length });
   const pause = yield* tried(() => readPause());
   const judging: Judging = { done: new Map(), unjudged: new Map() };
   for (const run of runs.filter(hasStarted)) yield* judged(e, judging, runs, run, resting);

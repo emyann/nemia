@@ -1249,6 +1249,7 @@ export const PASS = {
   ms: 212.4,
   line: 'a pass takes 212 ms',
   totals: '212 ms, 12 run records read, 812.0 kB read, 1 process started.',
+  seen: 'It saw 12 runs in the store, 3 tasks not settled, 1 queued and 2 admitted.',
   cost: (at: string) => ({
     at,
     ms: 212.4,
@@ -1257,6 +1258,10 @@ export const PASS = {
     spawned: 1,
     overheadMs: 0.4,
     rested: 0,
+    runs: 12,
+    tasks: 3,
+    queued: 1,
+    admitted: 2,
     phases: {
       records: { ms: 20, calls: 12, bytes: 12_000, reads: 12, spawned: 0 },
       asks: { ms: 5, calls: 40, bytes: 0, reads: 0, spawned: 0 },
@@ -1272,8 +1277,40 @@ export const PASS = {
 } as const;
 
 /**
+ * The daemon's recent passes, as the tick keeps them in `tick-recent.json` (`recordRecentPass`), oldest first, a pass every four
+ * seconds up to a minute ago: most under 100 ms, a few slower, one past the last bound; observing the harnesses the heaviest part. The
+ * Stats page draws them at `#passes`.
+ */
+export const RECENT = {
+  ms: [18, 22, 31, 45, 38, 27, 64, 88, 52, 41, 36, 29, 120, 75, 58, 47, 33, 212, 96, 61, 44, 39, 480, 70, 55, 26, 1300, 49, 35, 6200],
+  passes(now: number) {
+    return this.ms.map((ms, k) => ({
+      at: new Date(now - 60_000 - (this.ms.length - 1 - k) * 4000).toISOString(),
+      ms,
+      runs: 40 + (k % 4),
+      tasks: 3,
+      queued: 1,
+      admitted: 2,
+      records: 12,
+      rested: 28,
+      reads: 6,
+      phases: {
+        records: ms * 0.1,
+        asks: ms * 0.02,
+        journals: ms * 0.18,
+        observe: ms * 0.5,
+        runtime: ms * 0.05,
+        git: ms * 0.03,
+        assess: ms * 0.08,
+        act: ms * 0.02,
+      },
+    }));
+  },
+} as const;
+
+/**
  * Write QUEUE into the store at `root`, `first` and `refused` about the checkout at `repo`: the cards, the refused try, `tick.json`, and
- * what the pass that wrote it cost (`tick-stats.json`, PASS).
+ * what the pass that wrote it cost (`tick-stats.json`, PASS), and the recent passes (`tick-recent.json`, RECENT).
  */
 export function seedQueue(root: string, repo: string, now = Date.now()): void {
   const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
@@ -1293,6 +1330,7 @@ export function seedQueue(root: string, repo: string, now = Date.now()): void {
   write(path.join(root, 'queue', `${refused.name}.json`), JSON.stringify(tried, null, 2));
   write(path.join(root, 'tick.json'), JSON.stringify({ sessions: QUEUE.sessions, runs: QUEUE.cap }, null, 2));
   write(path.join(root, 'tick-stats.json'), JSON.stringify(PASS.cost(ago(1)), null, 2));
+  write(path.join(root, 'tick-recent.json'), JSON.stringify(RECENT.passes(now)));
 }
 
 /**

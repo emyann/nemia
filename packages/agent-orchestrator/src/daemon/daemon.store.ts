@@ -1,6 +1,7 @@
 /**
- * The store's two files about the tick itself: `tick.json`, the ceilings the last pass ran with, and `daemon.json`, who ticks the store —
- * read, judged by `daemon.ts`'s pure half against the process table, and written.
+ * The store's files about the tick itself: `tick.json`, the ceilings the last pass ran with; `tick-stats.json` and `tick-recent.json`,
+ * what the last pass and the recent ones cost; and `daemon.json`, who ticks the store — read, judged by `daemon.ts`'s pure half against
+ * the process table, and written.
  *
  * Beneath the controllers, beside `record.store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports what the
  * package exports of it.
@@ -10,7 +11,7 @@ import path from 'node:path';
 import { Result, Schema } from 'effect';
 import { HOME } from '../record/record.store.ts';
 import { maxConcurrent, maxRuns } from '../config/config.store.ts';
-import { PHASES, type PassCost, type Phase } from '../meter/meter.ts';
+import { PHASES, RECENT_KEPT, recentOf, type PassCost, type PassCostRead, type Phase, type RecentPass } from '../meter/meter.ts';
 import {
   DAEMON_FILE,
   daemonStanding as standingOf,
@@ -105,8 +106,8 @@ const HarnessCostSchema = Schema.StructWithRest(
 );
 
 /**
- * A pass's cost as `recordPassCost` writes it (`PassCost`), every phase and `rested` there.
- * A key it does not name is kept, as a newer `nemia` may write one.
+ * A pass's cost as `recordPassCost` writes it (`PassCost`), every phase and `rested` there, and what it saw (`Seen`) where an older tick
+ * that kept none did not write it. A key it does not name is kept, as a newer `nemia` may write one.
  */
 const isPassCost = Schema.is(
   Schema.StructWithRest(
@@ -120,19 +121,23 @@ const isPassCost = Schema.is(
       spawned: Count,
       overheadMs: Count,
       rested: Count,
+      runs: Schema.optionalKey(Count),
+      tasks: Schema.optionalKey(Count),
+      queued: Schema.optionalKey(Count),
+      admitted: Schema.optionalKey(Count),
     }),
     Rest,
   ),
 );
 
 /** A pass's cost as it reads off disk, or undefined when it does not read as one: a file from another version, or half of one. */
-export const parsePassCost = (text: string): PassCost | undefined => {
+export const parsePassCost = (text: string): PassCostRead | undefined => {
   const c = jsonOr(text);
   return isPassCost(c) ? c : undefined;
 };
 
 /** The last pass's cost (`statsFile`), or undefined before any pass has written one, or when the file does not read as one. */
-export function lastPassCost(): PassCost | undefined {
+export function lastPassCost(): PassCostRead | undefined {
   let text: string;
   try {
     text = fs.readFileSync(statsFile(), 'utf8');
@@ -418,4 +423,77 @@ export function releaseStore(held: DaemonFile, at = new Date().toISOString()): v
 export function storeRefusal(verb: 'tick', now: Instant = instantNow()): string | undefined {
   const holder = holderAgainst(daemonStanding(now), process.pid);
   return holder ? holdRefusal(holder, verb, HOME, now.at) : undefined;
+}
+
+/**
+ * The recent passes, oldest first: `$WF_ROOT/tick-recent.json`, the tick's alone to write (`recordRecentPass`), at most `RECENT_KEPT` of
+ * them, and read by `nemia passes` and the api. Kept on disk, so a restarted daemon and the command line read what the daemon's passes
+ * cost; nothing reads it to decide.
+ */
+export const recentFile = (): string => path.join(HOME, 'tick-recent.json');
+
+/** A pass as `recordRecentPass` keeps it (`RecentPass`): a key it does not name is kept, as a newer `nemia` may write one. */
+const isRecentPass = Schema.is(
+  Schema.StructWithRest(
+    Schema.Struct({
+      at: Schema.String,
+      ms: Count,
+      runs: Count,
+      tasks: Count,
+      queued: Count,
+      admitted: Count,
+      records: Count,
+      rested: Count,
+      reads: Count,
+      phases: Schema.Struct(Object.fromEntries(PHASES.map((p) => [p, Count])) as Record<Phase, typeof Count>),
+    }),
+    Rest,
+  ),
+);
+
+/** The recent passes as `text` holds them, and how many of its entries do not read as one; none of either for a text that is no list. */
+export const parseRecentPasses = (text: string): { passes: RecentPass[]; unread: number } => {
+  const list = jsonOr(text);
+  if (!Array.isArray(list)) return { passes: [], unread: 0 };
+  const passes = list.filter((entry): entry is RecentPass => isRecentPass(entry));
+  return { passes, unread: list.length - passes.length };
+};
+
+/** The file's text, or undefined where there is none yet. */
+const recentText = (): string | undefined => {
+  try {
+    return fs.readFileSync(recentFile(), 'utf8');
+  } catch {
+    return undefined;
+  }
+};
+
+/**
+ * The recent passes (`recentFile`), oldest first: none before any pass kept one, or for a file that is not a list. An entry that does not
+ * read as a pass is left out, and the file named once on stderr with how many; the next pass writes the file without them.
+ */
+export function recentPasses(): RecentPass[] {
+  const text = recentText();
+  if (text === undefined) return [];
+  const { passes, unread } = parseRecentPasses(text);
+  if (unread) process.stderr.write(`${recentFile()}: ${unread} of its passes did not read as one and were left out.\n`);
+  return passes;
+}
+
+/**
+ * The pass whose cost is `cost` kept among the recent (`recentOf`), after those the file holds and the oldest left out past `keep`, written
+ * through a hidden file renamed over the last, as `recordPassCost` writes. A store that cannot be written loses only this. Answers with
+ * the time it took, which is measuring's.
+ */
+export function recordRecentPass(cost: PassCost, keep = RECENT_KEPT): number {
+  const t0 = performance.now();
+  const text = recentText();
+  const kept = [...(text === undefined ? [] : parseRecentPasses(text).passes), recentOf(cost)].slice(-keep);
+  const hidden = path.join(HOME, `.tick-recent.json.${process.pid}`);
+  try {
+    fs.mkdirSync(HOME, { recursive: true });
+    fs.writeFileSync(hidden, JSON.stringify(kept));
+    fs.renameSync(hidden, recentFile());
+  } catch {}
+  return performance.now() - t0;
 }

@@ -154,7 +154,10 @@ test("a pass's phases add up to its time, less what measuring took, and the time
       cost.ms - sum <= cost.overheadMs + ROUNDING_MS,
       `the phases (${sum} ms) and measuring (${cost.overheadMs} ms) cover the pass (${cost.ms} ms)`,
     );
-    assert.ok(cost.overheadMs < cost.ms, 'measuring costs less than what it measures');
+    assert.ok(
+      sum + cost.overheadMs <= outside + ROUNDING_MS,
+      `the phases (${sum} ms) and measuring, the cost's write after the pass included (${cost.overheadMs} ms), fit in the ${outside} ms tick took`,
+    );
     for (const p of PHASES) assert.ok(cost.phases[p].ms >= 0, `${p} took no negative time`);
   }
 });

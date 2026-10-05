@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { Effect, ManagedRuntime } from 'effect';
-import { Engine as EngineService, refusalWords, type EngineShape } from '../index.ts';
+import { Engine as EngineService, refusalWords, type EngineOptions, type EngineShape } from '../index.ts';
 import {
   denialText,
   refusedText,
@@ -538,9 +538,12 @@ const printOutput = async (engine: EngineShape, id: string, stream: string): Pro
 const run = <A, E>(verb: string, effect: Effect.Effect<A, E>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.mapError(refusalWords(verb))));
 
-/** The engine at `root`, its layer built once and kept for the process; options it refuses are refused, exit code 2 (`refusalWords`). */
-const engineAt = (root: string): Promise<EngineShape> =>
-  ManagedRuntime.make(EngineService.layer({ root }))
+/**
+ * The engine over `options`, its layer built once and kept for the process. Refused — rejects with an `Error` whose `exitCode` is 2, led
+ * by `ae` (`refusalWords`) — for options the engine refuses; any other failure to build it is rejected as it is.
+ */
+export const engineAt = (options: EngineOptions): Promise<EngineShape> =>
+  ManagedRuntime.make(EngineService.layer(options))
     .runPromise(
       Effect.gen(function* () {
         return yield* EngineService;
@@ -589,7 +592,7 @@ export async function main(argv: string[]): Promise<void> {
   const [verb, arg] = argv;
   if (process.env.AE_MAX_CONCURRENT !== undefined) throw Object.assign(new Error(AE_MAX_CONCURRENT_RETIRED), { exitCode: 2 });
   const root = process.env.AE_ROOT ?? path.join(os.homedir(), '.agent-engine');
-  const engine = await engineAt(root);
+  const engine = await engineAt({ root });
 
   switch (verb) {
     case 'start': {

@@ -1,11 +1,11 @@
 /**
  * The client's way of reading the runtime: a verb of the engine read through `asked` dies, as an `Error`, of the runtime's refusal in the
- * runtime's words. `WF_ROOT` is set before the client loads, a scratch root.
+ * runtime's words, and an engine `engineOf` cannot build is refused in them. `WF_ROOT` is set before the client loads, a scratch root.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Effect } from 'effect';
-import { StopRefused } from 'agent-runtime/effect';
+import { Effect, Layer } from 'effect';
+import { Engine, EngineRefused, StopRefused } from 'agent-runtime/effect';
 import { board } from './engine-board.ts';
 import { scratch } from './scratch.ts';
 
@@ -34,4 +34,19 @@ test('a failure of the runtime that is no refusal is thrown as it was, with no e
   );
   assert.equal(err.message, 'the journal is gone');
   assert.equal(err.exitCode, undefined);
+});
+
+test('an engine whose layer the runtime refuses is refused with exit code 2, its message led by engine', () => {
+  const refused = Layer.effect(Engine, Effect.fail(new EngineRefused({ message: '`maxConcurrent: 0` is not a ceiling' })));
+  const err = (() => {
+    try {
+      engineOf(refused);
+    } catch (e) {
+      return e as Error & { exitCode?: number };
+    }
+    return assert.fail('the refused layer was built into an engine');
+  })();
+  assert.equal(err.exitCode, 2);
+  assert.ok(err.message.startsWith('engine: '), err.message);
+  assert.match(err.message, /`maxConcurrent: 0` is not a ceiling/);
 });

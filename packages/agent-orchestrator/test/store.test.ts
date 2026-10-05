@@ -4201,6 +4201,66 @@ test('REFUSED to fail the filing: a parent whose closeout cannot be read — a f
   assert.match(brief, /\nWhat implement said when it signed off cannot be given here — its closeout cannot be read: unparseable: .*\.\n/);
 });
 
+test('REFUSED to wait on context: a run handed only a run still in flight files its roots on the first pass, the source handed as not shipped, not judged', async () => {
+  const repo = aRepo();
+  const c = board();
+  const source = await aParent(repo, c, { work: 'source.txt', signed: false });
+  const child = start({ brief: 'Read what the source has', repo, workflowDir: folder(), context: [source.run.id] });
+  assert.deepEqual(readRun(child.id).context, [source.run.id], 'frozen on the record');
+  const r = await advance(c.e, readRun(child.id));
+  assert.deepEqual([r.filed, r.waiting], [['implement'], []]);
+  const brief = c.tasks.get(`${child.id}-implement`)!.spec.brief;
+  const section = brief.slice(brief.indexOf(`\n## From run ${source.run.id}\n`));
+  assert.ok(section.length < brief.length, brief);
+  assert.match(section, /as context \(`--from`\); it did not wait on it/);
+  assert.match(section, new RegExp(`Not shipped, not judged: ${source.run.id} was still in flight`));
+});
+
+test('REFUSED to wait on context: a run after one run and handed another waits for the first alone, handed it in `--after` words before the other', async () => {
+  const repo = aRepo();
+  const c = board();
+  const waited = await aParent(repo, c, { work: 'waited.txt' });
+  const read = await aParent(repo, c, { work: 'read.txt', signed: false });
+  const child = start({ brief: 'the child', repo, workflowDir: folder(), after: [waited.run.id], context: [read.run.id] });
+  const before = await advance(c.e, readRun(child.id));
+  assert.deepEqual(
+    [before.filed, before.waiting],
+    [[], [{ run: waited.run.id }]],
+    'waiting on the run it waits on, never the one it reads',
+  );
+  gitIn(repo, 'merge', '-q', '--no-ff', '-m', `Merge ${waited.run.id}`, waited.branch);
+  const r = await advance(c.e, readRun(child.id));
+  assert.deepEqual([r.filed, r.waiting], [['implement'], []]);
+  const brief = c.tasks.get(`${child.id}-implement`)!.spec.brief;
+  const waitedAt = brief.indexOf(`\n## From run ${waited.run.id}\n`);
+  const readAt = brief.indexOf(`\n## From run ${read.run.id}\n`);
+  assert.ok(waitedAt > 0 && readAt > waitedAt, brief);
+  assert.match(brief.slice(waitedAt, readAt), /waited on .* \(`--after`\) and started once it shipped/);
+  assert.match(brief.slice(readAt), /as context \(`--from`\).*\n.*\nNot shipped, not judged/);
+});
+
+test('`nemia concluded` prints the section the tick hands a run started with `--from` — REFUSED: a run the store does not have', async (t) => {
+  const repo = aRepo();
+  const c = board();
+  const source = await aParent(repo, c, { work: 'source.txt', signed: false });
+  const printed: string[] = [];
+  t.mock.method(console, 'log', (...args: unknown[]) => {
+    printed.push(args.join(' '));
+  });
+  const { main } = await import('../src/cli/main.ts');
+  await main(['concluded', source.run.id], c.e);
+  const child = start({ brief: 'Read what the source has', repo, workflowDir: folder(), context: [source.run.id] });
+  await advance(c.e, readRun(child.id));
+  const brief = c.tasks.get(`${child.id}-implement`)!.spec.brief;
+  const at = brief.indexOf(`\n## From run ${source.run.id}\n`);
+  const section = brief.slice(at, brief.indexOf('\n## Files for the steps after you\n', at));
+  assert.equal(printed.join('\n'), section.replace(/^\n+/, '').replace(/\n+$/, ''), 'the very section the root was handed');
+  await assert.rejects(main(['concluded', 'nobody-z9'], c.e), (err: Error) => {
+    assert.match(err.message, /nemia concluded nobody-z9: the store has no run nobody-z9/);
+    return true;
+  });
+});
+
 test("`nemia say` hands the words to the step's current task through the engine's `say` and prints the line it journalled, writing nothing of its own — `nemia ls` notes the step said to, and `nemia decide` prints each thing said under the step, before its closeout, fenced", async (t) => {
   const run = started(folder());
   const b = board();

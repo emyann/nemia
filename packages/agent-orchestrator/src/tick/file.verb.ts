@@ -50,7 +50,7 @@ import { runStore } from '../record/files.store.ts';
 import { checkCloseout, writeCheckCloseout } from '../check/check.store.ts';
 import { checkoutParts, gitSays, realRepoOf, workspaceFor } from '../workspace/worktree.store.ts';
 import { agentFilesDir, renderedIn, skillsAgain } from '../agents/agents.store.ts';
-import { checksHandedOf, closeoutOf, refusalOf, reportedEngine, saidIn, sessionIn } from '../views/views.verb.ts';
+import { checksHandedOf, closeoutOf, parentOf, refusalOf, reportedEngine, saidIn, sessionIn } from '../views/views.verb.ts';
 import { phaseOfView } from '../views/views-words.ts';
 import { placesOf } from '../folder/lookup.store.ts';
 import { skillsFor } from '../folder/folder.store.ts';
@@ -102,7 +102,8 @@ export const ownOf = (step: Workflow, rendered: ClaudeFlags | undefined, repoOf:
 };
 
 /**
- * What each run this one waited on concluded, for its roots' briefs (`## From run <id>` in `composeBrief`): the first line of its brief,
+ * What each run this one waited on or was handed as context concluded, for its roots' briefs (`## From run <id>` in `composeBrief`), each
+ * marked `how` it was given and whether it had `shipped`, asked of each run that reads: the first line of its brief,
  * and the closeout of each step whose work is that run's result (`resultSteps`), on the engine's record of its current try, read as
  * `nemia decide` reads one (`closeoutOf`). Read once, on the pass that files the roots.
  *
@@ -115,7 +116,12 @@ export const ownOf = (step: Workflow, rendered: ClaudeFlags | undefined, repoOf:
  * no closeout for — a failed step whose work a person merged all the same — and a closeout that does not parse each say so in the section,
  * and the roots are filed all the same.
  */
-export async function parentCloseouts(e: Engine, ids: readonly string[]): Promise<ParentCloseout[]> {
+export async function parentCloseouts(
+  e: Engine,
+  ids: readonly string[],
+  how: ParentCloseout['how'],
+  shippedOf: (runId: string) => Promise<boolean>,
+): Promise<ParentCloseout[]> {
   const out: ParentCloseout[] = [];
   for (const id of new Set(ids)) {
     let record: Run;
@@ -124,7 +130,7 @@ export async function parentCloseouts(e: Engine, ids: readonly string[]): Promis
       record = runStore.runs.read(id);
       steps = stepsOf(record);
     } catch (err) {
-      out.push({ run: id, unreadable: `its record cannot be read: ${(err as Error).message}` });
+      out.push({ run: id, unreadable: `its record cannot be read: ${(err as Error).message}`, how, shipped: false });
       continue;
     }
     const said: ParentStep[] = [];
@@ -147,7 +153,7 @@ export async function parentCloseouts(e: Engine, ids: readonly string[]): Promis
       else if ('error' in c) said.push({ name: step.name, unreadable: `its closeout cannot be read: ${c.error}` });
       else said.push({ step, said: c });
     }
-    out.push({ run: id, asked: record.brief.split('\n')[0], steps: said });
+    out.push({ run: id, asked: record.brief.split('\n')[0], steps: said, how, shipped: await shippedOf(id) });
   }
   return out;
 }
@@ -558,15 +564,25 @@ async function fileCheck(f: Filing, name: string): Promise<void> {
 type Place = Awaited<ReturnType<typeof workspaceFor>>;
 
 /**
+ * What a run's roots are handed of other runs, on the pass that files them: what each run it waited on concluded, shipped, then what each
+ * run it was handed as context concluded, shipped or not as `parentOf` reads it now (`parentCloseouts`). Undefined for a run with neither.
+ */
+async function handedOf(e: Engine, run: Run): Promise<ParentCloseout[] | undefined> {
+  const waited = run.after?.length ? await parentCloseouts(e, run.after, 'waited', async () => true) : [];
+  const read = run.context?.length ? await parentCloseouts(e, run.context, 'read', async (id) => (await parentOf(e, id)).shipped) : [];
+  return waited.length || read.length ? [...waited, ...read] : undefined;
+}
+
+/**
  * File the ready steps, in order, until the pass may file no more, each in the workspace cut for it: answers with the steps filed. A run
- * that waited on runs, on the pass that files its roots, moves its base to its branch as it stands and reads what they concluded
- * (`parentCloseouts`).
+ * that waited on runs, on the pass that files its roots, moves its base to its branch as it stands; and a run that waited on runs or was
+ * handed runs as context reads what they concluded (`handedOf`).
  */
 export async function fileReady(f: Filing, ready: readonly string[], starting: boolean): Promise<string[]> {
   const { e, run } = f;
   if (ready.length && starting && run.after?.length && isGitRun(run))
     run.baseRef = gitSays(run.repo, 'rev-parse', '--verify', `${run.branch}^{commit}`)?.trim() || run.baseRef;
-  const parents = ready.length && starting && run.after?.length ? await parentCloseouts(e, run.after) : undefined;
+  const parents = ready.length && starting ? await handedOf(e, run) : undefined;
   const filed: string[] = [];
   for (const name of ready) {
     if (!f.mayFile()) break;

@@ -2204,6 +2204,27 @@ A record written before `after` existed waits on nothing.
 A run that waited is told what its parents concluded, under `## From run <id>` (*What one step knows of another*,
 above). To start a whole graph of runs at once, write it as a folder of cards: `wf plan`, below.
 
+## Context without a wait: `wf start --from`
+
+```bash
+wf start ./e.md --repo ~/code/myapp --from a-1x2y                    # filed at once, handed what a-1x2y concluded
+wf start ./f.md --repo ~/code/myapp --after b-3z4w --from c-5v6u     # waits on b-3z4w alone
+wf concluded a-1x2y                                                  # the section a run handed a-1x2y is given
+```
+
+`--after` is a wait and a hand-off at once. `--from <runId>`, given once for each run, is the hand-off alone: frozen on the
+record as `context`, it is never read by what decides whether a run's steps are filed, so a run started only `--from` files its
+roots on the first pass. Each source becomes a `## From run <id>` section on the roots, worded as context, after the sections of
+the runs it waited on. A source that had shipped when the roots were filed is labelled so; one still in flight is accepted, read
+once, then, and labelled *not shipped, not judged*: what it had concluded so far, its change not in this workspace and its account
+judged by nobody. `wf start` says so on a `reads:` line for each.
+
+`wf concluded <runId>` prints the section exactly as a root would be handed it now, and the board's start form previews it. A
+card's `from:` (`wf inbox from`, below) and the api's start body key `context` are the same list. `wf start` refuses, by name: a
+run the store does not have, one named twice, one also given to `--after` (whose section `--after` hands already), and the run
+itself.
+
+
 ## Holding a run that has started: `wf hold`
 
 ```bash
@@ -2418,7 +2439,10 @@ run 'wf tick' (or 'wf up') to start it
   the step of its workflow whose closeout waits for a person in the run it starts, one step, refused as a list or as a step's
   `true` ([*A gate*](#a-gate-a-handoff-that-waits-for-a-person--gate---gate-and-wf-approve)). A fifth, `factory: <name>`, names
   the factory the card is started in ([below](#factories-a-named-grouping-in-the-store--wf-factory)); a card that names none
-  starts only with `--factory` ([*Every run in a factory*](#every-run-in-a-factory)).
+  starts only with `--factory` ([*Every run in a factory*](#every-run-in-a-factory)). A sixth, `from: a-1x2y, b-3z4w`, names the
+  runs the card is handed as context when it starts, as `--from` names them ([above](#context-without-a-wait-wf-start---from)):
+  `wf inbox from <name> <run>...` writes it, refused for a run the store does not have, and `wf inbox from <name> --off` takes it
+  back; a started card is not rewritten.
 - **`repo:` is what makes one inbox serve several repositories.** A card that names its repository starts on it from
   wherever `wf start` is typed, and a board that one day serves more than one repository can group its inbox by it. A card
   without one is about the repository its start names: `--repo`, else `.`.
@@ -2446,7 +2470,7 @@ run 'wf tick' (or 'wf up') to start it
   - the factory is `--factory`, else the card's `factory:`, else the default;
   - the repository is `--repo`, else the card's `repo:`, else the factory's one repository, else `.` — chosen before the card's
     `workflow:` is found in it;
-  - `--after`, `--input` and `--no-worktree` are `wf start`'s, as for any brief.
+  - `--after`, `--from`, `--input` and `--no-worktree` are `wf start`'s, as for any brief; `--from` adds to the card's `from:`.
 - **The record is written first, then the card is removed.** The record carries `from: { inbox: <name> }`, and `wf decide`
   prints `from inbox card <name>` under the run's line. A removal that fails leaves a card `wf inbox` lists as
   `started as <runId>` — never a run with no trace of its card — and `wf start` refuses that card, naming its run, until

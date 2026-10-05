@@ -15,7 +15,7 @@ import type { Engine } from 'agent-runtime';
 import { scratch } from './scratch.ts';
 import { teamCopy } from './team.ts';
 import { factoryMounts } from '../src/factory/factory.ts';
-import { mountsLine } from '../src/start/inputs.ts';
+import { mountsLine } from '../src/start/index.ts';
 
 const ROOT = scratch('wf-factory-mounts-');
 process.env.WF_ROOT = ROOT;

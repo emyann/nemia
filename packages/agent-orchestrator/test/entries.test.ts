@@ -457,6 +457,7 @@ const PINNED: Record<string, string[]> = {
     'gatesOf',
     'givenPlan',
     'handOffDue',
+    'handedParts',
     'harnessWaitLine',
     'hasGate',
     'hasStarted',

@@ -6,6 +6,7 @@ import path from 'node:path';
 import { WorkflowError } from '../step/step.ts';
 import { loadWorkflows, workflowFolder, workflowsIn } from '../folder/folder.store.ts';
 import {
+  fromText,
   inboxListing,
   inboxNameRefusal,
   nextQueued,
@@ -27,6 +28,7 @@ import { isDirectory } from '../record/record.store.ts';
 import { inboxDir, runStore } from '../record/files.store.ts';
 import { inboxCards } from './inbox.store.ts';
 import { repoFor, start } from '../start/start.verb.ts';
+import { contextRefusal } from '../start/index.ts';
 import { placesOf } from '../folder/lookup.store.ts';
 import { defaultStartsAllowed, factoryNames, readFactories } from '../factory/factory.store.ts';
 import { DEFAULT_FACTORY, defaultStartRefusal, type Factory } from '../factory/factory.ts';
@@ -59,6 +61,8 @@ export type InboxStart = {
   fix?: string;
   /** The runs it waits on (`nemia start --after`): an inbox card has no `after:`, so it is said here, at start. */
   after?: readonly string[];
+  /** The runs it is handed as context (`nemia start --from`), after the card's own `from:`; a run both name is handed once. */
+  context?: readonly string[];
   isolate?: boolean;
   inputs?: readonly string[];
   /** The steps its run is gated at (`nemia start --gate`), beside the card's own `gate:`. */
@@ -121,7 +125,9 @@ function cardFactory(opts: Pick<InboxStart, 'factory' | 'fix'>, named: string | 
  * is written, exit 2: a name that is not a card's (`inboxNameRefusal`), a card not there (`Missing`) — naming the cards there are — a card
  * that does not read, a card already started (`Conflict`), no factory from either — `Invalid`, naming the line to write and `fix`
  * (`unfactoredCardRefusal`), unless `defaultStartsAllowed` — or the default factory named (`defaultStartRefusal`), no workflow, a
- * workflow that does not load behind the card, a `gate:` naming no step of it, in the card's words, and a `brief` with nothing in it. And
+ * workflow that does not load behind the card, a `gate:` naming no step of it, in the card's words, a `from:` naming a run the store does
+ * not have or one also waited on (`contextRefusal`), and a `brief` with nothing in it. The run is handed as context the card's `from:` and
+ * `context`, in that order. And
  * refused as `start()` refuses it: an `--after`, an `--input` or a `--gate` it refuses, a factory not there, or one that does not offer
  * the workflow or does not work on the repository.
  */
@@ -150,12 +156,8 @@ export function startFromInbox(opts: InboxStart): InboxStarted {
       `${card.file}: the brief given in place of the card's body is empty. Give what the run is asked to do, or leave it out, and the run is asked what the card says.`,
     );
   }
-  const flags = opts.gates ?? [];
-  if (card.gate !== undefined) {
-    const refusedGate = gateRefusal([card.gate], loadWorkflows(workflowDir, placesOf(repo)), (step) => `${card.file}: \`gate: ${step}\``);
-    if (refusedGate) throw new WorkflowError(`${refusedGate} Correct the line, or delete it.`);
-  }
-  const gates = [...(card.gate !== undefined && !flags.includes(card.gate) ? [card.gate] : []), ...flags];
+  const gates = cardGates(card, opts.gates ?? [], workflowDir, repo);
+  const context = cardContext(card, opts);
 
   const run = start({
     brief: opts.brief?.trim() ?? card.body,
@@ -164,6 +166,7 @@ export function startFromInbox(opts: InboxStart): InboxStarted {
     workflowDir,
     isolate: opts.isolate,
     after: opts.after,
+    ...(context.length ? { context } : {}),
     inputs: opts.inputs,
     from: { inbox: card.name },
     ...(gates.length ? { gates } : {}),
@@ -176,6 +179,56 @@ export function startFromInbox(opts: InboxStart): InboxStarted {
     return { run, card, removed: false, why: `${file} could not be removed — ${(err as Error).message}`, ...ignoredRepo };
   }
   return { run, card, removed: true, ...ignoredRepo };
+}
+
+/** The steps a card's run is gated at: its `gate:` first, then `flags`, a step both name once — refused as the card's line when no step. */
+function cardGates(card: InboxCard, flags: readonly string[], workflowDir: string, repo: string): string[] {
+  if (card.gate !== undefined) {
+    const refusedGate = gateRefusal([card.gate], loadWorkflows(workflowDir, placesOf(repo)), (step) => `${card.file}: \`gate: ${step}\``);
+    if (refusedGate) throw new WorkflowError(`${refusedGate} Correct the line, or delete it.`);
+  }
+  return [...(card.gate !== undefined && !flags.includes(card.gate) ? [card.gate] : []), ...flags];
+}
+
+/** The runs a card's run is handed as context: its `from:`, then `opts.context`, a run both name once — refused as `contextRefusal` says. */
+function cardContext(card: InboxCard, opts: InboxStart): string[] {
+  const refusedFrom = contextRefusal(card.from ?? [], opts.after ?? [], runStore.runs.exists, undefined, `${card.file}: from:`);
+  if (refusedFrom) throw refusedFrom;
+  return [...new Set([...(card.from ?? []), ...(opts.context ?? [])])];
+}
+
+/** What `nemia inbox from` did: the card as it reads now, its file, and the runs its `from:` named before. */
+export type InboxFrom = { card: InboxCard; file: string; was: string[] };
+
+/**
+ * `nemia inbox from <card> <run>…`: the card's `from:` set to `runs`, the runs its run is handed as context — or taken off, for none
+ * (`--off`). The card is written whole through `runStore.inbox.rewrite`, every other key kept (`fromText`).
+ *
+ * Refused by name, exit 2, before anything is written: a name that is not a card's (`inboxNameRefusal`), a name with no card (`Missing`),
+ * a card that does not read, a card a run's record says was started (`Conflict`, `startedRefusal`), and what `contextRefusal` refuses of
+ * `runs`: one the store does not have (`Missing`) or one named twice.
+ */
+export function setFrom(name: string, runs: readonly string[]): InboxFrom {
+  const refused = inboxNameRefusal(name);
+  if (refused) throw new WorkflowError(refused);
+  const file = runStore.inbox.where(`${name}.md`);
+  const text = runStore.inbox.read(`${name}.md`);
+  if (text === null) {
+    throw new Missing({
+      message: `${noCardLine(name, inboxCards())} Name one of those — nemia inbox from <name> <run> — or park the idea first: nemia inbox add "<idea>".`,
+    });
+  }
+  const card = parseInboxCard(`${name}.md`, text, () => true);
+  const started = runStore.runs
+    .list()
+    .filter((r) => r.from?.inbox === card.name)
+    .map((r) => r.id);
+  if (started.length) throw new Conflict({ message: startedRefusal(card, file, started) });
+  const refusedRuns = contextRefusal(runs, [], runStore.runs.exists, undefined, 'nemia inbox from');
+  if (refusedRuns) throw refusedRuns;
+  const written = fromText(card, runs, () => true);
+  runStore.inbox.rewrite(`${name}.md`, written);
+  return { card: parseInboxCard(`${name}.md`, written, () => true), file, was: card.from ?? [] };
 }
 
 /** The store's factories that read, by name: what a queued card's repository is chosen from (`queueRepo`). One not read is none. */

@@ -22,7 +22,8 @@ type Filling = Record<string, string | number | boolean | readonly string[] | un
 /**
  * An argument given by its place. `required`: the command is given too little without it, and the CLI prints its help; `optional`: at
  * most one, after the required, never starting `--`; `rest`: every word after the required, joined by spaces, as one text; `many`: every
- * word after the required that starts with no `-`, among the flags, each once, in the order given — on the api, its path's one text.
+ * word after the required that starts with no `-`, among the flags, each once, in the order given — on the api, its path's one text, or a
+ * body's list.
  */
 export type Positional = {
   readonly key: string;

@@ -508,6 +508,38 @@ test("a start says what the card does not, over what it does: --workflows over `
   );
 });
 
+test("a card's `from:` is set and taken off by `nemia inbox from`, and its run is handed it as context before `--from`'s, a run both name once — REFUSED: a `from:` run also waited on, nothing written", async (t) => {
+  emptyInbox();
+  const repo = aRepoWith('dev');
+  writeRecord('source-a1');
+  writeRecord('source-b2');
+  const card = addToInbox({ text: 'Read the sources', workflow: 'dev', repo });
+  const set = await printedBy(t, 'inbox', 'from', card.card.name, 'source-a1');
+  assert.match(set[0], /from: source-a1 — its run is handed what each concluded, as context, and waits on none/);
+  assert.match(fs.readFileSync(card.file, 'utf8'), /^from: source-a1$/m);
+  const off = await printedBy(t, 'inbox', 'from', card.card.name, '--off');
+  assert.match(off[0], /from: taken off \(was source-a1\)/);
+  assert.doesNotMatch(fs.readFileSync(card.file, 'utf8'), /^from:/m);
+
+  await printedBy(t, 'inbox', 'from', card.card.name, 'source-a1');
+  const before = runsWritten();
+  assert.throws(
+    () => startFromInbox({ name: card.card.name, workflow: path.join(repo, 'workflows', 'dev'), callerRepo: repo, after: ['source-a1'] }),
+    refusedWith(/from: .*source-a1/),
+  );
+  assert.equal(runsWritten(), before, 'nothing written');
+  assert.ok(fs.existsSync(card.file), 'the card is kept');
+
+  const started = startFromInbox({
+    name: card.card.name,
+    workflow: path.join(repo, 'workflows', 'dev'),
+    callerRepo: repo,
+    context: ['source-b2', 'source-a1'],
+  });
+  assert.deepEqual(readRun(started.run.id).context, ['source-a1', 'source-b2']);
+  assert.equal(readRun(started.run.id).after, undefined, 'it waits on none');
+});
+
 test('REFUSED by name at shipped defaults, before a run is written and with the card left in the inbox: a card not there — naming those there are — a name that would leave the inbox, no workflow from the card or the flag, a workflow that does not load, a card that does not read, an empty --brief, --brief on anything but an inbox card, and an --after start() refuses', async () => {
   emptyInbox();
   const repo = aRepoWith('dev', 'ui');

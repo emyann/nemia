@@ -23,6 +23,7 @@ import { workRoot } from '../record/places.store.ts';
 import { gateRefusal } from '../ending/ending.ts';
 import { isGitRun, type Mount, type Run } from '../record/record.ts';
 import { afterRefusal } from '../wait/wait.ts';
+import { contextRefusal } from './context.ts';
 import { inputRefusal, type InputFile } from './inputs.ts';
 import { runStore } from '../record/files.store.ts';
 import { HOME, artifactsDir, inputsDir, runId, runsDir } from '../record/record.store.ts';
@@ -228,6 +229,7 @@ export type StartOptions = {
   workflowDir: string;
   isolate?: boolean;
   after?: readonly string[];
+  context?: readonly string[];
   inputs?: readonly string[];
   from?: { inbox: string };
   gates?: readonly string[];
@@ -235,7 +237,7 @@ export type StartOptions = {
 };
 
 /** What a run is told at `nemia start` and frozen on its record, whatever its place: the brief, the steps, and each option given. */
-type Told = Pick<Run, 'brief' | 'workflowDir' | 'workflow' | 'after' | 'inputs' | 'from' | 'gates' | 'factory' | 'mounts'>;
+type Told = Pick<Run, 'brief' | 'workflowDir' | 'workflow' | 'after' | 'context' | 'inputs' | 'from' | 'gates' | 'factory' | 'mounts'>;
 
 /** Why a folder team refuses `--repo`: its run works in folders it makes, and would never look at the repository named. */
 const repoNamedRefusal = (repo: string): string =>
@@ -310,12 +312,14 @@ export function leftOutMounts(run: Run): string[] {
  */
 function toldOf(opts: StartOptions, steps: Workflow[], inputs: readonly InputFile[], factory: Factory | undefined, mounts: Mount[]): Told {
   const after = opts.after ?? [];
+  const context = opts.context ?? [];
   const gates = opts.gates ?? [];
   return {
     brief: opts.brief,
     workflowDir: path.resolve(opts.workflowDir),
     workflow: steps,
     ...(after.length ? { after: [...after] } : {}),
+    ...(context.length ? { context: [...context] } : {}),
     ...(inputs.length ? { inputs: inputs.map((f) => path.basename(f.resolved)) } : {}),
     ...(opts.from ? { from: { inbox: opts.from.inbox } } : {}),
     ...(gates.length ? { gates: [...gates] } : {}),
@@ -413,6 +417,10 @@ export const repoFor = (name: string | undefined, named: string | undefined, fal
  * this run's base, or when the run is a folder run, which has no branch to wait for (`afterRefusal`), and frozen on the record. Left out,
  * the record has no `after`.
  *
+ * `context` names the runs this one is handed as context (`nemia start --from`): refused before anything is written when one is not in the
+ * store, is named twice or is also in `after` (`contextRefusal`), and frozen on the record. A run in flight is taken. Never waited on.
+ * Left out, the record has no `context`.
+ *
  * `inputs` are files to hand every step (`nemia start --input`), by path from where `nemia start` is typed: refused before anything is
  * written when one is not a file or two would take one name (`inputRefusal`), then copied into the run's own `inputs/` (`inputsDir`), and
  * their names frozen on the record. Left out, no directory is made, and the record has no `inputs`.
@@ -466,6 +474,8 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
   if (refusedInputs) return yield* Effect.fail(new Invalid({ message: refusedInputs }));
   let id = runId(opts.brief);
   while (runStore.runs.taken(id)) id = runId(opts.brief);
+  const refusedContext = contextRefusal(opts.context ?? [], opts.after ?? [], runStore.runs.exists, id);
+  if (refusedContext) return yield* Effect.fail(refusedContext);
   const mounts = mountsAt(factory, folder ? undefined : opts.repo);
   const unmounted = mountRefusal(opts, steps, places, factory, folder ? undefined : opts.repo, mounts);
   if (unmounted) return yield* Effect.fail(new Invalid({ message: unmounted }));

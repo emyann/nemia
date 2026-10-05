@@ -189,8 +189,8 @@ export {
   runWorktrees,
 } from './forget/forget.ts';
 export type { AskName, BranchFate, ForgetHow, Forgot, GitWorktree } from './forget/forget.ts';
-export { fromNote, inputRefusal, inputsLine, inputsNote } from './start/inputs.ts';
-export type { InputFile } from './start/inputs.ts';
+export { fromNote, inputRefusal, inputsLine, inputsNote } from './start/index.ts';
+export type { InputFile } from './start/index.ts';
 export { choicesOf, costLine, decision, runCostLines } from './decide/decide.ts';
 export type { DecideCommand, Decision, Offer, Shipped } from './decide/decide.ts';
 export { answerIn, deniedWords, harnessWaitLine, listing, onYouWords, shownNote, shownStatus, waitingWords } from './list/list.ts';
@@ -201,6 +201,7 @@ export {
   acceptedLines,
   composeBrief,
   gateLines,
+  handedParts,
   loopSection,
   remoteBrief,
   retrySection,
@@ -208,4 +209,4 @@ export {
   SIGNOFF,
   toldLayers,
 } from './brief/index.ts';
-export type { EndingStopped, ParentCloseout, ParentStep, RetryBriefing, RoundBriefing, ToldLayers } from './brief/index.ts';
+export type { EndingStopped, HandedPart, ParentCloseout, ParentStep, RetryBriefing, RoundBriefing, ToldLayers } from './brief/index.ts';

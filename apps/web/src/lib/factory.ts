@@ -98,6 +98,13 @@ export const clockCounts = (run: Clocked, finished: boolean): boolean => {
   return run.atWork ? run.atWork.since !== null : !finished;
 };
 
+/**
+ * How often a row of the runs list reads its clock again, in milliseconds: every second while its run's clock counts (`clockCounts`), a
+ * run not in flight (`inFlight`) read as finished, and every minute otherwise, so a row whose clock stands is not drawn again each second.
+ */
+export const rowClockEveryMs = (run: Clocked & Pick<RunSummary, 'status' | 'moving'>): number =>
+  clockCounts(run, !inFlight(run)) ? 1_000 : 60_000;
+
 /** A run's time at work at `now`: what ran and ended (`AtWork.ms`), and the time since what still runs started. */
 const atWorkMs = (atWork: AtWork, now: number): number =>
   atWork.ms + (atWork.since === null ? 0 : Math.max(0, now - Date.parse(atWork.since)));

@@ -247,7 +247,8 @@ Review the changes on this branch. Be specific about correctness, not style.
 
 Every `.md` in the folder is a step but its `README.md` (in any case), which says what the workflow is
 for: its first paragraph, past a heading, is the description the board lists the workflow with
-(`workflowDescription`). A folder with a README and no step is refused as a folder with no step is.
+(`workflowDescription`), and the whole of it is the workflow level's instruction, which the board shows on the workflow's
+page (`workflowReadme`). A folder with a README and no step is refused as a folder with no step is.
 A repository carries its workflows checked in, one folder each under `<repo>/workflows/`, as
 `.github/workflows/` holds a repository's CI, and
 `wf start <brief> --workflows dev` picks one: a bare name is a folder under `<repo>/workflows/`, and a path to any
@@ -2831,6 +2832,26 @@ before the store is taken: `wf up -5` would write an interval the file does not 
   pid to kill as it stands: it is said unconfirmed, with `ps -p <pid> -o lstart=,args=` to check it first. A daemon resumed from `^Z`
   after it was taken over finishes the pass it was in before it reads the file again.
 
+## What the daemon says: its lines, and OTLP — `OTEL_EXPORTER_OTLP_ENDPOINT`
+
+The daemon says each pass through Effect's log (`logPass` in `src/daemon/up.verb.ts`), and its process chooses where that goes, with one
+layer it provides around `up` (`telemetryLayer`, `src/telemetry/telemetry.store.ts`): `nemia up` in `src/cli/main.ts`, and the api's
+process in `apps/api/src/main.ts`. So the api's daemon, silent before, now prints the lines `nemia up` prints: a summary when one is due,
+a line when something changed, each stamped `08:09:10  …` — Info on stdout, a warning or worse on stderr. A line about a run is annotated
+with its `run`, and one about a step with its `step` too; the runtime's journal says each append at Debug, with its `task`, `kind` and
+`attempt`, which the lines leave out.
+
+- **`OTEL_EXPORTER_OTLP_ENDPOINT`** — unset or blank, nothing leaves the process. Set, as `http://localhost:4318`, the daemon also exports
+  its spans and its logs over OTLP/HTTP as JSON, to `<endpoint>/v1/traces` and `<endpoint>/v1/logs`, through Effect's own exporter
+  (`OtlpTracer`, `OtlpLogger`). The spans are the verbs' own (`Effect.fn`): `tick` > `pass` > `advancePass` > a filing (`fileReady`)
+  > the runtime's `file` > its journal's `append`, each annotated with the run, the step and the task it was for. A collector that does
+  not answer costs a failed post, never a pass.
+- **`OTEL_SERVICE_NAME`** — the service the export is under, `nemia` unless set. Without an endpoint it does nothing.
+
+```sh
+$ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 OTEL_SERVICE_NAME=factory nemia up
+```
+
 ## What a pass costs: `wf up --stats` and `wf passes`
 
 Every pass is measured as it runs, phase by phase (`src/meter/tally.store.ts` counts, `src/meter/meter.ts` composes and words it), and what it cost is
@@ -3176,7 +3197,7 @@ holding a concurrency slot forever.
 | `src/folder/folder.ts` | a folder of markdown from its text — pure: its step files (`stepFiles`), the names a step and the folders beside it may take, and every step read and checked together (`parseFolder`) |
 | `src/agents/agents.ts` | an agent — pure: its keys (`AGENT_KEYS`), read and written back (`parseAgent`, `renderAgent`), the skills it names and what they cost a turn (`skillTurnCost`), and its card (`agentCard`); and the agent rendered for Claude Code under `runs/<id>/agents/<step>/`: its prompt (`renderedPrompt`), its plugin (`pluginOf`), its flags (`renderedFlags`) and the brief it leaves (`briefBody`) |
 | `src/skills/skills.ts` | a skill on an agent — pure: the entry its card lists (`skillEntryOf`), a SKILL.md written back from a draft (`renderSkill`, `skillDraftOf`), and its `preload:` line (`withPreload`) |
-| `src/folder/folder.store.ts` | the format read from disk: a folder's steps (`loadWorkflows`), the agents beside it (`loadAgents`, `agentUsers`, `agentVersion`), its README's first paragraph (`workflowDescription`), the workflows a folder holds (`workflowsIn`), and a workflow folder found by a path or by its name under `<repo>/workflows/` (`workflowFolder`) |
+| `src/folder/folder.store.ts` | the format read from disk: a folder's steps (`loadWorkflows`), the agents beside it (`loadAgents`, `agentUsers`, `agentVersion`), its README's first paragraph (`workflowDescription`) and its whole text (`workflowReadme`), the workflows a folder holds (`workflowsIn`), and a workflow folder found by a path or by its name under `<repo>/workflows/` (`workflowFolder`) |
 | `src/plan/plan.ts` | a plan — pure: parse a folder of cards, and refuse a key a card does not have, a card with no workflow or no brief, and an `after:` that dangles or goes round; the order `wf plan` starts the cards in, and what it prints |
 | `src/inbox/inbox.ts` | the inbox — pure: an inbox card, and refuse a key it does not have, a key set to nothing, a `repo:` that is not an absolute directory and a `queued:` that is not a time or has no workflow; the card `wf inbox add` writes, and the one `wf inbox queue` writes (`queuedText`, `queueRefusal`); a name that would leave the folder; what `wf inbox` lists, `started as` composed from the records and a queued card's place and refusal; the queue's order (`queueOrder`, `nextQueued`); and which path is a card of the inbox |
 | `src/factory/factory.ts` | a factory — pure: its name, a lowercase slug (`FACTORY_NAME`, `factoryNameRefusal`), the one default factory, which is no file and is read, never written (`DEFAULT_FACTORY`, `defaultFactoryRefusal`), what `wf factory ls` prints (`factoryLines`, `noFactoryLine`), the workflows it offers: a workflow's name (`workflowNameRefusal`) and a start of one not attached (`unattachedRefusal`), and its hires: their shape (`hireRefusal`), one workflow's (`fillsOf`), and the steps they leave unfilled (`unfilledRefusal`) |
@@ -3256,7 +3277,7 @@ The package's contract is its `exports`: `agent-orchestrator` (`src/runner.ts`),
 and `agent-orchestrator/workflow` (`src/workflow.ts`); the root exports the refusals by kind, which the api answers by kind:
 `Missing` 404, `Conflict` 409, `Invalid` 422. Since 2026-09-23 `./workflow` is the format alone, pure, and what reads a
 folder from disk — `loadWorkflows`, `loadAgents`, `agentUsers`, `agentVersion`, `workflowDescription`, `workflowFolder`,
-`workflowsIn` — is exported from `agent-orchestrator`, where the api's imports of them moved (`docs/architecture.md`).
+`workflowReadme`, `workflowsIn` — is exported from `agent-orchestrator`, where the api's imports of them moved (`docs/architecture.md`).
 
 The store, under `WF_ROOT` (`~/.agent-workflows` unless it is set). It is read once, as the package loads (`wfRoot`), and must be an
 absolute path: a relative or empty one is refused by name, exit 2, since each process would read a store under its own working directory.

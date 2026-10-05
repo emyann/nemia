@@ -6,7 +6,7 @@ import { StatusChip } from '../components/StatusChip';
 import { StartedFrom } from '../components/TryTag';
 import { runsQuery, type RunSummary } from '../lib/api';
 import { spentTitle } from '../lib/cost';
-import { inFlight, inFlightFirst, onYouOf, runClock, titleOf, toDecideOf, waitsOnYou } from '../lib/factory';
+import { inFlight, inFlightFirst, onYouOf, rowClockEveryMs, runClock, titleOf, toDecideOf, waitsOnYou } from '../lib/factory';
 import { factoryOf, factorySearch, shownIn } from '../lib/factories';
 import { useNow } from '../lib/useNow';
 
@@ -27,7 +27,7 @@ export const Route = createFileRoute('/runs/')({
  * flight, so without the headings the first finished row, newer than the last in flight, would read as a sort gone wrong. A run to decide
  * is a group of its own, as the CLI's `ls` says it before who else a run waits on, and not a row among the finished that nothing marks as
  * waiting for a person; a run that is somehow both in flight and to decide is in flight, since what still moves is not yet a result to
- * decide. Every row reads how long its run has been at work against one clock for the page (`useNow`), not in the render.
+ * decide. Each row reads its own clock (`RowClock`): every second while its run's clock counts, every minute otherwise.
  *
  * Every factory's runs are listed, each tagged with its own; the factory the sidebar picks, kept in the address as `?factory=<name>` so it
  * survives a reload, the list's poll and a link, keeps only its own, and one that keeps none says so and how to show every factory's.
@@ -35,7 +35,6 @@ export const Route = createFileRoute('/runs/')({
 function Runs() {
   const { data: runs } = useSuspenseQuery(runsQuery);
   const { factory } = Route.useSearch();
-  const now = useNow(60_000);
 
   if (!runs.length) {
     return (
@@ -65,13 +64,11 @@ function Runs() {
           .
         </p>
       )}
-      {flying.length > 0 && <RunGroup group="in-flight" title="In flight" about="something of each still moves" runs={flying} now={now} />}
+      {flying.length > 0 && <RunGroup group="in-flight" title="In flight" about="something of each still moves" runs={flying} />}
       {deciding.length > 0 && (
-        <RunGroup group="to-decide" title="To decide" about="each is at its result, and nobody has decided it" runs={deciding} now={now} />
+        <RunGroup group="to-decide" title="To decide" about="each is at its result, and nobody has decided it" runs={deciding} />
       )}
-      {finished.length > 0 && (
-        <RunGroup group="finished" title="Finished" about="nothing of these moves any more" runs={finished} now={now} />
-      )}
+      {finished.length > 0 && <RunGroup group="finished" title="Finished" about="nothing of these moves any more" runs={finished} />}
     </article>
   );
 }
@@ -81,7 +78,7 @@ function Runs() {
  * three: a run whose check refused while a sibling's session still works is in flight, and waits on you, and a run at its ending's gate
  * waits on you for the decision itself.
  */
-function RunGroup({ group, title, about, runs, now }: { group: string; title: string; about: string; runs: RunSummary[]; now: number }) {
+function RunGroup({ group, title, about, runs }: { group: string; title: string; about: string; runs: RunSummary[] }) {
   const waiting = runs.filter(waitsOnYou).length;
   return (
     <section aria-label={title} data-group={group} className="space-y-1">
@@ -97,7 +94,7 @@ function RunGroup({ group, title, about, runs, now }: { group: string; title: st
       </h2>
       <ul className="divide-y divide-neutral-200 dark:divide-neutral-800">
         {runs.map((run) => (
-          <RunRow key={run.id} run={run} now={now} />
+          <RunRow key={run.id} run={run} />
         ))}
       </ul>
     </section>
@@ -114,13 +111,13 @@ function RunGroup({ group, title, about, runs, now }: { group: string; title: st
  * branch nobody has merged, the step's own `approve <step>` on this line alone; why the run is not judged, a task it reads that does not
  * read (`RunSummary.unreadable`); and each step's state. Beside the link, since a link inside a link is not HTML (`RowSide`): its star,
  * which puts it under Favorites; when it was created, which orders the list; the card's clock (`runClock`), how long it took or has been at
- * work, with its start, its end and the wall time on hover; what it has cost, as the CLI's `ls` puts it on the run's line, once a cost was
- * measured; the tokens its sessions used, their split on hover, once one measured any; and the workflow it was started from.
+ * work, with its start, its end and the wall time on hover, moving every second while it counts (`clockCounts`); what it has cost, as the
+ * CLI's `ls` puts it on the run's line, once a cost was measured; the tokens its sessions used, their split on hover, once one measured
+ * any; and the workflow it was started from.
  */
-function RunRow({ run, now }: { run: RunSummary; now: number }) {
+function RunRow({ run }: { run: RunSummary }) {
   const title = titleOf(run);
   const decide = toDecideOf(run);
-  const clock = runClock(run, now, !inFlight(run));
 
   return (
     <li
@@ -173,22 +170,20 @@ function RunRow({ run, now }: { run: RunSummary; now: number }) {
           ))}
         </ul>
       </Link>
-      <RowSide run={run} title={title} clock={clock} />
+      <RowSide run={run} title={title} />
     </li>
   );
 }
 
-/** The right of a run's row, beside its link: its star (`FavoriteStar`) and what `RunRow` says sits there. */
-function RowSide({ run, title, clock }: { run: RunSummary; title: string; clock: ReturnType<typeof runClock> }) {
+/** The right of a run's row, beside its link: its star (`FavoriteStar`), its clock (`RowClock`) and what `RunRow` says sits there. */
+function RowSide({ run, title }: { run: RunSummary; title: string }) {
   return (
     <div className="flex shrink-0 flex-col items-end gap-1 pt-0.5">
       <FavoriteStar favorite={{ kind: 'run', run: run.id }} name={title} className="-mt-0.5 -mr-1" />
       <time className="text-xs text-neutral-500" dateTime={run.createdAt}>
         {new Date(run.createdAt).toLocaleString()}
       </time>
-      <span data-clock title={clock.title} className="font-mono text-xs text-neutral-500">
-        {clock.words}
-      </span>
+      <RowClock run={run} />
       {run.cost && (
         <span data-cost title={spentTitle(run.cost, "the run's tries")} className="font-mono text-xs">
           {run.cost.said}
@@ -201,5 +196,16 @@ function RowSide({ run, title, clock }: { run: RunSummary; title: string; clock:
       )}
       <StartedFrom run={run} />
     </div>
+  );
+}
+
+/** A row's clock (`runClock`), read again at the row's pace (`rowClockEveryMs`): every second while its run's clock counts. */
+function RowClock({ run }: { run: RunSummary }) {
+  const now = useNow(rowClockEveryMs(run));
+  const clock = runClock(run, now, !inFlight(run));
+  return (
+    <span data-clock title={clock.title} className="font-mono text-xs text-neutral-500">
+      {clock.words}
+    </span>
   );
 }

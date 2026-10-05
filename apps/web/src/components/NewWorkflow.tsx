@@ -8,8 +8,8 @@ const INPUT =
 
 /**
  * A new workflow of yours, in `folder`, your workflows' folder: its name — its folder's — and a first step, a name and what it is told
- * (`POST /api/workflows/yours`). Once made, `onCreated` is told its name, and the page opens its builder. Refused in the api's words: a
- * name taken, or a step the package refuses.
+ * (`POST /api/workflows/yours`). Once made, `onCreated` is told its name, and the board opens its page with its builder. Refused in the
+ * api's words: a name taken, or a step the package refuses.
  */
 export function NewWorkflow({ folder, onCreated }: { folder: string; onCreated: (name: string) => void }) {
   const queryClient = useQueryClient();
@@ -54,7 +54,7 @@ export function NewWorkflow({ folder, onCreated }: { folder: string; onCreated: 
       <div className="space-y-0.5">
         <h2 className="text-sm font-semibold">New workflow</h2>
         <p className="text-xs text-neutral-500">
-          A folder of yours, under <code className="font-mono">{folder}/</code>, with its first step. Its builder opens once it is made.
+          A folder of yours, under <code className="font-mono">{folder}/</code>, with its first step. Its page opens in its builder.
         </p>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">

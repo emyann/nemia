@@ -40,6 +40,7 @@ import {
   unattachedRefusal,
   unfilledRefusal,
   workflowDescription,
+  workflowReadme,
   Missing,
   type Factory,
   type FolderLoaded,
@@ -153,6 +154,8 @@ export type WorkflowListing = {
   from: WorkflowSource;
   dir: string;
   description: string | null;
+  /** The folder's README in full, the workflow level's instruction (`workflowReadme`); null for a folder with none. */
+  readme: string | null;
   steps: ListedStep[];
   graph: RunGraph;
   schemas: string[];
@@ -306,6 +309,7 @@ export function listed(
   factory?: Factory,
 ): WorkflowListing {
   const description = workflowDescription(dir);
+  const readme = workflowReadme(dir);
   const schemas = schemasIn(dir);
   const version = versionOf(dir, places);
   if ('error' in loaded) {
@@ -314,6 +318,7 @@ export function listed(
       from,
       dir,
       description,
+      readme,
       steps: [],
       graph: graphOf([]),
       schemas,
@@ -329,6 +334,7 @@ export function listed(
     from,
     dir,
     description,
+    readme,
     steps: steps.map(listedStep(new Map(factory ? Object.entries(fillsOf(factory.hires, name)) : []))),
     graph: graphOf(steps),
     schemas,

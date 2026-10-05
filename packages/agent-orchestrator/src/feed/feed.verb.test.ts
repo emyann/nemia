@@ -46,9 +46,16 @@ const counted = (metric: typeof FEED_FOLLOW_READS) => Effect.runSync(Metric.valu
 /** The live readers counted now (`FEED_FOLLOWERS`). */
 const followers = () => Effect.runSync(Metric.value(FEED_FOLLOWERS)).value;
 
-/** Waits until `ok()` holds, checking between turns of the event loop. */
+/**
+ * Waits until `ok()` holds, checking between turns of the event loop; fails under a bound of seconds, never a length of time, so a
+ * reader that never gets what it waits for fails its test rather than hangs it.
+ */
 async function until(ok: () => boolean): Promise<void> {
-  while (!ok()) await sleep(5);
+  const deadline = performance.now() + 30_000;
+  while (!ok()) {
+    if (performance.now() > deadline) throw new Error(`waited 30 s for ${ok.toString()}`);
+    await sleep(5);
+  }
 }
 
 /**

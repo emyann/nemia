@@ -85,10 +85,14 @@ function HiredInto({ place: { factory, workflow, step } }: { place: HirePlace })
   );
 }
 
+/** Brings the notice that the hire was refused into the window: it says so above the form, and Create is pressed at the form's foot. */
+const intoView = (notice: HTMLDivElement | null): void => notice?.scrollIntoView({ block: 'nearest' });
+
 /** The agent written but not hired: the hire's refusal, in the package's words, and the way to the step and to the agent. */
 function Unhired({ place: { factory, workflow, step }, agent, why }: { place: HirePlace; agent: string; why: string }) {
   return (
     <div
+      ref={intoView}
       role="alert"
       data-hire-unhired
       className="space-y-1 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm dark:border-amber-900 dark:bg-amber-950/40"

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { photograph, themeOf } from '../board.ts';
-import { expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
+import { expectOnScreen, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { AGENTS, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
@@ -15,8 +15,9 @@ const MADE = { name: 'unhired-e2e', description: 'Use this when a plan needs a s
 export default {
   /**
    * New agent come from a step whose factory refuses the hire: the agent is written, the hire is answered 422 in the package's words,
-   * and the person stays on the creator, which says the agent is created but not hired, and why, with the way back to the step. Its one
-   * refusal is the point, so its page counts exactly it; the factory and the agent are written by the page and taken back after.
+   * and the person stays on the creator, which says in the window that the agent is created but not hired, and why, with the way back
+   * to the step. Its one refusal is the point, so its page counts exactly it; the factory and the agent are written by the page and
+   * taken back after.
    */
   name: 'step-hire-refused',
   route: '/agents',
@@ -53,6 +54,7 @@ export default {
         throw new Refused(`the api refuses the hire in the package's words — it answered ${answered.status()}: ${error}`);
       const unhired = refused.locator('[data-hire-unhired]');
       await expectVisible(unhired, 'the creator says the agent is created but not hired');
+      await expectOnScreen(unhired, 'in the window, though Create was pressed at the foot of the form');
       if (!(await unhired.textContent())?.includes(sentence))
         throw new Refused(`and why, in the package's words — it says ${JSON.stringify(await unhired.textContent())}`);
       await expectVisible(unhired.getByRole('link', { name: 'Back to the step' }), 'with the way back to the step');

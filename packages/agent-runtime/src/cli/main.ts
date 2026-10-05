@@ -534,7 +534,7 @@ const printOutput = async (engine: EngineShape, id: string, stream: string): Pro
   process.stdout.write(text);
 };
 
-/** The engine's verb `verb`, `effect`, run as a Promise: its refusal rejected in the runtime's words (`refusalWords`), anything else as it is. */
+/** The engine's verb `verb`, `effect`, as a Promise: a refusal rejected in the runtime's words (`refusalWords`), else as it failed. */
 const run = <A, E>(verb: string, effect: Effect.Effect<A, E>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.mapError(refusalWords(verb))));
 

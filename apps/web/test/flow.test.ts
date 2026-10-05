@@ -8,8 +8,8 @@ import type { StepState } from '../src/lib/status.ts';
 const after = (from: string, to: string): GraphEdge => ({ from, to, kind: 'after' });
 const loop = (from: string, to: string, rounds = 3): GraphEdge => ({ from, to, kind: 'loop', rounds });
 const graphOf = (...edges: GraphEdge[]): RunGraph => ({ roots: [], edges });
-const stepsOf = (states: Record<string, StepState>, notes: Record<string, string> = {}): EdgeStep[] =>
-  Object.entries(states).map(([name, state]) => ({ name, state, note: notes[name] ?? null }));
+const stepsOf = (states: Record<string, StepState>, notes: Record<string, string> = {}, due: string[] = []): EdgeStep[] =>
+  Object.entries(states).map(([name, state]) => ({ name, state, note: notes[name] ?? null, roundDue: due.includes(name) }));
 
 /** Each column's pills, left first, top to bottom: what the rail reads as. */
 const read = (flow: Flow): string[][] => {
@@ -80,7 +80,7 @@ test('a loop is an arrow under the row, from the looping step back, running whil
   const due = railOf(
     names,
     graph,
-    stepsOf({ implement: 'working', review: 'verified' }, { review: 'round 2 of 3 due — asked again' }),
+    stepsOf({ implement: 'working', review: 'verified' }, { review: 'round 2 of 3 due — asked again' }, ['review']),
     false,
   );
   const back = due.arrows.find((a) => a.loop)!;

@@ -270,7 +270,7 @@ const tiles = (steps: Record<string, string[]>) =>
   tilesOf(
     Object.keys(steps),
     { roots: [], edges: Object.entries(steps).flatMap(([to, after]) => after.map((from) => ({ from, to, kind: 'after' as const }))) },
-    Object.keys(steps).map((name) => ({ name, state: 'waiting' as const, note: null })),
+    Object.keys(steps).map((name) => ({ name, state: 'waiting' as const, note: null, roundDue: false })),
     false,
   );
 /** A chain of `n` steps, each after the one before. */
@@ -316,8 +316,8 @@ test("an open card's span reads its steps and their graph, not their words: a st
     ['a', 'b'],
     graph,
     [
-      { name: 'a', state: 'working', note: null },
-      { name: 'b', state: 'waiting', note: null },
+      { name: 'a', state: 'working', note: null, roundDue: false },
+      { name: 'b', state: 'waiting', note: null, roundDue: false },
     ],
     false,
   );
@@ -325,8 +325,8 @@ test("an open card's span reads its steps and their graph, not their words: a st
     ['a', 'b'],
     graph,
     [
-      { name: 'a', state: 'verified', note: null },
-      { name: 'b', state: 'blocked', note: 'round 2 of 2' },
+      { name: 'a', state: 'verified', note: null, roundDue: false },
+      { name: 'b', state: 'blocked', note: 'round 2 of 2', roundDue: false },
     ],
     true,
   );

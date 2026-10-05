@@ -73,8 +73,8 @@ export type CanvasEdge = {
   label: string | null;
 };
 
-/** A step as its edges read it: its state, and the note `wf ls` prints beside it. */
-export type EdgeStep = { name: string; state: StepState; note: string | null };
+/** A step as its edges read it: its state, the note the list words beside it, and whether its next round is due, as the api answers it. */
+export type EdgeStep = { name: string; state: StepState; note: string | null; roundDue: boolean };
 
 /**
  * The run's graph as the api gives it, between the steps the run has: an `after` edge done when the work at both ends is
@@ -107,7 +107,7 @@ export function edgesOf(graph: RunGraph, steps: readonly EdgeStep[]): CanvasEdge
         source: edge.from,
         target: edge.to,
         kind: 'loop',
-        state: roundDue(source.note) ? 'running' : 'to-come',
+        state: source.roundDue ? 'running' : 'to-come',
         label: loopLabel([source.note, target.note], edge.rounds),
       },
     ];
@@ -132,9 +132,6 @@ export function loopLabel(notes: ReadonlyArray<string | null>, rounds: number): 
   }
   return null;
 }
-
-/** Whether the looping step's note says its next round is due: it asked again with rounds left, or a person asked (`roundDueNote`). */
-export const roundDue = (note: string | null): boolean => note !== null && /^round \d+(?: of \d+ due\b| asked \(nemia round\))/.test(note);
 
 /** The handles a `loop` edge leaves its looping step by and comes into its target by: under each node (`StepNode`). */
 export const LOOP_SOURCE = 'loop-out';

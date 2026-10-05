@@ -52,9 +52,19 @@ export type Listing = {
    * again or about to be, `note`: the try it is on and how it got there (`tryNote`), or the try due (`dueNote`).
    * Beside the status and never in it, so the words stay the vocabulary a reader of them keys on: so are `waits`, what the harness says a
    * `needs-human` session waits for (`waitingWords`), and `denied`, what its current try was denied (`deniedWords`), which `nemia ls`
-   * prints in the line (`shownStatus`, `shownNote`) and the board does not.
+   * prints in the line (`shownStatus`, `shownNote`) and the board does not. `roundDue`, only on a looping step whose next round is due
+   * (`roundsDue`) and which no retry takes first: what its note words as `roundDueNote`.
    */
-  steps: Array<{ name: string; status: string; branch: string | null; note?: string; cost?: string; waits?: string; denied?: string }>;
+  steps: Array<{
+    name: string;
+    status: string;
+    branch: string | null;
+    note?: string;
+    cost?: string;
+    waits?: string;
+    denied?: string;
+    roundDue?: true;
+  }>;
   /**
    * Steps a person has to act on — blocked, unsigned, refused by their check, or awaiting approval, with no try due — on a run nobody has
    * called off, pruned or held.
@@ -279,7 +289,8 @@ export function listing({
     const landed = run.steps[step.name]?.landed;
     const landing = landed && !('untouched' in landed) ? oneLine(landedWords(run, landed), LANDED_CAP) : '';
     const note = [tried, gate, landing, saidWord(saidTo(step.name))].filter(Boolean).join(' · ');
-    return { ...row, ...(note ? { note } : {}), ...deniedRow(taskId ? deniedOf(taskId) : []), ...cost };
+    const roundDue = round && !retry ? { roundDue: true as const } : {};
+    return { ...row, ...(note ? { note } : {}), ...roundDue, ...deniedRow(taskId ? deniedOf(taskId) : []), ...cost };
   });
 
   function lineOf(step: Workflow): Listing['steps'][number] {

@@ -161,7 +161,7 @@ const typed = async (t: TestContext, ...args: string[]) => {
   }
 };
 
-test("`nemia rm` of a git run that is over forgets every task of it on the engine, its first try among them, says so, and leaves no marker; the feed's filings then read with the lines forgotten counted", async () => {
+test("`nemia rm` of a git run that is over forgets every task of it on the engine, its earlier try and its check among them, says so, and leaves no marker; the feed's filings then read with the lines forgotten counted", async () => {
   const { run, tasks } = await finished();
   const kept = await signed(oneStep('harness: codex'), SIGNED);
   const before = forgets.length;

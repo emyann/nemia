@@ -961,7 +961,7 @@ test('REFUSED: the inbox mounted writable is open to a write, and an Edit allow 
 });
 
 /** Nemia as her keeper files her: her shipped definition, in the background. */
-const nemia = (file?: string): Step => ({ ...readNemia(file), name: 'nemia', background: true }) as Step;
+const nemia = (file?: string): Step => ({ ...readNemia(file), name: 'nemia', background: true });
 
 test("Nemia is refused git push, a forced branch delete, a kill by name, browser_run_code_unsafe, a merge and gh's merge by her own deny", () => {
   const her = nemia();

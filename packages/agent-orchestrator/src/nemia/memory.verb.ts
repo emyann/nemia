@@ -23,7 +23,7 @@ const memoryLines = (data: NemiaMemory): string[] => {
 export const MEMORY: Command<NemiaMemory> = {
   name: 'memory',
   usage: '[<fact>]',
-  help: ["what Nemia keeps of the store: bare, her facts' names; given one, its words. Read only: her session alone writes them"],
+  help: ["what Nemia keeps of the store: bare, her facts' names; given one, its", 'words. Read only: her session alone writes them'],
   spec: {
     positionals: [{ key: 'fact', takes: 'optional', kind: 'name' }],
     flags: [],

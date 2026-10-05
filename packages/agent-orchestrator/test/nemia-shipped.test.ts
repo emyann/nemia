@@ -49,7 +49,7 @@ test("what ships with Nemia names no agent of this repository's team, no doc of 
 
 test('REFUSED: a skill of hers that names an agent of the team, or the playbook, is named', () => {
   const files = new Map([
-    ['skills/x/SKILL.md', `Commission ${TEAM[0]!.toUpperCase()} to read the stats.`],
+    ['skills/x/SKILL.md', `Commission ${TEAM[0].toUpperCase()} to read the stats.`],
     ['nemia.md', 'Follow docs/playbook-operator.md.'],
   ]);
   assert.deepEqual(oursIn(files), [`skills/x/SKILL.md: ${TEAM[0]}`, 'nemia.md: playbook-operator']);

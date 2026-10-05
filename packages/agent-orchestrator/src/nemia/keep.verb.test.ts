@@ -20,7 +20,7 @@ process.env.CLAUDE_CONFIG_DIR = CONFIG;
 const { keepOnce } = await import('./keep.verb.ts');
 const { LEVEL } = await import('./level.verb.ts');
 const { MEMORY } = await import('./memory.verb.ts');
-const { memoryDir, nemiaDir, promptFile, readLevel, readNemia, writeLevel } = await import('./level.store.ts');
+const { memoryDir, nemiaDir, promptFile, readLevel, readNemia } = await import('./level.store.ts');
 const { listSubscriptions } = await import('../subscription/subscription.store.ts');
 const { customInstructionsFile } = await import('../folder/folder.store.ts');
 const { DEFAULT_HARNESS } = await import('../harness/harness.ts');
@@ -114,7 +114,7 @@ test('a task stopped from outside is never filed again, and semi-auto then start
   b.settle(first, 'stopped');
   assert.deepEqual(await beat(), ['drop']);
   assert.deepEqual(await beat(), [], 'never filed again');
-  assert.equal((await runWith(e, LEVEL.handler({})) as { stopped: boolean }).stopped, true);
+  assert.equal(((await runWith(e, LEVEL.handler({}))) as { stopped: boolean }).stopped, true);
   await new Promise((resolve) => setTimeout(resolve, 2));
   const fresh = (await runWith(e, LEVEL.handler({ level: 'semi-auto' }))) as { task: string };
   assert.notEqual(fresh.task, first);
@@ -137,5 +137,8 @@ test('nemia memory lists her facts and prints one; a fact she does not keep is r
     '  feed-cursor',
   ]);
   assert.deepEqual(MEMORY.print((await runWith(e, MEMORY.handler({ fact: 'feed-cursor' }))) as never, {}), ['1234']);
-  assert.match(await refusal(() => runWith(e, MEMORY.handler({ fact: '../level.json' }))), /no fact named \.\.\/level\.json: she keeps feed-cursor/);
+  assert.match(
+    await refusal(() => runWith(e, MEMORY.handler({ fact: '../level.json' }))),
+    /no fact named \.\.\/level\.json: she keeps feed-cursor/,
+  );
 });

@@ -2710,6 +2710,25 @@ The api serves both (`GET`, `PUT` and `DELETE` on `/api/factories/<name>/instruc
 shows it on the factory's settings page, linked from its floor: the words of a store's instruction edited there, a folder's file shown as
 it reads.
 
+## Nemia, the store's own agent: `nemia level` and `nemia memory`
+
+Nemia watches every factory of the store for the person: a long-lived session, woken by the feed, that brings each gate to them with a
+recommendation, recaps what moved, and carries their answer back as a `nemia` verb. She is the person's switch, never a run:
+
+- **`nemia level`** says where she is — her level, her session's phase, how to reach it (`claude attach <id>` in a terminal, or the
+  web link her session shows, from a phone too), and what a person allowed her at a prompt beyond what ships.
+- **`nemia level semi-auto`** puts her on: the daemon's keeper files her session in `$WF_ROOT/nemia/` and subscribes it to the feed
+  (the subscription `nemia`, hers alone). She reads freely; every write she proposes — `approve`, `round`, `retry`, `hold`, `cancel`,
+  `say`, `start`, `inbox add` — is asked of the person at a prompt. The harness must trust her folder first, once, by hand: the
+  refusal names the command. **`nemia level manual`** puts her off: the keeper stops her session and drops her subscription. A
+  session stopped from outside is never filed again; `nemia level semi-auto` starts a fresh one.
+- **`nemia memory [<fact>]`** reads what she keeps, one fact a file in `$WF_ROOT/nemia/memory/`. She alone writes it: to prune it, ask
+  her.
+
+What she is ships in this package's `nemia/` folder: her instruction (`nemia.md`, with her fence) and her skills. The person's own words
+for her are their custom instruction (`$WF_ROOT/custom-instructions/nemia.md`), read at each `semi-auto`; a factory's rules are its
+instruction (above), which she reads before acting in it. Her machine and what was built: `docs/features.md`, *Nemia at Semi-auto*.
+
 ## How much runs at once: `WF_MAX_CONCURRENT` and `WF_MAX_RUNS`
 
 Two ceilings, both read from the environment the store's daemon runs in — the api's process or `wf up` — through Effect's `Config` (`src/config/config.store.ts`), and both said in

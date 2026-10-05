@@ -124,6 +124,20 @@ test('each command is served on the api where it was before the table, the lift 
       ['subscribe', { method: 'POST', path: '/api/subscriptions/:name', status: 201 }],
       ['unsubscribe', { method: 'DELETE', path: '/api/subscriptions/:name', status: 200 }],
       [
+        'level',
+        [
+          { method: 'GET', path: '/api/level', status: 200, hand: true },
+          { method: 'PUT', path: '/api/level', status: 200 },
+        ],
+      ],
+      [
+        'memory',
+        [
+          { method: 'GET', path: '/api/nemia/memory', status: 200 },
+          { method: 'GET', path: '/api/nemia/memory/:fact', status: 200 },
+        ],
+      ],
+      [
         'workflows write',
         [
           { method: 'POST', path: '/api/workflows/:from', status: 201, hand: true },
@@ -172,6 +186,7 @@ test('every command the api posts or deletes on writes, and the api guards it; t
       'skills read',
       'paused',
       'pause now',
+      'memory',
       'workflows list',
       'workflows step',
       'watch',

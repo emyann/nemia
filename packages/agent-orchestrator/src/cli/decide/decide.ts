@@ -15,7 +15,8 @@ import {
   branchWord,
   branchesToRead,
   checkoutLine,
-  decide,
+  decideRun,
+  runWith,
   diffStat,
   dueNote,
   fromNote,
@@ -131,8 +132,8 @@ export async function decideVerb(rest: string[], e: Engine): Promise<void> {
   if (rest[0].startsWith('--'))
     usage(`nemia decide takes the run first: nemia decide <runId> [--sensitive <globs>] — not ${rest[0]} before it.`);
   const { sensitive } = decideHow(rest.slice(1));
-  const decided = await decide(e, rest[0]).catch(async (err: unknown) => {
-    const unjudged = await unjudgedOf(e, runStore.runs.read(rest[0]), err, 'nemia decide');
+  const decided = await runWith(e, decideRun(rest[0])).catch(async (err: unknown) => {
+    const unjudged = await runWith(e, unjudgedOf(e, runStore.runs.read(rest[0]), err, 'nemia decide'));
     throw unjudged ? new Error(unjudged.said) : err;
   });
   const { run } = decided;

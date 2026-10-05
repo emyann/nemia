@@ -5,7 +5,7 @@
  */
 import { Effect, Metric } from 'effect';
 import type { Engine } from '../runtime-client.ts';
-import { addRuntime, aside, within, type Tallies } from './tally.store.ts';
+import { addRuntime, asideEffect, withinEffect, type Tallies } from './tally.store.ts';
 import { PASS_BOUNDS, passCost, PHASES, type HarnessCost, type PassCost, type Phase } from './meter.ts';
 
 /**
@@ -28,10 +28,10 @@ const ENGINE_PHASES: Readonly<Record<string, Phase>> = {
   say: 'act',
 };
 
-type EngineIo = ReturnType<Engine['io']>;
+type EngineIo = Effect.Success<ReturnType<Engine['io']>>;
 
 /** The runtime's running totals, or undefined for an engine that keeps none (a test's fake). */
-export const ioOf = (e: Engine): EngineIo | undefined => (typeof e.io === 'function' ? e.io() : undefined);
+export const ioOf = (e: Engine): Effect.Effect<EngineIo | undefined> => (typeof e.io === 'function' ? e.io() : Effect.succeed(undefined));
 
 /**
  * Each harness's observes between two of the runtime's totals, for a harness observed in between; `unread` only where some observe could
@@ -64,24 +64,26 @@ const observedBetween = (before: EngineIo | undefined, after: EngineIo | undefin
  * started, with the time its harnesses' observes took moved to `observe`. A pass observes its harnesses at once, so its observe took the
  * slowest's time; a view observes the one harness of its task.
  */
-async function engineCall<T>(e: Engine, verb: string, phase: Phase, call: () => Promise<T>): Promise<T> {
-  const before = aside(() => ioOf(e));
-  try {
-    return await within(phase, call);
-  } finally {
-    aside(() => {
-      const after = ioOf(e);
-      if (!before || !after) return;
-      const seen = Object.values(observedBetween(before, after));
-      const ms = verb === 'tick' ? Math.max(0, ...seen.map((o) => o.ms)) : seen.reduce((n, o) => n + o.ms, 0);
-      addRuntime(
-        phase,
-        { bytes: after.bytesRead - before.bytesRead, reads: after.reads - before.reads, spawned: after.spawned - before.spawned },
-        { ms, calls: seen.reduce((n, o) => n + o.calls, 0), spawned: seen.reduce((n, o) => n + o.spawned, 0) },
-      );
-    });
-  }
-}
+const engineCall = <A, E>(e: Engine, verb: string, phase: Phase, call: Effect.Effect<A, E>): Effect.Effect<A, E> =>
+  Effect.gen(function* () {
+    const before = yield* asideEffect(ioOf(e));
+    return yield* withinEffect(phase, call).pipe(
+      Effect.ensuring(
+        asideEffect(
+          Effect.map(ioOf(e), (after) => {
+            if (!before || !after) return;
+            const seen = Object.values(observedBetween(before, after));
+            const ms = verb === 'tick' ? Math.max(0, ...seen.map((o) => o.ms)) : seen.reduce((n, o) => n + o.ms, 0);
+            addRuntime(
+              phase,
+              { bytes: after.bytesRead - before.bytesRead, reads: after.reads - before.reads, spawned: after.spawned - before.spawned },
+              { ms, calls: seen.reduce((n, o) => n + o.calls, 0), spawned: seen.reduce((n, o) => n + o.spawned, 0) },
+            );
+          }),
+        ),
+      ),
+    );
+  });
 
 /** The engine, each verb counted in its phase (`engineCall`); anything else passed through as it is. */
 export const meteredEngine = (e: Engine): Engine =>
@@ -91,7 +93,12 @@ export const meteredEngine = (e: Engine): Engine =>
       const phase = typeof key === 'string' ? ENGINE_PHASES[key] : undefined;
       if (!phase || typeof value !== 'function') return value;
       return (...args: unknown[]) =>
-        engineCall(target, key as string, phase, () => (value as (...a: unknown[]) => Promise<unknown>).apply(target, args));
+        engineCall(
+          target,
+          key as string,
+          phase,
+          Effect.suspend(() => (value as (...a: unknown[]) => Effect.Effect<unknown>).apply(target, args)),
+        );
     },
   });
 

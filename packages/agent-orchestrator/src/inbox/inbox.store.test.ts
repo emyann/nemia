@@ -9,9 +9,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import type { Engine } from 'agent-runtime';
 import type { Run } from '../record/record.ts';
 import { scratch } from '../../test/scratch.ts';
+import { promised } from '../../test/promised.ts';
+import { Effect } from 'effect';
 
 const ROOT = scratch('wf-inbox-');
 const INBOX = path.join(ROOT, 'inbox');
@@ -20,13 +21,13 @@ fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 process.env.WF_ROOT = ROOT;
 delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
-const { addToInbox, dropFromInbox, inboxDir, readInbox, start, startFromInbox } = await import('../runner.ts');
+const { addToInbox, dropFromInbox, inboxDir, readInbox, startRun, startFromInbox } = await import('../runner.ts');
 const { readRun } = await import('../record/record.store.ts');
 const { runStore } = await import('../record/files.store.ts');
 const { main } = await import('../cli/main.ts');
 
 /** No verb here asks the engine anything. */
-const NO_ENGINE = {} as Engine;
+const NO_ENGINE = promised({});
 
 /** Refused by name: exit 2, and the message — never `String(err)`, which starts with `Error: `. */
 const refusedWith = (pattern: RegExp) => (err: Error & { exitCode?: number }) => err.exitCode === 2 && pattern.test(err.message);
@@ -364,7 +365,7 @@ test("`nemia start <inbox>/<name>.md` starts the card — its body the brief, it
   assert.deepEqual(readInbox(), []);
   const decided = await printedBy(t, 'decide', id);
   assert.deepEqual(decided.slice(0, 2), [`${id}  Cache the views between passes`, `  from inbox card ${card.name}`]);
-  const typed = start({ brief: 'typed', repo, workflowDir: path.join(repo, 'workflows', 'dev') });
+  const typed = await Effect.runPromise(startRun({ brief: 'typed', repo, workflowDir: path.join(repo, 'workflows', 'dev') }));
   assert.equal(
     Object.hasOwn(JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${typed.id}.json`), 'utf8')), 'from'),
     false,
@@ -494,7 +495,9 @@ test("a start says what the card does not, over what it does: --workflows over `
     "no repo: on the card and none given: the caller's, nemia start's `.`, and its workflow: found there, by name",
   );
   const given = addToInbox({ text: 'Document the flag' });
-  const byBoard = startFromInbox({ name: given.card.name, workflow: path.join(repo, 'workflows', 'dev'), callerRepo: repo });
+  const byBoard = await Effect.runPromise(
+    startFromInbox({ name: given.card.name, workflow: path.join(repo, 'workflows', 'dev'), callerRepo: repo }),
+  );
   assert.deepEqual([byBoard.run.repo, byBoard.run.workflowDir, byBoard.removed], [repo, path.join(repo, 'workflows', 'dev'), true]);
 
   const brief = path.join(mine, 'work.md');
@@ -523,13 +526,16 @@ test('REFUSED by name at shipped defaults, before a run is written and with the 
       ),
     ),
   );
-  assert.throws(
-    () => startFromInbox({ name: '../runs/x', callerRepo: repo }),
+  await assert.rejects(
+    async () => await Effect.runPromise(startFromInbox({ name: '../runs/x', callerRepo: repo })),
     refusedWith(/^`\.\.\/runs\/x` is not a card's name: a name stays in the inbox/),
   );
-  assert.throws(() => startFromInbox({ name: 'a/b', callerRepo: repo }), refusedWith(/^`a\/b` is not a card's name/));
-  assert.throws(
-    () => startFromInbox({ name: '', callerRepo: repo }),
+  await assert.rejects(
+    async () => await Effect.runPromise(startFromInbox({ name: 'a/b', callerRepo: repo })),
+    refusedWith(/^`a\/b` is not a card's name/),
+  );
+  await assert.rejects(
+    async () => await Effect.runPromise(startFromInbox({ name: '', callerRepo: repo })),
     refusedWith(/^A card is named by its file in the inbox, minus \.md, as nemia inbox lists it, and this name is empty\./),
   );
 
@@ -542,8 +548,8 @@ test('REFUSED by name at shipped defaults, before a run is written and with the 
     ),
   );
   const loose = addToInbox({ text: 'Anywhere at all' });
-  assert.throws(
-    () => startFromInbox({ name: loose.card.name, callerRepo: fs.mkdtempSync(path.join(ROOT, 'bare-')) }),
+  await assert.rejects(
+    async () => await Effect.runPromise(startFromInbox({ name: loose.card.name, callerRepo: fs.mkdtempSync(path.join(ROOT, 'bare-')) })),
     refusedWith(/: no workflow — .* has no workflows\. Give a workflow folder:/),
   );
 
@@ -582,8 +588,8 @@ test('REFUSED by name at shipped defaults, before a run is written and with the 
     starting(kept.file, '--workflows', 'dev', '--brief', ''),
     refusedWith(/^--brief takes what the run is asked to do in place of an inbox card's body/),
   );
-  assert.throws(
-    () => startFromInbox({ name: kept.card.name, workflow: 'dev', brief: '  \n', callerRepo: repo }),
+  await assert.rejects(
+    async () => await Effect.runPromise(startFromInbox({ name: kept.card.name, workflow: 'dev', brief: '  \n', callerRepo: repo })),
     refusedWith(
       new RegExp(
         `^${escaped(kept.card.file)}: the brief given in place of the card's body is empty\\. Give what the run is asked to do, or leave it out`,
@@ -650,14 +656,17 @@ test(
         ),
       ),
     );
-    assert.throws(() => startFromInbox({ name: card.name, callerRepo: repo }), refusedWith(/: this card was started as /));
+    await assert.rejects(
+      async () => await Effect.runPromise(startFromInbox({ name: card.name, callerRepo: repo })),
+      refusedWith(/: this card was started as /),
+    );
     assert.equal(runsWritten(), before + 1, 'not started twice');
     await printedBy(t, 'inbox', 'rm', card.name);
     assert.deepEqual(readInbox(), []);
   },
 );
 
-test('a card gone between its start and its removal — removed by someone else once the run is written — is still said removed, and the run stands', (t) => {
+test('a card gone between its start and its removal — removed by someone else once the run is written — is still said removed, and the run stands', async (t) => {
   emptyInbox();
   const repo = aRepoWith('dev');
   const { card, file } = addToInbox({ text: 'Cache the views', workflow: 'dev', repo });
@@ -666,7 +675,7 @@ test('a card gone between its start and its removal — removed by someone else 
     create(run);
     fs.rmSync(file);
   });
-  const started = startFromInbox({ name: card.name, callerRepo: repo });
+  const started = await Effect.runPromise(startFromInbox({ name: card.name, callerRepo: repo }));
   assert.equal(started.removed, true, 'a card already gone is not a removal that failed');
   assert.deepEqual(readRun(started.run.id).from, { inbox: card.name });
   assert.deepEqual(readInbox(), []);

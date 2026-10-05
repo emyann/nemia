@@ -16,10 +16,12 @@ import { parseFolder } from '../folder/folder.ts';
 import { parseAgent, type Agents } from '../agents/agents.ts';
 import { envNameOf, readRemoteAgents } from './a2a.store.ts';
 import { scratch } from '../../test/scratch.ts';
+import { promised } from '../../test/promised.ts';
+import { Effect } from 'effect';
 
 const ROOT = scratch('wf-a2a-agents-');
 process.env.WF_ROOT = ROOT;
-const { advance, remoteAgents, retry, start } = await import('../runner.ts');
+const { advanceRun, remoteAgents, retryRun, startRun, runWith } = await import('../runner.ts');
 const { readRun } = await import('../record/record.store.ts');
 const { credentials, missingCredential, readRemote } = await import('../runtime-client.ts');
 const { remoteBrief } = await import('../run.ts');
@@ -31,6 +33,17 @@ const declare = (agents: unknown): void => fs.writeFileSync(FILE, typeof agents 
 function refusal(fn: () => unknown): string {
   try {
     fn();
+  } catch (err) {
+    assert.equal((err as { exitCode?: number }).exitCode, 2, String(err));
+    return (err as Error).message;
+  }
+  return assert.fail('it was not refused');
+}
+
+/** What `fn`, which returns a Promise, is refused with — exit code 2, a person's to fix — as its message. */
+async function rejection(fn: () => Promise<unknown>): Promise<string> {
+  try {
+    await fn();
   } catch (err) {
     assert.equal((err as { exitCode?: number }).exitCode, 2, String(err));
     return (err as Error).message;
@@ -319,12 +332,11 @@ test("a loop's target on a remote agent is refused; a step inside the loop may b
 });
 
 type Filed = { id: string; brief: string; cwd: string; harness?: string } & Record<string, unknown>;
-type Engine = Parameters<typeof advance>[0];
 
 /** Just enough engine: what each task is doing and how it signed off, and every task's spec as it was filed. */
 const board = () => {
   const tasks = new Map<string, { spec: Filed; phase: string; closeout?: unknown }>();
-  const e = {
+  const e = promised({
     view: async (id: string) => {
       const t = tasks.get(id);
       const settled = t && ['succeeded', 'failed', 'stopped'].includes(t.phase) ? t.phase : null;
@@ -364,7 +376,7 @@ const board = () => {
     stop: async () => {},
     logs: async () => '',
     feed: async () => ({ entries: [], cursor: 0 }),
-  } as unknown as Engine;
+  });
   const settle = (id: string, phase: string, closeout?: unknown) => {
     tasks.set(id, { ...tasks.get(id)!, phase, closeout });
   };
@@ -381,10 +393,10 @@ const HERE = path.join(ROOT, 'here');
 fs.mkdirSync(HERE, { recursive: true });
 const FOLDER = 'workspace: folder\n';
 
-test('nemia start refuses a step whose remote agent a2a-agents.json does not declare, before a run is written, with the entry to add', () => {
+test('nemia start refuses a step whose remote agent a2a-agents.json does not declare, before a run is written, with the entry to add', async () => {
   const dir = team('undeclared', { ask: `---\n${FOLDER}harness: a2a:reviewer\n---\nReview it.\n` });
   const before = fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')).length : 0;
-  const none = refusal(() => start({ brief: 'a review', repo: HERE, workflowDir: dir }));
+  const none = await rejection(() => Effect.runPromise(startRun({ brief: 'a review', repo: HERE, workflowDir: dir })));
   assert.equal(
     none,
     `ask: \`harness: a2a:reviewer\` names a remote A2A agent \`reviewer\`, and ${FILE} declares none. Add it there — \`{ "reviewer": { "url": "https://…" } }\`, the agent's base URL, where its card is served — or name a declared one.`,
@@ -392,18 +404,18 @@ test('nemia start refuses a step whose remote agent a2a-agents.json does not dec
   declare({ critic: { url: 'https://a.example/critic' } });
   try {
     assert.match(
-      refusal(() => start({ brief: 'a review', repo: HERE, workflowDir: dir })),
+      await rejection(() => Effect.runPromise(startRun({ brief: 'a review', repo: HERE, workflowDir: dir }))),
       /and .*a2a-agents\.json declares `critic`\. Add it there/,
     );
     declare({ reviewer: { url: 'ftp://a.example' }, critic: { url: 'https://a.example/critic' } });
-    const entry = refusal(() => start({ brief: 'a review', repo: HERE, workflowDir: dir }));
+    const entry = await rejection(() => Effect.runPromise(startRun({ brief: 'a review', repo: HERE, workflowDir: dir })));
     assert.ok(
       entry.startsWith(`ask: \`harness: a2a:reviewer\` names a remote A2A agent whose entry is refused. ${FILE}: \`reviewer\`: `),
       `an entry the runtime refuses is refused for the step that names it, in the file's words: ${entry}`,
     );
     declare('[]');
     assert.match(
-      refusal(() => start({ brief: 'a review', repo: HERE, workflowDir: dir })),
+      await rejection(() => Effect.runPromise(startRun({ brief: 'a review', repo: HERE, workflowDir: dir }))),
       /^ask: `harness: a2a:reviewer` names a remote A2A agent, and the file that declares them is refused\. .*a2a-agents\.json: is a list/,
       'a file refused as it stands is refused for any step',
     );
@@ -423,14 +435,14 @@ test('the tick files a remote step with no harness arguments, schema, hold or se
     });
     const input = path.join(ROOT, 'tides.csv');
     fs.writeFileSync(input, 'hour,height\n');
-    const run = start({ brief: 'a note on tides', repo: HERE, workflowDir: dir, inputs: [input] });
+    const run = await Effect.runPromise(startRun({ brief: 'a note on tides', repo: HERE, workflowDir: dir, inputs: [input] }));
     const { e, tasks, settle } = board();
-    await advance(e, readRun(run.id));
+    await runWith(e, advanceRun(readRun(run.id)));
     const draft = tasks.get(`${run.id}-draft`)!.spec;
     assert.ok('config' in draft && 'closeoutSchema' in draft, 'a local step is filed as it always was');
 
     settle(`${run.id}-draft`, 'succeeded', { outcome: 'done', summary: 'drafted', artifacts: [], needs: null });
-    await advance(e, readRun(run.id));
+    await runWith(e, advanceRun(readRun(run.id)));
     const ask = tasks.get(`${run.id}-ask`)?.spec;
     assert.ok(ask, `signed off, the draft lets the remote step be filed: ${[...tasks.keys()].join(', ')}`);
     assert.equal(ask.harness, 'a2a:reviewer');
@@ -452,11 +464,11 @@ test('nemia retry refuses --model and --budget on a remote step, in the words it
   declare({ reviewer: { url: 'https://a.example/reviewer' } });
   try {
     const dir = team('retried', { ask: `---\n${FOLDER}harness: a2a:reviewer\n---\nReview it.\n` });
-    const run = start({ brief: 'a review', repo: HERE, workflowDir: dir });
+    const run = await Effect.runPromise(startRun({ brief: 'a review', repo: HERE, workflowDir: dir }));
     const { e, settle } = board();
-    await advance(e, readRun(run.id));
+    await runWith(e, advanceRun(readRun(run.id)));
     settle(`${run.id}-ask`, 'failed');
-    const model = await retry(e, run.id, 'ask', { mode: 'fresh', model: 'haiku' }).then(
+    const model = await runWith(e, retryRun(run.id, 'ask', { mode: 'fresh', model: 'haiku' })).then(
       () => assert.fail('--model was not refused'),
       (err: Error & { exitCode?: number }) => err,
     );
@@ -465,10 +477,10 @@ test('nemia retry refuses --model and --budget on a remote step, in the words it
       model.message,
       `\`--model haiku\` is how a harness of ours is to run the session, and a remote agent runs as its operator configured it: A2A carries no such argument, and the runtime refuses a task filed with one, and ask runs on \`harness: a2a:reviewer\`, a remote A2A agent: its try would be sent without it. Ask without --model: nemia retry ${run.id} ask.`,
     );
-    await assert.rejects(retry(e, run.id, 'ask', { mode: 'nudge', budget: 5 }), (err: Error) =>
+    await assert.rejects(runWith(e, retryRun(run.id, 'ask', { mode: 'nudge', budget: 5 })), (err: Error) =>
       err.message.startsWith('`--budget 5` is a spend cap a harness of ours keeps, and a remote agent keeps none'),
     );
-    const asked = await retry(e, run.id, 'ask', { mode: 'fresh' });
+    const asked = await runWith(e, retryRun(run.id, 'ask', { mode: 'fresh' }));
     assert.equal(asked.ask.try, 2, 'without them, the same try is asked for');
   } finally {
     fs.rmSync(FILE, { force: true });

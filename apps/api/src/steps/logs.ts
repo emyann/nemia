@@ -2,7 +2,7 @@
 import { phaseOfView, verdictWord, type Views } from 'agent-orchestrator';
 import type { Run } from 'agent-orchestrator/run';
 import type { Workflow } from 'agent-orchestrator/workflow';
-import type { Engine } from '../store.ts';
+import { engineRead, type Engine } from '../store.ts';
 
 /**
  * The command a step is judged by, and what it said once it refused.
@@ -79,7 +79,7 @@ export async function refusedStderr(e: Engine['Service'], run: Run, views: Views
   const read = await Promise.all(
     [...new Set(ids)].map(async (id): Promise<[string, StepLog | string]> => {
       try {
-        return [id, tailOf((await e.output(id, 'stderr', TAIL_BYTES)) ?? '', CHECK_LINES)];
+        return [id, tailOf((await engineRead('output', e.output(id, 'stderr', TAIL_BYTES))) ?? '', CHECK_LINES)];
       } catch (err) {
         return [id, unreadableOutput(run, id, err)];
       }
@@ -142,7 +142,10 @@ export async function checksOf(
     if (!check.refused) continue;
     try {
       const id = check.taskId!;
-      check.refused.stdout = tailOf((await e.output(id, 'stdout', TAIL_BYTES)) ?? (await e.logs(id)), CHECK_LINES);
+      check.refused.stdout = tailOf(
+        (await engineRead('output', e.output(id, 'stdout', TAIL_BYTES))) ?? (await engineRead('logs', e.logs(id))),
+        CHECK_LINES,
+      );
     } catch (err) {
       check.refused.stdout = NO_LINES;
       check.refused.unreadable ??= unreadableOutput(run, check.taskId!, err);

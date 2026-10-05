@@ -4,20 +4,20 @@
  * same views (`deniedCallsOf`, `skillsLoadedOf`, `filesTouchedOf`), each try's counts read off its own task's closeout (`taskCloseout`),
  * and the rules and paths each step's skills declare read off their frozen copies (`renderedSkillRules`, `renderedSkillApplies`): no
  * session's log nor transcript, and no skill of the checkout. A controller, reaching the runtime through the client (`runtime-client.ts`):
- * an Effect program that requires the engine as a service (`EngineService`), and `stats`, its plain face in a Promise, over the engine it
- * is handed. It writes nothing. It keeps nothing between
+ * an Effect program that requires the engine as a service (`EngineService`), run by a caller with `runWith`. It writes nothing. It keeps
+ * nothing between
  * calls but in the memo a caller hands it (`StatsMemo`): each finished run's facts, while its inputs stand.
  */
 import { isDeepStrictEqual } from 'node:util';
-import { Effect } from 'effect';
-import { EngineService, awaited, denialText, unreadableJournal, type Engine, type TaskView } from '../runtime-client.ts';
+import { Cause, Effect, Exit } from 'effect';
+import { EngineService, denialText, over, unreadableJournal, type Engine, type TaskView } from '../runtime-client.ts';
 import { refusedCheck, type Run } from '../record/record.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 import type { Workflow } from '../step/step.ts';
 import { timeline } from '../timeline/index.ts';
 import { runStore } from '../record/files.store.ts';
 import { stepsOf } from '../record/record.store.ts';
-import { closeoutReader, everyTryOf, taskCloseout, taskPhases, viewedOnce } from '../views/views.verb.ts';
+import { closeoutReader, everyTryOf, taskCloseout, taskPhasesRead, viewedOnce } from '../views/views.verb.ts';
 import { phaseOfView } from '../views/views-words.ts';
 import { renderedSkillApplies, renderedSkillRules, renderedSkillVersions } from '../agents/agents.store.ts';
 import { followedFeed } from '../rest/rest.verb.ts';
@@ -58,9 +58,9 @@ const frozenRun = (run: Run, steps: readonly Workflow[]): RunFrozen =>
  * One run's facts (`factsOf`) off its frozen `steps` and the engine's view of every task of every try, and whether every one of those
  * tasks had settled. Rejects with what a view rejected with, a journal that does not read among it.
  */
-async function runFacts(e: Engine, run: Run, steps: Workflow[]): Promise<Pick<Facts, 'tries' | 'runs'> & { settled: boolean }> {
-  const { views } = await taskPhases(e, run);
-  const everyTry = await Effect.runPromise(everyTryOf(e, run, views));
+const runFacts = Effect.fnUntraced(function* (e: Engine, run: Run, steps: Workflow[]) {
+  const { views } = yield* taskPhasesRead(run).pipe(over(e));
+  const everyTry = yield* everyTryOf(e, run, views);
   const filed = new Map([...everyTry].flatMap(([taskId, v]) => (v.state.filedAt ? [[taskId, v.state.filedAt] as const] : [])));
   const settled = [...everyTry.values()].every((v) => Boolean(v.state.settled));
   const of = factsOf({
@@ -78,7 +78,7 @@ async function runFacts(e: Engine, run: Run, steps: Workflow[]): Promise<Pick<Fa
     closeoutOfTask: (taskId) => taskCloseout(everyTry, taskId),
   });
   return { ...of, settled };
-}
+});
 
 /** One run's facts, as `statsOf` takes them: what it froze, and its tries and its run, none where a journal of it does not read. */
 type RunFacts = { frozen: RunFrozen; tries: TryFact[]; runs: RunFact[] };
@@ -107,25 +107,25 @@ export const freshStatsMemo = (): StatsMemo => ({ runs: new Map() });
  */
 export type StatsOptions = { memo?: StatsMemo; verify?: boolean };
 
-/** What `run` gives the stats (`RunRead`). Rejects with what a read of it rejected with but a journal that does not read. */
-async function factsRead(e: Engine, run: Run): Promise<RunRead> {
+/** What `run` gives the stats (`RunRead`). Fails with what a read of it failed with but a journal that does not read. */
+const factsRead = Effect.fnUntraced(function* (e: Engine, run: Run) {
   const steps = stepsRead(run);
   if (!steps) return null;
   const frozen = frozenRun(run, steps);
-  try {
-    const { tries, runs, settled } = await runFacts(e, run, steps);
-    return { id: run.id, facts: { frozen, tries, runs }, unreadable: false, keeps: settled && Boolean(run.workflow) };
-  } catch (err) {
-    if (unreadableJournal(err) === undefined) throw err;
-    return { id: run.id, facts: { frozen, tries: [], runs: [] }, unreadable: true, keeps: false };
+  const read = yield* Effect.exit(runFacts(e, run, steps));
+  if (Exit.isSuccess(read)) {
+    const { tries, runs, settled } = read.value;
+    return { id: run.id, facts: { frozen, tries, runs }, unreadable: false, keeps: settled && Boolean(run.workflow) } satisfies RunRead;
   }
-}
+  if (unreadableJournal(Cause.squash(read.cause)) === undefined) return yield* Effect.failCause(read.cause);
+  return { id: run.id, facts: { frozen, tries: [], runs: [] }, unreadable: true, keeps: false } satisfies RunRead;
+});
 
 /**
  * What the run `id` gives the stats (`factsRead`), off its record read now, a record that does not read said on `said` as the store's
  * list says it.
  */
-async function runRead(e: Engine, id: string, said: (line: string) => void): Promise<RunRead> {
+const runRead = Effect.fnUntraced(function* (e: Engine, id: string, said: (line: string) => void) {
   let run: Run;
   try {
     run = runStore.runs.read(id);
@@ -134,8 +134,8 @@ async function runRead(e: Engine, id: string, said: (line: string) => void): Pro
     else if (!(err instanceof Missing)) throw err;
     return null;
   }
-  return factsRead(e, run);
-}
+  return yield* factsRead(e, run);
+});
 
 const sayOnStderr = (line: string) => process.stderr.write(`${line}\n`);
 
@@ -146,8 +146,8 @@ const sayOnStderr = (line: string) => process.stderr.write(`${line}\n`);
  * is read, and kept where it may be (`RunRead`), the feed was read, and no other call has read it on past where this one read to. A run
  * gone from the stamps is gone from the memo; for an engine with no feed, nothing is answered from memory, nor kept.
  */
-async function memoReads(e: Engine, memo: StatsMemo, verify: boolean): Promise<RunRead[]> {
-  const fed = typeof e.feed === 'function' && (await followedFeed(e, memo));
+const memoReads = Effect.fnUntraced(function* (e: Engine, memo: StatsMemo, verify: boolean) {
+  const fed = typeof e.feed === 'function' && (yield* followedFeed(e, memo));
   if (!fed) memo.runs.clear();
   const readTo = memo.cursor;
   const stamps = runStore.runs.stamps();
@@ -156,25 +156,25 @@ async function memoReads(e: Engine, memo: StatsMemo, verify: boolean): Promise<R
   for (const [id, stamp] of [...stamps].sort(([a], [b]) => a.localeCompare(b))) {
     const kept = memo.runs.get(id);
     if (kept?.stamp === stamp) {
-      if (verify && !isDeepStrictEqual(await runRead(e, id, () => {}), kept.read))
+      if (verify && !isDeepStrictEqual(yield* runRead(e, id, () => {}), kept.read))
         throw new Error(`the stats' memo answered the run ${id} unlike a read of it afresh: an input of its facts is not in its stamp`);
       reads.push(kept.read);
       continue;
     }
     memo.runs.delete(id);
-    const read = await runRead(e, id, sayOnStderr);
+    const read = yield* runRead(e, id, sayOnStderr);
     reads.push(read);
     if (fed && memo.cursor === readTo && (read === null || read.keeps)) memo.runs.set(id, { stamp, read });
   }
   return reads;
-}
+});
 
 /** Every run in the store as the store lists it, each as it gives the stats (`factsRead`), read afresh. */
-async function listReads(e: Engine): Promise<RunRead[]> {
+const listReads = Effect.fnUntraced(function* (e: Engine) {
   const reads: RunRead[] = [];
-  for (const run of runStore.runs.list()) reads.push(await factsRead(e, run));
+  for (const run of runStore.runs.list()) reads.push(yield* factsRead(e, run));
   return reads;
-}
+});
 
 /**
  * The stats of every run in the store for `query`, as of `now` (`statsOf`), over `e` viewed once, through `options.memo` where one is
@@ -182,10 +182,10 @@ async function listReads(e: Engine): Promise<RunRead[]> {
  * still compared (`frozenRun`); a run whose frozen steps do not read gives nothing; a record that does not read is left out, said on
  * stderr.
  */
-async function statsOver(e: Engine, query: StatsQuery, now: Date, { memo, verify = false }: StatsOptions) {
+const statsOver = Effect.fnUntraced(function* (e: Engine, query: StatsQuery, now: Date, { memo, verify = false }: StatsOptions) {
   const facts: Facts = { tries: [], runs: [], frozen: [] };
   const unreadable: string[] = [];
-  for (const read of memo ? await memoReads(e, memo, verify) : await listReads(e)) {
+  for (const read of memo ? yield* memoReads(e, memo, verify) : yield* listReads(e)) {
     if (!read) continue;
     facts.frozen.push(read.facts.frozen);
     facts.tries.push(...read.facts.tries);
@@ -193,7 +193,7 @@ async function statsOver(e: Engine, query: StatsQuery, now: Date, { memo, verify
     if (read.unreadable) unreadable.push(read.id);
   }
   return statsOf(facts, query, now, unreadable);
-}
+});
 
 /**
  * `nemia stats`: the flow numbers of every run in the store for `query`, as of `now`, through the memo `options` hands it, if any. Fails
@@ -201,9 +201,5 @@ async function statsOver(e: Engine, query: StatsQuery, now: Date, { memo, verify
  */
 export const statsRun = Effect.fn('stats')(function* (query: StatsQuery, now: Date = new Date(), options: StatsOptions = {}) {
   const e = viewedOnce(yield* EngineService);
-  return yield* awaited(() => statsOver(e, query, now, options));
+  return yield* statsOver(e, query, now, options);
 });
-
-/** `nemia stats` (`statsRun`) in a Promise, over `engine`: what the CLI, the api and the tests call. */
-export const stats = (engine: Engine, query: StatsQuery, now: Date = new Date(), options: StatsOptions = {}) =>
-  Effect.runPromise(statsRun(query, now, options).pipe(Effect.provide(EngineService.layer(engine))));

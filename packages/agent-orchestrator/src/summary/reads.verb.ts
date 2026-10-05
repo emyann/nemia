@@ -6,13 +6,14 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { type Engine, type TaskView, unreadableJournal } from '../runtime-client.ts';
+import { Cause, Effect, Exit } from 'effect';
+import { asked, over, type Engine, type TaskView, unreadableJournal } from '../runtime-client.ts';
 import { loadWorkflows } from '../folder/folder.store.ts';
 import { runStore } from '../record/files.store.ts';
 import { type Run, runTasks, unjudgedWords } from '../record/record.ts';
 import { triesDir } from '../roster/try.store.ts';
 import type { Workflow } from '../step/step.ts';
-import { readFilings } from '../views/views.verb.ts';
+import { filingsRead } from '../views/views.verb.ts';
 
 export type { TaskView };
 export type Views = ReadonlyMap<string, TaskView>;
@@ -21,20 +22,20 @@ export type Unreadable = ReadonlyMap<string, string>;
 
 /**
  * The engine's view of every task a run's current tries have filed — each step's, and each check's — and each earlier try's session, for
- * its decision: what a step's tries have cost together is every try's session (`stepSpend`), as the tick reads them (`taskPhases` in
+ * its decision: what a step's tries have cost together is every try's session (`stepSpend`), as the tick reads them (`taskPhasesRead` in
  * views.verb.ts). A `view` of a settled task reads its journal and asks no harness; one of a task in flight observes its harness
  * — a scan of the detached runs' files for a job, a list of its sessions for a background session. Read through `reader`, a request's own
  * (`viewsFor`), a task two runs read is viewed once.
  */
-export async function viewsOf(run: Run, reader: Engine): Promise<Views> {
+export const viewsOf = Effect.fn('viewsOf')(function* (run: Run, reader: Engine) {
   const views = new Map<string, TaskView>();
   for (const { taskId, check, tries } of Object.values(run.steps)) {
-    if (taskId) views.set(taskId, await reader.view(taskId));
-    if (check) views.set(check.taskId, await reader.view(check.taskId));
-    for (const t of tries ?? []) if (!views.has(t.taskId)) views.set(t.taskId, await reader.view(t.taskId));
+    if (taskId) views.set(taskId, yield* asked('view', reader.view(taskId)));
+    if (check) views.set(check.taskId, yield* asked('view', reader.view(check.taskId)));
+    for (const t of tries ?? []) if (!views.has(t.taskId)) views.set(t.taskId, yield* asked('view', reader.view(t.taskId)));
   }
-  return views;
-}
+  return views satisfies Views;
+});
 
 /** The first task of a run's whose journal a read left out (`viewsFor`), and why; undefined for a run whose every task read. */
 export function unreadableOf(run: Run, unreadable: Unreadable): { taskId: string; why: string } | undefined {
@@ -44,27 +45,28 @@ export function unreadableOf(run: Run, unreadable: Unreadable): { taskId: string
 
 /**
  * `judge` of `run`, or why it is not judged, in the words the list and a run's page say it with (`RunSummary.unreadable`): a task of its
- * own the read left out (`unreadableOf`), or one of a run it waits on, whose view rejects in the runtime's words (`unreadableJournal`). As
- * the tick leaves such a run unjudged and counts it in flight. Any other failure rejects.
+ * own the read left out (`unreadableOf`), or one of a run it waits on, whose view fails in the runtime's words (`unreadableJournal`). As
+ * the tick leaves such a run unjudged and counts it in flight. Any other failure fails the same.
  */
-export async function judgedUnlessUnreadable<T>(
+/** What `judgedUnlessUnreadable` answers: the judgement, or why there is none. */
+export type JudgedOrNot<T> = { judged: T } | { unreadable: string };
+
+export const judgedUnlessUnreadable = Effect.fn('judgedUnlessUnreadable')(function* <T, E, R>(
   run: Run,
   unreadable: Unreadable,
-  judge: () => Promise<T>,
-): Promise<{ judged: T } | { unreadable: string }> {
+  judge: () => Effect.Effect<T, E, R>,
+): Effect.fn.Return<JudgedOrNot<T>, E, R> {
   const own = unreadableOf(run, unreadable);
   if (own) return { unreadable: unjudgedWords(run.id, own.taskId, own.why, 'the board') };
-  try {
-    return { judged: await judge() };
-  } catch (err) {
-    const why = unreadableJournal(err);
-    if (why === undefined) throw err;
-    return { unreadable: unjudgedWords(run.id, undefined, why, 'the board') };
-  }
-}
+  const exit = yield* Effect.exit(judge());
+  if (Exit.isSuccess(exit)) return { judged: exit.value };
+  const why = unreadableJournal(Cause.squash(exit.cause));
+  if (why === undefined) return yield* Effect.failCause(exit.cause);
+  return { unreadable: unjudgedWords(run.id, undefined, why, 'the board') };
+});
 
 /**
- * The views a request judges `runs` by, and the engine it hands `parentOf` for the runs they wait on: the tasks of those runs and of the
+ * The views a request judges `runs` by, and the engine it hands `parentRead` for the runs they wait on: the tasks of those runs and of the
  * runs they wait on or are held until, found among `store`, over one look at the harnesses (`list(taskIds)`), which reads their journals
  * and no other and asks a harness for its sessions only for a background session in flight among them — once, however many. A task of a
  * run waited on that the views do not hold, filed since, is viewed (`seenBy`).
@@ -75,24 +77,34 @@ export async function judgedUnlessUnreadable<T>(
  * A request reads the journals of the runs it judges and of their parents, once, and no other: never every journal in the store
  * (`everyView`), and never a run waited on a `view` a task, its journal once more.
  */
-export async function viewsFor(
+export const viewsFor = Effect.fn('viewsFor')(function* (
   e: Engine,
   runs: readonly Run[],
   store: () => readonly Run[] = () => runStore.runs.list(),
-): Promise<{ views: Views; reader: Engine; unreadable: Unreadable }> {
+) {
   const parents = new Set(runs.flatMap((run) => [...(run.after ?? []), ...(run.hold && !run.cancelledAt ? run.hold.until : [])]));
   const read = parents.size ? [...runs, ...store().filter((run) => parents.has(run.id))] : runs;
-  const listed = await e.list(read.flatMap(runTasks));
+  const listed = yield* asked('list', e.list(read.flatMap(runTasks)));
   const views: Views = new Map(listed.views.map((view) => [view.id, view]));
-  return { views, reader: seenBy(e, views), unreadable: new Map(listed.unreadable.map(({ taskId, why }) => [taskId, why])) };
-}
+  return {
+    views,
+    reader: seenBy(e, views),
+    unreadable: new Map(listed.unreadable.map(({ taskId, why }) => [taskId, why])) satisfies Unreadable,
+  };
+});
 
 /**
  * The engine as a request that has read `views` sees it: `view` answers from them, and everything else is the engine's own. What the
- * `parentOf` is handed on the list and on a run's detail, so reading the runs a run waits on observes no harness again — the
+ * `parentRead` is handed on the list and on a run's detail, so reading the runs a run waits on observes no harness again — the
  * list is what the Factory polls. A task the read did not see, filed since, is viewed.
  */
-export const seenBy = (e: Engine, views: Views): Engine => ({ ...e, view: async (taskId) => views.get(taskId) ?? e.view(taskId) });
+export const seenBy = (e: Engine, views: Views): Engine => ({
+  ...e,
+  view: (taskId) => {
+    const seen = views.get(taskId);
+    return seen ? Effect.succeed(seen) : e.view(taskId);
+  },
+});
 
 /**
  * The run's workflow folder, read now.
@@ -147,7 +159,7 @@ export const judgedSteps = (run: Run, folder: readonly Workflow[] | null): reado
 export const bare = (name: string): Workflow => ({ name, after: [], body: '' });
 
 /**
- * When each task was filed, off the engine's feed (`readFilings`), and where the last read of it stopped: a task's view carries no filing
+ * When each task was filed, off the engine's feed (`filingsRead`), and where the last read of it stopped: a task's view carries no filing
  * time, and the wait for a slot is filing → first attempt, and a run starts at its first filing (`runStartedAt`). Read on from the cursor
  * on each detail and each list — a filing is written once and never changes — so a page polled every five seconds reads what was appended
  * since. A read's cache, one for a caller that lives long, of its engine's feed: a fresh one reads the feed from the start.
@@ -158,12 +170,11 @@ export type Filings = { filed: Map<string, string>; cursor: number };
  * Every task's filing time `e`'s feed has, read on from where the last read into `filings` stopped. A feed that cannot be read this time
  * leaves what was read before: the queue times of tasks filed since say `not known` until a read works.
  */
-export async function filedTimes(e: Engine, filings: Filings): Promise<ReadonlyMap<string, string>> {
-  try {
-    filings.cursor = (await readFilings(e, filings.cursor, filings.filed)).cursor;
-  } catch {}
+export const filedTimes = Effect.fn('filedTimes')(function* (e: Engine, filings: Filings) {
+  const read = yield* Effect.exit(filingsRead(filings.cursor, filings.filed).pipe(over(e)));
+  if (Exit.isSuccess(read)) filings.cursor = read.value.cursor;
   return filings.filed;
-}
+});
 
 /** The agent a run tried, when it is a try: started from a folder directly under `tries/`. Null for every other run. */
 export function tryOf(run: Pick<Run, 'workflowDir'>, home: string): { agent: string } | null {

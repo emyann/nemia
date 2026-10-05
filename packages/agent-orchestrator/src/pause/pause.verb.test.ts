@@ -8,15 +8,16 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
-import type { Engine } from '../runtime-client.ts';
 import type { Workflow } from '../step/step.ts';
 import type { FinishingView } from './pause.ts';
+import { promised } from '../../test/promised.ts';
 
 const ROOT = scratch('wf-pause-now-');
 process.env.WF_ROOT = ROOT;
 const { nowRead, pauseNow } = await import('./pause.verb.ts');
 const { askFile, asksDir } = await import('../record/record.store.ts');
 const { pauseFile, putPause, readPause, resumePause } = await import('./pause.store.ts');
+const { runWith } = await import('../runtime-client.ts');
 
 const WORKFLOW: Workflow[] = [
   { name: 'implement', after: [], body: 'Implement it.', check: 'npm test' },
@@ -55,13 +56,13 @@ function engineOf(working: string[], refuse: string[] = []) {
   const asked = (taskId: string) =>
     fs.existsSync(asksDir('r-a')) &&
     fs.readdirSync(asksDir('r-a')).some((f) => fs.readFileSync(path.join(asksDir('r-a'), f), 'utf8').includes(taskId));
-  const e = {
+  const e = promised({
     list: async (ids: string[]) => ({ views: ids.filter((id) => working.includes(id)).map(atWork) }),
     stop: async (taskId: string) => {
       stops.push({ taskId, askOnDisk: asked(taskId) });
       if (refuse.includes(taskId)) throw Object.assign(new Error(`task ${taskId} is settled`), { exitCode: 2 });
     },
-  } as unknown as Engine;
+  });
   return { e, stops };
 }
 
@@ -73,7 +74,7 @@ test('a pause at once writes the pause, then for each task at work the ask namin
   writeRun('r-x', { implement: { taskId: 't4' } }, { cancelledAt: '2026-10-04T12:01:00.000Z' });
   const { e, stops } = engineOf(['c1', 't3', 't4']);
   const now = new Date('2026-10-04T13:00:00.000Z');
-  const paused = await pauseNow(e, { why: 'the bill', by: 'ann' }, now);
+  const paused = await runWith(e, pauseNow({ why: 'the bill', by: 'ann' }, now));
   assert.deepEqual(paused.pause, { at: '2026-10-04T13:00:00.000Z', by: 'ann', why: 'the bill' });
   assert.equal(paused.kept, false);
   assert.deepEqual(paused.interrupted, [{ run: 'r-a', step: 'implement', kind: 'check', taskId: 'c1' }]);
@@ -96,7 +97,7 @@ test('a pause at once keeps a pause that stands as it was put, and nudges the se
   putPause({ why: 'merging by hand', by: 'bob' }, new Date('2026-10-04T12:30:00.000Z'));
   const before = fs.readFileSync(pauseFile());
   const { e, stops } = engineOf(['t1']);
-  const paused = await pauseNow(e, { why: 'the bill', by: 'ann' }, new Date('2026-10-04T13:00:00.000Z'));
+  const paused = await runWith(e, pauseNow({ why: 'the bill', by: 'ann' }, new Date('2026-10-04T13:00:00.000Z')));
   assert.equal(paused.kept, true);
   assert.deepEqual(paused.pause, { at: '2026-10-04T12:30:00.000Z', by: 'bob', why: 'merging by hand' });
   assert.deepEqual(fs.readFileSync(pauseFile()), before);
@@ -116,7 +117,7 @@ test('a stop the engine refuses leaves its ask for the tick to set aside, and a 
     JSON.stringify({ step: 'implement', try: 2, mode: 'fresh', at: '2026-10-04T12:00:00Z' }),
   );
   const { e, stops } = engineOf(['t1', 't2'], ['t1']);
-  const paused = await pauseNow(e, {}, new Date('2026-10-04T13:00:00.000Z'));
+  const paused = await runWith(e, pauseNow({}, new Date('2026-10-04T13:00:00.000Z')));
   assert.deepEqual(paused.interrupted, [{ run: 'r-a', step: 'implement', kind: 'session', taskId: 't1' }]);
   assert.deepEqual(paused.skipped, [{ run: 'r-b', step: 'implement', kind: 'session', taskId: 't2' }]);
   assert.deepEqual(stops, [{ taskId: 't1', askOnDisk: true }]);
@@ -133,12 +134,12 @@ test('the pause read after a pause at once says each task it stopped resumed, an
   writeRun('r-a', { implement: { taskId: 't1' } });
   writeRun('r-b', { implement: { taskId: 't2' } });
   const { e } = engineOf(['t1']);
-  await pauseNow(e, {}, new Date('2026-10-04T13:00:00.000Z'));
+  await runWith(e, pauseNow({}, new Date('2026-10-04T13:00:00.000Z')));
   const stopped = (id: string): FinishingView & { id: string } => ({ ...atWork(id), state: { ...atWork(id).state, stopRequested: true } });
-  const read = {
+  const read = promised({
     list: async (ids: string[]) => ({ views: ids.filter((id) => ['t1', 't2'].includes(id)).map(stopped) }),
-  } as unknown as Engine;
-  assert.deepEqual((await pausedRead(read)).finishing, [
+  });
+  assert.deepEqual((await runWith(read, pausedRead())).finishing, [
     { run: 'r-a', step: 'implement', kind: 'session', stopping: true, resumed: true },
     { run: 'r-b', step: 'implement', kind: 'session', stopping: true },
   ]);
@@ -150,7 +151,7 @@ test('the pause read after a pause at once says each task it stopped resumed, an
 test('what a pause at once would stop is read, and nothing is written nor stopped', async () => {
   writeRun('r-a', { implement: { taskId: 't1', check: { taskId: 'c1' } } });
   const { e, stops } = engineOf(['c1']);
-  assert.deepEqual(await nowRead(e), [{ run: 'r-a', step: 'implement', kind: 'check', taskId: 'c1' }]);
+  assert.deepEqual(await runWith(e, nowRead()), [{ run: 'r-a', step: 'implement', kind: 'check', taskId: 'c1' }]);
   assert.deepEqual(stops, []);
   assert.equal(readPause(), null);
   assert.equal(fs.existsSync(asksDir('r-a')), false);
@@ -160,7 +161,7 @@ test('nemia pause --now says what it would stop and writes nothing; --yes acts; 
   const { PAUSE } = await import('../command/runs.verb.ts');
   writeRun('r-a', { implement: { taskId: 't1' } });
   const { e, stops } = engineOf(['t1']);
-  const preview = await PAUSE.handler(e, { now: true });
+  const preview = await runWith(e, PAUSE.handler({ now: true }));
   assert.deepEqual(PAUSE.print(preview, { now: true }), [
     'nemia pause --now would pause the store and stop 1 at work, each tried again on nemia resume:',
     "   r-a's implement: its session",
@@ -170,14 +171,14 @@ test('nemia pause --now says what it would stop and writes nothing; --yes acts; 
   assert.equal(fs.existsSync(pauseFile()), false);
   assert.equal(fs.existsSync(asksDir('r-a')), false);
   assert.deepEqual(stops, []);
-  await PAUSE.handler(e, { yes: true, why: 'lunch', by: 'ann' });
+  await runWith(e, PAUSE.handler({ yes: true, why: 'lunch', by: 'ann' }));
   assert.deepEqual(stops, [], '--yes alone pauses as a plain pause does');
   assert.equal(readPause()?.why, 'lunch');
-  await assert.rejects(PAUSE.handler(e, { why: 'other' }), (err: Error) => {
+  await assert.rejects(runWith(e, PAUSE.handler({ why: 'other' })), (err: Error) => {
     assert.match(err.message, /nemia pause --now stops what still finishes under it/);
     return true;
   });
-  const acted = await PAUSE.handler(e, { now: true, yes: true, why: 'other' });
+  const acted = await runWith(e, PAUSE.handler({ now: true, yes: true, why: 'other' }));
   assert.equal(
     PAUSE.print(acted, {})[0],
     "the store's pause stands as it was put, since " + readPause()?.at + ' by ann: lunch; now what runs is asked to stop',

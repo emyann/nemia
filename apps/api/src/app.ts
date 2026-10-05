@@ -3,7 +3,7 @@ import { type ErrorHandler, Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { VERSION } from 'agent-orchestrator';
-import { isRefusal, type Refusal } from 'agent-orchestrator/effect';
+import { isRefusal, type Refusal } from 'agent-orchestrator';
 import { agents, skills } from './agents/index.ts';
 import { customInstructions } from './custom/custom.ts';
 import { commands } from './commands/index.ts';
@@ -16,7 +16,7 @@ import { machines } from './machines/machines.ts';
 import { runs } from './runs/runs.ts';
 import { stats } from './stats/stats.ts';
 import { steps } from './steps/index.ts';
-import { Engine, StoreRoot } from './store.ts';
+import { engineRead, Engine, StoreRoot } from './store.ts';
 import { builder, remover, workflows, yours } from './workflows/index.ts';
 
 /**
@@ -149,7 +149,9 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     .get('/api/pause', (c) => served(c, async ({ e }) => c.json(await pauseOf(e))))
     .get('/api/pause/now', (c) => served(c, async ({ e }) => c.json(await pauseNowOf(e))))
     .get('/api/daemon', (c) => c.json(readDaemon()))
-    .get('/api/quota', (c) => served(c, async ({ e, env, quota }) => c.json(await quota({ env, ask: () => e.quota('claude') }))))
+    .get('/api/quota', (c) =>
+      served(c, async ({ e, env, quota }) => c.json(await quota({ env, ask: () => engineRead('quota', e.quota('claude')) }))),
+    )
     .route('/', commands)
     .route('/', steps)
     .route('/', feed)

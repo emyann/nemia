@@ -11,8 +11,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Engine } from 'agent-runtime';
 import { scratch } from './scratch.ts';
+import { promised } from './promised.ts';
 
 const ROOT = scratch('wf-stray-flags-');
 process.env.WF_ROOT = ROOT;
@@ -22,7 +22,7 @@ const { INBOX_HELP } = await import('../src/inbox/commands.verb.ts');
 const { PLAN_HELP } = await import('../src/start/commands.verb.ts');
 
 /** No command here reaches the engine: each is refused, or prints its help, before anything is read. */
-const NO_ENGINE = {} as Engine;
+const NO_ENGINE = promised({});
 
 const INBOX_SAYS =
   'It lists the inbox — nemia inbox — files a card with nemia inbox add "<idea>", queues one with nemia inbox queue <name>, and drops one with ' +

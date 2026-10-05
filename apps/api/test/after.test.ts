@@ -20,7 +20,7 @@ import path from 'node:path';
 import type { RunDecision } from '../src/decide/decision.ts';
 import type { RunDetail } from '../src/detail/detail.ts';
 import { app } from '../src/app.ts';
-import { decide, engine, list, waitAdvice, waitWord, runStore, type RunSummary } from 'agent-orchestrator';
+import { decideRun, engine, list, runStore, runWith, type RunSummary, waitAdvice, waitWord } from 'agent-orchestrator';
 
 type Wait = import('agent-orchestrator').Wait;
 
@@ -215,7 +215,7 @@ test("the list's words and waits are `list`'s, run by run — and `advice` is `w
     'c-cancelled',
   ]) {
     const api = runs.get(id)!;
-    const cli = await list(e, runStore.runs.read(id));
+    const cli = await runWith(e, list(e, runStore.runs.read(id)));
     assert.deepEqual(asWaits(api.waiting), cli.waiting, id);
     assert.deepEqual(
       api.steps.map((s) => s.status),
@@ -314,7 +314,7 @@ test('the decision of a run waiting on runs is `waiting`, and nothing else: what
     const body = (await res.json()) as RunDecision;
     assert.deepEqual(body, { waiting: runs.get(id)!.waiting }, id);
     assert.ok('waiting' in body, id);
-    const { run, waiting } = await decide(e, id);
+    const { run, waiting } = await runWith(e, decideRun(id));
     assert.deepEqual(asWaits(body.waiting), waiting, id);
     assert.equal(body.waiting.word, waitWord(waiting), id);
     assert.equal(body.waiting.advice, waitAdvice(run, waiting), id);

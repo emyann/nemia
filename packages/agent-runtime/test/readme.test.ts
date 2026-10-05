@@ -114,7 +114,3 @@ test('the README uses no `ae` verb the CLI does not have, and names every key a 
 test('the README keeps no count of tests or lines by hand', () => {
   assert.deepEqual(counts(read('README.md')), []);
 });
-
-test("the README's claim that the CLI imports no Effect is true", () => {
-  assert.doesNotMatch(read('src/cli/main.ts'), /from 'effect'/);
-});

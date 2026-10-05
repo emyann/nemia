@@ -15,9 +15,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
-import type { Engine, RefusedMove, TickReport } from 'agent-runtime';
+import type { RefusedMove, TickReport } from 'agent-runtime';
+import type { Engine } from '../runtime-client.ts';
 import { nodeChild } from '../../test/child.ts';
 import { scratch } from '../../test/scratch.ts';
+import { promised } from '../../test/promised.ts';
 
 const ROOT = scratch('wf-daemon-');
 process.env.WF_ROOT = ROOT;
@@ -134,16 +136,19 @@ const engineOf = (
     throw STOP;
   },
 ) => {
-  const e = {
+  const state = {
     passes: 0,
     tick: async (): Promise<TickReport> => {
-      e.passes++;
-      each(e.passes);
+      state.passes++;
+      each(state.passes);
       return pass();
     },
-    admit: async () => [],
   };
-  return e as typeof e & Engine;
+  const e = promised({ tick: () => state.tick(), admit: async () => [] });
+  return Object.defineProperties(e, {
+    passes: { get: () => state.passes, set: (n: number) => void (state.passes = n) },
+    setTick: { value: (tick: () => Promise<TickReport>) => void (state.tick = tick) },
+  }) as Engine & { passes: number; setTick: (tick: () => Promise<TickReport>) => void };
 };
 
 /** What a verb printed, line by line, and what it threw. */
@@ -174,7 +179,7 @@ test('a pass that runs long is heard from: the beat is written while the pass aw
   const e = engineOf(() => {
     throw STOP;
   });
-  e.tick = async () => {
+  e.setTick(async () => {
     e.passes++;
     const until = performance.now() + 10_000;
     while (beats.length < 2) {
@@ -190,7 +195,7 @@ test('a pass that runs long is heard from: the beat is written while the pass aw
       await new Promise((r) => setTimeout(r, 5));
     }
     throw STOP;
-  };
+  });
   const { threw } = await typed(t, ['up', '10'], e);
   assert.equal(threw, STOP);
   assert.equal(e.passes, 1);
@@ -478,8 +483,9 @@ for (const [signal, code] of [
   test(`\`nemia up\` stopped by ${signal} lets the store go on the way out, with the signal's exit code, ${code}`, async () => {
     clear();
     const cli = new URL('../cli/main.ts', import.meta.url).href;
+    const fake = new URL('../../test/promised.ts', import.meta.url).href;
     const w = nodeChild(
-      `const { main } = await import(${JSON.stringify(cli)}); await main(['up', '20'], { tick: async () => ({ tasks: 0, actions: [], running: {}, views: [] }), admit: async () => [] });`,
+      `const { main } = await import(${JSON.stringify(cli)}); const { promised } = await import(${JSON.stringify(fake)}); await main(['up', '20'], promised({ tick: async () => ({ tasks: 0, actions: [], running: {}, views: [] }), admit: async () => [] }));`,
       { ...process.env, WF_ROOT: ROOT },
     );
     const { child } = w;
@@ -648,11 +654,11 @@ test('`nemia up` says a move the runtime refused once while it lasts, and again 
   const other: RefusedMove = { taskId: 't-other', state: 'ending', event: 'CLOSED' };
   const byPass = [[stuck], [stuck], [stuck, other], [stuck, other], [], [stuck], [stuck]];
   const e = engineOf();
-  e.tick = async () => {
+  e.setTick(async () => {
     e.passes++;
     if (e.passes > byPass.length) throw STOP;
     return pass({ tasks: 2, refused: byPass[e.passes - 1] });
-  };
+  });
   const { printed, threw } = await typed(t, ['up', '1'], e);
   assert.equal(threw, STOP);
   assert.equal(e.passes, byPass.length + 1, 'every pass ran');
@@ -674,7 +680,7 @@ test('`nemia tick` says every move its one pass refused', async (t) => {
   clear();
   const stuck: RefusedMove = { taskId: 't-stuck', state: 'submitted', event: 'READY' };
   const e = engineOf();
-  e.tick = async () => pass({ tasks: 1, refused: [stuck, stuck] });
+  e.setTick(async () => pass({ tasks: 1, refused: [stuck, stuck] }));
   const { printed, threw } = await typed(t, ['tick'], e);
   assert.equal(threw, undefined);
   assert.deepEqual(
@@ -689,11 +695,11 @@ test('`nemia up` says a task the runtime left out once while it lasts, and again
   const feed = 'the feed (/store/feed.jsonl), entry 3 read from cursor 148 is no event this runtime writes';
   const byPass = [[bad], [bad, feed], [bad], [], [bad]];
   const e = engineOf();
-  e.tick = async () => {
+  e.setTick(async () => {
     e.passes++;
     if (e.passes > byPass.length) throw STOP;
     return pass({ tasks: 2, unreadable: byPass[e.passes - 1] });
-  };
+  });
   const errors: string[] = [];
   t.mock.method(console, 'error', (...args: unknown[]) => {
     errors.push(args.map(String).join(' '));
@@ -711,7 +717,7 @@ test('`nemia up` says a task the runtime left out once while it lasts, and again
     'stamped as the daemon stamps every line',
   );
   errors.length = 0;
-  e.tick = async () => pass({ tasks: 2, unreadable: [bad, feed] });
+  e.setTick(async () => pass({ tasks: 2, unreadable: [bad, feed] }));
   assert.equal((await typed(t, ['tick'], e)).threw, undefined);
   assert.deepEqual(errors, [`left out: ${bad}`, `left out: ${feed}`]);
 });
@@ -825,8 +831,9 @@ test('`up` as the api takes the store as the api, writes where it serves once it
     assert.equal(read().url, undefined, 'no url before it listens');
     assert.equal(holdUrl('http://127.0.0.1:8787'), true);
   });
-  const threw = await Effect.runPromise(
-    Effect.scoped(up(e, { every: 10, repo: ROOT, holder: 'api', onTaken: () => listening })).pipe(Effect.flip),
+  const threw = await Effect.runPromise(Effect.scoped(up(e, { every: 10, repo: ROOT, holder: 'api', onTaken: () => listening }))).then(
+    () => assert.fail('the daemon returned'),
+    (err: unknown) => err,
   );
   assert.equal(threw, STOP);
   assert.deepEqual(

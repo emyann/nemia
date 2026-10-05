@@ -5,7 +5,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { AGENTS_CUSTOM, HOME, PRUNE, pruneLines, pruningBytes, RM, runStore, sizeOf, type Args, type Pruning } from '../runner.ts';
+import { AGENTS_CUSTOM, HOME, PRUNE, pruneLines, pruningBytes, RM, runStore, runWith, sizeOf, type Args, type Pruning } from '../runner.ts';
 import { HELP, usage, confirmed, type Engine } from './flags.ts';
 
 /** The runs a command line named, in the order given, each once (`RM`'s and `PRUNE`'s many positional). */
@@ -17,7 +17,7 @@ const idsOf = (args: Args): readonly string[] => (Array.isArray(args.runId) ? ar
  */
 async function rmOne(e: Engine, id: string, args: Args): Promise<{ kept: boolean; failed: boolean }> {
   try {
-    const data = await RM.handler(e, { ...args, runId: id });
+    const data = await runWith(e, RM.handler({ ...args, runId: id }));
     for (const line of RM.print(data, args)) console.log(line);
     return { kept: data.forgot.kind === 'refused' || data.forgot.kind === 'held', failed: false };
   } catch (err) {
@@ -78,7 +78,7 @@ async function judged(e: Engine, ids: readonly string[], args: Args, tally: Prun
   const found: Pruning[] = [];
   for (const id of ids) {
     try {
-      found.push((await PRUNE.handler(e, { ...args, runId: id, yes: false })).pruning);
+      found.push((await runWith(e, PRUNE.handler({ ...args, runId: id, yes: false }))).pruning);
     } catch (err) {
       notPrunedLine(id, err, tally);
     }
@@ -105,7 +105,7 @@ function printFound(found: Pruning[], named: boolean, tally: PruneTally): void {
 async function prunedAll(e: Engine, prunable: Pruning[], args: Args, tally: PruneTally): Promise<void> {
   for (const p of prunable) {
     try {
-      const data = await PRUNE.handler(e, { ...args, runId: p.id, yes: true });
+      const data = await runWith(e, PRUNE.handler({ ...args, runId: p.id, yes: true }));
       const done = data.pruning;
       for (const line of PRUNE.print(data, args)) console.log(line);
       if (done.kind === 'refused' || done.left.length) tally.notPruned.push(p.id);
@@ -172,6 +172,6 @@ function wordsFrom(file: string): string {
 export async function agentsCustomRun(args: Args, e: Engine): Promise<void> {
   const file = typeof args.file === 'string' ? args.file : undefined;
   const asked: Args = file === undefined ? args : { ...args, words: wordsFrom(file) };
-  const data = await AGENTS_CUSTOM.handler(e, asked, undefined, HOME);
+  const data = await runWith(e, AGENTS_CUSTOM.handler(asked, undefined, HOME));
   for (const line of AGENTS_CUSTOM.print(data, asked)) console.log(line);
 }

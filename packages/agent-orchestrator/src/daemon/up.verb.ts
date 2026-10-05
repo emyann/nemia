@@ -4,9 +4,9 @@
  * `runMain` runs either as the process's command, a signal letting go of the lease before the process exits.
  */
 import { Cause, Effect, Exit, Fiber, type Scope } from 'effect';
-import type { Engine } from '../runtime-client.ts';
+import { over, type Engine } from '../runtime-client.ts';
 import { HOME } from '../record/record.store.ts';
-import { tick, type Pass } from '../tick/tick.verb.ts';
+import { tickRun, type Pass } from '../tick/tick.verb.ts';
 import { beat, heldUrl, passed, releaseStore, stillHeld, takeStore, type TakenStore } from './daemon.store.ts';
 import { takenFromLine, type HolderKind } from './daemon.ts';
 
@@ -40,7 +40,7 @@ export const up = (e: Engine, { every, repo, holder, onTaken, onPass }: UpOption
     for (;;) {
       const by = stillHeld(taken.held);
       if (by) return yield* Effect.fail(new Error(takenFromLine(by, HOME, holder)));
-      const pass = yield* Effect.tryPromise({ try: () => tick(e, { repo }), catch: (err) => err });
+      const pass = yield* tickRun({ repo }).pipe(over(e));
       passed(taken.held);
       onPass?.(pass);
       yield* Effect.sleep(every);

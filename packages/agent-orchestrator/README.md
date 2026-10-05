@@ -3229,22 +3229,22 @@ holding a concurrency slot forever.
 | `src/inbox/inbox.store.ts` | the inbox's cards read, filed, queued, dropped (`readInbox`, `addToInbox`, `queueInInbox`, `dropFromInbox`) through `runStore.inbox`, and a path named as a card (`inboxNameAt`) |
 | `src/factory/factory.store.ts` | the factories on disk (`factoriesDir`): read, a file that does not decode listed with why (`readFactories`), one read for a start (`readFactory`), filed through a hidden file linked onto its name (`addFactory`), given workflows and relieved of them, hired into and fired from, the file rewritten whole (`attachWorkflow`, `detachWorkflow`, `hireAgent`, `fireAgent`), removed (`removeFactory`) |
 | `src/runtime-client.ts` | the runtime client, the one file that imports agent-runtime: the engine (`engine`, over the runtime's `Engine` service as a layer; `engineOf` over any such layer, as `test/engine-board.ts` gives one), which files every task `queued` and is built with no ceiling, the harnesses it runs (`HARNESSES`), `nameFor`, the lifecycle as data the board draws (`lifecycleGraph`), and the runtime's types, passed through |
-| `src/views/views.verb.ts` | the programs `taskPhasesRead`, `checkReportsRead`, `refusalRead`, `parentRead`, `parentsRead` and `filingsRead`, and `taskPhases`, `checkReports`, `refusalOf`, `parentOf`, `parentsOf` and `readFilings`, their plain faces; what the engine's views of a run's tasks say: whether its closeout was asked and signed (`closeoutAsked`), its check's exit (`exitVerdicts`), what it consumed (`consumption`), its closeout (`closeoutOf`), a parent run (`parentOf`), and when each task was filed (`readFilings`) — what a consumer that words a step as `wf ls` does uses off the views it already has, with no `logs` call |
+| `src/views/views.verb.ts` | the programs `taskPhasesRead`, `checkReportsRead`, `refusalRead`, `parentRead`, `parentsRead` and `filingsRead`; what the engine's views of a run's tasks say: whether its closeout was asked and signed (`closeoutAsked`), its check's exit (`exitVerdicts`), what it consumed (`consumption`), its closeout (`closeoutOf`), a parent run (`parentRead`), and when each task was filed (`filingsRead`) — what a consumer that words a step as `wf ls` does uses off the views it already has, with no `logs` call |
 | `src/views/views-words.ts` | a step's phase off its view (`phaseOfView`), and the words `wf ls` and `wf decide` say of how its session ended (`endWords`, `wordOfView`) — pure |
-| `src/start/start.verb.ts` | a run started (`wf start`), refused before a byte is written: the program `startRun`, and `start`, its plain face |
+| `src/start/start.verb.ts` | a run started (`wf start`), refused before a byte is written: the program `startRun` |
 | `src/plan/plan.verb.ts` | a plan's cards started (`startPlan`) |
 | `src/inbox/inbox.verb.ts` | an inbox card started (`startFromInbox`), and a queued card started by the tick (`startQueued`) |
-| `src/tick/tick.verb.ts` | a pass over every run: the engine's pass and the queued tasks it reported admitted, then started runs and the rest admitted oldest first: the program `tickRun`, and `tick`, its plain face; and the memo of runs at rest (`RestMemo`) |
-| `src/tick/advance.verb.ts` | a pass over one run (`advance`), which writes its record, and what a pass filed and never wrote down, adopted |
+| `src/tick/tick.verb.ts` | a pass over every run: the engine's pass and the queued tasks it reported admitted, then started runs and the rest admitted oldest first: the program `tickRun`; and the memo of runs at rest (`RestMemo`) |
+| `src/tick/advance.verb.ts` | a pass over one run (`advanceRun`), which writes its record, and what a pass filed and never wrote down, adopted |
 | `src/tick/file.verb.ts` | what a pass files a step with: the first steps given their parents' closeouts (`parentCloseouts`), and the step as it is told (`toldOf`) |
 | `src/ending/ending.verb.ts` | the repository's own checkout, held for one run's ending at a time (`checkoutHold`), and an ending's staged merge committed or aborted on its check (`landEnding`) |
 | `src/cap/cap.verb.ts` | the runs the cap on runs in flight holds between passes (`runSlots`) |
 | `src/meter/meter.verb.ts` | the engine metered, each verb counted in its phase (`meteredEngine`), and a pass's cost (`costOf`) |
-| `src/cancel/cancel.verb.ts`, `src/retry/retry.verb.ts`, `src/gate/gate.verb.ts`, `src/say/say.verb.ts`, `src/wait/wait.verb.ts`, `src/round/round.verb.ts` | what a person asks of a run: the programs `cancelRun`, `retryRun`, `approveRun`, `sayRun`, `roundRun` and `acceptRun`, and `cancel`, `retry`, `approve`, `say`, `round` and `accept`, their plain faces; `hold` and `unhold` |
-| `src/forget/forget.verb.ts` | a run forgotten (`wf rm`): the program `forgetRun`, and `forget`, its plain face |
+| `src/cancel/cancel.verb.ts`, `src/retry/retry.verb.ts`, `src/gate/gate.verb.ts`, `src/say/say.verb.ts`, `src/wait/wait.verb.ts`, `src/round/round.verb.ts` | what a person asks of a run: the programs `cancelRun`, `retryRun`, `approveRun`, `sayRun`, `roundRun` and `acceptRun`; `hold` and `unhold` |
+| `src/forget/forget.verb.ts` | a run forgotten (`wf rm`): the program `forgetRun` |
 | `src/prune/prune.verb.ts` | a finished run's worktrees pruned (`prune`, `wf prune`) |
 | `src/list/list.verb.ts` | what a person reads of the runs: `wf ls` (`list`) |
-| `src/decide/decide.verb.ts` | what a person reads of a run: `wf decide` (`decide`) |
+| `src/decide/decide.verb.ts` | what a person reads of a run: `wf decide` (`decideRun`) |
 | `src/runner.ts` | the package's root: each name it exports re-exported by name from the file that holds it, and nothing else |
 | `src/meter/meter.ts` | what a pass costs — pure: its phases (`PHASES`), its cost composed (`passCost`) and read off disk (`parsePassCost`), the passes of an interval (`addPass`, `summaryDue`), and the line `wf up` says once a minute and the breakdown `--stats` prints (`summaryLine`, `breakdownLines`) |
 | `src/feed/feed.ts` | the feed of what the tick judged — pure: the line, the fold of the lines and what a pass owes it (`foldFeed`, `feedChanges`), a line in words (`feedLineWords`), and a run's steps as the feed says them (`feedWords`); the file is `src/feed/feed.store.ts`'s |
@@ -3256,9 +3256,9 @@ holding a concurrency slot forever.
 | `src/cli/decide/decide.ts` | `wf decide`: its help, its one flag, and the screen it prints (`decideVerb`) |
 | `src/cli/exit.ts` | what `nemia` exits with (`exitCodeOf`), imported by each bin, `bin/nemia.ts` and its alias `bin/wf.ts`, before the package |
 
-The package's contract is its `exports`: `agent-orchestrator` (`src/runner.ts`), `agent-orchestrator/run` (`src/run.ts`),
-`agent-orchestrator/workflow` (`src/workflow.ts`) and `agent-orchestrator/effect` (`src/effect.ts`, the refusals by kind, which
-the api answers by kind: `Missing` 404, `Conflict` 409, `Invalid` 422). Since 2026-09-23 `./workflow` is the format alone, pure, and what reads a
+The package's contract is its `exports`: `agent-orchestrator` (`src/runner.ts`), `agent-orchestrator/run` (`src/run.ts`)
+and `agent-orchestrator/workflow` (`src/workflow.ts`); the root exports the refusals by kind, which the api answers by kind:
+`Missing` 404, `Conflict` 409, `Invalid` 422. Since 2026-09-23 `./workflow` is the format alone, pure, and what reads a
 folder from disk — `loadWorkflows`, `loadAgents`, `agentUsers`, `agentVersion`, `workflowDescription`, `workflowFolder`,
 `workflowsIn` — is exported from `agent-orchestrator`, where the api's imports of them moved (`docs/architecture.md`).
 
@@ -3306,6 +3306,6 @@ files in one, no folder named `utils` or the like, no two files that need each o
 imports a test, and a folder's pure code imported from outside it through its face — its `index.ts`, or its one pure
 file. A test sits beside the file it tests (`src/<feature>/x.test.ts`), and `test/` keeps the tests of the top-level
 files and those across folders. Outside the package, the apps reach it through `agent-orchestrator`,
-`agent-orchestrator/run`, `agent-orchestrator/workflow` and `agent-orchestrator/effect` alone (`test/contract.test.ts`), whose names
+`agent-orchestrator/run` and `agent-orchestrator/workflow` alone (`test/contract.test.ts`), whose names
 `test/entries.test.ts` pins.
 `docs/architecture.md`, at the repository's root, states the four rules and the layers they hold.

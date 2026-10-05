@@ -3,6 +3,7 @@
  * the workflow from where it is typed, the api's route from its body, and each hands the same handler what it found. A plan is the command
  * line's alone, run by its runner.
  */
+import { Effect } from 'effect';
 import { leftOut, type Args, type Flag, type Spec } from '../command/command.ts';
 import type { Command, Ran } from '../command/entry.verb.ts';
 import { endingSteps } from '../ending/ending.ts';
@@ -14,7 +15,7 @@ import { isGitRun, type Run } from '../record/record.ts';
 import { inputsDir, stepsOf } from '../record/record.store.ts';
 import { approvedFirst, gatesOf } from '../status/status.ts';
 import { fromNote } from './inputs.ts';
-import { leftOutMounts, start } from './start.verb.ts';
+import { leftOutMounts, startRun } from './start.verb.ts';
 import { pausedRead } from '../list/list.verb.ts';
 import { pausedWords, type Paused } from '../pause/pause.ts';
 
@@ -203,12 +204,12 @@ function startedLines(started: Started): string[] {
 }
 
 /** An inbox card's start, off the handler's arguments (`START`). */
-function cardStart(card: string, args: Args): Started {
+const cardStart = Effect.fnUntraced(function* (card: string, args: Args) {
   const brief = textOf(args, 'instead');
   const workflow = textOf(args, 'workflows');
   const repo = textOf(args, 'repo');
   const factory = textOf(args, 'factory');
-  const started = startFromInbox({
+  const started = yield* startFromInbox({
     name: card,
     ...(brief !== undefined ? { brief } : {}),
     ...(workflow !== undefined ? { workflow } : {}),
@@ -228,8 +229,8 @@ function cardStart(card: string, args: Args): Started {
     removed: started.removed,
     ...(started.removed ? {} : { why: started.why }),
     ...(started.ignoredRepo !== undefined ? { ignoredRepo: started.ignoredRepo } : {}),
-  };
-}
+  } satisfies Started;
+});
 
 /**
  * `nemia start`: a run of a brief, or of an inbox card. Its handler is handed what its caller found: under `card`, an inbox card's name,
@@ -276,20 +277,20 @@ export const START: Command<Started> = {
     status: 201,
     hand: 'its body names a workflow by `from` and name, or an inbox card by name, which the api finds among the folders a start finds one in, in the factory the request is served in: never a path sent',
   },
-  async handler(e, args) {
-    const started = startOf(args);
-    const paused = await pausedRead(e);
+  handler: Effect.fnUntraced(function* (args: Args) {
+    const started = yield* startOf(args);
+    const paused = yield* pausedRead();
     return paused.pause ? { ...started, paused } : started;
-  },
+  }),
   print: startedLines,
 };
 
 /** A run of a brief, or of an inbox card under `card`, started off the handler's arguments (`START`). */
-function startOf(args: Args): Started {
+const startOf = Effect.fnUntraced(function* (args: Args) {
   const card = textOf(args, 'card');
-  if (card !== undefined) return cardStart(card, args);
+  if (card !== undefined) return yield* cardStart(card, args);
   const factory = textOf(args, 'factory');
-  const run = start({
+  const run = yield* startRun({
     brief: textOf(args, 'brief') ?? '',
     repo: textOf(args, 'repo') ?? '.',
     repoNamed: args.repoNamed === true,
@@ -300,8 +301,8 @@ function startOf(args: Args): Started {
     gates: listOf(args, 'gates'),
     ...(factory !== undefined ? { factory } : {}),
   });
-  return { id: run.id, run };
-}
+  return { id: run.id, run } satisfies Started;
+});
 
 /** The flags of `nemia start` that `nemia plan` refuses, each with why the folder says it instead. */
 const PLAN_REFUSES: Readonly<Record<string, string>> = {

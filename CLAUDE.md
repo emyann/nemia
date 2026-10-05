@@ -75,8 +75,9 @@ holds what every change needs.
   candidate to move, is in `docs/architecture.md`, *Who owns what*.
 - **Four rules hold the layers, each a test** (`docs/architecture.md`):
   - *Between packages, only the public contract*: `agent-runtime`, `agent-runtime/effect` and `agent-runtime/vocabulary`; `agent-orchestrator`,
-    `agent-orchestrator/run`, `agent-orchestrator/workflow` and `agent-orchestrator/effect` — never a subpath outside `exports`, a
-    relative path, `import.meta.resolve` or a path into `src/` (the two `contract.test.ts`).
+    `agent-orchestrator/run` and `agent-orchestrator/workflow` — never a subpath outside `exports`, a
+    relative path, `import.meta.resolve` or a path into `src/` (the two `contract.test.ts`). The packages' entries are Effect, and the api is the system's
+    public interface.
   - *Inside the orchestrator, every file is pure, store, controller or the client* (`PURE`, `STORE`, `CONTROLLER`, `CLIENT` in
     `packages/agent-orchestrator/test/boundary.test.ts`); a new file joins one kind, or the suite fails.
   - *The runtime is reached through one client*, `src/runtime-client.ts` (`CLIENT` in the same test): its behaviour through the client,

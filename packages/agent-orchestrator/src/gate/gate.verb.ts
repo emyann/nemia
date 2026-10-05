@@ -1,17 +1,17 @@
 /**
  * `nemia approve`: approve a step waiting at its gate, by writing the person's approval and nothing else, refused before anything is
  * written. A controller, reaching the runtime through the client (`runtime-client.ts`): an Effect program that requires the engine as a
- * service (`approveRun`, over `EngineService`), and `approve`, its plain face in a Promise, over the engine it is handed.
+ * service (`approveRun`, over `EngineService`), run by a caller with `runWith`.
  */
 import { Effect } from 'effect';
-import { EngineService, awaited, tried, type Engine } from '../runtime-client.ts';
+import { tried } from '../runtime-client.ts';
 import { tryOf, type Approval, type Run } from '../record/record.ts';
 import { approvedFirst } from '../status/status.ts';
 import { approvalRefusal } from './gate.ts';
 import { stepsOf } from '../record/record.store.ts';
 import { runStore } from '../record/files.store.ts';
 import { standingsOf } from '../branches/branches.store.ts';
-import { closeoutAsked, closeoutReader, exitVerdicts, spendReader, taskPhases } from '../views/views.verb.ts';
+import { closeoutAsked, closeoutReader, exitVerdicts, spendReader, taskPhasesRead } from '../views/views.verb.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
 
 /** What `nemia approve` did: the run, the approval as written, and its file. */
@@ -30,10 +30,9 @@ export type Approved = { run: Run; approval: Approval; file: string };
  * write is refused as the look would have refused it, and a file at the approval's name that is not one is named, with how to clear it.
  *
  * Sending back is not this verb's: `nemia retry <run> <step> --message "<objection>"` — the try it files is one this approval does not
- * name. Fails with a refusal, the verb's or one a read threw; dies of anything else (`tried`, `awaited`).
+ * name. Fails with a refusal, the verb's or one a read threw; dies of anything else (`tried`).
  */
 export const approveRun = Effect.fn('approve')(function* (id: string, stepName: string, message?: string) {
-  const e = yield* EngineService;
   if (!(yield* tried(() => runStore.runs.exists(id))))
     return yield* Effect.fail(
       new Missing({
@@ -42,7 +41,7 @@ export const approveRun = Effect.fn('approve')(function* (id: string, stepName: 
     );
   const run = yield* tried(() => runStore.runs.read(id));
   const steps = yield* tried(() => stepsOf(run));
-  const { views, phaseOf } = yield* awaited(() => taskPhases(e, run));
+  const { views, phaseOf } = yield* taskPhasesRead(run);
   const standings = yield* tried(() => (steps.some((s) => s.name === stepName && approvedFirst(s, run)) ? standingsOf(run) : []));
   const refusal = (now: Run) =>
     approvalRefusal(
@@ -81,10 +80,3 @@ export const approveRun = Effect.fn('approve')(function* (id: string, stepName: 
   }
   return { run, approval, file } satisfies Approved;
 });
-
-/**
- * `nemia approve` (`approveRun`) in a Promise, over `e`: what the CLI, the api and the tests call. Rejects with the refusal the program
- * failed with, or with whatever else it died of, as it was thrown.
- */
-export const approve = (e: Engine, id: string, stepName: string, message?: string): Promise<Approved> =>
-  Effect.runPromise(approveRun(id, stepName, message).pipe(Effect.provide(EngineService.layer(e))));

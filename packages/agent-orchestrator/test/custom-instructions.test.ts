@@ -16,10 +16,11 @@ import { briefBody, renderedFlags, renderedPrompt, rendersAgent, unrendered } fr
 import { FrozenStepSchema, loadWorkflows } from '../src/folder/folder.store.ts';
 import { scratch } from './scratch.ts';
 import { teamCopy } from './team.ts';
+import { Effect } from 'effect';
 
 const ROOT = scratch('wf-custom-');
 process.env.WF_ROOT = ROOT;
-const { start } = await import('../src/runner.ts');
+const { startRun } = await import('../src/runner.ts');
 const { readRun } = await import('../src/record/record.store.ts');
 const { agentFilesDir } = await import('../src/agents/agents.store.ts');
 const { clearCustomInstructions, writeCustomInstructions } = await import('../src/agents/custom.store.ts');
@@ -128,12 +129,12 @@ test("a load from the store gives each step its agent's custom instructions, rea
   }
 });
 
-test('`nemia start` freezes the custom instructions with the step: an edit or a removal after it reaches only a later run', () => {
+test('`nemia start` freezes the custom instructions with the step: an edit or a removal after it reaches only a later run', async () => {
   const team = teamCopy('wf-custom-freeze-');
   const repo = aRepo();
   customFor('implementer', 'Before: French.\n');
   try {
-    const run = start({ brief: 'freeze the words', repo, workflowDir: path.join(team, 'dev') });
+    const run = await Effect.runPromise(startRun({ brief: 'freeze the words', repo, workflowDir: path.join(team, 'dev') }));
     customFor('implementer', 'After: German.\n');
     const frozen = () => (readRun(run.id).workflow ?? []).find((s) => s.name === 'implement')!;
     const prompt = () => fs.readFileSync(path.join(agentFilesDir(run, 'implement'), 'prompt.md'), 'utf8');
@@ -144,7 +145,7 @@ test('`nemia start` freezes the custom instructions with the step: an edit or a 
       fs.rmSync(CUSTOM, { recursive: true, force: true });
     }
     customFor('implementer', 'After: German.\n');
-    const later = start({ brief: 'the later words', repo, workflowDir: path.join(team, 'dev') });
+    const later = await Effect.runPromise(startRun({ brief: 'the later words', repo, workflowDir: path.join(team, 'dev') }));
     const step = (readRun(later.id).workflow ?? []).find((s) => s.name === 'implement')!;
     assert.equal(step.agent?.customInstructions, 'After: German.');
     assert.ok(fs.readFileSync(path.join(agentFilesDir(later, 'implement'), 'prompt.md'), 'utf8').includes('After: German.'));
@@ -153,7 +154,7 @@ test('`nemia start` freezes the custom instructions with the step: an edit or a 
   }
 });
 
-test('REFUSED at shipped defaults: custom instructions with a frontmatter block, or a link, stop a start of a step naming the agent; one naming another starts', () => {
+test('REFUSED at shipped defaults: custom instructions with a frontmatter block, or a link, stop a start of a step naming the agent; one naming another starts', async () => {
   const team = teamCopy('wf-custom-refused-');
   const solo = path.join(team, 'solo');
   fs.mkdirSync(solo);
@@ -177,8 +178,8 @@ test('REFUSED at shipped defaults: custom instructions with a frontmatter block,
     for (const [what, plant, said] of refusals) {
       plant();
       const before = runsIn();
-      assert.throws(
-        () => start({ brief: what, repo, workflowDir: path.join(team, 'dev') }),
+      await assert.rejects(
+        async () => await Effect.runPromise(startRun({ brief: what, repo, workflowDir: path.join(team, 'dev') })),
         (err: Error & { exitCode?: number }) => {
           assert.match(err.message, said, what);
           assert.ok(err.message.includes(path.join(CUSTOM, 'implementer.md')), `${what}: names the file: ${err.message}`);
@@ -187,7 +188,7 @@ test('REFUSED at shipped defaults: custom instructions with a frontmatter block,
         },
       );
       assert.equal(runsIn(), before, `${what}: nothing started`);
-      const other = start({ brief: `${what}, another agent`, repo, workflowDir: solo });
+      const other = await Effect.runPromise(startRun({ brief: `${what}, another agent`, repo, workflowDir: solo }));
       assert.equal((readRun(other.id).workflow ?? [])[0]?.agent?.name, 'reviewer', what);
       fs.rmSync(CUSTOM, { recursive: true, force: true });
     }

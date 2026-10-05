@@ -13,13 +13,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { a2aServer, type Answer } from './a2a-server.ts';
 import { scratch } from './scratch.ts';
+import { Effect } from 'effect';
 
 const ROOT = scratch('wf-remote-step-');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 delete process.env.WF_MAX_CONCURRENT;
-const { engine, tick } = await import('../src/runner.ts');
+const { engine, tickRun, runWith } = await import('../src/runner.ts');
 const { readRun } = await import('../src/record/record.store.ts');
 const { main } = await import('../src/cli/main.ts');
 
@@ -73,15 +74,15 @@ async function started(dir: string): Promise<string> {
 async function settle(e: Engine, id: string): Promise<void> {
   const until = Date.now() + 60_000;
   while (Date.now() < until) {
-    await tick(e, { repo: ROOT });
-    if ((await e.view(`${id}-ask`)).state.settled) {
-      await tick(e, { repo: ROOT });
-      await tick(e, { repo: ROOT });
+    await runWith(e, tickRun({ repo: ROOT }));
+    if ((await Effect.runPromise(e.view(`${id}-ask`))).state.settled) {
+      await runWith(e, tickRun({ repo: ROOT }));
+      await runWith(e, tickRun({ repo: ROOT }));
       return;
     }
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
-  assert.fail(`${id}-ask did not settle: ${JSON.stringify(await e.view(`${id}-ask`))}`);
+  assert.fail(`${id}-ask did not settle: ${JSON.stringify(await Effect.runPromise(e.view(`${id}-ask`)))}`);
 }
 
 /** An agent that asks for a bearer secret, declared as `name`, answering each message with `answer`; and its run, settled. */
@@ -114,7 +115,7 @@ test('a step on a remote agent is sent its brief, with the secret its card asks 
     'the secret went in the header its card asks for',
   );
 
-  const view = await e.view(`${id}-ask`);
+  const view = await Effect.runPromise(e.view(`${id}-ask`));
   assert.equal(view.phase, 'succeeded');
   const run = readRun(id);
   assert.ok(run.steps.ask?.taskId, 'filed');
@@ -143,7 +144,7 @@ test('a data part on the Task the agent completes is its closeout: `blocked` the
 test('a secret not given sends nothing, and the step fails naming the variable to set', async () => {
   const { server, id, e, decided } = await remoteRun('critic', { text: 'never sent' }, undefined);
   assert.equal(server.sent.length, 0, 'no message went out without its secret');
-  const view = await e.view(`${id}-ask`);
+  const view = await Effect.runPromise(e.view(`${id}-ask`));
   assert.equal(view.phase, 'failed');
   const words = JSON.stringify(view.state.attempts) + decided.join('\n');
   assert.match(words, /set WF_A2A_CRITIC_TOKEN to the secret for the scheme `token` critic's card declares/);
@@ -163,12 +164,12 @@ test('a Task the agent leaves waiting on a question reads as waiting on you: nem
     const id = await started(team('asker-team', 'asker'));
     const e = engine();
     const until = Date.now() + 60_000;
-    while ((await e.view(`${id}-ask`)).phase !== 'needs-human') {
-      assert.ok(Date.now() < until, JSON.stringify(await e.view(`${id}-ask`)));
-      await tick(e, { repo: ROOT });
+    while ((await Effect.runPromise(e.view(`${id}-ask`))).phase !== 'needs-human') {
+      assert.ok(Date.now() < until, JSON.stringify(await Effect.runPromise(e.view(`${id}-ask`))));
+      await runWith(e, tickRun({ repo: ROOT }));
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
-    await tick(e, { repo: ROOT });
+    await runWith(e, tickRun({ repo: ROOT }));
     const listed = (await printed(['ls'], e)).join('\n');
     assert.match(listed, /^\s+ask\s+needs-human: waiting for an input\s*$/m, listed);
     const decided = (await printed(['decide', id], e)).join('\n');
@@ -185,7 +186,7 @@ test('a Task the agent leaves waiting on a question reads as waiting on you: nem
     await printed(['say', id, 'ask', 'Brest, please.'], e);
     await settle(e, id);
     assert.deepEqual(server.sent.slice(1), ['Brest, please.'], 'the answer went as a follow-up on the Task');
-    assert.equal((await e.view(`${id}-ask`)).phase, 'succeeded');
+    assert.equal((await Effect.runPromise(e.view(`${id}-ask`))).phase, 'succeeded');
     assert.match((await printed(['ls'], e)).join('\n'), /^\s+ask\s+unverified\s+· said to 1×\s*$/m);
   } finally {
     await server.close();

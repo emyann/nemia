@@ -19,6 +19,8 @@ import {
   noCardLine,
   startFromInbox,
   runStore,
+  runWith,
+  engine,
 } from 'agent-orchestrator';
 const repo = scratch('nemia-api-inbox-repo-');
 process.env.HKB_REPO = repo;
@@ -534,7 +536,10 @@ test('POST /api/runs with `card` starts the card through the package: the brief 
   clear();
   const { card } = addToInbox({ text: 'Show what a step cost\n\nOn the run page.', workflow: 'mine', repo });
   const other = addToInbox({ text: 'Another idea' });
-  const parent = startFromInbox({ name: other.card.name, callerRepo: repo, workflow: dev, brief: 'A run to wait on' });
+  const parent = await runWith(
+    engine(),
+    startFromInbox({ name: other.card.name, callerRepo: repo, workflow: dev, brief: 'A run to wait on' }),
+  );
   assert.equal(parent.removed, true);
 
   const res = await startCard({
@@ -630,9 +635,9 @@ test("GET /api/runs/:id says a run came from a card — the record's `from`, and
 });
 
 /** What `startFromInbox` refuses `name` with, asked as the route asks it. */
-const startRefusal = (name: string, extra: { brief?: string; after?: string[] } = {}): string => {
+const startRefusal = async (name: string, extra: { brief?: string; after?: string[] } = {}): Promise<string> => {
   try {
-    startFromInbox({ name, callerRepo: repo, workflow: dev, ...extra });
+    await runWith(engine(), startFromInbox({ name, callerRepo: repo, workflow: dev, ...extra }));
   } catch (err) {
     assert.equal((err as { exitCode?: unknown }).exitCode, 2);
     return (err as Error).message;
@@ -643,7 +648,7 @@ const startRefusal = (name: string, extra: { brief?: string; after?: string[] } 
 test("REFUSED at shipped defaults: a `card` that is not there is a 404 carrying the package's sentence word for word — and nothing is written", async () => {
   clear();
   const { card } = addToInbox({ text: 'The card that is there' });
-  const expected = startRefusal('no-such-card');
+  const expected = await startRefusal('no-such-card');
   assert.ok(expected.startsWith(`no card no-such-card in the inbox. Its cards are: ${card.name}.`), expected);
 
   const res = await startCard({ workflow: 'dev', card: 'no-such-card', brief: 'Do it.' });
@@ -653,7 +658,7 @@ test("REFUSED at shipped defaults: a `card` that is not there is a 404 carrying 
   assert.equal(withMd.status, 404);
   assert.equal(
     ((await withMd.json()) as Refused).error,
-    startRefusal(`${card.name}.md`),
+    await startRefusal(`${card.name}.md`),
     "given with its .md, as a path would name it: the package's sentence names the card without it",
   );
   assert.deepEqual(runFiles(), []);
@@ -671,18 +676,18 @@ test("REFUSED at shipped defaults: a card started already is a 409, a blank brie
   const again = await startCard({ workflow: 'dev', card: started.name, brief: 'Do it again.' });
   assert.equal(again.status, 409);
   const { error: startedError } = (await again.json()) as Refused;
-  assert.equal(startedError, startRefusal(started.name));
+  assert.equal(startedError, await startRefusal(started.name));
   assert.ok(startedError.includes('this card was started as started-once-k2q9'), startedError);
 
   for (const brief of ['', '  \n']) {
     const res = await startCard({ workflow: 'dev', card: card.name, brief });
     assert.equal(res.status, 422, JSON.stringify(brief));
-    assert.equal(((await res.json()) as Refused).error, startRefusal(card.name, { brief }));
+    assert.equal(((await res.json()) as Refused).error, await startRefusal(card.name, { brief }));
   }
 
   const broken = await startCard({ workflow: 'dev', card: 'broken', brief: 'Do it.' });
   assert.equal(broken.status, 422);
-  assert.equal(((await broken.json()) as Refused).error, startRefusal('broken'));
+  assert.equal(((await broken.json()) as Refused).error, await startRefusal('broken'));
 
   const waits = await startCard({ workflow: 'dev', card: card.name, brief: 'Wait for it.', after: ['no-such-run'] });
   assert.equal(waits.status, 422);
@@ -705,7 +710,7 @@ test("a card whose `repo:` is a folder a run cannot branch from — no git check
     const { card } = addToInbox({ text: 'Not a repository', repo: about });
     let failure: (Error & { exitCode?: unknown }) | undefined;
     try {
-      startFromInbox({ name: card.name, callerRepo: repo, workflow: dev });
+      await runWith(engine(), startFromInbox({ name: card.name, callerRepo: repo, workflow: dev }));
     } catch (err) {
       failure = err as Error & { exitCode?: unknown };
     }

@@ -333,9 +333,8 @@ Bring your own harness — three ways, in order of how much you have to write:
 | a `HarnessSpec` | any CLI that runs a prompt and exits — a command and an exit code |
 | a `PromiseRunner` | four async methods, and five optional ones, `find`, `output`, `release`, `transcript` and `say`, for anything else at all |
 
-**`src/cli/main.ts` builds its engine with `promiseEngine(Engine.layer(…))`, and imports types and plain helpers, through the
-two faces alone.** That is deliberate and it is the test: if the Promise API were not enough to write the CLI with, it would
-not be enough for anyone. `grep "from 'effect'" src/cli/main.ts` returns nothing, and a test says so.
+**`src/cli/main.ts` builds its engine from `Engine.layer(…)` once and runs each verb as an Effect**, a refusal worded by the runtime's
+`refusalWords` — exit code 2, the message led by the verb — through the entries alone.
 
 The Effect API is still there under `agent-runtime/effect` — `Layer` composition, typed error
 channels, the lot. Keep your `effect` version aligned with this package's if you use it: Context
@@ -2036,6 +2035,7 @@ of pure code sits beside it.
 | `src/service/engine.ts` | the engine as an Effect service, `Engine`: `Engine.layer(options)` assembles each harness behind its A2A agent, the store and the memo, and its verbs are Effects that fail with tagged errors (`ListRefused`, `TranscriptRefused`, `SayRefused`, `SayUnsent`, and the core's) |
 | `src/service/output.ts` | the engine's `output` verb, `outputVerbOf`, and `OutputRefused`: one stream of a task's latest attempt, kept whole by its harness |
 | `src/service/harnesses.ts` | `DEFAULT_HARNESSES`, the harnesses an engine runs when its options name none, and `configRefusal`, what they refuse of a task's configuration, exported for the layers above to ask before they file |
+| `src/service/refusal.ts` | `refusalWords`: a verb's refusal in words — an `Error` led by the verb whose `exitCode` is 2 — for a caller that answers with a sentence and an exit code: `ae` and the orchestrator |
 | `src/service/index.ts` | the face of `service/`, as the doors take it |
 | `src/facade/engine.ts` | `promiseEngine`: an `Engine` layer built once and each verb run as a Promise, a refusal an `Error` whose `exitCode` is 2: the Promise engine a consumer builds as `promiseEngine(Engine.layer(options))` |
 | `src/facade/promise.ts` | a harness a consumer wrote in Promises (`PromiseRunner`), as the engine's verbs: an adapter like the others, reached through the A2A seam |

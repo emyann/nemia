@@ -1,6 +1,6 @@
 ---
 name: effect
-description: "Any change to a file that imports from effect — a service, a layer, a verb, a schema at a boundary, a stream, a fiber, a schedule, a log or a metric — and the design or review of one: load it before reading, writing or judging such a file. How this repository writes Effect 4: read the docs installed with it first, reach for Effect's own primitives before writing one by hand, leave the Effect 3 names it no longer has, and keep our services, layers, Effect.fn verbs, tagged errors and plain faces, each where the runtime shows it."
+description: "Any change to a file that imports from effect — a service, a layer, a verb, a schema at a boundary, a stream, a fiber, a schedule, a log or a metric — and the design or review of one: load it before reading, writing or judging such a file. How this repository writes Effect 4: read the docs installed with it first, reach for Effect's own primitives before writing one by hand, leave the Effect 3 names it no longer has, and keep our services, layers, Effect.fn verbs, tagged errors and programs, each where the runtime shows it."
 applies: ["packages/agent-runtime/src/**", "packages/agent-orchestrator/src/**/*.store.ts", "packages/agent-orchestrator/src/**/*.verb.ts", "packages/agent-orchestrator/src/runtime-client.ts", "packages/agent-orchestrator/src/cli/**", "apps/api/src/**", "apps/web/src/lib/api/**"]
 ---
 
@@ -97,7 +97,7 @@ version, and the version above must be the pin. An upgrade re-measures the table
   `Data.TaggedError` imported from `effect/Data`, never from `effect`, and carries `exitCode: 2` as every refusal here does
   (the root `CLAUDE.md`, *Errors say what to do next*): `Missing`, `Conflict` and `Invalid` in
   `packages/agent-orchestrator/src/refusal/refusal.ts`, thrown as `new Invalid({ message })`, and exported to the api by
-  `agent-orchestrator/effect`, which loads `effect/Data` alone. `effect/Data` loads 14 modules; the
+  `agent-orchestrator`. `effect/Data` loads 14 modules; the
   barrel loads 203, about 100 ms, on every consumer of `agent-orchestrator/run` and `agent-orchestrator/workflow`, whose modules
   `packages/agent-orchestrator/test/refusal.test.ts` pins.
 
@@ -131,25 +131,25 @@ version, and the version above must be the pin. An upgrade re-measures the table
   and the routes catch what they word themselves. `runPromise` rejects with the failure itself, so a refusal reaches `app.onError`
   as the instance it was.
 
-## Plain faces
+## Programs
 
-- Consumers never adopt Effect. `agent-runtime` gives the Promise engine's types and plain helpers; the engine a consumer uses
-  in Promises is `promiseEngine(Engine.layer(options))` from `agent-runtime/effect`: `promiseEngine` in `src/facade/engine.ts`
-  builds the layer once and runs each verb with `Effect.runPromise`, a tagged refusal turned into a plain `Error`. There is no
-  `createEngine`.
-- `agent-runtime/effect` (`src/index.ts`) is the one door that hands out Effect values, and it does not export `decide`.
+- The packages' entries are Effect, and the api is the system's public interface. A caller of the runtime builds its engine once from
+  `Engine.layer(options)` (`agent-runtime/effect`) and runs each verb as an Effect: `ae` (`packages/agent-runtime/src/cli/main.ts`)
+  and the orchestrator's client (`engineOf` in `packages/agent-orchestrator/src/runtime-client.ts`). A refusal a caller answers with
+  a sentence and an exit code is worded by `refusalWords` (`src/service/refusal.ts`): an `Error` led by the verb whose `exitCode` is 2.
+  `promiseEngine` (`src/facade/engine.ts`) is left only to the runtime's own tests.
+- `agent-runtime/effect` (`src/index.ts`) is the door that hands out Effect values, and it does not export `decide`.
 - Stores and pure files stay plain TypeScript: `decide` in `src/core/domain.ts` imports no Effect.
-- A controller's program is an `Effect.fn` that requires the Promise engine as a service (`EngineService`) and lifts each read
-  with `tried` or `awaited` (`packages/agent-orchestrator/src/runtime-client.ts`): it fails with a `Refusal` and dies of anything
-  else. Its plain face runs it with `Effect.runPromise` over the engine it is handed, and rejects with either as it was thrown:
-  `decideRun` and `decide`, `forgetRun` and `forget`, and the verbs a person asks of a run (`roundRun` and `round`, `acceptRun`,
-  `retryRun`, `approveRun`, `sayRun`, `cancelRun`), and the views' reads (`taskPhasesRead` and `taskPhases`, `checkReportsRead`,
-  `refusalRead`, `parentRead` and `parentOf`, `parentsRead`, `filingsRead` and `readFilings`), and the tick (`tickRun` and
-  `tick`), whose pass is metered through `meteredPass` over the module-global meter. An engine refusal is mapped in one place:
-  `toldBy` in `say.verb.ts` turns the runtime's exit-code-2 error into a `Conflict`, which `awaited` alone would make a defect.
-- A controller that reads no engine requires nothing: `startRun`, whose plain face `start` runs it with `Effect.runSync` and
-  throws either as it was thrown (`runSync` throws the first failure, else the first defect, itself). Its face stays synchronous,
-  so a read it lifts must be too.
+- A controller is an `Effect.fn` program that requires the engine as a service (`EngineService`): it reads the engine with `asked`,
+  which dies of a runtime refusal in the runtime's words, and lifts every other read with `tried` or `awaited`, failing with a
+  `Refusal` and dying of anything else. Its caller runs it with `runWith(e, program)` over the engine it built once — the CLI, the
+  daemon, the api's handlers and the tests — and the Promise rejects with the refusal or the defect as it was thrown: `decideRun`,
+  `forgetRun`, the verbs a person asks of a run (`roundRun`, `acceptRun`, `retryRun`, `approveRun`, `sayRun`, `cancelRun`), the
+  views' reads (`taskPhasesRead`, `checkReportsRead`, `refusalRead`, `parentRead`, `parentsRead`, `filingsRead`), and the tick
+  (`tickRun`), whose pass is metered through `meteredPass` over the module-global meter. A command's `handler` is a program too. An
+  engine refusal a controller answers itself is read off the raw verb: `toldBy` in `say.verb.ts` turns the runtime's refusal into a
+  `Conflict`, and a journal that does not read is told by `unreadableJournal`.
+- A controller that reads no engine requires nothing: `startRun`, run with `Effect.runPromise` or `runWith` alike.
 
 ## Tests
 

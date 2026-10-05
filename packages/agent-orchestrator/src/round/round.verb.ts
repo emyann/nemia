@@ -1,18 +1,18 @@
 /**
  * `nemia round` and `nemia accept`: go round a loop once more, and end a loop as it stands. Each refuses before anything is written, and
  * writes a person's own file — never the run's record, which the tick owns. A controller, reaching the runtime through the client
- * (`runtime-client.ts`): Effect programs that require the engine as a service (`roundRun` and `acceptRun`, over `EngineService`), and
- * `round` and `accept`, their plain faces in a Promise, over the engine they are handed.
+ * (`runtime-client.ts`): Effect programs that require the engine as a service (`roundRun` and `acceptRun`, over `EngineService`), run by a
+ * caller with `runWith`.
  */
 import { Effect } from 'effect';
-import { EngineService, awaited, tried, type Engine } from '../runtime-client.ts';
+import { tried } from '../runtime-client.ts';
 import { type Acceptance, type Run } from '../record/record.ts';
 import { type RoundAsk } from '../status/status.ts';
 import { acceptAsk, roundAsk } from './round.ts';
 import { stepsOf } from '../record/record.store.ts';
 import { runStore } from '../record/files.store.ts';
 import { strayAsk } from '../say/say.verb.ts';
-import { closeoutAsked, closeoutReader, spendReader, taskPhases } from '../views/views.verb.ts';
+import { closeoutAsked, closeoutReader, spendReader, taskPhasesRead } from '../views/views.verb.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
 
 export type RoundAsked = { run: Run; ask: RoundAsk; file: string };
@@ -27,13 +27,12 @@ export type RoundAsked = { run: Run; ask: RoundAsk; file: string };
  * loop. `budget` raises the cap of each step of the loop over its budget, for a round held on it: the ask carries it, and the tick keeps
  * it. An ask written by someone else between the look and the write is refused as the look would have refused it, and a file at the ask's
  * name that does not read as one is named (`strayAsk`). Fails with a refusal, the verb's or one a read threw; dies of anything else
- * (`tried`, `awaited`).
+ * (`tried`).
  */
 export const roundRun = Effect.fn('round')(function* (id: string, stepName?: string, budget?: number) {
-  const e = yield* EngineService;
   const run = yield* tried(() => runStore.runs.read(id));
   const steps = yield* tried(() => stepsOf(run));
-  const { views, phaseOf } = yield* awaited(() => taskPhases(e, run));
+  const { views, phaseOf } = yield* taskPhasesRead(run);
   const answer = (asks: readonly RoundAsk[]) =>
     roundAsk(steps, run, stepName, phaseOf, closeoutReader(views, run), closeoutAsked(views), asks, spendReader(views), budget);
 
@@ -60,13 +59,6 @@ export const roundRun = Effect.fn('round')(function* (id: string, stepName?: str
   return { run, ask, file } satisfies RoundAsked;
 });
 
-/**
- * `nemia round` (`roundRun`) in a Promise, over `e`: what the CLI, the api and the tests call. Rejects with the refusal the program failed
- * with, or with whatever else it died of, as it was thrown.
- */
-export const round = (e: Engine, id: string, stepName?: string, budget?: number): Promise<RoundAsked> =>
-  Effect.runPromise(roundRun(id, stepName, budget).pipe(Effect.provide(EngineService.layer(e))));
-
 export type Accepted = { run: Run; acceptance: Acceptance; file: string };
 
 /**
@@ -81,10 +73,9 @@ export type Accepted = { run: Run; acceptance: Acceptance; file: string };
  * have refused it, and a file at the acceptance's name that ends no loop is named, with how to clear it.
  *
  * Going round once more is not this verb's: `nemia round <run> [<step>]` — and the two are offered side by side (`roundLines`). Fails with
- * a refusal, the verb's or one a read threw; dies of anything else (`tried`, `awaited`).
+ * a refusal, the verb's or one a read threw; dies of anything else (`tried`).
  */
 export const acceptRun = Effect.fn('accept')(function* (id: string, stepName?: string, message?: string) {
-  const e = yield* EngineService;
   if (!(yield* tried(() => runStore.runs.exists(id))))
     return yield* Effect.fail(
       new Missing({
@@ -93,7 +84,7 @@ export const acceptRun = Effect.fn('accept')(function* (id: string, stepName?: s
     );
   const run = yield* tried(() => runStore.runs.read(id));
   const steps = yield* tried(() => stepsOf(run));
-  const { views, phaseOf } = yield* awaited(() => taskPhases(e, run));
+  const { views, phaseOf } = yield* taskPhasesRead(run);
   const answer = (now: Run, rounds: readonly RoundAsk[]) =>
     acceptAsk(steps, now, stepName, message, phaseOf, closeoutReader(views, now), closeoutAsked(views), rounds, spendReader(views));
 
@@ -111,13 +102,6 @@ export const acceptRun = Effect.fn('accept')(function* (id: string, stepName?: s
   }
   return { run, acceptance, file } satisfies Accepted;
 });
-
-/**
- * `nemia accept` (`acceptRun`) in a Promise, over `e`: what the CLI, the api and the tests call. Rejects with the refusal the program
- * failed with, or with whatever else it died of, as it was thrown.
- */
-export const accept = (e: Engine, id: string, stepName?: string, message?: string): Promise<Accepted> =>
-  Effect.runPromise(acceptRun(id, stepName, message).pipe(Effect.provide(EngineService.layer(e))));
 
 /**
  * Why `acceptance` could not be written at `file` of the run `id`, read again: the refusal the look would now give (`now`), else the

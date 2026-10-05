@@ -9,7 +9,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Engine } from '../runtime-client.ts';
 import { scratch } from '../../test/scratch.ts';
 import { cursorTakes, feedLineWords, type FeedLine } from '../feed/feed.ts';
 import { pausedWords } from '../pause/pause.ts';
@@ -19,11 +18,13 @@ const NONE = { pause: null, finishing: [], staged: [] };
 import { statsLine, statsLines } from '../stats/index.ts';
 import { statsOf } from '../stats/stats.ts';
 import { parseArgv, type CommandSpec } from './command.ts';
+import { promised } from '../../test/promised.ts';
 
 const ROOT = scratch('wf-reads-');
 process.env.WF_ROOT = ROOT;
 const { FEED, LOGS, SHOW, STATS } = await import('./reads.verb.ts');
 const { resumePause, putPause } = await import('../pause/pause.store.ts');
+const { runWith } = await import('../runtime-client.ts');
 
 /** What `command` refuses of `argv` before anything is read, its parser's words or its check's; null where it takes it. */
 function refusedBy(command: CommandSpec, argv: readonly string[]): string | null {
@@ -101,16 +102,16 @@ test("nemia feed reads the store's feed from a cursor, and prints the pause firs
   const whole = `${head}${JSON.stringify(second)}\n`;
   fs.writeFileSync(path.join(ROOT, 'feed.jsonl'), whole);
   const end = Buffer.byteLength(whole);
-  const e = {} as Engine;
+  const e = promised({});
 
-  assert.deepEqual(await FEED.handler(e, {}), { lines: [first, second], cursor: end, pause: NONE });
-  const after = await FEED.handler(e, { cursor: String(Buffer.byteLength(head)) });
+  assert.deepEqual(await runWith(e, FEED.handler({})), { lines: [first, second], cursor: end, pause: NONE });
+  const after = await runWith(e, FEED.handler({ cursor: String(Buffer.byteLength(head)) }));
   assert.deepEqual(after, { lines: [second], cursor: end, pause: NONE });
   assert.deepEqual(FEED.print(after, {}), [feedLineWords(second), `cursor: ${end}`]);
 
   const pause = putPause({ why: 'merging by hand', by: 'ann' });
   try {
-    const paused = await FEED.handler(e, { cursor: String(Buffer.byteLength(head)) });
+    const paused = await runWith(e, FEED.handler({ cursor: String(Buffer.byteLength(head)) }));
     assert.deepEqual(FEED.print(paused, {}), [pausedWords({ pause, finishing: [] }), feedLineWords(second), `cursor: ${end}`]);
   } finally {
     resumePause();

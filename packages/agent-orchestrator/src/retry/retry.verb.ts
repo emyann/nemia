@@ -1,11 +1,11 @@
 /**
  * `nemia retry`: ask for another try of a step, by writing the person's ask and nothing else, refused before anything is written. A
  * controller, reaching the runtime through the client (`runtime-client.ts`): an Effect program that requires the engine as a service
- * (`retryRun`, over `EngineService`), and `retry`, its plain face in a Promise, over the engine it is handed.
+ * (`retryRun`, over `EngineService`), run by a caller with `runWith`.
  */
 import path from 'node:path';
 import { Effect } from 'effect';
-import { EngineService, awaited, configRefusal, tried, type Engine } from '../runtime-client.ts';
+import { configRefusal, tried } from '../runtime-client.ts';
 import { tryOf, type Run } from '../record/record.ts';
 import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
 import { filedRefusal, lineOf } from '../keys/index.ts';
@@ -17,7 +17,7 @@ import { retryable, retryRefusal, type RetryAsk, type RetryHow } from './index.t
 import { artifactsDir, stepsOf } from '../record/record.store.ts';
 import { inboxDir, runStore } from '../record/files.store.ts';
 import { strayAsk } from '../say/say.verb.ts';
-import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, spendReader, taskPhases } from '../views/views.verb.ts';
+import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, spendReader, taskPhasesRead } from '../views/views.verb.ts';
 import { Conflict, Invalid } from '../refusal/refusal.ts';
 
 /**
@@ -40,7 +40,7 @@ export type Asked = { run: Run; ask: RetryAsk; file: string; stopFirst: boolean 
  * `stopBlocked` takes a step whose session its harness blocked, with nothing signed (`retryable`): the ask is written as any other, and
  * the tick stops that session before it files the try. `nemia retry` passes it, and so does the board's `POST …/retry`. Left out, such a
  * step is running and refused as one: a caller takes the harness's word on purpose, never by default. Fails with a refusal, the verb's or
- * one a read threw; dies of anything else (`tried`, `awaited`).
+ * one a read threw; dies of anything else (`tried`).
  */
 export const retryRun = Effect.fn('retry')(function* (
   id: string,
@@ -48,10 +48,9 @@ export const retryRun = Effect.fn('retry')(function* (
   how: RetryHow,
   { stopBlocked = false }: { stopBlocked?: boolean } = {},
 ) {
-  const e = yield* EngineService;
   const run = yield* tried(() => runStore.runs.read(id));
   const steps = yield* tried(() => stepsOf(run));
-  const { views, phaseOf } = yield* awaited(() => taskPhases(e, run));
+  const { views, phaseOf } = yield* taskPhasesRead(run);
   const blocked = stopBlocked ? harnessBlocked(views) : () => false;
   const spendOf = spendReader(views);
   const refusal = (asks: readonly RetryAsk[]) =>
@@ -124,10 +123,3 @@ function tryRefused(run: Run, steps: readonly Workflow[], step: Workflow, how: R
   const flags = { ...(how.mode === 'fresh' && how.model !== undefined && { model: how.model }), budget: how.budget };
   return filedRefusal((c) => configRefusal(step.harness ?? DEFAULT_HARNESS, c), step.name, config, lineOf(step, flags));
 }
-
-/**
- * `nemia retry` (`retryRun`) in a Promise, over `e`: what the CLI, the api and the tests call. Rejects with the refusal the program failed
- * with, or with whatever else it died of, as it was thrown.
- */
-export const retry = (e: Engine, id: string, stepName: string, how: RetryHow, blocked: { stopBlocked?: boolean } = {}): Promise<Asked> =>
-  Effect.runPromise(retryRun(id, stepName, how, blocked).pipe(Effect.provide(EngineService.layer(e))));

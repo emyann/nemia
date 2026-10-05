@@ -28,7 +28,9 @@ to the person as a gate.
 - The landing gate (Otto) is approved only once a trial merge of the run's branch into `main` is clean; `nemia decide <run>` reads it
   live (`merges`), with each run in flight on `main` its branch collides with and in which files (`others`, `collides`), and a clean
   merge whose landing check refused the merged tree (`semantic`). Say what it read. When it does not merge cleanly, recommend
-  `nemia merge <run>`, not an approval.
+  `nemia merge <run>`, not an approval. On `collides`, recommend an order: land the run at its gate first, unless the other is
+  expensive or on its last round; then `nemia hold <run> --until <other>`. Either way, the one that lands second merges `main` after.
+  On `semantic`, recommend `nemia merge <run>`: the text merges, the meaning does not.
 - A step that failed its check: quote the check's last lines and its exit code. A check that did not finish (no numeric exit) is no
   refusal: recommend `nemia retry <run> <step> --recheck`. A check that failed twice for the same reason wants a fix in content — a
   brief, a workflow folder, a `CLAUDE.md`, a test — say which.

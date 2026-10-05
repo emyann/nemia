@@ -174,6 +174,23 @@ export const hirePlaceOf = (search: Record<string, unknown>): Partial<HirePlace>
     : {};
 };
 
+/** What follows an agent written from a step's New agent: hired, and back to the step; or the hire's refusal, to say on the creator. */
+export type HiredOnCreate = { hired: true } | { hired: false; why: string };
+
+/**
+ * Hires `agent`, just written, into `place` with `hire`, the board's hire: `hired` once the api takes it, else `why` not, in its words —
+ * never a refusal passed over as a hire.
+ */
+export const hireOnCreate = (
+  place: HirePlace,
+  agent: string,
+  hire: (factory: string, step: string, agent: string) => Promise<unknown>,
+): Promise<HiredOnCreate> =>
+  hire(place.factory, `${place.workflow}/${place.step}`, agent).then(
+    (): HiredOnCreate => ({ hired: true }),
+    (error: unknown): HiredOnCreate => ({ hired: false, why: error instanceof Error ? error.message : String(error) }),
+  );
+
 /**
  * The place a workflow's page or a step's is read in, from its address: `?factory=` as `factorySearch` reads it, and `?repo=` where it
  * names a repository by a string that is not empty.

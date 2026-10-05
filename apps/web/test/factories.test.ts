@@ -12,6 +12,7 @@ import {
   factoryOf,
   factorySearch,
   floorPlace,
+  hireOnCreate,
   hirePlaceOf,
   hiresInto,
   offeredIn,
@@ -252,4 +253,16 @@ test("a page's address filters by the factory it names, and by none when it name
   assert.deepEqual(factorySearch({ factory: 'default', step: 'x' }), { factory: 'default' });
   for (const none of [{}, { factory: '' }, { factory: ['nemia'] }, { factory: 7 }])
     assert.equal(Object.hasOwn(factorySearch(none), 'factory'), false);
+});
+
+test('REFUSED: an agent made from New agent is hired only when the api takes the hire — a refusal is said, in its words, never passed over', async () => {
+  const place = { factory: 'mill', workflow: 'mine', step: 'plan' };
+  const sent: string[] = [];
+  const taken = async (factory: string, step: string, agent: string) => {
+    sent.push(`${factory} ${step} ${agent}`);
+  };
+  assert.deepEqual(await hireOnCreate(place, 'scribe', taken), { hired: true });
+  assert.deepEqual(sent, ['mill mine/plan scribe'], 'the step is sent as <workflow>/<step>');
+  const words = 'mill does not offer the workflow mine, so it hires no one into its steps.';
+  assert.deepEqual(await hireOnCreate(place, 'scribe', () => Promise.reject(new Error(words))), { hired: false, why: words });
 });

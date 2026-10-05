@@ -5,7 +5,7 @@ import { AgentForm } from '../components/AgentForm';
 import { AgentRefused, RouteLink } from '../components/AgentParts';
 import { AgentRefusal, createAgent, hireAgent, keyFormQuery, storeQuery, type AgentDraft } from '../lib/api';
 import { invalidateAgents, invalidateHires } from '../lib/agentWrites';
-import { hirePlaceOf, type HirePlace } from '../lib/factories';
+import { hireOnCreate, hirePlaceOf, type HirePlace } from '../lib/factories';
 
 /**
  * The New agent page, at /agents/new: `agents_` draws it on its own, not inside the Agents page, which has no outlet for it. `?factory=`,
@@ -36,12 +36,9 @@ function NewAgentPage() {
       await invalidateAgents(queryClient);
       if (!hireInto) return navigate({ to: '/agents/$from/$agent', params: { from: 'yours', agent: saved.agent.name } });
       const { factory, workflow, step } = hireInto;
-      const hired = await hireAgent(factory, `${workflow}/${step}`, saved.agent.name).then(
-        () => null,
-        (error: unknown) => (error instanceof Error ? error.message : String(error)),
-      );
+      const made = await hireOnCreate(hireInto, saved.agent.name, hireAgent);
       await invalidateHires(queryClient);
-      if (hired !== null) return setUnhired({ agent: saved.agent.name, why: hired });
+      if (!made.hired) return setUnhired({ agent: saved.agent.name, why: made.why });
       return navigate({ to: '/workflows/$from/$workflow/$step', params: { from: 'yours', workflow, step }, search: { factory } });
     },
   });

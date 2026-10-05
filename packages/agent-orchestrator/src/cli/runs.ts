@@ -102,14 +102,16 @@ async function judged(e: Engine, ids: readonly string[], args: Args, tally: Prun
 
 /**
  * What `nemia rm` would forget of the engine's tasks of each run `nemia prune` found over or with nothing to prune (`runsForgetting`), put
- * on its finding: one count over all of them, which reads the engine's feed once. A count that fails is said, and costs only its lines.
+ * on its finding: one count over all of them, which reads the engine's feed once. A run it could not count, and a count that fails, are
+ * said, and cost only their lines.
  */
 async function withEngine(e: Engine, found: Pruning[]): Promise<Pruning[]> {
   const asked = found.filter((p) => p.kind === 'prunable' || p.kind === 'nothing').map((p) => p.id);
   if (!asked.length) return found;
   try {
-    const of = await runWith(e, runsForgetting(asked));
-    return found.map((p) => (of.has(p.id) ? { ...p, engine: of.get(p.id)! } : p));
+    const { counted, uncounted } = await runWith(e, runsForgetting(asked));
+    for (const { text } of uncounted) console.log(text);
+    return found.map((p) => (counted.has(p.id) ? { ...p, engine: counted.get(p.id)! } : p));
   } catch (err) {
     console.log(`what nemia rm would forget of the engine's tasks was not counted: ${(err as Error).message}`);
     return found;

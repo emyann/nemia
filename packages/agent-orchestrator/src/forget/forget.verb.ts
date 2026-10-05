@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { Effect } from 'effect';
+import { Cause, Effect, Exit } from 'effect';
 import { EngineService, over, tried, type Engine } from '../runtime-client.ts';
 import type { Workflow } from '../step/step.ts';
 import { isGitRun, namesInOrder, runTasks, type GitRun, type Run } from '../record/record.ts';
@@ -35,7 +35,8 @@ import { gitWords, merging, resolved } from '../prune/prune.verb.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, spendReader, taskPhasesRead } from '../views/views.verb.ts';
 import { adoptChecks, adoptRounds, adoptTries, closeWaitingTasks, unrecordedSteps } from '../tick/advance.verb.ts';
 import { Invalid } from '../refusal/refusal.ts';
-import { forgetTasks } from '../forgetting/forgetting.verb.ts';
+import { engineForgetting, forgetTasks } from '../forgetting/forgetting.verb.ts';
+import { forgettingOf, uncountedWords, type EngineForgetting } from '../forgetting/forgetting.ts';
 
 /** A run's answer when nothing of its worktrees or branches was touched, afresh on each call. */
 const nothing = (): Omit<Forgot, 'id' | 'kind'> => ({ removed: [], handedOff: [], gone: [], left: [], branches: [], files: [] });
@@ -91,7 +92,7 @@ export const forgetRun = Effect.fn('forget')(function* (id: string, how: ForgetH
   const said = { id, repo: run.repo, base: run.branch, isolate: run.isolate, ...(unfrozen ? { unfrozen } : {}) };
   const refusal = yield* tried(() => refusalOf(id, f));
   if (refusal) return { ...said, kind: 'refused', refusal, ...nothing() } satisfies Forgot;
-  const taskIds = [...new Set(runTasks(run))];
+  const taskIds = forgottenIds(run);
   yield* tried(() => runStore.forgetting.write(id, taskIds));
   yield* closeWaitingTasks(e, run, f.views);
   if (!isGitRun(run)) {
@@ -154,6 +155,30 @@ const readForgetting = Effect.fn('readForgetting')(function* (e: Engine, id: str
     for (const { name, taskId } of unrecorded) run.steps[name] = { ...run.steps[name], taskId };
   }
   return { run, steps, unfrozen, views, phaseOf, asks, rounds, reader, asked, verdictOf, spendOf };
+});
+
+/** The ids of the engine's tasks `nemia rm` forgets of `run` as `readForgetting` adopts it: each task it names (`runTasks`), once. */
+const forgottenIds = (run: Run): string[] => [...new Set(runTasks(run))];
+
+/**
+ * What `nemia rm` would forget of the engine's tasks of each of the runs `runIds`: each read as rm reads it (`readForgetting`), its ids
+ * the ones rm writes down (`forgottenIds`), counted by one dry call over all of them together (`engineForgetting`), which reads the
+ * engine's feed once, and shared out by run (`forgettingOf`) in `counted`. A run that does not read is left out of the call, and said in
+ * `uncounted`, with why. Removes nothing.
+ */
+export const runsForgetting = Effect.fn('runsForgetting')(function* (runIds: readonly string[]) {
+  const e = yield* EngineService;
+  const tasks = new Map<string, string[]>();
+  const uncounted: Array<{ id: string; text: string }> = [];
+  for (const id of runIds) {
+    const read = yield* Effect.exit(readForgetting(e, id));
+    if (Exit.isSuccess(read)) tasks.set(id, forgottenIds(read.value.run));
+    else uncounted.push({ id, text: uncountedWords(id, (Cause.squash(read.cause) as Error).message) });
+  }
+  const all = [...new Set([...tasks.values()].flat())];
+  if (!all.length) return { counted: new Map<string, EngineForgetting>(), uncounted };
+  const answer = yield* engineForgetting(all, { yes: false });
+  return { counted: new Map([...tasks].map(([id, ids]) => [id, forgettingOf(answer, ids)] as const)), uncounted };
 });
 
 /**

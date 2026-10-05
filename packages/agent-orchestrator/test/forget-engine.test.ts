@@ -209,6 +209,27 @@ test('REFUSED at shipped defaults: `nemia rm` of a run whose step is in flight w
   assert.ok((await listed()).includes(`${run.id}-implement`));
 });
 
+test('REFUSED at shipped defaults: `nemia rm` of a run with a directory in its worktrees git does not know is held: it asks the engine to forget nothing, lifts its marker and keeps its record', async () => {
+  const run = await signed(oneStep('harness: codex'), SIGNED);
+  const stray = path.join(ROOT, 'worktrees', run.id, 'stray');
+  fs.mkdirSync(stray, { recursive: true });
+  fs.writeFileSync(path.join(stray, 'notes.txt'), 'mine');
+  const before = forgets.length;
+  const forgot = await runWith(e, forgetRun(run.id));
+  assert.equal(forgot.kind, 'held', forgot.refusal);
+  assert.ok(
+    forgot.left.some((l) => l.path.endsWith(`${path.sep}stray`)),
+    JSON.stringify(forgot.left),
+  );
+  assert.equal(forgot.engine, undefined);
+  assert.equal(forgets.length, before, 'no forget asked');
+  assert.ok(!fs.existsSync(markerOf(run.id)), 'its marker lifted');
+  assert.ok(fs.existsSync(path.join(ROOT, 'runs', `${run.id}.json`)), 'its record kept');
+  assert.ok((await listed()).includes(`${run.id}-implement`), "its task the engine's still");
+  fs.rmSync(stray, { recursive: true });
+  assert.equal((await runWith(e, forgetRun(run.id))).kind, 'forgotten');
+});
+
 test("`nemia rm` of a run whose step waits for a word closes its task, which has not settled: it waits, with the run's marker, and a pass of the daemon forgets it once it settles and lifts the marker", async (t) => {
   const run = await signed(oneStep('harness: claude'), BLOCKED);
   const task = `${run.id}-implement`;
@@ -273,7 +294,7 @@ test('`nemia prune` of N runs asks the engine once, dry, over all their tasks to
   const runs = [await signed(oneStep('harness: codex'), SIGNED), await signed(oneStep('harness: codex'), SIGNED)];
   const tasks = runs.map((r) => `${r.id}-implement`);
   const before = forgets.length;
-  const counted = await runWith(e, runsForgetting(runs.map((r) => r.id)));
+  const { counted } = await runWith(e, runsForgetting(runs.map((r) => r.id)));
   assert.deepEqual(forgets.slice(before), [{ taskIds: tasks, yes: false }], 'one dry call, over the union');
   for (const [i, r] of runs.entries()) assert.deepEqual(counted.get(r.id)?.forgotten, [tasks[i]], 'each run its own share');
 
@@ -295,6 +316,41 @@ test('`nemia prune` of N runs asks the engine once, dry, over all their tasks to
     [],
     'the engine keeps them all',
   );
+});
+
+test('`nemia prune` counts the tasks `nemia rm` forgets of a run as rm reads it, a step a pass filed and never wrote down among them', async () => {
+  const run = await Effect.runPromise(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: oneStep('harness: codex') }));
+  const record = path.join(ROOT, 'runs', `${run.id}.json`);
+  const unfiled = fs.readFileSync(record, 'utf8');
+  assert.deepEqual((await pass(run.id)).filed, ['implement']);
+  await pass(run.id);
+  sign(`${run.id}-implement`, 1, SIGNED);
+  await pass(run.id);
+  fs.writeFileSync(record, unfiled);
+  assert.deepEqual(runTasks(readRun(run.id)), [], 'the record names no task');
+  const { counted } = await runWith(e, runsForgetting([run.id]));
+  assert.deepEqual(counted.get(run.id)?.forgotten, [`${run.id}-implement`], 'prune counts the step adopted');
+  const forgot = await runWith(e, forgetRun(run.id));
+  assert.equal(forgot.kind, 'forgotten', forgot.refusal);
+  assert.deepEqual(forgot.engine?.forgotten, counted.get(run.id)?.forgotten, 'what rm forgets is what prune counted');
+});
+
+test('`nemia prune` says of a run whose record does not read that it was not counted, and why, and counts the other runs', async () => {
+  const run = await signed(oneStep('harness: codex'), SIGNED);
+  const garbled = 'garbled-c3d4';
+  const file = path.join(ROOT, 'runs', `${garbled}.json`);
+  fs.writeFileSync(file, '{ not json');
+  try {
+    const { counted, uncounted } = await runWith(e, runsForgetting([garbled, run.id]));
+    assert.deepEqual([...counted.keys()], [run.id]);
+    assert.deepEqual(counted.get(run.id)?.forgotten, [`${run.id}-implement`]);
+    const [line, ...others] = uncounted;
+    assert.deepEqual(others, []);
+    const said = `${garbled}: what nemia rm would forget of the engine's tasks of it was not counted: `;
+    assert.ok(line.text.startsWith(said) && line.text.length > said.length, line.text);
+  } finally {
+    fs.rmSync(file);
+  }
 });
 
 test('an engine that refuses to forget: `nemia rm` removes the run, exits 0 and says so, the marker kept; each pass asks again and warns; only a person removes the marker, and it says how', async (t) => {

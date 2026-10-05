@@ -93,3 +93,7 @@ export function engineWords(f: EngineForgetting, { id, dry = false }: { id: stri
   const left = f.left.length ? `${dry ? 'it would leave' : 'it left'} ${f.left.join('; ')}` : '';
   return [forgotWords(f, id, dry), left, waitWords(f, marker, dry), refusalWords(f, marker, dry)].filter(Boolean).join('; ');
 }
+
+/** What `nemia prune` says of the run `id` whose tasks it could not count, since reading it as `nemia rm` does failed with `why`. */
+export const uncountedWords = (id: string, why: string): string =>
+  `${id}: what nemia rm would forget of the engine's tasks of it was not counted: ${why}`;

@@ -1,6 +1,6 @@
 /**
  * The engine's tasks of a run forgotten through the runtime's `forget`: by `nemia rm` once the run is removed (`forgetTasks`), by the
- * tick for what had not settled then (`finishForgetting`), and counted without removing anything for `nemia prune` (`runsForgetting`).
+ * tick for what had not settled then (`finishForgetting`), and asked without removing anything (`engineForgetting` with `yes: false`).
  * A controller, reaching the runtime through the client (`runtime-client.ts`): Effect programs that require the engine as a service
  * (`EngineService`). What `nemia rm` has yet to see forgotten is written down beside the store's runs (`runStore.forgetting`), so a
  * pass reads it again until nothing of it is left: nothing is carried between passes.
@@ -8,16 +8,7 @@
 import { Cause, Effect, Result } from 'effect';
 import { EngineService, ForgetRefused, tried, type ForgetReport } from '../runtime-client.ts';
 import { runStore } from '../record/files.store.ts';
-import { runTasks } from '../record/record.ts';
-import {
-  engineWords,
-  forgettingDone,
-  forgettingOf,
-  type EngineAnswer,
-  type EngineForgetting,
-  type TaskForgotten,
-  type TaskWaiting,
-} from './forgetting.ts';
+import { engineWords, forgettingDone, forgettingOf, type EngineAnswer, type TaskForgotten, type TaskWaiting } from './forgetting.ts';
 
 /** A task of the engine's report as `EngineAnswer` keeps it: what its harness leaves, every session's together. */
 const forgottenOf = (t: ForgetReport['tasks'][number]): TaskForgotten => ({
@@ -107,24 +98,3 @@ export const finishForgetting = (): Effect.Effect<ForgettingLine[], never, Engin
       ]),
     ),
   );
-
-/**
- * What `nemia rm` would forget of the engine's tasks of each of the runs `runIds` (`runTasks`), counted by one dry call over all their
- * tasks together (`engineForgetting`), which reads the engine's feed once, and shared out by run (`forgettingOf`). A run whose record
- * does not read is left out. Removes nothing.
- */
-export const runsForgetting = Effect.fn('runsForgetting')(function* (runIds: readonly string[]) {
-  const tasks = yield* tried(() => {
-    const of = new Map<string, string[]>();
-    for (const id of runIds) {
-      try {
-        of.set(id, [...new Set(runTasks(runStore.runs.read(id)))]);
-      } catch {}
-    }
-    return of;
-  });
-  const all = [...new Set([...tasks.values()].flat())];
-  if (!all.length) return new Map<string, EngineForgetting>();
-  const answer = yield* engineForgetting(all, { yes: false });
-  return new Map([...tasks].map(([id, ids]) => [id, forgettingOf(answer, ids)] as const));
-});

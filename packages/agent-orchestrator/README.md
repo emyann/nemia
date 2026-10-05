@@ -3052,6 +3052,13 @@ does. A marker beside a record is a `wf rm` cut short, and no pass touches it. T
 whole call is not a refusal of the run: `wf rm` exits 0, the line gives the engine's words, the marker
 keeps the ids and every pass asks again; only a person removes the marker, with the `rm` the line gives,
 once nothing of those tasks is wanted. A marker that does not read is said on every pass, the same way.
+A run held lifts its marker and forgets nothing: it is still there to be read.
+
+The marker's code is a feature folder of its own, `src/forgetting/`, beside `src/forget/`, which removes
+the run: `forgetting.ts` (pure) shares the engine's answer out by run and words it; `forgetting.verb.ts`
+(a controller) asks the engine to forget and lifts the marker, for `wf rm` (`forgetTasks`) and the tick
+(`finishForgetting`). `wf prune` asks it dry through `runsForgetting`, in `src/forget/forget.verb.ts`
+beside `forgetRun`, so it reads each run's tasks as `wf rm` does.
 
 **What it keeps.** Branches, by default, and the line says so: a branch is where the work is.
 `--delete-branches` deletes each one merged into the run's base branch, as git says it. One that is not
@@ -3128,7 +3135,9 @@ thing of a finished run nobody reads again. `wf prune [<runId> ...]` removes the
 over, and nothing else of them: the record, its asks, closeouts and cost, its branches, its files under
 `runs/<id>/` (artifacts and inputs), its check logs and the engine's tasks are all kept. The run stays on
 `wf ls` and the board as it ended. What `wf rm` would forget of the engine's tasks is said under each run,
-counted by one dry `forget` over the tasks of every run listed (`runsForgetting`), which removes nothing.
+counted by one dry `forget` over the tasks of every run listed (`runsForgetting`), which removes nothing:
+each run read as `wf rm` reads it, with what a pass filed and never wrote down; a run that does not read
+is said not counted, and why.
 
 **It lists before it removes.** Without `--yes` it prints each run it would prune, each worktree with the
 space it holds (`du`, which does not follow the links a worktree's `node_modules` has into the main
@@ -3287,7 +3296,7 @@ holding a concurrency slot forever.
 | `src/tick/assess.ts` | **`assess`** — pure: which steps are ready, due a check, another try or another round, blocked, done, off each step's standing (`stepStatus`, `status/status.ts`), and what stopped a finished run (`stoppedOnWord`) |
 | `src/round/round.ts` | a loop's rounds — pure: those due (`roundsDue`) and the steps once one is filed (`roundFiled`), what `wf round` and `wf accept` ask and refuse (`roundAsk`, `acceptAsk`), and what `wf ls` and `wf decide` say of a loop (`roundDueNote`, `roundLines`) |
 | `src/cancel/cancel.ts` | what cancelling a run has to do, and what to tell the person who asked (`cancelPlan`) — pure |
-| `src/forgetting/forgetting.ts` | what the engine forgot of a run's tasks, pure: each run's share of one answer (`forgettingOf`), whether nothing is left (`forgettingDone`), and its words (`engineWords`) |
+| `src/forgetting/forgetting.ts` | what the engine forgot of a run's tasks, pure: each run's share of one answer (`forgettingOf`), whether nothing is left (`forgettingDone`), and its words (`engineWords`, `uncountedWords`) |
 | `src/forget/forget.ts` | `wf rm` from the run's side — pure: **`forgetRefusal`**, whether a run may be forgotten, which worktrees, branches and check logs are its own (`runWorktrees`, `branchFates`, `checkLogsOf`), and the line that says what was done (`forgetLine`) |
 | `src/start/inputs.ts` | the files `wf start --input` gives a run — pure: why one is refused (`inputRefusal`), how a brief and `wf decide` name them (`inputsLine`, `inputsNote`), and where a run came from (`fromNote`) |
 | `src/decide/decide.ts` | what is left for a person to do about a run (`decision`), and the cost lines `wf decide` prints (`costLine`, `runCostLines`) — pure |
@@ -3344,8 +3353,8 @@ holding a concurrency slot forever.
 | `src/cap/cap.verb.ts` | the runs the cap on runs in flight holds between passes (`runSlots`) |
 | `src/meter/meter.verb.ts` | the engine metered, each verb counted in its phase (`meteredEngine`), and a pass's cost (`costOf`) |
 | `src/cancel/cancel.verb.ts`, `src/retry/retry.verb.ts`, `src/gate/gate.verb.ts`, `src/say/say.verb.ts`, `src/wait/wait.verb.ts`, `src/round/round.verb.ts` | what a person asks of a run: the programs `cancelRun`, `retryRun`, `approveRun`, `sayRun`, `roundRun` and `acceptRun`; `hold` and `unhold` |
-| `src/forget/forget.verb.ts` | a run forgotten (`wf rm`): the program `forgetRun` |
-| `src/forgetting/forgetting.verb.ts` | the engine's tasks of a removed run forgotten through the runtime's `forget`: by `wf rm` (`forgetTasks`), by the tick for what had not settled (`finishForgetting`), and counted dry for `wf prune` (`runsForgetting`) |
+| `src/forget/forget.verb.ts` | a run forgotten (`wf rm`): the program `forgetRun`, and what it would forget of the engine's tasks of each run, counted dry for `wf prune` (`runsForgetting`) |
+| `src/forgetting/forgetting.verb.ts` | the engine's tasks of a removed run forgotten through the runtime's `forget`: by `wf rm` (`forgetTasks`), and by the tick for what had not settled (`finishForgetting`); asked dry by `runsForgetting` (`engineForgetting`) |
 | `src/prune/prune.verb.ts` | a finished run's worktrees pruned (`prune`, `wf prune`) |
 | `src/list/list.verb.ts` | what a person reads of the runs: `wf ls` (`list`) |
 | `src/decide/decide.verb.ts` | what a person reads of a run: `wf decide` (`decideRun`) |

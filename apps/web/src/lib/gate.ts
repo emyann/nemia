@@ -193,7 +193,7 @@ function decisionFacts(decision: Decidable): GateFact[] {
  * The facts an ending's collisions add under its gate: the runs in flight on the base in one line — good when it collides with none, bad
  * when it conflicts with one — then each branch of theirs one of ours does not merge onto cleanly, and the semantic conflict.
  */
-function collisionFacts(collisions: Collisions): GateFact[] {
+export function collisionFacts(collisions: Collisions): GateFact[] {
   const conflicts = (c: Collision): boolean => 'clean' in c.merge;
   const { colliding, semantic } = collisions;
   return [

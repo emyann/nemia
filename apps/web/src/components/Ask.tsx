@@ -1,9 +1,10 @@
 /**
  * A person's ask of a step's next try, as the board's rows make it: the CLI `retry`'s ways, the button and box every ask is made with, the
- * ask itself through the api (`useAsk`), and the api's refusal of it, verbatim (`Refusal`).
+ * ask itself through the api (`useAsk`), and the api's refusal of it, verbatim (`Refusal`); and the asks of a loop's round (`useRound`)
+ * and of its acceptance (`useAccept`).
  */
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { askTry, type QuestionAnswer, type RetryMode } from '../lib/api';
+import { acceptLoop, askRound, askTry, type QuestionAnswer, type RetryMode } from '../lib/api';
 
 /** Each of the CLI `retry`'s ways, as an answer offers it. */
 export const MODES: Record<RetryMode, string> = {
@@ -45,6 +46,36 @@ export function useAsk(runId: string, step: string, onAsked: () => void) {
       onAsked();
       void queryClient.invalidateQueries({ queryKey: ['runs', runId], exact: true });
       void queryClient.invalidateQueries({ queryKey: ['runs'], exact: true });
+    },
+  });
+}
+
+/**
+ * An acceptance of a loop out of rounds through the api (`acceptLoop`), and the run read again once the api has it — its detail, and the
+ * list the Factory's card reads, each by its own key (`exact`): a decision is keyed by the state it was read for, and the next state is a
+ * key of its own.
+ */
+export function useAccept(runId: string, step: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (how: { message: string }) => acceptLoop(runId, step, how),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['runs', runId], exact: true });
+      void queryClient.invalidateQueries({ queryKey: ['runs'], exact: true });
+    },
+  });
+}
+
+/**
+ * An ask for another round of a run's loop through the api (`askRound`), and the run read again once the api has it: its record alone
+ * (`exact`), as for a try, since a decision is keyed by the state it was read for.
+ */
+export function useRound(runId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (how: { step?: string; budget?: number }) => askRound(runId, how),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['runs', runId], exact: true });
     },
   });
 }

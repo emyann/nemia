@@ -363,7 +363,7 @@
     {
       "files": ["apps/web/src/components/Decide.tsx"],
       "rules": {
-        "max-lines": ["error", { "max": 723, "skipBlankLines": true, "skipComments": true }],
+        "max-lines": ["error", { "max": 703, "skipBlankLines": true, "skipComments": true }],
         "max-lines-per-function": ["error", { "max": 129, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 27 }],
         "sonarjs/cognitive-complexity": ["error", 30]

@@ -1,8 +1,73 @@
 import type { ReactNode } from 'react';
-import type { PeakMark, RunDetail, StepCheck, StepFiled, StepLog, StepSpec, StepUsed } from '../lib/api';
+import type { Collisions, PeakMark, RunDetail, StepCheck, StepFiled, StepLog, StepSpec, StepUsed } from '../lib/api';
+import { stepAnchor } from '../lib/asks';
 import { contextText } from '../lib/builder';
 import { costText, pastBudget } from '../lib/cost';
+import { collisionFacts, type GateFact } from '../lib/gate';
+import { cn } from '../lib/utils';
+import { RouteLink } from './AgentParts';
 import { CopyButton } from './CopyButton';
+
+/** A link's look in a fact's words. */
+export const LINK =
+  'rounded-sm underline decoration-neutral-400 underline-offset-2 outline-none hover:decoration-neutral-700 focus-visible:ring-2 focus-visible:ring-ring/50 dark:decoration-neutral-500 dark:hover:decoration-neutral-300';
+
+const STATE = {
+  good: 'text-emerald-800 dark:text-emerald-300',
+  bad: 'text-red-700 dark:text-red-400',
+  none: '',
+} as const;
+
+/** `facts` of run `runId`, a label and its words a row, each coloured by its state: under a gate, and in the run's Decide section. */
+export function FactList({
+  runId,
+  facts,
+  label,
+  className,
+}: {
+  runId: string;
+  facts: readonly GateFact[];
+  label: string;
+  className?: string;
+}) {
+  return (
+    <dl aria-label={label} className={cn('grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-xs', className)}>
+      {facts.map((fact, i) => (
+        <div key={`${fact.label}-${i}`} className="contents">
+          <dt className="text-neutral-500">{fact.label}</dt>
+          <dd data-fact={fact.label} data-state={fact.state} className={cn('min-w-0 break-words', STATE[fact.state ?? 'none'])}>
+            <FactWords runId={runId} fact={fact} />
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+/** A fact's words, linked to the step's section on the run's page where there is more to read: a review's findings, a check's output. */
+function FactWords({ runId, fact }: { runId: string; fact: GateFact }) {
+  if (!fact.step) return <>{fact.said}</>;
+  return (
+    <RouteLink to="/runs/$runId" params={{ runId }} hash={stepAnchor(fact.step)} data-fact-link={fact.step} className={LINK}>
+      {fact.said}
+    </RouteLink>
+  );
+}
+
+/**
+ * The trial merges an ending's decision read (`Collisions`), in the run's Decide section: the runs in flight on the base and the semantic
+ * conflict, in the gate's words, which a landing its check refused waits at no gate to show.
+ */
+export function TrialMerges({ runId, collisions }: { runId: string; collisions: Collisions }) {
+  return (
+    <section aria-label="Trial merges" className="space-y-1">
+      <h3 className="text-xs font-medium text-neutral-500">
+        Trial merges, as git says them now: onto {collisions.onto}, and onto each run in flight on it
+      </h3>
+      <FactList runId={runId} facts={collisionFacts(collisions)} label="What the trial merges say" />
+    </section>
+  );
+}
 
 /** Label and value, one per row. A value that is not set reads as a dash. */
 export function Facts({ rows }: { rows: Array<[label: string, value: ReactNode]> }) {

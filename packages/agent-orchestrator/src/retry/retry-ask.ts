@@ -47,6 +47,8 @@ export type EarlierTry = {
   check?: { taskId: string };
   then: 'retries' | 'signoff' | RetryMode | 'round' | 'back';
   model?: string;
+  /** The pause filed the try after this one (`wf pause --now` stopped it, and the resume tried it again): `then` stays its mode. */
+  paused?: true;
   /** The cap a person raised the step's `budget:` to for the try after this one (`--budget`): in force from it on (`budgetOf`). */
   budget?: number;
 };
@@ -54,9 +56,20 @@ export type EarlierTry = {
 /**
  * A person's `wf retry`, as its ask file says it: the step, the try it asks for, how, and when — and `message`, what they said
  * with it (`--message`): the answer to the `needs` of a step that signed off blocked, or anything else they have to say to the
- * step. The try's brief carries it as `## Your answer` (`retrySection`). Absent on an ask without one.
+ * step. The try's brief carries it as `## Your answer` (`retrySection`). Absent on an ask without one. And `interrupted`, on the ask
+ * `wf pause --now` writes for each task it stops: that task's id, the step's session or its check, which the ask is due on only once
+ * that very task settled `stopped` (`pauseAskVoid`).
  */
-export type RetryAsk = { step: string; try: number; mode: RetryMode; model?: string; message?: string; budget?: number; at: string };
+export type RetryAsk = {
+  step: string;
+  try: number;
+  mode: RetryMode;
+  model?: string;
+  message?: string;
+  budget?: number;
+  interrupted?: string;
+  at: string;
+};
 
 /**
  * How a person asks for a try with `wf retry`: one way, the model a `--model` names, what they said with it — and `budget`, the cap
@@ -65,8 +78,9 @@ export type RetryAsk = { step: string; try: number; mode: RetryMode; model?: str
 export type RetryHow = { mode: RetryMode; model?: string; message?: string; budget?: number };
 
 /**
- * A try to file on this pass: of which step, its number, how, on whose word — `retries:`, a person's `ask`, or `signoff`, the run's one
- * nudge a round to a session that ended without its closeout — and, for a person's, what they said with it.
+ * A try to file on this pass: of which step, its number, how, on whose word — `retries:`, a person's `ask`, `signoff`, the run's one
+ * nudge a round to a session that ended without its closeout, or `pause`, the ask `wf pause --now` wrote for the task it stopped — and,
+ * for a person's, what they said with it.
  *
  * `stopFirst` on a person's try of a step whose task has not settled (`retriesDue`): the pass asks the engine to stop that session — once,
  * as the engine's `stopRequested` says — and files nothing. A later pass, once the task has settled, reads the try due as one of a stopped
@@ -80,7 +94,7 @@ export type Retry = {
   model?: string;
   message?: string;
   budget?: number;
-  by: 'retries' | 'signoff' | 'ask';
+  by: 'retries' | 'signoff' | 'ask' | 'pause';
   stopFirst?: true;
   runsOn?: true;
   /**
@@ -137,7 +151,8 @@ export function nextTry(record: StepRecord, retry: Retry, taskId?: string): Step
   const over: EarlierTry = {
     taskId: record.taskId!,
     ...(check ? { check } : {}),
-    then: retry.by === 'ask' ? retry.mode : retry.by,
+    then: retry.by === 'ask' || retry.by === 'pause' ? retry.mode : retry.by,
+    ...(retry.by === 'pause' ? { paused: true as const } : {}),
     ...(retry.model ? { model: retry.model } : {}),
     ...(retry.budget !== undefined ? { budget: retry.budget } : {}),
   };
@@ -174,12 +189,26 @@ export const spentAsks = (run: Run, asks: readonly RetryAsk[]): RetryAsk[] => as
  * A try due now, as `wf ls` and `wf decide` say it — and, for a step whose session the tick stops first, that it does:
  * `its blocked session` while its harness says so, and `its session` once it works again (`runsOn`).
  */
-export const dueNote = (step: Workflow, run: Run, r: Retry): string =>
-  r.by === 'ask'
-    ? `try ${r.try} asked (${modeWord(r)}${r.budget !== undefined ? `, --budget ${r.budget}` : ''}${r.message !== undefined ? ', with your answer' : ''}) — ${r.stopFirst ? `stopping its ${r.runsOn ? '' : 'blocked '}session, then the tick files it` : 'the next tick files it'}`
-    : r.by === 'signoff'
-      ? `try ${r.try} due — a nudge to sign off, once a round: its session ended without its closeout`
-      : `try ${r.try} due — retries: ${step.retries ?? 0}, ${retriesSpent(run.steps[step.name])} spent`;
+export const dueNote = (step: Workflow, run: Run, r: Retry): string => {
+  if (r.by === 'ask') return askedNote(r);
+  if (r.by === 'signoff') return `try ${r.try} due — a nudge to sign off, once a round: its session ended without its closeout`;
+  if (r.by === 'pause') return pausedNote(r);
+  return `try ${r.try} due — retries: ${step.retries ?? 0}, ${retriesSpent(run.steps[step.name])} spent`;
+};
+
+/** A try a person asked for, as `dueNote` says it: its mode, budget and answer, and whether its session is stopped first. */
+const askedNote = (r: Retry): string => {
+  const budget = r.budget !== undefined ? `, --budget ${r.budget}` : '';
+  const answer = r.message !== undefined ? ', with your answer' : '';
+  const next = r.stopFirst ? `stopping its ${r.runsOn ? '' : 'blocked '}session, then the tick files it` : 'the next tick files it';
+  return `try ${r.try} asked (${modeWord(r)}${budget}${answer}) — ${next}`;
+};
+
+/** A try `wf pause --now` asked for, as `dueNote` says it once its task is stopped: the session continued, or the check run again. */
+const pausedNote = (r: Retry): string =>
+  r.mode === 'recheck'
+    ? `try ${r.try} due — its check was stopped by wf pause --now, and the next tick runs it again`
+    : `try ${r.try} due — its session was stopped by wf pause --now, and the next tick continues it`;
 
 /**
  * The ask a step's current try answers: a person's ask for exactly that try, with a message, honoured the way it asked — the try

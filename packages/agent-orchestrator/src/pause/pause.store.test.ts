@@ -37,7 +37,7 @@ test('a pause is put once, read back, refused while it stands, and lifted once',
   refusedAs(
     () => putPause({ by: 'bob' }),
     'Conflict',
-    'the store is already paused by ann since 2026-10-04T12:00:00.000Z: wf resume lifts it first.',
+    'the store is already paused by ann since 2026-10-04T12:00:00.000Z: wf resume lifts it first, and wf pause --now stops what still finishes under it.',
   );
   assert.deepEqual(readPause(), put);
   assert.deepEqual(resumePause(), put);
@@ -66,7 +66,11 @@ test('a cordon put before the switch is the pause: read, refused a second, unsch
   fs.writeFileSync(path.join(ROOT, 'cordon'), `${JSON.stringify(cordon)}\n`);
   assert.deepEqual(readPause(), cordon);
   assert.equal(storeAdmission().unschedulable(), true, 'the runtime admits nothing under it');
-  refusedAs(() => putPause({ by: 'bob' }), 'Conflict', `the store is already paused by ann since ${cordon.at}: wf resume lifts it first.`);
+  refusedAs(
+    () => putPause({ by: 'bob' }),
+    'Conflict',
+    `the store is already paused by ann since ${cordon.at}: wf resume lifts it first, and wf pause --now stops what still finishes under it.`,
+  );
   assert.deepEqual(resumePause(), cordon);
   assert.equal(fs.existsSync(path.join(ROOT, 'cordon')), false, 'wf resume removes it');
   assert.equal(storeAdmission().unschedulable(), false);

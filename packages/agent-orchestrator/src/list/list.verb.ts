@@ -180,13 +180,23 @@ const stagedOf = ({ run, read }: Read): PauseStaged[] => {
 };
 
 /**
- * The pause; each task still finishing under it among `runs`, over one read of every current task and check (`e.list`), never stored; and
- * each landing it holds with its merge staged among the runs read. A task whose journal does not read is not counted.
+ * The pause; each task still finishing under it among `runs`, over one read of every current task and check (`e.list`), never stored,
+ * with the asks waiting on its run; and each landing it holds with its merge staged among the runs read. A task whose journal does not
+ * read is not counted.
  */
 async function pausedOf(e: Engine, pause: Pause, runs: readonly Run[], reads: readonly Read[]): Promise<Paused> {
   const ids = [...new Set(runs.flatMap(currentTasks))];
   const read = new Map((ids.length ? (await e.list(ids)).views : []).map((v) => [v.id, v]));
-  return { pause, finishing: finishingAmong(runs, (taskId) => read.get(taskId), stepsOf), staged: reads.flatMap(stagedOf) };
+  return {
+    pause,
+    finishing: finishingAmong(
+      runs,
+      (taskId) => read.get(taskId),
+      stepsOf,
+      (run) => runStore.asks.read(run.id).asks,
+    ),
+    staged: reads.flatMap(stagedOf),
+  };
 }
 
 /**

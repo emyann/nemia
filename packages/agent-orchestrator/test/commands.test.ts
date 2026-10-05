@@ -91,9 +91,10 @@ test('each command is served on the api where it was before the table, the lift 
       ['hold', { method: 'DELETE', path: '/api/runs/:runId/hold', status: 200, sets: { off: true } }],
       ['rm', { method: 'DELETE', path: '/api/runs/:runId', status: 200 }],
       ['prune', { method: 'POST', path: '/api/runs/:runId/prune', status: 200, sets: { yes: true } }],
-      ['pause', { method: 'POST', path: '/api/pause', status: 200 }],
+      ['pause', { method: 'POST', path: '/api/pause', status: 200, sets: { yes: true } }],
       ['resume', { method: 'DELETE', path: '/api/pause', status: 200 }],
       ['paused', { method: 'GET', path: '/api/pause', status: 200 }],
+      ['pause now', { method: 'GET', path: '/api/pause/now', status: 200 }],
       [
         'workflows write',
         [
@@ -138,6 +139,7 @@ test('every command the api posts or deletes on writes, and the api guards it; t
       'skills list',
       'skills read',
       'paused',
+      'pause now',
       'workflows list',
       'workflows step',
       'watch',

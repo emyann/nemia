@@ -1,4 +1,7 @@
-/** The store's pause (`GET`, `POST` and `DELETE /api/pause`, the package's `paused`, `pause` and `resume`). */
+/**
+ * The store's pause (`GET`, `POST` and `DELETE /api/pause`, the package's `paused`, `pause` and `resume`), and what a pause at once would
+ * stop (`GET /api/pause/now`, the package's `pause now`).
+ */
 import { queryOptions } from '@tanstack/react-query';
 import { pace } from '../feed.ts';
 import { Schema } from 'effect';
@@ -10,8 +13,20 @@ export type Pause = { at: string; by: string; why?: string };
 /** Mirrors the package's `PauseStaged`: a run whose ending has its merge staged in `repo`'s checkout, its check held by the pause. */
 export type PauseStaged = { run: string; step: string; repo: string };
 
-/** Mirrors the package's `Finishing`: `run`'s `step`, still at work under the pause, as a session, a check, or a landing's check. */
-export type Finishing = { run: string; step: string; kind: 'session' | 'check' | 'landing' };
+/**
+ * Mirrors the package's `Finishing`: `run`'s `step`, still at work under the pause, as a session, a check, or a landing's check;
+ * `stopping` once it was asked to stop, and `resumed` while a pause at once's ask names it, which tries it again on the resume.
+ */
+export type Finishing = { run: string; step: string; kind: 'session' | 'check' | 'landing'; stopping?: true; resumed?: true };
+
+/** Mirrors the package's `Interrupt`: `run`'s `step`, its session at work or its check, which a pause at once stops. */
+export type Interrupt = { run: string; step: string; kind: 'session' | 'check' };
+
+/** What `GET /api/pause/now` answers: each task a pause at once would stop, and what an interrupted step costs, in the package's words. */
+export type PauseNowRead = { interrupts: readonly Interrupt[]; cost: string };
+
+/** What a pause or a lift answers: the pause put, kept or lifted; and, for a pause at once, whether it was kept and what it stopped. */
+export type PauseAnswer = { pause: Pause; kept?: boolean; interrupted?: readonly Interrupt[] };
 
 /**
  * Mirrors the package's `Paused`: the pause, null where none stands; each task still finishing under it, none once it is Paused; and each
@@ -30,13 +45,36 @@ const PauseSchema = Schema.Struct({
 const PausedSchema = Schema.Struct({
   pause: Schema.NullOr(PauseSchema),
   finishing: Schema.Array(
-    Schema.Struct({ run: Schema.String, step: Schema.String, kind: Schema.Literals(['session', 'check', 'landing']) }),
+    Schema.Struct({
+      run: Schema.String,
+      step: Schema.String,
+      kind: Schema.Literals(['session', 'check', 'landing']),
+      stopping: Schema.optional(Schema.Literal(true)),
+      resumed: Schema.optional(Schema.Literal(true)),
+    }),
   ),
   staged: Schema.Array(Schema.Struct({ run: Schema.String, step: Schema.String, repo: Schema.String })),
 }) satisfies Schema.Schema<Paused>;
 
-/** Decodes what a pause or a lift answers: the pause put, or the one lifted. */
-const PauseAnswerSchema = Schema.Struct({ pause: PauseSchema }) satisfies Schema.Schema<{ pause: Pause }>;
+/** Decodes an `Interrupt`. */
+const InterruptSchema = Schema.Struct({
+  run: Schema.String,
+  step: Schema.String,
+  kind: Schema.Literals(['session', 'check']),
+}) satisfies Schema.Schema<Interrupt>;
+
+/** Decodes a `PauseNowRead`. */
+const PauseNowSchema = Schema.Struct({
+  interrupts: Schema.Array(InterruptSchema),
+  cost: Schema.String,
+}) satisfies Schema.Schema<PauseNowRead>;
+
+/** Decodes a `PauseAnswer`. */
+const PauseAnswerSchema = Schema.Struct({
+  pause: PauseSchema,
+  kept: Schema.optional(Schema.Boolean),
+  interrupted: Schema.optional(Schema.Array(InterruptSchema)),
+}) satisfies Schema.Schema<PauseAnswer>;
 
 /** Whether the store is paused, and what finishes under it: polled at `pace`, since the feed says nothing of either. */
 export const pauseQuery = queryOptions({
@@ -46,13 +84,27 @@ export const pauseQuery = queryOptions({
 });
 
 /**
- * Pauses the store, as the package's `pause` does, saying `why` when given: from the next pass nothing new starts, and what runs
- * finishes. Rejects with the api's refusal in full — the package's words for a store already paused — or its own about the request.
+ * What a pause at once would stop now, read when a person asks for it and never polled: the api reads every run's tasks to answer it.
+ * Kept by no cache, so each confirm reads it afresh.
  */
-export const putPause = (why?: string): Promise<{ pause: Pause }> =>
+export const pauseNowQuery = queryOptions({
+  queryKey: ['pause', 'now'],
+  queryFn: (): Promise<PauseNowRead> => get('/api/pause/now', PauseNowSchema),
+  gcTime: 0,
+});
+
+/**
+ * Pauses the store, as the package's `pause` does, saying `why` when given: from the next pass nothing new starts, and what runs
+ * finishes. With `now`, a pause at once, as the package's `pauseNow`: what runs is asked to stop too, each step tried again on the
+ * resume, and a pause that stands is kept as it was. Rejects with the api's refusal in full — the package's words for a store already
+ * paused — or its own about the request.
+ */
+export const putPause = (why?: string, now?: boolean): Promise<PauseAnswer> =>
   send('POST', '/api/pause', PauseAnswerSchema, {
-    body: why ? { why } : {},
-    may: 'The store may be paused: read the board again before pausing it again.',
+    body: { ...(why ? { why } : {}), ...(now ? { now: true } : {}) },
+    may: now
+      ? 'The store may be paused and what ran asked to stop: read the board again before pausing it again.'
+      : 'The store may be paused: read the board again before pausing it again.',
   });
 
 /**

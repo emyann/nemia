@@ -34,6 +34,7 @@ const EarlierTrySchema = Schema.StructWithRest(
     then: Schema.Literals(['retries', 'signoff', 'nudge', 'fresh', 'recheck', 'round', 'back']),
     model: Schema.optional(Schema.String),
     budget: Schema.optional(Schema.Finite),
+    paused: Schema.optional(Schema.Literal(true)),
   }),
   Rest,
 );
@@ -371,6 +372,19 @@ export const roundAskFile = (id: string, step: string, round: number): string =>
 export const approvalFile = (id: string, step: string, n: number): string => path.join(asksDir(id), `approve-${step}-${n}`);
 export const acceptFile = (id: string, step: string, n: number): string => path.join(asksDir(id), `accept-${step}-${n}`);
 
+/** The names of the files in `dir`, sorted; undefined where it cannot be listed, as when it was never made. */
+const fileNames = (dir: string): string[] | undefined => {
+  try {
+    return fs
+      .readdirSync(dir, { withFileTypes: true })
+      .filter((d) => d.isFile())
+      .map((d) => d.name)
+      .sort();
+  } catch {
+    return undefined;
+  }
+};
+
 /**
  * The approvals at a run's gates, waiting in its asks directory — each opens the gate of the try it names — and a line for each file named
  * as one that cannot be read as one.
@@ -382,16 +396,8 @@ export function readApprovals(id: string): { approvals: Approval[]; notes: strin
 function readApprovalsNow(id: string): { approvals: Approval[]; notes: string[] } {
   const approvals: Approval[] = [];
   const notes: string[] = [];
-  let names: string[];
-  try {
-    names = fs
-      .readdirSync(asksDir(id), { withFileTypes: true })
-      .filter((d) => d.isFile())
-      .map((d) => d.name)
-      .sort();
-  } catch {
-    return { approvals, notes };
-  }
+  const names = fileNames(asksDir(id));
+  if (!names) return { approvals, notes };
   for (const name of names) {
     const approved = /^approve-(.+)-(\d+)$/.exec(name);
     if (!approved) continue;
@@ -426,6 +432,7 @@ const RetryAskFileSchema = Schema.StructWithRest(
     model: Schema.optionalKey(Schema.NonEmptyString),
     message: Schema.optionalKey(Said),
     budget: Schema.optionalKey(Dollars),
+    interrupted: Schema.optionalKey(Schema.NonEmptyString),
     at: Schema.optionalKey(Schema.Unknown),
   }),
   Rest,
@@ -476,16 +483,8 @@ export function readAcceptances(id: string): { acceptances: Acceptance[]; notes:
 function readAcceptancesNow(id: string): { acceptances: Acceptance[]; notes: string[] } {
   const acceptances: Acceptance[] = [];
   const notes: string[] = [];
-  let names: string[];
-  try {
-    names = fs
-      .readdirSync(asksDir(id), { withFileTypes: true })
-      .filter((d) => d.isFile())
-      .map((d) => d.name)
-      .sort();
-  } catch {
-    return { acceptances, notes };
-  }
+  const names = fileNames(asksDir(id));
+  if (!names) return { acceptances, notes };
   for (const name of names) {
     const took = /^accept-(.+)-(\d+)$/.exec(name);
     if (!took) continue;
@@ -530,16 +529,8 @@ function readAsksNow(id: string): { asks: RetryAsk[]; rounds: RoundAsk[]; notes:
   const asks: RetryAsk[] = [];
   const rounds: RoundAsk[] = [];
   const notes: string[] = [];
-  let names: string[];
-  try {
-    names = fs
-      .readdirSync(asksDir(id), { withFileTypes: true })
-      .filter((d) => d.isFile())
-      .map((d) => d.name)
-      .sort();
-  } catch {
-    return { asks, rounds, notes };
-  }
+  const names = fileNames(asksDir(id));
+  if (!names) return { asks, rounds, notes };
   notes.push(...readApprovals(id).notes, ...readAcceptances(id).notes);
   for (const name of names) {
     const tried = /^retry-(.+)-(\d+)$/.exec(name);
@@ -568,6 +559,15 @@ export function roundAskIn(file: string, step: string, round: number): RoundAsk 
   return { step, round, ...(budget === undefined ? {} : { budget }), at: isText(at) ? at : '' };
 }
 
+/** Why an ask file cannot be read, by the field its schema refused (`refused`) of what it holds (`held`). */
+function askRefusal(refused: string, held: unknown): string {
+  if (refused === 'model') return 'its model is not a name';
+  if (refused === 'message') return messageWords(held);
+  if (refused === 'budget') return BUDGET_WORDS;
+  if (refused === 'interrupted') return 'the task it names as interrupted is not an id';
+  return `it asks for no mode wf retry knows (${JSON.stringify(fieldOf(held, 'mode'))})`;
+}
+
 /**
  * One ask file, read: the step and the try from its name, how, when and what was said from what it holds — or why it cannot be read.
  * A file with no message reads as an ask without one. What `wf retry` refuses to write is refused here too, so a file written by hand is
@@ -578,13 +578,8 @@ export function askIn(file: string, step: string, n: number): RetryAsk | string 
   const held = heldIn(file);
   if ('unreadable' in held) return held.unreadable;
   const read = readAs(RetryAskFileSchema, held.read);
-  if ('refused' in read) {
-    if (read.refused === 'model') return 'its model is not a name';
-    if (read.refused === 'message') return messageWords(held.read);
-    if (read.refused === 'budget') return BUDGET_WORDS;
-    return `it asks for no mode wf retry knows (${JSON.stringify(fieldOf(held.read, 'mode'))})`;
-  }
-  const { mode, model, message, budget, at } = read.read;
+  if ('refused' in read) return askRefusal(read.refused, held.read);
+  const { mode, model, message, budget, interrupted, at } = read.read;
   if (message !== undefined && mode === 'recheck') return 'it carries a message and asks for a recheck, which files no session to read it';
   if (budget !== undefined && mode === 'recheck') return 'it carries a budget and asks for a recheck, which files no session to spend it';
   return {
@@ -594,6 +589,7 @@ export function askIn(file: string, step: string, n: number): RetryAsk | string 
     ...(model === undefined ? {} : { model }),
     ...(message === undefined ? {} : { message }),
     ...(budget === undefined ? {} : { budget }),
+    ...(interrupted === undefined ? {} : { interrupted }),
     at: isText(at) ? at : '',
   };
 }
@@ -610,16 +606,7 @@ export function readAnswers(id: string): RetryAsk[] {
 function readAnswersNow(id: string): RetryAsk[] {
   const answers: RetryAsk[] = [];
   for (const dir of [asksDir(id), path.join(asksDir(id), 'done')]) {
-    let names: string[];
-    try {
-      names = fs
-        .readdirSync(dir, { withFileTypes: true })
-        .filter((d) => d.isFile())
-        .map((d) => d.name)
-        .sort();
-    } catch {
-      continue;
-    }
+    const names = fileNames(dir) ?? [];
     for (const name of names) {
       const tried = /^retry-(.+)-(\d+)$/.exec(name);
       const ask = tried ? askIn(path.join(dir, name), tried[1], Number(tried[2])) : undefined;
@@ -650,18 +637,19 @@ export function writeAsk(file: string, ask: RetryAsk | RoundAsk | Approval | Acc
 }
 
 /**
- * Move each ask the run's record already answers into `done/` — and each approval a later try of its step spent (`spentApprovals`), and
+ * Move each ask the run's record already answers into `done/`, and each one of `voided` — an ask `wf pause --now` wrote that the pass found
+ * void (`pauseAskVoid`) — and each approval a later try of its step spent (`spentApprovals`), and
  * each acceptance one spent (`spentAcceptances`). The tick's one touch on a person's file, and never an edit. `done/` is made inside the
  * run's asks directory, never the directory itself, which `wf rm` may remove mid-pass; an ask already moved by a pass beside this one, or
  * removed with its run, is passed over.
  */
-export function consumeAsks(run: Run, asks: readonly RetryAsk[], rounds: readonly RoundAsk[]): void {
-  within('act', () => consumeNow(run, asks, rounds));
+export function consumeAsks(run: Run, asks: readonly RetryAsk[], rounds: readonly RoundAsk[], voided: readonly RetryAsk[] = []): void {
+  within('act', () => consumeNow(run, asks, rounds, voided));
 }
 
-function consumeNow(run: Run, asks: readonly RetryAsk[], rounds: readonly RoundAsk[]): void {
+function consumeNow(run: Run, asks: readonly RetryAsk[], rounds: readonly RoundAsk[], voided: readonly RetryAsk[]): void {
   const spent = [
-    ...spentAsks(run, asks).map((a) => askFile(run.id, a.step, a.try)),
+    ...[...new Set([...spentAsks(run, asks), ...voided])].map((a) => askFile(run.id, a.step, a.try)),
     ...spentRoundAsks(run, rounds).map((a) => roundAskFile(run.id, a.step, a.round)),
     ...spentApprovals(run).map((a) => approvalFile(run.id, a.step, a.try)),
     ...spentAcceptances(run).map((a) => acceptFile(run.id, a.step, a.try)),

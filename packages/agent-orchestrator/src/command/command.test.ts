@@ -370,7 +370,7 @@ test("the table's help is today's, word for word", () => {
       '                               a worktree locked, on no branch, or with changes no commit has;',
       '                               and a finished run not merged unless --unmerged, with --artifacts',
       '                               as without: its files are what a person reads to decide it',
-      '  wf pause [--why "<words>"] [--by <name>]',
+      '  wf pause [--why "<words>"] [--by <name>] [--now [--yes]]',
       '                               pause the store: no pass starts new work — no step, try, round or',
       '                               check filed, no queued task admitted, no queued card started — and',
       '                               what runs finishes, its end and closeout recorded; a landing whose',
@@ -382,6 +382,11 @@ test("the table's help is today's, word for word", () => {
       '                               Refused while a pause stands.',
       '                               --why: the reason, said wherever the pause is; --by: who pauses it',
       '                               (default: your OS user)',
+      '                               --now: pause at once — each step session or check at work, but a',
+      '                               landing, is asked to stop and tried again on wf resume: a nudge of',
+      '                               its session, or a recheck. A pause that stands is kept as it was.',
+      '                               --yes: with --now, act; without it, --now only says what it would',
+      '                               interrupt',
       '  wf resume',
       '                               resume the store: the next pass files what waits',
       '  wf tick [--stats]',
@@ -548,7 +553,7 @@ test("REFUSED at shipped defaults: wf hold's arguments, before any run is read, 
 
 test("REFUSED at shipped defaults: wf pause's and wf resume's arguments, before the store is read, in their words whole", () => {
   const pause = entry('pause');
-  const shape = 'wf pause [--why "<words>"] [--by <name>]';
+  const shape = 'wf pause [--why "<words>"] [--by <name>] [--now [--yes]]';
   assert.equal(refusedBy(pause, ['--why', '--by']), `--why takes the words for why the store is paused: ${shape}.`);
   assert.equal(refusedBy(pause, ['--by']), `--by takes who pauses it, by a name: ${shape}.`);
   assert.equal(refusedBy(pause, ['--why', '--x']), `--why takes the words for why the store is paused: ${shape}.`);
@@ -561,6 +566,8 @@ test("REFUSED at shipped defaults: wf pause's and wf resume's arguments, before 
   assert.equal(refusedBy(pause, ['now']), `wf pause does not take now: ${shape}.`);
   assert.equal(refusedBy(pause, ['--why', 'merging by hand', '--by=ann']), null);
   assert.equal(refusedBy(pause, []), null);
+  assert.equal(refusedBy(pause, ['--now', '--now=yes']), `wf pause does not take --now=yes: ${shape}.`);
+  assert.equal(refusedBy(pause, ['--now', '--yes', '--why', 'the bill']), null);
   assert.equal(refusedBy(entry('resume'), ['--all']), 'wf resume takes no --all: it resumes the store, whoever paused it.');
   assert.equal(refusedBy(entry('resume'), []), null);
 });

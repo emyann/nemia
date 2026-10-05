@@ -517,8 +517,11 @@ export type RunStore = {
     readonly read: (id: string) => AsksRead;
     /** Every ask that carried a message, waiting or consumed. */
     readonly answers: (id: string) => RetryAsk[];
-    /** Set aside each ask, approval and acceptance the run's record already answers: consumed, never edited. */
-    readonly consume: (run: Run, asks: readonly RetryAsk[], rounds: readonly RoundAsk[]) => void;
+    /**
+     * Set aside each ask, approval and acceptance the run's record already answers, and each ask of `voided` (an ask `wf pause --now`
+     * wrote, found void): consumed, never edited.
+     */
+    readonly consume: (run: Run, asks: readonly RetryAsk[], rounds: readonly RoundAsk[], voided?: readonly RetryAsk[]) => void;
     /**
      * Write a person's ask, whole and exclusively, keyed by its kind, its step and its number: never over a file at its name, which is
      * answered as `written: false`, with why that file is no ask of its kind (`AskWritten`).

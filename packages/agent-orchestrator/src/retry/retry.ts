@@ -41,7 +41,7 @@ import {
   budgetWord,
 } from '../status/status.ts';
 import type { Verdict } from '../check/check.ts';
-import { retriesSpent, signoffsSpent, type Retry, type RetryAsk, type RetryMode } from './retry-ask.ts';
+import { retriesSpent, signoffsSpent, type EarlierTry, type Retry, type RetryAsk, type RetryMode } from './retry-ask.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 import type { Decision, Offer } from '../decide/decide.ts';
 import { filedDenies, landedWords } from '../ending/ending.ts';
@@ -166,6 +166,54 @@ export const carries = (a: Pick<RetryAsk, 'mode' | 'budget'>, raise: Raise | und
  */
 export const heard = (a: Pick<RetryAsk, 'message'>, sendsBack: true | undefined): boolean => !sendsBack || a.message !== undefined;
 
+/** The task a pause's ask is written for, as the step's record names it now: its check's for a recheck, else its session's. */
+const currentOf = (run: Run, a: RetryAsk): string | null | undefined =>
+  a.mode === 'recheck' ? run.steps[a.step]?.check?.taskId : run.steps[a.step]?.taskId;
+
+/**
+ * Whether an ask may be due on its task's standing: any ask of a person's own, and the ask `wf pause --now` wrote (`interrupted`) only
+ * while the task it stopped is still the step's current one and the engine reads it settled `stopped`. So such an ask never stops a session
+ * first, and never tries a step that ended on its own before its stop was taken.
+ */
+const pauseAskDue = (run: Run, a: RetryAsk, phaseOf: (taskId: string) => TaskPhase): boolean =>
+  a.interrupted === undefined || (currentOf(run, a) === a.interrupted && phaseOf(a.interrupted) === 'stopped');
+
+/**
+ * Whether the ask `wf pause --now` wrote for a task (`interrupted`) is void: never to be filed, and set aside by the tick, paused or not
+ * (`consumeAsks`). Void once the step's current task is another — a later try replaced it — or once that task settled other than
+ * `stopped` — it succeeded or failed on its own, its check exited with a number — or settled `stopped` on a step over its budget, which
+ * the ask, written with no `--budget`, does not carry (`carries`). Not void while the task has not settled: its stop may still be taken.
+ * An ask of a person's own is never void here. Pure.
+ *
+ * @param spendOf What each task's sessions cost (`taskSpend`): what holds a step over its budget.
+ */
+export function pauseAskVoid(
+  step: Workflow,
+  run: Run,
+  a: RetryAsk,
+  phaseOf: (taskId: string) => TaskPhase,
+  spendOf: SpendOf = () => undefined,
+): boolean {
+  if (a.interrupted === undefined) return false;
+  if (currentOf(run, a) !== a.interrupted) return true;
+  const phase = phaseOf(a.interrupted);
+  if (!SETTLED.has(phase)) return false;
+  return phase !== 'stopped' || !carries(a, overBudget(step, run, spendOf) ? raiseOf(step, run, spendOf) : undefined);
+}
+
+/** The asks among `asks` that `wf pause --now` wrote and that are void on this pass (`pauseAskVoid`), each of a step of `steps`. Pure. */
+export const pauseAsksVoid = (
+  steps: readonly Workflow[],
+  run: Run,
+  asks: readonly RetryAsk[],
+  phaseOf: (taskId: string) => TaskPhase,
+  spendOf: SpendOf = () => undefined,
+): RetryAsk[] =>
+  asks.filter((a) => {
+    const step = steps.find((s) => s.name === a.step);
+    return step !== undefined && pauseAskVoid(step, run, a, phaseOf, spendOf);
+  });
+
 /**
  * The tries due now. Pure, and blind to cancellation on purpose: `assess` answers for a cancelled run, and
  * `advance` looks for a try a pass filed and never wrote down whatever became of the run after.
@@ -218,6 +266,7 @@ export function retriesDue(
   spendOf: SpendOf = () => undefined,
 ): Retry[] {
   const due: Retry[] = [];
+  const open = asks.filter((a) => pauseAskDue(run, a, phaseOf));
   for (const step of steps) {
     const record = run.steps[step.name];
     const { status, modes, blockedByHarness, sendsBack, back, raise } = retryable(
@@ -237,7 +286,7 @@ export function retriesDue(
     const ways = unsettled ? STOPPED_FIRST : modes;
     if (!ways.length) continue;
     const next = tryOf(run, step.name) + 1;
-    const ask = asks.find(
+    const ask = open.find(
       (a) => a.step === step.name && a.try === next && ways.includes(a.mode) && carries(a, raise) && heard(a, sendsBack),
     );
     if (ask) {
@@ -248,7 +297,7 @@ export function retriesDue(
         ...(ask.model ? { model: ask.model } : {}),
         ...(ask.message !== undefined ? { message: ask.message } : {}),
         ...(raise && ask.mode !== 'recheck' ? { budget: ask.budget } : {}),
-        by: 'ask',
+        by: askedBy(ask),
         ...(unsettled ? { stopFirst: true as const, ...(blockedByHarness ? {} : { runsOn: true as const }) } : {}),
         ...(back && !unsettled ? { back } : {}),
       });
@@ -265,6 +314,9 @@ export function retriesDue(
   }
   return due.filter((r) => !due.some((o) => o.back?.includes(r.step)));
 }
+
+/** Who asked for a try by its ask: `wf pause --now`, where the ask names the task it stopped, else a person. */
+const askedBy = (ask: RetryAsk): 'ask' | 'pause' => (ask.interrupted === undefined ? 'ask' : 'pause');
 
 /**
  * The ways a person's try of a step whose task has not settled may be asked for: those `retryable` takes for a session its harness blocked.
@@ -286,19 +338,18 @@ export function tryNote(step: Workflow, record: StepRecord | undefined, steps: r
   const inRound = looping && round > 1 ? roundWord(round, capOf(looping)) : '';
   const raised = last.budget !== undefined ? `budget ${budgetWord(last.budget)}` : '';
   if (last.then === 'round') return [inRound, raised].filter(Boolean).join(', ');
-  const how =
-    last.then === 'retries'
-      ? `by retries: ${step.retries ?? 0}`
-      : last.then === 'signoff'
-        ? 'nudged to sign off by the run'
-        : last.then === 'recheck'
-          ? 'rechecked on your word'
-          : last.then === 'fresh'
-            ? `fresh${last.model ? ` on ${last.model}` : ''}, on your word`
-            : last.then === 'back'
-              ? 'sent back with the work, on your word'
-              : 'nudged on your word';
+  const how = howOf(step, last);
   return [inRound, `try ${record!.tries!.length + 1}, ${how}`, raised, answered ? 'answered' : ''].filter(Boolean).join(', ');
+}
+
+/** How a try was asked for, as `tryNote` says it: by `retries:`, the run's sign-off nudge, the pause, or a person's word and its mode. */
+function howOf(step: Workflow, last: EarlierTry): string {
+  if (last.then === 'retries') return `by retries: ${step.retries ?? 0}`;
+  if (last.then === 'signoff') return 'nudged to sign off by the run';
+  if (last.paused) return `${last.then === 'recheck' ? 'rechecked' : 'continued'} after wf pause --now`;
+  if (last.then === 'recheck') return 'rechecked on your word';
+  if (last.then === 'fresh') return `fresh${last.model ? ` on ${last.model}` : ''}, on your word`;
+  return last.then === 'back' ? 'sent back with the work, on your word' : 'nudged on your word';
 }
 
 /** What a new session of a step over its budget needs, beside an offer that files one: a `--budget` above what its tries have cost. */

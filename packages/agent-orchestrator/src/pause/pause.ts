@@ -6,6 +6,7 @@
  * and the tick's `pass`.
  */
 import type { Run } from '../record/record.ts';
+import type { RetryAsk } from '../retry/index.ts';
 import type { Workflow } from '../step/step.ts';
 import { landsOnCheck } from '../status/status.ts';
 import { phaseOfView, type WordView } from '../views/views-words.ts';
@@ -24,9 +25,16 @@ export type PauseStaged = { run: string; step: string; repo: string };
 
 /**
  * A task still at work under the pause, which it lets finish: `run`'s `step`, as a `session` at work, the `check` of its work, or the
- * check of a `landing` (an ending that lands on its check).
+ * check of a `landing` (an ending that lands on its check) — `stopping` once the engine was asked to stop it, and `resumed` while an ask
+ * `wf pause --now` wrote names it (`interrupted`), which tries it again on the resume. A stop asked by another hand carries no `resumed`.
  */
-export type Finishing = { run: string; step: string; kind: 'session' | 'check' | 'landing' };
+export type Finishing = { run: string; step: string; kind: 'session' | 'check' | 'landing'; stopping?: true; resumed?: true };
+
+/**
+ * A task a pause at once stops (`wf pause --now`): `run`'s `step`, its `session` at work or the `check` of its work, by the task's id. A
+ * landing is never one.
+ */
+export type Interrupt = { run: string; step: string; kind: 'session' | 'check'; taskId: string };
 
 /**
  * What a reader of the whole store is told of the pause: the pause, or null; each task still finishing under it, none once it is
@@ -37,8 +45,14 @@ export type Paused = { pause: Pause | null; finishing: Finishing[]; staged: Paus
 /** The pause as a pass reads it while it stands: the pause, each task still finishing under it, and each landing it holds staged. */
 export type PauseStanding = { pause: Pause; finishing: Finishing[]; staged: PauseStaged[] };
 
-/** A task's view as `finishingOf` reads it: the words' view (`WordView`), and whether the runtime holds it queued for a slot. */
-export type FinishingView = WordView & { admission?: string };
+/**
+ * A task's view as `finishingOf` reads it: the words' view (`WordView`), whether the runtime holds it queued for a slot, and whether it was
+ * asked to stop (`stopRequested`).
+ */
+export type FinishingView = WordView & { admission?: string; state: WordView['state'] & { stopRequested?: boolean } };
+
+/** What a pause at once costs, as `wf pause --now` and the board's confirm say it before it is paid. */
+export const NOW_COST = 'An interrupted step redoes its unfinished work and reads its context again.';
 
 /** How `wf resume` is typed, as every line that offers it says it. */
 export const RESUME_LINE = 'wf resume';
@@ -46,39 +60,84 @@ export const RESUME_LINE = 'wf resume';
 /**
  * The tasks of `run` still at work, which the pause lets finish: each step's current task and its check's, pending or running. Left out:
  * one the runtime holds queued, which no pass admits under the pause; a session that waits on a person (`needs-human`), which holds no
- * slot and does no work until answered; and one with no view.
+ * slot and does no work until answered; and one with no view. Each is `resumed` where one of `asks`, the run's waiting asks, names it.
  */
-export function finishingOf(run: Run, steps: readonly Workflow[], viewOf: (taskId: string) => FinishingView | undefined): Finishing[] {
-  const finishing: Finishing[] = [];
-  for (const step of steps) {
-    const record = run.steps[step.name];
-    const tasks = [
-      [record?.taskId, 'session'],
-      [record?.check?.taskId, landsOnCheck(step, run) ? 'landing' : 'check'],
-    ] as const;
-    for (const [taskId, kind] of tasks) {
-      const view = taskId ? viewOf(taskId) : undefined;
-      if (view && atWork(view)) finishing.push({ run: run.id, step: step.name, kind });
-    }
-  }
-  return finishing;
+export function finishingOf(
+  run: Run,
+  steps: readonly Workflow[],
+  viewOf: (taskId: string) => FinishingView | undefined,
+  asks: readonly RetryAsk[] = [],
+): Finishing[] {
+  return steps.flatMap((step) =>
+    stepAtWork(run, step, viewOf).map(({ taskId, kind, view }) => ({
+      run: run.id,
+      step: step.name,
+      kind: kind === 'check' && landsOnCheck(step, run) ? ('landing' as const) : kind,
+      ...(view.state.stopRequested ? { stopping: true as const } : {}),
+      ...(asks.some((a) => a.step === step.name && a.interrupted === taskId) ? { resumed: true as const } : {}),
+    })),
+  );
 }
 
+/** The session and the check of `step` in `run` at work (`atWork`), each with its task id and its view. */
+const stepAtWork = (
+  run: Run,
+  step: Workflow,
+  viewOf: (taskId: string) => FinishingView | undefined,
+): { taskId: string; kind: 'session' | 'check'; view: FinishingView }[] => {
+  const record = run.steps[step.name];
+  return (
+    [
+      [record?.taskId, 'session'],
+      [record?.check?.taskId, 'check'],
+    ] as const
+  ).flatMap(([taskId, kind]) => {
+    const view = taskId ? viewOf(taskId) : undefined;
+    return taskId && view && atWork(view) ? [{ taskId, kind, view }] : [];
+  });
+};
+
 /**
- * Each task still finishing under the pause among `runs` (`finishingOf`), each run's steps read (`stepsOf`) only where one of its current
- * tasks or checks is at work.
+ * The tasks of `run` a pause at once stops: those still at work as `finishingOf` reads them, but a step's in the repository's own
+ * checkout (`workspace: main`), whose session, check and merge are a landing and finish, and one the engine was already asked to stop.
+ */
+export function interruptsOf(run: Run, steps: readonly Workflow[], viewOf: (taskId: string) => FinishingView | undefined): Interrupt[] {
+  return steps
+    .filter((step) => step.workspace !== 'main')
+    .flatMap((step) =>
+      stepAtWork(run, step, viewOf)
+        .filter(({ view }) => !view.state.stopRequested)
+        .map(({ taskId, kind }) => ({ run: run.id, step: step.name, kind, taskId })),
+    );
+}
+
+/** Each task a pause at once stops among `runs` (`interruptsOf`), a run's steps read (`stepsOf`) only where one of its tasks is at work. */
+export function interruptsAmong(
+  runs: readonly Run[],
+  viewOf: (taskId: string) => FinishingView | undefined,
+  stepsOf: (run: Run) => readonly Workflow[],
+): Interrupt[] {
+  return runs.filter((run) => live(run, viewOf)).flatMap((run) => interruptsOf(run, stepsOf(run), viewOf));
+}
+
+/** Whether one of `run`'s current tasks or checks is at work. */
+const live = (run: Run, viewOf: (taskId: string) => FinishingView | undefined): boolean =>
+  currentTasks(run).some((taskId) => {
+    const view = viewOf(taskId);
+    return view !== undefined && atWork(view);
+  });
+
+/**
+ * Each task still finishing under the pause among `runs` (`finishingOf`), each run's steps read (`stepsOf`) and its waiting asks
+ * (`asksOf`) only where one of its current tasks or checks is at work.
  */
 export function finishingAmong(
   runs: readonly Run[],
   viewOf: (taskId: string) => FinishingView | undefined,
   stepsOf: (run: Run) => readonly Workflow[],
+  asksOf: (run: Run) => readonly RetryAsk[] = () => [],
 ): Finishing[] {
-  const live = (run: Run): boolean =>
-    currentTasks(run).some((taskId) => {
-      const view = viewOf(taskId);
-      return view !== undefined && atWork(view);
-    });
-  return runs.filter(live).flatMap((run) => finishingOf(run, stepsOf(run), viewOf));
+  return runs.filter((run) => live(run, viewOf)).flatMap((run) => finishingOf(run, stepsOf(run), viewOf, asksOf(run)));
 }
 
 /** Every step's current task and its check's, of `run`: what may still be at work. */
@@ -109,9 +168,56 @@ export const pausedWords = ({ pause, finishing }: Pick<Paused, 'pause' | 'finish
     : `Paused ${sinceWords(pause)} — nothing runs and nothing new starts; ${RESUME_LINE} resumes it`;
 };
 
-/** A task still finishing under the pause, in one line: its run, its step, and what of it is at work. */
-export const finishingWords = ({ run, step, kind }: Finishing): string =>
-  `${run}'s ${step} is finishing: ${kind === 'session' ? 'its session is at work' : kind === 'check' ? 'its check runs' : 'the check of its landing runs'}`;
+/**
+ * A task still finishing under the pause, in one line: its run, its step, and what of it is at work; once asked to stop, that it is
+ * stopping, and that wf resume tries it again only where a pause at once's ask names it (`resumed`).
+ */
+export const finishingWords = ({ run, step, kind, stopping, resumed }: Finishing): string =>
+  stopping
+    ? `${run}'s ${step} is stopping: its ${kind === 'session' ? 'session' : 'check'} was asked to stop${resumed ? `, and is tried again on ${RESUME_LINE}` : ''}`
+    : `${run}'s ${step} is finishing: ${kind === 'session' ? 'its session is at work' : kind === 'check' ? 'its check runs' : 'the check of its landing runs'}`;
+
+/** A task a pause at once stops, in words: its run, its step, and whether its session or its check. */
+export const interruptWords = ({ run, step, kind }: Interrupt): string =>
+  `${run}'s ${step}: its ${kind === 'session' ? 'session' : 'check'}`;
+
+/** What a pause at once did, as `wf pause --now --yes` answers it: the pause, whether it stood already, what it stopped and left. */
+export type PausedNow = { pause: Pause; kept: boolean; interrupted: Interrupt[]; skipped: Interrupt[] };
+
+/** How `wf pause --now` acts once it is shown what it stops. */
+export const NOW_LINE = 'wf pause --now --yes';
+
+/**
+ * What `wf pause --now` says before it acts: that it would put the pause, or keep the one that stands (`standing`); each task it would
+ * stop, what that costs (`NOW_COST`), that a landing finishes, and the line that acts (`NOW_LINE`). With nothing at work, it says so.
+ */
+export const nowLines = (interrupts: readonly Interrupt[], standing = false): string[] => {
+  const pausing = standing ? "would keep the store's pause as it stands" : 'would pause the store';
+  return [
+    interrupts.length
+      ? `wf pause --now ${pausing} and stop ${interrupts.length} at work, each tried again on ${RESUME_LINE}:`
+      : `wf pause --now ${pausing}; nothing outside a landing is at work, so it stops nothing.`,
+    ...interrupts.map((i) => `   ${interruptWords(i)}`),
+    `${NOW_COST} A landing that checks or merges is left to finish.`,
+    `${NOW_LINE} does it.`,
+  ];
+};
+
+/**
+ * What `wf pause --now --yes` says once it acted: the pause put, or the one that stood kept as it was put; each task it stopped, or that
+ * none was at work; each it left at work, since a try of it was asked for already; and the cost.
+ */
+export const pausedNowLines = ({ pause, kept, interrupted, skipped }: PausedNow): string[] => [
+  kept
+    ? `the store's pause stands as it was put, ${sinceWords(pause)}; now what runs is asked to stop`
+    : `the store is paused at once ${sinceWords(pause)} — what runs is asked to stop, and a landing finishes; ${RESUME_LINE} resumes it`,
+  interrupted.length
+    ? `asked to stop ${interrupted.length}, each tried again on ${RESUME_LINE}:`
+    : 'nothing outside a landing was at work: nothing was stopped',
+  ...interrupted.map((i) => `   ${interruptWords(i)}`),
+  ...skipped.map((i) => `   ${interruptWords(i)} — left at work: a try of it is asked for already`),
+  ...(interrupted.length ? [NOW_COST] : []),
+];
 
 /** A landing the pause holds, in one line: its run, and the checkout its merge is staged in until the resume. */
 export const stagedWords = ({ run, step, repo }: PauseStaged): string =>

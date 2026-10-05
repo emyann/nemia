@@ -606,8 +606,7 @@
     {
       "files": ["packages/agent-orchestrator/src/brief/brief-sections.ts"],
       "rules": {
-        "complexity": ["error", { "max": 24 }],
-        "sonarjs/cognitive-complexity": ["error", 29]
+        "sonarjs/cognitive-complexity": ["error", 18]
       }
     },
     {
@@ -701,8 +700,7 @@
     {
       "files": ["packages/agent-orchestrator/src/record/record.store.ts"],
       "rules": {
-        "max-lines": ["error", { "max": 551, "skipBlankLines": true, "skipComments": true }],
-        "sonarjs/cognitive-complexity": ["error", 16]
+        "max-lines": ["error", { "max": 534, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {

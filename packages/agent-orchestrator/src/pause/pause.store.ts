@@ -63,7 +63,7 @@ function osUser(): string | undefined {
 
 /**
  * Pauses the store: writes its file, created only where none is, and answers the pause as written — `by` the name given, else the
- * machine's user. Refuses (`Conflict`) a store already paused, naming who paused it and `wf resume`.
+ * machine's user. Refuses (`Conflict`) a store already paused, naming who paused it, `wf resume`, and `wf pause --now`.
  */
 export function putPause(said: { why?: string; by?: string }, now: Date = new Date()): Pause {
   const by = said.by ?? osUser() ?? 'someone';
@@ -75,7 +75,7 @@ export function putPause(said: { why?: string; by?: string }, now: Date = new Da
     if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
     const stands = readPause();
     throw new Conflict({
-      message: `the store is already paused${stands?.by ? ` by ${stands.by}` : ''}${stands?.at ? ` since ${stands.at}` : ''}: ${RESUME_LINE} lifts it first.`,
+      message: `the store is already paused${stands?.by ? ` by ${stands.by}` : ''}${stands?.at ? ` since ${stands.at}` : ''}: ${RESUME_LINE} lifts it first, and wf pause --now stops what still finishes under it.`,
     });
   }
   return pause;

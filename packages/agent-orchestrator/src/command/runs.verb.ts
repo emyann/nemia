@@ -16,9 +16,21 @@ import { Conflict, Missing } from '../refusal/refusal.ts';
 import { BY_CAP, oneLine, WHY_CAP, type Hold } from '../record/record.ts';
 import { holdWord } from '../wait/wait.ts';
 import { hold, unhold } from '../wait/wait.verb.ts';
-import { resumePause, putPause } from '../pause/pause.store.ts';
-import { pauseWords, RESUMED, type Pause, type Paused } from '../pause/pause.ts';
+import { readPause, resumePause, putPause } from '../pause/pause.store.ts';
+import { nowRead, pauseNow } from '../pause/pause.verb.ts';
+import {
+  NOW_COST,
+  nowLines,
+  pausedNowLines,
+  pauseWords,
+  RESUMED,
+  type Interrupt,
+  type Pause,
+  type Paused,
+  type PausedNow,
+} from '../pause/pause.ts';
 import { pausedRead } from '../list/list.verb.ts';
+import type { Engine } from '../runtime-client.ts';
 import type { Args } from './command.ts';
 import type { Command, Ran } from './entry.verb.ts';
 
@@ -300,7 +312,7 @@ export const PRUNE: Command<{
 };
 
 /** `wf pause`'s form, as each of its refusals ends on it. */
-const PAUSE_SHAPE = 'wf pause [--why "<words>"] [--by <name>]';
+const PAUSE_SHAPE = 'wf pause [--why "<words>"] [--by <name>] [--now [--yes]]';
 
 /** `wf pause`'s `--why` and `--by`. */
 const PAUSE_SAID: readonly Said[] = [
@@ -311,13 +323,27 @@ const PAUSE_SAID: readonly Said[] = [
 /** `wf pause`'s `--why` and `--by`, each with its refusal of a value left out. */
 const PAUSE_TAKES = takesOf(PAUSE_SAID, PAUSE_SHAPE);
 
+/** What `wf pause --now` would stop, before it acts: the pause that stands, if one does, and each task at work but a landing. */
+type PauseNowRead = { pause: Pause | null; interrupts: Interrupt[] };
+
+/** What `wf pause` answers: the pause put; with `--now`, what it would stop (`PauseNowRead`), or with `--yes` what it did (`PausedNow`). */
+type PauseAnswer = { pause: Pause } | PausedNow | PauseNowRead;
+
+/** `wf pause`'s handler, by its flags: a plain pause, refused while one stands; `--now`, which only reads; `--now --yes`, which acts. */
+async function pauseBy(e: Engine, args: Args): Promise<PauseAnswer> {
+  const said = { why: saidOf(args, 'why'), by: saidOf(args, 'by') };
+  if (args.now !== true) return { pause: putPause(said) };
+  if (args.yes !== true) return { pause: readPause(), interrupts: await nowRead(e) };
+  return pauseNow(e, said);
+}
+
 /**
- * `wf pause`: the store paused (`putPause`), on `POST /api/pause` too; the pause as written.
- * Refused while a pause stands (`Conflict`).
+ * `wf pause`: the store paused (`putPause`), on `POST /api/pause` too; the pause as written. Refused while a pause stands (`Conflict`).
+ * `--now` says what a pause at once would stop and writes nothing; `--now --yes`, as the route always does, pauses at once (`pauseNow`).
  */
-export const PAUSE: Command<{ pause: Pause }> = {
+export const PAUSE: Command<PauseAnswer> = {
   name: 'pause',
-  usage: '[--why "<words>"] [--by <name>]',
+  usage: '[--why "<words>"] [--by <name>] [--now [--yes]]',
   help: [
     'pause the store: no pass starts new work — no step, try, round or',
     'check filed, no queued task admitted, no queued card started — and',
@@ -330,18 +356,32 @@ export const PAUSE: Command<{ pause: Pause }> = {
     'Refused while a pause stands.',
     '--why: the reason, said wherever the pause is; --by: who pauses it',
     '(default: your OS user)',
+    '--now: pause at once — each step session or check at work, but a',
+    'landing, is asked to stop and tried again on wf resume: a nudge of',
+    'its session, or a recheck. A pause that stands is kept as it was.',
+    '--yes: with --now, act; without it, --now only says what it would',
+    'interrupt',
   ],
   spec: {
     positionals: [],
-    flags: saidFlags(PAUSE_SAID, 'wf pause', 'a pause', PAUSE_TAKES, PAUSE_SHAPE),
+    flags: [
+      ...saidFlags(PAUSE_SAID, 'wf pause', 'a pause', PAUSE_TAKES, PAUSE_SHAPE),
+      { flag: '--now', kind: 'switch', key: 'now' },
+      { flag: '--yes', kind: 'switch', key: 'yes' },
+    ],
     unknown: (arg) => `wf pause does not take ${arg}: ${PAUSE_SHAPE}.`,
     apart: (_value, flag) => PAUSE_TAKES[flag],
   },
   check: (args) => PAUSE_SAID.map((s) => saidRefusal(args, s, PAUSE_TAKES)).find((r) => r !== null) ?? null,
   writes: true,
-  route: { method: 'POST', path: '/api/pause', status: 200 },
-  handler: async (_e, args) => ({ pause: putPause({ why: saidOf(args, 'why'), by: saidOf(args, 'by') }) }),
-  print: ({ pause }) => [pauseWords(pause)],
+  route: { method: 'POST', path: '/api/pause', status: 200, sets: { yes: true } },
+  handler: (e, args) => pauseBy(e, args),
+  print: (answer) =>
+    'interrupts' in answer
+      ? nowLines(answer.interrupts, answer.pause !== null)
+      : 'kept' in answer
+        ? pausedNowLines(answer)
+        : [pauseWords(answer.pause)],
 };
 
 /**
@@ -375,6 +415,19 @@ export const PAUSED: Command<Paused> = {
     why: 'the board says the pause in its bottom bar; at the command line, wf ls says it, what finishes and each landing it holds',
   },
   handler: (e) => pausedRead(e),
+  print: () => [],
+};
+
+/** What a pause at once would stop (`nowRead`), and what it costs (`NOW_COST`): the board's confirm, which the api alone serves. */
+export const PAUSE_NOW: Command<{ interrupts: Interrupt[]; cost: string }> = {
+  name: 'pause now',
+  usage: '',
+  help: ['what a pause at once would stop, each task at work but a landing, and what that costs'],
+  spec: { positionals: [], flags: [], unknown: (arg) => `what a pause at once would stop takes no ${arg}.` },
+  writes: false,
+  route: { method: 'GET', path: '/api/pause/now', status: 200 },
+  only: { side: 'api', why: 'the board confirms a pause at once with it; at the command line, wf pause --now says it' },
+  handler: async (e) => ({ interrupts: await nowRead(e), cost: NOW_COST }),
   print: () => [],
 };
 

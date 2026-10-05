@@ -125,6 +125,10 @@ export const SIGNOFF = [
   'finished, finish it first and then sign off. If it cannot be finished, sign off anyway, saying what stops it.',
 ].join('\n');
 
+/** Who filed a try the store's pause stopped (`by: 'pause'`): the run, once resumed, and no person. */
+const PAUSED_WHO =
+  'The store was paused at once (`wf pause --now`), which stopped this session before it signed off; once resumed, the run filed this try itself.';
+
 const NEW_SESSION =
   'This is a new session. An earlier one worked on this step in this workspace, and what it left is committed on\n' +
   'this branch. You have not been given its reasoning, on purpose: read the change, not an account of it.';
@@ -133,6 +137,18 @@ const NEW_SESSION =
 const NEW_SESSION_IN_FOLDER =
   'This is a new session. An earlier one worked on this step in this folder, and what it left is still here.\n' +
   'You have not been given its reasoning, on purpose: read what it left, not an account of it.';
+
+/** Who filed a try, as its brief says it: the run — by `retries:`, a sign-off nudge or the pause — or a person, by their `wf retry`. */
+const whoOf = (step: Workflow, r: RetryBriefing): string => {
+  if (r.by === 'retries') return `The run filed this try itself: this step declares \`retries: ${step.retries ?? 0}\`.`;
+  if (r.by === 'signoff') return 'The run filed this try itself, once in a round, before it waits on a person.';
+  if (r.by === 'pause') return PAUSED_WHO;
+  const budget = r.budget !== undefined ? ` --budget ${r.budget}` : '';
+  const raised = r.budget !== undefined ? `, raising this step's budget to ${budgetWord(r.budget)}` : '';
+  const message = r.message !== undefined ? ' --message' : '';
+  const below = r.message !== undefined ? ', with what they said below' : '';
+  return `A person asked for this try: \`wf retry ${modeWord(r)}${budget}${message}\`${raised}${below}.`;
+};
 
 /**
  * `## Try <n>`: why the step is being tried again, and on whose word — then `## Your answer`, what the person who
@@ -173,13 +189,7 @@ export function retrySection(step: Workflow, r: RetryBriefing, inFolder = false)
       ? ["And this step's tries had together cost its budget or more, so the run filed nothing more for it until a person raised the cap."]
       : [];
   if (r.by === 'signoff' && r.resumed) return ['', `## Try ${r.try}`, '', SIGNOFF, ...saidSection(r.said)].join('\n');
-  const who =
-    r.by === 'retries'
-      ? `The run filed this try itself: this step declares \`retries: ${step.retries ?? 0}\`.`
-      : r.by === 'signoff'
-        ? 'The run filed this try itself, once in a round, before it waits on a person.'
-        : `A person asked for this try: \`wf retry ${modeWord(r)}${r.budget !== undefined ? ` --budget ${r.budget}` : ''}${r.message !== undefined ? ' --message' : ''}\`` +
-          `${r.budget !== undefined ? `, raising this step's budget to ${budgetWord(r.budget)}` : ''}${r.message !== undefined ? ', with what they said below' : ''}.`;
+  const who = whoOf(step, r);
   const where = r.resumed
     ? "This is the last try's session, continued. Finish the work, then sign off again."
     : inFolder

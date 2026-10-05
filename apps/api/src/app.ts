@@ -9,7 +9,7 @@ import { customInstructions } from './custom/custom.ts';
 import { commands } from './commands/index.ts';
 import { capabilitiesWithSteps, McpAsker } from './capabilities/index.ts';
 import { factories } from './factories/index.ts';
-import { ceilingsOf, pauseOf, feed, QuotaAsker, readDaemon } from './factory/index.ts';
+import { ceilingsOf, pauseNowOf, pauseOf, feed, QuotaAsker, readDaemon } from './factory/index.ts';
 import { inbox } from './inbox/inbox.ts';
 import { ApiConfig, type ApiEnv, type ApiRuntime, ReadMemo, served, type Services } from './layer.ts';
 import { machines } from './machines/machines.ts';
@@ -86,6 +86,9 @@ export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Servic
  *   under it (`{ run, step, kind }`, a `session`, `check` or `landing`), none once it is Paused; and each landing it holds with its merge
  *   staged in the repository's checkout (MERGE_HEAD), its check not filed until it resumes (`pausedRead`). Put on
  *   `POST /api/pause` and lifted on `DELETE /api/pause` (commands/routes.ts).
+ * - `GET /api/pause/now` — what a pause at once (`POST /api/pause` with `now`) would stop, `{ interrupts, cost }`: each step session or
+ *   check at work, of a run not called off, but a landing (`{ run, step, kind, taskId }`, a `session` or `check`), and the sentence of
+ *   what an interrupted step costs (`nowRead`). Read off one view of the engine, and nothing written.
  * - `GET /api/daemon` — whether a wf up ticks the store, and since when, and when it last passed: read off daemon.json and the process
  *   table as wf ls reads them, and never written, the file being the daemon's. What the Factory says over its floor when nothing ticks.
  *   500 for a daemon.json that is there and cannot be read — a directory in its place, a permission: the package throws rather than call
@@ -129,6 +132,7 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     .route('/', stats)
     .get('/api/ceilings', (c) => served(c, async ({ e, env }) => c.json(await ceilingsOf(e, env))))
     .get('/api/pause', (c) => served(c, async ({ e }) => c.json(await pauseOf(e))))
+    .get('/api/pause/now', (c) => served(c, async ({ e }) => c.json(await pauseNowOf(e))))
     .get('/api/daemon', (c) => c.json(readDaemon()))
     .get('/api/quota', (c) => served(c, async ({ e, env, quota }) => c.json(await quota({ env, ask: () => e.quota('claude') }))))
     .route('/', commands)

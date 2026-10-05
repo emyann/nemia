@@ -115,8 +115,8 @@ export function edgesOf(graph: RunGraph, steps: readonly EdgeStep[]): CanvasEdge
 }
 
 /**
- * The round a note puts a step of a loop on — `round 2 of 3`, `round 3 of 3, and it asked again — …`, `round 4 asked (wf round) — …` — and
- * its cap when it says one.
+ * The round a note puts a step of a loop on — `round 2 of 3`, `round 3 of 3, and it asked again — …`, `round 4 asked (nemia round) — …`
+ * — and its cap when it says one.
  */
 const ROUND = /^round (\d+)(?: of (\d+))?/;
 
@@ -134,7 +134,7 @@ export function loopLabel(notes: ReadonlyArray<string | null>, rounds: number): 
 }
 
 /** Whether the looping step's note says its next round is due: it asked again with rounds left, or a person asked (`roundDueNote`). */
-export const roundDue = (note: string | null): boolean => note !== null && /^round \d+(?: of \d+ due\b| asked \(wf round\))/.test(note);
+export const roundDue = (note: string | null): boolean => note !== null && /^round \d+(?: of \d+ due\b| asked \(nemia round\))/.test(note);
 
 /** The handles a `loop` edge leaves its looping step by and comes into its target by: under each node (`StepNode`). */
 export const LOOP_SOURCE = 'loop-out';

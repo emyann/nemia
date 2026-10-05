@@ -123,7 +123,7 @@ export default {
       "the Decide section offers no answer of its own: the gate is the step's",
     );
     await expectVisible(
-      decide.locator('[data-command="approve"] code', { hasText: new RegExp(`^wf approve ${id} ${gated}$`) }),
+      decide.locator('[data-command="approve"] code', { hasText: new RegExp(`^nemia approve ${id} ${gated}$`) }),
       'the Decide section offers the approval to copy, as wf decide prints it under the step',
     );
     await expectVisible(

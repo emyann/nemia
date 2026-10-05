@@ -233,13 +233,18 @@ test("a diff's file is found among the branch's changes by its name, a rename by
 
 test('the board presses `accept` on the step its command names, and on no other row, nor a command it cannot read the step off', () => {
   const accept = (command: string) => ({ label: 'accept' as const, command });
-  assert.equal(acceptStepOf(accept('wf accept r-1 review --message "<why>"'), 'r-1'), 'review');
-  assert.equal(acceptStepOf(accept('wf accept r 1 review --message "<why>"'), 'r 1'), 'review');
-  assert.equal(acceptStepOf({ label: 'once more', command: 'wf round r-1 review' }, 'r-1'), null, 'every other row only copies');
-  assert.equal(acceptStepOf(accept('wf accept r-2 review --message "<why>"'), 'r-1'), null, 'not `wf accept` for this run');
-  assert.equal(acceptStepOf(accept('wf accept r-1 --message "<why>"'), 'r-1'), null, 'names no step');
-  assert.equal(acceptStepOf(accept('wf accept r-1 review extra --message "<why>"'), 'r-1'), null, 'names no one step');
-  assert.equal(acceptStepOf(accept('wf accept r-1 review'), 'r-1'), null);
+  assert.equal(acceptStepOf(accept('nemia accept r-1 review --message "<why>"'), 'r-1'), 'review');
+  assert.equal(acceptStepOf(accept('nemia accept r 1 review --message "<why>"'), 'r 1'), 'review');
+  assert.equal(acceptStepOf({ label: 'once more', command: 'nemia round r-1 review' }, 'r-1'), null, 'every other row only copies');
+  assert.equal(acceptStepOf(accept('nemia accept r-2 review --message "<why>"'), 'r-1'), null, 'not `nemia accept` for this run');
+  assert.equal(acceptStepOf(accept('nemia accept r-1 --message "<why>"'), 'r-1'), null, 'names no step');
+  assert.equal(acceptStepOf(accept('nemia accept r-1 review extra --message "<why>"'), 'r-1'), null, 'names no one step');
+  assert.equal(acceptStepOf(accept('nemia accept r-1 review'), 'r-1'), null);
+  assert.equal(
+    acceptStepOf(accept('wf accept r-1 review --message "<why>"'), 'r-1'),
+    null,
+    'REFUSED: the old name is no command the api hands over',
+  );
 });
 
 test('a decision is read again when a hold is written, lifted, or its runs ship — the hold is what the api answers for a held run', () => {

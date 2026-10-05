@@ -85,7 +85,7 @@ export default {
 
     const decide = page.locator('section[aria-label="Decide"]');
     await expectVisible(
-      decide.locator('[data-command="approve"] code', { hasText: new RegExp(`^wf approve ${id} ${ending}$`) }),
+      decide.locator('[data-command="approve"] code', { hasText: new RegExp(`^nemia approve ${id} ${ending}$`) }),
       'the Decide section offers the approval to copy',
     );
     await expectVisible(

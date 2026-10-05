@@ -695,12 +695,19 @@ export async function detail(run: Run, { e, home, memo }: Pick<Served, 'e' | 'ho
         };
       }),
     ),
-    timeline: {
-      rounds: clock.rounds.map((r) => ({ ...r, cost: spentOf(roundSpend(clock, steps, r, judged.spendOf)) })),
-      run: { ...clock.run, cost: judged.cost },
-    },
+    timeline: runTimeline(clock, steps, judged),
   };
 }
+
+/** The run's timeline: each round with what it cost, by the steps the run is judged by, and the run's own span with what it cost. */
+const runTimeline = (
+  clock: Timeline,
+  steps: readonly Workflow[],
+  judged: { spendOf: Parameters<typeof roundSpend>[3]; cost: RunDetail['timeline']['run']['cost'] },
+): RunDetail['timeline'] => ({
+  rounds: clock.rounds.map((r) => ({ ...r, cost: spentOf(roundSpend(clock, steps, r, judged.spendOf)) })),
+  run: { ...clock.run, cost: judged.cost },
+});
 
 /** What the sessions of every try of every step read, by price (`RunRead`), off the run's timeline; null where none of it was measured. */
 const runRead = (clock: Timeline, steps: readonly Workflow[], names: readonly string[]): RunRead | null =>

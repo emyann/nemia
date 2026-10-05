@@ -25,5 +25,5 @@ export const yourStore = (home: string): YourStore => ({
   fileFactory: commandLine(FACTORY_ADD, {}, { repos: '<path>' }),
 });
 
-/** `GET /api/store` — your store's folders and how a factory is filed in it (`YourStore`), under the store root the request is served on. */
+/** `GET /api/store` — your store's folders and how a factory is filed in it (`YourStore`), under the request's store root. */
 export const yours = new Hono<ApiEnv>().get('/api/store', (c) => served(c, ({ home }) => c.json(yourStore(home))));

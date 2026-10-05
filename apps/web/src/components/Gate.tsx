@@ -77,20 +77,7 @@ export function Gate({
     : sendBack.isSuccess
       ? takenOf({ asked: sendBack.data, step: to }, step, acts)
       : null;
-  if (taken) {
-    return (
-      <section
-        aria-label={`The gate of ${step}`}
-        data-gate="taken"
-        className="rounded border border-neutral-200 px-3 py-2 text-sm dark:border-neutral-800"
-      >
-        <strong>{taken.named}</strong>{' '}
-        <span data-note className="font-mono text-xs text-neutral-600 dark:text-neutral-400">
-          {taken.said}
-        </span>
-      </section>
-    );
-  }
+  if (taken) return <GateTaken step={step} taken={taken} />;
 
   return (
     <section
@@ -218,6 +205,22 @@ export function Gate({
           )}
         </div>
       </div>
+    </section>
+  );
+}
+
+/** A gate once a person's word is taken (`takenOf`): the step it was about, and what the next tick does with it. */
+function GateTaken({ step, taken }: { step: string; taken: { named: string; said: string } }) {
+  return (
+    <section
+      aria-label={`The gate of ${step}`}
+      data-gate="taken"
+      className="rounded border border-neutral-200 px-3 py-2 text-sm dark:border-neutral-800"
+    >
+      <strong>{taken.named}</strong>{' '}
+      <span data-note className="font-mono text-xs text-neutral-600 dark:text-neutral-400">
+        {taken.said}
+      </span>
     </section>
   );
 }

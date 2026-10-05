@@ -317,8 +317,9 @@ test('a step a person has sent round or asked to retry is no gate from the momen
 });
 
 /**
- * A loop as the api gives it: review loops back to implement, both signed off, with the notes `wf ls` prints, and review's round due as `reviewDue` says. Neither step
- * has a spec — as when the api could not read one — so what is drawn is the api's graph, and nothing a step's spec says.
+ * A loop as the api gives it: review loops back to implement, both signed off, with the notes `wf ls` prints, and review's round due as
+ * `reviewDue` says. Neither step has a spec — as when the api could not read one — so what is drawn is the api's graph, and nothing a
+ * step's spec says.
  */
 function loopRun(notes: { implement: string | null; review: string | null }, reviewDue = false): RunDetail {
   const base = runWith(null);

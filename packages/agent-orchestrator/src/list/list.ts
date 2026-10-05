@@ -286,9 +286,7 @@ export function listing({
           ? onBaseNote(run, step.name, standings)
           : gateNote(run, step.name, sendBackTo(step, run));
     const taskId = run.steps[step.name]?.taskId;
-    const landed = run.steps[step.name]?.landed;
-    const landing = landed && !('untouched' in landed) ? oneLine(landedWords(run, landed), LANDED_CAP) : '';
-    const note = [tried, gate, landing, saidWord(saidTo(step.name))].filter(Boolean).join(' · ');
+    const note = [tried, gate, landingWord(run, step.name), saidWord(saidTo(step.name))].filter(Boolean).join(' · ');
     const roundDue = round && !retry ? { roundDue: true as const } : {};
     return { ...row, ...(note ? { note } : {}), ...roundDue, ...deniedRow(taskId ? deniedOf(taskId) : []), ...cost };
   });
@@ -449,6 +447,12 @@ export const answerIn = (session: string | null, remote?: { run: string; step: s
 /** The wait and the advice in one line, for a screen with room for it: `waiting for a permission prompt — answer it in Claude Code: …`. */
 export const harnessWaitLine = (waitingFor: string, session: string | null, remote?: { run: string; step: string }): string =>
   `${waitingWords(waitingFor)} — ${answerIn(session, remote)}`;
+
+/** What a step's landing adds to its note, cut to one line (`LANDED_CAP`): nothing for one that left the base untouched, or none yet. */
+function landingWord(run: Run, name: string): string {
+  const landed = run.steps[name]?.landed;
+  return landed && !('untouched' in landed) ? oneLine(landedWords(run, landed), LANDED_CAP) : '';
+}
 
 /** A row's `denied`, what a step's current try was denied (`deniedWords`); none for a step denied nothing. */
 const deniedRow = (denied: readonly string[]): { denied?: string } => (denied.length ? { denied: deniedWords(denied) } : {});

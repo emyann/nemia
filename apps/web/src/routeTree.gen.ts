@@ -14,6 +14,7 @@ import { Route as AgentsRouteImport } from './routes/agents'
 import { Route as CapabilitiesRouteImport } from './routes/capabilities'
 import { Route as InboxRouteImport } from './routes/inbox'
 import { Route as MachinesRouteImport } from './routes/machines'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as StatsRouteImport } from './routes/stats'
 import { Route as WorkflowsRouteImport } from './routes/workflows'
 import { Route as AgentsNewRouteImport } from './routes/agents_.new'
@@ -52,6 +53,11 @@ const InboxRoute = InboxRouteImport.update({
 const MachinesRoute = MachinesRouteImport.update({
   id: '/machines',
   path: '/machines',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const StatsRoute = StatsRouteImport.update({
@@ -133,6 +139,7 @@ export interface FileRoutesByFullPath {
   '/capabilities': typeof CapabilitiesRoute
   '/inbox': typeof InboxRoute
   '/machines': typeof MachinesRoute
+  '/settings': typeof SettingsRoute
   '/stats': typeof StatsRoute
   '/workflows': typeof WorkflowsRoute
   '/agents/new': typeof AgentsNewRoute
@@ -154,6 +161,7 @@ export interface FileRoutesByTo {
   '/capabilities': typeof CapabilitiesRoute
   '/inbox': typeof InboxRoute
   '/machines': typeof MachinesRoute
+  '/settings': typeof SettingsRoute
   '/stats': typeof StatsRoute
   '/workflows': typeof WorkflowsRoute
   '/agents/new': typeof AgentsNewRoute
@@ -176,6 +184,7 @@ export interface FileRoutesById {
   '/capabilities': typeof CapabilitiesRoute
   '/inbox': typeof InboxRoute
   '/machines': typeof MachinesRoute
+  '/settings': typeof SettingsRoute
   '/stats': typeof StatsRoute
   '/workflows': typeof WorkflowsRoute
   '/agents_/new': typeof AgentsNewRoute
@@ -199,6 +208,7 @@ export interface FileRouteTypes {
     | '/capabilities'
     | '/inbox'
     | '/machines'
+    | '/settings'
     | '/stats'
     | '/workflows'
     | '/agents/new'
@@ -220,6 +230,7 @@ export interface FileRouteTypes {
     | '/capabilities'
     | '/inbox'
     | '/machines'
+    | '/settings'
     | '/stats'
     | '/workflows'
     | '/agents/new'
@@ -241,6 +252,7 @@ export interface FileRouteTypes {
     | '/capabilities'
     | '/inbox'
     | '/machines'
+    | '/settings'
     | '/stats'
     | '/workflows'
     | '/agents_/new'
@@ -263,6 +275,7 @@ export interface RootRouteChildren {
   CapabilitiesRoute: typeof CapabilitiesRoute
   InboxRoute: typeof InboxRoute
   MachinesRoute: typeof MachinesRoute
+  SettingsRoute: typeof SettingsRoute
   StatsRoute: typeof StatsRoute
   WorkflowsRoute: typeof WorkflowsRoute
   AgentsNewRoute: typeof AgentsNewRoute
@@ -314,6 +327,13 @@ declare module '@tanstack/react-router' {
       path: '/machines'
       fullPath: '/machines'
       preLoaderRoute: typeof MachinesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/stats': {
@@ -423,6 +443,7 @@ const rootRouteChildren: RootRouteChildren = {
   CapabilitiesRoute: CapabilitiesRoute,
   InboxRoute: InboxRoute,
   MachinesRoute: MachinesRoute,
+  SettingsRoute: SettingsRoute,
   StatsRoute: StatsRoute,
   WorkflowsRoute: WorkflowsRoute,
   AgentsNewRoute: AgentsNewRoute,

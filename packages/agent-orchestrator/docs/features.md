@@ -2302,6 +2302,12 @@ stateDiagram-v2
 - **Her quota and her spend**: her task is allowed `curl -s <url>/api/quota` unasked, the address read off `daemon.json` at filing
   (`quotaUrl` in `keep.verb.ts`), and told it in her first message; none where the daemon serves no board. `nemia level` says what her ended sessions
   cost (`spend`), counted as a step's are (`taskSpend`).
+- **The board shows her** on a frame Settings page (`/settings`, the rail's last place): her level as a Semi-auto switch (`PUT
+  /api/level`, a refusal in the api's words), her session's state judged from the orchestrator's facts alone (`sessionOf`,
+  `apps/web/src/lib/nemia.ts`: off, leaving, not filed, starting, up, stopped from outside with a way to a fresh one), how to reach it
+  as the api answers it (its first line a command to copy), her spend and allows, and her memory read-only, with words saying a fact is
+  pruned by asking her. Still to build: the runtime reads her bridge's web link, and `reachOf` answers it, so the board shows the link
+  itself rather than the sentence about it.
 
 `commission-a-workflow` is the spec's `commission-argus`, named for what it does in any factory, since no team name ships; `nemia factory
 instruction` is not on her allow list, since its write flags share its prefix.

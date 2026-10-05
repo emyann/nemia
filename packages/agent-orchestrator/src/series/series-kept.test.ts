@@ -139,7 +139,9 @@ test('`nemia series --json` is the answer the api serves; REFUSED: a --range it 
 });
 
 test("a memo holds only the days its tier's last read covered: a day the range has left goes, and the other tier's days stay", () => {
-  appendLines('minute', [{ t: '2026-10-06T10:00:00.000Z', s: 'store.runs', l: {}, n: 1, sum: 2, min: 2, max: 2, last: 2 }]);
+  const line = (t: string) => ({ t, s: 'store.runs', l: {}, n: 1, sum: 2, min: 2, max: 2, last: 2 });
+  appendLines('minute', [line('2026-10-05T10:00:00.000Z'), line('2026-10-06T10:00:00.000Z')]);
+  appendLines('hour', [line('2026-10-05T10:00:00.000Z')]);
   const memo = seriesMemo();
   seriesHealth('2026-10-05', '2026-10-05', memo);
   seriesRead('24h', memo, at('14:05:00'));

@@ -167,7 +167,7 @@ function Where({ workflow, repo, factory, card }: { workflow: WorkflowListing; r
  * each by its title and id, picked as many as it waits on. None is left out for a reason the board would have to work out — which runs it
  * may wait on is the package's to say (`afterRefusal`), and its refusal is shown with the start's. `repo` is that repository when it is not
  * the api's own: an inbox card's `repo:`. The runs are read as the page opens, not on the list's beat: a run started since is listed on the
- * next visit.
+ * next visit. A title wraps within its row, read whole, and no row runs past the card it is in, however long the title.
  */
 export function AfterPicker({
   selected,
@@ -186,7 +186,7 @@ export function AfterPicker({
   const onRepo = where && runs.data ? newestFirst(runs.data.filter((run) => run.repo === where)) : null;
 
   return (
-    <fieldset aria-labelledby={legend} className="space-y-1.5">
+    <fieldset aria-labelledby={legend} className="min-w-0 space-y-1.5">
       <legend id={legend} className="text-sm font-medium">
         After
       </legend>
@@ -214,7 +214,7 @@ export function AfterPicker({
                   onChange={(event) => onChange(event.target.checked ? [...selected, run.id] : selected.filter((id) => id !== run.id))}
                   className="translate-y-0.5 self-start"
                 />
-                <span className="min-w-0 flex-1 truncate" title={titleOf(run)}>
+                <span data-run-title className="min-w-0 flex-1 break-words [overflow-wrap:anywhere]" title={titleOf(run)}>
                   {titleOf(run)}
                 </span>
                 <span className="hidden shrink-0 font-mono text-[11px] text-neutral-500 sm:inline">{run.id}</span>

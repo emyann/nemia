@@ -84,7 +84,7 @@ export const askTry = (
 ): Promise<AskedTry> =>
   send('POST', `/api/runs/${encodeURIComponent(runId)}/steps/${encodeURIComponent(step)}/retry`, AskedTrySchema, {
     body: how,
-    may: `The ask may be written: look at the step's note (\`wf ls ${runId}\`) before asking again.`,
+    may: "The ask may be written: look at the step's note on the run's page before asking again.",
   });
 
 /**
@@ -98,7 +98,7 @@ export const askTry = (
 export const askRound = (runId: string, how: { step?: string; budget?: number }): Promise<AskedRound> =>
   send('POST', `/api/runs/${encodeURIComponent(runId)}/round`, AskedRoundSchema, {
     body: how,
-    may: `The ask may be written: look at the looping step's note (\`wf ls ${runId}\`) before asking again.`,
+    may: "The ask may be written: look at the looping step's note on the run's page before asking again.",
   });
 
 /**
@@ -113,7 +113,7 @@ export const askRound = (runId: string, how: { step?: string; budget?: number })
 export const approveStep = (runId: string, step: string, how: { message?: string }): Promise<Approved> =>
   send('POST', `/api/runs/${encodeURIComponent(runId)}/steps/${encodeURIComponent(step)}/approve`, ApprovedSchema, {
     body: how,
-    may: `The approval may be written: look at the step (\`wf decide ${runId}\`) before approving again.`,
+    may: "The approval may be written: look at the step on the run's page before approving again.",
   });
 
 /**
@@ -129,7 +129,7 @@ export const approveStep = (runId: string, step: string, how: { message?: string
 export const acceptLoop = (runId: string, step: string, how: { message: string }): Promise<Accepted> =>
   send('POST', `/api/runs/${encodeURIComponent(runId)}/steps/${encodeURIComponent(step)}/accept`, AcceptedSchema, {
     body: how,
-    may: `The acceptance may be written: look at the looping step (\`wf ls ${runId}\`) before accepting again.`,
+    may: "The acceptance may be written: look at the looping step on the run's page before accepting again.",
   });
 
 /**
@@ -143,5 +143,5 @@ export const acceptLoop = (runId: string, step: string, how: { message: string }
 export const sayToStep = (runId: string, step: string, text: string): Promise<Said> =>
   send('POST', `/api/runs/${encodeURIComponent(runId)}/steps/${encodeURIComponent(step)}/say`, SaidSchema, {
     body: { text },
-    may: `The words may have been said: read the step's record (\`wf decide ${runId}\`) before saying them again.`,
+    may: "The words may have been said: read the step's conversation on its page before saying them again.",
   });

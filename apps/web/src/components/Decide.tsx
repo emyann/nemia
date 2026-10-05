@@ -747,7 +747,7 @@ export function DiffFileView({ file, counts }: { file: DiffFile; counts?: { adde
       </pre>
       {file.cut > 0 && (
         <p data-cut={file.cut} className="border-t border-neutral-200 px-2 py-1 text-xs text-neutral-500 dark:border-neutral-800">
-          {file.cut} more line{file.cut === 1 ? '' : 's'} — <code>wf decide</code> prints all
+          {file.cut} more line{file.cut === 1 ? '' : 's'} — the command line&apos;s decide prints them all
         </p>
       )}
     </details>

@@ -1368,13 +1368,13 @@ test('a diff is folded under its file, coloured by line, and a capped one says h
     [...capped.matchAll(/data-line="(\w+)"/g)].map((m) => m[1]),
     ['meta', 'meta', 'meta', 'hunk', 'removed', 'added', 'context'],
   );
-  assert.match(capped, /<p data-cut="26"[^>]*>26 more lines — <code>wf decide<\/code> prints all<\/p>/);
+  assert.match(capped, /<p data-cut="26"[^>]*>26 more lines — the command line&#x27;s decide prints them all<\/p>/);
 
   const whole = renderToStaticMarkup(createElement(DiffFileView, { file: { path: 'package.json', lines, cut: 0 } }));
   assert.doesNotMatch(whole, /data-cut|more line/);
   assert.match(
     renderToStaticMarkup(createElement(DiffFileView, { file: { path: 'package.json', lines, cut: 1 } })),
-    />1 more line — <code>/,
+    />1 more line — the command line/,
   );
 });
 
@@ -1904,7 +1904,7 @@ test("a closeout's file `wf prune --artifacts` removed is its path and when it w
   assert.match(pruned, /data-artifact="pruned"/);
   assert.ok(pruned.includes('>/wf/runs/r-1/artifacts/shoot/shot.png</span>'), pruned);
   const time = renderToStaticMarkup(when(at));
-  assert.ok(pruned.includes(`> — its files were removed at ${time} (wf prune --artifacts)</span>`), pruned);
+  assert.ok(pruned.includes(`> — its files were removed at ${time}, by a prune of its files</span>`), pruned);
   assert.ok(!textsOf(pruned).join(' ').includes(at), 'the moment is drawn as `when` draws it, never as the api spells it');
   assert.doesNotMatch(pruned, /<a |<img /);
   assert.match(bare, /data-artifact="path"/, 'a path the prune did not reach is the path, as before');

@@ -44,7 +44,7 @@ function Runs() {
         <Link to="/workflows" className="underline underline-offset-2">
           Workflows
         </Link>
-        , or with <code>npx wf start</code>.
+        , or from its card in the inbox.
       </p>
     );
   }

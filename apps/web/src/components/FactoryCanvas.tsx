@@ -579,13 +579,9 @@ function Empty({ anyRuns, queued }: { anyRuns: boolean; queued: number }) {
         <CardHeader>
           <CardTitle>Nothing in flight</CardTitle>
           <CardDescription>
-            {anyRuns ? (
-              'Every run has finished. Show finished runs above, or read them on Runs.'
-            ) : (
-              <>
-                No runs yet. Start one with <code>npx wf start</code>.
-              </>
-            )}
+            {anyRuns
+              ? 'Every run has finished. Show finished runs above, or read them on Runs.'
+              : 'No runs yet. Start one from a workflow, on Workflows.'}
             {queued > 0 && (
               <>
                 {' '}

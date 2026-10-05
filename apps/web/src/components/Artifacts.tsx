@@ -52,7 +52,7 @@ export function ArtifactView({ artifact, size = false }: { artifact: StepArtifac
     return (
       <span data-artifact="pruned">
         <span className="font-mono text-neutral-500">{artifact.path}</span>
-        <span className="text-neutral-500"> — its files were removed at {when(artifact.prunedAt)} (wf prune --artifacts)</span>
+        <span className="text-neutral-500"> — its files were removed at {when(artifact.prunedAt)}, by a prune of its files</span>
       </span>
     );
   }

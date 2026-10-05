@@ -450,7 +450,7 @@ test("a start the tick tried and did not make says so as `wf inbox` does: refuse
   );
   assert.equal(
     triedLine({ repo: null, factory: 'solo', error: null, tried: refused }, 'then'),
-    'Not started at then on /code/app: no workflow gone in /code/app/workflows. It stays queued, and the tick does not try it again while it reads the same: edit the card, or take it off the queue and queue it again, or run wf up in the repository it is about.',
+    'Not started at then on /code/app: no workflow gone in /code/app/workflows. It stays queued, and the tick does not try it again while it reads the same: edit the card, or take it off the queue and queue it again, or run the daemon in the repository it is about.',
   );
   const unfactored = 'card.md: this card names no factory, and a card is started only in the factory named for it.';
   assert.equal(

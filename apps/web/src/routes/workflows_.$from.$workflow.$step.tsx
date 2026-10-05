@@ -69,8 +69,8 @@ function StepPage() {
           rows={page.keys}
           note={
             <>
-              As the loader reads them, which a run freezes at <code>wf start</code>: <code>after</code> names the step <code>resume</code>{' '}
-              names, and a loop that sets no <code>rounds</code> runs 3. Source shows what the file says.
+              As the loader reads them, which a run freezes as it starts: <code>after</code> names the step <code>resume</code> names, and a
+              loop that sets no <code>rounds</code> runs 3. Source shows what the file says.
             </>
           }
         />

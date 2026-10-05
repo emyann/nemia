@@ -172,8 +172,8 @@ function Details({ run, step, state, runCancelled, current, selected, onSelect }
         </section>
       ) : (
         <p className="text-neutral-500">
-          No spec: the workflow the run is judged by does not have this step — the one it froze at <code>wf start</code>, or on a record
-          from before runs froze one, its folder.
+          No spec: the workflow the run is judged by does not have this step — the one it froze as it started, or on a record from before
+          runs froze one, its folder.
         </p>
       )}
       <Told told={step.told} layers={step.layers} filed={step.taskId !== null} />

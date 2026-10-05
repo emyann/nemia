@@ -71,9 +71,9 @@ function Ghost({ card, now }: { card: InboxEntry; now: number }) {
         <span
           data-ghost-repo
           className="shrink-0 truncate"
-          title={card.repo ?? 'It names no repository: it starts on the one wf up runs in'}
+          title={card.repo ?? 'It names no repository: it starts on the one the daemon runs in'}
         >
-          {card.repo ? repoName(card.repo) : "wf up's repository"}
+          {card.repo ? repoName(card.repo) : "the daemon's repository"}
         </span>
       </span>
       {tried && (

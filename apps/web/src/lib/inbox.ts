@@ -180,7 +180,7 @@ export function triedLine(
   const on = entry.repo === null && entry.factory !== null && entry.error === null ? ` on ${tried.repo}` : '';
   const why = tried.why !== entry.error ? `: ${tried.why.trim()}${/[.!?]$/.test(tried.why.trim()) ? '' : '.'}` : '.';
   return tried.refused
-    ? `Not started at ${at}${on}${why} It stays queued, and the tick does not try it again while it reads the same: edit the card, or take it off the queue and queue it again${on ? ', or run wf up in the repository it is about' : ''}.`
+    ? `Not started at ${at}${on}${why} It stays queued, and the tick does not try it again while it reads the same: edit the card, or take it off the queue and queue it again${on ? ', or run the daemon in the repository it is about' : ''}.`
     : `Failed at ${at}${on}${why} Not a refusal: the tick tries it again on every pass, where it keeps its place.`;
 }
 

@@ -106,7 +106,7 @@ test('a loop out of rounds waits on a person, in amber like a step that signed o
   assert.match(stateClass.exhausted, /\bbg-amber-100\b/);
   assert.equal(
     stateMeaning.exhausted,
-    'rounds exhausted: the reviewer asked for another round on the last one rounds: allows; a person decides — wf round for another, or wf accept to go on with what is there',
+    'rounds exhausted: the reviewer asked for another round on the last one rounds: allows; a person decides — another round, or accepting what is there to go on with it',
   );
   assert.equal(
     stepState('rounds exhausted', true, false),
@@ -138,7 +138,7 @@ test('a step past its budget waits on a person in amber, as a loop out of rounds
   for (const state of ['over-budget', 'budget-exhausted'] as const) {
     assert.equal(stateClass[state], stateClass.exhausted, state);
     assert.equal(satisfiesAfter(state), false, `${state} is not work done`);
-    assert.match(stateMeaning[state], /until a person raises the cap — wf retry --budget/);
+    assert.match(stateMeaning[state], /until a person raises the cap on a try/);
   }
   assert.match(stateMeaning['over-budget'], /^over budget: its tries have cost its budget: or more/);
   assert.match(stateMeaning['budget-exhausted'], /^budget exhausted: its harness ended its session at its budget:/);
@@ -201,7 +201,7 @@ test('a step waiting at its gate waits on a person in amber, as a step signed of
   assert.equal(isGate('awaiting-approval', true), false, 'nobody waits for an approval on a run called off');
   assert.match(
     stateMeaning['awaiting-approval'],
-    /^awaiting approval: it signed off at its gate, and nothing after it is filed until a person approves it — wf approve — or sends it back — wf retry --message$/,
+    /^awaiting approval: it signed off at its gate, and nothing after it is filed until a person approves it, or sends it back with words for its next try$/,
   );
   assert.equal(stepState('awaiting approvals', false, false), 'working', 'not a word that merely starts like it');
 });
@@ -278,7 +278,7 @@ test('on a run a person holds (`wf hold`), a step not filed and a step at a huma
   assert.equal(stepState('waiting', true, true), 'cancelled', 'a run called off is called off, held or not');
   assert.equal(stepState('awaiting approval', true, true), 'awaiting-approval');
   assert.equal(satisfiesAfter('held'), false);
-  assert.match(stateMeaning.held, /^held: .*wf hold/);
+  assert.match(stateMeaning.held, /^held: a person holds the run until other runs ship/);
   assert.notEqual(stateClass.held, stateClass.waiting, 'a person stops it, not the order of the steps');
   assert.notEqual(stateClass.held, stateClass.blocked, 'it asks nobody, as a gate does');
 });

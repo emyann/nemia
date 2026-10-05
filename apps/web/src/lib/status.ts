@@ -118,13 +118,13 @@ export const stateMeaning: Record<StepState, string> = {
   unverified: 'unverified: it signed off and has no check, so only its own word says it worked',
   blocked: 'blocked: it signed off without finishing, and needs a person',
   'awaiting-approval':
-    'awaiting approval: it signed off at its gate, and nothing after it is filed until a person approves it — wf approve — or sends it back — wf retry --message',
+    'awaiting approval: it signed off at its gate, and nothing after it is filed until a person approves it, or sends it back with words for its next try',
   exhausted:
-    'rounds exhausted: the reviewer asked for another round on the last one rounds: allows; a person decides — wf round for another, or wf accept to go on with what is there',
+    'rounds exhausted: the reviewer asked for another round on the last one rounds: allows; a person decides — another round, or accepting what is there to go on with it',
   'over-budget':
-    'over budget: its tries have cost its budget: or more, and the run spends nothing more on it until a person raises the cap — wf retry --budget, wf round --budget',
+    'over budget: its tries have cost its budget: or more, and the run spends nothing more on it until a person raises the cap on a try or a round',
   'budget-exhausted':
-    'budget exhausted: its harness ended its session at its budget:, and nothing more is filed for it until a person raises the cap — wf retry --budget',
+    'budget exhausted: its harness ended its session at its budget:, and nothing more is filed for it until a person raises the cap on a try',
   unsigned: 'unsigned: it ended without the closeout it was asked for',
   denied:
     "denied: its harness denied its try a call, and the step says denials: fail — nothing after it is filed until a person tries it again, and a new run's allowedTools: is where the call is let through",
@@ -133,7 +133,7 @@ export const stateMeaning: Record<StepState, string> = {
   waiting: 'waiting: not filed yet',
   'waiting-for-slot':
     'waiting for a run slot: not filed yet — the cap on runs in flight (WF_MAX_RUNS) holds the run, and the tick files it once a run in flight settles, oldest held first',
-  held: 'held: a person holds the run until other runs ship (wf hold), so nothing of it is filed and nothing is asked of you until the hold lifts',
+  held: 'held: a person holds the run until other runs ship, so nothing of it is filed and nothing is asked of you until the hold lifts',
   cancelled: 'cancelled: the run was called off',
   unreadable:
     "unreadable: its task's journal holds an entry no runtime wrote, so the run is not judged and the tick does not advance it until the journal reads again — the run says which entry",

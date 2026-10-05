@@ -72,12 +72,7 @@ function CardPage() {
         {card.keys && (
           <KeyTable
             rows={card.keys}
-            note={
-              <>
-                As the card sets them, in its frontmatter. A start names what a card leaves unset: <code>wf start</code>, or Start on the
-                Inbox page.
-              </>
-            }
+            note={<>As the card sets them, in its frontmatter. A start names what a card leaves unset: Start on the Inbox page.</>}
           />
         )}
       </AsWritten>

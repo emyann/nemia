@@ -45,9 +45,9 @@ function StatsPage() {
   return (
     <article className="space-y-6 px-6 py-6">
       <p className="max-w-4xl text-sm text-neutral-600 dark:text-neutral-400">
-        How well the runs went, counted from their journals as <code className="font-mono text-xs">wf stats</code> counts them, by UTC day.
-        A number nothing measured reads — and draws nothing; a measured 0 draws a line at the foot of its day. A violet rule marks a day a
-        run froze something that differs from the run of its workflow before it.
+        How well the runs went, counted from their journals by UTC day. A number nothing measured reads — and draws nothing; a measured 0
+        draws a line at the foot of its day. A violet rule marks a day a run froze something that differs from the run of its workflow
+        before it.
       </p>
       <StatsTiles last={data.all.tiles.last} before={data.all.tiles.before} />
       <StatsFilters search={search} now={new Date(at)} />
@@ -85,7 +85,7 @@ function StatsPage() {
       <StatsMarks marks={data.all.marks} />
       {data.unreadable.length > 0 && (
         <p data-unreadable className="text-xs text-amber-700 dark:text-amber-400">
-          Left out, a journal of each not reading (<code className="font-mono">wf ls</code> says why): {data.unreadable.join(', ')}
+          Left out, a journal of each not reading: {data.unreadable.join(', ')}
         </p>
       )}
     </article>

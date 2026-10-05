@@ -100,7 +100,7 @@ export const fileCard = (card: {
 }): Promise<{ name: string }> =>
   send('POST', '/api/inbox', Schema.Struct({ name: Schema.String }), {
     body: card,
-    may: 'The card may be filed: look in the inbox (`wf inbox`) before filing it again.',
+    may: 'The card may be filed: look in the inbox before filing it again.',
   });
 
 /**
@@ -112,7 +112,7 @@ export const fileCard = (card: {
  */
 export async function dropCard(name: string): Promise<void> {
   await send('DELETE', `/api/inbox/${encodeURIComponent(name)}`, Schema.Struct({ removed: Schema.Literal(true) }), {
-    may: 'The card may be dropped: look in the inbox (`wf inbox`) before dropping it again.',
+    may: 'The card may be dropped: look in the inbox before dropping it again.',
   });
 }
 
@@ -149,5 +149,5 @@ const QueuedSchema = Schema.Struct({
  */
 export const queueCard = (name: string, { off = false }: { off?: boolean } = {}): Promise<Queued> =>
   send(off ? 'DELETE' : 'POST', `/api/inbox/${encodeURIComponent(name)}/queue`, QueuedSchema, {
-    may: 'The card may be queued, or not: look in the inbox (`wf inbox`) before asking again.',
+    may: 'The card may be queued, or not: look in the inbox before asking again.',
   });

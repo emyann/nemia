@@ -111,7 +111,7 @@ function modelRow(workflow: string | null, filed: StepFiled | null): ReactNode {
     <Marked
       value={filed.model ?? filed.askedModel}
       mark="this try"
-      title={`Asked for with wf retry --model ${filed.askedModel}; the workflow ${says}.`}
+      title={`Asked for on this try: ${filed.askedModel}; the workflow ${says}.`}
     />
   );
 }

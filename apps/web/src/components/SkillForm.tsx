@@ -120,8 +120,7 @@ export function SkillForm({
             </Button>
           )}
           <p className="text-xs text-muted-foreground">
-            A save changes every agent that gives it, from what a later <code>wf start</code> freezes. A run already started keeps what it
-            froze.
+            A save changes every agent that gives it, from what a run started later freezes. A run already started keeps what it froze.
           </p>
         </div>
       )}

@@ -55,10 +55,10 @@ function InboxPage() {
   return (
     <article className="space-y-6">
       <p className="text-sm text-neutral-500">
-        An idea parked as a card until you start a workflow on it: a file each in the store&apos;s {code('inbox/')}, as{' '}
-        {code('wf inbox add')} parks one. Starting a card writes its run&apos;s record as {code('wf start')} does, and removes the card. A
-        card queued starts on its own, on the workflow it names, when the daemon — this api, or {code('wf up')} — has a run slot free: the
-        oldest queued first.
+        An idea parked as a card until you start a workflow on it: a file each in the store&apos;s {code('inbox/')}, as the box below or the
+        command line parks one. Starting a card writes its run&apos;s record as any start does, and removes the card. A card queued starts
+        on its own, on the workflow it names, when the daemon — this api, or the command line&apos;s — has a run slot free: the oldest
+        queued first.
       </p>
       <FileCard />
       <section aria-label="Cards" className="space-y-3">
@@ -95,7 +95,7 @@ function InboxPage() {
         )}
         {all.length === 0 && (
           <p data-empty className="text-sm text-neutral-500">
-            The inbox is empty. File an idea in the box above, or from the command line: {code('wf inbox add "<idea>"')}.
+            The inbox is empty. File an idea in the box above, or from the command line.
           </p>
         )}
       </section>
@@ -446,7 +446,7 @@ function StartHere({
             {namedElsewhere(entry.workflow, entry.repo, here) ? (
               <>
                 The card names {code(entry.workflow)}, a workflow of {code(entry.repo!)}, and the workflows here are {code(here)}&apos;s:
-                pick the one to run it on, or start it with {code('wf start')}, which finds that one.
+                pick the one to run it on, or start it from the command line, which finds that one.
               </>
             ) : (
               <>The card names {code(entry.workflow)}, which is not a workflow here that reads: pick the one to run it on.</>

@@ -118,8 +118,7 @@ export function StartRun({
           <Link to="/runs/$runId" params={{ runId: start.data.id }} className="font-mono text-sm underline underline-offset-2">
             {start.data.id}
           </Link>
-          . Nothing is filed until <code className="font-mono text-xs">wf tick</code> or <code className="font-mono text-xs">wf up</code>{' '}
-          runs
+          . Nothing is filed until the daemon&apos;s next pass
           {start.variables.after.length > 0 && (
             <>
               , and {start.variables.after.join(' and ')} {start.variables.after.length > 1 ? 'have' : 'has'} shipped
@@ -190,9 +189,7 @@ export function AfterPicker({
       <legend id={legend} className="text-sm font-medium">
         After
       </legend>
-      <p className="text-xs text-neutral-500">
-        The runs it waits on: nothing of it is filed until each has shipped, as <code className="font-mono">wf start --after</code> has it.
-      </p>
+      <p className="text-xs text-neutral-500">The runs it waits on: nothing of it is filed until each has shipped.</p>
       {error ? (
         <p className="text-xs text-red-700 dark:text-red-400">Could not list the runs to wait on: {error.message}</p>
       ) : !onRepo ? (

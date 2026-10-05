@@ -58,7 +58,7 @@ test("the title is the breakdown: the pass, every phase in the package's order, 
     'check: 1 observe, 2.00 ms, 40 sessions or run files listed, 0 processes started',
     'claude: 1 observe, 118 ms, 3 sessions or run files listed, 1 process started',
   ]);
-  assert.equal(lines.at(-1), 'Measuring it took 0.40 ms. wf up --stats says the same.');
+  assert.equal(lines.at(-1), 'Measuring it took 0.40 ms.');
   assert.ok(passTitle({ ...PASS, harnesses: {} }, now, 'UTC').includes('\nNo harness was observed.\n'));
   assert.match(
     passTitle(PASS, new Date('2026-09-26T10:05:00.000Z'), 'UTC'),

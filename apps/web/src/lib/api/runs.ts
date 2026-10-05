@@ -194,7 +194,7 @@ const LiftedSchema = Schema.Struct({ id: Schema.String, lifted: Schema.Literal(t
 export const liftHold = (id: string): Promise<{ id: string; lifted: true }> =>
   send('DELETE', `/api/runs/${encodeURIComponent(id)}/hold`, LiftedSchema, {
     body: {},
-    may: `The hold may be lifted: look at the run (\`wf ls ${id}\`) before lifting it again.`,
+    may: "The hold may be lifted: look at the run's page before lifting it again.",
   });
 
 /**
@@ -220,7 +220,7 @@ const PruneAnswerSchema = Schema.Struct({
 export async function pruneRun(id: string, how: PruneHow): Promise<Pruned> {
   const answer = await send('POST', `/api/runs/${encodeURIComponent(id)}/prune`, PruneAnswerSchema, {
     body: how,
-    may: `The run may be pruned: look at it (\`wf ls ${id}\`) before pruning it again.`,
+    may: 'The run may be pruned: look at its page before pruning it again.',
   });
   return { id, pruned: true, lines: answer.lines, left: answer.left.length };
 }

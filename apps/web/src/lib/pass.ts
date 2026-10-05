@@ -40,6 +40,6 @@ export function passTitle(pass: PassCost, now: Date, timeZone?: string): string 
     `The daemon's last pass, at ${clockWord(new Date(pass.at), now, timeZone)}: ${msWord(pass.ms)} ms, ${plural(pass.records, 'run record')} read, ${bytesWord(pass.bytes)} read, ${plural(pass.spawned, 'process', 'processes')} started.`,
     ...phases,
     ...(harnesses.length ? ['Observed, by harness (at once, so their times overlap):', ...harnesses] : ['No harness was observed.']),
-    `Measuring it took ${msWord(pass.overheadMs)} ms. wf up --stats says the same.`,
+    `Measuring it took ${msWord(pass.overheadMs)} ms.`,
   ].join('\n');
 }

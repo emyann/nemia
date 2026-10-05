@@ -1,6 +1,6 @@
 /**
  * A harness's quota through the runtime: Claude Code's answer to `get_usage` read (`quotaOfResponse`), the ask that starts a `claude` for
- * it (`claudeQuota`), here a fake on PATH that answers as 2.1.278 did, and the engine's `quota` verb through both doors, which answers
+ * it (`claudeQuota`), here a fake on PATH that answers as 2.1.278 did, and the engine's `quota` verb, which answers
  * for a harness that has one and refuses in words for one that has none.
  */
 import { test } from 'node:test';
@@ -9,9 +9,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Exit } from 'effect';
 import { claudeQuota, quotaOfResponse, USAGE_ARGS, usageEnv } from '../src/harness/claude/index.ts';
-import { Engine, promiseEngine, type EngineShape } from '../src/index.ts';
-import type { PromiseRunner } from '../src/facade.ts';
+import { Engine, type EngineShape } from '../src/index.ts';
 import { machineTempDir, scratch } from './scratch.ts';
+import { asyncOps, type AsyncRunner } from './promise-runner.ts';
+import { builtEngine } from './engine.ts';
 
 const bin = scratch('ae-quota-bin-');
 /** Every ask the fake took: its arguments, then what it ran in, then that it ended, each with its pid. */
@@ -89,20 +90,16 @@ const gone = (pid: number): boolean => {
 };
 
 /** A harness in Promises, which reports no quota. */
-const fake: PromiseRunner = {
+const fake: AsyncRunner = {
   spawn: async () => {},
   observe: async () => new Map(),
   stop: async () => {},
   logs: async () => '',
 };
 
-/** The engine over `claude`, its default, and `fake`, through each door. */
-const doors = () => {
-  const options = { root: scratch('ae-quota-'), harnesses: { claude: 'claude' as const, fake } };
-  const effect = <A, E>(f: (e: EngineShape) => Effect.Effect<A, E>): Promise<A> =>
-    Effect.runPromise(Engine.use(f).pipe(Effect.provide(Engine.layer(options))));
-  return { effect, promise: promiseEngine(Engine.layer(options)) };
-};
+/** The engine over `claude`, its default, and `fake`. */
+const engineOver = () =>
+  builtEngine(Engine.layer({ root: scratch('ae-quota-'), harnesses: { claude: 'claude' as const, fake: asyncOps(fake) } }));
 
 const PLAN = {
   kind: 'windows',
@@ -232,54 +229,34 @@ test('REFUSED: an ask interrupted before it has an outcome ends its claude befor
   }
 });
 
-test("the engine's quota asks its default harness, or the one named, and answers the same through either door", async () => {
-  const { effect, promise } = doors();
-  assert.deepEqual(await effect((e) => e.quota()), PLAN);
-  assert.deepEqual(await promise.quota(), PLAN);
-  assert.deepEqual(await promise.quota('claude'), PLAN);
+test("the engine's quota asks its default harness, or the one named, and answers the same either way", async () => {
+  const engine = engineOver();
+  assert.deepEqual(await Effect.runPromise(engine.quota()), PLAN);
+  assert.deepEqual(await Effect.runPromise(engine.quota('claude')), PLAN);
   usageAnswer(recorded('unanswered'));
   try {
-    assert.deepEqual(await effect((e) => e.quota('claude')), await promise.quota());
+    assert.deepEqual(await Effect.runPromise(engine.quota('claude')), await Effect.runPromise(engine.quota()));
   } finally {
     usageAnswer(recorded('plan'));
   }
 });
 
-test('REFUSED: a quota asked of a harness that has none, of one the engine has not, or with other arguments, at both doors', async () => {
-  const { effect, promise } = doors();
-  const untyped = <F>(f: F) => f as (...args: unknown[]) => never;
+test('REFUSED: a quota asked of a harness that has none, of one the engine has not, or with other arguments', async () => {
+  const engine = engineOver();
+  const untyped = <F>(f: F) => f as (...args: unknown[]) => EngineShape['quota'] extends (...a: never[]) => infer R ? R : never;
   const asks = (fs.readFileSync(calls, 'utf8').match(/^args /gm) ?? []).length;
-  const cases: Array<[() => Promise<unknown>, () => Promise<unknown>, string]> = [
-    [() => effect((e) => e.quota('fake')), () => promise.quota('fake'), 'the `fake` harness reports no quota. Ask one that does: claude.'],
+  const cases: Array<[() => ReturnType<EngineShape['quota']>, string]> = [
+    [() => engine.quota('fake'), 'the `fake` harness reports no quota. Ask one that does: claude.'],
+    [() => engine.quota('nope'), '`nope` is not a harness this engine has. Its harnesses are: claude, fake.'],
+    [() => untyped(engine.quota)(42), "takes one harness's name, or nothing for the default harness (`claude`); it was handed 42."],
     [
-      () => effect((e) => e.quota('nope')),
-      () => promise.quota('nope'),
-      '`nope` is not a harness this engine has. Its harnesses are: claude, fake.',
-    ],
-    [
-      () => effect((e) => untyped(e.quota)(42)),
-      () => untyped(promise.quota)(42),
-      "takes one harness's name, or nothing for the default harness (`claude`); it was handed 42.",
-    ],
-    [
-      () => effect((e) => untyped(e.quota)('claude', 'fake')),
-      () => untyped(promise.quota)('claude', 'fake'),
+      () => untyped(engine.quota)('claude', 'fake'),
       'takes one harness\'s name, or nothing for the default harness (`claude`); it was handed "claude", "fake".',
     ],
   ];
-  for (const [viaService, viaPromise, words] of cases) {
-    const tagged = await viaService().then(
-      (v) => assert.fail(`resolved with ${JSON.stringify(v)}`),
-      (e: Error & { _tag?: string }) => e,
-    );
-    assert.deepEqual([tagged._tag, tagged.message], ['QuotaRefused', words]);
-    const plain = await Promise.resolve()
-      .then(viaPromise)
-      .then(
-        (v) => assert.fail(`resolved with ${JSON.stringify(v)}`),
-        (e: Error & { exitCode?: number }) => e,
-      );
-    assert.deepEqual([plain.message, plain.exitCode], [`quota: ${words}`, 2]);
+  for (const [asked, words] of cases) {
+    const refused = await Effect.runPromise(Effect.flip(asked()));
+    assert.deepEqual([refused._tag, refused.message], ['QuotaRefused', words]);
   }
   assert.equal((fs.readFileSync(calls, 'utf8').match(/^args /gm) ?? []).length, asks, 'no refused quota started a claude');
 });

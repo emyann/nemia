@@ -3,7 +3,8 @@ import { claudeDetached } from '../harness/claude/index.ts';
 import { codex } from '../harness/codex/codex.ts';
 import { commandHarness } from '../harness/command/command.ts';
 import { argsRefusalOf, type HarnessArgs } from '../harness/args.ts';
-import { harnessRefusalOf, type HarnessConfig } from '../facade/consumer.ts';
+import { harnessRefusalOf } from './harness-refusal.ts';
+import type { HarnessConfig } from './options.ts';
 
 /** The harnesses of an engine given none: Claude Code, Codex, `claude -p` on the detached worker, and a process. */
 export const DEFAULT_HARNESSES: Record<string, HarnessConfig> = {

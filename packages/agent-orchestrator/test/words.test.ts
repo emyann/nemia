@@ -214,7 +214,7 @@ const WORKFLOW_WORDS: Baseline = {
   'packages/agent-runtime/src/core/lifecycle.ts': { count: 7, ...MOVES.closeout },
   'packages/agent-runtime/src/core/path.ts': { count: 2, ...MOVES.reword },
   'packages/agent-runtime/src/core/session.ts': { count: 3, ...MOVES.reword },
-  'packages/agent-runtime/src/facade/consumer.ts': { count: 4, ...MOVES.reword },
+  'packages/agent-runtime/src/service/options.ts': { count: 4, ...MOVES.reword },
   'packages/agent-runtime/src/harness/args.ts': { count: 3, ...MOVES.reword },
   'packages/agent-runtime/src/harness/claude/bg.ts': { count: 20, ...MOVES.closeout },
   'packages/agent-runtime/src/harness/claude/code.ts': { count: 3, ...MOVES.reword },

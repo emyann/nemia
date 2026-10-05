@@ -1,23 +1,27 @@
 /**
  * The package's entries are Effect: no function an entry exports hands back a Promise, or an object whose methods do — the shapes of a
- * plain face that runs a program for its caller, and of a Promise engine — but the one named in `PROMISED`. A pure function answers a
- * plain value, as it may; a verb is an Effect of the engine. Read by the TypeScript checker, over the entries `package.json` names.
+ * plain face that runs a program for its caller, and of a Promise engine — but one named in `PROMISED`, which is empty. A pure function
+ * answers a plain value, as it may; a verb is an Effect of the engine. Read by the TypeScript checker, over the entries `package.json`
+ * names, and proven on `fixtures/promise-face.ts`, which exports both shapes.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
+import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 
 const PACKAGE = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-const ENTRIES = ['src/facade.ts', 'src/index.ts', 'src/vocabulary.ts'];
+/** The source files `package.json` exports as the package's entries. */
+const ENTRIES = Object.values(
+  (JSON.parse(fs.readFileSync(path.join(PACKAGE, 'package.json'), 'utf8')) as { exports: Record<string, string> }).exports,
+)
+  .filter((f) => f.endsWith('.ts'))
+  .map((f) => path.normalize(f));
 
-/**
- * The functions an entry may export that answer a Promise, or methods that do: `promiseEngine`, the Promise door left to the runtime's own
- * tests until it goes.
- */
-const PROMISED = new Set(['promiseEngine']);
+/** The functions an entry may export that answer a Promise, or methods that do: none. */
+const PROMISED = new Set<string>();
 
 /** The names of the functions each entry in `files` exports whose call answers a Promise, or methods that do, as `entry: name`. */
 const promisedExports = (files: string[]): string[] => {
@@ -45,15 +49,21 @@ const promisedExports = (files: string[]): string[] => {
   });
 };
 
+test('the entries read are the ones package.json exports', () => {
+  assert.deepEqual(ENTRIES, ['src/index.ts', 'src/vocabulary.ts']);
+});
+
 test('no function an entry exports answers a Promise, or methods that do, but the ones PROMISED names', () => {
-  const promised = promisedExports(ENTRIES);
-  assert.ok(
-    promised.some((p) => p.endsWith(': promiseEngine')),
-    `the checker read the entries' exports: ${promised.join(', ')}`,
-  );
   assert.deepEqual(
-    promised.filter((p) => !PROMISED.has(p.slice(p.indexOf(': ') + 2))),
+    promisedExports(ENTRIES).filter((p) => !PROMISED.has(p.slice(p.indexOf(': ') + 2))),
     [],
     "an entry exports a plain face: make it an Effect, as the engine's verbs are",
   );
+});
+
+test('REFUSED: a function that answers a Promise, and one that answers an object of Promise methods, each named', () => {
+  assert.deepEqual(promisedExports(['test/fixtures/promise-face.ts']), [
+    'test/fixtures/promise-face.ts: promiseFace',
+    'test/fixtures/promise-face.ts: promiseEngine',
+  ]);
 });

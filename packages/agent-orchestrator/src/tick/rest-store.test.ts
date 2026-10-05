@@ -14,8 +14,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { nameFor, type PromiseJournal, type PromiseRunner, type PromiseSighting } from 'agent-runtime';
-import { Engine } from 'agent-runtime/effect';
+import { nameFor, Engine, type Sighting } from 'agent-runtime';
+import { asyncStore, type AsyncJournal, asyncOps, type AsyncRunner } from '../../test/promised.ts';
 import type { GitRun, Run } from '../run.ts';
 import type { PassCost } from '../meter/meter.ts';
 import { scratch } from '../../test/scratch.ts';
@@ -67,9 +67,9 @@ const folder = (...steps: string[]) => {
  * The engine's store, in memory, as its own tests keep one, noting in `starts` when each attempt began, by its session's name; `journal` is
  * kept so a test can append to a task as the runtime would.
  */
-const memoryJournal = (starts: Map<string, number>): PromiseJournal => {
-  const tasks = new Map<string, Parameters<PromiseJournal['append']>[1][]>();
-  const feed: Awaited<ReturnType<PromiseJournal['feed']>>['entries'] = [];
+const memoryJournal = (starts: Map<string, number>): AsyncJournal => {
+  const tasks = new Map<string, Parameters<AsyncJournal['append']>[1][]>();
+  const feed: Awaited<ReturnType<AsyncJournal['feed']>>['entries'] = [];
   return {
     async append(taskId, event) {
       tasks.set(taskId, [...(tasks.get(taskId) ?? []), event]);
@@ -98,9 +98,9 @@ const BLOCKED = { outcome: 'blocked', summary: 'two flags could be meant', artif
  * says its attempt began.
  */
 const engine = () => {
-  const sessions = new Map<string, PromiseSighting>();
+  const sessions = new Map<string, Sighting>();
   let n = 0;
-  const runner: PromiseRunner = {
+  const runner: AsyncRunner = {
     async spawn(r) {
       n++;
       sessions.set(r.name, { sessionId: `s-${n}`, nativeId: `native-${n}`, state: 'working', busy: true });
@@ -109,7 +109,7 @@ const engine = () => {
       return new Map(sessions);
     },
     async stop(id) {
-      for (const [name, s] of sessions) if (s.sessionId === id) sessions.set(name, { ...s, state: 'stopped', busy: false });
+      for (const [name, s] of sessions) if (s.sessionId === id) sessions.set(name, { ...s, state: 'canceled', busy: false });
     },
     async logs() {
       return '';
@@ -120,15 +120,20 @@ const engine = () => {
   const e = plainEngine(
     Engine.layer({
       root: fs.mkdtempSync(path.join(ROOT, 'engine-')),
-      journal,
-      harnesses: { claude: runner, codex: runner, check: runner },
+      journal: asyncStore(journal),
+      harnesses: { claude: asyncOps(runner), codex: asyncOps(runner), check: asyncOps(runner) },
       defaultHarness: 'claude',
     }),
   );
   const signAll = (keep: readonly Run[] = [], closeout: (name: string) => object | undefined = () => undefined) => {
     for (const [name, s] of sessions) {
       if (s.state !== 'working' || keep.some((r) => name.startsWith(`ae/${r.id}-`))) continue;
-      sessions.set(name, { ...s, state: 'done', busy: false, closeout: { payload: closeout(name) ?? SIGNED, at: starts.get(name)! + 1 } });
+      sessions.set(name, {
+        ...s,
+        state: 'completed',
+        busy: false,
+        closeout: { payload: closeout(name) ?? SIGNED, at: starts.get(name)! + 1 },
+      });
     }
   };
   return { e, journal, signAll };

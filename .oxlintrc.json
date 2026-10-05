@@ -835,7 +835,7 @@
       }
     },
     {
-      "files": ["packages/agent-runtime/src/facade/consumer.ts"],
+      "files": ["packages/agent-runtime/src/service/harness-refusal.ts"],
       "rules": {
         "complexity": ["error", { "max": 25 }],
         "sonarjs/cognitive-complexity": ["error", 27]

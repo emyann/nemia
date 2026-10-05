@@ -30,8 +30,7 @@
     "ae": "bin/ae.ts"
   },
   "exports": {
-    ".": "./src/facade.ts",
-    "./effect": "./src/index.ts",
+    ".": "./src/index.ts",
     "./vocabulary": "./src/vocabulary.ts",
     "./package.json": "./package.json"
   }

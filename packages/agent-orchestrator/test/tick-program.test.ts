@@ -12,9 +12,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { nameFor, type PromiseJournal, type PromiseRunner, type PromiseSighting } from 'agent-runtime';
+import { nameFor, Engine as RuntimeEngine, type Sighting } from 'agent-runtime';
+import { asyncStore, type AsyncJournal, asyncOps, type AsyncRunner } from './promised.ts';
 import type { Engine } from '../src/runtime-client.ts';
-import { Engine as RuntimeEngine } from 'agent-runtime/effect';
 import { Effect } from 'effect';
 import type { Effect as EffectOf } from 'effect/Effect';
 import type { Refusal } from '../src/refusal/refusal.ts';
@@ -50,10 +50,10 @@ git(REPO, 'commit', '-q', '--allow-empty', '-m', 'base');
 const FOLDER = fs.mkdtempSync(path.join(ROOT, 'wf-'));
 fs.writeFileSync(path.join(FOLDER, 'work.md'), '---\nharness: codex\n---\nwork it\n');
 
-const tasks = new Map<string, Awaited<ReturnType<PromiseJournal['read']>>>();
+const tasks = new Map<string, Awaited<ReturnType<AsyncJournal['read']>>>();
 /** When the journal says each attempt began, in milliseconds, by its session's name: a closeout counts only when made after it. */
 const starts = new Map<string, number>();
-const journal: PromiseJournal = {
+const journal: AsyncJournal = {
   async append(taskId, event) {
     tasks.set(taskId, [...(tasks.get(taskId) ?? []), event]);
     if (event.kind === 'starting') starts.set(nameFor(taskId, event.attempt), Date.parse(event.at));
@@ -69,8 +69,8 @@ const journal: PromiseJournal = {
   },
 };
 
-const sessions = new Map<string, PromiseSighting>();
-const runner: PromiseRunner = {
+const sessions = new Map<string, Sighting>();
+const runner: AsyncRunner = {
   async spawn(r) {
     sessions.set(r.name, { sessionId: `s-${sessions.size + 1}`, nativeId: `n-${sessions.size + 1}`, state: 'working', busy: true });
   },
@@ -85,8 +85,8 @@ const runner: PromiseRunner = {
 const e = plainEngine(
   RuntimeEngine.layer({
     root: fs.mkdtempSync(path.join(ROOT, 'engine-')),
-    journal,
-    harnesses: { claude: runner, codex: runner, check: runner },
+    journal: asyncStore(journal),
+    harnesses: { claude: asyncOps(runner), codex: asyncOps(runner), check: asyncOps(runner) },
     defaultHarness: 'claude',
   }),
 );
@@ -95,7 +95,7 @@ const signAll = () => {
     if (s.state === 'working')
       sessions.set(name, {
         ...s,
-        state: 'done',
+        state: 'completed',
         busy: false,
         closeout: { payload: { outcome: 'done', summary: 'did it', artifacts: [], needs: null }, at: starts.get(name)! + 1 },
       });

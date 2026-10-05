@@ -4,7 +4,7 @@
  * session (`native-<id>`). A settled task carries the closeout it is given. A verb the board does not keep dies naming itself.
  */
 import { Effect, Layer } from 'effect';
-import { Engine, type TaskView } from 'agent-runtime/effect';
+import { Engine, type TaskView } from 'agent-runtime';
 import type { TaskPhase } from '../src/run.ts';
 
 /** A task as it was filed: its id and brief, the closeout schema it asks for, and every other field of its spec. */

@@ -55,8 +55,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Effect, Layer } from 'effect';
-import { nameFor, type Engine, type Said, type TaskView } from '../src/facade.ts';
-import { Engine as EngineService, promiseEngine } from '../src/index.ts';
+import { nameFor, type EngineShape, type Said, type TaskView } from '../src/index.ts';
+import { Engine as EngineService } from '../src/index.ts';
+import { builtEngine } from './engine.ts';
 import { file } from '../src/core/engine/filing.ts';
 import { tick, view } from '../src/core/engine/engine.ts';
 import { Journal } from '../src/core/engine/journal.ts';
@@ -80,7 +81,7 @@ const tmp = (label: string) => scratch(`ae-live-${label}-`);
  * never got that far, and passes over a task with no view, which has nothing known to clean.
  */
 const settleThenCheck = async (
-  engine: Engine,
+  engine: EngineShape,
   ids: Record<string, string>,
   check: (views: Record<string, TaskView>) => void,
   act?: () => Promise<void>,
@@ -90,8 +91,8 @@ const settleThenCheck = async (
     await act?.();
     const until = Date.now() + 10 * 60_000;
     while (Date.now() < until) {
-      await engine.tick();
-      for (const [k, id] of Object.entries(ids)) views[k] = await engine.view(id);
+      await Effect.runPromise(engine.tick());
+      for (const [k, id] of Object.entries(ids)) views[k] = await Effect.runPromise(engine.view(id));
       if (Object.values(views).every((v) => v.state.settled)) break;
       await new Promise((r) => setTimeout(r, 5_000));
     }
@@ -100,7 +101,7 @@ const settleThenCheck = async (
     for (const [k, id] of Object.entries(ids)) {
       if (!views[k]) {
         try {
-          views[k] = await engine.view(id);
+          views[k] = await Effect.runPromise(engine.view(id));
         } catch {}
       }
     }
@@ -135,13 +136,15 @@ test(
     timeout: 12 * 60_000,
   },
   async () => {
-    const engine = promiseEngine(EngineService.layer({ root: tmp('board') }));
+    const engine = builtEngine(EngineService.layer({ root: tmp('board') }));
     const fenced = tmp('fenced');
     const open = tmp('open');
     const common = { brief: BRIEF, closeoutSchema: CLOSEOUT, deadlineSeconds: 480, config: { effort: 'low', background: true } };
     const ids = {
-      fenced: await engine.file({ ...common, cwd: fenced, config: { ...common.config, tools: ['Read', 'Grep', 'Glob'] } }),
-      open: await engine.file({ ...common, cwd: open }),
+      fenced: await Effect.runPromise(
+        engine.file({ ...common, cwd: fenced, config: { ...common.config, tools: ['Read', 'Grep', 'Glob'] } }),
+      ),
+      open: await Effect.runPromise(engine.file({ ...common, cwd: open })),
     };
 
     await settleThenCheck(engine, ids, (views) => {
@@ -193,7 +196,7 @@ test(
     timeout: 12 * 60_000,
   },
   async () => {
-    const engine = promiseEngine(EngineService.layer({ root: tmp('deny-board') }));
+    const engine = builtEngine(EngineService.layer({ root: tmp('deny-board') }));
     const fenced = allowingCheckout('deny-fenced');
     const open = allowingCheckout('deny-open');
     const common = {
@@ -204,12 +207,14 @@ test(
     };
     try {
       const ids = {
-        fenced: await engine.file({
-          ...common,
-          cwd: fenced,
-          config: { ...common.config, disallowedTools: ['Bash(npm run build)', 'Bash(npm run e2e)'] },
-        }),
-        open: await engine.file({ ...common, cwd: open }),
+        fenced: await Effect.runPromise(
+          engine.file({
+            ...common,
+            cwd: fenced,
+            config: { ...common.config, disallowedTools: ['Bash(npm run build)', 'Bash(npm run e2e)'] },
+          }),
+        ),
+        open: await Effect.runPromise(engine.file({ ...common, cwd: open })),
       };
 
       await settleThenCheck(engine, ids, (views) => {
@@ -274,17 +279,19 @@ test(
     timeout: 12 * 60_000,
   },
   async () => {
-    const engine = promiseEngine(EngineService.layer({ root: tmp('mcp-board') }));
+    const engine = builtEngine(EngineService.layer({ root: tmp('mcp-board') }));
     const server = path.join(tmp('mcp-server'), 'server.mjs');
     fs.writeFileSync(server, PROBE_SERVER);
     const common = { brief: MCP_BRIEF, closeoutSchema: MCP_CLOSEOUT, deadlineSeconds: 480, config: { effort: 'low', background: true } };
     const ids = {
-      bare: await engine.file({ ...common, cwd: tmp('mcp-bare') }),
-      given: await engine.file({
-        ...common,
-        cwd: tmp('mcp-given'),
-        config: { ...common.config, mcp: { aeprobe: { command: process.execPath, args: [server] } } },
-      }),
+      bare: await Effect.runPromise(engine.file({ ...common, cwd: tmp('mcp-bare') })),
+      given: await Effect.runPromise(
+        engine.file({
+          ...common,
+          cwd: tmp('mcp-given'),
+          config: { ...common.config, mcp: { aeprobe: { command: process.execPath, args: [server] } } },
+        }),
+      ),
     };
 
     await settleThenCheck(engine, ids, (views) => {
@@ -333,7 +340,7 @@ const NAME_CLOSEOUT = {
  *   a line of their own.
  */
 const sayReaches = (background: boolean) => async (t: TestContext) => {
-  const engine = promiseEngine(EngineService.layer({ root: tmp('say-board') }));
+  const engine = builtEngine(EngineService.layer({ root: tmp('say-board') }));
   const told = tmp('say-told');
   const control = tmp('say-control');
   const common = {
@@ -343,8 +350,8 @@ const sayReaches = (background: boolean) => async (t: TestContext) => {
     config: { effort: 'low', tools: ['Bash', 'Write'], ...(background ? { background } : {}) },
   };
   const ids = {
-    told: await engine.file({ ...common, cwd: told }),
-    control: await engine.file({ ...common, cwd: control }),
+    told: await Effect.runPromise(engine.file({ ...common, cwd: told })),
+    control: await Effect.runPromise(engine.file({ ...common, cwd: control })),
   };
   const name = `SAID-${randomUUID().slice(0, 8)}.txt`;
   const words = `The file to write is ${name}`;
@@ -371,16 +378,16 @@ const sayReaches = (background: boolean) => async (t: TestContext) => {
     async () => {
       const until = Date.now() + 5 * 60_000;
       while (!said && Date.now() < until) {
-        await engine.tick();
-        const { phase } = await engine.view(ids.told);
-        if (phase === 'running (working)' || phase === 'working (quiescent)') said = await engine.say(ids.told, words);
+        await Effect.runPromise(engine.tick());
+        const { phase } = await Effect.runPromise(engine.view(ids.told));
+        if (phase === 'running (working)' || phase === 'working (quiescent)') said = await Effect.runPromise(engine.say(ids.told, words));
         else await new Promise((r) => setTimeout(r, 5_000));
       }
       assert.ok(said, 'the told session was seen working within five minutes, and told');
     },
   );
 
-  const { events } = await engine.transcript(ids.told);
+  const { events } = await Effect.runPromise(engine.transcript(ids.told));
   if (!background) {
     const arrived = events.filter((e) => e.role === 'user' && e.kind === 'text' && e.text === words);
     assert.equal(
@@ -434,7 +441,7 @@ test(
   },
   async () => {
     const root = tmp('release-board');
-    const engine = promiseEngine(EngineService.layer({ root }));
+    const engine = builtEngine(EngineService.layer({ root }));
     const cwd = trusted('release');
     const word = `ae${randomUUID().slice(0, 8)}`;
     const agents = () =>
@@ -444,20 +451,22 @@ test(
     const settled = async (id: string) => {
       const until = Date.now() + 10 * 60_000;
       while (Date.now() < until) {
-        await engine.tick();
-        const v = await engine.view(id);
+        await Effect.runPromise(engine.tick());
+        const v = await Effect.runPromise(engine.view(id));
         if (v.state.settled) return v;
         await new Promise((r) => setTimeout(r, 5_000));
       }
-      return engine.view(id);
+      return Effect.runPromise(engine.view(id));
     };
     const sessions = new Set<string>();
     const common = { cwd, deadlineSeconds: 480, config: { model: 'haiku', background: true }, closeoutSchema: WORD_CLOSEOUT };
     try {
-      const firstId = await engine.file({
-        ...common,
-        brief: `The code word is ${word}. Remember it, and do nothing else. Then give your closing statement, with word set to ok.`,
-      });
+      const firstId = await Effect.runPromise(
+        engine.file({
+          ...common,
+          brief: `The code word is ${word}. Remember it, and do nothing else. Then give your closing statement, with word set to ok.`,
+        }),
+      );
       const first = await settled(firstId);
       if (first.sessionId) sessions.add(first.sessionId);
       const id = first.state.attempts.at(-1)?.nativeId ?? undefined;
@@ -468,13 +477,15 @@ test(
         false,
         'released in the pass that settled it: not in claude agents',
       );
-      assert.match(await engine.logs(firstId), new RegExp(word), 'ae logs still reads the removed session');
+      assert.match(await Effect.runPromise(engine.logs(firstId)), new RegExp(word), 'ae logs still reads the removed session');
 
-      const secondId = await engine.file({
-        ...common,
-        resumeFrom: id,
-        brief: 'What was the code word you were given? Give it as word in your closing statement.',
-      });
+      const secondId = await Effect.runPromise(
+        engine.file({
+          ...common,
+          resumeFrom: id,
+          brief: 'What was the code word you were given? Give it as word in your closing statement.',
+        }),
+      );
       const second = await settled(secondId);
       if (second.sessionId) sessions.add(second.sessionId);
       assert.equal(second.state.settled, 'succeeded', `resumed settled: ${second.phase}`);
@@ -530,15 +541,17 @@ test(
     timeout: 12 * 60_000,
   },
   async (t) => {
-    const engine = promiseEngine(EngineService.layer({ root: tmp('budget-board') }));
+    const engine = builtEngine(EngineService.layer({ root: tmp('budget-board') }));
     const ids = {
-      capped: await engine.file({
-        brief: LOOP_BRIEF,
-        cwd: notesIn('budget-p'),
-        harness: 'claude-detached',
-        config: { model: 'haiku', tools: ['Read'], budgetUsd: 0.01 },
-        deadlineSeconds: 480,
-      }),
+      capped: await Effect.runPromise(
+        engine.file({
+          brief: LOOP_BRIEF,
+          cwd: notesIn('budget-p'),
+          harness: 'claude-detached',
+          config: { model: 'haiku', tools: ['Read'], budgetUsd: 0.01 },
+          deadlineSeconds: 480,
+        }),
+      ),
     };
     await settleThenCheck(engine, ids, (views) => {
       const { state } = views.capped;
@@ -620,15 +633,17 @@ test(
     timeout: 15 * 60_000,
   },
   async (t) => {
-    const engine = promiseEngine(EngineService.layer({ root: tmp('unsigned-board') }));
+    const engine = builtEngine(EngineService.layer({ root: tmp('unsigned-board') }));
     const ids = {
-      unsigned: await engine.file({
-        brief: UNSIGNED_BRIEF,
-        cwd: tmp('unsigned'),
-        closeoutSchema: WORD_CLOSEOUT,
-        deadlineSeconds: 480,
-        config: { model: 'haiku', background: true },
-      }),
+      unsigned: await Effect.runPromise(
+        engine.file({
+          brief: UNSIGNED_BRIEF,
+          cwd: tmp('unsigned'),
+          closeoutSchema: WORD_CLOSEOUT,
+          deadlineSeconds: 480,
+          config: { model: 'haiku', background: true },
+        }),
+      ),
     };
 
     await settleThenCheck(engine, ids, (views) => {
@@ -668,21 +683,23 @@ test(
     timeout: 6 * 60_000,
   },
   async (t) => {
-    const engine = promiseEngine(EngineService.layer({ root: tmp('remote-board') }));
+    const engine = builtEngine(EngineService.layer({ root: tmp('remote-board') }));
     const common = {
       brief: 'Reply with the single word ok, and nothing else.',
       config: { model: 'haiku', tools: [] as string[], background: true },
     };
     const ids = {
-      bridged: await engine.file({ ...common, cwd: tmp('remote'), config: { ...common.config, claude: { remoteControl: true } } }),
-      control: await engine.file({ ...common, cwd: tmp('remote-none') }),
+      bridged: await Effect.runPromise(
+        engine.file({ ...common, cwd: tmp('remote'), config: { ...common.config, claude: { remoteControl: true } } }),
+      ),
+      control: await Effect.runPromise(engine.file({ ...common, cwd: tmp('remote-none') })),
     };
     const found: Record<string, Record<string, unknown> | undefined> = {};
     const read = () => {
       for (const [k, id] of Object.entries(ids)) found[k] = registrationOf(nameFor(id, 1));
     };
     try {
-      await engine.tick();
+      await Effect.runPromise(engine.tick());
       const until = Date.now() + 2 * 60_000;
       while (!(found.bridged?.bridgeSessionId && found.control) && Date.now() < until) {
         await new Promise((r) => setTimeout(r, 2_000));
@@ -706,7 +723,7 @@ test(
       for (const r of Object.values(found)) if (typeof r?.sessionId === 'string') sessions.add(r.sessionId);
       for (const id of Object.values(ids)) {
         try {
-          const v = await engine.view(id);
+          const v = await Effect.runPromise(engine.view(id));
           if (v.sessionId) sessions.add(v.sessionId);
         } catch {}
       }
@@ -729,20 +746,20 @@ test(
   },
   async (t) => {
     const root = tmp('long-lived-board');
-    const engine = promiseEngine(EngineService.layer({ root }));
+    const engine = builtEngine(EngineService.layer({ root }));
     const common = {
       brief: 'Reply with the single word ok, and nothing else.',
       config: { model: 'haiku', tools: [] as string[], background: true, claude: { remoteControl: true as const } },
     };
     const dirs = { open: trusted('long-lived'), job: trusted('long-lived-job') };
     const ids = {
-      open: await engine.file({ ...common, cwd: dirs.open, restartPolicy: 'Always' }),
-      job: await engine.file({ ...common, cwd: dirs.job }),
+      open: await Effect.runPromise(engine.file({ ...common, cwd: dirs.open, restartPolicy: 'Always' })),
+      job: await Effect.runPromise(engine.file({ ...common, cwd: dirs.job })),
     };
     const views: Record<string, TaskView> = {};
-    const pass = async (e: Engine) => {
-      await e.tick();
-      for (const [k, id] of Object.entries(ids)) views[k] = await e.view(id);
+    const pass = async (e: EngineShape) => {
+      await Effect.runPromise(e.tick());
+      for (const [k, id] of Object.entries(ids)) views[k] = await Effect.runPromise(e.view(id));
     };
     try {
       const until = Date.now() + 5 * 60_000;
@@ -753,7 +770,7 @@ test(
       assert.equal(views.open?.phase, 'idle', `the long-lived session reads idle once its turn ends: ${views.open?.phase}`);
       assert.equal(views.job?.state.settled, 'succeeded', `the job settles on its turn's end: ${views.job?.phase}`);
 
-      const restarted = promiseEngine(EngineService.layer({ root }));
+      const restarted = builtEngine(EngineService.layer({ root }));
       const quiet = Date.now() + 100_000;
       while (Date.now() < quiet) {
         await pass(restarted);
@@ -769,7 +786,7 @@ test(
       const sessionId = views.open?.sessionId;
       const word = `again-${randomUUID().slice(0, 8)}`;
       const words = `Reply with the single word ${word}, and nothing else.`;
-      await restarted.say(ids.open, words);
+      await Effect.runPromise(restarted.say(ids.open, words));
       const told = (events: TranscriptEvent[]) => events.findIndex((e) => e.kind === 'system' && e.text?.split('\n').includes(words));
       const answered = (events: TranscriptEvent[]) =>
         told(events) >= 0 && events.slice(told(events)).some((e) => e.role === 'assistant' && e.kind === 'text' && e.text?.includes(word));
@@ -778,7 +795,7 @@ test(
       while (!(answered(events) && views.open?.phase === 'idle') && Date.now() < turn) {
         await new Promise((r) => setTimeout(r, 5_000));
         await pass(restarted);
-        events = (await restarted.transcript(ids.open)).events;
+        events = (await Effect.runPromise(restarted.transcript(ids.open))).events;
       }
       assert.ok(
         told(events) >= 0,
@@ -792,7 +809,7 @@ test(
         'the same session took the turn: no end recorded, no second attempt',
       );
 
-      await restarted.stop(ids.open);
+      await Effect.runPromise(restarted.stop(ids.open));
       const stopping = Date.now() + 2 * 60_000;
       while (!views.open?.state.settled && Date.now() < stopping) {
         await pass(restarted);
@@ -939,23 +956,27 @@ test(
     timeout: 15 * 60_000,
   },
   async (t) => {
-    const engine = promiseEngine(EngineService.layer({ root: tmp('m1-board') }));
+    const engine = builtEngine(EngineService.layer({ root: tmp('m1-board') }));
     const probe = tmp('m1-engine');
     const ids = {
-      denied: await engine.file({
-        brief: DENIED_BRIEF(path.join(probe, 'outside')),
-        cwd: tmp('m1-denied'),
-        closeoutSchema: FINISHED_CLOSEOUT,
-        deadlineSeconds: 480,
-        config: { model: 'haiku' },
-      }),
-      control: await engine.file({
-        brief: 'Give your closing statement, with finished set to true. Call no tool first.',
-        cwd: tmp('m1-control'),
-        closeoutSchema: FINISHED_CLOSEOUT,
-        deadlineSeconds: 480,
-        config: { model: 'haiku' },
-      }),
+      denied: await Effect.runPromise(
+        engine.file({
+          brief: DENIED_BRIEF(path.join(probe, 'outside')),
+          cwd: tmp('m1-denied'),
+          closeoutSchema: FINISHED_CLOSEOUT,
+          deadlineSeconds: 480,
+          config: { model: 'haiku' },
+        }),
+      ),
+      control: await Effect.runPromise(
+        engine.file({
+          brief: 'Give your closing statement, with finished set to true. Call no tool first.',
+          cwd: tmp('m1-control'),
+          closeoutSchema: FINISHED_CLOSEOUT,
+          deadlineSeconds: 480,
+          config: { model: 'haiku' },
+        }),
+      ),
     };
     await settleThenCheck(engine, ids, (views) => {
       const [denied] = views.denied.state.attempts;
@@ -983,17 +1004,17 @@ test(
     timeout: 40 * 60_000,
   },
   async (t) => {
-    const engine = promiseEngine(EngineService.layer({ root: tmp('m2-board') }));
+    const engine = builtEngine(EngineService.layer({ root: tmp('m2-board') }));
     const cwd = tmp('m2');
     const settled = async (id: string) => {
       const end = Date.now() + 10 * 60_000;
       while (Date.now() < end) {
-        await engine.tick();
-        const v = await engine.view(id);
+        await Effect.runPromise(engine.tick());
+        const v = await Effect.runPromise(engine.view(id));
         if (v.state.settled) return v;
         await new Promise((r) => setTimeout(r, 5_000));
       }
-      return engine.view(id);
+      return Effect.runPromise(engine.view(id));
     };
     const common = { cwd, deadlineSeconds: 480, closeoutSchema: WORD_CLOSEOUT };
     const tell = (word: string) =>
@@ -1002,11 +1023,15 @@ test(
     const last = (v: TaskView) => v.state.attempts.at(-1);
 
     const bgWord = `ae${randomUUID().slice(0, 8)}`;
-    const bg = await settled(await engine.file({ ...common, config: { model: 'haiku', background: true }, brief: tell(bgWord) }));
+    const bg = await settled(
+      await Effect.runPromise(engine.file({ ...common, config: { model: 'haiku', background: true }, brief: tell(bgWord) })),
+    );
     assert.equal(bg.state.settled, 'succeeded', `the background session settled: ${bg.phase}`);
     const parent = last(bg)?.nativeId ?? undefined;
     assert.ok(parent, 'its Claude Code id is on the record');
-    const fromBg = await settled(await engine.file({ ...common, config: { model: 'haiku' }, resumeFrom: parent, brief: ask }));
+    const fromBg = await settled(
+      await Effect.runPromise(engine.file({ ...common, config: { model: 'haiku' }, resumeFrom: parent, brief: ask })),
+    );
     t.diagnostic(`a job resumed from a background session: ${fromBg.state.settled}, ${JSON.stringify(last(fromBg)?.usage)}`);
     assert.equal(fromBg.state.settled, 'succeeded', `the job resumed from it settled: ${fromBg.phase}`);
     assert.deepEqual(last(fromBg)?.closeout, { word: bgWord }, 'and remembered the word');
@@ -1018,10 +1043,10 @@ test(
     );
 
     const word = `ae${randomUUID().slice(0, 8)}`;
-    const first = await settled(await engine.file({ ...common, config: { model: 'haiku' }, brief: tell(word) }));
+    const first = await settled(await Effect.runPromise(engine.file({ ...common, config: { model: 'haiku' }, brief: tell(word) })));
     assert.equal(first.state.settled, 'succeeded', `the first job settled: ${first.phase}`);
     const second = await settled(
-      await engine.file({ ...common, config: { model: 'haiku' }, resumeFrom: last(first)!.nativeId!, brief: ask }),
+      await Effect.runPromise(engine.file({ ...common, config: { model: 'haiku' }, resumeFrom: last(first)!.nativeId!, brief: ask })),
     );
     const [one, two] = [last(first)?.usage?.costUsd, last(second)?.usage?.costUsd];
     t.diagnostic(`costs: first job ${one}, the job resumed from it ${two}`);
@@ -1034,7 +1059,9 @@ test(
 
     const cap = Math.max(0.01, Math.round((one + two) * 50) / 100);
     const capped = await settled(
-      await engine.file({ ...common, config: { model: 'haiku', budgetUsd: cap }, resumeFrom: last(second)!.nativeId!, brief: ask }),
+      await Effect.runPromise(
+        engine.file({ ...common, config: { model: 'haiku', budgetUsd: cap }, resumeFrom: last(second)!.nativeId!, brief: ask }),
+      ),
     );
     t.diagnostic(
       `a resume capped at $${cap}, under its session's $${(one + two).toFixed(4)}: ${capped.state.settled}, ${last(capped)?.reason}, cost ${last(capped)?.usage?.costUsd}`,
@@ -1050,20 +1077,20 @@ test(
     timeout: 20 * 60_000,
   },
   async (t) => {
-    const engine = promiseEngine(EngineService.layer({ root: tmp('m7-board') }));
+    const engine = builtEngine(EngineService.layer({ root: tmp('m7-board') }));
     const probe = tmp('m7');
     const common = { cwd: tmp('m7-work'), deadlineSeconds: 480, closeoutSchema: FINISHED_CLOSEOUT, config: { model: 'haiku' } };
     const settled = async (id: string) => {
       const end = Date.now() + 10 * 60_000;
       while (Date.now() < end) {
-        await engine.tick();
-        const v = await engine.view(id);
+        await Effect.runPromise(engine.tick());
+        const v = await Effect.runPromise(engine.view(id));
         if (v.state.settled) return v;
         await new Promise((r) => setTimeout(r, 5_000));
       }
-      return engine.view(id);
+      return Effect.runPromise(engine.view(id));
     };
-    const denied = await settled(await engine.file({ ...common, brief: DENIED_BRIEF(path.join(probe, 'outside')) }));
+    const denied = await settled(await Effect.runPromise(engine.file({ ...common, brief: DENIED_BRIEF(path.join(probe, 'outside')) })));
     const parent = denied.state.attempts.at(-1);
     assert.equal(denied.state.settled, 'succeeded', `the denied job settled: ${denied.phase}`);
     assert.ok(
@@ -1071,11 +1098,13 @@ test(
       'and its attempt says what it was denied',
     );
     const resumed = await settled(
-      await engine.file({
-        ...common,
-        resumeFrom: parent!.nativeId!,
-        brief: 'Give your closing statement, with finished set to true. Call no tool first.',
-      }),
+      await Effect.runPromise(
+        engine.file({
+          ...common,
+          resumeFrom: parent!.nativeId!,
+          brief: 'Give your closing statement, with finished set to true. Call no tool first.',
+        }),
+      ),
     );
     const child = resumed.state.attempts.at(-1);
     t.diagnostic(
@@ -1332,7 +1361,7 @@ test(
   async (t) => {
     const version = execFileSync('claude', ['--version'], { encoding: 'utf8' }).trim();
     t.diagnostic(`claude --version: ${version}`);
-    const engine = promiseEngine(EngineService.layer({ root: tmp('m11-board') }));
+    const engine = builtEngine(EngineService.layer({ root: tmp('m11-board') }));
     const job = oneAllowedCheckout('m11-job');
     const bg = oneAllowedCheckout('m11-bg');
     t.diagnostic(`allowed: npm run ${M11_ALLOWED}; unlisted: npm run ${M11_UNLISTED}`);
@@ -1344,8 +1373,8 @@ test(
     };
     try {
       const ids = {
-        job: await engine.file({ ...common, cwd: job }),
-        bg: await engine.file({ ...common, cwd: bg, config: { ...common.config, background: true } }),
+        job: await Effect.runPromise(engine.file({ ...common, cwd: job })),
+        bg: await Effect.runPromise(engine.file({ ...common, cwd: bg, config: { ...common.config, background: true } })),
       };
       await settleThenCheck(engine, ids, (views) => {
         const last = (k: string) => views[k]?.state.attempts.at(-1);
@@ -1391,27 +1420,29 @@ test(
   async (t) => {
     t.diagnostic(`claude --version: ${execFileSync('claude', ['--version'], { encoding: 'utf8' }).trim()}`);
     const root = tmp('m12-board');
-    const engine = promiseEngine(EngineService.layer({ root }));
+    const engine = builtEngine(EngineService.layer({ root }));
     const secret = `m12-${randomUUID().slice(0, 8)}`;
-    const id = await engine.file({
-      brief: `Remember the code word ${secret}. Call no tool but StructuredOutput, and give your closing statement with word set to ready.`,
-      cwd: tmp('m12-work'),
-      closeoutSchema: M12_CLOSEOUT,
-      holdOpen: true,
-      deadlineSeconds: 300,
-      config: { model: 'haiku', permissionMode: 'dontAsk', tools: ['Read'], budgetUsd: 0.5 },
-    });
+    const id = await Effect.runPromise(
+      engine.file({
+        brief: `Remember the code word ${secret}. Call no tool but StructuredOutput, and give your closing statement with word set to ready.`,
+        cwd: tmp('m12-work'),
+        closeoutSchema: M12_CLOSEOUT,
+        holdOpen: true,
+        deadlineSeconds: 300,
+        config: { model: 'haiku', permissionMode: 'dontAsk', tools: ['Read'], budgetUsd: 0.5 },
+      }),
+    );
     const until = async (phase: string) => {
       const by = Date.now() + 5 * 60_000;
-      let v = await engine.view(id);
+      let v = await Effect.runPromise(engine.view(id));
       while (v.phase !== phase && !v.state.settled && Date.now() < by) {
         await new Promise((r) => setTimeout(r, 3_000));
-        await engine.tick();
-        v = await engine.view(id);
+        await Effect.runPromise(engine.tick());
+        v = await Effect.runPromise(engine.view(id));
       }
       return v;
     };
-    await engine.tick();
+    await Effect.runPromise(engine.tick());
     const waiting = await until('input-required');
     t.diagnostic(`turn 0: ${waiting.phase}, ${JSON.stringify(waiting.state.attempts.map((a) => [a.ended, a.closeout, a.nativeId]))}`);
     assert.equal(waiting.phase, 'input-required');
@@ -1421,13 +1452,15 @@ test(
       false,
       'no process runs for it while it waits',
     );
-    for (let i = 0; i < 2; i++) await engine.tick();
-    assert.equal((await engine.view(id)).state.attempts.length, 1, 'and ticks start nothing');
+    for (let i = 0; i < 2; i++) await Effect.runPromise(engine.tick());
+    assert.equal((await Effect.runPromise(engine.view(id))).state.attempts.length, 1, 'and ticks start nothing');
 
-    await engine.answer(id, 'Call no tool but StructuredOutput. Give your closing statement with word set to the code word I gave you.', {
-      config: { budgetUsd: 0.3 },
-    });
-    await engine.tick();
+    await Effect.runPromise(
+      engine.answer(id, 'Call no tool but StructuredOutput. Give your closing statement with word set to the code word I gave you.', {
+        config: { budgetUsd: 0.3 },
+      }),
+    );
+    await Effect.runPromise(engine.tick());
     const answered = await until('input-required');
     const [first, second] = answered.state.attempts;
     t.diagnostic(
@@ -1442,9 +1475,9 @@ test(
     );
     assert.match(args, /"--max-budget-usd","0\.3"/, "under the answer's cap");
 
-    await engine.close(id);
-    await engine.tick();
-    assert.equal((await engine.view(id)).state.settled, 'succeeded');
+    await Effect.runPromise(engine.close(id));
+    await Effect.runPromise(engine.tick());
+    assert.equal((await Effect.runPromise(engine.view(id))).state.settled, 'succeeded');
   },
 );
 
@@ -1467,7 +1500,7 @@ test(
   async (t) => {
     t.diagnostic(`codex --version: ${execFileSync('codex', ['--version'], { encoding: 'utf8' }).trim()}`);
     const root = tmp('m13-board');
-    const engine = promiseEngine(EngineService.layer({ root, harnesses: { codex } }));
+    const engine = builtEngine(EngineService.layer({ root, harnesses: { codex } }));
     const client = clientOf('codex', detachedOps(codex, root), (taskId) =>
       Effect.runPromise(
         Effect.gen(function* () {
@@ -1476,26 +1509,28 @@ test(
       ),
     );
     const secret = `m13-${randomUUID().slice(0, 8)}`;
-    const id = await engine.file({
-      brief: `Remember the code word ${secret}. Run no command. Give your final answer with word set to ready.`,
-      cwd: tmp('m13-work'),
-      harness: 'codex',
-      closeoutSchema: M13_CLOSEOUT,
-      holdOpen: true,
-      deadlineSeconds: 300,
-      config: { permissionMode: 'read-only', effort: 'low' },
-    });
+    const id = await Effect.runPromise(
+      engine.file({
+        brief: `Remember the code word ${secret}. Run no command. Give your final answer with word set to ready.`,
+        cwd: tmp('m13-work'),
+        harness: 'codex',
+        closeoutSchema: M13_CLOSEOUT,
+        holdOpen: true,
+        deadlineSeconds: 300,
+        config: { permissionMode: 'read-only', effort: 'low' },
+      }),
+    );
     const until = async (phase: string) => {
       const by = Date.now() + 5 * 60_000;
-      let v = await engine.view(id);
+      let v = await Effect.runPromise(engine.view(id));
       while (v.phase !== phase && !v.state.settled && Date.now() < by) {
         await new Promise((r) => setTimeout(r, 3_000));
-        await engine.tick();
-        v = await engine.view(id);
+        await Effect.runPromise(engine.tick());
+        v = await Effect.runPromise(engine.view(id));
       }
       return v;
     };
-    await engine.tick();
+    await Effect.runPromise(engine.tick());
     const waiting = await until('input-required');
     const first = waiting.state.attempts[0];
     t.diagnostic(`turn 0: ${waiting.phase}, ${JSON.stringify([first?.ended, first?.closeout, first?.nativeId])}`);
@@ -1521,8 +1556,8 @@ test(
     assert.ok(workerOf(1), 'the worker recorded its pid');
     assert.equal(alive(workerOf(1)), false, 'and no worker runs for it while it waits');
 
-    await engine.answer(id, 'Run no command. Give your final answer with word set to the code word I gave you.');
-    await engine.tick();
+    await Effect.runPromise(engine.answer(id, 'Run no command. Give your final answer with word set to the code word I gave you.'));
+    await Effect.runPromise(engine.tick());
     const answered = await until('input-required');
     const second = answered.state.attempts[1];
     const rollouts = [first.nativeId, second?.nativeId].map((n) => (n ? codexRolloutFile(n) : undefined));
@@ -1537,8 +1572,8 @@ test(
     const resumed = await client.getTask({ tenant: '', id: nameFor(id, 2), historyLength: undefined });
     assert.equal(resumed.contextId, held.contextId, 'the answered turn is a Task in the same context');
 
-    await engine.close(id);
-    await engine.tick();
-    assert.equal((await engine.view(id)).state.settled, 'succeeded');
+    await Effect.runPromise(engine.close(id));
+    await Effect.runPromise(engine.tick());
+    assert.equal((await Effect.runPromise(engine.view(id))).state.settled, 'succeeded');
   },
 );

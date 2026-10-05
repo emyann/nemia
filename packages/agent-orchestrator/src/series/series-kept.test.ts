@@ -16,7 +16,7 @@ delete process.env.WF_METRICS_MINUTE_DAYS;
 delete process.env.WF_METRICS_HOUR_DAYS;
 const { main } = await import('../cli/main.ts');
 const { PHASES } = await import('../meter/meter.ts');
-const { appendLines, dayFile, days, keepSeries, rangeOf, readDay, seriesHealth, seriesRead, tierDir } = await import('./series.store.ts');
+const { appendLines, dayFile, days, keepSeries, rangeOf, readDay, seriesHealth, seriesRead } = await import('./series.store.ts');
 const { seriesMemo } = await import('./series.ts');
 type RecentPass = import('../meter/meter.ts').RecentPass;
 
@@ -123,7 +123,12 @@ const typed = async (t: TestContext, argv: string[]) => {
 };
 
 test('`nemia series --json` is the answer the api serves; REFUSED: a --range it does not take, as Invalid, naming the ranges', async (t) => {
+  appendLines('hour', [{ t: '2026-01-02T03:00:00.000Z', s: 'store.runs', l: {}, n: 1, sum: 7, min: 7, max: 7, last: 7 }]);
   const answer = JSON.parse((await typed(t, ['series', '--range', 'all', '--json'])).join('\n'));
+  assert.ok(
+    answer.series.some((x: { s: string }) => x.s === 'store.runs'),
+    'the line kept is in the answer',
+  );
   assert.deepEqual(answer.series, JSON.parse(JSON.stringify(seriesRead('all').series)));
   assert.equal(rangeOf(undefined), '24h');
   await assert.rejects(main(['series', '--range', '2w'], NO_ENGINE), (err: Error & { exitCode?: number }) => {
@@ -131,5 +136,4 @@ test('`nemia series --json` is the answer the api serves; REFUSED: a --range it 
     assert.equal(err.message, '--range takes 24h, 7d, 30d, all: nemia series --range 7d, not "2w".');
     return true;
   });
-  assert.ok(fs.existsSync(tierDir('minute')));
 });

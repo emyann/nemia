@@ -133,12 +133,17 @@ test('a pass keeps what it saw beside its time: the runs listed, the tasks, the 
     "kept among the recent, with the journals phase's reads",
   );
   assert.equal(kept.phases.observe, 120);
-  assert.ok(breakdownLines(COST).includes('it saw 40 runs in the store, 5 tasks not settled, 2 queued and 3 admitted, and made 30 journal reads'));
+  assert.ok(
+    breakdownLines(COST).includes('it saw 40 runs in the store, 5 tasks not settled, 2 queued and 3 admitted, and made 30 journal reads'),
+  );
 });
 
 test("the sessions a runtime's pass reported: queued off the views, admitted off the views and the sessions at work", () => {
   assert.deepEqual(
-    sessionsOf({ views: [{ admission: 'queued' }, { admission: 'queued' }, { admission: 'admitted' }, {}], running: { claude: 2, codex: 1 } }),
+    sessionsOf({
+      views: [{ admission: 'queued' }, { admission: 'queued' }, { admission: 'admitted' }, {}],
+      running: { claude: 2, codex: 1 },
+    }),
     { tasks: 4, queued: 2, admitted: 4 },
   );
   assert.deepEqual(sessionsOf({}), { tasks: 0, queued: 0, admitted: 0 }, "a fake's report carries neither");

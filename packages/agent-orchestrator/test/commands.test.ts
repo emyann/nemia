@@ -58,6 +58,7 @@ test('each command is served on the api where it was before the table, the lift 
       ['decide', { method: 'GET', path: '/api/runs/:runId/decision', status: 200 }],
       ['merges', 'api'],
       ['ceilings', { method: 'GET', path: '/api/ceilings', status: 200 }],
+      ['passes', { method: 'GET', path: '/api/passes', status: 200 }],
       ['agents', { method: 'GET', path: '/api/agents', status: 200 }],
       ['agents card', { method: 'GET', path: '/api/agents/:from/:name/card', status: 200 }],
       [
@@ -133,6 +134,7 @@ test('every command the api posts or deletes on writes, and the api guards it; t
       'decide',
       'merges',
       'ceilings',
+      'passes',
       'agents',
       'agents card',
       'agents read',

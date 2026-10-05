@@ -25,6 +25,7 @@ const OWN: Readonly<Record<string, string>> = {
   'GET /api/machines/:name': "one state machine's graph, read off its code: no run, no store",
   'GET /api/workflows/keys': "the keys a step may set and what each means, the builder's form: no run, no store",
   'GET /api/repository': 'the repository the request is served on, as the request names it',
+  'GET /api/metrics': "the api process's own metrics, kept in its memory: the command line runs in another process, which has none of them",
 };
 
 type Table = readonly Parameters<typeof routeList>[0][];

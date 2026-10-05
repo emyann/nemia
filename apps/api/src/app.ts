@@ -1,4 +1,4 @@
-import { Layer, ManagedRuntime } from 'effect';
+import { Layer, ManagedRuntime, Metric } from 'effect';
 import { type ErrorHandler, Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
@@ -9,7 +9,7 @@ import { customInstructions } from './custom/custom.ts';
 import { commands } from './commands/index.ts';
 import { capabilitiesWithSteps, McpAsker } from './capabilities/index.ts';
 import { factories } from './factories/index.ts';
-import { ceilingsOf, pauseNowOf, pauseOf, feed, QuotaAsker, readDaemon } from './factory/index.ts';
+import { ceilingsOf, metricsOf, passesOf, pauseNowOf, pauseOf, feed, QuotaAsker, readDaemon } from './factory/index.ts';
 import { inbox } from './inbox/inbox.ts';
 import { ApiConfig, type ApiEnv, type ApiRuntime, ReadMemo, served, type Services } from './layer.ts';
 import { machines } from './machines/machines.ts';
@@ -82,6 +82,14 @@ export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Servic
  * - `GET /api/ceilings` — the cap on runs in flight the daemon's last pass ran with, and the runs it counts and holds: what the Factory
  *   says over its floor. 422 for a `WF_MAX_RUNS` in the api's environment that is not a count, before any pass wrote the daemon's
  *   (`maxRuns`, an `Invalid`).
+ * - `GET /api/passes` — what the recent passes of the tick cost, `{ recent, histogram, parts, summary, bounds }`, as `nemia passes --json`
+ *   prints it: read off the store's `tick-recent.json`, which the ticking process keeps, the api's own or a `nemia up`'s. `?last=<n>` keeps
+ *   the last n; 422 for one that is not a whole number from 1.
+ * - `GET /api/metrics` — the process's metrics, each `{ name, type, description, attributes }` and its value (`MetricRead`,
+ *   factory/ceilings.ts), in the registry of the app's runtime: the journals each request read by its route's pattern (`api.poll.reads`,
+ *   about, since a pass or another request reading at the same time is counted too), and the pass's (`pass.duration`,
+ *   `pass.phase.duration`, `pass.journal_reads`, `store.runs`, `sessions.queued`, `sessions.admitted`) only where this process ticks: an
+ *   api started with `--no-tick`, or beside a `nemia up`, has none of them.
  * - `GET /api/pause` — the store's pause, `{ pause, finishing, staged }`: since when, by whom and why, or null; each task still finishing
  *   under it (`{ run, step, kind }`, a `session`, `check` or `landing`), none once it is Paused; and each landing it holds with its merge
  *   staged in the repository's checkout (MERGE_HEAD), its check not filed until it resumes (`pausedRead`). Put on
@@ -131,6 +139,8 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     .route('/', runs)
     .route('/', stats)
     .get('/api/ceilings', (c) => served(c, async ({ e, env }) => c.json(await ceilingsOf(e, env))))
+    .get('/api/passes', (c) => served(c, async ({ e }) => c.json(await passesOf(e, c.req.query('last')))))
+    .get('/api/metrics', async (c) => c.json(metricsOf(await runtime.runPromise(Metric.snapshot))))
     .get('/api/pause', (c) => served(c, async ({ e }) => c.json(await pauseOf(e))))
     .get('/api/pause/now', (c) => served(c, async ({ e }) => c.json(await pauseNowOf(e))))
     .get('/api/daemon', (c) => c.json(readDaemon()))

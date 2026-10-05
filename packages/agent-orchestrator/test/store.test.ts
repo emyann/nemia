@@ -14,7 +14,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { nameFor, type Sighting, type TaskSpec, type TaskView, Engine as RuntimeEngine, StopRefused } from 'agent-runtime';
+import { nameFor, type Sighting, type TaskSpec, type TaskView, Engine as RuntimeEngine, StopRefused, ForgetRefused } from 'agent-runtime';
 import { asyncStore, type AsyncJournal, asyncOps, type AsyncRunner } from './promised.ts';
 import type { Engine } from '../src/runtime-client.ts';
 import type { GitRun, Run, TaskPhase } from '../src/run.ts';
@@ -393,6 +393,7 @@ const board = () => {
   const waiting = new Map<string, string>();
   const denials = new Map<string, Array<{ tool: string; what?: string }>>();
   const stated = new Map<string, boolean>();
+  const forgets: { taskIds: string[]; yes: boolean }[] = [];
   const endOf = (reason: string) =>
     reason === 'budget' ? { ended: 'failed', reason: 'harness', limit: 'budget' } : { ended: 'failed', reason };
   let clock = Date.parse('2026-09-14T16:00:00.000Z');
@@ -467,13 +468,28 @@ const board = () => {
       said.set(id, [...(said.get(id) ?? []), entry]);
       return entry;
     },
+    /**
+     * The engine's `forget`, as far as a run can tell it: refused whole for a task not settled, naming it; otherwise each task taken off
+     * the board with `yes`, its journal 1 KB and its 2 lines in the feed, and each call counted on `forgets`.
+     */
+    forget: async (ids: string[], options?: { yes?: boolean }) => {
+      forgets.push({ taskIds: [...ids], yes: options?.yes === true });
+      for (const id of ids)
+        if (!['succeeded', 'failed', 'stopped'].includes(tasks.get(id)?.phase ?? 'pending'))
+          throw new ForgetRefused({ taskId: id, message: `forget: \`${id}\` has not settled: stop it first.` });
+      if (options?.yes) for (const id of ids) tasks.delete(id);
+      return { forgotten: options?.yes === true, tasks: ids.map((taskId) => ({ taskId, journalBytes: 1024, feedLines: 2, sessions: [] })) };
+    },
   });
   const settle = (id: string, phase: TaskPhase, closeout?: unknown, exitCode?: number, reason?: string | string[], usage?: object) =>
     Object.assign(tasks.get(id)!, { phase, closeout, exitCode, reason, usage });
-  return { e, tasks, filings, stopped, settle, logs, outputs, said, deaf, waiting, denials, stated };
+  return { e, tasks, filings, stopped, forgets, settle, logs, outputs, said, deaf, waiting, denials, stated };
 };
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
+
+/** What `nemia rm` says the board's `forget` did with a run's one task. */
+const FORGOT_ONE = '; the engine forgot 1 task of it (1.0 KB of journal, 2 feed lines)';
 
 /** A workflow folder: `implement`, with whatever frontmatter it is given, and `review` after it. */
 const folder = (implementKeys = '') => {
@@ -5466,7 +5482,7 @@ const rmTyped = async (t: TestContext, e: Engine, ...args: string[]) => {
   }
 };
 
-test("`nemia rm` forgets a run that is over, at shipped defaults: its worktree removed through git, which lists it no more — what the failed step left uncommitted committed on its branch first, what git ignores not, and nothing a link in it leads to touched — then the record and every file under its id; its branch kept, and said so; the engine's board untouched; a second `nemia rm` says there is no such run, and exits 0", async (t) => {
+test("`nemia rm` forgets a run that is over, at shipped defaults: its worktree removed through git, which lists it no more — what the failed step left uncommitted committed on its branch first, what git ignores not, and nothing a link in it leads to touched — then the record and every file under its id; its branch kept, and said so; the engine's task of it forgotten, and said so; a second `nemia rm` says there is no such run, and exits 0", async (t) => {
   const repo = anIgnoringRepo();
   const b = board();
   const run = await Effect.runPromise(startRun({ brief: 'add a flag', repo, workflowDir: folder() }));
@@ -5498,7 +5514,8 @@ test("`nemia rm` forgets a run that is over, at shipped defaults: its worktree r
   assert.deepEqual(printed, [
     `${run.id}  forgotten: removed 1 worktree, committed what implement left uncommitted on ${branch} as ${commit.slice(0, 7)}; ` +
       `removed runs/${run.id}.json, runs/${run.id}.asks/, runs/${run.id}/, checks/${run.id}-implement-check.stderr, worktrees/${run.id}/; ` +
-      `kept ${branch} — branches are kept unless asked: --delete-branches deletes those merged into ${run.branch}`,
+      `kept ${branch} — branches are kept unless asked: --delete-branches deletes those merged into ${run.branch}` +
+      FORGOT_ONE,
   ]);
 
   assert.ok(!worktreesOf(repo).includes(wt), 'git lists the worktree no more');
@@ -5517,7 +5534,11 @@ test("`nemia rm` forgets a run that is over, at shipped defaults: its worktree r
     assert.ok(!under('runs', ...gone), `runs/${gone.join('/')} removed`);
   assert.ok(!under('checks', `${run.id}-implement-check.stderr`));
   assert.ok(under('checks', `${run.id}-x2-implement-check.stderr`), "another run's check log is left");
-  assert.deepEqual([b.filings, b.stopped, b.tasks.has(`${run.id}-implement`)], [filings, [], true], "the engine's board is the engine's");
+  assert.deepEqual(
+    [b.filings, b.stopped, b.tasks.has(`${run.id}-implement`), b.forgets],
+    [filings, [], false, [{ taskIds: [`${run.id}-implement`], yes: true }]],
+    "the engine is asked to forget the run's task, once, and stops or files nothing",
+  );
   assert.throws(
     () => readRun(run.id),
     (err: Error) => err.message.startsWith('no such run: '),
@@ -5663,15 +5684,20 @@ test("`nemia rm --delete-branches` deletes a branch merged into its run's base a
 
   const one = await rmTyped(t, b.e, merged.run.id, unmerged.run.id, '--delete-branches');
   assert.equal(one.error, undefined);
-  assert.match(one.printed[0], new RegExp(`; deleted ${escaped(merged.branch)} \\(merged into ${base}\\)$`));
+  assert.match(one.printed[0], new RegExp(`; deleted ${escaped(merged.branch)} \\(merged into ${base}\\)${escaped(FORGOT_ONE)}$`));
   assert.match(
     one.printed[1],
-    new RegExp(`; kept ${escaped(unmerged.branch)}: not merged into ${base} — --force-unmerged deletes it, and the work on it$`),
+    new RegExp(
+      `; kept ${escaped(unmerged.branch)}: not merged into ${base} — --force-unmerged deletes it, and the work on it${escaped(FORGOT_ONE)}$`,
+    ),
   );
   assert.deepEqual([hasBranch(repo, merged.branch), hasBranch(repo, unmerged.branch)], [false, true]);
 
   const two = await rmTyped(t, b.e, forced.run.id, '--force-unmerged', '--delete-branches');
-  assert.match(two.printed[0], new RegExp(`; deleted ${escaped(forced.branch)} \\(not merged into ${base}, forced\\)$`));
+  assert.match(
+    two.printed[0],
+    new RegExp(`; deleted ${escaped(forced.branch)} \\(not merged into ${base}, forced\\)${escaped(FORGOT_ONE)}$`),
+  );
   assert.equal(hasBranch(repo, forced.branch), false);
 
   const direct = await Effect.runPromise(startRun({ brief: 'on the base itself', repo, workflowDir: oneStep(), isolate: false }));
@@ -5679,7 +5705,7 @@ test("`nemia rm --delete-branches` deletes a branch merged into its run's base a
   b.settle(`${direct.id}-implement`, 'succeeded', SIGNED);
   const three = await rmTyped(t, b.e, direct.id, '--delete-branches', '--force-unmerged');
   assert.deepEqual(three.printed, [
-    `${direct.id}  forgotten: no worktrees, it worked in ${repo} itself; removed runs/${direct.id}.json, runs/${direct.id}/; no branch of its own`,
+    `${direct.id}  forgotten: no worktrees, it worked in ${repo} itself; removed runs/${direct.id}.json, runs/${direct.id}/; no branch of its own${FORGOT_ONE}`,
   ]);
   assert.ok(hasBranch(repo, base) && fs.existsSync(path.join(repo, '.git')), 'the base branch and the repository are where they were');
 
@@ -5726,9 +5752,11 @@ test("REFUSED at shipped defaults: a pass that read a run before `nemia rm` forg
   const heldAfterReadingTheRun = {
     ...b.e,
     view: (id: string) =>
-      Effect.flatMap(
-        Effect.promise(() => gate),
-        () => b.e.view(id),
+      Effect.flatMap(b.e.view(id), (view) =>
+        Effect.as(
+          Effect.promise(() => gate),
+          view,
+        ),
       ),
   };
   const pass = runWith(heldAfterReadingTheRun, advanceRun(readRun(p.run.id)));
@@ -6487,10 +6515,11 @@ test('the programs of the views, given the engine as a service, answer what thei
       ['b', '2026-09-30T08:02:00.000Z'],
     ]),
     cursor: 3,
+    forgotten: 0,
   });
   assert.deepStrictEqual(
     await v.over(told, v.filingsRead(1)),
-    { filed: new Map([['b', '2026-09-30T08:02:00.000Z']]), cursor: 3 },
+    { filed: new Map([['b', '2026-09-30T08:02:00.000Z']]), cursor: 3, forgotten: 0 },
     'from a cursor',
   );
 

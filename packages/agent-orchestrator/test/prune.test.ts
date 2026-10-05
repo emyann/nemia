@@ -62,10 +62,14 @@ const oneStep = (budget?: number) => {
   return dir;
 };
 
-/** Just enough engine: each task's phase, and its closeout on its one attempt once it has one, with what that attempt cost when it says. */
+/**
+ * Just enough engine: each task's phase, and its closeout on its one attempt once it has one, with what that attempt cost when it says;
+ * and a `forget` that counts, each call on `forgets`, and removes nothing.
+ */
 const board = () => {
   const tasks = new Map<string, { phase: TaskPhase; closeout?: unknown; usage?: object }>();
   const filings: string[] = [];
+  const forgets: { taskIds: string[]; yes: boolean }[] = [];
   const e = promised({
     view: async (id: string) => {
       const t = tasks.get(id);
@@ -92,9 +96,13 @@ const board = () => {
       return spec.id;
     },
     stop: async () => {},
+    forget: async (ids: string[], options?: { yes?: boolean }) => {
+      forgets.push({ taskIds: [...ids], yes: options?.yes === true });
+      return { forgotten: false, tasks: ids.map((taskId) => ({ taskId, journalBytes: 1024, feedLines: 2, sessions: [] })) };
+    },
   });
   const settle = (id: string, phase: TaskPhase, closeout?: unknown, usage?: object) => tasks.set(id, { phase, closeout, usage });
-  return { e, filings, settle };
+  return { e, filings, forgets, settle };
 };
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
@@ -180,8 +188,14 @@ test('`nemia prune` on a run that shipped: listed with its size and nothing remo
   );
   assert.match(dry.printed[0], new RegExp(`^${run.id}  would remove 1 worktree, \\d+\\.\\d KB$`));
   assert.match(dry.printed[1], new RegExp(`^   ${wt.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}  \\d+\\.\\d KB$`));
-  assert.match(dry.printed[2], /^1 run to prune, \d+\.\d KB in all$/);
-  assert.equal(dry.printed[3], `nothing removed: nemia prune ${run.id} --yes removes them`);
+  assert.equal(
+    dry.printed[2],
+    `   the engine keeps 1 task of it (1.0 KB of journal, 2 feed lines): nemia rm ${run.id} forgets them`,
+    'and what nemia rm would forget of the engine, counted without removing it',
+  );
+  assert.match(dry.printed[3], /^1 run to prune, \d+\.\d KB in all$/);
+  assert.equal(dry.printed[4], `nothing removed: nemia prune ${run.id} --yes removes them`);
+  assert.ok(b.forgets.length && b.forgets.every((f) => !f.yes), 'the engine is asked dry: nemia prune forgets nothing of it');
   assert.ok(fs.existsSync(wt) && !under('runs', `${run.id}.pruned`), 'a dry run touches nothing');
   const measured = (await runWith(b.e, prune(run.id))).worktrees[0].bytes;
   assert.ok(measured >= 64 * 1024, `what node_modules holds is counted (${measured})`);
@@ -570,7 +584,8 @@ test('`nemia prune --artifacts` on a run that shipped: its worktree and its file
   assert.match(dry.printed[0], new RegExp(`^${id}  would remove 1 worktree and its files, \\d+\\.\\d KB$`));
   assert.match(dry.printed[1], new RegExp(`^   ${escaped(run0.wt)}  \\d+\\.\\d KB$`));
   assert.match(dry.printed[2], new RegExp(`^   ${escaped(files)}  \\d+\\.\\d KB$`));
-  assert.equal(dry.printed[4], `nothing removed: nemia prune ${id} --artifacts --yes removes them`);
+  assert.equal(dry.printed[3], `   the engine keeps 1 task of it (1.0 KB of journal, 2 feed lines): nemia rm ${id} forgets them`);
+  assert.equal(dry.printed[5], `nothing removed: nemia prune ${id} --artifacts --yes removes them`);
   assert.ok(fs.existsSync(shot) && !under('runs', `${id}.pruned`), 'a dry run touches nothing');
   const measured = (await runWith(b.e, prune(id, { artifacts: true }))).artifacts!.bytes;
   assert.ok(measured >= 32 * 1024, `what the files hold is counted (${measured})`);

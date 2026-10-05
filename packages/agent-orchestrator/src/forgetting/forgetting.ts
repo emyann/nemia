@@ -56,31 +56,40 @@ export const forgettingDone = (f: EngineForgetting): boolean => !f.waiting.lengt
 /** `n` tasks, in words. */
 const tasksWord = (n: number): string => `${n} task${n === 1 ? '' : 's'}`;
 
+/** What `nemia rm` says it forgot of the run `id`'s tasks, or, `dry`, what `nemia prune` says it would; empty when it forgot none. */
+const forgotWords = (f: EngineForgetting, id: string, dry: boolean): string => {
+  const n = f.forgotten.length;
+  if (!n) return '';
+  const size = `${sizeOf(f.journalBytes)} of journal, ${f.feedLines} feed line${f.feedLines === 1 ? '' : 's'}`;
+  return dry
+    ? `the engine keeps ${tasksWord(n)} of it (${size}): nemia rm ${id} forgets them`
+    : `the engine forgot ${tasksWord(n)} of it (${size})`;
+};
+
+/** What waits of the run's tasks, and why, and, unless `dry`, that the passes forget it from `marker`; empty when nothing waits. */
+const waitWords = (f: EngineForgetting, marker: string, dry: boolean): string => {
+  const one = f.waiting.length === 1;
+  if (!f.waiting.length) return '';
+  if (dry) return `${tasksWord(f.waiting.length)} of it ${one ? 'is' : 'are'} not to be forgotten yet: ${f.why.join('; ')}`;
+  const once = one ? 'it once it settles' : 'them once they settle';
+  return `${tasksWord(f.waiting.length)} of it ${one ? 'waits' : 'wait'} — ${f.why.join('; ')} — and the daemon's passes forget ${once}, from ${marker}`;
+};
+
+/** The engine's refusal of the whole call, and, unless `dry`, the marker it leaves, which only a person removes; empty without one. */
+const refusalWords = (f: EngineForgetting, marker: string, dry: boolean): string => {
+  if (f.refusal === undefined) return '';
+  if (dry) return `the engine would refuse to forget its tasks: ${f.refusal}`;
+  const asks = `${marker} keeps their ids and the daemon asks again each pass`;
+  return `the engine refused to forget its tasks: ${f.refusal} ${asks}; only a person removes it, once nothing of them is wanted: rm ${marker}`;
+};
+
 /**
  * What `nemia rm` says the engine did with the run `id`'s tasks, or, `dry`, what `nemia prune` says it would: the tasks forgotten with
  * their journals' size and feed lines, what their harness keeps, what waits and why, and a refusal of the whole call with the marker it
  * leaves, which only a person removes. Empty when the engine keeps no task of the run.
  */
-export function engineWords(f: EngineForgetting, { id, dry }: { id: string; dry?: boolean }): string {
+export function engineWords(f: EngineForgetting, { id, dry = false }: { id: string; dry?: boolean }): string {
   const marker = f.marker ?? `the marker of ${id}`;
-  const n = f.forgotten.length;
-  const size = `${sizeOf(f.journalBytes)} of journal, ${f.feedLines} feed line${f.feedLines === 1 ? '' : 's'}`;
-  const forgot = !n
-    ? ''
-    : dry
-      ? `the engine keeps ${tasksWord(n)} of it (${size}): nemia rm ${id} forgets them`
-      : `the engine forgot ${tasksWord(n)} of it (${size})`;
   const left = f.left.length ? `${dry ? 'it would leave' : 'it left'} ${f.left.join('; ')}` : '';
-  const waits = !f.waiting.length
-    ? ''
-    : dry
-      ? `${tasksWord(f.waiting.length)} of it ${f.waiting.length === 1 ? 'is' : 'are'} not to be forgotten yet: ${f.why.join('; ')}`
-      : `${tasksWord(f.waiting.length)} of it ${f.waiting.length === 1 ? 'waits' : 'wait'} — ${f.why.join('; ')} — and the daemon's passes forget ${f.waiting.length === 1 ? 'it' : 'them'} once ${f.waiting.length === 1 ? 'it settles' : 'they settle'}, from ${marker}`;
-  const refused =
-    f.refusal === undefined
-      ? ''
-      : dry
-        ? `the engine would refuse to forget its tasks: ${f.refusal}`
-        : `the engine refused to forget its tasks: ${f.refusal} ${marker} keeps their ids and the daemon asks again each pass; only a person removes it, once nothing of them is wanted: rm ${marker}`;
-  return [forgot, left, waits, refused].filter(Boolean).join('; ');
+  return [forgotWords(f, id, dry), left, waitWords(f, marker, dry), refusalWords(f, marker, dry)].filter(Boolean).join('; ');
 }

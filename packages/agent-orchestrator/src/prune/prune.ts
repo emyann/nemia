@@ -6,7 +6,7 @@ import { andList, isGitRun, prunedWords, type Pruned, type Run } from '../record
 import { holdWord } from '../wait/wait.ts';
 import { sizeOf } from '../artifacts/artifacts.ts';
 import type { Decision } from '../decide/decide.ts';
-import { engineWords, type EngineForgetting } from '../forget/forgetting.ts';
+import { engineWords, type EngineForgetting } from '../forgetting/forgetting.ts';
 
 /** What is kept of a pruned run, after `prunedWords`: its files too, unless `nemia prune --artifacts` removed them. */
 export const prunedKept = (pruned: Pruned): string =>

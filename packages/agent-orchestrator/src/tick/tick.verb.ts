@@ -42,7 +42,7 @@ import { RECENT_KEPT, sessionsOf, type PassCost, type Reading, type RecentPass }
 import { keepSeries } from '../series/series.store.ts';
 import { advancePass, type Advanced } from './advance.verb.ts';
 import { heldRead } from '../list/list.verb.ts';
-import { finishForgetting, type ForgettingLine } from '../forget/forgetting.verb.ts';
+import { finishForgetting, type ForgettingLine } from '../forgetting/forgetting.verb.ts';
 import { costOf, ioOf, meteredEngine, recordPassMetrics } from '../meter/meter.verb.ts';
 
 /**

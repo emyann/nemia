@@ -35,7 +35,7 @@ import { gitWords, merging, resolved } from '../prune/prune.verb.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, spendReader, taskPhasesRead } from '../views/views.verb.ts';
 import { adoptChecks, adoptRounds, adoptTries, closeWaitingTasks, unrecordedSteps } from '../tick/advance.verb.ts';
 import { Invalid } from '../refusal/refusal.ts';
-import { forgetTasks } from './forgetting.verb.ts';
+import { forgetTasks } from '../forgetting/forgetting.verb.ts';
 
 /** A run's answer when nothing of its worktrees or branches was touched, afresh on each call. */
 const nothing = (): Omit<Forgot, 'id' | 'kind'> => ({ removed: [], handedOff: [], gone: [], left: [], branches: [], files: [] });
@@ -76,8 +76,9 @@ type Worktrees = Pick<Forgot, 'removed' | 'handedOff' | 'gone' | 'left'>;
  *    (`finishForgetting`), or for `nemia rm` again. A run `held` lifts its marker and forgets nothing: it is still listed.
  *
  * A run whose record is gone is normal: what is left under its id, its files, is removed and named — never a worktree, since nothing says
- * whose they are — and its tasks a marker names are forgotten; a run whose worktrees or branches are already gone says so. Refused before anything is read, with exit code 2: an id
- * that is not a name (`idRefusal`). Fails with a refusal a read threw; dies of anything else (`tried`, `awaited`).
+ * whose they are — and its tasks a marker names are forgotten; a run whose worktrees or branches are already gone says so. Refused before
+ * anything is read, with exit code 2: an id that is not a name (`idRefusal`). Fails with a refusal a read threw; dies of anything else
+ * (`tried`, `awaited`).
  */
 export const forgetRun = Effect.fn('forget')(function* (id: string, how: ForgetHow = {}) {
   const e = yield* EngineService;

@@ -208,7 +208,7 @@ function putTry(name: string, tried: QueueTry): void {
   fs.writeFileSync(path.join(queueDir(), `${name}.json`), JSON.stringify(tried, null, 2));
 }
 
-/** Where `nemia rm` writes down the engine's tasks of the runs it forgets: beside `runs/`, since every `runs/<id>.*` goes with the record. */
+/** Where `nemia rm` writes down the engine's tasks of the runs it forgets: beside `runs/`, since each `runs/<id>.*` goes with a record. */
 const forgettingDir = (): string => path.join(HOME, 'forgetting');
 
 /** The marker of the run `id`. */

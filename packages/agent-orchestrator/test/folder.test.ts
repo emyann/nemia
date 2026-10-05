@@ -150,6 +150,10 @@ const board = () => {
       return spec.id;
     },
     stop: async () => {},
+    forget: async (ids: string[]) => ({
+      forgotten: true,
+      tasks: ids.map((taskId) => ({ taskId, journalBytes: 0, feedLines: 0, sessions: [] })),
+    }),
     logs: async () => '',
     feed: async () => ({ entries: [], cursor: 0 }),
   });

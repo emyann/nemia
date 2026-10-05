@@ -55,8 +55,9 @@ export type PassLine = { text: string; warn?: true; run?: string; step?: string 
 
 /**
  * What the daemon has said while it lasts, so it says each failure once: a queued card's start (`said`), the feed's (`feedSaid`), a move
- * the lifecycle refused (`refusedSaid`), a journal left out (`unreadableSaid`), what a pass forgot of removed runs or what refused it (`forgettingSaid`); the store's pause (`pauseSaid`), said once put, on each
- * change of its words and once resumed; and the passes its next summary counts (`interval`).
+ * the lifecycle refused (`refusedSaid`), a journal left out (`unreadableSaid`), what a pass forgot of removed runs or what refused it
+ * (`forgettingSaid`); the store's pause (`pauseSaid`), said once put, on each change of its words and once resumed; and the passes its next
+ * summary counts (`interval`).
  */
 export type UpSaid = {
   said: string | undefined;

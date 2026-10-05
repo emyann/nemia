@@ -477,10 +477,11 @@ export type AskWritten = { written: true; where: string } | { written: false; wh
 
 /**
  * The run store, as a plain value of synchronous methods: a run's record, and the files a person keeps beside it, by run id and never by
- * path. The tick writes the record; a person's verbs write their own files; no method lets one writer write the other's, but the tick's
- * one touch on a person's file, a hold lifted. Its implementation is `filesStore` (`files.store.ts`), bound as `runStore` there. What the
- * tick's pass and a person's verbs read and write of the store, grouped as `runs`, `asks`, `holds` and `forgetting`, the tasks `nemia rm` has yet to see the engine forget; and the inbox, `inbox`: a person's
- * cards, which their verbs write, and the tick's tries of a queued card's start, which the tick alone writes.
+ * path. The tick writes the record; a person's verbs write their own files; no method lets one writer write the other's, but the tick's one
+ * touch on a person's file, a hold lifted. Its implementation is `filesStore` (`files.store.ts`), bound as `runStore` there. What the
+ * tick's pass and a person's verbs read and write of the store, grouped as `runs`, `asks`, `holds` and `forgetting`, the tasks `nemia rm`
+ * has yet to see the engine forget; and the inbox, `inbox`: a person's cards, which their verbs write, and the tick's tries of a queued
+ * card's start, which the tick alone writes.
  */
 export type RunStore = {
   readonly runs: {

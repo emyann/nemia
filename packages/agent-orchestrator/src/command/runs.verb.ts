@@ -11,7 +11,7 @@ import { everyOf } from '../daemon/daemon.ts';
 import { cursorTakes } from '../feed/feed.ts';
 import { forgetLine, type Forgot } from '../forget/forget.ts';
 import { forgetRun } from '../forget/forget.verb.ts';
-import type { EngineForgetting } from '../forget/forgetting.ts';
+import type { EngineForgetting } from '../forgetting/forgetting.ts';
 import { pruneLines, type Pruning } from '../prune/prune.ts';
 import { prune } from '../prune/prune.verb.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';

@@ -150,6 +150,10 @@ const board = () => {
       return spec.id;
     },
     stop: async () => {},
+    forget: async (ids: string[]) => ({
+      forgotten: true,
+      tasks: ids.map((taskId) => ({ taskId, journalBytes: 0, feedLines: 0, sessions: [] })),
+    }),
   });
   const settle = (id: string, phase: TaskPhase, closeout?: unknown) => tasks.set(id, { phase, closeout });
   return { e, filings, settle };

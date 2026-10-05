@@ -298,6 +298,7 @@ const PINNED: Record<string, string[]> = {
     'runPlaceVerb',
     'runReading',
     'runSlots',
+    'runsForgetting',
     'runStore',
     'runSpend',
     'runStartedAt',

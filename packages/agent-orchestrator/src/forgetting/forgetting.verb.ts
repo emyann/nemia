@@ -39,9 +39,7 @@ export const engineForgetting = Effect.fn('engineForgetting')(function* (ids: re
   const waiting: TaskWaiting[] = [];
   let settled: string[] = [];
   for (const taskId of new Set(ids)) {
-    const view = yield* e.view(taskId).pipe(
-      Effect.catch((err) => Effect.sync(() => void waiting.push({ taskId, why: err.message }))),
-    );
+    const view = yield* e.view(taskId).pipe(Effect.catch((err) => Effect.sync(() => void waiting.push({ taskId, why: err.message }))));
     if (!view?.state.brief) continue;
     if (view.state.settled === null) waiting.push({ taskId, why: `${taskId} has not settled yet` });
     else settled.push(taskId);
@@ -102,7 +100,10 @@ export const finishForgetting = (): Effect.Effect<ForgettingLine[], never, Engin
   }).pipe(
     Effect.catchCause((cause) =>
       Effect.succeed([
-        { text: `the tasks of removed runs were not forgotten on this pass: ${(Cause.squash(cause) as Error).message}`, warn: true as const },
+        {
+          text: `the tasks of removed runs were not forgotten on this pass: ${(Cause.squash(cause) as Error).message}`,
+          warn: true as const,
+        },
       ]),
     ),
   );

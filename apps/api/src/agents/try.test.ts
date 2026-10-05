@@ -302,7 +302,13 @@ test('the board removes a try: its record and the folders it worked in', async (
   assert.ok(fs.existsSync(workspace));
   const res = await remove(first);
   assert.equal(res.status, 200, JSON.stringify(await res.clone().json()));
-  assert.deepEqual(await res.json(), { id: first, removed: true });
+  const body = (await res.json()) as { id: string; removed: boolean; engine: { forgotten: string[]; waiting: string[] } | null };
+  assert.deepEqual([body.id, body.removed], [first, true]);
+  assert.deepEqual(
+    [body.engine?.forgotten, body.engine?.waiting],
+    [[`t-${first}`], []],
+    "and the engine's records of its task, forgotten and named",
+  );
   assert.ok(!fs.existsSync(path.join(RUNS, `${first}.json`)), 'the record is gone');
   assert.ok(!fs.existsSync(workspace), 'and its folders');
   assert.ok(!(await listed()).some((r) => r.id === first), 'and the list has it no more');
@@ -315,7 +321,13 @@ test('a removal is guarded as every write is', async () => {
   ended(id);
   try {
     assert.equal((await remove(id, { 'content-type': 'text/plain' })).status, 415);
-    assert.equal((await remove(id, { ...json, 'sec-fetch-site': 'cross-site' })).status, 403);
+    const crossSite = await remove(id, { ...json, 'sec-fetch-site': 'cross-site' });
+    assert.equal(crossSite.status, 403);
+    const { error } = (await crossSite.json()) as { error: string };
+    assert.ok(
+      error.includes("the engine's journals and session files of its tasks"),
+      `what goes with it, the engine's records named: ${error}`,
+    );
     assert.equal((await remove(id, { ...json, host: 'evil.example' })).status, 403);
     assert.ok(fs.existsSync(path.join(RUNS, `${id}.json`)), 'the try is still there');
   } finally {

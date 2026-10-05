@@ -1054,7 +1054,9 @@ test(
           const attempt = (await Effect.runPromise(engine.view(id))).state.attempts[0];
           if (attempt?.ended != null) return;
           if (attempt?.denials?.length) {
-            const denied = (await journal()).flatMap((e) => (e.kind === 'denied' ? [{ tool: e.tool, what: e.what, attempt: e.attempt }] : []));
+            const denied = (await journal()).flatMap((e) =>
+              e.kind === 'denied' ? [{ tool: e.tool, what: e.what, attempt: e.attempt }] : [],
+            );
             inFlight = { denials: attempt.denials, resulted: /"type"\s*:\s*"result"/.test(capture()), denied };
           }
           await new Promise((r) => setTimeout(r, 1_000));

@@ -10,7 +10,7 @@
 import fs from 'node:fs';
 import { Effect } from 'effect';
 import { EngineService, asked as engineAsked, denialText, over, type Engine, type TaskView } from '../runtime-client.ts';
-import { deniedCallsOf } from '../stats/index.ts';
+import { deniedSoFarOf } from '../stats/index.ts';
 import type { Verdict } from '../check/check.ts';
 import type { Workflow } from '../workflow.ts';
 import { folderPlace } from '../record/places.store.ts';
@@ -538,7 +538,7 @@ function wordFeed(run: Run, r: PassReads, assessed: Assessment, admission: Admis
     run,
     assessed,
     (name) => closeoutOf(views, run, name),
-    (name) => deniedCallsOf(views.get(run.steps[name]?.taskId ?? '')).map(denialText),
+    (name) => deniedSoFarOf(views.get(run.steps[name]?.taskId ?? ''), denialText).map(denialText),
   );
 }
 

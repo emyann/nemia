@@ -4,8 +4,9 @@ description: When a step was denied a call (a feed line's denied: note), read wh
 ---
 # Grant access
 
-A step's line in the feed says `denied: <call> ×<n>, …` once an attempt of its session ended with calls its fence refused. The fence is
-its agent's: what it may call unasked (`allowedTools:`), what it may never call (`disallowedTools:`), the tools it is given at all
+A step's line in the feed says `denied: <call> ×<n>, …` as soon as the harness reports a call its fence refused, while the step still
+works: each distinct call once as it is first refused, and every call counted when its attempt ends, which says the note once more. A
+step on a harness that reports no denial while it runs says it only at the end. The fence is its agent's: what it may call unasked (`allowedTools:`), what it may never call (`disallowedTools:`), the tools it is given at all
 (`tools:`), and the folders it may write. A denial is either the fence doing its work, or a grant the agent lacks to do its job.
 
 ## Read it

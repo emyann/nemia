@@ -44,12 +44,13 @@ const refusedWith = (pattern: RegExp) => (err: Error & { exitCode?: number }) =>
 
 /**
  * An engine board a test settles by hand, as queue-store.test.ts's: a task filed is `pending`, one given a live word (`running (working)`)
- * is running with it, and a settled one carries the closeout it is given. It counts its reads, so a test can say the feed asked for none.
+ * is running with it, and a settled one carries the closeout it is given. A task denied calls has its attempt ended, or running with
+ * them (`live`). It counts its reads, so a test can say the feed asked for none.
  */
 const board = () => {
   const tasks = new Map<
     string,
-    { spec: { id: string; brief: string; closeoutSchema?: object }; phase: string; closeout?: unknown; denials?: object[] }
+    { spec: { id: string; brief: string; closeoutSchema?: object }; phase: string; closeout?: unknown; denials?: object[]; live?: boolean }
   >();
   const settledPhase = (p: string) => ['succeeded', 'failed', 'stopped'].includes(p);
   let views = 0;
@@ -75,7 +76,7 @@ const board = () => {
               : [
                   {
                     n: 1,
-                    ended: t.denials ? { at: '2026-09-22T10:05:00.000Z' } : null,
+                    ended: t.denials && !t.live ? { at: '2026-09-22T10:05:00.000Z' } : null,
                     ...(t.denials ? { denials: t.denials } : {}),
                     nativeId: `native-${id}`,
                     closeout: t.closeout,
@@ -102,7 +103,7 @@ const board = () => {
     feed: async () => ({ entries: [], cursor: 0 }),
   });
   const set = (id: string, phase: string, closeout?: unknown) => Object.assign(tasks.get(id)!, { phase, closeout });
-  const deny = (id: string, denials: object[]) => Object.assign(tasks.get(id)!, { denials });
+  const deny = (id: string, denials: object[], live = false) => Object.assign(tasks.get(id)!, { denials, live });
   return { e, set, deny, views: () => views };
 };
 
@@ -290,6 +291,36 @@ test('a step whose ended attempt was denied a call says it on its line in the fe
     denied.map((l) => l.note),
     ['denied: Bash(git push) ×2'],
     'said once, over three passes',
+  );
+});
+
+test('a running step says each distinct call it is denied on its line in the feed as it is denied, and the counts once its attempt ends', async () => {
+  emptyStore();
+  const b = board();
+  const run = await started('the live denial');
+  await runWith(b.e, tickRun());
+  const [ls, glob] = [{ tool: 'Bash', what: 'ls' }, { tool: 'Glob' }];
+  const id = `${run.id}-plan`;
+  b.set(id, 'running (working)');
+  const denied = () => lines().filter((l) => l.run === run.id && l.step === 'plan' && l.note?.startsWith('denied:'));
+  b.deny(id, [ls], true);
+  await runWith(b.e, tickRun());
+  assert.deepEqual(
+    denied().map((l) => l.note),
+    ['denied: Bash(ls) ×1'],
+    'said while the attempt runs',
+  );
+  b.deny(id, [ls, ls], true);
+  await runWith(b.e, tickRun());
+  assert.equal(denied().length, 1, 'the same call denied again says nothing new');
+  b.deny(id, [ls, ls, glob], true);
+  await runWith(b.e, tickRun());
+  b.deny(id, [ls, ls, glob]);
+  for (let i = 0; i < 2; i++) await runWith(b.e, tickRun());
+  assert.deepEqual(
+    denied().map((l) => l.note),
+    ['denied: Bash(ls) ×1', 'denied: Bash(ls) ×1, Glob ×1', 'denied: Bash(ls) ×2, Glob ×1'],
+    'a new call says itself, and the end counts each',
   );
 });
 

@@ -168,8 +168,8 @@ export const feedPhase = (word: string): string =>
  *
  * @param closeoutOf How each step signed off, as `listing` was handed it: a step that signed off blocked says what it needs beside its
  *   word.
- * @param deniedOf Each call a step's task was denied, in the runtime's words (`denialText`), as its ended attempts journalled them: a step
- *   denied a call says which beside its word (`deniedNote`).
+ * @param deniedOf Each call a step's task was denied so far, in the runtime's words (`denialText`): each of its ended attempts, and each
+ *   distinct call of one still running, once (`deniedSoFarOf`). A step denied a call says which beside its word (`deniedNote`).
  */
 export function feedWords(
   l: Listing,
@@ -216,8 +216,9 @@ const DENIED_CAP = 5;
 
 /**
  * The calls a step's task was denied, for its line in the feed: `denied: <call> ×<n>, …`, each distinct call once with how many times it
- * was denied, in the order first denied, at most `DENIED_CAP` named and the rest counted — or nothing, for a step denied nothing. A
- * subscriber woken by `denied:` reads the call a grant would have let through.
+ * was denied, in the order first denied, at most `DENIED_CAP` named and the rest counted — or nothing, for a step denied nothing. A call
+ * a running attempt was denied is handed once, so the note changes, and wakes a subscriber, on a call not yet named, and once more with
+ * the counts when the attempt ends. A subscriber woken by `denied:` reads the call a grant would have let through.
  */
 export const deniedNote = (calls: readonly string[]): string => {
   const counts = new Map<string, number>();

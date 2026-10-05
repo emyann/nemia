@@ -60,6 +60,13 @@ logs it at Info with its run, step and word, and publishes it to the process's h
 the hub dropped, or one another process wrote — on a beat that stats the file: the api's `GET /api/feed/stream`, on the hub its daemon
 publishes to. A reader in another process, `nemia watch`, watches the file (`watchFeed`).
 
+**Subscriptions** are the feed said to a long-lived task: `nemia subscribe <name> <task>` (`src/subscription/subscription.verb.ts`, also
+`POST /api/subscriptions/:name`) puts a file under `$WF_ROOT/subscriptions/`, the person's, and the daemon's deliverer (`deliver` in
+`src/subscription/deliver.verb.ts`, forked by `up`) follows the feed for each, writing where it is beside it (`<name>.state.json`, its
+one writer). A line holding a wake word is said to the task at once through the runtime's `say`, the routine lines before it riding it as
+a digest; with no wake, the digest is said after `digestEvery` minutes. The cursor moves only once `say` resolved, so a line is told at
+least once, to the harness's inbox: whether the session reads it is the runtime's (`agent-runtime/docs/open-issues.md`, #12, #14–#16).
+
 **In the orchestrator today, a candidate for the runtime**:
 
 - rendering agents and skills for Claude Code (`src/agents/agents.ts`, `src/agents/agents.store.ts`, `toldOf` in
@@ -138,11 +145,11 @@ A file at the top of `src/` is named in `PURE`, `STORE`, `CONTROLLER` or `CLIENT
   node:net or node:os, reads neither `process.env` nor `fetch`, and imports no file of the other kinds: radius, rendering,
   retry, run and workflow at the top, and the folders' own — agents, artifacts, branches, cap,
   check, closeout, daemon, ending, feed, folder, former, gate, harness, inbox, keys, meter, plan, prune, record, refusal,
-  rest, say, series, skills, status, step, timeline, views, wait, workflow, workspace.
+  rest, say, series, skills, status, step, subscription, timeline, views, wait, workflow, workspace.
 - **store** is the I/O beneath the controllers. It imports no agent-runtime, never a controller and not the client:
   branches and artifacts at the top, and record.store, folder.store, write.store, worktree.store, agents.store,
-  skills.store, plan.store, daemon.store, feed.store, inbox.store, tally.store, places.store, config.store, series.store and
-  a2a.store in the folders. They load as a tree. At the bottom are record/places.store.ts, folder/folder.store.ts, meter/tally.store.ts
+  skills.store, plan.store, daemon.store, feed.store, inbox.store, tally.store, places.store, config.store, series.store,
+  subscription.store and a2a.store in the folders. They load as a tree. At the bottom are record/places.store.ts, folder/folder.store.ts, meter/tally.store.ts
   (the pass's meter) and config/config.store.ts, which import no store file. record/record.store.ts imports only those
   four; workspace/worktree.store.ts imports only record.store.ts, places.store.ts and tally.store.ts; folder/write.store.ts
   imports only record.store.ts and folder.store.ts. Any other store file imports only these, and none imports it.

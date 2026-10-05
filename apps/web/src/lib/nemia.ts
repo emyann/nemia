@@ -15,7 +15,7 @@ export type SessionKind = 'off' | 'leaving' | 'not-filed' | 'starting' | 'up' | 
 /** What each state is said as, a sentence each. */
 const SESSION_WORDS: Record<SessionKind, string> = {
   off: 'Off: no session of hers runs.',
-  leaving: "Stopping: the keeper ends her session at its next beat.",
+  leaving: 'Stopping: the keeper ends her session at its next beat.',
   'not-filed': 'Not filed yet: the keeper files her session at its next beat.',
   starting: 'Filed: her session is starting.',
   up: 'Up: her session runs.',

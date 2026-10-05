@@ -1,4 +1,4 @@
-import { Bot, ChartColumn, Factory, House, Inbox, List, Network, Waypoints } from 'lucide-react';
+import { Bot, ChartColumn, Factory, House, Inbox, List, Network, Settings, Waypoints } from 'lucide-react';
 import { factorySearch } from '../lib/factories.ts';
 
 /** Whether `path` is `to` or a page under it: `/agents/new` is under `/agents`, `/agentsx` is not. */
@@ -55,13 +55,15 @@ export const tabsOf = (path: string): readonly PlaceTab[] | undefined =>
 
 /**
  * The rail, the frame's narrow column of icons at the left, in one column from the top: Home, the factories' canvas, lit on it and on a
- * factory's floor only; Agents, what a workflow's nodes may have attached, lit on an agent's page; and Machines & Capabilities, lit on
- * either of its tabs (`PLACE_TABS`).
+ * factory's floor only; Agents, what a workflow's nodes may have attached, lit on an agent's page; Machines & Capabilities, lit on
+ * either of its tabs (`PLACE_TABS`); and Settings, what is set for the whole store, lit on its page and under it, never on a factory's
+ * own settings, which are Home's.
  */
 export const RAIL = [
   { to: '/', label: 'Home', icon: House, active: (path: string) => path === '/' || path.startsWith('/factories/') },
   { to: '/agents', label: 'Agents', icon: Bot, active: under('/agents') },
   { to: '/machines', label: 'Machines & Capabilities', icon: Network, active: (path: string) => tabsOf(path) === PLACE_TABS },
+  { to: '/settings', label: 'Settings', icon: Settings, active: under('/settings') },
 ] as const;
 
 /**

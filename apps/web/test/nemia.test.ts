@@ -52,8 +52,7 @@ test('a session stopped from outside reads stopped, even while something still r
 });
 
 test('the phase is never read: any word there judges the same', () => {
-  for (const phase of ['running', 'settled', 'whatever'])
-    assert.equal(sessionOf({ ...up, phase }).kind, 'up', phase);
+  for (const phase of ['running', 'settled', 'whatever']) assert.equal(sessionOf({ ...up, phase }).kind, 'up', phase);
 });
 
 test('the switch offers Manual from Semi-auto, and Semi-auto from Manual', () => {
@@ -62,10 +61,7 @@ test('the switch offers Manual from Semi-auto, and Semi-auto from Manual', () =>
 });
 
 test('her spend says one session or several, and names the unmeasured ones only when there are some', () => {
-  assert.equal(
-    spendWords({ usd: 0.5, measured: 1, unmeasured: 0 }),
-    'Spent $0.50 over 1 session ended; her open one counts once it ends.',
-  );
+  assert.equal(spendWords({ usd: 0.5, measured: 1, unmeasured: 0 }), 'Spent $0.50 over 1 session ended; her open one counts once it ends.');
   assert.equal(
     spendWords({ usd: 2, measured: 2, unmeasured: 1 }),
     'Spent $2.00 over 2 sessions ended, 1 not measured; her open one counts once it ends.',

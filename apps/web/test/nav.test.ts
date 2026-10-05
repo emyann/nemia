@@ -34,14 +34,14 @@ test("each page lights one section — a factory's floor the Floor, a run and it
     assert.deepEqual(lit(path), [], `refused: a path that only begins with a section's name is not under it (${path})`);
 });
 
-test('the rail holds Home, Agents, then Machines & Capabilities, in that order', () => {
+test('the rail holds Home, Agents, Machines & Capabilities, then Settings, in that order', () => {
   assert.deepEqual(
     RAIL.map((item) => item.label),
-    ['Home', 'Agents', 'Machines & Capabilities'],
+    ['Home', 'Agents', 'Machines & Capabilities', 'Settings'],
   );
   assert.deepEqual(
     RAIL.map((item) => item.to),
-    ['/', '/agents', '/machines'],
+    ['/', '/agents', '/machines', '/settings'],
   );
 });
 
@@ -55,8 +55,10 @@ test("each page lights at most one place in the rail — Home on the canvas and 
   assert.deepEqual(lit('/capabilities'), ['Machines & Capabilities'], 'the place is lit on its second tab too');
   assert.deepEqual(lit('/runs'), [], 'a run is not Home');
   assert.deepEqual(lit('/inbox'), [], 'the Inbox is not Home');
+  assert.deepEqual(lit('/settings'), ['Settings']);
+  assert.deepEqual(lit('/factories/nemia/settings'), ['Home'], "a factory's own settings are Home's, not the store's Settings");
   assert.deepEqual(lit('/nowhere'), []);
-  for (const path of ['/agentsx', '/machinesx', '/capabilitiesx', '/factoriesx', '/machines/x', '/capabilities/x'])
+  for (const path of ['/agentsx', '/machinesx', '/capabilitiesx', '/factoriesx', '/machines/x', '/capabilities/x', '/settingsx'])
     assert.deepEqual(lit(path), [], `refused: a path that only begins with a place's name is not under it (${path})`);
 });
 
@@ -92,6 +94,7 @@ test("the header names a page by its section first — Floor on a factory's floo
   assert.equal(sectionOf('/agents/scribe'), 'Agents');
   assert.equal(sectionOf('/machines'), 'Machines & Capabilities');
   assert.equal(sectionOf('/capabilities'), 'Machines & Capabilities');
+  assert.equal(sectionOf('/settings'), 'Settings');
   assert.equal(sectionOf('/machinesx'), undefined);
 });
 

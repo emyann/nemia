@@ -35,6 +35,7 @@ import {
   renderAgent,
 } from '../src/workflow.ts';
 import { formerKeyLines } from '../src/folder/folder.store.ts';
+import { readsMounts } from '../src/filed/filed.ts';
 import { scratch } from './scratch.ts';
 import { placesOf, shippedFolders, TEAM_DEV, teamCopy } from './team.ts';
 
@@ -2826,20 +2827,28 @@ test('`reads:` is read as the store folders it names, written back as written, a
   assert.match(renderStep(step), /^reads: inbox$/m);
   assert.deepEqual(parseWorkflow('review', renderStep(step)).reads, ['inbox']);
   assert.equal(fm('review', 'permissionMode: dontAsk').reads, undefined);
+  assert.deepEqual(fm('review', 'reads: costs').reads, ['costs']);
+  assert.deepEqual(fm('review', 'reads: inbox, costs').reads, ['inbox', 'costs']);
+  assert.deepEqual(readsMounts({ harness: 'claude', reads: ['costs'] }, '/s/inbox'), [], '`costs` is said in the brief, and mounts nothing');
 });
 
 test('REFUSED at load: a `reads:` name off the store list, one given twice, none, and the key on a remote A2A agent', () => {
-  const shape = 'Each is a folder of the store by its name, never a path, comma-separated; the one there is: inbox.';
+  const shape = 'Each is what of the store a step may read, by its name, never a path, comma-separated: inbox, costs.';
   assert.equal(
     readsSaid('reads: runs'),
-    `review: \`reads: runs\` has \`runs\`, which names no folder of the store a step may read. ${shape}`,
+    `review: \`reads: runs\` has \`runs\`, which names nothing of the store a step may read. ${shape}`,
   );
   assert.equal(
     readsSaid('reads: /home/me/.agent-workflows/inbox'),
-    `review: \`reads: /home/me/.agent-workflows/inbox\` has \`/home/me/.agent-workflows/inbox\`, which names no folder of the store a step may read. ${shape}`,
+    `review: \`reads: /home/me/.agent-workflows/inbox\` has \`/home/me/.agent-workflows/inbox\`, which names nothing of the store a step may read. ${shape}`,
   );
   assert.equal(readsSaid('reads: inbox, inbox'), 'review: `reads: inbox, inbox` names `inbox` twice. Name it once.');
-  assert.equal(readsSaid('reads: , ,'), `review: \`reads: , ,\` names no folder. ${shape}`);
+  assert.equal(readsSaid('reads: , ,'), `review: \`reads: , ,\` names nothing. ${shape}`);
+  assert.equal(
+    readsSaid('reads: cost'),
+    `review: \`reads: cost\` has \`cost\`, which names nothing of the store a step may read. ${shape}`,
+  );
+  assert.equal(readsSaid('reads: costs, costs'), 'review: `reads: costs, costs` names `costs` twice. Name it once.');
   assert.match(
     readsSaid('harness: a2a:peer\nreads: inbox'),
     /^review: `reads: inbox` gives a session on this machine a folder of the store to read, and a remote agent works on another party's machine/,

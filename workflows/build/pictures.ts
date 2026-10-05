@@ -1,12 +1,13 @@
 /**
  * `node pictures.ts <closeout.json>` — the proof that a change to the board's pages hands its reviewer pictures of them.
  *
- * Reads what the work touched, `git diff --name-only $WF_BASE_REF...HEAD` in the working directory. A change under `apps/web/src` touches
- * a page; one only under `apps/web/test`, or outside `apps/web`, touches none and asks for no picture. When a page is touched, it reads
- * the closeout's `artifacts` (`WF_CLOSEOUT`, flat) and counts a picture for each entry that is an image by its extension (`IMAGES`, any
- * case) and a regular file of more than 0 bytes: by an absolute path inside the step's files directory (`WF_ARTIFACTS`); by a path from
- * the workspace root, where the run collected it in that directory, or else in the workspace. A path that climbs
- * out with `..`, or an absolute one anywhere else, never counts.
+ * Reads what the work touched in the working directory: the paths its own commits since `WF_BASE_REF` changed, along the first parent,
+ * and what a merge on that line changed beyond every parent, its resolution; a path a merged branch changed, main's, is not the work's. A
+ * change under `apps/web/src` touches a page; one only under `apps/web/test`, or outside `apps/web`, touches none and asks for no picture.
+ * When a page is touched, it reads the closeout's `artifacts` (`WF_CLOSEOUT`, flat) and counts a picture for each entry that is an image
+ * by its extension (`IMAGES`, any case) and a regular file of more than 0 bytes: by an absolute path inside the step's files directory
+ * (`WF_ARTIFACTS`); by a path from the workspace root, where the run collected it in that directory, or else in the workspace. A path
+ * that climbs out with `..`, or an absolute one anywhere else, never counts.
  *
  * Prints what it counted and exits 0 when no page was touched or a picture is named. Exits 1, on stderr, when a page was touched and no
  * picture is named, naming what was touched, the command that takes pictures and each entry that did not count with why; and when
@@ -28,22 +29,27 @@ const IMAGES = ['.png', '.jpg', '.jpeg', '.webp', '.gif', '.avif'];
 /** How many touched paths a refusal names before it says how many more. */
 const SHOWN = 5;
 
-/** Every path the work touched since `base`, from the root; refuses when git cannot say, never guessing. */
+/**
+ * Every path the work's own commits touched since `base`, from the root, once each: its commits along the first parent, and of a merge
+ * there only what differs from every parent (`--cc`), so what a merged branch changed is left out. Refuses when git cannot say, never
+ * guessing.
+ */
 function touchedSince(base: string): string[] {
-  const range = `${base}...HEAD`;
-  const diff = spawnSync('git', ['-c', 'core.quotePath=false', 'diff', '--no-renames', '--name-only', range, '--'], {
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-  if (diff.status !== 0)
+  const range = `${base}..HEAD`;
+  const args = ['-c', 'core.quotePath=false', 'log', '--first-parent', '--cc', '--no-renames', '--format=', '--name-only', range, '--'];
+  const log = spawnSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  if (log.status !== 0)
     throw new Refusal(
-      `cannot tell what the work touched, since git diff --name-only ${range} failed (${(diff.stderr ?? '').trim() || diff.error?.message}); ` +
-        'no picture is skipped on a guess',
+      `cannot tell what the work touched, since git log --first-parent --name-only ${range} failed ` +
+        `(${(log.stderr ?? '').trim() || log.error?.message}); no picture is skipped on a guess`,
     );
-  return diff.stdout.split('\n').filter(Boolean);
+  return [...new Set(log.stdout.split('\n').filter(Boolean))];
 }
 
-/** The `artifacts` of the closeout at `file`, a list of none when it names none; refuses a missing argument or a file that is no JSON object. */
+/**
+ * The `artifacts` of the closeout at `file`, a list of none when it names none; refuses a missing argument or a file that is no JSON
+ * object.
+ */
 function artifactsOf(file: string | undefined): unknown[] {
   if (!file) throw new Refusal('no closeout reached the check: WF_CLOSEOUT is empty, so there is no list of pictures to read');
   let parsed: unknown;

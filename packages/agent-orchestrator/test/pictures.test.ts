@@ -133,6 +133,46 @@ test('a change only under apps/web/test, or outside apps/web, asks for no pictur
   }
 });
 
+/**
+ * A scratch repository as `workOn` makes it, whose `main` then moves on a commit of `theirs`, merged into the work, which then commits
+ * `ours`; with the base's commit. `resolved` is written into the merge itself before it is committed, as a resolution would be.
+ */
+function mergedMain(
+  theirs: Record<string, string>,
+  ours: Record<string, string>,
+  resolved: Record<string, string> = {},
+): ReturnType<typeof workOn> {
+  const at = workOn({ 'packages/y.ts': 'export {};\n' });
+  git(at.repo, 'checkout', '-q', 'main');
+  write(at.repo, theirs);
+  git(at.repo, 'add', '-A');
+  git(at.repo, 'commit', '-qm', 'main moves on');
+  git(at.repo, 'checkout', '-q', 'work');
+  git(at.repo, 'merge', '-q', '--no-commit', '--no-ff', 'main');
+  write(at.repo, resolved);
+  git(at.repo, 'add', '-A');
+  git(at.repo, 'commit', '-qm', 'merge main');
+  write(at.repo, ours);
+  git(at.repo, 'add', '-A');
+  git(at.repo, 'commit', '-q', '--allow-empty', '-m', 'more work');
+  return at;
+}
+
+test("a page main changed, merged into the work, is not the work's: only the work's own commits and its merges' resolutions count", () => {
+  const files = scratch('wf-pictures-files-');
+  const merged = mergedMain(PAGE, { 'packages/x.ts': 'export {};\n' });
+  const theirs = pictures(merged.repo, [closeoutFile([])], { WF_BASE_REF: merged.base, WF_ARTIFACTS: files });
+  assert.equal(theirs.code, 0, theirs.err);
+  assert.match(theirs.out, /nothing under apps\/web\/src was touched/);
+  const own = mergedMain(PAGE, { 'apps/web/src/routes/y.tsx': 'export const y = 1;\n' });
+  const ours = pictures(own.repo, [closeoutFile([])], { WF_BASE_REF: own.base, WF_ARTIFACTS: files });
+  assert.equal(ours.code, 1, ours.out);
+  assert.ok(ours.err.includes('apps/web/src/routes/y.tsx') && !ours.err.includes('routes/x.tsx'), ours.err);
+  const resolution = mergedMain(PAGE, {}, { 'apps/web/src/routes/x.tsx': 'export const x = 2;\n' });
+  const resolved = pictures(resolution.repo, [closeoutFile([])], { WF_BASE_REF: resolution.base, WF_ARTIFACTS: files });
+  assert.equal(resolved.code, 1, `a page changed in the merge itself is the work's:\n${resolved.out}`);
+});
+
 test('REFUSED: no closeout with a page touched, and a base git cannot read', () => {
   const { repo, base } = workOn(PAGE);
   const files = scratch('wf-pictures-files-');

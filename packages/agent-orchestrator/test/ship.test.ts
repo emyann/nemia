@@ -2325,3 +2325,21 @@ test('a loop out of rounds is sent to merge without `nemia round`: the merge spe
   assert.equal(listed.steps.find((s) => s.name === 'ship')!.status, 'awaiting approval');
   assert.equal(roundOf(readRun(id), 'review'), 1, 'still round 1 of 1');
 });
+
+test('a merge a pass filed and never wrote down is adopted as a merge: the round kept, the base moved to the commit merged, nothing filed twice', async () => {
+  const { repo, id, e, tasks, filings } = await stoppedOnBase();
+  const sha = mainMoves(repo);
+  await runWith(e, mergeRun(id));
+  tasks.set(`${id}-implement-try2`, { spec: { id: `${id}-implement-try2`, brief: '## Merge main' }, phase: 'pending' });
+  const before = filings.length;
+  await runWith(e, advanceRun(readRun(id)));
+  const run = readRun(id);
+  assert.deepEqual(
+    run.steps.implement.tries?.map((t) => t.then),
+    ['merge'],
+  );
+  assert.equal(run.steps.implement.taskId, `${id}-implement-try2`);
+  assert.equal(roundOf(run, 'review'), 1);
+  assert.equal(run.baseRef, sha);
+  assert.ok(!filings.slice(before).includes(`${id}-implement-try2`), filings.join(', '));
+});

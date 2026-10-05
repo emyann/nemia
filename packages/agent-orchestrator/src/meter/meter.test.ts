@@ -8,8 +8,16 @@ import {
   addPass,
   breakdownLines,
   heaviest,
+  PASS_BOUNDS,
   passCost,
+  passesLines,
+  passesRead,
+  passHistogram,
+  passParts,
+  passSummary,
   PHASES,
+  recentOf,
+  sessionsOf,
   STATS_EVERY_MS,
   summaryDue,
   summaryLine,
@@ -17,6 +25,7 @@ import {
   type PassCost,
   type Phase,
   type PhaseCost,
+  type RecentPass,
 } from './meter.ts';
 
 const phase = (ms: number, over: Partial<PhaseCost> = {}): PhaseCost => ({ ms, calls: 1, bytes: 0, reads: 0, spawned: 0, ...over });
@@ -34,6 +43,10 @@ const COST: PassCost = passCost({
   records: 12,
   overheadMs: 0.4,
   rested: 0,
+  runs: 40,
+  tasks: 5,
+  queued: 2,
+  admitted: 3,
 });
 
 test("a pass's totals are its phases' bytes and processes, summed", () => {
@@ -108,4 +121,78 @@ test('the breakdown names every phase, each harness observed, and what measuring
     'the last pass, at 2026-09-25T10:00:00.000Z: 212 ms, 12 run records read, 812.0 kB read, 1 process started, 200 runs at rest answered from memory',
   );
   assert.equal(breakdownLines({ ...COST, rested: 0 })[0], lines[0], 'none answered, nothing said of it');
+});
+
+test('a pass keeps what it saw beside its time: the runs listed, the tasks, the sessions queued and admitted', () => {
+  const { runs, tasks, queued, admitted } = COST;
+  assert.deepEqual({ runs, tasks, queued, admitted }, { runs: 40, tasks: 5, queued: 2, admitted: 3 });
+  const kept = recentOf(COST);
+  assert.deepEqual(
+    { runs: kept.runs, tasks: kept.tasks, queued: kept.queued, admitted: kept.admitted, reads: kept.reads },
+    { runs: 40, tasks: 5, queued: 2, admitted: 3, reads: 30 },
+    "kept among the recent, with the journals phase's reads",
+  );
+  assert.equal(kept.phases.observe, 120);
+  assert.ok(breakdownLines(COST).includes('it saw 40 runs in the store, 5 tasks not settled, 2 queued and 3 admitted, and made 30 journal reads'));
+});
+
+test("the sessions a runtime's pass reported: queued off the views, admitted off the views and the sessions at work", () => {
+  assert.deepEqual(
+    sessionsOf({ views: [{ admission: 'queued' }, { admission: 'queued' }, { admission: 'admitted' }, {}], running: { claude: 2, codex: 1 } }),
+    { tasks: 4, queued: 2, admitted: 4 },
+  );
+  assert.deepEqual(sessionsOf({}), { tasks: 0, queued: 0, admitted: 0 }, "a fake's report carries neither");
+});
+
+const recent = (ms: number, phases: Partial<Record<Phase, number>> = {}): RecentPass => ({
+  ...recentOf(COST),
+  ms,
+  phases: Object.fromEntries(PHASES.map((p) => [p, phases[p] ?? 0])) as Record<Phase, number>,
+});
+
+test('a pass falls in the first bucket whose bound it does not pass: 100 ms in ≤ 100, 100.1 in ≤ 250, past the last in the open one', () => {
+  const passes = [100, 100.1, 5000, 5000.5, 0, 9].map((ms) => recent(ms));
+  const h = passHistogram(passes);
+  assert.equal(h.length, PASS_BOUNDS.length + 1);
+  assert.equal(
+    h.reduce((n, b) => n + b.count, 0),
+    passes.length,
+    'the counts add up to the passes',
+  );
+  const at = (le: number | null) => h.find((b) => b.le === le)!.count;
+  assert.equal(at(100), 1, 'exactly 100 ms is ≤ 100');
+  assert.equal(at(250), 1, '100.1 ms is past 100');
+  assert.equal(at(10), 2);
+  assert.equal(at(5000), 1);
+  assert.equal(at(null), 1, 'over 5000 ms has no bound');
+});
+
+test('the parts are each phase a pass on average, heaviest first, their shares adding up to no more than the whole', () => {
+  const passes = [recent(100, { git: 40, act: 10, records: 20 }), recent(50, { git: 10, act: 30 }), recent(30, { act: 20, records: 1 })];
+  const parts = passParts(passes);
+  assert.deepEqual(
+    parts.slice(0, 3).map((p) => p.phase),
+    ['act', 'git', 'records'],
+  );
+  assert.equal(parts[0].ms, 20);
+  assert.ok(parts.reduce((n, p) => n + p.share, 0) <= 1);
+  assert.equal(parts[0].share, 60 / 180);
+  assert.deepEqual(passParts([]), []);
+});
+
+test('the summary is the median and slowest pass, and what the latest saw; none for no pass', () => {
+  const s = passSummary([recent(30), { ...recent(10), runs: 7 }, recent(500), { ...recent(20), runs: 9, reads: 4 }])!;
+  assert.deepEqual(
+    { passes: s.passes, medianMs: s.medianMs, slowestMs: s.slowestMs, runs: s.runs, reads: s.reads },
+    { passes: 4, medianMs: 25, slowestMs: 500, runs: 9, reads: 4 },
+  );
+  assert.equal(passSummary([]), null);
+});
+
+test("`nemia passes`' lines: the summary, a row a bucket from the first with passes to the last, and the parts", () => {
+  const lines = passesLines(passesRead([recent(30, { act: 30 }), recent(80, { git: 80 })]));
+  assert.match(lines[0], /^2 passes since .*: 55\.0 ms a pass \(median\), slowest 80\.0$/);
+  assert.equal(lines.filter((l) => /^ +≤ \d+ ms /.test(l)).length, 2, lines.join('\n'));
+  assert.ok(lines.includes('  git         40.0 ms  73%'), lines.join('\n'));
+  assert.match(passesLines(passesRead([]))[0], /^no pass is kept yet/);
 });

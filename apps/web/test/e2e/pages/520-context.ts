@@ -81,9 +81,9 @@ const TASK = [
 ].join('\n');
 
 /**
- * READER's record, as `wf start --after --from` freezes it, from DIAMOND's `bottom`'s: waiting on `running` with nothing filed; or, `filed`,
- * after the diamond's top, which shipped, its step filed with TASK, its journal and its line on the engine's feed written as the runtime
- * writes them. Each file it writes is returned, to be taken back.
+ * READER's record, as `wf start --after --from` freezes it, from DIAMOND's `bottom`'s: waiting on `running` with nothing filed; or,
+ * `filed`, after the diamond's top, which shipped, its step filed with TASK, its journal and its line on the engine's feed written as the
+ * runtime writes them. Each file it writes is returned, to be taken back.
  */
 function written(filed: boolean): string[] {
   const runs = path.join(store!, 'runs');

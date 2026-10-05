@@ -8,8 +8,9 @@
  * It visits in the dark theme, pictured by no one, as `npm run e2e` does; with `--photos`, in light, then dark, the page pictured, as
  * `npm run e2e -- --photos` does. `none` breaks nothing, and must pass: otherwise the page itself is what fails, and a refusal of the
  * others proves nothing about the break; it takes a picture of its own too (`none-own-<theme>.png`), as a page of the app's does. The
- * page is painted for both themes, so the theme check passes and the break is what is left to fail. The two `store-` breaks break no page: they remove the store the visit is handed, as a sweep of /tmp can remove the e2e's
- * own, while the page looks (`store-removed`, which then fails on what the store held) or at its end (`store-swept`, which passes).
+ * page is painted for both themes, so the theme check passes and the break is what is left to fail. The two `store-` breaks break no
+ * page: they remove the store the visit is handed, as a sweep of /tmp can remove the e2e's own, while the page looks (`store-removed`,
+ * which then fails on what the store held) or at its end (`store-swept`, which passes, and with `--photos` fails before its dark visit).
  * That store is made in the screenshots directory, so one the page did not remove is a leftover the test's scratch root takes.
  */
 import fs from 'node:fs';

@@ -125,7 +125,8 @@ export const themeOf = (page: Page): Promise<string> =>
 /**
  * Takes a picture of a page or of what a locator finds into `file`, with every CSS animation stilled for the shot and played again after
  * it: an agent's face, which moves at all times, is drawn at rest with its eyes open, the same in every run. `fullPage` as Playwright's.
- * Takes none, and writes nothing, unless the page being visited is pictured (`photographing`) or the picture is taken `always`: a failure's.
+ * Takes none, and writes nothing, unless the page being visited is pictured (`photographing`) or the picture is taken `always`: a
+ * failure's.
  */
 export async function photograph(
   target: Page | Locator,

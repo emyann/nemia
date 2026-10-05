@@ -1,8 +1,8 @@
 /**
  * How `npm run e2e` looks at its pages, and how it ends: every page in the themes its plan asks — the dark alone, unless `--photos`
- * asks for light, then dark — pictured where the plan says, then an exit code that says whether each passed. Apart from run.ts, which builds and serves the app, so that a page
- * breaking the rules can be put through the very same code (broken-page.ts) and seen to fail it — not
- * only the app's pages seen to pass.
+ * asks for light, then dark — pictured where the plan says, then an exit code that says whether each passed. Apart from run.ts, which
+ * builds and serves the app, so that a page breaking the rules can be put through the very same code (broken-page.ts) and seen to fail
+ * it — not only the app's pages seen to pass.
  */
 import fs from 'node:fs';
 import path from 'node:path';

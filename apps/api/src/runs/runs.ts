@@ -1,6 +1,7 @@
 /** The runs, for the board: every run listed, one run in full, and what `nemia decide` shows of it. */
+import { Effect } from 'effect';
 import { Hono } from 'hono';
-import { COMMANDS, judgedUnlessUnreadable, viewsFor } from 'agent-orchestrator';
+import { COMMANDS, judgedUnlessUnreadable, viewsFor, runWith } from 'agent-orchestrator';
 import type { Run } from 'agent-orchestrator/run';
 import { decisionOf } from '../decide/decision.ts';
 import { detail } from '../detail/index.ts';
@@ -37,13 +38,13 @@ const RUN = COMMANDS.find((c) => c.name === 'run')!;
 export const runs = new Hono<ApiEnv>()
   .get('/api/runs', (c) =>
     served(c, async ({ e, env, home, memo }) =>
-      c.json(await RUNS.handler(e, {}, env, home, { runs: memo.resting, filings: memo.filings })),
+      c.json(await runWith(e, RUNS.handler({}, env, home, { runs: memo.resting, filings: memo.filings }))),
     ),
   )
   .get('/api/runs/:id', (c) =>
     served(c, async (s) => {
       const id = c.req.param('id');
-      const { run } = (await RUN.handler(s.e, { id })) as { run: Run | null };
+      const { run } = (await runWith(s.e, RUN.handler({ id }))) as { run: Run | null };
       if (!run) return c.json({ error: noSuchRun(id) }, 404);
       const full = await detail(run, s);
       if ('unjudged' in full) return c.json({ error: full.unjudged }, 502);
@@ -55,8 +56,11 @@ export const runs = new Hono<ApiEnv>()
       const id = c.req.param('runId');
       const run = findRun(id);
       if (!run) return c.json({ error: noSuchRun(id) }, 404);
-      const { unreadable } = await viewsFor(e, [run]);
-      const read = await judgedUnlessUnreadable(run, unreadable, () => decisionOf(run, e, home, env));
+      const { unreadable } = await runWith(e, viewsFor(e, [run]));
+      const read = await runWith(
+        e,
+        judgedUnlessUnreadable(run, unreadable, () => Effect.tryPromise({ try: () => decisionOf(run, e, home, env), catch: (err) => err })),
+      );
       if ('unreadable' in read) return c.json({ error: read.unreadable }, 502);
       return c.json(read.judged);
     }),

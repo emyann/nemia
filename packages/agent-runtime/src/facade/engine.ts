@@ -4,34 +4,7 @@
 import { Cause, Context, Effect, Exit, Layer, Scope } from 'effect';
 import { Engine as EngineService, listRefusalOf, type EngineShape } from '../service/index.ts';
 import type { Engine } from './consumer.ts';
-
-/** The tags of the verbs' refusals: each rejects at this door as an `Error` whose `exitCode` is 2, its message led by the verb. */
-const REFUSALS = new Set([
-  'FileRefused',
-  'TickRefused',
-  'AdmitRefused',
-  'InputRefused',
-  'StopRefused',
-  'ListRefused',
-  'TranscriptRefused',
-  'OutputRefused',
-  'SayRefused',
-  'QuotaRefused',
-  'EngineRefused',
-]);
-
-/**
- * What `verb` rejects with at this door for `e`, what its Effect failed with: a refusal or `SayUnsent` in words, anything else as it is.
- */
-const plainOf =
-  (verb: string) =>
-  (e: unknown): unknown => {
-    const { _tag, message, cause } = (e ?? {}) as { _tag?: unknown; message?: unknown; cause?: unknown };
-    if (typeof _tag !== 'string' || typeof message !== 'string') return e;
-    if (REFUSALS.has(_tag)) return Object.assign(new Error(`${verb}: ${message}`), { exitCode: 2 });
-    if (_tag === 'SayUnsent') return new Error(`${verb}: ${message}`, cause === undefined ? undefined : { cause });
-    return e;
-  };
+import { refusalWords } from '../service/refusal.ts';
 
 /**
  * The engine `layer` gives, in Promises: `promiseEngine(Engine.layer(options))` is the engine over `options` that a consumer uses
@@ -48,9 +21,9 @@ export function promiseEngine<E>(layer: Layer.Layer<EngineService, E>): Engine {
       Effect.provideService(Scope.Scope, Scope.makeUnsafe()),
     ),
   );
-  if (Exit.isFailure(built)) throw plainOf('promiseEngine')(Cause.squash(built.cause));
+  if (Exit.isFailure(built)) throw refusalWords('promiseEngine')(Cause.squash(built.cause));
   const service: EngineShape = built.value;
-  const run = <A, F>(verb: string, e: Effect.Effect<A, F>): Promise<A> => Effect.runPromise(e.pipe(Effect.mapError(plainOf(verb))));
+  const run = <A, F>(verb: string, e: Effect.Effect<A, F>): Promise<A> => Effect.runPromise(e.pipe(Effect.mapError(refusalWords(verb))));
 
   return {
     file: (spec) => run('file', service.file(spec)),

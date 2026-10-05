@@ -15,14 +15,15 @@ import { autoDropped, modeOf, parseAgent, parseWorkflow, renderAgent, WorkflowEr
 import { agentsFor, agentVersion, loadWorkflows, lookupRoots, skillsFor } from '../src/folder/folder.store.ts';
 import { briefBody, noCodingStyle, pluginOf, renderedFlags, renderedPrompt, rendersAgent, unrendered } from '../src/agents/agents.ts';
 import { scratch } from './scratch.ts';
+import { promised } from './promised.ts';
+import { Effect } from 'effect';
 
 const ROOT = scratch('wf-render-');
 process.env.WF_ROOT = ROOT;
-const { advance, start } = await import('../src/runner.ts');
+const { advanceRun, startRun, runWith } = await import('../src/runner.ts');
 const { readRun } = await import('../src/record/record.store.ts');
 const { agentFilesDir } = await import('../src/agents/agents.store.ts');
 
-type Engine = Parameters<typeof advance>[0];
 type Filed = {
   id: string;
   brief: string;
@@ -34,7 +35,7 @@ type Filed = {
 /** Just enough engine to file: every task's spec as it was filed, none of them started. */
 const board = () => {
   const filed = new Map<string, Filed>();
-  const e = {
+  const e = promised({
     view: async (id: string) => ({
       id,
       phase: 'pending',
@@ -48,7 +49,7 @@ const board = () => {
     stop: async () => {},
     logs: async () => '',
     feed: async () => ({ entries: [], cursor: 0 }),
-  } as unknown as Engine;
+  });
   return { e, filed };
 };
 
@@ -548,7 +549,7 @@ test("nemia start renders each Claude Code step's agent under runs/<id>/agents/<
     write: `---\nagent: scribe\n${FOLDER}---\nWrite about tides.\n`,
     code: `---\nagent: coder\nworkspace: folder\nafter: write\n---\nCode it.\n`,
   });
-  const run = start({ brief: 'a note on tides', repo: HERE, workflowDir: dir });
+  const run = await Effect.runPromise(startRun({ brief: 'a note on tides', repo: HERE, workflowDir: dir }));
   const at = agentFilesDir(run, 'write');
   assert.equal(
     fs.readFileSync(path.join(at, 'prompt.md'), 'utf8'),
@@ -577,7 +578,7 @@ test("nemia start renders each Claude Code step's agent under runs/<id>/agents/<
   );
 
   const { e, filed } = board();
-  assert.deepEqual((await advance(e, readRun(run.id))).filed, ['write']);
+  assert.deepEqual((await runWith(e, advanceRun(readRun(run.id)))).filed, ['write']);
   const write = filed.get(`${run.id}-write`)!;
   assert.deepEqual(write.config?.claude, {
     appendSystemPromptFile: path.join(at, 'prompt.md'),
@@ -590,9 +591,9 @@ test("nemia start renders each Claude Code step's agent under runs/<id>/agents/<
 
 test('a codex step is filed as before: its instructions in its brief, and no Claude Code flags', async () => {
   const dir = storeTeam('coded', { code: `---\nagent: coder\nworkspace: folder\n---\nCode it.\n` });
-  const run = start({ brief: 'some code', repo: HERE, workflowDir: dir });
+  const run = await Effect.runPromise(startRun({ brief: 'some code', repo: HERE, workflowDir: dir }));
   const { e, filed } = board();
-  await advance(e, readRun(run.id));
+  await runWith(e, advanceRun(readRun(run.id)));
   const code = filed.get(`${run.id}-code`)!;
   assert.equal(code.config?.claude, undefined);
   assert.match(code.brief, /^You write code\.\n\nCode it\./);
@@ -600,10 +601,10 @@ test('a codex step is filed as before: its instructions in its brief, and no Cla
 
 test('a rendered step whose folder is gone is filed as before 2026-09-25 — the instructions in its brief, no flag naming a file that is not there — and told its skills whole', async () => {
   const dir = storeTeam('lost', { write: `---\nagent: scribe\n${FOLDER}---\nWrite about tides.\n` });
-  const run = start({ brief: 'a note on tides', repo: HERE, workflowDir: dir });
+  const run = await Effect.runPromise(startRun({ brief: 'a note on tides', repo: HERE, workflowDir: dir }));
   fs.rmSync(agentFilesDir(run, 'write'), { recursive: true });
   const { e, filed } = board();
-  await advance(e, readRun(run.id));
+  await runWith(e, advanceRun(readRun(run.id)));
   const write = filed.get(`${run.id}-write`)!;
   assert.equal(write.config?.claude, undefined);
   assert.match(write.brief, /^You write notes\.\n\nWrite about tides\./);
@@ -628,11 +629,11 @@ test('a rendered step whose plugin is under another name, as a start before the 
     write: `---\nagent: scribe\n${FOLDER}---\nWrite about tides.\n`,
     plain: `---\nagent: plain\n${FOLDER}---\nWrite plainly.\n`,
   });
-  const run = start({ brief: 'a note on tides', repo: HERE, workflowDir: dir });
+  const run = await Effect.runPromise(startRun({ brief: 'a note on tides', repo: HERE, workflowDir: dir }));
   const at = agentFilesDir(run, 'write');
   fs.renameSync(path.join(at, pluginOf('scribe')), path.join(at, 'before-scribe'));
   const { e, filed } = board();
-  await advance(e, readRun(run.id));
+  await runWith(e, advanceRun(readRun(run.id)));
   const write = filed.get(`${run.id}-write`)!;
   assert.equal(write.config?.claude, undefined, 'no flag naming a plugin that is not there');
   assert.match(write.brief, /^You write notes\.\n\nWrite about tides\./);
@@ -654,22 +655,22 @@ test("a git run's step whose folder is gone is told a skill from the run's repos
   git('add', '-A');
   git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'skills');
   const dir = storeTeam('lost-git', { write: '---\nagent: scribe\n---\nWrite about tides.\n' });
-  const run = start({ brief: 'a note on tides', repo, workflowDir: dir, isolate: false });
+  const run = await Effect.runPromise(startRun({ brief: 'a note on tides', repo, workflowDir: dir, isolate: false }));
   fs.rmSync(agentFilesDir(run, 'write'), { recursive: true });
   const { e, filed } = board();
-  await advance(e, readRun(run.id));
+  await runWith(e, advanceRun(readRun(run.id)));
   const write = filed.get(`${run.id}-write`)!;
   assert.equal(write.config?.claude, undefined);
   assert.match(write.brief, /\n## Skill `mind-the-tone`\n\nIn this repository, how to mind the tone\.\n/);
 });
 
-test('REFUSED at shipped defaults: nemia start of a team whose agent gives a skill no place has, and nothing written', () => {
+test('REFUSED at shipped defaults: nemia start of a team whose agent gives a skill no place has, and nothing written', async () => {
   const dir = storeTeam('unskilled', { write: `---\nagent: scribe\n${FOLDER}---\nWrite.\n` });
   const runs = path.join(ROOT, 'runs');
   const before = fs.existsSync(runs) ? fs.readdirSync(runs).sort() : [];
   const elsewhere = fs.mkdtempSync(path.join(ROOT, 'elsewhere-'));
-  assert.throws(
-    () => start({ brief: 'x', repo: elsewhere, workflowDir: dir }),
+  await assert.rejects(
+    async () => await Effect.runPromise(startRun({ brief: 'x', repo: elsewhere, workflowDir: dir })),
     (e: Error) => /gives the skill `mind-the-tone`, and no skills folder has it/.test(e.message),
     'started from a directory whose .claude/ has no mind-the-tone, and the store has write-a-note alone',
   );

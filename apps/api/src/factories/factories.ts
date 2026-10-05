@@ -4,7 +4,7 @@
  * factory` is the one writer of a factory's file.
  */
 import { Hono } from 'hono';
-import { COMMANDS, commandLine, DEFAULT_FACTORY, FACTORY, type FactoryListing, type Hires } from 'agent-orchestrator';
+import { COMMANDS, commandLine, DEFAULT_FACTORY, FACTORY, type FactoryListing, type Hires, runWith } from 'agent-orchestrator';
 import { repoOf } from '../capabilities/capabilities.ts';
 import { type ApiEnv, served } from '../layer.ts';
 
@@ -70,7 +70,7 @@ const answerOf = (listing: FactoryListing): FactoryAnswer =>
  */
 export const factories = new Hono<ApiEnv>().get('/api/factories', (c) =>
   served(c, async ({ e, env }) => {
-    const listed = await FACTORY.handler(e, {});
+    const listed = await runWith(e, FACTORY.handler({}));
     return c.json([
       {
         name: DEFAULT_FACTORY,

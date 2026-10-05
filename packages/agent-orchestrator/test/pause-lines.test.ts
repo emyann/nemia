@@ -10,8 +10,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import type { Engine } from 'agent-runtime';
 import { scratch } from './scratch.ts';
+import { promised } from './promised.ts';
 
 const ROOT = scratch('wf-pause-lines-');
 process.env.WF_ROOT = ROOT;
@@ -60,13 +60,13 @@ const aStart = (): string[] => {
 test('nemia feed opens with the pause while one stands, Paused with nothing at work, and says none once it is resumed', async (t) => {
   const pause = putPause({ why: 'merging by hand', by: 'ann' });
   try {
-    const feed = await printed(t, () => main(['feed'], {} as Engine));
+    const feed = await printed(t, () => main(['feed'], promised({})));
     assert.equal(feed[0], pausedWords({ pause, finishing: [] }), feed.join('\n'));
     assert.match(feed[0], /^Paused since /);
   } finally {
     resumePause();
   }
-  const lifted = await printed(t, () => main(['feed'], {} as Engine));
+  const lifted = await printed(t, () => main(['feed'], promised({})));
   assert.equal(
     lifted.some((l) => l.startsWith('Paus')),
     false,
@@ -78,14 +78,14 @@ test('nemia start says, after how to start the run, that nothing of it is filed 
   const pause = putPause({ by: 'ann' });
   let started: string[];
   try {
-    started = await printed(t, () => main(aStart(), {} as Engine));
+    started = await printed(t, () => main(aStart(), promised({})));
   } finally {
     resumePause();
   }
   const at = started.indexOf("run 'nemia tick' (or 'nemia up') to start it");
   assert.ok(at > 0, started.join('\n'));
   assert.equal(started[at + 1], `${pausedWords({ pause, finishing: [] })}: nothing of this run is filed until then`);
-  const free = await printed(t, () => main(aStart(), {} as Engine));
+  const free = await printed(t, () => main(aStart(), promised({})));
   assert.equal(
     free.some((l) => l.includes('nothing of this run is filed')),
     false,

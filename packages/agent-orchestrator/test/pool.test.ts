@@ -18,13 +18,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { checkArgv } from '../src/check/check.ts';
 import { scratch } from './scratch.ts';
+import { Effect } from 'effect';
 
 const ROOT = scratch('wf-pool-');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
-const { engine, tick } = await import('../src/runner.ts');
+const { engine, tickRun, runWith } = await import('../src/runner.ts');
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -114,7 +115,7 @@ const fileInOrder = async (t: TestContext, tasks: ReadonlyArray<readonly [string
   t.mock.timers.enable({ apis: ['Date'], now: Date.now() });
   try {
     for (const [id, harness] of tasks) {
-      await file(id, harness);
+      await Effect.runPromise(file(id, harness));
       t.mock.timers.tick(1);
     }
   } finally {
@@ -122,13 +123,13 @@ const fileInOrder = async (t: TestContext, tasks: ReadonlyArray<readonly [string
   }
 };
 
-const attempts = async (id: string) => (await e.view(id)).state.attempts.length;
+const attempts = async (id: string) => (await Effect.runPromise(e.view(id))).state.attempts.length;
 
 /** Until every task is `phase` — a detached worker publishes a moment after the pass spawns it. */
 const until = async (ids: string[], phase: string) => {
   const deadline = Date.now() + 15_000;
   for (;;) {
-    const phases = await Promise.all(ids.map(async (id) => (await e.view(id)).phase));
+    const phases = await Promise.all(ids.map(async (id) => (await Effect.runPromise(e.view(id))).phase));
     if (phases.every((p) => p === phase)) return;
     if (Date.now() > deadline) assert.fail(`never all ${phase}: ${ids.map((id, i) => `${id} ${phases[i]}`).join(', ')}`);
     await sleep(50);
@@ -137,11 +138,11 @@ const until = async (ids: string[], phase: string) => {
 
 /** Every task on the board stopped and settled, so the next case starts on an empty pool. */
 const drain = async () => {
-  for (const v of (await e.list()).views) if (!v.state.settled) await e.stop(v.id);
+  for (const v of (await Effect.runPromise(e.list())).views) if (!v.state.settled) await Effect.runPromise(e.stop(v.id));
   const deadline = Date.now() + 15_000;
-  while ((await e.list()).views.some((v) => !v.state.settled)) {
+  while ((await Effect.runPromise(e.list())).views.some((v) => !v.state.settled)) {
     assert.ok(Date.now() < deadline, 'the board drains');
-    await e.tick();
+    await Effect.runPromise(e.tick());
     await sleep(50);
   }
 };
@@ -152,10 +153,13 @@ test("REFUSED at shipped defaults: a claude-detached session counts against clau
       ['a1', 'claude-detached'],
       ['a2', 'claude'],
     ]);
-    await tick(e);
+    await runWith(e, tickRun());
     assert.equal((await attempts('a1')) + (await attempts('a2')), 0, 'admitted on this pass, started on the next');
-    assert.deepEqual([(await e.view('a1')).admission, (await e.view('a2')).admission], ['admitted', 'admitted']);
-    await tick(e);
+    assert.deepEqual(
+      [(await Effect.runPromise(e.view('a1'))).admission, (await Effect.runPromise(e.view('a2'))).admission],
+      ['admitted', 'admitted'],
+    );
+    await runWith(e, tickRun());
     await until(['a1', 'a2'], 'running (working)');
 
     await fileInOrder(t, [
@@ -165,28 +169,28 @@ test("REFUSED at shipped defaults: a claude-detached session counts against clau
       ['c2', 'codex'],
       ['c3', 'codex'],
     ]);
-    await tick(e);
-    await tick(e);
+    await runWith(e, tickRun());
+    await runWith(e, tickRun());
     assert.equal(await attempts('b1'), 0, 'a claude task waits: one claude and one claude-detached session fill the pool');
     assert.equal(await attempts('b2'), 0, 'and so does a claude-detached one');
-    assert.equal((await e.view('b1')).admission, 'queued');
+    assert.equal((await Effect.runPromise(e.view('b1'))).admission, 'queued');
     assert.equal((await attempts('c1')) + (await attempts('c2')), 2, 'codex is not counted in that pool');
     assert.equal(await attempts('c3'), 0, 'and has a ceiling of its own');
 
     fake.open('a1');
     await until(['a1'], 'running (done)');
-    await tick(e);
-    assert.equal((await e.view('a1')).state.settled, 'succeeded');
+    await runWith(e, tickRun());
+    assert.equal((await Effect.runPromise(e.view('a1'))).state.settled, 'succeeded');
     assert.equal(
-      (await e.view('b1')).admission,
+      (await Effect.runPromise(e.view('b1'))).admission,
       'admitted',
       "the claude-detached session ended, and the slot it freed is the pool's: b1, filed first, is admitted into it",
     );
     assert.equal(await attempts('b1'), 0, 'and starts a pass later');
-    await tick(e);
+    await runWith(e, tickRun());
     assert.equal(await attempts('b1'), 1, 'b1 took the slot');
     assert.equal(await attempts('b2'), 0, 'and the pool is full again');
-    assert.equal((await e.view('b2')).admission, 'queued');
+    assert.equal((await Effect.runPromise(e.view('b2'))).admission, 'queued');
   } finally {
     await drain();
   }
@@ -198,8 +202,8 @@ test('REFUSED at shipped defaults: a check keeps its own pool beside a full Clau
       ['p1', 'claude'],
       ['p2', 'claude-detached'],
     ]);
-    await tick(e);
-    await tick(e);
+    await runWith(e, tickRun());
+    await runWith(e, tickRun());
     await until(['p1', 'p2'], 'running (working)');
 
     await fileInOrder(t, [
@@ -208,8 +212,8 @@ test('REFUSED at shipped defaults: a check keeps its own pool beside a full Clau
       ['d2', 'check'],
       ['d3', 'check'],
     ]);
-    await tick(e);
-    await tick(e);
+    await runWith(e, tickRun());
+    await runWith(e, tickRun());
     assert.equal(await attempts('q1'), 0, 'the Claude Code pool is full');
     assert.equal((await attempts('d1')) + (await attempts('d2')), 2, 'a check is not counted in it');
     assert.equal(await attempts('d3'), 0, 'and has a ceiling of its own');
@@ -225,21 +229,24 @@ test("one pass — the runtime's tick, which admits — asks `claude agents` not
       ['s1', 's2', 's3', 's4'].map((id) => [id, 'claude'] as const),
     );
     const admitting = fake.agentsCalls();
-    const first = (await tick(e)).cost;
+    const first = (await runWith(e, tickRun())).cost;
     assert.equal(
       fake.agentsCalls() - admitting,
       0,
       'no `claude agents` for the pass that admits s1 and s2: an admission is a word to the journals, and nothing has started',
     );
-    assert.deepEqual([(await e.view('s1')).admission, (await e.view('s3')).admission], ['admitted', 'queued']);
+    assert.deepEqual(
+      [(await Effect.runPromise(e.view('s1'))).admission, (await Effect.runPromise(e.view('s3'))).admission],
+      ['admitted', 'queued'],
+    );
     assert.equal(first?.harnesses.claude?.calls, 1, 'and the meter counts the observe, which listed the jobs alone');
     assert.equal(first?.harnesses.claude?.spawned, 0);
-    await tick(e);
+    await runWith(e, tickRun());
     await until(['s1', 's2'], 'running (working)');
-    assert.equal((await e.view('s3')).admission, 'queued');
+    assert.equal((await Effect.runPromise(e.view('s3'))).admission, 'queued');
 
     const before = fake.agentsCalls();
-    const { cost } = await tick(e);
+    const { cost } = await runWith(e, tickRun());
     assert.equal(
       fake.agentsCalls() - before,
       0,
@@ -263,15 +270,19 @@ test('REFUSED: `WF_MAX_CONCURRENT=abc` refuses the pass, and the engine `engine(
   process.env.WF_MAX_CONCURRENT = 'abc';
   try {
     const refused = engine();
-    await refused.file({ id: 'r1', cwd, harness: 'claude', brief: 'r1' });
-    const err = await tick(refused).then(
+    await Effect.runPromise(refused.file({ id: 'r1', cwd, harness: 'claude', brief: 'r1' }));
+    const err = await runWith(refused, tickRun()).then(
       () => assert.fail('a pass under a ceiling that does not read resolved'),
       (x: unknown) => x as Error,
     );
     assert.match(err.message, /^WF_MAX_CONCURRENT=abc is not a count from 1/);
-    for (let i = 0; i < 2; i++) await refused.tick();
-    assert.equal((await refused.view('r1')).admission, 'queued', "the runtime's own passes admit nothing with no ceiling");
-    assert.equal((await refused.view('r1')).state.attempts.length, 0);
+    for (let i = 0; i < 2; i++) await Effect.runPromise(refused.tick());
+    assert.equal(
+      (await Effect.runPromise(refused.view('r1'))).admission,
+      'queued',
+      "the runtime's own passes admit nothing with no ceiling",
+    );
+    assert.equal((await Effect.runPromise(refused.view('r1'))).state.attempts.length, 0);
   } finally {
     delete process.env.WF_MAX_CONCURRENT;
     await drain();

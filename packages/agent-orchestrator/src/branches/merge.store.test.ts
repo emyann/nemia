@@ -9,10 +9,12 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
+import { promised } from '../../test/promised.ts';
 
 process.env.WF_ROOT = scratch('wf-merge-root-');
 const { mergesOnto, mergeWord } = await import('./merge.store.ts');
 const { MERGES } = await import('./merges.verb.ts');
+const { runWith } = await import('../runtime-client.ts');
 
 /** A repository on `main` with `src/a.ts`, and its git. */
 function repoOf() {
@@ -58,7 +60,7 @@ test("a branch git does not have is neither clean nor conflicted: it carries git
 });
 
 test("REFUSED: the merge check of a run the store does not have, in the store's words whole", async () => {
-  await assert.rejects(MERGES.handler({} as never, { runId: 'r-none', branches: ['wf/r-none/implement'] }), (err: Error) => {
+  await assert.rejects(runWith(promised({}), MERGES.handler({ runId: 'r-none', branches: ['wf/r-none/implement'] })), (err: Error) => {
     assert.equal(err.message, "no such run: r-none  (try 'nemia ls')");
     return true;
   });

@@ -8,8 +8,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import type { Engine } from 'agent-runtime';
 import { scratch } from './scratch.ts';
+import { promised } from './promised.ts';
 
 const ROOT = scratch('wf-former-keys-');
 process.env.WF_ROOT = ROOT;
@@ -25,7 +25,7 @@ const printedBy = async (t: Mock, argv: string[]): Promise<string[]> => {
     out.push(args.join(' '));
   });
   try {
-    await main(argv, {} as Engine);
+    await main(argv, promised({}));
   } finally {
     log.mock.restore();
   }

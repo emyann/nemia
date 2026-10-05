@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { RunDetail } from '../src/detail/detail.ts';
 import { app } from '../src/app.ts';
-import { start } from 'agent-orchestrator';
+import { runWith, startRun, engine } from 'agent-orchestrator';
 
 const WORKFLOWS = path.join(root, 'workflows');
 const AGENT = path.join(WORKFLOWS, 'agents', 'layered.md');
@@ -41,7 +41,7 @@ const detailOf = async (id: string): Promise<RunDetail> => {
 };
 
 test('each layer is answered as the run froze it: an edit of the agent, its custom instructions or the step since reaches none', async () => {
-  const run = start({ brief: 'Write a note.', repo: '', workflowDir: TEAM });
+  const run = await runWith(engine(), startRun({ brief: 'Write a note.', repo: '', workflowDir: TEAM }));
   fs.writeFileSync(AGENT, '---\ndescription: Use this to write.\n---\nYou are someone else now.\n');
   fs.writeFileSync(CUSTOM, 'Be verbose.\n');
   fs.writeFileSync(STEP, '---\nworkspace: folder\nagent: layered\n---\nWrite an essay.\n');

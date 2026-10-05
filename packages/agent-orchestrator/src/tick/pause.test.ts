@@ -19,6 +19,7 @@ import { Engine } from 'agent-runtime/effect';
 import type { Run } from '../run.ts';
 import type { Finishing } from '../pause/pause.ts';
 import { scratch } from '../../test/scratch.ts';
+import { Effect } from 'effect';
 
 const ROOT = scratch('wf-pause-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -27,10 +28,10 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_MAX_CONCURRENT = '10000';
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
-const { addToInbox, approve, queueInInbox, readInbox, retry, start } = await import('../runner.ts');
+const { addToInbox, approveRun, queueInInbox, readInbox, retryRun, startRun } = await import('../runner.ts');
 const { approvalFile, asksDir, readRun } = await import('../record/record.store.ts');
-const { tick, freshRestMemo } = await import('./tick.verb.ts');
-const { engineOf, storeAdmission } = await import('../runtime-client.ts');
+const { tickRun, freshRestMemo } = await import('./tick.verb.ts');
+const { engineOf, runWith, storeAdmission } = await import('../runtime-client.ts');
 const { resumePause, putPause } = await import('../pause/pause.store.ts');
 const { pauseNow } = await import('../pause/pause.verb.ts');
 const { pausedRead, runsListed } = await import('../list/list.verb.ts');
@@ -145,9 +146,9 @@ const h = engine();
 const REPO = aRepo();
 const MEMO = freshRestMemo();
 /** A pass as the daemon makes one, with the memo it keeps — or with none, as a restarted daemon's first pass. */
-const pass = (memo = MEMO) => tick(h.e, { repo: ROOT, memo, verifyRest: true });
-const begun = (workflowDir: string, more: Partial<Parameters<typeof start>[0]> = {}) =>
-  start({ brief: 'paused', repo: REPO, workflowDir, isolate: false, ...more });
+const pass = (memo = MEMO) => runWith(h.e, tickRun({ repo: ROOT, memo, verifyRest: true }));
+const begun = async (workflowDir: string, more: Partial<Parameters<typeof startRun>[0]> = {}) =>
+  await Effect.runPromise(startRun({ brief: 'paused', repo: REPO, workflowDir, isolate: false, ...more }));
 const taskOf = (run: Run, step: string): string | undefined => readRun(run.id).steps[step]?.taskId ?? undefined;
 
 const TWO = folder(['plan', 'work']);
@@ -175,17 +176,17 @@ const staged = (repo: string) => {
 };
 
 test('while the store is paused nothing new starts and what runs finishes; the pass after the lift files what waits', async () => {
-  const running = begun(TWO);
-  const checked = begun(CHECKED);
-  const refused = begun(ONE);
-  const gated = begun(TWO, { gates: ['plan'] });
-  const landing = begun(SHIP, { repo: LANDS, isolate: true });
+  const running = await begun(TWO);
+  const checked = await begun(CHECKED);
+  const refused = await begun(ONE);
+  const gated = await begun(TWO, { gates: ['plan'] });
+  const landing = await begun(SHIP, { repo: LANDS, isolate: true });
   for (let k = 0; k < 6; k++) {
     await pass();
     if (k === 0) worked(LANDS, readRun(landing.id).steps.work.branch!);
     h.signAll([running, checked], [refused]);
   }
-  await approve(h.e, landing.id, 'ship');
+  await runWith(h.e, approveRun(landing.id, 'ship'));
   for (let k = 0; k < 3; k++) await pass();
   assert.ok(taskOf(landing, 'ship'), "landing's ship at work as the pause is put");
   assert.ok(taskOf(running, 'plan') && taskOf(checked, 'work'), "running's plan and checked's work at work as the pause is put");
@@ -193,13 +194,13 @@ test('while the store is paused nothing new starts and what runs finishes; the p
   assert.equal(taskOf(refused, 'work'), `${refused.id}-work`, "refused's work signed blocked, on its first try");
   const queued = begun(ONE);
   await pass();
-  const queuedTask = taskOf(queued, 'work')!;
-  assert.equal((await h.e.view(queuedTask)).admission, 'queued', 'a task filed and not yet admitted');
+  const queuedTask = taskOf(await queued, 'work')!;
+  assert.equal((await Effect.runPromise(h.e.view(queuedTask))).admission, 'queued', 'a task filed and not yet admitted');
 
   const pause = putPause({ why: 'merging by hand', by: 'ann' });
   const born = begun(ONE);
-  await retry(h.e, refused.id, 'work', { mode: 'fresh' });
-  await approve(h.e, gated.id, 'plan');
+  await runWith(h.e, retryRun(refused.id, 'work', { mode: 'fresh' }));
+  await runWith(h.e, approveRun(gated.id, 'plan'));
   const { card } = addToInbox({ text: 'an idea queued meanwhile', workflow: ONE, repo: REPO });
   queueInInbox(card.name);
   const before = h.spawned.length;
@@ -222,9 +223,9 @@ test('while the store is paused nothing new starts and what runs finishes; the p
   );
   assert.match(pausedLines(first.pause!)[0], /^Pausing: 3 finishing/);
   assert.equal(first.queue, undefined, 'and started no queued card');
-  const listedAtWork = (await runsListed(h.e)).paused!;
+  const listedAtWork = (await runWith(h.e, runsListed())).paused!;
   assert.deepEqual(sorted(listedAtWork), { pause, finishing: atWork, staged: [] }, 'nemia ls names each task still finishing');
-  assert.deepEqual(sorted(await pausedRead(h.e)), sorted(listedAtWork), 'and the api reads the same');
+  assert.deepEqual(sorted(await runWith(h.e, pausedRead())), sorted(listedAtWork), 'and the api reads the same');
   h.signAll();
   await pass(freshRestMemo());
   await pass();
@@ -239,8 +240,8 @@ test('while the store is paused nothing new starts and what runs finishes; the p
   assert.match(pausedLines(last.pause)[0], /^Paused since /);
 
   assert.deepEqual(h.spawned.slice(before), [], 'no session started while the store is paused');
-  assert.equal((await h.e.view(queuedTask)).admission, 'queued', 'the queued task not admitted');
-  assert.equal((await h.e.view(taskOf(running, 'plan')!)).phase, 'succeeded', "running's plan finished");
+  assert.equal((await Effect.runPromise(h.e.view(queuedTask))).admission, 'queued', 'the queued task not admitted');
+  assert.equal((await Effect.runPromise(h.e.view(taskOf(running, 'plan')!))).phase, 'succeeded', "running's plan finished");
   assert.equal(taskOf(running, 'work'), undefined, "running's work, ready, not filed");
   assert.equal(readRun(checked.id).steps.work?.check, undefined, "checked's work signed, its check not filed");
   assert.equal(taskOf(refused, 'work'), `${refused.id}-work`, "refused's try asked, not filed");
@@ -251,19 +252,19 @@ test('while the store is paused nothing new starts and what runs finishes; the p
   );
   assert.ok(fs.existsSync(approvalFile(gated.id, 'plan', 1)), "gated's approval kept");
   assert.equal(taskOf(gated, 'work'), undefined, "gated's work not filed on it");
-  assert.equal(taskOf(born, 'work'), undefined, 'nothing filed of the run started while paused');
+  assert.equal(taskOf(await born, 'work'), undefined, 'nothing filed of the run started while paused');
   assert.equal(last.queue, undefined, 'no queued card started');
   assert.equal(readInbox().find((l) => l.name === card.name)?.tried, undefined, 'nor tried');
   assert.ok(!('pause' in JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${running.id}.json`), 'utf8'))), 'no record holds the pause');
 
-  const listed = await runsListed(h.e);
+  const listed = await runWith(h.e, runsListed());
   assert.deepEqual(
     listed.paused,
     { pause, finishing: [], staged: held },
     'nemia ls names the pause, and the landing whose merge it holds staged in the checkout, its check not filed',
   );
   assert.equal(readRun(landing.id).steps.ship?.check, undefined);
-  assert.deepEqual(await pausedRead(h.e), listed.paused, 'and the api reads the same');
+  assert.deepEqual(await runWith(h.e, pausedRead()), listed.paused, 'and the api reads the same');
   const ls = COMMANDS.find((c) => c.name === 'ls')!;
   assert.deepEqual(ls.print(listed, {}).slice(0, 2), pausedLines(listed.paused), 'nemia ls says it first');
 
@@ -288,14 +289,14 @@ test('while the store is paused nothing new starts and what runs finishes; the p
   assert.ok(readRun(checked.id).steps.work?.check, "checked's check filed");
   assert.equal(taskOf(refused, 'work'), `${refused.id}-work-try2`, "refused's try filed");
   assert.ok(taskOf(gated, 'work'), "gated's work filed on the approval");
-  assert.ok(taskOf(born, 'work'), 'the run started while paused filed');
+  assert.ok(taskOf(await born, 'work'), 'the run started while paused filed');
   assert.ok(lifted.queue, 'the queued card tried');
   assert.ok(readRun(landing.id).steps.ship?.check, "landing's check filed");
-  assert.equal((await runsListed(h.e)).paused, undefined, 'and nemia ls says no pause');
-  assert.deepEqual(await pausedRead(h.e), { pause: null, finishing: [], staged: [] });
+  assert.equal((await runWith(h.e, runsListed())).paused, undefined, 'and nemia ls says no pause');
+  assert.deepEqual(await runWith(h.e, pausedRead()), { pause: null, finishing: [], staged: [] });
   await pass();
   assert.ok(h.spawned.length > before, 'and sessions started again');
-  assert.notEqual((await h.e.view(queuedTask)).admission, 'queued', 'the queued task admitted');
+  assert.notEqual((await Effect.runPromise(h.e.view(queuedTask))).admission, 'queued', 'the queued task admitted');
 });
 
 test('a pause at once stops each session and check at work but a landing, and the resume continues each; one that ended first is not tried', async () => {
@@ -304,21 +305,24 @@ test('a pause at once stops each session and check at work but a landing, and th
     await pass();
   }
   const lands = aRepo();
-  const session = begun(ONE);
-  const checking = begun(CHECKED);
-  const ended = begun(ONE);
-  const landing = begun(SHIP, { repo: lands, isolate: true });
+  const session = await begun(ONE);
+  const checking = await begun(CHECKED);
+  const ended = await begun(ONE);
+  const landing = await begun(SHIP, { repo: lands, isolate: true });
   await pass();
   worked(lands, readRun(landing.id).steps.work.branch!);
   await pass();
   await pass();
   h.signAll([session, ended]);
   for (let k = 0; k < 3; k++) await pass();
-  await approve(h.e, landing.id, 'ship');
+  await runWith(h.e, approveRun(landing.id, 'ship'));
   for (let k = 0; k < 3; k++) await pass();
   const sessionTask = taskOf(session, 'work')!;
   const checkTask = readRun(checking.id).steps.work?.check?.taskId;
-  assert.ok(checkTask && (await h.e.view(checkTask)).phase.startsWith('running'), "checking's check runs as the pause is put");
+  assert.ok(
+    checkTask && (await Effect.runPromise(h.e.view(checkTask))).phase.startsWith('running'),
+    "checking's check runs as the pause is put",
+  );
   assert.ok(taskOf(landing, 'ship'), "landing's ship at work as the pause is put");
   const before = h.spawned.length;
 
@@ -326,16 +330,17 @@ test('a pause at once stops each session and check at work but a landing, and th
   const racing = new Proxy(h.e, {
     get: (target, key) =>
       key === 'stop'
-        ? async (taskId: string) => {
-            if (taskId === endedTask) {
-              h.signAll([session, checking, landing]);
-              await pass();
-            }
-            return target.stop(taskId);
-          }
+        ? (taskId: string) =>
+            Effect.gen(function* () {
+              if (taskId === endedTask) {
+                h.signAll([session, checking, landing]);
+                yield* Effect.promise(() => pass());
+              }
+              return yield* target.stop(taskId);
+            })
         : Reflect.get(target, key),
   });
-  const now = await pauseNow(racing, { why: 'the bill', by: 'ann' });
+  const now = await runWith(racing, pauseNow({ why: 'the bill', by: 'ann' }));
   const mine = (i: { run: string }) => [session.id, checking.id, ended.id, landing.id].includes(i.run);
   assert.deepEqual(
     now.interrupted
@@ -346,10 +351,10 @@ test('a pause at once stops each session and check at work but a landing, and th
     'the landing is left to finish',
   );
   for (let k = 0; k < 3; k++) await pass();
-  assert.equal((await h.e.view(sessionTask)).phase, 'stopped');
-  assert.equal((await h.e.view(checkTask)).phase, 'stopped');
-  assert.equal((await h.e.view(endedTask)).phase, 'succeeded', 'a session that ended before its stop was taken');
-  assert.notEqual((await h.e.view(taskOf(landing, 'ship')!)).phase, 'stopped', 'the landing finishes');
+  assert.equal((await Effect.runPromise(h.e.view(sessionTask))).phase, 'stopped');
+  assert.equal((await Effect.runPromise(h.e.view(checkTask))).phase, 'stopped');
+  assert.equal((await Effect.runPromise(h.e.view(endedTask))).phase, 'succeeded', 'a session that ended before its stop was taken');
+  assert.notEqual((await Effect.runPromise(h.e.view(taskOf(landing, 'ship')!))).phase, 'stopped', 'the landing finishes');
   assert.deepEqual(
     fs.readdirSync(asksDir(landing.id)).filter((f) => f.startsWith('retry-')),
     [],
@@ -370,8 +375,12 @@ test('a pause at once stops each session and check at work but a landing, and th
   const resumed = readRun(session.id).steps.work;
   assert.notEqual(resumed.taskId, sessionTask, "session's try 2 filed");
   assert.deepEqual(resumed.tries, [{ taskId: sessionTask, then: 'nudge', paused: true }]);
-  const stoppedAttempt = (await h.e.view(sessionTask)).state.attempts.at(-1)!;
-  assert.equal((await h.e.view(resumed.taskId!)).state.resumeFrom, stoppedAttempt.nativeId, 'continuing the session it stopped');
+  const stoppedAttempt = (await Effect.runPromise(h.e.view(sessionTask))).state.attempts.at(-1)!;
+  assert.equal(
+    (await Effect.runPromise(h.e.view(resumed.taskId!))).state.resumeFrom,
+    stoppedAttempt.nativeId,
+    'continuing the session it stopped',
+  );
   const rechecked = readRun(checking.id).steps.work;
   assert.notEqual(rechecked.check?.taskId, checkTask, "checking's check filed again");
   assert.deepEqual(rechecked.tries?.at(-1), { taskId: rechecked.taskId, check: { taskId: checkTask }, then: 'recheck', paused: true });

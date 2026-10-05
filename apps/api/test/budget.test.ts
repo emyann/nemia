@@ -18,15 +18,16 @@ import { app } from '../src/app.ts';
 import {
   askFile,
   budgetRefusal,
-  decide,
+  decideRun,
   engine,
   list,
-  retry,
-  round,
+  retryRun,
   roundAskFile,
-  usedLines,
+  roundRun,
   runStore,
+  runWith,
   type RunSummary,
+  usedLines,
 } from 'agent-orchestrator';
 
 type RetryHow = import('agent-orchestrator').RetryHow;
@@ -254,20 +255,20 @@ const nothingWritten = (why: string) => {
   assert.equal(fs.readFileSync(recordFile, 'utf8'), record, `the run's record untouched: ${why}`);
 };
 
-/** What the package's `retry()` refuses `how` for, word for word, given the harness's word as `nemia retry` gives it. */
+/** What the package's `retryRun` refuses `how` for, word for word, given the harness's word as `nemia retry` gives it. */
 const retryRefuses = async (step: string, how: RetryHow, run = R): Promise<string> => {
   try {
-    await retry(engine(), run, step, how, { stopBlocked: true });
+    await runWith(engine(), retryRun(run, step, how, { stopBlocked: true }));
   } catch (err) {
     return (err as Error).message;
   }
   return assert.fail(`retry() asked for ${step} (${JSON.stringify(how)}), and should have refused`);
 };
 
-/** What the package's `round()` refuses, word for word: what `nemia round` prints. */
+/** What the package's `roundRun` refuses, word for word: what `nemia round` prints. */
 const roundRefuses = async (step: string | undefined, budget: number | undefined): Promise<string> => {
   try {
-    await round(engine(), R, step, budget);
+    await runWith(engine(), roundRun(R, step, budget));
   } catch (err) {
     return (err as Error).message;
   }
@@ -335,7 +336,7 @@ test("a measured try's cost is on the detail — the engine's costUsd, apiMs and
   );
   assert.equal(stepOf(run, 'implement').spent?.said, '$2.10');
 
-  const words = await list(engine(), runStore.runs.read(R));
+  const words = await runWith(engine(), list(engine(), runStore.runs.read(R)));
   assert.ok(run.cost);
   const { usd, ...total } = run.cost;
   assert.deepEqual(
@@ -367,11 +368,15 @@ test("a measured try's cost is on the detail — the engine's costUsd, apiMs and
     { usd: 5, said: '$5', of: null, over: false },
     'its cap is there, and what it cost of it is not known: no of',
   );
-  assert.equal((await list(engine(), runStore.runs.read(FREE))).cost, undefined, '`nemia ls` prints no cost for it either');
+  assert.equal(
+    (await runWith(engine(), list(engine(), runStore.runs.read(FREE)))).cost,
+    undefined,
+    '`nemia ls` prints no cost for it either',
+  );
 });
 
 test("a step over its budget, on the list and on the detail, in `nemia ls`'s words — waiting on you, and moving nothing — with its cap, what it has cost of it, and the raise the package takes", async () => {
-  const words = await list(engine(), runStore.runs.read(R));
+  const words = await runWith(engine(), list(engine(), runStore.runs.read(R)));
   const listed = await summary();
   const statuses = ['over budget $2.10 of $2', 'over budget — implement $2.10 of $2', 'over budget $4.25 of $3'];
   assert.deepEqual(
@@ -413,7 +418,7 @@ test("a step over its budget, on the list and on the detail, in `nemia ls`'s wor
 });
 
 test("the decision says what `nemia decide` says of steps held on their budget — the OVER BUDGET line, the run's cost — and offers the raise, a try's and a round's", async () => {
-  const said = await decide(engine(), R);
+  const said = await runWith(engine(), decideRun(R));
   const res = await app.request(`/api/runs/${R}/decision`);
   assert.equal(res.status, 200);
   const body = (await res.json()) as RunDecision;
@@ -444,7 +449,7 @@ test("REFUSED once pruned: steps over their budget are offered no raise — the 
   const pruned = { at: '2026-09-15T07:00:00.000Z', worktrees: [] };
   write(marker, JSON.stringify(pruned));
   try {
-    const said = await decide(engine(), R);
+    const said = await runWith(engine(), decideRun(R));
     const body = await decision();
     assert.ok('overBudget' in body, JSON.stringify(body));
     assert.equal(body.overBudget, said.overBudgetLine, 'one function says it, for `nemia decide` and for the board');
@@ -510,7 +515,7 @@ test("REFUSED at shipped defaults: a try's budget that is not an amount — 0, b
     assert.equal(res.status, 400, String(budget));
     const { error } = (await res.json()) as Refused;
     assert.equal(error, budgetRefusal(how, command));
-    assert.equal(error, await retryRefuses('tokens', how), 'and the sentence `retry()` refuses it with');
+    assert.equal(error, await retryRefuses('tokens', how), 'and the sentence `retryRun` refuses it with');
     assert.ok(error.startsWith(`--budget ${budget} is not an amount.`), error);
   }
   for (const budget of ['five', '5', null]) {
@@ -619,7 +624,7 @@ test("a raise as the board sends it is the package's ask: a try's and a round's,
   assert.ok(!Number.isNaN(Date.parse(roundWhen)), roundWhen);
   assert.equal(fs.readFileSync(recordFile, 'utf8'), record, "the api wrote nothing of the run's record");
 
-  const words = await list(engine(), runStore.runs.read(R));
+  const words = await runWith(engine(), list(engine(), runStore.runs.read(R)));
   const run = await detail();
   assert.deepEqual(
     run.steps.map(({ name, note }) => ({ name, note })),
@@ -646,7 +651,7 @@ test('a step past its budget on its own work is raised as `nemia decide` offers 
   assert.deepEqual(lint.raise, { by: 'retry', above: 1.2, said: '$1.20', modes: ['nudge', 'fresh', 'recheck'], own: 'failed (check)' });
   assert.equal(palette.needs, PALETTE_NEEDS, "its question is still the closeout's");
   assert.equal(
-    (await decide(engine(), R2)).answering.palette,
+    (await runWith(engine(), decideRun(R2))).answering.palette,
     `to answer it, its cap raised above $1.50:  nemia retry ${R2} palette --budget <amount> --message "<answer>"`,
     'nemia decide answers it with the raise and the answer on one ask',
   );
@@ -690,7 +695,7 @@ test('a step past its budget on its own work is raised as `nemia decide` offers 
     'a refused check past its budget, run again: no budget, since a recheck files no session to spend it',
   );
 
-  const words = await list(engine(), runStore.runs.read(R2));
+  const words = await runWith(engine(), list(engine(), runStore.runs.read(R2)));
   const after = await detail(R2);
   assert.deepEqual(
     after.steps.map(({ name, note }) => ({ name, note })),

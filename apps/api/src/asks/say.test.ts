@@ -1,5 +1,5 @@
 /**
- * A person's words to a step's running session over HTTP: POST /api/runs/:id/steps/:step/say, which calls the package's `say()` —
+ * A person's words to a step's running session over HTTP: POST /api/runs/:id/steps/:step/say, which calls the package's `sayRun` —
  * `nemia say`'s own — and the `said` on the step's detail, read back off the engine's journal.
  *
  * At shipped defaults: the api's own engine over a store this file seeds; the harness's fake `claude` (test/harness.ts) first on PATH,
@@ -15,6 +15,7 @@
 import { config, registry, root } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { Effect } from 'effect';
 import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
@@ -23,7 +24,7 @@ import { scratch } from '../../test/scratch.ts';
 import type { Said } from 'agent-orchestrator';
 import type { RunDetail } from '../detail/detail.ts';
 import { app } from '../app.ts';
-import { engine, list, say, runStore, type RunSummary } from 'agent-orchestrator';
+import { engine, list, runStore, runWith, sayRun, type RunSummary } from 'agent-orchestrator';
 
 const tmp = (label: string) => scratch(`nemia-api-say-${label}-`);
 
@@ -152,10 +153,10 @@ const written = () =>
     ),
   );
 
-/** What the package's `say()` refuses the words for, word for word: what `nemia say` prints. */
+/** What the package's `sayRun` refuses the words for, word for word: what `nemia say` prints. */
 const sayRefuses = async (step: string, text: string, run = R): Promise<string> => {
   try {
-    await say(engine(), run, step, text);
+    await runWith(engine(), sayRun(run, step, text));
   } catch (err) {
     return (err as Error).message;
   }
@@ -255,7 +256,7 @@ test("words the harness could not be given come back in the engine's words, 502 
   assert.deepEqual(written(), before, 'nothing written');
 });
 
-test("words as the board sends them are the package's `say`: 202 with the engine's entry — `at`, `attempt`, `text` — the words on the session's inbox as given, the entry on the task's journal, and on the step's detail and in its note, as `nemia ls` words it; nothing else written", async () => {
+test("words as the board sends them are the package's `sayRun`: 202 with the engine's entry — `at`, `attempt`, `text` — the words on the session's inbox as given, the entry on the task's journal, and on the step's detail and in its note, as `nemia ls` words it; nothing else written", async () => {
   const records = Object.fromEntries(Object.entries(written()).filter(([file]) => !file.startsWith(tasksDir)));
   const words = 'Widen the scope to apps/api too.\n\nAnd keep `--flag` as it is.';
   const res = await sayTo('implement', { text: words });
@@ -270,7 +271,7 @@ test("words as the board sends them are the package's `say`: 202 with the engine
     [{ type: 'user', session_id: implementSession, message: { role: 'user', content: words } }],
     'the words on the inbox, as given',
   );
-  assert.deepEqual((await engine().view('t-implement')).state.said, [said], "the engine's journal of the task");
+  assert.deepEqual((await Effect.runPromise(engine().view('t-implement'))).state.said, [said], "the engine's journal of the task");
   assert.deepEqual(
     JSON.parse(fs.readFileSync(journalFile('t-implement'), 'utf8').trim().split('\n').at(-1)!),
     { kind: 'said', ...said },
@@ -282,7 +283,7 @@ test("words as the board sends them are the package's `say`: 202 with the engine
   for (const other of steps.filter((s) => s.name !== 'implement'))
     assert.deepEqual(other.said, [], `${other.name}: nobody told it anything`);
   assert.equal(
-    (await list(engine(), runStore.runs.read(R))).steps.find((s) => s.name === 'implement')!.note,
+    (await runWith(engine(), list(engine(), runStore.runs.read(R)))).steps.find((s) => s.name === 'implement')!.note,
     'said to 1×',
     "`nemia ls`'s words",
   );

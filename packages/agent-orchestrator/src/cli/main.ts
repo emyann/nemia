@@ -28,7 +28,8 @@ import {
   summaryLine,
   takeoverLine,
   runMain,
-  tick,
+  tickRun,
+  runWith,
   up,
   waitWord,
   watchFeed,
@@ -73,7 +74,7 @@ export const watching = (from: number): Effect.Effect<never, unknown> =>
   ).pipe(Effect.andThen(Effect.never), Effect.scoped);
 
 /** What one pass of the tick hands back: each run it advanced, the queue's card, the feed's failure, its cost, and what it refused. */
-type Pass = Awaited<ReturnType<typeof tick>>;
+type Pass = Effect.Success<ReturnType<typeof tickRun>>;
 
 /** A run's line on `nemia tick`: its status and what the pass did to it, then its notes, a line each. */
 function tickRunLines(r: Pass['runs'][number]): void {
@@ -111,7 +112,7 @@ async function tickVerb(args: Args, e: Engine): Promise<void> {
   const stats = args.stats === true;
   const held = storeRefusal('tick');
   if (held) throw new Conflict({ message: stats ? `${held} What its last pass cost is read without a pass: nemia up --stats.` : held });
-  const { cost } = tickLines(await tick(e, { repo: path.resolve('.') }));
+  const { cost } = tickLines(await runWith(e, tickRun({ repo: path.resolve('.') })));
   if (stats) for (const line of cost ? breakdownLines(cost) : ['this pass was not measured']) console.log(line);
   return;
 }
@@ -275,7 +276,7 @@ async function commanded(command: Command | Ran, rest: string[], e: Engine): Pro
   if (wrong) usage(wrong);
   const runner = RUNS.get(command.name);
   if (runner || command.handler === undefined) return runner!(args, e);
-  const data = await command.handler(e, args);
+  const data = await runWith(e, command.handler(args));
   for (const line of command.print(data, args)) console.log(line);
   for (const line of command.note?.(data, args) ?? []) console.error(line);
 }

@@ -6,9 +6,10 @@
  * lists, never by a path made of its id, and a file by its name, never by a path. The api resolves the task a request names, words the
  * answer for what is not there, and judges what it is handed.
  */
-import type { Engine } from '../runtime-client.ts';
+import { Effect } from 'effect';
+import { EngineService, asked, tried, type Engine } from '../runtime-client.ts';
 import type { Args, Flag, Positional, Spec } from './command.ts';
-import type { Command } from './entry.verb.ts';
+import type { Command, Kept } from './entry.verb.ts';
 import { artifactFile, fileIn } from '../artifacts/artifacts.store.ts';
 import { runStore } from '../record/files.store.ts';
 import { isGitRun, type Run } from '../record/record.ts';
@@ -55,7 +56,7 @@ export const RUN: Command<{ run: Run | null }> = {
     side: 'api',
     why: "the board's run page is a run judged, with its steps and their files; at the command line, nemia show reads its record",
   },
-  handler: async (_e, args) => ({ run: runOf(args) ?? null }),
+  handler: (args) => tried(() => ({ run: runOf(args) ?? null })),
   print: () => [],
 };
 
@@ -74,13 +75,14 @@ export const RUNS: Command<RunSummary[]> = {
     side: 'api',
     why: "the board's list is every run judged into a summary, kept between its polls while the run rests; the command line prints each run's lines",
   },
-  handler: (e, _args, env, home, kept) =>
-    runsSummarized(e, {
+  handler: Effect.fnUntraced(function* (_args: Args, env?: NodeJS.ProcessEnv, home?: string, kept?: Kept) {
+    return yield* runsSummarized(yield* EngineService, {
       home: home ?? HOME,
       memo: kept?.runs ?? restingMemo(),
       filings: kept?.filings ?? { filed: new Map(), cursor: 0 },
       verify: env ? verifiesRest(env) : false,
-    }),
+    });
+  }),
   print: () => [],
 };
 
@@ -93,10 +95,11 @@ export const STEP_ARTIFACT: Command<{ file: Buffer | null }> = {
   writes: false,
   route: { method: 'GET', path: '/api/runs/:id/steps/:step/artifacts/:name', status: 200 },
   only: { side: 'api', why: "the board links each file a step's closeout named; at the command line a person opens the file" },
-  handler: async (_e, args) => {
-    const run = runOf(args);
-    return { file: run ? artifactFile(run, textOf(args, 'step') ?? '', textOf(args, 'name') ?? '') : null };
-  },
+  handler: (args) =>
+    tried(() => {
+      const run = runOf(args);
+      return { file: run ? artifactFile(run, textOf(args, 'step') ?? '', textOf(args, 'name') ?? '') : null };
+    }),
   print: () => [],
 };
 
@@ -112,16 +115,17 @@ export const STEP_FILE: Command<{ folder: string | null; file: Buffer | null }> 
   writes: false,
   route: { method: 'GET', path: '/api/runs/:id/steps/:step/files/:name', status: 200 },
   only: { side: 'api', why: "the board links each file a folder step's folder holds; at the command line a person opens the folder" },
-  handler: async (_e, args) => {
-    const run = runOf(args);
-    const folder = run && !isGitRun(run) ? (run.steps[textOf(args, 'step') ?? '']?.workspace ?? null) : null;
-    return { folder, file: folder === null ? null : fileIn(folder, textOf(args, 'name') ?? '') };
-  },
+  handler: (args) =>
+    tried(() => {
+      const run = runOf(args);
+      const folder = run && !isGitRun(run) ? (run.steps[textOf(args, 'step') ?? '']?.workspace ?? null) : null;
+      return { folder, file: folder === null ? null : fileIn(folder, textOf(args, 'name') ?? '') };
+    }),
   print: () => [],
 };
 
 /** One state of a task's path through the runtime's lifecycle, as the engine's `path` answers it. */
-export type LifecycleStep = Awaited<ReturnType<Engine['path']>>[number];
+export type LifecycleStep = Effect.Success<ReturnType<Engine['path']>>[number];
 
 /** The path through the runtime's lifecycle of the task `task` — a try of the step `step` of the run `id`, as the api resolved it. */
 export const STEP_PATH: Command<{ path: LifecycleStep[] }> = {
@@ -132,12 +136,15 @@ export const STEP_PATH: Command<{ path: LifecycleStep[] }> = {
   writes: false,
   route: { method: 'GET', path: '/api/runs/:id/steps/:step/path', status: 200 },
   only: { side: 'api', why: "the board draws each try of a step on the lifecycle's diagram; at the command line, nemia ls says its state" },
-  handler: async (e, args) => ({ path: [...(await e.path(textOf(args, 'task') ?? ''))] }),
+  handler: Effect.fnUntraced(function* (args: Args) {
+    const e = yield* EngineService;
+    return { path: [...(yield* asked('path', e.path(textOf(args, 'task') ?? '')))] };
+  }),
   print: () => [],
 };
 
 /** One event of a task's conversation, as the engine's `transcript` answers it. */
-export type ConversationEvent = Awaited<ReturnType<Engine['transcript']>>['events'][number];
+export type ConversationEvent = Effect.Success<ReturnType<Engine['transcript']>>['events'][number];
 
 /**
  * One read of the conversation of the task `task` — the current one of the step `step` of the run `id`, as the api resolved it — from
@@ -154,10 +161,11 @@ export const STEP_TRANSCRIPT: Command<{ events: ConversationEvent[]; cursor: str
     side: 'api',
     why: "the board reads a step's conversation as it goes; at the command line, nemia logs reads what its session printed",
   },
-  handler: async (e, args) => {
-    const { events, cursor } = await e.transcript(textOf(args, 'task') ?? '', textOf(args, 'after'));
+  handler: Effect.fnUntraced(function* (args: Args) {
+    const e = yield* EngineService;
+    const { events, cursor } = yield* asked('transcript', e.transcript(textOf(args, 'task') ?? '', textOf(args, 'after')));
     return { events: [...events], cursor };
-  },
+  }),
   print: () => [],
 };
 

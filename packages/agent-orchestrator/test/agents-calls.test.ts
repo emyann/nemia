@@ -16,6 +16,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { scratch } from './scratch.ts';
+import { Effect } from 'effect';
 
 const ROOT = scratch('wf-agents-calls-');
 process.env.WF_ROOT = ROOT;
@@ -23,7 +24,7 @@ process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
 process.env.CLAUDE_CONFIG_DIR = scratch('wf-agents-calls-config-');
-const { engine, start, tick } = await import('../src/runner.ts');
+const { engine, startRun, tickRun, runWith } = await import('../src/runner.ts');
 const { readRun } = await import('../src/record/record.store.ts');
 const { freshRestMemo } = await import('../src/tick/tick.verb.ts');
 
@@ -91,7 +92,7 @@ if (args[0] === 'agents') {
 const fake = fakes();
 let e = engine();
 let memo = freshRestMemo();
-const pass = () => tick(e, { repo: ROOT, memo });
+const pass = () => runWith(e, tickRun({ repo: ROOT, memo }));
 
 /** The task a run's one step is filed as. */
 const taskOf = (runId: string) => readRun(runId).steps.work.taskId!;
@@ -102,7 +103,7 @@ const atWork = async (runId: string) => {
   for (;;) {
     await pass();
     const taskId = readRun(runId).steps.work?.taskId;
-    if (taskId && (await e.view(taskId)).phase === 'running (working)') return taskId;
+    if (taskId && (await Effect.runPromise(e.view(taskId))).phase === 'running (working)') return taskId;
     if (Date.now() > deadline) assert.fail(`${runId}'s step never came to work`);
     await new Promise((r) => setTimeout(r, 50));
   }
@@ -115,8 +116,8 @@ const counted = async () => {
   return { calls: fake.agentsCalls() - before, done };
 };
 
-const jobRun = start({ brief: 'a job', repo: REPO, workflowDir: folder() });
-let bgRun: ReturnType<typeof start>;
+const jobRun = await Effect.runPromise(startRun({ brief: 'a job', repo: REPO, workflowDir: folder() }));
+let bgRun: Effect.Success<ReturnType<typeof startRun>>;
 
 /** What the pass judged of a run. */
 const advanced = (done: Awaited<ReturnType<typeof pass>>, runId: string) => done.runs.find((r) => r.run.id === runId);
@@ -135,7 +136,7 @@ test('a pass with claude jobs in flight and no background session asks `claude a
 });
 
 test('a pass with one background session in flight asks `claude agents` once, beside a job — advance adds no observe of its own', async () => {
-  bgRun = start({ brief: 'a background session', repo: REPO, workflowDir: folder('background: true\n') });
+  bgRun = await Effect.runPromise(startRun({ brief: 'a background session', repo: REPO, workflowDir: folder('background: true\n') }));
   const bg = await atWork(bgRun.id);
   const { calls, done } = await counted();
   assert.equal(calls, 1, "one `claude agents` for the runtime's observe, and none for the step advance reads");
@@ -146,7 +147,7 @@ test('a pass with one background session in flight asks `claude agents` once, be
       'both runs in flight, each step read',
     );
   assert.equal(done.cost?.harnesses.claude?.spawned, 1);
-  assert.equal((await e.view(bg)).phase, 'running (working)');
+  assert.equal((await Effect.runPromise(e.view(bg))).phase, 'running (working)');
 });
 
 test('a background session left running across a restart is observed on the first pass of a fresh engine, and read at work', async () => {
@@ -155,18 +156,18 @@ test('a background session left running across a restart is observed on the firs
   memo = freshRestMemo();
   const { calls, done } = await counted();
   assert.equal(calls, 1, 'a fresh engine remembers no session it spawned: the journal names the session, and the registry is asked for it');
-  assert.equal((await e.view(bg)).phase, 'running (working)', 'at work, as the registry lists it — not lost');
+  assert.equal((await Effect.runPromise(e.view(bg))).phase, 'running (working)', 'at work, as the registry lists it — not lost');
   assert.equal(advanced(done, bgRun.id)?.status, 'running');
-  assert.equal((await e.view(taskOf(jobRun.id))).phase, 'running (working)', 'and the job, off its run file');
+  assert.equal((await Effect.runPromise(e.view(taskOf(jobRun.id)))).phase, 'running (working)', 'and the job, off its run file');
 });
 
 test('the board drains', async () => {
   fake.end();
-  for (const id of [taskOf(jobRun.id), taskOf(bgRun.id)]) await e.stop(id);
+  for (const id of [taskOf(jobRun.id), taskOf(bgRun.id)]) await Effect.runPromise(e.stop(id));
   const deadline = Date.now() + 20_000;
-  while ((await e.list()).views.some((v) => !v.state.settled)) {
+  while ((await Effect.runPromise(e.list())).views.some((v) => !v.state.settled)) {
     assert.ok(Date.now() < deadline, 'every task settles');
-    await e.tick();
+    await Effect.runPromise(e.tick());
     await new Promise((r) => setTimeout(r, 50));
   }
 });

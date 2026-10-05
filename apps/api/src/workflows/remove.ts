@@ -8,7 +8,7 @@
  */
 import { Schema } from 'effect';
 import { Hono } from 'hono';
-import { COMMANDS } from 'agent-orchestrator';
+import { COMMANDS, runWith } from 'agent-orchestrator';
 import { readBody, valueAt } from '../body.ts';
 import { refusedBeforeReading } from '../guard.ts';
 import { type ApiEnv, served } from '../layer.ts';
@@ -59,6 +59,6 @@ export const remover = new Hono<ApiEnv>().delete('/api/workflows/:from/:name', (
     if ('status' in folder) return c.json({ error: folder.error }, folder.status);
     const now = versionOf(folder.dir, placesOf(repo, home));
     if (now !== read.body.version) return c.json({ error: staleWords(folder.dir, read.body.version, now) }, 409);
-    return c.json(await REMOVE.handler(e, { from, name, dir: folder.dir, repo }, undefined, home));
+    return c.json(await runWith(e, REMOVE.handler({ from, name, dir: folder.dir, repo }, undefined, home)));
   }),
 );

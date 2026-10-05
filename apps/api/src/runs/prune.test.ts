@@ -20,7 +20,7 @@ import path from 'node:path';
 import type { Pruning } from 'agent-orchestrator';
 import type { RunDetail } from '../detail/detail.ts';
 import { app } from '../app.ts';
-import { engine, prune, prunedKept, prunedWords, runStore, type RunSummary } from 'agent-orchestrator';
+import { engine, prune, prunedKept, prunedWords, runStore, runWith, type RunSummary } from 'agent-orchestrator';
 
 const git = (...args: string[]) =>
   execFileSync(
@@ -198,7 +198,7 @@ const stateOf = (id: string) => ({
 const hasBranch = (branch: string) => git('branch', '--list', branch).trim() !== '';
 
 /** What `nemia prune` says, without `--yes`, of the same run with the same switches: the words a refusal on the board must be. */
-const packageSays = async (id: string, how: { artifacts?: boolean; unmerged?: boolean } = {}) => prune(engine(), id, how);
+const packageSays = async (id: string, how: { artifacts?: boolean; unmerged?: boolean } = {}) => runWith(engine(), prune(id, how));
 
 test("the decision's `awaiting` is what `nemia prune` refuses without `--unmerged`: a run nobody merged, and one that worked on its base branch itself, whatever its outcome — never a failed run merged by hand", async () => {
   const awaiting = new Map<string, unknown>();
@@ -325,6 +325,7 @@ test('REFUSED at shipped defaults: a run not over is a 409 in the words of `nemi
 
 test('REFUSED at shipped defaults: a folder run is a 409 in the words of `nemia prune`, and its folder stays', async () => {
   const said = await packageSays('p-folder', { artifacts: true, unmerged: true });
+  assert.equal(said.kind, 'refused');
   const res = await pruneOn('p-folder', { artifacts: true, unmerged: true });
   assert.equal(res.status, 409);
   const { error } = (await res.json()) as { error: string };

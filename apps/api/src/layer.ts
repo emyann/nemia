@@ -95,7 +95,8 @@ export const POLL_READS = Metric.histogram('api.poll.reads', {
 });
 
 /** The files the engine has read so far, its journals among them, or none for an engine that keeps no count (a test's fake). */
-const readsOf = (e: Engine['Service']): number | undefined => (typeof e.io === 'function' ? e.io().reads : undefined);
+const readsOf = (e: Engine['Service']): Effect.Effect<number | undefined> =>
+  typeof e.io === 'function' ? Effect.map(e.io(), (io) => io.reads) : Effect.succeed(undefined);
 
 /**
  * `handle` over the request's services, run on the app's runtime, in the factory and on the repository the request names (`placeFor`):
@@ -116,17 +117,16 @@ export const served = <A>(c: RequestContext<ApiEnv>, handle: (s: Served) => A | 
         quota: yield* QuotaAsker,
         memo: yield* ReadMemo,
       };
-      const before = readsOf(services.e);
+      const before = yield* readsOf(services.e);
       return yield* Effect.promise(async () =>
         handle({ ...services, ...placeFor({ factory: c.req.query('factory'), repo: c.req.query('repo') }, env) }),
       ).pipe(
         Effect.ensuring(
-          Effect.suspend(() => {
-            const after = readsOf(services.e);
-            return before === undefined || after === undefined
+          Effect.flatMap(readsOf(services.e), (after) =>
+            before === undefined || after === undefined
               ? Effect.void
-              : Metric.update(Metric.withAttributes(POLL_READS, { route: routePath(c) }), after - before);
-          }),
+              : Metric.update(Metric.withAttributes(POLL_READS, { route: routePath(c) }), after - before),
+          ),
         ),
       );
     }),

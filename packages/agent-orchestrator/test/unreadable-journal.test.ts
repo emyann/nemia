@@ -1,7 +1,7 @@
 /**
  * A task whose journal holds an entry no runtime wrote, beside a run whose tasks read: the runtime leaves the task out of its pass and says
  * why (`TickReport.unreadable`), and the tick leaves the run it belongs to unjudged and says so, while every other run advances — through
- * `tick` and `nemia tick`, never a throw that stops the daemon. Walked through the runtime itself, `promiseEngine` over an in-memory
+ * `tick` and `nemia tick`, never a throw that stops the daemon. Walked through the runtime itself, `plainEngine` over an in-memory
  * journal that hands back what was put in it, as a store does, and a harness the test signs by hand, as rest-store.test.ts does.
  *
  * `WF_ROOT` is set before the runner is imported, which reads it as the module loads; `WF_MAX_CONCURRENT` admits sessions enough for both
@@ -13,8 +13,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { nameFor, type PromiseJournal, type PromiseRunner, type PromiseSighting } from 'agent-runtime';
-import { Engine, promiseEngine } from 'agent-runtime/effect';
+import { Engine } from 'agent-runtime/effect';
 import { scratch } from './scratch.ts';
+import { Effect } from 'effect';
+import { plainEngine } from './promised.ts';
 
 const ROOT = scratch('wf-unreadable-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -23,9 +25,9 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_MAX_CONCURRENT = '10';
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
-const { start } = await import('../src/runner.ts');
+const { startRun, runWith } = await import('../src/runner.ts');
 const { readRun } = await import('../src/record/record.store.ts');
-const { tick } = await import('../src/tick/tick.verb.ts');
+const { tickRun } = await import('../src/tick/tick.verb.ts');
 const { main } = await import('../src/cli/main.ts');
 const { readFeed } = await import('../src/feed/feed.store.ts');
 const { REMOVED } = await import('../src/feed/feed.ts');
@@ -79,7 +81,7 @@ const runner: PromiseRunner = {
     return '';
   },
 };
-const e = promiseEngine(
+const e = plainEngine(
   Engine.layer({
     root: fs.mkdtempSync(path.join(ROOT, 'engine-')),
     journal,
@@ -113,17 +115,18 @@ const printedBy = async (t: TestContext, argv: string[]) => {
 };
 
 test('a run whose task journal holds an entry no runtime wrote is left out of the pass and said, while the run beside it finishes', async (t) => {
-  const bad = start({ brief: 'the bad one', repo: REPO, workflowDir: FOLDER });
-  const good = start({ brief: 'the good one', repo: REPO, workflowDir: FOLDER });
-  for (let k = 0; k < 3; k++) await tick(e, { repo: ROOT });
+  const bad = await Effect.runPromise(startRun({ brief: 'the bad one', repo: REPO, workflowDir: FOLDER }));
+  const good = await Effect.runPromise(startRun({ brief: 'the good one', repo: REPO, workflowDir: FOLDER }));
+  for (let k = 0; k < 3; k++) await runWith(e, tickRun({ repo: ROOT }));
   const badTask = readRun(bad.id).steps.work.taskId!;
-  assert.match((await e.view(badTask)).phase, /^running/, 'both runs at work before the journal is spoiled');
-  assert.match((await e.view(readRun(good.id).steps.work.taskId!)).phase, /^running/);
+  assert.match((await Effect.runPromise(e.view(badTask))).phase, /^running/, 'both runs at work before the journal is spoiled');
+  assert.match((await Effect.runPromise(e.view(readRun(good.id).steps.work.taskId!))).phase, /^running/);
 
   tasks.get(badTask)!.push(MISWRITTEN);
   signAll();
-  let pass = await tick(e, { repo: ROOT });
-  for (let k = 0; k < 3 && pass.runs.find((a) => a.run.id === good.id)?.status !== 'succeeded'; k++) pass = await tick(e, { repo: ROOT });
+  let pass = await runWith(e, tickRun({ repo: ROOT }));
+  for (let k = 0; k < 3 && pass.runs.find((a) => a.run.id === good.id)?.status !== 'succeeded'; k++)
+    pass = await runWith(e, tickRun({ repo: ROOT }));
 
   assert.equal(pass.runs.find((a) => a.run.id === good.id)?.status, 'succeeded', 'the good run finished');
   assert.equal(

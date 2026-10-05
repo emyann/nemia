@@ -142,6 +142,18 @@ export const signoffsSpent = (record: StepRecord | undefined): number => {
 /** How a try was asked for, as a person typed it: `--nudge`, `--fresh`, `--model <m>`, `--recheck`. */
 export const modeWord = (how: { mode: RetryMode; model?: string }): string => (how.model ? `--model ${how.model}` : `--${how.mode}`);
 
+/** The note that says a try, and on whose word: `retries:`, a nudge to sign off, or `nemia retry` and what it was typed with. */
+export const tryWord = (r: Retry, step: Workflow): string =>
+  `${r.step}: try ${r.try} — ${r.by === 'retries' ? `retries: ${step.retries}` : r.by === 'signoff' ? 'a nudge to sign off, once a round' : askedWord(r)}`;
+
+/**
+ * A try asked for, as `tryWord` says it: by `nemia pause --now`, which stopped its session or check, or by `nemia retry` as it was typed.
+ */
+const askedWord = (r: Retry): string =>
+  r.by === 'pause'
+    ? `${r.mode === 'recheck' ? 'rechecked' : 'continued'} after nemia pause --now`
+    : `nemia retry ${modeWord(r)}${r.budget !== undefined ? ` --budget ${r.budget}` : ''}${r.message !== undefined ? ', with your answer' : ''}`;
+
 /**
  * A step's record once a try is filed: the current try moved behind, with what replaced it, and the new one in
  * its place — the re-filed step's task, or for a recheck the same task, with its check still to file. Pure.

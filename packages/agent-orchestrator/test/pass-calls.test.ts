@@ -12,9 +12,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import type { Engine } from 'agent-runtime';
 import type { Run, TaskPhase } from '../src/run.ts';
 import { scratch } from './scratch.ts';
+import { promised } from './promised.ts';
+import { Effect } from 'effect';
 
 const ROOT = scratch('wf-pass-calls-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -23,7 +24,7 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
-const { advance, approve, cancel, start } = await import('../src/runner.ts');
+const { advanceRun, approveRun, cancelRun, startRun, runWith } = await import('../src/runner.ts');
 const { readRun } = await import('../src/record/record.store.ts');
 const { metered } = await import('../src/meter/tally.store.ts');
 const { meteredEngine } = await import('../src/meter/meter.verb.ts');
@@ -56,7 +57,8 @@ const folder = (steps: Record<string, string>, extra: Record<string, string> = {
 };
 
 /** `nemia start` over a fresh repository, the steps working in its checkout unless `isolate`, each then in a worktree of its own. */
-const started = (dir: string, isolate = false): Run => start({ brief: 'add a flag', repo: aRepo(), workflowDir: dir, isolate });
+const started = async (dir: string, isolate = false): Promise<Run> =>
+  await Effect.runPromise(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: dir, isolate }));
 
 /**
  * An engine board a test settles by hand, which writes down each call made of it — its verb and the task it names — in order (`calls`).
@@ -65,7 +67,7 @@ const started = (dir: string, isolate = false): Run => start({ brief: 'add a fla
 const board = () => {
   const tasks = new Map<string, { spec: { id: string; brief: string }; phase: TaskPhase; closeout?: unknown; exitCode?: number }>();
   const calls: string[] = [];
-  const e = {
+  const e = promised({
     view: async (id: string) => {
       calls.push(`view ${id}`);
       const t = tasks.get(id);
@@ -108,7 +110,7 @@ const board = () => {
       calls.push(`output ${id} ${stream}`);
       return '';
     },
-  } as unknown as Engine;
+  });
   const settle = (id: string, phase: TaskPhase, closeout?: unknown, exitCode?: number) =>
     Object.assign(tasks.get(id)!, { phase, closeout, exitCode });
   return { e, calls, settle };
@@ -121,7 +123,7 @@ const board = () => {
  */
 const pass = async (b: ReturnType<typeof board>, id: string) => {
   b.calls.length = 0;
-  const { value, tallies } = await metered(() => advance(meteredEngine(b.e), readRun(id)));
+  const { value, tallies } = await metered(() => runWith(meteredEngine(b.e), advanceRun(readRun(id))));
   assert.ok(tallies, 'the pass was metered');
   return {
     advanced: value,
@@ -131,7 +133,7 @@ const pass = async (b: ReturnType<typeof board>, id: string) => {
 };
 
 test('a fresh step is filed with no look first; the step after it waits, unasked', async () => {
-  const run = started(folder({ implement: '', review: 'after: implement' }));
+  const run = await started(folder({ implement: '', review: 'after: implement' }));
   const b = board();
   const p = await pass(b, run.id);
   assert.deepEqual(p.advanced.filed, ['implement']);
@@ -144,7 +146,7 @@ test('a fresh step is filed with no look first; the step after it waits, unasked
 });
 
 test("a signed step's check is looked for, then filed; once it passes, the ready step after it is filed", async () => {
-  const run = started(folder({ implement: 'check: npm test', review: 'after: implement' }));
+  const run = await started(folder({ implement: 'check: npm test', review: 'after: implement' }));
   const b = board();
   await pass(b, run.id);
   b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
@@ -166,7 +168,7 @@ test("a signed step's check is looked for, then filed; once it passes, the ready
 });
 
 test('a try its check refused is looked for, then filed, under its own id', async () => {
-  const run = started(folder({ implement: 'check: npm test\nretries: 1', review: 'after: implement' }));
+  const run = await started(folder({ implement: 'check: npm test\nretries: 1', review: 'after: implement' }));
   const b = board();
   await pass(b, run.id);
   b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
@@ -188,7 +190,7 @@ test('a try its check refused is looked for, then filed, under its own id', asyn
 });
 
 test('a round the looping step asked for is looked for, then filed, under its target’s next try', async () => {
-  const run = started(
+  const run = await started(
     folder(
       { implement: '', review: 'after: implement\noutput: review.schema.json\nloop: implement' },
       { 'review.schema.json': JSON.stringify(LOOPING) },
@@ -213,7 +215,7 @@ test('a round the looping step asked for is looked for, then filed, under its ta
 });
 
 test('a try and a round due on one pass: the try is filed first, then the round, each looked for before', async () => {
-  const run = started(
+  const run = await started(
     folder(
       {
         implement: '',
@@ -256,11 +258,11 @@ test('a try and a round due on one pass: the try is filed first, then the round,
 });
 
 test("a cancelled run's task in flight is stopped by the pass, and nothing more is filed", async () => {
-  const run = started(folder({ implement: '', review: 'after: implement' }));
+  const run = await started(folder({ implement: '', review: 'after: implement' }));
   const b = board();
   await pass(b, run.id);
   b.settle(`${run.id}-implement`, 'running');
-  await cancel(b.e, run.id);
+  await runWith(b.e, cancelRun(run.id));
 
   const stopped = await pass(b, run.id);
   assert.deepEqual(stopped.advanced.filed, []);
@@ -269,7 +271,7 @@ test("a cancelled run's task in flight is stopped by the pass, and nothing more 
 });
 
 test('an approved ending is filed in the checkout, once the pass has read afresh who holds it', async () => {
-  const run = started(folder({ implement: '', ship: 'after: implement\nworkspace: main\ngate: true' }), true);
+  const run = await started(folder({ implement: '', ship: 'after: implement\nworkspace: main\ngate: true' }), true);
   const b = board();
   await pass(b, run.id);
   fs.writeFileSync(path.join(readRun(run.id).steps.implement.workspace!, 'flag.ts'), 'export const flag = true;\n');
@@ -279,7 +281,7 @@ test('an approved ending is filed in the checkout, once the pass has read afresh
   assert.deepEqual(gated.calls, ['view R-implement']);
   assert.deepEqual(gated.counted, { journals: 1, act: 3 }, 'the hand-off of what implement left, written, and the asks');
 
-  await approve(b.e, run.id, 'ship', 'Merge it.');
+  await runWith(b.e, approveRun(run.id, 'ship', 'Merge it.'));
   const shipped = await pass(b, run.id);
   assert.deepEqual(shipped.advanced.filed, ['ship']);
   assert.deepEqual(

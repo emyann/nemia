@@ -30,7 +30,8 @@ import {
   type SpawnRequest,
 } from '../src/index.ts';
 import { fold } from '../src/core/domain.ts';
-import { parseBrief, taskLine } from '../src/cli/main.ts';
+import { parseBrief } from '../src/cli/main.ts';
+import { taskLine } from '../src/cli/lines.ts';
 import { scratch } from './scratch.ts';
 import { asyncStore, asyncOps, type AsyncJournal, type AsyncRunner } from './promise-runner.ts';
 import { builtEngine } from './engine.ts';

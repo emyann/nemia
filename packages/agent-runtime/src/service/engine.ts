@@ -60,13 +60,17 @@ import {
   type Cursor,
   type FeedEntry,
   type FeedRefusal,
+  type SweepReport,
   type TaskList,
   type TaskView,
+  BodyRefused,
 } from '../core/engine/index.ts';
 import { claudeSayRefuses, isClaudeJob } from '../harness/claude/index.ts';
 import { OutputRefused, outputVerbOf } from './output.ts';
 import { DEFAULT_HARNESSES } from './harnesses.ts';
 import { a2aOps, type SeamOps } from '../a2a/index.ts';
+import { bodyVerbsOf } from './bodies.ts';
+import { watchOf } from './watch.ts';
 import {
   handleOf,
   isSpec,
@@ -131,8 +135,9 @@ export const listRefusalOf = (args: readonly unknown[]): string | undefined => {
 /**
  * The engine's verbs, each an Effect with what refuses it on its error channel, a tagged error whose message says what to do
  * instead: `FileRefused`, `TickRefused`, `AdmitRefused`, `ListRefused`, `TranscriptRefused`, `OutputRefused`, `SayRefused`,
- * `QuotaRefused`, `StopRefused` for `stop`, and `InputRefused` for `answer` and `close`. `SayUnsent` is `say`'s failure that is not a
- * refusal; a `JournalError` or a `RunnerError` is the store's or the harness's. `refusalWords(verb)` words a refusal as `ae` says it.
+ * `QuotaRefused`, `StopRefused` for `stop`, `InputRefused` for `answer` and `close`, and `BodyRefused` for `sweep` and `removeBody`.
+ * `SayUnsent` is `say`'s failure that is not a refusal; a `JournalError` or a `RunnerError` is the store's or the harness's.
+ * `refusalWords(verb)` words a refusal as `ae` says it.
  * `watch`, `io` and `start` succeed at once: `watch` and `start` with a handle that stops them.
  */
 export type EngineShape = {
@@ -327,6 +332,20 @@ export type EngineShape = {
    * that is not waiting for one. To end one that is running, `stop` it.
    */
   readonly close: (taskId: string) => Effect.Effect<void, InputRefused | JournalError>;
+  /**
+   * Count the bodies of the store no journal and no feed entry names, put more than a day ago (`BODY_GRACE_MS`), with their bytes;
+   * given `{ yes: true }`, remove them, each only if no put came since it was counted, and say those removed and their bytes. A long
+   * text a journal holds — a brief's part, a schema, a nudge, an answer — is kept once, as a body named by the sha256 of its text, and
+   * read back whole. A store that keeps no bodies has none to count. Refused — `BodyRefused` — for an argument other than nothing or
+   * `{ yes }`.
+   */
+  readonly sweep: (options?: { yes?: boolean }) => Effect.Effect<SweepReport, BodyRefused | JournalError>;
+  /**
+   * Remove the body `ref`, the sha256 of its text, as `sweep` would. Refused — `BodyRefused`, nothing removed — for a `ref` that is
+   * no reference, a body the store does not have, one a journal or the feed still names (naming it), one put within a day, whose
+   * line may still be on its way, and one put again while it was being removed.
+   */
+  readonly removeBody: (ref: string) => Effect.Effect<void, BodyRefused | JournalError>;
   /**
    * Everything that has happened since `after`, and where to resume. An entry no runtime wrote is skipped, the cursor past it, and
    * said on `refused` (`FeedRefusal`), so it is met by one read and stops no reader.
@@ -709,46 +728,6 @@ const make = (options: EngineOptions) =>
 
     const feedVerb = (after: Cursor = 0) => go(Effect.flatMap(Journal, (j) => j.feed(after)));
 
-    const watch: EngineShape['watch'] = ({ onEntry, from = 0, intervalMs = 1_000, onError }) =>
-      Effect.sync(() => {
-        let cursor = from;
-        let stopped = false;
-        let draining = false;
-
-        const drain = async () => {
-          if (stopped || draining) return;
-          draining = true;
-          try {
-            for (;;) {
-              const got = await Effect.runPromise(feedVerb(cursor));
-              if (!got.entries.length && !got.refused?.length) break;
-              cursor = got.cursor;
-              for (const r of got.refused ?? []) onError?.(new Error(r.why));
-              for (const entry of got.entries) {
-                if (stopped) return;
-                await onEntry(entry);
-              }
-            }
-          } catch (e) {
-            onError?.(e);
-          } finally {
-            draining = false;
-          }
-        };
-
-        const unsubscribe = journalOps?.subscribe?.(() => void drain());
-        const timer = setInterval(() => void drain(), intervalMs);
-        void drain();
-
-        return {
-          stop: () => {
-            stopped = true;
-            clearInterval(timer);
-            unsubscribe?.();
-          },
-        };
-      });
-
     return Engine.of({
       file: fileVerb,
       tick: tickVerb,
@@ -772,7 +751,8 @@ const make = (options: EngineOptions) =>
       answer: answerVerb,
       close: (taskId) => go(close(taskId)),
       feed: feedVerb,
-      watch,
+      ...bodyVerbsOf(go),
+      watch: watchOf(feedVerb, journalOps.subscribe),
       io: () => Effect.sync(() => ({ ...ioCounts(), observed: observedNow() })),
       start: startOf(tickVerb),
     });

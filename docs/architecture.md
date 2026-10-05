@@ -45,6 +45,10 @@ holds `daemon.json` (its pid, `by` and the `url` an api serves at) and ticks. Th
 served by the daemon keeps its store ticking; a board served with `--no-tick` ticks nothing, and a run filed on it moves on the daemon's
 next pass. Stopping the daemon itself, beyond `wf pause`, is a verb on this lease, still to come.
 
+**A journal's bodies** are the runtime's storage: each long text of a line kept once, under the sha256 of its text, resolved on every
+read and removed only by `sweep` (`agent-runtime/src/core/engine/bodies.ts`, `ae sweep`). Where a brief is cut is the orchestrator's
+(`briefParts`, `src/brief/parts.ts`), filed beside the whole brief as a hint the runtime refuses unless the parts join into it.
+
 **Logs and traces**: each layer logs and spans in its own words — the runtime its task, kind and attempt (`appendFields` in
 `agent-runtime/src/core/engine/journal.ts`), the orchestrator its run and step (`advancePass`, `forStep`) — and the process chooses the
 exporter: the daemon's provides `telemetryLayer` (`src/telemetry/telemetry.store.ts`), its lines always, OTLP only when

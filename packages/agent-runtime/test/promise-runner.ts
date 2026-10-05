@@ -14,7 +14,7 @@ import {
   type Usage,
 } from '../src/core/index.ts';
 import { RunnerError, type RunnerOps, type SpawnRequest, type Transcript, type TranscriptCursor } from '../src/harness/index.ts';
-import { JournalError, type Cursor, type Event, type FeedEntry, type StoreOps } from '../src/index.ts';
+import { JournalError, type BodiedJournalOps, type Cursor, type Event, type FeedEntry, type StoreOps } from '../src/index.ts';
 
 /**
  * A session as an `AsyncRunner` reports it: a `Sighting` whose state is one of A2A's names — or one of the five former
@@ -177,8 +177,8 @@ export type AsyncJournal = {
   feed(after?: Cursor): Promise<{ entries: FeedEntry[]; cursor: Cursor }>;
 };
 
-/** An `AsyncJournal` as the engine's store: each rejection a `JournalError`, on the task it was asked of, or `*`. */
-export const asyncStore = (j: AsyncJournal): StoreOps => ({
+/** An `AsyncJournal` as a store of whole events: each rejection a `JournalError`, on the task it was asked of, or `*`. */
+export const asyncStore = (j: AsyncJournal): Exclude<StoreOps, BodiedJournalOps> => ({
   append: (taskId, event) =>
     wrap(
       () => j.append(taskId, event),

@@ -432,6 +432,7 @@ const PINNED: Record<string, string[]> = {
     'askingTry',
     'assess',
     'branchFates',
+    'briefParts',
     'branchWord',
     'budgetOf',
     'budgetRefusal',

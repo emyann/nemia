@@ -58,8 +58,18 @@ export type { Filing } from './core/engine/index.ts';
 export type { RefusedMove, TaskList, TaskView, UnreadableTask } from './core/engine/index.ts';
 export { refusedText, retiredKeyRefusal } from './core/engine/index.ts';
 
-export { Journal, JournalError } from './core/engine/index.ts';
-export type { FeedEntry, FeedRefusal, Cursor, JournalOps, StoreOps } from './core/engine/index.ts';
+export { Journal, JournalError, BodyRefused } from './core/engine/index.ts';
+export type {
+  FeedEntry,
+  FeedRefusal,
+  Cursor,
+  JournalOps,
+  StoreOps,
+  PlainJournalOps,
+  BodiedJournalOps,
+  SweepReport,
+} from './core/engine/index.ts';
+export type { BodyEntry, BodyOps, BodyRef } from './core/engine/index.ts';
 export type { IoCounts } from './core/engine/index.ts';
 
 export { Runner, RunnerError, testOps } from './harness/index.ts';

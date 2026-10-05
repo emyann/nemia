@@ -175,4 +175,6 @@ What the `create-an-agent` skill, being generic, does not say here:
   factories get no workflow or agent from the package.
 - `tools/test-costs/` — the repository's test-cost recorder, on every package's `test` script: a probe in each test file's process, a
   reporter beside spec, and `report.ts`; held by `agent-orchestrator/test/test-costs.test.ts` and `suite.test.ts`.
+- `tools/journal-bytes/` — what a copy of a runtime store's journals cost, by event kind, the share that is a copy, and the heap a
+  full read holds, before and after a refile through bodies (`node --expose-gc tools/journal-bytes/report.ts <root> [--refile <dir>]`).
 - `.codex/rules/git-commit.rules` — lets a Codex step commit its own work in a worktree.

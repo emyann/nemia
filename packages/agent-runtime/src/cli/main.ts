@@ -9,19 +9,8 @@ import path from 'node:path';
 import os from 'node:os';
 import { Effect, ManagedRuntime } from 'effect';
 import { Engine as EngineService, refusalWords, type EngineOptions, type EngineShape } from '../index.ts';
-import {
-  denialText,
-  refusedText,
-  retiredKeyRefusal,
-  type Attempt,
-  type CodexArgs,
-  type Event,
-  type HarnessArgs,
-  type State,
-  type TaskSpec,
-  type TaskView,
-  type Usage,
-} from '../index.ts';
+import { refusedText, retiredKeyRefusal, type CodexArgs, type HarnessArgs, type SweepReport, type TaskSpec } from '../index.ts';
+import { attemptLine, entryLine, limitLines, taskLine } from './lines.ts';
 
 /**
  * Every key a brief may have — a closed list, on purpose.
@@ -293,154 +282,6 @@ export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
   };
 }
 
-/** What `ae show` says of the limits a task was filed with: its spend cap and its context window, each only when it has one. */
-export const limitLines = (state: Pick<State, 'config'>): string[] => [
-  ...(state.config?.budgetUsd !== undefined ? [`budget: $${state.config.budgetUsd} an attempt`] : []),
-  ...(state.config?.contextTokens !== undefined
-    ? [`context: ${state.config.contextTokens} tokens a session, compacted past about it`]
-    : []),
-];
-
-/** A count for a person: 20400 → 20.4k, 1234567 → 1.2M. */
-const count = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}k` : String(n));
-
-/**
- * What an attempt consumed, for a person — and when its runner measured nothing, saying so. A zero
- * would read as "cost nothing"; the truth is "nobody counted".
- */
-export const usageLine = (u: Usage | null): string => (u ? `${countsLine(u)} · ${costLine(u)}${readLine(u)}` : 'usage not measured');
-
-/** What an attempt has consumed so far, for a person, with no cost: a long-lived attempt's is written only at its end. */
-const runningLine = (u: Usage): string => `${countsLine(u)}${readLine(u)}`;
-
-/** An attempt's turns, tool calls and tokens, for a person, each one its runner could not see named not measured. */
-const countsLine = (u: Usage): string => {
-  const tokens =
-    u.inputTokens !== undefined && u.outputTokens !== undefined
-      ? ` · ${count(u.inputTokens)} in · ${count(u.outputTokens)} out`
-      : ' · tokens not measured';
-  const turns = u.turns !== undefined ? `${u.turns} turns` : 'turns not measured';
-  const calls = u.toolCalls !== undefined ? `${u.toolCalls} tool calls` : 'tool calls not measured';
-  return `${turns} · ${calls}${tokens}`;
-};
-
-/**
- * What an attempt read, by class, and how large its context got — after its cost, since the classes are what the cost is
- * made of: ` · read 21.4M · wrote 412.0k · uncached 1.2k · peak 167.0k`, and how often it compacted, which happens well
- * short of its window, so its peak alone never says it got there. Nothing for an attempt whose runner counted no
- * tokens, which already says so; a class or a peak its runner could not see is named not measured.
- */
-const readLine = (u: Usage): string => {
-  if (u.inputTokens === undefined) return '';
-  const classes =
-    u.cacheReadTokens !== undefined && u.cacheWriteTokens !== undefined && u.uncachedTokens !== undefined
-      ? `read ${count(u.cacheReadTokens)} · wrote ${count(u.cacheWriteTokens)} · uncached ${count(u.uncachedTokens)}`
-      : 'cache not measured';
-  const peak = u.peakContextTokens !== undefined ? `peak ${count(u.peakContextTokens)}` : 'peak not measured';
-  const compacted = u.compactions ? ` · compacted ${u.compactions === 1 ? 'once' : `${u.compactions} times`}` : '';
-  return ` · ${classes} · ${peak}${compacted}`;
-};
-
-/** Dollars for a person, to the cent: $3.01. Under a cent is `<$0.01` — `$0.00` would read as free. */
-export const usd = (n: number): string => (n > 0 && n < 0.01 ? '<$0.01' : `$${n.toFixed(2)}`);
-
-/** What an attempt cost, for a person: dollars, or that nobody measured it — and why, when the harness said. */
-const costLine = (u: Usage | null | undefined): string =>
-  u?.costUsd !== undefined ? usd(u.costUsd) : u?.unpricedModel ? 'cost not measured (a model without a price)' : 'cost not measured';
-
-/** A length of time for a person: 42s, 4m 59s, 1h 02m. */
-const duration = (ms: number): string => {
-  const s = Math.round(ms / 1000);
-  if (s < 60) return `${s}s`;
-  if (s < 3600) return `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s`;
-  return `${Math.floor(s / 3600)}h ${String(Math.floor(s / 60) % 60).padStart(2, '0')}m`;
-};
-
-/**
- * When an attempt ran, read off the record: start → end (how long), in UTC as the journal lines
- * above it are. One still running has no end to print, and a length up to now would need a clock
- * this line is not handed.
- */
-const ranLine = (a: Attempt): string =>
-  a.endedAt === null
-    ? `since ${a.startedAt.slice(11, 19)}`
-    : `${a.startedAt.slice(11, 19)} → ${a.endedAt.slice(11, 19)} (${duration(Date.parse(a.endedAt) - Date.parse(a.startedAt))})`;
-
-/**
- * `done (no statement)` for an end whose task asked for a closing statement and was given none (`stated: false`): the fact
- * the runtime records. What it means for the work is the layer above's to say; `ae` says only what happened.
- */
-const unstated = (stated: boolean | undefined): string => (stated === false ? ' (no statement)' : '');
-
-/**
- * One attempt, for `ae show`: how it ended, when it ran, how its process exited if it has one, what it consumed. A session
- * its harness ended at its spend cap says so as `failed (budget)`, the limit beside the end; what the harness denied the
- * session is said as the rules a person would write to allow it: the calls it went on without.
- */
-export const attemptLine = (a: Attempt): string => {
-  const when = ranLine(a);
-  if (a.ended === null) return `attempt ${a.n}  running ${when}`;
-  if (a.reason === 'unstartable') return `attempt ${a.n}  ${a.ended} (unstartable)  ${when}  ${a.error?.split('\n')[0] ?? ''}`.trimEnd();
-  const how = `${a.ended}${a.reason === 'lost' ? ' (lost)' : a.limit ? ` (${a.limit})` : unstated(a.stated)}`;
-  const exit = a.exitCode !== null ? `  exit ${a.exitCode}` : '';
-  const failedCall = a.error ? `  — the spawn call failed: ${a.error.split('\n')[0]}` : '';
-  const denied = a.denials?.length ? `  denied: ${a.denials.map(denialText).join(', ')}` : '';
-  return `attempt ${a.n}  ${how}  ${when}${exit}  ${usageLine(a.usage)}${denied}${failedCall}`;
-};
-
-/**
- * One task, for `ae ls`: `queued` while it waits for `ae admit`, and its latest attempt's cost beside its turns
- * — `$3.01 · 12t`, or `cost not measured` — once it has an attempt. An attempt still running has none yet: Claude
- * Code writes a session's cost as its process exits. A long-lived attempt's turns are those journalled as it grows, its
- * cost the one recorded at its end. A task held open and answered says which turn it is on — `turn 1`.
- */
-export const taskLine = (v: TaskView) => {
-  const turn = v.state.inputs.length;
-  const tries = turn ? `turn ${turn}` : '';
-  const u = v.usage ?? v.state.attempts.at(-1)?.usage ?? undefined;
-  const queued = v.admission === 'queued' ? '  queued' : '';
-  const meter = v.state.attempts.length ? `  ${[costLine(u), ...(u?.turns !== undefined ? [`${u.turns}t`] : [])].join(' · ')}` : '';
-  return `${v.id}  ${(v.state.harness ?? 'claude').padEnd(9)} ${v.phase.padEnd(18)}${tries ? ` ${tries}` : ''}${queued}${meter}  ${v.state.brief.split('\n')[0].slice(0, 44)}`;
-};
-
-/** The word each kind of journal entry is printed with. */
-const KINDS: Record<string, string> = {
-  filed: 'filed',
-  starting: 'starting',
-  spawned: 'started',
-  ended: 'ended',
-  measured: 'measured',
-  counted: 'counted',
-  settled: 'SETTLED',
-  'stop-requested': 'stop asked',
-  said: 'said',
-  input: 'answered',
-  closed: 'closed',
-  admitted: 'admitted',
-};
-
-/** What follows each kind of journal entry's word, for a person; nothing for a kind not named. */
-const EXTRAS: { [K in Event['kind']]?: (event: Extract<Event, { kind: K }>) => string } = {
-  settled: (e) => `  ${e.outcome}`,
-  measured: (e) => `  attempt ${e.attempt}: ${costLine(e.usage)}`,
-  counted: (e) => `  attempt ${e.attempt}: ${runningLine(e.usage)}`,
-  ended: (e) =>
-    `  ${e.observed}${e.limit ? ` (${e.limit})` : e.reason === 'harness' ? unstated(e.stated) : ` (${e.reason})`}${e.error ? `: ${e.error.split('\n')[0].slice(0, 160)}` : ''}`,
-  spawned: (e) => (e.error ? `  but the call failed: ${e.error.split('\n')[0].slice(0, 160)}` : ''),
-  said: (e) => `  to attempt ${e.attempt}: ${e.text.trim().split('\n')[0].slice(0, 160)}`,
-  input: (e) =>
-    `  ${e.text.trim().split('\n')[0].slice(0, 160)}${e.config?.budgetUsd !== undefined ? `  (budget $${e.config.budgetUsd})` : ''}`,
-};
-
-/**
- * One journal entry, for a person. Shared by `feed`, `show` and `watch` so the same event does not
- * read three different ways depending on which verb printed it.
- */
-export const entryLine = (taskId: string, event: Event) => {
-  const extra = (EXTRAS[event.kind] as ((e: Event) => string) | undefined)?.(event) ?? '';
-  return `${event.at.slice(11, 19)}  ${taskId.padEnd(34)} ${(KINDS[event.kind] ?? event.kind).padEnd(10)}${extra}`;
-};
-
 const HELP = `ae — an engine for agent sessions
 
   ae start <brief.md|"text">   file a task
@@ -462,6 +303,8 @@ const HELP = `ae — an engine for agent sessions
   ae admit <id>...             let tasks filed queued start (ae ls: queued): the next
                                tick starts them — one a store filed before stage 4c too
   ae feed [cursor]             what happened, since a cursor — the upper layer's API
+  ae sweep [--yes]             count the bodies no journal names, put over a day ago: a long
+                               text is kept once, named by its sha256; --yes removes them
   ae watch [cursor]            the same, followed
 
   a brief is markdown with optional frontmatter:
@@ -532,6 +375,53 @@ const printOutput = async (engine: EngineShape, id: string, stream: string): Pro
   const text = await run('output', engine.output(id, stream as 'stdout' | 'stderr'));
   if (text === undefined) return console.error(`${id}: no ${stream} kept: no attempt has run yet, or its run kept no streams`);
   process.stdout.write(text);
+};
+
+/** `ae show <id>`: task `id`'s journal, line by line, then its folder, the head of its brief, its limits and its attempts. */
+const show = async (engine: EngineShape, id: string): Promise<void> => {
+  const v = await run('view', engine.view(id));
+  if (!v.state.brief && !v.state.attempts.length) return console.log(`no such task: ${id}`);
+  const { entries } = await run('feed', engine.feed(0));
+  for (const e of entries.filter((x) => x.taskId === id)) console.log(entryLine(e.taskId, e.event));
+  console.log(`\ncwd: ${v.state.cwd}\nbrief: ${v.state.brief.slice(0, 200)}`);
+  for (const line of limitLines(v.state)) console.log(line);
+  for (const a of v.state.attempts) console.log(attemptLine(a));
+};
+
+/** `ae tick`: one pass, and a line for what it did, each move it refused and each task it left out. */
+const tickOnce = async (engine: EngineShape): Promise<void> => {
+  const r = await run('tick', engine.tick());
+  const load =
+    Object.entries(r.running)
+      .map(([h, n]) => `${h}:${n}`)
+      .join(' ') || 'idle';
+  console.log(`${r.actions} action(s) over ${r.tasks} task(s)  [${load}]`);
+  for (const m of r.refused) console.log(refusedText(m));
+  for (const why of r.unreadable) console.error(`left out: ${why}`);
+};
+
+/** What `ae sweep` is asked, off the arguments after it: `{ yes }`, given `--yes`. Refuses, with exit code 2, any other argument. */
+export const sweepAsked = (rest: readonly string[]): { yes: boolean } => {
+  const other = rest.filter((a) => a !== '--yes');
+  if (other.length)
+    throw Object.assign(new Error(`sweep: takes \`--yes\` to remove, or nothing to count; it was handed ${other.join(' ')}.`), {
+      exitCode: 2,
+    });
+  return { yes: rest.length > 0 };
+};
+
+const bodies = (n: number) => `${n} bod${n === 1 ? 'y' : 'ies'}`;
+
+/** The line `ae sweep` prints for `report`: what it removed, when `yes`, else what it would remove; and what it keeps. */
+export const sweepLine = (report: SweepReport, yes: boolean): string =>
+  yes
+    ? `${bodies(report.removed)} removed (${report.removedBytes} bytes), ${report.kept} kept`
+    : `${bodies(report.removable)} no journal names (${report.bytes} bytes): \`ae sweep --yes\` removes them; ${report.kept} kept`;
+
+/** `ae sweep [--yes]`: the bodies no journal and no feed entry names, counted, and removed given `--yes` (`Engine.sweep`). */
+const sweepBodies = async (engine: EngineShape, rest: readonly string[]): Promise<void> => {
+  const { yes } = sweepAsked(rest);
+  console.log(sweepLine(await run('sweep', engine.sweep({ yes })), yes));
 };
 
 /** The engine's verb `verb`, `effect`, as a Promise: a refusal rejected in the runtime's words (`refusalWords`), else as it failed. */
@@ -613,17 +503,9 @@ export async function main(argv: string[]): Promise<void> {
       return;
     }
 
-    case 'show': {
+    case 'show':
       if (!arg) return console.log(HELP);
-      const v = await run('view', engine.view(arg));
-      if (!v.state.brief && !v.state.attempts.length) return console.log(`no such task: ${arg}`);
-      const { entries } = await run('feed', engine.feed(0));
-      for (const e of entries.filter((x) => x.taskId === arg)) console.log(entryLine(e.taskId, e.event));
-      console.log(`\ncwd: ${v.state.cwd}\nbrief: ${v.state.brief.slice(0, 200)}`);
-      for (const line of limitLines(v.state)) console.log(line);
-      for (const a of v.state.attempts) console.log(attemptLine(a));
-      return;
-    }
+      return show(engine, arg);
 
     case 'logs':
       if (!arg) return console.log(HELP);
@@ -666,17 +548,8 @@ export async function main(argv: string[]): Promise<void> {
       return;
     }
 
-    case 'tick': {
-      const r = await run('tick', engine.tick());
-      const load =
-        Object.entries(r.running)
-          .map(([h, n]) => `${h}:${n}`)
-          .join(' ') || 'idle';
-      console.log(`${r.actions} action(s) over ${r.tasks} task(s)  [${load}]`);
-      for (const m of r.refused) console.log(refusedText(m));
-      for (const why of r.unreadable) console.error(`left out: ${why}`);
-      return;
-    }
+    case 'tick':
+      return tickOnce(engine);
 
     case 'feed': {
       const { entries, cursor, refused = [] } = await run('feed', engine.feed(Number(arg) || 0));
@@ -684,6 +557,9 @@ export async function main(argv: string[]): Promise<void> {
       for (const r of refused) console.error(`skipped: ${r.why}`);
       return console.log(`cursor: ${cursor}`);
     }
+
+    case 'sweep':
+      return sweepBodies(engine, argv.slice(1));
 
     case 'watch': {
       const from = Number(arg) || 0;

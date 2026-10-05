@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 const PINNED: Record<string, string[]> = {
   'agent-runtime': [
     'AdmitRefused',
+    'BodyRefused',
     'CLAUDE_AUTO_DROPPED',
     'CLAUDE_CONTEXT_TOKENS',
     'CLAUDE_EFFORTS',

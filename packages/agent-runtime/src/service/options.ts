@@ -69,6 +69,11 @@ export type EngineOptions = {
 /** A task to file (`Engine.file`). */
 export type TaskSpec = {
   brief: string;
+  /**
+   * The brief cut into parts, for storage alone: a store that keeps bodies keeps each long part once, however many tasks file it,
+   * and a session is told `brief`, whole, as ever. Refused unless the parts, put end to end, are `brief`.
+   */
+  briefParts?: string[];
   cwd: string;
   harness?: string;
   deadlineSeconds?: number;

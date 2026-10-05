@@ -7,8 +7,8 @@ import { Effect, Layer } from 'effect';
 import { Engine, type TaskView } from 'agent-runtime';
 import type { TaskPhase } from '../src/run.ts';
 
-/** A task as it was filed: its id and brief, the closeout schema it asks for, and every other field of its spec. */
-type Filed = { id: string; brief: string; closeoutSchema?: object } & Record<string, unknown>;
+/** A task as it was filed: its id and brief, the closeout schema it asks for, its brief's parts, and every other field of its spec. */
+type Filed = { id: string; brief: string; closeoutSchema?: object; briefParts?: string[] } & Record<string, unknown>;
 
 /** A task on the board: its spec, its phase, and what its one attempt ended with. */
 type BoardTask = { spec: Filed; phase: TaskPhase; closeout?: unknown; exitCode?: number };
@@ -73,6 +73,8 @@ export const board = () => {
       watch: unkept('watch'),
       io: unkept('io'),
       start: unkept('start'),
+      sweep: unkept('sweep'),
+      removeBody: unkept('removeBody'),
     }),
   );
   const settle = (id: string, phase: TaskPhase, closeout?: unknown, exitCode?: number) =>

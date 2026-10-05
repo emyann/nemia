@@ -193,6 +193,15 @@ const dayLines = (tier: Tier, day: string, memo: SeriesMemo | undefined): Rollup
   return lines;
 };
 
+/**
+ * The lines of a tier's `wanted` days, each day from `memo` where it holds it unmoved (`dayLines`); first, every day of the tier the memo
+ * holds outside `wanted` is dropped from it, so a memo holds no more than its tier's last read covered, and the other tier's days stay.
+ */
+const linesOf = (tier: Tier, wanted: readonly string[], memo: SeriesMemo | undefined): RollupLine[] => {
+  for (const key of memo?.keys() ?? []) if (key.startsWith(`${tier}/`) && !wanted.includes(key.slice(tier.length + 1))) memo?.delete(key);
+  return wanted.flatMap((d) => dayLines(tier, d, memo));
+};
+
 /** What `--range` takes, as its refusal says it. */
 export const RANGE_TAKES = `--range takes ${Object.keys(RANGES).join(', ')}: nemia series --range 7d`;
 
@@ -203,15 +212,11 @@ export const rangeOf = (text: string | undefined): keyof typeof RANGES => {
   return text;
 };
 
-/** The series over `range` (`rangeOf`) at `now`, read off its tier's days, past days from `memo` where one is handed. Writes nothing. */
+/** The series over `range` (`rangeOf`) at `now`, read off its tier's days, from `memo` where one is handed (`linesOf`). Writes nothing. */
 export const seriesRead = (range: string | undefined, memo?: SeriesMemo, now: number = Date.now()): SeriesRead => {
   const r = rangeOf(range);
   const tier = RANGES[r].tier;
-  return seriesOf(
-    r,
-    daysOfRange(r, days(tier), now).flatMap((d) => dayLines(tier, d, memo)),
-    now,
-  );
+  return seriesOf(r, linesOf(tier, daysOfRange(r, days(tier), now), memo), now);
 };
 
 /**
@@ -220,7 +225,9 @@ export const seriesRead = (range: string | undefined, memo?: SeriesMemo, now: nu
  */
 export const seriesHealth = (from: string | null, to: string, memo?: SeriesMemo): Health =>
   healthOf(
-    days('hour')
-      .filter((d) => (from === null || d >= from) && d <= to)
-      .flatMap((d) => dayLines('hour', d, memo)),
+    linesOf(
+      'hour',
+      days('hour').filter((d) => (from === null || d >= from) && d <= to),
+      memo,
+    ),
   );

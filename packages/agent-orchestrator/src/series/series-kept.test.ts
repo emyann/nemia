@@ -137,3 +137,13 @@ test('`nemia series --json` is the answer the api serves; REFUSED: a --range it 
     return true;
   });
 });
+
+test("a memo holds only the days its tier's last read covered: a day the range has left goes, and the other tier's days stay", () => {
+  appendLines('minute', [{ t: '2026-10-06T10:00:00.000Z', s: 'store.runs', l: {}, n: 1, sum: 2, min: 2, max: 2, last: 2 }]);
+  const memo = seriesMemo();
+  seriesHealth('2026-10-05', '2026-10-05', memo);
+  seriesRead('24h', memo, at('14:05:00'));
+  assert.deepEqual([...memo.keys()].sort(), ['hour/2026-10-05', 'minute/2026-10-05', 'minute/2026-10-06']);
+  seriesRead('24h', memo, Date.parse('2026-10-07T09:00:00Z'));
+  assert.deepEqual([...memo.keys()].sort(), ['hour/2026-10-05', 'minute/2026-10-06'], 'the day the range left is gone');
+});

@@ -81,6 +81,17 @@ function removeRunFiles(id: string): string[] {
   return removed;
 }
 
+/** Whether an id names something of a run in the store: its record, a person's file beside it, its asks or its own directory. */
+function runIdTaken(id: string): boolean {
+  let names: string[];
+  try {
+    names = fs.readdirSync(runsDir());
+  } catch {
+    return false;
+  }
+  return names.some((name) => name === id || name.startsWith(`${id}.`));
+}
+
 /** Write the prune marker whole, or remove it for `undefined`. */
 const writePruned = (id: string, marker: Pruned | undefined): void =>
   marker ? fs.writeFileSync(pruneFile(id), JSON.stringify(marker, null, 2)) : fs.rmSync(pruneFile(id), { force: true });
@@ -225,6 +236,7 @@ export const filesStore: RunStore = {
     rewrite: rewriteRun,
     stamps: restStamps,
     exists: (id) => fs.existsSync(runFile(id)),
+    taken: runIdTaken,
     calledOff: (id) => [cancelFile, pruneFile, holdFile].some((file) => fs.existsSync(file(id))) || fs.existsSync(pauseFile()),
     cancel: markCancelled,
     forget: removeRunFiles,

@@ -834,30 +834,40 @@ const gate = () => {
   return { shut, open };
 };
 
-test('a pass returns while the agent holds the send, and the next task in it is served; released, the task completes with its data', async () => {
-  const g = gate();
-  const held = await serve({ script: () => [{ until: g.shut, data: { ok: 'held' }, state: 'completed' }] });
-  const quick = await serve({ script: () => [{ data: { ok: 'quick' }, state: 'completed' }] });
-  const root = scratch('ae-remote-');
-  const e = promiseEngine(EngineService.layer({ root, harnesses: { held: { url: held.url }, quick: { url: quick.url } } }));
-  const a = await e.file(task({ harness: 'held' }));
-  const b = await e.file(task({ harness: 'quick' }));
-  const [ms] = await timed(() => e.tick());
-  assert.ok(ms < SPAWN_WAIT_MS + 2_000, `${ms} ms: one pass, not held by the send`);
-  assert.equal(held.counts.sendMessage, 1, 'the agent has the message');
-  assert.equal(quick.counts.sendMessage, 1, 'and the task after it in the same pass was sent too');
-  assert.equal((await settled(e, b)).state.settled, 'succeeded', 'the other task settles while the send is held');
-  const entry = JSON.parse(fs.readFileSync(entryFile(root, `ae/${a}/1`), 'utf8'));
-  assert.equal(entry.taskId, undefined);
-  assert.equal(entry.sending.pid, process.pid);
-  assert.equal((await e.view(a)).phase, 'running (working)', 'read submitted, a Task at work as far as anyone can tell');
-  assert.equal((await e.view(a)).state.settled, null);
-  g.open();
-  const v = await settled(e, a);
-  assert.equal(v.state.settled, 'succeeded');
-  assert.deepEqual(v.state.attempts[0].closeout, { ok: 'held' });
-  assert.equal(held.counts.sendMessage, 1, 'sent once');
-});
+/** How long a test whose gate opens only after its pass returns may run: far beyond a loaded pass, so a pass held by the send fails. */
+const HELD_PASS_BOUND_MS = 60_000;
+
+test(
+  'a pass returns while the agent holds the send, and the next task in it is served; released, the task completes with its data',
+  { timeout: HELD_PASS_BOUND_MS },
+  async () => {
+    const g = gate();
+    const held = await serve({ script: () => [{ until: g.shut, data: { ok: 'held' }, state: 'completed' }] });
+    const quick = await serve({ script: () => [{ data: { ok: 'quick' }, state: 'completed' }] });
+    const root = scratch('ae-remote-');
+    const e = promiseEngine(EngineService.layer({ root, harnesses: { held: { url: held.url }, quick: { url: quick.url } } }));
+    const a = await e.file(task({ harness: 'held' }));
+    const b = await e.file(task({ harness: 'quick' }));
+    await e.tick();
+    assert.equal(
+      held.counts.sendMessage,
+      1,
+      'the pass returned, the agent holding the message it was sent: one pass, not held by the send',
+    );
+    assert.equal(quick.counts.sendMessage, 1, 'and the task after it in the same pass was sent too');
+    assert.equal((await settled(e, b)).state.settled, 'succeeded', 'the other task settles while the send is held');
+    const entry = JSON.parse(fs.readFileSync(entryFile(root, `ae/${a}/1`), 'utf8'));
+    assert.equal(entry.taskId, undefined);
+    assert.equal(entry.sending.pid, process.pid);
+    assert.equal((await e.view(a)).phase, 'running (working)', 'read submitted, a Task at work as far as anyone can tell');
+    assert.equal((await e.view(a)).state.settled, null);
+    g.open();
+    const v = await settled(e, a);
+    assert.equal(v.state.settled, 'succeeded');
+    assert.deepEqual(v.state.attempts[0].closeout, { ok: 'held' });
+    assert.equal(held.counts.sendMessage, 1, 'sent once');
+  },
+);
 
 test("a remote Task's statement is kept when the wall clock steps back after the attempt began", async (t) => {
   const g = gate();

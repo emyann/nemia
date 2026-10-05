@@ -39,7 +39,10 @@ async function hire(page: Page, agent: string): Promise<void> {
   await page.locator('[data-hire-picker]').click();
   await page.getByRole('option', { name: new RegExp(`^${agent}`) }).click();
   await page.locator('[data-hire]').click();
-  await expectVisible(page.locator(`[data-fire="${agent}"]`), `${FACTORY} hires ${agent}, with Fire`);
+  await expectVisible(
+    page.locator(`[data-fire="${agent}"]:not([disabled])`),
+    `${FACTORY} hires ${agent}, with Fire, once its reads are back`,
+  );
 }
 
 /** Fires the agent hired, and refuses unless the picker is back. */
@@ -110,11 +113,11 @@ export default {
       await form.getByRole('textbox', { name: 'Model' }).fill(AGENTS.made.model);
       await form.getByRole('textbox', { name: 'Instructions' }).fill(MADE.body);
       await settled(page);
-      await photograph(page, path.join(OUT, `step-hire-new-agent-${theme}.png`));
+      await photograph(page, path.join(OUT, `step-hire-new-agent-${theme}.png`), { fullPage: true });
       await form.getByRole('button', { name: 'Create agent' }).click();
       await page.waitForURL((url) => url.pathname === step && url.searchParams.get('factory') === FACTORY, { timeout: WAIT_MS });
       await idle(page);
-      await expectVisible(page.locator(`[data-fire="${MADE.name}"]`), 'back on the step, the agent made is hired into it');
+      await expectVisible(page.locator(`[data-fire="${MADE.name}"]:not([disabled])`), 'back on the step, the agent made is hired into it');
       await fire(page, MADE.name);
 
       await goto(page, `/workflows/repo/${good.name}?factory=${FACTORIES.bare}`);

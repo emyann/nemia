@@ -10,6 +10,7 @@ import type { Workflow } from '../step/step.ts';
 import type { SpendOf } from '../status/status.ts';
 import { nextTry, type RetryAsk } from './retry-ask.ts';
 import { pauseAskVoid, pauseAsksVoid, retriesDue, tryNote } from './retry.ts';
+import { retryRefusal } from './retry-refusal.ts';
 import { retrySection } from '../brief/brief-sections.ts';
 
 const IMPLEMENT: Workflow = { name: 'implement', after: [], body: 'do it', check: 'npm test' };
@@ -104,6 +105,43 @@ test('a pause ask on a step its stopped session took over its budget is void', (
   const p = phases({ t1: 'stopped' });
   assert.equal(pauseAskVoid(step, runOn('t1'), pauseAsk('t1'), p, spent), true);
   assert.equal(pauseAskVoid(step, runOn('t1'), pauseAsk('t1'), p), false, 'under its budget, the same ask stands');
+});
+
+/** What `wf retry r-1 implement` says over `asks`: null where it writes its ask. */
+const refusalOver = (run: Run, phaseOf: (id: string) => TaskPhase, asks: readonly RetryAsk[], budget?: number, spendOf?: SpendOf) =>
+  retryRefusal(
+    [{ ...IMPLEMENT, ...(spendOf ? { budget: 1 } : {}) }],
+    run,
+    'implement',
+    { mode: 'nudge', ...(budget !== undefined ? { budget } : {}) },
+    phaseOf,
+    undefined,
+    undefined,
+    () => (phaseOf('c1') === 'failed' ? 1 : undefined),
+    asks,
+    () => false,
+    spendOf,
+  );
+
+test('wf retry passes over a void pause ask of its try: the task ended on its own, or went over its budget', () => {
+  const ended = [
+    { name: 'a session that failed on its own', run: runOn('t1'), p: phases({ t1: 'failed' }) },
+    { name: 'a session that succeeded, its check refused', run: runOn('t1', 'c1'), p: phases({ t1: 'succeeded', c1: 'failed' }) },
+  ];
+  for (const { name, run, p } of ended) {
+    assert.equal(refusalOver(run, p, []), null, `the fixture: ${name} may be retried`);
+    assert.equal(refusalOver(run, p, [pauseAsk('t1')]), null, name);
+  }
+  const spent: SpendOf = (id) => (id === 't1' ? { usd: 2, measured: 1, unmeasured: 0, budgetEnded: false } : undefined);
+  const stopped = phases({ t1: 'stopped' });
+  assert.equal(refusalOver(runOn('t1'), stopped, [], 5, spent), null, 'the fixture: a stopped session over its budget, raised');
+  assert.equal(refusalOver(runOn('t1'), stopped, [pauseAsk('t1')], 5, spent), null);
+});
+
+test('wf retry refuses a pause ask still due: its task is the current one, stopped, under its budget', () => {
+  const stopped = phases({ t1: 'stopped' });
+  assert.equal(refusalOver(runOn('t1'), stopped, []), null, 'the fixture: a stopped session may be retried');
+  assert.match(refusalOver(runOn('t1'), stopped, [pauseAsk('t1')]) ?? '', /^try 2 of implement is asked by wf pause --now/);
 });
 
 test('the try a pause filed keeps its mode, is marked paused, and is said as the pause', () => {

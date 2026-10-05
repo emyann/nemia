@@ -26,7 +26,7 @@ import {
 } from '../status/status.ts';
 import type { Verdict } from '../check/check.ts';
 import { messageRefusal, modeWord, retriesSpent, type RetryAsk, type RetryHow } from './retry-ask.ts';
-import { carries, heard, retriesDue, retryable } from './retry.ts';
+import { carries, heard, pauseAskVoid, retriesDue, retryable } from './retry.ts';
 import { remoteRetryRefusal } from '../harness/harness.ts';
 import { autoDropped } from '../workflow/index.ts';
 import { modeOf } from '../former/former.ts';
@@ -60,10 +60,10 @@ type Judged = Asked &
  *
  * Refused: a message that cannot ride on the ask (`messageRefusal`); a step the run does not have; a `--model` a Claude Code step in
  * `auto` would run in `default` on (`autoDropped`, as the load refuses it on the step's own `model:`); a cancelled run, which files
- * nothing, so the ask would never be honoured; an ask for the same try already waiting; a step whose last try is not over, or that let
- * what waits on it run (`retryable`); `--recheck` where no check failed, or on an ending that lands on its check, whose merge the run
- * aborted; and a step the run is about to try again itself, because `retries:` still covers its refusal — that step is not waiting on a
- * person.
+ * nothing, so the ask would never be honoured; an ask for the same try already waiting, but one `wf pause --now` wrote that is void
+ * (`pauseAskVoid`), which no tick files; a step whose last try is not over, or that let what waits on it run (`retryable`); `--recheck`
+ * where no check failed, or on an ending that lands on its check, whose merge the run aborted; and a step the run is about to try again
+ * itself, because `retries:` still covers its refusal — that step is not waiting on a person.
  *
  * An ending that stopped on the base branch (`endingStopped`) has two ways on that take the same try of it, so one waiting refuses the
  * other: shipping again would act on the work being changed, and a send-back would take back the try a person asked to ship again on.
@@ -170,7 +170,7 @@ function judged(asked: Asked, step: Workflow): Judged {
     ...retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps, asked.harnessBlocked, spendOf, asked.verdictOf),
     step,
     next,
-    pending: asks.find((a) => a.step === name && a.try === next),
+    pending: asks.find((a) => a.step === name && a.try === next && !pauseAskVoid(step, run, a, phaseOf, spendOf)),
     stoppedAt,
     again,
   };

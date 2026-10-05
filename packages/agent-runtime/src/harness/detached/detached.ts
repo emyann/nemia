@@ -175,6 +175,8 @@ export type HarnessOutput = {
   denials?: Denial[];
   /** Each skill the session loaded, one per call: `[]` when it loaded none. Absent when the harness cannot say. */
   skills?: string[];
+  /** Each file the session read or wrote, once, relative to its folder: `[]` when it touched none. Absent when the harness cannot say. */
+  files?: string[];
 };
 
 /**
@@ -337,7 +339,7 @@ export type RunInput = { first: string; inbox: string; from: number; closesOn: {
  * A run's sighting, field for field: its closeout the file its harness wrote (`statement`), else what its output says, with no
  * time: the spawn cleared both before it launched the run, so either was written by the run's own process, and the engine keeps
  * it whatever the clock says; its exit code once it has one, never the worker's -1; and what its output says it used, reached
- * and was denied, and the skills it loaded: an empty list kept, since it says they were counted.
+ * and was denied, and the skills it loaded and the files it touched: an empty list kept, since it says they were counted.
  */
 const sightingOf = (
   name: string,
@@ -356,6 +358,7 @@ const sightingOf = (
   ...(output?.read.limit ? { limit: output.read.limit } : {}),
   ...(output?.read.denials?.length ? { denials: output.read.denials } : {}),
   ...(output?.read.skills ? { skills: output.read.skills } : {}),
+  ...(output?.read.files ? { files: output.read.files } : {}),
 });
 
 const runFileOf = (spec: HarnessSpec, root: string, name: string) => path.join(root, 'runs', spec.name, `${safe(name)}.json`);

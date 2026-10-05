@@ -22,7 +22,7 @@ import { parseCloseout, type Closeout } from '../closeout/closeout.ts';
 import { taskUsage } from '../timeline/index.ts';
 import { runStore } from '../record/files.store.ts';
 import { stepsOf } from '../record/record.store.ts';
-import { oneByOne, parentRecord, shippedOf, type BranchReader } from '../branches/branches.store.ts';
+import { branchReader, oneByOne, parentRecord, shippedOf, type BranchReader } from '../branches/branches.store.ts';
 import { continuesFrom } from '../retry/index.ts';
 import { phaseOfView, unsignedEnd, wordOfView } from './views-words.ts';
 
@@ -47,25 +47,70 @@ export const answersIn = (view: TaskView | undefined): number => (view?.state.ho
  *
  * A task the report does not carry is read with `e.view`, and that asks no harness in the common case. The report carries every task the
  * runtime's pass left unsettled, so what it lacks is a task settled — read off its record, and found by name where its record lacks its
- * session's id, never observed — or one never filed, which is read as `unknown`. And a task a verb of this pass has changed since: `file`,
- * `admit`, `answer`, `stop`, `close` and `say` each drop the view of the tasks they name, when the verb runs, so what `advance` reads
- * after its own act is the engine's, never a report from before it. A verb this does not know drops every view, for the same reason.
+ * session's id, never observed — or one never filed, which is read as `unknown`. Either is read once for the value's life, which is the
+ * pass's, and kept: every later `view` of it, and `list` of it among others, answers what was read. `list` asks the engine for the tasks
+ * it neither was reported nor has read, in one `list`, and answers every task it was handed in their first order, a task whose journal
+ * does not read left out and named as the engine named it; a list of every task (no ids), or of anything else, is the engine's. A read
+ * that failed is not kept.
+ *
+ * And a task a verb of this pass has changed since is read again: `file`, `admit`, `answer`, `stop`, `close` and `say` each drop the view
+ * of the tasks they name, when the verb runs, so what `advance` reads after its own act is the engine's, never a report or a read from
+ * before it. A verb this does not know drops every view, for the same reason, and so does any verb while a read is in flight: what that
+ * read answers is not kept.
  */
 export function reportedEngine(e: Engine, views: readonly TaskView[]): Engine {
-  const reported = new Map<unknown, TaskView>(views.map((v) => [v.id, v]));
+  const kept = new Map<unknown, TaskView>(views.map((v) => [v.id, v]));
+  let writes = 0;
+  const keep = (read: readonly TaskView[], at: number) => {
+    if (writes === at) for (const v of read) kept.set(v.id, v);
+  };
+  const view = (taskId: string) =>
+    Effect.suspend(() => {
+      const was = kept.get(taskId);
+      if (was) return Effect.succeed(was);
+      const at = writes;
+      return e.view(taskId).pipe(Effect.tap((read) => Effect.sync(() => keep([read], at))));
+    });
+  const list = (ids: readonly string[]) =>
+    Effect.suspend(() => {
+      const wanted = [...new Set(ids)];
+      const missing = wanted.filter((id) => !kept.has(id));
+      const at = writes;
+      const read: Effect.Effect<TaskList, Effect.Error<ReturnType<Engine['list']>>> = missing.length
+        ? e.list(missing)
+        : Effect.succeed({ views: [], unreadable: [] });
+      return read.pipe(
+        Effect.map((got) => {
+          const fresh = new Map<unknown, TaskView>(got.views.map((v) => [v.id, v]));
+          keep(got.views, at);
+          const answered = wanted.flatMap((id) => fresh.get(id) ?? (missing.includes(id) ? [] : [kept.get(id)!]));
+          return { views: answered, unreadable: got.unreadable } satisfies TaskList;
+        }),
+      );
+    });
   return droppingOnWrite(
     e,
-    (taskId) => reported.delete(taskId),
-    () => reported.clear(),
+    (taskId) => {
+      writes++;
+      kept.delete(taskId);
+    },
+    () => {
+      writes++;
+      kept.clear();
+    },
     {
-      view: (taskId) => {
-        const v = reported.get(taskId);
-        return v ? Effect.succeed(v) : e.view(taskId);
-      },
+      view,
+      list: ((...args: unknown[]) =>
+        args.length === 1 && Array.isArray(args[0])
+          ? list(args[0] as string[])
+          : (e.list as (...a: unknown[]) => unknown)(...args)) as Engine['list'],
     },
     (key) => ENGINE_READS.has(key),
   );
 }
+
+/** What the engine's `list` answers: the views of the tasks it read, and each whose journal did not read. */
+type TaskList = Effect.Success<ReturnType<Engine['list']>>;
 
 /**
  * The engine a command reads — `nemia ls`, `nemia decide` — whose `view` of a task is read once for the whole command: `nemia ls` views a
@@ -128,9 +173,9 @@ function droppingOnWrite(
 /** The engine's verbs that change no task. */
 const ENGINE_READS = new Set(['tick', 'list', 'logs', 'output', 'transcript', 'path', 'feed', 'watch', 'io', 'start']);
 
-/** The engine's verbs that change a task, each with the tasks it names: a filing names none the report could carry. */
+/** The engine's verbs that change a task, each with the tasks it names: a filing names the task it files, which a read may have kept. */
 const ENGINE_WRITES: Readonly<Record<string, (args: unknown[]) => readonly unknown[]>> = {
-  file: () => [],
+  file: ([spec]) => [(spec as { id?: unknown } | undefined)?.id],
   admit: ([ids]) => (Array.isArray(ids) ? ids : []),
   answer: ([id]) => [id],
   stop: ([id]) => [id],
@@ -491,16 +536,35 @@ export const parentRead = Effect.fn('parentOf')(function* (id: string, git: Bran
   return { ...known, shipped: said.kind === 'shipped' } satisfies ParentRun;
 });
 
+/** A run another waits on as `read` holds it, else read (`parentRead`) over `git` and kept in `read` for whoever asks next. */
+export const keptParent = Effect.fn('keptParent')(function* (id: string, git: BranchReader, read: Map<string, ParentRun>) {
+  const was = read.get(id);
+  if (was) return was;
+  const now = yield* parentRead(id, git);
+  read.set(id, now);
+  return now;
+});
+
+/**
+ * The runs a pass reads as runs others wait on, each read once for the pass (`parentRead`) and kept by id, over one listing of branches per
+ * repository and base (`branchReader`): what the pass's `admit`, `liftHold`, claims on the checkout (`mainClaim`) and the cap's needs
+ * (`needOf`) all read through. Made by the pass and dropped with it, so a parent the pass lands is read shipped on the next.
+ */
+export type Parents = { git: BranchReader; read: Map<string, ParentRun> };
+
+/** The runs a pass reads as runs others wait on (`Parents`), none read yet. */
+export const passParents = (): Parents => ({ git: branchReader(), read: new Map() });
+
 /**
  * The runs this run waits on, each read once (`parentRead`), one at a time — and none, without a look, for a run the gate does not apply
- * to (`gated`). And the runs a person holds it until (`Run.hold`), for as long as the hold stands. Fails with a refusal a read failed
- * with; dies of anything else.
+ * to (`gated`). And the runs a person holds it until (`Run.hold`), for as long as the hold stands. A run `read` holds is answered from it,
+ * and every run read is kept there. Fails with a refusal a read failed with; dies of anything else.
  */
-export const parentsRead = Effect.fn('parentsOf')(function* (run: Run, git: BranchReader = oneByOne) {
-  const read = new Map<string, ParentRun>();
+export const parentsRead = Effect.fn('parentsOf')(function* (run: Run, git: BranchReader = oneByOne, read = new Map<string, ParentRun>()) {
   const ids = [...(gated(run) ? run.after! : []), ...(run.hold && !run.cancelledAt ? run.hold.until : [])];
-  for (const id of new Set(ids)) read.set(id, yield* parentRead(id, git));
-  return (id: string): ParentRun => read.get(id) ?? { shipped: false };
+  const mine = new Map<string, ParentRun>();
+  for (const id of new Set(ids)) mine.set(id, yield* keptParent(id, git, read));
+  return (id: string): ParentRun => mine.get(id) ?? { shipped: false };
 });
 
 /**

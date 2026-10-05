@@ -34,10 +34,12 @@ const writeRun = (run: { id: string } & Record<string, unknown>) => {
 const at = '2026-09-12T00:10:00.000Z';
 const filedBrief = (taskId: string) => `The brief ${taskId} was filed with.`;
 
-/** A task's journal, as the engine writes it. */
+/** A task's journal, as the engine writes it, and written again whole by a rename over it: the engine reads one only past what it kept. */
 const journal = (taskId: string, events: object[]) => {
-  fs.mkdirSync(path.join(root, 'engine', 'tasks'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'engine', 'tasks', `${taskId}.jsonl`), events.map((e) => JSON.stringify(e) + '\n').join(''));
+  const file = path.join(root, 'engine', 'tasks', `${taskId}.jsonl`);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(`${file}.new`, events.map((e) => JSON.stringify(e) + '\n').join(''));
+  fs.renameSync(`${file}.new`, file);
 };
 const filed = (taskId: string) => ({ kind: 'filed', at, brief: filedBrief(taskId), cwd: '/code/app', maxAttempts: 1, harness: 'codex' });
 

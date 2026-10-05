@@ -19,10 +19,37 @@ import { ReadMemo } from '../layer.ts';
 
 const e = await runtime.runPromise(Engine.useSync((engine) => engine));
 
+/** A file written whole, by a rename over it: as a hand edit of a journal must be, since the engine reads one only past what it kept. */
 const write = (file: string, text: string) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, text);
+  fs.writeFileSync(`${file}.new`, text);
+  fs.renameSync(`${file}.new`, file);
 };
+
+/**
+ * The journals `f` asks the engine for: a task it views, and each task a list answers, read or unreadable. What a request costs whether
+ * or not the engine's reader reads their bytes again: it reads a journal only for what was appended since it last read it.
+ */
+async function journalsAsked<T>(f: () => Promise<T>): Promise<{ value: T; asked: number }> {
+  const { view, list } = e;
+  let asked = 0;
+  Object.assign(e, {
+    view: (taskId: string) => {
+      asked++;
+      return view(taskId);
+    },
+    list: (...args: unknown[]) =>
+      Effect.map(Reflect.apply(list, e, args) as ReturnType<typeof list>, (listed) => {
+        asked += listed.views.length + listed.unreadable.length;
+        return listed;
+      }),
+  });
+  try {
+    return { value: await f(), asked };
+  } finally {
+    Object.assign(e, { view, list });
+  }
+}
 
 const at = '2026-09-28T09:00:00.000Z';
 const ended = '2026-09-28T10:00:00.000Z';
@@ -192,7 +219,10 @@ test('GET /api/stats answers the skills loaded per try as null, never 0, where n
   const other = await asked('?from=2026-09-28&to=2026-09-28&ofFactory=other');
   assert.equal(other.body.all.total.skillsPerTry, 2);
   const { skillLoads, skillTries, skills } = other.body.all.steps[0];
-  assert.deepEqual({ skillLoads, skillTries, skills }, { skillLoads: 2, skillTries: 1, skills: [{ skill: 'look', count: 2 }] });
+  assert.deepEqual(
+    { skillLoads, skillTries, skills },
+    { skillLoads: 2, skillTries: 1, skills: [{ skill: 'look', count: 2, tries: 1, touched: null, loadedWhenTouched: null }] },
+  );
 });
 
 test('GET /api/stats keeps one factory with ofFactory and one repository with ofRepo, compared as strings', async () => {
@@ -262,16 +292,14 @@ async function unverified<T>(f: () => Promise<T>): Promise<T> {
 
 test("GET /api/stats reads no run's journal again while the store is as it was, and reads again only the run whose record changed", async () => {
   const first = await asked('');
-  const reads = Effect.runSync(e.io()).reads;
-  const again = await unverified(() => asked(''));
-  assert.equal(Effect.runSync(e.io()).reads - reads, 0, "the app's memo answered every run");
-  assert.deepEqual(again, first);
+  const again = await journalsAsked(() => unverified(() => asked('')));
+  assert.equal(again.asked, 0, "the app's memo answered every run");
+  assert.deepEqual(again.value, first);
   const record = path.join(root, 'runs', 'r-home.json');
   write(record, JSON.stringify({ ...JSON.parse(fs.readFileSync(record, 'utf8')), brief: 'The brief of r-home, said again' }));
-  const before = Effect.runSync(e.io()).reads;
-  const after = await unverified(() => asked(''));
-  assert.equal(Effect.runSync(e.io()).reads - before, 1, "r-home's one journal, and no other run's");
-  assert.deepEqual(after.body, await runWith(e, flowNumbers({})));
+  const after = await journalsAsked(() => unverified(() => asked('')));
+  assert.equal(after.asked, 1, "r-home's one journal, and no other run's");
+  assert.deepEqual(after.value.body, await runWith(e, flowNumbers({})));
 });
 
 test("REFUSED at shipped defaults: under WF_VERIFY_REST=1, GET /api/stats refuses an answer of the app's memo unlike a read afresh, naming the run", async () => {

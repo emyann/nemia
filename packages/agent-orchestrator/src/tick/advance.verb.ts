@@ -31,7 +31,7 @@ import { runsDir, stepsOf } from '../record/record.store.ts';
 import { runStore } from '../record/files.store.ts';
 import { handOff } from '../workspace/worktree.store.ts';
 import { collectArtifacts } from '../artifacts/artifacts.store.ts';
-import { refsOf } from '../branches/branches.store.ts';
+import { oneByOne, refsOf } from '../branches/branches.store.ts';
 import { restBlockers, type RestFacts } from '../rest/rest.ts';
 import {
   answersIn,
@@ -40,16 +40,18 @@ import {
   closeoutReader,
   exitVerdicts,
   harnessBlocked,
-  parentRead,
+  keptParent,
   parentsRead,
   saidCount,
   spendReader,
   taskPhasesRead,
   waitingOf,
+  type Parents,
 } from '../views/views.verb.ts';
 import { engineWord, waitsForWord } from '../views/views-words.ts';
 import { within } from '../meter/tally.store.ts';
 import { checkoutHold, landEnding } from '../ending/ending.verb.ts';
+import type { PassRead } from '../cap/cap.verb.ts';
 import { fileChecks, fileReady, fileRounds, fileTries, mayFileOf, type Closer, type Filing, type PassReads } from './file.verb.ts';
 import { closeHeld, stopAsked } from './held.verb.ts';
 
@@ -259,7 +261,7 @@ export const advanceRun = Effect.fn('advance')(function* (run: Run, slot?: RunSl
  *   reads it landed, and no try of it is filed over a merge still staged.
  * - holds this run's ending while another run's works in the repository's checkout (`checkoutHold`), read from the world on this pass,
  *   what it has filed included, so the order a pass takes the runs in decides nothing.
- * - lifts a person's hold on the pass that reads every run it names shipped (`parentOf`), and goes on on that pass. A lift sticks, as a
+ * - lifts a person's hold on the pass that reads every run it names shipped (`keptParent`), and goes on on that pass. A lift sticks, as a
  *   start after `--after` does; only the hold this pass read is lifted (`removeHold`), so one put again since stays; and one that names
  *   no run is never lifted here (`holdAdvice`).
  * - closes each step's task held open that waits for a word nobody is to give (`holdsOpen`): an ungated step that signed off, a gate a
@@ -299,22 +301,25 @@ export const advanceRun = Effect.fn('advance')(function* (run: Run, slot?: RunSl
  * A run that waited on runs cuts its roots, and every worktree and diff after, from its base branch as it stands on the pass that files
  * them, with their work on it, and hands each root what they concluded (`parentCloseouts`); read on that pass, and never again.
  *
- * @param runs The pass's own listing of the store, which `run` is one of: the runs whose claims on the repository's checkout are read
- *   (`checkoutHold`). Left out, the store is listed afresh where the run's ending asks for the checkout.
+ * @param pass What the pass reads once for every run (`PassRead`): its own listing of the store, which `run` is one of, whose claims on the
+ *   repository's checkout are read (`checkoutHold`), the runs the cap holds, and the runs others wait on, which lifting a hold (`liftHold`)
+ *   and admitting the run (`admit`) read through. Left out, the store is listed afresh where the run's ending asks for the checkout, and
+ *   the runs this run waits on are read for this call alone.
  */
-export const advancePass = Effect.fn('advancePass')(function* (e: Engine, run: Run, slot?: RunSlot, runs?: readonly Run[]) {
+export const advancePass = Effect.fn('advancePass')(function* (e: Engine, run: Run, slot?: RunSlot, pass?: PassRead) {
   const { reads, askNotes } = yield* readPass(e, run);
   const { steps, phaseOf, signedOff, asked, verdictOf, sessionBlocked, spendOf, asks, roundAsks } = reads;
   const adopted = yield* adoptAll(e, run, reads);
   if (run.cancelledAt) yield* stopCancelled(e, run, reads);
   const handed = handOffAll(run, reads);
   const landing = landEnding(run, steps, phaseOf, signedOff, asked, spendOf, verdictOf);
-  const checkout = yield* checkoutHold(e, run, steps, runs);
-  const liftNotes = yield* liftHold(e, run);
+  const parents = pass?.parents ?? { git: oneByOne, read: new Map() };
+  const checkout = yield* checkoutHold(e, run, steps, pass && { read: pass, slot });
+  const liftNotes = yield* liftHold(e, run, parents);
   const assessed = assess(steps, run, phaseOf, signedOff, asked, verdictOf, asks, roundAsks, sessionBlocked, spendOf, [], checkout);
   const closer = closerOf(e, reads.views);
   const closeNotes = yield* closeHeldOpen(run, reads, closer);
-  const admission = yield* admit(e, run, slot, reads, assessed);
+  const admission = yield* admit(e, run, slot, reads, assessed, parents);
   const feed = wordFeed(run, reads, assessed, admission, checkout);
 
   const notes: string[] = [...askNotes, ...handed.collected, ...landing.notes, ...liftNotes, ...closeNotes];
@@ -407,11 +412,14 @@ function handOffAll(run: Run, r: PassReads): { collected: string[]; marked: bool
   return { collected, marked };
 }
 
-/** Lift a person's hold once every run it names has shipped, and only the hold this pass read (`removeHold`): answers with its note. */
-const liftHold = Effect.fnUntraced(function* (e: Engine, run: Run) {
+/**
+ * Lift a person's hold once every run it names has shipped, each read through `parents`, and only the hold this pass read (`removeHold`):
+ * answers with its note.
+ */
+const liftHold = Effect.fnUntraced(function* (e: Engine, run: Run, parents: Parents) {
   if (!run.hold || run.cancelledAt || !run.hold.until.length) return [];
   let shipped = true;
-  for (const id of run.hold.until) if (!(shipped = (yield* parentRead(id).pipe(over(e))).shipped)) break;
+  for (const id of run.hold.until) if (!(shipped = (yield* keptParent(id, parents.git, parents.read).pipe(over(e))).shipped)) break;
   if (!shipped || !runStore.holds.lift(run.id, run.hold.at)) return [];
   const { until } = run.hold;
   delete run.hold;
@@ -462,9 +470,19 @@ type Admission = {
   waiting: Wait[];
 };
 
-/** Admit the run's ready steps: while it has nothing filed, once every run it waits on has shipped and the cap leaves it a slot. */
-const admit = Effect.fnUntraced(function* (e: Engine, run: Run, slot: RunSlot | undefined, r: PassReads, assessed: Assessment) {
-  const parent = yield* parentsRead(run).pipe(over(e));
+/**
+ * Admit the run's ready steps: while it has nothing filed, once every run it waits on, read through `parents`, has shipped and the cap
+ * leaves it a slot.
+ */
+const admit = Effect.fnUntraced(function* (
+  e: Engine,
+  run: Run,
+  slot: RunSlot | undefined,
+  r: PassReads,
+  assessed: Assessment,
+  parents: Parents,
+) {
+  const parent = yield* parentsRead(run, parents.git, parents.read).pipe(over(e));
   const starting = !hasStarted(run);
   const need = slotNeed(run, r.phaseOf, assessed, (id) => parent(id).shipped, r.steps);
   const admitted = runAdmitted(run, slot, r.steps);

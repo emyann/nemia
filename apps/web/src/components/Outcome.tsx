@@ -103,7 +103,7 @@ function KindView({
     case 'markdown':
       return <Markdown>{value as string}</Markdown>;
     case 'text':
-      return <p className="whitespace-pre-wrap break-words">{String(value)}</p>;
+      return typeof value === 'string' ? <Markdown>{value}</Markdown> : <p className="whitespace-pre-wrap break-words">{String(value)}</p>;
     case 'json':
       return <Json value={value} />;
   }

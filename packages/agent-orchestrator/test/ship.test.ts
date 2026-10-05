@@ -620,8 +620,9 @@ test("an approved ending stages the merge and signs off its message; the run exe
   const check = tasks.get(checkId)!.spec;
   assert.deepEqual(
     [check.harness, check.cwd, check.deadlineSeconds],
-    ['check', repo, 1200],
-    "the check is filed as any step's is: on the check harness, in the checkout where the merge is, with its deadline",
+    ['check', repo, 2700],
+    "the check is filed as any step's is, on the check harness, in the checkout where the merge is, but with a landing's own deadline: " +
+      'the e2e on the merged tree runs in it (`LANDING_CHECK_DEADLINE_SECONDS`)',
   );
   const command = readRun(id).workflow!.find((s) => s.name === 'ship')!.check!;
   assert.deepEqual(check.config?.command, ['sh', '-c', command], 'the command frozen on the record, with no install to run first');

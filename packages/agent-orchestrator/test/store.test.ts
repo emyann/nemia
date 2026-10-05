@@ -308,6 +308,33 @@ const recording = () => {
   return { e, filed };
 };
 
+test("REFUSED at shipped defaults: a run is never started under an id the store has — a record, the asks one left, or a run's directory", async (t) => {
+  let draws = 0;
+  t.mock.method(Math, 'random', () => (draws++ === 0 ? 0.5 : draws / 97));
+  const first = await Effect.runPromise(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: WORKFLOW, isolate: false }));
+  draws = 0;
+  const second = await Effect.runPromise(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: WORKFLOW, isolate: false }));
+  assert.notEqual(second.id, first.id, "the id drawn again: the first run's record has it");
+
+  const runs = path.join(ROOT, 'runs');
+  fs.rmSync(path.join(runs, `${first.id}.json`));
+  fs.mkdirSync(path.join(runs, `${first.id}.asks`));
+  draws = 0;
+  const third = await Effect.runPromise(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: WORKFLOW, isolate: false }));
+  assert.notEqual(third.id, first.id, 'drawn again: the asks its record left have the id');
+
+  fs.rmSync(path.join(runs, `${first.id}.asks`), { recursive: true });
+  fs.mkdirSync(path.join(runs, first.id));
+  draws = 0;
+  const fourth = await Effect.runPromise(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: WORKFLOW, isolate: false }));
+  assert.notEqual(fourth.id, first.id, "drawn again: the run's own directory has the id");
+  assert.deepEqual(
+    [first, second, third, fourth].map((run) => run.id.replace(/-[^-]+$/, '')),
+    ['add-a-flag', 'add-a-flag', 'add-a-flag', 'add-a-flag'],
+    'each id is the brief, its tail drawn',
+  );
+});
+
 test('a run reads the workflow it froze at `nemia start` — the folder edited afterwards never reaches it', async () => {
   const folder = fs.mkdtempSync(path.join(ROOT, 'frozen-'));
   fs.writeFileSync(path.join(folder, 'implement.md'), 'implement it as asked\n');
@@ -506,6 +533,7 @@ test("the run files a signed step's check itself: the frozen command, in its wor
   assert.deepEqual(
     { harness: spec.harness, cwd: spec.cwd, deadlineSeconds: spec.deadlineSeconds, closeoutSchema: spec.closeoutSchema },
     { harness: 'check', cwd: run.repo, deadlineSeconds: 1200, closeoutSchema: undefined },
+    "a step's check that does not land the run keeps the shorter bound on a hang (`CHECK_DEADLINE_SECONDS`), not a landing's",
   );
   assert.equal('maxAttempts' in spec || 'resume' in spec, false, 'one attempt, as every task is: the runtime refuses a count or a policy');
   assert.equal(spec.brief, 'npm test && npm run typecheck', 'the brief is the check line, for a person reading the task');

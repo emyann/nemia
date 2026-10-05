@@ -132,6 +132,20 @@ export const SKILLS_STREAM = [
   resultLine({ structured_output: { outcome: 'done' } }),
 ].join('\n');
 
+/**
+ * A session in `/w` that read and wrote files: one read twice, one outside its folder, one denied, and a call that names no file,
+ * before its result.
+ */
+export const FILES_STREAM = [
+  JSON.stringify({ type: 'system', subtype: 'init', cwd: '/w', session_id: SESSION, permissionMode: 'default', model: 'claude-haiku-4-5' }),
+  stream.calls(['toolu_r1', 'Read', { file_path: '/w/apps/web/a.tsx' }], ['toolu_e1', 'Edit', { file_path: '/w/b.ts' }]),
+  stream.calls(['toolu_r2', 'Read', { file_path: '/w/apps/web/a.tsx' }], ['toolu_r3', 'Read', { file_path: '/elsewhere/c.ts' }]),
+  stream.calls(['toolu_r4', 'Read', { file_path: '/w/d.ts' }]),
+  stream.denied('toolu_r4', 'Read'),
+  stream.calls(['toolu_g1', 'Grep', { pattern: 'x', path: '/w/e.ts' }], ['toolu_n1', 'NotebookEdit', { notebook_path: '/w/n.ipynb' }]),
+  resultLine({ structured_output: { outcome: 'done' } }),
+].join('\n');
+
 const LONE = [stream.init, stream.denied('toolu_b', 'Bash')].join('\n');
 
 const STREAMS = [
@@ -153,6 +167,7 @@ const STREAMS = [
   [stream.init, stream.calls(['toolu_q', 'Bash', { command: 'ls' }]), stream.toolResult('toolu_q'), resultLine({})].join('\n'),
   SKILLS_STREAM,
   SKILLS_STREAM.split('\n').slice(1).join('\n'),
+  FILES_STREAM,
 ];
 
 const CODEX = [

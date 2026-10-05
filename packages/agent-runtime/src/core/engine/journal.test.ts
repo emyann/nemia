@@ -11,6 +11,7 @@ import { Journal, type JournalError } from './journal.ts';
 import type { Event, Usage } from '../domain.ts';
 import { HarnessArgsSchema, type StoredEvent } from '../event-schema.ts';
 import type { HarnessArgs } from '../../harness/args.ts';
+import { ioCounts } from './tally.ts';
 import { scratch } from '../../../test/scratch.ts';
 
 const root = () => scratch('ae-journal-');
@@ -538,6 +539,32 @@ test('the skills an end names are read back as written, an empty list kept; a li
   assert.ok(error.message.includes('entry 2 is a `ended` event, and its `skills` is "look"'), error.message);
 });
 
+test('the files an end names are read back as written, an empty list kept; a list of anything but paths fails the read', async () => {
+  const end = (attempt: number, files: unknown) => ({
+    kind: 'ended',
+    at: '2026-09-24T00:00:01Z',
+    attempt,
+    sessionId: 's',
+    observed: 'done',
+    reason: 'harness',
+    files,
+  });
+  const dir = legacyStore({ 't-files': [TODAY, end(1, []), end(2, ['apps/web/a.tsx'])] });
+  const read = await run(
+    dir,
+    Effect.flatMap(Journal, (j) => j.read('t-files')),
+  );
+  assert.deepEqual(
+    read.map((e) => (e.kind === 'ended' ? e.files : undefined)),
+    [undefined, [], ['apps/web/a.tsx']],
+  );
+  const error = await failureOf(
+    legacyStore({ 't-bad': [TODAY, end(1, 'b.ts')] }),
+    Effect.flatMap(Journal, (j) => j.read('t-bad')),
+  );
+  assert.ok(error.message.includes('entry 2 is a `ended` event, and its `files` is "b.ts"'), error.message);
+});
+
 test('a harness argument of the wrong type is refused under config and beside it, where a journal from before config put it', async () => {
   for (const filed of [
     { ...TODAY, config: { tools: 'Read' } },
@@ -683,4 +710,108 @@ test('the stored schema names every field of every event, of the harness argumen
   const none: [Forgotten, ForgottenArgs, ForgottenUsage] extends [never, never, never] ? true : [Forgotten, ForgottenArgs, ForgottenUsage] =
     true;
   assert.equal(none, true);
+});
+
+/** One `filesOps` over a fresh directory, a task journal of three events in it, and what its reads cost (`ioCounts` deltas). */
+const cursorStore = async () => {
+  const dir = root();
+  const ops = Journal.filesOps(dir);
+  for (const at of ['2026-01-01T00:00:00Z', '2026-01-01T00:00:01Z', '2026-01-01T00:00:02Z'])
+    await Effect.runPromise(ops.append('t1', ev('starting', at)));
+  const file = path.join(dir, 'tasks', 't1.jsonl');
+  const cost = async () => {
+    const before = ioCounts();
+    const entries = await Effect.runPromise(ops.read('t1'));
+    const after = ioCounts();
+    return { entries, bytes: after.bytesRead - before.bytesRead, reads: after.reads - before.reads };
+  };
+  return { dir, ops, file, cost };
+};
+
+test('a second read of a journal nothing has written to reads no byte', async () => {
+  const { file, cost } = await cursorStore();
+  const first = await cost();
+  assert.equal(first.bytes, fs.statSync(file).size, 'the first read reads the whole journal');
+  const second = await cost();
+  assert.deepEqual([second.bytes, second.reads], [0, 0], 'the second reads nothing');
+  assert.deepEqual(second.entries, first.entries, 'and gives the same entries');
+});
+
+test('a read after another writer appended one event reads only that line, and gives every event', async () => {
+  const { dir, file, cost } = await cursorStore();
+  await cost();
+  const size = fs.statSync(file).size;
+  await Effect.runPromise(Journal.filesOps(dir).append('t1', ev('spawned', '2026-01-01T00:00:03Z')));
+  const line = fs.statSync(file).size - size;
+  const after = await cost();
+  assert.deepEqual([after.bytes, after.reads], [line, 1], `read ${after.bytes} bytes for an appended line of ${line}`);
+  assert.deepEqual(
+    after.entries.map((e) => (e as Event).at),
+    ['2026-01-01T00:00:00Z', '2026-01-01T00:00:01Z', '2026-01-01T00:00:02Z', '2026-01-01T00:00:03Z'],
+  );
+});
+
+test('a journal replaced by a rename over it is read whole', async () => {
+  const { dir, file, cost } = await cursorStore();
+  await cost();
+  const other = path.join(dir, 'tasks', 't1.next');
+  fs.writeFileSync(other, fs.readFileSync(file, 'utf8') + JSON.stringify(ev('spawned', '2026-01-01T00:00:03Z')) + '\n');
+  fs.renameSync(other, file);
+  const after = await cost();
+  assert.equal(after.bytes, fs.statSync(file).size, 'the whole of the new file');
+  assert.equal(after.entries.length, 4);
+});
+
+test('a journal cut shorter is read whole', async () => {
+  const { file, cost } = await cursorStore();
+  await cost();
+  const lines = fs.readFileSync(file, 'utf8').split('\n');
+  fs.writeFileSync(file, lines[0] + '\n');
+  const after = await cost();
+  assert.equal(after.bytes, fs.statSync(file).size, 'the whole of what is left');
+  assert.equal(after.entries.length, 1);
+});
+
+test('a journal rewritten in place to the same size, at another time, is read whole', async () => {
+  const { file, cost } = await cursorStore();
+  await cost();
+  const { mtimeMs, ino } = fs.statSync(file);
+  fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replaceAll('00:00:0', '11:11:1'));
+  fs.utimesSync(file, new Date(mtimeMs + 5000), new Date(mtimeMs + 5000));
+  assert.equal(fs.statSync(file).ino, ino, 'the same file');
+  const after = await cost();
+  assert.equal(after.bytes, fs.statSync(file).size, 'the whole file');
+  assert.deepEqual(
+    after.entries.map((e) => (e as Event).at),
+    ['2026-01-01T11:11:10Z', '2026-01-01T11:11:11Z', '2026-01-01T11:11:12Z'],
+  );
+});
+
+test('a journal gone reads as none, and one made again in its place is read whole', async () => {
+  const { file, cost } = await cursorStore();
+  await cost();
+  const text = fs.readFileSync(file, 'utf8');
+  fs.rmSync(file);
+  const gone = await cost();
+  assert.deepEqual([gone.entries, gone.bytes], [[], 0]);
+  fs.writeFileSync(file, text.split('\n')[0] + '\n');
+  const again = await cost();
+  assert.equal(again.bytes, fs.statSync(file).size, 'the whole file');
+  assert.equal(again.entries.length, 1);
+});
+
+test('a last line cut short fails the read as it always has, and once completed is read for its bytes alone', async () => {
+  const { dir, ops, file, cost } = await cursorStore();
+  await cost();
+  const size = fs.statSync(file).size;
+  fs.appendFileSync(file, '{"kind":"spawned","at":"2026-01');
+  const error = await Effect.runPromise(Effect.flip(Effect.flatMap(Journal, (j) => j.read('t1')).pipe(Effect.provide(Journal.layer(ops)))));
+  assert.ok(error.message.startsWith(`t1's journal (${path.join(dir, 'tasks', 't1.jsonl')}), entry 4 is no JSON object`), error.message);
+  fs.appendFileSync(file, '-01T00:00:03Z","attempt":1}\n');
+  const after = await cost();
+  assert.equal(after.bytes, fs.statSync(file).size - size, 'the cut line and its end, never what came before it');
+  assert.deepEqual(
+    after.entries.map((e) => (e as Event).kind),
+    ['starting', 'starting', 'starting', 'spawned'],
+  );
 });

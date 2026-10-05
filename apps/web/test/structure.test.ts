@@ -2,7 +2,8 @@
  * The board's structure (`docs/architecture.md`, *Who owns what*): it reaches the api over HTTP alone. Its source imports no workspace
  * package and no node built-in, and no relative path that leaves `apps/web` (`importBreaks`); the lint block for `apps/web/src` in
  * `.oxlintrc.json` refuses the same packages as they are typed. Only `lib/useFeed.ts` and `lib/useStepTranscript.ts` open an
- * `EventSource`, the api's two streams (`eventSourceBreaks`). Its reads go through `lib/api/read.ts` (`unschemedReads`, `read.test.ts`).
+ * `EventSource`, the api's two streams (`eventSourceBreaks`), and only `components/Markdown.tsx` imports a markdown renderer
+ * (`rendererBreaks`). Its reads go through `lib/api/read.ts` (`unschemedReads`, `read.test.ts`).
  *
  * The board names no store path and builds no command of its own: a command or a store folder it shows is text the api answered, and no
  * file of `src` spells one, JSDoc included (`STORE_PATHS`, `COMMAND_TEXT`, both empty). `ratchetBreaks` refuses a file the baseline does
@@ -18,6 +19,12 @@ const WEB = path.join(import.meta.dirname, '..');
 
 /** The two files that open a stream from the api, and only they. */
 const STREAMS = ['src/lib/useFeed.ts', 'src/lib/useStepTranscript.ts'];
+
+/** The one file that renders markdown: every surface that shows a text written in markdown draws it through its `Markdown`. */
+const RENDERER = 'src/components/Markdown.tsx';
+
+/** A markdown renderer or a plugin of one: react-markdown, a remark or rehype plugin, Streamdown, marked. */
+const MARKDOWN_MODULE = /^(?:react-markdown|streamdown|marked|remark(?:-[\w-]+)?|rehype(?:-[\w-]+)?)(?:\/|$)/;
 
 /** A store's path or the variable that moves it: `~/.agent-workflows`, `~/.agent-engine`, `WF_ROOT`, `AE_ROOT`. */
 const STORE_PATH = /\.agent-workflows|\.agent-engine|\bWF_ROOT\b|\bAE_ROOT\b/g;
@@ -84,6 +91,16 @@ const eventSourceBreaks = (texts: ReadonlyMap<string, string>): string[] =>
   [...texts]
     .filter(([file, text]) => !STREAMS.includes(file) && /\bEventSource\b/.test(withoutComments(text)))
     .map(([file]) => `${file} opens an EventSource: the api's streams are opened in ${STREAMS.join(' and ')} alone`);
+
+/** Each import of a markdown renderer or its plugins outside `RENDERER`: the board renders markdown in that one file. */
+const rendererBreaks = (texts: ReadonlyMap<string, string>): string[] =>
+  [...texts]
+    .filter(([file]) => file !== RENDERER)
+    .flatMap(([file, text]) =>
+      importsIn(text)
+        .filter((mod) => MARKDOWN_MODULE.test(mod))
+        .map((mod) => `${file} imports ${mod}: the board renders markdown in ${RENDERER} alone, so draw the text with its Markdown`),
+    );
 
 /** Each file's count of `pattern`, for the files that hold it at least once. */
 const measured = (texts: ReadonlyMap<string, string>, pattern: RegExp): Record<string, number> =>
@@ -174,6 +191,29 @@ test('REFUSED: an EventSource opened in another file; one named in a JSDoc is le
     "src/lib/x.ts opens an EventSource: the api's streams are opened in src/lib/useFeed.ts and src/lib/useStepTranscript.ts alone",
   ]);
   assert.deepEqual(planted('/** Follows an EventSource, or anything that dispatches its events. */\nexport const x = 1;\n'), []);
+});
+
+test(`only ${RENDERER} imports a markdown renderer, and it does`, () => {
+  const texts = sourceTexts();
+  assert.deepEqual(rendererBreaks(texts), []);
+  assert.ok(
+    importsIn(texts.get(RENDERER)!).some((mod) => MARKDOWN_MODULE.test(mod)),
+    `${RENDERER} renders with react-markdown`,
+  );
+});
+
+test('REFUSED: a second markdown renderer, or a plugin of one, imported outside the one renderer', () => {
+  const planted = (text: string): string[] => rendererBreaks(new Map([...sourceTexts(), ['src/x.tsx', text]]));
+  assert.deepEqual(planted("import { Streamdown } from 'streamdown';\n"), [
+    'src/x.tsx imports streamdown: the board renders markdown in src/components/Markdown.tsx alone, so draw the text with its Markdown',
+  ]);
+  assert.deepEqual(planted("import ReactMarkdown from 'react-markdown';\n"), [
+    'src/x.tsx imports react-markdown: the board renders markdown in src/components/Markdown.tsx alone, so draw the text with its Markdown',
+  ]);
+  for (const mod of ['marked', 'remark-gfm', 'rehype-raw', 'rehype-sanitize/lib'])
+    assert.match(planted(`import x from '${mod}';\n`).join('\n'), new RegExp(`^src/x\\.tsx imports ${mod}:`), mod);
+  for (const mod of ['./Markdown', '@/components/Markdown', 'remarks'])
+    assert.deepEqual(planted(`import x from '${mod}';\n`), [], `${mod} is let through`);
 });
 
 test('the board spells no store path and no command: the api answers each', () => {

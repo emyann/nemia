@@ -5,7 +5,9 @@
  * package's own verbs read is not a service: the runs, the inbox and the daemon's file are under the package's `HOME`, fixed as it loads
  * (`StoreRoot`, store.ts).
  */
-import { Context, Effect, Layer, type ManagedRuntime } from 'effect';
+import { Context, Effect, Layer, type ManagedRuntime, Metric } from 'effect';
+import type { Context as RequestContext } from 'hono';
+import { routePath } from 'hono/route';
 import {
   freshStatsMemo,
   type Factory,
@@ -77,16 +79,33 @@ export type Served = {
   memo: ReadMemo['Service'];
 };
 
-/** What `served` reads of a request: the app's runtime, and the query's `factory` and `repo`. */
-export type ServedRequest = { var: ApiEnv['Variables']; req: { query: (key: string) => string | undefined } };
+/** The upper bounds of a request's reads, the files the runtime read for it, one past the last for more. */
+const READ_BOUNDS: readonly number[] = [0, 1, 2, 5, 10, 25, 50, 100, 250, 500, 1000];
+
+/**
+ * The files the runtime read for each request, its journals and every other file it reads (the engine's `io`), by the route it was
+ * served on (`route`, the route's pattern, never its path), in the registry of the app's runtime: the process's own unless its layer
+ * gives another. A read is one of bytes: a journal is counted when the engine reads what was appended to it since it last read it, and a
+ * journal it finds as it left it costs a `stat` and is not counted. Counted off the engine's running totals before and after the handler,
+ * so about: a pass or another request reading at the same time is counted here too.
+ */
+export const POLL_READS = Metric.histogram('api.poll.reads', {
+  description: 'the files the runtime read for a request',
+  boundaries: READ_BOUNDS,
+});
+
+/** The files the engine has read so far, its journals among them, or none for an engine that keeps no count (a test's fake). */
+const readsOf = (e: Engine['Service']): Effect.Effect<number | undefined> =>
+  typeof e.io === 'function' ? Effect.map(e.io(), (io) => io.reads) : Effect.succeed(undefined);
 
 /**
  * `handle` over the request's services, run on the app's runtime, in the factory and on the repository the request names (`placeFor`):
  * what it returns, or its rejection itself, so a refusal thrown inside it — the place's among them, before `handle` runs — reaches
  * `app.onError` as the instance it was and is answered by its kind. The handler's body stays a plain function: a failure yielded inside
- * `Effect.gen` never reaches a `try` around it, and the routes catch what they word themselves.
+ * `Effect.gen` never reaches a `try` around it, and the routes catch what they word themselves. The files the runtime read for it are
+ * counted into `POLL_READS`, whether it answered or threw.
  */
-export const served = <A>(c: ServedRequest, handle: (s: Served) => A | Promise<A>): Promise<A> =>
+export const served = <A>(c: RequestContext<ApiEnv>, handle: (s: Served) => A | Promise<A>): Promise<A> =>
   c.var.runtime.runPromise(
     Effect.gen(function* () {
       const { env } = yield* ApiConfig;
@@ -98,8 +117,17 @@ export const served = <A>(c: ServedRequest, handle: (s: Served) => A | Promise<A
         quota: yield* QuotaAsker,
         memo: yield* ReadMemo,
       };
+      const before = yield* readsOf(services.e);
       return yield* Effect.promise(async () =>
         handle({ ...services, ...placeFor({ factory: c.req.query('factory'), repo: c.req.query('repo') }, env) }),
+      ).pipe(
+        Effect.ensuring(
+          Effect.flatMap(readsOf(services.e), (after) =>
+            before === undefined || after === undefined
+              ? Effect.void
+              : Metric.update(Metric.withAttributes(POLL_READS, { route: routePath(c) }), after - before),
+          ),
+        ),
       );
     }),
   );

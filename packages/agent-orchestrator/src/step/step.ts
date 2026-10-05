@@ -49,6 +49,14 @@ export type Workflow = {
    */
   writable?: string[];
   /**
+   * `reads: inbox`: the store's folders this step reads and never writes, each by its name from a closed list (`STORE_READS`): `inbox`,
+   * the cards waiting to be started. Each is filed as a read-only mount of the folder on this machine (`readsMounts`), so Read, Grep and
+   * Glob reach it in any mode and every write is refused, and the brief names its path (`mountsLine`). A name, never a path: the
+   * workflow reads the same on every machine, and no step reads another run's folders. Refused at load for a name off the list, one
+   * given twice, and on a remote agent, and at `nemia start` on a harness that cannot hold the mount.
+   */
+  reads?: string[];
+  /**
    * `slot: none`: a run of this workflow takes no run slot (`WF_MAX_RUNS`).
    *
    * The cap on runs in flight is a cap on the work in flight — N runs' steps at once, and a run with nothing filed waits for one of
@@ -286,6 +294,7 @@ export const STEP_KEYS = [
   'input',
   'workspace',
   'writable',
+  'reads',
   'slot',
   'agent',
   'skills',
@@ -334,6 +343,8 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
     "`main`: the step runs in the repository's own checkout rather than a worktree of its own — a workflow's last step, which acts on the base branch. `folder`: the step works in a folder the run makes, and the run needs no git repository — said by every step of the team, or by none",
   writable:
     "the folders of the run's factory this step may write, each by its directory's name — every other step of the run only reads them; one that is the run's own repository is the step's workspace already — over a fence that writes",
+  reads:
+    'the folders of the store this step reads and never writes, each by name — `inbox`, the cards waiting to be started, the one there is — mounted read-only and named on its brief',
   slot: "`none`: the run takes no run slot (`WF_MAX_RUNS`) — a session that watches the other runs rather than doing a run's work, on a workflow of one step",
   agent:
     "what is attached to this node to do its work: an agent in agents/, whose role keys are this step's defaults and whose instructions come before this step's own note; the step's own keys win",

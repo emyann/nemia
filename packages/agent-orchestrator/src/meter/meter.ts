@@ -16,7 +16,11 @@
 export const PHASES = ['records', 'asks', 'journals', 'observe', 'runtime', 'git', 'assess', 'act'] as const;
 export type Phase = (typeof PHASES)[number];
 
-/** One phase's count: its time in ms, the calls made to it, the bytes and reads counted while it ran, and the processes it started. */
+/**
+ * One phase's count: its time in ms, the calls made to it, the bytes and reads counted while it ran, and the processes it started. A read
+ * is one of bytes: a journal is read for what was appended to it since the engine last read it, and one it finds as it left it costs a
+ * `stat` and no read, so a pass's journal reads are the journals that changed, not the ones it asked for.
+ */
 export type PhaseCost = { ms: number; calls: number; bytes: number; reads: number; spawned: number };
 
 /**
@@ -29,9 +33,10 @@ export type HarnessCost = { calls: number; ms: number; listed: number; spawned: 
  * What one pass cost. `ms` is its time, measured apart from the phases, which add up to it less the counting done inside the pass.
  * `records` is the run records it read, `bytes` and `spawned` its totals, and `overheadMs` what measuring took — the counting inside the
  * pass, and composing this after it and writing it down — so that the meter's own cost is measured too. `rested` is the runs the pass
- * answered from its memo of runs at rest (`rest.ts`), reading neither their tasks nor git for them.
+ * answered from its memo of runs at rest (`rest.ts`), reading neither their tasks nor git for them. Beside the time, what the pass saw
+ * (`Seen`): the runs the store listed to it, the tasks the runtime reported on its pass, and the sessions of those queued and admitted.
  */
-export type PassCost = {
+export type PassCost = Seen & {
   at: string;
   ms: number;
   phases: Record<Phase, PhaseCost>;
@@ -42,6 +47,36 @@ export type PassCost = {
   overheadMs: number;
   rested: number;
 };
+
+/**
+ * What a pass saw beside its time: `runs`, the runs the store listed to it, its size as the pass saw it; `tasks`, the tasks the runtime
+ * reported on its pass, every one not settled; `queued`, those of them waiting for a slot; `admitted`, the sessions holding one — at work,
+ * or admitted and not yet started.
+ */
+export type Seen = { runs: number; tasks: number; queued: number; admitted: number };
+
+/** What a pass sees before it has seen anything. */
+export const NOTHING_SEEN: Seen = { runs: 0, tasks: 0, queued: 0, admitted: 0 };
+
+/**
+ * The tasks a runtime's pass reported, and the sessions of them queued and admitted (`Seen`): `views` the tasks not settled, each with its
+ * admission, and `running` the sessions at work by harness. A session at work counts once, in `running`; one admitted and not yet started
+ * is its view's. A report that carries neither reads as none.
+ */
+export const sessionsOf = (report: {
+  views?: ReadonlyArray<{ admission?: 'queued' | 'admitted' }>;
+  running?: Readonly<Record<string, number>>;
+}): Omit<Seen, 'runs'> => {
+  const views = report.views ?? [];
+  return {
+    tasks: views.length,
+    queued: views.filter((v) => v.admission === 'queued').length,
+    admitted: views.filter((v) => v.admission === 'admitted').length + Object.values(report.running ?? {}).reduce((n, k) => n + k, 0),
+  };
+};
+
+/** A pass's cost as it reads back off disk: what it saw is absent from a file an older tick wrote, which kept none of it. */
+export type PassCostRead = Omit<PassCost, keyof Seen> & Partial<Seen>;
 
 /** A pass's cost from its counts: the totals summed from the phases. */
 export const passCost = (c: Omit<PassCost, 'bytes' | 'spawned'>): PassCost => ({
@@ -124,8 +159,17 @@ export const summaryLine = (i: Interval, now: number): string => {
   );
 };
 
+/** What a pass saw, said in a line, and its journal reads: none from a file an older tick wrote, which kept none of it. */
+const seenLines = ({ runs, tasks, queued, admitted, phases }: PassCostRead): string[] =>
+  runs === undefined
+    ? []
+    : [
+        `it saw ${plural(runs, 'run')} in the store, ${plural(tasks ?? 0, 'task')} not settled, ${queued ?? 0} queued and ${admitted ?? 0} admitted, ` +
+          `and made ${plural(phases.journals.reads, 'journal read')}`,
+      ];
+
 /** The last pass, phase by phase and harness by harness, for `nemia up --stats` and `nemia tick --stats`. */
-export const breakdownLines = (c: PassCost): string[] => {
+export const breakdownLines = (c: PassCostRead): string[] => {
   const rows = PHASES.map((p) => [
     p,
     msWord(c.phases[p].ms),
@@ -148,7 +192,136 @@ export const breakdownLines = (c: PassCost): string[] => {
       (c.rested ? `, ${plural(c.rested, 'run')} at rest answered from memory` : ''),
     line(head),
     ...rows.map(line),
+    ...seenLines(c),
     ...(harnesses.length ? ['observed, by harness (at once, so their times overlap):', ...harnesses] : ['no harness was observed']),
     `measuring it: ${msWord(c.overheadMs)} ms`,
+  ];
+};
+
+/**
+ * One pass as the store keeps it among the recent (`tick-recent.json`): when, its time, what it saw (`Seen`), the run records it read and
+ * the runs it answered from memory, its journal reads (`reads`, those of its `journals` phase), and each phase's time.
+ */
+export type RecentPass = Seen & {
+  at: string;
+  ms: number;
+  records: number;
+  rested: number;
+  reads: number;
+  phases: Record<Phase, number>;
+};
+
+/** A pass's cost as it is kept among the recent passes (`RecentPass`). */
+export const recentOf = (c: PassCost): RecentPass => ({
+  at: c.at,
+  ms: c.ms,
+  runs: c.runs,
+  tasks: c.tasks,
+  queued: c.queued,
+  admitted: c.admitted,
+  records: c.records,
+  rested: c.rested,
+  reads: c.phases.journals.reads,
+  phases: Object.fromEntries(PHASES.map((p) => [p, c.phases[p].ms])) as Record<Phase, number>,
+});
+
+/** How many recent passes the store keeps: about ten minutes of a daemon ticking every four seconds. */
+export const RECENT_KEPT = 150;
+
+/** The upper bounds, in ms, of a pass's buckets, one past the last for any longer: the histogram's, and the pass's metric's. */
+export const PASS_BOUNDS: readonly number[] = [10, 25, 50, 100, 250, 500, 1000, 2500, 5000];
+
+/** One bucket of passes: those over the bound before and at most `le` ms, `le` null for the last, which has no bound. */
+export type PassBucket = { le: number | null; count: number };
+
+/** The passes counted into the buckets of `bounds`, each in the first whose bound it does not pass, and one past the last for the rest. */
+export const passHistogram = (recent: readonly Pick<RecentPass, 'ms'>[], bounds: readonly number[] = PASS_BOUNDS): PassBucket[] => {
+  const counts = Array.from({ length: bounds.length + 1 }, () => 0);
+  for (const { ms } of recent) {
+    const at = bounds.findIndex((le) => ms <= le);
+    counts[at < 0 ? bounds.length : at]++;
+  }
+  return counts.map((count, k) => ({ le: k < bounds.length ? bounds[k] : null, count }));
+};
+
+/** One phase over the recent passes: its time a pass, on average, and its share of all their time. */
+export type PassPart = { phase: Phase; ms: number; share: number };
+
+/** Each phase over `recent` (`PassPart`), heaviest first, the phases' own order between equals; none for no pass. */
+export const passParts = (recent: readonly Pick<RecentPass, 'ms' | 'phases'>[]): PassPart[] => {
+  if (!recent.length) return [];
+  const whole = recent.reduce((n, r) => n + r.ms, 0);
+  return PHASES.map((phase) => {
+    const ms = recent.reduce((n, r) => n + r.phases[phase], 0);
+    return { phase, ms: ms / recent.length, share: whole > 0 ? ms / whole : 0 };
+  }).sort((a, b) => b.ms - a.ms);
+};
+
+/**
+ * The recent passes in a few numbers: how many, the median and the slowest time, and what the latest saw — the runs listed, the journal
+ * reads, the tasks, the sessions queued and admitted. Null for no pass.
+ */
+export type PassSummary = Seen & { passes: number; medianMs: number; slowestMs: number; reads: number; at: string };
+
+/** The recent passes' summary (`PassSummary`), null for none. */
+export const passSummary = (recent: readonly RecentPass[]): PassSummary | null => {
+  const latest = recent.at(-1);
+  if (!latest) return null;
+  const sorted = recent.map((r) => r.ms).sort((a, b) => a - b);
+  const mid = sorted.length >> 1;
+  return {
+    passes: recent.length,
+    medianMs: sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2,
+    slowestMs: sorted.at(-1)!,
+    at: latest.at,
+    runs: latest.runs,
+    tasks: latest.tasks,
+    queued: latest.queued,
+    admitted: latest.admitted,
+    reads: latest.reads,
+  };
+};
+
+/**
+ * What `nemia passes` and `GET /api/passes` answer: the recent passes, oldest first, and of them the histogram over `bounds`, the parts
+ * and the summary.
+ */
+export type PassesRead = {
+  recent: RecentPass[];
+  histogram: PassBucket[];
+  parts: PassPart[];
+  summary: PassSummary | null;
+  bounds: readonly number[];
+};
+
+/** The answer of the recent passes `recent` (`PassesRead`). */
+export const passesRead = (recent: RecentPass[]): PassesRead => ({
+  recent,
+  histogram: passHistogram(recent),
+  parts: passParts(recent),
+  summary: passSummary(recent),
+  bounds: PASS_BOUNDS,
+});
+
+/** A bucket's bound as a person reads it: `≤ 100 ms`, and `> 5000 ms` for the last. */
+const bucketWord = (b: PassBucket, bounds: readonly number[]): string => (b.le === null ? `> ${bounds.at(-1)} ms` : `≤ ${b.le} ms`);
+
+/** `nemia passes`' lines: the summary, the histogram a row a bucket from the first to the last with passes, and the parts. */
+export const passesLines = ({ recent, histogram, parts, summary, bounds }: PassesRead): string[] => {
+  if (!summary) return ['no pass is kept yet: nemia up, or the api, ticks the store and keeps its last passes'];
+  const first = histogram.findIndex((b) => b.count > 0);
+  const last = histogram.length - 1 - [...histogram].reverse().findIndex((b) => b.count > 0);
+  const most = Math.max(...histogram.map((b) => b.count));
+  const width = Math.max(...histogram.map((b) => bucketWord(b, bounds).length));
+  return [
+    `${plural(summary.passes, 'pass', 'passes')} since ${recent[0].at}: ${msWord(summary.medianMs)} ms a pass (median), slowest ${msWord(summary.slowestMs)}`,
+    `the last pass: ${plural(summary.runs, 'run')} in the store, ${plural(summary.reads, 'journal read')}, ` +
+      `${plural(summary.tasks, 'task')} not settled, ${summary.queued} queued, ${summary.admitted} admitted`,
+    'passes by time:',
+    ...histogram
+      .slice(first, last + 1)
+      .map((b) => `  ${bucketWord(b, bounds).padStart(width)}  ${'#'.repeat(Math.ceil((b.count / most) * 30))} ${b.count}`),
+    'where the time went, a pass on average:',
+    ...parts.map((p) => `  ${p.phase.padEnd(8)} ${msWord(p.ms).padStart(7)} ms  ${Math.round(p.share * 100)}%`),
   ];
 };

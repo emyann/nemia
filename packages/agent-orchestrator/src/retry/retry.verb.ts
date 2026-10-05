@@ -15,7 +15,7 @@ import { toldOf } from '../tick/file.verb.ts';
 import type { Workflow } from '../workflow.ts';
 import { retryable, retryRefusal, type RetryAsk, type RetryHow } from './index.ts';
 import { artifactsDir, stepsOf } from '../record/record.store.ts';
-import { runStore } from '../record/files.store.ts';
+import { inboxDir, runStore } from '../record/files.store.ts';
 import { strayAsk } from '../say/say.verb.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, spendReader, taskPhasesRead } from '../views/views.verb.ts';
 import { Conflict, Invalid } from '../refusal/refusal.ts';
@@ -113,7 +113,13 @@ function tryRefused(run: Run, steps: readonly Workflow[], step: Workflow, how: R
   const record = run.steps[step.name];
   const budgetUsd = budgetUsdFor(how.budget ?? budgetOf(step, record), stepSpend(run, step.name, spendOf));
   const runArtifacts = path.dirname(artifactsDir(run, step.name));
-  const config = filedConfig(step, steps, run, { model: tryModel(step, record, how), budgetUsd, runArtifacts, own: toldOf(run, step).own });
+  const config = filedConfig(step, steps, run, {
+    model: tryModel(step, record, how),
+    budgetUsd,
+    runArtifacts,
+    inbox: inboxDir(),
+    own: toldOf(run, step).own,
+  });
   const flags = { ...(how.mode === 'fresh' && how.model !== undefined && { model: how.model }), budget: how.budget };
   return filedRefusal((c) => configRefusal(step.harness ?? DEFAULT_HARNESS, c), step.name, config, lineOf(step, flags));
 }

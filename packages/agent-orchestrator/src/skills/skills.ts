@@ -1,6 +1,8 @@
 /**
  * A skill on an agent: the entry an agent's card lists for it (`skillEntryOf`), a SKILL.md written back from a draft (`renderSkill`,
- * `skillDraftOf`), its `preload:` line switched alone (`withPreload`), and a rule it declares (`SkillRule`).
+ * `skillDraftOf`), its `preload:` line switched alone (`withPreload`), a rule it declares (`SkillRule`), and the paths of the work it is
+ * for (`appliesOf`, `appliesMatch`): its `applies:` line, globs from the folder a session runs in, which `nemia stats` reads to tell a try
+ * that touched them; the harness ignores it.
  */
 import { FRONTMATTER, refuse, SKILLS_FOLDER, splitFrontmatter } from '../step/step.ts';
 import { frontmatterKey } from '../former/former.ts';
@@ -322,3 +324,45 @@ function entryValue(file: string, key: EntryKey, written: string): string | stri
   if (/:(\s|$)/.test(written)) return cannot('holds a colon and a space, which YAML reads as a map, not as text');
   return written.replace(/\s+#.*$/, '');
 }
+
+/**
+ * The globs a SKILL.md's `applies:` line names (`text`, the whole file): a one-line JSON list of globs, or one glob, plain or in double
+ * quotes, each from the folder a session runs in (`apps/web/**`). `[]` where it names none, or in any other form — a list over several
+ * lines among them, which `test/skills-rendered.test.ts` refuses on every SKILL.md of the repository.
+ */
+export function appliesOf(text: string): string[] {
+  const written = frontmatterKey(text, 'applies');
+  if (written === undefined) return [];
+  let read: unknown = written;
+  if (written.startsWith('[') || written.startsWith('"')) {
+    try {
+      read = JSON.parse(written);
+    } catch {
+      return [];
+    }
+  }
+  const globs = Array.isArray(read) ? read : [read];
+  return globs.every((g) => typeof g === 'string' && g.trim()) ? globs.map((g: string) => g.trim()) : [];
+}
+
+/** A glob as a pattern: `**` any folders, `*` any name's characters, `?` one of them, every other character itself. */
+const globPattern = (glob: string): RegExp =>
+  new RegExp(
+    `^${glob
+      .split(/(\*\*\/?|\*|\?)/)
+      .map((part) =>
+        part === '**/'
+          ? '(?:.*/)?'
+          : part === '**'
+            ? '.*'
+            : part === '*'
+              ? '[^/]*'
+              : part === '?'
+                ? '[^/]'
+                : part.replace(/[.+^${}()|[\]\\]/g, '\\$&'),
+      )
+      .join('')}$`,
+  );
+
+/** Whether the file `file`, a path from the folder a session ran in, is one of the paths `globs` name (`appliesOf`). */
+export const appliesMatch = (file: string, globs: readonly string[]): boolean => globs.some((g) => globPattern(g).test(file));

@@ -9,7 +9,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Cause, Effect, Exit } from 'effect';
 import { asked, awaited, over, type ClaudeFlags, type CodexArgs, type Engine, type TaskView } from '../runtime-client.ts';
-import { CHECK_DEADLINE_SECONDS, CHECK_NICENESS, checkArgv, type CheckEnv, type CheckHanded, type Verdict } from '../check/check.ts';
+import {
+  CHECK_DEADLINE_SECONDS,
+  CHECK_NICENESS,
+  checkArgv,
+  LANDING_CHECK_DEADLINE_SECONDS,
+  type CheckEnv,
+  type CheckHanded,
+  type Verdict,
+} from '../check/check.ts';
 import { isRemoteHarness, type Workflow } from '../workflow.ts';
 import { resultSteps } from '../branches/branches.ts';
 import { holdsOpen } from '../gate/gate.ts';
@@ -43,11 +51,11 @@ import {
 } from '../status/status.ts';
 import { composeBrief, remoteBrief, type EndingStopped, type ParentCloseout, type ParentStep, type RetryBriefing } from '../brief/index.ts';
 import { roundFiled } from '../round/round.ts';
-import { filedConfig, tryModel } from '../filed/filed.ts';
+import { filedConfig, readsMounts, tryModel } from '../filed/filed.ts';
 import { closeoutSchemaOf, parseCloseout, type Closeout } from '../closeout/closeout.ts';
-import { modeWord, nextTry, sessionModel, type Retry, type RetryAsk } from '../retry/index.ts';
+import { modeWord, nextTry, sessionModel, tryWord, type Retry, type RetryAsk } from '../retry/index.ts';
 import { artifactsDir, inputsDir, stepsOf } from '../record/record.store.ts';
-import { runStore } from '../record/files.store.ts';
+import { inboxDir, runStore } from '../record/files.store.ts';
 import { checkCloseout, writeCheckCloseout } from '../check/check.store.ts';
 import { checkoutParts, gitSays, realRepoOf, workspaceFor } from '../workspace/worktree.store.ts';
 import { agentFilesDir, renderedIn, skillsAgain } from '../agents/agents.store.ts';
@@ -238,18 +246,6 @@ const stopFirst = Effect.fnUntraced(function* (f: Filing, r: Retry, taskId: stri
   );
 });
 
-/** The note that says a try, and on whose word: `retries:`, a nudge to sign off, or `nemia retry` and what it was typed with. */
-const tryWord = (r: Retry, step: Workflow): string =>
-  `${r.step}: try ${r.try} — ${r.by === 'retries' ? `retries: ${step.retries}` : r.by === 'signoff' ? 'a nudge to sign off, once a round' : askedWord(r)}`;
-
-/**
- * A try asked for, as `tryWord` says it: by `nemia pause --now`, which stopped its session or check, or by `nemia retry` as it was typed.
- */
-const askedWord = (r: Retry): string =>
-  r.by === 'pause'
-    ? `${r.mode === 'recheck' ? 'rechecked' : 'continued'} after nemia pause --now`
-    : `nemia retry ${modeWord(r)}${r.budget !== undefined ? ` --budget ${r.budget}` : ''}${r.message !== undefined ? ', with your answer' : ''}`;
-
 /** Whether a try is a person's nudge that answers the step's task held open, in the session that signed, rather than a task of its own. */
 const answersHeld = (f: Filing, r: Retry, step: Workflow, record: StepRecord): boolean => {
   const { run, reads } = f;
@@ -336,6 +332,7 @@ const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: Workflow
         undefined,
         inputsDir(run),
         checked,
+        readsMounts(told.step, inboxDir()),
       );
   const budgetUsd = budgetUsdFor(r.budget ?? budgetOf(step, record), stepSpend(run, r.step, reads.spendOf));
   if (answers) return yield* answerHeld(e, taskId, brief, budgetUsd);
@@ -411,6 +408,7 @@ const trySpec = (
       model: tryModel(step, record, r),
       budgetUsd: t.budgetUsd,
       runArtifacts: path.dirname(artifactsDir(f.run, step.name)),
+      inbox: inboxDir(),
       own: t.told.own,
     }),
     resumeFrom: t.resumeFrom,
@@ -484,6 +482,8 @@ function roundSpec(f: Filing, r: Round, looping: Workflow, target: Workflow, tas
       },
       undefined,
       inputsDir(run),
+      undefined,
+      readsMounts(told.step, inboxDir()),
     ),
     cwd: record.workspace ?? run.workspace,
     harness: target.harness,
@@ -492,6 +492,7 @@ function roundSpec(f: Filing, r: Round, looping: Workflow, target: Workflow, tas
       config: filedConfig(target, reads.steps, run, {
         model: sessionModel(target, record),
         runArtifacts: path.dirname(artifactsDir(run, target.name)),
+        inbox: inboxDir(),
         budgetUsd: budgetUsdFor(
           r.budget !== undefined && r.raise?.includes(r.target) ? r.budget : budgetOf(target, record),
           stepSpend(run, r.target, reads.spendOf),
@@ -518,8 +519,8 @@ export const fileChecks = Effect.fn('fileChecks')(function* (f: Filing, names: r
 });
 
 /**
- * File a step's check where the engine does not hold it, on the `check` harness, with the command the run froze and a deadline, and put it
- * on the record: an ending's installs first what the staged merge's lockfile asks for (`checkoutParts`), and says so.
+ * File a step's check where the engine does not hold it, on the `check` harness, with the command the run froze and a deadline, a landing's
+ * its own, and put it on the record: an ending's installs first what the staged merge's lockfile asks for (`checkoutParts`), and says so.
  */
 const fileCheck = Effect.fnUntraced(function* (f: Filing, name: string) {
   const { e, run } = f;
@@ -530,7 +531,8 @@ const fileCheck = Effect.fnUntraced(function* (f: Filing, name: string) {
     fs.mkdirSync(path.dirname(checkCloseout(taskId)), { recursive: true });
     const files = artifactsDir(run, name);
     fs.mkdirSync(files, { recursive: true });
-    const install = isGitRun(run) && landsOnCheck(step, run) ? (checkoutParts(workspace) ?? undefined) : undefined;
+    const lands = isGitRun(run) && landsOnCheck(step, run);
+    const install = lands ? (checkoutParts(workspace) ?? undefined) : undefined;
     const closeout = f.reads.signedOff(name);
     if (install)
       f.notes.push(
@@ -552,7 +554,7 @@ const fileCheck = Effect.fnUntraced(function* (f: Filing, name: string) {
         priority: MOMENTUM,
         brief: step.check!,
         cwd: workspace,
-        deadlineSeconds: CHECK_DEADLINE_SECONDS,
+        deadlineSeconds: lands ? LANDING_CHECK_DEADLINE_SECONDS : CHECK_DEADLINE_SECONDS,
         config: { command: checkArgv(step.check!, install !== undefined), env, niceness: CHECK_NICENESS },
       }),
     );
@@ -633,6 +635,7 @@ function readySpec(
           step.after.length ? undefined : parents,
           inputsDir(run),
           said.checked,
+          readsMounts(told.step, inboxDir()),
         ),
     cwd: place.workspace,
     harness: step.harness,
@@ -642,6 +645,7 @@ function readySpec(
       config: filedConfig(step, reads.steps, run, {
         model: step.model,
         runArtifacts: path.dirname(artifactsDir(run, step.name)),
+        inbox: inboxDir(),
         budgetUsd: budgetUsdFor(budgetOf(step, run.steps[step.name]), stepSpend(run, step.name, reads.spendOf)),
         own: told.own,
       }),

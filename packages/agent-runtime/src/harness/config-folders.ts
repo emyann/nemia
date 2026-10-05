@@ -6,7 +6,7 @@
 import { CLAUDE_CONFIG_FOLDERS } from './claude/vocabulary.ts';
 
 /** Every folder name a harness reads as its own configuration inside a mounted folder, each harness's list once. */
-export const CONFIG_FOLDERS: readonly string[] = [...new Set([...CLAUDE_CONFIG_FOLDERS])];
+export const CONFIG_FOLDERS: readonly string[] = [...new Set(CLAUDE_CONFIG_FOLDERS)];
 
 /**
  * The first segment of `path`, split on either separator, that is one of `CONFIG_FOLDERS`; `undefined` when none is. A segment is matched

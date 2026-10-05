@@ -50,7 +50,9 @@ function doorBreaches(read: (file: string) => string): string[] {
     if (seen.has(file)) continue;
     seen.add(file);
     if (!DOOR_FILES.includes(file)) {
-      out.push(`the vocabulary door loads ${file}: keep it to the vocabulary files, choices.ts, reach.ts and config-folders.ts, or the door loads a runner`);
+      out.push(
+        `the vocabulary door loads ${file}: keep it to the vocabulary files, choices.ts, reach.ts and config-folders.ts, or the door loads a runner`,
+      );
       continue;
     }
     for (const spec of valueImports(read(file))) {

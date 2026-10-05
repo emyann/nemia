@@ -8,7 +8,12 @@ import { CONFIG_FOLDERS, configFolderIn } from '../src/vocabulary.ts';
 import { CLAUDE_CONFIG_FOLDERS } from '../src/harness/claude/vocabulary.ts';
 
 test('a path through .claude, as a whole segment on either separator, names it', () => {
-  for (const p of ['.claude/skills/x/SKILL.md', 'docs/.claude/agents/a.md', 'a\\.claude\\b', '/runs/r/artifacts/s/.claude/skills/x/SKILL.md'])
+  for (const p of [
+    '.claude/skills/x/SKILL.md',
+    'docs/.claude/agents/a.md',
+    'a\\.claude\\b',
+    '/runs/r/artifacts/s/.claude/skills/x/SKILL.md',
+  ])
     assert.equal(configFolderIn(p), '.claude', p);
 });
 

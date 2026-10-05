@@ -3063,7 +3063,11 @@ test('REFUSED: a declared artifact through a folder a harness reads as its own c
     assert.equal(artifactPlace(f, FILES), 'configuration', f);
   for (const f of ['claude/x.md', '.claude-notes/x.md', 'x.claude', '.e2e/shot.png']) assert.equal(artifactPlace(f, FILES), 'workspace', f);
   assert.equal(artifactPlace(`${FILES}/claude/x.png`, FILES), 'files');
-  assert.equal(artifactPlace('/srv/.claude/r/files/shot.png', '/srv/.claude/r/files'), 'files', 'only the path inside the directory counts');
+  assert.equal(
+    artifactPlace('/srv/.claude/r/files/shot.png', '/srv/.claude/r/files'),
+    'files',
+    'only the path inside the directory counts',
+  );
   assert.equal(artifactPlace('../.claude/x', FILES), 'escapes');
   assert.equal(artifactPlace('/etc/.claude/x', FILES), 'outside');
   assert.equal(artifactPlace(`${FILES}-old/.claude/x`, FILES), 'outside');

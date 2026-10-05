@@ -2262,13 +2262,13 @@ and every write she proposes is asked of the person at a prompt, over Remote Con
   never fights the person — and `nemia level semi-auto` then gives a fresh one. Her task is long-lived (`restartPolicy: 'Always'`,
   `background: true`, Remote Control on), in `$WF_ROOT/nemia/`, at `permissionMode: default`, with every factory's folders mounted
   read-only and her memory writable; her instruction is frozen at filing, the shipped one followed by the person's custom one.
-- **Her subscription is `nemia`**, with the default wake words and a digest once a day; `nemia subscribe nemia` and `nemia
+- **Her subscription is `nemia`**, with the default wake words and `denied:`, and a digest once a day; `nemia subscribe nemia` and `nemia
   unsubscribe nemia` are refused, pointing to `nemia level` (`Conflict`).
 - **`nemia memory [<fact>]`** (`src/nemia/memory.verb.ts`, also `GET /api/nemia/memory[/:fact]`) lists the facts she keeps in
   `$WF_ROOT/nemia/memory/`, or prints one; read-only, so she stays its one writer.
 - **What she is ships in `packages/agent-orchestrator/nemia/`**: `nemia.md` (her instruction, her allow list of read verbs and her deny
   list: push, a forced branch delete, a merge, a kill by name, a pull request or release by `gh`, `browser_run_code_unsafe`), and her
-  skills `recap`, `bring-a-gate` and `commission-a-workflow`. A factory's own rules are its instruction (`NEMIA.md`), which she reads
+  skills `recap`, `bring-a-gate`, `grant-access` and `commission-a-workflow`. A factory's own rules are its instruction (`NEMIA.md`), which she reads
   before acting there; this repository's is `NEMIA.md` at its root.
 
 Her machine, drawn by its code:
@@ -2293,13 +2293,20 @@ stateDiagram-v2
 ```
 <!-- diagram:nemia:end -->
 
-Not built here, each its own card: a step's access denials as a `denied:` note on the feed, with a `grant-access` skill that proposes
-the allow; her allow of the daemon's `GET /api/quota`; and her own spend on `nemia level`. `commission-a-workflow` is the spec's
-`commission-argus`, named for what it does in any factory, since no team name ships; `nemia factory instruction` is not on her allow
-list, since its write flags share its prefix.
+- **A step denied a call says so on its feed line**: a note part `denied: <call> ×<n>, …` (`deniedNote`, `src/feed/feed.ts`), off the
+  denials its task's ended attempts journalled (`deniedCallsOf`), each distinct call counted, at most five named. `denied:` is one of
+  her wake words, and her `grant-access` skill proposes the narrowest allow that would have let the call through, or says the deny
+  stands.
+- **Her quota and her spend**: her task is allowed `curl -s <url>/api/quota` unasked, the address read off `daemon.json` at filing
+  (`quotaUrl`), and told it in her first message; none where the daemon serves no board. `nemia level` says what her ended sessions
+  cost (`spend`), counted as a step's are (`taskSpend`).
 
-Tested in `src/nemia/nemia.test.ts` (what the keeper owes; a task stopped from outside never filed again; the levels; the diagram),
-`src/nemia/keep.verb.test.ts` (the untrusted refusal, the filing and its fields, a stop from outside, manual, memory),
+`commission-a-workflow` is the spec's `commission-argus`, named for what it does in any factory, since no team name ships; `nemia factory
+instruction` is not on her allow list, since its write flags share its prefix.
+
+Tested in `src/nemia/nemia.test.ts` (what the keeper owes; a task stopped from outside never filed again; the levels; the diagram;
+`denied:` waking her alone), `src/nemia/keep.verb.test.ts` (the untrusted refusal, the filing and its fields, the quota allow, her spend,
+a stop from outside, manual, memory), `src/feed/feed.test.ts` (the `denied:` note, and a tick that says it once),
 `src/subscription/subscription.verb.test.ts` (the name `nemia` refused), `test/agent-fences.test.ts` (her deny list, and a mode but
 `default` refused) and `test/nemia-shipped.test.ts` (no team name ships; each skill named ships).
 

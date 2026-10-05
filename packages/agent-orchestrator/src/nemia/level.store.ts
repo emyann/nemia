@@ -16,6 +16,7 @@ import { stepFrom } from '../workflow/index.ts';
 import type { Workflow } from '../step/step.ts';
 import { firstRefusal } from '../record/record.store.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
+import { daemonFile, parseDaemonFile } from '../daemon/daemon.store.ts';
 import { LEVELS, type LevelFile } from './nemia.ts';
 
 /** The store she is kept in, read once as the package loads, as `subscription.store.ts` reads its `ROOT`. */
@@ -147,3 +148,16 @@ export function promptAllows(): string[] {
   const allow = (raw as { permissions?: { allow?: unknown } } | null)?.permissions?.allow;
   return Array.isArray(allow) ? allow.filter((rule): rule is string => typeof rule === 'string') : [];
 }
+
+/**
+ * Where the store's quota is read, `<url>/api/quota` at the address its daemon's api serves (`daemon.json`); undefined with no daemon, one
+ * stopped, one serving no board (`nemia up`), or a file that does not read.
+ */
+export const quotaUrl = (): string | undefined => {
+  try {
+    const held = parseDaemonFile(fs.readFileSync(daemonFile(), 'utf8'));
+    return held?.url !== undefined && held.stoppedAt === undefined ? `${held.url}/api/quota` : undefined;
+  } catch {
+    return undefined;
+  }
+};

@@ -35,7 +35,10 @@ const e = {
     Effect.sync(() => {
       const t = b.tasks.get(id);
       const settled = t && ['succeeded', 'failed', 'stopped'].includes(t.phase) ? t.phase : null;
-      const state = t ? { filedAt: '2026-10-05T16:00:00.000Z', settled, stopRequested: b.stopped.includes(id) } : { settled: null };
+      const attempts = [{ n: 1, endedAt: '2026-10-05T16:30:00.000Z', reason: null, usage: { costUsd: 0.42 } }];
+      const state = t
+        ? { filedAt: '2026-10-05T16:00:00.000Z', settled, stopRequested: b.stopped.includes(id), attempts }
+        : { settled: null, attempts: [] };
       return { id, phase: t?.phase ?? 'pending', sessionId: t ? '0123456789abcdef' : null, state } as unknown as TaskView;
     }),
 };
@@ -77,6 +80,15 @@ test('at semi-auto the keeper files her task long-lived, subscribes it once open
   fs.mkdirSync(path.dirname(customInstructionsFile(ROOT, 'nemia')), { recursive: true });
   fs.writeFileSync(customInstructionsFile(ROOT, 'nemia'), 'Answer in French. Times in Montreal.\n');
   trust(true);
+  const daemon = {
+    pid: process.pid,
+    by: 'api',
+    url: 'http://127.0.0.1:8787',
+    startedAt: '2026-10-05T15:00:00.000Z',
+    cwd: ROOT,
+    every: 2000,
+  };
+  fs.writeFileSync(path.join(ROOT, 'daemon.json'), JSON.stringify(daemon));
   const set = (await runWith(e, LEVEL.handler({ level: 'semi-auto' }))) as { task: string; phase: string | null };
   assert.equal(set.phase, null, 'not filed until the keeper beats');
   assert.deepEqual(await beat(), ['file']);
@@ -89,6 +101,8 @@ test('at semi-auto the keeper files her task long-lived, subscribes it once open
   assert.equal(spec.config.background, true);
   assert.deepEqual(spec.config.disallowedTools, shipped.disallowedTools);
   assert.ok((spec.config.allowedTools as string[]).includes(`Edit(/${memoryDir()}/**)`), 'her memory hers to write');
+  assert.ok((spec.config.allowedTools as string[]).includes('Bash(curl -s http://127.0.0.1:8787/api/quota)'), 'the quota hers to read');
+  assert.match((spec as unknown as { brief: string }).brief, /`curl -s http:\/\/127\.0\.0\.1:8787\/api\/quota`/);
   const own = spec.config[DEFAULT_HARNESS] as { remoteControl: boolean; appendSystemPromptFile: string; pluginDir: string[] };
   assert.equal(own.remoteControl, true);
   assert.equal(own.appendSystemPromptFile, promptFile());
@@ -100,10 +114,13 @@ test('at semi-auto the keeper files her task long-lived, subscribes it once open
     listSubscriptions().map((s) => [s.name, s.subscription.task]),
     [['nemia', set.task]],
   );
+  assert.ok(listSubscriptions()[0].subscription.wake?.includes('denied:'), "a step's denied calls wake her");
   assert.deepEqual(await beat(), [], 'level-triggered: nothing filed again');
   assert.equal(b.filings.filter((id) => id === set.task).length, 1);
-  const status = (await runWith(e, LEVEL.handler({}))) as { reach: string[]; level: string };
+  const status = await runWith(e, LEVEL.handler({}));
   assert.equal(status.level, 'semi-auto');
+  assert.deepEqual(status.spend, { usd: 0.42, measured: 1, unmeasured: 0 });
+  assert.ok(LEVEL.print(status, {}).includes('spent $0.42 over 1 session ended; her open one counts once it ends'));
   assert.equal(status.reach[0], `${DEFAULT_HARNESS} attach 01234567`);
   const again = (await runWith(e, LEVEL.handler({ level: 'semi-auto' }))) as { task: string };
   assert.equal(again.task, set.task, 'semi-auto again keeps her open task');

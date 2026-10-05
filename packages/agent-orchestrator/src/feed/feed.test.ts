@@ -16,7 +16,7 @@ import { Cause, Effect, Exit, Fiber } from 'effect';
 import type { Engine } from '../runtime-client.ts';
 import type { Run } from '../record/record.ts';
 import { listing } from '../list/list.ts';
-import { feedChanges, feedPhase, feedWords, foldFeed, publishedOf, type FeedLine } from './feed.ts';
+import { deniedNote, feedChanges, feedPhase, feedWords, foldFeed, publishedOf, type FeedLine } from './feed.ts';
 import { nodeChild } from '../../test/child.ts';
 import { scratch } from '../../test/scratch.ts';
 import { promised } from '../../test/promised.ts';
@@ -47,7 +47,10 @@ const refusedWith = (pattern: RegExp) => (err: Error & { exitCode?: number }) =>
  * is running with it, and a settled one carries the closeout it is given. It counts its reads, so a test can say the feed asked for none.
  */
 const board = () => {
-  const tasks = new Map<string, { spec: { id: string; brief: string; closeoutSchema?: object }; phase: string; closeout?: unknown }>();
+  const tasks = new Map<
+    string,
+    { spec: { id: string; brief: string; closeoutSchema?: object }; phase: string; closeout?: unknown; denials?: object[] }
+  >();
   const settledPhase = (p: string) => ['succeeded', 'failed', 'stopped'].includes(p);
   let views = 0;
   const e = promised({
@@ -72,7 +75,8 @@ const board = () => {
               : [
                   {
                     n: 1,
-                    ended: null,
+                    ended: t.denials ? { at: '2026-09-22T10:05:00.000Z' } : null,
+                    ...(t.denials ? { denials: t.denials } : {}),
                     nativeId: `native-${id}`,
                     closeout: t.closeout,
                     exitCode: null,
@@ -98,7 +102,8 @@ const board = () => {
     feed: async () => ({ entries: [], cursor: 0 }),
   });
   const set = (id: string, phase: string, closeout?: unknown) => Object.assign(tasks.get(id)!, { phase, closeout });
-  return { e, set, views: () => views };
+  const deny = (id: string, denials: object[]) => Object.assign(tasks.get(id)!, { denials });
+  return { e, set, deny, views: () => views };
 };
 
 /** A store with no runs and no feed. */
@@ -266,6 +271,25 @@ test("a run waiting at its ending's gate reads `awaiting approval` in the feed, 
     words(broke.id).at(-1),
     'failed',
     'a run in which a step did break says so: a word that fits a gate is not a word that hides a failure',
+  );
+});
+
+test('a step whose ended attempt was denied a call says it on its line in the feed, denied:, once over passes', async () => {
+  emptyStore();
+  const b = board();
+  const run = await started('the denial');
+  await runWith(b.e, tickRun());
+  b.deny(`${run.id}-plan`, [
+    { tool: 'Bash', what: 'git push' },
+    { tool: 'Bash', what: 'git push' },
+  ]);
+  b.set(`${run.id}-plan`, 'running (working)');
+  for (let i = 0; i < 3; i++) await runWith(b.e, tickRun());
+  const denied = lines().filter((l) => l.run === run.id && l.step === 'plan' && l.note?.startsWith('denied:'));
+  assert.deepEqual(
+    denied.map((l) => l.note),
+    ['denied: Bash(git push) ×2'],
+    'said once, over three passes',
   );
 });
 
@@ -964,6 +988,32 @@ test('feedWords says the run with its prune, what waits on a person as a note, a
     'pruned too',
   );
   assert.deepEqual(feedWords(held, run, { status: 'failed' }).run, { word: 'failed' }, 'and one that broke says failed');
+});
+
+test("a step's denied calls are its note's denied: part, each distinct call counted, in the order first denied, the rest past five counted", () => {
+  assert.equal(deniedNote([]), '', 'a step denied nothing says nothing of it');
+  assert.equal(deniedNote(['Bash(git push)', 'WebFetch', 'Bash(git push)']), 'denied: Bash(git push) ×2, WebFetch ×1');
+  assert.equal(deniedNote(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'a']), 'denied: a ×2, b ×1, c ×1, d ×1, e ×1, and 2 more');
+  assert.equal(deniedNote(['Bash(echo\nrm)']), 'denied: Bash(echo rm) ×1', 'one line');
+  const steps = [{ name: 'build', after: [], brief: 'build it' }] as unknown as Parameters<typeof listing>[0]['steps'];
+  const run = {
+    id: 'r-1',
+    brief: 'b',
+    createdAt: '2026-09-22T10:00:00.000Z',
+    steps: {},
+    repo: '/r',
+    branch: 'wf/r-1',
+    base: 'main',
+  } as unknown as Run;
+  const l = listing({ steps, run, phaseOf: () => 'unknown', closeoutOf: () => undefined, asks: [], roundAsks: [], answers: [], waits: [] });
+  const words = feedWords(
+    l,
+    run,
+    { status: 'running' },
+    () => undefined,
+    (step) => (step === 'build' ? ['Bash(git push)'] : []),
+  );
+  assert.equal(words.steps[0].note?.split(' · ')[0], 'denied: Bash(git push) ×1', 'a part of its own, first beside a need');
 });
 
 test('the fold keeps the last word of each run and step, forgets a removed run, and the diff owes a line only for what moved', () => {

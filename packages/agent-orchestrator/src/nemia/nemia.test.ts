@@ -4,7 +4,18 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { levelRefusal, nemiaDiagram, nemiaDue, nemiaGraph, nemiaState, nemiaTaskId, type HerTask, type LevelFile } from './nemia.ts';
+import { DEFAULT_WAKE, sortLine } from '../subscription/subscription.ts';
+import {
+  NEMIA_WAKE,
+  levelRefusal,
+  nemiaDiagram,
+  nemiaDue,
+  nemiaGraph,
+  nemiaState,
+  nemiaTaskId,
+  type HerTask,
+  type LevelFile,
+} from './nemia.ts';
 
 const SEMI: LevelFile = { level: 'semi-auto', since: '2026-10-05T16:00:00.000Z', task: 'nemia-1' };
 const MANUAL: LevelFile = { level: 'manual', since: '2026-10-05T17:00:00.000Z', task: 'nemia-1' };
@@ -58,4 +69,10 @@ test('her diagram draws every edge and each verb from every state it is taken fr
     graph.verbs.map((v) => v.verb),
     ['level semi-auto', 'level manual'],
   );
+});
+
+test("a step's denied calls wake her, and only her: the default wake words leave them to the digest", () => {
+  const line = { at: '2026-10-05T16:00:00.000Z', run: 'r-1', step: 'build', word: 'running', note: 'denied: Bash(git push) ×1 · try 2' };
+  assert.equal(sortLine(line, NEMIA_WAKE), 'wake');
+  assert.equal(sortLine(line, DEFAULT_WAKE), 'routine');
 });

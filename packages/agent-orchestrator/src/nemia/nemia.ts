@@ -23,8 +23,8 @@ export type LevelFile = { level: Level; since: string; task?: string };
 /** The name of her subscription to the feed, which the keeper alone puts and drops: refused to `nemia subscribe` and `unsubscribe`. */
 export const NEMIA_SUBSCRIPTION = 'nemia';
 
-/** The words of the feed that wake her: those that wait on a person (`DEFAULT_WAKE`). */
-export const NEMIA_WAKE: readonly string[] = [...DEFAULT_WAKE];
+/** The words of the feed that wake her: those that wait on a person (`DEFAULT_WAKE`), and a step's calls denied (`denied:`). */
+export const NEMIA_WAKE: readonly string[] = [...DEFAULT_WAKE, 'denied:'];
 
 /**
  * The minutes a digest of the feed's routine lines waits for a wake: a day, so routine news reaches her mostly folded into a line that

@@ -20,8 +20,8 @@ In this order, a line or two each, and leave out a part with nothing in it:
 1. **Landed**: the runs that reached their base, by their brief's first words.
 2. **Waiting on you**: each gate, question or held run, oldest first, with how long it has waited.
 3. **Failed or blocked**: each, with the step and the reason in its own words.
-4. **Spent**: what the runs spent since the last recap, your own session's spend where the store says it, and the quota's pace where
-   `nemia ls` or the board shows it.
+4. **Spent**: what the runs spent since the last recap (`nemia ls`), your own sessions' spend (`nemia level`), and the quota's pace,
+   read with the command your first message names, when it names one.
 5. **Next**: the one thing you recommend the person do now, and why.
 
 Read `nemia ls` for what is in flight and `nemia decide <run>` for a run whose state you report. Quote a step's words rather than

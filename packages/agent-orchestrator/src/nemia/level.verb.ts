@@ -10,13 +10,14 @@ import type { Command } from '../command/entry.verb.ts';
 import { DEFAULT_HARNESS } from '../harness/harness.ts';
 import { Conflict } from '../refusal/refusal.ts';
 import { EngineService, asked, tried, trustedFolder, type Engine } from '../runtime-client.ts';
+import { dollars, taskSpend, type Spend } from '../status/status.ts';
 import { nemiaDir, promptAllows, readLevel, writeLevel } from './level.store.ts';
 import { LEVEL_FORM, levelRefusal, nemiaTaskId, type Level, type LevelFile } from './nemia.ts';
 
 /**
  * Where Nemia is, as `nemia level` answers: her `level` and since when; her task, its phase and its session where one is filed; how a
- * person reaches her session (`reach`); whether her task was stopped from outside (`stopped`); and the allow rules a person gave her at
- * a prompt (`allows`).
+ * person reaches her session (`reach`); whether her task was stopped from outside (`stopped`); what her sessions cost (`spend`, counted as
+ * each ends, as a step's; null where none is filed); and the allow rules a person gave her at a prompt (`allows`).
  */
 export type NemiaLevel = {
   level: Level;
@@ -26,6 +27,7 @@ export type NemiaLevel = {
   sessionId: string | null;
   reach: string[];
   stopped: boolean;
+  spend: Spend | null;
   allows: string[];
 };
 
@@ -37,6 +39,12 @@ const reachOf = (sessionId: string | null): string[] =>
   sessionId === null
     ? []
     : [`${DEFAULT_HARNESS} attach ${sessionId.slice(0, 8)}`, 'or the web link her session shows once its bridge is up, from a phone too'];
+
+/** What her sessions cost, off her task's view: a `Spend`, its share of the step's (`taskSpend`). */
+const spendOf = (view: Parameters<typeof taskSpend>[0]): Spend | null => {
+  const spent = taskSpend(view);
+  return spent === undefined ? null : { usd: spent.usd, measured: spent.measured, unmeasured: spent.unmeasured };
+};
 
 /** Where she is, off the level file and her task's view. */
 const levelNow = (e: Engine) =>
@@ -53,6 +61,7 @@ const levelNow = (e: Engine) =>
       sessionId,
       reach: filed && !view.state.settled ? reachOf(sessionId) : [],
       stopped: file?.level === 'semi-auto' && filed && (Boolean(view.state.settled) || view.state.stopRequested),
+      spend: filed ? spendOf(view) : null,
       allows: yield* tried(promptAllows),
     } satisfies NemiaLevel;
   });
@@ -84,6 +93,10 @@ const levelBy = (args: Args) =>
     return yield* levelNow(e);
   });
 
+/** What her sessions cost, as `nemia level` says it: each counted as it ends, her open one not yet. */
+const spendLine = ({ usd, measured, unmeasured }: Spend): string =>
+  `spent ${dollars(usd)} over ${measured} session${measured === 1 ? '' : 's'} ended${unmeasured ? `, ${unmeasured} not measured` : ''}; her open one counts once it ends`;
+
 /** What `nemia level` prints of where she is. */
 function levelLines(data: NemiaLevel): string[] {
   const head = `Nemia: ${data.level}${data.since === null ? '' : ` since ${data.since}`}`;
@@ -93,12 +106,13 @@ function levelLines(data: NemiaLevel): string[] {
       : data.phase === null
         ? [`her session ${data.task}: not filed yet, the keeper files it at its next beat (nemia up, or the api, keeps her)`]
         : [`her session ${data.task}: ${data.phase}`];
+  const spent = data.spend === null ? [] : [spendLine(data.spend)];
   const stopped = data.stopped ? ['it was stopped from outside and is not filed again: nemia level semi-auto starts a fresh one'] : [];
   const reach = data.reach.length ? ['reach her:', ...data.reach.map((line) => `  ${line}`)] : [];
   const allows = data.allows.length
     ? ['allowed at a prompt, beyond what ships (her folder’s local settings):', ...data.allows.map((rule) => `  ${rule}`)]
     : [];
-  return [head, ...session, ...stopped, ...reach, ...allows];
+  return [head, ...session, ...spent, ...stopped, ...reach, ...allows];
 }
 
 /**

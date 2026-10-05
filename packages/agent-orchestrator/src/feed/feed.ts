@@ -168,12 +168,15 @@ export const feedPhase = (word: string): string =>
  *
  * @param closeoutOf How each step signed off, as `listing` was handed it: a step that signed off blocked says what it needs beside its
  *   word.
+ * @param deniedOf Each call a step's task was denied, in the runtime's words (`denialText`), as its ended attempts journalled them: a step
+ *   denied a call says which beside its word (`deniedNote`).
  */
 export function feedWords(
   l: Listing,
   run: Pick<Run, 'pruned' | 'hold'>,
   { status, stoppedOn }: Pick<Assessment, 'status' | 'stoppedOn'>,
   closeoutOf: (step: string) => Closeout | { error: string } | undefined = () => undefined,
+  deniedOf: (step: string) => readonly string[] = () => [],
 ): FeedWords {
   const onYou = onYouWords(l);
   return {
@@ -186,7 +189,7 @@ export function feedWords(
           : {}),
     },
     steps: l.steps.map((s) => {
-      const note = [needsNote(closeoutOf(s.name)), s.note].filter(Boolean).join(' · ');
+      const note = [needsNote(closeoutOf(s.name)), deniedNote(deniedOf(s.name)), s.note].filter(Boolean).join(' · ');
       return { name: s.name, word: l.slot && s.status === slotWord(l.slot) ? SLOT_WAIT : shownStatus(s), ...(note ? { note } : {}) };
     }),
   };
@@ -206,6 +209,23 @@ const NEEDS_CAP = 200;
 const needsNote = (c: Closeout | { error: string } | undefined): string => {
   const needs = c && !('error' in c) && c.outcome === 'blocked' && typeof c.needs === 'string' ? oneLine(c.needs, NEEDS_CAP) : '';
   return needs ? `needs: ${needs}` : '';
+};
+
+/** The most distinct calls a step's `denied:` note names; the rest are counted. */
+const DENIED_CAP = 5;
+
+/**
+ * The calls a step's task was denied, for its line in the feed: `denied: <call> ×<n>, …`, each distinct call once with how many times it
+ * was denied, in the order first denied, at most `DENIED_CAP` named and the rest counted — or nothing, for a step denied nothing. A
+ * subscriber woken by `denied:` reads the call a grant would have let through.
+ */
+export const deniedNote = (calls: readonly string[]): string => {
+  const counts = new Map<string, number>();
+  for (const call of calls.map((c) => oneLine(c, NEEDS_CAP))) counts.set(call, (counts.get(call) ?? 0) + 1);
+  if (!counts.size) return '';
+  const named = [...counts].slice(0, DENIED_CAP).map(([call, n]) => `${call} ×${n}`);
+  const more = counts.size > DENIED_CAP ? [`and ${counts.size - DENIED_CAP} more`] : [];
+  return `denied: ${[...named, ...more].join(', ')}`;
 };
 
 /** The refusal of a cursor `nemia feed` or `nemia watch` does not take: a second, or anything but a whole number of bytes. */

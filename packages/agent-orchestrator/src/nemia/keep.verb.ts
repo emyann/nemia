@@ -15,7 +15,7 @@ import { readFactories } from '../factory/factory.store.ts';
 import { feedSize } from '../feed/feed.store.ts';
 import { dropSubscription, listSubscriptions, putSubscription } from '../subscription/subscription.store.ts';
 import { EngineService, asked, type Engine } from '../runtime-client.ts';
-import { composePrompt, memoryDir, nemiaDir, readLevel, readNemia, SHIPPED_NEMIA } from './level.store.ts';
+import { composePrompt, memoryDir, nemiaDir, quotaUrl, readLevel, readNemia, SHIPPED_NEMIA } from './level.store.ts';
 import { NEMIA_DIGEST_EVERY, NEMIA_SUBSCRIPTION, NEMIA_WAKE, nemiaDue, type HerTask, type NemiaAct } from './nemia.ts';
 
 /** What the keeper did, each act counted once done. */
@@ -32,9 +32,15 @@ export const KEEP_DEFAULTS: KeepOptions = { every: '5 seconds' };
 /** Her priority among the tasks waiting for a slot: above every step, so the person's agent is never queued behind the work. */
 const NEMIA_PRIORITY = 1_000_000;
 
-/** What her session is told first, once filed: the rest is her instruction's. */
-const NEMIA_BRIEF =
-  'You are on, at semi-auto. Read your memory, then wait: the feed is said to you when it needs the person, and the person may open you.';
+/** The call that reads the quota at `quota`, allowed her unasked: a read of the daemon's own api. */
+export const quotaCall = (quota: string): string => `curl -s ${quota}`;
+
+/** What her session is told first, once filed, and how she reads the quota at `quota`, where the daemon serves one. */
+const nemiaBrief = (quota: string | undefined): string =>
+  [
+    'You are on, at semi-auto. Read your memory, then wait: the feed is said to you when it needs the person, and the person may open you.',
+    ...(quota === undefined ? [] : [`The quota and its pace: \`${quotaCall(quota)}\`.`]),
+  ].join(' ');
 
 /** Each factory's folders, read-only: what she reads of the work and never writes. A factory that does not read is left out. */
 const factoryFolders = (): Mount[] => {
@@ -47,9 +53,10 @@ export function nemiaSpec(id: string): Parameters<Engine['file']>[0] {
   const step = readNemia();
   const prompt = composePrompt(step.body);
   const memory = `Edit(/${memoryDir()}/**)`;
+  const quota = quotaUrl();
   return {
     id,
-    brief: NEMIA_BRIEF,
+    brief: nemiaBrief(quota),
     cwd: nemiaDir(),
     harness: step.harness ?? DEFAULT_HARNESS,
     restartPolicy: 'Always',
@@ -58,7 +65,7 @@ export function nemiaSpec(id: string): Parameters<Engine['file']>[0] {
       ...(step.model === undefined ? {} : { model: step.model }),
       permissionMode: step.permissionMode ?? 'default',
       ...(step.disallowedTools === undefined ? {} : { disallowedTools: step.disallowedTools }),
-      allowedTools: [...(step.allowedTools ?? []), memory],
+      allowedTools: [...(step.allowedTools ?? []), memory, ...(quota === undefined ? [] : [`Bash(${quotaCall(quota)})`])],
       background: true,
       mounts: factoryFolders(),
       ...ownOf({ harness: step.harness, remote: true }, { appendSystemPromptFile: prompt, pluginDir: [SHIPPED_NEMIA] }, () => undefined),

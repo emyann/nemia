@@ -60,6 +60,6 @@ export type { SessionState, Ended, Outcome } from './core/index.ts';
 export { HARNESS_ARGS, TURN_ARGS, type CodexArgs, type HarnessArgs, type Mount } from './harness/index.ts';
 export type { ClaudeFlags } from './harness/claude/index.ts';
 export type { HarnessQuota, McpServer, QuotaLimit, SpawnRequest, Transcript, TranscriptCursor, TranscriptEvent } from './harness/index.ts';
-export type { FeedEntry, FeedRefusal, Cursor } from './core/engine/index.ts';
+export type { FeedEntry, FeedRefusal, Cursor, SweepReport } from './core/engine/index.ts';
 export type { IoCounts } from './core/engine/index.ts';
 export type { RefusedMove, TaskList, TaskView, UnreadableTask } from './core/engine/index.ts';

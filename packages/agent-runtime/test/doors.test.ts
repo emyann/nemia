@@ -6,6 +6,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { Effect } from 'effect';
 import {
   type EngineOptions,
@@ -176,6 +177,47 @@ test('each verb gives the same answer through either door, over one store', asyn
 
   const io = await effect((e) => e.io());
   assert.deepEqual(Object.keys(io).sort(), Object.keys(promise.io()).sort());
+
+  const none = { removable: 0, bytes: 0, kept: 0, removed: 0 };
+  assert.deepEqual(
+    [await effect((e) => e.sweep()), await promise.sweep({ yes: true })],
+    [none, none],
+    'a store that keeps no bodies has none',
+  );
+});
+
+test('a brief filed in parts is kept once through either door, and a body its journal names is refused removal at both', async () => {
+  const sessions = new Map<string, Sighting>();
+  const options: EngineOptions = {
+    root: scratch('ae-doors-bodies-'),
+    harnesses: { fake: fakeHarness(sessions, []) },
+    defaultHarness: 'fake',
+  };
+  const effect = <A, E>(f: (e: EngineShape) => Effect.Effect<A, E>): Promise<A> =>
+    Effect.runPromise(Engine.use(f).pipe(Effect.provide(Engine.layer(options))));
+  const promise = promiseEngine(Engine.layer(options));
+  const shared = `## Context\n${'the same context, said again. '.repeat(60)}\n`;
+  const briefParts = [`## Task\nthe first, ${'its own words. '.repeat(80)}\n`, shared];
+  await effect((e) => e.file({ brief: briefParts.join(''), briefParts, cwd: '/r', id: 'one', queued: true }));
+  await promise.file({ brief: briefParts.slice(1).join(''), briefParts: briefParts.slice(1), cwd: '/r', id: 'two', queued: true });
+  assert.deepEqual(
+    [(await effect((e) => e.view('one'))).state.brief, (await promise.view('two')).state.brief],
+    [briefParts.join(''), shared],
+    'each brief reads back whole',
+  );
+  const counted = { removable: 0, bytes: 0, kept: 2, removed: 0 };
+  assert.deepEqual([await effect((e) => e.sweep()), await promise.sweep()], [counted, counted], 'the shared part is one body');
+
+  const ref = createHash('sha256').update(shared, 'utf8').digest('hex');
+  const tagged = await failure(effect((e) => e.removeBody(ref)));
+  assert.equal(tagged._tag, 'BodyRefused', tagged.message);
+  assert.equal(
+    tagged.message,
+    `Body ${ref} is still named by task one's journal, and a body is removed only once no journal and no feed entry names it: leave it.`,
+  );
+  const plain = await failure(promise.removeBody(ref));
+  assert.deepEqual([plain.message, plain.exitCode], [`removeBody: ${tagged.message}`, 2]);
+  assert.deepEqual(await promise.sweep({ yes: true }), counted, 'a sweep removes nothing a journal names');
 });
 
 test('a long-lived task through either door: filed with its restart policy, idle and left open across passes, and ended by a stop alone', async () => {
@@ -326,6 +368,27 @@ test('each refusal is a tagged error at the Effect door, and its words behind th
       () => promise.output('one', 'stdout', lastBytes as never),
       new RegExp(`^\`lastBytes: ${String(lastBytes).replace('.', '\\.')}\` is not a count of bytes`),
     ]),
+    [
+      'file',
+      'FileRefused',
+      () => effect((e) => e.file({ brief: 'one two', briefParts: ['one', 'three'], cwd: '/r' })),
+      () => promise.file({ brief: 'one two', briefParts: ['one', 'three'], cwd: '/r' }),
+      /^`briefParts` do not join into `brief`/,
+    ],
+    [
+      'removeBody',
+      'BodyRefused',
+      () => effect((e) => e.removeBody('f'.repeat(64))),
+      () => promise.removeBody('f'.repeat(64)),
+      /^This store keeps no bodies, so there is no body f{64} to remove\.$/,
+    ],
+    [
+      'sweep',
+      'BodyRefused',
+      () => effect((e) => untyped(e.sweep)({ yes: 'please' })),
+      async () => untyped(promise.sweep)({ yes: 'please' }),
+      /^takes nothing to count the bodies no journal names, or `\{ yes: true \}` to remove them; it was handed \{"yes":"please"\}\.$/,
+    ],
     [
       'quota',
       'QuotaRefused',

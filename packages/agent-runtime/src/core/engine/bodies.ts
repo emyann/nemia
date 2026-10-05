@@ -224,31 +224,47 @@ export const resolver = (bodies: BodyOps | undefined) => {
   const text = (ref: BodyRef): Effect.Effect<string, BodyError> => {
     const known = texts.get(ref);
     if (known !== undefined) return Effect.succeed(known);
-    if (!bodies) return Effect.fail(new BodyError({ message: `names ${where(ref)}, and this store keeps no bodies: read it with the store that wrote it.` }));
+    if (!bodies)
+      return Effect.fail(
+        new BodyError({ message: `names ${where(ref)}, and this store keeps no bodies: read it with the store that wrote it.` }),
+      );
     return Effect.flatMap(bodies.get(ref), (got) => {
-      if (got === undefined) return Effect.fail(new BodyError({ message: `names ${where(ref)}, which is missing: restore it from a backup of the store.` }));
+      if (got === undefined)
+        return Effect.fail(new BodyError({ message: `names ${where(ref)}, which is missing: restore it from a backup of the store.` }));
       if (refOf(got) !== ref) {
-        return Effect.fail(new BodyError({ message: `names ${where(ref)}, which holds another text than its reference names: restore it from a backup of the store.` }));
+        return Effect.fail(
+          new BodyError({
+            message: `names ${where(ref)}, which holds another text than its reference names: restore it from a backup of the store.`,
+          }),
+        );
       }
       texts.set(ref, got);
       return Effect.succeed(got);
     });
   };
   const field = (key: keyof typeof STANDS_FOR, value: unknown): Effect.Effect<unknown, BodyError> => {
-    if (key !== 'briefParts') return key === 'closeoutSchemaBody' ? Effect.map(text(value as BodyRef), (json) => JSON.parse(json) as unknown) : text(value as BodyRef);
+    if (key !== 'briefParts')
+      return key === 'closeoutSchemaBody'
+        ? Effect.map(text(value as BodyRef), (json) => JSON.parse(json) as unknown)
+        : text(value as BodyRef);
     return Effect.map(
-      Effect.forEach(value as (string | { body: BodyRef })[], (part) => (typeof part === 'string' ? Effect.succeed(part) : text(part.body))),
+      Effect.forEach(value as (string | { body: BodyRef })[], (part) =>
+        typeof part === 'string' ? Effect.succeed(part) : text(part.body),
+      ),
       (texts) => texts.join(''),
     );
   };
   const read = Effect.fn('resolve')(function* (entry: StoredEvent) {
     const out: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(entry)) {
-      if (Object.hasOwn(STANDS_FOR, key)) out[STANDS_FOR[key as keyof typeof STANDS_FOR]] = yield* field(key as keyof typeof STANDS_FOR, value);
+      if (Object.hasOwn(STANDS_FOR, key))
+        out[STANDS_FOR[key as keyof typeof STANDS_FOR]] = yield* field(key as keyof typeof STANDS_FOR, value);
       else out[key] = value;
     }
-    if (out.kind === 'filed' && typeof out.brief !== 'string') return yield* Effect.fail(new BodyError({ message: 'is a `filed` event with no `brief` and no `briefParts`: take it out.' }));
-    if (out.kind === 'input' && typeof out.text !== 'string') return yield* Effect.fail(new BodyError({ message: 'is an `input` with no `text` and no `textBody`: take it out.' }));
+    if (out.kind === 'filed' && typeof out.brief !== 'string')
+      return yield* Effect.fail(new BodyError({ message: 'is a `filed` event with no `brief` and no `briefParts`: take it out.' }));
+    if (out.kind === 'input' && typeof out.text !== 'string')
+      return yield* Effect.fail(new BodyError({ message: 'is an `input` with no `text` and no `textBody`: take it out.' }));
     const resolved = out as Resolved;
     done.set(entry, resolved);
     return resolved;

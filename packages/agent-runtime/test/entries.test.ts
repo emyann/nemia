@@ -30,6 +30,7 @@ const PINNED: Record<string, string[]> = {
   ],
   'agent-runtime/effect': [
     'AdmitRefused',
+    'BodyRefused',
     'CLAUDE_AUTO_DROPPED',
     'CLAUDE_CONTEXT_TOKENS',
     'CLAUDE_EFFORTS',

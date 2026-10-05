@@ -45,6 +45,8 @@ export function promiseEngine<E>(layer: Layer.Layer<EngineService, E>): Engine {
     answer: (taskId, text, options) => run('answer', service.answer(taskId, text, options)),
     close: (taskId) => run('close', service.close(taskId)),
     feed: (after) => run('feed', service.feed(after)),
+    sweep: (...args: unknown[]) => run('sweep', Reflect.apply(service.sweep, service, args) as ReturnType<EngineShape['sweep']>),
+    removeBody: (ref) => run('removeBody', service.removeBody(ref)),
     watch: (options) => Effect.runSync(service.watch(options)),
     io: () => Effect.runSync(service.io()),
     start: (options) => Effect.runSync(service.start(options)),

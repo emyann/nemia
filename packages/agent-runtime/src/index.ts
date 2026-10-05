@@ -58,8 +58,9 @@ export { view, viewOfState, tick, TickRefused, step, settleTask, StepRefused, GR
 export type { Filing } from './core/engine/index.ts';
 export type { RefusedMove, TaskView } from './core/engine/index.ts';
 
-export { Journal, JournalError } from './core/engine/index.ts';
-export type { FeedEntry, FeedRefusal, Cursor, JournalOps } from './core/engine/index.ts';
+export { Journal, JournalError, BodyRefused } from './core/engine/index.ts';
+export type { FeedEntry, FeedRefusal, Cursor, JournalOps, PlainJournalOps, BodiedJournalOps, SweepReport } from './core/engine/index.ts';
+export type { BodyEntry, BodyOps, BodyRef } from './core/engine/index.ts';
 
 export { Runner, RunnerError, testOps } from './harness/index.ts';
 export { claudeOps } from './harness/claude/index.ts';

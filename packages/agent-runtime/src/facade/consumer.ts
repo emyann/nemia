@@ -15,6 +15,7 @@ import {
   type FeedRefusal,
   type IoCounts,
   type RefusedMove,
+  type SweepReport,
   type TaskList,
   type TaskView,
 } from '../core/engine/index.ts';
@@ -390,6 +391,19 @@ export type Engine = {
    * said on `refused` (`FeedRefusal`), so it is met by one read and stops no reader.
    */
   feed: (after?: Cursor) => Promise<{ entries: FeedEntry[]; cursor: Cursor; refused?: FeedRefusal[] }>;
+  /**
+   * Count the bodies of the store no journal and no feed entry names, put more than a day ago, with their bytes; given
+   * `{ yes: true }`, remove them, each only if no put came since it was counted. A long text a journal holds — a brief's part,
+   * a schema, a nudge, an answer — is kept once, as a body named by the sha256 of its text, and read back whole. A store that
+   * keeps no bodies has none to count. Refused — an `Error` whose `exitCode` is 2 — for an argument other than nothing or `{ yes }`.
+   */
+  sweep: (options?: { yes?: boolean }) => Promise<SweepReport>;
+  /**
+   * Remove the body `ref`, the sha256 of its text, as `sweep` would. Refused — an `Error` whose `exitCode` is 2, nothing removed —
+   * for a `ref` that is no reference, a body the store does not have, one a journal or the feed still names (naming it), and one
+   * put within a day, whose line may still be on its way.
+   */
+  removeBody: (ref: string) => Promise<void>;
   /**
    * Watch everything that happens, as it happens — the engine's event-driven surface.
    *

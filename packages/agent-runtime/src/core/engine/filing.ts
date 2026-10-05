@@ -160,21 +160,25 @@ export const file = Effect.fn('file')(function* (spec: Filing) {
   if (refused) return yield* Effect.fail(new FileRefused({ message: refused }));
   const journal = yield* Journal;
   const id = spec.id ?? `t-${Date.now().toString(36)}-${randomUUID().slice(0, 8)}`;
-  yield* journal.append(id, {
-    kind: 'filed',
-    at: new Date().toISOString(),
-    brief: spec.brief,
-    cwd: spec.cwd,
-    harness: spec.harness,
-    config: spec.config,
-    deadlineSeconds: spec.deadlineSeconds,
-    resumeFrom: spec.resumeFrom,
-    closeoutSchema: spec.closeoutSchema,
-    holdOpen: spec.holdOpen,
-    queued: spec.queued === true,
-    ...(spec.priority !== undefined && spec.priority !== 0 ? { priority: spec.priority } : {}),
-    ...(spec.restartPolicy === 'Always' ? { restartPolicy: 'Always' as const } : {}),
-  }, spec.briefParts);
+  yield* journal.append(
+    id,
+    {
+      kind: 'filed',
+      at: new Date().toISOString(),
+      brief: spec.brief,
+      cwd: spec.cwd,
+      harness: spec.harness,
+      config: spec.config,
+      deadlineSeconds: spec.deadlineSeconds,
+      resumeFrom: spec.resumeFrom,
+      closeoutSchema: spec.closeoutSchema,
+      holdOpen: spec.holdOpen,
+      queued: spec.queued === true,
+      ...(spec.priority !== undefined && spec.priority !== 0 ? { priority: spec.priority } : {}),
+      ...(spec.restartPolicy === 'Always' ? { restartPolicy: 'Always' as const } : {}),
+    },
+    spec.briefParts,
+  );
   return id;
 });
 

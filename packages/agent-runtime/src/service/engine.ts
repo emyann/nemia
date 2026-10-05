@@ -60,13 +60,17 @@ import {
   type Cursor,
   type FeedEntry,
   type FeedRefusal,
+  type SweepReport,
   type TaskList,
   type TaskView,
+  BodyRefused,
 } from '../core/engine/index.ts';
 import { claudeSayRefuses, isClaudeJob } from '../harness/claude/index.ts';
 import { OutputRefused, outputVerbOf } from './output.ts';
 import { DEFAULT_HARNESSES } from './harnesses.ts';
 import { a2aOps, type SeamOps } from '../a2a/index.ts';
+import { bodyVerbsOf } from './bodies.ts';
+import { watchOf } from './watch.ts';
 import {
   journalOf,
   handleOf,
@@ -133,7 +137,8 @@ export const listRefusalOf = (args: readonly unknown[]): string | undefined => {
  * The engine's verbs, each an Effect with what refuses it on its error channel. Each does what the verb of the same name on
  * `agent-runtime`'s `Engine` does, where each is described, and fails with a tagged error where that one rejects with an `Error`
  * whose `exitCode` is 2: `FileRefused`, `TickRefused`, `AdmitRefused`, `ListRefused`, `TranscriptRefused`, `OutputRefused`,
- * `SayRefused`, `QuotaRefused`, `StopRefused` for `stop`, and `InputRefused` for `answer` and `close`. `SayUnsent` is `say`'s
+ * `SayRefused`, `QuotaRefused`, `StopRefused` for `stop`, `InputRefused` for `answer` and `close`, and `BodyRefused` for `sweep` and
+ * `removeBody`. `SayUnsent` is `say`'s
  * failure that is not a refusal; a `JournalError` or a `RunnerError` is the store's or the harness's. `watch`, `io` and `start`
  * succeed at once: `watch` and `start` with a handle that stops them.
  */
@@ -159,6 +164,8 @@ export type EngineShape = {
   readonly quota: (harness?: string) => Effect.Effect<HarnessQuota, QuotaRefused | RunnerError>;
   readonly answer: (taskId: string, text: string, options?: { config?: HarnessArgs }) => Effect.Effect<Input, InputRefused | JournalError>;
   readonly close: (taskId: string) => Effect.Effect<void, InputRefused | JournalError>;
+  readonly sweep: (options?: { yes?: boolean }) => Effect.Effect<SweepReport, BodyRefused | JournalError>;
+  readonly removeBody: (ref: string) => Effect.Effect<void, BodyRefused | JournalError>;
   readonly feed: (after?: Cursor) => Effect.Effect<{ entries: FeedEntry[]; cursor: Cursor; refused?: FeedRefusal[] }, JournalError>;
   readonly watch: (options: {
     onEntry: (entry: FeedEntry) => void | Promise<void>;
@@ -518,46 +525,6 @@ const make = (options: EngineOptions) =>
 
     const feedVerb = (after: Cursor = 0) => go(Effect.flatMap(Journal, (j) => j.feed(after)));
 
-    const watch: EngineShape['watch'] = ({ onEntry, from = 0, intervalMs = 1_000, onError }) =>
-      Effect.sync(() => {
-        let cursor = from;
-        let stopped = false;
-        let draining = false;
-
-        const drain = async () => {
-          if (stopped || draining) return;
-          draining = true;
-          try {
-            for (;;) {
-              const got = await Effect.runPromise(feedVerb(cursor));
-              if (!got.entries.length && !got.refused?.length) break;
-              cursor = got.cursor;
-              for (const r of got.refused ?? []) onError?.(new Error(r.why));
-              for (const entry of got.entries) {
-                if (stopped) return;
-                await onEntry(entry);
-              }
-            }
-          } catch (e) {
-            onError?.(e);
-          } finally {
-            draining = false;
-          }
-        };
-
-        const unsubscribe = journalOps?.subscribe?.(() => void drain());
-        const timer = setInterval(() => void drain(), intervalMs);
-        void drain();
-
-        return {
-          stop: () => {
-            stopped = true;
-            clearInterval(timer);
-            unsubscribe?.();
-          },
-        };
-      });
-
     return Engine.of({
       file: fileVerb,
       tick: tickVerb,
@@ -581,7 +548,8 @@ const make = (options: EngineOptions) =>
       answer: answerVerb,
       close: (taskId) => go(close(taskId)),
       feed: feedVerb,
-      watch,
+      ...bodyVerbsOf(go),
+      watch: watchOf(feedVerb, journalOps?.subscribe),
       io: () => Effect.sync(() => ({ ...ioCounts(), observed: observedNow() })),
       start: startOf(tickVerb),
     });

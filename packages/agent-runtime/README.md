@@ -1988,6 +1988,8 @@ of pure code sits beside it.
 | `src/core/engine/counted.ts` | what a long-lived attempt in flight has consumed so far, journalled as it grows (`counted`), off the pass's sighting |
 | `src/core/engine/filing.ts` | filing a task, admitting, stopping, answering and closing it, each with what it refuses (`refusalOf`): a fact journalled for the pass to act on |
 | `src/core/engine/journal.ts` | append-only JSONL per task, plus the board-wide feed; `upgrade`, which reads a line written before an event's shape changed in today's, whoever's store it is — nothing on disk is rewritten |
+| `src/core/engine/bodies.ts` | a journal's long texts kept once, as bodies named by the sha256 of their text (`BodyOps`, `<root>/bodies/<ref>`): an entry cut into its stored shape (`split`), read back whole and checked against its name (`resolver`), and the references an entry holds (`refsOf`) |
+| `src/core/engine/sweep.ts` | removing a body nothing names, the one way a body goes (`sweep`, `removeBody`): every journal and the feed read for its references, a day's grace for a put whose line is on its way |
 | `src/core/engine/memo.ts` | the settled tasks an engine's passes may skip until the feed names them, and the cursor into the feed: a cache of `fold`, rebuilt by a fresh engine, never written down |
 | `src/core/engine/now.ts` | now on both clocks (`instantNow`): `Date.now()`, and `process.hrtime` under the boot's id read from `/proc/sys/kernel/random/boot_id`, with no monotonic reading where there is none |
 | `src/core/engine/tally.ts` | what the runtime's own reads and spawns have cost the process, as running totals (`Engine.io()`): a thin wrapper around its readers and `sh`, not a syscall tracer |
@@ -2031,6 +2033,8 @@ of pure code sits beside it.
 | `src/a2a/index.ts` | the face of `a2a/`, as the doors take it: it imports no name of the SDK's |
 | `src/facade/consumer.ts` | what a consumer writes and is given — its store in Promises, its harnesses, its options, its task and its engine — the adapters over them, and what the door refuses of them |
 | `src/service/engine.ts` | the engine as an Effect service, `Engine`: `Engine.layer(options)` assembles each harness behind its A2A agent, the store and the memo, and its verbs are Effects that fail with tagged errors (`ListRefused`, `TranscriptRefused`, `SayRefused`, `SayUnsent`, and the core's) |
+| `src/service/bodies.ts` | the engine's verbs over the store's bodies, `sweep` and `removeBody`, behind a refusal of an argument they do not take (`BodyRefused`) |
+| `src/service/watch.ts` | the engine's `watch`, on its `feed`: each entry in order, at least once, drained on the store's push and on a timer |
 | `src/service/output.ts` | the engine's `output` verb, `outputVerbOf`, and `OutputRefused`: one stream of a task's latest attempt, kept whole by its harness |
 | `src/service/harnesses.ts` | `DEFAULT_HARNESSES`, the harnesses an engine runs when its options name none, and `configRefusal`, what they refuse of a task's configuration, exported for the layers above to ask before they file |
 | `src/service/refusal.ts` | `refusalWords`: a verb's refusal in words — an `Error` led by the verb whose `exitCode` is 2 — for a caller that answers with a sentence and an exit code: `ae` and the orchestrator |
@@ -2038,6 +2042,7 @@ of pure code sits beside it.
 | `src/facade/engine.ts` | `promiseEngine`: an `Engine` layer built once and each verb run as a Promise, a refusal an `Error` whose `exitCode` is 2: the Promise engine a consumer builds as `promiseEngine(Engine.layer(options))` |
 | `src/facade/promise.ts` | a harness a consumer wrote in Promises (`PromiseRunner`), as the engine's verbs: an adapter like the others, reached through the A2A seam |
 | `src/cli/main.ts` | the verbs, and the brief: parse (closed keys), call, print |
+| `src/cli/lines.ts` | the lines `ae` prints for a person: a task, an attempt, a journal entry, a usage, the limits a task was filed with |
 | `bin/ae.ts` | the `ae` entry point: a refusal prints its sentence and exits 2 |
 | `bin/ae-worker.ts` | the detached worker: babysits one harness process, keeps the run file |
 | `src/core/decide.test.ts` | every branch of the decision, no harness needed |

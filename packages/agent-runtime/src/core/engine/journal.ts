@@ -114,9 +114,7 @@ export type BodiedJournalOps = Omit<PlainJournalOps, 'append' | 'read' | 'feed' 
  * A store as the runtime reads it: what `read` and `feed` give back is whatever the store holds, parsed, and is an event
  * only once `Journal.layer` has decoded it. A `JournalOps` is one; the files store is one that never says its lines are events.
  */
-export type StoreOps =
-  | BodiedJournalOps
-  | (Omit<PlainJournalOps, 'read' | 'feed'> & Pick<BodiedJournalOps, 'read' | 'feed' | 'located'>);
+export type StoreOps = BodiedJournalOps | (Omit<PlainJournalOps, 'read' | 'feed'> & Pick<BodiedJournalOps, 'read' | 'feed' | 'located'>);
 
 /** What `sweep` found: the bodies it may remove and their bytes, the bodies it keeps, and how many it removed. */
 export type SweepReport = { removable: number; bytes: number; kept: number; removed: number };
@@ -159,12 +157,27 @@ const decodeEvents = (taskId: string, raw: readonly unknown[], located: StoreOps
 /** Reads a stored entry back (`resolver` in `bodies.ts`), a failure said in the words of where the entry is. */
 type Resolve = ReturnType<typeof resolver>;
 
+/** Why the feed entry `entry`, at `where`, is no runtime's, and the task it names when it names one. */
+const feedRefusalOf = (where: string, entry: unknown): FeedRefusal => {
+  const error = refusalOf(StoredFeedEntrySchema, entry);
+  const taskId = typeof entry === 'object' && entry !== null && 'taskId' in entry ? entry.taskId : undefined;
+  return {
+    ...(typeof taskId === 'string' ? { taskId } : {}),
+    why: error ? entryWords(where, entry, error, true) : `${where} is not what the runtime writes.`,
+  };
+};
+
 /**
  * A store's feed entries, those no runtime wrote left out: each is skipped with why (`FeedRefusal`), and the cursor is past it all the
  * same, so one entry nobody can read stops no reader and no pass. The task it names, when it names one, is still named: its journal is
  * read again, and says for itself whether it reads. An entry naming a body that does not read back is skipped the same way.
  */
-const decodeFeed = Effect.fn('decodeFeed')(function* (raw: readonly unknown[], after: Cursor, located: StoreOps['located'], bodies: Resolve) {
+const decodeFeed = Effect.fn('decodeFeed')(function* (
+  raw: readonly unknown[],
+  after: Cursor,
+  located: StoreOps['located'],
+  bodies: Resolve,
+) {
   const entries: FeedEntry[] = [];
   const refused: FeedRefusal[] = [];
   for (const [index, entry] of raw.entries()) {
@@ -175,12 +188,7 @@ const decodeFeed = Effect.fn('decodeFeed')(function* (raw: readonly unknown[], a
       else refused.push({ taskId: entry.taskId, why: `${where} ${read.failure.message}` });
       continue;
     }
-    const error = refusalOf(StoredFeedEntrySchema, entry);
-    const taskId = typeof entry === 'object' && entry !== null && 'taskId' in entry ? entry.taskId : undefined;
-    refused.push({
-      ...(typeof taskId === 'string' ? { taskId } : {}),
-      why: error ? entryWords(where, entry, error, true) : `${where} is not what the runtime writes.`,
-    });
+    refused.push(feedRefusalOf(where, entry));
   }
   return { entries, refused };
 });
@@ -339,7 +347,7 @@ const appendSplit = (ops: BodiedJournalOps, taskId: string, event: Event, briefP
 };
 
 /** The answer to a store that keeps no bodies, asked to remove one. */
-const noBodies = (ref: BodyRef) =>
+const noBodies = (ref: unknown) =>
   Effect.fail(new BodyRefused({ message: `This store keeps no bodies, so there is no body ${String(ref)} to remove.` }));
 
 export class Journal extends Context.Service<Journal, JournalShape>()('engine/Journal') {
@@ -357,7 +365,7 @@ export class Journal extends Context.Service<Journal, JournalShape>()('engine/Jo
       Journal.of({
         list: ops.list,
         ...(ops.subscribe ? { subscribe: ops.subscribe } : {}),
-        append: (taskId, event, briefParts) => (bodied ? appendSplit(bodied, taskId, event, briefParts) : ops.append(taskId, event as never)),
+        append: (taskId, event, briefParts) => (bodied ? appendSplit(bodied, taskId, event, briefParts) : ops.append(taskId, event)),
         read: (taskId) =>
           ops.read(taskId).pipe(
             Effect.flatMap((raw) => decodeEvents(taskId, raw, ops.located)),
@@ -375,11 +383,11 @@ export class Journal extends Context.Service<Journal, JournalShape>()('engine/Jo
             ),
           ),
         sweep: (options) =>
-          bodied ? sweep(bodied, options).pipe(Effect.mapError(asJournal)) : Effect.succeed({ removable: 0, bytes: 0, kept: 0, removed: 0 }),
-        removeBody: (ref) =>
           bodied
-            ? removeBody(bodied, ref).pipe(Effect.catchTag('BodyError', (error) => Effect.fail(asJournal(error))))
-            : noBodies(ref),
+            ? sweep(bodied, options).pipe(Effect.mapError(asJournal))
+            : Effect.succeed({ removable: 0, bytes: 0, kept: 0, removed: 0 }),
+        removeBody: (ref) =>
+          bodied ? removeBody(bodied, ref).pipe(Effect.catchTag('BodyError', (error) => Effect.fail(asJournal(error)))) : noBodies(ref),
       }),
     );
   };

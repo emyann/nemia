@@ -190,7 +190,9 @@ function cardGates(card: InboxCard, flags: readonly string[], workflowDir: strin
   return [...(card.gate !== undefined && !flags.includes(card.gate) ? [card.gate] : []), ...flags];
 }
 
-/** The runs a card's run is handed as context: its `from:`, then `opts.context`, a run both name once — refused as `contextRefusal` says. */
+/**
+ * The runs a card's run is handed as context: its `from:`, then `opts.context`, a run both name once — refused as `contextRefusal` says.
+ */
 function cardContext(card: InboxCard, opts: InboxStart): string[] {
   const refusedFrom = contextRefusal(card.from ?? [], opts.after ?? [], runStore.runs.exists, undefined, `${card.file}: from:`);
   if (refusedFrom) throw refusedFrom;

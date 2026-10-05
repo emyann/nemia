@@ -1,8 +1,8 @@
 /**
  * GET /api/passes (app.ts), the recent passes the tick kept, as `nemia passes --json` prints them (`passesOf`, through the command table);
  * and GET /api/metrics, the api process's metrics (`metricsOf`), where each request `served` counts the files the runtime read for it
- * under its route's pattern (`api.poll.reads`; that the count is the engine's own, runs/resting.test.ts). In the harness's scratch store (`root`), whose `tick-recent.json` is written here as the tick writes
- * it.
+ * under its route's pattern (`api.poll.reads`; that the count is the engine's own, runs/resting.test.ts). In the harness's scratch store
+ * (`root`), whose `tick-recent.json` is written here as the tick writes it.
  */
 import { root } from '../../test/harness.ts';
 import { test } from 'node:test';

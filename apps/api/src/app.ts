@@ -88,8 +88,8 @@ export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Servic
  * - `GET /api/metrics` — the process's metrics, each `{ name, type, description, attributes }` and its value (`MetricRead`,
  *   factory/ceilings.ts), in the registry of the app's runtime: the files the runtime read for each request, its journals and every
  *   other, by its route's pattern (`api.poll.reads`, about, since a pass or another request reading at the same time is counted too),
- *   and the pass's (`pass.duration`, `pass.phase.duration`, `pass.journal_reads`, `store.runs`, `sessions.queued`, `sessions.admitted`) only where this process ticks: an
- *   api started with `--no-tick`, or beside a `nemia up`, has none of them.
+ *   and the pass's (`pass.duration`, `pass.phase.duration`, `pass.journal_reads`, `store.runs`, `sessions.queued`, `sessions.admitted`)
+ *   only where this process ticks: an api started with `--no-tick`, or beside a `nemia up`, has none of them.
  * - `GET /api/pause` — the store's pause, `{ pause, finishing, staged }`: since when, by whom and why, or null; each task still finishing
  *   under it (`{ run, step, kind }`, a `session`, `check` or `landing`), none once it is Paused; and each landing it holds with its merge
  *   staged in the repository's checkout (MERGE_HEAD), its check not filed until it resumes (`pausedRead`). Put on

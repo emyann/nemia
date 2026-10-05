@@ -266,17 +266,38 @@ const journalReader = () => {
   };
 };
 
+/** What an append says of itself, on its span and its log: its `task`, its event's `kind`, and its `attempt` where the event has one. */
+export const appendFields = (taskId: string, event: Event): { task: string; kind: Event['kind']; attempt?: number } => ({
+  task: taskId,
+  kind: event.kind,
+  ...('attempt' in event ? { attempt: event.attempt } : {}),
+});
+
+/**
+ * `append` of `ops`, in a span of its own, `append`, under the verb that wrote it, annotated with `appendFields`; once written, it is
+ * said at `Debug`, the event's kind, annotated the same. The runtime's journal at `Debug` is its log.
+ */
+const appendSaid = (ops: StoreOps) =>
+  Effect.fn('append')(function* (taskId: string, event: Event) {
+    const fields = appendFields(taskId, event);
+    yield* Effect.annotateCurrentSpan(fields);
+    yield* ops.append(taskId, event);
+    yield* Effect.logDebug(event.kind).pipe(Effect.annotateLogs(fields));
+  });
+
 export class Journal extends Context.Service<Journal, JournalOps>()('engine/Journal') {
   /**
    * Any implementation becomes a Layer. This is the only way a store reaches the engine — and so where what a store gives
    * back is decoded (`event-schema.ts`): an entry no runtime wrote in a task's journal fails that task's read with a
    * `JournalError` that names it, and one in the feed is skipped, said on the read's `refused`; and
-   * where an event in a former shape is read in the one the runtime reads (`upgrade`), whoever's store it is.
+   * where an event in a former shape is read in the one the runtime reads (`upgrade`), whoever's store it is; and where every
+   * append is traced and logged (`appendSaid`).
    */
   static layer = (ops: StoreOps) =>
     Layer.succeed(Journal)(
       Journal.of({
         ...ops,
+        append: appendSaid(ops),
         read: (taskId) =>
           ops.read(taskId).pipe(
             Effect.flatMap((raw) => decodeEvents(taskId, raw, ops.located)),

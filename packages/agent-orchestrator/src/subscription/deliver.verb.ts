@@ -59,6 +59,10 @@ export const DELIVER_DEFAULTS: DeliverOptions = {
   retryCap: '5 minutes',
 };
 
+/** The pace a failed `say` is said again at: after `retry`, doubling each time, and never longer than `retryCap`. */
+export const sayBackoff = (o: Pick<DeliverOptions, 'retry' | 'retryCap'>) =>
+  Schedule.min([Schedule.exponential(o.retry), Schedule.spaced(o.retryCap)]);
+
 /** `text` said to the subscription `name`'s task, said again on its backoff until the engine takes it, each failure a warning. */
 const told = (name: string, sub: Subscription, text: string, o: DeliverOptions): Effect.Effect<void, never, EngineService> =>
   Effect.gen(function* () {
@@ -71,7 +75,7 @@ const told = (name: string, sub: Subscription, text: string, o: DeliverOptions):
           ),
         ),
       ),
-      Effect.retry(Schedule.min([Schedule.exponential(o.retry), Schedule.spaced(o.retryCap)])),
+      Effect.retry(sayBackoff(o)),
       Effect.orDie,
     );
   });

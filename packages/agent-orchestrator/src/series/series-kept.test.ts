@@ -16,7 +16,7 @@ delete process.env.WF_METRICS_MINUTE_DAYS;
 delete process.env.WF_METRICS_HOUR_DAYS;
 const { main } = await import('../cli/main.ts');
 const { PHASES } = await import('../meter/meter.ts');
-const { appendLines, dayFile, days, keepSeries, rangeOf, readDay, seriesHealth, seriesRead } = await import('./series.store.ts');
+const { appendLines, dayFile, days, dropDay, keepSeries, rangeOf, readDay, seriesHealth, seriesRead } = await import('./series.store.ts');
 const { seriesMemo } = await import('./series.ts');
 type RecentPass = import('../meter/meter.ts').RecentPass;
 
@@ -138,14 +138,35 @@ test('`nemia series --json` is the answer the api serves; REFUSED: a --range it 
   });
 });
 
-test("a memo holds only the days its tier's last read covered: a day the range has left goes, and the other tier's days stay", () => {
+test("a memo keeps every day its tier's reads reach, whichever read came last: two readers alternate and neither reads again a day the other kept", () => {
   const line = (t: string) => ({ t, s: 'store.runs', l: {}, n: 1, sum: 2, min: 2, max: 2, last: 2 });
   appendLines('minute', [line('2026-10-05T10:00:00.000Z'), line('2026-10-06T10:00:00.000Z')]);
-  appendLines('hour', [line('2026-10-05T10:00:00.000Z')]);
+  appendLines('hour', [line('2026-08-01T10:00:00.000Z'), line('2026-10-04T10:00:00.000Z'), line('2026-10-05T10:00:00.000Z')]);
   const memo = seriesMemo();
-  seriesHealth('2026-10-05', '2026-10-05', memo);
+  seriesHealth(null, '2026-10-05', memo, at('14:05:00'));
+  const old = memo.get('hour/2026-08-01');
+  assert.ok(old, 'health from the first day holds the old day');
+  seriesRead('7d', memo, at('14:05:00'));
+  const recent = memo.get('hour/2026-10-05');
+  assert.ok(recent, 'a 7d read holds the day it read');
+  seriesHealth(null, '2026-10-05', memo, at('14:05:00'));
+  seriesRead('7d', memo, at('14:05:00'));
+  assert.equal(memo.get('hour/2026-08-01'), old, 'the 7d read left the day only health reads, and health did not read it again');
+  assert.equal(memo.get('hour/2026-10-05'), recent, 'and neither read the day both read again');
   seriesRead('24h', memo, at('14:05:00'));
-  assert.deepEqual([...memo.keys()].sort(), ['hour/2026-10-05', 'minute/2026-10-05', 'minute/2026-10-06']);
+  assert.ok(memo.has('minute/2026-10-05'));
   seriesRead('24h', memo, Date.parse('2026-10-07T09:00:00Z'));
-  assert.deepEqual([...memo.keys()].sort(), ['hour/2026-10-05', 'minute/2026-10-06'], 'the day the range left is gone');
+  assert.deepEqual(
+    [...memo.keys()].filter((k) => k.startsWith('minute/')),
+    ['minute/2026-10-06'],
+    'a minute day no read of its tier reaches any more is gone',
+  );
+  assert.deepEqual(
+    [...memo.keys()].filter((k) => k.startsWith('hour/')).sort(),
+    days('hour').map((d) => `hour/${d}`),
+    'every hour day stays',
+  );
+  dropDay('hour', '2026-08-01');
+  seriesRead('7d', memo, at('14:05:00'));
+  assert.equal(memo.has('hour/2026-08-01'), false, 'a day whose file is deleted is gone');
 });

@@ -10,6 +10,7 @@ import {
   daysPast,
   healthOf,
   hoursDue,
+  memoDays,
   mergeLines,
   minutesDue,
   percentileOf,
@@ -139,6 +140,12 @@ test('a day past its retention: with 30 on 2026-10-05, 2026-09-05 is kept and 20
   const now = Date.parse('2026-10-05T12:00:00Z');
   assert.deepEqual(daysPast(['2026-09-03', '2026-09-04', '2026-09-05', '2026-10-05'], now, 30), ['2026-09-03', '2026-09-04']);
   assert.deepEqual(daysPast(['2000-01-01'], now, undefined), []);
+});
+
+test("a memo keeps the days its tier's widest range reaches: the minute days of the last 24h, and every hour day, years old included", () => {
+  const now = Date.parse('2026-10-05T14:00:00Z');
+  assert.deepEqual(memoDays('minute', ['2026-10-03', '2026-10-04', '2026-10-05'], now), ['2026-10-04', '2026-10-05']);
+  assert.deepEqual(memoDays('hour', ['2020-01-01', '2026-08-01', '2026-10-05'], now), ['2020-01-01', '2026-08-01', '2026-10-05']);
 });
 
 test('a range reads its points: minutes for 24h, hours for 7d, days merged from hours for all, oldest first', () => {

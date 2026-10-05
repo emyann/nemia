@@ -97,7 +97,10 @@ export const SUBSCRIBE: Command<Subscribed> = {
   ],
 };
 
-/** `nemia unsubscribe`: a subscription taken away, and where its deliverer was with it (`dropSubscription`). */
+/**
+ * `nemia unsubscribe`: a subscription taken away, its file removed alone (`dropSubscription`); the deliverer's next read of the
+ * subscriptions stops it and removes its `<name>.state.json` (`reconcile` in `deliver.verb.ts`).
+ */
 export const UNSUBSCRIBE: Command<{ name: string }> = {
   name: 'unsubscribe',
   usage: '<name>',

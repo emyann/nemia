@@ -21,6 +21,7 @@ import {
   hoursDue,
   isRange,
   LABEL_KEYS,
+  memoDays,
   minutesDue,
   RANGES,
   rollHours,
@@ -195,10 +196,20 @@ const dayLines = (tier: Tier, day: string, memo: SeriesMemo | undefined): Rollup
 
 /**
  * The lines of a tier's `wanted` days, each day from `memo` where it holds it unmoved (`dayLines`); first, every day of the tier the memo
- * holds outside `wanted` is dropped from it, so a memo holds no more than its tier's last read covered, and the other tier's days stay.
+ * holds that is no longer among those it may keep at `now` (`memoDays` of `onDisk`, the days the tier holds a file of) is dropped from it:
+ * a day leaves by age or with its file, never because this read did not want it, and the other tier's days stay.
  */
-const linesOf = (tier: Tier, wanted: readonly string[], memo: SeriesMemo | undefined): RollupLine[] => {
-  for (const key of memo?.keys() ?? []) if (key.startsWith(`${tier}/`) && !wanted.includes(key.slice(tier.length + 1))) memo?.delete(key);
+const linesOf = (
+  tier: Tier,
+  wanted: readonly string[],
+  onDisk: readonly string[],
+  now: number,
+  memo: SeriesMemo | undefined,
+): RollupLine[] => {
+  if (memo) {
+    const keep = new Set(memoDays(tier, onDisk, now));
+    for (const key of memo.keys()) if (key.startsWith(`${tier}/`) && !keep.has(key.slice(tier.length + 1))) memo.delete(key);
+  }
   return wanted.flatMap((d) => dayLines(tier, d, memo));
 };
 
@@ -216,18 +227,23 @@ export const rangeOf = (text: string | undefined): keyof typeof RANGES => {
 export const seriesRead = (range: string | undefined, memo?: SeriesMemo, now: number = Date.now()): SeriesRead => {
   const r = rangeOf(range);
   const tier = RANGES[r].tier;
-  return seriesOf(r, linesOf(tier, daysOfRange(r, days(tier), now), memo), now);
+  const onDisk = days(tier);
+  return seriesOf(r, linesOf(tier, daysOfRange(r, onDisk, now), onDisk, now, memo), now);
 };
 
 /**
- * The system's health over the UTC days from `from` (every day kept, for null) to `to`, both included, read off the hour lines: each
- * figure null where nothing was kept.
+ * The system's health over the UTC days from `from` (every day kept, for null) to `to`, both included, read off the hour lines at `now`,
+ * from `memo` where one is handed (`linesOf`): each figure null where nothing was kept.
  */
-export const seriesHealth = (from: string | null, to: string, memo?: SeriesMemo): Health =>
-  healthOf(
+export const seriesHealth = (from: string | null, to: string, memo?: SeriesMemo, now: number = Date.now()): Health => {
+  const onDisk = days('hour');
+  return healthOf(
     linesOf(
       'hour',
-      days('hour').filter((d) => (from === null || d >= from) && d <= to),
+      onDisk.filter((d) => (from === null || d >= from) && d <= to),
+      onDisk,
+      now,
       memo,
     ),
   );
+};

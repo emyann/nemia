@@ -827,6 +827,27 @@ test('a journal gone reads as none, and one made again in its place is read whol
   assert.equal(again.entries.length, 1);
 });
 
+test('a journal gone and made again as the same file, longer, is read whole', async () => {
+  const { dir, file, cost } = await cursorStore();
+  await cost();
+  const aside = path.join(dir, 't1.aside');
+  fs.linkSync(file, aside);
+  fs.rmSync(file);
+  const gone = await cost();
+  assert.deepEqual([gone.entries, gone.bytes], [[], 0]);
+  const ats = ['2026-01-02T00:00:00Z', '2026-01-02T00:00:01Z', '2026-01-02T00:00:02Z', '2026-01-02T00:00:03Z', '2026-01-02T00:00:04Z'];
+  const { ino } = fs.statSync(aside);
+  fs.writeFileSync(aside, [filedAt(ats[0]), ...ats.slice(1).map((at) => ev('starting', at))].map((e) => JSON.stringify(e) + '\n').join(''));
+  fs.renameSync(aside, file);
+  assert.equal(fs.statSync(file).ino, ino, 'the same file as the one read before it went');
+  const again = await cost();
+  assert.equal(again.bytes, fs.statSync(file).size, 'the whole file');
+  assert.deepEqual(
+    again.entries.map((e) => (e as Event).at),
+    ats,
+  );
+});
+
 test('a last line cut short fails the read as it always has, and once completed is read for its bytes alone', async () => {
   const { dir, ops, file, cost } = await cursorStore();
   await cost();

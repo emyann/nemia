@@ -249,11 +249,19 @@ export type Range = keyof typeof RANGES;
 /** Whether `text` names a range. */
 export const isRange = (text: string): text is Range => Object.hasOwn(RANGES, text);
 
+/** The days of `days` a reach of `back` milliseconds at `now` reads, oldest first: every one for an endless reach. */
+const daysBack = (back: number, days: readonly string[], now: number): string[] =>
+  Number.isFinite(back) ? days.filter((d) => d >= dayOf(new Date(now - back).toISOString())) : [...days];
+
 /** The days a range reads at `now`, oldest first, of those its tier holds: every one for `all`. */
-export const daysOfRange = (range: Range, days: readonly string[], now: number): string[] => {
-  const back = RANGES[range].back;
-  return Number.isFinite(back) ? days.filter((d) => d >= dayOf(new Date(now - back).toISOString())) : [...days];
-};
+export const daysOfRange = (range: Range, days: readonly string[], now: number): string[] => daysBack(RANGES[range].back, days, now);
+
+/**
+ * The days of `tier` a memo may keep at `now`, of those its tier holds (`days`): the ones its widest range reaches (`RANGES`), so a day
+ * leaves by age alone. Every hour day, since `all` reaches back without end, as a period's health does; the minute days of the last 24h.
+ */
+export const memoDays = (tier: Tier, days: readonly string[], now: number): string[] =>
+  daysBack(Math.max(...Object.values(RANGES).flatMap((r) => (r.tier === tier ? [r.back] : []))), days, now);
 
 /** One point of a series: its span's start, and of the samples in it how many, their mean, least, most and last, and its percentiles. */
 export type SeriesPoint = { t: string; n: number; mean: number; min: number; max: number; last: number; p50?: number; p95?: number };
@@ -370,7 +378,10 @@ export const seriesLines = (read: SeriesRead): string[] =>
       ]
     : [`nothing is kept for ${read.range} yet: nemia up, or the api, ticks the store and keeps its series a minute at a time`];
 
-/** What a process that serves keeps of the series' days between reads: each day's lines, while the day's file stands as it was read. */
+/**
+ * What a process that serves keeps of the series' days between reads: each day's lines, while the day's file stands as it was read and a
+ * read of its tier can reach it (`memoDays`), whichever read came last.
+ */
 export type SeriesMemo = Map<string, { stamp: string; lines: RollupLine[] }>;
 
 /** A memo with nothing kept. */

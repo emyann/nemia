@@ -23,7 +23,7 @@ import { parseCloseout, type Closeout } from '../closeout/closeout.ts';
 import { taskUsage } from '../timeline/index.ts';
 import { runStore } from '../record/files.store.ts';
 import { stepsOf } from '../record/record.store.ts';
-import { oneByOne, parentRecord, shippedOf, type BranchReader } from '../branches/branches.store.ts';
+import { branchReader, oneByOne, parentRecord, shippedOf, type BranchReader } from '../branches/branches.store.ts';
 import { continuesFrom } from '../retry/index.ts';
 import { phaseOfView, unsignedEnd, wordOfView } from './views-words.ts';
 
@@ -543,31 +543,54 @@ export const parentRead = Effect.fn('parentOf')(function* (id: string, git: Bran
   return { ...known, shipped: said.kind === 'shipped' } satisfies ParentRun;
 });
 
-/**
- * A run another waits on (`parentRead`) in a Promise, over `e`. Rejects with the refusal the program failed with, or what it died of, as
- * it was thrown.
- */
-export const parentOf = (e: Engine, id: string, git: BranchReader = oneByOne): Promise<ParentRun> =>
-  Effect.runPromise(parentRead(id, git).pipe(Effect.provide(EngineService.layer(e))));
-
-/**
- * The runs this run waits on, each read once (`parentRead`), one at a time — and none, without a look, for a run the gate does not apply
- * to (`gated`). And the runs a person holds it until (`Run.hold`), for as long as the hold stands. Fails with a refusal a read failed
- * with; dies of anything else.
- */
-export const parentsRead = Effect.fn('parentsOf')(function* (run: Run, git: BranchReader = oneByOne) {
-  const read = new Map<string, ParentRun>();
-  const ids = [...(gated(run) ? run.after! : []), ...(run.hold && !run.cancelledAt ? run.hold.until : [])];
-  for (const id of new Set(ids)) read.set(id, yield* parentRead(id, git));
-  return (id: string): ParentRun => read.get(id) ?? { shipped: false };
+/** A run another waits on as `read` holds it, else read (`parentRead`) over `git` and kept in `read` for whoever asks next. */
+const keptParent = Effect.fn('keptParent')(function* (id: string, git: BranchReader, read: Map<string, ParentRun>) {
+  const was = read.get(id);
+  if (was) return was;
+  const now = yield* parentRead(id, git);
+  read.set(id, now);
+  return now;
 });
 
 /**
- * The runs this run waits on (`parentsRead`) in a Promise, over `e`. Rejects with the refusal the program failed with, or what it died
- * of, as it was thrown.
+ * A run another waits on (`parentRead`) in a Promise, over `e`: what `read` holds of it where it holds it, read and kept there where it
+ * does not. Rejects with the refusal the program failed with, or what it died of, as it was thrown.
  */
-export const parentsOf = (e: Engine, run: Run, git: BranchReader = oneByOne): Promise<(id: string) => ParentRun> =>
-  Effect.runPromise(parentsRead(run, git).pipe(Effect.provide(EngineService.layer(e))));
+export const parentOf = (e: Engine, id: string, git: BranchReader = oneByOne, read = new Map<string, ParentRun>()): Promise<ParentRun> =>
+  Effect.runPromise(keptParent(id, git, read).pipe(Effect.provide(EngineService.layer(e))));
+
+/**
+ * The runs a pass reads as runs others wait on, each read once for the pass (`parentRead`) and kept by id, over one listing of branches per
+ * repository and base (`branchReader`): what the pass's `admit`, `liftHold`, claims on the checkout (`mainClaim`) and the cap's needs
+ * (`needOf`) all read through. Made by the pass and dropped with it, so a parent the pass lands is read shipped on the next.
+ */
+export type Parents = { git: BranchReader; read: Map<string, ParentRun> };
+
+/** The runs a pass reads as runs others wait on (`Parents`), none read yet. */
+export const passParents = (): Parents => ({ git: branchReader(), read: new Map() });
+
+/**
+ * The runs this run waits on, each read once (`parentRead`), one at a time — and none, without a look, for a run the gate does not apply
+ * to (`gated`). And the runs a person holds it until (`Run.hold`), for as long as the hold stands. A run `read` holds is answered from it,
+ * and every run read is kept there. Fails with a refusal a read failed with; dies of anything else.
+ */
+export const parentsRead = Effect.fn('parentsOf')(function* (run: Run, git: BranchReader = oneByOne, read = new Map<string, ParentRun>()) {
+  const ids = [...(gated(run) ? run.after! : []), ...(run.hold && !run.cancelledAt ? run.hold.until : [])];
+  const mine = new Map<string, ParentRun>();
+  for (const id of new Set(ids)) mine.set(id, yield* keptParent(id, git, read));
+  return (id: string): ParentRun => mine.get(id) ?? { shipped: false };
+});
+
+/**
+ * The runs this run waits on (`parentsRead`) in a Promise, over `e`, answered from `read` and kept there. Rejects with the refusal the
+ * program failed with, or what it died of, as it was thrown.
+ */
+export const parentsOf = (
+  e: Engine,
+  run: Run,
+  git: BranchReader = oneByOne,
+  read = new Map<string, ParentRun>(),
+): Promise<(id: string) => ParentRun> => Effect.runPromise(parentsRead(run, git, read).pipe(Effect.provide(EngineService.layer(e))));
 
 /**
  * What each step's current task consumed, summed over its attempts (`sumUsage`): the try whose closeout

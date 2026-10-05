@@ -144,6 +144,9 @@ What Claude Code does as the steps meet it. Where the orchestrator's code holds 
   included, under a read-only added folder with no `Read` allow, and refuses it without the folder; a folder that is not
   there is no error (2.1.289).
 - **A project's allow rules are dropped in a directory Claude Code has not trusted**: measure a rule in a trusted checkout.
+- **`--bg` in a folder nobody opened is refused at spawn** ("Workspace not trusted. Run `claude` in <dir> once…", 2.1.289); trust is
+  kept per path in `.claude.json` (`trustedFolder`, `src/harness/claude/trust.ts`), read, never written. A `--bg` permission prompt
+  under `--remote-control` lists `blocked`, `waitingFor: "permission prompt"`, and is answered from the claude.ai link (2026-10-05).
 - **A session under `~/.claude/` cannot write there in any mode**: put a probe store elsewhere.
 - **A path a fenced step's brief names is inside its own folder**; a rule offered for the next run names no path of this one (in the
   orchestrator today: `givenPlan`, `folderPlace.make`, `allowRuleOf`, `disallowedBy`).

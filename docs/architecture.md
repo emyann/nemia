@@ -141,9 +141,9 @@ A file at the top of `src/` is named in `PURE`, `STORE`, `CONTROLLER` or `CLIENT
 - **controller** uses the runtime through the client: runner.ts, the package's root, which re-exports by name; the tick
   (tick.verb, advance.verb) and the verbs beneath it, one feature each (views.verb, file.verb, ending.verb, cap.verb,
   meter.verb, start.verb, plan.verb, inbox.verb, cancel.verb, retry.verb, gate.verb, say.verb, wait.verb, round.verb,
-  list.verb, decide.verb, forget.verb, prune.verb); and src/cli/ and bin/wf.ts
-  above it. A verb reaches the client itself or through a controller it imports.
-  src/cli/ reaches the package only through runner.ts, workflow.ts and its own files, and bin/wf.ts only through cli/main.ts
+  list.verb, decide.verb, forget.verb, prune.verb); and src/cli/ and the bins,
+  bin/nemia.ts and its alias bin/wf.ts, above it. A verb reaches the client itself or through a controller it imports.
+  src/cli/ reaches the package only through runner.ts, workflow.ts and its own files, and each bin only through cli/main.ts
   and cli/exit.ts. The client and
   the controllers import one another with no cycle.
 - **client** is `src/runtime-client.ts`, the subject of the third rule.

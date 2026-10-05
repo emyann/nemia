@@ -185,7 +185,8 @@ export const unattachedHireRefusal = (factory: string, workflow: string): string
 /**
  * Why no agent can be hired into the step of `workflow` in `factory`, or null where one can, judged in this order: the default factory,
  * which hires no one (`defaultFactoryRefusal`); a workflow the factory does not offer (`unattachedHireRefusal`); and a step whose own file
- * names an agent, `named` — null for none — which fills it in every factory, so a start would refuse a hire beside it.
+ * names an agent, `named` — null for none — which fills it in every factory, so a start would refuse a hire beside it. Said by a step's
+ * page before anyone hires, and by the hire it refuses (`hireAgent`), which says the file after it.
  */
 export function hireRefusalOf(
   factory: Pick<Factory, 'name' | 'workflows'> | undefined,

@@ -18,6 +18,7 @@ import {
   factoriesHolding,
   factoryNameRefusal,
   hireRefusal,
+  hireRefusalOf,
   instructionPathRefusal,
   noFactoryLine,
   noFactoryRefusal,
@@ -28,6 +29,7 @@ import {
   type FactoryWrite,
   type InstructionAt,
 } from './factory.ts';
+import { frontmatterKey } from '../former/former.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { firstRefusal, HOME, isDirectory } from '../record/record.store.ts';
 
@@ -294,19 +296,43 @@ function writeWhole(file: string, content: FactoryFile): void {
 }
 
 /**
+ * The first file of the step `step` of `workflow` that names its own agent, and the agent it names: in each of `repos`' `workflows/`, then
+ * in the store `home`'s, where a start in the factory reads a workflow by its name. A file that is not there or does not read names none.
+ */
+function ownAgentOf(repos: readonly string[], home: string, workflow: string, step: string): { named: string; file: string } | undefined {
+  for (const root of [...repos, home]) {
+    const file = path.join(path.resolve(root), 'workflows', workflow, `${step}.md`);
+    let named: string | undefined;
+    try {
+      named = frontmatterKey(fs.readFileSync(file, 'utf8'), 'agent');
+    } catch {
+      continue;
+    }
+    if (named !== undefined) return { named, file };
+  }
+  return undefined;
+}
+
+/**
  * `nemia factory hire`: the agent `agent` hired by the factory `factory` into the step `step`, `<workflow>/<step>` — the one agent of that
  * step, replacing an earlier hire, which is returned (`replaced`). Every other key of the file is kept. Refused before anything is written:
- * the factory (`fileToChange`), a step or an agent that is not one (`hireRefusal`, `Invalid`), and a step of a workflow the factory has
- * not attached (`Invalid`, naming the attach). Whether the workflow, its step and the
- * agent exist is judged when a run starts in the factory.
+ * the factory (`fileToChange`), a step or an agent that is not one (`hireRefusal`, `Invalid`), a step of a workflow the factory has not
+ * attached (`Invalid`, naming the attach), and a step whose own file names its agent in a repository of the factory's or in the store
+ * `home`'s `workflows/` (`Conflict`, in `hireRefusalOf`'s words, then the file). Whether the workflow, its step and the agent exist is
+ * judged when a run starts in the factory: a step with no file there takes a hire.
  */
-export function hireAgent(opts: { factory: string; agent: string; step: string }): { file: string; replaced?: string } {
+export function hireAgent(opts: { factory: string; agent: string; step: string; home?: string }): { file: string; replaced?: string } {
   const bad = hireRefusal(opts.step, opts.agent);
   if (bad) throw new Invalid({ message: `${bad} Nothing was hired.` });
   const { file, content } = fileToChange(opts.factory, 'hire');
   const workflow = opts.step.slice(0, opts.step.indexOf('/'));
   if (!content.workflows?.includes(workflow))
     throw new Invalid({ message: `${unattachedHireRefusal(opts.factory, workflow)} Nothing was hired.` });
+  const own = ownAgentOf(content.repos, opts.home ?? HOME, workflow, opts.step.slice(workflow.length + 1));
+  if (own)
+    throw new Conflict({
+      message: `${hireRefusalOf({ name: opts.factory, workflows: content.workflows }, workflow, own.named)} ${own.file} names it. Nothing was hired.`,
+    });
   const replaced = content.hires?.[opts.step];
   writeWhole(file, { ...content, hires: { ...content.hires, [opts.step]: opts.agent } });
   return { file, ...(replaced !== undefined && replaced !== opts.agent ? { replaced } : {}) };

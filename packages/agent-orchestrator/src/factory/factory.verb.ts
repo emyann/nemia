@@ -49,6 +49,7 @@ factory, naming the repositories its work is on, the workflows it offers and the
   nemia factory hire hires an agent into a step, <workflow>/<step> — the workflow by its folder's name, the step
                  by its file's, without .md: one agent a step, so a second hire replaces the first. Any agent
                  fills any step; it is found, when the run starts, where the step's own agent: would be.
+                 A step whose own file names its agent: takes no hire.
   nemia factory fire takes a step's hire back.
   nemia factory instruction says where the factory's instruction is kept, and prints it: NEMIA.md in its first
                  folder — the first --repo it was filed with — unless its file names another path there
@@ -73,7 +74,7 @@ name with no factory, an instruction of the default factory, two of --path, --st
 that is empty, absolute or climbs out of the folder, an instruct of an instruction kept in a folder or of blank
 words, a workflow's name that is empty, hidden, holds a slash or is agents or skills, a detach
 of a workflow not attached or still hired into, a --step that is not <workflow>/<step>, a hire into a workflow
-not attached, and a fire of a step with no hire. A start in a factory of a workflow it has not attached is
+not attached or into a step whose file names its own agent:, and a fire of a step with no hire. A start in a factory of a workflow it has not attached is
 refused, naming the attach.`;
 
 /** Why the api does not file, attach, detach or remove a factory: the board reads them, and the command line is their one writer. */
@@ -262,12 +263,13 @@ const FACTORY_HIRE: Command<{ file: string; replaced: string | null }> = {
   check: stepCheck('hire', '<factory> <agent>', HIRE_SPEC),
   writes: true,
   route: { method: 'PUT', path: '/api/factories/:factory/hires/:step', status: 200 },
-  handler: (args) =>
+  handler: (args, _env, home) =>
     tried(() => {
       const { file, replaced } = hireAgent({
         factory: textOf(args, 'factory'),
         agent: textOf(args, 'agent'),
         step: textOf(args, 'step'),
+        ...(home !== undefined && { home }),
       });
       return { file, replaced: replaced ?? null };
     }),

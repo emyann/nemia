@@ -329,7 +329,9 @@ export const wordBreaks = (table: readonly Pick<CommandSpec, 'name' | 'route'>[]
  * - `PUT /api/factories/:factory/hires/:step` — an agent hired into a step of a factory's workflow, as `nemia factory hire` hires it
  *   (`hireAgent`), its body `{ agent }` and its step `<workflow>/<step>` one encoded segment, `build%2Fimplement`. Refused in the package's
  *   words: a factory the store does not have (404, `Missing`), the default factory (409, `Conflict`), a step or an agent that is no name
- *   and a workflow the factory does not offer (422, `Invalid`). Its 200 is `{ file, replaced }`, the agent the hire replaced or null.
+ *   and a workflow the factory does not offer (422, `Invalid`), and a step whose own file names its agent, in the store's root of the
+ *   app or a repository of the factory's (409, `Conflict`, in `hireRefusalOf`'s words). Its 200 is `{ file, replaced }`, the agent the
+ *   hire replaced or null.
  * - `DELETE /api/factories/:factory/hires/:step` — a step's hire taken back, as `nemia factory fire` takes it (`fireAgent`); it reads no
  *   body. A step the factory hires no one into is a 404 (`Missing`). Its 200 is `{ file, fired }`.
  */

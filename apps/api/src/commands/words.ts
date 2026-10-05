@@ -9,13 +9,15 @@ import { decodeBody, valueAt, type BodyIssue, type Words } from '../body.ts';
 import type { Guarded } from '../guard.ts';
 
 /**
- * What a route's path names: the run and the step — `step` empty on a route that names none, both on a route of the store's own — the
- * `name` of what else it names, a card or an agent, and the request's `method` and `path`, as a refusal says the route.
+ * What a route's path names: the run and the step — `step` empty on a route that names none, `runId` on a route of the store's own, where
+ * `step` is a factory's hire's — the `name` of what else it names, a card or an agent, the `factory` a hire names, and the request's
+ * `method` and `path`, as a refusal says the route.
  */
 export type Named = {
   readonly runId: string;
   readonly step: string;
   readonly name: string;
+  readonly factory: string;
   readonly method: string;
   readonly path: string;
 };
@@ -478,6 +480,54 @@ const FACTORY_INSTRUCT: RouteWords = {
   notJson: (at) => `${instructionRoute(at, true)} takes a JSON body: ${INSTRUCT_PUT_SHAPE}.`,
 };
 
+const HIRE_PUT_SHAPE = '`{ "agent": "<the agent\'s name>" }`';
+
+/** The route of the hire into a step `at` names, as a refusal says it, the step encoded as the path carries it. */
+const hireRoute = ({ method, factory, step }: Named): string => `${method} /api/factories/${factory}/hires/${encodeURIComponent(step)}`;
+
+/** A name in a hire's route that is no factory's, in the package's words, before anything is read. */
+const hireFactoryNamed = (at: Named): string | null => {
+  const wrong = factoryNameRefusal(at.factory);
+  return wrong === undefined ? null : `${hireRoute(at)}: ${wrong}`;
+};
+
+/**
+ * An agent hired into a step of a factory's workflow, as the guard's refusals word it: a name that is no factory's is refused in the
+ * package's words, an agent that is no string in the api's.
+ */
+const FACTORY_HIRE: RouteWords = {
+  shape: HIRE_PUT_SHAPE,
+  guard: (at) => ({
+    route: hireRoute(at),
+    does: 'hires an agent into a step of a factory',
+    forAnother: 'hire one',
+    why: 'every run of the workflow started in the factory after runs the step as that agent, in its repositories',
+    reach: "hire it on the step's page on the board",
+    instead: "Hire it on the step's page on the board",
+    shape: HIRE_PUT_SHAPE,
+  }),
+  issue: (at) => (_issue, body) =>
+    `${hireRoute(at)}: \`agent\` names the agent to hire, a string, its file's name without .md: ${HIRE_PUT_SHAPE}. This request's was ${JSON.stringify(valueAt(body, ['agent'])) ?? 'left out'}.`,
+  named: hireFactoryNamed,
+  notJson: (at) => `${hireRoute(at)} takes a JSON body: ${HIRE_PUT_SHAPE}.`,
+};
+
+/** A step's hire taken back, as the guard's refusals word it: a name that is no factory's is refused in the package's words. */
+const FACTORY_FIRE: RouteWords = {
+  shape: '`{}`',
+  guard: (at) => ({
+    route: hireRoute(at),
+    does: "takes a step's hire back",
+    forAnother: 'take it back',
+    why: 'every run of the workflow started in the factory after runs the step with no agent hired, and a start refuses a step left with none',
+    reach: "fire it on the step's page on the board",
+    instead: "Fire it on the step's page on the board",
+    shape: '`{}`',
+  }),
+  issue: (at) => () => `${hireRoute(at)} takes no body.`,
+  named: hireFactoryNamed,
+};
+
 /** The api's words for each routed command, by its name. */
 export const WORDS: Readonly<Record<string, RouteWords>> = {
   retry: RETRY,
@@ -495,4 +545,6 @@ export const WORDS: Readonly<Record<string, RouteWords>> = {
   'agents custom': AGENTS_CUSTOM,
   'factory instruction': FACTORY_INSTRUCTION,
   'factory instruct': FACTORY_INSTRUCT,
+  'factory hire': FACTORY_HIRE,
+  'factory fire': FACTORY_FIRE,
 };

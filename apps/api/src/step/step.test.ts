@@ -5,9 +5,9 @@
 import '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { FactoryListing } from 'agent-orchestrator';
+import { hireRefusalOf, type FactoryListing } from 'agent-orchestrator';
 import type { Run } from 'agent-orchestrator/run';
-import { hiredInOf, RECENT_RUNS, recentRunsOf, workflowPageOf } from './step.ts';
+import { hiredInOf, hiringOf, RECENT_RUNS, recentRunsOf, workflowPageOf } from './step.ts';
 
 const home = '/store';
 const served = '/own';
@@ -104,5 +104,47 @@ test('the factories that hire into a step: those that attach its workflow and, f
       { factory: 'far', agent: 'cy' },
     ],
     'a workflow of yours is read in every factory that attaches it',
+  );
+});
+
+/** An agent as the listing reads it, the keys `hiringOf` reads: of `from`, broken where `error` says. */
+const agentOf = (name: string, from: 'repo' | 'yours', error: string | null = null) => ({
+  name,
+  from,
+  description: error ? null : `${name}, of ${from}`,
+  error,
+});
+
+test("a step's hiring: the agents beside its workflow that read, by name — the same name of the other place, and a broken one, left out", () => {
+  const mill = { name: 'mill', workflows: ['build'] };
+  const agents = [agentOf('zed', 'repo'), agentOf('ada', 'yours'), agentOf('ada', 'repo'), agentOf('bad', 'repo', 'no front matter')];
+  assert.deepEqual(hiringOf(mill, 'build', {}, null, 'repo', agents), {
+    refused: null,
+    agents: [
+      { name: 'ada', description: 'ada, of repo' },
+      { name: 'zed', description: 'zed, of repo' },
+    ],
+  });
+  assert.deepEqual(hiringOf(mill, 'build', {}, null, 'yours', agents), {
+    refused: null,
+    agents: [{ name: 'ada', description: 'ada, of yours' }],
+  });
+});
+
+test("REFUSED: a step's hiring in the default factory, and for a step whose file names its agent, with no agents to pick — but a hired step takes another", () => {
+  const mill = { name: 'mill', workflows: ['build'] };
+  const agents = [agentOf('ada', 'repo')];
+  const own = { agent: { name: 'agora' } } as never;
+  assert.deepEqual(hiringOf(undefined, 'build', {}, null, 'repo', agents), {
+    refused: hireRefusalOf(undefined, 'build', null),
+    agents: [],
+  });
+  assert.match(hiringOf(undefined, 'build', {}, null, 'repo', agents).refused ?? '', /is the default factory/);
+  assert.deepEqual(hiringOf(mill, 'build', own, null, 'repo', agents), { refused: hireRefusalOf(mill, 'build', 'agora'), agents: [] });
+  assert.match(hiringOf(mill, 'build', own, null, 'repo', agents).refused ?? '', /`agent: agora`/);
+  assert.deepEqual(
+    hiringOf(mill, 'build', { agent: { name: 'ada' } } as never, 'ada', 'repo', agents),
+    { refused: null, agents: [{ name: 'ada', description: 'ada, of repo' }] },
+    'a hired step is resolved with its hire as its agent: its file names none of its own',
   );
 });

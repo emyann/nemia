@@ -36,8 +36,8 @@ test('each command is served on the api where it was before the table, the lift 
       ['factory add', 'cli'],
       ['factory attach', 'cli'],
       ['factory detach', 'cli'],
-      ['factory hire', 'cli'],
-      ['factory fire', 'cli'],
+      ['factory hire', { method: 'PUT', path: '/api/factories/:factory/hires/:step', status: 200 }],
+      ['factory fire', { method: 'DELETE', path: '/api/factories/:factory/hires/:step', status: 200 }],
       [
         'factory instruction',
         [

@@ -200,6 +200,7 @@ export {
   writersOf,
   fillsOf,
   hireRefusal,
+  hireRefusalOf,
   noFactoryLine,
   outsideRefusal,
   unattachedRefusal,

@@ -136,7 +136,7 @@ test('a reader that opened the head before an append and a rotation, and the sea
   const sealed = path.join(root, 'feed.sealed.jsonl');
   const open = fs.openSync;
   let between = true;
-  fs.openSync = ((file: fs.PathLike, ...rest: never[]) => {
+  fs.openSync = ((file: fs.PathLike, ...rest: Parameters<typeof fs.openSync> extends [unknown, ...infer R] ? R : never) => {
     if (between && file === sealed) {
       between = false;
       Effect.runSync(ops.append('b', said(31) as never));

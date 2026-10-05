@@ -142,6 +142,32 @@ test('the beat stats the file and reads it only once it moved: a line another pr
   );
 });
 
+test('REFUSED: a reader whose read failed at the end of the feed says `readable` before the next line, though its item starts at the cursor', async (t) => {
+  if (process.getuid?.() === 0) return t.skip('a folder of mode 600 does not keep root from reading it');
+  const rt = hubbed(t);
+  const reader = await following(t, rt, '5 millis');
+  const mode = fs.statSync(ROOT).mode & 0o777;
+  fs.chmodSync(ROOT, 0o600);
+  try {
+    await until(() => reader.got.length >= 1);
+  } finally {
+    fs.chmodSync(ROOT, mode);
+  }
+  assert.deepEqual(
+    reader.got.map((f) => f.kind),
+    ['unreadable'],
+    'a beat that cannot stat the feed reads it, and the read fails',
+  );
+
+  await rt.runPromise(emitFeed(judged('after a failed read')));
+  await until(() => reader.words().length >= 1);
+  assert.deepEqual(
+    reader.got.map((f) => f.kind),
+    ['unreadable', 'readable', 'line'],
+    'the feed did not move while it failed, so the item starts at the cursor: only a read says the feed is readable again',
+  );
+});
+
 test('REFUSED: a cursor the feed cannot be read from fails the stream before the reader is counted — past the end, or inside a line', async () => {
   await foreign('cursor');
   const was = followers();

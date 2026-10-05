@@ -41,6 +41,7 @@ import { AGENTS_CUSTOM } from '../agents/custom.verb.ts';
 import { LIBRARY_ENTRIES } from '../agents/library.verb.ts';
 import { SKILL_ENTRIES } from '../skills/skills.verb.ts';
 import { MERGES } from '../branches/merges.verb.ts';
+import { MERGE } from '../merge/merge.verb.ts';
 import { WORKFLOW_ENTRIES } from '../folder/workflows.verb.ts';
 import { FACTORIES } from '../factory/factory.verb.ts';
 import { INBOXES } from '../inbox/commands.verb.ts';
@@ -497,6 +498,7 @@ export const COMMANDS: readonly Command[] = [
   APPROVE,
   ROUND,
   ACCEPT,
+  MERGE,
   SAY,
   LS,
   ...READS,

@@ -400,6 +400,7 @@ const PINNED: Record<string, string[]> = {
     'decideRun',
     'filingsRead',
     'forgetRun',
+    'mergeRun',
     'parentRead',
     'parentsRead',
     'retryRun',

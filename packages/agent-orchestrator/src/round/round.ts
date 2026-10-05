@@ -14,6 +14,7 @@ import {
   type Hold,
   type Pruned,
   type Run,
+  type StepStatus,
   type TaskPhase,
 } from '../record/record.ts';
 import type { Closeout } from '../closeout/closeout.ts';
@@ -27,6 +28,7 @@ import {
   roundOf,
   roundWord,
   sendBackTo,
+  sentBack,
   spentWord,
   standing,
   waitsAtGate,
@@ -42,6 +44,7 @@ import type { EarlierTry } from '../retry/index.ts';
 import { heldRefusal, prunedRefusal } from '../prune/prune.ts';
 import { holdWord } from '../wait/wait.ts';
 import type { Decision, Offer } from '../decide/decide.ts';
+import { mergeDue, mergeDueNote, mergeNote, mergeSpent } from '../merge/merge.ts';
 
 /**
  * The rounds due now. Pure, and blind to cancellation on purpose, as `retriesDue` is: `assess` answers for a cancelled run, and `advance`
@@ -49,7 +52,8 @@ import type { Decision, Offer } from '../decide/decide.ts';
  *
  * A looping step verified — or unverified, with no check — whose closeout says `again: true`: below its cap, since at the cap `stepStatus`
  * says `exhausted`, and the run files the next round on the step's word. A loop that is `exhausted`: only a person's ask for the next
- * round, which names it, so it is honoured once. `again: false`, blocked, unsigned, a check that did not pass: nothing is due.
+ * round, which names it, so it is honoured once. `again: false`, blocked, unsigned, a check that did not pass: nothing is due. A loop with
+ * no round due goes again on a person's `nemia merge` (`mergeDue`), on the round it is on.
  *
  * A loop with a step over its budget goes round on nobody's word but a person's raising the cap: its looping step reads `over budget`, so
  * `again` files nothing, and a person's ask — at the cap, or below it — is due only with a `--budget` above what each of those steps has
@@ -76,48 +80,90 @@ export function roundsDue(
       due.push({ step: step.name, target: step.loop, round, by: 'again' });
       continue;
     }
-    const over = loopOver(steps, step, run, spendOf);
-    const above = Math.max(0, ...over.map((o) => o.spent.usd));
-    const held = status === 'over budget' && satisfiesAfter(own) && askedAgain(step, run, closeoutOf);
-    const ask =
-      status === 'exhausted' || held
-        ? asks.find((a) => a.step === step.name && a.round === round && (!over.length || (a.budget !== undefined && a.budget > above)))
-        : undefined;
-    if (ask)
-      due.push({
-        step: step.name,
-        target: step.loop,
-        round,
-        by: 'ask',
-        ...(over.length ? { budget: ask.budget, raise: over.map((o) => o.name) } : {}),
-      });
+    const sent =
+      askedRound(steps, step, run, { status, own, round }, closeoutOf, asks, spendOf) ??
+      mergeDue(steps, run, step, status, asks, (f) => endingStopped(f, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf));
+    if (sent) due.push(sent);
   }
   return due;
 }
 
 /**
+ * The round a person asked for, due: the next round of an `exhausted` loop, or of one held over its budget with `again` said, at an ask
+ * whose `--budget` is above what each step over its budget has cost — or undefined.
+ *
+ * @param at The looping step's status, its own, and the round it would go.
+ */
+function askedRound(
+  steps: readonly Workflow[],
+  step: Workflow,
+  run: Run,
+  at: { status: StepStatus; own: StepStatus; round: number },
+  closeoutOf: (step: string) => Closeout | undefined,
+  asks: readonly RoundAsk[],
+  spendOf: SpendOf,
+): Round | undefined {
+  const over = loopOver(steps, step, run, spendOf);
+  const above = Math.max(0, ...over.map((o) => o.spent.usd));
+  const held = at.status === 'over budget' && satisfiesAfter(at.own) && askedAgain(step, run, closeoutOf);
+  const ask =
+    at.status === 'exhausted' || held
+      ? asks.find((a) => a.step === step.name && a.round === at.round && (!over.length || (a.budget !== undefined && a.budget > above)))
+      : undefined;
+  if (!ask) return undefined;
+  return {
+    step: step.name,
+    target: step.loop!,
+    round: at.round,
+    by: 'ask',
+    ...(over.length ? { budget: ask.budget, raise: over.map((o) => o.name) } : {}),
+  };
+}
+
+/**
  * The run's steps once a round is filed. Pure.
  *
- * Every step of the loop moves its try behind it, `then: 'round'`, and keeps its workspace and branch. The target's place is taken by the
- * task just filed, which continues its session. Every other step's is left unfiled, for `assess` to file once what it waits on is verified
- * — a new session, under its next try's id (`stepTaskId`). So the looping step's closeout that asked for the round is behind it, and a
- * pass that reads the record after this files no second round. A cap a person raised with the round is kept on each step it was raised
- * for, in force from its next try (`budgetOf`).
+ * Every step of the loop moves its try behind it, `then: 'round'` — `then: 'merge'` on a merge, which spends no round — and keeps its
+ * workspace and branch, and each ending a merge sends the work back from moves its own behind (`sentBack`). The target's place is taken
+ * by the task just filed, which continues its session. Every other step's is left unfiled, for `assess` to file once what it waits on is
+ * verified — a new session, under its next try's id (`stepTaskId`). So the looping step's closeout that asked for the round is behind it,
+ * and a pass that reads the record after this files no second round. A cap a person raised with the round is kept on each step it was
+ * raised for, in force from its next try (`budgetOf`).
  */
 export function roundFiled(steps: readonly Workflow[], run: Run, r: Round, taskId: string): Run['steps'] {
   const looping = steps.find((s) => s.name === r.step);
   const next = { ...run.steps };
+  const then = r.by === 'merge' ? 'merge' : 'round';
   for (const name of looping ? loopSpan(steps, looping) : []) {
     const { check, tries = [], handedOff: _, landed: __, ...rest } = run.steps[name] ?? { taskId: null };
     const raised = r.budget !== undefined && r.raise?.includes(name) ? { budget: r.budget } : {};
-    const over: EarlierTry[] = rest.taskId ? [{ taskId: rest.taskId, ...(check ? { check } : {}), then: 'round', ...raised }] : [];
+    const over: EarlierTry[] = rest.taskId ? [{ taskId: rest.taskId, ...(check ? { check } : {}), then, ...raised }] : [];
     next[name] = { ...rest, taskId: name === r.target ? taskId : null, tries: [...tries, ...over] };
   }
-  return next;
+  return { ...next, ...Object.fromEntries((r.back ?? []).filter((b) => next[b]).map((b) => [b, sentBack(next[b])])) };
 }
 
+/** The pass's line for a round it filed: its round and on whose word, or the merge it files (`mergeNote`). */
+export const roundFiledNote = (r: Round, looping: Workflow): string =>
+  r.merge
+    ? mergeNote(r)
+    : `${r.step}: round ${r.round} — ${r.by === 'again' ? `again, rounds: ${capOf(looping)}` : `nemia round${r.budget !== undefined ? ` --budget ${r.budget}` : ''}`}; ${r.target} goes again`;
+
+/**
+ * What a round filed tells its target of itself (`RoundBriefing`): its loop, its number, the loop's `rounds:`, on whose word, and what it
+ * merges.
+ */
+export const roundBriefed = (r: Round, looping: Workflow) => ({
+  loop: r.step,
+  round: r.round,
+  rounds: capOf(looping),
+  by: r.by,
+  ...(r.merge ? { merge: { onto: r.merge.onto, sha: r.merge.sha } } : {}),
+});
+
 /** The round asks a record already answers — each names a round its loop has reached. The tick consumes these. */
-export const spentRoundAsks = (run: Run, asks: readonly RoundAsk[]): RoundAsk[] => asks.filter((a) => a.round <= roundOf(run, a.step));
+export const spentRoundAsks = (run: Run, asks: readonly RoundAsk[]): RoundAsk[] =>
+  asks.filter((a) => (a.merge ? mergeSpent(run, a) : a.round <= roundOf(run, a.step)));
 
 /**
  * Why a `--budget` cannot ride on `nemia round <id>`, in words that say what to do instead — or null. Pure, and asked before anything about
@@ -425,6 +471,7 @@ export const acceptedNote = (step: Workflow, run: Run, a: Acceptance): string =>
 /** A round due now, as `nemia ls` and `nemia decide` say it. */
 export function roundDueNote(steps: readonly Workflow[], r: Round): string {
   const looping = steps.find((s) => s.name === r.step);
+  if (r.by === 'merge') return mergeDueNote(r);
   return r.by === 'ask'
     ? `round ${r.round} asked (nemia round${r.budget !== undefined ? ` --budget ${r.budget}` : ''}) — the next tick files ${r.target}`
     : `round ${r.round} of ${looping ? capOf(looping) : DEFAULT_ROUNDS} due — ${r.step} asked again, and the next tick files ${r.target}`;

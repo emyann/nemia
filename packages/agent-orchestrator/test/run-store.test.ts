@@ -275,7 +275,7 @@ const asksOfEachKind = (id: string): Array<{ asked: PersonAsk; file: string; str
 test('an ask of each kind is written at the name the tick reads it by, holding the ask alone, and answered where it is', () => {
   const run = made('r-write-asks');
   for (const { asked, file } of asksOfEachKind(run.id)) {
-    const n = asked.kind === 'round' ? asked.ask.round : asked.ask.try;
+    const n = asked.kind === 'round' ? asked.ask.round : asked.kind === 'merge' ? asked.ask.merge.try : asked.ask.try;
     assert.equal(filesStore.asks.where(run.id, { kind: asked.kind, step: asked.ask.step, n }), file);
     assert.deepEqual(filesStore.asks.write(run.id, asked), { written: true, where: file });
     assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), asked.ask, `${asked.kind} is written as the ask alone`);
@@ -284,6 +284,19 @@ test('an ask of each kind is written at the name the tick reads it by, holding t
   assert.equal(read.asks.length, 1);
   assert.equal(read.rounds.length, 1);
   assert.deepEqual(read.notes, []);
+});
+
+test('a merge ask is written at its target and try, holding its loop, round, base and commit, and read back as a round ask of its loop', () => {
+  const run = made('r-write-merge');
+  const merge = { target: 'implement', try: 3, onto: 'main', sha: 'a'.repeat(40) };
+  const file = filesStore.asks.where(run.id, { kind: 'merge', step: 'implement', n: 3 });
+  assert.match(file, /merge-implement-3$/);
+  assert.deepEqual(filesStore.asks.write(run.id, { kind: 'merge', ask: { step: 'review', round: 2, at, merge } }), {
+    written: true,
+    where: file,
+  });
+  assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), { loop: 'review', round: 2, onto: 'main', sha: 'a'.repeat(40), at });
+  assert.deepEqual(filesStore.asks.read(run.id).rounds, [{ step: 'review', round: 2, at, merge }]);
 });
 
 test('an ask written over one already there is refused as no stray, and the first stays byte for byte', () => {

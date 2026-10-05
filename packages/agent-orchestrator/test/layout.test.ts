@@ -247,6 +247,7 @@ test('REFUSED on the source: a value import from a leaf cut out of run.ts back t
       'src/forget/forget.ts',
       'src/gate/gate.ts',
       'src/list/list.ts',
+      'src/merge/merge.ts',
       'src/prune/prune.ts',
       'src/retry/index.ts',
       'src/retry/retry-refusal.ts',

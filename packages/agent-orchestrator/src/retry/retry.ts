@@ -344,13 +344,17 @@ export function tryNote(step: Workflow, record: StepRecord | undefined, steps: r
   return [inRound, `try ${record!.tries!.length + 1}, ${how}`, raised, answered ? 'answered' : ''].filter(Boolean).join(', ');
 }
 
-/** How a try was asked for, as `tryNote` says it: by `retries:`, the run's sign-off nudge, the pause, or a person's word and its mode. */
+/**
+ * How a try was asked for, as `tryNote` says it: by `retries:`, the run's sign-off nudge, the pause, or a person's word — its mode, or a
+ * merge of the base.
+ */
 function howOf(step: Workflow, last: EarlierTry): string {
   if (last.then === 'retries') return `by retries: ${step.retries ?? 0}`;
   if (last.then === 'signoff') return 'nudged to sign off by the run';
   if (last.paused) return `${last.then === 'recheck' ? 'rechecked' : 'continued'} after nemia pause --now`;
   if (last.then === 'recheck') return 'rechecked on your word';
   if (last.then === 'fresh') return `fresh${last.model ? ` on ${last.model}` : ''}, on your word`;
+  if (last.then === 'merge') return 'merged the base, on your word (nemia merge), the round unchanged';
   return last.then === 'back' ? 'sent back with the work, on your word' : 'nudged on your word';
 }
 

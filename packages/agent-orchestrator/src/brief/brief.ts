@@ -18,7 +18,8 @@ import {
   type RetryBriefing,
   type RoundBriefing,
 } from './brief-sections.ts';
-import { landsOnCheck, owesReplies } from '../status/status.ts';
+import { landsOnCheck, merged, owesReplies } from '../status/status.ts';
+import { mergeReviewSection, mergeSection } from './merge-sections.ts';
 import { checkContract, checkHandedSection, landingContract, type CheckHanded } from '../check/check.ts';
 import { artifactsContract } from '../artifacts/artifacts.ts';
 import { briefBody, rendersAgent, skillLayers } from '../agents/agents.ts';
@@ -112,15 +113,11 @@ export function composeBrief(
     ...(artifactsDir ? [artifactsContract(artifactsDir, step.workspace === 'main', inFolder)] : []),
     closeoutContract(
       step,
-      Boolean(round) || owesReplies(steps, run, step.name) ? 'owed' : isLoopTarget(steps, step.name) ? 'none' : false,
+      (round && !round.merge) || owesReplies(steps, run, step.name) ? 'owed' : isLoopTarget(steps, step.name) ? 'none' : false,
       inFolder,
     ),
   ].join('\n');
-  const again = retry
-    ? retrySection(step, retry, inFolder) + retriedInRound(step, run, steps, retry, closeoutOf)
-    : round
-      ? roundSection(step, round, steps, closeoutOf, inFolder)
-      : '';
+  const again = againSection(step, run, steps, closeoutOf, inFolder, retry, round);
   if (retry?.resumed || round?.resumed) return again.slice(1) + contracts;
   const given = givenSections(step, run, steps, closeoutOf, checked) + again;
   const tree = depsLines(deps);
@@ -228,6 +225,21 @@ export function composeBrief(
   return parts.join('\n');
 }
 
+/** What a step filed again is told of why: its try's section (`retrySection`), its merge's (`mergeSection`) or its round's, or nothing. */
+function againSection(
+  step: Workflow,
+  run: Run,
+  steps: readonly Workflow[],
+  closeoutOf: (step: string) => Closeout | undefined,
+  inFolder: boolean,
+  retry?: RetryBriefing,
+  round?: RoundBriefing,
+): string {
+  if (retry) return retrySection(step, retry, inFolder) + retriedInRound(step, run, steps, retry, closeoutOf);
+  if (round?.merge) return mergeSection(step, round.merge, round.loop, steps);
+  return round ? roundSection(step, round, steps, closeoutOf, inFolder) : '';
+}
+
 /**
  * What a step is handed of the steps before it, in every brief but a resumed try's or round's: what each step it reads declared
  * (`## From <step>`), what each checked step it follows was told by its check (`## What <step>'s check said`), and its loop's findings.
@@ -242,7 +254,11 @@ function givenSections(
   return (
     (step.input ?? []).map((from) => fromSection(from, steps, closeoutOf)).join('\n') +
     checked.map((c) => checkHandedSection(c)).join('') +
-    (step.loop ? loopSection(step, run, steps, closeoutOf) : '')
+    (step.loop
+      ? merged(run.steps[step.name])
+        ? mergeReviewSection(step, run, closeoutOf)
+        : loopSection(step, run, steps, closeoutOf)
+      : '')
   );
 }
 

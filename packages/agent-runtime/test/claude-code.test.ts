@@ -33,11 +33,12 @@ const JOB_ID = '5e551011-0000-4000-8000-00000000000a';
 const BG_ID = '5e551011-0000-4000-8000-00000000000b';
 
 /**
- * A fake `claude`: `-p` records its arguments, prints its init line, and then reads its stdin a line at a time as Claude
- * Code does — recording each in `job-stdin`, and printing a result for each but a brief of `wait`, until its stdin ends.
- * The result names its `type` last, as Claude Code's does. `--bg` records its arguments, and the file `sees` as it finds it in
- * `bg-saw` (`absent` when there is none); `agents` lists what `agents.json` holds, a line in `agents-calls` each time; `stop` and
- * `rm` are recorded in order.
+ * A fake `claude`: `-p` records its arguments and, in `job-env`, whether background tasks are off and the default timeout of a
+ * call (`unset` for a variable not set), prints its init line, and then reads its stdin a line at a time as Claude Code does —
+ * recording each in `job-stdin`, and printing a result for each but a brief of `wait`, until its stdin ends. The result names its
+ * `type` last, as Claude Code's does. `--bg` records its arguments, the same two variables in `bg-env`, and the file `sees` as it
+ * finds it in `bg-saw` (`absent` when there is none); `agents` lists what `agents.json` holds, a line in `agents-calls` each time;
+ * `stop` and `rm` are recorded in order.
  */
 const fake = (sees?: string) => {
   const dir = tmp('bin');
@@ -50,8 +51,9 @@ const fake = (sees?: string) => {
       'case "$1" in',
       `  agents) echo x >> '${dir}/agents-calls'; cat '${dir}/agents.json' ;;`,
       `  stop|rm) echo "$@" >> '${dir}/verbs' ;;`,
-      `  --bg) ${sees ? `{ cat '${sees}' 2>/dev/null || echo absent; } > '${dir}/bg-saw'; ` : ''}printf '%s\\n' "$@" > '${dir}/bg-args' ;;`,
-      `  -p) printf '%s\\n' "$@" > '${dir}/job-args.tmp'; mv '${dir}/job-args.tmp' '${dir}/job-args'`,
+      `  --bg) ${sees ? `{ cat '${sees}' 2>/dev/null || echo absent; } > '${dir}/bg-saw'; ` : ''}printf '%s %s' "\${CLAUDE_CODE_DISABLE_BACKGROUND_TASKS-unset}" "\${BASH_DEFAULT_TIMEOUT_MS-unset}" > '${dir}/bg-env'; printf '%s\\n' "$@" > '${dir}/bg-args' ;;`,
+      `  -p) printf '%s %s' "\${CLAUDE_CODE_DISABLE_BACKGROUND_TASKS-unset}" "\${BASH_DEFAULT_TIMEOUT_MS-unset}" > '${dir}/job-env.tmp'; mv '${dir}/job-env.tmp' '${dir}/job-env'`,
+      `      printf '%s\\n' "$@" > '${dir}/job-args.tmp'; mv '${dir}/job-args.tmp' '${dir}/job-args'`,
       echo({ type: 'system', subtype: 'init', session_id: JOB_ID }),
       `      while IFS= read -r line; do printf '%s\\n' "$line" >> '${dir}/job-stdin'`,
       `        case "$line" in *'"content":"wait"'*) ;; *)`,
@@ -754,6 +756,34 @@ test("a job reads its checkout's shared settings and neither the operator's nor 
     "beside the caller's own `--settings`",
   );
   assert.deepEqual(sources(bg), [], 'a background session reads what it read before');
+});
+
+const JOB_ENV_KEYS = ['CLAUDE_CODE_DISABLE_BACKGROUND_TASKS', 'BASH_DEFAULT_TIMEOUT_MS'] as const;
+
+test("REFUSED at shipped defaults: a job runs with background tasks off and its calls' default timeout at the most one may take, on both `claude -p` specs; a background session is left as it is", async () => {
+  const { claudeDetached } = await import('../src/harness/claude/code.ts');
+  const saved = JOB_ENV_KEYS.map((key) => [key, process.env[key]] as const);
+  for (const key of JOB_ENV_KEYS) delete process.env[key];
+  const f = fake();
+  let job: string[];
+  let bg: string[] | undefined;
+  try {
+    const ops = opsIn(tmp('root'));
+    await Effect.runPromise(ops.spawn({ name: 'ae/j/1', brief: 'go', cwd: f.dir }));
+    job = await until(async () => f.read('job-env'), 'the job started');
+    await Effect.runPromise(ops.spawn({ name: 'ae/b/1', brief: 'go', cwd: f.dir, config: { background: true } }));
+    bg = f.read('bg-env');
+  } finally {
+    f.restore();
+    for (const [key, value] of saved) if (value !== undefined) process.env[key] = value;
+  }
+  assert.deepEqual(job, ['1 600000'], 'the environment the worker gave the job');
+  assert.deepEqual(
+    claudeDetached.command({ name: 'ae/t/1', brief: 'b', cwd: '/r' }).env,
+    { CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: '1', BASH_DEFAULT_TIMEOUT_MS: '600000' },
+    'claude-detached',
+  );
+  assert.deepEqual(bg, ['unset unset'], 'a background session runs as it did before');
 });
 
 test('a bridge asked in `config.claude` reaches a background session as --remote-control, first of the bag and directly before the mode when it is written first', async () => {

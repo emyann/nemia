@@ -15,6 +15,7 @@
  *
  * A job's argv is built here too (`claudePrintArgs`), and so is `claude-detached` (`claudeDetached`): Claude Code run as
  * `claude -p`, detached by the engine's worker rather than by the harness, whose output is one JSON object at its exit.
+ * Both run with background tasks off (`CLAUDE_JOB_ENV`); a background session's environment is its own.
  */
 import { Effect } from 'effect';
 import os from 'node:os';
@@ -99,6 +100,17 @@ export const claudePrintFlags = (r: SpawnRequest, io: HarnessIO | undefined): st
   ...(r.config?.budgetUsd !== undefined ? ['--max-budget-usd', String(r.config.budgetUsd)] : []),
 ];
 
+/**
+ * The environment a `claude -p` job runs in, laid over the worker's own. A job's turn ends with its result, and a command
+ * left running in the background then reports to nothing, so background tasks are off: `run_in_background` is ignored and
+ * a call runs in the foreground. A call given no timeout may then run as long as Claude Code lets any call run, 10 minutes,
+ * where by default it is cut at 2.
+ */
+export const CLAUDE_JOB_ENV: Record<string, string> = {
+  CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: '1',
+  BASH_DEFAULT_TIMEOUT_MS: '600000',
+};
+
 /** The regex that finds Claude Code's own session id in what `claude -p` prints. */
 export const CLAUDE_SESSION_ID_PATTERN = '"session_id"\\s*:\\s*"([0-9a-f-]{16,})"';
 
@@ -118,7 +130,7 @@ export const claudePrepare = (r: SpawnRequest): Partial<HarnessIO> => {
  */
 export const claudeDetached: HarnessSpec = {
   name: 'claude-detached',
-  command: (r, io) => ({ cmd: 'claude', args: claudePrintArgs(r, io, ['--output-format', 'json']) }),
+  command: (r, io) => ({ cmd: 'claude', args: claudePrintArgs(r, io, ['--output-format', 'json']), env: CLAUDE_JOB_ENV }),
   readOutput: claudeResultOutput,
   nativeIdPattern: CLAUDE_SESSION_ID_PATTERN,
   transcript: { file: claudeTranscriptFile, events: claudeTranscriptEvents },
@@ -163,6 +175,7 @@ export const claudeJob: HarnessSpec = {
       'none',
       ...claudePrintFlags(r, io),
     ],
+    env: CLAUDE_JOB_ENV,
   }),
   input: {
     line: (text) => JSON.stringify({ type: 'user', message: { role: 'user', content: text } }),

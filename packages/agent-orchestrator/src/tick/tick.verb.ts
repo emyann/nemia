@@ -4,6 +4,7 @@
  * (`runtime-client.ts`): an Effect program that requires the engine as a service (`tickRun`, over `EngineService`), run by a caller
  * with `runWith`.
  */
+import os from 'node:os';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { Cause, Data, Effect, Exit } from 'effect';
@@ -36,7 +37,8 @@ import { followedFeed } from '../rest/rest.verb.ts';
 import { reportedEngine } from '../views/views.verb.ts';
 import { startQueued } from '../inbox/inbox.verb.ts';
 import { countRested, meteredPass, noteSeen, within, withinEffect } from '../meter/tally.store.ts';
-import { sessionsOf, type PassCost } from '../meter/meter.ts';
+import { RECENT_KEPT, sessionsOf, type PassCost, type Reading, type RecentPass } from '../meter/meter.ts';
+import { keepSeries } from '../series/series.store.ts';
 import { advancePass, type Advanced } from './advance.verb.ts';
 import { stagedRead } from '../list/list.verb.ts';
 import { costOf, ioOf, meteredEngine, recordPassMetrics } from '../meter/meter.verb.ts';
@@ -105,6 +107,26 @@ type TickReport = Effect.Success<ReturnType<Engine['tick']>>;
 type PassOptions = { repo: string; memo: RestMemo; verify: boolean };
 
 /**
+ * The series kept from the ring after a pass (`keepSeries`), and the time it took, which is measuring's. A failure costs the series, never
+ * the pass: it is said on stderr.
+ */
+const seriesKept = (ring: readonly RecentPass[]): number => {
+  const t0 = performance.now();
+  try {
+    keepSeries(ring);
+  } catch (err) {
+    process.stderr.write(`nemia: the series were not kept on this pass: ${err instanceof Error ? err.message : String(err)}\n`);
+  }
+  return performance.now() - t0;
+};
+
+/** The machine's load over the last minute, per core it has. */
+const loadNow = (): number => os.loadavg()[0] / os.availableParallelism();
+
+/** What a pass is handed from outside: where a queued card starts, the memo, whether it verifies, and the quota the daemon last read. */
+export type TickOptions = { repo?: string; memo?: RestMemo; verifyRest?: boolean; quota?: () => Reading | undefined };
+
+/**
  * Every run, advanced once, after one engine tick — then, with a run slot free, the queue's next card started. This is the whole daemon: an
  * Effect program that requires the engine as a service (`EngineService`).
  *
@@ -121,8 +143,9 @@ type PassOptions = { repo: string; memo: RestMemo; verify: boolean };
  * A run at rest — finished, every task settled, nothing due and nothing done — is answered from the memo of the passes before (`RestMemo`)
  * while none of its inputs changed, and costs no read of the engine and no git of its own: see `restMemo`.
  *
- * Metered as it goes (`meteredPass`), and its cost written down (`recordPassCost`), kept among the recent passes (`recordRecentPass`), put
- * into the pass's metrics (`recordPassMetrics`) and returned. A pass run inside another's meter — a
+ * Metered as it goes (`meteredPass`), and its cost written down (`recordPassCost`), kept among the recent passes (`recordRecentPass`) with
+ * the quota `quota` reads and the checks the pass filed, rolled from there into the series (`keepSeries`), put into the pass's metrics
+ * (`recordPassMetrics`) and returned. A pass run inside another's meter — a
  * test that meters its own — is counted as part of that one and carries no cost of its own.
  *
  * `memo` is the memo to answer from and keep, the engine's own by default: a fresh one each pass (`freshRestMemo`) is a daemon restarted
@@ -131,11 +154,7 @@ type PassOptions = { repo: string; memo: RestMemo; verify: boolean };
  *
  * Fails with the refusal a read threw (`Refusal`: the ceilings, `WF_VERIFY_REST`, a record); dies of anything else.
  */
-export const tickRun = Effect.fn('tick')(function* ({
-  repo,
-  memo,
-  verifyRest,
-}: { repo?: string; memo?: RestMemo; verifyRest?: boolean } = {}) {
+export const tickRun = Effect.fn('tick')(function* ({ repo, memo, verifyRest, quota }: TickOptions = {}) {
   const e = yield* EngineService;
   const options: PassOptions = {
     repo: repo ?? process.cwd(),
@@ -148,7 +167,10 @@ export const tickRun = Effect.fn('tick')(function* ({
   const t0 = performance.now();
   const measured = costOf(tallies, ms, io0, yield* ioOf(e));
   const cost = { ...measured, overheadMs: measured.overheadMs + (performance.now() - t0) };
-  const written = yield* tried(() => recordPassCost(cost) + recordRecentPass(cost));
+  const written = yield* tried(() => {
+    const recent = recordRecentPass(cost, RECENT_KEPT, { quota: quota?.(), checks: tallies.checks });
+    return recordPassCost(cost) + recent.ms + seriesKept(recent.kept);
+  });
   yield* recordPassMetrics(cost);
   return { ...value, cost: { ...cost, overheadMs: cost.overheadMs + written } };
 });
@@ -173,7 +195,7 @@ export const tickRun = Effect.fn('tick')(function* ({
  */
 const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }: PassOptions) {
   const report = yield* asked('tick', engine.tick());
-  noteSeen(sessionsOf(report));
+  noteSeen({ ...sessionsOf(report, Date.now()), load: loadNow() });
   const e = reportedEngine(engine, report.views ?? []);
   const resting = yield* restingPass(e, memo, verify);
   const ran = yield* tried(() => ceilings());

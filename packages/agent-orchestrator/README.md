@@ -2916,6 +2916,23 @@ written to `$WF_ROOT/tick-stats.json`, over the last pass's. Nothing decides on 
   `PASS_BOUNDS`; `pass.journal_reads`; and the gauges `store.runs`, `sessions.queued` and `sessions.admitted`, as the last pass saw them.
   The api serves its own process's at `GET /api/metrics`, with `api.poll.reads`: the files the runtime read for each request, by the
   route's pattern. A process that does not tick (an api started with `--no-tick`, or beside a `wf up`) has none of the pass's.
+- **The system's series are kept as rollups**, so what the recent passes say outlives the ring (`src/series/`). Each pass also keeps among
+  the recent its oldest queued session's wait since it was filed (`waitMs`), the machine's load (the one-minute load average over the
+  cores), the checks it filed, by factory, workflow, step and agent, and the quota the daemon last read; the daemon asks each harness
+  for its quota at once and every 10 minutes (`QUOTA_EVERY_MS`, `askedQuota` in `src/daemon/up.verb.ts`), and keeps a harness's last
+  reading while it does not answer. After writing the ring, the pass rolls the minutes it holds that are done and not yet kept into
+  `$WF_ROOT/metrics/minute/<YYYY-MM-DD>.jsonl`, a line a series a minute: its count, sum, least, most and last, and for a histogram its
+  buckets with an exact p50 and p95 (`SERIES`, `rollMinutes`). Once an hour is done it merges its minutes into
+  `$WF_ROOT/metrics/hour/<YYYY-MM-DD>.jsonl`, the percentiles read off the summed buckets (`rollHours`). What is due is read off the
+  files' last lines on every pass, so a restart rolls nothing twice. A line's labels are only `factory`, `workflow`, `step`, `agent`,
+  `phase`, `harness` and `window`, and a line with another is refused, never written: a run's own detail stays in its record. A pass
+  that cannot keep its series says so on stderr and goes on.
+- **Minute lines are kept 30 days and hour lines until deleted**: `WF_METRICS_MINUTE_DAYS` (a whole number from 2) and
+  `WF_METRICS_HOUR_DAYS` (a whole number from 1; unset, every hour is kept) delete the days past them on each pass, and any other value
+  is refused by name (`metricsMinuteDays`, `metricsHourDays` in `src/config/config.store.ts`). `nemia series [--range 24h|7d|30d|all]
+  [--json]` reads them: a point a minute over the last day, an hour over 7 or 30 days, a day over all of them; it writes nothing, and a
+  range it does not take is refused as `Invalid`. The api serves the same at `GET /api/series?range=<range>`, reading a past day off a
+  memo while its file has not moved, and `nemia stats` says the period's health off the hour lines (`seriesHealth`).
 - **A finished run costs a pass nothing while nothing of it changed.** A run at rest — succeeded, failed, cancelled or pruned, its
   workflow frozen on it, every task settled, nothing due, nothing done and nothing said on its last pass (`atRest`, `src/rest/rest.ts`) — is
   answered from the tick's memo while its inputs are as they were: its record, every file beside it in the store (the markers, the

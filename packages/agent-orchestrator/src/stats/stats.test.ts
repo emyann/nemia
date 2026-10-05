@@ -780,3 +780,42 @@ test('a workflow with other names gets its own tally rows, keyed by its step and
     ],
   );
 });
+
+test("a step's check time is its checks' run time alone, summed over its tries, and absent — null, not 0 — for a step with no check", () => {
+  const { all } = statsOf(factsOfAll(twoRounds('c1')), {}, NOW);
+  const checkMs = Object.fromEntries(all.steps.map((s) => [s.step, s.checkMs]));
+  assert.deepEqual(checkMs, { design: null, implement: 2 * 60 * MIN, review: null, land: 60 * MIN });
+  const implement = all.steps.find((s) => s.step === 'implement')!;
+  assert.ok(implement.ranMs! > implement.checkMs!, "the step's run time holds its sessions' too");
+  assert.match(statsLines(statsOf(factsOfAll(twoRounds('c1')), {}, NOW)).join('\n'), /^implement\s+ada\s+2\s+4h00m\s+2h00m\s+\$2\.00\s/m);
+});
+
+test("the system's health is read over the days the stats answer, and said under `system` only where the series kept some", () => {
+  const asked: Array<[string | null, string]> = [];
+  const health = {
+    pass: { p50: 12.34, p95: 80 },
+    runs: 40,
+    reads: 3,
+    load: { p95: 0.5, max: 1.25 },
+    queued: 2,
+    waitMs: 90_000,
+    checkLoad: 0.4,
+    quota: [{ harness: 'h', window: 'week', latest: 41.6, peak: 50 }],
+  };
+  const s = statsOf(factsOfAll(twoRounds('h1')), { from: '2026-09-01' }, NOW, [], (from, to) => {
+    asked.push([from, to]);
+    return health;
+  });
+  assert.deepEqual(asked, [['2026-09-01', DAY]]);
+  assert.deepEqual(s.health, health);
+  const lines = statsLines(s);
+  assert.deepEqual(lines.slice(lines.indexOf('system')), [
+    'system',
+    '  a pass: 12.3 ms (p50), 80.0 ms (p95)',
+    '  runs in the store: 40 at most; journal reads a pass: 3 (p95)',
+    '  sessions queued: 2 at most, waiting 1m30s at longest',
+    '  load: 0.5 (p95), 1.25 at most; checks filed at 0.4 (p50)',
+    '  quota h week: 42% used, 50% at most',
+  ]);
+  assert.ok(!statsLines(statsOf(factsOfAll(twoRounds('h1')), {}, NOW)).includes('system'), 'none kept, none said');
+});

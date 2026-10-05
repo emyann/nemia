@@ -34,8 +34,8 @@ export const Route = createFileRoute('/stats')({
 /**
  * How well the factory has worked, measured: the tiles for the last 14 days against the 14 before, then a daily chart per headline number
  * over the period chosen, with a rule on each day something a run froze changed; the skills each step and agent loaded beside the calls
- * refused it, side by side on a wide screen; and the changes in words. Every number is the api's, as `wf stats` counts it; one nothing
- * measured reads — and draws nothing.
+ * refused it, side by side on a wide screen; and the changes in words. Every number is the api's, as the CLI's `stats` counts it; one
+ * nothing measured reads — and draws nothing.
  */
 function StatsPage() {
   const search = Route.useSearch();

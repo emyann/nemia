@@ -18,25 +18,25 @@ import { Markdown } from './Markdown';
 import { when } from './Facts';
 
 /**
- * A step waiting at its gate, beside the closeout it handed on: the two things `wf ls` says a person can do. Approve, with a box for the
- * words every step after the gate is handed under `## Approved` — `wf approve --message`, which may be left empty. And Send back, the
- * answer box: an objection the step's next try is told, continuing its session or in a new one — `wf retry --message`, which needs words.
- * Each is the api's (`approveStep`, `askTry`), through the package, which writes a person's file and nothing else; its refusal shows beside
- * the button that made it, verbatim, the words still in the box. Once the api has taken either, what the tick does with it, until the run
- * is read again and the step says it: approved under the step, or the try asked in its note.
+ * A step waiting at its gate, beside the closeout it handed on: the two things the CLI's `ls` says a person can do. Approve, with a box for
+ * the words every step after the gate is handed under `## Approved` — the CLI's `approve --message`, which may be left empty. And Send
+ * back, the answer box: an objection the step's next try is told, continuing its session or in a new one — the CLI's `retry --message`,
+ * which needs words. Each is the api's (`approveStep`, `askTry`), through the package, which writes a person's file and nothing else; its
+ * refusal shows beside the button that made it, verbatim, the words still in the box. Once the api has taken either, what the tick does
+ * with it, until the run is read again and the step says it: approved under the step, or the try asked in its note.
  *
  * `back` are the steps a send-back names, as the package names them (`sendBackTo`): the gated step itself, which is the default and §6's
  * gate; or, at an ending step's gate — held before the step is filed — the steps it waits on, whose work the objection is about, since the
- * ending has done nothing to object to. `wf retry` of the step at such a gate is refused, so the button asks for a try of the work instead,
- * and where the ending waits on several steps a person picks which. Empty for an ending that waits on nothing — a workflow of one step in
- * the checkout — and then there is no send-back at all, as `wf ls`'s own gate note prints none (`gateNote`): approving it is the only word
- * there is to say. `acts` says the gate is an ending's: approving runs it rather than letting what follows be filed, and the words given
- * with the approval are the terms it acts on (`approvedSection`), not something handed to steps after it.
+ * ending has done nothing to object to. The CLI's `retry` of the step at such a gate is refused, so the button asks for a try of the work
+ * instead, and where the ending waits on several steps a person picks which. Empty for an ending that waits on nothing — a workflow of one
+ * step in the checkout — and then there is no send-back at all, as the CLI `ls`'s own gate note prints none (`gateNote`): approving it is
+ * the only word there is to say. `acts` says the gate is an ending's: approving runs it rather than letting what follows be filed, and the
+ * words given with the approval are the terms it acts on (`approvedSection`), not something handed to steps after it.
  *
- * `closeout` is what is being approved, where the gate is drawn beside it: the step's summary and each field it declared (`HandedOn`,
- * the Output tab's drawing) — for a plan its approach, then its files, steps and risks — beside Approve and Send back, since it is the
- * one thing a person must read before either: left of the answer where the page is wide, above it where it is not. The inspector's gate
- * has none: its Output tab is where the closeout is.
+ * `closeout` is what is being approved, where the gate is drawn beside it: the step's summary and each field it declared (`HandedOn`, the
+ * Output tab's drawing) — for a plan its approach, then its files, steps and risks — beside Approve and Send back, since it is the one
+ * thing a person must read before either: left of the answer where the page is wide, above it where it is not. The inspector's gate has
+ * none: its Output tab is where the closeout is.
  *
  * An ending's approval runs it where nothing can be taken back, so it takes a second, deliberate press: Approve, then Run <step>. The words
  * of either answer go as they were typed, as `--message` takes them: none with an approval where nothing was written, and a send-back with
@@ -257,7 +257,7 @@ export const endsTheRun = (step: Pick<RunDetail['steps'][number], 'spec'>): bool
  * the run's decision, which the Decide section on this page has already read for this state of the run); then, for each step the ending
  * waits on — the steps a send-back goes to (`sendBackTo`) — the closeout it handed on, rendered, with the files it named. That is the
  * whole of what there is to read: the ending has run nothing and said nothing. Git's own `--shortstat` sits under each branch, as
- * `wf decide` prints it beside the branch; the steps waited on are read in the run's order off the graph the api gives, whatever the
+ * the CLI's `decide` prints it beside the branch; the steps waited on are read in the run's order off the graph the api gives, whatever the
  * ending's spec reads.
  */
 export function ActsOn({ run, step }: { run: RunDetail; step: RunDetail['steps'][number] }) {

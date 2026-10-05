@@ -4,11 +4,9 @@
  * `.oxlintrc.json` refuses the same packages as they are typed. Only `lib/useFeed.ts` and `lib/useStepTranscript.ts` open an
  * `EventSource`, the api's two streams (`eventSourceBreaks`). Its reads go through `lib/api/read.ts` (`unschemedReads`, `read.test.ts`).
  *
- * The board names no store path and builds no command of its own: a command it shows is text the api answered. The files that do today are
- * the known exceptions architecture.md lists, counted here file by file, JSDoc included (`STORE_PATHS`, `COMMAND_TEXT`): a count only
- * shrinks. `ratchetBreaks` refuses a file the baseline does not hold, a count above the measure or below it, so a freed place cannot be
- * taken again, an entry for a file that is gone or clean, and an entry that names no card. A change that cuts a store path or a command
- * from a file lowers its count in the same commit.
+ * The board names no store path and builds no command of its own: a command or a store folder it shows is text the api answered, and no
+ * file of `src` spells one, JSDoc included (`STORE_PATHS`, `COMMAND_TEXT`, both empty). `ratchetBreaks` refuses a file the baseline does
+ * not hold, a count above the measure or below it, an entry for a file that is gone or clean, and an entry that names no card.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -27,93 +25,13 @@ const STORE_PATH = /\.agent-workflows|\.agent-engine|\bWF_ROOT\b|\bAE_ROOT\b/g;
 /** A command of the orchestrator's CLI, under its name today or the one it takes: `wf retry`, `nemia start`. */
 const COMMAND = /\b(?:wf|nemia) [a-z]+/g;
 
-const COMMANDS_CARD = "Nemia platform slice 4: the command table and the rename to nemia; the api answers the web's command text";
-const PATHS_CARD =
-  "Nemia platform slice 4: the command table and the rename to nemia; the api answers the web's text, store paths included";
-
 type Baseline = Record<string, { count: number; card: string }>;
 
-/** Each file that spells a store path today, with its count of them and the card that moves them to the api. */
-const STORE_PATHS: Baseline = {
-  'src/components/NewWorkflow.tsx': { count: 1, card: PATHS_CARD },
-  'src/routes/agents.tsx': { count: 3, card: PATHS_CARD },
-  'src/routes/agents_.$from.$agent.tsx': { count: 1, card: PATHS_CARD },
-  'src/routes/agents_.new.tsx': { count: 1, card: PATHS_CARD },
-  'src/routes/agents_.skills.new.tsx': { count: 1, card: PATHS_CARD },
-  'src/routes/workflows.tsx': { count: 1, card: PATHS_CARD },
-};
+/** Each file that spells a store path, with its count of them and the card that moves them to the api: none. */
+const STORE_PATHS: Baseline = {};
 
-/** Each file that spells a command today, JSDoc included, with its count of them and the card that moves them to the api. */
-const COMMAND_TEXT: Baseline = {
-  'src/components/AgentForm.tsx': { count: 1, card: COMMANDS_CARD },
-  'src/components/Artifacts.tsx': { count: 5, card: COMMANDS_CARD },
-  'src/components/Ask.tsx': { count: 2, card: COMMANDS_CARD },
-  'src/components/CanvasLegend.tsx': { count: 1, card: COMMANDS_CARD },
-  'src/components/CardGate.tsx': { count: 2, card: COMMANDS_CARD },
-  'src/components/Closeout.tsx': { count: 1, card: COMMANDS_CARD },
-  'src/components/DaemonLine.tsx': { count: 2, card: COMMANDS_CARD },
-  'src/components/Decide.tsx': { count: 28, card: COMMANDS_CARD },
-  'src/components/FactoriesCanvas.tsx': { count: 1, card: COMMANDS_CARD },
-  'src/components/FactoryCanvas.tsx': { count: 2, card: COMMANDS_CARD },
-  'src/components/FactoryCardStart.tsx': { count: 1, card: COMMANDS_CARD },
-  'src/components/FactoryStart.tsx': { count: 2, card: COMMANDS_CARD },
-  'src/components/Facts.tsx': { count: 4, card: COMMANDS_CARD },
-  'src/components/Gate.tsx': { count: 7, card: COMMANDS_CARD },
-  'src/components/LiftHold.tsx': { count: 2, card: COMMANDS_CARD },
-  'src/components/Needs.tsx': { count: 6, card: COMMANDS_CARD },
-  'src/components/PruneRun.tsx': { count: 3, card: COMMANDS_CARD },
-  'src/components/Questions.tsx': { count: 2, card: COMMANDS_CARD },
-  'src/components/QueueLane.tsx': { count: 2, card: COMMANDS_CARD },
-  'src/components/RemoveRun.tsx': { count: 1, card: COMMANDS_CARD },
-  'src/components/RunGone.tsx': { count: 1, card: COMMANDS_CARD },
-  'src/components/RunNode.tsx': { count: 6, card: COMMANDS_CARD },
-  'src/components/SkillForm.tsx': { count: 1, card: COMMANDS_CARD },
-  'src/components/StartRun.tsx': { count: 7, card: COMMANDS_CARD },
-  'src/components/StatusChip.tsx': { count: 4, card: COMMANDS_CARD },
-  'src/components/StepInspector.tsx': { count: 3, card: COMMANDS_CARD },
-  'src/components/StepNode.tsx': { count: 1, card: COMMANDS_CARD },
-  'src/components/Timeline.tsx': { count: 3, card: COMMANDS_CARD },
-  'src/components/TryAgent.tsx': { count: 2, card: COMMANDS_CARD },
-  'src/components/WorkflowCanvas.tsx': { count: 1, card: COMMANDS_CARD },
-  'src/components/conversation/PromptBox.tsx': { count: 2, card: COMMANDS_CARD },
-  'src/lib/api/asks.ts': { count: 11, card: COMMANDS_CARD },
-  'src/lib/api/daemon.ts': { count: 1, card: COMMANDS_CARD },
-  'src/lib/api/decision.ts': { count: 10, card: COMMANDS_CARD },
-  'src/lib/api/detail.ts': { count: 13, card: COMMANDS_CARD },
-  'src/lib/api/factories.ts': { count: 1, card: COMMANDS_CARD },
-  'src/lib/api/inbox.ts': { count: 9, card: COMMANDS_CARD },
-  'src/lib/api/judged.ts': { count: 10, card: COMMANDS_CARD },
-  'src/lib/api/library.ts': { count: 1, card: COMMANDS_CARD },
-  'src/lib/api/runs.ts': { count: 15, card: COMMANDS_CARD },
-  'src/lib/api/stats.ts': { count: 1, card: COMMANDS_CARD },
-  'src/lib/api/tries.ts': { count: 4, card: COMMANDS_CARD },
-  'src/lib/api/usage.ts': { count: 3, card: COMMANDS_CARD },
-  'src/lib/api/workflows.ts': { count: 4, card: COMMANDS_CARD },
-  'src/lib/asks.ts': { count: 14, card: COMMANDS_CARD },
-  'src/lib/canvas.ts': { count: 4, card: COMMANDS_CARD },
-  'src/lib/decide.ts': { count: 2, card: COMMANDS_CARD },
-  'src/lib/factories.ts': { count: 2, card: COMMANDS_CARD },
-  'src/lib/factory.ts': { count: 5, card: COMMANDS_CARD },
-  'src/lib/gate.ts': { count: 5, card: COMMANDS_CARD },
-  'src/lib/inbox.ts': { count: 5, card: COMMANDS_CARD },
-  'src/lib/layout.ts': { count: 1, card: COMMANDS_CARD },
-  'src/lib/pass.ts': { count: 3, card: COMMANDS_CARD },
-  'src/lib/prune.ts': { count: 4, card: COMMANDS_CARD },
-  'src/lib/say.ts': { count: 1, card: COMMANDS_CARD },
-  'src/lib/stats.ts': { count: 3, card: COMMANDS_CARD },
-  'src/lib/status.ts': { count: 16, card: COMMANDS_CARD },
-  'src/lib/transcript.ts': { count: 1, card: COMMANDS_CARD },
-  'src/routes/agents.tsx': { count: 1, card: COMMANDS_CARD },
-  'src/routes/factories.$factory.tsx': { count: 1, card: COMMANDS_CARD },
-  'src/routes/inbox.tsx': { count: 7, card: COMMANDS_CARD },
-  'src/routes/inbox_.$name.tsx': { count: 1, card: COMMANDS_CARD },
-  'src/routes/runs.$runId.tsx': { count: 12, card: COMMANDS_CARD },
-  'src/routes/runs.$runId_.steps.$step.tsx': { count: 1, card: COMMANDS_CARD },
-  'src/routes/runs.index.tsx': { count: 8, card: COMMANDS_CARD },
-  'src/routes/stats.tsx': { count: 3, card: COMMANDS_CARD },
-  'src/routes/workflows.tsx': { count: 2, card: COMMANDS_CARD },
-  'src/routes/workflows_.$from.$workflow.$step.tsx': { count: 1, card: COMMANDS_CARD },
-};
+/** Each file that spells a command, JSDoc included, with its count of them and the card that moves them to the api: none. */
+const COMMAND_TEXT: Baseline = {};
 
 /** Every `.ts` and `.tsx` under `src`, by its path from `apps/web`, with its text. */
 const sourceTexts = (): Map<string, string> =>
@@ -258,7 +176,7 @@ test('REFUSED: an EventSource opened in another file; one named in a JSDoc is le
   assert.deepEqual(planted('/** Follows an EventSource, or anything that dispatches its events. */\nexport const x = 1;\n'), []);
 });
 
-test('the store paths and the commands the board spells are held to their baselines, each entry naming its card', () => {
+test('the board spells no store path and no command: the api answers each', () => {
   const texts = sourceTexts();
   assert.deepEqual(ratchetBreaks('store paths', measured(texts, STORE_PATH), STORE_PATHS, onDisk), []);
   assert.deepEqual(ratchetBreaks('commands', measured(texts, COMMAND), COMMAND_TEXT, onDisk), []);

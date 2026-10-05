@@ -20,7 +20,7 @@ const SaidSchema = Schema.Struct({ at: Schema.String, attempt: Schema.Number, te
  */
 export type QuestionAnswer = { question: string; chose: readonly string[]; own?: string };
 
-/** How `wf retry` tries a step again: continue its session, a new one, or its check run again and no session. */
+/** How the CLI's `retry` tries a step again: continue its session, a new one, or its check run again and no session. */
 export type RetryMode = 'nudge' | 'fresh' | 'recheck';
 
 /** What an ask for a try answers: the try asked for, its ask file, and whether the tick stops the step's blocked session first. */
@@ -67,11 +67,11 @@ const AcceptedSchema = Schema.Struct({
 }) satisfies Schema.Schema<Accepted>;
 
 /**
- * Ask for another try of a step, as `wf retry` does: the api calls the package's `retry()`, which writes the ask and nothing else, and the
- * next tick files the try. Resolves with the try asked for, its ask file, and the package's `stopFirst` — the tick stops the step's blocked
- * session before it files the try; rejects with the api's refusal in full — the package's words for a message or a budget that cannot ride
- * on the ask, a step that may not be tried again that way, or a budget not above what its tries have cost — or the api's own about the
- * request; and an answer the board does not read, saying the ask may be written. `budget` is `--budget`: the cap a step over its
+ * Ask for another try of a step, as the CLI's `retry` does: the api calls the package's `retry()`, which writes the ask and nothing else,
+ * and the next tick files the try. Resolves with the try asked for, its ask file, and the package's `stopFirst` — the tick stops the step's
+ * blocked session before it files the try; rejects with the api's refusal in full — the package's words for a message or a budget that
+ * cannot ride on the ask, a step that may not be tried again that way, or a budget not above what its tries have cost — or the api's own
+ * about the request; and an answer the board does not read, saying the ask may be written. `budget` is `--budget`: the cap a step over its
  * budget, or ended at it, is raised to. `answers` are a person's to the questions the step's closeout asks: the api refuses those that do
  * not fit, and writes the rest as the try's message.
  *
@@ -88,10 +88,10 @@ export const askTry = (
   });
 
 /**
- * Ask for another round of a run's loop, as `wf round` does — past a cap, with `budget`, `--budget`: the api calls the package's `round()`,
- * which writes the ask and nothing else, and the next tick files the round. Resolves with the looping step, the round asked for, and its
- * ask file; rejects with the api's refusal in full — the package's words for a round the loop may not go, or a budget not above what its
- * steps have cost — or the api's own about the request; and an answer the board does not read, saying the ask may be written.
+ * Ask for another round of a run's loop, as the CLI's `round` does — past a cap, with `budget`, `--budget`: the api calls the package's
+ * `round()`, which writes the ask and nothing else, and the next tick files the round. Resolves with the looping step, the round asked for,
+ * and its ask file; rejects with the api's refusal in full — the package's words for a round the loop may not go, or a budget not above
+ * what its steps have cost — or the api's own about the request; and an answer the board does not read, saying the ask may be written.
  *
  * Sent as `application/json`, which the api requires of it, as of a try.
  */
@@ -102,11 +102,11 @@ export const askRound = (runId: string, how: { step?: string; budget?: number })
   });
 
 /**
- * Approve a step waiting at its gate, as `wf approve` does — with `message`, `--message`, the words every step after the gate is handed:
- * the api calls the package's `approve()`, which writes the approval and nothing else, and the next tick files what waits on the step.
- * Resolves with the try approved, when, the words and the approval's file; rejects with the api's refusal in full — the package's words for
- * a step that may not be approved, or for empty words — or the api's own about the request; and an answer the board does not read, saying
- * the approval may be written.
+ * Approve a step waiting at its gate, as the CLI's `approve` does — with `message`, `--message`, the words every step after the gate is
+ * handed: the api calls the package's `approve()`, which writes the approval and nothing else, and the next tick files what waits on the
+ * step. Resolves with the try approved, when, the words and the approval's file; rejects with the api's refusal in full — the package's
+ * words for a step that may not be approved, or for empty words — or the api's own about the request; and an answer the board does not
+ * read, saying the approval may be written.
  *
  * Sent as `application/json`, which the api requires of it, as of an ask. Sending the step back is an ask for a try with words (`askTry`).
  */
@@ -117,12 +117,12 @@ export const approveStep = (runId: string, step: string, how: { message?: string
   });
 
 /**
- * Accept the work of a loop out of rounds as it stands, as `wf accept` does — with `message`, `--message`, why the work is good enough with
- * its findings open, which every step after the loop is handed, and which the package requires: the api calls the package's `accept()`,
- * which writes the acceptance and nothing else, and the next tick files what waits on the looping step. Resolves with the step, the try
- * accepted, when, the words and the acceptance's file; rejects with the api's refusal in full — the package's words for words missing or
- * empty, or for a loop that may not be accepted — or the api's own about the request; and an answer the board does not read, saying the
- * acceptance may be written.
+ * Accept the work of a loop out of rounds as it stands, as the CLI's `accept` does — with `message`, `--message`, why the work is good
+ * enough with its findings open, which every step after the loop is handed, and which the package requires: the api calls the package's
+ * `accept()`, which writes the acceptance and nothing else, and the next tick files what waits on the looping step. Resolves with the step,
+ * the try accepted, when, the words and the acceptance's file; rejects with the api's refusal in full — the package's words for words
+ * missing or empty, or for a loop that may not be accepted — or the api's own about the request; and an answer the board does not read,
+ * saying the acceptance may be written.
  *
  * Sent as `application/json`, which the api requires of it, as of an approval. Going round once more is `askRound`.
  */
@@ -133,9 +133,9 @@ export const acceptLoop = (runId: string, step: string, how: { message: string }
   });
 
 /**
- * Tell a step's running session something, as `wf say` does: the api calls the package's `say()`, which hands the words to the session
- * through the engine, and the engine journals them on the step's task. Resolves with that entry; rejects with the api's refusal in full —
- * the package's words or the engine's, verbatim — or the api's own about the request; and an answer the board does not read, saying
+ * Tell a step's running session something, as the CLI's `say` does: the api calls the package's `say()`, which hands the words to the
+ * session through the engine, and the engine journals them on the step's task. Resolves with that entry; rejects with the api's refusal in
+ * full — the package's words or the engine's, verbatim — or the api's own about the request; and an answer the board does not read, saying
  * the words may have been said.
  *
  * Sent as `application/json`, which the api requires of it, as of a start and an ask.

@@ -2,7 +2,7 @@
  * A run's start: the sidebar's button that opens it in the frame's floating bar (`FloatingBar`), and what the bar then shows — with no
  * factory yet, the factories to start it in; then the repository the run starts on, the factory's one or picked among its several, the
  * workflows the factory offers there, each that cannot start saying why, and `StartRun` in the factory for the one picked, as
- * `wf start --factory` starts it.
+ * the CLI's `start --factory` starts it.
  */
 import { useId, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';

@@ -31,8 +31,8 @@ const FactorySchema = Schema.Struct({
 }) satisfies Schema.Schema<Factory>;
 
 /**
- * The factories: the default factory first, then each in the store. Not polled: a factory changes when a person runs `wf factory`. Read
- * again on each visit.
+ * The factories: the default factory first, then each in the store. Not polled: a factory changes when a person runs the CLI's `factory`.
+ * Read again on each visit.
  */
 export const factoriesQuery = queryOptions({
   queryKey: ['factories'],

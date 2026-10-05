@@ -115,13 +115,13 @@ export function edgesOf(graph: RunGraph, steps: readonly EdgeStep[]): CanvasEdge
 }
 
 /**
- * The round a note puts a step of a loop on — `round 2 of 3`, `round 3 of 3, and it asked again — …`, `round 4 asked (nemia round) — …`
+ * The round a note puts a step of a loop on — `round 2 of 3`, `round 3 of 3, and it asked again — …`, `round 4 asked (…) — …`
  * — and its cap when it says one.
  */
 const ROUND = /^round (\d+)(?: of (\d+))?/;
 
 /**
- * `round n of N` for a loop past its first round, off the notes `wf ls` prints: the looping step's first, where a round due
+ * `round n of N` for a loop past its first round, off the notes the CLI's `ls` prints: the looping step's first, where a round due
  * and a loop out of rounds are said, then its target's, which is filed first each round. Null while the loop is on its first.
  * N is the note's, else the loop's `rounds`: a round a person asked for past the cap reads `round 4 of 3`.
  */

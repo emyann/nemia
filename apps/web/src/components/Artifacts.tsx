@@ -1,7 +1,7 @@
 import type { StepArtifact } from '../lib/api';
 import { when } from './Facts';
 
-/** Bytes as a person reads them, as `wf decide` prints a file's size and `wf prune` a worktree's (`sizeOf`). */
+/** Bytes as a person reads them, as the CLI's `decide` prints a file's size and the CLI's `prune` a worktree's (`sizeOf`). */
 export const bytesWord = (bytes: number): string =>
   bytes < 1024
     ? `${bytes} B`
@@ -13,7 +13,7 @@ export const bytesWord = (bytes: number): string =>
 
 /**
  * The files a closeout named. One the api serves: an image drawn inline, opening full-size in a new tab; a text file as a link;
- * anything else as a link with its size. One `wf prune --artifacts` removed as its path, greyed, and when it went. Any other path as the
+ * anything else as a link with its size. The CLI's `prune --artifacts` removed as its path, greyed, and when it went. Any other path as the
  * path, as the closeout gave it.
  *
  * `size` puts every file's size beside its name, and says so when there are none: for a list of what a folder holds rather than of
@@ -44,8 +44,8 @@ const linkClass = 'font-mono font-medium text-neutral-900 underline underline-of
 
 /**
  * One file a closeout named, drawn as `Artifacts` draws each: the Output tab draws an image a field names with it too. One gone with the
- * run's files is not missing: it is the path it had, and when `wf prune --artifacts` removed it, in the form the run's `pruned` row gives
- * the same moment (`when`), not the api's ISO words.
+ * run's files is not missing: it is the path it had, and when the CLI's `prune --artifacts` removed it, in the form the run's `pruned` row
+ * gives the same moment (`when`), not the api's ISO words.
  */
 export function ArtifactView({ artifact, size = false }: { artifact: StepArtifact; size?: boolean }) {
   if ('pruned' in artifact) {

@@ -4,8 +4,8 @@ import { isDecidable } from './decide.ts';
 import type { PruneHow } from './api/runs.ts';
 
 /**
- * One thing a person may give back of a finished run, as `wf prune` takes it: its worktrees; with its files too (`--artifacts`); and with
- * them a run nobody merged (`--unmerged`). Each takes in what the one before it gives back. `unavailable` says why a choice would be
+ * One thing a person may give back of a finished run, as the CLI's `prune` takes it: its worktrees; with its files too (`--artifacts`); and
+ * with them a run nobody merged (`--unmerged`). Each takes in what the one before it gives back. `unavailable` says why a choice would be
  * refused.
  */
 export type PruneChoice = {
@@ -23,9 +23,9 @@ type Prunable = Pick<RunDetail, 'id' | 'place' | 'status' | 'moving' | 'onDisk'>
 
 /**
  * Whether the run finished and nobody has decided it, as the api's decision says it off the package's own (`Decidable['awaiting']`): the
- * reading `wf prune` refuses without `--unmerged` (`pruneRefusal`). Taken from the decision, never worked out here: the run's status says
- * nothing of a failed run whose branch a person merged by hand (shipped, the package says), and the list's `toDecide` is never said of a
- * run that worked on its base branch itself, which waits on a decision all the same.
+ * reading the CLI's `prune` refuses without `--unmerged` (`pruneRefusal`). Taken from the decision, never worked out here: the run's status
+ * says nothing of a failed run whose branch a person merged by hand (shipped, the package says), and the list's `toDecide` is never said of
+ * a run that worked on its base branch itself, which waits on a decision all the same.
  */
 export type Awaiting = NonNullable<Decidable['awaiting']>;
 

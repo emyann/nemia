@@ -99,8 +99,8 @@ const StepApprovalSchema = Schema.Struct({
 }) satisfies Schema.Schema<StepApproval>;
 
 /**
- * Mirrors `StepGate` in apps/api/src/detail/detail.ts: a gated step's gate. `awaiting` while it waits at it — `wf ls`'s `awaiting approval`
- * — and `approval` once a person approved the try it is on. Neither, for a gated step not signed off yet.
+ * Mirrors `StepGate` in apps/api/src/detail/detail.ts: a gated step's gate. `awaiting` while it waits at it — the CLI `ls`'s `awaiting
+ * approval` — and `approval` once a person approved the try it is on. Neither, for a gated step not signed off yet.
  */
 export type StepGate = { awaiting: boolean; approval: StepApproval | null };
 
@@ -110,7 +110,7 @@ const StepGateSchema = Schema.Struct({
   approval: Schema.NullOr(StepApprovalSchema),
 }) satisfies Schema.Schema<StepGate>;
 
-/** As the api's: a person's acceptance of a loop out of rounds (`wf accept`), on the try its looping step is on. */
+/** As the api's: a person's acceptance of a loop out of rounds (the CLI's `accept`), on the try its looping step is on. */
 export type StepAcceptance = { try: number; at: string; message: string };
 
 /** Decodes a `StepAcceptance`. */
@@ -181,7 +181,7 @@ const StepSpecSchema = Schema.Struct({
 /**
  * Mirrors `StepFiled` in apps/api/src/detail/detail.ts: what the engine filed a step's current try with. Each field is null where the
  * task was filed without it — no deadline, which is no limit, and the harness's own model, effort and tools. `askedModel` is
- * the model a person's `wf retry --model` asked this try for; `runsIn` the permission mode the session runs in, as its harness
+ * the model a person's `retry --model` asked this try for; `runsIn` the permission mode the session runs in, as its harness
  * decides it — the mode filed, its choice when none was (`auto` for Claude Code), or a Codex sandbox narrowed by `tools` — and
  * null where the api could not ask the harness.
  */
@@ -242,18 +242,18 @@ export type RunDetail = {
   startedAt: string | null;
   cancelledAt: string | null;
   /**
-   * That `wf prune` removed the run's worktrees: when, and each it removed with what it held on disk. Its branches and record are kept,
-   * and none of its steps can be tried again. `artifacts` is when `wf prune --artifacts` removed its files too, and what that freed; null
-   * while they are kept. Null on a run never pruned.
+   * That the CLI's `prune` removed the run's worktrees: when, and each it removed with what it held on disk. Its branches and record are
+   * kept, and none of its steps can be tried again. `artifacts` is when the CLI's `prune --artifacts` removed its files too, and what that
+   * freed; null while they are kept. Null on a run never pruned.
    */
   pruned: { at: string; worktrees: Array<{ path: string; bytes: number }>; artifacts: { at: string; bytes: number } | null } | null;
-  /** What `wf prune` would still find of it on disk: its worktrees and its files. The Prune button offers only what is there. */
+  /** What the CLI's `prune` would still find of it on disk: its worktrees and its files. The Prune button offers only what is there. */
   onDisk: { worktrees: boolean; files: boolean };
   /** As on `RunSummary`. */
   after: string[];
   /** The inbox card the run was started from, as its record carries it; absent for a run started without one. */
   from?: { inbox: string };
-  /** Where it came from, in `wf decide`'s words (`fromNote` in agent-orchestrator): absent with `from`. */
+  /** Where it came from, in the CLI `decide`'s words (`fromNote` in agent-orchestrator): absent with `from`. */
   fromNote?: string;
   waiting: RunWaiting | null;
   /** As on `RunSummary`. */
@@ -315,11 +315,11 @@ export type RunDetail = {
     denied: StepNeeds['denied'];
     /** Its gate, awaiting approval or approved (`StepGate`); null for a step with none. */
     gate: StepGate | null;
-    /** For a looping step a person ended out of rounds (`wf accept`), their acceptance of the try it is on; null for any other step. */
+    /** For a looping step a person ended out of rounds (the CLI's `accept`), their acceptance of the try it is on; else null. */
     accepted: StepAcceptance | null;
     /** For a step the harness blocked, what its session said last; null for any other, and for one that said nothing the api could read. */
     lastLine: string | null;
-    /** What a person said to its current try's session while it ran (`wf say`, or the session page's prompt box), in the order said. */
+    /** What a person said to its current try's session while it ran (the CLI's `say`, or the session page's prompt box), in order. */
     said: Said[];
     /** The try a person asked for that the next tick files; null when none is. */
     asked: StepAsked | null;
@@ -328,9 +328,9 @@ export type RunDetail = {
     /** Null for a step with no `check:`. */
     check: StepCheck | null;
     attempts: StepAttempts;
-    /** What its current try consumed, in `wf decide`'s words; null for a step not filed. */
+    /** What its current try consumed, in the CLI `decide`'s words; null for a step not filed. */
     used: StepUsed | null;
-    /** What all its tries have cost together, as `wf ls` puts it beside its word; null until a cost was measured. */
+    /** What all its tries have cost together, as the CLI's `ls` puts it beside its word; null until a cost was measured. */
     spent: Spent | null;
     /** Its cap in force, and what its tries have cost of it; null for a step with no `budget:`. */
     budget: StepBudget | null;
@@ -367,7 +367,7 @@ export type TaskSpan = {
 /**
  * Mirrors `StepTimelineTry` in apps/api/src/detail/detail.ts: one try of a step on the clock. `session` is null on a try a recheck reached,
  * whose session is try `sessionOf`'s; `check` null for a try whose check was never filed; `used` what its session consumed, in
- * `wf decide`'s words.
+ * the CLI `decide`'s words.
  */
 export type StepTimelineTry = {
   try: number;
@@ -521,9 +521,9 @@ const RunDetailSchema = Schema.Struct({
 }) satisfies Schema.Schema<RunDetail>;
 
 /**
- * Whether a read of a run's record found no run: the api's 404 (`noSuchRun`), as `wf rm` leaves it. A page open on the run keeps what it
- * last read when a read again fails — a suspense query throws only while it has nothing — so the run's pages read the query's `error`
- * beside its `data`, and say the run is gone rather than draw it as it was.
+ * Whether a read of a run's record found no run: the api's 404 (`noSuchRun`), as the CLI's `rm` leaves it. A page open on the run keeps
+ * what it last read when a read again fails — a suspense query throws only while it has nothing — so the run's pages read the query's
+ * `error` beside its `data`, and say the run is gone rather than draw it as it was.
  */
 export const runGone = (error: unknown): boolean => error instanceof ReadRefusal && error.status === 404;
 

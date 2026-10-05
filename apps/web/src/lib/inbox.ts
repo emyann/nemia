@@ -119,7 +119,7 @@ export function cardPlace(
 
 /**
  * What a card's `repo:` is worth on a team whose every step works in a folder: nothing. The package starts the card all the same —
- * refusing it would strand a card filed before the team worked in folders — and says the repository was not looked at: `wf start`
+ * refusing it would strand a card filed before the team worked in folders — and says the repository was not looked at: the CLI's `start`
  * prints it, a tick's line carries it, and the api answers it on the start (`ignoredRepo`).
  *
  * The board says it before the start instead, on the form where a person picks the workflow: a start the api takes opens the run's
@@ -131,8 +131,8 @@ export const ignoredRepoNote = (workflow: Pick<WorkflowListing, 'folderTeam'>, r
     : null;
 
 /**
- * The runs a start waits on, as it is sent: none on a team whose every step works in a folder. `wf start` refuses `--after` for such a
- * team — a folder run has no branch, so there is nothing for another run to wait for — and the form hides the picker for one.
+ * The runs a start waits on, as it is sent: none on a team whose every step works in a folder. The CLI's `start` refuses `--after` for such
+ * a team — a folder run has no branch, so there is nothing for another run to wait for — and the form hides the picker for one.
  *
  * Hiding a control does not forget what was chosen in it: the picker is on the card's form under the workflow it picks, and a person who
  * picked runs under a git workflow and then picked a folder team would have sent them still, to be shown a refusal about a control no
@@ -167,8 +167,8 @@ export const queueable = (entry: InboxEntry): boolean =>
   entry.workflow !== null && entry.error === null && !entry.queued && entry.startedAs.length === 0;
 
 /**
- * What the tick's last try of a queued card's start says, as `wf inbox` says it beside the card: refused, it waits for a person, not for a
- * slot; failed otherwise, the tick tries it again. The repository it was tried on is said for a card that names none but names its
+ * What the tick's last try of a queued card's start says, as the CLI's `inbox` says it beside the card: refused, it waits for a person, not
+ * for a slot; failed otherwise, the tick tries it again. The repository it was tried on is said for a card that names none but names its
  * factory, whose start turns on where the daemon runs — never for a card that names no factory, refused wherever a daemon runs; and `why`
  * is left out where the card's own refusal already says it. `at` is the try's time as the page shows one.
  */

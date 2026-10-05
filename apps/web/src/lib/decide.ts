@@ -1,6 +1,6 @@
 /**
  * What the board works out from a run's decision, without React: when to ask for it, the Factory card's line, a group's
- * bar, and what a line of a diff is. Pure. The words themselves are the api's, which are `wf decide`'s.
+ * bar, and what a line of a diff is. Pure. The words themselves are the api's, which are the CLI `decide`'s.
  */
 import type { Decidable, DecideCommand, Group, RunDecision, RunSummary, Touched } from './api';
 import { stepState } from './status.ts';
@@ -43,14 +43,14 @@ export const decisionStamp = (
   ]);
 
 /**
- * The Factory card's line for a run waiting on you: `touched 2 packages · +979 −12`. Every group the branches it reads
- * touched, counted once; the lines of every file, each file counted once; and how many branches git could not read.
+ * The Factory card's line for a run waiting on you: `touched 2 packages · +979 −12`. Every group the branches it reads touched, counted
+ * once; the lines of every file, each file counted once; and how many branches git could not read.
  *
- * Once per file, not once per branch: each branch is diffed against the run's base, and a follower in a worktree of its own starts from
- * its parent's branch, so a fan-out's result branches each carry the parent's changes, which a sum would count once per branch. A file on
+ * Once per file, not once per branch: each branch is diffed against the run's base, and a follower in a worktree of its own starts from its
+ * parent's branch, so a fan-out's result branches each carry the parent's changes, which a sum would count once per branch. A file on
  * several branches counts the change with the most lines among them — the parent's plus a follower's own on top of it. Two siblings that
- * each changed one file apart count the larger alone: the card is a line for triage, and `wf decide`, which prints each branch on its own,
- * is where the whole of it is. A binary file adds no lines.
+ * each changed one file apart count the larger alone: the card is a line for triage, and the CLI's `decide`, which prints each branch on
+ * its own, is where the whole of it is. A binary file adds no lines.
  */
 export function touchedSummary(touched: readonly Touched[]): string {
   const read = touched.flatMap((t) => ('error' in t.radius ? [] : [t.radius]));

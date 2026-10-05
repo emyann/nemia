@@ -3670,7 +3670,7 @@ test("a step past its budget is offered a raise: its word with the amounts, a bo
 
   const tokens = textsOf(rows.get('tokens')!.html);
   assert.ok(
-    tokens.includes('over budget $4.25 of $3') && tokens.includes('wf retry r-1 tokens --budget <amount>') && tokens.includes('$4.25'),
+    tokens.includes('over budget $4.25 of $3') && tokens.join(' ').includes(': the button below raises it.') && tokens.includes('$4.25'),
     tokens.join(' | '),
   );
   assert.equal(box('tokens'), '5', 'the number box starts above what it cost, whatever order a server render writes its attributes in');
@@ -3699,7 +3699,7 @@ test("a step past its budget is offered a raise: its word with the amounts, a bo
     /<div data-asks="true"[^>]*><p>asks:<\/p> <div data-markdown="true" class="[^"]*max-h-72 overflow-y-auto[^"]*"><p[^>]*>Warm colours, or cool ones\?<\/p>/,
     'the question as markdown, in a box that scrolls',
   );
-  assert.ok(palette.includes('wf retry r-1 palette --budget <amount> --message "<answer>"'), palette.join(' | '));
+  assert.ok(palette.join(' ').includes(': the button below raises it.'), palette.join(' | '));
   assert.equal(box('palette'), '2');
   assert.deepEqual(said('palette'), ['Your answer to palette', false], 'and the answer with the raise');
   assert.deepEqual(
@@ -3727,7 +3727,7 @@ test("a step past its budget is offered a raise: its word with the amounts, a bo
   assert.deepEqual(said('types'), ['What to tell types, if anything', true], 'and nobody to tell');
 
   const review = textsOf(rows.get('review')!.html);
-  assert.ok(review.includes('wf round r-1 review --budget <amount>'), review.join(' | '));
+  assert.ok(review.join(' ').includes(", with its loop's next round: the button below raises it."), review.join(' | '));
   assert.equal(box('review'), '3');
   assert.deepEqual(buttons('review'), [['submit', false, 'Raise the budget and go round again']]);
   assert.deepEqual(radios('review'), [], 'a round has no mode');

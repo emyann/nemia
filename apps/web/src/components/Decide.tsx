@@ -25,7 +25,7 @@ import { Markdown } from './Markdown';
 import { QuestionsForm } from './Questions';
 
 /**
- * The Decide section of a run's page: the answer each step waiting on you can be given (`answersOf`), then what `wf decide` shows a
+ * The Decide section of a run's page: the answer each step waiting on you can be given (`answersOf`), then what the CLI's `decide` shows a
  * person — read once for the run's state (`decisionQuery`), only while the run has something to decide, and shown when the api says
  * there is. A run that still runs with a try asked — of a session the harness blocked, continued from the banner — has that try's note
  * and nothing to decide. An api that refuses says why, here.
@@ -70,11 +70,12 @@ function DecideFrame({ children }: { children: ReactNode }) {
 }
 
 /**
- * What there is to decide, in `wf decide`'s order: the OVER BUDGET line where a step is held on its budget, what each branch touched and
- * the lesson line, the check-affecting files in full, what the run consumed and cost, and the commands — copyable, and none of them run
- * from here but `wf accept`, which the board presses with a person's reason (`AcceptCommand`). `offers` go first. The OVER BUDGET line says
- * why each step past its budget is held, as `wf decide` prints it first: its own amounts, or the step its loop's round would file. A folder
- * run has no branch and nothing to merge, so nothing is said of one: where its work is instead, as `wf decide` says.
+ * What there is to decide, in the CLI `decide`'s order: the OVER BUDGET line where a step is held on its budget, what each branch touched
+ * and the lesson line, the check-affecting files in full, what the run consumed and cost, and the commands — copyable, and none of them run
+ * from here but the CLI's `accept`, which the board presses with a person's reason (`AcceptCommand`). `offers` go first. The OVER BUDGET
+ * line says why each step past its budget is held, as the CLI's `decide` prints it first: its own amounts, or the step its loop's round
+ * would file. A folder run has no branch and nothing to merge, so nothing is said of one: where its work is instead, as the CLI's `decide`
+ * says.
  */
 export function DecideSection({
   runId,
@@ -132,7 +133,7 @@ export function DecideSection({
 
 /**
  * What the board can ask for each step waiting on you (`offersOf`), a row a step: a step whose closeout asks questions as data is answered
- * by choosing (`QuestionsForm`). Each ask is `wf retry`'s, made by the api through the
+ * by choosing (`QuestionsForm`). Each ask is the CLI `retry`'s, made by the api through the
  * package's `retry()`, which writes the ask and nothing else; the next tick files the try.
  */
 export function Offers({ runId, offers }: { runId: string; offers: readonly Answer[] }) {
@@ -157,7 +158,8 @@ export function Offers({ runId, offers }: { runId: string; offers: readonly Answ
 }
 
 /**
- * A question a step asks, as its agent wrote it, in a box that scrolls once it is long: under `asks:`, which `wf decide` puts before it.
+ * A question a step asks, as its agent wrote it, in a box that scrolls once it is long: under `asks:`, which the CLI's `decide` puts before
+ * it.
  */
 function Asks({ step, needs, ...data }: { step?: string; needs: string; 'data-asks'?: boolean; 'data-said'?: boolean }) {
   return (
@@ -190,12 +192,13 @@ function offerSaid(offer: Exclude<Answer, { kind: 'asked' | 'raise' }>): string 
 /**
  * One step's answer: what it needs, then the box and the button that ask — an answer to a step that signed off blocked, `Try again` for a
  * refused check or an unsigned step — and the api's refusal beside them, verbatim. Once the api has the ask, the run is read again and the
- * row says what `wf ls` says: `try 2 asked (…) — the next tick files it`; a step waiting on you again later starts afresh.
+ * row says what the CLI's `ls` says: `try 2 asked (…) — the next tick files it`; a step waiting on you again later starts afresh.
  *
- * As `wf decide` offers it, a check that did not finish is run again first, since the run spent no retry on it, and a denied step gets a
- * new session first, since the one it had was denied and carries on the same permissions. A recheck files no session, so it carries no
- * message (`messageRefusal` refuses one) and the box is closed while it is chosen. An answer goes as it was typed, as `--message` takes it;
- * something to tell a try is optional, and none is sent when nothing was written or with a recheck, whatever the closed box still holds.
+ * As the CLI's `decide` offers it, a check that did not finish is run again first, since the run spent no retry on it, and a denied step
+ * gets a new session first, since the one it had was denied and carries on the same permissions. A recheck files no session, so it carries
+ * no message (`messageRefusal` refuses one) and the box is closed while it is chosen. An answer goes as it was typed, as `--message` takes
+ * it; something to tell a try is optional, and none is sent when nothing was written or with a recheck, whatever the closed box still
+ * holds.
  */
 export function OfferRow({ runId, offer }: { runId: string; offer: Exclude<Answer, { kind: 'raise' }> }) {
   const [message, setMessage] = useState('');
@@ -298,16 +301,16 @@ const AMOUNT =
 /**
  * A step past its budget — over it, ended at it, or a check that did not finish past it — and the raise of its cap the package takes
  * (`raise`): its word, with the amounts; a box for the cap to raise it to, started at the first whole dollar above what the package says it
- * has to pass (`raiseTo`); and the button that asks — with its try, as `wf retry --budget` does, continuing its session or in a new one, or
- * with its loop's round, as `wf round --budget` does. The box takes any amount: the package refuses one not above what was spent, and its
- * sentence shows beside the box, verbatim, the amount still in it. Once the api has the ask, what the tick does with it, until the run is
- * read again and the step's note says it.
+ * has to pass (`raiseTo`); and the button that asks — with its try, as the CLI's `retry --budget` does, continuing its session or in a new
+ * one, or with its loop's round, as the CLI's `round --budget` does. The box takes any amount: the package refuses one not above what was
+ * spent, and its sentence shows beside the box, verbatim, the amount still in it. Once the api has the ask, what the tick does with it,
+ * until the run is read again and the step's note says it.
  *
  * A try carries what an answer row's would, beside the raise. For a step that signed off blocked, its question and a box for the answer,
- * which the button waits for — `wf retry --budget <amount> --message "<answer>"`, as `wf decide` offers it: once a try is asked, a second
- * ask carrying the answer is refused as already asked. For any other, a box for anything to tell it. And where a check did not pass, its
- * check again (`recheck`), which costs nothing and needs no raise — chosen first where it did not finish — with the amount and the box
- * closed: it files no session, so it takes no budget and carries no message, which `messageRefusal` refuses on one.
+ * which the button waits for — the CLI's `retry --budget <amount> --message "<answer>"`, as the CLI's `decide` offers it: once a try is
+ * asked, a second ask carrying the answer is refused as already asked. For any other, a box for anything to tell it. And where a check did
+ * not pass, its check again (`recheck`), which costs nothing and needs no raise — chosen first where it did not finish — with the amount
+ * and the box closed: it files no session, so it takes no budget and carries no message, which `messageRefusal` refuses on one.
  *
  * The amount goes as typed: one the package refuses is refused in its words, and an empty box sends none, which it refuses too. An answer
  * goes as it was typed, as `--message` takes it; something to tell a try is optional, and none is sent when nothing was written.
@@ -322,7 +325,6 @@ export function RaiseRow({ runId, offer }: { runId: string; offer: Extract<Answe
   const ask = offer.by === 'retry' ? tried : rounded;
   const asks = offer.by === 'retry' && offer.own === 'blocked';
   const rechecking = offer.by === 'retry' && mode === 'recheck';
-  const command = `wf ${offer.by} ${runId} ${offer.step} --budget <amount>${asks ? ' --message "<answer>"' : ''}`;
 
   if (tried.isSuccess || rounded.isSuccess) {
     return (
@@ -359,7 +361,7 @@ export function RaiseRow({ runId, offer }: { runId: string; offer: Extract<Answe
         ))}
       <p className="text-xs break-words text-neutral-600 dark:text-neutral-400">
         The run spends nothing more on it until its cap is raised above <span className="font-mono">{offer.said}</span>
-        {offer.by === 'round' ? ", with its loop's next round" : ''}, as <code>{command}</code> raises it.
+        {offer.by === 'round' ? ", with its loop's next round" : ''}: the button below raises it.
         {offer.modes.includes('recheck') && ' Its check again costs nothing, and needs no raise.'}
       </p>
       <form
@@ -446,11 +448,11 @@ export function RaiseRow({ runId, offer }: { runId: string; offer: Extract<Answe
 }
 
 /**
- * Continue a session the harness blocked, from the banner beside what it said last, as `wf retry` continues it: a nudge — with something to
- * tell it, if you like — which the package's `retry()` takes for such a step, and the tick honours by stopping the session, then filing the
- * try, which continues it told what happened. The api's refusal shows beside the button, verbatim. Once the api has the ask, what the tick
- * does with it (`askedSaid`), until the run is read again and the banner says it in `wf ls`'s words. Nothing written is a nudge with no
- * message, as `wf retry` sends one; something written goes as it was typed, as `--message` takes it.
+ * Continue a session the harness blocked, from the banner beside what it said last, as the CLI's `retry` continues it: a nudge — with
+ * something to tell it, if you like — which the package's `retry()` takes for such a step, and the tick honours by stopping the session,
+ * then filing the try, which continues it told what happened. The api's refusal shows beside the button, verbatim. Once the api has the
+ * ask, what the tick does with it (`askedSaid`), until the run is read again and the banner says it in the CLI `ls`'s words. Nothing
+ * written is a nudge with no message, as the CLI's `retry` sends one; something written goes as it was typed, as `--message` takes it.
  */
 export function Continue({ runId, step, line }: { runId: string; step: string; line: string }) {
   const [message, setMessage] = useState('');
@@ -711,8 +713,8 @@ const LINE_CLASS: Record<DiffLine, string> = {
 };
 
 /**
- * One file's unified diff, folded under its name, coloured by line; where the api cut it, how much more `wf decide` prints. Its summary is
- * a flex row, which draws no marker of its own: a chevron says it opens, and turns when it has.
+ * One file's unified diff, folded under its name, coloured by line; where the api cut it, how much more the CLI's `decide` prints. Its
+ * summary is a flex row, which draws no marker of its own: a chevron says it opens, and turns when it has.
  */
 export function DiffFileView({ file, counts }: { file: DiffFile; counts?: { added: number | null; removed: number | null } }) {
   return (
@@ -755,8 +757,9 @@ export function DiffFileView({ file, counts }: { file: DiffFile; counts?: { adde
 }
 
 /**
- * Ship it, drop it, once more: each command on a line of its own with a button that copies it. Nothing here runs one but `wf accept`, which
- * a person who never opens a terminal has no other way to give: its row also takes their reason and presses it (`AcceptCommand`).
+ * Ship it, drop it, once more: each command on a line of its own with a button that copies it. Nothing here runs one but the CLI's
+ * `accept`, which a person who never opens a terminal has no other way to give: its row also takes their reason and presses it
+ * (`AcceptCommand`).
  */
 export function Commands({ runId, commands }: { runId: string; commands: readonly DecideCommand[] }) {
   return (
@@ -799,10 +802,10 @@ function CommandLine({ command: c }: { command: DecideCommand }) {
 }
 
 /**
- * `wf accept` as a button: the command to copy, as every row has it, and a box for the reason — required, as `--message` is, so the button
- * waits for it, and sent as typed — and the button that accepts the loop's work as it stands through the api (`acceptLoop`), which calls
- * the package's `accept()`. What may be accepted is the package's to say: its refusal shows beside the button, verbatim. Once the api has
- * it, what the tick does with it, until the run is read again and the loop is offered no more.
+ * The CLI's `accept` as a button: the command to copy, as every row has it, and a box for the reason — required, as `--message` is, so the
+ * button waits for it, and sent as typed — and the button that accepts the loop's work as it stands through the api (`acceptLoop`), which
+ * calls the package's `accept()`. What may be accepted is the package's to say: its refusal shows beside the button, verbatim. Once the api
+ * has it, what the tick does with it, until the run is read again and the loop is offered no more.
  */
 export function AcceptCommand({ runId, step, command }: { runId: string; step: string; command: DecideCommand }) {
   const [message, setMessage] = useState('');

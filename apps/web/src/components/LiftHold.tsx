@@ -8,7 +8,7 @@ import { POPOVER, SMALL } from './CardGate';
 import { BUTTON, Refusal } from './Ask';
 import { SECONDARY } from './Gate';
 
-/** What a lift does, said before the second press: the package's `unhold`, as `wf hold <run> --off` runs it. */
+/** What a lift does, said before the second press: the package's `unhold`, as the CLI's `hold <run> --off` runs it. */
 const LIFTS = 'It goes on at the next tick, and what its steps asked while it was held is asked again.';
 
 /**
@@ -31,8 +31,8 @@ function useLift(id: string, onLifted: () => void = () => undefined) {
 }
 
 /**
- * Lift, where the run's page says it is held, asked twice: the first press asks, the second lifts the hold as `wf hold --off` does. A
- * refusal — a run nobody holds — is shown in the package's words.
+ * Lift, where the run's page says it is held, asked twice: the first press asks, the second lifts the hold as the CLI's `hold --off` does.
+ * A refusal — a run nobody holds — is shown in the package's words.
  */
 export function LiftHold({ id }: { id: string }) {
   const [asking, setAsking] = useState(false);

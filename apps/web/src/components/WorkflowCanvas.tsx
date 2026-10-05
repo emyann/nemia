@@ -22,7 +22,7 @@ const FIT = { padding: 0.15, maxZoom: 1 };
 const LOOP_ROOM = 70;
 
 /**
- * The run a workflow would start, the moment `wf start` has written it: every step waiting, nothing filed, nobody waited
+ * The run a workflow would start, the moment the CLI's `start` has written it: every step waiting, nothing filed, nobody waited
  * on. What a workflow's graph is drawn as, so its edges are the run canvas's own (`stepEdges`), drawn as they are on a run's
  * page before anything has happened: dashed, since all of it is still to come.
  */

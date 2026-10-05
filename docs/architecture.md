@@ -151,8 +151,8 @@ outside through its face — its `index.ts`, or its one pure file.
 
 **3. The runtime is reached through one client.** Of the orchestrator's files, `src/runtime-client.ts` alone imports
 agent-runtime, a type included (`CLIENT` in test/boundary.test.ts). It creates the runtime (`engine()`, `HARNESSES`): the
-runtime's `Engine` service from `agent-runtime/effect`, provided as a layer, each verb run as a Promise for the controllers
-(`engineOf`, which a test hands a layer of its own). It passes the runtime's surface through rather than wrapping it. Every controller beneath the CLI reaches it, itself or
+runtime's `Engine` service from `agent-runtime/effect`, built once, each verb an Effect a controller's program reads with `asked`
+(`engineOf`, which a test hands a layer of its own); a caller runs a program over it with `runWith`. It passes the runtime's surface through rather than wrapping it. Every controller beneath the CLI reaches it, itself or
 through a controller it imports, and it imports no controller. The runtime's behaviour comes through the client; its vocabulary through
 its pure door, `agent-runtime/vocabulary` (`src/vocabulary.ts`: the words each harness takes, per key (`HARNESS_CHOICES`), and `fenceReach`, with no Effect and no
 I/O, held by `packages/agent-runtime/test/vocabulary-door.test.ts`), which any file of the orchestrator imports, a pure one included

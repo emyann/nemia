@@ -87,6 +87,8 @@ import { resultSteps, workChecks } from '../branches/branches.ts';
  *   under what was asked for.
  * @param checked For a step filed after checked steps: what each of their checks said on the try or round it follows
  *   (`checkHandedSection`), read by file.verb.ts. Absent, and nothing is said of a check: the board's preview composes without it.
+ * @param inbox The store's inbox folder (`inboxDir` in files.store.ts): named, for a step whose `reads:` names it, under what was asked
+ *   for (`mountsLine`). Absent, and nothing is said of it.
  */
 export function composeBrief(
   step: Workflow,
@@ -100,6 +102,7 @@ export function composeBrief(
   parents?: readonly ParentCloseout[],
   inputsDir?: string,
   checked?: readonly CheckHanded[],
+  inbox?: string,
 ): string {
   const inFolder = placeOf(run) === 'folder';
   const contracts = [
@@ -133,17 +136,13 @@ export function composeBrief(
     : steps.filter((s) => s.name !== step.name && run.steps[s.name]?.taskId).map((s) => s.name);
 
   const inputs = inputsLine(inputsDir, run.inputs, inFolder);
-  const request = [run.brief, ...(inputs ? ['', inputs] : []), ...mountsLine(step, run)];
+  const request = [run.brief, ...(inputs ? ['', inputs] : []), ...mountsLine(step, run, inbox)];
   const opening = briefBody(step) ? [briefBody(step), ''] : [];
   const parts = [...opening, '## What was asked for', '', ...request, ...handed];
 
   if (step.after.length > 1 && step.workspace !== 'main' && !inFolder) {
     return [
-      ...opening,
-      '## What was asked for',
-      '',
-      ...request,
-      ...handed,
+      ...parts,
       '',
       '## What is in this workspace',
       '',

@@ -117,6 +117,7 @@ export const stepSpec = (extra: Partial<WorkflowStepSpec> = {}): WorkflowStepSpe
   input: ['review'],
   workspace: 'main',
   writable: [],
+  reads: [],
   slot: 'none',
   agent: 'otto',
   skills: [],

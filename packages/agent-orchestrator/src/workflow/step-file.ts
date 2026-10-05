@@ -34,6 +34,7 @@ import {
   rulesOf,
   skillNamesOf,
   writableNamesOf,
+  readsNamesOf,
   slotOf,
   toolsOf,
   wordOf,
@@ -253,6 +254,7 @@ export function stepFrom(
     resume: meta.resume,
     workspace: workspaceOf(name, meta.workspace, meta.check, meta.resume, meta.gate, meta.retries, harness),
     writable: writableNamesOf(name, meta.writable),
+    reads: readsNamesOf(name, meta.reads),
     slot: slotOf(name, meta.slot),
     body,
     skills: skillNamesOf(name, meta.skills),
@@ -330,7 +332,7 @@ export type StepDraft = Omit<Workflow, 'output' | 'agent'> & { output?: Pick<Ste
  * The keys whose empty list says what no line says: nothing to wait on, to read, to deny, to add. Not `tools:`, where none reads as every
  * tool to one person.
  */
-const EMPTY_IS_UNSET: readonly StepKey[] = ['after', 'input', 'writable', 'skills', 'disallowedTools', 'allowedTools', 'tally'];
+const EMPTY_IS_UNSET: readonly StepKey[] = ['after', 'input', 'writable', 'reads', 'skills', 'disallowedTools', 'allowedTools', 'tally'];
 
 /**
  * A step as its file: the frontmatter, with the keys the step sets in `STEP_KEYS`' order, each written as the parser reads it — a list as

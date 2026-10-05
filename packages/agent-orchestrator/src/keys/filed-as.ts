@@ -20,6 +20,7 @@ export type FiledStep = Pick<
   | 'budget'
   | 'remote'
   | 'writable'
+  | 'reads'
 >;
 
 /** What a retry asked for that its config is filed with instead of the step's own lines: `--model` on a fresh try, and `--budget`. */
@@ -40,7 +41,7 @@ export const FILED_AS: Readonly<Record<string, (step: FiledStep) => string | und
   background: (s) => (s.background === undefined ? undefined : `background: ${s.background}`),
   budgetUsd: (s) => (s.budget === undefined ? undefined : `budget: ${s.budget}`),
   claude: (s) => (s.remote ? 'remote: true' : undefined),
-  mounts: (s) => s.writable && `writable: ${s.writable.join(', ')}`,
+  mounts: (s) => (s.writable ? `writable: ${s.writable.join(', ')}` : s.reads && `reads: ${s.reads.join(', ')}`),
 };
 
 /** The flag a retry typed for a field it chose, before the step's own line: `--model <m>`, `--budget <amount>`. */

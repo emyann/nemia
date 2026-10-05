@@ -2621,6 +2621,21 @@ The same mounts carry what the steps before a step handed over: the artifacts fo
 factory's (`handedMounts`, in `filedConfig`), on a harness fenced by a permission mode and never named on its brief. A store whose path
 no permission rule can name refuses `wf start` of a workflow with such a later step, in the runtime's words, before anything is written.
 
+### A store's folders: `reads:`
+
+A step may read a folder of the store by its name, never by a path, so its tools reach it as they reach the workspace:
+
+```md
+---
+reads: inbox   # the store's folders this step reads and never writes; inbox, the cards waiting to be started, is the one there is
+---
+```
+
+The run files the folder read-only for that step alone — its first filing, a try and a round (`readsMounts`, in `filedConfig`) — and a
+new session's brief names it (`mountsLine`); a step without the line reads none of it. A harness that reads the disk in its sandbox
+(Codex) is filed no mount. Refused at load: a name off `STORE_READS`, one given twice, none, and the key on a remote agent. A store
+whose path no permission rule can name refuses `wf start` of such a step, quoting its `reads:` line, before anything is written.
+
 ## How much runs at once: `WF_MAX_CONCURRENT` and `WF_MAX_RUNS`
 
 Two ceilings, both read from the environment the store's daemon runs in — the api's process or `wf up` — through Effect's `Config` (`src/config/config.store.ts`), and both said in

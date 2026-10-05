@@ -2,7 +2,8 @@
  * A factory's folders, mounted: a run started in a factory reaches every repository of it but its own, read-only (`factoryMounts`),
  * frozen on its record at `nemia start`, filed with each local step — its first filing, a try and a round — and named on its brief. A
  * folder that is no directory at start is left out, and said; a step on a remote agent is filed none; a run in the default factory mounts
- * nothing, and its record has no `mounts`.
+ * nothing, and its record has no `mounts`. A step whose `reads:` names the store's inbox is filed it read-only too, in any factory or
+ * none, and its brief names it (`readsMounts`, `mountsLine`).
  *
  * `WF_ROOT` is set before the runner is imported, since it is read as the module loads.
  */
@@ -471,4 +472,42 @@ test('REFUSED at shipped defaults: a `writable:` folder on a harness that cannot
     `code: \`writable: ${path.basename(repos[1])}\` (filed as \`mounts\`): \`mounts\` gives the session ${repos[1]} writable, and the \`codex\` harness cannot hold a writable mount: its session would not reach the folder as asked. File the task on \`claude\` or \`claude-detached\`, or leave the mount off.\n` +
       `That folder is the factory trio's, and coded/code names it in \`writable:\`, so the run would mount it writable for that step. Hire into coded/code an agent whose harness holds a writable mount (nemia factory hire trio <agent> --step coded/code), or delete the name from \`writable:\`, so the step only reads the folder. Nothing was written.`,
   );
+});
+
+test("a step's `reads: inbox` is filed the store's inbox read-only, on its first filing, a try and a round, and named on each new session's brief; no other step is", async () => {
+  const { repos, loop } = fresh();
+  fs.writeFileSync(path.join(loop, 'implement.md'), '---\nreads: inbox\n---\nBuild what was asked.\n');
+  const inbox = path.join(ROOT, 'inbox');
+  const said = `Folders of the store you may read, and must not write, as this step's \`reads:\` names them: \`${inbox}\`. Each is mounted read-only; read it with Read, Grep and Glob.`;
+  const run = start({ brief: 'build it', repo: repos[0], workflowDir: loop, isolate: false });
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  const first = b.filed.get(`${run.id}-implement`)!;
+  assert.deepEqual(first.config?.mounts, readOnly(inbox), 'the first filing');
+  assert.ok(first.brief.includes(said), first.brief);
+  b.settle(`${run.id}-implement`, 'failed');
+  await advance(b.e, readRun(run.id));
+  await retry(b.e, run.id, 'implement', { mode: 'fresh' });
+  await advance(b.e, readRun(run.id));
+  const tried = readRun(run.id).steps.implement.taskId!;
+  assert.deepEqual(b.filed.get(tried)?.config?.mounts, readOnly(inbox), 'a try');
+  assert.ok(b.filed.get(tried)!.brief.includes(said), "a try's brief");
+  b.settle(tried, 'succeeded', SIGNED);
+  await advance(b.e, readRun(run.id));
+  const review = b.filed.get(`${run.id}-review`)!;
+  assert.deepEqual(review.config?.mounts, readOnly(artifactsDir(run, 'implement')), 'the step after it reads no inbox');
+  assert.equal(review.brief.includes(inbox), false, 'and is told none');
+  b.settle(`${run.id}-review`, 'succeeded', { ...SIGNED, again: true });
+  await advance(b.e, readRun(run.id));
+  const round = readRun(run.id).steps.implement.taskId!;
+  assert.notEqual(round, tried);
+  assert.deepEqual(b.filed.get(round)?.config?.mounts, readOnly(inbox), 'a round, which continues a session told it on its try');
+});
+
+test('mountsLine names the inbox for a local step whose `reads:` names it, and nothing for one without it or on a remote agent', () => {
+  const inbox = '/s/inbox';
+  assert.match(mountsLine({ harness: 'claude', reads: ['inbox'] }, {}, inbox).join('\n'), /reads:` names them: `\/s\/inbox`/);
+  assert.deepEqual(mountsLine({ harness: 'claude' }, {}, inbox), []);
+  assert.deepEqual(mountsLine({ harness: 'a2a:peer', reads: ['inbox'] }, {}, inbox), []);
+  assert.deepEqual(mountsLine({ harness: 'codex', reads: ['inbox'] }, {}, inbox), [], 'codex reads the disk in its sandbox already');
 });

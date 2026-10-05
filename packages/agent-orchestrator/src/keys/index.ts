@@ -19,6 +19,8 @@ export {
   SKILL_NAME,
   skillNamesOf,
   writableNamesOf,
+  readsNamesOf,
+  STORE_READS,
   slotOf,
   SLOTS,
   tokensOf,

@@ -4,22 +4,23 @@ import { filedAllows, filedDenies } from '../ending/ending.ts';
 import { sessionModel, type RetryHow } from '../retry/index.ts';
 import type { Mount, Run, StepRecord } from '../record/record.ts';
 import { stepMounts } from '../factory/factory.ts';
-import { handedMounts } from '../artifacts/artifacts.ts';
+import { handedMounts, readsMounts } from '../artifacts/artifacts.ts';
 
 /**
  * The harness's arguments a step is filed with, which the engine carries to the runner unread (`HarnessArgs`), all from the workflow
  * the run froze: its model and cap as the filing chooses them (`t`), its context window off the session it continues
  * (`sessionContext`), its deny list with an ending's (`filedDenies`), its allow list with an ending's read of the run's artifacts folder
  * (`runArtifacts`, `filedAllows`), the folders the run mounts (`mounts`, frozen at start), writable where the step's `writable:` names
- * one (`stepMounts`), then the artifacts folder of each step it comes after, read-only (`handedMounts`), the key left out with none, and
- * the harness's own arguments (`own`) last. The runtime judges no budget: `budgetUsd` is the harness's own cap,
+ * one (`stepMounts`), then the artifacts folder of each step it comes after, read-only (`handedMounts`), then the store's folders its
+ * `reads:` names, read-only (`readsMounts`, the inbox at `t.inbox`), the key left out with none, and the harness's own arguments (`own`)
+ * last. The runtime judges no budget: `budgetUsd` is the harness's own cap,
  * and whether the step went over is this package's (`ownStatus`). Pure.
  */
 export const filedConfig = <Own extends object>(
   step: Workflow,
   steps: readonly Workflow[],
   run: Pick<Run, 'gates' | 'mounts'>,
-  t: { model: string | undefined; budgetUsd: number | undefined; runArtifacts: string; own: Own },
+  t: { model: string | undefined; budgetUsd: number | undefined; runArtifacts: string; inbox: string; own: Own },
 ) => ({
   model: t.model,
   effort: step.effort,
@@ -30,7 +31,7 @@ export const filedConfig = <Own extends object>(
   allowedTools: filedAllows(step, t.runArtifacts),
   background: step.background,
   budgetUsd: t.budgetUsd,
-  ...mountsOf([...(stepMounts(step, run.mounts) ?? []), ...handedMounts(step, steps, t.runArtifacts)]),
+  ...mountsOf([...(stepMounts(step, run.mounts) ?? []), ...handedMounts(step, steps, t.runArtifacts), ...readsMounts(step, t.inbox)]),
   ...t.own,
 });
 

@@ -82,6 +82,7 @@ const KINDS: Readonly<Record<StepKey, KeyKind>> = {
   input: 'steps',
   workspace: 'choice',
   writable: 'list',
+  reads: 'list',
   slot: 'choice',
   agent: 'choice',
   skills: 'list',

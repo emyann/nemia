@@ -646,6 +646,7 @@ const frozenStepFields = {
   input: Schema.optionalKey(Strings),
   workspace: Schema.optionalKey(Schema.Literals(['main', 'folder'])),
   writable: Schema.optionalKey(Strings),
+  reads: Schema.optionalKey(Strings),
   slot: Schema.optionalKey(Schema.Literal('none')),
   agent: Schema.optionalKey(StepAgentSchema),
   skills: Schema.optionalKey(Strings),

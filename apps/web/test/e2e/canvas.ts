@@ -7,6 +7,7 @@ import { CELL_HEIGHT } from '../../src/lib/factory.ts';
 import { expectCount, expectVisible, Refused, settled } from './checks.ts';
 import { FAKE } from './seed.ts';
 import { photograph } from './board.ts';
+import { photographing } from './world.ts';
 
 /**
  * Finished runs on the Factory's floor too. Off by default, on every visit. Pressed where a person presses it, on its track: React Aria's
@@ -78,9 +79,11 @@ export async function dragBy(page: Page, grip: Locator, by: { x: number; y: numb
 /**
  * A picture of one card at its own size, which a picture of the fitted floor draws a third as large: the floor zoomed in about the card by
  * the wheel, as a person zooms, up to its own size or as much as fits; the pane dragged from an empty spot to bring it to the middle; the
- * card photographed alone; and the floor fitted again, as the page found it.
+ * card photographed alone; and the floor fitted again, as the page found it. Unless the page being visited is pictured (`photographing`),
+ * it does nothing, and leaves the floor as it was.
  */
 export async function photographCard(page: Page, card: Locator, file: string): Promise<void> {
+  if (!photographing) return;
   const floor = page.locator('.react-flow').first();
   const [frame, size] = [
     await floor.boundingBox(),

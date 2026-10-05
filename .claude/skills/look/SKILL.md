@@ -1,12 +1,12 @@
 ---
 name: look
-description: Look at the web app as a person would — read the e2e's screenshots of every page in a light and a dark theme, open the pages with the browser tools and photograph them, and name what is cut off or overlapping, unreadable in a theme, or the first thing a person would notice. For a step that changes a page, before it signs off, and for one that reviews the change. Writes nothing into the workspace.
+description: Look at the web app as a person would — take or read the e2e's screenshots of the pages a change touches, in a light and a dark theme, open the pages with the browser tools and photograph them, and name what is cut off or overlapping, unreadable in a theme, or the first thing a person would notice. For a step that changes a page, before it signs off, and for one that reviews the change. Writes nothing into the workspace.
 ---
 
 # Look at the web app as a person would
 
 A page that passes its assertions and looks wrong is not done. This is how a step looks at the web app
-(`apps/web`) the way a person who opens it would: through pictures of every page in both themes, and
+(`apps/web`) the way a person who opens it would: through pictures of its pages in both themes, and
 through the pages themselves in a browser. Any step may use it: the one that changes a page, before it
 signs off, and the one that reviews the change, beside the diff.
 
@@ -29,16 +29,24 @@ picture goes outside it.
 - **The e2e too:** run it with `WF_ARTIFACTS` set. Without it, it writes its pictures into `.e2e/` at the
   repository root.
 
-## 1. Read the pictures the e2e takes
+## 1. Take the pictures, or read them
 
-`npm run e2e` builds the web app, serves it against a seeded store, visits every page in
-`apps/web/test/e2e/pages/` in headless Chromium in a light and a dark theme, and screenshots each as
-`<page>-<theme>.png` into `$WF_ARTIFACTS`. Its last lines list them. A page that failed leaves
-`<page>-<theme>-failed.png` instead, and the e2e exits non-zero.
+`npm run e2e` builds the web app, serves it against a seeded store, and visits every page in
+`apps/web/test/e2e/pages/` in headless Chromium, in the dark theme, in the order of their file names. It
+takes no picture but a failing page's, `<page>-<theme>-failed.png`, and then exits non-zero.
 
-- **When a step before you declared `screenshots`,** those absolute paths are the pictures: read them.
-- **Otherwise,** read the PNGs in your files directory, after `WF_ARTIFACTS=<that directory> npm run e2e`
-  on the change as it stands if they are not there or are older than your last change.
+`npm run e2e -- --photos --pages <name,…>` takes them: it visits in a light and then a dark theme, and
+pictures the pages named, each as `<page>-<theme>.png` with the pictures the page takes of itself
+(`<page>-<what>-<theme>.png`, its phone's among them where it sets one), into `$WF_ARTIFACTS`. The pages
+before them are visited unpictured, since each reads what those leave. A page is named as its file is,
+without its number (`pages/NAMES` lists them); `--photos` alone pictures every page. Its last lines list
+the pictures.
+
+- **When a step before you named pictures** in its artifacts or `screenshots`, those absolute paths are
+  the pictures: read them.
+- **Otherwise,** take them: `WF_ARTIFACTS=<your files directory> npm run e2e -- --photos --pages <name,…>`
+  on the change as it stands, again after each change you make to a page.
+- **A state no page reaches** is pictured in the browser (section 2), or by a page that reaches it.
 
 Read every one with your Read tool, in both themes. Each is the whole page, top to bottom, at 1280 pixels
 wide: a menu fixed to the window is drawn only as far down as the first screen, which is the capture and
@@ -71,9 +79,9 @@ Then, for every page you are looking at, in the browser tools (`browser_*`, from
 
 **Both themes.** The app follows the system's colour scheme (`prefers-color-scheme`), and so does its
 canvas (React Flow's `colorMode="system"`). The browser's scheme is light, and no browser tool changes it:
-photograph the light theme there, and take the dark from the e2e's `<page>-dark.png`, side by side with
-the light. Do not restyle a page from `browser_evaluate` to fake the dark: the canvas would stay light,
-and you would be judging your own stylesheet.
+photograph the light theme there, and take the dark from the e2e's `<page>-dark.png` under `--photos`,
+side by side with the light. Do not restyle a page from `browser_evaluate` to fake the dark: the canvas
+would stay light, and you would be judging your own stylesheet.
 
 **Never `browser_run_code_unsafe`.** It runs code of your choosing in the browser server's own process,
 past every fence the other tools keep. Every shipped step that could reach it is denied it by name, in its

@@ -9,7 +9,10 @@ description: "Review a change in this repository as a second engineer would: aga
    would have made.
 2. **Read the whole diff** against the base (`git diff <base>...HEAD`, the base as your brief names it), and the tests beside it.
    Read a file with Read, list a folder with Glob and search with Grep; never `ls`, `find`, `head`, `cat`, `grep`, `git grep`, `awk`,
-   `sed` or a pipe in Bash: Bash runs only read-only git (`git diff`, `git log`, `git show`, `git status`) and the checks below.
+   `sed` or a pipe in Bash: Bash runs only the checks below and git's read-only questions, each bare, one per call, and never a write:
+   `git diff`, `git log`, `git show`, `git status`, `git merge-base`, `git rev-parse` and `git branch --contains`. Whether main is merged
+   into the branch is `git merge-base --is-ancestor <commit> HEAD`, answered by its exit code alone, so ask it with nothing after it,
+   never `; echo $?` or `&& echo`; `git branch --contains <commit>` answers in words.
 3. **Run the suite yourself**, each check bare and one command per call: `npx turbo run test --force --continue`,
    `npx turbo run typecheck --force`, `npm run lint`. Never wrap one in `timeout` or `( … )`, pipe it or redirect it; paths from the
    workspace root, never `cd`, `git -C`, `VAR=` or `for`: your fence refuses them. A claim you did not run is not a finding.
@@ -24,8 +27,7 @@ description: "Review a change in this repository as a second engineer would: aga
    kind `placement` that cites the rule.
 6. **Look for what the author could not see**: a rule claimed with no test that makes it refuse; a test that passes for nothing; a
    caller that rebuilds a returned type field by field and drops the new one; a limit raised; a behaviour change the spec did not ask
-   for. When the change touches `apps/web`, read the pictures implement handed on, in both themes, with `look`; never build
-   or run the e2e.
+   for. Never build or run the e2e.
 7. **Write each finding so the engineer can act on it alone**: the file, the line, the input or case, and the wrong result; its `kind`,
    and the `rule` it cites, by the file that states or holds it and its words. No finding invented to look thorough, none about taste.
 8. **Decide the round**: `again` true only when a finding is worth another round of work. From the second round, read the engineer's

@@ -1,7 +1,8 @@
 /**
  * Where the e2e's things are, and what the runner (run.ts) sets up for the pages to read: the store the api serves, the environment it
- * runs in, and what draft's stand-in inbox has heard. Set only by the runner, through `setStore` and `setApiEnv`; a page reads them
- * when it is visited, never as it is imported, when the runner has set up nothing yet.
+ * runs in, whether the page being visited is pictured, and what draft's stand-in inbox has heard. Set only by the runner, through
+ * `setStore`, `setApiEnv` and `setPhotographing`; a page reads them when it is visited, never as it is imported, when the runner has set
+ * up nothing yet.
  */
 import path from 'node:path';
 
@@ -19,6 +20,14 @@ export function setStore(to: string | undefined): void {
 export let apiEnv: NodeJS.ProcessEnv = {};
 export function setApiEnv(to: NodeJS.ProcessEnv): void {
   apiEnv = to;
+}
+/**
+ * Whether the page being visited is pictured: `photograph` takes no picture while it is false, but a failure's. Set by `visitAll`, page by
+ * page, from the run's plan (`planOf`): false unless the e2e was run with `--photos`.
+ */
+export let photographing = false;
+export function setPhotographing(to: boolean): void {
+  photographing = to;
 }
 /** Every line draft's stand-in inbox (SAYING, INBOX) has been sent, in order: what the `say` page holds its words to. */
 export const heard: unknown[] = [];

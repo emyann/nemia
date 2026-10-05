@@ -9,6 +9,7 @@ import { isRemoteHarness } from '../harness/harness.ts';
 import type { Workflow } from '../step/step.ts';
 import type { Mount, Run } from '../record/record.ts';
 import { stepMounts } from '../factory/factory.ts';
+import type { FiledFolders } from '../filed/filed.ts';
 
 /**
  * A file `nemia start --input` was given, as start.verb.ts found it: the path as typed, where it resolves, and what is there. What
@@ -60,18 +61,28 @@ export const inputsLine = (dir: string | undefined, names: readonly string[] | u
 const pathsOf = (mounts: readonly Mount[]): string => mounts.map((m) => `\`${m.path}\``).join(', ');
 
 /**
+ * What a brief says of the folders the steps before it handed over (`handed`, each read-only): each by its absolute path and its step,
+ * the folder's name, and that it is listed under its own path, since the run's artifacts folder above it is not mounted.
+ */
+const handedLine = (handed: readonly Mount[]): string =>
+  `Folders the steps before you handed over, which you may read and must not write: ${handed.map((m) => `\`${m.path}\` (${path.basename(m.path)}'s)`).join(', ')}. Each is mounted on its own path, and the run's artifacts folder above them is not: list one with Glob under its own path, as \`${handed[0].path}/**\`.`;
+
+/**
  * What a step's brief says of the folders its run mounts, under what was asked for: each by its absolute path, those its `writable:` names
- * to write (`stepMounts`), the others to read and never write; then the store's folders its `reads:` names (`store`, as `readsMounts` in
- * filed.ts files them), to read and never write; a blank line before them. Nothing for a run that mounts none and a step given no store
+ * to write (`stepMounts`), the others to read and never write; then the folders it is filed with beyond them (`folders`, as `filedFolders`
+ * in filed.ts files them), to read and never write: the artifacts folders of the steps before it (`handed`), each with how to list it, and
+ * the store's folders its `reads:` names (`store`); a blank line before them. Nothing for a run that mounts none and a step given no other
  * folder, and for a step on a remote agent, which is filed none.
  */
 export const mountsLine = (
   step: Pick<Workflow, 'harness' | 'writable'>,
   run: Pick<Run, 'mounts'>,
-  store: readonly Mount[] = [],
+  folders: FiledFolders = { handed: [], store: [] },
 ): string[] => {
-  const mounts = isRemoteHarness(step.harness) ? undefined : stepMounts(step, run.mounts);
-  if (!mounts?.length && !store.length) return [];
+  const local = !isRemoteHarness(step.harness);
+  const mounts = local ? stepMounts(step, run.mounts) : undefined;
+  const { handed, store } = local ? folders : { handed: [], store: [] };
+  if (!mounts?.length && !handed.length && !store.length) return [];
   const writes = (mounts ?? []).filter((m) => !m.readOnly);
   const reads = (mounts ?? []).filter((m) => m.readOnly);
   return [
@@ -86,6 +97,7 @@ export const mountsLine = (
           `Folders of this factory you may read, and must not write: ${pathsOf(reads)}. Each is mounted read-only; your own work stays in your workspace.`,
         ]
       : []),
+    ...(handed.length ? [handedLine(handed)] : []),
     ...(store.length
       ? [
           `Folders of the store you may read, and must not write, as this step's \`reads:\` names them: ${pathsOf(store)}. Each is mounted read-only; read it with Read, Grep and Glob.`,

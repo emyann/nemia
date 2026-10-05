@@ -49,7 +49,8 @@ next pass. Stopping the daemon itself, beyond `wf pause`, is a verb on this leas
 read and removed only by `sweep` (`agent-runtime/src/core/engine/bodies.ts`, `ae sweep`). Where a brief is cut is the orchestrator's
 (`briefParts`, `src/brief/parts.ts`), filed beside the whole brief as a hint the runtime refuses unless the parts join into it.
 A task's journal, its session files and its feed lines are removed only by `forget` (`agent-runtime/src/service/forget.ts`,
-`ae forget`), and only of a settled task; a body still only by `sweep`.
+`ae forget`), and only of a settled task; a body still only by `sweep`. Which tasks a run removed had is the orchestrator's: `nemia rm`
+asks `forget` of every task its record names, and the tick asks again for one that had not settled (`src/forgetting/forgetting.verb.ts`).
 
 **Logs and traces**: each layer logs and spans in its own words — the runtime its task, kind and attempt (`appendFields` in
 `agent-runtime/src/core/engine/journal.ts`), the orchestrator its run and step (`advancePass`, `forStep`) — and the process chooses the

@@ -18,7 +18,7 @@ import { FavoriteStar } from '../components/FavoriteStar';
 import { RemoveRun } from '../components/RemoveRun';
 import { LiftHold } from '../components/LiftHold';
 import { PruneRun } from '../components/PruneRun';
-import { runGone, runQuery, type RunDetail } from '../lib/api';
+import { loadRun, runGone, runQuery, type RunDetail } from '../lib/api';
 import { answersOf, gateOffered, stepAnchor } from '../lib/asks';
 import { barValue } from '../lib/bar';
 import { spentTitle } from '../lib/cost';
@@ -39,7 +39,7 @@ export const Route = createFileRoute('/runs/$runId')({
     const bar = barValue({ kind: 'step', run: params.runId, step: search.step });
     throw redirect({ to: '/runs/$runId', params, search: { bar }, replace: true });
   },
-  loader: ({ context, params }) => context.queryClient.ensureQueryData(runQuery(params.runId)),
+  loader: ({ context, params }) => loadRun(context.queryClient, params.runId),
   component: RunPage,
   errorComponent: ({ error }) => (
     <div className="space-y-3">
@@ -52,11 +52,27 @@ export const Route = createFileRoute('/runs/$runId')({
 type Step = RunDetail['steps'][number];
 
 /**
- * The page of a run, keyed by run, so where the nodes were dragged belongs to the run they were on. A run removed
- * while the page is open is said to be gone: the query keeps its last read, which is not drawn as if the run were still there.
+ * The page of a run, or, when the store has no run of its id as the page loads (`loadRun`), the words that say so, by its id: the
+ * address of a run removed, or of none.
  */
 function RunPage() {
   const { runId } = Route.useParams();
+  if (Route.useLoaderData().gone) {
+    return (
+      <div className="space-y-3">
+        <BackToRuns />
+        <RunGone id={runId} />
+      </div>
+    );
+  }
+  return <RunRead runId={runId} />;
+}
+
+/**
+ * The page of the run `runId`, keyed by run, so where the nodes were dragged belongs to the run they were on. A run removed
+ * while the page is open is said to be gone: the query keeps its last read, which is not drawn as if the run were still there.
+ */
+function RunRead({ runId }: { runId: string }) {
   const { data: run, error } = useSuspenseQuery(runQuery(runId));
   if (runGone(error)) {
     return (

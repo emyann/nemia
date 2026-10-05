@@ -16,7 +16,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { Effect } from 'effect';
-import { nameFor, Engine as EngineService, type RunnerOps, type Sighting, type SpawnRequest } from 'agent-runtime';
+import { ForgetRefused, nameFor, Engine as EngineService, type RunnerOps, type Sighting, type SpawnRequest } from 'agent-runtime';
 import { asyncOps, plainEngine, type AsyncRunner } from './promised.ts';
 import type { Engine } from '../src/runtime-client.ts';
 import { scratch } from './scratch.ts';
@@ -82,11 +82,13 @@ const real = plainEngine(
 );
 /** Every call of the engine's `forget`, its tasks and whether it removed them. */
 const forgets: { taskIds: string[]; yes: boolean }[] = [];
+/** The words the engine's `forget` refuses every call in, naming no task, while set: a refusal that does not clear. */
+let refusing: string | undefined;
 const e: Engine = {
   ...real,
   forget: (taskIds, options) => {
     forgets.push({ taskIds: [...taskIds], yes: options?.yes === true });
-    return real.forget(taskIds, options);
+    return refusing === undefined ? real.forget(taskIds, options) : Effect.fail(new ForgetRefused({ message: refusing }));
   },
 };
 
@@ -293,4 +295,34 @@ test('`nemia prune` of N runs asks the engine once, dry, over all their tasks to
     [],
     'the engine keeps them all',
   );
+});
+
+test('an engine that refuses to forget: `nemia rm` removes the run, exits 0 and says so, the marker kept; each pass asks again and warns; only a person removes the marker, and it says how', async (t) => {
+  const run = await signed(oneStep('harness: codex'), SIGNED);
+  const task = `${run.id}-implement`;
+  refusing = 'forget: the store is read-only.';
+  try {
+    const said = await typed(t, 'rm', run.id);
+    assert.equal(said.error, undefined, 'exit 0: the run is removed');
+    const marker = markerOf(run.id);
+    const words = `the engine refused to forget its tasks: forget: the store is read-only. ${marker} keeps their ids and the daemon asks again each pass`;
+    assert.ok(said.printed[0].startsWith(`${run.id}  `) && said.printed[0].includes(words), said.printed.join('\n'));
+    assert.ok(said.printed[0].endsWith(`only a person removes it, once nothing of them is wanted: rm ${marker}`), said.printed[0]);
+    assert.ok(!fs.existsSync(path.join(ROOT, 'runs', `${run.id}.json`)), 'the record is gone');
+    assert.deepEqual(runStore.forgetting.read(run.id), [task], 'the marker keeps its id');
+    const before = forgets.length;
+    const done = await runWith(e, tickRun({ repo: ROOT }));
+    assert.equal(forgets.length, before + 1, 'a pass asks again');
+    const [line, ...more] = done.forgetting ?? [];
+    assert.deepEqual([more, line.warn], [[], true]);
+    assert.ok(
+      line.text.startsWith(`${run.id} (removed): the engine refused to forget its tasks: `) && line.text.endsWith(`rm ${marker}`),
+      line.text,
+    );
+    assert.ok(fs.existsSync(marker), 'the marker stands');
+  } finally {
+    refusing = undefined;
+  }
+  await runWith(e, tickRun({ repo: ROOT }));
+  assert.ok(!fs.existsSync(markerOf(run.id)) && !(await listed()).includes(task), 'once the engine forgets, a pass lifts it');
 });

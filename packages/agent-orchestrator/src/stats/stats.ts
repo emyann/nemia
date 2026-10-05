@@ -2,8 +2,8 @@
  * The flow numbers of a store's history, defined on each workflow's structure and never on a step's name: the rounds of each `loop:` step
  * to acceptance, the tries of the `workspace: main` step to a landing, what a landed run cost and how long it took, and every step's tries,
  * time, cost, check verdicts and gate waits, the calls its harness refused it, where the harness records them, the skills its sessions
- * loaded, where their ends say, and each rule its skills declare, kept or broken by those calls (`discipline.ts`); and each count the
- * step declares over its closeouts (`tally:`, `tally.ts`), per step and day.
+ * loaded, where their ends say, and the skills whose paths they touched, and each rule its skills declare, kept or broken by those calls
+ * (`discipline.ts`); and each count the step declares over its closeouts (`tally:`, `tally.ts`), per step and day.
  *
  * Pure: `factsOf` turns one run's timeline and record into facts, `statsOf` buckets them by UTC day and by one breakdown key, filters them
  * and totals them, with the changes to what the runs froze (`marksOf`, `marks.ts`), and `statsQueryOf` reads what a person asked.
@@ -19,7 +19,18 @@ import { DEFAULT_FACTORY } from '../factory/factory.ts';
 import { askedAgain, landsOnCheck } from '../status/status.ts';
 import type { Timeline, TimelineTry } from '../timeline/index.ts';
 import { marksOf, type Mark, type RunFrozen } from './marks.ts';
-import { deniesRecorded, ranAsJob, ruleRowsOf, rulesOfTry, type RuleFact, type RuleRow } from './discipline.ts';
+import {
+  deniesRecorded,
+  ranAsJob,
+  ruleRowsOf,
+  rulesOfTry,
+  skillRowsOf,
+  skillsDueOf,
+  type DueFact,
+  type RuleFact,
+  type RuleRow,
+  type SkillRow,
+} from './discipline.ts';
 import type { SkillRule } from '../skills/skills.ts';
 import { tallyIn, tallyRowsOf, type TallyFact, type TallyRow } from '../tally/tally.ts';
 
@@ -48,7 +59,9 @@ export type RunKeys = { run: string; factory: string; workflow: string; repo: st
  * `denied` names each call its session was refused, one per call; null for a try that ran no session of its own (a recheck's), on a step
  * whose harness records no denial (`deniesRecorded`), and for a session filed before steps ran as jobs (`ranAsJob`). `skills` names each
  * skill its session loaded, one per load, `[]` for none; null for a try with no session of its own, and for a session an end of which does
- * not say what it loaded (`skillsLoadedOf`). `rules` holds each rule the step's frozen skills declare, kept or broken by `denied`
+ * not say what it loaded (`skillsLoadedOf`). `due` holds each of the step's frozen skills that declares paths (`applies:`), and whether
+ * a file the session read or wrote is one of them (`skillsDueOf`); null for a try with no session of its own, and where an end of it does
+ * not say its files. `rules` holds each rule the step's frozen skills declare, kept or broken by `denied`
  * (`rulesOfTry`), `[]` with none declared; null where `denied` is. `tallies` holds each count the frozen step declares (`tally:`), valued
  * off its session's own closeout (`tallyIn`): `[]` with none declared, and each value null for a try with no session of its own or whose
  * closeout does not hold it.
@@ -64,6 +77,7 @@ export type TryFact = RunKeys & {
   gateWaitMs: number | null;
   denied: string[] | null;
   skills: string[] | null;
+  due: DueFact[] | null;
   rules: RuleFact[] | null;
   tallies: TallyFact[];
 };
@@ -92,7 +106,8 @@ export type Facts = { tries: TryFact[]; runs: RunFact[]; frozen: RunFrozen[] };
 /**
  * A run's timeline and record, and what `factsOf` reads beyond them: whether a task succeeded, each check's verdict, each step's
  * closeout, every call a session's task was refused, one per call, worded as a permission rule (`Bash(git push)`), and every skill it
- * loaded, one per load, null where an end of it does not say (`skillsLoadedOf`); the rules each skill a step froze declares, by skill;
+ * loaded, one per load, null where an end of it does not say (`skillsLoadedOf`), and every file it touched, null where an end does not
+ * say (`filesTouchedOf`); the rules each skill a step froze declares, by skill, and the paths each declares (`applies:`), by skill;
  * and the closeout a task's current turn made, undefined where it made none that reads.
  */
 export type RunRead = {
@@ -104,7 +119,9 @@ export type RunRead = {
   closeoutOf: (step: string) => Closeout | undefined;
   deniedOf: (taskId: string) => string[];
   skillsOf: (taskId: string) => string[] | null;
+  filesOf: (taskId: string) => string[] | null;
   rulesOf: (step: Workflow) => ReadonlyMap<string, readonly SkillRule[]>;
+  appliesOf: (step: Workflow) => ReadonlyMap<string, readonly string[]>;
   closeoutOfTask: (taskId: string) => Closeout | undefined;
 };
 
@@ -168,6 +185,7 @@ function tryFactsOf(r: RunRead): TryFact[] {
           gateWaitMs: gateWaitOf(r, step, t),
           denied,
           skills: t.session ? r.skillsOf(t.session.taskId) : null,
+          due: t.session ? skillsDueOf(r.filesOf(t.session.taskId), r.appliesOf(step)) : null,
           rules: rulesOfTry(denied, r.rulesOf(step)),
           tallies: (step.tally ?? []).map((tally) => ({
             tally,
@@ -286,7 +304,8 @@ export type Headline = {
  * One step's totals, for one agent: its tries, their known run time, what the measured ones cost (`costTries` of them measured), their
  * checks' verdicts, and the mean gate wait; and the calls refused it, `deniedCalls` over the `deniedTries` tries measured (null with none),
  * each call with its count (`denials`), most first, then by call; and the skills its sessions loaded, `skillLoads` over the `skillTries`
- * tries measured (null with none), each skill with its count (`skills`), most first, then by name; and each rule its skills declare, kept
+ * tries measured (null with none), each skill loaded or touched with its loads, its tries and how often it was loaded when its paths were
+ * touched (`skills`, `skillRowsOf`), most loads first, then by name; and each rule its skills declare, kept
  * or broken over the tries whose denials were measured (`rules`, `ruleRowsOf`), empty with none declared or measured.
  */
 export type StepRow = {
@@ -303,7 +322,7 @@ export type StepRow = {
   denials: Array<{ call: string; count: number }>;
   skillLoads: number | null;
   skillTries: number;
-  skills: Array<{ skill: string; count: number }>;
+  skills: SkillRow[];
   rules: RuleRow[];
 };
 
@@ -396,7 +415,7 @@ function stepRowsOf(tries: readonly TryFact[]): StepRow[] {
     denials: countsOf(of.flatMap((t) => t.denied ?? [])).map(({ name, count }) => ({ call: name, count })),
     skillLoads: knownSum(of.map((t) => t.skills?.length)),
     skillTries: of.filter((t) => t.skills !== null).length,
-    skills: countsOf(of.flatMap((t) => t.skills ?? [])).map(({ name, count }) => ({ skill: name, count })),
+    skills: skillRowsOf(of),
     rules: ruleRowsOf(of),
   }));
 }

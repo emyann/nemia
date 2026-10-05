@@ -2,6 +2,7 @@
  * The calls a try was refused, as the stats count them: which steps' tries are measured at all (`deniesRecorded`), which sessions ran as
  * jobs that record them (`ranAsJob`), and every call each ended attempt of a session was denied, one per call (`deniedCallsOf`). And the
  * skills a try loaded: every skill each ended attempt of a session loaded, one per load, where each ended attempt says (`skillsLoadedOf`).
+ * And the skills a try was due to load: those whose `applies:` names a file its sessions read or wrote (`filesTouchedOf`, `skillsDueOf`).
  * And the rules those skills declare (`SkillRule`): on each try whose denials were measured, a rule is broken when a call the try was
  * denied matches one of its `breaks`, as a `disallowedTools:` rule matches a call (`disallowedBy`), and kept otherwise — "no refused call
  * matched", not "followed" (`rulesOfTry`, `ruleRowsOf`). Pure: `stats.verb.ts` hands the views and each step's frozen skills' rules here,
@@ -9,7 +10,7 @@
  */
 import { DEFAULT_HARNESS } from '../harness/harness.ts';
 import { disallowedBy } from '../keys/index.ts';
-import type { SkillRule } from '../skills/skills.ts';
+import { appliesMatch, type SkillRule } from '../skills/skills.ts';
 import type { Workflow } from '../step/step.ts';
 import type { TaskSpan } from '../timeline/index.ts';
 
@@ -64,6 +65,35 @@ export function skillsLoadedOf(view: SkillsClock | undefined): string[] | null {
   return ends.flatMap((a) => [...(a.skills ?? [])]);
 }
 
+/** What `filesTouchedOf` reads of a task's view: its attempts, whether each ended, and the files each touched, where its end says. */
+export type FilesClock = { state: { attempts: ReadonlyArray<{ ended: unknown; files?: readonly string[] }> } };
+
+/**
+ * Every file a task's sessions read or wrote, each once, in the order first touched over its attempts that ended; `[]` where they touched
+ * none. Null, not measured, where `skillsLoadedOf` would be: no view, no attempt ended, or an ended attempt whose end does not say its
+ * files.
+ */
+export function filesTouchedOf(view: FilesClock | undefined): string[] | null {
+  const ends = (view?.state.attempts ?? []).filter((a) => a.ended !== null && a.ended !== undefined);
+  if (!ends.length || !ends.every((a) => a.files !== undefined)) return null;
+  return [...new Set(ends.flatMap((a) => [...(a.files ?? [])]))];
+}
+
+/** One skill that declares the paths of its work (`applies:`), on one try: whether the try touched one of them. */
+export type DueFact = { skill: string; touched: boolean };
+
+/**
+ * Each skill that declares paths (`applies`, by skill, `[]` for none declared), in the order declared, and whether a file the try touched
+ * (`files`) is one of them (`appliesMatch`). Null where the try's files were not measured, so an unmeasured try is never counted as
+ * untouched; a skill that declares no path gives none.
+ */
+export function skillsDueOf(files: readonly string[] | null, applies: ReadonlyMap<string, readonly string[]>): DueFact[] | null {
+  if (files === null) return null;
+  return [...applies]
+    .filter(([, globs]) => globs.length)
+    .map(([skill, globs]) => ({ skill, touched: files.some((f) => appliesMatch(f, globs)) }));
+}
+
 /** One rule of one skill on one try: whether a call the try was denied broke it, and each call that did, one per call (`by`). */
 export type RuleFact = { skill: string; rule: string; says: string; broken: boolean; by: string[] };
 
@@ -95,4 +125,36 @@ export function ruleRowsOf(tries: ReadonlyArray<{ rules: readonly RuleFact[] | n
     rows.set(key, { ...row, kept: row.kept + (fact.broken ? 0 : 1), broken: row.broken + (fact.broken ? 1 : 0) });
   }
   return [...rows.values()].sort((a, b) => b.broken - a.broken || byName(a.skill, b.skill) || byName(a.rule, b.rule));
+}
+
+/**
+ * One skill over a set of tries: its loads (`count`), the tries that loaded it at least once (`tries`), and, over the tries whose files
+ * were measured, those that touched a path it declares (`touched`) and those of them that loaded it (`loadedWhenTouched`), each null where
+ * it declares none on a measured try.
+ */
+export type SkillRow = { skill: string; count: number; tries: number; touched: number | null; loadedWhenTouched: number | null };
+
+/**
+ * Each skill `tries` loaded or were due to load (`SkillRow`): most loads first, then by name. A skill touched and never loaded has a row
+ * of its own, with no load; one declared and neither touched nor loaded has none.
+ */
+export function skillRowsOf(tries: ReadonlyArray<{ skills: readonly string[] | null; due: readonly DueFact[] | null }>): SkillRow[] {
+  const names = new Set([
+    ...tries.flatMap((t) => t.skills ?? []),
+    ...tries.flatMap((t) => (t.due ?? []).filter((d) => d.touched).map((d) => d.skill)),
+  ]);
+  return [...names]
+    .map((skill): SkillRow => {
+      const loaded = (t: (typeof tries)[number]) => Boolean(t.skills?.includes(skill));
+      const declared = tries.filter((t) => t.due?.some((d) => d.skill === skill));
+      const touched = declared.filter((t) => t.due?.some((d) => d.skill === skill && d.touched));
+      return {
+        skill,
+        count: tries.flatMap((t) => t.skills ?? []).filter((name) => name === skill).length,
+        tries: tries.filter(loaded).length,
+        touched: declared.length ? touched.length : null,
+        loadedWhenTouched: declared.length ? touched.filter(loaded).length : null,
+      };
+    })
+    .sort((a, b) => b.count - a.count || byName(a.skill, b.skill));
 }

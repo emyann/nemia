@@ -7,8 +7,7 @@ import { CodeBlock } from './ai-elements/code-block';
 
 const PLUGINS = [remarkGfm];
 
-/** A heading's level on the page: two below the markdown's, so a text's `#` never stands level with the page's own headings. */
-const SHIFTED = { h1: 'h3', h2: 'h4', h3: 'h5', h4: 'h6', h5: 'h6', h6: 'h6' } as const;
+/** How large a heading is drawn, by its level in the markdown, wherever on the page it stands. */
 const HEADING = {
   h1: 'text-[1.15em]',
   h2: 'text-[1.08em]',
@@ -18,11 +17,19 @@ const HEADING = {
   h6: 'text-[0.95em] text-neutral-600 dark:text-neutral-400',
 } as const;
 
-const heading = (level: keyof typeof SHIFTED) =>
+const TAGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'] as const;
+
+/** The heading a text's `#` stands at on the page: an h3 by default, deeper where a panel's own heading is deeper. */
+type Level = 3 | 4 | 5;
+
+const heading = (written: (typeof TAGS)[number], Tag: (typeof TAGS)[number]) =>
   function Heading({ node: _node, className, ...props }: ComponentProps<'h1'> & ExtraProps) {
-    const Tag = SHIFTED[level];
-    return <Tag className={cn('mt-4 mb-1.5 font-semibold leading-snug', HEADING[level], className)} {...props} />;
+    return <Tag className={cn('mt-4 mb-1.5 font-semibold leading-snug', HEADING[written], className)} {...props} />;
   };
+
+/** Each heading of a text drawn `level` down the page from its `#`, deeper ones following, and none past h6. */
+const headingsAt = (level: Level): Components =>
+  Object.fromEntries(TAGS.map((written, i) => [written, heading(written, TAGS[Math.min(level - 1 + i, TAGS.length - 1)])]));
 
 const LINK =
   'font-medium text-neutral-900 underline underline-offset-2 break-words hover:text-neutral-600 dark:text-neutral-100 dark:hover:text-neutral-300';
@@ -33,7 +40,8 @@ const LINK =
  * - A link opens in a new tab, and gives the page it opens nothing of this one (`noreferrer`). One whose address the renderer emptied — a
  *   protocol other than http(s), mailto, irc or xmpp, such as `javascript:` — is its words, and no link. A link within the text, to a
  *   footnote, stays in the tab.
- * - A fenced block is the board's code block, highlighted where its fence names a language it has (`languageOf`).
+ * - A fenced block is the board's code block, highlighted where its fence names a language it has (`languageOf`), its lines as written:
+ *   a long one scrolls inside the block, never wraps.
  * - An image is a link to it, never fetched: a text an agent wrote names any address it likes.
  */
 const COMPONENTS: Components = {
@@ -64,7 +72,7 @@ const COMPONENTS: Components = {
   },
   pre: ({ node }) => {
     const { code, className } = fencedCode(node);
-    return <CodeBlock code={code} language={languageOf(className)} className="my-3 text-[13px]" />;
+    return <CodeBlock code={code} language={languageOf(className)} className="my-3 text-[13px] [&_pre]:whitespace-pre" />;
   },
   code: ({ node: _node, className, ...props }) => (
     <code
@@ -72,12 +80,6 @@ const COMPONENTS: Components = {
       {...props}
     />
   ),
-  h1: heading('h1'),
-  h2: heading('h2'),
-  h3: heading('h3'),
-  h4: heading('h4'),
-  h5: heading('h5'),
-  h6: heading('h6'),
   p: ({ node: _node, className, ...props }) => <p className={cn('my-2 leading-relaxed', className)} {...props} />,
   ul: ({ node: _node, className, ...props }) => <ul className={cn('my-2 list-disc space-y-1 pl-5', className)} {...props} />,
   ol: ({ node: _node, className, ...props }) => <ol className={cn('my-2 list-decimal space-y-1 pl-5', className)} {...props} />,
@@ -115,10 +117,19 @@ const COMPONENTS: Components = {
   ),
 };
 
+/** The components a text is drawn with, by the level its `#` stands at. */
+const COMPONENTS_AT: Record<Level, Components> = {
+  3: { ...COMPONENTS, ...headingsAt(3) },
+  4: { ...COMPONENTS, ...headingsAt(4) },
+  5: { ...COMPONENTS, ...headingsAt(5) },
+};
+
 type MarkdownProps = {
   /** The text, as an agent, a folder or a card wrote it. */
   children: string;
   className?: string;
+  /** The heading a text's `#` is drawn as: 3 by default, under the page's own; deeper in a panel whose own heading is an h4. */
+  level?: Level;
 };
 
 /**
@@ -126,10 +137,11 @@ type MarkdownProps = {
  *
  * Raw HTML in the text is shown as the text it is, never as HTML: react-markdown turns it into text as it ships, and nothing here adds
  * a plugin that would parse it. A link's address passes react-markdown's own check, which empties a protocol that could run script.
- * Headings are two levels down (`SHIFTED`), and a text's footnote ids have a prefix of its own, so two closeouts with a `[^1]` on one page
- * each link to their own.
+ * Headings stand under the page's: a `#` is an h3, or `level`, and each deeper one follows it, sized by its level in the text. A soft
+ * line break joins its lines into one paragraph: nothing here keeps a source's breaks. A text's footnote ids have a prefix of its own, so
+ * two closeouts with a `[^1]` on one page each link to their own.
  */
-function MarkdownText({ children, className }: MarkdownProps): ReactNode {
+function MarkdownText({ children, className, level = 3 }: MarkdownProps): ReactNode {
   const prefix = `md${useId().replace(/[^\w-]/g, '')}-`;
   return (
     <div data-markdown className={cn('min-w-0 break-words [&>*:first-child]:mt-0 [&>*:last-child]:mb-0', className)}>
@@ -137,7 +149,7 @@ function MarkdownText({ children, className }: MarkdownProps): ReactNode {
         remarkPlugins={PLUGINS}
         remarkRehypeOptions={{ clobberPrefix: prefix }}
         rehypePlugins={[() => labelFootnotes(prefix)]}
-        components={COMPONENTS}
+        components={COMPONENTS_AT[level]}
       >
         {children}
       </ReactMarkdown>
@@ -146,5 +158,8 @@ function MarkdownText({ children, className }: MarkdownProps): ReactNode {
 }
 
 /** Parsed once per text: a conversation redraws as it grows, and its earlier turns do not change. */
-export const Markdown = memo(MarkdownText, (before, after) => before.children === after.children && before.className === after.className);
+export const Markdown = memo(
+  MarkdownText,
+  (before, after) => before.children === after.children && before.className === after.className && before.level === after.level,
+);
 Markdown.displayName = 'Markdown';

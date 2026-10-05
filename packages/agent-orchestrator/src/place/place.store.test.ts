@@ -174,43 +174,54 @@ test('a script past its deadline is unread, saying so, and is left running nowhe
   assert.deepEqual(running(path.join(dir, 'scripts', 'report.ts')), []);
 });
 
-test('a script past its deadline stops its whole group, killing the children that ignore SIGTERM, and says so', (t) => {
-  const deaf = [
-    "import fs from 'node:fs';",
-    "process.on('SIGTERM', () => {});",
-    'fs.writeFileSync(process.argv[2], String(process.pid));',
-    'setInterval(() => {}, 1000);',
-  ].join('\n');
-  const dir = planted(
-    'report',
+/** A script that starts four children, each deaf to SIGTERM, which write their pid to a marker once deaf. */
+const DEAF_GROUP = [
+  "import { spawn } from 'node:child_process';",
+  "import fs from 'node:fs';",
+  "import path from 'node:path';",
+  "const child = path.resolve('scripts', 'child.mjs');",
+  `fs.writeFileSync(child, ${JSON.stringify(
     [
-      "import { spawn } from 'node:child_process';",
       "import fs from 'node:fs';",
-      "import path from 'node:path';",
-      "const child = path.resolve('scripts', 'child.mjs');",
-      `fs.writeFileSync(child, ${JSON.stringify(deaf)});`,
-      "for (const n of [1, 2, 3, 4]) spawn(process.execPath, [child, path.resolve(`deaf-${n}`)], { stdio: 'ignore' });",
+      "process.on('SIGTERM', () => {});",
+      'fs.writeFileSync(process.argv[2], String(process.pid));',
       'setInterval(() => {}, 1000);',
     ].join('\n'),
-  );
-  const child = path.join(dir, 'scripts', 'child.mjs');
-  t.after(() => {
-    for (const pid of running(child)) process.kill(pid, 'SIGKILL');
-  });
-  const said = saidOf(runPlaceVerb(dir, 'report', REQUESTS.report, { deadlineMs: 1500 }), 'report');
-  const markers = [1, 2, 3, 4].map((n) => path.join(dir, `deaf-${n}`));
-  assert.ok(
-    markers.every((marker) => fs.existsSync(marker)),
-    `each child ignored SIGTERM before the deadline: ${said}`,
-  );
-  for (const pid of markers.map((marker) => Number(fs.readFileSync(marker, 'utf8'))))
-    assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' }, `the child ${pid} is gone, not even a zombie`);
-  assert.match(
-    said,
-    /^it gave no answer within 1\.5 s, its deadline, and was stopped, and a process it started outlived SIGTERM for 2 s and was killed, so a lock it held may be left$/,
-  );
-  assert.deepEqual(running(child), []);
-  assert.deepEqual(running(path.join(dir, 'scripts', 'report.ts')), []);
+  )});`,
+  "for (const n of [1, 2, 3, 4]) spawn(process.execPath, [child, path.resolve(`deaf-${n}`)], { stdio: 'ignore' });",
+  'setInterval(() => {}, 1000);',
+].join('\n');
+
+/** The most tries the group test makes, each with twice the deadline of the one before, for its four children to be deaf in time. */
+const DEAF_TRIES = 6;
+
+test('a script past its deadline stops its whole group, killing the children that ignore SIGTERM, and says so', (t) => {
+  let deadlineMs = 1500;
+  for (let tries = 1; ; tries++, deadlineMs *= 2) {
+    const dir = planted('report', DEAF_GROUP);
+    const child = path.join(dir, 'scripts', 'child.mjs');
+    t.after(() => {
+      for (const pid of running(child)) process.kill(pid, 'SIGKILL');
+    });
+    const said = saidOf(runPlaceVerb(dir, 'report', REQUESTS.report, { deadlineMs }), 'report');
+    assert.deepEqual(running(child), [], `try ${tries}: no child left running`);
+    assert.deepEqual(running(path.join(dir, 'scripts', 'report.ts')), [], `try ${tries}: the script is not left running`);
+    const markers = [1, 2, 3, 4].map((n) => path.join(dir, `deaf-${n}`));
+    if (!markers.every((marker) => fs.existsSync(marker))) {
+      assert.ok(tries < DEAF_TRIES, `each child ignored SIGTERM before the deadline, on one of ${DEAF_TRIES} tries: ${said}`);
+      continue;
+    }
+    for (const pid of markers.map((marker) => Number(fs.readFileSync(marker, 'utf8'))))
+      assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' }, `the child ${pid} is gone, not even a zombie`);
+    const seconds = String(deadlineMs / 1000).replace('.', '\\.');
+    assert.match(
+      said,
+      new RegExp(
+        `^it gave no answer within ${seconds} s, its deadline, and was stopped, and a process it started outlived SIGTERM for 2 s and was killed, so a lock it held may be left$`,
+      ),
+    );
+    return;
+  }
 });
 
 test('the deadline is two minutes a verb, ten for make, and it is the default the runner holds a script to', () => {

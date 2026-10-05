@@ -112,10 +112,22 @@ function denialLines(steps: readonly StepRow[]): string[] {
   return rows.length ? table([['step', 'agent', 'denied', 'calls'], ...rows]) : [];
 }
 
-/** A row per skill each step and agent loaded, with how many times; none where no step loaded a skill. */
+/**
+ * A row per skill each step and agent loaded or touched the paths of: its loads, the tries that loaded it, and, of the tries that touched
+ * its paths, how many loaded it (`3 of 7`), `—` where it declares none; none where no step loaded or touched a skill.
+ */
 function skillLines(steps: readonly StepRow[]): string[] {
-  const rows = steps.flatMap((s) => s.skills.map((k) => [s.step, s.agent ?? NONE, k.skill, String(k.count)]));
-  return rows.length ? table([['step', 'agent', 'skill', 'loads'], ...rows]) : [];
+  const rows = steps.flatMap((s) =>
+    s.skills.map((k) => [
+      s.step,
+      s.agent ?? NONE,
+      k.skill,
+      String(k.count),
+      String(k.tries),
+      k.touched === null ? NONE : `${k.loadedWhenTouched} of ${k.touched}`,
+    ]),
+  );
+  return rows.length ? table([['step', 'agent', 'skill', 'loads', 'tries', 'when touched'], ...rows]) : [];
 }
 
 /** A row per rule each step and agent's skills declare, kept and broken over its measured tries; none where no step has one. */

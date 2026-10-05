@@ -4,7 +4,7 @@
  * the moment anything it watches does: the run's record, a file a person writes beside it, a line of its tasks on the engine's feed, a tip
  * of a branch git was asked about, or the record gone. Every api test runs with `WF_VERIFY_REST=1` (test/harness.ts), which judges each
  * kept answer afresh too and fails the request on a difference; the tests here turn it off where they measure what the memo saves, or ask
- * whether it saw a change on its own.
+ * whether it saw a change on its own. What a poll read is what the api's `api.poll.reads` counts for it (`served`, layer.ts).
  *
  * At shipped defaults: the api's own engine over a store this file seeds, the harness's fake `claude` (test/harness.ts) first on PATH.
  */
@@ -16,6 +16,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { app, runtime } from '../app.ts';
 import { ReadMemo } from '../layer.ts';
+import type { MetricRead } from '../factory/ceilings.ts';
 import { Engine, findRun } from '../store.ts';
 import { approve, engine, verifiesRest, restingRead, type RunSummary } from 'agent-orchestrator';
 
@@ -215,6 +216,23 @@ test("a finished run is kept and a moving one is not, and a poll then reads the 
   assert.deepEqual(again, first, 'the same answer from memory');
   assert.equal(asked, 1, "the moving run's one journal, and not the finished run's");
   assert.equal(resting.hits - hits, 1);
+});
+
+test("a poll's reads are counted into api.poll.reads under /api/runs as the engine counts them, every file it read", async () => {
+  const readsOf = async (): Promise<{ count: number; sum: number }> => {
+    const res = await app.request('/api/metrics');
+    assert.equal(res.status, 200);
+    const metric = ((await res.json()) as MetricRead[]).find((m) => m.name === 'api.poll.reads' && m.attributes.route === '/api/runs');
+    return { count: metric?.count ?? 0, sum: metric?.sum ?? 0 };
+  };
+  await list();
+  const before = await readsOf();
+  const reads = e.io().reads;
+  await unverified(list);
+  const read = e.io().reads - reads;
+  const after = await readsOf();
+  assert.ok(read > 0, "the moving run's journal was read");
+  assert.deepEqual(after, { count: before.count + 1, sum: before.sum + read }, "the poll's reads, the engine's own count");
 });
 
 test('a record rewritten is judged afresh', async () => {

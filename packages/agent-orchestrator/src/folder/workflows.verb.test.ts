@@ -1,6 +1,7 @@
 /**
- * The board's workflow entries (`WORKFLOWS_WRITE`, `WORKFLOWS_LIST`, `WORKFLOWS_STEP`), served on the api alone: a folder written from
- * its steps, or refused in the writer's words whole; each folder listed loaded, or with the loader's refusal, never failing the others;
+ * The board's workflow entries (`WORKFLOWS_WRITE`, `WORKFLOWS_REMOVE`, `WORKFLOWS_LIST`, `WORKFLOWS_STEP`), served on the api alone: a
+ * folder written from its steps, or refused in the writer's words whole; a folder of yours removed whole, or refused with nothing removed
+ * while it is not yours or something still needs it; each folder listed loaded, or with the loader's refusal, never failing the others;
  * and one step of a folder, or none, with the names of those it has. `WF_ROOT` is set before the import, since the store reads it as it
  * loads.
  */
@@ -12,8 +13,11 @@ import { scratch } from '../../test/scratch.ts';
 
 const ROOT = scratch('wf-workflows-root-');
 process.env.WF_ROOT = ROOT;
-const { WORKFLOWS_LIST, WORKFLOWS_STEP, WORKFLOWS_WRITE } = await import('./workflows.verb.ts');
+const { WORKFLOWS_LIST, WORKFLOWS_REMOVE, WORKFLOWS_STEP, WORKFLOWS_WRITE } = await import('./workflows.verb.ts');
 const { engine } = await import('../runner.ts');
+const { runStore } = await import('../record/files.store.ts');
+const { queueInInbox } = await import('../inbox/inbox.store.ts');
+const { Conflict, Invalid, Missing } = await import('../refusal/refusal.ts');
 
 const e = engine();
 
@@ -74,4 +78,177 @@ test("REFUSED: a draft the writer refuses is thrown in the writer's words whole,
     return true;
   });
   assert.equal(fs.existsSync(dir), false);
+});
+
+/** The folder `dir` removed through the entry, as the api hands it. */
+const remove = (dir: string) => WORKFLOWS_REMOVE.handler(e, { from: 'yours', name: path.basename(dir), dir }, undefined, ROOT);
+
+/** That removing `dir` is refused as `kind`, in exactly `message`, and the folder is still on disk. */
+async function refused(dir: string, kind: new (...args: never[]) => Error, message: string): Promise<void> {
+  await assert.rejects(remove(dir), (err: Error) => {
+    assert.ok(err instanceof kind, `${err.name}: ${err.message}`);
+    assert.equal(err.message, message);
+    return true;
+  });
+  assert.ok(fs.existsSync(dir), `${dir} kept`);
+}
+
+/** A run's record whose steps are read from `dir`: frozen at its start, or not. */
+function runOn(id: string, dir: string, frozen: boolean): void {
+  runStore.runs.create({
+    id,
+    repo: dir,
+    workspace: dir,
+    baseRef: 'abc123',
+    branch: 'main',
+    isolate: false,
+    brief: 'do it',
+    workflowDir: dir,
+    ...(frozen && { workflow: [{ name: 'only', after: [], body: 'Do it.', harness: 'claude' }] }),
+    steps: { only: { taskId: null } },
+    createdAt: '2026-10-01T00:00:00.000Z',
+  });
+}
+
+/** A card in the inbox naming `dir` as its workflow, queued or not. */
+function cardOn(name: string, dir: string, queued: boolean): void {
+  fs.mkdirSync(path.join(ROOT, 'inbox'), { recursive: true });
+  const queue = queued ? 'queued: 2026-10-01T00:00:00.000Z\n' : '';
+  fs.writeFileSync(path.join(ROOT, 'inbox', `${name}.md`), `---\nworkflow: ${dir}\n${queue}---\nAn idea.\n`);
+}
+
+/** A factory's file: its repositories, the workflows it attaches and its hires. */
+function factoryOf(name: string, repos: string[], workflows: string[], hires: Record<string, string>): void {
+  fs.mkdirSync(path.join(ROOT, 'factories'), { recursive: true });
+  fs.writeFileSync(path.join(ROOT, 'factories', `${name}.json`), JSON.stringify({ repos, workflows, hires }));
+}
+
+test('a folder of yours removed through the entry is gone, with every file it held named', async () => {
+  const dir = folder('gone', {
+    'plan.md': 'Plan it.\n',
+    'build.md': '---\nafter: plan\n---\nBuild it.\n',
+    'README.md': 'What it is for.\n',
+    'plan.schema.json': '{}',
+  });
+  fs.mkdirSync(path.join(dir, 'notes'));
+  fs.writeFileSync(path.join(dir, 'notes', 'a.txt'), 'a');
+  assert.deepEqual(await remove(dir), {
+    dir,
+    removed: ['README.md', 'build.md', path.join('notes', 'a.txt'), 'plan.md', 'plan.schema.json'],
+  });
+  assert.equal(fs.existsSync(dir), false);
+});
+
+test("REFUSED: a repository's workflow is not removed here, and the same folder in yours is", async () => {
+  const repo = scratch('wf-remove-repo-');
+  fs.mkdirSync(path.join(repo, '.git'));
+  const theirs = path.join(repo, 'workflows', 'shared');
+  fs.mkdirSync(theirs, { recursive: true });
+  fs.writeFileSync(path.join(theirs, 'only.md'), 'Do it.\n');
+  const yours = path.join(ROOT, 'workflows');
+  await refused(
+    theirs,
+    Invalid,
+    `${theirs} is not a workflow of yours (${path.join(yours, '<name>')}): only yours are removed here, and a repository's workflow is removed from its checkout, as a change to commit. Nothing was removed.`,
+  );
+  const nested = folder(path.join('outer', 'inner'), { 'only.md': 'Do it.\n' });
+  await assert.rejects(remove(nested), Invalid);
+  assert.ok(fs.existsSync(nested));
+  fs.renameSync(theirs, path.join(yours, 'shared'));
+  await remove(path.join(yours, 'shared'));
+  assert.equal(fs.existsSync(path.join(yours, 'shared')), false);
+});
+
+test('REFUSED: the folders of agents and of skills are no workflow, and both are kept', async () => {
+  for (const name of ['agents', 'skills']) {
+    const dir = folder(name, { 'one.md': 'An agent.\n' });
+    await assert.rejects(remove(dir), (err: Error) => {
+      assert.ok(err instanceof Invalid);
+      assert.match(err.message, new RegExp(`^${dir.replaceAll('/', '\\/')} is ${name}\\/, the folder of`));
+      return true;
+    });
+    assert.ok(fs.existsSync(path.join(dir, 'one.md')));
+  }
+});
+
+test('REFUSED: a folder that is a link is not removed, nor what it points at', async () => {
+  const target = scratch('wf-remove-target-');
+  fs.writeFileSync(path.join(target, 'only.md'), 'Do it.\n');
+  const link = path.join(ROOT, 'workflows', 'linked');
+  fs.mkdirSync(path.dirname(link), { recursive: true });
+  fs.symlinkSync(target, link);
+  await assert.rejects(remove(link), (err: Error) => {
+    assert.ok(err instanceof Invalid);
+    assert.match(err.message, new RegExp(`^${link.replaceAll('/', '\\/')} is a link, and removing it would remove the link`));
+    return true;
+  });
+  assert.ok(fs.lstatSync(link).isSymbolicLink());
+  assert.ok(fs.existsSync(path.join(target, 'only.md')));
+});
+
+test('REFUSED: a name not there, or a file of that name, is missing', async () => {
+  const none = path.join(ROOT, 'workflows', 'never');
+  await assert.rejects(remove(none), (err: Error) => {
+    assert.ok(err instanceof Missing);
+    assert.equal(err.message, `${none} is not there: it was removed already.`);
+    return true;
+  });
+  const file = path.join(ROOT, 'workflows', 'plain');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, 'not a folder');
+  await refused(file, Missing, `${file} is a file, not a workflow folder: nothing of yours is removed under that name.`);
+});
+
+test('REFUSED: a run that froze no workflow reads it from the folder, and one that froze it does not stop the removal', async () => {
+  const dir = folder('run-reads', { 'only.md': 'Do it.\n' });
+  runOn('r-reads', dir, false);
+  await refused(
+    dir,
+    Conflict,
+    `${dir} is still needed: run r-reads froze no workflow at its start and reads its steps from ${dir}: nemia rm r-reads forgets it. Nothing was removed.`,
+  );
+  runStore.runs.forget('r-reads');
+  runOn('r-froze', dir, true);
+  await remove(dir);
+  assert.equal(fs.existsSync(dir), false);
+  runStore.runs.forget('r-froze');
+});
+
+test('REFUSED: a card queued on the folder, freed by the commands its refusal names, and a card not queued does not stop the removal', async () => {
+  const dir = folder('card-on', { 'only.md': 'Do it.\n' });
+  const other = folder('card-elsewhere', { 'only.md': 'Do it.\n' });
+  cardOn('queued-idea', dir, true);
+  await refused(
+    dir,
+    Conflict,
+    `${dir} is still needed: card queued-idea is queued to start on ${dir}: nemia inbox queue queued-idea --off takes it back, and nemia inbox queue queued-idea --workflow <w> then queues it on another. Nothing was removed.`,
+  );
+  assert.throws(() => queueInInbox('queued-idea', { workflow: other }), Conflict, 'a card still queued is not queued on another');
+  queueInInbox('queued-idea', { off: true });
+  queueInInbox('queued-idea', { workflow: other });
+  await remove(dir);
+  assert.equal(fs.existsSync(dir), false);
+  const idle = folder('card-idle', { 'only.md': 'Do it.\n' });
+  cardOn('idle-idea', idle, false);
+  await remove(idle);
+  assert.equal(fs.existsSync(idle), false);
+  fs.rmSync(path.join(ROOT, 'inbox', 'queued-idea.md'));
+  fs.rmSync(path.join(ROOT, 'inbox', 'idle-idea.md'));
+});
+
+test('REFUSED: a factory offering the name with nothing else to give under it, and neither one whose repository has the workflow nor one offering another name does', async () => {
+  const dir = folder('offered', { 'review.md': 'Read it.\n' });
+  const repo = scratch('wf-remove-factory-repo-');
+  factoryOf('shop', [repo], ['offered'], { 'offered/review': 'reader', 'other/plan': 'planner' });
+  factoryOf('elsewhere', [scratch('wf-remove-elsewhere-repo-')], ['other'], { 'other/plan': 'planner' });
+  await refused(
+    dir,
+    Conflict,
+    `${dir} is still needed: factory shop offers offered, and none of its repositories has a workflow of that name: nemia factory fire shop --step offered/review, then nemia factory detach shop offered. Nothing was removed.`,
+  );
+  fs.mkdirSync(path.join(repo, 'workflows', 'offered'), { recursive: true });
+  await remove(dir);
+  assert.equal(fs.existsSync(dir), false);
+  fs.rmSync(path.join(ROOT, 'factories', 'shop.json'));
+  fs.rmSync(path.join(ROOT, 'factories', 'elsewhere.json'));
 });

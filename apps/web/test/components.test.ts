@@ -1012,6 +1012,29 @@ test('two texts with footnotes on one page name theirs apart — no id twice, ea
     assert.ok(ids.includes(label), `${label} names an element on the page`);
 });
 
+test('given a level, `#` is drawn as that heading and deeper ones follow it, sized by their own level and never past h6', () => {
+  // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
+  const panel = renderToStaticMarkup(createElement(Markdown, { level: 5, children: '# A\n## B\n### C' }));
+  assert.match(panel, /<h5 class="[^"]*text-\[1\.15em\][^"]*">A<\/h5>/, "a text's `#` keeps its size in a panel");
+  assert.match(panel, /<h6 class="[^"]*text-\[1\.08em\][^"]*">B<\/h6>/);
+  assert.match(panel, /<h6[^>]*>C<\/h6>/);
+  assert.doesNotMatch(panel, /<h[1-4][\s>]/, "no heading outranks the panel's own");
+  assert.match(md('# A\n## B'), /<h3[^>]*>A<\/h3>\s*<h4[^>]*>B<\/h4>/, 'without a level, `#` is an h3');
+});
+
+test('a code block keeps its lines as written: a long one scrolls inside the block, never wraps', () => {
+  const html = md('```\n' + 'x'.repeat(300) + '\n```');
+  const block = /<div class="([^"]*)" data-language="text"/.exec(html);
+  assert.ok(block, html);
+  assert.match(block[1], /(^|\s)\[&amp;_pre\]:whitespace-pre(\s|$)/, 'its lines are not wrapped');
+});
+
+test('a soft line break joins its lines into one paragraph, and nothing around a text keeps its breaks', () => {
+  const html = md('one\ntwo\n\nthree');
+  assert.match(html, /<p[^>]*>one\ntwo<\/p>\s*<p[^>]*>three<\/p>/);
+  assert.doesNotMatch(html, /whitespace-pre|<br/);
+});
+
 type WorkflowStepSpec = import('../src/lib/api.ts').WorkflowStepSpec;
 
 /** A step of a workflow no run has started, as the Workflows page draws it: in the step node's spec mode — on the builder, with `build`. */
@@ -2562,7 +2585,7 @@ test("the banner continues a session the harness blocked: Continue, and a box fo
 
   assert.match(html, /^<section aria-label="Waiting on you"/);
   const texts = textsOf(html);
-  assert.ok(texts.includes('asks: Which database?'), html);
+  assert.ok(textContentOf(html).includes('implement asks: Which database?'), html);
   assert.ok(
     texts.includes(`is blocked by the harness: ${WAIT.words} · ${LOGIN}`),
     `after the step's name, which is a tag of its own\n${html}`,
@@ -2613,6 +2636,47 @@ test("the banner continues a session the harness blocked: Continue, and a box fo
     `a harness that says nothing about what for: the need alone\n${mute}`,
   );
   assert.doesNotMatch(mute, /data-advice/, 'with no empty line under it');
+});
+
+/** What a piece of markup reads as, its tags gone: `textContent`, as the e2e's `hasText` reads it. */
+const textContentOf = (html: string): string => unescaped(html.replace(/<[^>]+>/g, ''));
+
+test("an agent's question is drawn as its markdown after `asks:`, in the banner and in the inspector; the banner's hover keeps it plain", async () => {
+  const needs = 'Which **database**?\n\n- one\n- two';
+  const run = needing('succeeded · BLOCKED', { needs }, { waitingOnYou: ['review'] });
+  const item = /<li data-need="asks"[^]*?<\/li>/.exec(bannerMarkup(run))![0];
+  assert.match(item, /<strong>review<\/strong> asks: <div data-markdown="true"[^>]*><p[^>]*>Which <strong>database<\/strong>\?<\/p>\s*<ul/);
+  assert.match(item, /class="[^"]*max-h-40 overflow-y-auto[^"]*"/, 'a long question scrolls in a box of its own');
+  assert.match(item, new RegExp(`title="asks: Which \\*\\*database\\*\\*\\?\\n\\n- one`));
+  assert.ok(textContentOf(item).startsWith('review asks: Which database?'), item);
+
+  const { Asked } = await import('../src/components/GateBrief.tsx');
+  const asked = await routedWith(createElement(Asked, { run, step: run.steps[0] }));
+  assert.match(
+    asked,
+    /data-asked="asks"[^]*<strong>review<\/strong> asks: <div data-markdown="true"[^>]*><p[^>]*>Which <strong>database<\/strong>/,
+  );
+  assert.ok(textContentOf(asked).includes('review asks: Which database?'), asked);
+  assert.doesNotMatch(asked, /\*\*|whitespace-pre/);
+
+  const harness = needing('needs-human', { blockedByHarness: true, waitingFor: WAIT, lastLine: '**not markdown**' }, { waitingOnYou: [] });
+  const blocked = await routedWith(createElement(Asked, { run: harness, step: harness.steps[0] }));
+  assert.match(
+    blocked,
+    /data-asked="harness"[^]*<p class="[^"]*break-words[^"]*">review is blocked by the harness; [^<]*\*\*not markdown\*\*<\/p>/,
+  );
+  assert.doesNotMatch(blocked, /data-markdown/, "the harness's words and the session's last line are said as they are");
+});
+
+test('a short string in a closeout is drawn as markdown; a number as it is', async () => {
+  const { FieldView } = await import('../src/components/Outcome.tsx');
+  const field = (value: unknown): string =>
+    renderToStaticMarkup(createElement(FieldView, { name: 'next', schema: null, value, artifacts: [], images: new Set<string>() }));
+  assert.match(
+    field('Run `npm test`.'),
+    /data-kind="text"[^]*<div data-markdown="true"[^>]*><p[^>]*>Run <code[^>]*>npm test<\/code>\.<\/p>/,
+  );
+  assert.match(field(3), /data-kind="text"[^]*<p class="whitespace-pre-wrap break-words">3<\/p>/);
 });
 
 test('REFUSED: the banner offers no Continue for a session still at work, which the harness did not block, nor on a run called off', () => {
@@ -4508,6 +4572,18 @@ test("the repository's agent lists the skills it gives read-only: no Remove, no 
   assert.doesNotMatch(html, /aria-label="Remove |Add a skill|data-skill-tool-note/);
 });
 
+test("a repository agent's instructions are read as markdown, under their label and hint; one of yours is typed in as written", async () => {
+  const body = '## Role\n\nYou **write**.';
+  const theirs = await agentFormWith({ ...composing, from: 'repo', body }, true);
+  const field = /<section aria-label="Instructions" data-field-markdown="true"[^]*?<\/section>/.exec(theirs)?.[0] ?? '';
+  assert.match(field, />Instructions<[^]*<h4[^>]*>Role<\/h4>[^]*<strong>write<\/strong>[^]*What every node that names it is told/);
+  assert.doesNotMatch(theirs, /<textarea[^>]*>## Role/, 'no box to type in');
+  assert.match(await agentFormWith({ ...composing, from: 'repo', body: '' }, true), /data-field-markdown[^]*Nothing written/);
+  const mine = await agentFormWith({ ...composing, body });
+  assert.match(mine, /<textarea[^>]*>## Role\n\nYou \*\*write\*\*\.<\/textarea>/);
+  assert.doesNotMatch(mine, /data-field-markdown/);
+});
+
 const SKILL_DETAIL = {
   skill: PLACES[0].skills[0],
   version: 'v1',
@@ -4549,8 +4625,13 @@ test("a skill of yours is filled from its file, its name set once, and saved; th
   assert.match(mine, />Save</);
   const theirs = await skillForm({ detail: { ...SKILL_DETAIL, skill: { ...SKILL_DETAIL.skill, from: 'repo' } }, readOnly: true });
   assert.doesNotMatch(theirs, />Save<|>Create skill</);
-  assert.equal([...theirs.matchAll(/readOnly=""/g)].length, 6, 'every field read-only');
+  assert.equal([...theirs.matchAll(/readOnly=""/g)].length, 5, 'every field read-only, and its instructions read as markdown');
+  assert.match(
+    theirs,
+    /<section aria-label="Instructions" data-field-markdown="true"[^>]*>[^]*<div data-markdown="true"[^>]*><p[^>]*>Write them\.<\/p>/,
+  );
   assert.equal([...mine.matchAll(/readOnly=""/g)].length, 1, 'of yours, only the name');
+  assert.doesNotMatch(mine, /data-field-markdown/, 'of yours, the instructions are typed in');
 });
 
 /** A page's piece inside a router, with the queries it reads already answered: a route link needs the router. */
@@ -5789,7 +5870,7 @@ test("a layer the run froze none of says so; a step with no agent draws no agent
 
   const whole = toldMarkup({ told: 'Write the note.\n\n## What was asked for', layers: null, filed: false });
   assert.match(whole, /What it would be told now/);
-  assert.match(whole, /Write the note\.\n\n## What was asked for/);
+  assert.match(whole, /<p[^>]*>Write the note\.<\/p>\s*<h6[^>]*>What was asked for<\/h6>/, 'the brief whole, as the markdown it is');
   assert.doesNotMatch(whole, /data-layer/);
   assert.equal(toldMarkup({ told: null, layers: null, filed: true }), '', 'nothing to fold, no fold');
 });
@@ -5806,6 +5887,23 @@ test('the fence lines a step tightens are drawn under its policy layer, and unde
   assert.ok(fence > html.indexOf('data-layer="policy"') && fence < html.indexOf('data-layer="task"'), html);
   assert.match(html, /Tightens writer&#x27;s fence:[^]*disallowedTools: Bash\(git push:\*\)/);
   assert.doesNotMatch(toldMarkup({ told: null, layers: LAYERS, filed: true }), /data-fence|Tightens/, 'no fence line, no fence');
+});
+
+test("each layer is drawn as the markdown it is: its source's line breaks joined, its marks drawn, no heading above the layer's own", () => {
+  const layers = {
+    ...LAYERS,
+    instructions: '# Role\n\nYou **write**.',
+    policy: 'Do **this**:\n\n- one\n- two',
+    task: 'A line\nwrapped.',
+  };
+  const html = toldMarkup({ told: null, layers, filed: true });
+  const layer = (name: string): string => new RegExp(`<section data-layer="${name}"[^]*?</section>`).exec(html)![0];
+  assert.match(layer('policy'), /<strong>this<\/strong>[^]*<ul[^>]*>\s*<li[^>]*>one<\/li>/);
+  assert.doesNotMatch(layer('policy'), /\*\*/);
+  assert.match(layer('task'), /<div data-markdown="true"[^>]*><p[^>]*>A line\nwrapped\.<\/p><\/div>/, 'one paragraph, its break a space');
+  assert.match(layer('instructions'), /<h5[^>]*>Role<\/h5>/, "a text's `#` sits under the layer's h4");
+  assert.doesNotMatch(html, /<pre|whitespace-pre/, 'no layer keeps its source lines');
+  assert.match(policyMarkup(layers), /data-layer="policy"[^]*<strong>this<\/strong>[^]*<li[^>]*>two<\/li>/, 'at the gate, the same');
 });
 
 test("at a gate, the step's policy is drawn open: its words, the skills it adds, its fence lines, and what was told before it — never the agent's words", () => {
@@ -5906,4 +6004,48 @@ test("a step with an agent is read by layer on the builder: its agent, the agent
   const agentless = await stepFormMarkup(null, null);
   assert.doesNotMatch(agentless, /data-layer|data-agent-note/);
   assert.match(agentless, /What it is told/);
+});
+
+const { StatsPasses } = await import('../src/components/StatsPasses.tsx');
+const { passesRead } = await import('./factory-fixtures.ts');
+
+/** The Stats page's section on the tick's pass, its read answered by `passes`. */
+const passesMarkup = (passes: import('../src/lib/api.ts').PassesRead): string => {
+  const client = new QueryClient();
+  client.setQueryData(['passes'], passes);
+  return renderToStaticMarkup(createElement(QueryClientProvider, { client }, createElement(StatsPasses)));
+};
+
+test("the tick's pass on the Stats page: a column a bucket with its count, a bar a part heaviest first, and what the last pass saw", () => {
+  const html = passesMarkup(passesRead());
+  assert.match(html, /id="passes"/, 'the Factory links to it by its anchor');
+  const buckets = [...html.matchAll(/data-bucket="([^"]+)" data-count="(\d+)"/g)].map((m) => [m[1], Number(m[2])]);
+  assert.equal(buckets.length, 10, html);
+  assert.deepEqual(
+    buckets.filter(([, n]) => n),
+    [
+      ['10', 1],
+      ['50', 1],
+      ['over', 1],
+    ],
+  );
+  assert.match(html, /title="&gt; 5000 ms: 1 pass"/, 'the open bucket names its end on hover');
+  assert.deepEqual(
+    [...html.matchAll(/data-part="([a-z]+)"/g)].map((m) => m[1]),
+    ['git', 'records'],
+  );
+  assert.match(html, /data-part="records"[^]*?1\.00 ms <span[^>]*>&lt; 1%</);
+  assert.deepEqual(
+    [...html.matchAll(/data-fact="([a-z]+)"/g)].map((m) => m[1]),
+    ['median', 'slowest', 'reads', 'runs', 'tasks', 'queued', 'admitted'],
+  );
+  assert.match(html, /data-fact="slowest"[^]*?<dd[^>]*>6000 ms</);
+  assert.match(html, /data-fact="runs"[^]*?<dd[^>]*>43</);
+  assert.match(html, /the last 3 the daemon kept, since /);
+});
+
+test("the tick's pass with none kept says so, and draws no column", () => {
+  const html = passesMarkup(passesRead({ recent: [], parts: [], summary: null }));
+  assert.match(html, /data-passes-none[^>]*>No pass is kept yet/);
+  assert.doesNotMatch(html, /data-bucket|data-part|data-fact/);
 });

@@ -28,6 +28,7 @@ import {
   idle,
   QUIET_MS,
   Refused,
+  WAIT_MS,
   watch,
 } from './checks.ts';
 
@@ -583,10 +584,13 @@ test('idle lets go of the requests a page left behind when it reloaded or naviga
   await idle(page, 3_000);
 
   const from = performance.now();
+  const slow = page.waitForRequest((r) => new URL(r.url()).search === '?ms=1200', { timeout: WAIT_MS });
   await page.evaluate(() => {
     void fetch('/api/slow?ms=1200');
     history.pushState({}, '', '/elsewhere');
   });
+  await slow;
+  await page.waitForURL(`${origin}/elsewhere`, { timeout: WAIT_MS });
   await idle(page, 5_000);
   assert.ok(
     performance.now() - from >= 1_200,

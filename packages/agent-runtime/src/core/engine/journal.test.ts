@@ -539,6 +539,32 @@ test('the skills an end names are read back as written, an empty list kept; a li
   assert.ok(error.message.includes('entry 2 is a `ended` event, and its `skills` is "look"'), error.message);
 });
 
+test('the files an end names are read back as written, an empty list kept; a list of anything but paths fails the read', async () => {
+  const end = (attempt: number, files: unknown) => ({
+    kind: 'ended',
+    at: '2026-09-24T00:00:01Z',
+    attempt,
+    sessionId: 's',
+    observed: 'done',
+    reason: 'harness',
+    files,
+  });
+  const dir = legacyStore({ 't-files': [TODAY, end(1, []), end(2, ['apps/web/a.tsx'])] });
+  const read = await run(
+    dir,
+    Effect.flatMap(Journal, (j) => j.read('t-files')),
+  );
+  assert.deepEqual(
+    read.map((e) => (e.kind === 'ended' ? e.files : undefined)),
+    [undefined, [], ['apps/web/a.tsx']],
+  );
+  const error = await failureOf(
+    legacyStore({ 't-bad': [TODAY, end(1, 'b.ts')] }),
+    Effect.flatMap(Journal, (j) => j.read('t-bad')),
+  );
+  assert.ok(error.message.includes('entry 2 is a `ended` event, and its `files` is "b.ts"'), error.message);
+});
+
 test('a harness argument of the wrong type is refused under config and beside it, where a journal from before config put it', async () => {
   for (const filed of [
     { ...TODAY, config: { tools: 'Read' } },

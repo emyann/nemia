@@ -14,7 +14,7 @@ const CARD = 'queued-on-it-e2e';
 export default {
   /**
    * A workflow of yours a queued card still needs is not removed: the api answers 409 in the package's words, naming the card and the
-   * command that takes it back, and the card on the board shows them verbatim, with the folder left whole on the disk. Its one refusal is
+   * command that takes it back, and the workflow's page on the board shows them verbatim, with the folder left whole on the disk. Its one refusal is
    * the point, so its page counts exactly it; the folder and the card are written by the page and taken back after.
    */
   name: 'workflow-remove-refused',
@@ -28,9 +28,9 @@ export default {
       fs.writeFileSync(path.join(dir, 'plan.md'), '---\nharness: claude\n---\nWrite PLAN.md.\n');
       fs.writeFileSync(card, `---\nworkflow: ${dir}\nqueued: 2026-10-01T00:00:00.000Z\n---\nAn idea queued on it.\n`);
       const { problems } = watch(refused);
-      await refused.goto(page.url(), { waitUntil: 'load' });
+      await refused.goto(new URL(`/workflows/yours/${NEEDED}`, page.url()).href, { waitUntil: 'load' });
       await idle(refused);
-      const section = refused.locator(`section[aria-label="Workflow ${NEEDED}"]`);
+      const section = refused.locator(`article[aria-label="Workflow ${NEEDED}"]`);
       await section.getByRole('button', { name: 'Remove…' }).click();
       const [answered] = await Promise.all([
         refused.waitForResponse(

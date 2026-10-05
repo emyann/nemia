@@ -969,6 +969,8 @@ export const WORKFLOWS = {
   good: {
     name: 'dev',
     description: 'Implement what was asked, then a second engineer reviews it, three rounds at most.',
+    /** The README's paragraph past the description: on the workflow's page, which shows the README whole, and not on its card. */
+    more: 'A second paragraph, which only its own page shows.',
     steps: ['implement', 'review'],
     runsOn: 'claude · opus',
     /** Implement's agent, which gives it its harness and model: its node names it before them, and its step's page says what it can do. */
@@ -1071,7 +1073,7 @@ export const AGENTS = {
 export function seedWorkflows(repo: string, root: string): void {
   const { good, broken, yours } = WORKFLOWS;
   const dev = path.join(repo, 'workflows', good.name);
-  write(path.join(dev, 'README.md'), `# ${good.name}\n\n${good.description}\n\nA second paragraph, which the page does not show.\n`);
+  write(path.join(dev, 'README.md'), `# ${good.name}\n\n${good.description}\n\n${good.more}\n`);
   write(
     path.join(repo, 'workflows', 'agents', `${good.agent.name}.md`),
     `---\nrole: ${good.agent.role}\nskills: ${good.agent.skill.id}\nharness: claude\nmodel: opus\n---\n${good.agent.body}`,

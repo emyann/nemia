@@ -55,7 +55,7 @@ function WorkflowPage() {
   const open = building && buildable;
 
   return (
-    <article className="space-y-6">
+    <article aria-label={`Workflow ${workflow.name}`} className="space-y-6">
       <BackToWorkflows />
       <WorkflowHeader
         workflow={workflow}

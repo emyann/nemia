@@ -20,9 +20,9 @@ const LONG = {
     'Keep the After list inside its card however long a title runs, apps/web/src/components/StartRun.tsx/AfterPicker/rows/each-title-read-whole, and say every word of it',
 };
 
-/** The rows of the dev card's After list, and the long run's. */
+/** The rows of the After list on dev's page, and the long run's. */
 const rowsOf = (page: Page) => {
-  const card = page.locator(`section[aria-label="Workflow ${WORKFLOWS.good.name}"]`);
+  const card = page.locator(`article[aria-label="Workflow ${WORKFLOWS.good.name}"]`);
   const row = card.locator(`ul[aria-label="Runs to wait on"] li[data-run="${LONG.id}"]`);
   return { card, row, title: row.locator('[data-run-title]') };
 };
@@ -43,11 +43,11 @@ async function expectWhole(page: Page, what: string): Promise<void> {
 export default {
   /**
    * The start form's After list with a run on the repository whose title runs longer than a row, a path in it breaking nowhere: on a wide
-   * screen and on a phone's, its row stays inside the workflow's card and the title wraps, read whole. The run is written beside the seed
+   * screen and on a phone's, its row stays inside the workflow's page and the title wraps, read whole. The run is written beside the seed
    * as a copy of the diamond's top and taken back after.
    */
   name: 'after-long-title',
-  route: '/workflows',
+  route: `/workflows/repo/${WORKFLOWS.good.name}`,
   expect: async (page) => {
     const runs = path.join(store!, 'runs');
     const record = JSON.parse(fs.readFileSync(path.join(runs, `${DIAMOND.top.id}.json`), 'utf8')) as { brief: string };

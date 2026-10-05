@@ -498,6 +498,7 @@ test("the run files a signed step's check itself: the frozen command, in its wor
   assert.deepEqual(
     { harness: spec.harness, cwd: spec.cwd, deadlineSeconds: spec.deadlineSeconds, closeoutSchema: spec.closeoutSchema },
     { harness: 'check', cwd: run.repo, deadlineSeconds: 1200, closeoutSchema: undefined },
+    "a step's check that does not land the run keeps the shorter bound on a hang (`CHECK_DEADLINE_SECONDS`), not a landing's",
   );
   assert.equal('maxAttempts' in spec || 'resume' in spec, false, 'one attempt, as every task is: the runtime refuses a count or a policy');
   assert.equal(spec.brief, 'npm test && npm run typecheck', 'the brief is the check line, for a person reading the task');

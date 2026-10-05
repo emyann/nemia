@@ -8,7 +8,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { ClaudeFlags, CodexArgs, Engine, TaskView } from '../runtime-client.ts';
-import { CHECK_DEADLINE_SECONDS, CHECK_NICENESS, checkArgv, type CheckEnv, type CheckHanded, type Verdict } from '../check/check.ts';
+import {
+  CHECK_DEADLINE_SECONDS,
+  CHECK_NICENESS,
+  checkArgv,
+  LANDING_CHECK_DEADLINE_SECONDS,
+  type CheckEnv,
+  type CheckHanded,
+  type Verdict,
+} from '../check/check.ts';
 import { isRemoteHarness, type Workflow } from '../workflow.ts';
 import { resultSteps } from '../branches/branches.ts';
 import { holdsOpen } from '../gate/gate.ts';
@@ -515,8 +523,8 @@ export async function fileChecks(f: Filing, names: readonly string[]): Promise<s
 }
 
 /**
- * File a step's check where the engine does not hold it, on the `check` harness, with the command the run froze and a deadline, and put it
- * on the record: an ending's installs first what the staged merge's lockfile asks for (`checkoutParts`), and says so.
+ * File a step's check where the engine does not hold it, on the `check` harness, with the command the run froze and a deadline, a landing's
+ * its own, and put it on the record: an ending's installs first what the staged merge's lockfile asks for (`checkoutParts`), and says so.
  */
 async function fileCheck(f: Filing, name: string): Promise<void> {
   const { e, run } = f;
@@ -527,7 +535,8 @@ async function fileCheck(f: Filing, name: string): Promise<void> {
     fs.mkdirSync(path.dirname(checkCloseout(taskId)), { recursive: true });
     const files = artifactsDir(run, name);
     fs.mkdirSync(files, { recursive: true });
-    const install = isGitRun(run) && landsOnCheck(step, run) ? (checkoutParts(workspace) ?? undefined) : undefined;
+    const lands = isGitRun(run) && landsOnCheck(step, run);
+    const install = lands ? (checkoutParts(workspace) ?? undefined) : undefined;
     const closeout = f.reads.signedOff(name);
     if (install)
       f.notes.push(
@@ -547,7 +556,7 @@ async function fileCheck(f: Filing, name: string): Promise<void> {
       priority: MOMENTUM,
       brief: step.check!,
       cwd: workspace,
-      deadlineSeconds: CHECK_DEADLINE_SECONDS,
+      deadlineSeconds: lands ? LANDING_CHECK_DEADLINE_SECONDS : CHECK_DEADLINE_SECONDS,
       config: { command: checkArgv(step.check!, install !== undefined), env, niceness: CHECK_NICENESS },
     });
   }

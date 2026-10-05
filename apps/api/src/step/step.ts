@@ -1,0 +1,206 @@
+/**
+ * A workflow step's page, for the board (`GET /api/workflows/:from/:name/:step`): the step as written and as the loader read it, and what a
+ * run of it would be told now, by layer, with where each layer lives — the agent the request's factory hires into it, the factories that
+ * hire into it, where each of its skills is found, and its recent runs. And the address of a run's workflow page (`workflowPageOf`), which a
+ * run's page links back to: the board builds no address from a store path.
+ *
+ * Everything here is read now, from the files: a run freezes its workflow and its hires as it starts, and what a run was told is its own
+ * page's (`toldOf` in detail/told.ts).
+ */
+import path from 'node:path';
+import { Hono } from 'hono';
+import {
+  COMMANDS,
+  DEFAULT_FACTORY,
+  fillsOf,
+  Missing,
+  readFactories,
+  runStore,
+  runWith,
+  skillsFor,
+  unattachedRefusal,
+} from 'agent-orchestrator';
+import type { FactoryListing } from 'agent-orchestrator';
+import { toldLayers, type Run, type ToldLayers } from 'agent-orchestrator/run';
+import type { AgentSkill, SkillsFound, Workflow } from 'agent-orchestrator/workflow';
+import { sourceOf, type SkillSource } from '../agents/skills.ts';
+import { type ApiEnv, served } from '../layer.ts';
+import { agentSkillsOf, folderOf, keyRows, placesOf, stepSourceOf, type KeyRow, type WorkflowSource } from '../workflows/workflows.ts';
+
+/** How many of a step's runs its page lists, newest first. */
+export const RECENT_RUNS = 5;
+
+/**
+ * Where a workflow's page is on the board, and a step's page under it: where the workflow is read from, its name, and the place it is read
+ * in — the factory, null for the default, and the repository, null for the api's own or the factory's only one.
+ */
+export type WorkflowPageAddress = { from: WorkflowSource; workflow: string; factory: string | null; repo: string | null };
+
+/** A factory that hires an agent into a step: the factory's name and the agent's. */
+export type HiredIn = { factory: string; agent: string };
+
+/** A skill a step's layers give, and where it is found: yours, the repository's or shipped; null where no place the board pages has it. */
+export type SkillFrom = { name: string; from: SkillSource | null };
+
+/** One of a step's recent runs: its id, its brief, when it was made, its factory (null for the default), and whether the step was filed. */
+export type RecentRun = { id: string; brief: string; createdAt: string; factory: string | null; filed: boolean };
+
+/**
+ * What a step's page shows: which workflow and step, its body, the file as written — frontmatter and all — and every key a step may set, in
+ * the package's order, with its value as the loader read it. Read so, `after` names the step `resume:` implies too, and a loop's `rounds`
+ * is the default where the file sets none: the file as written says which. `agentSkills` is what the agent attached to the step says it can
+ * do, generated from its skills and shown here read-only, as on the agent's page; null on a step with no agent, or one with no card.
+ *
+ * Read now, in the request's factory (`factory`, null for the default): `layers`, what a run of it would be told, by layer, with no task
+ * (`toldLayers`); `hired`, the agent the factory hires into it, which `layers.agent` then names; `hiredIn`, with no factory named, the
+ * factories that hire into it (`hiredInOf`); `skillsFrom`, where each skill of its layers is found; and `recentRuns`, its newest runs
+ * (`recentRunsOf`).
+ */
+export type WorkflowStepPage = {
+  workflow: string;
+  from: WorkflowSource;
+  dir: string;
+  step: string;
+  body: string;
+  source: string;
+  keys: KeyRow[];
+  agentSkills: AgentSkill[] | null;
+  factory: string | null;
+  layers: ToldLayers;
+  hired: string | null;
+  hiredIn: HiredIn[];
+  skillsFrom: SkillFrom[];
+  recentRuns: RecentRun[];
+};
+
+/** The factory a record or a summary names, null for the default factory, whether it names `default` or none. */
+const factoryNamed = (factory: string | null | undefined): string | null => (factory && factory !== DEFAULT_FACTORY ? factory : null);
+
+/**
+ * The address of the page of the workflow `run` was started from, on the api serving `served` with the store at `home`, or null where the
+ * board pages none: a folder of yours, in the run's factory on its repository; one of the run's repository, in its factory, or on the api's
+ * own repository in the default factory; and no other folder — one given by path, a try's, or another repository's in the default factory.
+ */
+export function workflowPageOf(
+  run: { workflowDir: string; repo?: string | null; factory?: string | null },
+  served: string,
+  home: string,
+): WorkflowPageAddress | null {
+  const dir = path.resolve(run.workflowDir);
+  const workflow = path.basename(dir);
+  const parent = path.dirname(dir);
+  const factory = factoryNamed(run.factory);
+  const repo = run.repo ? path.resolve(run.repo) : null;
+  if (parent === path.join(path.resolve(home), 'workflows')) return { from: 'yours', workflow, factory, repo: factory ? repo : null };
+  if (repo === null || parent !== path.join(repo, 'workflows')) return null;
+  if (factory) return { from: 'repo', workflow, factory, repo };
+  return repo === path.resolve(served) ? { from: 'repo', workflow, factory: null, repo: null } : null;
+}
+
+/**
+ * The newest runs of the workflow folder `dir` that hold the step `step`, at most `RECENT_RUNS`, newest first: of every factory, or only
+ * those of `factory` when one is named.
+ */
+export function recentRunsOf(runs: readonly Run[], dir: string, step: string, factory: string | null): RecentRun[] {
+  const folder = path.resolve(dir);
+  return runs
+    .filter((run) => path.resolve(run.workflowDir) === folder)
+    .filter((run) => step in run.steps || (run.workflow ?? []).some((s) => s.name === step))
+    .filter((run) => factory === null || factoryNamed(run.factory) === factory)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, RECENT_RUNS)
+    .map((run) => ({
+      id: run.id,
+      brief: run.brief,
+      createdAt: run.createdAt,
+      factory: factoryNamed(run.factory),
+      filed: (run.steps[step]?.taskId ?? null) !== null,
+    }));
+}
+
+/**
+ * The factories in `factories` that hire an agent into the step `step` of `workflow`, each with the agent: those that read, attach the
+ * workflow and hire into the step — for a workflow of the repository's (`from`), only those working on `repo`, which reads it.
+ */
+export function hiredInOf(
+  factories: readonly FactoryListing[],
+  workflow: string,
+  step: string,
+  from: WorkflowSource,
+  repo: string,
+): HiredIn[] {
+  return factories.flatMap((factory) => {
+    if ('error' in factory || !factory.workflows.includes(workflow)) return [];
+    if (from === 'repo' && !factory.repos.some((r) => path.resolve(r) === path.resolve(repo))) return [];
+    const agent = fillsOf(factory.hires, workflow)[step];
+    return agent === undefined ? [] : [{ factory: factory.name, agent }];
+  });
+}
+
+/** Each skill `layers` gives, the agent's then the step's, once each, with where `found` has it (`sourceOf`). */
+export function skillsFromOf(layers: ToldLayers, found: SkillsFound, repo: string, home: string): SkillFrom[] {
+  return [...new Set([...layers.agentSkills, ...layers.addedSkills])].map((name) => {
+    const at = found.at.get(name);
+    return { name, from: typeof at === 'string' ? sourceOf(at, repo, home) : null };
+  });
+}
+
+/** The table's entry a step's page is read through, served on the api alone. */
+const STEP = COMMANDS.find((c) => c.name === 'workflows step')!;
+
+/**
+ * A step's page.
+ *
+ * - `GET /api/workflows/:from/:name/:step` — one step of one folder, for its page (`WorkflowStepPage`): found among the folders the sources
+ *   have and the steps the loader read, never joined from what was sent — so no name in the path reaches a file outside the folder — or
+ *   why not, in the words a start would use. 400 for a `from` that is neither `repo` nor `yours`; 404 or 409 as `folderOf` says; 422 for
+ *   the loader's refusal, word for word (an `Invalid`, answered by `app.onError`), with which the folder is listed and has no step to show;
+ *   404 for a step the folder does not have. In a factory, the step is read with its hires, and a workflow the factory has not attached
+ *   is a 404 in the package's words (`unattachedRefusal`, a `Missing`).
+ *   The step's resolved agent carries its keys and words, not what its card says it can do: `agentSkills` is generated from the agent's
+ *   skills, found where the load found them (`cardSkills`) — the card's A2A skills, one for each Claude Code skill its `skills:` gives a
+ *   session, or one made from its description — and null for a card the package refuses, whose words the agent's page shows.
+ *   What a run would be told is read now, never frozen: `layers` as a start would tell them with no task, the agent the factory hires into
+ *   the step (`hired`), with no factory the factories that hire into it (`hiredIn`), where each skill is found (`skillsFrom`), and the
+ *   newest runs of the folder that hold the step, in the factory where one is named (`recentRuns`).
+ */
+export const step = new Hono<ApiEnv>().get('/api/workflows/:from/:name/:step', (c) =>
+  served(c, async ({ e, repo, home, factory }) => {
+    const { from, name, step: asked } = c.req.param();
+    if (from !== 'repo' && from !== 'yours') {
+      return c.json(
+        {
+          error: `A step's page names where its workflow is read from: \`repo\` or \`yours\`, as GET /api/workflows lists each workflow's \`from\` — /api/workflows/repo/${name}/${asked}, say. This request's was '${from}'.`,
+        },
+        400,
+      );
+    }
+    const unattached = factory && unattachedRefusal(factory, name);
+    if (unattached) throw new Missing({ message: unattached });
+    const folder = folderOf(name, from, repo, home);
+    if ('status' in folder) return c.json({ error: folder.error }, folder.status);
+    const args = { from, name, step: asked, dir: folder.dir, repo, ...(factory && { factory: factory.name }) };
+    const { step: found, steps } = (await runWith(e, STEP.handler(args, undefined, home))) as { step: Workflow | null; steps: string[] };
+    if (!found) {
+      return c.json({ error: `No step '${asked}' in workflow ${name} (${folder.dir}). Its steps are: ${steps.join(', ')}.` }, 404);
+    }
+    const places = placesOf(repo, home);
+    const layers = toldLayers(found, null);
+    return c.json({
+      workflow: name,
+      from,
+      dir: folder.dir,
+      step: found.name,
+      body: found.body,
+      source: stepSourceOf(folder.dir, found.name),
+      keys: keyRows(found),
+      agentSkills: agentSkillsOf(found, folder.dir, places),
+      factory: factory?.name ?? null,
+      layers,
+      hired: factory ? (fillsOf(factory.hires, name)[found.name] ?? null) : null,
+      hiredIn: factory ? [] : hiredInOf(readFactories(), name, found.name, from, repo),
+      skillsFrom: skillsFromOf(layers, skillsFor(folder.dir, places), repo, home),
+      recentRuns: recentRunsOf(runStore.runs.list(), folder.dir, found.name, factory?.name ?? null),
+    } satisfies WorkflowStepPage);
+  }),
+);

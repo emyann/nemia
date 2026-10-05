@@ -95,7 +95,7 @@ test("the header names a page by its section first — Floor on a factory's floo
   assert.equal(sectionOf('/machinesx'), undefined);
 });
 
-test("the picked factory is read from the address alone: the name of a factory's floor or settings, else a section page's ?factory=, else none", () => {
+test("the picked factory is read from the address alone: the name of a factory's floor or settings, else the ?factory= of a section's page, a workflow's or a step's, else none", () => {
   assert.equal(pickedOf('/factories/nemia', {}), 'nemia');
   assert.equal(pickedOf('/factories/nemia/settings', {}), 'nemia', "a factory's settings pick it, as its floor does");
   assert.equal(pickedOf('/factories/nemia/other', {}), undefined, "refused: no other page under a floor is the factory's own");

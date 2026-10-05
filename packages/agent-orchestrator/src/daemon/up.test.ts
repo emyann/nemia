@@ -74,3 +74,22 @@ test('passSaid is the words alone, the lines logPass logs, read with no logger',
     ['r-1  review: waits on implement', 'r-1  filed implement', 'r-1  checking review'],
   );
 });
+
+test('a forgetting line is said once while its words stand, and again once they change, with its warning', async () => {
+  const forgetting = (text: string, warn?: true) => ({ runs: [], forgetting: [{ text, ...(warn ? { warn } : {}) }] }) as never as Pass;
+  const waiting = 'r-9 (removed): the engine forgot 1 task of it, and 1 waits to settle';
+  const first = await logged(forgetting(waiting));
+  assert.deepEqual(
+    first.logs.map((l) => [l.level, l.text]),
+    [['Info', waiting]],
+  );
+  const again = await logged(forgetting(waiting), first.said);
+  assert.deepEqual(again.logs, [], 'said once while its words stand');
+  const refused = 'r-9 (removed): the engine refused to forget r-9-implement';
+  const changed = await logged(forgetting(refused, true), again.said);
+  assert.deepEqual(
+    changed.logs.map((l) => [l.level, l.text]),
+    [['Warn', refused]],
+    'said again once they change',
+  );
+});

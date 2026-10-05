@@ -47,6 +47,7 @@ export {
   SayRefused,
   SayUnsent,
   QuotaRefused,
+  refusalWords,
 } from './service/index.ts';
 export type { EngineShape } from './service/index.ts';
 export { promiseEngine } from './facade/engine.ts';

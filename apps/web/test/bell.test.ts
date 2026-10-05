@@ -33,6 +33,7 @@ const run = (id: string, extra: Partial<RunSummary> = {}, steps: readonly string
     branch: null,
     status: 'waiting',
     note: null,
+    roundDue: false,
     needs: null,
     blockedByHarness: false,
     waitingFor: null,

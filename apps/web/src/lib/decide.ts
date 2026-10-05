@@ -109,15 +109,8 @@ export function changeOf(touched: Touched | undefined, file: string): { added: n
 }
 
 /**
- * The looping step an `accept` command of this run accepts — `nemia accept <run> <step> --message "<why>"`, the bare command of
- * `nemia decide`'s offer, as the api hands it over — or null for any other command, or one of another run. The board presses that one
- * itself.
+ * The looping step an `accept` command accepts, as the api names it beside the command (`step`), or null for any other command. The board
+ * presses that one itself.
  */
-export function acceptStepOf(command: Pick<DecideCommand, 'label' | 'command'>, runId: string): string | null {
-  if (command.label !== 'accept') return null;
-  const prefix = `nemia accept ${runId} `;
-  const suffix = ' --message "<why>"';
-  if (!command.command.startsWith(prefix) || !command.command.endsWith(suffix)) return null;
-  const step = command.command.slice(prefix.length, -suffix.length);
-  return /^\S+$/.test(step) ? step : null;
-}
+export const acceptStepOf = (command: Pick<DecideCommand, 'label' | 'step'>): string | null =>
+  command.label === 'accept' ? command.step : null;

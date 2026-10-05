@@ -88,6 +88,7 @@ export type DecideCommand = {
   label: 'ship it' | 'drop it' | 'read it' | 'once more' | 'accept' | 'approve' | 'send back' | 'forget it';
   command: string;
   said: string | null;
+  step: string | null;
 };
 
 /** Decodes a `DecideCommand`. */
@@ -95,6 +96,7 @@ const DecideCommandSchema = Schema.Struct({
   label: Schema.Literals(['ship it', 'drop it', 'read it', 'once more', 'accept', 'approve', 'send back', 'forget it']),
   command: Schema.String,
   said: Schema.NullOr(Schema.String),
+  step: Schema.NullOr(Schema.String),
 }) satisfies Schema.Schema<DecideCommand>;
 
 /**

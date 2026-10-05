@@ -30,6 +30,7 @@ export function unstartedRun(workflow: WorkflowListing): RunDetail {
   return {
     id: `${workflow.from}:${workflow.name}`,
     brief: '',
+    decide: '',
     repo: '',
     place: workflow.folderTeam ? 'folder' : 'git',
     work: null,
@@ -95,6 +96,8 @@ function unstartedStep(name: string): RunDetail['steps'][number] {
     branch: null,
     status: 'waiting',
     note: null,
+    roundDue: false,
+    commands: { approve: '', retry: '', say: '' },
     needs: null,
     blockedByHarness: false,
     waitingFor: null,

@@ -224,6 +224,8 @@ const StepFiledSchema = Schema.Struct({
 export type RunDetail = {
   id: string;
   brief: string;
+  /** The line that prints what there is to decide on the run. */
+  decide: string;
   /** A git run's repository, base commit, base branch and whether it cut worktrees; each null on a folder run (`place`), which has none. */
   repo: string | null;
   place: PlaceKind;
@@ -300,6 +302,10 @@ export type RunDetail = {
     status: string;
     /** As on `RunSummary`. */
     note: string | null;
+    /** As on `RunSummary`. */
+    roundDue: boolean;
+    /** The lines a person types for what the step's controls do: its approval, a try in its session, and words said to it. */
+    commands: { approve: string; retry: string; say: string };
     needs: string | null;
     blockedByHarness: boolean;
     /** As on `RunSummary`: what the harness says the session waits for, and what a person does about it. */
@@ -445,6 +451,8 @@ const DetailStepSchema = Schema.Struct({
   branch: Schema.NullOr(Schema.String),
   status: Schema.String,
   note: Schema.NullOr(Schema.String),
+  roundDue: Schema.Boolean,
+  commands: Schema.Struct({ approve: Schema.String, retry: Schema.String, say: Schema.String }),
   ...StepNeedsFields,
   gate: Schema.NullOr(StepGateSchema),
   accepted: Schema.NullOr(StepAcceptanceSchema),
@@ -470,6 +478,7 @@ const DetailStepSchema = Schema.Struct({
 const RunDetailSchema = Schema.Struct({
   id: Schema.String,
   brief: Schema.String,
+  decide: Schema.String,
   repo: Schema.NullOr(Schema.String),
   place: PlaceKindSchema,
   work: Schema.NullOr(Schema.String),

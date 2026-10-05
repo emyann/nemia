@@ -542,6 +542,11 @@ const factoryOn = (name: string, repos: string[], error: string | null = null): 
   workflows: name === 'default' ? null : ['good'],
   hires: {},
   error,
+  commands: {
+    attach: `nemia factory attach ${name} <workflow>`,
+    rm: `nemia factory rm ${name}`,
+    add: `nemia factory add ${name} --repo <path>`,
+  },
 });
 const FACTORIES = [factoryOn('default', ['/code/app']), factoryOn('solo', ['/r/a']), factoryOn('pair', ['/r/a', '/r/b'])];
 

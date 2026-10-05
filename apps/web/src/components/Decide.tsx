@@ -766,7 +766,7 @@ export function Commands({ runId, commands }: { runId: string; commands: readonl
       {commands.length ? (
         <ul className="space-y-2">
           {commands.map((c) => {
-            const accepts = acceptStepOf(c, runId);
+            const accepts = acceptStepOf(c);
             return accepts ? (
               <AcceptCommand key={`${c.label} ${c.command}`} runId={runId} step={accepts} command={c} />
             ) : (

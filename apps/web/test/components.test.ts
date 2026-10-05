@@ -124,6 +124,7 @@ function runWith(note: string | null): RunDetail {
   return {
     id: 'r-1',
     brief: 'Go round again',
+    decide: 'nemia decide r-1',
     repo: '/code/app',
     place: 'git',
     work: null,
@@ -168,6 +169,8 @@ function runWith(note: string | null): RunDetail {
         branch: 'wf/r-1/implement',
         status: 'rounds exhausted',
         note,
+        roundDue: false,
+        commands: { approve: 'nemia approve r-1 review', retry: 'nemia retry r-1 review', say: 'nemia say r-1 review' },
         needs: null,
         blockedByHarness: false,
         waitingFor: null,
@@ -1379,9 +1382,10 @@ test('the Decide section copies its commands and runs none: a button per command
       label: 'once more',
       command: 'wf retry r-1 implement',
       said: 'implement: succeeded · BLOCKED. Continue its session, told what happened:  wf retry r-1 implement  (--fresh, or --model <m>, for a new session)',
+      step: 'implement',
     },
-    { label: 'ship it', command: 'git -C /code/app merge --no-ff wf/r-1/implement', said: null },
-    { label: 'drop it', command: 'git -C /code/app branch -D wf/r-1/implement', said: null },
+    { label: 'ship it', command: 'git -C /code/app merge --no-ff wf/r-1/implement', said: null, step: null },
+    { label: 'drop it', command: 'git -C /code/app branch -D wf/r-1/implement', said: null, step: null },
   ] as const;
   const decision: Decidable = {
     standings: [],
@@ -2434,7 +2438,7 @@ test('the Decide section puts the answers first, before what there is to decide,
     total: UNMEASURED,
     cost: null,
     overBudget: null,
-    commands: [{ label: 'ship it', command: 'git -C /code/app merge --no-ff wf/r-1/implement', said: null }],
+    commands: [{ label: 'ship it', command: 'git -C /code/app merge --no-ff wf/r-1/implement', said: null, step: null }],
     awaiting: null,
   };
   const offers = createElement(
@@ -2467,11 +2471,12 @@ test("the Decide section's accept row takes a reason and presses it; every other
     overBudget: null,
     awaiting: null,
     commands: [
-      { label: 'once more', command: 'nemia round r-1 review', said: null },
+      { label: 'once more', command: 'nemia round r-1 review', said: null, step: 'review' },
       {
         label: 'accept',
         command: 'nemia accept r-1 review --message "<why>"',
         said: 'review: enough — go on with what is there:  nemia accept r-1 review --message "<why>"',
+        step: 'review',
       },
     ],
   };
@@ -3113,6 +3118,7 @@ test('the edges between cards are drawn as every edge is: from a run into each c
         branch: null,
         status: filed ? 'running (working)' : 'waiting',
         note: null,
+        roundDue: false,
         needs: null,
         blockedByHarness: false,
         waitingFor: null,
@@ -4110,6 +4116,7 @@ test('a hold is drawn between two cards as an --after edge is: from the run it i
         branch: null,
         status: 'awaiting approval',
         note: null,
+        roundDue: false,
         needs: null,
         blockedByHarness: false,
         waitingFor: null,
@@ -5400,6 +5407,11 @@ const filed = (name: string, extra: Partial<import('../src/lib/api.ts').Factory>
   workflows: ['build'],
   hires: {},
   error: null,
+  commands: {
+    attach: `nemia factory attach ${name} <workflow>`,
+    rm: `nemia factory rm ${name}`,
+    add: `nemia factory add ${name} --repo <path>`,
+  },
   ...extra,
 });
 

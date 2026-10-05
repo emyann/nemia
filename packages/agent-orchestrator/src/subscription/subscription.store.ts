@@ -1,7 +1,8 @@
 /**
  * The store's subscriptions on disk, under `$WF_ROOT/subscriptions/`: a person's file per subscription, `<name>.json`, put by
- * `nemia subscribe` and deleted by `nemia unsubscribe`, and the deliverer's beside it, `<name>.state.json`, written by the daemon alone
- * after each line it delivers or folds. A name holds no `.`, so no subscription is named after a deliverer's file.
+ * `nemia subscribe` and deleted by `nemia unsubscribe`, and the deliverer's beside it, `<name>.state.json`, written and removed by the
+ * daemon alone, after each line it delivers or folds and once the person's file is gone, stamped with the subscription it is for. A name
+ * holds no `.`, so no subscription is named after a deliverer's file.
  *
  * Beneath the controllers, beside `pause.store.ts`: it imports no store of runs.
  */
@@ -12,7 +13,7 @@ import { wfRoot } from '../config/config.store.ts';
 import { firstRefusal } from '../record/record.store.ts';
 import { countRead } from '../meter/tally.store.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
-import type { Delivery, Subscription } from './subscription.ts';
+import type { KeptDelivery, Subscription } from './subscription.ts';
 
 /** The store whose subscriptions these are, read once as the package loads, as `record.store.ts` reads its `HOME`. */
 const ROOT = wfRoot();
@@ -60,7 +61,12 @@ const InstantSchema = Schema.Struct({
 
 /** The deliverer's file as it writes it. */
 const DeliverySchema = Schema.StructWithRest(
-  Schema.Struct({ cursor: Bytes, digest: Schema.Array(FeedLineSchema), since: Schema.optionalKey(InstantSchema) }),
+  Schema.Struct({
+    of: Schema.Struct({ task: Schema.String, from: Bytes }),
+    cursor: Bytes,
+    digest: Schema.Array(FeedLineSchema),
+    since: Schema.optionalKey(InstantSchema),
+  }),
   Rest,
 );
 
@@ -133,8 +139,8 @@ export function listSubscriptions(said: (line: string) => void = sayOnce): Array
 export const listDeliveries = (): string[] => namesIn().deliveries;
 
 /**
- * Puts a subscription: writes its file, created only where none is, and drops a deliverer's file left from one of the same name, so it
- * starts from its own `from`. Refuses (`Conflict`) a name a subscription already has, naming `nemia unsubscribe`.
+ * Puts a subscription: writes its file, created only where none is. Refuses (`Conflict`) a name a subscription already has, naming
+ * `nemia unsubscribe`.
  */
 export function putSubscription(name: string, subscription: Subscription): void {
   fs.mkdirSync(subscriptionsDir(), { recursive: true });
@@ -146,10 +152,9 @@ export function putSubscription(name: string, subscription: Subscription): void 
       message: `a subscription is already named ${name}: nemia unsubscribe ${name} removes it first, or name this one otherwise.`,
     });
   }
-  dropDelivery(name);
 }
 
-/** Removes a subscription and where its deliverer was with it. Refuses (`Missing`) a name no subscription has. */
+/** Removes a subscription; its deliverer stops and drops its own file. Refuses (`Missing`) a name no subscription has. */
 export function dropSubscription(name: string): void {
   try {
     fs.unlinkSync(subscriptionFile(name));
@@ -157,14 +162,13 @@ export function dropSubscription(name: string): void {
     if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
     throw new Missing({ message: `no subscription is named ${name}: nemia subscribe ${name} <task> puts one.` });
   }
-  dropDelivery(name);
 }
 
 /**
  * Where the deliverer is with a subscription, or undefined where it has not begun. A file that does not read is said once on stderr and
  * read as not begun: the subscription starts again from its `from`.
  */
-export function readDelivery(name: string, said: (line: string) => void = sayOnce): Delivery | undefined {
+export function readDelivery(name: string, said: (line: string) => void = sayOnce): KeptDelivery | undefined {
   const text = textOf(deliveryFile(name));
   if (text === undefined) return undefined;
   const read = decoded(DeliverySchema, text);
@@ -172,12 +176,12 @@ export function readDelivery(name: string, said: (line: string) => void = sayOnc
     said(`nemia: the delivery ${deliveryFile(name)} ${read.error}: the subscription starts again from where it was asked for.`);
     return undefined;
   }
-  const { cursor, digest, since } = read.value;
-  return { cursor, digest: [...digest], ...(since ? { since } : {}) };
+  const { of, cursor, digest, since } = read.value;
+  return { of: { task: of.task, from: of.from }, cursor, digest: [...digest], ...(since ? { since } : {}) };
 }
 
 /** Writes where the deliverer is with a subscription, whole, through a hidden file renamed over it, so a reader never reads half of it. */
-export function writeDelivery(name: string, delivery: Delivery): void {
+export function writeDelivery(name: string, delivery: KeptDelivery): void {
   fs.mkdirSync(subscriptionsDir(), { recursive: true });
   const hidden = path.join(subscriptionsDir(), `.${name}${STATE}.${process.pid}`);
   fs.writeFileSync(hidden, `${JSON.stringify(delivery)}\n`);

@@ -47,6 +47,7 @@ test('a subscription put is listed by its name, and its name taken again is refu
 test("the deliverer's file is written whole and read back, the deliverer's own files listed apart from the subscriptions", () => {
   putSubscription('round', SUB);
   const delivery = {
+    of: { task: SUB.task, from: SUB.from },
     cursor: 300,
     digest: [{ at: '2026-10-05T12:00:00.000Z', run: 'r-1', step: 'plan', word: 'running' }],
     since: { at: 1_000, mono: { boot: 'b', ms: 5 } },
@@ -63,12 +64,13 @@ test("the deliverer's file is written whole and read back, the deliverer's own f
   dropSubscription('round');
 });
 
-test("an unsubscribe removes the subscription and the deliverer's file; a name with none is refused, naming nemia subscribe", () => {
+test("an unsubscribe removes the person's file, not the deliverer's; a name with none is refused, naming nemia subscribe", () => {
   putSubscription('gone', SUB);
-  writeDelivery('gone', { cursor: 10, digest: [] });
+  writeDelivery('gone', { of: { task: SUB.task, from: SUB.from }, cursor: 10, digest: [] });
   dropSubscription('gone');
   assert.equal(fs.existsSync(subscriptionFile('gone')), false);
-  assert.equal(fs.existsSync(deliveryFile('gone')), false);
+  assert.equal(fs.existsSync(deliveryFile('gone')), true, "the deliverer's file is its own to drop");
+  fs.rmSync(deliveryFile('gone'));
   assert.throws(
     () => dropSubscription('gone'),
     (err: Error & { exitCode?: number }) => {
@@ -79,11 +81,13 @@ test("an unsubscribe removes the subscription and the deliverer's file; a name w
   );
 });
 
-test("a subscription put again under a name starts afresh: the deliverer's file left from the last is dropped", () => {
-  writeDelivery('again', { cursor: 900, digest: [] });
+test("a subscription put again under a name leaves the deliverer's file left from the last, stamped with the last one", () => {
+  const left = { of: { task: 'another', from: 0 }, cursor: 900, digest: [] };
+  writeDelivery('again', left);
   putSubscription('again', SUB);
-  assert.equal(readDelivery('again'), undefined);
+  assert.deepEqual(readDelivery('again'), left);
   dropSubscription('again');
+  fs.rmSync(deliveryFile('again'));
 });
 
 test('a subscription that does not read is left out and said, naming its file and its first wrong field; the others are listed', () => {
@@ -111,7 +115,7 @@ test('a subscription that does not read is left out and said, naming its file an
 
 test("a deliverer's file that does not read is said and read as not begun, so the subscription starts again from its from", () => {
   fs.mkdirSync(store.subscriptionsDir(), { recursive: true });
-  fs.writeFileSync(deliveryFile('odd'), JSON.stringify({ cursor: -1, digest: [] }));
+  fs.writeFileSync(deliveryFile('odd'), JSON.stringify({ of: { task: 'nemia', from: 0 }, cursor: -1, digest: [] }));
   const { said, say } = saying();
   assert.equal(readDelivery('odd', say), undefined);
   assert.match(said.join('\n'), /its cursor is -1/);

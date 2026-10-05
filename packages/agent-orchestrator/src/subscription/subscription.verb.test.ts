@@ -98,11 +98,11 @@ test('REFUSED: a name taken, a name that is none, an empty wake word and minutes
   await typed(UNSUBSCRIBE, ['taken']);
 });
 
-test('an unsubscribe removes the subscription and where its deliverer was; a name with none is refused, naming nemia subscribe', async () => {
+test("an unsubscribe removes the subscription, not its deliverer's file; a name with none is refused, naming nemia subscribe", async () => {
   await typed(SUBSCRIBE, ['gone', 'nemia']);
-  writeDelivery('gone', { cursor: 0, digest: [] });
+  writeDelivery('gone', { of: { task: 'nemia', from: 0 }, cursor: 0, digest: [] });
   assert.deepEqual(await typed(UNSUBSCRIBE, ['gone']), { name: 'gone' });
-  assert.equal(readDelivery('gone'), undefined);
+  assert.equal(readDelivery('gone')?.cursor, 0, "the deliverer's file is its own to drop");
   assert.deepEqual(listSubscriptions(), []);
   assert.match(await refusal(() => typed(UNSUBSCRIBE, ['gone'])), /^no subscription is named gone: nemia subscribe gone <task>/);
 });

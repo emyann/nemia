@@ -21,6 +21,18 @@ export type Subscription = { task: string; wake: string[]; digestEvery: number; 
  */
 export type Delivery = { cursor: number; digest: FeedLine[]; since?: Instant };
 
+/** The deliverer's file: where it is (`Delivery`), and the task and the `from` of the subscription it was written for (`of`). */
+export type KeptDelivery = Delivery & { of: { task: string; from: number } };
+
+/**
+ * Where the deliverer starts a subscription: where its file says, when the file was written for this subscription; else from its `from`,
+ * as a file left by another of the same name, a deliverer's that had not yet stopped, is none of its.
+ */
+export const resumedAt = (kept: KeptDelivery | undefined, sub: Subscription): Delivery =>
+  kept && kept.of.task === sub.task && kept.of.from === sub.from
+    ? { cursor: kept.cursor, digest: kept.digest, ...(kept.since ? { since: kept.since } : {}) }
+    : { cursor: sub.from, digest: [] };
+
 /**
  * The words that wake a subscriber when it names none: each word of the feed for a line that waits on a person. A step at its
  * gate (`awaiting approval`), a loop out of rounds (`rounds exhausted`), a session waiting on its harness's prompt (`needs-human`), a step

@@ -9,6 +9,7 @@ import {
   branchWord,
   CHECK_AFFECTING,
   COMMANDS,
+  type Collisions,
   type Decided,
   type StandingMerge,
   type DecideCommand,
@@ -46,7 +47,7 @@ export type Touched = { branch: string; radius: ReturnType<typeof touchedBy> };
  */
 export type Standing = BranchStanding & { said: string; stat: string | null; merge: StandingMerge | null };
 
-export type { StandingMerge };
+export type { Collisions, StandingMerge };
 
 /** One file of a branch's check-affecting diff: its unified diff, at most `DIFF_LINES` lines, and how many more it had. */
 export type DiffFile = { path: string; lines: string[]; cut: number };
@@ -101,6 +102,12 @@ export type Decidable = {
    * you. A run called off, or whose branches are on the base however they got there, is `nothing`, never this.
    */
   awaiting: { branches: string[]; direct: boolean } | null;
+  /**
+   * At an ending's decision — its gate, or its landing a check refused — whether each branch ahead merges onto the base, which other runs
+   * in flight on the base it collides with and in which files, and a merge clean as text whose landing check refused the base as it is
+   * now (`Collisions`), read live by the package's decision; null at any other.
+   */
+  collisions: Collisions | null;
 };
 
 /**
@@ -216,7 +223,8 @@ export async function decisionOf(run: Run, e: Engine['Service'], home: string, e
   const nothing = nothingOf(run, d);
   if (nothing) return { nothing };
   const steps = judgedSteps(run, folder);
-  const { touched, standings } = await branchesOf(e, run, steps, d.kind === 'awaiting' ? d.branches : undefined);
+  const collisions = decided.collisions ?? null;
+  const { touched, standings } = await branchesOf(e, run, steps, d.kind === 'awaiting' ? d.branches : undefined, collisions);
   const filed = Object.keys(run.steps).filter((name) => run.steps[name]?.taskId);
   const git = isGitRun(run) ? run : undefined;
   return {
@@ -234,6 +242,7 @@ export async function decisionOf(run: Run, e: Engine['Service'], home: string, e
     commands: decided.commands,
     ...(decided.checkout ? { checkout: decided.checkout } : {}),
     awaiting: d.kind === 'awaiting' ? { branches: d.branches, direct: d.direct } : null,
+    collisions,
   };
 }
 
@@ -247,9 +256,16 @@ function nothingOf(run: Run, d: Decided['decision']): string | undefined {
 /**
  * What each branch the CLI reads touched (`branchesToRead`, `touchedBy`), and where each result branch stands against the base
  * (`Standing`): the branches `awaiting` names, or the result steps' while the run still runs. None for a folder run, and no standings for a
- * run that worked on its base branch itself.
+ * run that worked on its base branch itself. Whether each branch ahead merges onto the base is the decision's own trial at an ending
+ * (`collisions`), and the table's merge check (`MERGES`) at any other.
  */
-async function branchesOf(e: Engine['Service'], run: Run, steps: Parameters<typeof resultSteps>[0], awaiting: string[] | undefined) {
+async function branchesOf(
+  e: Engine['Service'],
+  run: Run,
+  steps: Parameters<typeof resultSteps>[0],
+  awaiting: string[] | undefined,
+  collisions: Collisions | null,
+) {
   const results = [
     ...new Set(
       resultSteps(steps)
@@ -265,7 +281,9 @@ async function branchesOf(e: Engine['Service'], run: Run, steps: Parameters<type
   ).map((branch) => ({ branch, radius: touchedBy(run, branch) }));
   if (!run.isolate) return { touched, standings: [] };
   const read = branchStandings(run, results);
-  const merges = await mergesOf(e, run, read);
+  const merges = collisions
+    ? Object.fromEntries(collisions.base.map(({ branch, ...merge }) => [branch, merge]))
+    : await mergesOf(e, run, read);
   const standings: Standing[] = read.map((s) => ({
     ...s,
     said: branchWord(run, s),

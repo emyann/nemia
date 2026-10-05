@@ -180,7 +180,9 @@ test('a finished run: what its result branch touched, the lesson, the check-affe
     'overBudget',
     'commands',
     'awaiting',
+    'collisions',
   ]);
+  assert.equal(body.collisions, null, 'a branch handed to a person to merge is at no ending: no collision is read');
   assert.deepEqual(
     body.awaiting,
     { branches: [branch], direct: false },

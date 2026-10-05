@@ -3,7 +3,8 @@
  * broken main. The shipped check is run as the run runs it (the argv `checkArgv` gives it), on a scratch turbo monorepo whose cache is
  * warm from main, with a merge staged as the ending stages it: `MERGE_HEAD` set, no `WF_BASE_REF`. The merge changes only a doc, a file
  * turbo does not hash, and the doc breaks a test or a typecheck that reads it. The shipped check must refuse it; the same check with
- * `npm test && npm run typecheck` in place of the forced pair passes it, which proves the fixture really meets turbo's cache.
+ * `npm test && npm run typecheck` in place of the forced pair passes it, which proves the fixture really meets turbo's cache. A merge that
+ * touches the web app runs the e2e, which builds the app itself, and no build before it: the fixture's `build` and `e2e` each leave a mark.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -56,6 +57,10 @@ if (!/Nemia/.test(fs.readFileSync(new URL('../../docs/types.md', import.meta.url
 }
 `;
 
+/** The marks the fixture's `build` and `e2e` scripts leave at its root when they run. */
+const BUILT = 'built.mark';
+const E2E_RAN = 'e2e-ran.mark';
+
 /** The fixture's files: one package whose test reads `docs/name.md` and whose typecheck reads `docs/types.md`, both naming Nemia. */
 const files = (): Record<string, string> => {
   const root = JSON.parse(fs.readFileSync(path.join(REPO, 'package.json'), 'utf8')) as { packageManager: string };
@@ -69,8 +74,8 @@ const files = (): Record<string, string> => {
         test: 'turbo run test --continue',
         typecheck: 'turbo run typecheck',
         lint: 'node -e 0',
-        build: 'node -e 0',
-        e2e: 'node -e 0',
+        build: `node -e "require('fs').writeFileSync('${BUILT}', '')"`,
+        e2e: `node -e "require('fs').writeFileSync('${E2E_RAN}', '')"`,
       },
     }),
     'turbo.json': JSON.stringify({ tasks: { test: {}, typecheck: {} } }),
@@ -108,7 +113,7 @@ const sh = (dir: string, check: string): { status: number; out: string } => {
 
 /**
  * A scratch monorepo on main, its turbo cache warm from a pass of its tests and typecheck, with the merge of a branch that only
- * rewrites `doc` staged, not committed, as the landing leaves it.
+ * writes `doc` staged, not committed, as the landing leaves it.
  */
 const landing = (doc: string): string => {
   const dir = scratch('wf-land-check-');
@@ -124,8 +129,10 @@ const landing = (doc: string): string => {
   const warm = sh(dir, 'npm test && npm run typecheck');
   assert.equal(warm.status, 0, `main passes before the merge:\n${warm.out}`);
   git(dir, 'checkout', '-q', '-b', 'rename');
+  fs.mkdirSync(path.dirname(path.join(dir, doc)), { recursive: true });
   fs.writeFileSync(path.join(dir, doc), 'Formerly\n');
-  git(dir, 'commit', '-qam', 'rename');
+  git(dir, 'add', '-A');
+  git(dir, 'commit', '-qm', 'rename');
   git(dir, 'checkout', '-q', 'main');
   git(dir, 'merge', '-q', '--no-ff', '--no-commit', 'rename');
   return dir;
@@ -160,4 +167,12 @@ test('a doc that breaks a test refuses the landing, though turbo holds a pass', 
 
 test('a doc that breaks the typecheck refuses the landing, though turbo holds a pass', () => {
   assert.match(refused(landing('docs/types.md')), /docs\/types\.md does not name the project/);
+});
+
+test('a landing that touches the web app runs the e2e, which builds the app, and no build before it', () => {
+  const dir = landing('apps/web/note.md');
+  const shipped = sh(dir, landCheck());
+  assert.equal(shipped.status, 0, shipped.out);
+  assert.ok(fs.existsSync(path.join(dir, E2E_RAN)), `the e2e ran:\n${shipped.out}`);
+  assert.ok(!fs.existsSync(path.join(dir, BUILT)), `the app was built a second time, before the e2e:\n${shipped.out}`);
 });

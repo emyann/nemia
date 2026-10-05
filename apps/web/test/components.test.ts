@@ -5885,7 +5885,7 @@ test("each layer is drawn as the markdown it is: its source's line breaks joined
   };
   const html = toldMarkup({ told: null, layers, filed: true });
   const layer = (name: string): string => new RegExp(`<section data-layer="${name}"[^]*?</section>`).exec(html)![0];
-  assert.match(layer('policy'), /<strong>this<\/strong>[^]*<ul[^>]*><li[^>]*>one<\/li>/);
+  assert.match(layer('policy'), /<strong>this<\/strong>[^]*<ul[^>]*>\s*<li[^>]*>one<\/li>/);
   assert.doesNotMatch(layer('policy'), /\*\*/);
   assert.match(layer('task'), /<div data-markdown="true"[^>]*><p[^>]*>A line\nwrapped\.<\/p><\/div>/, 'one paragraph, its break a space');
   assert.match(layer('instructions'), /<h5[^>]*>Role<\/h5>/, "a text's `#` sits under the layer's h4");

@@ -97,11 +97,42 @@ export function feedChanges(
   return out;
 }
 
+/** What one line of the feed says, without its time: `r-1  plan  awaiting approval  · approve it: …`, the message `emitFeed` logs. */
+export const feedSaidWords = (l: FeedLine): string => `${l.run}  ${l.step ?? '—'}  ${l.word}${l.note ? `  · ${l.note}` : ''}`;
+
 /**
  * One line of the feed, for a person: `10:02:13  r-1  plan  awaiting approval  · approve it: …`. Shared by `nemia feed` and `nemia watch`.
  */
-export const feedLineWords = (l: FeedLine): string =>
-  `${l.at.slice(11, 19)}  ${l.run}  ${l.step ?? '—'}  ${l.word}${l.note ? `  · ${l.note}` : ''}`;
+export const feedLineWords = (l: FeedLine): string => `${l.at.slice(11, 19)}  ${feedSaidWords(l)}`;
+
+/**
+ * A line of the feed as its writer publishes it to the live readers in its process (`FeedHub`): the line, and the bytes it was written
+ * at, from `from` to `to`, the cursor just after its newline.
+ */
+export type FeedPublished = { from: number; to: number; line: FeedLine };
+
+/**
+ * Where an append put its bytes, as its writer measured them (`recordFeed`): the file's size before it (`before`) and after it (`after`),
+ * the lines it wrote, and `leading`, the newline it wrote first to end a line a writer died in, or `''`.
+ */
+export type FeedAppended = { lines: FeedLine[]; before: number; after: number; leading: string };
+
+/**
+ * Each line of an append with the bytes it was written at, for the live readers to take without reading the file (`FeedPublished`) — or
+ * none, when the file grew by more than the append wrote: another writer appended between the size read before and the one after, and
+ * where in that range this append's lines landed is not known, so nothing is vouched for and a reader reads the file. Pure.
+ */
+export function publishedOf({ lines, before, after, leading }: FeedAppended): FeedPublished[] {
+  const sizes = lines.map((l) => Buffer.byteLength(`${JSON.stringify(l)}\n`));
+  const written = Buffer.byteLength(leading) + sizes.reduce((a, b) => a + b, 0);
+  if (after !== before + written) return [];
+  let at = before + Buffer.byteLength(leading);
+  return lines.map((line, i) => {
+    const from = at;
+    at += sizes[i];
+    return { from, to: at, line };
+  });
+}
 
 /** A word the feed keeps, and the note beside it, when there is one: what one line of it says of a run or of a step. */
 export type FeedSaid = { word: string; note?: string };

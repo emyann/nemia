@@ -7,6 +7,7 @@ import http from 'node:http';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
+import type { MetricRead } from '../src/factory/ceilings.ts';
 import { DEFAULT_PORT, portOf, ticksOf, VIEWER_PORT } from '../src/port.ts';
 import { scratch } from './scratch.ts';
 
@@ -240,4 +241,79 @@ test("the api's daemon exports its passes' spans to the collector OTEL_EXPORTER_
   t.after(() => api.child.kill());
   const spans = await Promise.race([pass, api.ended.then((code) => assert.fail(`the api exited ${code}:\n${api.output()}`))]);
   assert.match(spans, /"nemia"/);
+});
+
+/** A metric of the api at `url`, as `GET /api/metrics` answers it, by its name. */
+const metricOf = async (url: string, name: string) =>
+  ((await (await fetch(`${url}/api/metrics`)).json()) as MetricRead[]).find((m) => m.name === name);
+
+/**
+ * A folder run whose one step signed off, written into the store at `root` as `nemia start` and the engine would leave it: the run's
+ * record and its task's journal, which the daemon's next pass judges and says on the feed.
+ */
+function signedOffRun(root: string): void {
+  const at = new Date().toISOString();
+  const work = path.join(root, 'runs', 'r-hub', 'work', 'write');
+  fs.mkdirSync(work, { recursive: true });
+  fs.mkdirSync(path.join(root, 'engine', 'tasks'), { recursive: true });
+  fs.writeFileSync(
+    path.join(root, 'engine', 'tasks', 't-hub.jsonl'),
+    [
+      { kind: 'filed', at, brief: 'Write it.', cwd: work, maxAttempts: 1, harness: 'claude' },
+      { kind: 'starting', at, attempt: 1 },
+      { kind: 'spawned', at, attempt: 1 },
+      {
+        kind: 'ended',
+        at,
+        attempt: 1,
+        sessionId: 'ae/t-hub/1',
+        observed: 'done',
+        reason: 'harness',
+        closeout: { outcome: 'done', summary: 'Wrote it.', needs: null, artifacts: [] },
+      },
+      { kind: 'settled', at, outcome: 'succeeded' },
+    ]
+      .map((e) => `${JSON.stringify(e)}\n`)
+      .join(''),
+  );
+  fs.writeFileSync(
+    path.join(root, 'runs', 'r-hub.json'),
+    JSON.stringify({
+      id: 'r-hub',
+      place: { kind: 'folder' },
+      workspace: path.dirname(work),
+      brief: 'Write a note.',
+      createdAt: at,
+      workflowDir: path.join(root, 'no-such-workflow'),
+      workflow: [{ name: 'write', after: [], body: 'Write it.', harness: 'claude', workspace: 'folder' }],
+      steps: { write: { taskId: 't-hub', workspace: work } },
+    }),
+  );
+}
+
+test("REFUSED: a line the api's daemon writes reaches the api's stream from the hub its runtime built, with no read of the file", async (t) => {
+  const api = startApi('0');
+  t.after(() => api.child.kill());
+  const [url] = await api.said(/http:\/\/127\.0\.0\.1:\d+/);
+  await leaseSays(api.root, (l) => l.url === url);
+  const stream = new AbortController();
+  t.after(() => stream.abort());
+  const res = await fetch(`${url}/api/feed/stream`, { signal: stream.signal });
+  const reader = res.body!.getReader();
+  while ((await metricOf(url, 'feed.followers'))?.value !== 1) await new Promise((r) => setTimeout(r, 20));
+  const reads = (await metricOf(url, 'feed.follow.reads'))?.count;
+
+  signedOffRun(api.root);
+  let said = '';
+  while (!/\nid: \d+/.test(said)) {
+    const { value, done } = await reader.read();
+    if (done) assert.fail(`the stream ended before a line:\n${said}\n${api.output()}`);
+    said += new TextDecoder().decode(value);
+  }
+  assert.match(said, /r-hub/, 'the line the pass wrote of the run');
+  assert.equal(
+    (await metricOf(url, 'feed.follow.reads'))?.count,
+    reads,
+    'the line came as an item of the hub the daemon published to, which the reader took without reading the file: the beat found the file where the reader was',
+  );
 });

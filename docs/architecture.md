@@ -10,7 +10,7 @@ broken. This page says what the tests hold; the tests are the rules.
 |---|---|---|
 | `packages/agent-runtime` | Agent sessions on a harness, durably: a job that runs to its end, and (not built yet) a long-lived session that runs until stopped. How a session runs: its command, mounts, restart and spend, the journal, the attempts, the harnesses' vocabulary. The `ae` command. | `agent-runtime` → `src/index.ts`, the runtime in Effect. `agent-runtime/vocabulary` → `src/vocabulary.ts`, the harnesses' words, what their fence words reach (`fenceReach`) and the folders a harness reads as its own configuration in a mounted folder (`configFolderIn`), pure. `decide` is exported by none. |
 | `packages/agent-orchestrator` | A folder of markdown as a workflow, and a run of its steps: which task to file next, what a person must decide, what the run's record says. The `wf` command, to become `nemia`. | `agent-orchestrator` → `src/runner.ts`: the controllers, everything that reads or writes the disk, and the refusals by kind, `Missing`, `Conflict` and `Invalid`, re-exported by name. `agent-orchestrator/run` → `src/run.ts`: `assess` (`src/tick/assess.ts`), and the words a run is described in, re-exported by name. `agent-orchestrator/workflow` → `src/workflow.ts`: the format, pure. |
-| `apps/api` | The workflows behind HTTP, and the feed as a stream. | Its routes. |
+| `apps/api` | The workflows behind HTTP, and the feed as a stream, read through the orchestrator's live reader (`followFeed`) on the hub its daemon publishes to. | Its routes. |
 | `apps/web` | The board people look at. It talks to the api over HTTP, decodes each answer it reads with a schema of its own (`effect`), imports none of our packages, names no store path, and builds no command of its own: a command or a store folder it shows is text the api answered (`STORE_PATHS` and `COMMAND_TEXT` in `apps/web/test/structure.test.ts`, both empty). | Its pages. |
 
 Each layer reaches exactly the one below it, and nothing reaches up or skips one:
@@ -53,6 +53,12 @@ read and removed only by `sweep` (`agent-runtime/src/core/engine/bodies.ts`, `ae
 `agent-runtime/src/core/engine/journal.ts`), the orchestrator its run and step (`advancePass`, `forStep`) — and the process chooses the
 exporter: the daemon's provides `telemetryLayer` (`src/telemetry/telemetry.store.ts`), its lines always, OTLP only when
 `OTEL_EXPORTER_OTLP_ENDPOINT` is set.
+
+**The feed** is the orchestrator's, written once: `emitFeed` (`src/feed/feed.verb.ts`) appends each line to `feed.jsonl`, the record,
+logs it at Info with its run, step and word, and publishes it to the process's hub (`FeedHub`, a sliding `PubSub` its layer builds,
+`feedHubLayer`). A live reader in that process, `followFeed`, takes the hub's items and reads from the file what none brought — a line
+the hub dropped, or one another process wrote — on a beat that stats the file: the api's `GET /api/feed/stream`, on the hub its daemon
+publishes to. A reader in another process, `nemia watch`, watches the file (`watchFeed`).
 
 **In the orchestrator today, a candidate for the runtime**:
 

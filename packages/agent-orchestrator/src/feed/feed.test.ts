@@ -16,7 +16,7 @@ import { Cause, Effect, Exit, Fiber } from 'effect';
 import type { Engine } from '../runtime-client.ts';
 import type { Run } from '../record/record.ts';
 import { listing } from '../list/list.ts';
-import { feedChanges, feedPhase, feedWords, foldFeed, type FeedLine } from './feed.ts';
+import { feedChanges, feedPhase, feedWords, foldFeed, publishedOf, type FeedLine } from './feed.ts';
 import { nodeChild } from '../../test/child.ts';
 import { scratch } from '../../test/scratch.ts';
 import { promised } from '../../test/promised.ts';
@@ -29,8 +29,11 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 delete process.env.WF_MAX_CONCURRENT;
-const { approveRun, cancelRun, feedCursorRefusal, feedFile, freshFeedMemo, readFeed, recordFeed, startRun, tickRun, watchFeed, runWith } =
+const { approveRun, cancelRun, feedCursorRefusal, feedFile, freshFeedMemo, readFeed, startRun, tickRun, watchFeed, runWith } =
   await import('../runner.ts');
+const store = await import('./feed.store.ts');
+/** The lines the feed's writer wrote (`recordFeed`), as a pass hands it what it judged. */
+const recordFeed = (...args: Parameters<typeof store.recordFeed>) => store.recordFeed(...args).lines;
 const { readRun } = await import('../record/record.store.ts');
 const { main, watchPrinted, watching } = await import('../cli/main.ts');
 
@@ -1001,4 +1004,35 @@ test('the fold keeps the last word of each run and step, forgets a removed run, 
     { at, run: 'r-1', word: 'removed' },
     { at, run: 'r-3', word: 'removed' },
   ]);
+});
+
+test('each line written is published with the bytes it was written at: after the newline that ended a torn line, in bytes not characters', () => {
+  const at = '2026-09-22T10:00:00.000Z';
+  const lines: FeedLine[] = [
+    { at, run: 'r-1', word: 'running' },
+    { at, run: 'r-1', step: 'plan', word: 'waiting', note: 'on you — approve' },
+  ];
+  const sizes = lines.map((l) => Buffer.byteLength(`${JSON.stringify(l)}\n`));
+  assert.notEqual(sizes[1], `${JSON.stringify(lines[1])}\n`.length, 'the second line holds a character of more than one byte');
+  const written = sizes[0] + sizes[1];
+  assert.deepEqual(publishedOf({ lines, before: 100, after: 100 + written, leading: '' }), [
+    { from: 100, to: 100 + sizes[0], line: lines[0] },
+    { from: 100 + sizes[0], to: 100 + written, line: lines[1] },
+  ]);
+  assert.deepEqual(
+    publishedOf({ lines, before: 100, after: 101 + written, leading: '\n' }).map(({ from, to }) => [from, to]),
+    [
+      [101, 101 + sizes[0]],
+      [101 + sizes[0], 101 + written],
+    ],
+    'a newline written first to end a line a writer died in the middle of is no line of its own',
+  );
+});
+
+test('REFUSED: lines another writer appended among are published with no bytes — the file is grown by more than they are, so its readers read it', () => {
+  const lines: FeedLine[] = [{ at: '2026-09-22T10:00:00.000Z', run: 'r-1', word: 'running' }];
+  const size = Buffer.byteLength(`${JSON.stringify(lines[0])}\n`);
+  assert.equal(publishedOf({ lines, before: 0, after: size, leading: '' }).length, 1);
+  assert.deepEqual(publishedOf({ lines, before: 0, after: size + 40, leading: '' }), []);
+  assert.deepEqual(publishedOf({ lines: [], before: 7, after: 7, leading: '' }), []);
 });

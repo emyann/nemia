@@ -3,7 +3,7 @@
  * others beside.
  */
 import path from 'node:path';
-import { Effect } from 'effect';
+import { Effect, Layer } from 'effect';
 import {
   breakdownLines,
   ceilingLines,
@@ -13,6 +13,7 @@ import {
   engine,
   everyOf,
   feedCursorRefusal,
+  feedHubLayer,
   feedLineWords,
   HOME,
   lastPassCost,
@@ -130,8 +131,8 @@ function upStats(): void {
 /**
  * `nemia up`: the headless daemon, a pass every interval until it is stopped, or `--stats`. It refuses its interval (`everyOf`) and its
  * ceilings (`ceilings`) before it takes the store, then runs the daemon's controller (`up`) as `nemia up` under `runMain`, its passes
- * said through the process's telemetry (`telemetryLayer`). A queued card that names no repository starts on the one it is typed in, as
- * `nemia start` takes `.`.
+ * said through the process's telemetry (`telemetryLayer`) and its feed's lines published to its live readers (`feedHubLayer`). A queued
+ * card that names no repository starts on the one it is typed in, as `nemia start` takes `.`.
  */
 function upVerb(args: Args, e: Engine): void | Promise<void> {
   if (args.stats === true) return upStats();
@@ -150,7 +151,7 @@ function upVerb(args: Args, e: Engine): void | Promise<void> {
       if (took) console.log(`   ${took}`);
     });
   const daemon = up(e, { every, repo: path.resolve('.'), holder: 'wf up', onTaken });
-  return runMain(daemon.pipe(Effect.scoped, Effect.provide(telemetryLayer(process.env))));
+  return runMain(daemon.pipe(Effect.scoped, Effect.provide(Layer.merge(telemetryLayer(process.env), feedHubLayer()))));
 }
 
 /** `nemia watch`: the feed's lines as they come, from a cursor, until it is stopped (`watching`). */

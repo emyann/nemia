@@ -1,7 +1,8 @@
 /**
  * The tick's spans and logs, and the runtime's under them: a pass of the tick (`tickRun`) over the runtime's engine as the client builds
  * it (`engineOf`), traced to a tracer that keeps its spans and logged at `Debug` to a logger that keeps its logs. The runtime's spans nest
- * under the pass's, its filing of a step carries the run and the step (`forStep`), and its journal's log says them beside its own task.
+ * under the pass's, its filing of a step carries the run and the step (`forStep`), and its journal's log says them beside its own task;
+ * what it says of a run outside any filing — the stop of a called-off run's step — carries the run alone (`advancePass`).
  *
  * `WF_ROOT` is set before the runner is imported, which reads it as the module loads. `WF_VERIFY_REST=1` judges in full every run a pass
  * answers from its memo, sessions enough are admitted for the one run, and no cap is set on runs.
@@ -26,6 +27,7 @@ delete process.env.WF_MAX_RUNS;
 const { startRun } = await import('../src/runner.ts');
 const { tickRun } = await import('../src/tick/tick.verb.ts');
 const { EngineService, engineOf } = await import('../src/runtime-client.ts');
+const { runStore } = await import('../src/record/files.store.ts');
 
 const REPO = fs.mkdtempSync(path.join(ROOT, 'repo-'));
 execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'init', '-q'], { cwd: REPO, stdio: 'ignore' });
@@ -144,4 +146,18 @@ test("a pass's filing of a step is traced under the pass, down to the runtime's 
     { run: run.id, step: 'work', kind: 'filed' },
   );
   assert.equal(typeof filed.annotations.task, 'string');
+});
+
+test("a called-off run's pass says the runtime's stop of its step under the run, though no filing names the step", async () => {
+  const run = await Effect.runPromise(startRun({ brief: 'one run called off', repo: REPO, workflowDir: FOLDER }));
+  await tickTraced();
+  runStore.runs.cancel(run.id);
+  const { logs } = await tickTraced();
+  const stopped = logs.find((l) => l.text === 'stop-requested' && l.annotations.task === `${run.id}-work`);
+  assert.ok(stopped, `no Debug log of the stop among ${logs.map((l) => l.text).join(', ')}`);
+  assert.deepEqual(
+    { run: stopped.annotations.run, step: stopped.annotations.step },
+    { run: run.id, step: undefined },
+    'said outside any filing, so with no step, and under the pass over the run, so with the run',
+  );
 });

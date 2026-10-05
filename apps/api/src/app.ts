@@ -2,7 +2,7 @@ import { Layer, ManagedRuntime, Metric } from 'effect';
 import { type ErrorHandler, Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
-import { VERSION } from 'agent-orchestrator';
+import { feedHubLayer, VERSION } from 'agent-orchestrator';
 import { isRefusal, type Refusal } from 'agent-orchestrator';
 import { agents, skills } from './agents/index.ts';
 import { customInstructions } from './custom/custom.ts';
@@ -43,11 +43,11 @@ export const answerError: ErrorHandler = (err, c) => {
 
 /**
  * Every service the api reads, live, over `env`: the settings read from it on each request (`ApiConfig`), the package's engine
- * (`Engine`) and root (`StoreRoot`), an MCP asker and a quota asker with nothing asked yet (`McpAsker`, `QuotaAsker`), and reads that have
- * kept nothing yet (`ReadMemo`).
+ * (`Engine`) and root (`StoreRoot`), an MCP asker and a quota asker with nothing asked yet (`McpAsker`, `QuotaAsker`), reads that have
+ * kept nothing yet (`ReadMemo`), and the hub the feed's lines are published to as the process's daemon writes them (`feedHubLayer`).
  */
 export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Services> =>
-  Layer.mergeAll(ApiConfig.layer(env), Engine.live, StoreRoot.live, McpAsker.live, QuotaAsker.live, ReadMemo.live);
+  Layer.mergeAll(ApiConfig.layer(env), Engine.live, StoreRoot.live, McpAsker.live, QuotaAsker.live, ReadMemo.live, feedHubLayer());
 
 /**
  * An api over `layer`, and the runtime its handlers run on (`ManagedRuntime`), built from the layer once, the first time a request or

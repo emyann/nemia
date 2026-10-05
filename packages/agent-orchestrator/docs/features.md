@@ -2179,15 +2179,33 @@ Tested in `src/telemetry/telemetry.test.ts` (no export without an endpoint, read
 `src/daemon/up.test.ts`, `test/up-lines.test.ts` (`nemia up` spawned, its line on stdout), `test/telemetry-nesting.test.ts`,
 `agent-runtime/src/core/engine/journal-said.test.ts` and `apps/api/test/main.test.ts` (the api's daemon exporting its `tick`).
 
-## Still to build: one emission — `emitFeed` and `FeedHub` (Nemia platform slice 5, part 2 of 3)
+## Shipped: one emission — `emitFeed` and `FeedHub` (Nemia platform slice 5, part 2 of 3)
 
-`recordFeed` becomes the verb `emitFeed` (`src/feed/feed.verb.ts`), which in one call appends the lines to `feed.jsonl` (the record), logs
-each with its `run`, `step` and `word`, and publishes the byte range it wrote, `{ from, to, line }`, to `FeedHub`: a
-`PubSub.sliding` built with the daemon's layer, so a publish never waits on a reader and a stuck one costs at most its capacity. The file
-stays the record. A live reader, `followFeed(cursor)`, subscribes first, catches up from the file to its end, then goes live: an item at
-or before its cursor is dropped, and one past it means the hub slid, so it reads the gap from the file. `nemia watch` and the api's
-`GET /api/feed/stream` read through it in the daemon's process; a reader in another process keeps `watchFeedFile`. To prove: a blocked
-subscriber never delays `emitFeed`, and a lagging one reads every line once, in order.
+The workflow layer writes each line of the feed once, and its live readers in the process read that write:
+
+- **`emitFeed`** (`src/feed/feed.verb.ts`), in place of `recordFeed` on the tick: in one call it appends the lines to `feed.jsonl` (the
+  record), logs each at Info annotated with its `run`, its `step` where it names one and its `word`, and publishes each with the bytes it
+  was written at, `{ from, to, line }` (`publishedOf`), to `FeedHub`. Lines another writer's bytes landed among are published with none.
+- **`FeedHub`**, a `PubSub.sliding` built once by the process's layer (`feedHubLayer`): the api's runtime and `nemia up`'s. A publish never
+  waits on a reader, and one that takes nothing costs at most the hub's capacity. A process with no hub writes and logs, and publishes
+  nothing.
+- **`followFeed(cursor)`**, a stream: it subscribes first, reads the file from the cursor to its end, then wakes on each item of the hub
+  and on a 1 s beat. An item at or before its cursor is dropped; one that starts at it is handed on without a read; one past it — the hub
+  slid, or another process wrote — reads the file from the cursor. A beat stats the file and reads only when its size is not the cursor,
+  so a line another process wrote (a `nemia tick` beside an api run with `--no-tick`) comes on the next beat. A cursor the feed cannot be
+  read from fails the stream, before it opens or under it; any other failed read is said once and tried again on every wake.
+- **Counted**: the readers in `FEED_FOLLOWERS` (a gauge, held in the stream's scope), the beats and the reads in `FEED_FOLLOW_BEATS` and
+  `FEED_FOLLOW_READS`.
+- **`GET /api/feed/stream` reads through `followFeed`** on the app's runtime, whose hub the api's daemon publishes to.
+
+Not as planned: `nemia watch` keeps `watchFeedFile`. It runs in a process of its own, with no hub to read, so the file is all it has.
+
+Tested in `src/feed/feed.verb.test.ts` (a reader that takes nothing never holds up the writer; a lagging one gets every line once and in
+order, with one read for what the hub dropped; a line another process wrote, read before the next item and on the beat; the beat reading
+nothing while the file stands; a cursor refused before the reader is counted; a cut under an open reader; the log's annotations),
+`src/feed/feed.test.ts` (the bytes published, and none among another writer's) and `apps/api/src/factory/feed.test.ts` (the stream's
+events, a line written by a process with no hub, a failed read said once and cleared, and the readers counted out once their client
+goes).
 
 ## Still to build: subscriptions (Nemia platform slice 5, part 3 of 3)
 

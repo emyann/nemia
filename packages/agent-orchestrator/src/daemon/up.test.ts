@@ -40,6 +40,15 @@ test('a pass that advanced a run is logged at Info, each line annotated with its
   ]);
 });
 
+test('a pass that filed two steps of a run says each on a line of its own, annotated with that step alone', async () => {
+  const pass = { runs: [{ run: { id: 'r-1' }, notes: [], filed: ['a', 'b'], tried: [], looped: [], checked: [] }] } as never as Pass;
+  const { logs } = await logged(pass);
+  assert.deepEqual(logs, [
+    { level: 'Info', text: 'r-1  filed a', annotations: { run: 'r-1', step: 'a' } },
+    { level: 'Info', text: 'r-1  filed b', annotations: { run: 'r-1', step: 'b' } },
+  ]);
+});
+
 test('a failure is a warning, said once while it stands and again once it cleared and came back; a quiet pass says nothing', async () => {
   const failing = { runs: [], feedError: 'the feed could not be written', unreadable: ['t-1: a line no runtime wrote'] } as never as Pass;
   const first = await logged(failing);

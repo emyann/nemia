@@ -2581,7 +2581,10 @@ be (the workflow's `agents/`, the repository's, the store's).
   `"hires": { "build/implement": "ada" }`, the workflow by its folder's name and the step by its file's. Hiring into a step
   again replaces its hire, and says which it replaced; **`wf factory fire <factory> --step <workflow>/<step>`** takes it back.
   Both write the whole file through a hidden file renamed onto it, keeping `repos` and any other key. The hire checks the shape
-  of what it is given, never that the workflow, the step or the agent exists: the start judges that.
+  of what it is given, never that the workflow, the step or the agent exists: the start judges that. It refuses (`Conflict`) a
+  step whose own file names its agent, in any place a start in the factory reads the workflow by its name (each of its
+  repositories' `workflows/`, then the store's), in `hireRefusalOf`'s words followed by the file; a step with no file there
+  takes the hire, and the start's own refusal below stays the last guard.
 - **The api serves both**, on the step's hire: `PUT /api/factories/<factory>/hires/<workflow>%2F<step>` with
   `{ "agent": "<name>" }`, and `DELETE` on the same path, the step one encoded segment; refused as the verbs refuse, by kind. The
   board offers them on a step inside a factory, and says before anyone hires why a step takes none (`hireRefusalOf`): the default

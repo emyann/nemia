@@ -19,6 +19,7 @@ const { addFactory, attachWorkflow, detachWorkflow, factoriesDir, fireAgent, hir
   await import('../runner.ts');
 const { main } = await import('../cli/main.ts');
 const { FACTORY_HELP } = await import('./factory.verb.ts');
+const { hireRefusalOf } = await import('./factory.ts');
 
 /** No verb here asks the engine anything. */
 const NO_ENGINE = promised({});
@@ -431,6 +432,42 @@ test('REFUSED: a hire into a step of a workflow the factory has not attached is 
   assert.deepEqual(fs.readFileSync(file), before);
   hireAgent({ factory: 'pipao', agent: 'ada', step: 'intake/frame' });
   assert.deepEqual(fileOf('pipao').hires, { 'intake/frame': 'ada' });
+});
+
+test("REFUSED: a hire into a step whose own file names its agent is a Conflict, in hireRefusalOf's words, and writes nothing", async () => {
+  const repo = fresh();
+  addFactory({ name: 'pipao', repos: [repo] });
+  attachWorkflow({ factory: 'pipao', workflow: 'build' });
+  const file = path.join(FACTORIES, 'pipao.json');
+  const before = fs.readFileSync(file);
+  const theirs = path.join(repo, 'workflows', 'build');
+  const yours = path.join(ROOT, 'workflows', 'build');
+  for (const dir of [theirs, yours]) fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(theirs, 'named.md'), '---\nagent: reviewer\n---\nSay it.\n');
+  fs.writeFileSync(path.join(theirs, 'implement.md'), '---\nmodel: opus\n---\nBuild it.\n');
+  fs.writeFileSync(path.join(yours, 'yours.md'), '---\nagent: agora\n---\nSay it.\n');
+  const refusal = (named: string, at: string) =>
+    `${hireRefusalOf({ name: 'pipao', workflows: ['build'] }, 'build', named)} ${at} names it. Nothing was hired.`;
+  try {
+    await assert.rejects(
+      main(['factory', 'hire', 'pipao', 'ada', '--step', 'build/named'], NO_ENGINE),
+      refusedWith('Conflict', new RegExp(`^${escaped(refusal('reviewer', path.join(theirs, 'named.md')))}$`)),
+    );
+    assert.throws(
+      () => hireAgent({ factory: 'pipao', agent: 'ada', step: 'build/yours' }),
+      refusedWith('Conflict', new RegExp(`^${escaped(refusal('agora', path.join(yours, 'yours.md')))}$`)),
+    );
+    assert.deepEqual(fs.readFileSync(file), before);
+    hireAgent({ factory: 'pipao', agent: 'ada', step: 'build/implement' });
+    hireAgent({ factory: 'pipao', agent: 'ada', step: 'build/absent' });
+    assert.deepEqual(
+      fileOf('pipao').hires,
+      { 'build/implement': 'ada', 'build/absent': 'ada' },
+      'a file naming none, and no file, take a hire',
+    );
+  } finally {
+    fs.rmSync(path.join(ROOT, 'workflows'), { recursive: true, force: true });
+  }
 });
 
 test('REFUSED: a detach of a workflow the factory still hires into is Invalid, naming each fire; one it has not attached is Missing', () => {

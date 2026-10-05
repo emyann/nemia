@@ -10,9 +10,11 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { addFactory, attachWorkflow, factoryNameRefusal } from 'agent-orchestrator';
+import { Layer } from 'effect';
+import { addFactory, attachWorkflow, factoryNameRefusal, hireRefusalOf } from 'agent-orchestrator';
 import { scratch } from '../../test/scratch.ts';
-import { app } from '../app.ts';
+import { app, appOf, liveOf } from '../app.ts';
+import { StoreRoot } from '../store.ts';
 
 const own = scratch('nemia-api-hires-own-');
 process.env.HKB_REPO = own;
@@ -83,6 +85,23 @@ test("REFUSED at shipped defaults: no factory (404), the default (409), a workfl
     await refused(() => send('PUT', '/api/factories/mill/hires/implement', { agent: 'ada' }), 422),
     /^--step implement names a step as <workflow>\/<step>/,
   );
+});
+
+test("REFUSED at shipped defaults: a hire into a step whose own file names its agent is a 409 in hireRefusalOf's words, then the file", async () => {
+  const named = path.join(folder, 'workflows', 'build', 'named.md');
+  fs.mkdirSync(path.dirname(named), { recursive: true });
+  fs.writeFileSync(named, '---\nagent: agora\n---\nReview it.\n');
+  const words = (agent: string, file: string) =>
+    `${hireRefusalOf({ name: 'mill', workflows: ['build'] }, 'build', agent)} ${file} names it. Nothing was hired.`;
+  assert.equal(await refused(() => send('PUT', '/api/factories/mill/hires/build%2Fnamed', { agent: 'ada' }), 409), words('agora', named));
+  const home = scratch('nemia-api-hires-home-');
+  const mine = path.join(home, 'workflows', 'build', 'mine.md');
+  fs.mkdirSync(path.dirname(mine), { recursive: true });
+  fs.writeFileSync(mine, '---\nagent: otto\n---\nShip it.\n');
+  const { app: moved } = appOf(Layer.merge(liveOf(), Layer.succeed(StoreRoot)(home)));
+  const put = () =>
+    moved.request('/api/factories/mill/hires/build%2Fmine', { method: 'PUT', headers: json, body: JSON.stringify({ agent: 'ada' }) });
+  assert.equal(await refused(put, 409), words('otto', mine), "yours, read under the app's store root");
 });
 
 test("REFUSED: a body with no agent and one that is not JSON (400), in the api's words, and a name that is no factory's (400) in the package's", async () => {

@@ -17,7 +17,7 @@
     "typecheck": "turbo run typecheck",
     "lint": "oxlint && oxfmt --check",
     "format": "oxfmt",
-    "e2e": "npm run e2e --workspace web"
+    "e2e": "npm run e2e --workspace web --"
   },
   "devDependencies": {
     "@playwright/mcp": "0.0.80",

@@ -1,7 +1,8 @@
 /**
  * `npm run e2e` made to refuse, whole: a page with a console error, one with a failed request, and one whose button
  * something lies over, each put through the code run.ts puts the app's pages through (visit.ts) in a process of its
- * own — which must exit non-zero, naming the page, and end both its streams saying so. checks.test.ts proves the
+ * own — which must exit non-zero, naming the page, and end both its streams saying so, with a picture of the failure alone. And the
+ * page that breaks nothing passes, pictured by no one unless `--photos` asks. checks.test.ts proves the
  * watch hears each problem; this proves hearing one fails the run. Needs Chromium, like checks.test.ts.
  */
 import { test } from 'node:test';
@@ -13,10 +14,10 @@ import { scratch } from '../scratch.ts';
 
 type Ended = { code: number | null; stdout: string; stderr: string; shots: string[] };
 
-/** broken-page.ts, run to its end, with the screenshots it wrote. */
-async function e2eOn(how: string): Promise<Ended> {
+/** broken-page.ts, run to its end with `flags` after its two arguments, with the screenshots it wrote. */
+async function e2eOn(how: string, ...flags: string[]): Promise<Ended> {
   const out = scratch('nemia-e2e-refusal-');
-  const child = spawn(process.execPath, [path.join(import.meta.dirname, 'broken-page.ts'), how, out], {
+  const child = spawn(process.execPath, [path.join(import.meta.dirname, 'broken-page.ts'), how, out, ...flags], {
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let stdout = '';
@@ -52,19 +53,19 @@ test('a page with a console error makes the e2e exit non-zero, naming the page, 
   assert.equal(ended.code, 1, said(ended));
   assert.match(
     ended.stderr,
-    /^e2e: FAILED — the console-error page \(\/console-error\) in the light theme: no console error and no failed request — \d+ seen:$/m,
+    /^e2e: FAILED — the console-error page \(\/console-error\) in the dark theme: no console error and no failed request — \d+ seen:$/m,
     said(ended),
   );
   assert.match(ended.stderr, /^\s+console error: the graph did not draw$/m, said(ended));
   endsSaying(
     ended,
-    /^e2e: FAILED — the console-error page \(\/console-error\) in the light theme: no console error and no failed request — \d+ seen:$/,
+    /^e2e: FAILED — the console-error page \(\/console-error\) in the dark theme: no console error and no failed request — \d+ seen:$/,
     [],
-    'console-error-light-failed.png',
+    'console-error-dark-failed.png',
   );
   assert.deepEqual(
     ended.shots,
-    ['console-error-light-failed.png'],
+    ['console-error-dark-failed.png'],
     `stopped at the first failure, with a picture of it, and no screenshot claiming the page passed\n${said(ended)}`,
   );
 });
@@ -77,16 +78,16 @@ test(
     assert.equal(ended.code, 1, said(ended));
     assert.match(
       ended.stderr,
-      /^e2e: FAILED — the failed-request page \(\/failed-request\) in the light theme: no console error and no failed request — \d+ seen:$/m,
+      /^e2e: FAILED — the failed-request page \(\/failed-request\) in the dark theme: no console error and no failed request — \d+ seen:$/m,
       said(ended),
     );
     assert.match(ended.stderr, /^\s+request failed: GET http:\/\/127\.0\.0\.1:\d+\/api\/dropped — /m, said(ended));
-    assert.deepEqual(ended.shots, ['failed-request-light-failed.png'], said(ended));
+    assert.deepEqual(ended.shots, ['failed-request-dark-failed.png'], said(ended));
     endsSaying(
       ended,
-      /^e2e: FAILED — the failed-request page \(\/failed-request\) in the light theme: no console error and no failed request — \d+ seen:$/,
+      /^e2e: FAILED — the failed-request page \(\/failed-request\) in the dark theme: no console error and no failed request — \d+ seen:$/,
       [],
-      'failed-request-light-failed.png',
+      'failed-request-dark-failed.png',
     );
   },
 );
@@ -97,12 +98,12 @@ test(
   async () => {
     const ended = await e2eOn('covered');
     assert.equal(ended.code, 1, said(ended));
-    assert.deepEqual(ended.shots, ['covered-light-failed.png'], said(ended));
+    assert.deepEqual(ended.shots, ['covered-dark-failed.png'], said(ended));
     endsSaying(
       ended,
-      /^e2e: FAILED — the covered page \(\/covered\) in the light theme: could not be checked: locator\.click: Timeout 2000ms exceeded\.$/,
+      /^e2e: FAILED — the covered page \(\/covered\) in the dark theme: could not be checked: locator\.click: Timeout 2000ms exceeded\.$/,
       [/^  waiting for getByRole\('button', \{ name: 'Press' \}\)$/, /^  <div data-cover="">…<\/div> intercepts pointer events$/],
-      'covered-light-failed.png',
+      'covered-dark-failed.png',
     );
   },
 );
@@ -121,16 +122,16 @@ test(
     );
     endsSaying(
       ended,
-      /^e2e: FAILED — the store-removed page \(\/store-removed\) in the light theme: the e2e's store \S+\/store is gone, removed from outside while the pages were visited: every run reads 404 since, so no page failed\. Run the e2e again$/,
+      /^e2e: FAILED — the store-removed page \(\/store-removed\) in the dark theme: the e2e's store \S+\/store is gone, removed from outside while the pages were visited: every run reads 404 since, so no page failed\. Run the e2e again$/,
       [],
-      'store-removed-light-failed.png',
+      'store-removed-dark-failed.png',
     );
-    assert.deepEqual(ended.shots, ['store-removed-light-failed.png'], said(ended));
+    assert.deepEqual(ended.shots, ['store-removed-dark-failed.png'], said(ended));
   },
 );
 
 test('a store gone between two visits is said before the next page, which is not visited', { timeout: 60_000 }, async () => {
-  const ended = await e2eOn('store-swept');
+  const ended = await e2eOn('store-swept', '--photos');
   assert.equal(ended.code, 1, said(ended));
   assert.match(ended.stdout, /the store-swept page \(\/store-swept\) in the light theme ✓/, said(ended));
   for (const stream of [ended.stdout, ended.stderr]) {
@@ -144,13 +145,28 @@ test('a store gone between two visits is said before the next page, which is not
 });
 
 test(
-  'the same page without the break passes in both themes — or the refusals above would be of the page, not the break',
+  'the same page without the break passes in the dark theme alone, and no picture is taken — or the refusals above would be of the page, not the break',
   { timeout: 60_000 },
   async () => {
     const ended = await e2eOn('none');
     assert.equal(ended.code, 0, said(ended));
-    assert.match(ended.stdout, /the none page \(\/none\) in the light theme ✓/, said(ended));
     assert.match(ended.stdout, /the none page \(\/none\) in the dark theme ✓/, said(ended));
-    assert.deepEqual(ended.shots, ['none-dark.png', 'none-light.png'], said(ended));
+    assert.doesNotMatch(ended.stdout, /in the light theme/, said(ended));
+    assert.deepEqual(ended.shots, [], `neither the runner's picture nor the page's own\n${said(ended)}`);
+  },
+);
+
+test(
+  'with --photos the same page passes in light, then dark, and is pictured in both, by the runner and by itself',
+  { timeout: 60_000 },
+  async () => {
+    const ended = await e2eOn('none', '--photos');
+    assert.equal(ended.code, 0, said(ended));
+    assert.match(
+      ended.stdout,
+      /the none page \(\/none\) in the light theme ✓\n(?:.*\n)*.*the none page \(\/none\) in the dark theme ✓/,
+      said(ended),
+    );
+    assert.deepEqual(ended.shots, ['none-dark.png', 'none-light.png', 'none-own-dark.png', 'none-own-light.png'], said(ended));
   },
 );

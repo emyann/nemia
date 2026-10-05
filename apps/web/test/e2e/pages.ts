@@ -10,11 +10,13 @@
  * Beside the pages, `pages/NAMES` says which pages there are, a name a line, in no order that matters. The directory alone cannot tell a
  * page deleted by mistake from one never written, so the load refuses a page with no line and a line with no page. The file is merged by
  * union (`.gitattributes`): two runs that each add a page and its line merge.
+ *
+ * Which of them a run visits, in which themes, and which it pictures, is its plan (`planOf`), read from its command line.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import type { PageSpec } from './visit.ts';
+import type { PageSpec, Theme } from './visit.ts';
 
 export const PAGES_DIR = path.join(import.meta.dirname, 'pages');
 
@@ -111,4 +113,42 @@ export async function loadPages(dir = PAGES_DIR): Promise<PageSpec[]> {
   }
   if (!pages.length) throw new Error(`${dir} has no page in it, and an e2e that visits nothing passes: put the pages back.`);
   return pages;
+}
+
+/**
+ * What a run of the e2e does, read from its command line: the pages it `visit`s, in their order; the `themes` it visits them in; and
+ * whether a page is `pictured`. With no flag, every page in the dark theme, pictured by none: the assertions alone. `--photos` visits
+ * light, then dark, and pictures each page visited; `--pages <name,…>` visits every page up to the last one named, since a page reads
+ * what the pages before it leave, and with `--photos` pictures only those named. Refuses a flag it does not know, a name that is no page
+ * (listing the pages there are), and `--pages` with no name after it.
+ */
+export function planOf<P extends { name: string }>(
+  argv: readonly string[],
+  pages: readonly P[],
+): { visit: P[]; themes: Theme[]; pictured: (name: string) => boolean } {
+  let photos = false;
+  let named: string[] | undefined;
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === '--photos') photos = true;
+    else if (argv[i] === '--pages') named = namesAfter(argv[++i]);
+    else throw new Error(`the e2e takes --photos and --pages <name,…>, not ${argv[i]}: npm run e2e -- --photos --pages <name,…>`);
+  }
+  const themes: Theme[] = photos ? ['light', 'dark'] : ['dark'];
+  if (!named) return { visit: [...pages], themes, pictured: () => photos };
+  const all = pages.map((p) => p.name);
+  const unknown = named.filter((name) => !all.includes(name));
+  if (unknown.length) throw new Error(`the e2e has no page ${unknown.join(', ')}: name pages there are, among ${all.join(', ')}`);
+  const chosen = new Set(named);
+  const last = Math.max(...named.map((name) => all.indexOf(name)));
+  return { visit: pages.slice(0, last + 1), themes, pictured: (name) => photos && chosen.has(name) };
+}
+
+/** The page names `--pages` is given, comma-separated; refuses none, and a flag in their place. */
+function namesAfter(arg: string | undefined): string[] {
+  const names = (arg?.startsWith('--') ? '' : (arg ?? ''))
+    .split(',')
+    .map((name) => name.trim())
+    .filter(Boolean);
+  if (!names.length) throw new Error('--pages names no page: give it the pages to visit, separated by commas (--pages factory,runs)');
+  return names;
 }

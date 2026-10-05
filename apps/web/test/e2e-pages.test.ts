@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
-import { loadPages, NAMES, namesIn, orderOf, PAGES_DIR, pageFiles } from './e2e/pages.ts';
+import { loadPages, NAMES, namesIn, orderOf, PAGES_DIR, pageFiles, planOf } from './e2e/pages.ts';
 import { scratch } from './scratch.ts';
 
 /**
@@ -39,10 +39,10 @@ test('the runner visits what loadPages reads, and no list of its own', () => {
   const runner = fs.readFileSync(path.join(import.meta.dirname, 'e2e', 'run.ts'), 'utf8');
   assert.match(
     runner,
-    /visitAll\(browser, base, pages, OUT, store\)/,
-    'the runner hands the store the api serves too, so a store swept from under the e2e is said, not blamed on a page (`storeGone`)',
+    /visitAll\(browser, base, plan\.visit, OUT, \{ store, themes: plan\.themes, pictured: plan\.pictured \}\)/,
+    'the runner visits its plan, and hands the store the api serves too, so a store swept from under the e2e is said, not blamed on a page (`storeGone`)',
   );
-  assert.match(runner, /const pages = await loadPages\(\);/);
+  assert.match(runner, /const pages = await loadPages\(\);\s*const plan = planOf\(process\.argv\.slice\(2\), pages\);/);
   assert.doesNotMatch(runner, /from '\.\/pages\//, 'run.ts imports no page by its file');
   assert.doesNotMatch(runner, /PageSpec\[\]/, 'run.ts keeps no array of pages');
 });
@@ -168,4 +168,63 @@ test('a page is refused the second time it is there, under another number', asyn
 
 test('an empty pages/ is refused: an e2e that visits nothing passes', async () => {
   await assert.rejects(loadPages(dirOf({})), (e: Error) => /has no page in it/.test(e.message));
+});
+
+/** Three pages, in the order they are visited, for a plan to choose from. */
+const ABC = [{ name: 'a' }, { name: 'b' }, { name: 'c' }];
+const namesOf = (pages: readonly { name: string }[]): string[] => pages.map((p) => p.name);
+const picturedOf = (plan: { pictured: (name: string) => boolean }): string[] => namesOf(ABC).filter((name) => plan.pictured(name));
+
+test('the e2e visits every page once, in the dark theme, and pictures none, unless it is asked otherwise', () => {
+  const plan = planOf([], ABC);
+  assert.deepEqual(namesOf(plan.visit), ['a', 'b', 'c']);
+  assert.deepEqual(plan.themes, ['dark']);
+  assert.deepEqual(picturedOf(plan), []);
+});
+
+test('--photos visits every page in light, then dark, and pictures each', () => {
+  const plan = planOf(['--photos'], ABC);
+  assert.deepEqual(namesOf(plan.visit), ['a', 'b', 'c']);
+  assert.deepEqual(plan.themes, ['light', 'dark']);
+  assert.deepEqual(picturedOf(plan), ['a', 'b', 'c']);
+});
+
+test('--pages visits every page up to the last one named, for the leavings it reads, and --photos pictures only the ones named', () => {
+  const photos = planOf(['--photos', '--pages', 'b'], ABC);
+  assert.deepEqual(namesOf(photos.visit), ['a', 'b'], 'a is visited for what it leaves, c is not');
+  assert.deepEqual(photos.themes, ['light', 'dark']);
+  assert.deepEqual(picturedOf(photos), ['b']);
+  const named = planOf(['--pages', 'c,a'], ABC);
+  assert.deepEqual(namesOf(named.visit), ['a', 'b', 'c'], 'the last named in the order of the pages, not of the names');
+  assert.deepEqual(named.themes, ['dark']);
+  assert.deepEqual(picturedOf(named), [], 'no picture without --photos');
+  assert.deepEqual(picturedOf(planOf(['--pages', 'a,c', '--photos'], ABC)), ['a', 'c'], 'in either order of the flags');
+});
+
+test('REFUSED: a page --pages names that there is not, naming it and the pages there are', () => {
+  assert.throws(
+    () => planOf(['--photos', '--pages', 'b,nope'], ABC),
+    (e: Error) => /^the e2e has no page nope: name pages there are, among a, b, c\b/.test(e.message),
+  );
+});
+
+test('REFUSED: --pages with no page after it', () => {
+  for (const argv of [['--pages'], ['--pages', '--photos'], ['--pages', ',']]) {
+    assert.throws(
+      () => planOf(argv, ABC),
+      (e: Error) => e.message.startsWith('--pages names no page: give it the pages to visit, separated by commas'),
+      argv.join(' '),
+    );
+  }
+});
+
+test('REFUSED: a flag the e2e does not know', () => {
+  assert.throws(
+    () => planOf(['--colour'], ABC),
+    (e: Error) => /^the e2e takes --photos and --pages <name,…>, not --colour\b/.test(e.message),
+  );
+  assert.throws(
+    () => planOf(['b'], ABC),
+    (e: Error) => /^the e2e takes --photos and --pages <name,…>, not b\b/.test(e.message),
+  );
 });

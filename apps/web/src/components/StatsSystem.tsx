@@ -158,8 +158,8 @@ function TracePath({ trace, frame, tone }: { trace: Trace; frame: Parameters<typ
 }
 
 /**
- * Each factory's landings over the range (`data-landings`, a row each, `data-factory`): a column per day the api answered, scaled to the
- * most landed on a day, and how many landed and what they cost in all.
+ * Each factory's landings over the range (`data-landings`, a row each, `data-factory`): a column per day the api answered (`data-day`),
+ * scaled to the most landed on a day, and how many landed and what they cost in all (`data-totals`).
  */
 function FactoryLandings({ range }: { range: SeriesRange }) {
   const now = new Date(useNow(60_000));
@@ -196,7 +196,7 @@ function LandingRow({ row, most }: { row: Landings; most: number }) {
     <li data-factory={row.factory} data-landed={row.landed} className="space-y-0.5">
       <div className="flex items-baseline justify-between gap-2">
         <span className="min-w-0 truncate font-mono">{row.factory}</span>
-        <span className="shrink-0 font-mono tabular-nums">
+        <span data-totals className="shrink-0 font-mono tabular-nums">
           {row.landed} landed · {row.costUsd === null ? NONE : dollars(row.costUsd)}
         </span>
       </div>
@@ -204,6 +204,7 @@ function LandingRow({ row, most }: { row: Landings; most: number }) {
         {row.days.map((d) => (
           <span
             key={d.day}
+            data-day={d.day}
             title={`${d.day}: ${d.landed} landed${d.costUsd === null ? '' : `, ${dollars(d.costUsd)}`}`}
             className="min-w-0 flex-1 rounded-t-sm bg-sky-600 dark:bg-sky-400"
             style={{ height: d.landed ? `${(d.landed / most) * 100}%` : 1, opacity: d.landed ? 1 : 0.3 }}

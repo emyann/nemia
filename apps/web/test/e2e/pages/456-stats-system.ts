@@ -49,6 +49,44 @@ async function pickRange(page: Page, range: string): Promise<Served> {
   return read;
 }
 
+/** The UTC day `back` days before today. */
+const dayBack = (back: number): string => new Date(Date.now() - back * 86_400_000).toISOString().slice(0, 10);
+
+/**
+ * The landings by factory, answered for a week by a fixed `GET /api/stats?by=factory` while the range is picked: a factory that landed
+ * nothing and a run with no repository left out, the most landed first, each day a column (`data-day`) scaled to the most landed on one,
+ * a day with none a stub, and the totals said. Returns what the week read served.
+ */
+async function expectLandings(page: Page): Promise<Served> {
+  const day = (back: number, landed: number | null, costPerLanded: number | null) => ({ day: dayBack(back), landed, costPerLanded });
+  const groups = [
+    { key: 'idle', days: [day(2, 0, null), day(1, null, null), day(0, 0, null)] },
+    { key: 'home', days: [day(2, 0, null), day(1, 1, null), day(0, 0, null)] },
+    { key: 'nemia', days: [day(2, 3, 2.5), day(1, 0, null), day(0, 1, 4)] },
+    { key: null, days: [day(2, 2, 1), day(1, 0, null), day(0, 0, null)] },
+  ];
+  const isFactories = (url: URL) => url.pathname === '/api/stats' && url.searchParams.get('by') === 'factory';
+  await page.route(isFactories, (route) => route.fulfill({ json: { groups } }));
+  try {
+    const read = await pickRange(page, '7d');
+    const rows = page.locator('section#system [data-landings] [data-factory]');
+    await expectCount(rows, 2, 'a row a factory that landed, none for one that landed nothing nor for a run with no repository');
+    const order = await rows.evaluateAll((els) => els.map((el) => `${el.getAttribute('data-factory')}:${el.getAttribute('data-landed')}`));
+    if (order.join(' ') !== 'nemia:4 home:1') throw new Refused(`the most landed first, nemia:4 home:1 — the rows are ${order.join(' ')}`);
+    const nemia = page.locator('section#system [data-landings] [data-factory="nemia"]');
+    const totals = await nemia.locator('[data-totals]').textContent();
+    if (totals !== '4 landed · $11.50') throw new Refused(`nemia's totals read 4 landed · $11.50 — they read ${totals}`);
+    const heights = await nemia.locator('[data-day]').evaluateAll((els) => els.map((el) => (el as HTMLElement).offsetHeight));
+    const [most, none, one] = heights;
+    if (!(most > one && one > none && none <= 1 && Math.abs(most - 3 * one) <= 1))
+      throw new Refused(`a column a day scaled to the 3 landed, a stub for none — the columns are ${heights.join(', ')} pixels tall`);
+    await photograph(page.locator('section#system'), path.join(OUT, `stats-system-week-${await themeOf(page)}.png`));
+    return read;
+  } finally {
+    await page.unroute(isFactories);
+  }
+}
+
 /** On a phone's 390 pixels: the page no wider, the legends and facts read whole, and its picture. */
 async function onPhone(page: Page): Promise<void> {
   const size = page.viewportSize();
@@ -71,8 +109,8 @@ export default {
   /**
    * The Stats page's section on the system (`#system`): over the last day, a chart each of a pass's time against the store, admission and
    * quota burn, each trace with as many points as the api serves; over 7 days and over every day once picked, the same; the system's
-   * health over the page's period, its runs in the store the most the seeded hours hold; the landings by factory; read whole at 1280 wide
-   * and on a phone.
+   * health over the page's period, its runs in the store the most the seeded hours hold; the landings by factory, drawn over a week from a
+   * fixed answer; read whole at 1280 wide and on a phone.
    */
   name: 'stats-system',
   route: '/stats',
@@ -89,8 +127,7 @@ export default {
     await expectUncut(page.locator('section#system [data-fact] dt, section#system [data-fact] dd'), 'every health fact reads whole');
     await photograph(page.locator('section#system'), path.join(OUT, `stats-system-section-${await themeOf(page)}.png`));
 
-    await pickRange(page, '7d');
-    await photograph(page.locator('section#system'), path.join(OUT, `stats-system-week-${await themeOf(page)}.png`));
+    await expectLandings(page);
     const all = await pickRange(page, 'all');
     if (all.span !== 'day') throw new Refused(`all is a point a day — the api serves a point a ${all.span}`);
     await pickRange(page, '24h');

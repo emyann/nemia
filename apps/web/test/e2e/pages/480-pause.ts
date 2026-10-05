@@ -5,7 +5,7 @@ import type { Paused } from '../../../src/lib/api/pause.ts';
 import { finishingSentence } from '../../../src/lib/pause.ts';
 import { photograph, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled } from '../checks.ts';
-import { GATED } from '../seed.ts';
+import { FAKE, GATED } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
@@ -34,6 +34,49 @@ async function afterTheDot(page: Page): Promise<void> {
 const headed = (page: Page, state: string) =>
   expectTexts(popoverOf(page).getByRole('heading'), [state], `the popover's heading is the state, ${state}`);
 
+/** What the package words a step whose check the pause holds, and what it notes beside it. */
+const HELD_WORDS = { status: 'waiting on the pause', note: 'its check is filed on nemia resume' };
+
+/** Whether `url` is the read of FAKE's run, never one of its steps'. */
+const fakeRead = (url: URL) => url.pathname === `/api/runs/${FAKE.id}`;
+
+/**
+ * Opens FAKE's page with the api's read of it held with `route`, its refused step worded as the package words a step whose check the
+ * pause holds; refuses unless the step's chip is drawn waiting, in those words; photographs its graph, wide and on a phone's screen;
+ * and goes back to the Factory.
+ */
+async function heldRun(page: Page, theme: string): Promise<void> {
+  const size = page.viewportSize();
+  await page.route(fakeRead, async (route) => {
+    if (route.request().method() !== 'GET') return route.fallback();
+    const read = (await (await route.fetch()).json()) as { steps: { name: string }[] };
+    const steps = read.steps.map((s) => (s.name === FAKE.refused ? { ...s, ...HELD_WORDS } : s));
+    return route.fulfill({ json: { ...read, steps } });
+  });
+  try {
+    await page.goto(new URL(`/runs/${FAKE.id}`, page.url()).href, { waitUntil: 'load' });
+    await idle(page);
+    const graph = page.locator(`section[aria-label="The run's steps as a graph"]`);
+    const node = graph.locator(`.react-flow__node[data-id="${FAKE.refused}"]`);
+    await expectTexts(
+      node.locator('[data-state="waiting"]'),
+      [HELD_WORDS.status],
+      'a step whose check the pause holds is drawn waiting on the pause, never checking',
+    );
+    await settled(page);
+    await photograph(graph, path.join(OUT, `pause-run-${theme}.png`));
+    await page.setViewportSize({ width: 390, height: 844 });
+    await idle(page);
+    await settled(page);
+    await photograph(graph, path.join(OUT, `pause-run-phone-${theme}.png`));
+  } finally {
+    if (size) await page.setViewportSize(size);
+    await page.unroute(fakeRead);
+  }
+  await page.goto(new URL('/factories/default', page.url()).href, { waitUntil: 'load' });
+  await idle(page);
+}
+
 /** Opens the popover and photographs the bottom bar's corner with it, as `<what>`. */
 async function opened(page: Page, what: string): Promise<void> {
   await pauseOf(page).click();
@@ -49,10 +92,11 @@ export default {
    * is a pause icon; its popover says what pausing all factories does and offers Pause… beside Pause now… (`pause-now`'s page).
    * Pause… asks an optional why, and once sent the pause's file holds it and the popover says since when, by whom and why: `Pausing · N`
    * while the seed's sessions are at work, as the api reads them, its popover naming each; once nothing finishes and a landing is held
-   * with its merge staged — the api's answer held with `route` — `Paused`, its popover naming the landing. Which tasks finish, and which
-   * landings are held, is the package's judgement, proven in its own tests (`packages/agent-orchestrator/src/tick/pause.test.ts`). On a
-   * phone's screen the button is still there, and its popover fits. Resume, in the popover, takes the file away. The window's size is put
-   * back.
+   * with its merge staged and another step's check held — the api's answer held with `route` — `Paused, 2 checks held`, its popover
+   * naming each; and on the run's page that step's chip is drawn waiting, `waiting on the pause`, the api's read of the run held with
+   * `route` as the package words it. Which tasks finish, and which checks are held, is the package's judgement, proven in its own tests
+   * (`packages/agent-orchestrator/src/tick/pause.test.ts`). On a phone's screen the button is still there, and its popover fits. Resume,
+   * in the popover, takes the file away. The window's size is put back.
    */
   name: 'pause',
   route: '/factories/default',
@@ -116,8 +160,11 @@ export default {
       await expectCount(popover, 0, 'Escape closes the popover');
 
       const staged = { run: GATED.id, step: 'ship', repo: '/code/app' };
+      const held = { run: FAKE.id, step: FAKE.refused };
       await page.route('**/api/pause', (route) =>
-        route.request().method() === 'GET' ? route.fulfill({ json: { pause: put, finishing: [], staged: [staged] } }) : route.fallback(),
+        route.request().method() === 'GET'
+          ? route.fulfill({ json: { pause: put, finishing: [], staged: [staged], held: [held] } })
+          : route.fallback(),
       );
       await page.reload({ waitUntil: 'load' });
       await idle(page);
@@ -127,15 +174,21 @@ export default {
       await expectVisible(
         popover
           .locator('[data-pause-line]')
-          .getByText(new RegExp(`^Paused since .+ by ${put.by}: ${WHY}\\. Nothing runs and nothing new starts\\.$`)),
-        'its popover says since when, by whom and why',
+          .getByText(new RegExp(`^Paused since .+ by ${put.by}: ${WHY}\\. Nothing runs and nothing new starts, 2 checks held\\.$`)),
+        'its popover says since when, by whom and why, and how many checks it holds',
       );
       await expectTexts(
         popover.locator('[data-pause-staged] li'),
         [`${GATED.id}'s ship has its merge staged in /code/app (MERGE_HEAD), and its check waits on the resume`],
         'and the landing it holds with its merge staged',
       );
+      await expectTexts(
+        popover.locator('[data-pause-held] li'),
+        [`${FAKE.id}'s ${FAKE.refused} has signed off, and its check waits on the resume`],
+        'and each other check it holds',
+      );
       await page.keyboard.press('Escape');
+      await heldRun(page, theme);
       await page.unroute('**/api/pause');
       await page.reload({ waitUntil: 'load' });
       await idle(page);

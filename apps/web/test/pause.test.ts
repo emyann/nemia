@@ -15,17 +15,17 @@ const AT = '2026-10-04T15:40:00.000Z';
 const PAUSE = { at: AT, by: 'ann', why: 'merging by hand' };
 
 /** What `GET /api/pause` answers, with `extra` over a pause and nothing at work. */
-const paused = (extra: Partial<Paused> = {}): Paused => ({ pause: PAUSE, finishing: [], staged: [], ...extra });
+const paused = (extra: Partial<Paused> = {}): Paused => ({ pause: PAUSE, finishing: [], staged: [], held: [], ...extra });
 
 test('no pause: all factories run, with no short form, and the button pauses them all', () => {
-  const words = pauseWords({ pause: null, finishing: [], staged: [] }, null, NOW);
+  const words = pauseWords({ pause: null, finishing: [], staged: [], held: [] }, null, NOW);
   assert.equal(words.state, 'running');
   assert.equal(words.text, null);
   assert.equal(words.label, 'Pause all factories');
   assert.equal(words.line, 'Pause all factories: nothing new starts, and what runs finishes.');
 });
 
-test('a pause with tasks at work is Pausing with their count, and names each, and each landing held', () => {
+test('a pause with tasks at work is Pausing with their count and the checks it holds, and names each, each landing staged and each check held', () => {
   const words = pauseWords(
     paused({
       finishing: [
@@ -33,6 +33,7 @@ test('a pause with tasks at work is Pausing with their count, and names each, an
         { run: 'r-2', step: 'ship', kind: 'landing' },
       ],
       staged: [{ run: 'r-3', step: 'ship', repo: '/code/app' }],
+      held: [{ run: 'r-4', step: 'land' }],
     }),
     null,
     NOW,
@@ -41,13 +42,24 @@ test('a pause with tasks at work is Pausing with their count, and names each, an
   assert.equal(words.text, 'Pausing · 2');
   assert.equal(
     words.line,
-    `Pausing: 2 finishing — paused since ${clockWord(new Date(AT), NOW)} by ann: merging by hand. Nothing new starts, and what runs finishes.`,
+    `Pausing: 2 finishing, 2 checks held — paused since ${clockWord(new Date(AT), NOW)} by ann: merging by hand. Nothing new starts, and what runs finishes.`,
   );
   assert.deepEqual(words.finishing, [
     "r-1's plan is finishing: its session is at work",
     "r-2's ship is finishing: the check of its landing runs",
   ]);
   assert.deepEqual(words.staged, ["r-3's ship has its merge staged in /code/app (MERGE_HEAD), and its check waits on the resume"]);
+  assert.deepEqual(words.held, ["r-4's land has signed off, and its check waits on the resume"]);
+});
+
+test('a pause with nothing at work counts the check it holds, and says none where it holds none', () => {
+  const words = pauseWords(paused({ held: [{ run: 'r-4', step: 'land' }] }), null, NOW);
+  assert.equal(words.state, 'paused');
+  assert.equal(
+    words.line,
+    `Paused since ${clockWord(new Date(AT), NOW)} by ann: merging by hand. Nothing runs and nothing new starts, 1 check held.`,
+  );
+  assert.doesNotMatch(pauseWords(paused(), null, NOW).line, /held/);
 });
 
 test('a pause with nothing at work is Paused, since when, by whom and why, and what the file no longer says is said so', () => {

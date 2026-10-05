@@ -6,15 +6,15 @@ import { Markdown } from '../components/Markdown';
 import { stepQuery } from '../lib/api';
 
 /**
- * The page of a workflow's step, at /workflows/$from/$workflow/$step: `workflows_` draws it on its own, not inside the Workflows page,
- * which has no outlet for it.
+ * The page of a workflow's step, at /workflows/$from/$workflow/$step: `workflows_` and `$workflow_` draw it on its own, not inside the
+ * Workflows page nor the workflow's, neither of which has an outlet for it.
  */
-export const Route = createFileRoute('/workflows_/$from/$workflow/$step')({
+export const Route = createFileRoute('/workflows_/$from/$workflow_/$step')({
   loader: ({ context, params }) => context.queryClient.ensureQueryData(stepQuery(params.from, params.workflow, params.step)),
   component: StepPage,
   errorComponent: ({ error }) => (
     <div className="space-y-3">
-      <BackToWorkflows />
+      <BackToWorkflow />
       <p className="text-sm text-red-600">Could not load this step: {error instanceof Error ? error.message : String(error)}</p>
     </div>
   ),
@@ -24,7 +24,7 @@ export const Route = createFileRoute('/workflows_/$from/$workflow/$step')({
  * One step of a workflow, to read: what it is told, rendered; the agent attached to it, if one is, read from the `agents/` beside its
  * workflow and linked to its page in the step's own place, with what that agent says it can do (`skills:`), a description of the work that
  * fences nothing; then every key a step may set with its value and what it means — or, with Source, its file as written. It starts nothing:
- * the Workflows page does.
+ * its workflow's page does.
  */
 function StepPage() {
   const { from, workflow, step } = Route.useParams();
@@ -33,7 +33,7 @@ function StepPage() {
 
   return (
     <article className="space-y-6">
-      <BackToWorkflows />
+      <BackToWorkflow />
 
       <header className="space-y-1">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -79,10 +79,16 @@ function StepPage() {
   );
 }
 
-function BackToWorkflows() {
+/** Back to the page of the step's workflow. */
+function BackToWorkflow() {
+  const { from, workflow } = Route.useParams();
   return (
-    <Link to="/workflows" className="text-sm text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100">
-      ← Workflows
+    <Link
+      to="/workflows/$from/$workflow"
+      params={{ from, workflow }}
+      className="font-mono text-sm text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100"
+    >
+      ← {workflow}
     </Link>
   );
 }

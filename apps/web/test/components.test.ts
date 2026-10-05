@@ -4111,6 +4111,7 @@ async function startMarkup(folderTeam: boolean, repo?: string): Promise<string> 
     from: 'yours' as const,
     dir: '/home/me/.agent-workflows/workflows/note',
     description: null,
+    readme: null,
     steps: [],
     graph: { roots: [], edges: [] },
     schemas: [],
@@ -5595,7 +5596,7 @@ test('the sidebar starts a run in the factory picked, or in none yet under All f
   assert.match(html, /data-favorites[\s\S]*Favorites[\s\S]*Nothing starred yet\./);
 });
 
-test('a favourite run links to its page by its title, and a workflow to its card on the Workflows page, yours said so, each with its unstar', async () => {
+test('a favourite run links to its page by its title, and a workflow to its own page, yours said so, each with its unstar', async () => {
   const { FavoriteLinks } = await import('../src/components/FrameSidebar.tsx');
   const { SidebarProvider } = await import('../src/components/ui/sidebar.tsx');
   const rows = [
@@ -5607,7 +5608,7 @@ test('a favourite run links to its page by its title, and a workflow to its card
   const html = await routedWith(createElement(SidebarProvider, { children: createElement(FavoriteLinks, { rows }) }));
   assert.deepEqual(
     [...html.matchAll(/<a\b[^>]*href="([^"]*)"/g)].map((m) => m[1]),
-    ['/runs/r-1', '/workflows#workflow-yours-dev', '/workflows#workflow-repo-build'],
+    ['/runs/r-1', '/workflows/yours/dev', '/workflows/repo/build'],
   );
   assert.match(html, /<li[^>]*title="r-1"[^>]*>[\s\S]*?>Star the runs<\/span>/, 'a run reads its title, its id on hover');
   assert.match(html, />dev<span[^>]*> \(yours\)<\/span>/);
@@ -6049,4 +6050,48 @@ test("the tick's pass with none kept says so, and draws no column", () => {
   const html = passesMarkup(passesRead({ recent: [], parts: [], summary: null }));
   assert.match(html, /data-passes-none[^>]*>No pass is kept yet/);
   assert.doesNotMatch(html, /data-bucket|data-part|data-fact/);
+});
+
+test("a workflow's steps, a row each: an agent's step by its policy, its agent linked and its skills; one without by its body and its own skills; each linked to its page", async () => {
+  const { StepRows } = await import('../src/components/StepRows.tsx');
+  const { workflow, stepSpec } = await import('./library-fixtures.ts');
+  const layers = {
+    agent: 'ada',
+    instructions: 'Build what was asked.',
+    custom: null,
+    agentSkills: ['implement-a-change'],
+    policy: 'Keep the **diff** small.',
+    addedSkills: ['look'],
+    fence: [],
+    task: null,
+    via: 'prompt' as const,
+  };
+  const listing = workflow({
+    from: 'repo',
+    steps: [
+      {
+        name: 'build',
+        spec: stepSpec({ agent: 'ada' }),
+        body: 'Build what was asked.\n\nKeep the **diff** small.',
+        own: null,
+        hired: null,
+        layers,
+      },
+      { name: 'ship', spec: stepSpec({ agent: null, skills: ['land-a-branch'] }), body: 'Land it.', own: null, hired: null, layers: null },
+    ],
+  });
+  const html = await routedWith(createElement(StepRows, { workflow: listing }));
+  assert.match(html, /<ol[^>]*aria-label="Steps of build"/);
+  assert.deepEqual(
+    [...html.matchAll(/<a\b[^>]*href="([^"]*)"/g)].map((m) => m[1]),
+    ['/workflows/repo/build/build', '/agents/repo/ada', '/workflows/repo/build/ship'],
+    'each step linked to its page, and the agent to its own',
+  );
+  const [build, ship] = html.split('data-step-row="ship"');
+  assert.match(build, /Keep the <strong>diff<\/strong> small\./, "the agent's step: its policy, as markdown");
+  assert.doesNotMatch(build, /Build what was asked\./, "and not its agent's instructions");
+  assert.match(build, /data-skill="implement-a-change"[\s\S]*data-skill="look"/, "its agent's skills, then those its line adds");
+  assert.match(ship, /Land it\./, 'a step with no agent: its body');
+  assert.match(ship, /No agent/);
+  assert.match(ship, /data-skill="land-a-branch"/, 'and the skills its file names');
 });

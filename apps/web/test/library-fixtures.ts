@@ -147,6 +147,7 @@ export const workflow = (extra: Partial<WorkflowListing> = {}): WorkflowListing 
   from: 'yours',
   dir: '/store/workflows/build',
   description: 'An intent to main.',
+  readme: '# build\n\nAn intent to main.\n\nEach step lands what the last one made.\n',
   steps: [
     {
       name: 'ship',

@@ -69,7 +69,8 @@ test('a folder of yours removed at the version it was read at is gone, every fil
   assert.equal(await listed('done'), true, 'listed before');
   const res = await remove('done');
   assert.equal(res.status, 200, await res.clone().text());
-  assert.deepEqual((await res.json()) as WorkflowRemoved, {
+  const answer = (await res.json()) as WorkflowRemoved;
+  assert.deepEqual(answer, {
     dir,
     removed: ['README.md', 'build.md', 'build.schema.json', 'plan.md'],
   });

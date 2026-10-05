@@ -568,7 +568,7 @@ type Done = Pick<Advanced, 'filed' | 'checked' | 'tried' | 'looped' | 'notes' | 
 
 /**
  * The pass's answer: what it did (`Advanced`), what holds the run out of rest (`restBlockers`), and at rest the branches it read the tips
- * of. `acted` says the pass wrote the record or closed a task.
+ * of, and its feed words marked `atRest`. `acted` says the pass wrote the record or closed a task.
  */
 function answerOf(
   run: Run,
@@ -582,6 +582,23 @@ function answerOf(
   const { held, waiting } = admission;
   const { filed, checked, tried, looped, notes, feed } = done;
   const { status, blocked } = assessed;
+  const inFlight = !takesNoSlot(steps) && (admission.need.inFlight || [filed, checked, tried, looped].some((names) => names.length > 0));
+  const ending = steps.find((s) => s.workspace === 'main');
+  const facts: RestFacts = {
+    run,
+    status,
+    due: assessed,
+    notes,
+    waiting,
+    inFlight,
+    held: Boolean(held),
+    settled: [...views.values()].every((v) => Boolean(v.state.settled)),
+    acted: pass.acted,
+    handOffDue: handOffOwed(steps, run, phaseOf),
+    landingOwed: steps.some((s) => landsOnCheck(s, run) && Boolean(run.steps[s.name]?.taskId) && !run.steps[s.name]?.landed),
+    checkoutAsked: Boolean(ending && !run.cancelledAt && endingAsked(run, ending, asks) !== undefined),
+  };
+  const blockers = restBlockers(facts);
   const advanced: Advanced = {
     run,
     filed,
@@ -592,26 +609,10 @@ function answerOf(
     blocked,
     notes,
     waiting,
-    inFlight: !takesNoSlot(steps) && (admission.need.inFlight || [filed, checked, tried, looped].some((names) => names.length > 0)),
+    inFlight,
     ...(held ? { held } : {}),
-    feed,
+    feed: blockers.length ? feed : { ...feed, atRest: true },
   };
-  const ending = steps.find((s) => s.workspace === 'main');
-  const facts: RestFacts = {
-    run,
-    status,
-    due: assessed,
-    notes,
-    waiting,
-    inFlight: advanced.inFlight,
-    held: Boolean(held),
-    settled: [...views.values()].every((v) => Boolean(v.state.settled)),
-    acted: pass.acted,
-    handOffDue: handOffOwed(steps, run, phaseOf),
-    landingOwed: steps.some((s) => landsOnCheck(s, run) && Boolean(run.steps[s.name]?.taskId) && !run.steps[s.name]?.landed),
-    checkoutAsked: Boolean(ending && !run.cancelledAt && endingAsked(run, ending, asks) !== undefined),
-  };
-  const blockers = restBlockers(facts);
   return { advanced, blockers, ...(blockers.length ? {} : { rest: { tipped: pass.tipped } }) };
 }
 

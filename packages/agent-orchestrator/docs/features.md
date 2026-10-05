@@ -1996,7 +1996,8 @@ What was built:
   from its byte each pass, and writes what differs (`feedChanges`). A fresh process folds from 0, so a restarted daemon writes nothing
   for what did not change; a feed replaced or truncated under it (another inode, a cursor no longer at a line) is folded again from 0.
 - **Words that move only when the judgement does.** The engine's live words fold into `running` (`feedPhase`); a slot wait drops its
-  count; no cost is said. Without these the feed would be written on every pass a session went idle, and every pass a dollar was spent.
+  count; no cost is said; and a note's change alone, on a run at rest (`atRest`), is not a change. Without these the feed would be
+  written on every pass a session went idle, every pass a dollar was spent, and for every finished run once a note is worded anew.
 - **The engine's cursor, refused by name where it cannot be read from**: a read stops at the last newline, never past a partial line;
   a cursor inside a line or past the end is refused with exit 2 and what to type (`wf feed 0`). A line a writer died in is ended by the
   next append and parsed by nobody.

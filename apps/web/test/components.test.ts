@@ -5968,16 +5968,21 @@ test("a step's agent: the one the factory picked hires, marked hired; else its f
   );
 });
 
-/** StepHire for the step `review` of `w`, read in the factory `hiring` from `page`'s answer, drawn on the step's page or a row. */
-const hireOn = async (page: Record<string, unknown> | null, where: 'page' | 'row' = 'page'): Promise<string> => {
+/**
+ * StepHire for the step `review` of `w`, read in `place` (the factory `hiring` unless said) from `page`'s answer, drawn on the step's
+ * page or a row.
+ */
+const hireOn = async (
+  page: Record<string, unknown> | null,
+  where: 'page' | 'row' = 'page',
+  place: { factory?: string } = { factory: 'hiring' },
+): Promise<string> => {
   const { StepHire } = await import('../src/components/StepHire.tsx');
   const { stepQuery } = await import('../src/lib/api/workflows.ts');
   const read = await hiredPage(page ?? {});
   const store = { workflows: '/store/workflows', agents: '/store/agents', skills: '/store/skills', fileFactory: '' };
-  return routedWith(createElement(StepHire, { from: read.from, workflow: 'w', step: 'review', place: { factory: 'hiring' }, where }), [
-    ...(page === null
-      ? []
-      : [[stepQuery(read.from, 'w', 'review', { factory: 'hiring' }).queryKey, read] as [readonly unknown[], unknown]]),
+  return routedWith(createElement(StepHire, { from: read.from, workflow: 'w', step: 'review', place, where }), [
+    ...(page === null ? [] : [[stepQuery(read.from, 'w', 'review', place).queryKey, read] as [readonly unknown[], unknown]]),
     [['store'], store],
   ]);
 };
@@ -6039,6 +6044,17 @@ test("hiring into one of the repository's steps: no New agent; its page says one
 
 test('hiring into a step draws nothing before its read is there', async () => {
   assert.equal(await hireOn(null), '');
+});
+
+test("REFUSED, hiring into a step with no factory picked: nothing is drawn — not the default factory's refusal, which is said in it", async () => {
+  const refused = '`default` is the default factory: a hire names a factory of yours.';
+  const page = { factory: null, hired: null, hiring: { refused, agents: [] } };
+  assert.equal(await hireOn(page, 'page', {}), '', 'under All factories, the step says nothing of a hire');
+  assert.match(
+    await hireOn(page, 'page', { factory: 'default' }),
+    /data-hire-refused[^>]*>`default` is the default factory: a hire names a factory of yours\.</,
+    'in the default factory, picked, why none is hired',
+  );
 });
 
 test("a step's file draws its own words, never the agent's the loader fills its body with, and says the agent row is the hire's", async () => {

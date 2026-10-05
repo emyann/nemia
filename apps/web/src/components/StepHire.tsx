@@ -19,9 +19,10 @@ const LINK =
 type Ask = { kind: 'hire'; agent: string } | { kind: 'fire' };
 
 /**
- * Hiring into the step `step` of `workflow`, read from `from`, in `place`: drawn once the step's read is there, and nothing before it.
- * `where` is the step's own page, which also says how a new agent is added to one of the repository's workflows, or a row of its
- * workflow's page, which says no more than its controls.
+ * Hiring into the step `step` of `workflow`, read from `from`, in `place`: drawn once the step's read is there, and nothing before it,
+ * nor with no factory picked, where a hire is no one's — the default factory's refusal is said only in it, picked. `where` is the step's
+ * own page, which also says how a new agent is added to one of the repository's workflows, or a row of its workflow's page, which says
+ * no more than its controls.
  */
 export function StepHire({
   from,
@@ -37,7 +38,7 @@ export function StepHire({
   where: 'page' | 'row';
 }) {
   const { data: page } = useQuery(stepQuery(from, workflow, step, place));
-  if (!page) return null;
+  if (!page || place.factory === undefined) return null;
   return <Hiring page={page} where={where} />;
 }
 

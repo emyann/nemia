@@ -70,9 +70,10 @@ export default {
   /**
    * Hiring into a step on the board. In a factory the page writes, offering `mine`, its workflow page's row of `plan` offers the agents
    * of yours to hire, and New agent; on the step's page, `scribe` is picked and hired, then fired; New agent opens the creator saying it
-   * hires what it makes into `mine/plan`, and once made, the page is back on the step, the new agent hired. In the default factory the
-   * step says why none is hired, with no picker; `pipao`, which does not offer `dev`, says so on `dev`'s page; and the repository's
-   * `dev` says, in the factory written, how a new agent is added to it. The page takes back the factory and the agent.
+   * hires what it makes into `mine/plan`, and once made, the page is back on the step, the new agent hired. With no factory picked the
+   * step says nothing of a hire; in the default factory, picked, it says why none is hired, with no picker; `pipao`, which does not
+   * offer `dev`, says so on `dev`'s page; and the repository's `dev` says, in the factory written, how a new agent is added to it. The
+   * page takes back the factory and the agent.
    */
   name: 'step-hire',
   route: `/workflows/yours/${WORKFLOWS.yours.name}/plan`,
@@ -82,8 +83,12 @@ export default {
     const step = `/workflows/yours/${yours.name}/plan`;
     const takeBack = written();
     try {
-      await expectVisible(page.locator('[data-hire-refused]'), 'in the default factory, why no agent is hired, said in place');
+      await expectCount(page.locator('[data-step-hire]'), 0, 'with no factory picked, the step says nothing of a hire');
+      await goto(page, `${step}?factory=default`);
+      await expectVisible(page.locator('[data-hire-refused]'), 'in the default factory, picked, why no agent is hired, said in place');
       await expectCount(page.locator('[data-hire-picker]'), 0, 'and no picker');
+      await settled(page);
+      await photograph(page, path.join(OUT, `step-hire-default-${theme}.png`));
 
       await goto(page, `/workflows/yours/${yours.name}?factory=${FACTORY}`);
       const row = page.locator('[data-step-hire="plan"]');

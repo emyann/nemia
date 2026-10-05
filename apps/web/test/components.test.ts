@@ -6385,7 +6385,7 @@ test("a workflow's steps, a row each: an agent's step by its policy, its agent l
   assert.match(ship, /data-skill="land-a-branch"/, 'and the skills its file names');
 });
 
-/** Nemia's section, drawn over a cache holding `level` and her memory, `facts`. */
+/** Nemia's section, drawn over a cache holding `level`, her memory, `facts`, and each fact's words, read as if opened once. */
 async function nemiaWith(level: Record<string, unknown>, facts: string[] = []): Promise<string> {
   const { NemiaSettings } = await import('../src/components/NemiaSettings.tsx');
   const client = new QueryClient();
@@ -6402,6 +6402,8 @@ async function nemiaWith(level: Record<string, unknown>, facts: string[] = []): 
     ...level,
   });
   client.setQueryData(['nemia', 'memory'], { dir: '/store/nemia/memory', facts, fact: null });
+  for (const name of facts)
+    client.setQueryData(['nemia', 'memory', name], { dir: '/store/nemia/memory', facts, fact: { name, text: `What ${name} says.` } });
   return renderToStaticMarkup(createElement(QueryClientProvider, { client }, createElement(NemiaSettings)));
 }
 
@@ -6440,7 +6442,7 @@ test('Nemia up: the switch selected, her task and phase, the attach line as code
   assert.match(html, /data-nemia-spend[^>]*>Spent \$1\.25 over 2 sessions ended; her open one counts once it ends\./);
   assert.match(html, /data-nemia-allows[\s\S]*>Bash\(git status\)</);
   assert.match(html, /data-nemia-fact="owner"[\s\S]*data-nemia-fact="style"/);
-  assert.doesNotMatch(html, /data-nemia-fact-text/, "a fact's words are drawn only while it is open");
+  assert.doesNotMatch(html, /data-nemia-fact-text|What style says\./, "a fact's words are drawn only while it is open, read or not");
 });
 
 test('Nemia stopped from outside: said so, with a way to a fresh session', async () => {

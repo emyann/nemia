@@ -149,23 +149,36 @@ export function hiredInOf(
   });
 }
 
+/** Why no agent is offered to hire into a step when the agents beside its workflow do not read: the listing's own `message`. */
+export const unreadAgentsRefusal = (message: string): string =>
+  `The agents beside this workflow could not be read, so none is offered to hire into this step: ${message}. The Agents page says which.`;
+
 /**
  * Whether an agent can be hired into `step`, of the workflow `workflow` read from `from`, in `factory` (undefined for the default), which
- * hires `hired` into it: refused as `hireRefusalOf` judges, the step's own `agent:` read only where no hire fills it; else each agent of
- * `agents` from the same place that reads, sorted by name.
+ * hires `hired` into it: refused as `hireRefusalOf` judges, the step's own `agent:` read only where no hire fills it, and `agents` never
+ * read then; else each agent `agents` reads from the same place that reads, sorted by name — or, when they cannot be read, why
+ * (`unreadAgentsRefusal`), so the step's page still answers.
  */
-export function hiringOf(
+export async function hiringOf(
   factory: Pick<Factory, 'name' | 'workflows'> | undefined,
   workflow: string,
   step: Pick<Workflow, 'agent'>,
   hired: string | null,
   from: WorkflowSource,
-  agents: readonly Pick<AgentReading, 'name' | 'from' | 'description' | 'error'>[],
-): Hiring {
+  agents: () => Promise<readonly Pick<AgentReading, 'name' | 'from' | 'description' | 'error'>[]>,
+): Promise<Hiring> {
   const refused = hireRefusalOf(factory, workflow, hired === null ? (step.agent?.name ?? null) : null);
   if (refused !== null) return { refused, agents: [] };
-  const beside = agents.filter((a) => a.from === from && a.error === null).map(({ name, description }) => ({ name, description }));
-  return { refused, agents: beside.sort((a, b) => a.name.localeCompare(b.name)) };
+  return agents().then(
+    (read) => ({
+      refused: null,
+      agents: read
+        .filter((a) => a.from === from && a.error === null)
+        .map(({ name, description }) => ({ name, description }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    }),
+    (err: unknown) => ({ refused: unreadAgentsRefusal(err instanceof Error ? err.message : String(err)), agents: [] }),
+  );
 }
 
 /** Each skill `layers` gives, the agent's then the step's, once each, with where `found` has it (`sourceOf`). */
@@ -222,7 +235,7 @@ export const step = new Hono<ApiEnv>().get('/api/workflows/:from/:name/:step', (
     const places = placesOf(repo, home);
     const layers = toldLayers(found, null);
     const hired = factory ? (fillsOf(factory.hires, name)[found.name] ?? null) : null;
-    const { agents } = (await runWith(e, AGENTS.handler({ repo }, env, home))) as AgentsRead;
+    const agents = async () => ((await runWith(e, AGENTS.handler({ repo }, env, home))) as AgentsRead).agents;
     return c.json({
       workflow: name,
       from,
@@ -236,7 +249,7 @@ export const step = new Hono<ApiEnv>().get('/api/workflows/:from/:name/:step', (
       layers,
       hired,
       hiredIn: factory ? [] : hiredInOf(readFactories(), name, found.name, from, repo),
-      hiring: hiringOf(factory, name, found, hired, from, agents),
+      hiring: await hiringOf(factory, name, found, hired, from, agents),
       skillsFrom: skillsFromOf(layers, skillsFor(folder.dir, places), repo, home),
       recentRuns: recentRunsOf(runStore.runs.list(), folder.dir, found.name, factory?.name ?? null),
     } satisfies WorkflowStepPage);

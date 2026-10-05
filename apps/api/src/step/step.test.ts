@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { hireRefusalOf, type FactoryListing } from 'agent-orchestrator';
 import type { Run } from 'agent-orchestrator/run';
-import { hiredInOf, hiringOf, RECENT_RUNS, recentRunsOf, workflowPageOf } from './step.ts';
+import { hiredInOf, hiringOf, RECENT_RUNS, recentRunsOf, unreadAgentsRefusal, workflowPageOf } from './step.ts';
 
 const home = '/store';
 const served = '/own';
@@ -115,36 +115,78 @@ const agentOf = (name: string, from: 'repo' | 'yours', error: string | null = nu
   error,
 });
 
-test("a step's hiring: the agents beside its workflow that read, by name — the same name of the other place, and a broken one, left out", () => {
+/** A reader of `agents` that counts how often it is read. */
+function readerOf(agents: readonly ReturnType<typeof agentOf>[]): { read: () => Promise<typeof agents>; reads: () => number } {
+  let reads = 0;
+  return {
+    read: async () => {
+      reads += 1;
+      return agents;
+    },
+    reads: () => reads,
+  };
+}
+
+test("a step's hiring: the agents beside its workflow that read, by name — the same name of the other place, and a broken one, left out", async () => {
   const mill = { name: 'mill', workflows: ['build'] };
-  const agents = [agentOf('zed', 'repo'), agentOf('ada', 'yours'), agentOf('ada', 'repo'), agentOf('bad', 'repo', 'no front matter')];
-  assert.deepEqual(hiringOf(mill, 'build', {}, null, 'repo', agents), {
+  const { read } = readerOf([
+    agentOf('zed', 'repo'),
+    agentOf('ada', 'yours'),
+    agentOf('ada', 'repo'),
+    agentOf('bad', 'repo', 'no front matter'),
+  ]);
+  assert.deepEqual(await hiringOf(mill, 'build', {}, null, 'repo', read), {
     refused: null,
     agents: [
       { name: 'ada', description: 'ada, of repo' },
       { name: 'zed', description: 'zed, of repo' },
     ],
   });
-  assert.deepEqual(hiringOf(mill, 'build', {}, null, 'yours', agents), {
+  assert.deepEqual(await hiringOf(mill, 'build', {}, null, 'yours', read), {
     refused: null,
     agents: [{ name: 'ada', description: 'ada, of yours' }],
   });
 });
 
-test("REFUSED: a step's hiring in the default factory, and for a step whose file names its agent, with no agents to pick — but a hired step takes another", () => {
+test("REFUSED: a step's hiring in the default factory, and for a step whose file names its agent, with no agents to pick — but a hired step takes another", async () => {
   const mill = { name: 'mill', workflows: ['build'] };
-  const agents = [agentOf('ada', 'repo')];
+  const { read } = readerOf([agentOf('ada', 'repo')]);
   const own = { agent: { name: 'agora' } } as never;
-  assert.deepEqual(hiringOf(undefined, 'build', {}, null, 'repo', agents), {
+  assert.deepEqual(await hiringOf(undefined, 'build', {}, null, 'repo', read), {
     refused: hireRefusalOf(undefined, 'build', null),
     agents: [],
   });
-  assert.match(hiringOf(undefined, 'build', {}, null, 'repo', agents).refused ?? '', /is the default factory/);
-  assert.deepEqual(hiringOf(mill, 'build', own, null, 'repo', agents), { refused: hireRefusalOf(mill, 'build', 'agora'), agents: [] });
-  assert.match(hiringOf(mill, 'build', own, null, 'repo', agents).refused ?? '', /`agent: agora`/);
+  assert.match((await hiringOf(undefined, 'build', {}, null, 'repo', read)).refused ?? '', /is the default factory/);
+  assert.deepEqual(await hiringOf(mill, 'build', own, null, 'repo', read), { refused: hireRefusalOf(mill, 'build', 'agora'), agents: [] });
+  assert.match((await hiringOf(mill, 'build', own, null, 'repo', read)).refused ?? '', /`agent: agora`/);
   assert.deepEqual(
-    hiringOf(mill, 'build', { agent: { name: 'ada' } } as never, 'ada', 'repo', agents),
+    await hiringOf(mill, 'build', { agent: { name: 'ada' } } as never, 'ada', 'repo', read),
     { refused: null, agents: [{ name: 'ada', description: 'ada, of repo' }] },
     'a hired step is resolved with its hire as its agent: its file names none of its own',
+  );
+});
+
+test('REFUSED before the agents are read: a step with no factory, in the default, in a factory not offering it, or naming its agent reads none', async () => {
+  const mill = { name: 'mill', workflows: ['build'] };
+  const reader = readerOf([agentOf('ada', 'repo')]);
+  await hiringOf(undefined, 'build', {}, null, 'repo', reader.read);
+  await hiringOf({ name: 'default', workflows: ['build'] }, 'build', {}, null, 'repo', reader.read);
+  await hiringOf({ name: 'mill', workflows: [] }, 'build', {}, null, 'repo', reader.read);
+  await hiringOf(mill, 'build', { agent: { name: 'agora' } } as never, null, 'repo', reader.read);
+  assert.equal(reader.reads(), 0, 'a refused hire never reads the agents');
+  await hiringOf(mill, 'build', {}, null, 'repo', reader.read);
+  assert.equal(reader.reads(), 1, 'one that can be hired reads them once');
+});
+
+test("REFUSED: agents that cannot be read offer none to hire, and say why in the listing's words, the step's page still answering", async () => {
+  const mill = { name: 'mill', workflows: ['build'] };
+  const unread = () => Promise.reject(new Error('agents/ada.md is not a file'));
+  assert.deepEqual(await hiringOf(mill, 'build', {}, null, 'repo', unread), {
+    refused: unreadAgentsRefusal('agents/ada.md is not a file'),
+    agents: [],
+  });
+  assert.match(
+    unreadAgentsRefusal('x'),
+    /^The agents beside this workflow could not be read, so none is offered to hire into this step: x\./,
   );
 });

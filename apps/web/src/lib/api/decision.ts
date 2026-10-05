@@ -92,7 +92,7 @@ export type DecideCommand = {
 };
 
 /** Decodes a `DecideCommand`. */
-export const DecideCommandSchema = Schema.Struct({
+const DecideCommandSchema = Schema.Struct({
   label: Schema.Literals(['ship it', 'drop it', 'read it', 'once more', 'accept', 'merge', 'approve', 'send back', 'forget it']),
   command: Schema.String,
   said: Schema.NullOr(Schema.String),

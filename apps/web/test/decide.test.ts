@@ -11,7 +11,8 @@ import {
   mostLines,
   touchedSummary,
 } from '../src/lib/decide.ts';
-import type { Decidable, Radius, RunStatus, Touched } from '../src/lib/api.ts';
+import { decisionQuery, type Decidable, type Radius, type RunStatus, type Touched } from '../src/lib/api.ts';
+import { decidable } from './run-fixtures.ts';
 
 const group = (name: string, files: number, added: number, removed: number, binary = 0) => ({ name, files, added, removed, binary });
 
@@ -243,16 +244,21 @@ test('the board presses `accept` on the step the api names beside it, never on o
   assert.equal(acceptStepOf(accept('nemia accept r-1 review --message "<why>"', null)), null, 'names no step');
 });
 
-test('a merge `nemia decide` offers decodes as the api serves it, labelled merge, and the board only copies it: it presses accept alone', async () => {
-  const { Schema } = await import('effect');
-  const { DecideCommandSchema } = await import('../src/lib/api/decision.ts');
+test('a merge `nemia decide` offers decodes as the api serves it, labelled merge, and the board only copies it: it presses accept alone', async (t) => {
   const merge = {
     label: 'merge',
     command: 'nemia merge r-1 review',
     said: "review: implement's work conflicts with main. Merge main into it — implement continued, then a new review, on round 1, which the merge does not spend:  nemia merge r-1 review",
     step: 'review',
   } as const;
-  assert.deepEqual(Schema.decodeUnknownSync(DecideCommandSchema)(merge), merge);
+  const before = globalThis.fetch;
+  globalThis.fetch = async () =>
+    new Response(JSON.stringify(decidable({ commands: [merge] })), { status: 200, headers: { 'content-type': 'application/json' } });
+  t.after(() => {
+    globalThis.fetch = before;
+  });
+  const answered = await decisionQuery('r-1', 'stamp').queryFn!({} as never);
+  assert.deepEqual(isDecidable(answered) ? answered.commands : answered, [merge]);
   assert.equal(acceptStepOf(merge), null);
 });
 

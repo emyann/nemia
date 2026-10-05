@@ -1,5 +1,5 @@
 /**
- * The cap on runs in flight as it holds between passes (`slotsOf`, `runSlots`): every run read as a pass reads it, for `wf ls`, `wf
+ * The cap on runs in flight as it holds between passes (`slotsOf`, `runSlots`): every run read as a pass reads it, for `nemia ls`, `nemia
  * decide`, the repository's checkout and the board's ceilings. A controller, reaching the runtime through the client (`runtime-client.ts`).
  */
 import { unreadableJournal, type Engine, type TaskView } from '../runtime-client.ts';
@@ -52,7 +52,7 @@ async function needOf(seen: Engine, listed: ReadonlyMap<string, TaskView>, run: 
 
 /**
  * The cap on runs in flight, and the runs it counts and holds (`Slots`): every run of `runs` read as a pass reads it, between passes, over
- * one look at the harnesses (`e.list` of every run's tasks) — what `wf ls`, `wf decide`, the repository's checkout and the board's
+ * one look at the harnesses (`e.list` of every run's tasks) — what `nemia ls`, `nemia decide`, the repository's checkout and the board's
  * ceilings say. Nothing read with no cap. A record whose workflow does not read is left out, as nothing of it could be filed; a run a task
  * of which does not read, its own or a run's it waits on, is counted in flight (`UNJUDGED`).
  *

@@ -1,8 +1,8 @@
 /**
  * The store's pause, as the tick honours it: while `$WF_ROOT/cordon` stands no pass starts new work — no step, try or check filed, no
- * queued task admitted, no queued card started, nothing of a run `wf start` wrote meanwhile — and what runs finishes; a person's retry and
- * approval written meanwhile wait on their files; and the pass after the lift files what waits. Every pass judges afresh what the memo of
- * runs at rest answers (`verifyRest`), and one in the middle starts with no memo at all, as a restarted daemon does.
+ * queued task admitted, no queued card started, nothing of a run `nemia start` wrote meanwhile — and what runs finishes; a person's retry
+ * and approval written meanwhile wait on their files; and the pass after the lift files what waits. Every pass judges afresh what the memo
+ * of runs at rest answers (`verifyRest`), and one in the middle starts with no memo at all, as a restarted daemon does.
  *
  * Walked through the runtime itself over an in-memory journal and a harness the test signs by hand, as rest-store.test.ts does, and every
  * filing `queued` as the store's own engine files it (`engineOf`), under the store's own admission (`storeAdmission`), so admission is
@@ -44,7 +44,7 @@ const git = (repo: string, ...args: string[]) =>
     stdio: ['ignore', 'pipe', 'pipe'],
   }).trim();
 
-/** A repository with one commit, so `wf start` has a base to record. */
+/** A repository with one commit, so `nemia start` has a base to record. */
 const aRepo = (): string => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   git(repo, 'init', '-q');
@@ -223,7 +223,7 @@ test('while the store is paused nothing new starts and what runs finishes; the p
   assert.match(pausedLines(first.pause!)[0], /^Pausing: 3 finishing/);
   assert.equal(first.queue, undefined, 'and started no queued card');
   const listedAtWork = (await runsListed(h.e)).paused!;
-  assert.deepEqual(sorted(listedAtWork), { pause, finishing: atWork, staged: [] }, 'wf ls names each task still finishing');
+  assert.deepEqual(sorted(listedAtWork), { pause, finishing: atWork, staged: [] }, 'nemia ls names each task still finishing');
   assert.deepEqual(sorted(await pausedRead(h.e)), sorted(listedAtWork), 'and the api reads the same');
   h.signAll();
   await pass(freshRestMemo());
@@ -234,7 +234,7 @@ test('while the store is paused nothing new starts and what runs finishes; the p
   assert.deepEqual(last.pause, { pause, finishing: [], staged: held }, 'once what ran has finished, nothing finishes; the landing is held');
   assert.deepEqual(pausedLines(last.pause), [
     pausedWords(last.pause),
-    `   ${landing.id}'s ship has its merge staged in ${repo} (MERGE_HEAD), and its check waits on wf resume`,
+    `   ${landing.id}'s ship has its merge staged in ${repo} (MERGE_HEAD), and its check waits on nemia resume`,
   ]);
   assert.match(pausedLines(last.pause)[0], /^Paused since /);
 
@@ -260,12 +260,12 @@ test('while the store is paused nothing new starts and what runs finishes; the p
   assert.deepEqual(
     listed.paused,
     { pause, finishing: [], staged: held },
-    'wf ls names the pause, and the landing whose merge it holds staged in the checkout, its check not filed',
+    'nemia ls names the pause, and the landing whose merge it holds staged in the checkout, its check not filed',
   );
   assert.equal(readRun(landing.id).steps.ship?.check, undefined);
   assert.deepEqual(await pausedRead(h.e), listed.paused, 'and the api reads the same');
   const ls = COMMANDS.find((c) => c.name === 'ls')!;
-  assert.deepEqual(ls.print(listed, {}).slice(0, 2), pausedLines(listed.paused), 'wf ls says it first');
+  assert.deepEqual(ls.print(listed, {}).slice(0, 2), pausedLines(listed.paused), 'nemia ls says it first');
 
   const spoiled = h.tasks.get(taskOf(landing, 'ship')!)!;
   spoiled.push(MISWRITTEN as never);
@@ -291,7 +291,7 @@ test('while the store is paused nothing new starts and what runs finishes; the p
   assert.ok(taskOf(born, 'work'), 'the run started while paused filed');
   assert.ok(lifted.queue, 'the queued card tried');
   assert.ok(readRun(landing.id).steps.ship?.check, "landing's check filed");
-  assert.equal((await runsListed(h.e)).paused, undefined, 'and wf ls says no pause');
+  assert.equal((await runsListed(h.e)).paused, undefined, 'and nemia ls says no pause');
   assert.deepEqual(await pausedRead(h.e), { pause: null, finishing: [], staged: [] });
   await pass();
   assert.ok(h.spawned.length > before, 'and sessions started again');

@@ -29,7 +29,7 @@ export const PLACE_DEADLINE_MS: Readonly<Record<PlaceVerb, number>> = {
   remove: 120_000,
 };
 
-/** What `open` answers at `wf start`: the repository, the commit a run starts from, and the line of work it is on. */
+/** What `open` answers at `nemia start`: the repository, the commit a run starts from, and the line of work it is on. */
 export type Opened = { readonly repo: string; readonly baseRef: string; readonly branch: string };
 
 /**

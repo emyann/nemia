@@ -12,12 +12,12 @@
  * findings, no special case for a framework.
  *
  * **Where the command comes from is the whole argument.** It is read from the workflow the run
- * froze at `wf start` (`Run.workflow`), never from a folder a step can edit. A step that could
+ * froze at `nemia start` (`Run.workflow`), never from a folder a step can edit. A step that could
  * author the command that judges it would be marking its own homework.
  *
  * **It runs as an engine task on the runtime's command harness**, registered as `check`: the argv (`checkArgv`), the environment and the
  * niceness are the task's `config`, its exit code the verdict (`attemptVerdict`), and its stdout and stderr are kept whole by the runtime
- * and read through `output`. What that buys without a line of engine code: the check survives a tick that dies, `wf cancel` stops a
+ * and read through `output`. What that buys without a line of engine code: the check survives a tick that dies, `nemia cancel` stops a
  * running suite through `e.stop`, a hung suite ends at the task's deadline, and checks have a concurrency pool of their own, so a suite
  * that runs for minutes never holds an agent's slot or the tick itself.
  *
@@ -40,7 +40,7 @@ export const CHECK_DEADLINE_SECONDS = 1200;
  */
 export const CHECK_NICENESS = 10;
 
-/** How many lines of each stream `wf decide` shows for a check that refused. */
+/** How many lines of each stream `nemia decide` shows for a check that refused. */
 export const CHECK_TAIL_LINES = 20;
 
 /**
@@ -66,7 +66,7 @@ export type CheckEnv = {
 export const INSTALL = 'npm install --no-save --no-audit --no-fund';
 
 /** What the log says of an install that failed, before the check ends with no exit code. */
-export const INSTALL_FAILED = '[wf check] install failed, exit';
+export const INSTALL_FAILED = '[nemia check] install failed, exit';
 
 /**
  * The argv a check runs: `sh -c`, and the shell line the run froze.
@@ -84,7 +84,7 @@ export const checkArgv = (command: string, install = false): string[] => [
   [
     ...(install
       ? [
-          `echo '[wf check] the staged merge asks for packages this checkout has not installed: ${INSTALL}'`,
+          `echo '[nemia check] the staged merge asks for packages this checkout has not installed: ${INSTALL}'`,
           `${INSTALL} 2>&1 || { printf '\\n${INSTALL_FAILED} %d: no verdict on the work\\n' "$?"; kill -s KILL $$; }`,
         ]
       : []),
@@ -155,7 +155,7 @@ export const landingContract = (command: string): string =>
 export type CheckRefusal = { command: string; verdict: Verdict; stdout: string; stderr: string };
 
 /**
- * What a check said, told to the step tried again after it (`retries:`, `wf retry`).
+ * What a check said, told to the step tried again after it (`retries:`, `nemia retry`).
  *
  * As data, the way a declared output reaches the step that reads it: JSON in a fence, under a line saying
  * whose words they are. A suite's output is text a step did not write and a run did not vet — a test name,

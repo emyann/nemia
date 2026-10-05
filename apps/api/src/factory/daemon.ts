@@ -1,7 +1,7 @@
 /**
- * Whether a daemon ticks the store — the api's process or a `wf up` — as the board asks it: the package's own judgement of
+ * Whether a daemon ticks the store — the api's process or a `nemia up` — as the board asks it: the package's own judgement of
  * `$WF_ROOT/daemon.json` (`daemonStanding`), read and never written — the file is the daemon's alone — turned into facts the board words in
- * the person's own time. `line` is `wf ls`'s last line, so the board and the terminal say the same thing of the same file.
+ * the person's own time. `line` is `nemia ls`'s last line, so the board and the terminal say the same thing of the same file.
  */
 import {
   daemonLine,
@@ -22,8 +22,8 @@ export const START = 'npm start in apps/api';
  * latest of its start, its last pass and its beat on the wall clock, said to a person; the package measures the silence beside it on the
  * monotonic clock, and `staleAfterMs` of silence makes a live daemon `stalled`.
  * `identity` is what the api's own process table said of the pid (the package's `Identity`). `by` is which kind of daemon wrote the file,
- * the api or a `wf up` (a file that names none is a `wf up`'s), and `url` where an api holder serves the board, null for a `wf up`.
- * `start` is how a person starts one (`START`). A file that does not read has no fields.
+ * the api or a `nemia up` (a file that names none is a `nemia up`'s), and `url` where an api holder serves the board, null for a `nemia
+ * up`. `start` is how a person starts one (`START`). A file that does not read has no fields.
  */
 export type Daemon = {
   kind: DaemonStanding['kind'];
@@ -86,8 +86,8 @@ export function daemonOf(standing: DaemonStanding, now: number): Daemon {
 }
 
 /**
- * Whether a daemon ticks the store now: the file read and the process table asked, as `wf ls` asks them, the package reading both clocks;
- * `now` is the wall time its ages are worded at. Throws what the package throws of a file that is there and cannot be read — a store that
- * cannot be read cannot be said to tick or not.
+ * Whether a daemon ticks the store now: the file read and the process table asked, as `nemia ls` asks them, the package reading both
+ * clocks; `now` is the wall time its ages are worded at. Throws what the package throws of a file that is there and cannot be read — a
+ * store that cannot be read cannot be said to tick or not.
  */
 export const readDaemon = (now = Date.now()): Daemon => daemonOf(daemonStanding(), now);

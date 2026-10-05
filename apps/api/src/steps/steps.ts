@@ -84,14 +84,14 @@ async function readTranscript(e: Engine['Service'], id: string, step: string, ta
     const why = err instanceof Error ? err.message : String(err);
     throw new Unread(
       502,
-      `Could not read task ${taskId} of step '${step}': ${why}. \`wf ls\` reads the same record from the command line.`,
+      `Could not read task ${taskId} of step '${step}': ${why}. \`nemia ls\` reads the same record from the command line.`,
     );
   }
   const phase = phaseOfView(view);
   if (phase === 'unknown') {
     throw new Unread(
       404,
-      `Step '${step}' of run '${id}' was filed as task ${taskId}, and the engine has no record of it: there is no conversation to read. \`wf ls\` shows the step unknown.`,
+      `Step '${step}' of run '${id}' was filed as task ${taskId}, and the engine has no record of it: there is no conversation to read. \`nemia ls\` shows the step unknown.`,
     );
   }
   try {
@@ -102,7 +102,7 @@ async function readTranscript(e: Engine['Service'], id: string, step: string, ta
     if ((err as { exitCode?: unknown }).exitCode !== 2) {
       throw new Unread(
         502,
-        `Could not read the conversation of step '${step}' (task ${taskId}): ${why}. \`wf logs ${id} ${step}\` reads its output from the command line.`,
+        `Could not read the conversation of step '${step}' (task ${taskId}): ${why}. \`nemia logs ${id} ${step}\` reads its output from the command line.`,
       );
     }
     if (
@@ -145,12 +145,12 @@ async function send(stream: SSEStreamingApi, read: Read): Promise<void> {
 /**
  * A step's own reads. Each answers 404 for a run or a step the run does not have.
  *
- * - `GET /api/runs/:runId/steps/:step/log` — the end of the step's session output as text (`LOG_LINES`), read by `wf logs`' entry
+ * - `GET /api/runs/:runId/steps/:step/log` — the end of the step's session output as text (`LOG_LINES`), read by `nemia logs`' entry
  *   (`LOGS`), which reads it whole; empty for a step not filed yet; 502 when the engine could not read it. The board reads the
  *   conversation from the transcript routes.
  * - `GET /api/runs/:id/steps/:step/artifacts/:name` — one file of the step's files directory, by name and never by path (`step artifact`),
  *   as its closeout's `artifacts` link it; read on each request and never kept, since a step that runs again writes its files again.
- *   400 for a name that is not one; 410 for a file gone because `wf prune --artifacts` removed the run's files, leaving its record,
+ *   400 for a name that is not one; 410 for a file gone because `nemia prune --artifacts` removed the run's files, leaving its record,
  *   closeouts and branches; 404 for a file the directory does not have.
  * - `GET /api/runs/:id/steps/:step/files/:name` — one file of a folder step's own folder, by name and never by path (`step file`), as
  *   `files` on the step links it: what the step made, named in its closeout or not. Read on each request and never kept: the folder is
@@ -188,7 +188,7 @@ export const steps = new Hono<ApiEnv>()
         const why = err instanceof Error ? err.message : String(err);
         return c.json(
           {
-            error: `Could not read the output of step '${step}' (task ${taskId}): ${why}. \`wf logs ${id} ${step}\` reads it the same way from the command line, with the error in full.`,
+            error: `Could not read the output of step '${step}' (task ${taskId}): ${why}. \`nemia logs ${id} ${step}\` reads it the same way from the command line, with the error in full.`,
           },
           502,
         );
@@ -209,7 +209,7 @@ export const steps = new Hono<ApiEnv>()
       if (!file && pruned) {
         return c.json(
           {
-            error: `Step '${step}' of run '${id}' has no file '${name}': ${filesPrunedWords(pruned)}. Its record, its closeouts and its branches are kept; \`wf decide ${id}\` reads them.`,
+            error: `Step '${step}' of run '${id}' has no file '${name}': ${filesPrunedWords(pruned)}. Its record, its closeouts and its branches are kept; \`nemia decide ${id}\` reads them.`,
             pruned: pruned.at,
           },
           410,
@@ -271,7 +271,7 @@ export const steps = new Hono<ApiEnv>()
         const why = err instanceof Error ? err.message : String(err);
         return c.json(
           {
-            error: `Could not read the journal of task ${asked.taskId} (step '${step}', try ${asked.try}): ${why}. \`wf ls\` reads the same record from the command line.`,
+            error: `Could not read the journal of task ${asked.taskId} (step '${step}', try ${asked.try}): ${why}. \`nemia ls\` reads the same record from the command line.`,
           },
           502,
         );

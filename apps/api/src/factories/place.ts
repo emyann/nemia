@@ -3,7 +3,7 @@
  * `served` (layer.ts), so no handler reads either off the request itself, and the api reads no path a request invents.
  *
  * A request that names neither is answered in the default factory, on the api's own repository (`repoOf`), as it was before a factory was
- * one to name. A factory is read from the store (`readFactory`), never written: `wf factory` is the one writer of its file.
+ * one to name. A factory is read from the store (`readFactory`), never written: `nemia factory` is the one writer of its file.
  */
 import path from 'node:path';
 import { DEFAULT_FACTORY, factoryRepo, Invalid, outsideRefusal, readFactories, readFactory, type Factory } from 'agent-orchestrator';
@@ -27,17 +27,17 @@ export function knownRepos(env: NodeJS.ProcessEnv): string[] {
 /** Why the default factory does not serve `repo`, which none of `known` is: an `Invalid`, naming them and the file that adds one. */
 const unknownRepo = (repo: string, known: readonly string[]): Invalid =>
   new Invalid({
-    message: `${repo}: the api serves its own repository and those of the factories in the store — ${known.join(', ')} — and this is none of them. Name one of them with ?repo=, or file a factory for it: wf factory add <name> --repo ${repo}.`,
+    message: `${repo}: the api serves its own repository and those of the factories in the store — ${known.join(', ')} — and this is none of them. Name one of them with ?repo=, or file a factory for it: nemia factory add <name> --repo ${repo}.`,
   });
 
 /**
  * Why the factory `factory` does not serve `repo`, not one of its repositories: an `Invalid`, naming them, the `?repo=` that asks for
- * one, and the `wf factory add` that files a factory on `repo`.
+ * one, and the `nemia factory add` that files a factory on `repo`.
  */
 const outsideRepo = (factory: Factory, repo: string): Invalid => {
   const repos = factory.repos.map((r) => path.resolve(r)).sort();
   return new Invalid({
-    message: `${repo}: the factory ${factory.name} works on ${repos.join(', ')}, and this repository is not one of them. Name one of them — ?factory=${factory.name}&repo=${repos[0]} — or file a factory on this one: wf factory add <name> --repo ${repo}.`,
+    message: `${repo}: the factory ${factory.name} works on ${repos.join(', ')}, and this repository is not one of them. Name one of them — ?factory=${factory.name}&repo=${repos[0]} — or file a factory on this one: nemia factory add <name> --repo ${repo}.`,
   });
 };
 

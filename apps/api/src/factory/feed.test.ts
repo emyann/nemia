@@ -106,7 +106,7 @@ test("a transition the tick writes to the feed arrives on the stream as it is wr
   try {
     assert.match(res.headers.get('content-type') ?? '', /^text\/event-stream/);
 
-    const [gate] = pass({ 'r-1': planAt('awaiting approval', 'approve it: wf approve r-1 plan') });
+    const [gate] = pass({ 'r-1': planAt('awaiting approval', 'approve it: nemia approve r-1 plan') });
     let said = await readUntil(reader, text, (s) => s.length >= 1);
     assert.deepEqual(
       said,
@@ -115,7 +115,7 @@ test("a transition the tick writes to the feed arrives on the stream as it is wr
     );
 
     const [done] = pass({
-      'r-1': { run: { word: 'done' }, steps: [{ name: 'plan', word: 'awaiting approval', note: 'approve it: wf approve r-1 plan' }] },
+      'r-1': { run: { word: 'done' }, steps: [{ name: 'plan', word: 'awaiting approval', note: 'approve it: nemia approve r-1 plan' }] },
     });
     said = await readUntil(reader, text, (s) => s.length >= 2);
     assert.deepEqual(said[1], { event: 'run', data: JSON.stringify(done), id: String(end()) });

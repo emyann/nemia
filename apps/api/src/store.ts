@@ -10,8 +10,8 @@ import { isGitRun, type Run } from 'agent-orchestrator/run';
 /**
  * The engine the api reads through — `list`, `view` and `logs` — one for an app, built with its runtime (`live`: the package's
  * `engine()`). The api's process, started without `--no-tick`, is the store's daemon, and ticks on this engine (main.ts), so a board
- * served by it keeps the store ticking; its routes still file and advance nothing but through `wf`'s own verbs, and an api under
- * `--no-tick` ticks nothing. The one write through it from a route is a try's removal (`DELETE /api/runs/:id`), `wf rm`'s own code,
+ * served by it keeps the store ticking; its routes still file and advance nothing but through `nemia`'s own verbs, and an api under
+ * `--no-tick` ticks nothing. The one write through it from a route is a try's removal (`DELETE /api/runs/:id`), `nemia rm`'s own code,
  * which closes a task that waits for a word nobody will give once the record is gone.
  */
 export class Engine extends Context.Service<Engine, ReturnType<typeof engine>>()('api/Engine') {
@@ -56,7 +56,7 @@ export const workFolderOf = (run: Run, step: string): string | null => (isGitRun
 export const findRun = (id: string): Run | undefined => runStore.runs.list().find((r) => r.id === id);
 
 export const noSuchRun = (id: string) =>
-  `No run '${id}' in this store. GET /api/runs (or \`wf ls\`) lists the runs it has; check WF_ROOT if you expected it here.`;
+  `No run '${id}' in this store. GET /api/runs (or \`nemia ls\`) lists the runs it has; check WF_ROOT if you expected it here.`;
 
 /**
  * The run and the task a step's routes read — null for a step not filed yet — or why there is no such step to read: no run by

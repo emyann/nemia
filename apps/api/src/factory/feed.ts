@@ -14,9 +14,9 @@ const feedEventOf = (line: FeedLine): 'step' | 'removed' | 'run' =>
   line.step !== undefined ? 'step' : line.word === REMOVED ? 'removed' : 'run';
 
 /**
- * Where a reader of the feed starts: the byte its cursor names — none, or an empty one, is 0, the whole feed, as `wf watch` and `ae watch`
- * start — or why it cannot. The package says which numbers the feed has a line boundary at (`feedCursorRefusal`); the api keeps no rule of
- * its own about them, and says only how a reader of the stream comes by a cursor.
+ * Where a reader of the feed starts: the byte its cursor names — none, or an empty one, is 0, the whole feed, as `nemia watch` and `ae
+ * watch` start — or why it cannot. The package says which numbers the feed has a line boundary at (`feedCursorRefusal`); the api keeps no
+ * rule of its own about them, and says only how a reader of the stream comes by a cursor.
  */
 function feedCursorOf(raw: string | undefined): number | { error: string } {
   if (!raw) return 0;

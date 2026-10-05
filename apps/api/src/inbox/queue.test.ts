@@ -63,7 +63,7 @@ const refusalOf = (name: string, off = false): string => {
   return assert.fail(`queueInInbox took ${name}${off ? ' --off' : ''}, which the api refused`);
 };
 
-/** A record of a run started from `card`, as `wf start` writes one: a folder run with nothing filed yet, its `from` naming the card. */
+/** A record of a run started from `card`, as `nemia start` writes one: a folder run with nothing filed yet, its `from` naming the card. */
 const startedFrom = (id: string, card: string): string =>
   JSON.stringify({
     id,
@@ -117,7 +117,7 @@ test("GET /api/inbox carries a queued card's time and place, and the tick's last
   assert.equal('queued' in byName.get(parked.name)!, false, 'a card not queued carries no `queued`');
 });
 
-test('POST /api/inbox/:name/queue queues a card as `wf inbox queue` does, with its place; DELETE takes it back as `--off` does, and says so of a card not queued, writing nothing', async (t) => {
+test('POST /api/inbox/:name/queue queues a card as `nemia inbox queue` does, with its place; DELETE takes it back as `--off` does, and says so of a card not queued, writing nothing', async (t) => {
   clear();
   t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-09-16T09:30:00.000Z') });
   const first = addToInbox({ text: 'Cache the views between passes', workflow: 'dev' }).card;
@@ -138,7 +138,7 @@ test('POST /api/inbox/:name/queue queues a card as `wf inbox queue` does, with i
   assert.equal(
     cardText(first.name),
     `---\nworkflow: dev\nqueued: ${answer.queued}\n---\nCache the views between passes\n`,
-    'written as wf inbox queue writes it',
+    'written as nemia inbox queue writes it',
   );
 
   t.mock.timers.tick(1);
@@ -276,7 +276,7 @@ test("REFUSED at shipped defaults: a queue of a name that is not a card's is a 4
   assert.equal(withWorkflow.status, 400);
   assert.equal(
     ((await withWorkflow.json()) as { error: string }).error,
-    `${route} takes no body, or \`{}\`: the card is named in the path, and queued on the workflow it names, and this request sent {"workflow":"dev"}. A card is queued on the workflow it names: file it with one, or queue it with \`wf inbox queue <name> --workflow <w>\`, which writes both.`,
+    `${route} takes no body, or \`{}\`: the card is named in the path, and queued on the workflow it names, and this request sent {"workflow":"dev"}. A card is queued on the workflow it names: file it with one, or queue it with \`nemia inbox queue <name> --workflow <w>\`, which writes both.`,
   );
   for (const body of ['{"off":true}', '[]', '"dev"', 'not json']) {
     const res = await queue(card.name, JSON_TYPE, body);
@@ -304,7 +304,7 @@ test("REFUSED at shipped defaults: a queue's body that is JSON and not `{}` — 
   assert.equal(named.status, 400);
   assert.equal(
     ((await named.json()) as { error: string }).error,
-    `${takes}, and this request sent {"workflow":null}. A card is queued on the workflow it names: file it with one, or queue it with \`wf inbox queue <name> --workflow <w>\`, which writes both.`,
+    `${takes}, and this request sent {"workflow":null}. A card is queued on the workflow it names: file it with one, or queue it with \`nemia inbox queue <name> --workflow <w>\`, which writes both.`,
   );
   assert.deepEqual(inboxAsIs(), before);
 });
@@ -373,7 +373,7 @@ const pending = (taskId: string) => {
   );
 };
 
-/** A run of one step, frozen on the record as `wf start` freezes it. */
+/** A run of one step, frozen on the record as `nemia start` freezes it. */
 function writeRun(id: string, minute: number, fields: { after?: string[]; taskId?: string; cancelled?: boolean } = {}): void {
   fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
   fs.writeFileSync(

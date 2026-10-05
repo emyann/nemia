@@ -3,7 +3,7 @@
  * their tasks and the filing times on its feed.
  *
  * Pure, as `tick/assess.ts` is: data in, a timeline and its lines out. `views.verb.ts` reads the views and the feed (`readFilings`) and
- * hands them here, `cli/main.ts` prints the lines `wf decide` shows, and nothing here reads a disk or calls the engine.
+ * hands them here, `cli/main.ts` prints the lines `nemia decide` shows, and nothing here reads a disk or calls the engine.
  */
 import type { Run } from '../record/record.ts';
 import { roundIn, dollars, durationWord, rebuiltCache, sumUsage, usedLines, type Consumed } from '../status/status.ts';
@@ -363,7 +363,7 @@ function totalOf(loop: string | null, round: number | null, spans: readonly Task
 }
 
 /**
- * A step's timeline as `wf decide` prints it, under its `used`: a row per try's session and per try's check, in the order they ran. Each
+ * A step's timeline as `nemia decide` prints it, under its `used`: a row per try's session and per try's check, in the order they ran. Each
  * says when it was filed, spawned and ended — UTC, with the day where it is not the first row's — then its queue and run time, and beside a
  * session what it used and, where the engine measured it, what it cost. Empty for a step not filed.
  */
@@ -399,7 +399,7 @@ export function timelineLines(tries: readonly TimelineTry[]): string[] {
 }
 
 /**
- * A run's totals as `wf decide` prints them, after its steps: each round of each loop that went round — named by its looping step where
+ * A run's totals as `nemia decide` prints them, after its steps: each round of each loop that went round — named by its looping step where
  * more than one did — then, on a run the cap on runs in flight held, its wait for a run slot, then the run's, every step's, that wait among
  * its queue.
  */

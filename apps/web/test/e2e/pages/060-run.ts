@@ -120,7 +120,7 @@ export default {
       'drop it: the branch deleted, as a line',
     );
     await expectVisible(
-      decide.locator('[data-command="once more"] code', { hasText: `wf retry ${FAKE.id} ${FAKE.refused}` }),
+      decide.locator('[data-command="once more"] code', { hasText: `nemia retry ${FAKE.id} ${FAKE.refused}` }),
       `once more: ${FAKE.refused} tried again, as a line`,
     );
     await expectCount(

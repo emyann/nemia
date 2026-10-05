@@ -1,5 +1,5 @@
 /**
- * The daemon's loop, one for its two kinds: the api's process, which serves the board as it ticks, and `wf up`, which only ticks. `up`
+ * The daemon's loop, one for its two kinds: the api's process, which serves the board as it ticks, and `nemia up`, which only ticks. `up`
  * takes the store's lease in its scope and lets it go as the scope closes; `holdUrl` writes into the lease where the api serves; and
  * `runMain` runs either as the process's command, a signal letting go of the lease before the process exits.
  */
@@ -13,7 +13,7 @@ import { takenFromLine, type HolderKind } from './daemon.ts';
 /**
  * What `up` runs with: its interval, `every` ms; the repository a queued card that names none starts on, and the folder the lease names
  * (`repo`); the kind of daemon it is (`holder`); what to do once the lease is taken and before the first pass, in the lease's scope
- * (`onTaken` — where the api serves, and `wf up` says what it holds); and what to say of each pass (`onPass`).
+ * (`onTaken` — where the api serves, and `nemia up` says what it holds); and what to say of each pass (`onPass`).
  */
 export type UpOptions = {
   every: number;
@@ -48,7 +48,7 @@ export const up = (e: Engine, { every, repo, holder, onTaken, onPass }: UpOption
   });
 
 /**
- * The api's word once it listens: `url`, where it serves the board, written into the lease this process holds, so `wf ls`, `/api/daemon`
+ * The api's word once it listens: `url`, where it serves the board, written into the lease this process holds, so `nemia ls`, `/api/daemon`
  * and a refused daemon name it. Answers whether it was written: not when the lease is another's, or let go.
  */
 export const holdUrl = (url: string): boolean => heldUrl(url);

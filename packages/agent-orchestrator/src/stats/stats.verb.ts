@@ -1,5 +1,5 @@
 /**
- * `wf stats` (`statsRun`): the flow numbers of every run in the store (`statsOf`), off each run's record and the engine's view of every
+ * `nemia stats` (`statsRun`): the flow numbers of every run in the store (`statsOf`), off each run's record and the engine's view of every
  * task of every try, each viewed once, the calls each session was refused and the skills it loaded read off the same views
  * (`deniedCallsOf`, `skillsLoadedOf`), each try's counts read off its own task's closeout (`taskCloseout`), and the rules each step's
  * skills declare read off their frozen copies (`renderedSkillRules`): no session's log nor transcript, and no skill of the checkout. A
@@ -193,7 +193,7 @@ async function statsOver(e: Engine, query: StatsQuery, now: Date, { memo, verify
 }
 
 /**
- * `wf stats`: the flow numbers of every run in the store for `query`, as of `now`, through the memo `options` hands it, if any. Fails
+ * `nemia stats`: the flow numbers of every run in the store for `query`, as of `now`, through the memo `options` hands it, if any. Fails
  * with a refusal a read threw; dies of anything else.
  */
 export const statsRun = Effect.fn('stats')(function* (query: StatsQuery, now: Date = new Date(), options: StatsOptions = {}) {
@@ -201,6 +201,6 @@ export const statsRun = Effect.fn('stats')(function* (query: StatsQuery, now: Da
   return yield* awaited(() => statsOver(e, query, now, options));
 });
 
-/** `wf stats` (`statsRun`) in a Promise, over `engine`: what the CLI, the api and the tests call. */
+/** `nemia stats` (`statsRun`) in a Promise, over `engine`: what the CLI, the api and the tests call. */
 export const stats = (engine: Engine, query: StatsQuery, now: Date = new Date(), options: StatsOptions = {}) =>
   Effect.runPromise(statsRun(query, now, options).pipe(Effect.provide(EngineService.layer(engine))));

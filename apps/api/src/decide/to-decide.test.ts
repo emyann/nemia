@@ -95,7 +95,7 @@ const running = (taskId: string, cwd: string) =>
     ]),
   );
 
-/** What `ship.md` says first, which is what a person is deciding on: `toDecide.says`, and the whole of `wf ls`'s line with it. */
+/** What `ship.md` says first, which is what a person is deciding on: `toDecide.says`, and the whole of `nemia ls`'s line with it. */
 const SHIPS = 'Merge this run onto the base branch, or abort on any failure.';
 const SHIP_BODY = `${SHIPS}\n\nLook at the checkout first.`;
 
@@ -182,14 +182,14 @@ test("a run at its ending's gate: `to decide` says what the ending would do and 
       /** What the card answers it with: a send-back goes to the work ship waits on (`sendBackTo`), and the result is on its way to main. */
       back: ['implement'],
       onto: 'main',
-      said: `${SHIPS} — wf approve ${id} ship`,
-      command: `wf approve ${id} ship`,
+      said: `${SHIPS} — nemia approve ${id} ship`,
+      command: `nemia approve ${id} ship`,
     },
     "the ending has not run: what there is to decide is what it would do, in the folder's own first line, and the command that runs it",
   );
   assert.ok(
     detail.toDecide.said.endsWith(detail.toDecide.command),
-    `the whole of wf ls's line ends with the command the board offers, so the two cannot drift apart: ${detail.toDecide.said}`,
+    `the whole of nemia ls's line ends with the command the board offers, so the two cannot drift apart: ${detail.toDecide.said}`,
   );
   assert.deepEqual((await listedOf(id)).toDecide, detail.toDecide, 'the list says the same, in the same words');
   assert.equal(
@@ -207,7 +207,7 @@ test("the decision of a run at its ending's gate offers the approval and the sen
   );
   assert.deepEqual(
     commands.map((c) => c.command),
-    [`wf approve r-ending ship`, `wf retry r-ending implement --message "<objection>"`],
+    [`nemia approve r-ending ship`, `nemia retry r-ending implement --message "<objection>"`],
   );
   assert.deepEqual(
     standings.map((b) => [b.branch, b.where]),
@@ -283,7 +283,11 @@ test("an ending that waits on several steps offers a send-back to each, and one 
   );
   assert.deepEqual(
     wideGate.commands.map((c) => c.command),
-    [`wf approve ${fan} ship`, `wf retry ${fan} implement --message "<objection>"`, `wf retry ${fan} docs --message "<objection>"`],
+    [
+      `nemia approve ${fan} ship`,
+      `nemia retry ${fan} implement --message "<objection>"`,
+      `nemia retry ${fan} docs --message "<objection>"`,
+    ],
     'a fan-in ending, which the loader allows: ship after implement and docs, nothing waiting on it and nothing ending beside it',
   );
 
@@ -299,7 +303,7 @@ test("an ending that waits on several steps offers a send-back to each, and one 
   const lone = await decidableOf(alone).finally(() => (process.env.WF_MAX_RUNS = 'set-it-in-the-test'));
   assert.deepEqual(
     lone.commands.map((c) => [c.label, c.command]),
-    [['approve', `wf approve ${alone} ship`]],
+    [['approve', `nemia approve ${alone} ship`]],
     'an ending that waits on nothing, a workflow of one step in the checkout, which the loader allows too: no work to send back, so the approval is the only command, and it is there',
   );
   for (const { commands } of [wideGate, lone]) {
@@ -388,13 +392,13 @@ test('an ending that ran on its approval and stopped on the base branch offers b
   assert.deepEqual(
     commands.map((c) => [c.label, c.command]),
     [
-      ['send back', `wf retry ${id} review --message "<objection>"`],
-      ['once more', `wf retry ${id} ship`],
+      ['send back', `nemia retry ${id} review --message "<objection>"`],
+      ['once more', `nemia retry ${id} ship`],
     ],
   );
 });
 
-test('a finished run whose folder says nothing about shipping: `to decide` is its branch ahead of the base, and the command is `wf decide`', async () => {
+test('a finished run whose folder says nothing about shipping: `to decide` is its branch ahead of the base, and the command is `nemia decide`', async () => {
   const id = 'r-plain';
   const branch = `wf/${id}/implement`;
   branchOff(repo, branch, 'src/b.ts', 'export const b = 2;\n');
@@ -407,8 +411,8 @@ test('a finished run whose folder says nothing about shipping: `to decide` is it
   assert.deepEqual(detail.toDecide, {
     kind: 'git',
     branches: [branch],
-    said: `${branch} is ahead of main, and nothing has merged it — wf decide ${id}`,
-    command: `wf decide ${id}`,
+    said: `${branch} is ahead of main, and nothing has merged it — nemia decide ${id}`,
+    command: `nemia decide ${id}`,
   });
   assert.deepEqual((await listedOf(id)).toDecide, detail.toDecide, 'the list says the same, in the same words');
 
@@ -425,7 +429,7 @@ test('a finished run whose folder says nothing about shipping: `to decide` is it
         merge: { clean: true, said: 'merges cleanly onto main' },
       },
     ],
-    'the facts under the result, as wf decide prints them: where the branch stands, and how much it changed',
+    'the facts under the result, as nemia decide prints them: where the branch stands, and how much it changed',
   );
   assert.deepEqual(
     commands.map((c) => c.label),
@@ -445,14 +449,14 @@ test('level-triggered: a branch merged by hand stops being one to decide on the 
     assert.deepEqual(
       await decisionOf(id),
       { nothing: `shipped — wf/${id}/implement is already on main` },
-      "wf decide's own answer reads the same way",
+      "nemia decide's own answer reads the same way",
     );
   } finally {
     git(repo, 'reset', '-q', '--hard', base);
   }
 });
 
-test('an approved ending that has run leaves nothing to decide: the folder answered for its own branch — its approval with no words, no `message` in it, as `wf approve` writes one', async () => {
+test('an approved ending that has run leaves nothing to decide: the folder answered for its own branch — its approval with no words, no `message` in it, as `nemia approve` writes one', async () => {
   const id = 'r-shipped';
   const branch = `wf/${id}/implement`;
   branchOff(repo, branch, 'src/c.ts', 'export const c = 3;\n');

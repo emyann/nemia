@@ -343,7 +343,7 @@ export default {
     await expectVisible(ending, `a run at its ending's gate keeps its card on the floor with no Show finished (${ENDING.id})`);
     await expectVisible(
       ending.locator(
-        `[data-to-decide="approve"][data-gate-line="${ENDING.ending}"][title^="approve to run ${ENDING.ending} on main"][title$="${ENDING.says} — wf approve ${ENDING.id} ${ENDING.ending}"]`,
+        `[data-to-decide="approve"][data-gate-line="${ENDING.ending}"][title^="approve to run ${ENDING.ending} on main"][title$="${ENDING.says} — nemia approve ${ENDING.id} ${ENDING.ending}"]`,
         { hasText: `approve to run ${ENDING.ending} on main, or send ${ENDING.back} back` },
       ),
       `its card says what approving its ending does and where a send-back goes, the folder's words on hover`,
@@ -382,7 +382,7 @@ export default {
     await expectVisible(cardOf(page, SHIPPED.id).locator('[data-pruned]', { hasText: /^pruned$/ }), 'and it says it was pruned');
     const prunedSaid = await cardOf(page, SHIPPED.id).locator('[data-pruned]').getAttribute('title');
     if (
-      !/^pruned at \S+ — its worktrees were removed \(wf prune\), and its files were removed at .* \(wf prune --artifacts\); its branches and record are kept$/.test(
+      !/^pruned at \S+ — its worktrees were removed \(nemia prune\), and its files were removed at .* \(nemia prune --artifacts\); its branches and record are kept$/.test(
         prunedSaid ?? '',
       )
     ) {

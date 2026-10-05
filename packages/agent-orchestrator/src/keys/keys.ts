@@ -32,7 +32,7 @@ export function harnessOf(step: string, harness: string | undefined): string | u
 
 /**
  * A permission mode, a sandbox or an effort as written: the harness's own word, which the runtime judges against the harness the step runs
- * on when `wf start` asks it (`configRefused` in start.verb.ts). Refused here: `sandbox:` on a step that does not run on codex, since a
+ * on when `nemia start` asks it (`configRefused` in start.verb.ts). Refused here: `sandbox:` on a step that does not run on codex, since a
  * step files its sandbox as its harness's permission mode, and a sandbox read as a mode is a fence nobody asked for.
  */
 export function wordOf(
@@ -54,7 +54,7 @@ export function wordOf(
 /**
  * `remote:` as written: `true` or `false`, or refused. Anything else — `yes`, `on` — is a word the run would have to interpret, and reading
  * it either way is wrong: as true it lets a session be driven from a phone nobody meant to reach it, as false it drops a setting without a
- * word. Which harnesses bridge a session is the runtime's to say, so `remote: true` where it bridges none is refused at `wf start`
+ * word. Which harnesses bridge a session is the runtime's to say, so `remote: true` where it bridges none is refused at `nemia start`
  * (`configRefused` in start.verb.ts).
  */
 export function remoteOf(step: string, remote: string | undefined): boolean | undefined {
@@ -68,7 +68,7 @@ export function remoteOf(step: string, remote: string | undefined): boolean | un
 
 /**
  * `background:` as written: `true` or `false`, or refused, for `remote:`'s reasons. Which harnesses run a background session is the
- * runtime's to say, so `true` on another is refused at `wf start` (`configRefused` in start.verb.ts).
+ * runtime's to say, so `true` on another is refused at `nemia start` (`configRefused` in start.verb.ts).
  */
 export function backgroundOf(step: string, background: string | undefined): boolean | undefined {
   if (background === undefined) return undefined;
@@ -120,7 +120,7 @@ export const contextText = (tokens: number): string =>
 
 /**
  * `context:` as tokens, refused unless a number of them (`tokensOf`). The windows a harness takes, and whether it has the knob, are the
- * runtime's to say at `wf start` (`configRefused` in start.verb.ts).
+ * runtime's to say at `nemia start` (`configRefused` in start.verb.ts).
  */
 export function contextOf(step: string, context: string | undefined): number | undefined {
   if (context === undefined) return undefined;
@@ -155,7 +155,7 @@ export const BUDGET_EXAMPLE = '`budget: 5`, or `budget: 2.50`';
 
 /**
  * Dollars as a person writes them — `5`, `2.50` — or undefined for anything else: digits, and a point with digits after it, above
- * zero. What `budget:` takes, and `wf retry --budget` and `wf round --budget` too.
+ * zero. What `budget:` takes, and `nemia retry --budget` and `nemia round --budget` too.
  */
 export function dollarsOf(written: string): number | undefined {
   const value = written.trim();
@@ -165,8 +165,8 @@ export function dollarsOf(written: string): number | undefined {
 
 /**
  * `budget:` as dollars, refused unless an amount above zero (`dollarsOf`). Which harnesses keep a cap, and beside what, is the runtime's to
- * say at `wf start` (`configRefused` in start.verb.ts). `$5` and `5 USD` are what the author meant, so the refusal writes the amount back
- * without its unit, as `deadlineSeconds: 5m`'s does the arithmetic.
+ * say at `nemia start` (`configRefused` in start.verb.ts). `$5` and `5 USD` are what the author meant, so the refusal writes the amount
+ * back without its unit, as `deadlineSeconds: 5m`'s does the arithmetic.
  */
 export function budgetOf(step: string, budget: string | undefined): number | undefined {
   if (budget === undefined) return undefined;
@@ -181,7 +181,7 @@ export function budgetOf(step: string, budget: string | undefined): number | und
 
 /**
  * `gate:` as written: `true`, or refused. `false` is what a step without the line already is, and anything else — `yes`, a step's name — is
- * a word the run would have to interpret. A gate at a step the folder does not gate is said at start: `wf start --gate <step>`.
+ * a word the run would have to interpret. A gate at a step the folder does not gate is said at start: `nemia start --gate <step>`.
  */
 export function gateOf(step: string, gate: string | undefined): true | undefined {
   if (gate === undefined) return undefined;
@@ -192,7 +192,7 @@ export function gateOf(step: string, gate: string | undefined): true | undefined
     );
   }
   return refuse(
-    `${step}: \`gate: ${gate}\` is not \`true\`. \`gate: true\` holds the step's closeout for a person — wf approve — before anything after it is filed; without the line the step has no gate. To gate one run of the workflow and not every run, delete the line and start it with --gate ${step}.`,
+    `${step}: \`gate: ${gate}\` is not \`true\`. \`gate: true\` holds the step's closeout for a person — nemia approve — before anything after it is filed; without the line the step has no gate. To gate one run of the workflow and not every run, delete the line and start it with --gate ${step}.`,
   );
 }
 
@@ -244,7 +244,7 @@ export function workspaceOf(
   }
   if (retries !== undefined) {
     refuse(
-      `${step}: \`workspace: main\` runs the step in the repository's own checkout, and \`retries: ${retries}\` would have the run do it again there on its own, on a refusal nobody read. A step that ends a run is tried again on a person's word: wf retry <run> ${step}. Delete the \`retries:\` line.`,
+      `${step}: \`workspace: main\` runs the step in the repository's own checkout, and \`retries: ${retries}\` would have the run do it again there on its own, on a refusal nobody read. A step that ends a run is tried again on a person's word: nemia retry <run> ${step}. Delete the \`retries:\` line.`,
     );
   }
   if (resume !== undefined) {
@@ -475,7 +475,7 @@ export function writableNamesOf(file: string, written: string | undefined): stri
   if (written === undefined) return undefined;
   const named = `${file}: \`writable: ${written}\``;
   const shape =
-    "Each is one of the factory's folders by its directory's name, never a path, comma-separated: `writable: web, docs`; wf factory ls lists the folders.";
+    "Each is one of the factory's folders by its directory's name, never a path, comma-separated: `writable: web, docs`; nemia factory ls lists the folders.";
   const names = written
     .split(',')
     .map((s) => s.trim())

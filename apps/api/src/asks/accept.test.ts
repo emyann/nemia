@@ -1,7 +1,7 @@
 /**
  * POST /api/runs/:id/steps/:step/accept: a person's acceptance of a loop out of rounds, as it stands, from the board — through the
- * package's `accept()`, `wf accept`'s own, which writes the acceptance and nothing else, and refused in the package's words. The api judges
- * none of it: every refusal here is asserted equal to what `accept()` itself says.
+ * package's `accept()`, `nemia accept`'s own, which writes the acceptance and nothing else, and refused in the package's words. The api
+ * judges none of it: every refusal here is asserted equal to what `accept()` itself says.
  *
  * At shipped defaults: the api's own engine over a store this file seeds, the harness's fake `claude` (test/harness.ts) first on PATH.
  */
@@ -116,7 +116,7 @@ const acceptOver = (step: string, body: unknown, headers: Record<string, string>
     body: typeof body === 'string' ? body : JSON.stringify(body),
   });
 
-/** What the package's `accept()` refuses, word for word: what `wf accept` prints. */
+/** What the package's `accept()` refuses, word for word: what `nemia accept` prints. */
 const acceptRefuses = async (step: string, message?: string, run = R): Promise<string> => {
   try {
     await accept(engine(), run, step, message);
@@ -152,7 +152,7 @@ test('REFUSED at shipped defaults: an acceptance another site could make — a p
       ),
       error,
     );
-    assert.ok(error.endsWith(`Accept it from the run's page on the board, or with \`wf accept ${R} review --message "<why>"\`.`), error);
+    assert.ok(error.endsWith(`Accept it from the run's page on the board, or with \`nemia accept ${R} review --message "<why>"\`.`), error);
   }
   for (const host of ['evil.example', 'evil.example:8787', 'localhost.evil.example:8787']) {
     const res = await acceptOver('review', body, { ...BOARD, host });
@@ -206,7 +206,7 @@ test("REFUSED: a body that is not an acceptance (400), a run or a step that does
     );
     const { error } = (await res.json()) as { error: string };
     const message = (body as { message?: string }).message;
-    assert.equal(error, acceptWordsRefusal(message, `wf accept ${R} review`), "the package's own sentence");
+    assert.equal(error, acceptWordsRefusal(message, `nemia accept ${R} review`), "the package's own sentence");
     assert.equal(error, await acceptRefuses('review', message), 'and the one `accept()` refuses with');
     assert.match(error, words);
   }
@@ -247,7 +247,7 @@ test("REFUSED at shipped defaults: a round the run files itself, a loop that end
     assert.equal(
       res.status,
       409,
-      "a round asked for, which the next tick files, written by the package's own `round()` as `wf round` writes it",
+      "a round asked for, which the next tick files, written by the package's own `round()` as `nemia round` writes it",
     );
     const { error } = (await res.json()) as { error: string };
     assert.equal(error, await acceptRefuses('review', WHY));
@@ -259,7 +259,7 @@ test("REFUSED at shipped defaults: a round the run files itself, a loop that end
   nothingWritten('a loop about to go round again');
 });
 
-test("an acceptance as the board sends it is the package's: 202 with the step, the try, when, the words and its file — the file as `wf accept` writes it, the record untouched — and the detail reads it under the loop, which waits on nobody and is offered no more; a second acceptance refused", async () => {
+test("an acceptance as the board sends it is the package's: 202 with the step, the try, when, the words and its file — the file as `nemia accept` writes it, the record untouched — and the detail reads it under the loop, which waits on nobody and is offered no more; a second acceptance refused", async () => {
   const res = await acceptOver('review', { message: WHY });
   assert.equal(res.status, 202, await res.clone().text());
   const took = (await res.json()) as Acceptance & { file: string };
@@ -275,7 +275,7 @@ test("an acceptance as the board sends it is the package's: 202 with the step, t
   assert.deepEqual(review.accepted, { try: 2, at: took.at, message: WHY });
   const words = await list(engine(), runStore.runs.read(R));
   const listed = words.steps.find((s) => s.name === 'review')!;
-  assert.equal(review.status, listed.status, 'as `wf ls` has it until the tick files what waits');
+  assert.equal(review.status, listed.status, 'as `nemia ls` has it until the tick files what waits');
   assert.notEqual(review.status, 'exhausted', "the loop over on the person's word");
   assert.deepEqual(run.waitingOnYou, [], 'and nobody waited on');
   const decision = (await (await app.request(`/api/runs/${R}/decision`)).json()) as RunDecision;

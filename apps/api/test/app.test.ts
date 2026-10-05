@@ -770,7 +770,7 @@ test('a folder changed since the run started keeps the steps that ran, and names
   assert.deepEqual(summary.waitingOnYou, ['original']);
 });
 
-/** A loop as `wf start` freezes it: review loops back to implement, for at most two rounds. */
+/** A loop as `nemia start` freezes it: review loops back to implement, for at most two rounds. */
 const frozenLoop = [
   { name: 'implement', after: [], body: 'Implement it, as frozen.', harness: 'claude', model: 'opus' },
   {
@@ -935,7 +935,7 @@ test('a run that froze its workflow is drawn from it, not from a folder that rea
   assert.deepEqual(
     run.graph,
     frozenGraph,
-    'the frozen graph, not the one of a folder edited after `wf start` with the loop taken out and review waiting on nothing',
+    'the frozen graph, not the one of a folder edited after `nemia start` with the loop taken out and review waiting on nothing',
   );
   assert.deepEqual(
     (await listed('r-42')).graph,
@@ -960,7 +960,7 @@ test('a run that froze its workflow shows only its steps: one its folder gained 
   });
 
   const run = await detailOf('r-43');
-  assert.ok(run.warning, 'docs was added to the folder after `wf start`: the tick reads the frozen workflow, so it never files it');
+  assert.ok(run.warning, 'docs was added to the folder after `nemia start`: the tick reads the frozen workflow, so it never files it');
   assert.match(
     run.warning,
     /has changed since this run started: it has docs, which the run did not start with and will never file, so it is not shown\./,
@@ -978,7 +978,7 @@ test('a run that froze its workflow shows only its steps: one its folder gained 
   assert.deepEqual(
     (await list(engine(), runStore.runs.read('r-43'))).steps.map((s: { name: string }) => s.name),
     ['implement', 'review'],
-    'the steps `wf ls` lists, and no other',
+    'the steps `nemia ls` lists, and no other',
   );
   assert.equal((await app.request('/api/runs/r-43/steps/docs/log')).status, 404);
 });
@@ -1087,7 +1087,7 @@ test('each step says how many attempts it has had, when the latest began, and ho
   assert.deepEqual(
     Object.keys((await listed('r-7')).steps[0]),
     ['name', 'taskId', 'branch', 'status', 'note', 'needs', 'blockedByHarness', 'waitingFor', 'approve', 'denied'],
-    'the list carries the note `wf ls` prints beside a step, and what a person has to know to act on it',
+    'the list carries the note `nemia ls` prints beside a step, and what a person has to know to act on it',
   );
   assert.equal((await listed('r-7')).steps[0].note, null, 'no note for a step on its first try');
 });
@@ -1173,7 +1173,7 @@ test('output the engine cannot read is a 502 that says how to read it from the c
   assert.equal(status, 502);
   const { error } = body as { error: string };
   assert.match(error, /Could not read the output of step 'implement' \(task t-10\)/);
-  assert.match(error, /`wf logs r-10 implement`/);
+  assert.match(error, /`nemia logs r-10 implement`/);
 });
 
 const done = { outcome: 'done', summary: 'It is done.', needs: null, artifacts: [] };
@@ -1216,7 +1216,7 @@ const silentTask = (taskId: string) =>
 const refusedOutput = 'ok 1 - builds\nnot ok 2 - parses a trailing comma\n# fail 1\n';
 
 /**
- * A run that froze its workflow, with a step for each thing `wf ls` says the run established: verified;
+ * A run that froze its workflow, with a step for each thing `nemia ls` says the run established: verified;
  * refused by its check, with an exit code and without one; still checking; done on its own word; ended
  * without the closeout it was asked for; still running; and waiting behind a refusal.
  */
@@ -1251,7 +1251,7 @@ function seedChecks() {
     id: 'r-20',
     workflow: r20Steps,
     /**
-     * The folder as somebody left it after `wf start`: the same steps, and every `check:` taken out. The run is judged by the workflow
+     * The folder as somebody left it after `nemia start`: the same steps, and every `check:` taken out. The run is judged by the workflow
      * it froze, so these change nothing.
      */
     workflowDir: workflowFolder(
@@ -1286,7 +1286,7 @@ function seedChecks() {
   });
 }
 
-test("each step says what the run established, in `wf ls`'s words, on both endpoints", async () => {
+test("each step says what the run established, in `nemia ls`'s words, on both endpoints", async () => {
   seedChecks();
   const words = [
     ['build', 'verified ✓'],
@@ -1490,7 +1490,7 @@ test('a check that refused with `retries:` left reads as the tick has it — run
     ],
   ];
   for (const [id, status, moving, waitingOnYou, word, why] of cases) {
-    assert.deepEqual((await list(e, runStore.runs.read(id))).waitingOnYou, waitingOnYou, `${id}, wf ls: ${why}`);
+    assert.deepEqual((await list(e, runStore.runs.read(id))).waitingOnYou, waitingOnYou, `${id}, nemia ls: ${why}`);
     for (const [where, run] of [
       ['list', await listed(id)],
       ['detail', await detailOf(id)],
@@ -1505,7 +1505,7 @@ test('a check that refused with `retries:` left reads as the tick has it — run
 });
 
 /**
- * A review that loops back to implement, frozen as `wf start` freezes it: `again` declared boolean in its `output:`,
+ * A review that loops back to implement, frozen as `nemia start` freezes it: `again` declared boolean in its `output:`,
  * and `rounds:` as the parser sets it for a loop that does not say — the shipped default.
  */
 const looped = [
@@ -1543,7 +1543,7 @@ function seedLoop(id: string, round: number, again: boolean) {
   writeRun({ ...r2, id, workflowDir: path.join(NOWHERE, 'no-such-workflow'), workflow: looped, steps });
 }
 
-/** A person's ask, as `wf retry` and `wf round` leave one: a file of its own beside the run's record, named for what it asks. */
+/** A person's ask, as `nemia retry` and `nemia round` leave one: a file of its own beside the run's record, named for what it asks. */
 function askFor(id: string, name: string, ask: object) {
   const dir = path.join(root, 'runs', `${id}.asks`);
   fs.mkdirSync(dir, { recursive: true });
@@ -1565,7 +1565,9 @@ type Judgement = [
   why: string,
 ];
 
-/** Each run on both endpoints: where it stands, whether it moves, who it waits on, each step's word and note — and those are `wf ls`'s. */
+/**
+ * Each run on both endpoints: where it stands, whether it moves, who it waits on, each step's word and note — and those are `nemia ls`'s.
+ */
 async function expectJudged(cases: readonly Judgement[]) {
   const e = engine();
   for (const [id, status, moving, waitingOnYou, rows, why] of cases) {
@@ -1580,8 +1582,8 @@ async function expectJudged(cases: readonly Judgement[]) {
         rows,
         `${id}, ${where}: ${why}`,
       );
-      assert.deepEqual(run.steps.map(asListed), words.steps, `${id}, ${where}: wf ls's words and notes`);
-      assert.deepEqual(run.waitingOnYou, words.waitingOnYou, `${id}, ${where}: who wf ls says is waited on`);
+      assert.deepEqual(run.steps.map(asListed), words.steps, `${id}, ${where}: nemia ls's words and notes`);
+      assert.deepEqual(run.waitingOnYou, words.waitingOnYou, `${id}, ${where}: who nemia ls says is waited on`);
     }
   }
 }
@@ -1599,7 +1601,7 @@ test('a loop out of rounds reads `rounds exhausted`, waits on you, and does not 
       ['review'],
       [
         ['implement', 'unverified · done', 'round 3 of 3'],
-        ['review', 'rounds exhausted', 'round 3 of 3, and it asked again — once more: wf round r-30 review'],
+        ['review', 'rounds exhausted', 'round 3 of 3, and it asked again — once more: nemia round r-30 review'],
       ],
       'at its cap, and it asked again: a person decides, and no tick files a thing',
     ],
@@ -1610,7 +1612,7 @@ test('a loop out of rounds reads `rounds exhausted`, waits on you, and does not 
       [],
       [
         ['implement', 'unverified · done', 'round 3 of 3'],
-        ['review', 'rounds exhausted', 'round 4 asked (wf round) — the next tick files implement'],
+        ['review', 'rounds exhausted', 'round 4 asked (nemia round) — the next tick files implement'],
       ],
       'a person asked for round 4: the next tick files it, and nobody is waited on',
     ],
@@ -1722,7 +1724,7 @@ test('a refused check whose output cannot be read still answers, and says how to
   );
   assert.ok(refused.unreadable);
   assert.match(refused.unreadable, /Could not read the output of its check \(task r-22-test-check\)/);
-  assert.match(refused.unreadable, /`wf decide r-22`/);
+  assert.match(refused.unreadable, /`nemia decide r-22`/);
 });
 
 test('a refused check whose stderr the engine cannot give still answers with its stdout, and says how to read it from the command line', async () => {
@@ -1750,7 +1752,7 @@ test('a refused check whose stderr the engine cannot give still answers with its
       unreadable: undefined,
     },
   );
-  assert.match(refused.unreadable ?? '', /^Could not read the output of its check \(task r-71-test-check\): .*EISDIR.*`wf decide r-71`/);
+  assert.match(refused.unreadable ?? '', /^Could not read the output of its check \(task r-71-test-check\): .*EISDIR.*`nemia decide r-71`/);
 });
 
 test('the list of runs observes the engine at most once, however many runs and steps are filed, and not at all with nothing in flight', async (t) => {
@@ -2215,7 +2217,7 @@ test("the mode the api says a Claude Code task runs in is the one the engine's `
   assert.equal(said.get('r-59-claude-mode'), jobWith('dontAsk'), 'a job filed with one');
 });
 
-test("a model a person's `wf retry --model` asked for is on the try it was asked for, past a recheck — and on no other", async () => {
+test("a model a person's `nemia retry --model` asked for is on the try it was asked for, past a recheck — and on no other", async () => {
   await engine().file({
     id: 'r-55-implement-try2',
     brief: 'Implement it.',
@@ -2378,7 +2380,7 @@ test("a step's file is served by name, with its type and no caching — and a na
   assert.equal((await app.request('/api/runs/r-52/steps/deploy/artifacts/shot.png')).status, 404, 'no such step');
 });
 
-test("once `wf prune --artifacts` removed a run's files, each file a closeout named there reads pruned, the route answers 410 saying so — not a 404 that reads as missing — and the run's page and its decision still answer", async () => {
+test("once `nemia prune --artifacts` removed a run's files, each file a closeout named there reads pruned, the route answers 410 saying so — not a 404 that reads as missing — and the run's page and its decision still answer", async () => {
   const { dir, named } = seedFiles();
   const marker = path.join(root, 'runs', 'r-52.pruned');
   const files = { at: '2026-09-28T09:00:00.000Z', bytes: 3 * 1024 * 1024 };
@@ -2389,7 +2391,7 @@ test("once `wf prune --artifacts` removed a run's files, each file a closeout na
     assert.equal(res.status, 200);
     const page = (await res.json()) as RunDetail;
     assert.deepEqual(page.pruned, { at: files.at, worktrees: [], artifacts: files });
-    const said = `its files were removed at ${files.at} (wf prune --artifacts)`;
+    const said = `its files were removed at ${files.at} (nemia prune --artifacts)`;
     const [shoot] = page.steps;
     assert.ok(shoot.closeout);
     assert.deepEqual(
@@ -2412,7 +2414,7 @@ test("once `wf prune --artifacts` removed a run's files, each file a closeout na
       const body = (await gone.json()) as { error: string; pruned: string };
       assert.equal(
         body.error,
-        `Step 'shoot' of run 'r-52' has no file '${name}': ${said}. Its record, its closeouts and its branches are kept; \`wf decide r-52\` reads them.`,
+        `Step 'shoot' of run 'r-52' has no file '${name}': ${said}. Its record, its closeouts and its branches are kept; \`nemia decide r-52\` reads them.`,
       );
       assert.equal(body.pruned, files.at);
     }
@@ -2557,7 +2559,7 @@ test("the detail carries where each step's time went — per try and per check, 
       peak: null,
       rebuilt: 0,
     },
-    "what each session used, in wf decide's words, as the step's used is",
+    "what each session used, in nemia decide's words, as the step's used is",
   );
   assert.deepEqual(review.timeline, [], 'a step not filed has no try on the clock');
   assert.deepEqual(
@@ -2579,7 +2581,7 @@ test("the detail carries where each step's time went — per try and per check, 
   assert.deepEqual(
     lessUsed(implement.timeline),
     lessUsed(theirs.steps.implement),
-    'each try as the package has it, less used, which the api words as wf decide does',
+    'each try as the package has it, less used, which the api words as nemia decide does',
   );
 
   ranTask('r-60-implement-try3', 'codex', T(40), T(40, 7));

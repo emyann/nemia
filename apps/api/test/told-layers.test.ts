@@ -1,6 +1,6 @@
 /**
  * What a step was told, by layer, as the run page reads it (`GET /api/runs/:id`, `layers`): each layer from what the run froze at
- * `wf start` — the agent's instructions and skills, the person's custom instructions, the step's note, the skill and the deny its line
+ * `nemia start` — the agent's instructions and skills, the person's custom instructions, the step's note, the skill and the deny its line
  * adds, and the task — never from the agent's, the custom instructions' or the step's file as it is now; and none for a record that froze
  * no workflow.
  */

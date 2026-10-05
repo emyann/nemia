@@ -1,6 +1,6 @@
 /**
- * The store's pause as the CLI says it (`pausedWords`): first on `wf feed`, after how to start the run on `wf start`, and on `wf up` once
- * when it is put, again each time its words change — Pausing with fewer finishing, then Paused, then a landing held staged — and
+ * The store's pause as the CLI says it (`pausedWords`): first on `nemia feed`, after how to start the run on `nemia start`, and on `nemia
+ * up` once when it is put, again each time its words change — Pausing with fewer finishing, then Paused, then a landing held staged — and
  * `resumed` once when it is resumed (`pauseSaid`); none of them while no pause stands.
  *
  * `WF_ROOT` is set before the import, since the module reads it as it loads.
@@ -57,7 +57,7 @@ const aStart = (): string[] => {
   return ['start', 'a paused start', '--workflows', dir, '--repo', repo, '--factory', factory, '--no-worktree'];
 };
 
-test('wf feed opens with the pause while one stands, Paused with nothing at work, and says none once it is resumed', async (t) => {
+test('nemia feed opens with the pause while one stands, Paused with nothing at work, and says none once it is resumed', async (t) => {
   const pause = putPause({ why: 'merging by hand', by: 'ann' });
   try {
     const feed = await printed(t, () => main(['feed'], {} as Engine));
@@ -74,7 +74,7 @@ test('wf feed opens with the pause while one stands, Paused with nothing at work
   );
 });
 
-test('wf start says, after how to start the run, that nothing of it is filed until it resumes, and nothing of a pause with none', async (t) => {
+test('nemia start says, after how to start the run, that nothing of it is filed until it resumes, and nothing of a pause with none', async (t) => {
   const pause = putPause({ by: 'ann' });
   let started: string[];
   try {
@@ -82,7 +82,7 @@ test('wf start says, after how to start the run, that nothing of it is filed unt
   } finally {
     resumePause();
   }
-  const at = started.indexOf("run 'wf tick' (or 'wf up') to start it");
+  const at = started.indexOf("run 'nemia tick' (or 'nemia up') to start it");
   assert.ok(at > 0, started.join('\n'));
   assert.equal(started[at + 1], `${pausedWords({ pause, finishing: [] })}: nothing of this run is filed until then`);
   const free = await printed(t, () => main(aStart(), {} as Engine));
@@ -93,7 +93,7 @@ test('wf start says, after how to start the run, that nothing of it is filed unt
   );
 });
 
-test('wf up says the pause once across passes, again each time its words change, and resumed once when it is resumed', async (t) => {
+test('nemia up says the pause once across passes, again each time its words change, and resumed once when it is resumed', async (t) => {
   const pause = { at: '2026-10-04T12:00:00.000Z', by: 'ann', why: 'merging by hand' };
   const two = {
     pause,
@@ -117,7 +117,7 @@ test('wf up says the pause once across passes, again each time its words change,
       pausedWords(one),
       pausedWords(none),
       pausedWords(held),
-      "   r-3's ship has its merge staged in /code/app (MERGE_HEAD), and its check waits on wf resume",
+      "   r-3's ship has its merge staged in /code/app (MERGE_HEAD), and its check waits on nemia resume",
       RESUMED,
     ],
   );

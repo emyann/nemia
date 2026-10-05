@@ -2467,11 +2467,11 @@ test("the Decide section's accept row takes a reason and presses it; every other
     overBudget: null,
     awaiting: null,
     commands: [
-      { label: 'once more', command: 'wf round r-1 review', said: null },
+      { label: 'once more', command: 'nemia round r-1 review', said: null },
       {
         label: 'accept',
-        command: 'wf accept r-1 review --message "<why>"',
-        said: 'review: enough — go on with what is there:  wf accept r-1 review --message "<why>"',
+        command: 'nemia accept r-1 review --message "<why>"',
+        said: 'review: enough — go on with what is there:  nemia accept r-1 review --message "<why>"',
       },
     ],
   };
@@ -2481,7 +2481,7 @@ test("the Decide section's accept row takes a reason and presses it; every other
   const commands = /<section aria-label="Commands"[\s\S]*?<\/section>/.exec(html)![0];
   const row = /<li data-command="accept"[\s\S]*?<\/li>/.exec(commands)![0];
   assert.match(row, /data-step="review"/);
-  assert.match(row, /<code[^>]*>wf accept r-1 review --message &quot;&lt;why&gt;&quot;<\/code>/);
+  assert.match(row, /<code[^>]*>nemia accept r-1 review --message &quot;&lt;why&gt;&quot;<\/code>/);
   assert.match(row, /<form aria-label="Accept review as it stands"/);
   const label = /<label for="([^"]+)"[^>]*>Why review&#x27;s work is good enough as it stands<\/label>/.exec(row);
   assert.ok(label, row);

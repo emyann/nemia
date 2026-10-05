@@ -181,7 +181,7 @@ function withoutFence<T extends Partial<Record<string, string>>>(keys: T): T {
 }
 
 /**
- * An agent a factory hires into a step (`wf factory hire`): the agent's name, the factory's, and the step as the hire names it,
+ * An agent a factory hires into a step (`nemia factory hire`): the agent's name, the factory's, and the step as the hire names it,
  * `<workflow>/<step>`.
  */
 export type Hire = { agent: string; factory: string; step: string };
@@ -190,7 +190,7 @@ export type Hire = { agent: string; factory: string; step: string };
 function attachedAgent(step: string, written: string | undefined, hired: Hire | undefined): string | undefined {
   if (written !== undefined && hired !== undefined)
     refuse(
-      `${step}: \`agent: ${written}\` fills this step in every factory, and the factory ${hired.factory} hires ${hired.agent} into it too. Take the hire back — wf factory fire ${hired.factory} --step ${hired.step} — or delete the step's \`agent:\` line. Nothing was started.`,
+      `${step}: \`agent: ${written}\` fills this step in every factory, and the factory ${hired.factory} hires ${hired.agent} into it too. Take the hire back — nemia factory fire ${hired.factory} --step ${hired.step} — or delete the step's \`agent:\` line. Nothing was started.`,
     );
   return written ?? hired?.agent;
 }
@@ -209,7 +209,7 @@ function agentOf(step: string, name: string, agents: Agents | undefined, hired?:
 /** Why `name` is not an agent of `step`, among the agents `there` are: named by its `agent:` line, or by the factory that `hired` it. */
 function notAnAgent(step: string, name: string, there: readonly string[], hired: Hire | undefined): string {
   const missing = hired ? `the factory ${hired.factory} hires \`${name}\` into it, which` : `\`agent: ${name}\``;
-  const instead = hired ? `hire one — wf factory hire ${hired.factory} <agent> --step ${hired.step}` : undefined;
+  const instead = hired ? `hire one — nemia factory hire ${hired.factory} <agent> --step ${hired.step}` : undefined;
   return (
     `${step}: ${missing} is not an agent here. ` +
     (there.length

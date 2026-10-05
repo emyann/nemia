@@ -1,5 +1,5 @@
 /**
- * A plan is a folder of cards: the format, the order `wf plan` starts them in, and what it prints — pure, as data.
+ * A plan is a folder of cards: the format, the order `nemia plan` starts them in, and what it prints — pure, as data.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -95,9 +95,9 @@ test('REFUSED by name at shipped defaults: a card with no `workflow:`, an empty 
   assert.throws(
     () => parsePlan([card('a', 'workflow: dev\nrepo: /home/me/code/app')]),
     refusedWith(
-      /^a\.md: `repo` is not a key a plan's card has: a plan works on one repository, the one wf plan <folder> --repo <r> is given, and a card started by hand works on wf start's --repo\. `repo:` is an inbox card's — delete the line, or file the idea in the inbox: wf inbox add <file> --repo <r>\.$/,
+      /^a\.md: `repo` is not a key a plan's card has: a plan works on one repository, the one nemia plan <folder> --repo <r> is given, and a card started by hand works on nemia start's --repo\. `repo:` is an inbox card's — delete the line, or file the idea in the inbox: nemia inbox add <file> --repo <r>\.$/,
     ),
-    "`repo:` is an inbox card's key: a plan works on the one repository `wf plan --repo` is given",
+    "`repo:` is an inbox card's key: a plan works on the one repository `nemia plan --repo` is given",
   );
   assert.throws(
     () => parsePlan([{ file: 'a.md', text: '---\nworkflow: dev\nParse the flag.\n' }]),
@@ -179,7 +179,7 @@ const startedOf = (names: readonly string[]): Planned[] =>
     .filter((c) => names.includes(c.name))
     .map((c) => ({ card: c, runId: IDS[c.name], workflowDir: `/repo/workflows/${c.workflow}` }));
 
-test('`wf plan` prints a line per card, parents first: the card, its run, its workflow as the card names it, and what it waits on, by card and by run', () => {
+test('`nemia plan` prints a line per card, parents first: the card, its run, its workflow as the card names it, and what it waits on, by card and by run', () => {
   assert.deepEqual(planLines(startedOf(['a', 'b', 'c', 'd'])), [
     'a  parse-the-flag-1x2y  dev         waits on nothing',
     'b  document-it-3z4w     dev         waits on a (parse-the-flag-1x2y)',
@@ -189,7 +189,7 @@ test('`wf plan` prints a line per card, parents first: the card, its run, its wo
   assert.deepEqual(planLines([]), []);
 });
 
-test('a plan stopped part-way says which card refused and why, names the runs that stand, and gives a `wf start --after` for each card left — a run not started yet by what will name it', () => {
+test('a plan stopped part-way says which card refused and why, names the runs that stand, and gives a `nemia start --after` for each card left — a run not started yet by what will name it', () => {
   const cards = planOrder(parsePlan(DIAMOND));
   const opts = {
     dir: '/plans/q3/',
@@ -197,27 +197,27 @@ test('a plan stopped part-way says which card refused and why, names the runs th
     folderOf: (c: { workflow: string }) => `/repo/workflows/${c.workflow.replace('./flows/', '')}`,
   };
   assert.deepEqual(planStopped({ card: cards[2], why: 'the disk is full', rest: [cards[3]] }, startedOf(['a', 'b']), opts).split('\n'), [
-    'wf plan stopped at c.md: the disk is full',
-    'The runs it started stand, and the tick files each as its edges allow: a (parse-the-flag-1x2y), b (document-it-3z4w). Cancel one with wf cancel <runId>.',
+    'nemia plan stopped at c.md: the disk is full',
+    'The runs it started stand, and the tick files each as its edges allow: a (parse-the-flag-1x2y), b (document-it-3z4w). Cancel one with nemia cancel <runId>.',
     'Start the rest by hand, parents first, once what stopped c.md is fixed — each --after the run of a card it waits on:',
-    "  wf start '/plans/q3/c.md' --workflows '/repo/workflows/ui' --repo '/repo' --after parse-the-flag-1x2y",
-    "  wf start '/plans/q3/d.md' --workflows '/repo/workflows/dev' --repo '/repo' --after document-it-3z4w --after <c's run id>",
+    "  nemia start '/plans/q3/c.md' --workflows '/repo/workflows/ui' --repo '/repo' --after parse-the-flag-1x2y",
+    "  nemia start '/plans/q3/d.md' --workflows '/repo/workflows/dev' --repo '/repo' --after document-it-3z4w --after <c's run id>",
   ]);
   assert.deepEqual(
     planStopped({ card: cards[0], why: 'not a git repository', rest: cards.slice(1) }, [], opts)
       .split('\n')
       .slice(0, 4),
     [
-      'wf plan stopped at a.md: not a git repository',
+      'nemia plan stopped at a.md: not a git repository',
       'It started no run.',
       'Start the rest by hand, parents first, once what stopped a.md is fixed — each --after the run of a card it waits on:',
-      "  wf start '/plans/q3/a.md' --workflows '/repo/workflows/dev' --repo '/repo'",
+      "  nemia start '/plans/q3/a.md' --workflows '/repo/workflows/dev' --repo '/repo'",
     ],
   );
   const spaced = { dir: "/home/me/plans/q3 it's", repo: '/code/my app', folderOf: () => '/code/my app/workflows/dev' };
   assert.equal(
     planStopped({ card: cards[0], why: 'x', rest: [] }, [], spaced).split('\n').at(-1),
-    `  wf start '/home/me/plans/q3 it'\\''s/a.md' --workflows '/code/my app/workflows/dev' --repo '/code/my app'`,
+    `  nemia start '/home/me/plans/q3 it'\\''s/a.md' --workflows '/code/my app/workflows/dev' --repo '/code/my app'`,
     'quoted for the shell: a space, and a quote, in a path',
   );
 });
@@ -255,19 +255,19 @@ test("`cardToStart`: a card file starts its body, with its `workflow:` and `afte
   assert.throws(
     () => cardToStart('plans/q3/d.md', '---\nworkflow: dev\nafter: b, c\n---\nShow the flag.\n', []),
     refusedWith(
-      /^plans\/q3\/d\.md: `after: b, c` — this card waits on the runs of b and c, and wf start was given no --after, so it would start at once, beside the work it was written to wait for\. Give the id of each, from wf ls: wf start plans\/q3\/d\.md --after <b's run id> --after <c's run id>\.$/,
+      /^plans\/q3\/d\.md: `after: b, c` — this card waits on the runs of b and c, and nemia start was given no --after, so it would start at once, beside the work it was written to wait for\. Give the id of each, from nemia ls: nemia start plans\/q3\/d\.md --after <b's run id> --after <c's run id>\.$/,
     ),
     'a card whose after: names cards, started with no --after, is refused whatever the rest of it says',
   );
   assert.throws(() => cardToStart('e.md', '---\nafter: a, b, c\n---\nx\n', []), refusedWith(/waits on the runs of a, b and c,/));
   assert.throws(
     () => cardToStart('e.md', '---\nafter: a\n---\nx\n', []),
-    refusedWith(/^e\.md: `after: a` — this card waits on the run of a,.* wf start e\.md --after <a's run id>\.$/),
+    refusedWith(/^e\.md: `after: a` — this card waits on the run of a,.* nemia start e\.md --after <a's run id>\.$/),
   );
   assert.throws(
     () => cardToStart('a.md', '---\nworkflow: dev\n---\n', []),
     refusedWith(/^a\.md: the body is empty\./),
-    'what wf plan refuses of a card is refused here too: an empty body, a key set twice or to nothing, an after: naming no card, or one twice',
+    'what nemia plan refuses of a card is refused here too: an empty body, a key set twice or to nothing, an after: naming no card, or one twice',
   );
   assert.throws(
     () => cardToStart('a.md', '---\nworkflow: dev\nworkflow: ui\n---\nx\n', []),

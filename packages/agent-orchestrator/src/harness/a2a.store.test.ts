@@ -1,9 +1,9 @@
 /**
  * A step on a remote A2A agent (`harness: a2a:<name>`), up to the engine: the store's `a2a-agents.json` and each way it is refused, the
  * variable a secret is read from and the refusal that names it, the keys a remote step may not set, each refused at load from the step and
- * from its agent, `wf start`'s refusal of a name the file does not declare, and what the tick files — no harness arguments, no schema, no
- * hold, and a brief that names nothing of this machine. The agent itself, reached over HTTP, is `remote-step.test.ts`'s. `WF_ROOT` is set
- * before the import, since the module reads it as it loads.
+ * from its agent, `nemia start`'s refusal of a name the file does not declare, and what the tick files — no harness arguments, no schema,
+ * no hold, and a brief that names nothing of this machine. The agent itself, reached over HTTP, is `remote-step.test.ts`'s. `WF_ROOT` is
+ * set before the import, since the module reads it as it loads.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -158,9 +158,9 @@ test('a secret not given is refused naming the variable to set, where to set it,
   const said = missingCredential('api-key', 'https://a.example', 'a2a:second-opinion');
   assert.match(
     said,
-    /^set WF_A2A_SECOND_OPINION_API_KEY to the secret for the scheme `api-key` second-opinion's card declares, in the environment of the daemon — the api, or `wf up` —/,
+    /^set WF_A2A_SECOND_OPINION_API_KEY to the secret for the scheme `api-key` second-opinion's card declares, in the environment of the daemon — the api, or `nemia up` —/,
   );
-  assert.match(said, /restart it; then `wf retry` the step/);
+  assert.match(said, /restart it; then `nemia retry` the step/);
 });
 
 test('harness: a2a:<name> is a harness a step can run on, and a name of another shape is refused', () => {
@@ -380,7 +380,7 @@ const HERE = path.join(ROOT, 'here');
 fs.mkdirSync(HERE, { recursive: true });
 const FOLDER = 'workspace: folder\n';
 
-test('wf start refuses a step whose remote agent a2a-agents.json does not declare, before a run is written, with the entry to add', () => {
+test('nemia start refuses a step whose remote agent a2a-agents.json does not declare, before a run is written, with the entry to add', () => {
   const dir = team('undeclared', { ask: `---\n${FOLDER}harness: a2a:reviewer\n---\nReview it.\n` });
   const before = fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')).length : 0;
   const none = refusal(() => start({ brief: 'a review', repo: HERE, workflowDir: dir }));
@@ -438,7 +438,7 @@ test('the tick files a remote step with no harness arguments, schema, hold or se
     assert.match(ask.brief, /^Review the draft\.\n\n## What was asked for\n\na note on tides\n/);
     assert.match(
       ask.brief,
-      /Files were given with it \(`wf start --input`\): `tides\.csv`\. They stay on the machine that runs this workflow/,
+      /Files were given with it \(`nemia start --input`\): `tides\.csv`\. They stay on the machine that runs this workflow/,
     );
     assert.equal(ask.brief.includes(ROOT), false, `no path under the store: ${ask.brief}`);
     assert.doesNotMatch(ask.brief, /closeout|artifacts|## Finishing/i, 'no contract a remote agent could not keep');
@@ -447,7 +447,7 @@ test('the tick files a remote step with no harness arguments, schema, hold or se
   }
 });
 
-test('wf retry refuses --model and --budget on a remote step, in the words its load refuses the keys in, and asks a try without them', async () => {
+test('nemia retry refuses --model and --budget on a remote step, in the words its load refuses the keys in, and asks a try without them', async () => {
   declare({ reviewer: { url: 'https://a.example/reviewer' } });
   try {
     const dir = team('retried', { ask: `---\n${FOLDER}harness: a2a:reviewer\n---\nReview it.\n` });
@@ -462,7 +462,7 @@ test('wf retry refuses --model and --budget on a remote step, in the words its l
     assert.equal(model.exitCode, 2);
     assert.equal(
       model.message,
-      `\`--model haiku\` is how a harness of ours is to run the session, and a remote agent runs as its operator configured it: A2A carries no such argument, and the runtime refuses a task filed with one, and ask runs on \`harness: a2a:reviewer\`, a remote A2A agent: its try would be sent without it. Ask without --model: wf retry ${run.id} ask.`,
+      `\`--model haiku\` is how a harness of ours is to run the session, and a remote agent runs as its operator configured it: A2A carries no such argument, and the runtime refuses a task filed with one, and ask runs on \`harness: a2a:reviewer\`, a remote A2A agent: its try would be sent without it. Ask without --model: nemia retry ${run.id} ask.`,
     );
     await assert.rejects(retry(e, run.id, 'ask', { mode: 'nudge', budget: 5 }), (err: Error) =>
       err.message.startsWith('`--budget 5` is a spend cap a harness of ours keeps, and a remote agent keeps none'),
@@ -512,7 +512,7 @@ test("a remote step's try is a new task, told which try and what a person said, 
   });
   assert.match(
     brief,
-    /## Try 2\n\nThe last try of this step ended `failed`\. A person asked for this try \(`wf retry`\), with what they said below\. This is a new task/,
+    /## Try 2\n\nThe last try of this step ended `failed`\. A person asked for this try \(`nemia retry`\), with what they said below\. This is a new task/,
   );
   assert.match(brief, /## Your answer\n\n[`~]+text\nLook at the tables too\.\n/);
   const auto = remoteBrief(steps[0], run, steps, undefined, { try: 2, by: 'retries', mode: 'nudge', resumed: false, status: 'failed' });

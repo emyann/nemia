@@ -1,8 +1,8 @@
 /**
  * What a pass costs, in words: the pure half of the pass's meter (`tally.store.ts` counts; this composes and says). A pass's cost
  * (`PassCost`) is its time and, phase by phase, where the time went, the calls made, the bytes read and the processes started — with each
- * harness's observes as the runtime reported them. `wf up` says one line of it an interval (`summaryLine`), and `wf up --stats` and
- * `wf tick --stats` the last pass whole (`breakdownLines`).
+ * harness's observes as the runtime reported them. `nemia up` says one line of it an interval (`summaryLine`), and `nemia up --stats` and
+ * `nemia tick --stats` the last pass whole (`breakdownLines`).
  */
 
 /**
@@ -57,12 +57,12 @@ export const heaviest = (phases: Record<Phase, { ms: number }>, n = 3): Array<{ 
     .sort((a, b) => b.ms - a.ms)
     .slice(0, n);
 
-/** How often `wf up` says what its passes cost: once a minute, however often it ticks. */
+/** How often `nemia up` says what its passes cost: once a minute, however often it ticks. */
 export const STATS_EVERY_MS = 60_000;
 
 /**
- * The passes since the last line `wf up` said of them: numbers only, summed, and started afresh after each line (`summaryDue`). All that is
- * carried between passes.
+ * The passes since the last line `nemia up` said of them: numbers only, summed, and started afresh after each line (`summaryDue`). All that
+ * is carried between passes.
  */
 export type Interval = {
   from: number;
@@ -99,7 +99,7 @@ export const addPass = (interval: Interval | undefined, cost: PassCost, now: num
   };
 };
 
-/** Whether the interval has run its length, so `wf up` says its line and starts another. */
+/** Whether the interval has run its length, so `nemia up` says its line and starts another. */
 export const summaryDue = (interval: Interval | undefined, now: number, every = STATS_EVERY_MS): boolean =>
   interval !== undefined && now - interval.from >= every;
 
@@ -112,7 +112,7 @@ export const bytesWord = (n: number): string =>
 const plural = (n: number, one: string, many = `${one}s`): string => `${n} ${n === 1 ? one : many}`;
 
 /**
- * `wf up`'s line for an interval: how many passes, what a pass took on average and at most, the three heaviest phases over the interval,
+ * `nemia up`'s line for an interval: how many passes, what a pass took on average and at most, the three heaviest phases over the interval,
  * the bytes read and the processes started, and what measuring cost.
  */
 export const summaryLine = (i: Interval, now: number): string => {
@@ -124,7 +124,7 @@ export const summaryLine = (i: Interval, now: number): string => {
   );
 };
 
-/** The last pass, phase by phase and harness by harness, for `wf up --stats` and `wf tick --stats`. */
+/** The last pass, phase by phase and harness by harness, for `nemia up --stats` and `nemia tick --stats`. */
 export const breakdownLines = (c: PassCost): string[] => {
   const rows = PHASES.map((p) => [
     p,

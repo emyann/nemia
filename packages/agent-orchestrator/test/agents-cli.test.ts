@@ -1,5 +1,5 @@
 /**
- * `wf agents`, and `wf agents card <name>`: the two places a `wf` reads agents from, and one agent printed in A2A's shape.
+ * `nemia agents`, and `nemia agents card <name>`: the two places a `nemia` reads agents from, and one agent printed in A2A's shape.
  *
  * The card is JSON on stdout and nothing else — a person pipes it — so what it is *not* goes to stderr. Held here: that
  * separation, the listing's two places, and each refusal at shipped defaults. `WF_ROOT` is set before the import, since the module
@@ -62,7 +62,7 @@ const repoAt = (name: string) => {
   return repo;
 };
 
-test('wf agents lists both places, each agent by what it is for and what it says it can do', async (t) => {
+test('nemia agents lists both places, each agent by what it is for and what it says it can do', async (t) => {
   const repo = repoAt('repo');
   anAgent(path.join(repo, 'workflows', 'agents'), 'scribe', 'Writes it down.');
   anAgent(YOURS, 'archivist', 'Files it away.');
@@ -71,11 +71,11 @@ test('wf agents lists both places, each agent by what it is for and what it says
   assert.match(out, /^ {3}read-a-thing {2}Read a thing — Reads it\.$/m);
   assert.match(out, /^archivist {2}yours {2}Files it away\.$/m);
   assert.ok(out.indexOf('scribe') < out.indexOf('archivist'), `the repository's place comes first, as it does on the board:\n${out}`);
-  assert.match(out, /one in A2A's shape: wf agents card <name>/);
+  assert.match(out, /one in A2A's shape: nemia agents card <name>/);
   fs.rmSync(path.join(YOURS, 'archivist.md'));
 });
 
-test('wf agents lists an agent with no skills by the one thing its description says, and says why of one with no card', async (t) => {
+test('nemia agents lists an agent with no skills by the one thing its description says, and says why of one with no card', async (t) => {
   const repo = repoAt('bare');
   fs.writeFileSync(path.join(repo, 'workflows', 'agents', 'plain.md'), '---\ndescription: Does one thing.\n---\nDo it.\n');
   fs.writeFileSync(path.join(repo, 'workflows', 'agents', 'mute.md'), '---\nmodel: opus\n---\nDo it.\n');
@@ -84,7 +84,7 @@ test('wf agents lists an agent with no skills by the one thing its description s
   assert.match(out, /^ {3}says nothing it can do — agents\/mute\.md has no `description:`/m);
 });
 
-test('wf agents card prints the card alone on stdout, and what it is not on stderr', async (t) => {
+test('nemia agents card prints the card alone on stdout, and what it is not on stderr', async (t) => {
   const repo = repoAt('card');
   anAgent(path.join(repo, 'workflows', 'agents'), 'scribe', 'Writes it down.');
   const { out, err } = await printedBy(t, 'agents', 'card', 'scribe', '--repo', repo);
@@ -116,8 +116,17 @@ test('REFUSED at shipped defaults: a card for an agent in neither place, one in 
       },
     );
   };
-  await refused(/^no agent named ghost\. Looked in .*wf agents lists them\.$/s, 'agents', 'card', 'ghost', '--repo', repo);
-  await refused(/^wf agents --from takes repo or yours, not elsewhere:/, 'agents', 'card', 'twin', '--repo', repo, '--from', 'elsewhere');
+  await refused(/^no agent named ghost\. Looked in .*nemia agents lists them\.$/s, 'agents', 'card', 'ghost', '--repo', repo);
+  await refused(
+    /^nemia agents --from takes repo or yours, not elsewhere:/,
+    'agents',
+    'card',
+    'twin',
+    '--repo',
+    repo,
+    '--from',
+    'elsewhere',
+  );
 
   anAgent(YOURS, 'twin', 'Yours.');
   await refused(
@@ -164,7 +173,7 @@ test('REFUSED at shipped defaults: a card for an agent whose skill says no descr
 
 const CUSTOM = path.join(ROOT, 'custom-instructions');
 
-/** What `wf agents custom` refused, run in-process: its message, with its exit code checked. */
+/** What `nemia agents custom` refused, run in-process: its message, with its exit code checked. */
 const customRefused = async (t: Mock, ...argv: string[]): Promise<string> => {
   let said = '';
   await assert.rejects(
@@ -178,7 +187,7 @@ const customRefused = async (t: Mock, ...argv: string[]): Promise<string> => {
   return said;
 };
 
-test('wf agents custom writes your words for an agent into your store, prints them bare, lists them, and removes them with --clear', async (t) => {
+test('nemia agents custom writes your words for an agent into your store, prints them bare, lists them, and removes them with --clear', async (t) => {
   const repo = repoAt('custom');
   anAgent(path.join(repo, 'workflows', 'agents'), 'scribe', 'Writes it down.');
   const words = path.join(repo, 'words.md');
@@ -201,7 +210,7 @@ test('wf agents custom writes your words for an agent into your store, prints th
   assert.equal((await printedBy(t, 'agents', '--repo', repo)).out.includes('custom instructions:'), false);
 });
 
-test('wf agents custom replaces a link at the file with the words, and never writes through it', async (t) => {
+test('nemia agents custom replaces a link at the file with the words, and never writes through it', async (t) => {
   const repo = repoAt('custom-link');
   anAgent(path.join(repo, 'workflows', 'agents'), 'scribe', 'Writes it down.');
   const outside = path.join(repo, 'outside.md');
@@ -221,11 +230,11 @@ test('wf agents custom replaces a link at the file with the words, and never wri
   }
 });
 
-test("wf agents custom takes an agent of the repository's .claude/agents, and reads the words from stdin with --file -", () => {
+test("nemia agents custom takes an agent of the repository's .claude/agents, and reads the words from stdin with --file -", () => {
   const repo = repoAt('claude');
   fs.mkdirSync(path.join(repo, '.claude', 'agents'), { recursive: true });
   fs.writeFileSync(path.join(repo, '.claude', 'agents', 'helper.md'), '---\ndescription: Helps.\n---\nHelp.\n');
-  const wf = path.join(import.meta.dirname, '..', 'bin', 'wf.ts');
+  const wf = path.join(import.meta.dirname, '..', 'bin', 'nemia.ts');
   const ran = spawnSync(process.execPath, [wf, 'agents', 'custom', 'helper', '--file', '-', '--repo', repo], {
     input: 'Help in French.\n',
     env: { ...process.env, WF_ROOT: ROOT },
@@ -236,7 +245,7 @@ test("wf agents custom takes an agent of the repository's .claude/agents, and re
   fs.rmSync(path.join(CUSTOM, 'helper.md'));
 });
 
-test('REFUSED at shipped defaults: wf agents custom for no agent — printed, with --file or with --clear — from no file, blank, or with a frontmatter block — writing nothing', async (t) => {
+test('REFUSED at shipped defaults: nemia agents custom for no agent — printed, with --file or with --clear — from no file, blank, or with a frontmatter block — writing nothing', async (t) => {
   const repo = repoAt('custom-refused');
   anAgent(path.join(repo, 'workflows', 'agents'), 'scribe', 'Writes it down.');
   const text = (name: string, words: string): string => {
@@ -255,11 +264,11 @@ test('REFUSED at shipped defaults: wf agents custom for no agent — printed, wi
   assert.equal(await customRefused(t, 'ghost', '--clear', '--repo', repo), ghost, 'and so is clearing them');
   assert.match(
     await customRefused(t, 'scribe', '--file', text('both.md', 'Both.\n'), '--clear', '--repo', repo),
-    /^wf agents custom takes --file or --clear, not both/,
+    /^nemia agents custom takes --file or --clear, not both/,
   );
   assert.match(
     await customRefused(t, 'scribe', '--file', path.join(repo, 'nowhere.md'), '--repo', repo),
-    /^wf agents custom cannot read .*nowhere\.md/,
+    /^nemia agents custom cannot read .*nowhere\.md/,
   );
   assert.match(
     await customRefused(t, 'scribe', '--file', text('blank.md', ' \n\n'), '--repo', repo),
@@ -272,7 +281,7 @@ test('REFUSED at shipped defaults: wf agents custom for no agent — printed, wi
   assert.equal(fs.existsSync(path.join(CUSTOM, 'ghost.md')), false);
 });
 
-test('wf agents and wf agents card take --repo joined as they take it apart', async (t) => {
+test('nemia agents and nemia agents card take --repo joined as they take it apart', async (t) => {
   const repo = repoAt('joined');
   anAgent(path.join(repo, 'workflows', 'agents'), 'scribe', 'Writes it down.');
   assert.deepEqual(await printedBy(t, 'agents', `--repo=${repo}`), await printedBy(t, 'agents', '--repo', repo));
@@ -282,32 +291,32 @@ test('wf agents and wf agents card take --repo joined as they take it apart', as
   );
 });
 
-test('wf agents card and wf agents custom with no name print the help', async (t) => {
+test('nemia agents card and nemia agents custom with no name print the help', async (t) => {
   const help = (await printedBy(t)).out;
   for (const argv of [
     ['agents', 'card'],
     ['agents', 'custom'],
   ])
-    assert.deepEqual(await printedBy(t, ...argv), { out: help, err: '' }, `wf ${argv.join(' ')}`);
+    assert.deepEqual(await printedBy(t, ...argv), { out: help, err: '' }, `nemia ${argv.join(' ')}`);
 });
 
-test('REFUSED at shipped defaults: wf agents given a word that is none of its commands or flags, in its own words', async (t) => {
+test('REFUSED at shipped defaults: nemia agents given a word that is none of its commands or flags, in its own words', async (t) => {
   const refusals: Array<[string[], string]> = [
     [
       ['agents', 'nope'],
-      'wf agents takes no argument but card <name> or custom <name>: wf agents, wf agents card nope, or wf agents custom nope.',
+      'nemia agents takes no argument but card <name> or custom <name>: nemia agents, nemia agents card nope, or nemia agents custom nope.',
     ],
-    [['agents', '--nope'], 'wf agents does not take --nope. It takes --repo <r>, and for a card --from repo|yours.'],
+    [['agents', '--nope'], 'nemia agents does not take --nope. It takes --repo <r>, and for a card --from repo|yours.'],
   ];
   for (const [argv, message] of refusals)
     await assert.rejects(
       () => printedBy(t, ...argv),
       (err: Error & { exitCode?: number }) => err.message === message && err.exitCode === 2,
-      `wf ${argv.join(' ')}`,
+      `nemia ${argv.join(' ')}`,
     );
 });
 
-test('REFUSED at shipped defaults: wf agents with a flag left out, given twice, or one it does not take — in its own words', async (t) => {
+test('REFUSED at shipped defaults: nemia agents with a flag left out, given twice, or one it does not take — in its own words', async (t) => {
   const refused = async (message: string, ...argv: string[]) => {
     await assert.rejects(
       () => printedBy(t, ...argv),
@@ -318,17 +327,17 @@ test('REFUSED at shipped defaults: wf agents with a flag left out, given twice, 
       },
     );
   };
-  const repoTakes = '--repo takes the repository whose workflows/agents to read: wf agents --repo <r>';
-  const fromTakes = '--from takes which place the agent is in: wf agents card <name> --from repo|yours';
+  const repoTakes = '--repo takes the repository whose workflows/agents to read: nemia agents --repo <r>';
+  const fromTakes = '--from takes which place the agent is in: nemia agents card <name> --from repo|yours';
   await refused(repoTakes, 'agents', '--repo');
   await refused(repoTakes, 'agents', '--repo', '--from', 'repo');
   await refused(repoTakes, 'agents', '--repo', '--elsewhere');
   await refused(repoTakes, 'agents', '--repo=');
   await refused(fromTakes, 'agents', 'card', 'scribe', '--from');
   await refused(fromTakes, 'agents', 'card', 'scribe', '--from', '--repo', '.');
-  await refused('wf agents takes --repo once: an agent is read from one repository.', 'agents', '--repo', 'a', '--repo', 'b');
+  await refused('nemia agents takes --repo once: an agent is read from one repository.', 'agents', '--repo', 'a', '--repo', 'b');
   await refused(
-    'wf agents takes --from once: an agent is read from one place.',
+    'nemia agents takes --from once: an agent is read from one place.',
     'agents',
     'card',
     'x',
@@ -338,14 +347,14 @@ test('REFUSED at shipped defaults: wf agents with a flag left out, given twice, 
     'yours',
   );
   await refused(
-    'wf agents does not take --nope. It takes --repo <r>, and for a card --from repo|yours.',
+    'nemia agents does not take --nope. It takes --repo <r>, and for a card --from repo|yours.',
     'agents',
     '--repo',
     '.',
     '--nope',
   );
   await refused(
-    'wf agents takes no argument but card <name> or custom <name>: wf agents, wf agents card extra, or wf agents custom extra.',
+    'nemia agents takes no argument but card <name> or custom <name>: nemia agents, nemia agents card extra, or nemia agents custom extra.',
     'agents',
     'card',
     'scribe',

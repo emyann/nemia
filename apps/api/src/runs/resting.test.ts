@@ -391,7 +391,7 @@ test('a gated run read by the list at every event from being filed to being appr
   await read('settled, from memory');
   assert.deepEqual(keptAt, ['settled', 'settled, from memory'], 'kept once at rest at its gate, and at no event before');
   assert.equal(gated.status, 'failed', "`assess`'s word for a run no follower of which can go on");
-  assert.equal(gated.stoppedOn, 'awaiting approval', 'and what stopped it, as `wf decide` says it');
+  assert.equal(gated.stoppedOn, 'awaiting approval', 'and what stopped it, as `nemia decide` says it');
   assert.equal(gated.moving, false);
   assert.deepEqual(gated.waitingOnYou, ['design']);
   assert.equal(gated.steps.find((s) => s.name === 'design')?.status, 'awaiting approval');

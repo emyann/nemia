@@ -92,7 +92,7 @@ export default {
       try {
         decided = execFileSync(
           process.execPath,
-          [path.join(REPO, 'packages', 'agent-orchestrator', 'bin', 'wf.ts'), 'decide', SAYING.run],
+          [path.join(REPO, 'packages', 'agent-orchestrator', 'bin', 'nemia.ts'), 'decide', SAYING.run],
           { encoding: 'utf8', env: apiEnv, stdio: 'pipe' },
         );
       } catch (err) {

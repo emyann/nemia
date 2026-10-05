@@ -89,51 +89,51 @@ import { readOf, type RunRead, type StepUsed, totalOf, usedOf } from './usage.ts
 
 /**
  * A step's cap, and what its tries have cost of it. `usd` is the cap in force (`budgetOf`): the `budget:` the run froze, until a person
- * raises it (`wf retry --budget`, `wf round --budget`). `said` is the cap as its author writes one (`budgetWord`: `$3`), and `of` what the
- * step's tries have cost of it, as `wf ls` puts it in `over budget $4.25 of $3` — null until a cost was measured. `over` is whether they
- * have cost the cap or more (`overBudget`). Past the cap alone holds nothing: the step is held only where its `status` word says
- * `over budget` or `budget exhausted` — where another session of it is the way on. A job (`claude -p`) is ended at its cap; a background
- * session (`background: true`, `claude --bg`) keeps none and is not stopped, so such a step — the package refuses a budget beside it, but a
- * frozen record may carry both — can finish past it with nothing waiting on a raise.
+ * raises it (`nemia retry --budget`, `nemia round --budget`). `said` is the cap as its author writes one (`budgetWord`: `$3`), and `of`
+ * what the step's tries have cost of it, as `nemia ls` puts it in `over budget $4.25 of $3` — null until a cost was measured. `over` is
+ * whether they have cost the cap or more (`overBudget`). Past the cap alone holds nothing: the step is held only where its `status` word
+ * says `over budget` or `budget exhausted` — where another session of it is the way on. A job (`claude -p`) is ended at its cap; a
+ * background session (`background: true`, `claude --bg`) keeps none and is not stopped, so such a step — the package refuses a budget
+ * beside it, but a frozen record may carry both — can finish past it with nothing waiting on a raise.
  */
 export type StepBudget = { usd: number; said: string; of: string | null; over: boolean };
 
 /**
- * A raise of a step's cap the package takes, and how it is asked for: `retry` — `wf retry --budget`, the board's `POST …/retry` — for a
- * step over its budget or ended at it that a try takes on (`retryable`'s `raise`); `round` — `wf round --budget`, `POST …/round` — for a
+ * A raise of a step's cap the package takes, and how it is asked for: `retry` — `nemia retry --budget`, the board's `POST …/retry` — for a
+ * step over its budget or ended at it that a try takes on (`retryable`'s `raise`); `round` — `nemia round --budget`, `POST …/round` — for a
  * looping step whose round waits on a step of its loop over its budget (`loopOver`). `above` is what the budget has to be more than, as the
  * package refuses one that is not — what the tries have cost, or the cap a session was ended at — and `said` that, in dollars (`dollars`).
  *
  * For a try, `modes` are the ways the package takes it (`retryable`) — `recheck` among them where a check did not pass, which costs nothing
  * and needs no raise — and `own` how the step ended on its own work, its budget aside (`ownStatus`): `blocked` for a step that signed off
- * blocked, whose try is answered with its raise (`wf retry --budget <amount> --message "<answer>"`, as `wf decide` offers it), `unsigned`,
- * `failed (check)`, `failed`, `stopped`, `denied` or `budget exhausted`. Over its budget, a step's word is `over budget`, so the word alone
- * does not say which. For a round, no modes, and `own` null: a round is asked for as it is, with a budget.
+ * blocked, whose try is answered with its raise (`nemia retry --budget <amount> --message "<answer>"`, as `nemia decide` offers it),
+ * `unsigned`, `failed (check)`, `failed`, `stopped`, `denied` or `budget exhausted`. Over its budget, a step's word is `over budget`, so
+ * the word alone does not say which. For a round, no modes, and `own` null: a round is asked for as it is, with a budget.
  */
 export type StepRaise = { by: 'retry' | 'round'; above: number; said: string; modes: RetryMode[]; own: StepStatus | null };
 
 /**
- * A person's approval of the try a gated step is on (`approvalOf`), off their file (`wf approve`): the try, when, and the words given with
- * it — handed to every step after the gate under `## Approved` — null where none were.
+ * A person's approval of the try a gated step is on (`approvalOf`), off their file (`nemia approve`): the try, when, and the words given
+ * with it — handed to every step after the gate under `## Approved` — null where none were.
  */
 export type StepApproval = { try: number; at: string; message: string | null };
 
 /**
  * A gated step's gate: its own `gate: true`, or one the run was started with (`hasGate`). `awaiting` while it waits at it — signed off,
- * verified first where it has a check, and the try it is on not approved: `wf ls`'s `awaiting approval`, whatever else is asked of it. And
- * `approval`, once a person approved that try. Neither, for a gated step not signed off yet.
+ * verified first where it has a check, and the try it is on not approved: `nemia ls`'s `awaiting approval`, whatever else is asked of it.
+ * And `approval`, once a person approved that try. Neither, for a gated step not signed off yet.
  */
 export type StepGate = { awaiting: boolean; approval: StepApproval | null };
 
 /**
- * A person's acceptance of a loop out of rounds, on the try its looping step is on (`acceptanceOf`), off their file (`wf accept`): the
+ * A person's acceptance of a loop out of rounds, on the try its looping step is on (`acceptanceOf`), off their file (`nemia accept`): the
  * try, when, and the words given. The step's closeout still says `again: true` — the acceptance does not rewrite what the reviewer said —
  * so whoever reads the step's last word needs this beside it, or a gate after the loop reads as if another round were still asked for.
  */
 export type StepAcceptance = { try: number; at: string; message: string };
 
 /**
- * A try a person asked for — with `wf retry`, or the board's answer box or Continue — that the next tick files: `assess`'s, off their
+ * A try a person asked for — with `nemia retry`, or the board's answer box or Continue — that the next tick files: `assess`'s, off their
  * ask file. `model` is the one a `--model` named, and `message` what they said with it; each null where the ask has none. `stopFirst`
  * is the package's (`Retry.stopFirst`): the harness blocked the step's session, so a tick stops that session first, and a later one files
  * the try, once it has stopped.
@@ -181,7 +181,7 @@ export type StepSpec = {
 export type StepFiled = {
   model: string | null;
   /**
-   * The model a person's `wf retry --model` asked this try for, off the run's record (`EarlierTry.model`): what tells a model the
+   * The model a person's `nemia retry --model` asked this try for, off the run's record (`EarlierTry.model`): what tells a model the
    * try was filed on from a default. Null when nobody asked.
    */
   askedModel: string | null;
@@ -233,14 +233,14 @@ export type RunDetail = {
   startedAt: string | null;
   cancelledAt: string | null;
   /**
-   * That `wf prune` removed the run's worktrees (`Run.pruned`): when, and each it removed with what it held on disk. Its branches, record
-   * and files are kept, so the rest of the page reads as before; what it does not offer is anything that would work in a worktree. Null for
-   * a run never pruned. `artifacts` is when `wf prune --artifacts` removed its files directory too, and what that freed: each file a
-   * closeout named there then reads `pruned`, and the artifacts route answers 410. Null while its files are kept.
+   * That `nemia prune` removed the run's worktrees (`Run.pruned`): when, and each it removed with what it held on disk. Its branches,
+   * record and files are kept, so the rest of the page reads as before; what it does not offer is anything that would work in a worktree.
+   * Null for a run never pruned. `artifacts` is when `nemia prune --artifacts` removed its files directory too, and what that freed: each
+   * file a closeout named there then reads `pruned`, and the artifacts route answers 410. Null while its files are kept.
    */
   pruned: { at: string; worktrees: Array<{ path: string; bytes: number }>; artifacts: { at: string; bytes: number } | null } | null;
   /**
-   * What `wf prune` would still find of the run on disk: its worktrees' directory (`worktrees/<id>`, which a prune removes once it has
+   * What `nemia prune` would still find of the run on disk: its worktrees' directory (`worktrees/<id>`, which a prune removes once it has
    * removed what is in it) and its files directory (`runs/<id>/artifacts`). The board offers to prune only what is there, so no button it
    * draws can be answered `nothing to prune`; the api judges the prune again all the same.
    */
@@ -249,7 +249,7 @@ export type RunDetail = {
   after: string[];
   /** The inbox card the run was started from, as its record carries it (`Run.from`); absent for a run started without one. */
   from?: { inbox: string };
-  /** Where it came from, as `wf decide` says it under the run's line (`fromNote`): absent with `from`. */
+  /** Where it came from, as `nemia decide` says it under the run's line (`fromNote`): absent with `from`. */
   fromNote?: string;
   waiting: RunWaiting | null;
   /** As on `RunSummary`. */
@@ -287,7 +287,7 @@ export type RunDetail = {
   /** The recorded steps in the order the run started with them, then — on a record with no frozen workflow — any the folder has gained. */
   steps: Array<{
     name: string;
-    /** From the workflow the run froze at `wf start`; for a record that froze none, the folder. */
+    /** From the workflow the run froze at `nemia start`; for a record that froze none, the folder. */
     spec: StepSpec | null;
     /** What the engine filed its current try with; null for a step not filed, or a task the engine has no record of. */
     filed: StepFiled | null;
@@ -296,8 +296,8 @@ export type RunDetail = {
     told: string | null;
     /**
      * What it was told, by layer (`toldLayers`): its agent's instructions, the person's custom instructions, the step's policy and the
-     * task, each from the step the run froze at `wf start`, the task cut from `told`. Null for a record that froze no workflow, never read
-     * from the folder.
+     * task, each from the step the run froze at `nemia start`, the task cut from `told`. Null for a record that froze no workflow, never
+     * read from the folder.
      */
     layers: ToldLayers | null;
     taskId: string | null;
@@ -326,7 +326,7 @@ export type RunDetail = {
      * not have is gated only where the run was started with its gate.
      */
     gate: StepGate | null;
-    /** For a looping step a person ended out of rounds (`wf accept`), their acceptance of the try it is on; null for any other step. */
+    /** For a looping step a person ended out of rounds (`nemia accept`), their acceptance of the try it is on; null for any other step. */
     accepted: StepAcceptance | null;
     /**
      * For a step the harness blocked, what its session said last, as the engine's `transcript` reads it: its last `text` or `system`
@@ -334,8 +334,8 @@ export type RunDetail = {
      */
     lastLine: string | null;
     /**
-     * What a person said to the session of the step's current try while it ran — with `wf say`, or the session page's prompt box — in the
-     * order said: the engine's `said` entries on its task, off the views the request already read. Empty for a step not filed, and one
+     * What a person said to the session of the step's current try while it ran — with `nemia say`, or the session page's prompt box — in
+     * the order said: the engine's `said` entries on its task, off the views the request already read. Empty for a step not filed, and one
      * nobody told.
      */
     said: Said[];
@@ -350,13 +350,13 @@ export type RunDetail = {
     check: StepCheck | null;
     attempts: StepAttempts;
     /**
-     * What its current try consumed, in `wf decide`'s words, its peak against the `context:` its sessions ran under as the run judges the
-     * step; null for a step not filed, which consumed nothing.
+     * What its current try consumed, in `nemia decide`'s words, its peak against the `context:` its sessions ran under as the run judges
+     * the step; null for a step not filed, which consumed nothing.
      */
     used: StepUsed | null;
     /**
-     * What every try of it has cost together, each session once, as `wf ls` puts it beside the step's word (`stepSpend`); null until a cost
-     * was measured.
+     * What every try of it has cost together, each session once, as `nemia ls` puts it beside the step's word (`stepSpend`); null until a
+     * cost was measured.
      */
     spent: Spent | null;
     /** Its cap in force, and what its tries have cost of it (`StepBudget`); null for a step with no `budget:`. */
@@ -390,7 +390,7 @@ export type StepTimelineTotal = TimelineTotal & { cost: Spent | null };
 
 /**
  * One try of a step on the clock, as the package's `timeline` has it (`TimelineTry`): its session's task and its check's, each filed,
- * spawned and ended, with how long it queued for a slot and ran (the package's `TaskSpan`) — and what its session used, in `wf decide`'s
+ * spawned and ended, with how long it queued for a slot and ran (the package's `TaskSpan`) — and what its session used, in `nemia decide`'s
  * words, where it ran one.
  */
 export type StepTimelineTry = Omit<TimelineTry, 'used'> & { used: StepUsed | null };
@@ -441,8 +441,8 @@ function costOf(
 /**
  * The raise of a step's cap the package takes (`StepRaise`), or null. A try's, where `retryable` carries one — a settled step over its
  * budget or ended at it, that a try takes on — and it may be tried; else a round's, for a looping step over its budget or out of rounds
- * whose loop has a step over its budget (`loopOver`): `wf round --budget` has to pass the most any of them has cost, as `roundAsk` refuses
- * less.
+ * whose loop has a step over its budget (`loopOver`): `nemia round --budget` has to pass the most any of them has cost, as `roundAsk`
+ * refuses less.
  */
 function raiseOf(run: Run, step: Workflow, steps: readonly Workflow[], views: Views, spendOf: SpendOf): StepRaise | null {
   const phase = (taskId: string) => phaseOfView(views.get(taskId));
@@ -480,7 +480,7 @@ function roundSpend(clock: Timeline, steps: readonly Workflow[], total: Timeline
 }
 
 /**
- * A step's gate (`StepGate`), or null for a step with none: whether it waits at it, in `wf ls`'s word, and the approval of the try it is
+ * A step's gate (`StepGate`), or null for a step with none: whether it waits at it, in `nemia ls`'s word, and the approval of the try it is
  * on. Off the record as `runStore` composes it, with each approval its file holds (`approvalOf`): no read of its own.
  */
 function gateOf(run: Run, step: Workflow, status: string): StepGate | null {
@@ -509,7 +509,7 @@ export type LastSaid = Map<string, { cursor: string; line: string | null }>;
 
 /**
  * What a session said last — its last `text` or `system` event, trimmed — through the engine's `transcript`, or null when it has said
- * none or its conversation cannot be read. What it said, not what it was told: a brief, a `wf say` and every tool result come back as
+ * none or its conversation cannot be read. What it said, not what it was told: a brief, a `nemia say` and every tool result come back as
  * `user` events (`TranscriptEvent`), and reading a person's own words back to them says nothing about why the harness stopped.
  *
  * Each read costs an observation of the task's harness: the attempt of a session the harness blocked has not ended, so its session's id
@@ -570,12 +570,12 @@ const specOf = (step: Workflow): StepSpec => ({
 });
 
 /**
- * Where what a page shows of a step's workflow is read from: the workflow the run froze at `wf start`, which the tick
+ * Where what a page shows of a step's workflow is read from: the workflow the run froze at `nemia start`, which the tick
  * files from and `judgedSteps` judges by; the folder only for a record that froze none. Null when neither reads.
  */
 const shownWorkflow = (run: Run, folder: readonly Workflow[] | null): readonly Workflow[] | null => run.workflow ?? folder;
 
-/** What `wf prune` took of a run, as the page shows it: when, each worktree and what it held, and its artifacts; null for none. */
+/** What `nemia prune` took of a run, as the page shows it: when, each worktree and what it held, and its artifacts; null for none. */
 const prunedOf = (run: Run): RunDetail['pruned'] =>
   run.pruned
     ? {
@@ -724,7 +724,7 @@ function filedOf(record: StepRecord | undefined, views: Views): StepFiled | null
 }
 
 /**
- * The model a person's `wf retry --model` asked a step's current try for: on the try its task replaced, where `nextTry` keeps the
+ * The model a person's `nemia retry --model` asked a step's current try for: on the try its task replaced, where `nextTry` keeps the
  * model with the mode — found past any recheck, which replaced only a check, and kept the task.
  */
 function askedModelOf(record: StepRecord | undefined): string | null {
@@ -738,7 +738,8 @@ function askedModelOf(record: StepRecord | undefined): string | null {
  * The remote A2A agent a task was filed on (`StepFiled.remote`), or null for a local harness. Its address is read from the store's
  * `a2a-agents.json` on each request (`remoteAgents`), as the base URL given or, for an agent given by its card, the card's first interface:
  * origin and path alone, so a query string that carries a key is never shown. A file that does not declare the name, whose entry for it is
- * refused, or that is refused as it stands, gives no address — the run's page is still drawn, and `wf up` says what is wrong with the file.
+ * refused, or that is refused as it stands, gives no address — the run's page is still drawn, and `nemia up` says what is wrong with the
+ * file.
  */
 function remoteOf(harness: string | undefined): StepFiled['remote'] {
   const name = remoteNameOf(harness);
@@ -797,7 +798,7 @@ function runsInOf(state: TaskView['state']): StepFiled['runsIn'] {
   return { mode, by: filedTools && modeOf(undefined) !== mode ? 'tools' : by };
 }
 
-/** What of a run `wf prune` would find on disk (`RunDetail.onDisk`): two stats, and no git. */
+/** What of a run `nemia prune` would find on disk (`RunDetail.onDisk`): two stats, and no git. */
 function onDiskOf(run: Run, home: string): RunDetail['onDisk'] {
   const files = path.dirname(artifactsDir(run, '_'));
   return { worktrees: isGitRun(run) && fs.existsSync(path.join(home, 'worktrees', run.id)), files: fs.existsSync(files) };

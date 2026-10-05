@@ -76,15 +76,15 @@ function cursorRefusalAt(file: string, after: number): string | undefined {
     return `a feed cursor is a whole number of bytes — 0, or one a \`cursor:\` line printed — not ${after}`;
   const size = statOf(file)?.size ?? 0;
   if (after > size) {
-    return `cursor ${after} is past the end of the feed (${size} bytes, ${file}): the feed it came from was truncated or replaced since — read it again from the start: wf feed 0`;
+    return `cursor ${after} is past the end of the feed (${size} bytes, ${file}): the feed it came from was truncated or replaced since — read it again from the start: nemia feed 0`;
   }
   if (after > 0 && byteAt(file, after - 1) !== 0x0a) {
-    return `cursor ${after} falls inside a line of the feed, not after one: a cursor is 0 or the number a \`cursor:\` line printed — wf feed 0 reads from the start`;
+    return `cursor ${after} falls inside a line of the feed, not after one: a cursor is 0 or the number a \`cursor:\` line printed — nemia feed 0 reads from the start`;
   }
   return undefined;
 }
 
-/** A line of the feed as `recordFeed` writes one (`FeedLine`); a key it does not name is kept, as a newer `wf` may write one. */
+/** A line of the feed as `recordFeed` writes one (`FeedLine`); a key it does not name is kept, as a newer `nemia` may write one. */
 const isFeedLine = Schema.is(
   Schema.Struct({
     at: Schema.String,
@@ -224,7 +224,7 @@ function feedCut(file: string, cursor: number, ino: number | undefined, stat: fs
  * once already allows. Without `onCut`, the cut is refused (exit 2) to `onError` on every beat, and the caller ends the watch — the api's
  * stream does, and a reader opens it again from the feed it has now.
  *
- * A directory `fs.watch` cannot watch leaves the timer alone. The timer is not unref'd: a watch keeps its process alive, as `wf watch`
+ * A directory `fs.watch` cannot watch leaves the timer alone. The timer is not unref'd: a watch keeps its process alive, as `nemia watch`
  * needs.
  */
 function watchFeedFile(

@@ -1,6 +1,6 @@
 /**
  * Who ticks the store, as data: `daemon.json`'s text judged at a fixed `now` with liveness handed in, and the words said of it. The file on
- * disk, `wf up` and `wf tick` taking and refusing the store, are daemon.store.test.ts's.
+ * disk, `nemia up` and `nemia tick` taking and refusing the store, are daemon.store.test.ts's.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -198,14 +198,14 @@ test('the refusals name the pid, where and since when it ticks, its last pass, a
   const up = holdRefusal(held(holder()), 'up', '/store', NOW);
   assert.match(
     up,
-    /^wf up: \/store is held by the wf up of pid 4242, started 2026-09-22T11:00:00\.000Z in \/home\/me\/repo, every 4000ms — last pass 3s ago \(2026-09-22T11:59:57\.000Z\)\. /,
+    /^nemia up: \/store is held by the nemia up of pid 4242, started 2026-09-22T11:00:00\.000Z in \/home\/me\/repo, every 4000ms — last pass 3s ago \(2026-09-22T11:59:57\.000Z\)\. /,
   );
   assert.match(up, /stop it with kill 4242 — that pid is the node process that ticks, not an npm wrapper around it/);
   assert.match(up, /a holder silent for 15m00s is taken over by the next daemon\.$/);
   const tick = holdRefusal(held(holder({ passedAt: null, startedAt: ago(0.5) })), 'tick', '/store', NOW);
   assert.match(
     tick,
-    /^wf tick: \/store is held by the wf up of pid 4242, started \S+ in \/home\/me\/repo, every 4000ms — no pass completed yet, started 30s ago \(\S+\), which runs this same pass within its interval: a pass by hand beside it would be a second writer\. /,
+    /^nemia tick: \/store is held by the nemia up of pid 4242, started \S+ in \/home\/me\/repo, every 4000ms — no pass completed yet, started 30s ago \(\S+\), which runs this same pass within its interval: a pass by hand beside it would be a second writer\. /,
   );
   assert.match(tick, /kill 4242 — that pid is the node process that ticks, not an npm wrapper .* and tick by hand then\.$/);
   for (const [file, why] of [
@@ -222,32 +222,32 @@ test('the refusals name the pid, where and since when it ticks, its last pass, a
     );
     assert.match(
       refusal,
-      /a pid is reused once its process ends — if ps -p 4242 -o lstart=,args= shows a wf up started at 2026-09-22T11:00:00\.000Z, kill 4242; /,
+      /a pid is reused once its process ends — if ps -p 4242 -o lstart=,args= shows a nemia up started at 2026-09-22T11:00:00\.000Z, kill 4242; /,
       'it is named, said unconfirmed, and how to check it comes before the kill',
     );
   }
 });
 
-test('REFUSED both ways round: an api holding the store refuses a wf up, naming its url and pid, and a wf up holding it refuses an api', () => {
+test('REFUSED both ways round: an api holding the store refuses a nemia up, naming its url and pid, and a nemia up holding it refuses an api', () => {
   const held = (file: DaemonFile) => holderAgainst(judged(text(file), live), 1)!;
   const api = holder({ by: 'api', url: 'http://127.0.0.1:8787' });
   assert.match(
     holdRefusal(held(api), 'up', '/store', NOW),
-    /^wf up: \/store is held by the api of pid 4242 at http:\/\/127\.0\.0\.1:8787, started .* One store takes one daemon, the api or a wf up: .* stop it with kill 4242 — /,
+    /^nemia up: \/store is held by the api of pid 4242 at http:\/\/127\.0\.0\.1:8787, started .* One store takes one daemon, the api or a nemia up: .* stop it with kill 4242 — /,
   );
   const second = holdRefusal(held(api), 'api', '/store', NOW);
   assert.match(second, /^api: \/store is held by the api of pid 4242 at http:\/\/127\.0\.0\.1:8787, /);
   assert.match(second, /serve a board beside it with --no-tick, or start this api again once it has stopped: stop it with kill 4242 — /);
-  assert.match(holdRefusal(held(holder()), 'api', '/store', NOW), /^api: \/store is held by the wf up of pid 4242, started /);
-  assert.match(holdRefusal(held(api), 'tick', '/store', NOW), /^wf tick: \/store is held by the api of pid 4242 at http:/);
-  assert.equal(holderOf({}), 'wf up', 'a record written before the api ticked is a wf up');
+  assert.match(holdRefusal(held(holder()), 'api', '/store', NOW), /^api: \/store is held by the nemia up of pid 4242, started /);
+  assert.match(holdRefusal(held(api), 'tick', '/store', NOW), /^nemia tick: \/store is held by the api of pid 4242 at http:/);
+  assert.equal(holderOf({}), 'wf up', 'a record written before the api ticked is a wf up, as it was written');
   assert.equal(
     daemonLine(judged(text(api), live), NOW),
     'api: ticking, pid 4242 at http://127.0.0.1:8787, every 4000ms — last pass 3s ago (2026-09-22T11:59:57.000Z)',
   );
 });
 
-test('what wf up says of the store it took: a holder gone, stalled or unreadable is named, and a clean stop or an empty store is not', () => {
+test('what nemia up says of the store it took: a holder gone, stalled or unreadable is named, and a clean stop or an empty store is not', () => {
   const standing = (file: DaemonFile, how = live) => judged(text(file), how);
   assert.equal(
     takeoverLine(standing(holder({ passedAt: ago(125) }), dead), '/store', NOW),
@@ -260,7 +260,7 @@ test('what wf up says of the store it took: a holder gone, stalled or unreadable
   assert.equal(takeoverLine(judged('{', live), '/store', NOW), 'took /store over from a daemon.json that did not read as a holder');
   assert.equal(
     takeoverLine(standing(holder(), as('other')), '/store', NOW),
-    "took /store over from pid 4242, whose process is gone — that pid is another process's now, started after the wf up that wrote daemon.json — its last pass 3s ago (2026-09-22T11:59:57.000Z)",
+    "took /store over from pid 4242, whose process is gone — that pid is another process's now, started after the nemia up that wrote daemon.json — its last pass 3s ago (2026-09-22T11:59:57.000Z)",
   );
   const unsure = takeoverLine(standing(holder({ passedAt: ago(16) }), as('unknown')), '/store', NOW)!;
   assert.doesNotMatch(unsure, /kill 4242 —/);
@@ -269,47 +269,47 @@ test('what wf up says of the store it took: a holder gone, stalled or unreadable
   assert.equal(takeoverLine(judged(undefined, live), '/store', NOW), undefined);
 });
 
-test("wf ls's line: whether a daemon ticks the store, and when its last pass was", () => {
+test("nemia ls's line: whether a daemon ticks the store, and when its last pass was", () => {
   const line = (file: DaemonFile | undefined, how = live) => daemonLine(judged(file && text(file), how), NOW);
   assert.equal(
     line(undefined),
-    'daemon: none has held this store — nothing ticks it; start one with npm start in apps/api, or wf up where no board is served',
+    'daemon: none has held this store — nothing ticks it; start one with npm start in apps/api, or nemia up where no board is served',
   );
   assert.equal(
     daemonLine(judged('nope', live), NOW),
     'daemon: none known — daemon.json does not read as a holder, so nothing is known to tick this store; the next daemon takes it over',
   );
-  assert.equal(line(holder()), 'wf up: ticking, pid 4242, every 4000ms — last pass 3s ago (2026-09-22T11:59:57.000Z)');
+  assert.equal(line(holder()), 'nemia up: ticking, pid 4242, every 4000ms — last pass 3s ago (2026-09-22T11:59:57.000Z)');
   assert.equal(
     line(holder({ passedAt: ago(20) })),
-    'wf up: stalled, pid 4242, every 4000ms — alive, but silent for 20m00s: last pass 20m00s ago (2026-09-22T11:40:00.000Z); the next daemon takes the store over, and kill 4242 stops it',
+    'nemia up: stalled, pid 4242, every 4000ms — alive, but silent for 20m00s: last pass 20m00s ago (2026-09-22T11:40:00.000Z); the next daemon takes the store over, and kill 4242 stops it',
   );
   assert.equal(
     line(holder({ passedAt: ago(40), beatAt: ago(0.05) })),
-    'wf up: ticking, pid 4242, every 4000ms — last pass 40m00s ago (2026-09-22T11:20:00.000Z), a pass under way since — alive 3s ago (2026-09-22T11:59:57.000Z)',
+    'nemia up: ticking, pid 4242, every 4000ms — last pass 40m00s ago (2026-09-22T11:20:00.000Z), a pass under way since — alive 3s ago (2026-09-22T11:59:57.000Z)',
     'a beat more than two intervals past the last pass is said, so a pass that runs long, or never ends, reads as one under way',
   );
   assert.equal(
     line(holder({ passedAt: ago(0.05), beatAt: ago(0.02) })),
-    'wf up: ticking, pid 4242, every 4000ms — last pass 3s ago (2026-09-22T11:59:57.000Z)',
+    'nemia up: ticking, pid 4242, every 4000ms — last pass 3s ago (2026-09-22T11:59:57.000Z)',
     'a beat between passes is not a pass under way',
   );
   assert.equal(
     line(holder(), dead),
-    'wf up: none ticking — pid 4242 is gone, its last pass 3s ago (2026-09-22T11:59:57.000Z); start one with npm start in apps/api, or wf up where no board is served',
+    'nemia up: none ticking — pid 4242 is gone, its last pass 3s ago (2026-09-22T11:59:57.000Z); start one with npm start in apps/api, or nemia up where no board is served',
   );
   assert.equal(
     line(holder(), as('other')),
-    "wf up: none ticking — the wf up of pid 4242 is gone, that pid another process's now; its last pass 3s ago (2026-09-22T11:59:57.000Z); start one with npm start in apps/api, or wf up where no board is served",
+    "nemia up: none ticking — the nemia up of pid 4242 is gone, that pid another process's now; its last pass 3s ago (2026-09-22T11:59:57.000Z); start one with npm start in apps/api, or nemia up where no board is served",
   );
   assert.equal(
     line(holder(), as('unknown')),
-    'wf up: ticking, pid 4242, every 4000ms — last pass 3s ago (2026-09-22T11:59:57.000Z) (pid 4242 not confirmed here as the process that wrote daemon.json)',
+    'nemia up: ticking, pid 4242, every 4000ms — last pass 3s ago (2026-09-22T11:59:57.000Z) (pid 4242 not confirmed here as the process that wrote daemon.json)',
   );
   assert.doesNotMatch(line(holder({ passedAt: ago(20) }), as('unknown')), /kill 4242 stops it/);
   assert.equal(
     line(holder({ passedAt: ago(6), stoppedAt: ago(5) })),
-    'wf up: none ticking — pid 4242 stopped 5m00s ago (2026-09-22T11:55:00.000Z), its last pass 6m00s ago (2026-09-22T11:54:00.000Z); start one with npm start in apps/api, or wf up where no board is served',
+    'nemia up: none ticking — pid 4242 stopped 5m00s ago (2026-09-22T11:55:00.000Z), its last pass 6m00s ago (2026-09-22T11:54:00.000Z); start one with npm start in apps/api, or nemia up where no board is served',
   );
 });
 
@@ -319,7 +319,7 @@ test('REFUSED: an interval the file cannot hold — negative, zero, fractional, 
     assert.ok('refusal' in asked, JSON.stringify(arg));
     assert.equal(
       asked.refusal,
-      `wf up takes its pass interval in whole milliseconds, from 1 to 2147483647, and ${JSON.stringify(arg)} is not one: wf up [ms], 4000 when none is given. The interval is written into daemon.json, and a holder whose interval does not read there holds nothing: a second wf up would take the store from it while it ticks.`,
+      `nemia up takes its pass interval in whole milliseconds, from 1 to 2147483647, and ${JSON.stringify(arg)} is not one: nemia up [ms], 4000 when none is given. The interval is written into daemon.json, and a holder whose interval does not read there holds nothing: a second nemia up would take the store from it while it ticks.`,
     );
   }
   assert.deepEqual(everyOf(undefined), { every: DEFAULT_EVERY_MS });

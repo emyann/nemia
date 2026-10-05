@@ -10,8 +10,8 @@ export type ArtifactKind = 'image' | 'text' | 'other';
  * A file a closeout named. A file in the step's files directory (`artifactsDir`), by a name the artifacts route serves, is
  * that name, where the api serves it, its kind and its size. Anything else is the path as the closeout gave it: a path on the
  * step's branch, a file the directory does not have, one in a directory under it, or an absolute path anywhere else — which
- * is not looked at, as `wf decide` does not look at it (`artifactPlace`). A file of the files directory that is not there on a run
- * `wf prune --artifacts` pruned is the path and what removed it, when (`filesPrunedWords`): gone, not missing. `prunedAt` is
+ * is not looked at, as `nemia decide` does not look at it (`artifactPlace`). A file of the files directory that is not there on a run
+ * `nemia prune --artifacts` pruned is the path and what removed it, when (`filesPrunedWords`): gone, not missing. `prunedAt` is
  * that moment alone, for a page that draws it as it draws every other time.
  */
 export type StepArtifact =

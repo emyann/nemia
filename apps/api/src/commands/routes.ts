@@ -1,7 +1,7 @@
 /**
  * The orchestrator's commands as routes, generated from its table (`COMMANDS`): each routed command on its path, its body derived from its
  * spec, guarded as a start is (guard.ts) where it writes, refused in the api's words (words.ts) and extended where the api does more
- * (extend.ts), then handed to the command's own handler — the one `wf` runs.
+ * (extend.ts), then handed to the command's own handler — the one `nemia` runs.
  */
 import { Schema } from 'effect';
 import { Hono, type Context } from 'hono';
@@ -242,63 +242,65 @@ export const wordBreaks = (table: readonly Pick<CommandSpec, 'name' | 'route'>[]
  * The board's writes for a person's asks of a run, one route per command of the package's table that has one (`routesOf(COMMANDS)`). Each
  * route is guarded as a start is (guard.ts), answers 404 for a run or a step it does not have, 400 for a body that is not an ask and 422
  * for a key another command takes on the api alone (`foreignKey`), refuses with 422 what the command's `check` refuses — the same words
- * `wf` prints — and writes through the command's own handler, the package's verb, whose refusals it lets through to
+ * `nemia` prints — and writes through the command's own handler, the package's verb, whose refusals it lets through to
  * `app.onError` (app.ts), which answers each by its kind, verbatim: 404 for a run gone since the route read it (`Missing`), 409 for a state
  * that forbids the ask (`Conflict`), 422 for a record that does not read (`Invalid`). The api judges none of it. A 202 is accepted and not
  * yet done: the next tick honours the ask once, as it does one made at the command line. A write that fails otherwise is a 502 naming the
  * command that asks the same way.
  *
  * - `POST /api/runs/:id/steps/:step/retry` — another try of a step: the answer to a step that signed off blocked, a nudge, a recheck. Made
- *   by `retry()`, `wf retry`'s own, which writes the ask file and nothing else. Refuses a message or a budget that cannot ride on the ask
- *   (`messageRefusal`, `budgetRefusal` — a budget on a recheck, which files no session to spend it) with 422 before the run is read, and a
- *   step that may not be tried again that way (`retryRefusal`) with 409 after. A step whose session its harness blocked, with nothing
- *   signed, is taken as `wf retry` takes it (`stopBlocked`): the ask is written as any other, and the tick stops the session before it
+ *   by `retry()`, `nemia retry`'s own, which writes the ask file and nothing else. Refuses a message or a budget that cannot ride on the
+ *   ask (`messageRefusal`, `budgetRefusal` — a budget on a recheck, which files no session to spend it) with 422 before the run is read,
+ *   and a step that may not be tried again that way (`retryRefusal`) with 409 after. A step whose session its harness blocked, with nothing
+ *   signed, is taken as `nemia retry` takes it (`stopBlocked`): the ask is written as any other, and the tick stops the session before it
  *   files the try — which the answer's `stopFirst` says, for the board to word, and then a tick after that one files the try. A person's
  *   `answers` to the questions the step's current closeout asks are checked against them and written as the try's message, the message
  *   given beside them its note (`answeredHow`): answers that do not fit, or on a recheck, are refused with 400.
  * - `POST /api/runs/:id/round` — another round of a run's loop: the loop out of rounds, or held on a step of it past its budget, with the
- *   cap raised. Made by `round()`, `wf round`'s own, which writes the ask file and nothing else. Refuses a budget not above zero with 400,
- *   before the round is asked (`roundBudgetRefusal`, which `roundAsk` refuses first, whatever the run); a round the loop may not go, or a
- *   budget not above what its steps have cost (`roundAsk`), with 409.
- * - `POST /api/runs/:id/steps/:step/say` — a person's words to a step's running session, through `say()`, `wf say`'s own, which hands them
- *   to the session through the engine, and the engine journals them: the api writes nothing, and the step's detail reads them back
+ *   cap raised. Made by `round()`, `nemia round`'s own, which writes the ask file and nothing else. Refuses a budget not above zero with
+ *   400, before the round is asked (`roundBudgetRefusal`, which `roundAsk` refuses first, whatever the run); a round the loop may not go,
+ *   or a budget not above what its steps have cost (`roundAsk`), with 409.
+ * - `POST /api/runs/:id/steps/:step/say` — a person's words to a step's running session, through `say()`, `nemia say`'s own, which hands
+ *   them to the session through the engine, and the engine journals them: the api writes nothing, and the step's detail reads them back
  *   (`said`). Refuses, in the package's and the engine's words, with 409: a step not filed, settled, or of a cancelled run; empty words; a
  *   session its harness does not list running — the engine's refusals thrown as a `Conflict` by `say()`. Words the harness did not take are
  *   the engine's error, verbatim, with 502: nothing was journalled, and asking again may work. Its 202 means the session's harness took the
  *   words and the engine journalled them; whether the session reads them is the session's.
- * - `POST /api/runs/:id/steps/:step/approve` — an approval of a step waiting at its gate, through `approve()`, `wf approve`'s own, which
+ * - `POST /api/runs/:id/steps/:step/approve` — an approval of a step waiting at its gate, through `approve()`, `nemia approve`'s own, which
  *   writes the approval file and nothing else; the next tick files what waits on the step. Refuses empty words (`approvalWordsRefusal`)
  *   with 422 before the run is read, and a step that may not be approved (`approvalRefusal`) with 409 after — not gated, not signed off
- *   yet, already approved, sent back, or of a run called off. Sending it back is `POST …/retry` with a message, as `wf retry --message` is.
- * - `POST /api/runs/:id/steps/:step/accept` — an acceptance of a loop out of rounds, as it stands, through `accept()`, `wf accept`'s own,
- *   which writes the acceptance file and nothing else; the next tick files what waits on the looping step as if it had said `again: false`.
- *   Refuses words that are missing or empty (`acceptWordsRefusal`) with 422 before the run is read, and a loop that may not be accepted
- *   (`acceptAsk`) with 409 after — a step with no `loop:`, a round the run files itself or one already asked for, a loop that ended
- *   `again: false`, a try already accepted, a run called off.
- * - `DELETE /api/runs/:id/hold` — a person's hold lifted, as `wf hold <run> --off` lifts it (`unhold`), the one form of `wf hold` the api
- *   serves: its route sets `off`, and it reads no body. Its file removed, the run goes on at the next tick, what its steps asked while it
- *   was held asked again. Refused in the package's words, by `app.onError`: a run nobody holds — a pruned one among them, since no verb
+ *   yet, already approved, sent back, or of a run called off. Sending it back is `POST …/retry` with a message, as `nemia retry --message`
+ *   is.
+ * - `POST /api/runs/:id/steps/:step/accept` — an acceptance of a loop out of rounds, as it stands, through `accept()`, `nemia accept`'s
+ *   own, which writes the acceptance file and nothing else; the next tick files what waits on the looping step as if it had said `again:
+ *   false`. Refuses words that are missing or empty (`acceptWordsRefusal`) with 422 before the run is read, and a loop that may not be
+ *   accepted (`acceptAsk`) with 409 after — a step with no `loop:`, a round the run files itself or one already asked for, a loop that
+ *   ended `again: false`, a try already accepted, a run called off.
+ * - `DELETE /api/runs/:id/hold` — a person's hold lifted, as `nemia hold <run> --off` lifts it (`unhold`), the one form of `nemia hold` the
+ *   api serves: its route sets `off`, and it reads no body. Its file removed, the run goes on at the next tick, what its steps asked while
+ *   it was held asked again. Refused in the package's words, by `app.onError`: a run nobody holds — a pruned one among them, since no verb
  *   holds one — and a hold put again as it was lifted are a 409 (`Conflict`), a run gone since the route read it a 404; any other failure
  *   is a 502. Its 200 is `{ id, lifted: true, hold }`. No feed line: the tick is the feed's one writer, and the board reads the run again.
- * - `POST /api/pause` — the store paused, as `wf pause` pauses it (`putPause`), its body `wf pause`'s `--why`, `--by` and `--now`, its
- *   route setting `yes`, and the route names no run: no pass starts new work until the lift. Refuses what `wf pause` refuses of `--why` and
- *   `--by` with 422, and a pause that stands without `now` with 409 (`Conflict`). Its 200 is `{ pause }`, as written. With `now`, as
- *   `wf pause --now --yes`, it pauses at once (`pauseNow`): it keeps a pause that stands as it was put, and asks each step session or check
- *   at work but a landing to stop, each tried again once the store is resumed; its 200 is `{ pause, kept, interrupted, skipped }`.
- * - `DELETE /api/pause` — the store's pause lifted, as `wf resume` lifts it (`resumePause`); it reads no body. None standing is a 404
+ * - `POST /api/pause` — the store paused, as `nemia pause` pauses it (`putPause`), its body `nemia pause`'s `--why`, `--by` and `--now`,
+ *   its route setting `yes`, and the route names no run: no pass starts new work until the lift. Refuses what `nemia pause` refuses of
+ *   `--why` and `--by` with 422, and a pause that stands without `now` with 409 (`Conflict`). Its 200 is `{ pause }`, as written. With
+ *   `now`, as `nemia pause --now --yes`, it pauses at once (`pauseNow`): it keeps a pause that stands as it was put, and asks each step
+ *   session or check at work but a landing to stop, each tried again once the store is resumed; its 200 is `{ pause, kept, interrupted,
+ *   skipped }`.
+ * - `DELETE /api/pause` — the store's pause lifted, as `nemia resume` lifts it (`resumePause`); it reads no body. None standing is a 404
  *   (`Missing`). Its 200 is `{ pause }`, the pause lifted.
- * - `DELETE /api/runs/:id` — a try's run removed, as `wf rm <run>` removes it (`forget`): its record, and the folders it worked in with it;
- *   it reads no body. Only a try (rm's extension, extend.ts): any other run is a 409 naming `wf rm`, which says what it hands off and what
- *   it leaves, and a git run's worktrees and branches are a person's to read before they go. What removed nothing is thrown in `wf rm`'s
- *   line (`RM.apiRefusal`): a try still working, and a worktree a session holds — the record kept — are a 409, a record gone since the
- *   route read it a 404; any other failure is a 502. Its 200 is `{ id, removed: true }`.
- * - `POST /api/runs/:id/prune` — a finished run pruned, as `wf prune <run> --yes` prunes it (`prune`), its route setting `yes`, with
+ * - `DELETE /api/runs/:id` — a try's run removed, as `nemia rm <run>` removes it (`forget`): its record, and the folders it worked in with
+ *   it; it reads no body. Only a try (rm's extension, extend.ts): any other run is a 409 naming `nemia rm`, which says what it hands off
+ *   and what it leaves, and a git run's worktrees and branches are a person's to read before they go. What removed nothing is thrown in
+ *   `nemia rm`'s line (`RM.apiRefusal`): a try still working, and a worktree a session holds — the record kept — are a 409, a record gone
+ *   since the route read it a 404; any other failure is a 502. Its 200 is `{ id, removed: true }`.
+ * - `POST /api/runs/:id/prune` — a finished run pruned, as `nemia prune <run> --yes` prunes it (`prune`), its route setting `yes`, with
  *   `artifacts` its `--artifacts` and `unmerged` its `--unmerged`, each true or false, and no other key, every one named at once (400):
  *   its worktrees removed, and its files with `artifacts`; its record and every branch kept. The page asks twice before it sends this, so
  *   there is no dry run here. The package decides everything and words it (`PRUNE.apiRefusal`): refused — a folder run, a run not over, a
- *   finished run nobody merged without `unmerged`, a worktree holding what no commit has — and nothing left to prune are each a 409 in `wf
- *   prune`'s words alone, the page saying `Not pruned` above them itself; any other failure is a 502. Its 200 is `{ id, pruned: true,
- *   lines, worktrees, artifacts, left }`. No feed line: the marker the prune writes moves the run's stamp in `runStore`, and the board
- *   reads the run again itself.
+ *   finished run nobody merged without `unmerged`, a worktree holding what no commit has — and nothing left to prune are each a 409 in
+ *   `nemia prune`'s words alone, the page saying `Not pruned` above them itself; any other failure is a 502. Its 200 is `{ id, pruned:
+ *   true, lines, worktrees, artifacts, left }`. No feed line: the marker the prune writes moves the run's stamp in `runStore`, and the
+ *   board reads the run again itself.
  */
 export const commands = routesOf(COMMANDS);

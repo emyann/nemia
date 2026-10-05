@@ -1,8 +1,8 @@
 /**
  * What the store reads back, read against what the tick and the verbs write: a run record, a person's asks and markers. A record that does
  * not read as a run is refused by `readRun` with its fix and left out of `listRuns`; an ask a verb would not write is not honoured, and
- * says why in the verb's words; a marker that does not read still holds its run. Every shape a former `wf` wrote reads as it did. `WF_ROOT`
- * is set before the import, since the module reads it as it loads.
+ * says why in the verb's words; a marker that does not read still holds its run. Every shape a former `nemia` wrote reads as it did.
+ * `WF_ROOT` is set before the import, since the module reads it as it loads.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -75,12 +75,12 @@ test('a record with no `id` is refused by name, with where it is and what to do 
   assert.ok(!said.includes('Expected'), `in wf's words: ${said}`);
 });
 
-test("a frozen step's `after` that is no list is refused at its path, saying what is there and what wf writes", () => {
+test("a frozen step's `after` that is no list is refused at its path, saying what is there and what nemia writes", () => {
   const record = aRecord('r-after');
   (record.workflow as Array<Record<string, unknown>>)[1].after = 'implement';
   put('r-after', record);
   const said = refusalOf('r-after');
-  assert.ok(said.includes('its `workflow.1.after` is "implement", where wf writes'), said);
+  assert.ok(said.includes('its `workflow.1.after` is "implement", where nemia writes'), said);
 });
 
 test("a field that holds a huge value is refused in bounded words: the value's first 60 characters as JSON, cut marked `…`", () => {
@@ -88,7 +88,7 @@ test("a field that holds a huge value is refused in bounded words: the value's f
   (record.workflow as Array<Record<string, unknown>>)[1].after = 'x'.repeat(100_000);
   put('r-huge', record);
   const said = refusalOf('r-huge');
-  assert.ok(said.includes(`its \`workflow.1.after\` is "${'x'.repeat(59)}…, where wf writes`), said.slice(0, 300));
+  assert.ok(said.includes(`its \`workflow.1.after\` is "${'x'.repeat(59)}…, where nemia writes`), said.slice(0, 300));
   assert.ok(said.length < 2_000, `${said.length} characters`);
 });
 
@@ -106,7 +106,7 @@ test('a frozen step with no name, a step record with no task, and a folder run w
   const { repo: _r, baseRef: _b, branch: _br, isolate: _i, ...folder } = aRecord('r-place');
   put('r-place', { ...folder, place: { kind: 'shelf' } });
   assert.ok(
-    refusalOf('r-place').includes('its `place.kind` is "shelf", where wf writes "folder"'),
+    refusalOf('r-place').includes('its `place.kind` is "shelf", where nemia writes "folder"'),
     'read against the folder run it says it is, not the git run it is not',
   );
 });
@@ -143,19 +143,19 @@ const withAgent = (id: string): Record<string, unknown> => {
 
 /** Each frozen step key the parser types, broken as a person's edit would break it: where it is, and what `readRun` says is there. */
 const BROKEN: ReadonlyArray<[string, (step: Record<string, unknown>) => void, string]> = [
-  ['retries', (step) => (step.retries = '2'), 'its `workflow.1.retries` is "2", where wf writes number'],
-  ['workspace', (step) => (step.workspace = 'shelf'), 'its `workflow.1.workspace` is "shelf", where wf writes "main" | "folder"'],
-  ['gate', (step) => (step.gate = 'yes'), 'its `workflow.1.gate` is "yes", where wf writes true'],
-  ['tools', (step) => (step.tools = 'Read'), 'its `workflow.1.tools` is "Read", where wf writes array'],
+  ['retries', (step) => (step.retries = '2'), 'its `workflow.1.retries` is "2", where nemia writes number'],
+  ['workspace', (step) => (step.workspace = 'shelf'), 'its `workflow.1.workspace` is "shelf", where nemia writes "main" | "folder"'],
+  ['gate', (step) => (step.gate = 'yes'), 'its `workflow.1.gate` is "yes", where nemia writes true'],
+  ['tools', (step) => (step.tools = 'Read'), 'its `workflow.1.tools` is "Read", where nemia writes array'],
   [
     'agent.keys',
     (step) => ((step.agent as { keys: string[] }).keys = ['gates']),
-    'its `workflow.1.agent.keys.0` is "gates", where wf writes "after" |',
+    'its `workflow.1.agent.keys.0` is "gates", where nemia writes "after" |',
   ],
   [
     'output.schema',
     (step) => ((step.output as { schema: Record<string, unknown> }).schema.additionalProperties = true),
-    'its `workflow.1.output.schema.additionalProperties` is true, where wf writes false',
+    'its `workflow.1.output.schema.additionalProperties` is true, where nemia writes false',
   ],
 ];
 
@@ -188,10 +188,10 @@ test('a record that is not JSON, or holds no object, is refused saying so', () =
   assert.ok(refusalOf('r-list').includes('is no run record: it holds no object'));
 });
 
-test('a run id with no record is still told to try `wf ls`, not called unreadable', () => {
+test('a run id with no record is still told to try `nemia ls`, not called unreadable', () => {
   assert.throws(
     () => readRun('r-nobody'),
-    (err: Error) => !(err instanceof UnreadableRecord) && err.message === "no such run: r-nobody  (try 'wf ls')",
+    (err: Error) => !(err instanceof UnreadableRecord) && err.message === "no such run: r-nobody  (try 'nemia ls')",
   );
 });
 
@@ -300,7 +300,7 @@ test("the oldest shapes on the owner's store read: no frozen workflow, `disallow
       disallowedTools: ['SendMessage'],
       agent: { name: 'implementer', keys: ['disallowedTools'], body: '', given: { disallowedTools: 'SendMessage' } },
     },
-    "a step a wf before 4612aa2a froze, the former name beside the new one on the step and in its agent's `given`, reads under the new",
+    "a step a nemia before 4612aa2a froze, the former name beside the new one on the step and in its agent's `given`, reads under the new",
   );
 
   const allowed = aRecord('r-allow');
@@ -329,7 +329,7 @@ test("the oldest shapes on the owner's store read: no frozen workflow, `disallow
   (text.workflow as Array<Record<string, unknown>>)[0].disallow = 'SendMessage';
   put('r-disallow-text', text);
   assert.ok(
-    refusalOf('r-disallow-text').includes('its `workflow.0.disallow` is "SendMessage", where wf writes array'),
+    refusalOf('r-disallow-text').includes('its `workflow.0.disallow` is "SendMessage", where nemia writes array'),
     'a field under a former name is checked as the key it is now',
   );
   fs.rmSync(runFile('r-disallow-text'));
@@ -365,12 +365,12 @@ const ask = (name: string, body: unknown): string => {
 
 const AT = '2026-09-01T00:00:00.000Z';
 
-test('an approval `wf approve` would not write is refused in its words; one it writes, with or without words, reads', () => {
+test('an approval `nemia approve` would not write is refused in its words; one it writes, with or without words, reads', () => {
   assert.equal(approvalIn(ask('a1', { message: 'go' }), 'plan', 1), 'it says no time it was given');
   assert.equal(approvalIn(ask('a2', { at: 'tuesday' }), 'plan', 1), 'it says no time it was given');
   assert.equal(approvalIn(ask('a3', { at: AT, message: 7 }), 'plan', 1), 'its message is not text');
   assert.equal(approvalIn(ask('a4', { at: AT, message: '  ' }), 'plan', 1), 'its message is empty');
-  assert.equal(approvalIn(ask('a5', [AT]), 'plan', 1), 'it is not an approval wf approve wrote');
+  assert.equal(approvalIn(ask('a5', [AT]), 'plan', 1), 'it is not an approval nemia approve wrote');
   assert.ok(String(approvalIn(ask('a6', '{'), 'plan', 1)).startsWith('unreadable ('));
   assert.deepEqual(approvalIn(ask('a7', { at: AT }), 'plan', 1), { step: 'plan', try: 1, at: AT });
   assert.deepEqual(approvalIn(ask('a8', { at: AT, message: 'go', by: 'a newer wf' }), 'plan', 2), {
@@ -381,7 +381,7 @@ test('an approval `wf approve` would not write is refused in its words; one it w
   });
 });
 
-test('an acceptance with no words, blank words or no time is refused in `wf accept`’s words', () => {
+test('an acceptance with no words, blank words or no time is refused in `nemia accept`’s words', () => {
   assert.equal(acceptanceIn(ask('c1', { message: 'fine' }), 'implement', 3), 'it says no time it was given');
   assert.equal(
     acceptanceIn(ask('c2', { at: AT }), 'implement', 3),
@@ -391,7 +391,7 @@ test('an acceptance with no words, blank words or no time is refused in `wf acce
     acceptanceIn(ask('c3', { at: AT, message: ' ' }), 'implement', 3),
     'its message is empty, and an acceptance is nothing but its reason',
   );
-  assert.equal(acceptanceIn(ask('c5', 'null'), 'implement', 3), 'it is not an acceptance wf accept wrote');
+  assert.equal(acceptanceIn(ask('c5', 'null'), 'implement', 3), 'it is not an acceptance nemia accept wrote');
   assert.deepEqual(acceptanceIn(ask('c4', { at: AT, message: 'fine' }), 'implement', 3), {
     step: 'implement',
     try: 3,
@@ -403,15 +403,15 @@ test('an acceptance with no words, blank words or no time is refused in `wf acce
 test('a round ask whose budget is not dollars above zero is refused; one with no time or a time that is no text reads as before', () => {
   assert.equal(roundAskIn(ask('r1', { at: AT, budget: 0 }), 'implement', 4), 'its budget is not an amount of dollars above zero');
   assert.equal(roundAskIn(ask('r2', { at: AT, budget: '5' }), 'implement', 4), 'its budget is not an amount of dollars above zero');
-  assert.equal(roundAskIn(ask('r3', 'null'), 'implement', 4), 'it is not an ask wf round wrote');
+  assert.equal(roundAskIn(ask('r3', 'null'), 'implement', 4), 'it is not an ask nemia round wrote');
   assert.deepEqual(roundAskIn(ask('r4', {}), 'implement', 4), { step: 'implement', round: 4, at: '' });
   assert.deepEqual(roundAskIn(ask('r5', { at: 12, budget: 2.5 }), 'implement', 4), { step: 'implement', round: 4, budget: 2.5, at: '' });
 });
 
-test('a retry ask is held to `wf retry`’s word, reason by reason; one from before asks carried a message reads as it did', () => {
+test('a retry ask is held to `nemia retry`’s word, reason by reason; one from before asks carried a message reads as it did', () => {
   const said = (body: unknown): unknown => askIn(ask('t', body), 'implement', 2);
-  assert.equal(said({ mode: 'again' }), 'it asks for no mode wf retry knows ("again")');
-  assert.equal(said({}), 'it asks for no mode wf retry knows (undefined)');
+  assert.equal(said({ mode: 'again' }), 'it asks for no mode nemia retry knows ("again")');
+  assert.equal(said({}), 'it asks for no mode nemia retry knows (undefined)');
   assert.equal(said({ mode: 'fresh', model: '' }), 'its model is not a name');
   assert.equal(said({ mode: 'nudge', message: ['go'] }), 'its message is not text');
   assert.equal(said({ mode: 'nudge', message: '\n' }), 'its message is empty');

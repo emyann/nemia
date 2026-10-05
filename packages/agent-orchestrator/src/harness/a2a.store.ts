@@ -8,9 +8,9 @@
  * read on every request, so a secret is never on disk here.
  *
  * Read when a process makes its engine (`engine()` in runtime-client.ts), which is also where each address is judged by the runtime's own
- * rule (`readRemote`) and what is refused is left out, when `wf start` checks the names its steps give, and when the api lists what a step
- * may run on: an edit reaches a running `wf up` or api when it restarts. A store file at the bottom of the tree: it reads one file, and
- * imports no other store file.
+ * rule (`readRemote`) and what is refused is left out, when `nemia start` checks the names its steps give, and when the api lists what a
+ * step may run on: an edit reaches a running `nemia up` or api when it restarts. A store file at the bottom of the tree: it reads one file,
+ * and imports no other store file.
  */
 import fs from 'node:fs';
 import path from 'node:path';

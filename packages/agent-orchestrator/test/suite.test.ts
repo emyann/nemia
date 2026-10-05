@@ -17,7 +17,7 @@
  * unbounded, a suite runs about as many processes as the machine has cores in every package, and several suites at once swap.
  *
  * Each package's `test` script records what its tests cost when a run's check gives it `WF_ARTIFACTS` (`tools/test-costs/`): it loads
- * the probe into every test file's process, keeps the spec reporter on stdout, where a check's log and its `wf <word>: ` lines are read,
+ * the probe into every test file's process, keeps the spec reporter on stdout, where a check's log and its `nemia <word>: ` lines are read,
  * and adds the cost reporter on stderr.
  */
 import { test } from 'node:test';

@@ -1,5 +1,6 @@
 /**
- * What `wf decide` shows a person about a run (`GET /api/runs/:runId/decision`): its branches, the lesson line, the diffs and the commands.
+ * What `nemia decide` shows a person about a run (`GET /api/runs/:runId/decision`): its branches, the lesson line, the diffs and the
+ * commands.
  */
 import {
   branchesToRead,
@@ -33,14 +34,14 @@ import { type StepUsed, totalOf, usedOf } from '../detail/usage.ts';
 
 export type { DecideCommand };
 
-/** What a branch touched, as `wf decide` reads it (`touchedBy`): its radius, or why git could not say. */
+/** What a branch touched, as `nemia decide` reads it (`touchedBy`): its radius, or why git could not say. */
 export type Touched = { branch: string; radius: ReturnType<typeof touchedBy> };
 
 /**
  * Where one result branch stands against the base branch, as git says it now (`BranchStanding`) — on it, ahead of it by N commits, or gone
- * — with the fact in the package's words (`branchWord`) and how much it changed, as `wf decide` prints beside the branch (`diffStat`, git's
- * `--shortstat`): `3 files changed, 12 insertions(+), 1 deletion(-)`, trimmed. `stat` is null where git said nothing of it: a branch it
- * does not have, or one with nothing on it past the run's base.
+ * — with the fact in the package's words (`branchWord`) and how much it changed, as `nemia decide` prints beside the branch (`diffStat`,
+ * git's `--shortstat`): `3 files changed, 12 insertions(+), 1 deletion(-)`, trimmed. `stat` is null where git said nothing of it: a branch
+ * it does not have, or one with nothing on it past the run's base.
  */
 export type Standing = BranchStanding & { said: string; stat: string | null; merge: StandingMerge | null };
 
@@ -53,19 +54,19 @@ export type DiffFile = { path: string; lines: string[]; cut: number };
 export type SensitiveDiff = { branch: string; files: DiffFile[]; error: string | null };
 
 /**
- * The lesson line as `wf decide` words it (`lessonLine`), without its label, and which of its three it is: a file where
+ * The lesson line as `nemia decide` words it (`lessonLine`), without its label, and which of its three it is: a file where
  * the next agent reads was changed, nothing was, or a branch could not be read, so nobody knows.
  */
 export type Lesson = { said: string; state: 'written' | 'nothing' | 'unknown' };
 
 /**
- * What `wf decide` shows a person about a run: what each branch it reads touched, the lesson line, the check-affecting
+ * What `nemia decide` shows a person about a run: what each branch it reads touched, the lesson line, the check-affecting
  * diffs in full, what each step consumed and the run's total, and the commands.
  */
 export type Decidable = {
   /**
    * Where each result branch stands against the base branch, and how much it changed (`Standing`): the facts under the run's result, as
-   * `wf decide` prints them before anything to do about it. Empty for a run that worked on its base branch itself, which has no result
+   * `nemia decide` prints them before anything to do about it. Empty for a run that worked on its base branch itself, which has no result
    * branch of its own, and for one whose steps recorded none.
    */
   standings: Standing[];
@@ -76,14 +77,14 @@ export type Decidable = {
   /** Every filed step's `used` summed: a count only where every one of them measured it. */
   total: StepUsed;
   /**
-   * What the run has cost, as `wf decide` prints it after its steps (`runCostLines`), without its label: `run $12.40`, with how many ended
-   * attempts had no cost on them — or `run not measured`. Null before any attempt has ended.
+   * What the run has cost, as `nemia decide` prints it after its steps (`runCostLines`), without its label: `run $12.40`, with how many
+   * ended attempts had no cost on them — or `run not measured`. Null before any attempt has ended.
    */
   cost: string | null;
-  /** `wf decide`'s OVER BUDGET line, saying why each step held on its budget is held (`overBudgetLine`); null when none is. */
+  /** `nemia decide`'s OVER BUDGET line, saying why each step held on its budget is held (`overBudgetLine`); null when none is. */
   overBudget: string | null;
   /**
-   * The commands a person may type on a run awaiting them, as the package builds them (`choicesOf`): each a bare `wf` or `git -C` line,
+   * The commands a person may type on a run awaiting them, as the package builds them (`choicesOf`): each a bare `nemia` or `git -C` line,
    * labelled, beside the sentence it ends where it has one. None on a run that awaits nobody.
    */
   commands: DecideCommand[];
@@ -93,21 +94,21 @@ export type Decidable = {
    */
   checkout?: CheckoutHold;
   /**
-   * The run finished and nobody has decided it, as the package reads it (`decision`'s `awaiting`) — the reading `wf prune` refuses without
-   * `--unmerged` (`pruneRefusal`): the result branches it waits on, and `direct` for a run that worked on its base branch itself, which has
-   * nothing to merge and still waits on you (its branch is the base branch). Null for a run still running with a step waiting on you. A run
-   * called off, or whose branches are on the base however they got there, is `nothing`, never this.
+   * The run finished and nobody has decided it, as the package reads it (`decision`'s `awaiting`) — the reading `nemia prune` refuses
+   * without `--unmerged` (`pruneRefusal`): the result branches it waits on, and `direct` for a run that worked on its base branch itself,
+   * which has nothing to merge and still waits on you (its branch is the base branch). Null for a run still running with a step waiting on
+   * you. A run called off, or whose branches are on the base however they got there, is `nothing`, never this.
    */
   awaiting: { branches: string[]; direct: boolean } | null;
 };
 
 /**
- * A run's decision. `waiting` for a run whose roots wait on runs that have not shipped: `wf decide` says that, and offers nothing else —
- * and the hold beside it, `holding`, for one a person also holds, as `wf decide` says both. `holding` alone for a run a person holds with
- * `wf hold`: `wf decide` says the hold and what lifts it, and offers nothing, since every verb that would release work is refused while it
- * stands (`heldRefusal`). `running` while it runs and nobody is waited on — `wf decide`'s "nothing to decide yet", with no git asked — and
- * `held` beside it for a run the cap on runs in flight holds, with the count it is held at (`slotsOf`). `nothing`, in `wf decide`'s words,
- * for a run called off or whose branches are already on its base. Else what there is to decide.
+ * A run's decision. `waiting` for a run whose roots wait on runs that have not shipped: `nemia decide` says that, and offers nothing else —
+ * and the hold beside it, `holding`, for one a person also holds, as `nemia decide` says both. `holding` alone for a run a person holds
+ * with `nemia hold`: `nemia decide` says the hold and what lifts it, and offers nothing, since every verb that would release work is
+ * refused while it stands (`heldRefusal`). `running` while it runs and nobody is waited on — `nemia decide`'s "nothing to decide yet", with
+ * no git asked — and `held` beside it for a run the cap on runs in flight holds, with the count it is held at (`slotsOf`). `nothing`, in
+ * `nemia decide`'s words, for a run called off or whose branches are already on its base. Else what there is to decide.
  */
 export type RunDecision =
   | { waiting: RunWaiting; holding?: RunHolding }
@@ -116,7 +117,7 @@ export type RunDecision =
   | { nothing: string }
   | Decidable;
 
-/** How many lines of one file's check-affecting diff the board is given. `wf decide` prints them all. */
+/** How many lines of one file's check-affecting diff the board is given. `nemia decide` prints them all. */
 export const DIFF_LINES = 400;
 
 /**
@@ -173,17 +174,17 @@ function lessonOf(touched: readonly Touched[]): Lesson {
   return { said, state: touched.some((t) => !('error' in t.radius) && t.radius.lessons.length) ? 'written' : 'nothing' };
 }
 
-/** The package's own `wf decide` of a run (`decideRun`), through its entry of the command table, served on the api alone. */
+/** The package's own `nemia decide` of a run (`decideRun`), through its entry of the command table, served on the api alone. */
 const DECIDE = COMMANDS.find((c) => c.name === 'decide')!;
 
 /** The merge check, the table's entry served on the api alone. */
 const MERGES = COMMANDS.find((c) => c.name === 'merges')!;
 
 /**
- * What `wf decide` shows a person about a run, decided by the package (`DECIDE`, the table's entry whose handler is `decideRun`): its
+ * What `nemia decide` shows a person about a run, decided by the package (`DECIDE`, the table's entry whose handler is `decideRun`): its
  * decision, commands (`choicesOf`), costs and checkout, read with the branches and diffs the api reads beside them.
  *
- * First, as `wf decide` asks it first, off the runs it waits on and is held until, each read once (`parentsOf`): a run whose roots wait
+ * First, as `nemia decide` asks it first, off the runs it waits on and is held until, each read once (`parentsOf`): a run whose roots wait
  * on runs that have not shipped is `waiting`, and none of its tasks is read. Then a run a person holds is `holding`, and none is read
  * either: what is in flight is on its detail, and nothing is offered. Else the run is judged (`judge`) over those runs. A run still
  * running with nobody waited on (`judge`, the listing's word) is `running`, with the slot the cap holds it for — its `WF_MAX_RUNS` before
@@ -234,7 +235,7 @@ export async function decisionOf(run: Run, e: Engine['Service'], home: string, e
   };
 }
 
-/** What `wf decide` says of a run with nothing to decide: called off, or its branches already on the base; undefined for any other. */
+/** What `nemia decide` says of a run with nothing to decide: called off, or its branches already on the base; undefined for any other. */
 function nothingOf(run: Run, d: Decided['decision']): string | undefined {
   if (d.kind === 'cancelled') return `cancelled at ${d.at} — nothing to decide`;
   if (d.kind === 'shipped') return `shipped — ${d.branches.join(', ')} is already on ${run.branch}`;

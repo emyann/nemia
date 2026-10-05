@@ -82,7 +82,8 @@ import { resultSteps, workChecks } from '../branches/branches.ts';
  * @param parents For a root of a run that waited on runs (`--after`), filed on the pass that saw them ship: what each concluded
  *   (`fromRunSection`), gathered by file.verb.ts. Given to no other step: a run without `after`, and every step after a root, is composed
  *   without it.
- * @param inputsDir The directory the run copied `wf start --input` files into (`inputsDir` in record.store.ts): named, with `run.inputs`,
+ * @param inputsDir The directory the run copied `nemia start --input` files into (`inputsDir` in record.store.ts): named, with
+ * `run.inputs`,
  *   under what was asked for.
  * @param checked For a step filed after checked steps: what each of their checks said on the try or round it follows
  *   (`checkHandedSection`), read by file.verb.ts. Absent, and nothing is said of a check: the board's preview composes without it.
@@ -250,7 +251,7 @@ function givenSections(
  * person said with it.
  *
  * Nothing of this machine. The agent runs somewhere else, as its operator configured it, so a path under the store — an artifacts
- * directory, the run's inputs, a workspace — names nothing it can open, and none is said: files given with `wf start --input` are named,
+ * directory, the run's inputs, a workspace — names nothing it can open, and none is said: files given with `nemia start --input` are named,
  * never located. Nor a contract: it has no `check:`, no `output:` and no closing statement's schema (`remoteRefusal` in
  * harness/harness.ts), and it is done when its Task completes. A try is a new Task, never a turn of the last one, so it is told what any
  * first try is, and then which try it is.
@@ -267,7 +268,7 @@ export function remoteBrief(
   const inputs = run.inputs?.length
     ? [
         '',
-        `Files were given with it (\`wf start --input\`): ${run.inputs.map((n) => `\`${n}\``).join(', ')}. They stay on the machine that runs this workflow and are not sent to you.`,
+        `Files were given with it (\`nemia start --input\`): ${run.inputs.map((n) => `\`${n}\``).join(', ')}. They stay on the machine that runs this workflow and are not sent to you.`,
       ]
     : [];
   const handed = [
@@ -297,7 +298,7 @@ function remoteTrySection(step: Workflow, r: RetryBriefing): string {
       ? `The run filed this try itself: this step declares \`retries: ${step.retries ?? 0}\`.`
       : r.by === 'signoff' || r.by === 'pause'
         ? 'The run filed this try itself.'
-        : `A person asked for this try (\`wf retry\`)${r.message !== undefined ? ', with what they said below' : ''}.`;
+        : `A person asked for this try (\`nemia retry\`)${r.message !== undefined ? ', with what they said below' : ''}.`;
   return [
     '',
     `## Try ${r.try}`,

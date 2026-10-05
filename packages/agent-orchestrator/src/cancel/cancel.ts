@@ -24,7 +24,7 @@ import { assess } from '../tick/assess.ts';
  *     step that slipped through the first time rather than something they have to reason about.
  *   - **finished** — it ended on its own, and there is nothing left for a tick to do either: no
  *     step in flight AND none ready to file. It is deliberately NOT relabelled — a run that
- *     succeeded succeeded, and overwriting that would make `wf ls` lie about work that landed.
+ *     succeeded succeeded, and overwriting that would make `nemia ls` lie about work that landed.
  *
  * "Finished" has to mean both of those — and no step waiting at its gate, whose approval would file what follows — because
  * `failed` does not mean a run has stopped moving:

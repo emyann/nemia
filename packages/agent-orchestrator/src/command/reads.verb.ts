@@ -1,7 +1,7 @@
 /**
- * The reads of the store, each defined once: `wf show` (a run's record), `wf logs` (a step's session output), `wf feed` (what the tick
- * judged, from a cursor) and `wf stats` (what the store's runs add up to). Their handlers answer data, and the CLI prints it; the api
- * serves a step's log and the stats on their routes from the same entries, and the board reads a run and the feed through reads of its
+ * The reads of the store, each defined once: `nemia show` (a run's record), `nemia logs` (a step's session output), `nemia feed` (what the
+ * tick judged, from a cursor) and `nemia stats` (what the store's runs add up to). Their handlers answer data, and the CLI prints it; the
+ * api serves a step's log and the stats on their routes from the same entries, and the board reads a run and the feed through reads of its
  * own (`only`).
  */
 import { runStore } from '../record/files.store.ts';
@@ -22,10 +22,10 @@ const textOf = (args: Args, key: string): string | undefined => {
   return typeof value === 'string' ? value : undefined;
 };
 
-/** `wf show` and `wf logs`' refusal of a word or a flag they do not take. */
-const takesNo = (verb: string, form: string) => (arg: string) => `wf ${verb} takes ${form}: not ${arg}.`;
+/** `nemia show` and `nemia logs`' refusal of a word or a flag they do not take. */
+const takesNo = (verb: string, form: string) => (arg: string) => `nemia ${verb} takes ${form}: not ${arg}.`;
 
-/** `wf show`: the run's record, its brief cut at 120 characters and each frozen step's body at 60, as JSON. */
+/** `nemia show`: the run's record, its brief cut at 120 characters and each frozen step's body at 60, as JSON. */
 export const SHOW: Command<Run> = {
   name: 'show',
   usage: '<runId>',
@@ -46,7 +46,7 @@ export const SHOW: Command<Run> = {
 };
 
 /**
- * `wf logs`: the session output of a step's current task, read from the engine whole, or nothing for a step with no task filed — one not
+ * `nemia logs`: the session output of a step's current task, read from the engine whole, or nothing for a step with no task filed — one not
  * run yet, or one the run does not have.
  */
 export const LOGS: Command<{ taskId?: string; output?: string }> = {
@@ -71,7 +71,7 @@ export const LOGS: Command<{ taskId?: string; output?: string }> = {
 };
 
 /**
- * `wf feed`: the store's pause while one stands, the feed's lines after a cursor, 0 when none is given, and the cursor to read on from;
+ * `nemia feed`: the store's pause while one stands, the feed's lines after a cursor, 0 when none is given, and the cursor to read on from;
  * printed in that order.
  */
 export const FEED: Command<{ pause: Paused; lines: FeedLine[]; cursor: number }> = {
@@ -79,8 +79,8 @@ export const FEED: Command<{ pause: Paused; lines: FeedLine[]; cursor: number }>
   usage: '[cursor]',
   help: [
     "what the tick judged, a line each time it changed: a run's status, a",
-    "step's word as wf ls says it, and what a person's word changed — then",
-    'cursor: <n>, to read on from with wf feed <n>; from the start with none',
+    "step's word as nemia ls says it, and what a person's word changed — then",
+    'cursor: <n>, to read on from with nemia feed <n>; from the start with none',
   ],
   spec: {
     positionals: [{ key: 'cursor', takes: 'optional', kind: 'text' }],
@@ -92,7 +92,7 @@ export const FEED: Command<{ pause: Paused; lines: FeedLine[]; cursor: number }>
     return cursor === undefined || /^\d+$/.test(cursor) ? null : cursorTakes('feed');
   },
   writes: false,
-  only: { side: 'cli', why: 'the board follows the feed through GET /api/feed/stream, the counterpart of wf watch' },
+  only: { side: 'cli', why: 'the board follows the feed through GET /api/feed/stream, the counterpart of nemia watch' },
   handler: async (e, args) => ({ ...readFeed(Number(textOf(args, 'cursor') ?? 0)), pause: await pausedRead(e) }),
   print: ({ pause, lines, cursor }) => {
     const paused = pausedWords(pause);
@@ -100,7 +100,7 @@ export const FEED: Command<{ pause: Paused; lines: FeedLine[]; cursor: number }>
   },
 };
 
-/** The value flags `wf stats` takes, by the query key each sets, and what each takes. */
+/** The value flags `nemia stats` takes, by the query key each sets, and what each takes. */
 const TAKES: Readonly<Record<QueryKey, string>> = {
   from: 'a day, YYYY-MM-DD in UTC: the first day counted',
   to: 'a day, YYYY-MM-DD in UTC: the last day counted',
@@ -112,14 +112,14 @@ const TAKES: Readonly<Record<QueryKey, string>> = {
   repo: "a repository's path, as a run's record names it: only its runs",
 };
 
-/** The query keys `wf stats` takes a flag for, in the order its help says them. */
+/** The query keys `nemia stats` takes a flag for, in the order its help says them. */
 const KEYS = Object.keys(TAKES) as QueryKey[];
 
-/** A `wf stats` flag's refusal of a value left out, empty, or given apart as a flag. */
+/** A `nemia stats` flag's refusal of a value left out, empty, or given apart as a flag. */
 const statsTakes = (key: string): string => `--${key} takes ${TAKES[key as QueryKey]}`;
 
-/** What `wf stats --help` prints: what it counts, each flag and what it takes, and how it prints. */
-export const STATS_HELP = `wf stats [--from <day>] [--to <day>] [--by <key>] [--agent|--step|--factory|--workflow|--repo <value>] [--line|--json]
+/** What `nemia stats --help` prints: what it counts, each flag and what it takes, and how it prints. */
+export const STATS_HELP = `nemia stats [--from <day>] [--to <day>] [--by <key>] [--agent|--step|--factory|--workflow|--repo <value>] [--line|--json]
 
 The flow numbers of every run in the store, of every factory and repository: the runs finished and landed, the rounds
 a loop took to be accepted, the share of landed runs that landed on their first try, the cost and wall time of a landed
@@ -136,8 +136,8 @@ const givenOf = (args: Args): Partial<Record<QueryKey, string>> =>
   Object.fromEntries(KEYS.flatMap((key) => (textOf(args, key) === undefined ? [] : [[key, textOf(args, key)]])));
 
 /**
- * Refused of `wf stats`' flags before anything is read: a value empty or starting `--`, which reads as the value left out, in what the flag
- * takes; then what `statsQueryOf` refuses of the query, in the flags' names.
+ * Refused of `nemia stats`' flags before anything is read: a value empty or starting `--`, which reads as the value left out, in what the
+ * flag takes; then what `statsQueryOf` refuses of the query, in the flags' names.
  */
 function statsRefusal(args: Args): string | null {
   const left = KEYS.find((key) => {
@@ -154,7 +154,7 @@ function statsRefusal(args: Args): string | null {
 }
 
 /**
- * `wf stats`: the flow numbers of every run in the store, as tiles and a row per day, one line (`--line`), or JSON (`--json`). The api
+ * `nemia stats`: the flow numbers of every run in the store, as tiles and a row per day, one line (`--line`), or JSON (`--json`). The api
  * answers the same `Stats` on its route, through the memo it keeps (`kept.stats`), verified as its environment says.
  */
 export const STATS: Command<Stats> = {
@@ -178,12 +178,12 @@ export const STATS: Command<Stats> = {
         kind: 'text' as const,
         key,
         takes: statsTakes(key),
-        twice: `wf stats takes --${key} once.`,
+        twice: `nemia stats takes --${key} once.`,
       })),
       { flag: '--line', kind: 'switch', key: 'line' },
       { flag: '--json', kind: 'switch', key: 'json' },
     ],
-    unknown: (arg) => `wf stats does not take ${arg}. It takes ${KEYS.map((k) => `--${k}`).join(', ')}, and --line or --json.`,
+    unknown: (arg) => `nemia stats does not take ${arg}. It takes ${KEYS.map((k) => `--${k}`).join(', ')}, and --line or --json.`,
     apart: (_value, flag) => statsTakes(flag.slice(2)),
   },
   check: statsRefusal,
@@ -202,5 +202,5 @@ export const STATS: Command<Stats> = {
   print: (s, args) => (args.json === true ? [JSON.stringify(s, null, 2)] : args.line === true ? [statsLine(s)] : statsLines(s)),
 };
 
-/** The reads, in the order `wf`'s help lists them. */
+/** The reads, in the order `nemia`'s help lists them. */
 export const READS: readonly Command[] = [SHOW, LOGS, FEED, STATS];

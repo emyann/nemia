@@ -213,11 +213,11 @@ export default {
       `${held.target} has no row of its own: it goes again with ${held.step}'s round`,
     );
     await expectVisible(
-      decide.locator('[data-command="once more"] code', { hasText: `wf retry ${COSTLY.id} ${over.step} --budget <amount>` }),
+      decide.locator('[data-command="once more"] code', { hasText: `nemia retry ${COSTLY.id} ${over.step} --budget <amount>` }),
       'once more: the try with its cap raised, as a line',
     );
     await expectVisible(
-      decide.locator('[data-command="once more"] code', { hasText: `wf round ${COSTLY.id} ${held.step} --budget <amount>` }),
+      decide.locator('[data-command="once more"] code', { hasText: `nemia round ${COSTLY.id} ${held.step} --budget <amount>` }),
       'once more: the round with its cap raised, as a line',
     );
 

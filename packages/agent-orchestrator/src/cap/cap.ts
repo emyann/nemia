@@ -117,7 +117,7 @@ export const admissionOrder = <R extends Pick<Run, 'id' | 'createdAt'>>(runs: re
 /**
  * The runs the cap holds, each with the count it was held at, as a pass would judge them from the store as it stands (`slotNeed`): every
  * run in flight counted, then each that wants a slot admitted oldest first while one is free — and counted — and held once none is. Pure.
- * What `wf ls` and `wf decide` say between passes; none with no cap.
+ * What `nemia ls` and `nemia decide` say between passes; none with no cap.
  */
 export function heldRuns(
   runs: ReadonlyArray<Pick<Run, 'id' | 'createdAt'> & { inFlight: boolean; wants: boolean }>,
@@ -133,10 +133,10 @@ export function heldRuns(
   return held;
 }
 
-/** A run the cap holds, in the words the feed keeps of it (`feedWords`): the count in flight is left to `wf ls`. */
+/** A run the cap holds, in the words the feed keeps of it (`feedWords`): the count in flight is left to `nemia ls`. */
 export const SLOT_WAIT = 'waiting for a run slot';
 
-/** A run the cap holds, as `wf ls` says it on its roots: `waiting for a run slot (2 of 2 in flight)`. */
+/** A run the cap holds, as `nemia ls` says it on its roots: `waiting for a run slot (2 of 2 in flight)`. */
 export const slotWord = (slot: RunSlot): string => `${SLOT_WAIT} (${slot.inFlight} of ${slot.cap} in flight)`;
 
 /**

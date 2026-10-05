@@ -1,6 +1,6 @@
 /**
- * `wf rm` and `wf prune` as entries of the table: the runs a command line names, read in order and each once; their arguments refused
- * before any run is read, in the words `wf` has always said them; and what the api throws in place of an answer that removed nothing.
+ * `nemia rm` and `nemia prune` as entries of the table: the runs a command line names, read in order and each once; their arguments refused
+ * before any run is read, in the words `nemia` has always said them; and what the api throws in place of an answer that removed nothing.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -13,7 +13,7 @@ import { PRUNE, RM } from './runs.verb.ts';
 function refusedBy(command: CommandSpec, argv: readonly string[]): string | null {
   try {
     const args = parseArgv(command.spec, argv);
-    assert.ok(args, `wf ${command.name} ${argv.join(' ')} is given too little`);
+    assert.ok(args, `nemia ${command.name} ${argv.join(' ')} is given too little`);
     return command.check?.(args) ?? null;
   } catch (err) {
     assert.equal((err as { exitCode?: number }).exitCode, 2);
@@ -34,18 +34,18 @@ test('the runs a command line names are read in the order given, each once, besi
     unmerged: true,
     artifacts: true,
   });
-  assert.deepEqual(parseArgv(RM.spec, []), {}, 'bare wf rm names no run, and its runner prints the help');
-  assert.deepEqual(parseArgv(PRUNE.spec, []), {}, 'bare wf prune names no run: every run');
-  assert.equal(commandLine(RM, { runId: ['a', 'b'] }), 'wf rm a b');
-  assert.equal(commandLine(RM, {}), 'wf rm [<runId> ...]');
+  assert.deepEqual(parseArgv(RM.spec, []), {}, 'bare nemia rm names no run, and its runner prints the help');
+  assert.deepEqual(parseArgv(PRUNE.spec, []), {}, 'bare nemia prune names no run: every run');
+  assert.equal(commandLine(RM, { runId: ['a', 'b'] }), 'nemia rm a b');
+  assert.equal(commandLine(RM, {}), 'nemia rm [<runId> ...]');
 });
 
-/** `wf rm`'s form, as its refusals end on it. */
-const RM_FORM = 'wf rm <runId> [<runId> ...] [--delete-branches [--force-unmerged]]';
+/** `nemia rm`'s form, as its refusals end on it. */
+const RM_FORM = 'nemia rm <runId> [<runId> ...] [--delete-branches [--force-unmerged]]';
 
-test("REFUSED at shipped defaults: wf rm's arguments, before any run is read, in today's words whole", () => {
+test("REFUSED at shipped defaults: nemia rm's arguments, before any run is read, in today's words whole", () => {
   const unknown = (arg: string) =>
-    `wf rm does not take ${arg}. It takes the runs to forget, then --delete-branches, and --force-unmerged beside it: ${RM_FORM}.`;
+    `nemia rm does not take ${arg}. It takes the runs to forget, then --delete-branches, and --force-unmerged beside it: ${RM_FORM}.`;
   for (const [argv, arg] of [
     [['a', '--bad'], '--bad'],
     [['-x'], '-x'],
@@ -54,19 +54,19 @@ test("REFUSED at shipped defaults: wf rm's arguments, before any run is read, in
   ] as const)
     assert.equal(refusedBy(RM, argv), unknown(arg), argv.join(' '));
   const force =
-    "--force-unmerged forces --delete-branches to delete a branch not merged into its run's base branch, and alone deletes nothing: wf rm <runId> --delete-branches --force-unmerged.";
+    "--force-unmerged forces --delete-branches to delete a branch not merged into its run's base branch, and alone deletes nothing: nemia rm <runId> --delete-branches --force-unmerged.";
   for (const argv of [['a', '--force-unmerged'], ['--force-unmerged']]) assert.equal(refusedBy(RM, argv), force, argv.join(' '));
   assert.equal(
     refusedBy(RM, ['--delete-branches']),
-    'wf rm takes the runs to forget, by id: wf rm <runId> [<runId> ...] — wf ls lists them.',
+    'nemia rm takes the runs to forget, by id: nemia rm <runId> [<runId> ...] — nemia ls lists them.',
   );
   assert.equal(refusedBy(RM, []), null);
   assert.equal(refusedBy(RM, ['a', '--delete-branches', '--force-unmerged']), null);
 });
 
-test("REFUSED at shipped defaults: wf prune's arguments, before any run is read, in today's words whole", () => {
+test("REFUSED at shipped defaults: nemia prune's arguments, before any run is read, in today's words whole", () => {
   const unknown = (arg: string) =>
-    `wf prune does not take ${arg}. It takes the runs to prune — none is every run — then --unmerged, --artifacts and --yes: wf prune [<runId> ...] [--unmerged] [--artifacts] [--yes].`;
+    `nemia prune does not take ${arg}. It takes the runs to prune — none is every run — then --unmerged, --artifacts and --yes: nemia prune [<runId> ...] [--unmerged] [--artifacts] [--yes].`;
   for (const [argv, arg] of [
     [['--artifact'], '--artifact'],
     [['a', '-x'], '-x'],
@@ -94,11 +94,11 @@ const thrown = (refusal: { _tag: string; message: string } | null | undefined) =
 
 test('REFUSED on the api: a removal that removed nothing is thrown in forget’s words — refused and held a Conflict, missing a Missing', () => {
   const rmRefusal = (f: Forgot) => thrown(RM.apiRefusal?.({ id: f.id, removed: f.kind === 'forgotten', forgot: f }, { runId: f.id }));
-  const refused = forgot({ kind: 'refused', refusal: 'r-1 has a task in flight: wf cancel r-1 first.' });
-  assert.deepEqual(rmRefusal(refused), { tag: 'Conflict', message: 'r-1 has a task in flight: wf cancel r-1 first.' });
+  const refused = forgot({ kind: 'refused', refusal: 'r-1 has a task in flight: nemia cancel r-1 first.' });
+  assert.deepEqual(rmRefusal(refused), { tag: 'Conflict', message: 'r-1 has a task in flight: nemia cancel r-1 first.' });
   const held = forgot({ kind: 'held', left: [{ path: '/w/r-1/implement', locked: 'in use' }], removed: ['/w/r-1/plan'] });
   assert.deepEqual(rmRefusal(held), { tag: 'Conflict', message: forgetLine(held) });
-  assert.match(forgetLine(held), /^r-1 {2}not forgotten:.*wf rm r-1 again then\.$/);
+  assert.match(forgetLine(held), /^r-1 {2}not forgotten:.*nemia rm r-1 again then\.$/);
   const missing = forgot({ kind: 'missing', files: ['runs/r-1.asks'] });
   assert.deepEqual(rmRefusal(missing), { tag: 'Missing', message: forgetLine(missing) });
   assert.equal(rmRefusal(forgot({ kind: 'forgotten' })), null);
@@ -107,7 +107,7 @@ test('REFUSED on the api: a removal that removed nothing is thrown in forget’s
 /** What `prune` answers of one run, with nothing found but what `more` says. */
 const pruning = (more: Partial<Pruning> & Pick<Pruning, 'kind'>): Pruning => ({ id: 'r-1', worktrees: [], left: [], ...more });
 
-test('REFUSED on the api: a prune that removed nothing is thrown as a Conflict, in wf prune’s words', () => {
+test('REFUSED on the api: a prune that removed nothing is thrown as a Conflict, in nemia prune’s words', () => {
   const pruneRefusal = (p: Pruning) =>
     thrown(
       PRUNE.apiRefusal?.(
@@ -115,9 +115,9 @@ test('REFUSED on the api: a prune that removed nothing is thrown as a Conflict, 
         { runId: p.id },
       ),
     );
-  assert.deepEqual(pruneRefusal(pruning({ kind: 'refused', refusal: 'r-1 is not over: wf cancel r-1 first.' })), {
+  assert.deepEqual(pruneRefusal(pruning({ kind: 'refused', refusal: 'r-1 is not over: nemia cancel r-1 first.' })), {
     tag: 'Conflict',
-    message: 'r-1 is not over: wf cancel r-1 first.',
+    message: 'r-1 is not over: nemia cancel r-1 first.',
   });
   assert.deepEqual(pruneRefusal(pruning({ kind: 'nothing', nothing: 'no worktree of it is left' })), {
     tag: 'Conflict',

@@ -98,7 +98,7 @@ export const seenBy = (e: Engine, views: Views): Engine => ({ ...e, view: async 
  * The run's workflow folder, read now.
  *
  * The run record is the truth about what ran; the folder is only where the prose came from, and it
- * can be edited or deleted after `wf start`. So a folder that does not read is a warning on the
+ * can be edited or deleted after `nemia start`. So a folder that does not read is a warning on the
  * run, not a failure of the request — and on a run that froze its workflow, nothing the page draws
  * comes from it. Its agents and skills are looked for where the start looked: the run's repository's
  * own folder of them, then yours.
@@ -113,7 +113,7 @@ export function workflowsOf(run: Run, home: string): { steps: Workflow[]; warnin
     return {
       steps: null,
       warning: run.workflow
-        ? `${why} Nothing here is read from it: the steps, their spec, prose and graph are the workflow the run froze at \`wf start\`, which is what it is judged by.`
+        ? `${why} Nothing here is read from it: the steps, their spec, prose and graph are the workflow the run froze at \`nemia start\`, which is what it is judged by.`
         : `${why} The steps are listed from the run record, without their spec or prose.`,
     };
   }
@@ -123,7 +123,7 @@ export function workflowsOf(run: Run, home: string): { steps: Workflow[]; warnin
  * Which steps a run has, in the order to show them.
  *
  * Every step on the record, in the record's order — the workflow's order when the run started —
- * because the record is the truth about what ran, whatever the folder says now; `wf decide` reads
+ * because the record is the truth about what ran, whatever the folder says now; `nemia decide` reads
  * the record too. Then any step the workflow the tick reads (`stepsOf` in record.store.ts) has and the record
  * does not. On a run that froze its workflow that is the frozen one, so a step the folder gained since is
  * not shown: the tick never files it, and drawn, it would wait for ever and make a root of the graph the
@@ -136,7 +136,7 @@ export function stepNames(run: Run, workflows: readonly Workflow[] | null): stri
 }
 
 /**
- * The steps a run is judged by: the workflow it froze at `wf start`, which the tick reads (`stepsOf` in
+ * The steps a run is judged by: the workflow it froze at `nemia start`, which the tick reads (`stepsOf` in
  * record.store.ts), and for a record that froze none, the folder. A record whose folder does not read is
  * judged from the record alone, a `bare` step each.
  */

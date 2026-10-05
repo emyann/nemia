@@ -88,19 +88,19 @@ const writeRecord = (id: string, from?: Run['from']) =>
     }),
   );
 
-test('the inbox is `$WF_ROOT/inbox/`, beside runs/ — and with no folder yet, `wf inbox` says it is empty', async (t) => {
+test('the inbox is `$WF_ROOT/inbox/`, beside runs/ — and with no folder yet, `nemia inbox` says it is empty', async (t) => {
   emptyInbox();
   assert.equal(inboxDir(), path.join(ROOT, 'inbox'));
   assert.deepEqual(readInbox(), []);
-  assert.deepEqual(await printedBy(t, 'inbox'), ['the inbox is empty — park an idea with wf inbox add "<idea>"']);
-  assert.match((await printedBy(t, 'inbox', '--help'))[0], /^wf inbox$/);
+  assert.deepEqual(await printedBy(t, 'inbox'), ['the inbox is empty — park an idea with nemia inbox add "<idea>"']);
+  assert.match((await printedBy(t, 'inbox', '--help'))[0], /^nemia inbox$/);
   assert.ok(
-    (await printedBy(t, 'help')).some((l) => l.startsWith('  wf inbox add "<idea>"|<file> [--workflow <name>] [--repo <path>]')),
+    (await printedBy(t, 'help')).some((l) => l.startsWith('  nemia inbox add "<idea>"|<file> [--workflow <name>] [--repo <path>]')),
     'on the general help',
   );
 });
 
-test('`wf inbox add` files a card under the slug of its first line and a suffix — two ideas alike are two cards — `--workflow` and `--repo` write its keys, a file is read as a card when its frontmatter is one; `wf inbox` lists each, with started as for a card a record names', async (t) => {
+test('`nemia inbox add` files a card under the slug of its first line and a suffix — two ideas alike are two cards — `--workflow` and `--repo` write its keys, a file is read as a card when its frontmatter is one; `nemia inbox` lists each, with started as for a card a record names', async (t) => {
   emptyInbox();
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   const added = await printedBy(t, 'inbox', 'add', "Cache the engine's views between passes\n\nThe tick reads each task twice.");
@@ -114,7 +114,7 @@ test('`wf inbox add` files a card under the slug of its first line and a suffix 
   );
   assert.deepEqual(added, [
     `${name.slice(0, -3)}  Cache the engine's views between passes`,
-    `filed: ${card} — start it with wf start ${card} --workflows <w>`,
+    `filed: ${card} — start it with nemia start ${card} --workflows <w>`,
   ]);
 
   await printedBy(
@@ -199,13 +199,13 @@ test('`wf inbox add` files a card under the slug of its first line and a suffix 
   );
   assert.deepEqual(lines.slice(-2), [
     '',
-    `start one: wf start ${path.join(INBOX, '<name>.md')} [--workflows <w>] [--repo <r>] [--factory <f>] — queue one: wf inbox queue <name> — drop one: wf inbox rm <name>`,
+    `start one: nemia start ${path.join(INBOX, '<name>.md')} [--workflows <w>] [--repo <r>] [--factory <f>] — queue one: nemia inbox queue <name> — drop one: nemia inbox rm <name>`,
   ]);
   fs.rmSync(path.join(ROOT, 'runs', 'show-the-flag-on-the-settin-zz99.json'));
   fs.rmSync(path.join(ROOT, 'runs', 'an-unrelated-run-yy88.json'));
 });
 
-test("`wf inbox add --factory` files a card that names its factory, over the text's own, and says it — REFUSED by name: a name that is not a factory's, and the flag twice; nothing filed", async (t) => {
+test("`nemia inbox add --factory` files a card that names its factory, over the text's own, and says it — REFUSED by name: a name that is not a factory's, and the flag twice; nothing filed", async (t) => {
   emptyInbox();
   const { card, file } = addToInbox({ text: 'Build the page', factory: 'pipao' });
   assert.equal(card.factory, 'pipao');
@@ -225,12 +225,12 @@ test("`wf inbox add --factory` files a card that names its factory, over the tex
   );
   await assert.rejects(
     main(['inbox', 'add', 'an idea', '--factory', 'pipao', '--factory', 'nemia'], NO_ENGINE),
-    refusedWith(/^wf inbox add takes --factory once: a card names one factory\.$/),
+    refusedWith(/^nemia inbox add takes --factory once: a card names one factory\.$/),
   );
   assert.deepEqual(inInbox(), [], 'nothing filed');
 });
 
-test('`wf inbox rm` drops a card without starting it — a name with no card is normal: it says so, and which cards there are, exit 0', async (t) => {
+test('`nemia inbox rm` drops a card without starting it — a name with no card is normal: it says so, and which cards there are, exit 0', async (t) => {
   emptyInbox();
   const { card, file } = addToInbox({ text: 'Drop me' });
   const kept = addToInbox({ text: 'Keep me' });
@@ -248,25 +248,25 @@ test('`wf inbox rm` drops a card without starting it — a name with no card is 
   assert.deepEqual(await printedBy(t, 'inbox', 'rm', 'anything'), ['no card anything in the inbox. The inbox is empty. Nothing to drop.']);
 });
 
-test('REFUSED by name at shipped defaults: `wf inbox add` with no idea, an empty one, a directory, a file whose card has `after:`, a repo that is not a directory, a flag with no value or twice — and `wf inbox rm` with a name that would leave the inbox, a hidden one, none, or two; nothing filed, nothing removed', async () => {
+test('REFUSED by name at shipped defaults: `nemia inbox add` with no idea, an empty one, a directory, a file whose card has `after:`, a repo that is not a directory, a flag with no value or twice — and `nemia inbox rm` with a name that would leave the inbox, a hidden one, none, or two; nothing filed, nothing removed', async () => {
   emptyInbox();
   const add = (...argv: string[]) => main(['inbox', 'add', ...argv], NO_ENGINE);
   await assert.rejects(
     add(),
     refusedWith(
-      /^wf inbox add takes the idea, first: wf inbox add "<idea>" \[--workflow <name>\] \[--repo <path>\] \[--factory <name>\], or a file: wf inbox add \.\/idea\.md\. Nothing was filed\.$/,
+      /^nemia inbox add takes the idea, first: nemia inbox add "<idea>" \[--workflow <name>\] \[--repo <path>\] \[--factory <name>\], or a file: nemia inbox add \.\/idea\.md\. Nothing was filed\.$/,
     ),
   );
-  await assert.rejects(add('--workflow', 'dev'), refusedWith(/^wf inbox add takes the idea, first:/));
-  await assert.rejects(add(''), refusedWith(/^wf inbox add takes the idea, and the idea has nothing in it\./));
-  await assert.rejects(add('   '), refusedWith(/^wf inbox add takes the idea, and the idea has nothing in it\./));
+  await assert.rejects(add('--workflow', 'dev'), refusedWith(/^nemia inbox add takes the idea, first:/));
+  await assert.rejects(add(''), refusedWith(/^nemia inbox add takes the idea, and the idea has nothing in it\./));
+  await assert.rejects(add('   '), refusedWith(/^nemia inbox add takes the idea, and the idea has nothing in it\./));
   const dir = fs.mkdtempSync(path.join(ROOT, 'given-'));
   const empty = path.join(dir, 'empty.md');
   fs.writeFileSync(empty, '\n');
-  await assert.rejects(add(empty), refusedWith(new RegExp(`^wf inbox add takes the idea, and ${escaped(empty)} has nothing in it\\.`)));
+  await assert.rejects(add(empty), refusedWith(new RegExp(`^nemia inbox add takes the idea, and ${escaped(empty)} has nothing in it\\.`)));
   await assert.rejects(
     add(dir),
-    refusedWith(new RegExp(`^${escaped(dir)} is a directory, and wf inbox add takes the idea as text or as one file`)),
+    refusedWith(new RegExp(`^${escaped(dir)} is a directory, and nemia inbox add takes the idea as text or as one file`)),
   );
   const waits = path.join(dir, 'd.md');
   fs.writeFileSync(waits, '---\nworkflow: dev\nafter: b, c\n---\nShow the flag.\n');
@@ -274,7 +274,7 @@ test('REFUSED by name at shipped defaults: `wf inbox add` with no idea, an empty
     add(waits),
     refusedWith(
       new RegExp(
-        `^${escaped(waits)}: \`after\` is not a key an inbox card has: what a card waits on is said when it is started, once the runs it could wait on are known\\. Delete the line and file the idea, then give the wait when you start the card wf inbox add names: wf start <inbox>/<name>\\.md --after <runId>\\.$`,
+        `^${escaped(waits)}: \`after\` is not a key an inbox card has: what a card waits on is said when it is started, once the runs it could wait on are known\\. Delete the line and file the idea, then give the wait when you start the card nemia inbox add names: nemia start <inbox>/<name>\\.md --after <runId>\\.$`,
       ),
     ),
   );
@@ -297,15 +297,15 @@ test('REFUSED by name at shipped defaults: `wf inbox add` with no idea, an empty
   await assert.rejects(add('an idea', '--workflow='), refusedWith(/^--workflow takes the workflow to start the card on/));
   await assert.rejects(
     add('an idea', '--repo', ROOT, '--repo', ROOT),
-    refusedWith(/^wf inbox add takes --repo once: a card names one repository\.$/),
+    refusedWith(/^nemia inbox add takes --repo once: a card names one repository\.$/),
   );
   await assert.rejects(
     add('an idea', '--workflows', 'dev'),
     refusedWith(
-      /^wf inbox add does not take --workflows\. It takes the idea, then --workflow <name>, --repo <path> and --factory <name>\.$/,
+      /^nemia inbox add does not take --workflows\. It takes the idea, then --workflow <name>, --repo <path> and --factory <name>\.$/,
     ),
   );
-  await assert.rejects(add('an', 'idea'), refusedWith(/^wf inbox add takes one idea, and idea is a second\. Quote an idea with spaces/));
+  await assert.rejects(add('an', 'idea'), refusedWith(/^nemia inbox add takes one idea, and idea is a second\. Quote an idea with spaces/));
   assert.deepEqual(inInbox(), [], 'nothing filed');
 
   const { card, file } = addToInbox({ text: 'Stay where you are' });
@@ -324,15 +324,18 @@ test('REFUSED by name at shipped defaults: `wf inbox add` with no idea, an empty
   }
   assert.throws(() => dropFromInbox('../runs/r-outside'), refusedWith(/^`\.\.\/runs\/r-outside` is not a card's name/));
   await assert.rejects(rm('.hidden'), refusedWith(/^`\.hidden` is not a card's name: a name that starts with a dot is a hidden file/));
-  await assert.rejects(rm(), refusedWith(/^wf inbox rm takes the name of the card to drop, as wf inbox lists it: wf inbox rm <name>\.$/));
+  await assert.rejects(
+    rm(),
+    refusedWith(/^nemia inbox rm takes the name of the card to drop, as nemia inbox lists it: nemia inbox rm <name>\.$/),
+  );
   await assert.rejects(
     rm(card.name, 'another'),
-    refusedWith(/^wf inbox rm drops one card, and another is a second: wf inbox rm <name>, once per card\.$/),
+    refusedWith(/^nemia inbox rm drops one card, and another is a second: nemia inbox rm <name>, once per card\.$/),
   );
   await assert.rejects(
     main(['inbox', 'list'], NO_ENGINE),
     refusedWith(
-      /^wf inbox does not take list\. It lists the inbox — wf inbox — files a card with wf inbox add "<idea>", queues one with wf inbox queue <name>, and drops one with wf inbox rm <name>/,
+      /^nemia inbox does not take list\. It lists the inbox — nemia inbox — files a card with nemia inbox add "<idea>", queues one with nemia inbox queue <name>, and drops one with nemia inbox rm <name>/,
     ),
   );
   assert.ok(fs.existsSync(path.join(ROOT, 'runs', 'r-outside.json')), 'the record outside the inbox is still there');
@@ -340,7 +343,7 @@ test('REFUSED by name at shipped defaults: `wf inbox add` with no idea, an empty
   fs.rmSync(path.join(ROOT, 'runs', 'r-outside.json'));
 });
 
-test("`wf start <inbox>/<name>.md` starts the card — its body the brief, its `workflow:` found in its `repo:` — writes `from` on the record and removes the card; `wf decide` names the card under the run's line; a plan's card started so stays where it is", async (t) => {
+test("`nemia start <inbox>/<name>.md` starts the card — its body the brief, its `workflow:` found in its `repo:` — writes `from` on the record and removes the card; `nemia decide` names the card under the run's line; a plan's card started so stays where it is", async (t) => {
   emptyInbox();
   const repo = aRepoWith('dev', 'ui');
   const { card, file } = addToInbox({ text: 'Cache the views between passes\n\nThe tick reads each task twice.', workflow: 'dev', repo });
@@ -365,18 +368,18 @@ test("`wf start <inbox>/<name>.md` starts the card — its body the brief, its `
   assert.equal(
     Object.hasOwn(JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${typed.id}.json`), 'utf8')), 'from'),
     false,
-    'a run typed at wf start carries no from',
+    'a run typed at nemia start carries no from',
   );
   assert.doesNotMatch((await printedBy(t, 'decide', typed.id)).join('\n'), /from inbox card/, 'and its decide screen names no card');
 
   const plan = fs.mkdtempSync(path.join(ROOT, 'plan-'));
   fs.writeFileSync(path.join(plan, 'a.md'), '---\nworkflow: dev\n---\nParse the flag\n');
   const planned = readRun((await printedBy(t, 'start', path.join(plan, 'a.md'), '--repo', repo))[0].split(' ')[0]);
-  assert.deepEqual([planned.brief, planned.from], ['Parse the flag', undefined], "a plan's card is started by wf start, with no from");
+  assert.deepEqual([planned.brief, planned.from], ['Parse the flag', undefined], "a plan's card is started by nemia start, with no from");
   assert.ok(fs.existsSync(path.join(plan, 'a.md')), "the plan's card stays");
 });
 
-test('`wf start <inbox>/<name>`, the name as `wf inbox` lists it, starts the card as `<name>.md` does — and a path under the inbox that names no card is refused by name, never started as a brief whose text is the path or the file', async (t) => {
+test('`nemia start <inbox>/<name>`, the name as `nemia inbox` lists it, starts the card as `<name>.md` does — and a path under the inbox that names no card is refused by name, never started as a brief whose text is the path or the file', async (t) => {
   emptyInbox();
   const repo = aRepoWith('dev');
   const { card, file } = addToInbox({ text: 'Cache the views between passes', workflow: 'dev', repo });
@@ -419,7 +422,7 @@ test('`wf start <inbox>/<name>`, the name as `wf inbox` lists it, starts the car
   assert.ok(fs.existsSync(other.file), 'and the other card is where it was');
 });
 
-test("`wf inbox add <file>` writes a path in the file's own `workflow:` absolute against the file's folder, so the card starts on the workflow the file meant — not on the store's workflow of that name, read from the inbox", async (t) => {
+test("`nemia inbox add <file>` writes a path in the file's own `workflow:` absolute against the file's folder, so the card starts on the workflow the file meant — not on the store's workflow of that name, read from the inbox", async (t) => {
   emptyInbox();
   const repo = aRepoWith('dev');
   const theStores = path.join(ROOT, 'workflows', 'dev');
@@ -488,7 +491,7 @@ test("a start says what the card does not, over what it does: --workflows over `
   assert.deepEqual(
     [here.repo, here.workflowDir],
     [fs.realpathSync(other), path.join(fs.realpathSync(other), 'workflows', 'ui')],
-    "no repo: on the card and none given: the caller's, wf start's `.`, and its workflow: found there, by name",
+    "no repo: on the card and none given: the caller's, nemia start's `.`, and its workflow: found there, by name",
   );
   const given = addToInbox({ text: 'Document the flag' });
   const byBoard = startFromInbox({ name: given.card.name, workflow: path.join(repo, 'workflows', 'dev'), callerRepo: repo });
@@ -516,7 +519,7 @@ test('REFUSED by name at shipped defaults, before a run is written and with the 
     starting(path.join(INBOX, 'cache-the-view.md')),
     refusedWith(
       new RegExp(
-        `^no card cache-the-view in the inbox\\. Its cards are: ${escaped(kept.card.name)}\\. Start one of those — wf start ${escaped(path.join(INBOX, '<name>.md'))} — or park the idea first: wf inbox add "<idea>"\\.$`,
+        `^no card cache-the-view in the inbox\\. Its cards are: ${escaped(kept.card.name)}\\. Start one of those — nemia start ${escaped(path.join(INBOX, '<name>.md'))} — or park the idea first: nemia inbox add "<idea>"\\.$`,
       ),
     ),
   );
@@ -527,14 +530,14 @@ test('REFUSED by name at shipped defaults, before a run is written and with the 
   assert.throws(() => startFromInbox({ name: 'a/b', callerRepo: repo }), refusedWith(/^`a\/b` is not a card's name/));
   assert.throws(
     () => startFromInbox({ name: '', callerRepo: repo }),
-    refusedWith(/^A card is named by its file in the inbox, minus \.md, as wf inbox lists it, and this name is empty\./),
+    refusedWith(/^A card is named by its file in the inbox, minus \.md, as nemia inbox lists it, and this name is empty\./),
   );
 
   await assert.rejects(
     starting(kept.file),
     refusedWith(
       new RegExp(
-        `^${escaped(kept.card.file)}: no workflow — the card names none, and none was given, so nothing says what runs it\\. The repository's workflows are: dev, ui, in ${escaped(path.join(repo, 'workflows'))}\\. Name one: wf start ${escaped(kept.file)} --workflows dev, or write \`workflow: dev\` in the card\\.$`,
+        `^${escaped(kept.card.file)}: no workflow — the card names none, and none was given, so nothing says what runs it\\. The repository's workflows are: dev, ui, in ${escaped(path.join(repo, 'workflows'))}\\. Name one: nemia start ${escaped(kept.file)} --workflows dev, or write \`workflow: dev\` in the card\\.$`,
       ),
     ),
   );
@@ -591,13 +594,13 @@ test('REFUSED by name at shipped defaults, before a run is written and with the 
     starting('add a flag', '--workflows', path.join(repo, 'workflows', 'dev'), '--repo', repo, '--brief', 'x'),
     refusedWith(
       new RegExp(
-        `^wf start takes --brief only for a card of the inbox, in place of its body: wf start ${escaped(path.join(INBOX, '<name>.md'))} --brief "<brief>"\\.`,
+        `^nemia start takes --brief only for a card of the inbox, in place of its body: nemia start ${escaped(path.join(INBOX, '<name>.md'))} --brief "<brief>"\\.`,
       ),
     ),
   );
   await assert.rejects(
     starting(kept.file, '--workflows', 'dev', '--brief', 'x', '--brief', 'y'),
-    refusedWith(/^wf start takes --brief once: a run is asked one thing\.$/),
+    refusedWith(/^nemia start takes --brief once: a run is asked one thing\.$/),
   );
   await assert.rejects(starting(kept.file, '--workflows', 'dev', '--after', 'no-such-run-zz99'), refusedWith(/no-such-run-zz99/));
 
@@ -627,7 +630,7 @@ test(
     assert.match(
       printed[1],
       new RegExp(
-        `^from inbox card ${escaped(card.name)} — still in the inbox: ${escaped(file)} could not be removed — .*\\. wf inbox lists it as started as ${escaped(id)}: drop it with wf inbox rm ${escaped(card.name)}$`,
+        `^from inbox card ${escaped(card.name)} — still in the inbox: ${escaped(file)} could not be removed — .*\\. nemia inbox lists it as started as ${escaped(id)}: drop it with nemia inbox rm ${escaped(card.name)}$`,
       ),
     );
     assert.deepEqual(
@@ -643,7 +646,7 @@ test(
       main(['start', file], NO_ENGINE),
       refusedWith(
         new RegExp(
-          `^${escaped(card.file)}: this card was started as ${escaped(id)} — that run's record says so — and is still in the inbox because its removal failed\\. Drop it with wf inbox rm ${escaped(card.name)};`,
+          `^${escaped(card.file)}: this card was started as ${escaped(id)} — that run's record says so — and is still in the inbox because its removal failed\\. Drop it with nemia inbox rm ${escaped(card.name)};`,
         ),
       ),
     );

@@ -1,6 +1,6 @@
 /**
- * `wf plan`: every card of a plan folder started, parents first (`startPlan`), each through `start`. A controller: it reaches the runtime
- * through `start/start.verb.ts`.
+ * `nemia plan`: every card of a plan folder started, parents first (`startPlan`), each through `start`. A controller: it reaches the
+ * runtime through `start/start.verb.ts`.
  */
 import { workflowFolder } from '../folder/folder.store.ts';
 import { type Card, type Planned } from './plan.ts';
@@ -21,9 +21,9 @@ export type PlanStarted = {
 };
 
 /**
- * `wf plan`: every card of a plan folder started, parents first, each with `start()` and `after` the runs of the cards its `after:` names —
- * the record `wf start --after` writes, so the tick, `wf ls`, `wf decide` and the board need nothing new; parents first, so every card a
- * card's `after:` names has a run by then. Nothing else is written: no plan
+ * `nemia plan`: every card of a plan folder started, parents first, each with `start()` and `after` the runs of the cards its `after:`
+ * names — the record `nemia start --after` writes, so the tick, `nemia ls`, `nemia decide` and the board need nothing new; parents first,
+ * so every card a card's `after:` names has a run by then. Nothing else is written: no plan
  * record, and no file of its own. The runs and their `after` are the plan.
  *
  * Refused before the first run is started, naming the card and the fix: a folder `parsePlan` refuses; a card whose `workflow:` names no
@@ -31,7 +31,7 @@ export type PlanStarted = {
  * `.worktreeinclude` `start` would refuse. A `start()` that refuses after that, part-way, stops the plan: the runs already started stand,
  * and `stopped` says which card refused and which are left. `startRun` is `start`, unless a test hands it one of its own.
  *
- * `factory` names the factory every card's run is started in, as `wf start --factory` names it: read first (`readFactory`), and each
+ * `factory` names the factory every card's run is started in, as `nemia start --factory` names it: read first (`readFactory`), and each
  * card's workflow is judged in it before the first run, a workflow it has not attached or a step its hires leave unfilled among what is
  * refused. Left out, each run is started with none, the default factory's.
  */

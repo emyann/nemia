@@ -1,7 +1,7 @@
 /**
  * A remote step filed, and then its agent left out of the engine: `a2a-agents.json` refused as it stands, its entry refused, or the entry
- * removed, and `wf tick` run with the engine `main` makes itself, as a restarted `wf up` would. One step is at work on the agent (its Task
- * waits on a question), one is filed and queued behind it. Neither may be handed to Claude Code, the engine's first harness: a runtime
+ * removed, and `nemia tick` run with the engine `main` makes itself, as a restarted `nemia up` would. One step is at work on the agent (its
+ * Task waits on a question), one is filed and queued behind it. Neither may be handed to Claude Code, the engine's first harness: a runtime
  * that falls back to it for a harness it does not have spawns the queued one as a `claude -p` job in the step's workspace, and looks for
  * the one at work in Claude Code's listing and, past the grace, ends it `lost`. The one at work is held, neither there nor gone, and
  * followed again once the file is fixed; the queued one is refused its start in words that say why. A fake `claude` and `codex` first on
@@ -55,7 +55,7 @@ fs.writeFileSync(
   '---\nworkspace: folder\nharness: a2a:reviewer\n---\nRead the note and say whether it is right.\n',
 );
 
-/** `wf start` of the remote team, from the store, and the run's id. */
+/** `nemia start` of the remote team, from the store, and the run's id. */
 async function started(): Promise<string> {
   const cwd = process.cwd();
   process.chdir(ROOT);

@@ -107,7 +107,7 @@ export default {
       await expectVisible(mark, `${id}'s row on Runs says pruned`);
       const said = await mark.getAttribute('title');
       if (
-        !/^pruned at \S+ — its worktrees were removed \(wf prune\), and its files were removed at .* \(wf prune --artifacts\); its branches and record are kept$/.test(
+        !/^pruned at \S+ — its worktrees were removed \(nemia prune\), and its files were removed at .* \(nemia prune --artifacts\); its branches and record are kept$/.test(
           said ?? '',
         )
       ) {

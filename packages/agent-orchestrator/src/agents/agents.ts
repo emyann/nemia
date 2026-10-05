@@ -1,7 +1,7 @@
 /**
  * An agent: a markdown file in `agents/` beside the workflows, whose frontmatter a step names with `agent:` and inherits. Its keys
  * (`AGENT_KEYS`), read by `parseAgent` and written back by `renderAgent`, the skills it names and what they cost a turn, and the card it is
- * published with (`agentCard`). And the agent rendered for Claude Code: what `wf start` writes for a step whose agent has instructions,
+ * published with (`agentCard`). And the agent rendered for Claude Code: what `nemia start` writes for a step whose agent has instructions,
  * skills or a harness prompt other than `keep` (`harnessPrompt:`), and what the tick hands Claude Code to read it. Pure: the layout, the
  * prompt's text and the flags; `writeAgentFiles` in agents.store.ts writes it.
  *
@@ -395,8 +395,8 @@ export function renderAgent(draft: AgentDraft): string {
  *
  * The protocol marks `supported_interfaces` REQUIRED: it is the list of URLs and bindings a client would call the agent at. Nothing here
  * serves this agent over A2A, so there is no URL to give, and this leaves the field out rather than give an address that does not answer. A
- * document missing a REQUIRED field is not a valid `AgentCard`, so everything that prints this says so in the same breath (`wf agents card`
- * on stderr, the api's `servedOverA2A: false`), and `test/agent-card.test.ts` pins the omission, which only
+ * document missing a REQUIRED field is not a valid `AgentCard`, so everything that prints this says so in the same breath (`nemia agents
+ * card` on stderr, the api's `servedOverA2A: false`), and `test/agent-card.test.ts` pins the omission, which only
  * code that serves a card over A2A may lift.
  *
  * `provider`, `documentationUrl`, `iconUrl`, `securitySchemes`, `security` and `signatures` are left out for the same reason — nothing here
@@ -415,8 +415,8 @@ export type AgentCardShape = {
 };
 
 /**
- * The card-shaped description of `agent`, at `version` — what `wf agents card` prints and the api answers with, one builder so the two can
- * never disagree. Pure. The JSON is spelled as the specification's sample card spells it, camelCase.
+ * The card-shaped description of `agent`, at `version` — what `nemia agents card` prints and the api answers with, one builder so the two
+ * can never disagree. Pure. The JSON is spelled as the specification's sample card spells it, camelCase.
  *
  * `defaultInputModes` is `text/plain`: a step is handed a composed brief and nothing else. `defaultOutputModes` is `application/json`:
  * every closeout is a JSON object. An agent's `output:` names a JSON Schema, and A2A describes an output's *media type*, never its schema —
@@ -493,7 +493,7 @@ export const NO_CODING_STYLE = 'no-coding';
 export const pluginOf = (agent: string): string => `nemia-${agent}`;
 
 /**
- * Whether `wf start` renders the step's agent and the tick files the step with it: a step of Claude Code's — codex loads no plugin and
+ * Whether `nemia start` renders the step's agent and the tick files the step with it: a step of Claude Code's — codex loads no plugin and
  * takes no prompt of ours — whose record gives its agent instructions, custom instructions, skills or a harness prompt other than `keep`
  * (`StepAgent.instructions`, `customInstructions`, `skills`, `harnessPrompt`; a record without them renders nothing), and which starts a
  * session of its own. A step that continues another's session keeps that session's prompt, so it is told its agent's instructions in its
@@ -529,8 +529,8 @@ export type SkillAgain = { name: string; text: string } | { name: string; missin
  * brief and no flags: filing it with a flag naming a file that is not there would end the session at
  * its start, and a brief without the instructions would tell it nothing of them. Nor without its skills: the instructions say to load
  * them, or that they follow, and with no plugin there is nothing to load, so each is told whole after the instructions, under its bare
- * name, as the instructions name it — or why it could not be read (`skills`, read again by the tick: an edit made since `wf start` reaches
- * it).
+ * name, as the instructions name it — or why it could not be read (`skills`, read again by the tick: an edit made since `nemia start`
+ * reaches it).
  */
 export const unrendered = (step: Workflow, skills: readonly SkillAgain[] = []): Workflow => {
   if (!step.agent) return step;

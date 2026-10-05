@@ -1,7 +1,7 @@
 /**
  * What a step needs from a person, and the board's answer to it: `needs` and `blockedByHarness` on each step, `answer` on a try a
- * person answered, and POST /api/runs/:id/steps/:step/retry, which asks for another try as `wf retry` does — through the package's
- * `retry()`, given the harness's word as `wf retry` gives it, and refused in the package's words.
+ * person answered, and POST /api/runs/:id/steps/:step/retry, which asks for another try as `nemia retry` does — through the package's
+ * `retry()`, given the harness's word as `nemia retry` gives it, and refused in the package's words.
  *
  * At shipped defaults: the api's own engine over a store this file seeds, reading transcripts where Claude Code keeps them
  * (CLAUDE_CONFIG_DIR). The harness's fake `claude` (test/harness.ts) is first on PATH, listing the sessions this file says are running
@@ -212,7 +212,8 @@ const nothingWritten = (why: string) => {
 };
 
 /**
- * What the package's `retry()` refuses `how` for, word for word — given the harness's word, as `wf retry` gives it: what `wf retry` prints.
+ * What the package's `retry()` refuses `how` for, word for word — given the harness's word, as `nemia retry` gives it: what `nemia retry`
+ * prints.
  */
 const retryRefuses = async (step: string, how: RetryHow): Promise<string> => {
   try {
@@ -368,7 +369,7 @@ test("a blocked session's last line follows its conversation: words written sinc
   assert.equal(
     await lastLineOf('held'),
     'Waiting on you.',
-    "what the session said, and never what it was told: a brief, a `wf say` and every tool result are `user` events, and the board would otherwise read a person's own words back at them as the reason the harness stopped; the conversation before it ends differently, so the line can only come from the filter",
+    "what the session said, and never what it was told: a brief, a `nemia say` and every tool result are `user` events, and the board would otherwise read a person's own words back at them as the reason the harness stopped; the conversation before it ends differently, so the line can only come from the filter",
   );
 });
 
@@ -415,7 +416,7 @@ test("REFUSED at shipped defaults: an empty message, and a message on a recheck,
     const res = await ask(step, how);
     assert.equal(res.status, 422, JSON.stringify(how));
     const { error } = (await res.json()) as { error: string };
-    assert.equal(error, messageRefusal(how, `wf retry ${R} ${step}`));
+    assert.equal(error, messageRefusal(how, `nemia retry ${R} ${step}`));
     assert.equal(error, await retryRefuses(step, how), "the package's own sentence, and the one `retry()` refuses with");
     assert.match(
       error,
@@ -462,12 +463,12 @@ test('REFUSED: a body that is not an ask (400), and a run or a step that does no
     [{ mode: 'nudge', message: 42 }, /^`message` is what to tell the step[\s\S]*was 42/],
     [
       { mode: 'fresh', model: 3 },
-      /^`model` names the model a new session runs on, as `wf retry --model <m>` does: a name, or left out for the step's own\. This request's was 3\.$/,
+      /^`model` names the model a new session runs on, as `nemia retry --model <m>` does: a name, or left out for the step's own\. This request's was 3\.$/,
     ],
     [{ mode: 'fresh', model: '  ' }, /^`model` names the model a new session runs on[\s\S]*This request's was "  "\.$/],
     [
       { mode: 'nudge', budget: 'five' },
-      /^`budget` is the cap to raise to, as `wf retry --budget <amount>` takes it[\s\S]*This request's was "five": `/,
+      /^`budget` is the cap to raise to, as `nemia retry --budget <amount>` takes it[\s\S]*This request's was "five": `/,
     ],
   ];
   for (const [body, words] of bodies) {
@@ -501,7 +502,7 @@ test("an answer as the board sends it is the package's ask: 202 with the try, it
   assert.equal(
     implement.note,
     words.steps.find((s) => s.name === 'implement')?.note,
-    'as `wf ls` has it until the tick files the try: a note beside the step',
+    'as `nemia ls` has it until the tick files the try: a note beside the step',
   );
   assert.deepEqual(implement.asked, {
     try: 2,
@@ -536,7 +537,7 @@ test("an answer as the board sends it is the package's ask: 202 with the try, it
   });
 });
 
-test("a session the harness blocked is continued as `wf retry` continues it: 202 with the package's `stopFirst`, the ask written with its mode and nothing else — no session stopped, the engine's journals and the run's record as they were — and the step reads `wf ls`'s `stopping its blocked session`", async () => {
+test("a session the harness blocked is continued as `nemia retry` continues it: 202 with the package's `stopFirst`, the ask written with its mode and nothing else — no session stopped, the engine's journals and the run's record as they were — and the step reads `nemia ls`'s `stopping its blocked session`", async () => {
   const journalOf = (taskId: string) => fs.readFileSync(path.join(root, 'engine', 'tasks', `${taskId}.jsonl`), 'utf8');
   const journals = { held: journalOf('t-held'), idle: journalOf('t-idle') };
 
@@ -557,7 +558,7 @@ test("a session the harness blocked is continued as `wf retry` continues it: 202
   assert.deepEqual(
     freshly,
     { step: 'idle', try: 2, mode: 'fresh', message: 'Sign in again first.' },
-    'a new session with something to tell it: the ask carries both, as `wf retry --fresh --message` writes them',
+    'a new session with something to tell it: the ask carries both, as `nemia retry --fresh --message` writes them',
   );
   assert.ok(!Number.isNaN(Date.parse(freshWhen)), freshWhen);
 
@@ -570,7 +571,11 @@ test("a session the harness blocked is continued as `wf retry` continues it: 202
   const run = await detail();
   const held = run.steps.find((s) => s.name === 'held')!;
   assert.equal(held.note, 'try 2 asked (--nudge) — stopping its blocked session, then the tick files it');
-  assert.equal(held.note, noteOf('held'), 'as `wf ls` has it until a tick stops the session: the note says the session is stopped first');
+  assert.equal(
+    held.note,
+    noteOf('held'),
+    'as `nemia ls` has it until a tick stops the session: the note says the session is stopped first',
+  );
   assert.deepEqual(held.asked, { try: 2, mode: 'nudge', model: null, message: null, stopFirst: true });
   assert.deepEqual([held.status, held.blockedByHarness], ['needs-human', true], 'still blocked: no tick has stopped it');
   const idle = run.steps.find((s) => s.name === 'idle')!;
@@ -592,7 +597,7 @@ test("a session the harness blocked is continued as `wf retry` continues it: 202
   assert.equal(stops(), 0, 'and still nothing is stopped');
 });
 
-test("a try a person answered carries the answer, as `wf decide` prints it — the note says `answered`, as `list`'s does — and a try nobody answered, none", async () => {
+test("a try a person answered carries the answer, as `nemia decide` prints it — the note says `answered`, as `list`'s does — and a try nobody answered, none", async () => {
   const A = 'r-answered';
   write(
     path.join(root, 'runs', `${A}.json`),

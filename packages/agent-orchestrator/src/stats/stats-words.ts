@@ -144,8 +144,8 @@ function tallyLines(g: Group): string[] {
 }
 
 /**
- * What `wf stats` prints: the tiles, a row per day — per group, with a key — then a row per change to what the runs froze, a row per step,
- * a row per call a step was refused, a row per skill a step loaded, a row per rule its skills declare, a row per day and count a step
+ * What `nemia stats` prints: the tiles, a row per day — per group, with a key — then a row per change to what the runs froze, a row per
+ * step, a row per call a step was refused, a row per skill a step loaded, a row per rule its skills declare, a row per day and count a step
  * declares, and the runs left out.
  */
 export function statsLines(s: Stats): string[] {
@@ -163,11 +163,11 @@ export function statsLines(s: Stats): string[] {
     ...(skillLines(s.all.steps).length ? ['', ...skillLines(s.all.steps)] : []),
     ...(ruleLines(s.all.steps).length ? ['', ...ruleLines(s.all.steps)] : []),
     ...(s.all.tallies.length ? ['', ...tallyLines(s.all)] : []),
-    ...(s.unreadable.length ? ['', `left out, a journal of each not reading (wf ls says why): ${s.unreadable.join(', ')}`] : []),
+    ...(s.unreadable.length ? ['', `left out, a journal of each not reading (nemia ls says why): ${s.unreadable.join(', ')}`] : []),
   ];
 }
 
-/** The one line the morning recap quotes (`wf stats --line`): the last 14 days, the 14 before in brackets. */
+/** The one line the morning recap quotes (`nemia stats --line`): the last 14 days, the 14 before in brackets. */
 export function statsLine(s: Stats): string {
   const now = wordsOf(s.all.tiles.last);
   const then = wordsOf(s.all.tiles.before);

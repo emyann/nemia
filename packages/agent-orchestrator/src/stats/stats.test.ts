@@ -215,9 +215,9 @@ test('a run with no ending finishes once each step is done; a check refused or u
   const finished = (last: Try) => factsOf(readOf('p', plain, { implement: [{ end: at(1) }], document: [last] })).runs.length;
   assert.equal(finished({ end: at(2), check: 'passed' }), 1);
   assert.equal(finished({ end: at(2) }), 1);
-  assert.equal(finished({ end: at(2), check: 'refused' }), 0, 'a refused check waits for wf retry');
-  assert.equal(finished({ end: at(2), check: 'unfinished' }), 0, 'an unfinished check waits for wf retry --recheck');
-  assert.equal(finished({ end: at(2), failed: true }), 0, 'a failed session waits for wf retry');
+  assert.equal(finished({ end: at(2), check: 'refused' }), 0, 'a refused check waits for nemia retry');
+  assert.equal(finished({ end: at(2), check: 'unfinished' }), 0, 'an unfinished check waits for nemia retry --recheck');
+  assert.equal(finished({ end: at(2), failed: true }), 0, 'a failed session waits for nemia retry');
 });
 
 test('an ending that commits in its own prose finishes once done, its landing unknown; one that lands on its check waits to land', () => {

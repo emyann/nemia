@@ -1,6 +1,6 @@
 /**
  * `main`, the verbs' table: the help for a verb it does not know and for one given too little, and the lines of the verbs no other test
- * reads — `wf cancel`, `wf show`, `wf logs` and `wf accept` — over a store and a repository of their own, with git for real.
+ * reads — `nemia cancel`, `nemia show`, `nemia logs` and `nemia accept` — over a store and a repository of their own, with git for real.
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,10 +12,10 @@ import { scratch } from '../../test/scratch.ts';
 
 const ROOT = scratch('wf-main-');
 process.env.WF_ROOT = ROOT;
-const { advance, TABLE, start } = await import('../runner.ts');
+const { advance, CLI, TABLE, start } = await import('../runner.ts');
 const { readRun } = await import('../record/record.store.ts');
-const { main, VERBS } = await import('./main.ts');
-const { HELP } = await import('./flags.ts');
+const { aliased, main, VERBS } = await import('./main.ts');
+const { HELP, WF_HINT } = await import('./flags.ts');
 
 type Engine = NonNullable<Parameters<typeof main>[1]>;
 
@@ -94,7 +94,7 @@ const board = () => {
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 
-/** `wf <verb>`, through the CLI, as a person types it: each line it printed on stdout, and on stderr. */
+/** `nemia <verb>`, through the CLI, as a person types it: each line it printed on stdout, and on stderr. */
 const typed = async (t: TestContext, e: Engine, ...argv: string[]) => {
   const out: string[] = [];
   const err: string[] = [];
@@ -109,8 +109,19 @@ const typed = async (t: TestContext, e: Engine, ...argv: string[]) => {
   return { out, err };
 };
 
+test('wf, the alias, writes its one hint line on stderr before the help, and nothing of it on stdout', async (t: TestContext) => {
+  const out: string[] = [];
+  const err: string[] = [];
+  t.mock.method(process.stderr, 'write', (chunk: string) => err.push(chunk) > 0);
+  t.mock.method(console, 'log', (...a: unknown[]) => out.push(a.join(' ')));
+  await aliased([]);
+  assert.deepEqual(err, [`${WF_HINT}\n`]);
+  assert.deepEqual(out, [HELP]);
+  assert.match(WF_HINT, new RegExp(`\\b${CLI} <args>`), 'the hint names what to type next');
+});
+
 test('the verbs the help names are the verbs main runs, and no other', () => {
-  const lines = [...HELP.matchAll(/^ {2}wf (.+)$/gm)].map((m) => m[1]);
+  const lines = [...HELP.matchAll(new RegExp(`^ {2}${CLI} (.+)$`, 'gm'))].map((m) => m[1]);
   const served = TABLE.filter((c) => c.only?.side !== 'api').map((c) => c.name);
   const names = [...VERBS.keys(), ...served];
   const first = (words: string) => words.split(' ')[0];
@@ -126,9 +137,9 @@ test('the help, once and alone, for no verb, a verb it does not know, and a name
   const { e } = board();
   const help = (await typed(t, e)).out;
   assert.equal(help.length, 1);
-  assert.match(help[0], /^wf — run a workflow of agent steps\n/);
+  assert.match(help[0], /^nemia — run a workflow of agent steps\n/);
   for (const verb of ['nope', 'constructor', '__proto__', 'toString', 'hasOwnProperty', 'valueOf'])
-    assert.deepEqual(await typed(t, e, verb), { out: help, err: [] }, `wf ${verb}`);
+    assert.deepEqual(await typed(t, e, verb), { out: help, err: [] }, `nemia ${verb}`);
 });
 
 test('the help, once and alone, for a verb given too little to act on', async (t) => {
@@ -155,10 +166,10 @@ test('the help, once and alone, for a verb given too little to act on', async (t
     ['agents', 'card'],
     ['agents', 'card', '--repo'],
   ])
-    assert.deepEqual(await typed(t, e, ...argv), { out: help, err: [] }, `wf ${argv.join(' ')}`);
+    assert.deepEqual(await typed(t, e, ...argv), { out: help, err: [] }, `nemia ${argv.join(' ')}`);
 });
 
-test('wf cancel: a run with a step in flight, the same run again, and a run already finished', async (t) => {
+test('nemia cancel: a run with a step in flight, the same run again, and a run already finished', async (t) => {
   const b = board();
   const repo = aRepo();
   const run = start({ brief: 'still going', repo, workflowDir: oneStep() });
@@ -180,7 +191,7 @@ test('wf cancel: a run with a step in flight, the same run again, and a run alre
   assert.deepEqual(await typed(t, b.e, 'cancel', done.id), { out: [`${done.id}  already succeeded — nothing to stop`], err: [] });
 });
 
-test('wf cancel of a run with nothing filed yet says so, a line more', async (t) => {
+test('nemia cancel of a run with nothing filed yet says so, a line more', async (t) => {
   const b = board();
   const run = start({ brief: 'not filed', repo: aRepo(), workflowDir: oneStep() });
   assert.deepEqual(await typed(t, b.e, 'cancel', run.id), {
@@ -189,19 +200,19 @@ test('wf cancel of a run with nothing filed yet says so, a line more', async (t)
   });
 });
 
-test("REFUSED at shipped defaults: wf cancel given a word after the run's id, and nothing is cancelled", async (t) => {
+test("REFUSED at shipped defaults: nemia cancel given a word after the run's id, and nothing is cancelled", async (t) => {
   const b = board();
   const run = start({ brief: 'not cancelled', repo: aRepo(), workflowDir: oneStep() });
   for (const extra of ['extra', '--now'])
     await assert.rejects(typed(t, b.e, 'cancel', run.id, extra), (err: Error & { exitCode?: number }) => {
-      assert.equal(err.message, `wf cancel takes one run's id: not ${extra}.`);
+      assert.equal(err.message, `nemia cancel takes one run's id: not ${extra}.`);
       assert.equal(err.exitCode, 2);
       return true;
     });
   assert.equal(readRun(run.id).cancelledAt, undefined, 'nothing cancelled');
 });
 
-test('wf show prints the record as JSON, the brief and each step body cut short', async (t) => {
+test('nemia show prints the record as JSON, the brief and each step body cut short', async (t) => {
   const b = board();
   const brief = `${'a long brief, '.repeat(12)}and more`;
   const run = start({ brief, repo: aRepo(), workflowDir: oneStep() });
@@ -214,7 +225,7 @@ test('wf show prints the record as JSON, the brief and each step body cut short'
   assert.equal((JSON.parse(out[0]) as { workflow: { body: string }[] }).workflow[0].body, 'implement it…');
 });
 
-test('wf logs: a step that has not run, and the output of one that has, from the engine', async (t) => {
+test('nemia logs: a step that has not run, and the output of one that has, from the engine', async (t) => {
   const b = board();
   const run = start({ brief: 'go', repo: aRepo(), workflowDir: oneStep() });
   assert.deepEqual(await typed(t, b.e, 'logs', run.id, 'implement'), { out: ['implement has not run yet'], err: [] });
@@ -227,21 +238,21 @@ test('wf logs: a step that has not run, and the output of one that has, from the
   );
 });
 
-test('REFUSED at shipped defaults: wf show and wf logs given a flag where a run or a step stands, in their words whole', async (t) => {
+test('REFUSED at shipped defaults: nemia show and nemia logs given a flag where a run or a step stands, in their words whole', async (t) => {
   const b = board();
   for (const [argv, said] of [
-    [['show', '--x'], "wf show takes one run's id: not --x."],
-    [['logs', '--x', 'implement'], "wf logs takes one run's id and one step's name: not --x."],
-    [['logs', 'r-1', '--x'], "wf logs takes one run's id and one step's name: not --x."],
+    [['show', '--x'], "nemia show takes one run's id: not --x."],
+    [['logs', '--x', 'implement'], "nemia logs takes one run's id and one step's name: not --x."],
+    [['logs', 'r-1', '--x'], "nemia logs takes one run's id and one step's name: not --x."],
   ] as const)
     await assert.rejects(typed(t, b.e, ...argv), (err: Error & { exitCode?: number }) => {
-      assert.equal(err.message, said, `wf ${argv.join(' ')}`);
+      assert.equal(err.message, said, `nemia ${argv.join(' ')}`);
       assert.equal(err.exitCode, 2);
       return true;
     });
 });
 
-test('wf accept of a loop out of rounds: what it accepted, and the file it wrote', async (t) => {
+test('nemia accept of a loop out of rounds: what it accepted, and the file it wrote', async (t) => {
   const b = board();
   const loop = start({ brief: 'a loop', repo: aRepo(), workflowDir: looping() });
   await advance(b.e, readRun(loop.id));

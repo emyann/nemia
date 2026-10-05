@@ -93,7 +93,7 @@ test('a run the pause holds nothing of is judged as without it', () => {
 test('the pause as put says since when, by whom, why, and how it is resumed', () => {
   assert.equal(
     pauseWords(PAUSE),
-    'the store is paused since 2026-10-04T12:00:00.000Z by ann: merging by hand — nothing new starts, and what runs finishes; wf resume resumes it',
+    'the store is paused since 2026-10-04T12:00:00.000Z by ann: merging by hand — nothing new starts, and what runs finishes; nemia resume resumes it',
   );
 });
 
@@ -103,15 +103,15 @@ test('the pause says Pausing with how many still finish, names each and each lan
     { run: 'r-2', step: 'review', kind: 'check' },
   ];
   assert.deepEqual(pausedLines({ pause: PAUSE, finishing, staged: [{ run: 'r-3', step: 'ship', repo: '/repo' }] }), [
-    'Pausing: 2 finishing — the store is paused since 2026-10-04T12:00:00.000Z by ann: merging by hand; nothing new starts, and what runs finishes; wf resume resumes it',
+    'Pausing: 2 finishing — the store is paused since 2026-10-04T12:00:00.000Z by ann: merging by hand; nothing new starts, and what runs finishes; nemia resume resumes it',
     "   r-1's implement is finishing: its session is at work",
     "   r-2's review is finishing: its check runs",
-    "   r-3's ship has its merge staged in /repo (MERGE_HEAD), and its check waits on wf resume",
+    "   r-3's ship has its merge staged in /repo (MERGE_HEAD), and its check waits on nemia resume",
   ]);
   assert.match(pausedWords({ pause: PAUSE, finishing: finishing.slice(1) }) ?? '', /^Pausing: 1 finishing/, 'one finishing is not Paused');
   assert.equal(
     pausedWords({ pause: { at: '', by: '' }, finishing: [] }),
-    'Paused since a time its file no longer says by someone its file no longer names — nothing runs and nothing new starts; wf resume resumes it',
+    'Paused since a time its file no longer says by someone its file no longer names — nothing runs and nothing new starts; nemia resume resumes it',
   );
   assert.deepEqual(pausedLines({ pause: null, finishing: [], staged: [] }), []);
 });
@@ -229,18 +229,18 @@ test('interruptsAmong reads the steps of a run only where one of its tasks is at
   assert.deepEqual(read, ['r-live']);
 });
 
-test('wf pause --now says each task it would stop, what that costs, and the line that acts', () => {
+test('nemia pause --now says each task it would stop, what that costs, and the line that acts', () => {
   assert.deepEqual(nowLines([{ run: 'r-1', step: 'implement', kind: 'session', taskId: 't1' }]), [
-    'wf pause --now would pause the store and stop 1 at work, each tried again on wf resume:',
+    'nemia pause --now would pause the store and stop 1 at work, each tried again on nemia resume:',
     "   r-1's implement: its session",
     `${NOW_COST} A landing that checks or merges is left to finish.`,
-    'wf pause --now --yes does it.',
+    'nemia pause --now --yes does it.',
   ]);
   assert.equal(NOW_COST, 'An interrupted step redoes its unfinished work and reads its context again.');
   assert.match(nowLines([])[0], /stops nothing/);
   assert.equal(
     nowLines([], true)[0],
-    "wf pause --now would keep the store's pause as it stands; nothing outside a landing is at work, so it stops nothing.",
+    "nemia pause --now would keep the store's pause as it stands; nothing outside a landing is at work, so it stops nothing.",
   );
 });
 
@@ -254,12 +254,12 @@ test('a task asked to stop that no pause ask names finishes as stopping, and is 
   ]);
 });
 
-test('a task a pause ask names finishes as stopping and resumed, tried again on wf resume', () => {
+test('a task a pause ask names finishes as stopping and resumed, tried again on nemia resume', () => {
   const r = run({ implement: { taskId: 't1' } });
   const ask = { step: 'implement', try: 2, mode: 'nudge' as const, interrupted: 't1', at: '2026-10-04T12:00:00Z' };
   const finishing = finishingOf(r, [step('implement')], () => view('running (working)', { stopRequested: true }), [ask]);
   assert.deepEqual(finishing, [{ run: 'r-1', step: 'implement', kind: 'session', stopping: true, resumed: true }]);
   assert.deepEqual(pausedLines({ pause: PAUSE, finishing, staged: [] }).slice(1), [
-    "   r-1's implement is stopping: its session was asked to stop, and is tried again on wf resume",
+    "   r-1's implement is stopping: its session was asked to stop, and is tried again on nemia resume",
   ]);
 });

@@ -301,7 +301,7 @@ export const refusalLines = (refused: WorktreeInclude['refused']): string[] => r
  * The steps whose leftovers the run commits on this pass. Pure.
  *
  * Every FINISHED step — succeeded, failed or stopped. A failed step still blocks what follows; handing
- * it off keeps its work on its branch, where `wf decide` can show it, instead of only in a worktree
+ * it off keeps its work on its branch, where `nemia decide` can show it, instead of only in a worktree
  * that gets removed (engine open issue 2).
  *
  * And only until its check is filed. The check judges the tree the step handed on; whatever the suite

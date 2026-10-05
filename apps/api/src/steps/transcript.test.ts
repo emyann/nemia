@@ -369,7 +369,7 @@ test("a conversation the engine cannot read is a 502 that says how to read the s
   assert.equal(res.status, 502, 'a directory where the transcript should be: found, opened, and not read');
   const { error } = (await res.json()) as { error: string };
   assert.match(error, /^Could not read the conversation of step 'broken' \(task t-broken\): /);
-  assert.match(error, /`wf logs r-talk broken` reads its output from the command line\.$/);
+  assert.match(error, /`nemia logs r-talk broken` reads its output from the command line\.$/);
 });
 
 test(
@@ -401,7 +401,7 @@ test(
     assert.equal(answered.status, 502, 'the read route answers the same failure with a 502, not a 500');
     assert.match(
       ((await answered.json()) as { error: string }).error,
-      /^Could not read task t-flaky of step 'flaky': .*`wf ls` reads the same record/,
+      /^Could not read task t-flaky of step 'flaky': .*`nemia ls` reads the same record/,
     );
     await sleep(2_500);
 

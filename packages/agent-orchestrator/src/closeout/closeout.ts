@@ -44,7 +44,7 @@ export type CloseoutSchema = { type: string; properties: Record<string, object>;
  *
  * Still strict: each declared field is required beside the four, and nothing else is allowed. The
  * declared schema is refused at load unless its own objects are strict, so what reaches the harness
- * is strict all the way down. It comes from the step the run froze at `wf start`, never the folder.
+ * is strict all the way down. It comes from the step the run froze at `nemia start`, never the folder.
  *
  * On a loop's target (`isLoopTarget`), `REPLIES_SCHEMA` is merged too: the target's answer to each finding it
  * was handed, which the next round's looping step reads. On every try, round 1's included, decided from the
@@ -147,7 +147,7 @@ export function declaredOutput(
 }
 
 /**
- * A step's declared output as `wf decide` prints it, after the summary: an array as a list under its
+ * A step's declared output as `nemia decide` prints it, after the summary: an array as a list under its
  * name — an item that says where it is leads with the place (`placeText`), its other fields beneath — and anything else as
  * `name: value`. A declared field the closeout did not give is named, since it is why the step reads
  * unsigned. `fields` as `declaredOutput` takes them: `owedFields`, so a loop's target's `replies` are printed too.
@@ -174,7 +174,7 @@ const labelled = (name: string, value: unknown, first = '', next = first): strin
 };
 
 /**
- * A place as `wf decide` prints one, never as JSON: `file:line` (or the file, with no line), `page · theme`, a string as it
+ * A place as `nemia decide` prints one, never as JSON: `file:line` (or the file, with no line), `page · theme`, a string as it
  * is, and any other object as its keys and values. What a place holds beside those follows it, the same way.
  */
 export function placeText(where: unknown): string {

@@ -1,5 +1,5 @@
 /**
- * The ask `wf pause --now` writes for each task it stops (`interrupted`): due only on that very task, still the step's current one and
+ * The ask `nemia pause --now` writes for each task it stops (`interrupted`): due only on that very task, still the step's current one and
  * settled `stopped`, never with a stop first; void, and set aside by the tick, once its task ended any other way, a later try replaced
  * it, or its step went over its budget. Each refusing fixture is one on which a person's ask of the same mode would be due.
  */
@@ -107,7 +107,7 @@ test('a pause ask on a step its stopped session took over its budget is void', (
   assert.equal(pauseAskVoid(step, runOn('t1'), pauseAsk('t1'), p), false, 'under its budget, the same ask stands');
 });
 
-/** What `wf retry r-1 implement` says over `asks`: null where it writes its ask. */
+/** What `nemia retry r-1 implement` says over `asks`: null where it writes its ask. */
 const refusalOver = (run: Run, phaseOf: (id: string) => TaskPhase, asks: readonly RetryAsk[], budget?: number, spendOf?: SpendOf) =>
   retryRefusal(
     [{ ...IMPLEMENT, ...(spendOf ? { budget: 1 } : {}) }],
@@ -123,13 +123,13 @@ const refusalOver = (run: Run, phaseOf: (id: string) => TaskPhase, asks: readonl
     spendOf,
   );
 
-test('wf retry refuses a void pause ask of its try as set aside by the next pass: ended on its own, or over its budget', () => {
+test('nemia retry refuses a void pause ask of its try as set aside by the next pass: ended on its own, or over its budget', () => {
   const ended = [
     { name: 'a session that failed on its own', run: runOn('t1'), p: phases({ t1: 'failed' }) },
     { name: 'a session that succeeded, its check refused', run: runOn('t1', 'c1'), p: phases({ t1: 'succeeded', c1: 'failed' }) },
   ];
   const setAside =
-    /^try 2 of implement is held by the ask wf pause --now wrote .* the next pass sets it aside, and no tick files it\. Ask again once it has: wf retry r-1 implement/;
+    /^try 2 of implement is held by the ask nemia pause --now wrote .* the next pass sets it aside, and no tick files it\. Ask again once it has: nemia retry r-1 implement/;
   for (const { name, run, p } of ended) {
     assert.equal(refusalOver(run, p, []), null, `the fixture: ${name} may be retried`);
     assert.match(refusalOver(run, p, [pauseAsk('t1')]) ?? '', setAside, name);
@@ -140,23 +140,23 @@ test('wf retry refuses a void pause ask of its try as set aside by the next pass
   assert.match(refusalOver(runOn('t1'), stopped, [pauseAsk('t1')], 5, spent) ?? '', setAside);
 });
 
-test('wf retry refuses a pause ask still due: its task is the current one, stopped, under its budget', () => {
+test('nemia retry refuses a pause ask still due: its task is the current one, stopped, under its budget', () => {
   const stopped = phases({ t1: 'stopped' });
   assert.equal(refusalOver(runOn('t1'), stopped, []), null, 'the fixture: a stopped session may be retried');
-  assert.match(refusalOver(runOn('t1'), stopped, [pauseAsk('t1')]) ?? '', /^try 2 of implement is asked by wf pause --now/);
+  assert.match(refusalOver(runOn('t1'), stopped, [pauseAsk('t1')]) ?? '', /^try 2 of implement is asked by nemia pause --now/);
 });
 
 test('the try a pause filed keeps its mode, is marked paused, and is said as the pause', () => {
   const record = nextTry(runOn('t1').steps.implement, { step: 'implement', try: 2, mode: 'nudge', by: 'pause' }, 't2');
   assert.deepEqual(record.tries, [{ taskId: 't1', then: 'nudge', paused: true }]);
-  assert.equal(tryNote(IMPLEMENT, record), 'try 2, continued after wf pause --now');
+  assert.equal(tryNote(IMPLEMENT, record), 'try 2, continued after nemia pause --now');
 });
 
 test('the brief of a try the pause filed says the pause stopped its session and the run filed the try, never a person', () => {
   const brief = retrySection(IMPLEMENT, { try: 2, by: 'pause', mode: 'nudge', resumed: true, status: 'stopped' });
   assert.match(
     brief,
-    /The store was paused at once \(`wf pause --now`\), which stopped this session before it signed off; once resumed, the run filed/,
+    /The store was paused at once \(`nemia pause --now`\), which stopped this session before it signed off; once resumed, the run filed/,
   );
   assert.doesNotMatch(brief, /A person asked for this try/);
 });

@@ -76,14 +76,14 @@ test("the title is the breakdown: the pass, every phase in the package's order, 
 function packagePhases(pass: PassCost): string[] {
   const store = scratch('web-pass-');
   fs.writeFileSync(path.join(store, 'tick-stats.json'), JSON.stringify(pass));
-  const out = execFileSync(process.execPath, [path.join(REPO, 'packages', 'agent-orchestrator', 'bin', 'wf.ts'), 'up', '--stats'], {
+  const out = execFileSync(process.execPath, [path.join(REPO, 'packages', 'agent-orchestrator', 'bin', 'nemia.ts'), 'up', '--stats'], {
     env: { ...process.env, WF_ROOT: store },
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   const lines = out.split('\n');
   const head = lines.findIndex((l) => /^ {2}phase +ms +calls/.test(l));
-  assert.ok(head > 0, `wf up --stats read the pass as one: ${out}`);
+  assert.ok(head > 0, `nemia up --stats read the pass as one: ${out}`);
   const rows = lines.slice(head + 1);
   return rows
     .slice(

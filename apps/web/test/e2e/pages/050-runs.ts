@@ -98,7 +98,7 @@ export default {
     await expectBeneath(finished, deciding, 'and the finished beneath those');
     await expectVisible(
       deciding.locator(`li a[href="/runs/${ENDING.id}"] [data-to-decide="approve"]`, {
-        hasText: `to decide: ${ENDING.says} — wf approve ${ENDING.id} ${ENDING.ending}`,
+        hasText: `to decide: ${ENDING.says} — nemia approve ${ENDING.id} ${ENDING.ending}`,
       }),
       `the row of a run at its ending's gate says, in wf ls's words, what it would do and the command that approves it`,
     );
@@ -165,7 +165,7 @@ export default {
     const orphanRow = page.locator(`li a[href="/runs/${DIAMOND.orphan.id}"]`);
     await expectVisible(
       orphanRow.locator('[data-waiting-on-you]', {
-        hasText: `waiting on you: ${DIAMOND.cancelled.id} was cancelled at ${cancelledAt()}, and a cancelled run never ships — yours to resolve: wf cancel ${DIAMOND.orphan.id}`,
+        hasText: `waiting on you: ${DIAMOND.cancelled.id} was cancelled at ${cancelledAt()}, and a cancelled run never ships — yours to resolve: nemia cancel ${DIAMOND.orphan.id}`,
       }),
       `the row of ${DIAMOND.orphan.id}, waiting on a run called off, says it waits on you, as the Factory counts it, and what is yours to resolve, in wf ls's words`,
     );

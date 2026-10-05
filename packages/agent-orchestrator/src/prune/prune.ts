@@ -7,27 +7,27 @@ import { holdWord } from '../wait/wait.ts';
 import { sizeOf } from '../artifacts/artifacts.ts';
 import type { Decision } from '../decide/decide.ts';
 
-/** What is kept of a pruned run, after `prunedWords`: its files too, unless `wf prune --artifacts` removed them. */
+/** What is kept of a pruned run, after `prunedWords`: its files too, unless `nemia prune --artifacts` removed them. */
 export const prunedKept = (pruned: Pruned): string =>
   pruned.artifacts ? 'its branches and record are kept' : 'its branches, record and files are kept';
 
-/** A step at its gate on a pruned run, as `wf ls` and `wf decide` both say it: no approval is left to give (`prunedRefusal`). */
+/** A step at its gate on a pruned run, as `nemia ls` and `nemia decide` both say it: no approval is left to give (`prunedRefusal`). */
 export const neverApproved = (pruned: Pruned): string => `not approved, and never can be: the run was ${prunedWords(pruned)}`;
 
 /**
  * Why a verb that would file work into a pruned run is refused — or null, for a run nobody pruned. Pure. A retry continues in the step's
  * worktree, a round and an approval file what inherits one, and an acceptance files what waits on a loop: every one of them would start a
- * session in a directory `wf prune` removed. What is left of the run is its branches, which a person ships by hand, and its record. A run
- * whose files alone were pruned, its worktrees gone or never cut, is over all the same, and refused in words that name its files.
+ * session in a directory `nemia prune` removed. What is left of the run is its branches, which a person ships by hand, and its record. A
+ * run whose files alone were pruned, its worktrees gone or never cut, is over all the same, and refused in words that name its files.
  */
 export function prunedRefusal(run: Run, what: string): string | null {
   if (!run.pruned) return null;
   const { at, worktrees, artifacts } = run.pruned;
   if (artifacts && !worktrees.length) {
-    return `${run.id} was pruned at ${artifacts.at}: its files were removed (wf prune --artifacts), and ${what} would file work on a run whose files the steps after it read are gone. Its branches are kept, with the work on them — wf decide ${run.id} names them. For more work on it, start a new run with wf start.`;
+    return `${run.id} was pruned at ${artifacts.at}: its files were removed (nemia prune --artifacts), and ${what} would file work on a run whose files the steps after it read are gone. Its branches are kept, with the work on them — nemia decide ${run.id} names them. For more work on it, start a new run with nemia start.`;
   }
-  const files = artifacts ? `, its files at ${artifacts.at} (wf prune --artifacts)` : '';
-  return `${run.id} was pruned at ${at}: its worktrees were removed (wf prune)${files}, and ${what} would file work into one of them. Its branches are kept, with the work on them — wf decide ${run.id} names them. For more work on it, start a new run with wf start.`;
+  const files = artifacts ? `, its files at ${artifacts.at} (nemia prune --artifacts)` : '';
+  return `${run.id} was pruned at ${at}: its worktrees were removed (nemia prune)${files}, and ${what} would file work into one of them. Its branches are kept, with the work on them — nemia decide ${run.id} names them. For more work on it, start a new run with nemia start.`;
 }
 
 /**
@@ -38,15 +38,15 @@ export function prunedRefusal(run: Run, what: string): string | null {
  */
 export function heldRefusal(run: Run, what: string): string | null {
   if (!run.hold) return null;
-  return `${run.id} is ${holdWord(run.hold.until.map((id) => ({ run: id })))} (wf hold, at ${run.hold.at || 'a time its file no longer says'}), and ${what} would release work the hold keeps back. What the step asks stays on its record, and is asked again once the hold lifts; to answer it now, lift the hold first: wf hold ${run.id} --off.`;
+  return `${run.id} is ${holdWord(run.hold.until.map((id) => ({ run: id })))} (nemia hold, at ${run.hold.at || 'a time its file no longer says'}), and ${what} would release work the hold keeps back. What the step asks stays on its record, and is asked again once the hold lifts; to answer it now, lift the hold first: nemia hold ${run.id} --off.`;
 }
 
 /**
- * What `wf prune` found of one run, as git and the engine say it now: what `pruneRefusal` judges. `decided` is the kind `wf decide` says
- * (`decision`), undefined for a record that froze no workflow and whose folder does not read; `held` is why `wf rm` would not forget it
- * (`forgetRefusal`, worded for `wf prune`); `owed` the steps a pass still owes a hand-off (`handOffOwed` in advance.verb.ts); and each
- * worktree git lists as the run's, with its lock, its detached HEAD when a removal would leave what it holds on no branch (`heldWorktree`),
- * and each change `git status --porcelain` lists in it.
+ * What `nemia prune` found of one run, as git and the engine say it now: what `pruneRefusal` judges. `decided` is the kind `nemia decide`
+ * says (`decision`), undefined for a record that froze no workflow and whose folder does not read; `held` is why `nemia rm` would not
+ * forget it (`forgetRefusal`, worded for `nemia prune`); `owed` the steps a pass still owes a hand-off (`handOffOwed` in advance.verb.ts);
+ * and each worktree git lists as the run's, with its lock, its detached HEAD when a removal would leave what it holds on no branch
+ * (`heldWorktree`), and each change `git status --porcelain` lists in it.
  */
 export type PruneFacts = {
   decided: Decision['kind'] | undefined;
@@ -58,23 +58,24 @@ export type PruneFacts = {
 };
 
 /**
- * The `wf prune` a person is told to run for one run: the flags they gave repeated, so what they run next is not refused for a flag it
+ * The `nemia prune` a person is told to run for one run: the flags they gave repeated, so what they run next is not refused for a flag it
  * left out — a files directory asked for is asked for again, and a run nobody has decided keeps its `--unmerged`. Pure.
  */
 export const pruneAgain = (id: string, { unmerged = false, artifacts = false }: { unmerged?: boolean; artifacts?: boolean } = {}): string =>
-  `wf prune ${id}${unmerged ? ' --unmerged' : ''}${artifacts ? ' --artifacts' : ''}`;
+  `nemia prune ${id}${unmerged ? ' --unmerged' : ''}${artifacts ? ' --artifacts' : ''}`;
 
 /**
- * Why `wf prune` will not remove this run's worktrees, in words that say what to do instead — or null, when it may. Pure. Every reason
+ * Why `nemia prune` will not remove this run's worktrees, in words that say what to do instead — or null, when it may. Pure. Every reason
  * is named at once, so a person clears them in one go.
  *
- * `wf prune` removes a run's worktrees and nothing else: they are most of the space a run holds (a `node_modules` per workspace package),
- * and nothing that reads a run that is over reads them — `wf decide`, the board and a run that waits on this one read its branches, its
- * files directory and the engine's record. So it takes only what is rebuildable, and refuses where a worktree still holds anything else:
+ * `nemia prune` removes a run's worktrees and nothing else: they are most of the space a run holds (a `node_modules` per workspace
+ * package), and nothing that reads a run that is over reads them — `nemia decide`, the board and a run that waits on this one read its
+ * branches, its files directory and the engine's record. So it takes only what is rebuildable, and refuses where a worktree still holds
+ * anything else:
  *
- * - **a folder run**: its steps' folders are its work, not a checkout of a branch, and they are kept until `wf rm` forgets the run.
+ * - **a folder run**: its steps' folders are its work, not a checkout of a branch, and they are kept until `nemia rm` forgets the run.
  * - **a run that is not over** (`decision` says running), or whose workflow no longer reads, so that nobody can say.
- * - **whatever holds `wf rm`** (`held`): a task in flight, anything due, an ask no pass has spent, a step at its gate. A run waiting on
+ * - **whatever holds `nemia rm`** (`held`): a task in flight, anything due, an ask no pass has spent, a step at its gate. A run waiting on
  *   this one is no reason here, since the record it reads stays.
  * - **a run finished and not merged**, unless `unmerged` — or already pruned, whose merge is not asked again of its worktrees; its files,
  *   when this prune would remove them (`files`), are asked again, since that word was for the worktrees — and said only once nothing
@@ -83,7 +84,7 @@ export const pruneAgain = (id: string, { unmerged = false, artifacts = false }: 
  *   merge, and is refused so only for its files, which are part of what a person reads to decide it.
  * - **a hand-off still owed** (`owed`): what a pass would commit, and the files it would collect, are only in the worktree.
  * - **a worktree git would not remove, or that holds what no branch has**: locked; on no branch; or with changes no commit holds — where
- *   `wf rm` would commit them under a step's name, `wf prune` leaves that to a person, since the run is not being forgotten.
+ *   `nemia rm` would commit them under a step's name, `nemia prune` leaves that to a person, since the run is not being forgotten.
  *
  * `unmerged` and `artifacts` are the flags the person gave, and every command offered repeats them (`pruneAgain`).
  */
@@ -96,14 +97,14 @@ export function pruneRefusal(
   const again = pruneAgain(id, { unmerged, artifacts });
   const agreed = unmerged || (Boolean(run.pruned) && !facts.files);
   if (!isGitRun(run)) {
-    return `a folder run: its steps' folders are its work, kept with the run until it is forgotten — no worktree to prune. wf rm ${id} forgets it with them.`;
+    return `a folder run: its steps' folders are its work, kept with the run until it is forgotten — no worktree to prune. nemia rm ${id} forgets it with them.`;
   }
   const said: string[] = [];
   if (facts.decided === undefined) {
-    said.push(`its workflow no longer reads, so whether it is over cannot be told — wf rm ${id} forgets it whole`);
+    said.push(`its workflow no longer reads, so whether it is over cannot be told — nemia rm ${id} forgets it whole`);
   } else if (facts.decided === 'running') {
     said.push(
-      `it is not over — wf decide ${id} says it is still running. Pruning is not cancelling: wf cancel ${id} files nothing more, then ${again} once what was in flight has settled`,
+      `it is not over — nemia decide ${id} says it is still running. Pruning is not cancelling: nemia cancel ${id} files nothing more, then ${again} once what was in flight has settled`,
     );
   } else if (facts.held) {
     said.push(facts.held.replace(/\.$/, ''));
@@ -120,7 +121,7 @@ export function pruneRefusal(
   if (facts.owed.length) {
     const one = facts.owed.length === 1;
     said.push(
-      `${andList(facts.owed)} ${one ? 'is' : 'are'} still to be handed off — a pass commits what ${one ? 'it' : 'they'} left, and collects ${one ? 'its' : 'their'} files, from the worktree: let a tick run (wf tick), then ${again}`,
+      `${andList(facts.owed)} ${one ? 'is' : 'are'} still to be handed off — a pass commits what ${one ? 'it' : 'they'} left, and collects ${one ? 'its' : 'their'} files, from the worktree: let a tick run (nemia tick), then ${again}`,
     );
   }
   for (const w of facts.worktrees) {
@@ -144,11 +145,11 @@ export function pruneRefusal(
 }
 
 /**
- * What `wf prune` found, or did, with one run, for `pruneLines` to say.
+ * What `nemia prune` found, or did, with one run, for `pruneLines` to say.
  *
  *   refused   `pruneRefusal` said why, and nothing was touched
  *   nothing   no worktree of it is left to remove — nor, under `--artifacts`, a files directory — and `nothing` says why
- *   prunable  what `wf prune --yes` would remove: each worktree, with what it holds on disk, and under `--artifacts` its files directory
+ *   prunable  what `nemia prune --yes` would remove: each worktree, with what it holds on disk, and under `--artifacts` its files directory
  *   pruned    those removed, and the run marked pruned; `left`, each git would not remove when asked, in its words, and the files
  *             directory when what was in it did not all go
  */
@@ -177,7 +178,7 @@ export const prunedBytes = (worktrees: ReadonlyArray<{ bytes: number }>): number
 export const pruningBytes = (p: Pick<Pruning, 'worktrees' | 'artifacts'>): number => prunedBytes(p.worktrees) + (p.artifacts?.bytes ?? 0);
 
 /**
- * What `wf prune` says of one run: a line, and under a run with worktrees, one line for each, and one for its files directory under
+ * What `nemia prune` says of one run: a line, and under a run with worktrees, one line for each, and one for its files directory under
  * `--artifacts`. Pure. A prune of the worktrees alone says that the files are kept.
  */
 export function pruneLines(p: Pruning): string[] {

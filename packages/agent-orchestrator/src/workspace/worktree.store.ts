@@ -6,7 +6,7 @@
  * Beneath the controllers, beside `record.store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports what the
  * package exports of it. What reads a branch once the run has one — its standing, its diff — is `branches.store.ts`'s, and a step's
  * artifacts `artifacts.store.ts`'s, both through the `git` helpers here, so this file imports `record.store.ts` alone of those beside it;
- * `wf rm`'s removal is `forget.verb.ts`'s.
+ * `nemia rm`'s removal is `forget.verb.ts`'s.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -466,7 +466,7 @@ export async function workspaceFor(
  * commits. Deliberately not a failure if it cannot — a step's real work is already committed by
  * the step itself in the normal case, and losing a run over a git edge case would be worse.
  * Answers with the commit it made, or with git's words when it could not make one — a hook that refused it, a signature that failed — and
- * undefined with nothing to commit: the tick reads neither, and `wf rm` says both. `when` goes on the commit's message, saying why.
+ * undefined with nothing to commit: the tick reads neither, and `nemia rm` says both. `when` goes on the commit's message, saying why.
  * The repository's hooks and signing are honoured: a hook may be what keeps a secret off a branch.
  */
 export function handOff(workspace: string, step: string, when = ''): { commit: string } | { error: string } | undefined {

@@ -134,7 +134,7 @@ test('REFUSED at shipped defaults: `agent:` inside an agent file, a key no agent
     attempts.startsWith('agents/reviewer.md: an agent may not set `maxAttempts` — the runtime makes one attempt at a session'),
     attempts,
   );
-  assert.ok(attempts.includes('`wf retry <run> <step>`'), attempts);
+  assert.ok(attempts.includes('`nemia retry <run> <step>`'), attempts);
 
   const context = refusal(() => agent('reviewer', '---\ncontext: loud\n---\nReview it.\n'));
   assert.ok(context.startsWith('agents/reviewer.md: `context: loud` is not a number of tokens'), context);
@@ -277,7 +277,7 @@ test('REFUSED at shipped defaults: a step naming an agent there is not, listing 
   assert.ok(empty.startsWith("build: the body is empty, and so is agents/quiet.md's"), empty);
 });
 
-/** A factory's hire of `agent` into the workflow build's step `step`, as `wf start --factory pipao` hands it to the parser. */
+/** A factory's hire of `agent` into the workflow build's step `step`, as `nemia start --factory pipao` hands it to the parser. */
 const hire = (agent: string, step = 'implement') => ({ agent, factory: 'pipao', step: `build/${step}` });
 
 test('a step whose file names no agent, hired one, is resolved exactly as if its file said `agent:` it', () => {
@@ -300,7 +300,7 @@ test('REFUSED: a step whose file names its own agent, hired another, naming both
   );
   assert.equal(
     both,
-    "implement: `agent: implementer` fills this step in every factory, and the factory pipao hires reviewer into it too. Take the hire back — wf factory fire pipao --step build/implement — or delete the step's `agent:` line. Nothing was started.",
+    "implement: `agent: implementer` fills this step in every factory, and the factory pipao hires reviewer into it too. Take the hire back — nemia factory fire pipao --step build/implement — or delete the step's `agent:` line. Nothing was started.",
   );
   const same = refusal(() =>
     parseWorkflow('implement', '---\nagent: implementer\n---\nBuild it.\n', undefined, agents, undefined, hire('implementer')),
@@ -316,12 +316,12 @@ test("REFUSED: a hired agent there is not, in the factory's words — the agents
   const unknown = refusal(() => parseWorkflow('implement', 'Build it.\n', undefined, agents, undefined, hire('ada')));
   assert.equal(
     unknown,
-    'implement: the factory pipao hires `ada` into it, which is not an agent here. The agents are: implementer, reviewer — hire one — wf factory hire pipao <agent> --step build/implement, or write agents/ada.md beside them.',
+    'implement: the factory pipao hires `ada` into it, which is not an agent here. The agents are: implementer, reviewer — hire one — nemia factory hire pipao <agent> --step build/implement, or write agents/ada.md beside them.',
   );
   const none = refusal(() => parseWorkflow('implement', 'Build it.\n', undefined, undefined, undefined, hire('ada')));
   assert.match(
     none,
-    /^implement: the factory pipao hires `ada` into it, which is not an agent here\. There are none: .* or hire one — wf factory hire pipao <agent> --step build\/implement\.$/,
+    /^implement: the factory pipao hires `ada` into it, which is not an agent here\. There are none: .* or hire one — nemia factory hire pipao <agent> --step build\/implement\.$/,
   );
   const refused: Agents = new Map([['ada', new WorkflowError('agents/ada.md: `after` is wiring.')]]);
   const broken = refusal(() => parseWorkflow('implement', 'Build it.\n', undefined, refused, undefined, hire('ada')));
@@ -445,7 +445,7 @@ test('a codex agent names its sandbox as `sandbox:`, and one that says `permissi
   );
 });
 
-test("REFUSED at shipped defaults: `sandbox:` on an agent or a step that runs on Claude Code, and a Claude Code agent's mode on a step that runs on codex by its own line — an agent's codex `permissionMode:` is its sandbox, whatever the word, for the runtime to judge at `wf start`", () => {
+test("REFUSED at shipped defaults: `sandbox:` on an agent or a step that runs on Claude Code, and a Claude Code agent's mode on a step that runs on codex by its own line — an agent's codex `permissionMode:` is its sandbox, whatever the word, for the runtime to judge at `nemia start`", () => {
   const onClaude = "is a codex step's sandbox, and this step runs on claude";
   assert.deepEqual(agent('reviewer', '---\nharness: codex\npermissionMode: dontAsk\n---\nReview.\n').keys, {
     harness: 'codex',
@@ -558,7 +558,7 @@ test('REFUSED at shipped defaults: writeWorkflow of a draft on codex by its agen
   );
 });
 
-test('wf start freezes the resolved steps on the run: an agent edited after the start changes no step of the run', () => {
+test('nemia start freezes the resolved steps on the run: an agent edited after the start changes no step of the run', () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   const git = (...args: string[]) =>
     execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -587,7 +587,7 @@ test('wf start freezes the resolved steps on the run: an agent edited after the 
   );
 });
 
-test("`wf start` names each node's agent beside it — by the agent's name, not the step's — and a node with no agent by its name alone", async (t) => {
+test("`nemia start` names each node's agent beside it — by the agent's name, not the step's — and a node with no agent by its name alone", async (t) => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   const git = (...args: string[]) =>
     execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: ['ignore', 'pipe', 'pipe'] });

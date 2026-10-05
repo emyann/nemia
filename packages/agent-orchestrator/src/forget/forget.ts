@@ -1,6 +1,6 @@
 /**
- * `wf rm`, from the run's side: whether a run may be forgotten (`idRefusal`, `forgetRefusal`), what becomes of its worktrees, branches and
- * check logs (`runWorktrees`, `heldWorktree`, `branchFates`, `checkLogsOf`), and the line that says what was done (`forgetLine`). Pure:
+ * `nemia rm`, from the run's side: whether a run may be forgotten (`idRefusal`, `forgetRefusal`), what becomes of its worktrees, branches
+ * and check logs (`runWorktrees`, `heldWorktree`, `branchFates`, `checkLogsOf`), and the line that says what was done (`forgetLine`). Pure:
  * what git lists is handed in.
  */
 import type { Workflow } from '../step/step.ts';
@@ -26,35 +26,35 @@ import { inside } from '../workspace/workspace.ts';
 import path from 'node:path';
 
 /**
- * How `wf rm` treats a run's branches. Kept by default, since a branch is where the work is: `deleteBranches` deletes each one merged into
- * the run's base branch, and `forceUnmerged`, beside it, each one that is not — and the work on it.
+ * How `nemia rm` treats a run's branches. Kept by default, since a branch is where the work is: `deleteBranches` deletes each one merged
+ * into the run's base branch, and `forceUnmerged`, beside it, each one that is not — and the work on it.
  */
 export type ForgetHow = { deleteBranches?: boolean; forceUnmerged?: boolean };
 
 /**
- * Why `wf rm` — or `wf prune` or `wf hold`, the `verb` — will not take this as a run's id — or null. Pure, and asked before anything is
- * read. A run's id names files under `WF_ROOT` with a suffix added — `runs/<id>.json`, `.cancelled`, `.pruned`, `.hold`, `.asks` — and
- * directories — `runs/<id>/`, `worktrees/<id>/` — so only what `runId` mints is taken: lowercase letters, digits and dashes, starting with
- * a letter or a digit. With a dot, `r-xyz.json` — what `ls runs/` gives — names `runs/r-xyz.json` as a run's directory, which is another
- * run's record, and a run with no record of its own is swept of it with nothing asked. `..` or a path would name a directory that is not
- * the run's. One that is an id with a file's suffix on it is told the id.
+ * Why `nemia rm` — or `nemia prune` or `nemia hold`, the `verb` — will not take this as a run's id — or null. Pure, and asked before
+ * anything is read. A run's id names files under `WF_ROOT` with a suffix added — `runs/<id>.json`, `.cancelled`, `.pruned`, `.hold`,
+ * `.asks` — and directories — `runs/<id>/`, `worktrees/<id>/` — so only what `runId` mints is taken: lowercase letters, digits and dashes,
+ * starting with a letter or a digit. With a dot, `r-xyz.json` — what `ls runs/` gives — names `runs/r-xyz.json` as a run's directory, which
+ * is another run's record, and a run with no record of its own is swept of it with nothing asked. `..` or a path would name a directory
+ * that is not the run's. One that is an id with a file's suffix on it is told the id.
  */
-export function idRefusal(id: string, verb: 'rm' | 'prune' | 'hold' = 'rm', command = `wf ${verb}`): string | null {
+export function idRefusal(id: string, verb: 'rm' | 'prune' | 'hold' = 'rm', command = `nemia ${verb}`): string | null {
   if (/^[a-z0-9][a-z0-9-]*$/.test(id)) return null;
   const file = /^([a-z0-9][a-z0-9-]*)(\.json|\.cancelled|\.pruned|\.hold|\.asks)$/.exec(id);
   if (file)
-    return `${JSON.stringify(id)} is not a run's id: ${file[2]} is on the name of one of its files under runs/, not on the run's. Give the id wf ls prints: ${command} ${file[1]}.`;
-  const does = verb === 'hold' ? 'wf hold writes its file under WF_ROOT by id' : `wf ${verb} removes what is under WF_ROOT by id`;
-  return `${JSON.stringify(id)} is not a run's id, and ${does} — lowercase letters, digits and dashes: give the id wf ls prints, as in ${command} add-a-flag-x1y2.`;
+    return `${JSON.stringify(id)} is not a run's id: ${file[2]} is on the name of one of its files under runs/, not on the run's. Give the id nemia ls prints: ${command} ${file[1]}.`;
+  const does = verb === 'hold' ? 'nemia hold writes its file under WF_ROOT by id' : `nemia ${verb} removes what is under WF_ROOT by id`;
+  return `${JSON.stringify(id)} is not a run's id, and ${does} — lowercase letters, digits and dashes: give the id nemia ls prints, as in ${command} add-a-flag-x1y2.`;
 }
 
-/** An ask as `wf rm` names it: a try (`retry`) or a round (`round`), of which step, and its number — what `askAt` finds its file by. */
+/** An ask as `nemia rm` names it: a try (`retry`) or a round (`round`), of which step, and its number — what `askAt` finds its file by. */
 export type AskName = { kind: 'retry' | 'round'; step: string; n: number };
 
 /**
- * Why `wf rm` will not forget this run, in words that say what to do instead — or null, when it may. Pure: handed the run with every task
- * a pass filed and never wrote down adopted onto it — a check, a try, a round, and a step, on a cancelled run too, since a pass that read
- * it before the cancel may be filing one — the asks in its directory, and the store's other runs.
+ * Why `nemia rm` will not forget this run, in words that say what to do instead — or null, when it may. Pure: handed the run with every
+ * task a pass filed and never wrote down adopted onto it — a check, a try, a round, and a step, on a cancelled run too, since a pass that
+ * read it before the cancel may be filing one — the asks in its directory, and the store's other runs.
  * Every reason is named at once, so a person clears them in one go.
  *
  * Refused:
@@ -86,11 +86,13 @@ export type AskName = { kind: 'retry' | 'round'; step: string; n: number };
  * @param askAt Where an ask's file is, for the command that takes it back.
  * @param standings Where each result branch stands against the base branch, as git says it now (`branchStandings` in branches.store.ts): an
  *   ending whose result git already has holds nothing (`resultOnBase`). Left out, git is not asked, and every gate holds.
- * @param verb The verb the fixes name: `wf prune` is held by every reason `wf rm` is (`pruneRefusal`), and its fixes end in `wf prune`.
+ * @param verb The verb the fixes name: `nemia prune` is held by every reason `nemia rm` is (`pruneRefusal`), and its fixes end in `nemia
+ * prune`.
  * @param merging Whose merge is in progress in the repository's checkout (`mergeState` in worktree.store.ts), for an ending that lands on
  *   its check: one staged and not landed holds the run (`landingOpen`). Left out, git is not asked, and only what the record and the
  *   engine say holds it.
- * @param command The command its fixes name, when it is more than `wf <verb> <id>`: a prune's, with the flags it was given (`pruneAgain`).
+ * @param command The command its fixes name, when it is more than `nemia <verb> <id>`: a prune's, with the flags it was given
+ * (`pruneAgain`).
  */
 export function forgetRefusal(
   steps: readonly Workflow[] | undefined,
@@ -107,7 +109,7 @@ export function forgetRefusal(
   standings: readonly BranchStanding[] = [],
   verb: 'rm' | 'prune' = 'rm',
   merging: MergeState['merging'] = 'none',
-  command = `wf ${verb} ${run.id}`,
+  command = `nemia ${verb} ${run.id}`,
 ): string | null {
   const asked: Forgetting = {
     steps,
@@ -242,14 +244,14 @@ function gatesOf(f: Forgetting, steps: readonly Workflow[]): string[] {
     .map((s) => s.name);
 }
 
-/** On whose word a try is due, as `dueOf` says it: `retries:`, the run's sign-off nudge, `wf pause --now`, or `wf retry`. */
+/** On whose word a try is due, as `dueOf` says it: `retries:`, the run's sign-off nudge, `nemia pause --now`, or `nemia retry`. */
 const dueBy = (r: Retry, step: Workflow | undefined): string => {
   if (r.by === 'retries') return `retries: ${step?.retries}`;
   if (r.by === 'signoff') return 'a nudge to sign off';
-  return r.by === 'pause' ? 'wf pause --now' : `wf retry ${modeWord(r)}`;
+  return r.by === 'pause' ? 'nemia pause --now' : `nemia retry ${modeWord(r)}`;
 };
 
-/** Whether a try due answers an ask file: a person's `wf retry`, or the ask `wf pause --now` wrote. */
+/** Whether a try due answers an ask file: a person's `nemia retry`, or the ask `nemia pause --now` wrote. */
 const askedFor = (r: Retry): boolean => r.by === 'ask' || r.by === 'pause';
 
 /** What a pass would file now, each said: the steps ready, unless the run waits on runs (`waits`), the checks, tries and rounds due. */
@@ -261,7 +263,7 @@ function dueOf(a: Assessment, steps: readonly Workflow[], waits: boolean): strin
     const step = steps.find((s) => s.name === r.step);
     due.push(`try ${r.try} of ${r.step} is due (${dueBy(r, step)})`);
   }
-  for (const r of a.round) due.push(`round ${r.round} of ${r.step}'s loop is due (${r.by === 'again' ? 'again: true' : 'wf round'})`);
+  for (const r of a.round) due.push(`round ${r.round} of ${r.step}'s loop is due (${r.by === 'again' ? 'again: true' : 'nemia round'})`);
   return due;
 }
 
@@ -315,7 +317,7 @@ function gatesHeld(c: Facts): string | undefined {
   if (!atGates.length) return undefined;
   const one = atGates.length === 1;
   const files = gateFiles(atGates, run);
-  return `${andList(atGates)} ${one ? 'waits at its gate' : 'wait at their gates'} for your approval, and ${files} once ${one ? 'it is' : 'each is'} approved${hold ? lifts : `: ${atGates.map((name) => `wf approve ${id} ${name}`).join(', ')}`}`;
+  return `${andList(atGates)} ${one ? 'waits at its gate' : 'wait at their gates'} for your approval, and ${files} once ${one ? 'it is' : 'each is'} approved${hold ? lifts : `: ${atGates.map((name) => `nemia approve ${id} ${name}`).join(', ')}`}`;
 }
 
 /**
@@ -359,10 +361,10 @@ const HELD = [liveHeld, unlandedHeld, waitsHeld, gatesHeld, dueHeld, unheardHeld
 function cancelFix(c: Facts): string | undefined {
   const { live, due, waits, atGates, run, id, again, verb } = c;
   if (live.length && run.cancelledAt) {
-    return `It was cancelled at ${run.cancelledAt}, and a tick stops what is in flight: ${again} once it has settled (wf ls ${id})`;
+    return `It was cancelled at ${run.cancelledAt}, and a tick stops what is in flight: ${again} once it has settled (nemia ls ${id})`;
   }
   if (live.length || due.length || waits || atGates.length) {
-    return `${verb === 'rm' ? 'Forgetting' : 'Pruning'} is not cancelling: wf cancel ${id} ${live.length ? 'stops what is in flight and ' : ''}files nothing more, then ${again}${live.length ? ` once what was in flight has settled (wf ls ${id})` : ''}`;
+    return `${verb === 'rm' ? 'Forgetting' : 'Pruning'} is not cancelling: nemia cancel ${id} ${live.length ? 'stops what is in flight and ' : ''}files nothing more, then ${again}${live.length ? ` once what was in flight has settled (nemia ls ${id})` : ''}`;
   }
   return undefined;
 }
@@ -378,7 +380,7 @@ function unheardFix(c: Facts): string | undefined {
 function unlandedFix(c: Facts): string | undefined {
   const { unlanded: ending, again, id } = c;
   if (!ending) return undefined;
-  return `The next tick lands it, cancelled or not: ${again} once wf ls ${id} says what became of ${ending.name}'s merge`;
+  return `The next tick lands it, cancelled or not: ${again} once nemia ls ${id} says what became of ${ending.name}'s merge`;
 }
 
 /** Let the runs that wait on this one start first, or call them off. */
@@ -386,7 +388,7 @@ function strandedFix(c: Facts): string | undefined {
   const { stranded, id } = c;
   if (!stranded.length) return undefined;
   const one = stranded.length === 1;
-  return `Let ${one ? 'it' : 'them'} start first, on the pass after wf decide says ${id} has shipped, or call ${one ? 'it' : 'them'} off: ${stranded.map((s) => `wf cancel ${s}`).join(', ')}`;
+  return `Let ${one ? 'it' : 'them'} start first, on the pass after nemia decide says ${id} has shipped, or call ${one ? 'it' : 'them'} off: ${stranded.map((s) => `nemia cancel ${s}`).join(', ')}`;
 }
 
 /** Let the runs held until this one go on first, or lift their holds — only lift them, when this run was cancelled and never ships. */
@@ -394,10 +396,10 @@ function holdersFix(c: Facts): string | undefined {
   const { holders, run, id } = c;
   if (!holders.length) return undefined;
   const one = holders.length === 1;
-  const lift = `${one ? 'the hold' : 'each hold'}: ${holders.map((h) => `wf hold ${h} --off`).join(', ')}`;
+  const lift = `${one ? 'the hold' : 'each hold'}: ${holders.map((h) => `nemia hold ${h} --off`).join(', ')}`;
   return run.cancelledAt
     ? `Lift ${lift}`
-    : `Let ${one ? 'it' : 'them'} go on first, on the pass after wf decide says ${id} has shipped, or lift ${lift}`;
+    : `Let ${one ? 'it' : 'them'} go on first, on the pass after nemia decide says ${id} has shipped, or lift ${lift}`;
 }
 
 /** What to do about each reason, in the order a person is told it. */
@@ -465,10 +467,10 @@ export function runWorktrees(
 }
 
 /**
- * Why `wf rm` leaves a worktree as it is — or null, when git may be asked to remove it. Pure: handed what git lists of it and, for one on
- * no branch, what git says of it. Locked: git refuses, and so does `wf rm`. Detached — a rebase, a bisect or a checkout of a commit left
- * its HEAD on no branch, as a session stopped in the middle of one does — unless nothing is uncommitted in it and its HEAD's commit is on a
- * branch already: a hand-off there commits onto no branch, and removing it leaves that commit, and any the session made, on none.
+ * Why `nemia rm` leaves a worktree as it is — or null, when git may be asked to remove it. Pure: handed what git lists of it and, for one
+ * on no branch, what git says of it. Locked: git refuses, and so does `nemia rm`. Detached — a rebase, a bisect or a checkout of a commit
+ * left its HEAD on no branch, as a session stopped in the middle of one does — unless nothing is uncommitted in it and its HEAD's commit is
+ * on a branch already: a hand-off there commits onto no branch, and removing it leaves that commit, and any the session made, on none.
  */
 export function heldWorktree(
   w: GitWorktree,
@@ -480,7 +482,7 @@ export function heldWorktree(
 }
 
 /**
- * What `wf rm` does with one of the run's branches, and why: merged into its base, forced, kept by default, or kept unmerged — or git's
+ * What `nemia rm` does with one of the run's branches, and why: merged into its base, forced, kept by default, or kept unmerged — or git's
  * words, when it would not.
  */
 export type BranchFate = { branch: string; deleted: boolean; why: 'merged' | 'forced' | 'default' | 'unmerged' | { git: string } };
@@ -535,12 +537,12 @@ export function checkLogsOf(
 }
 
 /**
- * What `wf rm` did with one run, for `forgetLine` to say.
+ * What `nemia rm` did with one run, for `forgetLine` to say.
  *
  *   missing    the store has no record of it: what was left under its id, removed
  *   refused    `forgetRefusal` said why, and nothing was touched
  *   held       a worktree git would not remove, or a directory in the run's own that git does not know: what git removed is gone, and the
- *              record, its files and its branches are kept, so `wf rm` again finishes the job
+ *              record, its files and its branches are kept, so `nemia rm` again finishes the job
  *   forgotten  every worktree gone, the branches as asked, the record and its files removed
  */
 export type Forgot = {
@@ -581,7 +583,7 @@ export type Forgot = {
   unfrozen?: string;
 };
 
-/** One line for one run `wf rm` was given, saying what happened. Pure. */
+/** One line for one run `nemia rm` was given, saying what happened. Pure. */
 export function forgetLine(f: Forgot): string {
   const them = (n: number) => (n > 1 ? 'them' : 'it');
   if (f.kind === 'refused') return `${f.id}  not forgotten: ${f.refusal}`;
@@ -595,7 +597,7 @@ export function forgetLine(f: Forgot): string {
     f.gone.length ? `${f.gone.length} worktree${f.gone.length > 1 ? 's were' : ' was'} already gone` : '',
   ].filter(Boolean);
   if (f.kind === 'held') {
-    return `${f.id}  not forgotten:${leftWords(f)}${worktrees.length ? `; ${worktrees.join(', ')}` : ''}. Its record, files and branches are kept until every worktree is gone: wf rm ${f.id} again then.`;
+    return `${f.id}  not forgotten:${leftWords(f)}${worktrees.length ? `; ${worktrees.join(', ')}` : ''}. Its record, files and branches are kept until every worktree is gone: nemia rm ${f.id} again then.`;
   }
 
   if (f.folder)
@@ -634,21 +636,21 @@ export function forgetLine(f: Forgot): string {
     .join('; ');
 }
 
-/** What is still there after `wf rm`, each with what to do about it. */
+/** What is still there after `nemia rm`, each with what to do about it. */
 function leftWords(f: Forgot): string {
   return f.left
     .map((l) =>
       l.locked !== undefined
         ? ` ${l.path} is locked${l.locked ? ` (${l.locked})` : ''}, and git will not remove it — unlock it if nothing needs it: git -C ${f.repo} worktree unlock ${l.path}`
         : l.detached !== undefined
-          ? ` ${l.path} is on no branch — its HEAD is detached${l.detached ? ` at ${l.detached.slice(0, 7)}` : ''}, as a rebase, a bisect or a checkout of a commit leaves it — and removing it would leave what it holds, committed or not, on no branch: put it on one (git -C ${l.path} switch -c <branch>, or finish or abort what left it there), then wf rm ${f.id} again`
+          ? ` ${l.path} is on no branch — its HEAD is detached${l.detached ? ` at ${l.detached.slice(0, 7)}` : ''}, as a rebase, a bisect or a checkout of a commit leaves it — and removing it would leave what it holds, committed or not, on no branch: put it on one (git -C ${l.path} switch -c <branch>, or finish or abort what left it there), then nemia rm ${f.id} again`
           : l.uncommitted !== undefined
-            ? ` ${l.path} holds what ${l.step} left uncommitted, and the hand-off could not commit it — ${l.uncommitted}. That work is on no branch until it is committed, so nothing of it was removed: commit it there yourself (it is staged: git -C ${l.path} commit), then wf rm ${f.id} again`
+            ? ` ${l.path} holds what ${l.step} left uncommitted, and the hand-off could not commit it — ${l.uncommitted}. That work is on no branch until it is committed, so nothing of it was removed: commit it there yourself (it is staged: git -C ${l.path} commit), then nemia rm ${f.id} again`
             : l.git !== undefined
               ? ` git would not remove ${l.path} — ${l.git}; what is uncommitted there is on no branch, so look in it before anything is forced: git -C ${l.path} status`
               : l.orphaned
-                ? ` ${l.path} is still there, and with no record wf rm cannot say whose worktrees are in it — git worktree list in their repository, and git worktree remove each`
-                : ` ${l.path} is not a worktree git knows, and wf rm removes worktrees only through git — look in it, and remove it yourself if nothing there is wanted`,
+                ? ` ${l.path} is still there, and with no record nemia rm cannot say whose worktrees are in it — git worktree list in their repository, and git worktree remove each`
+                : ` ${l.path} is not a worktree git knows, and nemia rm removes worktrees only through git — look in it, and remove it yourself if nothing there is wanted`,
     )
     .join(';');
 }

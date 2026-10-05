@@ -1,7 +1,7 @@
 /**
  * `runMain` in the process: what a program ends with reaches its caller as it was — its value, or the very error it failed or died with,
  * after what it held was let go — and the signal handlers it takes are handed back. A signal's exit code, which ends the process, is
- * daemon.store.test.ts's, on a real `wf up`.
+ * daemon.store.test.ts's, on a real `nemia up`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -20,7 +20,7 @@ test('a program that succeeds resolves with its value, and leaves no signal hand
 
 test('REFUSED: a program that fails with a refusal rejects with that refusal, its exitCode 2 kept, once what it held is let go', async () => {
   const before = listening();
-  const refusal = new Conflict({ message: 'wf up: the store is taken' });
+  const refusal = new Conflict({ message: 'nemia up: the store is taken' });
   const released: string[] = [];
   const program = Effect.acquireRelease(Effect.succeed('held'), () => Effect.sync(() => released.push('released'))).pipe(
     Effect.andThen(Effect.sleep(1)),
@@ -33,7 +33,7 @@ test('REFUSED: a program that fails with a refusal rejects with that refusal, it
   );
   assert.equal(threw, refusal, 'the very instance, not a wrapper of it');
   assert.equal(threw.exitCode, 2);
-  assert.equal(threw.message, 'wf up: the store is taken');
+  assert.equal(threw.message, 'nemia up: the store is taken');
   assert.deepEqual(released, ['released'], 'let go before the caller hears of the failure');
   assert.deepEqual(listening(), before);
 });

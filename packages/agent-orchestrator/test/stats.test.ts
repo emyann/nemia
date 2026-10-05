@@ -1,5 +1,5 @@
 /**
- * `wf stats` over a store of seeded records and the runtime itself, `promiseEngine` over an in-memory journal: the numbers `--json`
+ * `nemia stats` over a store of seeded records and the runtime itself, `promiseEngine` over an in-memory journal: the numbers `--json`
  * answers, the one line `--line` prints, a check that refused told from one that did not finish (`refusedCheck`), the calls a session was
  * refused on a harness that records them, the skills a session loaded where each of its ends says, and the refusals of a key and a day
  * it does not take. A run whose check did not finish has not finished; a run whose journal does not read is left out whole, and named.
@@ -228,7 +228,7 @@ const RULES = [
   { id: 'no-curl', says: 'Never fetch', breaks: ['Bash(curl:*)'] },
   { id: 'no-rm', says: 'Never remove', breaks: ['Bash(rm:*)'] },
 ];
-/** The skill `name` as `wf start` rendered it for the denied run's write step, its `rules.json` written as `rules` where given. */
+/** The skill `name` as `nemia start` rendered it for the denied run's write step, its `rules.json` written as `rules` where given. */
 function renderedForWrite(name: string, rules?: string) {
   const dir = path.join(ROOT, 'runs', 'denied', 'agents', 'write', 'nemia-ada', 'skills', name);
   fs.mkdirSync(dir, { recursive: true });
@@ -321,9 +321,9 @@ const printedBy = async (t: TestContext, argv: string[]) => {
   return out.join('\n');
 };
 
-test('wf stats --json answers the numbers of the store: a landing on its first try, its cost and rounds, and each check by its verdict', async (t) => {
+test('nemia stats --json answers the numbers of the store: a landing on its first try, its cost and rounds, and each check by its verdict', async (t) => {
   const s = JSON.parse(await printedBy(t, ['stats', '--json', '--from', DAY, '--to', DAY])) as Stats;
-  assert.equal(s.all.total.runs, 1, 'a run whose check did not finish waits for wf retry --recheck: it has not finished');
+  assert.equal(s.all.total.runs, 1, 'a run whose check did not finish waits for nemia retry --recheck: it has not finished');
   assert.deepEqual(
     [s.all.total.runs, s.all.total.landed, s.all.total.firstTry, s.all.total.rounds, s.all.total.costPerLanded, s.all.total.timePerLanded],
     [1, 1, 1, 1, 3.5, 4 * 3_600_000],
@@ -340,7 +340,7 @@ test('wf stats --json answers the numbers of the store: a landing on its first t
   assert.deepEqual(s.unreadable, ['marks-2', 'spoilt'], 'a run whose journal does not read is left out whole, and named');
 });
 
-test('wf stats --by factory answers a group per factory, and --factory keeps one', async (t) => {
+test('nemia stats --by factory answers a group per factory, and --factory keeps one', async (t) => {
   const s = JSON.parse(await printedBy(t, ['stats', '--json', '--by', 'factory'])) as Stats;
   assert.deepEqual(
     s.groups.map((g) => [g.key, g.total.tries]),
@@ -356,19 +356,19 @@ test('wf stats --by factory answers a group per factory, and --factory keeps one
   assert.equal(only.all.total.tries, 2);
 });
 
-test('wf stats --line prints one line, and wf stats prints the tiles and the day', async (t) => {
+test('nemia stats --line prints one line, and nemia stats prints the tiles and the day', async (t) => {
   const line = await printedBy(t, ['stats', '--line']);
   assert.equal(line.split('\n').length, 1, line);
   assert.match(line, /^stats, last 14 days/);
   const words = await printedBy(t, ['stats', '--from', DAY, '--to', DAY]);
   assert.match(words, /^last 14 days \(/);
   assert.match(words, new RegExp(`^${DAY}\\s+1\\s+1\\s+1\\s+100%\\s+\\$3\\.50\\s+4h00m`, 'm'));
-  assert.match(words, /left out, a journal of each not reading \(wf ls says why\): marks-2, spoilt/);
+  assert.match(words, /left out, a journal of each not reading \(nemia ls says why\): marks-2, spoilt/);
 });
 
-test('wf stats --help prints each flag and what it takes, and is refused nothing', async (t) => {
+test('nemia stats --help prints each flag and what it takes, and is refused nothing', async (t) => {
   const help = await printedBy(t, ['stats', '--help']);
-  assert.match(help, /^wf stats \[--from <day>\]/);
+  assert.match(help, /^nemia stats \[--from <day>\]/);
   for (const flag of ['from', 'to', 'by', 'agent', 'step', 'factory', 'workflow', 'repo', 'line', 'json']) {
     assert.match(help, new RegExp(`^\\s+--${flag}\\s+\\S`, 'm'), `--${flag} is said with what it takes`);
   }
@@ -376,7 +376,7 @@ test('wf stats --help prints each flag and what it takes, and is refused nothing
   assert.match(help, /never 0/);
 });
 
-test('wf stats refuses a key to go by it does not know, and a day that is not one, with exit 2 and what it takes', async (t) => {
+test('nemia stats refuses a key to go by it does not know, and a day that is not one, with exit 2 and what it takes', async (t) => {
   for (const [argv, want] of [
     [['--by', 'colour'], /^--by takes one of agent, step, factory, workflow, repo, not "colour"\.$/],
     [['--from', '2026-13-40'], /^--from takes a day as YYYY-MM-DD, in UTC/],
@@ -385,13 +385,13 @@ test('wf stats refuses a key to go by it does not know, and a day that is not on
       () => undefined,
       (thrown: unknown) => thrown as Error & { exitCode?: number },
     );
-    assert.ok(err, `wf stats ${argv.join(' ')} is refused`);
+    assert.ok(err, `nemia stats ${argv.join(' ')} is refused`);
     assert.match(err.message, want);
     assert.equal(err.exitCode, 2);
   }
 });
 
-test('wf stats marks the day a run froze a rendered skill that differs from the run before, its journal read or not', async (t) => {
+test('nemia stats marks the day a run froze a rendered skill that differs from the run before, its journal read or not', async (t) => {
   const s = JSON.parse(await printedBy(t, ['stats', '--json', '--workflow', 'review'])) as Stats;
   assert.deepEqual(
     s.all.marks,
@@ -415,7 +415,7 @@ test('wf stats marks the day a run froze a rendered skill that differs from the 
   assert.match(words, new RegExp(`^2026-09-25\\s+skill ${SKILL}\\s+marks-2\\s+marks-1$`, 'm'));
 });
 
-test('wf stats counts each call a session was refused, per measured try; a codex, background or recheck try is unmeasured', async (t) => {
+test('nemia stats counts each call a session was refused, per measured try; a codex, background or recheck try is unmeasured', async (t) => {
   const s = JSON.parse(await printedBy(t, ['stats', '--json', '--factory', 'denials', '--from', BG_DAY, '--to', DENIED_DAY])) as Stats;
   const perDay = Object.fromEntries(s.all.days.map((d) => [d.day, d.deniedPerTry]));
   assert.deepEqual(
@@ -445,7 +445,7 @@ test('wf stats counts each call a session was refused, per measured try; a codex
   assert.match(line, /, \S+ \(\S+\) calls denied, /);
 });
 
-test("wf stats counts each rule a step's frozen skills declare, kept or broken per measured try; rules that do not read count none", async (t) => {
+test("nemia stats counts each rule a step's frozen skills declare, kept or broken per measured try; rules that do not read count none", async (t) => {
   const range = ['--factory', 'denials', '--from', BG_DAY, '--to', DENIED_DAY];
   const s = JSON.parse(await printedBy(t, ['stats', '--json', ...range])) as Stats;
   const write = s.all.steps.find((row) => row.step === 'write');
@@ -465,7 +465,7 @@ test("wf stats counts each rule a step's frozen skills declare, kept or broken p
   assert.match(words, new RegExp(`^write\\s+ada\\s+${RULED}\\s+no-curl\\s+2\\s+0$`, 'm'));
 });
 
-test('wf stats counts each skill a session loaded, per try whose ends all say; a recheck, or one end unsaid, is unmeasured', async (t) => {
+test('nemia stats counts each skill a session loaded, per try whose ends all say; a recheck, or one end unsaid, is unmeasured', async (t) => {
   const range = ['--factory', 'skills', '--from', SKILLS_DAY, '--to', UNSAID_DAY];
   const s = JSON.parse(await printedBy(t, ['stats', '--json', ...range])) as Stats;
   assert.deepEqual(
@@ -496,7 +496,7 @@ test('wf stats counts each skill a session loaded, per try whose ends all say; a
   assert.match(line, /, \S+ \(\S+\) calls denied, \S+ \(\S+\) skills loaded$/);
 });
 
-test("wf stats totals each tally a step froze over its closeouts, per day and over the range; a day with no closeout's value is —, never 0", async (t) => {
+test("nemia stats totals each tally a step froze over its closeouts, per day and over the range; a day with no closeout's value is —, never 0", async (t) => {
   const range = ['--factory', 'tallies', '--from', TALLY_DAY, '--to', UNTALLIED_DAY];
   const s = JSON.parse(await printedBy(t, ['stats', '--json', ...range])) as Stats;
   assert.deepEqual(

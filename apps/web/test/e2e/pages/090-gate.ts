@@ -123,11 +123,11 @@ export default {
       "the Decide section offers no answer of its own: the gate is the step's",
     );
     await expectVisible(
-      decide.locator('[data-command="approve"] code', { hasText: new RegExp(`^wf approve ${id} ${gated}$`) }),
+      decide.locator('[data-command="approve"] code', { hasText: new RegExp(`^nemia approve ${id} ${gated}$`) }),
       'the Decide section offers the approval to copy, as wf decide prints it under the step',
     );
     await expectVisible(
-      decide.locator('[data-command="send back"] code', { hasText: `wf retry ${id} ${gated} --message "<objection>"` }),
+      decide.locator('[data-command="send back"] code', { hasText: `nemia retry ${id} ${gated} --message "<objection>"` }),
       'and the send-back',
     );
     await expectCount(

@@ -31,7 +31,7 @@ export default {
     );
     await expectVisible(decide.locator('[data-lesson="unknown"]'), 'the lesson chip says nobody can know, not that nothing was written');
     await expectVisible(
-      decide.locator('[data-command="once more"] code', { hasText: `wf round ${LOOPING.id} ${LOOPING.exhausted}` }),
+      decide.locator('[data-command="once more"] code', { hasText: `nemia round ${LOOPING.id} ${LOOPING.exhausted}` }),
       `once more: the wf round that takes ${LOOPING.exhausted}'s loop round again, as a line`,
     );
     const graph = page.locator(`section[aria-label="The run's steps as a graph"]`);

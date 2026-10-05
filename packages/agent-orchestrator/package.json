@@ -28,6 +28,7 @@
     "typescript": "^5.9.3"
   },
   "bin": {
+    "nemia": "bin/nemia.ts",
     "wf": "bin/wf.ts"
   },
   "exports": {

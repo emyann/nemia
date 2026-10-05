@@ -52,10 +52,10 @@ export const ceilings = (): { sessions: number; runs: number } => ({
 });
 
 /**
- * What the last pass ran with: `$WF_ROOT/tick.json`, the tick's to write — the ceilings of the process that ran it, `wf up`'s or
- * `wf tick`'s. `wf ls` and `wf decide` run in a shell of their own, whose environment is not the daemon's:
- * `WF_MAX_CONCURRENT=4 WF_MAX_RUNS=2 wf up` sets the cap on the daemon alone, and read from the shell, a run the daemon holds read as plain
- * `waiting`.
+ * What the last pass ran with: `$WF_ROOT/tick.json`, the tick's to write — the ceilings of the process that ran it, `nemia up`'s or
+ * `nemia tick`'s. `nemia ls` and `nemia decide` run in a shell of their own, whose environment is not the daemon's:
+ * `WF_MAX_CONCURRENT=4 WF_MAX_RUNS=2 nemia up` sets the cap on the daemon alone, and read from the shell, a run the daemon holds read as
+ * plain `waiting`.
  */
 const tickFile = (): string => path.join(HOME, 'tick.json');
 
@@ -77,9 +77,9 @@ export function lastCeilings(): { sessions: number; runs: number } | undefined {
 }
 
 /**
- * The ceilings a pass runs with, written down for `wf ls` and `wf decide` — only when they differ from what is there, and through a hidden
- * file renamed over it, so a reader never reads half of it. A store that cannot be written loses only this: a reader falls back to its own
- * environment, and the pass goes on.
+ * The ceilings a pass runs with, written down for `nemia ls` and `nemia decide` — only when they differ from what is there, and through a
+ * hidden file renamed over it, so a reader never reads half of it. A store that cannot be written loses only this: a reader falls back to
+ * its own environment, and the pass goes on.
  */
 export function recordCeilings(c: { sessions: number; runs: number }): void {
   const last = lastCeilings();
@@ -93,8 +93,8 @@ export function recordCeilings(c: { sessions: number; runs: number }): void {
 }
 
 /**
- * What the last pass cost, phase by phase: `$WF_ROOT/tick-stats.json`, written by the pass that measured it, `wf up`'s or `wf tick`'s, and
- * read by `wf up --stats` and the api. One pass's numbers, replaced by the next's: nothing reads it to decide.
+ * What the last pass cost, phase by phase: `$WF_ROOT/tick-stats.json`, written by the pass that measured it, `nemia up`'s or `nemia
+ * tick`'s, and read by `nemia up --stats` and the api. One pass's numbers, replaced by the next's: nothing reads it to decide.
  */
 export const statsFile = (): string => path.join(HOME, 'tick-stats.json');
 
@@ -106,7 +106,7 @@ const HarnessCostSchema = Schema.StructWithRest(
 
 /**
  * A pass's cost as `recordPassCost` writes it (`PassCost`), every phase and `rested` there.
- * A key it does not name is kept, as a newer `wf` may write one.
+ * A key it does not name is kept, as a newer `nemia` may write one.
  */
 const isPassCost = Schema.is(
   Schema.StructWithRest(
@@ -158,7 +158,7 @@ export function recordPassCost(cost: PassCost): number {
   return performance.now() - t0;
 }
 
-/** `$WF_ROOT/daemon.json`: the store taken by one daemon, the api or a `wf up`, written by it alone (`daemon.ts`). */
+/** `$WF_ROOT/daemon.json`: the store taken by one daemon, the api or a `nemia up`, written by it alone (`daemon.ts`). */
 export const daemonFile = (): string => path.join(HOME, DAEMON_FILE);
 
 const When = Schema.String.check(Schema.makeFilter((at: string) => !Number.isNaN(Date.parse(at))));
@@ -412,7 +412,7 @@ export function releaseStore(held: DaemonFile, at = new Date().toISOString()): v
 }
 
 /**
- * Why a pass by hand may not run now — a daemon of either kind ticks the store, named — or undefined when it may. A `wf tick` never
+ * Why a pass by hand may not run now — a daemon of either kind ticks the store, named — or undefined when it may. A `nemia tick` never
  * writes the file.
  */
 export function storeRefusal(verb: 'tick', now: Instant = instantNow()): string | undefined {

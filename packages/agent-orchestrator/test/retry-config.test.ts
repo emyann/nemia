@@ -1,5 +1,5 @@
 /**
- * `wf retry` asks the runtime of the config the try would be filed with, on the model it runs on and with its cap (`tryRefused`), and
+ * `nemia retry` asks the runtime of the config the try would be filed with, on the model it runs on and with its cap (`tryRefused`), and
  * refuses one it refuses before the ask is written, in its words after the flag the retry typed. The CLI refuses an empty `--model`
  * itself; the board's `POST …/retry` hands the verb what it was sent, so the verb is called here as it does. `WF_ROOT` is set before
  * the runner is imported, which reads it as it loads.
@@ -22,7 +22,7 @@ const { readRun } = await import('../src/record/record.store.ts');
 const { runStore } = await import('../src/record/files.store.ts');
 const { configRefusal, engineOf } = await import('../src/runtime-client.ts');
 
-/** A repository with one commit, so `wf start` has a base to record. */
+/** A repository with one commit, so `nemia start` has a base to record. */
 function aRepo(): string {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   const git = (...args: string[]) =>

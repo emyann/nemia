@@ -1,5 +1,5 @@
 /**
- * `wf decide`'s screen, end to end: a real repository, a run started for real, and a board settled by
+ * `nemia decide`'s screen, end to end: a real repository, a run started for real, and a board settled by
  * hand. What the branch touched, the lesson line and the check-affecting files in full sit between the
  * verdicts and the closeouts; what each step consumed sits beside its check; the commands are unchanged.
  *
@@ -182,7 +182,7 @@ const awaiting = async (implementKeys = '') => {
   return { run: record, repo, branch, e, settle, viewed, carries, filed, fed };
 };
 
-/** What `wf decide` prints, line by line. */
+/** What `nemia decide` prints, line by line. */
 const screen = async (t: TestContext, e: Engine, ...argv: string[]): Promise<string[]> => {
   const out: string[] = [];
   const log = t.mock.method(console, 'log', (...args: unknown[]) => {
@@ -196,7 +196,7 @@ const screen = async (t: TestContext, e: Engine, ...argv: string[]): Promise<str
   return out.join('\n').split('\n');
 };
 
-/** What `wf ls <run>` prints, line by line. */
+/** What `nemia ls <run>` prints, line by line. */
 const listed = async (t: TestContext, e: Engine, id: string): Promise<string[]> => {
   const out: string[] = [];
   const log = t.mock.method(console, 'log', (...args: unknown[]) => {
@@ -210,7 +210,7 @@ const listed = async (t: TestContext, e: Engine, id: string): Promise<string[]> 
   return out.join('\n').split('\n');
 };
 
-/** An approval as `wf approve` writes one: a file of a person's beside the retry asks. */
+/** An approval as `nemia approve` writes one: a file of a person's beside the retry asks. */
 const approveByHand = (id: string, step: string, n: number) => {
   const dir = path.join(ROOT, 'runs', `${id}.asks`);
   fs.mkdirSync(dir, { recursive: true });
@@ -300,7 +300,7 @@ test('the awaiting screen: what the branch touched, the lesson, and the check fi
   assert.ok(git(repo, 'branch', '--list', branch).trim(), 'the branch is still there');
 });
 
-test("`wf decide` and `wf ls` say nothing of a run's momentum, its admission or a step's Remote Control: the same screens, line for line, whether the engine's record carries the admission and the `claude.remoteControl` the run's filings were made with or not", async (t) => {
+test("`nemia decide` and `nemia ls` say nothing of a run's momentum, its admission or a step's Remote Control: the same screens, line for line, whether the engine's record carries the admission and the `claude.remoteControl` the run's filings were made with or not", async (t) => {
   const { run, e, carries, filed } = await awaiting('background: true\nremote: true\n');
   const ids = [`${run.id}-implement`, `${run.id}-implement-check`, `${run.id}-review`];
   assert.deepEqual(
@@ -336,21 +336,21 @@ test('--sensitive with a glob that matches nothing prints the heading, and none'
   );
 });
 
-test('`wf decide` refuses a flag it does not take, and --sensitive without globs or twice — before a run is read', async () => {
+test('`nemia decide` refuses a flag it does not take, and --sensitive without globs or twice — before a run is read', async () => {
   const refused = (pattern: RegExp) => (err: Error & { exitCode?: number }) => err.exitCode === 2 && pattern.test(err.message);
   for (const [flags, pattern] of [
-    [['--sensitve', 'src/**'], /^wf decide does not take --sensitve\./],
+    [['--sensitve', 'src/**'], /^nemia decide does not take --sensitve\./],
     [['--sensitive'], /^--sensitive takes the globs/],
     [['--sensitive', '--sensitive', 'src/**'], /^--sensitive takes the globs/],
     [['--sensitive', ' , '], /^--sensitive takes the globs/],
-    [['--sensitive', 'a', '--sensitive', 'b'], /^wf decide takes --sensitive once/],
+    [['--sensitive', 'a', '--sensitive', 'b'], /^nemia decide takes --sensitive once/],
   ] as const) {
     await assert.rejects(main(['decide', 'no-such-run', ...flags]), refused(pattern), flags.join(' '));
   }
   for (const argv of [['--sensitive', 'src/**', 'no-such-run'], ['--sensitive']]) {
     await assert.rejects(
       main(['decide', ...argv]),
-      refused(/^wf decide takes the run first: wf decide <runId> \[--sensitive <globs>\]/),
+      refused(/^nemia decide takes the run first: nemia decide <runId> \[--sensitive <globs>\]/),
       `${argv.join(' ')}: a flag before the run is refused, not answered with the general help, which exits 0 and says nothing of the order`,
     );
   }
@@ -361,14 +361,14 @@ test('`wf decide` refuses a flag it does not take, and --sensitive without globs
   );
 });
 
-test('`wf decide --help` prints the lists the screen uses, from the one place they are written', async (t) => {
+test('`nemia decide --help` prints the lists the screen uses, from the one place they are written', async (t) => {
   const out: string[] = [];
   t.mock.method(console, 'log', (...args: unknown[]) => {
     out.push(args.map(String).join(' '));
   });
   await main(['decide', '--help']);
   const text = out.join('\n');
-  assert.match(text, /^wf decide <runId> \[--sensitive <globs>\]/);
+  assert.match(text, /^nemia decide <runId> \[--sensitive <globs>\]/);
   for (const list of [CHECK_AFFECTING, AGENT_FACING, LESSON]) assert.ok(text.includes(list.join(', ')), list.join(', '));
 });
 
@@ -446,7 +446,7 @@ test('what a step consumed is summed over its attempts — one that never starte
   );
 });
 
-test('`wf decide` on a try a person answered: its line says so, and under it what the try before needed and your answer, read off the ask; a blocked step is told the wf retry --message that answers it', async (t) => {
+test('`nemia decide` on a try a person answered: its line says so, and under it what the try before needed and your answer, read off the ask; a blocked step is told the nemia retry --message that answers it', async (t) => {
   const run = start({ brief: 'add sub', repo: aRepo(), workflowDir: folder(), isolate: false });
   const { e, settle } = board();
   const blocked = (needs: string) => ({ outcome: 'blocked', summary: 'two readings', artifacts: [], needs });
@@ -458,12 +458,12 @@ test('`wf decide` on a try a person answered: its line says so, and under it wha
   const needs = indexOf(asking, '    needs: Rename --flag, or keep it?');
   assert.equal(
     asking[needs + 1],
-    `    to answer it:  wf retry ${run.id} implement --message "<answer>"`,
+    `    to answer it:  nemia retry ${run.id} implement --message "<answer>"`,
     'the question, then the command that answers it',
   );
   indexOf(
     asking,
-    `    implement: blocked. Continue its session, told what happened:  wf retry ${run.id} implement  (--fresh, or --model <m>, for a new session)`,
+    `    implement: blocked. Continue its session, told what happened:  nemia retry ${run.id} implement  (--fresh, or --model <m>, for a new session)`,
   );
   assert.ok(!asking.some((l) => /^ {4}your answer: |^ {4}try \d+ needs: |answered\)$/.test(l)), 'nothing answered yet');
 
@@ -487,7 +487,7 @@ test('`wf decide` on a try a person answered: its line says so, and under it wha
   );
 });
 
-test("a measured cost on both screens: `wf decide` prints each step's beside what it used, with the api and tool time, and the run's after the steps; `wf ls` puts each step's beside its word and the run's on its line — and a run nobody measured prints no dollar", async (t) => {
+test("a measured cost on both screens: `nemia decide` prints each step's beside what it used, with the api and tool time, and the run's after the steps; `nemia ls` puts each step's beside its word and the run's on its line — and a run nobody measured prints no dollar", async (t) => {
   const repo = aRepo();
   const run = start({ brief: 'add sub', repo, workflowDir: folder(), isolate: false });
   const { e, settle, logs } = board();
@@ -537,16 +537,16 @@ test("a measured cost on both screens: `wf decide` prints each step's beside wha
   const unmeasured = await awaiting();
   assert.ok(
     !(await ls(unmeasured.run.id)).some((l) => l.includes('$')),
-    'the run the other screen tests read measured no cost: no dollar on `wf ls`',
+    'the run the other screen tests read measured no cost: no dollar on `nemia ls`',
   );
   const bare = await screen(t, unmeasured.e, unmeasured.run.id);
   assert.ok(
     bare.includes('  cost  run not measured') && !bare.some((l) => l.includes('$')),
-    `nor on \`wf decide\`, where the run's cost says not measured:\n${bare.join('\n')}`,
+    `nor on \`nemia decide\`, where the run's cost says not measured:\n${bare.join('\n')}`,
   );
 });
 
-test('REFUSED to hide why a step stopped past its budget: `wf decide` on a step whose session failed after spending its budget says FAILED with its logs, and one that ended unsigned says UNSIGNED, each beside the OVER BUDGET line — and the offer names both', async (t) => {
+test('REFUSED to hide why a step stopped past its budget: `nemia decide` on a step whose session failed after spending its budget says FAILED with its logs, and one that ended unsigned says UNSIGNED, each beside the OVER BUDGET line — and the offer names both', async (t) => {
   const budgeted = () => {
     const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
     fs.writeFileSync(path.join(dir, 'implement.md'), '---\nbudget: 3\n---\nimplement it\n');
@@ -554,7 +554,7 @@ test('REFUSED to hide why a step stopped past its budget: `wf decide` on a step 
     return dir;
   };
   const cases = [
-    ['failed', 'failed', (id: string) => `  FAILED: implement  (wf logs ${id} <step>)`],
+    ['failed', 'failed', (id: string) => `  FAILED: implement  (nemia logs ${id} <step>)`],
     [
       'unsigned',
       'succeeded',
@@ -576,14 +576,14 @@ test('REFUSED to hide why a step stopped past its budget: `wf decide` on a step 
     assert.ok(said < over, `${own}, with no closeout: why it stopped, then why nothing more is filed`);
     indexOf(
       lines,
-      `    implement: over budget (${own}), $3.40 of $3. Raise its cap above $3.40 and continue its session:  wf retry ${run.id} implement --budget <amount>  (--fresh, or --model <m>, for a new session)`,
+      `    implement: over budget (${own}), $3.40 of $3. Raise its cap above $3.40 and continue its session:  nemia retry ${run.id} implement --budget <amount>  (--fresh, or --model <m>, for a new session)`,
     );
     indexOf(lines, '    cost  $3.40 · budget $3');
     assert.ok(!lines.some((l) => /its tries have cost its budget: or more/.test(l)), 'the shared reason is gone');
   }
 });
 
-test("UNSIGNED after the run's own nudge: `wf decide` and `wf ls` say the run nudged it to sign off once, and that it ended unsigned again — the nudge spent, the step yours", async (t) => {
+test("UNSIGNED after the run's own nudge: `nemia decide` and `nemia ls` say the run nudged it to sign off once, and that it ended unsigned again — the nudge spent, the step yours", async (t) => {
   const run = start({ brief: 'add sub, unsigned', repo: aRepo(), workflowDir: folder(), isolate: false });
   const { e, settle } = board();
   await advance(e, readRun(run.id));
@@ -634,7 +634,7 @@ test("the branch's standing against the base is a fact on every screen — on it
   );
 });
 
-test("a folder whose last step is an ending: `wf decide` says what that step would do in the folder's words, and the word that runs it — and prints no git command, since the step is the one that merges", async (t) => {
+test("a folder whose last step is an ending: `nemia decide` says what that step would do in the folder's words, and the word that runs it — and prints no git command, since the step is the one that merges", async (t) => {
   const repo = aRepo();
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   fs.writeFileSync(path.join(dir, 'implement.md'), '---\n---\nimplement it\n');
@@ -664,24 +664,24 @@ test("a folder whose last step is an ending: `wf decide` says what that step wou
   assert.deepEqual(lines.slice(decide + 1, decide + 5), [
     "    Ship it: trial merge this run's result branch onto main, run the check, and commit.",
     '',
-    `  approve it    wf approve ${run.id} ship [--message "<words>"]`,
-    `  send it back  wf retry ${run.id} implement --message "<objection>"`,
+    `  approve it    nemia approve ${run.id} ship [--message "<words>"]`,
+    `  send it back  nemia retry ${run.id} implement --message "<objection>"`,
   ]);
   assert.ok(!lines.some((l) => /ship it   git|drop it   git/.test(l)), 'the folder says what shipping is, so nobody is told to type it');
 
   const said = await listed(t, e, run.id);
   indexOf(
     said,
-    `   → to decide: Ship it: trial merge this run's result branch onto main, run the check, and commit. — wf approve ${run.id} ship`,
+    `   → to decide: Ship it: trial merge this run's result branch onto main, run the check, and commit. — nemia approve ${run.id} ship`,
   );
   assert.ok(
     !said.some((l) => l.includes('waiting on you')),
-    '`wf ls` says it in one line, where it says who the run waits on: the ending is not said twice',
+    '`nemia ls` says it in one line, where it says who the run waits on: the ending is not said twice',
   );
   indexOf(said, /^   ship {11}awaiting approval/);
 });
 
-test("REFUSED: an ending led by an agent that says `You are …` — `wf decide` and `wf ls` say the step's own note, or with none, that approving runs it, and never quote the agent", async (t) => {
+test("REFUSED: an ending led by an agent that says `You are …` — `nemia decide` and `nemia ls` say the step's own note, or with none, that approving runs it, and never quote the agent", async (t) => {
   const team = fs.mkdtempSync(path.join(ROOT, 'team-'));
   fs.mkdirSync(path.join(team, 'agents'));
   fs.writeFileSync(
@@ -709,14 +709,14 @@ test("REFUSED: an ending led by an agent that says `You are …` — `wf decide`
   assert.deepEqual(noted.lines.slice(decide + 1, decide + 4), [
     `    ${LANDS}`,
     '',
-    `  approve it    wf approve ${noted.id} land [--message "<words>"]`,
+    `  approve it    nemia approve ${noted.id} land [--message "<words>"]`,
   ]);
-  indexOf(noted.said, `   → to decide: ${LANDS} — wf approve ${noted.id} land`);
+  indexOf(noted.said, `   → to decide: ${LANDS} — nemia approve ${noted.id} land`);
 
   const bare = await atGate('');
   const heading = indexOf(bare.lines, "  to decide  land has not run: this workflow's ending, and your approval is what runs it");
-  assert.deepEqual(bare.lines.slice(heading + 1, heading + 3), ['', `  approve it    wf approve ${bare.id} land [--message "<words>"]`]);
-  indexOf(bare.said, `   → to decide: land has not run: approving runs it — wf approve ${bare.id} land`);
+  assert.deepEqual(bare.lines.slice(heading + 1, heading + 3), ['', `  approve it    nemia approve ${bare.id} land [--message "<words>"]`]);
+  indexOf(bare.said, `   → to decide: land has not run: approving runs it — nemia approve ${bare.id} land`);
 
   for (const shown of [noted.lines, noted.said, bare.lines, bare.said]) {
     assert.ok(!shown.some((l) => l.includes('You are')), shown.join('\n'));
@@ -741,10 +741,10 @@ test('a gate on the last step of a folder that merges nothing: approving accepts
 
   const held = await screen(t, e, run.id);
   indexOf(held, '  to decide  review has signed off and waits for your word:');
-  indexOf(held, `  approve it    wf approve ${run.id} review [--message "<words>"]`);
+  indexOf(held, `  approve it    nemia approve ${run.id} review [--message "<words>"]`);
   assert.ok(!held.some((l) => l.includes('Review the change in this workspace')), "the step's brief is not what happens next");
   assert.ok(!held.some((l) => /ship it   git/.test(l)), 'the branch is not offered while the gate holds');
-  indexOf(await listed(t, e, run.id), `   → to decide: review has signed off at its gate — wf approve ${run.id} review`);
+  indexOf(await listed(t, e, run.id), `   → to decide: review has signed off at its gate — nemia approve ${run.id} review`);
 
   approveByHand(run.id, 'review', 1);
   const after = await screen(t, e, run.id);
@@ -753,7 +753,7 @@ test('a gate on the last step of a folder that merges nothing: approving accepts
     [`  ship it   git -C ${repo} merge --no-ff ${branch}`, `  drop it   git -C ${repo} branch -D ${branch}`],
     "review, a terminal gated step, approved: the run is over, and the branch nobody has merged is still a person's, with the commands, since no step of this folder merges",
   );
-  indexOf(await listed(t, e, run.id), `   → to decide: ${branch} is ahead of main, and nothing has merged it — wf decide ${run.id}`);
+  indexOf(await listed(t, e, run.id), `   → to decide: ${branch} is ahead of main, and nothing has merged it — nemia decide ${run.id}`);
 });
 
 test('a run that worked on the base branch itself says so, and still says what is to be decided: the screen that used to return before it', async (t) => {
@@ -771,7 +771,7 @@ test('a run that worked on the base branch itself says so, and still says what i
   const worked = indexOf(direct, /^  worked directly on main; nothing to merge; the base was /);
   const said = indexOf(direct, '  to decide  review has signed off and waits for your word:');
   assert.ok(worked < said, 'the branch facts, then what to decide');
-  indexOf(direct, `  approve it    wf approve ${run.id} review [--message "<words>"]`);
+  indexOf(direct, `  approve it    nemia approve ${run.id} review [--message "<words>"]`);
   assert.ok(!direct.some((l) => l.startsWith('  branch    ')), 'no standing: it would read `main is on main`');
   assert.ok(!direct.some((l) => /ship it   git|drop it   git/.test(l)), 'nor a merge of the branch it is already on');
 });
@@ -815,7 +815,7 @@ test("a run whose one step works in the checkout is not shown the base branch's 
   );
   const said = indexOf(lines, '    add-sub is ready to merge.');
   assert.ok(indexOf(lines, '    needs: Merge add-sub, or hold it?') > said, 'what the person came for: the summary, then the question');
-  indexOf(lines, `    to answer it:  wf retry ${run.id} supervise --message "<answer>"`);
+  indexOf(lines, `    to answer it:  nemia retry ${run.id} supervise --message "<answer>"`);
 
   const direct = start({ brief: 'add sub, directly', repo, workflowDir: folder(), isolate: false });
   fs.appendFileSync(path.join(repo, 'packages/x/src/add.ts'), 'export const sub = (a, b) => a - b;\n');
@@ -832,7 +832,7 @@ test("a run whose one step works in the checkout is not shown the base branch's 
   );
 });
 
-test('REFUSED at `wf start`: --no-worktree on a workflow whose last step merges, before a run is written — such a run has no result branch', () => {
+test('REFUSED at `nemia start`: --no-worktree on a workflow whose last step merges, before a run is written — such a run has no result branch', () => {
   const repo = aRepo();
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   fs.writeFileSync(path.join(dir, 'implement.md'), '---\n---\nimplement it\n');
@@ -854,7 +854,7 @@ test('REFUSED at `wf start`: --no-worktree on a workflow whose last step merges,
   assert.ok(start({ brief: 'add sub', repo, workflowDir: dir }), 'with worktrees, it starts');
 });
 
-test('`wf ls` views each task once, and runs added in a repository it already reads add no git process', async (t) => {
+test('`nemia ls` views each task once, and runs added in a repository it already reads add no git process', async (t) => {
   const { e, viewed, settle, run } = await awaiting();
   const repo = run.repo!;
   const ls = async () => {
@@ -893,7 +893,7 @@ test('`wf ls` views each task once, and runs added in a repository it already re
   );
 });
 
-test("`wf decide`'s program, given the engine as a service, answers what its plain face answers: the face runs the program and adds nothing", async () => {
+test("`nemia decide`'s program, given the engine as a service, answers what its plain face answers: the face runs the program and adds nothing", async () => {
   const { Effect } = await import('effect');
   const { decide, decideRun } = await import('../src/decide/decide.verb.ts');
   const { EngineService } = await import('../src/runtime-client.ts');
@@ -917,7 +917,7 @@ test("`wf decide`'s program, given the engine as a service, answers what its pla
   assert.deepStrictEqual(program, face);
 });
 
-test('`wf decide` of a run that is not there rejects with the refusal itself: a `Missing`, exit code 2, in its words', async () => {
+test('`nemia decide` of a run that is not there rejects with the refusal itself: a `Missing`, exit code 2, in its words', async () => {
   const { decide } = await import('../src/decide/decide.verb.ts');
   const { Missing } = await import('../src/refusal/refusal.ts');
   const err = await decide(board().e, 'no-such-run').then(
@@ -929,7 +929,7 @@ test('`wf decide` of a run that is not there rejects with the refusal itself: a 
   assert.match(err.message, /^no such run: no-such-run/);
 });
 
-test("`wf decide`'s refusal is its program's typed failure: a `Missing`, picked out by its tag", async () => {
+test("`nemia decide`'s refusal is its program's typed failure: a `Missing`, picked out by its tag", async () => {
   const { Effect } = await import('effect');
   const { decideRun } = await import('../src/decide/decide.verb.ts');
   const { EngineService } = await import('../src/runtime-client.ts');
@@ -942,7 +942,7 @@ test("`wf decide`'s refusal is its program's typed failure: a `Missing`, picked 
   assert.match(String(recovered), /^no such run: no-such-run/);
 });
 
-test("`wf decide`'s program says in its type what it needs and what it refuses: run without the engine, it does not typecheck, and a refusal is its failure", async () => {
+test("`nemia decide`'s program says in its type what it needs and what it refuses: run without the engine, it does not typecheck, and a refusal is its failure", async () => {
   const { Effect } = await import('effect');
   const { decideRun } = await import('../src/decide/decide.verb.ts');
   const typed: EffectOf<Decided, Refusal, EngineService> = decideRun('x');
@@ -955,7 +955,7 @@ test("`wf decide`'s program says in its type what it needs and what it refuses: 
 });
 
 /**
- * `wf decide`'s whole screen for `id`, with the run id, its repository, its base commit and the store as `<id>`, `<repo>`, `<base>` and
+ * `nemia decide`'s whole screen for `id`, with the run id, its repository, its base commit and the store as `<id>`, `<repo>`, `<base>` and
  * `<root>`.
  */
 const whole = (t: TestContext, e: Engine, id: string, ...flags: string[]): Promise<string[]> => {
@@ -1073,7 +1073,7 @@ test('the whole screen of a running run, of a try asked for, of a step blocked w
     '  BLOCKED, waiting on you: implement',
     '',
     '  once more, on the next tick:',
-    '    implement: blocked. Continue its session, told what happened:  wf retry <id> implement  (--fresh, or --model <m>, for a new session)',
+    '    implement: blocked. Continue its session, told what happened:  nemia retry <id> implement  (--fresh, or --model <m>, for a new session)',
     '',
     '  touched  main',
     '    nothing — the branch changed no file against the base',
@@ -1088,7 +1088,7 @@ test('the whole screen of a running run, of a try asked for, of a step blocked w
     '    timeline  try 1  filed 00:00:00Z  spawned 00:00:12Z  ended 00:05:00Z  queued 12s  ran 4m48s  used not measured',
     '    two readings',
     '    needs: Rename --flag?',
-    '    to answer it:  wf retry <id> implement --message "<answer>"',
+    '    to answer it:  nemia retry <id> implement --message "<answer>"',
     '',
     '  cost  run not measured',
     '  timeline  run  queued 12s  ran 4m48s  wall 5m00s',
@@ -1111,7 +1111,7 @@ test('the whole screen of a running run, of a try asked for, of a step blocked w
     '  BLOCKED, waiting on you: implement',
     '',
     '  once more, on the next tick:',
-    '    implement: blocked. Continue its session, told what happened:  wf retry <id> implement  (--fresh, or --model <m>, for a new session)',
+    '    implement: blocked. Continue its session, told what happened:  nemia retry <id> implement  (--fresh, or --model <m>, for a new session)',
     '',
     '  touched  main',
     '    nothing — the branch changed no file against the base',
@@ -1130,7 +1130,7 @@ test('the whole screen of a running run, of a try asked for, of a step blocked w
     '    The flag is public.',
     '    one reading',
     '    needs: And the README?',
-    '    to answer it:  wf retry <id> implement --message "<answer>"',
+    '    to answer it:  nemia retry <id> implement --message "<answer>"',
     '',
     '  cost  run not measured',
     '  timeline  run  queued 24s  ran 9m36s  wall 15m00s',
@@ -1149,11 +1149,11 @@ test('the whole screen of a step past its budget: FAILED and OVER BUDGET, and th
   assert.deepEqual(await whole(t, e, run.id), [
     '<id>  add sub, failed',
     '',
-    '  FAILED: implement  (wf logs <id> <step>)',
+    '  FAILED: implement  (nemia logs <id> <step>)',
     '  OVER BUDGET, waiting on you: implement ($3.40 of $3)  — the run files nothing more for it on its own; nothing after it ran',
     '',
     '  once more, on the next tick:',
-    '    implement: over budget (failed), $3.40 of $3. Raise its cap above $3.40 and continue its session:  wf retry <id> implement --budget <amount>  (--fresh, or --model <m>, for a new session)',
+    '    implement: over budget (failed), $3.40 of $3. Raise its cap above $3.40 and continue its session:  nemia retry <id> implement --budget <amount>  (--fresh, or --model <m>, for a new session)',
     '',
     '  touched  main',
     '    nothing — the branch changed no file against the base',
@@ -1187,7 +1187,7 @@ test('the whole screen of a run the run nudged to sign off, unsigned again, and 
     '  UNSIGNED: implement (nudged to sign off once by the run, and unsigned again)  — ended without the closeout it was asked for, or without a field its output: declares; nothing after it ran',
     '',
     '  once more, on the next tick:',
-    '    implement: unsigned. Continue its session, told what happened:  wf retry <id> implement  (--fresh, or --model <m>, for a new session)',
+    '    implement: unsigned. Continue its session, told what happened:  nemia retry <id> implement  (--fresh, or --model <m>, for a new session)',
     '',
     '  touched  main',
     '    nothing — the branch changed no file against the base',
@@ -1221,7 +1221,7 @@ test('the whole screen of a run the run nudged to sign off, unsigned again, and 
     '  FAILED CHECK: implement  — the run executed its check and it did not exit 0; nothing after it ran',
     '',
     '  once more, on the next tick:',
-    '    implement: failed (check). Continue its session, told what happened:  wf retry <id> implement  (--fresh, or --model <m>, for a new session)',
+    '    implement: failed (check). Continue its session, told what happened:  nemia retry <id> implement  (--fresh, or --model <m>, for a new session)',
     '',
     '  touched  main',
     '    nothing — the branch changed no file against the base',
@@ -1298,8 +1298,8 @@ test("the whole screen of an ending at its gate: the folder's words, approve it 
     "  to decide  ship has not run: this workflow's ending, and your approval is what runs it:",
     "    Ship it: trial merge this run's result branch onto main, run the check, and commit.",
     '',
-    '  approve it    wf approve <id> ship [--message "<words>"]',
-    '  send it back  wf retry <id> implement --message "<objection>"',
+    '  approve it    nemia approve <id> ship [--message "<words>"]',
+    '  send it back  nemia retry <id> implement --message "<objection>"',
   ]);
 });
 
@@ -1339,7 +1339,7 @@ test('the whole screen of a gate on a last step that merges nothing, before and 
     '    did it',
     '',
     '  review',
-    '    gate  awaiting approval:  wf approve <id> review [--message "<words>"]  — or send it back:  wf retry <id> review --message "<objection>"',
+    '    gate  awaiting approval:  nemia approve <id> review [--message "<words>"]  — or send it back:  nemia retry <id> review --message "<objection>"',
     '    used  not measured',
     '    cost  not measured',
     '    timeline  try 1  filed 00:20:00Z  spawned 00:20:12Z  ended 00:25:00Z  queued 12s  ran 4m48s  used not measured',
@@ -1354,8 +1354,8 @@ test('the whole screen of a gate on a last step that merges nothing, before and 
     '',
     '  to decide  review has signed off and waits for your word:',
     '',
-    '  approve it    wf approve <id> review [--message "<words>"]',
-    '  send it back  wf retry <id> review --message "<objection>"',
+    '  approve it    nemia approve <id> review [--message "<words>"]',
+    '  send it back  nemia retry <id> review --message "<objection>"',
   ]);
   approveByHand(run.id, 'review', 1);
   assert.deepEqual(await whole(t, e, run.id), [
@@ -1429,7 +1429,7 @@ test('the whole screen of a run that worked on the base branch itself', async (t
     '    did it',
     '',
     '  review',
-    '    gate  awaiting approval:  wf approve <id> review [--message "<words>"]  — or send it back:  wf retry <id> review --message "<objection>"',
+    '    gate  awaiting approval:  nemia approve <id> review [--message "<words>"]  — or send it back:  nemia retry <id> review --message "<objection>"',
     '    used  not measured',
     '    cost  not measured',
     '    timeline  try 1  filed 00:20:00Z  spawned 00:20:12Z  ended 00:25:00Z  queued 12s  ran 4m48s  used not measured',
@@ -1445,19 +1445,19 @@ test('the whole screen of a run that worked on the base branch itself', async (t
     '',
     '  to decide  review has signed off and waits for your word:',
     '',
-    '  approve it    wf approve <id> review [--message "<words>"]',
-    '  send it back  wf retry <id> review --message "<objection>"',
+    '  approve it    nemia approve <id> review [--message "<words>"]',
+    '  send it back  nemia retry <id> review --message "<objection>"',
   ]);
 });
 
-test('the whole screen of `wf decide --help`, of `wf decide` with no run, and the refusal of a flag before the run', async (t) => {
+test('the whole screen of `nemia decide --help`, of `nemia decide` with no run, and the refusal of a flag before the run', async (t) => {
   const { DECIDE_HELP } = await import('../src/cli/decide/decide.ts');
   const { HELP } = await import('../src/cli/flags.ts');
   const { e } = board();
   assert.deepEqual(await decideScreen(t, e, ['some-run', '--help'], {}), DECIDE_HELP.split('\n'));
   assert.deepEqual(await decideScreen(t, e, [], {}), HELP.split('\n'));
   await assert.rejects(decideScreen(t, e, ['--sensitive', 'x/**'], {}), (err: Error) => {
-    assert.equal(err.message, 'wf decide takes the run first: wf decide <runId> [--sensitive <globs>] — not --sensitive before it.');
+    assert.equal(err.message, 'nemia decide takes the run first: nemia decide <runId> [--sensitive <globs>] — not --sensitive before it.');
     return true;
   });
 });

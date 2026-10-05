@@ -1,7 +1,7 @@
 /**
  * An agent rendered for Claude Code (`agents/agents.ts`): the skills it gives by name, found in the workflow's own root, the repository's
  * `.claude/` or the store, the repository's before the store's; what becomes of Claude Code's own prompt (`harnessPrompt:`); what
- * `wf start` writes under `runs/<id>/agents/<step>/`; and the flags the tick files the step with. Each refusal at shipped defaults. The
+ * `nemia start` writes under `runs/<id>/agents/<step>/`; and the flags the tick files the step with. Each refusal at shipped defaults. The
  * runs are folder teams, so no git is asked; a folder team started from `HERE` reads that directory's `.claude/` as its repository's.
  */
 import { test } from 'node:test';
@@ -543,7 +543,7 @@ fs.writeFileSync(path.join(ROOT, 'workflows', 'skills', 'write-a-note', 'templat
 fs.mkdirSync(path.join(HERE, '.claude', 'skills', 'mind-the-tone'), { recursive: true });
 fs.writeFileSync(path.join(HERE, '.claude', 'skills', 'mind-the-tone', 'SKILL.md'), SKILL('mind-the-tone', 'preload: true\n'));
 
-test("wf start renders each Claude Code step's agent under runs/<id>/agents/<step>/, and the tick files it with the flags and a brief without the instructions", async () => {
+test("nemia start renders each Claude Code step's agent under runs/<id>/agents/<step>/, and the tick files it with the flags and a brief without the instructions", async () => {
   const dir = storeTeam('noted', {
     write: `---\nagent: scribe\n${FOLDER}---\nWrite about tides.\n`,
     code: `---\nagent: coder\nworkspace: folder\nafter: write\n---\nCode it.\n`,
@@ -663,7 +663,7 @@ test("a git run's step whose folder is gone is told a skill from the run's repos
   assert.match(write.brief, /\n## Skill `mind-the-tone`\n\nIn this repository, how to mind the tone\.\n/);
 });
 
-test('REFUSED at shipped defaults: wf start of a team whose agent gives a skill no place has, and nothing written', () => {
+test('REFUSED at shipped defaults: nemia start of a team whose agent gives a skill no place has, and nothing written', () => {
   const dir = storeTeam('unskilled', { write: `---\nagent: scribe\n${FOLDER}---\nWrite.\n` });
   const runs = path.join(ROOT, 'runs');
   const before = fs.existsSync(runs) ? fs.readdirSync(runs).sort() : [];

@@ -4,12 +4,12 @@
  * A workflow is a folder of steps. A repository carries its own checked in, one folder
  * each under `<repo>/workflows/`, and a person keeps their own under `workflows/` in the store the runs are in —
  * `~/.agent-workflows/workflows/`, or under `WF_ROOT` when that is set. Each folder is read with the package's loader,
- * so one `wf start` would refuse is listed with the loader's refusal, never hidden.
+ * so one `nemia start` would refuse is listed with the loader's refusal, never hidden.
  *
- * The start is `wf start`'s entry of the package's command table (`START`), its handler `start()`: it writes the run's record and files
- * nothing — `wf tick` or `wf up` files the first step, as it does for a run started at the command line. A start that names an inbox card
- * (`card`) is the same handler's `startFromInbox()`, `wf start <inbox>/<name>.md`'s: the same record, with `from` on it, and the card
- * removed.
+ * The start is `nemia start`'s entry of the package's command table (`START`), its handler `start()`: it writes the run's record and files
+ * nothing — `nemia tick` or `nemia up` files the first step, as it does for a run started at the command line. A start that names an inbox
+ * card (`card`) is the same handler's `startFromInbox()`, `nemia start <inbox>/<name>.md`'s: the same record, with `from` on it, and the
+ * card removed.
  * Nothing else here writes; the inbox's own writes are inbox.ts's, and a folder the builder puts back is builder.ts's.
  *
  * A step's page reads one step of one folder, as written and as the loader read it (`GET /api/workflows/:from/:name/:step`), at the address
@@ -131,7 +131,7 @@ export type WorkflowStepSpec = {
   /** The schema file `output:` names, beside the step. */
   output: string | null;
   /**
-   * What `wf stats` counts of the step's closeouts (`tally:`), each a field its `output:` declares, `field.flag` or `field.key=value`:
+   * What `nemia stats` counts of the step's closeouts (`tally:`), each a field its `output:` declares, `field.flag` or `field.key=value`:
    * empty for none.
    */
   tally: string[];
@@ -280,7 +280,7 @@ export async function listWorkflows(e: Engine['Service'], repo: string, home: st
 }
 
 /**
- * Where a folder's agents and skills are looked for beyond its own `agents/` and `skills/`, as `wf start --repo <repo>` looks: the
+ * Where a folder's agents and skills are looked for beyond its own `agents/` and `skills/`, as `nemia start --repo <repo>` looks: the
  * repository's `.claude/`, then yours (`lookupRoots`). The listing, a folder's version and the builder's judgement all read with these, so
  * the board shows a folder as a start would read it.
  */
@@ -489,7 +489,7 @@ const SHAPE =
   '`{ "workflow": "<name>", "brief": "<what to do>" }`, with `"from": "repo"` or `"yours"` when both have a workflow of that name, `"after": ["<runId>", …]` for the runs it waits on, and `"card": "<name>"` for an inbox card it starts';
 
 /** Why a start with no card and no brief is not one (422). */
-const NO_BRIEF = `A run needs a brief: what to do, as \`wf start <brief>\` takes it. Write it in \`brief\` — the run's steps are told it, under "What was asked for".`;
+const NO_BRIEF = `A run needs a brief: what to do, as \`nemia start <brief>\` takes it. Write it in \`brief\` — the run's steps are told it, under "What was asked for".`;
 
 /**
  * `POST /api/runs`'s body, its keys in the order they are refused: a card's name is refused where it is not one, in the package's words
@@ -509,14 +509,14 @@ function startWords({ path: [key], input }: BodyIssue, body: unknown): string | 
   if (key === 'from')
     return `\`from\` is where the workflow is read from: "repo" or "yours", or left out when only one has a workflow named '${String(valueAt(body, ['workflow']))}'.`;
   if (key === 'after')
-    return `\`after\` is the runs this one waits on, by id, as \`wf start --after <runId>\` takes each: a list of run ids, such as \`"after": ["add-a-cache-k2q9"]\`, or left out for a run that waits on none. This request's was ${JSON.stringify(valueAt(body, ['after']))}. GET /api/runs lists the runs there are.`;
+    return `\`after\` is the runs this one waits on, by id, as \`nemia start --after <runId>\` takes each: a list of run ids, such as \`"after": ["add-a-cache-k2q9"]\`, or left out for a run that waits on none. This request's was ${JSON.stringify(valueAt(body, ['after']))}. GET /api/runs lists the runs there are.`;
   if (key === 'card') {
     return typeof input === 'string'
       ? (inboxNameRefusal(input) ?? `POST /api/runs takes a JSON object: ${SHAPE}.`)
-      : `\`card\` names the inbox card to start, as \`wf inbox\` lists it: a name, such as \`"card": "cache-the-views-k2q9"\`, or left out for a run that starts from no card. This request's was ${JSON.stringify(input)}. GET /api/inbox lists the cards.`;
+      : `\`card\` names the inbox card to start, as \`nemia inbox\` lists it: a name, such as \`"card": "cache-the-views-k2q9"\`, or left out for a run that starts from no card. This request's was ${JSON.stringify(input)}. GET /api/inbox lists the cards.`;
   }
   if (key === 'brief' && valueAt(body, ['card']) !== undefined)
-    return `\`brief\` is what the run is asked to do in place of the card's body, as \`wf start <card> --brief "<brief>"\` takes it: text, or left out for the card's body. This request's was ${JSON.stringify(input)}.`;
+    return `\`brief\` is what the run is asked to do in place of the card's body, as \`nemia start <card> --brief "<brief>"\` takes it: text, or left out for the card's body. This request's was ${JSON.stringify(input)}.`;
   if (key === 'brief') return { status: 422, error: NO_BRIEF };
   return `POST /api/runs takes a JSON object: ${SHAPE}.`;
 }
@@ -528,7 +528,7 @@ const START: Guarded = {
   forAnother: 'start one',
   why: "a run's brief is what an agent acts on in this repository",
   reach: 'start the run from the board',
-  instead: "Start it from the board's Workflows or Inbox page, or with `wf start`",
+  instead: "Start it from the board's Workflows or Inbox page, or with `nemia start`",
   shape: SHAPE,
 };
 
@@ -571,15 +571,15 @@ export type Asked =
 
 /**
  * What `POST /api/runs` starts off its decoded body, or why it does not: the workflow it names (404, 409), and the brief (422) — the api's
- * own, since `start()` takes any string and `wf start` prints its help for none. The body's shape (400) is `START_BODY`'s.
+ * own, since `start()` takes any string and `nemia start` prints its help for none. The body's shape (400) is `START_BODY`'s.
  *
- * `after` is only shaped here: a list of run ids, as `wf start --after <runId>` takes each, and never a blank one, which the CLI refuses
+ * `after` is only shaped here: a list of run ids, as `nemia start --after <runId>` takes each, and never a blank one, which the CLI refuses
  * too (`--after=`). Whether this run may wait on each is `start()`'s to say (`afterRefusal`), in its words.
  *
- * `card` names an inbox card to start, as `wf inbox` lists it: refused here only for a name that is not a card's (`inboxNameRefusal`, 400,
- * in the package's words), before any folder is read. Whether the card is there, and may start, is `startFromInbox`'s to say. With a card
- * the brief is what the person made of its body, and may be left out, for the body as it is; a blank one is the package's to refuse, as
- * `wf start <card> --brief ""` is.
+ * `card` names an inbox card to start, as `nemia inbox` lists it: refused here only for a name that is not a card's (`inboxNameRefusal`,
+ * 400, in the package's words), before any folder is read. Whether the card is there, and may start, is `startFromInbox`'s to say. With a
+ * card the brief is what the person made of its body, and may be left out, for the body as it is; a blank one is the package's to refuse,
+ * as `nemia start <card> --brief ""` is.
  */
 function startOf(body: typeof START_BODY.Type, repo: string, home: string): Asked | Refusal {
   const { workflow, brief, from, after, card } = body;
@@ -606,8 +606,8 @@ function agentSkillsOf(step: Workflow, dir: string, places: Places): AgentSkill[
 }
 
 /**
- * The inbox card `asked` names, started by `wf start`'s entry (`START`) with `repo` as the caller's and in the factory `factory` when one
- * is named, over the card's `factory:` — one that names none either way is refused, its fix `?factory=<name>` — and what
+ * The inbox card `asked` names, started by `nemia start`'s entry (`START`) with `repo` as the caller's and in the factory `factory` when
+ * one is named, over the card's `factory:` — one that names none either way is refused, its fix `?factory=<name>` — and what
  * `POST /api/runs` answers: the run's id and the card's name, whether the card was removed and why not, and the card's `repo:` the run
  * did not look at.
  */
@@ -647,26 +647,26 @@ async function cardStarted(e: Engine['Service'], asked: Extract<Asked, { card: s
  *   session, or one made from its description — and null for a card the package refuses, whose words the agent's page shows.
  * - `GET /api/repository` — the repository a start runs in, as the request's `?factory=` and `?repo=` resolve it: what the start form
  *   lists the runs of, for a run to wait on.
- * - `POST /api/runs` — the board's first write, and the one a person makes at the command line: `wf start <brief> --workflows <folder>
- *   --repo <repo> --after <runId>`, or, with `card`, `wf start <inbox>/<card>.md --brief <brief> --workflows <folder> --after <runId>`.
+ * - `POST /api/runs` — the board's first write, and the one a person makes at the command line: `nemia start <brief> --workflows <folder>
+ *   --repo <repo> --after <runId>`, or, with `card`, `nemia start <inbox>/<card>.md --brief <brief> --workflows <folder> --after <runId>`.
  *   Served by hand, through the entry's handler (`START`). Guarded (guard.ts); the body is refused as `startWords` and `startOf` say.
  *   201 with the run's `Location` once its record is written.
- *   A refusal goes to `app.onError`, which answers it by its kind, word for word (app.ts). Without a card, `wf start`'s refusal is an
+ *   A refusal goes to `app.onError`, which answers it by its kind, word for word (app.ts). Without a card, `nemia start`'s refusal is an
  *   `Invalid`, 422: a folder that does not read as a workflow, a step named for another's check or try, a `.worktreeinclude` it cannot
  *   use, or a run this one cannot wait on (`afterRefusal`). A failure that is not a refusal is a 500, git's on a repository it cannot
  *   branch from among them — no git checkout, no commit — which the queue tries again on its next pass. With a card, the api's repository
- *   is the caller's, as `.` is `wf start`'s, and the card's `repo:` is over it; the folder is the one
+ *   is the caller's, as `.` is `nemia start`'s, and the card's `repo:` is over it; the folder is the one
  *   `folderOf` found. `startFromInbox` refuses a card not there as a `Missing` (404), one a run's record already names as a
  *   `Conflict` (409), and the rest as an `Invalid` (422): a card that does not read, a workflow that does not load, a blank brief, and
  *   what `start()` refuses. A run started when the card could not be
  *   removed is started all the same: the answer says `removed: false` and `why`, and the card lists as started until it is dropped. A
- *   card whose `repo:` the run looked at none of — a folder team's — carries it as `ignoredRepo`, as `wf start` prints it and a tick's line
- *   says it (`ignoredRepoLine`): a client that starts a card is told the same fact wherever it started from. In a factory (`?factory=`),
- *   the run is started in it (`start()`'s `factory`), which refuses a workflow it has not attached, a step its hires leave unfilled and a
- *   repository outside it, each an `Invalid`; a card is started in it too, the request's factory over the card's `factory:`, as
- *   `wf start <card> --factory` starts it, and refused as `start()` refuses, the card left in the inbox. Every run is started in a
+ *   card whose `repo:` the run looked at none of — a folder team's — carries it as `ignoredRepo`, as `nemia start` prints it and a tick's
+ *   line says it (`ignoredRepoLine`): a client that starts a card is told the same fact wherever it started from. In a factory
+ *   (`?factory=`), the run is started in it (`start()`'s `factory`), which refuses a workflow it has not attached, a step its hires leave
+ *   unfilled and a repository outside it, each an `Invalid`; a card is started in it too, the request's factory over the card's `factory:`,
+ *   as `nemia start <card> --factory` starts it, and refused as `start()` refuses, the card left in the inbox. Every run is started in a
  *   factory: a start that names none runs in the one factory whose repository holds the api's repository, or `?repo=`, on that
- *   repository (`startFactory`, as `wf start` finds it), and is refused, `Invalid`, where none or two do; a card that names none either
+ *   repository (`startFactory`, as `nemia start` finds it), and is refused, `Invalid`, where none or two do; a card that names none either
  *   way is refused, `Invalid` (`unfactoredCardRefusal`), never started in a factory found from its repository; and `?factory=default`,
  *   of a workflow or a card, is refused, `Invalid` (`defaultStartRefusal`): the default factory holds history, and no start names it.
  */

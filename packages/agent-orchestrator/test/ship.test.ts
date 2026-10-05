@@ -159,7 +159,7 @@ const board = () => {
 
 /**
  * `implement ⇄ review → ship`, as the team's dev is, with its `dev/ship.md` as the ending, whose `after: review` is
- * what this folder has: what a person types `wf round` at once the loop has handed on.
+ * what this folder has: what a person types `nemia round` at once the loop has handed on.
  */
 const loopingFolder = (rounds = 3): string => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-loop-'));
@@ -244,7 +244,7 @@ async function atTheGate(given: Given = {}) {
   return { repo, id: run.id, branch: work.branch!, e, tasks, filings, settle, pass, base: git(repo, 'rev-parse', 'HEAD') };
 }
 
-test('`wf start` on a folder with an ending says so: nothing of that step runs until a person approves it', async (t) => {
+test('`nemia start` on a folder with an ending says so: nothing of that step runs until a person approves it', async (t) => {
   const repo = aRepo();
   const printed: string[] = [];
   const log = t.mock.method(console, 'log', (...args: unknown[]) => {
@@ -257,11 +257,14 @@ test('`wf start` on a folder with an ending says so: nothing of that step runs u
   }
   const id = printed[0].split(' ')[0];
   assert.equal(printed[0], `${id}  2 step(s): implement → ship (shipper)`, "the team's ship.md names its agent");
-  assert.ok(printed.includes(`ends at: ship — nothing of it runs until wf approve ${id} ship, which is what files it`), printed.join('\n'));
+  assert.ok(
+    printed.includes(`ends at: ship — nothing of it runs until nemia approve ${id} ship, which is what files it`),
+    printed.join('\n'),
+  );
   assert.ok(!printed.some((l) => l.startsWith('gated at:')), 'an ending is not a handoff waiting to be let through');
 });
 
-test('a run stops at its ending step: nothing of it is filed, the checkout is untouched, and `wf ls` says what is to be decided', async () => {
+test('a run stops at its ending step: nothing of it is filed, the checkout is untouched, and `nemia ls` says what is to be decided', async () => {
   const { repo, id, branch, e, filings, pass, base } = await atTheGate();
   assert.deepEqual([pass.filed, pass.status], [[], 'failed'], 'the ending is not filed, and the run reads as one waiting on a person');
   assert.deepEqual(filings, [`${id}-implement`]);
@@ -287,7 +290,7 @@ test('a run stops at its ending step: nothing of it is filed, the checkout is un
   assert.equal(isShipped(gitRun(readRun(id)), branch), false);
 });
 
-test("REFUSED at shipped defaults: an ending's gate whose result a person merged by hand — the run has shipped as git reads it, a run `--after` it starts, every screen agrees, and `wf approve` names `wf cancel` instead", async (t) => {
+test("REFUSED at shipped defaults: an ending's gate whose result a person merged by hand — the run has shipped as git reads it, a run `--after` it starts, every screen agrees, and `nemia approve` names `nemia cancel` instead", async (t) => {
   const { repo, id, branch, e, filings } = await atTheGate();
   assert.equal((await list(e, readRun(id))).toDecide?.kind, 'approve', 'at its gate, with the branch ahead: a decision to make');
   const child = start({ brief: 'read the flag', repo, workflowDir: oneStep(), after: [id] });
@@ -308,9 +311,9 @@ test("REFUSED at shipped defaults: an ending's gate whose result a person merged
     [ship.status, ship.note],
     [
       'awaiting approval',
-      `${branch} is on main — nothing is left for ship to merge: the run has shipped as git reads it, and nothing waits on you; close the record if you want it closed: wf cancel ${id}`,
+      `${branch} is on main — nothing is left for ship to merge: the run has shipped as git reads it, and nothing waits on you; close the record if you want it closed: nemia cancel ${id}`,
     ],
-    "the ending's line in wf ls says where the branch stands, and the one command there still is",
+    "the ending's line in nemia ls says where the branch stands, and the one command there still is",
   );
   const printed: string[] = [];
   const log = t.mock.method(console, 'log', (...args: unknown[]) => {
@@ -331,7 +334,7 @@ test("REFUSED at shipped defaults: an ending's gate whose result a person merged
   assert.deepEqual(
     [decision.kind, decision.kind === 'shipped' ? decision.branches : []],
     ['shipped', [branch]],
-    'wf decide says the same before anybody closes the record: shipped',
+    'nemia decide says the same before anybody closes the record: shipped',
   );
   const screen: string[] = [];
   const log2 = t.mock.method(console, 'log', (...args: unknown[]) => {
@@ -345,13 +348,13 @@ test("REFUSED at shipped defaults: an ending's gate whose result a person merged
   assert.ok(
     screen.some((l) =>
       l.endsWith(
-        `\n\n  shipped — ${branch} is already on main\n  ship never ran: nothing is left for it to merge, and nothing waits on you — close the record if you want it closed: wf cancel ${id}`,
+        `\n\n  shipped — ${branch} is already on main\n  ship never ran: nothing is left for it to merge, and nothing waits on you — close the record if you want it closed: nemia cancel ${id}`,
       ),
     ),
     screen.join('\n'),
   );
   assert.ok(
-    !screen.some((l) => l.includes('AWAITING APPROVAL') || l.includes('wf approve')),
+    !screen.some((l) => l.includes('AWAITING APPROVAL') || l.includes('nemia approve')),
     `no AWAITING APPROVAL above a branch on main\n${screen.join('\n')}`,
   );
 
@@ -360,7 +363,7 @@ test("REFUSED at shipped defaults: an ending's gate whose result a person merged
     assert.equal(
       err.message,
       `${branch} is on main, so there is nothing left for ship to merge: approving would file it to merge what the base branch already has. ` +
-        `The run has shipped as git reads it — wf decide ${id} says so, and a run started --after it goes on without ship. Nothing waits on you; if you want the record closed: wf cancel ${id}.`,
+        `The run has shipped as git reads it — nemia decide ${id} says so, and a run started --after it goes on without ship. Nothing waits on you; if you want the record closed: nemia cancel ${id}.`,
     );
     return true;
   });
@@ -379,13 +382,13 @@ test("REFUSED at shipped defaults: an ending's gate whose result a person merged
   );
 });
 
-test('`wf rm` of a run whose ending never ran and whose result a person merged by hand forgets it: the gate holds nothing, so the approval it named is not named', async () => {
+test('`nemia rm` of a run whose ending never ran and whose result a person merged by hand forgets it: the gate holds nothing, so the approval it named is not named', async () => {
   const { repo, id, branch, e } = await atTheGate();
   const held = await forget(e, id);
   assert.equal(held.kind, 'refused', 'at its gate with the branch ahead, the run is held');
   assert.match(
     held.kind === 'refused' ? (held.refusal ?? '') : '',
-    new RegExp(`ship waits at its gate for your approval, and it is filed once it is approved: wf approve ${id} ship`),
+    new RegExp(`ship waits at its gate for your approval, and it is filed once it is approved: nemia approve ${id} ship`),
   );
 
   git(repo, 'merge', '--no-ff', '--no-edit', branch);
@@ -405,7 +408,7 @@ test("an ending's gate is a decision again once the base branch no longer has th
     'approve',
     "the merge reset away before anybody pushed it: the branch is ahead again, and the gate is a person's word again",
   );
-  assert.match(listed.steps.find((s) => s.name === 'ship')!.note ?? '', /^approve it: wf approve /);
+  assert.match(listed.steps.find((s) => s.name === 'ship')!.note ?? '', /^approve it: nemia approve /);
   assert.equal((await approve(e, id, 'ship')).approval.step, 'ship');
   assert.deepEqual((await advance(e, readRun(id))).filed, ['ship']);
 });
@@ -680,7 +683,7 @@ test("an approved ending stages the merge and signs off its message; the run exe
   assert.equal(
     shipLine.note,
     `the run committed its merge onto main as ${head.slice(0, 7)}`,
-    'wf ls, and the board after it, say what landed — the commit — where nothing else of a run names it',
+    'nemia ls, and the board after it, say what landed — the commit — where nothing else of a run names it',
   );
 
   fs.writeFileSync(path.join(shot.dir, 'late.png'), 'a picture put there after the landing');
@@ -792,7 +795,7 @@ test("an ending's merge that brings a dependency: its check installs what the me
 
   const r = runCheck(tasks, checkId, repo);
   assert.equal(r.status, 0, r.stdout + r.stderr);
-  assert.match(r.stdout, /^\[wf check\] the staged merge asks for packages this checkout has not installed: npm install --no-save/m);
+  assert.match(r.stdout, /^\[nemia check\] the staged merge asks for packages this checkout has not installed: npm install --no-save/m);
   assert.equal(fs.realpathSync(path.join(repo, 'node_modules', 'b')), fs.realpathSync(path.join(repo, 'packages', 'b')));
   git(repo, 'diff', '--quiet');
   assert.match(
@@ -903,12 +906,12 @@ for (const [said, exitCode, words] of [
     const printed = (await decideLines(t, e, id)).flatMap((l) => l.split('\n'));
     const line = printed.find((l) => l.trimStart().startsWith('ship: '))?.trim();
     assert.ok(line, printed.join('\n'));
-    assert.ok(line.includes(`wf retry ${id} ship`), line);
+    assert.ok(line.includes(`nemia retry ${id} ship`), line);
     assert.ok(!printed.some((l) => l.includes('--recheck')), printed.join('\n'));
     if (exitCode === undefined)
       assert.equal(
         line,
-        `ship: its check did not finish, so the run aborted the merge and nothing landed on main. Merge and check again:  wf retry ${id} ship`,
+        `ship: its check did not finish, so the run aborted the merge and nothing landed on main. Merge and check again:  nemia retry ${id} ship`,
       );
 
     await assert.rejects(retry(e, id, 'ship', { mode: 'recheck' }), (err: Error & { exitCode?: number }) => {
@@ -916,7 +919,7 @@ for (const [said, exitCode, words] of [
       assert.match(
         err.message,
         new RegExp(
-          `^--recheck runs a step's check again on the work as it stands, and ship's check was run on the merge ship staged in the repository's checkout, which the run aborted when its check ${exitCode === undefined ? 'did not finish' : 'refused it'}: there is nothing staged for it to judge\\. Merge and check again, in a new try of ship: wf retry ${id} ship\\.$`,
+          `^--recheck runs a step's check again on the work as it stands, and ship's check was run on the merge ship staged in the repository's checkout, which the run aborted when its check ${exitCode === undefined ? 'did not finish' : 'refused it'}: there is nothing staged for it to judge\\. Merge and check again, in a new try of ship: nemia retry ${id} ship\\.$`,
         ),
       );
       return true;
@@ -1068,7 +1071,7 @@ test('REFUSED at shipped defaults: a merge the run is not to commit is aborted �
     assert.match(
       note,
       /^nothing landed on main: git refused the commit of its merge: .*refused by the hook \/ see CONTRIBUTING$/,
-      "wf ls prints them on the step's row, never a line break inside it",
+      "nemia ls prints them on the step's row, never a line break inside it",
     );
     assert.equal(mergeHead(repo), false);
     assert.equal(git(repo, 'status', '--porcelain'), '');
@@ -1076,7 +1079,7 @@ test('REFUSED at shipped defaults: a merge the run is not to commit is aborted �
   }
 });
 
-test("REFUSED at shipped defaults: `wf rm` of a run whose merge is staged and not landed, and another run's ending, wait until the run has landed it", async () => {
+test("REFUSED at shipped defaults: `nemia rm` of a run whose merge is staged and not landed, and another run's ending, wait until the run has landed it", async () => {
   const shared = board();
   const repo = aRepo();
   const { id, e, settle, checkId } = await stagedAndSigned({ repo, board: shared });
@@ -1099,7 +1102,7 @@ test("REFUSED at shipped defaults: `wf rm` of a run whose merge is staged and no
   assert.equal(
     refused.kind === 'refused' && refused.refusal,
     `ship's merge is staged in the repository's checkout (${repo}), and the run has not yet committed or aborted it. ` +
-      `The next tick lands it, cancelled or not: wf rm ${id} once wf ls ${id} says what became of ship's merge.`,
+      `The next tick lands it, cancelled or not: nemia rm ${id} once nemia ls ${id} says what became of ship's merge.`,
   );
   assert.equal(mergeHead(repo), true, 'and nothing was touched');
 
@@ -1229,7 +1232,7 @@ test("a try of an ending step waits for the checkout as its first filing does: a
       `  ship: waiting on the checkout (${first.id}'s ship has it) — it works in the repository's own checkout, ` +
         `and two endings never do at once; the next tick files ship once ${first.id}'s ship has settled`,
     ),
-    `wf decide says it on the screen of a run whose ending ended blocked\n${printed.join('\n')}`,
+    `nemia decide says it on the screen of a run whose ending ended blocked\n${printed.join('\n')}`,
   );
   assert.ok(
     !printed.some((l) => l.includes('the next tick files it')),
@@ -1242,7 +1245,7 @@ test("a try of an ending step waits for the checkout as its first filing does: a
   assert.equal(readRun(second.id).steps.ship.workspace, repo);
 });
 
-test("a run whose ending's try the checkout holds is a run still running: `wf ls`, `wf decide` and the pass agree, and it still counts against the cap on runs in flight", async () => {
+test("a run whose ending's try the checkout holds is a run still running: `nemia ls`, `nemia decide` and the pass agree, and it still counts against the cap on runs in flight", async () => {
   const { first, second, e, settle } = await twoApproved();
   await advance(e, readRun(second.id));
   settle(`${second.id}-ship`, 'succeeded', BLOCKED);
@@ -1273,7 +1276,7 @@ test("a run whose ending's try the checkout holds is a run still running: `wf ls
   assert.deepEqual(
     [decision.kind, decision.kind === 'running' ? decision.waiting : []],
     ['running', ['ship']],
-    'wf decide says the same as wf ls and the pass in that window',
+    'nemia decide says the same as nemia ls and the pass in that window',
   );
 
   settle(`${first.id}-ship`, 'succeeded', SIGNED);
@@ -1284,7 +1287,7 @@ test("a run whose ending's try the checkout holds is a run still running: `wf ls
   );
 });
 
-test("a cancelled run holds the checkout while its ending's session is still in it: `wf cancel` asks the engine to stop it, and it is still merging until it has", async () => {
+test("a cancelled run holds the checkout while its ending's session is still in it: `nemia cancel` asks the engine to stop it, and it is still merging until it has", async () => {
   const { repo, first, second, e, settle, tasks } = await twoApproved();
   await advance(e, readRun(second.id));
   assert.equal(tasks.get(`${second.id}-ship`)!.phase, 'pending', 'its session is in the checkout');
@@ -1441,7 +1444,7 @@ test("REFUSED at the ending's gate, at shipped defaults: a send-back with no wor
     assert.equal(
       err.message,
       "ship is at its gate, not implement: ship ends the run in the repository's own checkout, nothing of it has run, and the send-back from that gate goes to implement, the work it would act on. " +
-        `A try with no words tells its session nothing to change, so it would sign off as it did. Say what to change: wf retry ${id} implement --message "<objection>" — or approve the ending, which is what files it: wf approve ${id} ship.`,
+        `A try with no words tells its session nothing to change, so it would sign off as it did. Say what to change: nemia retry ${id} implement --message "<objection>" — or approve the ending, which is what files it: nemia approve ${id} ship.`,
     );
     return true;
   });
@@ -1462,14 +1465,14 @@ test('REFUSED at shipped defaults: a try of the ending step itself, which has no
     assert.equal(
       err.message,
       "ship is at its gate, and nothing of it has run: it ends the run in the repository's own checkout, and your approval is what files it, so there is no try of it to replace. " +
-        `Approve it: wf approve ${id} ship — or send the work back: wf retry ${id} implement --message "<objection>".`,
+        `Approve it: nemia approve ${id} ship — or send the work back: nemia retry ${id} implement --message "<objection>".`,
     );
     return true;
   });
   assert.equal(readRun(id).steps.ship.taskId, null, 'and nothing was written');
 });
 
-test("REFUSED at shipped defaults: `wf round` at an ending's gate says the run is at that gate — not that what waits on the loop has been filed", async () => {
+test("REFUSED at shipped defaults: `nemia round` at an ending's gate says the run is at that gate — not that what waits on the loop has been filed", async () => {
   const run = start({ brief: 'add sub', repo: aRepo(), workflowDir: loopingFolder() });
   const { e, settle } = board();
   await advance(e, readRun(run.id));
@@ -1485,7 +1488,7 @@ test("REFUSED at shipped defaults: `wf round` at an ending's gate says the run i
     assert.equal(
       err.message,
       "review signed off without asking for another round (`again: false`), so its loop is over — and nothing waiting on it has been filed: the run is at ship's gate, " +
-        `where nothing of ship has run and your approval is what files it. Approve it: wf approve ${run.id} ship — or send the work back: wf retry ${run.id} review --message "<objection>".`,
+        `where nothing of ship has run and your approval is what files it. Approve it: nemia approve ${run.id} ship — or send the work back: nemia retry ${run.id} review --message "<objection>".`,
     );
     return true;
   });
@@ -1591,7 +1594,7 @@ test('REFUSED at shipped defaults: an ending that stopped on its own word is wri
     assert.equal(
       (await list(e, readRun(id))).steps.find((s) => s.name === 'ship')!.note,
       undefined,
-      'wf ls says the step as it stopped, and nothing of a landing the run did not make',
+      'nemia ls says the step as it stopped, and nothing of a landing the run did not make',
     );
     for (let i = 0; i < 2; i++) await advance(e, readRun(id));
     assert.equal(mergeHead(repo), true, "no pass after takes the person's merge back: it is still staged");
@@ -1602,7 +1605,7 @@ test('REFUSED at shipped defaults: an ending that stopped on its own word is wri
     const { repo, id, e } = await blockedClean();
     const forgot = await forget(e, id);
     assert.notEqual(forgot.kind, 'refused', forgot.kind === 'refused' ? forgot.refusal : '');
-    assert.equal(mergeHead(repo), true, "wf rm does not wait on it: the run is forgotten with the person's merge left as it is");
+    assert.equal(mergeHead(repo), true, "nemia rm does not wait on it: the run is forgotten with the person's merge left as it is");
   }
 });
 
@@ -1640,7 +1643,7 @@ const STOPPED = {
   needs: "the branch has to take main: add.ts conflicts with main's sub",
 };
 
-/** What `wf decide` prints for a run, line by line. */
+/** What `nemia decide` prints for a run, line by line. */
 async function decideLines(t: { mock: { method: typeof import('node:test').mock.method } }, e: Engine, id: string): Promise<string[]> {
   const printed: string[] = [];
   const log = t.mock.method(console, 'log', (...args: unknown[]) => {
@@ -1662,15 +1665,15 @@ test("an ending that stopped on the base branch sends the work back through the 
   assert.ok(
     printed.some((l) =>
       l.includes(
-        `ship: blocked. Ship again, when what stopped it was not the work — a dirty checkout, a flaky test. Continue its session, told what happened:  wf retry ${id} ship  (`,
+        `ship: blocked. Ship again, when what stopped it was not the work — a dirty checkout, a flaky test. Continue its session, told what happened:  nemia retry ${id} ship  (`,
       ),
     ),
-    `wf decide offers both ways on, each with when to take it\n${printed.join('\n')}`,
+    `nemia decide offers both ways on, each with when to take it\n${printed.join('\n')}`,
   );
   assert.ok(
     printed.some((l) =>
       l.includes(
-        `review: ship stopped on the base branch. Send the work back, when it does not hold on the base branch — review is filed again with your objection and what ship said, may ask for a round, and ship waits at its gate for a new approval:  wf retry ${id} review --message "<objection>"`,
+        `review: ship stopped on the base branch. Send the work back, when it does not hold on the base branch — review is filed again with your objection and what ship said, may ask for a round, and ship waits at its gate for a new approval:  nemia retry ${id} review --message "<objection>"`,
       ),
     ),
     printed.join('\n'),
@@ -1732,7 +1735,7 @@ test("an ending that stopped on the base branch sends the work back through the 
   assert.equal(tasks.get(`${id}-ship-try2`)!.spec.cwd, repo);
 });
 
-test("a send-back composes with `wf round` in a loop out of rounds, as the incident's was: review's `again: true` reads exhausted, a round takes it once more, and ship waits at its gate for a new approval", async () => {
+test("a send-back composes with `nemia round` in a loop out of rounds, as the incident's was: review's `again: true` reads exhausted, a round takes it once more, and ship waits at its gate for a new approval", async () => {
   const { id, e, filings, settle } = await stoppedOnBase(loopingFolder(1));
   await retry(e, id, 'review', { mode: 'nudge', message: 'take main' });
   await advance(e, readRun(id));
@@ -1773,7 +1776,7 @@ test("a send-back composes with `wf round` in a loop out of rounds, as the incid
   assert.deepEqual((await advance(e, readRun(id))).filed, ['ship']);
 });
 
-/** Why a person judged the loop's findings later work rather than this run's: what `wf accept` carries to the shipper. */
+/** Why a person judged the loop's findings later work rather than this run's: what `nemia accept` carries to the shipper. */
 const ENOUGH = 'the findings are cases no shipped team has: follow-up work, not this run.';
 
 /**
@@ -1866,14 +1869,14 @@ test("REFUSED at shipped defaults: a send-back from a stopped ending with no wor
     retry(e, id, 'review', { mode: 'nudge' }),
     refused(
       "review's work went on to ship, and ship stopped on the base branch (blocked) without doing what it was approved for: a try of review sends the work back from there, and one with no words tells its session nothing to change. " +
-        `Say what to change: wf retry ${id} review --message "<objection>" — or ship again, for what was not the work — a dirty checkout, a flaky test: wf retry ${id} ship.`,
+        `Say what to change: nemia retry ${id} review --message "<objection>" — or ship again, for what was not the work — a dirty checkout, a flaky test: nemia retry ${id} ship.`,
     ),
   );
   await assert.rejects(
     retry(e, id, 'implement', { mode: 'nudge', message: 'take main' }),
     refused(
       "ship stopped on the base branch (blocked) without doing what it was approved for, and the work goes back through the folder's loop, not to implement: send it back to review, which is filed again with your objection and what ship said, and may ask for a round of the work — " +
-        `wf retry ${id} review --message "<objection>". Or ship again, for what was not the work — a dirty checkout, a flaky test: wf retry ${id} ship.`,
+        `nemia retry ${id} review --message "<objection>". Or ship again, for what was not the work — a dirty checkout, a flaky test: nemia retry ${id} ship.`,
     ),
   );
   await assert.rejects(
@@ -1881,7 +1884,7 @@ test("REFUSED at shipped defaults: a send-back from a stopped ending with no wor
     refused(
       'review signed off without asking for another round (`again: false`), and ship stopped on the base branch (blocked) without doing what it was approved for: a round would file the work again with nothing said of why. ' +
         'Send it back, with what to change — review is filed again with your objection and what ship said, and its `again: true` is the round: ' +
-        `wf retry ${id} review --message "<objection>". Or ship again, for what was not the work — a dirty checkout, a flaky test: wf retry ${id} ship.`,
+        `nemia retry ${id} review --message "<objection>". Or ship again, for what was not the work — a dirty checkout, a flaky test: nemia retry ${id} ship.`,
     ),
     "a round carries no words, and the loop is over: what goes round again is the send-back's again: true",
   );
@@ -1902,7 +1905,7 @@ test("REFUSED at shipped defaults: a send-back from a stopped ending with no wor
   await assert.rejects(
     retry(e, id, 'ship', { mode: 'nudge' }),
     refused(
-      `the work is being sent back from ship (wf retry ${id} review, at ${back.ask.at}): ship returns to its gate once it settles, and a try of ship now would act on work that is being changed. Wait for it: wf ls ${id}.`,
+      `the work is being sent back from ship (nemia retry ${id} review, at ${back.ask.at}): ship returns to its gate once it settles, and a try of ship now would act on work that is being changed. Wait for it: nemia ls ${id}.`,
     ),
   );
 });
@@ -1914,7 +1917,7 @@ test('REFUSED at shipped defaults: a folder with no loop before its ending has n
     assert.equal(
       err.message,
       'ship stopped on the base branch (blocked) without doing what it was approved for, and this workflow has no loop before it to send the work back through: a send-back files the looping step an ending waits on, whose `again: true` gives the work a round, and implement does not loop. ' +
-        `Ship again, for what was not the work — a dirty checkout, a flaky test: wf retry ${id} ship. For work that does not hold on the base branch, call this run off (wf cancel ${id}) and start one for the work on the base branch as it is now (wf start); a folder that gives its ending a \`loop:\` step to wait on can send work back.`,
+        `Ship again, for what was not the work — a dirty checkout, a flaky test: nemia retry ${id} ship. For work that does not hold on the base branch, call this run off (nemia cancel ${id}) and start one for the work on the base branch as it is now (nemia start); a folder that gives its ending a \`loop:\` step to wait on can send work back.`,
     );
     return true;
   });
@@ -1941,7 +1944,7 @@ test('the whole screen of a run whose result a person merged by hand, its ending
     '<id>  add sub',
     '',
     '  shipped — wf/<id>/implement is already on main',
-    '  ship never ran: nothing is left for it to merge, and nothing waits on you — close the record if you want it closed: wf cancel <id>',
+    '  ship never ran: nothing is left for it to merge, and nothing waits on you — close the record if you want it closed: nemia cancel <id>',
   ]);
 });
 
@@ -1967,7 +1970,7 @@ test("the whole screen of an ending whose check did not finish on the merge, wit
     '  UNVERIFIED: implement  — no check: declared; only its own word says it worked',
     '',
     '  once more, on the next tick:',
-    '    ship: its check did not finish, so the run aborted the merge and nothing landed on main. Merge and check again:  wf retry <id> ship',
+    '    ship: its check did not finish, so the run aborted the merge and nothing landed on main. Merge and check again:  nemia retry <id> ship',
     '',
     '  touched  wf/<id>/implement',
     '    (root)  1 file   +1 −0',
@@ -2018,7 +2021,7 @@ test("the whole screen of an ending whose check refused the merge, with the chec
     '  UNVERIFIED: implement  — no check: declared; only its own word says it worked',
     '',
     '  once more, on the next tick:',
-    '    ship: failed (check) — nothing landed on main: its check refused the merge (exit 1). Ship again, when what stopped it was not the work — a dirty checkout, a flaky test. Continue its session, told what happened:  wf retry <id> ship  (--fresh, or --model <m>, for a new session)',
+    '    ship: failed (check) — nothing landed on main: its check refused the merge (exit 1). Ship again, when what stopped it was not the work — a dirty checkout, a flaky test. Continue its session, told what happened:  nemia retry <id> ship  (--fresh, or --model <m>, for a new session)',
     '',
     '  touched  wf/<id>/implement',
     '    (root)  1 file   +1 −0',
@@ -2080,7 +2083,7 @@ test('the whole screen of a run whose ending waits for the checkout, first filed
     '  BLOCKED, waiting on you: ship',
     '',
     '  once more, on the next tick:',
-    '    ship: blocked. Ship again, when what stopped it was not the work — a dirty checkout, a flaky test. Continue its session, told what happened:  wf retry <second> ship  (--fresh, or --model <m>, for a new session)',
+    '    ship: blocked. Ship again, when what stopped it was not the work — a dirty checkout, a flaky test. Continue its session, told what happened:  nemia retry <second> ship  (--fresh, or --model <m>, for a new session)',
     '',
     '  touched  wf/<second>/implement',
     '    (root)  1 file   +1 −0',
@@ -2103,7 +2106,7 @@ test('the whole screen of a run whose ending waits for the checkout, first filed
     '    the check refused',
     '    !! declared and not given: message',
     '    needs: read the suite',
-    '    to answer it:  wf retry <second> ship --message "<answer>"',
+    '    to answer it:  nemia retry <second> ship --message "<answer>"',
     '',
     '  cost  run not measured',
     '  timeline  run  queued —  ran —  wall not known',

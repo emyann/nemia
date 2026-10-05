@@ -77,7 +77,7 @@ export default {
         'and says whose workflows they are, and on which repository',
       );
       await expectVisible(
-        item.locator('[data-unfilled]', { hasText: `wf factory hire ${factory} <agent> --step ${WORKFLOWS.good.name}/${UNFILLED}` }),
+        item.locator('[data-unfilled]', { hasText: `nemia factory hire ${factory} <agent> --step ${WORKFLOWS.good.name}/${UNFILLED}` }),
         `${WORKFLOWS.good.name}'s ${UNFILLED} has no agent in ${factory}: the start says so, and the hire that fills it`,
       );
       await expectCount(item.locator(`form[aria-label="Start ${CARD}"]`), 0, 'with no Start: the api would refuse it');

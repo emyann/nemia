@@ -126,7 +126,7 @@ function validateFolder(steps: readonly Workflow[]): void {
 
 /**
  * The modes a step's background session is judged by: its harness's reach (`fenceReach`), or the default harness's on one that ranks no
- * modes, since only Claude Code runs a background session and `background: true` elsewhere is refused at `wf start`.
+ * modes, since only Claude Code runs a background session and `background: true` elsewhere is refused at `nemia start`.
  */
 const backgroundReach = (harness: string = DEFAULT_HARNESS): FenceReach => {
   const reach = fenceReach(harness);
@@ -196,7 +196,7 @@ function validateSlot(steps: readonly Workflow[]): void {
  * for the steps `loadWorkflows` reads, since a folder lists them so. `resume:` is in `after` already, and `loop:` is the edge back, which
  * orders nothing. Pure.
  *
- * What a run's steps are listed in. In the folder's order, alphabetical, `wf start`, `wf ls`, `wf decide` and the board read a
+ * What a run's steps are listed in. In the folder's order, alphabetical, `nemia start`, `nemia ls`, `nemia decide` and the board read a
  * `plan → implement ⇄ review` workflow as implement, plan, review. The order given breaks a tie, not the name, so a workflow frozen in an
  * order that already runs forward reads as it was frozen: the board lists a run's steps in its record's order, and holds that to `list`'s.
  * It ends on any input, because a record read back is not validated again: an `after` naming a step that is not here orders nothing, and
@@ -321,7 +321,7 @@ function validateLoops(steps: readonly Workflow[]): void {
  * Could two steps of this workflow ever run at the same time?
  *
  * True when there is more than one starting point, or when any step is followed by more than one.
- * `wf start` refuses `--no-worktree` on a workflow that fans out: without isolation those steps would
+ * `nemia start` refuses `--no-worktree` on a workflow that fans out: without isolation those steps would
  * share a directory, which is the arrangement the whole worktree design exists to prevent.
  */
 export function fansOut(steps: readonly Workflow[]): boolean {
@@ -333,7 +333,7 @@ export function fansOut(steps: readonly Workflow[]): boolean {
 /**
  * The steps nothing waits on — where a run's work ends up.
  *
- * A run that succeeded is useless if nobody can find what it produced, so this is what `wf ls`
+ * A run that succeeded is useless if nobody can find what it produced, so this is what `nemia ls`
  * reports as the result. Usually one step; several when a workflow deliberately ends wide.
  */
 export function terminalSteps(steps: readonly Workflow[]): Workflow[] {

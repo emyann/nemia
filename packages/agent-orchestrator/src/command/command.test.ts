@@ -47,7 +47,7 @@ const entry = (name: string) => TABLE.find((c) => c.name === name)!;
 function refusedBy(command: (typeof TABLE)[number], argv: readonly string[]): string | null {
   try {
     const args = parseArgv(command.spec, argv);
-    assert.ok(args, `wf ${command.name} ${argv.join(' ')} is given too little`);
+    assert.ok(args, `nemia ${command.name} ${argv.join(' ')} is given too little`);
     return command.check?.(args) ?? null;
   } catch (err) {
     assert.equal((err as { exitCode?: number }).exitCode, 2);
@@ -171,12 +171,12 @@ test("a text flag's value left out — empty, or a word starting -- — is refus
 test("retry's command line keeps today's refusals", () => {
   assert.equal(
     refusalOf(['r-1', 'impl', '--fresh', '--recheck'], RETRY.spec),
-    'wf retry asks for one try, one way: pick one of --nudge, --fresh, --model <m>, --recheck.',
+    'nemia retry asks for one try, one way: pick one of --nudge, --fresh, --model <m>, --recheck.',
   );
   assert.equal(
     refusalOf(['r-1', 'impl', '--message', '--fresh'], RETRY.spec),
-    "--message takes what to tell the step, and --fresh is one of wf retry's own flags, so the answer was left out: " +
-      'wf retry <runId> <step> --message "<answer>". If --fresh is the whole answer, give it as --message=--fresh.',
+    "--message takes what to tell the step, and --fresh is one of nemia retry's own flags, so the answer was left out: " +
+      'nemia retry <runId> <step> --message "<answer>". If --fresh is the whole answer, give it as --message=--fresh.',
   );
   assert.deepEqual(parseArgv(RETRY.spec, ['r-1', 'impl', '--message=--fresh']), {
     mode: 'nudge',
@@ -198,74 +198,74 @@ test("say's words are every argument after its step, joined", () => {
 });
 
 test('the command line a refusal shows names what was given and the usage of what was not', () => {
-  assert.equal(commandLine(RETRY, { runId: 'r-1', step: 'impl' }), 'wf retry r-1 impl');
-  assert.equal(commandLine({ name: 'x', spec: SPEC }, { runId: 'r-1' }), 'wf x r-1 [<step>]');
-  assert.equal(commandLine({ name: 'x', spec: SPEC }, {}), 'wf x <runId> [<step>]');
-  assert.equal(commandLine(SAY, { runId: 'r-1', step: 'impl', text: 'hi' }), 'wf say r-1 impl');
+  assert.equal(commandLine(RETRY, { runId: 'r-1', step: 'impl' }), 'nemia retry r-1 impl');
+  assert.equal(commandLine({ name: 'x', spec: SPEC }, { runId: 'r-1' }), 'nemia x r-1 [<step>]');
+  assert.equal(commandLine({ name: 'x', spec: SPEC }, {}), 'nemia x <runId> [<step>]');
+  assert.equal(commandLine(SAY, { runId: 'r-1', step: 'impl', text: 'hi' }), 'nemia say r-1 impl');
 });
 
 test("the table's help is today's, word for word", () => {
   assert.equal(
     helpOf(TABLE),
     [
-      '  wf start <brief.md|card.md|"text"> [--workflows ./workflows] [--repo .] [--no-worktree] [--after <runId> ...] [--input <file> ...] [--gate <step> ...] [--factory <name>] [--brief "<brief>"]',
-      '                               --after <runId>: file nothing of this run until wf decide says that',
+      '  nemia start <brief.md|card.md|"text"> [--workflows ./workflows] [--repo .] [--no-worktree] [--after <runId> ...] [--input <file> ...] [--gate <step> ...] [--factory <name>] [--brief "<brief>"]',
+      '                               --after <runId>: file nothing of this run until nemia decide says that',
       '                               run has shipped — finished, and its result branch on the base',
       '                               branch — and start from the base as it is then; once per run.',
-      "                               --gate <step>: that step's closeout waits for wf approve before",
+      "                               --gate <step>: that step's closeout waits for nemia approve before",
       "                               anything after it is filed, as a step's own gate: true does; once",
       "                               per step. An inbox card's gate: <step> is one more",
       '                               --workflows takes a folder, or a name under <repo>/workflows/: dev',
-      '                               a card of a plan (wf plan --help) starts its body: --workflows is its',
+      '                               a card of a plan (nemia plan --help) starts its body: --workflows is its',
       '                               workflow: unless given, and its after: needs an --after for each',
       "                               --input <file>: copied into the run's own inputs/ directory, and named",
       "                               on every step's brief under what was asked for; once per file",
       '                               --factory <name>: the workflow must be attached to the factory, whose',
-      '                               hires fill its steps, and a step left with no agent is refused (wf',
+      '                               hires fill its steps, and a step left with no agent is refused (nemia',
       '                               factory --help). A factory with one repository gives the run its',
       "                               --repo, and a repository not one of the factory's is refused, naming",
       '                               them. Without it, the run is started in the factory whose repository',
-      '                               holds --repo, else where wf start is typed, on that repository, when',
+      '                               holds --repo, else where nemia start is typed, on that repository, when',
       '                               one factory alone does; none, or two, is refused, naming the fix.',
       '                               The default factory is history only: --factory default is refused',
-      '                               a card of the inbox (wf inbox --help) starts its body, or --brief',
+      '                               a card of the inbox (nemia inbox --help) starts its body, or --brief',
       '                               "<brief>" in its place, and leaves the inbox: --workflows is its workflow:',
       '                               unless given, --repo its repo:, --factory its factory:, and a card',
       '                               that names no factory either way is refused',
-      '  wf plan <folder> [--repo .] [--factory <name>]',
+      '  nemia plan <folder> [--repo .] [--factory <name>]',
       '                               start a plan: one run per card in the folder, parents first, each',
       '                               --after the runs of the cards its after: names, in the factory as',
-      '                               wf start finds it (wf plan --help)',
-      '  wf inbox',
+      '                               nemia start finds it (nemia plan --help)',
+      '  nemia inbox',
       '                               the cards parked before they are started: name, first line, workflow',
-      '                               and repo when set, and started as <runId> (wf inbox --help)',
-      '  wf inbox add "<idea>"|<file> [--workflow <name>] [--repo <path>] [--factory <name>]',
+      '                               and repo when set, and started as <runId> (nemia inbox --help)',
+      '  nemia inbox add "<idea>"|<file> [--workflow <name>] [--repo <path>] [--factory <name>]',
       '                               park an idea as a card in the inbox, named from its first line',
-      '  wf inbox queue <name> [--workflow <w>] [--off]',
+      '  nemia inbox queue <name> [--workflow <w>] [--off]',
       '                               mark a card to start on its own: the tick starts the oldest queued',
       '                               card once a run slot is free; --off takes the mark back',
-      '  wf inbox rm <name>',
+      '  nemia inbox rm <name>',
       '                               drop a card without starting it',
-      '  wf factory',
+      '  nemia factory',
       "                               the store's factories: the default first — every run and card that",
       '                               names no factory, read, never written — then each by name with its',
-      '                               repositories (wf factory --help)',
-      '  wf factory ls',
+      '                               repositories (nemia factory --help)',
+      '  nemia factory ls',
       '                               the same, by its name',
-      '  wf factory add <name> --repo <path> [--repo <path> ...]',
+      '  nemia factory add <name> --repo <path> [--repo <path> ...]',
       '                               file a factory: a lowercase slug naming one or more directories',
-      '  wf factory attach <factory> <workflow>',
+      '  nemia factory attach <factory> <workflow>',
       "                               offer a workflow in a factory, by its folder's name: a factory offers",
       '                               only the workflows attached to it',
-      '  wf factory detach <factory> <workflow>',
+      '  nemia factory detach <factory> <workflow>',
       '                               take a workflow back, once no hire fills its steps',
-      '  wf factory hire <factory> <agent> --step <workflow>/<step>',
+      '  nemia factory hire <factory> <agent> --step <workflow>/<step>',
       "                               hire an agent into a workflow's step: one a step, a second replaces it",
-      '  wf factory fire <factory> --step <workflow>/<step>',
+      '  nemia factory fire <factory> --step <workflow>/<step>',
       "                               take a step's hire back",
-      '  wf factory rm <name>',
+      '  nemia factory rm <name>',
       "                               remove a factory's file",
-      '  wf retry <runId> <step> [--nudge | --fresh | --model <m> | --recheck] [--message "<answer>"] [--budget <amount>]',
+      '  nemia retry <runId> <step> [--nudge | --fresh | --model <m> | --recheck] [--message "<answer>"] [--budget <amount>]',
       '                               try a step waiting on you again, once, on the next tick:',
       '                               --nudge (default) continues its session, told what happened;',
       '                               --fresh a new session on its branch; --model <m> the same, on m;',
@@ -277,79 +277,79 @@ test("the table's help is today's, word for word", () => {
       "                               that is only one of these flags' names goes as --message=<answer>;",
       '                               --budget <amount>: for a step over budget or budget exhausted, its',
       '                               cap raised to that many dollars, above what its tries have cost',
-      '  wf approve <runId> <step> [--message "<words>"]',
+      '  nemia approve <runId> <step> [--message "<words>"]',
       '                               let a step waiting at its gate hand on: what waits on it is filed on',
       '                               the next tick, and every step after the gate is handed your words',
       '                               under ## Approved. To send it back instead, with what to change:',
-      '                               wf retry <runId> <step> --message "<objection>"',
-      '  wf round <runId> [<step>] [--budget <amount>]',
+      '                               nemia retry <runId> <step> --message "<objection>"',
+      '  nemia round <runId> [<step>] [--budget <amount>]',
       '                               once more: a loop out of rounds goes round again, once, on the',
       '                               next tick — the step it loops to continued, then a new reviewer;',
       '                               --budget raises the cap of a step of the loop over its budget',
-      '  wf accept <runId> [<step>] --message "<why>"',
+      '  nemia accept <runId> [<step>] --message "<why>"',
       '                               enough: a loop out of rounds ends on your word, with its findings',
       '                               open. What waits on the looping step is filed on the next tick as',
       '                               if it had said again: false — a gated ending goes to its gate —',
       '                               and every step after the loop is handed your words and those',
-      '                               findings under ## Accepted. The other answer to wf round',
-      '  wf say <runId> <step> "<words>"',
+      '                               findings under ## Accepted. The other answer to nemia round',
+      '  nemia say <runId> <step> "<words>"',
       "                               tell a step's running session something, through its harness: the",
-      "                               engine journals the words on the step's task, wf ls notes the step",
-      '                               said to, and wf decide prints them under it. A try that continues',
+      "                               engine journals the words on the step's task, nemia ls notes the step",
+      '                               said to, and nemia decide prints them under it. A try that continues',
       '                               the session is handed them again, as ## Said to your session',
-      '  wf ls [<runId>]',
+      '  nemia ls [<runId>]',
       '                               runs and their steps — a run waiting on another says waiting on <run>,',
       '                               one the cap on runs in flight holds waiting for a run slot (2 of 2 in',
       "                               flight); what each step's tries and the run have cost, where measured;",
-      '                               last, whether a wf up ticks the store and when its last pass was;',
+      '                               last, whether a nemia up ticks the store and when its last pass was;',
       '                               first, while the store is paused, Pausing: N finishing and each',
       '                               session, check or landing at work, or Paused once none is, then each',
       '                               landing it holds with its merge staged in the checkout (MERGE_HEAD)',
-      '  wf show <runId>',
+      '  nemia show <runId>',
       '                               the run, and what each step was told',
-      '  wf logs <runId> <step>',
+      '  nemia logs <runId> <step>',
       "                               that step's session output",
-      '  wf feed [cursor]',
+      '  nemia feed [cursor]',
       "                               what the tick judged, a line each time it changed: a run's status, a",
-      "                               step's word as wf ls says it, and what a person's word changed — then",
-      '                               cursor: <n>, to read on from with wf feed <n>; from the start with none',
-      '  wf stats [--from <day>] [--to <day>] [--by agent|step|factory|workflow|repo] [--agent|--step|--factory|--workflow|--repo <v>] [--line|--json]',
+      "                               step's word as nemia ls says it, and what a person's word changed — then",
+      '                               cursor: <n>, to read on from with nemia feed <n>; from the start with none',
+      '  nemia stats [--from <day>] [--to <day>] [--by agent|step|factory|workflow|repo] [--agent|--step|--factory|--workflow|--repo <v>] [--line|--json]',
       '                               what every run in the store adds up to, by UTC day: rounds to',
       '                               acceptance of each loop: step, landings of the workspace: main step',
       "                               and on which try, cost and time per landed run, and each step's",
       '                               tries, time, cost, checks and gate waits; first the last 14 days',
       '                               against the 14 before. A number nothing measured reads —, never 0.',
       '                               --line: one line, for a recap; --json: the whole answer',
-      '  wf agents [--repo .]',
+      '  nemia agents [--repo .]',
       "                               the agents a step may name, the repository's then yours: what each is",
       '                               for, what it says it can do (an entry for each skill, read off its',
       '                               SKILL.md), and the skills it is given (its skills:)',
-      '  wf agents card <name> [--repo .] [--from repo|yours]',
+      '  nemia agents card <name> [--repo .] [--from repo|yours]',
       '                               that agent in the shape of an A2A Agent Card, JSON on stdout and',
       '                               nothing else — every field the protocol marks REQUIRED but',
       '                               supportedInterfaces, which is left out because nothing here serves an',
       '                               agent over A2A. The card describes; it is not an address',
-      '  wf agents custom <name> [--file <path>|-] [--clear] [--repo .]',
+      '  nemia agents custom <name> [--file <path>|-] [--clear] [--repo .]',
       '                               your custom instructions for that agent: words you add to it without',
       '                               rewriting it, kept in <store>/custom-instructions/<name>.md and told',
       '                               after its instructions. Bare, prints them; --file writes them (- for',
       '                               stdin); --clear removes them. Words only: a frontmatter block is',
       '                               refused. A run keeps the words it was started with',
-      '  wf cancel <runId>',
+      '  nemia cancel <runId>',
       '                               stop what it has in flight; file nothing more',
-      '  wf hold <runId> --until <runId> [--until <runId> ...] [--why "<words>"] [--by <name>]',
+      '  nemia hold <runId> --until <runId> [--until <runId> ...] [--why "<words>"] [--by <name>]',
       '                               file nothing more of a run until other runs ship, as --after would',
       '                               have: what is in flight finishes, nothing new is filed, and nothing',
-      '                               is asked of you — wf ls and wf decide say held until <run> ships, and',
+      '                               is asked of you — nemia ls and nemia decide say held until <run> ships, and',
       '                               what a step asks is asked once the hold lifts. The tick lifts it when',
       '                               every run named has shipped. Refused of a run cancelled, pruned,',
       '                               finished or already held, and of a run named that is unknown, the run',
       '                               itself, or one that already waits on it, through --after or a hold.',
       '                               --why: the reason, shown beside held until <run> ships wherever it is',
       '                               said; --by: who puts the hold (default: your OS user).',
-      '                               wf hold <runId> --off: lift the hold now, and the next tick goes on as',
+      '                               nemia hold <runId> --off: lift the hold now, and the next tick goes on as',
       '                               if it had never been put',
-      '  wf rm <runId> [<runId> ...] [--delete-branches [--force-unmerged]]',
+      '  nemia rm <runId> [<runId> ...] [--delete-branches [--force-unmerged]]',
       "                               forget runs that are over, a line each: a run's worktrees removed",
       '                               through git, what one held uncommitted committed first, then its',
       '                               record and every file under WF_ROOT keyed by its id. Refused while',
@@ -357,10 +357,10 @@ test("the table's help is today's, word for word", () => {
       '                               for, or a run waiting on it has not started. Its branches are kept:',
       "                               --delete-branches deletes those merged into the run's base branch,",
       '                               and --force-unmerged beside it the others, with their work',
-      '  wf prune [<runId> ...] [--unmerged] [--artifacts] [--yes]',
+      '  nemia prune [<runId> ...] [--unmerged] [--artifacts] [--yes]',
       '                               free the space runs that are over hold: their worktrees, removed',
       "                               through git, and nothing else — each run's record, branches and",
-      '                               files are kept, and it stays on wf ls, wf decide and the board,',
+      '                               files are kept, and it stays on nemia ls, nemia decide and the board,',
       '                               marked pruned. --artifacts removes its files too (runs/<id>/',
       '                               artifacts/: screenshots, logs), of a run whose worktrees are',
       '                               already gone as well; its record and branches are still kept.',
@@ -370,31 +370,31 @@ test("the table's help is today's, word for word", () => {
       '                               a worktree locked, on no branch, or with changes no commit has;',
       '                               and a finished run not merged unless --unmerged, with --artifacts',
       '                               as without: its files are what a person reads to decide it',
-      '  wf pause [--why "<words>"] [--by <name>] [--now [--yes]]',
+      '  nemia pause [--why "<words>"] [--by <name>] [--now [--yes]]',
       '                               pause the store: no pass starts new work — no step, try, round or',
       '                               check filed, no queued task admitted, no queued card started — and',
       '                               what runs finishes, its end and closeout recorded; a landing whose',
       '                               check has ended commits or aborts. Pausing: N finishing while a',
       '                               session works or a check or landing runs, Paused once none does.',
-      '                               wf start still writes a run, and approvals, retries and answers are',
-      '                               kept, not acted on: the pass after wf resume files what waits. wf ls,',
-      '                               wf feed, wf start and wf up say it, and wf ls names what finishes.',
+      '                               nemia start still writes a run, and approvals, retries and answers are',
+      '                               kept, not acted on: the pass after nemia resume files what waits. nemia ls,',
+      '                               nemia feed, nemia start and nemia up say it, and nemia ls names what finishes.',
       '                               Refused while a pause stands.',
       '                               --why: the reason, said wherever the pause is; --by: who pauses it',
       '                               (default: your OS user)',
       '                               --now: pause at once — each step session or check at work, but a',
-      '                               landing, is asked to stop and tried again on wf resume: a nudge of',
+      '                               landing, is asked to stop and tried again on nemia resume: a nudge of',
       '                               its session, or a recheck. A pause that stands is kept as it was.',
       '                               --yes: with --now, act; without it, --now only says what it would',
       '                               interrupt',
-      '  wf resume',
+      '  nemia resume',
       '                               resume the store: the next pass files what waits',
-      '  wf tick [--stats]',
+      '  nemia tick [--stats]',
       '                               one pass: tick the engine, file what became ready — refused while a',
-      '                               daemon (the api, or a wf up) ticks the store, since it runs the same',
+      '                               daemon (the api, or a nemia up) ticks the store, since it runs the same',
       '                               pass (daemon.json);',
       '                               --stats says after it what the pass cost, phase by phase',
-      '  wf up [ms]',
+      '  nemia up [ms]',
       '                               the headless daemon, where no board is served: the same pass on a',
       '                               timer (4000 unless given; whole ms, 1 to 2147483647), holding the',
       "                               store. The api's process (npm start in apps/api) is the daemon where",
@@ -406,11 +406,11 @@ test("the table's help is today's, word for word", () => {
       '                               once a minute, a line of what its passes cost (tick-stats.json); the',
       "                               store's pause once it is put, again each time it says another thing",
       '                               (Pausing: N finishing, then Paused), and once it is resumed.',
-      '                               wf up --stats: what the last pass cost, phase by phase — read, not',
+      '                               nemia up --stats: what the last pass cost, phase by phase — read, not',
       '                               run, so it fits while a daemon holds the store; where none does,',
-      '                               wf tick --stats',
-      '  wf watch [cursor]',
-      "                               wf feed's lines, followed as the tick writes them, until ^C",
+      '                               nemia tick --stats',
+      '  nemia watch [cursor]',
+      "                               nemia feed's lines, followed as the tick writes them, until ^C",
     ].join('\n'),
   );
 });
@@ -424,7 +424,7 @@ test('the help prints no command the CLI does not serve', () => {
   });
   assert.equal(
     helpOf([entry('a'), entry('b', { side: 'api', why: 'w' }), entry('c', { side: 'cli', why: 'w' })]),
-    ['  wf a <runId>', `${' '.repeat(31)}h`, '  wf c <runId>', `${' '.repeat(31)}h`].join('\n'),
+    ['  nemia a <runId>', `${' '.repeat(31)}h`, '  nemia c <runId>', `${' '.repeat(31)}h`].join('\n'),
   );
 });
 
@@ -515,28 +515,28 @@ test('a table breaks its rules: a key a route sets that no flag of its spec fill
   ]);
 });
 
-/** `wf hold`'s two forms, as each of its refusals ends on them. */
-const HOLD_SHAPE = 'wf hold <runId> --until <runId> [--until <runId> ...] [--why "<words>"] [--by <name>], or wf hold <runId> --off';
+/** `nemia hold`'s two forms, as each of its refusals ends on them. */
+const HOLD_SHAPE = 'nemia hold <runId> --until <runId> [--until <runId> ...] [--why "<words>"] [--by <name>], or nemia hold <runId> --off';
 
-test("REFUSED at shipped defaults: wf hold's arguments, before any run is read, in today's words whole", () => {
+test("REFUSED at shipped defaults: nemia hold's arguments, before any run is read, in today's words whole", () => {
   const hold = entry('hold');
-  const first = 'wf hold takes the run first: wf hold <runId> --until <runId> [--until <runId> ...], or wf hold <runId> --off.';
+  const first = 'nemia hold takes the run first: nemia hold <runId> --until <runId> [--until <runId> ...], or nemia hold <runId> --off.';
   for (const argv of [[], ['--until', 'a'], ['-x', '--off']]) assert.equal(refusedBy(hold, argv), first, argv.join(' '));
   const until = `--until takes the run to wait on, by id: ${HOLD_SHAPE}.`;
   for (const argv of [['--until'], ['--until', '--off'], ['--until', '-a'], ['--until=']])
     assert.equal(refusedBy(hold, ['r-x', ...argv]), until, argv.join(' '));
-  assert.equal(refusedBy(hold, ['r-x']), `wf hold needs the runs to wait on, or --off to lift a hold: ${HOLD_SHAPE}.`);
+  assert.equal(refusedBy(hold, ['r-x']), `nemia hold needs the runs to wait on, or --off to lift a hold: ${HOLD_SHAPE}.`);
   assert.equal(
     refusedBy(hold, ['r-x', '--until', 'a', '--off']),
-    `wf hold takes --until or --off, not both: lift the hold first, then hold it again — ${HOLD_SHAPE}.`,
+    `nemia hold takes --until or --off, not both: lift the hold first, then hold it again — ${HOLD_SHAPE}.`,
   );
   assert.equal(
     refusedBy(hold, ['r-x', '--off', '--why', 'w']),
-    `wf hold --off lifts the hold whole, and takes no --why or --by: those go with --until, on the hold put next — ${HOLD_SHAPE}.`,
+    `nemia hold --off lifts the hold whole, and takes no --why or --by: those go with --until, on the hold put next — ${HOLD_SHAPE}.`,
   );
   assert.equal(
     refusedBy(hold, ['r-x', '--after', 'a']),
-    `wf hold does not take --after. It takes the run, then the runs it waits on or --off: ${HOLD_SHAPE}.`,
+    `nemia hold does not take --after. It takes the run, then the runs it waits on or --off: ${HOLD_SHAPE}.`,
   );
   assert.equal(refusedBy(hold, ['r-x', '--until', 'a', '--why', '--x']), `--why takes the words for why the run is held: ${HOLD_SHAPE}.`);
   assert.equal(
@@ -545,15 +545,15 @@ test("REFUSED at shipped defaults: wf hold's arguments, before any run is read, 
   );
   assert.equal(
     refusedBy(hold, ['r-x', '--until', 'a', '--by', 'a', '--by', 'b']),
-    `wf hold takes --by once: a hold says one by. ${HOLD_SHAPE}.`,
+    `nemia hold takes --by once: a hold says one by. ${HOLD_SHAPE}.`,
   );
   assert.equal(refusedBy(hold, ['r-x', '--until', 'a', '--until', 'b', '--why', 'w']), null);
   assert.equal(refusedBy(hold, ['r-x', '--off', '--off']), null);
 });
 
-test("REFUSED at shipped defaults: wf pause's and wf resume's arguments, before the store is read, in their words whole", () => {
+test("REFUSED at shipped defaults: nemia pause's and nemia resume's arguments, before the store is read, in their words whole", () => {
   const pause = entry('pause');
-  const shape = 'wf pause [--why "<words>"] [--by <name>] [--now [--yes]]';
+  const shape = 'nemia pause [--why "<words>"] [--by <name>] [--now [--yes]]';
   assert.equal(refusedBy(pause, ['--why', '--by']), `--why takes the words for why the store is paused: ${shape}.`);
   assert.equal(refusedBy(pause, ['--by']), `--by takes who pauses it, by a name: ${shape}.`);
   assert.equal(refusedBy(pause, ['--why', '--x']), `--why takes the words for why the store is paused: ${shape}.`);
@@ -562,20 +562,20 @@ test("REFUSED at shipped defaults: wf pause's and wf resume's arguments, before 
     '--why takes the words for why the store is paused, and was given only blanks: give it words, or leave --why out.',
   );
   assert.equal(refusedBy(pause, ['--by', 'b'.repeat(65)]), '--by takes at most 64 characters, and was given 65: say it shorter.');
-  assert.equal(refusedBy(pause, ['--by', 'a', '--by', 'b']), `wf pause takes --by once: a pause says one by. ${shape}.`);
-  assert.equal(refusedBy(pause, ['now']), `wf pause does not take now: ${shape}.`);
+  assert.equal(refusedBy(pause, ['--by', 'a', '--by', 'b']), `nemia pause takes --by once: a pause says one by. ${shape}.`);
+  assert.equal(refusedBy(pause, ['now']), `nemia pause does not take now: ${shape}.`);
   assert.equal(refusedBy(pause, ['--why', 'merging by hand', '--by=ann']), null);
   assert.equal(refusedBy(pause, []), null);
-  assert.equal(refusedBy(pause, ['--now', '--now=yes']), `wf pause does not take --now=yes: ${shape}.`);
+  assert.equal(refusedBy(pause, ['--now', '--now=yes']), `nemia pause does not take --now=yes: ${shape}.`);
   assert.equal(refusedBy(pause, ['--now', '--yes', '--why', 'the bill']), null);
-  assert.equal(refusedBy(entry('resume'), ['--all']), 'wf resume takes no --all: it resumes the store, whoever paused it.');
+  assert.equal(refusedBy(entry('resume'), ['--all']), 'nemia resume takes no --all: it resumes the store, whoever paused it.');
   assert.equal(refusedBy(entry('resume'), []), null);
 });
 
-test("REFUSED at shipped defaults: wf tick's, wf up's and wf watch's arguments, in today's words whole", () => {
+test("REFUSED at shipped defaults: nemia tick's, nemia up's and nemia watch's arguments, in today's words whole", () => {
   assert.equal(
     refusedBy(entry('tick'), ['--bogus']),
-    'wf tick takes no --bogus: wf tick runs one pass, and wf tick --stats says after it what the pass cost.',
+    'nemia tick takes no --bogus: nemia tick runs one pass, and nemia tick --stats says after it what the pass cost.',
   );
   assert.equal(refusedBy(entry('tick'), ['--stats']), null);
   const up = entry('up');
@@ -585,17 +585,20 @@ test("REFUSED at shipped defaults: wf tick's, wf up's and wf watch's arguments, 
   ])
     assert.equal(
       refusedBy(up, argv),
-      'wf up --stats reads what the last pass cost and ticks nothing, so it takes no 20: wf up --stats alone, or wf up 20 to tick.',
+      'nemia up --stats reads what the last pass cost and ticks nothing, so it takes no 20: nemia up --stats alone, or nemia up 20 to tick.',
     );
   assert.match(
     refusedBy(up, ['soon']) ?? '',
-    /^wf up takes its pass interval in whole milliseconds, from 1 to \d+, and "soon" is not one: /,
+    /^nemia up takes its pass interval in whole milliseconds, from 1 to \d+, and "soon" is not one: /,
   );
-  assert.match(refusedBy(up, ['--x']) ?? '', /^wf up takes its pass interval in whole milliseconds, from 1 to \d+, and "--x" is not one: /);
-  assert.equal(refusedBy(up, ['10', '20']), 'wf up takes one pass interval at most, and was given 20 too: wf up [ms].');
+  assert.match(
+    refusedBy(up, ['--x']) ?? '',
+    /^nemia up takes its pass interval in whole milliseconds, from 1 to \d+, and "--x" is not one: /,
+  );
+  assert.equal(refusedBy(up, ['10', '20']), 'nemia up takes one pass interval at most, and was given 20 too: nemia up [ms].');
   assert.equal(refusedBy(up, ['10']), null);
   const cursor =
-    'wf watch takes one cursor at most, a whole number of bytes — 0, or the number a `cursor:` line printed: wf watch [cursor]';
+    'nemia watch takes one cursor at most, a whole number of bytes — 0, or the number a `cursor:` line printed: nemia watch [cursor]';
   for (const argv of [['x'], ['1', '2'], ['--from']]) assert.equal(refusedBy(entry('watch'), argv), cursor, argv.join(' '));
   assert.equal(refusedBy(entry('watch'), ['12']), null);
 });

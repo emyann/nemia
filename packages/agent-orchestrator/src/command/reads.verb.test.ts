@@ -1,6 +1,7 @@
 /**
- * `wf show`, `wf logs`, `wf feed` and `wf stats` as entries of the table: what each refuses of a command line before anything is read,
- * matched whole in the words `wf` has always said them; what `wf feed` reads of a store of its own, and how it and `wf stats` print it.
+ * `nemia show`, `nemia logs`, `nemia feed` and `nemia stats` as entries of the table: what each refuses of a command line before anything
+ * is read, matched whole in the words `nemia` has always said them; what `nemia feed` reads of a store of its own, and how it and `nemia
+ * stats` print it.
  *
  * `WF_ROOT` is set before the import, since the store's modules read it as they load.
  */
@@ -28,7 +29,7 @@ const { resumePause, putPause } = await import('../pause/pause.store.ts');
 function refusedBy(command: CommandSpec, argv: readonly string[]): string | null {
   try {
     const args = parseArgv(command.spec, argv);
-    assert.ok(args, `wf ${command.name} ${argv.join(' ')} is given too little`);
+    assert.ok(args, `nemia ${command.name} ${argv.join(' ')} is given too little`);
     return command.check?.(args) ?? null;
   } catch (err) {
     assert.equal((err as { exitCode?: number }).exitCode, 2);
@@ -36,24 +37,24 @@ function refusedBy(command: CommandSpec, argv: readonly string[]): string | null
   }
 }
 
-test('wf feed takes one cursor of digits or none, and refuses anything else with what a cursor is', () => {
+test('nemia feed takes one cursor of digits or none, and refuses anything else with what a cursor is', () => {
   assert.equal(refusedBy(FEED, []), null);
   assert.equal(refusedBy(FEED, ['12']), null);
   for (const argv of [['1', '2'], ['--x'], ['-5'], ['a'], ['1.5']]) {
-    assert.equal(refusedBy(FEED, argv), cursorTakes('feed'), `wf feed ${argv.join(' ')}`);
+    assert.equal(refusedBy(FEED, argv), cursorTakes('feed'), `nemia feed ${argv.join(' ')}`);
   }
 });
 
-test('wf show takes one run and wf logs one run and one step, and each refuses a word more by naming it', () => {
+test('nemia show takes one run and nemia logs one run and one step, and each refuses a word more by naming it', () => {
   assert.equal(refusedBy(SHOW, ['r']), null);
-  assert.equal(refusedBy(SHOW, ['--x']), "wf show takes one run's id: not --x.");
-  assert.equal(refusedBy(SHOW, ['r', 'extra']), "wf show takes one run's id: not extra.");
+  assert.equal(refusedBy(SHOW, ['--x']), "nemia show takes one run's id: not --x.");
+  assert.equal(refusedBy(SHOW, ['r', 'extra']), "nemia show takes one run's id: not extra.");
   assert.equal(refusedBy(LOGS, ['r', 's']), null);
-  assert.equal(refusedBy(LOGS, ['r', 's', 'extra']), "wf logs takes one run's id and one step's name: not extra.");
-  assert.equal(refusedBy(LOGS, ['r', 's', '--tail']), "wf logs takes one run's id and one step's name: not --tail.");
+  assert.equal(refusedBy(LOGS, ['r', 's', 'extra']), "nemia logs takes one run's id and one step's name: not extra.");
+  assert.equal(refusedBy(LOGS, ['r', 's', '--tail']), "nemia logs takes one run's id and one step's name: not --tail.");
 });
 
-test('wf stats refuses a value left out, empty or given as a flag in what the flag takes', () => {
+test('nemia stats refuses a value left out, empty or given as a flag in what the flag takes', () => {
   const from = '--from takes a day, YYYY-MM-DD in UTC: the first day counted';
   assert.equal(refusedBy(STATS, ['--from']), from);
   assert.equal(refusedBy(STATS, ['--from', '--to']), from);
@@ -63,20 +64,20 @@ test('wf stats refuses a value left out, empty or given as a flag in what the fl
   assert.equal(refusedBy(STATS, ['--by=--line']), '--by takes what the rows go by: agent, step, factory, workflow, repo');
 });
 
-test('wf stats refuses a flag given twice, and one it does not take, by name', () => {
-  assert.equal(refusedBy(STATS, ['--by', 'agent', '--by', 'step']), 'wf stats takes --by once.');
+test('nemia stats refuses a flag given twice, and one it does not take, by name', () => {
+  assert.equal(refusedBy(STATS, ['--by', 'agent', '--by', 'step']), 'nemia stats takes --by once.');
   assert.equal(refusedBy(STATS, ['--line', '--line']), null);
   assert.equal(
     refusedBy(STATS, ['--nope']),
-    'wf stats does not take --nope. It takes --from, --to, --by, --agent, --step, --factory, --workflow, --repo, and --line or --json.',
+    'nemia stats does not take --nope. It takes --from, --to, --by, --agent, --step, --factory, --workflow, --repo, and --line or --json.',
   );
   assert.equal(
     refusedBy(STATS, ['stray']),
-    'wf stats does not take stray. It takes --from, --to, --by, --agent, --step, --factory, --workflow, --repo, and --line or --json.',
+    'nemia stats does not take stray. It takes --from, --to, --by, --agent, --step, --factory, --workflow, --repo, and --line or --json.',
   );
 });
 
-test("wf stats refuses what the query does not take in its flags' names: a key, a day, and days out of order", () => {
+test("nemia stats refuses what the query does not take in its flags' names: a key, a day, and days out of order", () => {
   assert.equal(refusedBy(STATS, ['--by', 'colour']), '--by takes one of agent, step, factory, workflow, repo, not "colour".');
   assert.equal(refusedBy(STATS, ['--to', '2026-13-40']), '--to takes a day as YYYY-MM-DD, in UTC, such as 2026-09-30 — not "2026-13-40".');
   assert.equal(
@@ -86,14 +87,14 @@ test("wf stats refuses what the query does not take in its flags' names: a key, 
   assert.equal(refusedBy(STATS, ['--from', '2026-09-01', '--to', '2026-09-30', '--by', 'agent', '--repo', '/r']), null);
 });
 
-test('wf stats prints JSON with --json, one line with --line, and its tiles and rows with neither', () => {
+test('nemia stats prints JSON with --json, one line with --line, and its tiles and rows with neither', () => {
   const s = statsOf({ tries: [], runs: [], frozen: [] }, {}, new Date('2026-10-04T12:00:00Z'));
   assert.deepEqual(STATS.print?.(s, { json: true }), [JSON.stringify(s, null, 2)]);
   assert.deepEqual(STATS.print?.(s, { line: true }), [statsLine(s)]);
   assert.deepEqual(STATS.print?.(s, {}), statsLines(s));
 });
 
-test("wf feed reads the store's feed from a cursor, and prints the pause first while one stands, then the lines and the cursor", async () => {
+test("nemia feed reads the store's feed from a cursor, and prints the pause first while one stands, then the lines and the cursor", async () => {
   const first: FeedLine = { at: '2026-10-04T12:00:00.000Z', run: 'r-1', word: 'running' };
   const second: FeedLine = { at: '2026-10-04T12:01:00.000Z', run: 'r-1', step: 'implement', word: 'succeeded' };
   const head = `${JSON.stringify(first)}\n`;

@@ -1,6 +1,6 @@
 /**
- * A step's skills as a session is given them: rendered into the step's plugin by `wf start`, a preloaded one told whole in the prompt, and
- * every skill told whole in the brief when the rendered folder is gone. Held over the tests' team (`team.ts`).
+ * A step's skills as a session is given them: rendered into the step's plugin by `nemia start`, a preloaded one told whole in the prompt,
+ * and every skill told whole in the brief when the rendered folder is gone. Held over the tests' team (`team.ts`).
  *
  * A SKILL.md whose frontmatter is not YAML is dropped by Claude Code with nothing said — the session is simply not given it — so every
  * SKILL.md there is, the team's, whatever is shipped and the repository's own, is parsed here as YAML, as a card entry reads it.
@@ -64,7 +64,7 @@ test("a card entry reads a SKILL.md's frontmatter as YAML does, on every SKILL.m
   }
 });
 
-test("an agent renders as `wf start` renders it: skills to load named in its prompt, a preloaded one appended whole, each in the step's plugin", () => {
+test("an agent renders as `nemia start` renders it: skills to load named in its prompt, a preloaded one appended whole, each in the step's plugin", () => {
   const skillText = (place: string, skill: string) => {
     const file = path.join(place, 'skills', skill, 'SKILL.md');
     return splitFrontmatter(file, fs.readFileSync(file, 'utf8')).body;

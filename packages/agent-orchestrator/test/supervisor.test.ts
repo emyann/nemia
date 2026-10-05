@@ -23,7 +23,7 @@ delete process.env.WF_MAX_RUNS;
 const { advance, list, retry, runSlots, start } = await import('../src/runner.ts');
 const { readRun } = await import('../src/record/record.store.ts');
 
-/** A repository with one commit, so `wf start` has a base to record. */
+/** A repository with one commit, so `nemia start` has a base to record. */
 const aRepo = (): string => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   const git = (...args: string[]) =>
@@ -238,7 +238,7 @@ test("`slot: none` on disk: a watcher's run files its step at a full cap, counts
   assert.ok(filings.includes(`${watcher.id}-supervise`) && filings.includes(`${work.id}-implement`));
 });
 
-test("REFUSED at `wf start`, with nothing written: `slot: none` on a step of a workflow that has another — a slot is a run's, and the work beside it would run outside the cap", () => {
+test("REFUSED at `nemia start`, with nothing written: `slot: none` on a step of a workflow that has another — a slot is a run's, and the work beside it would run outside the cap", () => {
   const repo = aRepo();
   const runs = () => fs.readdirSync(path.join(ROOT, 'runs')).filter((f) => f.endsWith('.json')).length;
   const before = runs();

@@ -1,9 +1,9 @@
 # Nemia — contributor guide
 
 Two packages and two apps, each a layer that owns one thing. `packages/agent-runtime` runs agent sessions on a harness, durably: a job
-that runs to its end, and a long-lived session that runs until stopped (not built yet); the `ae` CLI, and `src/core/domain.ts` is the
-whole judgement. `packages/agent-orchestrator` owns workflows and the runs of their steps — a folder of markdown is a workflow (the `wf`
-CLI). `apps/api` puts the workflows behind HTTP; `apps/web`, the board, shows them to a person.
+that runs to its end, and a long-lived session that runs until stopped (`restartPolicy: 'Always'`); the `ae` CLI, and
+`src/core/domain.ts` is the whole judgement. `packages/agent-orchestrator` owns workflows and the runs of their steps — a folder of
+markdown is a workflow (the `wf` CLI). `apps/api` puts the workflows behind HTTP; `apps/web`, the board, shows them to a person.
 
 Each layer reaches exactly the one below it, and nothing reaches up or skips one: the web reaches the api over HTTP alone
 (`apps/web/test/structure.test.ts`); the api reaches the orchestrator's public entries alone (the entries:

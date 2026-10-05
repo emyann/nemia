@@ -1,11 +1,12 @@
 # packages/agent-runtime — `ae`
 
-Agent sessions on one harness each, durably: a job that runs to its end, and a long-lived session that runs until stopped (not built
-yet). It owns how a session runs: the task's command, mounts, restart and spend, the journal, the attempts, the harnesses' vocabulary.
-`decide` (`src/core/domain.ts`) is the whole judgement, pure (`test/engine.test.ts`); `src/index.ts` and `src/vocabulary.ts` are the
-only doors (`test/contract.test.ts`); the second, the harnesses' words, `HARNESS_CHOICES`, `fenceReach` and `configFolderIn`, loads no
-Effect and no I/O (`test/vocabulary-door.test.ts`). The orchestrator reaches it through its one client; what is still above it and a
-candidate to come down is in `docs/architecture.md`, *Who owns what*.
+Agent sessions on one harness each, durably: a job that runs to its end, and a long-lived session that runs until stopped
+(`restartPolicy: 'Always'` with `background: true`, README *A long-lived session*). It owns how a session runs: the task's command,
+mounts, restart and spend, the journal, the attempts, the harnesses' vocabulary. `decide` (`src/core/domain.ts`) is the whole judgement,
+pure (`test/engine.test.ts`); `src/index.ts` and `src/vocabulary.ts` are the only doors (`test/contract.test.ts`); the second, the
+harnesses' words, `HARNESS_CHOICES`, `fenceReach` and `configFolderIn`, loads no Effect and no I/O (`test/vocabulary-door.test.ts`). The
+orchestrator reaches it through its one client; what is still above it and a candidate to come down is in `docs/architecture.md`, *Who
+owns what*.
 
 ## Layout
 

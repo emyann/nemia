@@ -199,7 +199,15 @@ const SECTION = '## What runs of this workflow cost';
 
 test('a step that reads `costs` is told what the newest finished runs of its workflow in its factory cost; the step after it is told none', async () => {
   const run = await Effect.runPromise(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: WORKFLOW, isolate: false }));
+  viewed.length = 0;
   assert.deepEqual((await pass(run.id)).filed, ['design']);
+  const oldest = ['c00', 'c01', 'c02', 'c03', 'c04'].map((id) => `${id}-design`);
+  assert.ok(viewed.includes('c05-design'), 'the oldest run in the window is read');
+  assert.deepEqual(
+    viewed.filter((taskId) => oldest.includes(taskId)),
+    [],
+    'the reader stops at the window: no run older than it is read',
+  );
   const brief = briefs.get(`${run.id}-design`)!;
   assert.ok(brief.includes(SECTION), brief);
   assert.ok(brief.includes(`Over the last ${RECENT_RUNS} finished runs of \`costed\` in this factory, since 2026-09-01,`), brief);

@@ -20,15 +20,17 @@ This file holds only what is ours.
 
 ## Reach for Effect's own primitives
 
-Before writing a loop, a list of listeners, a timer, a retry, a counter or a parser by hand, find the task here and read its page.
+Before writing a loop, a list of listeners, a registry, a fan-out, a timer, a retry, a cache, a counter or a parser by hand, find the task
+here and read its page.
 
 | task | primitive | page |
 | --- | --- | --- |
 | Tell every listener of one event: a feed, a watcher, a page kept live | `PubSub.unbounded`, `PubSub.subscribe` | `node_modules/effect/ai-docs/src/01_effect/07_pubsub/10_pubsub.ts` |
 | Hand work from one fiber to another, bounded, the writer waiting when it is full | `Queue.bounded`, `Queue.take` | `node_modules/effect/dist/Queue.d.ts` |
 | Read a sequence over time: the lines of a file, the events of a feed, the pages of a listing | `Stream.callback`, `Stream.fromQueue` | `node_modules/effect/ai-docs/src/03_stream/10_creating-streams.ts` |
-| Keep one running fiber per key, the old one interrupted when the key runs again | `FiberMap.make`, `FiberMap.run` | `node_modules/effect/dist/FiberMap.d.ts` |
+| Keep a registry of running fibers, one per key, the old one interrupted when the key runs again | `FiberMap.make`, `FiberMap.run` | `node_modules/effect/dist/FiberMap.d.ts` |
 | Run fibers that end with their scope, none left behind | `FiberSet.make`, `FiberSet.run` | `node_modules/effect/dist/FiberSet.d.ts` |
+| Keep what was computed for a key, looked up again, refreshed or bounded: a memo, a hand-made cache | `Cache.make`, `Cache.get` | `node_modules/effect/dist/Cache.d.ts` |
 | Retry, poll or beat on a cadence: a backoff, a tick, a limit of tries | `Schedule.spaced`, `Schedule.exponential`, `Effect.retry`, `Effect.repeat` | `node_modules/effect/ai-docs/src/06_schedule/10_schedules.ts` |
 | Count or measure what the code does: passes, reads, durations | `Metric.counter`, `Metric.histogram` | `node_modules/effect/dist/Metric.d.ts` |
 | Say what happened, at a level, with its fields | `Effect.logInfo`, `Effect.annotateLogs`, `Logger.layer` | `node_modules/effect/ai-docs/src/08_observability/10_logging.ts` |

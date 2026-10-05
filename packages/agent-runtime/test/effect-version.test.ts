@@ -203,6 +203,7 @@ const PRIMITIVES = [
   'Stream',
   'FiberMap',
   'FiberSet',
+  'Cache',
   'Schedule',
   'Metric',
   'Logger',

@@ -111,7 +111,7 @@ export const freshStatsMemo = (): StatsMemo => ({ runs: new Map() });
 export type StatsOptions = { memo?: StatsMemo; verify?: boolean; series?: SeriesMemo };
 
 /** What `run` gives the stats (`RunRead`). Fails with what a read of it failed with but a journal that does not read. */
-const factsRead = Effect.fnUntraced(function* (e: Engine, run: Run) {
+export const factsRead = Effect.fnUntraced(function* (e: Engine, run: Run) {
   const steps = stepsRead(run);
   if (!steps) return null;
   const frozen = frozenRun(run, steps);

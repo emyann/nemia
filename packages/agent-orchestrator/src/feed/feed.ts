@@ -13,7 +13,8 @@
  * restarted daemon would not have, and not the run's record, which `nemia show` prints and the tick would then rewrite on every change. A
  * process keeps the fold it has read so far with the byte it read to (`FeedMemo`), so a pass reads only the lines written since —
  * its own and any other writer's — and a process with no fold reads the whole feed once. So a restart writes nothing for what did not
- * change, and a `nemia tick` typed beside `nemia up` is read by the daemon's next pass rather than said again.
+ * change, and a `nemia tick` typed beside `nemia up` is read by the daemon's next pass rather than said again. A run at rest whose words
+ * stand writes nothing when only its notes are worded anew, so a new wording does not say again every run long finished.
  *
  * **The cursor is the engine's**: a byte offset of complete lines, 0 or one a read handed out, that never expires, since the feed only
  * grows. A read stops at the last newline, so it never passes a line half written. Unlike the engine's, a cursor that is not at the start
@@ -65,11 +66,19 @@ export function foldFeed(fold: FeedFold, lines: readonly FeedLine[]): FeedFold {
   return fold;
 }
 
-const same = (a: FeedSaid | undefined, b: FeedSaid): boolean => a !== undefined && a.word === b.word && a.note === b.note;
+/**
+ * Whether the feed owes no line for `b`, having said `a` of it last: the same word and the same note — or, of a run at rest, the same word,
+ * whatever the note, since a note moving on a run nothing moves is a change of wording.
+ */
+const same = (a: FeedSaid | undefined, b: FeedSaid, atRest: boolean): boolean =>
+  a !== undefined && a.word === b.word && (atRest || a.note === b.note);
 
 /**
  * The lines a pass owes the feed: one for each run and each step whose word or note is not what the feed said of it last — a run the feed
  * has never named says each of its words once — and one `removed` for each run the feed still names that the store no longer has. Pure.
+ *
+ * A run the pass found at rest (`FeedWords.atRest`) owes a line only where a word moved: a note that moved alone, as a new wording of
+ * the listing moves every finished run's, is not news of the run, and the feed keeps the note it said last.
  *
  * `now` is every run in the store, as the pass read it: a run not in it is a run that is gone — but for one of `unjudged`, which the pass
  * read and could not judge, and of which it says nothing. A removed run's steps get no line of their own.
@@ -90,8 +99,9 @@ export function feedChanges(
   const out: FeedLine[] = [];
   for (const [id, words] of now) {
     const before = fold.get(id);
-    if (!same(before?.run, words.run)) out.push(line(id, undefined, words.run));
-    for (const s of words.steps) if (!same(before?.steps.get(s.name), s)) out.push(line(id, s.name, s));
+    const atRest = words.atRest === true;
+    if (!same(before?.run, words.run, atRest)) out.push(line(id, undefined, words.run));
+    for (const s of words.steps) if (!same(before?.steps.get(s.name), s, atRest)) out.push(line(id, s.name, s));
   }
   for (const id of fold.keys()) if (!now.has(id) && !unjudged.has(id)) out.push({ at, run: id, word: REMOVED });
   return out;
@@ -137,8 +147,11 @@ export function publishedOf({ lines, before, after, leading }: FeedAppended): Fe
 /** A word the feed keeps, and the note beside it, when there is one: what one line of it says of a run or of a step. */
 export type FeedSaid = { word: string; note?: string };
 
-/** What a pass judged of one run, in the words the feed keeps (`feedWords`): the run's, and each step's in the order they run. */
-export type FeedWords = { run: FeedSaid; steps: Array<FeedSaid & { name: string }> };
+/**
+ * What a pass judged of one run, in the words the feed keeps (`feedWords`): the run's, and each step's in the order they run; and
+ * `atRest` when the pass found the run at rest (`atRest` in rest.ts), whose notes moving alone owe the feed no line (`feedChanges`).
+ */
+export type FeedWords = { run: FeedSaid; steps: Array<FeedSaid & { name: string }>; atRest?: true };
 
 /**
  * The engine's word for a task, as the feed keeps it: every word of a session at work — `running (working)`, `running (idle)`,
@@ -168,15 +181,16 @@ export const feedPhase = (word: string): string =>
  *
  * @param closeoutOf How each step signed off, as `listing` was handed it: a step that signed off blocked says what it needs beside its
  *   word.
- * @param deniedOf Each call a step's task was denied, in the runtime's words (`denialText`), as its ended attempts journalled them: a step
- *   denied a call says which beside its word (`deniedNote`).
+ * @param deniedOf What a step's task was denied so far, in the runtime's words (`denialText`): every call of its ended attempts (`ended`),
+ *   and each distinct call of one still running (`running`, `deniedSoFarOf`). A step denied a call says which beside its word
+ *   (`deniedNote`).
  */
 export function feedWords(
   l: Listing,
   run: Pick<Run, 'pruned' | 'hold'>,
   { status, stoppedOn }: Pick<Assessment, 'status' | 'stoppedOn'>,
   closeoutOf: (step: string) => Closeout | { error: string } | undefined = () => undefined,
-  deniedOf: (step: string) => readonly string[] = () => [],
+  deniedOf: (step: string) => { ended: readonly string[]; running: readonly string[] } = () => ({ ended: [], running: [] }),
 ): FeedWords {
   const onYou = onYouWords(l);
   return {
@@ -189,7 +203,8 @@ export function feedWords(
           : {}),
     },
     steps: l.steps.map((s) => {
-      const note = [needsNote(closeoutOf(s.name)), deniedNote(deniedOf(s.name)), s.note].filter(Boolean).join(' · ');
+      const denied = deniedOf(s.name);
+      const note = [needsNote(closeoutOf(s.name)), deniedNote(denied.ended, denied.running), s.note].filter(Boolean).join(' · ');
       return { name: s.name, word: l.slot && s.status === slotWord(l.slot) ? SLOT_WAIT : shownStatus(s), ...(note ? { note } : {}) };
     }),
   };
@@ -215,15 +230,18 @@ const needsNote = (c: Closeout | { error: string } | undefined): string => {
 const DENIED_CAP = 5;
 
 /**
- * The calls a step's task was denied, for its line in the feed: `denied: <call> ×<n>, …`, each distinct call once with how many times it
- * was denied, in the order first denied, at most `DENIED_CAP` named and the rest counted — or nothing, for a step denied nothing. A
- * subscriber woken by `denied:` reads the call a grant would have let through.
+ * The calls a step's task was denied, for its line in the feed: `denied: <call> ×<n>, …`, each distinct call of its ended attempts
+ * (`calls`) once with how many times they denied it, then each call a running attempt was denied that they did not (`running`) by its
+ * name alone, with no count until its attempt ends; in the order first denied, at most `DENIED_CAP` named and the rest counted — or
+ * nothing, for a step denied nothing. The note changes, and wakes a subscriber, on a running call not yet named, and once more with the
+ * counts when the attempt ends. A subscriber woken by `denied:` reads the call a grant would have let through.
  */
-export const deniedNote = (calls: readonly string[]): string => {
-  const counts = new Map<string, number>();
+export const deniedNote = (calls: readonly string[], running: readonly string[] = []): string => {
+  const counts = new Map<string, number | null>();
   for (const call of calls.map((c) => oneLine(c, NEEDS_CAP))) counts.set(call, (counts.get(call) ?? 0) + 1);
+  for (const call of running.map((c) => oneLine(c, NEEDS_CAP))) if (!counts.has(call)) counts.set(call, null);
   if (!counts.size) return '';
-  const named = [...counts].slice(0, DENIED_CAP).map(([call, n]) => `${call} ×${n}`);
+  const named = [...counts].slice(0, DENIED_CAP).map(([call, n]) => (n === null ? call : `${call} ×${n}`));
   const more = counts.size > DENIED_CAP ? [`and ${counts.size - DENIED_CAP} more`] : [];
   return `denied: ${[...named, ...more].join(', ')}`;
 };

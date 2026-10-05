@@ -20,8 +20,8 @@ export const pickedIn = (url: URL): string | null =>
   /^\/factories\/([^/]+)(?:\/settings)?$/.exec(url.pathname)?.[1] ??
   (LISTINGS.includes(url.pathname) ? url.searchParams.get('factory') || null : null);
 
-/** The rail's places, in its order, one column from the top: Home first, and Machines & Capabilities, a place of two tabs, last. */
-export const RAIL_PLACES = ['Home', 'Agents', 'Machines & Capabilities'];
+/** The rail's places, in its order, one column from the top: Home first, Machines & Capabilities, a place of two tabs, then Settings. */
+export const RAIL_PLACES = ['Home', 'Agents', 'Machines & Capabilities', 'Settings'];
 
 /** The rail of places at the frame's left, under the header. */
 export const railOf = (page: Page): Locator => page.locator('nav[aria-label="Places"]');

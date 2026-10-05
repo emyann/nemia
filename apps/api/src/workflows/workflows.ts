@@ -86,7 +86,7 @@ export type WorkflowStepSpec = {
   workspace: 'main' | 'folder' | null;
   /** The factory's folders the step may write (`writable:`), each by its directory's name: empty where it writes none of them. */
   writable: string[];
-  /** The store's folders the step reads and never writes (`reads:`), each by its name (`inbox`): empty where it reads none of them. */
+  /** What of the store the step reads and never writes (`reads:`), each by its name (`inbox`, `costs`): empty where it reads none. */
   reads: string[];
   /**
    * `slot: none`: the run takes no run slot (`WF_MAX_RUNS`). Null for a step without the line, which is the only other thing a step can

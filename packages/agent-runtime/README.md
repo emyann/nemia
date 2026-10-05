@@ -695,7 +695,11 @@ was denied and the session carried on. Each denial is a `permission_denied` line
 `--permission-prompts none` all the same, so a later default cannot make it wait. The attempt carries them as `denials`
 (`{ tool, what }`: a file tool's path, a command's first word, a skill's name), `ae show` prints them as
 `denied: Write(/elsewhere/x.txt), Bash(curl), WebFetch`,
-and `decide` never reads them. `auto` on haiku ran as `default` — its `init` line said so — while sonnet kept `auto`. A
+and `decide` never reads them. A job's denials are journalled while its attempt runs: each a `denied` entry, written once
+off the sighting of the working job, before its end (M14, 2.1.289: the line reached the capture about 4 s in, the result about
+50 s in); `ae feed` prints it and `ae show` names a running attempt's denials so far. The end's list stands in their place.
+`claude-detached`, a `--bg` session, Codex and a remote agent report none while they work, so their attempts learn them at the
+end or never. `auto` on haiku ran as `default` — its `init` line said so — while sonnet kept `auto`. A
 background session's denials are not read (open issue 28). The attempt also carries `skills`: each skill its session loaded,
 one per call — a subagent's included — by its name without its plugin's (`write-a-spec`, not `nemia-seldon:write-a-spec`), a
 denied load left out. `[]` is a session that loaded none; the key is absent where the harness cannot say: `claude -p
@@ -1984,6 +1988,7 @@ of pure code sits beside it.
 | `src/core/index.ts` | the face of `core/`: what the other folders and the entries take of it; nothing of `core/engine/` |
 | `src/core/engine/engine.ts` | applies one decision, then the pass over every task |
 | `src/core/engine/counted.ts` | what a long-lived attempt in flight has consumed so far, journalled as it grows (`counted`), off the pass's sighting |
+| `src/core/engine/denied.ts` | what the harness denied an attempt in flight, each call journalled once as the sighting names it (`denied`) |
 | `src/core/engine/filing.ts` | filing a task, admitting, stopping, answering and closing it, each with what it refuses (`refusalOf`): a fact journalled for the pass to act on |
 | `src/core/engine/journal.ts` | append-only JSONL per task, plus the board-wide feed; `upgrade`, which reads a line written before an event's shape changed in today's, whoever's store it is — nothing on disk is rewritten |
 | `src/core/engine/feed.ts` | the files store's feed: read from a cursor that keeps its place for ever (`readFeed`), rotated so a forgotten task's lines go (`rotateFeed`: a head with its first cursor, `feed.jsonl`, and the lines before it kept in `feed.sealed.jsonl`), and every append and rotation one at a time under `feed.lock` (`withFeedLock`, `FEED_LOCK_WAIT_MS`) |

@@ -88,7 +88,10 @@ when the judgement does: the engine's live words (`running (working)`, `running 
 `working (quiescent)`, `starting`, `between attempts`) read `running`, a slot wait says no count, no
 cost is said, and no git standing is read (`wf ls`'s `→ to decide` for a finished run with no
 ending step is not in the feed). A step's filing reaches it a pass late, as `pending`: the words
-are read before the pass files anything.
+are read before the pass files anything. A run the pass finds at rest (`atRest`) whose words are
+the feed's writes nothing when only a note is worded anew, so a new or reworded note does not say
+again every finished run; a run in flight writes every change of word or note, a live step's new
+`denied:` among them.
 
 **The cursor is the engine's**: a byte offset, 0 or the number a `cursor:` line printed, that never
 expires. A read stops at the last newline, so it never passes a line half written, and one after
@@ -2674,20 +2677,33 @@ and step, read-only, and says to list one under its own path, since the run's ar
 fed by `filedFolders`, as the filing is). A store whose path
 no permission rule can name refuses `wf start` of a workflow with such a later step, in the runtime's words, before anything is written.
 
-### A store's folders: `reads:`
+### What a step reads of the store: `reads:`
 
-A step may read a folder of the store by its name, never by a path, so its tools reach it as they reach the workspace:
+A step may read what the store holds by its name, never by a path: a folder its tools reach as they reach the workspace, or a figure
+said in its brief:
 
 ```md
 ---
-reads: inbox   # the store's folders this step reads and never writes; inbox, the cards waiting to be started, is the one there is
+reads: inbox, costs   # what of the store this step reads and never writes, from STORE_READS
 ---
 ```
 
-The run files the folder read-only for that step alone — its first filing, a try and a round (`readsMounts`, in `filedConfig`) — and a
-new session's brief names it (`mountsLine`); a step without the line reads none of it. A harness that reads the disk in its sandbox
-(Codex) is filed no mount. Refused at load: a name off `STORE_READS`, one given twice, none, and the key on a remote agent. A store
-whose path no permission rule can name refuses `wf start` of such a step, quoting its `reads:` line, before anything is written.
+- **`inbox`**, the cards waiting to be started. The run files the folder read-only for that step alone — its first filing, a try and a
+  round (`readsMounts`, in `filedConfig`) — and a new session's brief names it (`mountsLine`). A harness that reads the disk in its
+  sandbox (Codex) is filed no mount. A store whose path no permission rule can name refuses `wf start` of such a step, quoting its
+  `reads:` line, before anything is written.
+- **`costs`**, what recent runs of its workflow cost. A new session's brief — its first filing, a fresh try, a round of a session not
+  continued, never a try or round that continues the last session — says it under *What runs of this workflow cost* (`costsSection`):
+  over the newest `RECENT_RUNS` finished runs of the same workflow in the same factory, the run being filed left out, per step the
+  median and p90 of what it cost a run, every try and round of it summed, and the median and most of its tries a run; and the same for
+  the whole run, over the runs every session of which was measured, with the rounds each loop ran to acceptance. The steps follow the
+  newest run's order, then any other met: a step a newer run no longer has still shows while it was measured in the window. The facts
+  are `wf stats`'s (`factsRead`), read newest first until the window is full (`costsRead`), never the whole store's journals; a figure
+  nothing measured is left out, never 0. It mounts nothing. What a run of the workflow should cost is the workflow's to say, in the
+  step's note: the package holds no line.
+
+A step without the line reads none of it. Refused at load: a name off `STORE_READS`, one given twice, none, and the key on a remote
+agent.
 
 ### A factory's instruction: `wf factory instruction` and `wf factory instruct`
 

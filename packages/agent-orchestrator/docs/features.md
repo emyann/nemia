@@ -1996,7 +1996,8 @@ What was built:
   from its byte each pass, and writes what differs (`feedChanges`). A fresh process folds from 0, so a restarted daemon writes nothing
   for what did not change; a feed replaced or truncated under it (another inode, a cursor no longer at a line) is folded again from 0.
 - **Words that move only when the judgement does.** The engine's live words fold into `running` (`feedPhase`); a slot wait drops its
-  count; no cost is said. Without these the feed would be written on every pass a session went idle, and every pass a dollar was spent.
+  count; no cost is said; and a note's change alone, on a run at rest (`atRest`), is not a change. Without these the feed would be
+  written on every pass a session went idle, every pass a dollar was spent, and for every finished run once a note is worded anew.
 - **The engine's cursor, refused by name where it cannot be read from**: a read stops at the last newline, never past a partial line;
   a cursor inside a line or past the end is refused with exit 2 and what to type (`wf feed 0`). A line a writer died in is ended by the
   next append and parsed by nobody.
@@ -2294,19 +2295,27 @@ stateDiagram-v2
 <!-- diagram:nemia:end -->
 
 - **A step denied a call says so on its feed line**: a note part `denied: <call> ×<n>, …` (`deniedNote`, `src/feed/feed.ts`), off the
-  denials its task's ended attempts journalled (`deniedCallsOf`), each distinct call counted, at most five named. `denied:` is one of
+  denials its task's attempts journalled (`deniedSoFarOf`): a running attempt's each distinct call once, by its name alone, as the
+  runtime journals it (`denied`), and each call counted when its attempt ends, at most five named. `denied:` is one of
   her wake words, and her `grant-access` skill proposes the narrowest allow that would have let the call through, or says the deny
   stands.
 - **Her quota and her spend**: her task is allowed `curl -s <url>/api/quota` unasked, the address read off `daemon.json` at filing
   (`quotaUrl` in `keep.verb.ts`), and told it in her first message; none where the daemon serves no board. `nemia level` says what her ended sessions
   cost (`spend`), counted as a step's are (`taskSpend`).
+- **The board shows her** on a frame Settings page (`/settings`, the rail's last place): her level as a Semi-auto switch (`PUT
+  /api/level`, a refusal in the api's words), her session's state judged from the orchestrator's facts alone (`sessionOf`,
+  `apps/web/src/lib/nemia.ts`: off, leaving, not filed, starting, up, stopped from outside with a way to a fresh one), how to reach it
+  as the api answers it (its first line a command to copy), her spend and allows, and her memory read-only, with words saying a fact is
+  pruned by asking her. Still to build: the runtime reads her bridge's web link, and `reachOf` answers it, so the board shows the link
+  itself rather than the sentence about it.
 
 `commission-a-workflow` is the spec's `commission-argus`, named for what it does in any factory, since no team name ships; `nemia factory
 instruction` is not on her allow list, since its write flags share its prefix.
 
 Tested in `src/nemia/nemia.test.ts` (what the keeper owes; a task stopped from outside never filed again; the levels; the diagram;
 `denied:` waking her alone), `src/nemia/keep.verb.test.ts` (the untrusted refusal, the filing and its fields, the quota allow, her spend,
-a stop from outside, manual, memory), `src/feed/feed.test.ts` (the `denied:` note, and a tick that says it once),
+a stop from outside, manual, memory), `src/feed/feed.test.ts` (the `denied:` note, a tick that says it once, and a running step's calls said as they come),
+`src/stats/discipline.test.ts` (the calls so far beside the ended ones the stats count),
 `src/subscription/subscription.verb.test.ts` (the name `nemia` refused), `test/agent-fences.test.ts` (her deny list, and a mode but
 `default` refused) and `test/nemia-shipped.test.ts` (no team name ships; each skill named ships).
 

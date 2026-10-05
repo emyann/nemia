@@ -5537,16 +5537,17 @@ test("no place sits at the rail's foot: its places stand in one column from the 
   assert.equal(railFoot(await railAt('/agents')).length, 0);
 });
 
-test("the rail is a nav of the three places, each a link named for a screen reader, and only the page's own is lit", async () => {
+test("the rail is a nav of the four places, each a link named for a screen reader, and only the page's own is lit", async () => {
   assert.deepEqual(railLinks(await railAt('/agents')), [
     { href: '/', name: 'Home', lit: false },
     { href: '/agents', name: 'Agents', lit: true },
     { href: '/machines', name: 'Machines &amp; Capabilities', lit: false },
+    { href: '/settings', name: 'Settings', lit: false },
   ]);
   for (const path of ['/machines', '/capabilities'])
     assert.deepEqual(
       railLinks(await railAt(path)).map((link) => link.lit),
-      [false, false, true],
+      [false, false, true, false],
       `Machines & Capabilities, and it alone, is lit on its tab ${path}`,
     );
   assert.deepEqual(
@@ -5556,8 +5557,13 @@ test("the rail is a nav of the three places, each a link named for a screen read
   );
   assert.deepEqual(
     railLinks(await railAt('/factories/nemia')).map((link) => link.lit),
-    [true, false, false],
+    [true, false, false, false],
     "a factory's floor lights Home",
+  );
+  assert.deepEqual(
+    railLinks(await railAt('/settings')).map((link) => link.lit),
+    [false, false, false, true],
+    'Settings, and it alone, is lit on its page',
   );
 });
 
@@ -6426,4 +6432,70 @@ test("a workflow's steps, a row each: an agent's step by its policy, its agent l
   assert.match(ship, /Land it\./, 'a step with no agent: its body');
   assert.match(ship, /No agent/);
   assert.match(ship, /data-skill="land-a-branch"/, 'and the skills its file names');
+});
+
+/** Nemia's section, drawn over a cache holding `level`, her memory, `facts`, and each fact's words, read as if opened once. */
+async function nemiaWith(level: Record<string, unknown>, facts: string[] = []): Promise<string> {
+  const { NemiaSettings } = await import('../src/components/NemiaSettings.tsx');
+  const client = new QueryClient();
+  client.setQueryData(['nemia', 'level'], {
+    level: 'manual',
+    since: null,
+    task: null,
+    phase: null,
+    sessionId: null,
+    reach: [],
+    stopped: false,
+    spend: null,
+    allows: [],
+    ...level,
+  });
+  client.setQueryData(['nemia', 'memory'], { dir: '/store/nemia/memory', facts, fact: null });
+  for (const name of facts)
+    client.setQueryData(['nemia', 'memory', name], { dir: '/store/nemia/memory', facts, fact: { name, text: `What ${name} says.` } });
+  return renderToStaticMarkup(createElement(QueryClientProvider, { client }, createElement(NemiaSettings)));
+}
+
+/** Her session up and reached, on Semi-auto. */
+const nemiaUp = {
+  level: 'semi-auto',
+  since: '2026-10-05T12:00:00.000Z',
+  task: 'nemia-1',
+  phase: 'running',
+  sessionId: '0123456789abcdef',
+  reach: ['attach 01234567', 'or the web link her session shows once its bridge is up, from a phone too'],
+};
+
+test('Nemia off: the Semi-auto switch unselected, her session off, no reach, and her memory empty with how to prune it', async () => {
+  const html = await nemiaWith({});
+  assert.match(html, /data-nemia-level="manual"/);
+  assert.doesNotMatch(html, /data-slot="switch"[^>]*data-selected="true"/, 'the switch is not on');
+  assert.match(html, /data-nemia-session="true" data-state="off"/);
+  assert.doesNotMatch(html, /data-nemia-reach/);
+  assert.doesNotMatch(html, /data-nemia-restart/);
+  assert.match(html, /data-nemia-no-facts[^>]*>She keeps no facts yet\./);
+  assert.match(html, /data-nemia-prune[^>]*>She keeps these facts herself[^<]*ask her to in her session\./);
+});
+
+test('Nemia up: the switch selected, her task and phase, the attach line as code to copy and the rest as words, her spend and allows', async () => {
+  const html = await nemiaWith({ ...nemiaUp, spend: { usd: 1.25, measured: 2, unmeasured: 0 }, allows: ['Bash(git status)'] }, [
+    'owner',
+    'style',
+  ]);
+  assert.match(html, /data-slot="switch"[^>]*data-selected="true"/);
+  assert.match(html, /data-state="up"/);
+  assert.match(html, /data-nemia-task[^>]*>nemia-1</);
+  assert.match(html, /data-nemia-phase[^>]*>running</);
+  assert.match(html, /data-nemia-attach[^>]*>attach 01234567<\/code><button[^>]*data-copy/);
+  assert.match(html, />or the web link her session shows once its bridge is up, from a phone too</);
+  assert.match(html, /data-nemia-spend[^>]*>Spent \$1\.25 over 2 sessions ended; her open one counts once it ends\./);
+  assert.match(html, /data-nemia-allows[\s\S]*>Bash\(git status\)</);
+  assert.match(html, /data-nemia-fact="owner"[\s\S]*data-nemia-fact="style"/);
+  assert.doesNotMatch(html, /data-nemia-fact-text|What style says\./, "a fact's words are drawn only while it is open, read or not");
+});
+
+test('Nemia stopped from outside: said so, with a way to a fresh session', async () => {
+  const html = await nemiaWith({ ...nemiaUp, stopped: true });
+  assert.match(html, /data-state="stopped"/);
+  assert.match(html, /data-nemia-restart[^>]*>Start a fresh session</);
 });

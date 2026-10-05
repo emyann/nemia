@@ -2,7 +2,7 @@
  * Which line of a step each field of its filed config comes from (`FILED_AS`), and the runtime's refusal of that config said as the
  * step's (`filedRefusal`): its words, after the line a person wrote. Pure.
  */
-import { contextText } from './keys.ts';
+import { contextText, MOUNTED_READS } from './keys.ts';
 import type { Workflow } from '../step/step.ts';
 
 /** A step's keys a filed config is written from. */
@@ -28,8 +28,8 @@ export type FiledFlags = { model?: string; budget?: number };
 
 /**
  * The step key each field of a filed config is written as, and its value as a step's line says it; `mounts`, which both `writable:` and
- * `reads:` give, names each the step has. A field not here — the harness's own arguments, which the step's agent and its run give — has
- * no line of the step's.
+ * `reads:` give, names each the step has, of `reads:` only the names that mount a folder (`MOUNTED_READS`). A field not here — the
+ * harness's own arguments, which the step's agent and its run give — has no line of the step's.
  */
 export const FILED_AS: Readonly<Record<string, (step: FiledStep) => string | undefined>> = {
   model: (s) => s.model && `model: ${s.model}`,
@@ -42,9 +42,11 @@ export const FILED_AS: Readonly<Record<string, (step: FiledStep) => string | und
   background: (s) => (s.background === undefined ? undefined : `background: ${s.background}`),
   budgetUsd: (s) => (s.budget === undefined ? undefined : `budget: ${s.budget}`),
   claude: (s) => (s.remote ? 'remote: true' : undefined),
-  mounts: (s) =>
-    [s.writable && `writable: ${s.writable.join(', ')}`, s.reads && `reads: ${s.reads.join(', ')}`].filter(Boolean).join('` and `') ||
-    undefined,
+  mounts: (s) => {
+    const mounted = s.reads?.filter((n) => MOUNTED_READS.includes(n)) ?? [];
+    const lines = [s.writable && `writable: ${s.writable.join(', ')}`, mounted.length && `reads: ${mounted.join(', ')}`];
+    return lines.filter(Boolean).join('` and `') || undefined;
+  },
 };
 
 /** The flag a retry typed for a field it chose, before the step's own line: `--model <m>`, `--budget <amount>`. */

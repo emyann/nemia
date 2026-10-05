@@ -5743,6 +5743,11 @@ test('a step that says `denials: fail` and signed off denied a call reads denied
   const denied = deniedSpend({ t1: ['Write(/tmp/w/notes.md)', 'Bash(pytest)'] });
   assert.equal(stepStatus(DENYING[0], r, p, signedDone, asked, DENYING, denied), 'denied');
   assert.equal(
+    stepStatus(DENYING[0], r, phases({ t1: 'running' }), () => undefined, asked, DENYING, denied),
+    'running',
+    'denied a call while it works: a verdict waits for its signed end',
+  );
+  assert.equal(
     stepStatus(DENYING[0], r, p, signedDone, asked, DENYING, deniedSpend({ t1: [] })),
     'checking',
     'denied nothing: its check is what comes',

@@ -21,6 +21,7 @@ export {
   writableNamesOf,
   readsNamesOf,
   STORE_READS,
+  MOUNTED_READS,
   slotOf,
   SLOTS,
   tokensOf,

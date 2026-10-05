@@ -35,6 +35,7 @@ import { divergence, releasableOf, TickMemo, TickMemoDiverged, type Releasable, 
 import { CEILING_INSTEAD } from './filing.ts';
 import { ownPool, toAdmit, type AdmissionRule } from '../admission.ts';
 import { countedFacts } from './counted.ts';
+import { deniedFacts } from './denied.ts';
 import { instantNow } from './now.ts';
 
 /**
@@ -348,16 +349,16 @@ const lastSighting = (state: State, observed: ReadonlyMap<string, Sighting>): Si
 };
 
 /**
- * What a task's sighting says of a long-lived attempt in flight, for the record: its process (`sightingFacts`), and what it has
- * consumed so far (`countedFacts`).
+ * What a task's sighting says of an attempt in flight, for the record: a long-lived one's process (`sightingFacts`) and what it
+ * has consumed so far (`countedFacts`), and what the harness has denied any (`deniedFacts`).
  */
 const notedOf = (state: State, observed: ReadonlyMap<string, Sighting>, at: string, mono?: Monotonic): Event[] => {
   const sighting = lastSighting(state, observed);
-  return [...sightingFacts(state, sighting, at, mono), ...countedFacts(state, sighting, at)];
+  return [...sightingFacts(state, sighting, at, mono), ...countedFacts(state, sighting, at), ...deniedFacts(state, sighting, at)];
 };
 
 /**
- * A task's fold, with what its sighting says of a long-lived attempt journalled first (`notedOf`): the fold `decide` reads, so
+ * A task's fold, with what its sighting says of an attempt in flight journalled first (`notedOf`): the fold `decide` reads, so
  * the time a gap opened is on the record before the pass judges it.
  */
 const notedFold = Effect.fn('notedFold')(function* (taskId: string, observed: ReadonlyMap<string, Sighting>) {

@@ -140,8 +140,11 @@ show (motion, a live board).
 
 A landing that fails its check costs a round and the person's time. Before showing one:
 
-1. **Trial-merge against main:** `git merge-tree --write-tree main <branch>`. A textual conflict means a round first.
-2. **Trial-merge against every landing in flight or approved ahead of it.**
+1. **Read the trial merges:** `nemia decide <run>` at an ending's gate says whether each branch merges onto main as it is now
+   (`merges`), which runs in flight on main its branches conflict with and in which files (`others`, `collides`), and, after a landing
+   its check refused, whether the merge was clean as text (`semantic`); the board's gate shows the same facts. A textual conflict with
+   main means a round first.
+2. **Order the landings ahead of it:** a run that `collides` with it will need a merge after whichever lands first.
 3. **Know what a trial merge cannot see.** Two runs that merge cleanly can still fail together: a new guard on main that the other
    branch breaks, a name deleted on main that the other branch imports, or two changes that disagree on a meaning (on 2026-10-05 the
    journal cursor and the tick-pass card's read counts merged cleanly and failed two tests together). When main moved in the area the run

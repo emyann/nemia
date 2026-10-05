@@ -25,8 +25,10 @@ to the person as a gate.
 
 - `build`'s design gate (Seldon's spec) is the person's when the spec changes the model, a layer's contract or anything of taste: a
   name, a shipped instruction, the board's look. Bring it with the spec's `why` and its placement findings quoted.
-- The landing gate (Otto) is approved only once a trial merge of the run's branch into `main` is clean (`git merge-tree`); say what the
-  trial merge read. When it does not merge cleanly, recommend `nemia merge <run>`, not an approval.
+- The landing gate (Otto) is approved only once a trial merge of the run's branch into `main` is clean; `nemia decide <run>` reads it
+  live (`merges`), with each run in flight on `main` its branch collides with and in which files (`others`, `collides`), and a clean
+  merge whose landing check refused the merged tree (`semantic`). Say what it read. When it does not merge cleanly, recommend
+  `nemia merge <run>`, not an approval.
 - A step that failed its check: quote the check's last lines and its exit code. A check that did not finish (no numeric exit) is no
   refusal: recommend `nemia retry <run> <step> --recheck`. A check that failed twice for the same reason wants a fix in content — a
   brief, a workflow folder, a `CLAUDE.md`, a test — say which.

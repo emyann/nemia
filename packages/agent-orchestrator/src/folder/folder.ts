@@ -52,6 +52,27 @@ export function agentsFolderRefusal(dir: string): string | undefined {
 export const linkRefusal = (file: string, what: string): string =>
   `${file} is a link, and ${what} Replace the link with a file of its own — remove the link and copy what it pointed at into its place, rm <file> && cp <target> <file> — or take it out of the folder.`;
 
+/**
+ * Why removing the workflow at `dir` would leave something unable to go on, one sentence per thing that still needs it, each naming the
+ * command that frees it: a run that froze no steps at its start and reads them from the folder (`run`), a card queued to start on it
+ * (`card`), and a factory that offers its name with nothing else to give under it, with its hires into it (`factory`).
+ */
+export const stillNeeded = {
+  run: (id: string, dir: string): string =>
+    `run ${id} froze no workflow at its start and reads its steps from ${dir}: nemia rm ${id} forgets it.`,
+  card: (name: string, dir: string): string =>
+    `card ${name} is queued to start on ${dir}: nemia inbox queue ${name} --off takes it back, or --workflow <w> names another.`,
+  factory: (factory: string, name: string, hires: readonly string[]): string =>
+    `factory ${factory} offers ${name}, and none of its repositories has a workflow of that name: ${[
+      ...hires.map((step) => `nemia factory fire ${factory} --step ${step}`),
+      `nemia factory detach ${factory} ${name}`,
+    ].join(', then ')}.`,
+};
+
+/** Why the workflow at `dir` is not removed while `users` need it (`stillNeeded`): each of them, and that nothing was removed. */
+export const workflowInUse = (dir: string, users: readonly string[]): string =>
+  `${dir} is still needed: ${users.join(' ')} Nothing was removed.`;
+
 /** The files of a folder that are steps: every `.md` but its README, sorted. */
 export const stepFiles = (entries: readonly string[]): string[] => entries.filter((f) => f.endsWith('.md') && !isReadme(f)).sort();
 

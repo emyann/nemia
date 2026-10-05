@@ -1,7 +1,8 @@
 /**
- * A workflow folder written from its steps (`writeWorkflow`), what the board's builder saves; where a folder's runs look for agents and
- * skills (`placesAround`); and whether a folder holds the workflows the board lists (`isWorkflowsHolder`). A store beside
- * `folder.store.ts`: it imports neither the engine nor a controller. A run is changed by none of it: it froze its folder at `wf start`.
+ * A workflow folder written from its steps (`writeWorkflow`), what the board's builder saves, and one of yours removed whole
+ * (`removeWorkflow`); where a folder's runs look for agents and skills (`placesAround`); and whether a folder holds the workflows the board
+ * lists (`isWorkflowsHolder`). A store beside `folder.store.ts`: it imports neither the engine nor a controller. A run that froze its
+ * folder at `wf start` is changed by none of it.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -9,7 +10,8 @@ import { isDeepStrictEqual } from 'node:util';
 import { isReadme, WorkflowError, type Workflow } from '../step/step.ts';
 import { codexModeWritten } from '../former/former.ts';
 import { parseWorkflow, renderStep, type StepDraft } from '../workflow/index.ts';
-import { agentsFolderRefusal, linkRefusal, parseFolder, stepNameRefusal } from './folder.ts';
+import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
+import { agentsFolderRefusal, linkRefusal, parseFolder, stepNameRefusal, workflowInUse } from './folder.ts';
 import { agentsFor, skillsFor, type Places } from './folder.store.ts';
 import { HOME, isDirectory } from '../record/record.store.ts';
 
@@ -118,6 +120,49 @@ export function writeWorkflow(
   if (readme !== undefined)
     put(entries.find((e) => e.isFile() && isReadme(e.name))?.name ?? 'README.md', readme, (there) => there === readme);
   return { dir: at, steps: parsed, written: written.sort(), kept: kept.sort(), removed: removed.sort() };
+}
+
+/** What `removeWorkflow` did: the folder removed, and the files it held, by their path in it, sorted. */
+export type WorkflowRemoved = { dir: string; removed: string[] };
+
+/**
+ * A workflow of yours removed whole: the folder `dir`, directly under `<home>/workflows/`, and every file in it.
+ *
+ * Refused, and nothing removed: the folder of agents or of skills (`agentsFolderRefusal`), a folder anywhere but directly under yours — a
+ * repository's workflow is not removed here (`Invalid`); a folder that is a link, since removing it would leave whatever it points at
+ * (`Invalid`); a folder not there, or a file of that name (`Missing`); and a folder something still needs, `users` being one sentence each
+ * naming the command that frees it, which the caller gathers (`Conflict`).
+ */
+export function removeWorkflow(
+  dir: string,
+  { home = HOME, users = [] }: { home?: string; users?: readonly string[] } = {},
+): WorkflowRemoved {
+  const at = path.resolve(dir);
+  const yours = path.resolve(home, 'workflows');
+  const folderRefused = agentsFolderRefusal(at);
+  if (folderRefused) throw new Invalid({ message: folderRefused });
+  if (path.dirname(at) !== yours)
+    throw new Invalid({
+      message: `${at} is not a workflow of yours (${path.join(yours, '<name>')}): only yours are removed here, and a repository's workflow is removed from its checkout, as a change to commit. Nothing was removed.`,
+    });
+  const stat = fs.lstatSync(at, { throwIfNoEntry: false });
+  if (stat?.isSymbolicLink())
+    throw new Invalid({
+      message: linkRefusal(at, 'removing it would remove the link and leave the folder it points at. Nothing was removed.'),
+    });
+  if (!stat?.isDirectory())
+    throw new Missing({
+      message: stat
+        ? `${at} is a file, not a workflow folder: nothing of yours is removed under that name.`
+        : `${at} is not there: it was removed already.`,
+    });
+  if (users.length) throw new Conflict({ message: workflowInUse(at, users) });
+  const removed = fs
+    .readdirSync(at, { recursive: true, encoding: 'utf8' })
+    .filter((file) => !fs.lstatSync(path.join(at, file)).isDirectory())
+    .sort();
+  fs.rmSync(at, { recursive: true });
+  return { dir: at, removed };
 }
 
 /**

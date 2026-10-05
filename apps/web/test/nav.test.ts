@@ -23,6 +23,7 @@ test("each page lights one section — a factory's floor the Floor, a run and it
   assert.deepEqual(lit('/runs/r-1'), ['Runs']);
   assert.deepEqual(lit('/runs/r-1/steps/s'), ['Runs']);
   assert.deepEqual(lit('/inbox/card'), ['Inbox']);
+  assert.deepEqual(lit('/workflows/repo/dev'), ['Workflows'], "a workflow's page");
   assert.deepEqual(lit('/workflows/repo/dev/review'), ['Workflows']);
   assert.deepEqual(lit('/'), [], 'Home is in the rail, not the sections');
   assert.deepEqual(lit('/agents'), [], 'Agents is in the rail, not the sections');
@@ -104,7 +105,7 @@ test("the picked factory is read from the address alone: a floor's name, else a 
   assert.equal(pickedOf('/runs', { factory: '' }), undefined, 'an empty name picks none');
   assert.equal(pickedOf('/runs', { factory: 3 }), undefined, 'a name that is no string picks none');
   assert.equal(pickedOf('/factories/nemia', { factory: 'hiring' }), 'nemia', 'on a floor the path wins over a stray ?factory=');
-  for (const path of ['/runs/r-1', '/agents', '/inbox/card', '/', '/workflows/repo/dev/review'])
+  for (const path of ['/runs/r-1', '/agents', '/inbox/card', '/', '/workflows/repo/dev', '/workflows/repo/dev/review'])
     assert.equal(pickedOf(path, {}), undefined, `${path} picks none`);
   for (const path of ['/runs/r-1', '/agents', '/inbox/card', '/'])
     assert.equal(pickedOf(path, { factory: 'hiring' }), undefined, `refused: ${path} reads no ?factory=, which its route keeps none of`);

@@ -332,6 +332,13 @@ export function unsavedSteps(steps: readonly DraftStep[], workflow: Pick<Workflo
 export const unsaved = (steps: readonly DraftStep[], workflow: Pick<WorkflowListing, 'steps'>): boolean =>
   unsavedSteps(steps, workflow).length > 0 || workflow.steps.some((listed) => !steps.some((s) => s.name === listed.name));
 
+/**
+ * The README a save sends: the draft when it is not the README as listed, and nothing when it is — a blank draft over a folder with no
+ * README included, so a save writes no empty README of its own accord.
+ */
+export const readmeSent = (draft: string, workflow: Pick<WorkflowListing, 'readme'>): string | undefined =>
+  draft === (workflow.readme ?? '') ? undefined : draft;
+
 /** The draft as a save puts it: each step in the listing's shape, a pasted schema's file named by its `output:`. */
 export const toPut = (steps: readonly DraftStep[]): StepWritten[] =>
   steps.map(({ name, spec, body, own, schema }) => ({ name, spec: schema ? { ...spec, output: schema.file } : spec, body, own }));

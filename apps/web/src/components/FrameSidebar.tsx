@@ -19,7 +19,7 @@ import {
   SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { inboxQuery, runsQuery, workflowsQuery } from '@/lib/api';
-import { favoriteRows, workflowAnchor, type Favorite, type FavoriteRow } from '@/lib/favorites';
+import { favoriteRows, type Favorite, type FavoriteRow } from '@/lib/favorites';
 import { inboxBadgeTitle, notStarted } from '@/lib/inbox';
 import { toggleFavorite, useFavorites } from '@/lib/useFavorites';
 import { FactoryPicker } from './FactoryPicker';
@@ -124,7 +124,7 @@ const rowName = ({ favorite, title }: FavoriteRow): string =>
 
 /**
  * The favourites (`rows`), each with a star that takes it off, shown on hover: a run a link to its page, read by its title with its id on
- * hover; a workflow a link to its card on the Workflows page; one the api no longer lists said gone, no link, its star always shown. None
+ * hover; a workflow a link to its page; one the api no longer lists said gone, no link, its star always shown. None
  * starred says so. A press on a link runs `onPick`.
  */
 export function FavoriteLinks({ rows, onPick }: { rows: readonly FavoriteRow[]; onPick?: () => void }) {
@@ -148,7 +148,7 @@ export function FavoriteLinks({ rows, onPick }: { rows: readonly FavoriteRow[]; 
   );
 }
 
-/** A favourite the api lists, a link: a run to its page, a workflow to its card on the Workflows page, yours said so. */
+/** A favourite the api lists, a link: a run to its page, a workflow to its own, yours said so. */
 function FavoriteLink({ row: { favorite, title }, onPick }: { row: FavoriteRow; onPick?: () => void }) {
   if (favorite.kind === 'run')
     return (
@@ -158,7 +158,7 @@ function FavoriteLink({ row: { favorite, title }, onPick }: { row: FavoriteRow; 
       </PlaceLink>
     );
   return (
-    <PlaceLink to="/workflows" search={{}} hash={workflowAnchor(favorite)} size="sm" onPress={onPick}>
+    <PlaceLink to="/workflows/$from/$workflow" params={{ from: favorite.from, workflow: favorite.workflow }} size="sm" onPress={onPick}>
       <Waypoints />
       <span className="truncate">
         {title}

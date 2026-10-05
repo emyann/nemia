@@ -20,6 +20,7 @@ import {
   nameRefusal,
   orderOf,
   placesOf,
+  readmeSent,
   schemasOf,
   toPut,
   unsaved,
@@ -53,7 +54,7 @@ const INPUT =
  * A folder of yours, built on the board: its steps as blocks with handles, drawn left to right by `after`. Drag from a block's right-hand
  * dot to another's left-hand dot and that one waits on it; from the violet dot underneath, and the block runs the other again (`loop:`,
  * with its rounds). An edge's button takes its key away. A block is added with a name and what it is told, and a block clicked opens its
- * form.
+ * form. Above them, its README: the workflow level's instruction, sent with a save only where it changed (`readmeSent`).
  *
  * Nothing is written until Save, which puts the whole folder with any schema pasted for an `output:` (`PUT /api/workflows/yours/:name`) in
  * one write, judged whole by the api before any of it is written, at the version the draft was read from. The api answers the folder read
@@ -72,6 +73,7 @@ export function WorkflowBuilder({ workflow, onClose }: { workflow: WorkflowListi
   const form = useQuery(keyFormQuery);
   const [base, setBase] = useState(workflow);
   const [steps, setSteps] = useState<DraftStep[]>(() => draftOf(workflow));
+  const [readme, setReadme] = useState(workflow.readme ?? '');
   const [selected, setSelected] = useState<string | null>(workflow.steps[0]?.name ?? null);
   const [version, setVersion] = useState(0);
   const [adding, setAdding] = useState(false);
@@ -86,11 +88,18 @@ export function WorkflowBuilder({ workflow, onClose }: { workflow: WorkflowListi
   const startFrom = (listing: WorkflowListing) => {
     setBase(listing);
     setSteps(draftOf(listing));
+    setReadme(listing.readme ?? '');
     setVersion((v) => v + 1);
   };
 
   const save = useMutation({
-    mutationFn: (draft: DraftStep[]) => saveWorkflow(base.name, { version: base.version, steps: toPut(draft), schemas: schemasOf(draft) }),
+    mutationFn: (draft: { steps: DraftStep[]; readme: string }) =>
+      saveWorkflow(base.name, {
+        version: base.version,
+        steps: toPut(draft.steps),
+        schemas: schemasOf(draft.steps),
+        readme: readmeSent(draft.readme, base),
+      }),
     onMutate: () => {
       setRefusal(null);
       setSaved(null);
@@ -120,7 +129,7 @@ export function WorkflowBuilder({ workflow, onClose }: { workflow: WorkflowListi
     onError: (err) => setRefusal((was) => new BuildRefusal(`Could not read the folder again: ${err.message}`, [], was?.status ?? null)),
   });
 
-  const dirty = unsaved(steps, base);
+  const dirty = unsaved(steps, base) || readmeSent(readme, base) !== undefined;
   const changedSteps = new Set(unsavedSteps(steps, base));
   const order = orderOf(steps);
   const { at, cycle } = placesOf(steps);
@@ -169,40 +178,20 @@ export function WorkflowBuilder({ workflow, onClose }: { workflow: WorkflowListi
 
   return (
     <section aria-label={`Builder of ${base.name}`} data-builder={base.name} className="space-y-3">
-      <div role="toolbar" aria-label={`Build ${base.name}`} className="flex flex-wrap items-center gap-2">
-        <span
-          data-unsaved={dirty || undefined}
-          className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-            dirty
-              ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
-              : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300'
-          }`}
-        >
-          {dirty ? 'Unsaved changes' : 'Saved'}
-        </span>
-        <button type="button" onClick={() => setAdding(true)} disabled={adding} className={BUTTON}>
-          Add a step
-        </button>
-        <span className="flex-1" />
-        <button
-          type="button"
-          disabled={!dirty || save.isPending}
-          onClick={() => {
-            setSteps(draftOf(base));
-            setVersion((v) => v + 1);
-            setRefusal(null);
-          }}
-          className={BUTTON}
-        >
-          Discard changes
-        </button>
-        <button type="button" onClick={onClose} className={BUTTON}>
-          {dirty ? 'Discard and close' : 'Close'}
-        </button>
-        <button type="button" disabled={!dirty || save.isPending || !steps.length} onClick={() => save.mutate(steps)} className={PRIMARY}>
-          {save.isPending ? 'Saving…' : 'Save'}
-        </button>
-      </div>
+      <BuilderToolbar
+        name={base.name}
+        dirty={dirty}
+        saving={save.isPending}
+        adding={adding}
+        empty={!steps.length}
+        onAdd={() => setAdding(true)}
+        onDiscard={() => {
+          startFrom(base);
+          setRefusal(null);
+        }}
+        onClose={onClose}
+        onSave={() => save.mutate({ steps, readme })}
+      />
 
       {refusal && <SaveRefused refusal={refusal} rereading={reread.isPending} onReread={() => reread.mutate()} />}
       {saved && !dirty && (
@@ -222,6 +211,15 @@ export function WorkflowBuilder({ workflow, onClose }: { workflow: WorkflowListi
           onCancel={() => setAdding(false)}
         />
       )}
+
+      <ReadmeField
+        text={readme}
+        changed={readmeSent(readme, base) !== undefined}
+        onChange={(text) => {
+          setReadme(text);
+          setSaved(null);
+        }}
+      />
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
         <div
@@ -282,6 +280,80 @@ export function WorkflowBuilder({ workflow, onClose }: { workflow: WorkflowListi
         </aside>
       </div>
     </section>
+  );
+}
+
+/**
+ * The builder's toolbar: whether the draft is saved, Add a step, Discard changes, Close — which discards what is unsaved — and Save, for a
+ * draft with a change and a step.
+ */
+function BuilderToolbar(props: {
+  name: string;
+  dirty: boolean;
+  saving: boolean;
+  adding: boolean;
+  empty: boolean;
+  onAdd: () => void;
+  onDiscard: () => void;
+  onClose: () => void;
+  onSave: () => void;
+}) {
+  const { name, dirty, saving } = props;
+  return (
+    <div role="toolbar" aria-label={`Build ${name}`} className="flex flex-wrap items-center gap-2">
+      <span
+        data-unsaved={dirty || undefined}
+        className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+          dirty
+            ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+            : 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300'
+        }`}
+      >
+        {dirty ? 'Unsaved changes' : 'Saved'}
+      </span>
+      <button type="button" onClick={props.onAdd} disabled={props.adding} className={BUTTON}>
+        Add a step
+      </button>
+      <span className="flex-1" />
+      <button type="button" disabled={!dirty || saving} onClick={props.onDiscard} className={BUTTON}>
+        Discard changes
+      </button>
+      <button type="button" onClick={props.onClose} className={BUTTON}>
+        {dirty ? 'Discard and close' : 'Close'}
+      </button>
+      <button type="button" disabled={!dirty || saving || props.empty} onClick={props.onSave} className={PRIMARY}>
+        {saving ? 'Saving…' : 'Save'}
+      </button>
+    </div>
+  );
+}
+
+/**
+ * The README in the builder: the workflow level's instruction, as markdown, written with the steps by Save. `changed` marks it not as the
+ * folder was read.
+ */
+function ReadmeField({ text, changed, onChange }: { text: string; changed: boolean; onChange: (text: string) => void }) {
+  const id = useId();
+  return (
+    <div className="space-y-1">
+      <label htmlFor={id} className="flex items-baseline gap-2 text-xs font-medium text-neutral-700 dark:text-neutral-300">
+        README
+        <span className="font-normal text-neutral-500">what the workflow is for, its first paragraph its description</span>
+        {changed && (
+          <span data-readme-unsaved className="font-normal text-amber-700 dark:text-amber-400">
+            unsaved
+          </span>
+        )}
+      </label>
+      <textarea
+        id={id}
+        value={text}
+        onChange={(e) => onChange(e.target.value)}
+        rows={Math.min(Math.max(text.split('\n').length, 3), 12)}
+        placeholder="What this workflow is for, in markdown."
+        className={`${INPUT} font-mono text-xs`}
+      />
+    </div>
   );
 }
 

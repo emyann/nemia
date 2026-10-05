@@ -56,9 +56,6 @@ export function favoritesOf(raw: string | null): Favorite[] {
     .filter((item, i, all) => all.findIndex((kept) => sameFavorite(kept, item)) === i);
 }
 
-/** The anchor of a workflow's card on the Workflows page, by where it is read from and its name, which a favourite links to. */
-export const workflowAnchor = ({ from, workflow }: { from: 'repo' | 'yours'; workflow: string }): string => `workflow-${from}-${workflow}`;
-
 /** A favourite as the sidebar lists it: a run by its title, a workflow by its name, and whether the api no longer lists it. */
 export type FavoriteRow = { favorite: Favorite; title: string; gone: boolean };
 

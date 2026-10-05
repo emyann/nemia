@@ -1,6 +1,7 @@
 /**
  * The client's way of reading the runtime: a verb of the engine read through `asked` dies, as an `Error`, of the runtime's refusal in the
- * runtime's words, and an engine `engineOf` cannot build is refused in them. `WF_ROOT` is set before the client loads, a scratch root.
+ * runtime's words, and an engine `engineOf` cannot build is refused in them; a program it runs (`runWith`) says its warnings and errors,
+ * and no Info line. `WF_ROOT` is set before the client loads, a scratch root.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -49,4 +50,22 @@ test('an engine whose layer the runtime refuses is refused with exit code 2, its
   assert.equal(err.exitCode, 2);
   assert.ok(err.message.startsWith('engine: '), err.message);
   assert.match(err.message, /`maxConcurrent: 0` is not a ceiling/);
+});
+
+test('REFUSED: a program run through runWith says no Info line, and still says its warnings and errors on the console', async (t) => {
+  const said: string[] = [];
+  for (const method of ['log', 'info', 'warn', 'error', 'debug'] as const)
+    t.mock.method(console, method, (...args: unknown[]) => void said.push(args.map(String).join(' ')));
+  await runWith(
+    engineOf(board().layer),
+    Effect.gen(function* () {
+      yield* Effect.logInfo('a feed line, said by the daemon alone');
+      yield* Effect.logWarning('a warning a command must not swallow');
+      yield* Effect.logError('an error a command must not swallow');
+    }),
+  );
+  t.mock.restoreAll();
+  assert.equal(said.filter((s) => s.includes('a feed line')).length, 0, said.join('\n'));
+  assert.equal(said.filter((s) => s.includes('a warning a command must not swallow')).length, 1, said.join('\n'));
+  assert.equal(said.filter((s) => s.includes('an error a command must not swallow')).length, 1, said.join('\n'));
 });

@@ -8,7 +8,7 @@
 import type { Verdict } from '../check/check.ts';
 import type { Workflow } from '../step/step.ts';
 import type { EarlierTry, RetryAsk } from '../retry/index.ts';
-import type { RoundAsk } from '../status/status.ts';
+import type { MergeOf, RoundAsk } from '../status/status.ts';
 import type { QueueTry } from '../inbox/inbox.ts';
 import type { Pause } from '../pause/pause.ts';
 
@@ -455,11 +455,14 @@ export type AsksRead = { asks: RetryAsk[]; rounds: RoundAsk[]; notes: string[] }
 
 /**
  * The kinds of ask a person writes: a try (`nemia retry`), a round (`nemia round`), an approval (`nemia approve`), an acceptance (`nemia
- * accept`).
+ * accept`), a merge of the base (`nemia merge`).
  */
-export type AskKind = 'retry' | 'round' | 'approve' | 'accept';
+export type AskKind = 'retry' | 'round' | 'approve' | 'accept' | 'merge';
 
-/** Which ask: its kind, its step, and its number — the try it names, or the round a round ask asks for. */
+/**
+ * Which ask: its kind, its step, and its number — the try it names, or the round a round ask asks for; for a merge, the loop's target and
+ * its try that merges.
+ */
 export type AskKey = { kind: AskKind; step: string; n: number };
 
 /** A person's ask, of its kind, as its verb writes it. */
@@ -467,7 +470,13 @@ export type PersonAsk =
   | { kind: 'retry'; ask: RetryAsk }
   | { kind: 'round'; ask: RoundAsk }
   | { kind: 'approve'; ask: Approval }
-  | { kind: 'accept'; ask: Acceptance };
+  | { kind: 'accept'; ask: Acceptance }
+  | { kind: 'merge'; ask: RoundAsk & { merge: MergeOf } };
+
+/**
+ * What a merge ask's file holds (`mergeAskIn`): the looping step, the round it is on, the base branch, its commit, and when it was asked.
+ */
+export type MergeAskHeld = { loop: string; round: number; onto: string; sha: string; at: string };
 
 /**
  * What writing a person's ask did, and `where` a person finds its file: written; or not, since a file already stood at its name — `stray`

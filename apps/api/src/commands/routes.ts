@@ -196,6 +196,7 @@ const namedBy = (c: Context<ApiEnv>): Named => ({
   runId: c.req.param('runId') ?? '',
   step: c.req.param('step') ?? '',
   name: c.req.param('name') ?? '',
+  factory: c.req.param('factory') ?? '',
   method: c.req.method,
   path: c.req.path,
 });
@@ -271,6 +272,10 @@ export const wordBreaks = (table: readonly Pick<CommandSpec, 'name' | 'route'>[]
  *   cap raised. Made by `roundRun`, `nemia round`'s own, which writes the ask file and nothing else. Refuses a budget not above zero with
  *   400, before the round is asked (`roundBudgetRefusal`, which `roundAsk` refuses first, whatever the run); a round the loop may not go,
  *   or a budget not above what its steps have cost (`roundAsk`), with 409.
+ * - `POST /api/runs/:id/merge` — a loop's work sent back to merge its base branch, on the round it is on, which the merge does not spend.
+ *   Made by `mergeRun`, `nemia merge`'s own, which tries the merge with git and writes the ask file and nothing else. Refuses a merge the
+ *   loop may not take (`mergeAsk`) with 409: among them a run whose result step closes no loop, pointed to `nemia retry`, and work that
+ *   merges cleanly, pointed to the landing's approval.
  * - `POST /api/runs/:id/steps/:step/say` — a person's words to a step's running session, through `sayRun`, `nemia say`'s own, which hands
  *   them to the session through the engine, and the engine journals them: the api writes nothing, and the step's detail reads them back
  *   (`said`). Refuses, in the package's and the engine's words, with 409: a step not filed, settled, or of a cancelled run; empty words; a
@@ -321,5 +326,11 @@ export const wordBreaks = (table: readonly Pick<CommandSpec, 'name' | 'route'>[]
  *   `nemia prune`'s words alone, the page saying `Not pruned` above them itself; any other failure is a 502. Its 200 is `{ id, pruned:
  *   true, lines, worktrees, artifacts, left }`. No feed line: the marker the prune writes moves the run's stamp in `runStore`, and the
  *   board reads the run again itself.
+ * - `PUT /api/factories/:factory/hires/:step` — an agent hired into a step of a factory's workflow, as `nemia factory hire` hires it
+ *   (`hireAgent`), its body `{ agent }` and its step `<workflow>/<step>` one encoded segment, `build%2Fimplement`. Refused in the package's
+ *   words: a factory the store does not have (404, `Missing`), the default factory (409, `Conflict`), a step or an agent that is no name
+ *   and a workflow the factory does not offer (422, `Invalid`). Its 200 is `{ file, replaced }`, the agent the hire replaced or null.
+ * - `DELETE /api/factories/:factory/hires/:step` — a step's hire taken back, as `nemia factory fire` takes it (`fireAgent`); it reads no
+ *   body. A step the factory hires no one into is a 404 (`Missing`). Its 200 is `{ file, fired }`.
  */
 export const commands = routesOf(COMMANDS);

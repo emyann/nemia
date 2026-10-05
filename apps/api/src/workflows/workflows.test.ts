@@ -14,7 +14,7 @@ import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
 import { app } from '../app.ts';
 import { listWorkflows, versionOf as versionIn } from './workflows.ts';
-import { engine, loadWorkflows, parentRecord, runStore } from 'agent-orchestrator';
+import { engine, hireRefusalOf, loadWorkflows, parentRecord, runStore } from 'agent-orchestrator';
 import { afterRefusal } from 'agent-orchestrator/run';
 import { AGENTS_FOLDER, STEP_KEY_MEANINGS, STEP_KEYS } from 'agent-orchestrator/workflow';
 /** The scratch repository, set as `HKB_REPO`, which the api reads on each request: a git repository, as `nemia start` reads its HEAD. */
@@ -278,6 +278,8 @@ test("GET /api/workflows/:from/:name/:step is a step's page: which workflow and 
       },
       hired: null,
       hiredIn: [],
+      /** Read in the default factory, which hires no one, so it offers no agent. */
+      hiring: { refused: hireRefusalOf(undefined, 'good', null), agents: [] },
       skillsFrom: [],
       recentRuns: [],
     },

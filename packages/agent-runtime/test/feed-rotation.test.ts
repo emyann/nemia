@@ -13,6 +13,8 @@ import { pathToFileURL } from 'node:url';
 import { Effect } from 'effect';
 import { Journal } from '../src/core/engine/journal.ts';
 import { FEED_LOCK_WAIT_MS, HEADER_BYTES, rotateFeed } from '../src/core/engine/feed.ts';
+import { instantNow } from '../src/core/engine/now.ts';
+import { elapsedMs } from '../src/core/clock.ts';
 import { ioCounts } from '../src/core/engine/tally.ts';
 import { scratch } from './scratch.ts';
 
@@ -259,10 +261,10 @@ test("a holder of the feed's lock that is stopped keeps an append out for FEED_L
     await until(() => stateOf(pid).startsWith('T'), 'the holder stops holding the lock');
     const sizes = () => [fs.statSync(head).size, fs.statSync(path.join(root, 'tasks', 'b.jsonl')).size];
     const was = sizes();
-    const t0 = performance.now();
+    const t0 = instantNow();
     const error = await Effect.runPromise(Effect.flip(ops.append('b', said(31) as never)));
-    const waited = performance.now() - t0;
-    assert.ok(waited >= FEED_LOCK_WAIT_MS, `waited ${waited} ms, at least the bound`);
+    const waited = elapsedMs(t0, instantNow());
+    assert.ok(waited >= FEED_LOCK_WAIT_MS, `waited ${waited} ms on the clock the lock is bounded by, at least the bound`);
     assert.ok(error.message.includes(path.join(root, 'feed.lock')), error.message);
     assert.ok(error.message.includes(`process ${pid}`), error.message);
     assert.ok(error.message.includes('if it is stopped, continue it or end it'), error.message);

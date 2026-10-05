@@ -255,6 +255,8 @@ export type RoundBriefing = {
    * What a person said to the target's last session while it ran (`nemia say`), given again to a round that continues it (`saidSection`).
    */
   said?: readonly Said[];
+  /** On a merge (`by: 'merge'`): the base branch and the commit of it the target merges (`mergeSection`). */
+  merge?: { onto: string; sha: string };
 };
 
 /**

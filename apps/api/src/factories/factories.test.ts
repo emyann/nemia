@@ -27,6 +27,7 @@ import {
   readInbox,
   removeFactory,
   runStore,
+  hireRefusalOf,
   unattachedRefusal,
   unfilledRefusal,
 } from 'agent-orchestrator';
@@ -214,6 +215,16 @@ test("a step's page in a factory is read with its hires, and a workflow the fact
     "in the default factory the step is the file's: no agent",
   );
   assert.deepEqual(plain.body.hiredIn, [{ factory: 'hired', agent: 'ada' }], 'and the factories that hire into it are named');
+
+  assert.deepEqual(
+    [page.body.hiring, unhired.body.hiring],
+    [
+      { refused: null, agents: [{ name: 'ada', description: null }] },
+      { refused: null, agents: [{ name: 'ada', description: null }] },
+    ],
+    "in a factory that offers the workflow, the step may be hired the repository's agents",
+  );
+  assert.deepEqual(plain.body.hiring, { refused: hireRefusalOf(undefined, 'alpha', null), agents: [] }, 'the default factory hires no one');
 
   const gamma = await get<unknown>('/api/workflows/repo/gamma/plan?factory=hired');
   assert.equal(gamma.status, 404);

@@ -14,11 +14,13 @@ import {
   factoryRepo,
   fillsOf,
   hireRefusal,
+  hireRefusalOf,
   instructionAt,
   instructionPathRefusal,
   noFactoryLine,
   noFactoryRefusal,
   outsideRefusal,
+  unattachedHireRefusal,
   unattachedRefusal,
   unfilledRefusal,
   workflowNameRefusal,
@@ -337,4 +339,25 @@ test("nemia factory ls: where a factory's instruction is kept, under its line, w
 test('the default factory keeps no instruction: both verbs refuse it, saying what to do instead', () => {
   assert.match(defaultFactoryRefusal('instruction'), /nemia factory instruction does not take it\. It keeps no instruction/);
   assert.match(defaultFactoryRefusal('instruct'), /nemia factory instruct does not take it\. It keeps no instruction/);
+});
+
+test('REFUSED before anyone hires: the default factory, a workflow the factory does not offer, and a step whose file names its agent', () => {
+  const pipao = { name: 'pipao', workflows: ['build'] };
+  assert.equal(hireRefusalOf(undefined, 'build', null), defaultFactoryRefusal('hire'), 'no factory named is the default');
+  assert.equal(hireRefusalOf({ name: DEFAULT_FACTORY, workflows: ['build'] }, 'build', null), defaultFactoryRefusal('hire'));
+  assert.equal(hireRefusalOf(pipao, 'intake', null), unattachedHireRefusal('pipao', 'intake'));
+  assert.equal(
+    unattachedHireRefusal('pipao', 'intake'),
+    'pipao does not offer the workflow intake, so it hires no one into its steps. Attach it first — nemia factory attach pipao intake — then hire.',
+  );
+  assert.equal(
+    hireRefusalOf(pipao, 'build', 'ada'),
+    "The step's own file names its agent, `agent: ada`, which fills it in every factory, and a start refuses a hire beside it. To hire into this step, delete its `agent:` line.",
+  );
+  assert.equal(hireRefusalOf(pipao, 'build', null), null, 'a step of a workflow it offers, naming no agent, takes a hire');
+});
+
+test('a hire is refused for the default factory first, then the workflow not offered, then the step naming its agent', () => {
+  assert.equal(hireRefusalOf({ name: DEFAULT_FACTORY, workflows: [] }, 'build', 'ada'), defaultFactoryRefusal('hire'));
+  assert.equal(hireRefusalOf({ name: 'pipao', workflows: [] }, 'build', 'ada'), unattachedHireRefusal('pipao', 'build'));
 });

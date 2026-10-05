@@ -57,7 +57,7 @@ export type StepUnreadable = { error: string; raw: unknown };
  * One try of a step, as the run's record keeps it: the tries behind the current one (`StepRecord.tries`), then the current.
  *
  * `try` counts from 1, and `round` is the round of its loop the try was filed in (`roundIn`). `then` is what replaced it —
- * `round`, `retries`, or the mode a person asked for — and null on the current try, which `current` marks. `note` is how the
+ * `round`, `merge`, `retries`, or the mode a person asked for — and null on the current try, which `current` marks. `note` is how the
  * try was reached, in `nemia ls`'s words (`tryNote`), and null on the first. `status` on the current try is the step's word, as on
  * the step; on an earlier one, the engine's own word for its task — `succeeded`, `failed` — since `nemia ls` words only the try
  * that decides the step. `attempts`, `check` and `closeout` are the try's own, in the step's shapes.

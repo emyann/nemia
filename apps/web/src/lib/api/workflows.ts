@@ -143,10 +143,17 @@ export type RecentRun = { id: string; brief: string; createdAt: string; factory:
 export type SkillFrom = { name: string; from: 'yours' | 'repo' | 'shipped' | null };
 
 /**
+ * Mirrors `Hiring` in apps/api/src/step/step.ts: why no agent can be hired into a step in the factory it is read in, null where one can;
+ * and the agents beside its workflow that can be, by name, each with its description — none where it is refused.
+ */
+export type Hiring = { refused: string | null; agents: Array<{ name: string; description: string | null }> };
+
+/**
  * Mirrors `WorkflowStepPage` in apps/api/src/step/step.ts: one step of a workflow — its body, its file as written, and every key a step
  * may set, in the package's order, with its value as the loader read it; and, read now in the request's factory (`factory`, null for the
  * default), what a run of it would be told (`layers`), the agent the factory hires into it (`hired`), the factories that hire into it when
- * none is named (`hiredIn`), where each skill of its layers is found (`skillsFrom`) and its newest runs (`recentRuns`).
+ * none is named (`hiredIn`), whether one can be hired into it and whom (`hiring`), where each skill of its layers is found (`skillsFrom`)
+ * and its newest runs (`recentRuns`).
  */
 export type WorkflowStepPage = {
   workflow: string;
@@ -165,6 +172,7 @@ export type WorkflowStepPage = {
   layers: StepLayers;
   hired: string | null;
   hiredIn: Array<{ factory: string; agent: string }>;
+  hiring: Hiring;
   skillsFrom: SkillFrom[];
   recentRuns: RecentRun[];
 };
@@ -183,6 +191,10 @@ const WorkflowStepPageSchema = Schema.Struct({
   layers: StepLayersSchema,
   hired: Schema.NullOr(Schema.String),
   hiredIn: Schema.mutable(Schema.Array(Schema.Struct({ factory: Schema.String, agent: Schema.String }))),
+  hiring: Schema.Struct({
+    refused: Schema.NullOr(Schema.String),
+    agents: Schema.mutable(Schema.Array(Schema.Struct({ name: Schema.String, description: Schema.NullOr(Schema.String) }))),
+  }),
   skillsFrom: Schema.mutable(
     Schema.Array(Schema.Struct({ name: Schema.String, from: Schema.NullOr(Schema.Literals(['yours', 'repo', 'shipped'])) })),
   ),

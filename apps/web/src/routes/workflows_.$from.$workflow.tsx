@@ -9,10 +9,10 @@ import { StepRows } from '../components/StepRows';
 import { WorkflowBuilder } from '../components/WorkflowBuilder';
 import { WorkflowCanvas } from '../components/WorkflowCanvas';
 import { FromBadge, NoBuilder } from '../components/WorkflowParts';
-import { factoriesQuery, storeQuery, workflowsQuery, type PagePlace, type WorkflowListing } from '../lib/api';
+import { factoriesQuery, storeQuery, workflowsQuery, type Factory, type PagePlace, type WorkflowListing } from '../lib/api';
 import { pagePlaceOf } from '../lib/factories';
 import { specStep, barOf } from '../lib/bar';
-import { workflowFactories } from '../lib/factories';
+import { hiresInto, workflowFactories } from '../lib/factories';
 
 /**
  * The page's search: `build`, while the builder of one of yours is open; and the place its steps' pages are read in, `factory` and `repo`,
@@ -55,6 +55,7 @@ function WorkflowPage() {
   const { data: all } = useSuspenseQuery(workflowsQuery);
   const { build: building = false, ...place } = Route.useSearch();
   const navigate = useNavigate();
+  const { data: factories } = useQuery(factoriesQuery);
   const workflow = all.find((w) => w.from === from && w.name === name);
   if (!workflow) return <NotListed from={from} name={name} />;
   const buildable = workflow.from === 'yours' && !workflow.error;
@@ -94,7 +95,8 @@ function WorkflowPage() {
           <WorkflowCanvas workflow={workflow} />
           <section className="space-y-2">
             <h2 className="text-xs font-medium tracking-wide text-neutral-500 uppercase">Steps</h2>
-            <StepRows workflow={workflow} place={place} />
+            <NotOffered workflow={workflow} factory={place.factory} factories={factories} />
+            <StepRows workflow={workflow} place={place} hiring={hiresInto(workflow, place.factory, factories)} />
           </section>
           <StartRun workflow={workflow} />
         </>
@@ -147,6 +149,29 @@ function WorkflowHeader({
       <p className="font-mono text-[11px] break-all text-neutral-500">{dir}</p>
       <NoBuilder workflow={workflow} />
     </header>
+  );
+}
+
+/**
+ * Once above the steps, where the factory picked is one in the store that does not offer the workflow: that it hires no one into its
+ * steps until the workflow is attached to it.
+ */
+function NotOffered({
+  workflow,
+  factory,
+  factories,
+}: {
+  workflow: WorkflowListing;
+  factory: string | undefined;
+  factories: readonly Factory[] | undefined;
+}) {
+  const named = factories?.find((f) => f.name === factory && !f.default);
+  if (!named || hiresInto(workflow, factory, factories)) return null;
+  return (
+    <p data-not-offered={named.name} className="text-xs text-neutral-500">
+      {named.name} does not offer {workflow.name}, so it hires no agent into its steps: attach the workflow to {named.name} first, and its
+      steps can be hired into here.
+    </p>
   );
 }
 

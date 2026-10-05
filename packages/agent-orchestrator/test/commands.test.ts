@@ -44,8 +44,8 @@ test('each command is served on the api where it was before the table, the lift 
       ['factory add', 'cli'],
       ['factory attach', 'cli'],
       ['factory detach', 'cli'],
-      ['factory hire', 'cli'],
-      ['factory fire', 'cli'],
+      ['factory hire', { method: 'PUT', path: '/api/factories/:factory/hires/:step', status: 200 }],
+      ['factory fire', { method: 'DELETE', path: '/api/factories/:factory/hires/:step', status: 200 }],
       [
         'factory instruction',
         [
@@ -66,6 +66,7 @@ test('each command is served on the api where it was before the table, the lift 
       ['approve', { method: 'POST', path: '/api/runs/:runId/steps/:step/approve', status: 202 }],
       ['round', { method: 'POST', path: '/api/runs/:runId/round', status: 202 }],
       ['accept', { method: 'POST', path: '/api/runs/:runId/steps/:step/accept', status: 202 }],
+      ['merge', { method: 'POST', path: '/api/runs/:runId/merge', status: 202 }],
       ['say', { method: 'POST', path: '/api/runs/:runId/steps/:step/say', status: 202 }],
       ['ls', 'cli'],
       ['show', 'cli'],

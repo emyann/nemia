@@ -182,7 +182,7 @@ export const StepAttemptsSchema = Schema.Struct({
 export type StepTry = {
   try: number;
   round: number;
-  then: 'retries' | 'nudge' | 'fresh' | 'recheck' | 'round' | 'signoff' | 'back' | null;
+  then: 'retries' | 'nudge' | 'fresh' | 'recheck' | 'round' | 'merge' | 'signoff' | 'back' | null;
   current: boolean;
   taskId: string | null;
   note: string | null;
@@ -200,7 +200,7 @@ export type StepTry = {
 export const StepTrySchema = Schema.Struct({
   try: Schema.Number,
   round: Schema.Number,
-  then: Schema.NullOr(Schema.Literals(['retries', 'nudge', 'fresh', 'recheck', 'round', 'signoff', 'back'])),
+  then: Schema.NullOr(Schema.Literals(['retries', 'nudge', 'fresh', 'recheck', 'round', 'merge', 'signoff', 'back'])),
   current: Schema.Boolean,
   taskId: Schema.NullOr(Schema.String),
   note: Schema.NullOr(Schema.String),

@@ -12,6 +12,9 @@ import {
   factoryOf,
   factorySearch,
   floorPlace,
+  hireOnCreate,
+  hirePlaceOf,
+  hiresInto,
   offeredIn,
   queuedIn,
   runsIn,
@@ -222,9 +225,44 @@ test('REFUSED: the Workflows page lists only the workflows the factory picked is
   assert.deepEqual(offered('nemia', undefined), [], 'none while the factories are unread');
 });
 
+test("REFUSED: a workflow page's rows hire into its steps only in a factory picked that offers it — never with none picked, in the default, or before the factories are read", () => {
+  const factories = [
+    factory('default', { default: true, repos: ['/r'], workflows: null, hires: {} }),
+    factory('nemia', { repos: ['/r'], workflows: ['dev'] }),
+  ];
+  const dev = { name: 'dev', from: 'repo' as const };
+  assert.equal(hiresInto(dev, 'nemia', factories), true);
+  assert.equal(hiresInto(dev, undefined, factories), false);
+  assert.equal(hiresInto(dev, 'default', factories), false, 'the default factory offers every workflow and hires no one');
+  assert.equal(hiresInto({ name: 'build', from: 'repo' }, 'nemia', factories), false);
+  assert.equal(hiresInto(dev, 'nemia', undefined), false);
+});
+
+test("REFUSED: New agent's address names the step it hires into only whole — a factory, a workflow and a step, each a string not empty", () => {
+  const whole = { factory: 'nemia', workflow: 'dev', step: 'implement' };
+  assert.deepEqual(hirePlaceOf(whole), whole);
+  assert.deepEqual(hirePlaceOf({ ...whole, other: 'x' }), whole);
+  assert.deepEqual(hirePlaceOf({}), {});
+  assert.deepEqual(hirePlaceOf({ ...whole, step: '' }), {}, 'a step named with nothing');
+  assert.deepEqual(hirePlaceOf({ ...whole, factory: undefined }), {}, 'no factory');
+  assert.deepEqual(hirePlaceOf({ ...whole, workflow: 3 }), {}, 'a workflow that is no string');
+});
+
 test("a page's address filters by the factory it names, and by none when it names none, an empty one or not one string", () => {
   assert.deepEqual(factorySearch({ factory: 'nemia' }), { factory: 'nemia' });
   assert.deepEqual(factorySearch({ factory: 'default', step: 'x' }), { factory: 'default' });
   for (const none of [{}, { factory: '' }, { factory: ['nemia'] }, { factory: 7 }])
     assert.equal(Object.hasOwn(factorySearch(none), 'factory'), false);
+});
+
+test('REFUSED: an agent made from New agent is hired only when the api takes the hire — a refusal is said, in its words, never passed over', async () => {
+  const place = { factory: 'mill', workflow: 'mine', step: 'plan' };
+  const sent: string[] = [];
+  const taken = async (factory: string, step: string, agent: string) => {
+    sent.push(`${factory} ${step} ${agent}`);
+  };
+  assert.deepEqual(await hireOnCreate(place, 'scribe', taken), { hired: true });
+  assert.deepEqual(sent, ['mill mine/plan scribe'], 'the step is sent as <workflow>/<step>');
+  const words = 'mill does not offer the workflow mine, so it hires no one into its steps.';
+  assert.deepEqual(await hireOnCreate(place, 'scribe', () => Promise.reject(new Error(words))), { hired: false, why: words });
 });

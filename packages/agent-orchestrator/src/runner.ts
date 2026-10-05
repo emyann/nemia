@@ -200,6 +200,7 @@ export {
   writersOf,
   fillsOf,
   hireRefusal,
+  hireRefusalOf,
   noFactoryLine,
   outsideRefusal,
   unattachedRefusal,
@@ -394,6 +395,7 @@ export type { SkillPage } from './skills/skills.verb.ts';
 export type { Advanced } from './tick/advance.verb.ts';
 export type { Pass } from './tick/tick.verb.ts';
 export { acceptRun, roundRun } from './round/round.verb.ts';
+export { mergeRun } from './merge/merge.verb.ts';
 export { approveRun } from './gate/gate.verb.ts';
 export { cancelRun } from './cancel/cancel.verb.ts';
 export { hold, unhold } from './wait/wait.verb.ts';

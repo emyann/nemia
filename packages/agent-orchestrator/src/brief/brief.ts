@@ -19,7 +19,8 @@ import {
   type RetryBriefing,
   type RoundBriefing,
 } from './brief-sections.ts';
-import { landsOnCheck, owesReplies } from '../status/status.ts';
+import { landsOnCheck, merged, owesReplies } from '../status/status.ts';
+import { mergeReviewSection, mergeSection } from '../merge/merge.ts';
 import { checkContract, checkHandedSection, landingContract, type CheckHanded } from '../check/check.ts';
 import { artifactsContract } from '../artifacts/artifacts.ts';
 import { briefBody, rendersAgent, skillLayers } from '../agents/agents.ts';
@@ -27,6 +28,17 @@ import { ownNote } from '../ending/ending.ts';
 import { FENCE_KEYS } from '../workflow/index.ts';
 import { inputsLine, mountsLine } from '../start/index.ts';
 import { resultSteps, workChecks } from '../branches/branches.ts';
+
+/**
+ * What a step's closeout says of `replies` (`closeoutContract`): owed on a round filed, none on a merge filed — told by the round itself,
+ * since its brief is composed before the record moves the try behind — else owed past round 1 (`owesReplies`), none for any other try of
+ * a loop's target, and nothing for a step that closes no loop.
+ */
+const repliesOf = (step: Workflow, run: Run, steps: readonly Workflow[], round?: RoundBriefing): 'owed' | 'none' | false => {
+  if (round) return round.merge ? 'none' : 'owed';
+  if (owesReplies(steps, run, step.name)) return 'owed';
+  return isLoopTarget(steps, step.name) ? 'none' : false;
+};
 
 /**
  * What a step is told. THE decision about what one step knows of another.
@@ -112,17 +124,9 @@ export function composeBrief(
   const contracts = [
     ...(step.check ? [landsOnCheck(step, run) ? landingContract(step.check) : checkContract(step.check)] : []),
     ...(artifactsDir ? [artifactsContract(artifactsDir, step.workspace === 'main', inFolder)] : []),
-    closeoutContract(
-      step,
-      Boolean(round) || owesReplies(steps, run, step.name) ? 'owed' : isLoopTarget(steps, step.name) ? 'none' : false,
-      inFolder,
-    ),
+    closeoutContract(step, repliesOf(step, run, steps, round), inFolder),
   ].join('\n');
-  const again = retry
-    ? retrySection(step, retry, inFolder) + retriedInRound(step, run, steps, retry, closeoutOf)
-    : round
-      ? roundSection(step, round, steps, closeoutOf, inFolder)
-      : '';
+  const again = againSection(step, run, steps, closeoutOf, inFolder, retry, round);
   if (retry?.resumed || round?.resumed) return again.slice(1) + contracts;
   const given = givenSections(step, run, steps, closeoutOf, checked) + again;
   const tree = depsLines(deps);
@@ -230,6 +234,21 @@ export function composeBrief(
   return parts.join('\n');
 }
 
+/** What a step filed again is told of why: its try's section (`retrySection`), its merge's (`mergeSection`) or its round's, or nothing. */
+function againSection(
+  step: Workflow,
+  run: Run,
+  steps: readonly Workflow[],
+  closeoutOf: (step: string) => Closeout | undefined,
+  inFolder: boolean,
+  retry?: RetryBriefing,
+  round?: RoundBriefing,
+): string {
+  if (retry) return retrySection(step, retry, inFolder) + retriedInRound(step, run, steps, retry, closeoutOf);
+  if (round?.merge) return mergeSection(step, round.merge, round.loop, steps);
+  return round ? roundSection(step, round, steps, closeoutOf, inFolder) : '';
+}
+
 /**
  * What a step is handed of the steps before it, in every brief but a resumed try's or round's: what each step it reads declared
  * (`## From <step>`), what each checked step it follows was told by its check (`## What <step>'s check said`), and its loop's findings.
@@ -244,7 +263,11 @@ function givenSections(
   return (
     (step.input ?? []).map((from) => fromSection(from, steps, closeoutOf)).join('\n') +
     checked.map((c) => checkHandedSection(c)).join('') +
-    (step.loop ? loopSection(step, run, steps, closeoutOf) : '')
+    (step.loop
+      ? merged(run.steps[step.name])
+        ? mergeReviewSection(step, run, closeoutOf)
+        : loopSection(step, run, steps, closeoutOf)
+      : '')
   );
 }
 

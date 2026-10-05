@@ -1,5 +1,6 @@
 import { RouteLink, AgentLink } from './AgentParts';
 import { Markdown } from './Markdown';
+import { StepHire } from './StepHire';
 import { Skills } from './Told';
 import type { ListedStep, PagePlace, WorkflowListing } from '../lib/api';
 
@@ -10,23 +11,23 @@ const LINK =
  * A workflow's steps, a row each in the order a run runs them: its name, linked to its page; its own words — a step with an agent its
  * policy, the note its file adds to its agent's instructions, and one without its whole body; its agent, linked to its page, or none; and
  * its skills — the agent's and those its line adds, or, with no agent, those its file names. Each step's page is read in `place`, the
- * factory the workflow's page was reached in.
+ * factory the workflow's page was reached in; where `hiring`, that factory offers the workflow, and each row hires into its step there.
  */
-export function StepRows({ workflow, place = {} }: { workflow: WorkflowListing; place?: PagePlace }) {
+export function StepRows({ workflow, place = {}, hiring = false }: { workflow: WorkflowListing; place?: PagePlace; hiring?: boolean }) {
   return (
     <ol
       aria-label={`Steps of ${workflow.name}`}
       className="divide-y divide-neutral-200 rounded border border-neutral-200 dark:divide-neutral-800 dark:border-neutral-800"
     >
       {workflow.steps.map((step) => (
-        <StepRow key={step.name} step={step} workflow={workflow} place={place} />
+        <StepRow key={step.name} step={step} workflow={workflow} place={place} hiring={hiring} />
       ))}
     </ol>
   );
 }
 
 /** One step's row. */
-function StepRow({ step, workflow, place }: { step: ListedStep; workflow: WorkflowListing; place: PagePlace }) {
+function StepRow({ step, workflow, place, hiring }: { step: ListedStep; workflow: WorkflowListing; place: PagePlace; hiring: boolean }) {
   const agent = step.layers?.agent ?? step.spec.agent;
   const words = step.layers ? step.layers.policy : step.body;
   return (
@@ -65,6 +66,7 @@ function StepRow({ step, workflow, place }: { step: ListedStep; workflow: Workfl
       ) : (
         <Skills word="Its skills:" skills={step.spec.skills} />
       )}
+      {hiring && <StepHire from={workflow.from} workflow={workflow.name} step={step.name} place={place} where="row" />}
     </li>
   );
 }

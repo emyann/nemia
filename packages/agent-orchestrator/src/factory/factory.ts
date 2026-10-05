@@ -176,6 +176,29 @@ export function unattachedRefusal(factory: Pick<Factory, 'name' | 'workflows'>, 
 }
 
 /**
+ * Why `factory` hires no one into the steps of `workflow`, which it does not offer: the attach that offers it, then the hire. Said by the
+ * hire it refuses (`hireAgent`) and by a step's page before anyone hires.
+ */
+export const unattachedHireRefusal = (factory: string, workflow: string): string =>
+  `${factory} does not offer the workflow ${workflow}, so it hires no one into its steps. Attach it first — nemia factory attach ${factory} ${workflow} — then hire.`;
+
+/**
+ * Why no agent can be hired into the step of `workflow` in `factory`, or null where one can, judged in this order: the default factory,
+ * which hires no one (`defaultFactoryRefusal`); a workflow the factory does not offer (`unattachedHireRefusal`); and a step whose own file
+ * names an agent, `named` — null for none — which fills it in every factory, so a start would refuse a hire beside it.
+ */
+export function hireRefusalOf(
+  factory: Pick<Factory, 'name' | 'workflows'> | undefined,
+  workflow: string,
+  named: string | null,
+): string | null {
+  if (factory === undefined || factory.name === DEFAULT_FACTORY) return defaultFactoryRefusal('hire');
+  if (!factory.workflows.includes(workflow)) return unattachedHireRefusal(factory.name, workflow);
+  if (named === null) return null;
+  return `The step's own file names its agent, \`agent: ${named}\`, which fills it in every factory, and a start refuses a hire beside it. To hire into this step, delete its \`agent:\` line.`;
+}
+
+/**
  * The repository a run in `factory` works on: `named` when a person named one, else the factory's repository when it has only one, else
  * `fallback` — where `nemia start` is typed, or the daemon's repository for a queued card. With no factory — the default — `named`, else
  * `fallback`. Whether it is one of the factory's is `outsideRefusal`'s to judge.

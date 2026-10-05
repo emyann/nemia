@@ -165,6 +165,7 @@ export const adoptRounds = Effect.fn('adoptRounds')(function* (
     if (!view.state.brief) continue;
     views.set(taskId, view);
     Object.assign(run.steps, roundFiled(steps, run, r, taskId));
+    if (r.merge && isGitRun(run)) run.baseRef = r.merge.sha;
     adopted.push(r.step);
   }
   return adopted;

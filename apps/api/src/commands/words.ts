@@ -9,13 +9,15 @@ import { decodeBody, valueAt, type BodyIssue, type Words } from '../body.ts';
 import type { Guarded } from '../guard.ts';
 
 /**
- * What a route's path names: the run and the step — `step` empty on a route that names none, both on a route of the store's own — the
- * `name` of what else it names, a card or an agent, and the request's `method` and `path`, as a refusal says the route.
+ * What a route's path names: the run and the step — `step` empty on a route that names none, `runId` on a route of the store's own, where
+ * `step` is a factory's hire's — the `name` of what else it names, a card or an agent, the `factory` a hire names, and the request's
+ * `method` and `path`, as a refusal says the route.
  */
 export type Named = {
   readonly runId: string;
   readonly step: string;
   readonly name: string;
+  readonly factory: string;
   readonly method: string;
   readonly path: string;
 };
@@ -44,6 +46,9 @@ const RETRY_SHAPE =
 
 /** The body `POST …/round` takes: `nemia round`'s arguments, as JSON. */
 const ROUND_SHAPE = '`{ "step"?: "<looping step>", "budget"?: <amount> }`';
+
+/** The body `POST …/merge` takes: `nemia merge`'s argument, as JSON. */
+const MERGE_SHAPE = '`{ "step"?: "<looping step>" }`';
 
 /** The body `POST …/approve` takes: `nemia approve`'s `--message`, as JSON. */
 const APPROVE_SHAPE = '`{ "message"?: "<words>" }`';
@@ -123,6 +128,28 @@ const ROUND: RouteWords = {
   issue: ({ runId }) => roundWords(runId),
   failed: ({ runId }, said) =>
     `Could not ask for another round of ${runId}'s loop: ${said}. \`nemia round ${runId}\` asks the same way from the command line.`,
+};
+
+/** A merge of the base into a loop's work, as the guard's refusals word it, its body and its failures. */
+const MERGE: RouteWords = {
+  shape: MERGE_SHAPE,
+  guard: ({ runId }) => ({
+    route: `POST /api/runs/${runId}/merge`,
+    does: "sends a loop's work back to merge its base branch",
+    forAnother: 'ask for one',
+    why: "the next tick files the merge a person asks for, which runs the loop's target again in this repository to merge the base into its work",
+    reach: "ask it from the run's page on the board",
+    instead: `Ask it from the run's page on the board, or with \`nemia merge ${runId} [<step>]\``,
+    shape: MERGE_SHAPE,
+  }),
+  issue:
+    ({ runId }) =>
+    ({ path: [key], input }) =>
+      key === 'step'
+        ? `\`step\` names the looping step whose work merges, as \`nemia merge ${runId} <step>\` does: a name, or left out for a run with one loop. This request's was ${JSON.stringify(input)}: ${MERGE_SHAPE}.`
+        : `POST …/merge takes a JSON object: ${MERGE_SHAPE}.`,
+  failed: ({ runId }, said) =>
+    `Could not ask for a merge of ${runId}'s base: ${said}. \`nemia merge ${runId}\` asks the same way from the command line.`,
 };
 
 /** An approval of a step waiting at its gate, as the guard's refusals word it, its body and its failures. */
@@ -553,10 +580,59 @@ const FACTORY_INSTRUCT: RouteWords = {
   notJson: (at) => `${instructionRoute(at, true)} takes a JSON body: ${INSTRUCT_PUT_SHAPE}.`,
 };
 
+const HIRE_PUT_SHAPE = '`{ "agent": "<the agent\'s name>" }`';
+
+/** The route of the hire into a step `at` names, as a refusal says it, the step encoded as the path carries it. */
+const hireRoute = ({ method, factory, step }: Named): string => `${method} /api/factories/${factory}/hires/${encodeURIComponent(step)}`;
+
+/** A name in a hire's route that is no factory's, in the package's words, before anything is read. */
+const hireFactoryNamed = (at: Named): string | null => {
+  const wrong = factoryNameRefusal(at.factory);
+  return wrong === undefined ? null : `${hireRoute(at)}: ${wrong}`;
+};
+
+/**
+ * An agent hired into a step of a factory's workflow, as the guard's refusals word it: a name that is no factory's is refused in the
+ * package's words, an agent that is no string in the api's.
+ */
+const FACTORY_HIRE: RouteWords = {
+  shape: HIRE_PUT_SHAPE,
+  guard: (at) => ({
+    route: hireRoute(at),
+    does: 'hires an agent into a step of a factory',
+    forAnother: 'hire one',
+    why: 'every run of the workflow started in the factory after runs the step as that agent, in its repositories',
+    reach: "hire it on the step's page on the board",
+    instead: "Hire it on the step's page on the board",
+    shape: HIRE_PUT_SHAPE,
+  }),
+  issue: (at) => (_issue, body) =>
+    `${hireRoute(at)}: \`agent\` names the agent to hire, a string, its file's name without .md: ${HIRE_PUT_SHAPE}. This request's was ${JSON.stringify(valueAt(body, ['agent'])) ?? 'left out'}.`,
+  named: hireFactoryNamed,
+  notJson: (at) => `${hireRoute(at)} takes a JSON body: ${HIRE_PUT_SHAPE}.`,
+};
+
+/** A step's hire taken back, as the guard's refusals word it: a name that is no factory's is refused in the package's words. */
+const FACTORY_FIRE: RouteWords = {
+  shape: '`{}`',
+  guard: (at) => ({
+    route: hireRoute(at),
+    does: "takes a step's hire back",
+    forAnother: 'take it back',
+    why: 'every run of the workflow started in the factory after runs the step with no agent hired, and a start refuses a step left with none',
+    reach: "fire it on the step's page on the board",
+    instead: "Fire it on the step's page on the board",
+    shape: '`{}`',
+  }),
+  issue: (at) => () => `${hireRoute(at)} takes no body.`,
+  named: hireFactoryNamed,
+};
+
 /** The api's words for each routed command, by its name. */
 export const WORDS: Readonly<Record<string, RouteWords>> = {
   retry: RETRY,
   round: ROUND,
+  merge: MERGE,
   approve: APPROVE,
   accept: ACCEPT,
   say: SAY,
@@ -573,4 +649,6 @@ export const WORDS: Readonly<Record<string, RouteWords>> = {
   'agents custom': AGENTS_CUSTOM,
   'factory instruction': FACTORY_INSTRUCTION,
   'factory instruct': FACTORY_INSTRUCT,
+  'factory hire': FACTORY_HIRE,
+  'factory fire': FACTORY_FIRE,
 };

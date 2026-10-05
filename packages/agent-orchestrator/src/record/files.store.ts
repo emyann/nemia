@@ -10,7 +10,9 @@ import { Schema } from 'effect';
 import { pauseFile, readPause } from '../pause/pause.store.ts';
 import type { Pause } from '../pause/pause.ts';
 import type { QueueTry } from '../inbox/inbox.ts';
-import type { AskKey, AskKind, AskWritten, PersonAsk, Pruned, Run, RunStore } from './record.ts';
+import type { AskKey, AskKind, AsksRead, AskWritten, PersonAsk, Pruned, Run, RunStore } from './record.ts';
+import type { RetryAsk } from '../retry/index.ts';
+import type { RoundAsk } from '../status/status.ts';
 import {
   HOME,
   acceptFile,
@@ -22,6 +24,9 @@ import {
   asksDir,
   cancelFile,
   consumeAsks,
+  doneWith,
+  fileNames,
+  heldIn,
   holdFile,
   isDirectory,
   listRuns,
@@ -29,6 +34,7 @@ import {
   markCancelled,
   pruneFile,
   readAnswers,
+  readAs,
   readAsks,
   readRun,
   removeHold,
@@ -41,7 +47,9 @@ import {
   writeAsk,
   writeHold,
   writeRun,
+  When,
 } from './record.store.ts';
+import { mergeSpent } from '../merge/merge.ts';
 
 /** Each kind of ask: the file it is written at, by run, step and number, and its reader, as the tick reads it. */
 const ASKS: Record<
@@ -52,6 +60,7 @@ const ASKS: Record<
   round: { file: roundAskFile, read: roundAskIn },
   approve: { file: approvalFile, read: approvalIn },
   accept: { file: acceptFile, read: acceptanceIn },
+  merge: { file: mergeAskFile, read: mergeAskIn },
 };
 
 /** The file of the ask `key` of the run `id`. */
@@ -61,12 +70,83 @@ const askWhere = (id: string, { kind, step, n }: AskKey): string => ASKS[kind].f
  * Write a person's ask at its name (`writeAsk`), the ask alone; and, when a file already stands there, why it is no ask of its kind: its
  * reader's words, or null when it reads as one or is gone since.
  */
-function writePersonAsk(id: string, { kind, ask }: PersonAsk): AskWritten {
-  const n = 'round' in ask ? ask.round : ask.try;
-  const where = askWhere(id, { kind, step: ask.step, n });
-  if (writeAsk(where, ask)) return { written: true, where };
-  const read = ASKS[kind].read(where, ask.step, n);
+function writePersonAsk(id: string, person: PersonAsk): AskWritten {
+  const { kind, ask } = person;
+  const [step, n] =
+    person.kind === 'merge' ? [person.ask.merge.target, person.ask.merge.try] : [ask.step, 'round' in ask ? ask.round : ask.try];
+  const where = askWhere(id, { kind, step, n });
+  if (writeAsk(where, askHeld(person))) return { written: true, where };
+  const read = ASKS[kind].read(where, step, n);
   return { written: false, where, stray: typeof read === 'string' && lstatOf(where) ? read : null };
+}
+
+/** What a person's ask file holds: the ask as its verb gave it, but a merge's, which holds its loop, round, base, commit and time. */
+function askHeld(person: PersonAsk): Parameters<typeof writeAsk>[1] {
+  if (person.kind !== 'merge') return person.ask;
+  const { step, round, at, merge } = person.ask;
+  return { loop: step, round, onto: merge.onto, sha: merge.sha, at };
+}
+
+const MergeAskFileSchema = Schema.StructWithRest(
+  Schema.Struct({ loop: Schema.NonEmptyString, round: Schema.Int, onto: Schema.NonEmptyString, sha: Schema.NonEmptyString, at: When }),
+  [Schema.Record(Schema.String, Schema.Unknown)],
+);
+
+/** A merge ask's file in the run's asks directory: `merge-<step>-<n>`, the loop's target and its try that merges the base. */
+function mergeAskFile(id: string, step: string, n: number): string {
+  return path.join(asksDir(id), `merge-${step}-${n}`);
+}
+
+/**
+ * One merge ask file, read: the loop's target and its try from its name; the looping step, the round it is on, the base branch, its commit
+ * and when from what it holds — as a round ask of that looping step and round, with what it merges (`RoundAsk.merge`) — or why it cannot be
+ * read.
+ */
+function mergeAskIn(file: string, step: string, n: number): RoundAsk | string {
+  const held = heldIn(file);
+  if ('unreadable' in held) return held.unreadable;
+  const read = readAs(MergeAskFileSchema, held.read);
+  if ('refused' in read) return read.refused === 'at' ? 'it says no time it was given' : 'it is not an ask nemia merge wrote';
+  const { loop, round, onto, sha, at } = read.read;
+  return { step: loop, round, at, merge: { target: step, try: n, onto, sha } };
+}
+
+/** The merge asks waiting in a run's directory, and a line for each file named as one that cannot be read as one. */
+function readMergeAsks(id: string): { rounds: RoundAsk[]; notes: string[] } {
+  const rounds: RoundAsk[] = [];
+  const notes: string[] = [];
+  for (const name of fileNames(asksDir(id)) ?? []) {
+    const named = /^merge-(.+)-(\d+)$/.exec(name);
+    const file = path.join(asksDir(id), name);
+    const ask = named ? mergeAskIn(file, named[1], Number(named[2])) : undefined;
+    if (typeof ask === 'string') notes.push(`${file}: ${ask}, so it is not honoured — remove it, and ask with nemia merge`);
+    else if (ask) rounds.push(ask);
+  }
+  return { rounds, notes };
+}
+
+/** Move each merge ask among `rounds` the run's record already answers (`mergeSpent`) into `done/`: the tick's one touch on it. */
+function consumeMergeAsks(run: Run, rounds: readonly RoundAsk[]): void {
+  const spent = rounds.filter((a) => a.merge && mergeSpent(run, a)).map((a) => mergeAskFile(run.id, a.merge!.target, a.merge!.try));
+  doneWith(run.id, spent);
+}
+
+/** The asks waiting in a run's directory (`readAsks`), a person's merges among its rounds (`readMergeAsks`). */
+function readAllAsks(id: string): AsksRead {
+  const { asks, rounds, notes } = readAsks(id);
+  const merges = readMergeAsks(id);
+  return { asks, rounds: [...rounds, ...merges.rounds], notes: [...notes, ...merges.notes] };
+}
+
+/** Consume the asks the run's record answers (`consumeAsks`), its merges apart (`consumeMergeAsks`). */
+function consumeAllAsks(run: Run, asks: readonly RetryAsk[], rounds: readonly RoundAsk[], voided: readonly RetryAsk[] = []): void {
+  consumeAsks(
+    run,
+    asks,
+    rounds.filter((a) => !a.merge),
+    voided,
+  );
+  consumeMergeAsks(run, rounds);
 }
 
 /** Remove the run's record and a person's files beside it, and its own directory, answering each path removed from `WF_ROOT`. */
@@ -288,7 +368,7 @@ export const filesStore: RunStore = {
     forget: removeRunFiles,
     prune: writePruned,
   },
-  asks: { read: readAsks, answers: readAnswers, consume: consumeAsks, write: writePersonAsk, where: askWhere },
+  asks: { read: readAllAsks, answers: readAnswers, consume: consumeAllAsks, write: writePersonAsk, where: askWhere },
   holds: { lift: removeHold, put: writeHold, stands: (id) => fs.existsSync(holdFile(id)) },
   forgetting: {
     write: writeForgetting,

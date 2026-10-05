@@ -1654,6 +1654,21 @@ test("the inspector's Details list a step's rounds, a row a try: its round and h
   assert.match(once, />attempts<\/dt>/);
 });
 
+test('a try a merge replaced decodes as the api serves it and reads as a merge, on the round it was on: the board says merge, never round', async () => {
+  const { Schema } = await import('effect');
+  const { StepTrySchema } = await import('../src/lib/api/tries.ts');
+  const merged = [
+    threeTries[0],
+    Schema.decodeUnknownSync(StepTrySchema)({ ...threeTries[1], then: 'merge', note: 'try 2, by retries: 1' }),
+    { ...threeTries[2], round: 1, note: 'try 3, merged the base, on your word (nemia merge), the round unchanged' },
+  ];
+  const run = runWith('round 1 of 3');
+  const step = { ...run.steps[0], name: 'implement', status: 'running (working)', attempts: merged[2].attempts, tries: merged };
+  const html = renderToStaticMarkup(createElement(StepTabs, { run, step }));
+  assert.ok(html.includes('round 1 · try 3 (merge)'), html);
+  assert.ok(!html.includes('(round)'), html);
+});
+
 test("the Output tab opens on the outcome and who said it, then draws each field by its shape — findings a table, replies with badges, a yes or no with what it means, anything else JSON — and every other try's folded beneath it", () => {
   const replies = [
     { finding: '`src/cache.ts:12` — the cache never expires', answer: 'fixed', why: 'Entries expire after the **TTL** now.' },
@@ -6007,6 +6022,95 @@ test("a step's agent: the one the factory picked hires, marked hired; else its f
   assert.match(
     await routedWith(createElement(StepAgent, { page: await hiredPage({ factory: null, hired: null, keys: [] }) })),
     /Its file names no agent\./,
+  );
+});
+
+/**
+ * StepHire for the step `review` of `w`, read in `place` (the factory `hiring` unless said) from `page`'s answer, drawn on the step's
+ * page or a row.
+ */
+const hireOn = async (
+  page: Record<string, unknown> | null,
+  where: 'page' | 'row' = 'page',
+  place: { factory?: string } = { factory: 'hiring' },
+): Promise<string> => {
+  const { StepHire } = await import('../src/components/StepHire.tsx');
+  const { stepQuery } = await import('../src/lib/api/workflows.ts');
+  const read = await hiredPage(page ?? {});
+  const store = { workflows: '/store/workflows', agents: '/store/agents', skills: '/store/skills', fileFactory: '' };
+  return routedWith(createElement(StepHire, { from: read.from, workflow: 'w', step: 'review', place, where }), [
+    ...(page === null ? [] : [[stepQuery(read.from, 'w', 'review', place).queryKey, read] as [readonly unknown[], unknown]]),
+    [['store'], store],
+  ]);
+};
+
+const PICKABLE = {
+  refused: null,
+  agents: [
+    { name: 'ada', description: 'Builds it.' },
+    { name: 'scribe', description: null },
+  ],
+};
+
+test('hiring into a step: the agent hired with Fire; else the picker of the agents beside it, with Hire and, on yours, New agent', async () => {
+  const hired = await hireOn({});
+  assert.match(hired, /hiring hires[^]*href="\/agents\/yours\/writer"[^]*into this step\./);
+  assert.match(hired, /data-fire="writer"[^>]*>Fire</);
+  assert.doesNotMatch(hired, /data-hire-picker|data-new-agent|data-hire-refused/, 'a step hired into is fired before another is hired');
+
+  const open = await hireOn({ hired: null, hiring: PICKABLE });
+  assert.match(open, /data-hire-picker/);
+  assert.match(open, />Hire into this step in hiring</);
+  assert.match(open, /data-hire="true"[^>]*disabled=""[^>]*>Hire</, 'Hire waits for an agent picked');
+  assert.match(open, /<option value="ada">ada<\/option><option value="scribe">scribe<\/option>/);
+  assert.doesNotMatch(open, /data-fire/);
+  assert.match(
+    open,
+    /data-new-agent[^>]*href="\/agents\/new\?factory=hiring&amp;workflow=w&amp;step=review"[^>]*>New agent, hired into this step</,
+    'New agent carries the step it comes back to hire into',
+  );
+  assert.doesNotMatch(open, /data-new-agent-repo/);
+
+  const none = await hireOn({ hired: null, hiring: { refused: null, agents: [] } });
+  assert.match(none, /data-hire-none[^>]*>None of your agents reads, so there is no agent to hire into this step in hiring\./);
+  assert.match(none, /data-new-agent/, 'and New agent writes the first');
+});
+
+test("REFUSED, hiring into a step: the package's words said in place, and no picker, Fire nor New agent", async () => {
+  const refused = "The step's own file names its agent, `agent: scribe`, which fills it in every factory.";
+  const html = await hireOn({ hired: null, hiring: { refused, agents: [] } });
+  assert.match(
+    html,
+    /data-hire-refused[^>]*>The step&#x27;s own file names its agent, `agent: scribe`, which fills it in every factory\.</,
+  );
+  assert.doesNotMatch(html, /data-hire-picker|data-fire|data-new-agent/);
+});
+
+test("hiring into one of the repository's steps: no New agent; its page says one is added through a card or by copying it into yours", async () => {
+  const page = await hireOn({ hired: null, from: 'repo', hiring: PICKABLE });
+  assert.match(page, /data-hire-picker/, "the repository's agents are hired as yours are");
+  assert.doesNotMatch(page, /data-new-agent=/);
+  assert.match(
+    page,
+    /data-new-agent-repo[^>]*>A new agent for this repository&#x27;s workflow is added through a card on the[^]*href="\/inbox"[^]*, or by copying the workflow&#x27;s folder into <code[^>]*>\/store\/workflows\/<\/code>/,
+  );
+  const row = await hireOn({ hired: null, from: 'repo', hiring: PICKABLE }, 'row');
+  assert.match(row, /data-hire-picker/);
+  assert.doesNotMatch(row, /data-new-agent/, 'a row says no more than its controls');
+});
+
+test('hiring into a step draws nothing before its read is there', async () => {
+  assert.equal(await hireOn(null), '');
+});
+
+test("REFUSED, hiring into a step with no factory picked: nothing is drawn — not the default factory's refusal, which is said in it", async () => {
+  const refused = '`default` is the default factory: a hire names a factory of yours.';
+  const page = { factory: null, hired: null, hiring: { refused, agents: [] } };
+  assert.equal(await hireOn(page, 'page', {}), '', 'under All factories, the step says nothing of a hire');
+  assert.match(
+    await hireOn(page, 'page', { factory: 'default' }),
+    /data-hire-refused[^>]*>`default` is the default factory: a hire names a factory of yours\.</,
+    'in the default factory, picked, why none is hired',
   );
 });
 

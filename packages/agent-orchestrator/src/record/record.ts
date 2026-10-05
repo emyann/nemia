@@ -504,6 +504,8 @@ export type RunStore = {
     readonly stamps: () => Map<string, string>;
     /** Whether the run's record is there. */
     readonly exists: (id: string) => boolean;
+    /** Whether a new run may not take the id: a record, a person's file, an ask or a directory of the store already has it. */
+    readonly taken: (id: string) => boolean;
     /** Whether a person called the run off: cancelled it, pruned it, or holds it — or paused the whole store. */
     readonly calledOff: (id: string) => boolean;
     /**

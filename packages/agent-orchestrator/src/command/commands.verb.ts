@@ -46,6 +46,7 @@ import { FACTORIES } from '../factory/factory.verb.ts';
 import { INBOXES } from '../inbox/commands.verb.ts';
 import { PLAN, START } from '../start/commands.verb.ts';
 import { CANCEL, PAUSE, PAUSED, PAUSE_NOW, HOLD, PRUNE, RAN, RM, RESUME } from './runs.verb.ts';
+import { SUBSCRIBE, UNSUBSCRIBE } from '../subscription/subscription.verb.ts';
 import { PASSES } from '../meter/passes.verb.ts';
 
 /** The text under `key`, or undefined where none was given. */
@@ -519,6 +520,8 @@ export const COMMANDS: readonly Command[] = [
   RESUME,
   PAUSED,
   PAUSE_NOW,
+  SUBSCRIBE,
+  UNSUBSCRIBE,
   ...WORKFLOW_ENTRIES,
 ];
 

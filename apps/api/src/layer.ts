@@ -79,25 +79,29 @@ export type Served = {
   memo: ReadMemo['Service'];
 };
 
-/** The upper bounds of a request's journal reads, one past the last for more. */
+/** The upper bounds of a request's reads, the files the runtime read for it, one past the last for more. */
 const READ_BOUNDS: readonly number[] = [0, 1, 2, 5, 10, 25, 50, 100, 250, 500, 1000];
 
 /**
- * The journals each request read, by the route it was served on (`route`, the route's pattern, never its path), in the registry of the
- * app's runtime: the process's own unless its layer gives another. Counted off the engine's running totals before and after the handler,
- * so about: a pass or another request reading at the same time is counted here too.
+ * The files the runtime read for each request, its journals and every other file it reads (the engine's `io`), by the route it was
+ * served on (`route`, the route's pattern, never its path), in the registry of the app's runtime: the process's own unless its layer
+ * gives another. Counted off the engine's running totals before and after the handler, so about: a pass or another request reading at
+ * the same time is counted here too.
  */
-export const POLL_READS = Metric.histogram('api.poll.reads', { description: 'the journals a request read', boundaries: READ_BOUNDS });
+export const POLL_READS = Metric.histogram('api.poll.reads', {
+  description: 'the files the runtime read for a request',
+  boundaries: READ_BOUNDS,
+});
 
-/** The journals the engine has read so far, or none for an engine that keeps no count (a test's fake). */
+/** The files the engine has read so far, its journals among them, or none for an engine that keeps no count (a test's fake). */
 const readsOf = (e: Engine['Service']): number | undefined => (typeof e.io === 'function' ? e.io().reads : undefined);
 
 /**
  * `handle` over the request's services, run on the app's runtime, in the factory and on the repository the request names (`placeFor`):
  * what it returns, or its rejection itself, so a refusal thrown inside it — the place's among them, before `handle` runs — reaches
  * `app.onError` as the instance it was and is answered by its kind. The handler's body stays a plain function: a failure yielded inside
- * `Effect.gen` never reaches a `try` around it, and the routes catch what they word themselves. The journals it read are counted into
- * `POLL_READS`, whether it answered or threw.
+ * `Effect.gen` never reaches a `try` around it, and the routes catch what they word themselves. The files the runtime read for it are
+ * counted into `POLL_READS`, whether it answered or threw.
  */
 export const served = <A>(c: RequestContext<ApiEnv>, handle: (s: Served) => A | Promise<A>): Promise<A> =>
   c.var.runtime.runPromise(

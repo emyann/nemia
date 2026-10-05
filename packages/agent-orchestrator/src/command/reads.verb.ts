@@ -197,6 +197,7 @@ export const STATS: Command<Stats> = {
       {
         memo: kept?.stats,
         verify: env ? verifiesRest(env) : undefined,
+        series: kept?.series,
       },
     ),
   print: (s, args) => (args.json === true ? [JSON.stringify(s, null, 2)] : args.line === true ? [statsLine(s)] : statsLines(s)),

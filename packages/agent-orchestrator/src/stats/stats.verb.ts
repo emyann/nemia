@@ -21,6 +21,8 @@ import { closeoutReader, everyTryOf, taskCloseout, taskPhases, viewedOnce } from
 import { phaseOfView } from '../views/views-words.ts';
 import { renderedSkillApplies, renderedSkillRules, renderedSkillVersions } from '../agents/agents.store.ts';
 import { followedFeed } from '../rest/rest.verb.ts';
+import type { SeriesMemo } from '../series/series.ts';
+import { seriesHealth } from '../series/series.verb.ts';
 import { dayOf, factsOf, keysOf, statsOf, type CheckVerdict, type Facts, type RunFact, type StatsQuery, type TryFact } from './stats.ts';
 import { frozenOf, type RunFrozen } from './marks.ts';
 import { deniedCallsOf, filesTouchedOf, skillsLoadedOf } from './discipline.ts';
@@ -103,9 +105,10 @@ export const freshStatsMemo = (): StatsMemo => ({ runs: new Map() });
 
 /**
  * How `stats` reads: `memo`, the memo it answers runs from and keeps them in, none by default, which reads every run; and `verify`, which
- * reads each run the memo answers afresh too and fails where the two differ (`WF_VERIFY_REST=1`).
+ * reads each run the memo answers afresh too and fails where the two differ (`WF_VERIFY_REST=1`); and `series`, the memo the system's
+ * health reads the series' days through (`seriesHealth`).
  */
-export type StatsOptions = { memo?: StatsMemo; verify?: boolean };
+export type StatsOptions = { memo?: StatsMemo; verify?: boolean; series?: SeriesMemo };
 
 /** What `run` gives the stats (`RunRead`). Rejects with what a read of it rejected with but a journal that does not read. */
 async function factsRead(e: Engine, run: Run): Promise<RunRead> {
@@ -180,9 +183,9 @@ async function listReads(e: Engine): Promise<RunRead[]> {
  * The stats of every run in the store for `query`, as of `now` (`statsOf`), over `e` viewed once, through `options.memo` where one is
  * handed (`memoReads`). A run a journal of which does not read is left out of the facts and named in `unreadable`, and what it froze is
  * still compared (`frozenRun`); a run whose frozen steps do not read gives nothing; a record that does not read is left out, said on
- * stderr.
+ * stderr. The system's health is read over the days answered (`seriesHealth`).
  */
-async function statsOver(e: Engine, query: StatsQuery, now: Date, { memo, verify = false }: StatsOptions) {
+async function statsOver(e: Engine, query: StatsQuery, now: Date, { memo, verify = false, series }: StatsOptions) {
   const facts: Facts = { tries: [], runs: [], frozen: [] };
   const unreadable: string[] = [];
   for (const read of memo ? await memoReads(e, memo, verify) : await listReads(e)) {
@@ -192,7 +195,7 @@ async function statsOver(e: Engine, query: StatsQuery, now: Date, { memo, verify
     facts.runs.push(...read.facts.runs);
     if (read.unreadable) unreadable.push(read.id);
   }
-  return statsOf(facts, query, now, unreadable);
+  return statsOf(facts, query, now, unreadable, (from, to) => seriesHealth(from, to, series));
 }
 
 /**

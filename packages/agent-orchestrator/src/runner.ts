@@ -427,6 +427,8 @@ export { prune } from './prune/prune.verb.ts';
 export { decide } from './decide/decide.verb.ts';
 export { freshStatsMemo, stats } from './stats/stats.verb.ts';
 export type { StatsMemo, StatsOptions } from './stats/stats.verb.ts';
+export { seriesMemo } from './series/series.ts';
+export type { Health, SeriesMemo, SeriesPoint, SeriesRead } from './series/series.ts';
 export { BY_KEYS, statsLine, statsLines, statsQueryOf } from './stats/index.ts';
 export type { ByKey, QueryKey, Stats, StatsQuery } from './stats/index.ts';
 export { list, pausedRead, runReading, unjudgedOf } from './list/list.verb.ts';

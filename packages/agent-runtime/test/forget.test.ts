@@ -234,7 +234,7 @@ test('a pass over settled tasks the memo skips writes nothing and takes no lock'
 
 const check: HarnessSpec = { name: 'check', command: () => ({ cmd: 'sh', args: ['-c', 'echo checked'] }) };
 
-test('forget removes the run files a detached harness keeps of a settled session', async () => {
+test("forget removes the run files a detached harness keeps of a settled session, and no other session's", async () => {
   const root = scratch('ae-forget-root-');
   const engine = builtEngine(Engine.layer({ root, harnesses: { check }, defaultHarness: 'check' }));
   const id = await Effect.runPromise(engine.file({ brief: 'b', cwd: scratch('ae-forget-cwd-') }));
@@ -248,10 +248,11 @@ test('forget removes the run files a detached harness keeps of a settled session
   const runs = path.join(root, 'runs', 'check');
   const files = fs.readdirSync(runs);
   assert.ok(files.length > 0, 'the run left files');
+  fs.writeFileSync(path.join(runs, 'ae-other-1.json'), '{}');
   const dry = await Effect.runPromise(engine.forget([id]));
   assert.deepEqual(dry.tasks[0]?.sessions[0]?.files.map((f) => path.basename(f)).sort(), files.sort());
   await Effect.runPromise(engine.forget([id], { yes: true }));
-  assert.deepEqual(fs.readdirSync(runs), [], 'every run file went');
+  assert.deepEqual(fs.readdirSync(runs), ['ae-other-1.json'], "every run file of the session went, and another session's stayed");
 });
 
 /** What `main(argv)` printed with `console.log`, on the board at `root`. */

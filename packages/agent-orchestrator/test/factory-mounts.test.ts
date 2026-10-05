@@ -71,9 +71,12 @@ function fresh(): { repos: string[]; loop: string; notes: string } {
 /** Read-only mounts of `paths`, as a record and a filing hold them. */
 const readOnly = (...paths: string[]) => paths.map((p) => ({ path: p, readOnly: true }));
 
-/** Just enough engine: each task's phase and closeout, and every task filed, by id, as the run handed it. */
+/**
+ * Just enough engine: each task's phase and closeout, and every task filed, by id, as the run handed it. A task settled `lost` keeps no
+ * session id, so what is filed after it starts a new session.
+ */
 const board = () => {
-  const tasks = new Map<string, { phase: string; closeout?: unknown }>();
+  const tasks = new Map<string, { phase: string; closeout?: unknown; lost?: boolean }>();
   const filed = new Map<string, { brief: string; harness?: string; config?: { mounts?: unknown } }>();
   const e = {
     view: async (id: string) => {
@@ -91,7 +94,7 @@ const board = () => {
           attempts:
             !t || t.phase === 'pending'
               ? []
-              : [{ n: 1, ended: null, nativeId: `native-${id}`, closeout: t.closeout, exitCode: null, usage: null }],
+              : [{ n: 1, ended: null, nativeId: t.lost ? null : `native-${id}`, closeout: t.closeout, exitCode: null, usage: null }],
         },
       };
     },
@@ -102,7 +105,7 @@ const board = () => {
     },
     stop: async () => {},
   } as unknown as Engine;
-  const settle = (id: string, phase: string, closeout?: unknown) => tasks.set(id, { phase, closeout });
+  const settle = (id: string, phase: string, closeout?: unknown, lost = false) => tasks.set(id, { phase, closeout, lost });
   return { e, filed, settle };
 };
 
@@ -522,11 +525,6 @@ test('mountsLine names each folder the steps before it handed over, by its path 
   ]);
   assert.deepEqual(mountsLine({ harness: 'claude' }, {}, { handed: [], store: [] }), [], 'a step handed none');
   assert.deepEqual(mountsLine({ harness: 'a2a:peer' }, {}, { handed, store: [] }), [], 'a remote agent is filed none');
-  assert.deepEqual(
-    mountsLine({ harness: 'claude' }, { place: { kind: 'folder' } }, { handed, store: [] }),
-    [],
-    "a folder run's step is told only of its own folder, where it is given the steps' work before it",
-  );
 });
 
 /**
@@ -541,7 +539,7 @@ const unnamed = (filing: { brief: string; config?: { mounts?: unknown } }): stri
     .map((m) => m.path);
 };
 
-test("every folder a local step is filed with is named on its brief, as it is mounted: the factory's, the steps' before it, the store's", async () => {
+test("every folder a local step is filed with is named on its brief, as it is mounted, on a first filing, a try and a round: the factory's, the steps' before it, the store's", async () => {
   const { repos, loop } = fresh();
   fs.writeFileSync(
     path.join(loop, 'implement.md'),
@@ -554,10 +552,16 @@ test("every folder a local step is filed with is named on its brief, as it is mo
   await advance(b.e, readRun(run.id));
   await retry(b.e, run.id, 'implement', { mode: 'fresh' });
   await advance(b.e, readRun(run.id));
-  b.settle(readRun(run.id).steps.implement.taskId!, 'succeeded', SIGNED);
+  const tried = readRun(run.id).steps.implement.taskId!;
+  b.settle(tried, 'succeeded', SIGNED, true);
   await advance(b.e, readRun(run.id));
+  b.settle(`${run.id}-review`, 'succeeded', { ...SIGNED, again: true });
+  await advance(b.e, readRun(run.id));
+  const round = readRun(run.id).steps.implement.taskId!;
+  assert.notEqual(round, tried, 'a round is filed');
+  assert.ok(b.filed.get(round)!.brief.includes('## What was asked for'), 'on a new session, its try having kept no session id');
   const filings = [...b.filed.values()];
-  assert.equal(filings.length, 3, 'a first filing, a try, and the step after it');
+  assert.equal(filings.length, 4, 'a first filing, a try, the step after it, and a round');
   const kinds = filings.flatMap((f) => (f.config?.mounts ?? []) as { path: string; readOnly: boolean }[]);
   assert.ok(kinds.some((m) => !m.readOnly) && kinds.some((m) => m.path === artifactsDir(run, 'implement')), 'every kind is filed');
   assert.ok(

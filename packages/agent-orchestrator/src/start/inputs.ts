@@ -7,7 +7,7 @@ import path from 'node:path';
 import { GIVEN } from '../workspace/workspace.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 import type { Workflow } from '../step/step.ts';
-import { placeOf, type Mount, type Run } from '../record/record.ts';
+import type { Mount, Run } from '../record/record.ts';
 import { stepMounts } from '../factory/factory.ts';
 import type { FiledFolders } from '../filed/filed.ts';
 
@@ -72,18 +72,16 @@ const handedLine = (handed: readonly Mount[]): string =>
  * to write (`stepMounts`), the others to read and never write; then the folders it is filed with beyond them (`folders`, as `filedFolders`
  * in filed.ts files them), to read and never write: the artifacts folders of the steps before it (`handed`), each with how to list it, and
  * the store's folders its `reads:` names (`store`); a blank line before them. Nothing for a run that mounts none and a step given no other
- * folder, and for a step on a remote agent, which is filed none. A folder run's step is told no handed folder: it is fenced to its own
- * folder, told of nothing outside it, and given the work of the steps before it there (`givenPlan`).
+ * folder, and for a step on a remote agent, which is filed none.
  */
 export const mountsLine = (
   step: Pick<Workflow, 'harness' | 'writable'>,
-  run: Pick<Run, 'mounts' | 'place'>,
+  run: Pick<Run, 'mounts'>,
   folders: FiledFolders = { handed: [], store: [] },
 ): string[] => {
   const local = !isRemoteHarness(step.harness);
   const mounts = local ? stepMounts(step, run.mounts) : undefined;
-  const handed = local && placeOf(run) !== 'folder' ? folders.handed : [];
-  const store = local ? folders.store : [];
+  const { handed, store } = local ? folders : { handed: [], store: [] };
   if (!mounts?.length && !handed.length && !store.length) return [];
   const writes = (mounts ?? []).filter((m) => !m.readOnly);
   const reads = (mounts ?? []).filter((m) => m.readOnly);

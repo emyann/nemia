@@ -4,17 +4,18 @@ import type { Page, Response } from 'playwright';
 import { fed, photograph, stepBar, themeOf } from '../board.ts';
 import { cardOf, expectClearOfEachOther, showFinished } from '../canvas.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
-import { ENDING } from '../seed.ts';
+import { ENDING, FAKE } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
 export default {
   /**
    * A gate answered on the Factory, from the floor as the grid lays it out: the ending's card says what approving does and where a
-   * send-back goes, and answers it; the ending's inspector says it in full, first, with the facts to decide on; the step not filed says so
-   * rather than a table of dashes. In a page of its own whose one refusal is the point, an approval made elsewhere first is refused; then
-   * the gate is approved on the card, confirmed, and sent back with words. The page takes each file back and lays the floor out again,
-   * each card still clear of the one beneath it, so each page after it reads the store and the floor as seeded.
+   * send-back goes, and answers it; the ending's inspector says it in full, first, with the facts to decide on, FAKE's run in flight on
+   * main its branch collides with among them; the step not filed says so rather than a table of dashes. In a page of its own whose one
+   * refusal is the point, an approval made elsewhere first is refused; then the gate is approved on the card, confirmed, and sent back with
+   * words. The page takes each file back and lays the floor out again, each card still clear of the one beneath it, so each page after it
+   * reads the store and the floor as seeded.
    */
   name: 'factory-gate',
   route: '/factories/default',
@@ -118,6 +119,18 @@ export default {
     const facts = asked.locator('dl[aria-label="What to decide on"]');
     await expectVisible(facts.locator('[data-fact="round"]', { hasText: /^round \d/ }), 'the round, and its cost');
     await expectVisible(facts.locator('[data-fact="merges"]'), 'and whether the branch still merges onto main, off the decision');
+    await expectVisible(
+      facts.locator('[data-fact="others"][data-state="bad"]', {
+        hasText: new RegExp(`^collides with 1 of the \\d runs in flight on main: ${FAKE.id}$`),
+      }),
+      `and the runs in flight on main its branch collides with: ${FAKE.id}, whose branch changed the same file`,
+    );
+    await expectVisible(
+      facts.locator('[data-fact="collides"][data-state="bad"]', {
+        hasText: `conflicts with ${FAKE.id}'s ${FAKE.branch} in 1 file: CLAUDE.md`,
+      }),
+      `with ${FAKE.branch}, and in which file`,
+    );
     await expectVisible(
       inspector.locator('[data-unfiled]', { hasText: 'not filed yet: it waits at its gate' }),
       `${ending} is not filed, and its inspector says so`,

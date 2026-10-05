@@ -16,7 +16,7 @@ import {
   readLink,
   takenLine,
 } from '../src/lib/gate.ts';
-import type { Decidable, RunDetail, RunSummary } from '../src/lib/api.ts';
+import type { Collision, Collisions, Decidable, RunDetail, RunSummary } from '../src/lib/api.ts';
 
 type Step = RunDetail['steps'][number];
 
@@ -206,6 +206,49 @@ test("the facts under a gate: the round of its loop's cap and the cost, the revi
   );
   const failed = [step('implement', { check: { verdict: 'failed' } as Step['check'] })];
   assert.equal(gateFacts(detail(failed), null)[1]?.state, 'bad');
+});
+
+/** A decision at an ending's gate that read `collisions`, with `more` over them. */
+const colliding = (more: Partial<Collisions>): Decidable =>
+  ({
+    touched: [],
+    standings: [],
+    collisions: { onto: 'main', base: [], inFlight: [], colliding: [], semantic: null, said: 'no other run is in flight on main', ...more },
+  }) as unknown as Decidable;
+
+/** The facts under a gate past the round every one opens with, off `decision`. */
+const pastRound = (decision: Decidable | null) => gateFacts(detail([]), decision).filter((f) => f.label !== 'round');
+
+test("the facts under an ending's gate: the runs in flight on its base, each it collides with and in which files, and the semantic conflict", () => {
+  const conflict: Collision = {
+    run: 'r-2',
+    branch: 'wf/r-2/implement',
+    ours: 'wf/r-1/implement',
+    merge: { clean: false, conflicts: ['src/a.ts'] },
+    said: "conflicts with r-2's wf/r-2/implement in 1 file: src/a.ts",
+  };
+  const unknown: Collision = { ...conflict, run: 'r-4', merge: { error: 'fatal' }, said: "whether it merges onto r-4's x is not known" };
+  const said = 'collides with 1 of the 2 runs in flight on main: r-2; whether it collides with r-4 is not known';
+  assert.deepEqual(pastRound(colliding({ inFlight: ['r-2', 'r-4'], colliding: [conflict, unknown], said })), [
+    { label: 'others', said, state: 'bad' },
+    { label: 'collides', said: "wf/r-1/implement conflicts with r-2's wf/r-2/implement in 1 file: src/a.ts", state: 'bad' },
+    { label: 'collides', said: "wf/r-1/implement whether it merges onto r-4's x is not known", state: undefined },
+  ]);
+  assert.deepEqual(pastRound(colliding({ inFlight: ['r-4'], colliding: [unknown], said: 'not known' }))[0], {
+    label: 'others',
+    said: 'not known',
+    state: undefined,
+  });
+  const semantic = { step: 'ship', check: 't-check', sha: 'b'.repeat(40), said: "ship's landing check refused the merged tree" };
+  assert.deepEqual(pastRound(colliding({ semantic })), [
+    { label: 'others', said: 'no other run is in flight on main', state: 'good' },
+    { label: 'semantic', said: "ship's landing check refused the merged tree", state: 'bad', step: 'ship' },
+  ]);
+});
+
+test('REFUSED: no fact of collisions under a gate whose decision read none, or is not read yet', () => {
+  assert.deepEqual(pastRound({ touched: [], standings: [], collisions: null } as unknown as Decidable), []);
+  assert.deepEqual(pastRound(null), []);
 });
 
 test('what else a run waits on a person for, in full words for the inspector and a line that fits for the card', () => {

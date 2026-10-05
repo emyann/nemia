@@ -1441,6 +1441,7 @@ test('the Decide section copies its commands and runs none: a button per command
     },
     cost: null,
     overBudget: null,
+    collisions: null,
     commands: [...commands],
     awaiting: null,
   };
@@ -2492,6 +2493,7 @@ test('the Decide section puts the answers first, before what there is to decide,
     total: UNMEASURED,
     cost: null,
     overBudget: null,
+    collisions: null,
     commands: [{ label: 'ship it', command: 'git -C /code/app merge --no-ff wf/r-1/implement', said: null, step: null }],
     awaiting: null,
   };
@@ -2523,6 +2525,7 @@ test("the Decide section's accept row takes a reason and presses it; every other
     total: UNMEASURED,
     cost: null,
     overBudget: null,
+    collisions: null,
     awaiting: null,
     commands: [
       { label: 'once more', command: 'nemia round r-1 review', said: null, step: 'review' },
@@ -3589,6 +3592,7 @@ test("the Decide section says why a step past its budget is held — `wf decide`
     total: UNMEASURED,
     cost: 'run $6.35 measured · 2 attempts not measured',
     overBudget: line,
+    collisions: null,
     commands: [],
     awaiting: null,
   };
@@ -3666,6 +3670,7 @@ test('what sessions read, by price: beside the cost, the peak marked at a cap or
     total: used('read 7.3M · wrote 455k · peak 250k, past 200k with no cap', 'large'),
     cost: 'run $6.80',
     overBudget: null,
+    collisions: null,
     commands: [],
     awaiting: null,
   };

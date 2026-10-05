@@ -485,8 +485,8 @@
     {
       "files": ["apps/web/src/lib/gate.ts"],
       "rules": {
-        "complexity": ["error", { "max": 32 }],
-        "sonarjs/cognitive-complexity": ["error", 64]
+        "complexity": ["error", { "max": 27 }],
+        "sonarjs/cognitive-complexity": ["error", 50]
       }
     },
     {

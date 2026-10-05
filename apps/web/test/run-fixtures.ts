@@ -284,6 +284,21 @@ export const decidable = (extra: Partial<Decidable> = {}): Decidable => ({
   overBudget: null,
   commands: [{ label: 'ship it', command: 'git merge wf/r-1/b', said: null, step: null }],
   awaiting: { branches: ['wf/r-1/b'], direct: false },
+  collisions: {
+    onto: 'main',
+    base: [
+      { branch: 'wf/r-1/b', clean: false, conflicts: ['a.ts'], said: 'conflicts in a.ts' },
+      { branch: 'wf/r-1/c', clean: true, said: 'merges clean' },
+      { branch: 'wf/r-1/d', error: 'no git', said: 'cannot tell' },
+    ],
+    inFlight: ['r-2', 'r-3', 'r-4'],
+    colliding: [
+      { run: 'r-2', branch: 'wf/r-2/x', ours: 'wf/r-1/b', merge: { clean: false, conflicts: ['a.ts'] }, said: "conflicts with r-2's x" },
+      { run: 'r-4', branch: 'wf/r-4/x', ours: 'wf/r-1/c', merge: { error: 'no git' }, said: "whether it merges onto r-4's x is not known" },
+    ],
+    semantic: { step: 'ship', check: 't-check', sha: 'b'.repeat(40), said: "ship's landing check refused the merged tree" },
+    said: 'collides with 1 of the 3 runs in flight on main: r-2; whether it collides with r-4 is not known',
+  },
   ...extra,
 });
 

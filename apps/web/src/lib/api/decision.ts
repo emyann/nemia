@@ -124,6 +124,63 @@ const StandingMergeSchema = Schema.Union([
   Schema.Struct({ error: Schema.String, said: Schema.String }),
 ]) satisfies Schema.Schema<StandingMerge>;
 
+/** Mirrors `MergeWord` in agent-orchestrator: a `StandingMerge` without its words. */
+export type MergeWord = { clean: true } | { clean: false; conflicts: string[] } | { error: string };
+
+/** Decodes a `MergeWord`. */
+const MergeWordSchema = Schema.Union([
+  Schema.Struct({ clean: Schema.Literal(true) }),
+  Schema.Struct({ clean: Schema.Literal(false), conflicts: StringsSchema }),
+  Schema.Struct({ error: Schema.String }),
+]) satisfies Schema.Schema<MergeWord>;
+
+/**
+ * Mirrors `Collision` in agent-orchestrator: a branch of this run (`ours`) that does not merge cleanly onto another run's (`branch`, of
+ * `run`), as git's `merge-tree` says it, and that in words.
+ */
+export type Collision = { run: string; branch: string; ours: string; merge: MergeWord; said: string };
+
+/** Decodes a `Collision`. */
+const CollisionSchema = Schema.Struct({
+  run: Schema.String,
+  branch: Schema.String,
+  ours: Schema.String,
+  merge: MergeWordSchema,
+  said: Schema.String,
+}) satisfies Schema.Schema<Collision>;
+
+/**
+ * Mirrors `Collisions` in agent-orchestrator, read at an ending's gate: whether each branch ahead merges onto the base (`onto`) as it is
+ * now, the other runs in flight on it, each branch of theirs one of ours does not merge onto cleanly, the ending whose landing check
+ * refused the merged tree though it merges cleanly (`semantic`), and the whole in one line.
+ */
+export type Collisions = {
+  onto: string;
+  base: (StandingMerge & { branch: string })[];
+  inFlight: string[];
+  colliding: Collision[];
+  semantic: { step: string; check: string; sha: string; said: string } | null;
+  said: string;
+};
+
+/** Decodes a `Collisions`. */
+const CollisionsSchema = Schema.Struct({
+  onto: Schema.String,
+  base: Schema.mutable(
+    Schema.Array(
+      Schema.Union([
+        Schema.Struct({ branch: Schema.String, clean: Schema.Literal(true), said: Schema.String }),
+        Schema.Struct({ branch: Schema.String, clean: Schema.Literal(false), conflicts: StringsSchema, said: Schema.String }),
+        Schema.Struct({ branch: Schema.String, error: Schema.String, said: Schema.String }),
+      ]),
+    ),
+  ),
+  inFlight: StringsSchema,
+  colliding: Schema.mutable(Schema.Array(CollisionSchema)),
+  semantic: Schema.NullOr(Schema.Struct({ step: Schema.String, check: Schema.String, sha: Schema.String, said: Schema.String })),
+  said: Schema.String,
+}) satisfies Schema.Schema<Collisions>;
+
 /** The keys every `Standing` has, whichever way it stands. */
 const StandingFields = { said: Schema.String, stat: Schema.NullOr(Schema.String), merge: Schema.NullOr(StandingMergeSchema) };
 
@@ -154,6 +211,11 @@ export type Decidable = {
    * with a step waiting on you.
    */
   awaiting: { branches: string[]; direct: boolean } | null;
+  /**
+   * At an ending's gate, or an ending whose landing a check refused: the runs in flight on the base its branches collide with, and in
+   * which files, and the semantic conflict; null for any other decision.
+   */
+  collisions: Collisions | null;
 };
 
 /** Decodes a `Decidable`. */
@@ -168,6 +230,7 @@ const DecidableSchema = Schema.Struct({
   overBudget: Schema.NullOr(Schema.String),
   commands: Schema.mutable(Schema.Array(DecideCommandSchema)),
   awaiting: Schema.NullOr(Schema.Struct({ branches: StringsSchema, direct: Schema.Boolean })),
+  collisions: Schema.NullOr(CollisionsSchema),
 }) satisfies Schema.Schema<Decidable>;
 
 /**

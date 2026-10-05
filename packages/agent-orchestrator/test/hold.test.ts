@@ -199,7 +199,7 @@ const refused = async (t: TestContext, e: Engine, pattern: RegExp, ...argv: stri
   assert.match(error.message, pattern);
 };
 
-const VERBS = /wf (approve|retry|round|accept) /;
+const VERBS = /nemia (approve|retry|round|accept) /;
 
 test('holdWord and holdAdvice say what holds a run and what is left to a person, and never that it waits on you', () => {
   const run = { id: 'r-1', branch: 'main' } as Parameters<typeof holdAdvice>[0];

@@ -1,8 +1,8 @@
 /**
- * The store's pause on the api, as `wf pause` and `wf resume` put and lift it, through their entries of the package's command table:
+ * The store's pause on the api, as `nemia pause` and `nemia resume` put and lift it, through their entries of the package's command table:
  * `POST /api/pause` pauses the store, `GET /api/pause` reads it back with what finishes and the landings it holds staged, a second
  * pause is the package's 409, `DELETE /api/pause` lifts it, and a second lift is its 404; the cordon's former route is gone; a body
- * that is not a pause, and words `wf pause` refuses, are refused before the store is written; and a page on another site is refused by
+ * that is not a pause, and words `nemia pause` refuses, are refused before the store is written; and a page on another site is refused by
  * the guard. `GET /api/pause/now` says what a pause at once would stop, and `POST /api/pause` with `now` stops it, keeping a pause that
  * stands.
  *
@@ -45,7 +45,7 @@ test('the board pauses the store, reads the pause back, is refused a second, lif
   assert.deepEqual(await asked('POST', {}), {
     status: 409,
     body: {
-      error: `the store is already paused by ann since ${pause.at}: wf resume lifts it first, and wf pause --now stops what still finishes under it.`,
+      error: `the store is already paused by ann since ${pause.at}: nemia resume lifts it first, and nemia pause --now stops what still finishes under it.`,
     },
   });
   assert.deepEqual(await asked('DELETE'), { status: 200, body: { pause } });
@@ -53,17 +53,17 @@ test('the board pauses the store, reads the pause back, is refused a second, lif
   assert.deepEqual(await asked('GET'), { status: 200, body: { pause: null, finishing: [], staged: [] } });
   assert.deepEqual(await asked('DELETE'), {
     status: 404,
-    body: { error: 'the store is not paused: there is nothing to resume (wf pause puts one).' },
+    body: { error: 'the store is not paused: there is nothing to resume (nemia pause puts one).' },
   });
 });
 
-test('REFUSED: a body that is not a pause, words wf pause refuses, and a page on another site, before the store is written', async () => {
+test('REFUSED: a body that is not a pause, words nemia pause refuses, and a page on another site, before the store is written', async () => {
   const shape = '`{ "why"?: "<words>", "by"?: "<name>", "now"?: true }`';
   assert.deepEqual(await asked('POST', 'not json'), { status: 400, body: { error: `POST …/pause takes a JSON body: ${shape}.` } });
   assert.deepEqual(await asked('POST', { why: 7 }), {
     status: 400,
     body: {
-      error: `\`why\` is why the store is paused, as \`wf pause --why "<words>"\` takes it: text, or left out. This request's was 7: ${shape}.`,
+      error: `\`why\` is why the store is paused, as \`nemia pause --why "<words>"\` takes it: text, or left out. This request's was 7: ${shape}.`,
     },
   });
   assert.deepEqual(await asked('POST', { by: ' ' }), {
@@ -73,7 +73,7 @@ test('REFUSED: a body that is not a pause, words wf pause refuses, and a page on
   assert.deepEqual(await asked('POST', { now: 'yes' }), {
     status: 400,
     body: {
-      error: `\`now\` stops what still finishes, as \`wf pause --now --yes\` does: true, or left out. This request's was "yes": ${shape}.`,
+      error: `\`now\` stops what still finishes, as \`nemia pause --now --yes\` does: true, or left out. This request's was "yes": ${shape}.`,
     },
   });
   const refused = await asked('POST', {}, { ...BOARD, 'sec-fetch-site': 'cross-site' });

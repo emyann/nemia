@@ -6010,7 +6010,7 @@ test("`budgetUsdFor`: what is left of the cap in force, once the step's tries ar
 test('REFUSED once pruned: a loop out of rounds, or held on a budget, is offered no round and no acceptance — `nemia ls` and `nemia decide` say the run was pruned instead', () => {
   const pruned = { at: '2026-09-17T01:00:00.000Z', worktrees: [] };
   const since = 'since the run was pruned at 2026-09-17T01:00:00.000Z — its worktrees were removed (nemia prune)';
-  const offered = /wf (approve|retry|round|accept) /;
+  const offered = /nemia (approve|retry|round|accept) /;
 
   const r = inRound(3, { pruned });
   const said = saidIn(3, true);
@@ -8683,7 +8683,7 @@ test('REFUSED once pruned: a step at its gate is offered no approval and no send
       undefined,
     ],
   );
-  assert.doesNotMatch(JSON.stringify(l), /wf (approve|retry|round|accept) /, JSON.stringify(l));
+  assert.doesNotMatch(JSON.stringify(l), /nemia (approve|retry|round|accept) /, JSON.stringify(l));
   assert.deepEqual(
     gateLines(ENDS, atEnd({ pruned, approvals: [approval('ship', 1)] }), DONE, signedDone, asked),
     { ship: 'approved 23:10Z' },

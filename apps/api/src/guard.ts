@@ -18,12 +18,12 @@
  * — written on the board, or one Nemia ships copied into your library (`POST /api/skills/yours`) — or changed, whole or its `preload:`
  * alone (`PUT /api/skills/yours/:name`), skills.ts, each of which writes the store's `workflows/skills/`, what every agent giving it is
  * told; and an agent of yours tried on a short brief (`POST /api/agents/yours/:name/try`, agents.ts), which writes its try's folder in the
- * store's `tries/` and a run's record, and a try's run removed (`DELETE /api/runs/:id`, commands/routes.ts, the route of `wf rm`), which
+ * store's `tries/` and a run's record, and a try's run removed (`DELETE /api/runs/:id`, commands/routes.ts, the route of `nemia rm`), which
  * removes the record and the folders it worked in; and a person's hold on a run lifted (`DELETE /api/runs/:id/hold`, commands/routes.ts,
- * the route of `wf hold --off`), which removes the hold file, so the run goes on at the next tick; and the store paused (`POST
- * /api/pause`) or its pause lifted (`DELETE /api/pause`), commands/routes.ts, the routes of `wf pause` and `wf resume`, which write
+ * the route of `nemia hold --off`), which removes the hold file, so the run goes on at the next tick; and the store paused (`POST
+ * /api/pause`) or its pause lifted (`DELETE /api/pause`), commands/routes.ts, the routes of `nemia pause` and `nemia resume`, which write
  * or remove the store's pause file, so no pass starts new work until the lift; and a finished run pruned (`POST /api/runs/:id/prune`,
- * commands/routes.ts, the route of `wf prune --yes`), which removes its worktrees, and its files when asked, for good. Each is what an
+ * commands/routes.ts, the route of `nemia prune --yes`), which removes its worktrees, and its files when asked, for good. Each is what an
  * agent acts on in the repository — once a tick files it, or at once, or once a person starts the card or the workflow, or once a run
  * slot frees for a queued card — or a person's idea or step gone, or its place, so a page on another site must not be able to make any of
  * them; and a `fetch` with a body, from any page, reaches the api without the browser asking it first, unless the body is JSON.

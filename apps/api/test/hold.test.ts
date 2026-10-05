@@ -1,7 +1,7 @@
 /**
- * A run a person holds (`wf hold <run> --until <run>`), as the board reads it: `heldUntil` and `holding` — the hold in the package's words
- * — on the list and the detail, a decision that is the hold and offers nothing, no step waiting on you and no raise, and every verb the
- * board sends refused in the package's words (`heldRefusal`). Each held to what `wf ls` and `wf decide` say of the same run.
+ * A run a person holds (`nemia hold <run> --until <run>`), as the board reads it: `heldUntil` and `holding` — the hold in the package's
+ * words — on the list and the detail, a decision that is the hold and offers nothing, no step waiting on you and no raise, and every verb
+ * the board sends refused in the package's words (`heldRefusal`). Each held to what `nemia ls` and `nemia decide` say of the same run.
  *
  * At shipped defaults: the api's own engine over a store this file seeds, with git for real where a run held on ships by its branch being
  * merged, in the harness's scratch store (`root`), and the harness's fake `claude` (test/harness.ts) first on PATH.
@@ -98,7 +98,9 @@ const DONE = { outcome: 'done', summary: 'Done.', needs: null, artifacts: [] };
 const BLOCKED = { outcome: 'blocked', summary: 'Two ways to go.', needs: 'Warm colours, or cool ones?', artifacts: [] };
 const AGAIN = { type: 'object', properties: { again: { type: 'boolean' } }, required: ['again'], additionalProperties: false };
 
-/** A run's record, as `wf start` writes it with its workflow frozen on it; cancelled as `wf cancel` marks one, with a file of its own. */
+/**
+ * A run's record, as `nemia start` writes it with its workflow frozen on it; cancelled as `nemia cancel` marks one, with a file of its own.
+ */
 function writeRun(id: string, workflow: object[], steps: object, more: { after?: string[]; cancelledAt?: string } = {}): void {
   const { cancelledAt, ...rest } = more;
   write(
@@ -124,8 +126,8 @@ function writeRun(id: string, workflow: object[], steps: object, more: { after?:
 const holdFile = (id: string) => path.join(root, 'runs', `${id}.hold`);
 const HELD_AT = at(30);
 /**
- * Held as `wf hold` writes it: a file of its own beside the record, which the tick lifts — with no `why` and no `by` unless `said` gives
- * them, as code older than `wf hold --why` wrote it.
+ * Held as `nemia hold` writes it: a file of its own beside the record, which the tick lifts — with no `why` and no `by` unless `said` gives
+ * them, as code older than `nemia hold --why` wrote it.
  */
 const holdOn = (id: string, until: string[], said: { why?: string; by?: string } = {}) =>
   write(holdFile(id), JSON.stringify({ at: HELD_AT, until, ...said }));
@@ -263,8 +265,8 @@ const asWaits = (holding: RunHolding | null | undefined): Wait[] =>
     ...(w.shipped ? { shipped: true as const } : {}),
   }));
 
-/** A `wf` verb that would release work, anywhere in what a surface says. */
-const VERBS = /wf (approve|retry|round|accept) /;
+/** A `nemia` verb that would release work, anywhere in what a surface says. */
+const VERBS = /nemia (approve|retry|round|accept) /;
 const HELD = [GATE, LOOP, BUDGET, BLOCKS, ...Object.keys(ON).map((kind) => `h-on-${kind}`), AFTER];
 
 /** What the package refuses, word for word: what the verb prints at the command line. */
@@ -283,7 +285,7 @@ const asked = (id: string): string[] => {
   return fs.existsSync(dir) ? (fs.readdirSync(dir, { recursive: true }) as string[]).sort() : [];
 };
 
-test("the list carries each held run's `heldUntil` and `holding` in `wf ls`'s words — the runs it waits on as `list` reads them, `word` its `holdWord`, `advice` its `holdAdvice` — and the detail the same", async () => {
+test("the list carries each held run's `heldUntil` and `holding` in `nemia ls`'s words — the runs it waits on as `list` reads them, `word` its `holdWord`, `advice` its `holdAdvice` — and the detail the same", async () => {
   const runs = await listed();
   const e = engine();
   for (const id of HELD) {
@@ -296,11 +298,11 @@ test("the list carries each held run's `heldUntil` and `holding` in `wf ls`'s wo
     assert.deepEqual(asWaits(api.holding), cli.holding, id);
     assert.equal(api.holding.word, holdWord(cli.holding!), id);
     assert.equal(api.holding.advice, holdAdvice(run, cli.holding!), id);
-    assert.deepEqual(asWaits(api.holding), (await decide(e, id)).holding, `${id}: wf decide's reading, which is list's`);
+    assert.deepEqual(asWaits(api.holding), (await decide(e, id)).holding, `${id}: nemia decide's reading, which is list's`);
     assert.deepEqual(
       api.steps.map((s) => [s.name, s.status, s.note]),
       cli.steps.map((s) => [s.name, s.status, s.note ?? null]),
-      `${id}: each step as wf ls words it`,
+      `${id}: each step as nemia ls words it`,
     );
     const page = await detail(id);
     assert.deepEqual(
@@ -313,7 +315,7 @@ test("the list carries each held run's `heldUntil` and `holding` in `wf ls`'s wo
     at: HELD_AT,
     runs: [{ run: 'p-live', missing: false, cancelledAt: null, gone: [], shipped: false }],
     word: 'held until p-live ships',
-    advice: `nothing of ${GATE} is filed, and nothing is asked of you, until wf decide says p-live has shipped; to go on before then: wf hold ${GATE} --off`,
+    advice: `nothing of ${GATE} is filed, and nothing is asked of you, until nemia decide says p-live has shipped; to go on before then: nemia hold ${GATE} --off`,
     onYou: false,
   });
   assert.deepEqual(
@@ -356,7 +358,7 @@ test('REFUSED while held: no step of a held run waits on you, none is offered an
   assert.equal(page.steps[0].status, 'over budget $1.50 of $1');
 });
 
-test("a held run's decision is `holding`, and nothing else: what `wf decide` prints for it, with no command — where the same run unheld is offered one", async () => {
+test("a held run's decision is `holding`, and nothing else: what `nemia decide` prints for it, with no command — where the same run unheld is offered one", async () => {
   const runs = await listed();
   const e = engine();
   for (const id of [GATE, LOOP, BUDGET, BLOCKS, 'h-on-live', 'h-on-missing']) {
@@ -368,10 +370,10 @@ test("a held run's decision is `holding`, and nothing else: what `wf decide` pri
     assert.doesNotMatch(JSON.stringify(said.gates), VERBS, id);
   }
   const offered: Record<string, RegExp> = {
-    [GATE]: /^wf approve h-gate plan$/,
-    [LOOP]: /^wf (round|accept) h-loop review/,
-    [BUDGET]: /^wf retry h-budget palette --budget/,
-    [BLOCKS]: /^wf retry h-blocked implement$/,
+    [GATE]: /^nemia approve h-gate plan$/,
+    [LOOP]: /^nemia (round|accept) h-loop review/,
+    [BUDGET]: /^nemia retry h-budget palette --budget/,
+    [BLOCKS]: /^nemia retry h-blocked implement$/,
   };
   for (const [id, command] of Object.entries(offered)) {
     const hold = fs.readFileSync(holdFile(id), 'utf8');
@@ -392,7 +394,7 @@ test("a held run's decision is `holding`, and nothing else: what `wf decide` pri
   assert.ok('holding' in back && back.holding, 'the hold is back');
 });
 
-test('a step over its budget on a held run is offered no raise, and `wf decide` says nothing waits on you for it — the run is held, not over budget on you', async () => {
+test('a step over its budget on a held run is offered no raise, and `nemia decide` says nothing waits on you for it — the run is held, not over budget on you', async () => {
   const said = await decide(engine(), BUDGET);
   assert.deepEqual(said.decision, { kind: 'running', waiting: [] });
   assert.doesNotMatch(said.overBudgetLine ?? '', /waiting on you/);
@@ -458,7 +460,7 @@ test("a hold that lifts only by a person's hand says so (`onYou`) — one naming
     assert.equal(
       holding.onYou,
       holding.advice.includes('yours to'),
-      `${kind}: held to wf decide's own words rather than a copy of its rule: its advice names the way out exactly when a person has to act`,
+      `${kind}: held to nemia decide's own words rather than a copy of its rule: its advice names the way out exactly when a person has to act`,
     );
   }
   assert.deepEqual(runs.get('h-on-shipped')!.holding!.runs, [
@@ -514,7 +516,7 @@ test('a held run called off reads as called off: no hold, nothing waiting on you
   assert.equal((await list(engine(), runStore.runs.read(CANCELLED))).holding, undefined);
 });
 
-test('a run waiting on runs and held as well is both, as `wf decide` says both: its decision carries the wait and the hold', async () => {
+test('a run waiting on runs and held as well is both, as `nemia decide` says both: its decision carries the wait and the hold', async () => {
   const run = (await listed()).get(AFTER)!;
   assert.ok(run.holding);
   assert.deepEqual(
@@ -565,7 +567,7 @@ fs.writeFileSync(
 signedOff(`${LIFT}-plan`, DONE);
 
 /**
- * Pruned, as `wf prune` marks a run: `h-pruned-held` with a hold written by hand, since no verb holds a pruned run, and `h-pruned` with
+ * Pruned, as `nemia prune` marks a run: `h-pruned-held` with a hold written by hand, since no verb holds a pruned run, and `h-pruned` with
  * none.
  */
 const PRUNED = { at: at(50), worktrees: [] };
@@ -575,7 +577,7 @@ for (const id of ['h-pruned-held', 'h-pruned']) {
   write(path.join(root, 'runs', `${id}.pruned`), JSON.stringify(PRUNED));
 }
 
-test('a hold lifted on the board is lifted as `wf hold --off` lifts it: its file gone, the list and the page say no hold, and the gate it hid is offered again', async () => {
+test('a hold lifted on the board is lifted as `nemia hold --off` lifts it: its file gone, the list and the page say no hold, and the gate it hid is offered again', async () => {
   holdOn(LIFT, ['p-live']);
   assert.equal((await listed()).get(LIFT)!.holding?.word, 'held until p-live ships');
   const res = await lift(LIFT);
@@ -589,13 +591,13 @@ test('a hold lifted on the board is lifted as `wf hold --off` lifts it: its file
   assert.equal(page.steps.find((s) => s.name === 'plan')!.approve !== null, true);
   const decided = await decisionOf(LIFT);
   assert.ok('commands' in decided, JSON.stringify(decided));
-  assert.ok(decided.commands.some((c) => c.command === `wf approve ${LIFT} plan`));
+  assert.ok(decided.commands.some((c) => c.command === `nemia approve ${LIFT} plan`));
   const again = await lift(LIFT);
   assert.equal(again.status, 409, "lifted, it is held no more: a second lift is the package's refusal");
   assert.equal(((await again.json()) as { error: string }).error, await refusal(async () => unhold(LIFT)));
 });
 
-test('a hold written by hand on a pruned run is lifted, as `wf hold --off` lifts it: nothing of the run is filed again either way', async () => {
+test('a hold written by hand on a pruned run is lifted, as `nemia hold --off` lifts it: nothing of the run is filed again either way', async () => {
   holdOn('h-pruned-held', ['p-live']);
   assert.ok((await listed()).get('h-pruned-held')!.holding, 'the board says the hold, so it offers the lift');
   const res = await lift('h-pruned-held');
@@ -604,7 +606,7 @@ test('a hold written by hand on a pruned run is lifted, as `wf hold --off` lifts
   assert.ok(fs.existsSync(path.join(root, 'runs', 'h-pruned-held.pruned')), 'still pruned');
 });
 
-test('REFUSED at shipped defaults: a lift of a run nobody holds — one never held, a pruned one — is a 409 in the words of `wf hold --off`, and nothing is written', async () => {
+test('REFUSED at shipped defaults: a lift of a run nobody holds — one never held, a pruned one — is a 409 in the words of `nemia hold --off`, and nothing is written', async () => {
   for (const id of ['p-live', 'h-pruned']) {
     const before = filesOf(id);
     const res = await lift(id);
@@ -627,7 +629,7 @@ test('REFUSED at shipped defaults: a lift of a run the store has not — none by
   }
   assert.ok(
     fs.existsSync(holdFile('h-removed')),
-    'the stray hold file, standing where wf rm took the record, is left for `wf hold --off` or a person',
+    'the stray hold file, standing where nemia rm took the record, is left for `nemia hold --off` or a person',
   );
 });
 

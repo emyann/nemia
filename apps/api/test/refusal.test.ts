@@ -42,7 +42,7 @@ test('REFUSAL_STATUS answers every kind of refusal, each once: 404 for Missing, 
 
 test('REFUSED: each kind thrown in a mounted router is answered its status, in its words alone', async () => {
   const cases: Array<[unknown, number, string]> = [
-    [new Missing({ message: "no such run: r-nope  (try 'wf ls')" }), 404, "no such run: r-nope  (try 'wf ls')"],
+    [new Missing({ message: "no such run: r-nope  (try 'nemia ls')" }), 404, "no such run: r-nope  (try 'nemia ls')"],
     [new Conflict({ message: 'the step is still running.' }), 409, 'the step is still running.'],
     [new Invalid({ message: 'WF_MAX_RUNS=two is not a count.' }), 422, 'WF_MAX_RUNS=two is not a count.'],
     [new WorkflowError('dev/implement.md: `gate` is set twice.'), 422, 'dev/implement.md: `gate` is set twice.'],

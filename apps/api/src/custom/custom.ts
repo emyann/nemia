@@ -1,8 +1,8 @@
 /**
- * A person's custom instructions for an agent on the board: read, written and cleared through `wf agents custom`'s entry of the package's
- * command table (`AGENTS_CUSTOM`), so the board and the command refuse the same things in the same words. They belong to an agent's name,
- * not to a place: one file per name in your store, told to whichever agent of that name a run finds. A run reads them once, at its start,
- * so a write or a clear reaches only the runs started after it.
+ * A person's custom instructions for an agent on the board: read, written and cleared through `nemia agents custom`'s entry of the
+ * package's command table (`AGENTS_CUSTOM`), so the board and the command refuse the same things in the same words. They belong to an
+ * agent's name, not to a place: one file per name in your store, told to whichever agent of that name a run finds. A run reads them once,
+ * at its start, so a write or a clear reaches only the runs started after it.
  */
 import { Hono } from 'hono';
 import { AGENTS_CUSTOM, customInstructionsFile } from 'agent-orchestrator';

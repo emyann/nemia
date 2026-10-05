@@ -9,7 +9,9 @@ import type { Engine } from '../store.ts';
 /** The package's read of the pause (`pausedRead`), through its entry of the command table, served on the api alone. */
 const PAUSED = COMMANDS.find((c) => c.name === 'paused')!;
 
-/** The package's read of what `wf pause --now` would stop (`nowRead`), through its entry of the command table, served on the api alone. */
+/**
+ * The package's read of what `nemia pause --now` would stop (`nowRead`), through its entry of the command table, served on the api alone.
+ */
 const PAUSE_NOW = COMMANDS.find((c) => c.name === 'pause now')!;
 
 /** What a pause at once would stop, each task at work but a landing, and the sentence of what an interrupted step costs. */

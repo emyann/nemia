@@ -1,4 +1,4 @@
-/** The flow numbers of every run in the store, for the board: what `wf stats --json` prints. */
+/** The flow numbers of every run in the store, for the board: what `nemia stats --json` prints. */
 import { Hono } from 'hono';
 import { STATS, statsQueryOf, type QueryKey, type Stats } from 'agent-orchestrator';
 import { type ApiEnv, served } from '../layer.ts';
@@ -21,7 +21,7 @@ const QUERY_KEYS: Record<QueryKey, string> = {
 };
 
 /**
- * - `GET /api/stats` — `Stats`, as `wf stats --json` prints it, answered by its entry (`STATS`): the flow numbers of every run in
+ * - `GET /api/stats` — `Stats`, as `nemia stats --json` prints it, answered by its entry (`STATS`): the flow numbers of every run in
  *   the store, whatever factory and repository the request is answered in, like `GET /api/runs`. `from` and `to` are UTC days
  *   (YYYY-MM-DD), `by` one of agent, step, factory, workflow or repo, and `agent`, `step`, `workflow`, `ofFactory` and `ofRepo` keep only
  *   the facts that have that value, compared as strings: `ofRepo` a repository's path as a run's record names it. A number nothing

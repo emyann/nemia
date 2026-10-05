@@ -64,7 +64,7 @@ fs.writeFileSync(
   path.join(root, 'runs', 'f-notes.json'),
   JSON.stringify({
     id: 'f-notes',
-    /** A folder run whose one step signed off: its record as `wf start` writes one, with `place` and none of a git run's fields. */
+    /** A folder run whose one step signed off: its record as `nemia start` writes one, with `place` and none of a git run's fields. */
     place: { kind: 'folder' },
     workspace: work,
     brief: 'Write a note.',
@@ -80,7 +80,7 @@ fs.writeFileSync(
  * leads out of the folder, and a name the files route refuses. All but the first three are things the folder holds that no name can
  * reach: the listing carries them by their path, since they are the work too, and serves none of them.
  *
- * And given/, what the run itself copies in before the step starts, which is not what the step made: the files `wf start --input`
+ * And given/, what the run itself copies in before the step starts, which is not what the step made: the files `nemia start --input`
  * gives it and a copy of each folder it waits on (`givenPlan` in the package). Every folder run started with `--input` has one.
  */
 const wrote = path.join(work, 'write');
@@ -143,8 +143,8 @@ test("a folder run's decision reads, with nothing to merge and nothing about git
   );
   assert.deepEqual(
     decision.commands,
-    [{ label: 'forget it', command: 'wf rm f-notes', said: 'forgets the run with its folders and files' }],
-    'what `wf decide` offers instead: the one command, and nothing to merge or delete (cli/main.ts, !git)',
+    [{ label: 'forget it', command: 'nemia rm f-notes', said: 'forgets the run with its folders and files' }],
+    'what `nemia decide` offers instead: the one command, and nothing to merge or delete (cli/main.ts, !git)',
   );
   for (const said of [...decision.commands.flatMap((c) => [c.command, c.said ?? '']), decision.overBudget ?? '']) {
     assert.doesNotMatch(said, GIT_WORD, `a sentence the board shows out of this answer names no git: ${said}`);
@@ -326,7 +326,7 @@ test('a card started on a folder team carries the repository it named and the ru
   assert.deepEqual(
     [started.card, started.removed, started.ignoredRepo],
     [named, true, notARepo],
-    "the api says what `wf start` prints and a tick's line carries: the card's `repo:` was not looked at",
+    "the api says what `nemia start` prints and a tick's line carries: the card's `repo:` was not looked at",
   );
   const run = (await (await app.request(`/api/runs/${started.id}`)).json()) as { repo: unknown; place: unknown };
   assert.deepEqual(

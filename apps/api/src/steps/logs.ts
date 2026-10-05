@@ -7,9 +7,9 @@ import type { Engine } from '../store.ts';
 /**
  * The command a step is judged by, and what it said once it refused.
  *
- * `command` is from the workflow the run froze at `wf start`: the one the run executes. `refused` is set
- * once the check settled failed or stopped: `exit` in `wf ls`'s words (`exit 1`, `unfinished`), then the
- * end of each of its streams, as `wf decide` shows them.
+ * `command` is from the workflow the run froze at `nemia start`: the one the run executes. `refused` is set
+ * once the check settled failed or stopped: `exit` in `nemia ls`'s words (`exit 1`, `unfinished`), then the
+ * end of each of its streams, as `nemia decide` shows them.
  */
 export type StepCheck = {
   command: string;
@@ -48,7 +48,7 @@ export function tailOf(output: string, max: number): StepLog {
   return lines.length > max ? { lines: lines.slice(-max), truncated: true } : { lines, truncated: false };
 }
 
-/** How many lines of each stream a refused check shows: as many as `wf decide` does (`CHECK_TAIL_LINES`). */
+/** How many lines of each stream a refused check shows: as many as `nemia decide` does (`CHECK_TAIL_LINES`). */
 const CHECK_LINES = 20;
 /** How much of the end of a stream is asked of the engine, ample for `CHECK_LINES` lines. */
 const TAIL_BYTES = 64_000;
@@ -90,7 +90,7 @@ export async function refusedStderr(e: Engine['Service'], run: Run, views: Views
 
 /** Why the output of a run's check could not be read, and where a person reads it instead. */
 const unreadableOutput = (run: Run, taskId: string, err: unknown): string =>
-  `Could not read the output of its check (task ${taskId}): ${err instanceof Error ? err.message : String(err)}. \`wf decide ${run.id}\` reads it the same way from the command line.`;
+  `Could not read the output of its check (task ${taskId}): ${err instanceof Error ? err.message : String(err)}. \`nemia decide ${run.id}\` reads it the same way from the command line.`;
 
 /**
  * A check of one try, off the engine's view of its task: the command, its verdict, and once it refused, what it exited with and
@@ -123,7 +123,7 @@ export function checkIn(command: string, taskId: string | undefined, views: View
 
 /**
  * Each judged step's check: its command, and for a check that refused, what it said — what `checkReports` in views.verb.ts reads for
- * `wf ls` and `wf decide`, which the package does not export. The current try's stdout is read through the engine's `output`, which
+ * `nemia ls` and `nemia decide`, which the package does not export. The current try's stdout is read through the engine's `output`, which
  * observes no harness; a check run before the runtime kept its streams kept none, and is read off its log, a `logs` call that observes
  * its harness again: on one run's page, and never on the list.
  */

@@ -476,7 +476,7 @@ test('REFUSED after a prune: a step over its budget is offered no raise — `dec
   const screen = (await typed(t, b.e, 'decide', run.id)).printed.join('\n');
   assert.ok(screen.includes(`\n  ${d.overBudgetLine}\n`), screen);
   assert.doesNotMatch(screen, /waiting on you/, screen);
-  assert.doesNotMatch(screen, /wf (retry|round|accept|approve) /, 'no verb a pruned run refuses');
+  assert.doesNotMatch(screen, /nemia (retry|round|accept|approve) /, 'no verb a pruned run refuses');
   assert.doesNotMatch((await typed(t, b.e, 'ls', run.id)).printed.join('\n'), /waiting on you/, 'and `nemia ls` agrees');
 });
 

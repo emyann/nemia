@@ -1,7 +1,8 @@
 /**
  * A step on a remote A2A agent (`harness: a2a:<name>`), as the api tells a person of it: on a run's detail, the agent a try was sent to and
  * where, as the store's `a2a-agents.json` gives it — never a query string, which can carry a key — and, for a step whose Task waits on its
- * caller, where it is answered: `wf say`, not a Claude Code session the agent is not in. In a scratch store, with journals written by hand.
+ * caller, where it is answered: `nemia say`, not a Claude Code session the agent is not in. In a scratch store, with journals written by
+ * hand.
  */
 import { root } from './harness.ts';
 import { test } from 'node:test';
@@ -92,7 +93,7 @@ test("a run's detail names the remote agent a try was sent to, and where, with n
   fs.rmSync(path.join(root, 'a2a-agents.json'));
 });
 
-test('a remote step whose Task waits on its caller is answered with wf say, and its question read with wf logs — not in Claude Code', () => {
+test('a remote step whose Task waits on its caller is answered with nemia say, and its question read with nemia logs — not in Claude Code', () => {
   const view = (harness: string): TaskView => ({
     id: 't-asks',
     phase: 'needs-human',
@@ -132,7 +133,7 @@ test('a remote step whose Task waits on its caller is answered with wf say, and 
   };
   assert.deepEqual(needsOf(run, 'ask', new Map([['t-asks', view('a2a:reviewer')]]), judged).waitingFor, {
     words: 'waiting for an input',
-    advice: 'read its question with wf logs r-asks ask, and answer it with wf say r-asks ask "<your answer>"',
+    advice: 'read its question with nemia logs r-asks ask, and answer it with nemia say r-asks ask "<your answer>"',
   });
   assert.deepEqual(
     needsOf(run, 'ask', new Map([['t-asks', view('claude')]]), judged).waitingFor?.advice,

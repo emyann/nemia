@@ -3,7 +3,7 @@
  * yours made, put back or removed through the package's `writeAgent` and `removeAgent`.
  *
  * A step is a node of a workflow, and an agent is one thing a node may have attached (`agent:`): what the node's work is told first and
- * runs with. So an agent lists the nodes that name it, and an edit of one changes each of them — in what a later `wf start` freezes, and
+ * runs with. So an agent lists the nodes that name it, and an edit of one changes each of them — in what a later `nemia start` freezes, and
  * nothing else: a run froze its folder and the agents its steps name when it started.
  *
  * The repository's agents are read-only here, as its workflows are: the api writes nothing into a checkout.
@@ -43,8 +43,8 @@ import { sourcesOf, type WorkflowSource } from '../workflows/workflows.ts';
 export type { AgentUser } from 'agent-orchestrator';
 
 /**
- * One agent as the board lists it: the package's reading of it (`AgentReading`, as `wf agents` reads it) but the file of a person's custom
- * instructions, which the board does not show, and two facts of the board's own:
+ * One agent as the board lists it: the package's reading of it (`AgentReading`, as `nemia agents` reads it) but the file of a person's
+ * custom instructions, which the board does not show, and two facts of the board's own:
  *
  * - `given`: each skill its `skills:` gives, in its order — where a start finds it, your library, the repository, or none; its card entry
  *   or why it has none; and what it costs a turn (skills.ts). Empty for none, and for a file that does not read.
@@ -59,10 +59,10 @@ export type AgentListing = Omit<AgentReading, 'custom'> & { given: GivenSkill[];
  */
 export type LibraryAgent = AgentListing & { fills: AgentFill[]; factories: string[] };
 
-/** The package's listing of the agents (`wf agents`), its handler `agentsRead`: the api answers it on `GET /api/agents`. */
+/** The package's listing of the agents (`nemia agents`), its handler `agentsRead`: the api answers it on `GET /api/agents`. */
 const AGENTS = COMMANDS.find((c) => c.name === 'agents')!;
 
-/** The package's card of one agent (`wf agents card`), its handler `agentCardRead`: on `GET /api/agents/:from/:name/card`. */
+/** The package's card of one agent (`nemia agents card`), its handler `agentCardRead`: on `GET /api/agents/:from/:name/card`. */
 const AGENT_CARD = COMMANDS.find((c) => c.name === 'agents card')!;
 
 /**
@@ -270,9 +270,10 @@ const noAgentWords = (from: string, name: string, dir: string): string =>
  * - `GET /api/agents` — the agents of the factory the request names (`LibraryAgent`, the package's `inFactory`), read from disk on each
  *   request, so an agent a person has just edited lists as it is now. Each with the steps it fills in that factory (`fills`) and the
  *   factories it fills a step in (`factories`), a step credited to the agent file a start would run it with. In a factory, only the agents
- *   it hires into a step or its attached workflows' steps name; in the default factory, every agent (`AGENTS`, the package's `wf agents`).
+ *   it hires into a step or its attached workflows' steps name; in the default factory, every agent (`AGENTS`, the package's `nemia
+ *   agents`).
  * - `GET /api/agents/:from/:name` — one agent, for its page; 404 for a name the place has no file of.
- * - `GET /api/agents/:from/:name/card` — one agent in the shape of an A2A Agent Card (`AgentCardAnswer`), as `wf agents card` prints it
+ * - `GET /api/agents/:from/:name/card` — one agent in the shape of an A2A Agent Card (`AgentCardAnswer`), as `nemia agents card` prints it
  *   (`AGENT_CARD`). Not a valid card and it says so: A2A marks `supportedInterfaces` REQUIRED, an interface is a transport and a URL, and
  *   nothing here serves an agent over A2A — so `servedOverA2A` is false beside it, in the answer, rather than left for a reader to work
  *   out. Its skills are generated (`cardSkills`); an agent with no `description:`, or a skill that cannot be read, has no card, and the

@@ -1,5 +1,5 @@
 /**
- * GET /api/runs/:runId/decision: what `wf decide` shows a person, off a real repository — what a result branch touched, the
+ * GET /api/runs/:runId/decision: what `nemia decide` shows a person, off a real repository — what a result branch touched, the
  * lesson line, the check-affecting diffs cut per file, what each step consumed, and the commands — and nothing of it, and
  * no `git` at all, for a run still running.
  */
@@ -128,7 +128,7 @@ const decisionOf = async (id: string) => {
   return { status: res.status, body: (await res.json()) as RunDecision };
 };
 
-/** A decision there is to make: a 200 whose body is `wf decide`'s whole reading (`Decidable`), not `running` nor `nothing`. */
+/** A decision there is to make: a 200 whose body is `nemia decide`'s whole reading (`Decidable`), not `running` nor `nothing`. */
 const decidable = async (id: string): Promise<Decidable> => {
   const { status, body } = await decisionOf(id);
   assert.equal(status, 200, JSON.stringify(body));
@@ -184,7 +184,7 @@ test('a finished run: what its result branch touched, the lesson, the check-affe
   assert.deepEqual(
     body.awaiting,
     { branches: [branch], direct: false },
-    'finished, and nobody merged it: what `wf prune` refuses without `--unmerged`',
+    'finished, and nobody merged it: what `nemia prune` refuses without `--unmerged`',
   );
 
   assert.deepEqual(
@@ -200,7 +200,7 @@ test('a finished run: what its result branch touched, the lesson, the check-affe
         merge: { clean: true, said: 'merges cleanly onto main' },
       },
     ],
-    "where the result stands against the base branch, and how much it changed, as `wf decide` prints them under the run: git's own `--shortstat`, trimmed",
+    "where the result stands against the base branch, and how much it changed, as `nemia decide` prints them under the run: git's own `--shortstat`, trimmed",
   );
 
   assert.equal(body.touched.length, 1);
@@ -267,7 +267,7 @@ test('a finished run: what its result branch touched, the lesson, the check-affe
         rebuilt: 0,
       },
     },
-    "`wf decide`'s words beside each step: a count nobody measured says so",
+    "`nemia decide`'s words beside each step: a count nobody measured says so",
   );
   assert.deepEqual(
     body.total,
@@ -287,7 +287,7 @@ test('a finished run: what its result branch touched, the lesson, the check-affe
   assert.equal(
     body.cost,
     'run $0.004 measured · 1 attempt not measured',
-    "the run's cost after its steps, as `wf decide` prints it: review's session was priced, implement's was not",
+    "the run's cost after its steps, as `nemia decide` prints it: review's session was priced, implement's was not",
   );
   assert.equal(body.overBudget, null, 'no step held on a budget');
 
@@ -397,7 +397,7 @@ test("a run the cap on runs in flight holds is `running`, held at the count `GET
   );
 });
 
-test('a loop out of rounds offers both answers as commands, each the bare `wf` line and not the sentence that carries it', async () => {
+test('a loop out of rounds offers both answers as commands, each the bare `nemia` line and not the sentence that carries it', async () => {
   const looping = [
     { name: 'implement', after: [], body: 'Implement it.', harness: 'codex' },
     {
@@ -434,14 +434,14 @@ test('a loop out of rounds offers both answers as commands, each the bare `wf` l
       .filter((c: { label: string }) => c.label !== 'ship it' && c.label !== 'drop it')
       .map(({ label, command }: DecideCommand) => ({ label, command })),
     [
-      { label: 'once more', command: 'wf round r-d9 review' },
-      { label: 'accept', command: 'wf accept r-d9 review --message "<why>"' },
-      { label: 'once more', command: 'wf retry r-d9 implement' },
+      { label: 'once more', command: 'nemia round r-d9 review' },
+      { label: 'accept', command: 'nemia accept r-d9 review --message "<why>"' },
+      { label: 'once more', command: 'nemia retry r-d9 implement' },
     ],
     'both offers are the bare command a person runs (`choicesOf`), never a paragraph under a button that says `once more`',
   );
   assert.deepEqual(
-    body.commands.filter((c) => !/^(wf|git -C) \S+( \S+)*$/.test(c.command) || /\n|\.$/.test(c.command)).map((c) => c.command),
+    body.commands.filter((c) => !/^(nemia|git -C) \S+( \S+)*$/.test(c.command) || /\n|\.$/.test(c.command)).map((c) => c.command),
     [],
     'every command is one line a person runs, never a sentence',
   );
@@ -449,7 +449,7 @@ test('a loop out of rounds offers both answers as commands, each the bare `wf` l
   assert.ok(accept?.said, JSON.stringify(body.commands));
   assert.match(
     accept.said,
-    /^review: enough — go on with what is there; its findings stay on the record, and the run ends with them on the record:  wf accept r-d9 review --message "<why>"$/,
+    /^review: enough — go on with what is there; its findings stay on the record, and the run ends with them on the record:  nemia accept r-d9 review --message "<why>"$/,
   );
 
   const stepsOf = async () => (await detailOf('r-d9')).steps;
@@ -489,7 +489,7 @@ test('a loop out of rounds offers both answers as commands, each the bare `wf` l
   );
 });
 
-test('an ending whose check did not finish on the merge it staged is offered the bare `wf retry <run> ship`, labelled once more, and never --recheck: the run aborted that merge', async () => {
+test('an ending whose check did not finish on the merge it staged is offered the bare `nemia retry <run> ship`, labelled once more, and never --recheck: the run aborted that merge', async () => {
   const { repo, base } = aRepo();
   const branch = 'wf/r-d20/implement';
   branchOff(repo, branch, () => write(repo, 'packages/x/src/sub.ts', 'export const sub = (a, b) => a - b;\n'));
@@ -543,19 +543,19 @@ test('an ending whose check did not finish on the merge it staged is offered the
   const offered = body.commands.filter((c: DecideCommand) => c.label === 'once more');
   assert.deepEqual(
     offered.map(({ command }: DecideCommand) => command),
-    ['wf retry r-d20 ship'],
+    ['nemia retry r-d20 ship'],
     JSON.stringify(body.commands),
   );
   const [first] = offered;
   assert.ok(first?.said, JSON.stringify(offered));
   assert.match(
     first.said,
-    /^ship: its check did not finish, so the run aborted the merge and nothing landed on main\. Merge and check again:  wf retry r-d20 ship$/,
+    /^ship: its check did not finish, so the run aborted the merge and nothing landed on main\. Merge and check again:  nemia retry r-d20 ship$/,
   );
   assert.ok(!JSON.stringify(body).includes('--recheck'), 'a check the run aborted the merge of is never checked again on its own');
 });
 
-test('a step `denials: fail` stopped is offered the bare `wf retry <run> <step> --fresh`, labelled once more — the rule for `allowedTools:` stays in what `wf decide` said — and reads `denied`, waited on by a person', async () => {
+test('a step `denials: fail` stopped is offered the bare `nemia retry <run> <step> --fresh`, labelled once more — the rule for `allowedTools:` stays in what `nemia decide` said — and reads `denied`, waited on by a person', async () => {
   const denying = [
     { ...workflow[0], harness: 'claude', denials: 'fail' },
     { ...workflow[1], harness: 'claude' },
@@ -590,7 +590,7 @@ test('a step `denials: fail` stopped is offered the bare `wf retry <run> <step> 
   const once = body.commands.filter((c: DecideCommand) => c.label === 'once more');
   assert.deepEqual(
     once.map(({ label, command }: DecideCommand) => ({ label, command })),
-    [{ label: 'once more', command: 'wf retry r-d11 implement --fresh' }],
+    [{ label: 'once more', command: 'nemia retry r-d11 implement --fresh' }],
   );
   assert.ok(once[0]?.said, JSON.stringify(once));
   assert.match(once[0].said, /add Edit\(\/\/tmp\/w\/notes\.md\) to the folder's allowedTools:/);
@@ -613,12 +613,12 @@ test('a branch git cannot read is an `error` on its entry — the lesson not kno
   assert.equal(body.commands.length, 1, 'no result branch to ship or drop');
   assert.deepEqual(
     { ...body.commands[0], said: undefined },
-    { label: 'once more', command: 'wf retry r-d3 implement', said: undefined },
-    'implement may be tried again, with the command `wf decide` prints for it',
+    { label: 'once more', command: 'nemia retry r-d3 implement', said: undefined },
+    'implement may be tried again, with the command `nemia decide` prints for it',
   );
   const [retried] = body.commands;
   assert.ok(retried?.said, JSON.stringify(retried));
-  assert.match(retried.said, /^implement: .*:  wf retry r-d3 implement {2}\(--fresh/);
+  assert.match(retried.said, /^implement: .*:  nemia retry r-d3 implement {2}\(--fresh/);
 
   writeRun({
     id: 'r-d3b',
@@ -631,11 +631,11 @@ test('a branch git cannot read is an `error` on its entry — the lesson not kno
   assert.equal(nowhere.lesson.state, 'unknown');
 });
 
-test('REFUSED once pruned: a run whose worktrees `wf prune` removed offers no try, since the verb refuses it, and its page says when it was pruned', async () => {
+test('REFUSED once pruned: a run whose worktrees `nemia prune` removed offers no try, since the verb refuses it, and its page says when it was pruned', async () => {
   writeRun({ id: 'r-d10', repo, baseRef: base, steps: { implement: { taskId: 't-d3-implement', branch }, review: { taskId: null } } });
   assert.deepEqual(
     (await decidable('r-d10')).commands.map((c: DecideCommand) => c.command),
-    ['wf retry r-d10 implement'],
+    ['nemia retry r-d10 implement'],
     'as r-d3: implement signed off blocked, and may be tried again while the run is not pruned',
   );
   assert.deepEqual((await detailOf('r-d10')).waitingOnYou, ['implement']);
@@ -661,7 +661,7 @@ test('REFUSED once pruned: a run whose worktrees `wf prune` removed offers no tr
   assert.equal((await detailOf('r-d1')).pruned, null, 'a run never pruned says so with a null, not a missing field');
 });
 
-test("a run called off, or whose branch is already on its base, has nothing to decide, in `wf decide`'s words", async () => {
+test("a run called off, or whose branch is already on its base, has nothing to decide, in `nemia decide`'s words", async () => {
   writeRun({
     id: 'r-d4',
     repo,
@@ -763,7 +763,7 @@ test("a run `assess` calls running while a step waits on a person is decided on:
   assert.deepEqual(
     body.touched.map((t: { branch: string }) => t.branch),
     ['wf/r-d6/tokens'],
-    "the branch of the terminal step the tick judges, as `wf decide` reads a run once it stops, not implement's",
+    "the branch of the terminal step the tick judges, as `nemia decide` reads a run once it stops, not implement's",
   );
   const [tokens] = body.touched;
   assert.ok(tokens && !('error' in tokens.radius), JSON.stringify(tokens));
@@ -779,7 +779,7 @@ test("a run `assess` calls running while a step waits on a person is decided on:
     baseRef: base,
     /**
      * The same steps frozen on the record fan out: implement blocked with tokens still spawned is `failed` to `assess`, so the decision
-     * is `wf decide`'s own, its result branches both roots'.
+     * is `nemia decide`'s own, its result branches both roots'.
      */
     workflow: [
       { name: 'implement', after: [], body: 'Implement it.' },

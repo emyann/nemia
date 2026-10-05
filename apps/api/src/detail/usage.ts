@@ -1,4 +1,4 @@
-/** What sessions consumed, in `wf decide`'s words: a step's, several steps' together, and what a run's sessions read. */
+/** What sessions consumed, in `nemia decide`'s words: a step's, several steps' together, and what a run's sessions read. */
 import { consumption, dollars, peakMark, readWords, sumUsage, usedLines } from 'agent-orchestrator';
 import type { Workflow } from 'agent-orchestrator/workflow';
 
@@ -6,7 +6,7 @@ import type { Workflow } from 'agent-orchestrator/workflow';
 export type Usage = NonNullable<ReturnType<typeof consumption>[string]>;
 
 /**
- * What a step consumed, summed over the attempts of its current try (`consumption`), and in the words `wf decide`
+ * What a step consumed, summed over the attempts of its current try (`consumption`), and in the words `nemia decide`
  * prints beside its check (`usedLines`) — `used` and `cost`, each `not measured` where nobody counted, never `0`.
  * `costUsd`, `apiMs` and `toolMs` are the engine's, off the same usage — what the harness priced the session at, and the
  * time it counted waiting on the model and running tools — each null where nobody measured it.
@@ -19,8 +19,8 @@ export type StepUsed = {
   apiMs: number | null;
   toolMs: number | null;
   /**
-   * What the sessions read, by price, as `wf decide` says it beside the cost (`readWords`): `read 21.4M · wrote 412k · peak 167k`, the peak
-   * against the step's `context:` cap, and a resumed session that rebuilt its cache. Null where the runner measured none of it.
+   * What the sessions read, by price, as `nemia decide` says it beside the cost (`readWords`): `read 21.4M · wrote 412k · peak 167k`, the
+   * peak against the step's `context:` cap, and a resumed session that rebuilt its cache. Null where the runner measured none of it.
    */
   read: string | null;
   /**
@@ -41,7 +41,7 @@ export type StepUsed = {
 export type RunRead = { said: string; peak: StepUsed['peak']; rebuilt: number };
 
 /**
- * A usage in `wf decide`'s words: `usedLines`, each line without the label it starts with — the cost alone, since what the sessions read
+ * A usage in `nemia decide`'s words: `usedLines`, each line without the label it starts with — the cost alone, since what the sessions read
  * is `read` — and the peak against `cap`, the `context:` of the step whose peak it is. `read` is the usage the words and the mark are of,
  * where that is not all of `usage`.
  */

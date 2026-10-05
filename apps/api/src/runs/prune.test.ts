@@ -1,8 +1,9 @@
 /**
- * A finished run pruned on the board (`POST /api/runs/:id/prune`), as `wf prune <run> --yes` prunes it: its worktrees removed, and its
+ * A finished run pruned on the board (`POST /api/runs/:id/prune`), as `nemia prune <run> --yes` prunes it: its worktrees removed, and its
  * files with `artifacts`, its record and every branch kept; the list and the page say it was pruned in the package's words. And every
- * refusal refused, in `wf prune`'s own words, with nothing touched: a run not over, a finished run nobody merged without `unmerged`, a run
- * pruned already, a folder run, a run the store has not, a body that is not the two switches, and a request from anywhere but the board.
+ * refusal refused, in `nemia prune`'s own words, with nothing touched: a run not over, a finished run nobody merged without `unmerged`, a
+ * run pruned already, a folder run, a run the store has not, a body that is not the two switches, and a request from anywhere but the
+ * board.
  *
  * At shipped defaults: the api's own engine over a store this file seeds, git for real — branches, a merge, a worktree cut for each run —
  * and the harness's fake `claude` (test/harness.ts) first on PATH. The runs it seeds: `p-merged`, `p-unmerged` and `p-running`, git runs of
@@ -65,9 +66,9 @@ const filesDir = (id: string) => path.join(root, 'runs', id, 'artifacts');
 const branchOf = (id: string) => `wf/${id}/implement`;
 
 /**
- * A git run of one step, `implement`, as `wf start` and the tick leave it: a result branch off main with its work committed — merged back
- * with `--no-ff` when `merge` says so — checked out in the step's worktree under the store, a file in the run's files directory, and the
- * step's task signed off and handed off, or still working.
+ * A git run of one step, `implement`, as `nemia start` and the tick leave it: a result branch off main with its work committed — merged
+ * back with `--no-ff` when `merge` says so — checked out in the step's worktree under the store, a file in the run's files directory, and
+ * the step's task signed off and handed off, or still working.
  */
 function gitRun(id: string, { merge, working: busy = false }: { merge: boolean; working?: boolean }): void {
   const branch = branchOf(id);
@@ -196,10 +197,10 @@ const stateOf = (id: string) => ({
 });
 const hasBranch = (branch: string) => git('branch', '--list', branch).trim() !== '';
 
-/** What `wf prune` says, without `--yes`, of the same run with the same switches: the words a refusal on the board must be. */
+/** What `nemia prune` says, without `--yes`, of the same run with the same switches: the words a refusal on the board must be. */
 const packageSays = async (id: string, how: { artifacts?: boolean; unmerged?: boolean } = {}) => prune(engine(), id, how);
 
-test("the decision's `awaiting` is what `wf prune` refuses without `--unmerged`: a run nobody merged, and one that worked on its base branch itself, whatever its outcome — never a failed run merged by hand", async () => {
+test("the decision's `awaiting` is what `nemia prune` refuses without `--unmerged`: a run nobody merged, and one that worked on its base branch itself, whatever its outcome — never a failed run merged by hand", async () => {
   const awaiting = new Map<string, unknown>();
   for (const id of ['p-merged', 'p-unmerged', 'p-running', 'p-failed-merged', 'p-direct']) {
     const res = await app.request(`/api/runs/${id}/decision`);
@@ -207,7 +208,7 @@ test("the decision's `awaiting` is what `wf prune` refuses without `--unmerged`:
     const body = (await res.json()) as { awaiting?: unknown };
     awaiting.set(id, body.awaiting ?? null);
     const said = await packageSays(id, { artifacts: true });
-    const refusedUnmerged = said.kind === 'refused' && said.refusal!.includes(`wf prune ${id} --unmerged`);
+    const refusedUnmerged = said.kind === 'refused' && said.refusal!.includes(`nemia prune ${id} --unmerged`);
     assert.equal(body.awaiting != null, refusedUnmerged, `${id}: ${JSON.stringify(body)} beside ${JSON.stringify(said)}`);
   }
   assert.deepEqual(Object.fromEntries(awaiting), {
@@ -219,7 +220,7 @@ test("the decision's `awaiting` is what `wf prune` refuses without `--unmerged`:
   });
 });
 
-test('a finished, merged run pruned on the board with its files is pruned as `wf prune --artifacts --yes` prunes it: worktree and files gone, marker written, branch kept, and the list and the page say so', async () => {
+test('a finished, merged run pruned on the board with its files is pruned as `nemia prune --artifacts --yes` prunes it: worktree and files gone, marker written, branch kept, and the list and the page say so', async () => {
   const before = await listed();
   assert.equal(before.get('p-merged')!.pruned, null, 'a run nobody pruned says nothing of it');
   assert.deepEqual((await detail('p-merged')).onDisk, { worktrees: true, files: true }, 'its page says what a prune would find');
@@ -246,7 +247,7 @@ test('a finished, merged run pruned on the board with its files is pruned as `wf
   assert.deepEqual(run.pruned, { said: `${prunedWords(pruned)}; ${prunedKept(pruned)}` });
   assert.match(
     run.pruned.said,
-    /its worktrees were removed \(wf prune\), and its files were removed at .* \(wf prune --artifacts\); its branches and record are kept$/,
+    /its worktrees were removed \(nemia prune\), and its files were removed at .* \(nemia prune --artifacts\); its branches and record are kept$/,
   );
   const page = await detail('p-merged');
   assert.equal(page.pruned!.artifacts!.at, pruned.artifacts.at);
@@ -261,7 +262,7 @@ test('a finished, merged run pruned on the board with its files is pruned as `wf
   );
 });
 
-test('REFUSED at shipped defaults: a run pruned already, with its files, is a 409 in the words of `wf prune`, and nothing is touched', async () => {
+test('REFUSED at shipped defaults: a run pruned already, with its files, is a 409 in the words of `nemia prune`, and nothing is touched', async () => {
   for (const how of [{}, { artifacts: true }, { artifacts: true, unmerged: true }]) {
     const before = stateOf('p-merged');
     const said = await packageSays('p-merged', how);
@@ -273,7 +274,7 @@ test('REFUSED at shipped defaults: a run pruned already, with its files, is a 40
   }
 });
 
-test('REFUSED at shipped defaults: a finished run nobody merged, pruned without `unmerged`, is a 409 in the words of `wf prune`, naming `--unmerged`, and nothing is touched', async () => {
+test('REFUSED at shipped defaults: a finished run nobody merged, pruned without `unmerged`, is a 409 in the words of `nemia prune`, naming `--unmerged`, and nothing is touched', async () => {
   for (const how of [{}, { artifacts: true }]) {
     const before = stateOf('p-unmerged');
     const said = await packageSays('p-unmerged', how);
@@ -286,7 +287,7 @@ test('REFUSED at shipped defaults: a finished run nobody merged, pruned without 
       error,
       /it finished and is not merged into main: pruned, none of its steps can be tried again, sent round or approved, and its branch is the one place its work is left/,
     );
-    assert.ok(error.includes(`wf prune p-unmerged --unmerged${how.artifacts ? ' --artifacts' : ''}`), error);
+    assert.ok(error.includes(`nemia prune p-unmerged --unmerged${how.artifacts ? ' --artifacts' : ''}`), error);
     assert.deepEqual(stateOf('p-unmerged'), before, JSON.stringify(how));
   }
 });
@@ -308,7 +309,7 @@ test('a finished run nobody merged, pruned with `unmerged`, loses its worktree a
   );
 });
 
-test('REFUSED at shipped defaults: a run not over is a 409 in the words of `wf prune`, whatever the switches, and nothing is touched', async () => {
+test('REFUSED at shipped defaults: a run not over is a 409 in the words of `nemia prune`, whatever the switches, and nothing is touched', async () => {
   for (const how of [{}, { unmerged: true }, { artifacts: true, unmerged: true }]) {
     const before = stateOf('p-running');
     const said = await packageSays('p-running', how);
@@ -317,12 +318,12 @@ test('REFUSED at shipped defaults: a run not over is a 409 in the words of `wf p
     assert.equal(res.status, 409, JSON.stringify(how));
     const { error } = (await res.json()) as { error: string };
     assert.equal(error, said.refusal);
-    assert.match(error, /^it is not over — wf decide p-running says it is still running/);
+    assert.match(error, /^it is not over — nemia decide p-running says it is still running/);
     assert.deepEqual(stateOf('p-running'), before, JSON.stringify(how));
   }
 });
 
-test('REFUSED at shipped defaults: a folder run is a 409 in the words of `wf prune`, and its folder stays', async () => {
+test('REFUSED at shipped defaults: a folder run is a 409 in the words of `nemia prune`, and its folder stays', async () => {
   const said = await packageSays('p-folder', { artifacts: true, unmerged: true });
   const res = await pruneOn('p-folder', { artifacts: true, unmerged: true });
   assert.equal(res.status, 409);
@@ -343,14 +344,17 @@ test('REFUSED at shipped defaults: a prune of a run the store has not — none b
   }
 });
 
-test("REFUSED at shipped defaults: a body that is not `wf prune`'s two switches is a 400, before the run is read, and nothing is touched", async () => {
+test("REFUSED at shipped defaults: a body that is not `nemia prune`'s two switches is a 400, before the run is read, and nothing is touched", async () => {
   gitRun('p-body', { merge: true });
   const cases: Array<[unknown, RegExp]> = [
     ['not json', /^POST …\/prune takes a JSON body: `\{ "artifacts"\?: boolean, "unmerged"\?: boolean \}`\.$/],
     [[], /^POST …\/prune takes a JSON object/],
     ['null', /^POST …\/prune takes a JSON object/],
-    [{ artifacts: 'yes' }, /^POST …\/prune takes `artifacts` as true or false — `wf prune`'s --artifacts — and this request sent "yes"\.$/],
-    [{ unmerged: 1 }, /^POST …\/prune takes `unmerged` as true or false — `wf prune`'s --unmerged — and this request sent 1\.$/],
+    [
+      { artifacts: 'yes' },
+      /^POST …\/prune takes `artifacts` as true or false — `nemia prune`'s --artifacts — and this request sent "yes"\.$/,
+    ],
+    [{ unmerged: 1 }, /^POST …\/prune takes `unmerged` as true or false — `nemia prune`'s --unmerged — and this request sent 1\.$/],
     [{ yes: true, force: true }, /^POST …\/prune does not take `yes`, `force`/],
   ];
   for (const [body, words] of cases) {

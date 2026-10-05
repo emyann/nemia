@@ -9,16 +9,16 @@ import type { Engine } from '../store.ts';
  * The cap on runs in flight, as the board says it over the Factory: `2 of 4 run slots taken`, or `no cap`.
  *
  * `last` is what the daemon's last pass ran with (`lastCeilings`, `$WF_ROOT/tick.json`): sessions at work per pool (`WF_MAX_CONCURRENT`)
- * and runs in flight (`WF_MAX_RUNS`, 0 for no cap) — null before any pass has written them. `cap` is the cap a run is judged by, as `wf ls`
- * and `wf decide` judge it (`slotsOf`): the last pass's, and before any, the api's own `WF_MAX_RUNS`; 0 for none.
+ * and runs in flight (`WF_MAX_RUNS`, 0 for no cap) — null before any pass has written them. `cap` is the cap a run is judged by, as `nemia
+ * ls` and `nemia decide` judge it (`slotsOf`): the last pass's, and before any, the api's own `WF_MAX_RUNS`; 0 for none.
  *
  * `inFlight` names the runs that count against it, oldest first, as a pass counts them (`slotNeed`): a task of the run filed and not
  * settled, or a started run nobody called off with something due. Not the Factory's own count of runs in flight, which also has a run
  * waiting on runs, or held for a slot, whose roots the tick will file. Null with no cap, when nothing is read.
- * `held` are the runs the cap holds, in the order a pass admits them, each with the count it is held at and `wf ls`'s words on its roots
+ * `held` are the runs the cap holds, in the order a pass admits them, each with the count it is held at and `nemia ls`'s words on its roots
  * (`heldRuns`, `slotWord`).
  *
- * `pass` is what the last pass cost, phase by phase, as it wrote it (`lastPassCost`, `$WF_ROOT/tick-stats.json`) — what `wf up --stats`
+ * `pass` is what the last pass cost, phase by phase, as it wrote it (`lastPassCost`, `$WF_ROOT/tick-stats.json`) — what `nemia up --stats`
  * prints; null before any pass has written it, or when the file does not read as one.
  */
 export type Ceilings = {

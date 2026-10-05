@@ -126,7 +126,7 @@ test("(a) the api is the store's daemon: it holds the lease as the api, at its u
   assert.deepEqual([daemon.by, daemon.url, daemon.pid], ['api', url, api.child.pid]);
 });
 
-test('REFUSED (b, c): a second api, and a wf up, on a store the api holds — exit 2 naming it, and the second api binds no port', async (t) => {
+test('REFUSED (b, c): a second api, and a nemia up, on a store the api holds — exit 2 naming it, and the second api binds no port', async (t) => {
   const first = startApi('0');
   t.after(() => first.child.kill());
   const [url] = await first.said(/http:\/\/127\.0\.0\.1:\d+/);
@@ -135,7 +135,7 @@ test('REFUSED (b, c): a second api, and a wf up, on a store the api holds — ex
   assert.equal(await second.ended, 2);
   assert.match(second.output(), new RegExp(`^api: \\S+ is held by the api of pid ${first.child.pid} at ${url}, `));
   assert.doesNotMatch(second.output(), /listening/);
-  const wf = spawn(process.execPath, [path.join(API, '../../packages/agent-orchestrator/bin/wf.ts'), 'up'], {
+  const wf = spawn(process.execPath, [path.join(API, '../../packages/agent-orchestrator/bin/nemia.ts'), 'up'], {
     env: { ...process.env, WF_ROOT: first.root, WF_MAX_CONCURRENT: '2', WF_MAX_RUNS: '2' },
     timeout: 60_000,
   });
@@ -145,13 +145,13 @@ test('REFUSED (b, c): a second api, and a wf up, on a store the api holds — ex
   assert.equal(code, 2);
   assert.match(
     said,
-    new RegExp(`wf up: \\S+ is held by the api of pid ${first.child.pid} at ${url}, .*stop it with kill ${first.child.pid} `),
+    new RegExp(`nemia up: \\S+ is held by the api of pid ${first.child.pid} at ${url}, .*stop it with kill ${first.child.pid} `),
   );
 });
 
-test('REFUSED (d): with a wf up holding the store, the api exits 2 naming its pid, and binds no port', async (t) => {
+test('REFUSED (d): with a nemia up holding the store, the api exits 2 naming its pid, and binds no port', async (t) => {
   const root = scratch('nemia-api-main-');
-  const wf = spawn(process.execPath, [path.join(API, '../../packages/agent-orchestrator/bin/wf.ts'), 'up', '200'], {
+  const wf = spawn(process.execPath, [path.join(API, '../../packages/agent-orchestrator/bin/nemia.ts'), 'up', '200'], {
     env: { ...process.env, WF_ROOT: root, WF_MAX_CONCURRENT: '2', WF_MAX_RUNS: '2' },
     cwd: root,
     timeout: 60_000,
@@ -160,7 +160,7 @@ test('REFUSED (d): with a wf up holding the store, the api exits 2 naming its pi
   await leaseSays(root, (l) => l.pid === wf.pid && l.passedAt !== null);
   const api = startApi('0', [], root);
   assert.equal(await api.ended, 2);
-  assert.match(api.output(), new RegExp(`^api: \\S+ is held by the wf up of pid ${wf.pid}, .*stop it with kill ${wf.pid} `));
+  assert.match(api.output(), new RegExp(`^api: \\S+ is held by the nemia up of pid ${wf.pid}, .*stop it with kill ${wf.pid} `));
   assert.doesNotMatch(api.output(), /listening/);
 });
 

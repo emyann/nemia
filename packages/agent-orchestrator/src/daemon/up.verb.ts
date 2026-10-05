@@ -4,7 +4,8 @@
  * `runMain` runs either as the process's command, a signal letting go of the lease before the process exits.
  */
 import { Cause, Effect, Exit, Fiber, type Scope } from 'effect';
-import type { Engine } from '../runtime-client.ts';
+import { quotaHarnesses, type Engine } from '../runtime-client.ts';
+import type { Reading } from '../meter/meter.ts';
 import { HOME } from '../record/record.store.ts';
 import { tick, type Pass } from '../tick/tick.verb.ts';
 import { beat, heldUrl, passed, releaseStore, stillHeld, takeStore, type TakenStore } from './daemon.store.ts';
@@ -23,11 +24,31 @@ export type UpOptions = {
   onPass?: (pass: Pass) => void;
 };
 
+/** How often the daemon asks each harness for its quota: the series keep it over time. */
+export const QUOTA_EVERY_MS = 600_000;
+
+/**
+ * Each harness's quota (`quotaHarnesses`) asked of `e`, over `last`: one that answers its windows replaces its own reading, the percent of
+ * each window used; one that refuses, fails or answers no windows leaves its last.
+ */
+export const askedQuota = async (e: Engine, last: Reading, names: readonly string[] = quotaHarnesses()): Promise<Reading> => {
+  const next = { ...last };
+  for (const name of names) {
+    try {
+      const q = await e.quota(name);
+      if (q.kind === 'windows') next[name] = Object.fromEntries(q.limits.map((l) => [l.key, l.usedPercentage]));
+    } catch {}
+  }
+  return next;
+};
+
 /**
  * The daemon: the store's lease taken as `holder` (`takeStore`, refused by name while another daemon of either kind ticks it) and let go
  * as its scope closes, however it ends, so a signal that stops it leaves the store free at once; `onTaken`; then a pass on `e` every
  * interval, each written down (`passed`) and handed to `onPass`. It beats on a fiber forked in the scope, so a long pass is not taken for
- * stalled and taken over mid-pass, and it fails at the first pass that finds the store taken over (`stillHeld`, `takenFromLine`).
+ * stalled and taken over mid-pass, and it fails at the first pass that finds the store taken over (`stillHeld`, `takenFromLine`). On
+ * another fiber in the scope it asks each harness for its quota, at once and every `QUOTA_EVERY_MS` (`askedQuota`), and hands each pass
+ * the latest reading, which the pass keeps among the recent and so in the series.
  */
 export const up = (e: Engine, { every, repo, holder, onTaken, onPass }: UpOptions): Effect.Effect<never, unknown, Scope.Scope> =>
   Effect.gen(function* () {
@@ -36,11 +57,20 @@ export const up = (e: Engine, { every, repo, holder, onTaken, onPass }: UpOption
       ({ held }) => Effect.sync(() => releaseStore(held)),
     );
     yield* Effect.forkScoped(Effect.forever(Effect.sleep(every).pipe(Effect.andThen(Effect.sync(() => beat(taken.held))))));
+    let reading: Reading = {};
+    yield* Effect.forkScoped(
+      Effect.forever(
+        Effect.promise(() => askedQuota(e, reading)).pipe(
+          Effect.andThen((next) => Effect.sync(() => (reading = next))),
+          Effect.andThen(Effect.sleep(QUOTA_EVERY_MS)),
+        ),
+      ),
+    );
     if (onTaken) yield* onTaken(taken);
     for (;;) {
       const by = stillHeld(taken.held);
       if (by) return yield* Effect.fail(new Error(takenFromLine(by, HOME, holder)));
-      const pass = yield* Effect.tryPromise({ try: () => tick(e, { repo }), catch: (err) => err });
+      const pass = yield* Effect.tryPromise({ try: () => tick(e, { repo, quota: () => reading }), catch: (err) => err });
       passed(taken.held);
       onPass?.(pass);
       yield* Effect.sleep(every);

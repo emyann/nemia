@@ -6,7 +6,7 @@
 import { Effect, Metric } from 'effect';
 import type { Engine } from '../runtime-client.ts';
 import { addRuntime, aside, within, type Tallies } from './tally.store.ts';
-import { PASS_BOUNDS, passCost, PHASES, type HarnessCost, type PassCost, type Phase } from './meter.ts';
+import { PASS_BOUNDS, passCost, READ_BOUNDS, PHASES, type HarnessCost, type PassCost, type Phase } from './meter.ts';
 
 /**
  * The phase each of the engine's verbs is counted in: its pass is the runtime's, a read of a journal is `journals`, a verb that changes a
@@ -108,13 +108,11 @@ export const costOf = (t: Tallies, ms: number, before: EngineIo | undefined, aft
     overheadMs: t.overheadMs,
   });
 
-/** The upper bounds of a pass's journal reads, one past the last for more. */
-const READ_BOUNDS: readonly number[] = [0, 1, 2, 5, 10, 25, 50, 100, 250, 500, 1000];
-
 /**
  * The metrics of the pass, in the registry of whoever runs it — the process's own unless a test gives another: its time and each phase's
  * (`pass.duration`, `pass.phase.duration` by `phase`, ms over `PASS_BOUNDS`), its journal reads (`pass.journal_reads`), and what the last
- * pass saw: the runs in the store (`store.runs`), and the sessions queued and admitted (`sessions.queued`, `sessions.admitted`).
+ * pass saw: the runs in the store (`store.runs`), the sessions queued and admitted (`sessions.queued`, `sessions.admitted`), how long the
+ * oldest queued has waited (`admission.wait`, ms), and the machine's load per core (`machine.load`).
  */
 export const PASS_METRICS = {
   duration: Metric.histogram('pass.duration', { description: 'the time of a tick pass, in ms', boundaries: PASS_BOUNDS }),
@@ -123,6 +121,8 @@ export const PASS_METRICS = {
   runs: Metric.gauge('store.runs', { description: 'the runs the store listed to the last pass' }),
   queued: Metric.gauge('sessions.queued', { description: 'the sessions waiting for a slot, as the last pass saw them' }),
   admitted: Metric.gauge('sessions.admitted', { description: 'the sessions holding a slot, as the last pass saw them' }),
+  wait: Metric.gauge('admission.wait', { description: 'how long the oldest queued session had waited at the last pass, in ms' }),
+  load: Metric.gauge('machine.load', { description: "the machine's load over the last minute per core, at the last pass" }),
 } as const;
 
 /** A pass's cost put into the pass's metrics (`PASS_METRICS`). */
@@ -133,4 +133,6 @@ export const recordPassMetrics = Effect.fn('recordPassMetrics')(function* (cost:
   yield* Metric.update(PASS_METRICS.runs, cost.runs);
   yield* Metric.update(PASS_METRICS.queued, cost.queued);
   yield* Metric.update(PASS_METRICS.admitted, cost.admitted);
+  yield* Metric.update(PASS_METRICS.wait, cost.waitMs);
+  yield* Metric.update(PASS_METRICS.load, cost.load);
 });

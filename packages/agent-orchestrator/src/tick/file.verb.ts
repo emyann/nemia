@@ -63,7 +63,8 @@ import { phaseOfView } from '../views/views-words.ts';
 import { placesOf } from '../folder/lookup.store.ts';
 import { skillsFor } from '../folder/folder.store.ts';
 import { renderedFlags, rendersAgent, unrendered } from '../agents/agents.ts';
-import { within } from '../meter/tally.store.ts';
+import { noteFiledCheck, within } from '../meter/tally.store.ts';
+import { DEFAULT_FACTORY } from '../factory/factory.ts';
 import { answerHeld, stopAsked } from './held.verb.ts';
 
 /**
@@ -525,6 +526,7 @@ export async function fileChecks(f: Filing, names: readonly string[]): Promise<s
 /**
  * File a step's check where the engine does not hold it, on the `check` harness, with the command the run froze and a deadline, a landing's
  * its own, and put it on the record: an ending's installs first what the staged merge's lockfile asks for (`checkoutParts`), and says so.
+ * A check filed is noted to the pass's meter by what it belongs to (`noteFiledCheck`), never its run.
  */
 async function fileCheck(f: Filing, name: string): Promise<void> {
   const { e, run } = f;
@@ -558,6 +560,12 @@ async function fileCheck(f: Filing, name: string): Promise<void> {
       cwd: workspace,
       deadlineSeconds: lands ? LANDING_CHECK_DEADLINE_SECONDS : CHECK_DEADLINE_SECONDS,
       config: { command: checkArgv(step.check!, install !== undefined), env, niceness: CHECK_NICENESS },
+    });
+    noteFiledCheck({
+      factory: run.factory ?? DEFAULT_FACTORY,
+      workflow: path.basename(run.workflowDir),
+      step: name,
+      agent: step.agent?.name ?? '',
     });
   }
   run.steps[name] = { ...run.steps[name], check: { taskId } };

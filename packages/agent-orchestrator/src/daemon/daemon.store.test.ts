@@ -731,6 +731,8 @@ const COST = passCost({
   tasks: 5,
   queued: 2,
   admitted: 1,
+  waitMs: 1500,
+  load: 0.25,
 });
 
 test('a cost reads back as written, and REFUSED: half a file, another shape, a phase missing, a count that is not one', () => {
@@ -893,5 +895,50 @@ test('an api whose store is taken over while it runs stops at its next pass, nam
   );
   assert.equal(e.passes, 1);
   assert.equal(fs.readFileSync(FILE, 'utf8'), theirs);
+  clear();
+});
+
+test('a recent pass keeps its quota and checks, a ring an older tick wrote without them still reads, and REFUSED: a quota not a number', () => {
+  fs.rmSync(recentFile(), { force: true });
+  try {
+    const check = { factory: 'nemia', workflow: 'build', step: 'implement', agent: 'ada' };
+    const { kept } = recordRecentPass(COST, 3, { quota: { h: { w: 12.5 } }, checks: [check] });
+    assert.deepEqual([kept.at(-1)?.quota, kept.at(-1)?.checks], [{ h: { w: 12.5 } }, [check]]);
+    assert.deepEqual(recentPasses(), kept, 'read back as kept');
+    const { waitMs: _w, load: _l, quota: _q, checks: _c, ...older } = kept[0];
+    fs.writeFileSync(recentFile(), JSON.stringify([older, { ...kept[0], quota: { h: { w: 'most' } } }]));
+    assert.deepEqual(recentPasses(), [older], 'the older reads; the quota that is no number is left out');
+  } finally {
+    fs.rmSync(recentFile(), { force: true });
+  }
+});
+
+test("the daemon asks each harness's quota and hands its reading to the passes; a harness that fails or answers no windows keeps its last", async () => {
+  clear();
+  const { up, askedQuota } = await import('./up.verb.ts');
+  const { Effect } = await import('effect');
+  const answers: Record<string, () => Promise<unknown>> = {
+    a: async () => ({ kind: 'windows', limits: [{ key: 'five', usedPercentage: 30, resetsAt: null }], subscription: null }),
+    b: async () => {
+      throw new Error('no answer');
+    },
+    c: async () => ({ kind: 'no-plan' }),
+  };
+  const asking = { quota: (name: string) => answers[name]() } as unknown as Engine;
+  const last = { b: { week: 5 }, c: { week: 6 } };
+  assert.deepEqual(await askedQuota(asking, last, ['a', 'b', 'c']), { a: { five: 30 }, b: { week: 5 }, c: { week: 6 } });
+  assert.deepEqual(last, { b: { week: 5 }, c: { week: 6 } }, 'the last reading is not changed in place');
+
+  fs.rmSync(recentFile(), { force: true });
+  const e = engineOf((n) => {
+    if (recentPasses().at(-1)?.quota || n > 500) throw STOP;
+  });
+  Object.assign(e, {
+    quota: async () => ({ kind: 'windows', limits: [{ key: 'w', usedPercentage: 12, resetsAt: null }], subscription: null }),
+  });
+  await Effect.runPromise(Effect.scoped(up(e, { every: 10, repo: ROOT, holder: 'api' })).pipe(Effect.flip));
+  const quota = recentPasses().at(-1)?.quota ?? {};
+  assert.ok(Object.keys(quota).length > 0, 'a pass kept the reading');
+  for (const windows of Object.values(quota)) assert.deepEqual(windows, { w: 12 });
   clear();
 });

@@ -18,7 +18,7 @@
 import fs from 'node:fs';
 import { execFileSync, type ExecFileSyncOptions } from 'node:child_process';
 import { Effect } from 'effect';
-import { NOTHING_SEEN, PHASES, type Phase, type PhaseCost, type Seen } from './meter.ts';
+import { NOTHING_SEEN, PHASES, type CheckLabels, type Phase, type PhaseCost, type Seen } from './meter.ts';
 
 /** The kinds of work a pass is counted in: its phases (`PHASES`). `assess` is the time in no other. */
 type Kind = Phase;
@@ -26,9 +26,16 @@ type Tally = PhaseCost;
 
 /**
  * A pass's counts: each kind's, the run records read, the runs at rest answered from the tick's memo (`rested`), what the pass saw beside
- * its time (`seen`, `noteSeen`), and the time the counting itself took (`overheadMs`).
+ * its time (`seen`, `noteSeen`), the checks it filed (`checks`, `noteFiledCheck`), and the time the counting itself took (`overheadMs`).
  */
-export type Tallies = { kinds: Record<Kind, Tally>; records: number; rested: number; seen: Seen; overheadMs: number };
+export type Tallies = {
+  kinds: Record<Kind, Tally>;
+  records: number;
+  rested: number;
+  seen: Seen;
+  checks: CheckLabels[];
+  overheadMs: number;
+};
 
 type Frame = { kind: Kind };
 type Meter = Tallies & { stack: Frame[]; mark: number };
@@ -122,6 +129,11 @@ export const noteSeen = (seen: Partial<Seen>): void => {
   if (meter) meter.seen = { ...meter.seen, ...seen };
 };
 
+/** A check the pass filed, by what it belongs to (`CheckLabels`), while a pass is metered. */
+export const noteFiledCheck = (labels: CheckLabels): void => {
+  if (meter) meter.checks.push({ factory: labels.factory, workflow: labels.workflow, step: labels.step, agent: labels.agent });
+};
+
 /**
  * What the runtime reported of a call, added to the kind that made it — its bytes, reads and processes — with the time it spent observing
  * its harnesses and the processes those started moved from that kind to `observe` (`observed`, at most the call's own).
@@ -164,6 +176,7 @@ const opened = (t0: number): Meter => {
     records: 0,
     rested: 0,
     seen: NOTHING_SEEN,
+    checks: [],
     overheadMs: 0,
     stack: [],
     mark: t0,
@@ -176,7 +189,10 @@ const opened = (t0: number): Meter => {
 const counted = (m: Meter, t0: number): { ms: number; tallies: Tallies } => {
   const end = performance.now();
   charge(m, end);
-  return { ms: end - t0, tallies: { kinds: m.kinds, records: m.records, rested: m.rested, seen: m.seen, overheadMs: m.overheadMs } };
+  return {
+    ms: end - t0,
+    tallies: { kinds: m.kinds, records: m.records, rested: m.rested, seen: m.seen, checks: m.checks, overheadMs: m.overheadMs },
+  };
 };
 
 /** No meter open, when `m` is the one open: what closes a pass that opened it, whatever it ended with. */

@@ -11,7 +11,17 @@ import path from 'node:path';
 import { Result, Schema } from 'effect';
 import { HOME } from '../record/record.store.ts';
 import { maxConcurrent, maxRuns } from '../config/config.store.ts';
-import { PHASES, RECENT_KEPT, recentOf, type PassCost, type PassCostRead, type Phase, type RecentPass } from '../meter/meter.ts';
+import {
+  PHASES,
+  RECENT_KEPT,
+  recentOf,
+  type CheckLabels,
+  type PassCost,
+  type PassCostRead,
+  type Phase,
+  type Reading,
+  type RecentPass,
+} from '../meter/meter.ts';
 import {
   DAEMON_FILE,
   daemonStanding as standingOf,
@@ -446,6 +456,12 @@ const isRecentPass = Schema.is(
       rested: Count,
       reads: Count,
       phases: Schema.Struct(Object.fromEntries(PHASES.map((p) => [p, Count])) as Record<Phase, typeof Count>),
+      waitMs: Schema.optionalKey(Count),
+      load: Schema.optionalKey(Count),
+      quota: Schema.optionalKey(Schema.Record(Schema.String, Schema.Record(Schema.String, Schema.Finite))),
+      checks: Schema.optionalKey(
+        Schema.Array(Schema.Struct({ factory: Schema.String, workflow: Schema.String, step: Schema.String, agent: Schema.String })),
+      ),
     }),
     Rest,
   ),
@@ -481,19 +497,23 @@ export function recentPasses(): RecentPass[] {
 }
 
 /**
- * The pass whose cost is `cost` kept among the recent (`recentOf`), after those the file holds and the oldest left out past `keep`, written
- * through a hidden file renamed over the last, as `recordPassCost` writes. A store that cannot be written loses only this. Answers with
- * the time it took, which is measuring's.
+ * The pass whose cost is `cost` kept among the recent (`recentOf`, with the quota read and the checks filed in it, `also`), after those
+ * the file holds and the oldest left out past `keep`, written through a hidden file renamed over the last, as `recordPassCost` writes. A
+ * store that cannot be written loses only this. Answers with the time it took, which is measuring's, and the passes kept, oldest first.
  */
-export function recordRecentPass(cost: PassCost, keep = RECENT_KEPT): number {
+export function recordRecentPass(
+  cost: PassCost,
+  keep = RECENT_KEPT,
+  also: { quota?: Reading; checks?: readonly CheckLabels[] } = {},
+): { ms: number; kept: RecentPass[] } {
   const t0 = performance.now();
   const text = recentText();
-  const kept = [...(text === undefined ? [] : parseRecentPasses(text).passes), recentOf(cost)].slice(-keep);
+  const kept = [...(text === undefined ? [] : parseRecentPasses(text).passes), recentOf(cost, also)].slice(-keep);
   const hidden = path.join(HOME, `.tick-recent.json.${process.pid}`);
   try {
     fs.mkdirSync(HOME, { recursive: true });
     fs.writeFileSync(hidden, JSON.stringify(kept));
     fs.renameSync(hidden, recentFile());
   } catch {}
-  return performance.now() - t0;
+  return { ms: performance.now() - t0, kept };
 }

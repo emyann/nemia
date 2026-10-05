@@ -6,16 +6,18 @@ import type { Engine } from '../runtime-client.ts';
 import type { Conflict, Missing } from '../refusal/refusal.ts';
 import type { StatsMemo } from '../stats/stats.verb.ts';
 import type { RestingMemo } from '../rest/resting.verb.ts';
+import type { SeriesMemo } from '../series/series.ts';
 import type { Filings } from '../summary/reads.verb.ts';
 import type { RunSummary } from '../summary/summary.verb.ts';
 import type { Args, CommandSpec } from './command.ts';
 
 /**
  * What a caller that lives long keeps between its calls of the table's handlers: the stats' memo of each run's facts (`stats`), the list's
- * memo of runs at rest (`runs`), and the feed's filing times (`filings`).
+ * memo of runs at rest (`runs`), the feed's filing times (`filings`), and the series' days read (`series`).
  */
 export type Kept = {
   readonly stats?: StatsMemo;
+  readonly series?: SeriesMemo;
   readonly runs?: RestingMemo<Omit<RunSummary, 'startedAt'>>;
   readonly filings?: Filings;
 };

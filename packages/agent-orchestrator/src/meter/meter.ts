@@ -47,27 +47,35 @@ export type PassCost = Seen & {
 /**
  * What a pass saw beside its time: `runs`, the runs the store listed to it, its size as the pass saw it; `tasks`, the tasks the runtime
  * reported on its pass, every one not settled; `queued`, those of them waiting for a slot; `admitted`, the sessions holding one — at work,
- * or admitted and not yet started.
+ * or admitted and not yet started; `waitMs`, how long the oldest of those queued has waited since it was filed, 0 with none; and `load`,
+ * the machine's load over the last minute per core it has.
  */
-export type Seen = { runs: number; tasks: number; queued: number; admitted: number };
+export type Seen = { runs: number; tasks: number; queued: number; admitted: number; waitMs: number; load: number };
 
 /** What a pass sees before it has seen anything. */
-export const NOTHING_SEEN: Seen = { runs: 0, tasks: 0, queued: 0, admitted: 0 };
+export const NOTHING_SEEN: Seen = { runs: 0, tasks: 0, queued: 0, admitted: 0, waitMs: 0, load: 0 };
 
 /**
- * The tasks a runtime's pass reported, and the sessions of them queued and admitted (`Seen`): `views` the tasks not settled, each with its
- * admission, and `running` the sessions at work by harness. A session at work counts once, in `running`; one admitted and not yet started
- * is its view's. A report that carries neither reads as none.
+ * The tasks a runtime's pass reported at `now`, and the sessions of them queued and admitted (`Seen`): `views` the tasks not settled, each
+ * with its admission and when it was filed, and `running` the sessions at work by harness. A session at work counts once, in `running`;
+ * one admitted and not yet started is its view's. The wait is the oldest queued view's, one with no time of filing left out. A report that
+ * carries neither reads as none.
  */
-export const sessionsOf = (report: {
-  views?: ReadonlyArray<{ admission?: 'queued' | 'admitted' }>;
-  running?: Readonly<Record<string, number>>;
-}): Omit<Seen, 'runs'> => {
+export const sessionsOf = (
+  report: {
+    views?: ReadonlyArray<{ admission?: 'queued' | 'admitted'; state?: { filedAt?: string } }>;
+    running?: Readonly<Record<string, number>>;
+  },
+  now: number,
+): Omit<Seen, 'runs' | 'load'> => {
   const views = report.views ?? [];
+  const queued = views.filter((v) => v.admission === 'queued');
+  const filed = queued.map((v) => Date.parse(v.state?.filedAt ?? '')).filter((ms) => Number.isFinite(ms));
   return {
     tasks: views.length,
-    queued: views.filter((v) => v.admission === 'queued').length,
+    queued: queued.length,
     admitted: views.filter((v) => v.admission === 'admitted').length + Object.values(report.running ?? {}).reduce((n, k) => n + k, 0),
+    waitMs: filed.length ? Math.max(0, now - Math.min(...filed)) : 0,
   };
 };
 
@@ -195,30 +203,44 @@ export const breakdownLines = (c: PassCostRead): string[] => {
 };
 
 /**
- * One pass as the store keeps it among the recent (`tick-recent.json`): when, its time, what it saw (`Seen`), the run records it read and
- * the runs it answered from memory, its journal reads (`reads`, those of its `journals` phase), and each phase's time.
+ * One pass as the store keeps it among the recent (`tick-recent.json`): when, its time, what it saw (`Seen`, its wait and load absent from
+ * a pass an older tick kept), the run records it read and the runs it answered from memory, its journal reads (`reads`, those of its
+ * `journals` phase), and each phase's time; with them, the quota the daemon last read (`Reading`), and the labels of each check it filed.
  */
-export type RecentPass = Seen & {
-  at: string;
-  ms: number;
-  records: number;
-  rested: number;
-  reads: number;
-  phases: Record<Phase, number>;
-};
+export type RecentPass = Omit<Seen, 'waitMs' | 'load'> &
+  Partial<Pick<Seen, 'waitMs' | 'load'>> & {
+    at: string;
+    ms: number;
+    records: number;
+    rested: number;
+    reads: number;
+    phases: Record<Phase, number>;
+    quota?: Reading;
+    checks?: CheckLabels[];
+  };
 
-/** A pass's cost as it is kept among the recent passes (`RecentPass`). */
-export const recentOf = (c: PassCost): RecentPass => ({
+/** Each harness's quota as last read: harness, then the harness's own name for a window, then the percent of it used. */
+export type Reading = Record<string, Record<string, number>>;
+
+/** A check filed, by what it belongs to: never its run, whose own detail stays in its record. */
+export type CheckLabels = { factory: string; workflow: string; step: string; agent: string };
+
+/** A pass's cost as it is kept among the recent passes (`RecentPass`), with the quota read and the checks filed in it. */
+export const recentOf = (c: PassCost, also: { quota?: Reading; checks?: readonly CheckLabels[] } = {}): RecentPass => ({
   at: c.at,
   ms: c.ms,
   runs: c.runs,
   tasks: c.tasks,
   queued: c.queued,
   admitted: c.admitted,
+  waitMs: c.waitMs,
+  load: c.load,
   records: c.records,
   rested: c.rested,
   reads: c.phases.journals.reads,
   phases: Object.fromEntries(PHASES.map((p) => [p, c.phases[p].ms])) as Record<Phase, number>,
+  ...(also.quota && Object.keys(also.quota).length ? { quota: also.quota } : {}),
+  ...(also.checks?.length ? { checks: [...also.checks] } : {}),
 });
 
 /** How many recent passes the store keeps: about ten minutes of a daemon ticking every four seconds. */
@@ -226,6 +248,9 @@ export const RECENT_KEPT = 150;
 
 /** The upper bounds, in ms, of a pass's buckets, one past the last for any longer: the histogram's, and the pass's metric's. */
 export const PASS_BOUNDS: readonly number[] = [10, 25, 50, 100, 250, 500, 1000, 2500, 5000];
+
+/** The upper bounds of a pass's journal reads, one past the last for more: the histogram's, and the pass's metric's. */
+export const READ_BOUNDS: readonly number[] = [0, 1, 2, 5, 10, 25, 50, 100, 250, 500, 1000];
 
 /** One bucket of passes: those over the bound before and at most `le` ms, `le` null for the last, which has no bound. */
 export type PassBucket = { le: number | null; count: number };
@@ -257,7 +282,13 @@ export const passParts = (recent: readonly Pick<RecentPass, 'ms' | 'phases'>[]):
  * The recent passes in a few numbers: how many, the median and the slowest time, and what the latest saw — the runs listed, the journal
  * reads, the tasks, the sessions queued and admitted. Null for no pass.
  */
-export type PassSummary = Seen & { passes: number; medianMs: number; slowestMs: number; reads: number; at: string };
+export type PassSummary = Omit<Seen, 'waitMs' | 'load'> & {
+  passes: number;
+  medianMs: number;
+  slowestMs: number;
+  reads: number;
+  at: string;
+};
 
 /** The recent passes' summary (`PassSummary`), null for none. */
 export const passSummary = (recent: readonly RecentPass[]): PassSummary | null => {

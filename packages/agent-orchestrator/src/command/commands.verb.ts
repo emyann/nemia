@@ -45,6 +45,7 @@ import { INBOXES } from '../inbox/commands.verb.ts';
 import { PLAN, START } from '../start/commands.verb.ts';
 import { CANCEL, PAUSE, PAUSED, PAUSE_NOW, HOLD, PRUNE, RAN, RM, RESUME } from './runs.verb.ts';
 import { PASSES } from '../meter/passes.verb.ts';
+import { SERIES } from '../series/series.verb.ts';
 
 /** The text under `key`, or undefined where none was given. */
 const textOf = (args: Args, key: string): string | undefined => {
@@ -500,6 +501,7 @@ export const COMMANDS: readonly Command[] = [
   MERGES,
   CEILINGS,
   PASSES,
+  SERIES,
   AGENTS,
   AGENT_CARD,
   AGENTS_CUSTOM,

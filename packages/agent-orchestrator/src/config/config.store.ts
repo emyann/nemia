@@ -1,6 +1,7 @@
 /**
  * The `WF_` environment the package reads: where the store lives (`WF_ROOT`), the daemon's two ceilings (`WF_MAX_CONCURRENT`,
- * `WF_MAX_RUNS`), and whether a pass judges its runs at rest in full (`WF_VERIFY_REST`). Each is an Effect `Config` with its default, and
+ * `WF_MAX_RUNS`), whether a pass judges its runs at rest in full (`WF_VERIFY_REST`), and how long the series are kept
+ * (`WF_METRICS_MINUTE_DAYS`, `WF_METRICS_HOUR_DAYS`). Each is an Effect `Config` with its default, and
  * each has a plain reader that takes the environment, `process.env` unless given, and answers the value or throws `Invalid`, exit 2, in the
  * variable's own words. A value that is set and not one the variable takes is refused, never read as its default. Reads no disk.
  */
@@ -42,6 +43,21 @@ const runs = Config.schema(Schema.String.check(Schema.isPattern(FROM_ZERO)), 'WF
 const verifyRest = Config.schema(Schema.Literals(['0', '1']), 'WF_VERIFY_REST').pipe(
   Config.map((value) => value === '1'),
   Config.withDefault(false),
+);
+
+/** Days of minute lines kept when `WF_METRICS_MINUTE_DAYS` is unset or empty. */
+const MINUTE_DAYS = 30;
+
+/** `WF_METRICS_MINUTE_DAYS`: days of minute lines kept, a whole number from 2, so a day's range always has yesterday; 30 when unset. */
+const minuteDays = Config.schema(Schema.String.check(Schema.isPattern(/^\s*0*([2-9]|[1-9]\d+)\s*$/)), 'WF_METRICS_MINUTE_DAYS').pipe(
+  Config.map((value) => Number(value.trim())),
+  Config.withDefault(MINUTE_DAYS),
+);
+
+/** `WF_METRICS_HOUR_DAYS`: days of hour lines kept, a whole number from 1; undefined, kept until pruned, when unset. */
+const hourDays = Config.schema(Schema.String.check(Schema.isPattern(/^\s*0*[1-9]\d*\s*$/)), 'WF_METRICS_HOUR_DAYS').pipe(
+  Config.map((value): number | undefined => Number(value.trim())),
+  Config.withDefault(undefined),
 );
 
 /**
@@ -100,4 +116,24 @@ export const verifiesRest = (env: Env = process.env): boolean =>
     env,
     (value) =>
       `WF_VERIFY_REST=${value} is neither 1 nor 0. It judges in full each run a pass answers from its memo of runs at rest, which costs all the memo saves: WF_VERIFY_REST=1 — or 0, or unset, for off.`,
+  );
+
+/** `WF_METRICS_MINUTE_DAYS`, the days of minute lines the series keep: a whole number from 2, or 30 when unset or empty. */
+export const metricsMinuteDays = (env: Env = process.env): number =>
+  read(
+    minuteDays,
+    'WF_METRICS_MINUTE_DAYS',
+    env,
+    (value) =>
+      `WF_METRICS_MINUTE_DAYS=${value} is not a whole number from 2. It is how many days of the series' minute lines are kept, two at least so a day's range has yesterday: WF_METRICS_MINUTE_DAYS=30 — or unset, for 30.`,
+  );
+
+/** `WF_METRICS_HOUR_DAYS`, the days of hour lines the series keep: a whole number from 1, or undefined — kept until pruned — when unset. */
+export const metricsHourDays = (env: Env = process.env): number | undefined =>
+  read(
+    hourDays,
+    'WF_METRICS_HOUR_DAYS',
+    env,
+    (value) =>
+      `WF_METRICS_HOUR_DAYS=${value} is not a whole number from 1. It is how many days of the series' hour lines are kept: WF_METRICS_HOUR_DAYS=365 — or unset, to keep them until you delete them.`,
   );

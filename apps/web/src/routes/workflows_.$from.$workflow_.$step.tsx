@@ -1,6 +1,7 @@
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { Skills } from '../components/AgentParts';
+import { StepHire } from '../components/StepHire';
 import { RecentRuns, StepAgent, StepTold, StepWritten } from '../components/StepParts';
 import { stepQuery } from '../lib/api';
 import { pagePlaceOf } from '../lib/factories';
@@ -23,8 +24,8 @@ export const Route = createFileRoute('/workflows_/$from/$workflow_/$step')({
 });
 
 /**
- * One step of a workflow, to read, in the factory picked: its agent, hired or named by its file (`StepAgent`), with what that agent says
- * it can do (`skills:`), a description of the work that fences nothing; what a run of it will be told, read now, each layer beside where
+ * One step of a workflow, to read, in the factory picked: its agent, hired or named by its file (`StepAgent`), hired and fired there
+ * (`StepHire`), with what that agent says it can do (`skills:`), a description of the work that fences nothing; what a run of it will be told, read now, each layer beside where
  * it is edited; its newest runs; then its file's own words and keys (`StepWritten`). It edits and starts nothing: each layer's home and its
  * workflow's page do.
  */
@@ -55,6 +56,7 @@ function StepPage() {
           </span>
         </div>
         <StepAgent page={page} />
+        <StepHire from={from} workflow={workflow} step={step} place={place} where="page" />
         <Skills skills={page.agentSkills} className="pl-3" />
       </header>
 

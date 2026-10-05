@@ -194,6 +194,7 @@ export const stepPage = (extra: Partial<WorkflowStepPage> = {}): WorkflowStepPag
   },
   hired: null,
   hiredIn: [],
+  hiring: { refused: null, agents: [] },
   skillsFrom: [],
   recentRuns: [],
   ...extra,

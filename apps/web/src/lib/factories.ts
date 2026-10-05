@@ -154,6 +154,27 @@ export const offeredIn =
     (factories !== undefined && workflowFactories(workflow, factories).includes(factory));
 
 /**
+ * Whether the factory `factory` hires into the steps of a listed workflow: a factory picked that offers it (`workflowFactories`) — never
+ * none, nor the default factory, which hires no one — and none while `factories` are unread.
+ */
+export const hiresInto = (
+  workflow: Pick<WorkflowListing, 'name' | 'from'>,
+  factory: string | undefined,
+  factories: readonly Factory[] | undefined,
+): boolean => factory !== undefined && factories !== undefined && workflowFactories(workflow, factories).includes(factory);
+
+/** The step a new agent is to be hired into once written: a factory, a workflow of yours, and its step. */
+export type HirePlace = { factory: string; workflow: string; step: string };
+
+/** The New agent page's search, the step it hires into: all three parts where the address names each by a string not empty, else none. */
+export const hirePlaceOf = (search: Record<string, unknown>): Partial<HirePlace> => {
+  const { factory, workflow, step } = search;
+  return typeof factory === 'string' && factory && typeof workflow === 'string' && workflow && typeof step === 'string' && step
+    ? { factory, workflow, step }
+    : {};
+};
+
+/**
  * The place a workflow's page or a step's is read in, from its address: `?factory=` as `factorySearch` reads it, and `?repo=` where it
  * names a repository by a string that is not empty.
  */

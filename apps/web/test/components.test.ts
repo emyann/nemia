@@ -5968,6 +5968,79 @@ test("a step's agent: the one the factory picked hires, marked hired; else its f
   );
 });
 
+/** StepHire for the step `review` of `w`, read in the factory `hiring` from `page`'s answer, drawn on the step's page or a row. */
+const hireOn = async (page: Record<string, unknown> | null, where: 'page' | 'row' = 'page'): Promise<string> => {
+  const { StepHire } = await import('../src/components/StepHire.tsx');
+  const { stepQuery } = await import('../src/lib/api/workflows.ts');
+  const read = await hiredPage(page ?? {});
+  const store = { workflows: '/store/workflows', agents: '/store/agents', skills: '/store/skills', fileFactory: '' };
+  return routedWith(createElement(StepHire, { from: read.from, workflow: 'w', step: 'review', place: { factory: 'hiring' }, where }), [
+    ...(page === null
+      ? []
+      : [[stepQuery(read.from, 'w', 'review', { factory: 'hiring' }).queryKey, read] as [readonly unknown[], unknown]]),
+    [['store'], store],
+  ]);
+};
+
+const PICKABLE = {
+  refused: null,
+  agents: [
+    { name: 'ada', description: 'Builds it.' },
+    { name: 'scribe', description: null },
+  ],
+};
+
+test('hiring into a step: the agent hired with Fire; else the picker of the agents beside it, with Hire and, on yours, New agent', async () => {
+  const hired = await hireOn({});
+  assert.match(hired, /hiring hires[^]*href="\/agents\/yours\/writer"[^]*into this step\./);
+  assert.match(hired, /data-fire="writer"[^>]*>Fire</);
+  assert.doesNotMatch(hired, /data-hire-picker|data-new-agent|data-hire-refused/, 'a step hired into is fired before another is hired');
+
+  const open = await hireOn({ hired: null, hiring: PICKABLE });
+  assert.match(open, /data-hire-picker/);
+  assert.match(open, />Hire into this step in hiring</);
+  assert.match(open, /data-hire="true"[^>]*disabled=""[^>]*>Hire</, 'Hire waits for an agent picked');
+  assert.match(open, /<option value="ada">ada<\/option><option value="scribe">scribe<\/option>/);
+  assert.doesNotMatch(open, /data-fire/);
+  assert.match(
+    open,
+    /data-new-agent[^>]*href="\/agents\/new\?factory=hiring&amp;workflow=w&amp;step=review"[^>]*>New agent, hired into this step</,
+    'New agent carries the step it comes back to hire into',
+  );
+  assert.doesNotMatch(open, /data-new-agent-repo/);
+
+  const none = await hireOn({ hired: null, hiring: { refused: null, agents: [] } });
+  assert.match(none, /data-hire-none[^>]*>None of your agents reads, so there is no agent to hire into this step in hiring\./);
+  assert.match(none, /data-new-agent/, 'and New agent writes the first');
+});
+
+test("REFUSED, hiring into a step: the package's words said in place, and no picker, Fire nor New agent", async () => {
+  const refused = "The step's own file names its agent, `agent: scribe`, which fills it in every factory.";
+  const html = await hireOn({ hired: null, hiring: { refused, agents: [] } });
+  assert.match(
+    html,
+    /data-hire-refused[^>]*>The step&#x27;s own file names its agent, `agent: scribe`, which fills it in every factory\.</,
+  );
+  assert.doesNotMatch(html, /data-hire-picker|data-fire|data-new-agent/);
+});
+
+test("hiring into one of the repository's steps: no New agent; its page says one is added through a card or by copying it into yours", async () => {
+  const page = await hireOn({ hired: null, from: 'repo', hiring: PICKABLE });
+  assert.match(page, /data-hire-picker/, "the repository's agents are hired as yours are");
+  assert.doesNotMatch(page, /data-new-agent=/);
+  assert.match(
+    page,
+    /data-new-agent-repo[^>]*>A new agent for this repository&#x27;s workflow is added through a card on the[^]*href="\/inbox"[^]*, or by copying the workflow&#x27;s folder into <code[^>]*>\/store\/workflows\/<\/code>/,
+  );
+  const row = await hireOn({ hired: null, from: 'repo', hiring: PICKABLE }, 'row');
+  assert.match(row, /data-hire-picker/);
+  assert.doesNotMatch(row, /data-new-agent/, 'a row says no more than its controls');
+});
+
+test('hiring into a step draws nothing before its read is there', async () => {
+  assert.equal(await hireOn(null), '');
+});
+
 test("a step's file draws its own words, never the agent's the loader fills its body with, and says the agent row is the hire's", async () => {
   const { StepWritten } = await import('../src/components/StepParts.tsx');
   const hired = await routedWith(

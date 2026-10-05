@@ -1,6 +1,6 @@
 ---
 name: effect
-description: "How this repository writes Effect 4: read the docs installed with it first, then the Effect 3 names it no longer has, and our services, layers, Effect.fn verbs, tagged errors and plain faces, each where the runtime shows it. For a change that imports from effect, and for a review of one."
+description: "How this repository writes Effect 4: read the docs installed with it first, then the Effect 3 names it no longer has, and our services, layers, Effect.fn verbs, tagged errors and programs, each where the runtime shows it. For a change that imports from effect, and for a review of one."
 ---
 
 # Writing Effect 4 here

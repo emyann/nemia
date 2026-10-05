@@ -113,8 +113,9 @@ const READ_BOUNDS: readonly number[] = [0, 1, 2, 5, 10, 25, 50, 100, 250, 500, 1
 
 /**
  * The metrics of the pass, in the registry of whoever runs it — the process's own unless a test gives another: its time and each phase's
- * (`pass.duration`, `pass.phase.duration` by `phase`, ms over `PASS_BOUNDS`), its journal reads (`pass.journal_reads`), and what the last
- * pass saw: the runs in the store (`store.runs`), and the sessions queued and admitted (`sessions.queued`, `sessions.admitted`).
+ * (`pass.duration`, `pass.phase.duration` by `phase`, ms over `PASS_BOUNDS`), its journal reads of bytes (`pass.journal_reads`, as
+ * `PhaseCost` counts a read), and what the last pass saw: the runs in the store (`store.runs`), and the sessions queued and admitted
+ * (`sessions.queued`, `sessions.admitted`).
  */
 export const PASS_METRICS = {
   duration: Metric.histogram('pass.duration', { description: 'the time of a tick pass, in ms', boundaries: PASS_BOUNDS }),

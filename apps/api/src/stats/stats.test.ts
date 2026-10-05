@@ -18,10 +18,35 @@ import { ReadMemo } from '../layer.ts';
 
 const e = await runtime.runPromise(Engine.useSync((engine) => engine));
 
+/** A file written whole, by a rename over it: as a hand edit of a journal must be, since the engine reads one only past what it kept. */
 const write = (file: string, text: string) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, text);
+  fs.writeFileSync(`${file}.new`, text);
+  fs.renameSync(`${file}.new`, file);
 };
+
+/**
+ * The journals `f` asks the engine for: a task it views, and each task a list answers, read or unreadable. What a request costs whether
+ * or not the engine's reader reads their bytes again: it reads a journal only for what was appended since it last read it.
+ */
+async function journalsAsked<T>(f: () => Promise<T>): Promise<{ value: T; asked: number }> {
+  const { view, list } = e;
+  let asked = 0;
+  e.view = async (taskId) => {
+    asked++;
+    return view(taskId);
+  };
+  e.list = async (...args: unknown[]) => {
+    const listed = await Reflect.apply(list, e, args);
+    asked += listed.views.length + listed.unreadable.length;
+    return listed;
+  };
+  try {
+    return { value: await f(), asked };
+  } finally {
+    Object.assign(e, { view, list });
+  }
+}
 
 const at = '2026-09-28T09:00:00.000Z';
 const ended = '2026-09-28T10:00:00.000Z';
@@ -264,16 +289,14 @@ async function unverified<T>(f: () => Promise<T>): Promise<T> {
 
 test("GET /api/stats reads no run's journal again while the store is as it was, and reads again only the run whose record changed", async () => {
   const first = await asked('');
-  const reads = e.io().reads;
-  const again = await unverified(() => asked(''));
-  assert.equal(e.io().reads - reads, 0, "the app's memo answered every run");
-  assert.deepEqual(again, first);
+  const again = await journalsAsked(() => unverified(() => asked('')));
+  assert.equal(again.asked, 0, "the app's memo answered every run");
+  assert.deepEqual(again.value, first);
   const record = path.join(root, 'runs', 'r-home.json');
   write(record, JSON.stringify({ ...JSON.parse(fs.readFileSync(record, 'utf8')), brief: 'The brief of r-home, said again' }));
-  const before = e.io().reads;
-  const after = await unverified(() => asked(''));
-  assert.equal(e.io().reads - before, 1, "r-home's one journal, and no other run's");
-  assert.deepEqual(after.body, await flowNumbers(e, {}));
+  const after = await journalsAsked(() => unverified(() => asked('')));
+  assert.equal(after.asked, 1, "r-home's one journal, and no other run's");
+  assert.deepEqual(after.value.body, await flowNumbers(e, {}));
 });
 
 test("REFUSED at shipped defaults: under WF_VERIFY_REST=1, GET /api/stats refuses an answer of the app's memo unlike a read afresh, naming the run", async () => {

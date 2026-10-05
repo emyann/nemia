@@ -19,9 +19,18 @@ import { runStore } from '../record/files.store.ts';
 import { stepsOf } from '../record/record.store.ts';
 import { abortMerge, commitMerge, mergeInProgress, mergeState } from '../workspace/worktree.store.ts';
 import { dropLandedPictures, LANDED_PICTURES } from '../artifacts/artifacts.store.ts';
-import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, parentsOf, spendReader, taskPhases } from '../views/views.verb.ts';
+import {
+  closeoutAsked,
+  closeoutReader,
+  exitVerdicts,
+  harnessBlocked,
+  parentsOf,
+  spendReader,
+  taskPhases,
+  type Parents,
+} from '../views/views.verb.ts';
 import { phaseOfView } from '../views/views-words.ts';
-import { runSlots } from '../cap/cap.verb.ts';
+import { passRead, type PassRead } from '../cap/cap.verb.ts';
 import { resultTips } from '../branches/branches.store.ts';
 
 /**
@@ -34,29 +43,32 @@ import { resultTips } from '../branches/branches.store.ts';
  * checkout already. A run is in the checkout while the engine holds its `workspace: main` task in flight, as `inFlight` counts one, so a
  * step filed earlier in this very pass is read as being in it. One waiting to be filed counts only if the pass would in fact file it: a
  * send-back of the work un-holds its gate, and an ending that will not be filed must not hold another run's for ever. The cap on runs in
- * flight is read once for every claim (`runSlots`): a run it holds files nothing, so its ending claims nothing (`mainClaim`).
+ * flight is read once for the pass (`runSlots`): a run it holds files nothing, so its ending claims nothing (`mainClaim`).
  *
- * @param runs The runs whose claims are read: a pass's own listing, the very runs it advances, so a step it filed is read on the run it
- *   filed it on; the store's, listed only past the run's own asks, when none is given.
+ * @param pass The pass that asks (`PassRead`), and the slot it gave this run (`advanceRun`'s): the runs whose claims are read are the
+ *   pass's own listing, the very runs it advances, so a step it filed is read on the run it filed it on; the runs the cap holds are read
+ *   once for the pass, and only where another run's claim waits on a slot, since this run's own claim reads the slot the pass gave it; and
+ *   each run another waits on is read once for the pass. With none given, the store is listed only past the run's own asks, and the cap
+ *   read only where a claim waits on a slot.
  * @param env Where the cap on runs in flight is read before any pass has written one (`runSlots`): the process's, or the api's own.
  */
 export async function checkoutHold(
   e: Engine,
   run: Run,
   steps: readonly Workflow[],
-  runs?: readonly Run[],
+  pass?: { read: PassRead; slot: RunSlot | undefined },
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<CheckoutHold | undefined> {
   const ending = steps.find((s) => s.workspace === 'main');
   if (!ending || run.cancelledAt || endingAsked(run, ending, runStore.asks.read(run.id).asks) === undefined) return undefined;
-  const listed = runs ?? runStore.runs.list();
-  const slots = await runSlots(e, listed, env);
-  const mine = await mainClaim(e, run, slots.get(run.id));
+  const read = pass?.read ?? passRead(e, runStore.runs.list(), env);
+  const slotOf = (id: string) => async () => (await read.slots()).get(id);
+  const mine = await mainClaim(e, run, pass ? async () => pass.slot : slotOf(run.id), read.parents);
   if (!mine || mine.holds) return undefined;
   const claims: MainClaim[] = [mine];
-  for (const other of listed) {
+  for (const other of read.runs) {
     if (other.id === run.id || !isGitRun(other) || path.resolve(other.repo) !== mine.repo) continue;
-    const claim = await mainClaim(e, other, slots.get(other.id));
+    const claim = await mainClaim(e, other, slotOf(other.id), read.parents);
     if (claim) claims.push(claim);
   }
   return heldCheckouts(claims).get(run.id);
@@ -80,9 +92,10 @@ export async function checkoutHold(
  * tick honours files nothing, a run waiting on runs that have not shipped files no root of its own (`runReady`), and neither does one the
  * cap on runs in flight holds (`runAdmitted`) — so an ending that will not be filed does not hold another run's. Those last two are the
  * questions `advance` asks before it files a ready step, and they bite only on a run with nothing filed: an ending is one when it is also
- * its root, which a folder whose one step merges has. Neither touches a try, since a run with a try due has started.
+ * its root, which a folder whose one step merges has. Neither touches a try, since a run with a try due has started. Its `slot` is asked
+ * for there alone, and the runs it waits on are read through `parents`.
  */
-async function mainClaim(e: Engine, run: Run, slot: RunSlot | undefined): Promise<MainClaim | undefined> {
+async function mainClaim(e: Engine, run: Run, slot: () => Promise<RunSlot | undefined>, parents: Parents): Promise<MainClaim | undefined> {
   let steps: Workflow[];
   try {
     steps = stepsOf(run);
@@ -118,8 +131,8 @@ async function mainClaim(e: Engine, run: Run, slot: RunSlot | undefined): Promis
     harnessBlocked(views),
     spendReader(views),
   );
-  const parent = await parentsOf(e, run);
-  const files = runReady(run, (id) => parent(id).shipped) && runAdmitted(run, slot);
+  const parent = await parentsOf(e, run, parents.git, parents.read);
+  const files = runReady(run, (id) => parent(id).shipped) && runAdmitted(run, await slot());
   return (files && a.ready.includes(ending.name)) || a.retry.some((r) => r.step === ending.name)
     ? { id: run.id, repo, step: ending.name, holds: false, at }
     : undefined;

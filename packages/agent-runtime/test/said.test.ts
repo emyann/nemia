@@ -16,7 +16,7 @@ import { claudeResultOutput, claudeStreamOutput } from '../src/harness/detached/
 import { SAID_DIGEST, SAID_EXTENDED, SAID_VERSION } from '../src/harness/detached/said.ts';
 import { codexOutput } from '../src/harness/codex/stream.ts';
 import { ioCounts } from '../src/core/engine/tally.ts';
-import { READER_STREAMS, resultLine, stream } from './reader-streams.ts';
+import { FILES_STREAM, READER_STREAMS, resultLine, stream } from './reader-streams.ts';
 import { scratch } from './scratch.ts';
 
 /** A spec of `claude -p`'s stream, whose reads of an output are counted. */
@@ -146,6 +146,25 @@ test('a session that loaded no skills keeps saying so: an empty list is on its s
   assert.deepEqual((await observe(spec, dir)).get('ae/s7/1')?.skills, []);
   assert.deepEqual((await observe(spec, dir)).get('ae/s7/1')?.skills, [], 'taken from what was kept');
   assert.equal(reads.n, 1);
+});
+
+test('a kept output whose files are not a list of paths is read again from the log, never trusted', async () => {
+  const kept = await withKept(({ log, kept }) => keep(kept, log, { read: { closeout: { payload: 'kept' }, files: 'a.ts' } }));
+  assert.deepEqual(kept, { payload: 'logged', reads: 1 });
+});
+
+test('the files a session touched are on its sighting, kept, and taken by a fresh runner; none touched is an empty list', async () => {
+  const dir = scratch('ae-said-');
+  const { spec, reads } = counted();
+  const none = [FILES_STREAM.split('\n')[0], resultLine({}), ''].join('\n');
+  runOf(dir, 'ae/s8/1', `${FILES_STREAM}\n`);
+  runOf(dir, 'ae/s8/2', none);
+  for (const said of ['read from the log', 'taken from what was kept']) {
+    const seen = await observe(spec, dir);
+    assert.deepEqual(seen.get('ae/s8/1')?.files, ['apps/web/a.tsx', 'b.ts', 'n.ipynb'], said);
+    assert.deepEqual(seen.get('ae/s8/2')?.files, [], said);
+  }
+  assert.equal(reads.n, 2, 'each log read once');
 });
 
 test('a kept output in no shape a reader reads is read again from the log, never trusted', async () => {

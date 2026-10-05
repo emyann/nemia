@@ -84,11 +84,18 @@ function writePersonAsk(id: string, person: PersonAsk): AskWritten {
 function askHeld(person: PersonAsk): Parameters<typeof writeAsk>[1] {
   if (person.kind !== 'merge') return person.ask;
   const { step, round, at, merge } = person.ask;
-  return { loop: step, round, onto: merge.onto, sha: merge.sha, at };
+  return { loop: step, round, onto: merge.onto, sha: merge.sha, at, ...(merge.landing ? { landing: merge.landing } : {}) };
 }
 
 const MergeAskFileSchema = Schema.StructWithRest(
-  Schema.Struct({ loop: Schema.NonEmptyString, round: Schema.Int, onto: Schema.NonEmptyString, sha: Schema.NonEmptyString, at: When }),
+  Schema.Struct({
+    loop: Schema.NonEmptyString,
+    round: Schema.Int,
+    onto: Schema.NonEmptyString,
+    sha: Schema.NonEmptyString,
+    at: When,
+    landing: Schema.optional(Schema.Struct({ step: Schema.NonEmptyString, check: Schema.NonEmptyString })),
+  }),
   [Schema.Record(Schema.String, Schema.Unknown)],
 );
 
@@ -107,8 +114,8 @@ function mergeAskIn(file: string, step: string, n: number): RoundAsk | string {
   if ('unreadable' in held) return held.unreadable;
   const read = readAs(MergeAskFileSchema, held.read);
   if ('refused' in read) return read.refused === 'at' ? 'it says no time it was given' : 'it is not an ask nemia merge wrote';
-  const { loop, round, onto, sha, at } = read.read;
-  return { step: loop, round, at, merge: { target: step, try: n, onto, sha } };
+  const { loop, round, onto, sha, at, landing } = read.read;
+  return { step: loop, round, at, merge: { target: step, try: n, onto, sha, ...(landing ? { landing: { ...landing } } : {}) } };
 }
 
 /** The merge asks waiting in a run's directory, and a line for each file named as one that cannot be read as one. */

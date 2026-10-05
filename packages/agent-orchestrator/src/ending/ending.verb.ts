@@ -213,5 +213,6 @@ export function landEnding(
       notes: [`${name}: ${due.why}, and the run could not abort its merge (${refused.error}): the next tick tries again`],
       landed: false,
     };
-  return write({ aborted: due.why }, `${due.why}, so the run aborted its merge; nothing landed on ${run.branch}`);
+  const aborted = { aborted: due.why, ...(due.refusedOn ? { refusedOn: due.refusedOn } : {}) };
+  return write(aborted, `${due.why}, so the run aborted its merge; nothing landed on ${run.branch}`);
 }

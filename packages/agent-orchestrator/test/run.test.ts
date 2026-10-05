@@ -9456,7 +9456,17 @@ test("REFUSED: landingDue commits nothing while the session or its check is in f
 
 test('REFUSED: landingDue aborts a merge it is not to commit — a check that refused, one that did not finish, a blank message, a conflict, a branch left out, a run called off, a step that did not sign off done', () => {
   const abort = (why: string) => ({ act: 'abort', why });
-  assert.deepEqual(due(atLanding(), 'checking', 'succeeded', 'failed', STAGED, 'm', 1), abort('its check refused the merge (exit 1)'));
+  assert.deepEqual(
+    due(atLanding(), 'checking', 'succeeded', 'failed', STAGED, 'm', 1),
+    { ...abort('its check refused the merge (exit 1)'), refusedOn: 'base000' },
+    'a refusal of the staged merge names the base it was staged on, which `nemia merge` reads',
+  );
+  const { head: _, ...headless } = STAGED;
+  assert.deepEqual(
+    due(atLanding(), 'checking', 'succeeded', 'failed', headless, 'm', 1),
+    abort('its check refused the merge (exit 1)'),
+    'with no HEAD read, no base is named',
+  );
   assert.deepEqual(due(atLanding(), 'checking', 'succeeded', 'failed', STAGED, 'm', 'unfinished'), abort('its check did not finish'));
   assert.deepEqual(
     due(atLanding(), 'checking', 'succeeded', 'stopped', STAGED, 'm', 1),

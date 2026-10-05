@@ -38,8 +38,8 @@ const fixedOf = (route: Route): Readonly<Record<string, string | boolean>> => ('
 /**
  * The body a command takes on its route, derived from its spec: each positional its path does not name, required unless it is optional;
  * each key a flag sets, required, as one of the values its flags set it to — a body says its way, and takes no default; each flag's value,
- * optional, a switch's as true or false, one given many times as a list, but a flag the CLI alone takes, and one the api alone takes required where it says so; and the
- * keys its extension takes (extend.ts), optional. A key its route fixes (`sets`) is none of the body's.
+ * optional, a switch's as true or false, one given many times as a list, but a flag the CLI alone takes, and one the api alone takes
+ * required where it says so; and the keys its extension takes (extend.ts), optional. A key its route fixes (`sets`) is none of the body's.
  */
 export function bodySchema(command: CommandSpec, inPath: readonly string[], route: Route) {
   const fields: Record<string, Schema.Decoder<unknown>> = {};
@@ -297,8 +297,8 @@ export const wordBreaks = (table: readonly Pick<CommandSpec, 'name' | 'route'>[]
  * - `POST /api/subscriptions/:name` — a long-lived task given a subscription to the feed, as `nemia subscribe <name> <task>` gives it
  *   (`subscribe`), its body `{ task, wake?, digestEvery? }`, `wake` a list as `--wake` given many times: the daemon's deliverer says the
  *   feed to the task from the feed's end. A name that names no file is a 400 before the body is read; a task never filed on the store's
- *   engine is a 404 (`Missing`), one not long-lived, an empty wake word or minutes not above zero a 422, and a name taken a 409 (`Conflict`).
- *   Its 201 is `{ name, subscription }`, as written.
+ *   engine is a 404 (`Missing`), one not long-lived, an empty wake word or minutes not above zero a 422, and a name taken a 409
+ *   (`Conflict`). Its 201 is `{ name, subscription }`, as written.
  * - `DELETE /api/subscriptions/:name` — a subscription taken away, as `nemia unsubscribe <name>` takes it (`dropSubscription`), and where
  *   its deliverer was with it; it reads no body. None by that name is a 404 (`Missing`). Its 200 is `{ name }`.
  * - `DELETE /api/runs/:id` — a try's run removed, as `nemia rm <run>` removes it (`forgetRun`): its record, and the folders it worked in

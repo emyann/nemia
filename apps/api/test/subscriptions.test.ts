@@ -2,8 +2,8 @@
  * A subscription to the feed on the api, as `nemia subscribe` and `nemia unsubscribe` put and take it, through their entries of the
  * package's command table: `POST /api/subscriptions/:name` gives a long-lived task one, 201; a task never filed is the package's 404, one
  * not long-lived and minutes not above zero its 422, a name taken its 409; a body that is not one, and a name that names no file, 400,
- * before anything is written; `DELETE /api/subscriptions/:name` takes it away, and a second is its 404; and a page on another site is refused
- * by the guard.
+ * before anything is written; `DELETE /api/subscriptions/:name` takes it away, and a second is its 404; and a page on another site is
+ * refused by the guard.
  *
  * At shipped defaults, over the harness's scratch store (`root`), and an engine of the test's whose `view` answers its tasks.
  */

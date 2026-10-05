@@ -2207,14 +2207,39 @@ nothing while the file stands; a cursor refused before the reader is counted; a 
 events, a line written by a process with no hub, a failed read said once and cleared, and the readers counted out once their client
 goes).
 
-## Still to build: subscriptions (Nemia platform slice 5, part 3 of 3)
+## Shipped: subscriptions (Nemia platform slice 5, part 3 of 3)
 
-`src/subscription/`: a pure file that sorts a line (a wake or routine news) and words a digest; a store, one file a subscription under
-`$WF_ROOT/subscriptions/`, `{ task, cursor, wake, digestEvery, digest }`, its one writer the deliverer; and a controller that runs
-`followFeed(cursor)` per subscription in a `FiberMap`, says a wake line to the task through the runtime's `say` with the digest riding it,
-says the digest after `digestEvery` (60 minutes by default) when nothing woke it, and moves the cursor only once `say` resolved.
-`nemia subscribe <name> <task> [--wake <word>]… [--digest-every <min>]` and `nemia unsubscribe <name>` in the command table. A restart
-reads each cursor again. Its first subscriber is Nemia, slice 5b.
+A long-lived task can be given a subscription to the feed, and the daemon says the feed to it: a line that needs its judgement at once,
+the rest folded into a digest.
+
+- **`nemia subscribe <name> <task> [--wake <word>]… [--digest-every <minutes>]`** and **`nemia unsubscribe <name>`**, in the command
+  table (`src/subscription/subscription.verb.ts`), and on the api as `POST` and `DELETE /api/subscriptions/:name`. The task is read off
+  the engine first: one never filed is refused (`Missing`), one not long-lived (`restartPolicy: Always`) is refused (`Invalid`), since its
+  session ends with its turn, and one settled (`Conflict`). The subscription's news starts at the feed's end (`from`). Until Nemia files
+  its own (slice 5b), the subscriber is filed by hand with `ae`: `AE_ROOT=$WF_ROOT/engine ae file`, with `restartPolicy: Always` and
+  `background: true`.
+- **Two files a subscription** under `$WF_ROOT/subscriptions/` (`subscription.store.ts`): `<name>.json`, the person's, written once by
+  `nemia subscribe`; and `<name>.state.json`, `{ cursor, digest, since }`, the deliverer's, its one writer, written whole after each line.
+  `nemia unsubscribe` removes both; a file that does not read is left out and said, never a stop.
+- **A line sorted** (`sortLine`, `src/subscription/subscription.ts`): a wake where its word holds a wake word, or a part of its note
+  (between ` · `) starts with one, case aside; else routine. The default wake words (`DEFAULT_WAKE`) are the feed's words for a wait on a person — `awaiting approval`,
+  `rounds exhausted`, `needs-human`, `blocked` (a run blocked carries the note `waiting on you: …`), `failed`, `waiting on you:` and
+  `needs:` — pinned against `feedWords` by a test.
+- **The deliverer** (`deliver`, `src/subscription/deliver.verb.ts`), forked by `up` beside the tick: a fiber a subscription in a
+  `FiberMap`, the subscriptions read again every 5 s (one gone stopped and its state dropped, one new started). Each follows the feed from
+  its cursor (`followFeed`). A wake line is said through the runtime's `say` at once, the digest riding it; a routine line is folded into
+  the digest, said alone once `digestEvery` minutes (60 by default) have passed since its first line with no wake. The cursor moves only
+  once `say` resolved: a `say` that fails is said again for ever on a backoff from 1 s doubling to 5 minutes, each failure a warning and
+  counted (`subscription.say.failures`), the feed not read on meanwhile. A restart reads the deliverer's file, so it neither repeats nor
+  drops a line. A feed cut under the cursor is read again from its start.
+
+The guarantee is at least once, to the harness's inbox: a line is said again only if the daemon stops between `say` and the write of the
+cursor, and whether the session reads what it was handed is the runtime's (`agent-runtime/docs/open-issues.md`, #12, #14, #15, #16).
+
+Tested in `src/subscription/subscription.test.ts` (the sort, pinned against `feedWords`; the words; a digest due), `subscription.store.test.ts`,
+`subscription.verb.test.ts` (each refusal), `deliver.verb.test.ts` (a wake said once with its digest; a digest due with no wake; a
+restart; the cursor held while `say` fails; an unsubscribe; a cut feed) and `apps/api/test/subscriptions.test.ts` (201, 400, 404, 409,
+422, 403, and a `DELETE` 200 then 404).
 
 ## Still to build: Nemia's loop at Manual (Nemia platform slice 5b)
 

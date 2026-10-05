@@ -2832,6 +2832,26 @@ before the store is taken: `wf up -5` would write an interval the file does not 
   pid to kill as it stands: it is said unconfirmed, with `ps -p <pid> -o lstart=,args=` to check it first. A daemon resumed from `^Z`
   after it was taken over finishes the pass it was in before it reads the file again.
 
+## What the daemon says: its lines, and OTLP — `OTEL_EXPORTER_OTLP_ENDPOINT`
+
+The daemon says each pass through Effect's log (`logPass` in `src/daemon/up.verb.ts`), and its process chooses where that goes, with one
+layer it provides around `up` (`telemetryLayer`, `src/telemetry/telemetry.store.ts`): `nemia up` in `src/cli/main.ts`, and the api's
+process in `apps/api/src/main.ts`. So the api's daemon, silent before, now prints the lines `nemia up` prints: a summary when one is due,
+a line when something changed, each stamped `08:09:10  …` — Info on stdout, a warning or worse on stderr. A line about a run is annotated
+with its `run`, and one about a step with its `step` too; the runtime's journal says each append at Debug, with its `task`, `kind` and
+`attempt`, which the lines leave out.
+
+- **`OTEL_EXPORTER_OTLP_ENDPOINT`** — unset or blank, nothing leaves the process. Set, as `http://localhost:4318`, the daemon also exports
+  its spans and its logs over OTLP/HTTP as JSON, to `<endpoint>/v1/traces` and `<endpoint>/v1/logs`, through Effect's own exporter
+  (`OtlpTracer`, `OtlpLogger`). The spans are the verbs' own (`Effect.fn`): `tick` > `pass` > `advancePass` > a filing (`fileReady`)
+  > the runtime's `file` > its journal's `append`, each annotated with the run, the step and the task it was for. A collector that does
+  not answer costs a failed post, never a pass.
+- **`OTEL_SERVICE_NAME`** — the service the export is under, `nemia` unless set. Without an endpoint it does nothing.
+
+```sh
+$ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 OTEL_SERVICE_NAME=factory nemia up
+```
+
 ## What a pass costs: `wf up --stats` and `wf passes`
 
 Every pass is measured as it runs, phase by phase (`src/meter/tally.store.ts` counts, `src/meter/meter.ts` composes and words it), and what it cost is

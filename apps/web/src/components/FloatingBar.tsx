@@ -110,9 +110,20 @@ function ResizeEdge({ width, most, onWidth }: { width: number; most: number; onW
 /**
  * The bar, titled `title`, with `description` under its title and `children` in a body that scrolls: an `aside` named by its title, which
  * takes the focus as it opens, so Tab reaches what it holds next, and gives it back as it closes (`useFocusReturn`). It carries the address
- * of what it shows (`data-bar`), and an Open button wherever that has a page (`barOpens`), so no bar can leave it out.
+ * of what it shows (`data-bar`), and an Open button wherever that has a page (`barOpens`), so no bar can leave it out; `actions`, outside
+ * its title so they are no part of its name, sit before Open.
  */
-export function FloatingBar({ title, description, children }: { title: ReactNode; description?: ReactNode; children: ReactNode }) {
+export function FloatingBar({
+  title,
+  description,
+  actions,
+  children,
+}: {
+  title: ReactNode;
+  description?: ReactNode;
+  actions?: ReactNode;
+  children: ReactNode;
+}) {
   const { open, close } = useBar();
   const page = open ? barOpens(open) : null;
   const [width, setWidth, most] = useBarWidth();
@@ -140,6 +151,7 @@ export function FloatingBar({ title, description, children }: { title: ReactNode
           </h2>
           {description && <div className="text-muted-foreground">{description}</div>}
         </div>
+        {actions}
         {page && (
           <RouterLinkButton {...page} variant="outline" size="sm" className="-mt-0.5 shrink-0">
             Open

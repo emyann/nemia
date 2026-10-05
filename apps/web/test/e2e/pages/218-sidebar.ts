@@ -127,7 +127,7 @@ async function favorites(page: Page): Promise<void> {
   await page.reload({ waitUntil: 'load' });
   await idle(page);
   const links = group.getByRole('link');
-  await expectTexts(links, [FOLDER.id, WORKFLOWS.good.name], 'each favourite kept is a link, in the order kept');
+  await expectTexts(links, [FOLDER.title, WORKFLOWS.good.name], 'each favourite kept is a link, a run by its title, in the order kept');
   await settled(page);
   await photograph(page, path.join(OUT, `sidebar-favorites-${await themeOf(page)}.png`));
   await links.filter({ hasText: WORKFLOWS.good.name }).click();
@@ -135,7 +135,7 @@ async function favorites(page: Page): Promise<void> {
   if (new URL(page.url()).hash !== `#workflow-repo-${WORKFLOWS.good.name}`)
     throw new Refused(`at its card, #workflow-repo-${WORKFLOWS.good.name} — the address is ${page.url()}`);
   await expectVisible(page.locator(`section#workflow-repo-${WORKFLOWS.good.name}`), 'its card is on the page');
-  await links.filter({ hasText: FOLDER.id }).click();
+  await links.filter({ hasText: FOLDER.title }).click();
   await expectAt(page, `/runs/${FOLDER.id}`, '', 'a run favourite opens its page');
 }
 

@@ -20,13 +20,17 @@
  * A fence also reaches the run's artifacts folder: each step is filed the folder of every step it comes after, read-only
  * (`handedMounts`), and reads what it holds and writes none of it, in any mode; it is filed no folder of a step it does not come after.
  * The reach is read off the config a filing gives the harness (`filedConfig`), as Claude Code holds a mount (`readsAt`, `writesAt`).
+ *
+ * The build workflow's design, implement and review steps each list `effect`, `shadcn` and `change-the-board` to their sessions
+ * (`workSkillsMissing`), and every path a repository skill says its work is on matches a file of the checkout (`appliesUnmatched`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadWorkflows, readSkillRules, RULES_FILE } from '../src/folder/folder.store.ts';
-import type { SkillRule } from '../src/skills/skills.ts';
+import { appliesMatch, appliesOf, type SkillRule } from '../src/skills/skills.ts';
 import { filedConfig } from '../src/filed/filed.ts';
 import { handedMounts } from '../src/artifacts/artifacts.ts';
 import { sandboxed, upstreamOf } from '../src/workflow/index.ts';
@@ -496,6 +500,77 @@ const shippedAllowed = (agent: string, workflow: string, allowed: string): Step 
 
 /** The janitor's step, its agent's `allowedTools` line replaced by `allowed` (`shippedAllowed`). */
 const argusAllowed = (allowed: string): Step => shippedAllowed('argus', 'janitor', allowed);
+
+/** The steps of the build workflow that design, write or judge a change, and the skills each gives its session to list. */
+const WORK_STEPS = ['design', 'implement', 'review'];
+const WORK_SKILLS = ['effect', 'shadcn', 'change-the-board'];
+
+/** Each skill of `WORK_SKILLS` a work step of `steps` does not give, as `<step>: <skill>`, read off the agent each step froze. */
+const workSkillsMissing = (steps: readonly Step[]): string[] =>
+  WORK_STEPS.flatMap((name) => {
+    const given = steps.find((step) => step.name === name)?.agent?.skills ?? [];
+    return WORK_SKILLS.filter((skill) => !given.includes(skill)).map((skill) => `${name}: ${skill}`);
+  });
+
+/** The build workflow's steps, read from a scratch copy of the shipped team whose step `step` has its `skills:` line replaced by `line`. */
+function buildWith(step: string, line: string): Step[] {
+  const root = scratch('wf-fences-build-');
+  fs.cpSync(SHIPPED_HOLDERS[0], root, { recursive: true });
+  const file = path.join(root, 'build', `${step}.md`);
+  const text = fs.readFileSync(file, 'utf8');
+  const changed = text.replace(/^skills: .*\n/m, line);
+  assert.notEqual(changed, text, `${step} has a skills: line to replace`);
+  fs.writeFileSync(file, changed);
+  return loadWorkflows(path.join(root, 'build'), { repo: REPO });
+}
+
+test("build's design, implement and review each give effect, shadcn and change-the-board, whatever their agents give", () => {
+  const build = FOLDERS.find((dir) => path.basename(dir) === 'build');
+  assert.ok(build, 'the build workflow is shipped');
+  assert.deepEqual(workSkillsMissing(loadWorkflows(build, placesOf(build))), []);
+});
+
+test('REFUSED: a work step that gives one of the three skills no more is named, read from its file as a run reads it', () => {
+  assert.deepEqual(workSkillsMissing(buildWith('review', 'skills: effect, shadcn\n')), ['review: change-the-board']);
+  assert.deepEqual(workSkillsMissing(buildWith('design', '')), ['design: effect', 'design: shadcn', 'design: change-the-board']);
+});
+
+/** Every file of the checkout `repo`, as git tracks it. */
+const checkoutFiles = (repo: string): string[] =>
+  execFileSync('git', ['ls-files'], { cwd: repo, encoding: 'utf8' }).split('\n').filter(Boolean);
+
+/** Each glob a skill of `skillsDir` applies to (`applies:`) that no file of the checkout `repo` matches, as `<skill>: <glob>`. */
+function appliesUnmatched(skillsDir: string, repo: string): string[] {
+  const files = checkoutFiles(repo);
+  return fs
+    .readdirSync(skillsDir)
+    .filter((skill) => fs.existsSync(path.join(skillsDir, skill, 'SKILL.md')))
+    .flatMap((skill) =>
+      appliesOf(fs.readFileSync(path.join(skillsDir, skill, 'SKILL.md'), 'utf8'))
+        .filter((glob) => !files.some((file) => appliesMatch(file, [glob])))
+        .map((glob) => `${skill}: ${glob}`),
+    );
+}
+
+test('every path a repository skill applies to matches a file of the checkout, and the two that say so are read', () => {
+  const skills = path.join(REPO, '.claude', 'skills');
+  assert.deepEqual(appliesUnmatched(skills, REPO), []);
+  assert.deepEqual(appliesOf(fs.readFileSync(path.join(skills, 'change-the-board', 'SKILL.md'), 'utf8')), ['apps/web/**']);
+  assert.equal(appliesOf(fs.readFileSync(path.join(skills, 'effect', 'SKILL.md'), 'utf8')).length, 7);
+});
+
+test('REFUSED: a skill that applies to a path no file of the checkout has is named, beside one that matches', () => {
+  const skills = scratch('wf-fences-applies-');
+  for (const [name, applies] of [
+    ['typo', '["apps/webb/**", "apps/web/**"]'],
+    ['none', ''],
+  ]) {
+    fs.mkdirSync(path.join(skills, name));
+    const line = applies ? `applies: ${applies}\n` : '';
+    fs.writeFileSync(path.join(skills, name, 'SKILL.md'), `---\nname: ${name}\ndescription: Do it.\n${line}---\nDo it.\n`);
+  }
+  assert.deepEqual(appliesUnmatched(skills, REPO), ['typo: apps/webb/**']);
+});
 
 test('Argus is refused every wf verb that acts and every edit: it runs dontAsk, and no allow reaches one', () => {
   assert.deepEqual(acting(shippedStepOf('argus')), []);

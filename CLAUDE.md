@@ -162,9 +162,10 @@ What the `create-an-agent` skill, being generic, does not say here:
 - `docs/architecture.md` — the layers, what each owns and its public contract, and the rules that hold them.
 - `packages/agent-orchestrator/docs/features.md` — what is still to build, in order.
 - `packages/agent-runtime/docs/open-issues.md` — what is still wrong or half-verified.
-- `.claude/skills/` — the repository's skills. Ours: `look`, `effect` (how we write Effect 4) and `create-an-agent` (how an agent is
-  made here). Vendored unchanged, pinned in `skills-lock.json` and credited in `THIRD_PARTY_NOTICES.md`: `shadcn` (its CLI runs from
-  `apps/web`, where `components.json` is), and `grilling` and `grill-me` (Iris's interview).
+- `.claude/skills/` — the repository's skills. Ours: `look`, `effect` (how we write Effect 4), `create-an-agent` (how an agent is
+  made here) and `change-the-board` (shadcn's trigger, for a change under apps/web). Vendored unchanged, pinned in `skills-lock.json`
+  and credited in `THIRD_PARTY_NOTICES.md`: `shadcn` (its CLI runs from `apps/web`, where `components.json` is), and `grilling` and
+  `grill-me` (Iris's interview).
 - `workflows/` — this repository's own team, `agents/`: Iris (product engineer), Seldon (software architect), Ada (software engineer),
   Agora (code reviewer), Otto (release engineer), Argus (janitor); and three workflows: `intake` (an idea to an intent), `build` (an
   intent to main, started `--after` the intake run) and `janitor` (on demand: the stats to inbox cards, none started). What Nemia ships:

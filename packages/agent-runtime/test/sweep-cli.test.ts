@@ -45,8 +45,18 @@ test('REFUSED: ae sweep given anything but --yes, with exit code 2', () => {
 
 test('ae sweep says one body in the singular', () => {
   assert.equal(
-    sweepLine({ removable: 1, bytes: 2048, kept: 3, removed: 0 }, false),
+    sweepLine({ removable: 1, bytes: 2048, kept: 3, removed: 0, removedBytes: 0 }, false),
     '1 body no journal names (2048 bytes): `ae sweep --yes` removes them; 3 kept',
   );
-  assert.equal(sweepLine({ removable: 1, bytes: 2048, kept: 3, removed: 1 }, true), '1 body removed (2048 bytes), 3 kept');
+  assert.equal(
+    sweepLine({ removable: 1, bytes: 2048, kept: 3, removed: 1, removedBytes: 2048 }, true),
+    '1 body removed (2048 bytes), 3 kept',
+  );
+});
+
+test('ae sweep --yes says the bytes of the bodies it removed, not of those it found removable', () => {
+  assert.equal(
+    sweepLine({ removable: 3, bytes: 12288, kept: 3, removed: 2, removedBytes: 8192 }, true),
+    '2 bodies removed (8192 bytes), 3 kept',
+  );
 });

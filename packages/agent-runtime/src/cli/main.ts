@@ -415,7 +415,7 @@ const bodies = (n: number) => `${n} bod${n === 1 ? 'y' : 'ies'}`;
 /** The line `ae sweep` prints for `report`: what it removed, when `yes`, else what it would remove; and what it keeps. */
 export const sweepLine = (report: SweepReport, yes: boolean): string =>
   yes
-    ? `${bodies(report.removed)} removed (${report.bytes} bytes), ${report.kept} kept`
+    ? `${bodies(report.removed)} removed (${report.removedBytes} bytes), ${report.kept} kept`
     : `${bodies(report.removable)} no journal names (${report.bytes} bytes): \`ae sweep --yes\` removes them; ${report.kept} kept`;
 
 /** `ae sweep [--yes]`: the bodies no journal and no feed entry names, counted, and removed given `--yes` (`Engine.sweep`). */

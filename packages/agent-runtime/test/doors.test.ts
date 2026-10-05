@@ -178,7 +178,7 @@ test('each verb gives the same answer through either door, over one store', asyn
   const io = await effect((e) => e.io());
   assert.deepEqual(Object.keys(io).sort(), Object.keys(promise.io()).sort());
 
-  const none = { removable: 0, bytes: 0, kept: 0, removed: 0 };
+  const none = { removable: 0, bytes: 0, kept: 0, removed: 0, removedBytes: 0 };
   assert.deepEqual(
     [await effect((e) => e.sweep()), await promise.sweep({ yes: true })],
     [none, none],
@@ -205,7 +205,7 @@ test('a brief filed in parts is kept once through either door, and a body its jo
     [briefParts.join(''), shared],
     'each brief reads back whole',
   );
-  const counted = { removable: 0, bytes: 0, kept: 2, removed: 0 };
+  const counted = { removable: 0, bytes: 0, kept: 2, removed: 0, removedBytes: 0 };
   assert.deepEqual([await effect((e) => e.sweep()), await promise.sweep()], [counted, counted], 'the shared part is one body');
 
   const ref = createHash('sha256').update(shared, 'utf8').digest('hex');

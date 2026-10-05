@@ -8,7 +8,7 @@ import { Effect, Layer } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Journal, type JournalError, type JournalOps } from './journal.ts';
-import { BODY_GRACE_MS, BODY_MIN_BYTES, refOf, split, type BodyRefused } from './bodies.ts';
+import { BODY_GRACE_MS, BODY_MIN_BYTES, BodyError, refOf, split, type BodyRefused } from './bodies.ts';
 import type { Event } from '../domain.ts';
 import { ioCounts } from './tally.ts';
 import { scratch } from '../../../test/scratch.ts';
@@ -216,7 +216,7 @@ test("a store that keeps no bodies appends each event whole: the memory store wi
         layer,
         Effect.flatMap(Journal, (j) => j.sweep({ yes: true })),
       ),
-      { removable: 0, bytes: 0, kept: 0, removed: 0 },
+      { removable: 0, bytes: 0, kept: 0, removed: 0, removedBytes: 0 },
     );
   }
   assert.equal(JSON.stringify(kept), JSON.stringify(EVENTS), 'whole, no reference in them');
@@ -278,6 +278,17 @@ const age = (dir: string, text: string, ms: number) => {
 };
 const sweep = (yes: boolean) => Effect.flatMap(Journal, (j) => j.sweep({ yes }));
 const removeBody = (ref: string) => Effect.flatMap(Journal, (j) => j.removeBody(ref));
+
+/** Takes task `taskId`'s journal and its feed entries out of the store under `dir`, as if its line never reached them. */
+const forget = (dir: string, taskId: string) => {
+  fs.rmSync(path.join(dir, 'tasks', `${taskId}.jsonl`));
+  const feedFile = path.join(dir, 'feed.jsonl');
+  const kept = fs
+    .readFileSync(feedFile, 'utf8')
+    .split('\n')
+    .filter((line) => line && !line.includes(`"taskId":"${taskId}"`));
+  fs.writeFileSync(feedFile, kept.map((line) => `${line}\n`).join(''));
+};
 
 test('removing a body a journal names is refused, naming the task, and the body stays; once nothing names it and the grace is past, it goes', async () => {
   const dir = root();
@@ -342,29 +353,75 @@ test('sweep removes only a body nothing names put before the grace: a young one 
     layer,
     Effect.all([append('t1', EVENTS[0], BRIEF_PARTS), append('t2', filed(orphan + young, { closeoutSchema: undefined }), [orphan, young])]),
   );
-  fs.rmSync(path.join(dir, 'tasks', 't2.jsonl'));
-  fs.writeFileSync(
-    path.join(dir, 'feed.jsonl'),
-    fs
-      .readFileSync(path.join(dir, 'feed.jsonl'), 'utf8')
-      .split('\n')
-      .filter((l) => !l.includes('"t2"'))
-      .join('\n'),
-  );
+  forget(dir, 't2');
   for (const text of [orphan, SHARED]) age(dir, text, BODY_GRACE_MS + 60_000);
   const bodies = () => fs.readdirSync(path.join(dir, 'bodies')).sort();
   const all = bodies();
 
   const dry = await run(layer, sweep(false));
-  assert.deepEqual(dry, { removable: 1, bytes: Buffer.byteLength(orphan), kept: all.length - 1, removed: 0 });
+  assert.deepEqual(dry, { removable: 1, bytes: Buffer.byteLength(orphan), kept: all.length - 1, removed: 0, removedBytes: 0 });
   assert.deepEqual(bodies(), all, 'a dry run removes nothing');
 
   const done = await run(layer, sweep(true));
-  assert.deepEqual(done, { ...dry, removed: 1 });
+  assert.deepEqual(done, { ...dry, removed: 1, removedBytes: dry.bytes });
   assert.deepEqual(
     bodies(),
     all.filter((ref) => ref !== refOf(orphan)),
     'the old orphan went; the young one and every named one stayed',
   );
   assert.equal(JSON.stringify(await run(Journal.files(dir), read('t1'))), JSON.stringify([EVENTS[0]]), 'and every named one still reads');
+});
+
+test('a body put again past the grace, its line not yet in a journal, is put anew: sweep keeps it', async () => {
+  const dir = root();
+  const layer = Journal.files(dir);
+  const orphan = long('an orphan');
+  const event = filed(orphan, { closeoutSchema: undefined });
+  await run(layer, append('t2', event, [orphan]));
+  forget(dir, 't2');
+  age(dir, orphan, BODY_GRACE_MS + 60_000);
+  await run(layer, append('t3', event, [orphan]));
+  forget(dir, 't3');
+
+  const done = await run(layer, sweep(true));
+  assert.deepEqual(done, { removable: 0, bytes: 0, kept: 1, removed: 0, removedBytes: 0 });
+  assert.ok(fs.existsSync(path.join(dir, 'bodies', refOf(orphan))), 'the body a filing in flight put again stays');
+});
+
+test('a body put again between the listing and its removal stays: removeBody refuses, saying so, and sweep counts it kept', async () => {
+  const dir = root();
+  const orphan = long('an orphan');
+  await run(Journal.files(dir), append('t2', filed(orphan, { closeoutSchema: undefined }), [orphan]));
+  forget(dir, 't2');
+  age(dir, orphan, BODY_GRACE_MS + 60_000);
+  const ops = Journal.filesOps(dir);
+  const racing = Journal.layer({
+    ...ops,
+    bodies: { ...ops.bodies, list: Effect.tap(ops.bodies.list, () => ops.bodies.put(refOf(orphan), orphan)) },
+  });
+  const file = path.join(dir, 'bodies', refOf(orphan));
+
+  const error = await failure(racing, removeBody(refOf(orphan)));
+  assert.equal(error.message, `Body ${refOf(orphan)} was put again while it was being removed, and is kept: run it again after the grace.`);
+  assert.ok(fs.existsSync(file));
+
+  age(dir, orphan, BODY_GRACE_MS + 60_000);
+  const done = await run(racing, sweep(true));
+  assert.deepEqual(done, { removable: 1, bytes: Buffer.byteLength(orphan), kept: 1, removed: 0, removedBytes: 0 });
+  assert.ok(fs.existsSync(file));
+});
+
+test('a body that fails to be put fails the append, and no line is written: the journal and the feed hold nothing new', async () => {
+  const dir = root();
+  const ops = Journal.filesOps(dir);
+  const full = Journal.layer({
+    ...ops,
+    bodies: { ...ops.bodies, put: () => Effect.fail(new BodyError({ message: 'no space left on device' })) },
+  });
+
+  const error = await failure(full, append('t1', EVENTS[0], BRIEF_PARTS));
+  assert.equal(error.message, 'no space left on device');
+  const fresh = Journal.files(dir);
+  assert.deepEqual(await run(fresh, read('t1')), []);
+  assert.deepEqual((await run(fresh, feed())).entries, []);
 });

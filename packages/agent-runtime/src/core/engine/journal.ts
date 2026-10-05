@@ -116,8 +116,11 @@ export type BodiedJournalOps = Omit<PlainJournalOps, 'append' | 'read' | 'feed' 
  */
 export type StoreOps = BodiedJournalOps | (Omit<PlainJournalOps, 'read' | 'feed'> & Pick<BodiedJournalOps, 'read' | 'feed' | 'located'>);
 
-/** What `sweep` found: the bodies it may remove and their bytes, the bodies it keeps, and how many it removed. */
-export type SweepReport = { removable: number; bytes: number; kept: number; removed: number };
+/**
+ * What `sweep` found: the bodies it may remove and their bytes, the bodies it keeps, and those it removed and their bytes — fewer
+ * than it may remove when a body was put again since it was listed.
+ */
+export type SweepReport = { removable: number; bytes: number; kept: number; removed: number; removedBytes: number };
 
 /** The journal as the engine reads and writes it: whole events, whatever the store keeps (`Journal.layer`). */
 export type JournalShape = Omit<PlainJournalOps, 'append' | 'bodies'> & {
@@ -385,7 +388,7 @@ export class Journal extends Context.Service<Journal, JournalShape>()('engine/Jo
         sweep: (options) =>
           bodied
             ? sweep(bodied, options).pipe(Effect.mapError(asJournal))
-            : Effect.succeed({ removable: 0, bytes: 0, kept: 0, removed: 0 }),
+            : Effect.succeed({ removable: 0, bytes: 0, kept: 0, removed: 0, removedBytes: 0 }),
         removeBody: (ref) =>
           bodied ? removeBody(bodied, ref).pipe(Effect.catchTag('BodyError', (error) => Effect.fail(asJournal(error)))) : noBodies(ref),
       }),

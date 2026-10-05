@@ -33,6 +33,8 @@ const cost = (k: number, ms: number, runs: number) =>
     tasks: 0,
     queued: 0,
     admitted: 0,
+    waitMs: 0,
+    load: 0,
   });
 
 const typed = async (t: TestContext, argv: string[]) => {
@@ -59,7 +61,7 @@ test('`nemia passes --json` is the whole answer, the passes oldest first; --last
   fs.rmSync(recentFile(), { force: true });
   for (const c of COSTS) recordRecentPass(c);
   const all = JSON.parse((await typed(t, ['passes', '--json'])).join('\n'));
-  assert.deepEqual(all, passesRead(COSTS.map(recentOf)));
+  assert.deepEqual(all, passesRead(COSTS.map((c) => recentOf(c))));
   assert.deepEqual(all, JSON.parse(JSON.stringify(passesOf({}))), 'the answer the api serves, off the same file');
   const last = JSON.parse((await typed(t, ['passes', '--json', '--last', '2'])).join('\n'));
   assert.deepEqual(

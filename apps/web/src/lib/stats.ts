@@ -20,7 +20,7 @@ export type HeadlineNumber = { key: HeadlineKey; label: string; about: string; w
 const or = (word: (v: number) => string) => (v: number | null) => (v === null ? NONE : word(v));
 
 /** A cost in dollars, as the package's `dollars` says it: three figures under a cent, cents above. */
-const dollars = (usd: number): string => `$${usd > 0 && usd < 0.01 ? Number(usd.toPrecision(3)) : usd.toFixed(2)}`;
+export const dollars = (usd: number): string => `$${usd > 0 && usd < 0.01 ? Number(usd.toPrecision(3)) : usd.toFixed(2)}`;
 
 /** A length of time, as the package's `durationWord` says it: `42s`, `2m05s`, `1h05m`, `1d01h`. */
 export function durationWord(ms: number): string {

@@ -9,7 +9,7 @@ import { customInstructions } from './custom/custom.ts';
 import { commands } from './commands/index.ts';
 import { capabilitiesWithSteps, McpAsker } from './capabilities/index.ts';
 import { factories, factoryInstruction } from './factories/index.ts';
-import { ceilingsOf, metricsOf, passesOf, pauseNowOf, pauseOf, feed, QuotaAsker, readDaemon } from './factory/index.ts';
+import { ceilingsOf, metricsOf, passesOf, seriesOf, pauseNowOf, pauseOf, feed, QuotaAsker, readDaemon } from './factory/index.ts';
 import { inbox } from './inbox/inbox.ts';
 import { ApiConfig, type ApiEnv, type ApiRuntime, ReadMemo, served, type Services } from './layer.ts';
 import { machines } from './machines/machines.ts';
@@ -90,6 +90,9 @@ export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Servic
  * - `GET /api/passes` — what the recent passes of the tick cost, `{ recent, histogram, parts, summary, bounds }`, as `nemia passes --json`
  *   prints it: read off the store's `tick-recent.json`, which the ticking process keeps, the api's own or a `nemia up`'s. `?last=<n>` keeps
  *   the last n; 422 for one that is not a whole number from 1.
+ * - `GET /api/series` — the system's series over a range, `{ range, span, from, to, series }`, as `nemia series --json` prints it: read
+ *   off the store's `metrics/` minute lines for `?range=24h` (the default) and its hour lines for `7d`, `30d` and `all`, which the ticking
+ *   process keeps; a past day off the app's memo while its file has not moved. 422 for a range it does not take.
  * - `GET /api/metrics` — the process's metrics, each `{ name, type, description, attributes }` and its value (`MetricRead`,
  *   factory/ceilings.ts), in the registry of the app's runtime: the files the runtime read for each request, its journals and every
  *   other, by its route's pattern (`api.poll.reads`, about, since a pass or another request reading at the same time is counted too),
@@ -148,6 +151,7 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     .route('/', stats)
     .get('/api/ceilings', (c) => served(c, async ({ e, env }) => c.json(await ceilingsOf(e, env))))
     .get('/api/passes', (c) => served(c, async ({ e }) => c.json(await passesOf(e, c.req.query('last')))))
+    .get('/api/series', (c) => served(c, async ({ e, memo }) => c.json(await seriesOf(e, c.req.query('range'), memo.series))))
     .get('/api/metrics', async (c) => c.json(metricsOf(await runtime.runPromise(Metric.snapshot))))
     .get('/api/pause', (c) => served(c, async ({ e }) => c.json(await pauseOf(e))))
     .get('/api/pause/now', (c) => served(c, async ({ e }) => c.json(await pauseNowOf(e))))

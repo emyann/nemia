@@ -75,5 +75,6 @@ workflow-remove
 workflow-remove-refused
 context
 stats-passes
+stats-system
 factory-settings
 factory-settings-none

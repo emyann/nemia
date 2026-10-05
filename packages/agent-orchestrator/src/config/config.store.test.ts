@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import os from 'node:os';
 import path from 'node:path';
-import { maxConcurrent, maxRuns, verifiesRest, wfRoot, type Env } from './config.store.ts';
+import { maxConcurrent, maxRuns, metricsHourDays, metricsMinuteDays, verifiesRest, wfRoot, type Env } from './config.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 
 /** That `read` refuses `env` with `Invalid`, exit 2, and exactly `message`. */
@@ -115,4 +115,28 @@ test('a reader given nothing reads the process environment when it is called, no
     () => maxConcurrent(),
     (err: unknown) => err instanceof Invalid && err.message.startsWith('WF_MAX_CONCURRENT=-3 '),
   );
+});
+
+test('REFUSED at shipped defaults: a WF_METRICS_MINUTE_DAYS below 2 or not a whole number, and a WF_METRICS_HOUR_DAYS not one from 1', () => {
+  for (const value of ['1', 'x', '-3', '0', '2.5'])
+    refuses(
+      metricsMinuteDays,
+      { WF_METRICS_MINUTE_DAYS: value },
+      `WF_METRICS_MINUTE_DAYS=${value} is not a whole number from 2. It is how many days of the series' minute lines are kept, two at least so a day's range has yesterday: WF_METRICS_MINUTE_DAYS=30 — or unset, for 30.`,
+    );
+  for (const value of ['abc', '0', '-1'])
+    refuses(
+      metricsHourDays,
+      { WF_METRICS_HOUR_DAYS: value },
+      `WF_METRICS_HOUR_DAYS=${value} is not a whole number from 1. It is how many days of the series' hour lines are kept: WF_METRICS_HOUR_DAYS=365 — or unset, to keep them until you delete them.`,
+    );
+});
+
+test('the series keep 30 days of minutes and every hour when unset, and the days a value names', () => {
+  assert.equal(metricsMinuteDays({}), 30);
+  assert.equal(metricsMinuteDays({ WF_METRICS_MINUTE_DAYS: '2' }), 2);
+  assert.equal(metricsMinuteDays({ WF_METRICS_MINUTE_DAYS: ' 45 ' }), 45);
+  assert.equal(metricsHourDays({}), undefined);
+  assert.equal(metricsHourDays({ WF_METRICS_HOUR_DAYS: '1' }), 1);
+  assert.equal(metricsHourDays({ WF_METRICS_HOUR_DAYS: '400' }), 400);
 });

@@ -34,7 +34,8 @@ const { startRun, runWith } = await import('../src/runner.ts');
 const { freshRestMemo, tickRun } = await import('../src/tick/tick.verb.ts');
 const { EngineService } = await import('../src/runtime-client.ts');
 const { Invalid } = await import('../src/refusal/refusal.ts');
-const { PHASES } = await import('../src/meter/meter.ts');
+const { PHASES, passCost } = await import('../src/meter/meter.ts');
+const { recentPasses, recordRecentPass } = await import('../src/daemon/daemon.store.ts');
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], {
@@ -182,4 +183,39 @@ test("the tick's program says in its type what it needs and what it refuses: run
     // @ts-expect-error -- tickRun requires EngineService, and runPromise takes no requirement
     Effect.runPromise(tickRun());
   assert.deepEqual([typeof typed, typeof infallible, typeof unprovided], ['object', 'object', 'function']);
+});
+
+test('a pass whose series cannot be written keeps its own cost and says so: the series are lost, never the pass; the quota read rides on it', async (t) => {
+  const old = new Date(Date.now() - 3_600_000).toISOString();
+  recordRecentPass(
+    passCost({
+      at: old,
+      ms: 5,
+      phases: Object.fromEntries(PHASES.map((p) => [p, { ms: 0, calls: 0, bytes: 0, reads: 0, spawned: 0 }])) as never,
+      harnesses: {},
+      records: 0,
+      overheadMs: 0,
+      rested: 0,
+      runs: 0,
+      tasks: 0,
+      queued: 0,
+      admitted: 0,
+      waitMs: 0,
+      load: 0,
+    }),
+  );
+  fs.rmSync(path.join(ROOT, 'metrics'), { recursive: true, force: true });
+  fs.writeFileSync(path.join(ROOT, 'metrics'), 'not a folder');
+  const said: string[] = [];
+  t.mock.method(process.stderr, 'write', (text: string) => said.push(text) > 0);
+  const pass = await runWith(e, tickRun({ repo: ROOT, quota: () => ({ h: { w: 12 } }) }));
+  t.mock.restoreAll();
+  fs.rmSync(path.join(ROOT, 'metrics'), { force: true });
+  assert.ok(pass.cost, 'the pass answered with its cost');
+  assert.ok(
+    said.some((x) => x.startsWith('nemia: the series were not kept on this pass: ')),
+    said.join(''),
+  );
+  const last = recentPasses().at(-1)!;
+  assert.deepEqual([last.at, last.quota], [pass.cost.at, { h: { w: 12 } }]);
 });

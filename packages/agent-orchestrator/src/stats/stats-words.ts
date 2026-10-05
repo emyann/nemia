@@ -4,6 +4,7 @@
  * declares (`tally:`), and the one line the morning recap quotes. A number with nothing measured under it reads `—`, never 0. Pure.
  */
 import { dollars, durationWord } from '../status/status.ts';
+import type { Health } from '../series/series.ts';
 import type { Group, Headline, Stats, StepRow } from './stats.ts';
 import type { Mark } from './marks.ts';
 import type { TallyCell } from '../tally/tally.ts';
@@ -83,18 +84,19 @@ const skillsWord = (s: StepRow): string =>
   s.skillLoads === null ? NONE : s.skillTries === s.tries ? String(s.skillLoads) : `${s.skillLoads} (${s.skillTries} of ${s.tries})`;
 
 /**
- * A row per step and agent: its tries, their run time and cost, its checks' verdicts, its mean gate wait, the calls it was refused, the
- * skills it loaded.
+ * A row per step and agent: its tries, their run time, its checks' run time and cost, its checks' verdicts, its mean gate wait, the calls
+ * it was refused, the skills it loaded.
  */
 function stepLines(steps: readonly StepRow[]): string[] {
   if (!steps.length) return [];
   return table([
-    ['step', 'agent', 'tries', 'ran', 'cost', 'passed', 'refused', 'unfinished', 'gate wait', 'denied', 'skills'],
+    ['step', 'agent', 'tries', 'ran', 'checks', 'cost', 'passed', 'refused', 'unfinished', 'gate wait', 'denied', 'skills'],
     ...steps.map((s) => [
       s.step,
       s.agent ?? NONE,
       String(s.tries),
       or(s.ranMs, durationWord),
+      or(s.checkMs, durationWord),
       costWord(s),
       String(s.checks.passed),
       String(s.checks.refused),
@@ -155,10 +157,30 @@ function tallyLines(g: Group): string[] {
   ]);
 }
 
+/** A load in words, to two decimals: the share of the cores at work. */
+const loadWord = (n: number): string => (Math.round(n * 100) / 100).toString();
+
+/**
+ * The system's health over the days in words, a line each — a pass's time, the store, the queue, the load, each quota window — or none
+ * where the series kept nothing over them.
+ */
+export function healthLines(h: Health): string[] {
+  const lines = [
+    h.pass.p50 === null ? null : `a pass: ${h.pass.p50.toFixed(1)} ms (p50), ${or(h.pass.p95, (n) => n.toFixed(1))} ms (p95)`,
+    h.runs === null ? null : `runs in the store: ${h.runs} at most; journal reads a pass: ${or(h.reads, oneDecimal)} (p95)`,
+    h.queued === null ? null : `sessions queued: ${h.queued} at most, waiting ${or(h.waitMs, durationWord)} at longest`,
+    h.load.max === null
+      ? null
+      : `load: ${or(h.load.p95, loadWord)} (p95), ${loadWord(h.load.max)} at most; checks filed at ${or(h.checkLoad, loadWord)} (p50)`,
+    ...h.quota.map((q) => `quota ${q.harness} ${q.window}: ${Math.round(q.latest)}% used, ${Math.round(q.peak)}% at most`),
+  ].filter((line): line is string => line !== null);
+  return lines.length ? ['system', ...lines.map((line) => `  ${line}`)] : [];
+}
+
 /**
  * What `nemia stats` prints: the tiles, a row per day — per group, with a key — then a row per change to what the runs froze, a row per
  * step, a row per call a step was refused, a row per skill a step loaded, a row per rule its skills declare, a row per day and count a step
- * declares, and the runs left out.
+ * declares, the system's health over the days, and the runs left out.
  */
 export function statsLines(s: Stats): string[] {
   const filtered = Object.entries(s.filters).map(([k, v]) => `${k} ${v}`);
@@ -175,6 +197,7 @@ export function statsLines(s: Stats): string[] {
     ...(skillLines(s.all.steps).length ? ['', ...skillLines(s.all.steps)] : []),
     ...(ruleLines(s.all.steps).length ? ['', ...ruleLines(s.all.steps)] : []),
     ...(s.all.tallies.length ? ['', ...tallyLines(s.all)] : []),
+    ...(healthLines(s.health).length ? ['', ...healthLines(s.health)] : []),
     ...(s.unreadable.length ? ['', `left out, a journal of each not reading (nemia ls says why): ${s.unreadable.join(', ')}`] : []),
   ];
 }

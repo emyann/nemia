@@ -204,7 +204,7 @@ test('--pages visits every page up to the last one named, for the leavings it re
 test('REFUSED: a page --pages names that there is not, naming it and the pages there are', () => {
   assert.throws(
     () => planOf(['--photos', '--pages', 'b,nope'], ABC),
-    (e: Error) => /^the e2e has no page nope: name pages there are, among a, b, c\b/.test(e.message),
+    (e: Error) => /^the e2e has no page nope: name pages there are, as pages\/NAMES lists them: a, b, c$/.test(e.message),
   );
 });
 

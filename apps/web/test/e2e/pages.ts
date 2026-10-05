@@ -137,7 +137,8 @@ export function planOf<P extends { name: string }>(
   if (!named) return { visit: [...pages], themes, pictured: () => photos };
   const all = pages.map((p) => p.name);
   const unknown = named.filter((name) => !all.includes(name));
-  if (unknown.length) throw new Error(`the e2e has no page ${unknown.join(', ')}: name pages there are, among ${all.join(', ')}`);
+  if (unknown.length)
+    throw new Error(`the e2e has no page ${unknown.join(', ')}: name pages there are, as pages/NAMES lists them: ${all.join(', ')}`);
   const chosen = new Set(named);
   const last = Math.max(...named.map((name) => all.indexOf(name)));
   return { visit: pages.slice(0, last + 1), themes, pictured: (name) => photos && chosen.has(name) };

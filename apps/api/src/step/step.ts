@@ -13,6 +13,7 @@ import {
   COMMANDS,
   DEFAULT_FACTORY,
   fillsOf,
+  hireRefusalOf,
   Missing,
   readFactories,
   runStore,
@@ -20,7 +21,7 @@ import {
   skillsFor,
   unattachedRefusal,
 } from 'agent-orchestrator';
-import type { FactoryListing } from 'agent-orchestrator';
+import type { AgentReading, AgentsRead, Factory, FactoryListing } from 'agent-orchestrator';
 import { toldLayers, type Run, type ToldLayers } from 'agent-orchestrator/run';
 import type { AgentSkill, SkillsFound, Workflow } from 'agent-orchestrator/workflow';
 import { sourceOf, type SkillSource } from '../agents/skills.ts';
@@ -42,6 +43,16 @@ export type HiredIn = { factory: string; agent: string };
 /** A skill a step's layers give, and where it is found: yours, the repository's or shipped; null where no place the board pages has it. */
 export type SkillFrom = { name: string; from: SkillSource | null };
 
+/** An agent a step may be hired: its name, and what it is for, null where its file says nothing. */
+export type HireableAgent = { name: string; description: string | null };
+
+/**
+ * Whether an agent can be hired into a step, read before anyone presses Hire: `refused`, why not, in the package's words
+ * (`hireRefusalOf`), null where one can; and `agents`, those it may be hired — the agents beside its workflow, the repository's for one of
+ * the repository's and yours for one of yours, each that reads, by name; none where it is refused.
+ */
+export type Hiring = { refused: string | null; agents: HireableAgent[] };
+
 /** One of a step's recent runs: its id, its brief, when it was made, its factory (null for the default), and whether the step was filed. */
 export type RecentRun = { id: string; brief: string; createdAt: string; factory: string | null; filed: boolean };
 
@@ -53,8 +64,8 @@ export type RecentRun = { id: string; brief: string; createdAt: string; factory:
  *
  * Read now, in the request's factory (`factory`, null for the default): `layers`, what a run of it would be told, by layer, with no task
  * (`toldLayers`); `hired`, the agent the factory hires into it, which `layers.agent` then names; `hiredIn`, with no factory named, the
- * factories that hire into it (`hiredInOf`); `skillsFrom`, where each skill of its layers is found; and `recentRuns`, its newest runs
- * (`recentRunsOf`).
+ * factories that hire into it (`hiredInOf`); `hiring`, whether one can be hired into it, and which (`hiringOf`); `skillsFrom`, where each
+ * skill of its layers is found; and `recentRuns`, its newest runs (`recentRunsOf`).
  */
 export type WorkflowStepPage = {
   workflow: string;
@@ -69,6 +80,7 @@ export type WorkflowStepPage = {
   layers: ToldLayers;
   hired: string | null;
   hiredIn: HiredIn[];
+  hiring: Hiring;
   skillsFrom: SkillFrom[];
   recentRuns: RecentRun[];
 };
@@ -137,6 +149,38 @@ export function hiredInOf(
   });
 }
 
+/** Why no agent is offered to hire into a step when the agents beside its workflow do not read: the listing's own `message`. */
+export const unreadAgentsRefusal = (message: string): string =>
+  `The agents beside this workflow could not be read, so none is offered to hire into this step: ${message}. The Agents page says which.`;
+
+/**
+ * Whether an agent can be hired into `step`, of the workflow `workflow` read from `from`, in `factory` (undefined for the default), which
+ * hires `hired` into it: refused as `hireRefusalOf` judges, the step's own `agent:` read only where no hire fills it, and `agents` never
+ * read then; else each agent `agents` reads from the same place that reads, sorted by name — or, when they cannot be read, why
+ * (`unreadAgentsRefusal`), so the step's page still answers.
+ */
+export async function hiringOf(
+  factory: Pick<Factory, 'name' | 'workflows'> | undefined,
+  workflow: string,
+  step: Pick<Workflow, 'agent'>,
+  hired: string | null,
+  from: WorkflowSource,
+  agents: () => Promise<readonly Pick<AgentReading, 'name' | 'from' | 'description' | 'error'>[]>,
+): Promise<Hiring> {
+  const refused = hireRefusalOf(factory, workflow, hired === null ? (step.agent?.name ?? null) : null);
+  if (refused !== null) return { refused, agents: [] };
+  return agents().then(
+    (read) => ({
+      refused: null,
+      agents: read
+        .filter((a) => a.from === from && a.error === null)
+        .map(({ name, description }) => ({ name, description }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    }),
+    (err: unknown) => ({ refused: unreadAgentsRefusal(err instanceof Error ? err.message : String(err)), agents: [] }),
+  );
+}
+
 /** Each skill `layers` gives, the agent's then the step's, once each, with where `found` has it (`sourceOf`). */
 export function skillsFromOf(layers: ToldLayers, found: SkillsFound, repo: string, home: string): SkillFrom[] {
   return [...new Set([...layers.agentSkills, ...layers.addedSkills])].map((name) => {
@@ -147,6 +191,9 @@ export function skillsFromOf(layers: ToldLayers, found: SkillsFound, repo: strin
 
 /** The table's entry a step's page is read through, served on the api alone. */
 const STEP = COMMANDS.find((c) => c.name === 'workflows step')!;
+
+/** The package's listing of the agents (`nemia agents`), which a step's hire is chosen from. */
+const AGENTS = COMMANDS.find((c) => c.name === 'agents')!;
 
 /**
  * A step's page.
@@ -162,10 +209,11 @@ const STEP = COMMANDS.find((c) => c.name === 'workflows step')!;
  *   session, or one made from its description — and null for a card the package refuses, whose words the agent's page shows.
  *   What a run would be told is read now, never frozen: `layers` as a start would tell them with no task, the agent the factory hires into
  *   the step (`hired`), with no factory the factories that hire into it (`hiredIn`), where each skill is found (`skillsFrom`), and the
- *   newest runs of the folder that hold the step, in the factory where one is named (`recentRuns`).
+ *   newest runs of the folder that hold the step, in the factory where one is named (`recentRuns`), and whether an agent can be hired
+ *   into it, with those it can (`hiring`).
  */
 export const step = new Hono<ApiEnv>().get('/api/workflows/:from/:name/:step', (c) =>
-  served(c, async ({ e, repo, home, factory }) => {
+  served(c, async ({ e, env, repo, home, factory }) => {
     const { from, name, step: asked } = c.req.param();
     if (from !== 'repo' && from !== 'yours') {
       return c.json(
@@ -186,6 +234,8 @@ export const step = new Hono<ApiEnv>().get('/api/workflows/:from/:name/:step', (
     }
     const places = placesOf(repo, home);
     const layers = toldLayers(found, null);
+    const hired = factory ? (fillsOf(factory.hires, name)[found.name] ?? null) : null;
+    const agents = async () => ((await runWith(e, AGENTS.handler({ repo }, env, home))) as AgentsRead).agents;
     return c.json({
       workflow: name,
       from,
@@ -197,8 +247,9 @@ export const step = new Hono<ApiEnv>().get('/api/workflows/:from/:name/:step', (
       agentSkills: agentSkillsOf(found, folder.dir, places),
       factory: factory?.name ?? null,
       layers,
-      hired: factory ? (fillsOf(factory.hires, name)[found.name] ?? null) : null,
+      hired,
       hiredIn: factory ? [] : hiredInOf(readFactories(), name, found.name, from, repo),
+      hiring: await hiringOf(factory, name, found, hired, from, agents),
       skillsFrom: skillsFromOf(layers, skillsFor(folder.dir, places), repo, home),
       recentRuns: recentRunsOf(runStore.runs.list(), folder.dir, found.name, factory?.name ?? null),
     } satisfies WorkflowStepPage);

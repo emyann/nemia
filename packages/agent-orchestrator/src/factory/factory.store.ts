@@ -21,6 +21,7 @@ import {
   instructionPathRefusal,
   noFactoryLine,
   noFactoryRefusal,
+  unattachedHireRefusal,
   workflowNameRefusal,
   type Factory,
   type FactoryListing,
@@ -305,9 +306,7 @@ export function hireAgent(opts: { factory: string; agent: string; step: string }
   const { file, content } = fileToChange(opts.factory, 'hire');
   const workflow = opts.step.slice(0, opts.step.indexOf('/'));
   if (!content.workflows?.includes(workflow))
-    throw new Invalid({
-      message: `${opts.factory} does not offer the workflow ${workflow}, so it hires no one into its steps. Attach it first — nemia factory attach ${opts.factory} ${workflow} — then hire. Nothing was hired.`,
-    });
+    throw new Invalid({ message: `${unattachedHireRefusal(opts.factory, workflow)} Nothing was hired.` });
   const replaced = content.hires?.[opts.step];
   writeWhole(file, { ...content, hires: { ...content.hires, [opts.step]: opts.agent } });
   return { file, ...(replaced !== undefined && replaced !== opts.agent ? { replaced } : {}) };

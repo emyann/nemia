@@ -14,6 +14,8 @@ import { daemonQuery, type Daemon } from '../src/lib/api/daemon.ts';
 import {
   factoriesQuery,
   factoryInstructionQuery,
+  fireAgent,
+  hireAgent,
   writeInstruction,
   type Factory,
   type FactoryInstruction,
@@ -322,4 +324,31 @@ test("REFUSED, a factory's instruction: one that does not say whether the store 
   await assert.rejects(readInstruction(), unread('/api/factories/mill/instruction', 'store', 'is missing'));
   answering(t, without(instruction, 'words'));
   await assert.rejects(readInstruction(), unread('/api/factories/mill/instruction', 'words', 'is missing'));
+});
+
+test("a hire and a fire are sent to the step's hire, the step one segment, and read back as the api answers them", async (t) => {
+  const sent: Array<{ url: string; method: string | undefined; body: unknown }> = [];
+  const before = globalThis.fetch;
+  let answer: unknown = { file: '/f/mill.json', replaced: null };
+  globalThis.fetch = async (input, init) => {
+    sent.push({ url: String(input), method: init?.method, body: JSON.parse(String(init?.body)) });
+    return new Response(JSON.stringify(answer), { headers: { 'content-type': 'application/json' } });
+  };
+  t.after(() => {
+    globalThis.fetch = before;
+  });
+  assert.deepEqual(await hireAgent('mill', 'build/implement', 'ada'), { file: '/f/mill.json', replaced: null });
+  answer = { file: '/f/mill.json', fired: 'ada' };
+  assert.deepEqual(await fireAgent('mill', 'build/implement'), { file: '/f/mill.json', fired: 'ada' });
+  assert.deepEqual(sent, [
+    { url: '/api/factories/mill/hires/build%2Fimplement', method: 'PUT', body: { agent: 'ada' } },
+    { url: '/api/factories/mill/hires/build%2Fimplement', method: 'DELETE', body: {} },
+  ]);
+  answer = { file: '/f/mill.json' };
+  await assert.rejects(hireAgent('mill', 'build/implement', 'ada'), (err: unknown) => {
+    assert.ok(err instanceof UnreadAnswer, String(err));
+    assert.ok(err.message.includes('at replaced, '), err.message);
+    assert.ok(err.message.includes("read the step's page again before hiring or firing again"), err.message);
+    return true;
+  });
 });

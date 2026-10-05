@@ -196,6 +196,7 @@ const namedBy = (c: Context<ApiEnv>): Named => ({
   runId: c.req.param('runId') ?? '',
   step: c.req.param('step') ?? '',
   name: c.req.param('name') ?? '',
+  factory: c.req.param('factory') ?? '',
   method: c.req.method,
   path: c.req.path,
 });
@@ -324,5 +325,11 @@ export const wordBreaks = (table: readonly Pick<CommandSpec, 'name' | 'route'>[]
  *   `nemia prune`'s words alone, the page saying `Not pruned` above them itself; any other failure is a 502. Its 200 is `{ id, pruned:
  *   true, lines, worktrees, artifacts, left }`. No feed line: the marker the prune writes moves the run's stamp in `runStore`, and the
  *   board reads the run again itself.
+ * - `PUT /api/factories/:factory/hires/:step` — an agent hired into a step of a factory's workflow, as `nemia factory hire` hires it
+ *   (`hireAgent`), its body `{ agent }` and its step `<workflow>/<step>` one encoded segment, `build%2Fimplement`. Refused in the package's
+ *   words: a factory the store does not have (404, `Missing`), the default factory (409, `Conflict`), a step or an agent that is no name
+ *   and a workflow the factory does not offer (422, `Invalid`). Its 200 is `{ file, replaced }`, the agent the hire replaced or null.
+ * - `DELETE /api/factories/:factory/hires/:step` — a step's hire taken back, as `nemia factory fire` takes it (`fireAgent`); it reads no
+ *   body. A step the factory hires no one into is a 404 (`Missing`). Its 200 is `{ file, fired }`.
  */
 export const commands = routesOf(COMMANDS);

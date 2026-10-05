@@ -2582,6 +2582,10 @@ be (the workflow's `agents/`, the repository's, the store's).
   again replaces its hire, and says which it replaced; **`wf factory fire <factory> --step <workflow>/<step>`** takes it back.
   Both write the whole file through a hidden file renamed onto it, keeping `repos` and any other key. The hire checks the shape
   of what it is given, never that the workflow, the step or the agent exists: the start judges that.
+- **The api serves both**, on the step's hire: `PUT /api/factories/<factory>/hires/<workflow>%2F<step>` with
+  `{ "agent": "<name>" }`, and `DELETE` on the same path, the step one encoded segment; refused as the verbs refuse, by kind. The
+  board offers them on a step inside a factory, and says before anyone hires why a step takes none (`hireRefusalOf`): the default
+  factory, a workflow the factory does not offer, or a step whose file names its own agent.
 - **`wf start --factory <name>`** reads the factory as it is then, and hands each step of the workflow its hire: a hired step
   is resolved exactly as if its file said `agent: <name>` (`parseWorkflow`'s `hired`), and frozen so on the run, which never
   reads the factory again.

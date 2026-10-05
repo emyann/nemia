@@ -195,6 +195,8 @@ test('REFUSED at shipped defaults: every route that writes, asked by a page on a
       'inbox from PUT',
       'inbox from DELETE',
       'inbox rm DELETE',
+      'factory hire PUT',
+      'factory fire DELETE',
       'factory instruction PUT',
       'factory instruction DELETE',
       'factory instruct PUT',

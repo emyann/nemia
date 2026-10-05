@@ -154,6 +154,44 @@ export const offeredIn =
     (factories !== undefined && workflowFactories(workflow, factories).includes(factory));
 
 /**
+ * Whether the factory `factory` hires into the steps of a listed workflow: a factory picked that offers it (`workflowFactories`) — never
+ * none, nor the default factory, which hires no one — and none while `factories` are unread.
+ */
+export const hiresInto = (
+  workflow: Pick<WorkflowListing, 'name' | 'from'>,
+  factory: string | undefined,
+  factories: readonly Factory[] | undefined,
+): boolean => factory !== undefined && factories !== undefined && workflowFactories(workflow, factories).includes(factory);
+
+/** The step a new agent is to be hired into once written: a factory, a workflow of yours, and its step. */
+export type HirePlace = { factory: string; workflow: string; step: string };
+
+/** The New agent page's search, the step it hires into: all three parts where the address names each by a string not empty, else none. */
+export const hirePlaceOf = (search: Record<string, unknown>): Partial<HirePlace> => {
+  const { factory, workflow, step } = search;
+  return typeof factory === 'string' && factory && typeof workflow === 'string' && workflow && typeof step === 'string' && step
+    ? { factory, workflow, step }
+    : {};
+};
+
+/** What follows an agent written from a step's New agent: hired, and back to the step; or the hire's refusal, to say on the creator. */
+export type HiredOnCreate = { hired: true } | { hired: false; why: string };
+
+/**
+ * Hires `agent`, just written, into `place` with `hire`, the board's hire: `hired` once the api takes it, else `why` not, in its words —
+ * never a refusal passed over as a hire.
+ */
+export const hireOnCreate = (
+  place: HirePlace,
+  agent: string,
+  hire: (factory: string, step: string, agent: string) => Promise<unknown>,
+): Promise<HiredOnCreate> =>
+  hire(place.factory, `${place.workflow}/${place.step}`, agent).then(
+    (): HiredOnCreate => ({ hired: true }),
+    (error: unknown): HiredOnCreate => ({ hired: false, why: error instanceof Error ? error.message : String(error) }),
+  );
+
+/**
  * The place a workflow's page or a step's is read in, from its address: `?factory=` as `factorySearch` reads it, and `?repo=` where it
  * names a repository by a string that is not empty.
  */

@@ -1,6 +1,7 @@
 /**
- * The factories (`GET /api/factories`, apps/api/src/factories/factories.ts), and a factory's instruction (`GET`, `PUT` and `DELETE` on
- * `/api/factories/<name>/instruction`, apps/api/src/factories/instruction.ts and the routes the api generates beside it).
+ * The factories (`GET /api/factories`, apps/api/src/factories/factories.ts), a factory's instruction (`GET`, `PUT` and `DELETE` on
+ * `/api/factories/<name>/instruction`, apps/api/src/factories/instruction.ts and the routes the api generates beside it), and its hires
+ * (`PUT` and `DELETE` on `/api/factories/<name>/hires/<workflow>%2F<step>`, routes the api generates).
  */
 import { queryOptions } from '@tanstack/react-query';
 import { Schema } from 'effect';
@@ -106,3 +107,29 @@ export const writeInstruction = (name: string, words: string): Promise<FactoryIn
 /** Remove the instruction the store keeps for the factory `name`: the instruction as it then reads. */
 export const clearInstruction = (name: string): Promise<FactoryInstruction> =>
   send('DELETE', `${instructionRoute(name)}/words`, FactoryInstructionSchema, { body: {}, may: INSTRUCTION_WRITTEN });
+
+/** The route of the hire of the factory `name` into `step`, `<workflow>/<step>`: the step one segment, its slash encoded. */
+const hireRoute = (name: string, step: string): string => `/api/factories/${encodeURIComponent(name)}/hires/${encodeURIComponent(step)}`;
+
+/** What a hire or a fire may have done, and what to look at before sending it again. */
+const HIRE_WRITTEN = "The factory's hires may be changed: read the step's page again before hiring or firing again.";
+
+/** A hire written: the factory's file, and the agent it replaced in the step, null where none was hired. */
+export type Hired = { file: string; replaced: string | null };
+
+/** A fire written: the factory's file, and the agent fired. */
+export type Fired = { file: string; fired: string };
+
+/**
+ * Hire the agent `agent` into `step`, `<workflow>/<step>`, in the factory `name`: replacing the one hired there, if any. Rejects with a
+ * `WriteRefusal` in the package's words: no such factory (404), the default factory (409), a workflow the factory does not offer (422).
+ */
+export const hireAgent = (name: string, step: string, agent: string): Promise<Hired> =>
+  send('PUT', hireRoute(name, step), Schema.Struct({ file: Schema.String, replaced: Schema.NullOr(Schema.String) }), {
+    body: { agent },
+    may: HIRE_WRITTEN,
+  });
+
+/** Fire the agent the factory `name` hires into `step`, `<workflow>/<step>`. Rejects with a `WriteRefusal` where it hires none (404). */
+export const fireAgent = (name: string, step: string): Promise<Fired> =>
+  send('DELETE', hireRoute(name, step), Schema.Struct({ file: Schema.String, fired: Schema.String }), { body: {}, may: HIRE_WRITTEN });

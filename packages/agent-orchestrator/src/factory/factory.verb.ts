@@ -1,7 +1,8 @@
 /**
  * `nemia factory`, each of its forms an entry of the command table: the store's factories listed — bare, which the api serves on its own
- * route, and `ls` — then filed, given workflows and relieved of them, hired into, fired from and removed, which the command line alone
- * does; and its instruction's two verbs (instruction.verb.ts), which the api serves. Their handlers answer data, and the CLI prints it.
+ * route, and `ls` — then filed, given workflows and relieved of them and removed, which the command line alone does; hired into and fired
+ * from, which the api serves on a step's hire, `/api/factories/:factory/hires/:step`, the step as one segment, `build%2Fimplement`; and its
+ * instruction's two verbs (instruction.verb.ts), which the api serves. Their handlers answer data, and the CLI prints it.
  */
 import { tried } from '../runtime-client.ts';
 import { leftOut, type Args, type Flag, type Spec } from '../command/command.ts';
@@ -75,8 +76,8 @@ of a workflow not attached or still hired into, a --step that is not <workflow>/
 not attached, and a fire of a step with no hire. A start in a factory of a workflow it has not attached is
 refused, naming the attach.`;
 
-/** Why the api writes no factory: the board reads them, and the command line is their one writer. */
-const WRITTEN_HERE = { side: 'cli', why: 'the board reads factories and writes none: nemia factory is their one writer' } as const;
+/** Why the api does not file, attach, detach or remove a factory: the board reads them, and the command line is their one writer. */
+const WRITTEN_HERE = { side: 'cli', why: 'the board files, attaches to and removes no factory: nemia factory does' } as const;
 
 /** The text under `key`: what the spec read there. */
 const textOf = (args: Args, key: string): string => {
@@ -260,7 +261,7 @@ const FACTORY_HIRE: Command<{ file: string; replaced: string | null }> = {
   spec: HIRE_SPEC,
   check: stepCheck('hire', '<factory> <agent>', HIRE_SPEC),
   writes: true,
-  only: WRITTEN_HERE,
+  route: { method: 'PUT', path: '/api/factories/:factory/hires/:step', status: 200 },
   handler: (args) =>
     tried(() => {
       const { file, replaced } = hireAgent({
@@ -290,7 +291,7 @@ const FACTORY_FIRE: Command<{ file: string; fired: string }> = {
   spec: FIRE_SPEC,
   check: stepCheck('fire', '<factory>', FIRE_SPEC),
   writes: true,
-  only: WRITTEN_HERE,
+  route: { method: 'DELETE', path: '/api/factories/:factory/hires/:step', status: 200 },
   handler: (args) => tried(() => fireAgent({ factory: textOf(args, 'factory'), step: textOf(args, 'step') })),
   print: ({ file, fired }, args) => [`${textOf(args, 'factory')}  ${textOf(args, 'step')}  fired ${fired}`, `fired: ${file}`],
 };

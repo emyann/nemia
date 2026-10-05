@@ -25,7 +25,7 @@ import { gitSays } from '../workspace/worktree.store.ts';
  * there (`workspaceArtifact`). An absolute path names a file in the step's files directory (`artifactsDir`), and is looked for there,
  * on disk: present when it is a file inside the directory once every link on the way is followed, so a link that leads out is as missing
  * as where it leads. Any other absolute path, and a path that climbs out of the workspace as written, are reported without being looked
- * at (`artifactPlace`).
+ * at (`artifactPlace`), as is a path through a folder a harness reads as its own configuration, which is never collected.
  */
 export function missingArtifacts(run: Run, stepName: string, closeout: Closeout | { error: string } | undefined): MissingArtifact[] {
   if (!closeout || 'error' in closeout) return [];
@@ -34,7 +34,7 @@ export function missingArtifacts(run: Run, stepName: string, closeout: Closeout 
   for (const file of closeout.artifacts) {
     const place = artifactPlace(file, dir);
     const why =
-      place === 'outside' || place === 'escapes'
+      place === 'outside' || place === 'escapes' || place === 'configuration'
         ? place
         : place === 'files'
           ? isFileIn(file, dir)
@@ -96,8 +96,8 @@ function inWorkspace(
  * `advance` runs it on each pass that hands a step off (`handOffDue`): until its check is filed, and until a step after it works in its
  * workspace. Level-triggered and idempotent, so a pass that dies halfway loses nothing: a copy with its source's size and, within a
  * millisecond, its time is left as it is, since a copy's time reads back a hair off its source's. Nothing is copied, and `nemia decide`
- * says why, for a path that climbs out of the workspace (never read), a link that leads out of it (not followed), a directory, a file that
- * is not there, and a copy that fails. Nothing is written through a link in the files directory, which a step may have made. It never
+ * says why, for a path that climbs out of the workspace (never read), a path through a folder a harness reads as its own configuration
+ * (`artifactPlace`), a link that leads out of it (not followed), a directory, a file that is not there, and a copy that fails. Nothing is written through a link in the files directory, which a step may have made. It never
  * throws, as a hand-off does not. The pass's note names what was copied.
  */
 export function collectArtifacts(run: Run, stepName: string, closeout: Closeout | undefined): string[] {

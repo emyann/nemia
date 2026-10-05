@@ -4675,6 +4675,29 @@ test('REFUSED at `nemia start`, before a run is written: an --input that is not 
   assert.equal(runsWritten(), before, 'nor by the CLI');
 });
 
+test('REFUSED at shipped defaults: a file a step names through a folder a harness reads as its own configuration is not collected into its files directory, which the steps after it mount, and `nemia decide` says why', async () => {
+  const run = started(folder('check: npm test'));
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  const files = artifactsDir(run, 'implement');
+  for (const file of ['.claude/skills/x/SKILL.md', 'notes/x.md']) {
+    fs.mkdirSync(path.dirname(path.join(run.repo, file)), { recursive: true });
+    fs.writeFileSync(path.join(run.repo, file), `# ${file}\n`);
+  }
+  gitIn(run.repo, 'add', '-A');
+  gitIn(run.repo, 'commit', '-q', '-m', 'the step, with a skill of its own');
+  const named = ['.claude/skills/x/SKILL.md', 'notes/x.md'];
+  b.settle(`${run.id}-implement`, 'succeeded', declaring(named));
+
+  const pass = await advance(b.e, readRun(run.id));
+  assert.deepEqual([pass.checked, pass.notes], [['implement'], [`implement: collected notes/x.md into ${files}`]]);
+  assert.equal(fs.readFileSync(path.join(files, 'notes', 'x.md'), 'utf8'), '# notes/x.md\n', 'a file anywhere else is handed over');
+  assert.ok(!fs.existsSync(path.join(files, '.claude')), 'nothing under the configuration folder reaches the files directory');
+  assert.deepEqual(missingArtifacts(readRun(run.id), 'implement', declaring(named)), [
+    { path: '.claude/skills/x/SKILL.md', why: 'configuration' },
+  ]);
+});
+
 test("a file `artifacts` names from the workspace root is collected into the step's files directory when the step hands off, before its check is filed — again, only what changed, after a pass that died — and read from there; an absolute path in the directory is read where it is", async () => {
   const run = started(folder('check: npm test'));
   const b = board();

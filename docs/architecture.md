@@ -8,7 +8,7 @@ broken. This page says what the tests hold; the tests are the rules.
 
 | Layer | Owns | Public contract |
 |---|---|---|
-| `packages/agent-runtime` | Agent sessions on a harness, durably: a job that runs to its end, and (not built yet) a long-lived session that runs until stopped. How a session runs: its command, mounts, restart and spend, the journal, the attempts, the harnesses' vocabulary. The `ae` command. | `agent-runtime` → `src/facade.ts`, the runtime in Promises. `agent-runtime/effect` → `src/index.ts`, the same in Effect. `agent-runtime/vocabulary` → `src/vocabulary.ts`, the harnesses' words and what their fence words reach (`fenceReach`), pure. `decide` is exported by none. |
+| `packages/agent-runtime` | Agent sessions on a harness, durably: a job that runs to its end, and (not built yet) a long-lived session that runs until stopped. How a session runs: its command, mounts, restart and spend, the journal, the attempts, the harnesses' vocabulary. The `ae` command. | `agent-runtime` → `src/facade.ts`, the runtime in Promises. `agent-runtime/effect` → `src/index.ts`, the same in Effect. `agent-runtime/vocabulary` → `src/vocabulary.ts`, the harnesses' words, what their fence words reach (`fenceReach`) and the folders a harness reads as its own configuration in a mounted folder (`configFolderIn`), pure. `decide` is exported by none. |
 | `packages/agent-orchestrator` | A folder of markdown as a workflow, and a run of its steps: which task to file next, what a person must decide, what the run's record says. The `wf` command, to become `nemia`. | `agent-orchestrator` → `src/runner.ts`: the controllers, and everything that reads or writes the disk, re-exported by name. `agent-orchestrator/run` → `src/run.ts`: `assess` (`src/tick/assess.ts`), and the words a run is described in, re-exported by name. `agent-orchestrator/workflow` → `src/workflow.ts`: the format, pure. `agent-orchestrator/effect` → `src/effect.ts`: the refusals by kind, `Missing`, `Conflict` and `Invalid`, as `agent-runtime/effect` is the runtime's face in Effect. |
 | `apps/api` | The workflows behind HTTP, and the feed as a stream. | Its routes. |
 | `apps/web` | The board people look at. It talks to the api over HTTP, decodes each answer it reads with a schema of its own (`effect`), imports none of our packages, names no store path, and builds no command of its own: a command or a store folder it shows is text the api answered (`STORE_PATHS` and `COMMAND_TEXT` in `apps/web/test/structure.test.ts`, both empty). | Its pages. |
@@ -154,8 +154,8 @@ agent-runtime, a type included (`CLIENT` in test/boundary.test.ts). It creates t
 runtime's `Engine` service from `agent-runtime/effect`, provided as a layer, each verb run as a Promise for the controllers
 (`engineOf`, which a test hands a layer of its own). It passes the runtime's surface through rather than wrapping it. Every controller beneath the CLI reaches it, itself or
 through a controller it imports, and it imports no controller. The runtime's behaviour comes through the client; its vocabulary through
-its pure door, `agent-runtime/vocabulary` (`src/vocabulary.ts`: the words each harness takes, per key (`HARNESS_CHOICES`), and `fenceReach`, with no Effect and no
-I/O, held by `packages/agent-runtime/test/vocabulary-door.test.ts`), which any file of the orchestrator imports, a pure one included
+its pure door, `agent-runtime/vocabulary` (`src/vocabulary.ts`: the words each harness takes, per key (`HARNESS_CHOICES`), `fenceReach`, and the folders a
+harness reads as its own configuration in a mounted folder (`configFolderIn`), with no Effect and no I/O, held by `packages/agent-runtime/test/vocabulary-door.test.ts`), which any file of the orchestrator imports, a pure one included
 (`VOCABULARY` in test/boundary.test.ts).
 
 **Inside the runtime, folders by feature**, held by path in `packages/agent-runtime/test/layout.test.ts`. The entries,

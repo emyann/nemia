@@ -96,3 +96,4 @@ export { CLAUDE_AUTO_DROPPED, CLAUDE_CONTEXT_TOKENS, CLAUDE_EFFORTS, CLAUDE_PERM
 export { fenceReach, type FenceReach } from './harness/reach.ts';
 export { CODEX_EFFORTS, CODEX_SANDBOXES } from './harness/codex/vocabulary.ts';
 export { HARNESS_CHOICES } from './harness/choices.ts';
+export { CONFIG_FOLDERS, configFolderIn } from './harness/config-folders.ts';

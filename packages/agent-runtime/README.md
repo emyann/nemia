@@ -72,7 +72,8 @@ the harnesses that do (`HarnessSpec.mounts`, `mountsMisplaced` in `src/facade/co
   as well as reads where the mode lets a session write; the deny holds the folder read-only in `dontAsk`, `acceptEdits`, `auto`
   and `bypassPermissions`, a Bash redirection into it included. A read-only path a permission rule cannot name — a space, a
   comma, a parenthesis, a glob's character — is refused. `--add-dir` also lists the folder's own `.claude/skills` in the
-  session; its `CLAUDE.md` is not read.
+  session; its `CLAUDE.md` is not read. The vocabulary door names the folders a harness reads so as its own configuration
+  (`CONFIG_FOLDERS`, `configFolderIn`), for a caller that puts files into a folder it mounts.
 - **Codex** holds a read-only mount and is given nothing for it: its `read-only` and `workspace-write` sandboxes read the whole
   disk and write only the workspace. It refuses a read-only mount in `danger-full-access`, which writes everywhere, and a writable
   one, which only `--add-dir` would give and `exec resume` rejects.

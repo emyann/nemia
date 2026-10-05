@@ -173,10 +173,10 @@ async function builds(page: Page): Promise<void> {
 
 export default {
   /**
-   * A workflow's canvas, on its page, and the frame's bar: a click or Enter on a step shows it in the bar, ringed, clear of the bar; the bar
-   * says what it runs on, its keys and what it waits on; again, or the empty canvas, closes it, and another step, on this canvas or another
-   * workflow's page, switches it. Open and a double click open the step's page. Build swaps the canvas for the builder, closes the bar showing one of its
-   * steps, and keeps a click on a step to edit it.
+   * A workflow's canvas, on its page, and the frame's bar: a click or Enter on a step shows it in the bar, ringed, clear of the bar; the
+   * bar says what it runs on, its keys and what it waits on; again, or the empty canvas, closes it, and another step, on this canvas or
+   * another workflow's page, switches it. Open and a double click open the step's page. Build swaps the canvas for the builder, closes the
+   * bar showing one of its steps, and keeps a click on a step to edit it.
    */
   name: 'workflow-bar',
   route: pageOf('repo', good.name),

@@ -29,8 +29,8 @@ const where = <code className="font-mono text-xs">workflows/</code>;
 
 /**
  * Every workflow the repository carries, then yours: a card each, linked to its page — and yours made on the board, the one just made
- * opened on its page in its builder. With a factory picked in the address, `?factory=<name>`, only those it offers (`offeredIn`); one that is in none
- * says so, and how to show every factory's.
+ * opened on its page in its builder. With a factory picked in the address, `?factory=<name>`, only those it offers (`offeredIn`); one that
+ * is in none says so, and how to show every factory's.
  */
 function WorkflowsPage() {
   const { data: all } = useSuspenseQuery(workflowsQuery);

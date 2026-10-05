@@ -27,11 +27,11 @@ const asked = (dir: string): string =>
 
 export default {
   /**
-   * A workflow of yours removed from its page: Remove… asks first, naming the folder, its steps and its star, and saying that a run
-   * started on it goes on from what it froze and that a card naming it not queued is refused at its start; Keep it takes the question
-   * back. On a phone, the question and its buttons wrap inside the page. Remove then takes the folder off the disk, goes back to the
-   * Workflows page, without its card, and takes its star off Favorites. No card on the Workflows page offers Remove. The folder is written by the page, and removed by it; a failure
-   * removes it too.
+   * A workflow of yours removed from its page: Remove… asks first, naming the folder, its steps and its star, and saying that a run started
+   * on it goes on from what it froze and that a card naming it not queued is refused at its start; Keep it takes the question back. On a
+   * phone, the question and its buttons wrap inside the page. Remove then takes the folder off the disk, goes back to the Workflows page,
+   * without its card, and takes its star off Favorites. No card on the Workflows page offers Remove. The folder is written by the page, and
+   * removed by it; a failure removes it too.
    */
   name: 'workflow-remove',
   route: '/workflows',

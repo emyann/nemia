@@ -14,8 +14,8 @@ const CARD = 'queued-on-it-e2e';
 export default {
   /**
    * A workflow of yours a queued card still needs is not removed: the api answers 409 in the package's words, naming the card and the
-   * command that takes it back, and the workflow's page on the board shows them verbatim, with the folder left whole on the disk. Its one refusal is
-   * the point, so its page counts exactly it; the folder and the card are written by the page and taken back after.
+   * command that takes it back, and the workflow's page on the board shows them verbatim, with the folder left whole on the disk. Its one
+   * refusal is the point, so its page counts exactly it; the folder and the card are written by the page and taken back after.
    */
   name: 'workflow-remove-refused',
   route: '/workflows',

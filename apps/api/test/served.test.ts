@@ -15,6 +15,7 @@ import { app } from '../src/app.ts';
 /** The routes the api serves that are its own, each with why no entry of the command table declares it. */
 const OWN: Readonly<Record<string, string>> = {
   'GET /api/health': 'the server answering at all, which no command of the orchestrator asks',
+  'GET /api/store': "your store's folders as the api reads them, under its store root, which no command of the orchestrator answers",
   'GET /api/version': "the api's build, as the board's bottom bar says it",
   'GET /api/capabilities': "the machine's harnesses and MCP servers, asked by the app's asker, which it keeps between requests",
   'GET /api/daemon': "the daemon's standing, read off its lease file: whether anything ticks the store at all",

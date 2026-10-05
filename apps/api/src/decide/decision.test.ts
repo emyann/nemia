@@ -294,8 +294,8 @@ test('a finished run: what its result branch touched, the lesson, the check-affe
   assert.deepEqual(
     body.commands,
     [
-      { label: 'ship it', command: `git -C ${repo} merge --no-ff ${branch}`, said: null },
-      { label: 'drop it', command: `git -C ${repo} branch -D ${branch}`, said: null },
+      { label: 'ship it', command: `git -C ${repo} merge --no-ff ${branch}`, said: null, step: null },
+      { label: 'drop it', command: `git -C ${repo} branch -D ${branch}`, said: null, step: null },
     ],
     'printed, never run',
   );
@@ -432,11 +432,11 @@ test('a loop out of rounds offers both answers as commands, each the bare `nemia
   assert.deepEqual(
     body.commands
       .filter((c: { label: string }) => c.label !== 'ship it' && c.label !== 'drop it')
-      .map(({ label, command }: DecideCommand) => ({ label, command })),
+      .map(({ label, command, step }: DecideCommand) => ({ label, command, step })),
     [
-      { label: 'once more', command: 'nemia round r-d9 review' },
-      { label: 'accept', command: 'nemia accept r-d9 review --message "<why>"' },
-      { label: 'once more', command: 'nemia retry r-d9 implement' },
+      { label: 'once more', command: 'nemia round r-d9 review', step: 'review' },
+      { label: 'accept', command: 'nemia accept r-d9 review --message "<why>"', step: 'review' },
+      { label: 'once more', command: 'nemia retry r-d9 implement', step: 'implement' },
     ],
     'both offers are the bare command a person runs (`choicesOf`), never a paragraph under a button that says `once more`',
   );
@@ -613,7 +613,7 @@ test('a branch git cannot read is an `error` on its entry — the lesson not kno
   assert.equal(body.commands.length, 1, 'no result branch to ship or drop');
   assert.deepEqual(
     { ...body.commands[0], said: undefined },
-    { label: 'once more', command: 'nemia retry r-d3 implement', said: undefined },
+    { label: 'once more', command: 'nemia retry r-d3 implement', said: undefined, step: 'implement' },
     'implement may be tried again, with the command `nemia decide` prints for it',
   );
   const [retried] = body.commands;

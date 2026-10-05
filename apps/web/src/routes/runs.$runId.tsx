@@ -69,18 +69,18 @@ function RunPage() {
 }
 
 /**
- * One run, top to bottom: what is left to decide about its result, above who else it waits on, as `wf ls` prints the two; the runs it waits
- * on and a person's hold; its warning; its id and its star (`RunHeading`), with what it has cost, every step's tries, once a cost was
- * measured (`≥` where an ended attempt has none on it), what the same sessions read, by price, where every one of them measured it, what
- * it was started from, and, once it is over, what it holds on disk to give back as `wf prune` does; then Decide, between the banners and
- * the canvas, for a run with something to decide and never while it runs: an answer to give, or a try a person has asked for, since a
- * session the harness blocked is continued from the banner and Decide draws it only once its try is asked; the graph, the whole width of
- * the page, a step pressed on it inspected in the frame's bar; the brief, with the inbox card it was started from under it, as
- * `wf decide` puts it under the run's line; its facts; its timeline; and each step's section.
+ * One run, top to bottom: what is left to decide about its result, above who else it waits on, as the CLI's `ls` prints the two; the runs
+ * it waits on and a person's hold; its warning; its id and its star (`RunHeading`), with what it has cost, every step's tries, once a cost
+ * was measured (`≥` where an ended attempt has none on it), what the same sessions read, by price, where every one of them measured it,
+ * what it was started from, and, once it is over, what it holds on disk to give back as the CLI's `prune` does; then Decide, between the
+ * banners and the canvas, for a run with something to decide and never while it runs: an answer to give, or a try a person has asked for,
+ * since a session the harness blocked is continued from the banner and Decide draws it only once its try is asked; the graph, the whole
+ * width of the page, a step pressed on it inspected in the frame's bar; the brief, with the inbox card it was started from under it, as the
+ * CLI's `decide` puts it under the run's line; its facts; its timeline; and each step's section.
  *
  * Its facts: a folder run has no repository, base or branch, and names where its work is instead, the one thing a person needs to find what
  * it made; when it started, its first step filed, and the wait before, which a run started `--after` runs spends doing nothing; and, only
- * once `wf prune` removed its worktrees, the prune: the run is then read as it ended, and nothing of it can be tried again.
+ * once the CLI's `prune` removed its worktrees, the prune: the run is then read as it ended, and nothing of it can be tried again.
  */
 function Run({ run }: { run: RunDetail }) {
   const runCancelled = run.cancelledAt !== null;
@@ -174,9 +174,9 @@ function Run({ run }: { run: RunDetail }) {
 }
 
 /**
- * When `wf prune` removed a run's worktrees, how many and what they held, and what it kept — in `wf prune`'s words. And when `--artifacts`
- * removed its files, what that freed: the files then go from what is kept. One prune took both, or its files alone, or the files went
- * later than the worktrees, each at its own time.
+ * When the CLI's `prune` removed a run's worktrees, how many and what they held, and what it kept — in the CLI `prune`'s words. And when
+ * `--artifacts` removed its files, what that freed: the files then go from what is kept. One prune took both, or its files alone, or the
+ * files went later than the worktrees, each at its own time.
  */
 function Pruned({ pruned: { at, worktrees, artifacts } }: { pruned: NonNullable<RunDetail['pruned']> }) {
   const bytes = worktrees.reduce((sum, w) => sum + w.bytes, 0);
@@ -223,24 +223,24 @@ const deniedRow = (calls: readonly string[]): ReactNode => (
  * One step's section: its state, its spec, its check, what it is told, its facts, its files, then its gate or what it handed on.
  *
  * Its facts: a folder step's folder, copyable, where a git step's branch goes; its task; its gate, where it has one — a person's word files
- * what follows it, or, for the step that ends the run, the step itself; what the harness denied its current try, every call as a
- * permission rule names it, which is what its work may be short of; what its current try consumed, in `wf decide`'s words, `not measured`
- * where nobody counted and never 0; what its sessions read, by price, where anything measured it, the peak and a rebuilt cache marked; and
- * what every try has cost together, and of its cap where it has one, red once past it.
+ * what follows it, or, for the step that ends the run, the step itself; what the harness denied its current try, every call as a permission
+ * rule names it, which is what its work may be short of; what its current try consumed, in the CLI `decide`'s words, `not measured` where
+ * nobody counted and never 0; what its sessions read, by price, where anything measured it, the peak and a rebuilt cache marked; and what
+ * every try has cost together, and of its cap where it has one, red once past it.
  *
  * A folder step's files: what it left in its folder, which is the whole of what it made — the files its closeout named and the ones it
  * forgot to, each with its size, a text file readable in a tab, and what the api serves by no name, a directory or a link, by its path — so
  * *the folder is empty* is said of an empty folder and of nothing else. A folder the api could not read says so instead, where an empty
  * list would say the step made nothing when nobody could look. A git step's work is its branch, and has no such list.
  *
- * At its gate — waiting on you as `wf ls` asks it (`approve`), on a run nobody called off, and not sent back already (`gateOffered`) — the
- * step's policy drawn open (`StepPolicy`), then the gate, with what the step handed on, every field it declared, which is what a person
- * approves, beside Approve and Send back. An ending step's gate (`endsTheRun`) holds before the step is filed: it has handed nothing on,
- * and shows instead the work it would act on (`ActsOn`), the branch's standing and diff stat and each work step's closeout with its files,
- * since approving is what runs it. An ending that has already run — filed, aborted, retried — is at its gate for its own closeout, as any
- * gated step is. A send-back names the steps the package names (`sendBackTo`): the step itself once it has run, or the steps it waits on.
- * Once approved, under the step: when, and the words every step after the gate is handed — or, for the step that ends the run, what its own
- * approval filed and the terms it acts on.
+ * At its gate — waiting on you as the CLI's `ls` asks it (`approve`), on a run nobody called off, and not sent back already (`gateOffered`)
+ * — the step's policy drawn open (`StepPolicy`), then the gate, with what the step handed on, every field it declared, which is what a
+ * person approves, beside Approve and Send back. An ending step's gate (`endsTheRun`) holds before the step is filed: it has handed nothing
+ * on, and shows instead the work it would act on (`ActsOn`), the branch's standing and diff stat and each work step's closeout with its
+ * files, since approving is what runs it. An ending that has already run — filed, aborted, retried — is at its gate for its own closeout,
+ * as any gated step is. A send-back names the steps the package names (`sendBackTo`): the step itself once it has run, or the steps it
+ * waits on. Once approved, under the step: when, and the words every step after the gate is handed — or, for the step that ends the run,
+ * what its own approval filed and the terms it acts on.
  */
 function StepSection({ run, step, runCancelled }: { run: RunDetail; step: Step; runCancelled: boolean }) {
   const runId = run.id;
@@ -312,10 +312,10 @@ function StepSection({ run, step, runCancelled }: { run: RunDetail; step: Step; 
           {acts ? (
             <div className="grid items-start gap-4 lg:grid-cols-2">
               <ActsOn run={run} step={step} />
-              <Gate runId={runId} step={step.name} back={back} acts={acts} />
+              <Gate runId={runId} step={step.name} approveLine={step.commands.approve} back={back} acts={acts} />
             </div>
           ) : (
-            <Gate runId={runId} step={step.name} back={back} closeout={closeout} />
+            <Gate runId={runId} step={step.name} approveLine={step.commands.approve} back={back} closeout={closeout} />
           )}
         </>
       ) : (
@@ -361,8 +361,9 @@ function startedRow(run: RunDetail): ReactNode {
 }
 
 /**
- * What a run started `--after` runs still waits on, as `wf decide` says it for such a run and offers nothing else: `wf ls`'s word, what it
- * leaves a person to do, and each run it names, linked to its page where the store has it. Amber when one never ships without a person.
+ * What a run started `--after` runs still waits on, as the CLI's `decide` says it for such a run and offers nothing else: the CLI `ls`'s
+ * word, what it leaves a person to do, and each run it names, linked to its page where the store has it. Amber when one never ships without
+ * a person.
  */
 function WaitingOnRuns({ run }: { run: RunDetail }) {
   const { waiting } = run;
@@ -397,9 +398,9 @@ function WaitingOnRuns({ run }: { run: RunDetail }) {
 }
 
 /**
- * A person's hold on the run (`wf hold`), as `wf decide` says it: until which runs ship, what that means and how to lift it, and each run
- * it is held until, linked where it is there. In violet as the held chips are, and in amber once only a person lifts it. While it stands no
- * step offers an answer — the package refuses each — so this is the one thing on the page asked of anyone.
+ * A person's hold on the run (the CLI's `hold`), as the CLI's `decide` says it: until which runs ship, what that means and how to lift it,
+ * and each run it is held until, linked where it is there. In violet as the held chips are, and in amber once only a person lifts it. While
+ * it stands no step offers an answer — the package refuses each — so this is the one thing on the page asked of anyone.
  */
 function HeldUntil({ run }: { run: RunDetail }) {
   const { holding } = run;

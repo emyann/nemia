@@ -1,6 +1,6 @@
 /**
  * The words of what the last pass cost, beside the cap over the Factory's floor (`PassCost`, served with the ceilings):
- * `a pass takes 212 ms`, and the breakdown `wf up --stats` prints, as its title. Pure: the time and the time zone are handed in, the
+ * `a pass takes 212 ms`, and the breakdown the CLI's `up --stats` prints, as its title. Pure: the time and the time zone are handed in, the
  * browser's own on the page.
  */
 import type { PassCost, PassPhase } from './api';
@@ -23,7 +23,7 @@ export const passLine = (pass: Pick<PassCost, 'ms'>): string => `a pass takes ${
 
 /**
  * The last pass whole, a line each: when it ran and its totals, each phase with its time, calls, bytes and processes, each harness
- * observed, and what measuring it took — the breakdown `wf up --stats` prints.
+ * observed, and what measuring it took — the breakdown the CLI's `up --stats` prints.
  */
 export function passTitle(pass: PassCost, now: Date, timeZone?: string): string {
   const phases = PASS_PHASES.map((p) => {
@@ -40,6 +40,6 @@ export function passTitle(pass: PassCost, now: Date, timeZone?: string): string 
     `The daemon's last pass, at ${clockWord(new Date(pass.at), now, timeZone)}: ${msWord(pass.ms)} ms, ${plural(pass.records, 'run record')} read, ${bytesWord(pass.bytes)} read, ${plural(pass.spawned, 'process', 'processes')} started.`,
     ...phases,
     ...(harnesses.length ? ['Observed, by harness (at once, so their times overlap):', ...harnesses] : ['No harness was observed.']),
-    `Measuring it took ${msWord(pass.overheadMs)} ms. wf up --stats says the same.`,
+    `Measuring it took ${msWord(pass.overheadMs)} ms.`,
   ].join('\n');
 }

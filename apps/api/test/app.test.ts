@@ -6,7 +6,20 @@ import path from 'node:path';
 import { scratch } from './scratch.ts';
 import type { RunDetail } from '../src/detail/detail.ts';
 import { app } from '../src/app.ts';
-import { atWork, engine, list, filingsRead, runWith, runTokens, timeline, runStore, VERSION, type RunSummary } from 'agent-orchestrator';
+import {
+  atWork,
+  COMMANDS,
+  commandLine,
+  engine,
+  list,
+  filingsRead,
+  runWith,
+  runTokens,
+  timeline,
+  runStore,
+  VERSION,
+  type RunSummary,
+} from 'agent-orchestrator';
 import { claudeDetached, claudeOps } from 'agent-runtime/effect';
 import { Effect } from 'effect';
 import { DEFAULT_ROUNDS } from 'agent-orchestrator/workflow';
@@ -234,6 +247,7 @@ test('runs are read from the workflow store and summarized, with what each step 
           /** `t-1` is on the record and not in this engine's store: a fresh `WF_ROOT` has no tasks at all. */
           status: 'unknown',
           note: null,
+          roundDue: false,
           needs: null,
           blockedByHarness: false,
           waitingFor: null,
@@ -246,6 +260,7 @@ test('runs are read from the workflow store and summarized, with what each step 
           branch: null,
           status: 'waiting',
           note: null,
+          roundDue: false,
           needs: null,
           blockedByHarness: false,
           waitingFor: null,
@@ -351,6 +366,7 @@ test("a run in full: the brief, each step's spec and prose, what it was told, an
     {
       id: 'r-2',
       brief: 'Add a cache\n\nKeep it small.',
+      decide: 'nemia decide r-2',
       repo: '/code/app',
       place: 'git',
       work: null,
@@ -426,6 +442,8 @@ test("a run in full: the brief, each step's spec and prose, what it was told, an
     files: [],
     filesError: null,
     note: null,
+    roundDue: false,
+    commands: { approve: 'nemia approve r-2 implement', retry: 'nemia retry r-2 implement', say: 'nemia say r-2 implement' },
     /** Its question, off its closeout; no session the harness blocked, so no last line; nothing asked of it yet. */
     needs: 'Which database?',
     blockedByHarness: false,
@@ -494,6 +512,8 @@ test("a run in full: the brief, each step's spec and prose, what it was told, an
       files: [],
       filesError: null,
       note: null,
+      roundDue: false,
+      commands: { approve: 'nemia approve r-2 review', retry: 'nemia retry r-2 review', say: 'nemia say r-2 review' },
       needs: null,
       blockedByHarness: false,
       waitingFor: null,
@@ -606,6 +626,8 @@ test('a run whose workflow folder is gone still answers, from its record', async
       files: [],
       filesError: null,
       note: null,
+      roundDue: false,
+      commands: { approve: 'nemia approve r-3 implement', retry: 'nemia retry r-3 implement', say: 'nemia say r-3 implement' },
       needs: 'Which database?',
       blockedByHarness: false,
       waitingFor: null,
@@ -646,6 +668,8 @@ test('a run whose workflow folder is gone still answers, from its record', async
       files: [],
       filesError: null,
       note: null,
+      roundDue: false,
+      commands: { approve: 'nemia approve r-3 review', retry: 'nemia retry r-3 review', say: 'nemia say r-3 review' },
       needs: null,
       blockedByHarness: false,
       waitingFor: null,
@@ -724,6 +748,8 @@ test('a folder changed since the run started keeps the steps that ran, and names
     files: [],
     filesError: null,
     note: null,
+    roundDue: false,
+    commands: { approve: 'nemia approve r-6 original', retry: 'nemia retry r-6 original', say: 'nemia say r-6 original' },
     needs: 'Which database?',
     blockedByHarness: false,
     waitingFor: null,
@@ -1086,7 +1112,7 @@ test('each step says how many attempts it has had, when the latest began, and ho
 
   assert.deepEqual(
     Object.keys((await listed('r-7')).steps[0]),
-    ['name', 'taskId', 'branch', 'status', 'note', 'needs', 'blockedByHarness', 'waitingFor', 'approve', 'denied'],
+    ['name', 'taskId', 'branch', 'status', 'note', 'roundDue', 'needs', 'blockedByHarness', 'waitingFor', 'approve', 'denied'],
     'the list carries the note `nemia ls` prints beside a step, and what a person has to know to act on it',
   );
   assert.equal((await listed('r-7')).steps[0].note, null, 'no note for a step on its first try');
@@ -1551,10 +1577,16 @@ function askFor(id: string, name: string, ask: object) {
 }
 
 /** A step row as the list and the detail both carry it. */
-type Row = Pick<RunSummary['steps'][number], 'name' | 'status' | 'branch' | 'note'>;
+type Row = Pick<RunSummary['steps'][number], 'name' | 'status' | 'branch' | 'note' | 'roundDue'>;
 
-/** A step row as `list` has it: a note only where it prints one. */
-const asListed = ({ name, status, branch, note }: Row) => ({ name, status, branch, ...(note === null ? {} : { note }) });
+/** A step row as `list` has it: a note only where it prints one, and `roundDue` only where a round is due. */
+const asListed = ({ name, status, branch, note, roundDue }: Row) => ({
+  name,
+  status,
+  branch,
+  ...(note === null ? {} : { note }),
+  ...(roundDue ? { roundDue } : {}),
+});
 
 type Judgement = [
   id: string,
@@ -1617,6 +1649,38 @@ test('a loop out of rounds reads `rounds exhausted`, waits on you, and does not 
       'a person asked for round 4: the next tick files it, and nobody is waited on',
     ],
   ]);
+  assert.deepEqual(
+    (await listed('r-31')).steps.map((s) => [s.name, s.roundDue]),
+    [
+      ['implement', false],
+      ['review', true],
+    ],
+    'the round asked is a fact beside the note, never read off its words',
+  );
+});
+
+test("a run's detail answers its decide line, and each step's approve, retry and say lines, built off the command table", async () => {
+  seedLoop('r-34', 1, true);
+  const entry = (name: string) => COMMANDS.find((c) => c.name === name)!;
+  const run = await detailOf('r-34');
+  assert.equal(run.decide, commandLine(entry('decide'), { runId: 'r-34' }));
+  assert.equal(run.decide, 'nemia decide r-34');
+  assert.deepEqual(
+    run.steps.map((s) => [s.name, s.commands]),
+    ['implement', 'review'].map((step) => [
+      step,
+      {
+        approve: commandLine(entry('approve'), { runId: 'r-34', step }),
+        retry: commandLine(entry('retry'), { runId: 'r-34', step }),
+        say: commandLine(entry('say'), { runId: 'r-34', step }),
+      },
+    ]),
+  );
+  assert.deepEqual(run.steps[1].commands, {
+    approve: 'nemia approve r-34 review',
+    retry: 'nemia retry r-34 review',
+    say: 'nemia say r-34 review',
+  });
 });
 
 test('a round the loop asked for, and a try a person asked for, read as the tick has them: a note beside the step, and the run moving', async () => {

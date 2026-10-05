@@ -1,19 +1,20 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { AgentForm } from '../components/AgentForm';
 import { AgentRefused, RouteLink } from '../components/AgentParts';
-import { AgentRefusal, createAgent, keyFormQuery, type AgentDraft } from '../lib/api';
+import { AgentRefusal, createAgent, keyFormQuery, storeQuery, type AgentDraft } from '../lib/api';
 import { invalidateAgents } from '../lib/agentWrites';
 
 /** The New agent page, at /agents/new: `agents_` draws it on its own, not inside the Agents page, which has no outlet for it. */
 export const Route = createFileRoute('/agents_/new')({
-  loader: ({ context }) => context.queryClient.prefetchQuery(keyFormQuery),
+  loader: ({ context }) => Promise.all([context.queryClient.ensureQueryData(storeQuery), context.queryClient.prefetchQuery(keyFormQuery)]),
   component: NewAgentPage,
 });
 
 /** A new agent of yours: the form, empty, and a Create that writes `agents/<name>.md` and opens its page. */
 function NewAgentPage() {
   const { data: keyForm } = useQuery(keyFormQuery);
+  const { data: store } = useSuspenseQuery(storeQuery);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const create = useMutation({
@@ -31,8 +32,8 @@ function NewAgentPage() {
       <header className="space-y-1">
         <h1 className="text-base font-semibold">New agent</h1>
         <p className="text-sm text-neutral-500">
-          Written to <code className="font-mono text-xs">~/.agent-workflows/workflows/agents/&lt;name&gt;.md</code>, beside your workflows.
-          A node of one of them takes it with <code className="font-mono text-xs">agent: &lt;name&gt;</code>.
+          Written to <code className="font-mono text-xs">{store.agents}/&lt;name&gt;.md</code>, beside your workflows. A node of one of them
+          takes it with <code className="font-mono text-xs">agent: &lt;name&gt;</code>.
         </p>
       </header>
       <AgentForm

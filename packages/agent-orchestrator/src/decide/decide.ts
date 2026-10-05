@@ -294,12 +294,13 @@ export type Offer = { step: string; command: string; said: string };
  * A command `nemia decide` offers, and runs none of: ship it, drop it, read it for a run worked on its base branch, forget it for a folder
  * run, each once-more (`nemia retry`, `nemia round`) and accept with the line it prints it in, and for a step waiting at its gate on you,
  * the approval (`nemia approve`) and a send-back (`nemia retry --message`) for each step it names. `said` is null where the label is all it
- * says.
+ * says; `step`, the step it acts on, null for a command on the whole run.
  */
 export type DecideCommand = {
   label: 'ship it' | 'drop it' | 'read it' | 'once more' | 'accept' | 'approve' | 'send back' | 'forget it';
   command: string;
   said: string | null;
+  step: string | null;
 };
 
 /** The label of an offer's command: an acceptance, a send-back with its objection, or once more. */
@@ -313,11 +314,17 @@ function gateChoices(steps: readonly Workflow[], run: Run, waiting: readonly str
     .flatMap((step): DecideCommand[] => {
       const approve = `nemia approve ${run.id} ${step.name}`;
       return [
-        { label: 'approve', command: approve, said: `${step.name} waits at its gate — with words: ${approve} --message "<words>"` },
+        {
+          label: 'approve',
+          command: approve,
+          said: `${step.name} waits at its gate — with words: ${approve} --message "<words>"`,
+          step: step.name,
+        },
         ...sendBackTo(step, run).map((name): DecideCommand => ({
           label: 'send back',
           command: `nemia retry ${run.id} ${name} --message "<objection>"`,
           said: null,
+          step: name,
         })),
       ];
     });
@@ -335,20 +342,20 @@ function gateChoices(steps: readonly Workflow[], run: Run, waiting: readonly str
 export function choicesOf(steps: readonly Workflow[], run: Run, d: Decision, offers: readonly Offer[]): DecideCommand[] {
   if (d.kind !== 'awaiting') return [];
   const once = [
-    ...offers.map(({ command, said }): DecideCommand => ({ label: labelOf(command), command, said })),
+    ...offers.map(({ step, command, said }): DecideCommand => ({ label: labelOf(command), command, said, step })),
     ...gateChoices(steps, run, d.awaitingApproval),
   ];
   if (!isGitRun(run))
-    return [...once, { label: 'forget it', command: `nemia rm ${run.id}`, said: 'forgets the run with its folders and files' }];
+    return [...once, { label: 'forget it', command: `nemia rm ${run.id}`, said: 'forgets the run with its folders and files', step: null }];
   if (d.direct) {
     const said = `worked directly on ${run.branch}; nothing to merge; the base was ${run.baseRef}`;
-    return [...once, { label: 'read it', command: `git -C ${run.repo} diff ${run.baseRef}...${run.branch}`, said }];
+    return [...once, { label: 'read it', command: `git -C ${run.repo} diff ${run.baseRef}...${run.branch}`, said, step: null }];
   }
   const first = merges(steps) ? undefined : d.branches[0];
   if (!first) return once;
   return [
     ...once,
-    { label: 'ship it', command: `git -C ${run.repo} merge --no-ff ${first}`, said: null },
-    { label: 'drop it', command: `git -C ${run.repo} branch -D ${d.branches.join(' ')}`, said: null },
+    { label: 'ship it', command: `git -C ${run.repo} merge --no-ff ${first}`, said: null, step: null },
+    { label: 'drop it', command: `git -C ${run.repo} branch -D ${d.branches.join(' ')}`, said: null, step: null },
   ];
 }

@@ -360,7 +360,20 @@ test('GET /api/factories serves the default factory first, then each factory by 
       body.map((f) => f.name),
       ['default', 'broken', 'hired', 'pair', 'solo'],
     );
-    assert.deepEqual(body[0], { name: 'default', default: true, repos: [own], workflows: null, hires: {}, error: null });
+    const commandsOf = (name: string) => ({
+      attach: `nemia factory attach ${name} <workflow>`,
+      rm: `nemia factory rm ${name}`,
+      add: `nemia factory add ${name} --repo <path>`,
+    });
+    assert.deepEqual(body[0], {
+      name: 'default',
+      default: true,
+      repos: [own],
+      workflows: null,
+      hires: {},
+      error: null,
+      commands: commandsOf('default'),
+    });
     assert.deepEqual(body[2], {
       name: 'hired',
       default: false,
@@ -368,7 +381,9 @@ test('GET /api/factories serves the default factory first, then each factory by 
       workflows: ['alpha'],
       hires: { 'alpha/implement': 'ada' },
       error: null,
+      commands: commandsOf('hired'),
     });
+    assert.deepEqual(body[1].commands, commandsOf('broken'), 'a file that does not read is filed again by the same lines');
     assert.deepEqual(body[3].repos, [repoR, repoS]);
     assert.equal(body[1].default, false);
     assert.match(body[1].error ?? '', /is not JSON/);

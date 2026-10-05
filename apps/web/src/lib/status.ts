@@ -1,15 +1,14 @@
 /**
  * What a step's status means for the person looking at it.
  *
- * The words are `wf ls`'s — what the run established, not only what the engine settled — and the board
- * shows them as they are; this only chooses the colour. `cancelled` is a fact about the run rather than
- * the step: a step that has not started on a run somebody called off never will, and a step the
- * cancellation stopped reads `stopped`.
+ * The words are the CLI `ls`'s — what the run established, not only what the engine settled — and the board shows them as they are; this
+ * only chooses the colour. `cancelled` is a fact about the run rather than the step: a step that has not started on a run somebody called
+ * off never will, and a step the cancellation stopped reads `stopped`.
  *
- * `held` is a fact about the run too: a person holds it until other runs ship (`wf hold`), so a step not filed will not be until the hold
- * lifts, and a step at a human gate asks nothing of anyone while it stands — every verb that would answer it is refused. The words stay
- * `wf ls`'s (`awaiting approval`, `succeeded · BLOCKED`); only the colour and the meaning say the run is held. A step at work, asking
- * through its harness (`needs-human`), checking, or settled keeps its state: what is in flight runs on, and a verdict is a verdict.
+ * `held` is a fact about the run too: a person holds it until other runs ship (the CLI's `hold`), so a step not filed will not be until the
+ * hold lifts, and a step at a human gate asks nothing of anyone while it stands — every verb that would answer it is refused. The words
+ * stay the CLI `ls`'s (`awaiting approval`, `succeeded · BLOCKED`); only the colour and the meaning say the run is held. A step at work,
+ * asking through its harness (`needs-human`), checking, or settled keeps its state: what is in flight runs on, and a verdict is a verdict.
  */
 export type StepState =
   | 'working'
@@ -56,14 +55,14 @@ const HELD_BY_A_HOLD: ReadonlySet<StepState> = new Set([
 
 /**
  * A step's state from its word alone, and whether the run was called off. `succeeded · BLOCKED` is `blocked`: the session ended cleanly,
- * and the step waits on a person. `over budget` comes with the amounts — `over budget $4.25 of $3`, or
- * `over budget — implement $4.25 of $3` on a looping step whose round would file one. The engine's `succeeded`, a session that ended, is at
- * most its own word, `unverified`; so is `input-required`, a task held open whose turn signed and waits for a person's word with nothing
- * running, whose word beside it says which (`input-required · BLOCKED`). `waiting on a-1x2y (cancelled), b-3z4w`, a root of a run started
- * `--after` runs that have not shipped, and `pending` are not filed, as `waiting` is. `waiting for a run slot (2 of 2 in flight)`, and the
- * feed's `waiting for a run slot` without the count, is a root of a run the cap on runs in flight holds: `waiting-for-slot`. Any other word
- * — `running (working)`, `working (quiescent)`, `starting`, `between attempts`, or one `wf ls` has that this does not know — is `working`:
- * a step the board cannot name is shown as still going, never as done or as needing you.
+ * and the step waits on a person. `over budget` comes with the amounts — `over budget $4.25 of $3`, or `over budget — implement $4.25 of
+ * $3` on a looping step whose round would file one. The engine's `succeeded`, a session that ended, is at most its own word, `unverified`;
+ * so is `input-required`, a task held open whose turn signed and waits for a person's word with nothing running, whose word beside it says
+ * which (`input-required · BLOCKED`). `waiting on a-1x2y (cancelled), b-3z4w`, a root of a run started `--after` runs that have not
+ * shipped, and `pending` are not filed, as `waiting` is. `waiting for a run slot (2 of 2 in flight)`, and the feed's `waiting for a run
+ * slot` without the count, is a root of a run the cap on runs in flight holds: `waiting-for-slot`. Any other word — `running (working)`,
+ * `working (quiescent)`, `starting`, `between attempts`, or the CLI's `ls` has that this does not know — is `working`: a step the board
+ * cannot name is shown as still going, never as done or as needing you.
  */
 function wordState(status: string, runCancelled: boolean): StepState {
   const [word = '', said] = status.split(' · ');
@@ -95,11 +94,11 @@ function wordState(status: string, runCancelled: boolean): StepState {
 export const satisfiesAfter = (state: StepState): boolean => state === 'verified' || state === 'unverified';
 
 /**
- * A human gate: final, and the run goes no further until a person decides — a step that signed off blocked, a step waiting at its gate
- * for an approval (`wf approve`), a loop out of rounds (`wf round`), or a step past its budget, over it or ended at it (`--budget`), whose
- * way on is a person's word to spend more. What `wf decide` calls a blocked outcome, on the step's own word. Not a refused check nor an
- * unsigned step, which wait on you too but are work to try again (`wf retry`). On a run somebody called off, nobody is waiting for the
- * answer any more.
+ * A human gate: final, and the run goes no further until a person decides — a step that signed off blocked, a step waiting at its gate for
+ * an approval (the CLI's `approve`), a loop out of rounds (the CLI's `round`), or a step past its budget, over it or ended at it
+ * (`--budget`), whose way on is a person's word to spend more. What the CLI's `decide` calls a blocked outcome, on the step's own word. Not
+ * a refused check nor an unsigned step, which wait on you too but are work to try again (the CLI's `retry`). On a run somebody called off,
+ * nobody is waiting for the answer any more.
  */
 export const isGate = (state: StepState, runCancelled: boolean): boolean =>
   (state === 'blocked' ||
@@ -118,13 +117,13 @@ export const stateMeaning: Record<StepState, string> = {
   unverified: 'unverified: it signed off and has no check, so only its own word says it worked',
   blocked: 'blocked: it signed off without finishing, and needs a person',
   'awaiting-approval':
-    'awaiting approval: it signed off at its gate, and nothing after it is filed until a person approves it — wf approve — or sends it back — wf retry --message',
+    'awaiting approval: it signed off at its gate, and nothing after it is filed until a person approves it, or sends it back with words for its next try',
   exhausted:
-    'rounds exhausted: the reviewer asked for another round on the last one rounds: allows; a person decides — wf round for another, or wf accept to go on with what is there',
+    'rounds exhausted: the reviewer asked for another round on the last one rounds: allows; a person decides — another round, or accepting what is there to go on with it',
   'over-budget':
-    'over budget: its tries have cost its budget: or more, and the run spends nothing more on it until a person raises the cap — wf retry --budget, wf round --budget',
+    'over budget: its tries have cost its budget: or more, and the run spends nothing more on it until a person raises the cap on a try or a round',
   'budget-exhausted':
-    'budget exhausted: its harness ended its session at its budget:, and nothing more is filed for it until a person raises the cap — wf retry --budget',
+    'budget exhausted: its harness ended its session at its budget:, and nothing more is filed for it until a person raises the cap on a try',
   unsigned: 'unsigned: it ended without the closeout it was asked for',
   denied:
     "denied: its harness denied its try a call, and the step says denials: fail — nothing after it is filed until a person tries it again, and a new run's allowedTools: is where the call is let through",
@@ -133,7 +132,7 @@ export const stateMeaning: Record<StepState, string> = {
   waiting: 'waiting: not filed yet',
   'waiting-for-slot':
     'waiting for a run slot: not filed yet — the cap on runs in flight (WF_MAX_RUNS) holds the run, and the tick files it once a run in flight settles, oldest held first',
-  held: 'held: a person holds the run until other runs ship (wf hold), so nothing of it is filed and nothing is asked of you until the hold lifts',
+  held: 'held: a person holds the run until other runs ship, so nothing of it is filed and nothing is asked of you until the hold lifts',
   cancelled: 'cancelled: the run was called off',
   unreadable:
     "unreadable: its task's journal holds an entry no runtime wrote, so the run is not judged and the tick does not advance it until the journal reads again — the run says which entry",

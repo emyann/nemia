@@ -205,7 +205,7 @@ export function AgentForm({
             </Button>
           )}
           <p className="text-xs text-muted-foreground">
-            A save changes what a later <code>wf start</code> freezes. A run already started keeps the agent it froze.
+            A save changes what a run started later freezes. A run already started keeps the agent it froze.
           </p>
           {footer}
         </div>

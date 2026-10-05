@@ -22,7 +22,7 @@ export type RunStatus = 'running' | 'succeeded' | 'failed' | 'cancelled';
 /** Decodes a `RunStatus`. */
 export const RunStatusSchema = Schema.Literals(['running', 'succeeded', 'failed', 'cancelled']) satisfies Schema.Schema<RunStatus>;
 
-/** Mirrors `RunStoppedOn` in apps/api/src/runs/judged.ts: what stopped a `failed` run in which no step broke, as `wf decide` says it. */
+/** Mirrors `RunStoppedOn` in apps/api/src/runs/judged.ts: what stopped a `failed` run no step broke, as the CLI's `decide` says it. */
 export type RunStoppedOn = 'awaiting approval' | 'blocked';
 
 /** Decodes a `RunStoppedOn`. */
@@ -38,7 +38,8 @@ export const RunStoppedOnSchema = Schema.Literals(['awaiting approval', 'blocked
  * before it is filed; and `onto` the base branch the run's result is on its way to: what the Factory's card answers the gate with, off the
  * list.
  *
- * `said` is the whole of what `wf ls` prints after `→ to decide:`, and `command` the command at the end of it. The board runs neither.
+ * `said` is the whole of what the CLI's `ls` prints after `→ to decide:`, and `command` the command at the end of it. The board runs
+ * neither.
  */
 export type RunToDecide =
   | {
@@ -131,8 +132,8 @@ export const RunTokensSchema = Schema.Struct({
 
 /**
  * Mirrors `RunWaiting` in apps/api/src/runs/judged.ts: what a run started `--after` still waits on, in the package's words. `runs` are each
- * run not shipped, and why one never will without a person (`missing`, `cancelledAt`, `gone`); `word` is what `wf ls` prints on its roots —
- * `waiting on a-1x2y (cancelled)` — and `advice` the line `wf decide` prints under it; `onYou` whether a person has to act.
+ * run not shipped, and why one never will without a person (`missing`, `cancelledAt`, `gone`); `word` is what the CLI's `ls` prints on its
+ * roots — `waiting on a-1x2y (cancelled)` — and `advice` the line the CLI's `decide` prints under it; `onYou` whether a person has to act.
  */
 export type RunWaiting = {
   runs: Array<{ run: string; missing: boolean; cancelledAt: string | null; gone: string[] }>;
@@ -154,11 +155,12 @@ export const RunWaitingSchema = Schema.Struct({
 }) satisfies Schema.Schema<RunWaiting>;
 
 /**
- * Mirrors `RunHolding` in apps/api/src/runs/judged.ts: a person's hold on a run (`wf hold <run> --until <run>`), in the package's words.
- * `at` is when it was put; `runs` each run it names that has not shipped, and why one never will without a person — or, in the moment every
- * one has shipped and the next tick has not yet lifted the hold, each of them `shipped`. `word` is what `wf ls` prints
- * (`held until a-1x2y ships`), `advice` the line `wf decide` prints under it, which names `wf hold <run> --off`; `onYou` whether only a
- * person's hand lifts it. While it stands no step waits on you and nothing is offered: every verb that would release work is refused.
+ * Mirrors `RunHolding` in apps/api/src/runs/judged.ts: a person's hold on a run (the CLI's `hold <run> --until <run>`), in the package's
+ * words. `at` is when it was put; `runs` each run it names that has not shipped, and why one never will without a person — or, in the
+ * moment every one has shipped and the next tick has not yet lifted the hold, each of them `shipped`. `word` is what the CLI's `ls` prints
+ * (`held until a-1x2y ships`), `advice` the line the CLI's `decide` prints under it, which names the CLI's `hold <run> --off`; `onYou`
+ * whether only a person's hand lifts it. While it stands no step waits on you and nothing is offered: every verb that would release work is
+ * refused.
  */
 export type RunHolding = {
   at: string;
@@ -192,10 +194,10 @@ export const RunHoldingSchema = Schema.Struct({
  * `blockedByHarness`: whether the harness marked its session blocked while it gave no closeout — the engine's `needs-human`. `waitingFor`:
  * what that harness says the session waits for, in the package's words — `words` the wait, `advice` what a person does about it — null
  * where the harness said nothing, and on the list as on the detail, since it costs no read of its own. What that session said last is on a
- * run's detail alone (`lastLine`): the list reads no conversation. `approve`: what `wf ls` asks of you for a step waiting at its gate,
- * `approve plan`; null for any other step, and for one already sent back. `denied`: what the harness denied the step's current try, `calls`
- * each as a permission rule names it (`Skill(look)`) and `words` the line `wf ls` says (`denied: Skill(look), Bash(pytest)`); null for a
- * step denied nothing, and for one whose harness cannot say.
+ * run's detail alone (`lastLine`): the list reads no conversation. `approve`: what the CLI's `ls` asks of you for a step waiting at its
+ * gate, `approve plan`; null for any other step, and for one already sent back. `denied`: what the harness denied the step's current try,
+ * `calls` each as a permission rule names it (`Skill(look)`) and `words` the line the CLI's `ls` says (`denied: Skill(look),
+ * Bash(pytest)`); null for a step denied nothing, and for one whose harness cannot say.
  */
 export type StepNeeds = {
   needs: string | null;

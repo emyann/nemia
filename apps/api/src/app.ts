@@ -17,7 +17,7 @@ import { runs } from './runs/runs.ts';
 import { stats } from './stats/stats.ts';
 import { steps } from './steps/index.ts';
 import { engineRead, Engine, StoreRoot } from './store.ts';
-import { builder, workflows } from './workflows/index.ts';
+import { builder, workflows, yours } from './workflows/index.ts';
 
 /**
  * The status each kind of the orchestrator's refusal answers, whichever route it came through: what is asked of is not there (404), the
@@ -69,6 +69,7 @@ export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Servic
  * - workflows/workflows.ts — a repository's workflows, listed, and a run of one started, the board's first write, or of an inbox card.
  * - workflows/builder.ts — a folder of yours built on the board: made with a first step, and put back from its steps with the schemas
  *   pasted for them; two writes, guarded as a start is, each through the package's entry `workflows write`.
+ * - workflows/yours.ts — your store's folders under the store root, and the line that files a factory in it.
  * - agents/agents.ts — the agents beside each place workflows are listed from, each with the nodes that name it; one of yours made, put
  *   back or removed; three writes, guarded as a start is, through the package's entries `agents write` and `agents remove`.
  * - custom/custom.ts — a person's custom instructions for an agent, by its name, read through `nemia agents custom`'s entry; written and
@@ -124,6 +125,7 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     .route('/', factories)
     .route('/', workflows)
     .route('/', builder)
+    .route('/', yours)
     .route('/', agents)
     .route('/', customInstructions)
     .route('/', skills)

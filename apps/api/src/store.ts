@@ -1,10 +1,26 @@
 /**
  * The store as every run route reads it: the engine an app reads through and the store's root, as services (`Engine`, `StoreRoot`); every
- * task's view, a run found by its id, and the task a step's routes read. What the board's reading of a run stands on — the views of its
- * tasks, its workflow and steps, the feed's filing times — is the package's (`viewsFor`, `workflowsOf`, `filedTimes`).
+ * task's view, a run found by its id, one run judged (`judgedOn`), and the task a step's routes read. What the board's reading of a run
+ * stands on — the views of its tasks, its workflow and steps, the feed's filing times — is the package's (`viewsFor`, `workflowsOf`,
+ * `filedTimes`).
  */
 import { Context, Effect, Layer } from 'effect';
-import { asked, engine, HOME, runStore, stepNames, type Unreadable, type Views, workflowsOf } from 'agent-orchestrator';
+import {
+  asked,
+  engine,
+  HOME,
+  judge,
+  judgedUnlessUnreadable,
+  runStore,
+  runWith,
+  standingsOf,
+  stepNames,
+  type Unreadable,
+  viewsFor,
+  type Views,
+  workflowsOf,
+} from 'agent-orchestrator';
+import type { Workflow } from 'agent-orchestrator/workflow';
 import { isGitRun, type Run } from 'agent-orchestrator/run';
 
 /**
@@ -78,3 +94,19 @@ export function taskOfStep(id: string, step: string, home: string): { run: Run; 
   }
   return { run, taskId: run.steps[step]?.taskId ?? null };
 }
+
+/**
+ * The views of `run`'s tasks over `e`, and what the run is judged as off them, its steps `names` of `workflows`: or, when a task it reads
+ * does not, why it is not judged (`judgedUnlessUnreadable`). Rejects with what the engine's reads die of.
+ */
+export const judgedOn = (e: Engine['Service'], run: Run, names: readonly string[], workflows: readonly Workflow[] | null) =>
+  runWith(
+    e,
+    Effect.gen(function* () {
+      const { views, reader, unreadable } = yield* viewsFor(e, [run]);
+      const standings = (status: Parameters<typeof standingsOf>[2], steps: Parameters<typeof standingsOf>[1]) =>
+        standingsOf(run, steps, status);
+      const read = yield* judgedUnlessUnreadable(run, unreadable, () => judge(run, names, workflows, views, { reader, standings }));
+      return { views, read };
+    }),
+  );

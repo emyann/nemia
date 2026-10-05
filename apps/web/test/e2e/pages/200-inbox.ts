@@ -548,9 +548,9 @@ export default {
       await idle(empty);
       await expectVisible(
         empty.locator('[data-empty]', {
-          hasText: 'The inbox is empty. File an idea in the box above, or from the command line: wf inbox add "<idea>".',
+          hasText: 'The inbox is empty. File an idea in the box above, or from the command line.',
         }),
-        'an empty inbox says how to file a card, here and with wf inbox add',
+        'an empty inbox says where to file a card, here or from the command line',
       );
       await expectVisible(empty.locator('form[aria-label="File a card"]'), 'and still has the box');
       await settled(empty);

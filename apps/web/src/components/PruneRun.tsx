@@ -13,8 +13,8 @@ import { Refusal } from './Ask';
 /**
  * Prune, on a finished git run's page: the button opens a popover with a choice of what to give back — its worktrees; its files too; and,
  * for a run nobody decided, the same though its branch becomes the only copy of its work — and the prune is asked twice, the second time in
- * words that say what goes. The api prunes through the package's `prune`, as `wf prune <run> --yes` does, and refuses in its words, shown
- * here. Nothing is offered where the package would prune nothing (`prunable`).
+ * words that say what goes. The api prunes through the package's `prune`, as the CLI's `prune <run> --yes` does, and refuses in its words,
+ * shown here. Nothing is offered where the package would prune nothing (`prunable`).
  */
 export function PruneRun({ run }: { run: RunDetail }) {
   if (!prunable(run)) return null;
@@ -33,9 +33,9 @@ export function PruneRun({ run }: { run: RunDetail }) {
 }
 
 /**
- * Whether anybody decided the run, read off the api's decision (`awaitingOf`) — the package's own reading, which `wf prune` refuses without
- * `--unmerged` — before anything is offered. The same query as the Decide section's, under the same key, so a page that shows the decision
- * reads nothing more; a run called off has nothing to decide, and is not asked. A decision read for an earlier state of the run
+ * Whether anybody decided the run, read off the api's decision (`awaitingOf`) — the package's own reading, which the CLI's `prune` refuses
+ * without `--unmerged` — before anything is offered. The same query as the Decide section's, under the same key, so a page that shows the
+ * decision reads nothing more; a run called off has nothing to decide, and is not asked. A decision read for an earlier state of the run
  * (`keepPreviousData`) is not taken for this one's.
  */
 function PruneRead({ run, onClose }: { run: RunDetail; onClose: () => void }) {
@@ -66,7 +66,7 @@ function PruneRead({ run, onClose }: { run: RunDetail; onClose: () => void }) {
 
 /**
  * The choice and the two presses. The run is read again once pruned, its record and the list each alone (`exact`), as an approval reads
- * them; the popover closes, unless `wf prune` kept something it could not remove, which its lines then say.
+ * them; the popover closes, unless the CLI's `prune` kept something it could not remove, which its lines then say.
  */
 function PruneForm({ id, offer, onClose }: { id: string; offer: PruneOffer; onClose: () => void }) {
   const [key, setKey] = useState<PruneChoice['key']>(firstChoice(offer).key);

@@ -1,11 +1,11 @@
 /**
- * A person's ask of a step's next try, as the board's rows make it: `wf retry`'s ways, the button and box every ask is made with, the
+ * A person's ask of a step's next try, as the board's rows make it: the CLI `retry`'s ways, the button and box every ask is made with, the
  * ask itself through the api (`useAsk`), and the api's refusal of it, verbatim (`Refusal`).
  */
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { askTry, type QuestionAnswer, type RetryMode } from '../lib/api';
 
-/** Each of `wf retry`'s ways, as an answer offers it. */
+/** Each of the CLI `retry`'s ways, as an answer offers it. */
 export const MODES: Record<RetryMode, string> = {
   nudge: 'continue its session',
   fresh: 'a new session',

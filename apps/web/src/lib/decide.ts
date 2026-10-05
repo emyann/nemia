@@ -1,6 +1,6 @@
 /**
  * What the board works out from a run's decision, without React: when to ask for it, the Factory card's line, a group's
- * bar, and what a line of a diff is. Pure. The words themselves are the api's, which are `wf decide`'s.
+ * bar, and what a line of a diff is. Pure. The words themselves are the api's, which are the CLI `decide`'s.
  */
 import type { Decidable, DecideCommand, Group, RunDecision, RunSummary, Touched } from './api';
 import { stepState } from './status.ts';
@@ -43,14 +43,14 @@ export const decisionStamp = (
   ]);
 
 /**
- * The Factory card's line for a run waiting on you: `touched 2 packages · +979 −12`. Every group the branches it reads
- * touched, counted once; the lines of every file, each file counted once; and how many branches git could not read.
+ * The Factory card's line for a run waiting on you: `touched 2 packages · +979 −12`. Every group the branches it reads touched, counted
+ * once; the lines of every file, each file counted once; and how many branches git could not read.
  *
- * Once per file, not once per branch: each branch is diffed against the run's base, and a follower in a worktree of its own starts from
- * its parent's branch, so a fan-out's result branches each carry the parent's changes, which a sum would count once per branch. A file on
+ * Once per file, not once per branch: each branch is diffed against the run's base, and a follower in a worktree of its own starts from its
+ * parent's branch, so a fan-out's result branches each carry the parent's changes, which a sum would count once per branch. A file on
  * several branches counts the change with the most lines among them — the parent's plus a follower's own on top of it. Two siblings that
- * each changed one file apart count the larger alone: the card is a line for triage, and `wf decide`, which prints each branch on its own,
- * is where the whole of it is. A binary file adds no lines.
+ * each changed one file apart count the larger alone: the card is a line for triage, and the CLI's `decide`, which prints each branch on
+ * its own, is where the whole of it is. A binary file adds no lines.
  */
 export function touchedSummary(touched: readonly Touched[]): string {
   const read = touched.flatMap((t) => ('error' in t.radius ? [] : [t.radius]));
@@ -109,15 +109,8 @@ export function changeOf(touched: Touched | undefined, file: string): { added: n
 }
 
 /**
- * The looping step an `accept` command of this run accepts — `nemia accept <run> <step> --message "<why>"`, the bare command of
- * `nemia decide`'s offer, as the api hands it over — or null for any other command, or one of another run. The board presses that one
- * itself.
+ * The looping step an `accept` command accepts, as the api names it beside the command (`step`), or null for any other command. The board
+ * presses that one itself.
  */
-export function acceptStepOf(command: Pick<DecideCommand, 'label' | 'command'>, runId: string): string | null {
-  if (command.label !== 'accept') return null;
-  const prefix = `nemia accept ${runId} `;
-  const suffix = ' --message "<why>"';
-  if (!command.command.startsWith(prefix) || !command.command.endsWith(suffix)) return null;
-  const step = command.command.slice(prefix.length, -suffix.length);
-  return /^\S+$/.test(step) ? step : null;
-}
+export const acceptStepOf = (command: Pick<DecideCommand, 'label' | 'step'>): string | null =>
+  command.label === 'accept' ? command.step : null;

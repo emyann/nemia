@@ -31,15 +31,12 @@ import {
   bare,
   filedTimes,
   judgedSteps,
-  judgedUnlessUnreadable,
   stepNames,
   type TaskView,
   type Views,
-  viewsFor,
   workflowsOf,
   tryOf,
   runWith,
-  judge,
   needsOf,
   type RunHolding,
   type RunStatus,
@@ -47,7 +44,6 @@ import {
   type RunWaiting,
   type Spent,
   spentOf,
-  standingsOf,
   type StepNeeds,
 } from 'agent-orchestrator';
 import {
@@ -73,7 +69,7 @@ import { loopSpan, remoteNameOf, type Workflow } from 'agent-orchestrator/workfl
 import { folderFiles, type StepArtifact } from '../steps/artifacts.ts';
 import { type RunGraph, runGraph } from 'agent-orchestrator';
 import { checksOf, refusedStderr, type StepCheck } from '../steps/logs.ts';
-import { engineRead, type Engine, workFolderOf } from '../store.ts';
+import { engineRead, type Engine, judgedOn, workFolderOf } from '../store.ts';
 import {
   attemptsIn,
   closeoutIn,
@@ -85,6 +81,7 @@ import {
   unreadableIn,
 } from './tries.ts';
 import { toldOf } from './told.ts';
+import { decideLine, stepCommands, type StepCommands } from './commands.ts';
 import type { Served } from '../layer.ts';
 import { readOf, type RunRead, type StepUsed, totalOf, usedOf } from './usage.ts';
 
@@ -214,6 +211,8 @@ export type StepFiled = {
 export type RunDetail = {
   id: string;
   brief: string;
+  /** The line that prints what there is to decide on the run, built off the table (`decideLine`). */
+  decide: string;
   /** A git run's repository, base commit, base branch and whether it cut worktrees; each null on a folder run, which has none of them. */
   repo: string | null;
   place: PlaceKind;
@@ -316,6 +315,10 @@ export type RunDetail = {
     status: string;
     /** As on `RunSummary`. */
     note: string | null;
+    /** As on `RunSummary`. */
+    roundDue: boolean;
+    /** The lines a person types for what the step's controls do, built off the table (`stepCommands`). */
+    commands: StepCommands;
     /** As on `RunSummary` (`StepNeeds`): read off that type, field by field, so a field it gains is declared here too and not only sent. */
     needs: StepNeeds['needs'];
     blockedByHarness: StepNeeds['blockedByHarness'];
@@ -586,18 +589,6 @@ const prunedOf = (run: Run): RunDetail['pruned'] =>
       }
     : null;
 
-/** The views of `run`'s tasks, read over one look at the harnesses, and what the run is judged as off them (`judgedUnlessUnreadable`). */
-async function judgedOn(e: Engine['Service'], run: Run, names: readonly string[], workflows: readonly Workflow[] | null) {
-  const { views, reader, unreadable } = await runWith(e, viewsFor(e, [run]));
-  const read = await runWith(
-    e,
-    judgedUnlessUnreadable(run, unreadable, () =>
-      judge(run, names, workflows, views, { reader, standings: (status, steps) => standingsOf(run, steps, status) }),
-    ),
-  );
-  return { views, read };
-}
-
 /**
  * A run in full, judged off the views of its tasks; or, when a task it reads does not (`judgedUnlessUnreadable`), why it is not judged, in
  * the words the list says it with (`RunSummary.unreadable`), and nothing else: the page shows no step as the engine's missing record would.
@@ -627,6 +618,7 @@ export async function detail(run: Run, { e, home, memo }: Pick<Served, 'e' | 'ho
   return {
     id: run.id,
     brief: run.brief,
+    decide: decideLine(run.id),
     repo: run.repo ?? null,
     place: placeOf(run),
     work: isGitRun(run) ? null : run.workspace,
@@ -681,6 +673,8 @@ export async function detail(run: Run, { e, home, memo }: Pick<Served, 'e' | 'ho
           ...filesOf(run, name),
           branch: run.steps[name]?.branch ?? null,
           note: judged.notes.get(name) ?? null,
+          roundDue: judged.roundDue.has(name),
+          commands: stepCommands(run.id, name),
           ...needs,
           lastLine: needs.blockedByHarness ? await lastLineOf(e, views.get(taskId!)!, memo.said) : null,
           gate: gateOf(run, steps.find((s) => s.name === name) ?? bare(name), current.status),
@@ -695,12 +689,19 @@ export async function detail(run: Run, { e, home, memo }: Pick<Served, 'e' | 'ho
         };
       }),
     ),
-    timeline: {
-      rounds: clock.rounds.map((r) => ({ ...r, cost: spentOf(roundSpend(clock, steps, r, judged.spendOf)) })),
-      run: { ...clock.run, cost: judged.cost },
-    },
+    timeline: runTimeline(clock, steps, judged),
   };
 }
+
+/** The run's timeline: each round with what it cost, by the steps the run is judged by, and the run's own span with what it cost. */
+const runTimeline = (
+  clock: Timeline,
+  steps: readonly Workflow[],
+  judged: { spendOf: Parameters<typeof roundSpend>[3]; cost: RunDetail['timeline']['run']['cost'] },
+): RunDetail['timeline'] => ({
+  rounds: clock.rounds.map((r) => ({ ...r, cost: spentOf(roundSpend(clock, steps, r, judged.spendOf)) })),
+  run: { ...clock.run, cost: judged.cost },
+});
 
 /** What the sessions of every try of every step read, by price (`RunRead`), off the run's timeline; null where none of it was measured. */
 const runRead = (clock: Timeline, steps: readonly Workflow[], names: readonly string[]): RunRead | null =>

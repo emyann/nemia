@@ -180,6 +180,22 @@ export const stepPage = (extra: Partial<WorkflowStepPage> = {}): WorkflowStepPag
     { key: 'model', value: null, meaning: 'The model.' },
   ],
   agentSkills: [skillEntry()],
+  factory: null,
+  layers: {
+    agent: null,
+    instructions: null,
+    custom: null,
+    agentSkills: [],
+    policy: 'Land it.',
+    addedSkills: [],
+    fence: [],
+    task: null,
+    via: 'brief',
+  },
+  hired: null,
+  hiredIn: [],
+  skillsFrom: [],
+  recentRuns: [],
   ...extra,
 });
 

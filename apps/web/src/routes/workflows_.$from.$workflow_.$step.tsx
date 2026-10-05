@@ -1,16 +1,20 @@
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
-import { AgentLink, Skills } from '../components/AgentParts';
+import { Skills } from '../components/AgentParts';
 import { AsWritten, KeyTable } from '../components/FilePage';
 import { Markdown } from '../components/Markdown';
+import { RecentRuns, StepAgent, StepTold } from '../components/StepParts';
 import { stepQuery } from '../lib/api';
+import { pagePlaceOf } from '../lib/factories';
 
 /**
  * The page of a workflow's step, at /workflows/$from/$workflow/$step: `workflows_` and `$workflow_` draw it on its own, not inside the
- * Workflows page nor the workflow's, neither of which has an outlet for it.
+ * Workflows page nor the workflow's, neither of which has an outlet for it. `?factory=` and `?repo=` are the place it is read in.
  */
 export const Route = createFileRoute('/workflows_/$from/$workflow_/$step')({
-  loader: ({ context, params }) => context.queryClient.ensureQueryData(stepQuery(params.from, params.workflow, params.step)),
+  validateSearch: pagePlaceOf,
+  loaderDeps: ({ search: { factory, repo } }) => ({ ...(factory && { factory }), ...(repo && { repo }) }),
+  loader: ({ context, params, deps }) => context.queryClient.ensureQueryData(stepQuery(params.from, params.workflow, params.step, deps)),
   component: StepPage,
   errorComponent: ({ error }) => (
     <div className="space-y-3">
@@ -21,15 +25,15 @@ export const Route = createFileRoute('/workflows_/$from/$workflow_/$step')({
 });
 
 /**
- * One step of a workflow, to read: what it is told, rendered; the agent attached to it, if one is, read from the `agents/` beside its
- * workflow and linked to its page in the step's own place, with what that agent says it can do (`skills:`), a description of the work that
- * fences nothing; then every key a step may set with its value and what it means — or, with Source, its file as written. It starts nothing:
- * its workflow's page does.
+ * One step of a workflow, to read, in the factory picked: its agent, hired or named by its file (`StepAgent`), with what that agent says
+ * it can do (`skills:`), a description of the work that fences nothing; what a run of it will be told, read now, each layer beside where
+ * it is edited; its newest runs; then its words, rendered, and every key a step may set with its value and what it means — or, with
+ * Source, its file as written. It edits and starts nothing: each layer's home and its workflow's page do.
  */
 function StepPage() {
   const { from, workflow, step } = Route.useParams();
-  const { data: page } = useSuspenseQuery(stepQuery(from, workflow, step));
-  const agent = page.keys.find((row) => row.key === 'agent')?.value ?? null;
+  const place = Route.useSearch();
+  const { data: page } = useSuspenseQuery(stepQuery(from, workflow, step, place));
 
   return (
     <article className="space-y-6">
@@ -52,16 +56,12 @@ function StepPage() {
             {page.from === 'yours' ? 'yours' : 'this repository'}
           </span>
         </div>
-        {agent && (
-          <div className="space-y-1">
-            <p data-step-agent className="text-xs text-neutral-500">
-              Its agent: <AgentLink from={page.from} name={agent} className="text-neutral-700 dark:text-neutral-300" />, whose instructions
-              it is told first.
-            </p>
-            <Skills skills={page.agentSkills} className="pl-3" />
-          </div>
-        )}
+        <StepAgent page={page} />
+        <Skills skills={page.agentSkills} className="pl-3" />
       </header>
+
+      <StepTold page={page} place={place} />
+      <RecentRuns page={page} />
 
       <AsWritten file={`${page.dir}/${page.step}.md`} source={page.source}>
         <Markdown className="text-sm">{page.body}</Markdown>
@@ -79,13 +79,15 @@ function StepPage() {
   );
 }
 
-/** Back to the page of the step's workflow. */
+/** Back to the page of the step's workflow, in the place this page is read in. */
 function BackToWorkflow() {
   const { from, workflow } = Route.useParams();
+  const place = Route.useSearch();
   return (
     <Link
       to="/workflows/$from/$workflow"
       params={{ from, workflow }}
+      search={place}
       className="font-mono text-sm text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100"
     >
       ← {workflow}

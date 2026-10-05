@@ -1,7 +1,7 @@
 import { RouteLink, AgentLink } from './AgentParts';
 import { Markdown } from './Markdown';
 import { Skills } from './Told';
-import type { ListedStep, WorkflowListing } from '../lib/api';
+import type { ListedStep, PagePlace, WorkflowListing } from '../lib/api';
 
 const LINK =
   'rounded-sm font-mono text-sm font-semibold underline decoration-neutral-300 underline-offset-2 outline-none hover:decoration-neutral-900 focus-visible:ring-2 focus-visible:ring-ring/50 dark:decoration-neutral-600 dark:hover:decoration-neutral-100';
@@ -9,23 +9,24 @@ const LINK =
 /**
  * A workflow's steps, a row each in the order a run runs them: its name, linked to its page; its own words — a step with an agent its
  * policy, the note its file adds to its agent's instructions, and one without its whole body; its agent, linked to its page, or none; and
- * its skills — the agent's and those its line adds, or, with no agent, those its file names.
+ * its skills — the agent's and those its line adds, or, with no agent, those its file names. Each step's page is read in `place`, the
+ * factory the workflow's page was reached in.
  */
-export function StepRows({ workflow }: { workflow: WorkflowListing }) {
+export function StepRows({ workflow, place = {} }: { workflow: WorkflowListing; place?: PagePlace }) {
   return (
     <ol
       aria-label={`Steps of ${workflow.name}`}
       className="divide-y divide-neutral-200 rounded border border-neutral-200 dark:divide-neutral-800 dark:border-neutral-800"
     >
       {workflow.steps.map((step) => (
-        <StepRow key={step.name} step={step} workflow={workflow} />
+        <StepRow key={step.name} step={step} workflow={workflow} place={place} />
       ))}
     </ol>
   );
 }
 
 /** One step's row. */
-function StepRow({ step, workflow }: { step: ListedStep; workflow: WorkflowListing }) {
+function StepRow({ step, workflow, place }: { step: ListedStep; workflow: WorkflowListing; place: PagePlace }) {
   const agent = step.layers?.agent ?? step.spec.agent;
   const words = step.layers ? step.layers.policy : step.body;
   return (
@@ -34,6 +35,7 @@ function StepRow({ step, workflow }: { step: ListedStep; workflow: WorkflowListi
         <RouteLink
           to="/workflows/$from/$workflow/$step"
           params={{ from: workflow.from, workflow: workflow.name, step: step.name }}
+          search={place}
           className={LINK}
         >
           {step.name}

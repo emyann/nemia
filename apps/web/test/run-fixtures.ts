@@ -188,6 +188,7 @@ export const detail = (extra: Partial<RunDetail> = {}): RunDetail => ({
   place: 'git',
   work: null,
   workflowDir: '/work/workflows/build',
+  workflowPage: null,
   try: null,
   baseRef: 'abc123',
   branch: 'main',

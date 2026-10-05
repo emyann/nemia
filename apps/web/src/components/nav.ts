@@ -29,6 +29,14 @@ type Listing = Exclude<Section['to'], '/factories/$factory'>;
 const isListing = (path: string): path is Listing =>
   SECTIONS.some((section) => section.to === path && section.to !== '/factories/$factory');
 
+/** A workflow's page or a step's, at `path`: its `from`, its workflow and its step, none for a workflow's page; none for any other page. */
+const workflowPageAt = (path: string): { from: string; workflow: string; step?: string } | undefined => {
+  const match = /^\/workflows\/([^/]+)\/([^/]+)(?:\/([^/]+))?$/.exec(path);
+  if (!match) return undefined;
+  const [from, workflow, step] = match.slice(1).map((part) => (part === undefined ? part : decodeURIComponent(part)));
+  return step === undefined ? { from, workflow } : { from, workflow, step };
+};
+
 /** The tabs of Machines & Capabilities, in their order: the state machines drawn from their code, and what the repository offers a step. */
 export const PLACE_TABS = [
   { to: '/machines', label: 'Machines' },
@@ -61,10 +69,11 @@ export const sectionOf = (path: string) => [...SECTIONS, ...RAIL].find((item) =>
 
 /**
  * The factory the address at `path` with `search` picks, from the address alone: a floor's own name, else the `?factory=` of a section's
- * page — the Inbox, Runs, Workflows or Stats, and none under them; none, All factories, on every other page.
+ * page — the Inbox, Runs, Workflows or Stats — or of a workflow's page or a step's, which read in it, and of no other page under them;
+ * none, All factories, on every other page.
  */
 export function pickedOf(path: string, search: Record<string, unknown>): string | undefined {
-  return floorOf(path) ?? (isListing(path) ? factorySearch(search).factory : undefined);
+  return floorOf(path) ?? (isListing(path) || workflowPageAt(path) ? factorySearch(search).factory : undefined);
 }
 
 /** Where a section's link goes: a factory's floor, or a section's page with the factory it narrows to, none for every factory's. */
@@ -79,21 +88,33 @@ export function sectionLink(section: Section, factory: string | undefined): Sect
   return { to: section.to, search: factory === undefined ? {} : { factory } };
 }
 
-/** Where a pick goes: a section's page with its search, a factory's floor, or Home. */
+/** Where a pick goes: a section's page with its search, a workflow's page or a step's in the picked factory, a factory's floor, or Home. */
 export type PickTarget =
   | { to: Listing; search: Record<string, unknown> }
+  | { to: '/workflows/$from/$workflow'; params: { from: string; workflow: string }; search: Record<string, unknown> }
+  | { to: '/workflows/$from/$workflow/$step'; params: { from: string; workflow: string; step: string }; search: Record<string, unknown> }
   | { to: '/factories/$factory'; params: { factory: string } }
   | { to: '/' };
 
 /**
  * Where picking `factory` (none for All factories) takes the page at `path` with `search`: on a section's page, the same page with every
- * other key of its search kept and `factory` set or dropped; on a floor, the picked factory's floor, or Home for All factories; on any
- * other page, the picked factory's floor, and nowhere for All factories, which that page already shows.
+ * other key of its search kept and `factory` set or dropped; on a workflow's page or a step's, the same page read in the picked factory,
+ * on the repository it reads, its `repo` dropped with the factory it was of; on a floor, the picked factory's floor, or Home for All
+ * factories; on any other page, the picked factory's floor, and nowhere for All factories, which that page already shows.
  */
 export function pickTo(path: string, search: Record<string, unknown>, factory: string | undefined): PickTarget | null {
   if (isListing(path)) {
     const { factory: _dropped, ...kept } = search;
     return { to: path, search: factory === undefined ? kept : { ...kept, factory } };
+  }
+  const page = workflowPageAt(path);
+  if (page) {
+    const { factory: _factory, repo: _repo, ...kept } = search;
+    const picked = factory === undefined ? kept : { ...kept, factory };
+    const { step, ...workflow } = page;
+    return step === undefined
+      ? { to: '/workflows/$from/$workflow', params: workflow, search: picked }
+      : { to: '/workflows/$from/$workflow/$step', params: { ...workflow, step }, search: picked };
   }
   if (factory !== undefined) return { to: '/factories/$factory', params: { factory } };
   return floorOf(path) === undefined ? null : { to: '/' };

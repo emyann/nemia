@@ -187,6 +187,44 @@ test('REFUSED, the workflows: a step without its workspace, a key row whose valu
   await assert.rejects(readRepository(), unread('/api/repository', 'repo', 'is missing'));
 });
 
+test("a step's page is read in the place named, keyed by it, with what a run of it will be told, its hires and its recent runs", async (t) => {
+  const asked: string[] = [];
+  const before = globalThis.fetch;
+  const page = stepPage({
+    factory: 'f',
+    hired: 'writer',
+    hiredIn: [{ factory: 'g', agent: 'scribe' }],
+    skillsFrom: [
+      { name: 'alpha', from: 'yours' },
+      { name: 'gamma', from: null },
+    ],
+    recentRuns: [{ id: 'r-1', brief: 'Do it', createdAt: '2026-10-01T00:00:00Z', factory: 'f', filed: false }],
+  });
+  globalThis.fetch = async (input) => {
+    asked.push(String(input));
+    return new Response(JSON.stringify(page), { headers: { 'content-type': 'application/json' } });
+  };
+  t.after(() => {
+    globalThis.fetch = before;
+  });
+  const placed = stepQuery('yours', 'w', 'review', { factory: 'f' });
+  assert.deepEqual(await (placed.queryFn as unknown as () => Promise<WorkflowStepPage>)(), page);
+  assert.equal(asked.at(-1), '/api/workflows/yours/w/review?factory=f');
+  assert.notDeepEqual(placed.queryKey, stepQuery('yours', 'w', 'review').queryKey, 'two places, two answers kept apart');
+  assert.notDeepEqual(placed.queryKey, stepQuery('yours', 'w', 'review', { factory: 'g' }).queryKey);
+  await (stepQuery('yours', 'w', 'review', { factory: 'f', repo: '/code/app' }).queryFn as unknown as () => Promise<unknown>)();
+  assert.equal(asked.at(-1), '/api/workflows/yours/w/review?factory=f&repo=%2Fcode%2Fapp');
+});
+
+test("REFUSED, a step's page: one without its recent runs, the factories that hire into it, or a skill's place the board knows", async (t) => {
+  answering(t, without(stepPage(), 'recentRuns'));
+  await assert.rejects(readStep(), unread('/api/workflows/repo/build/ship', 'recentRuns', 'is missing'));
+  answering(t, without(stepPage(), 'hiredIn'));
+  await assert.rejects(readStep(), unread('/api/workflows/repo/build/ship', 'hiredIn', 'is missing'));
+  answering(t, stepPage({ skillsFrom: [{ name: 'alpha', from: 'elsewhere' as never }] }));
+  await assert.rejects(readStep(), unread('/api/workflows/repo/build/ship', 'skillsFrom[0].from', '"elsewhere", where'));
+});
+
 test("REFUSED, the builder's form: a key no step has, and an agent's gate set false, which only a step without the line says", async (t) => {
   answering(t, keyForm({ keys: [{ ...keyForm().keys[0], key: 'colour' as never }] }));
   await assert.rejects(readKeyForm(), unread('/api/workflows/keys', 'keys[0].key', '"colour", where'));

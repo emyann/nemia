@@ -8,6 +8,7 @@ import { pace } from '../feed.ts';
 import { ReadRefusal, get } from './read.ts';
 import type { RetryMode, Said } from './asks.ts';
 import { RunGraphSchema, type RunGraph } from './graph.ts';
+import { WorkflowPageAddressSchema, type WorkflowPageAddress } from './address.ts';
 import { StepLayersSchema, type StepLayers } from './layers.ts';
 import {
   AtWorkSchema,
@@ -220,7 +221,7 @@ const StepFiledSchema = Schema.Struct({
   remote: Schema.NullOr(Schema.Struct({ name: Schema.String, address: Schema.NullOr(Schema.String) })),
 }) satisfies Schema.Schema<StepFiled>;
 
-/** Mirrors `RunDetail` in apps/api/src/detail/detail.ts. */
+/** Mirrors `RunPage` in apps/api/src/runs/runs.ts: a run in full (`RunDetail`, apps/api/src/detail/detail.ts), and its workflow page's address. */
 export type RunDetail = {
   id: string;
   brief: string;
@@ -232,6 +233,8 @@ export type RunDetail = {
   /** Where a folder run's work is: the directory its steps' folders are made under. Null on a git run, whose work is on its branch. */
   work: string | null;
   workflowDir: string;
+  /** The address of its workflow's page, and each step's under it: null where the board pages none, as for a folder given by path. */
+  workflowPage: WorkflowPageAddress | null;
   /** The agent it tried, for a try started from an agent's page; null for every other run. */
   try: { agent: string } | null;
   baseRef: string | null;
@@ -483,6 +486,7 @@ const RunDetailSchema = Schema.Struct({
   place: PlaceKindSchema,
   work: Schema.NullOr(Schema.String),
   workflowDir: Schema.String,
+  workflowPage: Schema.NullOr(WorkflowPageAddressSchema),
   try: Schema.NullOr(Schema.Struct({ agent: Schema.String })),
   baseRef: Schema.NullOr(Schema.String),
   branch: Schema.NullOr(Schema.String),

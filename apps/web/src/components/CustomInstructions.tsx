@@ -40,6 +40,7 @@ export function CustomInstructions({ name }: { name: string }) {
       : null;
   return (
     <section
+      id="custom-instructions"
       aria-label="Custom instructions"
       data-custom-instructions
       className="space-y-3 border-t border-neutral-200 pt-4 dark:border-neutral-800"

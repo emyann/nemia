@@ -133,12 +133,13 @@ version, and the version above must be the pin. An upgrade re-measures the table
 
 ## Programs
 
-- The packages' entries are Effect, and the api is the system's public interface. A caller of the runtime builds its engine once from
-  `Engine.layer(options)` (`agent-runtime/effect`) and runs each verb as an Effect: `ae` (`packages/agent-runtime/src/cli/main.ts`)
-  and the orchestrator's client (`engineOf` in `packages/agent-orchestrator/src/runtime-client.ts`). A refusal a caller answers with
-  a sentence and an exit code is worded by `refusalWords` (`src/service/refusal.ts`): an `Error` led by the verb whose `exitCode` is 2.
-  `promiseEngine` (`src/facade/engine.ts`) is left only to the runtime's own tests.
-- `agent-runtime/effect` (`src/index.ts`) is the door that hands out Effect values, and it does not export `decide`.
+- The packages' entries are Effect, and the api is the system's public interface. No function the runtime's entries export runs a
+  program for its caller or answers a Promise (`packages/agent-runtime/test/plain-faces.test.ts`, its `PROMISED` empty): a program is
+  run at its edge — the CLI (`ae`), the api's server, a test — with `Effect.runPromise` or `Effect.runSync`.
+- A caller of the runtime builds its engine once from `Engine.layer(options)` (`agent-runtime`, `src/index.ts`, which does not export
+  `decide`) and runs each verb as an Effect: `ae` (`packages/agent-runtime/src/cli/main.ts`) and the orchestrator's client (`engineOf`
+  in `packages/agent-orchestrator/src/runtime-client.ts`). A refusal a caller answers with a sentence and an exit code is worded by
+  `refusalWords` (`src/service/refusal.ts`): an `Error` led by the verb whose `exitCode` is 2.
 - Stores and pure files stay plain TypeScript: `decide` in `src/core/domain.ts` imports no Effect.
 - A controller is an `Effect.fn` program that requires the engine as a service (`EngineService`): it reads the engine with `asked`,
   which dies of a runtime refusal in the runtime's words, and lifts every other read with `tried` or `awaited`, failing with a

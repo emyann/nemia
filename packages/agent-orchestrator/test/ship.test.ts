@@ -2011,7 +2011,8 @@ async function checkedScreen(t: TestContext, exitCode: number | undefined): Prom
   photographed(id, { count: 2, bytes: 10 });
   settle(checkId, 'failed', undefined, exitCode);
   await runWith(e, advanceRun(readRun(id)));
-  return decideScreen(t, e, [id], { '<id>': id, '<repo>': repo, '<root>': ROOT });
+  const base = git(repo, 'rev-parse', 'HEAD').trim().slice(0, 7);
+  return decideScreen(t, e, [id], { '<id>': id, '<repo>': repo, '<root>': ROOT, '<base>': base });
 }
 
 test("the whole screen of an ending whose check did not finish on the merge, with the check's files", async (t) => {
@@ -2062,6 +2063,8 @@ test("the whole screen of an ending whose check did not finish on the merge, wit
     '  wf/<id>/implement  —1 file changed, 1 insertion(+)',
     '',
     '  branch    wf/<id>/implement is ahead of main by 1 commit',
+    '  merges    wf/<id>/implement merges cleanly onto main',
+    '  others    no other run is in flight on main',
   ]);
 });
 
@@ -2111,6 +2114,9 @@ test("the whole screen of an ending whose check refused the merge, with the chec
     '  wf/<id>/implement  —1 file changed, 1 insertion(+)',
     '',
     '  branch    wf/<id>/implement is ahead of main by 1 commit',
+    '  merges    wf/<id>/implement merges cleanly onto main',
+    '  others    no other run is in flight on main',
+    "  semantic  merges cleanly onto main, and ship's landing check refused the merged tree at <base>: a conflict of meaning, not of text",
   ]);
 });
 
@@ -2580,6 +2586,22 @@ test('nemia decide offers the merge of work its landing check refused, saying th
       `asked: merge main at ${base.slice(0, 7)} into implement's work, where ship's check refused the merged tree at ${base.slice(0, 7)}: the conflict is semantic — the next tick files it`,
     ),
     printed.join('\n'),
+  );
+});
+
+test('nemia decide reads the semantic conflict live at an ending whose landing check refused the merged tree: clean as text, refused on the base as it is', async () => {
+  const { id, e, base, checkId } = await refusedOnBase();
+  const { collisions, toDecide } = await runWith(e, decideRun(id));
+  assert.equal(toDecide?.kind === 'approve', false, 'the ending waits at no gate: it was filed, and its landing aborted');
+  assert.deepEqual(collisions?.semantic, {
+    step: 'ship',
+    check: checkId,
+    sha: base,
+    said: `merges cleanly onto main, and ship's landing check refused the merged tree at ${base.slice(0, 7)}: a conflict of meaning, not of text`,
+  });
+  assert.deepEqual(
+    collisions?.base.map((b) => b.said),
+    ['merges cleanly onto main'],
   );
 });
 

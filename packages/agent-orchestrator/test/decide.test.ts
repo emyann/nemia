@@ -33,6 +33,7 @@ const {
   LESSON,
   advanceRun,
   consumption,
+  decideRun,
   isGitRun,
   lessonLine,
   retryRun,
@@ -695,6 +696,57 @@ test("a folder whose last step is an ending: `nemia decide` says what that step 
   indexOf(said, /^   ship {11}awaiting approval/);
 });
 
+/** A folder of `implement`, then `ship`, its ending, gated and merging on the base branch. */
+const shipping = (): string => {
+  const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\n---\nimplement it\n');
+  fs.writeFileSync(path.join(dir, 'ship.md'), '---\nafter: implement\nworkspace: main\ngate: true\n---\nShip it.\n');
+  return dir;
+};
+
+/** A run of `dir` on `repo` whose implement committed `file` as `text` on its branch, left running or settled as `settled` says. */
+const working = async (repo: string, dir: string, file: string, text: string, settled: boolean) => {
+  const run = await Effect.runPromise(startRun({ brief: `write ${file}`, repo, workflowDir: dir }));
+  const { e, settle } = board();
+  await runWith(e, advanceRun(readRun(run.id)));
+  const work = readRun(run.id).steps.implement;
+  write(work.workspace!, file, text);
+  git(work.workspace!, 'add', '-A');
+  git(work.workspace!, 'commit', '-q', '-m', `write ${file}`);
+  if (settled) {
+    settle(`${run.id}-implement`, 'succeeded', SIGNED);
+    await runWith(e, advanceRun(readRun(run.id)));
+  }
+  return { id: run.id, branch: work.branch!, e };
+};
+
+test("at an ending's gate, `nemia decide` says which runs in flight on the base its branch collides with, and in which files; REFUSED: a run still running reads none", async (t) => {
+  const repo = aRepo();
+  const dir = shipping();
+  const add = 'packages/x/src/add.ts';
+  const ours = await working(repo, dir, add, 'export const add = (a, b) => b + a;\n', true);
+  const theirs = await working(repo, dir, add, 'export const add = (a, b) => a + b + 0;\n', false);
+  const apart = await working(repo, dir, 'packages/x/src/sub.ts', 'export const sub = (a, b) => a - b;\n', false);
+
+  const { collisions } = await runWith(ours.e, decideRun(ours.id));
+  assert.deepEqual([...(collisions?.inFlight ?? [])].sort(), [theirs.id, apart.id].sort());
+  assert.deepEqual(
+    collisions?.colliding.map((c) => [c.run, c.branch, c.ours, c.merge]),
+    [[theirs.id, theirs.branch, ours.branch, { clean: false, conflicts: [add] }]],
+  );
+  const lines = await screen(t, ours.e, ours.id);
+  const at = indexOf(lines, `  branch    ${ours.branch} is ahead of main by 1 commit`);
+  assert.deepEqual(lines.slice(at + 1, at + 4), [
+    `  merges    ${ours.branch} merges cleanly onto main`,
+    `  others    collides with 1 of the 2 runs in flight on main: ${theirs.id}`,
+    `  collides  ${ours.branch} conflicts with ${theirs.id}'s ${theirs.branch} in 1 file: ${add}`,
+  ]);
+
+  const running = await runWith(theirs.e, decideRun(theirs.id));
+  assert.equal(running.decision.kind, 'running');
+  assert.equal(running.collisions, undefined, 'a run still running is at no ending, and no trial merge is asked for it');
+});
+
 test("REFUSED: an ending led by an agent that says `You are …` — `nemia decide` and `nemia ls` say the step's own note, or with none, that approving runs it, and never quote the agent", async (t) => {
   const team = fs.mkdtempSync(path.join(ROOT, 'team-'));
   fs.mkdirSync(path.join(team, 'agents'));
@@ -1312,6 +1364,8 @@ test("the whole screen of an ending at its gate: the folder's words, approve it 
     '  wf/<id>/implement  —1 file changed, 1 insertion(+)',
     '',
     '  branch    wf/<id>/implement is ahead of main by 1 commit',
+    '  merges    wf/<id>/implement merges cleanly onto main',
+    '  others    no other run is in flight on main',
     '',
     "  to decide  ship has not run: this workflow's ending, and your approval is what runs it:",
     "    Ship it: trial merge this run's result branch onto main, run the check, and commit.",
@@ -1369,6 +1423,8 @@ test('the whole screen of a gate on a last step that merges nothing, before and 
     '  wf/<id>/implement  —1 file changed, 1 insertion(+)',
     '',
     '  branch    wf/<id>/implement is ahead of main by 1 commit',
+    '  merges    wf/<id>/implement merges cleanly onto main',
+    '  others    no other run is in flight on main',
     '',
     '  to decide  review has signed off and waits for your word:',
     '',

@@ -8,7 +8,16 @@
  * can still take one.
  */
 import { outputFields, type Workflow } from '../step/step.ts';
-import { dataBlock, isGitRun, satisfiesAfter, stopsFollowers, tryOf, type Run, type StepRecord, type StepStatus } from '../record/record.ts';
+import {
+  dataBlock,
+  isGitRun,
+  satisfiesAfter,
+  stopsFollowers,
+  tryOf,
+  type Run,
+  type StepRecord,
+  type StepStatus,
+} from '../record/record.ts';
 import { declaredOutput, type Closeout } from '../closeout/closeout.ts';
 import { loopSpan } from '../workflow/index.ts';
 import {

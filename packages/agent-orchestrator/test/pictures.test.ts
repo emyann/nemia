@@ -124,7 +124,8 @@ test('an image named from the workspace root counts where the run collected it, 
 });
 
 test('a change only under apps/web/test, or outside apps/web, asks for no picture', () => {
-  for (const work of [{ 'apps/web/test/e2e/pages/x.ts': 'export {};\n' }, { 'packages/x.ts': 'export {};\n' }]) {
+  const works: Record<string, string>[] = [{ 'apps/web/test/e2e/pages/x.ts': 'export {};\n' }, { 'packages/x.ts': 'export {};\n' }];
+  for (const work of works) {
     const { repo, base } = workOn(work);
     const r = pictures(repo, [closeoutFile([])], { WF_BASE_REF: base, WF_ARTIFACTS: scratch('wf-pictures-files-') });
     assert.equal(r.code, 0, r.err);

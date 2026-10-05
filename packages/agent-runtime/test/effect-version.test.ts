@@ -233,14 +233,17 @@ function primitiveProblems(skill: string, barrel: Record<string, unknown>, exist
   const named = new Set(rows.flatMap((cells) => cells[2].map((n) => n.split('.')[0])));
   return [
     ...(placed ? [] : [`${SKILL} has ${REACH} out of place: put it between its installed docs and its Effect 3 names`]),
-    ...rows.flatMap(([, , names, [page] = []]) => [
-      ...names
-        .filter((n) => !has(barrel, n))
-        .map((n) => `${SKILL} names ${n}, which effect does not export: read its page, not your memory`),
-      ...(page !== undefined && exists(page)
-        ? []
-        : [`${SKILL} sends ${names[0]} to ${page ?? 'no page'}, which is not installed: find its page under node_modules/effect`]),
-    ]),
+    ...rows.flatMap((cells) => {
+      const [names, page] = [cells[2], cells[3]?.at(0)];
+      return [
+        ...names
+          .filter((n) => !has(barrel, n))
+          .map((n) => `${SKILL} names ${n}, which effect does not export: read its page, not your memory`),
+        ...(page !== undefined && exists(page)
+          ? []
+          : [`${SKILL} sends ${names[0]} to ${page ?? 'no page'}, which is not installed: find its page under node_modules/effect`]),
+      ];
+    }),
     ...PRIMITIVES.filter((p) => !named.has(p)).map((p) => `${SKILL} gives ${p} no row: say the task it is for and its installed page`),
   ];
 }

@@ -2034,6 +2034,7 @@ of pure code sits beside it.
 | `src/a2a/said.ts` | the remote harness's own words told from another party's: the errors it throws in its own words, the A2A errors that refuse a send, and any other error's words quoted to 200 characters (`wordsOf`) |
 | `src/a2a/index.ts` | the face of `a2a/`, as the face takes it: it imports no name of the SDK's |
 | `src/service/engine.ts` | the engine as an Effect service, `Engine`: `Engine.layer(options)` assembles each harness behind its A2A agent, the store and the memo, and its verbs are Effects that fail with tagged errors (`ListRefused`, `TranscriptRefused`, `SayRefused`, `SayUnsent`, and the core's) |
+| `src/service/forget.ts` | the engine's `forget` verb, `forgetVerbOf`, and `ForgetRefused`: every guard asked of every id first, then each session's files through its harness, the feed's lines and the journal; without `yes`, a count (`ForgetReport`) |
 | `src/service/bodies.ts` | the engine's verbs over the store's bodies, `sweep` and `removeBody`, behind a refusal of an argument they do not take (`BodyRefused`) |
 | `src/service/watch.ts` | the engine's `watch`, on its `feed`: each entry in order, at least once, drained on the store's push and on a timer |
 | `src/service/options.ts` | what `Engine.layer` is built from and answers with — `HarnessConfig`, `Pooled`, `EngineOptions`, `TaskSpec`, `TickReport`, `EngineIo` — and what the engine refuses of its options before it builds anything (`optionsRefusalOf`) |
@@ -2058,6 +2059,8 @@ of pure code sits beside it.
 | `test/io.test.ts` | what a pass costs as the runtime reports it: a tick's `ms` and each harness's observes, and `io()`'s bytes read and processes started |
 | `test/engine-verbs.test.ts` | the engine's verbs as a caller of `agent-runtime` drives them, over a store and a harness of its own (`test/promise-runner.ts`), and every refusal at `file()` at shipped defaults; the engine refusing `maxConcurrent` and a harness's `pool`, and `tick()` refusing an argument |
 | `test/verb-refusals.test.ts` | the `Engine` service's verbs, pinned (`VERBS`): each verb's answer, the same from an engine built once and one provided per call, and each refusal a tagged error that `refusalWords` words as `verb: …` with exit code 2 |
+| `test/forget.test.ts` | forgetting settled tasks on the files store: the count and the removal, each guard made to refuse with nothing removed, a forget cut short finished, an append to a forgotten task refused, another engine's pass, `sweep` after it, a detached run's files, and `ae forget` and `ae feed` |
+| `test/feed-rotation.test.ts` | the feed rotated under its lock: readers parked before it read on, the forgotten counted; a feed with no header; a rotation stopped between its renames, and two racing; a stopped holder failing an append after `FEED_LOCK_WAIT_MS`, a dead one broken; a stopped writer keeping a rotation out; and what an append counts |
 | `test/release.test.ts` | letting a finished Claude Code session go, and reading what it cost once stopped, at shipped defaults — a fake `claude` that keeps a registry and writes a `cost-state` as it stops a session |
 | `test/budget.test.ts` | a spend cap, at shipped defaults — fake `claude`s: a `claude -p` that stops at its cap ends its attempt `failed` with `limit: 'budget'` and settles its task as any failure, the note naming no budget; the flag reaches both Claude runners on every attempt |
 | `test/admit.test.ts` | queued and admitted: the wait, the word, the pass after it, the pre-4c reading, `admit`'s refusals at shipped defaults, and a count proving the word asks no harness |
@@ -2108,6 +2111,7 @@ node bin/ae.ts say <id> "…"      # tell its running session something; journal
 node bin/ae.ts admit <id>        # let a task filed queued start, on the next pass
 node bin/ae.ts stop <id>
 node bin/ae.ts sweep            # count the bodies no journal names; --yes removes them
+node bin/ae.ts forget <id>       # count what a settled task keeps; --yes removes it
 ```
 
 ```bash
@@ -2136,8 +2140,14 @@ const next = Effect.gen(function* () {
 const cursor = await Effect.runPromise(next.pipe(Effect.provide(Engine.layer())))
 ```
 
-The cursor is a byte offset into `feed.jsonl` and never expires: a consumer that was away for a
-week replays rather than being told to start over.
+The cursor is a byte offset into the feed as it was ever written, and never expires: a consumer that was away for a
+week replays rather than being told to start over. A forget rotates the feed (`src/core/engine/feed.ts`): `feed.jsonl`
+starts with a header naming the cursor its first line is at, the lines before it move to `feed.sealed.jsonl`, and a
+forgotten task's lines leave both. A reader at any cursor ever handed out gets what is still there, in order and never a
+line twice, and `forgotten`, how many lines after its cursor went; `ae feed` prints it as "N lines of forgotten tasks
+were here, after cursor C". Every append and every rotation takes `feed.lock` (`FEED_LOCK_WAIT_MS`, then it fails naming
+the process that holds it, and a holder that died is broken): `io()` counts the store's `writes`, its `locks` and the
+milliseconds it waited (`lockWaitMs`).
 
 `AE_ROOT` points at a different board, the way a kubeconfig points at a different cluster. With it unset the board is
 `~/.agent-engine`, which keeps the package's former name on purpose: the package became `agent-runtime` on 2026-09-23,
@@ -2169,9 +2179,25 @@ key; a line written before bodies reads as it always did, and a store that keeps
 with `bodies: false`) appends whole events as before.
 
 A body goes only through `ae sweep --yes` (`Engine.sweep({ yes: true })`, or `removeBody` for one), which reads every journal and
-the feed from its start first and keeps a body any of them names, or one put in the last day. Removing a task's journal by hand
-leaves its bodies for the next sweep; removing a body by hand makes every task that names it unreadable, its read failing with a
+the feed from its start first and keeps a body any of them names, or one put in the last day. A task forgotten
+(*Forgetting a settled task*, below) leaves its bodies for the next sweep, which keeps any another task still names; removing a body by hand makes every task that names it unreadable, its read failing with a
 `JournalError` that names the body's path: restore it from a backup.
+
+### Forgetting a settled task: `forget`
+
+A settled task's journal, the files its harness keeps of each session and its lines in the feed go only through
+`ae forget <id>... [--yes]` (`Engine.forget(ids, { yes: true })`, `src/service/forget.ts`). Without `--yes` it counts, per
+task: its journal's bytes, its lines in the feed, each session's files, and what its harness keeps that is not the
+runtime's to remove (a conversation Claude Code or Codex keeps, the Task a remote agent keeps), named. With it, each
+session's files go through its harness (`RunnerOps.forget`, `forgetSession` across the A2A seam), then the feed's lines and
+the journal in one call to the store (`JournalOps.forget`), the journal last, so a forget cut short is finished by asking
+again. An append to a forgotten task, but a new filing, is refused: nothing writes to it again.
+
+Every guard is asked of every id before anything is removed, and a refusal (`ForgetRefused`, exit 2) ends "nothing was
+forgotten": an id the store does not list; a journal that cannot be read; a task not settled (stop it, let it settle,
+then forget it); a task filed on a harness the engine does not have, whose files could not be found; and a session its
+harness still holds — at work, or its process kept (`held`) — or could not be read for. A session listed ended and let go
+is no refusal: the pass lets a finished session go first. A store with no `forget` refuses too.
 
 ### `tick` and `up`, and why both
 

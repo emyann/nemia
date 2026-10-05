@@ -27,7 +27,7 @@ const ctx = new ServerCallContext();
 
 /**
  * A harness a test moves by hand, what it was asked, and a journal in memory, behind one handler. It has every verb a
- * driver may have — `find`, `release`, `quota`, `say`, `output`, `transcript`, `observeFor` — unless `bare`, which leaves it the four every
+ * driver may have — `find`, `release`, `quota`, `say`, `output`, `transcript`, `observeFor`, `forget` — unless `bare`, which leaves it the four every
  * driver has; `noFind` takes `find` alone away. `acted` is what the harness was asked, reads left out.
  */
 const harness = (
@@ -116,6 +116,11 @@ const harness = (
               asked.push(['observeFor', expected]);
               const seen = new Map([...sessions].filter(([name]) => expected.some((e) => e.name === name)));
               return Effect.succeed({ seen, unread: new Set(expected.map((e) => e.name).filter((name) => unread.has(name))) });
+            }),
+          forget: (session: { name: string; nativeId?: string }, options: { dry: boolean }) =>
+            Effect.suspend(() => {
+              asked.push(['forget', [session, options]]);
+              return Effect.succeed({ files: [`/runs/${session.name}.json`], left: options.dry ? ['kept elsewhere'] : [] });
             }),
           transcript: (sessionId: string, after?: string) =>
             Effect.suspend(() => {
@@ -518,6 +523,22 @@ const REFUSALS: Array<[string, (h: H) => Promise<unknown>, (e: Error) => boolean
     (h) => h.handler.releaseSession({ session: { sessionId: 's-1', state: 'completed' }, task: {} }, ctx),
     refusedWith(UnsupportedOperationError, 'the `fake` harness has nothing to let go of: its registry is the record.'),
     { bare: true },
+  ],
+  [
+    'a forget on a harness that keeps nothing of a session',
+    (h) => h.handler.forgetSession({ session: { name: 'ae/t-1/1' }, dry: true }, ctx),
+    refusedWith(UnsupportedOperationError, 'the `fake` harness keeps nothing of a session to forget.'),
+    { bare: true },
+  ],
+  [
+    'a forget of a name that is not a session name',
+    (h) => h.handler.forgetSession({ session: { name: 'ae/t-1/0' }, dry: true }, ctx),
+    refusedWith(RequestMalformedError, 'the request names no session: send `{ session: { name } }`, the name `ae/<task>/<n>`, n from 1.'),
+  ],
+  [
+    'a forget not told whether to remove',
+    (h) => h.handler.forgetSession({ session: { name: 'ae/t-1/1' }, dry: 'no' as never }, ctx),
+    refusedWith(RequestMalformedError, '`dry: no` is not a yes or no: send `dry: true` to list, `false` to remove.'),
   ],
   [
     'a release of no session',
@@ -1003,6 +1024,7 @@ test("the harness's card: its name, no streaming, no notifications, text in and 
             'sessionTranscript',
             'observeSessions',
             'harnessQuota',
+            'forgetSession',
           ],
           say: true,
         },
@@ -1018,6 +1040,22 @@ test('REFUSED on the card: a verb the driver lacks is not offered, and logs, whi
     card.capabilities!.extensions.map((e) => e.params),
     [{ methods: ['sessionLogs'], say: false }],
   );
+});
+
+test("forgetSession hands the driver's forget the session and whether to remove, and answers what it removed", async () => {
+  const h = harness();
+  assert.deepEqual(await h.handler.forgetSession({ session: { name: 'ae/t-1/1', nativeId: 'n-1' }, dry: true }, ctx), {
+    files: ['/runs/ae/t-1/1.json'],
+    left: ['kept elsewhere'],
+  });
+  assert.deepEqual(await h.handler.forgetSession({ session: { name: 'ae/t-1/2' }, dry: false }, ctx), {
+    files: ['/runs/ae/t-1/2.json'],
+    left: [],
+  });
+  assert.deepEqual(h.acted(), [
+    ['forget', [{ name: 'ae/t-1/1', nativeId: 'n-1' }, { dry: true }]],
+    ['forget', [{ name: 'ae/t-1/2' }, { dry: false }]],
+  ]);
 });
 
 test("harnessQuota answers the driver's quota; REFUSED on a driver without one, which is asked nothing", async () => {

@@ -9,7 +9,8 @@ import path from 'node:path';
 import os from 'node:os';
 import { Effect, ManagedRuntime } from 'effect';
 import { Engine as EngineService, refusalWords, type EngineOptions, type EngineShape } from '../index.ts';
-import { refusedText, retiredKeyRefusal, type CodexArgs, type HarnessArgs, type SweepReport, type TaskSpec } from '../index.ts';
+import { refusedText, retiredKeyRefusal, type CodexArgs, type ForgetReport, type HarnessArgs } from '../index.ts';
+import type { SweepReport, TaskSpec } from '../index.ts';
 import { attemptLine, entryLine, limitLines, taskLine } from './lines.ts';
 
 /**
@@ -303,6 +304,8 @@ const HELP = `ae — an engine for agent sessions
   ae admit <id>...             let tasks filed queued start (ae ls: queued): the next
                                tick starts them — one a store filed before stage 4c too
   ae feed [cursor]             what happened, since a cursor — the upper layer's API
+  ae forget <id>... [--yes]    count what settled tasks keep: their journals, their lines in
+                               the feed, their sessions' files; --yes removes them
   ae sweep [--yes]             count the bodies no journal names, put over a day ago: a long
                                text is kept once, named by its sha256; --yes removes them
   ae watch [cursor]            the same, followed
@@ -424,6 +427,66 @@ const sweepBodies = async (engine: EngineShape, rest: readonly string[]): Promis
   console.log(sweepLine(await run('sweep', engine.sweep({ yes })), yes));
 };
 
+/** What `ae forget` is asked, off the arguments after it: the task ids, and `yes`, given `--yes`. Refuses, with exit code 2, no id or a flag. */
+export const forgetAsked = (rest: readonly string[]): { taskIds: string[]; yes: boolean } => {
+  const taskIds = rest.filter((a) => a !== '--yes');
+  const flags = taskIds.filter((a) => a.startsWith('-'));
+  if (!taskIds.length || flags.length)
+    throw Object.assign(
+      new Error(
+        `forget: takes the ids of settled tasks, and \`--yes\` to remove them; it was handed ${rest.join(' ') || 'nothing'}: nothing was forgotten.`,
+      ),
+      { exitCode: 2 },
+    );
+  return { taskIds, yes: taskIds.length < rest.length };
+};
+
+/** The lines `ae forget` prints for `report`: per task what went, or without `yes` what would, what each harness leaves, and the next command. */
+export const forgetLines = (report: ForgetReport): string[] => {
+  const lines: string[] = [];
+  for (const t of report.tasks) {
+    const files = t.sessions.flatMap((s) => s.files);
+    lines.push(`${t.taskId}: journal ${t.journalBytes} bytes, ${t.feedLines} feed line(s), ${files.length} session file(s)`);
+    for (const file of files) lines.push(`  ${file}`);
+    for (const left of t.sessions.flatMap((s) => s.left)) lines.push(`  left: ${left}`);
+  }
+  const ids = report.tasks.map((t) => t.taskId).join(' ');
+  if (!report.forgotten) lines.push(`nothing was forgotten: \`ae forget ${ids} --yes\` removes it`);
+  else if (report.feed)
+    lines.push(
+      `forgotten; the feed lost ${report.feed.linesForgotten} line(s), ${report.feed.bytesBefore} bytes to ${report.feed.bytesAfter}`,
+    );
+  else lines.push('forgotten');
+  return lines;
+};
+
+/** `ae forget <id>... [--yes]`: what settled tasks keep, counted, and removed given `--yes` (`Engine.forget`). */
+const forgetTasks = async (engine: EngineShape, rest: readonly string[]): Promise<void> => {
+  const { taskIds, yes } = forgetAsked(rest);
+  for (const line of forgetLines(await run('forget', engine.forget(taskIds, { yes })))) console.log(line);
+};
+
+/** The line `ae feed` prints after a read from `after` when lines after it were forgotten, else none. */
+export const forgottenLine = (forgotten: number | undefined, after: number): string[] =>
+  forgotten ? [`${forgotten} lines of forgotten tasks were here, after cursor ${after}`] : [];
+
+/** `ae feed [cursor]`: the entries after `after`, what was forgotten after it, what was skipped, and the cursor to resume from. */
+const printFeed = async (engine: EngineShape, after: number): Promise<void> => {
+  const { entries, cursor, refused = [], forgotten } = await run('feed', engine.feed(after));
+  for (const line of forgottenLine(forgotten, after)) console.log(line);
+  for (const e of entries) console.log(entryLine(e.taskId, e.event));
+  for (const r of refused) console.error(`skipped: ${r.why}`);
+  console.log(`cursor: ${cursor}`);
+};
+
+/** `ae ls`: a line per task, and on stderr each journal left out and why. */
+const listTasks = async (engine: EngineShape): Promise<void> => {
+  const { views, unreadable } = await run('list', engine.list());
+  if (!views.length && !unreadable.length) return console.log('no tasks');
+  for (const v of views) console.log(taskLine(v));
+  for (const u of unreadable) console.error(`left out: ${u.why}`);
+};
+
 /** The engine's verb `verb`, `effect`, as a Promise: a refusal rejected in the runtime's words (`refusalWords`), else as it failed. */
 const run = <A, E>(verb: string, effect: Effect.Effect<A, E>): Promise<A> =>
   Effect.runPromise(effect.pipe(Effect.mapError(refusalWords(verb))));
@@ -495,13 +558,8 @@ export async function main(argv: string[]): Promise<void> {
       return;
     }
 
-    case 'ls': {
-      const { views, unreadable } = await run('list', engine.list());
-      if (!views.length && !unreadable.length) return console.log('no tasks');
-      for (const v of views) console.log(taskLine(v));
-      for (const u of unreadable) console.error(`left out: ${u.why}`);
-      return;
-    }
+    case 'ls':
+      return listTasks(engine);
 
     case 'show':
       if (!arg) return console.log(HELP);
@@ -551,15 +609,14 @@ export async function main(argv: string[]): Promise<void> {
     case 'tick':
       return tickOnce(engine);
 
-    case 'feed': {
-      const { entries, cursor, refused = [] } = await run('feed', engine.feed(Number(arg) || 0));
-      for (const e of entries) console.log(entryLine(e.taskId, e.event));
-      for (const r of refused) console.error(`skipped: ${r.why}`);
-      return console.log(`cursor: ${cursor}`);
-    }
+    case 'feed':
+      return printFeed(engine, Number(arg) || 0);
 
     case 'sweep':
       return sweepBodies(engine, argv.slice(1));
+
+    case 'forget':
+      return forgetTasks(engine, argv.slice(1));
 
     case 'watch': {
       const from = Number(arg) || 0;

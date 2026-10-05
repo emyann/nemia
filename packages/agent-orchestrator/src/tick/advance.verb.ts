@@ -21,6 +21,7 @@ import { checkTaskId, isGitRun, stepTaskId, tryOf, type CloseoutAsked, type Run,
 import { budgetOf, landsOnCheck, sentBack, stepStatus, type RoundAsk, type SpendOf } from '../status/status.ts';
 import { hasStarted, holdsOf, runReady, waitsOf, type ParentRun, type Wait } from '../wait/wait.ts';
 import { handOffDue } from '../workspace/workspace.ts';
+import { inParts } from '../brief/index.ts';
 import { assess, type Assessment } from './assess.ts';
 import { feedPhase, feedWords, type FeedWords } from '../feed/feed.ts';
 import { listing } from '../list/list.ts';
@@ -323,7 +324,7 @@ export const advancePass = Effect.fn('advancePass')(function* (e: Engine, run: R
   const feed = wordFeed(run, reads, assessed, admission, checkout);
 
   const notes: string[] = [...askNotes, ...handed.collected, ...landing.notes, ...liftNotes, ...closeNotes];
-  const f: Filing = { e, run, reads, closer, mayFile: mayFileOf(run), notes };
+  const f: Filing = { e: { ...e, file: (spec) => e.file(inParts(spec)) }, run, reads, closer, mayFile: mayFileOf(run), notes };
   const { tried, rechecked } = yield* fileTries(f, assessed.retry);
   const looped = yield* fileRounds(f, assessed.round);
   const checked = yield* fileChecks(f, [...assessed.check, ...rechecked]);

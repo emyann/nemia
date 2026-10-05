@@ -192,8 +192,9 @@ export type Closer = {
 };
 
 /**
- * One pass's filing: the engine, the run, what the pass read (`PassReads`), its closer (`Closer`), whether it may file still (`mayFile`,
- * made by `mayFileOf` once a pass), and the pass's notes, which each filing adds to in the order it runs.
+ * One pass's filing: the engine, which files each brief with its parts beside it (`inParts`, given by `advancePass`), the run, what
+ * the pass read (`PassReads`), its closer (`Closer`), whether it may file still (`mayFile`, made by `mayFileOf` once a pass), and the
+ * pass's notes, which each filing adds to in the order it runs.
  */
 export type Filing = { e: Engine; run: Run; reads: PassReads; closer: Closer; mayFile: () => boolean; notes: string[] };
 

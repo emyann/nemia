@@ -3051,6 +3051,38 @@ test('a declared artifact is from the workspace by a relative path — refused w
   }
 });
 
+test('REFUSED: a declared artifact through a folder a harness reads as its own configuration is placed `configuration`, after escapes and outside', () => {
+  for (const f of [
+    '.claude/skills/x/SKILL.md',
+    'docs/.claude/agents/a.md',
+    './.claude/settings.json',
+    'docs/../.claude/skills/x/SKILL.md',
+    `${FILES}/.claude/skills/x/SKILL.md`,
+    `${FILES}/shots/.claude/x.md`,
+  ])
+    assert.equal(artifactPlace(f, FILES), 'configuration', f);
+  for (const f of ['claude/x.md', '.claude-notes/x.md', 'x.claude', '.e2e/shot.png']) assert.equal(artifactPlace(f, FILES), 'workspace', f);
+  assert.equal(artifactPlace(`${FILES}/claude/x.png`, FILES), 'files');
+  assert.equal(
+    artifactPlace('/srv/.claude/r/files/shot.png', '/srv/.claude/r/files'),
+    'files',
+    'only the path inside the directory counts',
+  );
+  assert.equal(artifactPlace('../.claude/x', FILES), 'escapes');
+  assert.equal(artifactPlace('/etc/.claude/x', FILES), 'outside');
+  assert.equal(artifactPlace(`${FILES}-old/.claude/x`, FILES), 'outside');
+});
+
+test('the brief says a file under a configuration folder is not handed over, naming the folder; `nemia decide` names one refused so', () => {
+  for (const contract of [artifactsContract(FILES), artifactsContract(FILES, false, true)])
+    assert.match(contract, /A file whose path passes through `\.claude`, a folder a harness reads as its own configuration, is\nrefused/);
+  assert.doesNotMatch(artifactsContract(FILES, true), /configuration/, 'nothing follows a step in the checkout to read it');
+  assert.deepEqual(artifactLines(FILES, [{ path: '.claude/skills/x/SKILL.md', why: 'configuration' }], []), [
+    '!! declared through a folder a harness reads as its own configuration, and not handed over: .claude/skills/x/SKILL.md' +
+      '  — the steps after it would read it as theirs; name it outside `.claude`',
+  ]);
+});
+
 test("`nemia decide` tells apart why a declared file is missing — each refusal named, never passed over — then lists the step's files with their sizes", () => {
   const lines = artifactLines(
     FILES,

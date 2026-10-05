@@ -72,7 +72,8 @@ the harnesses that do (`HarnessSpec.mounts`, `mountsMisplaced` in `src/service/h
   as well as reads where the mode lets a session write; the deny holds the folder read-only in `dontAsk`, `acceptEdits`, `auto`
   and `bypassPermissions`, a Bash redirection into it included. A read-only path a permission rule cannot name — a space, a
   comma, a parenthesis, a glob's character — is refused. `--add-dir` also lists the folder's own `.claude/skills` in the
-  session; its `CLAUDE.md` is not read.
+  session; its `CLAUDE.md` is not read. The vocabulary door names the folders a harness reads so as its own configuration
+  (`CONFIG_FOLDERS`, `configFolderIn`), for a caller that puts files into a folder it mounts.
 - **Codex** holds a read-only mount and is given nothing for it: its `read-only` and `workspace-write` sandboxes read the whole
   disk and write only the workspace. It refuses a read-only mount in `danger-full-access`, which writes everywhere, and a writable
   one, which only `--add-dir` would give and `exec resume` rejects.
@@ -1996,6 +1997,7 @@ of pure code sits beside it.
 | `src/harness/args.ts` | a task's harness arguments, `HarnessArgs`: the adapter's configuration, carried as one `config`, and the checks every harness shares of it (`argsRefusalOf`), asked through every `Runner` |
 | `src/harness/reach.ts` | what a harness's fence words reach, `fenceReach`: each word's rank, the one a task naming none runs in, the held and unasking modes, and the modes Claude Code drops on a model |
 | `src/harness/choices.ts` | the words each default harness takes per key of a task's config, `HARNESS_CHOICES`: its efforts, its permission modes or its sandboxes, the lists `configRefusal` judges by |
+| `src/harness/config-folders.ts` | the folders a harness reads as its own configuration inside a folder it is given to read, `CONFIG_FOLDERS`, and the first a path passes through, `configFolderIn`: pure, for a caller that puts files into a mounted folder |
 | `src/harness/mounts.ts` | a task's mounts, `Mount`: the folders beyond its `cwd` a session may reach, each read-only or writable, and the check of their shape every harness shares (`mountsRefusalOf`) |
 | `src/harness/mcp.ts` | a task's MCP servers: what is refused, the configs written, and Claude Code's flags for them; for Codex, the server names its config already has and a task's servers as its `mcp_servers` table |
 | `src/harness/transcript.ts` | the one transcript reader behind every harness's `transcript`, and its cursor |

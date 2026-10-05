@@ -291,3 +291,9 @@ export const claudeCodeRefuses = (task: Omit<SpawnRequest, 'name'>): string | un
  */
 export const worktreeName = (r: SpawnRequest): string =>
   typeof r.config?.worktree === 'string' ? r.config.worktree : r.name.replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+/**
+ * The folders Claude Code reads as its own configuration inside a folder it is given by `--add-dir`: `.claude`, whose `skills` it lists
+ * in the session (its `CLAUDE.md` is not read). Taken whole, since what it does with the folder's other subfolders is unmeasured.
+ */
+export const CLAUDE_CONFIG_FOLDERS: readonly string[] = ['.claude'];

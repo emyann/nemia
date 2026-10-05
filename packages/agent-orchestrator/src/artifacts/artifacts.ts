@@ -4,6 +4,7 @@
  * (`artifactLines`). Pure: `artifacts.store.ts` copies them.
  */
 import path from 'node:path';
+import { CONFIG_FOLDERS, configFolderIn } from 'agent-runtime/vocabulary';
 import { filesPrunedWords, type Mount, type Pruned } from '../record/record.ts';
 import { sandboxed, upstreamOf } from '../workflow/index.ts';
 import type { Workflow } from '../step/step.ts';
@@ -32,6 +33,10 @@ import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
  * `dontAsk` (`validateFolderMode` in workflow/validate.ts), fenced to its own folder, and that directory sits beside the folder, outside
  * the fence: told to put a file there, the session is denied. The second way needs nothing outside the fence and hands the file over all
  * the same. So it too is told one way, and neither mentions a branch, since a folder run has none.
+ *
+ * Both of the ways that hand files to the steps after say that a file through a folder a harness reads as its own configuration
+ * (`CONFIG_FOLDERS`) is refused, and why: a later step reads the files directory as a mounted folder, and its harness would take such a
+ * file as its own. The checkout's way hands nothing to a later step, and says nothing of it.
  */
 export const artifactsContract = (dir: string, inMain = false, inFolder = false): string =>
   (inFolder
@@ -46,6 +51,8 @@ export const artifactsContract = (dir: string, inMain = false, inFolder = false)
         'Write nowhere else. This folder is yours and everything outside it is denied without asking, since there is',
         'nobody to ask. Refused, and not read: an absolute path, and a path that climbs out of this folder with `..`.',
         'A directory is not collected, nor a file that is not there: name each file.',
+        '',
+        ...configurationRefused('copied out'),
       ]
     : inMain
       ? [
@@ -77,8 +84,16 @@ export const artifactsContract = (dir: string, inMain = false, inFolder = false)
           "The run's check of this step is given the same directory as `WF_ARTIFACTS`. Refused, and not read: an absolute",
           'path anywhere else, and a path that climbs out of the workspace with `..`. A directory is not collected, nor a',
           'file that is not there: name each file.',
+          '',
+          ...configurationRefused('handed over'),
         ]
   ).join('\n');
+
+/** The brief's lines saying a file through a configuration folder (`CONFIG_FOLDERS`) is refused, and not `done` with it, and why. */
+const configurationRefused = (done: string): string[] => [
+  `A file whose path passes through ${CONFIG_FOLDERS.map((f) => `\`${f}\``).join(' or ')}, a folder a harness reads as its own configuration, is`,
+  `refused, and not ${done}: the steps after you read your files in a folder of theirs, and would take it as their own.`,
+];
 
 /**
  * Where a declared artifact is looked for. Pure: it reads the path, never the disk.
@@ -90,17 +105,23 @@ export const artifactsContract = (dir: string, inMain = false, inFolder = false)
  *   outside    any other absolute path — refused. A closeout is an agent's text, and the run does not
  *              look at a file on this machine because a step named it. `..` is resolved first, so a path
  *              that climbs out of the directory is outside however it is spelled.
+ *   configuration  a path from the workspace root, or one inside the files directory, that passes through a
+ *              folder a harness reads as its own configuration (`configFolderIn`) — refused, and never
+ *              collected: the steps after read the files directory as a mounted folder, and their harness
+ *              would take the file as its own. Asked after `escapes` and `outside`.
  */
-export type ArtifactPlace = 'workspace' | 'files' | 'escapes' | 'outside';
+export type ArtifactPlace = 'workspace' | 'files' | 'escapes' | 'outside' | 'configuration';
 
 /** Where a declared artifact is looked for (`ArtifactPlace`). Pure. The files directory itself is no file in it, and is `outside`. */
 export function artifactPlace(file: string, dir: string): ArtifactPlace {
   if (!path.isAbsolute(file)) {
     const rel = path.normalize(file);
-    return rel === '..' || rel.startsWith(`..${path.sep}`) ? 'escapes' : 'workspace';
+    if (rel === '..' || rel.startsWith(`..${path.sep}`)) return 'escapes';
+    return configFolderIn(rel) ? 'configuration' : 'workspace';
   }
   const within = path.relative(path.resolve(dir), path.resolve(file));
-  return within && within !== '..' && !within.startsWith(`..${path.sep}`) && !path.isAbsolute(within) ? 'files' : 'outside';
+  if (!within || within === '..' || within.startsWith(`..${path.sep}`) || path.isAbsolute(within)) return 'outside';
+  return configFolderIn(within) ? 'configuration' : 'files';
 }
 
 /** A file in a step's files directory, by absolute path, and its size. */
@@ -116,8 +137,12 @@ export type ArtifactFile = { path: string; bytes: number };
  *   missing        an absolute path in the step's files directory that is not a file there
  *   escapes        a path that climbs out of the workspace, as written or through a link in it: refused, and not read
  *   outside        an absolute path outside the step's files directory: refused, and not read
+ *   configuration  a path through a folder a harness reads as its own configuration (`ArtifactPlace`): refused, and not handed over
  */
-export type MissingArtifact = { path: string; why: 'not there' | 'directory' | 'not collected' | 'missing' | 'escapes' | 'outside' };
+export type MissingArtifact = {
+  path: string;
+  why: 'not there' | 'directory' | 'not collected' | 'missing' | 'escapes' | 'outside' | 'configuration';
+};
 
 /**
  * What `nemia decide` prints about a step's files, after its closeout: each declared file the run does not have, told apart by why —
@@ -150,6 +175,12 @@ export function artifactLines(dir: string, missing: readonly MissingArtifact[], 
       (names) => `!! declared outside the workspace, and not read: ${names}  — name a file from the workspace root, or put it in ${dir}`,
     ),
     ...line('outside', (names) => `!! declared outside ${dir}, and not read: ${names}  — a step's files go in its own directory`),
+    ...line(
+      'configuration',
+      (names) =>
+        `!! declared through a folder a harness reads as its own configuration, and not handed over: ${names}` +
+        `  — the steps after it would read it as theirs; name it outside ${CONFIG_FOLDERS.map((f) => `\`${f}\``).join(' or ')}`,
+    ),
     ...(files.length ? ['files:', ...files.map((f) => `  ${f.path}  ${sizeOf(f.bytes)}`)] : []),
   ];
 }

@@ -1056,6 +1056,49 @@ test('the fold keeps the last word of each run and step, forgets a removed run, 
   ]);
 });
 
+test('REFUSED: a run at rest whose words stand owes no line for a note reworded — a word moved, a step new to the fold and a run gone still do', () => {
+  const at = '2026-10-05T19:29:00.000Z';
+  const fold = foldFeed(new Map(), [
+    { at, run: 'r-1', word: 'succeeded' },
+    { at, run: 'r-1', step: 'plan', word: 'done' },
+    { at, run: 'r-2', word: 'succeeded' },
+  ]);
+  const reworded = {
+    run: { word: 'succeeded', note: 'a note it never had' },
+    steps: [{ name: 'plan', word: 'done', note: 'denied: Bash(git push) ×1' }],
+  };
+  assert.deepEqual(
+    feedChanges(fold, new Map([['r-1', { ...reworded, atRest: true as const }]]), at, new Set(['r-2'])),
+    [],
+    'at rest, the same words with new notes are a change of wording, not of the run',
+  );
+  assert.deepEqual(
+    feedChanges(fold, new Map([['r-1', reworded]]), at, new Set(['r-2'])),
+    [
+      { at, run: 'r-1', word: 'succeeded', note: 'a note it never had' },
+      { at, run: 'r-1', step: 'plan', word: 'done', note: 'denied: Bash(git push) ×1' },
+    ],
+    'in flight, a note that moved is a line',
+  );
+  const moved = { ...reworded, atRest: true as const, steps: [{ name: 'plan', word: 'failed', note: 'denied: Bash(git push) ×1' }] };
+  assert.deepEqual(
+    feedChanges(fold, new Map([['r-1', moved]]), at, new Set(['r-2'])),
+    [{ at, run: 'r-1', step: 'plan', word: 'failed', note: 'denied: Bash(git push) ×1' }],
+    'at rest, a word that moved is a line, with its note',
+  );
+  const added = { ...reworded, atRest: true as const, steps: [...reworded.steps, { name: 'ship', word: 'done' }] };
+  assert.deepEqual(
+    feedChanges(fold, new Map([['r-1', added]]), at, new Set(['r-2'])),
+    [{ at, run: 'r-1', step: 'ship', word: 'done' }],
+    'at rest, a step the feed never named says its word',
+  );
+  assert.deepEqual(
+    feedChanges(fold, new Map([['r-1', { ...reworded, atRest: true as const }]]), at),
+    [{ at, run: 'r-2', word: 'removed' }],
+    'a run gone from the store is removed, at rest or not',
+  );
+});
+
 test('each line written is published with the bytes it was written at: after the newline that ended a torn line, in bytes not characters', () => {
   const at = '2026-09-22T10:00:00.000Z';
   const lines: FeedLine[] = [

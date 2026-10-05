@@ -130,8 +130,8 @@ function upStats(): void {
 /**
  * `nemia up`: the headless daemon, a pass every interval until it is stopped, or `--stats`. It refuses its interval (`everyOf`) and its
  * ceilings (`ceilings`) before it takes the store, then runs the daemon's controller (`up`) as `nemia up` under `runMain`, its passes
- * said through the process's telemetry (`telemetryLayer`). A queued card that names no repository starts on the one it is typed in, as `nemia start` takes
- * `.`.
+ * said through the process's telemetry (`telemetryLayer`). A queued card that names no repository starts on the one it is typed in, as
+ * `nemia start` takes `.`.
  */
 function upVerb(args: Args, e: Engine): void | Promise<void> {
   if (args.stats === true) return upStats();

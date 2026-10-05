@@ -1,8 +1,9 @@
 /**
  * The daemon's process's telemetry, one layer that process provides around what it runs (`telemetryLayer`): each log printed as `nemia up`
- * prints its lines, and, only when its environment names an OTLP collector, its spans and its logs exported there too.
+ * prints its lines, and, only when its environment names an OTLP collector, its spans and its logs exported there too. And what a pass's
+ * work on one step says of itself, the run and the step, on the spans and logs under it (`forStep`).
  */
-import { Layer, Logger, LogLevel } from 'effect';
+import { Effect, Layer, Logger, LogLevel } from 'effect';
 import { FetchHttpClient } from 'effect/http';
 import { OtlpLogger, OtlpSerialization, OtlpTracer, type OtlpExporter } from 'effect/observability';
 import { lineOf, logsUrl, otlpOf, tracesUrl } from './telemetry.ts';
@@ -30,3 +31,12 @@ export function telemetryLayer(env: Readonly<Record<string, string | undefined>>
   );
   return exported.pipe(Layer.provide(OtlpSerialization.layerJson), Layer.provide(FetchHttpClient.layer));
 }
+
+/**
+ * `filing`, a pass's work on the step `step` of the run `run`, with its spans and its logs annotated with both: the runtime's spans
+ * under it, and the journal it writes, say which they were for, beside the runtime's own task.
+ */
+export const forStep =
+  (run: string, step: string) =>
+  <A, E, R>(filing: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
+    filing.pipe(Effect.annotateLogs({ run, step }), Effect.annotateSpans({ run, step }));

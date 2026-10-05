@@ -22,8 +22,9 @@
  * agent, the agents of both places read, the steps each fills, an agent's try folder written, a person's custom instructions for one, and
  * a skill read and written), `place.store.ts` (a place skill's verbs run and heard), `plan.store.ts` (a plan folder read),
  * `inbox.store.ts` (the inbox's cards filed, queued and dropped), `factory.store.ts` (the factories, `factoriesDir`), `config.store.ts`
- * (the `WF_` environment) and `telemetry.store.ts` (what a daemon's process logs and exports, `telemetryLayer`). They import neither the runtime nor a controller, and load as a tree: the bottom, beneath `record.store.ts`,
- * beneath `worktree.store.ts` and `write.store.ts`, beneath the rest, so no cycle can form (`test/boundary.test.ts`).
+ * (the `WF_` environment) and `telemetry.store.ts` (what a daemon's process logs and exports, `telemetryLayer`). They import neither
+ * the runtime nor a controller, and load as a tree: the bottom, beneath `record.store.ts`, beneath `worktree.store.ts` and
+ * `write.store.ts`, beneath the rest, so no cycle can form (`test/boundary.test.ts`).
  */
 export { verdictWord } from './check/check.ts';
 export { VERSION } from './version/version.ts';

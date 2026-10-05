@@ -45,6 +45,7 @@ const run = (id: string, extra: Partial<RunSummary> = {}, steps: readonly string
   onYou: [],
   after: [],
   waiting: null,
+  context: [],
   heldUntil: [],
   holding: null,
   toDecide: null,

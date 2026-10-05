@@ -57,6 +57,8 @@ export type RunSummary = {
   pruned: { said: string } | null;
   /** The runs this one waits on (the CLI's `start --after`), as its record froze them: the edges into its card on the Factory. */
   after: string[];
+  /** The runs it is handed as context (the CLI's `start --from`), read and never waited on: no edge on the Factory but on its focus. */
+  context: string[];
   /** The runs its roots still wait on, in the package's words (`RunWaiting`); null once there are none, or the run has started. */
   waiting: RunWaiting | null;
   /**
@@ -127,6 +129,7 @@ const RunSummarySchema = Schema.Struct({
   cancelledAt: Schema.NullOr(Schema.String),
   pruned: Schema.NullOr(Schema.Struct({ said: Schema.String })),
   after: StringsSchema,
+  context: StringsSchema,
   waiting: Schema.NullOr(RunWaitingSchema),
   heldUntil: StringsSchema,
   holding: Schema.NullOr(RunHoldingSchema),
@@ -165,6 +168,26 @@ export const runsQuery = queryOptions({
   queryFn: () => get('/api/runs', Schema.mutable(Schema.Array(RunSummarySchema))),
   refetchInterval: () => pace(5_000),
 });
+
+/**
+ * What a run started now with this one as context would be handed of it, as the CLI's `concluded` prints it: the run, whether it has
+ * shipped, and its section, in the words the run's steps would read.
+ */
+export type Concluded = { run: string; shipped: boolean; section: string };
+
+/** Decodes a `Concluded`. */
+const ConcludedSchema = Schema.Struct({
+  run: Schema.String,
+  shipped: Schema.Boolean,
+  section: Schema.String,
+}) satisfies Schema.Schema<Concluded>;
+
+/** What a run would hand as context now (`GET /api/runs/:runId/concluded`): read again with the runs, since a source in flight moves on. */
+export const concludedQuery = (id: string) =>
+  queryOptions({
+    queryKey: ['runs', id, 'concluded'],
+    queryFn: () => get(`/api/runs/${encodeURIComponent(id)}/concluded`, ConcludedSchema),
+  });
 
 /** What a removal answers: the run removed. */
 const RemovedSchema = Schema.Struct({ id: Schema.String, removed: Schema.Literal(true) }) satisfies Schema.Schema<{

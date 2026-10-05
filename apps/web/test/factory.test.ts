@@ -19,6 +19,7 @@ import {
   placeRuns,
   repoName,
   runEdges,
+  contextEdges,
   runClock,
   standingOf,
   TILES_FRAME,
@@ -77,6 +78,7 @@ const run = (statuses: readonly string[], extra: Partial<RunSummary> = {}): RunS
   onYou: extra.waitingOnYou ?? [],
   after: [],
   waiting: null,
+  context: [],
   heldUntil: [],
   holding: null,
   toDecide: null,
@@ -714,34 +716,55 @@ test("a factory's floor draws its own run waiting on a run of another factory, a
 
 const at = (minutes: number) => new Date(Date.UTC(2026, 8, 14, 0, minutes)).toISOString();
 
-test('the floor is every run in flight, and each finished run one of them waits on — and every run once finished runs are asked for', () => {
+/** What the api says of a card that still waits on `runs` before anything of it is filed (`RunWaiting`). */
+const waitsOn = (...runs: string[]): RunSummary['waiting'] => ({
+  runs: runs.map((run) => ({ run, missing: false, cancelledAt: null, gone: [] })),
+  word: `waiting on ${runs.join(', ')}`,
+  advice: '',
+  onYou: false,
+});
+
+test('the floor is every run in flight, and each finished run one of them still waits on — and every run once finished runs are asked for', () => {
   const runs = [
     run([], { id: 'z', status: 'succeeded', createdAt: at(0) }),
     run([], { id: 'a', status: 'succeeded', createdAt: at(1) }),
-    run([], { id: 'b', moving: true, after: ['a'], createdAt: at(2) }),
+    run([], { id: 'b', after: ['a'], waiting: waitsOn('a'), createdAt: at(2) }),
     run([], { id: 'c', status: 'cancelled', cancelledAt, createdAt: at(3) }),
     run([], { id: 'e', after: ['c'], waiting: waitingOn(true), createdAt: at(4) }),
     run([], { id: 'y', status: 'succeeded', after: ['z'], createdAt: at(5) }),
+    run([], { id: 'x', status: 'succeeded', createdAt: at(6) }),
+    run(['running (working)'], { id: 's', moving: true, after: ['x'], createdAt: at(7) }),
   ];
   assert.deepEqual(
     floorRuns(runs, false).map((r) => r.id),
-    ['a', 'b', 'e'],
-    "a, shipped and waited on by b in flight, is on the floor for b's edge to leave from; e waits on you, and its waiting line names c, " +
-      'which brings no card; y, finished, brings no z',
+    ['a', 'b', 'e', 's'],
+    "a, finished and still waited on by b in flight, is on the floor for b's edge to leave from; e waits on you, and its waiting line " +
+      'names c, which brings no card; y, finished, brings no z; s has started, its wait on x over, and brings no x',
   );
   assert.deepEqual(
     floorRuns(runs, true).map((r) => r.id),
-    ['z', 'a', 'b', 'c', 'e', 'y'],
+    ['z', 'a', 'b', 'c', 'e', 'y', 'x', 's'],
   );
   const chain = [
     run([], { id: 'g', status: 'succeeded', createdAt: at(0) }),
     run([], { id: 'p', status: 'succeeded', after: ['g'], createdAt: at(1) }),
-    run([], { id: 'k', moving: true, after: ['p'], createdAt: at(2) }),
+    run([], { id: 'k', after: ['p'], waiting: waitsOn('p'), createdAt: at(2) }),
   ];
   assert.deepEqual(
     floorRuns(chain, false).map((r) => r.id),
     ['p', 'k'],
     'one level: a finished parent brings none of its own parents',
+  );
+});
+
+test('a finished run read as context and waited on by nobody is kept off the floor: context is no wait', () => {
+  const runs = [
+    run([], { id: 'source', status: 'succeeded', createdAt: at(0) }),
+    run(['waiting'], { id: 'reader', moving: true, context: ['source'], createdAt: at(1) }),
+  ];
+  assert.deepEqual(
+    floorRuns(runs, false).map((r) => r.id),
+    ['reader'],
   );
 });
 
@@ -968,21 +991,48 @@ test('a run that stops moving drops below the runs still going, whenever it star
   );
 });
 
-test('an edge from each run a card waits on to its card, both on the floor: to come until the child starts, and done once it has', () => {
+test('an edge from each run a card still waits on to its card, both on the floor, to come — reduced: A→B, B→C and A→C draws only A→B and B→C', () => {
   const edges = runEdges([
     run(['verified ✓'], { id: 'a' }),
-    run(['running (working)'], { id: 'b', after: ['a'] }),
-    run(['waiting'], { id: 'd', after: ['a', 'b', 'off-the-floor', 'a'] }),
+    run(['waiting'], { id: 'b', after: ['a'], waiting: waitsOn('a') }),
+    run(['waiting'], { id: 'c', after: ['a', 'b'], waiting: waitsOn('a', 'b', 'off-the-floor', 'a') }),
   ]);
   assert.deepEqual(
     edges,
     [
-      { id: 'after:a->b', source: 'a', target: 'b', state: 'done' },
-      { id: 'after:a->d', source: 'a', target: 'd', state: 'to-come' },
-      { id: 'after:b->d', source: 'b', target: 'd', state: 'to-come' },
+      { id: 'after:a->b', source: 'a', target: 'b', state: 'to-come' },
+      { id: 'after:b->c', source: 'b', target: 'c', state: 'to-come' },
     ],
-    'b, with a step filed, has started; d has not, and a run it names twice is one edge, and one not on the floor is none',
+    'a→c goes by b, so it is not drawn; a run named twice is one edge, and one not on the floor is none',
   );
+});
+
+test('a wait that is over draws nothing: a card started after its waits, and a hold whose run shipped', () => {
+  assert.deepEqual(
+    runEdges([run(['verified ✓'], { id: 'a' }), run(['running (working)'], { id: 'b', after: ['a'], waiting: null })]),
+    [],
+    'b has started: its parents shipped, and it waits on none',
+  );
+  const shipped = { ...holdingOn(false), runs: [{ run: 'a', missing: false, cancelledAt: null, gone: [], shipped: true }] };
+  assert.deepEqual(
+    runEdges([run(['verified ✓'], { id: 'a' }), run(['awaiting approval'], { id: 'h', heldUntil: ['a'], holding: shipped })]),
+    [],
+  );
+});
+
+test('the lines of what a card reads are drawn only for the focused card: one from each run in its context on the floor, none without a focus', () => {
+  const runs = [
+    run(['verified ✓'], { id: 'a' }),
+    run(['running (working)'], { id: 'b' }),
+    run(['waiting'], { id: 'c', context: ['a', 'b', 'off-the-floor', 'a', 'c'] }),
+  ];
+  assert.deepEqual(contextEdges(runs, null), [], 'no focus, no line');
+  assert.deepEqual(contextEdges(runs, 'a'), [], 'a reads nothing');
+  assert.deepEqual(contextEdges(runs, 'c'), [
+    { id: 'read:a->c', source: 'a', target: 'c' },
+    { id: 'read:b->c', source: 'b', target: 'c' },
+  ]);
+  assert.deepEqual(runEdges(runs), [], 'and none of it is a wait');
 });
 
 /** The diamond: a, then b and c together, then d. */
@@ -1401,12 +1451,16 @@ test('a held run stays on the floor while it is held, and brings the finished ru
   );
 });
 
-test('an edge from each run a card is held until, both on the floor, drawn as an `after` edge — to come while the hold stands, whether or not the card started — and none where an `after` edge already joins the two', () => {
+test('an edge from each run a card is held until that has not shipped, both on the floor, drawn as an `after` edge — and none where an `after` edge already joins the two', () => {
+  const held = (...runs: string[]): RunSummary['holding'] => ({
+    ...holdingOn(false),
+    runs: runs.map((run) => ({ run, missing: false, cancelledAt: null, gone: [], shipped: false })),
+  });
   const edges = runEdges([
     run(['verified ✓'], { id: 'a' }),
     run(['running (working)'], { id: 'b' }),
-    run(['awaiting approval'], { id: 'h', heldUntil: ['a', 'b', 'a', 'off-the-floor', 'h'] }),
-    run(['waiting'], { id: 'd', after: ['a'], heldUntil: ['a'] }),
+    run(['awaiting approval'], { id: 'h', heldUntil: ['a', 'b'], holding: held('a', 'b', 'a', 'off-the-floor', 'h') }),
+    run(['waiting'], { id: 'd', after: ['a'], waiting: waitsOn('a'), heldUntil: ['a'], holding: held('a') }),
     run(['waiting'], { id: 'e' }),
   ]);
   assert.deepEqual(
@@ -1416,7 +1470,7 @@ test('an edge from each run a card is held until, both on the floor, drawn as an
       { id: 'hold:b->h', source: 'b', target: 'h', state: 'to-come' },
       { id: 'after:a->d', source: 'a', target: 'd', state: 'to-come' },
     ],
-    'h, started and held until a and b, has two edges to come; d, after a and held until it, one, the `after` one; e, with no `heldUntil`, none',
+    'h, started and held until a and b, has two edges to come; d, after a and held until it, one, the `after` one; e, held by nobody, none',
   );
   assert.deepEqual(
     runEdges([run(['verified ✓'], { id: 'a' }), run(['awaiting approval'], { id: 'h', heldUntil: [] })]),

@@ -45,6 +45,7 @@ const row = (extra: object = {}): RunSummary => ({
     advice: 'wait',
     onYou: false,
   },
+  context: [],
   heldUntil: [],
   holding: {
     at: '2026-09-30T05:00:00.000Z',

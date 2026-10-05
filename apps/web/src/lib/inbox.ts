@@ -26,8 +26,11 @@ export const hasPage = (entry: Pick<InboxEntry, 'name' | 'file'>, entries: reado
   !entry.name.startsWith('.') &&
   (isCard(entry) || !entries.some((other) => other.name === entry.name && isCard(other)));
 
-/** A start, a drop, a queue or its taking back the api refused: the card as the page listed it, what was asked, and the api's words. */
-export type CardRefusal = { entry: InboxEntry; action: 'start' | 'remove' | 'queue' | 'unqueue'; message: string };
+/**
+ * A start, a drop, a queue or its taking back, or a `from:` set, the api refused: the card as the page listed it, what was asked, and the
+ * api's words.
+ */
+export type CardRefusal = { entry: InboxEntry; action: 'start' | 'remove' | 'queue' | 'unqueue' | 'from'; message: string };
 
 /**
  * A line of the inbox page: a card, with the refusal it was last given, or one the inbox no longer lists (`gone`), kept for its refusal.

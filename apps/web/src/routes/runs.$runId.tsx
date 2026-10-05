@@ -278,7 +278,7 @@ function StepSection({ run, step, runCancelled }: { run: RunDetail; step: Step; 
 
       {step.body && <Markdown className="text-sm">{step.body}</Markdown>}
 
-      <Told told={step.told} layers={step.layers} filed={step.taskId !== null} />
+      <Told told={step.told} layers={step.layers} parts={step.taskParts} filed={step.taskId !== null} />
 
       <Facts
         rows={[

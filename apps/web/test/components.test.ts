@@ -49,7 +49,7 @@ const { renderToStaticMarkup } = await import('react-dom/server');
 const { StatusChip, StepNote } = await import('../src/components/StatusChip.tsx');
 const { StepTabs } = await import('../src/components/StepInspector.tsx');
 const { StepNode } = await import('../src/components/StepNode.tsx');
-const { afterEdges, stepData, stepEdges } = await import('../src/components/stepGraph.ts');
+const { afterEdges, readEdges, stepData, stepEdges } = await import('../src/components/stepGraph.ts');
 const { StepRail, StepTiles } = await import('../src/components/StepRail.tsx');
 const { flowSteps, railOf, tilesOf } = await import('../src/lib/flow.ts');
 const { StateEdge } = await import('../src/components/StateEdge.tsx');
@@ -68,6 +68,7 @@ type RunSummary = import('../src/lib/api.ts').RunSummary;
 type StepUsed = import('../src/lib/api.ts').StepUsed;
 type Decidable = import('../src/lib/api.ts').Decidable;
 type StepLayers = import('../src/lib/api.ts').StepLayers;
+type TaskPart = import('../src/lib/api.ts').TaskPart;
 type StateFlowEdge = import('../src/components/StateEdge.tsx').StateFlowEdge;
 type EdgeMarker = import('@xyflow/react').EdgeMarker;
 
@@ -140,6 +141,7 @@ function runWith(note: string | null): RunDetail {
     onDisk: { worktrees: true, files: true },
     after: [],
     waiting: null,
+    context: [],
     heldUntil: [],
     holding: null,
     status: 'failed',
@@ -162,6 +164,7 @@ function runWith(note: string | null): RunDetail {
         body: 'Review it.',
         told: null,
         layers: null,
+        taskParts: null,
         taskId: 't-1',
         workspace: null,
         files: [],
@@ -3170,13 +3173,13 @@ test('REFUSED: an ending that waits on nothing is offered no send-back, since a 
   );
 });
 
-test("the Factory's legend adds the edge between two cards, dashed and still as it is while a run waits on a run — and a run's page's legend does not", () => {
+test("the Factory's legend adds the edge between two cards, dashed and still as it is while a run waits until one ships, and the faint dotted line of a run read — and a run's page's legend does not", () => {
   const legendOf = (cards: boolean) =>
     withMotion(false, () => renderToStaticMarkup(createElement(ReactFlowProvider, null, createElement(CanvasLegend, { cards }))));
   const itemsOf = (html: string) =>
     new Map(
       html
-        .split('<span class="flex items-center gap-1">')
+        .split(/<span class="flex items-center gap-1"(?: title="[^"]*")?>/)
         .slice(1)
         .map((item) => [/([a-z ]+)<\/span>(?:<\/div>)?$/.exec(item)?.[1], item]),
     );
@@ -3184,38 +3187,33 @@ test("the Factory's legend adds the edge between two cards, dashed and still as 
   const items = itemsOf(legendOf(true));
   assert.deepEqual(
     [...items.keys()],
-    ['to come', 'running', 'done', 'loops back', 'waits on a run', 'human gate', 'to decide'],
-    'the edge between cards, and the ring round a card whose result nobody has decided, which only the Factory draws',
+    ['to come', 'running', 'done', 'loops back', 'waits until it ships', 'reads what it concluded', 'human gate', 'to decide'],
+    'the edge between cards, the line of what a card reads, and the ring round a card whose result nobody has decided, which only the Factory draws',
   );
   assert.match(items.get('to decide')!, /ring-1 ring-emerald-500/);
-  const cards = items.get('waits on a run')!;
+  const html = legendOf(true);
+  assert.match(html, /title="A run that has started draws no line from its waits\."[^>]*>[\s\S]*?waits until it ships/);
+  const reads = items.get('reads what it concluded')!;
+  assert.match(reads, /data-sample="reads"/);
+  assert.match(reads, /stroke-dasharray:1 5/);
+  assert.doesNotMatch(reads, / Z"/, 'no arrow: it waits on nothing');
+  const cards = items.get('waits until it ships')!;
   assert.match(cards, /data-sample="cards"/);
   assert.equal((cards.match(/<rect /g) ?? []).length, 2, 'a card at each end');
   assert.match(cards, /stroke:var\(--edge-to-come\);stroke-width:1.5;stroke-dasharray:5 4/);
   assert.equal(travelling(cards).length, 0);
 });
 
-test('the edges between cards are drawn as every edge is: from a run into each card that waits on it, dashed until its run starts, solid once it has, and moving never', () => {
-  const card = (id: string, after: string[], filed: boolean) => ({
-    id,
-    after,
-    steps: [
-      {
-        name: 'implement',
-        taskId: filed ? `t-${id}` : null,
-        branch: null,
-        status: filed ? 'running (working)' : 'waiting',
-        note: null,
-        roundDue: false,
-        needs: null,
-        blockedByHarness: false,
-        waitingFor: null,
-        approve: null,
-        denied: null,
-      },
-    ],
-  });
-  const edges = afterEdges([card('a', [], true), card('b', ['a'], true), card('d', ['a', 'b'], false)]);
+/** What the api says of a card that still waits on `runs` before anything of it is filed (`RunWaiting`); null for none. */
+const waitingOnRuns = (runs: string[]): RunSummary['waiting'] =>
+  runs.length
+    ? { runs: runs.map((run) => ({ run, missing: false, cancelledAt: null, gone: [] })), word: '', advice: '', onYou: false }
+    : null;
+
+test('the edges between cards are drawn only for live waits: dashed, out of one handle into the other, never moving — and a line of what the focused card reads, faint and dotted, with no arrow', () => {
+  const card = (id: string, waits: string[], context: string[] = []) => ({ id, waiting: waitingOnRuns(waits), context });
+  const runs = [card('a', []), card('b', ['a']), card('d', ['a', 'b'], ['a'])];
+  const edges = afterEdges(runs);
   const shape = ({ id, source, target, type, sourceHandle, targetHandle, data }: StateFlowEdge) => ({
     id,
     source,
@@ -3225,44 +3223,30 @@ test('the edges between cards are drawn as every edge is: from a run into each c
     targetHandle,
     data,
   });
+  const toCome = { type: 'state', sourceHandle: undefined, targetHandle: undefined, data: { state: 'to-come', loop: false } };
   assert.deepEqual(
     edges.map(shape),
     [
-      {
-        id: 'after:a->b',
-        source: 'a',
-        target: 'b',
-        type: 'state',
-        sourceHandle: undefined,
-        targetHandle: undefined,
-        data: { state: 'done', loop: false },
-      },
-      {
-        id: 'after:a->d',
-        source: 'a',
-        target: 'd',
-        type: 'state',
-        sourceHandle: undefined,
-        targetHandle: undefined,
-        data: { state: 'to-come', loop: false },
-      },
-      {
-        id: 'after:b->d',
-        source: 'b',
-        target: 'd',
-        type: 'state',
-        sourceHandle: undefined,
-        targetHandle: undefined,
-        data: { state: 'to-come', loop: false },
-      },
+      { id: 'after:a->b', source: 'a', target: 'b', ...toCome },
+      { id: 'after:b->d', source: 'b', target: 'd', ...toCome },
     ],
-    "out of a card's one source handle, on its right, and into its one target handle, on the left: no handle named",
+    "out of a card's one source handle, on its right, and into its one target handle, on the left: no handle named; a→d goes by b",
   );
-  const [done, toCome] = [edgeMarkup(edges[0]), edgeMarkup(edges[1])];
-  assert.match(toCome, /data-state="to-come"[^>]*stroke-dasharray:5 4|stroke-dasharray:5 4[^>]*data-state="to-come"/);
-  assert.match(done, /data-state="done"/);
-  assert.doesNotMatch(done, /stroke-dasharray/);
-  assert.equal(travelling(done + toCome).length, 0);
+  const markup = edges.map(edgeMarkup).join('');
+  assert.equal((markup.match(/stroke-dasharray:5 4/g) ?? []).length, 2, 'every wait dashed');
+  assert.equal(travelling(markup).length, 0);
+
+  assert.deepEqual(readEdges(runs, null), [], 'nothing read is drawn without a focus');
+  const [read, ...more] = readEdges(runs, 'd');
+  assert.deepEqual(more, []);
+  assert.deepEqual(
+    { id: read.id, source: read.source, target: read.target, className: read.className, markerEnd: read.markerEnd },
+    { id: 'read:a->d', source: 'a', target: 'd', className: 'context-edge', markerEnd: undefined },
+  );
+  const line = edgeMarkup(read);
+  assert.match(line, /data-state="read"/);
+  assert.match(line, /stroke-dasharray:1 5/);
+  assert.doesNotMatch(line, /marker-end/);
 });
 
 test("the run page's timeline: a row per try's session and per check, in the api's words — a recheck, a check still running, a task the engine lost — and the totals", async () => {
@@ -4192,33 +4176,27 @@ test("a held run's rail draws its gate and the steps not filed held, and its wor
   assert.deepEqual(pills, { implement: 'verified', tokens: 'unverified', review: 'working', theme: 'held', respond: 'held' }, html);
 });
 
-test('a hold is drawn between two cards as an --after edge is: from the run it is held until into the held card, dashed', () => {
-  const card = (id: string, heldUntil: string[]) => ({
+test('a hold is drawn between two cards as an --after edge is: from the run it is held until into the held card, dashed — and none once it shipped', () => {
+  const card = (id: string, held: Array<{ run: string; shipped: boolean }>) => ({
     id,
-    after: [],
-    heldUntil,
-    steps: [
-      {
-        name: 'plan',
-        taskId: `t-${id}`,
-        branch: null,
-        status: 'awaiting approval',
-        note: null,
-        roundDue: false,
-        needs: null,
-        blockedByHarness: false,
-        waitingFor: null,
-        approve: null,
-        denied: null,
-      },
-    ],
+    waiting: null,
+    holding: held.length
+      ? {
+          at: '2026-09-13T00:30:00.000Z',
+          runs: held.map((h) => ({ ...h, missing: false, cancelledAt: null, gone: [] })),
+          word: '',
+          advice: '',
+          onYou: false,
+        }
+      : null,
   });
-  const edges = afterEdges([card('p', []), card('h', ['p'])]);
+  const edges = afterEdges([card('p', []), card('h', [{ run: 'p', shipped: false }])]);
   assert.deepEqual(
     edges.map(({ id, source, target, type, data }) => ({ id, source, target, type, data })),
     [{ id: 'hold:p->h', source: 'p', target: 'h', type: 'state', data: { state: 'to-come', loop: false } }],
   );
   assert.match(edgeMarkup(edges[0]), /stroke-dasharray:5 4/);
+  assert.deepEqual(afterEdges([card('p', []), card('h', [{ run: 'p', shipped: true }])]), [], 'a hold whose run shipped is no wait');
 });
 
 const { HandedOn } = await import('../src/components/Closeout.tsx');
@@ -5222,9 +5200,20 @@ test('REFUSED: the Stats page draws no picker of the factory, which the sidebar 
 });
 
 /** A run's card on the floor, inside the router its title links with, as the floor draws it: shown in the bar or not (`inspected`). */
-async function cardMarkup(run: RunDetail, inspected: boolean): Promise<string> {
+async function cardMarkup(run: RunDetail, inspected: boolean, reads: string[] = []): Promise<string> {
   const { RunNode } = await import('../src/components/RunNode.tsx');
-  const data = { run, finished: false, open: false, detail: null, trouble: null, inspected, selected: null, onToggle() {}, onStep() {} };
+  const data = {
+    run,
+    reads,
+    finished: false,
+    open: false,
+    detail: null,
+    trouble: null,
+    inspected,
+    selected: null,
+    onToggle() {},
+    onStep() {},
+  };
   const props = { id: run.id, type: 'run' as const, data, dragging: false, zIndex: 0, isConnectable: false, positionAbsoluteX: 0 };
   return routedWith(createElement(ReactFlowProvider, null, createElement(RunNode, { ...props, positionAbsoluteY: 0 } as never)));
 }
@@ -5236,6 +5225,30 @@ test('the card the bar shows is ringed and marked as inspected, and a card it do
   const other = await cardMarkup(atGate(), false);
   assert.doesNotMatch(other, /data-inspected/);
   assert.doesNotMatch(other, /ring-2 ring-ring/);
+});
+
+test('a card that reads runs as context says how many in a chip, each run on hover by its id and title — and a card that reads none has none', async () => {
+  const { readsLines } = await import('../src/lib/factory.ts');
+  const reader = atGate({}, { context: ['shipped-a1', 'gone-b2'] });
+  const reads = readsLines(reader, [{ id: 'shipped-a1', brief: '# Cache the floor\nand more' }]);
+  assert.deepEqual(reads, ['shipped-a1 — Cache the floor', 'gone-b2'], 'a run the list does not have is said by its id');
+  const html = await cardMarkup(reader, false, reads);
+  const chip = /<span[^>]*data-context="true"[^>]*>[\s\S]*?<\/span>/.exec(html)?.[0] ?? '';
+  assert.match(chip, /title="shipped-a1 — Cache the floor\ngone-b2"/);
+  assert.match(chip, />⧉ reads 2 runs</);
+  assert.doesNotMatch(await cardMarkup(atGate(), false), /data-context/);
+});
+
+test('a run picked to read shows what it would hand, as markdown — badged not shipped, not judged where it has not shipped, and unbadged where it has', async () => {
+  const { ConcludedPreview } = await import('../src/components/ContextPicker.tsx');
+  const preview = (shipped: boolean) =>
+    routedWith(createElement(ConcludedPreview, { run: 'probe-b2' }), [
+      [['runs', 'probe-b2', 'concluded'], { run: 'probe-b2', shipped, section: '\n## From run probe-b2\n\nIt measured **the cache**.' }],
+    ]);
+  const inFlight = await preview(false);
+  assert.match(inFlight, /data-not-shipped[^>]*>not shipped, not judged</);
+  assert.match(inFlight, /<strong>the cache<\/strong>/);
+  assert.doesNotMatch(await preview(true), /data-not-shipped|not shipped, not judged/);
 });
 
 /** A piece that reads the address (`useBar`), drawn as a loaded root route's page, with the queries it reads already answered. */
@@ -5362,6 +5375,7 @@ test("the bar for a workflow's step says what it runs on, its keys as its node l
     own: { keys: [], body: '' },
     hired: null,
     layers: null,
+    taskParts: null,
   });
   const listing = workflow({
     name: 'dev',
@@ -5738,6 +5752,7 @@ const card = (name: string, factory: string | null, extra: Partial<import('../sr
   repo: null,
   factory,
   startedAs: [],
+  from: [],
   error: null,
   body: name,
   filedAt: null,
@@ -5853,6 +5868,26 @@ test('what a step was told is drawn by layer, in the order it reads them, each s
   assert.match(html, /What it was told/);
   assert.match(html, /in the session&#x27;s system prompt/);
   assert.match(toldMarkup({ told: null, layers: { ...LAYERS, via: 'brief' }, filed: false }), /at the head of its brief/);
+});
+
+test('the task is drawn in its parts: its text, and each run it was handed a block headed by how, linked to the run — a run handed neither way a plain block', async () => {
+  const parts: TaskPart[] = [
+    { kind: 'text', text: 'Do the work.' },
+    { kind: 'from', run: 'cache-a1', asked: 'Build the cache.', body: 'It built **the cache**.', how: 'waited' },
+    { kind: 'from', run: 'probe-b2', asked: 'Measure the cache.', body: 'Not shipped, not judged.', how: 'read' },
+    { kind: 'from', run: 'old-c3', asked: '', body: 'An older section.' },
+  ];
+  const html = await routedWith(createElement(Told, { told: null, layers: LAYERS, parts, filed: true }));
+  const task = html.slice(html.indexOf('data-layer="task"'));
+  assert.ok(task.indexOf('Do the work.') < task.indexOf('data-from-run="cache-a1"'), 'in the order the task has them');
+  const block = (run: string) => new RegExp(`<section data-from-run="${run}"[\\s\\S]*?</section>`).exec(task)?.[0] ?? '';
+  assert.match(block('cache-a1'), /data-how="waited"/);
+  assert.match(block('cache-a1'), /href="\/runs\/cache-a1"[^>]*>Waited on, shipped · Build the cache\. ↗<\/a>/);
+  assert.match(block('cache-a1'), /<strong>the cache<\/strong>/, 'its body drawn as markdown');
+  assert.match(block('probe-b2'), /href="\/runs\/probe-b2"[^>]*>Read as context · Measure the cache\. ↗<\/a>/);
+  assert.doesNotMatch(task, /data-from-run="old-c3"|href="\/runs\/old-c3"/);
+  assert.match(task, /From run old-c3[\s\S]*An older section\./);
+  assert.doesNotMatch(task, /What was asked for/, "the task's words whole are not drawn beside its parts");
 });
 
 test("a layer the run froze none of says so; a step with no agent draws no agent's layer; a run that froze no layers draws its brief whole", () => {

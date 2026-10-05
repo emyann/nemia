@@ -20,6 +20,8 @@ export type InboxEntry = {
   repo: string | null;
   /** The factory the card names (`factory:`); null for a card of the default factory, and for an entry that does not read as a card. */
   factory: string | null;
+  /** The runs its run is handed as context (`from:`), read and never waited on: none for a card without the line. */
+  from: string[];
   /** The runs a record says it was started as: a card still here was started, and its removal failed. */
   startedAs: string[];
   error: string | null;
@@ -45,6 +47,7 @@ const inboxEntryFields = {
   workflow: Schema.NullOr(Schema.String),
   repo: Schema.NullOr(Schema.String),
   factory: Schema.NullOr(Schema.String),
+  from: Schema.mutable(Schema.Array(Schema.String)),
   startedAs: Schema.mutable(Schema.Array(Schema.String)),
   error: Schema.NullOr(Schema.String),
   body: Schema.NullOr(Schema.String),
@@ -150,4 +153,29 @@ const QueuedSchema = Schema.Struct({
 export const queueCard = (name: string, { off = false }: { off?: boolean } = {}): Promise<Queued> =>
   send(off ? 'DELETE' : 'POST', `/api/inbox/${encodeURIComponent(name)}/queue`, QueuedSchema, {
     may: 'The card may be queued, or not: look in the inbox before asking again.',
+  });
+
+/**
+ * Mirrors `InboxFromAnswer` in apps/api/src/inbox/inbox.ts: what the CLI's `inbox from` did — the card's `from:` as it now reads, and the
+ * runs it named before.
+ */
+export type FromSet = { name: string; file: string; from: string[]; was: string[] };
+
+/** Decodes a `FromSet`. */
+const FromSetSchema = Schema.Struct({
+  name: Schema.String,
+  file: Schema.String,
+  from: Schema.mutable(Schema.Array(Schema.String)),
+  was: Schema.mutable(Schema.Array(Schema.String)),
+}) satisfies Schema.Schema<FromSet>;
+
+/**
+ * Set the runs a card's run is handed as context, as the CLI's `inbox from <name> <run>...` does — or, with none, take its `from:` off, as
+ * `--off` does. Rejects with the api's refusal in full: the package's words for a card that is not there or was started, a run the store
+ * does not have or named twice — or the api's own about the request.
+ */
+export const setCardFrom = (name: string, runs: readonly string[]): Promise<FromSet> =>
+  send(runs.length ? 'PUT' : 'DELETE', `/api/inbox/${encodeURIComponent(name)}/from`, FromSetSchema, {
+    body: runs.length ? { runs } : {},
+    may: "The card's from: may be set, or not: look at the card before asking again.",
   });

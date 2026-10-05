@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tansta
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { FactoryCardStart } from '../components/FactoryCardStart';
 import { CardMeta, GoneItem, PageLink, PRIMARY, Refused, SECONDARY, Tried } from '../components/InboxParts';
+import { CardFrom } from '../components/CardFrom';
 import { StartRun } from '../components/StartRun';
 import { FIELD, WorkflowOptions } from '../components/WorkflowOptions';
 import { dropCard, fileCard, inboxQuery, queueCard, repositoryQuery, workflowsQuery, type InboxEntry, type Started } from '../lib/api';
@@ -277,6 +278,7 @@ function CardItem({
             </p>
           )}
           <CardMeta entry={entry} />
+          <CardFrom entry={entry} editable={startable} onRefused={onRefused} />
           {entry.queued && (
             <p className="flex flex-wrap items-baseline gap-x-2 text-xs text-neutral-500">
               <span
@@ -335,25 +337,7 @@ function CardItem({
         </div>
       </div>
 
-      {started && (
-        <p data-started-as className="text-sm text-amber-700 dark:text-amber-400">
-          Started as{' '}
-          {startedAs.map((id, i) => (
-            <span key={id}>
-              {i > 0 && ', '}
-              <Link to="/runs/$runId" params={{ runId: id }} className="font-mono underline underline-offset-2">
-                {id}
-              </Link>
-            </span>
-          ))}
-          , and still here because its removal failed. Remove drops it; to run the idea again, file it again.
-          {kept && (
-            <span data-kept className="mt-1 block font-mono text-xs break-all">
-              {kept.why}
-            </span>
-          )}
-        </p>
-      )}
+      {started && <StartedAs startedAs={startedAs} kept={kept} />}
       {entry.queued && entry.tried && <Tried entry={{ ...entry, tried: entry.tried }} />}
       {entry.error !== null && (
         <div className="space-y-1 rounded border border-red-300 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40">
@@ -370,6 +354,29 @@ function CardItem({
       )}
       {refusal && <Refused refusal={refusal} />}
     </li>
+  );
+}
+
+/** The runs a card still in the inbox was started as, each linked, and why its removal failed where this page was told (`kept`). */
+function StartedAs({ startedAs, kept }: { startedAs: readonly string[]; kept: { why: string } | null }) {
+  return (
+    <p data-started-as className="text-sm text-amber-700 dark:text-amber-400">
+      Started as{' '}
+      {startedAs.map((id, i) => (
+        <span key={id}>
+          {i > 0 && ', '}
+          <Link to="/runs/$runId" params={{ runId: id }} className="font-mono underline underline-offset-2">
+            {id}
+          </Link>
+        </span>
+      ))}
+      , and still here because its removal failed. Remove drops it; to run the idea again, file it again.
+      {kept && (
+        <span data-kept className="mt-1 block font-mono text-xs break-all">
+          {kept.why}
+        </span>
+      )}
+    </p>
   );
 }
 

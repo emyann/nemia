@@ -179,8 +179,8 @@ type FloorRun = Pick<RunSummary, 'id' | 'createdAt' | 'status' | 'moving' | 'wai
 
 /**
  * The runs on the Factory's floor, oldest first: every run when finished runs are asked for; otherwise every run in flight, every run
- * nobody has decided (`toDecideOf`), every run that waits on a person (`waitsOnYou`), and each finished run that a run in flight waits on
- * (`after`) or is held until (`heldUntil`), so the edge into it leaves from a card.
+ * nobody has decided (`toDecideOf`), every run that waits on a person (`waitsOnYou`), and each finished run that a run in flight still
+ * waits on (`liveWaits`), so the edge into it leaves from a card. A run read as context (`context`) brings no card: nothing waits on it.
  *
  * A run to decide stays on the floor whatever "Show finished" says, and until it is decided. Nothing of it moves, so `inFlight` has it
  * finished and the switch would hide it: a run that finished with its ending waiting for a word, or its branch waiting for a merge, would
@@ -198,44 +198,77 @@ type FloorRun = Pick<RunSummary, 'id' | 'createdAt' | 'status' | 'moving' | 'wai
  * finished parent brings none of its own parents onto the floor, since it waits on nothing any more.
  */
 export function floorRuns<T extends FloorRun>(runs: readonly T[], showFinished: boolean): T[] {
-  const waitedOn = new Set(runs.filter(inFlight).flatMap((run) => [...run.after, ...(run.heldUntil ?? [])]));
+  const waitedOn = new Set(runs.filter(inFlight).flatMap(liveWaits));
   return byAge(runs).filter((run) => showFinished || inFlight(run) || toDecideOf(run) !== null || waitsOnYou(run) || waitedOn.has(run.id));
 }
 
-/**
- * An edge between two cards on the Factory: from a run to one that waits on it (`after:`), or that a person holds until it ships (`hold:`).
- * Dashed, to come, until the child starts; solid once it has. A hold's is to come while it stands: once it lifts, the api lists no run.
- */
-export type RunEdge = { id: string; source: string; target: string; state: Extract<EdgeState, 'to-come' | 'done'> };
+/** What a card's live waits are read off: the runs its roots still wait on, and a person's hold. */
+type Waits = Pick<RunSummary, 'id' | 'waiting'> & { holding?: RunSummary['holding'] };
 
 /**
- * The edges between the cards on the floor: one from each run in a card's `after` that is on the floor too, to that card. A run in `after`
- * that is not — finished with "Show finished" off and waited on by no run in flight, or one the store has lost — draws none; the card's
- * `waiting` line still names it.
- *
- * A child has started once any of its steps is filed: its parents shipped, and it no longer waits (`gated` in agent-orchestrator).
- *
- * And one from each run a card is held until (`heldUntil`, the CLI's `hold`) that is on the floor too, drawn as an `after` edge is: the
- * hold is a wait on a run's shipping, set after the start rather than at it. None where an `after` edge already joins the two, which says
- * the same. A listing without `heldUntil` draws no edge of a hold.
+ * The runs a card still waits on, each once: those its roots wait on before anything is filed (`waiting`, the CLI's `--after`), then each
+ * a person holds it until that has not shipped (`holding`). None once the run has started and nobody holds it: a wait it was started with
+ * is over, and a run it reads as context is never one.
  */
-export function runEdges(runs: ReadonlyArray<Pick<RunSummary, 'id' | 'after' | 'steps'> & { heldUntil?: readonly string[] }>): RunEdge[] {
+export const liveWaits = (run: Waits): string[] => [
+  ...new Set([...(run.waiting?.runs ?? []).map((w) => w.run), ...(run.holding?.runs ?? []).filter((h) => !h.shipped).map((h) => h.run)]),
+];
+
+/**
+ * An edge between two cards on the Factory: from a run to one that still waits on it (`after:`), or that a person holds until it ships
+ * (`hold:`). Always dashed, to come: a wait that is over draws nothing.
+ */
+export type RunEdge = { id: string; source: string; target: string; state: Extract<EdgeState, 'to-come'> };
+
+/**
+ * The edges between the cards on the floor that are live waits: one from each run a card's roots still wait on (`waiting`), and one from
+ * each run a person holds it until that has not shipped (`holding`), where none already joins the two — each only when both cards are on
+ * the floor. A run that has started draws none from its waits, and a run it reads as context none at all (`contextEdges`).
+ *
+ * Reduced transitively: an edge u→w is dropped when another path u→…→w joins the two among the edges drawn, since the chain says it.
+ */
+export function runEdges(runs: readonly Waits[]): RunEdge[] {
   const floor = new Set(runs.map((run) => run.id));
-  return runs.flatMap((child) => {
-    const started = child.steps.some((step) => step.taskId !== null);
+  const edges = runs.flatMap((child) => {
     const onTheFloor = (parent: string) => floor.has(parent) && parent !== child.id;
-    const after = [...new Set(child.after)].filter(onTheFloor);
-    const held = [...new Set(child.heldUntil ?? [])].filter((parent) => onTheFloor(parent) && !after.includes(parent));
+    const waited = [...new Set((child.waiting?.runs ?? []).map((w) => w.run))].filter(onTheFloor);
+    const held = liveWaits(child).filter((parent) => onTheFloor(parent) && !waited.includes(parent));
     return [
-      ...after.map((parent): RunEdge => ({
-        id: `after:${parent}->${child.id}`,
-        source: parent,
-        target: child.id,
-        state: started ? 'done' : 'to-come',
-      })),
+      ...waited.map((parent): RunEdge => ({ id: `after:${parent}->${child.id}`, source: parent, target: child.id, state: 'to-come' })),
       ...held.map((parent): RunEdge => ({ id: `hold:${parent}->${child.id}`, source: parent, target: child.id, state: 'to-come' })),
     ];
   });
+  return edges.filter((edge) => !reachesAround(edges, edge));
+}
+
+/** Whether `edge`'s target is reached from its source by a path of two edges or more among `edges`. */
+function reachesAround(edges: readonly RunEdge[], edge: RunEdge): boolean {
+  const seen = new Set<string>();
+  const next = edges.filter((e) => e.source === edge.source && e.target !== edge.target).map((e) => e.target);
+  while (next.length) {
+    const at = next.pop()!;
+    if (at === edge.target) return true;
+    if (seen.has(at)) continue;
+    seen.add(at);
+    next.push(...edges.filter((e) => e.source === at).map((e) => e.target));
+  }
+  return false;
+}
+
+/** A faint line on the Factory from a run another reads as context (`--from`) to the card that reads it. */
+export type ContextEdge = { id: string; source: string; target: string };
+
+/**
+ * The lines of what the focused card reads: one from each run in its `context` that is on the floor, to it. None without a focus — the
+ * card hovered, else the one selected — so the floor draws only its waits until a person looks at a card.
+ */
+export function contextEdges(runs: ReadonlyArray<Pick<RunSummary, 'id' | 'context'>>, focus: string | null): ContextEdge[] {
+  const card = runs.find((run) => run.id === focus);
+  if (!card) return [];
+  const floor = new Set(runs.map((run) => run.id));
+  return [...new Set(card.context)]
+    .filter((source) => floor.has(source) && source !== card.id)
+    .map((source) => ({ id: `read:${source}->${card.id}`, source, target: card.id }));
 }
 
 /** A card's title: the brief's first line with words on it, without a heading's hashes; else the run id. */
@@ -244,6 +277,18 @@ export const titleOf = (run: Pick<RunSummary, 'id' | 'brief'>): string =>
     .split('\n')
     .map((line) => line.replace(/^\s*#+\s*/, '').trim())
     .find(Boolean) ?? run.id;
+
+/**
+ * What a card's chip of the runs it reads says on hover: a line per run in its `context`, its id and its title where `runs` has it, its
+ * id alone where it does not.
+ */
+export const readsLines = (run: Pick<RunSummary, 'context'>, runs: ReadonlyArray<Pick<RunSummary, 'id' | 'brief'>>): string[] => {
+  const byId = new Map(runs.map((source) => [source.id, source]));
+  return run.context.map((id) => {
+    const source = byId.get(id);
+    return source ? `${id} — ${titleOf(source)}` : id;
+  });
+};
 
 /** The repo by its folder's name, which is what a person calls it; the full path is for machines. */
 export const repoName = (repo: string): string =>

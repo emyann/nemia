@@ -176,7 +176,7 @@ function Details({ run, step, state, runCancelled, current, selected, onSelect }
           runs froze one, its folder.
         </p>
       )}
-      <Told told={step.told} layers={step.layers} filed={step.taskId !== null} />
+      <Told told={step.told} layers={step.layers} parts={step.taskParts} filed={step.taskId !== null} />
     </>
   );
 }

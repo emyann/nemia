@@ -4,11 +4,12 @@ import { Link } from '@tanstack/react-router';
 import { repositoryQuery, runsQuery, startRun, type Place, type RunSummary, type Started, type WorkflowListing } from '../lib/api';
 import { standingOf, titleOf } from '../lib/factory';
 import { afterFor, ignoredRepoNote } from '../lib/inbox';
+import { ContextPicker } from './ContextPicker';
 
 /**
- * A brief, the runs the new run waits on, and the button that starts a run of the workflow with them: then the new run, linked to its page,
- * or the api's refusal in full — the loader's, the CLI `start`'s (`afterRefusal`'s, for a run it will not wait on), or its own about the
- * brief.
+ * A brief, the runs the new run waits on, the runs it reads as context (`ContextPicker`), and the button that starts a run of the
+ * workflow with them: then the new run, linked to its page, or the api's refusal in full — the loader's, the CLI `start`'s
+ * (`afterRefusal`'s, for a run it will not wait on, or `contextRefusal`'s, for one it will not read), or its own about the brief.
  *
  * Given a `card`, it starts that inbox card, as the CLI's `start <inbox>/<card>.md --brief <brief>` does: the brief is prefilled with the
  * card's body, to make into the work, and the start is refused in the package's words — a card not there, one started already. `onStarted`
@@ -46,16 +47,18 @@ export function StartRun({
   const queryClient = useQueryClient();
   const [brief, setBrief] = useState(card?.body ?? '');
   const [after, setAfter] = useState<string[]>([]);
+  const [context, setContext] = useState<string[]>([]);
   const inFolders = workflow.folderTeam;
   const ignored = ignoredRepoNote(workflow, repo);
   const start = useMutation({
-    mutationFn: (asked: { brief: string; after: string[] }) =>
+    mutationFn: (asked: { brief: string; after: string[]; context: string[] }) =>
       startRun(
         {
           workflow: workflow.name,
           from: workflow.from,
           brief: asked.brief,
           ...(asked.after.length ? { after: asked.after } : {}),
+          ...(asked.context.length ? { context: asked.context } : {}),
           ...(card ? { card: card.name } : {}),
         },
         place,
@@ -65,6 +68,7 @@ export function StartRun({
       if (!card) {
         setBrief('');
         setAfter([]);
+        setContext([]);
       }
       void queryClient.invalidateQueries({ queryKey: ['runs'], exact: true });
       onStarted?.(started);
@@ -82,7 +86,7 @@ export function StartRun({
       className={card ? 'space-y-2' : 'space-y-2 border-t border-neutral-200 pt-4 dark:border-neutral-800'}
       onSubmit={(event) => {
         event.preventDefault();
-        start.mutate({ brief, after: afterFor(workflow, after) });
+        start.mutate({ brief, after: afterFor(workflow, after), context });
       }}
     >
       <label htmlFor={field} className="block text-sm font-medium">
@@ -97,6 +101,7 @@ export function StartRun({
         className="block w-full resize-y rounded border border-neutral-300 bg-white px-2 py-1.5 text-sm placeholder:text-neutral-400 focus:border-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:placeholder:text-neutral-500 dark:focus:border-neutral-400"
       />
       {!inFolders && <AfterPicker selected={after} onChange={setAfter} repo={repo} />}
+      <ContextPicker selected={context} onChange={setContext} />
       <div className="flex flex-wrap items-center gap-3">
         <button
           type="submit"
@@ -113,21 +118,7 @@ export function StartRun({
         </p>
       )}
 
-      {start.isSuccess && (
-        <p className="text-sm" data-started={start.data.id}>
-          Started{' '}
-          <Link to="/runs/$runId" params={{ runId: start.data.id }} className="font-mono text-sm underline underline-offset-2">
-            {start.data.id}
-          </Link>
-          . Nothing is filed until the daemon&apos;s next pass
-          {start.variables.after.length > 0 && (
-            <>
-              , and {start.variables.after.join(' and ')} {start.variables.after.length > 1 ? 'have' : 'has'} shipped
-            </>
-          )}
-          .
-        </p>
-      )}
+      {start.isSuccess && <StartedLine id={start.data.id} after={start.variables.after} />}
       {start.isError && !onRefused && (
         <div data-refused className="space-y-1 rounded border border-red-300 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40">
           <p className="text-sm font-medium text-red-800 dark:text-red-300">Not started. The api refused it:</p>
@@ -135,6 +126,28 @@ export function StartRun({
         </div>
       )}
     </form>
+  );
+}
+
+/**
+ * That run `id` was started, linked to its page, and when its steps are filed: on the daemon's next pass, once each of `after` has
+ * shipped.
+ */
+function StartedLine({ id, after }: { id: string; after: readonly string[] }) {
+  return (
+    <p className="text-sm" data-started={id}>
+      Started{' '}
+      <Link to="/runs/$runId" params={{ runId: id }} className="font-mono text-sm underline underline-offset-2">
+        {id}
+      </Link>
+      . Nothing is filed until the daemon&apos;s next pass
+      {after.length > 0 && (
+        <>
+          , and {after.join(' and ')} {after.length > 1 ? 'have' : 'has'} shipped
+        </>
+      )}
+      .
+    </p>
   );
 }
 
@@ -190,7 +203,9 @@ export function AfterPicker({
       <legend id={legend} className="text-sm font-medium">
         After
       </legend>
-      <p className="text-xs text-neutral-500">The runs it waits on: nothing of it is filed until each has shipped.</p>
+      <p className="text-xs text-neutral-500">
+        Waits until it ships: nothing of it is filed until each has shipped, and it is handed what each concluded.
+      </p>
       {error ? (
         <p className="text-xs text-red-700 dark:text-red-400">Could not list the runs to wait on: {error.message}</p>
       ) : !onRepo ? (

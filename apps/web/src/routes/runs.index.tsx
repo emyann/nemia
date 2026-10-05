@@ -22,10 +22,10 @@ export const Route = createFileRoute('/runs/')({
 });
 
 /**
- * Every run, in three groups under a heading each, in the Factory's words and counts: the runs still going, then those at their result
- * that nobody has decided, then the rest, each newest first (`inFlightFirst`) where the api lists them by id. No row says whether its run
- * is in flight, so without the headings the first finished row, newer than the last in flight, would read as a sort gone wrong. A run to
- * decide is a group of its own, as `wf ls` says it before who else a run waits on, and not a row among the finished that nothing marks as
+ * Every run, in three groups under a heading each, in the Factory's words and counts: the runs still going, then those at their result that
+ * nobody has decided, then the rest, each newest first (`inFlightFirst`) where the api lists them by id. No row says whether its run is in
+ * flight, so without the headings the first finished row, newer than the last in flight, would read as a sort gone wrong. A run to decide
+ * is a group of its own, as the CLI's `ls` says it before who else a run waits on, and not a row among the finished that nothing marks as
  * waiting for a person; a run that is somehow both in flight and to decide is in flight, since what still moves is not yet a result to
  * decide. Every row reads how long its run has been at work against one clock for the page (`useNow`), not in the render.
  *
@@ -44,7 +44,7 @@ function Runs() {
         <Link to="/workflows" className="underline underline-offset-2">
           Workflows
         </Link>
-        , or with <code>npx wf start</code>.
+        , or from its card in the inbox.
       </p>
     );
   }
@@ -105,17 +105,17 @@ function RunGroup({ group, title, about, runs, now }: { group: string; title: st
 }
 
 /**
- * One run's row. Its link carries the run's title and id; the factory it is in, `default` for one naming none, as plain text since the
- * row is a link; where it works, its repository or, for a folder run, which has none, `folders`;
- * whether it is cancelled; whether `wf prune` gave back its worktrees, and its files when asked, with what it removed and kept on hover;
- * what waits on you, as `wf ls` prints it: the steps, `approve plan` for one at its gate, or for a run waiting on a run that never ships,
- * what is yours to resolve; a person's hold (`wf hold`) in `wf ls`'s word, with how to lift it on hover, amber once only a person lifts it;
- * what there is to decide about its result, in `wf ls`'s words (`toDecideWords`): the ending step's gate with the command that approves it,
- * or a branch nobody has merged, the step's own `approve <step>` on this line alone; why the run is not judged, a task it reads that does
- * not read (`RunSummary.unreadable`); and each step's state. Beside the link, since a link inside a link is not HTML (`RowSide`): its
- * star, which puts it under Favorites; when it was created, which orders the list; the card's clock (`runClock`), how long it took or has
- * been at work, with its start, its end and the wall time on hover; what it has cost, as `wf ls` puts it on the run's line, once a cost
- * was measured; the tokens its sessions used, their split on hover, once one measured any; and the workflow it was started from.
+ * One run's row. Its link carries the run's title and id; the factory it is in, `default` for one naming none, as plain text since the row
+ * is a link; where it works, its repository or, for a folder run, which has none, `folders`; whether it is cancelled; whether the CLI's
+ * `prune` gave back its worktrees, and its files when asked, with what it removed and kept on hover; what waits on you, as the CLI's `ls`
+ * prints it: the steps, `approve plan` for one at its gate, or for a run waiting on a run that never ships, what is yours to resolve; a
+ * person's hold (the CLI's `hold`) in the CLI `ls`'s word, with how to lift it on hover, amber once only a person lifts it; what there is
+ * to decide about its result, in the CLI `ls`'s words (`toDecideWords`): the ending step's gate with the command that approves it, or a
+ * branch nobody has merged, the step's own `approve <step>` on this line alone; why the run is not judged, a task it reads that does not
+ * read (`RunSummary.unreadable`); and each step's state. Beside the link, since a link inside a link is not HTML (`RowSide`): its star,
+ * which puts it under Favorites; when it was created, which orders the list; the card's clock (`runClock`), how long it took or has been at
+ * work, with its start, its end and the wall time on hover; what it has cost, as the CLI's `ls` puts it on the run's line, once a cost was
+ * measured; the tokens its sessions used, their split on hover, once one measured any; and the workflow it was started from.
  */
 function RunRow({ run, now }: { run: RunSummary; now: number }) {
   const title = titleOf(run);

@@ -40,24 +40,23 @@ export type RunNodeData = {
 export type RunFlowNode = Node<RunNodeData, 'run'>;
 
 /**
- * One run on the Factory floor: what was asked, where, what each step is doing — a small flowchart of them (`StepRail`) — and for
- * how long.
+ * One run on the Factory floor: what was asked, where, what each step is doing — a small flowchart of them (`StepRail`) — and for how long.
  *
- * Its star puts it under the sidebar's Favorites (`FavoriteStar`). The chevron opens it: the card grows to the right with every step a
- * tile (`StepTiles`), and a tile shows its step in the frame's bar.
- * A click on the card shows the run there, and the card is ringed while it does (`lookOf`). The title opens the run's page, and is not
- * preloaded on hover: only an open run reads its detail. `w-88` is `CARD_WIDTH`, narrower than the grid's cell, which leaves the gap
- * between cards.
+ * Its star puts it under the sidebar's Favorites (`FavoriteStar`). The chevron opens it: the card grows to the right with every step a tile
+ * (`StepTiles`), and a tile shows its step in the frame's bar. A click on the card shows the run there, and the card is ringed while it
+ * does (`lookOf`). The title opens the run's page, and is not preloaded on hover: only an open run reads its detail. `w-88` is
+ * `CARD_WIDTH`, narrower than the grid's cell, which leaves the gap between cards.
  *
- * - Its clock (`runClock`) says how long the run took, or has been at work, from its first filing — its sessions' and checks' time,
- *   a wait counted for nothing, the wall time on hover — or how long it has waited before that; it moves every second while it counts
+ * - Its clock (`runClock`) says how long the run took, or has been at work, from its first filing — its sessions' and checks' time,   a
+ *   wait counted for nothing, the wall time on hover — or how long it has waited before that; it moves every second while it counts
  *   (`clockCounts`), and every 30 s otherwise.
  * - A card nobody has decided the result of is ringed, and not dimmed as a finished card is: it is the one finished card on the floor
  *   that waits for a person rather than for a machine.
- * - Beside its id, where its steps work: its repository, or folders the run made (`workspace: folder`); a try of an agent, a folder
- *   run of the store's own, is tagged with its agent instead, since its folder is on no page.
- * - On whom a run started `--after` waits, and a person's hold on it (`wf hold`), each in `wf ls`'s word, amber when only a person moves
- *   it, with what to do on hover (`WaitingLine`). A hold is said instead of a gate: while it stands, nothing of the run is asked of anyone.
+ * - Beside its id, where its steps work: its repository, or folders the run made (`workspace: folder`); a try of an agent, a folder   run
+ *   of the store's own, is tagged with its agent instead, since its folder is on no page.
+ * - On whom a run started `--after` waits, and a person's hold on it (the CLI's `hold`), each in the CLI `ls`'s word, amber when only a
+ *   person moves   it, with what to do on hover (`WaitingLine`). A hold is said instead of a gate: while it stands, nothing of the run is
+ *   asked of anyone.
  * - A run that waits on runs that may still ship, and on nothing else (`waitsOnRuns`), is a ghost until it starts: dimmed and dashed, as
  *   the queue lane draws a card not started, each run it waits on a link to that run.
  * - What a person has to know to act, besides the gate's own `approve <step>`: a step's question, or a session the harness blocked, two
@@ -65,15 +64,15 @@ export type RunFlowNode = Node<RunNodeData, 'run'>;
  * - The gate, answered here (`CardGate`). Once answered, what the card said, through the state the answer was given in and the one it
  *   moved the run to (the step approved, or the try asked), until the run moves on from that, the tick filing it, or back, the answer
  *   taken back; the answer kept from the last render is adjusted as the render that sees the new state runs.
- * - A result nobody decided, in a line that fits, whole on hover in `wf ls`'s words, a link to where it is decided on the run's page.
- * - Once opened: how far a run waiting on you reaches (`TouchedLine`), and why its record, which adds each tile's attempt and cost,
- *   could not be read.
+ * - A result nobody decided, in a line that fits, whole on hover in the CLI `ls`'s words, a link to where it is decided on the run's page.
+ * - Once opened: how far a run waiting on you reaches (`TouchedLine`), and why its record, which adds each tile's attempt and cost,   could
+ *   not be read.
  * - In its footer, so the card is no taller for them than a line (`CELL_HEIGHT`): what it has cost, `≥` where an ended attempt has none
- *   on it; the tokens its sessions used, `≥` where one measured none, their split on hover; and on its right, or under them where both
- *   do not fit, its chips; the hold lifted here, as `wf hold --off` lifts it (`CardLift`); pruned; and why the run is not judged
+ *   on it; the tokens its sessions used, `≥` where one measured none, their split on hover; and on its right, or under them where both   do
+ *   not fit, its chips; the hold lifted here, as the CLI's `hold --off` lifts it (`CardLift`); pruned; and why the run is not judged
  *   (`RunSummary.unreadable`), whole on hover.
- * - A handle on its left where the edge from a run it waits on comes in, and one on its right where the edge into each card that
- *   waits on it leaves.
+ * - A handle on its left where the edge from a run it waits on comes in, and one on its right where the edge into each card that   waits on
+ *   it leaves.
  */
 export function RunNode({ data: { run, finished, open, detail, trouble, inspected, selected, onToggle, onStep } }: NodeProps<RunFlowNode>) {
   const now = useNow(clockCounts(run, finished) ? 1_000 : 30_000);
@@ -276,8 +275,8 @@ function lookOf(run: RunSummary, finished: boolean, inspected: boolean): Look {
 }
 
 /**
- * What a run started `--after` runs waits on, in `wf ls`'s word (`waiting.word`), with what `wf decide` says on hover. Amber when only a
- * person moves it; on a ghost's card (`ghost`), each run it waits on a link to that run's page.
+ * What a run started `--after` runs waits on, in the CLI `ls`'s word (`waiting.word`), with what the CLI's `decide` says on hover. Amber
+ * when only a person moves it; on a ghost's card (`ghost`), each run it waits on a link to that run's page.
  */
 function WaitingLine({ waiting, ghost }: { waiting: RunWaiting; ghost: boolean }) {
   return (

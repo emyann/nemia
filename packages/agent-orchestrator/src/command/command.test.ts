@@ -204,6 +204,27 @@ test('the command line a refusal shows names what was given and the usage of wha
   assert.equal(commandLine(SAY, { runId: 'r-1', step: 'impl', text: 'hi' }), 'nemia say r-1 impl');
 });
 
+test('a command line says the flags it is given after its positionals, in the order its spec lists them', () => {
+  const two: Spec = {
+    positionals: [{ key: 'runId', takes: 'required', kind: 'name' }],
+    flags: [
+      { flag: '--repo', kind: 'text', key: 'repos', many: true },
+      { flag: '--fresh', kind: 'switch', key: 'fresh' },
+      { flag: '--model', kind: 'name', key: 'model' },
+    ],
+    unknown: (arg) => arg,
+  };
+  const x = { name: 'x', spec: two };
+  assert.equal(
+    commandLine(x, { runId: 'r-1' }, { model: 'm', repos: ['a', 'b'], fresh: true }),
+    'nemia x r-1 --repo a --repo b --fresh --model m',
+  );
+  assert.equal(commandLine(x, {}, { repos: '<path>' }), 'nemia x <runId> --repo <path>');
+  assert.equal(commandLine(x, { runId: 'r-1' }, { fresh: false, other: 'y' }), 'nemia x r-1');
+  const add = COMMANDS.find((c) => c.name === 'factory add')!;
+  assert.equal(commandLine(add, {}, { repos: '<path>' }), 'nemia factory add <name> --repo <path>');
+});
+
 test("the table's help is today's, word for word", () => {
   assert.equal(
     helpOf(TABLE),

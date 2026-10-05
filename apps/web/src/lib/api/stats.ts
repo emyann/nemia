@@ -1,4 +1,4 @@
-/** The flow numbers the Stats page draws (`GET /api/stats`, apps/api/src/stats/stats.ts): what `wf stats --json` prints. */
+/** The flow numbers the Stats page draws (`GET /api/stats`, apps/api/src/stats/stats.ts): what the CLI's `stats --json` prints. */
 import { queryOptions } from '@tanstack/react-query';
 import { Schema } from 'effect';
 import { get } from './read.ts';

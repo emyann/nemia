@@ -187,8 +187,9 @@ test("a run's detail carries its gates and each gated step's gate — awaiting a
         label: 'approve',
         command: `nemia approve ${R} plan`,
         said: `plan waits at its gate — with words: nemia approve ${R} plan --message "<words>"`,
+        step: 'plan',
       },
-      { label: 'send back', command: `nemia retry ${R} plan --message "<objection>"`, said: null },
+      { label: 'send back', command: `nemia retry ${R} plan --message "<objection>"`, said: null, step: 'plan' },
     ],
     "the decision offers the gate's two commands, as `nemia decide` prints them under the step, and nothing else on a run with no branch to ship",
   );

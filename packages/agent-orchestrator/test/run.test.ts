@@ -3163,6 +3163,7 @@ test('`again: true` with rounds left is a round due — implement goes again —
     status: 'unverified · done',
     branch: null,
     note: 'round 2 of 3 due — review asked again, and the next tick files implement',
+    roundDue: true,
   });
   assert.deepEqual(l.waitingOnYou, []);
   assert.deepEqual(decision(LOOP, inRound(1), ALL_SUCCEEDED, nothingShipped, saidIn(1, true), asked), {

@@ -212,6 +212,8 @@ export const wordOf =
 type Judged = {
   words: ReadonlyMap<string, string>;
   notes: ReadonlyMap<string, string | null>;
+  /** The looping steps whose next round is due (`Listing`'s `roundDue`). */
+  roundDue: ReadonlySet<string>;
   /** What the reading says beside each step's word: what its harness waits for (`waits`) and what its try was denied (`denied`). */
   beside: ReadonlyMap<string, { waits?: string; denied?: string }>;
   waitingOnYou: string[];
@@ -387,6 +389,7 @@ export async function judge(
   return {
     words: new Map(read.steps.map((s) => [s.name, s.status])),
     notes: new Map(read.steps.map((s) => [s.name, s.note ?? null])),
+    roundDue: new Set(read.steps.filter((s) => s.roundDue).map((s) => s.name)),
     beside: new Map(read.steps.map(({ name, waits, denied }) => [name, { waits, denied }])),
     waitingOnYou,
     onYou: onYouWords({ steps: read.steps, waitingOnYou }),

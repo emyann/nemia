@@ -1,6 +1,6 @@
 /**
  * The words of what the last pass cost, beside the cap over the Factory's floor (`PassCost`, served with the ceilings):
- * `a pass takes 212 ms`, and the breakdown `nemia up --stats` prints, as its title. Pure: the time and the time zone are handed in, the
+ * `a pass takes 212 ms`, and the breakdown the CLI's `up --stats` prints, as its title. Pure: the time and the time zone are handed in, the
  * browser's own on the page.
  */
 import type { PassCost, PassPhase } from './api';
@@ -23,8 +23,8 @@ export const passLine = (pass: Pick<PassCost, 'ms'>): string => `a pass takes ${
 
 /**
  * The last pass whole, a line each: when it ran and its totals, each phase with its time, calls, bytes and processes, each harness
- * observed, what it saw where the pass says (`runs`, from the tick that keeps it), and what measuring it took, naming the commands that
- * print the same and the passes before it.
+ * observed, what it saw where the pass says (`runs`, from the tick that keeps it), and what measuring it took — the breakdown the CLI's
+ * `up --stats` prints.
  */
 export function passTitle(pass: PassCost, now: Date, timeZone?: string): string {
   const phases = PASS_PHASES.map((p) => {
@@ -44,7 +44,7 @@ export function passTitle(pass: PassCost, now: Date, timeZone?: string): string 
     ...(pass.runs === undefined
       ? []
       : [`It saw ${seenWords({ runs: pass.runs, tasks: pass.tasks ?? 0, queued: pass.queued ?? 0, admitted: pass.admitted ?? 0 })}.`]),
-    `Measuring it took ${msWord(pass.overheadMs)} ms. nemia up --stats says the same, and nemia passes the passes before it.`,
+    `Measuring it took ${msWord(pass.overheadMs)} ms.`,
   ].join('\n');
 }
 

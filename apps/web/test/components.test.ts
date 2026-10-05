@@ -124,6 +124,7 @@ function runWith(note: string | null): RunDetail {
   return {
     id: 'r-1',
     brief: 'Go round again',
+    decide: 'nemia decide r-1',
     repo: '/code/app',
     place: 'git',
     work: null,
@@ -168,6 +169,8 @@ function runWith(note: string | null): RunDetail {
         branch: 'wf/r-1/implement',
         status: 'rounds exhausted',
         note,
+        roundDue: false,
+        commands: { approve: 'nemia approve r-1 review', retry: 'nemia retry r-1 review', say: 'nemia say r-1 review' },
         needs: null,
         blockedByHarness: false,
         waitingFor: null,
@@ -314,10 +317,11 @@ test('a step a person has sent round or asked to retry is no gate from the momen
 });
 
 /**
- * A loop as the api gives it: review loops back to implement, both signed off, with the notes `wf ls` prints. Neither step
- * has a spec — as when the api could not read one — so what is drawn is the api's graph, and nothing a step's spec says.
+ * A loop as the api gives it: review loops back to implement, both signed off, with the notes `wf ls` prints, and review's round due as
+ * `reviewDue` says. Neither step has a spec — as when the api could not read one — so what is drawn is the api's graph, and nothing a
+ * step's spec says.
  */
-function loopRun(notes: { implement: string | null; review: string | null }): RunDetail {
+function loopRun(notes: { implement: string | null; review: string | null }, reviewDue = false): RunDetail {
   const base = runWith(null);
   const step = { ...base.steps[0], status: 'unverified · done', spec: null };
   return {
@@ -333,7 +337,7 @@ function loopRun(notes: { implement: string | null; review: string | null }): Ru
     },
     steps: [
       { ...step, name: 'implement', note: notes.implement },
-      { ...step, name: 'review', note: notes.review },
+      { ...step, name: 'review', note: notes.review, roundDue: reviewDue },
     ],
   };
 }
@@ -379,7 +383,9 @@ test("the loop's edge goes back to its target, whatever the steps' specs lack", 
     "an `after` edge takes each node's handle on its side, naming none; out of rounds, nothing is due, and the edge back rests",
   );
 
-  const due = stepEdges(loopRun({ implement: null, review: 'round 2 of 3 due — review asked again, and the next tick files implement' }));
+  const due = stepEdges(
+    loopRun({ implement: null, review: 'round 2 of 3 due — review asked again, and the next tick files implement' }, true),
+  );
   assert.deepEqual([due[1].label, due[1].data], ['round 2 of 3', { state: 'running', loop: true }]);
   const first = stepEdges(loopRun({ implement: null, review: null }));
   assert.deepEqual([first[1].label, first[1].data], [undefined, { state: 'to-come', loop: true }]);
@@ -675,7 +681,7 @@ test("an opened card's tiles each name the step, its chip and what it waits on a
 
 test("a loop's edge back moves as a running edge does while its round is due, along its curve and keeping its round", () => {
   const [, due] = stepEdges(
-    loopRun({ implement: 'round 2 of 3', review: 'round 2 of 3 due — review asked again, and the next tick files implement' }),
+    loopRun({ implement: 'round 2 of 3', review: 'round 2 of 3 due — review asked again, and the next tick files implement' }, true),
   );
   const html = withMotion(false, () => edgeMarkup(due));
   const d = pathOf(html);
@@ -695,7 +701,7 @@ test('where the person asked for reduced motion nothing travels — on a running
     ]),
   );
   const [, due] = stepEdges(
-    loopRun({ implement: 'round 2 of 3', review: 'round 2 of 3 due — review asked again, and the next tick files implement' }),
+    loopRun({ implement: 'round 2 of 3', review: 'round 2 of 3 due — review asked again, and the next tick files implement' }, true),
   );
   assert.equal((running.markerEnd as EdgeMarker).color, 'var(--edge-running)');
 
@@ -1363,13 +1369,13 @@ test('a diff is folded under its file, coloured by line, and a capped one says h
     [...capped.matchAll(/data-line="(\w+)"/g)].map((m) => m[1]),
     ['meta', 'meta', 'meta', 'hunk', 'removed', 'added', 'context'],
   );
-  assert.match(capped, /<p data-cut="26"[^>]*>26 more lines — <code>wf decide<\/code> prints all<\/p>/);
+  assert.match(capped, /<p data-cut="26"[^>]*>26 more lines — the command line&#x27;s decide prints them all<\/p>/);
 
   const whole = renderToStaticMarkup(createElement(DiffFileView, { file: { path: 'package.json', lines, cut: 0 } }));
   assert.doesNotMatch(whole, /data-cut|more line/);
   assert.match(
     renderToStaticMarkup(createElement(DiffFileView, { file: { path: 'package.json', lines, cut: 1 } })),
-    />1 more line — <code>/,
+    />1 more line — the command line/,
   );
 });
 
@@ -1379,9 +1385,10 @@ test('the Decide section copies its commands and runs none: a button per command
       label: 'once more',
       command: 'wf retry r-1 implement',
       said: 'implement: succeeded · BLOCKED. Continue its session, told what happened:  wf retry r-1 implement  (--fresh, or --model <m>, for a new session)',
+      step: 'implement',
     },
-    { label: 'ship it', command: 'git -C /code/app merge --no-ff wf/r-1/implement', said: null },
-    { label: 'drop it', command: 'git -C /code/app branch -D wf/r-1/implement', said: null },
+    { label: 'ship it', command: 'git -C /code/app merge --no-ff wf/r-1/implement', said: null, step: null },
+    { label: 'drop it', command: 'git -C /code/app branch -D wf/r-1/implement', said: null, step: null },
   ] as const;
   const decision: Decidable = {
     standings: [],
@@ -1898,7 +1905,7 @@ test("a closeout's file `wf prune --artifacts` removed is its path and when it w
   assert.match(pruned, /data-artifact="pruned"/);
   assert.ok(pruned.includes('>/wf/runs/r-1/artifacts/shoot/shot.png</span>'), pruned);
   const time = renderToStaticMarkup(when(at));
-  assert.ok(pruned.includes(`> — its files were removed at ${time} (wf prune --artifacts)</span>`), pruned);
+  assert.ok(pruned.includes(`> — its files were removed at ${time}, by a prune of its files</span>`), pruned);
   assert.ok(!textsOf(pruned).join(' ').includes(at), 'the moment is drawn as `when` draws it, never as the api spells it');
   assert.doesNotMatch(pruned, /<a |<img /);
   assert.match(bare, /data-artifact="path"/, 'a path the prune did not reach is the path, as before');
@@ -2434,7 +2441,7 @@ test('the Decide section puts the answers first, before what there is to decide,
     total: UNMEASURED,
     cost: null,
     overBudget: null,
-    commands: [{ label: 'ship it', command: 'git -C /code/app merge --no-ff wf/r-1/implement', said: null }],
+    commands: [{ label: 'ship it', command: 'git -C /code/app merge --no-ff wf/r-1/implement', said: null, step: null }],
     awaiting: null,
   };
   const offers = createElement(
@@ -2467,11 +2474,12 @@ test("the Decide section's accept row takes a reason and presses it; every other
     overBudget: null,
     awaiting: null,
     commands: [
-      { label: 'once more', command: 'nemia round r-1 review', said: null },
+      { label: 'once more', command: 'nemia round r-1 review', said: null, step: 'review' },
       {
         label: 'accept',
         command: 'nemia accept r-1 review --message "<why>"',
         said: 'review: enough — go on with what is there:  nemia accept r-1 review --message "<why>"',
+        step: 'review',
       },
     ],
   };
@@ -2574,7 +2582,7 @@ test("the banner continues a session the harness blocked: Continue, and a box fo
   );
   assert.match(review, /<label for="[^"]+" class="sr-only">What to tell review, if anything<\/label>/);
   assert.match(review, /<textarea [^>]*placeholder="Anything to tell it \(optional\): the next try is told it\."/);
-  assert.ok(textsOf(review).includes('wf retry r-1 review'), review);
+  assert.ok(textsOf(review).includes('nemia retry r-1 review'), `the step's retry line, as the api answers it\n${review}`);
   assert.doesNotMatch(
     html,
     /data-copy|data-unblock|ae stop|cannot continue/,
@@ -2670,7 +2678,7 @@ test("the banner says who the run waits on as `wf ls` does — `approve review`,
   const line = /<p>(Waiting on you:[\s\S]*?)<\/p>/.exec(both)![1];
   assert.equal(
     textsOf(line).join(''),
-    `Waiting on you:approve review, theme— signed off blocked, unsigned, refused by its check, denied a call, waiting at its gate, out of rounds, or past its budget —wf decide r-1`,
+    `Waiting on you:approve review, theme— signed off blocked, unsigned, refused by its check, denied a call, waiting at its gate, out of rounds, or past its budget —nemia decide r-1`,
   );
   assert.match(
     line,
@@ -2705,8 +2713,13 @@ test("in the frame's bar, the banners name a step by a button that opens the ste
 });
 
 test('the gate: Approve with a box for the words, which may stay empty, and Send back — the answer box — with an objection it waits for, continuing the session or in a new one', () => {
-  const html = withClient(createElement(Gates.Gate, { runId: 'r-1', step: 'plan' }));
+  const html = withClient(createElement(Gates.Gate, { runId: 'r-1', step: 'plan', approveLine: 'nemia approve r-1 plan' }));
   assert.match(html, /^<section aria-label="The gate of plan" data-gate="awaiting"/);
+  assert.match(
+    html,
+    /as <code>nemia approve r-1 plan<\/code> approves it: the next tick files what waits on it/,
+    'beside Approve, the line it answers',
+  );
   const forms = new Map([...html.matchAll(/<form aria-label="([^"]+)"[^>]*>([\s\S]*?)<\/form>/g)].map((m) => [m[1], m[2]]));
   assert.deepEqual([...forms.keys()], ['Approve plan', 'Send plan back']);
   const buttons = (form: string) =>
@@ -2721,7 +2734,7 @@ test('the gate: Approve with a box for the words, which may stay empty, and Send
     forms.get('Approve plan')!,
     /<label for="[^"]+" class="sr-only">Words to approve plan with, if any<\/label><textarea [^>]*placeholder="Your words \(optional\): every step after the gate is handed them, under “Approved”\."/,
   );
-  assert.ok(textsOf(forms.get('Approve plan')!).includes('wf approve r-1 plan'));
+  assert.ok(textsOf(forms.get('Approve plan')!).includes('nemia approve r-1 plan'), 'the line the api answers beside the button');
   assert.match(forms.get('Send plan back')!, /<label for="[^"]+" class="sr-only">What to change, sent back to plan<\/label>/);
   const radios = [...forms.get('Send plan back')!.matchAll(/<input type="radio" name="[^"]*"( checked="")? value="(\w+)"/g)].map((m) => [
     m[2],
@@ -2904,7 +2917,7 @@ test("the ending step's own gate is not asked for twice: the to-decide banner sa
   const line = /<p>(Waiting on you:[\s\S]*?)<\/p>/.exec(both)![1];
   assert.equal(
     textsOf(line).join(''),
-    'Waiting on you:theme— signed off blocked, unsigned, refused by its check, denied a call, waiting at its gate, out of rounds, or past its budget —wf decide r-1',
+    'Waiting on you:theme— signed off blocked, unsigned, refused by its check, denied a call, waiting at its gate, out of rounds, or past its budget —nemia decide r-1',
     'and only it',
   );
 });
@@ -2963,18 +2976,28 @@ test("what an ending step would act on, beside its gate: the branch's standing a
 });
 
 test('the gate of an ending step says approving is what files it, and its send-back goes to the work — never to the step at the gate, which `wf retry` refuses', () => {
-  const html = withClient(createElement(Gates.Gate, { runId: 'r-1', step: 'ship', back: ['implement'], acts: true }));
+  const html = withClient(
+    createElement(Gates.Gate, { runId: 'r-1', step: 'ship', approveLine: 'nemia approve r-1 ship', back: ['implement'], acts: true }),
+  );
   const texts = textsOf(html).join(' ');
   assert.match(
     texts,
     /ship waits at its gate: nothing of it runs until you approve it — your approval is what files it — or you send implement back\./,
   );
-  assert.ok(texts.includes('wf approve r-1 ship'), html);
+  assert.ok(texts.includes('nemia approve r-1 ship'), html);
   assert.match(texts, /the next tick files it(?! what)/);
   const forms = [...html.matchAll(/<form aria-label="([^"]+)"/g)].map((m) => m[1]);
   assert.deepEqual(forms, ['Approve ship', 'Send implement back'], 'the send-back names the step it goes to');
   assert.match(html, /What to change, sent back to implement<\/label>/);
-  const wide = withClient(createElement(Gates.Gate, { runId: 'r-1', step: 'ship', back: ['implement', 'docs'], acts: true }));
+  const wide = withClient(
+    createElement(Gates.Gate, {
+      runId: 'r-1',
+      step: 'ship',
+      approveLine: 'nemia approve r-1 ship',
+      back: ['implement', 'docs'],
+      acts: true,
+    }),
+  );
   assert.deepEqual(
     [...wide.matchAll(/<form aria-label="([^"]+)"/g)].map((m) => m[1]),
     ['Approve ship', 'Send the work back'],
@@ -2989,7 +3012,7 @@ test('the gate of an ending step says approving is what files it, and its send-b
     ],
     'the objection picks one, since one is enough to hold the gate again',
   );
-  const held = withClient(createElement(Gates.Gate, { runId: 'r-1', step: 'plan' }));
+  const held = withClient(createElement(Gates.Gate, { runId: 'r-1', step: 'plan', approveLine: 'nemia approve r-1 plan' }));
   assert.match(
     textsOf(held).join(' '),
     /plan waits at its gate: nothing after it is filed until you approve what it handed on, or send it back\./,
@@ -3031,13 +3054,15 @@ test("a step's facts say `workspace` only where the step says it: the step that 
 });
 
 test("the gate's own words at an ending: the approval's box says the step is handed them, and the word taken names the step it was about", () => {
-  const html = withClient(createElement(Gates.Gate, { runId: 'r-1', step: 'ship', back: ['review'], acts: true }));
+  const html = withClient(
+    createElement(Gates.Gate, { runId: 'r-1', step: 'ship', approveLine: 'nemia approve r-1 ship', back: ['review'], acts: true }),
+  );
   assert.match(
     html,
     /placeholder="Your words \(optional\): the step is handed them as the terms it acts on, under “Approved”\."/,
     "the words go to the step itself, as its brief's `## Approved` hands them: nothing follows an ending to be handed anything",
   );
-  const held = withClient(createElement(Gates.Gate, { runId: 'r-1', step: 'plan' }));
+  const held = withClient(createElement(Gates.Gate, { runId: 'r-1', step: 'plan', approveLine: 'nemia approve r-1 plan' }));
   assert.match(held, /placeholder="Your words \(optional\): every step after the gate is handed them, under “Approved”\."/);
 
   assert.deepEqual(
@@ -3061,7 +3086,9 @@ test("the gate's own words at an ending: the approval's box says the step is han
 });
 
 test('REFUSED: an ending that waits on nothing is offered no send-back, since a try of the unfiled step is refused — the approval is the only word there is', () => {
-  const alone = withClient(createElement(Gates.Gate, { runId: 'r-1', step: 'ship', back: [], acts: true }));
+  const alone = withClient(
+    createElement(Gates.Gate, { runId: 'r-1', step: 'ship', approveLine: 'nemia approve r-1 ship', back: [], acts: true }),
+  );
   const forms = [...alone.matchAll(/<form aria-label="([^"]+)"/g)].map((m) => m[1]);
   assert.deepEqual(forms, ['Approve ship'], "the approval alone, as `wf ls`'s gate note prints it for such a step");
   assert.doesNotMatch(alone, /Send back|What to change/);
@@ -3069,7 +3096,9 @@ test('REFUSED: an ending that waits on nothing is offered no send-back, since a 
     textsOf(alone).join(' ').includes('ship waits at its gate: nothing of it runs until you approve it — your approval is what files it.'),
     alone,
   );
-  const withWork = withClient(createElement(Gates.Gate, { runId: 'r-1', step: 'ship', back: ['review'], acts: true }));
+  const withWork = withClient(
+    createElement(Gates.Gate, { runId: 'r-1', step: 'ship', approveLine: 'nemia approve r-1 ship', back: ['review'], acts: true }),
+  );
   assert.deepEqual(
     [...withWork.matchAll(/<form aria-label="([^"]+)"/g)].map((m) => m[1]),
     ['Approve ship', 'Send review back'],
@@ -3113,6 +3142,7 @@ test('the edges between cards are drawn as every edge is: from a run into each c
         branch: null,
         status: filed ? 'running (working)' : 'waiting',
         note: null,
+        roundDue: false,
         needs: null,
         blockedByHarness: false,
         waitingFor: null,
@@ -3646,7 +3676,7 @@ test("a step past its budget is offered a raise: its word with the amounts, a bo
 
   const tokens = textsOf(rows.get('tokens')!.html);
   assert.ok(
-    tokens.includes('over budget $4.25 of $3') && tokens.includes('wf retry r-1 tokens --budget <amount>') && tokens.includes('$4.25'),
+    tokens.includes('over budget $4.25 of $3') && tokens.join(' ').includes(': the button below raises it.') && tokens.includes('$4.25'),
     tokens.join(' | '),
   );
   assert.equal(box('tokens'), '5', 'the number box starts above what it cost, whatever order a server render writes its attributes in');
@@ -3675,7 +3705,7 @@ test("a step past its budget is offered a raise: its word with the amounts, a bo
     /<div data-asks="true"[^>]*><p>asks:<\/p> <div data-markdown="true" class="[^"]*max-h-72 overflow-y-auto[^"]*"><p[^>]*>Warm colours, or cool ones\?<\/p>/,
     'the question as markdown, in a box that scrolls',
   );
-  assert.ok(palette.includes('wf retry r-1 palette --budget <amount> --message "<answer>"'), palette.join(' | '));
+  assert.ok(palette.join(' ').includes(': the button below raises it.'), palette.join(' | '));
   assert.equal(box('palette'), '2');
   assert.deepEqual(said('palette'), ['Your answer to palette', false], 'and the answer with the raise');
   assert.deepEqual(
@@ -3703,7 +3733,7 @@ test("a step past its budget is offered a raise: its word with the amounts, a bo
   assert.deepEqual(said('types'), ['What to tell types, if anything', true], 'and nobody to tell');
 
   const review = textsOf(rows.get('review')!.html);
-  assert.ok(review.includes('wf round r-1 review --budget <amount>'), review.join(' | '));
+  assert.ok(review.join(' ').includes(", with its loop's next round: the button below raises it."), review.join(' | '));
   assert.equal(box('review'), '3');
   assert.deepEqual(buttons('review'), [['submit', false, 'Raise the budget and go round again']]);
   assert.deepEqual(radios('review'), [], 'a round has no mode');
@@ -4110,6 +4140,7 @@ test('a hold is drawn between two cards as an --after edge is: from the run it i
         branch: null,
         status: 'awaiting approval',
         note: null,
+        roundDue: false,
         needs: null,
         blockedByHarness: false,
         waitingFor: null,
@@ -4213,13 +4244,15 @@ test("what a gate approves is its summary and each field declared, a plan's appr
 });
 
 test("the run page's gate draws what is being approved beside Approve and Send back; the inspector's, whose Output tab has it, does not", () => {
-  const html = withClient(createElement(Gate, { runId: 'r-1', step: 'plan', closeout: planCloseout }));
+  const html = withClient(
+    createElement(Gate, { runId: 'r-1', step: 'plan', approveLine: 'nemia approve r-1 plan', closeout: planCloseout }),
+  );
   const handed = html.indexOf('aria-label="What plan handed on"');
   assert.ok(handed >= 0, html);
   assert.ok(handed < html.indexOf('aria-label="Approve plan"'), 'what it handed on comes before the answer: read, then decided');
   assert.match(html, /data-field="approach"/);
   assert.match(html, /lg:grid-cols-2/, 'beside the answer where the page is wide');
-  const bare = withClient(createElement(Gate, { runId: 'r-1', step: 'plan', framed: false }));
+  const bare = withClient(createElement(Gate, { runId: 'r-1', step: 'plan', approveLine: 'nemia approve r-1 plan', framed: false }));
   assert.doesNotMatch(bare, /handed on, which you approve|data-handed-on|lg:grid-cols-2/);
 });
 
@@ -5400,6 +5433,11 @@ const filed = (name: string, extra: Partial<import('../src/lib/api.ts').Factory>
   workflows: ['build'],
   hires: {},
   error: null,
+  commands: {
+    attach: `nemia factory attach ${name} <workflow>`,
+    rm: `nemia factory rm ${name}`,
+    add: `nemia factory add ${name} --repo <path>`,
+  },
   ...extra,
 });
 

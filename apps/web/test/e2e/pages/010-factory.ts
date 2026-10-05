@@ -134,7 +134,7 @@ export default {
       await expectTexts(ghost.locator('[data-ghost-place]'), [PLACES_SAID[i]], `${card.name}'s ghost says its place (${PLACES_SAID[i]})`);
       await expectTexts(ghost.locator('[data-ghost-title]'), [card.title], `and its first line (${card.title})`);
       await expectTexts(ghost.locator('[data-ghost-workflow]'), [card.workflow], `and its workflow (${card.workflow})`);
-      const repo = card === QUEUE.third ? "wf up's repository" : path.basename(checkout);
+      const repo = card === QUEUE.third ? "the daemon's repository" : path.basename(checkout);
       await expectTexts(ghost.locator('[data-ghost-repo]'), [repo], `and its repository (${repo})`);
       const href = await ghost.getAttribute('href');
       if (href !== `/inbox/${card.name}`)
@@ -183,7 +183,7 @@ export default {
     if (
       !passLines.includes('claude: 1 observe, 118 ms, 3 sessions or run files listed, 1 process started') ||
       passLines.at(-2) !== PASS.seen ||
-      passLines.at(-1) !== 'Measuring it took 0.40 ms. nemia up --stats says the same, and nemia passes the passes before it.'
+      passLines.at(-1) !== 'Measuring it took 0.40 ms.'
     ) {
       throw new Refused(
         `the pass's title names the harness observed, what the pass saw and what measuring took — it says ${JSON.stringify(passTitle)}`,

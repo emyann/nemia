@@ -117,9 +117,12 @@ export type RunSummary = {
   /**
    * `status` is what `nemia ls` prints for the step — see `judge` for the one word it corrects. `note` is what `nemia ls` prints
    * beside it, for a step tried again or about to be, or in a loop past its first round — `try 2, by retries: 1`,
-   * `round 2 of 3`, `round 3 asked (nemia round) — …` — and null where it prints nothing.
+   * `round 2 of 3`, `round 3 asked (nemia round) — …` — and null where it prints nothing. `roundDue`: whether a looping step's next
+   * round is due, which its note words.
    */
-  steps: Array<{ name: string; taskId: string | null; branch: string | null; status: string; note: string | null } & StepNeeds>;
+  steps: Array<
+    { name: string; taskId: string | null; branch: string | null; status: string; note: string | null; roundDue: boolean } & StepNeeds
+  >;
   /** The steps as a graph, as the run's page has it (`runGraph`): the Factory's card draws its flow off it, with no read of the run. */
   graph: RunGraph;
   /**
@@ -185,6 +188,7 @@ async function summarize(run: Run, views: Views, reader: Engine, git: BranchRead
       branch: run.steps[name]?.branch ?? null,
       status: judged.words.get(name)!,
       note: judged.notes.get(name) ?? null,
+      roundDue: judged.roundDue.has(name),
       ...needsOf(run, name, views, judged),
     })),
     graph: runGraph(judgedSteps(run, folder), names),
@@ -234,6 +238,7 @@ function unjudged(run: Run, views: Views, unreadable: Unreadable, said: string, 
       branch: run.steps[name]?.branch ?? null,
       status: wordOf(run.steps[name]),
       note: null,
+      roundDue: false,
       needs: null,
       blockedByHarness: false,
       waitingFor: null,

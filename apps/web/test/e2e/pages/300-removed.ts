@@ -46,7 +46,7 @@ export default {
       fs.renameSync(record, record + AWAY);
       fed(id, 'removed');
       const said = new RegExp(
-        `^${SHIPPED.title} is no longer in this store: it was removed, with wf rm, while this page was open\\. Runs lists the runs the store has\\.$`,
+        `^${SHIPPED.title} is no longer in this store: it was removed while this page was open\\. Runs lists the runs the store has\\.$`,
       );
       for (const [{ other }, where] of [
         [run, 'the run page'],

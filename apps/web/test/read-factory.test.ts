@@ -196,9 +196,45 @@ test("a card the api refused still rejects in the api's words and status, not as
 
 /** The factories as `GET /api/factories` answers them: the default one, one attached with a hire, and one whose file does not read. */
 const factories = (): Factory[] => [
-  { name: 'default', default: true, repos: ['/work/repo'], workflows: null, hires: {}, error: null },
-  { name: 'nemia', default: false, repos: ['/work/repo'], workflows: ['build'], hires: { 'build/implement': 'ada' }, error: null },
-  { name: 'broken', default: false, repos: [], workflows: [], hires: {}, error: '/wf/factories/broken.json is not JSON' },
+  {
+    name: 'default',
+    default: true,
+    repos: ['/work/repo'],
+    workflows: null,
+    hires: {},
+    error: null,
+    commands: {
+      attach: 'nemia factory attach default <workflow>',
+      rm: 'nemia factory rm default',
+      add: 'nemia factory add default --repo <path>',
+    },
+  },
+  {
+    name: 'nemia',
+    default: false,
+    repos: ['/work/repo'],
+    workflows: ['build'],
+    hires: { 'build/implement': 'ada' },
+    error: null,
+    commands: {
+      attach: 'nemia factory attach nemia <workflow>',
+      rm: 'nemia factory rm nemia',
+      add: 'nemia factory add nemia --repo <path>',
+    },
+  },
+  {
+    name: 'broken',
+    default: false,
+    repos: [],
+    workflows: [],
+    hires: {},
+    error: '/wf/factories/broken.json is not JSON',
+    commands: {
+      attach: 'nemia factory attach broken <workflow>',
+      rm: 'nemia factory rm broken',
+      add: 'nemia factory add broken --repo <path>',
+    },
+  },
 ];
 
 test('the factories decode as the api gives them, every key kept: the default offering every workflow, a hire, a file that does not read', async (t) => {

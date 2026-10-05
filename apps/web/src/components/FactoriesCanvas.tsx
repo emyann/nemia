@@ -1,7 +1,9 @@
 import { useEffect, useEffectEvent, useMemo, useRef, type RefObject } from 'react';
 import { Background, BackgroundVariant, Controls, ReactFlow, ReactFlowProvider, useReactFlow, useStoreApi } from '@xyflow/react';
 import { useNavigate } from '@tanstack/react-router';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { storeQuery } from '@/lib/api';
 import type { Bar } from '@/lib/bar';
 import type { FactoryBlock } from '@/lib/factories';
 import { revealView, sizeOf } from '@/lib/frame';
@@ -137,16 +139,23 @@ function useKeepClear(frame: RefObject<HTMLDivElement | null>, inspected: string
   }, [frame]);
 }
 
-/** No factory, and no run in the default one: say how to make one. */
+/** No factory, and no run in the default one: say how to make one, with the line the api answers (`fileFactory`). */
 function NoFactory() {
+  const { data: store } = useQuery(storeQuery);
   return (
     <div className="flex h-[calc(100svh-5rem)] min-h-96 items-center justify-center p-6">
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle>No factory yet</CardTitle>
           <CardDescription>
-            Make one with <code>npx wf factory add &lt;name&gt; --repo &lt;path&gt;</code>. A run started in none is the default
-            factory&apos;s, which shows here while it holds one and no factory is made.
+            Make one from the command line
+            {store ? (
+              <>
+                {' '}
+                with <code>{store.fileFactory}</code>
+              </>
+            ) : null}
+            . A run started in none is the default factory&apos;s, which shows here while it holds one and no factory is made.
           </CardDescription>
         </CardHeader>
       </Card>

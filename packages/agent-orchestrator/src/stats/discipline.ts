@@ -52,17 +52,20 @@ export type DeniedClock<D> = { state: { attempts: ReadonlyArray<{ ended: unknown
 export const deniedCallsOf = <D>(view: DeniedClock<D> | undefined): D[] =>
   (view?.state.attempts ?? []).flatMap((a) => (a.ended === null || a.ended === undefined ? [] : [...(a.denials ?? [])]));
 
+/** What a task's sessions have been denied so far: `ended`, every call of its ended attempts; `running`, each distinct call of the rest. */
+export type DeniedSoFar<D> = { ended: D[]; running: D[] };
+
 /**
  * Every call a task's sessions have been denied so far, for its step's line in the feed: each denial of each attempt that ended, one per
- * call (`deniedCallsOf`), then each distinct call of an attempt still running, once, by `key`, in the order first denied — a running
- * attempt's call is named as the harness reports it, and counted once its attempt ends. Empty for a task with no view, and for one denied
- * nothing.
+ * call (`deniedCallsOf`), and apart, each distinct call of an attempt still running, once, by `key`, in the order first denied — a running
+ * attempt's call is named as the harness reports it, and counted only once its attempt ends. Both empty for a task with no view, and for
+ * one denied nothing.
  */
-export const deniedSoFarOf = <D>(view: DeniedClock<D> | undefined, key: (d: D) => string): D[] => {
+export const deniedSoFarOf = <D>(view: DeniedClock<D> | undefined, key: (d: D) => string): DeniedSoFar<D> => {
   const running = new Map<string, D>();
   for (const a of view?.state.attempts ?? [])
     if (a.ended === null || a.ended === undefined) for (const d of a.denials ?? []) if (!running.has(key(d))) running.set(key(d), d);
-  return [...deniedCallsOf(view), ...running.values()];
+  return { ended: deniedCallsOf(view), running: [...running.values()] };
 };
 
 /** What `skillsLoadedOf` reads of a task's view: its attempts, whether each ended, and the skills each loaded, where its end says. */

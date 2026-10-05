@@ -538,7 +538,10 @@ function wordFeed(run: Run, r: PassReads, assessed: Assessment, admission: Admis
     run,
     assessed,
     (name) => closeoutOf(views, run, name),
-    (name) => deniedSoFarOf(views.get(run.steps[name]?.taskId ?? ''), denialText).map(denialText),
+    (name) => {
+      const { ended, running } = deniedSoFarOf(views.get(run.steps[name]?.taskId ?? ''), denialText);
+      return { ended: ended.map(denialText), running: running.map(denialText) };
+    },
   );
 }
 

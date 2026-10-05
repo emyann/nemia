@@ -307,8 +307,8 @@ test('a running step says each distinct call it is denied on its line in the fee
   await runWith(b.e, tickRun());
   assert.deepEqual(
     denied().map((l) => l.note),
-    ['denied: Bash(ls) ×1'],
-    'said while the attempt runs',
+    ['denied: Bash(ls)'],
+    'said while the attempt runs, with no count: the attempt has not ended',
   );
   b.deny(id, [ls, ls], true);
   await runWith(b.e, tickRun());
@@ -319,7 +319,7 @@ test('a running step says each distinct call it is denied on its line in the fee
   for (let i = 0; i < 2; i++) await runWith(b.e, tickRun());
   assert.deepEqual(
     denied().map((l) => l.note),
-    ['denied: Bash(ls) ×1', 'denied: Bash(ls) ×1, Glob ×1', 'denied: Bash(ls) ×2, Glob ×1'],
+    ['denied: Bash(ls)', 'denied: Bash(ls), Glob', 'denied: Bash(ls) ×2, Glob ×1'],
     'a new call says itself, and the end counts each',
   );
 });
@@ -1021,11 +1021,17 @@ test('feedWords says the run with its prune, what waits on a person as a note, a
   assert.deepEqual(feedWords(held, run, { status: 'failed' }).run, { word: 'failed' }, 'and one that broke says failed');
 });
 
-test("a step's denied calls are its note's denied: part, each distinct call counted, in the order first denied, the rest past five counted", () => {
+test("a step's denied calls are its note's denied: part, each distinct ended call counted, a running one named, in the order first denied, the rest past five counted", () => {
   assert.equal(deniedNote([]), '', 'a step denied nothing says nothing of it');
   assert.equal(deniedNote(['Bash(git push)', 'WebFetch', 'Bash(git push)']), 'denied: Bash(git push) ×2, WebFetch ×1');
   assert.equal(deniedNote(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'a']), 'denied: a ×2, b ×1, c ×1, d ×1, e ×1, and 2 more');
   assert.equal(deniedNote(['Bash(echo\nrm)']), 'denied: Bash(echo rm) ×1', 'one line');
+  assert.equal(
+    deniedNote(['WebFetch', 'Bash(ls)'], ['Bash(ls)', 'Glob']),
+    'denied: WebFetch ×1, Bash(ls) ×1, Glob',
+    'a running call is named with no count, and one an ended attempt was denied keeps that count',
+  );
+  assert.equal(deniedNote([], ['a', 'b', 'c', 'd', 'e', 'f']), 'denied: a, b, c, d, e, and 1 more', 'running calls are capped alike');
   const steps = [{ name: 'build', after: [], brief: 'build it' }] as unknown as Parameters<typeof listing>[0]['steps'];
   const run = {
     id: 'r-1',
@@ -1042,7 +1048,7 @@ test("a step's denied calls are its note's denied: part, each distinct call coun
     run,
     { status: 'running' },
     () => undefined,
-    (step) => (step === 'build' ? ['Bash(git push)'] : []),
+    (step) => ({ ended: step === 'build' ? ['Bash(git push)'] : [], running: [] }),
   );
   assert.equal(words.steps[0].note?.split(' · ')[0], 'denied: Bash(git push) ×1', 'a part of its own, first beside a need');
 });

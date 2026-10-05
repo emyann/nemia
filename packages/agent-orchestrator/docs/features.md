@@ -2294,8 +2294,8 @@ stateDiagram-v2
 <!-- diagram:nemia:end -->
 
 - **A step denied a call says so on its feed line**: a note part `denied: <call> ×<n>, …` (`deniedNote`, `src/feed/feed.ts`), off the
-  denials its task's attempts journalled (`deniedSoFarOf`): a running attempt's each distinct call once, as the runtime journals it
-  (`denied`), and each call counted when its attempt ends, at most five named. `denied:` is one of
+  denials its task's attempts journalled (`deniedSoFarOf`): a running attempt's each distinct call once, by its name alone, as the
+  runtime journals it (`denied`), and each call counted when its attempt ends, at most five named. `denied:` is one of
   her wake words, and her `grant-access` skill proposes the narrowest allow that would have let the call through, or says the deny
   stands.
 - **Her quota and her spend**: her task is allowed `curl -s <url>/api/quota` unasked, the address read off `daemon.json` at filing

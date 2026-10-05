@@ -105,7 +105,10 @@ const SIGNED = { outcome: 'done', summary: 'wrote it', artifacts: ['note.md'], n
 
 /** Just enough engine: what each task is doing and how it signed off, and every task's spec as it was filed. */
 const board = () => {
-  const tasks = new Map<string, { spec: { id: string; brief: string; cwd: string }; phase: string; closeout?: unknown }>();
+  const tasks = new Map<
+    string,
+    { spec: { id: string; brief: string; cwd: string; config?: { mounts?: { path: string }[] } }; phase: string; closeout?: unknown }
+  >();
   const e = {
     view: async (id: string) => {
       const t = tasks.get(id);
@@ -404,10 +407,14 @@ test("a queued card of a folder team, started by a tick: its repo: is not looked
 
 /**
  * The paths a brief names, of the kind a session would open: every backtick-quoted token that reads as a path rather than as a command or
- * a key. A folder step is fenced to its own directory (`dontAsk`), so each of them has to be inside it and on disk.
+ * a key, but those in a folder the step is filed with (`mounted`). A folder step is fenced to its own directory (`dontAsk`) and reads a
+ * mounted folder alone outside it, so each of them has to be inside it and on disk.
  */
-const pathsNamed = (brief: string): string[] =>
-  [...brief.matchAll(/`([^`\n]+)`/g)].map((m) => m[1]).filter((t) => /^given(\/|$)/.test(t) || t.startsWith('/'));
+const pathsNamed = (brief: string, mounted: readonly string[] = []): string[] =>
+  [...brief.matchAll(/`([^`\n]+)`/g)]
+    .map((m) => m[1])
+    .filter((t) => /^given(\/|$)/.test(t) || t.startsWith('/'))
+    .filter((t) => !mounted.some((m) => t === m || t.startsWith(`${m}/`)));
 
 test('a folder team with a fan-in, given files at its start: what each brief tells a step to read is inside its own folder, and on disk', async () => {
   const run = start({
@@ -466,15 +473,25 @@ test('a folder team with a fan-in, given files at its start: what each brief tel
   );
 
   for (const name of ['a', 'b', 'c', 'd']) {
-    const { brief, cwd } = tasks.get(`${run.id}-${name}`)!.spec;
-    assert.ok(!brief.includes(ROOT), `${name}'s brief names no path under the store, which its fence denies it:\n${brief}`);
-    const named = pathsNamed(brief);
+    const { brief, cwd, config } = tasks.get(`${run.id}-${name}`)!.spec;
+    const mounted = (config?.mounts ?? []).map((m) => m.path);
+    for (const at of mounted) assert.ok(brief.includes(`\`${at}\``), `${name}'s brief names ${at}, which it is filed with:\n${brief}`);
+    assert.ok(
+      !mounted.reduce((rest, at) => rest.replaceAll(at, ''), brief).includes(ROOT),
+      `${name}'s brief names no path under the store but the folders it is filed with, which its fence denies it:\n${brief}`,
+    );
+    const named = pathsNamed(brief, mounted);
     assert.ok(named.length, `${name}'s brief names a path`);
     for (const at of named) {
       assert.equal(path.isAbsolute(at), false, `${name}: ${at} is named by its path from the folder`);
       assert.ok(fs.existsSync(path.join(cwd, at)), `${name}: ${at} is on disk in its folder`);
     }
   }
+  assert.deepEqual(
+    tasks.get(`${run.id}-c`)!.spec.config?.mounts?.map((m) => path.basename(m.path)),
+    ['a', 'b'],
+    "c is filed a's and b's artifacts folders, so its brief is held to naming them",
+  );
   assert.match(tasks.get(`${run.id}-c`)!.spec.brief, /- a: `given\/from\/a`\n- b: `given\/from\/b`/);
   assert.match(tasks.get(`${run.id}-a`)!.spec.brief, /copied into `given\/inputs` in this folder: `mock\.png`, `brief notes\.md`\./);
   const d = tasks.get(`${run.id}-d`)!.spec.brief;

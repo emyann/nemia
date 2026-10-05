@@ -1,14 +1,15 @@
 /**
- * How `npm run e2e` looks at its pages, and how it ends: every page in both themes, then an exit code
- * that says whether each passed. Apart from run.ts, which builds and serves the app, so that a page
- * breaking the rules can be put through the very same code (broken-page.ts) and seen to fail it — not
- * only the app's pages seen to pass.
+ * How `npm run e2e` looks at its pages, and how it ends: every page in the themes its plan asks — the dark alone, unless `--photos`
+ * asks for light, then dark — pictured where the plan says, then an exit code that says whether each passed. Apart from run.ts, which
+ * builds and serves the app, so that a page breaking the rules can be put through the very same code (broken-page.ts) and seen to fail
+ * it — not only the app's pages seen to pass.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
 import { expectTheme, idle, Refused, settled, track, watch } from './checks.ts';
 import { photograph } from './board.ts';
+import { photographing, setPhotographing } from './world.ts';
 
 export const THEMES = ['light', 'dark'] as const;
 export type Theme = (typeof THEMES)[number];
@@ -51,9 +52,17 @@ class PageFailure extends Error {
 
 /**
  * One page in one theme: loaded, held to its spec, and photographed as a person would see it, once whatever the last assertion started has
- * settled. Resolves with the screenshot; rejects with a `PageFailure` and a picture of the page as it failed.
+ * settled, when it is pictured (`photographing`). Resolves with the screenshot, or nothing when it is not pictured; rejects with a
+ * `PageFailure` and a picture of the page as it failed, which is taken whether or not the page is pictured.
  */
-async function visit(context: BrowserContext, base: string, spec: PageSpec, theme: Theme, out: string, store?: string): Promise<string> {
+async function visit(
+  context: BrowserContext,
+  base: string,
+  spec: PageSpec,
+  theme: Theme,
+  out: string,
+  store?: string,
+): Promise<string | undefined> {
   const page = await context.newPage();
   const { problems } = watch(page);
   const shot = path.join(out, `${spec.name}-${theme}.png`);
@@ -67,11 +76,11 @@ async function visit(context: BrowserContext, base: string, spec: PageSpec, them
     await photograph(page, shot, { fullPage: true });
     const seen = problems();
     if (seen.length) throw new Refused(`no console error and no failed request — ${seen.length} seen:\n    ${seen.join('\n    ')}`);
-    return shot;
+    return photographing ? shot : undefined;
   } catch (err) {
     fs.rmSync(shot, { force: true });
     const failed = path.join(out, `${spec.name}-${theme}-failed.png`);
-    await photograph(page, failed, { fullPage: true }).catch(() => {});
+    await photograph(page, failed, { fullPage: true, always: true }).catch(() => {});
     throw new PageFailure(where(spec, theme), err, failed, store !== undefined && !fs.existsSync(store) ? storeGone(store) : undefined);
   } finally {
     await page.close();
@@ -79,12 +88,19 @@ async function visit(context: BrowserContext, base: string, spec: PageSpec, them
 }
 
 /**
- * Every page, in the light theme and then the dark, each in a 1280 × 800 browser; a screenshot of each
- * into `out`. Rejects on the first page that fails, naming the page, the theme and the assertion — or, once the `store` the api serves
- * is gone, saying so in place of the assertion (`storeGone`), and visiting no page after it. Every page a theme's browser opens, a
- * page's second page too, has its requests counted from its first, for `idle`.
+ * Every page, in each of `themes` in turn, each in a 1280 × 800 browser; a screenshot into `out` of each page `pictured` names, which
+ * alone take their own pictures too (`setPhotographing`). Resolves with the screenshots. Rejects on the first page that fails, naming the
+ * page, the theme and the assertion, with its picture — or, once the `store` the api serves is gone, saying so in place of the assertion
+ * (`storeGone`), and visiting no page after it. Every page a theme's browser opens, a page's second page too, has its requests counted from
+ * its first, for `idle`.
  */
-export async function visitAll(browser: Browser, base: string, pages: readonly PageSpec[], out: string, store?: string): Promise<string[]> {
+export async function visitAll(
+  browser: Browser,
+  base: string,
+  pages: readonly PageSpec[],
+  out: string,
+  { store, themes, pictured }: { store?: string; themes: readonly Theme[]; pictured: (name: string) => boolean },
+): Promise<string[]> {
   fs.mkdirSync(out, { recursive: true });
   for (const spec of pages) {
     for (const theme of THEMES) {
@@ -93,16 +109,19 @@ export async function visitAll(browser: Browser, base: string, pages: readonly P
     }
   }
   const shots: string[] = [];
-  for (const theme of THEMES) {
+  for (const theme of themes) {
     const context = await browser.newContext({ colorScheme: theme, viewport: { width: 1280, height: 800 } });
     context.on('page', track);
     try {
       for (const spec of pages) {
         if (store !== undefined && !fs.existsSync(store)) throw new Error(`before ${where(spec, theme)}: ${storeGone(store)}`);
-        shots.push(await visit(context, base, spec, theme, out, store));
+        setPhotographing(pictured(spec.name));
+        const shot = await visit(context, base, spec, theme, out, store);
+        if (shot) shots.push(shot);
         console.log(`e2e: ${where(spec, theme)} ✓`);
       }
     } finally {
+      setPhotographing(false);
       await context.close();
     }
   }

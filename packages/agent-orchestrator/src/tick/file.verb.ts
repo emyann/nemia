@@ -2,15 +2,22 @@
  * What a pass files, and what it files a step with: the tries due (`fileTries`), the rounds (`fileRounds`), the checks (`fileChecks`) and
  * the ready steps (`fileReady`), in the order `advanceRun` calls them, each under the id the run derives and asking the store first
  * whether it may file (`mayFileOf`), a nudge answering a task held open through `answerHeld` (`held.verb.ts`); the fields of a filing
- * that only a local harness reads (`localFields`), the step as it is told (`toldOf`), and what each run it waited on concluded
- * (`parentCloseouts`). A controller, reaching the runtime through the client (`runtime-client.ts`).
+ * that only a local harness reads (`localFields`), and the step as it is told (`toldOf`); what its roots are handed of other runs is
+ * `handedOf`'s (`handed.verb.ts`). A controller, reaching the runtime through the client (`runtime-client.ts`).
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import type { ClaudeFlags, CodexArgs, Engine, TaskView } from '../runtime-client.ts';
-import { CHECK_DEADLINE_SECONDS, CHECK_NICENESS, checkArgv, type CheckEnv, type CheckHanded, type Verdict } from '../check/check.ts';
+import {
+  CHECK_DEADLINE_SECONDS,
+  CHECK_NICENESS,
+  checkArgv,
+  LANDING_CHECK_DEADLINE_SECONDS,
+  type CheckEnv,
+  type CheckHanded,
+  type Verdict,
+} from '../check/check.ts';
 import { isRemoteHarness, type Workflow } from '../workflow.ts';
-import { resultSteps } from '../branches/branches.ts';
 import { holdsOpen } from '../gate/gate.ts';
 import {
   checkTaskId,
@@ -40,18 +47,18 @@ import {
   type RoundAsk,
   type SpendOf,
 } from '../status/status.ts';
-import { composeBrief, remoteBrief, type EndingStopped, type ParentCloseout, type ParentStep, type RetryBriefing } from '../brief/index.ts';
+import { composeBrief, remoteBrief, type EndingStopped, type ParentCloseout, type RetryBriefing } from '../brief/index.ts';
+import { handedOf } from '../brief/handed.verb.ts';
 import { roundFiled } from '../round/round.ts';
-import { filedConfig, tryModel } from '../filed/filed.ts';
+import { filedConfig, filedFolders, tryModel } from '../filed/filed.ts';
 import { closeoutSchemaOf, parseCloseout, type Closeout } from '../closeout/closeout.ts';
 import { modeWord, nextTry, sessionModel, type Retry, type RetryAsk } from '../retry/index.ts';
-import { artifactsDir, inputsDir, stepsOf } from '../record/record.store.ts';
-import { runStore } from '../record/files.store.ts';
+import { artifactsDir, inputsDir } from '../record/record.store.ts';
+import { inboxDir, runStore } from '../record/files.store.ts';
 import { checkCloseout, writeCheckCloseout } from '../check/check.store.ts';
 import { checkoutParts, gitSays, realRepoOf, workspaceFor } from '../workspace/worktree.store.ts';
 import { agentFilesDir, renderedIn, skillsAgain } from '../agents/agents.store.ts';
-import { checksHandedOf, closeoutOf, parentOf, refusalOf, reportedEngine, saidIn, sessionIn } from '../views/views.verb.ts';
-import { phaseOfView } from '../views/views-words.ts';
+import { checksHandedOf, refusalOf, reportedEngine, saidIn, sessionIn } from '../views/views.verb.ts';
 import { placesOf } from '../folder/lookup.store.ts';
 import { skillsFor } from '../folder/folder.store.ts';
 import { renderedFlags, rendersAgent, unrendered } from '../agents/agents.ts';
@@ -100,63 +107,6 @@ export const ownOf = (step: Workflow, rendered: ClaudeFlags | undefined, repoOf:
     ...(repo === undefined ? {} : { codex: { trustFrom: repo } }),
   };
 };
-
-/**
- * What each run this one waited on or was handed as context concluded, for its roots' briefs (`## From run <id>` in `composeBrief`), each
- * marked `how` it was given and whether it had `shipped`, asked of each run that reads: the first line of its brief,
- * and the closeout of each step whose work is that run's result (`resultSteps`), on the engine's record of its current try, read as
- * `nemia decide` reads one (`closeoutOf`). Read once, on the pass that files the roots.
- *
- * The result's steps, not the terminal ones: where a folder's last step is an ending that merges (`workspace: main`), that step's account
- * is of the merge — "merged wf/…/implement onto main, the check passed" — and it declares nothing, so a child handed it would be handed
- * nothing about the work. What the child wants is what the work said, which is the step the ending acts on. A folder with no ending step
- * is unchanged: its terminal steps are its result.
- *
- * It never throws: a parent whose record or workflow does not read, a step never filed, a task the engine holds
- * no closeout for — a failed step whose work a person merged all the same — and a closeout that does not parse each say so in the section,
- * and the roots are filed all the same.
- */
-export async function parentCloseouts(
-  e: Engine,
-  ids: readonly string[],
-  how: ParentCloseout['how'],
-  shippedOf: (runId: string) => Promise<boolean>,
-): Promise<ParentCloseout[]> {
-  const out: ParentCloseout[] = [];
-  for (const id of new Set(ids)) {
-    let record: Run;
-    let steps: Workflow[];
-    try {
-      record = runStore.runs.read(id);
-      steps = stepsOf(record);
-    } catch (err) {
-      out.push({ run: id, unreadable: `its record cannot be read: ${(err as Error).message}`, how, shipped: false });
-      continue;
-    }
-    const said: ParentStep[] = [];
-    for (const step of resultSteps(steps)) {
-      const taskId = record.steps[step.name]?.taskId;
-      if (!taskId) {
-        said.push({ name: step.name, unreadable: 'it was never filed' });
-        continue;
-      }
-      let view: TaskView;
-      try {
-        view = await e.view(taskId);
-      } catch (err) {
-        said.push({ name: step.name, unreadable: `the engine could not be asked for its task ${taskId}: ${(err as Error).message}` });
-        continue;
-      }
-      const c = closeoutOf(new Map([[taskId, view]]), record, step.name);
-      if (!c)
-        said.push({ name: step.name, unreadable: `the engine holds no closeout for its task ${taskId}, which is ${phaseOfView(view)}` });
-      else if ('error' in c) said.push({ name: step.name, unreadable: `its closeout cannot be read: ${c.error}` });
-      else said.push({ step, said: c });
-    }
-    out.push({ run: id, asked: record.brief.split('\n')[0], steps: said, how, shipped: await shippedOf(id) });
-  }
-  return out;
-}
 
 /** A task as the engine is asked to file it (`e.file`). */
 type Spec = Parameters<Engine['file']>[0];
@@ -340,6 +290,7 @@ async function sendTry(f: Filing, r: Retry, step: Workflow, taskId: string, answ
         undefined,
         inputsDir(run),
         checked,
+        filedFolders(told.step, reads.steps, { runArtifacts: path.dirname(files), inbox: inboxDir() }),
       );
   const budgetUsd = budgetUsdFor(r.budget ?? budgetOf(step, record), stepSpend(run, r.step, reads.spendOf));
   if (answers) return answerHeld(e, taskId, brief, budgetUsd);
@@ -415,6 +366,7 @@ const trySpec = (
       model: tryModel(step, record, r),
       budgetUsd: t.budgetUsd,
       runArtifacts: path.dirname(artifactsDir(f.run, step.name)),
+      inbox: inboxDir(),
       own: t.told.own,
     }),
     resumeFrom: t.resumeFrom,
@@ -487,6 +439,8 @@ function roundSpec(f: Filing, r: Round, looping: Workflow, target: Workflow, tas
       },
       undefined,
       inputsDir(run),
+      undefined,
+      filedFolders(told.step, reads.steps, { runArtifacts: path.dirname(files), inbox: inboxDir() }),
     ),
     cwd: record.workspace ?? run.workspace,
     harness: target.harness,
@@ -495,6 +449,7 @@ function roundSpec(f: Filing, r: Round, looping: Workflow, target: Workflow, tas
       config: filedConfig(target, reads.steps, run, {
         model: sessionModel(target, record),
         runArtifacts: path.dirname(artifactsDir(run, target.name)),
+        inbox: inboxDir(),
         budgetUsd: budgetUsdFor(
           r.budget !== undefined && r.raise?.includes(r.target) ? r.budget : budgetOf(target, record),
           stepSpend(run, r.target, reads.spendOf),
@@ -521,8 +476,8 @@ export async function fileChecks(f: Filing, names: readonly string[]): Promise<s
 }
 
 /**
- * File a step's check where the engine does not hold it, on the `check` harness, with the command the run froze and a deadline, and put it
- * on the record: an ending's installs first what the staged merge's lockfile asks for (`checkoutParts`), and says so.
+ * File a step's check where the engine does not hold it, on the `check` harness, with the command the run froze and a deadline, a landing's
+ * its own, and put it on the record: an ending's installs first what the staged merge's lockfile asks for (`checkoutParts`), and says so.
  */
 async function fileCheck(f: Filing, name: string): Promise<void> {
   const { e, run } = f;
@@ -533,7 +488,8 @@ async function fileCheck(f: Filing, name: string): Promise<void> {
     fs.mkdirSync(path.dirname(checkCloseout(taskId)), { recursive: true });
     const files = artifactsDir(run, name);
     fs.mkdirSync(files, { recursive: true });
-    const install = isGitRun(run) && landsOnCheck(step, run) ? (checkoutParts(workspace) ?? undefined) : undefined;
+    const lands = isGitRun(run) && landsOnCheck(step, run);
+    const install = lands ? (checkoutParts(workspace) ?? undefined) : undefined;
     const closeout = f.reads.signedOff(name);
     if (install)
       f.notes.push(
@@ -553,7 +509,7 @@ async function fileCheck(f: Filing, name: string): Promise<void> {
       priority: MOMENTUM,
       brief: step.check!,
       cwd: workspace,
-      deadlineSeconds: CHECK_DEADLINE_SECONDS,
+      deadlineSeconds: lands ? LANDING_CHECK_DEADLINE_SECONDS : CHECK_DEADLINE_SECONDS,
       config: { command: checkArgv(step.check!, install !== undefined), env, niceness: CHECK_NICENESS },
     });
   }
@@ -562,16 +518,6 @@ async function fileCheck(f: Filing, name: string): Promise<void> {
 
 /** Where a step is filed and what it depends on, as its workspace was cut (`workspaceFor`). */
 type Place = Awaited<ReturnType<typeof workspaceFor>>;
-
-/**
- * What a run's roots are handed of other runs, on the pass that files them: what each run it waited on concluded, shipped, then what each
- * run it was handed as context concluded, shipped or not as `parentOf` reads it now (`parentCloseouts`). Undefined for a run with neither.
- */
-async function handedOf(e: Engine, run: Run): Promise<ParentCloseout[] | undefined> {
-  const waited = run.after?.length ? await parentCloseouts(e, run.after, 'waited', async () => true) : [];
-  const read = run.context?.length ? await parentCloseouts(e, run.context, 'read', async (id) => (await parentOf(e, id)).shipped) : [];
-  return waited.length || read.length ? [...waited, ...read] : undefined;
-}
 
 /**
  * File the ready steps, in order, until the pass may file no more, each in the workspace cut for it: answers with the steps filed. A run
@@ -643,6 +589,7 @@ function readySpec(
           step.after.length ? undefined : parents,
           inputsDir(run),
           said.checked,
+          filedFolders(told.step, reads.steps, { runArtifacts: path.dirname(files), inbox: inboxDir() }),
         ),
     cwd: place.workspace,
     harness: step.harness,
@@ -652,6 +599,7 @@ function readySpec(
       config: filedConfig(step, reads.steps, run, {
         model: step.model,
         runArtifacts: path.dirname(artifactsDir(run, step.name)),
+        inbox: inboxDir(),
         budgetUsd: budgetUsdFor(budgetOf(step, run.steps[step.name]), stepSpend(run, step.name, reads.spendOf)),
         own: told.own,
       }),

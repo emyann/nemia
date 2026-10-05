@@ -48,7 +48,7 @@ import type { SessionState } from '../src/core/session.ts';
 import type { Sighting } from '../src/core/domain.ts';
 import { runningIn, scratch } from './scratch.ts';
 import { stepClock } from './clock.ts';
-import { resultLine, SESSION, SKILLS_STREAM, stream } from './reader-streams.ts';
+import { FILES_STREAM, resultLine, SESSION, SKILLS_STREAM, stream } from './reader-streams.ts';
 import { ioCounts } from '../src/core/engine/tally.ts';
 import { monoNow } from '../src/core/engine/now.ts';
 
@@ -1692,6 +1692,22 @@ test('a stream that started says the skills its session loaded even when it load
   const unstarted = SKILLS_STREAM.split('\n').slice(1).join('\n');
   assert.equal('skills' in claudeStreamOutput(unstarted), false, 'no init line: no session known to have started, nothing measured');
   assert.equal('skills' in claudeResultOutput(SKILLS_STREAM), false, '--output-format json has no events: it cannot say');
+});
+
+test("claude -p's stream says each file its session read or wrote through its file tools, once, relative to its folder", () => {
+  assert.deepEqual(
+    claudeStreamOutput(FILES_STREAM).files,
+    ['apps/web/a.tsx', 'b.ts', 'n.ipynb'],
+    'a file read again is one; one outside its folder, one denied, and a call naming no file are none',
+  );
+});
+
+test('a stream says the files its session touched only when its init line names its folder', () => {
+  const none = [JSON.parse(FILES_STREAM.split('\n')[0]), { type: 'result', subtype: 'success' }].map((l) => JSON.stringify(l)).join('\n');
+  assert.deepEqual(claudeStreamOutput(none).files, [], 'measured: none touched');
+  assert.equal('files' in claudeStreamOutput(FILES_STREAM.split('\n').slice(1).join('\n')), false, 'no init line: nothing measured');
+  assert.equal('files' in claudeStreamOutput(SKILLS_STREAM), false, 'an init line with no folder: no path can be made relative to it');
+  assert.equal('files' in claudeResultOutput(FILES_STREAM), false, '--output-format json has no events: it cannot say');
 });
 
 test("a spec that reads its harness's output reports the answer found there, with no time — nothing in the workspace", async () => {

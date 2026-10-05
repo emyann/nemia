@@ -48,14 +48,15 @@ const board = async () => {
 };
 
 test('the views of some tasks are their views, each journal read once and the harness observed once for all those in flight', async () => {
-  const { engine, counts, settled, flying, queued } = await board();
+  const { engine, root, runner, counts, settled, flying, queued } = await board();
   const asked = [flying[1], settled[0], queued, flying[0], settled[0]];
   const one = async (id: string) => engine.view(id);
   const expected = await Promise.all([...new Set(asked)].map(one));
+  const cold = promiseEngine(Engine.layer({ root, harnesses: { mine: runner } }));
 
-  const reads = engine.io().reads;
+  const reads = cold.io().reads;
   const observes = counts.observe;
-  const { views } = await engine.list(asked);
+  const { views } = await cold.list(asked);
   assert.deepEqual(
     views.map((v) => v.id),
     [flying[1], settled[0], queued, flying[0]],
@@ -73,8 +74,15 @@ test('the views of some tasks are their views, each journal read once and the ha
     views.map((v) => v.phase),
     ['running (working)', 'succeeded', 'pending', 'running (working)'],
   );
-  assert.equal(engine.io().reads - reads, 4, "a journal for each task asked, and none of the store's other two");
+  assert.equal(
+    cold.io().reads - reads,
+    4,
+    "an engine that never read them reads a journal for each task asked, and none of the store's other two",
+  );
   assert.equal(counts.observe - observes, 1, 'one look at the harness for the two in flight');
+  const again = cold.io().reads;
+  await cold.list(asked);
+  assert.equal(cold.io().reads - again, 0, 'and once read, a journal nothing has written to since is not read again');
 });
 
 test('the views of tasks none of which is in flight observe nothing', async () => {

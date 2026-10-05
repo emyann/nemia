@@ -51,6 +51,8 @@ const REMOTE_REFUSED: Partial<Record<StepKey, string>> = {
   denials: 'stops the step on a call its harness denied, and a remote agent reports none',
   writable:
     "gives a session on this machine a folder of the run's factory to write, and a remote agent works on another party's machine, where no folder of this one is mounted",
+  reads:
+    "gives a session on this machine a folder of the store to read, and a remote agent works on another party's machine, where no folder of this one is mounted",
   budget: 'is a spend cap a harness of ours keeps, and a remote agent keeps none and reports no cost',
   output:
     "declares the fields of a closing statement the harness is asked for, and A2A has no closeout schema: a Task the agent completes is the step's sign-off, and a data part on its reply is what it says",

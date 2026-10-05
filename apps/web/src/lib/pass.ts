@@ -23,7 +23,8 @@ export const passLine = (pass: Pick<PassCost, 'ms'>): string => `a pass takes ${
 
 /**
  * The last pass whole, a line each: when it ran and its totals, each phase with its time, calls, bytes and processes, each harness
- * observed, and what measuring it took — the breakdown the CLI's `up --stats` prints.
+ * observed, what it saw where the pass says (`runs`, from the tick that keeps it), and what measuring it took — the breakdown the CLI's
+ * `up --stats` prints.
  */
 export function passTitle(pass: PassCost, now: Date, timeZone?: string): string {
   const phases = PASS_PHASES.map((p) => {
@@ -40,6 +41,26 @@ export function passTitle(pass: PassCost, now: Date, timeZone?: string): string 
     `The daemon's last pass, at ${clockWord(new Date(pass.at), now, timeZone)}: ${msWord(pass.ms)} ms, ${plural(pass.records, 'run record')} read, ${bytesWord(pass.bytes)} read, ${plural(pass.spawned, 'process', 'processes')} started.`,
     ...phases,
     ...(harnesses.length ? ['Observed, by harness (at once, so their times overlap):', ...harnesses] : ['No harness was observed.']),
+    ...(pass.runs === undefined
+      ? []
+      : [`It saw ${seenWords({ runs: pass.runs, tasks: pass.tasks ?? 0, queued: pass.queued ?? 0, admitted: pass.admitted ?? 0 })}.`]),
     `Measuring it took ${msWord(pass.overheadMs)} ms.`,
   ].join('\n');
 }
+
+/** A bucket of the recent passes' histogram, in words: `≤ 10 ms` up to its bound, `> 5000 ms` past the last bound (`le` null). */
+export const bucketWord = (le: number | null, bounds: readonly number[]): string =>
+  le === null ? `> ${bounds.at(-1) ?? 0} ms` : `≤ ${le} ms`;
+
+/** A bucket's label under its column, short enough for a narrow one: `250`, `2.5k`, `>5k` past the last bound (`le` null). */
+export const bucketLabel = (le: number | null, bounds: readonly number[]): string => {
+  const short = (ms: number) => (ms >= 1000 ? `${ms / 1000}k` : `${ms}`);
+  return le === null ? `>${short(bounds.at(-1) ?? 0)}` : short(le);
+};
+
+/** A share of the whole as a person reads it: `37%`, `< 1%` for a part too small to round to one. */
+export const shareWord = (share: number): string => (share > 0 && share < 0.005 ? '< 1%' : `${Math.round(share * 100)}%`);
+
+/** What a pass saw, in words: `43 runs in the store, 3 tasks not settled, 1 queued and 2 admitted`. */
+export const seenWords = (seen: { runs: number; tasks: number; queued: number; admitted: number }): string =>
+  `${plural(seen.runs, 'run')} in the store, ${plural(seen.tasks, 'task')} not settled, ${seen.queued} queued and ${seen.admitted} admitted`;

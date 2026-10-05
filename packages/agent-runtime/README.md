@@ -701,7 +701,10 @@ and `decide` never reads them. `auto` on haiku ran as `default` — its `init` l
 background session's denials are not read (open issue 28). The attempt also carries `skills`: each skill its session loaded,
 one per call — a subagent's included — by its name without its plugin's (`write-a-spec`, not `nemia-seldon:write-a-spec`), a
 denied load left out. `[]` is a session that loaded none; the key is absent where the harness cannot say: `claude -p
---output-format json`, Codex, a background session, and a job that ended before it was read.
+--output-format json`, Codex, a background session, and a job that ended before it was read. It carries `files` too: each file its
+session read or wrote through its file tools (`Read`, `Edit`, `Write`, `MultiEdit`, `NotebookEdit`), a subagent's included, once,
+relative to the folder its `init` line names, a denied call and a file outside that folder left out. `[]` is a session that
+touched none; absent where `skills` is, and where the `init` line names no folder.
 
 The lists are exported, from both entries and from the pure door `agent-runtime/vocabulary` (no Effect, no I/O):
 `CLAUDE_PERMISSION_MODES`, `CLAUDE_EFFORTS` and `CLAUDE_CONTEXT_TOKENS`, `CODEX_SANDBOXES` and `CODEX_EFFORTS`, with
@@ -2017,7 +2020,7 @@ of pure code sits beside it.
 | `src/harness/codex/stream.ts` | what a Codex session prints under `exec --json`: each event the runtime reads decoded by `CodexEventSchema`, a stream that does not decode refused, and its usage |
 | `src/harness/codex/transcript.ts` | a Codex thread's rollout: where it is, and its records as events |
 | `src/harness/detached/detached.ts` | a runner for any harness that runs a prompt and exits: `HarnessSpec`, the detached worker's run files, the lease, the four verbs over them, and `output`, a stream kept whole |
-| `src/harness/detached/output.ts` | what a detached session's output says: `claude -p`'s result and stream, read for closeout, usage, cost, a spent budget and denials, and the stream for the skills loaded |
+| `src/harness/detached/output.ts` | what a detached session's output says: `claude -p`'s result and stream, read for closeout, usage, cost, a spent budget and denials, and the stream for the skills loaded and the files touched |
 | `src/harness/detached/said.ts` | what was read of a finished run's output, kept beside its log keyed by the log's size and mtime and the readers' version — or a former one they only added fields to (`SAID_EXTENDED`) — so each process reads a log once per change of it |
 | `src/a2a/map.ts` | the runtime's words in A2A's and back, pure: a session is a Task named for it, a spawn a user Message marked with the runtime's extension and `config` in its metadata, words said to a session a follow-up on its Task, a sighting or a journalled attempt a Task, its context the harness's id for the conversation and its closeout its one Artifact |
 | `src/a2a/handler.ts` | one harness as an A2A agent: the SDK's `A2ARequestHandler` over its driver, and the runtime extension's `findSession`, `sessionLogs` and `releaseSession`, holding nothing — every answer read afresh off the harness and the journal |

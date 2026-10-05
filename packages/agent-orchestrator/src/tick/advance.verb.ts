@@ -30,7 +30,7 @@ import { runsDir, stepsOf } from '../record/record.store.ts';
 import { runStore } from '../record/files.store.ts';
 import { handOff } from '../workspace/worktree.store.ts';
 import { collectArtifacts } from '../artifacts/artifacts.store.ts';
-import { refsOf } from '../branches/branches.store.ts';
+import { oneByOne, refsOf } from '../branches/branches.store.ts';
 import { restBlockers, type RestFacts } from '../rest/rest.ts';
 import {
   answersIn,
@@ -45,10 +45,12 @@ import {
   spendReader,
   taskPhases,
   waitingOf,
+  type Parents,
 } from '../views/views.verb.ts';
 import { engineWord, waitsForWord } from '../views/views-words.ts';
 import { within } from '../meter/tally.store.ts';
 import { checkoutHold, landEnding } from '../ending/ending.verb.ts';
+import type { PassRead } from '../cap/cap.verb.ts';
 import { fileChecks, fileReady, fileRounds, fileTries, mayFileOf, type Closer, type Filing, type PassReads } from './file.verb.ts';
 import { closeHeld, stopAsked } from './held.verb.ts';
 
@@ -297,14 +299,16 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
  * A run that waited on runs cuts its roots, and every worktree and diff after, from its base branch as it stands on the pass that files
  * them, with their work on it, and hands each root what they concluded (`parentCloseouts`); read on that pass, and never again.
  *
- * @param runs The pass's own listing of the store, which `run` is one of: the runs whose claims on the repository's checkout are read
- *   (`checkoutHold`). Left out, the store is listed afresh where the run's ending asks for the checkout.
+ * @param pass What the pass reads once for every run (`PassRead`): its own listing of the store, which `run` is one of, whose claims on the
+ *   repository's checkout are read (`checkoutHold`), the runs the cap holds, and the runs others wait on, which lifting a hold (`liftHold`)
+ *   and admitting the run (`admit`) read through. Left out, the store is listed afresh where the run's ending asks for the checkout, and
+ *   the runs this run waits on are read for this call alone.
  */
 export async function advanceRun(
   e: Engine,
   run: Run,
   slot?: RunSlot,
-  runs?: readonly Run[],
+  pass?: PassRead,
 ): Promise<{ advanced: Advanced; blockers: string[]; rest?: { tipped: string[] } }> {
   const { reads, askNotes } = await readPass(e, run);
   const { steps, phaseOf, signedOff, asked, verdictOf, sessionBlocked, spendOf, asks, roundAsks } = reads;
@@ -312,12 +316,13 @@ export async function advanceRun(
   if (run.cancelledAt) await stopCancelled(e, run, reads);
   const handed = handOffAll(run, reads);
   const landing = landEnding(run, steps, phaseOf, signedOff, asked, spendOf, verdictOf);
-  const checkout = await checkoutHold(e, run, steps, runs);
-  const liftNotes = await liftHold(e, run);
+  const parents = pass?.parents ?? { git: oneByOne, read: new Map() };
+  const checkout = await checkoutHold(e, run, steps, pass && { read: pass, slot });
+  const liftNotes = await liftHold(e, run, parents);
   const assessed = assess(steps, run, phaseOf, signedOff, asked, verdictOf, asks, roundAsks, sessionBlocked, spendOf, [], checkout);
   const closer = closerOf(e, reads.views);
   const closeNotes = await closeHeldOpen(run, reads, closer);
-  const admission = await admit(e, run, slot, reads, assessed);
+  const admission = await admit(e, run, slot, reads, assessed, parents);
   const feed = wordFeed(run, reads, assessed, admission, checkout);
 
   const notes: string[] = [...askNotes, ...handed.collected, ...landing.notes, ...liftNotes, ...closeNotes];
@@ -409,11 +414,14 @@ function handOffAll(run: Run, r: PassReads): { collected: string[]; marked: bool
   return { collected, marked };
 }
 
-/** Lift a person's hold once every run it names has shipped, and only the hold this pass read (`removeHold`): answers with its note. */
-async function liftHold(e: Engine, run: Run): Promise<string[]> {
+/**
+ * Lift a person's hold once every run it names has shipped, each read through `parents`, and only the hold this pass read (`removeHold`):
+ * answers with its note.
+ */
+async function liftHold(e: Engine, run: Run, parents: Parents): Promise<string[]> {
   if (!run.hold || run.cancelledAt || !run.hold.until.length) return [];
   let shipped = true;
-  for (const id of run.hold.until) if (!(shipped = (await parentOf(e, id)).shipped)) break;
+  for (const id of run.hold.until) if (!(shipped = (await parentOf(e, id, parents.git, parents.read)).shipped)) break;
   if (!shipped || !runStore.holds.lift(run.id, run.hold.at)) return [];
   const { until } = run.hold;
   delete run.hold;
@@ -464,9 +472,19 @@ type Admission = {
   waiting: Wait[];
 };
 
-/** Admit the run's ready steps: while it has nothing filed, once every run it waits on has shipped and the cap leaves it a slot. */
-async function admit(e: Engine, run: Run, slot: RunSlot | undefined, r: PassReads, assessed: Assessment): Promise<Admission> {
-  const parent = await parentsOf(e, run);
+/**
+ * Admit the run's ready steps: while it has nothing filed, once every run it waits on, read through `parents`, has shipped and the cap
+ * leaves it a slot.
+ */
+async function admit(
+  e: Engine,
+  run: Run,
+  slot: RunSlot | undefined,
+  r: PassReads,
+  assessed: Assessment,
+  parents: Parents,
+): Promise<Admission> {
+  const parent = await parentsOf(e, run, parents.git, parents.read);
   const starting = !hasStarted(run);
   const need = slotNeed(run, r.phaseOf, assessed, (id) => parent(id).shipped, r.steps);
   const admitted = runAdmitted(run, slot, r.steps);

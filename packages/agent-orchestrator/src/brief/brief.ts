@@ -4,6 +4,7 @@
  */
 import type { Workflow } from '../step/step.ts';
 import { fenced, placeOf, type Run } from '../record/record.ts';
+import type { FiledFolders } from '../filed/filed.ts';
 import { closeoutContract, isLoopTarget, type Closeout } from '../closeout/closeout.ts';
 import { handedSection, type ParentCloseout } from './handed.ts';
 import { depsLines, givenPlan, workspacePlan, type Provisioned } from '../workspace/workspace.ts';
@@ -89,6 +90,9 @@ import { resultSteps, workChecks } from '../branches/branches.ts';
  *   under what was asked for.
  * @param checked For a step filed after checked steps: what each of their checks said on the try or round it follows
  *   (`checkHandedSection`), read by file.verb.ts. Absent, and nothing is said of a check: the board's preview composes without it.
+ * @param folders The folders the step is filed with beyond its factory's, each read-only (`filedFolders` in filed.ts): the artifacts
+ *   folders of the steps before it and the store's its `reads:` names, named under what was asked for (`mountsLine`). Absent, and
+ *   nothing is said of them.
  */
 export function composeBrief(
   step: Workflow,
@@ -102,6 +106,7 @@ export function composeBrief(
   parents?: readonly ParentCloseout[],
   inputsDir?: string,
   checked?: readonly CheckHanded[],
+  folders?: FiledFolders,
 ): string {
   const inFolder = placeOf(run) === 'folder';
   const contracts = [
@@ -135,17 +140,13 @@ export function composeBrief(
     : steps.filter((s) => s.name !== step.name && run.steps[s.name]?.taskId).map((s) => s.name);
 
   const inputs = inputsLine(inputsDir, run.inputs, inFolder);
-  const request = [run.brief, ...(inputs ? ['', inputs] : []), ...mountsLine(step, run)];
+  const request = [run.brief, ...(inputs ? ['', inputs] : []), ...mountsLine(step, run, folders)];
   const opening = briefBody(step) ? [briefBody(step), ''] : [];
   const parts = [...opening, '## What was asked for', '', ...request, ...handed];
 
   if (step.after.length > 1 && step.workspace !== 'main' && !inFolder) {
     return [
-      ...opening,
-      '## What was asked for',
-      '',
-      ...request,
-      ...handed,
+      ...parts,
       '',
       '## What is in this workspace',
       '',

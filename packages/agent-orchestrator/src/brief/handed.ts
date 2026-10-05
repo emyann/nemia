@@ -12,7 +12,7 @@ export type ParentStep = { step: Workflow; said: Closeout } | { name: string; un
 
 /**
  * A run this one waited on (`--after`) or was handed as context (`--from`), as the pass that files this run's roots read it off the store
- * and the engine (`parentCloseouts` in file.verb.ts): the first line of what it was asked and its terminal steps — or why the run itself
+ * and the engine (`parentCloseouts` in handed.verb.ts): the first line of what it was asked and its terminal steps — or why the run itself
  * cannot be read; `how` it was given, `waited` on or `read` as context, and whether it had `shipped` when it was read.
  */
 export type ParentCloseout = ({ run: string; asked: string; steps: readonly ParentStep[] } | { run: string; unreadable: string }) & {

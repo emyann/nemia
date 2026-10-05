@@ -1,4 +1,7 @@
-/** The cap on runs in flight (`GET /api/ceilings`, apps/api/src/factory/ceilings.ts). */
+/**
+ * The cap on runs in flight (`GET /api/ceilings`, apps/api/src/factory/ceilings.ts), and what the recent passes of the tick cost
+ * (`GET /api/passes`).
+ */
 import { queryOptions } from '@tanstack/react-query';
 import { pace } from '../feed.ts';
 import { Schema } from 'effect';
@@ -10,7 +13,8 @@ export type PassPhase = 'records' | 'asks' | 'journals' | 'observe' | 'runtime' 
 /**
  * Mirrors the package's `PassCost`: what the last pass cost — its time, and each phase's time, calls, bytes read and processes started;
  * each harness's observes (at once in a pass, so their times overlap); the run records read, the totals, what measuring it took, and the
- * runs at rest it answered from memory.
+ * runs at rest it answered from memory; and what it saw — the runs in the store, the tasks not settled, the sessions queued and admitted —
+ * absent from a pass an older tick wrote.
  */
 export type PassCost = {
   at: string;
@@ -22,6 +26,10 @@ export type PassCost = {
   spawned: number;
   overheadMs: number;
   rested: number;
+  runs?: number;
+  tasks?: number;
+  queued?: number;
+  admitted?: number;
 };
 
 /** Decodes one phase's cost. */
@@ -56,6 +64,10 @@ const PassCostSchema = Schema.Struct({
   spawned: Schema.Number,
   overheadMs: Schema.Number,
   rested: Schema.Number,
+  runs: Schema.optionalKey(Schema.Number),
+  tasks: Schema.optionalKey(Schema.Number),
+  queued: Schema.optionalKey(Schema.Number),
+  admitted: Schema.optionalKey(Schema.Number),
 }) satisfies Schema.Schema<PassCost>;
 
 /**
@@ -86,5 +98,78 @@ const CeilingsSchema = Schema.Struct({
 export const ceilingsQuery = queryOptions({
   queryKey: ['ceilings'],
   queryFn: () => get('/api/ceilings', CeilingsSchema),
+  refetchInterval: () => pace(5_000),
+});
+
+/** What a pass saw: the runs in the store, the tasks not settled, and the sessions queued and admitted. */
+type Seen = { runs: number; tasks: number; queued: number; admitted: number };
+
+/** Mirrors the package's `RecentPass`: one of the recent passes, its time, what it saw and read, and each phase's time. */
+export type RecentPass = Seen & {
+  at: string;
+  ms: number;
+  records: number;
+  rested: number;
+  reads: number;
+  phases: Record<PassPhase, number>;
+};
+
+/** Mirrors `PassesRead` (`GET /api/passes`): the recent passes, oldest first; their histogram (`le` null past the last bound); each
+ * phase's time a pass on average and share of the whole, heaviest first; their median, slowest and what the latest saw; and the bounds. */
+export type PassesRead = {
+  recent: RecentPass[];
+  histogram: Array<{ le: number | null; count: number }>;
+  parts: Array<{ phase: PassPhase; ms: number; share: number }>;
+  summary: (Seen & { passes: number; medianMs: number; slowestMs: number; reads: number; at: string }) | null;
+  bounds: number[];
+};
+
+const PhaseSchema = Schema.Literals(['records', 'asks', 'journals', 'observe', 'runtime', 'git', 'assess', 'act']);
+
+const SeenFields = { runs: Schema.Number, tasks: Schema.Number, queued: Schema.Number, admitted: Schema.Number };
+
+/** Decodes `PassesRead`. */
+const PassesReadSchema = Schema.Struct({
+  recent: Schema.mutable(
+    Schema.Array(
+      Schema.Struct({
+        ...SeenFields,
+        at: Schema.String,
+        ms: Schema.Number,
+        records: Schema.Number,
+        rested: Schema.Number,
+        reads: Schema.Number,
+        phases: Schema.Struct({
+          records: Schema.Number,
+          asks: Schema.Number,
+          journals: Schema.Number,
+          observe: Schema.Number,
+          runtime: Schema.Number,
+          git: Schema.Number,
+          assess: Schema.Number,
+          act: Schema.Number,
+        }),
+      }),
+    ),
+  ),
+  histogram: Schema.mutable(Schema.Array(Schema.Struct({ le: Schema.NullOr(Schema.Number), count: Schema.Number }))),
+  parts: Schema.mutable(Schema.Array(Schema.Struct({ phase: PhaseSchema, ms: Schema.Number, share: Schema.Number }))),
+  summary: Schema.NullOr(
+    Schema.Struct({
+      ...SeenFields,
+      passes: Schema.Number,
+      medianMs: Schema.Number,
+      slowestMs: Schema.Number,
+      reads: Schema.Number,
+      at: Schema.String,
+    }),
+  ),
+  bounds: Schema.mutable(Schema.Array(Schema.Number)),
+}) satisfies Schema.Schema<PassesRead>;
+
+/** The recent passes of the tick, read again as the cap is: the Stats page's section on the tick's pass. */
+export const passesQuery = queryOptions({
+  queryKey: ['passes'],
+  queryFn: () => get('/api/passes', PassesReadSchema),
   refetchInterval: () => pace(5_000),
 });

@@ -2,7 +2,9 @@
  * A factory's folders, mounted: a run started in a factory reaches every repository of it but its own, read-only (`factoryMounts`),
  * frozen on its record at `nemia start`, filed with each local step — its first filing, a try and a round — and named on its brief. A
  * folder that is no directory at start is left out, and said; a step on a remote agent is filed none; a run in the default factory mounts
- * nothing, and its record has no `mounts`.
+ * nothing, and its record has no `mounts`. A step whose `reads:` names the store's inbox is filed it read-only too, in any factory or
+ * none, and its brief names it (`readsMounts`, `mountsLine`). Every folder a local step is filed with is named on its brief, as it is
+ * mounted, the artifacts folder of each step before it included (`filedFolders`, `unnamed`).
  *
  * `WF_ROOT` is set before the runner is imported, since it is read as the module loads.
  */
@@ -16,6 +18,7 @@ import { scratch } from './scratch.ts';
 import { teamCopy } from './team.ts';
 import { factoryMounts } from '../src/factory/factory.ts';
 import { mountsLine } from '../src/start/index.ts';
+import { readsMounts } from '../src/filed/filed.ts';
 
 const ROOT = scratch('wf-factory-mounts-');
 process.env.WF_ROOT = ROOT;
@@ -68,9 +71,12 @@ function fresh(): { repos: string[]; loop: string; notes: string } {
 /** Read-only mounts of `paths`, as a record and a filing hold them. */
 const readOnly = (...paths: string[]) => paths.map((p) => ({ path: p, readOnly: true }));
 
-/** Just enough engine: each task's phase and closeout, and every task filed, by id, as the run handed it. */
+/**
+ * Just enough engine: each task's phase and closeout, and every task filed, by id, as the run handed it. A task settled `lost` keeps no
+ * session id, so what is filed after it starts a new session.
+ */
 const board = () => {
-  const tasks = new Map<string, { phase: string; closeout?: unknown }>();
+  const tasks = new Map<string, { phase: string; closeout?: unknown; lost?: boolean }>();
   const filed = new Map<string, { brief: string; harness?: string; config?: { mounts?: unknown } }>();
   const e = {
     view: async (id: string) => {
@@ -88,7 +94,7 @@ const board = () => {
           attempts:
             !t || t.phase === 'pending'
               ? []
-              : [{ n: 1, ended: null, nativeId: `native-${id}`, closeout: t.closeout, exitCode: null, usage: null }],
+              : [{ n: 1, ended: null, nativeId: t.lost ? null : `native-${id}`, closeout: t.closeout, exitCode: null, usage: null }],
         },
       };
     },
@@ -99,7 +105,7 @@ const board = () => {
     },
     stop: async () => {},
   } as unknown as Engine;
-  const settle = (id: string, phase: string, closeout?: unknown) => tasks.set(id, { phase, closeout });
+  const settle = (id: string, phase: string, closeout?: unknown, lost = false) => tasks.set(id, { phase, closeout, lost });
   return { e, filed, settle };
 };
 
@@ -471,4 +477,108 @@ test('REFUSED at shipped defaults: a `writable:` folder on a harness that cannot
     `code: \`writable: ${path.basename(repos[1])}\` (filed as \`mounts\`): \`mounts\` gives the session ${repos[1]} writable, and the \`codex\` harness cannot hold a writable mount: its session would not reach the folder as asked. File the task on \`claude\` or \`claude-detached\`, or leave the mount off.\n` +
       `That folder is the factory trio's, and coded/code names it in \`writable:\`, so the run would mount it writable for that step. Hire into coded/code an agent whose harness holds a writable mount (nemia factory hire trio <agent> --step coded/code), or delete the name from \`writable:\`, so the step only reads the folder. Nothing was written.`,
   );
+});
+
+test("a step's `reads: inbox` is filed the store's inbox read-only, on its first filing, a try and a round, and named on each new session's brief; no other step is", async () => {
+  const { repos, loop } = fresh();
+  fs.writeFileSync(path.join(loop, 'implement.md'), '---\nreads: inbox\n---\nBuild what was asked.\n');
+  const inbox = path.join(ROOT, 'inbox');
+  const said = `Folders of the store you may read, and must not write, as this step's \`reads:\` names them: \`${inbox}\`. Each is mounted read-only; read it with Read, Grep and Glob.`;
+  const run = start({ brief: 'build it', repo: repos[0], workflowDir: loop, isolate: false });
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  const first = b.filed.get(`${run.id}-implement`)!;
+  assert.deepEqual(first.config?.mounts, readOnly(inbox), 'the first filing');
+  assert.ok(first.brief.includes(said), first.brief);
+  b.settle(`${run.id}-implement`, 'failed');
+  await advance(b.e, readRun(run.id));
+  await retry(b.e, run.id, 'implement', { mode: 'fresh' });
+  await advance(b.e, readRun(run.id));
+  const tried = readRun(run.id).steps.implement.taskId!;
+  assert.deepEqual(b.filed.get(tried)?.config?.mounts, readOnly(inbox), 'a try');
+  assert.ok(b.filed.get(tried)!.brief.includes(said), "a try's brief");
+  b.settle(tried, 'succeeded', SIGNED);
+  await advance(b.e, readRun(run.id));
+  const review = b.filed.get(`${run.id}-review`)!;
+  assert.deepEqual(review.config?.mounts, readOnly(artifactsDir(run, 'implement')), 'the step after it reads no inbox');
+  assert.equal(review.brief.includes(inbox), false, 'and is told none');
+  b.settle(`${run.id}-review`, 'succeeded', { ...SIGNED, again: true });
+  await advance(b.e, readRun(run.id));
+  const round = readRun(run.id).steps.implement.taskId!;
+  assert.notEqual(round, tried);
+  assert.deepEqual(b.filed.get(round)?.config?.mounts, readOnly(inbox), 'a round, which continues a session told it on its try');
+});
+
+test('mountsLine names the inbox for a local step whose `reads:` names it, and nothing for one without it or on a remote agent', () => {
+  const told = (step: { harness: string; reads?: string[] }) => mountsLine(step, {}, { handed: [], store: readsMounts(step, '/s/inbox') });
+  assert.match(told({ harness: 'claude', reads: ['inbox'] }).join('\n'), /reads:` names them: `\/s\/inbox`/);
+  assert.deepEqual(told({ harness: 'claude' }), []);
+  assert.deepEqual(told({ harness: 'a2a:peer', reads: ['inbox'] }), []);
+  assert.deepEqual(told({ harness: 'codex', reads: ['inbox'] }), [], 'codex reads the disk in its sandbox already');
+});
+
+test('mountsLine names each folder the steps before it handed over, by its path and step, read-only, and how to list one; nothing for none', () => {
+  const handed = readOnly('/s/runs/r-1/artifacts/design', '/s/runs/r-1/artifacts/implement');
+  assert.deepEqual(mountsLine({ harness: 'claude' }, {}, { handed, store: [] }), [
+    '',
+    "Folders the steps before you handed over, which you may read and must not write: `/s/runs/r-1/artifacts/design` (design's), `/s/runs/r-1/artifacts/implement` (implement's). Each is mounted on its own path, and the run's artifacts folder above them is not: list one with Glob under its own path, as `/s/runs/r-1/artifacts/design/**`.",
+  ]);
+  assert.deepEqual(mountsLine({ harness: 'claude' }, {}, { handed: [], store: [] }), [], 'a step handed none');
+  assert.deepEqual(mountsLine({ harness: 'a2a:peer' }, {}, { handed, store: [] }), [], 'a remote agent is filed none');
+});
+
+/**
+ * The folders a filing mounts that its brief does not name as it mounts them: a writable one on the line that says it may be written, a
+ * read-only one on a line that says it must not be. Each by its path.
+ */
+const unnamed = (filing: { brief: string; config?: { mounts?: unknown } }): string[] => {
+  const lines = filing.brief.split('\n');
+  const mounts = (filing.config?.mounts ?? []) as { path: string; readOnly: boolean }[];
+  return mounts
+    .filter((m) => !lines.some((l) => l.includes(`\`${m.path}\``) && (m.readOnly ? /must not write/ : /you may write/).test(l)))
+    .map((m) => m.path);
+};
+
+test("every folder a local step is filed with is named on its brief, as it is mounted, on a first filing, a try and a round: the factory's, the steps' before it, the store's", async () => {
+  const { repos, loop } = fresh();
+  fs.writeFileSync(
+    path.join(loop, 'implement.md'),
+    `---\nwritable: ${path.basename(repos[1])}\nreads: inbox\n---\nBuild what was asked.\n`,
+  );
+  const run = start({ brief: 'build it', repo: repos[0], workflowDir: loop, isolate: false, factory: 'trio' });
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  b.settle(`${run.id}-implement`, 'failed');
+  await advance(b.e, readRun(run.id));
+  await retry(b.e, run.id, 'implement', { mode: 'fresh' });
+  await advance(b.e, readRun(run.id));
+  const tried = readRun(run.id).steps.implement.taskId!;
+  b.settle(tried, 'succeeded', SIGNED, true);
+  await advance(b.e, readRun(run.id));
+  b.settle(`${run.id}-review`, 'succeeded', { ...SIGNED, again: true });
+  await advance(b.e, readRun(run.id));
+  const round = readRun(run.id).steps.implement.taskId!;
+  assert.notEqual(round, tried, 'a round is filed');
+  assert.ok(b.filed.get(round)!.brief.includes('## What was asked for'), 'on a new session, its try having kept no session id');
+  const filings = [...b.filed.values()];
+  assert.equal(filings.length, 4, 'a first filing, a try, the step after it, and a round');
+  const kinds = filings.flatMap((f) => (f.config?.mounts ?? []) as { path: string; readOnly: boolean }[]);
+  assert.ok(kinds.some((m) => !m.readOnly) && kinds.some((m) => m.path === artifactsDir(run, 'implement')), 'every kind is filed');
+  assert.ok(
+    kinds.some((m) => m.path === path.join(ROOT, 'inbox')),
+    "and the store's",
+  );
+  for (const filing of filings) assert.deepEqual(unnamed(filing), [], filing.brief);
+  const review = b.filed.get(`${run.id}-review`)!;
+  assert.ok(review.brief.includes(`\`${artifactsDir(run, 'implement')}\` (implement's)`), review.brief);
+  assert.equal(review.brief.includes(path.join(ROOT, 'inbox')), false, 'the step after it reads no inbox, and is told none');
+});
+
+test('REFUSED: a brief that leaves out a folder its filing mounts names that folder', () => {
+  const handed = artifactsDir({ id: 'r-1' }, 'implement');
+  const brief = ['## What was asked for', '', 'build it', ...mountsLine({ harness: 'claude' }, {}, { handed: [], store: [] })].join('\n');
+  assert.deepEqual(unnamed({ brief, config: { mounts: readOnly(handed) } }), [handed]);
+  const told = [brief, ...mountsLine({ harness: 'claude' }, {}, { handed: readOnly(handed), store: [] })].join('\n');
+  assert.deepEqual(unnamed({ brief: told, config: { mounts: readOnly(handed) } }), []);
+  assert.deepEqual(unnamed({ brief: told.replace('must not write', 'may write'), config: { mounts: readOnly(handed) } }), [handed]);
 });

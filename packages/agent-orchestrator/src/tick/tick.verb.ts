@@ -20,24 +20,25 @@ import {
 import type { QueueStarted } from '../inbox/inbox.ts';
 import { tipsSeen } from '../branches/branches.ts';
 import { admissionOrder, slotFree, type RunSlot } from '../cap/cap.ts';
+import { passRead, type PassRead } from '../cap/cap.verb.ts';
 import { readPause } from '../pause/pause.store.ts';
 import { finishingAmong, type Finishing, type PauseStanding } from '../pause/pause.ts';
 import { isGitRun, type Run } from '../record/record.ts';
 import { stepsOf } from '../record/record.store.ts';
 import { hasStarted } from '../wait/wait.ts';
 import { runStore } from '../record/files.store.ts';
-import { ceilings, recordCeilings, recordPassCost } from '../daemon/daemon.store.ts';
+import { ceilings, recordCeilings, recordPassCost, recordRecentPass } from '../daemon/daemon.store.ts';
 import { verifiesRest } from '../config/config.store.ts';
 import { feedFile, recordFeed } from '../feed/feed.store.ts';
 import { headsOf } from '../branches/branches.store.ts';
 import { followedFeed } from '../rest/rest.verb.ts';
 import { reportedEngine } from '../views/views.verb.ts';
 import { startQueued } from '../inbox/inbox.verb.ts';
-import { countRested, meteredPass, within } from '../meter/tally.store.ts';
-import type { PassCost } from '../meter/meter.ts';
+import { countRested, meteredPass, noteSeen, within } from '../meter/tally.store.ts';
+import { sessionsOf, type PassCost } from '../meter/meter.ts';
 import { advanceRun, type Advanced } from './advance.verb.ts';
 import { stagedRead } from '../list/list.verb.ts';
-import { costOf, ioOf, meteredEngine } from '../meter/meter.verb.ts';
+import { costOf, ioOf, meteredEngine, recordPassMetrics } from '../meter/meter.verb.ts';
 
 /**
  * One pass: every run advanced, in the store's order, and what the pass did with the queue of inbox cards, when it did anything
@@ -119,7 +120,8 @@ type PassOptions = { repo: string; memo: RestMemo; verify: boolean };
  * A run at rest — finished, every task settled, nothing due and nothing done — is answered from the memo of the passes before (`RestMemo`)
  * while none of its inputs changed, and costs no read of the engine and no git of its own: see `restMemo`.
  *
- * Metered as it goes (`meteredPass`), and its cost written down (`recordPassCost`) and returned. A pass run inside another's meter — a
+ * Metered as it goes (`meteredPass`), and its cost written down (`recordPassCost`), kept among the recent passes (`recordRecentPass`), put
+ * into the pass's metrics (`recordPassMetrics`) and returned. A pass run inside another's meter — a
  * test that meters its own — is counted as part of that one and carries no cost of its own.
  *
  * `memo` is the memo to answer from and keep, the engine's own by default: a fresh one each pass (`freshRestMemo`) is a daemon restarted
@@ -145,7 +147,8 @@ export const tickRun = Effect.fn('tick')(function* ({
   const t0 = performance.now();
   const measured = costOf(tallies, ms, io0, ioOf(e));
   const cost = { ...measured, overheadMs: measured.overheadMs + (performance.now() - t0) };
-  const written = yield* tried(() => recordPassCost(cost));
+  const written = yield* tried(() => recordPassCost(cost) + recordRecentPass(cost));
+  yield* recordPassMetrics(cost);
   return { ...value, cost: { ...cost, overheadMs: cost.overheadMs + written } };
 });
 
@@ -163,7 +166,8 @@ export const tick = (e: Engine, options: { repo?: string; memo?: RestMemo; verif
  *   `measured` — is read on this one, and what is appended after is read on the next; a run `nemia rm` forgot leaves the memo
  *   (`forgotten`).
  * - the runs are listed, each run the memo holds whose stamp has not moved answered with the memo's run, its record not read (`keptOf`):
- *   the one listing of the pass, handed to every run judged for the claims on a repository's checkout, and to the queue.
+ *   the one listing of the pass, handed to every run judged for the claims on a repository's checkout, and to the queue; with it, the cap's
+ *   slots and the runs others wait on, each read once for the pass where a run asks (`passRead`).
  * - the ceilings the pass runs with are written (`recordCeilings`), for `nemia ls` and `nemia decide`, which judge the cap from a shell of
  *   their own; the runtime's pass admitted no queued task while the store was paused (`engine()`'s `unschedulable`).
  * - every run that has started is judged, finished ones included (`advanceResting`); then each run with nothing filed, oldest first, with
@@ -175,16 +179,19 @@ export const tick = (e: Engine, options: { repo?: string; memo?: RestMemo; verif
  */
 const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }: PassOptions) {
   const report = yield* awaited(() => engine.tick());
+  noteSeen(sessionsOf(report));
   const e = reportedEngine(engine, report.views ?? []);
   const resting = yield* restingPass(e, memo, verify);
   const ran = yield* tried(() => ceilings());
   yield* tried(() => within('act', () => recordCeilings(ran)));
   const runs = yield* tried(() => runStore.runs.list(undefined, resting && keptOf(resting)));
   if (resting) forgotten(memo, runs);
+  noteSeen({ runs: runs.length });
   const pause = yield* tried(() => readPause());
   const judging: Judging = { done: new Map(), unjudged: new Map() };
-  for (const run of runs.filter(hasStarted)) yield* judged(e, judging, runs, run, resting);
-  const counted = yield* waitingJudged(e, judging, runs, resting, ran.runs);
+  const read = passRead(e, runs);
+  for (const run of runs.filter(hasStarted)) yield* judged(e, judging, read, run, resting);
+  const counted = yield* waitingJudged(e, judging, read, resting, ran.runs);
   const queue =
     slotFree({ inFlight: counted, cap: ran.runs }) && !(yield* tried(() => readPause()))
       ? yield* tried(() => within('act', () => startQueued(repo, runs)))
@@ -216,11 +223,11 @@ const forgotten = (memo: RestMemo, runs: readonly Run[]): void => {
 };
 
 /**
- * One run of the pass's listing `runs` judged into `judging` (`advanceResting`), and what it was judged: undefined when a read of its
+ * One run of the pass's listing (`PassRead`) judged into `judging` (`advanceResting`), and what it was judged: undefined when a read of its
  * journal was refused, the run then left unjudged with the runtime's words for why.
  */
-const judged = (e: Engine, judging: Judging, runs: readonly Run[], run: Run, resting: RestingPass | undefined, slot?: RunSlot) =>
-  advanceResting(e, run, runs, resting, slot).pipe(
+const judged = (e: Engine, judging: Judging, pass: PassRead, run: Run, resting: RestingPass | undefined, slot?: RunSlot) =>
+  advanceResting(e, run, pass, resting, slot).pipe(
     Effect.map((advanced): Advanced | undefined => {
       judging.done.set(run.id, advanced);
       return advanced;
@@ -241,13 +248,13 @@ const judged = (e: Engine, judging: Judging, runs: readonly Run[], run: Run, res
 const waitingJudged = Effect.fn('waitingJudged')(function* (
   e: Engine,
   judging: Judging,
-  runs: readonly Run[],
+  pass: PassRead,
   resting: RestingPass | undefined,
   cap: RunSlot['cap'],
 ) {
   let counted = [...judging.done.values()].filter((a) => a.inFlight).length + judging.unjudged.size;
-  for (const run of admissionOrder(runs.filter((r) => !hasStarted(r)))) {
-    const advanced = yield* judged(e, judging, runs, run, resting, { inFlight: counted, cap });
+  for (const run of admissionOrder(pass.runs.filter((r) => !hasStarted(r)))) {
+    const advanced = yield* judged(e, judging, pass, run, resting, { inFlight: counted, cap });
     if (!advanced || advanced.inFlight) counted++;
   }
   return counted;
@@ -352,13 +359,13 @@ const restingPass = Effect.fn('restingPass')(function* (e: Engine, memo: RestMem
 });
 
 /**
- * A run's full pass (`advanceRun`), the pass's listing `runs` handed on: what it advanced, what holds it out of rest, and what it rests
+ * A run's full pass (`advanceRun`), the pass's reads (`PassRead`) handed on: what it advanced, what holds it out of rest, and what it rests
  * on. Fails with `Unjudged` where a read of one of its tasks' journals was refused (`unreadableJournal`), with a refusal where the pass
  * refused, and dies of anything else.
  */
-const fullPass = (e: Engine, run: Run, runs: readonly Run[], slot?: RunSlot) =>
+const fullPass = (e: Engine, run: Run, pass: PassRead, slot?: RunSlot) =>
   awaited(() =>
-    advanceRun(e, run, slot, runs).catch((err: unknown) => {
+    advanceRun(e, run, slot, pass).catch((err: unknown) => {
       const why = unreadableJournal(err);
       if (why === undefined) throw err;
       return new Unjudged({ why });
@@ -374,20 +381,20 @@ const fullPass = (e: Engine, run: Run, runs: readonly Run[], slot?: RunSlot) =>
  * Answered from memory, it costs no journal read, no observe and no git process of its own, and is counted (`rested`). With `verify`, it is
  * judged in full as well (`verified`), and a difference is died of: a change the memo missed is a bug in what it watches.
  *
- * `runs` is the pass's one listing, `run` among them, handed to every full pass as the runs whose claims on a repository's checkout are
- * read (`checkoutHold`): the store is not listed again. `slot` is `advance`'s, handed on to every full pass. A run with nothing filed
- * comes here too — one called off before it started rests like any other — and its answer from memory does not hang on the slot: a run at
- * rest has nothing ready (`atRest`), and only a run with a step ready wants a slot (`slotNeed`), so the cap holds it on no pass and it
- * counts on none.
+ * `pass` holds the pass's one listing, `run` among them, handed to every full pass as the runs whose claims on a repository's checkout
+ * are read (`checkoutHold`): the store is not listed again, nor the cap's slots read, nor a run others wait on, twice in a pass. `slot`
+ * is `advance`'s, handed on to every full pass. A run with nothing filed comes here too — one called off before it started rests like
+ * any other — and its answer from memory does not hang on the slot: a run at rest has nothing ready (`atRest`), and only a run with a
+ * step ready wants a slot (`slotNeed`), so the cap holds it on no pass and it counts on none.
  */
 const advanceResting = Effect.fn('advanceResting')(function* (
   e: Engine,
   run: Run,
-  runs: readonly Run[],
+  pass: PassRead,
   resting: RestingPass | undefined,
   slot?: RunSlot,
 ) {
-  if (!resting) return (yield* fullPass(e, run, runs, slot)).advanced;
+  if (!resting) return (yield* fullPass(e, run, pass, slot)).advanced;
   const { memo, stamps, heads, verify } = resting;
   const stamp = stamps.get(run.id);
   const kept = memo.runs.get(run.id);
@@ -397,12 +404,12 @@ const advanceResting = Effect.fn('advanceResting')(function* (
     (yield* tried(() => !kept.tipped.length || !isGitRun(run) || tipsSeen(run, kept.tipped, heads(run.repo)) === undefined))
   ) {
     countRested();
-    if (verify) yield* verified(e, run, runs, slot, kept.advanced);
+    if (verify) yield* verified(e, run, pass, slot, kept.advanced);
     return { ...kept.advanced, run };
   }
   memo.runs.delete(run.id);
   const record = JSON.stringify(run);
-  const { advanced, rest } = yield* fullPass(e, run, runs, slot);
+  const { advanced, rest } = yield* fullPass(e, run, pass, slot);
   if (rest && stamp !== undefined && JSON.stringify(run) === record) {
     const { run: _, ...answered } = advanced;
     memo.runs.set(run.id, { stamp, run, tipped: rest.tipped, advanced: answered });
@@ -418,7 +425,7 @@ const advanceResting = Effect.fn('advanceResting')(function* (
 const verified = Effect.fn('verified')(function* (
   e: Engine,
   run: Run,
-  runs: readonly Run[],
+  pass: PassRead,
   slot: RunSlot | undefined,
   kept: Omit<Advanced, 'run'>,
 ) {
@@ -435,7 +442,7 @@ const verified = Effect.fn('verified')(function* (
     advanced: { run: _, ...judged },
     blockers,
     rest,
-  } = yield* fullPass(e, fresh, runs, slot);
+  } = yield* fullPass(e, fresh, pass, slot);
   if (rest && isDeepStrictEqual(judged, kept) && JSON.stringify(fresh) === record) return;
   return yield* Effect.die(
     new Error(

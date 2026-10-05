@@ -20,7 +20,7 @@ import { pausedWords, type Paused } from '../pause/pause.ts';
 import { parentOf } from '../views/views.verb.ts';
 import { contextLines } from './context.ts';
 import { contextSection } from '../brief/index.ts';
-import { parentCloseouts } from '../tick/file.verb.ts';
+import { parentCloseouts } from '../brief/handed.verb.ts';
 import { runStore } from '../record/files.store.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 import { idRefusal } from '../forget/forget.ts';

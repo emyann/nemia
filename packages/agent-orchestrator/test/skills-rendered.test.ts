@@ -12,6 +12,7 @@ import path from 'node:path';
 import yaml from 'js-yaml';
 import { skillEntryOf, splitFrontmatter } from '../src/workflow.ts';
 import { loadWorkflows, skillsFor } from '../src/folder/folder.store.ts';
+import { appliesOf } from '../src/skills/skills.ts';
 import { briefBody, pluginOf, unrendered } from '../src/agents/agents.ts';
 import { scratch } from './scratch.ts';
 import { SHIPPED_HOLDERS, TEAM, TEAM_DEV } from './team.ts';
@@ -39,7 +40,7 @@ function frontmatterOf(file: string, text: string): Record<string, unknown> {
   return read as Record<string, unknown>;
 }
 
-test("a card entry reads a SKILL.md's frontmatter as YAML does, on every SKILL.md there is: the team's, shipped, or the repository's own", () => {
+test("a card entry and a skill's paths read a SKILL.md's frontmatter as YAML does, on every SKILL.md there is: the team's, shipped, or the repository's own", () => {
   const files = SKILL_FOLDERS.flatMap((dir) =>
     fs.existsSync(dir) ? fs.readdirSync(dir).map((name) => path.join(dir, name, 'SKILL.md')) : [],
   ).filter((file) => fs.existsSync(file));
@@ -61,6 +62,7 @@ test("a card entry reads a SKILL.md's frontmatter as YAML does, on every SKILL.m
       ...(keys.examples ? { examples: keys.examples } : {}),
     };
     assert.deepEqual(skillEntryOf(file, id, text), expected, file);
+    assert.deepEqual(appliesOf(text), keys.applies === undefined ? [] : [keys.applies].flat(), `${file}: its applies:`);
   }
 });
 

@@ -6,7 +6,17 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { JOBS_SINCE, deniedCallsOf, deniesRecorded, ranAsJob, ruleRowsOf, rulesOfTry, skillsLoadedOf } from './discipline.ts';
+import {
+  JOBS_SINCE,
+  deniedCallsOf,
+  deniesRecorded,
+  filesTouchedOf,
+  ranAsJob,
+  ruleRowsOf,
+  rulesOfTry,
+  skillsDueOf,
+  skillsLoadedOf,
+} from './discipline.ts';
 import type { SkillRule } from '../skills/skills.ts';
 
 const write = { tool: 'Write', what: '/x' };
@@ -65,6 +75,41 @@ test('a session is unmeasured where one ended attempt does not say its skills, w
   assert.equal(skillsLoadedOf({ state: { attempts: [{ ended: null, skills: ['look'] }] } }), null, 'no attempt ended');
   assert.equal(skillsLoadedOf({ state: { attempts: [] } }), null);
   assert.equal(skillsLoadedOf(undefined), null);
+});
+
+test("a task's files are each file its ended attempts touched, once, in the order first touched; unmeasured where one end does not say", () => {
+  const ended = (files?: string[]) => ({ ended: 'done', ...(files ? { files } : {}) });
+  const view = (...attempts: object[]) => ({ state: { attempts } }) as Parameters<typeof filesTouchedOf>[0];
+  assert.deepEqual(filesTouchedOf(view(ended(['b.ts', 'a.ts']), ended(['a.ts', 'c.ts']), { ended: null, files: ['d.ts'] })), [
+    'b.ts',
+    'a.ts',
+    'c.ts',
+  ]);
+  assert.deepEqual(filesTouchedOf(view(ended([]))), [], 'a session that touched no file');
+  assert.equal(filesTouchedOf(view(ended(['a.ts']), ended())), null, 'an end that does not say its files');
+  assert.equal(filesTouchedOf(view({ ended: null, files: ['a.ts'] })), null, 'no attempt ended');
+  assert.equal(filesTouchedOf(undefined), null);
+});
+
+test('a skill that declares paths is due on a try that touched one, in the order declared; none where the files were not measured', () => {
+  const applies = new Map<string, string[]>([
+    ['change-the-board', ['apps/web/**']],
+    ['look', []],
+    ['effect', ['apps/api/src/**', 'packages/agent-runtime/src/**']],
+  ]);
+  assert.deepEqual(skillsDueOf(['apps/web/src/a.tsx', 'README.md'], applies), [
+    { skill: 'change-the-board', touched: true },
+    { skill: 'effect', touched: false },
+  ]);
+  assert.deepEqual(skillsDueOf([], applies), [
+    { skill: 'change-the-board', touched: false },
+    { skill: 'effect', touched: false },
+  ]);
+  assert.deepEqual(
+    skillsDueOf(['apps/api/src/main.ts'], applies)?.find((d) => d.skill === 'effect'),
+    { skill: 'effect', touched: true },
+  );
+  assert.equal(skillsDueOf(null, applies), null);
 });
 
 const readWithRead: SkillRule = { id: 'read-with-read', says: 'Read a file with Read', breaks: ['Bash(cat:*)', 'Bash(head:*)'] };

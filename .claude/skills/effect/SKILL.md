@@ -1,6 +1,7 @@
 ---
 name: effect
-description: "How this repository writes Effect 4: read the docs installed with it first, then the Effect 3 names it no longer has, and our services, layers, Effect.fn verbs, tagged errors and plain faces, each where the runtime shows it. For a change that imports from effect, and for a review of one."
+description: "Any change to a file that imports from effect — a service, a layer, a verb, a schema at a boundary, a stream, a fiber, a schedule, a log or a metric — and the design or review of one: load it before reading, writing or judging such a file. How this repository writes Effect 4: read the docs installed with it first, reach for Effect's own primitives before writing one by hand, leave the Effect 3 names it no longer has, and keep our services, layers, Effect.fn verbs, tagged errors and plain faces, each where the runtime shows it."
+applies: ["packages/agent-runtime/src/**", "packages/agent-orchestrator/src/**/*.store.ts", "packages/agent-orchestrator/src/**/*.verb.ts", "packages/agent-orchestrator/src/runtime-client.ts", "packages/agent-orchestrator/src/cli/**", "apps/api/src/**", "apps/web/src/lib/api/**"]
 ---
 
 # Writing Effect 4 here
@@ -16,6 +17,33 @@ refuses a range or a second version). Its own guide ships with it and matches it
 
 Prefer them to what you remember and to anything outside the repository: the package says outside copies may be outdated.
 This file holds only what is ours.
+
+## Reach for Effect's own primitives
+
+Before writing a loop, a list of listeners, a registry, a fan-out, a timer, a retry, a cache, a counter or a parser by hand, find the task
+here and read its page.
+
+| task | primitive | page |
+| --- | --- | --- |
+| Tell every listener of one event: a feed, a watcher, a page kept live | `PubSub.unbounded`, `PubSub.subscribe` | `node_modules/effect/ai-docs/src/01_effect/07_pubsub/10_pubsub.ts` |
+| Hand work from one fiber to another, bounded, the writer waiting when it is full | `Queue.bounded`, `Queue.take` | `node_modules/effect/dist/Queue.d.ts` |
+| Read a sequence over time: the lines of a file, the events of a feed, the pages of a listing | `Stream.callback`, `Stream.fromQueue` | `node_modules/effect/ai-docs/src/03_stream/10_creating-streams.ts` |
+| Keep a registry of running fibers, one per key, the old one interrupted when the key runs again | `FiberMap.make`, `FiberMap.run` | `node_modules/effect/dist/FiberMap.d.ts` |
+| Run fibers that end with their scope, none left behind | `FiberSet.make`, `FiberSet.run` | `node_modules/effect/dist/FiberSet.d.ts` |
+| Keep what was computed for a key, looked up again, refreshed or bounded: a memo, a hand-made cache | `Cache.make`, `Cache.get` | `node_modules/effect/dist/Cache.d.ts` |
+| Retry, poll or beat on a cadence: a backoff, a tick, a limit of tries | `Schedule.spaced`, `Schedule.exponential`, `Effect.retry`, `Effect.repeat` | `node_modules/effect/ai-docs/src/06_schedule/10_schedules.ts` |
+| Count or measure what the code does: passes, reads, durations | `Metric.counter`, `Metric.histogram` | `node_modules/effect/dist/Metric.d.ts` |
+| Say what happened, at a level, with its fields | `Effect.logInfo`, `Effect.annotateLogs`, `Logger.layer` | `node_modules/effect/ai-docs/src/08_observability/10_logging.ts` |
+| Time a verb and tie it to its caller | `Effect.fn`, `Effect.withSpan`, `Tracer` | `node_modules/effect/ai-docs/src/08_observability/20_otlp-tracing.ts` |
+| Read a value that crosses a boundary: a file, a request, a harness's line, JSON | `Schema.Struct`, `Schema.decodeUnknownEffect` | `node_modules/effect/ai-docs/src/01_effect/02_schema/10_schema-basics.ts` |
+| Hold a resource and let it go whatever happens, the last taken first | `Effect.acquireRelease`, `Scope.addFinalizer` | `node_modules/effect/ai-docs/src/01_effect/05_resources/10_acquire-release.ts` |
+| Build a service from others and give it to a program | `Layer.effect`, `Layer.provide`, `Layer.mergeAll` | `node_modules/effect/ai-docs/src/01_effect/03_services/20_layer-composition.ts` |
+
+In a review, a hand-rolled version of one of these is a finding.
+
+v4 is not v3: read the page, not your memory.
+
+`effect-version.test.ts` reads this table: each name must be one the pinned version exports, and each page installed.
 
 ## Effect 3 names this version does not have
 

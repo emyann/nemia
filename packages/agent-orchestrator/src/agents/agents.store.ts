@@ -1,9 +1,9 @@
 /**
  * The agent files: where `nemia start` renders each step's agent for Claude Code (`agentFilesDir`), the render itself (`writeAgentFiles`),
- * the version of each skill it rendered (`renderedSkillVersions`) and the rules each declares (`renderedSkillRules`), and a skill read
- * again once its rendered folder is gone (`skillsAgain`); and what the board's Agents page writes — an agent and the files beside it
- * (`writeAgent`, `removeAgent`, refused as `AgentWriteError`). What a folder holds is `agents.ts`'s; this writes and reads it, and the
- * agents of the two places the board lists them from are read in `roster.store.ts`.
+ * the version of each skill it rendered (`renderedSkillVersions`), the rules each declares (`renderedSkillRules`) and the paths of its work
+ * (`renderedSkillApplies`), and a skill read again once its rendered folder is gone (`skillsAgain`); and what the board's Agents page
+ * writes — an agent and the files beside it (`writeAgent`, `removeAgent`, refused as `AgentWriteError`). What a folder holds is
+ * `agents.ts`'s; this writes and reads it, and the agents of the two places the board lists them from are read in `roster.store.ts`.
  *
  * Beneath the controllers, beside `record.store.ts`, whose run folder holds the agent files: it imports neither the engine nor a
  * controller, and no pure file imports it (`test/boundary.test.ts`). A run is changed by none of the writes: it froze its agents at
@@ -33,7 +33,7 @@ import {
 import { frontmatterKey } from '../former/former.ts';
 import { linkRefusal } from '../folder/folder.ts';
 import { agentUsers, agentVersion, preloads, readSkillRules, skillsFor, skillVersion } from '../folder/folder.store.ts';
-import type { SkillRule } from '../skills/skills.ts';
+import { appliesOf, type SkillRule } from '../skills/skills.ts';
 import { isWorkflowsHolder } from '../folder/write.store.ts';
 import { HOME, isDirectory, runsDir } from '../record/record.store.ts';
 
@@ -121,6 +121,23 @@ export function renderedSkillRules(run: Pick<Run, 'id'>, step: Workflow): Map<st
         if (err instanceof WorkflowError) return [];
         throw err;
       }
+    }),
+  );
+}
+
+/**
+ * The paths of the work (`appliesOf`) each skill `nemia start` rendered for a step of `run` declares, by the skill's name, read off its
+ * copy's SKILL.md in the step's folder (`agentFilesDir`): a skill whose copy is not there, or that declares none, is left out.
+ */
+export function renderedSkillApplies(run: Pick<Run, 'id'>, step: Workflow): Map<string, string[]> {
+  const agent = step.agent;
+  if (!agent?.skills) return new Map();
+  const skills = path.join(agentFilesDir(run, step.name), pluginOf(agent.name), 'skills');
+  return new Map(
+    agent.skills.flatMap((name) => {
+      const file = path.join(skills, name, 'SKILL.md');
+      const globs = fs.existsSync(file) ? appliesOf(fs.readFileSync(file, 'utf8')) : [];
+      return globs.length ? [[name, globs] as const] : [];
     }),
   );
 }

@@ -159,8 +159,18 @@ wf stats --json                            # what GET /api/stats answers
   without it (an older journal, a `lost` end, codex, a remote agent, `background: true`), no ended
   attempt, or no session of its own (a recheck) leaves the try unmeasured, never 0. `skills` is the mean
   loads per measured try; a step's row sums them, says how many of its tries were measured where not
-  all (`3 (2 of 4)`), and names each skill with its count, most first, then by name. Only the task
-  journals the engine already reads are read: no session's log, transcript or capture.
+  all (`3 (2 of 4)`), and names each skill with its count, most first, then by name, and the measured
+  tries that loaded it (`tries`).
+- **A skill that says where its work is is counted against the tries that touched it**: a SKILL.md's
+  `applies:` names globs of the checkout (`["apps/web/**"]`), read off the copy `wf start` froze with
+  the run's agent. The runtime writes `files` on an attempt's end where its harness can say (a `claude`
+  job): each file its session read or wrote through its file tools, relative to its folder. A try
+  touched the skill when one of its files matches one glob (`**` across folders, `*` and `?` within
+  one); its files are measured as its loads are, never read as none. `when touched` is `<loaded> of
+  <touched>`: of the tries that touched the skill's paths, how many loaded it. A skill touched in many
+  tries and loaded in few is a description that does not reach its sessions. `—` where the skill
+  declares no paths or no try's files were measured. Only the task journals the engine already reads
+  are read: no session's log, transcript or capture.
 - **A skill's traceable rules are counted kept or broken**: a skill names them in a `rules.json` beside
   its SKILL.md, `{ "rules": [{ "id", "says", "breaks" }] }`, each `breaks` a list of calls written as
   `disallowedTools:` rules (`Bash(cat:*)`, a path pattern `//`-absolute or a bare name). On each try
@@ -433,6 +443,11 @@ examples: ["Use this when a change is written and nobody has read it yet."]
 | `description` | `description:`, required — A2A marks it REQUIRED, and Claude Code lists a skill by it |
 | `tags` | `tags:`, a list; the id when there is none, since A2A marks tags REQUIRED |
 | `examples` | `examples:`, a list, only when given |
+
+`applies:`, a one-line JSON list of globs of the checkout, is no card entry: `wf stats` reads it off the run's frozen copy and
+counts the tries that touched those paths against those that loaded the skill (*What the runs add up to*, above). Claude Code
+ignores the key, and it is not Claude Code's `paths:`, which hides a skill from the listing until a matching file is read: a skill
+with `applies:` is listed from the start, as any other.
 
 An agent that gives no skills has one entry, made from its own description: its name as id and name, the description, and its
 name as its tag. An agent with no description has no card. Each key is read off one line — a plain value, one in quotes, or a

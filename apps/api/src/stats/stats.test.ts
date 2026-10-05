@@ -191,7 +191,10 @@ test('GET /api/stats answers the skills loaded per try as null, never 0, where n
   const other = await asked('?from=2026-09-28&to=2026-09-28&ofFactory=other');
   assert.equal(other.body.all.total.skillsPerTry, 2);
   const { skillLoads, skillTries, skills } = other.body.all.steps[0];
-  assert.deepEqual({ skillLoads, skillTries, skills }, { skillLoads: 2, skillTries: 1, skills: [{ skill: 'look', count: 2 }] });
+  assert.deepEqual(
+    { skillLoads, skillTries, skills },
+    { skillLoads: 2, skillTries: 1, skills: [{ skill: 'look', count: 2, tries: 1, touched: null, loadedWhenTouched: null }] },
+  );
 });
 
 test('GET /api/stats keeps one factory with ofFactory and one repository with ofRepo, compared as strings', async () => {

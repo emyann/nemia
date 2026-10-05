@@ -1247,6 +1247,7 @@ export const PASS = {
   ms: 212.4,
   line: 'a pass takes 212 ms',
   totals: '212 ms, 12 run records read, 812.0 kB read, 1 process started.',
+  seen: 'It saw 12 runs in the store, 3 tasks not settled, 1 queued and 2 admitted.',
   cost: (at: string) => ({
     at,
     ms: 212.4,
@@ -1255,6 +1256,10 @@ export const PASS = {
     spawned: 1,
     overheadMs: 0.4,
     rested: 0,
+    runs: 12,
+    tasks: 3,
+    queued: 1,
+    admitted: 2,
     phases: {
       records: { ms: 20, calls: 12, bytes: 12_000, reads: 12, spawned: 0 },
       asks: { ms: 5, calls: 40, bytes: 0, reads: 0, spawned: 0 },

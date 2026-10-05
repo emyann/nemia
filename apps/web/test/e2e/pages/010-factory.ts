@@ -182,9 +182,12 @@ export default {
     }
     if (
       !passLines.includes('claude: 1 observe, 118 ms, 3 sessions or run files listed, 1 process started') ||
-      passLines.at(-1) !== 'Measuring it took 0.40 ms. wf up --stats says the same.'
+      passLines.at(-2) !== PASS.seen ||
+      passLines.at(-1) !== 'Measuring it took 0.40 ms. nemia up --stats says the same, and nemia passes the passes before it.'
     ) {
-      throw new Refused(`the pass's title names the harness observed and what measuring took — it says ${JSON.stringify(passTitle)}`);
+      throw new Refused(
+        `the pass's title names the harness observed, what the pass saw and what measuring took — it says ${JSON.stringify(passTitle)}`,
+      );
     }
     const { card, pills, tiles, pill, tile } = onTheFloor(page);
     const beside = page.locator(`.react-flow__node[data-id="${NEIGHBOUR.id}"]`);

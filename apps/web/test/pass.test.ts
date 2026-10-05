@@ -1,6 +1,6 @@
 /**
  * What the last pass cost, as the Factory says it beside the cap (`lib/pass.ts`): the line, and the breakdown in its title, worded as
- * `wf up --stats` words it.
+ * `nemia up --stats` words it.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -58,13 +58,22 @@ test("the title is the breakdown: the pass, every phase in the package's order, 
     'check: 1 observe, 2.00 ms, 40 sessions or run files listed, 0 processes started',
     'claude: 1 observe, 118 ms, 3 sessions or run files listed, 1 process started',
   ]);
-  assert.equal(lines.at(-1), 'Measuring it took 0.40 ms. wf up --stats says the same.');
+  assert.equal(lines.at(-1), 'Measuring it took 0.40 ms. nemia up --stats says the same, and nemia passes the passes before it.');
+  assert.ok(!lines.some((l) => l.startsWith('It saw')), 'a pass from before the tick said what it saw says nothing of it');
   assert.ok(passTitle({ ...PASS, harnesses: {} }, now, 'UTC').includes('\nNo harness was observed.\n'));
   assert.match(
     passTitle(PASS, new Date('2026-09-26T10:05:00.000Z'), 'UTC'),
     /^The daemon's last pass, at Fri 10:00: /,
     'a pass of another day says its day',
   );
+});
+
+test('the title says what the pass saw, before what measuring took, where the pass says it', () => {
+  const lines = passTitle({ ...PASS, runs: 43, tasks: 3, queued: 1, admitted: 2 }, new Date('2026-09-25T10:05:00.000Z'), 'UTC').split('\n');
+  assert.deepEqual(lines.slice(-2), [
+    'It saw 43 runs in the store, 3 tasks not settled, 1 queued and 2 admitted.',
+    'Measuring it took 0.40 ms. nemia up --stats says the same, and nemia passes the passes before it.',
+  ]);
 });
 
 test('a bucket says its bound, and the last its open end past the last bound; a share rounds to a whole percent, a sliver to < 1%', () => {
@@ -83,7 +92,7 @@ test('a bucket says its bound, and the last its open end past the last bound; a 
 });
 
 /**
- * The phases as the package words them: `wf up --stats` over a store holding this pass, its CLI. The web imports nothing of the package,
+ * The phases as the package words them: `nemia up --stats` over a store holding this pass, its CLI. The web imports nothing of the package,
  * and reaching into its `src` is refused (`packages/agent-orchestrator/test/contract.test.ts`), so it is asked as a person asks it. A phase
  * the package added is missing from this pass, which the package then does not read as one; a phase it dropped or moved is a row gone or
  * moved.

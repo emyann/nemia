@@ -25,6 +25,10 @@
  * Agora, the reviewer, asks git's read-only questions by its own allow, whatever the settings say, and runs no git write (`GIT_QUESTIONS`,
  * `GIT_WRITES`, `runs`); every git question its skill names is one that allow reaches (`askedGit`).
  *
+ * Nemia, the store's own agent, ships outside any workflow folder (`nemia/nemia.md`) and runs in the background, reading the person's user
+ * settings: she is held to the same fence by her own deny, and to `git merge` and a pull request merged by `gh` besides; a mode but
+ * `default` is refused her (`readNemia`).
+ *
  * The build workflow's design, implement and review steps each list `effect`, `shadcn` and `change-the-board` to their sessions
  * (`workSkillsMissing`), and every path a repository skill says its work is on matches a file of the checkout (`appliesUnmatched`).
  */
@@ -38,6 +42,7 @@ import { filedConfig, readsMounts } from '../src/filed/filed.ts';
 import { handedMounts } from '../src/artifacts/artifacts.ts';
 import { sandboxed, upstreamOf } from '../src/workflow/index.ts';
 import { scratch } from './scratch.ts';
+import { readNemia } from '../src/nemia/level.store.ts';
 import { placesOf, shippedFolders, SHIPPED_HOLDERS, TEAM, TEAM_DEV, teamCopy } from './team.ts';
 
 const REPO = path.join(import.meta.dirname, '..', '..', '..');
@@ -953,4 +958,38 @@ test('REFUSED: the inbox mounted writable is open to a write, and an Edit allow 
   const allowed = { ...config, allowedTools: [...(config.allowedTools ?? []), `Edit(/${INBOX}/**)`] };
   assert.ok(writesAt({ ...allowed, mounts: [] }, CARD), 'the model sees an Edit allow as a write');
   assert.equal(writesAt(allowed, CARD), false, "the read-only mount's deny beats the allow");
+});
+
+/** Nemia as her keeper files her: her shipped definition, in the background. */
+const nemia = (file?: string): Step => ({ ...readNemia(file), name: 'nemia', background: true }) as Step;
+
+test("Nemia is refused git push, a forced branch delete, a kill by name, browser_run_code_unsafe, a merge and gh's merge by her own deny", () => {
+  const her = nemia();
+  assert.deepEqual(unfenced(her, {}), [], 'fenced by her own list, whatever the settings say');
+  for (const command of ['git merge wf/r-1/implement', 'gh pr merge 12 --squash', 'cd /code/app && git merge main'])
+    assert.ok(
+      partsOfCall({ tool: 'Bash', command }).some((part) => (her.disallowedTools ?? []).some((rule) => reaches(rule, part))),
+      command,
+    );
+});
+
+test('REFUSED: Nemia without her deny of git push is open on each push, and a mode but default is refused her', () => {
+  const her = nemia();
+  const bare = { ...her, disallowedTools: her.disallowedTools?.filter((rule) => !rule.startsWith('Bash(git push')) };
+  assert.deepEqual(unfenced(bare, {}), [
+    'nemia: Bash(git push)',
+    'nemia: Bash(git push origin main)',
+    'nemia: Bash(git push --force origin wf/r-1/implement)',
+  ]);
+  const dir = scratch('wf-nemia-mode-');
+  const text = fs.readFileSync(path.join(import.meta.dirname, '..', 'nemia', 'nemia.md'), 'utf8');
+  for (const mode of ['dontAsk', 'bypassPermissions', 'acceptEdits']) {
+    const file = path.join(dir, `${mode}.md`);
+    fs.writeFileSync(file, text.replace('permissionMode: default', `permissionMode: ${mode}`));
+    assert.throws(
+      () => readNemia(file),
+      (err: Error) => err.message.includes(`her permissionMode is ${mode}`) && err.message.endsWith('permissionMode: default.'),
+      mode,
+    );
+  }
 });

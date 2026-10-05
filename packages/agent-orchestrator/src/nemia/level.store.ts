@@ -80,10 +80,18 @@ export function writeLevel(level: LevelFile): void {
   fs.renameSync(hidden, levelFile());
 }
 
-/** Her definition as a step is read, frontmatter judged as an agent's: her fence, mode and model, and her instruction (`body`). */
+/**
+ * Her definition as a step is read, frontmatter judged as an agent's: her fence, mode and model, and her instruction (`body`). Refused
+ * (`Invalid`): a mode but `default`, under which a write she proposes is not asked of the person.
+ */
 export function readNemia(file: string = nemiaDefinition()): Workflow {
   const agent = parseAgent('nemia', fs.readFileSync(file, 'utf8'));
-  return stepFrom('nemia/nemia.md', agent.keys, agent.body, undefined);
+  const step = stepFrom('nemia/nemia.md', agent.keys, agent.body, undefined);
+  if (step.permissionMode !== 'default')
+    throw new Invalid({
+      message: `${file}: her permissionMode is ${step.permissionMode ?? 'not set'}, and at semi-auto every write she proposes is asked of the person: permissionMode: default.`,
+    });
+  return step;
 }
 
 /**

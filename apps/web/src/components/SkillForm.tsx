@@ -104,7 +104,7 @@ export function SkillForm({
         value={form.body}
         onChange={set('body')}
         readOnly={readOnly}
-        mono
+        markdown
         area="min-h-72"
         placeholder={detail ? undefined : 'When a change is done, write its notes…'}
       />

@@ -17,6 +17,7 @@ import { scratch } from './scratch.ts';
 import { teamCopy } from './team.ts';
 import { factoryMounts } from '../src/factory/factory.ts';
 import { mountsLine } from '../src/start/inputs.ts';
+import { readsMounts } from '../src/filed/filed.ts';
 
 const ROOT = scratch('wf-factory-mounts-');
 process.env.WF_ROOT = ROOT;
@@ -505,9 +506,9 @@ test("a step's `reads: inbox` is filed the store's inbox read-only, on its first
 });
 
 test('mountsLine names the inbox for a local step whose `reads:` names it, and nothing for one without it or on a remote agent', () => {
-  const inbox = '/s/inbox';
-  assert.match(mountsLine({ harness: 'claude', reads: ['inbox'] }, {}, inbox).join('\n'), /reads:` names them: `\/s\/inbox`/);
-  assert.deepEqual(mountsLine({ harness: 'claude' }, {}, inbox), []);
-  assert.deepEqual(mountsLine({ harness: 'a2a:peer', reads: ['inbox'] }, {}, inbox), []);
-  assert.deepEqual(mountsLine({ harness: 'codex', reads: ['inbox'] }, {}, inbox), [], 'codex reads the disk in its sandbox already');
+  const told = (step: { harness: string; reads?: string[] }) => mountsLine(step, {}, readsMounts(step, '/s/inbox'));
+  assert.match(told({ harness: 'claude', reads: ['inbox'] }).join('\n'), /reads:` names them: `\/s\/inbox`/);
+  assert.deepEqual(told({ harness: 'claude' }), []);
+  assert.deepEqual(told({ harness: 'a2a:peer', reads: ['inbox'] }), []);
+  assert.deepEqual(told({ harness: 'codex', reads: ['inbox'] }), [], 'codex reads the disk in its sandbox already');
 });

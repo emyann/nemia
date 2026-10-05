@@ -9,7 +9,6 @@ import { isRemoteHarness } from '../harness/harness.ts';
 import type { Workflow } from '../step/step.ts';
 import type { Mount, Run } from '../record/record.ts';
 import { stepMounts } from '../factory/factory.ts';
-import { readsMounts } from '../artifacts/artifacts.ts';
 
 /**
  * A file `nemia start --input` was given, as start.verb.ts found it: the path as typed, where it resolves, and what is there. What
@@ -62,13 +61,16 @@ const pathsOf = (mounts: readonly Mount[]): string => mounts.map((m) => `\`${m.p
 
 /**
  * What a step's brief says of the folders its run mounts, under what was asked for: each by its absolute path, those its `writable:` names
- * to write (`stepMounts`), the others to read and never write; then the store's folders its `reads:` names (`readsMounts`, the inbox at
- * `inbox`), to read and never write; a blank line before them. Nothing for a run that mounts none and a step that reads no store folder,
- * and for a step on a remote agent, which is filed none.
+ * to write (`stepMounts`), the others to read and never write; then the store's folders its `reads:` names (`store`, as `readsMounts` in
+ * filed.ts files them), to read and never write; a blank line before them. Nothing for a run that mounts none and a step given no store
+ * folder, and for a step on a remote agent, which is filed none.
  */
-export const mountsLine = (step: Pick<Workflow, 'harness' | 'writable' | 'reads'>, run: Pick<Run, 'mounts'>, inbox?: string): string[] => {
+export const mountsLine = (
+  step: Pick<Workflow, 'harness' | 'writable'>,
+  run: Pick<Run, 'mounts'>,
+  store: readonly Mount[] = [],
+): string[] => {
   const mounts = isRemoteHarness(step.harness) ? undefined : stepMounts(step, run.mounts);
-  const store = inbox === undefined ? [] : readsMounts(step, inbox);
   if (!mounts?.length && !store.length) return [];
   const writes = (mounts ?? []).filter((m) => !m.readOnly);
   const reads = (mounts ?? []).filter((m) => m.readOnly);

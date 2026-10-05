@@ -1,8 +1,7 @@
 /**
  * Files a step leaves for the steps after it and for the person who decides: what its brief says of them (`artifactsContract`), where a
  * file it names is found (`artifactPlace`), the folders a later step reads them in (`handedMounts`), and the lines that list them
- * (`artifactLines`); and the store's folders a step reads by name, mounted as those are (`readsMounts`). Pure: `artifacts.store.ts`
- * copies them.
+ * (`artifactLines`). Pure: `artifacts.store.ts` copies them.
  */
 import path from 'node:path';
 import { filesPrunedWords, type Mount, type Pruned } from '../record/record.ts';
@@ -177,13 +176,3 @@ export const handedMounts = (step: Pick<Workflow, 'name' | 'harness'>, steps: re
   const upstream = upstreamOf(steps, step.name);
   return steps.filter((s) => upstream.has(s.name)).map((s) => ({ path: path.join(runArtifacts, s.name), readOnly: true }));
 };
-
-/**
- * The store's folders a step's `reads:` names, each read-only: the inbox (`inbox`, its absolute path) when it names it. It reads the
- * cards and writes none of them, whatever its fence. None on a harness fenced by a sandbox, which reads the disk already, nor on a remote
- * agent, filed no local field.
- */
-export const readsMounts = (step: Pick<Workflow, 'harness' | 'reads'>, inbox: string): Mount[] =>
-  isRemoteHarness(step.harness) || sandboxed(step.harness ?? DEFAULT_HARNESS) || !step.reads?.includes('inbox')
-    ? []
-    : [{ path: inbox, readOnly: true }];

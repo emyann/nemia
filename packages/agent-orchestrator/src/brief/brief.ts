@@ -3,7 +3,7 @@
  * on concluded (`ParentCloseout`). Pure; the sections a brief is made of are `brief-sections.ts`'s.
  */
 import { outputFields, type Workflow } from '../step/step.ts';
-import { dataBlock, fenced, placeOf, type Run } from '../record/record.ts';
+import { dataBlock, fenced, placeOf, type Mount, type Run } from '../record/record.ts';
 import { closeoutContract, declaredOutput, isLoopTarget, type Closeout } from '../closeout/closeout.ts';
 import { depsLines, givenPlan, workspacePlan, type Provisioned } from '../workspace/workspace.ts';
 import {
@@ -87,8 +87,8 @@ import { resultSteps, workChecks } from '../branches/branches.ts';
  *   under what was asked for.
  * @param checked For a step filed after checked steps: what each of their checks said on the try or round it follows
  *   (`checkHandedSection`), read by file.verb.ts. Absent, and nothing is said of a check: the board's preview composes without it.
- * @param inbox The store's inbox folder (`inboxDir` in files.store.ts): named, for a step whose `reads:` names it, under what was asked
- *   for (`mountsLine`). Absent, and nothing is said of it.
+ * @param store The store's folders the step reads, read-only, as its `reads:` names them (`readsMounts` in filed.ts): named under what
+ *   was asked for (`mountsLine`). Absent, and nothing is said of them.
  */
 export function composeBrief(
   step: Workflow,
@@ -102,7 +102,7 @@ export function composeBrief(
   parents?: readonly ParentCloseout[],
   inputsDir?: string,
   checked?: readonly CheckHanded[],
-  inbox?: string,
+  store?: readonly Mount[],
 ): string {
   const inFolder = placeOf(run) === 'folder';
   const contracts = [
@@ -136,7 +136,7 @@ export function composeBrief(
     : steps.filter((s) => s.name !== step.name && run.steps[s.name]?.taskId).map((s) => s.name);
 
   const inputs = inputsLine(inputsDir, run.inputs, inFolder);
-  const request = [run.brief, ...(inputs ? ['', inputs] : []), ...mountsLine(step, run, inbox)];
+  const request = [run.brief, ...(inputs ? ['', inputs] : []), ...mountsLine(step, run, store)];
   const opening = briefBody(step) ? [briefBody(step), ''] : [];
   const parts = [...opening, '## What was asked for', '', ...request, ...handed];
 

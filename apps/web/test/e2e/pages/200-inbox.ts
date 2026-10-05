@@ -607,7 +607,7 @@ export default {
         form.getByRole('button', { name: 'Start' }).click(),
       ]);
       const { error } = (await answered.json()) as { error?: string };
-      const sentence = `no card ${bare.name} in the inbox. Its cards are: ${[planned.name, rich.name, ...queuedByFiling].sort().join(', ')}. Start one of those — wf start ${path.join(inbox, '<name>.md')} — or park the idea first: wf inbox add "<idea>".`;
+      const sentence = `no card ${bare.name} in the inbox. Its cards are: ${[planned.name, rich.name, ...queuedByFiling].sort().join(', ')}. Start one of those — nemia start ${path.join(inbox, '<name>.md')} — or park the idea first: nemia inbox add "<idea>".`;
       if (answered.status() !== 404 || error !== sentence) {
         throw new Refused(
           `the api refuses to start a card that is not there, in the package's words — it answered ${answered.status()}: ${JSON.stringify(error)}`,
@@ -796,7 +796,7 @@ export default {
       ]);
       const { error } = (await answered.json()) as { error?: string };
       const place = QUEUED.length + 1;
-      const sentence = `${planned.name}.md: already queued, at ${behind}, ${place} in the queue's order: the tick starts it when its turn comes and a run slot is free. To queue it again, take it back first: wf inbox queue ${planned.name} --off.`;
+      const sentence = `${planned.name}.md: already queued, at ${behind}, ${place} in the queue's order: the tick starts it when its turn comes and a run slot is free. To queue it again, take it back first: nemia inbox queue ${planned.name} --off.`;
       if (answered.status() !== 409 || error !== sentence) {
         throw new Refused(
           `the api refuses to queue a card queued already, in the package's words — it answered ${answered.status()}: ${JSON.stringify(error)}`,

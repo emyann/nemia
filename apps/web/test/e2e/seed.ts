@@ -293,7 +293,7 @@ export const LOOPING = {
   /** What `wf ls` prints beside each step: the round it is on, and for the loop out of rounds, the command that takes it once more. */
   notes: {
     implement: 'round 3 of 3',
-    review: 'round 3 of 3, and it asked again — once more: wf round go-round-again-e2e2 review',
+    review: 'round 3 of 3, and it asked again — once more: nemia round go-round-again-e2e2 review',
   },
   /** What each step said in the rounds before the one it is on: round 1, then round 2. */
   earlier: [
@@ -498,7 +498,7 @@ export const UNMERGED = {
   steps: ['implement'],
   branch: 'wf/nobody-merged-it-e2e14/implement',
   /** What `wf ls` says after `→ to decide:` for it, and the board's line with it. */
-  said: 'wf/nobody-merged-it-e2e14/implement is ahead of main, and nothing has merged it — wf decide nobody-merged-it-e2e14',
+  said: 'wf/nobody-merged-it-e2e14/implement is ahead of main, and nothing has merged it — nemia decide nobody-merged-it-e2e14',
 } as const;
 
 /**
@@ -548,7 +548,7 @@ export const FOLDER = {
   /** What `review` gave back, which changed nothing. */
   verdict: 'The note holds: nothing in it is claimed beyond what it says it is unsure of.',
   /** The one command `wf decide` offers a run with no repository, which the board offers too. */
-  forget: 'wf rm a-note-on-the-tides-e2e15',
+  forget: 'nemia rm a-note-on-the-tides-e2e15',
   /** The factory it was started in, FACTORIES' `hiring`: the one run not in the default factory. */
   factory: 'nemia',
 } as const;

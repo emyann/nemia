@@ -81,7 +81,7 @@ export default {
       await expectVisible(bar.locator('[data-repo]', { hasText: `On ${checkout}` }), "on the factory's one repository, fixed");
       const row = bar.locator(`[data-workflow="repo:${workflow}"]`);
       await expectVisible(
-        row.locator('[data-why-not]', { hasText: `wf factory hire ${factory} <agent> --step ${workflow}/${UNFILLED}` }),
+        row.locator('[data-why-not]', { hasText: `nemia factory hire ${factory} <agent> --step ${workflow}/${UNFILLED}` }),
         `${workflow}'s ${UNFILLED} has no agent in ${factory}: its row says so, and the hire that fills it`,
       );
       if (!(await row.getByRole('radio').isDisabled())) throw new Refused(`${workflow} cannot be picked while it is unfilled`);

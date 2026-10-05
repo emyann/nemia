@@ -18,7 +18,7 @@ export default {
     await sidebar(page);
     const { id, ending, back } = ENDING;
     const asks = path.join(store!, 'runs', `${id}.asks`);
-    const said = `${ENDING.says} — wf approve ${id} ${ending}`;
+    const said = `${ENDING.says} — nemia approve ${id} ${ending}`;
 
     const banner = page.locator('section[aria-label="To decide"]');
     await expectVisible(
@@ -89,7 +89,7 @@ export default {
       'the Decide section offers the approval to copy',
     );
     await expectVisible(
-      decide.locator('[data-command="send back"] code', { hasText: `wf retry ${id} ${back} --message "<objection>"` }),
+      decide.locator('[data-command="send back"] code', { hasText: `nemia retry ${id} ${back} --message "<objection>"` }),
       'and the send-back, to the work',
     );
     await expectCount(

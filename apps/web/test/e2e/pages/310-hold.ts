@@ -25,7 +25,7 @@ export default {
     const until = HELD.id;
     const hold = path.join(store!, 'runs', `${id}.hold`);
     const word = `held until ${until} ships`;
-    const advice = `nothing of ${id} is filed, and nothing is asked of you, until wf decide says ${until} has shipped; to go on before then: wf hold ${id} --off`;
+    const advice = `nothing of ${id} is filed, and nothing is asked of you, until nemia decide says ${until} has shipped; to go on before then: nemia hold ${id} --off`;
     await page.getByRole('button', { name: 'Reset layout' }).click();
     await settled(page);
     const card = cardOf(page, id);

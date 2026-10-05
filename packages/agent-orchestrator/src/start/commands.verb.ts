@@ -22,7 +22,8 @@ import { contextLines } from './context.ts';
 import { contextSection } from '../brief/index.ts';
 import { parentCloseouts } from '../tick/file.verb.ts';
 import { runStore } from '../record/files.store.ts';
-import { Missing } from '../refusal/refusal.ts';
+import { Invalid, Missing } from '../refusal/refusal.ts';
+import { idRefusal } from '../forget/forget.ts';
 
 export const PLAN_HELP = `nemia plan <folder> [--repo .] [--factory <name>]
 
@@ -322,7 +323,8 @@ type Concluded = { run: string; shipped: boolean; section: string };
 /**
  * `nemia concluded <run>`: what a run started now with `--from <run>` would be handed of it — the `## From run <id>` section its roots
  * would read, made as the tick makes it (`parentCloseouts`, `contextSection`), labelled shipped or not shipped, not judged, as `parentOf`
- * reads it now. The board's preview of a run picked as context. Refused with `Missing` for a run the store does not have.
+ * reads it now. The board's preview of a run picked as context. Refused with `Invalid` for an id that is not a run's (`idRefusal`), before
+ * the store is read, and with `Missing` for a run the store does not have.
  */
 export const CONCLUDED: Command<Concluded> = {
   name: 'concluded',
@@ -338,6 +340,8 @@ export const CONCLUDED: Command<Concluded> = {
   route: { method: 'GET', path: '/api/runs/:runId/concluded', status: 200 },
   async handler(e, args) {
     const id = textOf(args, 'runId') ?? '';
+    const notId = idRefusal(id, 'read', 'nemia concluded');
+    if (notId) throw new Invalid({ message: notId });
     if (!runStore.runs.exists(id))
       throw new Missing({ message: `nemia concluded ${id}: the store has no run ${id}. It takes a run by its id — nemia ls lists them.` });
     const { shipped } = await parentOf(e, id);

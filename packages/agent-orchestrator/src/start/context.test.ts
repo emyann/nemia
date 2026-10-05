@@ -36,6 +36,14 @@ test('the run itself is refused as its own context', () => {
   assert.match(refused.message, /that is the run itself/);
 });
 
+test('a context id that is not a name is Invalid before the store is asked, so `../x` never reads a file outside runs/', () => {
+  const asked: string[] = [];
+  const refused = contextRefusal(['../escape'], [], (id) => (asked.push(id), true));
+  assert.equal(refused?._tag, 'Invalid');
+  assert.match(refused.message, /^--from "\.\.\/escape" is not a run's id.*--from add-a-flag-x1y2\.$/);
+  assert.equal(asked.length, 0, 'the store is never asked of a path');
+});
+
 test("a card's refusal names its from: key", () => {
   assert.match(contextRefusal(['x-9'], [], exists, undefined, 'from:')!.message, /^from: x-9: the store has no run x-9/);
 });

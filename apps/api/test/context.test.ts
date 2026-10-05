@@ -60,6 +60,15 @@ test('GET /api/runs/:runId/concluded answers the run, whether it shipped and its
   assert.match(((await missing.json()) as { error: string }).error, /the store has no run nobody-z9/);
 });
 
+test('GET /api/runs/:runId/concluded refuses an id that is not a name, never reading the record a path names — REFUSED: `..%2Fescape`', async () => {
+  writeRun({ id: '../escape' });
+  const res = await app.request('/api/runs/..%2Fescape/concluded');
+  assert.equal(res.status, 422);
+  const { error } = (await res.json()) as { error: string };
+  assert.match(error, /"\.\.\/escape" is not a run's id/);
+  assert.doesNotMatch(error, /The brief of/);
+});
+
 test("PUT /api/inbox/:name/from sets a card's from:, DELETE takes it off — REFUSED: a run the store does not have is a 404, nothing written", async () => {
   writeRun({ id: 'source-f1' });
   const { card } = addToInbox({ text: 'Read what source-f1 concluded' });

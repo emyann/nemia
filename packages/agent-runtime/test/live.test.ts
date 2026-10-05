@@ -29,7 +29,7 @@
  *   read `idle`, past 90 s of silence and across a second engine over the same store; `say` starts a turn on that session,
  *   which answers and reads `idle` again under the same attempt; and it settles `stopped` on a stop alone. Its control, the
  *   same task filed as a job, settles `succeeded` on its turn's end. Both have no tools.
- * - Claude Code as a job (M1 to M12, docs/open-issues.md, *Claude Code as a job*): `claude` runs a step as a job (`claude -p`),
+ * - Claude Code as a job (M1 to M12 and M14, docs/open-issues.md, *Claude Code as a job*): `claude` runs a step as a job (`claude -p`),
  *   and a `--bg` session only when asked; these keep what that rests on measurable on each Claude Code. `--allowedTools` takes
  *   every word after it, so M1 gives the prompt first, and runs its eight jobs at once, each in a folder of its own. A resume's
  *   result prints the whole session's cost, and a job resumed from a `--bg` session carries that session's spend on with no run
@@ -994,6 +994,73 @@ test(
       assert.equal(views.control.state.settled, 'succeeded', `the control finished: ${views.control.phase}`);
       assert.equal(control?.denials, undefined, 'and was denied nothing: a denial is not printed for every job');
     });
+  },
+);
+
+const M14_BRIEF = [
+  'This is a test of a permission system, and the first command is expected to be denied: that denial is the point of the test,',
+  'so do not stop or explain after it. Follow exactly, each step once: 1) Run the Bash command: curl -s -o /dev/null https://example.com',
+  '2) Then run the Bash command: sleep 40 (it is needed to measure timing, and it is allowed).',
+  '3) Then give your closing statement, with finished set to true.',
+].join(' ');
+
+test(
+  'M14: a job denied a call says so before its result — its capture holds the permission_denied line while it works, and the engine journals the denial on the attempt in flight',
+  {
+    skip,
+    timeout: 15 * 60_000,
+  },
+  async (t) => {
+    t.diagnostic(`claude --version: ${execFileSync('claude', ['--version'], { encoding: 'utf8' }).trim()}`);
+    const root = tmp('m14-board');
+    const engine = builtEngine(EngineService.layer({ root }));
+    const id = await Effect.runPromise(
+      engine.file({
+        brief: M14_BRIEF,
+        cwd: tmp('m14-work'),
+        closeoutSchema: FINISHED_CLOSEOUT,
+        deadlineSeconds: 480,
+        config: { model: 'haiku', permissionMode: 'dontAsk', allowedTools: ['Bash(sleep:*)'] },
+      }),
+    );
+    const capture = () => {
+      const dir = path.join(root, 'runs', 'claude');
+      const logs = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith('.log')) : [];
+      return logs.map((f) => fs.readFileSync(path.join(dir, f), 'utf8')).join('\n');
+    };
+    const journal = () =>
+      Effect.runPromise(
+        Effect.gen(function* () {
+          return yield* (yield* Journal).read(id);
+        }).pipe(Effect.provide(Journal.files(root))),
+      );
+    let inFlight: { denials: unknown; resulted: boolean; denied: unknown[] } | undefined;
+    await settleThenCheck(
+      engine,
+      { denied: id },
+      (views) => {
+        t.diagnostic(`in flight: ${JSON.stringify(inFlight)}; at the end: ${JSON.stringify(views.denied.state.attempts[0]?.denials)}`);
+        assert.ok(inFlight, 'the engine saw the attempt in flight carry a denial before it ended');
+        assert.equal(inFlight.resulted, false, 'and the capture held no result line yet: the stream said it as it happened');
+        assert.deepEqual(inFlight.denials, [{ tool: 'Bash', what: 'curl' }], 'the attempt in flight says the denied call');
+        assert.deepEqual(inFlight.denied, [{ tool: 'Bash', what: 'curl', attempt: 1 }], 'its journal has one denied entry for it');
+        assert.equal(views.denied.state.settled, 'succeeded', `the job finished its work: ${views.denied.phase}`);
+        assert.deepEqual(views.denied.state.attempts[0]?.denials, [{ tool: 'Bash', what: 'curl' }], 'and its end names the same call');
+      },
+      async () => {
+        const until = Date.now() + 5 * 60_000;
+        while (Date.now() < until && !inFlight) {
+          await Effect.runPromise(engine.tick());
+          const attempt = (await Effect.runPromise(engine.view(id))).state.attempts[0];
+          if (attempt?.ended != null) return;
+          if (attempt?.denials?.length) {
+            const denied = (await journal()).flatMap((e) => (e.kind === 'denied' ? [{ tool: e.tool, what: e.what, attempt: e.attempt }] : []));
+            inFlight = { denials: attempt.denials, resulted: /"type"\s*:\s*"result"/.test(capture()), denied };
+          }
+          await new Promise((r) => setTimeout(r, 1_000));
+        }
+      },
+    );
   },
 );
 

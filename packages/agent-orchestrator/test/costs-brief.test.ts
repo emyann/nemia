@@ -87,7 +87,7 @@ const briefs = new Map<string, string>();
 const e: Engine = {
   ...engine,
   file: (spec) => {
-    briefs.set(spec.id, spec.brief);
+    if (spec.id) briefs.set(spec.id, spec.brief);
     return engine.file(spec);
   },
 };
@@ -129,7 +129,7 @@ fs.mkdirSync(WORKFLOW);
 fs.writeFileSync(path.join(WORKFLOW, 'design.md'), '---\nreads: costs\n---\nDesign it.\n');
 fs.writeFileSync(path.join(WORKFLOW, 'implement.md'), '---\nafter: design\n---\nBuild it.\n');
 
-/** The hour `i` of 2026-09-01, as a record and a journal stamp it. */
+/** The hour `i` from the first run's start, as a record and a journal stamp it. */
 const hour = (i: number) => new Date(Date.UTC(2026, 8, 1, i)).toISOString();
 
 /**
@@ -179,12 +179,15 @@ async function aRun(id: string, i: number, costUsd: number, more: { settled?: bo
  * Twenty-five finished runs of `costed`, c00 the oldest at $1 to c24 the newest at $25, so the store lists them oldest first; and,
  * newer than all of them, one unfinished, one whose journal does not read, and one each of another workflow and another factory at $1000.
  */
-for (let i = 0; i < RECENT_RUNS + 5; i++) await aRun(`c${String(i).padStart(2, '0')}`, i, i + 1);
-await aRun('z-moving', 40, 1000, { settled: false });
-await aRun('z-spoiled', 41, 1000);
-spoiled.add('z-spoiled-design');
-await aRun('z-intake', 42, 1000, { workflowDir: '/elsewhere/intake' });
-await aRun('z-other', 43, 1000, { factory: 'other' });
+async function seed(): Promise<void> {
+  for (let i = 0; i < RECENT_RUNS + 5; i++) await aRun(`c${String(i).padStart(2, '0')}`, i, i + 1);
+  await aRun('z-moving', 40, 1000, { settled: false });
+  await aRun('z-spoiled', 41, 1000);
+  spoiled.add('z-spoiled-design');
+  await aRun('z-intake', 42, 1000, { workflowDir: '/elsewhere/intake' });
+  await aRun('z-other', 43, 1000, { factory: 'other' });
+}
+await seed();
 
 const SECTION = '## What runs of this workflow cost';
 

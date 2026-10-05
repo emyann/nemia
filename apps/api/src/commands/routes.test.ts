@@ -163,6 +163,21 @@ test('a round on its route writes what `nemia round` writes: the same step, roun
   assert.deepEqual(asked('r-api-loop'), asked('r-cli-loop'));
 });
 
+test('REFUSED on its route: a merge of a run whose result step closes no loop — a 409 naming `nemia retry`, as `nemia merge` says it, and no ask', async () => {
+  gatedRun('r-cli-noloop');
+  gatedRun('r-api-noloop');
+  const typed = await asTyped('merge', ['r-cli-noloop']).then(
+    () => assert.fail('nemia merge is refused'),
+    (err: Error) => err.message,
+  );
+  const res = await post('/api/runs/r-api-noloop/merge', {});
+  assert.equal(res.status, 409);
+  const said = ((await res.json()) as { error: string }).error;
+  assert.equal(said, typed.replaceAll('r-cli-noloop', 'r-api-noloop'));
+  assert.match(said, /implement closes no loop[^]*nemia retry r-api-noloop implement --message/);
+  assert.deepEqual([asked('r-api-noloop'), asked('r-cli-noloop')], [[], []]);
+});
+
 test('REFUSED at shipped defaults: every route that writes, asked by a page on another site — 403, nothing written', async () => {
   gatedRun('r-guard');
   const routed = COMMANDS.filter((c) => c.writes).flatMap((c) =>
@@ -186,6 +201,7 @@ test('REFUSED at shipped defaults: every route that writes, asked by a page on a
       'approve POST',
       'round POST',
       'accept POST',
+      'merge POST',
       'say POST',
       'agents custom PUT',
       'agents custom DELETE',

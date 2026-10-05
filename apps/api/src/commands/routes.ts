@@ -261,6 +261,10 @@ export const wordBreaks = (table: readonly Pick<CommandSpec, 'name' | 'route'>[]
  *   cap raised. Made by `roundRun`, `nemia round`'s own, which writes the ask file and nothing else. Refuses a budget not above zero with
  *   400, before the round is asked (`roundBudgetRefusal`, which `roundAsk` refuses first, whatever the run); a round the loop may not go,
  *   or a budget not above what its steps have cost (`roundAsk`), with 409.
+ * - `POST /api/runs/:id/merge` — a loop's work sent back to merge its base branch, on the round it is on, which the merge does not spend.
+ *   Made by `mergeRun`, `nemia merge`'s own, which tries the merge with git and writes the ask file and nothing else. Refuses a merge the
+ *   loop may not take (`mergeAsk`) with 409: among them a run whose result step closes no loop, pointed to `nemia retry`, and work that
+ *   merges cleanly, pointed to the landing's approval.
  * - `POST /api/runs/:id/steps/:step/say` — a person's words to a step's running session, through `sayRun`, `nemia say`'s own, which hands
  *   them to the session through the engine, and the engine journals them: the api writes nothing, and the step's detail reads them back
  *   (`said`). Refuses, in the package's and the engine's words, with 409: a step not filed, settled, or of a cancelled run; empty words; a

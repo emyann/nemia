@@ -1,7 +1,7 @@
 /**
- * The store's pause, each task still finishing under it, and each landing it holds with its merge staged: what the board's bottom bar says
- * (`GET /api/pause`, app.ts); and what a pause at once would stop, with what it costs: what the board's confirm says
- * (`GET /api/pause/now`).
+ * The store's pause, each task still finishing under it, and each check it holds, a landing with its merge staged among them: what the
+ * board's bottom bar says (`GET /api/pause`, app.ts); and what a pause at once would stop, with what it costs: what the board's confirm
+ * says (`GET /api/pause/now`).
  */
 import { COMMANDS, type Interrupt, type Paused, runWith } from 'agent-orchestrator';
 import type { Engine } from '../store.ts';
@@ -18,8 +18,8 @@ const PAUSE_NOW = COMMANDS.find((c) => c.name === 'pause now')!;
 export type PauseNowRead = { interrupts: Interrupt[]; cost: string };
 
 /**
- * The store's pause or null, each task still finishing under it, and each landing it holds with its merge staged in its checkout
- * (MERGE_HEAD), read through `e`.
+ * The store's pause or null, each task still finishing under it, each landing it holds with its merge staged in its checkout
+ * (MERGE_HEAD), and each other check it holds, read through `e`.
  */
 export const pauseOf = async (e: Engine['Service']): Promise<Paused> => (await runWith(e, PAUSED.handler({}))) as Paused;
 

@@ -355,7 +355,9 @@ const LS: Command<RunsListed> = {
     'last, whether a nemia up ticks the store and when its last pass was;',
     'first, while the store is paused, Pausing: N finishing and each',
     'session, check or landing at work, or Paused once none is, then each',
-    'landing it holds with its merge staged in the checkout (MERGE_HEAD)',
+    'check it holds, a landing with its merge staged in the checkout',
+    '(MERGE_HEAD) among them; a step whose check it holds says waiting on',
+    'the pause',
   ],
   spec: {
     positionals: [{ key: 'runId', takes: 'optional', kind: 'name' }],

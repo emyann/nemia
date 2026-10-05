@@ -219,6 +219,13 @@ test('a root of a run waiting on runs reads `waiting on <run>`, which is waiting
   assert.equal(stepState('waitingroom', false, false), 'working', 'not a word that merely starts like one');
 });
 
+test('a step signed off whose check the pause keeps from being filed reads `waiting on the pause`: waiting, never checking', () => {
+  const state = stepState('waiting on the pause', false, false);
+  assert.equal(state, 'waiting');
+  assert.notEqual(state, stepState('checking', false, false), 'no check of it is filed');
+  assert.equal(isLive(state), false, 'no session or check of it is at work');
+});
+
 test('a root of a run the cap on runs in flight holds reads `waiting for a run slot`, a wait nobody is asked about — never working — and cancelled on a run called off', () => {
   for (const word of ['waiting for a run slot (2 of 2 in flight)', 'waiting for a run slot']) {
     const state = stepState(word, false, false);

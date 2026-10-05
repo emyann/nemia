@@ -57,7 +57,11 @@ async function expectLayers(keys: Locator, agent: string): Promise<void> {
   const drawn = await keys.locator('[data-layer]').evaluateAll((all) => all.map((el) => el.getAttribute('data-layer')));
   if (drawn.join() !== layers.join()) throw new Refused(`the layers are drawn ${layers.join(', ')} — they are ${drawn.join(', ')}`);
   const instructions = keys.locator('[data-layer="instructions"]');
-  await expectCount(instructions.locator('details:not([open]) pre', { hasText: 'You write code.' }), 1, `${agent}'s words, folded`);
+  await expectCount(
+    instructions.locator('details:not([open]) [data-markdown]', { hasText: 'You write code.' }),
+    1,
+    `${agent}'s words, folded`,
+  );
   await expectVisible(keys.locator('[data-layer="custom"]', { hasText: `None. Write them on ${agent}'s page.` }), 'no custom instructions');
   const policy = keys.locator('[data-layer="policy"]');
   await expectVisible(policy.getByRole('textbox', { name: 'Its words' }), "the step's words are its policy");
@@ -66,7 +70,7 @@ async function expectLayers(keys: Locator, agent: string): Promise<void> {
   await expectVisible(policy.getByText(`May only tighten ${agent}'s fence: a loosening is refused on save.`), 'which may only tighten');
   await expectCount(policy.locator('[data-field="check"], [data-field="model"]'), 0, 'and no wiring key is in it');
   await instructions.locator('summary').click();
-  await expectVisible(instructions.locator('pre', { hasText: 'You write code.' }), `opened, the fold reads ${agent}'s words`);
+  await expectVisible(instructions.locator('[data-markdown]', { hasText: 'You write code.' }), `opened, the fold reads ${agent}'s words`);
   await instructions.locator('summary').click();
 }
 

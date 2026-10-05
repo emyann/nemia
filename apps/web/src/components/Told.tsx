@@ -2,11 +2,13 @@
  * What a step was told, folded away: it is long, and it does not change while you look at the step. Where its run froze its layers,
  * each is drawn apart, as the run froze it when it started — the agent's instructions with its own skills, the person's custom
  * instructions, the step's policy with the skills its line adds and the fence lines it tightens, and the task; a run that froze none
- * shows its brief whole. At a gate, the step's policy is drawn open on its own (`StepPolicy`), the layer a person judges the step by.
+ * shows its brief whole. Each is drawn as the markdown it is written in (`Words`). At a gate, the step's policy is drawn open on its
+ * own (`StepPolicy`), the layer a person judges the step by.
  */
 import type { ReactNode } from 'react';
 import { Badge } from '@/components/ui/badge';
 import type { StepLayers } from '../lib/api';
+import { Markdown } from './Markdown';
 
 /**
  * The fold: `told`, the brief whole, drawn only where `layers` is null; `filed` says whether it was told or would be told now. Nothing
@@ -91,10 +93,17 @@ export function Layer({ name, title, children }: { name: string; title: string; 
   );
 }
 
-/** A layer's words as written, or `none` where the run froze none. */
+/**
+ * A layer's words, drawn as the markdown they are written in, at the fold's size on a quiet ground of their own, a `#` under the
+ * layer's title; or `none` where the run froze none.
+ */
 export function Words({ text, none = 'None frozen on this run' }: { text: string | null; none?: string }) {
   if (text === null) return <p className="text-xs text-muted-foreground italic">{none}</p>;
-  return <pre className="overflow-x-auto rounded bg-muted p-3 text-xs whitespace-pre-wrap">{text}</pre>;
+  return (
+    <Markdown level={5} className="rounded bg-muted/60 p-3">
+      {text}
+    </Markdown>
+  );
 }
 
 /** The skills a layer gives, after `word`; nothing where it gives none. */

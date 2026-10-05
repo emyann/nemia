@@ -9,12 +9,12 @@ import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { Effect, Fiber, Metric } from 'effect';
+import { Duration, Effect, Fiber, Metric, Schedule } from 'effect';
 import { scratch } from '../../test/scratch.ts';
 import { board } from '../../test/engine-board.ts';
 
 process.env.WF_ROOT = scratch('wf-deliver-');
-const { SUBSCRIPTION_DIGEST_CHECKS, deliver } = await import('./deliver.verb.ts');
+const { SUBSCRIPTION_DIGEST_CHECKS, deliver, sayBackoff } = await import('./deliver.verb.ts');
 const { deliveryFile, dropSubscription, putSubscription, readDelivery, writeDelivery } = await import('./subscription.store.ts');
 const { DEFAULT_WAKE } = await import('./subscription.ts');
 const { feedFile, feedSize } = await import('../feed/feed.store.ts');
@@ -158,6 +158,23 @@ test('the cursor stays while say fails, said again after a backoff until it is t
   assert.equal(toldTo('t-held').length, 1);
   await stop();
   dropSubscription('held');
+});
+
+test('a failed say is said again after a backoff that doubles from retry and never waits longer than retryCap', () => {
+  const delays = Effect.runSync(
+    Effect.gen(function* () {
+      const step = yield* Schedule.toStep(sayBackoff({ retry: '1 second', retryCap: '5 minutes' }));
+      const waits: number[] = [];
+      let now = 0;
+      for (let k = 0; k < 12; k++) {
+        const [, delay] = yield* step(now, undefined);
+        waits.push(Duration.toMillis(delay));
+        now += Duration.toMillis(delay);
+      }
+      return waits;
+    }),
+  );
+  assert.deepEqual(delays, [1000, 2000, 4000, 8000, 16_000, 32_000, 64_000, 128_000, 256_000, 300_000, 300_000, 300_000]);
 });
 
 test('an unsubscribe stops delivery, and the deliverer drops its file', async (t) => {

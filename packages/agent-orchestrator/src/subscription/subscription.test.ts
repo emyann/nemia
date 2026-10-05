@@ -80,10 +80,12 @@ test('routine words do not wake: a step at work, verified, waiting, a run runnin
   );
 });
 
-test("a subscriber's own wake words replace the default, matched on the word whatever its case", () => {
+test("a subscriber's own wake words replace the default, matched on the word or the note's lead whatever their case", () => {
   const line: FeedLine = { at: AT, run: 'r-1', step: 'plan', word: 'Verified ✓' };
   assert.equal(sortLine(line, ['verified']), 'wake');
+  assert.equal(sortLine({ ...line, word: 'verified ✓' }, ['VERIFIED']), 'wake', 'the wake word folded too');
   assert.equal(sortLine({ ...line, word: 'awaiting approval' }, ['verified']), 'routine');
+  assert.equal(sortLine({ ...line, word: 'running', note: 'Waiting On You: review it' }, DEFAULT_WAKE), 'wake', "the note's lead folded");
 });
 
 test('a wake is told its line, then the digest riding it; a digest alone is told with its count', () => {

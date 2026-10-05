@@ -30,6 +30,7 @@ import {
   runStore,
   tryOf,
   judgedNow,
+  runWith,
 } from 'agent-orchestrator';
 import { AGENTS_FOLDER, agentNameRefusal, type AgentCardShape, type AgentDraft } from 'agent-orchestrator/workflow';
 import { readBody, valueAt, type BodyIssue, type Words } from '../body.ts';
@@ -295,7 +296,7 @@ const noAgentWords = (from: string, name: string, dir: string): string =>
 export const agents = new Hono<ApiEnv>()
   .get('/api/agents', (c) =>
     served(c, async ({ e, env, repo, home, factory }) => {
-      const { agents: read } = (await AGENTS.handler(e, { repo }, env, home)) as AgentsRead;
+      const { agents: read } = (await runWith(e, AGENTS.handler({ repo }, env, home))) as AgentsRead;
       const listings = read.map((one) => listingOf(one, repo, home));
       const answer: LibraryAgent[] = inFactory(
         listings,
@@ -311,7 +312,7 @@ export const agents = new Hono<ApiEnv>()
       const { from, name } = c.req.param();
       const place = placeOf(from, name, `GET /api/agents/${from}/${name}`, repo, home);
       if ('status' in place) return c.json({ error: place.error }, place.status);
-      const { agent } = (await READ.handler(e, { from, name, dir: place.dir, repo }, env, home)) as { agent: AgentReading | null };
+      const { agent } = (await runWith(e, READ.handler({ from, name, dir: place.dir, repo }, env, home))) as { agent: AgentReading | null };
       if (!agent) return c.json({ error: noAgentWords(from, name, place.dir) }, 404);
       return c.json(listingOf(agent, repo, home));
     }),
@@ -325,7 +326,7 @@ export const agents = new Hono<ApiEnv>()
       const agent = loadAgents(place.dir).get(name);
       if (agent === undefined) return c.json({ error: noAgentWords(from, name, place.dir) }, 404);
       if (agent instanceof Error) return c.json({ error: agent.message }, 422);
-      const { card } = (await AGENT_CARD.handler(e, { name, repo, from }, env, home)) as CardRead;
+      const { card } = (await runWith(e, AGENT_CARD.handler({ name, repo, from }, env, home))) as CardRead;
       return c.json({
         card,
         servedOverA2A: false,
@@ -438,7 +439,7 @@ export const agents = new Hono<ApiEnv>()
           );
         }
         const tries = runStore.runs.list().filter((run) => tryOf(run, home)?.agent === name);
-        const moving = (await judgedNow(e, home, tries)).find((run) => run.moving);
+        const moving = (await runWith(e, judgedNow(e, home, tries))).find((run) => run.moving);
         if (moving)
           return c.json(
             {
@@ -447,7 +448,7 @@ export const agents = new Hono<ApiEnv>()
             409,
           );
         const workflowDir = tryFolder(name, agent.version, agent.keys, home);
-        const run = (await TRY.handler(e, { from, name, dir: workflowDir, brief: brief.trim() }, undefined, home)) as AgentTried;
+        const run = (await runWith(e, TRY.handler({ from, name, dir: workflowDir, brief: brief.trim() }, undefined, home))) as AgentTried;
         return c.json({ id: run.id } satisfies AgentTried, 201);
       } catch (err) {
         const answer = refusalOf(err);
@@ -481,7 +482,7 @@ export const agents = new Hono<ApiEnv>()
       if ('status' in read) return c.json({ error: read.error }, read.status);
       const { version } = read.body;
       try {
-        return c.json(await REMOVE.handler(e, { from, name, dir: place.dir, version, repo }, undefined, home));
+        return c.json(await runWith(e, REMOVE.handler({ from, name, dir: place.dir, version, repo }, undefined, home)));
       } catch (err) {
         const answer = refusalOf(err);
         if (answer) return c.json(answer.body, answer.status);
@@ -513,7 +514,7 @@ async function saved(
     ...(name !== undefined && { name }),
   };
   try {
-    const done = (await WRITE.handler(e, args, undefined, home)) as AgentWritten;
+    const done = (await runWith(e, WRITE.handler(args, undefined, home))) as AgentWritten;
     return {
       body: { agent: listedAgent('yours', done.dir, done.agent.name, repo, home)!, written: done.written, removed: done.removed },
       status: ok,

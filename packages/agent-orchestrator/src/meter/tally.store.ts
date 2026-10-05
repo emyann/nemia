@@ -101,6 +101,22 @@ export function within<T>(kind: Kind, f: () => T): T {
   return out;
 }
 
+/**
+ * `program`, counted as `kind` while a pass is metered, as `within` counts a Promise: its time until it ends, however it ends,
+ * interruption included. Outside a pass, `program` itself.
+ */
+export const withinEffect = <A, E, R>(kind: Kind, program: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
+  Effect.suspend(() => {
+    const m = meter;
+    if (!m) return program;
+    const frame: Frame = { kind };
+    return Effect.acquireUseRelease(
+      Effect.sync(() => enter(m, frame)),
+      () => program,
+      () => Effect.sync(() => leave(m, frame)),
+    );
+  });
+
 /** A read of `bytes`, counted to the kind at work — `assess` in none — while a pass is metered. */
 export const countRead = (bytes: number): void => {
   if (!meter) return;
@@ -165,6 +181,26 @@ export function aside<T>(f: () => T): T {
   const m = meter;
   return m ? counting(m, f) : f();
 }
+
+/**
+ * `program`, counted as `aside` counts a function: its time added to the overhead and charged to no kind, the mark moved past it after.
+ * Outside a pass, `program` itself.
+ */
+export const asideEffect = <A, E, R>(program: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
+  Effect.suspend(() => {
+    const m = meter;
+    if (!m) return program;
+    const now = performance.now();
+    charge(m, now);
+    return Effect.ensuring(
+      program,
+      Effect.sync(() => {
+        const after = performance.now();
+        m.overheadMs += after - now;
+        m.mark = after;
+      }),
+    );
+  });
 
 /** Whether a pass is being metered now. */
 export const metering = (): boolean => meter !== undefined;

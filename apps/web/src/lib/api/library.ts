@@ -95,6 +95,8 @@ export type WorkflowStepSpec = {
   workspace: 'main' | 'folder' | null;
   /** The factory's folders the step may write (`writable:`), by their directory names: empty where it only reads them. */
   writable: string[];
+  /** The store's folders the step reads and never writes (`reads:`), each by its name (`inbox`): empty where it reads none of them. */
+  reads: string[];
   /** `slot: none`: the run takes no run slot (`WF_MAX_RUNS`). Null for a step without the line. */
   slot: 'none' | null;
   /** The agent attached to the step (`agent:`), in agents/ beside the folder: the rest of the keys are resolved with it. Null for none. */
@@ -147,6 +149,7 @@ export const StepKeySchema = Schema.Literals([
   'input',
   'workspace',
   'writable',
+  'reads',
   'slot',
   'agent',
   'skills',
@@ -184,6 +187,7 @@ export const WorkflowStepSpecSchema = Schema.Struct({
   input: Strings,
   workspace: Schema.NullOr(Schema.Literals(['main', 'folder'])),
   writable: Strings,
+  reads: Strings,
   slot: Schema.NullOr(Schema.Literal('none')),
   agent: Schema.NullOr(Schema.String),
   skills: Strings,

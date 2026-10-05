@@ -13,12 +13,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { Cause, Effect, Exit, Fiber } from 'effect';
-import type { Engine } from 'agent-runtime';
+import type { Engine } from '../runtime-client.ts';
 import type { Run } from '../record/record.ts';
 import { listing } from '../list/list.ts';
 import { feedChanges, feedPhase, feedWords, foldFeed, type FeedLine } from './feed.ts';
 import { nodeChild } from '../../test/child.ts';
 import { scratch } from '../../test/scratch.ts';
+import { promised } from '../../test/promised.ts';
 
 const ROOT = scratch('wf-feed-');
 const RUNS = path.join(ROOT, 'runs');
@@ -28,7 +29,7 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 delete process.env.WF_MAX_CONCURRENT;
-const { approve, cancel, feedCursorRefusal, feedFile, freshFeedMemo, readFeed, recordFeed, start, tick, watchFeed } =
+const { approveRun, cancelRun, feedCursorRefusal, feedFile, freshFeedMemo, readFeed, recordFeed, startRun, tickRun, watchFeed, runWith } =
   await import('../runner.ts');
 const { readRun } = await import('../record/record.store.ts');
 const { main, watchPrinted, watching } = await import('../cli/main.ts');
@@ -46,7 +47,7 @@ const board = () => {
   const tasks = new Map<string, { spec: { id: string; brief: string; closeoutSchema?: object }; phase: string; closeout?: unknown }>();
   const settledPhase = (p: string) => ['succeeded', 'failed', 'stopped'].includes(p);
   let views = 0;
-  const e = {
+  const e = promised({
     tick: async () => ({ tasks: 0, actions: [], running: {}, views: [] }),
     admit: async () => [],
     view: async (id: string) => {
@@ -92,7 +93,7 @@ const board = () => {
     },
     logs: async () => '(no output yet)',
     feed: async () => ({ entries: [], cursor: 0 }),
-  } as unknown as Engine;
+  });
   const set = (id: string, phase: string, closeout?: unknown) => Object.assign(tasks.get(id)!, { phase, closeout });
   return { e, set, views: () => views };
 };
@@ -121,7 +122,8 @@ const gated = (() => {
   return dir;
 })();
 
-const started = (brief: string): Run => start({ brief, repo: aRepo(), workflowDir: gated, isolate: false });
+const started = async (brief: string): Promise<Run> =>
+  await Effect.runPromise(startRun({ brief, repo: aRepo(), workflowDir: gated, isolate: false }));
 
 /** Every line in the feed, read off the file as a reader with cursor 0 would. */
 const lines = (): FeedLine[] => readFeed(0).lines;
@@ -151,29 +153,29 @@ const printedBy = async (
 };
 
 /** The pass's words for every run, as `tick` hands them to the feed: what a restarted daemon's first pass would judge. */
-const judged = (pass: Awaited<ReturnType<typeof tick>>) => new Map(pass.runs.map((a) => [a.run.id, a.feed]));
+const judged = (pass: Effect.Success<ReturnType<typeof tickRun>>) => new Map(pass.runs.map((a) => [a.run.id, a.feed]));
 
 test('a transition is written once, not on every pass: the gate a step reaches, the approval that opens it, and the run done, each a line', async () => {
   emptyStore();
   const b = board();
-  const run = started('the gate');
+  const run = await started('the gate');
 
-  await tick(b.e);
+  await runWith(b.e, tickRun());
   assert.deepEqual(words(run.id), ['running'], 'the run says it is running, once');
   assert.equal(words(run.id, 'plan').length, 1, 'and each step says its first word, once');
 
-  for (let i = 0; i < 3; i++) await tick(b.e);
+  for (let i = 0; i < 3; i++) await runWith(b.e, tickRun());
   assert.deepEqual(
     words(run.id, 'plan').slice(1),
     ['pending'],
     'filed on that pass, it reads as filed on the next, since the feed words what the pass read before it filed, and then says nothing more',
   );
   const quiet = size();
-  await tick(b.e);
+  await runWith(b.e, tickRun());
   assert.equal(size(), quiet, 'a pass that judged nothing new writes nothing');
 
   b.set(`${run.id}-plan`, 'succeeded', SIGNED);
-  for (let i = 0; i < 4; i++) await tick(b.e);
+  for (let i = 0; i < 4; i++) await runWith(b.e, tickRun());
   assert.deepEqual(
     words(run.id, 'plan').filter((w) => w === 'awaiting approval'),
     ['awaiting approval'],
@@ -191,8 +193,8 @@ test('a transition is written once, not on every pass: the gate a step reaches, 
     'at its gate, in the word nemia decide says it in: nothing failed',
   );
 
-  await approve(b.e, run.id, 'plan');
-  for (let i = 0; i < 3; i++) await tick(b.e);
+  await runWith(b.e, approveRun(run.id, 'plan'));
+  for (let i = 0; i < 3; i++) await runWith(b.e, tickRun());
   const plan = words(run.id, 'plan');
   assert.notEqual(
     plan.at(-1),
@@ -205,7 +207,7 @@ test('a transition is written once, not on every pass: the gate a step reaches, 
   assert.deepEqual(words(run.id, 'implement').at(-1), 'pending');
 
   b.set(`${run.id}-implement`, 'succeeded', SIGNED);
-  for (let i = 0; i < 3; i++) await tick(b.e);
+  for (let i = 0; i < 3; i++) await runWith(b.e, tickRun());
   assert.deepEqual(
     words(run.id).filter((w) => w === 'succeeded'),
     ['succeeded'],
@@ -230,14 +232,14 @@ test("a run waiting at its ending's gate reads `awaiting approval` in the feed, 
   emptyStore();
   const b = board();
   const repo = aRepo();
-  const run = start({ brief: 'the ship gate', repo, workflowDir: ending });
-  await tick(b.e);
+  const run = await Effect.runPromise(startRun({ brief: 'the ship gate', repo, workflowDir: ending }));
+  await runWith(b.e, tickRun());
   const branch = readRun(run.id).steps.implement.branch!;
   const git = (...args: string[]) =>
     execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, encoding: 'utf8' }).trim();
   git('update-ref', `refs/heads/${branch}`, git('commit-tree', `${branch}^{tree}`, '-p', branch, '-m', 'the work'));
   b.set(`${run.id}-implement`, 'succeeded', SIGNED);
-  for (let i = 0; i < 3; i++) await tick(b.e);
+  for (let i = 0; i < 3; i++) await runWith(b.e, tickRun());
 
   assert.equal(
     words(run.id, 'ship').at(-1),
@@ -253,10 +255,10 @@ test("a run waiting at its ending's gate reads `awaiting approval` in the feed, 
   assert.match(decided, /AWAITING APPROVAL, waiting on you: ship/, 'nemia decide says the same run awaits approval');
   assert.doesNotMatch(decided, /FAILED/, 'and that nothing failed');
 
-  const broke = start({ brief: 'the break', repo: aRepo(), workflowDir: ending });
-  await tick(b.e);
+  const broke = await Effect.runPromise(startRun({ brief: 'the break', repo: aRepo(), workflowDir: ending }));
+  await runWith(b.e, tickRun());
   b.set(`${broke.id}-implement`, 'failed');
-  for (let i = 0; i < 2; i++) await tick(b.e);
+  for (let i = 0; i < 2; i++) await runWith(b.e, tickRun());
   assert.equal(
     words(broke.id).at(-1),
     'failed',
@@ -267,11 +269,11 @@ test("a run waiting at its ending's gate reads `awaiting approval` in the feed, 
 test('a step that signed off blocked says what it needs on its line in the feed, made one line, beside BLOCKED — and the run says blocked, not failed', async () => {
   emptyStore();
   const b = board();
-  const run = started('the question');
-  await tick(b.e);
+  const run = await started('the question');
+  await runWith(b.e, tickRun());
   const needs = 'Which colour —\n  red, or\tblue?\n\nThe brief says both.';
   b.set(`${run.id}-plan`, 'succeeded', { outcome: 'blocked', summary: 'stopped', artifacts: [], needs });
-  for (let i = 0; i < 3; i++) await tick(b.e);
+  for (let i = 0; i < 3; i++) await runWith(b.e, tickRun());
 
   const plan = lines()
     .filter((l) => l.run === run.id && l.step === 'plan')
@@ -288,12 +290,12 @@ test('a step that signed off blocked says what it needs on its line in the feed,
     .at(-1)!;
   assert.deepEqual({ word: said.word, note: said.note }, { word: 'blocked', note: 'waiting on you: plan' });
 
-  const long = started('the long question');
-  const other = started('the done');
-  await tick(b.e);
+  const long = await started('the long question');
+  const other = await started('the done');
+  await runWith(b.e, tickRun());
   b.set(`${long.id}-plan`, 'succeeded', { outcome: 'blocked', summary: 'stopped', artifacts: [], needs: 'why '.repeat(100) });
   b.set(`${other.id}-plan`, 'succeeded', { ...SIGNED, needs: 'nothing, really' });
-  for (let i = 0; i < 2; i++) await tick(b.e);
+  for (let i = 0; i < 2; i++) await runWith(b.e, tickRun());
   const clipped = lines()
     .filter((l) => l.run === long.id && l.step === 'plan')
     .at(-1)!.note!;
@@ -311,9 +313,9 @@ test('a step that signed off blocked says what it needs on its line in the feed,
 test('nothing is written when nothing changed, across a restart: a daemon with no fold of its own reads the feed, and says nothing again', async () => {
   emptyStore();
   const b = board();
-  const run = started('the restart');
-  for (let i = 0; i < 3; i++) await tick(b.e);
-  const pass = await tick(b.e);
+  const run = await started('the restart');
+  for (let i = 0; i < 3; i++) await runWith(b.e, tickRun());
+  const pass = await runWith(b.e, tickRun());
   const before = fs.readFileSync(FEED, 'utf8');
 
   assert.deepEqual(
@@ -324,7 +326,7 @@ test('nothing is written when nothing changed, across a restart: a daemon with n
   assert.equal(fs.readFileSync(FEED, 'utf8'), before);
 
   b.set(`${run.id}-plan`, 'succeeded', SIGNED);
-  const moved = await tick(b.e);
+  const moved = await runWith(b.e, tickRun());
   const after = size();
   assert.ok(after > before.length, 'the pass wrote the gate');
   assert.deepEqual(
@@ -344,15 +346,15 @@ test('nothing is written when nothing changed, across a restart: a daemon with n
 test("a step's live word moving — `running (working)` to `running (idle)` and back — writes nothing: the feed says running, once", async () => {
   emptyStore();
   const b = board();
-  const run = started('the flicker');
-  await tick(b.e);
-  await tick(b.e);
+  const run = await started('the flicker');
+  await runWith(b.e, tickRun());
+  await runWith(b.e, tickRun());
   b.set(`${run.id}-plan`, 'running (working)');
-  await tick(b.e);
+  await runWith(b.e, tickRun());
   const once = size();
   for (const live of ['running (idle)', 'working (quiescent)', 'running (working)', 'between attempts']) {
     b.set(`${run.id}-plan`, live);
-    await tick(b.e);
+    await runWith(b.e, tickRun());
   }
   assert.equal(
     size(),
@@ -365,7 +367,7 @@ test("a step's live word moving — `running (working)` to `running (idle)` and 
   assert.equal(words(run.id, 'plan').at(-1), 'running');
 
   b.set(`${run.id}-plan`, 'needs-human');
-  await tick(b.e);
+  await runWith(b.e, tickRun());
   assert.equal(
     words(run.id, 'plan').at(-1)!.startsWith('needs-human'),
     true,
@@ -376,12 +378,12 @@ test("a step's live word moving — `running (working)` to `running (idle)` and 
 test('a person calling the run off writes one line, and a run gone from the store writes one `removed`, then nothing', async () => {
   emptyStore();
   const b = board();
-  const stays = started('the one that stays');
-  const goes = started('the one that goes');
-  for (let i = 0; i < 2; i++) await tick(b.e);
+  const stays = await started('the one that stays');
+  const goes = await started('the one that goes');
+  for (let i = 0; i < 2; i++) await runWith(b.e, tickRun());
 
-  await cancel(b.e, stays.id);
-  for (let i = 0; i < 3; i++) await tick(b.e);
+  await runWith(b.e, cancelRun(stays.id));
+  for (let i = 0; i < 3; i++) await runWith(b.e, tickRun());
   assert.deepEqual(
     words(stays.id).filter((w) => w === 'cancelled'),
     ['cancelled'],
@@ -389,7 +391,7 @@ test('a person calling the run off writes one line, and a run gone from the stor
 
   fs.rmSync(path.join(RUNS, `${goes.id}.json`));
   const before = lines().length;
-  for (let i = 0; i < 3; i++) await tick(b.e);
+  for (let i = 0; i < 3; i++) await runWith(b.e, tickRun());
   const said = lines().slice(before);
   assert.deepEqual(
     said.map((l) => [l.run, l.step, l.word]),
@@ -397,7 +399,7 @@ test('a person calling the run off writes one line, and a run gone from the stor
     "`nemia rm` removes the record, and the feed keeps the run's lines: the next pass says it is gone, once, with no line for its steps",
   );
   assert.deepEqual(
-    recordFeed(judged(await tick(b.e)), { memo: freshFeedMemo() }),
+    recordFeed(judged(await runWith(b.e, tickRun())), { memo: freshFeedMemo() }),
     [],
     'a restarted daemon reads it as gone: nothing said of it again',
   );
@@ -406,10 +408,10 @@ test('a person calling the run off writes one line, and a run gone from the stor
 test("a pruned run's word says so, once: `nemia prune`'s marker is a person's fact, and the run's line gains it", async () => {
   emptyStore();
   const b = board();
-  const run = started('the pruned');
-  await tick(b.e);
+  const run = await started('the pruned');
+  await runWith(b.e, tickRun());
   fs.writeFileSync(path.join(RUNS, `${run.id}.pruned`), JSON.stringify({ at: '2026-09-22T10:00:00.000Z', worktrees: [] }));
-  for (let i = 0; i < 3; i++) await tick(b.e);
+  for (let i = 0; i < 3; i++) await runWith(b.e, tickRun());
   assert.equal(readRun(run.id).pruned !== undefined, true);
   assert.deepEqual(
     words(run.id).filter((w) => w.endsWith('(pruned)')),
@@ -420,8 +422,8 @@ test("a pruned run's word says so, once: `nemia prune`'s marker is a person's fa
 test('REFUSED: a cursor inside a line is refused by name, by the read, by `nemia feed` and by `nemia watch` — and one past the end, and one that is not a number', async (t) => {
   emptyStore();
   const b = board();
-  started('the cursor');
-  await tick(b.e);
+  await started('the cursor');
+  await runWith(b.e, tickRun());
   const { cursor } = readFeed(0);
   assert.equal(cursor, size());
   const inside = cursor - 2;
@@ -503,14 +505,14 @@ test('a line whose step or note is not text is read by nobody, and the lines aft
 test('a line a writer died in the middle of is ended by the next pass, and costs that line alone', async () => {
   emptyStore();
   const b = board();
-  const run = started('the torn');
-  await tick(b.e);
+  const run = await started('the torn');
+  await runWith(b.e, tickRun());
   const good = lines().length;
   fs.appendFileSync(FEED, '{"at":"2026-09-22T10:00:00.000Z","run":"r-torn","wo');
 
   b.set(`${run.id}-plan`, 'succeeded', SIGNED);
-  await tick(b.e);
-  await tick(b.e);
+  await runWith(b.e, tickRun());
+  await runWith(b.e, tickRun());
   const text = fs.readFileSync(FEED, 'utf8');
   assert.ok(text.endsWith('\n'));
   assert.ok(text.includes('"wo\n{'), 'the torn line is ended before the pass writes');
@@ -528,8 +530,8 @@ test('a line a writer died in the middle of is ended by the next pass, and costs
 test('`nemia feed` prints each line and the cursor to read on from; `nemia watch` follows the lines as they are written, until stopped', async (t) => {
   emptyStore();
   const b = board();
-  const run = started('the watch');
-  await tick(b.e);
+  const run = await started('the watch');
+  await runWith(b.e, tickRun());
   const printed = await printedBy(t, b.e, 'feed');
   assert.equal(printed.at(-1), `cursor: ${size()}`);
   assert.ok(
@@ -554,7 +556,7 @@ test('`nemia feed` prints each line and the cursor to read on from; `nemia watch
       arrived = resolve;
     });
     b.set(`${run.id}-plan`, 'succeeded', SIGNED);
-    await tick(b.e);
+    await runWith(b.e, tickRun());
     await Promise.race([
       two,
       new Promise((_, reject) => setTimeout(() => reject(new Error(`the watch delivered ${got.length} lines in 5s`)), 5_000)),
@@ -564,7 +566,7 @@ test('`nemia feed` prints each line and the cursor to read on from; `nemia watch
     watch.stop();
   }
   const stopped = got.length;
-  await tick(b.e);
+  await runWith(b.e, tickRun());
   fs.appendFileSync(FEED, `${JSON.stringify({ at: '2026-09-22T10:00:00.000Z', run: 'r-after', word: 'running' })}\n`);
   await new Promise((r) => setTimeout(r, 100));
   assert.equal(got.length, stopped, 'a watch stopped delivers nothing more');
@@ -634,8 +636,8 @@ test('a watch hands each line on with its own cursor: the byte after it, in byte
 test('`nemia watch` survives a feed cut under it: truncated, deleted or replaced, it says so once and delivers the next transition', async () => {
   emptyStore();
   const b = board();
-  const run = started('the cut');
-  await tick(b.e);
+  const run = await started('the cut');
+  await runWith(b.e, tickRun());
   const cli = new URL('../cli/main.ts', import.meta.url).href;
   const w = nodeChild(`const { main } = await import(${JSON.stringify(cli)}); await main(['watch', '${size()}'], {});`, {
     ...process.env,
@@ -657,8 +659,8 @@ test('`nemia watch` survives a feed cut under it: truncated, deleted or replaced
     assert.equal(cuts().length, 1, 'the truncation is said once');
     assert.match(cuts()[0], /^nemia watch: the feed was truncated under this watch at cursor \d+, and is 0 bytes now .*from its start/);
     b.set(`${run.id}-plan`, 'succeeded', SIGNED);
-    await tick(b.e);
-    await tick(b.e);
+    await runWith(b.e, tickRun());
+    await runWith(b.e, tickRun());
     await w.until(
       () => /\splan\s+awaiting approval/.test(w.out()),
       'the watch reads the feed the tick writes again from its start: the gate reached after the cut is delivered',
@@ -669,8 +671,8 @@ test('`nemia watch` survives a feed cut under it: truncated, deleted or replaced
     await w.until(() => cuts().length >= 2, 'deleted: the same, the deletion is said');
     assert.equal(cuts().length, 2, 'the deletion is said once');
     assert.match(cuts()[1], /the feed was deleted under this watch/);
-    await approve(b.e, run.id, 'plan');
-    for (let i = 0; i < 2; i++) await tick(b.e);
+    await runWith(b.e, approveRun(run.id, 'plan'));
+    for (let i = 0; i < 2; i++) await runWith(b.e, tickRun());
     await w.until(() => /\splan\s+(?!awaiting)/.test(w.out().slice(before)), 'the approval after the deletion is delivered');
 
     const at = w.out().length;
@@ -887,11 +889,11 @@ test('`wf --help` names nemia feed and nemia watch, and says which feed is whose
 test('the feed asks the engine nothing of its own: a pass reads each task as many times with the feed as the judgement did', async () => {
   emptyStore();
   const b = board();
-  started('the reads');
-  await tick(b.e);
-  await tick(b.e);
+  await started('the reads');
+  await runWith(b.e, tickRun());
+  await runWith(b.e, tickRun());
   const before = b.views();
-  await tick(b.e);
+  await runWith(b.e, tickRun());
   const perPass = b.views() - before;
   assert.equal(
     perPass,

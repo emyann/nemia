@@ -53,6 +53,60 @@ async function tookOnTheRow(page: Page, costly: Locator): Promise<void> {
   if (size) await page.setViewportSize(size);
 }
 
+/**
+ * A row ticks each second while its run's clock counts, and only then: DIAMOND's `running`, whose session works, says its seconds move
+ * three times, while COSTLY's, finished and waiting on you, whose clock's title still says how long from start to now, changes once at
+ * most over the same stretch, shorter than its minute: counted, never timed, so a slow machine holds it too.
+ */
+async function ticksOnTheRows(page: Page): Promise<void> {
+  const running = `li:has(a[href="/runs/${DIAMOND.running.id}"]) [data-clock]`;
+  const costly = `li:has(a[href="/runs/${COSTLY.id}"]) [data-clock]`;
+  await expectVisible(
+    page.locator(running, { hasText: /^\d+m \d{2}s at work$/ }),
+    `the row of ${DIAMOND.running.id}, whose session works, says its time at work to the second`,
+  );
+  await page.evaluate(
+    ([runningAt, costlyAt]) => {
+      const read = () => ({
+        running: document.querySelector(runningAt)?.textContent ?? '',
+        costly: document.querySelector(costlyAt)?.getAttribute('title') ?? '',
+      });
+      const ticks = { running: 0, costly: 0, last: read(), stop: () => {} };
+      const watch = new MutationObserver(() => {
+        const now = read();
+        if (now.running !== ticks.last.running) ticks.running += 1;
+        if (now.costly !== ticks.last.costly) ticks.costly += 1;
+        ticks.last = now;
+      });
+      watch.observe(document.body, { subtree: true, childList: true, characterData: true, attributeFilter: ['title'] });
+      ticks.stop = () => watch.disconnect();
+      (window as unknown as { e2eTicks?: typeof ticks }).e2eTicks = ticks;
+    },
+    [running, costly] as const,
+  );
+  const counted = () =>
+    page.evaluate(() => {
+      const ticks = (window as unknown as { e2eTicks: { running: number; costly: number; stop: () => void } }).e2eTicks;
+      ticks.stop();
+      return { running: ticks.running, costly: ticks.costly };
+    });
+  try {
+    await page.waitForFunction(() => (window as unknown as { e2eTicks: { running: number } }).e2eTicks.running >= 3, undefined, {
+      timeout: WAIT_MS,
+    });
+  } catch {
+    const { running: moved, costly: drawn } = await counted();
+    throw new Refused(
+      `the row of ${DIAMOND.running.id}, whose session works, ticks each second — its seconds stand still: it changed ${moved} times in ${WAIT_MS} ms, and COSTLY's ${drawn}`,
+    );
+  }
+  const { running: moved, costly: drawn } = await counted();
+  if (drawn > 1)
+    throw new Refused(
+      `a finished row is not drawn again each second — COSTLY's clock changed ${drawn} times while ${DIAMOND.running.id}'s changed ${moved}`,
+    );
+}
+
 export default {
   /**
    * The runs list: the runs in flight, as the Factory counts them, then those nobody has decided, then the finished, each group under a
@@ -208,6 +262,8 @@ export default {
       loop.locator(`[data-state="exhausted"][title$="${LOOPING.notes.review}"]`, { hasText: 'rounds exhausted' }),
       `the row shows ${LOOPING.exhausted} as an amber chip, its note after what that means on hover`,
     );
+
+    await ticksOnTheRows(page);
 
     await enterOnPlace(page, 'Inbox', '/inbox');
     await expectVisible(

@@ -13,7 +13,15 @@ import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
 import { TEAM } from '../../test/team.ts';
 import { Layer } from 'effect';
-import { COMMANDS, clearCustomInstructions, engine, writeCustomInstructions, type AgentsRead, type CardRead } from 'agent-orchestrator';
+import {
+  COMMANDS,
+  clearCustomInstructions,
+  engine,
+  runWith,
+  writeCustomInstructions,
+  type AgentsRead,
+  type CardRead,
+} from 'agent-orchestrator';
 import { app, appOf, liveOf } from '../app.ts';
 import { StoreRoot } from '../store.ts';
 const repo = scratch('nemia-api-agents-repo-');
@@ -777,7 +785,7 @@ test("the listing and a card are the package's nemia agents and nemia agents car
       [],
       "the file of a person's custom instructions is the CLI's to print, not a key of the board's",
     );
-    const { agents: read } = (await AGENTS_ENTRY.handler(engine(), { repo }, process.env, root)) as AgentsRead;
+    const { agents: read } = (await runWith(engine(), AGENTS_ENTRY.handler({ repo }, process.env, root))) as AgentsRead;
     assert.ok(read.find((a) => a.name === 'reviewer' && a.from === 'yours')?.custom, 'the package read the custom file');
     const board = (one: object) => {
       const { given: _given, untried: _untried, fills: _fills, factories: _factories, ...rest } = one as Record<string, unknown>;
@@ -789,7 +797,10 @@ test("the listing and a card are the package's nemia agents and nemia agents car
     );
     const res = await app.request('/api/agents/yours/reviewer/card');
     assert.equal(res.status, 200, await res.clone().text());
-    const { card } = (await CARD_ENTRY.handler(engine(), { name: 'reviewer', repo, from: 'yours' }, process.env, root)) as CardRead;
+    const { card } = (await runWith(
+      engine(),
+      CARD_ENTRY.handler({ name: 'reviewer', repo, from: 'yours' }, process.env, root),
+    )) as CardRead;
     assert.deepEqual(((await res.json()) as { card: unknown }).card, card);
   } finally {
     clearCustomInstructions(root, 'reviewer', repo);

@@ -3,14 +3,17 @@
  * earliest filed, then the lower id, and the pass after it starts them. Each order is proven by a fixture listed in the opposite
  * one, and each pool by a fixture that shares or splits it.
  */
+import { Effect } from 'effect';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { Event, FeedEntry, HarnessConfig, PromiseJournal, PromiseRunner, Sighting } from '../src/facade.ts';
-import { Engine, promiseEngine } from '../src/index.ts';
+import type { Event, FeedEntry, HarnessConfig, Sighting } from '../src/index.ts';
+import { Engine } from '../src/index.ts';
 import { nameFor } from '../src/core/domain.ts';
 import { holdsSlot, ownPool, toAdmit, type AdmissionView } from '../src/core/admission.ts';
+import { asyncStore, asyncOps, type AsyncJournal, type AsyncRunner } from './promise-runner.ts';
+import { builtEngine } from './engine.ts';
 
-const memoryJournal = (): PromiseJournal => {
+const memoryJournal = (): AsyncJournal => {
   const tasks = new Map<string, Event[]>();
   const feed: FeedEntry[] = [];
   return {
@@ -31,7 +34,7 @@ const memoryJournal = (): PromiseJournal => {
 };
 
 /** A harness whose sessions work until the test says otherwise. */
-const fake = (sessions: Map<string, Sighting>): PromiseRunner => ({
+const fake = (sessions: Map<string, Sighting>): AsyncRunner => ({
   async spawn(r) {
     sessions.set(r.name, { sessionId: `s-${sessions.size + 1}`, state: 'working' });
   },
@@ -48,15 +51,17 @@ const fake = (sessions: Map<string, Sighting>): PromiseRunner => ({
 const board = (maxConcurrent: number | undefined, pools: { a?: string; b?: string } = {}, journal = memoryJournal()) => {
   const sessions = new Map<string, Sighting>();
   const harnesses: Record<string, HarnessConfig> = {
-    a: { ...fake(sessions), ...(pools.a ? { pool: pools.a } : {}) },
-    b: { ...fake(sessions), ...(pools.b ? { pool: pools.b } : {}) },
+    a: { ...asyncOps(fake(sessions)), ...(pools.a ? { pool: pools.a } : {}) },
+    b: { ...asyncOps(fake(sessions)), ...(pools.b ? { pool: pools.b } : {}) },
   };
-  const engine = promiseEngine(Engine.layer({ journal, harnesses, defaultHarness: 'a', ...(maxConcurrent ? { maxConcurrent } : {}) }));
+  const engine = builtEngine(
+    Engine.layer({ journal: asyncStore(journal), harnesses, defaultHarness: 'a', ...(maxConcurrent ? { maxConcurrent } : {}) }),
+  );
   return { engine, sessions, journal };
 };
 
 /** File `id` queued on `harness` as of `at`, with `priority` when given: the entry `file` writes, at a time the test chooses. */
-const fileAt = (journal: PromiseJournal, id: string, at: string, harness = 'a', priority?: number) =>
+const fileAt = (journal: AsyncJournal, id: string, at: string, harness = 'a', priority?: number) =>
   journal.append(id, { kind: 'filed', at, brief: id, cwd: '/r', harness, queued: true, ...(priority !== undefined ? { priority } : {}) });
 
 const started = (sessions: Map<string, Sighting>) => [...sessions.keys()].sort();
@@ -66,7 +71,7 @@ test('under a ceiling of 1, the queued task of the highest priority is admitted,
   await fileAt(b.journal, 'x', '2026-10-04T09:00:00.000Z', 'a', 0);
   await fileAt(b.journal, 'y', '2026-10-04T09:00:02.000Z', 'a', 1);
   await fileAt(b.journal, 'z', '2026-10-04T09:00:01.000Z', 'a', 0);
-  const first = await b.engine.tick();
+  const first = await Effect.runPromise(b.engine.tick());
   assert.deepEqual(
     first.views.map((v) => [v.id, v.admission]),
     [
@@ -77,7 +82,7 @@ test('under a ceiling of 1, the queued task of the highest priority is admitted,
     'the pass admits `y`, filed last and listed between two of priority 0',
   );
   assert.equal(b.sessions.size, 0, 'admitted on this pass, started on none');
-  await b.engine.tick();
+  await Effect.runPromise(b.engine.tick());
   assert.deepEqual(started(b.sessions), [nameFor('y', 1)], 'the next pass starts it');
 });
 
@@ -86,38 +91,38 @@ test('of one priority, the earliest filed is admitted, against the order the sto
   await fileAt(b.journal, 'a1', '2026-10-04T09:00:02.000Z');
   await fileAt(b.journal, 'a2', '2026-10-04T09:00:01.000Z');
   await fileAt(b.journal, 'a3', '2026-10-04T09:00:00.000Z');
-  await b.engine.tick();
-  await b.engine.tick();
+  await Effect.runPromise(b.engine.tick());
+  await Effect.runPromise(b.engine.tick());
   assert.deepEqual(started(b.sessions), [nameFor('a3', 1)]);
 });
 
 test('two harnesses sharing a pool share its ceiling: one at work holds the other back, and apart each is admitted', async () => {
   const shared = board(1, { a: 'x', b: 'x' });
   await fileAt(shared.journal, 'on-b', '2026-10-04T09:00:00.000Z', 'b');
-  await shared.engine.tick();
-  await shared.engine.tick();
+  await Effect.runPromise(shared.engine.tick());
+  await Effect.runPromise(shared.engine.tick());
   assert.deepEqual(started(shared.sessions), [nameFor('on-b', 1)], '`on-b` at work');
   await fileAt(shared.journal, 'on-a', '2026-10-04T09:00:01.000Z', 'a');
-  const held = await shared.engine.tick();
+  const held = await Effect.runPromise(shared.engine.tick());
   assert.equal(held.views.find((v) => v.id === 'on-a')?.admission, 'queued', "`on-a` waits: its pool's one slot is held");
 
   const apart = board(1, { a: 'x' });
   await fileAt(apart.journal, 'on-b', '2026-10-04T09:00:00.000Z', 'b');
-  await apart.engine.tick();
-  await apart.engine.tick();
+  await Effect.runPromise(apart.engine.tick());
+  await Effect.runPromise(apart.engine.tick());
   await fileAt(apart.journal, 'on-a', '2026-10-04T09:00:01.000Z', 'a');
-  const admitted = await apart.engine.tick();
+  const admitted = await Effect.runPromise(apart.engine.tick());
   assert.equal(admitted.views.find((v) => v.id === 'on-a')?.admission, 'admitted', "with `b`'s pool its own, `on-a` is admitted");
 });
 
 test('with no ceiling the pass admits nothing: a queued task waits for `admit`, as ever', async () => {
   const b = board(undefined);
   await fileAt(b.journal, 'q', '2026-10-04T09:00:00.000Z');
-  for (let i = 0; i < 3; i++) await b.engine.tick();
+  for (let i = 0; i < 3; i++) await Effect.runPromise(b.engine.tick());
   assert.equal(b.sessions.size, 0);
-  assert.equal((await b.engine.view('q')).admission, 'queued');
-  await b.engine.admit(['q']);
-  await b.engine.tick();
+  assert.equal((await Effect.runPromise(b.engine.view('q'))).admission, 'queued');
+  await Effect.runPromise(b.engine.admit(['q']));
+  await Effect.runPromise(b.engine.tick());
   assert.deepEqual(started(b.sessions), [nameFor('q', 1)]);
 });
 
@@ -126,8 +131,8 @@ test('the order is the journal’s: an engine that never saw the filing admits b
   await fileAt(journal, 'low', '2026-10-04T09:00:00.000Z', 'a', 0);
   await fileAt(journal, 'high', '2026-10-04T09:00:01.000Z', 'a', 7);
   const after = board(1, {}, journal);
-  await after.engine.tick();
-  await after.engine.tick();
+  await Effect.runPromise(after.engine.tick());
+  await Effect.runPromise(after.engine.tick());
   assert.deepEqual(started(after.sessions), [nameFor('high', 1)]);
 });
 
@@ -232,30 +237,30 @@ test('an engine unschedulable admits no queued task on any pass while it says so
   const journal = memoryJournal();
   const sessions = new Map<string, Sighting>();
   let unschedulable = false;
-  const harnesses: Record<string, HarnessConfig> = { a: fake(sessions) };
-  const engine = promiseEngine(
-    Engine.layer({ journal, harnesses, defaultHarness: 'a', maxConcurrent: 3, unschedulable: () => unschedulable }),
+  const harnesses: Record<string, HarnessConfig> = { a: asyncOps(fake(sessions)) };
+  const engine = builtEngine(
+    Engine.layer({ journal: asyncStore(journal), harnesses, defaultHarness: 'a', maxConcurrent: 3, unschedulable: () => unschedulable }),
   );
   await fileAt(journal, 'before', '2026-10-04T09:00:00.000Z');
-  await engine.tick();
+  await Effect.runPromise(engine.tick());
   unschedulable = true;
   await fileAt(journal, 'held', '2026-10-04T09:00:01.000Z');
-  for (let i = 0; i < 3; i++) await engine.tick();
+  for (let i = 0; i < 3; i++) await Effect.runPromise(engine.tick());
   assert.deepEqual(started(sessions), [nameFor('before', 1)], 'admitted before, it starts; filed after, it waits');
-  assert.equal((await engine.view('held')).admission, 'queued');
+  assert.equal((await Effect.runPromise(engine.view('held'))).admission, 'queued');
   await fileAt(journal, 'named', '2026-10-04T09:00:02.000Z');
-  await engine.admit(['named']);
-  await engine.tick();
+  await Effect.runPromise(engine.admit(['named']));
+  await Effect.runPromise(engine.tick());
   assert.deepEqual(started(sessions), [nameFor('before', 1), nameFor('named', 1)], 'a task `admit` names starts all the same');
   unschedulable = false;
-  await engine.tick();
-  await engine.tick();
+  await Effect.runPromise(engine.tick());
+  await Effect.runPromise(engine.tick());
   assert.deepEqual(started(sessions), [nameFor('before', 1), nameFor('held', 1), nameFor('named', 1)], 'the flag down, it is admitted');
 });
 
 test('REFUSED at shipped defaults: an `unschedulable` that is not a function builds no engine', () => {
   assert.throws(
-    () => promiseEngine(Engine.layer({ journal: memoryJournal(), unschedulable: true } as never)),
+    () => builtEngine(Engine.layer({ journal: memoryJournal(), unschedulable: true } as never)),
     (err: Error) => err.message.includes('`unschedulable` is a function, `() => boolean`, asked on every pass'),
   );
 });

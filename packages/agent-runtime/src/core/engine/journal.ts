@@ -21,7 +21,7 @@ import {
   type StoredEvent,
 } from '../event-schema.ts';
 import { FORMER_ARGS, HARNESS_ARGS, type HarnessArgs } from '../../harness/args.ts';
-import { countRead, readText } from './tally.ts';
+import { countRead } from './tally.ts';
 
 /**
  * One entry of the board-wide feed: an event, and which task it happened to.
@@ -205,17 +205,99 @@ export const upgrade = (event: StoredEvent): Event => {
   return { ...rest, ...(Object.keys(config).length ? { config: argsOf(config) } : {}) };
 };
 
+/** A line as its JSON, or as its text where it is none — a write cut short — for the decoder to refuse by place. */
+const parsed = (line: string): unknown => {
+  try {
+    return JSON.parse(line);
+  } catch {
+    return line;
+  }
+};
+
+/** The bytes of `file` from `from` to `to`, in one positioned read, counted. */
+const span = (file: string, from: number, to: number): Buffer => {
+  const fd = fs.openSync(file, 'r');
+  try {
+    const buf = Buffer.alloc(to - from);
+    const read = fs.readSync(fd, buf, 0, buf.length, from);
+    countRead(read);
+    return buf.subarray(0, read);
+  } finally {
+    fs.closeSync(fd);
+  }
+};
+
+/** What a journal reader keeps of one file: its identity, the end of its last complete line, its time there, and the entries before it. */
+type Kept = { dev: number; ino: number; offset: number; mtimeMs: number; entries: readonly unknown[] };
+
+/**
+ * A reader of journal files that reads each only for what was appended since it last read it: it keeps, per file, the file's
+ * identity (`dev`, `ino`), the byte offset of the end of its last complete line, its `mtimeMs` there and the entries up to it,
+ * for as long as the reader lives. One `stat` per read decides:
+ *
+ * - the same file, of the size and time kept: the kept entries, nothing read;
+ * - the same file grown: only the bytes past the offset;
+ * - another file, a shorter one, or one of the same size at another time: the whole file, kept afresh;
+ * - no file: `[]`, and nothing kept.
+ *
+ * A last line with no newline yet — a write cut short — is returned as its text and not kept: the offset never passes it. A journal
+ * is appended to, never edited: one edited in place to a longer length is read from the old offset, so a hand edit replaces the file
+ * by rename.
+ */
+const journalReader = () => {
+  const kept = new Map<string, Kept>();
+  return (file: string): unknown[] => {
+    const stat = fs.statSync(file, { throwIfNoEntry: false });
+    if (!stat) {
+      kept.delete(file);
+      return [];
+    }
+    const was = kept.get(file);
+    const same = was !== undefined && was.dev === stat.dev && was.ino === stat.ino;
+    if (same && stat.size === was.offset && stat.mtimeMs === was.mtimeMs) return [...was.entries];
+    const from = same && stat.size > was.offset ? was.offset : 0;
+    const buf = span(file, from, stat.size);
+    const end = buf.lastIndexOf(0x0a) + 1;
+    const lines = buf.subarray(0, end).toString('utf8').split('\n').filter(Boolean).map(parsed);
+    const entries = from > 0 && was ? [...was.entries, ...lines] : lines;
+    kept.set(file, { dev: stat.dev, ino: stat.ino, offset: from + end, mtimeMs: stat.mtimeMs, entries });
+    const partial = buf.subarray(end).toString('utf8');
+    return partial ? [...entries, parsed(partial)] : [...entries];
+  };
+};
+
+/** What an append says of itself, on its span and its log: its `task`, its event's `kind`, and its `attempt` where the event has one. */
+export const appendFields = (taskId: string, event: Event): { task: string; kind: Event['kind']; attempt?: number } => ({
+  task: taskId,
+  kind: event.kind,
+  ...('attempt' in event ? { attempt: event.attempt } : {}),
+});
+
+/**
+ * `append` of `ops`, in a span of its own, `append`, under the verb that wrote it, annotated with `appendFields`; once written, it is
+ * said at `Debug`, the event's kind, annotated the same. The runtime's journal at `Debug` is its log.
+ */
+const appendSaid = (ops: StoreOps) =>
+  Effect.fn('append')(function* (taskId: string, event: Event) {
+    const fields = appendFields(taskId, event);
+    yield* Effect.annotateCurrentSpan(fields);
+    yield* ops.append(taskId, event);
+    yield* Effect.logDebug(event.kind).pipe(Effect.annotateLogs(fields));
+  });
+
 export class Journal extends Context.Service<Journal, JournalOps>()('engine/Journal') {
   /**
    * Any implementation becomes a Layer. This is the only way a store reaches the engine — and so where what a store gives
    * back is decoded (`event-schema.ts`): an entry no runtime wrote in a task's journal fails that task's read with a
    * `JournalError` that names it, and one in the feed is skipped, said on the read's `refused`; and
-   * where an event in a former shape is read in the one the runtime reads (`upgrade`), whoever's store it is.
+   * where an event in a former shape is read in the one the runtime reads (`upgrade`), whoever's store it is; and where every
+   * append is traced and logged (`appendSaid`).
    */
   static layer = (ops: StoreOps) =>
     Layer.succeed(Journal)(
       Journal.of({
         ...ops,
+        append: appendSaid(ops),
         read: (taskId) =>
           ops.read(taskId).pipe(
             Effect.flatMap((raw) => decodeEvents(taskId, raw, ops.located)),
@@ -236,7 +318,8 @@ export class Journal extends Context.Service<Journal, JournalOps>()('engine/Jour
 
   /**
    * The same implementation as a plain value, for a caller that needs its optional `subscribe`. A line is read as its JSON,
-   * or as its text where it is none — a write cut short — for the decoder to refuse by place.
+   * or as its text where it is none — a write cut short — for the decoder to refuse by place. A task's journal is read through
+   * one `journalReader` for the value's life, so a read costs a `stat` and the bytes appended since this value last read it.
    */
   static filesOps = (root = path.join(os.homedir(), '.agent-engine')): StoreOps => {
     const dir = path.join(root, 'tasks');
@@ -244,13 +327,7 @@ export class Journal extends Context.Service<Journal, JournalOps>()('engine/Jour
     const feedFile = path.join(root, 'feed.jsonl');
     const fail = (taskId: string) => (cause: unknown) =>
       new JournalError({ taskId, message: cause instanceof Error ? cause.message : String(cause) });
-    const parsed = (line: string): unknown => {
-      try {
-        return JSON.parse(line);
-      } catch {
-        return line;
-      }
-    };
+    const journals = journalReader();
 
     return {
       located: { journal: file, feed: feedFile },
@@ -267,14 +344,7 @@ export class Journal extends Context.Service<Journal, JournalOps>()('engine/Jour
           },
           catch: fail(taskId),
         }),
-      read: (taskId) =>
-        Effect.try({
-          try: () => {
-            if (!fs.existsSync(file(taskId))) return [];
-            return readText(file(taskId)).split('\n').filter(Boolean).map(parsed);
-          },
-          catch: fail(taskId),
-        }),
+      read: (taskId) => Effect.try({ try: () => journals(file(taskId)), catch: fail(taskId) }),
       list: Effect.try({
         try: () =>
           fs.existsSync(dir)

@@ -11,7 +11,9 @@ import { Journal, type JournalError } from './journal.ts';
 import type { Event, Usage } from '../domain.ts';
 import { HarnessArgsSchema, type StoredEvent } from '../event-schema.ts';
 import type { HarnessArgs } from '../../harness/args.ts';
+import { ioCounts } from './tally.ts';
 import { scratch } from '../../../test/scratch.ts';
+import { asyncStore } from '../../../test/promise-runner.ts';
 
 const root = () => scratch('ae-journal-');
 /** A fresh layer over the same directory — what a restarted engine sees. */
@@ -233,10 +235,11 @@ test("an old filed event is read with the harness's arguments under config, and 
 
 test('a store with tasks filed on both sides of the change reads them alike, and the engine folds each', async () => {
   const dir = legacyStore({ 't-new': [TODAY], 't-old': [LEGACY] });
-  const { Engine, promiseEngine } = await import('../../index.ts');
-  const engine = promiseEngine(Engine.layer({ root: dir }));
+  const { Engine } = await import('../../index.ts');
+  const { builtEngine } = await import('../../../test/engine.ts');
+  const engine = builtEngine(Engine.layer({ root: dir }));
 
-  const old = await engine.view('t-old');
+  const old = await Effect.runPromise(engine.view('t-old'));
   assert.deepEqual(old.state.config, {
     budgetUsd: 2,
     model: 'opus',
@@ -247,7 +250,7 @@ test('a store with tasks filed on both sides of the change reads them alike, and
   });
   assert.equal((old.state as unknown as Record<string, unknown>).model, undefined, 'no argument is left on the state beside it');
   assert.equal('budgetUsd' in old.state, false, 'the cap included');
-  assert.deepEqual((await engine.view('t-new')).state.config, { model: 'haiku' });
+  assert.deepEqual((await Effect.runPromise(engine.view('t-new'))).state.config, { model: 'haiku' });
 });
 
 test("config is the newer word: a value there is kept over one beside it, and an undefined one is no argument — in a consumer's store that keeps the key JSON drops", async () => {
@@ -280,19 +283,20 @@ test("config is the newer word: a value there is kept over one beside it, and an
 });
 
 test("a consumer's own store is read in today's shape too: the upgrade is the Journal's, not the files'", async () => {
-  const { Engine, promiseEngine } = await import('../../index.ts');
+  const { Engine } = await import('../../index.ts');
+  const { builtEngine } = await import('../../../test/engine.ts');
   const events = [LEGACY as unknown as Event];
-  const engine = promiseEngine(
+  const engine = builtEngine(
     Engine.layer({
-      journal: {
+      journal: asyncStore({
         append: async () => {},
         read: async () => events,
         list: async () => ['t-old'],
         feed: async () => ({ entries: events.map((event) => ({ taskId: 't-old', event })), cursor: 1 }),
-      },
+      }),
     }),
   );
-  assert.deepEqual((await engine.view('t-old')).state.config?.model, 'opus');
+  assert.deepEqual((await Effect.runPromise(engine.view('t-old'))).state.config?.model, 'opus');
   assert.deepEqual(events[0], LEGACY, "and the consumer's record is not touched");
 });
 
@@ -364,8 +368,9 @@ test("a journal from a runtime that judged the spend cap reads its caps under co
   );
   assert.deepEqual(bytesOf(dir), before, 'append-only: a read changes no byte');
 
-  const { Engine, promiseEngine } = await import('../../index.ts');
-  const { state } = await promiseEngine(Engine.layer({ root: dir })).view('t-capped');
+  const { Engine } = await import('../../index.ts');
+  const { builtEngine } = await import('../../../test/engine.ts');
+  const { state } = await Effect.runPromise(builtEngine(Engine.layer({ root: dir })).view('t-capped'));
   assert.deepEqual(state.inputs, [{ at: CAPPED[4].at, text: 'shorter', config: { budgetUsd: 0.5 } }]);
   assert.deepEqual(
     state.attempts.map((a) => [a.ended, a.reason, a.limit]),
@@ -434,8 +439,9 @@ test("a filing that asked for remoteControl, Claude Code's bridge to claude.ai, 
   );
   assert.deepEqual(bytesOf(dir), before, 'append-only: a read changes no byte');
 
-  const { Engine, promiseEngine } = await import('../../index.ts');
-  const { state } = await promiseEngine(Engine.layer({ root: dir })).view('under');
+  const { Engine } = await import('../../index.ts');
+  const { builtEngine } = await import('../../../test/engine.ts');
+  const { state } = await Effect.runPromise(builtEngine(Engine.layer({ root: dir })).view('under'));
   assert.deepEqual(state.config, { background: true, claude: { remoteControl: true } });
 });
 
@@ -590,8 +596,9 @@ test("Codex's arguments are read from a journal as filed, and the engine folds t
     Effect.flatMap(Journal, (j) => j.read('t-codex')),
   );
   assert.deepEqual(filed, codex);
-  const { Engine, promiseEngine } = await import('../../index.ts');
-  assert.deepEqual((await promiseEngine(Engine.layer({ root: dir })).view('t-codex')).state.config, {
+  const { Engine } = await import('../../index.ts');
+  const { builtEngine } = await import('../../../test/engine.ts');
+  assert.deepEqual((await Effect.runPromise(builtEngine(Engine.layer({ root: dir })).view('t-codex'))).state.config, {
     model: 'gpt-5',
     codex: { trustFrom: '/repo' },
   });
@@ -679,19 +686,20 @@ test('the in-memory store is decoded the same: an event appended in no shape the
 });
 
 test("a consumer's own store is decoded too: an entry it holds in no shape the runtime writes is said, not folded", async () => {
-  const { Engine, promiseEngine } = await import('../../index.ts');
+  const { Engine } = await import('../../index.ts');
+  const { builtEngine } = await import('../../../test/engine.ts');
   const events = [{ ...TODAY, kind: 'filled' } as unknown as Event];
-  const engine = promiseEngine(
+  const engine = builtEngine(
     Engine.layer({
-      journal: {
+      journal: asyncStore({
         append: async () => {},
         read: async () => events,
         list: async () => ['t-own'],
         feed: async () => ({ entries: [], cursor: 0 }),
-      },
+      }),
     }),
   );
-  await assert.rejects(engine.view('t-own'), (e: Error) =>
+  await assert.rejects(Effect.runPromise(engine.view('t-own')), (e: Error) =>
     e.message.includes(`t-own's journal, entry 1 is no event this runtime writes (its kind is "filled"`),
   );
 });
@@ -709,4 +717,108 @@ test('the stored schema names every field of every event, of the harness argumen
   const none: [Forgotten, ForgottenArgs, ForgottenUsage] extends [never, never, never] ? true : [Forgotten, ForgottenArgs, ForgottenUsage] =
     true;
   assert.equal(none, true);
+});
+
+/** One `filesOps` over a fresh directory, a task journal of three events in it, and what its reads cost (`ioCounts` deltas). */
+const cursorStore = async () => {
+  const dir = root();
+  const ops = Journal.filesOps(dir);
+  for (const at of ['2026-01-01T00:00:00Z', '2026-01-01T00:00:01Z', '2026-01-01T00:00:02Z'])
+    await Effect.runPromise(ops.append('t1', ev('starting', at)));
+  const file = path.join(dir, 'tasks', 't1.jsonl');
+  const cost = async () => {
+    const before = ioCounts();
+    const entries = await Effect.runPromise(ops.read('t1'));
+    const after = ioCounts();
+    return { entries, bytes: after.bytesRead - before.bytesRead, reads: after.reads - before.reads };
+  };
+  return { dir, ops, file, cost };
+};
+
+test('a second read of a journal nothing has written to reads no byte', async () => {
+  const { file, cost } = await cursorStore();
+  const first = await cost();
+  assert.equal(first.bytes, fs.statSync(file).size, 'the first read reads the whole journal');
+  const second = await cost();
+  assert.deepEqual([second.bytes, second.reads], [0, 0], 'the second reads nothing');
+  assert.deepEqual(second.entries, first.entries, 'and gives the same entries');
+});
+
+test('a read after another writer appended one event reads only that line, and gives every event', async () => {
+  const { dir, file, cost } = await cursorStore();
+  await cost();
+  const size = fs.statSync(file).size;
+  await Effect.runPromise(Journal.filesOps(dir).append('t1', ev('spawned', '2026-01-01T00:00:03Z')));
+  const line = fs.statSync(file).size - size;
+  const after = await cost();
+  assert.deepEqual([after.bytes, after.reads], [line, 1], `read ${after.bytes} bytes for an appended line of ${line}`);
+  assert.deepEqual(
+    after.entries.map((e) => (e as Event).at),
+    ['2026-01-01T00:00:00Z', '2026-01-01T00:00:01Z', '2026-01-01T00:00:02Z', '2026-01-01T00:00:03Z'],
+  );
+});
+
+test('a journal replaced by a rename over it is read whole', async () => {
+  const { dir, file, cost } = await cursorStore();
+  await cost();
+  const other = path.join(dir, 'tasks', 't1.next');
+  fs.writeFileSync(other, fs.readFileSync(file, 'utf8') + JSON.stringify(ev('spawned', '2026-01-01T00:00:03Z')) + '\n');
+  fs.renameSync(other, file);
+  const after = await cost();
+  assert.equal(after.bytes, fs.statSync(file).size, 'the whole of the new file');
+  assert.equal(after.entries.length, 4);
+});
+
+test('a journal cut shorter is read whole', async () => {
+  const { file, cost } = await cursorStore();
+  await cost();
+  const lines = fs.readFileSync(file, 'utf8').split('\n');
+  fs.writeFileSync(file, lines[0] + '\n');
+  const after = await cost();
+  assert.equal(after.bytes, fs.statSync(file).size, 'the whole of what is left');
+  assert.equal(after.entries.length, 1);
+});
+
+test('a journal rewritten in place to the same size, at another time, is read whole', async () => {
+  const { file, cost } = await cursorStore();
+  await cost();
+  const { mtimeMs, ino } = fs.statSync(file);
+  fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replaceAll('00:00:0', '11:11:1'));
+  fs.utimesSync(file, new Date(mtimeMs + 5000), new Date(mtimeMs + 5000));
+  assert.equal(fs.statSync(file).ino, ino, 'the same file');
+  const after = await cost();
+  assert.equal(after.bytes, fs.statSync(file).size, 'the whole file');
+  assert.deepEqual(
+    after.entries.map((e) => (e as Event).at),
+    ['2026-01-01T11:11:10Z', '2026-01-01T11:11:11Z', '2026-01-01T11:11:12Z'],
+  );
+});
+
+test('a journal gone reads as none, and one made again in its place is read whole', async () => {
+  const { file, cost } = await cursorStore();
+  await cost();
+  const text = fs.readFileSync(file, 'utf8');
+  fs.rmSync(file);
+  const gone = await cost();
+  assert.deepEqual([gone.entries, gone.bytes], [[], 0]);
+  fs.writeFileSync(file, text.split('\n')[0] + '\n');
+  const again = await cost();
+  assert.equal(again.bytes, fs.statSync(file).size, 'the whole file');
+  assert.equal(again.entries.length, 1);
+});
+
+test('a last line cut short fails the read as it always has, and once completed is read for its bytes alone', async () => {
+  const { dir, ops, file, cost } = await cursorStore();
+  await cost();
+  const size = fs.statSync(file).size;
+  fs.appendFileSync(file, '{"kind":"spawned","at":"2026-01');
+  const error = await Effect.runPromise(Effect.flip(Effect.flatMap(Journal, (j) => j.read('t1')).pipe(Effect.provide(Journal.layer(ops)))));
+  assert.ok(error.message.startsWith(`t1's journal (${path.join(dir, 'tasks', 't1.jsonl')}), entry 4 is no JSON object`), error.message);
+  fs.appendFileSync(file, '-01T00:00:03Z","attempt":1}\n');
+  const after = await cost();
+  assert.equal(after.bytes, fs.statSync(file).size - size, 'the cut line and its end, never what came before it');
+  assert.deepEqual(
+    after.entries.map((e) => (e as Event).kind),
+    ['starting', 'starting', 'starting', 'spawned'],
+  );
 });

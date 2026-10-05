@@ -11,8 +11,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Engine } from 'agent-runtime';
 import { scratch } from './scratch.ts';
+import { promised } from './promised.ts';
 
 const ROOT = scratch('wf-stray-flags-');
 process.env.WF_ROOT = ROOT;
@@ -22,7 +22,7 @@ const { INBOX_HELP } = await import('../src/inbox/commands.verb.ts');
 const { PLAN_HELP } = await import('../src/start/commands.verb.ts');
 
 /** No command here reaches the engine: each is refused, or prints its help, before anything is read. */
-const NO_ENGINE = {} as Engine;
+const NO_ENGINE = promised({});
 
 const INBOX_SAYS =
   'It lists the inbox — nemia inbox — files a card with nemia inbox add "<idea>", queues one with nemia inbox queue <name>, and drops one with ' +
@@ -30,8 +30,9 @@ const INBOX_SAYS =
 const FACTORY_SAYS =
   'It lists the factories — nemia factory ls — files one with nemia factory add <name> --repo <path>, attaches a workflow with ' +
   'nemia factory attach <factory> <workflow>, detaches it with nemia factory detach <factory> <workflow>, hires an agent into a step with ' +
-  'nemia factory hire <factory> <agent> --step <workflow>/<step>, fires it with nemia factory fire <factory> --step <workflow>/<step>, and ' +
-  'removes one with nemia factory rm <name> (nemia factory --help).';
+  'nemia factory hire <factory> <agent> --step <workflow>/<step>, fires it with nemia factory fire <factory> --step <workflow>/<step>, ' +
+  'says where its instruction is kept with nemia factory instruction <name>, writes it with nemia factory instruct <name> --file <path>, ' +
+  'and removes one with nemia factory rm <name> (nemia factory --help).';
 const START_SAYS =
   'It takes the brief, then --workflows <dir>, --repo <r>, --no-worktree, and --after <runId> once per run to wait on; --input <file> ' +
   'once per file to hand its steps; --gate <step> once per step to gate; --factory <name>; and, for an inbox card, --brief "<brief>".';
@@ -71,6 +72,16 @@ const REFUSALS: Array<[string[], string[], string]> = [
   ],
   [['factory', 'hire'], ['f', 'a'], 'nemia factory hire does not take --nope. It takes <factory> <agent>, then --step <workflow>/<step>.'],
   [['factory', 'fire'], ['f'], 'nemia factory fire does not take --nope. It takes <factory>, then --step <workflow>/<step>.'],
+  [
+    ['factory', 'instruction'],
+    ['f'],
+    "nemia factory instruction takes one factory's name, then --path <path>, --store or --clear, not --nope: nemia factory instruction <name> [--path <path> | --store | --clear].",
+  ],
+  [
+    ['factory', 'instruct'],
+    ['f'],
+    "nemia factory instruct takes one factory's name, then --file <path> (or --file - for stdin) or --clear, not --nope.",
+  ],
   [['factory', 'rm'], ['f'], 'nemia factory rm removes one factory, and --nope is a second: nemia factory rm <name>, once per factory.'],
   [
     ['agents', 'custom'],
@@ -98,6 +109,9 @@ const MISSING: Readonly<Record<string, string>> = {
   'factory hire':
     'nemia factory hire takes the factory, then the agent: nemia factory hire <factory> <agent> --step <workflow>/<step>. Nothing was hired.',
   'factory fire': 'nemia factory fire takes the factory first: nemia factory fire <factory> --step <workflow>/<step>. Nothing was fired.',
+  'factory instruction':
+    "nemia factory instruction takes the factory's name: nemia factory instruction <name> [--path <path> | --store | --clear].",
+  'factory instruct': "nemia factory instruct takes the factory's name: nemia factory instruct <name> --file <path>|- or --clear.",
   'factory rm': 'nemia factory rm takes the name of the factory to remove, as nemia factory ls lists it: nemia factory rm <name>.',
 };
 

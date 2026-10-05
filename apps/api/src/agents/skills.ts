@@ -34,6 +34,7 @@ import {
   type SkillPage,
   type SkillRead,
   type SkillWritten,
+  runWith,
 } from 'agent-orchestrator';
 import {
   AGENTS_FOLDER,
@@ -118,7 +119,7 @@ const WRITE = COMMANDS.find((c) => c.name === 'skills write')!;
 
 /** Each skill folder of `dirs` read now, through the table's `skills list`, by folder. */
 const readsOf = async (e: Engine['Service'], dirs: readonly string[]) =>
-  (await LIST.handler(e, { skills: dirs })) as Record<string, SkillRead>;
+  (await runWith(e, LIST.handler({ skills: dirs }))) as Record<string, SkillRead>;
 
 /** One skill as the picker lists it: the package's reading of its folder (`read`), where it is, and who gives it. */
 export function skillRow(
@@ -378,7 +379,7 @@ export async function skillDetail(
   const dir = skillDirOf(from, name, repo, home, shipped);
   if (dir === null) return null;
   const users = skillUsers(dir, name, repo);
-  const { text, version, ...read } = (await READ.handler(e, { from, name, dir })) as SkillPage;
+  const { text, version, ...read } = (await runWith(e, READ.handler({ from, name, dir }))) as SkillPage;
   const skill = skillRow(
     name,
     dir,
@@ -454,7 +455,7 @@ async function written(
     ...(name !== undefined && { name }),
   };
   try {
-    wrote = (await WRITE.handler(e, args)) as SkillWritten;
+    wrote = (await runWith(e, WRITE.handler(args))) as SkillWritten;
   } catch (err) {
     return writeRefused(err);
   }
@@ -543,7 +544,7 @@ export const skills = new Hono<ApiEnv>()
       if (name === undefined) return c.json({ error: copyOrSkill(route)('neither') }, 400);
       let copied: SkillCopied;
       try {
-        copied = (await WRITE.handler(e, { from, library, copy: name, shipped: SHIPPED_SKILLS })) as SkillCopied;
+        copied = (await runWith(e, WRITE.handler({ from, library, copy: name, shipped: SHIPPED_SKILLS }))) as SkillCopied;
       } catch (err) {
         const answer = writeRefused(err);
         return c.json({ error: answer.error }, answer.status);

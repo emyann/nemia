@@ -1,7 +1,7 @@
 /**
  * The tick as an Effect program (`tickRun`, over `EngineService`) beside its plain face (`tick`): the face runs the program over the engine
  * it is handed and adds nothing, a refusal is the program's typed failure and the face's rejection, and anything else is a defect the
- * program dies of and the face rethrows as it was thrown. Walked through the runtime itself, `promiseEngine` over an in-memory journal
+ * program dies of and the face rethrows as it was thrown. Walked through the runtime itself, `plainEngine` over an in-memory journal
  * and a harness the test signs by hand, as unreadable-journal.test.ts does.
  *
  * `WF_ROOT` is set before the runner is imported, which reads it as the module loads. `WF_VERIFY_REST=1` judges in full every run a pass
@@ -12,14 +12,16 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { nameFor, type Engine, type PromiseJournal, type PromiseRunner, type PromiseSighting } from 'agent-runtime';
-import { Engine as RuntimeEngine, promiseEngine } from 'agent-runtime/effect';
+import { nameFor, Engine as RuntimeEngine, type Sighting } from 'agent-runtime';
+import { asyncStore, type AsyncJournal, asyncOps, type AsyncRunner } from './promised.ts';
+import type { Engine } from '../src/runtime-client.ts';
 import { Effect } from 'effect';
 import type { Effect as EffectOf } from 'effect/Effect';
 import type { Refusal } from '../src/refusal/refusal.ts';
 import type { EngineService as Service } from '../src/runtime-client.ts';
 import type { Pass } from '../src/tick/tick.verb.ts';
 import { scratch } from './scratch.ts';
+import { plainEngine } from './promised.ts';
 
 const ROOT = scratch('wf-tick-program-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -28,8 +30,8 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_MAX_CONCURRENT = '10';
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
-const { start } = await import('../src/runner.ts');
-const { freshRestMemo, tick, tickRun } = await import('../src/tick/tick.verb.ts');
+const { startRun, runWith } = await import('../src/runner.ts');
+const { freshRestMemo, tickRun } = await import('../src/tick/tick.verb.ts');
 const { EngineService } = await import('../src/runtime-client.ts');
 const { Invalid } = await import('../src/refusal/refusal.ts');
 const { PHASES, passCost } = await import('../src/meter/meter.ts');
@@ -49,10 +51,10 @@ git(REPO, 'commit', '-q', '--allow-empty', '-m', 'base');
 const FOLDER = fs.mkdtempSync(path.join(ROOT, 'wf-'));
 fs.writeFileSync(path.join(FOLDER, 'work.md'), '---\nharness: codex\n---\nwork it\n');
 
-const tasks = new Map<string, Awaited<ReturnType<PromiseJournal['read']>>>();
+const tasks = new Map<string, Awaited<ReturnType<AsyncJournal['read']>>>();
 /** When the journal says each attempt began, in milliseconds, by its session's name: a closeout counts only when made after it. */
 const starts = new Map<string, number>();
-const journal: PromiseJournal = {
+const journal: AsyncJournal = {
   async append(taskId, event) {
     tasks.set(taskId, [...(tasks.get(taskId) ?? []), event]);
     if (event.kind === 'starting') starts.set(nameFor(taskId, event.attempt), Date.parse(event.at));
@@ -68,8 +70,8 @@ const journal: PromiseJournal = {
   },
 };
 
-const sessions = new Map<string, PromiseSighting>();
-const runner: PromiseRunner = {
+const sessions = new Map<string, Sighting>();
+const runner: AsyncRunner = {
   async spawn(r) {
     sessions.set(r.name, { sessionId: `s-${sessions.size + 1}`, nativeId: `n-${sessions.size + 1}`, state: 'working', busy: true });
   },
@@ -81,11 +83,11 @@ const runner: PromiseRunner = {
     return '';
   },
 };
-const e = promiseEngine(
+const e = plainEngine(
   RuntimeEngine.layer({
     root: fs.mkdtempSync(path.join(ROOT, 'engine-')),
-    journal,
-    harnesses: { claude: runner, codex: runner, check: runner },
+    journal: asyncStore(journal),
+    harnesses: { claude: asyncOps(runner), codex: asyncOps(runner), check: asyncOps(runner) },
     defaultHarness: 'claude',
   }),
 );
@@ -94,7 +96,7 @@ const signAll = () => {
     if (s.state === 'working')
       sessions.set(name, {
         ...s,
-        state: 'done',
+        state: 'completed',
         busy: false,
         closeout: { payload: { outcome: 'done', summary: 'did it', artifacts: [], needs: null }, at: starts.get(name)! + 1 },
       });
@@ -107,21 +109,19 @@ const programOn = (engine: Engine, options: Parameters<typeof tickRun>[0] = {}) 
 /** The engine, but for a runtime pass that rejects with `err`. */
 const failingWith = (err: unknown): Engine => ({
   ...e,
-  tick: async () => {
-    throw err;
-  },
+  tick: () => Effect.die(err),
 });
 
 test("the tick's program, given the engine as a service, answers what its plain face answers: the face runs the program and adds nothing", async () => {
-  const run = start({ brief: 'one run', repo: REPO, workflowDir: FOLDER });
-  for (let k = 0; k < 3; k++) await tick(e, { repo: ROOT });
+  const run = await Effect.runPromise(startRun({ brief: 'one run', repo: REPO, workflowDir: FOLDER }));
+  for (let k = 0; k < 3; k++) await runWith(e, tickRun({ repo: ROOT }));
   signAll();
-  const status = async () => (await tick(e, { repo: ROOT })).runs.find((a) => a.run.id === run.id)?.status;
+  const status = async () => (await runWith(e, tickRun({ repo: ROOT }))).runs.find((a) => a.run.id === run.id)?.status;
   let now = await status();
   for (let k = 0; k < 4 && now !== 'succeeded'; k++) now = await status();
   assert.equal(now, 'succeeded', 'the run finished before the two are compared');
 
-  const { cost: faceCost, ...face } = await tick(e, { repo: ROOT, memo: freshRestMemo() });
+  const { cost: faceCost, ...face } = await runWith(e, tickRun({ repo: ROOT, memo: freshRestMemo() }));
   const { cost: programCost, ...program } = await programOn(e, { repo: ROOT, memo: freshRestMemo() });
   assert.deepEqual(
     face.runs.map((a) => [a.run.id, a.status]),
@@ -143,7 +143,7 @@ test("REFUSED: the tick's refusal is its program's typed failure, picked out by 
       ),
     );
     assert.match(String(recovered), /^WF_MAX_CONCURRENT=-3 is not a count from 1/);
-    const err = await tick(e, { repo: ROOT }).then(
+    const err = await runWith(e, tickRun({ repo: ROOT })).then(
       () => assert.fail('a pass under a ceiling that does not read resolved'),
       (x: unknown) => x,
     );
@@ -167,7 +167,7 @@ test("REFUSED: what is not a refusal is a defect the tick's program dies of, rec
     (x: unknown) => x,
   );
   assert.equal(caught, boom, 'the catch of failures left the defect alone');
-  const err = await tick(failingWith(boom), { repo: ROOT }).then(
+  const err = await runWith(failingWith(boom), tickRun({ repo: ROOT })).then(
     () => assert.fail('a pass whose runtime rejected resolved'),
     (x: unknown) => x,
   );
@@ -208,7 +208,7 @@ test('a pass whose series cannot be written keeps its own cost and says so: the 
   fs.writeFileSync(path.join(ROOT, 'metrics'), 'not a folder');
   const said: string[] = [];
   t.mock.method(process.stderr, 'write', (text: string) => said.push(text) > 0);
-  const pass = await tick(e, { repo: ROOT, quota: () => ({ h: { w: 12 } }) });
+  const pass = await runWith(e, tickRun({ repo: ROOT, quota: () => ({ h: { w: 12 } }) }));
   t.mock.restoreAll();
   fs.rmSync(path.join(ROOT, 'metrics'), { force: true });
   assert.ok(pass.cost, 'the pass answered with its cost');

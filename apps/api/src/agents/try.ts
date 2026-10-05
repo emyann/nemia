@@ -11,7 +11,7 @@
 import path from 'node:path';
 import { tryDir, writeTryFolder } from 'agent-orchestrator';
 import { AGENTS_FOLDER, directoryFence, isRemoteHarness, SKILLS_FOLDER } from 'agent-orchestrator/workflow';
-import { Invalid } from 'agent-orchestrator/effect';
+import { Invalid } from 'agent-orchestrator';
 import { quoted } from './skills.ts';
 
 /** The cap on a try, in dollars: what its step's `budget:` says. */

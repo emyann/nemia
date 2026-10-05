@@ -13,6 +13,7 @@ import {
   type SeriesRead,
   type Slots,
   slotWord,
+  runWith,
 } from 'agent-orchestrator';
 import type { Engine } from '../store.ts';
 
@@ -50,7 +51,7 @@ const CEILINGS = COMMANDS.find((c) => c.name === 'ceilings')!;
  * ran with and cost. Read through `e`; the cap, before any pass wrote one, is `WF_MAX_RUNS` of `env`, the app's environment.
  */
 export async function ceilingsOf(e: Engine['Service'], env: NodeJS.ProcessEnv): Promise<Ceilings> {
-  const { cap, inFlight, held } = (await CEILINGS.handler(e, {}, env)) as Slots;
+  const { cap, inFlight, held } = (await runWith(e, CEILINGS.handler({}, env))) as Slots;
   return {
     last: lastCeilings() ?? null,
     cap,
@@ -68,7 +69,7 @@ const PASSES = COMMANDS.find((c) => c.name === 'passes')!;
  * every one kept; refused as `Invalid` for a `last` that is not a whole number from 1.
  */
 export const passesOf = async (e: Engine['Service'], last: string | undefined): Promise<PassesRead> =>
-  (await PASSES.handler(e, last === undefined ? {} : { last })) as PassesRead;
+  (await runWith(e, PASSES.handler(last === undefined ? {} : { last }))) as PassesRead;
 
 /** The series' entry of the command table, served on both sides. */
 const SERIES = COMMANDS.find((c) => c.name === 'series')!;
@@ -78,7 +79,7 @@ const SERIES = COMMANDS.find((c) => c.name === 'series')!;
  * file has not moved; refused as `Invalid` for a range that is not 24h, 7d, 30d or all.
  */
 export const seriesOf = async (e: Engine['Service'], range: string | undefined, memo: SeriesMemo): Promise<SeriesRead> =>
-  (await SERIES.handler(e, range === undefined ? {} : { range }, undefined, undefined, { series: memo })) as SeriesRead;
+  (await runWith(e, SERIES.handler(range === undefined ? {} : { range }, undefined, undefined, { series: memo }))) as SeriesRead;
 
 /**
  * One metric as `GET /api/metrics` answers it: its name, kind, description and attributes, and its value — a counter's `count`, a gauge's

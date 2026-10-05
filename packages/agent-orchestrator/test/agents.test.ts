@@ -22,10 +22,11 @@ import {
 } from '../src/workflow.ts';
 import { loadAgents, loadWorkflows, workflowFolder, workflowsIn } from '../src/folder/folder.store.ts';
 import { scratch } from './scratch.ts';
+import { Effect } from 'effect';
 
 const ROOT = scratch('wf-agents-');
 process.env.WF_ROOT = ROOT;
-const { start, writeWorkflow } = await import('../src/runner.ts');
+const { startRun, writeWorkflow } = await import('../src/runner.ts');
 const { agentFilesDir } = await import('../src/agents/agents.store.ts');
 
 /** A folder of workflows under a fresh directory, each file written from `files`, by its path from the folder. */
@@ -87,6 +88,7 @@ test('REFUSED at shipped defaults: every wiring key in an agent file, by name, s
     'input',
     'workspace',
     'writable',
+    'reads',
     'slot',
     'denials',
     'background',
@@ -558,7 +560,7 @@ test('REFUSED at shipped defaults: writeWorkflow of a draft on codex by its agen
   );
 });
 
-test('nemia start freezes the resolved steps on the run: an agent edited after the start changes no step of the run', () => {
+test('nemia start freezes the resolved steps on the run: an agent edited after the start changes no step of the run', async () => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   const git = (...args: string[]) =>
     execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -567,7 +569,7 @@ test('nemia start freezes the resolved steps on the run: an agent edited after t
   git('add', '-A');
   git('commit', '-q', '-m', 'base');
   const dir = workflows({ 'agents/implementer.md': IMPLEMENTER, 'dev/build.md': '---\nagent: implementer\n---\nBuild it.\n' });
-  const run = start({ brief: 'build it', repo, workflowDir: path.join(dir, 'dev'), isolate: false });
+  const run = await Effect.runPromise(startRun({ brief: 'build it', repo, workflowDir: path.join(dir, 'dev'), isolate: false }));
   fs.writeFileSync(path.join(dir, 'agents', 'implementer.md'), '---\nmodel: haiku\n---\nSomething else.\n');
   assert.ok(run.workflow, 'the workflow is frozen on the record at start');
   const [build] = run.workflow;

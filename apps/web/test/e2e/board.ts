@@ -4,7 +4,7 @@ import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { expectCount, expectTexts, expectVisible, idle, Refused, WAIT_MS, watch } from './checks.ts';
 import { DIAMOND } from './seed.ts';
-import { API, store } from './world.ts';
+import { API, photographing, store } from './world.ts';
 
 /** The sidebar's sections under All factories, in their order: the Inbox first. */
 export const SECTIONS = ['Inbox', 'Runs', 'Workflows', 'Stats'] as const;
@@ -12,12 +12,13 @@ export const SECTIONS = ['Inbox', 'Runs', 'Workflows', 'Stats'] as const;
 /** The sidebar's sections with a factory picked: its Floor first, then the others. */
 export const PICKED_SECTIONS = ['Floor', ...SECTIONS] as const;
 
-/** The pages whose `?factory=` picks a factory; on any other page only a floor's path does. */
+/** The pages whose `?factory=` picks a factory; on any other page only the path of a factory's floor or settings does. */
 const LISTINGS = ['/inbox', '/runs', '/workflows', '/stats'];
 
-/** The factory `url` picks, as the board reads it: a floor's name, else a listing's `?factory=`, else none. */
+/** The factory `url` picks, as the board reads it: the name of a factory's floor or settings, else a listing's `?factory=`, else none. */
 export const pickedIn = (url: URL): string | null =>
-  /^\/factories\/([^/]+)$/.exec(url.pathname)?.[1] ?? (LISTINGS.includes(url.pathname) ? url.searchParams.get('factory') || null : null);
+  /^\/factories\/([^/]+)(?:\/settings)?$/.exec(url.pathname)?.[1] ??
+  (LISTINGS.includes(url.pathname) ? url.searchParams.get('factory') || null : null);
 
 /** The rail's places, in its order, one column from the top: Home first, and Machines & Capabilities, a place of two tabs, last. */
 export const RAIL_PLACES = ['Home', 'Agents', 'Machines & Capabilities'];
@@ -125,8 +126,15 @@ export const themeOf = (page: Page): Promise<string> =>
 /**
  * Takes a picture of a page or of what a locator finds into `file`, with every CSS animation stilled for the shot and played again after
  * it: an agent's face, which moves at all times, is drawn at rest with its eyes open, the same in every run. `fullPage` as Playwright's.
+ * Takes none, and writes nothing, unless the page being visited is pictured (`photographing`) or the picture is taken `always`: a
+ * failure's.
  */
-export async function photograph(target: Page | Locator, file: string, options: { fullPage?: boolean } = {}): Promise<void> {
+export async function photograph(
+  target: Page | Locator,
+  file: string,
+  { always = false, ...options }: { fullPage?: boolean; always?: boolean } = {},
+): Promise<void> {
+  if (!photographing && !always) return;
   await target.screenshot({ ...options, path: file, animations: 'disabled' });
 }
 

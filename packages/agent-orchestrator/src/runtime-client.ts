@@ -4,28 +4,29 @@
  * runtime's types the controllers use (`Engine`, `TaskView`, `Usage`, `Denial`, `RefusedMove`, `HarnessQuota`, `QuotaLimit`, `nameFor`,
  * `denialText`, `refusedText` and `lifecycleGraph`), which they import from here and never from the runtime.
  *
- * It uses the runtime's `Engine` service (`agent-runtime/effect`) and provides it as a layer, changed in one verb: `file`, so that every
- * task the orchestrator files is `queued` and starts only once the runtime admits it under the ceiling `engine()` gives it. The controllers
- * take the engine in Promises, each verb of that service run as one (`promiseEngine`): what they do with the runtime — file a task, view
- * one, tick, admit, stop one, read its logs, say something to it, read the feed — are the methods of the runtime's Promise `Engine`, which
- * every controller takes as it is and every test hands one of (`engineOf` over a layer of its own). A wrapper would be a second surface to
- * keep in step with the first, and a place for behaviour to grow; this file holds none but that one. A controller written as an Effect
- * program requires that same Promise engine as a service (`EngineService`), which its plain face provides from the engine it is handed, and
- * lifts each read with `tried` or `awaited`: a refusal is the program's failure, anything else a defect it dies of.
+ * It builds the runtime's `Engine` service (`agent-runtime`) once, changed in one verb: `file`, so that every task the orchestrator
+ * files is `queued` and starts only once the runtime admits it under the ceiling `engine()` gives it. What the controllers do with the
+ * runtime — file a task, view one, tick, admit, stop one, read its logs, say something to it, read the feed — are the verbs of that
+ * service, each an Effect, which every controller takes as it is and every test hands one of (`engineOf` over a layer of its own). A
+ * wrapper would be a second surface to keep in step with the first, and a place for behaviour to grow; this file holds none but that one.
+ * A controller is an Effect program that requires the engine as a service (`EngineService`), run by its caller with `runWith`; it reads
+ * the engine with `asked`, and lifts every other read with `tried` or `awaited`: a refusal is the program's failure, anything else a
+ * defect it dies of.
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { Context, Effect, Layer } from 'effect';
-import { Engine as RuntimeEngine, promiseEngine } from 'agent-runtime/effect';
+import { Cause, Context, Effect, Exit, Layer, Scope } from 'effect';
 import {
   claudeDetached,
   codex,
   commandHarness,
   remoteConfigRefusal,
   type Credentials,
-  type Engine,
   type MissingCredential,
   type RemoteAgent,
+  Engine as RuntimeEngine,
+  refusalWords,
+  type EngineShape,
 } from 'agent-runtime';
 import { envNameOf, readRemoteAgents, remoteAgentsFile } from './harness/a2a.store.ts';
 import { HOME } from './record/record.store.ts';
@@ -34,7 +35,9 @@ import { pauseFile } from './pause/pause.store.ts';
 import { REMOTE_PREFIX, remoteNameOf } from './harness/harness.ts';
 import { Invalid, isRefusal, type Refusal } from './refusal/refusal.ts';
 
-export type { ClaudeFlags, CodexArgs, Denial, Engine, HarnessQuota, QuotaLimit, RefusedMove, TaskView, Usage } from 'agent-runtime';
+/** The runtime's engine, built: each verb an Effect whose refusal is a tagged error, which a controller reads with `asked`. */
+export type Engine = EngineShape;
+export type { ClaudeFlags, CodexArgs, Denial, HarnessQuota, QuotaLimit, RefusedMove, TaskView, Usage } from 'agent-runtime';
 /** The name the engine gives a task's session, which is the name `claude agents` lists it under (`harnessWaitLine`). */
 export { nameFor } from 'agent-runtime';
 /** The task's lifecycle as plain data, which the board draws: what the api serves at `/api/machines`. */
@@ -111,24 +114,26 @@ export const engine = (): Engine => {
 };
 
 /**
- * The engine the controllers use over `layer`'s `Engine` service, in Promises (`promiseEngine`), with every filing `queued`: `engine()`
- * over the store's runtime, a test over a layer of its own (`test/engine-board.ts`). Builds the layer at the call, and throws what the
- * runtime throws for a layer that does not build.
+ * The engine the controllers use over `layer`'s `Engine` service, built once at the call and kept for the process, with every filing
+ * `queued`: `engine()` over the store's runtime, a test over a layer of its own (`test/engine-board.ts`). Refused — throws an `Error` whose
+ * `exitCode` is 2, led by `engine` (`refusalWords`) — when the layer fails with the runtime's `EngineRefused`; any other failure to build
+ * it is thrown as it is.
  */
-export const engineOf = <E>(layer: Layer.Layer<RuntimeEngine, E>): Engine =>
-  promiseEngine(
-    Layer.effect(
-      RuntimeEngine,
-      Effect.gen(function* () {
-        const e = yield* RuntimeEngine;
-        return RuntimeEngine.of({ ...e, file: (spec) => e.file({ ...spec, queued: true }) });
-      }),
-    ).pipe(Layer.provide(layer)),
+export const engineOf = <E>(layer: Layer.Layer<RuntimeEngine, E>): Engine => {
+  const built = Effect.runSyncExit(
+    Layer.build(layer).pipe(
+      Effect.map((context) => Context.get(context, RuntimeEngine)),
+      Effect.provideService(Scope.Scope, Scope.makeUnsafe()),
+    ),
   );
+  if (Exit.isFailure(built)) throw refusalWords('engine')(Cause.squash(built.cause));
+  const e = built.value;
+  return { ...e, file: (spec) => e.file({ ...spec, queued: true }) };
+};
 
 /**
- * The engine a controller's program requires: the Promise `Engine` every controller takes, `engine()`'s or a test's (`engineOf`), as a
- * service. `layer(e)` provides the one engine it is given.
+ * The engine a controller's program requires: the `Engine` `engine()` builds, or a test's (`engineOf`), as a service. `layer(e)` provides
+ * the one engine it is given.
  */
 export class EngineService extends Context.Service<EngineService, Engine>()('agent-orchestrator/Engine') {
   static readonly layer = (e: Engine): Layer.Layer<EngineService> => Layer.succeed(EngineService)(e);
@@ -145,8 +150,31 @@ export const tried = <A>(read: () => A): Effect.Effect<A, Refusal> =>
   Effect.try({ try: read, catch: (err) => err }).pipe(Effect.catch(orRefusal));
 
 /**
- * A read of the engine, in a controller's program: what `read` resolves, or the refusal it rejected with as the program's failure
- * (`orRefusal`); anything else it rejected with, the program dies of.
+ * The engine's verb `verb`, `effect`, in a controller's program: what it succeeds with; a refusal of the runtime it dies of in the
+ * runtime's words (`refusalWords`: an `Error` led by the verb whose `exitCode` is 2), as anything else it failed with.
+ */
+export const asked = <A, E>(verb: string, effect: Effect.Effect<A, E>): Effect.Effect<A> =>
+  effect.pipe(Effect.mapError(refusalWords(verb)), Effect.orDie);
+
+/**
+ * `program` over the engine `e`, run to a Promise: what the CLI, the api and the tests run a controller with. Rejects with the refusal
+ * the program failed with, or with whatever else it died of, as it was thrown.
+ */
+export const runWith = <A, E>(e: Engine, program: Effect.Effect<A, E, EngineService>): Promise<A> =>
+  Effect.runPromise(program.pipe(Effect.provide(EngineService.layer(e))));
+
+/**
+ * `program` over the engine `e` in place of the one in its context: what a pass hands a read the engine it reads through
+ * (`reportedEngine`), and a command a read of its own (`viewedOnce`).
+ */
+export const over =
+  (e: Engine) =>
+  <A, E>(program: Effect.Effect<A, E, EngineService>): Effect.Effect<A, E> =>
+    Effect.provideService(program, EngineService, e);
+
+/**
+ * A read that is not the engine's, in a controller's program: what `read` resolves, or the refusal it rejected with as the program's
+ * failure (`orRefusal`); anything else it rejected with, the program dies of.
  */
 export const awaited = <A>(read: () => Promise<A>): Effect.Effect<A, Refusal> =>
   Effect.tryPromise({ try: read, catch: (err) => err }).pipe(Effect.catch(orRefusal));

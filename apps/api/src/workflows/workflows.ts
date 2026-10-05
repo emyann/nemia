@@ -6,9 +6,9 @@
  * `~/.agent-workflows/workflows/`, or under `WF_ROOT` when that is set. Each folder is read with the package's loader,
  * so one `nemia start` would refuse is listed with the loader's refusal, never hidden.
  *
- * The start is `nemia start`'s entry of the package's command table (`START`), its handler `start()`: it writes the run's record and files
+ * The start is `nemia start`'s entry of the package's command table (`START`), its handler `startRun`: it writes the run's record and files
  * nothing — `nemia tick` or `nemia up` files the first step, as it does for a run started at the command line. A start that names an inbox
- * card (`card`) is the same handler's `startFromInbox()`, `nemia start <inbox>/<name>.md`'s: the same record, with `from` on it, and the
+ * card (`card`) is the same handler's `startFromInbox`, `nemia start <inbox>/<name>.md`'s: the same record, with `from` on it, and the
  * card removed.
  * Nothing else here writes; the inbox's own writes are inbox.ts's, and a folder the builder puts back is builder.ts's.
  *
@@ -40,10 +40,12 @@ import {
   unattachedRefusal,
   unfilledRefusal,
   workflowDescription,
+  workflowReadme,
   Missing,
   type Factory,
   type FolderLoaded,
   type Places,
+  runWith,
 } from 'agent-orchestrator';
 import {
   AGENTS_FOLDER,
@@ -87,6 +89,8 @@ export type WorkflowStepSpec = {
   workspace: 'main' | 'folder' | null;
   /** The factory's folders the step may write (`writable:`), each by its directory's name: empty where it writes none of them. */
   writable: string[];
+  /** The store's folders the step reads and never writes (`reads:`), each by its name (`inbox`): empty where it reads none of them. */
+  reads: string[];
   /**
    * `slot: none`: the run takes no run slot (`WF_MAX_RUNS`). Null for a step without the line, which is the only other thing a step can
    * say.
@@ -150,6 +154,8 @@ export type WorkflowListing = {
   from: WorkflowSource;
   dir: string;
   description: string | null;
+  /** The folder's README in full, the workflow level's instruction (`workflowReadme`); null for a folder with none. */
+  readme: string | null;
   steps: ListedStep[];
   graph: RunGraph;
   schemas: string[];
@@ -257,7 +263,10 @@ const STEP = COMMANDS.find((c) => c.name === 'workflows step')!;
  * folder.
  */
 export const loadedOf = async (e: Engine['Service'], dirs: readonly string[], repo: string, home: string, factory?: Factory) =>
-  (await LIST.handler(e, { dirs, repo, ...(factory && { factory: factory.name }) }, undefined, home)) as Record<string, FolderLoaded>;
+  (await runWith(e, LIST.handler({ dirs, repo, ...(factory && { factory: factory.name }) }, undefined, home))) as Record<
+    string,
+    FolderLoaded
+  >;
 
 /**
  * Every workflow `repo` and `home` have that `factory` offers: each folder in each source, by name — in a factory, only those attached to
@@ -300,6 +309,7 @@ export function listed(
   factory?: Factory,
 ): WorkflowListing {
   const description = workflowDescription(dir);
+  const readme = workflowReadme(dir);
   const schemas = schemasIn(dir);
   const version = versionOf(dir, places);
   if ('error' in loaded) {
@@ -308,6 +318,7 @@ export function listed(
       from,
       dir,
       description,
+      readme,
       steps: [],
       graph: graphOf([]),
       schemas,
@@ -323,6 +334,7 @@ export function listed(
     from,
     dir,
     description,
+    readme,
     steps: steps.map(listedStep(new Map(factory ? Object.entries(fillsOf(factory.hires, name)) : []))),
     graph: graphOf(steps),
     schemas,
@@ -452,6 +464,7 @@ function schemasIn(dir: string): string[] {
 const listsOf = (step: Workflow) => ({
   input: step.input ?? [],
   writable: step.writable ?? [],
+  reads: step.reads ?? [],
   skills: step.skills ?? [],
   disallowedTools: step.disallowedTools ?? [],
   allowedTools: step.allowedTools ?? [],
@@ -571,10 +584,10 @@ export type Asked =
 
 /**
  * What `POST /api/runs` starts off its decoded body, or why it does not: the workflow it names (404, 409), and the brief (422) — the api's
- * own, since `start()` takes any string and `nemia start` prints its help for none. The body's shape (400) is `START_BODY`'s.
+ * own, since `startRun` takes any string and `nemia start` prints its help for none. The body's shape (400) is `START_BODY`'s.
  *
  * `after` is only shaped here: a list of run ids, as `nemia start --after <runId>` takes each, and never a blank one, which the CLI refuses
- * too (`--after=`). Whether this run may wait on each is `start()`'s to say (`afterRefusal`), in its words.
+ * too (`--after=`). Whether this run may wait on each is `startRun`'s to say (`afterRefusal`), in its words.
  *
  * `card` names an inbox card to start, as `nemia inbox` lists it: refused here only for a name that is not a card's (`inboxNameRefusal`,
  * 400, in the package's words), before any folder is read. Whether the card is there, and may start, is `startFromInbox`'s to say. With a
@@ -612,15 +625,18 @@ function agentSkillsOf(step: Workflow, dir: string, places: Places): AgentSkill[
  * did not look at.
  */
 async function cardStarted(e: Engine['Service'], asked: Extract<Asked, { card: string }>, repo: string, factory: string | undefined) {
-  const started = await START_ENTRY.handler(e, {
-    card: asked.card,
-    at: repo,
-    factory,
-    fix: '?factory=<name>',
-    workflows: asked.dir,
-    instead: asked.brief,
-    after: asked.after,
-  });
+  const started = await runWith(
+    e,
+    START_ENTRY.handler({
+      card: asked.card,
+      at: repo,
+      factory,
+      fix: '?factory=<name>',
+      workflows: asked.dir,
+      instead: asked.brief,
+      after: asked.after,
+    }),
+  );
   return {
     id: started.id,
     card: started.card,
@@ -658,13 +674,13 @@ async function cardStarted(e: Engine['Service'], asked: Extract<Asked, { card: s
  *   is the caller's, as `.` is `nemia start`'s, and the card's `repo:` is over it; the folder is the one
  *   `folderOf` found. `startFromInbox` refuses a card not there as a `Missing` (404), one a run's record already names as a
  *   `Conflict` (409), and the rest as an `Invalid` (422): a card that does not read, a workflow that does not load, a blank brief, and
- *   what `start()` refuses. A run started when the card could not be
+ *   what `startRun` refuses. A run started when the card could not be
  *   removed is started all the same: the answer says `removed: false` and `why`, and the card lists as started until it is dropped. A
  *   card whose `repo:` the run looked at none of — a folder team's — carries it as `ignoredRepo`, as `nemia start` prints it and a tick's
  *   line says it (`ignoredRepoLine`): a client that starts a card is told the same fact wherever it started from. In a factory
- *   (`?factory=`), the run is started in it (`start()`'s `factory`), which refuses a workflow it has not attached, a step its hires leave
+ *   (`?factory=`), the run is started in it (`startRun`'s `factory`), which refuses a workflow it has not attached, a step its hires leave
  *   unfilled and a repository outside it, each an `Invalid`; a card is started in it too, the request's factory over the card's `factory:`,
- *   as `nemia start <card> --factory` starts it, and refused as `start()` refuses, the card left in the inbox. Every run is started in a
+ *   as `nemia start <card> --factory` starts it, and refused as `startRun` refuses, the card left in the inbox. Every run is started in a
  *   factory: a start that names none runs in the one factory whose repository holds the api's repository, or `?repo=`, on that
  *   repository (`startFactory`, as `nemia start` finds it), and is refused, `Invalid`, where none or two do; a card that names none either
  *   way is refused, `Invalid` (`unfactoredCardRefusal`), never started in a factory found from its repository; and `?factory=default`,
@@ -688,7 +704,7 @@ export const workflows = new Hono<ApiEnv>()
       const folder = folderOf(name, from, repo, home);
       if ('status' in folder) return c.json({ error: folder.error }, folder.status);
       const args = { from, name, step, dir: folder.dir, repo, ...(factory && { factory: factory.name }) };
-      const { step: found, steps } = (await STEP.handler(e, args, undefined, home)) as { step: Workflow | null; steps: string[] };
+      const { step: found, steps } = (await runWith(e, STEP.handler(args, undefined, home))) as { step: Workflow | null; steps: string[] };
       if (!found) {
         return c.json({ error: `No step '${step}' in workflow ${name} (${folder.dir}). Its steps are: ${steps.join(', ')}.` }, 404);
       }
@@ -722,13 +738,16 @@ export const workflows = new Hono<ApiEnv>()
         return c.json(started, 201);
       }
       const found = factory ? { factory, repo } : startFactory(named, repo, '?factory=<name>');
-      const { id } = await START_ENTRY.handler(e, {
-        brief: asked.brief,
-        repo: found.repo ?? repo,
-        workflows: asked.dir,
-        after: asked.after,
-        factory: found.factory?.name,
-      });
+      const { id } = await runWith(
+        e,
+        START_ENTRY.handler({
+          brief: asked.brief,
+          repo: found.repo ?? repo,
+          workflows: asked.dir,
+          after: asked.after,
+          factory: found.factory?.name,
+        }),
+      );
       c.header('Location', `/api/runs/${encodeURIComponent(id)}`);
       return c.json({ id }, 201);
     }),

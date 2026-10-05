@@ -23,9 +23,12 @@ import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Engine, TaskView } from 'agent-runtime';
-import { Engine as EngineService, promiseEngine } from 'agent-runtime/effect';
+import type { TaskView } from 'agent-runtime';
+import { Effect } from 'effect';
+import { Engine as EngineService } from 'agent-runtime';
+import { type Engine } from '../src/runtime-client.ts';
 import { scratch } from './scratch.ts';
+import { plainEngine } from './promised.ts';
 
 const REPO = path.resolve(import.meta.dirname, '..', '..', '..');
 const read = (file: string) => JSON.parse(fs.readFileSync(path.join(REPO, file), 'utf8'));
@@ -249,20 +252,22 @@ test(
     timeout: 12 * 60_000,
   },
   async () => {
-    const engine: Engine = promiseEngine(EngineService.layer({ root: scratch('wf-live-mcp-') }));
-    const id = await engine.file({
-      brief: BRIEF,
-      cwd: REPO,
-      closeoutSchema: CLOSEOUT,
-      deadlineSeconds: 480,
-      config: { effort: 'low', background: true },
-    });
+    const engine: Engine = plainEngine(EngineService.layer({ root: scratch('wf-live-mcp-') }));
+    const id = await Effect.runPromise(
+      engine.file({
+        brief: BRIEF,
+        cwd: REPO,
+        closeoutSchema: CLOSEOUT,
+        deadlineSeconds: 480,
+        config: { effort: 'low', background: true },
+      }),
+    );
     let view: TaskView | undefined;
     try {
       const until = Date.now() + 10 * 60_000;
       while (Date.now() < until) {
-        await engine.tick();
-        view = await engine.view(id);
+        await Effect.runPromise(engine.tick());
+        view = await Effect.runPromise(engine.view(id));
         if (view.state.settled) break;
         await new Promise((r) => setTimeout(r, 5_000));
       }

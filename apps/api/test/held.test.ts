@@ -13,11 +13,12 @@
 import { root } from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { Effect } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { RunDetail } from '../src/detail/detail.ts';
 import { app } from '../src/app.ts';
-import { approve, engine, list, runStore, type RunSummary } from 'agent-orchestrator';
+import { approveRun, engine, list, runStore, runWith, type RunSummary } from 'agent-orchestrator';
 
 const T0 = Date.parse('2026-09-24T01:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();
@@ -123,8 +124,12 @@ const summary = async (id: string) => {
 };
 
 test('a held step that signed off blocked reads `input-required · BLOCKED` with its question, and waits on you — on both endpoints, as `nemia ls` says', async () => {
-  assert.equal((await engine().view('h-blocked-plan')).phase, 'input-required', "the seed is the engine's held task, waiting");
-  const listed = await list(engine(), runStore.runs.read('h-blocked'));
+  assert.equal(
+    (await Effect.runPromise(engine().view('h-blocked-plan'))).phase,
+    'input-required',
+    "the seed is the engine's held task, waiting",
+  );
+  const listed = await runWith(engine(), list(engine(), runStore.runs.read('h-blocked')));
   for (const run of [await detail('h-blocked'), await summary('h-blocked')]) {
     assert.deepEqual(
       run.steps.map(({ name, status, needs }) => ({ name, status, needs })),
@@ -152,9 +157,13 @@ test("a held step at its gate reads `awaiting approval`, never the engine's word
 });
 
 test("a held step closed and not yet settled reads as it signed, never the engine's `between attempts` for a session still going — as `nemia ls` says", async () => {
-  assert.equal((await engine().view('h-closed-plan')).phase, 'between attempts', 'the seed: closed, and the engine has not settled it');
-  await approve(engine(), 'h-closed', 'plan');
-  const listed = await list(engine(), runStore.runs.read('h-closed'));
+  assert.equal(
+    (await Effect.runPromise(engine().view('h-closed-plan'))).phase,
+    'between attempts',
+    'the seed: closed, and the engine has not settled it',
+  );
+  await runWith(engine(), approveRun('h-closed', 'plan'));
+  const listed = await runWith(engine(), list(engine(), runStore.runs.read('h-closed')));
   for (const run of [await detail('h-closed'), await summary('h-closed')]) {
     assert.deepEqual(
       run.steps.map((s) => s.status),

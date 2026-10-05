@@ -1,28 +1,27 @@
 /**
  * The verbs — and the first consumer of the engine's own public API.
  *
- * This file reaches the engine through its two faces alone, and imports no `effect`: it builds the engine with `promiseEngine` and
- * uses it in Promises. That is deliberate and it is a test: if the Promise API were not enough to write the CLI with, it would not
- * be enough for anyone else either.
+ * This file reaches the engine through its entries alone: it builds the `Engine` service from its layer and runs each verb as an Effect,
+ * a refusal worded by the runtime (`refusalWords`), so `bin/ae.ts` prints it and exits 2.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { Engine as EngineService, promiseEngine } from '../index.ts';
+import { Effect, ManagedRuntime } from 'effect';
+import { Engine as EngineService, refusalWords, type EngineOptions, type EngineShape } from '../index.ts';
 import {
   denialText,
   refusedText,
   retiredKeyRefusal,
   type Attempt,
   type CodexArgs,
-  type Engine,
   type Event,
   type HarnessArgs,
   type State,
   type TaskSpec,
   type TaskView,
   type Usage,
-} from '../facade.ts';
+} from '../index.ts';
 
 /**
  * Every key a brief may have — a closed list, on purpose.
@@ -529,10 +528,52 @@ const answerArgs = (rest: string[]): { words: string; budget: string | undefined
  * Prints the stream `stream` of task `id` whole, as `engine.output` answers it, or says on stderr that none is kept; the engine
  * refuses a stream that is neither `stdout` nor `stderr`.
  */
-const printOutput = async (engine: Engine, id: string, stream: string): Promise<void> => {
-  const text = await engine.output(id, stream as 'stdout' | 'stderr');
+const printOutput = async (engine: EngineShape, id: string, stream: string): Promise<void> => {
+  const text = await run('output', engine.output(id, stream as 'stdout' | 'stderr'));
   if (text === undefined) return console.error(`${id}: no ${stream} kept: no attempt has run yet, or its run kept no streams`);
   process.stdout.write(text);
+};
+
+/** The engine's verb `verb`, `effect`, as a Promise: a refusal rejected in the runtime's words (`refusalWords`), else as it failed. */
+const run = <A, E>(verb: string, effect: Effect.Effect<A, E>): Promise<A> =>
+  Effect.runPromise(effect.pipe(Effect.mapError(refusalWords(verb))));
+
+/**
+ * The engine over `options`, its layer built once and kept for the process. Refused — rejects with an `Error` whose `exitCode` is 2, led
+ * by `ae` (`refusalWords`) — for options the engine refuses; any other failure to build it is rejected as it is.
+ */
+export const engineAt = (options: EngineOptions): Promise<EngineShape> =>
+  ManagedRuntime.make(EngineService.layer(options))
+    .runPromise(
+      Effect.gen(function* () {
+        return yield* EngineService;
+      }),
+    )
+    .catch((e: unknown) => {
+      throw refusalWords('ae')(e);
+    });
+
+/** `ae up`: the engine ticking every `every` ms until the process stops, a line for each pass that acted and each task left out anew. */
+const up = async (engine: EngineShape, every: number): Promise<void> => {
+  console.log(`up — ticking every ${every}ms, ^C to stop`);
+  let leftOut = new Set<string>();
+  await new Promise<void>(() => {
+    Effect.runSync(
+      engine.start({
+        intervalMs: every,
+        onTick: (r) => {
+          for (const why of r.unreadable) if (!leftOut.has(why)) console.error(`left out: ${why}`);
+          leftOut = new Set(r.unreadable);
+          if (!r.actions) return;
+          const load = Object.entries(r.running)
+            .map(([h, n]) => `${h}:${n}`)
+            .join(' ');
+          console.log(`${new Date().toISOString().slice(11, 19)}  ${r.actions} action(s) over ${r.tasks} task(s)  [${load}]`);
+        },
+        onError: (e) => console.error(String(e)),
+      }),
+    );
+  });
 };
 
 /**
@@ -551,21 +592,21 @@ export async function main(argv: string[]): Promise<void> {
   const [verb, arg] = argv;
   if (process.env.AE_MAX_CONCURRENT !== undefined) throw Object.assign(new Error(AE_MAX_CONCURRENT_RETIRED), { exitCode: 2 });
   const root = process.env.AE_ROOT ?? path.join(os.homedir(), '.agent-engine');
-  const engine: Engine = promiseEngine(EngineService.layer({ root }));
+  const engine = await engineAt({ root });
 
   switch (verb) {
     case 'start': {
       if (!arg) return console.log(HELP);
       const text = fs.existsSync(arg) ? fs.readFileSync(arg, 'utf8') : arg;
       const spec = parseBrief(text, process.cwd());
-      const id = await engine.file(spec);
+      const id = await run('file', engine.file(spec));
       console.log(`${id}  filed → ${spec.cwd}`);
       console.log(`run 'ae tick' (or 'ae up') to start it`);
       return;
     }
 
     case 'ls': {
-      const { views, unreadable } = await engine.list();
+      const { views, unreadable } = await run('list', engine.list());
       if (!views.length && !unreadable.length) return console.log('no tasks');
       for (const v of views) console.log(taskLine(v));
       for (const u of unreadable) console.error(`left out: ${u.why}`);
@@ -574,9 +615,9 @@ export async function main(argv: string[]): Promise<void> {
 
     case 'show': {
       if (!arg) return console.log(HELP);
-      const v = await engine.view(arg);
+      const v = await run('view', engine.view(arg));
       if (!v.state.brief && !v.state.attempts.length) return console.log(`no such task: ${arg}`);
-      const { entries } = await engine.feed(0);
+      const { entries } = await run('feed', engine.feed(0));
       for (const e of entries.filter((x) => x.taskId === arg)) console.log(entryLine(e.taskId, e.event));
       console.log(`\ncwd: ${v.state.cwd}\nbrief: ${v.state.brief.slice(0, 200)}`);
       for (const line of limitLines(v.state)) console.log(line);
@@ -586,7 +627,7 @@ export async function main(argv: string[]): Promise<void> {
 
     case 'logs':
       if (!arg) return console.log(HELP);
-      return console.log(await engine.logs(arg));
+      return console.log(await run('logs', engine.logs(arg)));
 
     case 'output':
       if (!arg) return console.log(HELP);
@@ -594,39 +635,39 @@ export async function main(argv: string[]): Promise<void> {
 
     case 'stop':
       if (!arg) return console.log(HELP);
-      await engine.stop(arg);
+      await run('stop', engine.stop(arg));
       return console.log(`${arg}  stop requested`);
 
     case 'say': {
       if (!arg) return console.log(HELP);
-      const said = await engine.say(arg, argv.slice(2).join(' '));
+      const said = await run('say', engine.say(arg, argv.slice(2).join(' ')));
       return console.log(entryLine(arg, { kind: 'said', ...said }));
     }
 
     case 'answer': {
       if (!arg) return console.log(HELP);
       const { words, budget } = answerArgs(argv.slice(2));
-      const input = await engine.answer(arg, words, budget !== undefined ? { config: { budgetUsd: Number(budget) } } : {});
+      const input = await run('answer', engine.answer(arg, words, budget !== undefined ? { config: { budgetUsd: Number(budget) } } : {}));
       console.log(entryLine(arg, { kind: 'input', ...input }));
       return console.log(`run 'ae tick' (or 'ae up') to start its next turn`);
     }
 
     case 'close':
       if (!arg) return console.log(HELP);
-      await engine.close(arg);
+      await run('close', engine.close(arg));
       return console.log(`${arg}  closed: the next tick settles it`);
 
     case 'admit': {
       if (!arg) return console.log(HELP);
       const ids = argv.slice(1);
-      const admitted = new Set(await engine.admit(ids));
+      const admitted = new Set(await run('admit', engine.admit(ids)));
       for (const id of ids)
         console.log(`${id}  ${admitted.has(id) ? 'admitted: the next tick starts it' : 'waits for no admission: left as it is'}`);
       return;
     }
 
     case 'tick': {
-      const r = await engine.tick();
+      const r = await run('tick', engine.tick());
       const load =
         Object.entries(r.running)
           .map(([h, n]) => `${h}:${n}`)
@@ -638,7 +679,7 @@ export async function main(argv: string[]): Promise<void> {
     }
 
     case 'feed': {
-      const { entries, cursor, refused = [] } = await engine.feed(Number(arg) || 0);
+      const { entries, cursor, refused = [] } = await run('feed', engine.feed(Number(arg) || 0));
       for (const e of entries) console.log(entryLine(e.taskId, e.event));
       for (const r of refused) console.error(`skipped: ${r.why}`);
       return console.log(`cursor: ${cursor}`);
@@ -648,36 +689,19 @@ export async function main(argv: string[]): Promise<void> {
       const from = Number(arg) || 0;
       console.log(`watching from ${from}, ^C to stop`);
       await new Promise<void>(() => {
-        engine.watch({
-          from,
-          onEntry: ({ taskId, event }) => console.log(entryLine(taskId, event)),
-          onError: (e) => console.error(String(e)),
-        });
+        Effect.runSync(
+          engine.watch({
+            from,
+            onEntry: ({ taskId, event }) => console.log(entryLine(taskId, event)),
+            onError: (e) => console.error(String(e)),
+          }),
+        );
       });
       return;
     }
 
-    case 'up': {
-      const every = Number(arg) || 3_000;
-      console.log(`up — ticking every ${every}ms, ^C to stop`);
-      let leftOut = new Set<string>();
-      await new Promise<void>(() => {
-        engine.start({
-          intervalMs: every,
-          onTick: (r) => {
-            for (const why of r.unreadable) if (!leftOut.has(why)) console.error(`left out: ${why}`);
-            leftOut = new Set(r.unreadable);
-            if (!r.actions) return;
-            const load = Object.entries(r.running)
-              .map(([h, n]) => `${h}:${n}`)
-              .join(' ');
-            console.log(`${new Date().toISOString().slice(11, 19)}  ${r.actions} action(s) over ${r.tasks} task(s)  [${load}]`);
-          },
-          onError: (e) => console.error(String(e)),
-        });
-      });
-      return;
-    }
+    case 'up':
+      return up(engine, Number(arg) || 3_000);
 
     default:
       return console.log(HELP);

@@ -536,7 +536,7 @@ const outputOps = (spec: HarnessSpec, dir: string): Pick<RunnerOps, 'output'> =>
  * - `spawn`, in order:
  *   1. Resolves the task's `cwd` from the process that launches, as `claude --bg`'s is: relative, the worker would start in
  *      it and launch the harness in the same path again, from inside it (`spawn sh ENOENT` for `cwd: 'repo'`). `file`
- *      refuses one at both doors; this is for a journal written otherwise, or by hand, and a caller of the runner itself.
+ *      refuses one; this is for a journal written otherwise, or by hand, and a caller of the runner itself.
  *   2. Refuses a `cwd` that is not a directory, because `spawn` does not throw for it: the child emits the error later,
  *      and, unheard, that event kills the process that launched the worker — the engine.
  *   3. Clears the previous attempt's closeout, output and its streams, what was read of its output, and stop: a re-spawn of the same

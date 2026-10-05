@@ -32,13 +32,14 @@ import { UnsupportedOperationError } from '@a2a-js/sdk/errors';
 import { clientOf } from '../src/a2a/client.ts';
 import { cardOf } from '../src/a2a/handler.ts';
 import { closeoutOf, followUpOf, messageOf, RUNTIME_EXTENSION } from '../src/a2a/map.ts';
-import { nameFor } from '../src/facade.ts';
-import { Engine, promiseEngine } from '../src/index.ts';
+import { nameFor } from '../src/index.ts';
+import { Engine } from '../src/index.ts';
 import { Journal } from '../src/core/engine/journal.ts';
 import { codex } from '../src/harness/codex/codex.ts';
 import { detachedOps } from '../src/harness/detached/detached.ts';
 import type { SpawnRequest } from '../src/harness/seam.ts';
 import { scratch } from './scratch.ts';
+import { builtEngine } from './engine.ts';
 
 /** A task's events, read as the engine reads them: decoded and upgraded (`Journal.layer`). */
 const readJournal = (taskId: string) =>
@@ -292,12 +293,12 @@ test('cancelTask ends a working Codex session and what it started, answers CANCE
 test('a held Codex task is INPUT_REQUIRED between turns, with no process; its answer resumes the same thread, in the same context — and no running attempt is ever INPUT_REQUIRED', async () => {
   const root = tmp('store');
   const cwd = workdir();
-  const engine = promiseEngine(Engine.layer({ root, harnesses: { codex } }));
+  const engine = builtEngine(Engine.layer({ root, harnesses: { codex } }));
   const client = agent(root, (taskId) => Effect.runPromise(readJournal(taskId).pipe(Effect.provide(Journal.files(root)))));
-  const id = await engine.file({ brief: 'the brief', cwd, harness: 'codex', holdOpen: true, closeoutSchema: SCHEMA });
+  const id = await Effect.runPromise(engine.file({ brief: 'the brief', cwd, harness: 'codex', holdOpen: true, closeoutSchema: SCHEMA }));
   const phase = async (want: string) => {
-    await engine.tick();
-    return (await engine.view(id)).phase === want;
+    await Effect.runPromise(engine.tick());
+    return (await Effect.runPromise(engine.view(id))).phase === want;
   };
 
   fs.writeFileSync(path.join(cwd, 'fake.json'), JSON.stringify({ exitOn: 'exit1' } satisfies Fake));
@@ -323,7 +324,7 @@ test('a held Codex task is INPUT_REQUIRED between turns, with no process; its an
   assert.equal(alive(pidIn(cwd, 'pid')), false, 'nothing runs while it waits');
 
   fs.writeFileSync(path.join(cwd, 'fake.json'), JSON.stringify({ gate: 'go2' } satisfies Fake));
-  await engine.answer(id, 'the words');
+  await Effect.runPromise(engine.answer(id, 'the words'));
   await until(() => phase('running (working)'), 'the answer started turn 1');
   await until(() => argvOf(cwd).length === 2, 'the fake codex run again');
   const running = await get(client, nameFor(id, 2));
@@ -350,7 +351,7 @@ test('a held Codex task is INPUT_REQUIRED between turns, with no process; its an
     [nameFor(id, 1), nameFor(id, 2)],
   );
 
-  await engine.close(id);
+  await Effect.runPromise(engine.close(id));
   await until(() => phase('succeeded'), 'closed and settled');
   assert.equal((await get(client, nameFor(id, 2))).status!.state, TaskState.TASK_STATE_COMPLETED, 'closed, nothing waits');
 });
@@ -358,32 +359,36 @@ test('a held Codex task is INPUT_REQUIRED between turns, with no process; its an
 test('a held Codex attempt whose statement is on disk before its thread is read is not ended on the statement: it ends once its session is known, and the answer resumes that thread', async () => {
   const root = tmp('store');
   const cwd = workdir({ threadOn: 'thread-go', exitOn: 'exit1' });
-  const engine = promiseEngine(Engine.layer({ root, harnesses: { codex } }));
-  const id = await engine.file({ brief: 'the brief', cwd, harness: 'codex', holdOpen: true, closeoutSchema: SCHEMA });
+  const engine = builtEngine(Engine.layer({ root, harnesses: { codex } }));
+  const id = await Effect.runPromise(engine.file({ brief: 'the brief', cwd, harness: 'codex', holdOpen: true, closeoutSchema: SCHEMA }));
   const phase = async (want: string) => {
-    await engine.tick();
-    return (await engine.view(id)).phase === want;
+    await Effect.runPromise(engine.tick());
+    return (await Effect.runPromise(engine.view(id))).phase === want;
   };
 
   await until(async () => {
-    await engine.tick();
+    await Effect.runPromise(engine.tick());
     return fs.existsSync(path.join(cwd, 'wrote-out'));
   }, 'the statement written');
-  for (let i = 0; i < 5; i++) await engine.tick();
-  assert.notEqual((await engine.view(id)).phase, 'input-required', 'a statement with no session known does not end the attempt');
+  for (let i = 0; i < 5; i++) await Effect.runPromise(engine.tick());
+  assert.notEqual(
+    (await Effect.runPromise(engine.view(id))).phase,
+    'input-required',
+    'a statement with no session known does not end the attempt',
+  );
 
   fs.writeFileSync(path.join(cwd, 'thread-go'), '');
   await until(() => phase('input-required'), 'the attempt ended once its thread was read');
   fs.writeFileSync(path.join(cwd, 'exit1'), '');
   fs.writeFileSync(path.join(cwd, 'fake.json'), JSON.stringify({} satisfies Fake));
-  await engine.answer(id, 'the words');
+  await Effect.runPromise(engine.answer(id, 'the words'));
   await until(async () => {
-    await engine.tick();
+    await Effect.runPromise(engine.tick());
     return argvOf(cwd).length === 2;
   }, 'the fake codex run again');
   assert.deepEqual(argvOf(cwd)[1].slice(-3), ['resume', THREAD, 'the words'], 'told the words, resuming the thread that signed');
   await until(() => phase('input-required'), 'turn 1 signed and waiting');
-  await engine.close(id);
+  await Effect.runPromise(engine.close(id));
   await until(() => phase('succeeded'), 'closed and settled');
 });
 

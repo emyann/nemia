@@ -31,6 +31,7 @@ import {
   skillsFor,
   type Places,
   type WorkflowWritten,
+  runWith,
 } from 'agent-orchestrator';
 import {
   AGENT_KEYS,
@@ -82,6 +83,7 @@ const KINDS: Readonly<Record<StepKey, KeyKind>> = {
   input: 'steps',
   workspace: 'choice',
   writable: 'list',
+  reads: 'list',
   slot: 'choice',
   agent: 'choice',
   skills: 'list',
@@ -603,7 +605,7 @@ async function write(
       fs.writeFileSync(path.join(dir, file), text);
     }
     const args = { from: 'yours', name, dir, draft: JSON.stringify(steps), repo, ...(readme !== undefined && { readme }) };
-    result = (await WRITE.handler(e, args, undefined, home)) as WorkflowWritten;
+    result = (await runWith(e, WRITE.handler(args, undefined, home))) as WorkflowWritten;
   } catch (err) {
     putSchemasBack(dir, written);
     if (err instanceof WorkflowError) return refused(err.message);

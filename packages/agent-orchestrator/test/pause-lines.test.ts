@@ -10,13 +10,14 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import type { Engine } from 'agent-runtime';
 import { scratch } from './scratch.ts';
+import { promised } from './promised.ts';
 
 const ROOT = scratch('wf-pause-lines-');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
-const { main, pauseSaid } = await import('../src/cli/main.ts');
+const { main } = await import('../src/cli/main.ts');
+const { pauseSaid } = await import('../src/daemon/up.verb.ts');
 const { resumePause, putPause } = await import('../src/pause/pause.store.ts');
 const { pausedWords, RESUMED } = await import('../src/pause/pause.ts');
 const { addFactory, attachWorkflow, hireAgent } = await import('../src/runner.ts');
@@ -60,13 +61,13 @@ const aStart = (): string[] => {
 test('nemia feed opens with the pause while one stands, Paused with nothing at work, and says none once it is resumed', async (t) => {
   const pause = putPause({ why: 'merging by hand', by: 'ann' });
   try {
-    const feed = await printed(t, () => main(['feed'], {} as Engine));
+    const feed = await printed(t, () => main(['feed'], promised({})));
     assert.equal(feed[0], pausedWords({ pause, finishing: [] }), feed.join('\n'));
     assert.match(feed[0], /^Paused since /);
   } finally {
     resumePause();
   }
-  const lifted = await printed(t, () => main(['feed'], {} as Engine));
+  const lifted = await printed(t, () => main(['feed'], promised({})));
   assert.equal(
     lifted.some((l) => l.startsWith('Paus')),
     false,
@@ -78,14 +79,14 @@ test('nemia start says, after how to start the run, that nothing of it is filed 
   const pause = putPause({ by: 'ann' });
   let started: string[];
   try {
-    started = await printed(t, () => main(aStart(), {} as Engine));
+    started = await printed(t, () => main(aStart(), promised({})));
   } finally {
     resumePause();
   }
   const at = started.indexOf("run 'nemia tick' (or 'nemia up') to start it");
   assert.ok(at > 0, started.join('\n'));
   assert.equal(started[at + 1], `${pausedWords({ pause, finishing: [] })}: nothing of this run is filed until then`);
-  const free = await printed(t, () => main(aStart(), {} as Engine));
+  const free = await printed(t, () => main(aStart(), promised({})));
   assert.equal(
     free.some((l) => l.includes('nothing of this run is filed')),
     false,
@@ -93,7 +94,7 @@ test('nemia start says, after how to start the run, that nothing of it is filed 
   );
 });
 
-test('nemia up says the pause once across passes, again each time its words change, and resumed once when it is resumed', async (t) => {
+test('nemia up says the pause once across passes, again each time its words change, and resumed once when it is resumed', () => {
   const pause = { at: '2026-10-04T12:00:00.000Z', by: 'ann', why: 'merging by hand' };
   const two = {
     pause,
@@ -107,22 +108,22 @@ test('nemia up says the pause once across passes, again each time its words chan
   const none = { ...two, finishing: [] };
   const held = { ...none, staged: [{ run: 'r-3', step: 'ship', repo: '/code/app' }] };
   let said: string | undefined;
-  const lines = await printed(t, () => {
-    for (const standing of [undefined, two, two, one, none, none, held, held, undefined, undefined]) said = pauseSaid(standing, said);
-  });
+  const lines: string[] = [];
+  for (const standing of [undefined, two, two, one, none, none, held, held, undefined, undefined]) {
+    const now = pauseSaid(standing, said);
+    lines.push(...now.lines);
+    said = now.said;
+  }
+  assert.deepEqual(lines, [
+    pausedWords(two),
+    pausedWords(one),
+    pausedWords(none),
+    pausedWords(held),
+    "   r-3's ship has its merge staged in /code/app (MERGE_HEAD), and its check waits on nemia resume",
+    RESUMED,
+  ]);
   assert.deepEqual(
-    lines.map((l) => l.slice(10)),
-    [
-      pausedWords(two),
-      pausedWords(one),
-      pausedWords(none),
-      pausedWords(held),
-      "   r-3's ship has its merge staged in /code/app (MERGE_HEAD), and its check waits on nemia resume",
-      RESUMED,
-    ],
-  );
-  assert.deepEqual(
-    lines.map((l) => l.slice(10, 17)),
+    lines.map((l) => l.slice(0, 7)),
     ['Pausing', 'Pausing', 'Paused ', 'Paused ', "   r-3'", 'the sto'],
   );
 });

@@ -35,7 +35,7 @@ export {
 } from './filing.ts';
 export type { Filing } from './filing.ts';
 export { Journal, JournalError } from './journal.ts';
-export type { Cursor, FeedEntry, FeedRefusal, JournalOps } from './journal.ts';
+export type { Cursor, FeedEntry, FeedRefusal, JournalOps, StoreOps } from './journal.ts';
 export { tickMemoLayer } from './memo.ts';
 export { ioCounts } from './tally.ts';
 export type { IoCounts } from './tally.ts';

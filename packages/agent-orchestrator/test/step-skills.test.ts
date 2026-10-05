@@ -15,10 +15,11 @@ import { FrozenStepSchema, loadWorkflows, skillsFor } from '../src/folder/folder
 import { Result, Schema } from 'effect';
 import { scratch } from './scratch.ts';
 import { teamCopy } from './team.ts';
+import { Effect } from 'effect';
 
 const ROOT = scratch('wf-step-skills-');
 process.env.WF_ROOT = ROOT;
-const { start, writeWorkflow } = await import('../src/runner.ts');
+const { startRun, writeWorkflow } = await import('../src/runner.ts');
 const { readRun } = await import('../src/record/record.store.ts');
 const { agentFilesDir } = await import('../src/agents/agents.store.ts');
 
@@ -187,14 +188,14 @@ test('REFUSED: a skill the step adds that no place has, naming every place looke
   assert.deepEqual(step.agent?.skills, ['implement-a-change', 'review-a-change']);
 });
 
-test("`nemia start` freezes the step's own line and the session's list, renders the added skill and names it; a later edit changes nothing", () => {
+test("`nemia start` freezes the step's own line and the session's list, renders the added skill and names it; a later edit changes nothing", async () => {
   const root = teamWith('---\nagent: implementer\nskills: review-a-change\n---\n');
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
   const git = (...args: string[]) =>
     execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: ['ignore', 'pipe', 'pipe'] });
   git('init', '-q');
   git('commit', '-q', '--allow-empty', '-m', 'base');
-  const run = start({ brief: 'add a skill', repo, workflowDir: path.join(root, 'dev') });
+  const run = await Effect.runPromise(startRun({ brief: 'add a skill', repo, workflowDir: path.join(root, 'dev') }));
   fs.writeFileSync(path.join(root, 'dev', 'implement.md'), '---\nagent: implementer\n---\n');
   const frozen = (readRun(run.id).workflow ?? []).find((s) => s.name === 'implement')!;
   assert.deepEqual(frozen.skills, ['review-a-change']);

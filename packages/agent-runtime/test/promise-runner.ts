@@ -1,7 +1,7 @@
 /**
- * A harness a consumer wrote in Promises (`PromiseRunner`), as the engine's `RunnerOps`: each verb an Effect with the
- * engine's error on it, and each optional verb present only when the consumer gave it. An adapter like the others,
- * handed to the A2A seam (`a2a/client.ts`) and reached only through it.
+ * A test's fakes written with async methods, as the engine takes them: a harness (`AsyncRunner`) as a `RunnerOps`, and a store
+ * (`AsyncJournal`) as a `StoreOps`, each rejection an Effect failure with the engine's error on it. Test-only, read by the package's
+ * typecheck.
  */
 import { Effect } from 'effect';
 import {
@@ -12,18 +12,19 @@ import {
   type SessionState,
   type Sighting,
   type Usage,
-} from '../core/index.ts';
-import { RunnerError, type RunnerOps, type SpawnRequest, type Transcript, type TranscriptCursor } from '../harness/index.ts';
+} from '../src/core/index.ts';
+import { RunnerError, type RunnerOps, type SpawnRequest, type Transcript, type TranscriptCursor } from '../src/harness/index.ts';
+import { JournalError, type Cursor, type Event, type FeedEntry, type StoreOps } from '../src/index.ts';
 
 /**
- * A session as a `PromiseRunner` reports it: a `Sighting` whose state is one of A2A's names — or one of the five former
- * words (`working`, `blocked`, `done`, `failed`, `stopped`), which `promiseOps` reads as their names (`formerStateOf`:
- * `blocked` is `input-required`). Any other word is refused.
+ * A session as an `AsyncRunner` reports it: a `Sighting` whose state is one of A2A's names — or one of the five former
+ * words (`working`, `blocked`, `done`, `failed`, `stopped`), which `asyncOps` reads as their names (`formerStateOf`:
+ * `blocked` is `input-required`), so a fake may keep the words it was written in. Any other word is refused.
  */
-export type PromiseSighting = Omit<Sighting, 'state'> & { state: SessionState | PhaseWord };
+export type AsyncSighting = Omit<Sighting, 'state'> & { state: SessionState | PhaseWord };
 
-/** A harness, in Promises. Only needed for one that `HarnessSpec` cannot describe. */
-export type PromiseRunner = {
+/** A fake harness, in async methods: what `asyncOps` makes a `RunnerOps` of. */
+export type AsyncRunner = {
   /**
    * Start the session; reject if that fails. When you know nothing started under `r.name`, reject
    * with an error whose `refused` is `true`, and the attempt ends `unstartable` at once. Otherwise
@@ -31,7 +32,7 @@ export type PromiseRunner = {
    * it appears, the attempt `lost` if it never does.
    */
   spawn(r: SpawnRequest): Promise<void>;
-  observe(): Promise<Map<string, PromiseSighting>>;
+  observe(): Promise<Map<string, AsyncSighting>>;
   /**
    * Optional. The session running under `name` — a name the engine chose — found without observing every other, or
    * `undefined` when none runs. Only which session it is: a read that needs its state asks `observe`, and takes
@@ -71,10 +72,10 @@ export type PromiseRunner = {
 };
 
 /**
- * A `PromiseRunner` as the engine's verbs. A rejected `spawn` is not taken as proof that nothing started: it is a
+ * An `AsyncRunner` as the engine's verbs. A rejected `spawn` is not taken as proof that nothing started: it is a
  * refusal (`refused`) only when the error it rejects with says `refused: true`.
  */
-export const promiseOps = (h: PromiseRunner): RunnerOps => ({
+export const asyncOps = (h: AsyncRunner): RunnerOps => ({
   spawn: (r: SpawnRequest) =>
     Effect.tryPromise({
       try: () => h.spawn(r),
@@ -146,8 +147,8 @@ export const promiseOps = (h: PromiseRunner): RunnerOps => ({
     : {}),
 });
 
-/** What a `PromiseRunner` observed, every state in A2A's names — or refused, naming the session and the words it takes. */
-const inNames = (seen: Map<string, PromiseSighting>): Effect.Effect<Map<string, Sighting>, RunnerError> => {
+/** What an `AsyncRunner` observed, every state in A2A's names — or refused, naming the session and the words it takes. */
+const inNames = (seen: Map<string, AsyncSighting>): Effect.Effect<Map<string, Sighting>, RunnerError> => {
   const out = new Map<string, Sighting>();
   for (const [name, s] of seen) {
     const state = isSessionState(s.state) ? s.state : formerStateOf(s.state);
@@ -164,6 +165,37 @@ const inNames = (seen: Map<string, PromiseSighting>): Effect.Effect<Map<string, 
   return Effect.succeed(out);
 };
 
-/** A Promise the consumer wrote becomes an Effect with the engine's error type on it. */
-export const wrap = <A, E>(f: () => Promise<A>, onError: (message: string) => E) =>
+/** A Promise a fake answers becomes an Effect with the engine's error type on it. */
+const wrap = <A, E>(f: () => Promise<A>, onError: (message: string) => E) =>
   Effect.tryPromise({ try: f, catch: (cause) => onError(cause instanceof Error ? cause.message : String(cause)) });
+
+/** A fake store, in async methods: what `asyncStore` makes a `StoreOps` of. */
+export type AsyncJournal = {
+  append(taskId: string, event: Event): Promise<void>;
+  read(taskId: string): Promise<Event[]>;
+  list(): Promise<string[]>;
+  feed(after?: Cursor): Promise<{ entries: FeedEntry[]; cursor: Cursor }>;
+};
+
+/** An `AsyncJournal` as the engine's store: each rejection a `JournalError`, on the task it was asked of, or `*`. */
+export const asyncStore = (j: AsyncJournal): StoreOps => ({
+  append: (taskId, event) =>
+    wrap(
+      () => j.append(taskId, event),
+      (m) => new JournalError({ taskId, message: m }),
+    ),
+  read: (taskId) =>
+    wrap(
+      () => j.read(taskId),
+      (m) => new JournalError({ taskId, message: m }),
+    ),
+  list: wrap(
+    () => j.list(),
+    (m) => new JournalError({ taskId: '*', message: m }),
+  ),
+  feed: (after) =>
+    wrap(
+      () => j.feed(after),
+      (m) => new JournalError({ taskId: '*', message: m }),
+    ),
+});

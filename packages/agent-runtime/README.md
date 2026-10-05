@@ -53,7 +53,7 @@ under `codex` (`trustFrom`, below); a key is named
 on `HarnessArgs` only when more than one harness is given it (the model, the effort, the tools, the fence, `mcp`, the budget),
 another harness translates it (`worktree`, which Codex turns into a worktree of its own and the A2A release carries), a spec
 declares it or a layer above judges it (`contextTokens`), or it chooses the runtime's own process (`background`). A key moved
-into the bag is read at its old place off a journal (`upgrade` in `src/core/engine/journal.ts`) and refused there at both doors, naming
+into the bag is read at its old place off a journal (`upgrade` in `src/core/engine/journal.ts`) and refused there, naming
 the new place (`FORMER_ARGS`): `remoteControl` moved on 2026-09-25.
 
 ### Mounts
@@ -61,11 +61,11 @@ the new place (`FORMER_ARGS`): `remoteControl` moved on 2026-09-25.
 A task reaches folders beyond its `cwd` through `config.mounts`, as a Pod's container is given its `volumeMounts`: each an absolute
 path and whether the session may only read it — `[{ "path": "/srv/notes", "readOnly": true }]` (`Mount`, `src/harness/mounts.ts`).
 A local process sees the disk as it is, so a mount's source and its place are one path. `readOnly` is required: a mount left
-unmarked is refused, never silently writable. `file()` refuses at both doors a value that is not a list, an entry that is not
+unmarked is refused, never silently writable. `file()` refuses a value that is not a list, an entry that is not
 `path` and `readOnly` alone, a path that is not absolute and resolved or holds a NUL, and a path given twice (`mountsRefusalOf`).
 
 Each harness renders them its own way, and one that cannot hold a mount's mode refuses the task before it is journalled, naming
-the harnesses that do (`HarnessSpec.mounts`, `mountsMisplaced` in `src/facade/consumer.ts`):
+the harnesses that do (`HarnessSpec.mounts`, `mountsMisplaced` in `src/service/harness-refusal.ts`):
 
 - **Claude Code** (a job, `claude-detached`, `claude --bg`) holds both modes. Each mount is `--add-dir <path>`, and a read-only one
   is also `Edit(//<path>/**)` in the one `--disallowedTools` list (`claudeMountArgs`, `claudeDenies`). `--add-dir` grants writes
@@ -77,7 +77,7 @@ the harnesses that do (`HarnessSpec.mounts`, `mountsMisplaced` in `src/facade/co
   disk and write only the workspace. It refuses a read-only mount in `danger-full-access`, which writes everywhere, and a writable
   one, which only `--add-dir` would give and `exec resume` rejects.
 - **The command harness and a remote agent** hold none: a command reads the disk it runs on as it is, and a remote agent has none
-  of this machine's disk. A `PromiseRunner` is handed them.
+  of this machine's disk. A `RunnerOps` brought as its own is handed them.
 
 ### One attempt per start
 
@@ -144,8 +144,8 @@ eight `TaskState` names in `src/core/session.ts`: the SDK stays out of the pure 
 once, at its own edge, and says why there: Claude Code's registry in `claudeStateOf` (`done` is `completed`, `stopped`
 `canceled`, and `blocked` is `auth-required` when what it waits for names signing in, `AUTH_WAIT`, else `input-required`);
 the detached worker's run file, which keeps the worker's words, in `detachedStateOf`; a remote agent passes its Task's
-state through; a `PromiseRunner` reports A2A's names or the five former words, read by `formerStateOf`, and anything else
-refuses the pass. `observe` gives the three names no harness spoke before no event of their own, since each asks nothing
+state through; a `RunnerOps` brought as its own reports A2A's names, and `formerStateOf` reads the five former words where a
+remote registry entry an older runtime wrote still says them. `observe` gives the three names no harness spoke before no event of their own, since each asks nothing
 the journal can tell apart: `submitted` is at work (`SESSION_LIVE`, or quiet), `auth-required` waits on a person as
 `input-required` does (`SESSION_BLOCKED`, `waitingFor` says which), and `rejected` is an end recorded `failed`. So the
 machine and its diagram did not change. The journal keeps its three end words (`Ended`: `done`, `failed`, `stopped`,
@@ -293,34 +293,48 @@ Because we do not own the thing being leased. "Is it still running" is a questio
 liveness probe, the expiry reclaim and the abort plumbing — most of the version of this that tried
 to own the process.
 
-## Using it without Effect
+## Using it
 
-Effect is how this engine is written, not how it is used. The engine a consumer uses has **no Effect
-in any signature**: `promiseEngine` builds it from the Effect face's `Engine.layer`, once, and every verb is a Promise.
-The consumer calls two functions and writes no Effect:
+The engine is an Effect service, `Engine`, and `agent-runtime` its one face: `Engine.layer(options)` takes the engine's options,
+and each verb is an Effect whose refusal is a tagged error (`FileRefused`, `TickRefused`, `ListRefused`, …) whose message says
+what to do instead, with no verb in front. A program is run at its edge — `ae`, the api's server, a test — with `Effect.runPromise`;
+a caller that writes no Effect reaches the system through the api. Keep your `effect` version aligned with this package's: Context
+tags are identity-based, and two copies in one tree do not see each other's services. The examples further down are lines of such a
+program, `engine` the service it yields (`const engine = yield* Engine`).
 
 ```ts
-import { codex } from 'agent-runtime'
-import { Engine, promiseEngine } from 'agent-runtime/effect'
+import { Effect } from 'effect'
+import { codex, Engine } from 'agent-runtime'
 
-const engine = promiseEngine(Engine.layer({ harnesses: { claude: 'claude-bg', codex } }))
+const layer = Engine.layer({ harnesses: { claude: 'claude-bg', codex } })
 
-const id = await engine.file({ brief, cwd, harness: 'codex' })
-await engine.tick()
-const { entries, cursor } = await engine.feed(0)
+const { entries, cursor } = await Effect.runPromise(
+  Effect.gen(function* () {
+    const engine = yield* Engine
+    yield* engine.file({ brief, cwd, harness: 'codex' })
+    yield* engine.tick()
+    return yield* engine.feed(0)
+  }).pipe(Effect.provide(layer)),
+)
 ```
 
-Bring your own store — plain async, no `Effect.tryPromise` anywhere:
+Bring your own store — a `StoreOps`, each method an Effect, `list` an Effect value, and `subscribe(onChange)`, optional, to wake
+`watch`:
 
 ```ts
-promiseEngine(Engine.layer({
+import { JournalError } from 'agent-runtime'
+
+const tried = <A>(taskId: string, f: () => Promise<A>) =>
+  Effect.tryPromise({ try: f, catch: (e) => new JournalError({ taskId, message: String(e) }) })
+
+Engine.layer({
   journal: {
-    append: async (taskId, event) => { await db.event.create({ data: { jobId: +taskId, payload: event } }) },
-    read:   async (taskId) => (await db.event.findMany({ where: { jobId: +taskId } })).map(r => r.payload),
-    list:   async () => (await db.job.findMany()).map(j => String(j.id)),
-    feed:   async (after) => { /* WHERE id > after ORDER BY id */ },
+    append: (taskId, event) => Effect.asVoid(tried(taskId, () => db.event.create({ data: { jobId: +taskId, payload: event } }))),
+    read:   (taskId) => tried(taskId, async () => (await db.event.findMany({ where: { jobId: +taskId } })).map(r => r.payload)),
+    list:   tried('', async () => (await db.job.findMany()).map(j => String(j.id))),
+    feed:   (after) => tried('', async () => { /* WHERE id > after ORDER BY id */ }),
   },
-}))
+})
 ```
 
 Bring your own harness — three ways, in order of how much you have to write:
@@ -330,38 +344,19 @@ Bring your own harness — three ways, in order of how much you have to write:
 | `'claude'` | Claude Code as the engine runs it by default: a step as a job (`claude -p`), and a background session (`claude --bg`) when its task asks with `config.background: true` |
 | `'claude-bg'` | Claude Code's background sessions alone; it keeps the registry |
 | a `HarnessSpec` | any CLI that runs a prompt and exits — a command and an exit code |
-| a `PromiseRunner` | four async methods, and five optional ones, `find`, `output`, `release`, `transcript` and `say`, for anything else at all |
+| a `RunnerOps` | four Effect methods, and six optional ones, `find`, `output`, `release`, `transcript`, `say` and `refuses`, for anything else at all; its own `refuses` is asked by `file` |
 
-**`src/cli/main.ts` builds its engine with `promiseEngine(Engine.layer(…))`, and imports types and plain helpers, through the
-two faces alone.** That is deliberate and it is the test: if the Promise API were not enough to write the CLI with, it would
-not be enough for anyone. `grep "from 'effect'" src/cli/main.ts` returns nothing, and a test says so.
+**`src/cli/main.ts` builds its engine from `Engine.layer(…)` once and runs each verb as an Effect**, a refusal worded by the runtime's
+`refusalWords` — exit code 2, the message led by the verb — through the entries alone. `test/verb-refusals.test.ts` pins the
+`Engine` service's verbs and holds each verb's refusal to a tagged error that `refusalWords` words so.
 
-The Effect API is still there under `agent-runtime/effect` — `Layer` composition, typed error
-channels, the lot. Keep your `effect` version aligned with this package's if you use it: Context
-tags are identity-based, and two copies in one tree do not see each other's services. A consumer
-who never imports Effect can never have that problem.
-
-The engine itself is a service there, `Engine`: `Engine.layer(options)` takes the engine's options, and each verb is an
-Effect whose refusal is a tagged error in the words the Promise door rejects with, without the verb in front. The Promise door is
-that layer with each verb run as a Promise (`promiseEngine`), so both doors are one engine; `test/doors.test.ts` calls every verb
-through both.
-
-```ts
-import { Effect } from 'effect'
-import { Engine } from 'agent-runtime/effect'
-
-const id = await Effect.runPromise(
-  Engine.use((e) => e.file({ brief, cwd })).pipe(Effect.provide(Engine.layer({ root }))),
-)
-```
-
-Its `file` refuses what the Promise engine's `file` refuses of the task itself, in the same sentence — `refusalOf` in
-`src/core/engine/filing.ts` for the task's own fields, and `argsRefusalOf` in `src/harness/args.ts` for the checks every harness shares
-of its `config`, which `file` asks and every `Runner` made by `Runner.layer` asks too, so a runner built with `Runner.of`
-alone is no way round them; `test/refusal.test.ts` holds both doors to both — and fails
-with `FileRefused`, a tagged error beside `JournalError`, with nothing journalled. It refuses no harness's words: it has no harnesses to
-ask, so an unknown harness or a permission mode the harness rejects is still journalled there (open issue 6). `Engine`'s
-`file` has them, and refuses them as the Promise engine's `file` does.
+The bare `file` building block (`src/core/engine/filing.ts`) refuses what `Engine`'s `file` refuses of the task itself, in the same
+sentence — `refusalOf` in `src/core/engine/filing.ts` for the task's own fields, and `argsRefusalOf` in `src/harness/args.ts` for the
+checks every harness shares of its `config`, which `file` asks and every `Runner` made by `Runner.layer` asks too, so a runner built
+with `Runner.of` alone is no way round them; `test/refusal.test.ts` holds both — and fails with `FileRefused`, a tagged error beside
+`JournalError`, with nothing journalled. It refuses no harness's words: it has no harnesses to ask, so an unknown harness or a
+permission mode the harness rejects is still journalled there (open issue 6). `Engine`'s `file` has them, and refuses them in that
+harness's words (`harnessRefusalOf` in `src/service/harness-refusal.ts`).
 
 ## Several harnesses, one board
 
@@ -446,14 +441,14 @@ exited with. Its stdout and its stderr each go whole to a file of their own besi
 `streams: true`), cleared when the name is spawned again, and are read by `output`, never off the run directory:
 
 ```ts
-const id = await engine.file({ brief: 'test', cwd, harness: 'command', config: { command: ['npm', 'test'], niceness: 10 } });
+const id = yield* engine.file({ brief: 'test', cwd, harness: 'command', config: { command: ['npm', 'test'], niceness: 10 } });
 // … ticked to its end
-await engine.output(id, 'stdout');        // all of it
-await engine.output(id, 'stderr', 4096);  // its last 4096 bytes, starting on a whole character
+yield* engine.output(id, 'stdout');        // all of it
+yield* engine.output(id, 'stderr', 4096);  // its last 4096 bytes, starting on a whole character
 ```
 
 `output` asks the task's latest attempt, observes nothing, and answers `undefined` before an attempt or for a run that kept
-no streams. It refuses (exit 2; `OutputRefused` at the Effect door) a stream that is neither, a `lastBytes` that is not a whole
+no streams. It refuses (`OutputRefused`, exit 2 in `refusalWords`) a stream that is neither, a `lastBytes` that is not a whole
 number above 0, a task the board does not have, and a harness that keeps no whole streams, whose `logs` is what it has. On
 the command line, `ae output <task> [stdout|stderr]`, which says on stderr when there is nothing kept to print.
 
@@ -490,7 +485,7 @@ harness still lists it `done` — a job is never let go — or not at all: the j
 session listed `done`. A listing keeps the harness's `COMPLETED` of the same session, since `observe` reads the harness's
 word; the two differ on purpose. `answer` and `close` stay the engine's verbs, journalled; the agent reads the journal and
 never writes it. Not done, by the owner's decision at the plan gate: no `SubscribeToTask` (nothing reads a live stream —
-the api polls the facade — and every subscription opens with the Task, a listing here); no collected files as Artifacts
+the api polls the engine — and every subscription opens with the Task, a listing here); no collected files as Artifacts
 (they are the orchestrator's, for its own Task, stage 6); and a Task is still one attempt, not one runtime task.
 
 **Codex as an A2A agent** (stage 3). The detached `codex exec` driver answers in the same shape, through the real worker
@@ -513,7 +508,7 @@ lands before the worker has published its pid is left on disk, and the worker st
 
 One verb still reaches the driver directly: `refuses`, which judges a task before any session exists and so is no call to
 one. A transcript is read by the session's name through `sessionTranscript`, and the agent finds the session's id as the
-facade did — the journal's, then `find` for an attempt in flight, then a listing. The same method takes a session's id
+engine's own verbs did — the journal's, then `find` for an attempt in flight, then a listing. The same method takes a session's id
 instead, which is how `Runner.transcript` reaches it under `a2aRunner`. It is not A2A's `SubscribeToTask`: a
 transcript is a history read from a cursor, of a session that has often ended, and A2A refuses a subscription to a Task in
 a terminal state, and opens every one with the Task, which here is a listing. The call answers once and holds nothing, so no
@@ -528,12 +523,14 @@ A harness can be an A2A agent another party runs, reached over HTTP by its addre
 where the other harnesses are, by name, and a task picks it by that name, as it picks `codex`:
 
 ```ts
-const engine = promiseEngine(Engine.layer({
+const layer = Engine.layer({
   harnesses: { reviewer: { url: 'https://agents.example/reviewer' } },
   credentials: (scheme, agentUrl, harness) => (scheme === 'token' ? process.env.REVIEWER_TOKEN : undefined),
   missingCredential: (scheme) => `set REVIEWER_TOKEN for \`${scheme}\``, // optional: the end of the refusal's words
-}));
-await engine.file({ harness: 'reviewer', brief: 'Review this diff …', cwd: '/repo', closeoutSchema });
+});
+await Effect.runPromise(
+  Engine.use((e) => e.file({ harness: 'reviewer', brief: 'Review this diff …', cwd: '/repo', closeoutSchema })).pipe(Effect.provide(layer)),
+);
 ```
 
 The configuration is `{ url }` — the agent's base URL, whose card is read at `.well-known/agent-card.json` beneath its path
@@ -687,7 +684,7 @@ Claude Code's permission modes are what 2.1.270 accepts when it parses its argum
 taken though its help no longer lists it). Its efforts are refused here because the CLI does not
 refuse one: an unknown `--effort` gets a warning and the default. Codex's efforts are the ones its
 API named when refusing a bad one, for the default model; Codex itself checks none, and a bad one
-fails the session. A harness brought as a `PromiseRunner` is asked nothing.
+fails the session. A harness brought as a `RunnerOps` is asked only its own `refuses`, if it has one.
 
 **A job waits on nobody, and says what it was denied.** Measured on 2.1.280 (`test/live.test.ts`, M1): `claude -p` in
 `auto`, `dontAsk`, `default` and `acceptEdits`, with and without `--permission-prompts none`, told to write outside its
@@ -706,7 +703,7 @@ session read or wrote through its file tools (`Read`, `Edit`, `Write`, `MultiEdi
 relative to the folder its `init` line names, a denied call and a file outside that folder left out. `[]` is a session that
 touched none; absent where `skills` is, and where the `init` line names no folder.
 
-The lists are exported, from both entries and from the pure door `agent-runtime/vocabulary` (no Effect, no I/O):
+The lists are exported, from `agent-runtime` and from the pure door `agent-runtime/vocabulary` (no Effect, no I/O):
 `CLAUDE_PERMISSION_MODES`, `CLAUDE_EFFORTS` and `CLAUDE_CONTEXT_TOKENS`, `CODEX_SANDBOXES` and `CODEX_EFFORTS`, with
 `CLAUDE_AUTO_DROPPED`, the models Claude Code drops `auto` on. agent-orchestrator keeps no copy: `wf start` asks `configRefusal` of every
 step before a run is written, and its form offers these lists.
@@ -722,7 +719,7 @@ filed in `auto` and runs in `default`, as the measure above says.
 
 **A spawn that fails** is answered by what the harness can vouch for. When nothing can have
 started, and waiting would not change that — the OS would not create the process for a reason that stays (no binary,
-no working folder, a file the runner cannot write), a detached worker was never launched, or a `PromiseRunner` rejects
+no working folder, a file the runner cannot write), a detached worker was never launched, or a brought `RunnerOps` fails
 with `refused: true` — the attempt ends `failed`, reason `unstartable`, in the harness's words, and the task settles
 `failed` with them: `N attempt(s), none succeeded: the last could not start: <words>; fix what it names and file the
 task again`. A long-lived task settles so too, and is not restarted. The OS refusing a process for a short-lived reason
@@ -876,7 +873,7 @@ its budget is the orchestrator's to decide:
 by up to one response. `claude --bg` took the same flag without a word, read the file 42 times, spent $0.19 and was listed
 `done`; neither the registry nor its transcript said anything of a budget, and the flag's help says it "only works with
 --print". A cap that caps nothing is a guard that is silently inert, so `file()` refuses a budget beside `background: true`, naming
-a job, and on `claude-bg`. The `--bg` runner still passes the flag to a task that reaches it through the Effect API's bare `file`, which refuses
+a job, and on `claude-bg`. The `--bg` runner still passes the flag to a task that reaches it through the bare `file`, which refuses
 no harness's words (open issue 6), and `test/live.test.ts` fails the day a `--bg` session keeps it. What that leaves unbounded is
 open issue 17.
 
@@ -933,11 +930,11 @@ and `tty`: whether anything may attach to the workload, declared on the workload
 |---|---|
 | `claude` with `background: true` | `--remote-control`, on every attempt |
 | `claude`, a job | refused at `file()`: file it with `background: true`, since a job runs a prompt and exits |
-| `claude-detached` | refused at `file()`, and by its spec at the Effect door: `claude -p` runs a prompt and exits, and its help offers Remote Control only to an interactive session |
+| `claude-detached` | refused at `file()`, by its spec: `claude -p` runs a prompt and exits, and its help offers Remote Control only to an interactive session |
 | `codex`, and any other `HarnessSpec` — agent-orchestrator's `check` | refused at `file()`, naming the harness and the one to file on |
-| a `PromiseRunner` | asked nothing: handed `claude.remoteControl` on the spawn, to honour or not |
+| a `RunnerOps` brought as its own | asked only its own `refuses`: handed `claude.remoteControl` on the spawn, to honour or not |
 
-**It was a harness argument of its own until 2026-09-25**, `config.remoteControl`. That place is refused at both doors, at any
+**It was a harness argument of its own until 2026-09-25**, `config.remoteControl`. That place is refused, at any
 value, `false` included, at the top level too, naming the new one (`FORMER_ARGS` in `src/harness/args.ts`), and a journal
 filed before reads as filed under `claude` (`upgrade` in `src/core/engine/journal.ts`): `true` as the flag, first in the bag, and `false`,
 which asked for nothing, dropped. Nothing on disk is rewritten. The argv did not move: `packages/agent-orchestrator/test/argv.test.ts`
@@ -983,7 +980,7 @@ reads the journal alone and asks no harness anything. The **next** pass starts a
 queued, so a task admitted after a pass starts one pass (about 4 s under `ae up`) after the word. The word is per turn: a task
 held open (`holdOpen`) waits for another before each later turn. `admit` does nothing for a task already admitted, filed
 unqueued, or whose turn has started, and refuses one it has no record of and a settled one (exit 2, nothing written for
-any task in the call). `queued` that is not true or false is refused at `file()`, at both doors, and in a brief, where
+any task in the call). `queued` that is not true or false is refused at `file()` and in a brief, where
 `queued: true` is how `ae start` files one.
 
 **The engine admits too, under its ceiling.** `Engine.layer({ maxConcurrent })` is how many sessions of each pool may be
@@ -1016,9 +1013,9 @@ A ceiling handed anywhere but `Engine.layer` is refused by name rather than drop
 start every task at once and say nothing:
 
 - `maxConcurrent` that is not a whole number from 1, and a `pool` that is not a name (exit 2, naming the harness);
-- a `priority` that is not a whole number in int32, at both doors (exit 2);
-- any argument to `tick()`, at both doors (the Effect door fails `TickRefused`);
-- a third argument to `step`, and a `maxSteps` to `settleTask` that is not a whole number above nought, on the Effect door:
+- a `priority` that is not a whole number in int32 (exit 2);
+- any argument to `tick()` (`TickRefused`);
+- a third argument to `step`, and a `maxSteps` to `settleTask` that is not a whole number above nought:
   each took the ceiling's `slots` third (`StepRefused`);
 - `AE_MAX_CONCURRENT` in `ae`'s environment, set to anything, empty too (exit 2, before anything is read or written).
 
@@ -1468,8 +1465,8 @@ events a board can draw — messages, thinking, tool calls and their results —
 harness:
 
 ```ts
-const { events, cursor } = await engine.transcript(taskId)   // from the start
-const since = await engine.transcript(taskId, cursor)        // only what was written after
+const { events, cursor } = yield* engine.transcript(taskId)   // from the start
+const since = yield* engine.transcript(taskId, cursor)        // only what was written after
 
 type TranscriptEvent = {
   id: string                                   // the harness's own; a tool_result carries its call's
@@ -1502,7 +1499,7 @@ the attempt began — decides what to show.
 | `claude` | the session's transcript — a job's while it runs, found by the id its stream names first: the raw JSONL the closeout is read from, not `getSessionMessages`, whose messages carry no time | the text of thinking Claude Code wrote empty — three blocks in four, in the transcripts measured — which is a thinking event with no `text` |
 | `codex` | the thread's rollout, `$CODEX_HOME/sessions/YYYY/MM/DD/rollout-…-<thread id>.jsonl`, found by the thread id the worker reads off `exec --json` | below |
 | `claude-detached` | the same transcript as `claude` | anything before the session exits: its id is in the one object `claude -p --output-format json` prints, last |
-| a `PromiseRunner` | its own `transcript`, when it has one | — |
+| a `RunnerOps` brought as its own | its own `transcript`, when it has one | — |
 
 Claude Code's lines are read as it writes them, measured on the 150 transcripts last written on this
 machine: one event per content block; a `system` line as a `system` event; a line Claude Code put into
@@ -1536,9 +1533,9 @@ here: a view is read again. A pass, which acts on what it reads, does not count 
 the start). Neither is a refusal: ask again.
 
 **Refused, with exit code 2** and the fix in the sentence: a task the engine has no record of, a harness
-that keeps no conversation this engine can read — a `PromiseRunner` or a `HarnessSpec` without
+that keeps no conversation this engine can read — a brought `RunnerOps` or a `HarnessSpec` without
 `transcript` — whose tasks have `logs`, and, for the engine's own readers (`claude-bg` and a
-`HarnessSpec`), a cursor none of them gave. **A `PromiseRunner`'s cursor is its own**: the engine passes it
+`HarnessSpec`), a cursor none of them gave. **A brought `RunnerOps`'s cursor is its own**: the engine passes it
 through as the runner gave it, and hands the runner none of its own. The start a read of no session
 returns reaches the runner as no cursor at all.
 
@@ -1548,9 +1545,9 @@ returns reaches the runner as no cursor at all.
 words to the session of a task's attempt in flight, through the task's own harness, and journals them:
 
 ```ts
-const said = await engine.say(taskId, 'Widen the scope to apps/api too.')
+const said = yield* engine.say(taskId, 'Widen the scope to apps/api too.')
 // { at: '2026-09-14T16:06:19.851Z', attempt: 1, text: 'Widen the scope to apps/api too.' }
-;(await engine.view(taskId)).state.said   // every one, in the order said
+(yield* engine.view(taskId)).state.said   // every one, in the order said
 ```
 
 ```bash
@@ -1598,7 +1595,7 @@ refused (`docs/open-issues.md`, issue 16).
 the brief there as the first user message, keeps stdin open, and writes each word said to it as another, which the job
 takes into the turn it is working (M6, measured on 2.1.280). `say` appends the line to the run's inbox,
 `runs/claude/<name>.inbox.jsonl`, which the worker only reads — within half a second — so the file has one writer, the
-facade, as the run file has one, the worker. A job reads its stdin until it ends, so the worker ends it at the job's
+engine's `say`, as the run file has one, the worker. A job reads its stdin until it ends, so the worker ends it at the job's
 first `result` line and the job exits; its closeout, its spend cap and what it is denied are as they are under a prompt
 (M8–M10, 2.1.280). Words said once the result is out are refused by the runner (`has given its result and reads no more
 words`); the job is still `working` until it exits, so the rejection comes with no exit code, and the next tick settles
@@ -1617,7 +1614,7 @@ before the result are journalled and never written on (open issue 29).
 | `claude` with `background: true` | a line on the session's inbox socket | a task in `bypassPermissions` — Claude Code holds a message into such a session for a person to approve, and a background session nobody attached to holds it for ever; and words that make a line longer than the inbox reads (1,048,576 characters) |
 | `codex` | — | always: `codex exec` reads its prompt once and takes nothing while it runs |
 | `claude-detached` | — | always: its session's id is known only once `claude -p` exits |
-| a `PromiseRunner` | its own `say`, when it has one | when it has none |
+| a `RunnerOps` brought as its own | its own `say`, when it has one | when it has none |
 
 **Refused, with exit code 2**, nothing sent and nothing journalled, and the fix in the sentence: empty words; a
 task the engine has no record of; a harness with no channel, in its own words; what the harness cannot carry; a
@@ -1639,10 +1636,10 @@ it, however it is listed: the seam takes words and a stop for a session listed d
 (`held`), and refuses them, as A2A does a terminal Task, once the process is gone.
 
 ```ts
-const id = await engine.file({ brief: 'Watch the queue.', cwd, restartPolicy: 'Always', config: { background: true } })
+const id = yield* engine.file({ brief: 'Watch the queue.', cwd, restartPolicy: 'Always', config: { background: true } })
 // … its turn ends: view(id).phase is 'idle', and the session is still there
-await engine.say(id, 'Look again.')
-await engine.stop(id)       // the next passes stop it, record the end `operator`, and settle it stopped
+yield* engine.say(id, 'Look again.')
+yield* engine.stop(id)       // the next passes stop it, record the end `operator`, and settle it stopped
 ```
 
 **Idle is read off the sighting.** A sighting carries `held`, whether the harness still holds the session's process
@@ -1676,8 +1673,8 @@ A launch the OS could not make for a short-lived reason is no refusal: its attem
 
 **Refused, with exit code 2**, nothing journalled: a `restartPolicy` other than `'Always'`; beside it, `holdOpen` (a turn's
 end is idle here, not a wait), `deadlineSeconds` (only a stop ends a session that runs) and `closeoutSchema` (a statement would end its
-attempt); and, at the engine's doors, a harness that ends its session with its turn — `claude` without
-`config.background: true`, Codex, `claude-detached`, a remote agent. A consumer's own runner is asked nothing.
+attempt); and, at the engine's `file`, a harness that ends its session with its turn — `claude` without
+`config.background: true`, Codex, `claude-detached`, a remote agent. A consumer's own runner is asked only its own `refuses`.
 
 ## A harness's quota: `quota`
 
@@ -1687,7 +1684,7 @@ with its key, its use in percent and its reset (`windows`), or why there are non
 an answer in a shape the runtime does not read, no harness binary, a timeout, a process that ended before it answered.
 
 ```ts
-const q = await engine.quota('claude')
+const q = yield* engine.quota('claude')
 if (q.kind === 'windows') for (const l of q.limits) console.log(l.key, l.usedPercentage, l.resetsAt)
 ```
 
@@ -1697,7 +1694,7 @@ lets it go before it returns, whatever ended it — an answer, the timeout, an i
 A2A seam, which an interruption does not cross: a caller that interrupts `quota()` gets control back at once, and the process ends by
 the ask's own timeout, within `QUOTA_TIMEOUT_MS` (15 s) and 2 s more. Nothing is journalled and nothing kept, so a caller that reads
 often keeps the answer itself. A
-harness with no quota — Codex, a remote agent, a `PromiseRunner` — is refused in words (`QuotaRefused`, exit code 2 at the Promise door),
+harness with no quota — Codex, a remote agent, a brought `RunnerOps` — is refused in words (`QuotaRefused`, worded with exit code 2 by `refusalWords`, as `ae` does),
 naming the harnesses that have one; so is a harness the engine does not have, and any argument but one name.
 
 ## Waiting for a person: `holdOpen`, `answer` and `close`
@@ -1709,11 +1706,11 @@ place of the brief. A close settles it `succeeded`, note `closed`. It is how a p
 kept alive for it, and how its next turn keeps the conversation that made the plan.
 
 ```ts
-const id = await engine.file({ brief: 'Draft the plan.', cwd, holdOpen: true, closeoutSchema })
+const id = yield* engine.file({ brief: 'Draft the plan.', cwd, holdOpen: true, closeoutSchema })
 // … it signs: view(id).phase is 'input-required', and its session is let go as any ended attempt's is
-await engine.answer(id, 'Cut step 3; keep the rest.', { config: { budgetUsd: 2 } })
+yield* engine.answer(id, 'Cut step 3; keep the rest.', { config: { budgetUsd: 2 } })
 // { at: '…', text: 'Cut step 3; keep the rest.', config: { budgetUsd: 2 } } — the next tick resumes the session, told that
-await engine.close(id)      // once it signs again and waits: the next tick settles it succeeded
+yield* engine.close(id)      // once it signs again and waits: the next tick settles it succeeded
 ```
 
 ```bash
@@ -1742,7 +1739,7 @@ waiting task `stopped`, as it does any other.
 above 0, or one the task's harness would not keep (as `file` refuses one: `claude --bg` and `codex` keep none); a task the
 engine has no record of; one not filed to be held open; one settled, closed or asked to stop; and one that is not waiting —
 not started, an attempt running (`say` reaches a running session; `stop` ends it), between attempts, or answered already
-and its next turn not begun. An answer, not a close, is refused too where the attempt that signed has no session recorded. The Effect door (`answer`, `close` from `agent-runtime/effect`) refuses in the same words, as
+and its next turn not begun. An answer, not a close, is refused too where the attempt that signed has no session recorded. The engine's `answer` and `close` (and the bare ones from `agent-runtime`) refuse in the same words, as
 `InputRefused`. A close is a verdict on a signed turn, so it is refused while one runs, not queued behind it.
 
 **Through the seam** (stage 2 part 5), the attempt that signed is `TASK_STATE_INPUT_REQUIRED` on `getTask` while the task
@@ -1863,7 +1860,7 @@ not made. A registration refused, or not there, refuses nothing: the read observ
 **Where a registration and the registry disagree, every read that observes takes the registry's word** — a view's phase
 and session, `say`, and the pass, which never uses `find`. `transcript` of an attempt in flight is the one read that
 takes a registration's, and only for which session to read: every live registration on that machine named the session
-`claude agents` listed for its pid, under the same name. A `PromiseRunner` without `find` is observed as it always was,
+`claude agents` listed for its pid, under the same name. A brought `RunnerOps` without `find` is observed as it always was,
 on its own and no other harness; a task whose harness the engine no longer has is viewed on the fallback, where its
 `logs` are read (`test/find.test.ts`).
 
@@ -1899,12 +1896,12 @@ what a step leaves behind. The rule is what lets Codex do it itself.
 ## Which runner: CLI or Agent SDK
 
 **`Engine.layer` and `ae` always use the CLI runners.** No environment variable selects another.
-`sdkRunner()` exists, but only as a `Layer` for the Effect API: you compose it yourself, and tick
+`sdkRunner()` exists, but only as a `Layer`: you compose it yourself, and tick
 in the same long-lived process that spawned the sessions, because they die with it.
 
 ```ts
 import { Effect, Layer } from 'effect'
-import { Journal, sdkRunner, file, tick } from 'agent-runtime/effect'
+import { Journal, sdkRunner, file, tick } from 'agent-runtime'
 
 const board = Layer.mergeAll(Journal.layer(Journal.filesOps(root)), sdkRunner())
 await Effect.runPromise(file({ brief, cwd }).pipe(Effect.provide(board)))
@@ -1969,14 +1966,13 @@ selector, and it is why no attempt can ever run twice.
 
 Folders by feature, held by path in `test/layout.test.ts`: the two entries alone sit flat in `src/`; `core/` is the
 judgement and `core/engine/` its shell; `harness/` is the seam and each harness's driver; `a2a/` alone imports the A2A SDK;
-`service/` is the engine as an Effect service, `facade/` the Promise door over it, and `cli/` the `ae` command. A folder another folder reads has a face, `index.ts`, and a test
+`service/` is the engine as an Effect service, and `cli/` the `ae` command. A folder another folder reads has a face, `index.ts`, and a test
 of pure code sits beside it.
 
 | file | what |
 |---|---|
 | `src/vocabulary.ts` | the vocabulary door's export list, pure: what `agent-runtime/vocabulary` gives |
-| `src/facade.ts` | the Promise API's export list, by name: what `agent-runtime` gives |
-| `src/index.ts` | the Effect API's export list — the boundary; `decide` is not on it |
+| `src/index.ts` | the export list of `agent-runtime`, by name, all Effect — the boundary; `decide` is not on it |
 | `src/core/session.ts` | a session's state in A2A's names, the end each records and the word a person reads (`endOf`, `phaseWordOf`): read by both `domain.ts` and `lifecycle.ts`, so neither imports the other's values |
 | `src/core/domain.ts` | events, `fold`, **`decide`** and what it reads — `lifecycleOf`, `observe` — pure, no I/O, the whole judgement, and the session name read back (`nameParts`) |
 | `src/core/lifecycle.ts` | the lifecycle as an XState statechart, used as a pure transition function: its states, the edge for each event and the one action it names, the refusal of an event with no edge, and the diagram generated from it |
@@ -1992,7 +1988,7 @@ of pure code sits beside it.
 | `src/core/engine/memo.ts` | the settled tasks an engine's passes may skip until the feed names them, and the cursor into the feed: a cache of `fold`, rebuilt by a fresh engine, never written down |
 | `src/core/engine/now.ts` | now on both clocks (`instantNow`): `Date.now()`, and `process.hrtime` under the boot's id read from `/proc/sys/kernel/random/boot_id`, with no monotonic reading where there is none |
 | `src/core/engine/tally.ts` | what the runtime's own reads and spawns have cost the process, as running totals (`Engine.io()`): a thin wrapper around its readers and `sh`, not a syscall tracer |
-| `src/core/engine/index.ts` | the face of `core/engine/`: the engine's verbs, journal, memo and tally, as the doors take them |
+| `src/core/engine/index.ts` | the face of `core/engine/`: the engine's verbs, journal, memo and tally, as the face takes them |
 | `src/harness/seam.ts` | the compute seam — `spawn`/`observe`/`stop`/`logs`, and the optional `find`, `release`, `transcript` and `say` — the `Runner` service, the free harness `testOps`, and `composite`: dispatch by harness, merge what they all see |
 | `src/harness/error.ts` | `RunnerError`, beneath the seam and Claude Code's `--bg` runner: `Runner.claude` needs `claudeOps` as a value, and `claudeOps` builds `RunnerError`, so neither file imports the other for it |
 | `src/harness/args.ts` | a task's harness arguments, `HarnessArgs`: the adapter's configuration, carried as one `config`, and the checks every harness shares of it (`argsRefusalOf`), asked through every `Runner` |
@@ -2002,7 +1998,7 @@ of pure code sits beside it.
 | `src/harness/mcp.ts` | a task's MCP servers: what is refused, the configs written, and Claude Code's flags for them; for Codex, the server names its config already has and a task's servers as its `mcp_servers` table |
 | `src/harness/transcript.ts` | the one transcript reader behind every harness's `transcript`, and its cursor |
 | `src/harness/sdk.ts` | the same four verbs on the Agent SDK, with the tradeoff written down |
-| `src/harness/index.ts` | the face of the seam, as the A2A seam and the doors take it; `core/` imports `seam.ts` and `args.ts` by their own path |
+| `src/harness/index.ts` | the face of the seam, as the A2A seam and the face take it; `core/` imports `seam.ts` and `args.ts` by their own path |
 | `src/harness/claude/bg.ts` | Claude Code's `--bg` runner (`claudeOps`), and `sh`, the one way it shells out |
 | `src/harness/claude/quiet.ts` | when a working `--bg` session's transcript was first seen at its mtime, on the monotonic clock, per attempt under the root: written by a look only when the mtime or the boot differs, cleared at spawn, read fresh on every look |
 | `src/harness/claude/parent.ts` | what a resumed `--bg` session's spawn records of its parent: the id of the parent's last StructuredOutput call, and whose a statement is by it |
@@ -2013,7 +2009,7 @@ of pure code sits beside it.
 | `src/harness/claude/inbox.ts` | words said into a running Claude Code session: its inbox, and its registration found by name |
 | `src/harness/claude/transcript.ts` | a Claude Code session's transcript: where it is, its closeout, its lines as events, and its usage and cost |
 | `src/harness/claude/vocabulary.ts` | Claude Code's modes, their ranks, efforts and context windows, the models it drops `auto` on, and what it refuses to be asked for |
-| `src/harness/claude/index.ts` | the face of `harness/claude/`, as the doors take it |
+| `src/harness/claude/index.ts` | the face of `harness/claude/`, as the face takes it |
 | `src/harness/command/command.ts` | a process as a harness: the program a task's `config.command` names, its `env` and `niceness`, its streams kept whole, and what it refuses |
 | `src/harness/codex/codex.ts` | Codex through `codex exec`: the trust it is extended, and its spec |
 | `src/harness/codex/vocabulary.ts` | Codex's sandboxes, narrowest first, its efforts and its default sandbox, with no I/O |
@@ -2029,14 +2025,14 @@ of pure code sits beside it.
 | `src/a2a/remote.ts` | a remote A2A agent as a harness: its card read and the binding chosen, auth as the card declares it, the registry under `remote/` (the intent before the send, the Task on its answer, never a second send), and the verbs as SendMessage, GetTask and CancelTask |
 | `src/a2a/sending.ts` | a send under way: its lease (`sendHeld`), `SEND_MS` on the monotonic clock from its stamp within a boot and on the wall clock from `sentAt` otherwise, and whether the process making it lives |
 | `src/a2a/said.ts` | the remote harness's own words told from another party's: the errors it throws in its own words, the A2A errors that refuse a send, and any other error's words quoted to 200 characters (`wordsOf`) |
-| `src/a2a/index.ts` | the face of `a2a/`, as the doors take it: it imports no name of the SDK's |
-| `src/facade/consumer.ts` | what a consumer writes and is given — its store in Promises, its harnesses, its options, its task and its engine — the adapters over them, and what the door refuses of them |
+| `src/a2a/index.ts` | the face of `a2a/`, as the face takes it: it imports no name of the SDK's |
 | `src/service/engine.ts` | the engine as an Effect service, `Engine`: `Engine.layer(options)` assembles each harness behind its A2A agent, the store and the memo, and its verbs are Effects that fail with tagged errors (`ListRefused`, `TranscriptRefused`, `SayRefused`, `SayUnsent`, and the core's) |
+| `src/service/options.ts` | what `Engine.layer` is built from and answers with — `HarnessConfig`, `Pooled`, `EngineOptions`, `TaskSpec`, `TickReport`, `EngineIo` — and what the engine refuses of its options before it builds anything (`optionsRefusalOf`) |
+| `src/service/harness-refusal.ts` | `harnessRefusalOf`: what the engine refuses of a task on the harness it names, in that harness's words — a knob the harness lacks, an argument only another takes (`mountsMisplaced` among them), a session that would not stay open, and the harness's own `refuses` |
 | `src/service/output.ts` | the engine's `output` verb, `outputVerbOf`, and `OutputRefused`: one stream of a task's latest attempt, kept whole by its harness |
 | `src/service/harnesses.ts` | `DEFAULT_HARNESSES`, the harnesses an engine runs when its options name none, and `configRefusal`, what they refuse of a task's configuration, exported for the layers above to ask before they file |
-| `src/service/index.ts` | the face of `service/`, as the doors take it |
-| `src/facade/engine.ts` | `promiseEngine`: an `Engine` layer built once and each verb run as a Promise, a refusal an `Error` whose `exitCode` is 2: the Promise engine a consumer builds as `promiseEngine(Engine.layer(options))` |
-| `src/facade/promise.ts` | a harness a consumer wrote in Promises (`PromiseRunner`), as the engine's verbs: an adapter like the others, reached through the A2A seam |
+| `src/service/refusal.ts` | `refusalWords`: a verb's refusal in words — an `Error` led by the verb whose `exitCode` is 2 — for a caller that answers with a sentence and an exit code: `ae` and the orchestrator |
+| `src/service/index.ts` | the face of `service/`, as the face takes it |
 | `src/cli/main.ts` | the verbs, and the brief: parse (closed keys), call, print |
 | `bin/ae.ts` | the `ae` entry point: a refusal prints its sentence and exits 2 |
 | `bin/ae-worker.ts` | the detached worker: babysits one harness process, keeps the run file |
@@ -2050,7 +2046,8 @@ of pure code sits beside it.
 | `test/detached.test.ts` | the worker, the lease, the composite, each spec's argv and refusals — `sh` as the harness |
 | `test/mcp.test.ts` | what each harness is given for MCP, at shipped defaults — fake `claude` and `codex` on `PATH` |
 | `test/io.test.ts` | what a pass costs as the runtime reports it: a tick's `ms` and each harness's observes, and `io()`'s bytes read and processes started |
-| `test/facade.test.ts` | the Promise API, and every refusal at `file()` at shipped defaults; the Promise engine refusing `maxConcurrent` and a harness's `pool`, and `tick()` refusing an argument |
+| `test/engine-verbs.test.ts` | the engine's verbs as a caller of `agent-runtime` drives them, over a store and a harness of its own (`test/promise-runner.ts`), and every refusal at `file()` at shipped defaults; the engine refusing `maxConcurrent` and a harness's `pool`, and `tick()` refusing an argument |
+| `test/verb-refusals.test.ts` | the `Engine` service's verbs, pinned (`VERBS`): each verb's answer, the same from an engine built once and one provided per call, and each refusal a tagged error that `refusalWords` words as `verb: …` with exit code 2 |
 | `test/release.test.ts` | letting a finished Claude Code session go, and reading what it cost once stopped, at shipped defaults — a fake `claude` that keeps a registry and writes a `cost-state` as it stops a session |
 | `test/budget.test.ts` | a spend cap, at shipped defaults — fake `claude`s: a `claude -p` that stops at its cap ends its attempt `failed` with `limit: 'budget'` and settles its task as any failure, the note naming no budget; the flag reaches both Claude runners on every attempt |
 | `test/admit.test.ts` | queued and admitted: the wait, the word, the pass after it, the pre-4c reading, `admit`'s refusals at shipped defaults, and a count proving the word asks no harness |
@@ -2061,7 +2058,7 @@ of pure code sits beside it.
 | `test/brief.test.ts` | the brief parser, made to refuse; `ae start` exits 2, and `ae` exits 2 with `AE_MAX_CONCURRENT` set |
 | `test/usage.test.ts` | the transcript count and cost — a resumed session's own share, from its `cost-state` lines — and "not measured" rather than 0 |
 | `test/transcript.test.ts` | a session's conversation as events, from a transcript file and a rollout the test writes: the cursor, words sent in, and each refusal at shipped defaults |
-| `test/hold-open.test.ts` | a task held open, through both doors: it waits with its session let go, an answer after a restart resumes it, a close settles it, and every refusal of `answer` and `close` |
+| `test/hold-open.test.ts` | a task held open, through the engine and the Effect layers: it waits with its session let go, an answer after a restart resumes it, a close settles it, and every refusal of `answer` and `close` |
 | `test/say.test.ts` | telling a running session something, at shipped defaults — a fake `claude` that keeps a registry, a real socket for the inbox: the words and the entry, every refusal, the inbox's guards, `ae say` |
 | `test/find.test.ts` | finding one session by its name, at shipped defaults — a fake `claude` that counts its `agents` calls, and registration files: found, gone, not registered, and the registry's word taken where the two disagree; a view that asks its task's own harness and no other |
 | `test/a2a.test.ts` | the A2A mappings round-tripped, and a harness driven through the SDK's `Client`: its words, its refusals and its defects reach the engine unchanged |
@@ -2072,7 +2069,7 @@ of pure code sits beside it.
 | `src/a2a/map.test.ts` | a remote agent's Task in the runtime's words and a spawn in A2A's, pure: every state, where a statement is read, and none before completion |
 | `test/remote-agent.test.ts` | a remote agent end to end against the SDK's own server over HTTP (`test/remote-server.ts`), on each binding and in each order: every refusal at shipped defaults with nothing sent, a restart that never sends twice, the secret on no file, and what a pass costs |
 | `test/a2a-boundary.test.ts` | only `src/a2a/` imports the A2A SDK, its face left out, and neither entry exports an SDK name or value — each made to refuse planted source |
-| `test/journal-words.test.ts` | the journal's words for five runs through `promiseEngine`, pinned: the seam beneath the harnesses changes none of them |
+| `test/journal-words.test.ts` | the journal's words for six runs through `builtEngine` (`test/engine.ts`), pinned: the seam beneath the harnesses changes none of them |
 | `test/readme.test.ts` | this file, held to the code |
 | `test/live.test.ts` | the `--tools` fence, the `--disallowedTools` deny (run from a checkout Claude Code trusts), `--strict-mcp-config`, what a released session still has, `say` into a working session, a session that ends its turn without its closing statement, a `claude -p` session stopped at its budget, a `--bg` session spending past one, its cost read once let go, and a session bridged by `remoteControl` beside one that is not, against real Claude Code — `AE_LIVE=1` only |
 | `docs/open-issues.md` | what is still wrong or half-verified |
@@ -2112,15 +2109,20 @@ watches for its `settled` event, and files the next one — it never reads a tas
 learns what `decide` is:
 
 ```ts
-import { Engine, promiseEngine } from 'agent-runtime/effect'
+import { Effect } from 'effect'
+import { Engine } from 'agent-runtime'
 
-const engine = promiseEngine(Engine.layer())
-const { entries, cursor } = await engine.feed(lastCursor)
-for (const { taskId, event } of entries) {
-  if (event.kind === 'settled' && event.outcome === 'succeeded') {
-    await engine.file({ brief: `Review what ${taskId} did`, cwd, harness: 'codex' })
+const next = Effect.gen(function* () {
+  const engine = yield* Engine
+  const { entries, cursor } = yield* engine.feed(lastCursor)
+  for (const { taskId, event } of entries) {
+    if (event.kind === 'settled' && event.outcome === 'succeeded') {
+      yield* engine.file({ brief: `Review what ${taskId} did`, cwd, harness: 'codex' })
+    }
   }
-}
+  return cursor
+})
+const cursor = await Effect.runPromise(next.pipe(Effect.provide(Engine.layer())))
 ```
 
 The cursor is a byte offset into `feed.jsonl` and never expires: a consumer that was away for a

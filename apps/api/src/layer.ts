@@ -90,8 +90,9 @@ const READ_BOUNDS: readonly number[] = [0, 1, 2, 5, 10, 25, 50, 100, 250, 500, 1
 /**
  * The files the runtime read for each request, its journals and every other file it reads (the engine's `io`), by the route it was
  * served on (`route`, the route's pattern, never its path), in the registry of the app's runtime: the process's own unless its layer
- * gives another. Counted off the engine's running totals before and after the handler, so about: a pass or another request reading at
- * the same time is counted here too.
+ * gives another. A read is one of bytes: a journal is counted when the engine reads what was appended to it since it last read it, and a
+ * journal it finds as it left it costs a `stat` and is not counted. Counted off the engine's running totals before and after the handler,
+ * so about: a pass or another request reading at the same time is counted here too.
  */
 export const POLL_READS = Metric.histogram('api.poll.reads', {
   description: 'the files the runtime read for a request',
@@ -99,7 +100,8 @@ export const POLL_READS = Metric.histogram('api.poll.reads', {
 });
 
 /** The files the engine has read so far, its journals among them, or none for an engine that keeps no count (a test's fake). */
-const readsOf = (e: Engine['Service']): number | undefined => (typeof e.io === 'function' ? e.io().reads : undefined);
+const readsOf = (e: Engine['Service']): Effect.Effect<number | undefined> =>
+  typeof e.io === 'function' ? Effect.map(e.io(), (io) => io.reads) : Effect.succeed(undefined);
 
 /**
  * `handle` over the request's services, run on the app's runtime, in the factory and on the repository the request names (`placeFor`):
@@ -120,17 +122,16 @@ export const served = <A>(c: RequestContext<ApiEnv>, handle: (s: Served) => A | 
         quota: yield* QuotaAsker,
         memo: yield* ReadMemo,
       };
-      const before = readsOf(services.e);
+      const before = yield* readsOf(services.e);
       return yield* Effect.promise(async () =>
         handle({ ...services, ...placeFor({ factory: c.req.query('factory'), repo: c.req.query('repo') }, env) }),
       ).pipe(
         Effect.ensuring(
-          Effect.suspend(() => {
-            const after = readsOf(services.e);
-            return before === undefined || after === undefined
+          Effect.flatMap(readsOf(services.e), (after) =>
+            before === undefined || after === undefined
               ? Effect.void
-              : Metric.update(Metric.withAttributes(POLL_READS, { route: routePath(c) }), after - before);
-          }),
+              : Metric.update(Metric.withAttributes(POLL_READS, { route: routePath(c) }), after - before),
+          ),
         ),
       );
     }),

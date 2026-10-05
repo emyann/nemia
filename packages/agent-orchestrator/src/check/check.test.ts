@@ -10,9 +10,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import type { Engine } from 'agent-runtime';
-import { commandHarness } from 'agent-runtime';
-import { Engine as EngineService, promiseEngine } from 'agent-runtime/effect';
+import type { Engine } from '../runtime-client.ts';
+import { commandHarness, Engine as EngineService } from 'agent-runtime';
 import {
   CHECK_NICENESS,
   INSTALL,
@@ -31,6 +30,8 @@ import { refusedCheck } from '../record/record.ts';
 import { exitVerdicts } from '../views/views.verb.ts';
 import { HARNESSES } from '../runtime-client.ts';
 import { scratch } from '../../test/scratch.ts';
+import { Effect } from 'effect';
+import { plainEngine } from '../../test/promised.ts';
 
 const ENV: CheckEnv = {
   WF_RUN: 'r-1',
@@ -186,11 +187,17 @@ test('the last lines of some output, without the blank ones at its end', () => {
  * Ticks `e` until `id` is in a phase `done` accepts, and answers its view; fails after `ms` on the monotonic clock, which a test may
  * seed `Date` beside.
  */
-const reached = async (e: Engine, id: string, done: (v: Awaited<ReturnType<Engine['view']>>) => boolean, what: string, ms = 20_000) => {
+const reached = async (
+  e: Engine,
+  id: string,
+  done: (v: Effect.Success<ReturnType<Engine['view']>>) => boolean,
+  what: string,
+  ms = 20_000,
+) => {
   const deadline = performance.now() + ms;
   for (;;) {
-    await e.tick();
-    const v = await e.view(id);
+    await Effect.runPromise(e.tick());
+    const v = await Effect.runPromise(e.view(id));
     if (done(v)) return v;
     if (performance.now() > deadline) assert.fail(`${id} never ${what}; phase ${v.phase}`);
     await new Promise((r) => setTimeout(r, 150));
@@ -203,17 +210,19 @@ const rig = () => {
   const root = fs.realpathSync(scratch('wf-check-'));
   const workspace = path.join(root, 'workspace');
   fs.mkdirSync(workspace);
-  const e = promiseEngine(EngineService.layer({ root: path.join(root, 'engine'), harnesses: { check: HARNESSES.check } }));
+  const e = plainEngine(EngineService.layer({ root: path.join(root, 'engine'), harnesses: { check: HARNESSES.check } }));
   const env = (step: string): CheckEnv => ({ ...ENV, WF_STEP: step, WF_WORKSPACE: workspace });
   const file = (step: string, command: string, deadlineSeconds = 60, install = false) =>
-    e.file({
-      id: `r-1-${step}-check`,
-      harness: 'check',
-      cwd: workspace,
-      brief: command,
-      deadlineSeconds,
-      config: { command: checkArgv(command, install), env: env(step), niceness: CHECK_NICENESS },
-    });
+    Effect.runPromise(
+      e.file({
+        id: `r-1-${step}-check`,
+        harness: 'check',
+        cwd: workspace,
+        brief: command,
+        deadlineSeconds,
+        config: { command: checkArgv(command, install), env: env(step), niceness: CHECK_NICENESS },
+      }),
+    );
   return { root, workspace, e, file };
 };
 
@@ -233,10 +242,10 @@ test('LIVE: the engine settles a check on its exit code, in the workspace, with 
     'a non-zero exit fails the check: an exit in the command does not end the script, nor does a # comment swallow its parenthesis',
   );
   assert.equal(attemptVerdict(r.state.attempts.at(-1)), 3, 'the real exit code, not the forged trailer the command printed');
-  const stdout = (await e.output(refused, 'stdout')) ?? '';
+  const stdout = (await Effect.runPromise(e.output(refused, 'stdout'))) ?? '';
   assert.match(stdout, new RegExp(`^refused in ${workspace} against abc123$`, 'm'), 'run in the workspace, told about the run');
   assert.doesNotMatch(stdout, /loud/, 'stderr is not in stdout');
-  assert.equal(await e.output(refused, 'stderr'), 'loud\n', 'stderr is kept apart, whole');
+  assert.equal(await Effect.runPromise(e.output(refused, 'stderr')), 'loud\n', 'stderr is kept apart, whole');
 
   const p = await settled(e, passed);
   assert.equal(p.state.settled, 'succeeded');
@@ -259,7 +268,7 @@ test('LIVE: a check the engine runs is niced, and IO-idle where this machine let
   const id = await file('niced', 'echo "nice=$(nice)"; echo "io=$(ionice 2>/dev/null || echo none)"');
   const v = await settled(e, id);
   assert.equal(v.state.settled, 'succeeded');
-  const log = (await e.output(id, 'stdout')) ?? '';
+  const log = (await Effect.runPromise(e.output(id, 'stdout'))) ?? '';
   assert.match(
     log,
     new RegExp(`^nice=${Math.min(19, os.getPriority() + CHECK_NICENESS)}$`, 'm'),
@@ -298,7 +307,7 @@ test("LIVE: an ending's check whose install fails settles failed with no exit co
   const verdict = exitVerdicts(new Map([[id, v]]), { steps: { ship: { check: { taskId: id } } } } as never)('ship');
   assert.equal(verdict, 'unfinished');
   assert.equal(refusedCheck(v.state.settled, verdict), false, 'not a refusal of the work');
-  const log = (await e.output(id, 'stdout')) ?? '';
+  const log = (await Effect.runPromise(e.output(id, 'stdout'))) ?? '';
   assert.match(
     log,
     /\[nemia check\] install failed, exit 3/,

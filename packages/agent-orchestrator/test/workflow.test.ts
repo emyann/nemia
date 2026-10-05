@@ -15,7 +15,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fansOut, orderSteps, terminalSteps, parseWorkflow, validate, WorkflowError, type Workflow } from '../src/workflow.ts';
-import { loadWorkflows, workflowDescription, workflowFolder } from '../src/folder/folder.store.ts';
+import { loadWorkflows, workflowDescription, workflowFolder, workflowReadme } from '../src/folder/folder.store.ts';
 import { CLOSEOUT_FIELDS, DEFAULT_ROUNDS, loopSpan, outputFields, STEP_KEY_MEANINGS, STEP_KEYS, type StepKey } from '../src/workflow.ts';
 import { agentsDir, parseFolder, renderStep, sessionContext, stepNameRefusal, type StepDraft } from '../src/workflow.ts';
 import { loadAgents } from '../src/folder/folder.store.ts';
@@ -166,6 +166,19 @@ test("a README in a workflow folder is not a step, and its first paragraph is th
     'a README with only a title: no description',
   );
   assert.equal(workflowDescription(path.join(scratch('wf-none-'), 'no-such-folder')), null);
+});
+
+test('a workflow README is read whole, in any case, and none is null', () => {
+  const whole = '# dev\n\nImplement what was asked, then review it.\n\nMore about it.\n';
+  assert.equal(workflowReadme(folder({ 'README.md': whole, 'implement.md': 'Implement it.\n' })), whole, 'every paragraph, the title too');
+  const bom = String.fromCharCode(0xfeff);
+  assert.equal(
+    workflowReadme(folder({ 'readme.md': `${bom}A change a person will see.\n`, 'implement.md': 'Implement it.\n' })),
+    'A change a person will see.\n',
+    'a lowercase readme, without its byte order mark',
+  );
+  assert.equal(workflowReadme(folder({ 'implement.md': 'Implement it.\n' })), null, 'no README: null');
+  assert.equal(workflowReadme(path.join(scratch('wf-none-'), 'no-such-folder')), null, 'no folder: null');
 });
 
 test('REFUSED: a folder with a README and no step, as a folder with no step is — saying the README is not one', () => {
@@ -460,6 +473,7 @@ test('every key a step has is read — none is accepted and then dropped', () =>
     resume: 'implement',
     input: 'implement',
     writable: 'web, docs',
+    reads: 'inbox',
     harness: 'claude-detached',
     model: 'opus',
     effort: 'xhigh',
@@ -567,7 +581,7 @@ test('REFUSED: a table of meanings with a key missing, one out of order, an extr
 
 test('a key a step does not have is refused by name, with the keys it does have', () => {
   const list =
-    "A step's keys are: after, resume, input, workspace, writable, slot, agent, skills, harness, model, effort, context, permissionMode, sandbox, tools, disallowedTools, allowedTools, denials, background, remote, deadlineSeconds, budget, check, retries, gate, output, tally, loop, rounds.";
+    "A step's keys are: after, resume, input, workspace, writable, reads, slot, agent, skills, harness, model, effort, context, permissionMode, sandbox, tools, disallowedTools, allowedTools, denials, background, remote, deadlineSeconds, budget, check, retries, gate, output, tally, loop, rounds.";
   assert.throws(
     () => fm('review', 'colour: red'),
     (e: unknown) => {
@@ -2369,6 +2383,7 @@ test('`renderStep` of a step that sets every key: one line a key, in `STEP_KEYS`
     resume: 'implement',
     input: 'implement',
     writable: 'web, docs',
+    reads: 'inbox',
     harness: 'claude-detached',
     model: 'opus',
     effort: 'xhigh',
@@ -2413,6 +2428,7 @@ test('`renderStep` of a step that sets every key: one line a key, in `STEP_KEYS`
       'resume: implement',
       'input: implement',
       'writable: web, docs',
+      'reads: inbox',
       'harness: claude-detached',
       'model: opus',
       'effort: xhigh',
@@ -2792,4 +2808,41 @@ test('REFUSED at load: a skill whose `rules.json` does not read — not JSON, a 
   const root = teamCopy('wf-rules-');
   fs.writeFileSync(path.join(root, 'skills', 'implement-a-change', 'rules.json'), JSON.stringify({ rules: [rule('a', ['Bash(cat:*)'])] }));
   assert.equal(loadWorkflows(path.join(root, 'dev')).length, 3, 'a rules.json that reads is no refusal');
+});
+
+/** What reading a step `review` with `lines` refuses, or `read` when it is taken. */
+const readsSaid = (lines: string): string => {
+  try {
+    fm('review', lines);
+    return 'read';
+  } catch (err) {
+    return (err as Error).message;
+  }
+};
+
+test('`reads:` is read as the store folders it names, written back as written, and a step without the line has none', () => {
+  const step = fm('review', 'reads: inbox');
+  assert.deepEqual(step.reads, ['inbox']);
+  assert.match(renderStep(step), /^reads: inbox$/m);
+  assert.deepEqual(parseWorkflow('review', renderStep(step)).reads, ['inbox']);
+  assert.equal(fm('review', 'permissionMode: dontAsk').reads, undefined);
+});
+
+test('REFUSED at load: a `reads:` name off the store list, one given twice, none, and the key on a remote A2A agent', () => {
+  const shape = 'Each is a folder of the store by its name, never a path, comma-separated; the one there is: inbox.';
+  assert.equal(
+    readsSaid('reads: runs'),
+    `review: \`reads: runs\` has \`runs\`, which names no folder of the store a step may read. ${shape}`,
+  );
+  assert.equal(
+    readsSaid('reads: /home/me/.agent-workflows/inbox'),
+    `review: \`reads: /home/me/.agent-workflows/inbox\` has \`/home/me/.agent-workflows/inbox\`, which names no folder of the store a step may read. ${shape}`,
+  );
+  assert.equal(readsSaid('reads: inbox, inbox'), 'review: `reads: inbox, inbox` names `inbox` twice. Name it once.');
+  assert.equal(readsSaid('reads: , ,'), `review: \`reads: , ,\` names no folder. ${shape}`);
+  assert.match(
+    readsSaid('harness: a2a:peer\nreads: inbox'),
+    /^review: `reads: inbox` gives a session on this machine a folder of the store to read, and a remote agent works on another party's machine/,
+  );
+  assert.equal(readsSaid('harness: claude\nreads: inbox'), 'read');
 });

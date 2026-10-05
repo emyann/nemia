@@ -5,7 +5,7 @@
  *
  * Beneath the controllers, beside `files.store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports what the
  * package exports of it. A card's start — `startFromInbox`, and `startQueued`, the tick's — starts a run, and
- * is `inbox.verb.ts`'s, through `start`.
+ * is `inbox.verb.ts`'s, through `startRun`.
  */
 import fs from 'node:fs';
 import path from 'node:path';

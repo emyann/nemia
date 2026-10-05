@@ -92,14 +92,14 @@ the engine, and the import arrow points one way.
 
 ```ts
 // hkb: src/engine-journal.ts
-import { Journal, JournalError, type Event, type JournalOps } from 'agent-runtime/effect'
+import { Journal, JournalError, type Event, type JournalOps } from 'agent-runtime'
 import { openBoard } from './db.ts'
 
 export const prismaJournal = (boardId: number): JournalOps => { /* four methods */ }
 ```
 
-Or, with the Promise facade, four plain `async` functions and no Effect in hkb at all —
-`promiseEngine(Engine.layer({ journal: { append, read, list, feed } }))`.
+The engine takes it as `Engine.layer({ journal: prismaJournal(boardId) })`, each method an Effect
+(`list` an Effect value): a Prisma call goes in through `Effect.tryPromise`, its failure a `JournalError`.
 
 Three details that make it fit:
 

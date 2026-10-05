@@ -5,7 +5,7 @@
  * at its start, so a write or a clear reaches only the runs started after it.
  */
 import { Hono } from 'hono';
-import { AGENTS_CUSTOM, customInstructionsFile } from 'agent-orchestrator';
+import { AGENTS_CUSTOM, customInstructionsFile, runWith } from 'agent-orchestrator';
 import { agentNameRefusal, WorkflowError } from 'agent-orchestrator/workflow';
 import { type ApiEnv, served } from '../layer.ts';
 
@@ -36,7 +36,7 @@ export const customInstructions = new Hono<ApiEnv>().get('/api/custom-instructio
     const wrong = agentNameRefusal(name);
     if (wrong !== undefined) return c.json({ error: `GET /api/custom-instructions/${name}: ${wrong}` }, 400);
     try {
-      return c.json((await AGENTS_CUSTOM.handler(e, { name, repo }, undefined, home)) as CustomInstructionsAnswer);
+      return c.json((await runWith(e, AGENTS_CUSTOM.handler({ name, repo }, undefined, home))) as CustomInstructionsAnswer);
     } catch (err) {
       if (!(err instanceof WorkflowError)) throw err;
       return c.json({ name, file: customInstructionsFile(home, name), words: null, error: err.message } satisfies CustomInstructionsAnswer);

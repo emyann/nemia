@@ -39,7 +39,7 @@ import path from 'node:path';
 const PKG = path.join(import.meta.dirname, '..');
 
 /** Judgement at the root of `src`: no runtime, no disk, no process, and no file of the other three kinds. */
-const PURE = ['effect', 'run', 'workflow'].map((f) => `src/${f}.ts`);
+const PURE = ['run', 'workflow'].map((f) => `src/${f}.ts`);
 
 /**
  * The I/O beneath the controllers at the root of `src`: none, as every store sits in a feature folder under a `.store.ts` name. A store
@@ -460,8 +460,8 @@ test('REFUSED: a file of no kind, a file of two, and a kind naming a file that i
   assert.deepEqual(unsorted({ ...packageSources(), 'src/x.ts': [] }), [
     'src/x.ts is of no kind: put it in a feature folder under a name that says its kind, or name it in PURE, STORE, CONTROLLER or CLIENT in test/boundary.test.ts',
   ]);
-  const { 'src/effect.ts': _, ...gone } = packageSources();
-  assert.deepEqual(unsorted(gone), ['PURE names src/effect.ts, which is not there']);
+  const { 'src/run.ts': _, ...gone } = packageSources();
+  assert.deepEqual(unsorted(gone), ['PURE names src/run.ts, which is not there']);
   const { [CLIENT]: __, ...clientGone } = packageSources();
   assert.deepEqual(unsorted(clientGone), ['CLIENT names src/runtime-client.ts, which is not there']);
   const named = [...PURE, ...STORE, ...CONTROLLER, CLIENT];
@@ -528,7 +528,7 @@ test('REFUSED: a pure file that reads the disk, spawns, imports the runtime or E
   assert.deepEqual(impurities(adding('src/check/check.ts', 'node:child_process')), [
     'src/check/check.ts is pure and imports node:child_process',
   ]);
-  assert.deepEqual(impurities(adding('src/run.ts', 'agent-runtime/effect')), ['src/run.ts is pure and imports agent-runtime/effect']);
+  assert.deepEqual(impurities(adding('src/run.ts', 'agent-runtime/harness')), ['src/run.ts is pure and imports agent-runtime/harness']);
   assert.deepEqual(impurities(adding('src/run.ts', 'agent-runtime')), ['src/run.ts is pure and imports agent-runtime']);
   assert.deepEqual(impurities(adding('src/run.ts', 'agent-runtime/vocabulary/x')), [
     'src/run.ts is pure and imports agent-runtime/vocabulary/x',
@@ -753,7 +753,7 @@ test('REFUSED: a type imported from the runtime by a controller, a store file, a
   assert.deepEqual(clientBreaks(adding('src/record/record.store.ts', 'agent-runtime')), [
     'src/record/record.store.ts imports agent-runtime, and only src/runtime-client.ts may',
   ]);
-  assert.deepEqual(clientBreaks(adding('src/timeline/timeline.ts', 'agent-runtime/effect')), [
+  assert.deepEqual(clientBreaks(adding('src/timeline/timeline.ts', 'agent-runtime/harness')), [
     'src/timeline/timeline.ts imports agent-runtime, and only src/runtime-client.ts may',
   ]);
   assert.deepEqual(clientBreaks(adding('src/cli/main.ts', 'agent-runtime')), [

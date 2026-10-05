@@ -10,13 +10,14 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { board as engineBoard } from './engine-board.ts';
 import { scratch } from './scratch.ts';
+import { Effect } from 'effect';
 
 const ROOT = scratch('wf-pause-retry-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 process.env.WF_ROOT = ROOT;
 delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
-const { advance, retry, start } = await import('../src/runner.ts');
+const { advanceRun, retryRun, startRun, runWith } = await import('../src/runner.ts');
 const { askFile, asksDir, readRun } = await import('../src/record/record.store.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
 
@@ -34,10 +35,10 @@ function aRepo(): string {
 async function pausedThen(phase: 'failed' | 'stopped') {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   fs.writeFileSync(path.join(dir, 'implement.md'), 'implement it\n');
-  const run = start({ brief: 'the pause', repo: aRepo(), workflowDir: dir, isolate: false });
+  const run = await Effect.runPromise(startRun({ brief: 'the pause', repo: aRepo(), workflowDir: dir, isolate: false }));
   const b = engineBoard();
   const e = engineOf(b.layer);
-  await advance(e, readRun(run.id));
+  await runWith(e, advanceRun(readRun(run.id)));
   const taskId = `${run.id}-implement`;
   b.settle(taskId, phase);
   const pauseAsk = { step: 'implement', try: 2, mode: 'nudge', interrupted: taskId, at: '2026-10-04T12:00:00.000Z' };
@@ -48,21 +49,21 @@ async function pausedThen(phase: 'failed' | 'stopped') {
 
 test('REFUSED: a retry over a void pause ask of its try, which the verb leaves for the tick; once a pass set it aside, the retry is written', async () => {
   const { e, id, pauseAsk } = await pausedThen('failed');
-  await assert.rejects(retry(e, id, 'implement', { mode: 'fresh', message: 'start over' }), (err: Error) => {
+  await assert.rejects(runWith(e, retryRun(id, 'implement', { mode: 'fresh', message: 'start over' })), (err: Error) => {
     assert.match(err.message, /^try 2 of implement is held by the ask nemia pause --now wrote .* the next pass sets it aside/);
     return true;
   });
   assert.deepEqual(JSON.parse(fs.readFileSync(askFile(id, 'implement', 2), 'utf8')), pauseAsk);
   assert.equal(fs.existsSync(path.join(asksDir(id), 'done')), false, 'the verb moves no file the tick reads');
-  await advance(e, readRun(id));
+  await runWith(e, advanceRun(readRun(id)));
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(asksDir(id), 'done', 'retry-implement-2'), 'utf8')), pauseAsk);
-  const { ask } = await retry(e, id, 'implement', { mode: 'fresh', message: 'start over' });
+  const { ask } = await runWith(e, retryRun(id, 'implement', { mode: 'fresh', message: 'start over' }));
   assert.deepEqual(JSON.parse(fs.readFileSync(askFile(id, 'implement', 2), 'utf8')), ask);
 });
 
 test('REFUSED: a retry over a pause ask still due, its session stopped, and that ask left as it is', async () => {
   const { e, id, pauseAsk } = await pausedThen('stopped');
-  await assert.rejects(retry(e, id, 'implement', { mode: 'fresh' }), (err: Error) => {
+  await assert.rejects(runWith(e, retryRun(id, 'implement', { mode: 'fresh' })), (err: Error) => {
     assert.match(err.message, /^try 2 of implement is asked by nemia pause --now/);
     return true;
   });

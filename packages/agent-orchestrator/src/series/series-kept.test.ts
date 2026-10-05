@@ -7,7 +7,7 @@
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import type { Engine } from 'agent-runtime';
+import { promised } from '../../test/promised.ts';
 import { scratch } from '../../test/scratch.ts';
 
 process.env.WF_ROOT = scratch('wf-series-kept-');
@@ -21,7 +21,7 @@ const { seriesMemo } = await import('./series.ts');
 type RecentPass = import('../meter/meter.ts').RecentPass;
 
 /** No pass is run: the engine is never asked. */
-const NO_ENGINE = {} as Engine;
+const NO_ENGINE = promised({});
 
 const pass = (at: string, ms: number): RecentPass => ({
   at,

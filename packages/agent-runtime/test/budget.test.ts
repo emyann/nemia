@@ -6,8 +6,8 @@
  * no cap, runs on past it, and ends `done`. So `claude-detached` hands a task's cap (`config.budgetUsd`, one of the
  * harness's arguments) to the harness on every attempt and records the end it prints — `failed`, and the limit the harness
  * says it stopped at, as a fact: the runtime judges no budget, and the orchestrator says `budget exhausted` of it.
- * The Promise engine's `file` refuses a cap on a `claude --bg` session, which would keep none. The `claude --bg` runner is
- * still given the flag when a task reaches it with one — through the Effect door, which refuses no harness's words — and a
+ * The engine's `file` refuses a cap on a `claude --bg` session, which would keep none. The `claude --bg` runner is
+ * still given the flag when a task reaches it with one — through a `Runner` of its own, which refuses no harness's words — and a
  * later turn of a task held open is spawned from the record the same way (`engine.test.ts`).
  *
  * The `claude -p` fake prints the result `claude -p --output-format json` prints for a session that crosses its cap, keys
@@ -19,12 +19,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Layer } from 'effect';
-import { Engine, promiseEngine } from '../src/index.ts';
+import { Engine } from '../src/index.ts';
 import { file } from '../src/core/engine/filing.ts';
 import { tick } from '../src/core/engine/engine.ts';
 import { Journal } from '../src/core/engine/journal.ts';
 import { Runner } from '../src/harness/seam.ts';
 import { scratch } from './scratch.ts';
+import { builtEngine } from './engine.ts';
 
 const tmp = (label: string) => scratch(`ae-budget-${label}-`);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -75,15 +76,17 @@ process.exitCode = 1;
   );
 
   await onPath(bin, async () => {
-    const engine = promiseEngine(Engine.layer({ root: tmp('root') }));
-    const id = await engine.file({ brief: 'the prompt', cwd: tmp('cwd'), harness: 'claude-detached', config: { budgetUsd: 0.01 } });
+    const engine = builtEngine(Engine.layer({ root: tmp('root') }));
+    const id = await Effect.runPromise(
+      engine.file({ brief: 'the prompt', cwd: tmp('cwd'), harness: 'claude-detached', config: { budgetUsd: 0.01 } }),
+    );
     const until = Date.now() + 20_000;
-    while (!(await engine.view(id)).state.settled && Date.now() < until) {
-      await engine.tick();
+    while (!(await Effect.runPromise(engine.view(id))).state.settled && Date.now() < until) {
+      await Effect.runPromise(engine.tick());
       await sleep(100);
     }
-    for (let i = 0; i < 3; i++) await engine.tick();
-    const { state } = await engine.view(id);
+    for (let i = 0; i < 3; i++) await Effect.runPromise(engine.tick());
+    const { state } = await Effect.runPromise(engine.view(id));
     assert.equal(state.settled, 'failed');
     assert.equal(state.attempts.length, 1, 'a budget spent is spent: no attempt 2');
     const [a] = state.attempts;
@@ -94,7 +97,7 @@ process.exitCode = 1;
     );
     assert.deepEqual(a.usage, { costUsd: 0.01804, apiMs: 718 }, 'with what it spent getting there');
     assert.equal(a.nativeId, result.session_id, 'a session a new filing could continue');
-    const settled = (await engine.feed(0)).entries.find((e) => e.taskId === id && e.event.kind === 'settled')?.event;
+    const settled = (await Effect.runPromise(engine.feed(0))).entries.find((e) => e.taskId === id && e.event.kind === 'settled')?.event;
     const note = settled?.kind === 'settled' ? (settled.note ?? '') : '';
     assert.equal(note, '1 attempt(s), none succeeded', 'settled as any failed attempt is');
     assert.doesNotMatch(note, /budget/, "the runtime says nothing of a budget: whether a cap reached is the reason is the caller's to say");
@@ -105,7 +108,7 @@ process.exitCode = 1;
   });
 });
 
-test('claude --bg is given --max-budget-usd on the attempt of a task that reaches it with one — through the Effect door, since file() refuses a cap a --bg session would not keep', async () => {
+test('claude --bg is given --max-budget-usd on the attempt of a task that reaches it with one — through a Runner layer of the core, since file() refuses a cap a --bg session would not keep', async () => {
   const bin = tmp('bin');
   const registry = path.join(bin, 'registry.json');
   const runs = path.join(bin, 'runs.jsonl');

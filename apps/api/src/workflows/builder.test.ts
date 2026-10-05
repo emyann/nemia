@@ -129,6 +129,7 @@ const spec = (fields: Partial<WorkflowStepSpec> = {}): WorkflowStepSpec => ({
   input: [],
   workspace: null,
   writable: [],
+  reads: [],
   slot: null,
   agent: null,
   skills: [],
@@ -694,6 +695,7 @@ test('PUT /api/workflows/yours/:name writes the folder the steps make — a step
     { from: 'review', to: 'build', kind: 'loop', rounds: 2 },
   ]);
   assert.equal(saved.workflow.description, 'Plan, build, review.');
+  assert.equal(saved.workflow.readme, '# drawn\n\nPlan, build, review.\n', 'the README it wrote, whole');
   assert.deepEqual(
     saved.workflow,
     (await listWorkflows(engine(), repo, root)).find((w) => w.name === 'drawn'),

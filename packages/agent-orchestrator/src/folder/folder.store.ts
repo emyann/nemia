@@ -589,15 +589,24 @@ export function preloads(skillDir: string): boolean {
  * that cannot be read describes nothing, and the steps beside it are `loadWorkflows`' to judge.
  */
 export function workflowDescription(dir: string): string | null {
-  let text: string;
+  const text = workflowReadme(dir);
+  return text === null ? null : readmeDescription(text);
+}
+
+/**
+ * A workflow's README in full, the workflow level's instruction: the text of the first README of its folder by name, any case, without a
+ * leading byte order mark.
+ *
+ * Null when the folder has no README or it cannot be read. Never throws: the steps beside it are `loadWorkflows`' to judge.
+ */
+export function workflowReadme(dir: string): string | null {
   try {
     const readme = fs.readdirSync(dir).filter(isReadme).sort()[0];
     if (!readme) return null;
-    text = fs.readFileSync(path.join(dir, readme), 'utf8');
+    return fs.readFileSync(path.join(dir, readme), 'utf8').replace(/^\uFEFF/, '');
   } catch {
     return null;
   }
-  return readmeDescription(text);
 }
 
 const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
@@ -646,6 +655,7 @@ const frozenStepFields = {
   input: Schema.optionalKey(Strings),
   workspace: Schema.optionalKey(Schema.Literals(['main', 'folder'])),
   writable: Schema.optionalKey(Strings),
+  reads: Schema.optionalKey(Strings),
   slot: Schema.optionalKey(Schema.Literal('none')),
   agent: Schema.optionalKey(StepAgentSchema),
   skills: Schema.optionalKey(Strings),

@@ -25,16 +25,16 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { nameFor } from 'agent-runtime';
-import { fold } from 'agent-runtime/effect';
+import { nameFor, fold } from 'agent-runtime';
 import { scratch } from './scratch.ts';
+import { Effect } from 'effect';
 
 const ROOT = scratch('wf-restart-');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 delete process.env.WF_MAX_CONCURRENT;
-const { engine, start, tick } = await import('../src/runner.ts');
+const { engine, startRun, tickRun, runWith } = await import('../src/runner.ts');
 const { readRun } = await import('../src/record/record.store.ts');
 const { rewriteRun } = await import('../src/record/record.store.ts');
 
@@ -130,13 +130,13 @@ const solo = (() => {
   fs.writeFileSync(path.join(dir, 'solo.md'), '---\nretries: 1\n---\ndo it\n');
   return dir;
 })();
-const runNaming = (record: { taskId: string; tries?: Array<{ taskId: string; then: 'retries' }> }) => {
+const runNaming = async (record: { taskId: string; tries?: Array<{ taskId: string; then: 'retries' }> }) => {
   const repo = scratch('wf-restart-repo-');
   const git = (...args: string[]) =>
     execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: 'ignore' });
   git('init', '-q');
   git('commit', '-q', '--allow-empty', '-m', 'base');
-  const run = start({ brief: 'restart', repo, workflowDir: solo, isolate: false });
+  const run = await Effect.runPromise(startRun({ brief: 'restart', repo, workflowDir: solo, isolate: false }));
   assert.ok(rewriteRun({ ...readRun(run.id), steps: { solo: record } }));
   return run.id;
 };
@@ -151,8 +151,8 @@ const failed = (id: string, s: number) =>
   ]);
 
 let e = engine();
-const admission = async (id: string) => (await e.view(id)).admission;
-const attempts = async (id: string) => (await e.view(id)).state.attempts.length;
+const admission = async (id: string) => (await Effect.runPromise(e.view(id))).admission;
+const attempts = async (id: string) => (await Effect.runPromise(e.view(id))).state.attempts.length;
 const CLAUDE = ['try-b', 'try-a', 'try-c', 'orphan', 'root-new', 'root-old'];
 const CODEX = ['x1', 'x2', 'x3', 'x4', 'x5', 'x6'];
 
@@ -169,24 +169,24 @@ for (const [id, s] of [
 ] as const) {
   failed(`${id}-was`, 2);
   pending(id, s, { priority: 1 });
-  runNaming({ taskId: id, tries: [{ taskId: `${id}-was`, then: 'retries' }] });
+  await runNaming({ taskId: id, tries: [{ taskId: `${id}-was`, then: 'retries' }] });
 }
 pending('orphan', 5);
 pending('root-new', 10);
-runNaming({ taskId: 'root-new' });
+await runNaming({ taskId: 'root-new' });
 pending('root-old', 15);
-runNaming({ taskId: 'root-old' });
+await runNaming({ taskId: 'root-old' });
 CODEX.forEach((id, i) => pending(id, 40 + i, { harness: 'codex' }));
 
 test("REFUSED at shipped defaults: the two sessions at work fill claude's pool, so the restarted daemon admits no claude task and starts none; codex takes its own two", async () => {
-  await tick(e);
+  await runWith(e, tickRun());
   for (const id of [...CLAUDE, ...CODEX]) assert.equal(await attempts(id), 0, `${id} started on the pass that admitted it`);
   assert.deepEqual(
     await Promise.all(CLAUDE.map(admission)),
     CLAUDE.map(() => 'queued'),
   );
   assert.deepEqual(await Promise.all(CODEX.map(admission)), ['admitted', 'admitted', 'queued', 'queued', 'queued', 'queued']);
-  await tick(e);
+  await runWith(e, tickRun());
   for (const id of CLAUDE) {
     assert.equal(await admission(id), 'queued', `${id} still waits`);
     assert.equal(await attempts(id), 0);
@@ -197,7 +197,7 @@ test("REFUSED at shipped defaults: the two sessions at work fill claude's pool, 
 test('restarted under a raised ceiling, a fresh engine admits in the old order â€” priority, filing, id â€” a pass before it starts, and one more per session ended', async () => {
   process.env.WF_MAX_CONCURRENT = '5';
   e = engine();
-  await tick(e);
+  await runWith(e, tickRun());
   for (const id of CLAUDE) assert.equal(await attempts(id), 0, `${id} started on the pass that admitted it`);
   assert.deepEqual(
     await Promise.all(CLAUDE.map(admission)),
@@ -210,7 +210,7 @@ test('restarted under a raised ceiling, a fresh engine admits in the old order â
     'codex up to its own five, beside the two at work since the first case: an admission is spent on the start it let through, so theirs reads as none',
   );
 
-  await tick(e);
+  await runWith(e, tickRun());
   for (const id of ['try-a', 'try-b', 'try-c', 'x1', 'x2', 'x3', 'x4', 'x5'])
     assert.equal(await attempts(id), 1, `${id} started on the second pass`);
   for (const id of ['orphan', 'root-new', 'root-old', 'x6'])
@@ -220,14 +220,14 @@ test('restarted under a raised ceiling, a fresh engine admits in the old order â
     { name: sessionName('w1'), state: 'done' },
     { name: sessionName('w2'), state: 'working' },
   ]);
-  await tick(e);
-  assert.equal((await e.view('w1')).state.settled, 'succeeded');
+  await runWith(e, tickRun());
+  assert.equal((await Effect.runPromise(e.view('w1'))).state.settled, 'succeeded');
   assert.deepEqual(
     await Promise.all(['orphan', 'root-new', 'root-old'].map(admission)),
     ['admitted', 'queued', 'queued'],
     'one session ended: the next pass admits exactly one more, the earliest filing of those with none, which no run names',
   );
-  await tick(e);
+  await runWith(e, tickRun());
   assert.equal(await attempts('orphan'), 1, 'the pass after starts it');
   assert.equal(await attempts('root-new'), 0);
 });

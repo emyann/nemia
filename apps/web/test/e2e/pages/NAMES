@@ -16,6 +16,7 @@ cost
 moving
 waits
 workflows
+workflow
 builder
 inbox
 card
@@ -74,3 +75,5 @@ workflow-remove
 workflow-remove-refused
 stats-passes
 stats-system
+factory-settings
+factory-settings-none

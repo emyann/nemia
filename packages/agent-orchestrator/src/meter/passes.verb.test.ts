@@ -6,7 +6,7 @@
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import type { Engine } from 'agent-runtime';
+import { promised } from '../../test/promised.ts';
 import { scratch } from '../../test/scratch.ts';
 
 process.env.WF_ROOT = scratch('wf-passes-');
@@ -17,7 +17,7 @@ const { PHASES, passCost, passesRead, recentOf } = await import('./meter.ts');
 const { passesOf } = await import('./passes.verb.ts');
 
 /** No pass is run: the engine is never asked. */
-const NO_ENGINE = {} as Engine;
+const NO_ENGINE = promised({});
 
 /** A pass of `ms`, at the `k`th second, that saw `runs` runs. */
 const cost = (k: number, ms: number, runs: number) =>
@@ -62,7 +62,7 @@ test('`nemia passes --json` is the whole answer, the passes oldest first; --last
   for (const c of COSTS) recordRecentPass(c);
   const all = JSON.parse((await typed(t, ['passes', '--json'])).join('\n'));
   assert.deepEqual(all, passesRead(COSTS.map((c) => recentOf(c))));
-  assert.deepEqual(all, JSON.parse(JSON.stringify(await passesOf({}))), 'the answer the api serves, off the same file');
+  assert.deepEqual(all, JSON.parse(JSON.stringify(passesOf({}))), 'the answer the api serves, off the same file');
   const last = JSON.parse((await typed(t, ['passes', '--json', '--last', '2'])).join('\n'));
   assert.deepEqual(
     last.recent.map((p: { runs: number }) => p.runs),

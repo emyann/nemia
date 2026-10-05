@@ -81,6 +81,7 @@ const spec = (fields: Partial<WorkflowStepSpec>): WorkflowStepSpec => ({
   input: [],
   workspace: null,
   writable: [],
+  reads: [],
   slot: null,
   agent: null,
   skills: [],
@@ -143,6 +144,8 @@ test("GET /api/workflows lists each folder, the repository's then yours: its des
       from: 'repo',
       dir: broken,
       description: 'A reviewer with a misspelt key.',
+      /** A folder the loader refuses still has its README. */
+      readme: '# broken\n\nA reviewer with a misspelt key.\n',
       steps: [],
       graph: { roots: [], edges: [] },
       schemas: [],
@@ -156,6 +159,8 @@ test("GET /api/workflows lists each folder, the repository's then yours: its des
       from: 'repo',
       dir: good,
       description: 'Implement it, then review it, two rounds at most.',
+      /** Whole: the paragraphs past the description too. */
+      readme: '# good\n\nImplement it, then review it,\ntwo rounds at most.\n\nMore about it.\n',
       /** The README is not among the steps. */
       steps: [
         {
@@ -205,6 +210,7 @@ test("GET /api/workflows lists each folder, the repository's then yours: its des
       from: 'yours',
       dir: mine,
       description: null,
+      readme: null,
       steps: [
         {
           name: 'plan',
@@ -558,7 +564,7 @@ test("a start as the board sends it is not refused: same-origin through vite's `
   assert.equal(runFiles().length, before + 3);
 });
 
-test("REFUSED at shipped defaults: what `start()` refuses is a 422 carrying its message word for word — a folder the loader refuses, a step named for another's check — and nothing is written", async () => {
+test("REFUSED at shipped defaults: what `startRun` refuses is a 422 carrying its message word for word — a folder the loader refuses, a step named for another's check — and nothing is written", async () => {
   const before = runFiles();
 
   const broke = await post({ workflow: 'broken', brief: 'Do it.' });
@@ -636,7 +642,7 @@ test('GET /api/repository is the repository a start runs in, as the start form l
   assert.deepEqual(await res.json(), { repo });
 });
 
-test('POST /api/runs takes `after` and passes it to `start()`, which freezes it on the record as `nemia start --after` does — and the board reads the run waiting on it', async () => {
+test('POST /api/runs takes `after` and passes it to `startRun`, which freezes it on the record as `nemia start --after` does — and the board reads the run waiting on it', async () => {
   parents();
   const res = await post({ workflow: 'good', from: 'repo', brief: 'Once it ships.', after: ['p-running'] });
   assert.equal(res.status, 201, await res.clone().text());

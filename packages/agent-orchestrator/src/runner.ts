@@ -6,7 +6,7 @@
  * `HARNESS_CHOICES`, the words each harness takes per key, is re-exported from there. The controllers are a verb each, in its feature's
  * folder, and each imports the client, or a controller that does, never the runtime: `views.verb.ts` (what the runtime's views of a run's
  * tasks say), `start.verb.ts`, `plan.verb.ts` and `inbox.verb.ts` (starting runs, plans and inbox cards), `tick.verb.ts` and
- * `advance.verb.ts` (a pass — `tick`, `advance` — and the filings it adopts), what a person asks of a run (`cancel.verb.ts`,
+ * `advance.verb.ts` (a pass — `tickRun`, `advanceRun` — and the filings it adopts), what a person asks of a run (`cancel.verb.ts`,
  * `retry.verb.ts`, `gate.verb.ts`, `say.verb.ts`, `wait.verb.ts`, `round.verb.ts`), the table of the commands that call them, each defined
  * once (`commands.verb.ts`), `forget.verb.ts` and `prune.verb.ts` (`nemia rm` and `nemia prune`), `list.verb.ts` and `decide.verb.ts` (what
  * a person reads of a run: `nemia ls` and `nemia decide`), and `stats.verb.ts` (what the store's runs add up to: `nemia stats`). They
@@ -21,13 +21,14 @@
  * a place holds), `agents.store.ts`, `roster.store.ts`, `fills.store.ts`, `try.store.ts`, `custom.store.ts` and `skills.store.ts` (an
  * agent, the agents of both places read, the steps each fills, an agent's try folder written, a person's custom instructions for one, and
  * a skill read and written), `place.store.ts` (a place skill's verbs run and heard), `plan.store.ts` (a plan folder read),
- * `inbox.store.ts` (the inbox's cards filed, queued and dropped), `factory.store.ts` (the factories, `factoriesDir`) and `config.store.ts`
- * (the `WF_` environment). They import neither the runtime nor a controller, and load as a tree: the bottom, beneath `record.store.ts`,
- * beneath `worktree.store.ts` and `write.store.ts`, beneath the rest, so no cycle can form (`test/boundary.test.ts`).
+ * `inbox.store.ts` (the inbox's cards filed, queued and dropped), `factory.store.ts` (the factories, `factoriesDir`), `config.store.ts`
+ * (the `WF_` environment) and `telemetry.store.ts` (what a daemon's process logs and exports, `telemetryLayer`). They import neither
+ * the runtime nor a controller, and load as a tree: the bottom, beneath `record.store.ts`, beneath `worktree.store.ts` and
+ * `write.store.ts`, beneath the rest, so no cycle can form (`test/boundary.test.ts`).
  */
 export { verdictWord } from './check/check.ts';
 export { VERSION } from './version/version.ts';
-export { Conflict, Invalid, Missing } from './refusal/refusal.ts';
+export { Conflict, Invalid, isRefusal, Missing } from './refusal/refusal.ts';
 export { maxConcurrent, maxRuns, verifiesRest, wfRoot } from './config/config.store.ts';
 export type { Refusal } from './refusal/refusal.ts';
 export {
@@ -171,6 +172,7 @@ export {
   skillVersion,
   workflowDescription,
   workflowFolder,
+  workflowReadme,
   workflowsIn,
 } from './folder/folder.store.ts';
 export type { Places } from './folder/folder.store.ts';
@@ -203,7 +205,7 @@ export {
   unattachedRefusal,
   unfilledRefusal,
 } from './factory/factory.ts';
-export type { Factory, FactoryListing, Hires } from './factory/factory.ts';
+export type { Factory, FactoryListing, Hires, InstructionAt } from './factory/factory.ts';
 export { cursorTakes, feedLineWords, REMOVED } from './feed/feed.ts';
 export type { FeedLine } from './feed/feed.ts';
 export type { FeedSaid, FeedWords } from './run.ts';
@@ -258,6 +260,7 @@ export {
 export type { TakenStore } from './daemon/daemon.store.ts';
 export { holdUrl, runMain, up } from './daemon/up.verb.ts';
 export type { UpOptions } from './daemon/up.verb.ts';
+export { telemetryLayer } from './telemetry/telemetry.store.ts';
 export { addPass, breakdownLines, heaviest, PHASES, STATS_EVERY_MS, summaryDue, summaryLine } from './meter/meter.ts';
 export type {
   HarnessCost,
@@ -346,9 +349,10 @@ export {
   readFactories,
   readFactory,
   removeFactory,
+  setInstruction,
   startFactory,
 } from './factory/factory.store.ts';
-export { HARNESSES, engine, remoteAgents } from './runtime-client.ts';
+export { EngineService, HARNESSES, asked, engine, remoteAgents, runWith } from './runtime-client.ts';
 export { HARNESS_CHOICES } from 'agent-runtime/vocabulary';
 export { A2A_AGENTS_FILE, envNameOf } from './harness/a2a.store.ts';
 export {
@@ -359,9 +363,10 @@ export {
   deniedOf,
   exitVerdicts,
   harnessBlocked,
-  parentOf,
-  parentsOf,
-  readFilings,
+  parentRead,
+  parentsRead,
+  filingsRead,
+  taskPhasesRead,
   saidCount,
   spendReader,
   viewedOnce,
@@ -371,13 +376,13 @@ export {
 export { endWords, phaseOfView, wordOfView } from './views/views-words.ts';
 export type { CheckReport } from './views/views.verb.ts';
 export { readPlan } from './plan/plan.store.ts';
-export { leftOutMounts, repoFor, start } from './start/start.verb.ts';
+export { leftOutMounts, repoFor, startRun } from './start/start.verb.ts';
 export { startFromInbox, startQueued } from './inbox/inbox.verb.ts';
 export { startPlan } from './plan/plan.verb.ts';
 export type { InboxStart, InboxStarted } from './inbox/inbox.verb.ts';
 export type { PlanStarted } from './plan/plan.verb.ts';
-export { advance } from './tick/advance.verb.ts';
-export { refusalLines, tick } from './tick/tick.verb.ts';
+export { advanceRun } from './tick/advance.verb.ts';
+export { refusalLines, tickRun } from './tick/tick.verb.ts';
 export { checkoutHold } from './ending/ending.verb.ts';
 export { runSlots, type Slots, slotsOf } from './cap/cap.verb.ts';
 export type { MergeWord, StandingMerge } from './branches/merge.store.ts';
@@ -385,9 +390,9 @@ export type { FolderLoaded } from './folder/workflows.verb.ts';
 export type { SkillPage } from './skills/skills.verb.ts';
 export type { Advanced } from './tick/advance.verb.ts';
 export type { Pass } from './tick/tick.verb.ts';
-export { accept, round } from './round/round.verb.ts';
-export { approve } from './gate/gate.verb.ts';
-export { cancel } from './cancel/cancel.verb.ts';
+export { acceptRun, roundRun } from './round/round.verb.ts';
+export { approveRun } from './gate/gate.verb.ts';
+export { cancelRun } from './cancel/cancel.verb.ts';
 export { hold, unhold } from './wait/wait.verb.ts';
 export {
   finishingWords,
@@ -404,14 +409,16 @@ export {
   type PauseStaged,
 } from './pause/pause.ts';
 export { readPause } from './pause/pause.store.ts';
-export { retry } from './retry/retry.verb.ts';
-export { say } from './say/say.verb.ts';
+export { retryRun } from './retry/retry.verb.ts';
+export { sayRun } from './say/say.verb.ts';
 export { COMMANDS, TABLE } from './command/commands.verb.ts';
 export { PRUNE, RM } from './command/runs.verb.ts';
 export { LOGS, STATS } from './command/reads.verb.ts';
 export { START } from './start/commands.verb.ts';
 export { INBOX, INBOX_ADD, INBOX_QUEUE } from './inbox/commands.verb.ts';
 export { FACTORY } from './factory/factory.verb.ts';
+export { FACTORY_INSTRUCT, FACTORY_INSTRUCTION, factoryInstruction } from './factory/instruction.verb.ts';
+export type { FactoryInstruction } from './factory/instruction.verb.ts';
 export { AGENTS_CUSTOM } from './agents/custom.verb.ts';
 export type { Command, Ran } from './command/entry.verb.ts';
 export { CLI, commandBreaks, commandLine, generated, helpOf, leftOut, parseArgv, routeList } from './command/command.ts';
@@ -422,10 +429,10 @@ export type { Asked } from './retry/retry.verb.ts';
 export type { Cancelled } from './cancel/cancel.verb.ts';
 export type { Holding } from './wait/wait.verb.ts';
 export type { Told } from './say/say.verb.ts';
-export { forget } from './forget/forget.verb.ts';
+export { forgetRun } from './forget/forget.verb.ts';
 export { prune } from './prune/prune.verb.ts';
-export { decide } from './decide/decide.verb.ts';
-export { freshStatsMemo, stats } from './stats/stats.verb.ts';
+export { decideRun } from './decide/decide.verb.ts';
+export { freshStatsMemo, statsRun } from './stats/stats.verb.ts';
 export type { StatsMemo, StatsOptions } from './stats/stats.verb.ts';
 export { seriesMemo } from './series/series.ts';
 export type { Health, SeriesMemo, SeriesPoint, SeriesRead } from './series/series.ts';

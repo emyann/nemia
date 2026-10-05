@@ -16,7 +16,11 @@
 export const PHASES = ['records', 'asks', 'journals', 'observe', 'runtime', 'git', 'assess', 'act'] as const;
 export type Phase = (typeof PHASES)[number];
 
-/** One phase's count: its time in ms, the calls made to it, the bytes and reads counted while it ran, and the processes it started. */
+/**
+ * One phase's count: its time in ms, the calls made to it, the bytes and reads counted while it ran, and the processes it started. A read
+ * is one of bytes: a journal is read for what was appended to it since the engine last read it, and one it finds as it left it costs a
+ * `stat` and no read, so a pass's journal reads are the journals that changed, not the ones it asked for.
+ */
 export type PhaseCost = { ms: number; calls: number; bytes: number; reads: number; spawned: number };
 
 /**

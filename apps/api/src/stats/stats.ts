@@ -47,6 +47,6 @@ export const stats = new Hono<ApiEnv>().get('/api/stats', (c) =>
       }),
     );
     statsQueryOf(given, (key) => `?${QUERY_KEYS[key]}=`);
-    return c.json(await STATS.handler(e, given, env, home, { stats: memo.stats }));
+    return c.json(await STATS.handler(e, given, env, home, { stats: memo.stats, series: memo.series }));
   }),
 );

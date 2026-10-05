@@ -10,6 +10,8 @@ import type { Context as RequestContext } from 'hono';
 import { routePath } from 'hono/route';
 import {
   freshStatsMemo,
+  seriesMemo,
+  type SeriesMemo,
   type Factory,
   type StatsMemo,
   type Filings,
@@ -35,7 +37,8 @@ export class ApiConfig extends Context.Service<ApiConfig, { readonly env: NodeJS
 /**
  * What an app's reads keep between requests, each read through its engine: the list's memo of runs at rest (`resting`, the package's
  * `RestingMemo`), the stats' memo of each run's facts (`stats`, the package's `StatsMemo`), the feed's filing times (`filings`,
- * `filedTimes`), and where each blocked session's conversation was last read (`said`). One for an app, built with its runtime (`live`),
+ * `filedTimes`), where each blocked session's conversation was last read (`said`), and the series' days read (`series`, the
+ * package's `SeriesMemo`). One for an app, built with its runtime (`live`),
  * so an app over another engine starts with none. A cache: nothing is decided by it.
  */
 export class ReadMemo extends Context.Service<
@@ -45,6 +48,7 @@ export class ReadMemo extends Context.Service<
     readonly stats: StatsMemo;
     readonly filings: Filings;
     readonly said: LastSaid;
+    readonly series: SeriesMemo;
   }
 >()('api/ReadMemo') {
   static readonly live: Layer.Layer<ReadMemo> = Layer.sync(ReadMemo)(() => ({
@@ -52,6 +56,7 @@ export class ReadMemo extends Context.Service<
     stats: freshStatsMemo(),
     filings: { filed: new Map(), cursor: 0 },
     said: new Map(),
+    series: seriesMemo(),
   }));
 }
 

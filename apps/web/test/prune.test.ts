@@ -104,6 +104,7 @@ test('the decision is read for its `awaiting` alone: null for every answer but a
     total: { usage: null, used: '', cost: '', costUsd: null, apiMs: null, toolMs: null, read: null, peak: null, rebuilt: 0 },
     cost: null,
     overBudget: null,
+    collisions: null,
     commands: [],
   };
   assert.deepEqual(awaitingOf({ ...decidable, awaiting: unmerged }), unmerged);

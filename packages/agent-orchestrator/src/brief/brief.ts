@@ -27,7 +27,7 @@ import { briefBody, rendersAgent, skillLayers } from '../agents/agents.ts';
 import { ownNote } from '../ending/ending.ts';
 import { FENCE_KEYS } from '../workflow/index.ts';
 import { inputsLine, mountsLine } from '../start/index.ts';
-import { resultSteps, workChecks } from '../branches/branches.ts';
+import { resultSteps, workChecks } from '../branches/index.ts';
 import { costsSection, type WorkflowCosts } from '../costs/index.ts';
 
 /**

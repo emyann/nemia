@@ -148,6 +148,7 @@ test("only the api's decision is shown: not `running`, not `nothing`, not an ans
     },
     cost: null,
     overBudget: null,
+    collisions: null,
     commands: [],
     awaiting: null,
   };

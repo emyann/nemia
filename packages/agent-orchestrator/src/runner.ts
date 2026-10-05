@@ -40,7 +40,7 @@ export {
   lessonLine,
   parseGlobs,
   touchedLines,
-} from './branches/branches.ts';
+} from './branches/index.ts';
 export { LARGE_CONTEXT, budgetWord, dollars, peakMark, readWords, rebuiltCache, sumUsage, usedLines } from './status/status.ts';
 export { isGitRun, placeOf } from './run.ts';
 export { answerIn, deniedWords, harnessWaitLine, waitingWords } from './run.ts';
@@ -389,7 +389,8 @@ export { advanceRun } from './tick/advance.verb.ts';
 export { refusalLines, tickRun } from './tick/tick.verb.ts';
 export { checkoutHold } from './ending/ending.verb.ts';
 export { runSlots, type Slots, slotsOf } from './cap/cap.verb.ts';
-export type { MergeWord, StandingMerge } from './branches/merge.store.ts';
+export type { MergeWord, StandingMerge } from './branches/index.ts';
+export type { Collision, Collisions } from './collide/collide.ts';
 export type { FolderLoaded } from './folder/workflows.verb.ts';
 export type { SkillPage } from './skills/skills.verb.ts';
 export type { Advanced } from './tick/advance.verb.ts';

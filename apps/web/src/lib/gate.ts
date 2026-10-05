@@ -6,7 +6,7 @@
  * sentences joining them are the board's, so a person reads what approving does without knowing the package: the CLI's `ls` prints the
  * command.
  */
-import type { Decidable, RunDetail, RunSummary, StepAsked } from './api';
+import type { Collision, Collisions, Decidable, RunDetail, RunSummary, StepAsked } from './api';
 import { askedSaid, needsOf, stepAnchor, type Need } from './asks.ts';
 import { touchedSummary } from './decide.ts';
 
@@ -169,18 +169,42 @@ export function gateFacts(run: Pick<RunDetail, 'steps' | 'cost'>, decision: Deci
       step: checked.name,
     });
   }
-  if (decision) {
-    if (decision.touched.length) facts.push({ label: 'touched', said: touchedSummary(decision.touched) });
-    for (const standing of decision.standings) {
-      if (!standing.merge) continue;
-      facts.push({
-        label: 'merges',
-        said: standing.merge.said,
-        state: 'clean' in standing.merge ? (standing.merge.clean ? 'good' : 'bad') : undefined,
-      });
-    }
-  }
+  if (decision) facts.push(...decisionFacts(decision));
   return facts;
+}
+
+/** The facts the run's decision adds under its gate: what it touched, whether each branch merges onto the base, and its collisions. */
+function decisionFacts(decision: Decidable): GateFact[] {
+  const facts: GateFact[] = [];
+  if (decision.touched.length) facts.push({ label: 'touched', said: touchedSummary(decision.touched) });
+  for (const standing of decision.standings) {
+    if (!standing.merge) continue;
+    facts.push({
+      label: 'merges',
+      said: standing.merge.said,
+      state: 'clean' in standing.merge ? (standing.merge.clean ? 'good' : 'bad') : undefined,
+    });
+  }
+  if (decision.collisions) facts.push(...collisionFacts(decision.collisions));
+  return facts;
+}
+
+/**
+ * The facts an ending's collisions add under its gate: the runs in flight on the base in one line — good when it collides with none, bad
+ * when it conflicts with one — then each branch of theirs one of ours does not merge onto cleanly, and the semantic conflict.
+ */
+export function collisionFacts(collisions: Collisions): GateFact[] {
+  const conflicts = (c: Collision): boolean => 'clean' in c.merge;
+  const { colliding, semantic } = collisions;
+  return [
+    {
+      label: 'others',
+      said: collisions.said,
+      state: colliding.some(conflicts) ? 'bad' : colliding.length ? undefined : 'good',
+    },
+    ...colliding.map((c): GateFact => ({ label: 'collides', said: `${c.ours} ${c.said}`, state: conflicts(c) ? 'bad' : undefined })),
+    ...(semantic ? [{ label: 'semantic', said: semantic.said, state: 'bad', step: semantic.step } satisfies GateFact] : []),
+  ];
 }
 
 /**

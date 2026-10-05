@@ -14,7 +14,8 @@ import { parseCloseout, type Closeout } from '../closeout/closeout.ts';
 import { roundsDue } from '../round/round.ts';
 import { stepsOf } from '../record/record.store.ts';
 import { runStore } from '../record/files.store.ts';
-import { mergesOnto } from '../branches/merge.store.ts';
+import { trialMerges } from '../place/place.store.ts';
+import { mergeWordOf } from '../branches/index.ts';
 import { gitSays } from '../workspace/worktree.store.ts';
 import { strayAsk } from '../say/say.verb.ts';
 import { closeoutAsked, closeoutReader, spendReader, taskPhasesRead } from '../views/views.verb.ts';
@@ -42,11 +43,11 @@ function mergeReads(
   };
 }
 
-/** A trial merge of a branch onto the run's base branch, by git's `merge-tree` (`mergesOnto`), which touches no checkout. */
+/** A trial merge of a branch onto the run's base branch, by the place's trial merge (`trialMerges`), which touches no checkout. */
 const trialOf =
   (run: Run) =>
   (branch: string): Trial =>
-    isGitRun(run) ? mergesOnto(run.repo, run.branch, branch) : { error: 'no repository' };
+    isGitRun(run) ? mergeWordOf(trialMerges(run.repo, [{ onto: run.branch, branch }]).trials[0]) : { error: 'no repository' };
 
 /** The commit the run's base branch is at now, as git reads it in the run's repository, and when it was read; '' where git cannot. */
 const baseOf = (run: Run) => ({
@@ -87,8 +88,8 @@ export function mergeOffers(
  * The next tick honours it once, and moves the run's base to the commit merged.
  *
  * Refused before anything is written, with what to do instead (`mergeAsk`): among them a run whose result step closes no loop, pointed to
- * `nemia retry`, and work whose trial merge onto the base is clean, pointed to the landing's approval. The trial is git's `merge-tree`
- * (`mergesOnto`), which touches no checkout. An ask written by someone else between the look and the write is refused as the look would
+ * `nemia retry`, and work whose trial merge onto the base is clean, pointed to the landing's approval. The trial is the place's
+ * (`trialMerges`), which touches no checkout. An ask written by someone else between the look and the write is refused as the look would
  * have refused it, and a file at the ask's name that does not read as one is named (`strayAsk`). Fails with a refusal, the verb's or one a
  * read threw (`Missing` for no such run); dies of anything else (`tried`).
  */

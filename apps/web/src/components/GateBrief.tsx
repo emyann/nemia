@@ -3,17 +3,15 @@ import { useQuery } from '@tanstack/react-query';
 import { decisionQuery, type RunDetail } from '../lib/api';
 import { needOf, stepAnchor } from '../lib/asks';
 import { decidableRun, decisionStamp, isDecidable } from '../lib/decide';
-import { gateBrief, gateFacts, gateOfStep, needWords, type GateFact } from '../lib/gate';
+import { gateBrief, gateFacts, gateOfStep, needWords } from '../lib/gate';
 import { cn } from '../lib/utils';
 import { RouteLink } from './AgentParts';
+import { FactList, LINK } from './Facts';
 import { Gate } from './Gate';
 import { Markdown } from './Markdown';
 import { StepPolicy } from './Told';
 
 type Step = RunDetail['steps'][number];
-
-const LINK =
-  'rounded-sm underline decoration-neutral-400 underline-offset-2 outline-none hover:decoration-neutral-700 focus-visible:ring-2 focus-visible:ring-ring/50 dark:decoration-neutral-500 dark:hover:decoration-neutral-300';
 
 /**
  * What a run asks of a person at this step, first in its inspector, above everything else: at a gate, which step waits, what approving does
@@ -68,40 +66,12 @@ function GateBrief({ run, step }: { run: RunDetail; step: Step }) {
       <p data-brief="sending-back" className="break-words">
         {brief.sendingBack}
       </p>
-      <dl
-        aria-label="What to decide on"
-        className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 border-t border-amber-200 pt-2 text-xs dark:border-amber-900"
-      >
-        {facts.map((fact, i) => (
-          <div key={`${fact.label}-${i}`} className="contents">
-            <dt className="text-neutral-500">{fact.label}</dt>
-            <dd data-fact={fact.label} data-state={fact.state} className={cn('min-w-0 break-words', STATE[fact.state ?? 'none'])}>
-              <FactWords run={run} fact={fact} />
-            </dd>
-          </div>
-        ))}
-      </dl>
+      <FactList runId={run.id} facts={facts} label="What to decide on" className="border-t border-amber-200 pt-2 dark:border-amber-900" />
       <StepPolicy layers={step.layers} />
       <div className="border-t border-amber-200 pt-3 dark:border-amber-900">
         <Gate runId={run.id} step={step.name} approveLine={step.commands.approve} back={gate.back} acts={gate.ends} framed={false} />
       </div>
     </section>
-  );
-}
-
-const STATE = {
-  good: 'text-emerald-800 dark:text-emerald-300',
-  bad: 'text-red-700 dark:text-red-400',
-  none: '',
-} as const;
-
-/** A fact's words, linked to the step's section on the run's page where there is more to read: a review's findings, a check's output. */
-function FactWords({ run, fact }: { run: RunDetail; fact: GateFact }) {
-  if (!fact.step) return <>{fact.said}</>;
-  return (
-    <RouteLink to="/runs/$runId" params={{ runId: run.id }} hash={stepAnchor(fact.step)} data-fact-link={fact.step} className={LINK}>
-      {fact.said}
-    </RouteLink>
   );
 }
 

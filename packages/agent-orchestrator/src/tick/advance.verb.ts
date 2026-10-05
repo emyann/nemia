@@ -14,7 +14,7 @@ import { deniedSoFarOf } from '../stats/index.ts';
 import type { Verdict } from '../check/check.ts';
 import type { Workflow } from '../workflow.ts';
 import { folderPlace } from '../record/places.store.ts';
-import { tipBranches, tipsSeen } from '../branches/branches.ts';
+import { tipBranches, tipsSeen } from '../branches/index.ts';
 import { inFlight, runAdmitted, slotNeed, slotWord, takesNoSlot, type CheckoutHold, type RunSlot } from '../cap/cap.ts';
 import { endingAsked } from '../ending/ending.ts';
 import { holdsOpen } from '../gate/gate.ts';

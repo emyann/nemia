@@ -59,7 +59,7 @@ called from about 40 places. Two more sites read git's files off disk with no pr
 | `run.ts:5037`, `:5078`, `:5100`; `check/check.ts:239-241`; `run.ts:3799-3808`, `:3950-3960`, `:4014`; `cli.ts:1580`, `:1600-1601`; `keys/keys.ts` (`workspaceOf`'s codex refusal) | git commands printed to agents and people: how to read the diff, resolve a conflict, stage a landing, unlock a worktree, ship or drop a branch | `place.json` `say`, and the skill's prose |
 | `meter/meter.ts:16`, `meter/tally.store.ts:195` | the pass's `git` phase, counted by the command's name | the `place` phase |
 | `authoring.ts:152`, `:628` (`.git` beside `workflows/`) | whether a folder is a repository's, for the board's lookup of workflows, agents and skills | open question 5 |
-| api `decide/merge.ts:21` `mergesOnto` (`merge-tree --write-tree`) | the board's trial merge: does a result still merge onto the base as it is now | `report` |
+| ~~api `decide/merge.ts:21` `mergesOnto` (`merge-tree --write-tree`)~~ moved to the place's `trial` verb (`trialMerges`), read live (open question 2) | the board's trial merge: does a result still merge onto the base as it is now | `report` |
 | api `decide/decision.ts:333-359` (`touchedBy`, `sensitiveDiff`, `diffStat`, `branchStandings`), `:246`, `:253-254` (`git -C … diff`, `merge --no-ff`, `branch -D`) | the decision page's diff, standings and offered commands | the report snapshot; `place.json` `say` |
 | runtime `harness/codex/codex.ts:41-53` `repositoryOf` (`rev-parse --git-common-dir`), used at `:202-204` | the repository a Codex worktree belongs to, to extend the operator's trust to it | a task field (below) |
 
@@ -140,7 +140,7 @@ worked out in code today with no git: the parent's workspace, the checkout, the 
 | `open` | `wf start`, once | `{ root }`: the directory `--repo` names | `Opened { repo, baseRef, branch }` | `makeWorkspace` |
 | `make` | before filing a `fork` or `merge` step of an isolated run | `{ repo, at, name, from, also[] }`: `at` is `WF_ROOT/worktrees/<id>/<step>`, `name` is `wf/<id>/<step>`, `from` a branch or the base | `Made { workspace, branch, conflicts[], notes[] }` | `workspaceFor`'s git half, `includeFiles` |
 | `handoff` | each pass a finished step's hand-off is due, and before `wf rm` removes a workspace | `{ workspace, step, why }` | `HandedOff { commit: string \| null }` | `handOff` |
-| `report` | when a run's result tips or its base moved since the last report (below) | `{ repo, baseRef, onto, branches[], diffOf[], present[], atBase[] }` | `Changes` (below) | `touchedBy`, `diffStat`, `artifacts`, `readArtifact`, `sensitiveDiff`, `workspacesOf`, `artifacts.ts:62`, the api's `mergesOnto` |
+| `report` | when a run's result tips or its base moved since the last report (below) | `{ repo, baseRef, onto, branches[], diffOf[], present[], atBase[] }` | `Changes` (below) | `touchedBy`, `diffStat`, `artifacts`, `readArtifact`, `sensitiveDiff`, `workspacesOf`, `artifacts.ts:62`, the trial merges `trial` reads live today |
 | `standing` | by the tick, each pass: one call per repository and frozen copy, over every result branch the store's records name there; written to a snapshot the api and `wf ls` read (below) | `{ repo, branches: [{ branch, tip?, baseRef }], base }` | `Standing { heads, branches: [{ branch, tip, onBase, pastBase, ahead }] }` | `isShipped`, `branchReader`, `refsOf`, `headsOf`, `parentRecord`'s reads |
 | `status` | only while an ending that lands on its check holds the checkout (`landingOpen`) | `{ checkout, tips }` | `Status { merging, conflicted, missing[], head? }` | `mergeInProgress`, `mergeState` |
 | `land` | when `landingDue` says `commit` or `abort` | `{ checkout, act: 'commit', message }` or `{ checkout, act: 'abort' }` | `Landed { commit }` or `{ aborted: true }` | `commitMerge`, `abortMerge` |
@@ -273,7 +273,8 @@ What the board and `wf decide` render:
 - **The diff.** `Changes.files` grouped by `radius`, the counts written in our words, and the check-affecting `diffs` cut as
   `inFullLines` cuts them now (`decide/decision.ts:124-166`). `diffStat`'s git sentence ("3 files changed, …") goes. The api reads the
   snapshot and runs nothing.
-- **The trial merge.** `Changes.merges`, as `mergeWord` words it today. It is a snapshot, not a live `merge-tree`, and it says the base
+- **The trial merge.** `Changes.merges`, as `mergeWord` words it today. Until cards H and J it is read live through the `trial` verb
+  (open question 2). It is to be a snapshot, not a live `merge-tree`, and it says the base
   commit it was made at. The tick makes a new report when a result tip or the base branch's head moves from the `at` it was made at. It
   sees that from the `Standing.heads` it reads anyway for the memo of runs at rest. So a merge onto the base makes the waiting runs'
   reports stale, and the next pass refreshes them. That happens only for runs with something to decide (`toDecide`, or an ending at its
@@ -387,6 +388,10 @@ absorbs. The `say` templates are what make the words match.
    run's tips or base move, `standing.json` each pass. The board and `wf ls` then run nothing, and what they show is at most one pass
    old. When no daemon is ticking, they show the snapshot's age rather than read live. A live read would make the api run the place's
    script, which is our code running a command at a person's click.
+   *Departed from, for the trial merges, on 2026-10-05*: the decision's `merges`, `nemia merge`'s trial and a land gate's collisions
+   are read live, through the git place's `trial` verb (`trialMerges` in `src/place/place.store.ts`), when a decision is read — never by
+   the tick, never on a poll. The decision already ran `merge-tree` live, so nothing new runs at a click; it now runs in the place.
+   Cards H (`report`) and J (the api reads snapshots) replace it.
 3. **Codex trust: a task field, or leave `repositoryOf` in the runtime?** *Recommend* `config.codex.trustFrom` (cards B1, B2). The runtime
    is finished, but this is a harness's own flag, the shape `config.claude` already has. batch/v1 has no field for it, and neither does
    it for `config.claude`.

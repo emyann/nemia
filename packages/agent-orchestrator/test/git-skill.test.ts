@@ -107,12 +107,12 @@ test('place.json decodes, declares exactly the verbs scripts/ holds, and denies 
     .filter((f) => f !== 'contract.ts')
     .map((f) => f.replace(/\.ts$/, ''));
   assert.deepEqual([...declared.verbs].sort(), scripts.sort());
-  assert.deepEqual([...declared.verbs].sort(), ['handoff', 'land', 'open', 'status']);
+  assert.deepEqual([...declared.verbs].sort(), ['handoff', 'land', 'open', 'status', 'trial']);
   assert.deepEqual(declared.denyWhileLanding, LANDING_DENIED);
 });
 
 test('a request that does not carry v 1 is refused by every script, exit 2, before it acts', () => {
-  for (const script of ['open', 'handoff', 'status', 'land']) {
+  for (const script of ['open', 'handoff', 'status', 'land', 'trial']) {
     const ran = spawnSync(process.execPath, [path.join(GIT_SKILL, 'scripts', `${script}.ts`)], {
       input: JSON.stringify({ v: 2, root: '/' }),
       encoding: 'utf8',
@@ -395,4 +395,46 @@ test('REFUSED: land with no merge in progress, either act, and a commit git will
 test('land is unread for an act it does not know, and for a commit with no message', () => {
   assert.equal(unreadOf(run('land', { checkout: '/', act: 'push' })), 'the request\'s `act` is "push", where commit or abort is asked');
   assert.equal(unreadOf(run('land', { checkout: '/', act: 'commit' })), "the request's `message` is missing, where a string is asked");
+});
+
+/** Every ref of `dir` with its commit, HEAD and what the checkout and index hold: what a trial merge must leave as it was. */
+const untouched = (dir: string): string =>
+  [git(dir, 'for-each-ref', '--format=%(refname) %(objectname)'), git(dir, 'rev-parse', 'HEAD'), git(dir, 'status', '--porcelain')].join(
+    '\n',
+  );
+
+test('trial answers each pair in the order asked, clean, conflicted or not known, the bases now, and touches nothing', () => {
+  const dir = repository();
+  branched(dir, 'wf/x/a', 'f', 'a\n');
+  branched(dir, 'wf/y/b', 'f', 'b\n');
+  branched(dir, 'wf/z/c', 'g', 'c\n');
+  const before = untouched(dir);
+  const answer = answerOf(
+    run('trial', {
+      repo: dir,
+      trials: [
+        { onto: 'wf/x/a', branch: 'wf/y/b' },
+        { onto: 'main', branch: 'wf/x/a' },
+        { onto: 'wf/x/a', branch: 'wf/z/c' },
+        { onto: 'main', branch: 'wf/no/such' },
+        { onto: 'gone', branch: 'wf/x/a' },
+      ],
+    }),
+  );
+  assert.deepEqual(answer.at, { 'wf/x/a': git(dir, 'rev-parse', 'wf/x/a'), main: git(dir, 'rev-parse', 'main'), gone: null });
+  assert.deepEqual(answer.trials.slice(0, 3), [{ clean: false, conflicts: ['f'] }, { clean: true }, { clean: true }]);
+  const [lacked, noBase] = answer.trials.slice(3);
+  assert.ok('unknown' in lacked && /wf\/no\/such/.test(lacked.unknown), JSON.stringify(lacked));
+  assert.ok('unknown' in noBase && /gone/.test(noBase.unknown), JSON.stringify(noBase));
+  assert.equal(untouched(dir), before, 'no ref, HEAD, index or checkout moved');
+});
+
+test('REFUSED: trial in a repository that is not there; unread for a request with no repo or no list of pairs', () => {
+  const gone = path.join(scratch('wf-git-skill-trial-'), 'gone');
+  assert.equal(refusalOf(run('trial', { repo: gone, trials: [] })), `${gone} is not a directory, so no branch in it can be tried`);
+  assert.equal(unreadOf(run('trial', { trials: [] })), "the request's `repo` is missing, where a string is asked");
+  assert.equal(
+    unreadOf(run('trial', { repo: '/', trials: [{ onto: 'main' }] })),
+    'the request\'s `trials` is [{"onto":"main"}], where a list of { onto, branch } is asked',
+  );
 });

@@ -1,7 +1,30 @@
-/** The merge check as an entry of the command table (`MERGES`), served on the api alone. */
+/** The merge check (`mergesOf`) and its entry in the command table (`MERGES`), served on the api alone. */
 import { tried } from '../runtime-client.ts';
 import type { Command } from '../command/entry.verb.ts';
-import { mergesOf, type StandingMerge } from './merge.store.ts';
+import { isGitRun } from '../record/record.ts';
+import { runStore } from '../record/files.store.ts';
+import { trialMerges } from '../place/place.store.ts';
+import { mergeWord, mergeWordOf, type StandingMerge } from './merges.ts';
+
+/**
+ * Whether each of `branches` merges onto the base branch of the run `runId` (`StandingMerge`), keyed by branch, by the place's trial
+ * merges (`trialMerges`); none for a run that is not a git run, which has no base to merge onto. Throws `Missing` for a run the store
+ * does not have.
+ */
+export function mergesOf(runId: string, branches: readonly string[]): Record<string, StandingMerge> {
+  const run = runStore.runs.read(runId);
+  if (!isGitRun(run)) return {};
+  const { trials } = trialMerges(
+    run.repo,
+    branches.map((branch) => ({ onto: run.branch, branch })),
+  );
+  return Object.fromEntries(
+    branches.map((branch, i) => {
+      const merge = mergeWordOf(trials[i]);
+      return [branch, { ...merge, said: mergeWord(merge, run.branch) }];
+    }),
+  );
+}
 
 /**
  * Whether each branch named still merges onto the base branch of the run named (`mergesOf`), keyed by branch: what the board's decision

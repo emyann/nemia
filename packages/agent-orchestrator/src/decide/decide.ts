@@ -27,7 +27,7 @@ import {
 } from '../status/status.ts';
 import type { CheckoutHold } from '../cap/cap.ts';
 import { assess } from '../tick/assess.ts';
-import { resultSteps } from '../branches/branches.ts';
+import { resultSteps } from '../branches/index.ts';
 import { merges } from '../ending/ending.ts';
 
 /**

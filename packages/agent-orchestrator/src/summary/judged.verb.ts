@@ -8,7 +8,7 @@ import { type Engine, nameFor } from '../runtime-client.ts';
 import { answerIn, onYouWords } from '../list/list.ts';
 import { runReading } from '../list/list.verb.ts';
 import { type BranchReader, branchReader, branchStandings } from '../branches/branches.store.ts';
-import { resultSteps } from '../branches/branches.ts';
+import { resultSteps } from '../branches/index.ts';
 import { type BranchStanding, sendBackTo, type Spend, type SpendOf, spentWord } from '../status/status.ts';
 import { closeoutOf, deniedOf } from '../views/views.verb.ts';
 import { wordOfView } from '../views/views-words.ts';

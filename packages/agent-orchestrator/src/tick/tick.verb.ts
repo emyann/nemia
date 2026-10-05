@@ -20,7 +20,7 @@ import {
   type TaskView,
 } from '../runtime-client.ts';
 import type { QueueStarted } from '../inbox/inbox.ts';
-import { tipsSeen } from '../branches/branches.ts';
+import { tipsSeen } from '../branches/index.ts';
 import { admissionOrder, slotFree, type RunSlot } from '../cap/cap.ts';
 import { passRead, type PassRead } from '../cap/cap.verb.ts';
 import { readPause } from '../pause/pause.store.ts';

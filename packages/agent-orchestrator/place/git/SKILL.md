@@ -24,6 +24,9 @@ froze when it started; you need not run them. Each reads one JSON request on std
 - `open` — the repository a run starts in: `{ "root" }` answers `{ "repo", "baseRef", "branch" }`.
 - `handoff` — commit what a step left uncommitted: `{ "workspace", "step", "why" }` answers `{ "commit" }`, null when the tree is clean.
 - `status` — the merge staged in a checkout: `{ "checkout", "tips" }` answers `{ "merging", "conflicted", "missing", "head" }`.
+- `trial` — whether branches merge, by a merge made in git's object store alone, which touches no checkout, index or ref:
+  `{ "repo", "trials": [{ "onto", "branch" }] }` answers `{ "at", "trials" }`, the commit each `onto` names now and each trial in the
+  order asked, `{ "clean": true }`, `{ "clean": false, "conflicts" }` or `{ "unknown" }` with git's words.
 - `land` — commit the staged merge, or take it back: `{ "checkout", "act": "commit", "message" }` answers `{ "commit" }`, and
   `{ "checkout", "act": "abort" }` answers `{ "aborted": true }`.
 

@@ -7,7 +7,7 @@ import { Cause, Effect, Exit } from 'effect';
 import { asked, over, type Engine } from '../runtime-client.ts';
 import type { Workflow } from '../workflow.ts';
 import type { Run } from '../record/record.ts';
-import { resultSteps } from '../branches/branches.ts';
+import { resultSteps } from '../branches/index.ts';
 import { stepsOf } from '../record/record.store.ts';
 import { runStore } from '../record/files.store.ts';
 import { closeoutOf, parentRead } from '../views/views.verb.ts';

@@ -1441,6 +1441,7 @@ test('the Decide section copies its commands and runs none: a button per command
     },
     cost: null,
     overBudget: null,
+    collisions: null,
     commands: [...commands],
     awaiting: null,
   };
@@ -2492,6 +2493,7 @@ test('the Decide section puts the answers first, before what there is to decide,
     total: UNMEASURED,
     cost: null,
     overBudget: null,
+    collisions: null,
     commands: [{ label: 'ship it', command: 'git -C /code/app merge --no-ff wf/r-1/implement', said: null, step: null }],
     awaiting: null,
   };
@@ -2523,6 +2525,7 @@ test("the Decide section's accept row takes a reason and presses it; every other
     total: UNMEASURED,
     cost: null,
     overBudget: null,
+    collisions: null,
     awaiting: null,
     commands: [
       { label: 'once more', command: 'nemia round r-1 review', said: null, step: 'review' },
@@ -3589,6 +3592,7 @@ test("the Decide section says why a step past its budget is held — `wf decide`
     total: UNMEASURED,
     cost: 'run $6.35 measured · 2 attempts not measured',
     overBudget: line,
+    collisions: null,
     commands: [],
     awaiting: null,
   };
@@ -3603,6 +3607,50 @@ test("the Decide section says why a step past its budget is held — `wf decide`
   );
   assert.doesNotMatch(none, /data-over-budget/, 'no step held on a budget: no line');
   assert.match(none, /<dt[^>]*>every try<\/dt><dd[^>]*>—<\/dd>/, 'nothing ended yet: a dash, not $0');
+});
+
+test('the Decide section of an ending whose landing its check refused shows its trial merges: the runs in flight, each it collides with, and the semantic conflict, linked to the step — and none where the decision read no trial', async () => {
+  const decision: Decidable = {
+    standings: [],
+    touched: [],
+    lesson: { said: 'nothing written where the next agent reads', state: 'nothing' },
+    sensitive: [],
+    used: {},
+    total: UNMEASURED,
+    cost: null,
+    overBudget: null,
+    collisions: {
+      onto: 'main',
+      base: [],
+      inFlight: ['r-2'],
+      colliding: [
+        {
+          run: 'r-2',
+          branch: 'wf/r-2/implement',
+          ours: 'wf/r-1/implement',
+          merge: { clean: false, conflicts: ['src/a.ts'] },
+          said: "conflicts with r-2's wf/r-2/implement in 1 file: src/a.ts",
+        },
+      ],
+      semantic: { step: 'ship', check: 't-check', sha: 'b'.repeat(40), said: "ship's landing check refused the merged tree" },
+      said: 'collides with 1 of the 1 run in flight on main: r-2',
+    },
+    commands: [],
+    awaiting: null,
+  };
+  const html = await routedWith(createElement(DecideSection, { runId: 'r-1', decision }));
+  const merges = html.match(/<section aria-label="Trial merges"[^]*?<\/section>/)?.[0] ?? '';
+  assert.match(merges, /<dd data-fact="others" data-state="bad"[^>]*>collides with 1 of the 1 run in flight on main: r-2<\/dd>/);
+  assert.match(
+    merges,
+    /<dd data-fact="collides" data-state="bad"[^>]*>wf\/r-1\/implement conflicts with r-2&#x27;s wf\/r-2\/implement in 1 file: src\/a\.ts<\/dd>/,
+  );
+  assert.match(
+    merges,
+    /<dd data-fact="semantic" data-state="bad"[^>]*><a data-fact-link="ship"[^>]*href="\/runs\/r-1#step-ship"[^>]*>ship&#x27;s landing check refused the merged tree<\/a><\/dd>/,
+  );
+  const none = await routedWith(createElement(DecideSection, { runId: 'r-1', decision: { ...decision, collisions: null } }));
+  assert.doesNotMatch(none, /Trial merges|data-fact="(others|collides|semantic)"/, 'no trial read: nothing said of one');
 });
 
 test('what sessions read, by price: beside the cost, the peak marked at a cap or past 200k, a rebuilt cache said beneath — and no row where nothing measured it', () => {
@@ -3666,6 +3714,7 @@ test('what sessions read, by price: beside the cost, the peak marked at a cap or
     total: used('read 7.3M · wrote 455k · peak 250k, past 200k with no cap', 'large'),
     cost: 'run $6.80',
     overBudget: null,
+    collisions: null,
     commands: [],
     awaiting: null,
   };

@@ -8,7 +8,16 @@
  * can still take one.
  */
 import { outputFields, type Workflow } from '../step/step.ts';
-import { dataBlock, isGitRun, satisfiesAfter, stopsFollowers, tryOf, type Run, type StepStatus } from '../record/record.ts';
+import {
+  dataBlock,
+  isGitRun,
+  satisfiesAfter,
+  stopsFollowers,
+  tryOf,
+  type Run,
+  type StepRecord,
+  type StepStatus,
+} from '../record/record.ts';
 import { declaredOutput, type Closeout } from '../closeout/closeout.ts';
 import { loopSpan } from '../workflow/index.ts';
 import {
@@ -37,7 +46,10 @@ export type MergeReads = {
   goesRound: (looping: Workflow) => boolean;
 };
 
-/** A trial merge of a branch onto the base branch, as `mergesOnto` answers it: clean, conflicted, or not known, with git's words. */
+/**
+ * A trial merge of a branch onto the base branch, as `mergeWordOf` reads the place's (`trialMerges`): clean, conflicted, or not known,
+ * with git's words.
+ */
 export type Trial = { clean: boolean } | { error: string };
 
 /** A person's merge ask, whole: the looping step and the round it is on, when, and what merges (`MergeOf`). */
@@ -259,10 +271,18 @@ const endingAfter = (steps: readonly Workflow[], run: Run, looping: Workflow): W
  */
 function refusedLanding(steps: readonly Workflow[], run: Run, looping: Workflow, sha: string): MergeLanding | undefined {
   const ending = endingAfter(steps, run, looping);
-  const record = ending ? run.steps[ending.name] : undefined;
+  const check = ending ? landingRefusedOn(run.steps[ending.name], sha) : undefined;
+  return ending && check ? { step: ending.name, check } : undefined;
+}
+
+/**
+ * The task of the check that refused the merge an ending staged on `sha`, a commit of the base, as the ending's `record` says it
+ * (`Landed`'s `refusedOn`): undefined when the ending's landing was not aborted on that commit, or names no check.
+ */
+export function landingRefusedOn(record: StepRecord | undefined, sha: string): string | undefined {
   const landed = record?.landed;
-  if (!ending || !landed || !('aborted' in landed) || landed.refusedOn !== sha || !record.check) return undefined;
-  return { step: ending.name, check: record.check.taskId };
+  if (!landed || !('aborted' in landed) || landed.refusedOn !== sha || !record?.check) return undefined;
+  return record.check.taskId;
 }
 
 /** What to do with a loop whose work merges cleanly: approve the ending at its gate, ship a stopped one again, or nothing. */

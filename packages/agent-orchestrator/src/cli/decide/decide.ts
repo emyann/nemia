@@ -75,7 +75,10 @@ Under a gated step's name, its gate: approved, when and with what words — or a
 nemia approve that lets what follows be filed and the nemia retry --message that sends it back.
 
 Last, the result: where each branch stands against the base branch — on it, ahead by N commits, gone —
-and then what is left to decide. A workflow whose last step is an ending, gated, says in its own prose
+and, at an ending's gate or after its landing check refused the merged tree, read live: whether each branch
+ahead still merges onto the base (merges), which other runs in flight on the base it collides with and in
+which files (others, collides), and a merge clean as text whose landing check refused the base as it is
+now (semantic). Then what is left to decide. A workflow whose last step is an ending, gated, says in its own prose
 what happens when the work is done; that prose is printed with the nemia approve that runs it and the nemia
 retry --message that sends the work back. A workflow with no such step ends by handing you a branch, and
 the git commands are printed instead: ship it, drop it. Neither is run.
@@ -152,6 +155,7 @@ export async function decideVerb(rest: string[], e: Engine): Promise<void> {
   printTotals(decided);
   if (git) printBranches(git, decision.branches);
   printStanding(decided, decision, git);
+  printCollisions(decided);
   printChoice(decided, steps);
 }
 
@@ -430,6 +434,15 @@ function printStanding({ run, standings }: Decided, decision: Awaiting, git: Git
     console.log();
     for (const s of standings) console.log(`  branch    ${branchWord(run, s)}`);
   }
+}
+
+/** At an ending's decision, what its branches merge onto and collide with (`Decided.collisions`): a line for each fact, none without. */
+function printCollisions({ collisions }: Decided): void {
+  if (!collisions) return;
+  for (const b of collisions.base) console.log(`  merges    ${b.branch} ${b.said}`);
+  console.log(`  others    ${collisions.said}`);
+  for (const c of collisions.colliding) console.log(`  collides  ${c.ours} ${c.said}`);
+  if (collisions.semantic) console.log(`  semantic  ${collisions.semantic.said}`);
 }
 
 /**

@@ -1,7 +1,7 @@
 /**
- * The merge check (`mergesOnto`, `mergeWord`), against a real repository: a branch that merges cleanly, one that conflicts, and one git
- * does not have; and the entry that serves it (`MERGES`), refusing a run the store does not have. `WF_ROOT` is set before the import,
- * since the store reads it as it loads.
+ * The merge check (`mergesOf`), against a run on a real repository and the git place's trial merges: a branch that merges cleanly, one
+ * that conflicts, and one git does not have; and the entry that serves it (`MERGES`), refusing a run the store does not have. `WF_ROOT`
+ * is set before the import, since the store reads it as it loads.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,8 +12,7 @@ import { scratch } from '../../test/scratch.ts';
 import { promised } from '../../test/promised.ts';
 
 process.env.WF_ROOT = scratch('wf-merge-root-');
-const { mergesOnto, mergeWord } = await import('./merge.store.ts');
-const { MERGES } = await import('./merges.verb.ts');
+const { MERGES, mergesOf } = await import('./merges.verb.ts');
 const { runWith } = await import('../runtime-client.ts');
 
 /** A repository on `main` with `src/a.ts`, and its git. */
@@ -36,27 +35,50 @@ function repoOf() {
   return { repo, git, commit };
 }
 
+/** A git run `id` on `repo`, branched from `main`, its record written as `nemia start` would. */
+function runOn(id: string, repo: string): void {
+  const file = path.join(process.env.WF_ROOT ?? '', 'runs', `${id}.json`);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(
+    file,
+    JSON.stringify({
+      id,
+      repo,
+      workspace: repo,
+      baseRef: 'main',
+      branch: 'main',
+      isolate: true,
+      brief: 'b',
+      createdAt: '2026-10-05T00:00:00.000Z',
+      workflowDir: path.join(repo, 'no-such-workflow'),
+      workflow: [{ name: 'implement', after: [], body: 'Do it.', harness: 'codex' }],
+      steps: {},
+    }),
+  );
+}
+
 test('a branch merges cleanly, then conflicts once main writes its file otherwise, and the checkout is untouched', () => {
   const { repo, git, commit } = repoOf();
   git('checkout', '-q', '-b', 'wf/r-1/implement');
   commit('src/a.ts', 'export const a = 1;\n', 'implement');
   git('checkout', '-q', 'main');
-  const clean = mergesOnto(repo, 'main', 'wf/r-1/implement');
-  assert.deepEqual(clean, { clean: true });
-  assert.equal(mergeWord(clean, 'main'), 'merges cleanly onto main');
+  runOn('r-1', repo);
+  assert.deepEqual(mergesOf('r-1', ['wf/r-1/implement']), {
+    'wf/r-1/implement': { clean: true, said: 'merges cleanly onto main' },
+  });
   commit('src/a.ts', 'export const a = 2;\n', 'main writes a.ts too');
-  const conflicted = mergesOnto(repo, 'main', 'wf/r-1/implement');
-  assert.deepEqual(conflicted, { clean: false, conflicts: ['src/a.ts'] });
-  assert.equal(mergeWord(conflicted, 'main'), 'conflicts with main in 1 file: src/a.ts');
-  assert.equal(mergeWord({ clean: false, conflicts: ['a', 'b'] }, 'main'), 'conflicts with main in 2 files: a, b');
+  assert.deepEqual(mergesOf('r-1', ['wf/r-1/implement']), {
+    'wf/r-1/implement': { clean: false, conflicts: ['src/a.ts'], said: 'conflicts with main in 1 file: src/a.ts' },
+  });
   assert.equal(git('status', '--porcelain'), '', "a trial in git's object store alone");
 });
 
 test("a branch git does not have is neither clean nor conflicted: it carries git's own word for why it cannot say", () => {
   const { repo } = repoOf();
-  const gone = mergesOnto(repo, 'main', 'wf/no-such-run/implement');
+  runOn('r-2', repo);
+  const gone = mergesOf('r-2', ['wf/no-such-run/implement'])['wf/no-such-run/implement'];
   assert.ok('error' in gone && /no-such-run/.test(gone.error), JSON.stringify(gone));
-  assert.equal(mergeWord({ error: 'no such ref' }, 'main'), 'whether it merges onto main is not known: no such ref');
+  assert.match(gone.said, /^whether it merges onto main is not known: .*no-such-run/);
 });
 
 test("REFUSED: the merge check of a run the store does not have, in the store's words whole", async () => {

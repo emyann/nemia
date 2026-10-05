@@ -237,7 +237,17 @@ test('whether the result still merges onto the base, as the base is now: clean, 
       [],
       'the list the Factory polls asks git no merge',
     );
+    const read = gitCount();
     const conflicted = await decidableOf(id);
+    assert.ok(
+      fs
+        .readFileSync(gitCalls, 'utf8')
+        .split('\n')
+        .filter(Boolean)
+        .slice(read)
+        .some((call) => call.startsWith('merge-tree')),
+      "the decision's trial merge, run in the git place's own process, is counted: the list's none is no blind spot",
+    );
     assert.deepEqual(
       conflicted.standings.map((s) => s.merge),
       [{ clean: false, conflicts: ['src/a.ts'], said: 'conflicts with main in 1 file: src/a.ts' }],
@@ -564,4 +574,48 @@ test('nothing to decide, and no `git` asked, for a run still running, one still 
   writeRun({ id: 'r-ahead', repo, baseRef: base, workflow: PLAIN, steps: { implement: { taskId: 'r-ahead-implement', branch: ahead } } });
   assert.equal((await detailOf('r-ahead')).toDecide?.kind, 'git');
   assert.ok(gitCount() > before, 'a finished run whose branch may be ahead is read out of git, through the same PATH: the count counts');
+});
+
+test("at an ending's gate, the decision says each run in flight on the base its branch collides with, and in which files, in one trial merge for each; a branch left to git reads none", async () => {
+  const own = aRepo();
+  const runOn = (id: string, file: string, text: string, done: boolean, workflow = ENDING) => {
+    const branch = `wf/${id}/implement`;
+    branchOff(own.repo, branch, file, text);
+    (done ? signedOff : running)(`${id}-implement`, own.repo);
+    const steps = { implement: { taskId: `${id}-implement`, branch }, ...(workflow === ENDING ? { ship: { taskId: null } } : {}) };
+    writeRun({ id, repo: own.repo, baseRef: own.base, workflow, steps });
+  };
+  runOn('r-gate', 'src/c.ts', 'export const c = 1;\n', true);
+  runOn('r-flight', 'src/c.ts', 'export const c = 2;\n', false);
+  runOn('r-apart', 'src/f.ts', 'export const f = 6;\n', false);
+
+  const read = gitCount();
+  const { collisions, standings } = await decidableOf('r-gate');
+  const trials = fs
+    .readFileSync(gitCalls, 'utf8')
+    .split('\n')
+    .filter(Boolean)
+    .slice(read)
+    .filter((call) => call.startsWith('merge-tree'));
+  assert.ok(collisions, 'an ending at its gate carries its collisions');
+  assert.deepEqual([...collisions.inFlight].sort(), ['r-apart', 'r-flight']);
+  assert.deepEqual(
+    collisions.colliding.map((c) => [c.run, c.branch, c.said]),
+    [['r-flight', 'wf/r-flight/implement', "conflicts with r-flight's wf/r-flight/implement in 1 file: src/c.ts"]],
+  );
+  assert.equal(collisions.said, 'collides with 1 of the 2 runs in flight on main: r-flight');
+  assert.equal(collisions.semantic, null);
+  assert.deepEqual(
+    standings.map((s) => s.merge),
+    [{ clean: true, said: 'merges cleanly onto main' }],
+    "the branch's merge onto the base is the collisions' own trial",
+  );
+  assert.equal(
+    trials.length,
+    3,
+    `one trial onto the base and one onto each run in flight, the merge check not asked again: ${trials.join('\n')}`,
+  );
+
+  runOn('r-handed', 'src/g.ts', 'export const g = 7;\n', true, PLAIN);
+  assert.equal((await decidableOf('r-handed')).collisions, null, 'a branch handed to a person to merge is at no ending');
 });

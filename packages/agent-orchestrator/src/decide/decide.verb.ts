@@ -45,6 +45,8 @@ import { checkoutHold } from '../ending/ending.verb.ts';
 import { mergeOffers } from '../merge/merge.verb.ts';
 import { slotsOf } from '../cap/cap.verb.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
+import { collisionsDue, type Collisions } from '../collide/collide.ts';
+import { collisionsAt } from '../collide/collisions.verb.ts';
 
 /** A step's current try that a person answered: the try, what they said, and what the try before it needed, when it said. */
 export type Answered = { try: number; message: string; needs?: string };
@@ -151,6 +153,11 @@ export type Decided = {
    * the same `standings`).
    */
   toDecide?: ToDecide;
+  /**
+   * At an ending's decision (`collisionsDue`) — its gate, or its landing a check refused — whether the run's branches merge onto the base,
+   * which runs in flight they collide with, and the semantic conflict (`collisionsAt`), read live; absent at any other decision.
+   */
+  collisions?: Collisions;
 };
 
 /**
@@ -257,6 +264,8 @@ export const decideRun = Effect.fn('decide')(function* (id: string, env: NodeJS.
   const d = decision(steps, run, phaseOf, shipped, reader, asked, verdictOf, asks, rounds, blocked, spendOf, checkout);
   const standings = d.kind === 'running' || d.kind === 'cancelled' ? [] : yield* tried(() => standingsOf(run, git));
   const { toDecide: decide } = assess(steps, run, phaseOf, reader, asked, verdictOf, asks, rounds, blocked, spendOf, standings);
+  const ending = collisionsDue(steps, run, decide);
+  const collisions = ending ? yield* collisionsAt(run, ending, standings, git) : undefined;
   const answers = yield* answersOf(e, run, views, yield* tried(() => runStore.asks.answers(id)));
   const everyTry = yield* everyTryOf(e, run, views);
   const said = saidOf(run, everyTry);
@@ -300,6 +309,7 @@ export const decideRun = Effect.fn('decide')(function* (id: string, env: NodeJS.
     standings,
     ...(checkout ? { checkout } : {}),
     ...(decide ? { toDecide: decide } : {}),
+    ...(collisions ? { collisions } : {}),
   };
   return answer;
 });

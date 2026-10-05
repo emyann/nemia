@@ -1,9 +1,7 @@
 import { useEffect, useId, useState, type ReactNode } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { ChevronRight } from 'lucide-react';
 import {
-  acceptLoop,
-  askRound,
   decisionQuery,
   type Decidable,
   type DecideCommand,
@@ -18,9 +16,9 @@ import {
 import { answersOf, askedSaid, raiseTo, type Answer } from '../lib/asks';
 import { acceptStepOf, barOf, changeOf, decidableRun, decisionStamp, diffLine, isDecidable, mostLines, type DiffLine } from '../lib/decide';
 import { cn } from '../lib/utils';
-import { BUTTON, MODES, Refusal, TEXTAREA, useAsk } from './Ask';
+import { BUTTON, MODES, Refusal, TEXTAREA, useAccept, useAsk, useRound } from './Ask';
 import { CopyButton } from './CopyButton';
-import { Facts, pathRow, readRows } from './Facts';
+import { Facts, pathRow, readRows, TrialMerges } from './Facts';
 import { Markdown } from './Markdown';
 import { QuestionsForm } from './Questions';
 
@@ -118,6 +116,8 @@ export function DecideSection({
         )}
         {!inFolders && <LessonChip lesson={lesson} />}
       </div>
+
+      {decision.collisions && <TrialMerges runId={runId} collisions={decision.collisions} />}
 
       {!inFolders && <InFull sensitive={sensitive} touched={touched} />}
 
@@ -498,36 +498,6 @@ export function Continue({ runId, step, line }: { runId: string; step: string; l
       {ask.isError && <Refusal error={ask.error} />}
     </div>
   );
-}
-
-/**
- * An acceptance of a loop out of rounds through the api (`acceptLoop`), and the run read again once the api has it — its detail, and the
- * list the Factory's card reads, each by its own key (`exact`): a decision is keyed by the state it was read for, and the next state is a
- * key of its own.
- */
-function useAccept(runId: string, step: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (how: { message: string }) => acceptLoop(runId, step, how),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['runs', runId], exact: true });
-      void queryClient.invalidateQueries({ queryKey: ['runs'], exact: true });
-    },
-  });
-}
-
-/**
- * An ask for another round of a run's loop through the api (`askRound`), and the run read again once the api has it: its record alone
- * (`exact`), as for a try, since a decision is keyed by the state it was read for.
- */
-function useRound(runId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (how: { step?: string; budget?: number }) => askRound(runId, how),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['runs', runId], exact: true });
-    },
-  });
 }
 
 /**

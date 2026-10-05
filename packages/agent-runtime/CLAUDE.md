@@ -46,7 +46,9 @@ owns what*.
   (the detached spawn clears the last one's), or that tells it from its parent's (`--bg`: the parent's last call id,
   `harness/claude/parent.ts`), reports it with no time, and its test steps the clock (`stepClock`, `test/clock.ts`).
 - **A duration the runtime decides on is `elapsedMs` over `Instant`s from `instantNow()`** (`core/clock.ts`, `core/engine/now.ts`), never
-  two `Date.now()` readings: monotonic within a boot, the wall clock across one. `stepClock` leaves `process.hrtime` alone.
+  two `Date.now()` readings: monotonic within a boot, the wall clock across one. `stepClock` leaves `process.hrtime` alone. A test's
+  floor on such a bound reads `elapsedMs` over `instantNow()` taken around the call (`test/feed-rotation.test.ts`), never
+  `performance.now()`: `monoNow` keeps whole milliseconds, so the bound fires up to 1 ms before `performance.now()` reaches it.
 - **A detached look told names reads only their run files** (`observeFor`); `observe` lists every run, for views and verbs. A finished
   session leaves the pass's look once released and not at work (`releaseFinished`): `detached.test.ts` and `engine.test.ts` count it.
 - **`engine.test.ts` reads `domain.ts` from `decide` on, and all of `lifecycle.ts`, comments included**: a JSDoc there writes no

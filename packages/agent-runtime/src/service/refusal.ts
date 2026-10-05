@@ -1,4 +1,4 @@
-/** A verb's refusal in words: what a caller that answers with a sentence and an exit code — `ae`, the orchestrator — says of one. */
+/** A verb's refusal in words: what a caller that answers with a sentence and an exit code — `ae`, a layer above — says of one. */
 
 /** The tags of the verbs' refusals: each worded as an `Error` whose `exitCode` is 2, its message led by the verb. */
 const REFUSALS = new Set([

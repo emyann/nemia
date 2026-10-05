@@ -10,7 +10,7 @@
 import fs from 'node:fs';
 import { Effect } from 'effect';
 import { EngineService, asked as engineAsked, denialText, over, type Engine, type TaskView } from '../runtime-client.ts';
-import { deniedCallsOf } from '../stats/discipline.ts';
+import { deniedCallsOf } from '../stats/index.ts';
 import type { Verdict } from '../check/check.ts';
 import type { Workflow } from '../workflow.ts';
 import { folderPlace } from '../record/places.store.ts';

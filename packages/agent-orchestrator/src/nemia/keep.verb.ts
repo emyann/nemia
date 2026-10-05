@@ -6,6 +6,7 @@
  *
  * A controller: it reaches the runtime through the client (`EngineService`), run by `up` (`daemon/up.verb.ts`) beside the deliverer.
  */
+import fs from 'node:fs';
 import { Cause, Effect, Metric, type Duration } from 'effect';
 import { DEFAULT_HARNESS } from '../harness/harness.ts';
 import { ownOf } from '../tick/file.verb.ts';
@@ -15,7 +16,8 @@ import { readFactories } from '../factory/factory.store.ts';
 import { feedSize } from '../feed/feed.store.ts';
 import { dropSubscription, listSubscriptions, putSubscription } from '../subscription/subscription.store.ts';
 import { EngineService, asked, type Engine } from '../runtime-client.ts';
-import { composePrompt, memoryDir, nemiaDir, quotaUrl, readLevel, readNemia, SHIPPED_NEMIA } from './level.store.ts';
+import { composePrompt, memoryDir, nemiaDir, readLevel, readNemia, SHIPPED_NEMIA } from './level.store.ts';
+import { daemonFile, parseDaemonFile } from '../daemon/daemon.store.ts';
 import { NEMIA_DIGEST_EVERY, NEMIA_SUBSCRIPTION, NEMIA_WAKE, nemiaDue, type HerTask, type NemiaAct } from './nemia.ts';
 
 /** What the keeper did, each act counted once done. */
@@ -31,6 +33,19 @@ export const KEEP_DEFAULTS: KeepOptions = { every: '5 seconds' };
 
 /** Her priority among the tasks waiting for a slot: above every step, so the person's agent is never queued behind the work. */
 const NEMIA_PRIORITY = 1_000_000;
+
+/**
+ * Where the store's quota is read, `<url>/api/quota` at the address its daemon's api serves (`daemon.json`); undefined with no daemon, one
+ * stopped, one serving no board (`nemia up`), or a file that does not read.
+ */
+const quotaUrl = (): string | undefined => {
+  try {
+    const held = parseDaemonFile(fs.readFileSync(daemonFile(), 'utf8'));
+    return held?.url !== undefined && held.stoppedAt === undefined ? `${held.url}/api/quota` : undefined;
+  } catch {
+    return undefined;
+  }
+};
 
 /** The call that reads the quota at `quota`, allowed her unasked: a read of the daemon's own api. */
 export const quotaCall = (quota: string): string => `curl -s ${quota}`;

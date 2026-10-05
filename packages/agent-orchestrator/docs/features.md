@@ -2298,7 +2298,7 @@ stateDiagram-v2
   her wake words, and her `grant-access` skill proposes the narrowest allow that would have let the call through, or says the deny
   stands.
 - **Her quota and her spend**: her task is allowed `curl -s <url>/api/quota` unasked, the address read off `daemon.json` at filing
-  (`quotaUrl`), and told it in her first message; none where the daemon serves no board. `nemia level` says what her ended sessions
+  (`quotaUrl` in `keep.verb.ts`), and told it in her first message; none where the daemon serves no board. `nemia level` says what her ended sessions
   cost (`spend`), counted as a step's are (`taskSpend`).
 
 `commission-a-workflow` is the spec's `commission-argus`, named for what it does in any factory, since no team name ships; `nemia factory

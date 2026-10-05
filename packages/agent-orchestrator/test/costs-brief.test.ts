@@ -2,7 +2,7 @@
  * A step whose `reads:` names `costs` is told, on each new session's brief, what the newest finished runs of its workflow in its factory
  * cost (`costsRead`, `costsSection`): read off the store's records, newest first by when they were started, as many as the window holds
  * (`RECENT_RUNS`), a run unfinished or whose journal does not read passed over, and a run of another workflow or factory never counted. A
- * step without the line is told none, and a try that continues the last session is not told again.
+ * step without the line is told none, and a try that continues the last session neither reads them nor is told them again.
  *
  * Walked through the runtime itself, `plainEngine` over an in-memory journal: the finished runs are journalled by hand, as the stats read
  * them, and the run filed is the tick's. `WF_ROOT` is set before the runner is imported: it is read as the module loads.
@@ -84,8 +84,14 @@ const engine = plainEngine(
 );
 /** Every brief the run filed, by task id. */
 const briefs = new Map<string, string>();
+/** Every task the run viewed, in order. */
+const viewed: string[] = [];
 const e: Engine = {
   ...engine,
+  view: (taskId) => {
+    viewed.push(taskId);
+    return engine.view(taskId);
+  },
   file: (spec) => {
     if (spec.id) briefs.set(spec.id, spec.brief);
     return engine.file(spec);
@@ -209,14 +215,16 @@ test('a step that reads `costs` is told what the newest finished runs of its wor
   assert.equal(briefs.get(`${run.id}-implement`)!.includes(SECTION), false, 'implement reads no costs');
 });
 
-test("a fresh try of the step is told the costs again, and one that continues the last session is not: it was, on that session's first brief", async () => {
+test("a fresh try of the step is told the costs again, and one that continues the last session neither reads nor is told them: it was, on that session's first brief", async () => {
   const run = await Effect.runPromise(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: WORKFLOW, isolate: false }));
   await pass(run.id);
   await pass(run.id);
   fail(`${run.id}-design`, 1);
   await pass(run.id);
   await runWith(e, retryRun(run.id, 'design', { mode: 'fresh' }));
+  viewed.length = 0;
   await pass(run.id);
+  assert.ok(viewed.includes('c24-design'), 'the pass that files a fresh try reads the newest run');
   const fresh = readRun(run.id).steps.design.taskId!;
   assert.notEqual(fresh, `${run.id}-design`);
   assert.ok(briefs.get(fresh)!.includes(SECTION), briefs.get(fresh));
@@ -224,7 +232,13 @@ test("a fresh try of the step is told the costs again, and one that continues th
   fail(fresh, 1);
   await pass(run.id);
   await runWith(e, retryRun(run.id, 'design', { mode: 'nudge', message: 'once more' }));
+  viewed.length = 0;
   await pass(run.id);
+  assert.deepEqual(
+    viewed.filter((taskId) => !taskId.startsWith(run.id)),
+    [],
+    'the pass that files a continued session reads no other run',
+  );
   const nudged = readRun(run.id).steps.design.taskId!;
   assert.notEqual(nudged, fresh);
   assert.equal(briefs.get(nudged)!.includes(SECTION), false, briefs.get(nudged));

@@ -342,14 +342,14 @@ export const COSTLY = {
   /** What the run cost, on its card, its row on Runs and its page's header: `≥`, since review's sessions were not priced. */
   cost: '≥$7.85',
   /**
-   * The tokens its sessions used, on its card, its row and its header: every session's, review's Codex ones too, which measure tokens
-   * though they price nothing; and their split, on hover and in the header.
-   */
-  /**
    * Its time at work: from implement's first spawn, 1.48 minutes ago, to tokens' second check's end, 0.95 — the union of its sessions and
    * checks, which overlap; their sum is 74s. Waiting on you, it is at work and not over.
    */
   took: '31s at work',
+  /**
+   * The tokens its sessions used, on its card, its row and its header: every session's, review's Codex ones too, which measure tokens
+   * though they price nothing; and their split, on hover and in the header.
+   */
   tokens: { said: '6.73M tokens', split: '5.9M read from the cache · 690k written to it · 60k uncached · 84.5k out' },
   /**
    * The step that signed off blocked past its budget, answered with its raise: its word, what it cost of its cap, its question, and where

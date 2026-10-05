@@ -24,8 +24,7 @@ description: "Review a change in this repository as a second engineer would: aga
    kind `placement` that cites the rule.
 6. **Look for what the author could not see**: a rule claimed with no test that makes it refuse; a test that passes for nothing; a
    caller that rebuilds a returned type field by field and drops the new one; a limit raised; a behaviour change the spec did not ask
-   for. When the change touches `apps/web`, read the pictures implement handed on, in both themes, with `look`; never build
-   or run the e2e.
+   for. Never build or run the e2e.
 7. **Write each finding so the engineer can act on it alone**: the file, the line, the input or case, and the wrong result; its `kind`,
    and the `rule` it cites, by the file that states or holds it and its words. No finding invented to look thorough, none about taste.
 8. **Decide the round**: `again` true only when a finding is worth another round of work. From the second round, read the engineer's

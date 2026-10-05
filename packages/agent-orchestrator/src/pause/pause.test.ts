@@ -128,8 +128,12 @@ test('the pause once nothing finishes counts each check it holds back, staged or
     "   r-1's land has signed off, and its check waits on nemia resume",
   ]);
   assert.match(
-    pausedWords({ pause: PAUSE, finishing: [], staged: [{ run: 'r-2', step: 'ship', repo: '/repo' }], held: [{ run: 'r-1', step: 'land' }] }) ??
-      '',
+    pausedWords({
+      pause: PAUSE,
+      finishing: [],
+      staged: [{ run: 'r-2', step: 'ship', repo: '/repo' }],
+      held: [{ run: 'r-1', step: 'land' }],
+    }) ?? '',
     / nothing new starts, 2 checks held; /,
   );
 });

@@ -110,7 +110,8 @@ test('nemia up says the pause once across passes, again each time its words chan
   const signed = { ...held, held: [{ run: 'r-4', step: 'land' }] };
   let said: string | undefined;
   const lines = await printed(t, () => {
-    for (const standing of [undefined, two, two, one, none, none, held, held, signed, signed, undefined, undefined]) said = pauseSaid(standing, said);
+    for (const standing of [undefined, two, two, one, none, none, held, held, signed, signed, undefined, undefined])
+      said = pauseSaid(standing, said);
   });
   assert.deepEqual(
     lines.map((l) => l.slice(10)),

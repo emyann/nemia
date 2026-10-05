@@ -112,7 +112,11 @@ test("nemia feed reads the store's feed from a cursor, and prints the pause firs
   const pause = putPause({ why: 'merging by hand', by: 'ann' });
   try {
     const paused = await runWith(e, FEED.handler({ cursor: String(Buffer.byteLength(head)) }));
-    assert.deepEqual(FEED.print(paused, {}), [pausedWords({ pause, finishing: [], staged: [], held: [] }), feedLineWords(second), `cursor: ${end}`]);
+    assert.deepEqual(FEED.print(paused, {}), [
+      pausedWords({ pause, finishing: [], staged: [], held: [] }),
+      feedLineWords(second),
+      `cursor: ${end}`,
+    ]);
   } finally {
     resumePause();
   }

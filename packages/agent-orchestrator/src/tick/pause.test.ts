@@ -35,8 +35,9 @@ const { engineOf, runWith, storeAdmission } = await import('../runtime-client.ts
 const { resumePause, putPause } = await import('../pause/pause.store.ts');
 const { pauseNow } = await import('../pause/pause.verb.ts');
 const { pausedRead, runsListed } = await import('../list/list.verb.ts');
+const { PAUSE_WAIT } = await import('../list/list.ts');
 const { COMMANDS } = await import('../command/commands.verb.ts');
-const { PAUSE_WAIT, pausedLines, pausedWords } = await import('../pause/pause.ts');
+const { pausedLines, pausedWords } = await import('../pause/pause.ts');
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], {

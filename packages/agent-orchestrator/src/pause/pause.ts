@@ -64,12 +64,6 @@ export const NOW_COST = 'An interrupted step redoes its unfinished work and read
 /** How `nemia resume` is typed, as every line that offers it says it. */
 export const RESUME_LINE = 'nemia resume';
 
-/** The word of a step whose check is due and the pause keeps from being filed, where `checking` would say its check exists. */
-export const PAUSE_WAIT = 'waiting on the pause';
-
-/** The note beside `PAUSE_WAIT`: when the check it waits for is filed. */
-export const PAUSE_WAIT_NOTE = `its check is filed on ${RESUME_LINE}`;
-
 /**
  * The tasks of `run` still at work, which the pause lets finish: each step's current task and its check's, pending or running. Left out:
  * one the runtime holds queued, which no pass admits under the pause; a session that waits on a person (`needs-human`), which holds no

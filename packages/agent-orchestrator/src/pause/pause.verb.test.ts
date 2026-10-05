@@ -50,7 +50,10 @@ const atWork = (id: string): FinishingView & { id: string } => ({
   state: { brief: 'b', settled: null, attempts: [ATTEMPT] },
 });
 
-/** An engine whose tasks `working` are at work, recording each stop it is asked and whether its ask was on disk then. */
+/**
+ * An engine whose tasks `working` are at work, each viewed so, as the pause's read views a run with a check due; recording each stop it
+ * is asked and whether its ask was on disk then.
+ */
 function engineOf(working: string[], refuse: string[] = []) {
   const stops: { taskId: string; askOnDisk: boolean }[] = [];
   const asked = (taskId: string) =>
@@ -58,6 +61,7 @@ function engineOf(working: string[], refuse: string[] = []) {
     fs.readdirSync(asksDir('r-a')).some((f) => fs.readFileSync(path.join(asksDir('r-a'), f), 'utf8').includes(taskId));
   const e = promised({
     list: async (ids: string[]) => ({ views: ids.filter((id) => working.includes(id)).map(atWork) }),
+    view: async (id: string) => atWork(id),
     stop: async (taskId: string) => {
       stops.push({ taskId, askOnDisk: asked(taskId) });
       if (refuse.includes(taskId)) throw Object.assign(new Error(`task ${taskId} is settled`), { exitCode: 2 });
@@ -138,6 +142,7 @@ test('the pause read after a pause at once says each task it stopped resumed, an
   const stopped = (id: string): FinishingView & { id: string } => ({ ...atWork(id), state: { ...atWork(id).state, stopRequested: true } });
   const read = promised({
     list: async (ids: string[]) => ({ views: ids.filter((id) => ['t1', 't2'].includes(id)).map(stopped) }),
+    view: async (id: string) => stopped(id),
   });
   assert.deepEqual((await runWith(read, pausedRead())).finishing, [
     { run: 'r-a', step: 'implement', kind: 'session', stopping: true, resumed: true },

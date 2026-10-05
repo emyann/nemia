@@ -44,7 +44,7 @@ import { saidWord } from '../say/say.ts';
 import { assess } from '../tick/assess.ts';
 import { neverApproved } from '../prune/prune.ts';
 import { daemonLine, type DaemonStanding } from '../daemon/daemon.ts';
-import { PAUSE_WAIT, PAUSE_WAIT_NOTE, type Paused } from '../pause/pause.ts';
+import type { Paused } from '../pause/pause.ts';
 
 export type Listing = {
   /**
@@ -400,6 +400,12 @@ function judgedRow(status: StepStatus, verdictOf: () => Verdict | undefined, hel
  * board's included (`StepNeeds.waitingFor.words`), so a word over this length is read whole nowhere else.
  */
 const WAIT_CAP = 60;
+
+/** The word of a step whose check is due and the pause keeps from being filed, where `checking` would say its check exists. */
+export const PAUSE_WAIT = 'waiting on the pause';
+
+/** The note beside `PAUSE_WAIT`: when the check it waits for is filed, on `nemia resume`. */
+const PAUSE_WAIT_NOTE = 'its check is filed on nemia resume';
 
 /** A word that already names its own thing. `permission prompt` does not, and reads as `a permission prompt`; `the login dialog` does. */
 const DETERMINED = /^(a|an|the|its|their|another|some|one|no)\b/i;

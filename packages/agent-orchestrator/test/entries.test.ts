@@ -119,7 +119,6 @@ const PINNED: Record<string, string[]> = {
     'pauseWords',
     'heldLines',
     'heldWords',
-    'PAUSE_WAIT',
     'pausedLines',
     'pausedRead',
     'pausedWords',

@@ -2105,6 +2105,7 @@ node bin/ae.ts logs <id>         # the session's own output
 node bin/ae.ts say <id> "…"      # tell its running session something; journalled
 node bin/ae.ts admit <id>        # let a task filed queued start, on the next pass
 node bin/ae.ts stop <id>
+node bin/ae.ts sweep            # count the bodies no journal names; --yes removes them
 ```
 
 ```bash
@@ -2150,6 +2151,20 @@ t-mtxp3z5p  claude    running (working)   cost not measured  Write the number 2 
 t-mtxp3zb3  claude    pending             queued  Write the number 3 into N3.txt
 t-mtxp3zgs  claude    pending             queued  Write the number 4 into N4.txt
 ```
+
+### Bodies: a long text kept once
+
+The files store keeps each long text of an entry once, under `<root>/bodies/<sha256 of its text>`, and the entry names it
+(`src/core/engine/bodies.ts`): a filing's brief in its parts (`briefParts`, given on the filing, which must join into its `brief`;
+else the brief as one part), the schema its end is held to, a `starting` nudge and an `input`'s text. A text under 1024 bytes stays
+in its line. Every read resolves each name, so the journal, the feed, `view` and `ae show` give the event as it was appended, key for
+key; a line written before bodies reads as it always did, and a store that keeps no bodies (`PlainJournalOps`, the in-memory one
+with `bodies: false`) appends whole events as before.
+
+A body goes only through `ae sweep --yes` (`Engine.sweep({ yes: true })`, or `removeBody` for one), which reads every journal and
+the feed from its start first and keeps a body any of them names, or one put in the last day. Removing a task's journal by hand
+leaves its bodies for the next sweep; removing a body by hand makes every task that names it unreadable, its read failing with a
+`JournalError` that names the body's path: restore it from a backup.
 
 ### `tick` and `up`, and why both
 

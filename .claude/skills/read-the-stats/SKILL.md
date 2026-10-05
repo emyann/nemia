@@ -25,8 +25,8 @@ description: "Read a factory's stats since the janitor's last run, against the s
    rounds, a gate that waited longer, a count a workflow declares over its closeouts that rose (`all.tallies`: each step's `sum` over
    its measured `tries`, null where none was measured). Propose a correction only where the numbers point at one; a number that moved with nothing to
    correct goes in the report, not on a card.
-6. **Read the inbox** (`npx wf inbox`, and the cards under `${WF_ROOT:-~/.agent-workflows}/inbox/` with Read): propose nothing a card
-   there already says, under its title or another. The check files no card whose title one there already has.
+6. **Read the inbox** (`npx wf inbox`, and its cards in the inbox folder your brief names, mounted read-only: read them with Read, Grep
+   and Glob): propose nothing a card there already says, under its title or another. The check files no card whose title one there already has.
 7. **Write each card ready to start**: a title of one line, what to correct; the correction exactly — the rule, or the line and the
    file it goes in; the evidence, the numbers of both periods; the agent; and the factory, the workflow and the repository it is
    started with — the factory and repository the runs it is about ran in (`--by factory`, `--by repo`), and the workflow that changes

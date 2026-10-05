@@ -19,7 +19,8 @@
  *
  * A fence also reaches the run's artifacts folder: each step is filed the folder of every step it comes after, read-only
  * (`handedMounts`), and reads what it holds and writes none of it, in any mode; it is filed no folder of a step it does not come after.
- * The reach is read off the config a filing gives the harness (`filedConfig`), as Claude Code holds a mount (`readsAt`, `writesAt`).
+ * The reach is read off the config a filing gives the harness (`filedConfig`), as Claude Code holds a mount (`readsAt`, `writesAt`). So
+ * does the store's inbox, for a step whose `reads:` names it (`readsMounts`): read-only, in any mode, and to no other step.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -28,7 +29,7 @@ import path from 'node:path';
 import { loadWorkflows, readSkillRules, RULES_FILE } from '../src/folder/folder.store.ts';
 import type { SkillRule } from '../src/skills/skills.ts';
 import { filedConfig } from '../src/filed/filed.ts';
-import { handedMounts } from '../src/artifacts/artifacts.ts';
+import { handedMounts, readsMounts } from '../src/artifacts/artifacts.ts';
 import { sandboxed, upstreamOf } from '../src/workflow/index.ts';
 import { scratch } from './scratch.ts';
 import { placesOf, shippedFolders, SHIPPED_HOLDERS, TEAM, TEAM_DEV, teamCopy } from './team.ts';
@@ -589,14 +590,26 @@ test('REFUSED: a call that breaks a shipped rule, allowed to the step given the 
   const seldon = shippedAllowed('seldon', 'build', 'Agent, Bash(npm run lint), Bash(cat:*)');
   assert.deepEqual(unbreakable(seldon, spec.rules), ['design: read-with-read Bash(cat:*)']);
   const cd = [{ id: 'checks-bare', says: 'never cd', breaks: ['Bash(cd:*)'] }];
-  assert.deepEqual(unbreakable(shippedStepOf('seldon'), cd), ['design: checks-bare Bash(cd:*)'], "the settings' allow reaches cd");
-  assert.deepEqual(unbreakable({ ...seldon, disallowedTools: ['Bash(cat:*)'] }, spec.rules), [], 'a deny of its own refuses it');
+  const ownDenies = shippedStepOf('seldon').disallowedTools ?? [];
+  assert.ok(ownDenies.includes('Bash(cd:*)'), 'Seldon denies cd itself');
+  assert.deepEqual(unbreakable(shippedStepOf('seldon'), cd), [], 'its own deny refuses cd');
+  const unDenied = { ...shippedStepOf('seldon'), disallowedTools: ownDenies.filter((rule) => rule !== 'Bash(cd:*)') };
+  assert.deepEqual(unbreakable(unDenied, cd), ['design: checks-bare Bash(cd:*)'], "without it, the settings' allow reaches cd");
+  assert.deepEqual(
+    unbreakable({ ...seldon, disallowedTools: [...ownDenies, 'Bash(cat:*)'] }, spec.rules),
+    [],
+    'a deny of its own refuses it',
+  );
   assert.deepEqual(brokenBy('Bash(git -C:*)'), { tool: 'Bash', command: 'git' }, "a denial keeps a command's first word");
   assert.deepEqual(brokenBy('Read(//etc/**)'), { tool: 'Read' });
 });
 
 /** The run's artifacts folder the reach below is filed against, one folder per step under it. */
 const RUN_ARTIFACTS = '/s/runs/r-1/artifacts';
+
+/** The store's inbox the reach below is filed against, and a card in it. */
+const INBOX = '/s/inbox';
+const CARD = path.join(INBOX, 'card.md');
 
 /** A file the step `by` handed over, in its own folder of the run's artifacts. */
 const handedBy = (by: string): string => path.join(RUN_ARTIFACTS, by, 'shot.png');
@@ -606,7 +619,12 @@ const filedOf = (steps: readonly Step[]): Map<string, Filed> =>
   new Map(
     steps.map((step) => [
       step.name,
-      filedConfig(step, steps, { gates: [] }, { model: undefined, budgetUsd: undefined, runArtifacts: RUN_ARTIFACTS, own: {} }),
+      filedConfig(
+        step,
+        steps,
+        { gates: [] },
+        { model: undefined, budgetUsd: undefined, runArtifacts: RUN_ARTIFACTS, inbox: INBOX, own: {} },
+      ),
     ]),
   );
 
@@ -710,4 +728,46 @@ test('every shipped step on a harness fenced by a permission mode reads, and nev
     }
   }
   assert.ok(checked.includes('build/review <- implement'), checked.join('\n'));
+});
+
+test('the janitor reads the inbox, and writes none of it: every shipped step whose `reads:` names it', () => {
+  const readers = shipped().filter(({ step }) => step.reads?.includes('inbox'));
+  assert.ok(
+    readers.some(({ dir, step }) => `${path.basename(dir)}/${step.name}` === 'janitor/argus'),
+    readers.map(({ dir, step }) => `${path.basename(dir)}/${step.name}`).join('\n'),
+  );
+  for (const { dir, step } of readers) {
+    const config = filedOf(loadWorkflows(dir, placesOf(dir))).get(step.name)!;
+    assert.ok(readsAt(config, CARD), `${path.basename(dir)}/${step.name} reads the inbox's cards`);
+    assert.equal(writesAt(config, CARD), false, `${path.basename(dir)}/${step.name} writes none of them`);
+  }
+});
+
+test('REFUSED: a step whose `reads:` does not name the inbox reads none of it', () => {
+  const at = (workflow: string, name: string): Filed => {
+    const found = shipped().find(({ dir, step }) => path.basename(dir) === workflow && step.name === name);
+    assert.ok(found, `${workflow}/${name} is shipped`);
+    return filedOf(loadWorkflows(found.dir, placesOf(found.dir))).get(name)!;
+  };
+  for (const [workflow, name] of [
+    ['build', 'design'],
+    ['build', 'review'],
+    ['intake', 'intake'],
+  ])
+    assert.equal(readsAt(at(workflow, name), CARD), false, `${workflow}/${name} names no store folder, and reads no card`);
+  const argus = shippedStepOf('argus');
+  assert.equal(readsAt(filedOf([{ ...argus, reads: undefined }]).get(argus.name)!, CARD), false, 'Argus without the line reads none');
+  assert.deepEqual(readsMounts({ ...argus, harness: 'codex' }, INBOX), [], 'codex reads the disk in its sandbox already');
+  assert.deepEqual(readsMounts({ ...argus, harness: 'a2a:peer' }, INBOX), [], 'a remote agent is filed no local field');
+  assert.deepEqual(readsMounts(argus, INBOX), [{ path: INBOX, readOnly: true }]);
+});
+
+test('REFUSED: the inbox mounted writable is open to a write, and an Edit allow on it is no write while it is mounted read-only', () => {
+  const argus = shippedStepOf('argus');
+  const config = filedOf([argus]).get(argus.name)!;
+  const opened = { ...config, mounts: config.mounts!.map((m) => ({ ...m, readOnly: false })) };
+  assert.ok(writesAt(opened, CARD), 'the model sees a writable mount as a write');
+  const allowed = { ...config, allowedTools: [...(config.allowedTools ?? []), `Edit(/${INBOX}/**)`] };
+  assert.ok(writesAt({ ...allowed, mounts: [] }, CARD), 'the model sees an Edit allow as a write');
+  assert.equal(writesAt(allowed, CARD), false, "the read-only mount's deny beats the allow");
 });

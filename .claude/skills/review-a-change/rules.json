@@ -1,0 +1,26 @@
+{
+  "rules": [
+    {
+      "id": "read-with-read",
+      "says": "Read a file with Read, list a folder with Glob and search with Grep; never ls, find, head, cat, grep, git grep, awk, sed or a pipe in Bash",
+      "breaks": [
+        "Bash(ls:*)",
+        "Bash(find:*)",
+        "Bash(head:*)",
+        "Bash(cat:*)",
+        "Bash(grep:*)",
+        "Bash(awk:*)",
+        "Bash(sed:*)"
+      ]
+    },
+    {
+      "id": "checks-bare",
+      "says": "Run each check bare, one command per call: never wrapped in timeout, never cd or a for loop",
+      "breaks": [
+        "Bash(timeout:*)",
+        "Bash(cd:*)",
+        "Bash(for:*)"
+      ]
+    }
+  ]
+}

@@ -14,8 +14,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import type { PromiseJournal, PromiseRunner, PromiseSighting } from 'agent-runtime';
-import { Engine } from 'agent-runtime/effect';
+import type { Sighting } from 'agent-runtime';
+import { asyncStore, type AsyncJournal, asyncOps, type AsyncRunner } from '../../test/promised.ts';
+import { Engine } from 'agent-runtime';
 import type { Run } from '../run.ts';
 import type { Finishing } from '../pause/pause.ts';
 import { scratch } from '../../test/scratch.ts';
@@ -70,11 +71,11 @@ const folder = (steps: readonly string[], more: (name: string) => string = () =>
 };
 
 /** Each task's journal, as the engine's store holds it: what a test spoils by hand, out of the feed. */
-type Tasks = Map<string, Parameters<PromiseJournal['append']>[1][]>;
+type Tasks = Map<string, Parameters<AsyncJournal['append']>[1][]>;
 
 /** The engine's store, in memory, in `tasks`, noting in `starts` when each attempt began, by its session's name. */
-const memoryJournal = (tasks: Tasks, starts: Map<string, number>): PromiseJournal => {
-  const feed: Awaited<ReturnType<PromiseJournal['feed']>>['entries'] = [];
+const memoryJournal = (tasks: Tasks, starts: Map<string, number>): AsyncJournal => {
+  const feed: Awaited<ReturnType<AsyncJournal['feed']>>['entries'] = [];
   return {
     async append(taskId, event) {
       tasks.set(taskId, [...(tasks.get(taskId) ?? []), event]);
@@ -104,9 +105,9 @@ const BLOCKED = { outcome: 'blocked', summary: 'two flags could be meant', artif
  * signs every session at work but those of the runs `keep` names, with `BLOCKED` for those of the runs `blocking` names.
  */
 const engine = () => {
-  const sessions = new Map<string, PromiseSighting>();
+  const sessions = new Map<string, Sighting>();
   const spawned: string[] = [];
-  const runner: PromiseRunner = {
+  const runner: AsyncRunner = {
     async spawn(r) {
       spawned.push(r.name);
       sessions.set(r.name, { sessionId: `s-${spawned.length}`, nativeId: `native-${spawned.length}`, state: 'working', busy: true });
@@ -115,7 +116,7 @@ const engine = () => {
       return new Map(sessions);
     },
     async stop(id) {
-      for (const [name, s] of sessions) if (s.sessionId === id) sessions.set(name, { ...s, state: 'stopped', busy: false });
+      for (const [name, s] of sessions) if (s.sessionId === id) sessions.set(name, { ...s, state: 'canceled', busy: false });
     },
     async logs() {
       return '';
@@ -126,8 +127,8 @@ const engine = () => {
   const e = engineOf(
     Engine.layer({
       root: fs.mkdtempSync(path.join(ROOT, 'engine-')),
-      journal: memoryJournal(tasks, starts),
-      harnesses: { claude: runner, codex: runner, check: runner },
+      journal: asyncStore(memoryJournal(tasks, starts)),
+      harnesses: { claude: asyncOps(runner), codex: asyncOps(runner), check: asyncOps(runner) },
       defaultHarness: 'claude',
       ...storeAdmission(),
     }),
@@ -137,7 +138,7 @@ const engine = () => {
     for (const [name, s] of sessions) {
       if (s.state !== 'working' || of(name, keep)) continue;
       const payload = of(name, blocking) ? BLOCKED : SIGNED;
-      sessions.set(name, { ...s, state: 'done', busy: false, closeout: { payload, at: (starts.get(name) ?? Date.now()) + 1 } });
+      sessions.set(name, { ...s, state: 'completed', busy: false, closeout: { payload, at: (starts.get(name) ?? Date.now()) + 1 } });
     }
   };
   return { e, spawned, signAll, tasks };

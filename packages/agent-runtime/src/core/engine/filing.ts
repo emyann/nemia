@@ -13,6 +13,8 @@ import { Runner } from '../../harness/seam.ts';
 /** What `file` journals: a task as a person files it. */
 export type Filing = {
   brief: string;
+  /** The brief cut into parts that join into it, for a store that keeps each long part once. See `TaskSpec.briefParts`. */
+  briefParts?: string[];
   cwd: string;
   harness?: string;
   config?: HarnessArgs;
@@ -82,12 +84,12 @@ const priorityRefusalOf = (priority: unknown): string | undefined =>
  *    that is not a boolean, and a `priority` that is not a whole number in int32;
  * 5. what a long-lived task cannot honour (`restartRefusalOf`).
  *
- * Checked by `file` itself, so neither door journals what the loop cannot use. A journalled task is a promise the loop
+ * Checked by `file` itself, so no caller journals what the loop cannot use. A journalled task is a promise the loop
  * keeps trying to honour, so a value it cannot use is cheapest refused before it is written: `deadlineSeconds: NaN`
  * journals as `null` and would stop its task on the first pass. The harness's arguments under `config` are the adapter's to
  * check (`argsRefusalOf` in `harness/args.ts`), and `file` asks those checks next, then the runner (`Runner.refuses`).
  * The `file` of an engine `Engine.layer` builds asks both, then each harness for its own words (`harnessRefusalOf` in
- * `facade/consumer.ts`), which this door never learns.
+ * `service/harness-refusal.ts`), which the core never learns.
  */
 export const refusalOf = (spec: Filing): string | undefined => {
   if (typeof spec.brief !== 'string' || !spec.brief.trim()) return '`brief` is empty. Say what the session should do.';
@@ -106,7 +108,19 @@ export const refusalOf = (spec: Filing): string | undefined => {
   if (spec.queued !== undefined && typeof spec.queued !== 'boolean') {
     return `\`queued: ${JSON.stringify(spec.queued)}\` is not a yes or a no. Give true to have the task wait for \`admit\` before it starts, or leave it out to start it on the next pass.`;
   }
-  return priorityRefusalOf(spec.priority) ?? restartRefusalOf(spec);
+  return priorityRefusalOf(spec.priority) ?? partsRefusalOf(spec) ?? restartRefusalOf(spec);
+};
+
+/** Why a task's `briefParts` cannot be its brief's, or `undefined`: anything but a list of texts, or texts that do not join into it. */
+const partsRefusalOf = ({ brief, briefParts }: Filing): string | undefined => {
+  if (briefParts === undefined) return undefined;
+  if (!Array.isArray(briefParts) || !briefParts.every((part) => typeof part === 'string')) {
+    return `\`briefParts: ${JSON.stringify(briefParts)}\` is not a list of texts. Give the brief cut into parts, each a string, or leave it out.`;
+  }
+  if (briefParts.join('') !== brief) {
+    return '`briefParts` do not join into `brief`: give parts that, put end to end, are the brief, or leave them out to keep the brief whole.';
+  }
+  return undefined;
 };
 
 /**
@@ -146,21 +160,25 @@ export const file = Effect.fn('file')(function* (spec: Filing) {
   if (refused) return yield* Effect.fail(new FileRefused({ message: refused }));
   const journal = yield* Journal;
   const id = spec.id ?? `t-${Date.now().toString(36)}-${randomUUID().slice(0, 8)}`;
-  yield* journal.append(id, {
-    kind: 'filed',
-    at: new Date().toISOString(),
-    brief: spec.brief,
-    cwd: spec.cwd,
-    harness: spec.harness,
-    config: spec.config,
-    deadlineSeconds: spec.deadlineSeconds,
-    resumeFrom: spec.resumeFrom,
-    closeoutSchema: spec.closeoutSchema,
-    holdOpen: spec.holdOpen,
-    queued: spec.queued === true,
-    ...(spec.priority !== undefined && spec.priority !== 0 ? { priority: spec.priority } : {}),
-    ...(spec.restartPolicy === 'Always' ? { restartPolicy: 'Always' as const } : {}),
-  });
+  yield* journal.append(
+    id,
+    {
+      kind: 'filed',
+      at: new Date().toISOString(),
+      brief: spec.brief,
+      cwd: spec.cwd,
+      harness: spec.harness,
+      config: spec.config,
+      deadlineSeconds: spec.deadlineSeconds,
+      resumeFrom: spec.resumeFrom,
+      closeoutSchema: spec.closeoutSchema,
+      holdOpen: spec.holdOpen,
+      queued: spec.queued === true,
+      ...(spec.priority !== undefined && spec.priority !== 0 ? { priority: spec.priority } : {}),
+      ...(spec.restartPolicy === 'Always' ? { restartPolicy: 'Always' as const } : {}),
+    },
+    spec.briefParts,
+  );
   return id;
 });
 
@@ -242,7 +260,7 @@ export class InputRefused extends Schema.TaggedError<InputRefused>()('InputRefus
  * Why a task cannot take an answer or a close now — or `undefined`. Only a task its guard (`awaitsWord`, by `verbTakes`) takes
  * does: held open, its current turn signed, nothing running, nothing said since and no stop asked — and an answer only one
  * whose signing session its harness recorded, since the answer is told to that session. Otherwise the words say why not. Read
- * off the record alone, so it costs no registry call, and the same at both doors.
+ * off the record alone, so it costs no registry call.
  */
 const waitRefusalOf = (verb: 'answer' | 'close', taskId: string, state: State | undefined): string | undefined => {
   if (!state) return `\`${taskId}\` is not a task on this board. \`ae ls\`, or \`list()\`, gives the ones it has.`;

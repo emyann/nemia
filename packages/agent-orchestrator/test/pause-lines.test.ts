@@ -16,7 +16,8 @@ import { promised } from './promised.ts';
 const ROOT = scratch('wf-pause-lines-');
 process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
-const { main, pauseSaid } = await import('../src/cli/main.ts');
+const { main } = await import('../src/cli/main.ts');
+const { pauseSaid } = await import('../src/daemon/up.verb.ts');
 const { resumePause, putPause } = await import('../src/pause/pause.store.ts');
 const { pausedWords, RESUMED } = await import('../src/pause/pause.ts');
 const { addFactory, attachWorkflow, hireAgent } = await import('../src/runner.ts');
@@ -93,7 +94,7 @@ test('nemia start says, after how to start the run, that nothing of it is filed 
   );
 });
 
-test('nemia up says the pause once across passes, again each time its words change, and resumed once when it is resumed', async (t) => {
+test('nemia up says the pause once across passes, again each time its words change, and resumed once when it is resumed', () => {
   const pause = { at: '2026-10-04T12:00:00.000Z', by: 'ann', why: 'merging by hand' };
   const two = {
     pause,
@@ -109,26 +110,25 @@ test('nemia up says the pause once across passes, again each time its words chan
   const held = { ...none, staged: [{ run: 'r-3', step: 'ship', repo: '/code/app' }] };
   const signed = { ...held, held: [{ run: 'r-4', step: 'land' }] };
   let said: string | undefined;
-  const lines = await printed(t, () => {
-    for (const standing of [undefined, two, two, one, none, none, held, held, signed, signed, undefined, undefined])
-      said = pauseSaid(standing, said);
-  });
+  const lines: string[] = [];
+  for (const standing of [undefined, two, two, one, none, none, held, held, signed, signed, undefined, undefined]) {
+    const now = pauseSaid(standing, said);
+    lines.push(...now.lines);
+    said = now.said;
+  }
+  assert.deepEqual(lines, [
+    pausedWords(two),
+    pausedWords(one),
+    pausedWords(none),
+    pausedWords(held),
+    "   r-3's ship has its merge staged in /code/app (MERGE_HEAD), and its check waits on nemia resume",
+    pausedWords(signed),
+    "   r-3's ship has its merge staged in /code/app (MERGE_HEAD), and its check waits on nemia resume",
+    "   r-4's land has signed off, and its check waits on nemia resume",
+    RESUMED,
+  ]);
   assert.deepEqual(
-    lines.map((l) => l.slice(10)),
-    [
-      pausedWords(two),
-      pausedWords(one),
-      pausedWords(none),
-      pausedWords(held),
-      "   r-3's ship has its merge staged in /code/app (MERGE_HEAD), and its check waits on nemia resume",
-      pausedWords(signed),
-      "   r-3's ship has its merge staged in /code/app (MERGE_HEAD), and its check waits on nemia resume",
-      "   r-4's land has signed off, and its check waits on nemia resume",
-      RESUMED,
-    ],
-  );
-  assert.deepEqual(
-    lines.map((l) => l.slice(10, 17)),
+    lines.map((l) => l.slice(0, 7)),
     ['Pausing', 'Pausing', 'Paused ', 'Paused ', "   r-3'", 'Paused ', "   r-3'", "   r-4'", 'the sto'],
   );
 });

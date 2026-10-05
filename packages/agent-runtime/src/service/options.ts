@@ -1,0 +1,265 @@
+/**
+ * What `Engine.layer` is built from and what it answers with: the harnesses it names, its options, the task it files and the
+ * reports it gives — and what the engine refuses of its options before it builds anything.
+ */
+import { Layer } from 'effect';
+import type { Event } from '../core/index.ts';
+import type { HarnessArgs, RunnerOps } from '../harness/index.ts';
+import { Admission, type IoCounts, type RefusedMove, type StoreOps, type TaskView } from '../core/engine/index.ts';
+import { claudeOps, claudeCodeOps } from '../harness/claude/index.ts';
+import { detachedOps, type HarnessSpec } from '../harness/detached/detached.ts';
+import { remoteConfigRefusal, remoteOps, type Credentials, type MissingCredential, type RemoteAgent } from '../a2a/index.ts';
+
+/**
+ * A harness, as one of five things:
+ *   `'claude'`      Claude Code as the engine runs it by default: each task a job (`claude -p`, detached by us), or a
+ *                   background session (`claude --bg`, its registry Claude Code's) when its `config.background` is true
+ *   `'claude-bg'`   Claude Code's own background sessions, every task — it keeps the registry
+ *   a `HarnessSpec` any CLI that runs a prompt and exits — we keep the registry
+ *   a `RemoteAgent` an A2A agent another party runs, by its URL or its card (`a2a/remote.ts`) — we keep the registry of
+ *                   what we sent it; its secrets come from `credentials`
+ *   a `RunnerOps`   anything else at all: a runner the consumer wrote, its sightings in A2A's names
+ *
+ * Each counts its sessions under the engine's ceiling (`maxConcurrent`) in a pool of its own, named as the harness is; one brought as
+ * an object may name a `pool` instead (`Pooled`), so two harnesses under one rate limit share one ceiling.
+ */
+export type HarnessConfig = 'claude' | 'claude-bg' | (HarnessSpec & Pooled) | (RemoteAgent & Pooled) | (RunnerOps & Pooled);
+
+/** The pool a harness brought as an object counts its sessions in, when not its own: a name of one or more characters. */
+export type Pooled = { pool?: string };
+
+/**
+ * What `Engine.layer` builds an engine from. `maxConcurrent` is the engine's ceiling: how many sessions of each pool may be at work at
+ * once, a whole number from 1. With it, a pass admits the tasks filed `queued` while their pool has room, the highest `priority` first,
+ * then the earliest filed; without it, a queued task waits for `admit`. A task filed unqueued starts on the next pass, ceiling or not.
+ */
+export type EngineOptions = {
+  /** The sessions at work at once in each pool: a whole number from 1. Absent: no ceiling, and nothing is admitted but by `admit`. */
+  maxConcurrent?: number;
+  /**
+   * Asked on every pass before it admits: while it says true the pass admits no queued task, as a node marked `unschedulable` takes no
+   * new Pod; what is at work goes on, `admit` still admits, and a task filed unqueued still starts. Absent: always schedulable.
+   */
+  unschedulable?: () => boolean;
+  /** Where the file-backed store lives. Ignored when you bring your own `journal`. */
+  root?: string;
+  /**
+   * The store to keep the engine's records in, instead of the files under `root`: any `StoreOps`, a `JournalOps` among them. Every
+   * `append` goes on its `feed` too, and a store that can signal an append (`subscribe`) wakes `watch` at once.
+   */
+  journal?: StoreOps;
+  harnesses?: Record<string, HarnessConfig>;
+  defaultHarness?: string;
+  /**
+   * The secret for a remote agent's security scheme, asked on every request that needs one: `scheme` is the scheme's name on
+   * the agent's card, `agentUrl` the agent's configured URL (for an agent given by its card, the URL of the interface it is
+   * reached on), `harness` the name the agent is configured under. `undefined` when there is none, and a task on an agent
+   * whose card asks for it is refused before anything is sent. A secret is sent as a header and written nowhere: not on the
+   * task, the journal, the registry or the feed.
+   */
+  credentials?: Credentials;
+  /**
+   * What to do when `credentials` gives no secret for a scheme, in words: the end of the refusal a task on that agent is
+   * refused with, `unstartable`. A caller that keeps its secrets somewhere of its own names the place — the variable to
+   * set, say. Absent, the refusal says to give `Engine.layer` a `credentials` that answers for the scheme.
+   */
+  missingCredential?: MissingCredential;
+};
+
+/** A task to file (`Engine.file`). */
+export type TaskSpec = {
+  brief: string;
+  /**
+   * The brief cut into parts, for storage alone: a store that keeps bodies keeps each long part once, however many tasks file it,
+   * and a session is told `brief`, whole, as ever. Refused unless the parts, put end to end, are `brief`.
+   */
+  briefParts?: string[];
+  cwd: string;
+  harness?: string;
+  deadlineSeconds?: number;
+  /** Continue an existing session of this harness instead of starting cold. */
+  resumeFrom?: string;
+  /**
+   * How the harness starts the session — its model, permission mode, tools, effort, MCP servers, context window, Remote
+   * Control, worktree and spend cap (`HarnessArgs`, each key described there). The adapter's configuration: carried on the task,
+   * handed to the runner at every spawn, and read by nothing else — `decide` and the loop never open it. Refused, before
+   * anything is journalled, when a key is no harness argument, a value is one no harness could use, or its harness does
+   * not take it; and a harness argument filed beside `config` rather than in it is refused, naming where it goes.
+   */
+  config?: HarnessArgs;
+  /**
+   * A JSON Schema for the workload's closing statement, handed to the harness verbatim.
+   *
+   * A harness that can take a structured final answer uses it — Claude Code as its StructuredOutput
+   * tool, Codex as `--output-schema` — and the moment the workload gives one, the attempt is over.
+   * The statement is recorded on the attempt (`state.attempts[n].closeout`) and never read by the
+   * engine: its shape is yours.
+   */
+  closeoutSchema?: object;
+  /**
+   * Hold the task open when an attempt signs, rather than settle it: the task waits, phase `input-required` — A2A's
+   * `TASK_STATE_INPUT_REQUIRED` — with no process running, until a person `answer`s it, which starts its next turn, or
+   * `close`s it, which settles it. A turn is one attempt, under `deadlineSeconds` and a budget of its own, so a task may
+   * wait on a person for as long as they take; a turn that does not end `done` settles the task `failed`. `stop` settles it `stopped`,
+   * waiting or not. Refused unless `true`.
+   */
+  holdOpen?: true;
+  /**
+   * Wait for the word to start: the task is filed and a pass starts nothing of it until `admit` names it — then
+   * the next pass starts it. A task held open waits for the word again before each later
+   * turn. For a layer above that decides itself what runs when; `view` says `admission: 'queued'` while it waits, and its
+   * phase stays `pending`. Absent, or `false`, starts it on the next pass. Refused unless true or false.
+   */
+  queued?: boolean;
+  /**
+   * Long-lived, a Pod's `restartPolicy: Always`: the session stays open while idle — the end of a turn, an idle listing and
+   * silence are not its end — and only `stop` ends it; a person can `say` it words, or attach to it, at any time. A session that
+   * ends with no stop asked settles the task `failed`. Taken only by a Claude Code background session (`'claude'` with
+   * `config.background: true`, or `'claude-bg'`) and a `RunnerOps` brought as its own; refused beside `holdOpen`, `deadlineSeconds` or
+   * `closeoutSchema`, and unless `'Always'`.
+   */
+  restartPolicy?: 'Always';
+  /** Choose the id yourself, to keep it in step with a row in your own database. */
+  id?: string;
+  /**
+   * Which queued task a free slot of its pool goes to first, higher first, as a Pod's priority: a whole number in int32. Absent is 0;
+   * tasks of one priority go in the order they were filed. Read by the pass's admission alone (`maxConcurrent`).
+   */
+  priority?: number;
+};
+
+/**
+ * One pass: how many tasks it read, how many actions it took, the sessions at work on each harness as it left them — its
+ * last attempt open, and `working` or not yet listed; a `blocked` one is not — and the
+ * view of every task it left unsettled — built off the pass's one observation of each harness and the fold it made, so a
+ * layer above that decides what to `admit` reads the board without asking any harness again — and what the pass
+ * cost, as facts: `ms`, its wall time, and `observed`, each harness's observes made during it (`ObserveCount`). Nothing decides on them.
+ *
+ * `refused` is every move the task's lifecycle had no edge for in this pass, off the same steps: the task, the state
+ * it was in and the event it was handed. Such a task did nothing and will be asked again next pass, so a refusal that persists
+ * is on every report until something changes; a layer above says it once (`wf up`). Empty on a healthy board, and a settled
+ * task is never on it.
+ *
+ * `unreadable` says why each task whose journal did not read was left out of the pass, naming its file, the entry and the field —
+ * on every report while it lasts, as a refusal is — and each feed entry no runtime wrote that the pass skipped, on the report of
+ * the pass that met it. Every other task is moved all the same. Empty on a healthy board.
+ */
+export type TickReport = {
+  tasks: number;
+  actions: number;
+  running: Record<string, number>;
+  views: TaskView[];
+  ms: number;
+  observed: Record<string, ObserveCount>;
+  refused: RefusedMove[];
+  unreadable: string[];
+};
+
+/**
+ * One harness's observes, counted: how many were made, their wall time in ms, the sessions or run files they listed, and the processes
+ * started while they ran (`claude agents` for Claude Code's background sessions; none for a directory of run files). The harnesses of a
+ * pass observe at once, so their `ms` can add up to more than the pass's, and a process another harness started in the same moment is
+ * counted in both. `unread` is how many of the observes could not read all they were to: one that failed, or one that left an
+ * expected name unread (`Observation`) — a harness that keeps failing shows there, where the pass waits on it rather than reading its
+ * sessions gone.
+ */
+export type ObserveCount = { calls: number; ms: number; listed: number; spawned: number; unread: number };
+
+/**
+ * What this engine's reads and spawns have cost since the process started, as running totals: the runtime's own reads and spawns
+ * (`IoCounts`, per process), and each harness's observes, whichever call made them — a pass, a `view`, a `transcript` (per engine). A
+ * caller that wants one call's cost takes the difference before and after it.
+ */
+export type EngineIo = IoCounts & { observed: Record<string, ObserveCount> };
+
+/**
+ * The session an attempt ended as, as its harness named it then (the `ended` entry's `sessionId`, the sighting's): what an
+ * observe would have listed it by. Undefined for an attempt no harness ever named, whose end says so in parentheses.
+ */
+export const handleOf = (events: readonly Event[], attempt: number): string | undefined => {
+  const end = [...events].reverse().find((e) => e.kind === 'ended' && e.attempt === attempt);
+  return end?.kind === 'ended' && !['(never seen)', '(never started)'].includes(end.sessionId) ? end.sessionId : undefined;
+};
+
+export const isSpec = (h: HarnessConfig): h is HarnessSpec => typeof h === 'object' && 'command' in h;
+/** A remote A2A agent: an object that is neither a spec (`command`) nor a runner (`spawn`). */
+export const isRemote = (h: HarnessConfig): h is RemoteAgent => typeof h === 'object' && h !== null && !('command' in h) && !('spawn' in h);
+/** Claude Code as the engine runs it itself, in either of the two ways it is brought. */
+export const isClaude = (h: HarnessConfig): h is 'claude' | 'claude-bg' => h === 'claude' || h === 'claude-bg';
+
+/** Each configured harness as the seam's value, by name: composed into one `Runner`, and asked directly for a task's logs. */
+export const runnersOf = (
+  harnesses: Record<string, HarnessConfig>,
+  root: string,
+  credentials?: Credentials,
+  missingCredential?: MissingCredential,
+): Record<string, RunnerOps> =>
+  Object.fromEntries(
+    Object.entries(harnesses).map(([name, h]): [string, RunnerOps] => [
+      name,
+      h === 'claude'
+        ? claudeCodeOps({ root })
+        : h === 'claude-bg'
+          ? claudeOps({ root })
+          : isSpec(h)
+            ? detachedOps(h, root)
+            : isRemote(h)
+              ? remoteOps(name, h, root, credentials, undefined, { missingCredential })
+              : h,
+    ]),
+  );
+
+/** Why `maxConcurrent` is not a ceiling, or `undefined`: anything but a whole number from 1. */
+const ceilingRefusalOf = (maxConcurrent: unknown): string | undefined =>
+  maxConcurrent === undefined || (Number.isInteger(maxConcurrent) && (maxConcurrent as number) >= 1)
+    ? undefined
+    : `\`maxConcurrent: ${typeof maxConcurrent === 'number' ? maxConcurrent : JSON.stringify(maxConcurrent)}\` is not a ceiling. Give the sessions each pool may have at work at once, a whole number from 1, or leave it out for none.`;
+
+/** Why the harness `name` cannot be taken as given, or `undefined`: a `pool` that is not a name, and a remote agent's config. */
+const harnessConfigRefusalOf = (name: string, h: HarnessConfig): string | undefined => {
+  const pooled: Record<string, unknown> = typeof h === 'object' && h !== null ? h : {};
+  if (Object.hasOwn(pooled, 'pool') && (typeof pooled.pool !== 'string' || !pooled.pool.trim())) {
+    return `the \`${name}\` harness names the \`pool\` ${JSON.stringify(pooled.pool) ?? String(pooled.pool)}, which is not a name. Give the name of the pool its sessions share a ceiling in, or leave it out for a pool of its own.`;
+  }
+  const { pool: _, ...agent } = pooled;
+  return typeof h === 'object' && h !== null && isRemote(h) ? remoteConfigRefusal(name, agent) : undefined;
+};
+
+/**
+ * Why an engine cannot be built from these options, in a sentence that says what to do instead — or `undefined`. Asked of the
+ * options as handed in, untyped, and refuses, in this order: a `maxConcurrent` that is not a whole number from 1; a harness
+ * brought as an object whose `pool` is not a name; a remote agent's entry `remoteConfigRefusal` refuses, its `pool` aside; and an
+ * `unschedulable`, a `credentials` or a `missingCredential` that is not a function.
+ */
+export const optionsRefusalOf = (options: EngineOptions): string | undefined => {
+  const ceiling = ceilingRefusalOf(options.maxConcurrent);
+  if (ceiling) return ceiling;
+  for (const [name, h] of Object.entries(options.harnesses ?? {})) {
+    const refused = harnessConfigRefusalOf(name, h);
+    if (refused) return refused;
+  }
+  if (options.unschedulable !== undefined && typeof options.unschedulable !== 'function') {
+    return '`unschedulable` is a function, `() => boolean`, asked on every pass: give one, or leave it out.';
+  }
+  if (options.credentials !== undefined && typeof options.credentials !== 'function') {
+    return '`credentials` is a function, `(scheme, agentUrl, harness) => secret | undefined`: give one, or leave it out.';
+  }
+  if (options.missingCredential !== undefined && typeof options.missingCredential !== 'function') {
+    return '`missingCredential` is a function, `(scheme, agentUrl, harness) => words`: give one, or leave it out.';
+  }
+  return undefined;
+};
+
+/**
+ * What an engine over `options` admits under (`Admission`): its `maxConcurrent`, its `unschedulable`, and the pool each of `harnesses`
+ * counts in — the `pool` it names, else its own name; a task with no harness counts in `default`.
+ */
+export const admissionOf = (options: EngineOptions, harnesses: Record<string, HarnessConfig>) =>
+  Layer.succeed(Admission)({
+    ...(options.maxConcurrent !== undefined ? { ceiling: options.maxConcurrent } : {}),
+    ...(options.unschedulable !== undefined ? { unschedulable: options.unschedulable } : {}),
+    poolOf: (harness) => {
+      const h = harness !== undefined && Object.hasOwn(harnesses, harness) ? harnesses[harness] : undefined;
+      return typeof h === 'object' && h !== null && typeof h.pool === 'string' ? h.pool : (harness ?? 'default');
+    },
+  });

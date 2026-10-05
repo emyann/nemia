@@ -22,7 +22,7 @@ import { scratch } from './scratch.ts';
 const ROOT = scratch('wf-run-store-');
 process.env.WF_ROOT = ROOT;
 const { filesStore } = await import('../src/record/files.store.ts');
-const { mayFileOf } = await import('../src/tick/file.verb.ts');
+const { mayFileOf } = await import('../src/tick/advance.verb.ts');
 const { resumePause, putPause } = await import('../src/pause/pause.store.ts');
 const {
   acceptFile,

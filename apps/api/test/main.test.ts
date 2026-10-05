@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
+import http from 'node:http';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
@@ -45,11 +46,20 @@ test('the api ticks with no argument, and not with --no-tick; any other is refus
 });
 
 /**
- * `node src/main.ts` with `PORT` and `args`, in the store `root` (one of its own unless given): what it printed, and how it ended if it
- * did. It is killed when the test is done, if it still runs, and in any case within a minute.
+ * `node src/main.ts` with `PORT` and `args`, in the store `root` (one of its own unless given), exporting no telemetry unless `otel`
+ * names a collector: what it printed, and how it ended if it did. It is killed when the test is done, if it still runs, and in any case
+ * within a minute.
  */
-function startApi(port: string, args: string[] = [], root = scratch('nemia-api-main-')) {
-  const env = { ...process.env, PORT: port, WF_ROOT: root, HKB_REPO: root, WF_MAX_CONCURRENT: '2', WF_MAX_RUNS: '2' };
+function startApi(port: string, args: string[] = [], root = scratch('nemia-api-main-'), otel = '') {
+  const env = {
+    ...process.env,
+    PORT: port,
+    WF_ROOT: root,
+    HKB_REPO: root,
+    WF_MAX_CONCURRENT: '2',
+    WF_MAX_RUNS: '2',
+    OTEL_EXPORTER_OTLP_ENDPOINT: otel,
+  };
   const child = spawn(process.execPath, ['src/main.ts', ...args], { cwd: API, env, timeout: 60_000 });
   let output = '';
   child.stdout.on('data', (chunk) => (output += chunk));
@@ -204,4 +214,30 @@ test('(f) --no-tick serves the board and writes no lease; (g) any other argument
   assert.equal(await wrong.ended, 2);
   assert.match(wrong.output(), /the api takes no --tick=no\. Give --no-tick /);
   assert.equal(fs.existsSync(path.join(wrong.root, 'daemon.json')), false);
+});
+
+/** A collector on loopback that answers each post: its url, and the body of the first post to `path` that has `word`. */
+async function collector(t: { after: (fn: () => Promise<void>) => void }) {
+  const waiting: { path: string; word: string; found: (body: string) => void }[] = [];
+  const server = http.createServer((req, res) => {
+    let body = '';
+    req.on('data', (chunk: Buffer) => (body += chunk.toString('utf8')));
+    req.on('end', () => {
+      for (const w of waiting) if (w.path === req.url && body.includes(w.word)) w.found(body);
+      res.writeHead(200, { 'content-type': 'application/json' }).end('{}');
+    });
+  });
+  await new Promise<void>((listening) => server.listen(0, '127.0.0.1', listening));
+  t.after(() => new Promise<void>((closed) => server.close(() => closed())));
+  const posted = (path: string, word: string) => new Promise<string>((found) => waiting.push({ path, word, found }));
+  return { url: `http://127.0.0.1:${(server.address() as net.AddressInfo).port}`, posted };
+}
+
+test("the api's daemon exports its passes' spans to the collector OTEL_EXPORTER_OTLP_ENDPOINT names, as the nemia service", async (t) => {
+  const c = await collector(t);
+  const pass = c.posted('/v1/traces', '"tick"');
+  const api = startApi('0', [], undefined, c.url);
+  t.after(() => api.child.kill());
+  const spans = await Promise.race([pass, api.ended.then((code) => assert.fail(`the api exited ${code}:\n${api.output()}`))]);
+  assert.match(spans, /"nemia"/);
 });

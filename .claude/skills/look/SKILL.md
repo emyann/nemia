@@ -65,8 +65,9 @@ person's dev servers and beside another worktree's e2e.
 3. The built app, from `apps/web`: `HKB_API_URL=http://127.0.0.1:<the api's port> npx vite preview --port 0
    --host 127.0.0.1`. It prints `Local: http://127.0.0.1:<port>/`.
 
-Run both in the background, and stop both when you are done. A store of your own is empty: the runs, the
-session and the loop the e2e seeds (`apps/web/test/e2e/seed.ts`) are in its pictures, not on these pages.
+Start both with a shell `&`, keeping each pid (`$!`), and `kill` both when you are done: in a job, `run_in_background` runs a
+command in the foreground, and a server would hold the call. A store of your own is empty: the runs, the session and the loop
+the e2e seeds (`apps/web/test/e2e/seed.ts`) are in its pictures, not on these pages.
 
 Then, for every page you are looking at, in the browser tools (`browser_*`, from `.mcp.json`):
 

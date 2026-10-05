@@ -25,7 +25,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { TaskView } from 'agent-runtime';
 import { Effect } from 'effect';
-import { Engine as EngineService } from 'agent-runtime/effect';
+import { Engine as EngineService } from 'agent-runtime';
 import { type Engine } from '../src/runtime-client.ts';
 import { scratch } from './scratch.ts';
 import { plainEngine } from './promised.ts';

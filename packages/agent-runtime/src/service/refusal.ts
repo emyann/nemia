@@ -13,6 +13,7 @@ const REFUSALS = new Set([
   'SayRefused',
   'QuotaRefused',
   'EngineRefused',
+  'BodyRefused',
 ]);
 
 /**

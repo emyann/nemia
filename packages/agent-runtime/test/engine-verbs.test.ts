@@ -1,29 +1,35 @@
 /**
- * The facade, proven by what this file does NOT import.
- *
- * There is no `import ... from 'effect'` anywhere below, and there must never be: the whole claim
- * of this layer is that a consumer can drive the engine, bring their own store and bring their own
- * harness while knowing nothing about Effect. A test that imported it would be testing something
- * else.
+ * The engine's verbs, driven as a caller of `agent-runtime` drives them: the `Engine` service built over a store and a harness of the
+ * caller's own, here written in plain async and made the runtime's by `asyncStore` and `asyncOps` (`test/promise-runner.ts`), each
+ * verb run with `Effect.runPromise`. The file store by default; `start` and `watch` holding their host process open; and what `file`,
+ * `tick` and the layer refuse, each a tagged error.
  */
+import { Effect } from 'effect';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { spawn } from 'node:child_process';
 import {
+  claudeDetached,
+  codex,
   nameFor,
   type EngineOptions,
+  type EngineShape,
   type Event,
   type FeedEntry,
-  type PromiseJournal,
-  type PromiseRunner,
+  type HarnessArgs,
+  type HarnessSpec,
   type Sighting,
-} from '../src/facade.ts';
-import { Engine as EngineService, promiseEngine } from '../src/index.ts';
+  type TaskSpec,
+} from '../src/index.ts';
+import { Engine as EngineService } from '../src/index.ts';
 import { scratch } from './scratch.ts';
+import { asyncStore, asyncOps, type AsyncJournal, type AsyncRunner } from './promise-runner.ts';
+import { builtEngine } from './engine.ts';
 
 /** A store in twelve lines of plain async — what an application with its own database writes. */
-const memoryJournal = (): PromiseJournal => {
+const memoryJournal = (): AsyncJournal => {
   const tasks = new Map<string, Event[]>();
   const feed: FeedEntry[] = [];
   return {
@@ -44,7 +50,7 @@ const memoryJournal = (): PromiseJournal => {
 };
 
 /** A harness in eight. */
-const fakeHarness = (sessions: Map<string, Sighting>): PromiseRunner => ({
+const fakeHarness = (sessions: Map<string, Sighting>): AsyncRunner => ({
   async spawn(r) {
     sessions.set(r.name, { sessionId: `s-${sessions.size + 1}`, state: 'working' });
   },
@@ -61,80 +67,92 @@ const fakeHarness = (sessions: Map<string, Sighting>): PromiseRunner => ({
 
 test('a consumer can run the whole lifecycle in plain async/await', async () => {
   const sessions = new Map<string, Sighting>();
-  const engine = promiseEngine(
+  const engine = builtEngine(
     EngineService.layer({
-      journal: memoryJournal(),
-      harnesses: { fake: fakeHarness(sessions) },
+      journal: asyncStore(memoryJournal()),
+      harnesses: { fake: asyncOps(fakeHarness(sessions)) },
       defaultHarness: 'fake',
     }),
   );
 
-  const id = await engine.file({ brief: 'do the thing', cwd: '/repo' });
-  assert.equal((await engine.view(id)).phase, 'pending');
+  const id = await Effect.runPromise(engine.file({ brief: 'do the thing', cwd: '/repo' }));
+  assert.equal((await Effect.runPromise(engine.view(id))).phase, 'pending');
 
-  await engine.tick();
-  assert.equal((await engine.view(id)).phase, 'running (working)');
+  await Effect.runPromise(engine.tick());
+  assert.equal((await Effect.runPromise(engine.view(id))).phase, 'running (working)');
   assert.equal(sessions.size, 1);
 
   for (const [k, v] of sessions) sessions.set(k, { ...v, state: 'completed' });
-  await engine.tick();
-  assert.equal((await engine.view(id)).phase, 'succeeded', 'the harness finished the work, and the engine found out by asking');
+  await Effect.runPromise(engine.tick());
+  assert.equal(
+    (await Effect.runPromise(engine.view(id))).phase,
+    'succeeded',
+    'the harness finished the work, and the engine found out by asking',
+  );
 });
 
 test('the feed is enough to build a workflow on, with no Effect anywhere', async () => {
   const sessions = new Map<string, Sighting>();
-  const engine = promiseEngine(
-    EngineService.layer({ journal: memoryJournal(), harnesses: { fake: fakeHarness(sessions) }, defaultHarness: 'fake' }),
+  const engine = builtEngine(
+    EngineService.layer({
+      journal: asyncStore(memoryJournal()),
+      harnesses: { fake: asyncOps(fakeHarness(sessions)) },
+      defaultHarness: 'fake',
+    }),
   );
 
-  const first = await engine.file({ brief: 'implement', cwd: '/repo' });
-  await engine.tick();
+  const first = await Effect.runPromise(engine.file({ brief: 'implement', cwd: '/repo' }));
+  await Effect.runPromise(engine.tick());
   for (const [k, v] of sessions) sessions.set(k, { ...v, state: 'completed' });
-  await engine.tick();
+  await Effect.runPromise(engine.tick());
 
   let cursor = 0;
   const filed: string[] = [];
-  const { entries, cursor: next } = await engine.feed(cursor);
+  const { entries, cursor: next } = await Effect.runPromise(engine.feed(cursor));
   cursor = next;
   for (const { taskId, event } of entries) {
     if (event.kind === 'settled' && event.outcome === 'succeeded') {
-      filed.push(await engine.file({ brief: `review ${taskId}`, cwd: '/repo' }));
+      filed.push(await Effect.runPromise(engine.file({ brief: `review ${taskId}`, cwd: '/repo' })));
     }
   }
   assert.equal(filed.length, 1, 'the settled event drove a follow-up task');
   assert.notEqual(filed[0], first);
 });
 
-test('the start, the stop and the list all work through the facade — and every task given starts, with no ceiling', async () => {
+test('the start, the stop and the list all work through the engine — and every task given starts, with no ceiling', async () => {
   const sessions = new Map<string, Sighting>();
-  const engine = promiseEngine(
-    EngineService.layer({ journal: memoryJournal(), harnesses: { fake: fakeHarness(sessions) }, defaultHarness: 'fake' }),
+  const engine = builtEngine(
+    EngineService.layer({
+      journal: asyncStore(memoryJournal()),
+      harnesses: { fake: asyncOps(fakeHarness(sessions)) },
+      defaultHarness: 'fake',
+    }),
   );
-  for (let i = 0; i < 5; i++) await engine.file({ brief: `t${i}`, cwd: '/repo', id: `task-${i}` });
+  for (let i = 0; i < 5; i++) await Effect.runPromise(engine.file({ brief: `t${i}`, cwd: '/repo', id: `task-${i}` }));
 
-  const report = await engine.tick();
+  const report = await Effect.runPromise(engine.tick());
   assert.equal(sessions.size, 5, 'the runtime holds nothing back: a layer above files `queued: true` to');
   assert.deepEqual(report.running, { fake: 5 }, 'counted under the harness that ran it, not "default"');
-  assert.equal((await engine.list()).views.length, 5);
+  assert.equal((await Effect.runPromise(engine.list())).views.length, 5);
 
-  await engine.stop('task-0');
-  await engine.tick();
+  await Effect.runPromise(engine.stop('task-0'));
+  await Effect.runPromise(engine.tick());
   assert.equal(sessions.get(nameFor('task-0', 1))!.state, 'canceled');
 });
 
 test('the file-backed default needs no configuration at all', async () => {
-  const root = scratch('ae-facade-');
+  const root = scratch('ae-verbs-');
   const sessions = new Map<string, Sighting>();
-  const engine = promiseEngine(EngineService.layer({ root, harnesses: { fake: fakeHarness(sessions) }, defaultHarness: 'fake' }));
+  const engine = builtEngine(EngineService.layer({ root, harnesses: { fake: asyncOps(fakeHarness(sessions)) }, defaultHarness: 'fake' }));
 
-  const id = await engine.file({ brief: 'b', cwd: '/repo' });
-  await engine.tick();
+  const id = await Effect.runPromise(engine.file({ brief: 'b', cwd: '/repo' }));
+  await Effect.runPromise(engine.tick());
   assert.ok(fs.existsSync(path.join(root, 'tasks', `${id}.jsonl`)), 'it wrote a journal');
   assert.ok(fs.existsSync(path.join(root, 'feed.jsonl')), 'and a feed');
 
-  const reopened = promiseEngine(EngineService.layer({ root, harnesses: { fake: fakeHarness(sessions) }, defaultHarness: 'fake' }));
+  const reopened = builtEngine(EngineService.layer({ root, harnesses: { fake: asyncOps(fakeHarness(sessions)) }, defaultHarness: 'fake' }));
   assert.equal(
-    (await reopened.view(id)).state.brief,
+    (await Effect.runPromise(reopened.view(id))).state.brief,
     'b',
     'a second engine over the same root sees the same board: the state is on disk, not in memory',
   );
@@ -151,7 +169,7 @@ test('the file-backed default needs no configuration at all', async () => {
 const slowHarness = (sessions: Map<string, Sighting>, ms: number) => {
   const fast = fakeHarness(sessions);
   const seen = { passes: 0, inFlight: 0, most: 0 };
-  const harness: PromiseRunner = {
+  const harness: AsyncRunner = {
     ...fast,
     async observe() {
       seen.passes += 1;
@@ -204,18 +222,22 @@ const ticksUntil = (n: number, boundMs: number) => {
 test('start() ticks on a timer and never overlaps', async () => {
   const sessions = new Map<string, Sighting>();
   const { harness, seen } = slowHarness(sessions, 60);
-  const engine = promiseEngine(EngineService.layer({ journal: memoryJournal(), harnesses: { fake: harness }, defaultHarness: 'fake' }));
-  await engine.file({ brief: 'b', cwd: '/repo' });
+  const engine = builtEngine(
+    EngineService.layer({ journal: asyncStore(memoryJournal()), harnesses: { fake: asyncOps(harness) }, defaultHarness: 'fake' }),
+  );
+  await Effect.runPromise(engine.file({ brief: 'b', cwd: '/repo' }));
 
   const errors: unknown[] = [];
   const ticks = ticksUntil(3, 30_000);
-  const loop = engine.start({
-    intervalMs: 20,
-    onTick: ticks.onTick,
-    onError: (e) => {
-      errors.push(e);
-    },
-  });
+  const loop = Effect.runSync(
+    engine.start({
+      intervalMs: 20,
+      onTick: ticks.onTick,
+      onError: (e) => {
+        errors.push(e);
+      },
+    }),
+  );
   try {
     await ticks.wait(errors);
   } finally {
@@ -236,18 +258,22 @@ test('start() ticks on a timer and never overlaps', async () => {
 test('a tick under way when stop() is called — its sessions spawned, its events journalled, not to be taken back — finishes, and reports, and is the last', async () => {
   const sessions = new Map<string, Sighting>();
   const { harness, seen } = slowHarness(sessions, 60);
-  const engine = promiseEngine(EngineService.layer({ journal: memoryJournal(), harnesses: { fake: harness }, defaultHarness: 'fake' }));
-  await engine.file({ brief: 'b', cwd: '/repo' });
+  const engine = builtEngine(
+    EngineService.layer({ journal: asyncStore(memoryJournal()), harnesses: { fake: asyncOps(harness) }, defaultHarness: 'fake' }),
+  );
+  await Effect.runPromise(engine.file({ brief: 'b', cwd: '/repo' }));
 
   const errors: unknown[] = [];
   const ticks = ticksUntil(1, 30_000);
-  const loop = engine.start({
-    intervalMs: 20,
-    onTick: ticks.onTick,
-    onError: (e) => {
-      errors.push(e);
-    },
-  });
+  const loop = Effect.runSync(
+    engine.start({
+      intervalMs: 20,
+      onTick: ticks.onTick,
+      onError: (e) => {
+        errors.push(e);
+      },
+    }),
+  );
   const bound = Date.now() + 30_000;
   while (seen.inFlight === 0 && Date.now() < bound) await new Promise((r) => setTimeout(r, 1));
   loop.stop();
@@ -263,39 +289,49 @@ test('a tick under way when stop() is called — its sessions spawned, its event
 
 test('running is keyed by the harness the task resolved to: a task that names it and one that does not count together', async () => {
   const sessions = new Map<string, Sighting>();
-  const engine = promiseEngine(
-    EngineService.layer({ journal: memoryJournal(), harnesses: { fake: fakeHarness(sessions) }, defaultHarness: 'fake' }),
+  const engine = builtEngine(
+    EngineService.layer({
+      journal: asyncStore(memoryJournal()),
+      harnesses: { fake: asyncOps(fakeHarness(sessions)) },
+      defaultHarness: 'fake',
+    }),
   );
-  for (let i = 0; i < 3; i++) await engine.file({ brief: `e${i}`, cwd: '/r', id: `a-${i}`, harness: 'fake' });
-  for (let i = 0; i < 3; i++) await engine.file({ brief: `i${i}`, cwd: '/r', id: `b-${i}` });
+  for (let i = 0; i < 3; i++) await Effect.runPromise(engine.file({ brief: `e${i}`, cwd: '/r', id: `a-${i}`, harness: 'fake' }));
+  for (let i = 0; i < 3; i++) await Effect.runPromise(engine.file({ brief: `i${i}`, cwd: '/r', id: `b-${i}` }));
 
-  const report = await engine.tick();
+  const report = await Effect.runPromise(engine.tick());
   assert.equal(sessions.size, 6);
   assert.deepEqual(
     report.running,
     { fake: 6 },
-    'the facade resolves the harness at filing: three that name `fake` and three that name nothing are six under `fake`, none under "default"',
+    'the engine resolves the harness at filing: three that name `fake` and three that name nothing are six under `fake`, none under "default"',
   );
 });
 
 test('watch delivers every event, in order, once', async () => {
   const sessions = new Map<string, Sighting>();
-  const engine = promiseEngine(
-    EngineService.layer({ journal: memoryJournal(), harnesses: { fake: fakeHarness(sessions) }, defaultHarness: 'fake' }),
+  const engine = builtEngine(
+    EngineService.layer({
+      journal: asyncStore(memoryJournal()),
+      harnesses: { fake: asyncOps(fakeHarness(sessions)) },
+      defaultHarness: 'fake',
+    }),
   );
 
   const seen: string[] = [];
-  const w = engine.watch({
-    onEntry: (e) => {
-      seen.push(e.event.kind);
-    },
-    intervalMs: 20,
-  });
+  const w = Effect.runSync(
+    engine.watch({
+      onEntry: (e) => {
+        seen.push(e.event.kind);
+      },
+      intervalMs: 20,
+    }),
+  );
 
-  const id = await engine.file({ brief: 'b', cwd: '/r' });
-  await engine.tick();
+  const id = await Effect.runPromise(engine.file({ brief: 'b', cwd: '/r' }));
+  await Effect.runPromise(engine.tick());
   for (const [k, v] of sessions) sessions.set(k, { ...v, state: 'completed' });
-  await engine.tick();
+  await Effect.runPromise(engine.tick());
   await new Promise((r) => setTimeout(r, 200));
   w.stop();
 
@@ -307,16 +343,16 @@ test('watch delivers every event, in order, once', async () => {
 const MISWRITTEN = JSON.stringify({ kind: 'measured', at: '2026-09-28T00:00:00Z', attempt: 1, usage: { turns: 'three' } }) + '\n';
 
 test('a task whose journal holds an entry no runtime wrote is left out of each pass and said, naming the file, the entry and the field; every other task moves', async () => {
-  const root = scratch('ae-facade-');
+  const root = scratch('ae-verbs-');
   const sessions = new Map<string, Sighting>();
-  const engine = promiseEngine(EngineService.layer({ root, harnesses: { fake: fakeHarness(sessions) }, defaultHarness: 'fake' }));
-  const bad = await engine.file({ brief: 'miswritten', cwd: '/repo' });
-  const good = await engine.file({ brief: 'fine', cwd: '/repo' });
+  const engine = builtEngine(EngineService.layer({ root, harnesses: { fake: asyncOps(fakeHarness(sessions)) }, defaultHarness: 'fake' }));
+  const bad = await Effect.runPromise(engine.file({ brief: 'miswritten', cwd: '/repo' }));
+  const good = await Effect.runPromise(engine.file({ brief: 'fine', cwd: '/repo' }));
   const journal = path.join(root, 'tasks', `${bad}.jsonl`);
   fs.appendFileSync(journal, MISWRITTEN);
 
-  const first = await engine.tick();
-  assert.equal((await engine.view(good)).phase, 'running (working)');
+  const first = await Effect.runPromise(engine.tick());
+  assert.equal((await Effect.runPromise(engine.view(good))).phase, 'running (working)');
   assert.deepEqual([...sessions.keys()], [nameFor(good, 1)]);
   assert.equal(first.unreadable.length, 1);
   assert.ok(
@@ -327,34 +363,34 @@ test('a task whose journal holds an entry no runtime wrote is left out of each p
   );
 
   for (const [k, v] of sessions) sessions.set(k, { ...v, state: 'completed' });
-  const second = await engine.tick();
-  assert.equal((await engine.view(good)).phase, 'succeeded');
+  const second = await Effect.runPromise(engine.tick());
+  assert.equal((await Effect.runPromise(engine.view(good))).phase, 'succeeded');
   assert.deepEqual(second.unreadable, first.unreadable, 'said on every pass it lasts');
-  await assert.rejects(engine.view(bad), (e: Error) => e.message.includes(`${bad}'s journal (${journal}), entry 2`));
+  await assert.rejects(Effect.runPromise(engine.view(bad)), (e: Error) => e.message.includes(`${bad}'s journal (${journal}), entry 2`));
 });
 
 test('a feed entry no runtime wrote is skipped: the pass that meets it says it once and moves on, and a watcher is told and delivers the rest', async () => {
-  const root = scratch('ae-facade-');
+  const root = scratch('ae-verbs-');
   const sessions = new Map<string, Sighting>();
-  const engine = promiseEngine(EngineService.layer({ root, harnesses: { fake: fakeHarness(sessions) }, defaultHarness: 'fake' }));
-  const id = await engine.file({ brief: 'b', cwd: '/repo' });
-  await engine.tick();
+  const engine = builtEngine(EngineService.layer({ root, harnesses: { fake: asyncOps(fakeHarness(sessions)) }, defaultHarness: 'fake' }));
+  const id = await Effect.runPromise(engine.file({ brief: 'b', cwd: '/repo' }));
+  await Effect.runPromise(engine.tick());
   const feedFile = path.join(root, 'feed.jsonl');
   fs.appendFileSync(feedFile, JSON.stringify({ taskId: id, event: { kind: 'nudged', at: 'x' } }) + '\n');
   fs.appendFileSync(feedFile, '{"taskId":"t-cut","ev\n');
   for (const [k, v] of sessions) sessions.set(k, { ...v, state: 'completed' });
 
-  const meets = await engine.tick();
-  assert.equal((await engine.view(id)).phase, 'succeeded');
+  const meets = await Effect.runPromise(engine.tick());
+  assert.equal((await Effect.runPromise(engine.view(id))).phase, 'succeeded');
   assert.equal(meets.unreadable.length, 2);
   assert.ok(
     meets.unreadable[0].startsWith(`the feed (${feedFile}), entry `) &&
       meets.unreadable[0].includes('is no event this runtime writes (its kind is "nudged"'),
     meets.unreadable[0],
   );
-  assert.deepEqual((await engine.tick()).unreadable, [], 'said once: the cursor is past it');
+  assert.deepEqual((await Effect.runPromise(engine.tick())).unreadable, [], 'said once: the cursor is past it');
 
-  const { entries, cursor, refused } = await engine.feed(0);
+  const { entries, cursor, refused } = await Effect.runPromise(engine.feed(0));
   assert.equal(cursor, fs.statSync(feedFile).size);
   assert.deepEqual(
     entries.map((e) => e.event.kind),
@@ -364,11 +400,13 @@ test('a feed entry no runtime wrote is skipped: the pass that meets it says it o
 
   const seen: string[] = [];
   const told: string[] = [];
-  const w = engine.watch({
-    onEntry: (e) => void seen.push(e.event.kind),
-    onError: (e) => void told.push((e as Error).message),
-    intervalMs: 20,
-  });
+  const w = Effect.runSync(
+    engine.watch({
+      onEntry: (e) => void seen.push(e.event.kind),
+      onError: (e) => void told.push((e as Error).message),
+      intervalMs: 20,
+    }),
+  );
   const bound = Date.now() + 10_000;
   while (seen.length < 5 && Date.now() < bound) await new Promise((r) => setTimeout(r, 10));
   w.stop();
@@ -381,25 +419,31 @@ test('a feed entry no runtime wrote is skipped: the pass that meets it says it o
 
 test('a watcher starting at 0 replays history, and stop() stops', async () => {
   const sessions = new Map<string, Sighting>();
-  const engine = promiseEngine(
-    EngineService.layer({ journal: memoryJournal(), harnesses: { fake: fakeHarness(sessions) }, defaultHarness: 'fake' }),
+  const engine = builtEngine(
+    EngineService.layer({
+      journal: asyncStore(memoryJournal()),
+      harnesses: { fake: asyncOps(fakeHarness(sessions)) },
+      defaultHarness: 'fake',
+    }),
   );
-  await engine.file({ brief: 'b', cwd: '/r' });
-  await engine.tick();
+  await Effect.runPromise(engine.file({ brief: 'b', cwd: '/r' }));
+  await Effect.runPromise(engine.tick());
 
   const seen: string[] = [];
-  const w = engine.watch({
-    onEntry: (e) => {
-      seen.push(e.event.kind);
-    },
-    intervalMs: 20,
-  });
+  const w = Effect.runSync(
+    engine.watch({
+      onEntry: (e) => {
+        seen.push(e.event.kind);
+      },
+      intervalMs: 20,
+    }),
+  );
   await new Promise((r) => setTimeout(r, 120));
   assert.deepEqual(seen, ['filed', 'starting', 'spawned'], 'the cursor never expires — it replays');
 
   w.stop();
   const before = seen.length;
-  await engine.file({ brief: 'another', cwd: '/r' });
+  await Effect.runPromise(engine.file({ brief: 'another', cwd: '/r' }));
   await new Promise((r) => setTimeout(r, 120));
   assert.equal(seen.length, before, 'nothing arrives after stop()');
 });
@@ -407,25 +451,75 @@ test('a watcher starting at 0 replays history, and stop() stops', async () => {
 test('the file store pushes: a watcher hears about a write it did not poll for', async () => {
   const root = scratch('ae-watch-');
   const sessions = new Map<string, Sighting>();
-  const engine = promiseEngine(EngineService.layer({ root, harnesses: { fake: fakeHarness(sessions) }, defaultHarness: 'fake' }));
+  const engine = builtEngine(EngineService.layer({ root, harnesses: { fake: asyncOps(fakeHarness(sessions)) }, defaultHarness: 'fake' }));
 
   const seen: string[] = [];
-  const w = engine.watch({
-    onEntry: (e) => {
-      seen.push(e.event.kind);
-    },
-    intervalMs: 60_000,
-  });
+  const w = Effect.runSync(
+    engine.watch({
+      onEntry: (e) => {
+        seen.push(e.event.kind);
+      },
+      intervalMs: 60_000,
+    }),
+  );
   await new Promise((r) => setTimeout(r, 50));
 
-  await engine.file({ brief: 'b', cwd: '/r' });
+  await Effect.runPromise(engine.file({ brief: 'b', cwd: '/r' }));
   await new Promise((r) => setTimeout(r, 400));
   w.stop();
 
   assert.deepEqual(seen, ['filed'], 'delivered without waiting for the interval');
 });
 
-import { spawn } from 'node:child_process';
+test("a brought store's subscribe wakes a watcher, which hears a write it did not poll for", async () => {
+  const listeners = new Set<() => void>();
+  const plain = asyncStore(memoryJournal());
+  const store = {
+    ...plain,
+    append: (taskId: string, event: Event) =>
+      plain.append(taskId, event).pipe(Effect.tap(() => Effect.sync(() => listeners.forEach((l) => l())))),
+    subscribe: (onChange: () => void) => {
+      listeners.add(onChange);
+      return () => void listeners.delete(onChange);
+    },
+  };
+  const engine = builtEngine(
+    EngineService.layer({ journal: store, harnesses: { fake: asyncOps(fakeHarness(new Map())) }, defaultHarness: 'fake' }),
+  );
+  await Effect.runPromise(engine.file({ brief: 'first', cwd: '/r', id: 'first' }));
+
+  const seen: string[] = [];
+  let heard: (() => void) | undefined;
+  const w = Effect.runSync(
+    engine.watch({
+      onEntry: (e) => {
+        seen.push(e.taskId);
+        heard?.();
+      },
+      intervalMs: 600_000,
+    }),
+  );
+  const until = (n: number) =>
+    new Promise<void>((resolve, reject) => {
+      const bound = setTimeout(() => reject(new Error(`heard ${seen.length} of ${n}: the store's subscribe woke nobody`)), 10_000);
+      heard = () => {
+        if (seen.length < n) return;
+        clearTimeout(bound);
+        resolve();
+      };
+      heard();
+    });
+  try {
+    await until(1);
+    assert.equal(listeners.size, 1, 'the watcher subscribed');
+    await Effect.runPromise(engine.file({ brief: 'second', cwd: '/r', id: 'second' }));
+    await until(2);
+  } finally {
+    w.stop();
+  }
+  assert.deepEqual(seen, ['first', 'second']);
+  assert.equal(listeners.size, 0, 'stop() unsubscribes');
+});
 
 /**
  * Whether a child process that runs `body` against an engine is still there after 1.2 seconds. `start()` and `watch()`
@@ -441,8 +535,10 @@ const survives = (body: string) =>
         '--input-type=module',
         '-e',
         `
-    import { Engine, promiseEngine } from '${path.resolve('src/index.ts')}';
-    const engine = promiseEngine(Engine.layer({ root: ${JSON.stringify(root)} }));
+    import { Effect } from 'effect';
+    import { Engine } from '${path.resolve('src/index.ts')}';
+    import { builtEngine } from '${path.resolve('test/engine.ts')}';
+    const engine = builtEngine(Engine.layer({ root: ${JSON.stringify(root)} }));
     ${body}
   `,
       ],
@@ -460,38 +556,35 @@ const survives = (body: string) =>
   });
 
 test('start() keeps its host process alive — a loop that lets you exit is not a loop', async () => {
-  assert.equal(await survives('engine.start({ intervalMs: 200 });'), true);
+  assert.equal(await survives('Effect.runSync(engine.start({ intervalMs: 200 }));'), true);
 });
 
 test('watch() keeps its host process alive, even with a store that cannot push', async () => {
   assert.equal(
     await survives(`
     const store = {
-      append: async () => {}, read: async () => [], list: async () => [],
-      feed: async () => ({ entries: [], cursor: 0 }),
+      append: () => Effect.void, read: () => Effect.succeed([]), list: Effect.succeed([]),
+      feed: () => Effect.succeed({ entries: [], cursor: 0 }),
     };
-    promiseEngine(Engine.layer({ journal: store })).watch({ onEntry: () => {} });
+    Effect.runSync(builtEngine(Engine.layer({ journal: store })).watch({ onEntry: () => {} }));
   `),
     true,
     "a store with no `subscribe`, the kind a consumer brings, has only the interval to hold the loop open: the file store's fs.watch holds it by itself",
   );
 });
 
-import { claudeDetached, codex, type Engine, type HarnessSpec, type HarnessArgs, type TaskSpec } from '../src/facade.ts';
-
 /** An engine at shipped defaults — the three built-in harnesses — over a store a test can read. */
 const shipped = () => {
   const journal = memoryJournal();
-  return { journal, engine: promiseEngine(EngineService.layer({ journal })) };
+  return { journal, engine: builtEngine(EngineService.layer({ journal: asyncStore(journal) })) };
 };
 
-/** Rejected with exit code 2 and a sentence that matches. */
-const refused = (engine: Engine, spec: TaskSpec, says: RegExp) =>
-  assert.rejects(engine.file(spec), (e: Error & { exitCode?: number }) => {
-    assert.equal(e.exitCode, 2, e.message);
-    assert.match(e.message, says);
-    return true;
-  });
+/** Refused: `FileRefused`, in a sentence that matches. */
+const refused = async (engine: EngineShape, spec: TaskSpec, says: RegExp) => {
+  const e = await Effect.runPromise(Effect.flip(engine.file(spec)));
+  assert.equal(e._tag, 'FileRefused', e.message);
+  assert.match(e.message, says);
+};
 
 test('file() refuses a harness the engine does not have, rather than run the task on the fallback', async () => {
   const { journal, engine } = shipped();
@@ -516,12 +609,12 @@ test('file() refuses the retired maxAttempts and resume, at what were their defa
   await refused(
     engine,
     { brief: 'b', cwd: '/r', maxAttempts: 1 } as TaskSpec,
-    /^file: `maxAttempts` is retired: .*file it again.*`retries:`.*`wf retry <run> <step>`/,
+    /^`maxAttempts` is retired: .*file it again.*`retries:`.*`wf retry <run> <step>`/,
   );
   await refused(
     engine,
     { brief: 'b', cwd: '/r', resume: 'interrupted' } as TaskSpec,
-    /^file: `resume` is retired: .*`retries:`.*`wf retry <run> <step>`/,
+    /^`resume` is retired: .*`retries:`.*`wf retry <run> <step>`/,
   );
   assert.deepEqual(await journal.list(), [], 'nothing was journalled');
 });
@@ -545,8 +638,8 @@ test("file() refuses a permission mode outside its harness's own words", async (
   );
   assert.deepEqual(await journal.list(), [], 'nothing was journalled');
 
-  await engine.file({ brief: 'b', cwd: '/r', harness: 'codex', config: { permissionMode: 'read-only' } });
-  await engine.file({ brief: 'b', cwd: '/r', config: { permissionMode: 'default' } });
+  await Effect.runPromise(engine.file({ brief: 'b', cwd: '/r', harness: 'codex', config: { permissionMode: 'read-only' } }));
+  await Effect.runPromise(engine.file({ brief: 'b', cwd: '/r', config: { permissionMode: 'default' } }));
   assert.equal((await journal.list()).length, 2, 'the words each harness does have are filed');
 });
 
@@ -570,7 +663,7 @@ test('file() refuses a cwd that is not absolute, naming it resolved — the proc
   await refused(engine, { brief: 'b', cwd: './repo' }, /`cwd: \.\/repo` is not an absolute path/);
   await refused(engine, { brief: 'b', cwd: '~/repo' }, /`cwd: ~\/repo` is not an absolute path/);
   assert.deepEqual(await journal.list(), [], 'nothing was journalled, so no tick can spawn it');
-  assert.ok(await engine.file({ brief: 'b', cwd: path.resolve('repo') }), 'the same directory, resolved, is filed');
+  assert.ok(await Effect.runPromise(engine.file({ brief: 'b', cwd: path.resolve('repo') })), 'the same directory, resolved, is filed');
 });
 
 test('a harness brought as a spec is asked its own refusals; one brought as a runner is asked nothing', async () => {
@@ -579,11 +672,24 @@ test('a harness brought as a spec is asked its own refusals; one brought as a ru
     command: () => ({ cmd: 'true', args: [] }),
     refuses: (task) => (task.config?.model === 'huge' ? 'picky runs no huge models' : undefined),
   };
-  const engine = promiseEngine(
-    EngineService.layer({ journal: memoryJournal(), harnesses: { picky, fake: fakeHarness(new Map()) }, defaultHarness: 'picky' }),
+  const engine = builtEngine(
+    EngineService.layer({
+      journal: asyncStore(memoryJournal()),
+      harnesses: { picky, fake: asyncOps(fakeHarness(new Map())) },
+      defaultHarness: 'picky',
+    }),
   );
   await refused(engine, { brief: 'b', cwd: '/r', config: { model: 'huge' } }, /picky runs no huge models/);
-  assert.ok(await engine.file({ brief: 'b', cwd: '/r', harness: 'fake', config: { permissionMode: 'anything' } }));
+  assert.ok(await Effect.runPromise(engine.file({ brief: 'b', cwd: '/r', harness: 'fake', config: { permissionMode: 'anything' } })));
+});
+
+test('a runner brought as its own RunnerOps is asked its own refusal, and the task it refuses is not journalled', async () => {
+  const journal = memoryJournal();
+  const own = { ...asyncOps(fakeHarness(new Map())), refuses: (task: TaskSpec) => (task.brief === 'no' ? 'own runs no "no"' : undefined) };
+  const engine = builtEngine(EngineService.layer({ journal: asyncStore(journal), harnesses: { own }, defaultHarness: 'own' }));
+  await refused(engine, { brief: 'no', cwd: '/r' }, /own runs no "no"/);
+  assert.deepEqual(await journal.list(), [], 'nothing was journalled');
+  assert.ok(await Effect.runPromise(engine.file({ brief: 'yes', cwd: '/r' })));
 });
 
 test('file() refuses an effort its harness does not have — Claude Code would have ignored it', async () => {
@@ -593,8 +699,8 @@ test('file() refuses an effort its harness does not have — Claude Code would h
   await refused(engine, { brief: 'b', cwd: '/r', config: { effort: '' } }, /`effort` is empty/);
   assert.deepEqual(await journal.list(), [], 'nothing was journalled');
 
-  await engine.file({ brief: 'b', cwd: '/r', config: { effort: 'xhigh' } });
-  await engine.file({ brief: 'b', cwd: '/r', harness: 'codex', config: { effort: 'minimal' } });
+  await Effect.runPromise(engine.file({ brief: 'b', cwd: '/r', config: { effort: 'xhigh' } }));
+  await Effect.runPromise(engine.file({ brief: 'b', cwd: '/r', harness: 'codex', config: { effort: 'minimal' } }));
   assert.equal((await journal.list()).length, 2, 'the efforts each harness does have are filed');
 });
 
@@ -605,7 +711,7 @@ test('file() refuses a tool list that is not a list of names, and journals one t
   }
   assert.deepEqual(await journal.list(), [], 'nothing was journalled');
 
-  const id = await engine.file({ brief: 'b', cwd: '/r', config: { tools: ['Read', 'Grep', 'Glob'] } });
+  const id = await Effect.runPromise(engine.file({ brief: 'b', cwd: '/r', config: { tools: ['Read', 'Grep', 'Glob'] } }));
   const [filed] = await journal.read(id);
   assert.deepEqual((filed as { config?: { tools?: string[] } }).config?.tools, ['Read', 'Grep', 'Glob'], 'on the record, for the runner');
 });
@@ -645,7 +751,7 @@ test('file() refuses a disallowedTools that is not a list of permission rules, a
     'Read(//home/**)',
     `Bash(git commit -m 'wip')`,
   ];
-  const id = await engine.file({ brief: 'b', cwd: '/r', config: { disallowedTools: rules } });
+  const id = await Effect.runPromise(engine.file({ brief: 'b', cwd: '/r', config: { disallowedTools: rules } }));
   const [filed] = await journal.read(id);
   assert.deepEqual((filed as { config?: { disallowedTools?: string[] } }).config?.disallowedTools, rules, 'on the record, for the runner');
 });
@@ -679,7 +785,7 @@ test('file() refuses an allowedTools that is not a list of permission rules, and
   assert.deepEqual(await journal.list(), [], 'nothing was journalled');
 
   const rules = ['Write(**)', 'Edit(**)', 'Bash(npm test)', 'mcp__playwright__browser_navigate', `Bash(git commit -m 'wip')`];
-  const id = await engine.file({ brief: 'b', cwd: '/r', config: { allowedTools: rules } });
+  const id = await Effect.runPromise(engine.file({ brief: 'b', cwd: '/r', config: { allowedTools: rules } }));
   const [filed] = await journal.read(id);
   assert.deepEqual((filed as { config?: { allowedTools?: string[] } }).config?.allowedTools, rules, 'on the record, for the runner');
 });
@@ -714,12 +820,12 @@ test('file() refuses an mcp map whose entries are not .mcp.json servers, and jou
   );
   assert.deepEqual(await journal.list(), [], 'nothing was journalled');
 
-  await engine.file({ brief: 'b', cwd: '/r', harness: 'claude-detached', config: { mcp: sse } });
+  await Effect.runPromise(engine.file({ brief: 'b', cwd: '/r', harness: 'claude-detached', config: { mcp: sse } }));
   const mcp = {
     browser: { command: 'npx', args: ['-y', '@playwright/mcp'], env: { HEADLESS: '1' } },
     docs: { type: 'http' as const, url: 'https://h/mcp' },
   };
-  const id = await engine.file({ brief: 'b', cwd: '/r', config: { mcp } });
+  const id = await Effect.runPromise(engine.file({ brief: 'b', cwd: '/r', config: { mcp } }));
   const [filed] = await journal.read(id);
   assert.deepEqual((filed as { config?: { mcp?: unknown } }).config?.mcp, mcp, 'on the record, for the runner');
 });
@@ -746,12 +852,12 @@ test('file() refuses a config.budgetUsd that is not dollars above 0, and one on 
   assert.deepEqual(await journal.list(), [], 'nothing was journalled');
 
   for (const harness of ['claude-detached', 'claude']) {
-    const id = await engine.file({ brief: 'b', cwd: '/r', harness, config: { budgetUsd: 0.25 } });
+    const id = await Effect.runPromise(engine.file({ brief: 'b', cwd: '/r', harness, config: { budgetUsd: 0.25 } }));
     const [filed] = await journal.read(id);
     assert.deepEqual((filed as { config?: object }).config, { budgetUsd: 0.25 }, 'on the record, for the runner');
     assert.equal('budgetUsd' in filed, false, 'and nowhere else');
     assert.equal(
-      (await engine.view(id)).state.config?.budgetUsd,
+      (await Effect.runPromise(engine.view(id))).state.config?.budgetUsd,
       0.25,
       `a job keeps its cap on ${harness}: \`claude -p\` ends the session at it`,
     );
@@ -765,66 +871,63 @@ test('file() carries a whole `priority` in int32 on the record, and refuses any 
       await refused(
         engine,
         { brief: 'b', cwd: '/r', harness, priority } as unknown as TaskSpec,
-        /^file: `priority: .*` is not a priority\. Give a whole number from -2147483648 to 2147483647, higher first, or leave it out for 0\./,
+        /^`priority: .*` is not a priority\. Give a whole number from -2147483648 to 2147483647, higher first, or leave it out for 0\./,
       );
     }
   }
   assert.deepEqual(await journal.list(), [], 'nothing was journalled');
   for (const priority of [1, -1, 2 ** 31 - 1]) {
-    const id = await engine.file({ brief: 'b', cwd: '/r', harness: 'codex', priority });
-    assert.equal((await engine.view(id)).state.priority, priority, 'carried on the record');
+    const id = await Effect.runPromise(engine.file({ brief: 'b', cwd: '/r', harness: 'codex', priority }));
+    assert.equal((await Effect.runPromise(engine.view(id))).state.priority, priority, 'carried on the record');
   }
 });
 
-test('the Promise engine refuses a `maxConcurrent` that is not a whole number from 1, and takes one that is', () => {
+test('the engine refuses a `maxConcurrent` that is not a whole number from 1, and takes one that is', () => {
   for (const maxConcurrent of [0, -1, 1.5, '2', Infinity, null]) {
     assert.throws(
-      () => promiseEngine(EngineService.layer({ journal: memoryJournal(), maxConcurrent } as unknown as EngineOptions)),
-      (e: Error & { exitCode?: number }) => {
-        assert.equal(e.exitCode, 2, e.message);
+      () => builtEngine(EngineService.layer({ journal: asyncStore(memoryJournal()), maxConcurrent } as unknown as EngineOptions)),
+      (e: Error & { _tag?: string }) => {
+        assert.equal(e._tag, 'EngineRefused', e.message);
         assert.match(
           e.message,
-          /^promiseEngine: `maxConcurrent: .*` is not a ceiling\. Give the sessions each pool may have at work at once, a whole number from 1/,
+          /^`maxConcurrent: .*` is not a ceiling\. Give the sessions each pool may have at work at once, a whole number from 1/,
         );
         return true;
       },
     );
   }
   for (const maxConcurrent of [1, 3, undefined]) {
-    assert.doesNotThrow(() => promiseEngine(EngineService.layer({ journal: memoryJournal(), maxConcurrent })));
+    assert.doesNotThrow(() => builtEngine(EngineService.layer({ journal: asyncStore(memoryJournal()), maxConcurrent })));
   }
 });
 
-test('the Promise engine refuses a harness whose `pool` is not a name, naming the harness, and takes one that is', () => {
+test('the engine refuses a harness whose `pool` is not a name, naming the harness, and takes one that is', () => {
   const sessions = new Map<string, Sighting>();
   const badPool = [
     ['codex-pooled', { ...codex, pool: '' }],
-    ['fake', { ...fakeHarness(sessions), pool: 3 }],
-    ['unpooled', { ...fakeHarness(sessions), pool: undefined }],
+    ['fake', { ...asyncOps(fakeHarness(sessions)), pool: 3 }],
+    ['unpooled', { ...asyncOps(fakeHarness(sessions)), pool: undefined }],
     ['remote', { url: 'https://agent.example', pool: ' ' }],
   ] as const;
   for (const [name, harness] of badPool) {
     assert.throws(
-      () =>
-        promiseEngine(
-          EngineService.layer({ journal: memoryJournal(), harnesses: { [name]: harness } as unknown as Record<string, PromiseRunner> }),
-        ),
-      (e: Error & { exitCode?: number }) => {
-        assert.equal(e.exitCode, 2, e.message);
-        assert.match(e.message, new RegExp(`^promiseEngine: the \`${name}\` harness names the \`pool\` .*, which is not a name\\.`));
+      () => builtEngine(EngineService.layer({ journal: asyncStore(memoryJournal()), harnesses: { [name]: harness } as never })),
+      (e: Error & { _tag?: string }) => {
+        assert.equal(e._tag, 'EngineRefused', e.message);
+        assert.match(e.message, new RegExp(`^the \`${name}\` harness names the \`pool\` .*, which is not a name\\.`));
         return true;
       },
     );
   }
   assert.doesNotThrow(
     () =>
-      promiseEngine(
+      builtEngine(
         EngineService.layer({
-          journal: memoryJournal(),
+          journal: asyncStore(memoryJournal()),
           harnesses: {
             codex: { ...codex, pool: 'x' },
             bg: claudeDetached,
-            fake: fakeHarness(sessions),
+            fake: asyncOps(fakeHarness(sessions)),
             remote: { url: 'https://agent.example', pool: 'x' },
           },
         }),
@@ -833,41 +936,46 @@ test('the Promise engine refuses a harness whose `pool` is not a name, naming th
   );
 });
 
-test("the facade's tick refuses any argument, with exit 2 and nothing started — a ceiling handed to it is not dropped", async () => {
+test("the engine's tick refuses any argument, TickRefused and nothing started — a ceiling handed to it is not dropped", async () => {
   const sessions = new Map<string, Sighting>();
-  const engine = promiseEngine(
-    EngineService.layer({ journal: memoryJournal(), harnesses: { fake: fakeHarness(sessions) }, defaultHarness: 'fake' }),
+  const engine = builtEngine(
+    EngineService.layer({
+      journal: asyncStore(memoryJournal()),
+      harnesses: { fake: asyncOps(fakeHarness(sessions)) },
+      defaultHarness: 'fake',
+    }),
   );
-  await engine.file({ brief: 'b', cwd: '/r', id: 'waits' });
-  const tick = engine.tick as unknown as (...args: unknown[]) => Promise<unknown>;
+  await Effect.runPromise(engine.file({ brief: 'b', cwd: '/r', id: 'waits' }));
+  const tick: (...args: unknown[]) => ReturnType<typeof engine.tick> = engine.tick;
   for (const args of [[3], [3, { fake: 'fake' }], [undefined]]) {
-    await assert.rejects(tick(...args), (e: Error & { exitCode?: number }) => {
-      assert.equal(e.exitCode, 2, e.message);
-      assert.match(
-        e.message,
-        new RegExp(
-          `^tick: the pass takes no arguments, and was handed ${args.length}: a ceiling and its pools are the engine's own, never a pass's\\. A ceiling is the engine's`,
-        ),
-      );
-      return true;
-    });
+    const e = await Effect.runPromise(Effect.flip(tick(...args)));
+    assert.equal(e._tag, 'TickRefused', e.message);
+    assert.match(
+      e.message,
+      new RegExp(
+        `^the pass takes no arguments, and was handed ${args.length}: a ceiling and its pools are the engine's own, never a pass's\\. A ceiling is the engine's`,
+      ),
+    );
   }
   assert.equal(sessions.size, 0, 'nothing started');
-  assert.equal((await engine.view('waits')).phase, 'pending');
+  assert.equal((await Effect.runPromise(engine.view('waits'))).phase, 'pending');
 });
 
 test("file() refuses claude.remoteControl on every harness with no such flag, by name — codex, claude-detached and a check — ahead of the bag's own refusal; claude journals it; and the old place is refused naming the new one", async () => {
   const check: HarnessSpec = { name: 'check', command: () => ({ cmd: 'sh', args: ['-c', 'true'] }) };
   const journal = memoryJournal();
-  const engine = promiseEngine(
-    EngineService.layer({ journal, harnesses: { claude: 'claude-bg', codex, 'claude-detached': claudeDetached, check } }),
+  const engine = builtEngine(
+    EngineService.layer({
+      journal: asyncStore(journal),
+      harnesses: { claude: 'claude-bg', codex, 'claude-detached': claudeDetached, check },
+    }),
   );
   for (const harness of ['codex', 'claude-detached', 'check']) {
     await refused(
       engine,
       { brief: 'b', cwd: '/r', harness, config: { claude: { remoteControl: true } } },
       new RegExp(
-        `^file: \`claude\\.remoteControl\` asks for a session bridged to claude\\.ai, and the \`${harness}\` harness has no such flag.*File the task on \`claude\`, or leave \`claude\\.remoteControl\` off`,
+        `^\`claude\\.remoteControl\` asks for a session bridged to claude\\.ai, and the \`${harness}\` harness has no such flag.*File the task on \`claude\`, or leave \`claude\\.remoteControl\` off`,
       ),
     );
   }
@@ -875,18 +983,18 @@ test("file() refuses claude.remoteControl on every harness with no such flag, by
     await refused(
       engine,
       { brief: 'b', cwd: '/r', config: config as never },
-      /^file: `remoteControl` is Claude Code's own flag, not a harness argument: file it with Claude Code's flags, as `config: \{ claude: \{ remoteControl: true \} \}`/,
+      /^`remoteControl` is Claude Code's own flag, not a harness argument: file it with Claude Code's flags, as `config: \{ claude: \{ remoteControl: true \} \}`/,
     );
   }
-  await refused(engine, { brief: 'b', cwd: '/r', remoteControl: true } as never, /^file: `remoteControl` is Claude Code's own flag/);
+  await refused(engine, { brief: 'b', cwd: '/r', remoteControl: true } as never, /^`remoteControl` is Claude Code's own flag/);
   assert.deepEqual(await journal.list(), [], 'nothing was journalled');
 
-  const id = await engine.file({ brief: 'b', cwd: '/r', config: { claude: { remoteControl: true } } });
+  const id = await Effect.runPromise(engine.file({ brief: 'b', cwd: '/r', config: { claude: { remoteControl: true } } }));
   const [filed] = await journal.read(id);
   assert.deepEqual((filed as { config?: object }).config, { claude: { remoteControl: true } }, 'on the record, for the runner');
-  assert.equal((await engine.view(id)).state.config?.claude?.remoteControl, true);
+  assert.equal((await Effect.runPromise(engine.view(id))).state.config?.claude?.remoteControl, true);
 
-  const bare = promiseEngine(EngineService.layer({ journal: memoryJournal(), harnesses: { codex } }));
+  const bare = builtEngine(EngineService.layer({ journal: asyncStore(memoryJournal()), harnesses: { codex } }));
   await refused(
     bare,
     { brief: 'b', cwd: '/r', config: { claude: { remoteControl: true } } },
@@ -905,7 +1013,7 @@ test('file() refuses background on every harness with no such mode, and remoteCo
       ),
     );
   }
-  const bg = promiseEngine(EngineService.layer({ journal: memoryJournal(), harnesses: { claude: 'claude-bg' } }));
+  const bg = builtEngine(EngineService.layer({ journal: asyncStore(memoryJournal()), harnesses: { claude: 'claude-bg' } }));
   await refused(
     bg,
     { brief: 'b', cwd: '/r', config: { background: true } },
@@ -914,7 +1022,7 @@ test('file() refuses background on every harness with no such mode, and remoteCo
   await refused(
     engine,
     { brief: 'b', cwd: '/r', config: { claude: { remoteControl: true } } },
-    /^file: `claude\.remoteControl` bridges a session to claude\.ai, and only a background session \(`claude --bg`\) can be bridged.*Give `config\.background: true` as well, or leave `claude\.remoteControl` off/,
+    /^`claude\.remoteControl` bridges a session to claude\.ai, and only a background session \(`claude --bg`\) can be bridged.*Give `config\.background: true` as well, or leave `claude\.remoteControl` off/,
   );
   assert.deepEqual(await journal.list(), [], 'nothing was journalled');
 
@@ -923,7 +1031,7 @@ test('file() refuses background on every harness with no such mode, and remoteCo
     { background: true, claude: { remoteControl: true } },
     { background: false },
   ] as HarnessArgs[]) {
-    const id = await engine.file({ brief: 'b', cwd: '/r', config });
+    const id = await Effect.runPromise(engine.file({ brief: 'b', cwd: '/r', config }));
     const [filed] = await journal.read(id);
     assert.deepEqual((filed as { config?: object }).config, config, 'on the record, for the runner');
   }
@@ -932,9 +1040,9 @@ test('file() refuses background on every harness with no such mode, and remoteCo
 test('say() to a job at shipped defaults is refused only as any task is — here, before its attempt — and never for its mode', async () => {
   const { engine } = shipped();
   for (const config of [undefined, { permissionMode: 'bypassPermissions' as const }]) {
-    const id = await engine.file({ brief: 'b', cwd: '/r', config });
-    await assert.rejects(engine.say(id, 'hello'), (e: Error & { exitCode?: number }) => {
-      assert.equal(e.exitCode, 2, e.message);
+    const id = await Effect.runPromise(engine.file({ brief: 'b', cwd: '/r', config }));
+    await assert.rejects(Effect.runPromise(engine.say(id, 'hello')), (e: Error & { _tag?: string }) => {
+      assert.equal(e._tag, 'SayRefused', e.message);
       assert.match(
         e.message,
         /has not started an attempt yet/,
@@ -943,10 +1051,12 @@ test('say() to a job at shipped defaults is refused only as any task is — here
       return true;
     });
   }
-  const bg = await engine.file({ brief: 'b', cwd: '/r', config: { background: true, permissionMode: 'bypassPermissions' } });
+  const bg = await Effect.runPromise(
+    engine.file({ brief: 'b', cwd: '/r', config: { background: true, permissionMode: 'bypassPermissions' } }),
+  );
   await assert.rejects(
-    engine.say(bg, 'hello'),
-    (e: Error & { exitCode?: number }) => e.exitCode === 2 && /permissionMode: bypassPermissions`/.test(e.message),
+    Effect.runPromise(engine.say(bg, 'hello')),
+    (e: Error & { _tag?: string }) => e._tag === 'SayRefused' && /permissionMode: bypassPermissions`/.test(e.message),
     "a background session's words are refused in that mode before anything is read",
   );
 });
@@ -981,28 +1091,33 @@ test('file() refuses a contextTokens that is not a whole number of tokens, one o
     ['claude-detached', 100000],
     ['claude', 1000000],
   ] as const) {
-    const id = await engine.file({ brief: 'b', cwd: '/r', harness, config: { contextTokens } });
+    const id = await Effect.runPromise(engine.file({ brief: 'b', cwd: '/r', harness, config: { contextTokens } }));
     const [filed] = await journal.read(id);
     assert.equal((filed as { config?: { contextTokens?: number } }).config?.contextTokens, contextTokens, 'on the record, for the runner');
-    assert.equal((await engine.view(id)).state.config?.contextTokens, contextTokens);
+    assert.equal((await Effect.runPromise(engine.view(id))).state.config?.contextTokens, contextTokens);
   }
 });
 
 test('a HarnessSpec is given a contextTokens only when it declares the windows it takes, and a runner is asked nothing', async () => {
   const bare: HarnessSpec = { name: 'bare', command: () => ({ cmd: 'sh', args: ['-c', 'true'] }) };
   const windowed: HarnessSpec = { ...bare, name: 'windowed', contextTokens: { least: 8_000, most: 32_000 } };
-  const runner: PromiseRunner = { spawn: async () => {}, observe: async () => new Map(), stop: async () => {}, logs: async () => '' };
-  const engine = promiseEngine(EngineService.layer({ journal: memoryJournal(), harnesses: { bare, windowed, runner } }));
+  const runner: AsyncRunner = { spawn: async () => {}, observe: async () => new Map(), stop: async () => {}, logs: async () => '' };
+  const engine = builtEngine(
+    EngineService.layer({ journal: asyncStore(memoryJournal()), harnesses: { bare, windowed, runner: asyncOps(runner) } }),
+  );
   await refused(
     engine,
     { brief: 'b', cwd: '/r', harness: 'bare', config: { contextTokens: 16_000 } },
     /the `bare` harness has no such knob: it would run on its own window.*File the task on `windowed`, whose sessions compact past it, or leave `contextTokens` off/,
   );
   await refused(engine, { brief: 'b', cwd: '/r', harness: 'windowed', config: { contextTokens: 64_000 } }, /from 8000 to 32000/);
-  assert.ok(await engine.file({ brief: 'b', cwd: '/r', harness: 'windowed', config: { contextTokens: 16_000 } }));
-  assert.ok(await engine.file({ brief: 'b', cwd: '/r', harness: 'runner', config: { contextTokens: 5 } }), "a runner's own business");
+  assert.ok(await Effect.runPromise(engine.file({ brief: 'b', cwd: '/r', harness: 'windowed', config: { contextTokens: 16_000 } })));
+  assert.ok(
+    await Effect.runPromise(engine.file({ brief: 'b', cwd: '/r', harness: 'runner', config: { contextTokens: 5 } })),
+    "a runner's own business",
+  );
 
-  const none = promiseEngine(EngineService.layer({ journal: memoryJournal(), harnesses: { codex } }));
+  const none = builtEngine(EngineService.layer({ journal: asyncStore(memoryJournal()), harnesses: { codex } }));
   await refused(
     none,
     { brief: 'b', cwd: '/r', config: { contextTokens: 200000 } },
@@ -1014,49 +1129,49 @@ test('a harness brought as a runner is asked nothing of claude.remoteControl, an
   const sessions = new Map<string, Sighting>();
   const asked: boolean[] = [];
   const runner = fakeHarness(sessions);
-  const engine = promiseEngine(
+  const engine = builtEngine(
     EngineService.layer({
-      journal: memoryJournal(),
+      journal: asyncStore(memoryJournal()),
       defaultHarness: 'mine',
       harnesses: {
-        mine: {
+        mine: asyncOps({
           ...runner,
           spawn: async (r) => {
             asked.push(r.config?.claude?.remoteControl === true);
             await runner.spawn(r);
           },
-        },
+        }),
       },
     }),
   );
-  await engine.file({ brief: 'b', cwd: '/r', config: { claude: { remoteControl: true } } });
-  await engine.tick();
+  await Effect.runPromise(engine.file({ brief: 'b', cwd: '/r', config: { claude: { remoteControl: true } } }));
+  await Effect.runPromise(engine.tick());
   assert.deepEqual(asked, [true], 'its to honour');
 });
 
 test('a usage whose key has no value, as `{ costUsd: undefined }` that the files journal writes without the key, is not something new to write down — measured is written once a value arrives, not on every pass', async () => {
   const root = scratch('ae-measured-');
   const sessions = new Map<string, Sighting>();
-  const engine = promiseEngine(EngineService.layer({ root, harnesses: { fake: fakeHarness(sessions) }, defaultHarness: 'fake' }));
-  const id = await engine.file({ brief: 'b', cwd: '/repo' });
-  await engine.tick();
+  const engine = builtEngine(EngineService.layer({ root, harnesses: { fake: asyncOps(fakeHarness(sessions)) }, defaultHarness: 'fake' }));
+  const id = await Effect.runPromise(engine.file({ brief: 'b', cwd: '/repo' }));
+  await Effect.runPromise(engine.tick());
   const measured = async () =>
-    (await engine.feed(0)).entries.filter((e) => e.taskId === id && e.event.kind === 'measured').map((e) => e.event);
+    (await Effect.runPromise(engine.feed(0))).entries.filter((e) => e.taskId === id && e.event.kind === 'measured').map((e) => e.event);
 
   for (const [k, v] of sessions) sessions.set(k, { ...v, state: 'completed', usage: { turns: 3, costUsd: undefined } });
-  for (let i = 0; i < 4; i++) await engine.tick();
-  assert.equal((await engine.view(id)).state.settled, 'succeeded');
+  for (let i = 0; i < 4; i++) await Effect.runPromise(engine.tick());
+  assert.equal((await Effect.runPromise(engine.view(id))).state.settled, 'succeeded');
   assert.deepEqual(await measured(), [], 'the end already says turns, and nothing says a cost: nothing to write, on any pass');
 
   for (const [k, v] of sessions) sessions.set(k, { ...v, usage: { turns: 3, costUsd: 0.5 } });
-  for (let i = 0; i < 3; i++) await engine.tick();
+  for (let i = 0; i < 3; i++) await Effect.runPromise(engine.tick());
   assert.equal((await measured()).length, 1, 'a cost that arrives is written once');
-  assert.deepEqual((await engine.view(id)).state.attempts[0]?.usage, { turns: 3, costUsd: 0.5 });
+  assert.deepEqual((await Effect.runPromise(engine.view(id))).state.attempts[0]?.usage, { turns: 3, costUsd: 0.5 });
 });
 
-test('a PromiseRunner whose spawn rejects is not taken to have started nothing — unless it says so', async () => {
+test('an AsyncRunner whose spawn rejects is not taken to have started nothing — unless it says so', async () => {
   const sessions = new Map<string, Sighting>();
-  const launcher: PromiseRunner = {
+  const launcher: AsyncRunner = {
     ...fakeHarness(sessions),
     async spawn(r) {
       if (r.brief === 'refuse') throw Object.assign(new Error('quota: no sessions today'), { refused: true });
@@ -1064,15 +1179,17 @@ test('a PromiseRunner whose spawn rejects is not taken to have started nothing �
       throw new Error('launcher: lost the acknowledgement');
     },
   };
-  const engine = promiseEngine(EngineService.layer({ journal: memoryJournal(), harnesses: { launcher }, defaultHarness: 'launcher' }));
-  const maybe = await engine.file({ brief: 'start', cwd: '/r' });
-  const no = await engine.file({ brief: 'refuse', cwd: '/r' });
+  const engine = builtEngine(
+    EngineService.layer({ journal: asyncStore(memoryJournal()), harnesses: { launcher: asyncOps(launcher) }, defaultHarness: 'launcher' }),
+  );
+  const maybe = await Effect.runPromise(engine.file({ brief: 'start', cwd: '/r' }));
+  const no = await Effect.runPromise(engine.file({ brief: 'refuse', cwd: '/r' }));
 
-  await engine.tick();
-  assert.equal((await engine.view(no)).state.settled, 'failed', 'said nothing started: unstartable');
-  assert.equal((await engine.view(no)).state.attempts[0]?.reason, 'unstartable');
-  assert.equal((await engine.view(maybe)).state.settled, null, 'said nothing: not failed');
+  await Effect.runPromise(engine.tick());
+  assert.equal((await Effect.runPromise(engine.view(no))).state.settled, 'failed', 'said nothing started: unstartable');
+  assert.equal((await Effect.runPromise(engine.view(no))).state.attempts[0]?.reason, 'unstartable');
+  assert.equal((await Effect.runPromise(engine.view(maybe))).state.settled, null, 'said nothing: not failed');
 
-  await engine.tick();
-  assert.equal((await engine.view(maybe)).phase, 'running (working)', 'and its session is adopted');
+  await Effect.runPromise(engine.tick());
+  assert.equal((await Effect.runPromise(engine.view(maybe))).phase, 'running (working)', 'and its session is adopted');
 });

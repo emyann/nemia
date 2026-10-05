@@ -13,6 +13,7 @@ import { HarnessArgsSchema, type StoredEvent } from '../event-schema.ts';
 import type { HarnessArgs } from '../../harness/args.ts';
 import { ioCounts } from './tally.ts';
 import { scratch } from '../../../test/scratch.ts';
+import { asyncStore } from '../../../test/promise-runner.ts';
 
 const root = () => scratch('ae-journal-');
 /** A fresh layer over the same directory — what a restarted engine sees. */
@@ -234,10 +235,11 @@ test("an old filed event is read with the harness's arguments under config, and 
 
 test('a store with tasks filed on both sides of the change reads them alike, and the engine folds each', async () => {
   const dir = legacyStore({ 't-new': [TODAY], 't-old': [LEGACY] });
-  const { Engine, promiseEngine } = await import('../../index.ts');
-  const engine = promiseEngine(Engine.layer({ root: dir }));
+  const { Engine } = await import('../../index.ts');
+  const { builtEngine } = await import('../../../test/engine.ts');
+  const engine = builtEngine(Engine.layer({ root: dir }));
 
-  const old = await engine.view('t-old');
+  const old = await Effect.runPromise(engine.view('t-old'));
   assert.deepEqual(old.state.config, {
     budgetUsd: 2,
     model: 'opus',
@@ -248,7 +250,7 @@ test('a store with tasks filed on both sides of the change reads them alike, and
   });
   assert.equal((old.state as unknown as Record<string, unknown>).model, undefined, 'no argument is left on the state beside it');
   assert.equal('budgetUsd' in old.state, false, 'the cap included');
-  assert.deepEqual((await engine.view('t-new')).state.config, { model: 'haiku' });
+  assert.deepEqual((await Effect.runPromise(engine.view('t-new'))).state.config, { model: 'haiku' });
 });
 
 test("config is the newer word: a value there is kept over one beside it, and an undefined one is no argument — in a consumer's store that keeps the key JSON drops", async () => {
@@ -281,19 +283,20 @@ test("config is the newer word: a value there is kept over one beside it, and an
 });
 
 test("a consumer's own store is read in today's shape too: the upgrade is the Journal's, not the files'", async () => {
-  const { Engine, promiseEngine } = await import('../../index.ts');
+  const { Engine } = await import('../../index.ts');
+  const { builtEngine } = await import('../../../test/engine.ts');
   const events = [LEGACY as unknown as Event];
-  const engine = promiseEngine(
+  const engine = builtEngine(
     Engine.layer({
-      journal: {
+      journal: asyncStore({
         append: async () => {},
         read: async () => events,
         list: async () => ['t-old'],
         feed: async () => ({ entries: events.map((event) => ({ taskId: 't-old', event })), cursor: 1 }),
-      },
+      }),
     }),
   );
-  assert.deepEqual((await engine.view('t-old')).state.config?.model, 'opus');
+  assert.deepEqual((await Effect.runPromise(engine.view('t-old'))).state.config?.model, 'opus');
   assert.deepEqual(events[0], LEGACY, "and the consumer's record is not touched");
 });
 
@@ -365,8 +368,9 @@ test("a journal from a runtime that judged the spend cap reads its caps under co
   );
   assert.deepEqual(bytesOf(dir), before, 'append-only: a read changes no byte');
 
-  const { Engine, promiseEngine } = await import('../../index.ts');
-  const { state } = await promiseEngine(Engine.layer({ root: dir })).view('t-capped');
+  const { Engine } = await import('../../index.ts');
+  const { builtEngine } = await import('../../../test/engine.ts');
+  const { state } = await Effect.runPromise(builtEngine(Engine.layer({ root: dir })).view('t-capped'));
   assert.deepEqual(state.inputs, [{ at: CAPPED[4].at, text: 'shorter', config: { budgetUsd: 0.5 } }]);
   assert.deepEqual(
     state.attempts.map((a) => [a.ended, a.reason, a.limit]),
@@ -435,8 +439,9 @@ test("a filing that asked for remoteControl, Claude Code's bridge to claude.ai, 
   );
   assert.deepEqual(bytesOf(dir), before, 'append-only: a read changes no byte');
 
-  const { Engine, promiseEngine } = await import('../../index.ts');
-  const { state } = await promiseEngine(Engine.layer({ root: dir })).view('under');
+  const { Engine } = await import('../../index.ts');
+  const { builtEngine } = await import('../../../test/engine.ts');
+  const { state } = await Effect.runPromise(builtEngine(Engine.layer({ root: dir })).view('under'));
   assert.deepEqual(state.config, { background: true, claude: { remoteControl: true } });
 });
 
@@ -591,8 +596,9 @@ test("Codex's arguments are read from a journal as filed, and the engine folds t
     Effect.flatMap(Journal, (j) => j.read('t-codex')),
   );
   assert.deepEqual(filed, codex);
-  const { Engine, promiseEngine } = await import('../../index.ts');
-  assert.deepEqual((await promiseEngine(Engine.layer({ root: dir })).view('t-codex')).state.config, {
+  const { Engine } = await import('../../index.ts');
+  const { builtEngine } = await import('../../../test/engine.ts');
+  assert.deepEqual((await Effect.runPromise(builtEngine(Engine.layer({ root: dir })).view('t-codex'))).state.config, {
     model: 'gpt-5',
     codex: { trustFrom: '/repo' },
   });
@@ -680,19 +686,20 @@ test('the in-memory store is decoded the same: an event appended in no shape the
 });
 
 test("a consumer's own store is decoded too: an entry it holds in no shape the runtime writes is said, not folded", async () => {
-  const { Engine, promiseEngine } = await import('../../index.ts');
+  const { Engine } = await import('../../index.ts');
+  const { builtEngine } = await import('../../../test/engine.ts');
   const events = [{ ...TODAY, kind: 'filled' } as unknown as Event];
-  const engine = promiseEngine(
+  const engine = builtEngine(
     Engine.layer({
-      journal: {
+      journal: asyncStore({
         append: async () => {},
         read: async () => events,
         list: async () => ['t-own'],
         feed: async () => ({ entries: [], cursor: 0 }),
-      },
+      }),
     }),
   );
-  await assert.rejects(engine.view('t-own'), (e: Error) =>
+  await assert.rejects(Effect.runPromise(engine.view('t-own')), (e: Error) =>
     e.message.includes(`t-own's journal, entry 1 is no event this runtime writes (its kind is "filled"`),
   );
 });

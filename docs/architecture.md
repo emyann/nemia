@@ -40,7 +40,8 @@ inbox, factories, stats, agent definitions.
 no round: the loop's target is filed again to merge the base at the commit a trial merge read, its try `then: 'merge'`, the run's
 `baseRef` moves to that commit, and the reviewer after it reads the merge; a finding of it with `again: true` is a round, counted as any
 (`test/ship.test.ts`, *a merge send-back leaves the round count unchanged*). A merge of work that merges cleanly is refused, pointed to
-the landing's approval; one of a run whose result step closes no loop, to `nemia retry`.
+the landing's approval; one of a run whose result step closes no loop, to `nemia retry`. While a merge is asked, `nemia round` and
+`nemia accept` of its loop are refused, since either would drop it; `nemia decide` offers the merge wherever the verb would take it.
 
 **In the runtime since platform slice 3**: session admission and pools. The runtime admits a queued task under the engine's ceiling
 and its harness's pool, the highest priority first (`agent-runtime/src/core/admission.ts`); the orchestrator hands it the ceiling

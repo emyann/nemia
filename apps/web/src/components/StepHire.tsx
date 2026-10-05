@@ -58,8 +58,8 @@ function Hiring({ page, where }: { page: WorkflowStepPage; where: 'page' | 'row'
   return (
     <div data-step-hire={page.step} className="space-y-1.5">
       {factory && hired ? (
-        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-neutral-500">
-          <span>
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+          <span className="text-neutral-500">
             {factory} hires <AgentLink from={page.from} name={hired} className="text-neutral-700 dark:text-neutral-300" /> into this step.
           </span>
           <Button variant="outline" size="xs" data-fire={hired} isDisabled={write.isPending} onPress={() => send({ kind: 'fire' })}>

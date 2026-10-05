@@ -43,6 +43,7 @@ type Try = {
   failed?: true;
   denied?: string[];
   skills?: string[];
+  files?: string[];
   recheck?: true;
   closeout?: Record<string, unknown>;
 };
@@ -75,6 +76,7 @@ function readOf(id: string, steps: readonly Workflow[], tries: Record<string, Tr
   const verdicts = new Map<string, CheckVerdict>();
   const denied = new Map<string, string[]>();
   const skills = new Map<string, string[]>();
+  const files = new Map<string, string[]>();
   const closeouts = new Map<string, Record<string, unknown>>();
   const record: Run['steps'] = {};
   for (const [name, list] of Object.entries(tries)) {
@@ -87,6 +89,7 @@ function readOf(id: string, steps: readonly Workflow[], tries: Record<string, Tr
       filed.set(taskId, minus(sessionEnd, 70 * MIN));
       if (t.denied) denied.set(taskId, t.denied);
       if (t.skills) skills.set(taskId, t.skills);
+      if (t.files) files.set(taskId, t.files);
       if (t.closeout) closeouts.set(taskId, t.closeout);
       if (t.check) {
         views.set(`${own}-check`, ended(t.end, null));
@@ -107,7 +110,9 @@ function readOf(id: string, steps: readonly Workflow[], tries: Record<string, Tr
     verdictOf: (taskId: string) => verdicts.get(taskId) ?? null,
     deniedOf: (taskId: string) => denied.get(taskId) ?? [],
     skillsOf: (taskId: string) => skills.get(taskId) ?? null,
+    filesOf: (taskId: string) => files.get(taskId) ?? null,
     rulesOf: (_step: Workflow): ReadonlyMap<string, readonly SkillRule[]> => new Map(),
+    appliesOf: (_step: Workflow): ReadonlyMap<string, readonly string[]> => new Map(),
     closeoutOfTask: (taskId: string) => {
       const output = closeouts.get(taskId);
       return output && { outcome: 'done' as const, summary: '', artifacts: [], output };
@@ -480,9 +485,9 @@ test("a step's skills are counted by skill over its measured tries, most first a
   const [row] = s.all.steps;
   assert.deepEqual([row.tries, row.skillLoads, row.skillTries], [3, 4, 2]);
   assert.deepEqual(row.skills, [
-    { skill: 'write-a-spec', count: 2 },
-    { skill: 'effect', count: 1 },
-    { skill: 'look', count: 1 },
+    { skill: 'write-a-spec', count: 2, tries: 2, touched: null, loadedWhenTouched: null },
+    { skill: 'effect', count: 1, tries: 1, touched: null, loadedWhenTouched: null },
+    { skill: 'look', count: 1, tries: 1, touched: null, loadedWhenTouched: null },
   ]);
   const words = statsLines(s);
   assert.match(
@@ -490,9 +495,79 @@ test("a step's skills are counted by skill over its measured tries, most first a
     /\s4 \(2 of 3\)$/,
     'the step row says how many of its tries were measured',
   );
-  assert.ok(words.some((l) => /^design\s+seldon\s+write-a-spec\s+2$/.test(l)));
+  assert.ok(
+    words.some((l) => /^step\s+agent\s+skill\s+loads\s+tries\s+when touched$/.test(l)),
+    words.join('\n'),
+  );
+  assert.ok(
+    words.some((l) => /^design\s+seldon\s+write-a-spec\s+2\s+2\s+—$/.test(l)),
+    words.join('\n'),
+  );
   const [unmeasured] = statsOf(factsOfAll(readOf('unsaid', steps, { design: [{ end: at(1) }] })), {}, NOW).all.steps;
   assert.deepEqual([unmeasured.skillLoads, unmeasured.skillTries, unmeasured.skills], [null, 0, []]);
+});
+
+/** `r`, its steps' frozen skills declaring the paths `applies`, by step name and then by skill. */
+const applying = <R extends ReturnType<typeof readOf>>(r: R, applies: Record<string, Record<string, string[]>>): R => ({
+  ...r,
+  appliesOf: (s: Workflow) => new Map(Object.entries(applies[s.name] ?? {})),
+});
+
+test("a skill's tries that touched its paths are counted, and how many of them loaded it, over the tries whose files were measured", () => {
+  const steps = [step('design', [], { by: 'seldon' })];
+  const tries = {
+    design: [
+      { end: at(1), skills: [], files: ['apps/web/src/a.tsx'] },
+      { end: at(2), skills: ['change-the-board', 'shadcn'], files: ['apps/web/src/b.tsx'] },
+      { end: at(3), skills: ['effect'] },
+      { end: at(4), skills: [], files: ['packages/x.ts'] },
+    ],
+  };
+  const r = applying(readOf('due', steps, tries), { design: { 'change-the-board': ['apps/web/**'], effect: ['packages/**'], shadcn: [] } });
+  assert.deepEqual(
+    factsOf(r).tries.map((t) => t.due),
+    [
+      [
+        { skill: 'change-the-board', touched: true },
+        { skill: 'effect', touched: false },
+      ],
+      [
+        { skill: 'change-the-board', touched: true },
+        { skill: 'effect', touched: false },
+      ],
+      null,
+      [
+        { skill: 'change-the-board', touched: false },
+        { skill: 'effect', touched: true },
+      ],
+    ],
+    'a skill that declares no path is due on no try, and a try whose files are not measured is due nothing',
+  );
+  const s = statsOf(factsOfAll(r), {}, NOW);
+  assert.deepEqual(s.all.steps[0].skills, [
+    { skill: 'change-the-board', count: 1, tries: 1, touched: 2, loadedWhenTouched: 1 },
+    { skill: 'effect', count: 1, tries: 1, touched: 1, loadedWhenTouched: 0 },
+    { skill: 'shadcn', count: 1, tries: 1, touched: null, loadedWhenTouched: null },
+  ]);
+  const words = statsLines(s);
+  assert.ok(
+    words.some((l) => /^design\s+seldon\s+change-the-board\s+1\s+1\s+1 of 2$/.test(l)),
+    words.join('\n'),
+  );
+  assert.ok(
+    words.some((l) => /^design\s+seldon\s+shadcn\s+1\s+1\s+—$/.test(l)),
+    words.join('\n'),
+  );
+  const unloaded = statsOf(
+    factsOfAll(applying(readOf('unloaded', steps, { design: [tries.design[0]] }), { design: { look: ['apps/**'] } })),
+    {},
+    NOW,
+  );
+  assert.deepEqual(
+    unloaded.all.steps[0].skills,
+    [{ skill: 'look', count: 0, tries: 0, touched: 1, loadedWhenTouched: 0 }],
+    'a skill touched and never loaded has a row',
+  );
 });
 
 const readWithRead: SkillRule = { id: 'read-with-read', says: 'Read a file with Read', breaks: ['Bash(cat:*)', 'Bash(head:*)'] };

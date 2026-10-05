@@ -295,6 +295,24 @@ writeRun(
   { factory: 'skills', createdAt: `${SKILLS_DAY}T00:00:00.000Z` },
 );
 
+const TOUCHED_DAY = '2026-09-16';
+endedSession('touched-design', TOUCHED_DAY, 1, [{ skills: [], files: ['apps/web/src/a.tsx'] }]);
+endedSession('touched-design-2', TOUCHED_DAY, 2, [{ skills: ['change-the-board', 'shadcn'], files: ['apps/web/src/b.tsx'] }]);
+for (const [name, applies] of [
+  ['change-the-board', 'applies: ["apps/web/**"]\n'],
+  ['shadcn', ''],
+]) {
+  const dir = path.join(ROOT, 'runs', 'touched', 'agents', 'design', 'nemia-seldon', 'skills', name);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'SKILL.md'), `---\nname: ${name}\ndescription: A skill.\n${applies}---\nDo it.\n`);
+}
+writeRun(
+  'touched',
+  [{ name: 'design', after: [], body: 'Design it.', agent: { ...agent('seldon'), skills: ['change-the-board', 'shadcn'] } }],
+  { design: { taskId: 'touched-design-2', tries: [{ taskId: 'touched-design', then: 'retries' }] } },
+  { factory: 'touched', createdAt: `${TOUCHED_DAY}T00:00:00.000Z` },
+);
+
 const TALLY_DAY = '2026-09-18';
 const UNTALLIED_DAY = '2026-09-19';
 ran('tallied-triage', 1, 2, { day: TALLY_DAY, closeout: { ...SIGNED, issues: [{ open: true }, { open: false }] } });
@@ -350,6 +368,7 @@ test('nemia stats --by factory answers a group per factory, and --factory keeps 
       ['other', 2],
       ['skills', 5],
       ['tallies', 2],
+      ['touched', 2],
     ],
   );
   const only = JSON.parse(await printedBy(t, ['stats', '--json', '--factory', 'other'])) as Stats;
@@ -477,8 +496,8 @@ test('nemia stats counts each skill a session loaded, per try whose ends all say
   const spec = row('spec');
   assert.deepEqual([spec?.tries, spec?.skillLoads, spec?.skillTries], [3, 3, 1]);
   assert.deepEqual(spec?.skills, [
-    { skill: 'write-a-spec', count: 2 },
-    { skill: 'look', count: 1 },
+    { skill: 'write-a-spec', count: 2, tries: 1, touched: null, loadedWhenTouched: null },
+    { skill: 'look', count: 1, tries: 1, touched: null, loadedWhenTouched: null },
   ]);
   assert.deepEqual([row('quiet')?.skillLoads, row('quiet')?.skillTries, row('quiet')?.skills], [0, 1, []], 'a measured empty list');
   assert.deepEqual([row('old')?.skillLoads, row('old')?.skillTries, row('old')?.skills], [null, 0, []], 'an end that does not say');
@@ -489,11 +508,27 @@ test('nemia stats counts each skill a session loaded, per try whose ends all say
   assert.match(words, new RegExp(`^${UNSAID_DAY}\\s.*\\s—$`, 'm'));
   assert.match(words, /^spec\s+seldon\s+3\s.*\s3 \(1 of 3\)$/m, 'the step row says how many of its tries were measured');
   assert.match(words, /^old\s+—\s+1\s.*\s—$/m);
-  assert.match(words, /^step\s+agent\s+skill\s+loads$/m);
-  assert.match(words, /^spec\s+seldon\s+write-a-spec\s+2$/m);
-  assert.match(words, /^spec\s+seldon\s+look\s+1$/m);
+  assert.match(words, /^step\s+agent\s+skill\s+loads\s+tries\s+when touched$/m);
+  assert.match(words, /^spec\s+seldon\s+write-a-spec\s+2\s+1\s+—$/m);
+  assert.match(words, /^spec\s+seldon\s+look\s+1\s+1\s+—$/m);
   const line = await printedBy(t, ['stats', '--line', '--factory', 'skills']);
   assert.match(line, /, \S+ \(\S+\) calls denied, \S+ \(\S+\) skills loaded$/);
+});
+
+test("nemia stats counts the tries that touched a frozen skill's paths and how many of them loaded it, read off the sessions' ends", async (t) => {
+  const range = ['--factory', 'touched', '--from', TOUCHED_DAY, '--to', TOUCHED_DAY];
+  const s = JSON.parse(await printedBy(t, ['stats', '--json', ...range])) as Stats;
+  assert.deepEqual(
+    s.all.steps.find((r) => r.step === 'design')?.skills,
+    [
+      { skill: 'change-the-board', count: 1, tries: 1, touched: 2, loadedWhenTouched: 1 },
+      { skill: 'shadcn', count: 1, tries: 1, touched: null, loadedWhenTouched: null },
+    ],
+    'both tries touched apps/web and one loaded change-the-board; shadcn declares no path',
+  );
+  const words = await printedBy(t, ['stats', ...range]);
+  assert.match(words, /^design\s+seldon\s+change-the-board\s+1\s+1\s+1 of 2$/m);
+  assert.match(words, /^design\s+seldon\s+shadcn\s+1\s+1\s+—$/m);
 });
 
 test("nemia stats totals each tally a step froze over its closeouts, per day and over the range; a day with no closeout's value is —, never 0", async (t) => {

@@ -246,6 +246,7 @@ test('runs are read from the workflow store and summarized, with what each step 
           /** `t-1` is on the record and not in this engine's store: a fresh `WF_ROOT` has no tasks at all. */
           status: 'unknown',
           note: null,
+          roundDue: false,
           needs: null,
           blockedByHarness: false,
           waitingFor: null,
@@ -258,6 +259,7 @@ test('runs are read from the workflow store and summarized, with what each step 
           branch: null,
           status: 'waiting',
           note: null,
+          roundDue: false,
           needs: null,
           blockedByHarness: false,
           waitingFor: null,
@@ -363,6 +365,7 @@ test("a run in full: the brief, each step's spec and prose, what it was told, an
     {
       id: 'r-2',
       brief: 'Add a cache\n\nKeep it small.',
+      decide: 'nemia decide r-2',
       repo: '/code/app',
       place: 'git',
       work: null,
@@ -438,6 +441,8 @@ test("a run in full: the brief, each step's spec and prose, what it was told, an
     files: [],
     filesError: null,
     note: null,
+    roundDue: false,
+    commands: { approve: 'nemia approve r-2 implement', retry: 'nemia retry r-2 implement', say: 'nemia say r-2 implement' },
     /** Its question, off its closeout; no session the harness blocked, so no last line; nothing asked of it yet. */
     needs: 'Which database?',
     blockedByHarness: false,
@@ -506,6 +511,8 @@ test("a run in full: the brief, each step's spec and prose, what it was told, an
       files: [],
       filesError: null,
       note: null,
+      roundDue: false,
+      commands: { approve: 'nemia approve r-2 review', retry: 'nemia retry r-2 review', say: 'nemia say r-2 review' },
       needs: null,
       blockedByHarness: false,
       waitingFor: null,
@@ -618,6 +625,8 @@ test('a run whose workflow folder is gone still answers, from its record', async
       files: [],
       filesError: null,
       note: null,
+      roundDue: false,
+      commands: { approve: 'nemia approve r-3 implement', retry: 'nemia retry r-3 implement', say: 'nemia say r-3 implement' },
       needs: 'Which database?',
       blockedByHarness: false,
       waitingFor: null,
@@ -658,6 +667,8 @@ test('a run whose workflow folder is gone still answers, from its record', async
       files: [],
       filesError: null,
       note: null,
+      roundDue: false,
+      commands: { approve: 'nemia approve r-3 review', retry: 'nemia retry r-3 review', say: 'nemia say r-3 review' },
       needs: null,
       blockedByHarness: false,
       waitingFor: null,
@@ -736,6 +747,8 @@ test('a folder changed since the run started keeps the steps that ran, and names
     files: [],
     filesError: null,
     note: null,
+    roundDue: false,
+    commands: { approve: 'nemia approve r-6 original', retry: 'nemia retry r-6 original', say: 'nemia say r-6 original' },
     needs: 'Which database?',
     blockedByHarness: false,
     waitingFor: null,
@@ -1098,7 +1111,7 @@ test('each step says how many attempts it has had, when the latest began, and ho
 
   assert.deepEqual(
     Object.keys((await listed('r-7')).steps[0]),
-    ['name', 'taskId', 'branch', 'status', 'note', 'needs', 'blockedByHarness', 'waitingFor', 'approve', 'denied'],
+    ['name', 'taskId', 'branch', 'status', 'note', 'roundDue', 'needs', 'blockedByHarness', 'waitingFor', 'approve', 'denied'],
     'the list carries the note `nemia ls` prints beside a step, and what a person has to know to act on it',
   );
   assert.equal((await listed('r-7')).steps[0].note, null, 'no note for a step on its first try');

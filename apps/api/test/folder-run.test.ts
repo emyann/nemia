@@ -143,7 +143,7 @@ test("a folder run's decision reads, with nothing to merge and nothing about git
   );
   assert.deepEqual(
     decision.commands,
-    [{ label: 'forget it', command: 'nemia rm f-notes', said: 'forgets the run with its folders and files' }],
+    [{ label: 'forget it', command: 'nemia rm f-notes', said: 'forgets the run with its folders and files', step: null }],
     'what `nemia decide` offers instead: the one command, and nothing to merge or delete (cli/main.ts, !git)',
   );
   for (const said of [...decision.commands.flatMap((c) => [c.command, c.said ?? '']), decision.overBudget ?? '']) {

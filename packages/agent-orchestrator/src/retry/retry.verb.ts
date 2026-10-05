@@ -29,14 +29,13 @@ export type Asked = { run: Run; ask: RetryAsk; file: string; stopFirst: boolean 
 /**
  * Ask for another try of a step — `wf retry` — by writing the ask, and nothing else. The next tick honours it once.
  *
- * Refused before anything is written, with what to do instead (`retryRefusal`): a message that is empty or rides on
- * `--recheck`, a step that is not waiting on a person, a cancelled run, an ask for that try already there; then a try whose config
- * its harness refuses (`tryRefused`). An ask `wf pause --now` wrote for that try and that is void (`pauseAskVoid`) refuses nothing: it
- * is set aside into `done/`, as the tick would, before the person's is written in its place. Like a cancellation, the ask is the person's own file, and the verb never writes the run's json,
- * which the tick owns. What
- * the person said goes in the ask, `message`, and nowhere else: the tick carries it into the try's brief. An ask written by someone else
- * between the look and the write is refused as the look would have refused it, and a file at the ask's name that no pass reads as one is
- * named (`strayAsk`).
+ * Refused before anything is written, with what to do instead (`retryRefusal`): a message that is empty or rides on `--recheck`, a step
+ * that is not waiting on a person, a cancelled run, an ask for that try already there; then a try whose config its harness refuses
+ * (`tryRefused`). An ask `wf pause --now` wrote for that try and that is void (`pauseAskVoid`) refuses nothing: it is set aside into
+ * `done/`, as the tick would, before the person's is written in its place. Like a cancellation, the ask is the person's own file, and
+ * the verb never writes the run's json, which the tick owns. What the person said goes in the ask, `message`, and nowhere else: the tick
+ * carries it into the try's brief. An ask written by someone else between the look and the write is refused as the look would have
+ * refused it, and a file at the ask's name that no pass reads as one is named (`strayAsk`).
  *
  * `stopBlocked` takes a step whose session its harness blocked, with nothing signed (`retryable`): the ask is written as any other, and
  * the tick stops that session before it files the try. `wf retry` passes it, and so does the board's `POST …/retry`. Left out, such a

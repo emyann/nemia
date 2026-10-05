@@ -6,7 +6,7 @@
  * and the tick's `pass`.
  */
 import type { Run } from '../record/record.ts';
-import type { RetryAsk } from '../retry/retry-ask.ts';
+import type { RetryAsk } from '../retry/index.ts';
 import type { Workflow } from '../step/step.ts';
 import { landsOnCheck } from '../status/status.ts';
 import { phaseOfView, type WordView } from '../views/views-words.ts';

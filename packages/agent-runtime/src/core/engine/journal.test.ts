@@ -20,15 +20,24 @@ const root = () => scratch('ae-journal-');
 const run = <A, E>(dir: string, e: Effect.Effect<A, E, Journal>) => Effect.runPromise(e.pipe(Effect.provide(Journal.files(dir))));
 
 const ev = (kind: Event['kind'], at: string): Event => ({ kind, at, attempt: 1 }) as Event;
+/** A task's `filed`, at `at`: what an append to a task with no journal must be. */
+const filedAt = (at: string): Event => ({ ...TODAY, at }) as Event;
+/** Each of `ids` filed, at the start of 2026, so the events a test appends after have a journal to go to. */
+const fileEach = (ids: readonly string[]) =>
+  Effect.flatMap(Journal, (j) => Effect.forEach(ids, (id) => j.append(id, filedAt('2026-01-01T00:00:00Z')), { discard: true }));
 
 test('events come back in the order they were appended', async () => {
   const dir = root();
   await run(
     dir,
-    Effect.flatMap(Journal, (j) =>
-      Effect.forEach(['a', 'b', 'c'], (s) => j.append('t1', ev('starting', `2026-01-01T00:00:0${s.charCodeAt(0) - 97}Z`)), {
-        discard: true,
-      }),
+    fileEach(['t1']).pipe(
+      Effect.andThen(
+        Effect.flatMap(Journal, (j) =>
+          Effect.forEach(['a', 'b', 'c'], (s) => j.append('t1', ev('starting', `2026-01-01T00:00:0${s.charCodeAt(0) - 97}Z`)), {
+            discard: true,
+          }),
+        ),
+      ),
     ),
   );
 
@@ -36,10 +45,10 @@ test('events come back in the order they were appended', async () => {
     dir,
     Effect.flatMap(Journal, (j) => j.read('t1')),
   );
-  assert.equal(events.length, 3);
+  assert.equal(events.length, 4);
   assert.deepEqual(
-    events.map((e) => e.at.slice(-3, -1)),
-    ['00', '01', '02'],
+    events.map((e) => `${e.kind} ${e.at.slice(-3, -1)}`),
+    ['filed 00', 'starting 00', 'starting 01', 'starting 02'],
   );
 });
 
@@ -47,10 +56,14 @@ test('the feed spans tasks and the cursor resumes exactly where it stopped', asy
   const dir = root();
   await run(
     dir,
-    Effect.flatMap(Journal, (j) =>
-      Effect.all([j.append('t1', ev('starting', '2026-01-01T00:00:00Z')), j.append('t2', ev('starting', '2026-01-01T00:00:01Z'))], {
-        discard: true,
-      }),
+    fileEach(['t1', 't2', 't3']).pipe(
+      Effect.andThen(
+        Effect.flatMap(Journal, (j) =>
+          Effect.all([j.append('t1', ev('starting', '2026-01-01T00:00:00Z')), j.append('t2', ev('starting', '2026-01-01T00:00:01Z'))], {
+            discard: true,
+          }),
+        ),
+      ),
     ),
   );
 
@@ -60,7 +73,7 @@ test('the feed spans tasks and the cursor resumes exactly where it stopped', asy
   );
   assert.deepEqual(
     first.entries.map((e) => e.taskId),
-    ['t1', 't2'],
+    ['t1', 't2', 't3', 't1', 't2'],
   );
   assert.ok(first.cursor > 0);
 
@@ -96,8 +109,12 @@ test('an old cursor replays everything since — it never expires', async () => 
   const dir = root();
   await run(
     dir,
-    Effect.flatMap(Journal, (j) =>
-      Effect.forEach([1, 2, 3, 4, 5], (n) => j.append(`t${n}`, ev('starting', `2026-01-01T00:00:0${n}Z`)), { discard: true }),
+    fileEach(['t1', 't2', 't3', 't4', 't5']).pipe(
+      Effect.andThen(
+        Effect.flatMap(Journal, (j) =>
+          Effect.forEach([1, 2, 3, 4, 5], (n) => j.append(`t${n}`, ev('starting', `2026-01-01T00:00:0${n}Z`)), { discard: true }),
+        ),
+      ),
     ),
   );
 
@@ -105,14 +122,14 @@ test('an old cursor replays everything since — it never expires', async () => 
     dir,
     Effect.flatMap(Journal, (j) => j.feed(0)),
   );
-  assert.equal(all.entries.length, 5, 'a consumer away for a week replays rather than starting over');
+  assert.equal(all.entries.length, 10, 'a consumer away for a week replays rather than starting over');
 });
 
 test('a half-written trailing line is never handed to a consumer', async () => {
   const dir = root();
   await run(
     dir,
-    Effect.flatMap(Journal, (j) => j.append('t1', ev('starting', '2026-01-01T00:00:00Z'))),
+    fileEach(['t1']).pipe(Effect.andThen(Effect.flatMap(Journal, (j) => j.append('t1', ev('starting', '2026-01-01T00:00:00Z'))))),
   );
   fs.appendFileSync(path.join(dir, 'feed.jsonl'), '{"taskId":"t2","eve');
 
@@ -122,7 +139,7 @@ test('a half-written trailing line is never handed to a consumer', async () => {
   );
   assert.deepEqual(
     got.entries.map((e) => e.taskId),
-    ['t1'],
+    ['t1', 't1'],
     'the partial line is not parsed',
   );
 
@@ -719,12 +736,15 @@ test('the stored schema names every field of every event, of the harness argumen
   assert.equal(none, true);
 });
 
-/** One `filesOps` over a fresh directory, a task journal of three events in it, and what its reads cost (`ioCounts` deltas). */
+/**
+ * One `filesOps` over a fresh directory, a task journal of three events in it, filed first, and what its reads cost (`ioCounts`
+ * deltas).
+ */
 const cursorStore = async () => {
   const dir = root();
   const ops = Journal.filesOps(dir);
-  for (const at of ['2026-01-01T00:00:00Z', '2026-01-01T00:00:01Z', '2026-01-01T00:00:02Z'])
-    await Effect.runPromise(ops.append('t1', ev('starting', at)));
+  await Effect.runPromise(ops.append('t1', filedAt('2026-01-01T00:00:00Z')));
+  for (const at of ['2026-01-01T00:00:01Z', '2026-01-01T00:00:02Z']) await Effect.runPromise(ops.append('t1', ev('starting', at)));
   const file = path.join(dir, 'tasks', 't1.jsonl');
   const cost = async () => {
     const before = ioCounts();
@@ -819,6 +839,6 @@ test('a last line cut short fails the read as it always has, and once completed 
   assert.equal(after.bytes, fs.statSync(file).size - size, 'the cut line and its end, never what came before it');
   assert.deepEqual(
     after.entries.map((e) => (e as Event).kind),
-    ['starting', 'starting', 'starting', 'spawned'],
+    ['filed', 'starting', 'starting', 'spawned'],
   );
 });

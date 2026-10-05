@@ -1,5 +1,5 @@
 /**
- * What the runtime's own reads and spawns have cost this process, as running totals: bytes read, read calls, and processes
+ * What the runtime's own reads, writes and spawns have cost this process, as running totals: bytes read, read calls, and processes
  * started. A fact the runtime reports (`Engine.io()`), never one it decides on: nothing in `decide` or the loop reads it.
  *
  * Counted where the runtime reads a file or starts a process through its own code — a journal, the feed, a detached run's
@@ -9,10 +9,14 @@
  */
 import fs from 'node:fs';
 
-/** The running totals: bytes read and read calls through the runtime's readers, and processes it started. */
-export type IoCounts = { bytesRead: number; reads: number; spawned: number };
+/**
+ * The running totals: bytes read and read calls through the runtime's readers, and processes it started; the store's writes to a
+ * journal or the feed (`writes`, an append or a rename each), the times it took the feed's lock (`locks`) and the milliseconds it
+ * waited for it (`lockWaitMs`).
+ */
+export type IoCounts = { bytesRead: number; reads: number; spawned: number; writes: number; locks: number; lockWaitMs: number };
 
-const counts: IoCounts = { bytesRead: 0, reads: 0, spawned: 0 };
+const counts: IoCounts = { bytesRead: 0, reads: 0, spawned: 0, writes: 0, locks: 0, lockWaitMs: 0 };
 
 /** The totals as they stand: a copy, so a caller can take a difference. */
 export const ioCounts = (): IoCounts => ({ ...counts });
@@ -21,6 +25,17 @@ export const ioCounts = (): IoCounts => ({ ...counts });
 export const countRead = (bytes: number): void => {
   counts.reads++;
   counts.bytesRead += bytes;
+};
+
+/** One write of the store's to a journal or the feed: an append, or a rename into place. */
+export const countWrite = (): void => {
+  counts.writes++;
+};
+
+/** The feed's lock taken once, after `waitedMs` milliseconds of waiting for it. */
+export const countLock = (waitedMs: number): void => {
+  counts.locks++;
+  counts.lockWaitMs += waitedMs;
 };
 
 /** One process started. */

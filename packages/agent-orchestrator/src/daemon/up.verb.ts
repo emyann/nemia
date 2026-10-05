@@ -12,6 +12,7 @@ import { heldLines, pausedWords, RESUMED } from '../pause/pause.ts';
 import { refusalLines, tickRun, type Pass } from '../tick/tick.verb.ts';
 import { beat, heldUrl, passed, releaseStore, stillHeld, takeStore, type TakenStore } from './daemon.store.ts';
 import { takenFromLine, type HolderKind } from './daemon.ts';
+import { deliver } from '../subscription/deliver.verb.ts';
 
 /**
  * What `up` runs with: its interval, `every` ms; the repository a queued card that names none starts on, and the folder the lease names
@@ -158,7 +159,8 @@ export const logPass = Effect.fn('logPass')(function* (pass: Pass, was: UpSaid) 
  * interval, each written down (`passed`) and logged (`logPass`), through whatever logger the process provides. It beats on a fiber forked
  * in the scope, so a long pass is not taken for stalled and taken over mid-pass, and it fails at the first pass that finds the store taken
  * over (`stillHeld`, `takenFromLine`). On another fiber in the scope it asks each harness for its quota, at once and every
- * `QUOTA_EVERY_MS` (`askedQuota`), and hands each pass the latest reading, which the pass keeps among the recent and so in the series.
+ * `QUOTA_EVERY_MS` (`askedQuota`), and hands each pass the latest reading, which the pass keeps among the recent and so in the series. On
+ * a third it delivers the store's subscriptions to the feed (`deliver`).
  */
 export const up = (e: Engine, { every, repo, holder, onTaken }: UpOptions): Effect.Effect<never, unknown, Scope.Scope> =>
   Effect.gen(function* () {
@@ -176,6 +178,7 @@ export const up = (e: Engine, { every, repo, holder, onTaken }: UpOptions): Effe
         ),
       ),
     );
+    yield* Effect.forkScoped(over(e)(deliver()));
     if (onTaken) yield* onTaken(taken);
     let said = NOTHING_SAID;
     for (;;) {

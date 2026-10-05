@@ -29,6 +29,9 @@ import { type Named, type RouteWords, WORDS } from './words.ts';
 const valueSchema = (kind: Positional['kind'] | Flag['kind']): Schema.Decoder<unknown> =>
   kind === 'name' ? NotBlank : kind === 'amount' ? Schema.Number : kind === 'switch' ? Schema.Boolean : Schema.String;
 
+/** The schema of a flag's value in a body: a list of its values where the flag is given many times. */
+const flagSchema = (flag: Flag): Schema.Decoder<unknown> => (flag.many ? Schema.Array(valueSchema(flag.kind)) : valueSchema(flag.kind));
+
 /** The arguments a route fixes (`sets`), whatever a request says: none on a read. */
 const fixedOf = (route: Route): Readonly<Record<string, string | boolean>> => ('sets' in route ? (route.sets ?? {}) : {});
 
@@ -36,8 +39,8 @@ const fixedOf = (route: Route): Readonly<Record<string, string | boolean>> => ('
  * The body a command takes on its route, derived from its spec: each positional its path does not name, required unless it is optional,
  * and a list, optional, where it takes many;
  * each key a flag sets, required, as one of the values its flags set it to — a body says its way, and takes no default; each flag's value,
- * optional, a switch's as true or false, but a flag the CLI alone takes, and one the api alone takes required where it says so; and the
- * keys its extension takes (extend.ts), optional. A key its route fixes (`sets`) is none of the body's.
+ * optional, a switch's as true or false, one given many times as a list, but a flag the CLI alone takes, and one the api alone takes
+ * required where it says so; and the keys its extension takes (extend.ts), optional. A key its route fixes (`sets`) is none of the body's.
  */
 export function bodySchema(command: CommandSpec, inPath: readonly string[], route: Route) {
   const fields: Record<string, Schema.Decoder<unknown>> = {};
@@ -54,7 +57,7 @@ export function bodySchema(command: CommandSpec, inPath: readonly string[], rout
     set.set(key, [...new Set([...(set.get(key) ?? []), value])]);
   for (const [key, values] of set) fields[key] = Schema.Literals(values);
   for (const f of command.spec.flags.filter((f) => f.key !== undefined && f.only?.side !== 'cli'))
-    fields[f.key!] = f.only?.required ? valueSchema(f.kind) : Schema.optionalKey(valueSchema(f.kind));
+    fields[f.key!] = f.only?.required ? flagSchema(f) : Schema.optionalKey(flagSchema(f));
   for (const key of command.apiTakes ?? []) {
     const takes = EXTENSIONS[command.name]?.takes[key];
     if (takes) fields[key] = Schema.optionalKey(takes);
@@ -114,7 +117,7 @@ async function jsonOf(c: Context<ApiEnv>, name: string, words: RouteWords, at: N
   }
 }
 
-/** The body's values that are arguments, and those under the keys the command takes on the api alone. */
+/** The body's values that are arguments, a list of words among them, and those under the keys the command takes on the api alone. */
 function split(command: CommandSpec, body: Readonly<Record<string, unknown>>) {
   const own = new Set(command.apiTakes);
   const args: Record<string, string | number | boolean | readonly string[]> = {};
@@ -301,6 +304,13 @@ export const wordBreaks = (table: readonly Pick<CommandSpec, 'name' | 'route'>[]
  *   skipped }`.
  * - `DELETE /api/pause` — the store's pause lifted, as `nemia resume` lifts it (`resumePause`); it reads no body. None standing is a 404
  *   (`Missing`). Its 200 is `{ pause }`, the pause lifted.
+ * - `POST /api/subscriptions/:name` — a long-lived task given a subscription to the feed, as `nemia subscribe <name> <task>` gives it
+ *   (`subscribe`), its body `{ task, wake?, digestEvery? }`, `wake` a list as `--wake` given many times: the daemon's deliverer says the
+ *   feed to the task from the feed's end. A name that names no file is a 400 before the body is read; a task never filed on the store's
+ *   engine is a 404 (`Missing`), one not long-lived, an empty wake word or minutes not above zero a 422, and a name taken a 409
+ *   (`Conflict`). Its 201 is `{ name, subscription }`, as written.
+ * - `DELETE /api/subscriptions/:name` — a subscription taken away, as `nemia unsubscribe <name>` takes it (`dropSubscription`), and where
+ *   its deliverer was with it; it reads no body. None by that name is a 404 (`Missing`). Its 200 is `{ name }`.
  * - `DELETE /api/runs/:id` — a try's run removed, as `nemia rm <run>` removes it (`forgetRun`): its record, and the folders it worked in
  *   with it; it reads no body. Only a try (rm's extension, extend.ts): any other run is a 409 naming `nemia rm`, which says what it hands
  *   off and what it leaves, and a git run's worktrees and branches are a person's to read before they go. What removed nothing is thrown in

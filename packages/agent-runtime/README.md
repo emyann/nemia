@@ -1986,13 +1986,15 @@ of pure code sits beside it.
 | `src/core/engine/counted.ts` | what a long-lived attempt in flight has consumed so far, journalled as it grows (`counted`), off the pass's sighting |
 | `src/core/engine/filing.ts` | filing a task, admitting, stopping, answering and closing it, each with what it refuses (`refusalOf`): a fact journalled for the pass to act on |
 | `src/core/engine/journal.ts` | append-only JSONL per task, plus the board-wide feed; `upgrade`, which reads a line written before an event's shape changed in today's, whoever's store it is — nothing on disk is rewritten |
+| `src/core/engine/feed.ts` | the files store's feed: read from a cursor that keeps its place for ever (`readFeed`), rotated so a forgotten task's lines go (`rotateFeed`: a head with its first cursor, `feed.jsonl`, and the lines before it kept in `feed.sealed.jsonl`), and every append and rotation one at a time under `feed.lock` (`withFeedLock`, `FEED_LOCK_WAIT_MS`) |
 | `src/core/engine/bodies.ts` | a journal's long texts kept once, as bodies named by the sha256 of their text (`BodyOps`, `<root>/bodies/<ref>`): an entry cut into its stored shape (`split`), read back whole and checked against its name (`resolver`), and the references an entry holds (`refsOf`) |
 | `src/core/engine/sweep.ts` | removing a body nothing names, the one way a body goes (`sweep`, `removeBody`): every journal and the feed read for its references, a day's grace for a put whose line is on its way |
 | `src/core/engine/memo.ts` | the settled tasks an engine's passes may skip until the feed names them, and the cursor into the feed: a cache of `fold`, rebuilt by a fresh engine, never written down |
 | `src/core/engine/now.ts` | now on both clocks (`instantNow`): `Date.now()`, and `process.hrtime` under the boot's id read from `/proc/sys/kernel/random/boot_id`, with no monotonic reading where there is none |
 | `src/core/engine/tally.ts` | what the runtime's own reads and spawns have cost the process, as running totals (`Engine.io()`): a thin wrapper around its readers and `sh`, not a syscall tracer |
 | `src/core/engine/index.ts` | the face of `core/engine/`: the engine's verbs, journal, memo and tally, as the face takes them |
-| `src/harness/seam.ts` | the compute seam — `spawn`/`observe`/`stop`/`logs`, and the optional `find`, `release`, `transcript` and `say` — the `Runner` service, the free harness `testOps`, and `composite`: dispatch by harness, merge what they all see |
+| `src/harness/seam.ts` | the compute seam — `spawn`/`observe`/`stop`/`logs`, and the optional `find`, `release`, `transcript`, `say` and `forget` — the `Runner` service, the free harness `testOps`, and `composite`: dispatch by harness, merge what they all see |
+| `src/harness/forget.ts` | what every harness's `forget` shares (`forgetFiles`): the files it keeps of a session, removed or, dry, listed, and what it leaves that is not its own |
 | `src/harness/error.ts` | `RunnerError`, beneath the seam and Claude Code's `--bg` runner: `Runner.claude` needs `claudeOps` as a value, and `claudeOps` builds `RunnerError`, so neither file imports the other for it |
 | `src/harness/args.ts` | a task's harness arguments, `HarnessArgs`: the adapter's configuration, carried as one `config`, and the checks every harness shares of it (`argsRefusalOf`), asked through every `Runner` |
 | `src/harness/reach.ts` | what a harness's fence words reach, `fenceReach`: each word's rank, the one a task naming none runs in, the held and unasking modes, and the modes Claude Code drops on a model |
@@ -2023,14 +2025,16 @@ of pure code sits beside it.
 | `src/harness/detached/output.ts` | what a detached session's output says: `claude -p`'s result and stream, read for closeout, usage, cost, a spent budget and denials, and the stream for the skills loaded and the files touched |
 | `src/harness/detached/said.ts` | what was read of a finished run's output, kept beside its log keyed by the log's size and mtime and the readers' version — or a former one they only added fields to (`SAID_EXTENDED`) — so each process reads a log once per change of it |
 | `src/a2a/map.ts` | the runtime's words in A2A's and back, pure: a session is a Task named for it, a spawn a user Message marked with the runtime's extension and `config` in its metadata, words said to a session a follow-up on its Task, a sighting or a journalled attempt a Task, its context the harness's id for the conversation and its closeout its one Artifact |
-| `src/a2a/handler.ts` | one harness as an A2A agent: the SDK's `A2ARequestHandler` over its driver, and the runtime extension's `findSession`, `sessionLogs` and `releaseSession`, holding nothing — every answer read afresh off the harness and the journal |
+| `src/a2a/handler.ts` | one harness as an A2A agent: the SDK's `A2ARequestHandler` over its driver, and the runtime extension's methods (`SESSION_METHODS`), `forgetSession` among them, holding nothing — every answer read afresh off the harness and the journal |
 | `src/a2a/client.ts` | the engine's side of that seam: an in-process `Transport` to the handler, and a harness's verbs as calls through the SDK's `Client` and the extension's methods, as its card offers them; `transcript` and `refuses` passed through |
 | `src/a2a/card.ts` | a remote agent's card as it enters, served or configured: `CardSchema` decodes what the runtime reads of it before the SDK's parser, a card that does not decode is refused naming its first wrong field, and a configuration is judged (`remoteConfigRefusal`) |
 | `src/a2a/remote.ts` | a remote A2A agent as a harness: its card read and the binding chosen, auth as the card declares it, the registry under `remote/` (the intent before the send, the Task on its answer, never a second send), and the verbs as SendMessage, GetTask and CancelTask |
+| `src/a2a/entry.ts` | the remote harness's registry entry: its shape, an older one read in today's words, its file under `remote/`, and the remote `forget`, which removes the entry and names the Task the agent keeps (`forgetEntryOf`) |
 | `src/a2a/sending.ts` | a send under way: its lease (`sendHeld`), `SEND_MS` on the monotonic clock from its stamp within a boot and on the wall clock from `sentAt` otherwise, and whether the process making it lives |
 | `src/a2a/said.ts` | the remote harness's own words told from another party's: the errors it throws in its own words, the A2A errors that refuse a send, and any other error's words quoted to 200 characters (`wordsOf`) |
 | `src/a2a/index.ts` | the face of `a2a/`, as the face takes it: it imports no name of the SDK's |
 | `src/service/engine.ts` | the engine as an Effect service, `Engine`: `Engine.layer(options)` assembles each harness behind its A2A agent, the store and the memo, and its verbs are Effects that fail with tagged errors (`ListRefused`, `TranscriptRefused`, `SayRefused`, `SayUnsent`, and the core's) |
+| `src/service/forget.ts` | the engine's `forget` verb, `forgetVerbOf`, and `ForgetRefused`: every guard asked of every id first, then each session's files through its harness, the feed's lines and the journal; without `yes`, a count (`ForgetReport`) |
 | `src/service/bodies.ts` | the engine's verbs over the store's bodies, `sweep` and `removeBody`, behind a refusal of an argument they do not take (`BodyRefused`) |
 | `src/service/watch.ts` | the engine's `watch`, on its `feed`: each entry in order, at least once, drained on the store's push and on a timer |
 | `src/service/options.ts` | what `Engine.layer` is built from and answers with — `HarnessConfig`, `Pooled`, `EngineOptions`, `TaskSpec`, `TickReport`, `EngineIo` — and what the engine refuses of its options before it builds anything (`optionsRefusalOf`) |
@@ -2055,6 +2059,8 @@ of pure code sits beside it.
 | `test/io.test.ts` | what a pass costs as the runtime reports it: a tick's `ms` and each harness's observes, and `io()`'s bytes read and processes started |
 | `test/engine-verbs.test.ts` | the engine's verbs as a caller of `agent-runtime` drives them, over a store and a harness of its own (`test/promise-runner.ts`), and every refusal at `file()` at shipped defaults; the engine refusing `maxConcurrent` and a harness's `pool`, and `tick()` refusing an argument |
 | `test/verb-refusals.test.ts` | the `Engine` service's verbs, pinned (`VERBS`): each verb's answer, the same from an engine built once and one provided per call, and each refusal a tagged error that `refusalWords` words as `verb: …` with exit code 2 |
+| `test/forget.test.ts` | forgetting settled tasks on the files store: the count and the removal, each guard made to refuse with nothing removed, a forget cut short finished, an append to a forgotten task refused, another engine's pass, `sweep` after it, a detached run's files, and `ae forget` and `ae feed` |
+| `test/feed-rotation.test.ts` | the feed rotated under its lock: readers parked before it read on, the forgotten counted; a feed with no header; a rotation stopped between its renames, and two racing; a stopped holder failing an append after `FEED_LOCK_WAIT_MS`, a dead one broken; a stopped writer keeping a rotation out; and what an append counts |
 | `test/release.test.ts` | letting a finished Claude Code session go, and reading what it cost once stopped, at shipped defaults — a fake `claude` that keeps a registry and writes a `cost-state` as it stops a session |
 | `test/budget.test.ts` | a spend cap, at shipped defaults — fake `claude`s: a `claude -p` that stops at its cap ends its attempt `failed` with `limit: 'budget'` and settles its task as any failure, the note naming no budget; the flag reaches both Claude runners on every attempt |
 | `test/admit.test.ts` | queued and admitted: the wait, the word, the pass after it, the pre-4c reading, `admit`'s refusals at shipped defaults, and a count proving the word asks no harness |
@@ -2105,6 +2111,7 @@ node bin/ae.ts say <id> "…"      # tell its running session something; journal
 node bin/ae.ts admit <id>        # let a task filed queued start, on the next pass
 node bin/ae.ts stop <id>
 node bin/ae.ts sweep            # count the bodies no journal names; --yes removes them
+node bin/ae.ts forget <id>       # count what a settled task keeps; --yes removes it
 ```
 
 ```bash
@@ -2133,8 +2140,14 @@ const next = Effect.gen(function* () {
 const cursor = await Effect.runPromise(next.pipe(Effect.provide(Engine.layer())))
 ```
 
-The cursor is a byte offset into `feed.jsonl` and never expires: a consumer that was away for a
-week replays rather than being told to start over.
+The cursor is a byte offset into the feed as it was ever written, and never expires: a consumer that was away for a
+week replays rather than being told to start over. A forget rotates the feed (`src/core/engine/feed.ts`): `feed.jsonl`
+starts with a header naming the cursor its first line is at, the lines before it move to `feed.sealed.jsonl`, and a
+forgotten task's lines leave both. A reader at any cursor ever handed out gets what is still there, in order and never a
+line twice, and `forgotten`, how many lines after its cursor went; `ae feed` prints it as "N lines of forgotten tasks
+were here, after cursor C". Every append and every rotation takes `feed.lock` (`FEED_LOCK_WAIT_MS`, then it fails naming
+the process that holds it, and a holder that died is broken): `io()` counts the store's `writes`, its `locks` and the
+milliseconds it waited (`lockWaitMs`).
 
 `AE_ROOT` points at a different board, the way a kubeconfig points at a different cluster. With it unset the board is
 `~/.agent-engine`, which keeps the package's former name on purpose: the package became `agent-runtime` on 2026-09-23,
@@ -2166,9 +2179,25 @@ key; a line written before bodies reads as it always did, and a store that keeps
 with `bodies: false`) appends whole events as before.
 
 A body goes only through `ae sweep --yes` (`Engine.sweep({ yes: true })`, or `removeBody` for one), which reads every journal and
-the feed from its start first and keeps a body any of them names, or one put in the last day. Removing a task's journal by hand
-leaves its bodies for the next sweep; removing a body by hand makes every task that names it unreadable, its read failing with a
+the feed from its start first and keeps a body any of them names, or one put in the last day. A task forgotten
+(*Forgetting a settled task*, below) leaves its bodies for the next sweep, which keeps any another task still names; removing a body by hand makes every task that names it unreadable, its read failing with a
 `JournalError` that names the body's path: restore it from a backup.
+
+### Forgetting a settled task: `forget`
+
+A settled task's journal, the files its harness keeps of each session and its lines in the feed go only through
+`ae forget <id>... [--yes]` (`Engine.forget(ids, { yes: true })`, `src/service/forget.ts`). Without `--yes` it counts, per
+task: its journal's bytes, its lines in the feed, each session's files, and what its harness keeps that is not the
+runtime's to remove (a conversation Claude Code or Codex keeps, the Task a remote agent keeps), named. With it, each
+session's files go through its harness (`RunnerOps.forget`, `forgetSession` across the A2A seam), then the feed's lines and
+the journal in one call to the store (`JournalOps.forget`), the journal last, so a forget cut short is finished by asking
+again. An append to a forgotten task, but a new filing, is refused: nothing writes to it again.
+
+Every guard is asked of every id before anything is removed, and a refusal (`ForgetRefused`, exit 2) ends "nothing was
+forgotten": an id the store does not list; a journal that cannot be read; a task not settled (stop it, let it settle,
+then forget it); a task filed on a harness the engine does not have, whose files could not be found; and a session its
+harness still holds — at work, or its process kept (`held`) — or could not be read for. A session listed ended and let go
+is no refusal: the pass lets a finished session go first. A store with no `forget` refuses too.
 
 ### `tick` and `up`, and why both
 

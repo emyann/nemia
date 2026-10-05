@@ -111,6 +111,7 @@ const VERBS = [
   'close',
   'feed',
   'file',
+  'forget',
   'io',
   'list',
   'logs',
@@ -365,6 +366,31 @@ test('each refusal is a tagged error, and refusalWords words it behind the verb,
       /^takes nothing to count the bodies no journal names, or `\{ yes: true \}` to remove them; it was handed \{"yes":"please"\}\.$/,
     ],
     ['quota', 'QuotaRefused', () => effect((e) => e.quota('fake')), /^the `fake` harness reports no quota\. Ask one that does: claude\.$/],
+    [
+      'forget',
+      'ForgetRefused',
+      () => effect((e) => untyped(e.forget)('one')),
+      /^takes the ids of settled tasks, a list of one or more strings/,
+    ],
+    ...[[[]], [['one'], { yes: 'y' }], [['one'], { yes: true, all: true }]].map(
+      (args): [string, string, () => Promise<unknown>, RegExp] => [
+        'forget',
+        'ForgetRefused',
+        () => effect((e) => untyped(e.forget)(...args)),
+        new RegExp(
+          `it was handed ${args
+            .map((a) => JSON.stringify(a))
+            .join(', ')
+            .replace(/[[\]{}]/g, '\\$&')}: nothing was forgotten\\.$`,
+        ),
+      ],
+    ),
+    [
+      'forget',
+      'ForgetRefused',
+      () => effect((e) => e.forget(['one'])),
+      /^this store keeps no way to forget a task: nothing was forgotten\.$/,
+    ],
   ];
   for (const [verb, tag, refused, words] of cases) {
     const tagged = await failure(refused());

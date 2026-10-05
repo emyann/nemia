@@ -1,11 +1,12 @@
 # packages/agent-runtime — `ae`
 
-Agent sessions on one harness each, durably: a job that runs to its end, and a long-lived session that runs until stopped (not built
-yet). It owns how a session runs: the task's command, mounts, restart and spend, the journal, the attempts, the harnesses' vocabulary.
-`decide` (`src/core/domain.ts`) is the whole judgement, pure (`test/engine.test.ts`); `src/index.ts` and `src/vocabulary.ts` are the
-only doors (`test/contract.test.ts`); the second, the harnesses' words, `HARNESS_CHOICES`, `fenceReach` and `configFolderIn`, loads no
-Effect and no I/O (`test/vocabulary-door.test.ts`). The orchestrator reaches it through its one client; what is still above it and a
-candidate to come down is in `docs/architecture.md`, *Who owns what*.
+Agent sessions on one harness each, durably: a job that runs to its end, and a long-lived session that runs until stopped
+(`restartPolicy: 'Always'` with `background: true`, README *A long-lived session*). It owns how a session runs: the task's command,
+mounts, restart and spend, the journal, the attempts, the harnesses' vocabulary. `decide` (`src/core/domain.ts`) is the whole judgement,
+pure (`test/engine.test.ts`); `src/index.ts` and `src/vocabulary.ts` are the only doors (`test/contract.test.ts`); the second, the
+harnesses' words, `HARNESS_CHOICES`, `fenceReach` and `configFolderIn`, loads no Effect and no I/O (`test/vocabulary-door.test.ts`). The
+orchestrator reaches it through its one client; what is still above it and a candidate to come down is in `docs/architecture.md`, *Who
+owns what*.
 
 ## Layout
 
@@ -75,6 +76,8 @@ candidate to come down is in `docs/architecture.md`, *Who owns what*.
 - **A long text of a line is a body named by its sha256, resolved on every read** (`core/engine/bodies.ts`): its field takes the
   place of the one it stands for (`STANDS_FOR`), so a read gives the event key for key; a body goes only through `sweep` or
   `removeBody`, which read every journal and the feed first (`src/core/engine/bodies.test.ts`, `test/verb-refusals.test.ts`).
+- **Every feed write goes through `filesOps.append` under `feed.lock`** (`withFeedLock`), a rotation too; a rotated feed has a header
+  and a sealed file (`core/engine/feed.ts`): read it through `readFeed`, never as plain lines from byte 0.
 - **A `claude agents --json` row of ours is decoded by `RegistryRowSchema` (`harness/claude/registry.ts`)**: one that does not decode
   fails the whole read, so every background session is unread, never absent. A field the runtime starts reading is added to the schema;
   a row not ours (no `ae/` name, no `state`) is skipped undecoded.

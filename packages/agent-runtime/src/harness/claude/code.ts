@@ -212,6 +212,8 @@ export const isClaudeJob = (sessionId: string) => nameParts(sessionId) !== undef
  * - `say` sends a job's words to its inbox, which its worker writes on to its stdin, and a background session's to Claude
  *   Code's inbox.
  * - `quota` asks the `claude` on PATH for the plan's usage (`claudeQuota`), whichever mode the sessions run in.
+ * - `forget` removes what either mode keeps under the session's name, since a name the engine gave does not say which mode
+ *   ran it, and names the transcript once.
  */
 export const claudeCodeOps = (options: ClaudeOptions = {}): RunnerOps => {
   const root = options.root ?? path.join(os.homedir(), '.agent-engine');
@@ -275,5 +277,13 @@ export const claudeCodeOps = (options: ClaudeOptions = {}): RunnerOps => {
     say: (session, text) => of(session.sessionId).say!(session, text),
 
     quota: claudeQuota(),
+
+    forget: (session, options) =>
+      Effect.all([job.forget!(session, options), bg.forget!(session, options)]).pipe(
+        Effect.map(([jobs, sessions]) => ({
+          files: [...jobs.files, ...sessions.files],
+          left: [...new Set([...jobs.left, ...sessions.left])],
+        })),
+      ),
   };
 };

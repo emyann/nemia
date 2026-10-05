@@ -34,7 +34,7 @@ export const RUNTIME_EXTENSION = 'urn:agent-runtime:session:v1';
  * journal expects. Each keeps its own key — a name, a session id, the sighting — since none of them is a Task's to answer: a
  * transcript is a history read with a cursor, of a session that may have ended, where A2A's `SubscribeToTask` is a live stream
  * refused on a Task in a terminal state. One is no session's at all: `harnessQuota`, what the harness's subscription has left,
- * asked of the harness itself.
+ * asked of the harness itself. `forgetSession` removes what the harness keeps of a settled session, or, dry, lists it.
  */
 export const SESSION_METHODS = [
   'findSession',
@@ -44,6 +44,7 @@ export const SESSION_METHODS = [
   'sessionTranscript',
   'observeSessions',
   'harnessQuota',
+  'forgetSession',
 ] as const;
 export type SessionMethod = (typeof SESSION_METHODS)[number];
 

@@ -8,7 +8,7 @@ broken. This page says what the tests hold; the tests are the rules.
 
 | Layer | Owns | Public contract |
 |---|---|---|
-| `packages/agent-runtime` | Agent sessions on a harness, durably: a job that runs to its end, and (not built yet) a long-lived session that runs until stopped. How a session runs: its command, mounts, restart and spend, the journal, the attempts, the harnesses' vocabulary. The `ae` command. | `agent-runtime` → `src/index.ts`, the runtime in Effect. `agent-runtime/vocabulary` → `src/vocabulary.ts`, the harnesses' words, what their fence words reach (`fenceReach`) and the folders a harness reads as its own configuration in a mounted folder (`configFolderIn`), pure. `decide` is exported by none. |
+| `packages/agent-runtime` | Agent sessions on a harness, durably: a job that runs to its end, and a long-lived session that runs until stopped (`restartPolicy: 'Always'` with `background: true`, the runtime's README, *A long-lived session*). How a session runs: its command, mounts, restart and spend, the journal, the attempts, the harnesses' vocabulary. The `ae` command. | `agent-runtime` → `src/index.ts`, the runtime in Effect. `agent-runtime/vocabulary` → `src/vocabulary.ts`, the harnesses' words, what their fence words reach (`fenceReach`) and the folders a harness reads as its own configuration in a mounted folder (`configFolderIn`), pure. `decide` is exported by none. |
 | `packages/agent-orchestrator` | A folder of markdown as a workflow, and a run of its steps: which task to file next, what a person must decide, what the run's record says. The `wf` command, to become `nemia`. | `agent-orchestrator` → `src/runner.ts`: the controllers, everything that reads or writes the disk, and the refusals by kind, `Missing`, `Conflict` and `Invalid`, re-exported by name. `agent-orchestrator/run` → `src/run.ts`: `assess` (`src/tick/assess.ts`), and the words a run is described in, re-exported by name. `agent-orchestrator/workflow` → `src/workflow.ts`: the format, pure. |
 | `apps/api` | The workflows behind HTTP, and the feed as a stream, read through the orchestrator's live reader (`followFeed`) on the hub its daemon publishes to. | Its routes. |
 | `apps/web` | The board people look at. It talks to the api over HTTP, decodes each answer it reads with a schema of its own (`effect`), imports none of our packages, names no store path, and builds no command of its own: a command or a store folder it shows is text the api answered (`STORE_PATHS` and `COMMAND_TEXT` in `apps/web/test/structure.test.ts`, both empty). | Its pages. |
@@ -56,6 +56,8 @@ next pass. Stopping the daemon itself, beyond `wf pause`, is a verb on this leas
 **A journal's bodies** are the runtime's storage: each long text of a line kept once, under the sha256 of its text, resolved on every
 read and removed only by `sweep` (`agent-runtime/src/core/engine/bodies.ts`, `ae sweep`). Where a brief is cut is the orchestrator's
 (`briefParts`, `src/brief/parts.ts`), filed beside the whole brief as a hint the runtime refuses unless the parts join into it.
+A task's journal, its session files and its feed lines are removed only by `forget` (`agent-runtime/src/service/forget.ts`,
+`ae forget`), and only of a settled task; a body still only by `sweep`.
 
 **Logs and traces**: each layer logs and spans in its own words — the runtime its task, kind and attempt (`appendFields` in
 `agent-runtime/src/core/engine/journal.ts`), the orchestrator its run and step (`advancePass`, `forStep`) — and the process chooses the
@@ -67,6 +69,14 @@ logs it at Info with its run, step and word, and publishes it to the process's h
 `feedHubLayer`). A live reader in that process, `followFeed`, takes the hub's items and reads from the file what none brought — a line
 the hub dropped, or one another process wrote — on a beat that stats the file: the api's `GET /api/feed/stream`, on the hub its daemon
 publishes to. A reader in another process, `nemia watch`, watches the file (`watchFeed`).
+
+**Subscriptions** are the feed said to a long-lived task: `nemia subscribe <name> <task>` (`src/subscription/subscription.verb.ts`, also
+`POST /api/subscriptions/:name`) puts a file under `$WF_ROOT/subscriptions/`, the person's, and the daemon's deliverer (`deliver` in
+`src/subscription/deliver.verb.ts`, forked by `up`) follows the feed for each, writing where it is beside it (`<name>.state.json`, its
+one writer, stamped with the subscription it is for). A line holding a wake word is said to the task at once through the runtime's
+`say`, the routine lines before it riding it as a digest; with no wake, the digest is said after `digestEvery` minutes. The cursor moves
+only once `say` resolved, so a line is told at least once, to the harness's inbox: whether the session reads it is the runtime's
+(`agent-runtime/docs/open-issues.md`, #12, #14–#16).
 
 **In the orchestrator today, a candidate for the runtime**:
 
@@ -146,11 +156,11 @@ A file at the top of `src/` is named in `PURE`, `STORE`, `CONTROLLER` or `CLIENT
   node:net or node:os, reads neither `process.env` nor `fetch`, and imports no file of the other kinds: radius, rendering,
   retry, run and workflow at the top, and the folders' own — agents, artifacts, branches, cap,
   check, closeout, daemon, ending, feed, folder, former, gate, harness, inbox, keys, merge, meter, plan, prune, record, refusal,
-  rest, say, series, skills, status, step, timeline, views, wait, workflow, workspace.
+  rest, say, series, skills, status, step, subscription, timeline, views, wait, workflow, workspace.
 - **store** is the I/O beneath the controllers. It imports no agent-runtime, never a controller and not the client:
   branches and artifacts at the top, and record.store, folder.store, write.store, worktree.store, agents.store,
-  skills.store, plan.store, daemon.store, feed.store, inbox.store, tally.store, places.store, config.store, series.store and
-  a2a.store in the folders. They load as a tree. At the bottom are record/places.store.ts, folder/folder.store.ts, meter/tally.store.ts
+  skills.store, plan.store, daemon.store, feed.store, inbox.store, tally.store, places.store, config.store, series.store,
+  subscription.store and a2a.store in the folders. They load as a tree. At the bottom are record/places.store.ts, folder/folder.store.ts, meter/tally.store.ts
   (the pass's meter) and config/config.store.ts, which import no store file. record/record.store.ts imports only those
   four; workspace/worktree.store.ts imports only record.store.ts, places.store.ts and tally.store.ts; folder/write.store.ts
   imports only record.store.ts and folder.store.ts. Any other store file imports only these, and none imports it.

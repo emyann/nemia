@@ -5,6 +5,7 @@
 export { HARNESS_ARGS, TURN_ARGS, argsRefusalOf } from './args.ts';
 export type { CodexArgs, HarnessArgs } from './args.ts';
 export type { Mount } from './mounts.ts';
+export { forgetFiles } from './forget.ts';
 export { sdkRunner } from './sdk.ts';
 export { Runner, RunnerError, composite, testOps } from './seam.ts';
 export type {
@@ -14,6 +15,7 @@ export type {
   Observation,
   QuotaLimit,
   RunnerOps,
+  SessionForgotten,
   SpawnRequest,
   Transcript,
   TranscriptCursor,

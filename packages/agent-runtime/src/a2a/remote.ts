@@ -55,11 +55,11 @@ import { TaskNotCancelableError, TaskNotFoundError } from '@a2a-js/sdk/errors';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { firstOf, formerStateOf, isSessionState, quote, type SessionState, type Sighting, WORDS_QUOTE } from '../core/index.ts';
+import { firstOf, quote, type SessionState, type Sighting, WORDS_QUOTE } from '../core/index.ts';
 import { RunnerError, type RunnerOps, type SpawnRequest } from '../harness/index.ts';
-import type { Monotonic } from '../core/clock.ts';
 import { instantNow } from '../core/engine/now.ts';
 import { cardOfJson, SCHEME_KINDS } from './card.ts';
+import { entryFileOf, forgetEntryOf, readEntry, type Entry } from './entry.ts';
 import { logsOfTask, remoteFollowUpOf, remoteMessageOf, sightingOfTask } from './map.ts';
 import { alive, sendHeld } from './sending.ts';
 import { AuthRefused, Doubt, Late, late, messageOf, Redirected, Refusal, sendRefused, untaken, wordsOf } from './said.ts';
@@ -228,52 +228,10 @@ const servedCard = async (at: URL, response: Response): Promise<AgentCard> => {
   );
 };
 
-/** One session's entry in the registry. */
-type Entry = {
-  name: string;
-  /** The harness it was sent through: the engine's name for the agent, never its address. */
-  agent: string;
-  messageId: string;
-  contextId?: string;
-  sentAt: string;
-  /** The Task the agent made of the message, once its answer is back. */
-  taskId?: string;
-  /** How it was last seen: read when the agent cannot be asked. */
-  seen?: Sighting;
-  /** The Task has ended, and `seen` is how: read from here, with no call to the agent. */
-  ended?: true;
-  /** The agent answered with a Message, not a Task: the whole of the session, in its words. */
-  reply?: string;
-  /**
-   * The send is under way in the process `pid`, which gives it up at `until`, `mono` its start on the monotonic clock: while that
-   * process lives and the send holds its lease (`sendHeld`), the entry is a Task `submitted`. Gone once the answer, or its
-   * failure, is written.
-   */
-  sending?: { pid: number; until: string; mono?: Monotonic };
-  /** The agent refused the message after the spawn had returned: its words, the session ended `rejected`. */
-  refused?: string;
-  /** The send failed on the way, or was not answered in time: its words, the Task in doubt. */
-  doubt?: string;
-};
-
 /** What a send came to: the agent's answer, its refusal, a failure on the way, or a stop that cut it. */
 type Answer = { task: Task } | { message: Message } | { refused: string } | { failed: unknown } | { canceled: true };
 
 const TERMINAL: ReadonlySet<SessionState> = new Set(['completed', 'failed', 'canceled', 'rejected']);
-
-/**
- * An entry as this code reads it. An entry an older runtime wrote may say how it was last seen in the runtime's former
- * words — `done`, `blocked`, `stopped` — and is read in A2A's, as the Task it was seen in said them (`blocked` waiting for
- * `authentication` is `AUTH_REQUIRED`, `WAITS`). The file keeps its words until it is next written. A word neither
- * vocabulary has is `failed`, as the other drivers read one: no session the runtime can wait on.
- */
-const upgraded = (e: Entry): Entry => {
-  const seen = e.seen as (Omit<Sighting, 'state'> & { state: string }) | undefined;
-  if (!seen || isSessionState(seen.state)) return e;
-  const state =
-    seen.state === 'blocked' && seen.waitingFor === 'authentication' ? 'auth-required' : (formerStateOf(seen.state) ?? 'failed');
-  return { ...e, seen: { ...seen, state } };
-};
 
 /** The bounds of a send, and the words for a secret not given: each has its shipped default. */
 export type RemoteOptions = { sendMs?: number; spawnWaitMs?: number; missingCredential?: MissingCredential };
@@ -317,6 +275,7 @@ export type RemoteOptions = { sendMs?: number; spawnWaitMs?: number; missingCred
  *   the open registry, so no later pass asks the agent about it.
  * - `say` sends words to a Task that waits on its caller, as A2A's follow-up on it; the engine's `say` refuses them to a Task
  *   at work.
+ * - `forget` removes the session's entry, open or let go of, and names the Task the remote party keeps, which is not ours.
  */
 export const remoteOps = (
   harness: string,
@@ -335,16 +294,8 @@ export const remoteOps = (
     (inFlight.has(e.name) || (e.sending.pid !== process.pid && alive(e.sending.pid)));
   const dir = path.join(root, 'remote');
   const done = path.join(dir, 'done');
-  const fileOf = (name: string, under = dir) => path.join(under, `${encodeURIComponent(name)}.json`);
+  const fileOf = (name: string, under = dir) => entryFileOf(under, name);
 
-  const readEntry = (file: string): Entry | undefined => {
-    try {
-      return upgraded(JSON.parse(fs.readFileSync(file, 'utf8')) as Entry);
-    } catch (e) {
-      if ((e as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
-      throw e;
-    }
-  };
   const write = (e: Entry, under = dir) => {
     fs.mkdirSync(under, { recursive: true });
     const tmp = `${fileOf(e.name, under)}.${process.pid}.${randomUUID()}.tmp`;
@@ -747,5 +698,5 @@ export const remoteOps = (
       },
     });
 
-  return { spawn, observe, find, stop, logs, release, say, refuses: remoteRefuses(harness) };
+  return { spawn, observe, find, stop, logs, release, say, forget: forgetEntryOf(harness, dir), refuses: remoteRefuses(harness) };
 };

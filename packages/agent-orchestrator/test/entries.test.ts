@@ -119,6 +119,8 @@ const PINNED: Record<string, string[]> = {
     'judgedUnlessUnreadable',
     'needsOf',
     'pauseWords',
+    'heldLines',
+    'heldWords',
     'pausedLines',
     'pausedRead',
     'pausedWords',

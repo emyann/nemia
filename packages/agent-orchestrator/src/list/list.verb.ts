@@ -39,7 +39,7 @@ import { checkoutHold } from '../ending/ending.verb.ts';
 import { landsOnCheck } from '../status/status.ts';
 import { mergeInProgress } from '../workspace/worktree.store.ts';
 import { readPause } from '../pause/pause.store.ts';
-import { currentTasks, finishingAmong, type Pause, type Paused, type PauseStaged } from '../pause/pause.ts';
+import { currentTasks, finishingAmong, type Pause, type Paused, type PauseHeld, type PauseStaged } from '../pause/pause.ts';
 
 /**
  * How a caller reads a run (`runReading`): what it already holds, and what it asks to be read. Each left out is read as `nemia ls` reads
@@ -180,19 +180,30 @@ export const runsListed = Effect.fn('runsListed')(function* (runId?: string) {
 type Read = { run: Run; read: RunReading | Unjudged };
 
 /**
- * The landings of `run` the pause holds with their merge staged: an ending that lands on its check (`landsOnCheck`), whose check the
- * pause keeps from being filed (`paused.checks`), while MERGE_HEAD is in the repository's own checkout (`mergeInProgress`).
+ * The checks of `run` the pause keeps from being filed (`paused.checks`, `assess`'s): each landing with its merge staged — an ending that
+ * lands on its check (`landsOnCheck`) while MERGE_HEAD is in the repository's own checkout (`mergeInProgress`) — and each other (`held`).
  */
-const stagedOf = ({ run, read }: Read): PauseStaged[] => {
+const heldOf = ({ run, read }: Read): Pick<Paused, 'staged' | 'held'> => {
   const checks = 'assessed' in read ? (read.assessed.paused?.checks ?? []) : [];
-  const held = stepsOf(run).filter((s) => checks.includes(s.name) && landsOnCheck(s, run));
-  return held.length && isGitRun(run) && mergeInProgress(run.repo) ? held.map((s) => ({ run: run.id, step: s.name, repo: run.repo })) : [];
+  const landings = stepsOf(run).filter((s) => checks.includes(s.name) && landsOnCheck(s, run));
+  const staged: PauseStaged[] =
+    landings.length && isGitRun(run) && mergeInProgress(run.repo)
+      ? landings.map((s) => ({ run: run.id, step: s.name, repo: run.repo }))
+      : [];
+  const held: PauseHeld[] = checks.filter((step) => !staged.some((s) => s.step === step)).map((step) => ({ run: run.id, step }));
+  return { staged, held };
+};
+
+/** The checks the pause holds among `reads` (`heldOf`): each landing with its merge staged, and each other. */
+const heldAmong = (reads: readonly Read[]): Pick<Paused, 'staged' | 'held'> => {
+  const each = reads.map(heldOf);
+  return { staged: each.flatMap((h) => h.staged), held: each.flatMap((h) => h.held) };
 };
 
 /**
  * The pause; each task still finishing under it among `runs`, over one read of every current task and check (`e.list`), never stored,
- * with the asks waiting on its run; and each landing it holds with its merge staged among the runs read. A task whose journal does not
- * read is not counted.
+ * with the asks waiting on its run; and each check it holds among the runs read (`heldAmong`), a landing with its merge staged among them.
+ * A task whose journal does not read is not counted.
  */
 const pausedOf = Effect.fnUntraced(function* (e: Engine, pause: Pause, runs: readonly Run[], reads: readonly Read[]) {
   const ids = [...new Set(runs.flatMap(currentTasks))];
@@ -205,33 +216,42 @@ const pausedOf = Effect.fnUntraced(function* (e: Engine, pause: Pause, runs: rea
       stepsOf,
       (run) => runStore.asks.read(run.id).asks,
     ),
-    staged: reads.flatMap(stagedOf),
+    ...heldAmong(reads),
   } satisfies Paused;
 });
 
 /**
  * The store's pause, as `GET /api/pause`, `nemia feed` and `nemia start` answer it: the pause or null; each task still finishing under it,
- * read on this call while a pause stands; and each landing it holds with its merge staged — read of the runs whose ending lands on its
- * check while MERGE_HEAD is in their checkout, the one landing the pause can leave staged.
+ * read on this call while a pause stands; and each check it holds, a landing with its merge staged among them — read of the runs that can
+ * hold one (`holdingReads`).
  */
 export const pausedRead = Effect.fn('pausedRead')(function* () {
   const e = yield* EngineService;
   const pause = readPause();
-  if (!pause) return { pause: null, finishing: [], staged: [] } satisfies Paused;
+  if (!pause) return { pause: null, finishing: [], staged: [], held: [] } satisfies Paused;
   const runs = runStore.runs.list();
   const viewed = viewedOnce(e);
-  return yield* pausedOf(viewed, pause, runs, yield* stagingReads(viewed, runs));
+  return yield* pausedOf(viewed, pause, runs, yield* holdingReads(viewed, runs));
 });
 
+/** Whether `run` has a step with a `check:` whose session was filed and whose check was not: one the pause can hold. */
+const checkDue = (run: Run): boolean =>
+  stepsOf(run).some((s) => s.check !== undefined && run.steps[s.name]?.taskId && !run.steps[s.name]?.check);
+
 /**
- * The readings of those of `runs` whose ending lands on its check while MERGE_HEAD is in their checkout: the runs `stagedOf` can name. A
- * run a task journal of which does not read (`unreadableJournal`) is left out, as the tick leaves it unjudged; any other failure throws.
+ * The readings of those of `runs` the pause can hold a check of (`heldOf`): each whose ending lands on its check while MERGE_HEAD is in
+ * its checkout, read as `nemia ls` reads it, and each other with a check due (`checkDue`), read without asking git where its branches
+ * stand. A run a task journal of which does not read (`unreadableJournal`) is left out, as the tick leaves it unjudged; any other failure
+ * throws.
  */
-const stagingReads = Effect.fnUntraced(function* (e: Engine, runs: readonly Run[]) {
-  const staging = runs.filter((run) => isGitRun(run) && stepsOf(run).some((s) => landsOnCheck(s, run)) && mergeInProgress(run.repo));
+const holdingReads = Effect.fnUntraced(function* (e: Engine, runs: readonly Run[]) {
+  const staging = (run: Run): boolean => isGitRun(run) && stepsOf(run).some((s) => landsOnCheck(s, run)) && mergeInProgress(run.repo);
+  const holding = runs.flatMap((run) =>
+    staging(run) ? [{ run, how: {} }] : checkDue(run) ? [{ run, how: { standings: () => [] } satisfies ReadingHow }] : [],
+  );
   const reads = yield* Effect.all(
-    staging.map((run) =>
-      Effect.exit(runReading(e, run)).pipe(
+    holding.map(({ run, how }) =>
+      Effect.exit(runReading(e, run, how)).pipe(
         Effect.flatMap((exit) => {
           if (Exit.isSuccess(exit)) return Effect.succeed<Read | undefined>({ run, read: exit.value });
           return unreadableJournal(Cause.squash(exit.cause)) === undefined ? Effect.failCause(exit.cause) : Effect.succeed(undefined);
@@ -243,8 +263,8 @@ const stagingReads = Effect.fnUntraced(function* (e: Engine, runs: readonly Run[
   return reads.filter((r) => r !== undefined);
 });
 
-/** Each landing among `runs` the pause holds with its merge staged (`stagedOf`), as the tick's pass says it under the pause. */
-export const stagedRead = (e: Engine, runs: readonly Run[]) => Effect.map(stagingReads(e, runs), (reads) => reads.flatMap(stagedOf));
+/** Each check among `runs` the pause holds (`heldOf`), a landing with its merge staged among them, as the tick's pass says it. */
+export const heldRead = (e: Engine, runs: readonly Run[]) => Effect.map(holdingReads(e, runs), heldAmong);
 
 /**
  * A run a read of which rejected with `err`, answered off its record when that is a task journal that does not read (`unreadableJournal`),

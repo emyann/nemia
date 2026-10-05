@@ -151,6 +151,7 @@ function PauseFacts({
       </p>
       <Lines lines={words.finishing} data="data-pause-finishing" />
       <Lines lines={words.staged} data="data-pause-staged" className="text-amber-700 dark:text-amber-400" />
+      <Lines lines={words.held} data="data-pause-held" />
       <ul data-pause-actions className="flex flex-col gap-1">
         {words.state === 'running' && (
           <li>
@@ -186,10 +187,10 @@ function PauseFacts({
  * `Pausing · N` while what runs finishes, and a play icon with `Paused` once nothing does (`pauseWords`, read again on each poll of
  * `GET /api/pause`).
  * It opens a popover with the whole of it — since when, by whom and why, each task still finishing, each landing held with its merge
- * staged, so a person who paused to use main knows why `MERGE_HEAD` is there — and a list of what may be done: Pause…, which asks an
- * optional why (`WhyForm`) and puts the pause (`POST /api/pause`); Pause now…, which says what it stops and what that costs (`NowForm`)
- * and pauses at once (`POST /api/pause` with `now`); or Resume (`DELETE /api/pause`); the popover closes once the api answered. A
- * refusal — a pause put or resumed elsewhere meanwhile — is said in the package's words, the popover open.
+ * staged, so a person who paused to use main knows why `MERGE_HEAD` is there, and each other check held — and a list of what may be
+ * done: Pause…, which asks an optional why (`WhyForm`) and puts the pause (`POST /api/pause`); Pause now…, which says what it stops and
+ * what that costs (`NowForm`) and pauses at once (`POST /api/pause` with `now`); or Resume (`DELETE /api/pause`); the popover closes
+ * once the api answered. A refusal — a pause put or resumed elsewhere meanwhile — is said in the package's words, the popover open.
  */
 export function PauseButton() {
   const queryClient = useQueryClient();

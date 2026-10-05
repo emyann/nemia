@@ -406,17 +406,17 @@ export const RESUME: Command<{ pause: Pause }> = {
   print: () => [RESUMED],
 };
 
-/** The store's pause and the landings it holds with their merge staged (`pausedRead`), which the api alone serves. */
+/** The store's pause and the checks it holds, a landing with its merge staged among them (`pausedRead`), which the api alone serves. */
 export const PAUSED: Command<Paused> = {
   name: 'paused',
   usage: '',
-  help: ["the store's pause, what finishes under it, and each landing it holds with its merge staged"],
+  help: ["the store's pause, what finishes under it, and each check it holds, a landing with its merge staged among them"],
   spec: { positionals: [], flags: [], unknown: (arg) => `the pause takes no ${arg}.` },
   writes: false,
   route: { method: 'GET', path: '/api/pause', status: 200 },
   only: {
     side: 'api',
-    why: 'the board says the pause in its bottom bar; at the command line, nemia ls says it, what finishes and each landing it holds',
+    why: 'the board says the pause in its bottom bar; at the command line, nemia ls says it, what finishes and each check it holds',
   },
   handler: () => pausedRead(),
   print: () => [],

@@ -398,6 +398,8 @@ export { cancelRun } from './cancel/cancel.verb.ts';
 export { hold, unhold } from './wait/wait.verb.ts';
 export {
   finishingWords,
+  heldLines,
+  heldWords,
   pausedLines,
   pausedWords,
   pauseWords,
@@ -408,6 +410,7 @@ export {
   type Pause,
   type Paused,
   type PausedNow,
+  type PauseHeld,
   type PauseStaged,
 } from './pause/pause.ts';
 export { readPause } from './pause/pause.store.ts';

@@ -1590,9 +1590,13 @@ it files the step.
   links followed. Any other absolute path — another step's directory, a `..` that climbs out, a link inside
   that leads out, `/etc/passwd` — is reported and never opened, stat-ed or resolved: a closeout is an
   agent's text. So is a path from the workspace root that climbs out of it, as written or through a link.
+  A path from the workspace root, or one inside `<dir>`, that passes through a folder a harness reads as its
+  own configuration (the runtime names them: `configFolderIn`, from `agent-runtime/vocabulary`) is refused
+  and never collected: every later step mounts `<dir>`, and its harness would take such a file as its own,
+  a skill among them.
 - **`wf decide` names each refusal** under the step's closeout, never passing one over: a path outside the
-  workspace or the directory, a directory, a file that is not there, and a file in the workspace that was
-  not collected. Then it lists the directory, each file by absolute path with its size.
+  workspace or the directory, a path through a configuration folder, a directory, a file that is not there,
+  and a file in the workspace that was not collected. Then it lists the directory, each file by absolute path with its size.
 
 A file reaches a later step by its path, declared: an `implement` that declares `screenshots`, the absolute paths
 of its PNGs, hands them to a `review` that reads them with `input: implement`.

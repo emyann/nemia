@@ -5087,8 +5087,11 @@ under `danger-full-access`, and a writable one is refused on Codex outright. The
   a copy is a snapshot at every filing. What a folder step is given (`given/`) stays a copy.
 - **A mount lists the folder's `.claude/skills` in the session** (Claude Code's `--add-dir`); its `CLAUDE.md` is not read. No flag turns
   the one off without the other, so each local step of a run in a factory of several repositories sees, and may invoke, the others'
-  skills, which share the listing's budget that `--setting-sources project` keeps to the agent's own. **Open, for the owner**: accept
-  it, or file a follow-up that mounts a folder without its skills (a runtime flag, measured on Claude Code first).
+  skills, which share the listing's budget that `--setting-sources project` keeps to the agent's own. **Decided by the owner, 2026-10-05**:
+  accepted as it is, since they are the person's own repositories; no follow-up that mounts a folder without its skills. A file a step
+  hands over is another matter: one named through a folder a harness reads as its own configuration is refused at hand-off and never
+  collected into the files directory the steps after it mount (`artifactPlace`, `configFolderIn`). A file a step writes straight into
+  that directory under such a folder, by an absolute path or unnamed, is still mounted: accepted for now.
 
 ## Shipped: every run in a factory (slice 2b)
 

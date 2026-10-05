@@ -50,7 +50,7 @@ import {
 } from '../status/status.ts';
 import { composeBrief, remoteBrief, type EndingStopped, type ParentCloseout, type ParentStep, type RetryBriefing } from '../brief/index.ts';
 import { roundFiled } from '../round/round.ts';
-import { filedConfig, readsMounts, tryModel } from '../filed/filed.ts';
+import { filedConfig, filedFolders, tryModel } from '../filed/filed.ts';
 import { closeoutSchemaOf, parseCloseout, type Closeout } from '../closeout/closeout.ts';
 import { modeWord, nextTry, sessionModel, type Retry, type RetryAsk } from '../retry/index.ts';
 import { artifactsDir, inputsDir, stepsOf } from '../record/record.store.ts';
@@ -342,7 +342,7 @@ async function sendTry(f: Filing, r: Retry, step: Workflow, taskId: string, answ
         undefined,
         inputsDir(run),
         checked,
-        readsMounts(told.step, inboxDir()),
+        filedFolders(told.step, reads.steps, { runArtifacts: path.dirname(files), inbox: inboxDir() }),
       );
   const budgetUsd = budgetUsdFor(r.budget ?? budgetOf(step, record), stepSpend(run, r.step, reads.spendOf));
   if (answers) return answerHeld(e, taskId, brief, budgetUsd);
@@ -492,7 +492,7 @@ function roundSpec(f: Filing, r: Round, looping: Workflow, target: Workflow, tas
       undefined,
       inputsDir(run),
       undefined,
-      readsMounts(told.step, inboxDir()),
+      filedFolders(told.step, reads.steps, { runArtifacts: path.dirname(files), inbox: inboxDir() }),
     ),
     cwd: record.workspace ?? run.workspace,
     harness: target.harness,
@@ -641,7 +641,7 @@ function readySpec(
           step.after.length ? undefined : parents,
           inputsDir(run),
           said.checked,
-          readsMounts(told.step, inboxDir()),
+          filedFolders(told.step, reads.steps, { runArtifacts: path.dirname(files), inbox: inboxDir() }),
         ),
     cwd: place.workspace,
     harness: step.harness,

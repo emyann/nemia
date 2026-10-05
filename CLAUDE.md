@@ -69,15 +69,15 @@ holds what every change needs.
 
 - **The runtime owns how a session runs; the layers above own what it means.** `decide` (`agent-runtime/src/core/domain.ts`) is pure
   (`agent-runtime/test/engine.test.ts` refuses a carried field read in it) and stays a screen long `(no test yet)`; `agent-runtime`
-  (`src/facade.ts`) and `agent-runtime/effect` (`src/index.ts`) are the export lists, and neither exports `decide`
+  (`src/index.ts`) and `agent-runtime/vocabulary` (`src/vocabulary.ts`) are the export lists, and neither exports `decide`
   (`agent-runtime/test/contract.test.ts`). A knob on a workload is a field carried on the task and read by a runner, never a callback
   into `decide`, and no `if` in `engine.ts` belongs in `decide` `(no test yet)`. What sits in which layer today, and what is a
   candidate to move, is in `docs/architecture.md`, *Who owns what*.
 - **Four rules hold the layers, each a test** (`docs/architecture.md`):
-  - *Between packages, only the public contract*: `agent-runtime`, `agent-runtime/effect` and `agent-runtime/vocabulary`; `agent-orchestrator`,
-    `agent-orchestrator/run` and `agent-orchestrator/workflow` — never a subpath outside `exports`, a
-    relative path, `import.meta.resolve` or a path into `src/` (the two `contract.test.ts`). The packages' entries are Effect, and the api is the system's
-    public interface.
+  - *Between packages, only the public contract*: `agent-runtime` and `agent-runtime/vocabulary`; `agent-orchestrator`,
+    `agent-orchestrator/run` and `agent-orchestrator/workflow` — never a subpath outside `exports`, a relative path,
+    `import.meta.resolve` or a path into `src/` (the two `contract.test.ts`). The packages' entries are Effect, and the api is the
+    system's public interface.
   - *Inside the orchestrator, every file is pure, store, controller or the client* (`PURE`, `STORE`, `CONTROLLER`, `CLIENT` in
     `packages/agent-orchestrator/test/boundary.test.ts`); a new file joins one kind, or the suite fails.
   - *The runtime is reached through one client*, `src/runtime-client.ts` (`CLIENT` in the same test): its behaviour through the client,

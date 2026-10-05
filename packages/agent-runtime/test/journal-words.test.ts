@@ -1,5 +1,5 @@
 /**
- * What the journal says, word for word, for six scripted runs through `promiseEngine` — and what the harness was asked.
+ * What the journal says, word for word, for six scripted runs through `builtEngine` — and what the harness was asked.
  *
  * Whatever carries a spawn, an observe or a stop to a harness, the record a run leaves is the same, to the word. Times are
  * masked, since they are the clock's — `at`, and the monotonic `mono` a start, a spawn and an end carry beside it; everything else —
@@ -17,11 +17,14 @@
  * decides as if it did not (the last test here; `decide.test.ts`); and it may carry `budgetUsd` beside `config`, or
  * `reason: 'budget'` on an `ended`, which `upgrade` in `journal.ts` reads in this shape (`journal.test.ts`).
  */
+import { Effect } from 'effect';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fold } from '../src/core/domain.ts';
-import type { Event, PromiseJournal, PromiseRunner, Sighting, SpawnRequest } from '../src/facade.ts';
-import { Engine, promiseEngine } from '../src/index.ts';
+import type { Event, Sighting, SpawnRequest } from '../src/index.ts';
+import { Engine } from '../src/index.ts';
+import { asyncStore, asyncOps, type AsyncJournal, type AsyncRunner } from './promise-runner.ts';
+import { builtEngine } from './engine.ts';
 
 /**
  * A store in memory, and a harness whose sessions a test moves by hand, behind the engine as a consumer builds it. Its
@@ -29,7 +32,7 @@ import { Engine, promiseEngine } from '../src/index.ts';
  */
 const board = (spawnFails?: Error) => {
   const tasks = new Map<string, Event[]>();
-  const journal: PromiseJournal = {
+  const journal: AsyncJournal = {
     async append(taskId, event) {
       tasks.set(taskId, [...(tasks.get(taskId) ?? []), event]);
     },
@@ -46,7 +49,7 @@ const board = (spawnFails?: Error) => {
   const sessions = new Map<string, Sighting>();
   const asked: Array<[string, unknown]> = [];
   let n = 0;
-  const fake: PromiseRunner = {
+  const fake: AsyncRunner = {
     async spawn(r: SpawnRequest) {
       asked.push(['spawn', r]);
       if (spawnFails) throw spawnFails;
@@ -64,7 +67,7 @@ const board = (spawnFails?: Error) => {
       return '';
     },
   };
-  const engine = promiseEngine(Engine.layer({ journal, harnesses: { fake } }));
+  const engine = builtEngine(Engine.layer({ journal: asyncStore(journal), harnesses: { fake: asyncOps(fake) } }));
   const record = async (id: string) =>
     (await journal.read(id)).map((e) => ({ ...e, at: '<at>', ...('mono' in e ? { mono: '<mono>' } : {}) }));
   return { engine, sessions, asked, record };
@@ -105,10 +108,10 @@ const filed = {
 
 test('a session that signs off: spawned, ended with its statement and usage, settled succeeded', async () => {
   const b = board();
-  const id = await b.engine.file(filing);
-  await b.engine.tick();
+  const id = await Effect.runPromise(b.engine.file(filing));
+  await Effect.runPromise(b.engine.tick());
   const name = 'ae/t-words/1';
-  const began = Date.parse((await b.engine.view(id)).state.attempts[0].startedAt);
+  const began = Date.parse((await Effect.runPromise(b.engine.view(id))).state.attempts[0].startedAt);
   b.sessions.set(name, {
     ...b.sessions.get(name)!,
     state: 'completed',
@@ -116,7 +119,7 @@ test('a session that signs off: spawned, ended with its statement and usage, set
     closeout: { payload: { outcome: 'done', summary: 'wrote them' }, at: began + 1_000 },
     usage: { turns: 3, outputTokens: 120, costUsd: 0.25 },
   });
-  await b.engine.tick();
+  await Effect.runPromise(b.engine.tick());
   assert.deepEqual(await b.record(id), [
     filed,
     { kind: 'starting', at: '<at>', mono: '<mono>', attempt: 1, resumeFrom: undefined, nudge: undefined },
@@ -146,11 +149,11 @@ test('a session that signs off: spawned, ended with its statement and usage, set
 
 test("a session that ends with no statement where one was asked: ended as its harness said, `stated: false`, settled succeeded — the judging is the layer above's — and an end without the key folds the same", async () => {
   const b = board();
-  const id = await b.engine.file(filing);
-  await b.engine.tick();
+  const id = await Effect.runPromise(b.engine.file(filing));
+  await Effect.runPromise(b.engine.tick());
   b.sessions.set('ae/t-words/1', { ...b.sessions.get('ae/t-words/1')!, state: 'completed', busy: false });
-  await b.engine.tick();
-  await b.engine.tick();
+  await Effect.runPromise(b.engine.tick());
+  await Effect.runPromise(b.engine.tick());
   assert.deepEqual(await b.record(id), [
     filed,
     { kind: 'starting', at: '<at>', mono: '<mono>', attempt: 1, resumeFrom: undefined, nudge: undefined },
@@ -186,8 +189,8 @@ test("a session that ends with no statement where one was asked: ended as its ha
 
 test('a spawn the harness refused: the attempt ends unstartable in its words, and the task settles failed', async () => {
   const b = board(Object.assign(new Error('fake: no binary called `fake` on PATH'), { refused: true }));
-  const id = await b.engine.file(filing);
-  await b.engine.tick();
+  const id = await Effect.runPromise(b.engine.file(filing));
+  await Effect.runPromise(b.engine.tick());
   assert.deepEqual(await b.record(id), [
     filed,
     { kind: 'starting', at: '<at>', mono: '<mono>', attempt: 1, resumeFrom: undefined, nudge: undefined },
@@ -213,26 +216,26 @@ test('a spawn the harness refused: the attempt ends unstartable in its words, an
 
 test('a spawn that failed without saying nothing started: spawned, with its error, and left to the grace window', async () => {
   const b = board(new Error('fake: the launcher lost its acknowledgement'));
-  const id = await b.engine.file(filing);
-  await b.engine.tick();
-  await b.engine.tick();
+  const id = await Effect.runPromise(b.engine.file(filing));
+  await Effect.runPromise(b.engine.tick());
+  await Effect.runPromise(b.engine.tick());
   assert.deepEqual(await b.record(id), [
     filed,
     { kind: 'starting', at: '<at>', mono: '<mono>', attempt: 1, resumeFrom: undefined, nudge: undefined },
     { kind: 'spawned', at: '<at>', mono: '<mono>', attempt: 1, error: 'fake: the launcher lost its acknowledgement' },
   ]);
-  assert.equal((await b.engine.view(id)).phase, 'starting');
+  assert.equal((await Effect.runPromise(b.engine.view(id))).phase, 'starting');
   assert.deepEqual(b.asked, [['spawn', spawnAsked]]);
 });
 
 test('a person stops it: the session is stopped, its attempt ended by the operator, and the task settles stopped', async () => {
   const b = board();
-  const id = await b.engine.file(filing);
-  await b.engine.tick();
-  await b.engine.stop(id);
-  await b.engine.tick();
+  const id = await Effect.runPromise(b.engine.file(filing));
+  await Effect.runPromise(b.engine.tick());
+  await Effect.runPromise(b.engine.stop(id));
+  await Effect.runPromise(b.engine.tick());
   assert.equal(b.sessions.get('ae/t-words/1')?.state, 'canceled', 'the harness was asked to stop the session');
-  await b.engine.tick();
+  await Effect.runPromise(b.engine.tick());
   assert.deepEqual(await b.record(id), [
     filed,
     { kind: 'starting', at: '<at>', mono: '<mono>', attempt: 1, resumeFrom: undefined, nudge: undefined },
@@ -265,12 +268,12 @@ test('a person stops it: the session is stopped, its attempt ended by the operat
 
 test('what the harness denied the session is written on its end, as it said it, and an end written before the key folds the same', async () => {
   const b = board();
-  const id = await b.engine.file(filing);
-  await b.engine.tick();
+  const id = await Effect.runPromise(b.engine.file(filing));
+  await Effect.runPromise(b.engine.tick());
   const name = 'ae/t-words/1';
   const denials = [{ tool: 'Skill', what: 'look' }, { tool: 'Bash', what: 'pytest' }, { tool: 'WebFetch' }];
   b.sessions.set(name, { ...b.sessions.get(name)!, state: 'failed', busy: false, denials });
-  await b.engine.tick();
+  await Effect.runPromise(b.engine.tick());
   const ended = (await b.record(id)).find((e) => e.kind === 'ended');
   assert.deepEqual(ended, {
     kind: 'ended',
@@ -290,7 +293,7 @@ test('what the harness denied the session is written on its end, as it said it, 
     files: undefined,
     limit: undefined,
   });
-  assert.deepEqual((await b.engine.view(id)).state.attempts[0]?.denials, denials);
+  assert.deepEqual((await Effect.runPromise(b.engine.view(id))).state.attempts[0]?.denials, denials);
 
   const events = (await b.record(id)) as Event[];
   const without = events.map((e) => (e.kind === 'ended' ? (({ denials: _, ...rest }) => rest)(e) : e)) as Event[];
@@ -304,13 +307,18 @@ test('what the harness denied the session is written on its end, as it said it, 
 test('the skills the session loaded are written on its end as its harness said them, an empty list kept, and an end without the key folds with none', async () => {
   const endWith = async (skills: string[]) => {
     const b = board();
-    const id = await b.engine.file(filing);
-    await b.engine.tick();
+    const id = await Effect.runPromise(b.engine.file(filing));
+    await Effect.runPromise(b.engine.tick());
     const name = 'ae/t-words/1';
     b.sessions.set(name, { ...b.sessions.get(name)!, state: 'failed', busy: false, skills });
-    await b.engine.tick();
+    await Effect.runPromise(b.engine.tick());
     const events = (await b.record(id)) as Event[];
-    return { id, events, ended: events.find((e) => e.kind === 'ended'), attempt: (await b.engine.view(id)).state.attempts[0] };
+    return {
+      id,
+      events,
+      ended: events.find((e) => e.kind === 'ended'),
+      attempt: (await Effect.runPromise(b.engine.view(id))).state.attempts[0],
+    };
   };
   const loaded = await endWith(['look', 'look']);
   assert.deepEqual(loaded.ended && 'skills' in loaded.ended && loaded.ended.skills, ['look', 'look'], 'one per load, as said');
@@ -326,13 +334,18 @@ test('the skills the session loaded are written on its end as its harness said t
 test('the files the session touched are written on its end as its harness said them, an empty list kept, and an end without the key folds with none', async () => {
   const endWith = async (files: string[]) => {
     const b = board();
-    const id = await b.engine.file(filing);
-    await b.engine.tick();
+    const id = await Effect.runPromise(b.engine.file(filing));
+    await Effect.runPromise(b.engine.tick());
     const name = 'ae/t-words/1';
     b.sessions.set(name, { ...b.sessions.get(name)!, state: 'failed', busy: false, files });
-    await b.engine.tick();
+    await Effect.runPromise(b.engine.tick());
     const events = (await b.record(id)) as Event[];
-    return { id, events, ended: events.find((e) => e.kind === 'ended'), attempt: (await b.engine.view(id)).state.attempts[0] };
+    return {
+      id,
+      events,
+      ended: events.find((e) => e.kind === 'ended'),
+      attempt: (await Effect.runPromise(b.engine.view(id))).state.attempts[0],
+    };
   };
   const touched = await endWith(['apps/web/a.tsx', 'b.ts']);
   assert.deepEqual(touched.ended && 'files' in touched.ended && touched.ended.files, ['apps/web/a.tsx', 'b.ts']);
@@ -345,10 +358,10 @@ test('the files the session touched are written on its end as its harness said t
 
 test('a task held open: it signs and waits, an answer is a turn that continues its session, a close settles it', async () => {
   const b = board();
-  const id = await b.engine.file({ ...filing, holdOpen: true });
-  await b.engine.tick();
+  const id = await Effect.runPromise(b.engine.file({ ...filing, holdOpen: true }));
+  await Effect.runPromise(b.engine.tick());
   const sign = async (n: number, summary: string) => {
-    const began = Date.parse((await b.engine.view(id)).state.attempts[n - 1].startedAt);
+    const began = Date.parse((await Effect.runPromise(b.engine.view(id))).state.attempts[n - 1].startedAt);
     b.sessions.set(`ae/t-words/${n}`, {
       ...b.sessions.get(`ae/t-words/${n}`)!,
       state: 'completed',
@@ -357,14 +370,14 @@ test('a task held open: it signs and waits, an answer is a turn that continues i
     });
   };
   await sign(1, 'a first draft');
-  await b.engine.tick();
-  assert.equal((await b.engine.view(id)).phase, 'input-required');
-  await b.engine.answer(id, 'shorter, please', { config: { budgetUsd: 0.5 } });
-  await b.engine.tick();
+  await Effect.runPromise(b.engine.tick());
+  assert.equal((await Effect.runPromise(b.engine.view(id))).phase, 'input-required');
+  await Effect.runPromise(b.engine.answer(id, 'shorter, please', { config: { budgetUsd: 0.5 } }));
+  await Effect.runPromise(b.engine.tick());
   await sign(2, 'a shorter draft');
-  await b.engine.tick();
-  await b.engine.close(id);
-  await b.engine.tick();
+  await Effect.runPromise(b.engine.tick());
+  await Effect.runPromise(b.engine.close(id));
+  await Effect.runPromise(b.engine.tick());
   const ended = (n: number, summary: string) => ({
     kind: 'ended',
     at: '<at>',
@@ -412,8 +425,8 @@ test('a task held open: it signs and waits, an answer is a turn that continues i
 
 test('a journal an older runtime filed, with `maxAttempts` and `resume`, folds as one without them, and a refused spawn settles it on its first attempt', async () => {
   const b = board(Object.assign(new Error('fake: no binary called `fake` on PATH'), { refused: true }));
-  const id = await b.engine.file(filing);
-  await b.engine.tick();
+  const id = await Effect.runPromise(b.engine.file(filing));
+  await Effect.runPromise(b.engine.tick());
   const now = (await b.record(id)) as Event[];
   const before = now.map((e) => (e.kind === 'filed' ? { ...e, maxAttempts: 3, resume: 'always' } : e)) as Event[];
   assert.deepEqual(fold(id, before), fold(id, now));

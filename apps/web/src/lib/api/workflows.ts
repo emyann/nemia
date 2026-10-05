@@ -70,6 +70,8 @@ export type WorkflowListing = {
   from: 'repo' | 'yours';
   dir: string;
   description: string | null;
+  /** The folder's README in full, the workflow level's instruction; null for a folder with none. */
+  readme: string | null;
   steps: ListedStep[];
   graph: RunGraph;
   /** The `.json` files beside the steps, which an `output:` may name. */
@@ -98,6 +100,7 @@ const WorkflowListingSchema = Schema.Struct({
   from: WorkflowSourceSchema,
   dir: Schema.String,
   description: Schema.NullOr(Schema.String),
+  readme: Schema.NullOr(Schema.String),
   steps: Schema.mutable(Schema.Array(ListedStepSchema)),
   graph: RunGraphSchema,
   schemas: Schema.mutable(Schema.Array(Schema.String)),
@@ -274,19 +277,21 @@ const build = (method: 'PUT' | 'POST', route: string, body: unknown): Promise<Wo
   });
 
 /**
- * Put a folder of yours back from its steps and the schemas pasted for them, as the builder saves it: the api judges the two together,
- * calls the package's `writeWorkflow`, and answers the folder read back from disk. `version` is the one the folder was listed at. Rejects
- * with a `BuildRefusal`: the package's sentence and the steps it names, a folder changed since it was read (409), or the api's own about
- * the request; and with an `UnreadAnswer` for an answer the board does not read, saying the folder may be written.
+ * Put a folder of yours back from its steps, the schemas pasted for them and its README when it changed, as the builder saves it: the
+ * api judges them together, calls the package's `writeWorkflow`, and answers the folder read back from disk. `version` is the one the
+ * folder was listed at. Rejects with a `BuildRefusal`: the package's sentence and the steps it names, a folder changed since it was read
+ * (409), or the api's own about the request; and with an `UnreadAnswer` for an answer the board does not read, saying the folder may be
+ * written.
  */
 export const saveWorkflow = (
   name: string,
-  save: { version: string; steps: readonly StepWritten[]; schemas: readonly SchemaFile[] },
+  save: { version: string; steps: readonly StepWritten[]; schemas: readonly SchemaFile[]; readme?: string },
 ): Promise<WorkflowSaved> =>
   build('PUT', `/api/workflows/yours/${encodeURIComponent(name)}`, {
     version: save.version,
     steps: save.steps,
     ...(save.schemas.length ? { schemas: save.schemas } : {}),
+    ...(save.readme === undefined ? {} : { readme: save.readme }),
   });
 
 /**

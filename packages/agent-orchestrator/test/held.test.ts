@@ -15,17 +15,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import {
-  nameFor,
-  type PromiseJournal,
-  type PromiseRunner,
-  type PromiseSighting,
-  type Sighting,
-  type SpawnRequest,
-  type TaskView,
-} from 'agent-runtime';
+import { nameFor, type Sighting, type SpawnRequest, type TaskView, Engine as EngineService } from 'agent-runtime';
+import { asyncStore, type AsyncJournal, asyncOps, type AsyncRunner } from './promised.ts';
 import type { Engine } from '../src/runtime-client.ts';
-import { Engine as EngineService } from 'agent-runtime/effect';
 import { scratch } from './scratch.ts';
 import { Effect } from 'effect';
 import { plainEngine } from './promised.ts';
@@ -63,9 +55,9 @@ const folder = (keys: { plan?: string; implement?: string } = {}) => {
 };
 
 /** The engine's store, in memory, as its own tests keep one, noting in `starts` when each attempt began, by its session's name. */
-const memoryJournal = (starts: Map<string, number>): PromiseJournal => {
-  const tasks = new Map<string, Parameters<PromiseJournal['append']>[1][]>();
-  const feed: Awaited<ReturnType<PromiseJournal['feed']>>['entries'] = [];
+const memoryJournal = (starts: Map<string, number>): AsyncJournal => {
+  const tasks = new Map<string, Parameters<AsyncJournal['append']>[1][]>();
+  const feed: Awaited<ReturnType<AsyncJournal['feed']>>['entries'] = [];
   return {
     async append(taskId, event) {
       tasks.set(taskId, [...(tasks.get(taskId) ?? []), event]);
@@ -96,11 +88,11 @@ const BLOCKED = { outcome: 'blocked', summary: 'two flags could be meant', artif
  * runtime's command harness does, and none was printed. `pass` is what the daemon does: the engine's tick, then the run's.
  */
 const engine = () => {
-  const sessions = new Map<string, PromiseSighting>();
+  const sessions = new Map<string, Sighting>();
   const spawned: SpawnRequest[] = [];
   const refusing = new Set<string>();
   const starts = new Map<string, number>();
-  const runner: PromiseRunner = {
+  const runner: AsyncRunner = {
     async spawn(r) {
       if (refusing.has(r.name)) throw Object.assign(new Error(`${r.name}: refused`), { refused: true });
       spawned.push(r);
@@ -110,7 +102,7 @@ const engine = () => {
       return new Map(sessions);
     },
     async stop(id) {
-      for (const [name, s] of sessions) if (s.sessionId === id) sessions.set(name, { ...s, state: 'stopped', busy: false });
+      for (const [name, s] of sessions) if (s.sessionId === id) sessions.set(name, { ...s, state: 'canceled', busy: false });
     },
     async logs() {
       return '';
@@ -119,8 +111,8 @@ const engine = () => {
   const e = plainEngine(
     EngineService.layer({
       root: fs.mkdtempSync(path.join(ROOT, 'engine-')),
-      journal: memoryJournal(starts),
-      harnesses: { claude: runner, codex: runner, check: { ...runner, output: async () => undefined } },
+      journal: asyncStore(memoryJournal(starts)),
+      harnesses: { claude: asyncOps(runner), codex: asyncOps(runner), check: asyncOps({ ...runner, output: async () => undefined }) },
       defaultHarness: 'claude',
     }),
   );
@@ -129,7 +121,7 @@ const engine = () => {
     assert.ok(sessions.has(name), `${name} was never started: ${[...sessions.keys()].join(', ')}`);
     sessions.set(name, {
       ...sessions.get(name)!,
-      state: 'done',
+      state: 'completed',
       busy: false,
       closeout: { payload: closeout, at: starts.get(name)! + 1 },
       ...(usage ? { usage } : {}),
@@ -287,7 +279,7 @@ test("a held task whose job ended `done` with no statement (`stated: false`) wai
     const plan = `${run.id}-plan`;
     await pass(run.id);
     await pass(run.id);
-    sessions.set(nameFor(plan, 1), { ...sessions.get(nameFor(plan, 1))!, state: 'done', busy: false });
+    sessions.set(nameFor(plan, 1), { ...sessions.get(nameFor(plan, 1))!, state: 'completed', busy: false });
     await Effect.runPromise(e.tick());
     const waiting = await stateOf(e, plan);
     assert.deepEqual(
@@ -474,7 +466,7 @@ test('a gated step stays open while its check runs, so a send-back once the chec
   assert.equal((await stateOf(e, plan)).state.closed, false, 'not closed while the check that decides whether it reaches its gate runs');
 
   const check = nameFor(`${plan}-check`, 1);
-  sessions.set(check, { ...sessions.get(check)!, state: 'done', busy: false, exitCode: 0 });
+  sessions.set(check, { ...sessions.get(check)!, state: 'completed', busy: false, exitCode: 0 });
   await pass(run.id);
   assert.equal((await statuses(e, run.id)).plan, 'awaiting approval');
   await runWith(e, retryRun(run.id, 'plan', { mode: 'nudge', message: 'smaller steps, please' }));

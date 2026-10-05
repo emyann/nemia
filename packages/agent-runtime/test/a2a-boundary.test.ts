@@ -67,7 +67,7 @@ test('the scan reads the seam and the rest of the package — or it would pass b
     'src/a2a/said.ts',
     'src/a2a/sending.ts',
   ]);
-  assert.ok(files.includes('src/facade.ts') && files.includes('src/core/engine/engine.ts') && files.includes('bin/ae.ts'));
+  assert.ok(files.includes('src/index.ts') && files.includes('src/core/engine/engine.ts') && files.includes('bin/ae.ts'));
   const sdkOf = (f: string) => specifiersIn(fs.readFileSync(path.join(PKG, f), 'utf8')).some((s) => s.startsWith(SDK));
   assert.ok(
     files.filter((f) => inSeam(f) && !SDK_FREE.includes(f)).every(sdkOf),
@@ -91,7 +91,7 @@ test('REFUSED: the SDK imported outside the seam — the root, a subpath, a type
   const why = 'only src/a2a/ speaks A2A, its face left out — reach a harness through RunnerOps, and put what needs the SDK in the seam';
   const planted: Array<[string, string, string]> = [
     ['src/core/engine/engine.ts', "import { TaskState } from '@a2a-js/sdk';", '@a2a-js/sdk'],
-    ['src/facade.ts', "import { Client } from '@a2a-js/sdk/client';", '@a2a-js/sdk/client'],
+    ['src/cli/main.ts', "import { Client } from '@a2a-js/sdk/client';", '@a2a-js/sdk/client'],
     ['src/harness/seam.ts', "import type { A2ARequestHandler } from '@a2a-js/sdk/server';", '@a2a-js/sdk/server'],
     ['src/index.ts', "export { TaskNotFoundError } from '@a2a-js/sdk/errors';", '@a2a-js/sdk/errors'],
     ['bin/ae.ts', "const sdk = await import('@a2a-js/sdk');", '@a2a-js/sdk'],
@@ -136,7 +136,7 @@ function exportBreaches(entry: string, exported: Record<string, unknown>, sdk: {
 test("neither of the runtime's entries exports an SDK name or value", async () => {
   const sdk = await sdkExports();
   assert.ok(sdk.names.has('TaskState') && sdk.names.has('Client') && sdk.names.has('TaskNotFoundError'), 'the SDK was read');
-  for (const entry of ['agent-runtime', 'agent-runtime/effect']) {
+  for (const entry of ['agent-runtime', 'agent-runtime/vocabulary']) {
     assert.deepEqual(exportBreaches(entry, { ...(await import(entry)) }, sdk), [], entry);
   }
 });
@@ -145,11 +145,11 @@ test('REFUSED: an entry that exports an SDK name, or an SDK value renamed', asyn
   const sdk = await sdkExports();
   const { TaskState } = await import(SDK);
   const { Client } = await import(`${SDK}/client`);
-  const effect = { ...(await import('agent-runtime/effect')) };
-  assert.deepEqual(exportBreaches('agent-runtime/effect', { ...effect, TaskState }, sdk), [
-    "agent-runtime/effect exports TaskState, which is the A2A SDK's: a consumer of the runtime learns no protocol — keep it inside src/a2a/",
+  const root = { ...(await import('agent-runtime')) };
+  assert.deepEqual(exportBreaches('agent-runtime', { ...root, TaskState }, sdk), [
+    "agent-runtime exports TaskState, which is the A2A SDK's: a consumer of the runtime learns no protocol — keep it inside src/a2a/",
   ]);
-  assert.deepEqual(exportBreaches('agent-runtime', { A2AClient: Client }, sdk), [
-    "agent-runtime exports A2AClient, which is the A2A SDK's: a consumer of the runtime learns no protocol — keep it inside src/a2a/",
+  assert.deepEqual(exportBreaches('agent-runtime/vocabulary', { A2AClient: Client }, sdk), [
+    "agent-runtime/vocabulary exports A2AClient, which is the A2A SDK's: a consumer of the runtime learns no protocol — keep it inside src/a2a/",
   ]);
 });

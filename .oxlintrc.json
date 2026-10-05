@@ -372,7 +372,7 @@
     {
       "files": ["apps/web/src/components/FactoryCanvas.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 256, "skipBlankLines": true, "skipComments": true }]
+        "max-lines-per-function": ["error", { "max": 250, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
@@ -459,8 +459,7 @@
     {
       "files": ["apps/web/src/components/WorkflowBuilder.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 206, "skipBlankLines": true, "skipComments": true }],
-        "complexity": ["error", { "max": 25 }]
+        "max-lines-per-function": ["error", { "max": 202, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
@@ -836,7 +835,7 @@
       }
     },
     {
-      "files": ["packages/agent-runtime/src/facade/consumer.ts"],
+      "files": ["packages/agent-runtime/src/service/harness-refusal.ts"],
       "rules": {
         "complexity": ["error", { "max": 25 }],
         "sonarjs/cognitive-complexity": ["error", 27]

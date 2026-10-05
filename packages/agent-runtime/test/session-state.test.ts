@@ -1,7 +1,8 @@
 /**
  * Sightings speak A2A's TaskState: each driver translates its harness's words once, at its edge, into A2A's eight names, and the
- * journal keeps its three end words. A harness or a `PromiseRunner` may speak the runtime's five former words instead — `working`,
- * `blocked`, `done`, `failed`, `stopped` — which `formerStateOf` reads as their names.
+ * journal keeps its three end words. A remote registry entry an older runtime wrote may speak its five former words — `working`,
+ * `blocked`, `done`, `failed`, `stopped` — which `formerStateOf` reads as their names; so does this suite's helper `asyncOps`
+ * (`test/promise-runner.ts`), for a fake written in them.
  *
  * What holds it:
  *
@@ -21,11 +22,11 @@ import { endOf, formerStateOf, isSessionState, phaseWordOf, SESSION_STATES, type
 import { viewOfState } from '../src/core/engine/engine.ts';
 import { AUTH_WAIT, claudeStateOf } from '../src/harness/claude/bg.ts';
 import { detachedStateOf } from '../src/harness/detached/detached.ts';
-import { promiseOps } from '../src/facade/promise.ts';
-import type { PromiseRunner } from '../src/facade.ts';
-import { Engine, promiseEngine } from '../src/index.ts';
+import { Engine } from '../src/index.ts';
 import { corpusOf, filed, spawned, starting, TASK, type Case } from './lifecycle-corpus.ts';
 import { scratch } from './scratch.ts';
+import { asyncOps, type AsyncRunner } from './promise-runner.ts';
+import { builtEngine } from './engine.ts';
 
 type Recorded = { event: string; action: Action };
 const RECORDED = JSON.parse(fs.readFileSync(new URL('./fixtures/decide-corpus.json', import.meta.url), 'utf8')) as Record<string, Recorded>;
@@ -233,7 +234,7 @@ test("the detached worker's words on its run file: each is one name, a lease gon
     assert.equal(detachedStateOf({ state, heartbeatAt }, { at: now }), name, `${state} at ${heartbeatAt}`);
 });
 
-const reporting = (states: Record<string, string>): PromiseRunner => ({
+const reporting = (states: Record<string, string>): AsyncRunner => ({
   async spawn() {},
   async observe() {
     return new Map(Object.entries(states).map(([name, state]) => [name, { sessionId: `s-${name}`, state } as never]));
@@ -244,22 +245,20 @@ const reporting = (states: Record<string, string>): PromiseRunner => ({
   },
 });
 
-test("a PromiseRunner reports in A2A's names, or in the five former words, which are read as their names", async () => {
+test("the helper asyncOps reads a fake's A2A names as they are, and the five former words as their names", async () => {
   const names = Object.fromEntries(SESSION_STATES.map((s) => [s, s]));
-  const seen = await Effect.runPromise(promiseOps(reporting(names)).observe);
+  const seen = await Effect.runPromise(asyncOps(reporting(names)).observe);
   for (const s of SESSION_STATES) assert.equal(seen.get(s)?.state, s);
-  const former = await Effect.runPromise(
-    promiseOps(reporting({ a: 'working', b: 'blocked', c: 'done', d: 'failed', e: 'stopped' })).observe,
-  );
+  const former = await Effect.runPromise(asyncOps(reporting({ a: 'working', b: 'blocked', c: 'done', d: 'failed', e: 'stopped' })).observe);
   assert.deepEqual(
     [...former.values()].map((s) => s.state),
     ['working', 'input-required', 'completed', 'failed', 'canceled'],
   );
 });
 
-test('REFUSED: a PromiseRunner that reports a word neither vocabulary has fails the observe, naming the words it takes', async () => {
+test('REFUSED: through the helper asyncOps, a fake that reports a word neither vocabulary has fails the observe, naming the words it takes', async () => {
   for (const word of ['finished', 'idle', 'constructor', '']) {
-    const err = await Effect.runPromise(Effect.flip(promiseOps(reporting({ 'ae/t-1/1': 'working', 'ae/t-2/1': word })).observe));
+    const err = await Effect.runPromise(Effect.flip(asyncOps(reporting({ 'ae/t-1/1': 'working', 'ae/t-2/1': word })).observe));
     assert.equal(err._tag, 'RunnerError');
     assert.equal(err.verb, 'observe');
     assert.match(err.message, new RegExp(`session \`ae/t-2/1\` as \`${word}\``));
@@ -268,9 +267,9 @@ test('REFUSED: a PromiseRunner that reports a word neither vocabulary has fails 
   }
 });
 
-test('an engine over a PromiseRunner that speaks the former words settles its tasks as it did', async () => {
+test('an engine over a fake in the former words, read through the helper asyncOps, settles its tasks as it did', async () => {
   const sessions = new Map<string, { sessionId: string; state: string }>();
-  const fake: PromiseRunner = {
+  const fake: AsyncRunner = {
     async spawn(r) {
       sessions.set(r.name, { sessionId: `s-${r.name}`, state: 'working' });
     },
@@ -284,23 +283,23 @@ test('an engine over a PromiseRunner that speaks the former words settles its ta
       return '';
     },
   };
-  const engine = promiseEngine(Engine.layer({ root: scratch('ae-state-root-'), harnesses: { fake } }));
+  const engine = builtEngine(Engine.layer({ root: scratch('ae-state-root-'), harnesses: { fake: asyncOps(fake) } }));
   const cwd = scratch('ae-state-cwd-');
   const [done, stopped, blocked] = [
-    await engine.file({ brief: 'a', cwd, harness: 'fake' }),
-    await engine.file({ brief: 'b', cwd, harness: 'fake' }),
-    await engine.file({ brief: 'c', cwd, harness: 'fake' }),
+    await Effect.runPromise(engine.file({ brief: 'a', cwd, harness: 'fake' })),
+    await Effect.runPromise(engine.file({ brief: 'b', cwd, harness: 'fake' })),
+    await Effect.runPromise(engine.file({ brief: 'c', cwd, harness: 'fake' })),
   ];
-  await engine.tick();
-  await engine.tick();
-  assert.equal((await engine.view(done)).phase, 'running (working)');
+  await Effect.runPromise(engine.tick());
+  await Effect.runPromise(engine.tick());
+  assert.equal((await Effect.runPromise(engine.view(done))).phase, 'running (working)');
   sessions.set(nameFor(done, 1), { sessionId: 's-d', state: 'done' });
   sessions.set(nameFor(blocked, 1), { sessionId: 's-b', state: 'blocked' });
-  await engine.stop(stopped);
-  for (let i = 0; i < 3; i++) await engine.tick();
-  assert.equal((await engine.view(done)).state.settled, 'succeeded');
-  assert.equal((await engine.view(stopped)).state.settled, 'stopped');
-  assert.equal((await engine.view(blocked)).phase, 'needs-human');
+  await Effect.runPromise(engine.stop(stopped));
+  for (let i = 0; i < 3; i++) await Effect.runPromise(engine.tick());
+  assert.equal((await Effect.runPromise(engine.view(done))).state.settled, 'succeeded');
+  assert.equal((await Effect.runPromise(engine.view(stopped))).state.settled, 'stopped');
+  assert.equal((await Effect.runPromise(engine.view(blocked))).phase, 'needs-human');
 });
 
 test("a view prints each name in the words views have always printed: A2A's names stop at the runtime", () => {
@@ -332,7 +331,7 @@ test("a view prints each name in the words views have always printed: A2A's name
 test("a journal written before the words changed folds and settles as it did: its end words are the journal's still (each filing as this engine writes it, then what a runtime in the former words wrote, word for word, read by a new process)", async () => {
   const root = scratch('ae-state-old-');
   const cwd = scratch('ae-state-old-cwd-');
-  const fake: PromiseRunner = {
+  const fake: AsyncRunner = {
     async spawn() {},
     async observe() {
       return new Map();
@@ -342,11 +341,11 @@ test("a journal written before the words changed folds and settles as it did: it
       return '';
     },
   };
-  const first = promiseEngine(Engine.layer({ root, harnesses: { fake } }));
+  const first = builtEngine(Engine.layer({ root, harnesses: { fake: asyncOps(fake) } }));
   const ids = [
-    await first.file({ brief: 'a', cwd, harness: 'fake' }),
-    await first.file({ brief: 'b', cwd, harness: 'fake' }),
-    await first.file({ brief: 'c', cwd, harness: 'fake' }),
+    await Effect.runPromise(first.file({ brief: 'a', cwd, harness: 'fake' })),
+    await Effect.runPromise(first.file({ brief: 'b', cwd, harness: 'fake' })),
+    await Effect.runPromise(first.file({ brief: 'c', cwd, harness: 'fake' })),
   ];
   const file = (id: string) => path.join(root, 'tasks', `${id}.jsonl`);
   const then = (id: string, ...lines: object[]) => fs.appendFileSync(file(id), lines.map((l) => `${JSON.stringify(l)}\n`).join(''));
@@ -382,9 +381,9 @@ test("a journal written before the words changed folds and settles as it did: it
   );
   const before = ids.map((id) => fs.readFileSync(file(id), 'utf8'));
 
-  const engine = promiseEngine(Engine.layer({ root, harnesses: { fake } }));
-  await engine.tick();
-  const views = await Promise.all(ids.map((id) => engine.view(id)));
+  const engine = builtEngine(Engine.layer({ root, harnesses: { fake: asyncOps(fake) } }));
+  await Effect.runPromise(engine.tick());
+  const views = await Promise.all(ids.map((id) => Effect.runPromise(engine.view(id))));
   assert.deepEqual(
     views.map((v) => v.state.settled),
     ['succeeded', 'stopped', 'failed'],

@@ -23,6 +23,7 @@ test("each page lights one section — a factory's floor the Floor, a run and it
   assert.deepEqual(lit('/runs/r-1'), ['Runs']);
   assert.deepEqual(lit('/runs/r-1/steps/s'), ['Runs']);
   assert.deepEqual(lit('/inbox/card'), ['Inbox']);
+  assert.deepEqual(lit('/workflows/repo/dev'), ['Workflows'], "a workflow's page");
   assert.deepEqual(lit('/workflows/repo/dev/review'), ['Workflows']);
   assert.deepEqual(lit('/'), [], 'Home is in the rail, not the sections');
   assert.deepEqual(lit('/agents'), [], 'Agents is in the rail, not the sections');
@@ -94,8 +95,10 @@ test("the header names a page by its section first — Floor on a factory's floo
   assert.equal(sectionOf('/machinesx'), undefined);
 });
 
-test("the picked factory is read from the address alone: a floor's name, else a section page's ?factory=, else none", () => {
+test("the picked factory is read from the address alone: the name of a factory's floor or settings, else a section page's ?factory=, else none", () => {
   assert.equal(pickedOf('/factories/nemia', {}), 'nemia');
+  assert.equal(pickedOf('/factories/nemia/settings', {}), 'nemia', "a factory's settings pick it, as its floor does");
+  assert.equal(pickedOf('/factories/nemia/other', {}), undefined, "refused: no other page under a floor is the factory's own");
   assert.equal(pickedOf('/runs', { factory: 'hiring' }), 'hiring');
   assert.equal(pickedOf('/stats', { factory: 'hiring', period: '90d' }), 'hiring');
   assert.equal(pickedOf('/workflows', { factory: 'hiring' }), 'hiring');
@@ -104,7 +107,7 @@ test("the picked factory is read from the address alone: a floor's name, else a 
   assert.equal(pickedOf('/runs', { factory: '' }), undefined, 'an empty name picks none');
   assert.equal(pickedOf('/runs', { factory: 3 }), undefined, 'a name that is no string picks none');
   assert.equal(pickedOf('/factories/nemia', { factory: 'hiring' }), 'nemia', 'on a floor the path wins over a stray ?factory=');
-  for (const path of ['/runs/r-1', '/agents', '/inbox/card', '/', '/workflows/repo/dev/review'])
+  for (const path of ['/runs/r-1', '/agents', '/inbox/card', '/', '/workflows/repo/dev', '/workflows/repo/dev/review'])
     assert.equal(pickedOf(path, {}), undefined, `${path} picks none`);
   for (const path of ['/runs/r-1', '/agents', '/inbox/card', '/'])
     assert.equal(pickedOf(path, { factory: 'hiring' }), undefined, `refused: ${path} reads no ?factory=, which its route keeps none of`);
@@ -124,13 +127,15 @@ test("a section's link carries the picked factory, and none under All factories;
   }
 });
 
-test("a pick on a section's page stays there, keeping its other keys; on a floor it opens the picked one's, or Home; elsewhere it opens the picked one's floor, or stays", () => {
+test("a pick on a section's page stays there, keeping its other keys; on a factory's floor or settings it opens the picked one's floor, or Home; elsewhere it opens the picked one's floor, or stays", () => {
   const search = { period: '90d', agent: 'ada', factory: 'hiring' };
   assert.deepEqual(pickTo('/stats', search, 'nemia'), { to: '/stats', search: { period: '90d', agent: 'ada', factory: 'nemia' } });
   assert.deepEqual(pickTo('/stats', search, undefined), { to: '/stats', search: { period: '90d', agent: 'ada' } });
   assert.deepEqual(pickTo('/runs', {}, 'nemia'), { to: '/runs', search: { factory: 'nemia' } });
   assert.deepEqual(pickTo('/factories/nemia', {}, undefined), { to: '/' });
   assert.deepEqual(pickTo('/factories/nemia', {}, 'hiring'), { to: '/factories/$factory', params: { factory: 'hiring' } });
+  assert.deepEqual(pickTo('/factories/nemia/settings', {}, undefined), { to: '/' }, "All factories leaves a factory's settings for Home");
+  assert.deepEqual(pickTo('/factories/nemia/settings', {}, 'hiring'), { to: '/factories/$factory', params: { factory: 'hiring' } });
   assert.deepEqual(pickTo('/runs/r-1', {}, 'nemia'), { to: '/factories/$factory', params: { factory: 'nemia' } });
   assert.deepEqual(pickTo('/inbox/card', { factory: 'x' }, 'nemia'), { to: '/factories/$factory', params: { factory: 'nemia' } });
   assert.equal(pickTo('/runs/r-1', {}, undefined), null);

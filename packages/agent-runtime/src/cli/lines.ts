@@ -1,7 +1,7 @@
 /**
  * The lines `ae` prints for a person: a task, an attempt, a journal entry, a usage, and the limits a task was filed with.
  */
-import { denialText, type Attempt, type Event, type State, type TaskView, type Usage } from '../facade.ts';
+import { denialText, type Attempt, type Event, type State, type TaskView, type Usage } from '../index.ts';
 
 /** What `ae show` says of the limits a task was filed with: its spend cap and its context window, each only when it has one. */
 export const limitLines = (state: Pick<State, 'config'>): string[] => [

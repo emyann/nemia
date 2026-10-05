@@ -18,6 +18,7 @@ import {
   openSpan,
   placeRuns,
   repoName,
+  rowClockEveryMs,
   runEdges,
   runClock,
   standingOf,
@@ -1256,6 +1257,27 @@ test("a card's clock counts from when the run started — its first filing — n
     [atOnce.words, atOnce.title],
     ['6h 14m since it started', `Started ${new Date(createdAt).toLocaleString()}.`],
     'started at once, or with its filings off the feed where the api gives createdAt: no wait to speak of',
+  );
+});
+
+test("REFUSED: a row of the runs list reads its clock each second only while its run's clock counts, and each minute otherwise", () => {
+  const startedAt = '2026-09-20T12:00:00.000Z';
+  const working = run(['running'], { startedAt, atWork: { ms: 60_000, since: '2026-09-20T12:01:00.000Z', endedAt: null } });
+  assert.equal(rowClockEveryMs(working), 1_000, 'a task of it runs: its seconds move');
+  const onYou = run(['over budget $4.25 of $3'], {
+    status: 'failed',
+    startedAt,
+    waitingOnYou: ['step-0'],
+    atWork: { ms: 31_000, since: null, endedAt: '2026-09-20T12:01:00.000Z' },
+  });
+  assert.equal(rowClockEveryMs(onYou), 60_000, 'finished and waiting on you, nothing of it runs: its clock stands');
+  const unjudged = run(['running'], { startedAt });
+  assert.equal(rowClockEveryMs(unjudged), 1_000, "without the api's time at work, it counts while in flight");
+  assert.equal(rowClockEveryMs({ ...unjudged, status: 'failed' }), 60_000, 'and not once finished');
+  assert.equal(
+    rowClockEveryMs(run(['waiting'], { status: 'failed' })),
+    1_000,
+    'nothing filed and nobody called it off: it waits, counting',
   );
 });
 

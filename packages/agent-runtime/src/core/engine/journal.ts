@@ -353,13 +353,33 @@ const appendSplit = (ops: BodiedJournalOps, taskId: string, event: Event, briefP
 const noBodies = (ref: unknown) =>
   Effect.fail(new BodyRefused({ message: `This store keeps no bodies, so there is no body ${String(ref)} to remove.` }));
 
+/** What an append says of itself, on its span and its log: its `task`, its event's `kind`, and its `attempt` where the event has one. */
+export const appendFields = (taskId: string, event: Event): { task: string; kind: Event['kind']; attempt?: number } => ({
+  task: taskId,
+  kind: event.kind,
+  ...('attempt' in event ? { attempt: event.attempt } : {}),
+});
+
+/**
+ * `append`, in a span of its own, `append`, under the verb that wrote it, annotated with `appendFields`; once written, it is
+ * said at `Debug`, the event's kind, annotated the same. The runtime's journal at `Debug` is its log.
+ */
+const appendSaid = (append: JournalShape['append']) =>
+  Effect.fn('append')(function* (taskId: string, event: Event, briefParts?: readonly string[]) {
+    const fields = appendFields(taskId, event);
+    yield* Effect.annotateCurrentSpan(fields);
+    yield* append(taskId, event, briefParts);
+    yield* Effect.logDebug(event.kind).pipe(Effect.annotateLogs(fields));
+  });
+
 export class Journal extends Context.Service<Journal, JournalShape>()('engine/Journal') {
   /**
    * Any implementation becomes a Layer. This is the only way a store reaches the engine — and so where what a store gives
    * back is decoded (`event-schema.ts`): an entry no runtime wrote in a task's journal fails that task's read with a
    * `JournalError` that names it, and one in the feed is skipped, said on the read's `refused`; where a store that keeps bodies
    * has each named body put before the entry naming it, and each entry read back as the event appended (`bodies.ts`); and
-   * where an event in a former shape is read in the one the runtime reads (`upgrade`), whoever's store it is.
+   * where an event in a former shape is read in the one the runtime reads (`upgrade`), whoever's store it is; and where every
+   * append is traced and logged (`appendSaid`).
    */
   static layer = (ops: StoreOps) => {
     const bodied = ops.bodies ? ops : undefined;
@@ -368,7 +388,9 @@ export class Journal extends Context.Service<Journal, JournalShape>()('engine/Jo
       Journal.of({
         list: ops.list,
         ...(ops.subscribe ? { subscribe: ops.subscribe } : {}),
-        append: (taskId, event, briefParts) => (bodied ? appendSplit(bodied, taskId, event, briefParts) : ops.append(taskId, event)),
+        append: appendSaid((taskId, event, briefParts) =>
+          bodied ? appendSplit(bodied, taskId, event, briefParts) : ops.append(taskId, event),
+        ),
         read: (taskId) =>
           ops.read(taskId).pipe(
             Effect.flatMap((raw) => decodeEvents(taskId, raw, ops.located)),

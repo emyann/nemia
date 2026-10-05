@@ -144,6 +144,8 @@ test("GET /api/workflows lists each folder, the repository's then yours: its des
       from: 'repo',
       dir: broken,
       description: 'A reviewer with a misspelt key.',
+      /** A folder the loader refuses still has its README. */
+      readme: '# broken\n\nA reviewer with a misspelt key.\n',
       steps: [],
       graph: { roots: [], edges: [] },
       schemas: [],
@@ -157,6 +159,8 @@ test("GET /api/workflows lists each folder, the repository's then yours: its des
       from: 'repo',
       dir: good,
       description: 'Implement it, then review it, two rounds at most.',
+      /** Whole: the paragraphs past the description too. */
+      readme: '# good\n\nImplement it, then review it,\ntwo rounds at most.\n\nMore about it.\n',
       /** The README is not among the steps. */
       steps: [
         {
@@ -206,6 +210,7 @@ test("GET /api/workflows lists each folder, the repository's then yours: its des
       from: 'yours',
       dir: mine,
       description: null,
+      readme: null,
       steps: [
         {
           name: 'plan',

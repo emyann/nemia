@@ -13,7 +13,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { Effect } from 'effect';
-import { Journal, type Event } from 'agent-runtime/effect';
+import { Journal, type Event } from 'agent-runtime';
 import { briefParts } from 'agent-orchestrator/run';
 
 /** What the report says of one store. */

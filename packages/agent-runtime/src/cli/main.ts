@@ -9,7 +9,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { Effect, ManagedRuntime } from 'effect';
 import { Engine as EngineService, refusalWords, type EngineOptions, type EngineShape } from '../index.ts';
-import { refusedText, retiredKeyRefusal, type CodexArgs, type HarnessArgs, type SweepReport, type TaskSpec } from '../facade.ts';
+import { refusedText, retiredKeyRefusal, type CodexArgs, type HarnessArgs, type SweepReport, type TaskSpec } from '../index.ts';
 import { attemptLine, entryLine, limitLines, taskLine } from './lines.ts';
 
 /**

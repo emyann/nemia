@@ -25,6 +25,7 @@ import {
   tokensOf,
   toPut,
   UNSET,
+  readmeSent,
   unsaved,
   unsavedSteps,
   type DraftStep,
@@ -232,6 +233,7 @@ test("a folder written goes into the page's listing in the listing's order: the 
     from,
     dir: `/${from}/${name}`,
     description: null,
+    readme: null,
     steps: [],
     graph: { roots: [], edges: [] },
     schemas: [],
@@ -253,6 +255,15 @@ test("a folder written goes into the page's listing in the listing's order: the 
     listedWith(undefined, w('built', 'yours')).map((x) => x.name),
     ['built'],
   );
+});
+
+test("a README is sent only when the draft is not what was listed: none as it was, none blank over no README, '' over one cleared", () => {
+  const listed = { readme: '# dev\n\nImplement, then review.\n' };
+  assert.equal(readmeSent('# dev\n\nImplement, then review.\n', listed), undefined, 'unchanged: not sent');
+  assert.equal(readmeSent('# dev\n\nPlan first.\n', listed), '# dev\n\nPlan first.\n', 'changed: the text');
+  assert.equal(readmeSent('', { readme: null }), undefined, 'blank over a folder with no README: no empty README is written');
+  assert.equal(readmeSent('A first README.\n', { readme: null }), 'A first README.\n', 'written over none: the text');
+  assert.equal(readmeSent('', listed), '', 'cleared: sent blank');
 });
 
 /** `build`, whose agent `coder` gives it its harness, model and effort, with a check and a note of its own — as the listing has it. */

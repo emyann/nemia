@@ -462,9 +462,8 @@ What it leaves:
   that sandbox. A Claude reviewer with `tools: Read, Grep, Glob, Bash` has the tool for it, and the operator's own
   folders run review on Claude. But Bash can also write. And the `auto` classifier that refused `node --test`
   (plan §4b) is not a tool list, so whether it lets a tool-fenced reviewer's `npm test` through is unmeasured.
-- **The engine's lists are not exported from its root.** The vocabulary test reads them from the engine modules
-  beside the root the package resolves. One export line in `agent-runtime/src/facade.ts` would let it import
-  them by name.
+- **The engine's lists are exported by name**, done since: `agent-runtime` (`src/index.ts`) and its pure door
+  `agent-runtime/vocabulary` (`src/vocabulary.ts`) both give them.
 - **The api still carries its copies.** `apps/api/src/app.ts` has `phaseOf`, `askedOf` and `verdictOf`, and
   its test leaves a lost task out of the words it holds to `list`'s. Both go when the api swaps to these
   exports, in a follow-up.
@@ -2159,6 +2158,50 @@ Tested in `agent-runtime/test/admission.test.ts`, `test/pool.test.ts`, `src/daem
 its lease through `/api/daemon`, a second api and a `wf up` refused, SIGTERM writing `stoppedAt` and the next api taking over,
 `--no-tick` taking nothing), `apps/web/test/daemon.test.ts` and the e2e's `daemon` page (each holder stalled, and fresh). Starting the
 daemon on demand from the board stays card 4e; stopping the daemon itself, beyond `wf pause`, is a verb on this lease, still to come.
+
+## Shipped: the daemon's log and traces (Nemia platform slice 5, part 1 of 3)
+
+Nemia's loop (slice 5) wakes on what the engine and the workflow layer say. They are to say it once, through Effect, and every reader —
+the log, OpenTelemetry, `nemia watch`, the feed's stream, a subscription — reads that one emission. This part builds the log and the
+traces:
+
+- **Effect 4.0.1**, the stable release, in every package (`agent-runtime/test/effect-version.test.ts`).
+- **One telemetry layer, provided by the process** (`telemetryLayer`, `src/telemetry/telemetry.store.ts`): the line logger `nemia up`
+  printed through, and, only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set, Effect's own OTLP tracer and logger, under `OTEL_SERVICE_NAME`
+  (`nemia` by default). `nemia up` and the api's process provide it around `up`.
+- **The daemon says each pass through `Effect.log`** (`logPass`), in place of the `onPass` callback: the same lines, a summary when due and
+  a line on a change, each annotated with its `run` and `step`. The api's daemon prints them too.
+- **The runtime's spans nest under the pass**: `tick` > `pass` > `advancePass` > a filing > the runtime's `file` > `append`, the
+  orchestrator annotating the run and the step (`advancePass`, `forStep`), the runtime its task, kind and attempt (`appendFields`), and
+  its journal said at Debug.
+
+Tested in `src/telemetry/telemetry.test.ts` (no export without an endpoint, read off the context; a scratch collector posted the `tick`),
+`src/daemon/up.test.ts`, `test/up-lines.test.ts` (`nemia up` spawned, its line on stdout), `test/telemetry-nesting.test.ts`,
+`agent-runtime/src/core/engine/journal-said.test.ts` and `apps/api/test/main.test.ts` (the api's daemon exporting its `tick`).
+
+## Still to build: one emission — `emitFeed` and `FeedHub` (Nemia platform slice 5, part 2 of 3)
+
+`recordFeed` becomes the verb `emitFeed` (`src/feed/feed.verb.ts`), which in one call appends the lines to `feed.jsonl` (the record), logs
+each with its `run`, `step` and `word`, and publishes the byte range it wrote, `{ from, to, line }`, to `FeedHub`: a
+`PubSub.sliding` built with the daemon's layer, so a publish never waits on a reader and a stuck one costs at most its capacity. The file
+stays the record. A live reader, `followFeed(cursor)`, subscribes first, catches up from the file to its end, then goes live: an item at
+or before its cursor is dropped, and one past it means the hub slid, so it reads the gap from the file. `nemia watch` and the api's
+`GET /api/feed/stream` read through it in the daemon's process; a reader in another process keeps `watchFeedFile`. To prove: a blocked
+subscriber never delays `emitFeed`, and a lagging one reads every line once, in order.
+
+## Still to build: subscriptions (Nemia platform slice 5, part 3 of 3)
+
+`src/subscription/`: a pure file that sorts a line (a wake or routine news) and words a digest; a store, one file a subscription under
+`$WF_ROOT/subscriptions/`, `{ task, cursor, wake, digestEvery, digest }`, its one writer the deliverer; and a controller that runs
+`followFeed(cursor)` per subscription in a `FiberMap`, says a wake line to the task through the runtime's `say` with the digest riding it,
+says the digest after `digestEvery` (60 minutes by default) when nothing woke it, and moves the cursor only once `say` resolved.
+`nemia subscribe <name> <task> [--wake <word>]… [--digest-every <min>]` and `nemia unsubscribe <name>` in the command table. A restart
+reads each cursor again. Its first subscriber is Nemia, slice 5b.
+
+## Still to build: Nemia's loop at Manual (Nemia platform slice 5b)
+
+The system agent on the long-lived kind of session, woken by its subscription to the feed, bringing each gate and round to the person —
+the intents `nemia-the-system-agent-a-lon-kwf1` and `amend-the-nemia-intent-one-n-y2vp`.
 
 ## Shipped: freeing the space — `wf prune`
 

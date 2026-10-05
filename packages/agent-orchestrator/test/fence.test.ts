@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseAgent, parseWorkflow, WorkflowError, type Agents, type Workflow } from '../src/workflow.ts';
 import { CLAUDE_PERMISSION_MODES, fenceReach } from 'agent-runtime/vocabulary';
-import { Engine } from 'agent-runtime/effect';
+import { Engine } from 'agent-runtime';
 import { directoryFence } from '../src/workflow/fence.ts';
 import { scratch } from './scratch.ts';
 import { Effect } from 'effect';

@@ -174,6 +174,7 @@ const READERS = [
   'loadWorkflows',
   'skillsFor',
   'workflowDescription',
+  'workflowReadme',
   'workflowFolder',
   'workflowsIn',
 ];
@@ -286,11 +287,11 @@ test('REFUSED: a workspace import its package does not declare, and a source imp
   const names = ['api', 'agent-runtime', 'agent-orchestrator'];
   const bare: Manifest = { dir: 'apps/api', name: 'api', dependencies: {}, devDependencies: {} };
   const dev: Manifest = { ...bare, devDependencies: { 'agent-runtime': '*' } };
-  assert.deepEqual(undeclared('apps/api/test/x.test.ts', "import { Engine } from 'agent-runtime/effect';", bare, names), [
-    'apps/api/test/x.test.ts imports agent-runtime/effect, but apps/api/package.json does not declare agent-runtime: add it to its devDependencies',
+  assert.deepEqual(undeclared('apps/api/test/x.test.ts', "import { Engine } from 'agent-runtime';", bare, names), [
+    'apps/api/test/x.test.ts imports agent-runtime, but apps/api/package.json does not declare agent-runtime: add it to its devDependencies',
   ]);
-  assert.deepEqual(undeclared('apps/api/test/x.test.ts', "import { Engine } from 'agent-runtime/effect';", dev, names), []);
-  assert.deepEqual(undeclared('apps/api/src/x.test.ts', "import { Engine } from 'agent-runtime/effect';", dev, names), []);
+  assert.deepEqual(undeclared('apps/api/test/x.test.ts', "import { Engine } from 'agent-runtime';", dev, names), []);
+  assert.deepEqual(undeclared('apps/api/src/x.test.ts', "import { Engine } from 'agent-runtime';", dev, names), []);
   assert.deepEqual(
     undeclared('apps/api/src/x.ts', "import { claudeJob } from 'agent-runtime';", dev, names),
     ['apps/api/src/x.ts imports agent-runtime, but apps/api/package.json does not declare agent-runtime: add it to its dependencies'],
@@ -304,7 +305,7 @@ test('REFUSED: a workspace import its package does not declare, and a source imp
     "import { x } from './x.ts';",
     "import { Hono } from 'hono';",
     "import { y } from 'agent-runtimes';",
-    ' * `agent-runtime/effect` named in prose',
+    ' * `agent-runtime/vocabulary` named in prose',
   ].join('\n');
   assert.deepEqual(undeclared('apps/api/src/x.ts', fine, bare, names), []);
 });

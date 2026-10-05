@@ -11,8 +11,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import type { Engine } from '../runtime-client.ts';
-import { commandHarness } from 'agent-runtime';
-import { Engine as EngineService } from 'agent-runtime/effect';
+import { commandHarness, Engine as EngineService } from 'agent-runtime';
 import {
   CHECK_NICENESS,
   INSTALL,

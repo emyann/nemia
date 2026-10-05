@@ -11,8 +11,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { PromiseJournal, PromiseRunner } from 'agent-runtime';
-import { Engine } from 'agent-runtime/effect';
+import { asyncStore, type AsyncJournal, asyncOps, type AsyncRunner } from '../../test/promised.ts';
+import { Engine } from 'agent-runtime';
 import { scratch } from '../../test/scratch.ts';
 import { Effect } from 'effect';
 import { plainEngine } from '../../test/promised.ts';
@@ -23,15 +23,15 @@ process.env.WF_ROOT = ROOT;
 const { freshStatsMemo, statsRun } = await import('./stats.verb.ts');
 const { runWith } = await import('../runtime-client.ts');
 
-type Event = Parameters<PromiseJournal['append']>[1];
+type Event = Parameters<AsyncJournal['append']>[1];
 
 /** Every task whose journal does not read: the engine rejects its view with the `JournalError` a store's failure becomes. */
 const spoiled = new Set<string>();
 
 /** The engine's store, in memory: every append reaches the feed; a task in `spoiled` does not read. */
-const memoryJournal = (): PromiseJournal => {
+const memoryJournal = (): AsyncJournal => {
   const tasks = new Map<string, Event[]>();
-  const feed: Awaited<ReturnType<PromiseJournal['feed']>>['entries'] = [];
+  const feed: Awaited<ReturnType<AsyncJournal['feed']>>['entries'] = [];
   return {
     async append(taskId, event) {
       tasks.set(taskId, [...(tasks.get(taskId) ?? []), event]);
@@ -51,7 +51,7 @@ const memoryJournal = (): PromiseJournal => {
 };
 
 /** A harness no task here reaches: every task is journalled by hand. */
-const idle: PromiseRunner = {
+const idle: AsyncRunner = {
   async spawn() {},
   async observe() {
     return new Map();
@@ -64,7 +64,12 @@ const idle: PromiseRunner = {
 
 const journal = memoryJournal();
 const engine = plainEngine(
-  Engine.layer({ root: path.join(ROOT, 'engine'), journal, harnesses: { codex: idle, check: idle }, defaultHarness: 'codex' }),
+  Engine.layer({
+    root: path.join(ROOT, 'engine'),
+    journal: asyncStore(journal),
+    harnesses: { codex: asyncOps(idle), check: asyncOps(idle) },
+    defaultHarness: 'codex',
+  }),
 );
 /** Every task id the engine was asked to view since the last `viewedRuns`. */
 let viewed: string[] = [];

@@ -77,10 +77,10 @@ parent is the run under the id it resumed that started last before it. What is l
 worker's — a `--bg` session, or a session another tool started — records no cost and no API time, since what it printed
 cannot be told apart from what its parent spent. `claude-detached` records what it printed, as before.
 
-### 6. The Effect door's `file` refuses no harness's words
+### 6. The bare `file` refuses no harness's words
 
 **Where.** `file` in `agent-runtime/src/core/engine/filing.ts` refuses what the task says of itself; the refusals in a harness's
-words live in the `file` of an engine `Engine.layer` builds (`harnessRefusalOf` in `agent-runtime/src/facade/consumer.ts`), because that is where the
+words live in the `file` of an engine `Engine.layer` builds (`harnessRefusalOf` in `agent-runtime/src/service/harness-refusal.ts`), because that is where the
 configured harnesses, and so their words, are known.
 
 **What changed** (2026-09-22). The harness-agnostic half moved under the Effect `file`: `refusalOf` in `engine.ts`, the
@@ -105,7 +105,7 @@ That is the first half of the paragraph below, done: `RunnerOps` took the option
 words at both doors, and fails with `argsRefusalOf` taken out of both `file` and `Runner.layer`; `test/harness-args.test.ts`
 fails with it out of either (a runner built with `Runner.of` through `file`, and every runner's own `refuses`).
 
-**What is left.** Through the Effect door, still journalled: a `harness` the runner does not have — which `composite`
+**What is left.** Through the bare `file`, still journalled: a `harness` the runner does not have — which `composite`
 runs on its fallback without a word — a permission mode or an effort the harness rejects, which waits out the grace
 window and ends the attempt `lost`; a `contextTokens` outside the harness's range, or on one with no window setting;
 `claude.remoteControl`, and every other flag under `claude`, on `codex` or a `check` (Claude Code's own `-p` specs refuse
@@ -120,13 +120,13 @@ falls back today; and the refusals that name another harness — *file the task 
 the bridged harnesses listed by name — need the whole map of harness configs, which only the engine's options hold, where
 the composite sees opaque ops. A value passed to `file` instead would be opt-in: it repeats what the consumer's runner
 layer already knows, and by default refuses nothing. Either is more than a small change, so it was left; nothing in the
-workspace files through the Effect door (agent-orchestrator and the api use the Promise engine).
+workspace files through the bare `file` (`ae` and the orchestrator's client file through `Engine`).
 
-**What changed** (the engine as a service). The Effect door has the engine too: `Engine.layer(options)` holds the harness
-configs, and its `file` asks `refusalOf`, `argsRefusalOf` and `harnessRefusalOf` first, and the Promise engine is that
-layer with each verb run as a Promise (`promiseEngine`; `service/engine.ts`, `facade/engine.ts`). `test/doors.test.ts` refuses an unknown harness
-and a mode its harness rejects at both doors. What is left is the bare `file` building block, which still has only the
-runner to ask, and so the paragraph above still holds for a consumer that composes its own layers.
+**What changed** (the engine as a service). `agent-runtime` is one face, Effect, and its engine is the `Engine` service:
+`Engine.layer(options)` holds the harness configs, and its `file` asks `refusalOf`, `argsRefusalOf` and `harnessRefusalOf` first
+(`service/engine.ts`, `service/harness-refusal.ts`). `test/engine-verbs.test.ts` refuses an unknown harness and a mode its harness
+rejects; `test/verb-refusals.test.ts` holds each verb's refusal a tagged error. What is left is the bare `file` building block,
+which still has only the runner to ask, and so the paragraph above still holds for a consumer that composes its own layers.
 
 ### 8. A Codex `tools` list that names Bash, Write or Edit narrows nothing
 
@@ -329,15 +329,15 @@ transcript, and the pass journals a `measured` entry (engine `9d075f7`). What th
 **What changed** (2026-09-16). `remoteControl: true` on a task gives every attempt's `claude --bg` spawn `--remote-control`
 (`claudeOps` in `agent-runtime/src/harness/claude/bg.ts`), so the session is listed in claude.ai's agents view — measured 2026-09-16 on
 2.1.273 (agent-orchestrator `docs/features.md` §2): a `--bg` session gets a `bridgeSessionId` only with the flag. The flag takes
-an optional name, so it goes before `--permission-mode` and never before the prompt. The Promise engine's `file` refuses a value
+an optional name, so it goes before `--permission-mode` and never before the prompt. The engine's `file` refuses a value
 that is not true or false, and `true` on any `HarnessSpec` — `codex`, `claude-detached`, agent-orchestrator's `check` — naming the
-harness and the `'claude-bg'` one to file on; a `PromiseRunner` is handed it and asked nothing. `test/completion.test.ts`:
+harness and the `'claude-bg'` one to file on; a `RunnerOps` brought as its own is handed it and asked only its own `refuses`. `test/completion.test.ts`:
 the flag's place in the argv, and at `Engine.layer`'s own harnesses a fake `claude` given it on a first attempt and a
 retry, and never for a task without it; `test/engine.test.ts`: carried to every attempt, and not read by `decide`;
-`test/facade.test.ts`: every refusal, by name. Measured under the engine (Verified live, below).
+`test/engine-verbs.test.ts`: every refusal, by name. Measured under the engine (Verified live, below).
 
 **What changed again** (2026-09-25). The bridge is Claude Code's own flag, `config.claude.remoteControl`, no harness argument
-of its own: the runtime grows no named field per harness flag. `config.remoteControl` is refused at both doors at any value,
+of its own: the runtime grows no named field per harness flag. `config.remoteControl` is refused at any value,
 naming the new place (`FORMER_ARGS`), and a journal filed before reads as filed under `claude` (`upgrade`). The argv did not
 move (`packages/agent-orchestrator/test/argv.test.ts`, recorded before). In the bag it could reach a `claude -p` spec at the Effect
 door, which the named key never did, so `claudeJob` and `claudeDetached` refuse it there (`claudePrintRefuses`).
@@ -353,7 +353,7 @@ door, which the named key never did, so `claudeJob` and `claudeDetached` refuse 
   told.
 - **A session let go.** The engine stops and removes a session once its end is written (`release`); whether the agents view
   drops a released session at once was not looked at.
-- **The Effect door's bare `file` refuses no harness's words** (issue 6; `Engine`'s `file` does): it refuses a `claude.remoteControl` the bag refuses of any flag
+- **The bare `file` refuses no harness's words** (issue 6; `Engine`'s `file` does): it refuses a `claude.remoteControl` the bag refuses of any flag
   (`false`, `''`), and one on `claude-detached` (since 2026-09-25); one that reaches `codex` or a `check` through it is dropped without a word.
 - **Not a brief key.** agent-orchestrator files it for a step that says `remote: true` (features.md §2).
 - **Rests on a measurement, not a document.** The flag's help says it starts "an interactive session with Remote Control";
@@ -443,7 +443,7 @@ and a held task's signed attempt `INPUT_REQUIRED` on `getTask`. What is still di
   carry request-scoped values, a service parameter into `ServerCallContext.state`. `SubscribeToTask` waits for a consumer
   that reads a live stream, and then streams what `sessionTranscript` reads, beside it, not instead. **Asked again at stage 2
   part 5, and still none:** the `-p` job's `stream-json` lines are read by its worker, not by any A2A caller, and the board
-  follows a session by polling the api, which reads the facade's `transcript`, never the seam's Tasks. A stream would cost
+  follows a session by polling the api, which reads the engine's `transcript`, never the seam's Tasks. A stream would cost
   what CLAUDE.md's transcript rule says a read costs — for an attempt in flight, a `find` or one `claude agents` call, and
   two journal reads — on every event it forwarded, plus a listing to open it, and a subscription held for each follower.
   The owner kept it refused at the plan gate; `sendMessageStream` and `resubscribe` stay `UnsupportedOperationError`.
@@ -463,10 +463,10 @@ and a held task's signed attempt `INPUT_REQUIRED` on `getTask`. What is still di
   says `COMPLETED`, the harness's word, since the engine's `observe` reads it and `sightingOf` needs the Task's state to be
   the sighting's. One journal read per `getTask` of a finished session; the engine never calls `getTask`. A Task is still
   one attempt: a held task's turns are Tasks of their own, sharing a context.
-- **The agent finds the session's id as the facade did**, in the same order: the attempt's `nativeId` off the journal, then
+- **The agent finds the session's id as the engine's `transcript` did**, in the same order: the attempt's `nativeId` off the journal, then
   `find` for an attempt in flight (a failure counts as none), then a listing. A name with no attempt journalled yet is asked
-  of the harness, not refused: a session is listed before its `spawned` is written. The facade no longer asks the harness
-  for a task with no attempt at all, and the journal is read twice per transcript — once by the facade, for its refusals,
+  of the harness, not refused: a session is listed before its `spawned` is written. The engine no longer asks the harness
+  for a task with no attempt at all, and the journal is read twice per transcript — once by the engine, for its refusals,
   once by the agent, which holds nothing. The cost in listings is otherwise unchanged: one `claude agents` per read of an
   attempt in flight only on a harness with no `find`.
 - **No subscription is held.** `sessionTranscript` is one request and one answer; the agent keeps no cursor, no listener
@@ -476,13 +476,13 @@ and a held task's signed attempt `INPUT_REQUIRED` on `getTask`. What is still di
   `urn:agent-runtime:session:v1`, and the agent reads a message without it as words for a running session: a plain A2A
   client can speak to a session, and can start none. A message with no `taskId` is refused in words: this agent starts a
   session only on a spawn.
-- **Each `say` costs one more `observe`**: the facade lists the harness to find the session and refuse a settled one, and
+- **Each `say` costs one more `observe`**: the engine's `say` lists the harness to find the session and refuse a settled one, and
   the agent, holding nothing, lists again for the id it hands the driver and to refuse a session that has ended. Words are
   said by a person, rarely.
-- **The Effect door is direct unless it asks otherwise.** `Runner.layer`, `Runner.claude` and `Runner.test` hand the
+- **A runner an Effect program provides is direct unless it asks otherwise.** `Runner.layer`, `Runner.claude` and `Runner.test` hand the
   engine the driver as they did; `a2aRunner(ops)`, which needs the program's `Journal`, is the same seam `Engine.layer`
   takes. Its `Runner.transcript` is keyed by session id, as it always was, and goes through the seam by that id
-  (`sessionTranscript` takes a name or an id, never both); the Promise engine asks by name (`transcriptOf`).
+  (`sessionTranscript` takes a name or an id, never both); the `Engine` service asks by name (`transcriptOf`).
 - **`listTasks` lists what the harness sees, never the journal.** An attempt the harness has let go is answered by
   `getTask`, off the journal; it is in no listing. So `observe` through the seam is the map it was.
 - **A stop of a session no harness lists fails in words** (`` the `<harness>` harness lists no session `<id>`: there is
@@ -589,7 +589,7 @@ What a job gives up, or what is not done:
 ### 29. A job's stdin: words at most once, and none after its result
 
 Since thin runtime stage 2 part 2a (2026-09-23), `say` into a job appends a user message to the run's inbox
-(`runs/claude/<name>.inbox.jsonl`), which only the facade writes, and the job's worker (`bin/ae-worker.ts`) writes each whole
+(`runs/claude/<name>.inbox.jsonl`), which only the engine's `say` writes, and the job's worker (`bin/ae-worker.ts`) writes each whole
 line on to the job's stdin, looking every half second. It records how far it has written on (`inputAt`) on the run file
 before each line, and a run spawned under the name starts at the inbox's end as it was (`input.from`). At the job's first
 `result` line it writes `inputClosed` and ends the stdin, and the job exits. What that leaves:
@@ -604,7 +604,7 @@ before each line, and a run spawned under the name starts at the inbox's end as 
   500 ms, and the look stops at the result: a line appended in between is on the record as `said` and reached no model. A
   word said after the result is refused. Whether a job reads a word that reached its stdin after its last turn began and
   before its result was not measured; M6 measured one said mid-turn.
-- **A word refused after the result carries no exit code.** The job is still `working` until it exits, so the facade asks the
+- **A word refused after the result carries no exit code.** The job is still `working` until it exits, so the engine asks the
   runner, and the runner's refusal crosses the A2A seam as an error, not a refusal: `ae say` exits 1, not 2. The next tick
   settles the task, and a word said then is refused with exit 2.
 - **A second result is read over the first.** A word written on in the same look as the result may start a second turn,
@@ -638,7 +638,7 @@ What `codex exec` cannot do, said and not faked:
 - **No words while it runs.** It reads its prompt and then only its own shell. Its card says `say: false`; an A2A
   follow-up is refused `UnsupportedOperationError` naming the way on — once the session has ended, a spawn in its
   context, which `test/codex-agent.test.ts` follows to a `resume` of the same thread; spawned while it runs, a second
-  process would resume the thread beside the first, and nothing refuses that, so the words say *once* — and the facade
+  process would resume the thread beside the first, and nothing refuses that, so the words say *once* — and the engine
   refuses first in the harness's own words (`noChannel`), which `wf` and the board print unchanged.
 - **Never `INPUT_REQUIRED` mid-run.** The worker writes no `blocked`: a sandboxed command is refused and the turn goes on,
   so only a held task's signed attempt, between turns, waits on a person.
@@ -695,7 +695,7 @@ What is left:
   task's file, then the feed's line (`Journal.filesOps`): a process that dies between the two leaves an entry no running
   engine reads, where before the next pass read it. The window is two `appendFileSync` calls. Writing the feed first would
   have a restarted engine read a feed line the record lacks, which is worse. A hand edit of `tasks/*.jsonl` under a running
-  `wf up` is the same — one more reason never to make one — and so is a consumer's `PromiseJournal` whose `feed` drops an
+  `wf up` is the same — one more reason never to make one — and so is a consumer's `StoreOps` whose `feed` drops an
   append, which its doc now forbids.
 - **An engine's first pass reads the whole feed** to learn where it ends, since a store gives a cursor only by reading
   (`JournalOps.feed`): 14 MB here, about as much again as the journals. `wf up` pays it once; a one-shot `wf tick` or `ae tick`
@@ -985,7 +985,7 @@ stopped for it, and nothing more is admitted while the count is at or past the c
 ### 20. Pools are declared, and one ceiling fits every pool (moved to the orchestrator)
 
 **Where it is now** (2026-09-25). The runtime counts no pools since stage 4c part 2: `pool` is gone from `HarnessSpec` and
-`PromiseRunner`, with `CLAUDE_POOL` and `poolsOf`, and `createEngine` refuses a harness that still names one (exit 2,
+the runner a consumer brings, with `CLAUDE_POOL` and `poolsOf`, and `createEngine` refuses a harness that still names one (exit 2,
 naming the harness and where pools live now). agent-orchestrator keeps them as `POOLS` in `src/cap/cap.ts`: `claude` and
 `claude-detached` one pool, since they are one subscription; `codex` and `check` each their own; a harness no line names
 its own. Its `test/pool.test.ts` proves it at shipped defaults, with fake `claude` and `codex`.
@@ -1113,7 +1113,7 @@ A detached run's file is written with `pid: 0` before the worker is spawned, and
 group — so a stop in that window does nothing, and the next pass issues it again. The engine's stop is level-triggered, a
 `stop-requested` it reads on every tick, so the engine loses nothing. An A2A client's `cancelTask` is not: the handler
 answers `CANCELED` off the listing, which still says `working`, and nothing asks again, so a caller of the agent itself is
-told a session stopped that goes on. Nothing in the runtime calls `cancelTask` but the facade's `stop`, under the engine's
+told a session stopped that goes on. Nothing in the runtime calls `cancelTask` but the engine's `stop`, under the engine's
 re-issuing tick.
 
 **Fixed** (2026-09-23, in review of stage 3). The stop is left on disk before the pid is read: `stop` writes a marker of its own
@@ -1157,7 +1157,7 @@ harness's cancel and still left a direct caller to ask again.
 | a spawn the harness refused rejected the whole tick, stalling every task behind it | a refusal the harness vouches for ends the attempt `unstartable`; any other spawn error is journalled as spawned and left to the grace window, so a session it did start is still adopted (the first version ended every spawn error; found in review) | engine `8a52173`, `0d5c720` |
 | a detached harness launched into a missing cwd killed the process that launched it: the child's `error` event went unheard | the cwd is checked first and refused; the child's `error` is heard | engine `0d5c720` |
 | a `claude --bg` step loaded the operator's MCP servers — `~/.claude.json`, the claude.ai connectors (mail, calendar, drive) — and Claude in Chrome, beside the checkout's `.mcp.json` | `mcp` carried on the task and refused unless it is `.mcp.json` servers; every Claude Code spawn `--strict-mcp-config --no-chrome`, naming the checkout's `.mcp.json` and the task's map (the Codex half is bug 9) | engine `5340772`, `945bf46` |
-| the tests were never typechecked, and a required `PromiseJournal.watch` that nothing called hid there | `test/` in the typecheck; the dead method gone | engine `9aaa38b` |
+| the tests were never typechecked, and a required `watch` on the consumer's store that nothing called hid there | `test/` in the typecheck; the dead method gone | engine `9aaa38b` |
 | the README claimed `AE_RUNNER=sdk`, "refuse a tool call: no", 25 tests, a file table 2–3× off, and "three next things" already done (bug 5) | made true; `test/readme.test.ts` refuses each of those classes | engine `f947da4` |
 | a step that gave its closeout and was then marked `blocked` never ended: needs-a-person for ever, its run needs-human, its slot held | a closeout made during the attempt, from a session not busy, ends a `blocked` attempt as it ends a `working` one; the busy and inherited-statement rules unchanged, `decide` untouched | engine `9073c18` |
 | a relative `cwd` filed through the API failed a detached harness: its worker was launched in `repo`, then launched the harness in `repo` again, from inside it (`spawn sh ENOENT`) | `file()` refuses a `cwd` that is not absolute, naming it resolved; the detached runner resolves the one it is handed, as `claude --bg` always has | engine `7425471` |

@@ -53,7 +53,7 @@ import { engineWord, waitsForWord } from '../views/views-words.ts';
 import { within } from '../meter/tally.store.ts';
 import { checkoutHold, landEnding } from '../ending/ending.verb.ts';
 import type { PassRead } from '../cap/cap.verb.ts';
-import { fileChecks, fileReady, fileRounds, fileTries, mayFileOf, type Closer, type Filing, type PassReads } from './file.verb.ts';
+import { fileChecks, fileReady, fileRounds, fileTries, type Closer, type Filing, type PassReads } from './file.verb.ts';
 import { closeHeld, stopAsked } from './held.verb.ts';
 
 /**
@@ -302,44 +302,61 @@ export const advanceRun = Effect.fn('advance')(function* (run: Run, slot?: RunSl
  * A run that waited on runs cuts its roots, and every worktree and diff after, from its base branch as it stands on the pass that files
  * them, with their work on it, and hands each root what they concluded (`parentCloseouts`); read on that pass, and never again.
  *
+ * Its span is annotated with the run, `run`, and so is every log said within it, the runtime's included; a filing of a step adds the
+ * step, `step`, to the runtime's spans and logs under it (`forStep`).
+ *
  * @param pass What the pass reads once for every run (`PassRead`): its own listing of the store, which `run` is one of, whose claims on the
  *   repository's checkout are read (`checkoutHold`), the runs the cap holds, and the runs others wait on, which lifting a hold (`liftHold`)
  *   and admitting the run (`admit`) read through. Left out, the store is listed afresh where the run's ending asks for the checkout, and
  *   the runs this run waits on are read for this call alone.
  */
-export const advancePass = Effect.fn('advancePass')(function* (e: Engine, run: Run, slot?: RunSlot, pass?: PassRead) {
-  const { reads, askNotes } = yield* readPass(e, run);
-  const { steps, phaseOf, signedOff, asked, verdictOf, sessionBlocked, spendOf, asks, roundAsks } = reads;
-  const adopted = yield* adoptAll(e, run, reads);
-  if (run.cancelledAt) yield* stopCancelled(e, run, reads);
-  const handed = handOffAll(run, reads);
-  const landing = landEnding(run, steps, phaseOf, signedOff, asked, spendOf, verdictOf);
-  const parents = pass?.parents ?? { git: oneByOne, read: new Map() };
-  const checkout = yield* checkoutHold(e, run, steps, pass && { read: pass, slot });
-  const liftNotes = yield* liftHold(e, run, parents);
-  const assessed = assess(steps, run, phaseOf, signedOff, asked, verdictOf, asks, roundAsks, sessionBlocked, spendOf, [], checkout);
-  const closer = closerOf(e, reads.views);
-  const closeNotes = yield* closeHeldOpen(run, reads, closer);
-  const admission = yield* admit(e, run, slot, reads, assessed, parents);
-  const feed = wordFeed(run, reads, assessed, admission, checkout);
+export const advancePass = Effect.fn('advancePass')(
+  function* (e: Engine, run: Run, slot?: RunSlot, pass?: PassRead) {
+    yield* Effect.annotateCurrentSpan({ run: run.id });
+    const { reads, askNotes } = yield* readPass(e, run);
+    const { steps, phaseOf, signedOff, asked, verdictOf, sessionBlocked, spendOf, asks, roundAsks } = reads;
+    const adopted = yield* adoptAll(e, run, reads);
+    if (run.cancelledAt) yield* stopCancelled(e, run, reads);
+    const handed = handOffAll(run, reads);
+    const landing = landEnding(run, steps, phaseOf, signedOff, asked, spendOf, verdictOf);
+    const parents = pass?.parents ?? { git: oneByOne, read: new Map() };
+    const checkout = yield* checkoutHold(e, run, steps, pass && { read: pass, slot });
+    const liftNotes = yield* liftHold(e, run, parents);
+    const assessed = assess(steps, run, phaseOf, signedOff, asked, verdictOf, asks, roundAsks, sessionBlocked, spendOf, [], checkout);
+    const closer = closerOf(e, reads.views);
+    const closeNotes = yield* closeHeldOpen(run, reads, closer);
+    const admission = yield* admit(e, run, slot, reads, assessed, parents);
+    const feed = wordFeed(run, reads, assessed, admission, checkout);
 
-  const notes: string[] = [...askNotes, ...handed.collected, ...landing.notes, ...liftNotes, ...closeNotes];
-  const f: Filing = { e: { ...e, file: (spec) => e.file(inParts(spec)) }, run, reads, closer, mayFile: mayFileOf(run), notes };
-  const { tried, rechecked } = yield* fileTries(f, assessed.retry);
-  const looped = yield* fileRounds(f, assessed.round);
-  const checked = yield* fileChecks(f, [...assessed.check, ...rechecked]);
-  const filed = yield* fileReady(f, admission.ready, admission.starting);
-  const heldFirst = holdFirst(f, admission.held, assessed.ready);
-  const { tipped, tips } = keepTips(run, steps, assessed.status);
-  const wrote =
-    [filed, checked, tried, looped, adopted].some((names) => names.length > 0) ||
-    Boolean(tips || heldFirst || handed.marked || landing.landed);
-  if (wrote) runStore.runs.rewrite(run);
-  runStore.asks.consume(run, asks, roundAsks, pauseAsksVoid(steps, run, asks, phaseOf, spendOf));
+    const notes: string[] = [...askNotes, ...handed.collected, ...landing.notes, ...liftNotes, ...closeNotes];
+    const f: Filing = { e: { ...e, file: (spec) => e.file(inParts(spec)) }, run, reads, closer, mayFile: mayFileOf(run), notes };
+    const { tried, rechecked } = yield* fileTries(f, assessed.retry);
+    const looped = yield* fileRounds(f, assessed.round);
+    const checked = yield* fileChecks(f, [...assessed.check, ...rechecked]);
+    const filed = yield* fileReady(f, admission.ready, admission.starting);
+    const heldFirst = holdFirst(f, admission.held, assessed.ready);
+    const { tipped, tips } = keepTips(run, steps, assessed.status);
+    const wrote =
+      [filed, checked, tried, looped, adopted].some((names) => names.length > 0) ||
+      Boolean(tips || heldFirst || handed.marked || landing.landed);
+    if (wrote) runStore.runs.rewrite(run);
+    runStore.asks.consume(run, asks, roundAsks, pauseAsksVoid(steps, run, asks, phaseOf, spendOf));
 
-  const done = { filed, checked, tried, looped, notes, feed };
-  return answerOf(run, reads, assessed, admission, done, { acted: wrote || closer.closed.size > 0, tipped });
-});
+    const done = { filed, checked, tried, looped, notes, feed };
+    return answerOf(run, reads, assessed, admission, done, { acted: wrote || closer.closed.size > 0, tipped });
+  },
+  (advanced, _e: Engine, run: Run, _slot?: RunSlot, _pass?: PassRead) => advanced.pipe(Effect.annotateLogs({ run: run.id })),
+);
+
+/**
+ * Whether a pass may file for this run still, read off the store before each filing: not once the run is called off, forgotten, pruned
+ * or held, or the store paused, while the pass was at work. Once it has said no it says no for the rest of the pass, whatever the store
+ * reads after.
+ */
+export const mayFileOf = (run: Run): (() => boolean) => {
+  let calledOff = false;
+  return () => !(calledOff ||= !runStore.runs.exists(run.id) || runStore.runs.calledOff(run.id));
+};
 
 /** A pass's reads of a run, before it adopts or files anything: the engine's views of its tasks, the readers made of them, and its asks. */
 const readPass = Effect.fnUntraced(function* (e: Engine, run: Run) {

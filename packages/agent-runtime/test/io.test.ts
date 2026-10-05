@@ -116,7 +116,7 @@ test('io() counts the bytes of a journal a view reads, and the worker a pass sta
   }
 });
 
-test("a view reads its journal once, settled or observed: it views the fold it chose what to ask by, and a harness held in memory makes every read counted the journal's", async () => {
+test("a view on an engine that never read the task reads its journal once, settled or observed: it views the fold it chose what to ask by, and a harness held in memory makes every read counted the journal's", async () => {
   const sessions = new Map<string, { sessionId: string; state: 'working' | 'done'; busy: boolean }>();
   const inMemory = {
     spawn: async (r: { name: string }) => {
@@ -126,17 +126,24 @@ test("a view reads its journal once, settled or observed: it views the fold it c
     stop: async () => {},
     logs: async () => '',
   };
-  const engine = promiseEngine(Engine.layer({ root: scratch('ae-io-root-'), harnesses: { inMemory }, defaultHarness: 'inMemory' }));
+  const root = scratch('ae-io-root-');
+  const made = () => promiseEngine(Engine.layer({ root, harnesses: { inMemory }, defaultHarness: 'inMemory' }));
+  const engine = made();
   const id = await engine.file({ brief: 'b', cwd: scratch('ae-io-cwd-') });
   await engine.tick();
   await engine.tick();
-  const observed0 = engine.io().reads;
-  const working = await engine.view(id);
+  const cold = made();
+  const observed0 = cold.io().reads;
+  const working = await cold.view(id);
   assert.equal(working.phase, 'running (working)');
-  assert.equal(engine.io().reads - observed0, 1, 'a task in flight, observed, is one read');
+  assert.equal(cold.io().reads - observed0, 1, 'a task in flight, observed, is one read');
   for (const [name, s] of sessions) sessions.set(name, { ...s, state: 'done', busy: false });
   await engine.tick();
-  const settled0 = engine.io().reads;
-  assert.ok((await engine.view(id)).state.settled, 'the task settled');
-  assert.equal(engine.io().reads - settled0, 1, 'a settled task, read off its record, is one read');
+  const later = made();
+  const settled0 = later.io().reads;
+  assert.ok((await later.view(id)).state.settled, 'the task settled');
+  assert.equal(later.io().reads - settled0, 1, 'a settled task, read off its record, is one read');
+  const again = later.io().reads;
+  await later.view(id);
+  assert.equal(later.io().reads - again, 0, 'and once read, a journal nothing has written to since is not read again');
 });

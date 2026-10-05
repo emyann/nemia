@@ -28,6 +28,7 @@ import { ownNote } from '../ending/ending.ts';
 import { FENCE_KEYS } from '../workflow/index.ts';
 import { inputsLine, mountsLine } from '../start/index.ts';
 import { resultSteps, workChecks } from '../branches/branches.ts';
+import { costsSection, type WorkflowCosts } from '../costs/index.ts';
 
 /**
  * What a step's closeout says of `replies` (`closeoutContract`): owed on a round filed, none on a merge filed — told by the round itself,
@@ -105,6 +106,8 @@ const repliesOf = (step: Workflow, run: Run, steps: readonly Workflow[], round?:
  * @param folders The folders the step is filed with beyond its factory's, each read-only (`filedFolders` in filed.ts): the artifacts
  *   folders of the steps before it and the store's its `reads:` names, named under what was asked for (`mountsLine`). Absent, and
  *   nothing is said of them.
+ * @param costs For a step whose `reads:` names `costs`: what recent finished runs of its workflow in its factory cost (`costsRead`), read
+ *   by file.verb.ts and said among what the step is handed (`costsSection`). Absent, and nothing is said of costs.
  */
 export function composeBrief(
   step: Workflow,
@@ -119,6 +122,7 @@ export function composeBrief(
   inputsDir?: string,
   checked?: readonly CheckHanded[],
   folders?: FiledFolders,
+  costs?: WorkflowCosts,
 ): string {
   const inFolder = placeOf(run) === 'folder';
   const contracts = [
@@ -130,13 +134,11 @@ export function composeBrief(
   if (retry?.resumed || round?.resumed) return again.slice(1) + contracts;
   const given = givenSections(step, run, steps, closeoutOf, checked) + again;
   const tree = depsLines(deps);
-  const approved = approvedSection(step, run, steps);
-  const accepted = acceptedSection(step, run, steps, closeoutOf);
-  const handed = [...(parents ?? []).map((p) => handedSection(p)), ...(approved ? [approved] : []), ...(accepted ? [accepted] : [])];
+  const handed = handedOf(step, run, steps, closeoutOf, parents, costs);
 
   if (step.resume && !retry && !round)
     return (
-      briefBody(step) + approved + accepted + (tree.length ? ['', '## Where to look', '', ...tree].join('\n') : '') + given + contracts
+      briefBody(step) + handed.decided.join('') + (tree.length ? ['', '## Where to look', '', ...tree].join('\n') : '') + given + contracts
     );
 
   const earlier = step.after.length
@@ -146,7 +148,7 @@ export function composeBrief(
   const inputs = inputsLine(inputsDir, run.inputs, inFolder);
   const request = [run.brief, ...(inputs ? ['', inputs] : []), ...mountsLine(step, run, folders)];
   const opening = briefBody(step) ? [briefBody(step), ''] : [];
-  const parts = [...opening, '## What was asked for', '', ...request, ...handed];
+  const parts = [...opening, '## What was asked for', '', ...request, ...handed.parents, ...handed.decided];
 
   if (step.after.length > 1 && step.workspace !== 'main' && !inFolder) {
     return [
@@ -232,6 +234,26 @@ export function composeBrief(
   if (given) parts.push(given);
   parts.push(contracts);
   return parts.join('\n');
+}
+
+/**
+ * What a step is handed under what was asked for: what each run it waited on or was handed concluded (`parents`), then what a person
+ * approved and accepted before it and what recent runs of its workflow cost (`decided`), each section left out where it says nothing.
+ */
+function handedOf(
+  step: Workflow,
+  run: Run,
+  steps: readonly Workflow[],
+  closeoutOf: (step: string) => Closeout | undefined,
+  parents: readonly ParentCloseout[] = [],
+  costs?: WorkflowCosts,
+): { parents: string[]; decided: string[] } {
+  return {
+    parents: parents.map((p) => handedSection(p)),
+    decided: [approvedSection(step, run, steps), acceptedSection(step, run, steps, closeoutOf), costs ? costsSection(costs) : ''].filter(
+      Boolean,
+    ),
+  };
 }
 
 /** What a step filed again is told of why: its try's section (`retrySection`), its merge's (`mergeSection`) or its round's, or nothing. */

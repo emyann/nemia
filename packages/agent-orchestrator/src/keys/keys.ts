@@ -488,24 +488,30 @@ export function writableNamesOf(file: string, written: string | undefined): stri
   return names;
 }
 
-/** The store's folders a step may read by name (`reads:`), each mounted read-only: the inbox, the cards waiting to be started. */
-export const STORE_READS: readonly string[] = ['inbox'];
+/**
+ * What of the store a step may read by name (`reads:`), and never write: `inbox`, the cards waiting to be started, mounted read-only;
+ * and `costs`, what recent finished runs of its workflow in its factory cost, said in its brief.
+ */
+export const STORE_READS: readonly string[] = ['inbox', 'costs'];
+
+/** What of `STORE_READS` is a folder, filed as a read-only mount; the rest is said in the brief. */
+export const MOUNTED_READS: readonly string[] = ['inbox'];
 
 /**
- * `reads:` as the store's folders it lists, refused in `file`'s name unless each is one of `STORE_READS`, once: a folder is named, never
- * a path, so no step reads another run's folders.
+ * `reads:` as what of the store it lists, refused in `file`'s name unless each is one of `STORE_READS`, once: a name, never a path, so
+ * no step reads another run's folders.
  */
 export function readsNamesOf(file: string, written: string | undefined): string[] | undefined {
   if (written === undefined) return undefined;
   const named = `${file}: \`reads: ${written}\``;
-  const shape = `Each is a folder of the store by its name, never a path, comma-separated; the one there is: ${STORE_READS.join(', ')}.`;
+  const shape = `Each is what of the store a step may read, by its name, never a path, comma-separated: ${STORE_READS.join(', ')}.`;
   const names = written
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean);
-  if (!names.length) refuse(`${named} names no folder. ${shape}`);
+  if (!names.length) refuse(`${named} names nothing. ${shape}`);
   const odd = names.find((n) => !STORE_READS.includes(n));
-  if (odd) refuse(`${named} has \`${odd}\`, which names no folder of the store a step may read. ${shape}`);
+  if (odd) refuse(`${named} has \`${odd}\`, which names nothing of the store a step may read. ${shape}`);
   const twice = names.find((n, i) => names.indexOf(n) !== i);
   if (twice) refuse(`${named} names \`${twice}\` twice. Name it once.`);
   return names;

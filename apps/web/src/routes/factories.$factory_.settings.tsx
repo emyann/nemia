@@ -7,14 +7,15 @@ import { factoriesQuery, factoryInstructionQuery } from '@/lib/api';
 
 /**
  * A factory's settings, at /factories/$factory/settings: `$factory_` draws it on its own, not inside the floor, which has no outlet for it.
- * It waits for the factories and prefetches the instruction, which says why it does not read in its own section.
+ * It waits for the factories, then prefetches the instruction of a factory a person made, which says why it does not read in its own
+ * section; the default factory and a name no factory has ask for none.
  */
 export const Route = createFileRoute('/factories/$factory_/settings')({
-  loader: ({ context, params }) =>
-    Promise.all([
-      context.queryClient.ensureQueryData(factoriesQuery),
-      context.queryClient.prefetchQuery(factoryInstructionQuery(params.factory)),
-    ]),
+  loader: async ({ context, params }) => {
+    const factories = await context.queryClient.ensureQueryData(factoriesQuery);
+    if (factories.some((f) => f.name === params.factory && !f.default))
+      await context.queryClient.prefetchQuery(factoryInstructionQuery(params.factory));
+  },
   component: SettingsPage,
   errorComponent: ({ error }) => (
     <p className="p-4 text-sm text-red-600">Could not load the factories: {error instanceof Error ? error.message : String(error)}</p>

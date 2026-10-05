@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { photograph, themeOf } from '../board.ts';
+import { photograph, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS } from '../checks.ts';
 import { FACTORIES, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -36,12 +36,16 @@ async function expectKept(section: Locator, kept: 'store' | 'folder', file: stri
   if (shown !== file) throw new Refused(`${assertion}: the file it names is ${file} — it names ${JSON.stringify(shown)}`);
 }
 
-/** The floor's Settings leads to the factory's settings page, which reads the instruction from `NEMIA.md`, no file there yet. */
+/**
+ * The floor's Settings leads to the factory's settings page, whose sidebar still picks the factory, and which reads the instruction from
+ * `NEMIA.md`, no file there yet.
+ */
 async function followSettings(page: Page, section: Locator, checkout: string): Promise<void> {
   await page.locator('[data-factory-settings-link]').click();
   await page.waitForURL((url) => url.pathname === `/factories/${FACTORY}/settings`, { timeout: WAIT_MS });
   await idle(page);
   await expectVisible(page.getByRole('heading', { level: 1, name: FACTORY }), "the page is headed with the factory's name");
+  await sidebar(page);
   await expectKept(
     section,
     'folder',

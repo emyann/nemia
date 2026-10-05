@@ -47,7 +47,7 @@ v4 is not v3: read the page, not your memory.
 
 ## Effect 3 names this version does not have
 
-Measured on `4.0.0-rc.116`. `tsc` catches each, but writing from memory costs a round per name.
+Measured on `4.0.1`. `tsc` catches each, but writing from memory costs a round per name.
 
 | Effect 3 | Effect 4 |
 | --- | --- |
@@ -97,8 +97,8 @@ version, and the version above must be the pin. An upgrade re-measures the table
   `Data.TaggedError` imported from `effect/Data`, never from `effect`, and carries `exitCode: 2` as every refusal here does
   (the root `CLAUDE.md`, *Errors say what to do next*): `Missing`, `Conflict` and `Invalid` in
   `packages/agent-orchestrator/src/refusal/refusal.ts`, thrown as `new Invalid({ message })`, and exported to the api by
-  `agent-orchestrator`. `effect/Data` loads 14 modules; the
-  barrel loads 203, about 100 ms, on every consumer of `agent-orchestrator/run` and `agent-orchestrator/workflow`, whose modules
+  `agent-orchestrator`. `effect/Data` loads 15 modules; the
+  barrel loads 216, about 130 ms, on every consumer of `agent-orchestrator/run` and `agent-orchestrator/workflow`, whose modules
   `packages/agent-orchestrator/test/refusal.test.ts` pins.
 
 ## Resources and the process
